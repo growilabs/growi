@@ -196,6 +196,23 @@ describe('createOffScreenIndicator', () => {
   });
 });
 
+describe('createOffScreenIndicator — hover tooltip', () => {
+  it('renders a tooltip with the user name and cursor color', () => {
+    const el = createOffScreenIndicator({
+      direction: 'above',
+      clientId: 1,
+      color: '#ff0000',
+      name: 'Alice',
+      imageUrlCached: '/avatar.png',
+      isActive: false,
+    });
+
+    const tooltip = el.querySelector('.cm-offScreenTooltip') as HTMLElement;
+    expect(tooltip.textContent).toBe('Alice');
+    expect(tooltip.style.backgroundColor).toBe('#ff0000');
+  });
+});
+
 /**
  * Task 20.1 — Click behavior tests for off-screen indicators
  * Requirements: 6.6, 6.7

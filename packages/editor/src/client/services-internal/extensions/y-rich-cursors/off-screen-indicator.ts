@@ -86,15 +86,23 @@ export function createOffScreenIndicator(
     avatarEl = initials;
   }
 
+  const tooltip = document.createElement('span');
+  tooltip.className = 'cm-offScreenTooltip';
+  tooltip.style.backgroundColor = color;
+  tooltip.textContent = name;
+
   // "above": arrow points up (toward the off-screen cursor), avatar below
   // "below": avatar above, arrow points down (toward the off-screen cursor)
   if (direction === 'above') {
     indicator.appendChild(arrow);
     indicator.appendChild(avatarEl);
+    tooltip.style.bottom = '0';
   } else {
     indicator.appendChild(avatarEl);
     indicator.appendChild(arrow);
+    tooltip.style.top = '0';
   }
+  indicator.appendChild(tooltip);
 
   return indicator;
 }

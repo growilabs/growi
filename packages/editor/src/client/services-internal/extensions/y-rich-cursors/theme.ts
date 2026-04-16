@@ -127,6 +127,9 @@ export const richCursorsTheme = EditorView.baseTheme({
   // bounding box. clip-path trims both top and bottom simultaneously so the
   // visible triangle is flush with both the avatar AND the editor edge.
   // Negative margins compensate the clip so the flex layout stays correct.
+  // Arrow — always fully opaque; negative margins trim the ~20% internal
+  // whitespace of Material Symbols so the triangle sits flush with the avatar
+  // and the editor edge.
   '.cm-offScreenArrow': {
     fontFamily: 'var(--grw-font-family-material-symbols-outlined)',
     fontSize: '20px',
@@ -134,18 +137,6 @@ export const richCursorsTheme = EditorView.baseTheme({
     display: 'block',
     userSelect: 'none',
     opacity: '1',
-  },
-  // "above" indicator: arrow (first child) → avatar (second child)
-  //   top clip  = trim the whitespace at the editor edge
-  //   bottom clip = trim the gap between arrow and avatar
-  '.cm-offScreenArrow:first-child': {
-    marginTop: '-8px',
-    marginBottom: '-8px',
-  },
-  // "below" indicator: avatar (first child) → arrow (last child)
-  //   top clip  = trim the gap between avatar and arrow
-  //   bottom clip = trim the whitespace at the editor edge
-  '.cm-offScreenArrow:last-child': {
     marginTop: '-8px',
     marginBottom: '-8px',
   },
@@ -181,4 +172,23 @@ export const richCursorsTheme = EditorView.baseTheme({
     {
       opacity: '1',
     },
+
+  // Name tooltip — appears to the right of the avatar on hover.
+  // top/bottom set inline in JS to align with the avatar per direction.
+  '.cm-offScreenTooltip': {
+    display: 'none',
+    position: 'absolute',
+    left: '100%',
+    marginLeft: '2px',
+    whiteSpace: 'nowrap',
+    padding: '0 6px',
+    borderRadius: '3px',
+    color: 'white',
+    fontSize: '12px',
+    height: AVATAR_SIZE,
+    lineHeight: AVATAR_SIZE,
+  },
+  '.cm-offScreenIndicator:hover .cm-offScreenTooltip': {
+    display: 'block',
+  },
 });
