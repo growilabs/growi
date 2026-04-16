@@ -33,7 +33,7 @@ export const createMongoDBPersistence = (
   const persistence: YWebsocketPersistence = {
     provider: mdb,
     bindState: async (docName: string, ydoc: WSSharedDoc) => {
-      logger.debug('bindState', { docName });
+      logger.debug({ docName }, 'bindState');
 
       const persistedYdoc = await mdb.getYDoc(docName);
 
@@ -93,7 +93,7 @@ export const createMongoDBPersistence = (
       });
     },
     writeState: async (docName: string) => {
-      logger.debug('writeState', { docName });
+      logger.debug({ docName }, 'writeState');
       // flush document on close to have the smallest possible database
       await mdb.flushDocument(docName);
     },

@@ -27,12 +27,16 @@ export const useSetupAdminSocket = (): void => {
       .then(({ default: io }) => {
         if (cancelled) return;
         const newSocket = io('/admin', { transports: ['websocket'] });
-        newSocket.on('connect_error', (error) => logger.error('/admin', error));
-        newSocket.on('error', (error) => logger.error('/admin', error));
+        newSocket.on('connect_error', (error) =>
+          logger.error({ err: error }, '/admin'),
+        );
+        newSocket.on('error', (error) =>
+          logger.error({ err: error }, '/admin'),
+        );
         setSocket(newSocket);
       })
       .catch((error) =>
-        logger.error('Failed to initialize admin WebSocket:', error),
+        logger.error({ err: error }, 'Failed to initialize admin WebSocket'),
       );
 
     return () => {

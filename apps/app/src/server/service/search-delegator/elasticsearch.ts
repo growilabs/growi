@@ -213,6 +213,11 @@ class ElasticsearchDelegator
   async init(): Promise<void> {
     await this.initClient();
     const normalizeIndices = await this.normalizeIndices();
+    try {
+      await this.normalizeAuditlogIndices();
+    } catch (err) {
+      logger.error('Failed to normalize auditlog indices', err);
+    }
     if (this.isElasticsearchReindexOnBoot) {
       try {
         await this.rebuildIndex();
@@ -405,7 +410,6 @@ class ElasticsearchDelegator
         index: indexName,
       });
     }
-    await this.normalizeAuditlogIndices();
   }
 
   async normalizeAuditlogIndices(): Promise<void> {
@@ -430,12 +434,6 @@ class ElasticsearchDelegator
     });
     if (!isExistsAuditlogIndex) {
       await this.createAuditlogIndex(indexName);
-    }
-
-    // sync documents
-    const auditlogCount = await mongoose.model('Activity').countDocuments();
-    const esCount = (await client.count({ index: indexName })).count;
-    if (!isExistsAuditlogIndex || auditlogCount !== esCount) {
       await this.addAllAuditlogs();
     }
 
@@ -451,18 +449,56 @@ class ElasticsearchDelegator
 
   async addAllAuditlogs(): Promise<void> {
     const Activity = mongoose.model('Activity');
-    const activities = await Activity.find();
+    const bulkWrite = this.client.bulk.bind(this.client);
+    const auditlogIndexName = this.auditlogIndexName;
 
-    const body = activities.flatMap((activity) => {
-      const username = activity.snapshot?.username;
-      if (username == null || username === '') return [];
-      return [
-        { index: { _index: this.auditlogIndexName, _id: activity._id } },
-        { username },
-      ];
+    const bulkSize: number = configManager.getConfig(
+      'app:elasticsearchReindexBulkSize',
+    );
+
+    const readStream = Activity.find().cursor();
+    const batchStream = createBatchStream(bulkSize);
+
+    const writeStream = new Writable({
+      objectMode: true,
+      async write(batch, encoding, callback) {
+        const body = batch.flatMap((activity) => {
+          const username = activity.snapshot?.username;
+          if (username == null || username === '') return [];
+          return [
+            { index: { _index: auditlogIndexName, _id: activity._id } },
+            { username },
+          ];
+        });
+
+        if (body.length === 0) {
+          callback();
+          return;
+        }
+
+        try {
+          const bulkResponse = await bulkWrite({ body });
+
+          if (bulkResponse.errors) {
+            logger.error('addAllAuditlogs bulk indexing had errors');
+          }
+
+          logger.info(
+            `addAllAuditlogs progressing: (count=${bulkResponse.items?.length ?? 0}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`,
+          );
+        } catch (err) {
+          logger.error('addAllAuditlogs error on bulk write: ', err);
+        }
+
+        callback();
+      },
+      final(callback) {
+        logger.info('addAllAuditlogs has completed.');
+        callback();
+      },
     });
 
-    await this.client.bulk({ body });
+    await pipeline(readStream, batchStream, writeStream);
   }
 
   async createIndex(index: string) {
@@ -497,6 +533,7 @@ class ElasticsearchDelegator
       });
     }
   }
+
   async createAuditlogIndex(index: string) {
     if (isES7ClientDelegator(this.client)) {
       const { mappings } = await import('./mappings/mappings-auditlog-es7');
@@ -728,7 +765,7 @@ class ElasticsearchDelegator
       this.prepareBodyForDelete(body, page);
     });
 
-    logger.debug('deletePages(): Sending Request to ES', body);
+    logger.debug({ body }, 'deletePages(): Sending Request to ES');
     return this.client.bulk({
       body,
     });
@@ -746,7 +783,7 @@ class ElasticsearchDelegator
   ): Promise<ISearchResult<ISearchResultData>> {
     // for debug
     if (process.env.NODE_ENV === 'development') {
-      logger.debug('query: ', JSON.stringify(query, null, 2));
+      logger.debug({ query }, 'query');
 
       const validateQueryResponse = await (async () => {
         if (isES7ClientDelegator(this.client)) {
@@ -782,7 +819,7 @@ class ElasticsearchDelegator
       })();
 
       // for debug
-      logger.debug('ES result: ', validateQueryResponse);
+      logger.debug({ validateQueryResponse }, 'ES result');
     }
 
     const searchResponse = await (async () => {
@@ -1116,7 +1153,7 @@ class ElasticsearchDelegator
     const count = (await User.count({})) || 1;
 
     const minScore = queryString.length * 0.1 - 1; // increase with length
-    logger.debug('min_score: ', minScore);
+    logger.debug({ minScore }, 'min_score');
 
     query.body.query = {
       function_score: {

@@ -39,7 +39,7 @@ export function createSESClient(
 
   const client = nodemailer.createTransport(ses(option));
 
-  logger.debug('mailer set up for SES', client);
+  logger.debug('mailer set up for SES');
 
   return client;
 }
