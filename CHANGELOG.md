@@ -1,8 +1,40 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.5.0...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.5.1...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.5.1](https://github.com/growilabs/compare/v7.5.0...v7.5.1) - 2026-04-16
+
+### 💎 Features
+
+* feat(editor): Add full Emacs markdown-mode keybindings (#10980) @yuki-takei
+* feat(ui): Add Other Shortcuts link to modal footer (#10976) @tomoyuki-t-weseek
+* feat(editor): Collaborative editor awareness with rich cursors and off-screen indicators (#10981) @yuki-takei
+* feat: Define actions that result in Create vs Edit activities (#10818) @arvid-e
+* feat(editor): Add full Emacs markdown-mode keybindings (#10980) @yuki-takei
+
+### 🚀 Improvement
+
+* feat(editor): Collaborative editor awareness with rich cursors and off-screen indicators (#10981) @yuki-takei
+* feat: add dedicated share link page API and simplify GET /page (#11000) @miya
+
+### 🐛 Bug Fixes
+
+* fix: Initial page fails to generate automatically upon a new installation (#11007) @miya
+* fix(security): upgrade axios to ^1.15.0 (CVSS 10.0) (#11009) @yuki-takei
+* fix(security): Path traversal (#10998) @mariko-h
+* fix: Initial page fails to generate automatically upon a new installation (#11007) @miya
+* fix: Unify documentation URL locale logic (#10999) @tomoyuki-t-weseek
+* fix(admin): Prevent flickering for V5 Page Migration section on app settings page (#10992) @yuki-takei
+* fix(security): Path traversal (#10998) @mariko-h
+* fix(mail): TypeError when sending test email via SMTP (#10991) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Upgrade Claude Code Spec-Driven Development (SDD) to v3 (#11014) @yuki-takei
+* support: Add contributor (#10985) @satof3
+* support: Migrate logger to pino (#10958) @yuki-takei
 
 ## [v7.5.0](https://github.com/growilabs/compare/v7.4.7...v7.5.0) - 2026-04-07
 
