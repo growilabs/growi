@@ -2,14 +2,9 @@ import type { Extension } from '@codemirror/state';
 import { ViewPlugin } from '@codemirror/view';
 import type { WebsocketProvider } from 'y-websocket';
 
+import { richCursorsTheme } from './dom';
 import type { ScrollCallbackRef } from './plugin';
 import { YRichCursorsPluginValue } from './plugin';
-import { richCursorsTheme } from './theme';
-
-export type { OffScreenIndicatorOptions } from './off-screen-indicator';
-export { createOffScreenIndicator } from './off-screen-indicator';
-export type { ScrollCallbackRef } from './plugin';
-export { RichCaretWidget } from './widget';
 
 type Awareness = WebsocketProvider['awareness'];
 
