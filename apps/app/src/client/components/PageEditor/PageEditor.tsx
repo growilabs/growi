@@ -57,6 +57,7 @@ import {
   useWaitingSaveProcessingActions,
 } from '~/states/ui/editor';
 import { useSetEditingClients } from '~/states/ui/editor/editing-clients';
+import { useSetScrollToRemoteCursor } from '~/states/ui/editor/scroll-to-remote-cursor';
 import { useEditorSettings } from '~/stores/editor';
 import { useSWRxCurrentGrantData } from '~/stores/page';
 import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
@@ -128,6 +129,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   );
   const user = useCurrentUser();
   const setEditingClients = useSetEditingClients();
+  const setScrollToRemoteCursor = useSetScrollToRemoteCursor();
   const onConflict = useConflictResolver();
   const reservedNextCaretLine = useReservedNextCaretLineValue();
   const setReservedNextCaretLine = useSetReservedNextCaretLine();
@@ -474,6 +476,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
           pageId={pageId ?? undefined}
           editorSettings={editorSettings}
           onEditorsUpdated={setEditingClients}
+          onScrollToRemoteCursorReady={setScrollToRemoteCursor}
           cmProps={cmProps}
         />
       </div>
