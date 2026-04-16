@@ -4,7 +4,7 @@ import { useTranslation } from 'next-i18next';
 
 import unreadDotStyles from '~/client/components/InAppNotification/UnreadDot.module.scss';
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { getLocale } from '~/server/util/locale-utils';
+import { getLocale } from '~/utils/locale-utils';
 
 import type { INewsItemWithReadStatus } from '../../interfaces/news-item';
 

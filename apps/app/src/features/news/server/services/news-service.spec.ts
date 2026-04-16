@@ -191,30 +191,27 @@ describe('NewsService', () => {
   describe('getUnreadCount', () => {
     test('should return the number of unread items', async () => {
       const id1 = new mongoose.Types.ObjectId();
-      const id2 = new mongoose.Types.ObjectId();
-      const id3 = new mongoose.Types.ObjectId();
 
-      mocks.newsItemFind.mockReturnValue({
-        lean: vi
-          .fn()
-          .mockResolvedValue([{ _id: id1 }, { _id: id2 }, { _id: id3 }]),
-      });
       mocks.newsReadStatusDistinct.mockResolvedValue([id1]);
+      mocks.newsItemCountDocuments.mockResolvedValue(2);
 
       const userId = new mongoose.Types.ObjectId();
       const count = await service.getUnreadCount(userId, ['general']);
-      // 3 total - 1 read = 2 unread
       expect(count).toBe(2);
+
+      expect(mocks.newsItemCountDocuments).toHaveBeenCalledWith(
+        expect.objectContaining({
+          _id: { $nin: [id1] },
+        }),
+      );
     });
 
     test('should return 0 when all items are read', async () => {
       const id1 = new mongoose.Types.ObjectId();
       const id2 = new mongoose.Types.ObjectId();
 
-      mocks.newsItemFind.mockReturnValue({
-        lean: vi.fn().mockResolvedValue([{ _id: id1 }, { _id: id2 }]),
-      });
       mocks.newsReadStatusDistinct.mockResolvedValue([id1, id2]);
+      mocks.newsItemCountDocuments.mockResolvedValue(0);
 
       const userId = new mongoose.Types.ObjectId();
       const count = await service.getUnreadCount(userId, ['general']);

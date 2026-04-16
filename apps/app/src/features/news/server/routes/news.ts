@@ -110,7 +110,7 @@ export const createNewsRouter = (crowi?: {
    */
   router.post(
     '/mark-read',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -145,7 +145,7 @@ export const createNewsRouter = (crowi?: {
    */
   router.post(
     '/mark-all-read',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,

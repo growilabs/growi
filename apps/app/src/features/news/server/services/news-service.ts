@@ -87,14 +87,12 @@ export class NewsService {
   ): Promise<number> {
     const roleFilter = buildRoleFilter(userRoles);
 
-    const [allItems, readItemIds] = await Promise.all([
-      NewsItem.find(roleFilter).lean(),
-      NewsReadStatus.distinct('newsItemId', { userId }),
-    ]);
+    const readItemIds = await NewsReadStatus.distinct('newsItemId', { userId });
 
-    const readIdSet = new Set(readItemIds.map((id) => id.toString()));
-    return allItems.filter((item) => !readIdSet.has(item._id.toString()))
-      .length;
+    return NewsItem.countDocuments({
+      ...roleFilter,
+      _id: { $nin: readItemIds },
+    });
   }
 
   /**
