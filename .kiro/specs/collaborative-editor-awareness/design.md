@@ -84,6 +84,22 @@ graph TB
 - Off-screen indicators are managed within the same `yRichCursors` ViewPlugin — it compares each remote cursor's absolute position against `view.visibleRanges` (the actually visible content range, excluding CodeMirror's pre-render buffer) to decide between widget decoration (in-view) and DOM overlay (off-screen)
 - **`scrollCallbackRef`** is a `{ current: ((clientId: number) => void) | null }` mutable object created once alongside the `yRichCursors` extension. Because the scroll function is created in a separate `useEffect` from the extension instantiation, passing it as a plain value would require recreating the extension on every update. The mutable ref allows `yRichCursors` to hold a stable reference to the container while the hook silently updates `.current` when the scroll function is registered or cleared.
 
+**Dual-path scroll delivery — why both `scrollCallbackRef` and `onScrollToRemoteCursorReady` coexist**:
+
+The scroll-to-remote-cursor function has two independent consumers that live in fundamentally different runtime contexts:
+
+| Consumer | Context | Why this delivery mechanism |
+|----------|---------|----------------------------|
+| Off-screen indicator (DOM click) | CodeMirror `ViewPlugin` — vanilla JS, not a React component | Cannot call React hooks (`useAtomValue`) to read a Jotai atom. Needs a plain mutable ref whose `.current` is read at click time. |
+| `EditingUserList` avatar click | React component in `apps/app` | Needs a React-compatible state update (Jotai atom) so that `EditorNavbar` re-renders when the scroll function becomes available. A mutable ref change does not trigger re-render. |
+
+Consolidating into a single mechanism is not feasible:
+- **Ref-only**: React components that read `useRef` do not re-render when `.current` changes; `EditorNavbar` would receive `null` on initial render and never update.
+- **Atom-only**: `yRichCursors` is a CodeMirror `ViewPlugin` class (not a React component) and cannot call `useAtomValue`. Importing the atom directly from `apps/app` into `packages/editor` would violate the monorepo dependency direction (lower package must not depend on higher).
+- **Event-emitter**: Considered as an alternative to the callback prop chain. A typed event emitter (e.g., `mitt`) would replace the two callback props (`onEditorsUpdated`, `onScrollToRemoteCursorReady`) with a single event bus prop. However, with only two events, the abstraction cost outweighs the benefit: event emitters introduce implicit coupling (string-keyed subscriptions are harder to trace and not caught by the compiler if one side is renamed), require manual subscribe/unsubscribe lifecycle management (risk of stale handler leaks), and add an external dependency — all for marginal reduction in prop drilling (2 → 1).
+
+The `onScrollToRemoteCursorReady` callback follows the same pattern as the existing `onEditorsUpdated` callback, which also bridges `packages/editor` → `apps/app` across the package boundary via props.
+
 ### Technology Stack
 
 | Layer | Choice / Version | Role in Feature | Notes |
@@ -527,9 +543,22 @@ const scrollToRemoteCursorAtom = atom<((clientId: number) => void) | null>(null)
 export const useScrollToRemoteCursor = (): ((clientId: number) => void) | null =>
   useAtomValue(scrollToRemoteCursorAtom);
 
-/** Register or clear the scroll callback */
-export const useSetScrollToRemoteCursor = () =>
-  useSetAtom(scrollToRemoteCursorAtom);
+/** Register or clear the scroll callback.
+ *  Wraps the raw setAtom call to prevent Jotai from treating a function
+ *  value as an updater.  Jotai's `setAtom(fn)` signature interprets `fn`
+ *  as `(prev) => next`; passing `setAtom(() => fn)` forces it to store
+ *  the function value itself instead of invoking it. */
+export const useSetScrollToRemoteCursor = (): ((
+  fn: ((clientId: number) => void) | null,
+) => void) => {
+  const setAtom = useSetAtom(scrollToRemoteCursorAtom);
+  return useCallback(
+    (fn: ((clientId: number) => void) | null) => {
+      setAtom(() => fn);
+    },
+    [setAtom],
+  );
+};
 ```
 
 **Lifecycle**: set when `useCollaborativeEditorMode`'s extension effect runs, cleared on effect cleanup.
