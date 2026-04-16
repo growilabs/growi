@@ -61,19 +61,23 @@ export const createScrollToRemoteCursorFn = (
     const view = getView();
     if (view == null) return;
 
-    // Enable smooth scroll for this navigation, then restore
     const { scrollDOM } = view;
     const prevBehavior = scrollDOM.style.scrollBehavior;
     scrollDOM.style.scrollBehavior = 'smooth';
 
+    // First scroll — uses estimated heights for distant lines, so may land
+    // at an approximate position.
     view.dispatch({
       effects: EditorView.scrollIntoView(pos.index, { y: 'center' }),
     });
 
+    // Second scroll — after the view stabilizes, measured heights are
+    // available and the scroll lands at the correct position.
     setTimeout(() => {
       scrollDOM.style.scrollBehavior = prevBehavior;
-      // Re-run off-screen classification after scroll animation completes
-      view.dispatch({});
+      view.dispatch({
+        effects: EditorView.scrollIntoView(pos.index, { y: 'center' }),
+      });
     }, 500);
   };
 };
