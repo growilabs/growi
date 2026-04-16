@@ -53,7 +53,7 @@ graph TB
 
 **Architecture Integration**:
 - メンション通知は既存の `ACTION_COMMENT_CREATE` フローとは**独立した** `insertMentionNotifications` パスで処理し、7日間重複排除を回避する
-- 既存の `getAdditionalTargetUsers` フローは変更しない
+- 既存の `getAdditionalTargetUsers` でメンション対象ユーザーを `upsertByActivity` フローに乗せている部分を**削除する**。削除しない場合、ページ購読者かつメンション対象のユーザーに同一コメントで2件の通知が届く（二重通知）
 
 ### Technology Stack
 
@@ -107,7 +107,10 @@ sequenceDiagram
 ### `SupportedAction` / `EssentialActionGroup`（修正）
 
 - `interfaces/activity.ts` に `ACTION_COMMENT_MENTION = 'COMMENT_MENTION'` を追加
+  - `InAppNotification.action` フィールドに格納する値として型安全のために必要
 - `EssentialActionGroup` に `ACTION_COMMENT_MENTION` を追加（`AllEssentialActions` は自動更新）
+  - `insertMentionNotifications` は `initActivityEventListeners` を経由しないため、通知生成フロー自体には影響しない
+  - `AllEssentialActions` が通知一覧の表示・フィルタリングロジックで参照される箇所があるため追加する
 
 ---
 
@@ -119,7 +122,7 @@ sequenceDiagram
 | Requirements | 1.1, 1.3 |
 
 **Responsibilities & Constraints**
-- `upsertByActivity` を**使わず**、`InAppNotification.insertMany` で直接挿入
+- `upsertByActivity` を**使わず**、`InAppNotification.insertMany({ ordered: false })` で直接挿入（1件のバリデーションエラーで残りの挿入が止まらないようにするため）
 - `actionUserId` を `mentionedUserIds` から除外する（1.3）
 - `emitSocketIo` で対象ユーザーにリアルタイム通知を送信
 - `mentionedUserIds` が空の場合は早期 return
