@@ -396,6 +396,128 @@ describe('Task 12.2 — Off-screen indicator renders for cursor in render buffer
 });
 
 // ---------------------------------------------------------------------------
+// Task 20.2 — Off-screen indicator scroll wiring via scrollCallbackRef
+// ---------------------------------------------------------------------------
+
+describe('Task 20.2 — Off-screen indicator click wires through scrollCallbackRef', () => {
+  it('invokes ref.current with the correct clientId when an off-screen indicator is clicked', () => {
+    const ydoc = new Y.Doc({ guid: 'click-wire-test' });
+    const ytext = ydoc.getText('codemirror');
+    // Insert content long enough to push a remote cursor off-screen
+    const content = 'Line\n'.repeat(200);
+    ytext.insert(0, content);
+
+    const awareness = new FakeAwareness(ydoc);
+
+    const scrollFn = vi.fn();
+    const scrollCallbackRef: { current: ((clientId: number) => void) | null } =
+      { current: scrollFn };
+
+    const state = EditorState.create({
+      doc: content,
+      extensions: [
+        yCollab(ytext, null),
+        yRichCursors(awareness as never, {
+          onClickIndicator: scrollCallbackRef,
+        }),
+      ],
+    });
+
+    const container = document.createElement('div');
+    container.style.height = '100px';
+    container.style.overflow = 'auto';
+    document.body.appendChild(container);
+
+    const view = new EditorView({ state, parent: container });
+
+    // Place remote cursor far from viewport (end of document)
+    const farIndex = content.length - 10;
+    const anchor = Y.createRelativePositionFromTypeIndex(ytext, farIndex);
+    const head = Y.createRelativePositionFromTypeIndex(ytext, farIndex);
+    const remoteClient = makeClient(77, 'FarUser');
+
+    awareness.setRemoteClientState(77, {
+      editors: remoteClient,
+      cursor: { anchor, head },
+    });
+
+    // Force update so the indicator is built
+    view.dispatch({});
+
+    // Find the off-screen indicator in the bottom container
+    const bottomContainer = view.dom.querySelector('.cm-offScreenBottom');
+    const indicator = bottomContainer?.querySelector(
+      '.cm-offScreenIndicator',
+    ) as HTMLElement | null;
+    expect(indicator).not.toBeNull();
+    if (indicator == null) throw new Error('indicator not found');
+
+    // Click the indicator
+    indicator.dispatchEvent(new Event('click'));
+
+    expect(scrollFn).toHaveBeenCalledOnce();
+    expect(scrollFn).toHaveBeenCalledWith(77);
+
+    view.destroy();
+    container.remove();
+  });
+
+  it('does not throw when ref.current is null and indicator is clicked', () => {
+    const ydoc = new Y.Doc({ guid: 'null-ref-test' });
+    const ytext = ydoc.getText('codemirror');
+    const content = 'Line\n'.repeat(200);
+    ytext.insert(0, content);
+
+    const awareness = new FakeAwareness(ydoc);
+
+    const scrollCallbackRef: { current: ((clientId: number) => void) | null } =
+      { current: null };
+
+    const state = EditorState.create({
+      doc: content,
+      extensions: [
+        yCollab(ytext, null),
+        yRichCursors(awareness as never, {
+          onClickIndicator: scrollCallbackRef,
+        }),
+      ],
+    });
+
+    const container = document.createElement('div');
+    container.style.height = '100px';
+    container.style.overflow = 'auto';
+    document.body.appendChild(container);
+
+    const view = new EditorView({ state, parent: container });
+
+    const farIndex = content.length - 10;
+    const anchor = Y.createRelativePositionFromTypeIndex(ytext, farIndex);
+    const head = Y.createRelativePositionFromTypeIndex(ytext, farIndex);
+    const remoteClient = makeClient(88, 'NullRefUser');
+
+    awareness.setRemoteClientState(88, {
+      editors: remoteClient,
+      cursor: { anchor, head },
+    });
+
+    view.dispatch({});
+
+    const bottomContainer = view.dom.querySelector('.cm-offScreenBottom');
+    const indicator = bottomContainer?.querySelector(
+      '.cm-offScreenIndicator',
+    ) as HTMLElement | null;
+
+    // Indicator must exist so the click actually fires
+    if (indicator == null) throw new Error('indicator not found');
+    // Clicking when ref.current is null must be a silent no-op (no throw)
+    indicator.dispatchEvent(new Event('click'));
+
+    view.destroy();
+    container.remove();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Task 10.2 — Activity tracking timer lifecycle
 // ---------------------------------------------------------------------------
 

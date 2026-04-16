@@ -93,20 +93,20 @@
 
 ## Phase 3: Off-Screen Indicator Click & Username Tooltip (Requirements 6.6–6.7, 7)
 
-- [ ] 17. Add click-to-scroll to off-screen cursor indicators
-- [ ] 17.1 Extend the off-screen indicator to accept and fire a click callback
+- [x] 17. Add click-to-scroll to off-screen cursor indicators
+- [x] 17.1 Extend the off-screen indicator to accept and fire a click callback
   - Add a user identifier and an optional click callback to the indicator creation options
   - Attach a click event listener on the indicator's root element that invokes the callback with the user identifier
   - Apply pointer cursor styling when a click handler is provided; omit it when not
   - _Requirements: 6.6, 6.7_
 
-- [ ] 17.2 Wire the scroll function to off-screen indicators via a mutable ref in the editor mode hook
+- [x] 17.2 Wire the scroll function to off-screen indicators via a mutable ref in the editor mode hook
   - Accept a mutable ref option in the rich cursor extension factory for the indicator click callback
   - When building off-screen indicators, pass the ref's current value as the click handler for each indicator
   - In the collaborative editor mode hook, create the mutable ref alongside the extension, write the existing scroll function to it when the provider is ready, and clear it on cleanup
   - _Requirements: 6.6_
 
-- [ ] 18. (P) Refactor the UserPicture component to eliminate the tooltip higher-order component
+- [x] 18. (P) Refactor the UserPicture component to eliminate the tooltip higher-order component
   - Remove the higher-order component that wraps the root element and tooltip in a React Fragment
   - Render the tooltip directly within the component's render body as a child of the root element, conditionally based on the noTooltip flag
   - Preserve the dynamic import for the tooltip component so that consumers who suppress tooltips never trigger the tooltip chunk load
@@ -114,31 +114,31 @@
   - The root element is always a single span, making it safe inside flex containers
   - _Requirements: 7.1, 7.3, 7.4, 7.5_
 
-- [ ] 19. Enable the native UserPicture tooltip in EditingUserList
+- [x] 19. Enable the native UserPicture tooltip in EditingUserList
   - Remove the tooltip-suppression flag from UserPicture in the avatar wrapper so the built-in tooltip renders automatically for all avatars
   - Both the first-four direct avatars and the overflow popover avatars use the same wrapper, so tooltips appear uniformly
   - _Requirements: 7.2_
   - _Depends on: Task 18_
 
-- [ ]\* 20. Test coverage for off-screen click and tooltip refactoring
-- [ ]\* 20.1 (P) Unit tests for off-screen indicator click behavior
+- [x]\* 20. Test coverage for off-screen click and tooltip refactoring
+- [x]\* 20.1 (P) Unit tests for off-screen indicator click behavior
   - Verify the indicator root has pointer cursor when a click handler is provided
   - Verify clicking the indicator calls the callback with the correct user identifier
   - Verify no click handler or pointer cursor when the callback is omitted
   - _Requirements: 6.6, 6.7_
 
-- [ ]\* 20.2 (P) Integration test for off-screen indicator scroll wiring
+- [x]\* 20.2 (P) Integration test for off-screen indicator scroll wiring
   - Verify that when the mutable ref holds a function and an off-screen indicator is clicked, the function is called with the correct user identifier
   - Verify that clicking when the ref is null does not throw
   - _Requirements: 6.6_
 
-- [ ]\* 20.3 (P) Unit tests for UserPicture tooltip refactoring
+- [x]\* 20.3 (P) Unit tests for UserPicture tooltip refactoring
   - Verify that without the tooltip-suppression flag, the component renders a single root element containing the image and a portal tooltip
   - Verify that with the tooltip-suppression flag, only the image is rendered inside the root element
   - Verify tooltip content includes the username prefix and display name
   - _Requirements: 7.1, 7.3, 7.4_
 
-- [ ]\* 20.4 Unit tests for EditingUserList tooltip integration
+- [x]\* 20.4 Unit tests for EditingUserList tooltip integration
   - Verify the avatar wrapper renders UserPicture without the tooltip-suppression flag
   - Verify tooltips are present for both direct avatars and overflow popover avatars
   - _Requirements: 7.2_

@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { EditorView, keymap } from '@codemirror/view';
 import { YJS_WEBSOCKET_BASE_PATH } from '@growi/core/dist/consts';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
@@ -90,6 +90,10 @@ export const useCollaborativeEditorMode = (
     reviewMode,
     onScrollToRemoteCursorReady,
   } = configuration ?? {};
+
+  // Stable mutable ref passed to yRichCursors so off-screen indicator clicks
+  // can invoke the scroll function without recreating the extension.
+  const scrollCallbackRef = useRef<((clientId: number) => void) | null>(null);
 
   const { primaryDoc, activeDoc } =
     useSecondaryYdocs(isEnabled, {
@@ -190,7 +194,7 @@ export const useCollaborativeEditorMode = (
     const extensions = [
       keymap.of(yUndoManagerKeymap),
       yCollab(activeText, null, { undoManager }),
-      yRichCursors(provider.awareness),
+      yRichCursors(provider.awareness, { onClickIndicator: scrollCallbackRef }),
     ];
 
     const cleanupFunctions = extensions.map((ext) =>
@@ -223,9 +227,11 @@ export const useCollaborativeEditorMode = (
       () => codeMirrorEditor.view,
     );
 
+    scrollCallbackRef.current = scrollFn;
     onScrollToRemoteCursorReady?.(scrollFn);
 
     return () => {
+      scrollCallbackRef.current = null;
       onScrollToRemoteCursorReady?.(null);
     };
   }, [

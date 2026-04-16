@@ -19,11 +19,17 @@ vi.mock('@growi/ui/dist/components', () => ({
   UserPicture: ({
     user,
     className,
+    noTooltip,
   }: {
     user: EditingClient;
     className?: string;
+    noTooltip?: boolean;
   }) => (
-    <span data-testid={`user-picture-${user.clientId}`} className={className}>
+    <span
+      data-testid={`user-picture-${user.clientId}`}
+      data-no-tooltip={noTooltip ? 'true' : undefined}
+      className={className}
+    >
       {user.name}
     </span>
   ),
@@ -199,6 +205,55 @@ describe('EditingUserList — Task 16.1', () => {
     it('renders nothing when clientList is empty', () => {
       const { container } = render(<EditingUserList clientList={[]} />);
       expect(container.firstChild).toBeNull();
+    });
+  });
+});
+
+/**
+ * Task 20.4 — EditingUserList tooltip integration
+ * Requirements: 7.2
+ */
+describe('EditingUserList — Task 20.4 (tooltip integration)', () => {
+  describe('Req 7.2 — UserPicture rendered without noTooltip so tooltip is active', () => {
+    it('does not pass noTooltip to UserPicture for direct avatars', () => {
+      render(<EditingUserList clientList={[clientAlice]} />);
+
+      const pic = screen.getByTestId('user-picture-1');
+      // data-no-tooltip attribute is only set when noTooltip=true; should be absent
+      expect(pic.getAttribute('data-no-tooltip')).toBeNull();
+    });
+
+    it('does not pass noTooltip to UserPicture for all first-4 direct avatars', () => {
+      render(
+        <EditingUserList
+          clientList={[clientAlice, clientBob, clientCarol, clientDave]}
+        />,
+      );
+
+      for (const client of [clientAlice, clientBob, clientCarol, clientDave]) {
+        const pic = screen.getByTestId(`user-picture-${client.clientId}`);
+        expect(pic.getAttribute('data-no-tooltip')).toBeNull();
+      }
+    });
+
+    it('does not pass noTooltip to UserPicture for overflow popover avatars', async () => {
+      render(
+        <EditingUserList
+          clientList={[
+            clientAlice,
+            clientBob,
+            clientCarol,
+            clientDave,
+            clientEve,
+          ]}
+        />,
+      );
+
+      // Open the overflow popover
+      await userEvent.click(screen.getByRole('button', { name: /^\+1$/ }));
+
+      const evePic = screen.getByTestId('user-picture-5');
+      expect(evePic.getAttribute('data-no-tooltip')).toBeNull();
     });
   });
 });

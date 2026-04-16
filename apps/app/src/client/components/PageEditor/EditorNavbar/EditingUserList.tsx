@@ -25,7 +25,7 @@ const AvatarWrapper: FC<{
       style={{ border: `2px solid ${client.color}` }}
       onClick={() => onUserClick?.(client.clientId)}
     >
-      <UserPicture user={client} noLink noTooltip />
+      <UserPicture user={client} noLink />
     </button>
   );
 };

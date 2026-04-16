@@ -2,10 +2,14 @@ import { toInitials } from './widget';
 
 export type OffScreenIndicatorOptions = {
   direction: 'above' | 'below';
+  /** Client ID of the remote user; passed to onClick when the indicator is clicked. */
+  clientId: number;
   color: string;
   name: string;
   imageUrlCached: string | undefined;
   isActive: boolean;
+  /** Invoked with clientId when the indicator is clicked. Omit to suppress click handling. */
+  onClick?: (clientId: number) => void;
 };
 
 /**
@@ -29,13 +33,26 @@ export type OffScreenIndicatorOptions = {
 export function createOffScreenIndicator(
   opts: OffScreenIndicatorOptions,
 ): HTMLElement {
-  const { direction, color, name, imageUrlCached, isActive } = opts;
+  const {
+    direction,
+    clientId,
+    color,
+    name,
+    imageUrlCached,
+    isActive,
+    onClick,
+  } = opts;
 
   const indicator = document.createElement('span');
   indicator.className = 'cm-offScreenIndicator';
   indicator.style.borderColor = color;
   if (isActive) {
     indicator.classList.add('cm-yRichCursorActive');
+  }
+
+  if (onClick != null) {
+    indicator.style.cursor = 'pointer';
+    indicator.addEventListener('click', () => onClick(clientId));
   }
 
   const arrow = document.createElement('span');

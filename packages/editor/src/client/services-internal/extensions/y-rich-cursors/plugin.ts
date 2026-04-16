@@ -19,11 +19,17 @@ type AwarenessState = {
   };
 };
 
+/** Mutable ref container for the scroll-to-remote-cursor function. */
+export type ScrollCallbackRef = {
+  current: ((clientId: number) => void) | null;
+};
+
 export const yRichCursorsAnnotation = Annotation.define<number[]>();
 
 export class YRichCursorsPluginValue {
   decorations: DecorationSet;
   private readonly awareness: Awareness;
+  private readonly scrollCallbackRef: ScrollCallbackRef | undefined;
   private readonly changeListener: (update: {
     added: number[];
     updated: number[];
@@ -36,8 +42,13 @@ export class YRichCursorsPluginValue {
   private readonly topContainer: HTMLElement;
   private readonly bottomContainer: HTMLElement;
 
-  constructor(view: EditorView, awareness: Awareness) {
+  constructor(
+    view: EditorView,
+    awareness: Awareness,
+    scrollCallbackRef?: ScrollCallbackRef,
+  ) {
     this.awareness = awareness;
+    this.scrollCallbackRef = scrollCallbackRef;
     this.decorations = RangeSet.of([]);
 
     // Create off-screen containers
@@ -241,15 +252,25 @@ export class YRichCursorsPluginValue {
       const headIndex = head.index;
 
       // Classify: off-screen (above/below) or in-viewport
+      // Build a click handler from the mutable ref (captured once per indicator build).
+      // Using a closure that reads ref.current at call-time so no extension recreation
+      // is needed when the scroll function changes.
+      const onClickIndicator =
+        this.scrollCallbackRef != null
+          ? (id: number) => this.scrollCallbackRef?.current?.(id)
+          : undefined;
+
       if (rangedMode) {
         if (headIndex < vpFrom) {
           aboveIndicators.push({
             el: createOffScreenIndicator({
               direction: 'above',
+              clientId,
               color: editors.color,
               name: editors.name,
               imageUrlCached: editors.imageUrlCached,
               isActive,
+              onClick: onClickIndicator,
             }),
             headIndex,
           });
@@ -259,10 +280,12 @@ export class YRichCursorsPluginValue {
           belowIndicators.push({
             el: createOffScreenIndicator({
               direction: 'below',
+              clientId,
               color: editors.color,
               name: editors.name,
               imageUrlCached: editors.imageUrlCached,
               isActive,
+              onClick: onClickIndicator,
             }),
             headIndex,
           });
@@ -283,10 +306,12 @@ export class YRichCursorsPluginValue {
           aboveIndicators.push({
             el: createOffScreenIndicator({
               direction: 'above',
+              clientId,
               color: editors.color,
               name: editors.name,
               imageUrlCached: editors.imageUrlCached,
               isActive,
+              onClick: onClickIndicator,
             }),
             headIndex,
           });
@@ -296,10 +321,12 @@ export class YRichCursorsPluginValue {
           belowIndicators.push({
             el: createOffScreenIndicator({
               direction: 'below',
+              clientId,
               color: editors.color,
               name: editors.name,
               imageUrlCached: editors.imageUrlCached,
               isActive,
+              onClick: onClickIndicator,
             }),
             headIndex,
           });
