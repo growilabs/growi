@@ -147,6 +147,90 @@ describe('News API Integration', () => {
     });
   });
 
+  describe('GET /apiv3/news/list - sort order', () => {
+    test('should return items sorted by publishedAt descending', async () => {
+      const now = new Date();
+      await NewsItem.insertMany([
+        {
+          externalId: 'oldest',
+          title: { ja_JP: 'Oldest' },
+          publishedAt: new Date('2026-01-01'),
+          fetchedAt: now,
+        },
+        {
+          externalId: 'newest',
+          title: { ja_JP: 'Newest' },
+          publishedAt: new Date('2026-03-01'),
+          fetchedAt: now,
+        },
+        {
+          externalId: 'middle',
+          title: { ja_JP: 'Middle' },
+          publishedAt: new Date('2026-02-01'),
+          fetchedAt: now,
+        },
+      ]);
+
+      const { app } = buildApp();
+      const res = await request(app).get('/apiv3/news/list');
+
+      expect(res.status).toBe(200);
+      const ids = res.body.docs.map(
+        (d: { externalId: string }) => d.externalId,
+      );
+      expect(ids).toEqual(['newest', 'middle', 'oldest']);
+    });
+  });
+
+  describe('markRead → listForUser cross-method consistency', () => {
+    test('should reflect isRead=true after mark-read', async () => {
+      const now = new Date();
+      const item = await NewsItem.create({
+        externalId: 'cross-test',
+        title: { ja_JP: 'Cross test' },
+        publishedAt: now,
+        fetchedAt: now,
+      });
+
+      const { app } = buildApp();
+
+      // Before mark-read: isRead should be false
+      const before = await request(app).get('/apiv3/news/list');
+      expect(before.body.docs[0].isRead).toBe(false);
+
+      // Mark as read
+      await request(app)
+        .post('/apiv3/news/mark-read')
+        .send({ newsItemId: item._id.toString() });
+
+      // After mark-read: isRead should be true
+      const after = await request(app).get('/apiv3/news/list');
+      expect(after.body.docs[0].isRead).toBe(true);
+    });
+
+    test('should decrease unread-count after mark-read', async () => {
+      const now = new Date();
+      const item = await NewsItem.create({
+        externalId: 'count-test',
+        title: { ja_JP: 'Count test' },
+        publishedAt: now,
+        fetchedAt: now,
+      });
+
+      const { app } = buildApp();
+
+      const before = await request(app).get('/apiv3/news/unread-count');
+      expect(before.body.count).toBe(1);
+
+      await request(app)
+        .post('/apiv3/news/mark-read')
+        .send({ newsItemId: item._id.toString() });
+
+      const after = await request(app).get('/apiv3/news/unread-count');
+      expect(after.body.count).toBe(0);
+    });
+  });
+
   describe('GET /apiv3/news/unread-count', () => {
     test('should return 0 after mark-all-read', async () => {
       const now = new Date();
@@ -171,6 +255,32 @@ describe('News API Integration', () => {
 
       expect(res.status).toBe(200);
       expect(res.body.count).toBe(0);
+    });
+
+    test('should not count admin-only items for general user', async () => {
+      const now = new Date();
+      await NewsItem.insertMany([
+        {
+          externalId: 'admin-news',
+          title: { ja_JP: 'Admin only' },
+          publishedAt: now,
+          fetchedAt: now,
+          conditions: { targetRoles: ['admin'] },
+        },
+        {
+          externalId: 'general-news',
+          title: { ja_JP: 'General' },
+          publishedAt: now,
+          fetchedAt: now,
+        },
+      ]);
+
+      const { app } = buildApp({ admin: false });
+      const res = await request(app).get('/apiv3/news/unread-count');
+
+      expect(res.status).toBe(200);
+      // Contract: general user only sees 1 unread (not the admin-only item)
+      expect(res.body.count).toBe(1);
     });
   });
 });

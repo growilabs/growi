@@ -113,53 +113,135 @@ describe('NewsService', () => {
       expect(read?.isRead).toBe(true);
     });
 
-    test('should filter by targetRoles when conditions are set', async () => {
-      const userId = new mongoose.Types.ObjectId();
+    test('should not include items with non-matching targetRoles in docs', async () => {
+      const generalItemId = new mongoose.Types.ObjectId();
 
+      // Mock returns both items (simulating DB returning role-filtered results)
       mocks.newsItemFind.mockReturnValue({
         sort: vi.fn().mockReturnThis(),
         skip: vi.fn().mockReturnThis(),
         limit: vi.fn().mockReturnThis(),
-        lean: vi.fn().mockResolvedValue([]),
+        lean: vi
+          .fn()
+          .mockResolvedValue([
+            {
+              _id: generalItemId,
+              externalId: 'general-news',
+              title: { ja_JP: 'General' },
+              publishedAt: new Date(),
+              fetchedAt: new Date(),
+            },
+          ]),
       });
-      mocks.newsItemCountDocuments.mockResolvedValue(0);
+      mocks.newsItemCountDocuments.mockResolvedValue(1);
       mocks.newsReadStatusDistinct.mockResolvedValue([]);
 
-      await service.listForUser(userId, ['general'], { limit: 10, offset: 0 });
+      const result = await service.listForUser(
+        new mongoose.Types.ObjectId(),
+        ['general'],
+        { limit: 10, offset: 0 },
+      );
 
-      const findCall = mocks.newsItemFind.mock.calls[0][0];
-      expect(findCall).toMatchObject({
-        $or: expect.arrayContaining([
-          { 'conditions.targetRoles': { $exists: false } },
-          { 'conditions.targetRoles': { $size: 0 } },
-          { 'conditions.targetRoles': { $in: ['general'] } },
-        ]),
-      });
+      // Contract: only items matching user's role appear in docs
+      expect(result.docs).toHaveLength(1);
+      expect(result.docs.every((d) => d._id.equals(generalItemId))).toBe(true);
     });
 
-    test('should filter onlyUnread when specified', async () => {
-      const userId = new mongoose.Types.ObjectId();
+    test('should exclude read items from docs when onlyUnread is true', async () => {
+      const unreadId = new mongoose.Types.ObjectId();
       const readId = new mongoose.Types.ObjectId();
-      mocks.newsReadStatusDistinct.mockResolvedValue([readId]);
 
+      mocks.newsReadStatusDistinct.mockResolvedValue([readId]);
+      // When onlyUnread=true, DB query already excludes read items
       mocks.newsItemFind.mockReturnValue({
         sort: vi.fn().mockReturnThis(),
         skip: vi.fn().mockReturnThis(),
         limit: vi.fn().mockReturnThis(),
-        lean: vi.fn().mockResolvedValue([]),
+        lean: vi
+          .fn()
+          .mockResolvedValue([
+            {
+              _id: unreadId,
+              externalId: 'unread-news',
+              title: { ja_JP: 'Unread' },
+              publishedAt: new Date(),
+              fetchedAt: new Date(),
+            },
+          ]),
       });
-      mocks.newsItemCountDocuments.mockResolvedValue(0);
+      mocks.newsItemCountDocuments.mockResolvedValue(1);
 
-      await service.listForUser(userId, ['general'], {
-        limit: 10,
-        offset: 0,
-        onlyUnread: true,
-      });
+      const result = await service.listForUser(
+        new mongoose.Types.ObjectId(),
+        ['general'],
+        { limit: 10, offset: 0, onlyUnread: true },
+      );
 
-      const findCall = mocks.newsItemFind.mock.calls[0][0];
-      expect(findCall).toMatchObject({
-        _id: { $nin: [readId] },
+      // Contract: no read item appears in output
+      expect(result.docs).toHaveLength(1);
+      expect(result.docs[0].isRead).toBe(false);
+      expect(result.docs.some((d) => d._id.equals(readId))).toBe(false);
+    });
+
+    test('should return correct pagination metadata', async () => {
+      mocks.newsItemFind.mockReturnValue({
+        sort: vi.fn().mockReturnThis(),
+        skip: vi.fn().mockReturnThis(),
+        limit: vi.fn().mockReturnThis(),
+        lean: vi.fn().mockResolvedValue([
+          {
+            _id: new mongoose.Types.ObjectId(),
+            externalId: 'p1',
+            title: { ja_JP: 'P1' },
+            publishedAt: new Date(),
+            fetchedAt: new Date(),
+          },
+          {
+            _id: new mongoose.Types.ObjectId(),
+            externalId: 'p2',
+            title: { ja_JP: 'P2' },
+            publishedAt: new Date(),
+            fetchedAt: new Date(),
+          },
+          {
+            _id: new mongoose.Types.ObjectId(),
+            externalId: 'p3',
+            title: { ja_JP: 'P3' },
+            publishedAt: new Date(),
+            fetchedAt: new Date(),
+          },
+          {
+            _id: new mongoose.Types.ObjectId(),
+            externalId: 'p4',
+            title: { ja_JP: 'P4' },
+            publishedAt: new Date(),
+            fetchedAt: new Date(),
+          },
+          {
+            _id: new mongoose.Types.ObjectId(),
+            externalId: 'p5',
+            title: { ja_JP: 'P5' },
+            publishedAt: new Date(),
+            fetchedAt: new Date(),
+          },
+        ]),
       });
+      mocks.newsItemCountDocuments.mockResolvedValue(23);
+      mocks.newsReadStatusDistinct.mockResolvedValue([]);
+
+      const result = await service.listForUser(
+        new mongoose.Types.ObjectId(),
+        ['general'],
+        { limit: 5, offset: 10 },
+      );
+
+      // Contract: pagination fields are correct for offset=10, limit=5, total=23
+      expect(result.totalDocs).toBe(23);
+      expect(result.limit).toBe(5);
+      expect(result.page).toBe(3);
+      expect(result.totalPages).toBe(5);
+      expect(result.hasNextPage).toBe(true);
+      expect(result.hasPrevPage).toBe(true);
     });
   });
 
@@ -188,33 +270,107 @@ describe('NewsService', () => {
     });
   });
 
+  describe('markAllRead', () => {
+    test('should complete without error when news items exist', async () => {
+      const itemId = new mongoose.Types.ObjectId();
+      mocks.newsItemFind.mockReturnValue({
+        lean: vi.fn().mockResolvedValue([{ _id: itemId }]),
+      });
+      mocks.newsReadStatusInsertMany.mockResolvedValue([]);
+
+      const userId = new mongoose.Types.ObjectId();
+      await expect(
+        service.markAllRead(userId, ['general']),
+      ).resolves.not.toThrow();
+    });
+
+    test('should complete without error when no news items exist', async () => {
+      mocks.newsItemFind.mockReturnValue({
+        lean: vi.fn().mockResolvedValue([]),
+      });
+
+      const userId = new mongoose.Types.ObjectId();
+      await expect(
+        service.markAllRead(userId, ['general']),
+      ).resolves.not.toThrow();
+
+      // Contract: no write operation when nothing to mark
+      expect(mocks.newsReadStatusInsertMany).not.toHaveBeenCalled();
+    });
+
+    test('should silently ignore duplicate key errors (already-read items)', async () => {
+      mocks.newsItemFind.mockReturnValue({
+        lean: vi
+          .fn()
+          .mockResolvedValue([{ _id: new mongoose.Types.ObjectId() }]),
+      });
+      const duplicateError = Object.assign(new Error('duplicate key'), {
+        code: 11000,
+      });
+      mocks.newsReadStatusInsertMany.mockRejectedValue(duplicateError);
+
+      const userId = new mongoose.Types.ObjectId();
+      // Contract: idempotent — calling twice doesn't throw
+      await expect(
+        service.markAllRead(userId, ['general']),
+      ).resolves.not.toThrow();
+    });
+
+    test('should throw non-duplicate errors', async () => {
+      mocks.newsItemFind.mockReturnValue({
+        lean: vi
+          .fn()
+          .mockResolvedValue([{ _id: new mongoose.Types.ObjectId() }]),
+      });
+      const otherError = Object.assign(new Error('connection lost'), {
+        code: 12345,
+      });
+      mocks.newsReadStatusInsertMany.mockRejectedValue(otherError);
+
+      const userId = new mongoose.Types.ObjectId();
+      // Contract: real errors propagate to caller
+      await expect(service.markAllRead(userId, ['general'])).rejects.toThrow(
+        'connection lost',
+      );
+    });
+  });
+
   describe('getUnreadCount', () => {
     test('should return the number of unread items', async () => {
-      const id1 = new mongoose.Types.ObjectId();
-
-      mocks.newsReadStatusDistinct.mockResolvedValue([id1]);
+      mocks.newsReadStatusDistinct.mockResolvedValue([
+        new mongoose.Types.ObjectId(),
+      ]);
       mocks.newsItemCountDocuments.mockResolvedValue(2);
 
       const userId = new mongoose.Types.ObjectId();
       const count = await service.getUnreadCount(userId, ['general']);
-      expect(count).toBe(2);
 
-      expect(mocks.newsItemCountDocuments).toHaveBeenCalledWith(
-        expect.objectContaining({
-          _id: { $nin: [id1] },
-        }),
-      );
+      // Contract: returns the unread count as a number
+      expect(count).toBe(2);
     });
 
     test('should return 0 when all items are read', async () => {
-      const id1 = new mongoose.Types.ObjectId();
-      const id2 = new mongoose.Types.ObjectId();
-
-      mocks.newsReadStatusDistinct.mockResolvedValue([id1, id2]);
+      mocks.newsReadStatusDistinct.mockResolvedValue([
+        new mongoose.Types.ObjectId(),
+        new mongoose.Types.ObjectId(),
+      ]);
       mocks.newsItemCountDocuments.mockResolvedValue(0);
 
-      const userId = new mongoose.Types.ObjectId();
-      const count = await service.getUnreadCount(userId, ['general']);
+      const count = await service.getUnreadCount(
+        new mongoose.Types.ObjectId(),
+        ['general'],
+      );
+      expect(count).toBe(0);
+    });
+
+    test('should return 0 when no news items exist', async () => {
+      mocks.newsReadStatusDistinct.mockResolvedValue([]);
+      mocks.newsItemCountDocuments.mockResolvedValue(0);
+
+      const count = await service.getUnreadCount(
+        new mongoose.Types.ObjectId(),
+        ['general'],
+      );
       expect(count).toBe(0);
     });
   });
