@@ -173,16 +173,16 @@ export const richCursorsTheme = EditorView.baseTheme({
       opacity: '1',
     },
 
-  // Name tooltip — appears to the right of the avatar on hover.
+  // Name tooltip — tab shape behind the avatar, matching .cm-yRichCursorInfo.
   // top/bottom set inline in JS to align with the avatar per direction.
   '.cm-offScreenTooltip': {
     display: 'none',
     position: 'absolute',
-    left: '100%',
-    marginLeft: '2px',
+    left: '0',
+    zIndex: '-1',
     whiteSpace: 'nowrap',
-    padding: '0 6px',
-    borderRadius: '3px',
+    padding: `0 6px 0 calc(${AVATAR_SIZE} + 4px)`,
+    borderRadius: `calc(${AVATAR_SIZE} / 2) 3px 3px calc(${AVATAR_SIZE} / 2)`,
     color: 'white',
     fontSize: '12px',
     height: AVATAR_SIZE,
