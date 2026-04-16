@@ -186,6 +186,29 @@
 - **Finding**: `EditorView.scrollIntoView` dispatches a CodeMirror state effect that CodeMirror resolves by scrolling `view.scrollDOM`. Setting `view.scrollDOM.style.scrollBehavior = 'smooth'` before the dispatch causes the browser to animate the scroll. Restoring the value after ~500 ms (typical animation window) avoids affecting other programmatic scrolls.
 - **Constraint**: This approach works when `view.scrollDOM` is the actual scrolling element. In GROWI's page-scroll setup, the effective scrolling element may be a parent container; if smooth scrolling does not animate as expected, the `scrollBehavior` may need to be set on the parent scroll container instead.
 
+### Phase 3 — Off-Screen Indicator Click & Username Tooltip
+
+#### scrollCallbackRef Pattern — Why Not Pass scrollFn Directly to yRichCursors
+
+- **Context**: Req 6.6 requires off-screen indicators to invoke the same `scrollFn` used by `EditingUserList`. The natural approach would be `yRichCursors(awareness, { onClickIndicator: scrollFn })`, but this fails because `yRichCursors` and `scrollFn` are created in two separate `useEffect` calls with slightly different dependency sets.
+- **Finding**: If `scrollFn` is passed as a plain value, every time the scroll function is recreated (on provider/activeDoc/codeMirrorEditor change), the extension array must also be recreated — causing a full CodeMirror extension reload. This is expensive and unnecessary.
+- **Solution**: Pass a mutable ref `scrollCallbackRef = useRef(null)` to `yRichCursors`. The plugin captures the ref object (stable reference across re-renders). The scroll-function registration effect updates `.current` silently without touching the extension.
+- **Implication**: This is the standard React pattern for exposing a stable callback to an imperative API. The `ScrollCallbackRef` type (`{ current: Fn | null }`) is defined in `packages/editor` without importing React, making it usable in the non-React CodeMirror extension context.
+
+#### UserPicture Tooltip — withTooltip HOC Elimination (Design Review Outcome)
+
+- **Context**: Req 7 requires username tooltips in `EditingUserList`. The `UserPicture` component's `withTooltip` HOC returns a React Fragment (`<span><img/></span> + <UncontrolledTooltip/>`), which caused layout instability when used inside a flex `<button>` (Phase 2 finding). The initial approach (Phase 2) was to use `noTooltip` + external `UncontrolledTooltip` at the wrapper level, but design review identified this as a workaround that would need to be repeated by every consumer facing the same Fragment/flex issue.
+- **Root cause analysis**: The `withTooltip` HOC returns a Fragment because `UncontrolledTooltip` is placed as a **sibling** of the wrapped component. While `UncontrolledTooltip` uses `ReactDOM.createPortal` (tooltip content renders to `document.body`), the Fragment still produces two React children at the parent level, which can destabilize flex layout.
+- **Key insight**: Since `UncontrolledTooltip` is a portal, it can be placed as a **child** of the root `<span>` instead of a sibling. As a portal child, it occupies no DOM space in the parent — only the `<img>` is a visible child. The root element becomes a single `<span>` with predictable layout behavior in any container type.
+- **Solution**: Eliminate the `withTooltip` HOC. Move tooltip rendering inline into `UserPicture`'s render function:
+  1. Create `rootRef = useRef<HTMLSpanElement>(null)` unconditionally (hooks rules compliant)
+  2. Pass `rootRef` to `UserPictureRootWithoutLink`/`UserPictureRootWithLink` via `forwardRef` (they already support it)
+  3. Conditionally render `UncontrolledTooltip` as a child of the root element alongside `imgElement`
+  4. Delete the `withTooltip` HOC function
+- **Impact verification**: `withTooltip` is not exported — it's only used internally in `UserPicture.tsx`. The public API (`Props`: `user, size, noLink, noTooltip, className`) is unchanged. All existing consumers (30+ usages across `apps/app`) are unaffected.
+- **`noTooltip` usages** (16 call sites): Consumers that pass `noTooltip` (sidebar dropdowns, inline notifications, comment editors, conflict modals) continue to suppress tooltips. `EditingUserList` is the only consumer that **removes** `noTooltip` to gain the tooltip.
+- **Implication**: `EditingUserList` no longer needs external tooltip code (`UncontrolledTooltip`, `id` generation, `clientId`-based targeting). The `AvatarWrapper` sub-component is simplified to just a `<button>` wrapping `<UserPicture>` with color border.
+
 ## References
 
 - y-codemirror.next v0.3.5 source: `node_modules/.pnpm/y-codemirror.next@0.3.5_.../src/`

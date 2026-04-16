@@ -2,11 +2,11 @@
 
 ## Overview
 
-**Purpose**: This feature fixes intermittent disappearance of the `EditingUserList` component and upgrades in-editor cursors to display a user's name and avatar alongside the cursor caret.
+**Purpose**: This feature fixes intermittent disappearance of the `EditingUserList` component, upgrades in-editor cursors to display a user's name and avatar, adds off-screen cursor indicators with click-to-scroll navigation, and surfaces username tooltips in `EditingUserList`.
 
-**Users**: All GROWI users who use real-time collaborative page editing. They will see stable editing-user indicators and rich, avatar-bearing cursor flags that identify co-editors by name and profile image.
+**Users**: All GROWI users who use real-time collaborative page editing. They will see stable editing-user indicators, rich avatar-bearing cursor flags, off-screen indicators they can click to jump to a co-editor's position, and username tooltips on hover in the editing user list.
 
-**Impact**: Modifies `use-collaborative-editor-mode` in `@growi/editor`, replaces the default `yRemoteSelections` cursor plugin from `y-codemirror.next` with a purpose-built `yRichCursors` ViewPlugin, and adds one new source file.
+**Impact**: Modifies `use-collaborative-editor-mode` in `@growi/editor`, replaces the default `yRemoteSelections` cursor plugin with `yRichCursors`, adds off-screen click-to-scroll via a mutable ref pattern, and enhances `EditingUserList` with color-matched borders, click-to-scroll, and username tooltips.
 
 ### Goals
 
@@ -14,11 +14,12 @@
 - Remove incorrect direct mutation of Yjs-managed `awareness.getStates()` map
 - Render remote cursors with display name and profile image avatar
 - Read user data exclusively from `state.editors` (GROWI's canonical awareness field), eliminating the current `state.user` mismatch
+- Enable click-to-scroll on both `EditingUserList` avatars and off-screen cursor indicators
+- Display username tooltips on `EditingUserList` avatar hover without reintroducing the HOC Fragment layout issue
 
 ### Non-Goals
 
 - Server-side awareness bridging (covered in `collaborative-editor` spec)
-- Changes to the `EditingUserList` React component
 - Upgrading `y-codemirror.next` or `yjs`
 - Cursor rendering for the local user's own cursor
 
@@ -40,6 +41,7 @@ graph TB
         COLLAB[use-collaborative-editor-mode]
         RICH[yRichCursors ViewPlugin]
         YCOLLAB[yCollab - null awareness]
+        SCROLLREF[scrollCallbackRef - MutableRef]
     end
 
     subgraph y_codemirror_next
@@ -62,12 +64,14 @@ graph TB
     COLLAB -->|null awareness| YCOLLAB
     YCOLLAB --> YSYNC
     YCOLLAB --> YUNDO
-    COLLAB -->|awareness| RICH
+    COLLAB -->|awareness + scrollCallbackRef| RICH
     RICH -->|reads state.editors| AWR
     RICH -->|sets state.cursor| AWR
     RICH -->|viewport comparison| RICH
+    RICH -->|indicator click| SCROLLREF
     COLLAB -->|filtered clientList| ATOM
     ATOM --> EUL
+    COLLAB -->|scrollFn written to ref| SCROLLREF
     COLLAB -->|onScrollToRemoteCursorReady| ATOM2
     ATOM2 -->|onUserClick| EUL
 ```
@@ -78,6 +82,7 @@ graph TB
 - `state.editors` remains the single source of truth for user identity data
 - `state.cursor` (anchor/head relative positions) continues to be used for cursor position broadcasting, consistent with `y-codemirror.next` convention
 - Off-screen indicators are managed within the same `yRichCursors` ViewPlugin — it compares each remote cursor's absolute position against `view.visibleRanges` (the actually visible content range, excluding CodeMirror's pre-render buffer) to decide between widget decoration (in-view) and DOM overlay (off-screen)
+- **`scrollCallbackRef`** is a `{ current: ((clientId: number) => void) | null }` mutable object created once alongside the `yRichCursors` extension. Because the scroll function is created in a separate `useEffect` from the extension instantiation, passing it as a plain value would require recreating the extension on every update. The mutable ref allows `yRichCursors` to hold a stable reference to the container while the hook silently updates `.current` when the scroll function is registered or cleared.
 
 ### Technology Stack
 
@@ -89,7 +94,7 @@ graph TB
 
 ## System Flows
 
-### Click-to-Scroll Flow (Requirement 6)
+### Click-to-Scroll Flow — EditingUserList Avatar (Requirements 6.1–6.5)
 
 ```mermaid
 sequenceDiagram
@@ -103,15 +108,41 @@ sequenceDiagram
     ATOM2->>HOOK: scrollFn(clientId)
     HOOK->>AW: getStates().get(clientId)
     AW-->>HOOK: AwarenessState { cursor.head }
-    Note over HOOK: cursor.head == null → return (no-op)
+    Note over HOOK: cursor.head == null → return (no-op, req 6.3)
     HOOK->>HOOK: createAbsolutePositionFromRelativePosition(head, activeDoc)
     HOOK->>CM: view.dispatch(EditorView.scrollIntoView(pos.index, { y: 'center' }))
 ```
 
 **Key design decisions**:
-- `scrollFn` closes over `codeMirrorEditor` (accessed lazily via `codeMirrorEditor?.view` at call time, not capture time) so late-mounted editors are handled correctly.
+- `scrollFn` closes over `codeMirrorEditor` (accessed lazily via `codeMirrorEditor?.view` at call time) so late-mounted editors are handled correctly.
 - `activeDoc` (Y.Doc) is captured in the same effect that creates `scrollFn`; the function is invalidated and recreated whenever `activeDoc` or `provider` changes.
 - If `cursor.head` is absent (user connected but not focused), the click is silently ignored per requirement 6.3.
+
+### Click-to-Scroll Flow — Off-Screen Indicator (Requirements 6.6–6.7)
+
+```mermaid
+sequenceDiagram
+    participant IND as Off-Screen Indicator DOM
+    participant REF as scrollCallbackRef
+    participant HOOK as use-collaborative-editor-mode
+    participant AW as provider.awareness
+    participant CM as CodeMirror EditorView
+
+    Note over REF: Ref created alongside yRichCursors extension
+    HOOK->>REF: scrollCallbackRef.current = scrollFn (on setup)
+    IND->>REF: click handler calls scrollCallbackRef.current(clientId)
+    REF->>HOOK: scrollFn(clientId)
+    HOOK->>AW: getStates().get(clientId)
+    AW-->>HOOK: AwarenessState { cursor.head }
+    Note over HOOK: cursor.head == null → return (no-op, req 6.3)
+    HOOK->>HOOK: createAbsolutePositionFromRelativePosition(head, activeDoc)
+    HOOK->>CM: view.dispatch(EditorView.scrollIntoView(pos.index, { y: 'center' }))
+```
+
+**Key design decisions for off-screen click**:
+- `scrollCallbackRef` is a plain object `{ current: Fn | null }` created with `useRef` in `use-collaborative-editor-mode` and passed to `yRichCursors(awareness, { onClickIndicator: scrollCallbackRef })`. This is the standard React mutable-ref pattern but without the React import constraint (the `packages/editor` package uses it as a plain typed object).
+- The extension is created once; the ref's `.current` value is updated silently by the hook's scroll-function `useEffect`. This avoids recreating CodeMirror extensions on every provider change.
+- `createOffScreenIndicator` receives `clientId` and `onClick` callback, attaching a `click` event listener that calls `onClick(clientId)`. The indicator element has `cursor: pointer` via the theme CSS or inline style.
 
 ### Awareness Update → EditingUserList
 
@@ -187,16 +218,24 @@ sequenceDiagram
 | 6.3 | No-op when cursor absent from awareness | `use-collaborative-editor-mode` | Guard: `cursor?.head == null → return` |
 | 6.4 | `cursor: pointer` on each avatar | `EditingUserList` | CSS `cursor: pointer` on the clickable wrapper element |
 | 6.5 | Overflow popover avatars also support click-to-scroll | `EditingUserList` | Inline rendering in popover body shares same `onUserClick` prop |
+| 6.6 | Click off-screen indicator → scroll to remote cursor | `yRichCursors` + `use-collaborative-editor-mode` | `scrollCallbackRef.current(clientId)` → same `scrollFn` path as 6.1–6.3 |
+| 6.7 | `cursor: pointer` on each off-screen indicator | `yRichCursors` | `cursor: pointer` via theme or inline style in `createOffScreenIndicator` |
+| 7.1 | Tooltip shows display name on avatar hover in EditingUserList | `UserPicture` (refactored) | Built-in tooltip renders `@username` + display name via portal child |
+| 7.2 | Tooltip on both direct and overflow popover avatars | `EditingUserList` | `noTooltip` removed from `UserPicture`; tooltip renders automatically for all avatars |
+| 7.3 | Tooltip coexists with color-matched border and click-to-scroll | `UserPicture` (refactored) | Tooltip is a portal child of the root `<span>`; no Fragment siblings to disturb flex layout |
+| 7.4 | Tooltip mechanism does not use `UserPicture` HOC | `UserPicture` (refactored) | `withTooltip` HOC eliminated; tooltip inlined in `UserPicture` render function |
+| 7.5 | Tooltip appears with hover-intent delay; disappears on pointer leave | `UserPicture` (refactored) | `UncontrolledTooltip` with `delay={0}` and `fade={false}` (existing behavior preserved) |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0) | Contracts |
 |-----------|--------------|--------|--------------|----------------------|-----------|
-| `use-collaborative-editor-mode` | packages/editor — Hook | Fix awareness filter bug; compose extensions with rich cursor; expose scroll-to-remote-cursor callback | 1.1–1.4, 2.1, 2.4, 6.1–6.3 | `yCollab` (P0), `yRichCursors` (P0) | State |
-| `yRichCursors` | packages/editor — Extension | Custom ViewPlugin: broadcasts local cursor position, renders in-viewport cursors with overlay avatar+hover name+activity opacity, renders off-screen indicators at editor edges | 3.1–3.10, 4.1–4.7 | `@codemirror/view` (P0), `y-websocket awareness` (P0) | Service |
+| `use-collaborative-editor-mode` | packages/editor — Hook | Fix awareness filter bug; compose extensions with rich cursor; expose scroll-to-remote-cursor callback; own `scrollCallbackRef` lifecycle | 1.1–1.4, 2.1, 2.4, 6.1–6.3, 6.6 | `yCollab` (P0), `yRichCursors` (P0) | State |
+| `yRichCursors` | packages/editor — Extension | Custom ViewPlugin: broadcasts local cursor position, renders in-viewport cursors with overlay avatar+hover name+activity opacity, renders clickable off-screen indicators at editor edges | 3.1–3.10, 4.1–4.9, 6.6, 6.7 | `@codemirror/view` (P0), `y-websocket awareness` (P0) | Service |
 | `CodeMirrorEditorMain` | packages/editor — Component | Bridge: passes `onScrollToRemoteCursorReady` prop from apps/app into `useCollaborativeEditorMode` | 6.1 | `useCollaborativeEditorMode` (P0) | State |
 | `scrollToRemoteCursorAtom` | apps/app — Jotai atom | Stores the scroll callback registered by `useCollaborativeEditorMode`; read by EditorNavbar | 6.1 | `jotai` (P0) | State |
-| `EditingUserList` | apps/app — Component | Renders active editor avatars with color-matched borders; handles click-to-scroll | 5.1–5.3, 6.1, 6.4–6.5 | `EditingClient[]` (P0) | View |
+| `UserPicture` | packages/ui — Component | Refactored: eliminates `withTooltip` HOC; renders tooltip as portal child of root `<span>` instead of Fragment sibling | 7.1, 7.3–7.5 | `UncontrolledTooltip` (P1) | View |
+| `EditingUserList` | apps/app — Component | Renders active editor avatars with color-matched borders, click-to-scroll; tooltips via native `UserPicture` (no `noTooltip`) | 5.1–5.3, 6.1, 6.4–6.5, 7.2 | `EditingClient[]` (P0) | View |
 
 ### packages/editor — Hook
 
@@ -205,13 +244,14 @@ sequenceDiagram
 | Field | Detail |
 |-------|--------|
 | Intent | Orchestrates WebSocket provider, awareness, and CodeMirror extension lifecycle for collaborative editing |
-| Requirements | 1.1, 1.2, 1.3, 1.4, 2.1, 2.4, 6.1–6.3 |
+| Requirements | 1.1, 1.2, 1.3, 1.4, 2.1, 2.4, 6.1–6.3, 6.6 |
 
 **Responsibilities & Constraints**
 - Filters `undefined` awareness entries before calling `onEditorsUpdated`
 - Does not mutate `awareness.getStates()` directly
-- Composes `yCollab(null)` + `yRichCursors(awareness)` to achieve text-sync, undo, and rich cursor rendering without the default `yRemoteSelections` plugin
+- Composes `yCollab(null)` + `yRichCursors(awareness, { onClickIndicator: scrollCallbackRef })` to achieve text-sync, undo, rich cursor rendering, and off-screen indicator click handling
 - Creates and registers a `scrollFn` callback (requirement 6) that resolves a remote user's cursor position and dispatches a CodeMirror scroll effect
+- Owns the `scrollCallbackRef` lifecycle: writes `scrollFn` to `scrollCallbackRef.current` when the scroll function is ready; writes `null` on cleanup
 
 **Dependencies**
 - Outbound: `yCollab` from `y-codemirror.next` — text-sync and undo (P0)
@@ -245,7 +285,7 @@ sequenceDiagram
 - Integration: `yCollab` with `null` awareness suppresses `yRemoteSelections` and `yRemoteSelectionsTheme`. Text-sync (`ySync`) and undo (`yUndoManager`) are not affected by the null awareness value.
 - Risks: If `y-codemirror.next` is upgraded, re-verify that passing `null` awareness still suppresses only the cursor plugins.
 
-##### Configuration Type Extension (Requirement 6)
+##### Configuration Type Extension (Requirements 6, 6.6)
 
 ```typescript
 type Configuration = {
@@ -253,12 +293,31 @@ type Configuration = {
   pageId?: string;
   reviewMode?: boolean;
   onEditorsUpdated?: (clientList: EditingClient[]) => void;
-  // NEW: called with the scroll function when provider+ydoc are ready; null on cleanup
+  // called with the scroll function when provider+ydoc are ready; null on cleanup
   onScrollToRemoteCursorReady?: (fn: ((clientId: number) => void) | null) => void;
 };
 ```
 
-The `scrollFn` is created in the "Setup Ydoc Extensions" `useEffect` where both `provider` and `activeDoc` are in scope:
+**`scrollCallbackRef` pattern** (new for req 6.6):
+
+```typescript
+// Defined inside useCollaborativeEditorMode, created once per hook mount
+const scrollCallbackRef: { current: ((clientId: number) => void) | null } = useRef(null);
+
+// Extension creation effect (depends on provider, activeDoc, codeMirrorEditor)
+// scrollCallbackRef is captured by reference — stable across provider changes
+yRichCursors(provider.awareness, { onClickIndicator: scrollCallbackRef })
+
+// Scroll function registration effect (same dependencies)
+scrollCallbackRef.current = scrollFn;   // updated silently — no extension recreation
+onScrollToRemoteCursorReady?.(scrollFn);
+
+// Cleanup
+scrollCallbackRef.current = null;
+onScrollToRemoteCursorReady?.(null);
+```
+
+The `scrollFn` is shared by both paths (avatar click via atom, indicator click via ref). Its logic:
 
 ```
 scrollFn(clientId: number):
@@ -270,8 +329,6 @@ scrollFn(clientId: number):
   6. view.dispatch({ effects: EditorView.scrollIntoView(absPos.index, { y: 'center' }) })
 ```
 
-`onScrollToRemoteCursorReady(scrollFn)` is called after the function is created. On effect cleanup, `onScrollToRemoteCursorReady(null)` is called to clear the atom.
-
 ---
 
 ### packages/editor — Extension
@@ -280,8 +337,8 @@ scrollFn(clientId: number):
 
 | Field | Detail |
 |-------|--------|
-| Intent | CodeMirror ViewPlugin — broadcasts local cursor position, renders in-viewport cursors with overlay avatar and hover-revealed name, renders off-screen indicators pinned to editor edges for cursors outside the viewport |
-| Requirements | 3.1–3.10, 4.1–4.7 |
+| Intent | CodeMirror ViewPlugin — broadcasts local cursor position, renders in-viewport cursors with overlay avatar and hover-revealed name, renders clickable off-screen indicators pinned to editor edges for cursors outside the viewport |
+| Requirements | 3.1–3.10, 4.1–4.9, 6.6, 6.7 |
 
 **Responsibilities & Constraints**
 - On each `ViewUpdate`: derives local cursor anchor/head → converts to Yjs relative positions → calls `awareness.setLocalStateField('cursor', { anchor, head })` (matches `state.cursor` convention from `y-codemirror.next`)
@@ -302,28 +359,43 @@ scrollFn(clientId: number):
 ##### Service Interface
 
 ```typescript
+/** Mutable ref container for the scroll-to-remote-cursor function. */
+type ScrollCallbackRef = { current: ((clientId: number) => void) | null };
+
+/** Options for the yRichCursors extension. */
+type YRichCursorsOptions = {
+  /**
+   * Mutable ref holding the scroll-to-remote-cursor callback.
+   * When set, off-screen indicator clicks invoke ref.current(clientId).
+   * Null or unset means clicks are no-ops.
+   */
+  onClickIndicator?: ScrollCallbackRef;
+};
+
 /**
  * Creates a CodeMirror Extension that renders remote user cursors with
  * name labels and avatar images, reading user data from state.editors.
- *
  * Also broadcasts the local user's cursor position via state.cursor.
+ * Renders clickable off-screen indicators for cursors outside the viewport.
  */
-export function yRichCursors(awareness: Awareness): Extension;
+export function yRichCursors(awareness: Awareness, options?: YRichCursorsOptions): Extension;
 ```
 
 Preconditions:
 - `awareness` is an active `y-websocket` Awareness instance
 - `ySyncFacet` is installed by a preceding `yCollab` call so that `ytext` can be resolved for position conversion
+- If `options.onClickIndicator` is provided, `onClickIndicator.current` must be set before any indicator click occurs (typically set synchronously by `use-collaborative-editor-mode` in the scroll-function registration effect)
 
 Postconditions:
 - Remote cursors within the visible viewport are rendered as `cm-yRichCaret` widget decorations at each remote client's head position
-- Remote cursors outside the visible viewport are rendered as off-screen indicator overlays pinned to the top or bottom edge of `view.dom`
+- Remote cursors outside the visible viewport are rendered as off-screen indicator overlays pinned to the top or bottom edge of `view.dom`; each indicator responds to click events by invoking `options.onClickIndicator?.current(clientId)` 
 - Local cursor position is broadcast to awareness as `state.cursor.{ anchor, head }` on each focus-selection change
 
 Invariants:
 - Local client's own cursor is never rendered
 - Cursor decorations are rebuilt when awareness `change` fires for **remote** clients (dispatched via `yRichCursorsAnnotation`); local-only changes are ignored to prevent recursive `dispatch` during an in-progress update
 - `state.cursor` field is written exclusively by `yRichCursors`; no other plugin or code path may call `awareness.setLocalStateField('cursor', ...)` to avoid data races
+- Off-screen indicator click is a no-op when `options.onClickIndicator` is undefined or `.current` is null
 
 ##### Widget DOM Structure
 
@@ -395,6 +467,22 @@ view.dom (position: relative — already set by CodeMirror)
         └── .cm-offScreenArrow (material-symbols-outlined) — "arrow_drop_down"
 ```
 
+**`OffScreenIndicatorOptions` type extension** (req 6.6, 6.7):
+
+```typescript
+export type OffScreenIndicatorOptions = {
+  direction: 'above' | 'below';
+  clientId: number;                          // NEW: identifies user for click handler
+  color: string;
+  name: string;
+  imageUrlCached: string | undefined;
+  isActive: boolean;
+  onClick?: (clientId: number) => void;      // NEW: invoked on indicator click
+};
+```
+
+`createOffScreenIndicator` attaches a `click` event listener on the root `<span>` element that calls `onClick(clientId)`. The indicator root element also receives `style.cursor = 'pointer'` when `onClick` is provided, satisfying req 6.7.
+
 **Indicator DOM structure** (built by `createOffScreenIndicator()` in `off-screen-indicator.ts`):
 - **above**: `[arrow_drop_up icon][avatar or initials]` stacked vertically (flex-column)
 - **below**: `[avatar or initials][arrow_drop_down icon]` stacked vertically (flex-column)
@@ -448,14 +536,86 @@ export const useSetScrollToRemoteCursor = () =>
 
 ---
 
+### packages/ui — Component
+
+#### `UserPicture` (refactored)
+
+| Field | Detail |
+|-------|--------|
+| Intent | Eliminate the `withTooltip` HOC that returns a React Fragment, replacing it with inline tooltip rendering as a portal child of the root `<span>` |
+| Requirements | 7.1, 7.3–7.5 |
+
+**Problem**: The current `withTooltip` HOC wraps `UserPictureRootWithoutLink`/`UserPictureRootWithLink` and returns a Fragment (`<> <span ref={ref}><img/></span> <UncontrolledTooltip target={ref}/> </>`). When the HOC-wrapped `UserPicture` is placed inside a flex container (e.g., the `<button>` in `EditingUserList`), the Fragment's two React children can cause unpredictable flex layout behavior.
+
+**Refactoring approach**: Eliminate the `withTooltip` HOC entirely. Render the tooltip inline within `UserPicture`'s render function as a child of the root `<span>`:
+
+```typescript
+export const UserPicture = memo((userProps: Props): JSX.Element => {
+  const { user, size, noLink, noTooltip, className: additionalClassName } = userProps;
+  // ... existing field extraction (username, displayName, src, className) ...
+
+  const showTooltip = !noTooltip && hasName(user);
+  const rootRef = useRef<HTMLSpanElement>(null);
+
+  const tooltipClassName = `${moduleTooltipClass} user-picture-tooltip-${size ?? 'md'}`;
+
+  const children = (
+    <>
+      {imgElement}
+      {showTooltip && (
+        <UncontrolledTooltip
+          placement="bottom"
+          target={rootRef}
+          popperClassName={tooltipClassName}
+          delay={0}
+          fade={false}
+        >
+          {username ? <>{`@${username}`}<br /></> : null}
+          {displayName}
+        </UncontrolledTooltip>
+      )}
+    </>
+  );
+
+  if (username == null || noLink) {
+    return (
+      <UserPictureRootWithoutLink ref={rootRef} displayName={displayName} size={size}>
+        {children}
+      </UserPictureRootWithoutLink>
+    );
+  }
+
+  return (
+    <UserPictureRootWithLink ref={rootRef} displayName={displayName} size={size} username={username}>
+      {children}
+    </UserPictureRootWithLink>
+  );
+});
+```
+
+**Why this works**: `UncontrolledTooltip` (reactstrap) uses `ReactDOM.createPortal` to render tooltip markup into `document.body`. When placed as a child of the root `<span>`, it occupies no space in the parent's DOM — only the `<img>` is a visible child. The root element is always a single `<span>`, regardless of whether the tooltip is shown. This eliminates the Fragment-induced flex layout issue.
+
+**Key changes**:
+- `withTooltip` HOC function: **deleted**
+- `useRef` for tooltip targeting: moved from HOC into `UserPicture` render body (always called unconditionally — satisfies React hooks rules)
+- `rootRef` is passed to `UserPictureRootWithoutLink`/`UserPictureRootWithLink` via `forwardRef` (they already support it)
+- Tooltip content, `popperClassName`, `delay`, `fade` values: preserved from the existing HOC
+- **`next/dynamic()` import: preserved** — the module-level `const UncontrolledTooltip = dynamic(() => import('reactstrap')..., { ssr: false })` is unchanged. This maintains the code-split boundary: reactstrap is loaded as a separate chunk only when the tooltip is actually rendered. Consumers passing `noTooltip` never trigger the chunk load.
+- `UserPicture.module.scss`: **unchanged** (tooltip margin classes still referenced via `popperClassName`)
+- `noTooltip` prop: **preserved** for consumers that intentionally suppress tooltips (e.g., sidebar dropdowns, inline notifications)
+
+**Impact on existing consumers**: The public API (`Props`) is unchanged. The only observable difference is that the returned React element is always a single-root `<span>` (no Fragment), which is layout-safe in all container types (flex, grid, inline). Existing `noTooltip` usages continue to work.
+
+---
+
 ### apps/app — Component
 
 #### `EditingUserList` (modified)
 
 | Field | Detail |
 |-------|--------|
-| Intent | Displays active editor avatars with color-matched borders; delegates click events to parent-supplied callback |
-| Requirements | 5.1–5.3, 6.1, 6.4–6.5 |
+| Intent | Displays active editor avatars with color-matched borders, click-to-scroll, and username tooltips on hover |
+| Requirements | 5.1–5.3, 6.1, 6.4–6.5, 7.1–7.5 |
 
 **Props change**:
 
@@ -496,9 +656,30 @@ Each avatar wrapper is made interactive:
 </button>
 ```
 
-**Overflow popover (req 5.3, 6.5)**:
+**Username tooltip (req 7.1–7.5)**:
 
-`UserPictureList` (a generic legacy class component that does not accept `onUserClick` or color props) is replaced by inline rendering within `EditingUserList`, applying the same wrapper and button pattern to `remainingUsers`.
+Tooltips are provided by `UserPicture` natively, after the HOC refactoring (see `UserPicture` component section below). The `noTooltip` prop is **removed** from all `UserPicture` usages in `EditingUserList`. Because the refactored `UserPicture` renders the tooltip as a portal child of its root `<span>` (not a Fragment sibling), the tooltip coexists cleanly with the flex `<button>` wrapper.
+
+```
+// AvatarWrapper renders (simplified — no external tooltip needed):
+<button
+  type="button"
+  data-testid={`avatar-wrapper-${client.clientId}`}
+  className={`${avatarWrapperClass} d-inline-flex ...`}
+  style={{ border: `2px solid ${client.color}` }}
+  onClick={() => onUserClick?.(client.clientId)}
+>
+  <UserPicture user={client} noLink />
+</button>
+```
+
+**Key decisions**:
+- The same `AvatarWrapper` sub-component is reused for both the first-4 direct avatars and the overflow popover avatars, so the tooltip applies uniformly (req 7.2).
+- No `id` attribute generation or external `UncontrolledTooltip` needed — the tooltip is fully encapsulated within `UserPicture`.
+
+**Overflow popover (req 5.3, 6.5, 7.2)**:
+
+`UserPictureList` (a generic legacy class component that does not accept `onUserClick` or color props) is replaced by inline rendering within `EditingUserList`, using the same `AvatarWrapper` sub-component for `remainingUsers`. This gives overflow avatars the same color border, click-to-scroll, and tooltip behavior.
 
 **`EditorNavbar` wiring**:
 
@@ -574,14 +755,32 @@ Test files are co-located with source in `y-rich-cursors/`:
 - **Integration**: `plugin.integ.ts` (awareness filter, cursor broadcast, viewport classification, activity timers)
 - **E2E** (Playwright, deferred): hover behavior, off-screen scroll transitions, pointer-events pass-through
 
-### Additional Tests for Requirements 5 & 6
+### Additional Tests for Requirements 5, 6, 6.6–6.7, and 7
+
+- **Unit — `UserPicture.spec.tsx`** (new or extended in `packages/ui`):
+  - Without `noTooltip`: renders a single root `<span>` (no Fragment) containing `<img>` and portal tooltip (req 7.4)
+  - With `noTooltip`: renders a single root `<span>` containing only `<img>` (existing behavior preserved)
+  - Tooltip content includes `@username` and display name when both available (req 7.1)
+  - Root element is flex-layout-safe (single child, not Fragment) (req 7.3)
 
 - **Unit — `EditingUserList.spec.tsx`** (new or extended):
   - Renders a colored border wrapper matching `editingClient.color` (req 5.1)
   - Does not render `border-info` class (req 5.1)
   - Calls `onUserClick(clientId)` when avatar is clicked (req 6.1, 6.4)
   - Overflow popover avatars also call `onUserClick` (req 6.5)
-- **Integration — `use-collaborative-editor-mode` scroll test** (added to existing integ file):
+  - `UserPicture` rendered without `noTooltip` (tooltip delegated to `UserPicture`) (req 7.2)
+
+- **Integration — `use-collaborative-editor-mode` scroll test** (extended):
   - `onScrollToRemoteCursorReady` is called with a function when provider is set up
   - `scrollFn(clientId)` dispatches `scrollIntoView` to the view when cursor is available (req 6.1–6.2)
   - `scrollFn(clientId)` is a no-op when cursor is absent (req 6.3)
+  - `scrollCallbackRef.current` is set when the scroll function is registered; cleared on cleanup (req 6.6)
+
+- **Unit — `off-screen-indicator.spec.ts`** (extended):
+  - Indicator root element has `cursor: pointer` when `onClick` is provided (req 6.7)
+  - Clicking the indicator element invokes `onClick(clientId)` (req 6.6)
+  - No click handler or `cursor: pointer` when `onClick` is not provided (boundary test)
+
+- **Integration — `plugin.integ.ts`** (extended):
+  - When `onClickIndicator` ref is set and an off-screen indicator is clicked, `ref.current` is invoked with the correct `clientId` (req 6.6)
+  - When `onClickIndicator.current` is null, clicking an off-screen indicator does not throw (req 6.6, no-op guard)

@@ -91,3 +91,17 @@ GROWI's collaborative editor uses Yjs awareness protocol to track which users ar
 3. If the clicked user has no active cursor position in the awareness state, the click shall have no effect (no error or crash).
 4. Each avatar shall display a `cursor: pointer` affordance to indicate it is clickable.
 5. Both the first-4 avatars displayed directly in the navbar and the avatars in the overflow popover shall support click-to-scroll.
+6. When an off-screen indicator (pinned to the top or bottom edge of the editor) is clicked, the Collaborative Editor Client shall scroll the editor viewport so that the corresponding remote user's cursor is centered vertically in the visible area, applying the same scroll behavior as Criteria 1–3 above.
+7. Each off-screen indicator shall display a `cursor: pointer` affordance to indicate it is clickable.
+
+### Requirement 7: Username Tooltip in EditingUserList
+
+**Objective:** As a wiki user editing collaboratively, I want to see a tooltip with the co-editor's username when hovering over their avatar in `EditingUserList`, so that I can identify each co-editor by name even when the avatar image is not recognizable.
+
+#### Acceptance Criteria
+
+1. While hovering over any avatar in `EditingUserList`, the Collaborative Editor Client shall display a tooltip containing the user's display name.
+2. The tooltip shall be applied to both the first-4 directly visible avatars and the avatars inside the overflow popover.
+3. The tooltip shall coexist with the color-matched border (Requirement 5) and the click-to-scroll behavior (Requirement 6) without visual or functional conflict.
+4. If the `UserPicture` component's `noTooltip` flag or a higher-order component (HoC) prevents native tooltip rendering, the tooltip mechanism shall be refactored — for example by embedding tooltip functionality directly in the component or by adopting a tooltip primitive (e.g., `UncontrolledTooltip`, `Tooltip` from `reactstrap`) — so that username display is not suppressed.
+5. The tooltip shall appear with standard UI delay (hover intent) and disappear when the pointer leaves the avatar area.
