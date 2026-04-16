@@ -8,6 +8,9 @@ overrides:
   '@lykmapipo/common>flat': 5.0.2
   '@lykmapipo/common>mime': 3.0.0
   '@lykmapipo/common>parse-json': 5.2.0
+  axios: ^1.15.0
+
+packageExtensionsChecksum: sha256-8AVTVG6XqA8Sdx2pyiL0NkxKdDqAh83Jgy7TwdlUUks=
 
 patchedDependencies:
   '@marp-team/marp-core':
@@ -343,8 +346,8 @@ importers:
         specifier: ^1.0.3
         version: 1.0.3
       axios:
-        specifier: ^1.11.0
-        version: 1.11.0
+        specifier: ^1.15.0
+        version: 1.15.0
       axios-retry:
         specifier: ^3.2.4
         version: 3.9.1
@@ -1125,8 +1128,8 @@ importers:
         specifier: '=6.43.0'
         version: 6.43.0(typeorm@0.2.45(mysql2@2.3.3)(redis@3.1.2))
       axios:
-        specifier: ^1.11.0
-        version: 1.11.0
+        specifier: ^1.15.0
+        version: 1.15.0
       body-parser:
         specifier: ^1.20.3
         version: 1.20.3
@@ -1406,8 +1409,8 @@ importers:
   packages/pdf-converter-client:
     dependencies:
       axios:
-        specifier: ^1.11.0
-        version: 1.11.0
+        specifier: ^1.15.0
+        version: 1.15.0
       tslib:
         specifier: ^2.8.0
         version: 2.8.1
@@ -1542,8 +1545,8 @@ importers:
         specifier: workspace:^
         version: link:../ui
       axios:
-        specifier: ^1.11.0
-        version: 1.11.0
+        specifier: ^1.15.0
+        version: 1.15.0
       express:
         specifier: ^4.20.0
         version: 4.21.0
@@ -1762,8 +1765,8 @@ importers:
         specifier: ^3.0.4
         version: 3.0.4
       axios:
-        specifier: ^1.11.0
-        version: 1.11.0
+        specifier: ^1.15.0
+        version: 1.15.0
       hast-util-sanitize:
         specifier: ^5.0.1
         version: 5.0.1
@@ -1801,8 +1804,8 @@ importers:
         specifier: ^4.0.2
         version: 4.0.3
       axios:
-        specifier: ^1.11.0
-        version: 1.11.0
+        specifier: ^1.15.0
+        version: 1.15.0
       crypto:
         specifier: ^1.0.1
         version: 1.0.1
@@ -6249,14 +6252,8 @@ packages:
   axios-retry@3.9.1:
     resolution: {integrity: sha512-8PJDLJv7qTTMMwdnbMvrLYuvB47M81wRtxQmEdV5w4rgbTXTt+vtPkXwajOfOdSyv/wZICJOC+/UhXH4aQ/R+w==}
 
-  axios@0.21.4:
-    resolution: {integrity: sha512-ut5vewkiu8jjGBdqpM44XxjuCjq9LAKeHVmoVfHVzy8eHgxxq8SbAVQNovDA8mVi05kP0Ea/n/UzcSHcTJQfNg==}
-
-  axios@0.26.1:
-    resolution: {integrity: sha512-fPwcX4EvnSHuInCMItEhAGnaSEXRBjtzh9fOtsE6E1G6p7vl7edEeZe11QHf18+6+9gR5PbKV/sGKNaD8YaMeA==}
-
-  axios@1.11.0:
-    resolution: {integrity: sha512-1Lx3WLFQWm3ooKDYZD1eXmoGO9fxYQjrycfHFC8P0sCfQVXyROp0p9PFWBehewBOdCwHc+f/b8I0fMto5eSfwA==}
+  axios@1.15.0:
+    resolution: {integrity: sha512-wWyJDlAatxk30ZJer+GeCWS209sA42X+N5jU2jy6oHTp7ufw8uzUTVFBX9+wTfAlhiJXGS0Bq7X6efruWjuK9Q==}
 
   b4a@1.6.6:
     resolution: {integrity: sha512-5Tk1HLk6b6ctmjIkAcU/Ujv/1WqiDl0F0JdRCR80VsOcUlHcu7pWeWRlOqQLHfDEsVx9YH/aif5AG4ehoCtTmg==}
@@ -8436,6 +8433,10 @@ packages:
 
   form-data@4.0.4:
     resolution: {integrity: sha512-KrGhL9Q4zjj0kiUt5OO4Mr/A/jlI2jDYs5eHBpYHPcBEVSiipAvn2Ko2HnPe20rmcuuvMHNdZFp+4IlGTMF0Ow==}
+    engines: {node: '>= 6'}
+
+  form-data@4.0.5:
+    resolution: {integrity: sha512-8RipRLol37bNs2bhoV67fiTEvdTrbMUYcFTiy3+wuuOnUog2QBHCZWXDRijWQfAkhBj2Uf5UnVaiWwA5vdd82w==}
     engines: {node: '>= 6'}
 
   format@0.2.2:
@@ -11520,6 +11521,10 @@ packages:
 
   proxy-from-env@1.1.0:
     resolution: {integrity: sha512-D+zkORCbA9f1tdWRK0RaCR3GPv50cMxcrz4X8k5LTSUD1Dkw47mKJEZQNunItRTkWwgtaUSo1RVFRIG9ZXiFYg==}
+
+  proxy-from-env@2.1.0:
+    resolution: {integrity: sha512-cJ+oHTW1VAEa8cJslgmUZrc+sjRKgAKl3Zyse6+PV38hZe/V6Z14TbCuXcan9F9ghlz4QrFr2c92TNF82UkYHA==}
+    engines: {node: '>=10'}
 
   prr@1.0.1:
     resolution: {integrity: sha512-yPw4Sng1gWghHQWj0B3ZggWUm4qVbPwPFcRG8KyxiU7J2OHFSoEHKS+EZ3fv5l1t9CyCiop6l/ZYeWbrgoQejw==}
@@ -16439,7 +16444,7 @@ snapshots:
 
   '@keycloak/keycloak-admin-client@18.0.2':
     dependencies:
-      axios: 0.26.1
+      axios: 1.15.0
       camelize-ts: 1.0.9
       keycloak-js: 17.0.1
       lodash: 4.17.23
@@ -17582,6 +17587,7 @@ snapshots:
       esutils: 2.0.3
       fs-extra: 11.2.0
       globby: 11.1.0
+      lodash: 4.17.23
       lodash.get: 4.4.2
       lodash.isempty: 4.4.0
       lodash.omit: 4.5.0
@@ -17961,7 +17967,7 @@ snapshots:
       '@slack/types': 2.14.0
       '@types/is-stream': 1.1.0
       '@types/node': 20.19.17
-      axios: 1.11.0
+      axios: 1.15.0
       eventemitter3: 3.1.2
       form-data: 2.5.1
       is-electron: 2.2.2
@@ -17977,7 +17983,7 @@ snapshots:
       '@slack/types': 2.14.0
       '@types/node': 20.19.17
       '@types/retry': 0.12.0
-      axios: 1.11.0
+      axios: 1.15.0
       eventemitter3: 5.0.1
       form-data: 4.0.4
       is-electron: 2.2.2
@@ -17992,7 +17998,7 @@ snapshots:
     dependencies:
       '@slack/types': 1.10.0
       '@types/node': 20.19.17
-      axios: 0.21.4
+      axios: 1.15.0
     transitivePeerDependencies:
       - debug
 
@@ -19024,7 +19030,7 @@ snapshots:
       '@types/fs-extra': 11.0.4
       '@types/inquirer': 9.0.7
       ajv: 8.18.0
-      axios: 1.11.0
+      axios: 1.15.0
       chalk: 5.3.0
       change-case: 5.4.4
       commander: 12.1.0
@@ -20506,23 +20512,11 @@ snapshots:
       '@babel/runtime': 7.28.6
       is-retry-allowed: 2.2.0
 
-  axios@0.21.4:
+  axios@1.15.0:
     dependencies:
       follow-redirects: 1.15.11(debug@4.4.3)
-    transitivePeerDependencies:
-      - debug
-
-  axios@0.26.1:
-    dependencies:
-      follow-redirects: 1.15.11(debug@4.4.3)
-    transitivePeerDependencies:
-      - debug
-
-  axios@1.11.0:
-    dependencies:
-      follow-redirects: 1.15.11(debug@4.4.3)
-      form-data: 4.0.4
-      proxy-from-env: 1.1.0
+      form-data: 4.0.5
+      proxy-from-env: 2.1.0
     transitivePeerDependencies:
       - debug
 
@@ -22668,6 +22662,14 @@ snapshots:
       mime-types: 2.1.35
 
   form-data@4.0.4:
+    dependencies:
+      asynckit: 0.4.0
+      combined-stream: 1.0.8
+      es-set-tostringtag: 2.1.0
+      hasown: 2.0.2
+      mime-types: 2.1.35
+
+  form-data@4.0.5:
     dependencies:
       asynckit: 0.4.0
       combined-stream: 1.0.8
@@ -26312,6 +26314,8 @@ snapshots:
       - supports-color
 
   proxy-from-env@1.1.0: {}
+
+  proxy-from-env@2.1.0: {}
 
   prr@1.0.1:
     optional: true

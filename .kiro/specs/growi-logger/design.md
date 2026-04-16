@@ -1,43 +1,43 @@
-# Design Document: migrate-logger-to-pino
+# Design Document: growi-logger
 
 ## Overview
 
-**Purpose**: This feature migrates GROWI's logging infrastructure from bunyan (with the custom `universal-bunyan` wrapper) to pino, delivering faster structured logging with a smaller dependency footprint.
+**Purpose**: `@growi/logger` is the shared logging infrastructure for the GROWI monorepo, providing namespace-based level control, platform detection (Node.js/browser), and Express HTTP middleware — built on pino.
 
-**Users**: All GROWI developers (logger consumers), operators (log level configuration), and the CI/CD pipeline (dependency management).
+**Users**: All GROWI developers (logger consumers), operators (log level configuration), and the CI/CD pipeline.
 
-**Impact**: Replaces 7 logging-related packages (`bunyan`, `universal-bunyan`, `bunyan-format`, `express-bunyan-logger`, `morgan`, `browser-bunyan`, `@browser-bunyan/console-formatted-stream`) with 3 (`pino`, `pino-pretty`, `pino-http`) plus a new shared package `@growi/logger`. Consumer applications import only `@growi/logger`; `pino-http` is encapsulated within the package.
+**Scope**: All GROWI applications (`apps/app`, `apps/slackbot-proxy`) and packages (`packages/slack`, `packages/remark-attachment-refs`, `packages/remark-lsx`) import from `@growi/logger` as the single logging entry point. Consumer applications do not import pino or pino-http directly.
 
 ### Goals
-- Replace bunyan with pino across all apps and packages without functional degradation
-- Preserve namespace-based log level control (config files + env var overrides)
-- Eliminate morgan by consolidating HTTP logging into pino-http
+- Provide namespace-based log level control via config objects and environment variable overrides
+- Consolidate HTTP request logging under `createHttpLoggerMiddleware()` (pino-http encapsulated)
 - Maintain OpenTelemetry diagnostic logger integration
-- Provide a shared `@growi/logger` package as the single logging entry point
+- Serve as the single `@growi/logger` entry point for all monorepo consumers
+- Preserve pino's worker-thread performance model (single Worker thread, child loggers)
 
 ### Non-Goals
-- Changing log output semantics (field names, message format) beyond what pino naturally produces
 - Adding new logging capabilities (structured context propagation, remote log shipping)
-- Migrating to pino v10 (deferred until OTel instrumentation supports it)
 - Changing the namespace naming convention (e.g., `growi:service:page`)
+- Publishing `@growi/logger` to npm (private package, monorepo-internal only)
+- Migrating to pino v10 (blocked on `@opentelemetry/instrumentation-pino` v10 support)
 
 ## Architecture
 
-### Existing Architecture Analysis
+### Architecture Overview
 
-The current logging stack has these layers:
+`@growi/logger` is organized into these layers:
 
-1. **universal-bunyan** — custom wrapper providing: namespace-based level control via config + env vars, platform detection (Node.js/browser), stream selection (bunyan-format for Node.js, ConsoleFormattedStream for browser), logger caching
-2. **Per-app loggerFactory** — thin wrapper that loads dev/prod config and delegates to universal-bunyan
-3. **bunyan / browser-bunyan** — underlying logger implementations
-4. **express-bunyan-logger / morgan** — HTTP request logging middleware
+1. **LoggerFactory** — creates and caches namespace-bound pino child loggers; `initializeLoggerFactory` spawns one Worker thread; `loggerFactory(name)` returns `rootLogger.child({ name })` with resolved level
+2. **LevelResolver + EnvVarParser** — resolve log level from config patterns and env var overrides via minimatch glob matching
+3. **TransportFactory** — produces pino transport config for Node.js (dev: bunyan-format, prod+FORMAT_NODE_LOG: pino-pretty singleLine, prod: raw JSON) and browser (console)
+4. **HttpLoggerFactory** — encapsulates pino-http as `createHttpLoggerMiddleware()`; dev-mode morgan-like formatting dynamically imported from `src/dev/`
 
-Key patterns to preserve:
-- `loggerFactory(name: string): Logger` as the sole logger creation API
+Key invariants:
+- `loggerFactory(name: string): Logger<string>` as the sole logger creation API
 - Hierarchical colon-delimited namespaces with glob pattern matching
-- Environment variables (`DEBUG`, `TRACE`, etc.) overriding config file levels
-- Dev: human-readable output; Prod: JSON output (toggleable via `FORMAT_NODE_LOG`)
-- Browser: console output with error-level default in production
+- `pino.transport()` called **once** in `initializeLoggerFactory`; all namespace loggers share the Worker thread
+- Dev-only modules (`src/dev/`) are never statically imported in production paths
+- Browser-unsafe modules (pino-http) are imported lazily inside function bodies
 
 ### Architecture Pattern & Boundary Map
 
@@ -88,7 +88,7 @@ graph TB
 ```
 
 **Architecture Integration**:
-- Selected pattern: Wrapper package (`@growi/logger`) encapsulating pino configuration — mirrors universal-bunyan's role
+- `@growi/logger` wraps pino with namespace-level control, transport setup, and HTTP middleware — the single logging entry point for all monorepo consumers
 - Domain boundary: `@growi/logger` owns all logger creation, level resolution, and transport setup; consumer apps only call `loggerFactory(name)`
 - Existing patterns preserved: factory function signature, namespace conventions, config file structure
 - New components: `LevelResolver` (namespace-to-level matching), `TransportFactory` (dev/prod stream setup), `EnvVarParser` (env variable parsing)
@@ -173,8 +173,7 @@ flowchart TD
 | 6.1–6.4 | HTTP request logging | HttpLoggerMiddleware | `createHttpLogger()` | — |
 | 7.1–7.3 | OpenTelemetry integration | DiagLoggerPinoAdapter | `DiagLogger` interface | — |
 | 8.1–8.5 | Multi-app consistency | @growi/logger package | Package exports | — |
-| 9.1–9.3 | Dependency cleanup | — (removal task) | — | — |
-| 10.1–10.3 | Backward-compatible API | LoggerFactory | `Logger` type export | — |
+| 10.1–10.3 | Pino logger type export | LoggerFactory | `Logger<string>` export | — |
 | 11.1–11.4 | Pino performance preservation | LoggerFactory | `initializeLoggerFactory`, shared root logger | Logger Creation |
 | 12.1–12.6 | Bunyan-like output format | BunyanFormatTransport, TransportFactory | Custom transport target | Logger Creation |
 | 13.1–13.5 | HTTP logger encapsulation | HttpLoggerFactory | `createHttpLoggerMiddleware()` | — |
@@ -543,128 +542,3 @@ Logging infrastructure must be resilient — a logger failure must never crash t
 - Logger initialization errors are written to `process.stderr` directly (cannot use the logger itself)
 - No additional monitoring infrastructure required — this is the monitoring infrastructure
 
-## Addendum: Formatting Improvements (Post-Migration)
-
-> Added 2026-03-30. The core migration is complete. This section covers log output readability improvements based on operator feedback.
-
-### Background
-
-- Morgan was used in dev because bunyan's express logging was too verbose
-- Morgan's one-liner format (`GET /path 200 12ms`) was valued for readability
-- `FORMAT_NODE_LOG=true` should produce concise one-liner logs suitable for quick-glance monitoring
-- Production default should remain structured JSON (already working via `.env.production`)
-
-### Gap Summary
-
-| Gap | Issue | Resolution |
-|-----|-------|------------|
-| A | `singleLine: false` in prod FORMAT_NODE_LOG path | Change to `singleLine: true` |
-| B | `FORMAT_NODE_LOG` defaults to formatted when unset | Defer to separate PR (`.env.production` handles this) |
-| C | pino-http uses default verbose messages | Add `customSuccessMessage` / `customErrorMessage` / `customLogLevel` |
-| D | Dev and prod pino-pretty configs identical | Differentiate via `singleLine` |
-
-### Change 1: TransportFactory — Differentiated `singleLine`
-
-**File**: `packages/logger/src/transport-factory.ts`
-
-Current production + FORMAT_NODE_LOG branch uses `singleLine: false`. Change to `singleLine: true`:
-
-```
-Dev:                    singleLine: false  (unchanged — full context)
-Prod + FORMAT_NODE_LOG: singleLine: true   (concise one-liners)
-Prod default:           raw JSON           (unchanged)
-```
-
-The dev branch remains multi-line so developers see full object context. The production formatted path becomes single-line for operator readability.
-
-### Change 2: HttpLoggerMiddleware — Custom Message Format
-
-**Files**: `apps/app/src/server/crowi/index.ts`, `apps/slackbot-proxy/src/Server.ts`
-
-Add pino-http message customization to produce morgan-like output:
-
-```typescript
-const customSuccessMessage: PinoHttpOptions['customSuccessMessage'] = (req, res, responseTime) => {
-  return `${req.method} ${req.url} ${res.statusCode} - ${Math.round(responseTime)}ms`;
-};
-
-const customErrorMessage: PinoHttpOptions['customErrorMessage'] = (req, res, error) => {
-  return `${req.method} ${req.url} ${res.statusCode} - ${error.message}`;
-};
-
-const customLogLevel: PinoHttpOptions['customLogLevel'] = (_req, res, error) => {
-  if (error != null || res.statusCode >= 500) return 'error';
-  if (res.statusCode >= 400) return 'warn';
-  return 'info';
-};
-```
-
-### Output Examples (Updated with dev-only bunyan-like format)
-
-**Dev** (bunyan-format transport + morgan-like HTTP messages):
-```
-10:06:30.419Z  INFO express: GET /page/path 200 - 12ms
-    req: {"method":"GET","url":"/page/path"}
-    res: {"statusCode":200}
-```
-
-**Prod + FORMAT_NODE_LOG=true** (standard pino-pretty, default pino-http messages):
-```
-[2026-03-30 12:00:00.000] INFO (express): request completed
-```
-
-**Prod default** (JSON, default pino-http messages):
-```json
-{"level":30,"time":1711792800000,"name":"express","msg":"request completed","req":{"method":"GET","url":"/page/path"},"res":{"statusCode":200},"responseTime":12}
-```
-
-### Testing
-
-- `transport-factory.spec.ts`: Verify transport target contains `bunyan-format` (not pino-pretty directly); dev transport passes no options (singleLine handled inside bunyan-format); prod + FORMAT_NODE_LOG returns pino-pretty with `singleLine: true`
-- `bunyan-format.spec.ts`: Verify transport module produces `HH:mm:ss.SSSZ LEVEL name: message` format; verify req/res are excluded from output
-- `http-logger.spec.ts`: Verify `createHttpLoggerMiddleware` returns middleware, applies morganLikeFormatOptions in dev, passes autoLogging options
-- `morgan-like-format-options.spec.ts`: Verify message formats using `strip()` to remove ANSI codes before assertion; verify customLogLevel returns correct levels for 2xx/4xx/5xx
-
----
-
-## Addendum: HTTP Logger Encapsulation (Post-Migration)
-
-> Added 2026-04-02. Moves pino-http usage from consumer apps into @growi/logger.
-
-### Background
-
-- Consumer apps (`apps/app`, `apps/slackbot-proxy`) currently import `pino-http` directly
-- This leaks implementation details and requires each app to configure morgan-like format options
-- Encapsulating in `@growi/logger` provides a single configuration point and cleaner dependency graph
-
-### Changes
-
-1. **New file**: `packages/logger/src/http-logger.ts` — exports `createHttpLoggerMiddleware(options)`
-2. **Package.json**: Add `pino-http` to `@growi/logger` dependencies
-3. **apps/app**: Replace direct `pino-http` import with `createHttpLoggerMiddleware` from `@growi/logger`
-4. **apps/slackbot-proxy**: Same as apps/app
-5. **Cleanup**: Remove `pino-http` from apps' direct dependencies (keep in @growi/logger)
-
----
-
-## Addendum: Dev-Only Module Isolation and Browser Compatibility (Post-Migration)
-
-> Added 2026-04-06. Restructures dev-only modules and fixes browser bundle compatibility.
-
-### Background
-
-- `bunyan-format` and `morgan-like-format-options` were mixed with production modules at the `src/` root level
-- `pino-http` imported at the module top-level caused browser bundle errors (Turbopack: `TypeError: __turbopack_context__.r(...).symbols is undefined`) when `@growi/logger` was imported by shared page code
-- HTTP request logs in dev were verbose (multi-line `req`/`res` JSON objects)
-- HTTP status codes in dev lacked visual differentiation
-
-### Changes
-
-1. **`src/dev/` directory**: All dev-only modules moved under `src/dev/`
-   - `src/transports/bunyan-format.ts` → `src/dev/bunyan-format.ts`
-   - `src/morgan-like-format-options.ts` → `src/dev/morgan-like-format-options.ts`
-   - `src/transports/` directory removed
-2. **`index.ts`**: Removed static `export { morganLikeFormatOptions }` — dev-only module must not appear in production-facing package exports
-3. **`http-logger.ts`**: `pino-http` import moved from module top-level into the async function body (`const { default: pinoHttp } = await import('pino-http')`) — prevents browser bundlers from including the Node.js-only package
-4. **`bunyan-format.ts`**: `ignore` extended to `'pid,hostname,name,req,res,responseTime'` — suppresses verbose pino-http req/res objects; morgan-like `customSuccessMessage` already provides all relevant HTTP metadata on one line
-5. **`morgan-like-format-options.ts`**: ANSI color codes added for status code (2xx=green, 3xx=cyan, 4xx=yellow, 5xx=red) and dim response time; `NO_COLOR` env var respected

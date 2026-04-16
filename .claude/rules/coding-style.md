@@ -38,6 +38,97 @@ MANY SMALL FILES > FEW LARGE FILES:
 - Extract utilities from large components
 - Organize by feature/domain, not by type
 
+## Module Design: Separation of Concerns
+
+### Pure Function Extraction
+
+When a framework-specific wrapper (React hook, Express middleware, CodeMirror extension handler, etc.) contains non-trivial logic, extract the core logic as a **pure function** and reduce the wrapper to a thin adapter. This enables direct reuse across different contexts and makes unit testing straightforward.
+
+```typescript
+// ❌ WRONG: Business logic locked inside a framework-specific wrapper
+export const useToggleSymbol = (view?: EditorView) => {
+  return useCallback((prefix, suffix) => {
+    // 30 lines of symbol-toggling logic here...
+  }, [view]);
+};
+
+// ✅ CORRECT: Pure function + thin wrappers for each context
+// services-internal/markdown-utils/toggle-markdown-symbol.ts
+export const toggleMarkdownSymbol = (view: EditorView, prefix: string, suffix: string): void => {
+  // Pure logic — testable, reusable from hooks, keymaps, shortcuts, etc.
+};
+
+// React hook wrapper
+export const useInsertMarkdownElements = (view?: EditorView) => {
+  return useCallback((prefix, suffix) => {
+    if (view == null) return;
+    toggleMarkdownSymbol(view, prefix, suffix);
+  }, [view]);
+};
+
+// Emacs command wrapper
+EmacsHandler.addCommands({
+  markdownBold(handler: { view: EditorView }) {
+    toggleMarkdownSymbol(handler.view, '**', '**');
+  },
+});
+```
+
+**Applies to**: React hooks, Express/Koa middleware, CLI command handlers, CodeMirror extension callbacks, test fixtures — any framework-specific adapter that wraps reusable logic.
+
+### Data-Driven Control over Hard-Coded Mode Checks
+
+Replace conditional branching on mode/variant names with **declared metadata** that consumers filter generically. This eliminates the need to update consumers when adding new modes.
+
+```typescript
+// ❌ WRONG: Consumer knows mode-specific behavior
+if (keymapModeName === 'emacs') {
+  return sharedKeyBindings; // exclude formatting
+}
+return [formattingBindings, ...sharedKeyBindings];
+
+// ✅ CORRECT: Module declares its overrides, consumer filters generically
+// Keymap module returns: { overrides: ['formatting', 'structural'] }
+const activeBindings = allGroups
+  .filter(group => group.category === null || !overrides?.includes(group.category))
+  .flatMap(group => group.bindings);
+```
+
+### Factory Pattern with Encapsulated Metadata
+
+When a module produces a value that requires configuration from the consumer (precedence, feature flags, etc.), **bundle the metadata alongside the value** in a structured return type. This keeps decision-making inside the module that has the knowledge.
+
+```typescript
+// ❌ WRONG: Consumer decides precedence based on mode name
+const wrapWithPrecedence = mode === 'vim' ? Prec.high : Prec.low;
+codeMirrorEditor.appendExtensions(wrapWithPrecedence(keymapExtension));
+
+// ✅ CORRECT: Factory encapsulates its own requirements
+interface KeymapResult {
+  readonly extension: Extension;
+  readonly precedence: (ext: Extension) => Extension;
+  readonly overrides: readonly ShortcutCategory[];
+}
+// Consumer applies generically:
+codeMirrorEditor.appendExtensions(result.precedence(result.extension));
+```
+
+### Responsibility-Based Submodule Decomposition
+
+When a single module grows beyond ~200 lines or accumulates multiple distinct responsibilities, split into submodules **by responsibility domain** (not by arbitrary size). Each submodule should be independently understandable.
+
+```
+// ❌ WRONG: One large file with mixed concerns
+keymaps/emacs.ts  (400+ lines: formatting + structural + navigation + save)
+
+// ✅ CORRECT: Split by responsibility
+keymaps/emacs/
+├── index.ts          ← Factory: composes submodules
+├── formatting.ts     ← Text styling commands
+├── structural.ts     ← Document structure commands
+└── navigation.ts     ← Movement and editing commands
+```
+
 ## Naming Conventions
 
 ### Variables and Functions
@@ -236,3 +327,6 @@ Before marking work complete:
 - [ ] Named exports (except Next.js pages)
 - [ ] English comments
 - [ ] Co-located tests
+- [ ] Non-trivial logic extracted as pure functions from framework wrappers
+- [ ] No hard-coded mode/variant checks in consumers (use declared metadata)
+- [ ] Modules with multiple responsibilities split by domain
