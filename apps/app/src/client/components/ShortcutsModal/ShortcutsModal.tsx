@@ -8,6 +8,7 @@ import {
   useShortcutsModalActions,
   useShortcutsModalStatus,
 } from '~/states/ui/modal/shortcuts';
+import { getLocale } from '~/utils/locale-utils';
 
 import styles from './ShortcutsModal.module.scss';
 
@@ -18,7 +19,7 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
   const { t, i18n } = useTranslation();
   const { close } = useShortcutsModalActions();
   const documentationUrl = useGrowiDocumentationUrl();
-  const langCode = i18n.language?.startsWith('ja') ? 'ja' : 'en';
+  const langCode = getLocale(i18n.language).code === 'ja' ? 'ja' : 'en';
 
   // Memoize OS-specific class
   const additionalClassByOs = useMemo(() => {
