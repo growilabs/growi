@@ -20,8 +20,6 @@
 
 ## Post-Implementation Refactoring (from code review)
 
-See `gap-analysis.md` for detailed rationale.
-
 - [x] 8. Simplify service layer abstractions
 - [x] 8.1 Remove `GenerateSuggestionsDeps` DI pattern from `generate-suggestions.ts`
 - [x] 8.2 Remove `RetrieveSearchCandidatesOptions` from `retrieve-search-candidates.ts`
