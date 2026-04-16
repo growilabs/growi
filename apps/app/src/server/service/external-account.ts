@@ -57,7 +57,7 @@ class ExternalAccountService {
           );
           return ExternalAccount.associate(providerId, userInfo.id, err.user);
         }
-        logger.error('provider-DuplicatedUsernameException', providerId);
+        logger.error({ providerId }, 'provider-DuplicatedUsernameException');
 
         throw new ErrorV3(
           'message.provider_duplicated_username_exception',

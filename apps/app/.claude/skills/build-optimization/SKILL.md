@@ -27,16 +27,13 @@ user-invocable: false
 
 ### Resolve Aliases (`turbopack.resolveAlias`)
 
-7 server-only packages + `fs` are aliased to `./src/lib/empty-module.ts` in browser context:
+4 server-only packages + `fs` are aliased to `./src/lib/empty-module.ts` in browser context:
 
 | Package | Reason |
 |---------|--------|
 | `fs` | Node.js built-in, not available in browser |
-| `dtrace-provider` | Native module, server-only |
 | `mongoose` | MongoDB driver, server-only |
 | `i18next-fs-backend` | File-system i18n loader, server-only |
-| `bunyan` | Server-side logger |
-| `bunyan-format` | Server-side logger formatter |
 | `core-js` | Server-side polyfills |
 
 - Uses conditional `{ browser: './src/lib/empty-module.ts' }` syntax so server-side resolution is unaffected

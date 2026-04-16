@@ -17,7 +17,9 @@
     }
   },
   "exclude": [
-    "config",
+    "config/ci",
+    "config/*.js",
+    "config/*.spec.ts",
     "resource",
     "src/client",
     "src/components",
