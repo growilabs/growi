@@ -38,6 +38,7 @@ Kiro-style Spec-Driven Development on an agentic SDLC
   - Without task numbers: autonomous mode (subagent per task + independent review + final validation)
   - With task numbers: manual mode (selected tasks in main context, still reviewer-gated before completion)
   - `/kiro-validate-impl {feature}` (standalone re-validation)
+- Phase 3 (Post-implementation): `/kiro-spec-cleanup {feature}` — trim HOW, preserve WHY for future refactoring
 - Progress check: `/kiro-spec-status {feature}` (use anytime)
 
 ## Skills Structure
