@@ -212,6 +212,11 @@ class ElasticsearchDelegator
   async init(): Promise<void> {
     await this.initClient();
     const normalizeIndices = await this.normalizeIndices();
+    try {
+      await this.normalizeAuditlogIndices();
+    } catch (err) {
+      logger.error('Failed to normalize auditlog indices', err);
+    }
     if (this.isElasticsearchReindexOnBoot) {
       try {
         await this.rebuildIndex();
@@ -404,7 +409,6 @@ class ElasticsearchDelegator
         index: indexName,
       });
     }
-    await this.normalizeAuditlogIndices();
   }
 
   async normalizeAuditlogIndices(): Promise<void> {
@@ -429,12 +433,6 @@ class ElasticsearchDelegator
     });
     if (!isExistsAuditlogIndex) {
       await this.createAuditlogIndex(indexName);
-    }
-
-    // sync documents
-    const auditlogCount = await mongoose.model('Activity').countDocuments();
-    const esCount = (await client.count({ index: indexName })).count;
-    if (!isExistsAuditlogIndex || auditlogCount !== esCount) {
       await this.addAllAuditlogs();
     }
 
@@ -450,18 +448,56 @@ class ElasticsearchDelegator
 
   async addAllAuditlogs(): Promise<void> {
     const Activity = mongoose.model('Activity');
-    const activities = await Activity.find();
+    const bulkWrite = this.client.bulk.bind(this.client);
+    const auditlogIndexName = this.auditlogIndexName;
 
-    const body = activities.flatMap((activity) => {
-      const username = activity.snapshot?.username;
-      if (username == null || username === '') return [];
-      return [
-        { index: { _index: this.auditlogIndexName, _id: activity._id } },
-        { username },
-      ];
+    const bulkSize: number = configManager.getConfig(
+      'app:elasticsearchReindexBulkSize',
+    );
+
+    const readStream = Activity.find().cursor();
+    const batchStream = createBatchStream(bulkSize);
+
+    const writeStream = new Writable({
+      objectMode: true,
+      async write(batch, encoding, callback) {
+        const body = batch.flatMap((activity) => {
+          const username = activity.snapshot?.username;
+          if (username == null || username === '') return [];
+          return [
+            { index: { _index: auditlogIndexName, _id: activity._id } },
+            { username },
+          ];
+        });
+
+        if (body.length === 0) {
+          callback();
+          return;
+        }
+
+        try {
+          const bulkResponse = await bulkWrite({ body });
+
+          if (bulkResponse.errors) {
+            logger.error('addAllAuditlogs bulk indexing had errors');
+          }
+
+          logger.info(
+            `addAllAuditlogs progressing: (count=${bulkResponse.items?.length ?? 0}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`,
+          );
+        } catch (err) {
+          logger.error('addAllAuditlogs error on bulk write: ', err);
+        }
+
+        callback();
+      },
+      final(callback) {
+        logger.info('addAllAuditlogs has completed.');
+        callback();
+      },
     });
 
-    await this.client.bulk({ body });
+    await pipeline(readStream, batchStream, writeStream);
   }
 
   async createIndex(index: string) {
@@ -496,6 +532,7 @@ class ElasticsearchDelegator
       });
     }
   }
+
   async createAuditlogIndex(index: string) {
     if (isES7ClientDelegator(this.client)) {
       const { mappings } = await import('./mappings/mappings-auditlog-es7');
