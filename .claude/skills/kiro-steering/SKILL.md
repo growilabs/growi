@@ -1,11 +1,17 @@
 ---
-description: Manage .kiro/steering/ as persistent project knowledge
-allowed-tools: Bash, Read, Write, Edit, MultiEdit, Glob, Grep, LS
+name: kiro-steering
+description: Maintain .kiro/steering/ as persistent project memory (bootstrap/sync). Use when initializing or updating steering documents.
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash
+metadata:
+  shared-rules: "steering-principles.md"
 ---
 
-# Kiro Steering Management
+# kiro-steering Skill
 
-<background_information>
+## Role
+You are a specialized skill for maintaining `.kiro/steering/` as persistent project memory.
+
+## Core Mission
 **Role**: Maintain `.kiro/steering/` as persistent project memory.
 
 **Mission**:
@@ -17,14 +23,22 @@ allowed-tools: Bash, Read, Write, Edit, MultiEdit, Glob, Grep, LS
 - Steering captures patterns and principles, not exhaustive lists
 - Code drift detected and reported
 - All `.kiro/steering/*.md` treated equally (core + custom)
-</background_information>
 
-<instructions>
+## Execution Steps
+
+### Step 1: Gather Context
+
+If steering context is already available from conversation, skip redundant file reads.
+
+- For Bootstrap mode: Read templates from `.kiro/settings/templates/steering/`
+- For Sync mode: Read all existing `.kiro/steering/*.md` files
+- Read `rules/steering-principles.md` from this skill's directory for steering principles
+
 ## Scenario Detection
 
 Check `.kiro/steering/` status:
 
-**Bootstrap Mode**: Empty OR missing core files (product.md, tech.md, structure.md)  
+**Bootstrap Mode**: Empty OR missing core files (product.md, tech.md, structure.md)
 **Sync Mode**: All core files exist
 
 ---
@@ -33,15 +47,22 @@ Check `.kiro/steering/` status:
 
 1. Load templates from `.kiro/settings/templates/steering/`
 2. Analyze codebase (JIT):
-   - `glob_file_search` for source files
-   - `read_file` for README, package.json, etc.
-   - `grep` for patterns
+
+#### Parallel Research
+
+The following research areas are independent and can be executed in parallel:
+1. **Product analysis**: README, package.json, documentation files for purpose, value, core capabilities
+2. **Tech analysis**: Config files, dependencies, frameworks for technology patterns and decisions
+3. **Structure analysis**: Directory tree, naming conventions, import patterns for organization
+
+After all parallel research completes, synthesize patterns for steering files.
+
 3. Extract patterns (not lists):
    - Product: Purpose, value, core capabilities
    - Tech: Frameworks, decisions, conventions
    - Structure: Organization, naming, imports
 4. Generate steering files (follow templates)
-5. Load principles from `.kiro/settings/rules/steering-principles.md`
+5. Load principles from `rules/steering-principles.md` from this skill's directory
 6. Present summary for review
 
 **Focus**: Patterns that guide decisions, not catalogs of files/dependencies.
@@ -65,33 +86,31 @@ Check `.kiro/steering/` status:
 
 ## Granularity Principle
 
-From `.kiro/settings/rules/steering-principles.md`:
+From `rules/steering-principles.md` (in this skill's directory):
 
 > "If new code follows existing patterns, steering shouldn't need updating."
 
 Document patterns and principles, not exhaustive lists.
 
-**Bad**: List every file in directory tree  
+**Bad**: List every file in directory tree
 **Good**: Describe organization pattern with examples
 
-</instructions>
+## Tool Guidance
 
-## Tool guidance
-
-- `glob_file_search`: Find source/config files
-- `read_file`: Read steering, docs, configs
-- `grep`: Search patterns
-- `list_dir`: Analyze structure
+- `Glob`: Find source/config files
+- `Read`: Read steering, docs, configs
+- `Grep`: Search patterns
+- `Bash` with `ls`: Analyze structure
 
 **JIT Strategy**: Fetch when needed, not upfront.
 
-## Output description
+## Output Description
 
 Chat summary only (files updated directly).
 
 ### Bootstrap:
 ```
-✅ Steering Created
+Steering Created
 
 ## Generated:
 - product.md: [Brief description]
@@ -103,7 +122,7 @@ Review and approve as Source of Truth.
 
 ### Sync:
 ```
-✅ Steering Updated
+Steering Updated
 
 ## Changes:
 - tech.md: React 18 → 19
@@ -119,11 +138,11 @@ Review and approve as Source of Truth.
 ## Examples
 
 ### Bootstrap
-**Input**: Empty steering, React TypeScript project  
+**Input**: Empty steering, React TypeScript project
 **Output**: 3 files with patterns - "Feature-first", "TypeScript strict", "React 19"
 
 ### Sync
-**Input**: Existing steering, new `/api` directory  
+**Input**: Existing steering, new `/api` directory
 **Output**: Updated structure.md, flagged non-compliant files, suggested api-standards.md
 
 ## Safety & Fallback
@@ -138,6 +157,4 @@ Review and approve as Source of Truth.
 - Templates and principles are external for customization
 - Focus on patterns, not catalogs
 - "Golden Rule": New code following patterns shouldn't require steering updates
-- Avoid documenting agent-specific tooling directories (e.g. `.cursor/`, `.gemini/`, `.claude/`)
 - `.kiro/settings/` content should NOT be documented in steering files (settings are metadata, not project knowledge)
-- Light references to `.kiro/specs/` and `.kiro/steering/` are acceptable; avoid other `.kiro/` directories

@@ -1,11 +1,17 @@
 ---
-description: Create custom steering documents for specialized project contexts
-allowed-tools: Bash, Read, Write, Edit, MultiEdit, Glob, Grep, LS
+name: kiro-steering-custom
+description: Create custom steering documents for specialized project contexts. Use when creating domain-specific steering files.
+allowed-tools: Read, Write, Edit, Glob, Grep, Bash
+metadata:
+  shared-rules: "steering-principles.md"
 ---
 
-# Kiro Custom Steering Creation
+# kiro-steering-custom Skill
 
-<background_information>
+## Role
+You are a specialized skill for creating custom steering documents beyond core files (product, tech, structure).
+
+## Core Mission
 **Role**: Create specialized steering documents beyond core files (product, tech, structure).
 
 **Mission**: Help users create domain-specific project memory for specialized areas.
@@ -14,9 +20,16 @@ allowed-tools: Bash, Read, Write, Edit, MultiEdit, Glob, Grep, LS
 - Custom steering captures specialized patterns
 - Follows same granularity principles as core steering
 - Provides clear value for specific domain
-</background_information>
 
-<instructions>
+## Execution Steps
+
+### Step 1: Gather Context
+
+If steering context is already available from conversation, skip redundant file reads.
+Otherwise:
+- Check `.kiro/settings/templates/steering-custom/` for available templates
+- Read `rules/steering-principles.md` from this skill's directory for steering principles
+
 ## Workflow
 
 1. **Ask user** for custom steering needs:
@@ -28,13 +41,18 @@ allowed-tools: Bash, Read, Write, Edit, MultiEdit, Glob, Grep, LS
    - Use as starting point, customize based on project
 
 3. **Analyze codebase** (JIT) for relevant patterns:
-   - **Glob** for related files
-   - **Read** for existing implementations
-   - **Grep** for specific patterns
+
+#### Parallel Research
+
+The following research areas are independent and can be executed in parallel:
+1. **Template & principles**: Load matching template and steering-principles.md
+2. **Domain patterns**: Analyze codebase for domain-specific patterns using Glob/Grep/Read
+
+After all parallel research completes, synthesize findings for steering document.
 
 4. **Generate custom steering**:
    - Follow template structure if available
-   - Apply principles from `.kiro/settings/rules/steering-principles.md`
+   - Apply principles from `rules/steering-principles.md` from this skill's directory
    - Focus on patterns, not exhaustive lists
    - Keep to 100-200 lines (2-3 minute read)
 
@@ -56,7 +74,7 @@ Load template when needed, customize for project.
 
 ## Steering Principles
 
-From `.kiro/settings/rules/steering-principles.md`:
+From `rules/steering-principles.md` (in this skill's directory):
 
 - **Patterns over lists**: Document patterns, not every file/component
 - **Single domain**: One topic per file
@@ -64,23 +82,21 @@ From `.kiro/settings/rules/steering-principles.md`:
 - **Maintainable size**: 100-200 lines typical
 - **Security first**: Never include secrets or sensitive data
 
-</instructions>
-
-## Tool guidance
+## Tool Guidance
 
 - **Read**: Load template, analyze existing code
 - **Glob**: Find related files for pattern analysis
 - **Grep**: Search for specific patterns
-- **LS**: Understand relevant structure
+- **Bash** with `ls`: Understand relevant structure
 
 **JIT Strategy**: Load template only when creating that type of steering.
 
-## Output description
+## Output Description
 
 Chat summary with file location (file created directly).
 
 ```
-✅ Custom Steering Created
+Custom Steering Created
 
 ## Created:
 - .kiro/steering/api-standards.md
@@ -102,13 +118,13 @@ Review and customize as needed.
 ## Examples
 
 ### Success: API Standards
-**Input**: "Create API standards steering"  
-**Action**: Load template, analyze src/api/, extract patterns  
+**Input**: "Create API standards steering"
+**Action**: Load template, analyze src/api/, extract patterns
 **Output**: api-standards.md with project-specific REST conventions
 
 ### Success: Testing Strategy
-**Input**: "Document our testing approach"  
-**Action**: Load template, analyze test files, extract patterns  
+**Input**: "Document our testing approach"
+**Action**: Load template, analyze test files, extract patterns
 **Output**: testing.md with test organization and mocking strategies
 
 ## Safety & Fallback
