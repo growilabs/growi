@@ -121,17 +121,15 @@ describe('NewsService', () => {
         sort: vi.fn().mockReturnThis(),
         skip: vi.fn().mockReturnThis(),
         limit: vi.fn().mockReturnThis(),
-        lean: vi
-          .fn()
-          .mockResolvedValue([
-            {
-              _id: generalItemId,
-              externalId: 'general-news',
-              title: { ja_JP: 'General' },
-              publishedAt: new Date(),
-              fetchedAt: new Date(),
-            },
-          ]),
+        lean: vi.fn().mockResolvedValue([
+          {
+            _id: generalItemId,
+            externalId: 'general-news',
+            title: { ja_JP: 'General' },
+            publishedAt: new Date(),
+            fetchedAt: new Date(),
+          },
+        ]),
       });
       mocks.newsItemCountDocuments.mockResolvedValue(1);
       mocks.newsReadStatusDistinct.mockResolvedValue([]);
@@ -157,17 +155,15 @@ describe('NewsService', () => {
         sort: vi.fn().mockReturnThis(),
         skip: vi.fn().mockReturnThis(),
         limit: vi.fn().mockReturnThis(),
-        lean: vi
-          .fn()
-          .mockResolvedValue([
-            {
-              _id: unreadId,
-              externalId: 'unread-news',
-              title: { ja_JP: 'Unread' },
-              publishedAt: new Date(),
-              fetchedAt: new Date(),
-            },
-          ]),
+        lean: vi.fn().mockResolvedValue([
+          {
+            _id: unreadId,
+            externalId: 'unread-news',
+            title: { ja_JP: 'Unread' },
+            publishedAt: new Date(),
+            fetchedAt: new Date(),
+          },
+        ]),
       });
       mocks.newsItemCountDocuments.mockResolvedValue(1);
 
