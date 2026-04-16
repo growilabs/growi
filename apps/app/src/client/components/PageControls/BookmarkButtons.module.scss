@@ -2,14 +2,14 @@
 @use '@growi/ui/scss/atoms/btn-muted';
 @use './button-styles';
 
-.btn-group-bookmark :global {
-  .btn-bookmark {
+.btn-group-bookmark {
+  :global(.btn-bookmark) {
     @extend %btn-basis;
   }
-  .dropdown .btn-bookmark {
+  :global(.dropdown .btn-bookmark) {
     padding-right: 1px;
   }
-  .total-counts {
+  :global(.total-counts) {
     @extend %btn-total-counts-basis;
 
     padding-left: 5px;
@@ -17,9 +17,9 @@
 }
 
 // == Colors
-.btn-group-bookmark :global {
+.btn-group-bookmark {
   /* stylelint-disable-next-line no-descending-specificity */
-  .btn-bookmark {
+  :global(.btn-bookmark) {
     @include btn-muted.colorize(bs.$orange);
   }
 }

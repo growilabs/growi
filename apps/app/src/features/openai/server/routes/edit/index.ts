@@ -246,6 +246,7 @@ export const postMessageToEditHandlersFactory = (
 
       const threadRelation = await ThreadRelationModel.findOne({
         threadId: { $eq: threadId },
+        userId: user._id,
       });
       if (threadRelation == null) {
         return res.apiv3Err(new ErrorV3('ThreadRelation not found'), 404);
@@ -384,7 +385,7 @@ export const postMessageToEditHandlersFactory = (
 
         // Error handler
         stream.once('error', (err) => {
-          logger.error('Stream error:', err);
+          logger.error({ err }, 'Stream error');
 
           // Clean up
           streamProcessor.destroy();
@@ -408,7 +409,7 @@ export const postMessageToEditHandlersFactory = (
         });
       } catch (err) {
         // Clean up and respond on error
-        logger.error('Error in edit handler:', err);
+        logger.error({ err }, 'Error in edit handler');
         streamProcessor.destroy();
         return res.status(500).send(err.message);
       }

@@ -1,3 +1,4 @@
+import { PassThrough } from 'node:stream';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
 
@@ -52,7 +53,12 @@ async function postProcess(
 }
 
 /**
- * Execute a pipeline that reads the page files from the temporal fs directory, compresses them, and uploads to the cloud storage
+ * Compress page files into a tar.gz archive and upload to cloud storage.
+ *
+ * Wraps archiver output with PassThrough to provide a Node.js native Readable,
+ * since archiver uses npm's readable-stream which fails AWS SDK's instanceof check.
+ * The Content-Length / Transfer-Encoding issue is resolved by aws/index.ts using
+ * the Upload class from @aws-sdk/lib-storage.
  */
 export async function compressAndUpload(
   this: IPageBulkExportJobCronService,
@@ -75,19 +81,29 @@ export async function compressAndUpload(
 
   const fileUploadService: FileUploader = this.crowi.fileUploadService;
 
+  // Wrap with Node.js native PassThrough so that AWS SDK recognizes the stream as a native Readable
+  const uploadStream = new PassThrough();
+  pageArchiver.pipe(uploadStream);
+
+  pageArchiver.on('error', (err) => {
+    logger.error({ err }, 'pageArchiver error');
+    uploadStream.destroy(err);
+  });
+
   pageArchiver.directory(this.getTmpOutputDir(pageBulkExportJob), false);
   pageArchiver.finalize();
-  this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver);
+
+  this.setStreamsInExecution(pageBulkExportJob._id, pageArchiver, uploadStream);
 
   try {
-    await fileUploadService.uploadAttachment(pageArchiver, attachment);
+    await fileUploadService.uploadAttachment(uploadStream, attachment);
+    await postProcess.bind(this)(
+      pageBulkExportJob,
+      attachment,
+      pageArchiver.pointer(),
+    );
   } catch (e) {
     logger.error(e);
-    this.handleError(e, pageBulkExportJob);
+    await this.handleError(e, pageBulkExportJob);
   }
-  await postProcess.bind(this)(
-    pageBulkExportJob,
-    attachment,
-    pageArchiver.pointer(),
-  );
 }

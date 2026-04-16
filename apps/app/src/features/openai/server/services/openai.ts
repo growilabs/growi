@@ -1,3 +1,4 @@
+/// <reference types="multer" />
 import assert from 'node:assert';
 import fs from 'node:fs';
 import { Readable, Transform, Writable } from 'node:stream';
@@ -12,7 +13,6 @@ import {
 } from '@growi/core';
 import { deepEquals } from '@growi/core/dist/utils';
 import { isGlobPatternPath } from '@growi/core/dist/utils/page-path-utils';
-import escapeStringRegexp from 'escape-string-regexp';
 import createError from 'http-errors';
 import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 import type { OpenAI } from 'openai';
@@ -77,7 +77,7 @@ const convertPathPatternsToRegExp = (
   return pagePathPatterns.map((pagePathPattern) => {
     if (isGlobPatternPath(pagePathPattern)) {
       const trimedPagePathPattern = pagePathPattern.replace('/*', '');
-      const escapedPagePathPattern = escapeStringRegexp(trimedPagePathPattern);
+      const escapedPagePathPattern = RegExp.escape(trimedPagePathPattern);
       // https://regex101.com/r/x5KIZL/1
       return new RegExp(`^${escapedPagePathPattern}($|/)`);
     }
@@ -98,6 +98,7 @@ export interface IOpenaiService {
   ): Promise<ThreadRelationDocument>;
   getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId?: string,
   ): Promise<ThreadRelationDocument[]>;
   deleteThread(threadRelationId: string): Promise<ThreadRelationDocument>;
   deleteExpiredThreads(limit: number, apiCallInterval: number): Promise<void>; // for CronJob
@@ -258,8 +259,8 @@ class OpenaiService implements IOpenaiService {
           })
           .catch((err) => {
             logger.error(
-              `Failed to generate thread title for threadId ${thread.id}:`,
-              err,
+              { err },
+              `Failed to generate thread title for threadId ${thread.id}`,
             );
           });
       }
@@ -281,21 +282,30 @@ class OpenaiService implements IOpenaiService {
           threadRelation.threadId,
           vectorStoreId,
         );
-        logger.debug('Update thread', updatedThreadResponse);
+        logger.debug({ data: updatedThreadResponse }, 'Update thread');
       } catch (err) {
-        logger.error(err);
+        logger.error({ err }, 'Failed to update thread');
       }
     }
   }
 
   async getThreadsByAiAssistantId(
     aiAssistantId: string,
+    userId?: string,
     type: ThreadType = ThreadType.KNOWLEDGE,
   ): Promise<ThreadRelationDocument[]> {
-    const threadRelations = await ThreadRelationModel.find({
+    const query: { aiAssistant: string; type: ThreadType; userId?: string } = {
       aiAssistant: aiAssistantId,
       type,
-    }).sort({ updatedAt: -1 });
+    };
+
+    if (userId != null) {
+      query.userId = userId;
+    }
+
+    const threadRelations = await ThreadRelationModel.find(query).sort({
+      updatedAt: -1,
+    });
     return threadRelations;
   }
 
@@ -311,7 +321,7 @@ class OpenaiService implements IOpenaiService {
       const deletedThreadResponse = await this.client.deleteThread(
         threadRelation.threadId,
       );
-      logger.debug('Delete thread', deletedThreadResponse);
+      logger.debug({ data: deletedThreadResponse }, 'Delete thread');
       await threadRelation.remove();
     } catch (err) {
       await openaiApiErrorHandler(err, {
@@ -341,13 +351,13 @@ class OpenaiService implements IOpenaiService {
         const deleteThreadResponse = await this.client.deleteThread(
           expiredThreadRelation.threadId,
         );
-        logger.debug('Delete thread', deleteThreadResponse);
+        logger.debug({ data: deleteThreadResponse }, 'Delete thread');
         deletedThreadIds.push(expiredThreadRelation.threadId);
 
         // sleep
         await new Promise((resolve) => setTimeout(resolve, apiCallInterval));
       } catch (err) {
-        logger.error(err);
+        logger.error({ err }, 'Failed to delete expired thread');
       }
     }
 
@@ -499,7 +509,7 @@ class OpenaiService implements IOpenaiService {
       const deleteVectorStoreResponse = await this.client.deleteVectorStore(
         vectorStoreDocument.vectorStoreId,
       );
-      logger.debug('Delete vector store', deleteVectorStoreResponse);
+      logger.debug({ data: deleteVectorStoreResponse }, 'Delete vector store');
       await vectorStoreDocument.markAsDeleted();
     } catch (err) {
       await openaiApiErrorHandler(err, {
@@ -553,7 +563,7 @@ class OpenaiService implements IOpenaiService {
               attachment._id,
             );
           } catch (err) {
-            logger.error(err);
+            logger.error({ err }, 'Failed to upload attachment file');
           }
         }
         callback();
@@ -637,7 +647,7 @@ class OpenaiService implements IOpenaiService {
     const fileUploadResult = await Promise.allSettled(workers);
     fileUploadResult.forEach((result) => {
       if (result.status === 'rejected') {
-        logger.error(result.reason);
+        logger.error({ err: result.reason }, 'File upload failed');
       }
     });
 
@@ -667,14 +677,14 @@ class OpenaiService implements IOpenaiService {
           uploadedFileIds,
         );
       logger.debug(
+        { data: createVectorStoreFileBatchResponse },
         'Create vector store file',
-        createVectorStoreFileBatchResponse,
       );
 
       // Set isAttachedToVectorStore: true when the uploaded file is attached to VectorStore
       await VectorStoreFileRelationModel.markAsAttachedToVectorStore(pageIds);
     } catch (err) {
-      logger.error(err);
+      logger.error({ err }, 'Failed to create vector store file batch');
 
       // Delete all uploaded files if createVectorStoreFileBatch fails
       for await (const pageId of pageIds) {
@@ -732,8 +742,8 @@ class OpenaiService implements IOpenaiService {
       const fileId = vectorStoreFileRelation.fileIds[0];
       const deleteFileResponse = await this.client.deleteFile(fileId);
       logger.debug(
-        'Delete vector store file (attachment) ',
-        deleteFileResponse,
+        { data: deleteFileResponse },
+        'Delete vector store file (attachment)',
       );
 
       // Delete related VectorStoreFileRelation document
@@ -742,7 +752,10 @@ class OpenaiService implements IOpenaiService {
         await deleteAllAttachmentVectorStoreFileRelations();
       }
     } catch (err) {
-      logger.error(err);
+      logger.error(
+        { err },
+        'Failed to delete vector store file for attachment',
+      );
       await openaiApiErrorHandler(err, {
         notFoundError: () => deleteAllAttachmentVectorStoreFileRelations(),
       });
@@ -771,7 +784,10 @@ class OpenaiService implements IOpenaiService {
               vectorStoreFileRelation,
             );
           } catch (err) {
-            logger.error(err);
+            logger.error(
+              { err },
+              'Failed to delete vector store file for attachment',
+            );
           }
         }
       }
@@ -790,7 +806,7 @@ class OpenaiService implements IOpenaiService {
     for await (const fileId of vectorStoreFileRelation.fileIds) {
       try {
         const deleteFileResponse = await this.client.deleteFile(fileId);
-        logger.debug('Delete vector store file', deleteFileResponse);
+        logger.debug({ data: deleteFileResponse }, 'Delete vector store file');
         deletedFileIds.push(fileId);
         if (apiCallInterval != null) {
           // sleep
@@ -802,7 +818,7 @@ class OpenaiService implements IOpenaiService {
             deletedFileIds.push(fileId);
           },
         });
-        logger.error(err);
+        logger.error({ err }, 'Failed to delete file');
       }
     }
 
@@ -870,7 +886,7 @@ class OpenaiService implements IOpenaiService {
           apiCallInterval,
         );
       } catch (err) {
-        logger.error(err);
+        logger.error({ err }, 'Failed to delete vector store file');
       }
     }
   }
@@ -886,7 +902,10 @@ class OpenaiService implements IOpenaiService {
     try {
       await this.deleteVectorStoreFileForAttachment(vectorStoreFileRelation);
     } catch (err) {
-      logger.error(err);
+      logger.error(
+        { err },
+        'Failed to delete vector store file on attachment delete',
+      );
     }
   }
 
@@ -992,10 +1011,13 @@ class OpenaiService implements IOpenaiService {
       }
 
       logger.debug('--------- createVectorStoreFileOnPageCreate ---------');
-      logger.debug('AccessScopeType of aiAssistant: ', aiAssistant.accessScope);
       logger.debug(
-        'VectorStoreFile pagePath to be created: ',
-        pagesToVectorize.map((page) => page.path),
+        { accessScope: aiAssistant.accessScope },
+        'AccessScopeType of aiAssistant',
+      );
+      logger.debug(
+        { pagePaths: pagesToVectorize.map((page) => page.path) },
+        'VectorStoreFile pagePath to be created',
       );
       logger.debug('-----------------------------------------------------');
 
@@ -1028,11 +1050,17 @@ class OpenaiService implements IOpenaiService {
       }
 
       logger.debug('---------- updateVectorStoreOnPageUpdate ------------');
-      logger.debug('AccessScopeType of aiAssistant: ', aiAssistant.accessScope);
-      logger.debug('PagePath of VectorStoreFile to be deleted: ', page.path);
       logger.debug(
-        'pagePath of VectorStoreFile to be created: ',
-        pagesToVectorize.map((page) => page.path),
+        { accessScope: aiAssistant.accessScope },
+        'AccessScopeType of aiAssistant',
+      );
+      logger.debug(
+        { pagePath: page.path },
+        'PagePath of VectorStoreFile to be deleted',
+      );
+      logger.debug(
+        { pagePaths: pagesToVectorize.map((page) => page.path) },
+        'pagePath of VectorStoreFile to be created',
       );
       logger.debug('-----------------------------------------------------');
 
@@ -1079,7 +1107,7 @@ class OpenaiService implements IOpenaiService {
       undefined,
       file.path,
     );
-    logger.debug('Uploaded file', uploadedFile);
+    logger.debug({ data: uploadedFile }, 'Uploaded file');
 
     for await (const aiAssistant of aiAssistants) {
       const pagesToVectorize = await this.filterPagesByAccessScope(
@@ -1142,8 +1170,8 @@ class OpenaiService implements IOpenaiService {
       ) {
         try {
           logger.debug(
-            'Target page path for VectorStoreFile generation: ',
-            chunk.map((page) => page.path),
+            { pagePaths: chunk.map((page) => page.path) },
+            'Target page path for VectorStoreFile generation',
           );
           await createVectorStoreFile(vectorStoreRelation, chunk);
           this.push(chunk);
@@ -1575,7 +1603,7 @@ class OpenaiService implements IOpenaiService {
       0,
     );
 
-    logger.debug('TotalPageCount: ', totalPageCount);
+    logger.debug({ totalPageCount }, 'TotalPageCount');
 
     const limitLearnablePageCountPerAssistant = configManager.getConfig(
       'openai:limitLearnablePageCountPerAssistant',

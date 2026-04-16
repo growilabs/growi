@@ -1,22 +1,22 @@
-@use '~/styles/modal';
+@use 'styles/modal';
 
-.grw-presentation-modal :global {
+.grw-presentation-modal {
   /* stylelint-disable-next-line length-zero-no-unit */
-  @include modal.expand-modal-fullscreen(false, false, 0px);
+  @include modal.expand-modal-fullscreen(false, false, 0px, $css-modules: true);
 
-  .modal-content {
+  :global(.modal-content) {
     background-color: transparent;
     border-radius: 0;
   }
 
-  .grw-presentation-controls {
+  :global(.grw-presentation-controls) {
     position: absolute;
     top: 1rem;
     right: 1rem;
     z-index: 110; // over ".reveal .slides"
   }
 
-  .btn-close {
+  :global(.btn-close) {
     display: inline-block;
     width: 3rem;
     height: 3rem;

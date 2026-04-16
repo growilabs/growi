@@ -4,42 +4,9 @@ import {
   type CompletionContext,
 } from '@codemirror/autocomplete';
 import { syntaxTree } from '@codemirror/language';
-import emojiData from '@emoji-mart/data';
+import nativeLookup from '@growi/emoji-mart-data';
 
-const getEmojiDataArray = (): string[] => {
-  const rawEmojiDataArray = emojiData.categories;
-
-  const emojiCategoriesData = [
-    'people',
-    'nature',
-    'foods',
-    'activity',
-    'places',
-    'objects',
-    'symbols',
-    'flags',
-  ];
-
-  const fixedEmojiDataArray: string[] = [];
-
-  emojiCategoriesData.forEach((value) => {
-    const tempArray = rawEmojiDataArray.find(
-      (obj: { id: string }) => obj.id === value,
-    )?.emojis;
-
-    if (tempArray == null) {
-      return;
-    }
-
-    fixedEmojiDataArray.push(...tempArray);
-  });
-
-  return fixedEmojiDataArray;
-};
-
-const emojiDataArray = getEmojiDataArray();
-
-const emojiOptions = emojiDataArray.map((tag) => ({
+const emojiOptions: Completion[] = Object.keys(nativeLookup).map((tag) => ({
   label: `:${tag}:`,
   type: tag,
 }));
@@ -66,7 +33,7 @@ export const emojiAutocompletionSettings = autocompletion({
     {
       render: (completion: Completion) => {
         const emojiName = completion.type ?? '';
-        const emoji = emojiData.emojis[emojiName].skins[0].native;
+        const emoji = nativeLookup[emojiName]?.skins[0].native ?? '';
 
         const element = document.createElement('span');
         element.innerHTML = emoji;
