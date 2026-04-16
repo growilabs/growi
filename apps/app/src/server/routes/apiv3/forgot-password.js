@@ -14,6 +14,7 @@ import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import httpErrorHandler from '../../middlewares/http-error-handler';
+import { resolveLocalePath } from '../../util/safe-path-utils';
 import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password';
 
 const logger = loggerFactory('growi:routes:apiv3:forgotPassword');
@@ -85,6 +86,7 @@ module.exports = (crowi) => {
 
   const checkPassportStrategyMiddleware =
     checkForgotPasswordEnabledMiddlewareFactory(crowi, true);
+  const ALLOWED_TEMPLATE_NAMES = ['passwordReset', 'passwordResetSuccessful'];
 
   async function sendPasswordResetEmail(
     templateFileName,
@@ -93,13 +95,19 @@ module.exports = (crowi) => {
     url,
     expiredAt,
   ) {
+    if (!ALLOWED_TEMPLATE_NAMES.includes(templateFileName)) {
+      throw new Error(`Invalid template name: ${templateFileName}`);
+    }
+    const templatePath = resolveLocalePath(
+      locale,
+      crowi.localeDir,
+      `notifications/${templateFileName}.ejs`,
+    );
+
     return mailService.send({
       to: email,
       subject: '[GROWI] Password Reset',
-      template: join(
-        crowi.localeDir,
-        `${locale}/notifications/${templateFileName}.ejs`,
-      ),
+      template: templatePath,
       vars: {
         appTitle: appService.getAppTitle(),
         email,

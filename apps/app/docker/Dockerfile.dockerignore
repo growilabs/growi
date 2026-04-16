@@ -37,6 +37,8 @@ apps/slackbot-proxy
 # Documentation (no .md files are needed for build)
 # ============================================================
 **/*.md
+# Keep locale template .md files required at runtime by the installer
+!apps/app/resource/locales/**/*.md
 
 # ============================================================
 # Local environment overrides

@@ -26,6 +26,7 @@ export default defineConfig({
         index: 'src/index.ts',
       },
       name: 'remark-drawio-libs',
+      cssFileName: 'style',
       formats: ['es'],
     },
   },

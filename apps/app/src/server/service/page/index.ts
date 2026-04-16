@@ -2406,7 +2406,7 @@ class PageService implements IPageService {
     const ids = pages.map((page) => page._id);
     const paths = pages.map((page) => page.path);
 
-    logger.debug('Deleting completely', paths);
+    logger.debug({ paths }, 'Deleting completely');
 
     await this.deleteCompletelyOperation(ids, paths);
 
@@ -2461,7 +2461,7 @@ class PageService implements IPageService {
     const ids = [page._id];
     const paths = [page.path];
 
-    logger.debug('Deleting completely', paths);
+    logger.debug({ paths }, 'Deleting completely');
 
     const parameters = {
       ip: activityParameters.ip,
@@ -2598,7 +2598,7 @@ class PageService implements IPageService {
     const ids = [page._id];
     const paths = [page.path];
 
-    logger.debug('Deleting completely', paths);
+    logger.debug({ paths }, 'Deleting completely');
 
     await this.deleteCompletelyOperation(ids, paths);
 
@@ -3692,8 +3692,8 @@ class PageService implements IPageService {
         paths: nonNormalizablePagePaths,
       });
       logger.debug(
+        { paths: nonNormalizablePagePaths },
         'Some pages could not be converted.',
-        nonNormalizablePagePaths,
       );
     }
 
@@ -4219,8 +4219,8 @@ class PageService implements IPageService {
           // Throw if any error is found
           if (res.result.writeErrors.length > 0) {
             logger.error(
+              { writeErrors: res.result.writeErrors },
               'Failed to migrate some pages',
-              res.result.writeErrors,
             );
             socket?.emit(SocketEventName.PMEnded, { isSucceeded: false });
             throw Error('Failed to migrate some pages');
@@ -4230,11 +4230,8 @@ class PageService implements IPageService {
           if (res.result.nModified === 0 && res.result.nMatched === 0) {
             shouldContinue = false;
             logger.error(
+              { parentPaths, bulkWriteResult: res },
               'Migration is unable to continue',
-              'parentPaths:',
-              parentPaths,
-              'bulkWriteResult:',
-              res,
             );
             socket?.emit(SocketEventName.PMEnded, { isSucceeded: false });
           }

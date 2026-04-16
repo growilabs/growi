@@ -95,6 +95,7 @@ export const generateViewOptions = (
             presentation.sanitizeOption,
             drawio.sanitizeOption,
             mermaidSanitizeOption,
+            plantuml.sanitizeOption,
             callout.sanitizeOption,
             attachment.sanitizeOption,
             lsxGrowiDirective.sanitizeOption,
@@ -132,6 +133,7 @@ export const generateViewOptions = (
     components.refsimg = refsGrowiDirective.RefsImg;
     components.gallery = refsGrowiDirective.Gallery;
     components.drawio = DrawioViewerWithEditButton;
+    components.plantuml = plantuml.PlantUmlViewer;
     components.table = TableWithEditButton;
     components.mermaid = MermaidViewer;
     components.callout = callout.CalloutViewer;
@@ -220,6 +222,7 @@ export const generateSimpleViewOptions = (
             presentation.sanitizeOption,
             drawio.sanitizeOption,
             mermaidSanitizeOption,
+            plantuml.sanitizeOption,
             callout.sanitizeOption,
             attachment.sanitizeOption,
             lsxGrowiDirective.sanitizeOption,
@@ -250,6 +253,7 @@ export const generateSimpleViewOptions = (
     components.refsimg = refsGrowiDirective.RefsImgImmutable;
     components.gallery = refsGrowiDirective.GalleryImmutable;
     components.drawio = drawio.DrawioViewer;
+    components.plantuml = plantuml.PlantUmlViewer;
     components.mermaid = MermaidViewer;
     components.callout = callout.CalloutViewer;
     components.attachment = RichAttachment;
@@ -321,6 +325,7 @@ export const generatePreviewOptions = (
             getCommonSanitizeOption(config),
             drawio.sanitizeOption,
             mermaidSanitizeOption,
+            plantuml.sanitizeOption,
             callout.sanitizeOption,
             attachment.sanitizeOption,
             lsxGrowiDirective.sanitizeOption,
@@ -352,6 +357,7 @@ export const generatePreviewOptions = (
     components.refsimg = refsGrowiDirective.RefsImgImmutable;
     components.gallery = refsGrowiDirective.GalleryImmutable;
     components.drawio = drawio.DrawioViewer;
+    components.plantuml = plantuml.PlantUmlViewer;
     components.mermaid = MermaidViewer;
     components.callout = callout.CalloutViewer;
     components.attachment = RichAttachment;

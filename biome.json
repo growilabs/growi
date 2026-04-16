@@ -101,7 +101,11 @@
   },
   "overrides": [
     {
-      "includes": ["**/vite*.config.ts", "vitest*.config.ts"],
+      "includes": [
+        "**/vite*.config.ts",
+        "vitest*.config.ts",
+        "**/declaration.d.ts"
+      ],
       "linter": {
         "rules": {
           "style": {

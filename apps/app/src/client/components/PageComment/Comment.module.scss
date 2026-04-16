@@ -33,7 +33,7 @@
         visibility: hidden;
       }
 
-      &:hover > .page-comment-control {
+      &:hover > :global(.page-comment-control) {
         visibility: visible;
       }
     }

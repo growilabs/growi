@@ -31,7 +31,7 @@
   "scripts": {
     "generate:marpit-base-css": "node scripts/extract-marpit-css.ts",
     "build": "vite build",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "lint:biome": "biome check",

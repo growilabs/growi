@@ -132,13 +132,16 @@ export class LlmResponseStreamProcessor {
             const validDiff = LlmEditorAssistantDiffSchema.safeParse(item);
             if (!validDiff.success) {
               // Phase 2B: Enhanced error logging for diff validation failures
-              logger.warn('Diff validation failed', {
-                errors: validDiff.error.issues,
-                item: JSON.stringify(item).substring(0, 200),
-                hasStartLine: 'startLine' in item,
-                hasSearch: 'search' in item,
-                hasReplace: 'replace' in item,
-              });
+              logger.warn(
+                {
+                  errors: validDiff.error.errors,
+                  item: JSON.stringify(item).substring(0, 200),
+                  hasStartLine: 'startLine' in item,
+                  hasSearch: 'search' in item,
+                  hasReplace: 'replace' in item,
+                },
+                'Diff validation failed',
+              );
               continue;
             }
 
@@ -146,10 +149,13 @@ export class LlmResponseStreamProcessor {
 
             // Phase 2B: Additional validation for required fields
             if (!diff.startLine) {
-              logger.error('startLine is required but missing in diff', {
-                search: diff.search?.substring(0, 50),
-                replace: diff.replace?.substring(0, 50),
-              });
+              logger.error(
+                {
+                  search: diff.search?.substring(0, 50),
+                  replace: diff.replace?.substring(0, 50),
+                },
+                'startLine is required but missing in diff',
+              );
               continue;
             }
 
@@ -187,7 +193,10 @@ export class LlmResponseStreamProcessor {
       }
     } catch (e) {
       // Ignore parse errors (expected for incomplete JSON)
-      logger.debug('JSON parsing error (expected for partial data):', e);
+      logger.debug(
+        { err: e },
+        'JSON parsing error (expected for partial data)',
+      );
     }
   }
 
@@ -254,7 +263,7 @@ export class LlmResponseStreamProcessor {
       const finalMessage = this.extractFinalMessage(rawBuffer);
       this.options?.dataFinalizedCallback?.(finalMessage, this.replacements);
     } catch (e) {
-      logger.debug('Failed to parse final JSON response:', e);
+      logger.debug({ err: e }, 'Failed to parse final JSON response');
 
       // Send final notification even on error
       const finalMessage = this.extractFinalMessage(rawBuffer);

@@ -54,7 +54,7 @@ export const RecentActivity = (props: RecentActivityProps): JSX.Element => {
 
   useEffect(() => {
     if (error) {
-      logger.error('Failed to fetch recent activity data', error);
+      logger.error({ err: error }, 'Failed to fetch recent activity data');
       toastError(error);
       return;
     }
