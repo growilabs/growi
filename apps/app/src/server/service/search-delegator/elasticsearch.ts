@@ -455,7 +455,10 @@ class ElasticsearchDelegator
       'app:elasticsearchReindexBulkSize',
     );
 
-    const readStream = Activity.find().cursor();
+    const readStream = Activity.find()
+      .select('snapshot.username')
+      .lean()
+      .cursor();
     const batchStream = createBatchStream(bulkSize);
 
     const writeStream = new Writable({
@@ -465,7 +468,12 @@ class ElasticsearchDelegator
           const username = activity.snapshot?.username;
           if (username == null || username === '') return [];
           return [
-            { index: { _index: auditlogIndexName, _id: activity._id } },
+            {
+              index: {
+                _index: auditlogIndexName,
+                _id: activity._id.toString(),
+              },
+            },
             { username },
           ];
         });
@@ -487,6 +495,8 @@ class ElasticsearchDelegator
           );
         } catch (err) {
           logger.error('addAllAuditlogs error on bulk write: ', err);
+          callback(err);
+          return;
         }
 
         callback();
