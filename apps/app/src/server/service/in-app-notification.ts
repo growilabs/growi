@@ -1,11 +1,15 @@
-import type { HasObjectId, IPage, IUser } from '@growi/core';
+import type { HasObjectId, IPage, IPageHasId, IUser } from '@growi/core';
 import { SubscriptionStatusType } from '@growi/core';
 import { subDays } from 'date-fns/subDays';
 import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
 
 import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import { AllEssentialActions } from '~/interfaces/activity';
+import {
+  AllEssentialActions,
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity';
 import type { PaginateResult } from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import type { ActivityDocument } from '~/server/models/activity';
@@ -197,6 +201,45 @@ export class InAppNotificationService {
       logger.error('Error on getUnreadCountByUser', err);
       throw err;
     }
+  };
+
+  insertMentionNotifications = async (
+    mentionedUserIds: Types.ObjectId[],
+    actionUserId: Types.ObjectId,
+    activity: ActivityDocument,
+    page: IPageHasId,
+  ): Promise<void> => {
+    const filteredUserIds = mentionedUserIds.filter(
+      (userId) => userId.toString() !== actionUserId.toString(),
+    );
+
+    if (filteredUserIds.length === 0) {
+      return;
+    }
+
+    const { _id: activityId } = activity;
+    const now = new Date();
+    const snapshot = await generateSnapshot(
+      SupportedTargetModel.MODEL_PAGE,
+      page,
+    );
+
+    const documents = filteredUserIds.map((userId) => ({
+      user: userId,
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+      target: page._id,
+      action: SupportedAction.ACTION_COMMENT_MENTION,
+      status: STATUS_UNOPENED,
+      createdAt: now,
+      snapshot,
+      activities: [activityId],
+    }));
+
+    await InAppNotification.insertMany(documents, { ordered: false });
+    logger.info(
+      `insertMentionNotifications: inserted ${filteredUserIds.length} notifications`,
+    );
+    await this.emitSocketIo(filteredUserIds);
   };
 
   createSubscription = async (
