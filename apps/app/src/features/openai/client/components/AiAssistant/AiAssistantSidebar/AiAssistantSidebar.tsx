@@ -373,10 +373,10 @@ const AiAssistantSidebarSubstance: React.FC<
                   mainMessages.push(data.appendedMessage);
                 },
                 onDetectedDiff: (data) => {
-                  logger.debug('sse diff', { data });
+                  logger.debug({ data }, 'sse diff');
                 },
                 onFinalized: (data) => {
-                  logger.debug('sse finalized', { data });
+                  logger.debug({ data }, 'sse finalized');
                 },
               });
             } else if (trimmedLine.startsWith('error:')) {

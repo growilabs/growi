@@ -1,8 +1,78 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.4.7...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.5.1...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.5.1](https://github.com/growilabs/compare/v7.5.0...v7.5.1) - 2026-04-16
+
+### 💎 Features
+
+* feat(editor): Add full Emacs markdown-mode keybindings (#10980) @yuki-takei
+* feat(ui): Add Other Shortcuts link to modal footer (#10976) @tomoyuki-t-weseek
+* feat(editor): Collaborative editor awareness with rich cursors and off-screen indicators (#10981) @yuki-takei
+* feat: Define actions that result in Create vs Edit activities (#10818) @arvid-e
+* feat(editor): Add full Emacs markdown-mode keybindings (#10980) @yuki-takei
+
+### 🚀 Improvement
+
+* feat(editor): Collaborative editor awareness with rich cursors and off-screen indicators (#10981) @yuki-takei
+* feat: add dedicated share link page API and simplify GET /page (#11000) @miya
+
+### 🐛 Bug Fixes
+
+* fix: Initial page fails to generate automatically upon a new installation (#11007) @miya
+* fix(security): upgrade axios to ^1.15.0 (CVSS 10.0) (#11009) @yuki-takei
+* fix(security): Path traversal (#10998) @mariko-h
+* fix: Initial page fails to generate automatically upon a new installation (#11007) @miya
+* fix: Unify documentation URL locale logic (#10999) @tomoyuki-t-weseek
+* fix(admin): Prevent flickering for V5 Page Migration section on app settings page (#10992) @yuki-takei
+* fix(security): Path traversal (#10998) @mariko-h
+* fix(mail): TypeError when sending test email via SMTP (#10991) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Upgrade Claude Code Spec-Driven Development (SDD) to v3 (#11014) @yuki-takei
+* support: Add contributor (#10985) @satof3
+* support: Migrate logger to pino (#10958) @yuki-takei
+
+## [v7.5.0](https://github.com/growilabs/compare/v7.4.7...v7.5.0) - 2026-04-07
+
+### 💎 Features
+
+* feat(ai): Suggest path to save (#10777) @tomoyuki-t-weseek
+* feat: Audit log bulk export (#10874) @Ryosei-Fukushima
+* feat(page-create-modal): add template help link icon (#10899) @tomoyuki-t-weseek
+* feat: add tooltips to editor toolbar (#10938) @Ryosei-Fukushima
+* feat: Add growi cloud link to audit log settings (#10881) @ryota-t0401
+
+### 🚀 Improvement
+
+* imprv: Staff credit (#10839) @yuki-takei
+* imprv(lsx): Allow spaces in attribute names (#10931) @NJisEverywhere
+* imprv: pre-fill export modal with current filter values (#10944) @NJisEverywhere
+* imprv(presentation): Decouple Marp from GrowiSlides (#10840) @yuki-takei
+* imprv(ui): Implement the improved New button. (#10937) @yuyaiwahori
+
+### 🐛 Bug Fixes
+
+* fix: re-scroll to hash target after lazy-rendered content completes (#10853) @miya
+* fix: Bulk export fails due to S3 upload complete version (#10833) @ryotaro-nagahara
+* fix: Duplicate user data is appearing in the user table at /user/admin (#10940) @miya
+* fix: Deleted users are not displayed in the user list on the user management page (/admin/users) (#10934) @miya
+* fix: Resolve React warnings during page rendering (#10913) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Upgrade Next.js to v16 (#10831) @yuki-takei
+* support(yjs): Migrate collaborative editing transport from y-socket.io to y-websocket (#10889) @yuki-takei
+* support: Upgrade vite v6, vitest v3, and related packages (#10945) @yuki-takei
+* ci(deps-dev): bump vite from 6.4.1 to 6.4.2 (#10960) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Upgrade version-pinned packages and replace escape-string-regexp with RegExp.escape() (#10920) @yuki-takei
+* support: Migrate to Turbopack (#10838) @yuki-takei
+* support: Modernize Dockerfile (#10809) @yuki-takei
+* support: Reclassify deps (#10873) @yuki-takei
+* support(dev): Reduce modules loaded (#10822) @yuki-takei
 
 ## [v7.4.7](https://github.com/growilabs/compare/v7.4.6...v7.4.7) - 2026-03-23
 

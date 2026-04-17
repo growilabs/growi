@@ -250,8 +250,8 @@ export class SlackIntegrationService implements S2sMessageHandlable {
     try {
       await client.chat.postMessage(messageArgs);
     } catch (error) {
-      logger.debug('Post error', error);
-      logger.debug('Sent data to slack is:', messageArgs);
+      logger.debug({ err: error }, 'Post error');
+      logger.debug({ messageArgs }, 'Sent data to slack');
       throw error;
     }
   }
@@ -264,8 +264,8 @@ export class SlackIntegrationService implements S2sMessageHandlable {
     try {
       await slackLegacyUtil.postMessage(messageArgs);
     } catch (error) {
-      logger.debug('Post error', error);
-      logger.debug('Sent data to slack is:', messageArgs);
+      logger.debug({ err: error }, 'Post error');
+      logger.debug({ messageArgs }, 'Sent data to slack');
       throw error;
     }
   }

@@ -562,7 +562,8 @@
       "Code Block": "コードブロック",
       "Comment Out": "非表示にする",
       "Comment Out Desc": "(コメントアウト)"
-    }
+    },
+    "Other Shortcuts": "その他のショートカット"
   },
   "modal_resolve_conflict": {
     "conflicts_with_new_body_on_server_side": "サーバー側の新しい本文と衝突します。ページ本文を選択または編集して衝突を解消してください。",
@@ -693,7 +694,9 @@
     }
   },
   "default_ai_assistant": {
-    "not_set": "デフォルトアシスタントが設定されていません"
+    "not_set": "デフォルトアシスタントが設定されていません",
+    "open_cloud_settings_to_enable": "AI 連携を有効にするには GROWI.cloud の管理画面をご確認ください",
+    "to_cloud_settings": "GROWI.cloud の管理画面へ"
   },
   "ai_assistant_substance": {
     "add_assistant": "アシスタントを追加する",

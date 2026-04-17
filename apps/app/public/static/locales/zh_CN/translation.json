@@ -520,7 +520,8 @@
       "Code Block": "代码块",
       "Comment Out": "隐藏",
       "Comment Out Desc": "（注释）"
-    }
+    },
+    "Other Shortcuts": "其他快捷键"
   },
   "modal_resolve_conflict": {
     "conflicts_with_new_body_on_server_side": "与服务器端的新正文文本冲突。 请选择或编辑页面正文以解决冲突",
@@ -651,7 +652,9 @@
     }
   },
   "default_ai_assistant": {
-    "not_set": "未设置默认助手"
+    "not_set": "未设置默认助手",
+    "open_cloud_settings_to_enable": "请查看 GROWI.cloud 管理界面以启用 AI 集成",
+    "to_cloud_settings": "前往 GROWI.cloud 管理界面"
   },
   "ai_assistant_substance": {
     "add_assistant": "添加助手",

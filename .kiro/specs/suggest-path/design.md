@@ -343,17 +343,3 @@ interface SuggestPathResponse {
 
 Each component fails independently. Memo is always generated first as guaranteed fallback.
 
-## Security Considerations
-
-- **Authentication**: All requests require valid API token or login session (standard middleware)
-- **Authorization**: Search results are permission-scoped via `searchKeyword()` user/group parameters
-- **Input safety**: Content body is passed to GROWI AI, not directly to Elasticsearch — no NoSQL injection risk
-- **AI prompt injection**: System prompt and user content are separated to minimize prompt injection risk
-- **Information leakage**: Error responses use generic messages (Req 9.2)
-
-## Performance Considerations
-
-- Content analysis and candidate evaluation are sequential (ES sits between) — 2 AI roundtrips minimum
-- Search-evaluate pipeline and category generation run in parallel to minimize total latency
-- ES snippets (not full page bodies) are passed to AI to manage context budget
-- Score threshold filtering reduces the number of candidates passed to the 2nd AI call

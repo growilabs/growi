@@ -23,7 +23,6 @@ export default class AdminAppContainer extends Container {
       isEmailPublishedForNewUser: true,
       isReadOnlyForNewUser: false,
 
-      isV5Compatible: null,
       siteUrl: '',
       siteUrlUseOnlyEnvVars: null,
       envSiteUrl: '',
@@ -68,7 +67,6 @@ export default class AdminAppContainer extends Container {
       globalLang: appSettingsParams.globalLang,
       isEmailPublishedForNewUser: appSettingsParams.isEmailPublishedForNewUser,
       isReadOnlyForNewUser: appSettingsParams.isReadOnlyForNewUser,
-      isV5Compatible: appSettingsParams.isV5Compatible,
       siteUrl: appSettingsParams.siteUrl,
       siteUrlUseOnlyEnvVars: appSettingsParams.siteUrlUseOnlyEnvVars,
       envSiteUrl: appSettingsParams.envSiteUrl,
@@ -125,13 +123,6 @@ export default class AdminAppContainer extends Container {
    */
   changeIsReadOnlyForNewUserShow(isReadOnlyForNewUser) {
     this.setState({ isReadOnlyForNewUser });
-  }
-
-  /**
-   * Change site url
-   */
-  changeIsV5Compatible(isV5Compatible) {
-    this.setState({ isV5Compatible });
   }
 
   /**

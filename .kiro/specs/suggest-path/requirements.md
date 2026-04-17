@@ -36,7 +36,7 @@ Phase 2 was revised based on reviewer feedback: (1) flow/stock information class
 
 **Summary**: Extracts top-level path segment from keyword-matched pages as a `category` type suggestion. Includes parent grant. Omitted if no match found.
 
-> **Note**: May overlap with the AI-based evaluation approach (Reqs 11, 12). Whether to retain, merge, or remove will be determined after reviewer discussion.
+> **Note**: After reviewer discussion, the prior implementation was retained as-is. Potential overlap with the AI-based evaluation approach (Reqs 11, 12) was acknowledged; merging or removal deferred to a future iteration.
 
 ### Requirement 5: Content Analysis via GROWI AI (Phase 2)
 
