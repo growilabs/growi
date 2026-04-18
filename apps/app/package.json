@@ -121,6 +121,7 @@
     "@replit/codemirror-vscode-keymap": "^6.0.2",
     "@slack/web-api": "^6.2.4",
     "@slack/webhook": "^6.0.0",
+    "@swc/helpers": "^0.5.18",
     "@tanstack/react-virtual": "^3.13.12",
     "@types/async": "^3.2.24",
     "@types/multer": "^1.4.12",
@@ -274,9 +275,12 @@
     "swr": "^2.3.2",
     "throttle-debounce": "^5.0.0",
     "ts-deepmerge": "^6.2.0",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0",
     "tslib": "^2.8.0",
     "uglifycss": "^0.0.29",
     "uid-safe": "^2.1.5",
+    "umzug": "^3.8.2",
     "unified": "^11.0.0",
     "unist-util-visit": "^5.0.0",
     "unstated": "^2.1.1",
@@ -349,7 +353,6 @@
     "supertest": "^7.1.4",
     "swagger2openapi": "^7.0.8",
     "tinykeys": "^3.0.0",
-    "umzug": "^3.8.2",
     "unist-util-is": "^6.0.0",
     "unist-util-visit-parents": "^6.0.0"
   }
