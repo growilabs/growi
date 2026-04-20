@@ -19,7 +19,7 @@ export const getContributions = async (userId: string) => {
 };
 
 export const addContribution = async (userId: string) => {
-  if (typeof userId !== 'string' || !mongoose.Types.ObjectId.isValid(userId)) {
+  if (userId == null || !mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('User ID is invalid.');
   }
 

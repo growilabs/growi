@@ -64,9 +64,21 @@ class ActivityService {
         );
 
         if (shouldGenerateContribution) {
-          addContribution(parameters.user).catch((err) => {
-            logger.error('Failed to update contribution:', err);
-          });
+          const user =
+            parameters.user ||
+            parameters.event?.creator ||
+            parameters.target?.lastUpdateUser;
+
+          if (user) {
+            addContribution(user).catch((err) => {
+              logger.error(`Failed to update contribution: ${err.message}`);
+            });
+          } else {
+            logger.warn(
+              'Could not find a valid user for contribution. Parameters:',
+              parameters,
+            );
+          }
         }
 
         if (shoudUpdate) {
