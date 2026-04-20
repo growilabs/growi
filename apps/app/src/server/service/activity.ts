@@ -2,7 +2,7 @@ import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
-import Contribution from '~/features/contribution-graph/server/models/contribution-model';
+import { addContribution } from '~/features/contribution-graph/server/services/contribution-service';
 import type { IActivity, SupportedActionType } from '~/interfaces/activity';
 import {
   ActionGroupSize,
@@ -64,27 +64,9 @@ class ActivityService {
         );
 
         if (shouldGenerateContribution) {
-          try {
-            const today = new Date();
-            today.setUTCHours(0, 0, 0, 0);
-
-            await Contribution.findOneAndUpdate(
-              {
-                user: parameters.user,
-                date: today,
-              },
-              {
-                $inc: { count: 1 },
-              },
-              {
-                upsert: true,
-                new: true,
-                setDefaultsOnInsert: true,
-              },
-            );
-          } catch (err) {
-            logger.error('Contribution update failed', err);
-          }
+          addContribution(parameters.user).catch((err) => {
+            logger.error('Failed to update contribution:', err);
+          });
         }
 
         if (shoudUpdate) {
