@@ -566,10 +566,10 @@ class ElasticsearchDelegator
           }
 
           logger.info(
-            `addAllAuditlogs progressing: (count=${bulkResponse.items?.length ?? 0}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`,
+            `Adding auditlogs progressing: (count=${bulkResponse.items?.length ?? 0}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`,
           );
         } catch (err) {
-          logger.error('addAllAuditlogs error on bulk write: ', err);
+          logger.error(`Adding auditlogs has completed.`, err);
           callback(err);
           return;
         }
