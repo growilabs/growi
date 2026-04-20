@@ -1,195 +1,221 @@
-# Implementation Plan
+# 実装計画
 
-## Phase 1: Remaining Shared Packages ESM Conversion
+以下のタスク集は design.md の Phased Migration (Phase 1–5) と Phase 6 の end-to-end 検証に対応する。各 major task の末尾には phase gate を設け、成功時のみ次 phase に進む (Req 6.6)。
 
-- [ ] 1. Convert remaining shared packages to ESM declarations
-- [ ] 1.1 (P) Convert `@growi/pdf-converter-client` to ESM
-  - Add `"type": "module"` to `package.json`
-  - Update `tsconfig.json` to use `"module": "ESNext"` and `"moduleResolution": "Bundler"` if not already set
-  - Rename `orval.config.js` to `orval.config.cjs` to preserve CJS semantics for the Orval CLI
-  - Verify `turbo run build --filter @growi/pdf-converter-client` passes
-  - _Requirements: 1.1, 1.3_
+## Phase 1: 残余共有パッケージの ESM 宣言
 
-- [ ] 1.2 (P) Convert `@growi/preset-templates` to ESM
-  - Add `"type": "module"` to `package.json`
-  - This package has no JS source (plugin data only); conversion is config-only
-  - Verify build passes
-  - _Requirements: 1.1, 1.3_
+- [ ] 1. 共有パッケージ 5 つを ESM 宣言に揃える
+- [ ] 1.1 (P) `@growi/pdf-converter-client` を ESM 化
+  - `packages/pdf-converter-client/package.json` に `"type": "module"` を追加
+  - `packages/pdf-converter-client/orval.config.js` を `orval.config.cjs` にリネーム
+  - `packages/pdf-converter-client/package.json` の orval 関連スクリプトの参照を `.cjs` に更新
+  - `turbo run build --filter @growi/pdf-converter-client` が成功し、orval 生成コードが ESM として解決される
+  - _Requirements: 1.1, 1.2, 5.3_
+  - _Boundary: Package Config Updater (pdf-converter-client)_
 
-- [ ] 1.3 (P) Convert `@growi/preset-themes` to ESM
-  - Add `"type": "module"` to `package.json`
-  - Retain Vite dual (ES + UMD) output — the CJS fallback stays until all consumers are verified ESM-only
-  - Verify `turbo run build --filter @growi/preset-themes` passes
-  - _Requirements: 1.1, 1.2, 1.3_
+- [ ] 1.2 (P) `@growi/preset-templates` を ESM 化
+  - `packages/preset-templates/package.json` に `"type": "module"` を追加
+  - 本パッケージは JS ソースを持たないため設定のみの変更
+  - `turbo run build --filter @growi/preset-templates` が成功
+  - _Requirements: 1.1, 1.2, 5.3_
+  - _Boundary: Package Config Updater (preset-templates)_
 
-- [ ] 1.4 (P) Convert `@growi/core-styles` and `@growi/custom-icons` to ESM
-  - Add `"type": "module"` to both `package.json` files
-  - These packages have no JS output (SCSS/SVG only); declaration is for consistency
-  - Verify builds pass for both packages
-  - _Requirements: 1.1, 1.3_
+- [ ] 1.3 (P) `@growi/preset-themes` を ESM 化 (dual 出力維持)
+  - `packages/preset-themes/package.json` に `"type": "module"` を追加
+  - Vite 設定の `build.lib.formats` に ES と UMD の両方が残っていることを確認
+  - `turbo run build --filter @growi/preset-themes` が成功し、`dist/` に ES と UMD の双方が生成される
+  - _Requirements: 1.1, 1.2, 1.3, 5.3_
+  - _Boundary: Package Config Updater (preset-themes)_
 
-- [ ] 1.5 Verify all shared packages build successfully together
-  - Run `turbo run build` for all 5 converted packages
-  - Confirm no downstream consumer breakage across the monorepo
-  - _Requirements: 1.4_
+- [ ] 1.4 (P) `@growi/core-styles` と `@growi/custom-icons` を ESM 化
+  - 両パッケージの `package.json` に `"type": "module"` を追加
+  - JS 出力を持たないため一貫性目的の宣言のみ
+  - `turbo run build --filter @growi/core-styles --filter @growi/custom-icons` が成功
+  - _Requirements: 1.1, 5.3_
+  - _Boundary: Package Config Updater (core-styles, custom-icons)_
 
-## Phase 2: Type Declarations and Config File Renames
+- [ ] 1.5 Phase 1 統合ゲート
+  - 5 パッケージ変換後に `turbo run build` をモノレポ全体で実行し、`apps/app` を含む下流コンシューマが退行しないことを確認
+  - Phase 1 完了コミットに revert 用のタグを付与
+  - _Requirements: 1.4, 6.6_
+  - _Depends: 1.1, 1.2, 1.3, 1.4_
 
-- [ ] 2. Declare `"type": "module"` in root and app, rename CJS config files
-- [ ] 2.1 Add `"type": "module"` to root and `apps/app` package.json
-  - Add the field to the monorepo root `package.json`
-  - Add the field to `apps/app/package.json`
-  - _Requirements: 5.1, 5.2_
+## Phase 2: ルート/apps/app の type:module 宣言と CJS 隔離
 
-- [ ] 2.2 Rename CJS config files in `apps/app` to `.cjs`
-  - Rename `config/migrate-mongo-config.js` → `.cjs`
-  - Rename `config/next-i18next.config.js` → `.cjs`
-  - Rename `config/i18next.config.js` → `.cjs`
-  - Rename `config/logger/config.dev.js` → `.cjs`
-  - Rename `config/logger/config.prod.js` → `.cjs`
-  - _Requirements: 5.3_
+- [ ] 2. 既定モジュールを ESM に切替え、CJS 残置箇所を明示化
+- [ ] 2.1 (P) `apps/app/src/migrations/` をディレクトリ単位で CJS 隔離
+  - `apps/app/src/migrations/package.json` を新規作成し `{ "type": "commonjs" }` を宣言
+  - `apps/app/tsconfig.build.server.json` の `exclude` に `src/migrations/**` が含まれていることを再確認
+  - `pnpm run dev:migrate` が実 DB に対してマイグレーション読込を成功させる
+  - _Requirements: 5.4, 5.5_
+  - _Boundary: CJS Isolation Strategy (migrations)_
 
-- [ ] 2.3 Preserve CJS semantics for migration files
-  - Add `src/migrations/package.json` with `{ "type": "commonjs" }` so that 60+ migration `.js` files continue to work with `migrate-mongo` CLI under the new `"type": "module"` root
-  - Verify `migrate-mongo` can still discover and execute migration files
-  - _Requirements: 5.3_
-
-- [ ] 2.4 Update all references to renamed config files
-  - Update `package.json` `migrate` script and any CLI arguments that reference `migrate-mongo-config.js`
-  - Update i18next initialization code that imports `next-i18next.config` and `i18next.config`
-  - Update logger initialization that references `config.dev.js` / `config.prod.js`
-  - Update `next.config.prod.cjs` if it references `next-i18next.config.js` by name
-  - Grep the codebase for all remaining references to old filenames and fix them
-  - _Requirements: 5.3_
-
-- [ ] 2.5 Verify Phase 2 builds pass
-  - Run `turbo run build` for all workspaces
-  - Verify no broken config file references at build time
+- [ ] 2.2 (P) `apps/app/config/` の 3 ファイルを `.cjs` にリネーム
+  - `apps/app/config/migrate-mongo-config.js`, `next-i18next.config.js`, `i18next.config.js` をそれぞれ `.cjs` に変更
+  - `apps/app/package.json` 内の `migrate` 系スクリプトと i18next 初期化コードのパス参照を新拡張子に更新
+  - `pnpm run dev:migrate` と i18next 初期化が正常動作することを smoke 確認
   - _Requirements: 5.4_
+  - _Boundary: CJS Isolation Strategy (config files)_
 
-## Phase 3: Server Code ESM Migration
+- [ ] 2.3 ワークスペースルートと `apps/app` に `"type": "module"` を宣言
+  - ルート `package.json` と `apps/app/package.json` の両方に `"type": "module"` を追加
+  - 宣言後に `apps/app/config/*.cjs` および `src/migrations/*.js` が CJS として扱われ続けることを確認
+  - `pnpm install` が成功し、`pnpm why` で解決が変化していないこと
+  - _Requirements: 5.1, 5.2_
+  - _Depends: 2.1, 2.2_
 
-- [ ] 3. Migrate the Express server layer from CJS to ESM
-- [ ] 3.1 Fix circular dependencies in model → service imports
-  - In `models/user/index.js`, move the top-level `import { configManager }` and `import { aclService }` into the model factory body where the `crowi` parameter is available
-  - Extract `configManager` and `aclService` from `crowi` at runtime instead of importing at module level
-  - Audit other model files for similar top-level service imports using grep; fix any found
-  - Verify existing tests still pass after the refactor
-  - _Requirements: 2.2_
+- [ ] 2.4 Phase 2 統合ゲート
+  - `turbo run build` と `turbo run lint` が成功 (サーバ側は依然 CJS でコンパイル)
+  - 既存 dev ランナー (`ts-node` + `tsconfig-paths`) による `pnpm dev` が引き続き起動する
+  - _Requirements: 5.6, 6.6_
+  - _Depends: 2.3_
 
-- [ ] 3.2 Write the jscodeshift custom transform for CJS → ESM conversion
-  - Create a jscodeshift transform that handles all 4 CJS patterns:
-    - Pattern 1: `module.exports = (crowi, app) => { ... }` → named export factory
-    - Pattern 2: `const x = require('module')` → ES import statement
-    - Pattern 3: `require('./page')(crowi, app)` → static import + factory call
-    - Pattern 4: `__dirname` → `import.meta.dirname`
-  - Add `.js` extensions to all relative import specifiers
-  - Test the transform on a representative sample of files (one route, one middleware, one service, one util) and verify output correctness
-  - _Requirements: 2.2, 2.3, 2.4, 2.5_
-  - _Contracts: CodemodTransform Service_
+## Phase 3: apps/app サーバ層の ESM 化
 
-- [ ] 3.3 Run codemod on all server source files
-  - Execute the jscodeshift transform across the server source (82 files with `module.exports`, 179 `require()` occurrences)
-  - Focus particular attention on the API v3 route registry (36 factory require+invoke) and the main route registry (9 factory patterns)
-  - Static imports are safe for all factory patterns — each route module is a leaf receiving `crowi` as parameter
-  - _Requirements: 2.2, 2.3_
-
-- [ ] 3.4 Run ts2esm to fix import extensions
-  - Execute ts2esm as a second pass to add `.js` extensions to any remaining extensionless relative imports
-  - Verify all relative imports in the server directory include file extensions
-  - _Requirements: 2.3_
-
-- [ ] 3.5 Manually convert dynamic require patterns
-  - Convert runtime-computed `require(modulePath)` in the S2S messaging service to `await import(modulePath)`
-  - Convert runtime-computed `require(modulePath)` in the file uploader service to `await import(modulePath)`
-  - Review conditional requires (ternary patterns) and convert to conditional `await import()`
-  - Ensure wrapping functions are marked `async` where needed
-  - _Requirements: 2.5_
-
-- [ ] 3.6 Update server tsconfig to ESM output
-  - Change the server build config from `"module": "CommonJS"` → `"module": "NodeNext"` and `"moduleResolution": "Node"` → `"moduleResolution": "NodeNext"`
-  - This step runs AFTER codemod because `NodeNext` rejects `require()` in ESM context
-  - Verify `turbo run build --filter @growi/app` succeeds with the new config
-  - _Requirements: 2.1_
-  - _Contracts: ServerBuildConfig Config_
-
-- [ ] 3.7 Replace ts-node with tsx for dev server
-  - Add `tsx` to devDependencies
-  - Update the dev server startup script: replace `ts-node/register` + `tsconfig-paths/register` with `--import tsx`
-  - Replace `-r dotenv-flow/config` with `--import dotenv-flow/config`
-  - Remove the `ts-node` CJS override section from `tsconfig.json`
-  - Verify `pnpm run dev` starts the server correctly with tsx
-  - Remove `ts-node`, `tsconfig-paths` from devDependencies if no longer used elsewhere
+- [ ] 3. サーバソースから CJS 構文を排除し、ESM 出力に切替
+- [ ] 3.1 `models/user/*` の service singleton 参照を lazy 化
+  - `configManager` と `aclService` のモジュールトップ import を getter / ラッパ関数経由の遅延取得に置換
+  - research.md §2.3 パターン A に挙げた他のモデルファイルも同様に修正
+  - 既存の `apps/app/src/**/*.integ.ts` を実行し、モデル初期化を経由する統合テストが pass する
   - _Requirements: 2.6_
-  - _Contracts: DevServerConfig Config_
+  - _Boundary: Codemod Transform (models lazy-load)_
 
-- [ ] 3.8 Update production entry point for ESM
-  - Change production startup from `-r dotenv-flow/config` to `--import dotenv-flow/config`
-  - Update the command in `Dockerfile` and/or `docker-compose.yml` if applicable
-  - Verify the compiled ESM output starts and serves requests
-  - _Requirements: 2.6, 6.4, 6.5_
-  - _Contracts: ProdEntryConfig Config_
+- [ ] 3.2 jscodeshift カスタム transform を作成
+  - `tools/codemod/cjs-to-esm.ts` を新規作成し、design.md の 4 パターン (module.exports → export、static require → import、factory require+invoke、conditional require) をすべて扱う
+  - jscodeshift の test utility で 4 パターンそれぞれに input→expected のスナップショットテストを追加
+  - 追加テストが全件 pass
+  - _Requirements: 2.2, 2.3, 2.5, 2.6_
+  - _Boundary: Codemod Transform (tooling)_
 
-- [ ] 3.9 Verify Phase 3 build, lint, and test
-  - Run `turbo run build --filter @growi/app` and verify success
-  - Run `turbo run lint --filter @growi/app` and verify no new warnings
-  - Run `turbo run test --filter @growi/app` and verify no new failures
-  - Confirm no `require()` or `module.exports` patterns remain in converted files (grep check)
-  - _Requirements: 2.6, 2.7, 6.1, 6.2, 6.3_
+- [ ] 3.3 `apps/app/src/server/` に codemod を適用
+  - `tools/codemod/cjs-to-esm.ts` を `apps/app/src/server/**/*.{js,ts}` に対して実行 (`src/migrations/**` を除外)
+  - 変換統計が想定規模 (約 82 ファイルの module.exports、176 箇所の require、56 箇所の factory invoke) と一致することを確認
+  - ESLint ルール `import/no-commonjs` が server 配下で 0 件検出になる
+  - _Requirements: 2.2, 2.3, 2.5, 2.6_
+  - _Depends: 3.1, 3.2_
+  - _Boundary: Codemod Transform (server source)_
 
-## Phase 4: Cleanup
+- [ ] 3.4 `ts2esm` で `.js` 拡張子を補完
+  - `ts2esm` を `apps/app/src/server/` に対して実行
+  - すべての relative import が `.js` 拡張子付きとなる
+  - `NodeNext` 切替前の段階でも `tsc --noEmit` が拡張子起因のエラーを出さないこと
+  - _Requirements: 2.2, 2.3_
+  - _Depends: 3.3_
+  - _Boundary: Codemod Transform (extensions)_
 
-- [ ] 4. Remove transpilePackages entries and pnpm overrides
-- [ ] 4.1 Remove @growi/* packages from transpilePackages
-  - Evaluate and remove first-party @growi/* entries from the transpile packages list in Next.js config
-  - Verify build and SSR runtime resolution for each removed entry
-  - Document any entries that must be retained with justification in code comments
-  - _Requirements: 3.1, 3.2, 3.3, 3.4_
+- [ ] 3.5 `__dirname` / `__filename` を 3 ファイルで手動置換
+  - `apps/app/src/server/crowi/index.ts`, `crowi/dev.js`, `service/i18next.ts` の `__dirname` を `import.meta.dirname` 相当に置換
+  - 置換後も i18next リソース読込とアプリ起動が同じファイルパスに解決されることを smoke で確認
+  - _Requirements: 2.4_
+  - _Boundary: Codemod Transform (dirname)_
 
-- [ ] 4.2 Remove unified/remark/rehype ecosystem from transpilePackages
-  - Test removing the dynamic prefix-based package list (remark-/rehype-/hast-/mdast-/micromark-/unist-) as a batch
-  - If batch removal causes errors, fall back to incremental removal per prefix group
-  - Verify Turbopack SSR resolves these ESM packages correctly without forced transpilation
-  - Retain entries that cause `ERR_MODULE_NOT_FOUND` or `ERR_REQUIRE_ESM` and document
-  - _Requirements: 3.1, 3.2, 3.3, 3.4_
+- [ ] 3.6 `tsconfig.build.server.json` を NodeNext に切替
+  - `"module": "CommonJS"` → `"module": "NodeNext"`、`"moduleResolution": "Node"` → `"moduleResolution": "NodeNext"` に変更
+  - `exclude` に `src/migrations/**` が含まれていることを再確認
+  - `turbo run build --filter @growi/app` が成功し、`transpiled/` 配下に ESM 出力が生成される
+  - _Requirements: 2.1_
+  - _Depends: 3.3, 3.4, 3.5_
+  - _Boundary: Server Build Config_
 
-- [ ] 4.3 Remove remaining hardcoded transpilePackages entries
-  - Evaluate the ~40 hardcoded entries individually or in small groups
-  - Verify build + runtime after each removal batch
-  - Confirm the final transpilePackages list contains only packages genuinely requiring forced transpilation
-  - _Requirements: 3.1, 3.4, 3.5_
+- [ ] 3.7 開発/本番起動スクリプトを tsx / --import に切替
+  - `apps/app/package.json` の `scripts.ts-node` を廃止し、`dev` / `launch-dev:ci` / `repl` / `dev:migrate-mongo` を `tsx` ベースに書き換え
+  - 本番起動スクリプトを `node --import dotenv-flow/config dist/server/app.js` に変更
+  - `pnpm dev` でサーバが起動し、`curl http://localhost:3000/_api/v3/healthcheck` が 200 を返す
+  - _Requirements: 2.7_
+  - _Depends: 3.6_
+  - _Boundary: Dev Runner Adapter_
 
-- [ ] 4.4 (P) Remove pnpm.overrides for `@lykmapipo/common` transitive dependencies
-  - Remove the `flat` override (pinned to 5.0.2) — test with `pnpm install && turbo run build`
-  - Remove the `mime` override (pinned to 3.0.0) — test with `pnpm install && turbo run build`
-  - Remove the `parse-json` override (pinned to 5.2.0) — test with `pnpm install && turbo run build`
-  - Node.js 24 `require(esm)` allows CJS packages to `require()` ESM-only deps (no top-level await in these packages)
-  - If any removal causes failures, retain the override and document the reason
+- [ ] 3.8 Phase 3 統合ゲート
+  - `turbo run build lint test --filter @growi/app` がすべて成功 (test は移行前ベースラインと比較して新規失敗なし)
+  - `pnpm dev` 起動 + Playwright smoke (ログイン / ページ作成 / Markdown 保存 / Yjs 編集) が通る
+  - `import/no-commonjs` が `apps/app/src/server/` で 0 件検出を維持
+  - _Requirements: 2.8, 2.9, 6.1, 6.2, 6.3, 6.6_
+  - _Depends: 3.7_
+
+## Phase 4: transpilePackages の削減
+
+- [ ] 4. `next.config.ts` から CJS 起因エントリを除去
+- [ ] 4.1 prefix グループを 1 つずつ削除評価
+  - `remark-` / `rehype-` / `hast-` / `mdast-` / `micromark-` / `unist-` を順に `listPrefixedPackages` から除外
+  - 各削除後に `turbo run build --filter @growi/app` + `.next/node_modules/` 目視確認 + `pnpm start` で SSR smoke を実行
+  - 失敗した prefix は `next.config.ts` に戻し、インラインコメントで残存理由を記録
+  - 最終的に prefix 配列が最小化されている (削除できたものはすべて削除済み)
+  - _Requirements: 3.1, 3.2, 3.3_
+  - _Boundary: transpilePackages Reducer (prefix groups)_
+
+- [ ] 4.2 hardcoded エントリを評価・削除
+  - 42 件のハードコードエントリをエコシステム単位でグルーピングし、グループごとに削除 → build → smoke を実施
+  - 失敗したエントリは戻してインラインコメントで理由を記録
+  - 残存エントリすべてが CJS 以外の理由を示すインラインコメントを持つ
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 7.2_
+  - _Depends: 4.1_
+  - _Boundary: transpilePackages Reducer (hardcoded)_
+
+- [ ] 4.3 Phase 4 検証: CI `reusable-app-prod.yml` で本番相当確認
+  - GitHub Actions の `reusable-app-prod.yml` を `workflow_dispatch` でトリガ
+  - `build-prod` と `launch-prod` の両ジョブが成功
+  - `check-next-symlinks.sh` が `fslightbox-react` 以外の broken symlink を検出しない
+  - _Requirements: 3.5, 6.4, 6.6_
+  - _Depends: 4.2_
+
+## Phase 5: pnpm.overrides 削除とドキュメント整合
+
+- [ ] 5. CJS 起因の override を除去し、文書を新状態に同期
+- [ ] 5.1 `@lykmapipo/common>flat` override を削除評価
+  - ルート `package.json` の overrides から `flat` ピンを削除
+  - `pnpm install` 成功後 `turbo run build` を実行し、`pnpm why flat` で最新 ESM バージョンが解決されることを確認
+  - サーバを起動し mongoose-gridfs 経由のファイルアップロードフローを smoke
+  - 失敗時は override を戻しインラインコメントで原因記録
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - _Boundary: Overrides Reducer (flat)_
 
-## Phase 5: Full Verification and Documentation
+- [ ] 5.2 `@lykmapipo/common>mime` override を削除評価
+  - overrides から `mime` ピンを削除し、5.1 と同じプロトコル (install → build → file-upload smoke) で検証
+  - `pnpm why mime` で最新 ESM バージョンが解決される
+  - 失敗時は戻してインラインコメントで原因記録
+  - _Requirements: 4.1, 4.2, 4.3, 4.4_
+  - _Depends: 5.1_
+  - _Boundary: Overrides Reducer (mime)_
 
-- [ ] 5. End-to-end verification and documentation updates
-- [ ] 5.1 Run full monorepo build, lint, and test
-  - Execute `turbo run build` for all workspaces and verify success
-  - Execute `turbo run lint` for all workspaces and verify pass
-  - Execute `turbo run test` for all workspaces and verify no new failures
-  - _Requirements: 6.1, 6.2, 6.3_
+- [ ] 5.3 `@lykmapipo/common>parse-json` override を削除評価
+  - overrides から `parse-json` ピンを削除し、5.1 と同じプロトコルで検証
+  - `axios` override は変更しないことを確認
+  - 失敗時は戻してインラインコメントで原因記録
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - _Depends: 5.2_
+  - _Boundary: Overrides Reducer (parse-json)_
 
-- [ ] 5.2 Verify production assembly and runtime
-  - Run the production assembly script and verify it produces a working artifact
-  - Start the production server and verify Express, Next.js SSR, and WebSocket connections function correctly
-  - Verify the Next.js symlink check passes after transpilePackages cleanup
-  - _Requirements: 6.4, 6.5, 6.6_
-
-- [ ] 5.3 Update package.json dependency comments and transpilePackages justifications
-  - Remove obsolete CJS/ESM pinning notes from dependency comment blocks
-  - Add justification comments for any remaining transpilePackages entries
-  - Document packages with special constraints (handsontable license pinning, @keycloak deferred upgrade)
+- [ ] 5.4 dependency コメントとインライン理由を整理
+  - `package.json` の `// comments for dependencies` から解消済みの CJS/ESM ピン記述を削除
+  - 残存する `transpilePackages` / `pnpm.overrides` のすべてのエントリにインライン理由コメントが存在することを確認
   - _Requirements: 7.1, 7.2, 7.3_
+  - _Depends: 4.2, 5.3_
 
-- [ ] 5.4 Update steering and project documentation
-  - Update `.kiro/steering/tech.md` to reflect ESM architecture
-  - Update production assembly documentation if the startup command changed
-  - Remove outdated references to CJS workarounds in project docs
-  - _Requirements: 7.1, 7.2, 7.3_
+- [ ] 5.5 ステアリング文書と auto-loaded skill を同期更新
+  - `.kiro/steering/tech.md` の Production Assembly / Turbopack 外部化の記述を ESM 前提に書き換え
+  - `.claude/skills/tech-stack/SKILL.md` と `.claude/skills/monorepo-overview/SKILL.md` の CJS/ESM 関連節を最新化
+  - 更新後の文書に含まれるコードブロックや件数がリポジトリ実態と一致する
+  - _Requirements: 7.4_
+  - _Depends: 5.4_
+
+## Phase 6: 本番アセンブリ end-to-end 検証
+
+- [ ] 6. 本番アーティファクトで全要件を最終確認
+- [ ] 6.1 `assemble-prod.sh` をローカル実行し本番相当アーティファクトを生成
+  - `assemble-prod.sh` が成功し、既定出力ディレクトリに成果物が生成される
+  - `check-next-symlinks.sh` が `fslightbox-react` 以外の broken symlink を検出しない
+  - _Requirements: 6.4_
+  - _Depends: 5.5_
+
+- [ ] 6.2 本番アーティファクトを起動して機能 smoke
+  - `node --import dotenv-flow/config dist/server/app.js` でサーバを起動
+  - Playwright もしくは手動で API (apiv3 代表エンドポイント) / Next.js SSR ページ / WebSocket (Yjs 編集) の 3 項目が機能することを確認
+  - 起動時間が移行前ベースラインの ±20% 以内
+  - _Requirements: 6.5_
+  - _Depends: 6.1_
+
+- [ ] 6.3 CI 最終通過
+  - `reusable-app-prod.yml` を `workflow_dispatch` で実行し、`build-prod` と `launch-prod` の両ジョブが成功
+  - 全 Phase の変更を含むブランチが `server:ci` でエラーなく起動・終了する
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
+  - _Depends: 6.2_
