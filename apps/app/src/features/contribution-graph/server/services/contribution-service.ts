@@ -27,7 +27,7 @@ export const getContributions = async (userId: string) => {
 
 export const addContribution = async (userId: string) => {
   if (userId == null || !mongoose.Types.ObjectId.isValid(userId)) {
-    throw new Error('User ID is invalid.');
+    throw new Error('User ID is invalid');
   }
 
   const today = new Date();
