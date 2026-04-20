@@ -1,0 +1,15 @@
+{
+  "feature_name": "attachment-search-ui",
+  "created_at": "2026-04-17T16:30:00.000Z",
+  "updated_at": "2026-04-17T16:30:00.000Z",
+  "language": "ja",
+  "phase": "design-generated",
+  "derived_from": "full-text-search-for-attachments",
+  "dependencies": ["attachment-search-indexing"],
+  "approvals": {
+    "requirements": { "generated": true, "approved": false },
+    "design": { "generated": true, "approved": false },
+    "tasks": { "generated": false, "approved": false }
+  },
+  "ready_for_implementation": false
+}
