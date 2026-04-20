@@ -446,6 +446,8 @@ export type PromptInputProps = Omit<
   // Minimal constraints
   maxFiles?: number;
   maxFileSize?: number; // bytes
+  /** Extra className forwarded to the inner InputGroup wrapper. */
+  inputGroupClassName?: string;
   onError?: (err: {
     code: 'max_files' | 'max_file_size' | 'accept';
     message: string;
@@ -464,6 +466,7 @@ export const PromptInput = ({
   syncHiddenInput,
   maxFiles,
   maxFileSize,
+  inputGroupClassName,
   onError,
   onSubmit,
   children,
@@ -770,7 +773,7 @@ export const PromptInput = ({
         onSubmit={handleSubmit}
         {...props}
       >
-        <InputGroup>{children}</InputGroup>
+        <InputGroup className={inputGroupClassName}>{children}</InputGroup>
       </form>
     </>
   );

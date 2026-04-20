@@ -150,8 +150,14 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         const uiMessageStream = createUIMessageStream({
           originalMessages: messages,
           execute: async ({ writer }) => {
-            for await (const part of toAISdkStream(stream, { from: 'agent' })) {
-              await writer.write(part);
+            // Workaround for https://github.com/mastra-ai/mastra/issues/11884#issuecomment-3799153269
+            // toAISdkStream() returns a ReadableStream that lacks [Symbol.asyncIterator]
+            // in the TypeScript types, so iterate manually via a reader.
+            const reader = toAISdkStream(stream, { from: 'agent' }).getReader();
+            while (true) {
+              const { value, done } = await reader.read();
+              if (done) break;
+              writer.write(value);
             }
           },
         });
