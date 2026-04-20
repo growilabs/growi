@@ -73,34 +73,92 @@
 ## Phase 3: apps/app サーバ層の ESM 化
 
 - [ ] 3. サーバソースから CJS 構文を排除し、ESM 出力に切替
+- [ ] 3.0 循環依存ベースラインの取得と記録
+  - `npx madge --circular --extensions js,ts apps/app/src/server` を実行し結果を `research.md` または PR 本文に保存
+  - 2026-04-20 時点の 25 件ベースラインと件数・ハブ構造が一致することを確認 (差分があれば design.md を更新)
+  - `service/search-delegator/elasticsearch-client-delegator/interfaces.ts` の独立分離 (`crowi/index.ts` 非経由の 1 件) の対処計画を確定
+  - _Requirements: 2.6_
+  - _Boundary: Codemod Transform (pre-analysis)_
+
 - [ ] 3.1 `models/user/*` の service singleton 参照を lazy 化
   - `configManager` と `aclService` のモジュールトップ import を getter / ラッパ関数経由の遅延取得に置換
   - research.md §2.3 パターン A に挙げた他のモデルファイルも同様に修正
   - 既存の `apps/app/src/**/*.integ.ts` を実行し、モデル初期化を経由する統合テストが pass する
   - _Requirements: 2.6_
+  - _Depends: 3.0_
   - _Boundary: Codemod Transform (models lazy-load)_
 
 - [ ] 3.2 jscodeshift カスタム transform を作成
   - `tools/codemod/cjs-to-esm.ts` を新規作成し、design.md の 4 パターン (module.exports → export、static require → import、factory require+invoke、conditional require) をすべて扱う
+  - ディレクトリ引数を受け取る CLI ラッパ (`pnpm codemod:cjs-to-esm -- <path>`) を実装し、step ごとに独立実行できるようにする
   - jscodeshift の test utility で 4 パターンそれぞれに input→expected のスナップショットテストを追加
   - 追加テストが全件 pass
   - _Requirements: 2.2, 2.3, 2.5, 2.6_
   - _Boundary: Codemod Transform (tooling)_
 
-- [ ] 3.3 `apps/app/src/server/` に codemod を適用
-  - `tools/codemod/cjs-to-esm.ts` を `apps/app/src/server/**/*.{js,ts}` に対して実行 (`src/migrations/**` を除外)
-  - 変換統計が想定規模 (約 82 ファイルの module.exports、176 箇所の require、56 箇所の factory invoke) と一致することを確認
-  - ESLint ルール `import/no-commonjs` が server 配下で 0 件検出になる
+- [ ] 3.3 段階適用: codemod を依存の内側から外側へディレクトリ単位で適用
+  - 各 step は単一コミット。失敗時は当該 step のみ revert して原因修正後に再実行する (Req 6.6)
+  - 各 step 完了後に `tsc --noEmit` を実行し、型エラー 0 件を確認 (NodeNext 切替前のため `.js` 拡張子エラーは許容)
+
+- [ ] 3.3.a (step 3.a) `models/` と `events/` を変換
+  - `pnpm codemod:cjs-to-esm -- apps/app/src/server/models apps/app/src/server/events` を実行
+  - `module.exports` → named export、静的 `require` → `import` の 2 パターンが対象
+  - `ReferenceError: Cannot access 'X' before initialization` が発生しないこと (dev build で確認)
+  - _Requirements: 2.2, 2.3_
+  - _Depends: 3.2_
+  - _Boundary: Codemod Transform (models/events)_
+
+- [ ] 3.3.b (step 3.b) `service/` を変換 (`search-delegator` の interface 分離を含む)
+  - `service/search-delegator/elasticsearch-client-delegator/interfaces.ts` と `es7-client-delegator.ts` の循環を、型のみの独立ファイルに分離することで構造解消
+  - `pnpm codemod:cjs-to-esm -- apps/app/src/server/service` を実行
+  - 動的 `require` → `await import` の変換も含む
+  - `*.integ.ts` のうち service 層を触るテストが pass
+  - _Requirements: 2.2, 2.3, 2.5_
+  - _Depends: 3.3.a_
+  - _Boundary: Codemod Transform (service)_
+
+- [ ] 3.3.c (step 3.c) `middlewares/`, `util/`, `pageserv/` 等の非ルートを変換
+  - `pnpm codemod:cjs-to-esm -- apps/app/src/server/middlewares apps/app/src/server/util apps/app/src/server/pageserv` ほか
+  - 各サブツリーで `tsc --noEmit` をクリーン
+  - _Requirements: 2.2, 2.3_
+  - _Depends: 3.3.b_
+  - _Boundary: Codemod Transform (middlewares/util)_
+
+- [ ] 3.3.d (step 3.d) `routes/` 配下の非中央ファイル (~40 本) を変換
+  - `routes/index.js` と `routes/apiv3/index.js` を **除く** `routes/**/*.js` に対して codemod を実行
+  - factory DI (`module.exports = (crowi, app) => ...`) を named export に変換
+  - _Requirements: 2.2, 2.3, 2.6_
+  - _Depends: 3.3.c_
+  - _Boundary: Codemod Transform (routes leaves)_
+
+- [ ] 3.3.e (step 3.e) `routes/index.js` (中央ルーター 12 箇所) を変換
+  - factory invoke (`require('./x')(crowi, app)`) を `import { setup as setupX } from './x.js'; const x = setupX(crowi, app);` に変換
+  - 変換後に `pnpm dev` を起動し、`/_api/v3/healthcheck` が 200 を返すこと
+  - _Requirements: 2.3, 2.6_
+  - _Depends: 3.3.d_
+  - _Boundary: Codemod Transform (routes/index)_
+
+- [ ] 3.3.f (step 3.f) `routes/apiv3/index.js` (中央ルーター 44 箇所) を変換
+  - 3.3.e と同じ規約で 44 エントリを名前付き factory invoke に変換
+  - supertest もしくは手動で apiv3 代表エンドポイント (例: `/_api/v3/healthcheck`, `/_api/v3/users`, `/_api/v3/page`) がそれぞれ想定ステータスを返すこと
+  - _Requirements: 2.3, 2.6_
+  - _Depends: 3.3.e_
+  - _Boundary: Codemod Transform (routes/apiv3/index)_
+
+- [ ] 3.3.g (step 3.g) `crowi/` を変換し `import/no-commonjs` 0 件を達成
+  - `crowi/index.ts`, `crowi/setup-models.ts`, `crowi/dev.js` に codemod を適用
+  - 変換完了後、ESLint `import/no-commonjs` が `apps/app/src/server/` 全域で 0 件検出
+  - 変換統計が想定規模 (約 82 ファイルの module.exports、176 箇所の require、56 箇所の factory invoke) と累計で一致
   - _Requirements: 2.2, 2.3, 2.5, 2.6_
-  - _Depends: 3.1, 3.2_
-  - _Boundary: Codemod Transform (server source)_
+  - _Depends: 3.3.f_
+  - _Boundary: Codemod Transform (crowi)_
 
 - [ ] 3.4 `ts2esm` で `.js` 拡張子を補完
   - `ts2esm` を `apps/app/src/server/` に対して実行
   - すべての relative import が `.js` 拡張子付きとなる
   - `NodeNext` 切替前の段階でも `tsc --noEmit` が拡張子起因のエラーを出さないこと
   - _Requirements: 2.2, 2.3_
-  - _Depends: 3.3_
+  - _Depends: 3.3.g_
   - _Boundary: Codemod Transform (extensions)_
 
 - [ ] 3.5 `__dirname` / `__filename` を 3 ファイルで手動置換
@@ -127,8 +185,9 @@
 
 - [ ] 3.8 Phase 3 統合ゲート
   - `turbo run build lint test --filter @growi/app` がすべて成功 (test は移行前ベースラインと比較して新規失敗なし)
-  - `pnpm dev` 起動 + Playwright smoke (ログイン / ページ作成 / Markdown 保存 / Yjs 編集) が通る
+  - `pnpm dev` 起動 + Playwright smoke (ログイン / ページ作成 / Markdown 保存) が通る
   - `import/no-commonjs` が `apps/app/src/server/` で 0 件検出を維持
+  - Yjs / WebSocket の確認は Phase 6 (6.2) に委譲 (既存 Playwright スペック未整備のため)
   - _Requirements: 2.8, 2.9, 6.1, 6.2, 6.3, 6.6_
   - _Depends: 3.7_
 
@@ -209,10 +268,20 @@
 
 - [ ] 6.2 本番アーティファクトを起動して機能 smoke
   - `node --import dotenv-flow/config dist/server/app.js` でサーバを起動
-  - Playwright もしくは手動で API (apiv3 代表エンドポイント) / Next.js SSR ページ / WebSocket (Yjs 編集) の 3 項目が機能することを確認
+  - **API**: apiv3 代表エンドポイント (`/_api/v3/healthcheck` ほか 2 種) が期待ステータスを返す
+  - **SSR**: トップページと任意のユーザページを HTTP GET し、200 応答で HTML 内に期待文字列が含まれること
+  - **WebSocket (socket.io)**: `curl --include --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" http://$HOST/socket.io/` が接続確立 (101 もしくは認証拒否の 4xx) で、5xx / `ERR_MODULE_NOT_FOUND` ではないこと
+  - **WebSocket (Yjs)**: 2 クライアントで同一ページを Chromium で開き、クライアント A の編集が 2 秒以内にクライアント B に反映されること。DevTools Network で `ws://.../y-websocket` が `101 Switching Protocols` で確立
   - 起動時間が移行前ベースラインの ±20% 以内
   - _Requirements: 6.5_
   - _Depends: 6.1_
+
+- [ ] 6.2.1 (任意) Yjs 同期 Playwright スペックを追加
+  - `apps/app/playwright/23-editor/yjs-sync.spec.ts` (仮) を追加し 6.2 の Yjs 手順を自動化
+  - `reusable-app-prod.yml` の `launch-prod` で自動実行されるよう組み込む
+  - 本タスクは CI 自動化を目的とする延命措置で、6.2 の手動 smoke 成功が Req 6.5 の充足条件である
+  - _Requirements: 6.5_
+  - _Depends: 6.2_
 
 - [ ] 6.3 CI 最終通過
   - `reusable-app-prod.yml` を `workflow_dispatch` で実行し、`build-prod` と `launch-prod` の両ジョブが成功

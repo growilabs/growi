@@ -85,6 +85,19 @@ GROWI モノレポのモジュールシステムは層状になっている:
 - Factory DI (`require('./route')(crowi, app)`) は Crowi インスタンスをランタイム引数として渡す形で 2 中央ファイルに集中 (`routes/index.js` 12 箇所 / `routes/apiv3/index.js` 44 箇所)。
 - `models/user/index.js` がモジュールトップレベルで `configManager` と `aclService` を import し、`configManager` が `models/config` を動的 require する循環チェーンを形成。ESM の strict loading ではここが最初に破綻する候補。
 
+**循環依存ベースライン** (`madge --circular apps/app/src/server` 実行結果 — 2026-04-20 時点):
+
+- 合計 **25 件** の循環依存が CJS 状態で既に存在。全体のトポロジーは **`crowi/index.ts` がハブ** として機能し、25 件中 23 件が `crowi/index.ts` を経由する。
+- 主要グループ:
+  - `crowi/index.ts` ↔ `setup-models.ts` (`models/bookmark.ts`, `models/page.ts` 経由を含む) — 3 件
+  - `crowi/index.ts` ↔ `events/*` (activity, admin, bookmark, page, tag, user) — 6 件
+  - `crowi/index.ts` ↔ `service/*` (activity, app, attachment, comment, customize, g2g-transfer, in-app-notification, installer, page-operation, search, slack-integration, socket-io, user-group) — 13 件
+  - `crowi/index.ts` ↔ `middlewares/login-required.ts` — 1 件
+  - `service/socket-io/socket-io.ts` ↔ `middlewares/admin-required.ts` — 1 件
+  - `service/search-delegator/elasticsearch-client-delegator/{es7-client-delegator,interfaces}.ts` — 1 件 (`crowi/index.ts` 非経由)
+- CJS では `require()` の遅延評価により静かに成立していた循環が、ESM の静的 hoisting 下では `ReferenceError: Cannot access 'X' before initialization` として顕在化しうる。
+- 対処方針: **Crowi クラスを直接 import しない** 依存方向を徹底し、各 service/event/model ファイルは Crowi インスタンスを引数経由でのみ受け取る (factory DI 維持)。`service/search-delegator/elasticsearch-client-delegator/*` の 1 件は `interfaces.ts` を分離する構造修正で解消する。
+
 ### Architecture Pattern & Boundary Map
 
 ```mermaid
@@ -408,15 +421,31 @@ sequenceDiagram
 
 ##### Batch Contract
 
-- Trigger: 開発者が Phase 3 実行時に `pnpm codemod:cjs-to-esm` 等の one-shot スクリプトで起動
-- Input / validation: `apps/app/src/server/**/*.{js,ts}` を glob で取得、`src/migrations/**` を除外
-- Output: 入力ファイルを in-place 変換 (`--run-in-band`)。変換統計 (変換数/ファイル数) を標準出力
-- Idempotency & recovery: 再実行しても既 ESM ファイルには no-op。失敗時は `git checkout` でロールバック
+- Trigger: 開発者が Phase 3 実行時に `pnpm codemod:cjs-to-esm -- <path>` で **ディレクトリ単位** に起動
+- Input / validation: 引数で与えられたサブツリーを glob で取得、`src/migrations/**` を除外。`--run-mode={lazy-only,full}` で段階的な変換を許容
+- Output: 入力ファイルを in-place 変換。変換統計 (変換数/ファイル数) を標準出力
+- Idempotency & recovery: 再実行しても既 ESM ファイルには no-op。失敗時は当該ディレクトリの git revert でロールバック
+
+**段階適用プロトコル (Phase 3)**
+
+1 回のコミットで全 160+ ファイルを変換するのではなく、依存の内側 (leaf) から外側 (root) へディレクトリ単位で適用する。各ステップ間で `tsc --noEmit` と `pnpm dev` smoke を実行し、循環依存起因の `ReferenceError` を早期検出する。
+
+| Step | 対象ディレクトリ | 変換パターン | 検証 |
+|------|------------------|-------------|------|
+| 3.a | `models/`, `events/` (leaf side) | `module.exports` → named export、静的 `require` → `import` | `tsc --noEmit` |
+| 3.b | `service/` (`search-delegator/*` の interface 分離を含む) | 同上 + 動的 `require` → `await import` | `tsc --noEmit` + unit test |
+| 3.c | `middlewares/`, `util/`, `pageserv/`, その他非ルート | 同上 | `tsc --noEmit` + integ test |
+| 3.d | `routes/` (中央以外の ~40 ファイル) | factory DI (`module.exports = (crowi, app) => ...`) → named export | `tsc --noEmit` |
+| 3.e | `routes/index.js` (12 箇所) | factory invoke → `import` + 明示呼び出し | `pnpm dev` smoke (healthcheck 200) |
+| 3.f | `routes/apiv3/index.js` (44 箇所) | 同上 | `pnpm dev` smoke + apiv3 代表 endpoint |
+| 3.g | `crowi/` | factory DI + `__dirname` 置換 | full build + smoke |
+
+各 step は単一コミット。失敗時は **当該 step のみ revert** することで Phase 3 全体の巻き戻しを回避できる。Step 3.a で顕在化する可能性が高い `models/user/*` の lazy 化 (本 spec Phase 3.1 タスク) は、この step の前段で先行実施する。
 
 **Implementation Notes**
 - Integration: 完了後に `pnpm lint` + `tsc --noEmit` で enforcement、残存 CJS を ESLint `import/no-commonjs` で検出。
 - Validation: transform を `routes/page.js` 等の代表ファイルで単体テストしてから一括適用。
-- Risks: (1) TypeScript の factory シグネチャ保持、(2) CommonJS wrapping された default export が named export と衝突、(3) 循環依存の顕在化。(1)(2) は transform 内で型注釈を保持して対処、(3) は `models/user` の lazy 化で先行対処する。
+- Risks: (1) TypeScript の factory シグネチャ保持、(2) CommonJS wrapping された default export が named export と衝突、(3) 循環依存の顕在化。(1)(2) は transform 内で型注釈を保持して対処、(3) は上記ベースライン 25 件に対し **Crowi を引数経由のみで受け取る依存方向を維持する変換規約** で対処。`search-delegator` 1 件は `interfaces.ts` 分離で構造解消する。
 
 #### Dev Runner Adapter
 
@@ -606,8 +635,11 @@ sequenceDiagram
 
 ### E2E / UI Tests
 
-- `pnpm dev` → Playwright (既存) でのスモーク: ログイン / ページ作成 / Yjs 編集 / Markdown 保存。
-- `assemble-prod.sh` 成果物起動 + Playwright: Req 6.5 の Express API / Next.js SSR / WebSocket 確認。
+- `pnpm dev` → Playwright 既存スペック: ログイン (`auth.setup.ts`) / ページ作成 (`20-basic-features/create-page-button.spec.ts`) / Markdown 保存 (`23-editor/saving.spec.ts`)。
+- **WebSocket / Yjs カバレッジギャップ** (2026-04-20 時点): `apps/app/playwright/` 配下に Yjs / socket.io / y-websocket を実走するスペックは **現存しない**。Req 6.5 を充足するため、Phase 6 で以下を追加もしくは代替手段で検証する。
+  - **追加するスペック (または手動プロトコル)**: 2 クライアントで同一ページを開き、クライアント A での編集がクライアント B に 2 秒以内に反映されること (Yjs awareness + document sync)。併せて Chromium devtools の Network タブで `ws://.../socketio/` と `ws://.../y-websocket` のハンドシェイクが `101 Switching Protocols` で確立することを確認。
+  - **サーバ側 smoke**: `apps/app/src/server/service/yjs/upgrade-handler.ts` と `service/socket-io/socket-io.ts` が ESM 解決下で起動時にロードされ、HTTP Upgrade リクエストを処理すること。CI の `launch-prod` ジョブで `curl --include --http1.1 --header "Connection: Upgrade" --header "Upgrade: websocket" http://$HOST/socket.io/` が 101 または期待される 400 を返す (無認証拒否でも接続自体は成立)。
+- `assemble-prod.sh` 成果物起動 + 上記 Yjs smoke を Phase 6 で実行し、Req 6.5 の Express API / Next.js SSR / WebSocket すべてを同じ本番相当バイナリで確認する。
 
 ### Performance / Runtime Smoke
 
@@ -628,14 +660,23 @@ flowchart TB
         B3[add src migrations package.json commonjs]
         B4[update references and scripts]
     end
-    subgraph Phase3[Phase 3 Server ESM]
+    subgraph Phase3[Phase 3 Server ESM - staged by directory]
+        C0[madge baseline capture]
         C1[lazy load models user configManager aclService]
-        C2[run jscodeshift custom transform]
+        C2a[codemod step 3a models and events]
+        C2b[codemod step 3b service incl search-delegator split]
+        C2c[codemod step 3c middlewares util pageserv others]
+        C2d[codemod step 3d routes non-central]
+        C2e[codemod step 3e routes index]
+        C2f[codemod step 3f routes apiv3 index]
+        C2g[codemod step 3g crowi]
         C3[ts2esm extension fixer]
         C4[manual replace __dirname]
         C5[switch tsconfig to NodeNext]
         C6[switch scripts to tsx and import dotenv]
         C7[verify build lint test and smoke]
+
+        C0 --> C1 --> C2a --> C2b --> C2c --> C2d --> C2e --> C2f --> C2g --> C3 --> C4 --> C5 --> C6 --> C7
     end
     subgraph Phase4[Phase 4 transpilePackages]
         D1[per entry remove]
