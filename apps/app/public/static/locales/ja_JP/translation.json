@@ -1136,7 +1136,6 @@
     "template": "テンプレート",
     "text_formatting": "テキスト書式"
   },
-
   "editor_guide": {
     "title": "エディターガイド",
     "tabs": {
@@ -1161,7 +1160,8 @@
       "link_sandbox": "砂場ページはこちら",
       "all_important": "このテキストはすべて\n重要です",
       "sub_text": "下付き",
-      "sup_text": "上付き"
+      "sup_text": "上付き",
+      "is_text": "これは{{val}}です"
     },
     "layout": {
       "copy_done": "コピーしました！",
@@ -1197,14 +1197,13 @@
       "copy_done": "コピーしました！",
       "style": "スタイル",
       "alert": "アラート",
+      "alert_with_custom_title": "ラベル付きアラート",
+      "alert_with_custom_title_text": "カスタムタイトル",
+      "alert_unavailable": "このスタイルでは使用できません",
       "badge": "バッジ",
       "text_color": "テキストカラー",
       "back_color": "背景色",
-      "alert_block": "アラートブロック",
-      "important_label": "Important",
-      "important_text": "重要な情報",
-      "caution_label": "Caution",
-      "caution_text": "禁止事項や警告",
+
       "placeholder": "テキストが入ります",
       "docs_title": "Bootstrap5 公式ドキュメント",
       "docs_badge": "バッジの詳細はこちら",

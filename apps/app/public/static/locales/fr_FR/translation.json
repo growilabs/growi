@@ -1095,7 +1095,6 @@
     "template": "Modèle",
     "text_formatting": "Mise en forme du texte"
   },
-
   "editor_guide": {
     "title": "Guide de l'Éditeur",
     "tabs": {
@@ -1120,7 +1119,8 @@
       "link_sandbox": "La page bac à sable est ici",
       "all_important": "Tout ce texte est\nimportant",
       "sub_text": "indice",
-      "sup_text": "exposant"
+      "sup_text": "exposant",
+      "is_text": "Ceci est du {{val}}"
     },
     "layout": {
       "copy_done": "Copié !",
@@ -1156,14 +1156,13 @@
       "copy_done": "Copié dans le presse-papiers !",
       "style": "Style",
       "alert": "Alerte",
+      "alert_with_custom_title": "Alerte avec étiquette",
+      "alert_with_custom_title_text": "Titre personnalisé",
+      "alert_unavailable": "Non disponible pour ce style",
       "badge": "Badge",
       "text_color": "Couleur du texte",
       "back_color": "Couleur d'arrière-plan",
-      "alert_block": "Bloc d'alerte",
-      "important_label": "Important",
-      "important_text": "Informations importantes",
-      "caution_label": "Attention",
-      "caution_text": "Avertissements ou éléments interdits",
+
       "placeholder": "Le texte s'affiche ici",
       "docs_title": "Documentation officielle de Bootstrap 5",
       "docs_badge": "En savoir plus sur les Badges",

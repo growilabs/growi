@@ -1103,7 +1103,6 @@
     "template": "Template",
     "text_formatting": "Text Formatting"
   },
-
   "editor_guide": {
     "title": "Editor Guide",
     "tabs": {
@@ -1128,7 +1127,8 @@
       "link_sandbox": "Sandbox page is here",
       "all_important": "This text is all\nimportant",
       "sub_text": "subscript",
-      "sup_text": "superscript"
+      "sup_text": "superscript",
+      "is_text": "This is {{val}}"
     },
     "layout": {
       "copy_done": "Copied!",
@@ -1164,14 +1164,12 @@
       "copy_done": "Copied to clipboard!",
       "style": "Style",
       "alert": "Alert",
+      "alert_with_custom_title": "Alert with label",
+      "alert_with_custom_title_text": "Custom Title",
+      "alert_unavailable": "Unavailable in this style",
       "badge": "Badge",
       "text_color": "Text Color",
       "back_color": "Background Color",
-      "alert_block": "Alert Block",
-      "important_label": "Important",
-      "important_text": "Important information",
-      "caution_label": "Caution",
-      "caution_text": "Prohibited items or warnings",
       "placeholder": "Sample text goes here",
       "docs_title": "Bootstrap 5 Official Documentation",
       "docs_badge": "Learn more about Badges",

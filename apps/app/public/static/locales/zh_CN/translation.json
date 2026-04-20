@@ -1108,7 +1108,6 @@
     "template": "模板",
     "text_formatting": "文本格式"
   },
-
   "editor_guide": {
     "title": "编辑器指南",
     "tabs": {
@@ -1133,7 +1132,8 @@
       "link_sandbox": "沙盒页面在这里",
       "all_important": "这段文字非常\n重要",
       "sub_text": "下标",
-      "sup_text": "上标"
+      "sup_text": "上标",
+      "is_text": "这是{{val}}效果"
     },
     "layout": {
       "copy_done": "已复制！",
@@ -1169,14 +1169,13 @@
       "copy_done": "已复制到剪贴板！",
       "style": "样式",
       "alert": "提示",
+      "alert_with_custom_title": "带标签的提示",
+      "alert_with_custom_title_text": "自定义标题",
+      "alert_unavailable": "此样式不可用",
       "badge": "徽章",
       "text_color": "文本颜色",
       "back_color": "背景颜色",
-      "alert_block": "警告框",
-      "important_label": "Important",
-      "important_text": "重要信息",
-      "caution_label": "Caution",
-      "caution_text": "禁止事项及警告",
+
       "placeholder": "此处显示文本内容",
       "docs_title": "Bootstrap 5 官方文档",
       "docs_badge": "了解更多关于徽章的信息",

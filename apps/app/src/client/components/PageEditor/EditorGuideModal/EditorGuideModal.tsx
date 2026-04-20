@@ -1,7 +1,6 @@
 import {
   type JSX,
   type RefObject,
-  useEffect,
   useLayoutEffect,
   useMemo,
   useState,
@@ -10,14 +9,21 @@ import {
   useEditorGuideModalActions,
   useEditorGuideModalStatus,
 } from '@growi/editor/dist/states/modal/editor-guide';
-import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { Card, CardBody, CardHeader, Modal } from 'reactstrap';
 
 import { CustomNavTab } from '../../CustomNavigation/CustomNav';
 import CustomTabContent from '../../CustomNavigation/CustomTabContent';
 import { DecorationTab } from './contents/DecorationTab';
 import { LayoutTab } from './contents/LayoutTab';
 import { TextStyleTab } from './contents/TextStyleTab';
+
+import styles from './EditorGuideModal.module.scss';
+
+// Bootstrap $spacer (1rem = 16px) * 2 — matches calc(100% - 32px) padding on both sides
+const MODAL_MARGIN_PX = 32;
+// Bootstrap $modal-lg
+const MODAL_MAX_WIDTH = '800px';
 
 const TAB_TYPES = ['textstyle', 'layout', 'decoration'] as const;
 type TabType = (typeof TAB_TYPES)[number];
@@ -32,17 +38,12 @@ const TextStyleTabPane = (): React.JSX.Element => <TextStyleTab />;
 const LayoutTabPane = (): React.JSX.Element => <LayoutTab />;
 const DecorationTabPane = (): React.JSX.Element => <DecorationTab />;
 
-/**
- * EditorGuideModal
- *
- * This modal overlays only the preview area (specified by containerRef),
- * not the entire screen. Uses createPortal to render into document.body.
- */
-export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
+export const EditorGuideModal = ({
+  containerRef,
+}: Props): JSX.Element | null => {
   const { t } = useTranslation();
   const { isOpened } = useEditorGuideModalStatus();
   const { close } = useEditorGuideModalActions();
-  const [isShown, setIsShown] = useState(false);
   const [rect, setRect] = useState<DOMRect | null>(null);
 
   const [activeTab, setActiveTab] = useState<TabType>('textstyle');
@@ -63,82 +64,80 @@ export const EditorGuideModal = ({ containerRef }: Props): JSX.Element => {
     };
   }, [t]);
 
-  // Get rect on open and on resize
   useLayoutEffect(() => {
     if (!isOpened || containerRef.current == null) return;
 
-    const updateRect = () =>
-      setRect(containerRef.current?.getBoundingClientRect() ?? null);
+    const updateRect = () => {
+      const r = containerRef.current?.getBoundingClientRect() ?? null;
+      setRect(r);
+      if (r != null) {
+        document.body.style.setProperty('--egm-top', `${r.top}px`);
+        document.body.style.setProperty('--egm-left', `${r.left}px`);
+        document.body.style.setProperty('--egm-width', `${r.width}px`);
+        document.body.style.setProperty('--egm-height', `${r.height}px`);
+      }
+    };
     updateRect();
     window.addEventListener('resize', updateRect);
-    return () => window.removeEventListener('resize', updateRect);
+    return () => {
+      window.removeEventListener('resize', updateRect);
+      document.body.style.removeProperty('--egm-top');
+      document.body.style.removeProperty('--egm-left');
+      document.body.style.removeProperty('--egm-width');
+      document.body.style.removeProperty('--egm-height');
+    };
   }, [isOpened, containerRef]);
 
-  // Trigger fade-in after mount
-  useEffect(() => {
-    if (!isOpened) {
-      setIsShown(false);
-      return;
-    }
-    const id = requestAnimationFrame(() => setIsShown(true));
-    return () => cancelAnimationFrame(id);
-  }, [isOpened]);
+  if (!isOpened || rect == null) return null;
 
-  if (!isOpened || rect == null) return <></>;
-
-  const style = {
-    position: 'fixed' as const,
-    top: rect.top,
-    left: rect.left,
-    width: rect.width,
-    height: rect.height,
-  };
-
-  return createPortal(
-    <>
-      <div
-        className={`modal-backdrop fade z-2 ${isShown ? 'show' : ''}`}
-        style={style}
-        onClick={close}
-        aria-hidden="true"
-      />
-      <div
-        className={`d-flex align-items-center justify-content-center z-3 pe-none fade ${isShown ? 'show' : ''}`}
-        style={style}
+  return (
+    <Modal
+      isOpen={isOpened}
+      toggle={close}
+      keyboard
+      modalClassName={styles['editor-guide-modal']}
+      backdropClassName={styles['editor-guide-backdrop']}
+      contentClassName="bg-transparent border-0 shadow-none"
+      style={{
+        margin: 0,
+        maxWidth: MODAL_MAX_WIDTH,
+        width: `calc(100% - ${MODAL_MARGIN_PX}px)`,
+      }}
+    >
+      <Card
+        className="shadow-lg border-0"
+        style={{ maxHeight: rect.height - MODAL_MARGIN_PX }}
       >
-        <div className="px-3 pe-auto">
-          <div className="card shadow-lg">
-            <div className="card-header d-flex justify-content-between align-items-center">
-              <h5 className="mb-0">Editor Guide</h5>
-              <button
-                type="button"
-                className="btn-close"
-                onClick={close}
-                aria-label="Close"
-              />
-            </div>
-            <div className="mt-2 px-3">
-              <CustomNavTab
-                activeTab={activeTab}
-                navTabMapping={navTabMapping}
-                onNavSelected={(tabKey) => {
-                  if (isTabType(tabKey)) {
-                    setActiveTab(tabKey);
-                  }
-                }}
-                hideBorderBottom
-              />
-            </div>
-            <div className="card-body overflow-auto">
-              <CustomTabContent
-                activeTab={activeTab}
-                navTabMapping={navTabMapping}
-              />
-            </div>
-          </div>
+        <CardHeader className="d-flex justify-content-between align-items-center bg-transparent border-bottom-0 pt-3">
+          <h5 className="mb-0 text-body">{t('editor_guide.title')}</h5>
+          <button
+            type="button"
+            className="btn-close"
+            onClick={close}
+            aria-label="Close"
+          />
+        </CardHeader>
+        <div className={`mt-2 px-3 ${styles['editor-guide-tabs-container']}`}>
+          <CustomNavTab
+            activeTab={activeTab}
+            navTabMapping={navTabMapping}
+            onNavSelected={(tabKey) => {
+              if (isTabType(tabKey)) {
+                setActiveTab(tabKey);
+              }
+            }}
+            hideBorderBottom
+          />
         </div>
-      </div>
-    </>,
-    document.body,
+        <CardBody
+          className={`pt-0 flex-fill ${styles['card-body-scrollable']}`}
+        >
+          <CustomTabContent
+            activeTab={activeTab}
+            navTabMapping={navTabMapping}
+          />
+        </CardBody>
+      </Card>
+    </Modal>
   );
 };
