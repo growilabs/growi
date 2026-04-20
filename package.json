@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "7.5.1-RC.0",
+  "version": "7.5.2-RC.0",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
   "private": true,
@@ -90,18 +90,29 @@
   "// comments for pnpm.overrides": {
     "@lykmapipo/common>flat": "flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
     "@lykmapipo/common>mime": "mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
-    "@lykmapipo/common>parse-json": "parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version"
+    "@lykmapipo/common>parse-json": "parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
+    "axios": "CVE-2025-XXXXX: CRLF Injection + Prototype Pollution combo leads to HTTP Request Smuggling (CVSS 10.0). All versions < 1.15.0 are vulnerable."
+  },
+  "// comments for pnpm.packageExtensions": {
+    "@orval/core": "@orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime, but @orval/core does not declare lodash as a dependency"
   },
   "pnpm": {
     "overrides": {
       "@lykmapipo/common>flat": "5.0.2",
       "@lykmapipo/common>mime": "3.0.0",
-      "@lykmapipo/common>parse-json": "5.2.0"
+      "@lykmapipo/common>parse-json": "5.2.0",
+      "axios": "^1.15.0"
+    },
+    "packageExtensions": {
+      "@orval/core": {
+        "dependencies": {
+          "lodash": "*"
+        }
+      }
     },
     "ignoredBuiltDependencies": [
       "@swc/core",
       "core-js",
-      "dtrace-provider",
       "esbuild",
       "leveldown",
       "protobufjs",

@@ -21,12 +21,14 @@ import { debounce } from 'throttle-debounce';
 import { useCreateTemplatePage } from '~/client/services/create-page';
 import { useCreatePage } from '~/client/services/create-page/use-create-page';
 import { useToastrOnError } from '~/client/services/use-toastr-on-error';
-import { useCurrentUser, useGrowiCloudUri } from '~/states/global';
+import { useGrowiDocumentationUrl } from '~/states/context';
+import { useCurrentUser } from '~/states/global';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 import {
   usePageCreateModalActions,
   usePageCreateModalStatus,
 } from '~/states/ui/modal/page-create';
+import { getLocale } from '~/utils/locale-utils';
 
 import PagePathAutoComplete from './PagePathAutoComplete';
 
@@ -38,7 +40,7 @@ const PageCreateModal: React.FC = () => {
   const { t, i18n } = useTranslation();
 
   const currentUser = useCurrentUser();
-  const growiCloudUri = useGrowiCloudUri();
+  const documentationUrl = useGrowiDocumentationUrl();
 
   const { isOpened, path: pathname = '' } = usePageCreateModalStatus();
   const { close: closeCreateModal } = usePageCreateModalActions();
@@ -72,11 +74,8 @@ const PageCreateModal: React.FC = () => {
     [userHomepagePath, t, now],
   );
 
-  const templateHelpLang = i18n.language === 'ja' ? 'ja' : 'en';
-  const templateHelpUrl =
-    growiCloudUri != null
-      ? `https://growi.cloud/help/${templateHelpLang}/guide/features/template.html`
-      : `https://docs.growi.org/${templateHelpLang}/guide/features/template.html`;
+  const docsLang = getLocale(i18n.language).code === 'ja' ? 'ja' : 'en';
+  const templateHelpUrl = `${documentationUrl}/${docsLang}/guide/features/template.html`;
 
   const [todayInput, setTodayInput] = useState('');
   const [pageNameInput, setPageNameInput] = useState(pageNameInputInitialValue);

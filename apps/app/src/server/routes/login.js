@@ -4,6 +4,7 @@ import loggerFactory from '~/utils/logger';
 
 import { UserStatus } from '../models/user/conts';
 import { growiInfoService } from '../service/growi-info';
+import { resolveLocalePath } from '../util/safe-path-utils';
 
 // disable all of linting
 // because this file is a deprecated legacy of Crowi
@@ -11,7 +12,6 @@ import { growiInfoService } from '../service/growi-info';
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:login');
-  const path = require('path');
   const { User } = crowi.models;
   const { appService, aclService, mailService, activityService } = crowi;
   const activityEvent = crowi.events.activity;
@@ -23,15 +23,17 @@ module.exports = (crowi, app) => {
     const admins = await User.findAdmins();
     const appTitle = appService.getAppTitle();
     const locale = configManager.getConfig('app:globalLang');
+    const templatePath = resolveLocalePath(
+      locale,
+      crowi.localeDir,
+      'admin/userWaitingActivation.ejs',
+    );
 
     const promises = admins.map((admin) => {
       return mailService.send({
         to: admin.email,
         subject: `[${appTitle}:admin] A New User Created and Waiting for Activation`,
-        template: path.join(
-          crowi.localeDir,
-          `${locale}/admin/userWaitingActivation.ejs`,
-        ),
+        template: templatePath,
         vars: {
           adminUser: admin,
           createdUser: userData,
