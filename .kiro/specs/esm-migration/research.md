@@ -41,7 +41,7 @@
 | Factory require+invoke | 56 箇所 — `routes/index.js` に 12、`routes/apiv3/index.js` に 44 | 静的 `import` + ファクトリ呼び出しに変換 |
 | 条件付き require | 2 ファイルで三項演算子の require | 条件付き `await import()` に変換 |
 | `__dirname` / `__filename` | 3 ファイル — `crowi/index.ts`, `crowi/dev.js`, `service/i18next.ts` | `import.meta.dirname` (Node.js 21.2+) に置換。`next.config.ts` の `__dirname` はビルド時のみで対象外 |
-| 開発サーバ起動 | `node -r ts-node/register/transpile-only -r tsconfig-paths/register -r dotenv-flow/config` (package.json の `ts-node` スクリプト) | ESM ローダへ切替 (tsx が最有力) |
+| 開発サーバ起動 | `node -r ts-node/register/transpile-only -r tsconfig-paths/register -r dotenv-flow/config` (package.json の `ts-node` スクリプト) | ESM 対応ランナーへ切替 (Phase 3.7.a bake-off で選定。候補: `tsx` / `@swc-node/register`) |
 | 本番起動 | `node -r dotenv-flow/config dist/server/app.js` | `--import dotenv-flow/config` に切替 |
 | 設定ファイル (CJS) | `apps/app/config/` に `migrate-mongo-config.js`, `next-i18next.config.js`, `i18next.config.js` | `.cjs` にリネーム (logger config は .ts 化済みで対象外) |
 | `next.config.prod.cjs` | すでに `.cjs` | 変更不要 |
@@ -266,15 +266,17 @@ module.exports = (crowi, app) => {
 - **Selected Approach**: `NodeNext` / `NodeNext` を `tsconfig.build.server.json` に適用。
 - **Rationale**: 直接実行コードで `.js` 拡張子強制 + ESM 意味論を compile 時にチェック。ランタイムエラーの前倒し検出。
 
-### Decision: 開発サーバに tsx を採用
+### Decision: 開発サーバの ESM 対応 TS ランナーは bake-off で実測選定 (2026-04-20 改訂)
 
-- **Context**: ESM 対応 TS ランナーで path alias もサポートしたい。
+- **Context**: ESM 対応 TS ランナーで path alias もサポートしたい。ただし当初 `tsx` 一本化を推奨したが、実装試行で `tsx` への切替により dev 起動速度が劣化することが観測された。tsx の esbuild transform は高速だが、ESM loader hook 経由の resolve/load が GROWI サーバの大量 import fan-out (routes/apiv3/index.js 単体で 44 factory invoke を含む) に対して定数コストを上乗せするのが要因と推定される。
 - **Alternatives Considered**:
-  1. ts-node/esm — loader API が deprecated
-  2. tsx — モダン・高速・ESM + paths ネイティブ対応
-  3. Node.js `--experimental-strip-types` — path alias 未対応
-- **Selected Approach**: `ts-node` + `tsconfig-paths` を **tsx** に置換。
-- **Rationale**: 単一ツールで 2 つを置換。ESM ネイティブ。tsconfig の `paths` を追加設定なしで解決。アクティブメンテナンス。
+  1. `ts-node/esm` — `--loader` API が deprecated。将来負債を避けるため候補外
+  2. `tsx` — esbuild ベース、ESM loader hook 経由。`tsconfig.paths` をネイティブ解決
+  3. `@swc-node/register` — SWC ベース、CJS/ESM 両対応
+  4. Node.js `--experimental-strip-types` — `enum` / decorator 等の TS 機能に制約、path alias 未対応のため候補外
+- **Selected Approach**: **特定ツールに事前コミットせず、Phase 3.7.a の bake-off で実測選定する。** 最低候補は `tsx` と `@swc-node/register`。Phase 0.5 で取得する ts-node 時代の dev 起動 baseline を基準に相対評価し、`tsconfig.paths` 解決成立を必須条件、Phase 3.8.e の ±20% gate 通過を採用条件とする。
+- **Rationale**: 「ts-node のままは不可」(`"type": "module"` と非互換) と「ESM 化後の最適ランナーは GROWI のプロファイル依存」(fan-out 量 + 型チェック off + Node 24) の両方を踏まえ、単一ツールの事前選定ではなく測定駆動で決める。bake-off の生データを `dev-runner-bench.md` として保存し、将来の再評価時に比較基準として再利用可能にする。
+- **Superseded notes**: 当初の「tsx 一本化」判断は、研究段階で実ワークロード未計測だったことに起因する。design.md の Dev Runner Adapter および tasks.md の 3.7.a / 3.7.b が最新の権威ソース。
 
 ### Decision: CJS のまま残す設定は .cjs リネーム
 

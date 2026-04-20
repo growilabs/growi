@@ -16,23 +16,52 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 - [ ] 0.2 セキュリティ監査ベースラインを捕捉
   - `pnpm audit --audit-level=moderate --json > .kiro/specs/esm-migration/audit-baseline.json` を取得
   - Phase 5 の override 削除ごとに diff を取り、新規 HIGH/CRITICAL advisory が出た場合は該当 override を維持
-  - _Requirements: 4.1, 4.3, 4.4_
+  - **`axios` override の CVE プレースホルダ (`package.json` 内の `CVE-2025-XXXXX` 等) を Phase 0 で実 advisory ID / GHSA URL に置換**。プレースホルダのまま次 phase に進むことを禁止。現行ピン (`^1.15.0` 等) が該当 advisory を実際にカバーしていることを `pnpm audit --json` 出力で確認し、確認結果を `audit-baseline.json` に併記
+  - _Requirements: 4.1, 4.3, 4.4, 7.3_
 
 - [ ] 0.3 `/api/v3/**` auth middleware チェーンのスナップショットを取得
   - 移行前の `pnpm dev` 起動状態で `app._router.stack` を walk し、各 apiv3 エンドポイントについて `(method, path, middlewareNames[])` を JSON に出力するスクリプトを追加 (`tools/snapshot-route-middleware.ts`)
+  - walker は **無名関数を許容しない**: `handle.name === ''` / `'anonymous'` が apiv3 リーフのチェーンに 1 件でも出現したら fail として、該当 middleware factory を named function 化してから再実行する
   - 出力を `.kiro/specs/esm-migration/route-middleware-baseline.json` にコミット
-  - スクリプトは Phase 3.8 ゲートで再実行して diff を取るため、ESM/CJS 両方で動作する実装にする (`tsx` で起動可能)
+  - スクリプトは Phase 3.8 ゲートで再実行して diff を取るため、ESM/CJS 両方で動作する実装にする (Phase 3.7.a で選定する ESM 対応ランナー、もしくは pre-build した `dist/` 経由で起動可能)
   - _Requirements: 2.6, 2.8_
 
-- [ ] 0.4 起動時パフォーマンスベースラインを捕捉
+- [ ] 0.3.1 ブラックボックス認可マトリクスベースラインを捕捉 (snapshot 補完 / MANDATORY)
+  - structural snapshot (0.3) が拾えないケース (インライン `express.Router()` のガード、無名アロー middleware、Mongoose model 取得順差異) を補完するため、**supertest ベースの認可マトリクステスト**を追加
+  - 全 apiv3 エンドポイント × {unauthenticated / guest / read-only / admin} の 4 persona で期待 HTTP ステータス (401 / 403 / 200 / 302 等) を記録
+  - 出力を `.kiro/specs/esm-migration/authz-matrix-baseline.json` にコミット
+  - テストは本番ビルド成果物に対して実行する想定 (dev 実装と分岐しないため)。Phase 3.8.c で diff 実行し、差分 = 認可バイパスと見なして Phase 4 進行を block する
+  - _Requirements: 2.6, 2.8, 6.5_
+
+- [ ] 0.3.2 WebSocket 認可マトリクスベースラインを捕捉 (MANDATORY)
+  - `service/yjs/upgrade-handler.ts` と `service/socket-io/socket-io.ts` の認可は `app._router.stack` から見えないため独立ベースライン化
+  - `/yjs/<pageId>` について 3 ケース (セッション無し / 有効セッション+閲覧不可ページ / 有効セッション+許可ページ) の接続結果 (4xx / 4xx / 101+Yjs 同期) を記録
+  - socket.io `connect` についても同等 3 ケースを記録
+  - 出力を `.kiro/specs/esm-migration/ws-authz-baseline.json` にコミット
+  - Phase 3.8.d で diff 実行し、差分は Phase 4 進行を block
+  - _Requirements: 2.6, 6.5_
+
+- [ ] 0.4 起動時パフォーマンスベースラインを捕捉 (本番側)
   - 移行前の本番相当出力 (`pnpm run server:ci` 相当) で、起動完了までの wall time を 5 回計測し中央値を記録
   - OpenTelemetry が利用可能な場合、5 代表ルート (`/`, `/editor/:id`, `/_api/v3/healthcheck`, `/admin`, LSX/drawio/attachment-refs を含むサンプルページ) の first-request p50/p95 を `.kiro/specs/esm-migration/perf-baseline.md` に記録
   - _Requirements: 6.5_
 
-- [ ] 0.5 Phase 0 完了確認
-  - 上記 4 ファイルがコミットされていることを確認
+- [ ] 0.5 dev 起動ベースラインを捕捉 (現 ts-node 構成)
+  - 現状の `pnpm dev` (= `node -r ts-node/register/transpile-only -r tsconfig-paths/register -r dotenv-flow/config ...`) で、起動 → `/_api/v3/healthcheck` が 200 を返すまでの wall time を 5 回計測し中央値を `.kiro/specs/esm-migration/perf-baseline.md` の "dev 起動時間 (ts-node 時代)" セクションに記録
+  - 計測条件を明文化 (warm cache / cold cache、Node.js バージョン、ホスト CPU、並走プロセスなし)。Phase 3.7.a の bake-off と完全に同一条件で再現できるよう記述する
+  - この値が Phase 3.7.a dev runner bake-off の相対評価の基準、および Phase 3.8.e の dev 側 ±20% gate の判定基準となる
+  - _Requirements: 2.7, 6.5_
+
+- [ ] 0.6 Phase 0 完了確認
+  - 以下のファイルがコミットされていることを確認:
+    - `test-baseline.md` (0.1)
+    - `audit-baseline.json` + `axios` CVE ID 実値置換 (0.2)
+    - `route-middleware-baseline.json` (0.3)
+    - `authz-matrix-baseline.json` (0.3.1)
+    - `ws-authz-baseline.json` (0.3.2)
+    - `perf-baseline.md` の本番部 (0.4) と dev 部 (0.5)
   - ベースラインが存在しない状態での Phase 1 以降の着手を禁止する
-  - _Depends: 0.1, 0.2, 0.3, 0.4_
+  - _Depends: 0.1, 0.2, 0.3, 0.3.1, 0.3.2, 0.4, 0.5_
 
 ## Phase 1: 残余共有パッケージの ESM 宣言
 
@@ -85,6 +114,9 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 - [ ] 2.2 (P) `apps/app/config/` の 3 ファイルを `.cjs` にリネーム
   - `apps/app/config/migrate-mongo-config.js`, `next-i18next.config.js`, `i18next.config.js` をそれぞれ `.cjs` に変更
+  - **拡張子なし importer の全列挙と書換え**: `apps/app/` 配下で `^/config/migrate-mongo-config`, `^/config/next-i18next.config`, `^/config/i18next.config` を import / require している全ファイル (server + client 両方) を grep で列挙し、specifier を `.cjs` 付きに書換える。Phase 3 で NodeNext 切替 (3.6) 後は拡張子なしの解決が失敗するため、この書換えは Phase 2 で完了させる
+  - 該当既知箇所 (最低限): `src/server/models/user/index.js`, `src/server/service/i18next.ts`, `src/server/routes/apiv3/personal-setting/index.js`, `src/server/util/locale-utils.ts`, `src/pages/_app.page.tsx` — grep で上記以外の importer が無いことを確認
+  - **ESLint / grep guard の追加**: 拡張子なしで `^/config/{migrate-mongo,next-i18next,i18next}-config` を import する行を CI で禁止 (将来回帰防止)
   - `apps/app/package.json` 内の `migrate` 系スクリプトと i18next 初期化コードのパス参照を新拡張子に更新
   - `pnpm run dev:migrate` と i18next 初期化が正常動作することを smoke 確認
   - _Requirements: 5.4_
@@ -100,6 +132,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 - [ ] 2.4 Phase 2 統合ゲート
   - `turbo run build` と `turbo run lint` が成功 (サーバ側は依然 CJS でコンパイル)
   - 既存 dev ランナー (`ts-node` + `tsconfig-paths`) による `pnpm dev` が引き続き起動する
+  - **dev ランナー切替禁止**: 本フェーズ時点でサーバソースは CJS のままなので、ここで `tsx` / `@swc-node/register` 等への切替は行わない。CJS 状態で切替えると hybrid 解決コストが最大化し、Phase 3.7.a の bake-off 測定が実運用プロファイルを反映しなくなる (Dev Runner Adapter 切替タイミング制約)
   - _Requirements: 5.6, 6.6_
   - _Depends: 2.3_
 
@@ -115,16 +148,27 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 - [ ] 3.1 `models/user/*` の service singleton 参照を lazy 化
   - `configManager` と `aclService` のモジュールトップ import を getter / ラッパ関数経由の遅延取得に置換
-  - research.md §2.3 パターン A に挙げた他のモデルファイルも同様に修正
+  - **実装規約 (MANDATORY)**: 遅延取得は **sync cached reference** で実装する (初回呼出しで cache に詰めて以降は同期取得)。`await import()` / 動的 `require()` を hot path (auth / ACL 毎 request 経路) に入れないこと。auth チェックは request-path のため、非同期化すると steady-state レイテンシに全量影響する
+  - unit test で (a) cache が singleton、(b) 呼出しが同期関数、の 2 点を assert
+  - research.md §2.3 パターン A に挙げた他のモデルファイルも同様に修正 (同規約適用)
   - 既存の `apps/app/src/**/*.integ.ts` を実行し、モデル初期化を経由する統合テストが pass する
-  - _Requirements: 2.6_
+  - _Requirements: 2.6, 6.5_
   - _Depends: 3.0_
   - _Boundary: Codemod Transform (models lazy-load)_
 
 - [ ] 3.2 jscodeshift カスタム transform を作成
-  - `tools/codemod/cjs-to-esm.ts` を新規作成し、design.md の 4 パターン (module.exports → export、static require → import、factory require+invoke、conditional require) をすべて扱う
+  - `tools/codemod/cjs-to-esm.ts` を新規作成し、design.md の **8 パターン**を扱う:
+    1. `module.exports` → named export
+    2. 静的 `require('./x')` → `import`
+    3. factory invoke `require('./x')(crowi, app)` → `import { setup } + invoke`
+    4. 三項 × factory invoke (`routes/apiv3/index.js:124` `isInstalled ? ... : require('./installer')(crowi)`) — enclosing を async 化しない書換え
+    5. 分割代入 require (`const { x } = require('pkg')`) → named import
+    6. 部分名前空間利用 (`require('pkg').member(...)`) → named import (対象例: `crowi/dev.js:65`, `crowi/index.ts:364`, `models/attachment.ts:16`)
+    7. 動的 `require(modulePath)(ctx)` 6 箇所 (`service/file-uploader/index.ts:16`, `service/s2s-messaging/index.ts:60`, `service/slack-integration.ts:287,322,354`) → `await import(modulePath)` + singleton memoize
+    8. **意図的 lazy の exclusion list**: `crowi/index.ts:500` setupMailer 内 `MailService = require('~/server/service/mail').default` 等、codemod で触ってはならない箇所をファイル+行で明示リスト化し、`transform` の先頭で AST マーカを確認してスキップする
+  - 追加で `^/config/{migrate-mongo,next-i18next,i18next}-config` specifier の `.cjs` 書換えサブパスも組込む
   - ディレクトリ引数を受け取る CLI ラッパ (`pnpm codemod:cjs-to-esm -- <path>`) を実装し、step ごとに独立実行できるようにする
-  - jscodeshift の test utility で 4 パターンそれぞれに input→expected のスナップショットテストを追加
+  - jscodeshift の test utility で **8 パターン + exclusion list + specifier 書換え**それぞれに input→expected のスナップショットテストを追加。フィクスチャは実ファイル (上記で列挙した行位置) から抽出する
   - 追加テストが全件 pass
   - _Requirements: 2.2, 2.3, 2.5, 2.6_
   - _Boundary: Codemod Transform (tooling)_
@@ -144,8 +188,12 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 - [ ] 3.3.b (step 3.b) `service/` を変換 (`search-delegator` の interface 分離を含む)
   - `service/search-delegator/elasticsearch-client-delegator/interfaces.ts` と `es7-client-delegator.ts` の循環を、型のみの独立ファイルに分離することで構造解消
   - `pnpm codemod:cjs-to-esm -- apps/app/src/server/service` を実行
-  - 動的 `require` → `await import` の変換も含む
+  - 動的 `require(modulePath)(ctx)` → `await import(modulePath)` の対象を **6 箇所すべて** 明示的に検証:
+    - `service/file-uploader/index.ts:16` (getUploader — memoize 追加必須)
+    - `service/s2s-messaging/index.ts:60` (既存 `this.delegator` memoize を維持)
+    - `service/slack-integration.ts:287, 322, 354` (3 箇所、design.md 記述の "2 ファイル" から増補)
   - `*.integ.ts` のうち service 層を触るテストが pass
+  - **マトリクス smoke の追加**: uploader (`FILE_UPLOAD={aws,local}`) × s2s (`S2S_MESSAGING_TYPE={redis,none}`) の各組合せで本番出力を起動し、attach endpoint に 1 回ずつ到達 (env 依存の動的 import が全分岐で機能することを確認)
   - _Requirements: 2.2, 2.3, 2.5_
   - _Depends: 3.3.a_
   - _Boundary: Codemod Transform (service)_
@@ -217,17 +265,36 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Depends: 2.1, 3.3, 3.4, 3.5_
   - _Boundary: Server Build Config_
 
-- [ ] 3.7 開発/本番起動スクリプトを tsx / --import に切替
-  - `apps/app/package.json` の `scripts.ts-node` を廃止し、`dev` / `launch-dev:ci` / `repl` / `dev:migrate-mongo` を `tsx` ベースに書き換え
-  - 本番起動スクリプトを `node --import dotenv-flow/config dist/server/app.js` に変更
+- [ ] 3.7.a dev runner bake-off で ESM 対応ランナーを実測選定
+  - **Precondition (hard)**: タスク 3.6 (NodeNext 切替) 完了後に限り実施。サーバソースが ESM として本番ビルド可能な状態でのみ bake-off 結果が実運用プロファイルを反映する
+  - 候補ランナーごとに `apps/app/package.json` の `scripts.dev` を一時的に切替え、cold start wall time (`pnpm dev` 起動 → `/_api/v3/healthcheck` 200 までの壁時計時間) を Phase 0.5 と **同一条件** で 5 回計測し中央値を記録
+  - 最低限の候補:
+    1. `tsx` (latest) — `node --import tsx src/server/app.ts` 相当
+    2. `@swc-node/register` — `node --import @swc-node/register/esm src/server/app.ts` 相当
+    3. 評価時点で他に有力候補があれば追加可
+  - **除外**: `ts-node/esm` (`--loader` API deprecated) は候補に含めない
+  - 各候補で以下を確認:
+    - cold start wall time (中央値)
+    - `tsconfig.paths` (`~/*`) の runtime 解決が成立するか (`import ... from '~/...'` を含むモジュールが起動時に解決できるか)
+    - Node.js 24 下で起動ログにエラー/警告が出ないか
+  - 生データ (全 5 回の計測値) と選定理由、採用ランナー名を `.kiro/specs/esm-migration/dev-runner-bench.md` にコミット
+  - **選定基準**: `tsconfig.paths` 解決成立を必須条件とし、その上で Phase 0.5 baseline との差分が最小の候補を選定する。ただし Phase 3.8.e の ±20% gate を通過できない候補は選定時点で却下 (= 本タスク失敗として扱い、候補を追加して再測定)
+  - _Requirements: 2.7, 6.5_
+  - _Depends: 3.6, 0.5_
+  - _Boundary: Dev Runner Adapter (selection)_
+
+- [ ] 3.7.b 開発/本番起動スクリプトを選定ランナー / --import に切替
+  - `apps/app/package.json` の `scripts.ts-node` を廃止し、`dev` / `launch-dev:ci` / `repl` / `dev:migrate-mongo` を **3.7.a で選定したランナー** ベースに書き換え
+  - 本番起動スクリプトを `node --import dotenv-flow/config dist/server/app.js` に変更 (選定ランナーに依存しない共通部)
   - `pnpm dev` でサーバが起動し、`curl http://localhost:3000/_api/v3/healthcheck` が 200 を返す
+  - 選定ランナー依存の追加パッケージを `devDependencies` に追加し、`ts-node` / `tsconfig-paths` を削除
   - _Requirements: 2.7_
-  - _Depends: 3.6_
-  - _Boundary: Dev Runner Adapter_
+  - _Depends: 3.7.a_
+  - _Boundary: Dev Runner Adapter (adoption)_
 
 - [ ] 3.8 Phase 3 統合ゲート (MANDATORY — 迂回禁止)
 
-  本ゲートは ESM 化の成否を決定する最重要検証であり、以下の項目すべてを **本番コンパイル出力** (`node --import dotenv-flow/config dist/server/app.js` ないし `pnpm run server:ci`) に対して実行する。`pnpm dev` (tsx) と Vitest と Node NodeNext は ESM 実装が異なるため、dev / test での pass は本ゲートの代替にはならない。
+  本ゲートは ESM 化の成否を決定する最重要検証であり、以下の項目すべてを **本番コンパイル出力** (`node --import dotenv-flow/config dist/server/app.js` ないし `pnpm run server:ci`) に対して実行する。`pnpm dev` (選定 TS ランナー経由) と Vitest と Node NodeNext は ESM 実装が異なるため、dev / test での pass は本ゲートの代替にはならない。
 
   **迂回禁止条項**: 下記 3.8.c (auth middleware snapshot diff) のいずれかの手順 — 特に `app._router.stack` の walk — が実装上の理由で失敗した場合、代替検証で代用したり「実害がなさそうだから」とスキップすることは **禁止** する。スクリプトが動作しないなら修正するまで Phase 4 には進まない。担当者はユーザーに対して明確に「ゲート 3.8.c を通過できないため Phase 4 に進めない」と報告し、対処方針の指示を仰ぐこと。これは他の 3.8.a / 3.8.b / 3.8.d / 3.8.e にも同様に適用される (Req 6.6 を厳格運用)。
 
@@ -245,28 +312,30 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
       - markdown 全拡張 (drawio / LSX / footnote / math / mermaid / attachment-refs) を含むサンプルページの SSR 200 応答で、各拡張のレンダリング結果を含む HTML が返る
     - **NG 時対応**: 本番モードでのみ再現する ESM ローダ起因の初期化エラー (TDZ, ERR_MODULE_NOT_FOUND, ERR_REQUIRE_ESM 等) は dev/test では捕捉不能。原因特定まで Phase 4 に進んではならない
 
-  - [ ] 3.8.c auth middleware チェーン snapshot diff (MANDATORY)
-    - Phase 0.3 で作成した `tools/snapshot-route-middleware.ts` を ESM 化後の本番出力に対して実行
-    - 生成された snapshot を `route-middleware-baseline.json` と diff し、**すべての apiv3 エンドポイントで middleware 名列が一致する** ことを確認
-    - 差分があった場合 (guard 欠落、順序変化、未知 middleware の挿入等) は認可バイパス級の潜在リスクと見なし、Phase 4 に進んではならない
-    - **スクリプトが動作しない場合の対応 (迂回禁止条項の具体例)**: `app._router` 構造が Express バージョン差で変わっている、動的 mount で stack が取得できない等の理由でスナップショット取得が失敗した場合、「目視で確認した」「代表 3 エンドポイントだけテストした」での代用は禁止。スクリプトを修正して全件を捕捉できる状態にしてから再実行する。それが不可能なら Phase 4 に進まず、ユーザーに報告して方針の指示を仰ぐ
-    - _Requirements: 2.6, 2.8_
+  - [ ] 3.8.c auth middleware チェーン snapshot diff + ブラックボックス認可マトリクス diff (MANDATORY)
+    - (1) Phase 0.3 で作成した `tools/snapshot-route-middleware.ts` を ESM 化後の本番出力に対して実行し、`route-middleware-baseline.json` と diff。**すべての apiv3 エンドポイントで middleware 名列が一致** + **無名関数 0 件** を確認
+    - (2) Phase 0.3.1 のブラックボックス認可マトリクステストを本番出力に対して再実行し、`authz-matrix-baseline.json` と diff。全 apiv3 × 4 persona (unauth / guest / read-only / admin) の期待 HTTP ステータスが完全一致
+    - (1)(2) いずれかに差分があった場合 (guard 欠落、順序変化、未知 middleware 挿入、persona ステータス変化) は認可バイパス級の潜在リスクと見なし、Phase 4 に進んではならない
+    - **スクリプトが動作しない場合の対応 (迂回禁止条項の具体例)**: `app._router` 構造が Express バージョン差で変わっている、動的 mount で stack が取得できない、supertest の fixture が壊れた等の理由でどちらか一方でも動かない場合、「目視で確認した」「代表 3 エンドポイントだけテストした」での代用は禁止。スクリプトを修正して全件を捕捉できる状態にしてから再実行する。それが不可能なら Phase 4 に進まず、ユーザーに報告して方針の指示を仰ぐ
+    - _Requirements: 2.6, 2.8, 6.5_
 
-  - [ ] 3.8.d WebSocket / Yjs 接続 smoke (Phase 6 から前倒し)
+  - [ ] 3.8.d WebSocket / Yjs 接続 smoke + WS 認可マトリクス diff (Phase 6 から前倒し / MANDATORY)
     - 本番出力起動状態で以下をいずれも確認:
       - `curl --include --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" http://$HOST/socket.io/` が 101 もしくは認証起因 4xx で応答 (5xx / ERR_MODULE_NOT_FOUND は NG)
       - Yjs: Chromium 2 クライアントで同一ページを開き、クライアント A の編集が 2 秒以内にクライアント B に反映される。DevTools Network で `ws://.../y-websocket` が 101 で確立
+    - **WS 認可マトリクス diff (MANDATORY)**: Phase 0.3.2 で baseline 化した 3 ケース (`/yjs/<pageId>` セッション無し / 閲覧不可 / 許可) + socket.io 3 ケースを再実行し、`ws-authz-baseline.json` と完全一致することを確認。差分があれば Phase 4 に進まず、迂回禁止条項 (3.8.c と同等) を適用
     - 起動ログに socket.io attach / yjs upgrade-handler attach / `server.listen()` callback のタイムスタンプを出力し、**attach が listen callback 前に完了している** ことを assert (ログに「socketio attached」「yjs attached」が「server listening」より先に現れる)
     - _Requirements: 6.5_
 
-  - [ ] 3.8.e 起動性能・first-request レイテンシ比較
-    - 本番出力起動の wall time を 3 回計測し中央値が Phase 0.4 ベースラインの ±20% 以内
-    - OpenTelemetry 経由で 5 代表ルート (`/`, `/editor/:id`, `/_api/v3/healthcheck`, `/admin`, markdown 拡張サンプルページ) の first-request-after-cold-start p95 が Phase 0.4 ベースラインの ±25% 以内
-    - 超過時は `require(esm)` コスト / import fan-out / lazy load 位置のいずれかの調整を行い、超過したまま Phase 4 に進んではならない
-    - _Requirements: 6.5_
+  - [ ] 3.8.e 起動性能・first-request レイテンシ比較 (本番 + dev)
+    - **本番**: 本番出力起動の wall time を 3 回計測し中央値が Phase 0.4 ベースラインの ±20% 以内
+    - **本番**: OpenTelemetry 経由で 5 代表ルート (`/`, `/editor/:id`, `/_api/v3/healthcheck`, `/admin`, markdown 拡張サンプルページ) の first-request-after-cold-start p95 が Phase 0.4 ベースラインの ±25% 以内
+    - **dev**: 3.7.b 切替後の `pnpm dev` cold start wall time を 3 回計測し中央値が Phase 0.5 ベースライン (ts-node 時代) の ±20% 以内。超過時は bake-off 候補の再検討または lazy load 位置調整を行い、超過したまま Phase 4 に進んではならない
+    - いずれかの項目が超過した場合、`require(esm)` コスト / import fan-out / lazy load 位置 / 選定ランナーのいずれかの調整を行い、超過したまま Phase 4 に進んではならない
+    - _Requirements: 2.7, 6.5_
 
   - _Requirements: 2.8, 2.9, 6.1, 6.2, 6.3, 6.5, 6.6_
-  - _Depends: 3.7, 0.1, 0.3, 0.4_
+  - _Depends: 3.7.b, 0.1, 0.3, 0.4, 0.5_
 
 ## Phase 4: transpilePackages の削減
 
@@ -351,6 +420,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - **API / SSR / WebSocket / Yjs**: 3.8.b と 3.8.d の検証項目を再度パスすること
   - 起動時間と first-request レイテンシが Phase 0.4 ベースラインおよび Phase 3.8.e 時点と比較して有意な悪化なし (±20% / ±25% 内)
   - auth middleware snapshot を再取得して Phase 0.3 ベースラインと diff — 差分なしを確認 (3.8.c と同じ迂回禁止条項を適用)
+  - ブラックボックス認可マトリクス (0.3.1) と WS 認可マトリクス (0.3.2) も再実行して baseline と完全一致することを確認 (Phase 4 / 5 の変更で認可チェーンが壊れていないことの最終保証)
   - _Requirements: 6.5_
   - _Depends: 6.1, 3.8_
 
