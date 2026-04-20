@@ -212,11 +212,22 @@ class ElasticsearchDelegator
   async init(): Promise<void> {
     await this.initClient();
     const normalizeIndices = await this.normalizeIndices();
+    const isExistsAuditlogIndex = await this.client.indices.exists({
+      index: this.auditlogIndexName,
+    });
+
     try {
       await this.normalizeAuditlogIndices();
     } catch (err) {
       logger.error('Failed to normalize auditlog indices', err);
     }
+
+    if (this.isElasticsearchReindexOnBoot || !isExistsAuditlogIndex) {
+      void this.rebuildAuditlogIndex().catch((err) => {
+        logger.error('Rebuild auditlog index on boot failed', err);
+      });
+    }
+
     if (this.isElasticsearchReindexOnBoot) {
       try {
         await this.rebuildIndex();
@@ -379,6 +390,45 @@ class ElasticsearchDelegator
     }
   }
 
+  async rebuildAuditlogIndex(): Promise<void> {
+    const {
+      client,
+      auditlogIndexName: indexName,
+      auditlogAliasName: aliasName,
+    } = this;
+
+    const tmpIndexName = `${indexName}-tmp`;
+
+    try {
+      // reindex to tmp index
+      await this.createAuditlogIndex(tmpIndexName);
+      await client.reindex(indexName, tmpIndexName);
+
+      // update alias
+      await client.indices.updateAliases({
+        actions: [
+          { add: { alias: aliasName, index: tmpIndexName } },
+          { remove: { alias: aliasName, index: indexName } },
+        ],
+      });
+
+      // flush index
+      await client.indices.delete({
+        index: indexName,
+      });
+      await this.createAuditlogIndex(indexName);
+      await this.addAllAuditlogs();
+      await client.indices.delete({ index: tmpIndexName });
+    } catch (error) {
+      logger.error("An error occured while 'rebuildAuditlogIndex'.", error);
+      const isExistsTmp = await client.indices.exists({ index: tmpIndexName });
+      if (isExistsTmp) {
+        await client.indices.delete({ index: tmpIndexName });
+      }
+      throw error;
+    }
+  }
+
   async normalizeIndices(): Promise<void> {
     const { client, indexName, aliasName } = this;
 
@@ -433,7 +483,6 @@ class ElasticsearchDelegator
     });
     if (!isExistsAuditlogIndex) {
       await this.createAuditlogIndex(indexName);
-      await this.addAllAuditlogs();
     }
 
     // create alias
