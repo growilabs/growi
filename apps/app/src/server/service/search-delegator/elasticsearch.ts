@@ -396,7 +396,6 @@ class ElasticsearchDelegator
       auditlogIndexName: indexName,
       auditlogAliasName: aliasName,
     } = this;
-
     const tmpIndexName = `${indexName}-tmp`;
 
     try {
@@ -413,19 +412,43 @@ class ElasticsearchDelegator
       });
 
       // flush index
-      await client.indices.delete({
-        index: indexName,
-      });
+      await client.indices.delete({ index: indexName });
       await this.createAuditlogIndex(indexName);
       await this.addAllAuditlogs();
+
+      await client.indices.updateAliases({
+        actions: [
+          { add: { alias: aliasName, index: indexName } },
+          { remove: { alias: aliasName, index: tmpIndexName } },
+        ],
+      });
+
+      // delete tmp
       await client.indices.delete({ index: tmpIndexName });
     } catch (error) {
       logger.error("An error occured while 'rebuildAuditlogIndex'.", error);
-      const isExistsTmp = await client.indices.exists({ index: tmpIndexName });
-      if (isExistsTmp) {
-        await client.indices.delete({ index: tmpIndexName });
+
+      try {
+        const isExistsIndex = await client.indices.exists({ index: indexName });
+        if (isExistsIndex) {
+          await client.indices.delete({ index: indexName });
+        }
+      } catch (cleanupErr) {
+        logger.error('Failed to delete incomplete auditlog index', cleanupErr);
       }
+
       throw error;
+    } finally {
+      try {
+        const isExistsTmp = await client.indices.exists({
+          index: tmpIndexName,
+        });
+        if (isExistsTmp) {
+          await client.indices.delete({ index: tmpIndexName });
+        }
+      } catch (cleanupErr) {
+        logger.error('Failed to cleanup tmp auditlog index', cleanupErr);
+      }
     }
   }
 
@@ -536,7 +559,10 @@ class ElasticsearchDelegator
           const bulkResponse = await bulkWrite({ body });
 
           if (bulkResponse.errors) {
-            logger.error('addAllAuditlogs bulk indexing had errors');
+            const errMsg = 'addAllAuditlogs bulk indexing had errors';
+            logger.error(errMsg);
+            callback(new Error(errMsg));
+            return;
           }
 
           logger.info(
