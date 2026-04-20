@@ -236,19 +236,24 @@ growi-esm/
 ```mermaid
 flowchart TB
     Start[Start]
+    P0[Phase 0 capture baselines tests audit route-middleware perf]
     P1[Phase 1 remaining packages ESM]
     P2[Phase 2 root and app type module and config cjs]
     P3[Phase 3 server tsconfig and code transform]
     P4[Phase 4 transpilePackages reduction]
     P5[Phase 5 overrides and docs]
+    Verify0[baselines committed]
     Verify1[build lint test]
     Verify2[build lint test]
-    Verify3[build lint test plus runtime]
+    Verify3[prod-build boot smoke plus route-middleware diff plus ws plus perf]
     Verify4[build plus runtime per removal]
     Verify5[assemble-prod e2e]
     Done[Done]
 
-    Start --> P1 --> Verify1
+    Start --> P0 --> Verify0
+    Verify0 -->|OK| P1
+    Verify0 -->|FAIL| P0
+    P1 --> Verify1
     Verify1 -->|OK| P2
     Verify1 -->|FAIL| P1
     P2 --> Verify2
@@ -267,10 +272,11 @@ flowchart TB
 
 **フロー上の意思決定**:
 
-- **Verify1-3**: 各フェーズ完了後に `turbo run build lint test` を実行。失敗すれば当該フェーズに差し戻し、次フェーズには進まない (Req 6.6)。
-- **Verify3** は Phase 3 完了後のみ本番起動 smoke test (サーバ起動 + HTTP 200) も含める。
-- **Verify4**: `transpilePackages` エントリ 1 つずつ削除 → ビルド + ランタイム検証 → 失敗時はそのエントリを戻して理由を comment。全件並列ではなく逐次。
-- **Verify5**: 最終段で `assemble-prod.sh` + `check-next-symlinks.sh` を起動する end-to-end 検証。本番 Docker のビルド成果物で起動試験。
+- **Verify0**: ベースライン 4 ファイルがコミットされていること。未コミットのまま Phase 1 に進むことは禁止。
+- **Verify1-2**: 各フェーズ完了後に `turbo run build lint test` を実行。失敗すれば当該フェーズに差し戻し、次フェーズには進まない (Req 6.6)。
+- **Verify3 (Phase 3 ゲート、最重要)**: dev/test だけでは不十分。本番コンパイル出力 (`node --import dotenv-flow/config dist/server/app.js` / `pnpm run server:ci`) を起動し、(a) markdown 全拡張を含む SSR smoke、(b) auth middleware snapshot を Phase 0 ベースラインと diff (差分 = 認可バイパス相当で fail)、(c) WebSocket / Yjs 2-client sync、(d) 起動時間と first-request p95 を Phase 0 perf baseline と比較、を全件通過。**いずれかのスクリプトが動作しない場合、代替検証で迂回してはならず、ユーザーに「ゲート通過不可」を報告して指示を仰ぐ**。
+- **Verify4**: `transpilePackages` エントリ 1 つずつ削除 → ビルド + ランタイム検証 → 失敗時はそのエントリを戻して理由を comment。markdown 全拡張を含むサンプルページで SSR を試し、特定ページだけで起こる `ERR_MODULE_NOT_FOUND` を捕捉する。
+- **Verify5**: 最終段で `assemble-prod.sh` + `check-next-symlinks.sh` を起動する end-to-end 検証。Phase 3.8.c の route-middleware snapshot と Phase 3.8.d の WebSocket smoke を **再実行** し、Phase 4/5 の変更で回帰していないことを確認。
 
 ### Route Factory Conversion Sequence
 
@@ -613,8 +619,9 @@ sequenceDiagram
 
 - **ビルドエラー** (TypeScript / turbo): 当該 phase 内で修正。`tsconfig.build.server.json` の `NodeNext` 化直後は `.js` 拡張子不足が大量出現する想定 — `ts2esm` のセカンドパスで解消する。
 - **ランタイムエラー** (`ERR_MODULE_NOT_FOUND` / `ERR_REQUIRE_ESM`): Phase 4 で transpilePackages 削除時に最も発生しうる。該当エントリを戻してインラインコメントに原因を記録。
-- **初期化デッドロック / 循環依存** (`ReferenceError: Cannot access 'X' before initialization`): Phase 3 で発生した場合は即座に停止し、`models/user/*` 等の lazy 化で解決。`research.md` §2.3 パターン A 参照。
+- **初期化デッドロック / 循環依存** (`ReferenceError: Cannot access 'X' before initialization`): Phase 3 で発生した場合は即座に停止し、`models/user/*` 等の lazy 化で解決。`research.md` §2.3 パターン A 参照。特に本番 ESM 実行時にのみ顕在化するケースがあるため、`pnpm run server:ci` での全モジュールロード到達確認を Phase 3.8.b に組み込む。
 - **CI 失敗** (`reusable-app-prod.yml` / `launch-prod`): 本番相当環境でのみ顕在化する問題 (e.g., `pnpm deploy --prod` の deps 除外)。ローカルで再現できない場合は CI ログと `.next/node_modules/` のスナップショット取得で追う。
+- **検証スクリプト自体の失敗**: `tools/snapshot-route-middleware.ts` の walk 失敗、OpenTelemetry データ取得不可、`curl Upgrade` が期待通り動かない等。**検証項目をスキップしたり目視確認で代用することは禁止**。スクリプト側の不具合は修正対象であり、修正完了まで phase gate を通過したと扱ってはならない。修正不能であればユーザーに明示的に報告して判断を仰ぐ。
 
 ### Monitoring
 
@@ -623,32 +630,62 @@ sequenceDiagram
 
 ## Testing Strategy
 
+### Baselines (Phase 0 で事前取得)
+
+Phase 1 以降の判定はすべて Phase 0 で捕捉した 4 ベースラインとの diff で行う。ベースラインなしでの前進は認めない。
+
+- **テスト結果ベースライン** (`.kiro/specs/esm-migration/test-baseline.md`): 移行前 master で `turbo run test --filter @growi/app` を 3 回連続実行し、per-spec pass/fail を記録。Req 2.9 / 6.3 の「新規失敗なし」判定はこの表との diff で行い、回ごとに揺れる既知 flaky と真の新規回帰を分離する。
+- **セキュリティ監査ベースライン** (`.kiro/specs/esm-migration/audit-baseline.json`): `pnpm audit --audit-level=moderate --json` の出力。Phase 5 の override 削除ごとに diff し、新規 HIGH/CRITICAL advisory が出現した場合は override を維持しつつ代替セキュリティピンを設定する。
+- **auth middleware チェーン baseline** (`.kiro/specs/esm-migration/route-middleware-baseline.json`): 移行前の起動状態で `app._router.stack` を walk し、apiv3 エンドポイントごとの `(method, path, middlewareNames[])` を JSON 化。Phase 3.8.c で ESM 化後の出力と diff して認可経路の保全を機械検証する。
+- **起動性能ベースライン** (`.kiro/specs/esm-migration/perf-baseline.md`): 本番出力の wall time 中央値と、OpenTelemetry 経由で 5 代表ルート (`/`, `/editor/:id`, `/_api/v3/healthcheck`, `/admin`, markdown 拡張サンプルページ) の first-request-after-cold-start p50/p95 を記録。
+
 ### Unit Tests
 
 - `tools/codemod/cjs-to-esm.ts` のカスタム transform: 4 パターンそれぞれについて input → expected output のスナップショットテスト (jscodeshift の testUtils 使用)。
+- **複合パターン専用フィクスチャ**: `isInstalled ? alreadyInstalledMiddleware : require('./installer')(crowi)` 型の三項演算子 × factory invoke の合成パターンを実コードから抽出し、codemod が条件付き invoke を壊さず変換することを検証する。
 - `apps/app/src/server/models/user/index.ts` の lazy 化後、`configManager` 未初期化時の getter 取得がエラーにならないこと。
+
+### Structural Guards (ESLint / grep)
+
+Codemod 完了後に構造的な回帰を防ぐためのルールを CI に固定化する。
+
+- `import/no-commonjs` を `apps/app/src/server/` 全域で強制。
+- `routes/**/*.{js,ts}` のトップレベルに import / 型宣言 / `export const setup = ...` 以外の文を禁止するカスタムルール (または CI grep)。ESM 化で import が hoist されて factory 外の副作用が早期実行されるのを防ぐ。
+- `apps/app/src/server/` から `src/migrations/` への import を禁止する grep チェック (migrations は CJS のまま残るため、ESM 側から参照されると解釈がずれる)。
 
 ### Integration Tests
 
-- `apps/app` の既存 `*.integ.ts` を ESM 下で全実行し、新規失敗がないことを確認 (Req 2.9, 6.3)。
+- `apps/app` の既存 `*.integ.ts` を ESM 下で全実行し、テスト結果ベースラインとの diff で新規失敗がないことを確認 (Req 2.9, 6.3)。
 - 中央ルーター (`routes/apiv3/index.js`) 変換後、全 apiv3 エンドポイントがルーティング登録されていることを supertest で確認。
+- **auth middleware snapshot diff** (Phase 3.8.c / 6.2): `tools/snapshot-route-middleware.ts` を本番起動状態で実行して得た snapshot を Phase 0 ベースラインと完全一致させる。差分 = 認可バイパス相当として扱う。
 
 ### E2E / UI Tests
 
 - `pnpm dev` → Playwright 既存スペック: ログイン (`auth.setup.ts`) / ページ作成 (`20-basic-features/create-page-button.spec.ts`) / Markdown 保存 (`23-editor/saving.spec.ts`)。
-- **WebSocket / Yjs カバレッジギャップ** (2026-04-20 時点): `apps/app/playwright/` 配下に Yjs / socket.io / y-websocket を実走するスペックは **現存しない**。Req 6.5 を充足するため、Phase 6 で以下を追加もしくは代替手段で検証する。
-  - **追加するスペック (または手動プロトコル)**: 2 クライアントで同一ページを開き、クライアント A での編集がクライアント B に 2 秒以内に反映されること (Yjs awareness + document sync)。併せて Chromium devtools の Network タブで `ws://.../socketio/` と `ws://.../y-websocket` のハンドシェイクが `101 Switching Protocols` で確立することを確認。
-  - **サーバ側 smoke**: `apps/app/src/server/service/yjs/upgrade-handler.ts` と `service/socket-io/socket-io.ts` が ESM 解決下で起動時にロードされ、HTTP Upgrade リクエストを処理すること。CI の `launch-prod` ジョブで `curl --include --http1.1 --header "Connection: Upgrade" --header "Upgrade: websocket" http://$HOST/socket.io/` が 101 または期待される 400 を返す (無認証拒否でも接続自体は成立)。
-- `assemble-prod.sh` 成果物起動 + 上記 Yjs smoke を Phase 6 で実行し、Req 6.5 の Express API / Next.js SSR / WebSocket すべてを同じ本番相当バイナリで確認する。
+- **WebSocket / Yjs**: Phase 3.8.d で前倒し検証する (Phase 6 への先送りを廃止)。2 クライアント同時編集で 2 秒以内に反映されることを手動 (もしくは 6.2.1 の Playwright) で確認し、`curl --include --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" /socket.io/` が 101 / 認証 4xx で応答することも併せて確認する。
+- **サーバ側 smoke**: `service/yjs/upgrade-handler.ts` と `service/socket-io/socket-io.ts` の attach が `server.listen()` コールバックより前に完了することを起動ログタイムスタンプで assert。
+- `assemble-prod.sh` 成果物起動 + 上記 Yjs smoke を Phase 6.2 で再確認し、Phase 4 / 5 の変更による回帰がないことを保証する。
 
 ### Performance / Runtime Smoke
 
-- 起動時間計測: ESM 化後に dev / prod 起動時間が現状 ±20% 以内であること。大幅悪化は import 順序の問題を示唆するので要調査。
+- **起動時間**: Phase 0.4 ベースライン中央値との比較で ±20% 以内。
+- **first-request-after-cold-start**: 5 代表ルートの p95 がベースライン ±25% 以内。OpenTelemetry (`apps/app/features/opentelemetry/`) を活用し、単一 scalar の起動時間のみに依存しない。
+- 超過は `require(esm)` コスト / import fan-out / lazy load 位置の問題を示唆するため、調整せずに次 phase に進んではならない。
+
+### 迂回禁止条項 (全検証共通)
+
+上記 snapshot / baseline diff / 本番起動 smoke のいずれかが実装上の理由で「動かない」場合でも、代替検証や目視スポットチェックで代用して次 phase に進むことは **禁止** する。スクリプトが動作しないなら修正するまで待つ。それが不可能な場合は phase gate を通過できない旨をユーザーに明示的に報告し、対処方針の指示を仰ぐ (Req 6.6 を厳格運用)。
 
 ## Migration Strategy
 
 ```mermaid
 flowchart TB
+    subgraph Phase0[Phase 0 Baselines]
+        Z1[capture test-baseline md]
+        Z2[capture audit-baseline json]
+        Z3[capture route-middleware-baseline json]
+        Z4[capture perf-baseline md]
+    end
     subgraph Phase1[Phase 1 Packages ESM]
         A1[add type module to 5 packages]
         A2[rename orval.config to cjs]
@@ -658,7 +695,8 @@ flowchart TB
         B1[add type module to root and apps app]
         B2[rename 3 config files to cjs]
         B3[add src migrations package.json commonjs]
-        B4[update references and scripts]
+        B4[add tsconfig exclude src migrations]
+        B5[update references and scripts]
     end
     subgraph Phase3[Phase 3 Server ESM - staged by directory]
         C0[madge baseline capture]
@@ -669,33 +707,38 @@ flowchart TB
         C2d[codemod step 3d routes non-central]
         C2e[codemod step 3e routes index]
         C2f[codemod step 3f routes apiv3 index]
+        C2h[guard no top-level side effects in routes]
         C2g[codemod step 3g crowi]
         C3[ts2esm extension fixer]
         C4[manual replace __dirname]
         C5[switch tsconfig to NodeNext]
         C6[switch scripts to tsx and import dotenv]
-        C7[verify build lint test and smoke]
+        C7a[gate 3.8.a build lint test vs baseline]
+        C7b[gate 3.8.b prod-build boot and markdown SSR]
+        C7c[gate 3.8.c route-middleware snapshot diff MANDATORY]
+        C7d[gate 3.8.d websocket yjs smoke MANDATORY]
+        C7e[gate 3.8.e startup and first-request perf]
 
-        C0 --> C1 --> C2a --> C2b --> C2c --> C2d --> C2e --> C2f --> C2g --> C3 --> C4 --> C5 --> C6 --> C7
+        C0 --> C1 --> C2a --> C2b --> C2c --> C2d --> C2e --> C2f --> C2h --> C2g --> C3 --> C4 --> C5 --> C6 --> C7a --> C7b --> C7c --> C7d --> C7e
     end
     subgraph Phase4[Phase 4 transpilePackages]
         D1[per entry remove]
-        D2[build and smoke]
+        D2[build and markdown-extensions smoke]
         D3[revert on fail with comment]
     end
     subgraph Phase5[Phase 5 Overrides and Docs]
         E1[per override remove]
-        E2[pnpm install plus build plus runtime smoke]
+        E2[pnpm install plus build plus runtime smoke plus audit diff]
         E3[revert on fail with comment]
-        E4[update package.json comments]
+        E4[update package.json comments and CVE ids]
         E5[update steering docs]
-        E6[final assemble-prod e2e]
+        E6[final assemble-prod e2e and rerun gates 3.8.c 3.8.d]
     end
 
-    Phase1 --> Phase2 --> Phase3 --> Phase4 --> Phase5
+    Phase0 --> Phase1 --> Phase2 --> Phase3 --> Phase4 --> Phase5
 ```
 
-**Rollback 方針**: すべての phase は git commit 単位で revert 可能。Phase 3 の大規模 commit は codemod 再実行前の状態を tag で保存する。
+**Rollback 方針**: すべての phase は git commit 単位で revert 可能。Phase 3 の大規模 commit は codemod 再実行前の状態を tag で保存する。各 phase 完了コミットにも `esm-migration/phaseN-done` の tag を打ち、forward-fix vs revert の意思決定を記録として残す。
 
 ## Supporting References
 

@@ -2,6 +2,38 @@
 
 以下のタスク集は design.md の Phased Migration (Phase 1–5) と Phase 6 の end-to-end 検証に対応する。各 major task の末尾には phase gate を設け、成功時のみ次 phase に進む (Req 6.6)。
 
+## Phase 0: ベースライン捕捉と事前ガード整備
+
+Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前の master に対して先行取得する。ここで取得した成果物は移行全ての phase のゲート判定に利用する。
+
+- [ ] 0. 移行前ベースラインを確立する
+- [ ] 0.1 テスト結果ベースラインを捕捉
+  - 移行前 master で `turbo run test --filter @growi/app` を **3 回連続実行** し、全回の per-spec pass/fail を記録
+  - 結果を `.kiro/specs/esm-migration/test-baseline.md` にコミット (3 回連続 fail = 真の失敗、回ごとに揺れる = 既知 flaky)
+  - Phase 3 以降の Req 2.9 / 6.3 判定はこの表との差分のみを新規失敗として扱う
+  - _Requirements: 2.9, 6.3_
+
+- [ ] 0.2 セキュリティ監査ベースラインを捕捉
+  - `pnpm audit --audit-level=moderate --json > .kiro/specs/esm-migration/audit-baseline.json` を取得
+  - Phase 5 の override 削除ごとに diff を取り、新規 HIGH/CRITICAL advisory が出た場合は該当 override を維持
+  - _Requirements: 4.1, 4.3, 4.4_
+
+- [ ] 0.3 `/api/v3/**` auth middleware チェーンのスナップショットを取得
+  - 移行前の `pnpm dev` 起動状態で `app._router.stack` を walk し、各 apiv3 エンドポイントについて `(method, path, middlewareNames[])` を JSON に出力するスクリプトを追加 (`tools/snapshot-route-middleware.ts`)
+  - 出力を `.kiro/specs/esm-migration/route-middleware-baseline.json` にコミット
+  - スクリプトは Phase 3.8 ゲートで再実行して diff を取るため、ESM/CJS 両方で動作する実装にする (`tsx` で起動可能)
+  - _Requirements: 2.6, 2.8_
+
+- [ ] 0.4 起動時パフォーマンスベースラインを捕捉
+  - 移行前の本番相当出力 (`pnpm run server:ci` 相当) で、起動完了までの wall time を 5 回計測し中央値を記録
+  - OpenTelemetry が利用可能な場合、5 代表ルート (`/`, `/editor/:id`, `/_api/v3/healthcheck`, `/admin`, LSX/drawio/attachment-refs を含むサンプルページ) の first-request p50/p95 を `.kiro/specs/esm-migration/perf-baseline.md` に記録
+  - _Requirements: 6.5_
+
+- [ ] 0.5 Phase 0 完了確認
+  - 上記 4 ファイルがコミットされていることを確認
+  - ベースラインが存在しない状態での Phase 1 以降の着手を禁止する
+  - _Depends: 0.1, 0.2, 0.3, 0.4_
+
 ## Phase 1: 残余共有パッケージの ESM 宣言
 
 - [ ] 1. 共有パッケージ 5 つを ESM 宣言に揃える
@@ -45,7 +77,8 @@
 - [ ] 2. 既定モジュールを ESM に切替え、CJS 残置箇所を明示化
 - [ ] 2.1 (P) `apps/app/src/migrations/` をディレクトリ単位で CJS 隔離
   - `apps/app/src/migrations/package.json` を新規作成し `{ "type": "commonjs" }` を宣言
-  - `apps/app/tsconfig.build.server.json` の `exclude` に `src/migrations/**` が含まれていることを再確認
+  - **`apps/app/tsconfig.build.server.json` の `exclude` に `src/migrations/**` を追加する (既存で含まれていない場合は必ず追加。hard precondition として Phase 3.6 までに完了していること)**
+  - ESLint/grep による構造ガードを追加: `apps/app/src/server/` 以下から `import ... from '~/server/migrations/...'` もしくは相対パスでの `src/migrations/` への import を禁止 (現状存在しないことを確認した上で将来回帰を防止)
   - `pnpm run dev:migrate` が実 DB に対してマイグレーション読込を成功させる
   - _Requirements: 5.4, 5.5_
   - _Boundary: CJS Isolation Strategy (migrations)_
@@ -141,16 +174,25 @@
 - [ ] 3.3.f (step 3.f) `routes/apiv3/index.js` (中央ルーター 44 箇所) を変換
   - 3.3.e と同じ規約で 44 エントリを名前付き factory invoke に変換
   - supertest もしくは手動で apiv3 代表エンドポイント (例: `/_api/v3/healthcheck`, `/_api/v3/users`, `/_api/v3/page`) がそれぞれ想定ステータスを返すこと
+  - 複合パターン (例: `isInstalled ? alreadyInstalledMiddleware : require('./installer')(crowi)` — 三項演算子の片側のみ factory invoke) が正しく変換されていること。該当箇所を事前に grep して codemod の単体テスト (タスク 3.2) に入力フィクスチャとして追加しておく
   - _Requirements: 2.3, 2.6_
   - _Depends: 3.3.e_
   - _Boundary: Codemod Transform (routes/apiv3/index)_
+
+- [ ] 3.3.h (step 3.h) 変換済みルートモジュールのトップレベル副作用を禁止するガードを追加
+  - `routes/**/*.js` および `routes/**/*.ts` に対し、import / type-only 宣言 / 関数宣言 / `export const setup = (crowi, app) => { ... }` 以外のトップレベル文を ESLint カスタムルール (もしくは CI の grep チェック) で禁止
+  - 現状のファイルで違反がある場合、副作用コードを `setup` 関数内に移す (例: 過去に module-top で `crowi.model('X')` を取得していた箇所を factory 内に移動)
+  - ガード追加後に `turbo run lint --filter @growi/app` でエラー 0 件
+  - _Requirements: 2.2, 2.3, 2.6_
+  - _Depends: 3.3.f_
+  - _Boundary: Codemod Transform (top-level side-effect guard)_
 
 - [ ] 3.3.g (step 3.g) `crowi/` を変換し `import/no-commonjs` 0 件を達成
   - `crowi/index.ts`, `crowi/setup-models.ts`, `crowi/dev.js` に codemod を適用
   - 変換完了後、ESLint `import/no-commonjs` が `apps/app/src/server/` 全域で 0 件検出
   - 変換統計が想定規模 (約 82 ファイルの module.exports、176 箇所の require、56 箇所の factory invoke) と累計で一致
   - _Requirements: 2.2, 2.3, 2.5, 2.6_
-  - _Depends: 3.3.f_
+  - _Depends: 3.3.h_
   - _Boundary: Codemod Transform (crowi)_
 
 - [ ] 3.4 `ts2esm` で `.js` 拡張子を補完
@@ -168,11 +210,11 @@
   - _Boundary: Codemod Transform (dirname)_
 
 - [ ] 3.6 `tsconfig.build.server.json` を NodeNext に切替
+  - **Precondition (hard)**: タスク 2.1 で `exclude` に `src/migrations/**` が追加済みであること。未完了なら本タスクを着手してはならない
   - `"module": "CommonJS"` → `"module": "NodeNext"`、`"moduleResolution": "Node"` → `"moduleResolution": "NodeNext"` に変更
-  - `exclude` に `src/migrations/**` が含まれていることを再確認
   - `turbo run build --filter @growi/app` が成功し、`transpiled/` 配下に ESM 出力が生成される
   - _Requirements: 2.1_
-  - _Depends: 3.3, 3.4, 3.5_
+  - _Depends: 2.1, 3.3, 3.4, 3.5_
   - _Boundary: Server Build Config_
 
 - [ ] 3.7 開発/本番起動スクリプトを tsx / --import に切替
@@ -183,13 +225,48 @@
   - _Depends: 3.6_
   - _Boundary: Dev Runner Adapter_
 
-- [ ] 3.8 Phase 3 統合ゲート
-  - `turbo run build lint test --filter @growi/app` がすべて成功 (test は移行前ベースラインと比較して新規失敗なし)
-  - `pnpm dev` 起動 + Playwright smoke (ログイン / ページ作成 / Markdown 保存) が通る
-  - `import/no-commonjs` が `apps/app/src/server/` で 0 件検出を維持
-  - Yjs / WebSocket の確認は Phase 6 (6.2) に委譲 (既存 Playwright スペック未整備のため)
-  - _Requirements: 2.8, 2.9, 6.1, 6.2, 6.3, 6.6_
-  - _Depends: 3.7_
+- [ ] 3.8 Phase 3 統合ゲート (MANDATORY — 迂回禁止)
+
+  本ゲートは ESM 化の成否を決定する最重要検証であり、以下の項目すべてを **本番コンパイル出力** (`node --import dotenv-flow/config dist/server/app.js` ないし `pnpm run server:ci`) に対して実行する。`pnpm dev` (tsx) と Vitest と Node NodeNext は ESM 実装が異なるため、dev / test での pass は本ゲートの代替にはならない。
+
+  **迂回禁止条項**: 下記 3.8.c (auth middleware snapshot diff) のいずれかの手順 — 特に `app._router.stack` の walk — が実装上の理由で失敗した場合、代替検証で代用したり「実害がなさそうだから」とスキップすることは **禁止** する。スクリプトが動作しないなら修正するまで Phase 4 には進まない。担当者はユーザーに対して明確に「ゲート 3.8.c を通過できないため Phase 4 に進めない」と報告し、対処方針の指示を仰ぐこと。これは他の 3.8.a / 3.8.b / 3.8.d / 3.8.e にも同様に適用される (Req 6.6 を厳格運用)。
+
+  - [ ] 3.8.a 基本品質ゲート
+    - `turbo run build lint test --filter @growi/app` がすべて成功
+    - `test` の結果は `.kiro/specs/esm-migration/test-baseline.md` (Phase 0.1) と比較し、新規失敗 0 件 (既知 flaky のブレは除外)
+    - `import/no-commonjs` が `apps/app/src/server/` で 0 件検出
+
+  - [ ] 3.8.b 本番出力起動 smoke (production-mode)
+    - `turbo run build --filter @growi/app` + `assemble-prod.sh` 相当で本番相当成果物を生成
+    - `pnpm run server:ci` (= `node dist/server/app.js --ci`) がエラー終了せず exit 0 で完走 (全モジュールロード到達の確認)
+    - 続いて `node --import dotenv-flow/config dist/server/app.js` で通常起動し、以下を確認:
+      - `/_api/v3/healthcheck` が 200
+      - 代表 apiv3 エンドポイント 2 種が想定ステータス
+      - markdown 全拡張 (drawio / LSX / footnote / math / mermaid / attachment-refs) を含むサンプルページの SSR 200 応答で、各拡張のレンダリング結果を含む HTML が返る
+    - **NG 時対応**: 本番モードでのみ再現する ESM ローダ起因の初期化エラー (TDZ, ERR_MODULE_NOT_FOUND, ERR_REQUIRE_ESM 等) は dev/test では捕捉不能。原因特定まで Phase 4 に進んではならない
+
+  - [ ] 3.8.c auth middleware チェーン snapshot diff (MANDATORY)
+    - Phase 0.3 で作成した `tools/snapshot-route-middleware.ts` を ESM 化後の本番出力に対して実行
+    - 生成された snapshot を `route-middleware-baseline.json` と diff し、**すべての apiv3 エンドポイントで middleware 名列が一致する** ことを確認
+    - 差分があった場合 (guard 欠落、順序変化、未知 middleware の挿入等) は認可バイパス級の潜在リスクと見なし、Phase 4 に進んではならない
+    - **スクリプトが動作しない場合の対応 (迂回禁止条項の具体例)**: `app._router` 構造が Express バージョン差で変わっている、動的 mount で stack が取得できない等の理由でスナップショット取得が失敗した場合、「目視で確認した」「代表 3 エンドポイントだけテストした」での代用は禁止。スクリプトを修正して全件を捕捉できる状態にしてから再実行する。それが不可能なら Phase 4 に進まず、ユーザーに報告して方針の指示を仰ぐ
+    - _Requirements: 2.6, 2.8_
+
+  - [ ] 3.8.d WebSocket / Yjs 接続 smoke (Phase 6 から前倒し)
+    - 本番出力起動状態で以下をいずれも確認:
+      - `curl --include --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" http://$HOST/socket.io/` が 101 もしくは認証起因 4xx で応答 (5xx / ERR_MODULE_NOT_FOUND は NG)
+      - Yjs: Chromium 2 クライアントで同一ページを開き、クライアント A の編集が 2 秒以内にクライアント B に反映される。DevTools Network で `ws://.../y-websocket` が 101 で確立
+    - 起動ログに socket.io attach / yjs upgrade-handler attach / `server.listen()` callback のタイムスタンプを出力し、**attach が listen callback 前に完了している** ことを assert (ログに「socketio attached」「yjs attached」が「server listening」より先に現れる)
+    - _Requirements: 6.5_
+
+  - [ ] 3.8.e 起動性能・first-request レイテンシ比較
+    - 本番出力起動の wall time を 3 回計測し中央値が Phase 0.4 ベースラインの ±20% 以内
+    - OpenTelemetry 経由で 5 代表ルート (`/`, `/editor/:id`, `/_api/v3/healthcheck`, `/admin`, markdown 拡張サンプルページ) の first-request-after-cold-start p95 が Phase 0.4 ベースラインの ±25% 以内
+    - 超過時は `require(esm)` コスト / import fan-out / lazy load 位置のいずれかの調整を行い、超過したまま Phase 4 に進んではならない
+    - _Requirements: 6.5_
+
+  - _Requirements: 2.8, 2.9, 6.1, 6.2, 6.3, 6.5, 6.6_
+  - _Depends: 3.7, 0.1, 0.3, 0.4_
 
 ## Phase 4: transpilePackages の削減
 
@@ -224,6 +301,7 @@
   - ルート `package.json` の overrides から `flat` ピンを削除
   - `pnpm install` 成功後 `turbo run build` を実行し、`pnpm why flat` で最新 ESM バージョンが解決されることを確認
   - サーバを起動し mongoose-gridfs 経由のファイルアップロードフローを smoke
+  - **セキュリティ監査必須**: override 削除後に `pnpm audit --audit-level=moderate --json` を実行し、Phase 0.2 の `audit-baseline.json` と diff。新規 HIGH/CRITICAL advisory が解決バージョンに存在する場合は override を戻し、代替としてセキュリティ境界側の新ピン (最新修正版 >= との不等式ピン等) を設定し、CVE ID を参照する正当化コメントを付与する
   - 失敗時は override を戻しインラインコメントで原因記録
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _Boundary: Overrides Reducer (flat)_
@@ -247,6 +325,7 @@
 - [ ] 5.4 dependency コメントとインライン理由を整理
   - `package.json` の `// comments for dependencies` から解消済みの CJS/ESM ピン記述を削除
   - 残存する `transpilePackages` / `pnpm.overrides` のすべてのエントリにインライン理由コメントが存在することを確認
+  - `axios` override のコメントに含まれる CVE ID プレースホルダ (`CVE-2025-XXXXX` 等) を正式な CVE 識別子もしくは内部アドバイザリ URL に置換する
   - _Requirements: 7.1, 7.2, 7.3_
   - _Depends: 4.2, 5.3_
 
@@ -266,15 +345,14 @@
   - _Requirements: 6.4_
   - _Depends: 5.5_
 
-- [ ] 6.2 本番アーティファクトを起動して機能 smoke
+- [ ] 6.2 本番アーティファクトを起動して機能 smoke (Phase 3.8 の最終確認)
+  - 本タスクは Phase 3.8.b / 3.8.d / 3.8.e で既に前倒し実施済みだが、Phase 4 / 5 の変更 (transpilePackages 削減 / overrides 削除) 後に **回帰していないことの最終確認** として再実行する位置付けに変更する
   - `node --import dotenv-flow/config dist/server/app.js` でサーバを起動
-  - **API**: apiv3 代表エンドポイント (`/_api/v3/healthcheck` ほか 2 種) が期待ステータスを返す
-  - **SSR**: トップページと任意のユーザページを HTTP GET し、200 応答で HTML 内に期待文字列が含まれること
-  - **WebSocket (socket.io)**: `curl --include --http1.1 -H "Connection: Upgrade" -H "Upgrade: websocket" http://$HOST/socket.io/` が接続確立 (101 もしくは認証拒否の 4xx) で、5xx / `ERR_MODULE_NOT_FOUND` ではないこと
-  - **WebSocket (Yjs)**: 2 クライアントで同一ページを Chromium で開き、クライアント A の編集が 2 秒以内にクライアント B に反映されること。DevTools Network で `ws://.../y-websocket` が `101 Switching Protocols` で確立
-  - 起動時間が移行前ベースラインの ±20% 以内
+  - **API / SSR / WebSocket / Yjs**: 3.8.b と 3.8.d の検証項目を再度パスすること
+  - 起動時間と first-request レイテンシが Phase 0.4 ベースラインおよび Phase 3.8.e 時点と比較して有意な悪化なし (±20% / ±25% 内)
+  - auth middleware snapshot を再取得して Phase 0.3 ベースラインと diff — 差分なしを確認 (3.8.c と同じ迂回禁止条項を適用)
   - _Requirements: 6.5_
-  - _Depends: 6.1_
+  - _Depends: 6.1, 3.8_
 
 - [ ] 6.2.1 (任意) Yjs 同期 Playwright スペックを追加
   - `apps/app/playwright/23-editor/yjs-sync.spec.ts` (仮) を追加し 6.2 の Yjs 手順を自動化
