@@ -3,14 +3,21 @@ import mongoose from 'mongoose';
 import Contribution from '../models/contribution-model';
 
 export const getContributions = async (userId: string) => {
-  if (typeof userId !== 'string' || !mongoose.Types.ObjectId.isValid(userId)) {
+  if (userId == null || !mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error('User ID is invalid');
   }
 
   try {
-    const contributions = await Contribution.find({ user: userId }).exec();
+    const contributions = await Contribution.find({ user: userId })
+      .select('date count -_id')
+      .lean();
 
-    return contributions;
+    const formattedContributions = contributions.map((c) => ({
+      date: c.date.toISOString().split('T')[0],
+      count: c.count,
+    }));
+
+    return { contributions: formattedContributions };
   } catch {
     throw new Error(
       'Internal Server Error: Could not retrieve contribution data',
