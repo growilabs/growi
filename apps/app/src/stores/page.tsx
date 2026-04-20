@@ -90,11 +90,21 @@ export const mutateAllPageInfo = (): Promise<void[]> => {
   return mutate((key) => Array.isArray(key) && key[0] === '/page/info');
 };
 
+const hasShareLinkId = (
+  shareLinkId: string | null | undefined,
+): shareLinkId is string => {
+  return shareLinkId != null && shareLinkId.trim().length > 0;
+};
+
+/**
+ * Build query params for /page/info endpoint.
+ * Only includes shareLinkId when it is a non-empty string.
+ */
 const buildPageInfoParams = (
   pageId: string,
   shareLinkId: string | null | undefined,
 ): { pageId: string; shareLinkId?: string } => {
-  if (shareLinkId != null) {
+  if (hasShareLinkId(shareLinkId)) {
     return { pageId, shareLinkId };
   }
   return { pageId };
@@ -111,7 +121,7 @@ export const useSWRxPageInfo = (
   const key = useMemo(() => {
     if (pageId == null) return null;
     // Guests without a share link cannot access page info, so skip the request
-    if (isGuestUser && shareLinkId == null) return null;
+    if (isGuestUser && !hasShareLinkId(shareLinkId)) return null;
     return ['/page/info', pageId, shareLinkId, isGuestUser];
   }, [shareLinkId, isGuestUser, pageId]);
 
