@@ -65,9 +65,7 @@ class ActivityService {
 
         if (shouldGenerateContribution) {
           const user =
-            parameters.user ||
-            parameters.event?.creator ||
-            parameters.target?.lastUpdateUser;
+            parameters.event?.creator || parameters.target?.lastUpdateUser;
 
           if (user) {
             addContribution(user).catch((err) => {
