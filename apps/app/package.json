@@ -28,6 +28,7 @@
     "dev:migrate:down": "pnpm run dev:migrate-mongo down -f config/migrate-mongo-config.js",
     "//// for CI": "",
     "launch-dev:ci": "cross-env NODE_ENV=development pnpm run dev:migrate && pnpm run ts-node src/server/app.ts --ci",
+    "snapshot-routes": "cross-env NODE_ENV=development pnpm run ts-node tools/snapshot-route-middleware.ts -- --out=../../.kiro/specs/esm-migration/route-middleware-baseline.json",
     "lint:typecheck": "tsgo --noEmit",
     "lint:biome": "biome check --diagnostic-level=error",
     "lint:styles": "stylelint \"src/**/*.scss\"",

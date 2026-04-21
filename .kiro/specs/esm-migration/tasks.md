@@ -19,7 +19,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - **`axios` override の CVE プレースホルダ (`package.json` 内の `CVE-2025-XXXXX` 等) を Phase 0 で実 advisory ID / GHSA URL に置換**。プレースホルダのまま次 phase に進むことを禁止。現行ピン (`^1.15.0` 等) が該当 advisory を実際にカバーしていることを `pnpm audit --json` 出力で確認し、確認結果を `audit-baseline.json` に併記
   - _Requirements: 4.1, 4.3, 4.4, 7.3_
 
-- [ ] 0.3 `/api/v3/**` auth middleware チェーンのスナップショットを取得
+- [x] 0.3 `/api/v3/**` auth middleware チェーンのスナップショットを取得
   - 移行前の `pnpm dev` 起動状態で `app._router.stack` を walk し、各 apiv3 エンドポイントについて `(method, path, middlewareNames[])` を JSON に出力するスクリプトを追加 (`tools/snapshot-route-middleware.ts`)
   - walker は **無名関数を許容しない**: `handle.name === ''` / `'anonymous'` が apiv3 リーフのチェーンに 1 件でも出現したら fail として、該当 middleware factory を named function 化してから再実行する
   - 出力を `.kiro/specs/esm-migration/route-middleware-baseline.json` にコミット

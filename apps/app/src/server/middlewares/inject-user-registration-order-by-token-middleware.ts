@@ -13,12 +13,14 @@ export type ReqWithUserRegistrationOrder = Request & {
   userRegistrationOrder: IUserRegistrationOrder;
 };
 
+// Named function expression so the route-middleware snapshot tool can
+// identify this handler in the apiv3 auth chain.
 // biome-ignore lint/style/noDefaultExport: ignore
-export default async (
+export default async function injectUserRegistrationOrderByTokenMiddleware(
   req: ReqWithUserRegistrationOrder,
   _res: Response,
   next: NextFunction,
-): Promise<void> => {
+): Promise<void> {
   const token = req.params.token || req.body.token;
 
   if (token == null) {
@@ -60,4 +62,4 @@ export default async (
   req.userRegistrationOrder = userRegistrationOrder;
 
   return next();
-};
+}

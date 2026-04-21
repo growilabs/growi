@@ -2,7 +2,9 @@
 module.exports = (crowi) => {
   const { appService } = crowi;
 
-  return async (req, res, next) => {
+  // Named function so the route-middleware snapshot tool can identify this
+  // handler in the apiv3 auth chain.
+  return async function applicationInstalled(req, res, next) {
     const isDBInitialized = await appService.isDBInitialized();
 
     // when already installed

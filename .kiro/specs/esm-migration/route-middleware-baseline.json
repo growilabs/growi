@@ -1,0 +1,3106 @@
+{
+  "capturedAt": "2026-04-21T10:23:24.721Z",
+  "node": "v24.13.1",
+  "git": "531da6e4c86e08676e909a111d682a98776419e5",
+  "entryCount": 260,
+  "entries": [
+    {
+      "method": "GET",
+      "path": "/_api/v3/activity/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/admin-home/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/ai-tools/suggest-path",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "certifyAiService",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/app-settings/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/app-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/file-upload-setting/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/app-settings/maintenance-mode",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/oauth2-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/page-bulk-export-settings",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/ses-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/site-url-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/smtp-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/app-settings/smtp-test",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/app-settings/v5-schema-migration",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/attachment/",
+      "middlewares": [
+        "multerMiddleware",
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/attachment/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "certifySharedPageAttachmentMiddleware",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/attachment/limit",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/attachment/list",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/audit-log-bulk-export/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/bookmark-folder/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/bookmark-folder/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/bookmark-folder/:id",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/bookmark-folder/add-bookmark-to-folder",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/bookmark-folder/list/:userId",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/bookmark-folder/update-bookmark",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/bookmarks/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/bookmarks/:userId",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/bookmarks/info",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/check-username",
+      "middlewares": ["<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/complete-registration",
+      "middlewares": [
+        "addActivity",
+        "injectUserRegistrationOrderByTokenMiddleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "validateCompleteRegistration",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/content-disposition-settings/",
+      "middlewares": ["loginRequired", "adminRequired", "<anonymous>"]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/content-disposition-settings/",
+      "middlewares": [
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/customize-setting/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-css",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-logo",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-noscript",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-script",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-title",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/customize-setting/delete-brand-logo",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/function",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/highlight",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/customize-setting/layout",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/layout",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/presentation",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/customize-setting/sidebar",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/sidebar",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/customize-setting/theme",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/theme",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/customize-setting/upload-brand-logo",
+      "middlewares": [
+        "multerMiddleware",
+        "accessTokenParserMw",
+        "loginRequired",
+        "multerMiddleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/export/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/export/:fileName",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/export/status",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-group-relations/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/external-user-groups/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/:id/external-user-group-relations",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/ancestors",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/children",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/keycloak/sync",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/keycloak/sync-settings",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/keycloak/sync-settings",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/keycloak/sync-status",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/ldap/sync",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/ldap/sync-settings",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/ldap/sync-settings",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/ldap/sync-status",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/forgot-password/",
+      "middlewares": [
+        "checkForgotPasswordEnabled",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/forgot-password/",
+      "middlewares": [
+        "checkForgotPasswordEnabled",
+        "injectResetOrderByTokenMiddleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/g2g-transfer/",
+      "middlewares": ["validateTransferKey", "multerMiddleware", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/g2g-transfer/attachment",
+      "middlewares": ["validateTransferKey", "multerMiddleware", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/g2g-transfer/files",
+      "middlewares": ["validateTransferKey", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/g2g-transfer/generate-key",
+      "middlewares": [
+        "accessTokenParserMw",
+        "adminRequiredIfInstalled",
+        "appSiteUrlRequiredIfNotInstalled",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/g2g-transfer/growi-info",
+      "middlewares": ["validateTransferKey", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/g2g-transfer/transfer",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/healthcheck/",
+      "middlewares": ["nocache", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/import/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/import/all",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/import/status",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/import/upload",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "multerMiddleware",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/in-app-notification/all-statuses-open",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/in-app-notification/list",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/in-app-notification/open",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/in-app-notification/status",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/invited/",
+      "middlewares": [
+        "applicationInstalled",
+        "middleware",
+        "middleware",
+        "middleware",
+        "invitedValidation",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/login",
+      "middlewares": [
+        "applicationInstalled",
+        "middleware",
+        "middleware",
+        "loginValidation",
+        "addActivity",
+        "injectRedirectTo",
+        "isEnableLoginWithLocalOrLdap",
+        "loginWithLocal",
+        "loginWithLdap",
+        "cannotLoginErrorHadnler",
+        "loginFailure"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/logout/",
+      "middlewares": ["addActivity", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/markdown-setting/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/markdown-setting/indent",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/markdown-setting/lineBreak",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/markdown-setting/xss",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/mongo/collections",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/notification-setting/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/notification-setting/global-notification",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/notification-setting/global-notification/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/notification-setting/global-notification/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/notification-setting/global-notification/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/notification-setting/global-notification/:id/enabled",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/notification-setting/notify-for-page-grant",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/notification-setting/user-notification",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/notification-setting/user-notification/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "_ALL",
+      "path": "/_api/v3/openai*",
+      "middlewares": ["<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/page-bulk-export/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page-listing/children",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page-listing/info",
+      "middlewares": [
+        "accessTokenParserMw",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page-listing/item",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page-listing/root",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/page/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/content-width",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/grant",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/publish",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/sync-latest-revision-body-to-yjs-draft",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/unpublish",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/:pageId/yjs-data",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/applicable-grant",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/exist",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/exist-paths",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/export/:pageId",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/grant-data",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/info",
+      "middlewares": [
+        "accessTokenParserMw",
+        "certifySharedPage",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/likes",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/non-user-related-groups-granted",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/page-paths-with-descendant-count",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/shared",
+      "middlewares": [
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "rejectLinkSharingDisabled",
+        "certifySharedPage",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/subscribe",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/convert-pages-by-path",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "adminRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/delete",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/duplicate",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/pages/empty-trash",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/legacy-pages-migration",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/pages/list",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/pages/recent",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/pages/rename",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/resume-rename",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/pages/subordinated-list",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/pages/v5-migration-status",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/personal-setting/access-token",
+      "middlewares": [
+        "accessTokenParserMw",
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/access-token",
+      "middlewares": [
+        "accessTokenParserMw",
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/personal-setting/access-token",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/personal-setting/access-token/all",
+      "middlewares": [
+        "accessTokenParserMw",
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/api-token",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/associate-ldap",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/disassociate-ldap",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/editor-settings",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/editor-settings",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/external-accounts",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/image-type",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/in-app-notification-settings",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/in-app-notification-settings",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/is-password-set",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/password",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/plugins/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/plugins/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/plugins/:id/activate",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/plugins/:id/deactivate",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/plugins/:id/remove",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/register",
+      "middlewares": [
+        "applicationInstalled",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "registerValidation",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/revisions/:id",
+      "middlewares": [
+        "certifySharedPage",
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/revisions/list",
+      "middlewares": [
+        "certifySharedPage",
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/search/connection",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/search/connection",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/search/connection",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/search/connection",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/search/indices",
+      "middlewares": [
+        "nocache",
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/search/indices",
+      "middlewares": [
+        "nocache",
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/search/indices",
+      "middlewares": [
+        "nocache",
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/search/indices",
+      "middlewares": [
+        "nocache",
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/search/indices",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/search/indices",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/search/indices",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/search/indices",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/security-setting/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/security-setting/all-share-links/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/security-setting/all-share-links/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/security-setting/authentication/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/authentication/enabled",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/general-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/github-oauth",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/google-oauth",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/ldap",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/local-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/oidc",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/saml",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/share-link-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/share-links/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/share-links/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "linkSharingRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/share-links/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "linkSharingRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/share-links/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "excludeReadOnlyUser",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/share-links/all",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/slack-integration-legacy-settings/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-legacy-settings/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/slack-integration-settings/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/slack-integration-settings/bot-type",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/bot-type",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/proxy-uri",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id/make-primary",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id/permissions",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id/regenerate-tokens",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id/relation-test",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration-settings/without-proxy/test",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/without-proxy/update-permissions",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/without-proxy/update-settings",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/commands",
+      "middlewares": [
+        "addSigningSecretToReq",
+        "S",
+        "checkCommandsPermission",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/events",
+      "middlewares": [
+        "verifyUrlMiddleware",
+        "addSigningSecretToReq",
+        "S",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/interactions",
+      "middlewares": [
+        "addSigningSecretToReq",
+        "S",
+        "parseSlackInteractionRequest",
+        "checkInteractionsPermission",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/proxied/commands",
+      "middlewares": [
+        "verifyAccessTokenFromProxy",
+        "checkCommandsPermission",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/proxied/events",
+      "middlewares": [
+        "verifyAccessTokenFromProxy",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/proxied/interactions",
+      "middlewares": [
+        "verifyAccessTokenFromProxy",
+        "parseSlackInteractionRequest",
+        "checkInteractionsPermission",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/proxied/verify",
+      "middlewares": ["verifyAccessTokenFromProxy", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/slack-integration/supported-commands",
+      "middlewares": ["verifyAccessTokenFromProxy", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/staffs/",
+      "middlewares": ["<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/statistics/user",
+      "middlewares": ["nocache", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/templates/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/templates/plugin-templates/:organizationId/:reposId/:templateId/:locale",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/templates/preset-templates/:templateId/:locale",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/user-activation/register",
+      "middlewares": [
+        "applicationInstalled",
+        "middleware",
+        "validateRegisterForm",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-activities/",
+      "middlewares": [
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-group-relations/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/user-groups/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/user-groups/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/user-groups/:id",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id/pages",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id/unrelated-users",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id/user-group-relations",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id/users",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/user-groups/:id/users/:username",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/user-groups/:id/users/:username",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/ancestors",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/children",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/selectable-child-groups",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/selectable-parent-groups",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "middleware",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/user-ui-settings/",
+      "middlewares": [
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user/related-groups",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/activate",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/deactivate",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "certifyUserOperationOtherThenYourOwn",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/grant-admin",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/grant-read-only",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/:id/recent",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/users/:id/remove",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "certifyUserOperationOtherThenYourOwn",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/revoke-admin",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "certifyUserOperationOtherThenYourOwn",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/revoke-read-only",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/external-accounts/",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/users/external-accounts/:id/remove",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/users/invite",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/list",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/reset-password",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/reset-password-email",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/send-invitation-email",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "addActivity",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/update.imageUrlCache",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/usernames",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "middleware",
+        "middleware",
+        "middleware",
+        "middleware",
+        "apiV3FormValidator",
+        "<anonymous>"
+      ]
+    }
+  ]
+}
