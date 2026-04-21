@@ -203,7 +203,7 @@ function createMentionCompletionExtension(fetchUsers: FetchUsersFn): Extension;
 - ユーザーへのエラー表示は不要（補完はあくまで補助機能）
 
 **remark プラグイン処理エラー**
-- AST 変換中の例外は remark の標準エラーハンドリングに委ねる。コメントレンダリング全体が失敗しないよう、プラグイン内で try-catch を使用
+- コメントレンダリング全体が失敗しないよう、プラグイン内で try-catch を使用し、失敗した node はそのまま通す
 
 ### Monitoring
 
@@ -223,6 +223,3 @@ function createMentionCompletionExtension(fetchUsers: FetchUsersFn): Extension;
 1. `GET /_api/v3/users/?searchText=ab` — 前方一致ユーザーが返却されること
 2. 認証なしアクセスで 401 が返ること
 
-### Performance
-
-1. `fetchUsers` — `searchText` クエリで 10 件取得が 300ms 以内に返すこと（デバウンス時間内に完了）

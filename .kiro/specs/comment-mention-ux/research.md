@@ -66,6 +66,15 @@
 
 ---
 
+### Decision: remark プラグインの正規表現に `@` を含む理由
+
+- **Context**: `remarkMentionPlugin` の正規表現 `/\B@[\w@.-]+/g` の文字クラスに `@` が含まれている理由
+- **Selected Approach**: 既存実装 `CommentService.getMentionedUsers`（`comment-mention-notification` で参照）が同じ `/\B@[\w@.-]+/g` を使用しており、その挙動と一致させるために踏襲した
+- **Rationale**: `comment-mention-notification` の通知ロジックと remark プラグインのマッチ対象が食い違うと、通知は届くが強調表示されない（または逆）ケースが発生する。既存実装との整合性を優先した
+- **Trade-offs**: `@user@other` のような連続メンション（スペースなし）は1マッチになるが、実際の使用では発生しない想定
+
+---
+
 ## Risks & Mitigations
 
 - remark プラグインの sanitize option 漏れによる XSS → sanitize option の単体テストで検証

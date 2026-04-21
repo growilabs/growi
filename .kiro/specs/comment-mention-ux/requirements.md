@@ -13,7 +13,7 @@
 #### Acceptance Criteria
 
 1. When コメントが表示される, the GROWI shall コメント本文内の `@username` パターンを通常テキストと異なるスタイル（強調色・ハイライト等）で描画する
-2. The GROWI shall クライアント側でのユーザー存在確認を行わない。サーバー往復コスト削減のため、`@username` パターンに一致するすべての文字列を同一スタイルで強調表示する
+2. The GROWI shall すべての `@username` パターンに一致する文字列を同一スタイルで強調表示する
 3. The GROWI shall メンション表示スタイルをコメントのプレビューと投稿後の表示の両方に適用する
 
 ---
@@ -28,4 +28,4 @@
 2. When ユーザーが候補リストからユーザーを選択した, the GROWI shall 入力中の `@文字列` を選択されたユーザーの `@username` に置換する
 3. If 候補リストに表示するユーザーが存在しない, the GROWI shall 候補リストを表示しない
 4. When ユーザーが `Escape` キーを押した, the GROWI shall 候補リストを閉じる
-5. The GROWI shall 候補リストに表示するユーザー数の上限を設ける（最大10件程度）
+5. The GROWI shall 候補リストに表示するユーザー数の上限を10件とする

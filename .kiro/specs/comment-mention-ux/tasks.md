@@ -21,7 +21,7 @@
   - _Requirements: 2.1, 2.3_
 
 - [ ] 1.4 (P) `.mention-user` のスタイルを追加する
-  - `apps/app/src/styles/` 配下に `.mention-user` クラスのスタイル（強調色・フォントウェイト等）を追加する
+  - `apps/app/src/styles/organisms/_wiki.scss` の `.wiki.comment` ブロック（`&.comment`）内に `.mention-user` クラスのスタイル（強調色・フォントウェイト等）を追加する
   - _Requirements: 2.1_
 
 - [ ]* 1.5 (P) remark プラグインのユニットテストを作成する
@@ -35,7 +35,7 @@
 - [ ] 2.1 (P) CodeMirror 向けメンション補完拡張のファクトリを作成する
   - `packages/editor/src/client/services-internal/extensions/` に `mentionAutocompletionSettings.ts` を新規作成する
   - `emojiAutocompletionSettings.ts` のパターンを踏襲して `@codemirror/autocomplete` の `autocompletion` + `CompletionContext` を使う
-  - `@` に続く1文字以上の入力でトリガーするよう正規表現を設定する（`/(?<!\w)@\w+$/`）
+  - `@` に続く1文字以上の入力でトリガーするよう正規表現を設定する（`/(?<!\w)@[\w.-]+$/`）
   - 候補取得は外部注入の `fetchUsers` コールバック経由にして `packages/editor` から `apps/app` への依存を持ち込まない
   - 候補選択時に `@文字列` 全体を `@username` に置換する
   - 最大10件（`maxMatches: 10`）に制限する
