@@ -6,7 +6,7 @@
 
 Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前の master に対して先行取得する。ここで取得した成果物は移行全ての phase のゲート判定に利用する。
 
-- [ ] 0. 移行前ベースラインを確立する
+- [x] 0. 移行前ベースラインを確立する
 - [x] 0.1 テスト結果ベースラインを捕捉
   - 移行前 master で `turbo run test --filter @growi/app` を **3 回連続実行** し、全回の per-spec pass/fail を記録
   - 結果を `.kiro/specs/esm-migration/test-baseline.md` にコミット (3 回連続 fail = 真の失敗、回ごとに揺れる = 既知 flaky)
@@ -52,7 +52,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - この値が Phase 3.7.a dev runner bake-off の相対評価の基準、および Phase 3.8.e の dev 側 ±20% gate の判定基準となる
   - _Requirements: 2.7, 6.5_
 
-- [ ] 0.6 Phase 0 完了確認
+- [x] 0.6 Phase 0 完了確認
   - 以下のファイルがコミットされていることを確認:
     - `test-baseline.md` (0.1)
     - `audit-baseline.json` + `axios` CVE ID 実値置換 (0.2)
