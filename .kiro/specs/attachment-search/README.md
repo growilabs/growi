@@ -6,13 +6,15 @@
 
 ## 構成する 3 sub-specs
 
-このプロジェクトは 3-way split で以下 3 spec として実装されます (roadmap.md 参照):
+このプロジェクトは 3-way split で以下 3 spec として実装されます:
 
 1. **`attachment-search-markitdown-extractor/`** — Python FastAPI 抽出サービス (`services/markitdown-extractor/`)
 2. **`attachment-search-indexing/`** — apps/app サーバ側統合 (ES 連携、indexer、apiv3)
 3. **`attachment-search-ui/`** — apps/app クライアント側 UI (検索結果、管理画面)
 
 依存順序: `attachment-search-markitdown-extractor` → `attachment-search-indexing` → `attachment-search-ui`
+
+3-way split を選択した経緯 (Tika / TS ポート等の代替案を退けた理由) は [research.md](./research.md) 参照。
 
 ## このディレクトリに残した資料
 

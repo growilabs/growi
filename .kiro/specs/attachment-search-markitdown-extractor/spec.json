@@ -1,14 +1,23 @@
 {
   "feature_name": "attachment-search-markitdown-extractor",
   "created_at": "2026-04-17T16:30:00.000Z",
-  "updated_at": "2026-04-17T16:30:00.000Z",
+  "updated_at": "2026-04-21T11:00:00.000Z",
   "language": "ja",
-  "phase": "design-generated",
+  "phase": "tasks-generated",
   "derived_from": "attachment-search",
   "approvals": {
-    "requirements": { "generated": true, "approved": false },
-    "design": { "generated": true, "approved": false },
-    "tasks": { "generated": false, "approved": false }
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true
 }

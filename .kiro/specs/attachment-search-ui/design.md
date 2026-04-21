@@ -346,15 +346,16 @@ sequenceDiagram
 | 4.2 | 成功/失敗フィードバック | use-attachment-reextract + toast | — | Flow 2 |
 | 4.3 | エラー概要表示 | ReextractButton + toast (reason code 分岐) | — | Flow 2 |
 | 4.4 | 機能無効時ボタン隠蔽 | ReextractButton + use-search-attachments-enabled + isAttachmentFullTextSearchEnabledAtom | — | — |
-| 5.1 | 設定セクション表示 | AttachmentSearchSettings | `use-attachment-search-config` (`{ extractorUri, hasExtractorToken, timeoutMs, maxFileSizeBytes }` の shape、token 値は GET に含まれない) | — |
+| 5.1 | 設定セクション表示 | AttachmentSearchSettings | `use-attachment-search-config` (`{ extractorUri, hasExtractorToken, timeoutMs, maxFileSizeBytes, isAttachmentFullTextSearchEnabled, requiresReindex }` の shape、token 値は GET に含まれない) | — |
 | 5.2 | URI 設定時ガイダンス | AttachmentSearchSettings (URI が空から非空に変化した保存時) | — | — |
 | 5.3 | バリデーションエラー | AttachmentSearchSettings (form validation) | — | — |
+| indexing 5.3 | 再インデックス要否フラグ表示 | AttachmentSearchSettings (`config.requiresReindex === true` のとき standing inline notice を表示、rebuild セクションへのアンカー付き) | `use-attachment-search-config` (`config.requiresReindex`) | — |
 | 5.4 | 権限制御 | 既存 admin middleware (apiv3 側) | — | — |
 | 6.1 | チェックボックス追加 | RebuildWithAttachmentsCheckbox | — | Flow 3 |
 | 6.2 | 進捗表示 | ElasticsearchManagement Socket.io listener | — | Flow 3 |
 | 6.3 | 機能無効時隠蔽 | RebuildWithAttachmentsCheckbox + ElasticsearchManagement による `use-attachment-search-config` 経由の gate (admin 画面内の判定は config SWR を真実の源とする) | — | — |
 | 7.1 | 失敗ログ表示 | AttachmentExtractionFailures | `use-attachment-extraction-failures` | — |
-| 7.2 | 機能無効時非表示 | AttachmentExtractionFailures + `use-attachment-search-config` (`config.extractorUri` 非空 AND `config.hasExtractorToken` true の両条件; admin 画面内の判定は config SWR を真実の源とする) | — | — |
+| 7.2 | 機能無効時非表示 | AttachmentExtractionFailures + `use-attachment-search-config` (`config.isAttachmentFullTextSearchEnabled`; admin 画面内の判定は config SWR を真実の源とする) | — | — |
 | 7.3 | 取得失敗時のエラー表示 | AttachmentExtractionFailures error state | — | — |
 
 ## Components and Interfaces
@@ -514,9 +515,11 @@ interface AttachmentSearchSettingsProps {
 interface AttachmentSearchConfigForm {
   readonly extractorUri: string;
   readonly extractorTokenInput: string;       // write-only、空欄は "変更なし"、削除は別ボタン
-  readonly hasExtractorToken: boolean;        // server から来る read-only な存在フラグ
+  readonly hasExtractorToken: boolean;        // server から来る read-only な存在フラグ (form の "token 設定済み" 表示用途のみ; 機能ゲート判定には使わない)
   readonly timeoutMs: number;
   readonly maxFileSizeBytes: number;
+  readonly isAttachmentFullTextSearchEnabled: boolean; // server 算出済みの機能有効フラグ (read-only、admin 画面内ゲートの単一真実の源)
+  readonly requiresReindex: boolean;          // server 算出済み (read-only、NOT editable)。既存添付が検索対象に取り込まれていないことを示す
 }
 ```
 
@@ -529,6 +532,7 @@ interface AttachmentSearchConfigForm {
   - 明示的な「token を削除」ボタンを別途提供し、押下時に `extractorToken: null` を送って削除 (soft-disable 手段)
 - **`extractorUri` allowlist エラー表示**: server が 400 `invalid_extractor_uri` を返した場合、scheme が http/https 以外 or クラウドメタデータ endpoint (`169.254.169.254` 等) を指している旨の toast + inline エラーを出す。k8s 内部 DNS / RFC1918 / loopback は許可されているため、通常のデプロイ構成ではこのエラーは出ない
 - 保存時に `extractorUri` が空文字列から非空文字列に変化した場合のみ、「既存添付を検索対象に取り込むには別途一括再インデックスの実行が必要」のガイダンスを保存成功後に表示する (空→空 / 非空→非空 / 非空→空 のときは出さない)
+- **再インデックス要否の常設通知 (Req 5.3)**: `config.requiresReindex === true` のとき、フォーム内に inline notice を常時表示する (「既存添付が検索対象に入っていません。`ElasticsearchManagement` セクションの「一括再インデックス」から取り込んでください」)。notice には同画面内の rebuild セクションへのスクロールリンク/アンカーを付与する。これは server が count 比較で算出する read-only フラグで、上記の保存時 URI-change ガイダンス (Req 5.2) とは独立した別通知である (後者は一過性の toast/アラート、前者は状態が解消されるまで出し続ける standing notice)
 - form validation: `extractorUri` は空または有効な URI 形式、数値項目 (`timeoutMs` / `maxFileSizeBytes`) は `>= 1`。`extractorToken` は形式検証なし (server 側で hmac 比較のみ)。エラー時は保存ボタン disabled
 - 保存成功後、`use-attachment-search-config` 内部で `mutate()` を呼び SWR キャッシュを更新する。同画面内の他 admin UI (`RebuildWithAttachmentsCheckbox` / `AttachmentExtractionFailures`) は同じ SWR キーを subscribe しているため、SSR hydrate を待たずに即座に再レンダリングされる (既存 `useSWRxAppSettings` + `mutate()` パターンと同型)
 
@@ -556,7 +560,7 @@ interface ExtractionFailureView {
 ```
 
 **Responsibilities & Constraints**
-- 機能無効判定は `use-attachment-search-config` の `config.extractorUri` が空または `config.hasExtractorToken` が false のときに `null` を返す (admin 画面内では SSR atom ではなく admin config SWR を真実の源とする; 後述「Admin 画面内の機能ゲート (in-page reactivity)」節参照)
+- 機能無効判定は `use-attachment-search-config` の `config.isAttachmentFullTextSearchEnabled` が false のときに `null` を返す (admin 画面内では SSR atom ではなく admin config SWR を真実の源とする; 後述「Admin 画面内の機能ゲート (in-page reactivity)」節参照)
 - API エラー時はセクション内にエラーメッセージを表示 (画面全体は閉塞させない)
 - 重量テーブルコンポーネントを採用する場合は `dynamic({ ssr: false })`
 
@@ -577,7 +581,7 @@ interface RebuildWithAttachmentsCheckboxProps {
 
 **Responsibilities & Constraints**
 - 機能有効時はデフォルト `checked = true` (親側で初期化)
-- 親 (`ElasticsearchManagement`) 側で `use-attachment-search-config` の `config.extractorUri` が空または `config.hasExtractorToken` が false のとき本コンポーネントを render しない (admin 画面内では SSR atom ではなく admin config SWR を真実の源とする; 後述「Admin 画面内の機能ゲート (in-page reactivity)」節参照)
+- 親 (`ElasticsearchManagement`) 側で `use-attachment-search-config` の `config.isAttachmentFullTextSearchEnabled` が false のとき本コンポーネントを render しない (admin 画面内では SSR atom ではなく admin config SWR を真実の源とする; 後述「Admin 画面内の機能ゲート (in-page reactivity)」節参照)
 
 ### Admin 画面内の機能ゲート (in-page reactivity)
 
@@ -585,10 +589,10 @@ interface RebuildWithAttachmentsCheckboxProps {
 
 **既存 GROWI の採用パターン**: `apps/app/src/client/components/Admin/App/` 配下 (`PageBulkExportSettings.tsx` / `FileUploadSetting.tsx` / `MaintenanceMode.tsx` / `AppSettingsPageContents.tsx` 等) は、admin config を**単一の共有 SWR キャッシュキー** (`useSWRxAppSettings` = `/app-settings/`) に集約し、保存側コンポーネントが PUT 成功後に `mutate()` を呼ぶことで、同画面内の兄弟コンポーネントが同一 SWR を subscribe しているため自動的に再レンダリングされる (`PageBulkExportSettings.tsx` L32-L52 の `onSubmitHandler` → `mutate()`、`AppSettingsPageContents.tsx` L32 の `useSWRxAppSettings()` を兄弟がそれぞれ subscribe するパターン)。SSR hydrated Jotai atom は admin 画面の in-page 判定ソースとしては使用していない (admin 画面で SSR 由来の状態を更新する必要があるときは `ElasticsearchManagement.reconnect` のように `window.location.reload()` を使う数少ないケースに限定される)。Jotai atom の client-side 直接 mutation は既存規約に存在しない。
 
-**採用する解法**: **admin 画面内では `use-attachment-search-config` SWR を単一の真実の源とし、feature gate を `config.extractorUri` 非空 AND `config.hasExtractorToken` true の両条件で判定する**。これは既存 `useSWRxAppSettings` + `mutate()` パターンと同型の解 (上記 (a)/(b)/(c) 分類では (a) 系 = 画面ローカルの hook に判定を寄せる案の GROWI 流バリアント)。
+**採用する解法**: **admin 画面内では `use-attachment-search-config` SWR を単一の真実の源とし、feature gate を `config.isAttachmentFullTextSearchEnabled` (server 算出済みの単一フラグ) で判定する**。これは既存 `useSWRxAppSettings` + `mutate()` パターンと同型の解 (上記 (a)/(b)/(c) 分類では (a) 系 = 画面ローカルの hook に判定を寄せる案の GROWI 流バリアント)。
 
 - `AttachmentSearchSettings.save()` は PUT 成功後、内部で SWR `mutate()` を呼び `['search-attachments', 'admin', 'config']` キャッシュを更新する (既存 `PageBulkExportSettings.tsx` の `onSubmitHandler` と同じ流儀)
-- admin 画面内の feature-gated 兄弟 UI (`RebuildWithAttachmentsCheckbox` / `AttachmentExtractionFailures`) は `use-search-attachments-enabled` (SSR atom) **ではなく** `use-attachment-search-config` の `config.extractorUri` 非空 AND `config.hasExtractorToken` trueかどうかでゲートする。`save()` が `mutate()` した時点で同一 SWR キーを subscribe している兄弟が SWR 経由で自動再レンダリングされ、追加 UI が即時表示/非表示に切り替わる
+- admin 画面内の feature-gated 兄弟 UI (`RebuildWithAttachmentsCheckbox` / `AttachmentExtractionFailures`) は `use-search-attachments-enabled` (SSR atom) **ではなく** `use-attachment-search-config` の `config.isAttachmentFullTextSearchEnabled` でゲートする。`save()` が `mutate()` した時点で同一 SWR キーを subscribe している兄弟が SWR 経由で自動再レンダリングされ、追加 UI が即時表示/非表示に切り替わる
 - 親 `ElasticsearchManagement` は admin 専用画面なので、admin config SWR を呼ぶことで 403 問題は発生しない
 - `RebuildWithAttachmentsCheckbox` は自身では SWR を呼ばず、親 `ElasticsearchManagement` が `use-attachment-search-config` で判定して conditional render する (props 経由)。`AttachmentExtractionFailures` は自身で `use-attachment-search-config` を subscribe してゲートする (同 SWR キーなので多重 fetch は SWR の dedup で 1 回に集約される)
 - 一方、**admin 画面外** (検索 UI / 添付モーダル) は admin config API を呼べないため、引き続き SSR hydrated atom (`isAttachmentFullTextSearchEnabledAtom`) + `use-search-attachments-enabled` をゲート源として使う。admin 画面での設定変更が非 admin ユーザの既存タブに反映されるのは、次回フルロード時の SSR hydrate 経由で OK (要件 3.5 / 4.4 / 6.3 / 7.2 は admin 設定画面外での in-page 即時反映を要求していない)
@@ -597,7 +601,7 @@ interface RebuildWithAttachmentsCheckboxProps {
 
 | Scope | 判定ソース | 即時反映 |
 |-------|-----------|---------|
-| admin 画面内 (`AttachmentSearchSettings` / `RebuildWithAttachmentsCheckbox` / `AttachmentExtractionFailures`) | `use-attachment-search-config` の `config.extractorUri` 非空 AND `config.hasExtractorToken` true | `save()` → SWR `mutate()` で即時 |
+| admin 画面内 (`AttachmentSearchSettings` / `RebuildWithAttachmentsCheckbox` / `AttachmentExtractionFailures`) | `use-attachment-search-config` の `config.isAttachmentFullTextSearchEnabled` | `save()` → SWR `mutate()` で即時 |
 | 検索 UI / 添付モーダル (非 admin 含む) | `isAttachmentFullTextSearchEnabledAtom` (SSR hydrated) + `use-search-attachments-enabled` | 次回フルロード |
 
 この二本立ては既存 GROWI の admin 判定と非 admin 判定の分離 (admin 専用設定 API vs. 汎用 SSR prop) にそのまま沿う。
@@ -620,7 +624,7 @@ export function useAttachmentFullTextSearchEnabled(): boolean {
 - **上流での算出ロジック**: 上流 spec 側で「ES 有効 AND `extractorUri` 設定済み AND `extractorToken` 設定済み」という算出値として導出される (専用 Config キー `enabled` は存在しない)。本 spec は算出結果だけを consume するので、算出ロジックの変更は Revalidation Trigger で追従する
 - **admin config API への依存なし**: 非 admin ユーザでも常に参照可能。403 問題は発生しない
 - 同期的に `boolean` を返すため loading 状態は持たない (SSR hydrate 済み前提)。atom は hydrate 前に default false を返すので、CSR ナビゲーション時も安全側 (機能 OFF) にフォールバック
-- 設定画面 (`AttachmentSearchSettings`) で `extractorUri` / `extractorToken` を変更して保存しても、当該 SSR prop が次回ページ到達時に更新されるまでは atom の値は変わらない。admin 画面のその場プレビューが必要な場合は `use-attachment-search-config` の戻り値 (`extractorUri` 非空 AND `hasExtractorToken` true かどうか) を使う (Open Question 参照)
+- 設定画面 (`AttachmentSearchSettings`) で `extractorUri` / `extractorToken` を変更して保存しても、当該 SSR prop が次回ページ到達時に更新されるまでは atom の値は変わらない。admin 画面のその場プレビューが必要な場合は `use-attachment-search-config` の戻り値 (`config.isAttachmentFullTextSearchEnabled`) を使う (Open Question 参照)
 
 #### use-attachment-reextract
 
@@ -652,9 +656,9 @@ export function useAttachmentSearchConfig(): UseAttachmentSearchConfigResult;
 ```
 
 - キャッシュキー: `['search-attachments', 'admin', 'config']`
-- `config` shape は `{ extractorUri, hasExtractorToken, timeoutMs, maxFileSizeBytes }` (`extractorToken` 値は GET に含まれず、存在判定 `hasExtractorToken: boolean` のみ。`enabled` / `maxConcurrency` は上流 spec で削除済み)
+- `config` shape は `{ extractorUri, hasExtractorToken, timeoutMs, maxFileSizeBytes, isAttachmentFullTextSearchEnabled, requiresReindex }` (`extractorToken` 値は GET に含まれず、存在判定 `hasExtractorToken: boolean` のみ。`enabled` / `maxConcurrency` は上流 spec で削除済み)。`isAttachmentFullTextSearchEnabled` と `requiresReindex` は上流 `AttachmentSearchConfig` DTO の server 算出フィールドをそのまま透過 (後者は 30s TTL キャッシュ付き count 比較)
 - `save` 成功後に内部で SWR `mutate()` を呼び同 SWR キーを更新する (既存 `useSWRxAppSettings` + `mutate()` パターンに同型)
-- **admin 画面の feature gate は本 hook を唯一の真実の源とする**。`AttachmentSearchSettings` / `RebuildWithAttachmentsCheckbox` / `AttachmentExtractionFailures` は `config.extractorUri` 非空 AND `config.hasExtractorToken` true の両条件で判定する。SSR hydrated `isAttachmentFullTextSearchEnabledAtom` は admin 画面内では参照しない (次回フルロードまで更新されず in-page reactivity が壊れるため)。詳細は前節「Admin 画面内の機能ゲート (in-page reactivity)」参照
+- **admin 画面の feature gate は本 hook を唯一の真実の源とする**。`AttachmentSearchSettings` / `RebuildWithAttachmentsCheckbox` / `AttachmentExtractionFailures` は `config.isAttachmentFullTextSearchEnabled` の両条件で判定する。SSR hydrated `isAttachmentFullTextSearchEnabledAtom` は admin 画面内では参照しない (次回フルロードまで更新されず in-page reactivity が壊れるため)。詳細は前節「Admin 画面内の機能ゲート (in-page reactivity)」参照
 
 #### use-attachment-extraction-failures
 
@@ -805,7 +809,7 @@ export const isAttachmentFullTextSearchEnabledAtom = atom<boolean>(false);
 ### Hook Tests
 
 - `use-attachment-reextract`: 成功時に SWR key が mutate される、失敗時に outcome が propagate
-- `use-attachment-search-config`: save 後に config キャッシュキーが mutate される (`extractorUri` / `hasExtractorToken` / `timeoutMs` / `maxFileSizeBytes` フィールドが最新化される。`extractorToken` 値はそもそも GET に含まれない)
+- `use-attachment-search-config`: save 後に config キャッシュキーが mutate される (`extractorUri` / `hasExtractorToken` / `timeoutMs` / `maxFileSizeBytes` / `isAttachmentFullTextSearchEnabled` / `requiresReindex` フィールドが最新化される。`extractorToken` 値はそもそも GET に含まれない)
 
 ### Integration / E2E
 

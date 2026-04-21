@@ -918,6 +918,10 @@ interface IPageWithSearchMeta {
   attachmentHits?: IAttachmentHit[];  // NEW optional
 }
 
+// Array order of IPageWithSearchMeta.attachmentHits[] is not a contract.
+// Consumers (downstream attachment-search-ui spec) must sort by `score` desc
+// before selecting the expanded top hit — relying on array order for UX
+// decisions will silently regress if the server changes ordering.
 interface IAttachmentHit {
   attachmentId: string;
   fileName: string;
@@ -1046,6 +1050,10 @@ TTL index: `occurredAt` に 90 日 TTL。
 interface IPageWithSearchMeta {
   attachmentHits?: IAttachmentHit[];  // NEW optional
 }
+// Array order of IPageWithSearchMeta.attachmentHits[] is not a contract.
+// Consumers (downstream attachment-search-ui spec) must sort by `score` desc
+// before selecting the expanded top hit — relying on array order for UX
+// decisions will silently regress if the server changes ordering.
 interface IAttachmentHit {
   attachmentId: string;
   fileName: string;
