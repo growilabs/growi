@@ -2,7 +2,7 @@
  * umzug cli
  *
  * Usage:
- *   pnpm ts-node bin/migrate.ts
+ *   pnpm ts-node prisma/migrate.ts
  */
 import { resolve } from 'node:path';
 import { MongoClient } from 'mongodb';
