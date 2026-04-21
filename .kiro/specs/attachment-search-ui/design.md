@@ -72,6 +72,7 @@
 - 機能有効/無効の算出ロジック変更 (上流 SSR prop の算出式が「ES 有効 AND `extractorUri` 設定済み AND `extractorToken` 設定済み」以外に変わる場合、判定の意味論が変わるため本 spec のコメント・ドキュメントと admin UI のガイダンス文言 (URI / token 未設定時の UI 状態説明など) を再確認)
 - 上流 spec の `SearchConfigurationProps.searchConfig` shape 変更 (特に `isAttachmentFullTextSearchEnabled` フィールドの有無・型変更) → 本 spec の機能ゲート hook (`use-search-attachments-enabled`) と Jotai atom (`isAttachmentFullTextSearchEnabledAtom`) の型変更および hydrate ロジックの調整
 - **上流 `IAttachmentHit.score` の意味論または配列順序意味論の変更** (例: relevance order ではなくなる、`score` の scale/方向が変わる、`score` が optional 化される等) → 本 spec の `AttachmentSubEntry` / `AttachmentHitCard` の sort ロジックと展開対象決定の再検証が必要
+- **上流 `IAttachmentHit.snippet` / `ISnippetSegment` 契約の変更** (例: segment 配列から string 型への後退、`highlighted` 以外の属性追加、escape policy 変更) → 本 spec の snippet render 実装と XSS 防御テストの再検証が必要 (string 型への後退は XSS 再発リスクがあるため NG、追加属性は `<mark>` 以外の render 分岐追加で対応)
 
 ## Architecture
 
@@ -387,13 +388,29 @@ export interface AttachmentHitViewProps {
   readonly fileSize: number;
   readonly pageNumber: number | null;
   readonly label: string | null;    // 表示用ラベル (Slide N / Sheet name / Page N)
-  readonly snippet: string;
+  readonly snippet: readonly SnippetSegment[];  // 構造化 segment 配列 (XSS 防御契約、上流 IAttachmentHit.snippet から射影)
   readonly score: number;           // 関連度スコア (上流 IAttachmentHit.score から射影)
   readonly viewerHref: string;      // 既存添付ビューアへの遷移先
+}
+
+export interface SnippetSegment {
+  readonly text: string;
+  readonly highlighted: boolean;
 }
 ```
 
 **`score` を props に含める理由**: 「最上位 1 件を展開、残りは折りたたみ」(Req 1.4 / 2.4) を**配列順序に依存しない明示契約**にするため。UI 層で `score desc` で sort してから先頭を展開する。上流 `IAttachmentHit` の配列順序意味論が変わっても silent regression しない (テストで sort を verify 可能)。
+
+**Snippet の render 契約 (XSS 防御)**:
+- `snippet: readonly SnippetSegment[]` を React テキストノードとして render する。例:
+  ```tsx
+  <span>
+    {snippet.map((seg, i) => seg.highlighted ? <mark key={i}>{seg.text}</mark> : <span key={i}>{seg.text}</span>)}
+  </span>
+  ```
+- **`dangerouslySetInnerHTML` を使わない**。attacker が PDF/DOCX に `<script>...</script>` や `<img onerror=...>` を仕込んでも、`seg.text` は React の text node として自動 escape される
+- `seg.text` に `<em>` 等の HTML tag 風文字列が含まれていても平文として表示される (parse は上流 Aggregator が既に実施済み)
+- snippet 関連の unit test で「攻撃 payload 文字列 (`<script>alert(1)</script>`) が DOM 上 script element として生成されないこと」を verify する
 
 ### UI Component Contracts
 
@@ -670,8 +687,13 @@ interface IAttachmentHit {
   fileSize: number;
   pageNumber: number | null;
   label: string | null;
-  snippet: string;
+  snippet: ISnippetSegment[];  // 構造化 segment 配列 (XSS 防御契約)
   score: number;
+}
+
+interface ISnippetSegment {
+  text: string;
+  highlighted: boolean;
 }
 
 interface IPageWithSearchMeta {
@@ -700,8 +722,14 @@ interface AttachmentHitViewProps {
   readonly fileSize: number;
   readonly pageNumber: number | null;
   readonly label: string | null;
-  readonly snippet: string;
+  readonly snippet: readonly SnippetSegment[];
+  readonly score: number;
   readonly viewerHref: string; // composed at UI layer from attachmentId + existing viewer routing
+}
+
+interface SnippetSegment {
+  readonly text: string;
+  readonly highlighted: boolean;
 }
 ```
 
@@ -826,3 +854,4 @@ export const isAttachmentFullTextSearchEnabledAtom = atom<boolean>(false);
 8. **添付ビューアの `viewerHref` 組み立て**: 既存ビューアルーティング (`/attachment/:id` 等) の URL 規約を確認し、本 spec 内で組み立てロジックをヘルパ関数化する
 9. **URI クリアによる soft-disable の UI 側 watch の要否**: admin が `extractorUri` を空文字にクリアして保存した後、(a) 既存の検索結果応答に残る `attachmentHits[]` が stale として UI に表示されないか、(b) ReextractButton / rebuild チェックボックス等の追加 UI が次回ページロードまで残留しないか、という観点で UI 側の追加 watch が必要かを確認する。上流 spec が search 側で「URI 未設定時は `attachmentHits[]` を応答に含めない」または「検索 API 層でフィルタする」ことを既に保証している場合、本 spec 側の追加対応は不要で、機能ゲート atom の SSR hydrate 更新 (次回ナビゲーション時) のみで十分。上流 spec 確定後に Resolved/Open を確定する
 10. **[Resolved] admin 画面の in-page reactivity (2 つの判定ソース混在問題)**: `AttachmentSearchSettings` の保存が `use-attachment-search-config` SWR を更新する一方で、兄弟 UI が SSR hydrated atom (`isAttachmentFullTextSearchEnabledAtom`) を参照すると次回ナビゲーションまで反映されない混在問題について、既存 `apps/app/src/client/components/Admin/App/PageBulkExportSettings.tsx` + `useSWRxAppSettings` + `mutate()` パターン (admin 画面内で同じ config SWR を兄弟が subscribe) に揃えることで resolve。admin 画面内のすべての feature gate は `use-attachment-search-config.config.extractorUri` で判定し、保存側が `mutate()` を呼ぶことで SWR 経由で即時反映される。詳細は "Admin 画面内の機能ゲート (in-page reactivity)" 節参照
+11. **hydrate 時 `isAttachmentFullTextSearchEnabled` の missing 正規化**: 上流 spec が本フィールドを optional (`?: boolean`) として追加する方針のため、`basic-layout-page/hydrate.ts` で `searchConfig?.isAttachmentFullTextSearchEnabled ?? false` に正規化する必要がある。これにより SSR props 構築経路が本フィールドを渡さない (error page / maintenance page / storybook fixtures 等) 場合でも atom が `undefined` ではなく `false` で初期化される。hydrate 側の 1 行修正なので初期実装で対応

@@ -203,7 +203,8 @@ apps/app/src/features/search-attachments/
 │   │   └── attachments-mappings-es9.ts
 │   ├── queries/
 │   │   ├── build-attachment-search-query.ts       # attachments_index content match body builder (primary/secondary 両方で利用)
-│   │   └── build-attachments-by-page-ids-query.ts # secondary 用: terms: { pageId: primaryIds } + content match body builder
+│   │   ├── build-attachments-by-page-ids-query.ts # secondary 用: terms: { pageId: primaryIds } + content match body builder
+│   │   └── build-snippet-segments.ts              # ES highlighter の <em> タグ入り文字列を ISnippetSegment[] にパース (XSS 防御 DTO 変換、pure function)
 │   ├── routes/apiv3/
 │   │   ├── attachment-reextract.ts                # POST /attachments/:id/reextract
 │   │   ├── search-attachments.ts                  # GET /search/attachments (secondary enrichment endpoint)
@@ -397,6 +398,14 @@ sequenceDiagram
 
 `POST /_api/v3/attachments/:id/reextract` で apiv3 が (admin OR page editor) ガード後、`AttachmentSearchIndexer.reindex(attachmentId)` を**同期呼び出し**し、`ExtractionOutcome` を HTTP レスポンスにマップする。Flow 1 の抽出経路を再利用する。機能無効時は 503 feature_disabled。
 
+**Editor 権限判定の current grant 再チェック**: 「page editor」判定は middleware pipeline ではなく **handler 内でリクエスト時点の page_index (or Page collection) を参照して都度判定** する。session cache や middleware で事前解決した `isPageEditor` フラグは使わない (権限失効後の古い判定が残る可能性があるため)。具体的には:
+1. attachment から `pageId` を取得
+2. 親 Page の `grant` / `grantedUsers` / `grantedGroups` / `creator` を参照
+3. `viewer` が現在の権限モデルで edit 可能かを `filterPagesByViewer` と同等の判定ロジックで評価
+4. 不可なら 403 forbidden
+
+これにより、権限 demote された editor が session 残存を利用して不正 reextract するシナリオを防ぐ。
+
 ### 5. 一括再インデックス (rebuildIndex with attachments)
 
 ```mermaid
@@ -516,6 +525,7 @@ Key decisions:
 
 **Responsibilities & Constraints**
 - FileUploader からバイトを取得し `markitdown-client` に multipart 送信
+- **503 `service_busy` retry (burst 耐性)**: 上流が 503 `service_busy` を返した場合、exponential backoff + jitter で**最大 1 回だけ retry** (default 500ms + jitter(0-500ms) 待機)。2 回目も 503 なら `serviceBusy` として正規化し ExtractionFailureLog に記録。retry 回数と base delay は `AttachmentSearchService` の設定可能定数として export (テスト容易性)。複雑な queue / BullMQ は初期実装では導入しない (k8s HPA が pod 増設で対応する前提)
 - **Bearer auth**: 呼び出しごとに `configManager.getConfig('app:attachmentFullTextSearch:extractorToken')` を取得し `Authorization: Bearer <token>` ヘッダに付与。token 未設定時は `isFeatureEnabled()` 段階で早期 return するので通常は到達しないが、保険として未設定検出時は `serviceUnreachable` 正規化
 - **extractorUri DNS rebinding 対策 (metadata IP のみ)**: 送信前に URI の host を DNS 解決し、結果がクラウドメタデータ endpoint IP literal (`169.254.169.254` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) のいずれかに解決される場合のみ request を送らず `serviceUnreachable` 正規化。k8s 内部 DNS / loopback / RFC1918 への解決は許可
 - **Bearer auth 失敗**: 上流 401 `unauthorized` は `extraction_failed` ではなく**`serviceUnreachable` に正規化** (機能を soft-disable 相当に degrade、admin が token 不整合に気付くよう pino ERROR ログ + ExtractionFailureLog 記録)。token 回転中の一時的な不一致も自動的に failing open せず、新 token が伝搬するまで抽出は停止
@@ -915,12 +925,26 @@ interface IAttachmentHit {
   fileSize: number;
   pageNumber: number | null;
   label: string | null;
-  snippet: string;
+  snippet: ISnippetSegment[];  // 構造化 segment 配列 (XSS 防御のため string ではない)
   score: number;
+}
+
+// XSS 防御契約: サーバ側で pre-tokenize した segment 配列を返す。
+// UI は text セグメントと highlighted セグメントを React テキストノードとして描画し、
+// 文字列結合や dangerouslySetInnerHTML は使わない (DTO 層で構造的に防止)。
+interface ISnippetSegment {
+  text: string;           // 平文。attacker 入力が混入していても React が自動 escape
+  highlighted: boolean;   // true なら UI 側で <mark> などでハイライト表示
 }
 ```
 
 > `IAttachmentHit` の shape は下流 `attachment-search-ui` spec が消費するため、変更は Revalidation Trigger となる。
+
+**Snippet XSS 防御の設計判断**:
+- 添付元文書には任意のユーザー入力が含まれる (悪意ある PDF/DOCX に `<script>` タグ等が埋め込まれる可能性)。ES highlighter の出力を生文字列で渡すと UI 側の誤った render (例: `dangerouslySetInnerHTML` 利用) が XSS 脆弱性を生む
+- 対策として **DTO レベルで構造化 segment 配列に固定**。string 型を避けることで UI 側の render 選択肢から `dangerouslySetInnerHTML` を実質的に排除する (配列から HTML 文字列を組み立てる余計な手間を増やす → 自然に安全な実装に倒れる)
+- ES highlighter は `<em>` タグを含む文字列を返すため、Aggregator 内でパース → `ISnippetSegment[]` に変換する処理を挟む。`<em>...</em>` 以外のタグは一律平文扱い (attacker が PDF 内に仕込んだ `<script>` 等は text セグメント内の文字列として扱われ、UI の React text node で自動 escape される)
+- パース処理は `build-snippet-segments.ts` の pure function として切り出し、ES response からの変換と UI 向け segment 配列生成を分離テスト可能にする
 
 ### SearchConfigurationProps 拡張 (SSR)
 
@@ -955,12 +979,14 @@ export interface SearchConfigurationProps {
     isSearchServiceConfigured: boolean;
     isSearchServiceReachable: boolean;
     isSearchScopeChildrenAsDefault: boolean;
-    isAttachmentFullTextSearchEnabled: boolean; // NEW
+    isAttachmentFullTextSearchEnabled?: boolean; // NEW (optional、未提供時は false として扱う)
   };
 }
 ```
 
-- **値の源**: `searchService.isConfigured` および `ConfigManager.getConfig('app:attachmentFullTextSearch:extractorUri')` からの**算出値** (Requirement 5.1 で定義)。独立した `enabled` Config は持たず、admin config と同一の `extractorUri` を読んで真偽を合成する (真偽を別キーとして複製しない)
+- **optional である理由**: 既存の error/maintenance ページや storybook fixtures 等で `searchConfig` オブジェクトを**独自に構築する経路**が存在する。それらが型エラーを起こさずに silent な `undefined` 混入を生むリスクを避けるため、`?` を付けた上で hydrate 層で `?? false` に正規化する。hydrate 側で正規化することで、下流 UI は常に `boolean` として扱える (partial-object hydration の silent 破綻を防ぐ)
+- **hydrate 側の正規化**: `apps/app/src/pages/basic-layout-page/hydrate.ts` で `isAttachmentFullTextSearchEnabledAtom` に書き込む際に `searchConfig?.isAttachmentFullTextSearchEnabled ?? false` とする。この正規化は下流 `attachment-search-ui` spec の hydrate 経路で担保 (本 spec は型だけ optional にする)
+- **値の源**: `searchService.isConfigured` および `ConfigManager.getConfig('app:attachmentFullTextSearch:extractorUri')` および `extractorToken` からの**算出値** (Requirement 5.1 で定義)。独立した `enabled` Config は持たず、admin config と同一の `extractorUri` / `extractorToken` を読んで真偽を合成する (真偽を別キーとして複製しない)
 - **下流 UI への契約**: 本 spec では SSR props の**生成と型定義**までを所有する。クライアント側での Jotai atom 化 / SWR fallback 配線 / UI 分岐は下流 `attachment-search-ui` spec が担う (既存 `basic-layout-page/hydrate.ts` の hydration 経路を踏襲)
 - **Non-goals**: 下流が追加する Jotai atom 名、atom 書き込みタイミング、コンポーネント側の feature gate 実装
 
@@ -991,6 +1017,7 @@ Primary fields:
 
 ライフサイクル:
 - `attachments` 実インデックス + `attachments` エイリアス (既存 Page 側 `${indexName}` と同じ命名)
+- **起動時 alias 衝突チェック**: `initializeSearchIndex` で `attachments` alias の既存を確認。alias が本 spec 所有の実 index 以外 (外部運用で作成された index や deprecated version) を指している場合、起動ログに WARN を出して human intervention を促す (`initialize` は続行しない)。OSS デプロイで既存 `attachments` index / alias 名が別用途で使われていた場合の silent upsert 破壊を防止
 - rebuildIndex 時は**固定名 `attachments-tmp`** を使って atomic alias swap (Page 側 `${pageIndexName}-tmp` と同じパターン)。開始時に drop → create で冪等化し、tmp index は累積しない
 - ES 7/8/9 それぞれの mapping は `mappings/attachments-mappings-esN.ts` で differ
 
@@ -1042,6 +1069,7 @@ interface IAttachmentHit {
 - **Extraction-specific errors**: 上流が返す `unsupported_format` / `file_too_large` / `extraction_timeout` / `service_busy` / `extraction_failed` を `AttachmentTextExtractorService` で `ExtractionOutcome` に統一正規化
 - **到達不可**: ネットワーク層 throw を catch して `serviceUnreachable` に畳み込む
 - **Permission 判定失敗**: `facet=attachments` primary の mget または secondary の viewer 再検証 mget が失敗した場合、Aggregator は該当添付ヒットを全て除外する fail-close 経路に合流 (漏洩防止優先)。facet=`all` primary では pages viewer filter が有効なので別経路で degrade
+- **Permission 判定の partial failure 処理 (fail-close 徹底)**: mget が部分的に成功 (一部 pageId は 200、他は 404 / errors 配列にエラー) したケースでは、**成功分のみを許可判定に使い、エラー/欠損分は一律除外**する。`found:false` は「存在せず」として除外、`errors` 配列は「権限不明」として同じく除外。**「一部成功で全件許可」や「エラーを無視して成功分のみ通す」のような fail-open ブランチは絶対に実装しない**。この挙動は integ test で以下の 3 ケースを明示的に verify: (a) 全件 200 (b) 一部 404 (c) `errors` 配列に含まれる pageId あり
 - **Orphan sweeper 失敗**: `AttachmentOrphanSweeper` の失敗は `rebuildIndex` 全体の成功を阻害しない。pino に構造化ログを記録し、alias swap は続行 (query-time permission 判定によりユーザ可視性は守られるため、cleanup 遅延は許容)
 - **rebuild window 中の dual-write 失敗**: tmp index 側の write 失敗は live 側の成功を阻害しない (pino 記録のみ、real-time event は成功扱い)。tmp 側だけに書き漏れが発生した場合、alias swap 後に当該添付が検索で出ないが、次回の rebuild で救済。ユーザーが遭遇する期間は短く、可視性に致命的な影響はないと判断
 - **rebuild lifecycle leak**: `AttachmentReindexBatch.end()` 呼び出し漏れによる `isRebuilding=true` の leak を防ぐため、API route で try/finally 必須。万が一 leak してもプロセス再起動で state は reset される (in-memory boolean のため永続化なし)
@@ -1084,6 +1112,23 @@ interface IAttachmentHit {
   - `begin('attachments-tmp')` 後に `isRebuilding() === true` / `getTmpIndexName() === 'attachments-tmp'`
   - `end()` 後に `isRebuilding() === false` / `getTmpIndexName() === null`
   - `begin()` が既に true で再呼び出しされた場合 conflict error を throw
+- `build-snippet-segments` (ES highlighter parse):
+  - `<em>...</em>` で囲まれた部分が `{text, highlighted: true}`、それ以外が `{text, highlighted: false}` になること
+  - `<script>alert(1)</script>` / `<img src=x onerror=...>` を含む input が全て `{text, highlighted: false}` の単一 segment になり、tag はエスケープされずそのまま text に保持される (UI 層の React text node で escape される前提)
+  - 不正な `<em>` 入れ子 (`<em><em>foo</em></em>`) で crash しないこと
+- Extractor Service 503 retry:
+  - 1 回目 503 → 2 回目 200 で success を返す
+  - 1 回目 503 → 2 回目も 503 で `serviceBusy` を返し、FailureLog 記録が 1 件
+  - exponential backoff + jitter の base delay が設定値通りであること
+- Permission mget partial failure (fail-close 徹底):
+  - mget response で一部が `found:false` のとき、該当 pageId が accessible 扱いにならない
+  - mget response の `errors` 配列にエラーがある pageId も accessible 扱いにならない
+  - 完全成功のみ accessible に追加される
+- reextract current grant 再チェック:
+  - session は editor 権限、しかし Page current grant では viewer 以下 (demote 済み) の状態で reextract 呼び出し → 403 forbidden
+  - session / Page current grant ともに editor → 200 + `ExtractionOutcome` 返却
+- attachments alias 名衝突検出:
+  - 起動時 `attachments` alias が既存 index 以外を指していたら WARN ログ + initialize 中断 (silent overwrite 防止)
 
 ### Integration Tests
 
@@ -1196,3 +1241,5 @@ flowchart LR
 5. **Socket.io イベント名の衝突回避**: `AddAttachmentProgress` / `FinishAddAttachment` の既存 namespace との衝突を init 時に検証
 6. **中断後 tmp index の自動クリーンアップと orphan sweeper の統合運用**: 初期は tmp index を手動削除、orphan sweeper は rebuildIndex 内のみで動作。両者が別時点で発生するため、運用 runbook 上の役割分担と失敗時のリカバリ手順を実装時に明文化する必要あり
 7. **`packages/markitdown-client` の公開境界**: server 専用依存として apps/app から import し、UI 側に混入させないレイヤリング制約を lint ルール化するか検討
+9. **`requiresReindex` cardinality agg の共有 ES コスト**: 30 秒 TTL in-memory cache を持たせたものの、horizontal scale 時は pod ごとに cache が独立するため admin GET 連打で全 pod が個別に agg を叩きうる。tenant scope の term filter / `precision_threshold` 指定 / Redis shared cache による緩和 / MongoDB 上の counter doc 化 (`syncAttachmentIndexed` で inc / `onDetach` で dec) への置換、いずれかを post-launch で検討 (初期実装は 30 秒 TTL のまま出荷)
+10. **PDF fallback の N-page full-parse コスト**: markitdown PR #1263 未マージ時の pdfminer.six fallback は `page_numbers=[i]` で繰り返し呼ぶため、N ページ PDF を N 回 full-parse する。200 ページの PDF で線形に増えるレイテンシ。PR マージ後に fallback を削除する計画だが、それまでは大ページ数 PDF の extraction timeout が顕在化しうる (上流側 `TIMEOUT_S=60` が safety net)。実装時に pdfminer の `extract_pages(doc)` iterator 単回呼び出し + per-page buffering 版に差し替え可能かも併せて検討
