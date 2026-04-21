@@ -1,0 +1,2017 @@
+{
+  "capturedAt": "2026-04-21T10:40:52.182Z",
+  "node": "v24.13.1",
+  "git": "1236c58dce71f8ac508633d48cd83c9ef233ee0a",
+  "personaHeader": "x-authz-matrix-persona",
+  "entryCount": 251,
+  "matrix": [
+    {
+      "method": "GET",
+      "path": "/_api/v3/activity/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 405
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/admin-home/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/ai-tools/suggest-path",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 403,
+      "admin": 403
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/app-settings/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/app-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/file-upload-setting/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/app-settings/maintenance-mode",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/oauth2-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/page-bulk-export-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/ses-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/site-url-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/app-settings/smtp-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/app-settings/smtp-test",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/app-settings/v5-schema-migration",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/attachment/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/attachment/:id",
+      "unauthenticated": 403,
+      "guest": 404,
+      "readonly": 404,
+      "admin": 404
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/attachment/limit",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/attachment/list",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/audit-log-bulk-export/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/bookmark-folder/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/bookmark-folder/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 500,
+      "admin": 500
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/bookmark-folder/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/bookmark-folder/add-bookmark-to-folder",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/bookmark-folder/list/:userId",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/bookmark-folder/update-bookmark",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 500,
+      "admin": 500
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/bookmarks/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/bookmarks/:userId",
+      "unauthenticated": 403,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/bookmarks/info",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/check-username",
+      "unauthenticated": 200,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/complete-registration",
+      "unauthenticated": 599,
+      "guest": 599,
+      "readonly": 599,
+      "admin": 599
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/content-disposition-settings/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/content-disposition-settings/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/customize-setting/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-css",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-logo",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-noscript",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-script",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/customize-title",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/customize-setting/delete-brand-logo",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/function",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/highlight",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/customize-setting/layout",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/layout",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/presentation",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/customize-setting/sidebar",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/sidebar",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/customize-setting/theme",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/customize-setting/theme",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/customize-setting/upload-brand-logo",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/export/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/export/:fileName",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 500
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/export/status",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-group-relations/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/external-user-groups/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/:id/external-user-group-relations",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/ancestors",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/children",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/keycloak/sync",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 422
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/keycloak/sync-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/keycloak/sync-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/keycloak/sync-status",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/ldap/sync",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 500
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/ldap/sync-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/external-user-groups/ldap/sync-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/external-user-groups/ldap/sync-status",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/forgot-password/",
+      "unauthenticated": 400,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/forgot-password/",
+      "unauthenticated": 400,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/g2g-transfer/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 403,
+      "admin": 403
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/g2g-transfer/attachment",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 403,
+      "admin": 403
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/g2g-transfer/files",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 403,
+      "admin": 403
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/g2g-transfer/generate-key",
+      "unauthenticated": 302,
+      "guest": 302,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/g2g-transfer/growi-info",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 403,
+      "admin": 403
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/g2g-transfer/transfer",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/healthcheck/",
+      "unauthenticated": 200,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/import/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 599
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/import/all",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/import/status",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/import/upload",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 599
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/in-app-notification/all-statuses-open",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/in-app-notification/list",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/in-app-notification/open",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/in-app-notification/status",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/invited/",
+      "unauthenticated": 200,
+      "guest": 200,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/login",
+      "unauthenticated": 400,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/logout/",
+      "unauthenticated": 200,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/markdown-setting/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/markdown-setting/indent",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/markdown-setting/lineBreak",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/markdown-setting/xss",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/mongo/collections",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/notification-setting/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/notification-setting/global-notification",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/notification-setting/global-notification/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/notification-setting/global-notification/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/notification-setting/global-notification/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/notification-setting/global-notification/:id/enabled",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/notification-setting/notify-for-page-grant",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/notification-setting/user-notification",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/notification-setting/user-notification/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "_ALL",
+      "path": "/_api/v3/openai*",
+      "unauthenticated": -1,
+      "guest": -1,
+      "readonly": -1,
+      "admin": -1
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/page-bulk-export/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page-listing/children",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page-listing/info",
+      "unauthenticated": 400,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page-listing/item",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page-listing/root",
+      "unauthenticated": 403,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/page/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/content-width",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/grant",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/publish",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 404,
+      "admin": 404
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/sync-latest-revision-body-to-yjs-draft",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 403,
+      "admin": 403
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/:pageId/unpublish",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 404,
+      "admin": 404
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/:pageId/yjs-data",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 403,
+      "admin": 403
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/applicable-grant",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/exist",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/exist-paths",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/export/:pageId",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 404,
+      "admin": 404
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/grant-data",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/info",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/likes",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/non-user-related-groups-granted",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/page-paths-with-descendant-count",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/page/shared",
+      "unauthenticated": 400,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/page/subscribe",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/convert-pages-by-path",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/delete",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/duplicate",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/pages/empty-trash",
+      "unauthenticated": 403,
+      "guest": 500,
+      "readonly": 400,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/legacy-pages-migration",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/pages/list",
+      "unauthenticated": 403,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/pages/recent",
+      "unauthenticated": 403,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/pages/rename",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/pages/resume-rename",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/pages/subordinated-list",
+      "unauthenticated": 403,
+      "guest": 200,
+      "readonly": 500,
+      "admin": 500
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/pages/v5-migration-status",
+      "unauthenticated": 403,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/personal-setting/access-token",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/access-token",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/personal-setting/access-token",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/personal-setting/access-token/all",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/api-token",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/associate-ldap",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/disassociate-ldap",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/editor-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/editor-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/external-accounts",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/image-type",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/in-app-notification-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/in-app-notification-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/personal-setting/is-password-set",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/personal-setting/password",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/plugins/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/plugins/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/plugins/:id/activate",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/plugins/:id/deactivate",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/plugins/:id/remove",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/register",
+      "unauthenticated": 400,
+      "guest": 400,
+      "readonly": 403,
+      "admin": 403
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/revisions/:id",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/revisions/list",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/search/connection",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/search/indices",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/search/indices",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/security-setting/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/security-setting/all-share-links/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/security-setting/all-share-links/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/security-setting/authentication/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/authentication/enabled",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/general-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/github-oauth",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/google-oauth",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/ldap",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/local-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/oidc",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/saml",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/security-setting/share-link-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/share-links/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/share-links/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/share-links/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/share-links/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/share-links/all",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/slack-integration-legacy-settings/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-legacy-settings/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/slack-integration-settings/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/slack-integration-settings/bot-type",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/bot-type",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/proxy-uri",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id/make-primary",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id/permissions",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id/regenerate-tokens",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration-settings/slack-app-integrations/:id/relation-test",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration-settings/without-proxy/test",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/without-proxy/update-permissions",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/slack-integration-settings/without-proxy/update-settings",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/commands",
+      "unauthenticated": 599,
+      "guest": 599,
+      "readonly": 599,
+      "admin": 599
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/events",
+      "unauthenticated": 599,
+      "guest": 599,
+      "readonly": 599,
+      "admin": 599
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/interactions",
+      "unauthenticated": 599,
+      "guest": 599,
+      "readonly": 599,
+      "admin": 599
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/proxied/commands",
+      "unauthenticated": 599,
+      "guest": 599,
+      "readonly": 599,
+      "admin": 599
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/proxied/events",
+      "unauthenticated": 599,
+      "guest": 599,
+      "readonly": 599,
+      "admin": 599
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/proxied/interactions",
+      "unauthenticated": 599,
+      "guest": 599,
+      "readonly": 599,
+      "admin": 599
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/slack-integration/proxied/verify",
+      "unauthenticated": 599,
+      "guest": 599,
+      "readonly": 599,
+      "admin": 599
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/slack-integration/supported-commands",
+      "unauthenticated": 599,
+      "guest": 599,
+      "readonly": 599,
+      "admin": 599
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/staffs/",
+      "unauthenticated": 200,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/statistics/user",
+      "unauthenticated": 200,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/templates/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/templates/plugin-templates/:organizationId/:reposId/:templateId/:locale",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/templates/preset-templates/:templateId/:locale",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/user-activation/register",
+      "unauthenticated": 400,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-activities/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-group-relations/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/user-groups/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/user-groups/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/user-groups/:id",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id/pages",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id/unrelated-users",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id/user-group-relations",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/:id/users",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/user-groups/:id/users/:username",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/user-groups/:id/users/:username",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/ancestors",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/children",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/selectable-child-groups",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user-groups/selectable-parent-groups",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/user-ui-settings/",
+      "unauthenticated": 400,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/user/related-groups",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/activate",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/deactivate",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/grant-admin",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/grant-read-only",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 404
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/:id/recent",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/users/:id/remove",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/revoke-admin",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/:id/revoke-read-only",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 404
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/external-accounts/",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "DELETE",
+      "path": "/_api/v3/users/external-accounts/:id/remove",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/users/invite",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/list",
+      "unauthenticated": 403,
+      "guest": 200,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/reset-password",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/reset-password-email",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/send-invitation-email",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "PUT",
+      "path": "/_api/v3/users/update.imageUrlCache",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/users/usernames",
+      "unauthenticated": 403,
+      "guest": 400,
+      "readonly": 400,
+      "admin": 400
+    }
+  ]
+}

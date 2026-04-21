@@ -13,7 +13,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - Phase 3 以降の Req 2.9 / 6.3 判定はこの表との差分のみを新規失敗として扱う
   - _Requirements: 2.9, 6.3_
 
-- [ ] 0.2 セキュリティ監査ベースラインを捕捉
+- [x] 0.2 セキュリティ監査ベースラインを捕捉
   - `pnpm audit --audit-level=moderate --json > .kiro/specs/esm-migration/audit-baseline.json` を取得
   - Phase 5 の override 削除ごとに diff を取り、新規 HIGH/CRITICAL advisory が出た場合は該当 override を維持
   - **`axios` override の CVE プレースホルダ (`package.json` 内の `CVE-2025-XXXXX` 等) を Phase 0 で実 advisory ID / GHSA URL に置換**。プレースホルダのまま次 phase に進むことを禁止。現行ピン (`^1.15.0` 等) が該当 advisory を実際にカバーしていることを `pnpm audit --json` 出力で確認し、確認結果を `audit-baseline.json` に併記
@@ -26,7 +26,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - スクリプトは Phase 3.8 ゲートで再実行して diff を取るため、ESM/CJS 両方で動作する実装にする (Phase 3.7.a で選定する ESM 対応ランナー、もしくは pre-build した `dist/` 経由で起動可能)
   - _Requirements: 2.6, 2.8_
 
-- [ ] 0.3.1 ブラックボックス認可マトリクスベースラインを捕捉 (snapshot 補完 / MANDATORY)
+- [x] 0.3.1 ブラックボックス認可マトリクスベースラインを捕捉 (snapshot 補完 / MANDATORY)
   - structural snapshot (0.3) が拾えないケース (インライン `express.Router()` のガード、無名アロー middleware、Mongoose model 取得順差異) を補完するため、**supertest ベースの認可マトリクステスト**を追加
   - 全 apiv3 エンドポイント × {unauthenticated / guest / read-only / admin} の 4 persona で期待 HTTP ステータス (401 / 403 / 200 / 302 等) を記録
   - 出力を `.kiro/specs/esm-migration/authz-matrix-baseline.json` にコミット
@@ -436,3 +436,44 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - 全 Phase の変更を含むブランチが `server:ci` でエラーなく起動・終了する
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
   - _Depends: 6.2_
+
+## Implementation Notes
+
+Learnings captured during Phase 0 baseline capture (kiro-impl). Each entry is
+a cross-cutting insight meant to help later tasks avoid rediscovering the
+same issue.
+
+- **0.3 baseline scope**: The route-middleware snapshot tool exempts the
+  terminal route-body slot from the "no anonymous function" guard because
+  Express arrow route handlers (~260 in apiv3) are inherently pinned to
+  their (path, method) slot. Diff still catches any reordering/insertion
+  in the middleware chain. Phase 3.8.c "無名関数 0 件" should be interpreted
+  as "0 newly-anonymous chain middleware slots", not as "0 anonymous
+  entries anywhere in the baseline". Document this at design.md as a
+  Phase 3.8 follow-up.
+
+- **0.3 CLI ergonomics**: `apps/app/tools/snapshot-route-middleware.ts`
+  currently picks the first `--out=` flag. The `snapshot-routes` npm script
+  bakes in `--out=../../.kiro/specs/esm-migration/route-middleware-baseline.json`,
+  so Phase 3.8.c re-run with a user-supplied alternate output path will
+  silently overwrite the committed baseline. Fix this (last-wins CLI
+  precedence) before Phase 3.8.c consumption.
+
+- **0.3.1 auth chain coverage**: `apps/app/tools/capture-authz-matrix.ts`
+  uses an `X-Authz-Matrix-Persona` injection middleware mounted at the
+  same position as `passport.session()`. This exercises the production
+  route-level auth chain (`accessTokenParser` → `loginRequired` →
+  `adminRequired` → handler) for all 4 named personas, but does NOT
+  exercise passport's cookie-parsing logic itself. Passport cookie
+  handling is covered by Phase 6 E2E and 3.8.b smoke tests, not by this
+  matrix.
+
+- **0.3.1 baseline diff scope**: `authz-matrix-baseline.json` envelope has
+  `capturedAt`, `git`, `node` metadata fields that change on every run.
+  Phase 3.8.c diff tooling MUST scope comparison to the `matrix` array
+  only. The same applies to `route-middleware-baseline.json`.
+
+- **0.3.1 capture runner**: The current capture uses `ts-node` + CJS. Phase
+  3.8.c re-execution against production build will need either an
+  ESM-compatible runner (selected in 3.7.a) or a pre-built `dist/` entry
+  for the capture script.

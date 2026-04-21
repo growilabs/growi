@@ -29,6 +29,8 @@
     "//// for CI": "",
     "launch-dev:ci": "cross-env NODE_ENV=development pnpm run dev:migrate && pnpm run ts-node src/server/app.ts --ci",
     "snapshot-routes": "cross-env NODE_ENV=development pnpm run ts-node tools/snapshot-route-middleware.ts -- --out=../../.kiro/specs/esm-migration/route-middleware-baseline.json",
+    "authz-matrix:capture": "cross-env NODE_ENV=development pnpm run ts-node tools/capture-authz-matrix.ts -- --in=../../.kiro/specs/esm-migration/route-middleware-baseline.json --out=../../.kiro/specs/esm-migration/authz-matrix-baseline.json",
+    "authz-matrix:verify": "cross-env NODE_ENV=development pnpm run ts-node tools/capture-authz-matrix.ts -- --in=../../.kiro/specs/esm-migration/route-middleware-baseline.json --out=../../.kiro/specs/esm-migration/authz-matrix-baseline.json --verify-determinism",
     "lint:typecheck": "tsgo --noEmit",
     "lint:biome": "biome check --diagnostic-level=error",
     "lint:styles": "stylelint \"src/**/*.scss\"",
