@@ -12,6 +12,7 @@ const indentSize = 10; // in px
 
 type TreeItemLayoutProps = TreeItemProps & {
   className?: string;
+  asLink?: boolean;
 };
 
 export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
@@ -24,6 +25,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
     isReadOnlyUser,
     isWipPageShown = true,
     showAlternativeContent,
+    asLink,
     onRenamed,
     onClick,
     onClickDuplicateMenuItem,
@@ -142,7 +144,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
           ))
         ) : (
           <>
-            <SimpleItemContent page={page} />
+            <SimpleItemContent page={page} asLink={asLink} />
             <div className="d-hover-none">
               {EndComponents?.map((EndComponent, index) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: static component list

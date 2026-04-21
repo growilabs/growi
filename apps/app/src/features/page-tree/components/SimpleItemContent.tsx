@@ -1,4 +1,6 @@
 import { useId } from 'react';
+import Link from 'next/link';
+import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import path from 'pathe';
 import { UncontrolledTooltip } from 'reactstrap';
@@ -12,8 +14,10 @@ const moduleClass = styles['simple-item-content'] ?? '';
 
 export const SimpleItemContent = ({
   page,
+  asLink = false,
 }: {
   page: IPageForItem;
+  asLink?: boolean;
 }): JSX.Element => {
   const { t } = useTranslation();
 
@@ -24,9 +28,21 @@ export const SimpleItemContent = ({
 
   const spanId = `path-recovery-${useId()}`;
 
+  // When asLink is true, render the title as an anchor so that the browser
+  // recognizes it as a link (enables Ctrl/Cmd+click to open in new tab,
+  // middle-click, and the right-click "Open link in new tab" context menu).
+  // Otherwise we render a plain div and let the surrounding <li> capture
+  // clicks via JS (existing non-navigation usages such as modals).
+  const href =
+    asLink && page.path != null && page._id != null
+      ? pathUtils.returnPathForURL(page.path, page._id)
+      : undefined;
+
+  const titleClassName = `grw-page-title-anchor flex-grow-1 text-truncate ${page.isEmpty ? 'opacity-75' : ''}`;
+
   return (
     <div
-      className={`${moduleClass} flex-grow-1 d-flex align-items-center pe-none`}
+      className={`${moduleClass} flex-grow-1 d-flex align-items-center ${href != null ? '' : 'pe-none'}`}
       style={{ minWidth: 0 }}
     >
       {shouldShowAttentionIcon && (
@@ -42,21 +58,29 @@ export const SimpleItemContent = ({
           </UncontrolledTooltip>
         </>
       )}
-      {page != null && page.path != null && page._id != null && (
-        <div className="grw-page-title-anchor flex-grow-1">
-          <div className="d-flex align-items-center">
-            <span
-              className={`text-truncate me-1 ${page.isEmpty && 'opacity-75'}`}
-            >
-              {pageName}
-            </span>
-            {page.wip && (
-              <span className="wip-page-badge badge rounded-pill me-1 text-bg-secondary">
-                WIP
-              </span>
-            )}
+      {page != null &&
+        page.path != null &&
+        page._id != null &&
+        (href != null ? (
+          <Link
+            href={href}
+            prefetch={false}
+            className={`${titleClassName} text-reset`}
+            style={{ minWidth: 0 }}
+          >
+            {pageName}
+          </Link>
+        ) : (
+          <div className={titleClassName} style={{ minWidth: 0 }}>
+            {pageName}
           </div>
-        </div>
+        ))}
+      {/* WIP is a status indicator — kept outside the link so it is not
+          read as part of the anchor's accessible name, and not truncated. */}
+      {page.wip && (
+        <span className="wip-page-badge badge rounded-pill ms-1 text-bg-secondary flex-shrink-0">
+          WIP
+        </span>
       )}
     </div>
   );
