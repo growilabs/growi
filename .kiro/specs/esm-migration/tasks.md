@@ -7,7 +7,7 @@
 Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前の master に対して先行取得する。ここで取得した成果物は移行全ての phase のゲート判定に利用する。
 
 - [ ] 0. 移行前ベースラインを確立する
-- [ ] 0.1 テスト結果ベースラインを捕捉
+- [x] 0.1 テスト結果ベースラインを捕捉
   - 移行前 master で `turbo run test --filter @growi/app` を **3 回連続実行** し、全回の per-spec pass/fail を記録
   - 結果を `.kiro/specs/esm-migration/test-baseline.md` にコミット (3 回連続 fail = 真の失敗、回ごとに揺れる = 既知 flaky)
   - Phase 3 以降の Req 2.9 / 6.3 判定はこの表との差分のみを新規失敗として扱う
