@@ -41,12 +41,12 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - Phase 3.8.d で diff 実行し、差分は Phase 4 進行を block
   - _Requirements: 2.6, 6.5_
 
-- [ ] 0.4 起動時パフォーマンスベースラインを捕捉 (本番側)
+- [x] 0.4 起動時パフォーマンスベースラインを捕捉 (本番側)
   - 移行前の本番相当出力 (`pnpm run server:ci` 相当) で、起動完了までの wall time を 5 回計測し中央値を記録
   - OpenTelemetry が利用可能な場合、5 代表ルート (`/`, `/editor/:id`, `/_api/v3/healthcheck`, `/admin`, LSX/drawio/attachment-refs を含むサンプルページ) の first-request p50/p95 を `.kiro/specs/esm-migration/perf-baseline.md` に記録
   - _Requirements: 6.5_
 
-- [ ] 0.5 dev 起動ベースラインを捕捉 (現 ts-node 構成)
+- [x] 0.5 dev 起動ベースラインを捕捉 (現 ts-node 構成)
   - 現状の `pnpm dev` (= `node -r ts-node/register/transpile-only -r tsconfig-paths/register -r dotenv-flow/config ...`) で、起動 → `/_api/v3/healthcheck` が 200 を返すまでの wall time を 5 回計測し中央値を `.kiro/specs/esm-migration/perf-baseline.md` の "dev 起動時間 (ts-node 時代)" セクションに記録
   - 計測条件を明文化 (warm cache / cold cache、Node.js バージョン、ホスト CPU、並走プロセスなし)。Phase 3.7.a の bake-off と完全に同一条件で再現できるよう記述する
   - この値が Phase 3.7.a dev runner bake-off の相対評価の基準、および Phase 3.8.e の dev 側 ±20% gate の判定基準となる
