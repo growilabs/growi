@@ -1,0 +1,39 @@
+{
+  "capturedAt": "2026-04-21T11:02:44.187Z",
+  "node": "v24.13.1",
+  "git": "66379d2b5aeb2f1ca337d6f892b7502abd719380",
+  "yjs": {
+    "no-session": {
+      "status": 401,
+      "syncReceived": false,
+      "notes": "No Cookie header on upgrade; targets the unviewable page (GRANT_OWNER) so the null-user ACL check rejects."
+    },
+    "session-unviewable": {
+      "status": 403,
+      "syncReceived": false,
+      "notes": "Valid session cookie; page grant=GRANT_OWNER owned by a different user. isAccessiblePageByViewer returns false."
+    },
+    "session-viewable": {
+      "status": 101,
+      "syncReceived": true,
+      "notes": "Valid session cookie; page grant=GRANT_PUBLIC. Expect 101 + at least one Yjs sync frame within the grace window."
+    }
+  },
+  "socketio": {
+    "no-session": {
+      "connected": false,
+      "errorMessage": "Login is required to connect.",
+      "notes": "Default namespace \"/\"; no cookie. loginRequired middleware (setupLoginRequiredMiddleware) rejects before connect."
+    },
+    "session-nonadmin-admin-ns": {
+      "connected": false,
+      "errorMessage": "Admin priviledge is required to connect.",
+      "notes": "Admin namespace \"/admin\"; cookie of a non-admin user. adminRequired middleware (setupAdminRequiredMiddleware) rejects. Substituted for the \"session-unviewable\" case because socket.io has no per-page ACL at connect time."
+    },
+    "session-viewable": {
+      "connected": true,
+      "errorMessage": null,
+      "notes": "Default namespace \"/\"; valid non-admin session. All middlewares (loginRequired, connection limits) pass."
+    }
+  }
+}

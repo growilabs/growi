@@ -33,7 +33,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - テストは本番ビルド成果物に対して実行する想定 (dev 実装と分岐しないため)。Phase 3.8.c で diff 実行し、差分 = 認可バイパスと見なして Phase 4 進行を block する
   - _Requirements: 2.6, 2.8, 6.5_
 
-- [ ] 0.3.2 WebSocket 認可マトリクスベースラインを捕捉 (MANDATORY)
+- [x] 0.3.2 WebSocket 認可マトリクスベースラインを捕捉 (MANDATORY)
   - `service/yjs/upgrade-handler.ts` と `service/socket-io/socket-io.ts` の認可は `app._router.stack` から見えないため独立ベースライン化
   - `/yjs/<pageId>` について 3 ケース (セッション無し / 有効セッション+閲覧不可ページ / 有効セッション+許可ページ) の接続結果 (4xx / 4xx / 101+Yjs 同期) を記録
   - socket.io `connect` についても同等 3 ケースを記録

@@ -31,6 +31,8 @@
     "snapshot-routes": "cross-env NODE_ENV=development pnpm run ts-node tools/snapshot-route-middleware.ts -- --out=../../.kiro/specs/esm-migration/route-middleware-baseline.json",
     "authz-matrix:capture": "cross-env NODE_ENV=development pnpm run ts-node tools/capture-authz-matrix.ts -- --in=../../.kiro/specs/esm-migration/route-middleware-baseline.json --out=../../.kiro/specs/esm-migration/authz-matrix-baseline.json",
     "authz-matrix:verify": "cross-env NODE_ENV=development pnpm run ts-node tools/capture-authz-matrix.ts -- --in=../../.kiro/specs/esm-migration/route-middleware-baseline.json --out=../../.kiro/specs/esm-migration/authz-matrix-baseline.json --verify-determinism",
+    "ws-authz-matrix:capture": "cross-env NODE_ENV=development pnpm run ts-node tools/capture-ws-authz.ts -- --out=../../.kiro/specs/esm-migration/ws-authz-baseline.json",
+    "ws-authz-matrix:verify": "cross-env NODE_ENV=development pnpm run ts-node tools/capture-ws-authz.ts -- --out=../../.kiro/specs/esm-migration/ws-authz-baseline.json --verify-determinism",
     "lint:typecheck": "tsgo --noEmit",
     "lint:biome": "biome check --diagnostic-level=error",
     "lint:styles": "stylelint \"src/**/*.scss\"",
