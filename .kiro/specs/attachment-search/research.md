@@ -1,4 +1,4 @@
-# Gap Analysis: full-text-search-for-attachments
+# Gap Analysis: attachment-search
 
 _Generated: 2026-04-17_
 

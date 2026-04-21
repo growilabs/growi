@@ -1,6 +1,6 @@
 # Brief: attachment-search-ui
 
-> 3-way split の第 3 spec。詳細背景・既存コード調査は [../full-text-search-for-attachments/research.md](../full-text-search-for-attachments/research.md) を参照。
+> 3-way split の第 3 spec。詳細背景・既存コード調査は [../attachment-search/research.md](../attachment-search/research.md) を参照。
 
 ## Problem
 
@@ -66,7 +66,7 @@
 - apiv3 エンドポイント実装 (`POST /attachments/:id/reextract` / `GET /failures` / `GET|PUT /config` / `PUT /search/indices` の includeAttachments) — `attachment-search-indexing` spec
 - 応答型 `IPageWithSearchMeta.attachmentHits[]` の定義 — `attachment-search-indexing` spec
 - Config キー定義と永続化 — `attachment-search-indexing` spec
-- 抽出サービス本体 — `markitdown-extractor` spec
+- 抽出サービス本体 — `attachment-search-markitdown-extractor` spec
 - 添付ビューア本体の変更 (既存ビューアへ遷移するだけ)
 - PDF/Office のインラインプレビュー
 - 形式別詳細ファセット (PDF だけ / xlsx だけ等)
@@ -86,7 +86,7 @@
 ## Out of Boundary
 
 - サーバ側 API やデータモデル (前段 spec の責務)
-- 抽出サービス本体 (`markitdown-extractor` spec)
+- 抽出サービス本体 (`attachment-search-markitdown-extractor` spec)
 - 添付ファイル一覧モーダル自体の構造変更 (行アクション追加のみ)
 - 検索結果ページのレイアウト変更 (既存レイアウトを維持して拡張のみ)
 - i18n の新規キー追加以外 (既存の translation パイプラインに従う)
@@ -112,7 +112,7 @@
 - **Adjacent**:
   - `attachment-search-indexing` (上流の API/型 提供元)
   - `suggest-path` (検索 UI の近傍、ただし責務非重複)
-  - umbrella `full-text-search-for-attachments` (設計資料)
+  - umbrella `attachment-search` (設計資料)
 
 ## Constraints
 

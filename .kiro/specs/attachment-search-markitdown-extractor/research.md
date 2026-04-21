@@ -1,8 +1,8 @@
-# Research: markitdown-extractor
+# Research: attachment-search-markitdown-extractor
 
-_Generated: 2026-04-17 (3-way split; derived from umbrella `full-text-search-for-attachments`)_
+_Generated: 2026-04-17 (3-way split; derived from umbrella `attachment-search`)_
 
-本ドキュメントは、`services/markitdown-extractor` の設計判断に関わる調査のみを umbrella の [research.md](../full-text-search-for-attachments/research.md) と [research-docker-image.md](../full-text-search-for-attachments/research-docker-image.md) から抽出・再構成したものである。下流 spec (apps/app 統合、UI) に関わる調査は含めない。
+本ドキュメントは、`services/markitdown-extractor` の設計判断に関わる調査のみを umbrella の [research.md](../attachment-search/research.md) と [research-docker-image.md](../attachment-search/research-docker-image.md) から抽出・再構成したものである。下流 spec (apps/app 統合、UI) に関わる調査は含めない。
 
 ## Scope of this Research
 
@@ -228,5 +228,5 @@ umbrella design.md で議論された配置候補:
 
 設計判断の背景詳細 (採用 / 不採用の比較表、Docker image 実測、既製 image 調査の網羅結果) は umbrella の以下を参照:
 
-- [../full-text-search-for-attachments/research.md](../full-text-search-for-attachments/research.md) — gap analysis / design phase discovery / implementation approach options
-- [../full-text-search-for-attachments/research-docker-image.md](../full-text-search-for-attachments/research-docker-image.md) — Microsoft 公式 / サードパーティ 8 件の pre-built image 比較、自前ビルドリファレンス Dockerfile
+- [../attachment-search/research.md](../attachment-search/research.md) — gap analysis / design phase discovery / implementation approach options
+- [../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md) — Microsoft 公式 / サードパーティ 8 件の pre-built image 比較、自前ビルドリファレンス Dockerfile

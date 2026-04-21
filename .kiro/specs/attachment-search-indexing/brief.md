@@ -1,10 +1,10 @@
 # Brief: attachment-search-indexing
 
-> 3-way split の第 2 spec。詳細背景・既存コード調査は [../full-text-search-for-attachments/research.md](../full-text-search-for-attachments/research.md) を参照。
+> 3-way split の第 2 spec。詳細背景・既存コード調査は [../attachment-search/research.md](../attachment-search/research.md) を参照。
 
 ## Problem
 
-`markitdown-extractor` spec で抽出サービスが動作しても、GROWI の既存検索基盤 (Elasticsearch) に抽出結果が流し込まれなければ検索できない。また、添付アップロード・削除・親ページ権限変更などのイベントに検索インデックスを追従させる仕組み、管理者向けの一括再インデックス・個別再抽出・失敗可視化の API が必要。
+`attachment-search-markitdown-extractor` spec で抽出サービスが動作しても、GROWI の既存検索基盤 (Elasticsearch) に抽出結果が流し込まれなければ検索できない。また、添付アップロード・削除・親ページ権限変更などのイベントに検索インデックスを追従させる仕組み、管理者向けの一括再インデックス・個別再抽出・失敗可視化の API が必要。
 
 ## Current State
 
@@ -74,9 +74,9 @@
 - [apps/app/src/server/routes/apiv3/search.js](apps/app/src/server/routes/apiv3/search.js): `PUT /search/indices` に `includeAttachments` フラグ受理
 
 ### Out
-- Python 抽出サービス本体の実装 — `markitdown-extractor` spec (前段 spec)
+- Python 抽出サービス本体の実装 — `attachment-search-markitdown-extractor` spec (前段 spec)
 - 検索結果 UI / 添付モーダル UI / 管理画面 UI — `attachment-search-ui` spec (後段 spec)
-- OpenAPI export script の実装 — `markitdown-extractor` spec
+- OpenAPI export script の実装 — `attachment-search-markitdown-extractor` spec
 - 添付ファイル自体の保管方式変更 (FileUploader 抽象は据え置き)
 - 既存 Page 検索クエリ・ランキング・権限モデル本体の改変
 - 永続ジョブキュー化 (fire-and-forget パターンを継続)
@@ -103,7 +103,7 @@
 ## Upstream / Downstream
 
 ### Upstream (依存先)
-- `markitdown-extractor` spec: OpenAPI spec と Docker image
+- `attachment-search-markitdown-extractor` spec: OpenAPI spec と Docker image
 - 既存 `ElasticsearchDelegator` / `SearchService` / `AttachmentService` / `FileUploader` / `ConfigManager` / `pageEvent`
 - 既存 Socket.io progress チャネル (`AddPageProgress` 等) — 同パターンで `AddAttachmentProgress` を追加
 - 既存 `apps/pdf-converter` + `packages/pdf-converter-client` (orval パターンの参考)
@@ -118,7 +118,7 @@
 - **Extends**:
   - (暗黙) 既存検索 / 添付サブシステム。spec 化されていないが apps/app 内の SearchService / AttachmentService / ElasticsearchDelegator を拡張
 - **Adjacent**:
-  - `markitdown-extractor` (上流 API 提供元)
+  - `attachment-search-markitdown-extractor` (上流 API 提供元)
   - `attachment-search-ui` (下流 UI 消費者)
   - `suggest-path` (既存 spec、検索体験で隣接するが責務は重ならない)
 

@@ -4,7 +4,7 @@
   "updated_at": "2026-04-17T16:30:00.000Z",
   "language": "ja",
   "phase": "design-generated",
-  "derived_from": "full-text-search-for-attachments",
+  "derived_from": "attachment-search",
   "dependencies": ["attachment-search-indexing"],
   "approvals": {
     "requirements": { "generated": true, "approved": false },

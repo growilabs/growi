@@ -6,7 +6,7 @@ _Generated: 2026-04-17_
 
 ## 経緯
 
-1. 当初は単一 spec `full-text-search-for-attachments` として設計
+1. 当初は単一 spec `attachment-search` として設計
 2. 要件 14 件 / タスク推定 20+ でスコープ広すぎと判断 → 3-way split (roadmap.md 作成)
 3. 3 spec 分割後に `/kiro-validate-design` で各 spec を個別品質レビュー
 4. UI spec: NO-GO (3 Critical)、indexing spec: GO with must-fix (3 Critical)、extractor spec: GO (3 Minor) の計 9 Issue

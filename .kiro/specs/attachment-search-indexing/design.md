@@ -2,7 +2,7 @@
 
 ## Overview
 
-本 spec は GROWI 添付ファイル全文検索機能のうち **apps/app サーバ側の統合層** を定義する。上流 `markitdown-extractor` spec が提供する FastAPI 抽出マイクロサービスを `packages/markitdown-client` (orval 生成) 経由で呼び出し、添付ファイル専用 Elasticsearch インデックス (`attachments`) への書き込みを行う。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ConfigManager` / `pageEvent` の拡張点を用い、独立サブシステムを作らずに feature module として統合する。
+本 spec は GROWI 添付ファイル全文検索機能のうち **apps/app サーバ側の統合層** を定義する。上流 `attachment-search-markitdown-extractor` spec が提供する FastAPI 抽出マイクロサービスを `packages/markitdown-client` (orval 生成) 経由で呼び出し、添付ファイル専用 Elasticsearch インデックス (`attachments`) への書き込みを行う。既存の `AttachmentService` / `ElasticsearchDelegator` / `SearchService` / `ConfigManager` / `pageEvent` の拡張点を用い、独立サブシステムを作らずに feature module として統合する。
 
 **Purpose**: apps/app 内で「抽出結果を ES へ upsert / 権限変更や削除を追従 / 一括再インデックスと個別再抽出を提供 / 検索クエリを multi-index で集約」する責務を完結させる。
 
@@ -21,7 +21,7 @@
 
 ### Non-Goals
 
-- Python 抽出サービス本体・Dockerfile・k8s manifest (上流 `markitdown-extractor` spec)
+- Python 抽出サービス本体・Dockerfile・k8s manifest (上流 `attachment-search-markitdown-extractor` spec)
 - 検索結果 UI / 添付一覧モーダル UI / 管理画面 UI (下流 `attachment-search-ui` spec)
 - 既存 Page 検索のクエリ・ランキング・権限モデル本体の改変
 - 添付ファイル保管方式の変更
@@ -48,7 +48,7 @@
 
 ### Out of Boundary
 
-- Python 抽出サービス本体、FastAPI ルータ、Dockerfile、docker-compose / k8s manifest、NetworkPolicy (**`markitdown-extractor` spec**)
+- Python 抽出サービス本体、FastAPI ルータ、Dockerfile、docker-compose / k8s manifest、NetworkPolicy (**`attachment-search-markitdown-extractor` spec**)
 - 検索結果 UI コンポーネント (`AttachmentHitCard` / `AttachmentSubEntry` / `SearchResultFacetTabs`)、添付モーダルの「再抽出」ボタン、管理画面 (`AttachmentSearchSettings` / `AttachmentExtractionFailures` / `RebuildWithAttachmentsCheckbox`)、ユーザ向けガイダンス文言 (**`attachment-search-ui` spec**)
 - 添付ファイル保管方式 (`FileUploader` 抽象は据え置き)
 - 既存 Page 検索 (Page/Comment) のクエリ・ランキング・権限モデル本体の改変
@@ -58,7 +58,7 @@
 
 ### Allowed Dependencies
 
-- **上流**: `markitdown-extractor` spec が提供する FastAPI OpenAPI spec (`POST /extract`、`ExtractResponse` / `ErrorResponse`)、Docker image、デプロイ manifest
+- **上流**: `attachment-search-markitdown-extractor` spec が提供する FastAPI OpenAPI spec (`POST /extract`、`ExtractResponse` / `ErrorResponse`)、Docker image、デプロイ manifest
 - 既存 `AttachmentService.addAttachHandler` / `addDetachHandler` (ハンドラ登録のみ)
 - 既存 `ElasticsearchDelegator` (composition で添付向けメソッド合成、既存 Page 系メソッドは不変)
 - 既存 `SearchService.registerUpdateEvent()` (リスナ追加のみ)
@@ -71,7 +71,7 @@
 
 ### Revalidation Triggers
 
-- **上流 API 契約の変更** (`markitdown-extractor` spec): `POST /extract` の request/response schema、エラーコード enum、HTTP ステータス対応の変更 → `packages/markitdown-client` 再生成、`AttachmentTextExtractorService` の正規化ロジック再確認、drift 検知 CI の再評価
+- **上流 API 契約の変更** (`attachment-search-markitdown-extractor` spec): `POST /extract` の request/response schema、エラーコード enum、HTTP ステータス対応の変更 → `packages/markitdown-client` 再生成、`AttachmentTextExtractorService` の正規化ロジック再確認、drift 検知 CI の再評価
 - **ES 添付 mapping のフィールド追加/削除**: 既存添付インデックスの再構築必要性判定、ES 7/8/9 mapping 変種の同期。特に権限フィールドを **再導入する変更は Option D の設計前提を覆す** ため、本 spec の本質的再検討が必要
 - **`IPageWithSearchMeta.attachmentHits[]` / `IAttachmentHit` の形状変更**: 下流 `attachment-search-ui` spec に破壊的変更を強いるため、spec 再調整が必須
 - **apiv3 エンドポイント契約** (reextract / admin config / admin failures / search indices 拡張) の request/response 変更: 下流 spec の SWR hook 再調整が必須
@@ -99,7 +99,7 @@
 
 ```mermaid
 graph TB
-    subgraph upstream [Upstream - markitdown-extractor spec]
+    subgraph upstream [Upstream - attachment-search-markitdown-extractor spec]
         FastAPI[FastAPI /extract]
     end
 

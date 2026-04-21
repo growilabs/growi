@@ -1,6 +1,6 @@
-# Brief: markitdown-extractor
+# Brief: attachment-search-markitdown-extractor
 
-> 3-way split の第 1 spec。詳細背景・既存コード調査は [../full-text-search-for-attachments/research.md](../full-text-search-for-attachments/research.md) を参照。
+> 3-way split の第 1 spec。詳細背景・既存コード調査は [../attachment-search/research.md](../attachment-search/research.md) を参照。
 
 ## Problem
 
@@ -11,7 +11,7 @@ GROWI には現在、添付ファイル (PDF / Office 等) のテキストを抽
 - GROWI monorepo には Python コードが存在せず、抽出ライブラリも未採用
 - 既存マイクロサービス `apps/pdf-converter` は HTML → PDF 専用 (Puppeteer ベース) で、テキスト抽出には転用できない
 - microsoft/markitdown (Python、MIT、v0.1.x) が PDF/Office/テキスト系を Markdown に変換する公式ライブラリとして利用可能
-- Microsoft 公式の REST API 実装は存在しない (CLI / MCP のみ)。サードパーティ pre-built image も要件を完全に満たすものは不在 (詳細は [../full-text-search-for-attachments/research-docker-image.md](../full-text-search-for-attachments/research-docker-image.md))
+- Microsoft 公式の REST API 実装は存在しない (CLI / MCP のみ)。サードパーティ pre-built image も要件を完全に満たすものは不在 (詳細は [../attachment-search/research-docker-image.md](../attachment-search/research-docker-image.md))
 
 ## Desired Outcome
 
@@ -95,7 +95,7 @@ GROWI には現在、添付ファイル (PDF / Office 等) のテキストを抽
 ## Existing Spec Touchpoints
 
 - **Extends**: なし (Python サービスは本プロジェクトで初めて GROWI monorepo に入る)
-- **Adjacent**: `attachment-search-indexing` (下流の消費者)、umbrella `full-text-search-for-attachments` (設計資料)
+- **Adjacent**: `attachment-search-indexing` (下流の消費者)、umbrella `attachment-search` (設計資料)
 
 ## Constraints
 

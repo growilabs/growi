@@ -147,7 +147,7 @@ graph TB
 | Test | pytest + httpx TestClient | 単体 / 統合 | FastAPI 標準パターン |
 | Lint / Format | ruff | Python 静的解析 | CI 必須 |
 
-> 採用背景 (なぜ Python か、なぜ markitdown か、なぜ FastAPI + uv か等) は [research.md](./research.md) と [umbrella research-docker-image.md](../full-text-search-for-attachments/research-docker-image.md) を参照。
+> 採用背景 (なぜ Python か、なぜ markitdown か、なぜ FastAPI + uv か等) は [research.md](./research.md) と [umbrella research-docker-image.md](../attachment-search/research-docker-image.md) を参照。
 
 ## File Structure Plan
 

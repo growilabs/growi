@@ -21,7 +21,7 @@
 ### Non-Goals
 
 - apiv3 エンドポイント実装 / ES 連携 / Config 永続化 / 応答型定義 (上流 `attachment-search-indexing` 責務)
-- 抽出サービス本体 (`markitdown-extractor` 責務)
+- 抽出サービス本体 (`attachment-search-markitdown-extractor` 責務)
 - 添付ビューア本体の機能追加、PDF インラインプレビュー、抽出テキスト全文プレビュー
 - 形式別詳細ファセット (PDF だけ / xlsx だけ等)、選択的再インデックス UI
 - 添付専用検索画面の新設 (既存 SearchPage を拡張する方針)

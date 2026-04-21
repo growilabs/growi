@@ -2,7 +2,7 @@
 
 _Generated: 2026-04-17 (3-way split から派生)_
 
-umbrella spec `full-text-search-for-attachments` の research.md / design.md から、本 spec (UI 層) の設計判断に直接関わる調査のみを抽出・再整理する。サーバ側や抽出サービス側の調査は対象外とする。
+umbrella spec `attachment-search` の research.md / design.md から、本 spec (UI 層) の設計判断に直接関わる調査のみを抽出・再整理する。サーバ側や抽出サービス側の調査は対象外とする。
 
 ## 1. 既存 UI 拡張ポイントの特定経緯
 
