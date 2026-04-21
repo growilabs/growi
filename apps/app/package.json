@@ -19,7 +19,7 @@
     "pre:styles-components": "vite build --config vite.vendor-styles-components.ts",
     "migrate": "pnpm run migrate:migrate-mongo && pnpm run migrate:umzug",
     "migrate:migrate-mongo": "node -r dotenv-flow/config node_modules/migrate-mongo/bin/migrate-mongo up -f config/migrate-mongo-config.js",
-    "migrate:umzug": "pnpm run ts-node prisma/migrate.ts",
+    "migrate:umzug": "pnpm run ts-node prisma/migrate.ts up",
     "//// for development": "",
     "dev": "cross-env NODE_ENV=development nodemon --exec pnpm run ts-node --inspect src/server/app.ts",
     "dev:pre:styles-commons": "pnpm run pre:styles-commons --mode dev",

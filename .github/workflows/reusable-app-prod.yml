@@ -69,16 +69,19 @@ jobs:
         tar -zcf production.tar.gz --exclude ./apps/app/.next/cache \
           package.json \
           node_modules \
+          tsconfig.base.json \
           apps/app/.next \
           apps/app/config \
           apps/app/dist \
+          apps/app/prisma \
           apps/app/public \
           apps/app/resource \
           apps/app/tmp \
           apps/app/.env.production* \
           apps/app/node_modules \
           apps/app/next.config.js \
-          apps/app/package.json
+          apps/app/package.json \
+          apps/app/tsconfig.json
         echo "file=production.tar.gz" >> $GITHUB_OUTPUT
 
     - name: Upload production files as artifact
