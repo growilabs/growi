@@ -1,3 +1,4 @@
+import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
 import {
   type GrowiBotEvent,
   type GrowiCommand,
@@ -132,18 +133,14 @@ export class SlackIntegrationService implements S2sMessageHandlable {
 
     // TODO assert currentBotType is not null and CUSTOM_WITHOUT_PROXY
 
-    let proxyUri: string | undefined;
-
     switch (currentBotType) {
       case SlackbotType.OFFICIAL:
-        proxyUri = OFFICIAL_SLACKBOT_PROXY_URI;
-        break;
+        return OFFICIAL_SLACKBOT_PROXY_URI;
       default:
-        proxyUri = configManager.getConfig('slackbot:proxyUri');
-        break;
+        return toNonBlankStringOrUndefined(
+          configManager.getConfig('slackbot:proxyUri'),
+        );
     }
-
-    return proxyUri;
   }
 
   /**
