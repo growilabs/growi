@@ -1201,12 +1201,23 @@ module.exports = (crowi: Crowi) => {
       );
 
       try {
+        const page = await Page.findByIdAndViewer(pageId, req.user);
+        if (page == null) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Page is unreachable or empty.',
+              'page_unreachable_or_empty',
+            ),
+            400,
+          );
+        }
+
         const updateQuery =
           expandContentWidth === isContainerFluidBySystem
             ? { $unset: { expandContentWidth } } // remove if the specified value is the same to the system's one
             : { $set: { expandContentWidth } };
 
-        const page = await Page.updateOne({ _id: pageId }, updateQuery);
+        await Page.updateOne({ _id: page._id }, updateQuery);
         return res.apiv3({ page });
       } catch (err) {
         logger.error('update-content-width-failed', err);
