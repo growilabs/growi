@@ -179,7 +179,9 @@ After reporting, ask the user:
 
 Proceed only after explicit user approval.
 
-### 5-A: Add WIP Label
+### 5-A: Add WIP Label — BEFORE Any Code Changes
+
+**MANDATORY — Do this FIRST, before creating a branch or touching any files.**
 
 Use the exact label name from the label list fetched in Step 2 (e.g. `"4️⃣ phase/WIP"`):
 
@@ -215,7 +217,21 @@ Example: `fix/12345-page-title-overflow`
   Fixes #ISSUE_NUMBER
   ```
 
-### 5-D: Open a Pull Request
+### 5-D: STOP — Ask for PR Approval
+
+**STOP HERE. Do not create a PR until the user explicitly approves.**
+
+Report the implementation summary and ask:
+
+> Implementation complete. Changes committed to `fix/{ISSUE_NUMBER}-{short-description}`.
+> Would you like me to:
+> 1. **Create a PR** — I'll open a pull request now
+> 2. **Review first** — you'll review the changes before PR
+> 3. **Stop here** — you'll handle the PR manually
+
+**Wait for the user's response before proceeding.**
+
+### 5-E: Open a Pull Request (Only if Approved)
 
 ```bash
 gh pr create \
@@ -242,6 +258,18 @@ gh pr create \
 Closes #{ISSUE_NUMBER}
 EOF
 )"
+```
+
+### 5-F: Update Labels — Mark as Resolved
+
+After the PR is created, update the labels:
+
+```bash
+# Remove WIP label
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "{EXACT_PHASE_WIP_LABEL}"
+
+# Add resolved label
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_RESOLVED_LABEL}"
 ```
 
 ## Error Handling
