@@ -112,20 +112,23 @@ describe('MultipartUploader', () => {
         },
       ];
 
-      describe.each(cases)(
-        'When current status is $current and desired status is $desired',
-        ({ current, desired, errorMessage }) => {
-          beforeEach(() => {
-            uploader.setCurrentStatus(current);
-          });
+      describe.each(
+        cases,
+      )('When current status is $current and desired status is $desired', ({
+        current,
+        desired,
+        errorMessage,
+      }) => {
+        beforeEach(() => {
+          uploader.setCurrentStatus(current);
+        });
 
-          it(`should throw expected error: "${errorMessage}"`, () => {
-            expect(() => uploader.testValidateUploadStatus(desired)).toThrow(
-              errorMessage,
-            );
-          });
-        },
-      );
+        it(`should throw expected error: "${errorMessage}"`, () => {
+          expect(() => uploader.testValidateUploadStatus(desired)).toThrow(
+            errorMessage,
+          );
+        });
+      });
     });
   });
 });

@@ -25,6 +25,11 @@ pnpm config set store-dir /workspace/.pnpm-store
 # Install turbo
 pnpm install turbo --global
 
+# Install typescript-language-server for Claude Code LSP plugin
+# Use `npm -g` (not `pnpm --global`) so the binary lands in nvm's node bin, which is on the default PATH.
+# pnpm's global bin requires PNPM_HOME from ~/.bashrc, which the Claude Code extension's shell doesn't source.
+npm install -g typescript-language-server typescript
+
 # Install dependencies
 turbo run bootstrap
 
