@@ -24,4 +24,4 @@ class S2sMessage {
   }
 }
 
-module.exports = S2sMessage;
+export default S2sMessage;

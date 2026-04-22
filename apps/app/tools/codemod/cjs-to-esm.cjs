@@ -504,7 +504,8 @@ if (require.main === module) {
   // Resolve all target paths to absolute
   const targetPaths = args.map(a => path.resolve(a));
 
-  const jscodeshift = require.resolve('.bin/jscodeshift');
+  // Resolve to the actual JS entry point, not the shell wrapper in .bin/
+  const jscodeshift = require.resolve('jscodeshift/bin/jscodeshift.js');
   const transformPath = __filename;
 
   try {

@@ -1,3 +1,4 @@
+import nodePath from 'node:path';
 import { GroupType, Origin } from '@growi/core';
 import {
   pagePathUtils,
@@ -7,6 +8,8 @@ import {
 import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
+import mongoose from 'mongoose';
+import urljoin from 'url-join';
 
 import { Comment } from '~/features/comment/server/models/comment';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
@@ -24,11 +27,6 @@ function getConfigManager() {
 }
 
 const logger = loggerFactory('growi:models:page');
-
-const nodePath = require('path');
-
-const mongoose = require('mongoose');
-const urljoin = require('url-join');
 
 const { isTopPage, isTrashPage } = pagePathUtils;
 const { checkTemplatePath } = templateChecker;

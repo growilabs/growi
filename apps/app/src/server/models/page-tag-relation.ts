@@ -1,4 +1,5 @@
 import type { ITag } from '@growi/core';
+import flatMap from 'array.prototype.flatmap';
 import type { Document, Model, ObjectId, Types } from 'mongoose';
 import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
@@ -10,8 +11,6 @@ import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import { getOrCreateModel } from '../util/mongoose-utils';
 import type { IdToNamesMap } from './tag';
 import Tag from './tag';
-
-const flatMap = require('array.prototype.flatmap');
 
 export interface PageTagRelationDocument extends IPageTagRelation, Document {}
 
