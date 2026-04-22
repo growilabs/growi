@@ -33,14 +33,22 @@ Extract and display:
 
 ## Step 2: Update Labels — Mark as Under Investigation
 
-Remove `phase/new` (if present) and add `phase/under-investigation`:
+Before applying any labels, fetch the exact label names from the repository:
 
 ```bash
-# Remove phase/new
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "phase/new"
+gh label list --repo growilabs/growi --json name --limit 100
+```
 
-# Add phase/under-investigation
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "phase/under-investigation"
+Use these exact names when calling `--remove-label` or `--add-label`. Label names in this repo include emoji prefixes (e.g. `"0️⃣ phase/new"`, `"1️⃣ phase/under-investigation"`), so always look them up rather than guessing.
+
+Remove the `phase/new` label (if present) and add `phase/under-investigation`, using the exact names returned above:
+
+```bash
+# Remove phase/new (use exact name from label list, e.g. "0️⃣ phase/new")
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "{EXACT_PHASE_NEW_LABEL}"
+
+# Add phase/under-investigation (use exact name from label list, e.g. "1️⃣ phase/under-investigation")
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_UNDER_INVESTIGATION_LABEL}"
 ```
 
 If `phase/new` is not present, skip the removal step and only add `phase/under-investigation`.
@@ -93,8 +101,10 @@ If code analysis alone is insufficient to confirm the root cause, attempt reprod
 If the problem is **confirmed** (root cause found in code OR reproduction succeeded):
 
 ```bash
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "phase/under-investigation"
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "phase/confirmed"
+# Use exact label names from the label list fetched in Step 2
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "{EXACT_PHASE_UNDER_INVESTIGATION_LABEL}"
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_CONFIRMED_LABEL}"
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "type/bug"
 ```
 
 ## Step 4: Report Findings
@@ -124,8 +134,9 @@ List specific files and changes needed, but do NOT apply them yet.}
 
 ### 4-B: Post Comment on Issue
 
-Detect the language of the issue body (from Step 1) and write the comment **in the same language**.
-For example, if the issue is written in Japanese, write the comment in Japanese.
+**CRITICAL — Language rule**: Detect the language of the issue body (from Step 1) and write the comment **strictly in that language**, regardless of the language used in this conversation.
+The issue body language takes absolute priority over the conversation language.
+For example, if the issue body is written in English, the comment MUST be in English even if the user conversed in Japanese — and vice versa.
 
 Post the findings as a GitHub issue comment:
 
@@ -170,8 +181,10 @@ Proceed only after explicit user approval.
 
 ### 5-A: Add WIP Label
 
+Use the exact label name from the label list fetched in Step 2 (e.g. `"4️⃣ phase/WIP"`):
+
 ```bash
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "phase/WIP"
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_WIP_LABEL}"
 ```
 
 ### 5-B: Create a Fix Branch
