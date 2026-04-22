@@ -4,6 +4,7 @@ import express from 'express';
 import mongoose from 'mongoose';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
@@ -25,17 +26,13 @@ const getUserRoles = (user: IUserHasId): string[] => {
  * Creates and returns the news Express router.
  * Accepts an optional Crowi instance for middleware setup.
  */
-export const createNewsRouter = (crowi?: {
-  loginRequired?: unknown;
-}): express.Router => {
+export const createNewsRouter = (crowi?: Crowi): express.Router => {
   const router = express.Router();
 
   // Use loginRequiredFactory when crowi is provided, otherwise use a pass-through middleware for testing
   const loginRequiredStrictly =
     crowi != null
-      ? loginRequiredFactory(
-          crowi as Parameters<typeof loginRequiredFactory>[0],
-        )
+      ? loginRequiredFactory(crowi)
       : (_req: unknown, _res: unknown, next: () => void) => next();
 
   /**
@@ -173,6 +170,4 @@ export const createNewsRouter = (crowi?: {
  * Required by the apiv3 router loader which calls require(...).default(crowi).
  */
 // biome-ignore lint/style/noDefaultExport: required by apiv3 router loader
-export default (
-  crowi: Parameters<typeof loginRequiredFactory>[0],
-): express.Router => createNewsRouter({ loginRequired: crowi });
+export default (crowi: Crowi): express.Router => createNewsRouter(crowi);

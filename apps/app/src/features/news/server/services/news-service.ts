@@ -56,7 +56,7 @@ export class NewsService {
     const readIdSet = new Set(readItemIds.map((id) => id.toString()));
 
     const docs: INewsItemWithReadStatus[] = items.map((item) => ({
-      ...(item as unknown as INewsItemWithReadStatus),
+      ...item,
       isRead: readIdSet.has(item._id.toString()),
     }));
 
