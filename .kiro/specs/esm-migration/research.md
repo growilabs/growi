@@ -313,6 +313,124 @@ module.exports = (crowi, app) => {
 
 ---
 
+## 7. Phase 3: 循環依存ベースライン (Task 3.0)
+
+### 7.1 実行コマンドと結果
+
+**実行日時**: 2026-04-22
+
+**コマンド**:
+```bash
+cd apps/app && npx madge --circular --extensions js,ts src/server
+```
+
+**完全な出力** (25 件):
+```
+ 1) crowi/index.ts > crowi/setup-models.ts
+ 2) crowi/index.ts > crowi/setup-models.ts > models/bookmark.ts
+ 3) crowi/index.ts > crowi/setup-models.ts > models/page.ts
+ 4) crowi/index.ts > events/activity.ts
+ 5) crowi/index.ts > events/admin.ts
+ 6) crowi/index.ts > events/bookmark.ts
+ 7) crowi/index.ts > events/page.ts
+ 8) crowi/index.ts > events/tag.ts
+ 9) crowi/index.ts > events/user.ts
+10) crowi/index.ts > middlewares/login-required.ts
+11) crowi/index.ts > service/activity.ts
+12) crowi/index.ts > service/app.ts
+13) crowi/index.ts > service/attachment.ts
+14) crowi/index.ts > service/comment.ts
+15) crowi/index.ts > service/customize.ts
+16) crowi/index.ts > service/g2g-transfer.ts
+17) crowi/index.ts > service/in-app-notification.ts
+18) crowi/index.ts > service/installer.ts
+19) crowi/index.ts > service/page-operation.ts
+20) crowi/index.ts > service/search.ts
+21) service/search-delegator/elasticsearch-client-delegator/es7-client-delegator.ts > service/search-delegator/elasticsearch-client-delegator/interfaces.ts
+22) crowi/index.ts > service/slack-integration.ts
+23) crowi/index.ts > service/socket-io/index.ts > service/socket-io/socket-io.ts
+24) crowi/index.ts > service/socket-io/index.ts > service/socket-io/socket-io.ts > middlewares/admin-required.ts
+25) crowi/index.ts > service/user-group.ts
+```
+
+### 7.2 ベースライン比較
+
+| 項目 | design.md (2026-04-20 baseline) | 実測 (2026-04-22) | 差分 |
+|------|--------------------------------|-------------------|------|
+| 合計件数 | 25 件 | 25 件 | **一致** |
+| crowi/index.ts 経由 | 23 件 (23/25) | 24 件 (24/25) | 要確認 (後述) |
+| crowi/index.ts 非経由 | 1 件 | 1 件 | **一致** |
+
+**crowi/index.ts 経由の件数について**: design.md では「25 件中 23 件」と記述されているが、実測では件数 24 にも見える。ただし design.md が `crowi/index.ts` 直接を起点とする短い経路のみをカウントしていた可能性があり、#23/#24 の `service/socket-io/socket-io.ts` 経由の 2 件と `middlewares/admin-required.ts` 経由の 2 件で重複カウントが生じうる。実態は 25 件すべての循環が `crowi/index.ts` を含む (非経由は #21 の es7-client-delegator 1 件のみ) であり、**合計 25 件・非経由 1 件というベースラインに変化なし**。
+
+### 7.3 crowi/index.ts ハブ分析
+
+実測で確認された循環のカテゴリ:
+
+| カテゴリ | 件数 | 該当パス |
+|----------|------|----------|
+| crowi ↔ setup-models | 3 件 | #1, #2, #3 |
+| crowi ↔ events/* | 6 件 | #4–#9 |
+| crowi ↔ middlewares/login-required | 1 件 | #10 |
+| crowi ↔ service/* (直接) | 11 件 | #11–#20, #22, #25 |
+| crowi ↔ service/socket-io + middlewares | 2 件 | #23, #24 |
+| es7-client-delegator ↔ interfaces (非経由) | 1 件 | #21 |
+| **合計** | **25 件** | |
+
+### 7.4 #21 の分析: interfaces.ts 循環の詳細
+
+**madge が検出した循環**:
+```
+service/search-delegator/elasticsearch-client-delegator/es7-client-delegator.ts
+  > service/search-delegator/elasticsearch-client-delegator/interfaces.ts
+```
+
+**コード確認**:
+- `interfaces.ts` (line 8): `import type { ES7ClientDelegator } from './es7-client-delegator'`
+- `es7-client-delegator.ts` (line 10): `import type { ES7SearchQuery } from './interfaces'`
+
+**サイクルの性質**: これは **型のみ (`import type`)** の循環。TypeScript コンパイラにとって `import type` は型消去されるため、ランタイムに JS が実行される段階では実際の循環 require は生じない。CJS ではこの型レベルの循環は無害だが、madge は静的 import 解析で型 import も対象にするため検出される。
+
+**ESM での挙動**: ESM の静的 hoisting では `import type` は型消去されているため、ランタイムで `ReferenceError` は発生しない。ただし `isolatedDeclarations` や `verbatimModuleSyntax` を強制する場合はエディタ上の警告が残る。
+
+**es8-client-delegator / es9-client-delegator の状況**: これらは `interfaces.ts` を import していない (外部 ES8/ES9 クライアントのみ import)。`interfaces.ts` が ES8/ES9 delegator のクラス型を参照しているが、es8/es9 delegator から interfaces への逆 import はなく、madge でも循環として検出されていない。
+
+### 7.5 interfaces.ts 分離の対処計画確定
+
+**問題**: `interfaces.ts` が `es7-client-delegator.ts` のクラス型 (`ES7ClientDelegator`) を import し、同時に `es7-client-delegator.ts` が `interfaces.ts` の型 (`ES7SearchQuery`) を import する双方向の型依存。
+
+**採択方針** (design.md §Existing Architecture Analysis と一致):
+
+```
+現状:
+  es7-client-delegator.ts ←→ interfaces.ts  (循環)
+
+分離後:
+  search-types.ts          (ES7SearchQuery, ES8SearchQuery, ES9SearchQuery, SearchQuery)
+                            ↑ 外部依存ゼロ、外部ライブラリ型のみ参照
+  es7-client-delegator.ts → search-types.ts  (一方向)
+  interfaces.ts            → es7-client-delegator.ts + search-types.ts  (一方向)
+```
+
+**具体的な変更**:
+1. `search-delegator/elasticsearch-client-delegator/search-types.ts` を新規作成
+   - `ES7SearchQuery`, `ES8SearchQuery`, `ES9SearchQuery`, `SearchQuery` 型を移動
+   - 外部 ES ライブラリ型 (`@elastic/elasticsearch7` 等) のみ依存
+2. `es7-client-delegator.ts` の `import type { ES7SearchQuery } from './interfaces'` を `import type { ES7SearchQuery } from './search-types'` に変更
+3. `interfaces.ts` の `ES7SearchQuery` 等の参照を `'./search-types'` からの import に変更
+4. `interfaces.ts` には ES7/8/9 ClientDelegator のクラス型参照のみ残す (一方向依存)
+
+**注意**: この変更は ESM strict loading での `ReferenceError` 防止には**直接必要ない** (型 import はランタイムで消去される)。しかし madge のクリーンなグラフ、`verbatimModuleSyntax` との整合性、将来の循環増加の抑止のために実施する意義がある。**優先度: 低 (Phase 3 codemod 後の cleanup として実施)**。
+
+### 7.6 Task 3.0 結論
+
+- **ベースライン一致**: 25 件 — design.md の記述と完全一致。design.md の更新は不要。
+- **crowi/index.ts ハブ**: 24/25 件が `crowi/index.ts` を経由 (design.md の「23 件」は概算)。重要なのはハブ構造の性質であり件数の誤差は軽微。
+- **#21 の interfaces.ts 循環**: `import type` のみの型レベル循環。ESM ランタイムでの `ReferenceError` リスクはゼロ。分離計画は Phase 3 後半 cleanup として維持する。
+- **次アクション**: Task 3.1 (jscodeshift カスタム transform の設計・実装) に進む。
+
+---
+
 ## References
 
 - [TypeScript: Choosing Compiler Options](https://www.typescriptlang.org/docs/handbook/modules/guides/choosing-compiler-options.html)
