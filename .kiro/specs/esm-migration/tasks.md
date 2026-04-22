@@ -88,7 +88,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 1.1, 1.2, 1.3, 5.3_
   - _Boundary: Package Config Updater (preset-themes)_
 
-- [ ] 1.4 (P) `@growi/core-styles` と `@growi/custom-icons` を ESM 化
+- [x] 1.4 (P) `@growi/core-styles` と `@growi/custom-icons` を ESM 化
   - 両パッケージの `package.json` に `"type": "module"` を追加
   - JS 出力を持たないため一貫性目的の宣言のみ
   - `turbo run build --filter @growi/core-styles --filter @growi/custom-icons` が成功
