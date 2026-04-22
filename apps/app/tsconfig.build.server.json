@@ -21,6 +21,7 @@
     "config/*.js",
     "config/*.spec.ts",
     "resource",
+    "src/migrations/**",
     "src/client",
     "src/components",
     "src/components-universal",

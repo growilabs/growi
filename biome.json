@@ -26,7 +26,8 @@
       "!apps/pdf-converter/specs",
       "!apps/slackbot-proxy/src/public/bootstrap",
       "!packages/pdf-converter-client/src/index.ts",
-      "!packages/pdf-converter-client/specs"
+      "!packages/pdf-converter-client/specs",
+      "!apps/app/src/migrations"
     ]
   },
   "formatter": {
@@ -186,6 +187,10 @@
                   {
                     "group": ["~/client/**", "**/client/**", "client/**"],
                     "message": "Importing from client/ directories is restricted."
+                  },
+                  {
+                    "group": ["~/migrations/**", "**/src/migrations/**"],
+                    "message": "Importing from src/migrations/ in server code is forbidden. Migrations run independently via migrate-mongo CLI and must remain CJS-isolated."
                   }
                 ]
               }

@@ -104,7 +104,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 ## Phase 2: ルート/apps/app の type:module 宣言と CJS 隔離
 
 - [ ] 2. 既定モジュールを ESM に切替え、CJS 残置箇所を明示化
-- [ ] 2.1 (P) `apps/app/src/migrations/` をディレクトリ単位で CJS 隔離
+- [x] 2.1 (P) `apps/app/src/migrations/` をディレクトリ単位で CJS 隔離
   - `apps/app/src/migrations/package.json` を新規作成し `{ "type": "commonjs" }` を宣言
   - **`apps/app/tsconfig.build.server.json` の `exclude` に `src/migrations/**` を追加する (既存で含まれていない場合は必ず追加。hard precondition として Phase 3.6 までに完了していること)**
   - ESLint/grep による構造ガードを追加: `apps/app/src/server/` 以下から `import ... from '~/server/migrations/...'` もしくは相対パスでの `src/migrations/` への import を禁止 (現状存在しないことを確認した上で将来回帰を防止)
