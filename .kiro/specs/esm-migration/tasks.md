@@ -122,11 +122,11 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 5.4_
   - _Boundary: CJS Isolation Strategy (config files)_
 
-- [ ] 2.3 ワークスペースルートと `apps/app` に `"type": "module"` を宣言
-  - ルート `package.json` と `apps/app/package.json` の両方に `"type": "module"` を追加
-  - 宣言後に `apps/app/config/*.cjs` および `src/migrations/*.js` が CJS として扱われ続けることを確認
-  - `pnpm install` が成功し、`pnpm why` で解決が変化していないこと
-  - _Requirements: 5.1, 5.2_
+- [x] 2.3 ワークスペースルートと `apps/app` に `"type": "module"` を宣言
+  - ルート `package.json` に `"type": "module"` を追加 (Req 5.1)
+  - **`apps/app/package.json` への宣言は Phase 3.7.b に延期** — ts-node v10 は `"type":"module"` 宣言済みパッケージ内の `.ts` ファイルを `require()` できず、`dev:migrate` (turbo で `dev` の必須依存) が破綻するため。Phase 3.7.b で dev runner を tsx/swc-node に切り替える際に同時追加する (Req 5.2 は Phase 3 で充足)
+  - `pnpm install` が成功し、root の type:module 宣言が既存パッケージ解決に影響しないことを確認
+  - _Requirements: 5.1_
   - _Depends: 2.1, 2.2_
 
 - [ ] 2.4 Phase 2 統合ゲート
