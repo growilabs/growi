@@ -298,6 +298,13 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
   **迂回禁止条項**: 下記 3.8.c (auth middleware snapshot diff) のいずれかの手順 — 特に `app._router.stack` の walk — が実装上の理由で失敗した場合、代替検証で代用したり「実害がなさそうだから」とスキップすることは **禁止** する。スクリプトが動作しないなら修正するまで Phase 4 には進まない。担当者はユーザーに対して明確に「ゲート 3.8.c を通過できないため Phase 4 に進めない」と報告し、対処方針の指示を仰ぐこと。これは他の 3.8.a / 3.8.b / 3.8.d / 3.8.e にも同様に適用される (Req 6.6 を厳格運用)。
 
+  **Evidence 捕捉義務 (MANDATORY)**: 3.8.a〜3.8.e のすべてのゲート判定は、実行ログ / 計測生データ / diff 出力を `.kiro/specs/esm-migration/phase3-gate-evidence/` 配下に artifact としてコミットすること。tasks.md の check 更新のみで「通過した」と主張することは禁止する (Phase 2 の post-hoc 検証不能問題の再発防止)。最低限以下を成果物として残す:
+  - 3.8.a: `turbo run build lint test` の full output と、test baseline との diff
+  - 3.8.b: `server:ci` exit 0 の証跡 + `/_api/v3/healthcheck` 等の curl 応答ログ + SSR サンプルの HTML 一部
+  - 3.8.c: `route-middleware-baseline.json` との diff 出力 (matrix 配列のみ) + `authz-matrix-baseline.json` との diff 出力
+  - 3.8.d: WS 接続 curl 応答 + `ws-authz-baseline.json` との diff + attach/listen タイムスタンプログ
+  - 3.8.e: 本番/dev 起動 wall time 全 3 回の生値 + OTel first-request p95 生値 + ±%gate 判定
+
   - [ ] 3.8.a 基本品質ゲート
     - `turbo run build lint test --filter @growi/app` がすべて成功
     - `test` の結果は `.kiro/specs/esm-migration/test-baseline.md` (Phase 0.1) と比較し、新規失敗 0 件 (既知 flaky のブレは除外)
@@ -477,3 +484,30 @@ same issue.
   3.8.c re-execution against production build will need either an
   ESM-compatible runner (selected in 3.7.a) or a pre-built `dist/` entry
   for the capture script.
+
+- **2.1 migrations lint exclusion**: `biome.json` now excludes
+  `apps/app/src/migrations/**` from lint targets (in addition to the
+  `noRestrictedImports` guard required by task 2.1). This was necessary
+  because migration source files contain a mix of ESM `import` syntax and
+  raw `require()` calls (e.g. `20200903080025-remove-timeline-type.js.js`
+  imports `~/server/models/config` as ESM but also `require('mongoose')`
+  in the same file). The mix currently works only because `ts-node` +
+  `tsconfig-paths` with `allowJs: true` transpiles both forms under
+  `module: CommonJS`. **Phase 3.7.b dev runner swap (tsx / @swc-node)
+  MUST re-verify `pnpm run dev:migrate` end-to-end against the chosen
+  runner.** If the new runner does not transpile `.js` files in a
+  `type:commonjs` subdirectory the same way, migration loading will
+  fail at runtime. Record the verification command and output in the
+  3.7.b bake-off evidence file.
+
+- **2.2 config .d.cts pairing**: The three CJS config files
+  (`migrate-mongo-config.cjs`, `i18next.config.cjs`,
+  `next-i18next.config.cjs`) each ship a hand-written `.d.cts` sibling.
+  These are load-bearing: removing them breaks typecheck because callers
+  use `import * as x from '...cjs'` against a module whose runtime shape
+  is `module.exports = {...}` / `export =`. Under the current `Bundler`
+  moduleResolution, only the `.d.cts` pairing resolves this cleanly, and
+  the Phase 3.6 switch to `NodeNext` will make the `.cjs ↔ .d.cts`
+  pairing strictly required. Do not delete these declaration files, and
+  keep them in sync with the `.cjs` implementations when adding / removing
+  exported symbols.
