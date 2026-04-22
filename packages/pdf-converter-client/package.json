@@ -1,13 +1,14 @@
 {
   "name": "@growi/pdf-converter-client",
   "version": "1.0.0",
+  "type": "module",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",
   "license": "MIT",
   "private": true,
   "scripts": {
     "lint": "biome check",
-    "gen:client-code": "orval",
+    "gen:client-code": "orval --config orval.config.cjs",
     "dev": "pnpm gen:client-code && tsc -p tsconfig.json",
     "build": "pnpm gen:client-code && tsc -p tsconfig.json"
   },

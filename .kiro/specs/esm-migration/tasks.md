@@ -66,7 +66,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 ## Phase 1: 残余共有パッケージの ESM 宣言
 
 - [ ] 1. 共有パッケージ 5 つを ESM 宣言に揃える
-- [ ] 1.1 (P) `@growi/pdf-converter-client` を ESM 化
+- [x] 1.1 (P) `@growi/pdf-converter-client` を ESM 化
   - `packages/pdf-converter-client/package.json` に `"type": "module"` を追加
   - `packages/pdf-converter-client/orval.config.js` を `orval.config.cjs` にリネーム
   - `packages/pdf-converter-client/package.json` の orval 関連スクリプトの参照を `.cjs` に更新
