@@ -8,13 +8,16 @@ import { resolve } from 'node:path';
 import { MongoClient } from 'mongodb';
 import { MongoDBStorage, Umzug } from 'umzug';
 
-
 (async () => {
   const url = process.env.MONGO_URI;
   if (url === undefined) {
     throw new Error('MONGO_URI is required');
   }
-  const { prisma } = await import(process.env.NODE_ENV === 'production' ? '../dist/utils/prisma' : '../src/utils/prisma');
+  const { prisma } = await import(
+    process.env.NODE_ENV === 'production'
+      ? '../dist/utils/prisma'
+      : '../src/utils/prisma'
+  );
   const client = new MongoClient(url);
   await client.connect();
 
