@@ -4,8 +4,9 @@
   "description": "GROWI preset themes",
   "license": "MIT",
   "private": true,
-  "main": "dist/libs/preset-themes.umd.js",
-  "module": "dist/libs/preset-themes.mjs",
+  "type": "module",
+  "main": "dist/libs/preset-themes.umd.cjs",
+  "module": "dist/libs/preset-themes.js",
   "types": "dist/libs/index.d.ts",
   "files": [
     "dist"

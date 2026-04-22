@@ -81,7 +81,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 1.1, 1.2, 5.3_
   - _Boundary: Package Config Updater (preset-templates)_
 
-- [ ] 1.3 (P) `@growi/preset-themes` を ESM 化 (dual 出力維持)
+- [x] 1.3 (P) `@growi/preset-themes` を ESM 化 (dual 出力維持)
   - `packages/preset-themes/package.json` に `"type": "module"` を追加
   - Vite 設定の `build.lib.formats` に ES と UMD の両方が残っていることを確認
   - `turbo run build --filter @growi/preset-themes` が成功し、`dist/` に ES と UMD の双方が生成される
