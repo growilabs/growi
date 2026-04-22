@@ -1072,10 +1072,10 @@ describe('useFetchCurrentPage - Integration Test', () => {
       });
     });
 
-    // Assert: API should be called with pageId (not path=/share/...) and shareLinkId
+    // Assert: API should be called with /page/shared endpoint, pageId (not path=/share/...) and shareLinkId
     await waitFor(() => {
       expect(mockedApiv3Get).toHaveBeenCalledWith(
-        '/page',
+        '/page/shared',
         expect.objectContaining({
           pageId,
           shareLinkId,
@@ -1083,7 +1083,7 @@ describe('useFetchCurrentPage - Integration Test', () => {
       );
       // path should NOT be sent
       expect(mockedApiv3Get).toHaveBeenCalledWith(
-        '/page',
+        '/page/shared',
         expect.not.objectContaining({ path: expect.anything() }),
       );
       expect(store.get(currentPageEntityIdAtom)).toBe(pageId);
@@ -1109,10 +1109,10 @@ describe('useFetchCurrentPage - Integration Test', () => {
       await result.current.fetchCurrentPage({ path: '/some/path' });
     });
 
-    // Assert: Falls through to path-based logic since currentPageId is null
+    // Assert: Falls through to path-based logic since currentPageId is null, but still uses /page/shared
     await waitFor(() => {
       expect(mockedApiv3Get).toHaveBeenCalledWith(
-        '/page',
+        '/page/shared',
         expect.objectContaining({
           path: '/some/path',
           shareLinkId,

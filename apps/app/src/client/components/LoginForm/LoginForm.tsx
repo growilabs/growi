@@ -147,10 +147,10 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
       if (errors == null || errors.length === 0) return <></>;
       return (
         <div className="alert alert-danger">
-          {errors.map((err, index) => {
+          {errors.map((err) => {
             return (
               <small
-                key={`${err.code}-${index}`}
+                key={err.code}
                 // biome-ignore lint/security/noDangerouslySetInnerHtml: rendered HTML from translations
                 dangerouslySetInnerHTML={{
                   __html: tWithOpt(err.message, err.args),
@@ -171,10 +171,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
       return (
         <ul className="alert alert-danger">
           {errors.map((err, index) => (
-            <small
-              key={`${err.message}-${index}`}
-              className={index > 0 ? 'mt-1' : ''}
-            >
+            <small key={err.message} className={index > 0 ? 'mt-1' : ''}>
               {tWithOpt(err.message, err.args)}
             </small>
           ))}
@@ -394,8 +391,8 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
 
         {registerErrors != null && registerErrors.length > 0 && (
           <p className="alert alert-danger">
-            {registerErrors.map((err, index) => (
-              <span key={`${err.message}-${index}`}>
+            {registerErrors.map((err) => (
+              <span key={err.message}>
                 {tWithOpt(err.message, err.args)}
                 <br />
               </span>
