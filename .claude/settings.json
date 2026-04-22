@@ -23,9 +23,7 @@
       "Bash(gh pr diff *)",
       "Bash(ls *)",
       "WebFetch(domain:github.com)",
-      "mcp__context7__*",
       "mcp__plugin_context7_*",
-      "mcp__github__*",
       "WebSearch",
       "WebFetch"
     ]
@@ -57,8 +55,6 @@
   },
   "enabledPlugins": {
     "context7@claude-plugins-official": true,
-    "github@claude-plugins-official": true,
-    "typescript-lsp@claude-plugins-official": true,
-    "playwright@claude-plugins-official": true
+    "typescript-lsp@claude-plugins-official": true
   }
 }
