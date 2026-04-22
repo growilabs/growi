@@ -103,7 +103,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 ## Phase 2: ルート/apps/app の type:module 宣言と CJS 隔離
 
-- [ ] 2. 既定モジュールを ESM に切替え、CJS 残置箇所を明示化
+- [x] 2. 既定モジュールを ESM に切替え、CJS 残置箇所を明示化
 - [x] 2.1 (P) `apps/app/src/migrations/` をディレクトリ単位で CJS 隔離
   - `apps/app/src/migrations/package.json` を新規作成し `{ "type": "commonjs" }` を宣言
   - **`apps/app/tsconfig.build.server.json` の `exclude` に `src/migrations/**` を追加する (既存で含まれていない場合は必ず追加。hard precondition として Phase 3.6 までに完了していること)**
@@ -129,7 +129,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 5.1_
   - _Depends: 2.1, 2.2_
 
-- [ ] 2.4 Phase 2 統合ゲート
+- [x] 2.4 Phase 2 統合ゲート
   - `turbo run build` と `turbo run lint` が成功 (サーバ側は依然 CJS でコンパイル)
   - 既存 dev ランナー (`ts-node` + `tsconfig-paths`) による `pnpm dev` が引き続き起動する
   - **dev ランナー切替禁止**: 本フェーズ時点でサーバソースは CJS のままなので、ここで `tsx` / `@swc-node/register` 等への切替は行わない。CJS 状態で切替えると hybrid 解決コストが最大化し、Phase 3.7.a の bake-off 測定が実運用プロファイルを反映しなくなる (Dev Runner Adapter 切替タイミング制約)
