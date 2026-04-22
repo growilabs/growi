@@ -112,7 +112,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 5.4, 5.5_
   - _Boundary: CJS Isolation Strategy (migrations)_
 
-- [ ] 2.2 (P) `apps/app/config/` の 3 ファイルを `.cjs` にリネーム
+- [x] 2.2 (P) `apps/app/config/` の 3 ファイルを `.cjs` にリネーム
   - `apps/app/config/migrate-mongo-config.js`, `next-i18next.config.js`, `i18next.config.js` をそれぞれ `.cjs` に変更
   - **拡張子なし importer の全列挙と書換え**: `apps/app/` 配下で `^/config/migrate-mongo-config`, `^/config/next-i18next.config`, `^/config/i18next.config` を import / require している全ファイル (server + client 両方) を grep で列挙し、specifier を `.cjs` 付きに書換える。Phase 3 で NodeNext 切替 (3.6) 後は拡張子なしの解決が失敗するため、この書換えは Phase 2 で完了させる
   - 該当既知箇所 (最低限): `src/server/models/user/index.js`, `src/server/service/i18next.ts`, `src/server/routes/apiv3/personal-setting/index.js`, `src/server/util/locale-utils.ts`, `src/pages/_app.page.tsx` — grep で上記以外の importer が無いことを確認

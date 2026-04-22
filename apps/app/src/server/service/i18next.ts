@@ -4,7 +4,7 @@ import { createInstance } from 'i18next';
 import resourcesToBackend from 'i18next-resources-to-backend';
 import path from 'path';
 
-import * as i18nextConfig from '^/config/i18next.config';
+import * as i18nextConfig from '^/config/i18next.config.cjs';
 
 import { resolveFromRoot } from '~/server/util/project-dir-utils';
 

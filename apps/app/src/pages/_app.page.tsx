@@ -9,7 +9,7 @@ import { Provider } from 'jotai';
 import { appWithTranslation } from 'next-i18next';
 import { SWRConfig } from 'swr';
 
-import * as nextI18nConfig from '^/config/next-i18next.config';
+import * as nextI18nConfig from '^/config/next-i18next.config.cjs';
 
 import { GlobalFonts } from '~/components/FontFamily/GlobalFonts';
 import type { CrowiRequest } from '~/interfaces/crowi-request';

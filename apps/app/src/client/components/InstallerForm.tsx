@@ -5,7 +5,7 @@ import { AllLang, Lang } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import * as nextI18nConfig from '^/config/next-i18next.config';
+import * as nextI18nConfig from '^/config/next-i18next.config.cjs';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { useTWithOpt } from '~/client/util/t-with-opt';

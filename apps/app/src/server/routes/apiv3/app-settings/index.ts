@@ -4,7 +4,7 @@ import pathUtils from '@growi/core/dist/utils/path-utils';
 import express from 'express';
 import { body } from 'express-validator';
 
-import * as nextI18nConfig from '^/config/next-i18next.config';
+import * as nextI18nConfig from '^/config/next-i18next.config.cjs';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';

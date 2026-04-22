@@ -2,7 +2,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 
-import { i18n } from '^/config/next-i18next.config';
+import { i18n } from '^/config/next-i18next.config.cjs';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';

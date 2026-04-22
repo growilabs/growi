@@ -3,7 +3,7 @@ import { AllLang } from '@growi/core';
 import type { SSRConfig } from 'next-i18next';
 import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
-import nextI18NextConfig from '^/config/next-i18next.config';
+import nextI18NextConfig from '^/config/next-i18next.config.cjs';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { getLangAtServerSide } from '~/pages/utils/locale';

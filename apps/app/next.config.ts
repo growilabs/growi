@@ -8,7 +8,7 @@
 import type { NextConfig } from 'next';
 import path from 'node:path';
 
-import nextI18nConfig from './config/next-i18next.config';
+import nextI18nConfig from './config/next-i18next.config.cjs';
 import { listPrefixedPackages } from './src/utils/next.config.utils';
 
 const { i18n } = nextI18nConfig;

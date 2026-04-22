@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import { i18n } from '^/config/next-i18next.config';
+import { i18n } from '^/config/next-i18next.config.cjs';
 
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';

@@ -1,7 +1,7 @@
 import { Lang } from '@growi/core/dist/interfaces';
 import type { IncomingHttpHeaders } from 'http';
 
-import * as i18nextConfig from '^/config/i18next.config';
+import * as i18nextConfig from '^/config/i18next.config.cjs';
 
 // Re-export getLocale from the shared client-safe module
 export { getLocale } from '~/utils/locale-utils';

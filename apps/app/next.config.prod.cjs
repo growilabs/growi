@@ -11,7 +11,7 @@
  * Keep the runtime-relevant values in sync with next.config.ts.
  */
 
-const nextI18nConfig = require('./config/next-i18next.config');
+const nextI18nConfig = require('./config/next-i18next.config.cjs');
 
 const { i18n } = nextI18nConfig;
 

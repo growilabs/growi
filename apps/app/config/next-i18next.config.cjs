@@ -1,24 +1,19 @@
+'use strict';
 const isDev = process.env.NODE_ENV === 'development';
 // biome-ignore lint/style/useNodejsImportProtocol: ignore
 const path = require('path');
-
 const { AllLang } = require('@growi/core');
 const { isServer } = require('@growi/core/dist/utils');
-
-const { defaultLang } = require('./i18next.config');
-
+const { defaultLang } = require('./i18next.config.cjs');
 /** @type {import('next-i18next').UserConfig} */
 module.exports = {
-  ...require('./i18next.config').initOptions,
-
+  ...require('./i18next.config.cjs').initOptions,
   i18n: {
     defaultLocale: defaultLang.toString(),
     locales: AllLang,
   },
-
   localePath: path.resolve('./public/static/locales'),
   serializeConfig: false,
-
   use: isDev
     ? isServer()
       ? []
