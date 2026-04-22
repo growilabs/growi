@@ -88,16 +88,15 @@ describe('isSimpleRequest', () => {
         'X-Requested-With',
         'X-CSRF-Token',
       ];
-      it.each(unsafeHeaders)(
-        'returns false for unsafe header: %s',
-        (headerName) => {
-          const reqMock = mock<Request>({
-            method: 'POST',
-            headers: { [headerName]: 'test-value' },
-          });
-          expect(isSimpleRequest(reqMock)).toBe(false);
-        },
-      );
+      it.each(
+        unsafeHeaders,
+      )('returns false for unsafe header: %s', (headerName) => {
+        const reqMock = mock<Request>({
+          method: 'POST',
+          headers: { [headerName]: 'test-value' },
+        });
+        expect(isSimpleRequest(reqMock)).toBe(false);
+      });
       // combination
       it('returns false when safe and unsafe headers are mixed', () => {
         const reqMock = mock<Request>();
