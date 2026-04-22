@@ -65,7 +65,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 ## Phase 1: 残余共有パッケージの ESM 宣言
 
-- [ ] 1. 共有パッケージ 5 つを ESM 宣言に揃える
+- [x] 1. 共有パッケージ 5 つを ESM 宣言に揃える
 - [x] 1.1 (P) `@growi/pdf-converter-client` を ESM 化
   - `packages/pdf-converter-client/package.json` に `"type": "module"` を追加
   - `packages/pdf-converter-client/orval.config.js` を `orval.config.cjs` にリネーム
@@ -95,7 +95,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 1.1, 5.3_
   - _Boundary: Package Config Updater (core-styles, custom-icons)_
 
-- [ ] 1.5 Phase 1 統合ゲート
+- [x] 1.5 Phase 1 統合ゲート
   - 5 パッケージ変換後に `turbo run build` をモノレポ全体で実行し、`apps/app` を含む下流コンシューマが退行しないことを確認
   - Phase 1 完了コミットに revert 用のタグを付与
   - _Requirements: 1.4, 6.6_
