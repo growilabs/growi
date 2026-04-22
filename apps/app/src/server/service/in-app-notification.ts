@@ -1,15 +1,11 @@
-import type { HasObjectId, IPage, IPageHasId, IUser } from '@growi/core';
+import type { HasObjectId, IPage, IUser } from '@growi/core';
 import { SubscriptionStatusType } from '@growi/core';
 import { subDays } from 'date-fns/subDays';
 import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
 
 import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import {
-  AllEssentialActions,
-  SupportedAction,
-  SupportedTargetModel,
-} from '~/interfaces/activity';
+import { AllEssentialActions } from '~/interfaces/activity';
 import type { PaginateResult } from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import type { ActivityDocument } from '~/server/models/activity';

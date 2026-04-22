@@ -285,6 +285,14 @@ module.exports = (crowi, _app) => {
       },
     );
 
+    const parameters = {
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+      target: page,
+      eventModel: SupportedEventModel.MODEL_COMMENT,
+      event: createdComment,
+      action: SupportedAction.ACTION_COMMENT_CREATE,
+    };
+
     /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */
     const getAdditionalTargetUsers = async (activity) => {
       const mentionedUsers = await crowi.commentService.getMentionedUsers(
@@ -292,14 +300,6 @@ module.exports = (crowi, _app) => {
       );
 
       return mentionedUsers;
-    };
-
-    const parameters = {
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: page,
-      eventModel: SupportedEventModel.MODEL_COMMENT,
-      event: createdComment,
-      action: SupportedAction.ACTION_COMMENT_CREATE,
     };
 
     activityEvent.emit(
