@@ -1,4 +1,4 @@
-import { type FC, useId, useState } from 'react';
+import { type FC, useRef, useState } from 'react';
 import type { EditingClient } from '@growi/editor';
 import { UserPicture } from '@growi/ui/dist/components';
 import { Popover, PopoverBody } from 'reactstrap';
@@ -31,7 +31,7 @@ const AvatarWrapper: FC<{
 };
 
 export const EditingUserList: FC<Props> = ({ clientList, onUserClick }) => {
-  const popoverTargetId = useId();
+  const popoverTargetRef = useRef<HTMLButtonElement>(null);
   const [isPopoverOpen, setIsPopoverOpen] = useState(false);
 
   const togglePopover = () => setIsPopoverOpen(!isPopoverOpen);
@@ -56,7 +56,7 @@ export const EditingUserList: FC<Props> = ({ clientList, onUserClick }) => {
           <div className="ms-1">
             <button
               type="button"
-              id={popoverTargetId}
+              ref={popoverTargetRef}
               className="btn border-0 bg-info-subtle rounded-pill p-0"
               onClick={togglePopover}
             >
@@ -67,7 +67,7 @@ export const EditingUserList: FC<Props> = ({ clientList, onUserClick }) => {
             <Popover
               placement="bottom"
               isOpen={isPopoverOpen}
-              target={popoverTargetId}
+              target={popoverTargetRef}
               toggle={togglePopover}
               trigger="legacy"
             >
