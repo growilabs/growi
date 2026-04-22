@@ -74,7 +74,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 1.1, 1.2, 5.3_
   - _Boundary: Package Config Updater (pdf-converter-client)_
 
-- [ ] 1.2 (P) `@growi/preset-templates` を ESM 化
+- [x] 1.2 (P) `@growi/preset-templates` を ESM 化
   - `packages/preset-templates/package.json` に `"type": "module"` を追加
   - 本パッケージは JS ソースを持たないため設定のみの変更
   - `turbo run build --filter @growi/preset-templates` が成功
