@@ -82,29 +82,27 @@ describe('watchRenderingAndReScroll', () => {
   });
 
   // Retry absorbs rare happy-dom MO WeakRef GC drops (see file-top note).
-  it(
-    'should detect rendering elements added after initial check via observer',
-    { retry: 3 },
-    async () => {
-      const cleanup = watchRenderingAndReScroll(container, scrollToTarget);
+  it('should detect rendering elements added after initial check via observer', {
+    retry: 3,
+  }, async () => {
+    const cleanup = watchRenderingAndReScroll(container, scrollToTarget);
 
-      vi.advanceTimersByTime(3000);
-      expect(scrollToTarget).not.toHaveBeenCalled();
+    vi.advanceTimersByTime(3000);
+    expect(scrollToTarget).not.toHaveBeenCalled();
 
-      // Add a rendering element later (within 10s timeout)
-      const renderingEl = document.createElement('div');
-      renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true');
-      container.appendChild(renderingEl);
+    // Add a rendering element later (within 10s timeout)
+    const renderingEl = document.createElement('div');
+    renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true');
+    container.appendChild(renderingEl);
 
-      // Flush MO so it schedules the poll timer
-      await flushMutationObservers();
+    // Flush MO so it schedules the poll timer
+    await flushMutationObservers();
 
-      await vi.advanceTimersByTimeAsync(5000);
-      expect(scrollToTarget).toHaveBeenCalledTimes(1);
+    await vi.advanceTimersByTimeAsync(5000);
+    expect(scrollToTarget).toHaveBeenCalledTimes(1);
 
-      cleanup();
-    },
-  );
+    cleanup();
+  });
 
   it('should scroll once when multiple rendering elements exist simultaneously', () => {
     const renderingEl1 = document.createElement('div');
@@ -175,34 +173,32 @@ describe('watchRenderingAndReScroll', () => {
   });
 
   // Retry absorbs rare happy-dom MO WeakRef GC drops (see file-top note).
-  it(
-    'should perform a final re-scroll when rendering completes after the first poll',
-    { retry: 3 },
-    async () => {
-      const renderingEl = document.createElement('div');
-      renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true');
-      container.appendChild(renderingEl);
+  it('should perform a final re-scroll when rendering completes after the first poll', {
+    retry: 3,
+  }, async () => {
+    const renderingEl = document.createElement('div');
+    renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true');
+    container.appendChild(renderingEl);
 
-      const cleanup = watchRenderingAndReScroll(container, scrollToTarget);
+    const cleanup = watchRenderingAndReScroll(container, scrollToTarget);
 
-      // First timer fires at 5s — re-scroll executes
-      vi.advanceTimersByTime(5000);
-      expect(scrollToTarget).toHaveBeenCalledTimes(1);
+    // First timer fires at 5s — re-scroll executes
+    vi.advanceTimersByTime(5000);
+    expect(scrollToTarget).toHaveBeenCalledTimes(1);
 
-      // Rendering completes — attribute toggled to false. MO observes the
-      // transition and triggers a final re-scroll to compensate for the
-      // trailing layout shift.
-      renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'false');
-      await flushMutationObservers();
-      expect(scrollToTarget).toHaveBeenCalledTimes(2);
+    // Rendering completes — attribute toggled to false. MO observes the
+    // transition and triggers a final re-scroll to compensate for the
+    // trailing layout shift.
+    renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'false');
+    await flushMutationObservers();
+    expect(scrollToTarget).toHaveBeenCalledTimes(2);
 
-      // No further scrolls afterward — the MO cleared the next poll timer.
-      vi.advanceTimersByTime(10000);
-      expect(scrollToTarget).toHaveBeenCalledTimes(2);
+    // No further scrolls afterward — the MO cleared the next poll timer.
+    vi.advanceTimersByTime(10000);
+    expect(scrollToTarget).toHaveBeenCalledTimes(2);
 
-      cleanup();
-    },
-  );
+    cleanup();
+  });
 
   it('should scroll exactly once when rendering completes before the first timer fires', () => {
     const renderingEl = document.createElement('div');
