@@ -403,7 +403,7 @@ class ElasticsearchDelegator
       await this.createAuditlogIndex(tmpIndexName);
       await client.reindex(indexName, tmpIndexName);
 
-      // update alias`
+      // update alias
       const isAliasOnMain = await client.indices.existsAlias({
         index: indexName,
         name: aliasName,
@@ -509,6 +509,7 @@ class ElasticsearchDelegator
       .cursor();
     const batchStream = createBatchStream(bulkSize);
 
+    let count = 0;
     const writeStream = new Writable({
       objectMode: true,
       async write(batch, _encoding, callback) {
@@ -541,11 +542,12 @@ class ElasticsearchDelegator
             return;
           }
 
+          count += (bulkResponse.items || []).length;
           logger.info(
-            `Adding auditlogs progressing: (count=${bulkResponse.items?.length ?? 0}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`,
+            `Adding auditlogs progressing: (count=${count}, took=${bulkResponse.took}ms)`,
           );
         } catch (err) {
-          logger.error(`Adding auditlogs bulk indexing failed.`, err);
+          logger.error('Adding auditlogs bulk indexing failed.', err);
           callback(err);
           return;
         }
@@ -553,7 +555,7 @@ class ElasticsearchDelegator
         callback();
       },
       final(callback) {
-        logger.info('addAllAuditlogs has completed.');
+        logger.info(`Adding auditlogs has completed: (totalCount=${count})`);
         callback();
       },
     });
@@ -607,6 +609,9 @@ class ElasticsearchDelegator
       const { mappings } = await import('./mappings/mappings-auditlog-es9');
       return this.client.indices.create({ index, ...mappings });
     }
+    throw new Error(
+      `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
+    );
   }
   /**
    * generate object that is related to page.grant*
