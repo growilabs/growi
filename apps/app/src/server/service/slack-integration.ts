@@ -285,7 +285,9 @@ export class SlackIntegrationService implements S2sMessageHandlable {
 
     let handler: any;
     try {
-      handler = require(modulePath)(this.crowi);
+      const mod = await import(modulePath);
+      const factory = mod.setup ?? mod.default ?? mod;
+      handler = factory(this.crowi);
     } catch (err) {
       const text = `*No command.*\n \`command: ${growiCommand.text}\``;
       logger.error(err);
@@ -320,7 +322,9 @@ export class SlackIntegrationService implements S2sMessageHandlable {
 
     let handler: any;
     try {
-      handler = require(modulePath)(this.crowi);
+      const mod = await import(modulePath);
+      const factory = mod.setup ?? mod.default ?? mod;
+      handler = factory(this.crowi);
     } catch (err) {
       throw new SlackCommandHandlerError(
         `No interaction.\n \`actionId: ${actionId}\``,
@@ -352,7 +356,9 @@ export class SlackIntegrationService implements S2sMessageHandlable {
 
     let handler: any;
     try {
-      handler = require(modulePath)(this.crowi);
+      const mod = await import(modulePath);
+      const factory = mod.setup ?? mod.default ?? mod;
+      handler = factory(this.crowi);
     } catch (err) {
       throw new SlackCommandHandlerError(
         `No interaction.\n \`callbackId: ${callbackId}\``,

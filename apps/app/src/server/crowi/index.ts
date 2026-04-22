@@ -411,9 +411,12 @@ class Crowi {
   }
 
   async setupS2sMessagingService(): Promise<void> {
-    const s2sMessagingService = require('../service/s2s-messaging')(this);
+    const { setup: setupS2sMessaging } = await import(
+      '../service/s2s-messaging'
+    );
+    const s2sMessagingService = await setupS2sMessaging(this);
     if (s2sMessagingService != null) {
-      s2sMessagingService.subscribe();
+      s2sMessagingService.subscribe(false);
       this.configManager.setS2sMessagingService(s2sMessagingService);
       // add as a message handler
       s2sMessagingService.addMessageHandler(this.configManager);
@@ -752,7 +755,7 @@ class Crowi {
    */
   async setUpFileUpload(isForceUpdate = false): Promise<void> {
     if (this.fileUploadService == null || isForceUpdate) {
-      this.fileUploadService = getUploader(this);
+      this.fileUploadService = await getUploader(this);
     }
   }
 
@@ -760,7 +763,9 @@ class Crowi {
    * setup FileUploaderSwitchService
    */
   async setUpFileUploaderSwitchService(): Promise<void> {
-    const FileUploaderSwitchService = require('../service/file-uploader-switch');
+    const { default: FileUploaderSwitchService } = await import(
+      '../service/file-uploader-switch'
+    );
     this.fileUploaderSwitchService = new FileUploaderSwitchService(this);
     // add as a message handler
     if (this.s2sMessagingService != null) {

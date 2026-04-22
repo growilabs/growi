@@ -9,16 +9,26 @@ export type { FileUploader } from './file-uploader';
 
 const logger = loggerFactory('growi:service:FileUploaderServise');
 
-export const getUploader = (crowi: Crowi): FileUploader => {
+// Memoized uploader instance — lazily initialized on first call
+let cachedUploader: FileUploader | null = null;
+
+export const getUploader = async (crowi: Crowi): Promise<FileUploader> => {
+  if (cachedUploader != null) {
+    return cachedUploader;
+  }
+
   const method =
     EnvToModuleMappings[configManager.getConfig('app:fileUploadType')];
   const modulePath = `./${method}`;
-  const uploader = require(modulePath)(crowi);
+  const mod = await import(modulePath);
+  const factory = mod.default ?? mod.setup ?? mod;
+  const uploader = factory(crowi);
 
   if (uploader == null) {
     logger.warn('Failed to initialize uploader.');
   }
 
+  cachedUploader = uploader;
   return uploader;
 };
 

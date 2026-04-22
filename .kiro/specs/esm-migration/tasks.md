@@ -185,7 +185,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Depends: 3.2_
   - _Boundary: Codemod Transform (models/events)_
 
-- [ ] 3.3.b (step 3.b) `service/` を変換 (`search-delegator` の interface 分離を含む)
+- [x] 3.3.b (step 3.b) `service/` を変換 (`search-delegator` の interface 分離を含む)
   - `service/search-delegator/elasticsearch-client-delegator/interfaces.ts` と `es7-client-delegator.ts` の循環を、型のみの独立ファイルに分離することで構造解消
   - `pnpm codemod:cjs-to-esm -- apps/app/src/server/service` を実行
   - 動的 `require(modulePath)(ctx)` → `await import(modulePath)` の対象を **6 箇所すべて** 明示的に検証:
