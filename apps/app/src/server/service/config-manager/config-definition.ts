@@ -1115,7 +1115,7 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'SLACKBOT_TYPE',
     defaultValue: undefined,
   }),
-  'slackbot:proxyUri': defineConfig<string | undefined>({
+  'slackbot:proxyUri': defineConfig<NonBlankString | undefined>({
     envVarName: 'SLACKBOT_INTEGRATION_PROXY_URI',
     defaultValue: undefined,
   }),

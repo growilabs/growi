@@ -25,15 +25,16 @@ type GetDelegatorOptions =
     };
 
 type IsAny<T> = 'dummy' extends T & 'dummy' ? true : false;
-type Delegator<Opts extends GetDelegatorOptions> = IsAny<Opts> extends true
-  ? ElasticsearchClientDelegator
-  : Opts extends { version: 7 }
-    ? ES7ClientDelegator
-    : Opts extends { version: 8 }
-      ? ES8ClientDelegator
-      : Opts extends { version: 9 }
-        ? ES9ClientDelegator
-        : ElasticsearchClientDelegator;
+type Delegator<Opts extends GetDelegatorOptions> =
+  IsAny<Opts> extends true
+    ? ElasticsearchClientDelegator
+    : Opts extends { version: 7 }
+      ? ES7ClientDelegator
+      : Opts extends { version: 8 }
+        ? ES8ClientDelegator
+        : Opts extends { version: 9 }
+          ? ES9ClientDelegator
+          : ElasticsearchClientDelegator;
 
 let instance: ElasticsearchClientDelegator | null = null;
 export const getClient = async <Opts extends GetDelegatorOptions>(
