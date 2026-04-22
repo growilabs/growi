@@ -212,17 +212,17 @@ class ElasticsearchDelegator
   async init(): Promise<void> {
     await this.initClient();
     const normalizeIndices = await this.normalizeIndices();
-    const isExistsAuditlogIndex = await this.client.indices.exists({
-      index: this.auditlogIndexName,
-    });
-
     try {
       await this.normalizeAuditlogIndices();
     } catch (err) {
       logger.error('Failed to normalize auditlog indices', err);
     }
 
-    if (this.isElasticsearchReindexOnBoot || !isExistsAuditlogIndex) {
+    const isExistsAuditlogAlias = await this.client.indices.existsAlias({
+      name: this.auditlogAliasName,
+    });
+
+    if (this.isElasticsearchReindexOnBoot || !isExistsAuditlogAlias) {
       void this.rebuildAuditlogIndex().catch((err) => {
         logger.error('Rebuild auditlog index on boot failed', err);
       });
@@ -403,11 +403,17 @@ class ElasticsearchDelegator
       await this.createAuditlogIndex(tmpIndexName);
       await client.reindex(indexName, tmpIndexName);
 
-      // update alias
+      // update alias`
+      const isAliasOnMain = await client.indices.existsAlias({
+        index: indexName,
+        name: aliasName,
+      });
       await client.indices.updateAliases({
         actions: [
           { add: { alias: aliasName, index: tmpIndexName } },
-          { remove: { alias: aliasName, index: indexName } },
+          ...(isAliasOnMain
+            ? [{ remove: { alias: aliasName, index: indexName } }]
+            : []),
         ],
       });
 
@@ -423,32 +429,14 @@ class ElasticsearchDelegator
         ],
       });
 
-      // delete tmp
       await client.indices.delete({ index: tmpIndexName });
     } catch (error) {
-      logger.error("An error occured while 'rebuildAuditlogIndex'.", error);
-
       try {
-        const isExistsIndex = await client.indices.exists({ index: indexName });
-        if (isExistsIndex) {
-          await client.indices.delete({ index: indexName });
-        }
-      } catch (cleanupErr) {
-        logger.error('Failed to delete incomplete auditlog index', cleanupErr);
+        await this.normalizeAuditlogIndices();
+      } catch (normalizeErr) {
+        logger.error('Failed to restore auditlog indices', normalizeErr);
       }
-
       throw error;
-    } finally {
-      try {
-        const isExistsTmp = await client.indices.exists({
-          index: tmpIndexName,
-        });
-        if (isExistsTmp) {
-          await client.indices.delete({ index: tmpIndexName });
-        }
-      } catch (cleanupErr) {
-        logger.error('Failed to cleanup tmp auditlog index', cleanupErr);
-      }
     }
   }
 
@@ -485,13 +473,10 @@ class ElasticsearchDelegator
   }
 
   async normalizeAuditlogIndices(): Promise<void> {
-    const {
-      client,
-      auditlogIndexName: indexName,
-      auditlogAliasName: aliasName,
-    } = this;
+    const { client, auditlogIndexName: indexName } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
+
     // remove tmp index
     const isExistsAuditlogTmpIndex = await client.indices.exists({
       index: tmpIndexName,
@@ -506,15 +491,6 @@ class ElasticsearchDelegator
     });
     if (!isExistsAuditlogIndex) {
       await this.createAuditlogIndex(indexName);
-    }
-
-    // create alias
-    const isExistsAlias = await client.indices.existsAlias({
-      index: indexName,
-      name: aliasName,
-    });
-    if (!isExistsAlias) {
-      await client.indices.putAlias({ name: aliasName, index: indexName });
     }
   }
 
@@ -535,7 +511,7 @@ class ElasticsearchDelegator
 
     const writeStream = new Writable({
       objectMode: true,
-      async write(batch, encoding, callback) {
+      async write(batch, _encoding, callback) {
         const body = batch.flatMap((activity) => {
           const username = activity.snapshot?.username;
           if (username == null || username === '') return [];
@@ -569,7 +545,7 @@ class ElasticsearchDelegator
             `Adding auditlogs progressing: (count=${bulkResponse.items?.length ?? 0}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`,
           );
         } catch (err) {
-          logger.error(`Adding auditlogs has completed.`, err);
+          logger.error(`Adding auditlogs bulk indexing failed.`, err);
           callback(err);
           return;
         }
