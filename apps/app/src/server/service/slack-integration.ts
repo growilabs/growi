@@ -1,4 +1,7 @@
-import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
+import {
+  type NonBlankString,
+  toNonBlankStringOrUndefined,
+} from '@growi/core/dist/interfaces';
 import {
   type GrowiBotEvent,
   type GrowiCommand,
@@ -26,7 +29,8 @@ import { LinkSharedEventHandler } from './slack-event-handler/link-shared';
 
 const logger = loggerFactory('growi:service:SlackBotService');
 
-const OFFICIAL_SLACKBOT_PROXY_URI = 'https://slackbot-proxy.growi.org';
+const OFFICIAL_SLACKBOT_PROXY_URI =
+  'https://slackbot-proxy.growi.org' as NonBlankString;
 
 type S2sMessageForSlackIntegration = S2sMessage & { updatedAt: Date };
 
@@ -128,7 +132,7 @@ export class SlackIntegrationService implements S2sMessageHandlable {
     return true;
   }
 
-  get proxyUriForCurrentType(): string | undefined {
+  get proxyUriForCurrentType(): NonBlankString | undefined {
     const currentBotType = configManager.getConfig('slackbot:currentBotType');
 
     // TODO assert currentBotType is not null and CUSTOM_WITHOUT_PROXY
