@@ -2,6 +2,26 @@
 
 The `LSP` tool provides TypeScript-aware code intelligence. Prefer it over `grep`/`find` for symbol-level queries.
 
+## Tool availability (read before concluding LSP is unavailable)
+
+The way `LSP` is exposed differs between the main session and sub-agents. Check which context you are in before concluding it is unavailable.
+
+**Main session (this file is in your system prompt):**
+`LSP` is registered as a **deferred tool** — its schema is not loaded at session start, so it will NOT appear in the initial top-level tool list. It instead shows up by name inside the session-start `<system-reminder>` listing deferred tools.
+
+Do not conclude LSP is unavailable just because it isn't in the initial tool list. To use it:
+
+1. Confirm `LSP` appears in the deferred-tool list in the session-start system-reminder.
+2. Load its schema with `ToolSearch` using `query: "select:LSP"`.
+3. After that, call `LSP` like any other tool.
+
+Only if `LSP` is missing from the deferred-tool list AND `ToolSearch` with `select:LSP` returns no match should you treat LSP as disabled and fall back to `grep`.
+
+**Sub-agents (Explore, general-purpose, etc.):**
+`LSP` is provided directly in the initial tool list — no `ToolSearch` step needed. `ToolSearch` itself is not available in sub-agents. Just call `LSP` as a normal tool.
+
+Note: `.claude/rules/` files are NOT injected into sub-agent system prompts. A sub-agent will not know the guidance in this file unless the parent includes it in the `Agent` prompt. When delegating symbol-level research (definition lookup, caller search, type inspection) to a sub-agent, restate the key rules inline — at minimum: "prefer LSP over grep for TypeScript symbol queries; use `incomingCalls` for callers, `goToDefinition` for definitions".
+
 ## Auto-start behavior
 
 The `typescript-language-server` starts automatically when the LSP tool is first invoked — no manual startup or health check is needed. If the server isn't installed, the tool returns an error; in that case fall back to `grep`.
