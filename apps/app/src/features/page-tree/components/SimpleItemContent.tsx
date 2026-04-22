@@ -1,4 +1,4 @@
-import { useId } from 'react';
+import { useRef } from 'react';
 import Link from 'next/link';
 import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
@@ -26,7 +26,7 @@ export const SimpleItemContent = ({
   const shouldShowAttentionIcon =
     page.processData != null ? shouldRecoverPagePaths(page.processData) : false;
 
-  const spanId = `path-recovery-${useId()}`;
+  const warningIconRef = useRef<HTMLSpanElement>(null);
 
   // When asLink is true, render the title as an anchor so that the browser
   // recognizes it as a link (enables Ctrl/Cmd+click to open in new tab,
@@ -48,12 +48,16 @@ export const SimpleItemContent = ({
       {shouldShowAttentionIcon && (
         <>
           <span
-            id={spanId}
+            ref={warningIconRef}
             className="material-symbols-outlined mr-2 text-warning"
           >
             warning
           </span>
-          <UncontrolledTooltip placement="top" target={spanId} fade={false}>
+          <UncontrolledTooltip
+            placement="top"
+            target={warningIconRef}
+            fade={false}
+          >
             {t('tooltip.operation.attention.rename')}
           </UncontrolledTooltip>
         </>
