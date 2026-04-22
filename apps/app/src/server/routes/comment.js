@@ -285,6 +285,15 @@ module.exports = (crowi, _app) => {
       },
     );
 
+    /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */
+    const getAdditionalTargetUsers = async (activity) => {
+      const mentionedUsers = await crowi.commentService.getMentionedUsers(
+        activity.event,
+      );
+
+      return mentionedUsers;
+    };
+
     const parameters = {
       targetModel: SupportedTargetModel.MODEL_PAGE,
       target: page,
@@ -299,23 +308,10 @@ module.exports = (crowi, _app) => {
       parameters,
       page,
       preNotifyService.generatePreNotify,
+      getAdditionalTargetUsers,
     );
 
     res.json(ApiResponse.success({ comment: createdComment }));
-
-    try {
-      const mentionedUserIds = await crowi.commentService.getMentionedUsers(
-        createdComment._id,
-      );
-      await crowi.inAppNotificationService.insertMentionNotifications(
-        mentionedUserIds,
-        req.user._id,
-        res.locals.activity,
-        page,
-      );
-    } catch (err) {
-      logger.error('Mention notification failed', err);
-    }
 
     // global notification
     try {

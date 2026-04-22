@@ -203,45 +203,6 @@ export class InAppNotificationService {
     }
   };
 
-  insertMentionNotifications = async (
-    mentionedUserIds: Types.ObjectId[],
-    actionUserId: Types.ObjectId,
-    activity: ActivityDocument,
-    page: IPageHasId,
-  ): Promise<void> => {
-    const filteredUserIds = mentionedUserIds.filter(
-      (userId) => userId.toString() !== actionUserId.toString(),
-    );
-
-    if (filteredUserIds.length === 0) {
-      return;
-    }
-
-    const { _id: activityId } = activity;
-    const now = new Date();
-    const snapshot = await generateSnapshot(
-      SupportedTargetModel.MODEL_PAGE,
-      page,
-    );
-
-    const documents = filteredUserIds.map((userId) => ({
-      user: userId,
-      targetModel: SupportedTargetModel.MODEL_PAGE,
-      target: page._id,
-      action: SupportedAction.ACTION_COMMENT_MENTION,
-      status: STATUS_UNOPENED,
-      createdAt: now,
-      snapshot,
-      activities: [activityId],
-    }));
-
-    await InAppNotification.insertMany(documents, { ordered: false });
-    logger.info(
-      `insertMentionNotifications: inserted ${filteredUserIds.length} notifications`,
-    );
-    await this.emitSocketIo(filteredUserIds);
-  };
-
   createSubscription = async (
     userId: Types.ObjectId,
     pageId: Types.ObjectId,
