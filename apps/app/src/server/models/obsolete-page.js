@@ -13,10 +13,15 @@ import ExternalUserGroup from '~/features/external-user-group/server/models/exte
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import loggerFactory from '~/utils/logger';
 
-import { configManager } from '../service/config-manager';
+import { configManager as _configManager } from '../service/config-manager';
 import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
 import UserGroup from './user-group';
 import UserGroupRelation from './user-group-relation';
+
+/** @returns {import('../service/config-manager').IConfigManagerForApp} */
+function getConfigManager() {
+  return _configManager;
+}
 
 const logger = loggerFactory('growi:models:page');
 
@@ -361,7 +366,7 @@ export const getPageSchema = (crowi) => {
       return false;
     }
 
-    const disabledUserPages = configManager.getConfig(
+    const disabledUserPages = getConfigManager().getConfig(
       'security:disableUserPages',
     );
 
@@ -591,10 +596,10 @@ export const getPageSchema = (crowi) => {
     validateCrowi();
 
     // determine User condition
-    const hidePagesRestrictedByOwner = configManager.getConfig(
+    const hidePagesRestrictedByOwner = getConfigManager().getConfig(
       'security:list-policy:hideRestrictedByOwner',
     );
-    const hidePagesRestrictedByGroup = configManager.getConfig(
+    const hidePagesRestrictedByGroup = getConfigManager().getConfig(
       'security:list-policy:hideRestrictedByGroup',
     );
 

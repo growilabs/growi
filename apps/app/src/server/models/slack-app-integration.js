@@ -2,8 +2,13 @@ import { defaultSupportedSlackEventActions } from '@growi/slack';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 
-import { configManager } from '../service/config-manager';
+import { configManager as _configManager } from '../service/config-manager';
 import { getModelSafely } from '../util/mongoose-utils';
+
+/** @returns {import('../service/config-manager').IConfigManagerForApp} */
+function getConfigManager() {
+  return _configManager;
+}
 
 const schema = new mongoose.Schema({
   tokenGtoP: { type: String, required: true, unique: true },
@@ -40,10 +45,10 @@ class SlackAppIntegration {
     let generateTokens;
 
     // get salt strings
-    const saltForGtoP = configManager.getConfig(
+    const saltForGtoP = getConfigManager().getConfig(
       'slackbot:withProxy:saltForGtoP',
     );
-    const saltForPtoG = configManager.getConfig(
+    const saltForPtoG = getConfigManager().getConfig(
       'slackbot:withProxy:saltForPtoG',
     );
 
