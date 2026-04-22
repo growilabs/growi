@@ -20,6 +20,9 @@ pnpm i -g pnpm
 # Install turbo
 pnpm install turbo --global
 
+# Install typescript-language-server for Claude Code LSP plugin
+pnpm install --global typescript-language-server typescript
+
 # Install dependencies
 turbo run bootstrap
 
