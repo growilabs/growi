@@ -60,12 +60,11 @@ describe('generateChildrenRegExp', () => {
       expect(validPath).toMatch(result);
     });
 
-    test.each(invalidPaths)(
-      'should not match invalid path: %s',
-      (invalidPath) => {
-        const result = generateChildrenRegExp(path);
-        expect(invalidPath).not.toMatch(result);
-      },
-    );
+    test.each(
+      invalidPaths,
+    )('should not match invalid path: %s', (invalidPath) => {
+      const result = generateChildrenRegExp(path);
+      expect(invalidPath).not.toMatch(result);
+    });
   });
 });

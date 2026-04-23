@@ -57,7 +57,7 @@ const PageRenameModalSubstance: React.FC = () => {
 
   const [errs, setErrs] = useState(null);
 
-  const [subordinatedPages, setSubordinatedPages] = useState([]);
+  const [_subordinatedPages, setSubordinatedPages] = useState([]);
   const [existingPaths, setExistingPaths] = useState<string[]>([]);
   const [isRenameRecursively, setIsRenameRecursively] = useState(true);
   const [isRenameRedirect, setIsRenameRedirect] = useState(false);
@@ -201,7 +201,7 @@ const PageRenameModalSubstance: React.FC = () => {
     };
 
     return debounce(1000, checkIsPagePathRenameable);
-  }, [isUsersHomepage]);
+  }, []);
 
   useEffect(() => {
     if (isOpened && page != null && pageNameInput !== page.data.path) {
