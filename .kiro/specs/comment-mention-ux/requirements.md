@@ -25,7 +25,8 @@
 #### Acceptance Criteria
 
 1. When ユーザーがコメントエディタで `@` に続けて1文字以上入力した, the GROWI shall `username` が前方一致するユーザー候補リストを表示する
-2. When ユーザーが候補リストからユーザーを選択した, the GROWI shall 入力中の `@文字列` を選択されたユーザーの `@username` に置換する
-3. If 候補リストに表示するユーザーが存在しない, the GROWI shall 候補リストを表示しない
-4. When ユーザーが `Escape` キーを押した, the GROWI shall 候補リストを閉じる
-5. The GROWI shall 候補リストに表示するユーザー数の上限を10件とする
+2. If `@` の直前に空白以外の文字が存在する（例: `foo@example.com` のようなメールアドレス形式）, the GROWI shall 候補リストを表示しない
+3. When ユーザーが候補リストからユーザーを選択した, the GROWI shall 入力中の `@文字列` を選択されたユーザーの `@username` に置換する
+4. If 候補リストに表示するユーザーが存在しない, the GROWI shall 候補リストを表示しない
+5. When ユーザーが `Escape` キーを押した, the GROWI shall 候補リストを閉じる
+6. The GROWI shall 候補リストに表示するユーザー数の上限を10件とする
