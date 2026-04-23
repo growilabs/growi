@@ -14,7 +14,7 @@
 
 依存順序: `attachment-search-markitdown-extractor` → `attachment-search-indexing` → `attachment-search-ui`
 
-3-way split を選択した経緯 (Tika / TS ポート等の代替案を退けた理由) は [research.md](./research.md) 参照。
+3-way split を選択した経緯は [design-review-fixes.md](./design-review-fixes.md) 参照。抽出アーキテクチャ選択の根拠 (Tika / TS ポート等の代替案を退けた理由) は [research.md](./research.md) 参照。
 
 ## このディレクトリに残した資料
 
@@ -27,8 +27,9 @@
 ## このディレクトリを開く人へ
 
 - 「なぜ 3 spec に分割したのか」を知りたい → `design-review-fixes.md` 冒頭の「経緯」
+- 「なぜ Tika や TS ポートではなく Python markitdown マイクロサービスなのか」を知りたい → `research.md` 末尾の「抽出アーキテクチャ選択の根拠」
 - 「既存 GROWI のどの部分にどう統合するのか」を知りたい → `research.md` の Current State Investigation
-- 「なぜ Docker image は自前ビルドなのか / markitdown TS ポートを使わないのか」を知りたい → `research-docker-image.md`
+- 「なぜ Docker image は自前ビルドなのか」を知りたい → `research-docker-image.md`
 - 個別 spec の requirements / design を見たい → 上記 3 sub-specs のディレクトリへ
 
 ## Superseded artifacts (削除済み)

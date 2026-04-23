@@ -318,3 +318,29 @@ _Generated: 2026-04-17 (during `/kiro-spec-design`)_
 3. **検索 multi-index 性能**: msearch で 2 インデックス並列クエリ、結果を app 側で pageId 集約。クエリタイムアウトと結果件数制限を設計時に明示
 4. **日本語 highlight**: 既存 kuromoji analyzer を添付 index にも適用 (mapping 同構成)
 5. **設計時点で未確定**: FastAPI OpenAPI spec のリポジトリへのコミット運用 (drift 検知)
+
+---
+
+# 抽出アーキテクチャ選択の根拠
+
+_Source: brief.md (original single-spec phase, 2026-04-17)_
+
+## 採用アーキテクチャ概要
+
+**Python 版 microsoft/markitdown を共有 HTTP マイクロサービス (`markitdown-extractor`) として分離し、apps/app (Node.js) から HTTP 経由で呼び出してテキスト抽出、結果を Elasticsearch にインデックスする。**
+
+### 採用根拠
+
+- markitdown は Microsoft 公式メンテ、MIT ライセンス、PDF/Office を extras で絞ると**外部バイナリ不要・image ~200MB** の軽量構成
+- apps/pdf-converter で確立された「マイクロサービス + OpenAPI → 自動生成 client」パターンを踏襲可能
+- pdf-converter と異なり **FUSE によるファイルシステム共有は不要**。入力=添付バイナリ、出力=短いテキストという短命リクエストのため、HTTP multipart/form-data で完結
+- **共有サービス方式 (k8s Deployment + HPA) を採用**。サイドカー方式に比べクラスタ全体のベースライン消費を大幅削減 (例: 100 テナント × idle ~120MB のサイドカー = 12GB → 共有 2 replica × ~500MB ≈ 1GB)、バースト時のみスケール
+- apps/app 側に抽出処理を載せないことで、テナント間のリソース境界維持・クラッシュ耐性・言語別ランタイムの分離を実現
+
+## 検討した代替案と不採用理由
+
+| 案 | 概要 | 不採用理由 |
+|---|---|---|
+| **ES ingest-attachment (Apache Tika)** | ES の built-in pipeline として ingest-attachment plugin を使い、ドキュメント投入時に Tika でテキスト抽出 | GROWI.cloud のマルチテナント共有 ES クラスタに Tika の CPU/memory 負荷が集中し、他テナントの検索・インデックス更新に波及するリスク。plugin 追加の運用負担も発生 |
+| **apps/app 内で Node ライブラリ直接抽出 (unpdf + officeparser 等)** | Node.js プロセス内で抽出ライブラリを呼び出し、Python マイクロサービスを持たない構成 | apps/app に重い処理を抱える構造的リスク (イベントループ占有、OOM 時の巻き込み)。Office 系の抽出品質は markitdown に劣る。将来的な差し替え余地としては残す |
+| **markitdown TS ポート (markitdown-ts / markitdown-js / markitdown-node)** | TypeScript/JavaScript 移植版を使い Node.js 内で完結させる構成 | いずれも個人メンテ。markitdown-ts は PPTX 未対応。本質的に Node ライブラリの薄いラッパーで独自価値が小さい。markitdown-js/node は停滞・未成熟。プロダクション利用に不適 |
