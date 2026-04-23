@@ -24,6 +24,8 @@ GROWI is a team collaboration wiki platform using Markdown, featuring hierarchic
 | **coding-style** | Coding conventions, naming, exports, immutability, comments |
 | **security** | Security checklist, secret management, OWASP vulnerability prevention |
 | **performance** | Model selection, context management, build troubleshooting |
+| **github-cli** | **CRITICAL**: gh CLI auth required; stop immediately if unauthenticated |
+
 | **testing** | Test commands, pnpm vitest usage |
 
 ### On-Demand Skills

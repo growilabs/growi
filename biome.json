@@ -17,6 +17,7 @@
       "!.vscode",
       "!.claude",
       "!tsconfig.base.json",
+      "!apps/app/src/generated",
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs"
     ]
