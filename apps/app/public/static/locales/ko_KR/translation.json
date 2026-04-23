@@ -499,7 +499,8 @@
       "Code Block": "코드 블록",
       "Comment Out": "주석 처리",
       "Comment Out Desc": "(숨기기)"
-    }
+    },
+    "Other Shortcuts": "기타 단축키"
   },
   "modal_resolve_conflict": {
     "conflicts_with_new_body_on_server_side": "서버 측의 새 본문과 충돌합니다. 충돌을 해결하려면 페이지 본문을 선택하거나 편집하십시오.",

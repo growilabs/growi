@@ -524,7 +524,8 @@
       "Code Block": "Bloc de code",
       "Comment Out": "Masquer",
       "Comment Out Desc": "(Commenter)"
-    }
+    },
+    "Other Shortcuts": "Autres raccourcis"
   },
   "modal_resolve_conflict": {
     "file_conflicting_with_newer_remote": "Ce fichier est en conflit avec une autre version",

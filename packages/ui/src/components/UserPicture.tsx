@@ -82,42 +82,6 @@ const UserPictureRootWithLink = forwardRef<
   );
 });
 
-// wrapper with Tooltip
-const withTooltip =
-  <P extends BaseUserPictureRootProps>(
-    UserPictureSpanElm: React.ForwardRefExoticComponent<
-      P & React.RefAttributes<HTMLSpanElement>
-    >,
-  ) =>
-  (props: P): JSX.Element => {
-    const { displayName, size } = props;
-    const username = 'username' in props ? props.username : undefined;
-
-    const tooltipClassName = `${moduleTooltipClass} user-picture-tooltip-${size ?? 'md'}`;
-    const userPictureRef = useRef<HTMLSpanElement>(null);
-
-    return (
-      <>
-        <UserPictureSpanElm ref={userPictureRef} {...props} />
-        <UncontrolledTooltip
-          placement="bottom"
-          target={userPictureRef}
-          popperClassName={tooltipClassName}
-          delay={0}
-          fade={false}
-        >
-          {username ? (
-            <>
-              {`@${username}`}
-              <br />
-            </>
-          ) : null}
-          {displayName}
-        </UncontrolledTooltip>
-      </>
-    );
-  };
-
 /**
  * type guard to determine whether the specified object is IUser
  */
@@ -181,20 +145,59 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
     .filter(Boolean)
     .join(' ');
 
+  // ref is always called unconditionally to satisfy React hooks rules.
+  // Passed to the root element so UncontrolledTooltip can target it.
+  const rootRef = useRef<HTMLSpanElement>(null);
+
+  const tooltipClassName = `${moduleTooltipClass} user-picture-tooltip-${size ?? 'md'}`;
+
   // biome-ignore lint/performance/noImgElement: ignore
   const imgElement = <img src={src} alt={displayName} className={className} />;
-  const baseProps = { displayName, size, children: imgElement };
+
+  const children = (
+    <>
+      {imgElement}
+      {showTooltip && (
+        <UncontrolledTooltip
+          placement="bottom"
+          target={rootRef}
+          popperClassName={tooltipClassName}
+          delay={0}
+          fade={false}
+        >
+          {username ? (
+            <>
+              {`@${username}`}
+              <br />
+            </>
+          ) : null}
+          {displayName}
+        </UncontrolledTooltip>
+      )}
+    </>
+  );
 
   if (username == null || noLink) {
-    const Component = showTooltip
-      ? withTooltip(UserPictureRootWithoutLink)
-      : UserPictureRootWithoutLink;
-    return <Component {...baseProps} />;
+    return (
+      <UserPictureRootWithoutLink
+        ref={rootRef}
+        displayName={displayName}
+        size={size}
+      >
+        {children}
+      </UserPictureRootWithoutLink>
+    );
   }
 
-  const Component = showTooltip
-    ? withTooltip(UserPictureRootWithLink)
-    : UserPictureRootWithLink;
-  return <Component {...baseProps} username={username} />;
+  return (
+    <UserPictureRootWithLink
+      ref={rootRef}
+      displayName={displayName}
+      size={size}
+      username={username}
+    >
+      {children}
+    </UserPictureRootWithLink>
+  );
 });
 UserPicture.displayName = 'UserPicture';

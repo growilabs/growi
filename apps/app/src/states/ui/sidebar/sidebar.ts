@@ -66,10 +66,10 @@ export const useCurrentProductNavWidth = () => {
 
 // Export base atoms for SSR hydration
 export {
-  preferCollapsedModeAtom,
-  isCollapsedContentsOpenedAtom,
-  currentSidebarContentsAtom,
   currentProductNavWidthAtom,
+  currentSidebarContentsAtom,
+  isCollapsedContentsOpenedAtom,
+  preferCollapsedModeAtom,
 };
 
 const sidebarModeAtom = atom((get) => {

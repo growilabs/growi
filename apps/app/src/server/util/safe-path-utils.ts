@@ -1,5 +1,6 @@
 import { AllLang } from '@growi/core';
 import path from 'pathe';
+
 export { AllLang as SUPPORTED_LOCALES };
 
 /**
