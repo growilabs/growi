@@ -87,6 +87,8 @@ class ElasticsearchDelegator
 
   private isElasticsearchReindexOnBoot: boolean;
 
+  private isElasticsearchAuditlogReindexOnBoot: boolean;
+
   private elasticsearchVersion: 7 | 8 | 9;
 
   private client: ElasticsearchClientDelegator;
@@ -124,6 +126,10 @@ class ElasticsearchDelegator
 
     this.isElasticsearchReindexOnBoot = configManager.getConfig(
       'app:elasticsearchReindexOnBoot',
+    );
+
+    this.isElasticsearchAuditlogReindexOnBoot = configManager.getConfig(
+      'app:elasticsearchAuditlogReindexOnBoot',
     );
   }
 
@@ -217,24 +223,19 @@ class ElasticsearchDelegator
     } catch (err) {
       logger.error('Failed to normalize auditlog indices', err);
     }
-
-    const isExistsAuditlogAlias = await this.client.indices.existsAlias({
-      name: this.auditlogAliasName,
-    });
-
-    if (this.isElasticsearchReindexOnBoot || !isExistsAuditlogAlias) {
-      void this.rebuildAuditlogIndex().catch((err) => {
-        logger.error('Rebuild auditlog index on boot failed', err);
-      });
-    }
-
     if (this.isElasticsearchReindexOnBoot) {
       try {
         await this.rebuildIndex();
       } catch (err) {
         logger.error('Rebuild index on boot failed', err);
       }
-      return;
+    }
+    if (this.isElasticsearchAuditlogReindexOnBoot) {
+      try {
+        await this.rebuildAuditlogIndex();
+      } catch (err) {
+        logger.error('Rebuild auditlog index on boot failed', err);
+      }
     }
     return normalizeIndices;
   }
@@ -404,17 +405,8 @@ class ElasticsearchDelegator
       await client.reindex(indexName, tmpIndexName);
 
       // update alias
-      const isAliasOnMain = await client.indices.existsAlias({
-        index: indexName,
-        name: aliasName,
-      });
       await client.indices.updateAliases({
-        actions: [
-          { add: { alias: aliasName, index: tmpIndexName } },
-          ...(isAliasOnMain
-            ? [{ remove: { alias: aliasName, index: indexName } }]
-            : []),
-        ],
+        actions: [{ remove: { alias: aliasName, index: indexName } }],
       });
 
       // flush index
@@ -473,7 +465,11 @@ class ElasticsearchDelegator
   }
 
   async normalizeAuditlogIndices(): Promise<void> {
-    const { client, auditlogIndexName: indexName } = this;
+    const {
+      client,
+      auditlogIndexName: indexName,
+      auditlogAliasName: aliasName,
+    } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
 
@@ -491,6 +487,15 @@ class ElasticsearchDelegator
     });
     if (!isExistsAuditlogIndex) {
       await this.createAuditlogIndex(indexName);
+    }
+
+    // create alias
+    const isExistsAlias = await client.indices.existsAlias({
+      index: indexName,
+      name: aliasName,
+    });
+    if (!isExistsAlias) {
+      await client.indices.putAlias({ name: aliasName, index: indexName });
     }
   }
 
@@ -613,6 +618,7 @@ class ElasticsearchDelegator
       `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
     );
   }
+
   /**
    * generate object that is related to page.grant*
    */

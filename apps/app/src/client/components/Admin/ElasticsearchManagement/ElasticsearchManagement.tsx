@@ -27,6 +27,10 @@ const ElasticsearchManagement = (): JSX.Element => {
     useState(false);
   const [isRebuildingProcessing, setIsRebuildingProcessing] = useState(false);
   const [isRebuildingCompleted, setIsRebuildingCompleted] = useState(false);
+  const [isAuditlogRebuildingProcessing, setIsAuditlogRebuildingProcessing] =
+    useState(false);
+  const [isAuditlogNormalizingProcessing, setIsAuditlogNormalizingProcessing] =
+    useState(false);
 
   const [isNormalized, setIsNormalized] = useState(false);
   const [indicesData, setIndicesData] = useState(null);
@@ -146,6 +150,32 @@ const ElasticsearchManagement = (): JSX.Element => {
     await retrieveIndicesStatus();
   };
 
+  const normalizeAuditlogIndices = async () => {
+    setIsAuditlogNormalizingProcessing(true);
+
+    try {
+      await apiv3Put('/search/auditlog-indices', { operation: 'normalize' });
+      toastSuccess('Normalizing audit log index has succeeded');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setIsAuditlogNormalizingProcessing(false);
+    }
+  };
+
+  const rebuildAuditlogIndices = async () => {
+    setIsAuditlogRebuildingProcessing(true);
+
+    try {
+      await apiv3Put('/search/auditlog-indices', { operation: 'rebuild' });
+      toastSuccess('Rebuilding audit log index is requested');
+    } catch (e) {
+      toastError(e);
+    } finally {
+      setIsAuditlogRebuildingProcessing(false);
+    }
+  };
+
   const isErrorOccuredOnSearchService = !isSearchServiceReachable;
 
   const isReconnectBtnEnabled =
@@ -212,6 +242,60 @@ const ElasticsearchManagement = (): JSX.Element => {
             isNormalized={isNormalized}
             onRebuildingRequested={rebuildIndices}
           />
+        </div>
+      </div>
+
+      <hr />
+
+      <div className="row">
+        <div className="col-md-3 col-form-label text-start text-md-end">
+          Normalize Audit Log Index
+        </div>
+        <div className="col-md-6">
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            disabled={
+              isAuditlogRebuildingProcessing || isAuditlogNormalizingProcessing
+            }
+            onClick={normalizeAuditlogIndices}
+          >
+            {isAuditlogNormalizingProcessing && (
+              <span
+                className="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+              />
+            )}
+            Normalize audit log index
+          </button>
+        </div>
+      </div>
+
+      <hr />
+
+      <div className="row">
+        <div className="col-md-3 col-form-label text-start text-md-end">
+          Rebuild Audit Log Index
+        </div>
+        <div className="col-md-6">
+          <button
+            type="button"
+            className="btn btn-outline-secondary"
+            disabled={
+              isAuditlogRebuildingProcessing || isAuditlogNormalizingProcessing
+            }
+            onClick={rebuildAuditlogIndices}
+          >
+            {isAuditlogRebuildingProcessing && (
+              <span
+                className="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+              />
+            )}
+            Rebuild audit log index
+          </button>
         </div>
       </div>
     </>
