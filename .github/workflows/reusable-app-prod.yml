@@ -127,6 +127,8 @@ jobs:
         - 9200/tcp
         env:
           discovery.type: single-node
+          # ES 9.x enables security (HTTPS + auth) by default; disable for plaintext CI access
+          xpack.security.enabled: false
 
     steps:
     - uses: actions/setup-node@v4
@@ -196,6 +198,8 @@ jobs:
         - 9200/tcp
         env:
           discovery.type: single-node
+          # ES 9.x enables security (HTTPS + auth) by default; disable for plaintext CI access
+          xpack.security.enabled: false
 
     steps:
     - uses: actions/checkout@v4
