@@ -562,7 +562,8 @@
       "Code Block": "コードブロック",
       "Comment Out": "非表示にする",
       "Comment Out Desc": "(コメントアウト)"
-    }
+    },
+    "Other Shortcuts": "その他のショートカット"
   },
   "modal_resolve_conflict": {
     "conflicts_with_new_body_on_server_side": "サーバー側の新しい本文と衝突します。ページ本文を選択または編集して衝突を解消してください。",

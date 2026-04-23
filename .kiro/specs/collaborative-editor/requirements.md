@@ -58,14 +58,16 @@ GROWI provides real-time collaborative editing powered by Yjs, allowing multiple
 
 ### Requirement 5: Awareness and Presence Tracking
 
-**Objective:** As a wiki user, I want to see which other users are currently editing the same page, so that I can coordinate edits and avoid conflicts.
+> **Note**: Client-side awareness display behavior (EditingUserList stability, rich cursor rendering) is specified in the [`collaborative-editor-awareness`](../collaborative-editor-awareness/requirements.md) spec. This requirement covers only the server-side awareness event bridging responsibility of the Yjs service.
+
+**Objective:** As a system component, I want awareness state changes to be broadcast to page-level Socket.IO rooms, so that non-editor UI components can reflect collaborative editing activity.
 
 #### Acceptance Criteria
 
 1. While a user is editing a page, the Editor Client shall broadcast the user's presence information (name, username, avatar, cursor color) via the Yjs awareness protocol.
 2. When a user connects or disconnects from a collaborative editing session, the Yjs Service shall emit awareness state size updates to the page's Socket.IO room (`page:{pageId}`).
 3. When the last user disconnects from a document, the Yjs Service shall emit a draft status notification (`YjsHasYdocsNewerThanLatestRevisionUpdated`) to the page's Socket.IO room.
-4. The Editor Client shall display the list of active editors based on awareness state updates from the Yjs provider.
+4. The Editor Client shall display the list of active editors based on awareness state updates from the Yjs provider. See `collaborative-editor-awareness` spec for display-level requirements.
 
 ### Requirement 6: YDoc Status and Sync Integration
 

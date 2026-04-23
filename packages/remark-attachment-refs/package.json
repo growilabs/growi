@@ -48,7 +48,7 @@
     "@growi/logger": "workspace:^",
     "@growi/remark-growi-directive": "workspace:^",
     "@growi/ui": "workspace:^",
-    "axios": "^1.11.0",
+    "axios": "^1.15.0",
     "express": "^4.20.0",
     "hast-util-select": "^6.0.2",
     "mongoose": "^6.13.6",

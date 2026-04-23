@@ -1,13 +1,13 @@
 declare module 'y-websocket/bin/utils' {
   import type { IncomingMessage } from 'http';
   import type { WebSocket } from 'ws';
-  import type { Awareness } from 'y-protocols/awareness';
+  import type { WebsocketProvider } from 'y-websocket';
   import * as Y from 'yjs';
 
   export class WSSharedDoc extends Y.Doc {
     name: string;
     conns: Map<WebSocket, Set<number>>;
-    awareness: Awareness;
+    awareness: WebsocketProvider['awareness'];
     whenInitialized: Promise<void>;
     constructor(name: string);
   }
