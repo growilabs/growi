@@ -406,7 +406,10 @@ class ElasticsearchDelegator
 
       // update alias
       await client.indices.updateAliases({
-        actions: [{ remove: { alias: aliasName, index: indexName } }],
+        actions: [
+          { add: { alias: aliasName, index: tmpIndexName } },
+          { remove: { alias: aliasName, index: indexName } },
+        ],
       });
 
       // flush index
