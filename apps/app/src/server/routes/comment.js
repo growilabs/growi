@@ -293,20 +293,35 @@ module.exports = (crowi, _app) => {
       action: SupportedAction.ACTION_COMMENT_CREATE,
     };
 
+    // Fetch mentioned users before emitting to exclude them from subscriber notifications,
+    // preventing duplicate COMMENT_CREATE + COMMENT_MENTION for the same user.
+    let mentionedUserIds = [];
+    try {
+      mentionedUserIds = await crowi.commentService.getMentionedUsers(
+        createdComment._id,
+      );
+    } catch (err) {
+      logger.error('Failed to fetch mentioned users', err);
+    }
+
+    const generatePreNotify = (activity, getAdditionalTargetUsers) =>
+      preNotifyService.generatePreNotify(
+        activity,
+        getAdditionalTargetUsers,
+        mentionedUserIds,
+      );
+
     activityEvent.emit(
       'update',
       res.locals.activity._id,
       parameters,
       page,
-      preNotifyService.generatePreNotify,
+      generatePreNotify,
     );
 
     res.json(ApiResponse.success({ comment: createdComment }));
 
     try {
-      const mentionedUserIds = await crowi.commentService.getMentionedUsers(
-        createdComment._id,
-      );
       await crowi.inAppNotificationService.insertMentionNotifications(
         mentionedUserIds,
         req.user._id,

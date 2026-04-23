@@ -203,6 +203,8 @@ export class InAppNotificationService {
     }
   };
 
+  // Intentionally bypasses Activity creation to avoid the 7-day upsert deduplication
+  // in the activityEvent flow. InAppNotification documents are inserted directly.
   insertMentionNotifications = async (
     mentionedUserIds: Types.ObjectId[],
     actionUserId: Types.ObjectId,
