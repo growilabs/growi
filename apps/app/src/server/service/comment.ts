@@ -34,7 +34,7 @@ class CommentService {
     commentEvent.on(CommentEvent.CREATE, async (savedComment) => {
       try {
         const Page = mongoose.model<IPage, PageModel>('Page');
-        await Page.updateCommentCount(savedComment.page);
+        await Page.updateCommentCount(savedComment.pageId);
       } catch (err) {
         logger.error(
           'Error occurred while handling the comment create event:\n',

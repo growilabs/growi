@@ -8,6 +8,7 @@ import {
   SupportedTargetModel,
 } from '~/interfaces/activity';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
 import { preNotifyService } from '../service/pre-notify';
@@ -263,7 +264,7 @@ module.exports = (crowi, _app) => {
 
     let createdComment;
     try {
-      createdComment = await Comment.add(
+      createdComment = await prisma.comments.add(
         pageId,
         req.user._id,
         revisionId,
@@ -289,7 +290,7 @@ module.exports = (crowi, _app) => {
       targetModel: SupportedTargetModel.MODEL_PAGE,
       target: page,
       eventModel: SupportedEventModel.MODEL_COMMENT,
-      event: createdComment,
+      event: createdComment.id,
       action: SupportedAction.ACTION_COMMENT_CREATE,
     };
 
