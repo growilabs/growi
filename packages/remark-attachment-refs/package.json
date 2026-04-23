@@ -51,7 +51,7 @@
     "axios": "^1.15.0",
     "express": "^4.20.0",
     "hast-util-select": "^6.0.2",
-    "mongoose": "^6.13.6",
+    "mongoose": "^9.5.0",
     "swr": "^2.3.2",
     "xss": "^1.0.15"
   },
