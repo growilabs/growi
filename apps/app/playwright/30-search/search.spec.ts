@@ -28,10 +28,6 @@ test('checkboxes behaviors', async ({ page }) => {
   await page.getByTestId('cb-select').first().click({ force: true });
 
   // Click the select all checkbox
-  await page
-    .getByTestId('delete-control-button')
-    .first()
-    .click({ force: true });
   await page.getByTestId('cb-select-all').click({ force: true });
 
   // Unclick the first checkbox after selecting all
@@ -77,7 +73,11 @@ test.describe
       await page.locator('#edit-tags-btn-wrapper-for-tooltip').click();
       await expect(page.locator('#edit-tag-modal')).toBeVisible();
       await page.locator('.rbt-input-main').fill(tag);
-      await page.locator('#tag-typeahead-asynctypeahead-item-0').click();
+      const typeaheadItem = page.locator(
+        '#tag-typeahead-asynctypeahead-item-0',
+      );
+      await expect(typeaheadItem).toBeVisible();
+      await typeaheadItem.click();
       await page.getByTestId('tag-edit-done-btn').click();
     });
 
