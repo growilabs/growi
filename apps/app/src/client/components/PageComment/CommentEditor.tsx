@@ -9,6 +9,7 @@ import {
 import dynamic from 'next/dynamic';
 import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
 import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment';
+import { mentionDecorationSettings } from '@growi/editor/dist/client/services-internal/extensions/mentionDecorationSettings';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
@@ -230,6 +231,10 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     }),
     [editorKey, markDirty],
   );
+
+  useEffect(() => {
+    return codeMirrorEditor?.appendExtensions?.([mentionDecorationSettings]);
+  }, [codeMirrorEditor]);
 
   // initialize CodeMirrorEditor
   useEffect(() => {
