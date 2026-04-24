@@ -8,7 +8,9 @@ export const WATCH_TIMEOUT_MS = 10000;
 
 /**
  * Watch for elements with in-progress rendering status in the container.
- * Periodically calls scrollToTarget while rendering elements remain.
+ * Periodically calls scrollToTarget while rendering elements remain, and
+ * performs a final re-scroll when the last rendering element completes
+ * to compensate for the trailing layout shift (Requirements 3.1–3.3).
  * Returns a cleanup function that stops observation and clears timers.
  */
 export const watchRenderingAndReScroll = (
