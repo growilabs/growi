@@ -20,6 +20,8 @@ const TRANSPILED_DIR = 'transpiled';
 const DIST_DIR = 'dist';
 const SRC_SUBDIR = `${TRANSPILED_DIR}/src`;
 const CONFIG_SUBDIR = `${TRANSPILED_DIR}/config`;
+const PRISMA_SRC_DIR = 'src/generated/prisma';
+const PRISMA_DIST_DIR = `${DIST_DIR}/generated/prisma`;
 
 // List transpiled contents for debugging
 // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
@@ -40,3 +42,20 @@ if (existsSync(CONFIG_SUBDIR)) {
 
 // Remove leftover transpiled directory
 rmSync(TRANSPILED_DIR, { recursive: true, force: true });
+
+// Copy Prisma native engine binaries from src to dist.
+// tspc only compiles TypeScript files, so .so.node engine files must be copied manually.
+if (existsSync(PRISMA_SRC_DIR)) {
+  // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
+  console.log(
+    `Copying Prisma engine files from ${PRISMA_SRC_DIR} to ${PRISMA_DIST_DIR}...`,
+  );
+  const engineFiles = readdirSync(PRISMA_SRC_DIR).filter((f) =>
+    f.endsWith('.node'),
+  );
+  for (const file of engineFiles) {
+    cpSync(`${PRISMA_SRC_DIR}/${file}`, `${PRISMA_DIST_DIR}/${file}`);
+    // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
+    console.log(`  Copied: ${file}`);
+  }
+}
