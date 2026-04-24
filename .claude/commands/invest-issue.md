@@ -33,14 +33,22 @@ Extract and display:
 
 ## Step 2: Update Labels — Mark as Under Investigation
 
-Remove `phase/new` (if present) and add `phase/under-investigation`:
+Before applying any labels, fetch the exact label names from the repository:
 
 ```bash
-# Remove phase/new
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "phase/new"
+gh label list --repo growilabs/growi --json name --limit 100
+```
 
-# Add phase/under-investigation
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "phase/under-investigation"
+Use these exact names when calling `--remove-label` or `--add-label`. Label names in this repo include emoji prefixes (e.g. `"0️⃣ phase/new"`, `"1️⃣ phase/under-investigation"`), so always look them up rather than guessing.
+
+Remove the `phase/new` label (if present) and add `phase/under-investigation`, using the exact names returned above:
+
+```bash
+# Remove phase/new (use exact name from label list, e.g. "0️⃣ phase/new")
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "{EXACT_PHASE_NEW_LABEL}"
+
+# Add phase/under-investigation (use exact name from label list, e.g. "1️⃣ phase/under-investigation")
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_UNDER_INVESTIGATION_LABEL}"
 ```
 
 If `phase/new` is not present, skip the removal step and only add `phase/under-investigation`.
@@ -93,8 +101,10 @@ If code analysis alone is insufficient to confirm the root cause, attempt reprod
 If the problem is **confirmed** (root cause found in code OR reproduction succeeded):
 
 ```bash
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "phase/under-investigation"
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "phase/confirmed"
+# Use exact label names from the label list fetched in Step 2
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "{EXACT_PHASE_UNDER_INVESTIGATION_LABEL}"
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_CONFIRMED_LABEL}"
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "type/bug"
 ```
 
 ## Step 4: Report Findings
@@ -124,8 +134,9 @@ List specific files and changes needed, but do NOT apply them yet.}
 
 ### 4-B: Post Comment on Issue
 
-Detect the language of the issue body (from Step 1) and write the comment **in the same language**.
-For example, if the issue is written in Japanese, write the comment in Japanese.
+**CRITICAL — Language rule**: Detect the language of the issue body (from Step 1) and write the comment **strictly in that language**, regardless of the language used in this conversation.
+The issue body language takes absolute priority over the conversation language.
+For example, if the issue body is written in English, the comment MUST be in English even if the user conversed in Japanese — and vice versa.
 
 Post the findings as a GitHub issue comment:
 
@@ -168,10 +179,14 @@ After reporting, ask the user:
 
 Proceed only after explicit user approval.
 
-### 5-A: Add WIP Label
+### 5-A: Add WIP Label — BEFORE Any Code Changes
+
+**MANDATORY — Do this FIRST, before creating a branch or touching any files.**
+
+Use the exact label name from the label list fetched in Step 2 (e.g. `"4️⃣ phase/WIP"`):
 
 ```bash
-gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "phase/WIP"
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_WIP_LABEL}"
 ```
 
 ### 5-B: Create a Fix Branch
@@ -202,7 +217,21 @@ Example: `fix/12345-page-title-overflow`
   Fixes #ISSUE_NUMBER
   ```
 
-### 5-D: Open a Pull Request
+### 5-D: STOP — Ask for PR Approval
+
+**STOP HERE. Do not create a PR until the user explicitly approves.**
+
+Report the implementation summary and ask:
+
+> Implementation complete. Changes committed to `fix/{ISSUE_NUMBER}-{short-description}`.
+> Would you like me to:
+> 1. **Create a PR** — I'll open a pull request now
+> 2. **Review first** — you'll review the changes before PR
+> 3. **Stop here** — you'll handle the PR manually
+
+**Wait for the user's response before proceeding.**
+
+### 5-E: Open a Pull Request (Only if Approved)
 
 ```bash
 gh pr create \
@@ -229,6 +258,18 @@ gh pr create \
 Closes #{ISSUE_NUMBER}
 EOF
 )"
+```
+
+### 5-F: Update Labels — Mark as Resolved
+
+After the PR is created, update the labels:
+
+```bash
+# Remove WIP label
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "{EXACT_PHASE_WIP_LABEL}"
+
+# Add resolved label
+gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_RESOLVED_LABEL}"
 ```
 
 ## Error Handling
