@@ -203,8 +203,14 @@ export class InAppNotificationService {
     }
   };
 
-  // Intentionally bypasses Activity creation to avoid the 7-day upsert deduplication
-  // in the activityEvent flow. InAppNotification documents are inserted directly.
+  // Mention notifications are generated directly without a dedicated Activity document.
+  // Rationale:
+  //   - A mention is a sub-event of ACTION_COMMENT_CREATE; creating a separate Activity
+  //     would split one comment post into two activities.
+  //   - Going through the upsertByActivity flow would apply the 7-day dedup window,
+  //     which is not desired for mentions (every mention must notify).
+  // Note: notification.action (COMMENT_MENTION) intentionally differs from the
+  // referenced activity.action (COMMENT_CREATE). See PR #11022 for discussion
   insertMentionNotifications = async (
     mentionedUserIds: Types.ObjectId[],
     actionUserId: Types.ObjectId,
