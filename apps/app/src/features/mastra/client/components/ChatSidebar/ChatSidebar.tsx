@@ -91,10 +91,18 @@ export const ChatSidebar = (): JSX.Element => {
     id: chatThreadId,
     transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
     // Refresh the thread list after the assistant finishes streaming.
+    //
     // The thread itself is persisted by the time the stream closes, but
     // Mastra's auto-generated title (configured via `generateTitle: true`
     // on the Memory) is written asynchronously and may land slightly later.
-    // Poll briefly so the list reflects the title once it is available.
+    //
+    // This is an intentional design choice of Mastra. See:
+    //   https://mastra.ai/docs/memory/storage
+    //   > Title generation operates asynchronously after the agent
+    //   > responds, ensuring it doesn't impact response times.
+    //
+    // Mastra exposes no event for "title persisted", so poll briefly until
+    // the title for the current thread shows up in the list.
     onFinish: async () => {
       const targetId = chatThreadId;
       const maxAttempts = 5;
