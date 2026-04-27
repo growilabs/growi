@@ -1,4 +1,4 @@
-import { SCOPE } from '@growi/core/dist/interfaces';
+import { type IUser, SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { addMinutes } from 'date-fns/addMinutes';
 import { isValid } from 'date-fns/isValid';
@@ -21,6 +21,14 @@ import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
+type UsernamesQuery = { q?: string; offset?: number; limit?: number };
+type UsernamesReq = Request<
+  Record<string, string>,
+  ApiV3Response,
+  undefined,
+  UsernamesQuery
+> & { user?: IUser };
+
 const validator = {
   list: [
     query('limit')
@@ -32,6 +40,20 @@ const validator = {
       .optional()
       .isString()
       .withMessage('query must be a string'),
+  ],
+  usernames: [
+    query('q').optional().isString().withMessage('keyword must be a string'),
+    query('offset')
+      .optional()
+      .isInt()
+      .toInt()
+      .withMessage('offset must be a number'),
+    query('limit')
+      .optional()
+      .isInt({ max: 100 })
+      .toInt()
+      .withMessage('limit must be a number less than or equal to 100'),
+    query('limit').toInt(),
   ],
 };
 
@@ -319,5 +341,44 @@ module.exports = (crowi: Crowi): Router => {
     },
   );
 
+  router.get(
+    '/usernames',
+    accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    validator.usernames,
+    apiV3FormValidator,
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
+    async (req: UsernamesReq, res: ApiV3Response) => {
+      const q = req.query.q ?? '';
+      const offset = req.query.offset ?? 0;
+      const limit = req.query.limit ?? 5;
+      try {
+        const result = await crowi.searchService.searchAuditlogs(
+          q,
+          offset,
+          limit,
+        );
+        return res.apiv3({
+          activeUser: {
+            usernames: result.activeUsernames,
+            totalCount: result.activeUsernames.length,
+          },
+          inactiveUser: {
+            usernames: result.inactiveUsernames,
+            totalCount: result.inactiveUsernames.length,
+          },
+          activitySnapshotUser: {
+            usernames: result.activitySnapshotUsernames,
+            totalCount: result.activitySnapshotUsernames.length,
+          },
+        });
+      } catch (err) {
+        logger.error('Failed to search auditlogs', err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  );
   return router;
 };

@@ -15,7 +15,10 @@ import type {
   IPageWithSearchMeta,
   ISearchResult,
 } from '~/interfaces/search';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import {
+  USER_FIELDS_EXCEPT_CONFIDENTIAL,
+  UserStatus,
+} from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
@@ -28,6 +31,7 @@ import type {
   SearchQueryParser,
   SearchResolver,
 } from '../interfaces/search';
+import type { ActivityDocument } from '../models/activity';
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
@@ -319,6 +323,32 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   async normalizeIndices() {
     return this.fullTextSearchDelegator.normalizeIndices();
+  }
+
+  async updateOrInsertAuditlog(activity: ActivityDocument) {
+    return this.fullTextSearchDelegator.updateOrInsertAuditlog(activity);
+  }
+
+  async searchAuditlogs(username: string, offset: number, limit: number) {
+    const usernames = await this.fullTextSearchDelegator.searchAuditlogs(
+      username,
+      offset,
+      limit,
+    );
+
+    const User = mongoose.model<IUser>('User');
+    const users = await User.find({ username: { $in: usernames } });
+    const userMap = new Map(users.map((u) => [u.username, u.status]));
+
+    const activeUsernames = usernames.filter(
+      (u) => userMap.get(u) === UserStatus.STATUS_ACTIVE,
+    );
+    const inactiveUsernames = usernames.filter(
+      (u) => userMap.has(u) && userMap.get(u) !== UserStatus.STATUS_ACTIVE,
+    );
+    const activitySnapshotUsernames = usernames;
+
+    return { activeUsernames, inactiveUsernames, activitySnapshotUsernames };
   }
 
   async rebuildIndex() {
