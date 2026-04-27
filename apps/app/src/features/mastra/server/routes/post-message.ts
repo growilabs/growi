@@ -40,16 +40,17 @@ type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
 const requestContext = new RequestContext<{ vectorStoreId: string }>();
 
-const reasoningSchema = z.object({
-  thoughtProcess: z.array(
-    z.object({
-      step: z.string(),
-      reasoning: z.string(),
-      conclusion: z.string(),
-    }),
-  ),
-  finalAnswer: z.string(),
-});
+//TODO:  https://redmine.weseek.co.jp/issues/182496
+// const reasoningSchema = z.object({
+//   thoughtProcess: z.array(
+//     z.object({
+//       step: z.string(),
+//       reasoning: z.string(),
+//       conclusion: z.string(),
+//     }),
+//   ),
+//   finalAnswer: z.string(),
+// });
 
 export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   crowi,
@@ -128,9 +129,9 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
       try {
         const stream = await growiAgent.stream(messages, {
-          structuredOutput: {
-            schema: reasoningSchema,
-          },
+          // structuredOutput: {
+          //   schema: reasoningSchema,
+          // },
           requestContext,
           memory: {
             thread: thread.id,
@@ -165,6 +166,13 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         return pipeUIMessageStreamToResponse({
           response: res,
           stream: uiMessageStream,
+          // Bypass Express `compression()` middleware (it honours `no-transform`)
+          // and disable nginx proxy buffering so SSE chunks reach the client
+          // immediately instead of being buffered until the stream ends.
+          headers: {
+            'Cache-Control': 'no-cache, no-transform',
+            'X-Accel-Buffering': 'no',
+          },
         });
       } catch (error) {
         logger.error(error);
