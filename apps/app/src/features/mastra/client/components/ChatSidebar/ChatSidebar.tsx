@@ -2,6 +2,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { CopyIcon, GlobeIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
+import { v7 as uuid } from 'uuid';
 
 import { Action, Actions } from '~/components/ai-elements/actions';
 import {
@@ -76,12 +77,18 @@ export const ChatSidebar = (): JSX.Element => {
   const { close } = useChatSidebarActions();
   const threadId = chatSidebarStatus?.threadId;
 
+  // Generate a stable thread id for this chat session.
+  // For an existing thread, reuse the given id; for a new chat, mint one
+  // so every message in the same session targets the same thread on the
+  // server (the server creates the thread on first use).
+  const [chatThreadId] = useState<string>(() => threadId ?? uuid());
+
   const { data: savedMessages } = useSWRxMessages(threadId);
   const swrInfiniteThreads = useSWRINFxRecentThreads();
   const { mutate: mutateRecentThreads } = swrInfiniteThreads;
 
   const { messages, sendMessage, status, regenerate, setMessages } = useChat({
-    id: threadId ?? 'new',
+    id: chatThreadId,
     transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
   });
 
@@ -99,7 +106,7 @@ export const ChatSidebar = (): JSX.Element => {
       {
         body: {
           aiAssistantId: chatSidebarStatus?.aiAssistantData?._id,
-          threadId,
+          threadId: chatThreadId,
         },
       },
     );

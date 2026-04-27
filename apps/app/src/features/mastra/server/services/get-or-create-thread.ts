@@ -16,10 +16,13 @@ export const getOrCreateThread = async ({
   resourceId,
   threadId,
 }: GetOrCreateThreadParams): Promise<ThreadWithMeta> => {
-  if (threadId == null) {
+  const existingThread =
+    threadId != null ? await memory.getThreadById({ threadId }) : null;
+
+  if (existingThread == null) {
     const newThread = await memory.createThread({
-      resourceId: resourceId,
-      threadId: uuid(),
+      resourceId,
+      threadId: threadId ?? uuid(),
       metadata: {
         aiAssistantId,
       },
@@ -32,18 +35,13 @@ export const getOrCreateThread = async ({
     return newThread;
   }
 
-  const thread = await memory.getThreadById({ threadId });
-  if (thread == null) {
-    throw new Error('Thread not found');
-  }
-
-  if (thread.resourceId !== resourceId) {
+  if (existingThread.resourceId !== resourceId) {
     throw new Error('Thread does not belong to the resource');
   }
 
-  if (!isThreadWithMeta(thread)) {
+  if (!isThreadWithMeta(existingThread)) {
     throw new Error('Thread metadata is invalid');
   }
 
-  return thread;
+  return existingThread;
 };
