@@ -1,0 +1,216 @@
+/* Explicitly declare layer order */
+@layer theme, base, components, utilities;
+
+/* prefix(tw) only works with full import, not sub-imports */
+@import "tailwindcss" prefix(tw);
+@import "tw-animate-css";
+
+/* Neutralize ALL preflight effects outside .tw-root in one comprehensive rule.
+ * :not(.tw-root, .tw-root *) matches every element that is neither .tw-root nor inside it.
+ * all: revert-layer cancels every @layer base rule (preflight) for those elements.
+ * Bootstrap is unlayered so it is unaffected by this layer-level revert. */
+@layer base {
+  :root :not(.tw-root, .tw-root *) {
+    all: revert-layer;
+  }
+}
+
+/* Explicitly scan only AI Elements source files. */
+@source "../components/ai-elements/**/*.tsx";
+@source "../components/ui/**/*.tsx";
+@source "../features/mastra/client/components/ChatSidebar/**/*.{ts,tsx}";
+@source "../utils/shadcn-ui.ts";
+
+/* Use Bootstrap's dark mode attribute instead of .dark class */
+@custom-variant dark (&:is([data-bs-theme="dark"] *));
+
+/* Cancel Bootstrap's element overrides inside .tw-root.
+ * These rules are unlayered so they win over Bootstrap's unlayered reboot rules
+ * via higher specificity (.tw-root p > p, .tw-root button > button). */
+.tw-root p {
+  margin-top: 0;
+  margin-bottom: 0;
+}
+
+/* Bootstrap reboot sets button { border-radius: 0 } (unlayered, specificity 0,0,1).
+ * Override with explicit values for the rounded variants actually used in .tw-root.
+ * These are unlayered with higher specificity, so they beat Bootstrap's button rule. */
+.tw-root button {
+  border-radius: calc(var(--radius) - 2px); /* default: equivalent to tw:rounded-md */
+}
+
+/* Markdown prose typography for AI response content.
+ * Unlayered rules — beat Bootstrap's unlayered reboot via higher specificity.
+ * .tw-prose must appear after .tw-root p so paragraph margins are correctly overridden. */
+.tw-prose p {
+  margin-top: 0;
+  margin-bottom: 0.75rem;
+}
+
+.tw-prose h1 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.875rem;
+  font-weight: 700;
+  line-height: 1.2;
+}
+
+.tw-prose h2 {
+  margin-top: 1.5rem;
+  margin-bottom: 0.5rem;
+  font-size: 1.5rem;
+  font-weight: 700;
+  line-height: 1.25;
+}
+
+.tw-prose h3 {
+  margin-top: 1.25rem;
+  margin-bottom: 0.375rem;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.3;
+}
+
+.tw-prose h4 {
+  margin-top: 1rem;
+  margin-bottom: 0.25rem;
+  font-size: 1.125rem;
+  font-weight: 600;
+  line-height: 1.35;
+}
+
+.tw-prose ul {
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+  list-style: disc;
+}
+
+.tw-prose ol {
+  padding-left: 1.5rem;
+  margin-bottom: 0.75rem;
+  list-style: decimal;
+}
+
+.tw-prose li {
+  margin-bottom: 0.25rem;
+}
+
+.tw-prose pre {
+  padding: 1rem;
+  margin-bottom: 0.75rem;
+  overflow-x: auto;
+  background-color: var(--bs-tertiary-bg, #f1f5f9);
+  border-radius: 0.375rem;
+}
+
+.tw-prose pre code {
+  padding: 0;
+  font-size: 0.875rem;
+  background: transparent;
+}
+
+.tw-prose code:not(pre code) {
+  padding: 0.125rem 0.375rem;
+  font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+  font-size: 0.875em;
+  background-color: var(--bs-tertiary-bg, #f1f5f9);
+  border-radius: 0.25rem;
+}
+
+.tw-prose blockquote {
+  padding-left: 1rem;
+  margin-left: 0;
+  color: var(--bs-secondary-color, #6c757d);
+  border-left: 3px solid var(--bs-border-color, #dee2e6);
+}
+
+.tw-prose hr {
+  margin-top: 1rem;
+  margin-bottom: 1rem;
+  border: 0;
+  border-top: 1px solid var(--bs-border-color, #dee2e6);
+}
+
+.tw-prose a {
+  color: var(--bs-primary, #0d6efd);
+  text-decoration: underline;
+}
+
+@theme inline {
+  --radius-sm: calc(var(--radius) - 4px);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-lg: var(--radius);
+  --radius-xl: calc(var(--radius) + 4px);
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-card: var(--card);
+  --color-card-foreground: var(--card-foreground);
+  --color-popover: var(--popover);
+  --color-popover-foreground: var(--popover-foreground);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-secondary: var(--secondary);
+  --color-secondary-foreground: var(--secondary-foreground);
+  --color-muted: var(--muted);
+  --color-muted-foreground: var(--muted-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-destructive: var(--destructive);
+  --color-border: var(--border);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-chart-1: var(--chart-1);
+  --color-chart-2: var(--chart-2);
+  --color-chart-3: var(--chart-3);
+  --color-chart-4: var(--chart-4);
+  --color-chart-5: var(--chart-5);
+  --color-sidebar: var(--sidebar);
+  --color-sidebar-foreground: var(--sidebar-foreground);
+  --color-sidebar-primary: var(--sidebar-primary);
+  --color-sidebar-primary-foreground: var(--sidebar-primary-foreground);
+  --color-sidebar-accent: var(--sidebar-accent);
+  --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
+  --color-sidebar-border: var(--sidebar-border);
+  --color-sidebar-ring: var(--sidebar-ring);
+}
+
+:root {
+  --radius: 0.375rem;
+
+  /* Bridge shadcn design tokens to Bootstrap CSS variables.
+   * Dark mode is handled automatically by Bootstrap's [data-bs-theme="dark"] on <html>,
+   * so a separate .dark block is not needed. */
+  --background: var(--bs-body-bg);
+  --foreground: var(--bs-body-color);
+  --card: var(--bs-body-bg);
+  --card-foreground: var(--bs-body-color);
+  --popover: var(--bs-body-bg);
+  --popover-foreground: var(--bs-body-color);
+  --primary: var(--bs-primary);
+  --primary-foreground: #fff;
+  --secondary: var(--bs-secondary-bg);
+  --secondary-foreground: var(--bs-secondary-color);
+  --muted: var(--bs-tertiary-bg);
+  --muted-foreground: var(--bs-secondary-color);
+  --accent: var(--bs-tertiary-bg);
+  --accent-foreground: var(--bs-body-color);
+  --destructive: var(--bs-danger);
+  --border: var(--bs-border-color);
+  --input: var(--bs-border-color);
+  --ring: var(--bs-primary);
+
+  /* chart/sidebar tokens are not present in Bootstrap; keep as-is */
+  --chart-1: oklch(0.646 0.222 41.116);
+  --chart-2: oklch(0.6 0.118 184.704);
+  --chart-3: oklch(0.398 0.07 227.392);
+  --chart-4: oklch(0.828 0.189 84.429);
+  --chart-5: oklch(0.769 0.188 70.08);
+  --sidebar: var(--bs-body-bg);
+  --sidebar-foreground: var(--bs-body-color);
+  --sidebar-primary: var(--bs-primary);
+  --sidebar-primary-foreground: #fff;
+  --sidebar-accent: var(--bs-tertiary-bg);
+  --sidebar-accent-foreground: var(--bs-body-color);
+  --sidebar-border: var(--bs-border-color);
+  --sidebar-ring: var(--bs-primary);
+}

@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 
-import { AiAssistant } from '~/features/openai/client/components/AiAssistant/Sidebar/AiAssistant';
+import { AiAssistant } from '~/features/mastra/client/components/Sidebar/AiAssistant';
 import { SidebarContentsType } from '~/interfaces/ui';
 import { useIsGuestUser } from '~/states/context';
 import { aiEnabledAtom } from '~/states/server-configurations';

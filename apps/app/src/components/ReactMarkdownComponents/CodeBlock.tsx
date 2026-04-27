@@ -33,9 +33,9 @@ const InlineCodeBlockSubstance = (props: InlineCodeBlockProps): JSX.Element => {
   );
 };
 
-function extractChildrenToIgnoreReactNode(children: ReactNode): ReactNode {
+function extractChildrenToIgnoreReactNode(children: ReactNode): string {
   if (children == null) {
-    return children;
+    return '';
   }
 
   // Single element array
