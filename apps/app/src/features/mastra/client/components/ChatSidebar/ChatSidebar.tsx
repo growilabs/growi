@@ -180,10 +180,10 @@ export const ChatSidebar = (): JSX.Element => {
                         {message.parts
                           .filter((part) => part.type === 'source-url')
                           .map((_part, i) => (
-                            // eslint-disable-next-line react/no-array-index-key
+                            // biome-ignore lint/suspicious/noArrayIndexKey: the source parts have no stable ID, but the index is sufficient for this static list
                             <SourcesContent key={`${message.id}-${i}`}>
                               <Source
-                                // eslint-disable-next-line react/no-array-index-key
+                                // biome-ignore lint/suspicious/noArrayIndexKey: the source parts have no stable ID, but the index is sufficient for this static list
                                 key={`${message.id}-${i}`}
                                 // href={part.url}
                                 // title={part.url}
@@ -196,8 +196,10 @@ export const ChatSidebar = (): JSX.Element => {
                     switch (part.type) {
                       case 'text':
                         return (
-                          // eslint-disable-next-line react/no-array-index-key
-                          <Fragment key={`${message.id}-${i}`}>
+                          <Fragment
+                            // biome-ignore lint/suspicious/noArrayIndexKey: the text parts have no stable ID, but the index is sufficient for this static list
+                            key={`${message.id}-${i}`}
+                          >
                             <Message from={message.role}>
                               <MessageContent variant="flat">
                                 <Response
@@ -235,7 +237,7 @@ export const ChatSidebar = (): JSX.Element => {
                       case 'reasoning':
                         return (
                           <Reasoning
-                            // eslint-disable-next-line react/no-array-index-key
+                            // biome-ignore lint/suspicious/noArrayIndexKey: the reasoning parts have no stable ID, but the index is sufficient for this static list
                             key={`${message.id}-${i}`}
                             className="w-full"
                             isStreaming={
