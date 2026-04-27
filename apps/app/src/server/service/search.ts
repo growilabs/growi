@@ -321,8 +321,16 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.normalizeIndices();
   }
 
+  async normalizeAuditlogIndices() {
+    return this.fullTextSearchDelegator.normalizeAuditlogIndices();
+  }
+
   async rebuildIndex() {
     return this.fullTextSearchDelegator.rebuildIndex();
+  }
+
+  async rebuildAuditlogIndex() {
+    return this.fullTextSearchDelegator.rebuildAuditlogIndex();
   }
 
   async parseSearchQuery(
