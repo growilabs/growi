@@ -28,6 +28,7 @@ import type {
   SearchQueryParser,
   SearchResolver,
 } from '../interfaces/search';
+import type { ActivityDocument } from '../models/activity';
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
@@ -319,6 +320,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   async normalizeIndices() {
     return this.fullTextSearchDelegator.normalizeIndices();
+  }
+
+  async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
+    return this.fullTextSearchDelegator.updateOrInsertAuditlog(activity);
   }
 
   async normalizeAuditlogIndices() {
