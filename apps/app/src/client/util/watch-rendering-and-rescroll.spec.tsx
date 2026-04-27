@@ -1,7 +1,23 @@
+import { setImmediate as realSetImmediate } from 'node:timers/promises';
 import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { watchRenderingAndReScroll } from './watch-rendering-and-rescroll';
+
+// happy-dom captures the real setTimeout at module load, before vitest's
+// fake timers are installed. Its MutationObserver callbacks therefore fire
+// on the REAL event loop, not on the fake timer clock. Yielding to the real
+// event loop (via node:timers/promises) flushes them.
+// Yield twice because happy-dom batches zero-delay timeouts and dispatch
+// across two real-timer ticks (the batcher + the listener's own timer).
+// NOTE: happy-dom v15 stores the MO listener callback in a `WeakRef`
+// (see MutationObserverListener.cjs), so GC between `observe()` and the
+// first mutation can silently drop delivery. Tests that assert MO-driven
+// behavior should rely on retry to absorb that rare collection window.
+const flushMutationObservers = async () => {
+  await realSetImmediate();
+  await realSetImmediate();
+};
 
 describe('watchRenderingAndReScroll', () => {
   let container: HTMLDivElement;
@@ -56,7 +72,7 @@ describe('watchRenderingAndReScroll', () => {
     // Trigger a DOM mutation mid-timer
     const child = document.createElement('span');
     container.appendChild(child);
-    await vi.advanceTimersByTimeAsync(0);
+    await flushMutationObservers();
 
     // The timer should NOT have been reset — 2 more seconds should fire it
     vi.advanceTimersByTime(2000);
@@ -65,7 +81,10 @@ describe('watchRenderingAndReScroll', () => {
     cleanup();
   });
 
-  it('should detect rendering elements added after initial check via observer', async () => {
+  // Retry absorbs rare happy-dom MO WeakRef GC drops (see file-top note).
+  it('should detect rendering elements added after initial check via observer', {
+    retry: 3,
+  }, async () => {
     const cleanup = watchRenderingAndReScroll(container, scrollToTarget);
 
     vi.advanceTimersByTime(3000);
@@ -76,10 +95,9 @@ describe('watchRenderingAndReScroll', () => {
     renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true');
     container.appendChild(renderingEl);
 
-    // Flush microtasks so MutationObserver callback fires
-    await vi.advanceTimersByTimeAsync(0);
+    // Flush MO so it schedules the poll timer
+    await flushMutationObservers();
 
-    // Timer should be scheduled — fires after 5s
     await vi.advanceTimersByTimeAsync(5000);
     expect(scrollToTarget).toHaveBeenCalledTimes(1);
 
@@ -154,7 +172,10 @@ describe('watchRenderingAndReScroll', () => {
     expect(scrollToTarget).not.toHaveBeenCalled();
   });
 
-  it('should not schedule further re-scrolls after rendering elements complete', async () => {
+  // Retry absorbs rare happy-dom MO WeakRef GC drops (see file-top note).
+  it('should perform a final re-scroll when rendering completes after the first poll', {
+    retry: 3,
+  }, async () => {
     const renderingEl = document.createElement('div');
     renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'true');
     container.appendChild(renderingEl);
@@ -165,13 +186,16 @@ describe('watchRenderingAndReScroll', () => {
     vi.advanceTimersByTime(5000);
     expect(scrollToTarget).toHaveBeenCalledTimes(1);
 
-    // Rendering completes — attribute toggled to false
+    // Rendering completes — attribute toggled to false. MO observes the
+    // transition and triggers a final re-scroll to compensate for the
+    // trailing layout shift.
     renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'false');
-    await vi.advanceTimersByTimeAsync(0);
+    await flushMutationObservers();
+    expect(scrollToTarget).toHaveBeenCalledTimes(2);
 
-    // No further re-scrolls should be scheduled
+    // No further scrolls afterward — the MO cleared the next poll timer.
     vi.advanceTimersByTime(10000);
-    expect(scrollToTarget).toHaveBeenCalledTimes(1);
+    expect(scrollToTarget).toHaveBeenCalledTimes(2);
 
     cleanup();
   });
@@ -183,12 +207,13 @@ describe('watchRenderingAndReScroll', () => {
 
     const cleanup = watchRenderingAndReScroll(container, scrollToTarget);
 
-    // Rendering completes before the first poll timer fires
+    // Rendering completes before the first poll timer fires (no async flush,
+    // so the MO does not deliver before the timer).
     renderingEl.setAttribute(GROWI_IS_CONTENT_RENDERING_ATTR, 'false');
 
-    // Poll timer fires at 5s — detects no rendering elements.
-    // wasRendering is reset in the timer callback BEFORE scrollToTarget so that
-    // the subsequent checkAndSchedule call does not trigger a redundant extra scroll.
+    // wasRendering is reset in the timer callback BEFORE scrollToTarget so
+    // the subsequent checkAndSchedule call does not trigger a redundant
+    // extra scroll.
     vi.advanceTimersByTime(5000);
     expect(scrollToTarget).toHaveBeenCalledTimes(1);
 
