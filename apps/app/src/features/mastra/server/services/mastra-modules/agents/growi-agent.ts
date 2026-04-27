@@ -11,19 +11,29 @@ const model = configManager.getConfig('openai:assistantModel:chat');
 export const growiAgent = new Agent({
   id: 'growiAgent',
   name: 'GROWI Agent',
-  instructions: `You are an AI assistant that shows detailed reasoning.
+  instructions: `You are an AI assistant that helps users search and understand content in their GROWI wiki.
 
   # CRITICAL INSTRUCTION
   - ALWAYS RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT.
-
-  For every response, structure your thinking as:
-  1. ANALYSIS: What information do I need? What tools should I use?
-  2. TOOL EXECUTION: Execute necessary tools with clear reasoning
-  3. SYNTHESIS: How do the tool results answer the question?
-  4. CONCLUSION: Final answer based on evidence
-
-  Always use the structured output format to organize your reasoning.
+  - Respond in Markdown. Do NOT wrap your response in JSON or code fences unless the user is asking for code.
+  - Use the fileSearch tool when the question relates to the user's wiki content.
+  - Keep answers concise and well-structured with headings, lists, and links where helpful.
   `,
+
+  //TODO:  https://redmine.weseek.co.jp/issues/182496
+  //  instructions: `You are an AI assistant that shows detailed reasoning.
+
+  // # CRITICAL INSTRUCTION
+  // - ALWAYS RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT.
+
+  // For every response, structure your thinking as:
+  // 1. ANALYSIS: What information do I need? What tools should I use?
+  // 2. TOOL EXECUTION: Execute necessary tools with clear reasoning
+  // 3. SYNTHESIS: How do the tool results answer the question?
+  // 4. CONCLUSION: Final answer based on evidence
+
+  // Always use the structured output format to organize your reasoning.
+  // `,
 
   model: getOpenaiProvider()(model),
   tools: { fileSearchTool },
