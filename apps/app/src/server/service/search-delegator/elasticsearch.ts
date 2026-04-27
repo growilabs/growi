@@ -88,6 +88,8 @@ class ElasticsearchDelegator
 
   private isElasticsearchReindexOnBoot: boolean;
 
+  private isElasticsearchAuditlogReindexOnBoot: boolean;
+
   private elasticsearchVersion: 7 | 8 | 9;
 
   private client: ElasticsearchClientDelegator;
@@ -125,6 +127,10 @@ class ElasticsearchDelegator
 
     this.isElasticsearchReindexOnBoot = configManager.getConfig(
       'app:elasticsearchReindexOnBoot',
+    );
+
+    this.isElasticsearchAuditlogReindexOnBoot = configManager.getConfig(
+      'app:elasticsearchAuditlogReindexOnBoot',
     );
   }
 
@@ -224,7 +230,13 @@ class ElasticsearchDelegator
       } catch (err) {
         logger.error('Rebuild index on boot failed', err);
       }
-      return;
+    }
+    if (this.isElasticsearchAuditlogReindexOnBoot) {
+      try {
+        await this.rebuildAuditlogIndex();
+      } catch (err) {
+        logger.error('Rebuild auditlog index on boot failed', err);
+      }
     }
     return normalizeIndices;
   }
@@ -380,6 +392,50 @@ class ElasticsearchDelegator
     }
   }
 
+  async rebuildAuditlogIndex(): Promise<void> {
+    const {
+      client,
+      auditlogIndexName: indexName,
+      auditlogAliasName: aliasName,
+    } = this;
+    const tmpIndexName = `${indexName}-tmp`;
+
+    try {
+      // reindex to tmp index
+      await this.createAuditlogIndex(tmpIndexName);
+      await client.reindex(indexName, tmpIndexName);
+
+      // update alias
+      await client.indices.updateAliases({
+        actions: [
+          { add: { alias: aliasName, index: tmpIndexName } },
+          { remove: { alias: aliasName, index: indexName } },
+        ],
+      });
+
+      // flush index
+      await client.indices.delete({ index: indexName });
+      await this.createAuditlogIndex(indexName);
+      await this.addAllAuditlogs();
+
+      await client.indices.updateAliases({
+        actions: [
+          { add: { alias: aliasName, index: indexName } },
+          { remove: { alias: aliasName, index: tmpIndexName } },
+        ],
+      });
+
+      await client.indices.delete({ index: tmpIndexName });
+    } catch (error) {
+      try {
+        await this.normalizeAuditlogIndices();
+      } catch (normalizeErr) {
+        logger.error('Failed to restore auditlog indices', normalizeErr);
+      }
+      throw error;
+    }
+  }
+
   async normalizeIndices(): Promise<void> {
     const { client, indexName, aliasName } = this;
 
@@ -420,6 +476,7 @@ class ElasticsearchDelegator
     } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
+
     // remove tmp index
     const isExistsAuditlogTmpIndex = await client.indices.exists({
       index: tmpIndexName,
@@ -434,7 +491,6 @@ class ElasticsearchDelegator
     });
     if (!isExistsAuditlogIndex) {
       await this.createAuditlogIndex(indexName);
-      await this.addAllAuditlogs();
     }
 
     // create alias
@@ -456,17 +512,26 @@ class ElasticsearchDelegator
       'app:elasticsearchReindexBulkSize',
     );
 
-    const readStream = Activity.find().cursor();
+    const readStream = Activity.find()
+      .select('snapshot.username')
+      .lean()
+      .cursor();
     const batchStream = createBatchStream(bulkSize);
 
+    let count = 0;
     const writeStream = new Writable({
       objectMode: true,
-      async write(batch, encoding, callback) {
+      async write(batch, _encoding, callback) {
         const body = batch.flatMap((activity) => {
           const username = activity.snapshot?.username;
           if (username == null || username === '') return [];
           return [
-            { index: { _index: auditlogIndexName, _id: activity._id } },
+            {
+              index: {
+                _index: auditlogIndexName,
+                _id: activity._id.toString(),
+              },
+            },
             { username },
           ];
         });
@@ -480,20 +545,26 @@ class ElasticsearchDelegator
           const bulkResponse = await bulkWrite({ body });
 
           if (bulkResponse.errors) {
-            logger.error('addAllAuditlogs bulk indexing had errors');
+            const errMsg = 'addAllAuditlogs bulk indexing had errors';
+            logger.error(errMsg);
+            callback(new Error(errMsg));
+            return;
           }
 
+          count += (bulkResponse.items || []).length;
           logger.info(
-            `addAllAuditlogs progressing: (count=${bulkResponse.items?.length ?? 0}, errors=${bulkResponse.errors}, took=${bulkResponse.took}ms)`,
+            `Adding auditlogs progressing: (count=${count}, took=${bulkResponse.took}ms)`,
           );
         } catch (err) {
-          logger.error('addAllAuditlogs error on bulk write: ', err);
+          logger.error('Adding auditlogs bulk indexing failed.', err);
+          callback(err);
+          return;
         }
 
         callback();
       },
       final(callback) {
-        logger.info('addAllAuditlogs has completed.');
+        logger.info(`Adding auditlogs has completed: (totalCount=${count})`);
         callback();
       },
     });
@@ -547,7 +618,11 @@ class ElasticsearchDelegator
       const { mappings } = await import('./mappings/mappings-auditlog-es9');
       return this.client.indices.create({ index, ...mappings });
     }
+    throw new Error(
+      `Unsupported Elasticsearch version: ${this.elasticsearchVersion}`,
+    );
   }
+
   /**
    * generate object that is related to page.grant*
    */
