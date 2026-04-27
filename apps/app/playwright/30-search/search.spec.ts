@@ -28,10 +28,6 @@ test('checkboxes behaviors', async ({ page }) => {
   await page.getByTestId('cb-select').first().click({ force: true });
 
   // Click the select all checkbox
-  await page
-    .getByTestId('delete-control-button')
-    .first()
-    .click({ force: true });
   await page.getByTestId('cb-select-all').click({ force: true });
 
   // Unclick the first checkbox after selecting all
@@ -76,8 +72,15 @@ test.describe
       await page.locator('.grw-side-contents-sticky-container').isVisible();
       await page.locator('#edit-tags-btn-wrapper-for-tooltip').click();
       await expect(page.locator('#edit-tag-modal')).toBeVisible();
-      await page.locator('.rbt-input-main').fill(tag);
-      await page.locator('#tag-typeahead-asynctypeahead-item-0').click();
+      // Use pressSequentially to fire per-character input events that the
+      // AsyncTypeahead listens to; fill() can be too fast to trigger the
+      // debounced onSearch reliably on CI.
+      await page.locator('.rbt-input-main').pressSequentially(tag);
+      const typeaheadItem = page.locator(
+        '#tag-typeahead-asynctypeahead-item-0',
+      );
+      await expect(typeaheadItem).toBeVisible({ timeout: 15000 });
+      await typeaheadItem.click();
       await page.getByTestId('tag-edit-done-btn').click();
     });
 
@@ -99,11 +102,11 @@ test.describe
     test('Successfully order page search results by tag', async ({ page }) => {
       await page.goto('/');
 
-      await page.locator('.grw-tag-simple-bar').locator('a').click();
+      await page.locator('.grw-tag-simple-bar').locator('button').click();
 
-      expect(page.getByTestId('search-result-base')).toBeVisible();
-      expect(page.getByTestId('search-result-list')).toBeVisible();
-      expect(page.getByTestId('search-result-content')).toBeVisible();
+      await expect(page.getByTestId('search-result-base')).toBeVisible();
+      await expect(page.getByTestId('search-result-list')).toBeVisible();
+      await expect(page.getByTestId('search-result-content')).toBeVisible();
     });
   });
 
