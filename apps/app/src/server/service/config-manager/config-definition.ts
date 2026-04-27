@@ -79,6 +79,10 @@ export const CONFIG_KEYS = [
   'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
   'app:isReadOnlyForNewUser',
 
+  // Content-Disposition settings for MIME types
+  'attachments:contentDisposition:inlineMimeTypes',
+  'attachments:contentDisposition:attachmentMimeTypes',
+
   // Security Settings
   'security:wikiMode',
   'security:sessionMaxAge',
@@ -524,6 +528,23 @@ export const CONFIG_DEFINITIONS = {
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
     defaultValue: false,
+  }),
+
+  // Attachment Content-Disposition settings
+  'attachments:contentDisposition:inlineMimeTypes': defineConfig<{
+    inlineMimeTypes: string[];
+  }>({
+    defaultValue: {
+      inlineMimeTypes: [],
+    },
+  }),
+
+  'attachments:contentDisposition:attachmentMimeTypes': defineConfig<{
+    attachmentMimeTypes: string[];
+  }>({
+    defaultValue: {
+      attachmentMimeTypes: [],
+    },
   }),
 
   // Security Settings
@@ -1041,7 +1062,7 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: false,
   }),
   'customize:isEnabledMarp': defineConfig<boolean>({
-    defaultValue: false,
+    defaultValue: true,
   }),
   'customize:isSidebarCollapsedMode': defineConfig<boolean>({
     defaultValue: false,
@@ -1094,7 +1115,7 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'SLACKBOT_TYPE',
     defaultValue: undefined,
   }),
-  'slackbot:proxyUri': defineConfig<string | undefined>({
+  'slackbot:proxyUri': defineConfig<NonBlankString | undefined>({
     envVarName: 'SLACKBOT_INTEGRATION_PROXY_URI',
     defaultValue: undefined,
   }),

@@ -1,6 +1,8 @@
 # next.js
 /.next/
 /out/
+next-env.d.ts
+next.config.js
 
 # test
 .reg
@@ -9,11 +11,18 @@
 /build/
 /dist/
 /transpiled/
+/config/**/*.js
+/config/**/*.d.ts
+/public/static/fonts
 /public/static/js
 /public/static/styles
 /public/uploads
 /src/styles/prebuilt
+/src/**/*.vendor-styles.prebuilt.*
 /tmp/
 
 # cache
 /.swc/
+
+# prisma
+/src/generated/prisma

@@ -1,14 +1,14 @@
 @use '@growi/ui/scss/molecules/page_list';
 
-.page-list :global {
-  .highlighted-keyword {
+.page-list {
+  :global(.highlighted-keyword) {
     font-style: normal;
     font-weight: bold;
   }
 }
 
-.search-result-content :global  {
-  .highlighted-keyword {
+.search-result-content  {
+  :global(.highlighted-keyword) {
     background:linear-gradient(
       transparent 40%,
       var(--grw-marker-bg, var(--grw-marker-bg-yellow)) 40%);

@@ -26,7 +26,8 @@
       { "transform": "typescript-transform-paths", "afterDeclarations": true }
     ]
   },
-  "include": ["next-env.d.ts", "config", "src"],
+  "include": ["next-env.d.ts", "config", "prisma", "src"],
+  "exclude": ["src/**/*.vendor-styles.*"],
   "ts-node": {
     "transpileOnly": true,
     "swc": true,

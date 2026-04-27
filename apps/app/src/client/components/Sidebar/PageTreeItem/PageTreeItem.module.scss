@@ -2,31 +2,31 @@
 
 
 // fix height
-.page-tree-item :global {
-  li {
+.page-tree-item {
+  :global(li) {
     min-height: 40px;
   }
 }
 
 // font size
-.page-tree-item :global {
+.page-tree-item {
     font-size: 14px;
 }
 
 // == Colors
 
 // drag over
-.page-tree-item :global {
-  .drag-over {
+.page-tree-item {
+  :global(.drag-over) {
     background-color: var(--bs-list-group-action-active-bg);
   }
 }
 
 @include bs.color-mode(light) {
   // button
-  .page-tree-item :global {
-    .list-group-item-action {
-      .btn-page-item-control {
+  .page-tree-item {
+    :global(.list-group-item-action) {
+      :global(.btn-page-item-control) {
         --bs-btn-bg: transparent;
         --bs-btn-hover-bg: var(--grw-primary-200);
         --bs-btn-active-bg: var(--grw-primary-300);
@@ -37,9 +37,9 @@
 
 @include bs.color-mode(dark) {
   // button
-  .page-tree-item :global {
-    .list-group-item-action {
-      .btn-page-item-control {
+  .page-tree-item {
+    :global(.list-group-item-action) {
+      :global(.btn-page-item-control) {
         --bs-btn-bg: transparent;
         --bs-btn-hover-bg: var(--grw-primary-600);
         --bs-btn-active-bg: var(--grw-primary-700);

@@ -146,6 +146,7 @@ class GcsFileUploader extends AbstractFileUploader {
    * @inheritdoc
    */
   override determineResponseMode() {
+    // This is already correct in your provided code, using this.configManager
     return configManager.getConfig('gcs:referenceFileWithRelayMode')
       ? ResponseMode.RELAY
       : ResponseMode.REDIRECT;
@@ -265,7 +266,7 @@ class GcsFileUploader extends AbstractFileUploader {
     // https://cloud.google.com/storage/docs/access-control/signed-urls
     const isDownload = opts?.download ?? false;
     const contentHeaders = createContentHeaders(attachment, {
-      inline: !isDownload,
+      forceAttachment: isDownload,
     });
     const [signedUrl] = await file.getSignedUrl({
       action: 'read',

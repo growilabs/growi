@@ -82,15 +82,14 @@ See [GROWI Docs: Environment Variables](https://docs.growi.org/en/admin-guide/ad
 ## Dependencies
 
 - Node.js v24.x
-- npm 6.x
-- pnpm 9.x
+- pnpm 10.x
 - [Turborepo](https://turbo.build/repo)
 - MongoDB v6.x or v8.x
 
 ### Optional Dependencies
 
 - Redis 3.x
-- ElasticSearch 7.x or 8.x (needed when using Full-text search)
+- ElasticSearch 7.x or 8.x or 9.x (needed when using Full-text search)
   - **CAUTION: Following plugins are required**
     - [Japanese (kuromoji) Analysis plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/analysis-kuromoji.html)
     - [ICU Analysis Plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/analysis-icu.html)

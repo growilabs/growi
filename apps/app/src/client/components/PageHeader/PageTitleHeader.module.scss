@@ -1,5 +1,5 @@
-.page-title-header :global {
-  input {
+.page-title-header {
+  :global(input) {
     min-width: 20px;
     min-height: unset;
     padding: 0 0.5rem;
@@ -8,7 +8,7 @@
   }
 
   // Make Truncated elements horizontally scrollable and hide the scroll bar
-  .page-title-header-input {
+  :global(.page-title-header-input) {
     scrollbar-width: none;
   }
 }
@@ -16,7 +16,7 @@
 .page-title-header-border-color {
   --bs-border-color: transparent;
 
-  &:global {
+  & {
     &:hover {
       --bs-border-color: var(--bs-primary-border-subtle);
     }

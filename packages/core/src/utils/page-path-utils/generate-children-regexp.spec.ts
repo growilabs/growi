@@ -18,7 +18,7 @@ describe('generateChildrenRegExp', () => {
     },
     {
       path: '/parent (with brackets)',
-      expected: '^\\/parent \\(with brackets\\)(\\/[^/]+)\\/?$',
+      expected: '^\\/parent\\x20\\(with\\x20brackets\\)(\\/[^/]+)\\/?$',
       validPaths: [
         '/parent (with brackets)/child',
         '/parent (with brackets)/test',
@@ -30,7 +30,7 @@ describe('generateChildrenRegExp', () => {
     },
     {
       path: '/parent[with square]',
-      expected: '^\\/parent\\[with square\\](\\/[^/]+)\\/?$',
+      expected: '^\\/parent\\[with\\x20square\\](\\/[^/]+)\\/?$',
       validPaths: ['/parent[with square]/child', '/parent[with square]/test'],
       invalidPaths: [
         '/parent[with square]',
@@ -60,12 +60,11 @@ describe('generateChildrenRegExp', () => {
       expect(validPath).toMatch(result);
     });
 
-    test.each(invalidPaths)(
-      'should not match invalid path: %s',
-      (invalidPath) => {
-        const result = generateChildrenRegExp(path);
-        expect(invalidPath).not.toMatch(result);
-      },
-    );
+    test.each(
+      invalidPaths,
+    )('should not match invalid path: %s', (invalidPath) => {
+      const result = generateChildrenRegExp(path);
+      expect(invalidPath).not.toMatch(result);
+    });
   });
 });

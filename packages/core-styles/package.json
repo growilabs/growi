@@ -17,11 +17,9 @@
     "lint": "npm-run-all -p lint:*"
   },
   "dependencies": {},
-  "// comments for defDependencies": {
-    "bootstrap": "v5.3.3 has a bug. refs: https://github.com/twbs/bootstrap/issues/39798"
-  },
+  "// comments for defDependencies": {},
   "devDependencies": {
-    "bootstrap": "=5.3.2"
+    "bootstrap": "^5.3.8"
   },
   "peerDependencies": {
     "@popperjs/core": "^2.11.8"

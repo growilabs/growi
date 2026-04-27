@@ -20,7 +20,7 @@ RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
   apt-get update && apt-get install -y ca-certificates wget --no-install-recommends
 
 # install pnpm
-RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" PNPM_VERSION="10.4.1" sh -
+RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" PNPM_VERSION="10.32.1" sh -
 ENV PNPM_HOME=$PNPM_HOME
 ENV PATH="$PNPM_HOME:$PATH"
 
@@ -50,7 +50,7 @@ RUN turbo run clean
 RUN turbo run build --filter @growi/pdf-converter
 
 # make artifacts
-RUN pnpm deploy out --prod --filter @growi/pdf-converter
+RUN pnpm deploy out --prod --legacy --filter @growi/pdf-converter
 RUN rm -rf apps/pdf-converter/node_modules && mv out/node_modules apps/pdf-converter/node_modules
 RUN tar -zcf /tmp/packages.tar.gz \
   package.json \

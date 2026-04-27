@@ -413,6 +413,7 @@
     "azure_storage_account_name": "스토리지 계정 이름",
     "azure_storage_container_name": "컨테이너 이름",
     "azure_note_for_the_only_env_option": "Azure 설정은 환경 변수 값에 의해 제한됩니다.<br>이 설정을 변경하려면 환경 변수 <code>{{env}}</code>의 값을 false로 변경하거나 삭제하십시오.",
+    "azure_note_for_the_only_env_option_cloud": "Azure 설정은 GROWI.cloud 관리 화면에서 변경할 수 있습니다.",
     "file_upload": "파일 업로드 설정용입니다. 파일 업로드 설정을 완료하면 파일 업로드 기능, 프로필 사진 기능 등이 활성화됩니다.",
     "test_connection": "메일 연결 테스트",
     "change_setting": "주의: 이 설정을 완료하지 않으면 지금까지 업로드한 파일에 접근할 수 없습니다.",
@@ -425,7 +426,8 @@
     "enable": "활성화",
     "disable": "비활성화",
     "use_env_var_if_empty": "데이터베이스 값이 비어 있으면 환경 변수 <code>{{variable}}</code>의 값이 사용됩니다.",
-    "note_for_the_only_env_option": "GCS 설정은 환경 변수 값에 의해 제한됩니다.<br>이 설정을 변경하려면 환경 변수 <code>{{env}}</code>의 값을 false로 변경하거나 삭제하십시오."
+    "note_for_the_only_env_option": "GCS 설정은 환경 변수 값에 의해 제한됩니다.<br>이 설정을 변경하려면 환경 변수 <code>{{env}}</code>의 값을 false로 변경하거나 삭제하십시오.",
+    "note_for_the_only_env_option_cloud": "GCS 설정은 GROWI.cloud 관리 화면에서 변경할 수 있습니다."
   },
   "markdown_settings": {
     "markdown_settings": "마크다운 설정",
@@ -456,6 +458,18 @@
       "tag_names": "태그 이름",
       "tag_attributes": "태그 속성",
       "import_recommended": "권장 {{target}} 가져오기"
+    },
+    "content-disposition_header": "Content-Disposition 마임 타입(MIME Type) 설정",
+    "content-disposition_options": {
+      "add_header": "마임 타입 추가",
+      "note": "참고: 마임 타입을 추가하면 다른 리스트에서 자동으로 제거됩니다.",
+      "inline_header": "인라인(Inline) 마임 타입",
+      "attachment_header": "파일 첨부(Attachment) 마임 타입",
+      "inline_button": "인라인",
+      "attachment_button": "파일 첨부",
+      "no_inline": "설정된 인라인 타입이 없습니다.",
+      "no_attachment": "설정된 파일 첨부 타입이 없습니다.",
+      "remove_button": "삭제"
     }
   },
   "customize_settings": {
@@ -769,7 +783,8 @@
       "revoke_read_only_access": "읽기 전용 권한 취소",
       "grant_read_only_access": "읽기 전용 권한 부여",
       "send_invitation_email": "초대 이메일 전송",
-      "resend_invitation_email": "초대 이메일 재전송"
+      "resend_invitation_email": "초대 이메일 재전송",
+      "deleted_user": "(삭제된 사용자)"
     },
     "reset_password": "비밀번호 재설정",
     "reset_password_modal": {
@@ -869,6 +884,14 @@
     "available_action_list_explanation": "현재 설정에서 검색/볼 수 있는 작업 목록",
     "action_list": "작업 목록",
     "disable_mode_explanation": "감사 로그가 현재 비활성화되어 있습니다. 활성화하려면 환경 변수 <code>AUDIT_LOG_ENABLED</code>를 true로 설정하십시오.",
+    "export": "내보내기",
+    "export_audit_log": "감사 로그 내보내기",
+    "export_requested": "내보내기 요청이 접수되었습니다. 내보내기가 완료되면 알림을 받게 됩니다.",
+    "export_failed": "내보내기 시작에 실패했습니다",
+    "duplicate_export_confirm": "동일한 조건의 내보내기가 이미 진행 중입니다. 다시 시작하시겠습니까?",
+    "restart_export": "내보내기 다시 시작",
+    "confirm_export": "내보내기 확인",
+    "disable_mode_explanation_cloud": "현재 감사 로그가 비활성화되어 있습니다. 활성화하려면 GROWI.cloud 관리 화면에서 앱 설정을 변경하십시오.",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
@@ -894,7 +917,9 @@
     "confirm": "플러그인 삭제?"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "GROWI.cloud 설정 열기"
+    "to_cloud_settings": "GROWI.cloud 설정 열기",
+    "change_from_cloud": "GROWI.cloud 관리 화면에서 설정을 변경할 수 있습니다.",
+    "storage_change_from_cloud": "현재 파일 업로드 방법은 {{fileUploadType}} 입니다. 설정은 GROWI.cloud 관리 화면에서 변경할 수 있습니다."
   },
   "audit_log_action_category": {
     "Page": "페이지",

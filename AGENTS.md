@@ -14,40 +14,37 @@ GROWI is a team collaboration wiki platform using Markdown, featuring hierarchic
 
 ## Knowledge Base
 
-### Claude Code Skills (Auto-Invoked)
+### Always-Loaded Context
 
-Technical information is available in **Claude Code Skills** (`.claude/skills/`), which are automatically invoked during development.
-
-**Global Skills** (always loaded):
-
-| Skill | Description |
-|-------|-------------|
-| **monorepo-overview** | Monorepo structure, workspace organization, Changeset versioning |
-| **tech-stack** | Technology stack, pnpm/Turborepo, TypeScript, Biome |
-
-**Rules** (always applied):
+**Rules** (`.claude/rules/`) — loaded into every session automatically:
 
 | Rule | Description |
 |------|-------------|
+| **project-structure** | Monorepo layout, @growi/core role, build order, Changeset workflow |
 | **coding-style** | Coding conventions, naming, exports, immutability, comments |
 | **security** | Security checklist, secret management, OWASP vulnerability prevention |
 | **performance** | Model selection, context management, build troubleshooting |
+| **github-cli** | **CRITICAL**: gh CLI auth required; stop immediately if unauthenticated |
 
-**Agents** (specialized):
+| **testing** | Test commands, pnpm vitest usage |
+
+### On-Demand Skills
+
+**Agents** (specialized subagents):
 
 | Agent | Description |
 |-------|-------------|
 | **build-error-resolver** | TypeScript/build error resolution with minimal diffs |
 | **security-reviewer** | Security vulnerability detection, OWASP Top 10 |
 
-**Commands** (user-invocable):
+**Commands** (user-invocable via `/`):
 
 | Command | Description |
 |---------|-------------|
 | **/tdd** | Test-driven development workflow |
 | **/learn** | Extract reusable patterns from sessions |
 
-**apps/app Skills** (loaded when working in apps/app):
+**apps/app Skills** (load via Skill tool when working in apps/app):
 
 | Skill | Description |
 |-------|-------------|
@@ -62,10 +59,6 @@ Each application has its own CLAUDE.md with detailed instructions:
 - `apps/app/CLAUDE.md` - Main GROWI application
 - `apps/pdf-converter/CLAUDE.md` - PDF conversion microservice
 - `apps/slackbot-proxy/CLAUDE.md` - Slack integration proxy
-
-### Serena Memories
-
-Additional detailed specifications are stored in **Serena memories** and can be referenced when needed for specific features or subsystems.
 
 ## Quick Reference
 
@@ -94,9 +87,9 @@ growi/
 │   └── slackbot-proxy/     # Slack integration proxy
 ├── packages/               # Shared libraries (@growi/core, @growi/ui, etc.)
 └── .claude/
-    ├── skills/             # Claude Code skills (auto-loaded)
-    ├── rules/              # Coding standards (always applied)
-    ├── agents/             # Specialized agents
+    ├── rules/              # Always loaded into every session
+    ├── skills/             # Load on demand via Skill tool
+    ├── agents/             # Specialized subagents
     └── commands/           # User-invocable commands (/tdd, /learn)
 ```
 
@@ -104,11 +97,13 @@ growi/
 
 1. **Feature-Based Architecture**: Create new features in `features/{feature-name}/`
 2. **Server-Client Separation**: Keep server and client code separate
-3. **State Management**: Jotai for UI state, SWR for data fetching
-4. **Named Exports**: Prefer named exports (except Next.js pages)
-5. **Test Co-location**: Place test files next to source files
-6. **Type Safety**: Use strict TypeScript throughout
-7. **Changeset**: Use `npx changeset` for version management
+3. **State Management**: Jotai for UI state, SWR for data fetching *(Jotai: atomic/TypeScript-first for UI; SWR: caching/revalidation for server state — don't mix)*
+4. **Linter/Formatter**: Biome (replaces ESLint + Prettier); Stylelint for SCSS *(10–100x faster, single config in `biome.json`)*
+5. **Frontend Framework**: Next.js Pages Router *(App Router not yet adopted — GROWI predates its stability)*
+6. **Named Exports**: Prefer named exports (except Next.js pages)
+7. **Test Co-location**: Place test files next to source files
+8. **Type Safety**: Use strict TypeScript throughout
+9. **Changeset**: Use `npx changeset` for version management
 
 ## Before Committing
 
@@ -116,8 +111,7 @@ Always execute these checks:
 
 ```bash
 # From workspace root (recommended)
-turbo run lint:typecheck --filter @growi/app
-turbo run lint:biome --filter @growi/app
+turbo run lint --filter @growi/app
 turbo run test --filter @growi/app
 turbo run build --filter @growi/app
 ```
@@ -125,8 +119,7 @@ turbo run build --filter @growi/app
 Or from apps/app directory:
 
 ```bash
-pnpm run lint:typecheck
-pnpm run lint:biome
+pnpm run lint
 pnpm run test
 pnpm run build
 ```
@@ -134,6 +127,6 @@ pnpm run build
 ---
 
 For detailed information, refer to:
-- **Rules**: `.claude/rules/` (coding standards)
-- **Skills**: `.claude/skills/` (technical knowledge)
+- **Rules**: `.claude/rules/` (always loaded — coding standards, project structure)
+- **Skills**: `.claude/skills/` (on-demand — app-specific patterns)
 - **Package docs**: `apps/*/CLAUDE.md` (package-specific)
