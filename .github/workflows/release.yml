@@ -70,7 +70,7 @@ jobs:
         target_commitish: ${{ github.head_ref }}
 
     - name: Delete drafts
-      uses: hugo19941994/delete-draft-releases@v1.0.1
+      uses: hugo19941994/delete-draft-releases@v2.0.0
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
