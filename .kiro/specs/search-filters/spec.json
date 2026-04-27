@@ -1,0 +1,22 @@
+{
+  "feature_name": "search-filters",
+  "created_at": "2026-04-27T05:40:00.000Z",
+  "updated_at": "2026-04-27T07:30:00.000Z",
+  "language": "en",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": false
+}
