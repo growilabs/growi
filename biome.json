@@ -1,22 +1,19 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "files": {
     "includes": [
       "**",
-      "!**/.pnpm-store",
       "!**/.terraform",
-      "!**/coverage",
-      "!**/dist",
-      "!**/.next",
-      "!**/node_modules",
-      "!**/vite.*.ts.timestamp-*",
       "!**/*.grit",
       "!**/turbo.json",
       "!**/.devcontainer",
       "!**/.stylelintrc.json",
       "!**/package.json",
-      "!**/*.vendor-styles.prebuilt.*",
-      "!.turbo",
       "!.vscode",
       "!.claude",
       "!tsconfig.base.json",
@@ -26,6 +23,7 @@
       "!apps/app/tmp",
       "!apps/pdf-converter/specs",
       "!apps/slackbot-proxy/src/public/bootstrap",
+      "!apps/app/src/generated",
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs"
     ]
@@ -86,7 +84,7 @@
       "correctness": {
         "useUniqueElementIds": "warn"
       },
-      "nursery": {
+      "complexity": {
         "useMaxParams": "warn"
       }
     }

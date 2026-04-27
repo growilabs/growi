@@ -55,5 +55,9 @@ The release image includes `node_modules/` at workspace root alongside `apps/app
 
 For apps/app-specific build optimization details (webpack config, null-loader rules, SuperJSON architecture, module count KPI), see `apps/app/.claude/skills/build-optimization/SKILL.md`.
 
+### Logging
+
+The monorepo uses **pino** (via `@growi/logger`) as the standard logging library. Legacy bunyan usage has been migrated.
+
 ---
-_Updated: 2026-03-17. Turbopack now used for production builds; expanded justified-deps list; added Production Assembly Pattern._
+_Updated: 2026-04-16. Added pino logging note._
