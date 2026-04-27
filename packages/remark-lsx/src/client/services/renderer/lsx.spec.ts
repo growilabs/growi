@@ -19,32 +19,67 @@ const runPlugin = (node: LeafGrowiPluginDirective) => {
 
 describe('remarkPlugin', () => {
   describe('prefix extraction', () => {
-    it('case 1: should use explicit prefix attribute', () => {
-      // $lsx(prefix=/path)
-      const node = createNode({ prefix: '/path' });
-      runPlugin(node);
-      expect(node.data?.hProperties).toMatchObject({ prefix: '/path' });
+    describe('explicit prefix attribute takes priority', () => {
+      it.concurrent.each`
+        scenario                                  | attributes                        | expectedPrefix
+        ${'explicit prefix attribute'}            | ${{ prefix: '/path' }}            | ${'/path'}
+        ${'explicit prefix over bare'}            | ${{ '/foo': '', prefix: '/bar' }} | ${'/bar'}
+        ${'explicit empty string prefix is used'} | ${{ prefix: '', '/path': '' }}    | ${''}
+      `('should handle $scenario', ({ attributes, expectedPrefix }) => {
+        const node = createNode(attributes);
+        runPlugin(node);
+        expect(node.data?.hProperties).toMatchObject({
+          prefix: expectedPrefix,
+        });
+      });
     });
 
-    it('case 2: should use first bare attribute as prefix', () => {
-      // $lsx(/path)
-      const node = createNode({ '/path': '' });
-      runPlugin(node);
-      expect(node.data?.hProperties).toMatchObject({ prefix: '/path' });
+    describe('bare attribute as prefix', () => {
+      it.concurrent.each`
+        scenario                        | attributes                 | expectedPrefix
+        ${'single bare attribute'}      | ${{ '/path': '' }}         | ${'/path'}
+        ${'multi-word bare attributes'} | ${{ '/foo': '', bar: '' }} | ${'/foo bar'}
+      `(
+        'should extract prefix from $scenario',
+        ({ attributes, expectedPrefix }) => {
+          const node = createNode(attributes);
+          runPlugin(node);
+          expect(node.data?.hProperties).toMatchObject({
+            prefix: expectedPrefix,
+          });
+        },
+      );
     });
 
-    it('case 3: should prefer explicit prefix over bare attribute', () => {
-      // $lsx(/foo, prefix=/bar)
-      const node = createNode({ '/foo': '', prefix: '/bar' });
-      runPlugin(node);
-      expect(node.data?.hProperties).toMatchObject({ prefix: '/bar' });
+    describe('bare attribute joining stops at boundaries', () => {
+      it.concurrent.each`
+        scenario                                          | attributes                                | expectedPrefix
+        ${'non-empty value stops joining'}                | ${{ '/foo': '', bar: 'baz' }}             | ${'/foo'}
+        ${'supported attribute stops joining'}            | ${{ '/foo': '', '/bar': '', depth: '1' }} | ${'/foo /bar'}
+        ${'supported attribute with empty value stops'}   | ${{ '/foo': '', depth: '' }}              | ${'/foo'}
+        ${'both conditions true (non-empty + supported)'} | ${{ '/foo': '', depth: '1' }}             | ${'/foo'}
+      `('should handle $scenario', ({ attributes, expectedPrefix }) => {
+        const node = createNode(attributes);
+        runPlugin(node);
+        expect(node.data?.hProperties).toMatchObject({
+          prefix: expectedPrefix,
+        });
+      });
     });
 
-    it('case 4: should join consecutive bare attributes as prefix when path contains spaces', () => {
-      // $lsx(/foo bar) - micromark parser splits "/foo bar" into "/foo" and "bar"
-      const node = createNode({ '/foo': '', bar: '' });
-      runPlugin(node);
-      expect(node.data?.hProperties).toMatchObject({ prefix: '/foo bar' });
+    describe('no prefix set when conditions not met', () => {
+      it.concurrent.each`
+        scenario                                  | attributes
+        ${'empty attributes'}                     | ${{}}
+        ${'first attribute is supported attr'}    | ${{ depth: '1', '/path': '' }}
+        ${'first attribute is non-empty'}         | ${{ '/path': 'value' }}
+        ${'only supported attributes present'}    | ${{ depth: '1', sort: 'asc' }}
+        ${'supported attr with empty value only'} | ${{ depth: '' }}
+      `('should not set prefix when $scenario', ({ attributes }) => {
+        const node = createNode(attributes);
+        runPlugin(node);
+        expect(node.data?.hProperties?.prefix).toBeUndefined();
+      });
     });
   });
 });
