@@ -90,6 +90,27 @@ export const ChatSidebar = (): JSX.Element => {
   const { messages, sendMessage, status, regenerate, setMessages } = useChat({
     id: chatThreadId,
     transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
+    // Refresh the thread list after the assistant finishes streaming.
+    // The thread itself is persisted by the time the stream closes, but
+    // Mastra's auto-generated title (configured via `generateTitle: true`
+    // on the Memory) is written asynchronously and may land slightly later.
+    // Poll briefly so the list reflects the title once it is available.
+    onFinish: async () => {
+      const targetId = chatThreadId;
+      const maxAttempts = 5;
+      const intervalMs = 1000;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        // biome-ignore lint/performance/noAwaitInLoops: intentionally poll in series with a delay
+        const pages = await mutateRecentThreads();
+        const thread = pages
+          ?.flatMap((p) => p.threads)
+          .find((t) => t.id === targetId);
+        if (thread?.title) return;
+        await new Promise((resolve) => {
+          setTimeout(resolve, intervalMs);
+        });
+      }
+    },
   });
 
   useEffect(() => {
@@ -111,8 +132,6 @@ export const ChatSidebar = (): JSX.Element => {
       },
     );
     setInput('');
-
-    mutateRecentThreads();
   };
 
   return (
