@@ -972,6 +972,7 @@
   },
   "user_home_page": {
     "bookmarks": "북마크",
+    "contribution_graph": "기여 그래프",
     "recently_created": "최근 생성됨",
     "recent_activity": "최근 활동",
     "unknown_action": "지정되지 않은 변경 사항을 적용했습니다",
