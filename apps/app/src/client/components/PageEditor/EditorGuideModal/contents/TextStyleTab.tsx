@@ -201,7 +201,7 @@ export const TextStyleTab: React.FC = () => {
     },
   ];
   return (
-    <div className={`px-4 py-2 overflow-y-auto ${styles.textStyleTab}`}>
+    <div className="px-4 py-2">
       {TEXT_STYLE_GUIDES.map((item) => (
         <GuideRow
           key={item.id}

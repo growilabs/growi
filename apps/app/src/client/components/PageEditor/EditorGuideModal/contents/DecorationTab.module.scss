@@ -3,8 +3,6 @@
 
 .decorationTab {
   min-width: map.get(bs.$grid-breakpoints, 'sm');
-  max-height: 80vh;
-  overflow-y: auto;
 }
 
 // Override the margin of callout in the preview
