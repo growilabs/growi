@@ -1,0 +1,24 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+@use 'sass:map';
+
+.textStyleTab {
+  max-height: 80vh;
+}
+
+.codeBlockWrapper {
+  width: fit-content;
+}
+
+.copyBadge {
+  top: bs.$dropdown-spacer;
+  right: map.get(bs.$spacers, 1);
+  font-size: bs.$badge-font-size;
+}
+
+.wikiPreview {
+  font-size: bs.$font-size-sm;
+}
+
+.inlineCodeLabel {
+  border: 1px solid currentColor;
+}
