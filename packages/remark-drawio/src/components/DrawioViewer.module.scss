@@ -12,10 +12,16 @@
 // drawio sizes each cell using UA-default HTML metrics and clips overflow via
 // an inline max-height wrapper, so non-default styles (e.g. line-height,
 // margin from a wrapping `.wiki` ruleset) cause label content to be cut off.
+//
+// `!important` is required: host selectors such as `.wiki ol:not(.nav) li`
+// outrank our scoped selector on specificity (`:not(.nav)` adds a class-level
+// weight). Defending the foreignObject content is an adversarial cross-cutting
+// concern, so we explicitly opt out of the specificity contest rather than
+// chasing host selectors.
 .drawio-viewer foreignObject {
   h1, h2, h3, h4, h5, h6,
   p, ul, ol, li, blockquote,
   img, video, table {
-    all: revert;
+    all: revert !important;
   }
 }
