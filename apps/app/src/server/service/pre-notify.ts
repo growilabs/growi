@@ -35,7 +35,6 @@ class PreNotifyService implements IPreNotifyService {
   generatePreNotify = (
     activity: ActivityDocument,
     getAdditionalTargetUsers?: GetAdditionalTargetUsers,
-    excludeUsers: mongoose.Types.ObjectId[] = [],
   ): PreNotify => {
     const preNotify = async (props: PreNotifyProps) => {
       const { notificationTargetUsers } = props;
@@ -46,11 +45,8 @@ class PreNotifyService implements IPreNotifyService {
       const subscribedUsers = await Subscription.getSubscription(
         target as unknown as Ref<IPage>,
       );
-      const excludeSet = new Set(excludeUsers.map((id) => id.toString()));
       const notificationUsers = subscribedUsers.filter(
-        (item) =>
-          item.toString() !== getIdForRef(actionUser).toString() &&
-          !excludeSet.has(item.toString()),
+        (item) => item.toString() !== getIdForRef(actionUser).toString(),
       );
       const activeNotificationUsers = await User.find({
         _id: { $in: notificationUsers },

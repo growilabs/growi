@@ -304,12 +304,23 @@ module.exports = (crowi, _app) => {
       logger.error('Failed to fetch mentioned users', err);
     }
 
-    const generatePreNotify = (activity, getAdditionalTargetUsers) =>
-      preNotifyService.generatePreNotify(
+    // Mentioned users receive COMMENT_MENTION instead of COMMENT_CREATE,
+    // so exclude them from subscriber notifications to avoid duplicates.
+    const excludeSet = new Set(mentionedUserIds.map((id) => id.toString()));
+    const generatePreNotify = (activity, getAdditionalTargetUsers) => {
+      const preNotify = preNotifyService.generatePreNotify(
         activity,
         getAdditionalTargetUsers,
-        mentionedUserIds,
       );
+      return async (props) => {
+        await preNotify(props);
+        if (props.notificationTargetUsers != null) {
+          props.notificationTargetUsers = props.notificationTargetUsers.filter(
+            (user) => !excludeSet.has(user.toString()),
+          );
+        }
+      };
+    };
 
     activityEvent.emit(
       'update',
