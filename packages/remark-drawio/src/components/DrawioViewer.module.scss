@@ -18,6 +18,8 @@
 // weight). Defending the foreignObject content is an adversarial cross-cutting
 // concern, so we explicitly opt out of the specificity contest rather than
 // chasing host selectors.
+//
+// See: https://github.com/growilabs/growi/issues/11052
 .drawio-viewer foreignObject {
   h1, h2, h3, h4, h5, h6,
   p, ul, ol, li, blockquote,
