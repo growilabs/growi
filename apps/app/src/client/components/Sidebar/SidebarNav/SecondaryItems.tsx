@@ -52,6 +52,9 @@ export const SecondaryItems: FC = memo(() => {
       )}
       <SecondaryItem label="Trash" href="/trash" iconName="delete" />
       {!isGuestUser && <PersonalDropdown />}
+      {isGuestUser && (
+        <SecondaryItem label="Theme" href="#" iconName="light_mode" />
+      )}
     </div>
   );
 });
