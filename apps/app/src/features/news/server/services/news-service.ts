@@ -143,13 +143,15 @@ export class NewsService {
    * Upsert news items from feed (keyed by externalId)
    */
   async upsertNewsItems(items: INewsItemInput[]): Promise<void> {
+    if (items.length === 0) return;
+
     const now = new Date();
 
-    await Promise.all(
-      items.map((item) =>
-        NewsItem.updateMany(
-          { externalId: item.id },
-          {
+    await NewsItem.bulkWrite(
+      items.map((item) => ({
+        updateOne: {
+          filter: { externalId: item.id },
+          update: {
             $set: {
               externalId: item.id,
               title: item.title,
@@ -161,9 +163,10 @@ export class NewsService {
               conditions: item.conditions,
             },
           },
-          { upsert: true },
-        ),
-      ),
+          upsert: true,
+        },
+      })),
+      { ordered: false },
     );
   }
 

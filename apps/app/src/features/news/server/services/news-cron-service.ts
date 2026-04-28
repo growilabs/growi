@@ -7,8 +7,8 @@ import { NewsService } from './news-service';
 
 const logger = loggerFactory('growi:feature:news:cron');
 
-/** Maximum random sleep in ms (5 minutes) */
-const MAX_RANDOM_SLEEP_MS = 5 * 60 * 1000;
+/** Maximum random sleep in ms (5 hours) */
+const MAX_RANDOM_SLEEP_MS = 5 * 60 * 60 * 1000;
 
 /** HTTP fetch timeout in ms */
 const FETCH_TIMEOUT_MS = 10_000;
@@ -74,7 +74,7 @@ const randomSleep = (maxMs: number): Promise<void> => {
 
 export class NewsCronService extends CronService {
   override getCronSchedule(): string {
-    return '0 1 * * *';
+    return '0 0 * * *';
   }
 
   override async executeJob(): Promise<void> {

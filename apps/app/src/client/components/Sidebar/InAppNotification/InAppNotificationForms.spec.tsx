@@ -6,7 +6,7 @@ vi.mock('next-i18next', () => ({
   }),
 }));
 
-import { InAppNotificationForms } from './InAppNotificationSubstance';
+import { InAppNotificationForms } from './InAppNotificationForms';
 
 describe('InAppNotificationForms', () => {
   const defaultProps = {

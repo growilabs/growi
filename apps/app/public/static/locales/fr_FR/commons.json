@@ -172,7 +172,8 @@
         "share_link": "Accorde la permission de voir les fonctionnalités de lien de partage.",
         "bookmark": "Accorde la permission de voir les fonctionnalités de signet.",
         "attachment": "Accorde la permission de voir les fonctionnalités de pièce jointe.",
-        "page_bulk_export": "Accorde la permission de voir les fonctionnalités d'exportation en masse de pages."
+        "page_bulk_export": "Accorde la permission de voir les fonctionnalités d'exportation en masse de pages.",
+        "in_app_notification": "Accorde la permission de voir les fonctionnalités de notification intégrée à l'application."
       }
     },
     "write": {
@@ -217,7 +218,8 @@
         "share_link": "Accorde la permission de modifier les fonctionnalités de lien de partage.",
         "bookmark": "Accorde la permission de modifier les fonctionnalités de signet.",
         "attachment": "Accorde la permission de modifier les fonctionnalités de pièce jointe.",
-        "page_bulk_export": "Accorde la permission de modifier les fonctionnalités d'exportation en masse de pages."
+        "page_bulk_export": "Accorde la permission de modifier les fonctionnalités d'exportation en masse de pages.",
+        "in_app_notification": "Accorde la permission de modifier les fonctionnalités de notification intégrée à l'application."
       }
     }
   }

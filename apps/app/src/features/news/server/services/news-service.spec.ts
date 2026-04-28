@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 // Use vi.hoisted so these variables are accessible inside vi.mock factory
 const mocks = vi.hoisted(() => {
   const newsItemFind = vi.fn();
-  const newsItemUpdateMany = vi.fn();
+  const newsItemBulkWrite = vi.fn();
   const newsItemDeleteMany = vi.fn();
   const newsItemCountDocuments = vi.fn();
 
@@ -14,7 +14,7 @@ const mocks = vi.hoisted(() => {
   return {
     NewsItem: {
       find: newsItemFind,
-      updateMany: newsItemUpdateMany,
+      bulkWrite: newsItemBulkWrite,
       deleteMany: newsItemDeleteMany,
       countDocuments: newsItemCountDocuments,
     },
@@ -24,7 +24,7 @@ const mocks = vi.hoisted(() => {
       insertMany: newsReadStatusInsertMany,
     },
     newsItemFind,
-    newsItemUpdateMany,
+    newsItemBulkWrite,
     newsItemDeleteMany,
     newsItemCountDocuments,
     newsReadStatusDistinct,
@@ -372,8 +372,8 @@ describe('NewsService', () => {
   });
 
   describe('upsertNewsItems', () => {
-    test('should call updateMany with upsert for each item', async () => {
-      mocks.newsItemUpdateMany.mockResolvedValue({ upsertedCount: 1 });
+    test('should call bulkWrite with upsert for each item', async () => {
+      mocks.newsItemBulkWrite.mockResolvedValue({ upsertedCount: 1 });
 
       await service.upsertNewsItems([
         {
@@ -383,15 +383,17 @@ describe('NewsService', () => {
         },
       ]);
 
-      expect(mocks.newsItemUpdateMany).toHaveBeenCalledTimes(1);
-      const [filter, update, opts] = mocks.newsItemUpdateMany.mock.calls[0];
-      expect(filter).toEqual({ externalId: 'ext-001' });
-      expect(update.$set.externalId).toBe('ext-001');
-      expect(opts).toEqual({ upsert: true });
+      expect(mocks.newsItemBulkWrite).toHaveBeenCalledTimes(1);
+      const [ops, opts] = mocks.newsItemBulkWrite.mock.calls[0];
+      expect(ops).toHaveLength(1);
+      expect(ops[0].updateOne.filter).toEqual({ externalId: 'ext-001' });
+      expect(ops[0].updateOne.update.$set.externalId).toBe('ext-001');
+      expect(ops[0].updateOne.upsert).toBe(true);
+      expect(opts).toEqual({ ordered: false });
     });
 
-    test('should upsert multiple items', async () => {
-      mocks.newsItemUpdateMany.mockResolvedValue({ upsertedCount: 1 });
+    test('should batch multiple items into a single bulkWrite call', async () => {
+      mocks.newsItemBulkWrite.mockResolvedValue({ upsertedCount: 2 });
 
       await service.upsertNewsItems([
         {
@@ -406,7 +408,16 @@ describe('NewsService', () => {
         },
       ]);
 
-      expect(mocks.newsItemUpdateMany).toHaveBeenCalledTimes(2);
+      expect(mocks.newsItemBulkWrite).toHaveBeenCalledTimes(1);
+      const [ops] = mocks.newsItemBulkWrite.mock.calls[0];
+      expect(ops).toHaveLength(2);
+      expect(ops[0].updateOne.filter).toEqual({ externalId: 'ext-001' });
+      expect(ops[1].updateOne.filter).toEqual({ externalId: 'ext-002' });
+    });
+
+    test('should do nothing when items is empty', async () => {
+      await service.upsertNewsItems([]);
+      expect(mocks.newsItemBulkWrite).not.toHaveBeenCalled();
     });
   });
 

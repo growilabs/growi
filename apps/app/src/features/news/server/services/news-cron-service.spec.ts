@@ -66,8 +66,8 @@ describe('NewsCronService', () => {
   });
 
   describe('getCronSchedule', () => {
-    test('should return daily schedule at 1AM', () => {
-      expect(service.getCronSchedule()).toBe('0 1 * * *');
+    test('should return daily schedule at midnight', () => {
+      expect(service.getCronSchedule()).toBe('0 0 * * *');
     });
   });
 

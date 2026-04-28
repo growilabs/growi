@@ -41,7 +41,7 @@ export const createNewsRouter = (crowi?: Crowi): express.Router => {
    */
   router.get(
     '/list',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.READ.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -81,7 +81,7 @@ export const createNewsRouter = (crowi?: Crowi): express.Router => {
    */
   router.get(
     '/unread-count',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.READ.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -107,7 +107,7 @@ export const createNewsRouter = (crowi?: Crowi): express.Router => {
    */
   router.post(
     '/mark-read',
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.WRITE.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -142,7 +142,7 @@ export const createNewsRouter = (crowi?: Crowi): express.Router => {
    */
   router.post(
     '/mark-all-read',
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.WRITE.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,

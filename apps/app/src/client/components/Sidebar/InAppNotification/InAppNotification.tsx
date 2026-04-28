@@ -3,13 +3,13 @@ import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
 import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
-import { InAppNotificationForms } from './InAppNotificationSubstance';
+import { InAppNotificationForms } from './InAppNotificationForms';
 
 export type FilterType = 'all' | 'news' | 'notifications';
 
 const InAppNotificationContent = dynamic(
   () =>
-    import('./InAppNotificationSubstance').then(
+    import('./InAppNotificationContent').then(
       (mod) => mod.InAppNotificationContent,
     ),
   { ssr: false },
