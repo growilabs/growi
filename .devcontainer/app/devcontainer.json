@@ -18,7 +18,7 @@
 
   "initializeCommand": "/bin/bash .devcontainer/pdf-converter/initializeCommand.sh",
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "/bin/bash ./.devcontainer/app/postCreateCommand.sh",
+  "postCreateCommand": "/bin/bash ./.devcontainer/app/postCreateCommand/main.sh",
 
   // Configure tool-specific properties.
   "customizations": {
@@ -49,7 +49,9 @@
         "mongodb.mongodb-vscode",
         // Debug
         "msjsdiag.debugger-for-chrome",
-        "firefox-devtools.vscode-firefox-debug"
+        "firefox-devtools.vscode-firefox-debug",
+        // prisma
+        "Prisma.prisma@6.19.0"
       ],
       "settings": {
         "terminal.integrated.defaultProfile.linux": "bash"
