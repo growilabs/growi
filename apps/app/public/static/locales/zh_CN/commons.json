@@ -61,7 +61,11 @@
     "unopend": "未读",
     "mark_all_as_read": "标记为已读",
     "no_unread_messages": "no_unread_messages",
-    "only_unread": "Only unread"
+    "only_unread": "Only unread",
+    "news": "公告",
+    "notifications": "通知",
+    "filter_all": "全部",
+    "no_news": "暂无公告"
   },
   "personal_dropdown": {
     "home": "家",
@@ -170,7 +174,8 @@
         "share_link": "授予查看共享链接功能的权限。",
         "bookmark": "授予查看书签功能的权限。",
         "attachment": "授予查看附件功能的权限。",
-        "page_bulk_export": "授予查看页面批量导出功能的权限。"
+        "page_bulk_export": "授予查看页面批量导出功能的权限。",
+        "in_app_notification": "授予查看应用内通知功能的权限。"
       }
     },
     "write": {
@@ -215,7 +220,8 @@
         "share_link": "授予编辑共享链接功能的权限。",
         "bookmark": "授予编辑书签功能的权限。",
         "attachment": "授予编辑附件功能的权限。",
-        "page_bulk_export": "授予编辑页面批量导出功能的权限。"
+        "page_bulk_export": "授予编辑页面批量导出功能的权限。",
+        "in_app_notification": "授予编辑应用内通知功能的权限。"
       }
     }
   }

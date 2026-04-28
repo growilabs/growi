@@ -61,7 +61,11 @@
     "unopend": "未読",
     "mark_all_as_read": "全て既読にする",
     "no_unread_messages": "未読はありません",
-    "only_unread": "未読のみ"
+    "only_unread": "未読のみ",
+    "news": "お知らせ",
+    "notifications": "通知",
+    "filter_all": "すべて",
+    "no_news": "ニュースはありません"
   },
   "personal_dropdown": {
     "home": "ホーム",
@@ -171,7 +175,8 @@
         "share_link": "共有リンク機能の閲覧権限を付与できます。",
         "bookmark": "ブックマーク機能の閲覧権限を付与できます。",
         "attachment": "添付ファイル機能の閲覧権限を付与できます。",
-        "page_bulk_export": "ページの一括エクスポート機能の閲覧権限を付与できます。"
+        "page_bulk_export": "ページの一括エクスポート機能の閲覧権限を付与できます。",
+        "in_app_notification": "アプリ内通知機能の閲覧権限を付与できます。"
       }
     },
     "write": {
@@ -216,7 +221,8 @@
         "share_link": "共有リンク機能の編集権限を付与できます。",
         "bookmark": "ブックマーク機能の編集権限を付与できます。",
         "attachment": "添付ファイル機能の編集権限を付与できます。",
-        "page_bulk_export": "ページの一括エクスポート機能の編集権限を付与できます。"
+        "page_bulk_export": "ページの一括エクスポート機能の編集権限を付与できます。",
+        "in_app_notification": "アプリ内通知機能の編集権限を付与できます。"
       }
     }
   }

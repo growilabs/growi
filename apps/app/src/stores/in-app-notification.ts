@@ -1,9 +1,11 @@
 import type { SWRConfiguration, SWRResponse } from 'swr';
 import useSWR from 'swr';
+import type { SWRInfiniteResponse } from 'swr/infinite';
+import useSWRInfinite from 'swr/infinite';
 
 import { SupportedTargetModel } from '~/interfaces/activity';
 import type {
-  IInAppNotification,
+  IInAppNotificationHasId,
   InAppNotificationStatuses,
   PaginateResult,
 } from '~/interfaces/in-app-notification';
@@ -14,21 +16,24 @@ import { apiv3Get } from '../client/util/apiv3-client';
 
 const logger = loggerFactory('growi:cli:InAppNotification');
 
-type inAppNotificationPaginateResult = PaginateResult<IInAppNotification>;
+type InAppNotificationPaginateResult = PaginateResult<IInAppNotificationHasId>;
 
 export const useSWRxInAppNotifications = (
   limit: number,
   offset?: number,
   status?: InAppNotificationStatuses,
   config?: SWRConfiguration,
-): SWRResponse<PaginateResult<IInAppNotification>, Error> => {
+): SWRResponse<InAppNotificationPaginateResult, Error> => {
   return useSWR(
     ['/in-app-notification/list', limit, offset, status],
     ([endpoint]) =>
-      apiv3Get(endpoint, { limit, offset, status }).then((response) => {
-        const inAppNotificationPaginateResult =
-          response.data as inAppNotificationPaginateResult;
-        inAppNotificationPaginateResult.docs.forEach((doc) => {
+      apiv3Get<InAppNotificationPaginateResult>(endpoint, {
+        limit,
+        offset,
+        status,
+      }).then((response) => {
+        const result = response.data;
+        result.docs.forEach((doc) => {
           try {
             if (doc.targetModel === SupportedTargetModel.MODEL_USER) {
               doc.parsedSnapshot = userSerializers.parseSnapshot(doc.snapshot);
@@ -37,7 +42,7 @@ export const useSWRxInAppNotifications = (
             logger.warn('Failed to parse snapshot', err);
           }
         });
-        return inAppNotificationPaginateResult;
+        return result;
       }),
     config,
   );
@@ -48,6 +53,54 @@ export const useSWRxInAppNotificationStatus = (): SWRResponse<
   Error
 > => {
   return useSWR('/in-app-notification/status', (endpoint) =>
-    apiv3Get(endpoint).then((response) => response.data.count),
+    apiv3Get<{ count: number }>(endpoint).then(
+      (response) => response.data.count,
+    ),
+  );
+};
+
+type InAppNotificationListKey =
+  | [string, number, number, InAppNotificationStatuses | undefined]
+  | null;
+
+/**
+ * SWRInfinite hook for paginated in-app notifications (for infinite scroll)
+ */
+export const useSWRINFxInAppNotifications = (
+  limit: number,
+  options?: { status?: InAppNotificationStatuses },
+  config?: SWRConfiguration,
+): SWRInfiniteResponse<InAppNotificationPaginateResult, Error> => {
+  const status = options?.status;
+
+  return useSWRInfinite<InAppNotificationPaginateResult, Error>(
+    (pageIndex, previousPageData): InAppNotificationListKey => {
+      if (previousPageData != null && !previousPageData.hasNextPage)
+        return null;
+      const offset = pageIndex * limit;
+      return ['/in-app-notification/list', limit, offset, status];
+    },
+    ([endpoint, limit, offset, status]) =>
+      apiv3Get<InAppNotificationPaginateResult>(endpoint, {
+        limit,
+        offset,
+        status,
+      }).then((response) => {
+        const result = response.data;
+        result.docs.forEach((doc) => {
+          try {
+            if (doc.targetModel === SupportedTargetModel.MODEL_USER) {
+              doc.parsedSnapshot = userSerializers.parseSnapshot(doc.snapshot);
+            }
+          } catch (err) {
+            logger.warn('Failed to parse snapshot', err);
+          }
+        });
+        return result;
+      }),
+    {
+      ...config,
+      revalidateFirstPage: false,
+    },
   );
 };

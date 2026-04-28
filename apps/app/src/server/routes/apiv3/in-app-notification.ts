@@ -133,7 +133,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.get(
     '/list',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.READ.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -222,7 +222,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.get(
     '/status',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.READ.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -272,7 +272,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.post(
     '/open',
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.WRITE.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
@@ -309,7 +309,7 @@ module.exports = (crowi: Crowi) => {
    */
   router.put(
     '/all-statuses-open',
-    accessTokenParser([SCOPE.WRITE.USER_SETTINGS.IN_APP_NOTIFICATION], {
+    accessTokenParser([SCOPE.WRITE.FEATURES.IN_APP_NOTIFICATION], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,

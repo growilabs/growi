@@ -213,7 +213,7 @@ class NewsCronService extends CronService {
 
 **Implementation Notes**
 - Integration: `server/service/cron.ts` の `CronService` を継承。`startCron()` をアプリ起動時に呼ぶ
-- Validation: `NEWS_FEED_URL` が `https://` で始まることを確認。`growiVersionRegExps` は try-catch で個別評価し、不正 regex はスキップ
+- Validation: `NEWS_FEED_URL` の URL 検証は以下のルールで行う。`https://` で始まる URL は常に許可。`http://localhost` または `http://127.0.0.1` で始まる URL はローカル開発用として許可。それ以外の `http://` は拒否する。`growiVersionRegExps` は try-catch で個別評価し、不正 regex はスキップ
 - Risks: フィード取得タイムアウト（10秒推奨）。外部依存のため失敗を前提に設計する
 
 ---
@@ -399,6 +399,12 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 ---
 
+#### InAppNotificationElm.tsx（既存・修正あり）
+
+**実装後に判明した落とし穴**: 未読ドットに使われていた CSS クラス `grw-unopend-notification` はコードベースに定義が存在せず、ドットが不可視だった。`bg-primary rounded-circle` + インラインスタイル（`width/height: 8px, display: inline-block`）に置き換えて修正済み。このコンポーネントを今後変更する場合、同クラスを再導入しないこと。
+
+---
+
 #### InAppNotificationSubstance.tsx（変更）
 
 | Field | Detail |
@@ -414,11 +420,34 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 **InAppNotificationContent の変更**:
 - `activeFilter` に応じて3パターンに分岐
-  - `'all'`: `useSWRINFxNews` + `useSWRINFxInAppNotifications` の結果を `publishedAt/createdAt` 降順でマージ
+  - `'all'`: `useSWRINFxNews` + `useSWRINFxInAppNotifications` の両フックを呼び、現在ロード済みの全ページデータを `publishedAt/createdAt` 降順でマージして表示する。`InfiniteScroll.tsx` に渡すために **合成 `swrInifiniteResponse` オブジェクト**を生成する：`setSize` は終端に達していない方のストリームをインクリメント（両方未終端なら両方インクリメント）、`isValidating` はいずれかが true なら true、とする。両ストリームが終端に達したら `isReachingEnd = true` として `InfiniteScroll` に渡す
   - `'news'`: `useSWRINFxNews` のみ。`NewsList` に渡す
   - `'notifications'`: `useSWRINFxInAppNotifications` のみ。既存 `InAppNotificationList` に渡す
 - 既存 `InfiniteScroll` コンポーネントを使用（`client/components/InfiniteScroll.tsx`）
 - 既存 `// TODO: Infinite scroll implemented` コメントを解消
+
+**サイドバーモード別スクロール戦略（実装後に判明した設計上の決定）**:
+
+サイドバーには2種類のモードがあり、スクロール担当コンテナが異なる。
+
+| モード | UI | スクロール担当 | コンテンツエリアの制約 |
+|---|---|---|---|
+| collapsed（ホバーパネル ①） | ベルアイコンにホバー時の小パネル | `InAppNotificationContent` 内の `overflow-auto` div | `maxHeight: 60vh` で高さを制限 |
+| dock / drawer（全面サイドバー ②） | 展開した全面パネル | 外側の `SimpleBar`（`h-100`） | 制約なし。コンテンツが自然に伸長 |
+
+collapsed モードで `overflow-auto + maxHeight` を使い、dock/drawer モードでは外していない場合、**二重スクロールコンテナ**が発生する。具体的には：
+- `overflow-auto` div がサイドバーと同高の scroll context を作る
+- スクロールバーがコンテンツ高さとほぼ同じ縦幅で出現し、わずかな余白でしか動かせなくなる（振動挙動）
+
+対策として `InAppNotificationContent` 内で `useSidebarMode()` を呼び、`isCollapsedMode()` が true のときのみ `overflow-auto` クラスと `maxHeight: 60vh` を付与する。dock/drawer モードでは div に何も付与せず、SimpleBar にスクロールを委ねる。
+
+**通知ドット即時消去: SWR mutate による楽観的更新**:
+
+`InAppNotificationElm` はクリック時に `apiv3Post('/in-app-notification/open')` でサーバーへ書き込みを行うが、UI への反映は SWR キャッシュの即時書き換えで行う。`InAppNotificationContent` 内で `notificationResponse.mutate(updater, { revalidate: false })` を用い、`useSWRInfinite` のページごとに該当 `doc.status` を `STATUS_OPENED` へ書き換える。
+
+`useSWRInfinite` のキャッシュは `SWRConfig` プロバイダの Map に保持されるため、同一 React tree のアンマウント／リマウントを跨いで状態が維持され、リマウント後もドットは消えたままとなる。ローカル `useState` を持たずに SWR の標準機能のみで完結させることで、キャッシュ・再検証制御・キー共有といった SWR の利点をそのまま活かせる。
+
+品質改善の経緯: PR #10986 のレビュー FB を受け、当初採用した `useState<Set<string>>` 戦略を SWR `mutate` + `revalidate: false` に差し替えた。実機検証で SWRConfig のグローバル Map がアンマウント／リマウント間でキャッシュを保持することを確認し、ドット復活の再発がないことを確認した。
 
 ---
 
@@ -431,10 +460,14 @@ type FilterType = 'all' | 'news' | 'notifications';
 
 **Implementation Notes**
 - 配置: `features/news/client/components/NewsItem.tsx`
-- ロケールフォールバック: `browserLocale → ja_JP → en_US → 最初に利用可能なキー`
-- 未読: `fw-bold` + 左端に `bg-primary` 8px 丸ドット
-- 既読: `fw-normal` + 同幅の透明スペーサー
-- `emoji` 未設定時は `📢` をフォールバック
+- **レイアウト**: 既存の `InAppNotificationElm` と同一カラム構成に揃える
+  - 左端: 未読ドット（`bg-primary` 8px 丸）または同幅の透明スペーサー
+  - アバター位置: `emoji` を表示（`UserPicture` が占める位置と同等）。未設定時は `📢` をフォールバック
+  - コンテンツ列: タイトル（未読時 `fw-bold`、既読時 `fw-normal`）+ 公開日時
+- ロケールフォールバック: `i18n.language → ja_JP → en_US → 最初に利用可能なキー`（`useTranslation()` から取得）
+- 日付フォーマット: `date-fns` の `format` と `getLocale(i18n.language)` を用い、`ActivityListItem` と同じロケールパターンに統一
+- Bootstrap クラス: `w-100 text-start bg-transparent fs-5 lh-1` などを利用し、インラインスタイルを最小化
+- 未読ドット: `InAppNotificationElm` と共有の `UnreadDot.module.scss` を使用し、両者の見た目を完全に揃える
 - クリック時: `POST /mark-read` + SWR mutate + `url` があれば新タブで開く
 
 ---
@@ -522,13 +555,7 @@ interface INewsItemWithReadStatus {
   isRead: boolean;
 }
 
-interface PaginateResult<T> {
-  docs: T[];
-  totalDocs: number;
-  limit: number;
-  offset: number;
-  hasNextPage: boolean;
-}
+// PaginateResult<T> は ~/interfaces/in-app-notification の既存型を再利用する（再定義不要）
 ```
 
 ---
@@ -587,7 +614,7 @@ interface PaginateResult<T> {
 
 - すべての `/apiv3/news/*` エンドポイントに `loginRequiredStrictly` を適用する
 - `conditions.targetRoles` のフィルタリングはサーバーサイドの `NewsService.listForUser()` で強制する。クライアントから `targetRoles` パラメータを受け付けない
-- `NEWS_FEED_URL` は `https://` のみ許可（HTTP 不可）
+- `NEWS_FEED_URL` は `https://` で始まる URL は常に許可。`http://localhost` または `http://127.0.0.1` で始まる URL はローカル開発用として許可。それ以外の `http://` は拒否する
 - フィードから取得したデータはそのまま DB に保存し、クライアントへのレスポンス時に Mongoose スキーマで型安全に扱う
 
 ## Performance & Scalability
