@@ -410,7 +410,7 @@ module.exports = (crowi, _app) => {
 
     const commentStr = commentForm?.comment;
     const commentId = commentForm?.comment_id;
-    const revision = commentForm?.revision_id;
+    const revisionId = commentForm?.revision_id;
 
     if (commentStr === '') {
       return res.json(ApiResponse.error('Comment text is required'));
@@ -422,14 +422,22 @@ module.exports = (crowi, _app) => {
 
     let updatedComment;
     try {
-      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
+      const comment = await prisma.comments.findUnique({
+        select: {
+          pageId: true,
+          creatorId: true,
+        },
+        where: {
+          id: commentId,
+        },
+      });
 
       if (comment == null) {
         throw new Error('This comment does not exist.');
       }
 
       // check whether accessible
-      const pageId = comment.page;
+      const pageId = comment.pageId;
       const isAccessible = await Page.isAccessiblePageByViewer(
         pageId,
         req.user,
@@ -437,14 +445,23 @@ module.exports = (crowi, _app) => {
       if (!isAccessible) {
         throw new Error('Current user is not accessible to this page.');
       }
-      if (req.user._id.toString() !== comment.creator.toString()) {
+      if (req.user._id.toString() !== comment.creatorId.toString()) {
         throw new Error('Current user is not operatable to this comment.');
       }
 
-      updatedComment = await Comment.findOneAndUpdate(
-        { _id: { $eq: commentId } },
-        { $set: { comment: commentStr, revision } },
-      );
+      updatedComment = await prisma.comments.update({
+        where: {
+          id: commentId,
+        },
+        data: {
+          comment: commentStr,
+          revision: {
+            connect: {
+              id: revisionId,
+            },
+          },
+        },
+      });
       commentEvent.emit(CommentEvent.UPDATE, updatedComment);
     } catch (err) {
       logger.error(err);
