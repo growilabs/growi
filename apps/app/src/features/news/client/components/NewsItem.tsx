@@ -1,4 +1,5 @@
 import type { FC } from 'react';
+import { memo } from 'react';
 import { format } from 'date-fns';
 import { useTranslation } from 'next-i18next';
 
@@ -30,7 +31,7 @@ type Props = {
   onReadMutate: () => void;
 };
 
-export const NewsItem: FC<Props> = ({ item, onReadMutate }) => {
+const NewsItemInner: FC<Props> = ({ item, onReadMutate }) => {
   const { i18n } = useTranslation();
   const locale = i18n.language;
   const title = resolveTitle(item.title, locale);
@@ -78,3 +79,5 @@ export const NewsItem: FC<Props> = ({ item, onReadMutate }) => {
     </button>
   );
 };
+
+export const NewsItem = memo(NewsItemInner);

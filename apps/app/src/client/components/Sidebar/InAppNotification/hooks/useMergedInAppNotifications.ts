@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 
 import {
@@ -156,27 +156,35 @@ export const useMergedInAppNotifications = (
     );
   }, [allNewsItems, allNotificationItems]);
 
-  const handleReadMutate = () => {
-    newsResponse.mutate();
+  // SWR's mutate is stable per cache key — destructure once and depend on it
+  // rather than the whole response object (which may carry unstable identity).
+  const { mutate: mutateNews } = newsResponse;
+  const { mutate: mutateNotifications } = notificationResponse;
+
+  const handleReadMutate = useCallback(() => {
+    mutateNews();
     mutateNewsUnreadCount();
-  };
+  }, [mutateNews, mutateNewsUnreadCount]);
 
   // SWR-idiomatic optimistic update: rewrite the per-page cache in place and
   // suppress revalidation so the dot stays removed across unmount/remount.
-  const handleNotificationRead = (notificationId: string) => {
-    notificationResponse.mutate(
-      (pages) =>
-        pages?.map((page) => ({
-          ...page,
-          docs: page.docs.map((doc) =>
-            doc._id.toString() === notificationId
-              ? { ...doc, status: InAppNotificationStatuses.STATUS_OPENED }
-              : doc,
-          ),
-        })),
-      { revalidate: false },
-    );
-  };
+  const handleNotificationRead = useCallback(
+    (notificationId: string) => {
+      mutateNotifications(
+        (pages) =>
+          pages?.map((page) => ({
+            ...page,
+            docs: page.docs.map((doc) =>
+              doc._id.toString() === notificationId
+                ? { ...doc, status: InAppNotificationStatuses.STATUS_OPENED }
+                : doc,
+            ),
+          })),
+        { revalidate: false },
+      );
+    },
+    [mutateNotifications],
+  );
 
   return {
     newsResponse,
