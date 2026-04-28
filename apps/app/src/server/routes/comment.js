@@ -296,7 +296,7 @@ module.exports = (crowi, _app) => {
       await crowi.commentService.prepareMentionNotifications(
         createdComment._id,
         req.user._id,
-        res.locals.activity,
+        res.locals.activity._id,
         page,
       );
 

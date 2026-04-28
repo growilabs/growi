@@ -102,7 +102,7 @@ class CommentService {
   prepareMentionNotifications = async (
     commentId: Types.ObjectId,
     actionUserId: Types.ObjectId,
-    activity: ActivityDocument,
+    activityId: Types.ObjectId,
     page: IPageHasId,
   ): Promise<{
     generatePreNotify: (
@@ -142,7 +142,7 @@ class CommentService {
       this.inAppNotificationService.insertMentionNotifications(
         mentionedUserIds,
         actionUserId,
-        activity,
+        activityId,
         page,
       );
 

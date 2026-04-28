@@ -214,7 +214,7 @@ export class InAppNotificationService {
   insertMentionNotifications = async (
     mentionedUserIds: Types.ObjectId[],
     actionUserId: Types.ObjectId,
-    activity: ActivityDocument,
+    activityId: Types.ObjectId,
     page: IPageHasId,
   ): Promise<void> => {
     const filteredUserIds = mentionedUserIds.filter(
@@ -225,7 +225,6 @@ export class InAppNotificationService {
       return;
     }
 
-    const { _id: activityId } = activity;
     const now = new Date();
     const snapshot = await generateSnapshot(
       SupportedTargetModel.MODEL_PAGE,

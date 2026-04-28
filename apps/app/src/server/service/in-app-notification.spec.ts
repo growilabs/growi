@@ -4,7 +4,6 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
-import type { ActivityDocument } from '~/server/models/activity';
 import { InAppNotification } from '~/server/models/in-app-notification';
 
 import type Crowi from '../crowi';
@@ -73,7 +72,6 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
   const activityId = new Types.ObjectId();
   const pageId = new Types.ObjectId();
 
-  const mockActivity = { _id: activityId } as unknown as ActivityDocument;
   const mockPage = { _id: pageId, path: '/test-page' } as unknown as IPageHasId;
 
   beforeEach(() => {
@@ -89,7 +87,7 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     await service.insertMentionNotifications(
       mentionedUserIds,
       actionUserId,
-      mockActivity,
+      activityId,
       mockPage,
     );
 
@@ -108,7 +106,7 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     await service.insertMentionNotifications(
       [],
       actionUserId,
-      mockActivity,
+      activityId,
       mockPage,
     );
 
@@ -119,7 +117,7 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     await service.insertMentionNotifications(
       [actionUserId],
       actionUserId,
-      mockActivity,
+      activityId,
       mockPage,
     );
 
@@ -130,7 +128,7 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     await service.insertMentionNotifications(
       [userId1],
       actionUserId,
-      mockActivity,
+      activityId,
       mockPage,
     );
 
@@ -163,7 +161,7 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     await service.insertMentionNotifications(
       [userId1, userId2],
       actionUserId,
-      mockActivity,
+      activityId,
       mockPage,
     );
 
@@ -177,7 +175,7 @@ describe('InAppNotificationService.insertMentionNotifications', () => {
     await service.insertMentionNotifications(
       [userId1],
       actionUserId,
-      mockActivity,
+      activityId,
       mockPage,
     );
 
