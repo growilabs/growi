@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { keymap } from '@codemirror/view';
+import { useEffect, useRef, useState } from 'react';
+import { EditorView, keymap } from '@codemirror/view';
 import { YJS_WEBSOCKET_BASE_PATH } from '@growi/core/dist/consts';
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next';
@@ -9,13 +9,77 @@ import * as Y from 'yjs';
 import { userColor } from '../../consts';
 import type { EditingClient } from '../../interfaces';
 import type { UseCodeMirrorEditor } from '../services';
+import { yRichCursors } from '../services-internal/extensions/y-rich-cursors';
 import { useSecondaryYdocs } from './use-secondary-ydocs';
+
+type Awareness = WebsocketProvider['awareness'];
+
+type AwarenessState = {
+  editors?: EditingClient;
+  cursor?: {
+    anchor: Y.RelativePosition;
+    head: Y.RelativePosition;
+  };
+};
 
 type Configuration = {
   user?: IUserHasId;
   pageId?: string;
   reviewMode?: boolean;
   onEditorsUpdated?: (clientList: EditingClient[]) => void;
+  onScrollToRemoteCursorReady?: (
+    scrollFn: ((clientId: number) => void) | null,
+  ) => void;
+};
+
+/**
+ * Pure function that creates a scroll-to-remote-cursor callback.
+ * Extracted for unit testability.
+ *
+ * @param awareness - Yjs awareness instance for reading remote cursor positions
+ * @param activeDoc - The active Y.Doc used to resolve relative positions
+ * @param getView - Lazy accessor for the CodeMirror EditorView
+ */
+export const createScrollToRemoteCursorFn = (
+  awareness: Pick<Awareness, 'getStates'>,
+  activeDoc: Y.Doc,
+  getView: () => EditorView | undefined,
+): ((clientId: number) => void) => {
+  return (clientId: number) => {
+    const state = awareness.getStates().get(clientId) as
+      | AwarenessState
+      | undefined;
+    const cursor = state?.cursor;
+    if (cursor?.head == null) return;
+
+    const pos = Y.createAbsolutePositionFromRelativePosition(
+      cursor.head,
+      activeDoc,
+    );
+    if (pos == null) return;
+
+    const view = getView();
+    if (view == null) return;
+
+    const { scrollDOM } = view;
+    const prevBehavior = scrollDOM.style.scrollBehavior;
+    scrollDOM.style.scrollBehavior = 'smooth';
+
+    // First scroll — uses estimated heights for distant lines, so may land
+    // at an approximate position.
+    view.dispatch({
+      effects: EditorView.scrollIntoView(pos.index, { y: 'center' }),
+    });
+
+    // Second scroll — after the view stabilizes, measured heights are
+    // available and the scroll lands at the correct position.
+    setTimeout(() => {
+      scrollDOM.style.scrollBehavior = prevBehavior;
+      view.dispatch({
+        effects: EditorView.scrollIntoView(pos.index, { y: 'center' }),
+      });
+    }, 500);
+  };
 };
 
 export const useCollaborativeEditorMode = (
@@ -23,7 +87,17 @@ export const useCollaborativeEditorMode = (
   codeMirrorEditor?: UseCodeMirrorEditor,
   configuration?: Configuration,
 ): void => {
-  const { user, pageId, onEditorsUpdated, reviewMode } = configuration ?? {};
+  const {
+    user,
+    pageId,
+    onEditorsUpdated,
+    reviewMode,
+    onScrollToRemoteCursorReady,
+  } = configuration ?? {};
+
+  // Stable mutable ref passed to yRichCursors so off-screen indicator clicks
+  // can invoke the scroll function without recreating the extension.
+  const scrollCallbackRef = useRef<((clientId: number) => void) | null>(null);
 
   const { primaryDoc, activeDoc } =
     useSecondaryYdocs(isEnabled, {
@@ -69,13 +143,10 @@ export const useCollaborativeEditorMode = (
 
     const emitEditorList = () => {
       if (onEditorsUpdated == null) return;
-      const clientList: EditingClient[] = Array.from(
-        awareness.getStates().values(),
-        (value) => value.editors,
-      );
-      if (Array.isArray(clientList)) {
-        onEditorsUpdated(clientList);
-      }
+      const clientList = Array.from(awareness.getStates().values())
+        .map((value) => value.editors)
+        .filter((v): v is EditingClient => v != null);
+      onEditorsUpdated(clientList);
     };
 
     const providerSyncHandler = (isSync: boolean) => {
@@ -84,14 +155,11 @@ export const useCollaborativeEditorMode = (
 
     _provider.on('sync', providerSyncHandler);
 
-    const updateAwarenessHandler = (update: {
+    const updateAwarenessHandler = (_update: {
       added: number[];
       updated: number[];
       removed: number[];
     }) => {
-      for (const clientId of update.removed) {
-        awareness.getStates().delete(clientId);
-      }
       emitEditorList();
     };
 
@@ -129,7 +197,8 @@ export const useCollaborativeEditorMode = (
 
     const extensions = [
       keymap.of(yUndoManagerKeymap),
-      yCollab(activeText, provider.awareness, { undoManager }),
+      yCollab(activeText, null, { undoManager }),
+      yRichCursors(provider.awareness, { onClickIndicator: scrollCallbackRef }),
     ];
 
     const cleanupFunctions = extensions.map((ext) =>
@@ -143,4 +212,37 @@ export const useCollaborativeEditorMode = (
       codeMirrorEditor.initDoc('');
     };
   }, [isEnabled, codeMirrorEditor, provider, primaryDoc, activeDoc]);
+
+  // Setup scroll-to-remote-cursor callback
+  useEffect(() => {
+    if (
+      !isEnabled ||
+      provider == null ||
+      activeDoc == null ||
+      codeMirrorEditor == null
+    ) {
+      onScrollToRemoteCursorReady?.(null);
+      return;
+    }
+
+    const scrollFn = createScrollToRemoteCursorFn(
+      provider.awareness,
+      activeDoc,
+      () => codeMirrorEditor.view,
+    );
+
+    scrollCallbackRef.current = scrollFn;
+    onScrollToRemoteCursorReady?.(scrollFn);
+
+    return () => {
+      scrollCallbackRef.current = null;
+      onScrollToRemoteCursorReady?.(null);
+    };
+  }, [
+    isEnabled,
+    provider,
+    activeDoc,
+    codeMirrorEditor,
+    onScrollToRemoteCursorReady,
+  ]);
 };

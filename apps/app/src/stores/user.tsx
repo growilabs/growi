@@ -5,15 +5,20 @@ import useSWRImmutable from 'swr/immutable';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
+import { useIsGuestUser } from '~/states/context';
 import { checkAndUpdateImageUrlCached } from '~/stores/middlewares/user';
 
 export const useSWRxUsersList = (
   userIds: string[],
 ): SWRResponse<IUserHasId[], Error> => {
+  const isGuestUser = useIsGuestUser();
   const distinctUserIds =
     userIds.length > 0 ? Array.from(new Set(userIds)).sort() : [];
+
+  const shouldFetch = !isGuestUser && distinctUserIds.length > 0;
+
   return useSWR(
-    distinctUserIds.length > 0 ? ['/users/list', distinctUserIds] : null,
+    shouldFetch ? ['/users/list', distinctUserIds] : null,
     ([endpoint, userIds]) =>
       apiv3Get(endpoint, { userIds: userIds.join(',') }).then((response) => {
         return response.data.users;

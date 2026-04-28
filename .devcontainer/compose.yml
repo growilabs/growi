@@ -13,7 +13,7 @@ services:
     - opentelemetry-collector-dev-setup_default
 
   mongo:
-    image: mongo:8.0
+    image: mongo:8.2
     restart: unless-stopped
     ports:
       - 27017
@@ -23,11 +23,7 @@ services:
   # This container requires '../../growi-docker-compose' repository
   #   cloned from https://github.com/growilabs/growi-docker-compose.git
   elasticsearch:
-    build:
-      context: ../../growi-docker-compose/elasticsearch/v9
-      dockerfile: ./Dockerfile
-      args:
-        - version=9.0.3
+    image: docker.elastic.co/elasticsearch/elasticsearch:9.3.3
     restart: unless-stopped
     ports:
       - 9200
@@ -42,6 +38,7 @@ services:
     volumes:
       - /usr/share/elasticsearch/data
       - ../../growi-docker-compose/elasticsearch/v9/config/elasticsearch.yml:/usr/share/elasticsearch/config/elasticsearch.yml
+      - ../../growi-docker-compose/elasticsearch/v9/config/elasticsearch-plugins.yml:/usr/share/elasticsearch/config/elasticsearch-plugins.yml
 
 volumes:
   pnpm-store:
