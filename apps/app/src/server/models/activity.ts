@@ -32,6 +32,7 @@ export interface ActivityDocument extends Document {
   event: Types.ObjectId;
   action: SupportedActionType;
   snapshot: ISnapshot;
+  createdAt: Date;
 }
 
 export interface ActivityModel extends Model<ActivityDocument> {
