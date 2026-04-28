@@ -7,6 +7,7 @@ import { useIsAdmin, useIsGuestUser } from '~/states/context';
 
 import { HelpDropdown } from './HelpDropdown';
 import { SkeletonItem } from './SkeletonItem';
+import { ThemeDropdown } from './ThemeDropdown';
 
 import styles from './SecondaryItems.module.scss';
 
@@ -52,9 +53,7 @@ export const SecondaryItems: FC = memo(() => {
       )}
       <SecondaryItem label="Trash" href="/trash" iconName="delete" />
       {!isGuestUser && <PersonalDropdown />}
-      {isGuestUser && (
-        <SecondaryItem label="Theme" href="#" iconName="light_mode" />
-      )}
+      {isGuestUser && <ThemeDropdown />}
     </div>
   );
 });
