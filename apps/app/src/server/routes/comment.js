@@ -293,13 +293,33 @@ module.exports = (crowi, _app) => {
       action: SupportedAction.ACTION_COMMENT_CREATE,
     };
 
-    /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */
-    const getAdditionalTargetUsers = async (activity) => {
-      const mentionedUsers = await crowi.commentService.getMentionedUsers(
-        activity.event,
+    // Fetch mentioned users before emitting to exclude them from subscriber notifications,
+    // preventing duplicate COMMENT_CREATE + COMMENT_MENTION for the same user.
+    let mentionedUserIds = [];
+    try {
+      mentionedUserIds = await crowi.commentService.getMentionedUsers(
+        createdComment._id,
       );
+    } catch (err) {
+      logger.error('Failed to fetch mentioned users', err);
+    }
 
-      return mentionedUsers;
+    // Mentioned users receive COMMENT_MENTION instead of COMMENT_CREATE,
+    // so exclude them from subscriber notifications to avoid duplicates.
+    const excludeSet = new Set(mentionedUserIds.map((id) => id.toString()));
+    const generatePreNotify = (activity, getAdditionalTargetUsers) => {
+      const preNotify = preNotifyService.generatePreNotify(
+        activity,
+        getAdditionalTargetUsers,
+      );
+      return async (props) => {
+        await preNotify(props);
+        if (props.notificationTargetUsers != null) {
+          props.notificationTargetUsers = props.notificationTargetUsers.filter(
+            (user) => !excludeSet.has(user.toString()),
+          );
+        }
+      };
     };
 
     activityEvent.emit(
@@ -307,11 +327,21 @@ module.exports = (crowi, _app) => {
       res.locals.activity._id,
       parameters,
       page,
-      preNotifyService.generatePreNotify,
-      getAdditionalTargetUsers,
+      generatePreNotify,
     );
 
     res.json(ApiResponse.success({ comment: createdComment }));
+
+    try {
+      await crowi.inAppNotificationService.insertMentionNotifications(
+        mentionedUserIds,
+        req.user._id,
+        res.locals.activity,
+        page,
+      );
+    } catch (err) {
+      logger.error('Mention notification failed', err);
+    }
 
     // global notification
     try {
