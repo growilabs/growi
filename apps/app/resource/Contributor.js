@@ -18,6 +18,7 @@ const contributors = [
           { position: 'Haberion', name: 'hakumizuki' },
           { position: 'Undefined', name: 'miya' },
           { position: 'Hoimi Slime', name: 'satof3' },
+          { position: 'Archer', name: 'Ryosei-Fukushima' },
         ],
       },
       {
@@ -172,9 +173,15 @@ const contributors = [
         additionalClass: 'col-md-4 my-4',
         members: [
           { name: 'Crowi Team' },
-          { position: 'Ambassador', name: 'Tsuyoshi Suzuki' },
+          { name: 'RIKEN' },
           { name: 'JPCERT/CC' },
-          { name: 'goofmint' },
+        ],
+      },
+      {
+        additionalClass: 'col-md-6 my-4',
+        members: [
+          { position: 'Ambassador', name: 'Tsuyoshi Suzuki' },
+          { position: 'Ambassador', name: 'goofmint' },
         ],
       },
       {

@@ -528,7 +528,8 @@
       "Code Block": "Code Block",
       "Comment Out": "Comment Out",
       "Comment Out Desc": "(Hide)"
-    }
+    },
+    "Other Shortcuts": "Other Shortcuts"
   },
   "modal_resolve_conflict": {
     "conflicts_with_new_body_on_server_side": "Conflict with new body on server side. Please select or edit the page body to resolve the conflict.",

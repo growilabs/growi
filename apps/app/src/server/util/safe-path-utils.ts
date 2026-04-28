@@ -1,4 +1,7 @@
+import { AllLang } from '@growi/core';
 import path from 'pathe';
+
+export { AllLang as SUPPORTED_LOCALES };
 
 /**
  * Validates that the given file path is within the base directory.
@@ -45,6 +48,25 @@ export function assertFileNameSafeForBaseDir(
   if (!isValid) {
     throw new Error('Invalid file path: path traversal detected');
   }
+}
+
+/**
+ * Resolves a locale-specific template path safely, preventing path traversal attacks.
+ * Falls back to 'en_US' if the locale is not in the supported list.
+ *
+ * @param locale - The locale string (e.g. 'en_US')
+ * @param baseDir - The base directory for locale files
+ * @param templateSubPath - The sub-path within the locale directory (e.g. 'notifications/event.ejs')
+ * @returns The template path
+ * @throws Error if path traversal is detected
+ */
+export function resolveLocalePath(
+  locale: string,
+  baseDir: string,
+  templateSubPath: string,
+): string {
+  const safeLocale = (AllLang as string[]).includes(locale) ? locale : 'en_US';
+  return path.join(baseDir, safeLocale, templateSubPath);
 }
 
 /**
