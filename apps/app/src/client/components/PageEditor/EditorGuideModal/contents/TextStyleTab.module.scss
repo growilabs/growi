@@ -1,10 +1,6 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 @use 'sass:map';
 
-.textStyleTab {
-  max-height: 80vh;
-}
-
 .codeBlockWrapper {
   width: fit-content;
 }
