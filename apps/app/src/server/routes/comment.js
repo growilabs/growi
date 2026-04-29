@@ -538,15 +538,21 @@ module.exports = (crowi, _app) => {
     }
 
     try {
-      /** @type {import('mongoose').HydratedDocument<import('~/interfaces/comment').IComment>} */
-      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
+      const comment = await prisma.comments.findUnique({
+        include: {
+          page: true,
+        },
+        where: {
+          id: commentId,
+        },
+      });
 
       if (comment == null) {
         throw new Error('This comment does not exist.');
       }
 
       // check whether accessible
-      const pageId = getIdStringForRef(comment.page);
+      const pageId = comment.pageId;
       const isAccessible = await Page.isAccessiblePageByViewer(
         pageId,
         req.user,
@@ -554,12 +560,12 @@ module.exports = (crowi, _app) => {
       if (!isAccessible) {
         throw new Error('Current user is not accessible to this page.');
       }
-      if (getIdStringForRef(req.user) !== getIdStringForRef(comment.creator)) {
+      if (getIdStringForRef(req.user) !== comment.creatorId) {
         throw new Error('Current user is not operatable to this comment.');
       }
 
-      await Comment.removeWithReplies(comment);
-      await Page.updateCommentCount(comment.page);
+      await prisma.comments.removeWithReplies(comment.id);
+      await Page.updateCommentCount(comment.pageId);
       commentEvent.emit(CommentEvent.DELETE, comment);
     } catch (err) {
       return res.json(ApiResponse.error(err));
