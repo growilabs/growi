@@ -137,26 +137,42 @@ module.exports = (crowi, _app) => {
       );
     }
 
-    let query = null;
+    let comments;
 
     try {
       if (revisionId) {
-        query = Comment.findCommentsByRevisionId(revisionId);
+        comments = await prisma.comments.findCommentsByRevisionId(revisionId, {
+          include: { creator: true },
+        });
       } else {
-        query = Comment.findCommentsByPageId(pageId);
+        comments = await prisma.comments.findCommentsByPageId(pageId, {
+          include: { creator: true },
+        });
       }
     } catch (err) {
       return res.json(ApiResponse.error(err));
     }
 
-    const comments = await query.populate('creator');
-    comments.forEach((comment) => {
-      if (comment.creator != null && comment.creator instanceof User) {
-        comment.creator = serializeUserSecurely(comment.creator);
-      }
-    });
-
-    res.json(ApiResponse.success({ comments }));
+    res.json(
+      ApiResponse.success({
+        comments: comments.map((comment) => ({
+          ...comment,
+          _id: comment.id,
+          __v: comment.v,
+          page: comment.pageId,
+          creator:
+            comment.creator != null
+              ? serializeUserSecurely(comment.creator)
+              : comment.creator,
+          revision: comment.revisionId,
+          comment: comment.comment,
+          commentPosition: comment.commentPosition,
+          replyTo: comment.replyToId,
+          createdAt: comment.createdAt,
+          updatedAt: comment.updatedAt,
+        })),
+      }),
+    );
   };
 
   api.validators.add = () => {
