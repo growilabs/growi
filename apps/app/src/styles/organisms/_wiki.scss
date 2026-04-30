@@ -123,11 +123,15 @@
 
   blockquote {
     padding: 0 20px;
-    margin: 0 0 30px;
+    margin: 24px 0 16px;
     font-size: 0.9em;
     /* stylelint-disable-next-line scss/no-global-function-names */
     color: lighten(bs.$gray-800, 35%);
     border-left: 0.3rem solid #ddd;
+
+    &:first-child {
+      margin-top: 0;
+    }
   }
 
   img,video {
