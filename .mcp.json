@@ -1,3 +1,11 @@
 {
-  "mcpServers": {}
+  "mcpServers": {
+    "code-mode": {
+      "command": "npx",
+      "args": ["-y", "@utcp/code-mode-mcp"],
+      "env": {
+        "UTCP_CONFIG_FILE": "/workspace/growi/.utcp_config.json"
+      }
+    }
+  }
 }
