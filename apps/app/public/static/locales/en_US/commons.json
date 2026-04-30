@@ -58,7 +58,11 @@
     "unopend": "Unread",
     "mark_all_as_read": "Mark all as read",
     "no_unread_messages": "no_unread_messages",
-    "only_unread": "Only unread"
+    "only_unread": "Only unread",
+    "news": "News",
+    "notifications": "Notifications",
+    "filter_all": "All",
+    "no_news": "No news available"
   },
   "personal_dropdown": {
     "home": "Home",
@@ -167,7 +171,8 @@
         "share_link": "Grants permission to view share link features.",
         "bookmark": "Grants permission to view bookmark features.",
         "attachment": "Grants permission to view attachment features.",
-        "page_bulk_export": "Grants permission to view page bulk export features."
+        "page_bulk_export": "Grants permission to view page bulk export features.",
+        "in_app_notification": "Grants permission to view in-app notification features."
       }
     },
     "write": {
@@ -212,7 +217,8 @@
         "share_link": "Grants permission to edit share link features.",
         "bookmark": "Grants permission to edit bookmark features.",
         "attachment": "Grants permission to edit attachment features.",
-        "page_bulk_export": "Grants permission to edit page bulk export features."
+        "page_bulk_export": "Grants permission to edit page bulk export features.",
+        "in_app_notification": "Grants permission to edit in-app notification features."
       }
     }
   }
