@@ -10,20 +10,14 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import type { IApiv3GetThreadsParams } from '../../interfaces/thread';
 import { mastra } from '../services/mastra-modules';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:get-threads');
 
 type GetThreadsFactory = (crowi: Crowi) => RequestHandler[];
 
-type ReqQuery = {
-  page: number;
-  perPage: number;
-  field?: 'updatedAt' | 'createdAt';
-  direction?: 'ASC' | 'DESC';
-};
-
-type Req = Request<undefined, Response, undefined, ReqQuery> & {
+type Req = Request<undefined, Response, undefined, IApiv3GetThreadsParams> & {
   user: IUserHasId;
 };
 

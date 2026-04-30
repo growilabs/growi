@@ -90,6 +90,35 @@ export const ChatSidebar = (): JSX.Element => {
   const { messages, sendMessage, status, regenerate, setMessages } = useChat({
     id: chatThreadId,
     transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
+    // Refresh the thread list after the assistant finishes streaming.
+    //
+    // The thread itself is persisted by the time the stream closes, but
+    // Mastra's auto-generated title (configured via `generateTitle: true`
+    // on the Memory) is written asynchronously and may land slightly later.
+    //
+    // This is an intentional design choice of Mastra. See:
+    //   https://mastra.ai/docs/memory/storage
+    //   > Title generation operates asynchronously after the agent
+    //   > responds, ensuring it doesn't impact response times.
+    //
+    // Mastra exposes no event for "title persisted", so poll briefly until
+    // the title for the current thread shows up in the list.
+    onFinish: async () => {
+      const targetId = chatThreadId;
+      const maxAttempts = 5;
+      const intervalMs = 1000;
+      for (let attempt = 0; attempt < maxAttempts; attempt++) {
+        // biome-ignore lint/performance/noAwaitInLoops: intentionally poll in series with a delay
+        const pages = await mutateRecentThreads();
+        const thread = pages
+          ?.flatMap((p) => p.threads)
+          .find((t) => t.id === targetId);
+        if (thread?.title) return;
+        await new Promise((resolve) => {
+          setTimeout(resolve, intervalMs);
+        });
+      }
+    },
   });
 
   useEffect(() => {
@@ -111,8 +140,6 @@ export const ChatSidebar = (): JSX.Element => {
       },
     );
     setInput('');
-
-    mutateRecentThreads();
   };
 
   return (
@@ -153,10 +180,10 @@ export const ChatSidebar = (): JSX.Element => {
                         {message.parts
                           .filter((part) => part.type === 'source-url')
                           .map((_part, i) => (
-                            // eslint-disable-next-line react/no-array-index-key
+                            // biome-ignore lint/suspicious/noArrayIndexKey: the source parts have no stable ID, but the index is sufficient for this static list
                             <SourcesContent key={`${message.id}-${i}`}>
                               <Source
-                                // eslint-disable-next-line react/no-array-index-key
+                                // biome-ignore lint/suspicious/noArrayIndexKey: the source parts have no stable ID, but the index is sufficient for this static list
                                 key={`${message.id}-${i}`}
                                 // href={part.url}
                                 // title={part.url}
@@ -169,8 +196,10 @@ export const ChatSidebar = (): JSX.Element => {
                     switch (part.type) {
                       case 'text':
                         return (
-                          // eslint-disable-next-line react/no-array-index-key
-                          <Fragment key={`${message.id}-${i}`}>
+                          <Fragment
+                            // biome-ignore lint/suspicious/noArrayIndexKey: the text parts have no stable ID, but the index is sufficient for this static list
+                            key={`${message.id}-${i}`}
+                          >
                             <Message from={message.role}>
                               <MessageContent variant="flat">
                                 <Response
@@ -208,7 +237,7 @@ export const ChatSidebar = (): JSX.Element => {
                       case 'reasoning':
                         return (
                           <Reasoning
-                            // eslint-disable-next-line react/no-array-index-key
+                            // biome-ignore lint/suspicious/noArrayIndexKey: the reasoning parts have no stable ID, but the index is sufficient for this static list
                             key={`${message.id}-${i}`}
                             className="w-full"
                             isStreaming={
