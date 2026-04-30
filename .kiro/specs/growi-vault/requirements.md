@@ -67,6 +67,8 @@ GROWI Vault は、GROWI 上のページを git プロトコル経由で read-onl
 4. When 2 つ以上の GROWI ページが大文字小文字を区別しないファイルシステム上で衝突するファイル名にマップされる場合, the GROWI Vault shall クローン後も個別にアドレス可能となるよう衝突ファイル名を曖昧性解消する
 5. Where ページが GROWI のページツリー上で親ページを持たない orphan page である場合, the GROWI Vault shall 通常のページツリーとは分離された well-known な予約場所の下に該当ファイルを配置する
 6. The GROWI Vault shall path-to-filename マッピング規則を利用者向けに文書化し、利用者が GROWI ページに対応するファイルを予測できるようにする
+7. The GROWI Vault shall `/trash` 配下のページをリポジトリに含めない (ごみ箱ページは常にサーバー側で除外する)
+8. The GROWI Vault shall `/user` 配下のページを ACL フィルタ後にリポジトリに含める。ただし、利用者が `git sparse-checkout` を用いて `/user` 配下をローカルチェックアウトから除外できることをドキュメントに明記する
 
 ### Requirement 3: ACL に基づく per-user 可視範囲制御
 

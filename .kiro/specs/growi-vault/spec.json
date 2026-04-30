@@ -1,17 +1,17 @@
 {
   "feature_name": "growi-vault",
   "created_at": "2026-04-24T10:07:43Z",
-  "updated_at": "2026-04-24T10:12:00Z",
+  "updated_at": "2026-04-30T15:00:00Z",
   "language": "ja",
-  "phase": "requirements-generated",
+  "phase": "design-validated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "design": {
-      "generated": false,
-      "approved": false
+      "generated": true,
+      "approved": true
     },
     "tasks": {
       "generated": false,
