@@ -22,6 +22,7 @@ import type {
 import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info';
 import { useFetchCurrentPage } from '~/states/page';
 import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
+import { useSidebarMode } from '~/states/ui/sidebar';
 import { mutateAllPageInfo, useSWRxPageInfo } from '~/stores/page';
 
 import {
@@ -62,6 +63,7 @@ export const BookmarkItem = (props: Props): JSX.Element => {
     bookmarkFolderTreeMutation,
   } = props;
   const { open: openPutBackPageModal } = usePutBackPageModalActions();
+  const { isDrawerMode } = useSidebarMode();
   const [isRenameInputShown, setRenameInputShown] = useState(false);
 
   const { data: pageInfo, mutate: mutatePageInfo } = useSWRxPageInfo(
@@ -258,6 +260,7 @@ export const BookmarkItem = (props: Props): JSX.Element => {
             page={bookmarkedPage}
             pageTitle={pageTitle}
             isNarrowView
+            hidePageListMeta={isDrawerMode()}
           />
         )}
 
@@ -286,7 +289,7 @@ export const BookmarkItem = (props: Props): JSX.Element => {
           >
             <DropdownToggle
               color="transparent"
-              className="border-0 rounded btn-page-item-control p-0 grw-visible-on-hover me-1"
+              className={`border-0 rounded btn-page-item-control p-0 ${isDrawerMode() ? '' : 'grw-visible-on-hover'} me-1`}
             >
               <span className="material-symbols-outlined p-1">more_vert</span>
             </DropdownToggle>
