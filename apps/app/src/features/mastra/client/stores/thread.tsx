@@ -3,7 +3,10 @@ import type { SWRInfiniteResponse } from 'swr/infinite';
 import useSWRInfinite from 'swr/infinite';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-import type { ThreadListOutput } from '~/features/mastra/interfaces/thread';
+import type {
+  IApiv3GetThreadsParams,
+  ThreadListOutput,
+} from '~/features/mastra/interfaces/thread';
 
 const getRecentThreadsKey = (
   pageIndex: number,
@@ -25,11 +28,18 @@ export const useSWRINFxRecentThreads = (
   return useSWRInfinite(
     (pageIndex, previousPageData) =>
       getRecentThreadsKey(pageIndex, previousPageData),
-    ([endpoint, page, perPage]) =>
-      apiv3Get<{ paginatedThread: ThreadListOutput }>(endpoint, {
+    ([endpoint, page, perPage]) => {
+      const params: IApiv3GetThreadsParams = {
+        field: 'updatedAt',
+        direction: 'DESC',
         page,
         perPage,
-      }).then((response) => response.data.paginatedThread),
+      };
+      return apiv3Get<{ paginatedThread: ThreadListOutput }>(
+        endpoint,
+        params,
+      ).then((response) => response.data.paginatedThread);
+    },
     {
       ...config,
       initialSize: 0,

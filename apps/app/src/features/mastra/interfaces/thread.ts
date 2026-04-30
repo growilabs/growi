@@ -21,3 +21,10 @@ export const isThreadWithMeta = (
 export type ThreadListOutput = PaginationInfo & {
   threads: ThreadWithMeta[];
 };
+
+export type IApiv3GetThreadsParams = {
+  page: number;
+  perPage: number;
+  field?: 'updatedAt' | 'createdAt';
+  direction?: 'ASC' | 'DESC';
+};
