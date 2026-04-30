@@ -323,6 +323,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
   }
 
   async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
+    if (!this.isConfigured) return;
     return this.fullTextSearchDelegator.updateOrInsertAuditlog(activity);
   }
 
