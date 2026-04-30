@@ -160,6 +160,10 @@ const contributors = [
             name: 'Yuji Tounai',
           },
           { name: 'yy0931' },
+          {
+            position: 'GMO Cybersecurity by Ierae, Inc.',
+            name: 'Sho Odagiri',
+          },
         ],
       },
     ],
