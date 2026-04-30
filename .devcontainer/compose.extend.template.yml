@@ -7,5 +7,6 @@ services:
     volumes:
       - ..:/workspace/growi:delegated
       - pnpm-store:/workspace/.pnpm-store
+      - ${HOME}/.claude:/home/vscode/.claude
       - page_bulk_export_tmp:/tmp/page-bulk-export
     tty: true

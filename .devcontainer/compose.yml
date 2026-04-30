@@ -4,6 +4,7 @@ services:
     volumes:
       - ..:/workspace/growi:delegated
       - pnpm-store:/workspace/.pnpm-store
+      - ${HOME}/.claude:/home/vscode/.claude
       - ../../growi-docker-compose:/workspace/growi-docker-compose:delegated
       - ../../share:/workspace/share:delegated
       - page_bulk_export_tmp:/tmp/page-bulk-export
