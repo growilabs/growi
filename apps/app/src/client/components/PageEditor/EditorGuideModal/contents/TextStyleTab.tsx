@@ -5,6 +5,8 @@ import { PrismAsyncLight } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useGrowiDocumentationUrl } from '~/states/context';
+import { getLocale } from '~/utils/locale-utils';
 
 import styles from './TextStyleTab.module.scss';
 
@@ -64,7 +66,9 @@ const GuideRow = ({
 };
 
 export const TextStyleTab: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
+  const documentationUrl = useGrowiDocumentationUrl();
+  const docsLang = getLocale(i18n.language).code === 'ja' ? 'ja' : 'en';
   const i18nKey = 'editor_guide.textstyle';
 
   const TEXT_STYLE_GUIDES = [
@@ -170,10 +174,10 @@ export const TextStyleTab: React.FC = () => {
     {
       id: 'link-docs',
       title: t(`${i18nKey}.link_label`),
-      code: `[${t(`${i18nKey}.link_docs`)}](https://docs.growi.org/ja/g)`,
+      code: `[${t(`${i18nKey}.link_docs`)}](${documentationUrl}/${docsLang})`,
       preview: (
         <a
-          href="https://docs.growi.org/ja/g"
+          href={`${documentationUrl}/${docsLang}`}
           target="_blank"
           rel="noreferrer"
           className="text-secondary text-decoration-underline"
@@ -201,7 +205,7 @@ export const TextStyleTab: React.FC = () => {
     },
   ];
   return (
-    <div className={`px-4 py-2 overflow-y-auto ${styles.textStyleTab}`}>
+    <div className="px-4 py-2">
       {TEXT_STYLE_GUIDES.map((item) => (
         <GuideRow
           key={item.id}
