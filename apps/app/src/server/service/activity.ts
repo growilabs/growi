@@ -157,16 +157,19 @@ class ActivityService {
     const shoudCreateActivity = this.crowi.activityService.shoudUpdateActivity(
       parameters.action,
     );
-    if (shoudCreateActivity) {
-      let activity: IActivity;
-      try {
-        activity = await Activity.createByParameters(parameters);
-        return activity;
-      } catch (err) {
-        logger.error('Create activity failed', err);
-      }
+    if (!shoudCreateActivity) return null;
+
+    let activity: IActivity;
+    try {
+      activity = await Activity.createByParameters(parameters);
+    } catch (err) {
+      logger.error('Create activity failed', err);
+      return null;
     }
-    return null;
+
+    await this.crowi.searchService.updateOrInsertAuditlog(activity);
+
+    return activity;
   };
 
   createTtlIndex = async function () {

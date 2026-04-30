@@ -9,6 +9,7 @@ import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import { SocketEventName } from '~/interfaces/websocket';
+import type { ActivityDocument } from '~/server/models/activity';
 import PageTagRelation from '~/server/models/page-tag-relation';
 import type { SocketIoService } from '~/server/service/socket-io';
 import loggerFactory from '~/utils/logger';
@@ -505,7 +506,7 @@ class ElasticsearchDelegator
   async addAllAuditlogs(): Promise<void> {
     const Activity = mongoose.model('Activity');
     const bulkWrite = this.client.bulk.bind(this.client);
-    const auditlogIndexName = this.auditlogIndexName;
+    const prepareBodyForAuditlog = this.prepareBodyForAuditlog.bind(this);
 
     const bulkSize: number = configManager.getConfig(
       'app:elasticsearchReindexBulkSize',
@@ -521,19 +522,9 @@ class ElasticsearchDelegator
     const writeStream = new Writable({
       objectMode: true,
       async write(batch, _encoding, callback) {
-        const body = batch.flatMap((activity) => {
-          const username = activity.snapshot?.username;
-          if (username == null || username === '') return [];
-          return [
-            {
-              index: {
-                _index: auditlogIndexName,
-                _id: activity._id.toString(),
-              },
-            },
-            { username },
-          ];
-        });
+        const body = batch.flatMap((activity) =>
+          prepareBodyForAuditlog(activity),
+        );
 
         if (body.length === 0) {
           callback();
@@ -670,6 +661,19 @@ class ElasticsearchDelegator
     };
 
     return [command, document];
+  }
+
+  private prepareBodyForAuditlog(
+    activity: Pick<ActivityDocument, '_id' | 'snapshot'>,
+  ): [] | [{ index: { _index: string; _id: string } }, { username: string }] {
+    const username = activity.snapshot?.username;
+    if (username == null || username === '') return [];
+    return [
+      {
+        index: { _index: this.auditlogIndexName, _id: activity._id.toString() },
+      },
+      { username },
+    ];
   }
 
   prepareBodyForDelete(body, page): void {
@@ -824,6 +828,26 @@ class ElasticsearchDelegator
     });
 
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
+  }
+
+  async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
+    const body = this.prepareBodyForAuditlog(activity);
+    if (body.length === 0) return;
+
+    try {
+      const bulkResponse = await this.client.bulk({ body });
+      if (bulkResponse.errors) {
+        const failedItems = (bulkResponse.items ?? []).filter(
+          (i) => i.index?.error,
+        );
+        logger.error(
+          { failedItems },
+          'updateOrInsertAuditlog bulk indexing had errors',
+        );
+      }
+    } catch (err) {
+      logger.error('updateOrInsertAuditlog failed.', err);
+    }
   }
 
   deletePages(pages) {
