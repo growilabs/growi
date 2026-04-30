@@ -665,7 +665,7 @@ class ElasticsearchDelegator
 
   private prepareBodyForAuditlog(
     activity: Pick<ActivityDocument, '_id' | 'snapshot'>,
-  ): [] | [object, { username: string }] {
+  ): [] | [{ index: { _index: string; _id: string } }, { username: string }] {
     const username = activity.snapshot?.username;
     if (username == null || username === '') return [];
     return [
@@ -837,7 +837,13 @@ class ElasticsearchDelegator
     try {
       const bulkResponse = await this.client.bulk({ body });
       if (bulkResponse.errors) {
-        logger.error('updateOrInsertAuditlog bulk indexing had errors');
+        const failedItems = (bulkResponse.items ?? []).filter(
+          (i) => i.index?.error,
+        );
+        logger.error(
+          { failedItems },
+          'updateOrInsertAuditlog bulk indexing had errors',
+        );
       }
     } catch (err) {
       logger.error('updateOrInsertAuditlog failed.', err);
