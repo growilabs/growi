@@ -3,6 +3,7 @@ import {
   type Completion,
   type CompletionContext,
 } from '@codemirror/autocomplete';
+import { markdownLanguage } from '@codemirror/lang-markdown';
 import { syntaxTree } from '@codemirror/language';
 import nativeLookup from '@growi/emoji-mart-data';
 
@@ -28,20 +29,22 @@ const emojiAutocompletion = (context: CompletionContext) => {
   };
 };
 
-export const emojiAutocompletionSettings = autocompletion({
-  addToOptions: [
-    {
-      render: (completion: Completion) => {
-        const emojiName = completion.type ?? '';
-        const emoji = nativeLookup[emojiName]?.skins[0].native ?? '';
+export const emojiAutocompletionSettings = [
+  autocompletion({
+    addToOptions: [
+      {
+        render: (completion: Completion) => {
+          const emojiName = completion.type ?? '';
+          const emoji = nativeLookup[emojiName]?.skins[0].native ?? '';
 
-        const element = document.createElement('span');
-        element.innerHTML = emoji;
-        return element;
+          const element = document.createElement('span');
+          element.innerHTML = emoji;
+          return element;
+        },
+        position: 20,
       },
-      position: 20,
-    },
-  ],
-  icons: false,
-  override: [emojiAutocompletion],
-});
+    ],
+    icons: false,
+  }),
+  markdownLanguage.data.of({ autocomplete: emojiAutocompletion }),
+];
