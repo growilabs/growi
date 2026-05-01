@@ -50,6 +50,16 @@ const VALID_FEED = {
   ],
 };
 
+/** Build a Response-like mock that exposes `text()` returning the JSON-stringified body. */
+const mockResponse = (
+  body: unknown,
+  init?: { ok?: boolean; status?: number },
+) => ({
+  ok: init?.ok ?? true,
+  status: init?.status ?? 200,
+  text: () => Promise.resolve(JSON.stringify(body)),
+});
+
 describe('NewsCronService', () => {
   let service: NewsCronService;
   const originalEnv = process.env.NEWS_FEED_URL;
@@ -99,10 +109,7 @@ describe('NewsCronService', () => {
 
     test('should allow https:// URLs', async () => {
       process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
-      mocks.mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(VALID_FEED),
-      });
+      mocks.mockFetch.mockResolvedValue(mockResponse(VALID_FEED));
 
       await service.executeJob();
 
@@ -114,10 +121,7 @@ describe('NewsCronService', () => {
 
     test('should allow http://localhost URLs', async () => {
       process.env.NEWS_FEED_URL = 'http://localhost:8099/feed.json';
-      mocks.mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(VALID_FEED),
-      });
+      mocks.mockFetch.mockResolvedValue(mockResponse(VALID_FEED));
 
       await service.executeJob();
 
@@ -126,10 +130,7 @@ describe('NewsCronService', () => {
 
     test('should allow http://127.0.0.1 URLs', async () => {
       process.env.NEWS_FEED_URL = 'http://127.0.0.1:8099/feed.json';
-      mocks.mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(VALID_FEED),
-      });
+      mocks.mockFetch.mockResolvedValue(mockResponse(VALID_FEED));
 
       await service.executeJob();
 
@@ -138,10 +139,7 @@ describe('NewsCronService', () => {
 
     test('should upsert items on successful fetch', async () => {
       process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
-      mocks.mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(VALID_FEED),
-      });
+      mocks.mockFetch.mockResolvedValue(mockResponse(VALID_FEED));
 
       await service.executeJob();
 
@@ -188,10 +186,7 @@ describe('NewsCronService', () => {
           },
         ],
       };
-      mocks.mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(feedWithVersionFilter),
-      });
+      mocks.mockFetch.mockResolvedValue(mockResponse(feedWithVersionFilter));
 
       await service.executeJob();
 
@@ -219,10 +214,7 @@ describe('NewsCronService', () => {
           },
         ],
       };
-      mocks.mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(feedWithInvalidRegex),
-      });
+      mocks.mockFetch.mockResolvedValue(mockResponse(feedWithInvalidRegex));
 
       await service.executeJob();
 
@@ -234,6 +226,21 @@ describe('NewsCronService', () => {
       expect(upsertCall.map((i: { id: string }) => i.id)).not.toContain(
         'invalid-regex-item',
       );
+    });
+
+    test('should skip when response body exceeds size limit (5 MiB)', async () => {
+      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
+      // Build a string that exceeds 5 MiB
+      const oversizedText = 'x'.repeat(5 * 1024 * 1024 + 1);
+      mocks.mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve(oversizedText),
+      });
+
+      await service.executeJob();
+
+      expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
+      expect(mocks.deleteNewsItemsByExternalIds).not.toHaveBeenCalled();
     });
   });
 });
