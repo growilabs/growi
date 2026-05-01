@@ -9,6 +9,10 @@ import {
 import dynamic from 'next/dynamic';
 import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
 import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment';
+import {
+  createMentionCompletionExtension,
+  type FetchUsersFn,
+} from '@growi/editor/dist/client/services-internal/extensions/mentionAutocompletionSettings';
 import { mentionDecorationSettings } from '@growi/editor/dist/client/services-internal/extensions/mentionDecorationSettings';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { UserPicture } from '@growi/ui/dist/components';
@@ -232,9 +236,38 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     [editorKey, markDirty],
   );
 
+  const fetchUsers = useMemo<FetchUsersFn>(() => {
+    return async (query: string) => {
+      try {
+        const res = await fetch(
+          `/_api/v3/users/?searchText=${encodeURIComponent(query)}&sort=username&sortOrder=asc&page=1`,
+        );
+        if (!res.ok) return [];
+        const data = await res.json();
+        return (data.paginateResult?.docs ?? []).map(
+          (user: { username: string; name: string }) => ({
+            username: user.username,
+            name: user.name,
+          }),
+        );
+      } catch {
+        return [];
+      }
+    };
+  }, []);
+
+  const mentionExtension = useMemo(
+    () => createMentionCompletionExtension(fetchUsers),
+    [fetchUsers],
+  );
+
   useEffect(() => {
     return codeMirrorEditor?.appendExtensions?.([mentionDecorationSettings]);
   }, [codeMirrorEditor]);
+
+  useEffect(() => {
+    return codeMirrorEditor?.appendExtensions?.(mentionExtension);
+  }, [codeMirrorEditor, mentionExtension]);
 
   // initialize CodeMirrorEditor
   useEffect(() => {
