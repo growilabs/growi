@@ -3,6 +3,7 @@ import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
 import type { INewsItemInput } from '../../interfaces/news-item';
+import { type FeedItem, parseFeedJson } from './feed-parser';
 import { NewsService } from './news-service';
 
 const logger = loggerFactory('growi:feature:news:cron');
@@ -13,24 +14,12 @@ const MAX_RANDOM_SLEEP_MS = 5 * 60 * 60 * 1000;
 /** HTTP fetch timeout in ms */
 const FETCH_TIMEOUT_MS = 10_000;
 
-interface FeedItem {
-  id: string;
-  type?: string;
-  emoji?: string;
-  title: Record<string, string>;
-  body?: Record<string, string>;
-  url?: string;
-  publishedAt: string;
-  conditions?: {
-    targetRoles?: string[];
-    growiVersionRegExps?: string[];
-  };
-}
-
-interface FeedJson {
-  version: string;
-  items: FeedItem[];
-}
+/**
+ * Maximum response body size (5 MiB).
+ * Sanity limit for the trust boundary at the news feed adapter — caps how much
+ * an external endpoint (broken or compromised) can push into our process memory.
+ */
+const MAX_RESPONSE_SIZE_BYTES = 5 * 1024 * 1024;
 
 /**
  * Check if the given URL is allowed for fetching
@@ -95,7 +84,7 @@ export class NewsCronService extends CronService {
     // Random sleep to distribute requests across multiple GROWI instances
     await randomSleep(MAX_RANDOM_SLEEP_MS);
 
-    let feedJson: FeedJson;
+    let rawJson: unknown;
     try {
       const response = await fetch(feedUrl, {
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
@@ -106,9 +95,22 @@ export class NewsCronService extends CronService {
         return;
       }
 
-      feedJson = (await response.json()) as FeedJson;
+      const text = await response.text();
+      if (Buffer.byteLength(text, 'utf8') > MAX_RESPONSE_SIZE_BYTES) {
+        logger.error(
+          `News feed response exceeds size limit (${MAX_RESPONSE_SIZE_BYTES} bytes), skipping`,
+        );
+        return;
+      }
+
+      rawJson = JSON.parse(text);
     } catch (err) {
       logger.error('Error fetching news feed, keeping existing data', err);
+      return;
+    }
+
+    const feedJson = parseFeedJson(rawJson);
+    if (feedJson == null) {
       return;
     }
 
