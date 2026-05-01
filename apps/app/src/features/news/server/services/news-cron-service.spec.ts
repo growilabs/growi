@@ -238,5 +238,53 @@ describe('NewsCronService', () => {
         'invalid-regex-item',
       );
     });
+
+    // Regression for Requirement 1.3: items removed from the feed must be
+    // deleted from the local DB. Earlier code computed `idsToDelete` from
+    // `feedJson.items` only, so DB items absent from the feed were never
+    // cleaned up. The cron must now hand the full set of feed externalIds
+    // to `deleteItemsNotInFeed`, which uses a $nin filter to remove the rest.
+    test('should pass every feed externalId to deleteItemsNotInFeed (regression for stale-item bug)', async () => {
+      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
+      const feed = {
+        version: '1.0',
+        items: [
+          {
+            id: 'still-present-1',
+            title: { ja_JP: 'still present 1' },
+            publishedAt: '2026-01-01T00:00:00Z',
+          },
+          {
+            id: 'still-present-2',
+            title: { ja_JP: 'still present 2' },
+            publishedAt: '2026-01-02T00:00:00Z',
+          },
+          // Item present in feed but version-filtered out — must remain in
+          // the deletion safelist so it is not wiped from the DB.
+          {
+            id: 'version-filtered',
+            title: { ja_JP: 'version filtered' },
+            publishedAt: '2026-01-03T00:00:00Z',
+            conditions: { growiVersionRegExps: ['^999\\.'] },
+          },
+        ],
+      };
+      mocks.mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(feed),
+      });
+
+      await service.executeJob();
+
+      // The argument is the *full* feed externalId list, not the
+      // version-matched subset. Items absent from this list (e.g. an
+      // earlier `removed-from-feed` item still in the DB) will be
+      // deleted by the service via `$nin`.
+      expect(mocks.deleteItemsNotInFeed).toHaveBeenCalledWith([
+        'still-present-1',
+        'still-present-2',
+        'version-filtered',
+      ]);
+    });
   });
 });
