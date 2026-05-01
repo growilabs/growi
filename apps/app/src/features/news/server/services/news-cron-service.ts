@@ -132,15 +132,14 @@ export class NewsCronService extends CronService {
         : undefined,
     }));
 
-    const feedIds = new Set(filteredItems.map((item) => item.id));
-
-    // Get all existing external IDs to find which ones are no longer in the feed
-    // We pass all filtered items' IDs — items not in the feed are determined by exclusion
-    const allFeedIds = feedJson.items.map((item) => item.id);
-    const idsToDelete = allFeedIds.filter((id) => !feedIds.has(id));
+    // Pass the full set of feed externalIds so the service can delete any DB
+    // item that is no longer present in the feed (Requirement 1.3). Includes
+    // items filtered out by version match — those remain "in the feed" and
+    // are allowed to age out via the NewsItem TTL.
+    const feedExternalIds = feedJson.items.map((item) => item.id);
 
     const service = new NewsService();
     await service.upsertNewsItems(newsItemInputs);
-    await service.deleteNewsItemsByExternalIds(idsToDelete);
+    await service.deleteItemsNotInFeed(feedExternalIds);
   }
 }

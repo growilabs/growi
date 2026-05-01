@@ -178,4 +178,16 @@ export class NewsService {
 
     await NewsItem.deleteMany({ externalId: { $in: externalIds } });
   }
+
+  /**
+   * Delete every cached news item whose externalId is NOT in the supplied set.
+   * Caller passes the full list of externalIds present in the latest feed; any DB
+   * item missing from that list is considered stale and removed (Requirement 1.3).
+   *
+   * Note: passing an empty array means "feed has no items" and will delete every
+   * cached news item. Callers must only invoke this after a successful feed fetch.
+   */
+  async deleteItemsNotInFeed(feedExternalIds: string[]): Promise<void> {
+    await NewsItem.deleteMany({ externalId: { $nin: feedExternalIds } });
+  }
 }

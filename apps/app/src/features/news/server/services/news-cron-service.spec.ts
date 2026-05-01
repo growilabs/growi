@@ -1,17 +1,17 @@
 // Hoisted mocks
 const mocks = vi.hoisted(() => {
   const upsertNewsItems = vi.fn();
-  const deleteNewsItemsByExternalIds = vi.fn();
+  const deleteItemsNotInFeed = vi.fn();
   const mockFetch = vi.fn();
   const getGrowiVersion = vi.fn(() => '7.5.0');
 
   return {
     NewsService: vi.fn(() => ({
       upsertNewsItems,
-      deleteNewsItemsByExternalIds,
+      deleteItemsNotInFeed,
     })),
     upsertNewsItems,
-    deleteNewsItemsByExternalIds,
+    deleteItemsNotInFeed,
     mockFetch,
     getGrowiVersion,
   };
@@ -146,7 +146,10 @@ describe('NewsCronService', () => {
       await service.executeJob();
 
       expect(mocks.upsertNewsItems).toHaveBeenCalledWith(VALID_FEED.items);
-      expect(mocks.deleteNewsItemsByExternalIds).toHaveBeenCalledWith([]);
+      expect(mocks.deleteItemsNotInFeed).toHaveBeenCalledWith([
+        'item-001',
+        'item-002',
+      ]);
     });
 
     test('should NOT update DB when fetch fails', async () => {
@@ -156,7 +159,7 @@ describe('NewsCronService', () => {
       await service.executeJob();
 
       expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
-      expect(mocks.deleteNewsItemsByExternalIds).not.toHaveBeenCalled();
+      expect(mocks.deleteItemsNotInFeed).not.toHaveBeenCalled();
     });
 
     test('should NOT update DB when fetch throws', async () => {
