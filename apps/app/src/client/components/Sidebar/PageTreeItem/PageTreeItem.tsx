@@ -22,6 +22,7 @@ import { useCurrentPagePath, useFetchCurrentPage } from '~/states/page';
 import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
 import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
+import { useSidebarMode } from '~/states/ui/sidebar';
 import { mutateAllPageInfo } from '~/stores/page';
 import { mutatePageList, mutatePageTree } from '~/stores/page-listing';
 import { mutateSearching } from '~/stores/search';
@@ -132,6 +133,9 @@ export const PageTreeItem: FC<TreeItemProps> = ({
     ],
   );
 
+  const { isDrawerMode } = useSidebarMode();
+  const drawerMode = isDrawerMode();
+
   const { Control } = usePageItemControl();
 
   // Rename feature from usePageRename hook
@@ -140,6 +144,8 @@ export const PageTreeItem: FC<TreeItemProps> = ({
   // Page create feature
   const { cancelCreating, CreateButton, isCreatingPlaceholder } =
     usePageCreate();
+
+  const pageControls = [Control, CreateButton];
 
   // Manage placeholder renaming mode (auto-start, track, and cancel on Esc)
   usePlaceholderRenameEffect({
@@ -179,8 +185,9 @@ export const PageTreeItem: FC<TreeItemProps> = ({
       onToggle={onToggle}
       onClickDuplicateMenuItem={onClickDuplicateMenuItem}
       onClickDeleteMenuItem={onClickDeleteMenuItem}
-      customEndComponents={[CountBadgeForPageTreeItem]}
-      customHoveredEndComponents={[Control, CreateButton]}
+      customEndComponents={drawerMode ? undefined : [CountBadgeForPageTreeItem]}
+      customHoveredEndComponents={drawerMode ? undefined : pageControls}
+      customPinnedEndComponents={drawerMode ? pageControls : undefined}
       showAlternativeContent={isRenaming(item) || isCreatingPlaceholder(item)}
       customAlternativeComponents={[TreeNameInput]}
     />

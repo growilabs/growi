@@ -96,6 +96,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
 
   const EndComponents = props.customEndComponents;
   const HoveredEndComponents = props.customHoveredEndComponents;
+  const PinnedEndComponents = props.customPinnedEndComponents;
   const AlternativeComponents = props.customAlternativeComponents;
 
   if (!isWipPageShown && page.wip) {
@@ -155,6 +156,12 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
               {HoveredEndComponents?.map((HoveredEndContent, index) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: static component list
                 <HoveredEndContent key={index} {...toolProps} />
+              ))}
+            </div>
+            <div className="d-flex">
+              {PinnedEndComponents?.map((PinnedEndContent, index) => (
+                // biome-ignore lint/suspicious/noArrayIndexKey: static component list
+                <PinnedEndContent key={index} {...toolProps} />
               ))}
             </div>
           </>
