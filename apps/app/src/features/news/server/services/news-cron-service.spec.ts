@@ -242,5 +242,53 @@ describe('NewsCronService', () => {
       expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
       expect(mocks.deleteNewsItemsByExternalIds).not.toHaveBeenCalled();
     });
+
+    test('should abort when top-level shape is invalid', async () => {
+      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
+      // Missing `items` field — top-level schema check fails
+      mocks.mockFetch.mockResolvedValue(mockResponse({ version: '1.0' }));
+
+      await service.executeJob();
+
+      expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
+      expect(mocks.deleteNewsItemsByExternalIds).not.toHaveBeenCalled();
+    });
+
+    test('should skip individual invalid items but keep valid ones', async () => {
+      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
+      const feedWithMixedItems = {
+        version: '1.0',
+        items: [
+          // Missing required fields (title, publishedAt) → skipped
+          { id: 'broken-item' },
+          // Valid item
+          {
+            id: 'good-item',
+            title: { ja_JP: '正常' },
+            publishedAt: '2026-01-01T00:00:00Z',
+          },
+        ],
+      };
+      mocks.mockFetch.mockResolvedValue(mockResponse(feedWithMixedItems));
+
+      await service.executeJob();
+
+      const upsertCall = mocks.upsertNewsItems.mock.calls[0][0];
+      expect(upsertCall.map((i: { id: string }) => i.id)).toEqual([
+        'good-item',
+      ]);
+    });
+
+    test('should skip when response body is not valid JSON', async () => {
+      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
+      mocks.mockFetch.mockResolvedValue({
+        ok: true,
+        text: () => Promise.resolve('not-a-json{'),
+      });
+
+      await service.executeJob();
+
+      expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
+    });
   });
 });
