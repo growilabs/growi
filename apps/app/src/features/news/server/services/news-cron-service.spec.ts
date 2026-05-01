@@ -1,17 +1,17 @@
 // Hoisted mocks
 const mocks = vi.hoisted(() => {
   const upsertNewsItems = vi.fn();
-  const deleteNewsItemsByExternalIds = vi.fn();
+  const deleteItemsNotInFeed = vi.fn();
   const mockFetch = vi.fn();
   const getGrowiVersion = vi.fn(() => '7.5.0');
 
   return {
     NewsService: vi.fn(() => ({
       upsertNewsItems,
-      deleteNewsItemsByExternalIds,
+      deleteItemsNotInFeed,
     })),
     upsertNewsItems,
-    deleteNewsItemsByExternalIds,
+    deleteItemsNotInFeed,
     mockFetch,
     getGrowiVersion,
   };
@@ -146,7 +146,10 @@ describe('NewsCronService', () => {
       await service.executeJob();
 
       expect(mocks.upsertNewsItems).toHaveBeenCalledWith(VALID_FEED.items);
-      expect(mocks.deleteNewsItemsByExternalIds).toHaveBeenCalledWith([]);
+      expect(mocks.deleteItemsNotInFeed).toHaveBeenCalledWith([
+        'item-001',
+        'item-002',
+      ]);
     });
 
     test('should NOT update DB when fetch fails', async () => {
@@ -156,7 +159,7 @@ describe('NewsCronService', () => {
       await service.executeJob();
 
       expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
-      expect(mocks.deleteNewsItemsByExternalIds).not.toHaveBeenCalled();
+      expect(mocks.deleteItemsNotInFeed).not.toHaveBeenCalled();
     });
 
     test('should NOT update DB when fetch throws', async () => {
@@ -234,6 +237,54 @@ describe('NewsCronService', () => {
       expect(upsertCall.map((i: { id: string }) => i.id)).not.toContain(
         'invalid-regex-item',
       );
+    });
+
+    // Regression for Requirement 1.3: items removed from the feed must be
+    // deleted from the local DB. Earlier code computed `idsToDelete` from
+    // `feedJson.items` only, so DB items absent from the feed were never
+    // cleaned up. The cron must now hand the full set of feed externalIds
+    // to `deleteItemsNotInFeed`, which uses a $nin filter to remove the rest.
+    test('should pass every feed externalId to deleteItemsNotInFeed (regression for stale-item bug)', async () => {
+      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
+      const feed = {
+        version: '1.0',
+        items: [
+          {
+            id: 'still-present-1',
+            title: { ja_JP: 'still present 1' },
+            publishedAt: '2026-01-01T00:00:00Z',
+          },
+          {
+            id: 'still-present-2',
+            title: { ja_JP: 'still present 2' },
+            publishedAt: '2026-01-02T00:00:00Z',
+          },
+          // Item present in feed but version-filtered out — must remain in
+          // the deletion safelist so it is not wiped from the DB.
+          {
+            id: 'version-filtered',
+            title: { ja_JP: 'version filtered' },
+            publishedAt: '2026-01-03T00:00:00Z',
+            conditions: { growiVersionRegExps: ['^999\\.'] },
+          },
+        ],
+      };
+      mocks.mockFetch.mockResolvedValue({
+        ok: true,
+        json: () => Promise.resolve(feed),
+      });
+
+      await service.executeJob();
+
+      // The argument is the *full* feed externalId list, not the
+      // version-matched subset. Items absent from this list (e.g. an
+      // earlier `removed-from-feed` item still in the DB) will be
+      // deleted by the service via `$nin`.
+      expect(mocks.deleteItemsNotInFeed).toHaveBeenCalledWith([
+        'still-present-1',
+        'still-present-2',
+        'version-filtered',
+      ]);
     });
   });
 });
