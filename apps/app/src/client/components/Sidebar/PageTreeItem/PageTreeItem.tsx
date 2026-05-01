@@ -134,6 +134,7 @@ export const PageTreeItem: FC<TreeItemProps> = ({
   );
 
   const { isDrawerMode } = useSidebarMode();
+  const drawerMode = isDrawerMode();
 
   const { Control } = usePageItemControl();
 
@@ -143,6 +144,8 @@ export const PageTreeItem: FC<TreeItemProps> = ({
   // Page create feature
   const { cancelCreating, CreateButton, isCreatingPlaceholder } =
     usePageCreate();
+
+  const pageControls = [Control, CreateButton];
 
   // Manage placeholder renaming mode (auto-start, track, and cancel on Esc)
   usePlaceholderRenameEffect({
@@ -182,15 +185,9 @@ export const PageTreeItem: FC<TreeItemProps> = ({
       onToggle={onToggle}
       onClickDuplicateMenuItem={onClickDuplicateMenuItem}
       onClickDeleteMenuItem={onClickDeleteMenuItem}
-      customEndComponents={
-        isDrawerMode() ? undefined : [CountBadgeForPageTreeItem]
-      }
-      customHoveredEndComponents={
-        isDrawerMode() ? undefined : [Control, CreateButton]
-      }
-      customPinnedEndComponents={
-        isDrawerMode() ? [Control, CreateButton] : undefined
-      }
+      customEndComponents={drawerMode ? undefined : [CountBadgeForPageTreeItem]}
+      customHoveredEndComponents={drawerMode ? undefined : pageControls}
+      customPinnedEndComponents={drawerMode ? pageControls : undefined}
       showAlternativeContent={isRenaming(item) || isCreatingPlaceholder(item)}
       customAlternativeComponents={[TreeNameInput]}
     />
