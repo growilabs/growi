@@ -1,132 +1,89 @@
 # Requirements Document
 
 ## Project Description (Input)
-GROWI team wiki users (developers, knowledge managers) currently have no discoverable way to filter search results by user (creator or editor), page path prefix, creation/update date range, or user group. The search page supports only keyword input with sort and binary toggles (user/trash pages); narrowing by structured fields requires embedding raw query operators in the keyword field — a non-obvious power-user feature. For wikis with thousands of pages, this forces users to scroll through large result sets.
 
-The goal is to add a **Search Filter Bar** to the GROWI search page using a Static Plugin Registry architecture. Each filter is a self-contained descriptor (`FilterPlugin<T>`) implementing URL serialization and a React control. A generic `FilterBar` container renders all registered plugins. Filter state syncs bidirectionally with URL query parameters for deep-linking and browser history. The server-side `/search` route and service layer are extended to accept and apply the new parameters.
+GROWI team wiki users currently have no way to narrow search results by page author, last editor, or user group membership without knowing opaque internal query syntax. The search service already supports inline operators (`prefix:`, `tag:`) that are extracted directly from the `?q=` query string in `parseQueryString()`. This feature extends that mechanism with three new operators: `author:`, `editor:`, and `group:`, so users can type structured filters directly into the existing search box with no new UI components.
 
-Five concrete plugins ship with the framework: **User**, **Path**, **Created Date**, **Updated Date**, and **Group**.
+## Boundary Context
 
-- **User filter**: A single control labeled "User" (placeholder: "Search by creator or editor...") that returns pages where the selected user is either the page creator or the most recent editor.
-- **Date filters**: Preset-only controls — Last 7 Days, Last 30 Days, Last 90 Days, Last Year (365 days). No free-form date input.
-- **Group filter**: Returns pages whose creator is a member of the selected user group. The server resolves group membership to a list of user identifiers at query time, avoiding any Elasticsearch index schema changes.
+- **In scope**: Three new inline search operators (`author:`, `editor:`, `group:`) and their negation variants (`-author:`, `-editor:`, `-group:`); server-side parsing, name resolution, and filter application; graceful handling of unknown usernames and group names
+- **Out of scope**: New UI components, filter bars, or dedicated filter controls; new URL parameters beyond `?q=`; changes to existing `prefix:`, `tag:`, `-word`, or phrase operators; date-based operators (planned for a future iteration); changes to the Elasticsearch index schema or mappings; mobile-specific search UI changes
+- **Adjacent expectations**: The existing `parseQueryString()` and Elasticsearch query pipeline are extended without changing their current behavior; all existing operator semantics remain unchanged
 
 ## Requirements
 
-### Requirement 1: Filter Bar Display
-**Objective:** As a GROWI user, I want a dedicated Filter Bar on the search page, so that I can discover and apply structured filters without knowing hidden query operators.
+### Requirement 1: Author Filter Operator
+
+**Objective:** As a GROWI user, I want to type `author:username` in the search box so that I can find pages created by a specific team member.
 
 #### Acceptance Criteria
-1. While the search service is configured and reachable, the Search Page shall display the Filter Bar containing all five filter controls: User, Path, Created Date, Updated Date, and Group.
-2. If the search service is not configured or is not reachable, the Search Page shall not display the Filter Bar.
-3. The Search Page shall display a visual active-state indicator on each filter control that has a non-empty value applied.
-4. When the user clears all active filters, the Search Page shall render all filter controls in their default empty state.
-5. The Search Page shall display the Filter Bar on desktop screen widths and shall not alter the existing mobile search options modal.
+
+1. When a user submits a search query containing `author:<username>`, the Search Service shall return only pages whose creator has that username.
+2. When `author:<username>` is combined with free-text keywords (e.g., `author:jim weekly report`), the Search Service shall return only pages created by that user that also match the remaining keywords.
+3. The Search Service shall treat the `author:` token as a filter and shall not include it as a keyword in full-text or relevance scoring.
+4. If the `author:` token has no value (e.g., `author:`), the Search Service shall ignore that token and apply no author filter.
 
 ---
 
-### Requirement 2: Filter Combination Logic
-**Objective:** As a GROWI user, I want to apply multiple filters simultaneously, so that I can precisely narrow search results by combining criteria.
+### Requirement 2: Editor Filter Operator
+
+**Objective:** As a GROWI user, I want to type `editor:username` in the search box so that I can find pages last edited by a specific team member.
 
 #### Acceptance Criteria
-1. When more than one filter has an active value, the Search Page shall return only pages that satisfy all active filters simultaneously (AND logic).
-2. When the user clears one filter while other filters remain active, the Search Page shall immediately re-run the search applying only the remaining active filters.
-3. When no filters are active, the Search Page shall return results as if the Filter Bar were not present, with no change to existing search behavior.
+
+1. When a user submits a search query containing `editor:<username>`, the Search Service shall return only pages whose most recent editor has that username.
+2. When `editor:<username>` is combined with free-text keywords, the Search Service shall return only pages last edited by that user that also match the remaining keywords.
+3. The Search Service shall treat the `editor:` token as a filter and shall not include it as a keyword in full-text or relevance scoring.
+4. If the `editor:` token has no value, the Search Service shall ignore that token and apply no editor filter.
 
 ---
 
-### Requirement 3: URL Parameter Synchronization
-**Objective:** As a GROWI user, I want active filter state to be reflected in the browser URL, so that I can bookmark, share, and navigate back to filter-specific searches.
+### Requirement 3: Group Filter Operator
+
+**Objective:** As a GROWI user, I want to type `group:groupname` in the search box so that I can find pages authored by members of a specific team or group.
 
 #### Acceptance Criteria
-1. When a filter value is applied, the Search Page shall update the browser URL to include the corresponding query parameter for that filter without performing a full page reload.
-2. When a filter is cleared, the Search Page shall remove the corresponding query parameter(s) from the browser URL.
-3. When the search page loads with one or more filter parameters present in the URL, the Search Page shall pre-populate those filter controls and apply the filters immediately on load.
-4. When the user navigates backward or forward in browser history, the Search Page shall restore the filter state (and search results) that was active at that history entry.
-5. The Search Page shall preserve existing URL parameters (`q`, `sort`, `order`, `nq`, `limit`, `offset`) when adding, updating, or removing filter parameters.
-6. If a URL filter parameter value is malformed or unrecognizable, the Search Page shall silently ignore that parameter and display the corresponding filter control in its default empty state.
+
+1. When a user submits a search query containing `group:<groupname>`, the Search Service shall return only pages whose creator is a member of the user group with that name.
+2. When `group:<groupname>` is combined with free-text keywords, the Search Service shall return only pages matching both the group membership criterion and the remaining keywords.
+3. The Search Service shall treat the `group:` token as a filter and shall not include it as a keyword in full-text or relevance scoring.
+4. If the `group:` token has no value, the Search Service shall ignore that token and apply no group filter.
 
 ---
 
-### Requirement 4: User Filter
-**Objective:** As a GROWI user, I want to filter search results by a specific team member, so that I can find pages that person created or last edited.
+### Requirement 4: Negation Variants
+
+**Objective:** As a GROWI user, I want to prefix any new operator with `-` so that I can exclude pages matching that criterion from my results.
 
 #### Acceptance Criteria
-1. The Search Page shall provide a User filter control labeled "User" with the placeholder text "Search by creator or editor..." that allows the user to search for and select a GROWI user.
-2. When a user is selected in the User filter, the Search Page shall display that user's display name in the filter control.
-3. When the User filter is active, the Search Page shall return only pages for which the selected user is either the original creator or the most recent editor.
-4. When the User filter is cleared, the Search Page shall return results without any user restriction.
-5. If the user identifier in the URL parameter does not correspond to a known GROWI user, the Search Page shall display the User filter control in its default empty state.
+
+1. When a user submits `-author:<username>`, the Search Service shall exclude all pages created by that user from the results.
+2. When a user submits `-editor:<username>`, the Search Service shall exclude all pages whose most recent editor has that username from the results.
+3. When a user submits `-group:<groupname>`, the Search Service shall exclude all pages whose creator is a member of that group from the results.
+4. When negation operators are combined with positive operators or keywords, the Search Service shall apply all constraints simultaneously.
 
 ---
 
-### Requirement 5: Path Filter
-**Objective:** As a GROWI user, I want to filter search results by page path prefix, so that I can scope my search to a specific section of the wiki hierarchy.
+### Requirement 5: Operator Combination and Coexistence
+
+**Objective:** As a GROWI user, I want to combine the new operators with each other and with existing operators so that I can construct precise queries in a single search box.
 
 #### Acceptance Criteria
-1. The Search Page shall provide a Path filter control that accepts a GROWI page path prefix as input.
-2. When a path prefix is entered and applied, the Search Page shall return only pages whose path begins with the specified prefix.
-3. While the Path filter is active, the Search Page shall display the entered prefix value in the filter control.
-4. When the Path filter is cleared, the Search Page shall return results without any path restriction.
+
+1. When multiple different operator types are active in one query (e.g., `author:jim group:dev-team`), the Search Service shall require a page to satisfy every active filter in order to appear in results (AND logic across operator types).
+2. When new operators are combined with existing operators (`prefix:`, `tag:`), the Search Service shall apply all constraints and return only pages satisfying every active constraint.
+3. When new operators are combined with free-text keywords, the Search Service shall apply both the operator filters and full-text keyword matching.
+4. The Search Service shall leave the behavior of existing operators (`prefix:`, `-prefix:`, `tag:`, `-tag:`, quoted phrases, negated keywords) unchanged when the new operators appear in the same query.
 
 ---
 
-### Requirement 6: Created Date Filter
-**Objective:** As a GROWI user, I want to filter search results by page creation date using quick presets, so that I can find recently created or historically created pages without manually entering date ranges.
+### Requirement 6: Unknown Identifier Handling
+
+**Objective:** As a GROWI user, I want the search to respond predictably when I use a username or group name that does not exist, so that I receive a clear empty result rather than an error.
 
 #### Acceptance Criteria
-1. The Search Page shall provide a Created Date filter control offering exactly four preset options: Last 7 Days, Last 30 Days, Last 90 Days, and Last Year (365 days).
-2. When a preset is selected, the Search Page shall return only pages created within the corresponding time window ending at the current moment.
-3. While a Created Date preset is active, the Search Page shall display the selected preset label in the filter control.
-4. When the Created Date filter is cleared, the Search Page shall return results without any creation-date restriction.
-5. When the search page loads with a Created Date preset parameter in the URL, the Search Page shall pre-select and apply that preset immediately.
-6. If the Created Date preset value in the URL does not correspond to a recognized preset, the Search Page shall silently ignore it and display the filter control in its default empty state.
 
----
-
-### Requirement 7: Updated Date Filter
-**Objective:** As a GROWI user, I want to filter search results by the date pages were last updated using quick presets, so that I can find recently modified or stale pages without manually entering date ranges.
-
-#### Acceptance Criteria
-1. The Search Page shall provide an Updated Date filter control offering exactly four preset options: Last 7 Days, Last 30 Days, Last 90 Days, and Last Year (365 days).
-2. When a preset is selected, the Search Page shall return only pages last updated within the corresponding time window ending at the current moment.
-3. While an Updated Date preset is active, the Search Page shall display the selected preset label in the filter control.
-4. When the Updated Date filter is cleared, the Search Page shall return results without any update-date restriction.
-5. When the search page loads with an Updated Date preset parameter in the URL, the Search Page shall pre-select and apply that preset immediately.
-6. If the Updated Date preset value in the URL does not correspond to a recognized preset, the Search Page shall silently ignore it and display the filter control in its default empty state.
-
----
-
-### Requirement 8: Group Filter
-**Objective:** As a GROWI user, I want to filter search results by user group, so that I can find pages authored by members of a specific team or project group.
-
-#### Acceptance Criteria
-1. The Search Page shall provide a Group filter control that allows the user to search for and select a GROWI user group as the filter criterion.
-2. When a group is selected, the Search Page shall display the selected group's name in the filter control.
-3. When the Group filter is active, the Search Page shall return only pages whose original creator is a member of the selected user group.
-4. When the Group filter is cleared, the Search Page shall return results without any group restriction.
-5. If the group identifier in the URL parameter does not correspond to a known GROWI user group, the Search Page shall display the Group filter control in its default empty state.
-
----
-
-### Requirement 9: Server-Side Filter Application
-**Objective:** As a GROWI operator, I want the search API to accept and correctly apply the new filter parameters, so that client-side filter selections translate into accurate, narrowed search results.
-
-#### Acceptance Criteria
-1. When one or more filter controls are active, the Search Page shall include the corresponding filter parameters in the search request sent to the server.
-2. The Search API shall accept a user filter parameter and return only pages where the specified user is either the original creator or the most recent editor of the page.
-3. The Search API shall accept a path prefix parameter and return only pages whose path begins with the specified prefix.
-4. The Search API shall accept a date preset parameter for creation date and translate the selected preset into the corresponding date range relative to the time of the request before applying it to search results.
-5. The Search API shall accept a date preset parameter for update date and translate the selected preset into the corresponding date range relative to the time of the request before applying it to search results.
-6. The Search API shall accept a group filter parameter, resolve the full list of user identifiers who are members of that group at query time, and return only pages whose original creator is among those members.
-7. When filter parameters are absent from a search request, the Search API shall return results identical to current behavior, with no regression.
-8. When multiple filter parameters are present, the Search API shall combine their effects using AND logic, further narrowing results beyond the keyword match.
-9. If a user or group parameter value is not a valid GROWI user or group identifier, the Search API shall return an empty result set or a descriptive error response rather than a server error.
-10. The Search API shall not modify or reinterpret the existing `q`, `sort`, `order`, `nq`, `limit`, or `offset` parameters when filter parameters are also present.
-
----
-
-## Boundary Context
-- **In scope**: Filter Bar display on the search page; User (creator OR editor), Path, Created Date (preset), Updated Date (preset), and Group (by creator membership) filter controls; URL query parameter sync for all filter state; server-side acceptance and application of filter parameters; AND-logic combination of active filters
-- **Out of scope**: Free-form date range inputs (only presets are in scope); Tag filter UI; saved or named filter sets; mobile-specific FilterBar layout (the existing mobile search options modal is not changed); admin configuration of filters; changes to the Elasticsearch index schema; modifications to the existing `?q=` keyword parameter format or the existing sort/order/pagination controls; filtering pages by which groups they are *granted to* (the Group filter targets creator membership, not page grants)
-- **Adjacent expectations**: When no filters are active, the search API must return results identical to current behavior. The existing keyword matching, sort, order, and pagination controls must function correctly alongside any active filters. URL parameters `q`, `sort`, `order`, `nq`, `limit`, and `offset` must remain unaffected by filter operations.
+1. If the username in an `author:` operator does not match any known GROWI user, the Search Service shall return an empty result set rather than an error response.
+2. If the username in an `editor:` operator does not match any known GROWI user, the Search Service shall return an empty result set rather than an error response.
+3. If the group name in a `group:` operator does not match any known GROWI user group, the Search Service shall return an empty result set rather than an error response.
+4. If a group exists but has no members, the Search Service shall return an empty result set for queries using that `group:` operator.
