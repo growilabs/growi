@@ -171,15 +171,6 @@ export class NewsService {
   }
 
   /**
-   * Delete news items that are no longer in the feed
-   */
-  async deleteNewsItemsByExternalIds(externalIds: string[]): Promise<void> {
-    if (externalIds.length === 0) return;
-
-    await NewsItem.deleteMany({ externalId: { $in: externalIds } });
-  }
-
-  /**
    * Delete every cached news item whose externalId is NOT in the supplied set.
    * Caller passes the full list of externalIds present in the latest feed; any DB
    * item missing from that list is considered stale and removed (Requirement 1.3).

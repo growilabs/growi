@@ -421,23 +421,6 @@ describe('NewsService', () => {
     });
   });
 
-  describe('deleteNewsItemsByExternalIds', () => {
-    test('should call deleteMany with externalId filter', async () => {
-      mocks.newsItemDeleteMany.mockResolvedValue({ deletedCount: 1 });
-
-      await service.deleteNewsItemsByExternalIds(['ext-001', 'ext-002']);
-
-      expect(mocks.newsItemDeleteMany).toHaveBeenCalledWith({
-        externalId: { $in: ['ext-001', 'ext-002'] },
-      });
-    });
-
-    test('should do nothing if externalIds is empty', async () => {
-      await service.deleteNewsItemsByExternalIds([]);
-      expect(mocks.newsItemDeleteMany).not.toHaveBeenCalled();
-    });
-  });
-
   describe('deleteItemsNotInFeed', () => {
     test('should call deleteMany with $nin filter for items not in feed', async () => {
       mocks.newsItemDeleteMany.mockResolvedValue({ deletedCount: 1 });
