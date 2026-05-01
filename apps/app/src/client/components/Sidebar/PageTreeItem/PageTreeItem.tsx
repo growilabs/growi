@@ -22,7 +22,6 @@ import { useCurrentPagePath, useFetchCurrentPage } from '~/states/page';
 import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
 import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
-import { useSidebarMode } from '~/states/ui/sidebar';
 import { mutateAllPageInfo } from '~/stores/page';
 import { mutatePageList, mutatePageTree } from '~/stores/page-listing';
 import { mutateSearching } from '~/stores/search';

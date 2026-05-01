@@ -32,7 +32,6 @@ export type TreeItemProps = TreeItemBaseProps & {
   customHoveredEndComponents?: Array<
     React.FunctionComponent<TreeItemToolProps>
   >;
-  customPinnedEndComponents?: Array<React.FunctionComponent<TreeItemToolProps>>;
   customHeadOfChildrenComponents?: Array<
     React.FunctionComponent<TreeItemToolProps>
   >;

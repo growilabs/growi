@@ -15,17 +15,10 @@ type PageListItemSProps = {
   noLink?: boolean;
   pageTitle?: string;
   isNarrowView?: boolean;
-  hidePageListMeta?: boolean;
 };
 
 export const PageListItemS = (props: PageListItemSProps): JSX.Element => {
-  const {
-    page,
-    noLink = false,
-    pageTitle,
-    isNarrowView = false,
-    hidePageListMeta = false,
-  } = props;
+  const { page, noLink = false, pageTitle, isNarrowView = false } = props;
 
   const path = pageTitle != null ? pageTitle : page.path;
 
@@ -54,11 +47,9 @@ export const PageListItemS = (props: PageListItemSProps): JSX.Element => {
       ) : (
         pagePathElement
       )}
-      {!hidePageListMeta && (
-        <span className="ms-1">
-          <PageListMeta page={page} shouldSpaceOutIcon />
-        </span>
-      )}
+      <span className="ms-1">
+        <PageListMeta page={page} shouldSpaceOutIcon />
+      </span>
     </>
   );
 };
