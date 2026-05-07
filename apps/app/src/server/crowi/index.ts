@@ -13,6 +13,7 @@ import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bu
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
+import { initializeVaultFeature } from '~/features/growi-vault/server';
 import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
 import { initializeOpenaiService } from '~/features/openai/server/services/openai';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
@@ -303,6 +304,8 @@ class Crowi {
 
       // depends on AttachmentService
       this.setupOpenaiService(),
+      // depends on pageService and activityService
+      this.setupVaultFeature(),
     ]);
 
     await this.setupCron();
@@ -901,6 +904,10 @@ class Crowi {
 
   setupOpenaiService(): void {
     initializeOpenaiService(this);
+  }
+
+  async setupVaultFeature(): Promise<void> {
+    await initializeVaultFeature(this);
   }
 }
 
