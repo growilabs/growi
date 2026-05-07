@@ -28,7 +28,7 @@
   - _Requirements: 5.1, 5.2_
   - _Boundary: ConfigManager / config-definition_
 
-- [ ] 2.2 (P) ES 添付 index mapping を ES 7/8/9 変種ごとに作成する
+- [x] 2.2 (P) ES 添付 index mapping を ES 7/8/9 変種ごとに作成する
   - `attachments-mappings-es7.ts` / `es8.ts` / `es9.ts` を追加し、`attachmentId` / `pageId` / `pageNumber` / `label` / `fileName` / `originalName` (text+keyword) / `fileFormat` / `fileSize` / `content` (kuromoji + ngram) / `attachmentType` / `created_at` / `updated_at` を定義する
   - **権限フィールド (`grant` / `granted_users` / `granted_groups` / `creator`) を含めない** ことを mapping snapshot test で固定する (Option D の構造的担保)
   - ES バージョン別 delegator が version-aware に正しい mapping を選択できること

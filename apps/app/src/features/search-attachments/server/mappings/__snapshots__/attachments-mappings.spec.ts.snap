@@ -1,0 +1,319 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`attachments mappings ('ES7') > matches snapshot 1`] = `
+{
+  "mappings": {
+    "properties": {
+      "attachmentId": {
+        "type": "keyword",
+      },
+      "attachmentType": {
+        "type": "keyword",
+      },
+      "content": {
+        "fields": {
+          "en": {
+            "analyzer": "english_edge_ngram",
+            "search_analyzer": "standard",
+            "type": "text",
+          },
+          "ja": {
+            "analyzer": "japanese",
+            "type": "text",
+          },
+        },
+        "type": "text",
+      },
+      "created_at": {
+        "format": "dateOptionalTime",
+        "type": "date",
+      },
+      "fileFormat": {
+        "type": "keyword",
+      },
+      "fileName": {
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+          },
+        },
+        "type": "text",
+      },
+      "fileSize": {
+        "type": "long",
+      },
+      "label": {
+        "type": "keyword",
+      },
+      "originalName": {
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+          },
+        },
+        "type": "text",
+      },
+      "pageId": {
+        "type": "keyword",
+      },
+      "pageNumber": {
+        "type": "integer",
+      },
+      "updated_at": {
+        "format": "dateOptionalTime",
+        "type": "date",
+      },
+    },
+  },
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "english_edge_ngram": {
+          "filter": [
+            "lowercase",
+            "english_stop",
+          ],
+          "tokenizer": "edge_ngram_tokenizer",
+          "type": "custom",
+        },
+        "japanese": {
+          "char_filter": [
+            "icu_normalizer",
+          ],
+          "tokenizer": "kuromoji_tokenizer",
+          "type": "custom",
+        },
+      },
+      "filter": {
+        "english_stop": {
+          "stopwords": "_english_",
+          "type": "stop",
+        },
+      },
+      "tokenizer": {
+        "edge_ngram_tokenizer": {
+          "max_gram": 20,
+          "min_gram": 2,
+          "token_chars": [
+            "letter",
+            "digit",
+          ],
+          "type": "edge_ngram",
+        },
+      },
+    },
+  },
+}
+`;
+
+exports[`attachments mappings ('ES8') > matches snapshot 1`] = `
+{
+  "mappings": {
+    "properties": {
+      "attachmentId": {
+        "type": "keyword",
+      },
+      "attachmentType": {
+        "type": "keyword",
+      },
+      "content": {
+        "fields": {
+          "en": {
+            "analyzer": "english_edge_ngram",
+            "search_analyzer": "standard",
+            "type": "text",
+          },
+          "ja": {
+            "analyzer": "japanese",
+            "type": "text",
+          },
+        },
+        "type": "text",
+      },
+      "created_at": {
+        "format": "date_optional_time",
+        "type": "date",
+      },
+      "fileFormat": {
+        "type": "keyword",
+      },
+      "fileName": {
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+          },
+        },
+        "type": "text",
+      },
+      "fileSize": {
+        "type": "long",
+      },
+      "label": {
+        "type": "keyword",
+      },
+      "originalName": {
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+          },
+        },
+        "type": "text",
+      },
+      "pageId": {
+        "type": "keyword",
+      },
+      "pageNumber": {
+        "type": "integer",
+      },
+      "updated_at": {
+        "format": "date_optional_time",
+        "type": "date",
+      },
+    },
+  },
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "english_edge_ngram": {
+          "filter": [
+            "lowercase",
+            "english_stop",
+          ],
+          "tokenizer": "edge_ngram_tokenizer",
+          "type": "custom",
+        },
+        "japanese": {
+          "char_filter": [
+            "icu_normalizer",
+          ],
+          "tokenizer": "kuromoji_tokenizer",
+          "type": "custom",
+        },
+      },
+      "filter": {
+        "english_stop": {
+          "stopwords": "_english_",
+          "type": "stop",
+        },
+      },
+      "tokenizer": {
+        "edge_ngram_tokenizer": {
+          "max_gram": 20,
+          "min_gram": 2,
+          "token_chars": [
+            "letter",
+            "digit",
+          ],
+          "type": "edge_ngram",
+        },
+      },
+    },
+  },
+}
+`;
+
+exports[`attachments mappings ('ES9') > matches snapshot 1`] = `
+{
+  "mappings": {
+    "properties": {
+      "attachmentId": {
+        "type": "keyword",
+      },
+      "attachmentType": {
+        "type": "keyword",
+      },
+      "content": {
+        "fields": {
+          "en": {
+            "analyzer": "english_edge_ngram",
+            "search_analyzer": "standard",
+            "type": "text",
+          },
+          "ja": {
+            "analyzer": "japanese",
+            "type": "text",
+          },
+        },
+        "type": "text",
+      },
+      "created_at": {
+        "format": "date_optional_time",
+        "type": "date",
+      },
+      "fileFormat": {
+        "type": "keyword",
+      },
+      "fileName": {
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+          },
+        },
+        "type": "text",
+      },
+      "fileSize": {
+        "type": "long",
+      },
+      "label": {
+        "type": "keyword",
+      },
+      "originalName": {
+        "fields": {
+          "keyword": {
+            "type": "keyword",
+          },
+        },
+        "type": "text",
+      },
+      "pageId": {
+        "type": "keyword",
+      },
+      "pageNumber": {
+        "type": "integer",
+      },
+      "updated_at": {
+        "format": "date_optional_time",
+        "type": "date",
+      },
+    },
+  },
+  "settings": {
+    "analysis": {
+      "analyzer": {
+        "english_edge_ngram": {
+          "filter": [
+            "lowercase",
+            "english_stop",
+          ],
+          "tokenizer": "edge_ngram_tokenizer",
+          "type": "custom",
+        },
+        "japanese": {
+          "char_filter": [
+            "icu_normalizer",
+          ],
+          "tokenizer": "kuromoji_tokenizer",
+          "type": "custom",
+        },
+      },
+      "filter": {
+        "english_stop": {
+          "stopwords": "_english_",
+          "type": "stop",
+        },
+      },
+      "tokenizer": {
+        "edge_ngram_tokenizer": {
+          "max_gram": 20,
+          "min_gram": 2,
+          "token_chars": [
+            "letter",
+            "digit",
+          ],
+          "type": "edge_ngram",
+        },
+      },
+    },
+  },
+}
+`;
