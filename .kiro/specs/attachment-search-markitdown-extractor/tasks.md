@@ -4,7 +4,7 @@
 
 ## 1. Foundation: プロジェクト基盤と設定
 
-- [ ] 1.1 Python プロジェクトスキャフォールドと依存管理基盤を作成
+- [x] 1.1 Python プロジェクトスキャフォールドと依存管理基盤を作成
   - `services/markitdown-extractor/` ディレクトリを新設し、`.python-version` (3.12) / `pyproject.toml` / `uv.lock` を配置
   - `pyproject.toml` で `markitdown[pdf,docx,xlsx,pptx,outlook]>=0.1.5` / `fastapi` / `uvicorn` / `pydantic>=2` / `pydantic-settings` / `pdfminer.six` / `defusedxml` / dev-deps (`pytest` / `httpx` / `ruff`) を宣言
   - `[all]` extras と GPL/AGPL 依存を取り込まないことを宣言 (コメントで根拠明記)

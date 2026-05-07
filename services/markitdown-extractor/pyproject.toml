@@ -1,0 +1,87 @@
+[project]
+name = "markitdown-extractor"
+version = "0.1.0"
+description = "GROWI attachment text extraction microservice using markitdown"
+requires-python = ">=3.12"
+dependencies = [
+    # Extraction engine: use only the formats GROWI requires.
+    # [all] is intentionally excluded because it pulls in optional dependencies
+    # with unacceptable licensing or external runtime requirements:
+    #   - azure-ai-documentintelligence (Azure DI) — network egress, proprietary
+    #   - openai / anthropic client libs — network egress, LLM calls
+    #   - torch / torchvision / easyocr — OCR engine, GPL-adjacent runtime deps,
+    #     large image size (~2–4 GB), violates Req 1.7 (no external binary/network)
+    #   - youtube-transcript-api — network egress, violates Req 1.7
+    #   - pydub / speechbrain — audio/video transcription, not needed
+    # Only [pdf,docx,xlsx,pptx,outlook] is safe: MIT-licensed, pure Python, no
+    # network or binary dependencies at runtime.
+    "markitdown[pdf,docx,xlsx,pptx,outlook]>=0.1.5",
+    # HTTP framework and ASGI server (all MIT)
+    "fastapi>=0.115.0",
+    "uvicorn[standard]>=0.30.0",
+    # Schema / settings (MIT)
+    "pydantic>=2",
+    "pydantic-settings>=2",
+    # PDF page-boundary fallback: markitdown does not yet expose per-page offsets
+    # (see microsoft/markitdown#1263); pdfminer.six provides page-level text
+    # extraction without external binaries. (MIT license)
+    "pdfminer.six>=20221105",
+    # XML/HTML safety: prevents XXE and billion-laughs attacks when parsing
+    # DOCX / XLSX / PPTX ZIP members. (MIT license — no GPL/AGPL transitive deps)
+    "defusedxml>=0.7.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.0",
+    "httpx>=0.27",   # ASGI test client for FastAPI
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/app"]
+
+# ---------------------------------------------------------------------------
+# Ruff configuration
+# ---------------------------------------------------------------------------
+[tool.ruff]
+line-length = 120
+target-version = "py312"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = [
+    "E",   # pycodestyle errors
+    "W",   # pycodestyle warnings
+    "F",   # pyflakes
+    "I",   # isort
+    "UP",  # pyupgrade
+    "B",   # flake8-bugbear
+    "S",   # flake8-bandit (security)
+    "ANN", # flake8-annotations
+    "N",   # pep8-naming
+]
+ignore = [
+    "ANN101", # missing-type-self (deprecated in newer ruff)
+    "ANN102", # missing-type-cls
+    "S101",   # assert-used (needed in tests)
+]
+
+[tool.ruff.lint.per-file-ignores]
+"tests/**/*.py" = ["S", "ANN"]  # relax security and annotation rules in tests
+
+[tool.ruff.format]
+quote-style = "double"
+indent-style = "space"
+line-ending = "lf"
+
+# ---------------------------------------------------------------------------
+# Pytest configuration
+# ---------------------------------------------------------------------------
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+asyncio_mode = "auto"
