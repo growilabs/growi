@@ -11,7 +11,6 @@ import {
 } from 'ai';
 import type { Request, RequestHandler } from 'express';
 import { body, type ValidationChain } from 'express-validator';
-import { z } from 'zod';
 
 import AiAssistantModel from '~/features/openai/server/models/ai-assistant';
 import { getOpenaiService } from '~/features/openai/server/services/openai';
@@ -39,18 +38,6 @@ type Req = Request<undefined, Response, ReqBody> & {
 type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
 const requestContext = new RequestContext<{ vectorStoreId: string }>();
-
-//TODO:  https://redmine.weseek.co.jp/issues/182496
-// const reasoningSchema = z.object({
-//   thoughtProcess: z.array(
-//     z.object({
-//       step: z.string(),
-//       reasoning: z.string(),
-//       conclusion: z.string(),
-//     }),
-//   ),
-//   finalAnswer: z.string(),
-// });
 
 export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   crowi,
@@ -129,13 +116,22 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
       try {
         const stream = await growiAgent.stream(messages, {
-          // structuredOutput: {
-          //   schema: reasoningSchema,
-          // },
           requestContext,
           memory: {
             thread: thread.id,
             resource: thread.resourceId,
+          },
+          // Configure the OpenAI Responses API to emit reasoning summary
+          // chunks. Without `reasoningSummary`, reasoning happens internally
+          // (and is billed) but no human-readable trace reaches the UI.
+          // Note: `reasoningSummary` requires a verified OpenAI organization.
+          // `effort: 'low'` keeps reasoning-token volume bounded; raise per
+          // user preference if deeper traces are desired.
+          providerOptions: {
+            openai: {
+              reasoningEffort: 'low',
+              reasoningSummary: 'auto',
+            },
           },
         });
 

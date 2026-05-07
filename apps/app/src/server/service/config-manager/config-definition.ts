@@ -266,6 +266,7 @@ export const CONFIG_KEYS = [
   'openai:apiKey',
   'openai:assistantModel:chat',
   'openai:assistantModel:edit',
+  'openai:assistantModel:mastraAgent',
   'openai:threadDeletionCronExpression',
   'openai:threadDeletionBarchSize',
   'openai:threadDeletionApiCallInterval',
@@ -1167,6 +1168,12 @@ export const CONFIG_DEFINITIONS = {
   'openai:assistantModel:edit': defineConfig<OpenAI.Chat.ChatModel>({
     envVarName: 'OPENAI_EDITOR_ASSISTANT_MODEL',
     defaultValue: 'gpt-4.1-mini',
+  }),
+  // Reasoning-capable model for the Mastra agent. Emits reasoning summary
+  // chunks consumed by the AI Elements Reasoning UI in the chat sidebar.
+  'openai:assistantModel:mastraAgent': defineConfig<OpenAI.Chat.ChatModel>({
+    envVarName: 'OPENAI_MASTRA_AGENT_MODEL',
+    defaultValue: 'o4-mini',
   }),
   'openai:threadDeletionCronExpression': defineConfig<string>({
     envVarName: 'OPENAI_THREAD_DELETION_CRON_EXPRESSION',
