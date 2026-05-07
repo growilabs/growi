@@ -161,14 +161,14 @@
 
 ## 6. 統合テスト (FastAPI TestClient)
 
-- [ ] 6.1 (P) 認証パスの統合テスト
+- [x] 6.1 (P) 認証パスの統合テスト
   - 正しい token → 200、欠落 → 401、不一致 → 401、大容量 (size check より前) でも token 不一致なら 401 が優先されること
   - 完了条件: 上記 4 ケースすべて green で `/healthz` `/readyz` `/openapi.json` が認証なしで 200 になることも別途 assert
   - _Requirements: 3.3_
   - _Boundary: ExtractRouter, BearerAuthMiddleware_
   - _Depends: 4.3_
 
-- [ ] 6.2 (P) 形式別抽出 E2E テスト
+- [x] 6.2 (P) 形式別抽出 E2E テスト
   - PDF / PPTX / XLSX / DOCX / TXT / JSON の各 fixture で `POST /extract` → 200 + `ExtractResponse` が期待どおり (pages 数、label、pageNumber)
   - サポート外形式 (`application/x-custom`) → 400 `unsupported_format`
   - 完了条件: 全形式テストが green
