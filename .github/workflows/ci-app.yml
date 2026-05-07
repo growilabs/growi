@@ -72,6 +72,12 @@ jobs:
           pnpm add turbo --global
           pnpm install --frozen-lockfile
 
+      - name: Check markitdown-client orval drift
+        run: |
+          pnpm -F @growi/markitdown-client gen
+          git diff --exit-code packages/markitdown-client/src/
+          git diff --exit-code packages/markitdown-client/openapi.json
+
       - name: Lint
         run: |
           turbo run lint --filter=@growi/app --filter=./packages/*

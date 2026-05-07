@@ -7,6 +7,7 @@
   "private": true,
   "scripts": {
     "lint": "biome check",
+    "gen": "orval",
     "gen:client-code": "orval",
     "dev": "pnpm gen:client-code && tsc -p tsconfig.json",
     "build": "pnpm gen:client-code && tsc -p tsconfig.json"

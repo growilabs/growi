@@ -4,14 +4,14 @@
 
 ## 1. Foundation: packages/markitdown-client と orval パイプライン
 
-- [ ] 1.1 `packages/markitdown-client` パッケージ雛形を追加する
+- [x] 1.1 `packages/markitdown-client` パッケージ雛形を追加する
   - `package.json` / `tsconfig.json` / `src/index.ts` / `orval.config.js` / `openapi.json` (上流 `attachment-search-markitdown-extractor` spec の export をコミット) を作成する
   - `pdf-converter-client` と同じ export パターンで generated コード (`src/generated/`) を commit 対象とし、`src/index.ts` で re-export する
   - pnpm workspace / Turborepo pipeline に組み込み、`apps/app` から型安全に import できる状態を確認する (`pnpm -F @growi/markitdown-client build` が成功することを観察)
   - _Requirements: 2.1_
   - _Boundary: packages/markitdown-client_
 
-- [ ] 1.2 orval による TS クライアント自動生成と drift 検知 CI を整備する
+- [x] 1.2 orval による TS クライアント自動生成と drift 検知 CI を整備する
   - `openapi.json` を入力に `src/generated/` を再生成する `pnpm gen` スクリプトを追加する
   - CI に `pnpm -F @growi/markitdown-client gen && git diff --exit-code packages/markitdown-client/src/` を追加し、orval 出力 drift を検知する
   - CI に `git diff --exit-code packages/markitdown-client/openapi.json` を追加し、上流 Python CI との 2 段 drift 検知を有効化する (上流 export 忘れ時に本 spec 側の CI が赤くなることを観察)

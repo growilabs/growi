@@ -4,5 +4,8 @@ module.exports = {
     output: {
       target: './src/generated/index.ts',
     },
+    hooks: {
+      afterAllFilesWrite: 'biome check --write src/generated/',
+    },
   },
 };
