@@ -29,7 +29,7 @@
   - _Requirements: 1.1, 1.6, 2.1, 2.2, 2.3, 3.3_
   - _Boundary: Schemas_
 
-- [ ] 1.4 pytest 設定と共通 fixture 基盤を整備
+- [x] 1.4 pytest 設定と共通 fixture 基盤を整備
   - `tests/conftest.py` に FastAPI TestClient fixture と `MARKITDOWN_SERVICE_TOKEN` をテスト用に注入する fixture を実装
   - `tests/fixtures/` ディレクトリを作成し、サンプル PDF / PPTX / XLSX / DOCX / TXT / JSON を配置する placeholder と生成スクリプトを含む
   - ruff config を pytest が参照できる状態にし、`uv run pytest --collect-only` が通るダミーテストを配置

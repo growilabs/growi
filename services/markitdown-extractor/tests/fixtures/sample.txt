@@ -1,0 +1,4 @@
+Hello, GROWI!
+This is a plain-text fixture file used by the markitdown-extractor test suite.
+Line 3: unicode test — café, naïve, résumé.
+Line 4: special characters — <tag> & "quotes" 'apostrophe'.
