@@ -91,6 +91,8 @@
     "@lykmapipo/common>flat": "flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
     "@lykmapipo/common>mime": "mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
     "@lykmapipo/common>parse-json": "parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
+    "p-map": "p-map v5+ is provided only by ESM, but @mastra/core requires CommonJS version",
+    "uuid": "uuid v12+ is provided only by ESM, but @mastra/mongodb requires CommonJS version",
     "axios": "CVE-2025-XXXXX: CRLF Injection + Prototype Pollution combo leads to HTTP Request Smuggling (CVSS 10.0). All versions < 1.15.0 are vulnerable."
   },
   "// comments for pnpm.packageExtensions": {
@@ -101,6 +103,8 @@
       "@lykmapipo/common>flat": "5.0.2",
       "@lykmapipo/common>mime": "3.0.0",
       "@lykmapipo/common>parse-json": "5.2.0",
+      "@mastra/core>p-map": "4.0.0",
+      "@mastra/mongodb>uuid": "11.1.0",
       "axios": "^1.15.0"
     },
     "packageExtensions": {

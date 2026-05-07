@@ -1,3 +1,5 @@
+// Remove all dependencies from this module and use mastra/client/status/chat-sidebar.tsx.
+
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 

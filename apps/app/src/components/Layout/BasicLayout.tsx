@@ -14,8 +14,8 @@ import { PageRenameModalLazyLoaded } from '~/client/components/PageRenameModal';
 import { PageSelectModalLazyLoaded } from '~/client/components/PageSelectModal';
 import { PutBackPageModalLazyLoaded } from '~/client/components/PutbackPageModal';
 import { ShortcutsModalLazyLoaded } from '~/client/components/ShortcutsModal';
+import { ChatSidebarLazyLoaded } from '~/features/mastra/client/components/ChatSidebar';
 import { AiAssistantManagementModalLazyLoaded } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal';
-import { AiAssistantSidebarLazyLoaded } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar';
 import { PageBulkExportSelectModalLazyLoaded } from '~/features/page-bulk-export/client/components';
 
 // biome-ignore-end lint/style/noRestrictedImports: no-problem lazy loaded components
@@ -73,7 +73,7 @@ export const BasicLayout = ({ children, className }: Props): JSX.Element => {
           {children}
         </div>
 
-        <AiAssistantSidebarLazyLoaded />
+        <ChatSidebarLazyLoaded />
       </div>
 
       <GrowiNavbarBottom />

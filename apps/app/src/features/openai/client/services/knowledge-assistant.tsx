@@ -11,6 +11,7 @@ import {
 } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
+import { useSWRINFxRecentThreads } from '~/features/mastra/client/stores/thread';
 import {
   type SseMessage,
   SseMessageSchema,
@@ -25,13 +26,15 @@ import type {
 } from '../../interfaces/message';
 import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
 import { ThreadType } from '../../interfaces/thread-relation';
-import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
+// import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
+// import { useAiAssistantSidebar } from '../stores/ai-assistant';
+// import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
 } from '../states';
-import { useSWRMUTxMessages } from '../stores/message';
-import { useSWRINFxRecentThreads, useSWRMUTxThreads } from '../stores/thread';
+
+// import { useSWRMUTxThreads } from '../stores/thread';
 
 type CreateThread = (
   aiAssistantId: string,
@@ -83,7 +86,7 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
   const { aiAssistantData, threadData } = useAiAssistantSidebarStatus();
   const { refreshThreadData } = useAiAssistantSidebarActions();
   const { mutate: mutateRecentThreads } = useSWRINFxRecentThreads();
-  const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
+  // const { trigger: mutateThreadData } = useSWRMUTxThreads(aiAssistantData?._id);
   const { t } = useTranslation();
 
   const form = useForm<FormData>({
@@ -114,11 +117,11 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
       const thread = response.data;
 
       // No need to await because data is not used
-      mutateThreadData();
+      // mutateThreadData();
 
       return thread;
     },
-    [mutateThreadData],
+    [],
   );
 
   const postMessage: PostMessage = useCallback(
@@ -179,10 +182,11 @@ export const useKnowledgeAssistant: UseKnowledgeAssistant = () => {
     }
 
     return (
-      <AiAssistantChatInitialView
-        description={aiAssistantData.description}
-        pagePathPatterns={aiAssistantData.pagePathPatterns}
-      />
+      // <AiAssistantChatInitialView
+      //   description={aiAssistantSidebarData.aiAssistantData.description}
+      //   pagePathPatterns={aiAssistantSidebarData.aiAssistantData.pagePathPatterns}
+      // />
+      <></>
     );
   }, [aiAssistantData]);
 
@@ -352,55 +356,55 @@ const transformApiMessagesToLogs = (
     });
 };
 
-export const useFetchAndSetMessageDataEffect = (
-  setMessageLogs: Dispatch<SetStateAction<MessageLog[]>>,
-  threadId?: string,
-): void => {
-  const aiAssistantSidebarData = useAiAssistantSidebarStatus();
-  const { trigger: mutateMessageData } = useSWRMUTxMessages(
-    aiAssistantSidebarData?.aiAssistantData?._id,
-    threadId,
-  );
+// export const useFetchAndSetMessageDataEffect = (
+//   setMessageLogs: Dispatch<SetStateAction<MessageLog[]>>,
+//   threadId?: string,
+// ): void => {
+//   const aiAssistantSidebarData = useAiAssistantSidebarStatus();
+//   const { trigger: mutateMessageData } = useSWRMUTxMessages(
+//     aiAssistantSidebarData?.aiAssistantData?._id,
+//     threadId,
+//   );
 
-  useEffect(() => {
-    if (aiAssistantSidebarData?.isEditorAssistant) {
-      return;
-    }
+//   useEffect(() => {
+//     if (aiAssistantSidebarData?.isEditorAssistant) {
+//       return;
+//     }
 
-    if (threadId == null) {
-      setMessageLogs([]);
-      return; // Early return if no threadId
-    }
+//     if (threadId == null) {
+//       setMessageLogs([]);
+//       return; // Early return if no threadId
+//     }
 
-    const fetchAndSetLogs = async () => {
-      try {
-        // Assuming mutateMessageData() returns a Promise<MessageWithCustomMetaData | null | undefined>
-        const rawApiMessageData: MessageWithCustomMetaData | null | undefined =
-          await mutateMessageData();
-        const fetchedLogs = transformApiMessagesToLogs(rawApiMessageData);
+//     const fetchAndSetLogs = async () => {
+//       try {
+//         // Assuming mutateMessageData() returns a Promise<MessageWithCustomMetaData | null | undefined>
+//         const rawApiMessageData: MessageWithCustomMetaData | null | undefined =
+//           await mutateMessageData();
+//         const fetchedLogs = transformApiMessagesToLogs(rawApiMessageData);
 
-        setMessageLogs((currentLogs) => {
-          // Preserve current logs if they represent a single, user-submitted message
-          // AND the newly fetched logs are empty (common for new threads).
-          const shouldPreserveCurrentMessage =
-            currentLogs.length === 1 &&
-            currentLogs[0].isUserMessage &&
-            fetchedLogs.length === 0;
+//         setMessageLogs((currentLogs) => {
+//           // Preserve current logs if they represent a single, user-submitted message
+//           // AND the newly fetched logs are empty (common for new threads).
+//           const shouldPreserveCurrentMessage =
+//             currentLogs.length === 1 &&
+//             currentLogs[0].isUserMessage &&
+//             fetchedLogs.length === 0;
 
-          // Update with fetched logs, or preserve current if applicable
-          return shouldPreserveCurrentMessage ? currentLogs : fetchedLogs;
-        });
-      } catch (error) {
-        // console.error('Failed to fetch or process message data:', error); // Optional: for debugging
-        setMessageLogs([]); // Clear logs on error to avoid inconsistent state
-      }
-    };
+//           // Update with fetched logs, or preserve current if applicable
+//           return shouldPreserveCurrentMessage ? currentLogs : fetchedLogs;
+//         });
+//       } catch (error) {
+//         // console.error('Failed to fetch or process message data:', error); // Optional: for debugging
+//         setMessageLogs([]); // Clear logs on error to avoid inconsistent state
+//       }
+//     };
 
-    fetchAndSetLogs();
-  }, [
-    threadId,
-    mutateMessageData,
-    setMessageLogs,
-    aiAssistantSidebarData?.isEditorAssistant,
-  ]); // Dependencies
-};
+//     fetchAndSetLogs();
+//   }, [
+//     threadId,
+//     mutateMessageData,
+//     setMessageLogs,
+//     aiAssistantSidebarData?.isEditorAssistant,
+//   ]); // Dependencies
+// };

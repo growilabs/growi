@@ -17,6 +17,12 @@
       "!.vscode",
       "!.claude",
       "!tsconfig.base.json",
+      "!apps/app/src/styles/prebuilt",
+      "!apps/app/src/styles/tailwind.css",
+      "!apps/app/next-env.d.ts",
+      "!apps/app/tmp",
+      "!apps/pdf-converter/specs",
+      "!apps/slackbot-proxy/src/public/bootstrap",
       "!apps/app/src/generated",
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs"
