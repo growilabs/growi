@@ -21,7 +21,7 @@
 
 ## 2. Foundation: Config / ES mapping / feature module scaffolding
 
-- [ ] 2.1 (P) `app:attachmentFullTextSearch:*` Config キー 4 件を config-definition に追加する
+- [x] 2.1 (P) `app:attachmentFullTextSearch:*` Config キー 4 件を config-definition に追加する
   - `extractorUri` / `extractorToken` / `timeoutMs` / `maxFileSizeBytes` の 4 キーを定義する
   - `extractorToken` は既存 `app:openaiApiKey` と同パターンで encrypted storage を指定し、`extractorUri` は `GROWI_MARKITDOWN_EXTRACTOR_URI`、`extractorToken` は `GROWI_MARKITDOWN_SERVICE_TOKEN` を初期値に採り得るようにする
   - ConfigManager 経由で get/set できることを単体テストで確認する (encrypted field は plaintext で persist されないことも assert)

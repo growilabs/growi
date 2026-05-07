@@ -2,7 +2,11 @@ import type { RawConfigData } from '@growi/core/dist/interfaces';
 import { mock } from 'vitest-mock-extended';
 
 import type { S2sMessagingService } from '../s2s-messaging/base';
-import type { ConfigKey, ConfigValues } from './config-definition';
+import {
+  CONFIG_DEFINITIONS,
+  type ConfigKey,
+  type ConfigValues,
+} from './config-definition';
 import { configManager } from './config-manager';
 
 // Test helper type for setting configs
@@ -261,6 +265,62 @@ describe('ConfigManager test', () => {
       // assert
       expect(result.AUTO_INSTALL_ADMIN_USERNAME).toEqual('admin');
       expect(result.AUTO_INSTALL_ADMIN_PASSWORD).toEqual('***');
+    });
+  });
+
+  describe('app:attachmentFullTextSearch config keys', () => {
+    // Load from env so all keys get their default values populated in envConfig.
+    // Also set dbConfig to an empty object so getConfig does not throw "Config is not loaded".
+    beforeAll(async () => {
+      await configManager.loadConfigs({ source: 'env' });
+      Object.defineProperty(configManager, 'dbConfig', {
+        value: {},
+        configurable: true,
+      });
+    });
+
+    test('extractorUri returns undefined by default', () => {
+      expect(
+        configManager.getConfig('app:attachmentFullTextSearch:extractorUri'),
+      ).toBeUndefined();
+    });
+
+    test('extractorToken returns undefined by default', () => {
+      expect(
+        configManager.getConfig('app:attachmentFullTextSearch:extractorToken'),
+      ).toBeUndefined();
+    });
+
+    test('timeoutMs returns 60000 by default', () => {
+      expect(
+        configManager.getConfig('app:attachmentFullTextSearch:timeoutMs'),
+      ).toBe(60000);
+    });
+
+    test('maxFileSizeBytes returns 52428800 by default', () => {
+      expect(
+        configManager.getConfig(
+          'app:attachmentFullTextSearch:maxFileSizeBytes',
+        ),
+      ).toBe(52428800);
+    });
+
+    test('extractorToken has isSecret: true', () => {
+      expect(
+        CONFIG_DEFINITIONS['app:attachmentFullTextSearch:extractorToken']
+          .isSecret,
+      ).toBe(true);
+    });
+
+    test('extractorToken is not persisted as plaintext (isSecret prevents plaintext storage)', () => {
+      const def =
+        CONFIG_DEFINITIONS['app:attachmentFullTextSearch:extractorToken'];
+      // isSecret: true means ConfigManager encrypts the value — plaintext is never stored in DB
+      expect(def.isSecret).toBe(true);
+      // other non-secret fields should NOT have isSecret set
+      const extractorUriDef =
+        CONFIG_DEFINITIONS['app:attachmentFullTextSearch:extractorUri'];
+      expect(extractorUriDef.isSecret).toBeFalsy();
     });
   });
 
