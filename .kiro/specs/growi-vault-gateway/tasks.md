@@ -152,7 +152,7 @@ _要件: 3_
 _Boundary: `apps/app/src/features/growi-vault/server/services/vault-namespace-mapper.ts`_
 _Depends: 1.1, 1.2_
 
-### 5.1 vault-namespace-mapper.ts の作成
+### [x] 5.1 vault-namespace-mapper.ts の作成
 
 `apps/app/src/features/growi-vault/server/services/vault-namespace-mapper.ts` を新規作成する。
 
@@ -171,7 +171,7 @@ _Depends: 1.1, 1.2_
 - named export する
 - **完了確認**: 各 GRANT 種別の単体テストが全て通ること
 
-### 5.2 VaultNamespaceMapper の単体テスト
+### [x] 5.2 VaultNamespaceMapper の単体テスト
 
 `apps/app/src/features/growi-vault/server/services/vault-namespace-mapper.spec.ts` を作成する。
 
@@ -191,7 +191,7 @@ _要件: 7_
 _Boundary: `apps/app/src/features/growi-vault/server/services/vault-settings-service.ts`_
 _Depends: 2.1_
 
-### 6.1 vault-settings-service.ts の作成
+### [x] 6.1 vault-settings-service.ts の作成
 
 `apps/app/src/features/growi-vault/server/services/vault-settings-service.ts` を新規作成する。
 

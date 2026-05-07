@@ -69,8 +69,8 @@
 
 ---
 
-- [ ] 3. ストレージ抽象とパスユーティリティ
-- [ ] 3.1 `VaultRepoStorage` の実装
+- [x] 3. ストレージ抽象とパスユーティリティ
+- [x] 3.1 `VaultRepoStorage` の実装
   - `src/services/vault-repo-storage.ts` を作成する
   - `init()`（bare repo が存在しなければ `git init --bare`、冪等）を実装する
   - isomorphic-git の `writeBlob` / `writeTree` / `writeCommit` / `readTree` を薄くラップする
@@ -80,14 +80,14 @@
   - _Requirements: 9.1–9.5_
   - _Boundary: apps/growi-vault-manager/src/services/vault-repo-storage.ts_
 
-- [ ] 3.2 `VaultBlobHasher` の実装
+- [x] 3.2 `VaultBlobHasher` の実装
   - `src/services/vault-blob-hasher.ts` を作成する
   - isomorphic-git の `hashObject({ type: 'blob', object })` を利用して 40-char SHA-1 OID を返す
   - 同一内容で同一 OID を返すこと（ユニットテストで確認）
   - _Requirements: 2.1, 2.2_
   - _Boundary: apps/growi-vault-manager/src/services/vault-blob-hasher.ts_
 
-- [ ] 3.3 `VaultPathMapper` の実装
+- [x] 3.3 `VaultPathMapper` の実装
   - `src/services/vault-path-mapper.ts` を作成する
   - `map(pagePath, pageId)` を実装する（Windows 予約文字 `%XX` エンコード・予約ファイル名 `_` プレフィックス・大文字 suffix `__<hash8>`・orphan `_orphaned/`）
   - `mapPrefix(pagePath)` を実装する（ディレクトリ prefix、末尾 `.md` なし）
@@ -95,7 +95,7 @@
   - _Requirements: 3.1–3.7_
   - _Boundary: apps/growi-vault-manager/src/services/vault-path-mapper.ts_
 
-- [ ] 3.4 VaultPathMapper のユニットテスト
+- [x] 3.4 VaultPathMapper のユニットテスト
   - `src/services/vault-path-mapper.spec.ts` を作成する
   - 特殊文字エンコーディング・予約ファイル名・大文字 suffix・orphan 配置の各ケースをテストする
   - `pnpm vitest run vault-path-mapper.spec` が全件 PASS すること
@@ -104,8 +104,8 @@
 
 ---
 
-- [ ] 4. SharedSecretAuth middleware
-- [ ] 4.1 `SharedSecretAuth` middleware の実装
+- [x] 4. SharedSecretAuth middleware
+- [x] 4.1 `SharedSecretAuth` middleware の実装
   - `src/middlewares/shared-secret-auth.ts` を作成する
   - `Authorization: Bearer <token>` ヘッダを抽出し、`crypto.timingSafeEqual` で `VAULT_MANAGER_INTERNAL_SECRET` と定数時間比較する
   - token 不一致・ヘッダなし → 401 Unauthorized を返す
