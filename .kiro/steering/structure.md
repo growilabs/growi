@@ -16,5 +16,9 @@ For apps/app-specific examples and build tooling details, see `apps/app/.claude/
 
 See: `.claude/skills/monorepo-overview/SKILL.md` — "@growi/core — Domain & Utilities Hub" section
 
+### `services/` — Polyglot Microservices
+
+In addition to `apps/` and `packages/`, the monorepo has a `services/` directory for polyglot (non-Node) microservices. These live **outside the pnpm workspace** and each has its own toolchain and `CLAUDE.md`.
+
 ---
-_Updated: 2026-03-24. @growi/core details moved to monorepo-overview SKILL.md (auto-loaded)._
+_Updated: 2026-05-07. Added `services/` directory note._

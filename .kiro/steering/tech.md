@@ -60,4 +60,4 @@ For apps/app-specific build optimization details (webpack config, null-loader ru
 The monorepo uses **pino** (via `@growi/logger`) as the standard logging library. Legacy bunyan usage has been migrated.
 
 ---
-_Updated: 2026-04-16. Added pino logging note._
+_Updated: 2026-05-07. Python microservice toolchain details moved to services/markitdown-extractor/CLAUDE.md (service-local)._
