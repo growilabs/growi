@@ -30,7 +30,7 @@ async function bootstrap() {
 
 dotenvFlow.config();
 
-const mongoUri = process.env.MONGODB_URI ?? 'mongodb://localhost:27017/growi';
+const mongoUri = process.env.MONGO_URI ?? 'mongodb://localhost:27017/growi';
 mongoose
   .connect(mongoUri)
   .then(async () => {
