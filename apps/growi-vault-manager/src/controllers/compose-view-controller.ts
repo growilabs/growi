@@ -19,7 +19,7 @@ import type {
 import { BodyParams, UseBefore } from '@tsed/common';
 import { Controller } from '@tsed/di';
 import { InternalServerError } from '@tsed/exceptions';
-import type { Logger } from '@tsed/logger';
+import { Logger } from '@tsed/logger';
 import { Post, Returns } from '@tsed/schema';
 
 import { SharedSecretAuth } from '../middlewares/shared-secret-auth.js';
