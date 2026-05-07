@@ -1,0 +1,66 @@
+# Development docker-compose for GROWI Vault Manager
+# Starts vault-manager service alongside a shared bare repo volume
+# Usage: docker-compose up vault-manager
+version: '3.9'
+
+volumes:
+  # Shared bare repository storage volume (mounted by vault-manager)
+  vault-bare-repo:
+    driver: local
+  mongo-data:
+    driver: local
+
+services:
+  vault-manager:
+    build:
+      context: .
+      dockerfile: apps/growi-vault-manager/Dockerfile
+    image: growi-vault-manager:dev
+    ports:
+      - '3001:3001'
+    volumes:
+      # Mount the shared bare repo volume into the container
+      - vault-bare-repo:/var/lib/growi-vault/repo
+    environment:
+      NODE_ENV: development
+      PORT: 3001
+      # MongoDB connection string (point to your local or dev MongoDB)
+      MONGODB_URI: ${MONGODB_URI:-mongodb://mongo:27017/growi}
+      # Shared secret for service-to-service authentication (Bearer token)
+      VAULT_MANAGER_INTERNAL_SECRET: ${VAULT_MANAGER_INTERNAL_SECRET:-changeme-dev-secret}
+      # Path to the shared bare repository on the container filesystem
+      VAULT_REPO_PATH: /var/lib/growi-vault/repo
+      # Maintenance scheduler thresholds (optional overrides)
+      VAULT_SQUASH_COMMIT_THRESHOLD: ${VAULT_SQUASH_COMMIT_THRESHOLD:-1000}
+      VAULT_SQUASH_AGE_HOURS: ${VAULT_SQUASH_AGE_HOURS:-1}
+      VAULT_GC_INTERVAL_HOURS: ${VAULT_GC_INTERVAL_HOURS:-24}
+      VAULT_GC_LOOSE_OBJECT_THRESHOLD: ${VAULT_GC_LOOSE_OBJECT_THRESHOLD:-50000}
+    depends_on:
+      - mongo
+    restart: unless-stopped
+
+  mongo:
+    image: mongo:7
+    ports:
+      - '27017:27017'
+    volumes:
+      - mongo-data:/data/db
+    command: ['--replSet', 'rs0', '--bind_ip_all']
+    restart: unless-stopped
+
+  # One-shot service to initialize the MongoDB replica set
+  mongo-init:
+    image: mongo:7
+    depends_on:
+      - mongo
+    entrypoint: >
+      sh -c "
+        sleep 5 &&
+        mongosh --host mongo:27017 --eval '
+          rs.initiate({
+            _id: \"rs0\",
+            members: [{ _id: 0, host: \"mongo:27017\" }]
+          })
+        '
+      "
+    restart: 'no'

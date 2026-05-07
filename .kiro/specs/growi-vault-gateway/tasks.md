@@ -72,7 +72,7 @@ _Boundary: `packages/core/src/interfaces/vault/`_
 _要件: 7_
 _Boundary: `apps/app/src/server/models/config-definition.ts`_
 
-### 2.1 vault 関連の config key 定義
+### [x] 2.1 vault 関連の config key 定義
 
 `apps/app/src/server/models/config-definition.ts` を編集する。
 

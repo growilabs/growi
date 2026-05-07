@@ -6,8 +6,8 @@
 
 ---
 
-- [ ] 1. アプリスケルトンと開発環境構築
-- [ ] 1.1 `apps/growi-vault-manager` の Ts.ED + TypeScript プロジェクト scaffold (P)
+- [x] 1. アプリスケルトンと開発環境構築
+- [x] 1.1 `apps/growi-vault-manager` の Ts.ED + TypeScript プロジェクト scaffold (P)
   - `package.json`（Ts.ED v7.x / isomorphic-git v1.37.x / mongoose / @growi/core / @growi/logger 依存）を作成する
   - `tsconfig.json`（strict: true）を作成する
   - `src/server.ts`（Ts.ED bootstrap・DI container）を作成する
@@ -15,14 +15,14 @@
   - _Requirements: 10.1, 10.4_
   - _Boundary: apps/growi-vault-manager/package.json, tsconfig.json, src/server.ts_
 
-- [ ] 1.2 Dockerfile と docker-compose 統合 (P)
+- [x] 1.2 Dockerfile と docker-compose 統合 (P)
   - `Dockerfile`（node + git binary v2.30+ 同梱、`apk add git`）を作成する
   - `docker-compose.yml` に vault-manager サービスと共有 volume の定義を追加する
   - `docker build` が成功し、コンテナ内で `git --version` が `2.30` 以上を返すこと
   - _Requirements: 10.2, 10.3_
   - _Boundary: apps/growi-vault-manager/Dockerfile, docker-compose.yml_
 
-- [ ] 1.3 Turborepo タスク設定と pnpm workspace 登録 (P)
+- [x] 1.3 Turborepo タスク設定と pnpm workspace 登録 (P)
   - ルート `turbo.json` に vault-manager の `build` / `dev` / `test` タスクを追加する
   - `turbo run build --filter @growi/vault-manager` が通ること
   - _Requirements: 10.4_
