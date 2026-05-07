@@ -1,9 +1,9 @@
 """Unit tests for the Limits resource-control module (Task 2.1).
 
 Tests cover the three enforcement paths:
-  1. Semaphore full → ServiceBusy
-  2. File exceeds MAX_FILE_SIZE_MB → FileTooLarge
-  3. Coroutine hangs → ExtractionTimeout
+  1. Semaphore full → ServiceBusyError
+  2. File exceeds MAX_FILE_SIZE_MB → FileTooLargeError
+  3. Coroutine hangs → ExtractionTimeoutError
 
 Also verifies:
   4. Semaphore is always released (context-manager invariant)
@@ -17,7 +17,7 @@ import asyncio
 
 import pytest
 
-from app.limits import ExtractionTimeout, FileTooLarge, Limits, ServiceBusy
+from app.limits import ExtractionTimeoutError, FileTooLargeError, Limits, ServiceBusyError
 
 # Use anyio as the async test runner (pytest-asyncio not installed; anyio plugin is)
 pytestmark = pytest.mark.anyio
@@ -26,6 +26,7 @@ pytestmark = pytest.mark.anyio
 # ---------------------------------------------------------------------------
 # Helpers
 # ---------------------------------------------------------------------------
+
 
 def make_limits(
     *,
@@ -45,25 +46,27 @@ def make_limits(
 # Exception import / instantiation
 # ---------------------------------------------------------------------------
 
+
 class TestExceptions:
     """Verify that the custom exception classes are importable and usable."""
 
     def test_service_busy_is_exception(self) -> None:
-        exc = ServiceBusy("busy")
+        exc = ServiceBusyError("busy")
         assert isinstance(exc, Exception)
 
     def test_file_too_large_is_exception(self) -> None:
-        exc = FileTooLarge("big")
+        exc = FileTooLargeError("big")
         assert isinstance(exc, Exception)
 
     def test_extraction_timeout_is_exception(self) -> None:
-        exc = ExtractionTimeout("slow")
+        exc = ExtractionTimeoutError("slow")
         assert isinstance(exc, Exception)
 
 
 # ---------------------------------------------------------------------------
 # acquire_slot — semaphore concurrency control
 # ---------------------------------------------------------------------------
+
 
 class TestAcquireSlot:
     """Tests for the non-blocking semaphore slot acquisition."""
@@ -79,19 +82,19 @@ class TestAcquireSlot:
         limits = make_limits(max_concurrency=2)
         async with limits.acquire_slot():
             async with limits.acquire_slot():
-                pass  # both slots available — no ServiceBusy
+                pass  # both slots available — no ServiceBusyError
 
     async def test_service_busy_when_semaphore_full(self) -> None:
-        """When all concurrency slots are taken, ServiceBusy must be raised immediately."""
+        """When all concurrency slots are taken, ServiceBusyError must be raised immediately."""
         limits = make_limits(max_concurrency=1)
         async with limits.acquire_slot():
             # semaphore is now at 0 — next acquire should raise, not block
-            with pytest.raises(ServiceBusy):
+            with pytest.raises(ServiceBusyError):
                 async with limits.acquire_slot():
                     pass
 
     async def test_service_busy_with_larger_concurrency(self) -> None:
-        """Fill all N slots then verify the (N+1)-th raises ServiceBusy."""
+        """Fill all N slots then verify the (N+1)-th raises ServiceBusyError."""
         n = 3
         limits = make_limits(max_concurrency=n)
 
@@ -99,7 +102,7 @@ class TestAcquireSlot:
         for _ in range(n):
             await limits._semaphore.acquire()
         try:
-            with pytest.raises(ServiceBusy):
+            with pytest.raises(ServiceBusyError):
                 async with limits.acquire_slot():
                     pass
         finally:
@@ -141,6 +144,7 @@ class TestAcquireSlot:
 # enforce_size — streaming byte-count check
 # ---------------------------------------------------------------------------
 
+
 class TestEnforceSize:
     """Tests for the accumulated byte-size enforcement."""
 
@@ -151,10 +155,10 @@ class TestEnforceSize:
         await limits.enforce_size(data)  # should not raise
 
     async def test_one_byte_over_limit_raises_file_too_large(self) -> None:
-        """A single byte over the limit must raise FileTooLarge."""
+        """A single byte over the limit must raise FileTooLargeError."""
         limits = make_limits(max_file_size_mb=1)
         data = b"x" * (1 * 1024 * 1024 + 1)
-        with pytest.raises(FileTooLarge):
+        with pytest.raises(FileTooLargeError):
             await limits.enforce_size(data)
 
     async def test_empty_data_is_accepted(self) -> None:
@@ -163,10 +167,10 @@ class TestEnforceSize:
         await limits.enforce_size(b"")  # should not raise
 
     async def test_large_data_raises_file_too_large(self) -> None:
-        """Data significantly larger than the limit raises FileTooLarge."""
+        """Data significantly larger than the limit raises FileTooLargeError."""
         limits = make_limits(max_file_size_mb=1)
         data = b"x" * (10 * 1024 * 1024)  # 10 MiB >> 1 MiB limit
-        with pytest.raises(FileTooLarge):
+        with pytest.raises(FileTooLargeError):
             await limits.enforce_size(data)
 
     async def test_file_too_large_regardless_of_stated_size(self) -> None:
@@ -182,21 +186,22 @@ class TestEnforceSize:
         stated_content_length = 512 * 1024  # header said 512 KiB — within limit
         actual_data = b"x" * (2 * 1024 * 1024)  # actual body is 2 MiB
         assert len(actual_data) > stated_content_length  # sanity
-        with pytest.raises(FileTooLarge):
+        with pytest.raises(FileTooLargeError):
             await limits.enforce_size(actual_data)
 
     async def test_file_too_large_message_contains_limit(self) -> None:
-        """The FileTooLarge exception message must mention the configured limit."""
+        """The FileTooLargeError exception message must mention the configured limit."""
         limit_mb = 5
         limits = make_limits(max_file_size_mb=limit_mb)
         data = b"x" * (limit_mb * 1024 * 1024 + 1)
-        with pytest.raises(FileTooLarge, match=str(limit_mb)):
+        with pytest.raises(FileTooLargeError, match=str(limit_mb)):
             await limits.enforce_size(data)
 
 
 # ---------------------------------------------------------------------------
 # with_timeout — asyncio.wait_for wrapper
 # ---------------------------------------------------------------------------
+
 
 class TestWithTimeout:
     """Tests for the extraction-timeout wrapper."""
@@ -212,24 +217,24 @@ class TestWithTimeout:
         assert result == "done"
 
     async def test_slow_coroutine_raises_extraction_timeout(self) -> None:
-        """A coroutine that exceeds the timeout must raise ExtractionTimeout."""
+        """A coroutine that exceeds the timeout must raise ExtractionTimeoutError."""
         limits = make_limits(timeout_s=1)
 
         async def slow_coro() -> None:
             await asyncio.sleep(10)  # much longer than timeout_s=1
 
-        with pytest.raises(ExtractionTimeout):
+        with pytest.raises(ExtractionTimeoutError):
             await limits.with_timeout(slow_coro())
 
     async def test_extraction_timeout_message_contains_timeout(self) -> None:
-        """The ExtractionTimeout message must mention the configured timeout."""
+        """The ExtractionTimeoutError message must mention the configured timeout."""
         timeout_s = 1
         limits = make_limits(timeout_s=timeout_s)
 
         async def slow_coro() -> None:
             await asyncio.sleep(10)
 
-        with pytest.raises(ExtractionTimeout, match=str(timeout_s)):
+        with pytest.raises(ExtractionTimeoutError, match=str(timeout_s)):
             await limits.with_timeout(slow_coro())
 
     async def test_coroutine_exception_propagates_unchanged(self) -> None:
@@ -243,14 +248,14 @@ class TestWithTimeout:
             await limits.with_timeout(raising_coro())
 
     async def test_timeout_is_not_wrapped_as_asyncio_error(self) -> None:
-        """asyncio.TimeoutError must be caught and re-raised as ExtractionTimeout."""
+        """asyncio.TimeoutError must be caught and re-raised as ExtractionTimeoutError."""
         limits = make_limits(timeout_s=1)
 
         async def slow_coro() -> None:
             await asyncio.sleep(10)
 
-        # Must NOT be asyncio.TimeoutError — must be ExtractionTimeout
-        with pytest.raises(ExtractionTimeout):
+        # Must NOT be asyncio.TimeoutError — must be ExtractionTimeoutError
+        with pytest.raises(ExtractionTimeoutError):
             await limits.with_timeout(slow_coro())
 
     async def test_with_timeout_returns_none_for_void_coroutine(self) -> None:

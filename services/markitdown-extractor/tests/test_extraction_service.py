@@ -5,8 +5,8 @@ Tests cover:
 - TXT file → dispatches correctly, returns PageInfo list
 - JSON file → dispatches correctly
 - MIME hint overrides extension-based lookup
-- application/x-custom → UnsupportedFormat raised
-- Unknown extension (no MIME hint) → UnsupportedFormat raised
+- application/x-custom → UnsupportedFormatError raised
+- Unknown extension (no MIME hint) → UnsupportedFormatError raised
 - PDF, PPTX, XLSX are in registry (temporarily use simple_extractor)
 
 Requirements: 1.1 (extraction returns pages array), 1.6 (unsupported formats raise)
@@ -20,8 +20,8 @@ from unittest.mock import patch
 import pytest
 
 from app.schemas import PageInfo
-from app.services.extractors import EXTRACTOR_REGISTRY, EXTENSION_TO_MIME
-from app.services.extraction_service import UnsupportedFormat, extract
+from app.services.extraction_service import UnsupportedFormatError, extract
+from app.services.extractors import EXTENSION_TO_MIME, EXTRACTOR_REGISTRY
 
 # Use anyio as the async test runner (pytest-asyncio not installed; anyio plugin is)
 pytestmark = pytest.mark.anyio
@@ -115,7 +115,10 @@ class TestExtensionToMime:
         assert EXTENSION_TO_MIME.get(".pdf") == "application/pdf"
 
     def test_pptx_extension(self) -> None:
-        assert EXTENSION_TO_MIME.get(".pptx") == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        assert (
+            EXTENSION_TO_MIME.get(".pptx")
+            == "application/vnd.openxmlformats-officedocument.presentationml.presentation"
+        )
 
     def test_xlsx_extension(self) -> None:
         assert EXTENSION_TO_MIME.get(".xlsx") == "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
@@ -125,7 +128,9 @@ class TestExtensionToMime:
         assert EXTENSION_TO_MIME.get(".htm") == "text/html"
 
     def test_docx_extension(self) -> None:
-        assert EXTENSION_TO_MIME.get(".docx") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        assert (
+            EXTENSION_TO_MIME.get(".docx") == "application/vnd.openxmlformats-officedocument.wordprocessingml.document"
+        )
 
 
 # ---------------------------------------------------------------------------
@@ -160,23 +165,23 @@ class TestExtractDispatch:
         assert pages[0].content == "fake content"
 
     async def test_mime_hint_not_in_registry_raises(self) -> None:
-        """mime_hint present but not in registry → UnsupportedFormat."""
-        with pytest.raises(UnsupportedFormat):
+        """mime_hint present but not in registry → UnsupportedFormatError."""
+        with pytest.raises(UnsupportedFormatError):
             await extract(b"data", "file.txt", mime_hint="application/x-custom")
 
     async def test_unsupported_mime_raises(self) -> None:
-        """Custom MIME type not in registry → UnsupportedFormat raised (Req 1.6)."""
-        with pytest.raises(UnsupportedFormat):
+        """Custom MIME type not in registry → UnsupportedFormatError raised (Req 1.6)."""
+        with pytest.raises(UnsupportedFormatError):
             await extract(b"data", "file.xyz")
 
     async def test_unknown_extension_raises(self) -> None:
-        """Unknown extension with no MIME hint → UnsupportedFormat raised."""
-        with pytest.raises(UnsupportedFormat):
+        """Unknown extension with no MIME hint → UnsupportedFormatError raised."""
+        with pytest.raises(UnsupportedFormatError):
             await extract(b"data", "archive.unknownext")
 
     async def test_no_extension_raises(self) -> None:
-        """Filename without extension and no MIME hint → UnsupportedFormat raised."""
-        with pytest.raises(UnsupportedFormat):
+        """Filename without extension and no MIME hint → UnsupportedFormatError raised."""
+        with pytest.raises(UnsupportedFormatError):
             await extract(b"data", "noextension")
 
     async def test_pdf_dispatches(self) -> None:
@@ -189,14 +194,19 @@ class TestExtractDispatch:
     async def test_pptx_dispatches(self) -> None:
         """PPTX dispatches to a callable extractor (task 3.2 will replace with real one)."""
         data = b"PK stub pptx"
-        with patch.dict(EXTRACTOR_REGISTRY, {"application/vnd.openxmlformats-officedocument.presentationml.presentation": _fake_extractor}):
+        with patch.dict(
+            EXTRACTOR_REGISTRY,
+            {"application/vnd.openxmlformats-officedocument.presentationml.presentation": _fake_extractor},
+        ):
             pages = await extract(data, "slides.pptx")
         assert len(pages) >= 1
 
     async def test_xlsx_dispatches(self) -> None:
         """XLSX dispatches to a callable extractor (task 3.3 will replace with real one)."""
         data = b"PK stub xlsx"
-        with patch.dict(EXTRACTOR_REGISTRY, {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": _fake_extractor}):
+        with patch.dict(
+            EXTRACTOR_REGISTRY, {"application/vnd.openxmlformats-officedocument.spreadsheetml.sheet": _fake_extractor}
+        ):
             pages = await extract(data, "spreadsheet.xlsx")
         assert len(pages) >= 1
 

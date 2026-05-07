@@ -69,8 +69,6 @@ select = [
     "N",   # pep8-naming
 ]
 ignore = [
-    "ANN101", # missing-type-self (deprecated in newer ruff)
-    "ANN102", # missing-type-cls
     "S101",   # assert-used (needed in tests)
 ]
 

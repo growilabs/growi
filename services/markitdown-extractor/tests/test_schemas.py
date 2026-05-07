@@ -19,7 +19,7 @@ class TestPageInfo:
         """PageInfo must be importable from app.schemas."""
         from app.schemas import PageInfo  # noqa: F401
 
-    def test_pageNumber_is_optional_int(self) -> None:
+    def test_page_number_is_optional_int(self) -> None:
         """pageNumber must accept int or None."""
         from app.schemas import PageInfo
 
@@ -53,7 +53,7 @@ class TestPageInfo:
         with pytest.raises(ValidationError):
             PageInfo(pageNumber=1, label="Page 1")  # type: ignore[call-arg]
 
-    def test_pageNumber_field_in_json_schema(self) -> None:
+    def test_page_number_field_in_json_schema(self) -> None:
         """pageNumber must appear in the JSON Schema."""
         from app.schemas import PageInfo
 
@@ -98,14 +98,14 @@ class TestExtractResponse:
         r = ExtractResponse(pages=[], mimeType="application/pdf", extractedCharacters=0)
         assert r.pages == []
 
-    def test_mimeType_is_str(self) -> None:
+    def test_mime_type_is_str(self) -> None:
         """mimeType must be a string."""
         from app.schemas import ExtractResponse
 
         r = ExtractResponse(pages=[], mimeType="text/plain", extractedCharacters=0)
         assert r.mimeType == "text/plain"
 
-    def test_extractedCharacters_is_int(self) -> None:
+    def test_extracted_characters_is_int(self) -> None:
         """extractedCharacters must be an integer."""
         from app.schemas import ExtractResponse
 
@@ -120,14 +120,14 @@ class TestExtractResponse:
         schema = ExtractResponse.model_json_schema()
         assert "pages" in schema["properties"]
 
-    def test_json_schema_contains_mimeType(self) -> None:
+    def test_json_schema_contains_mime_type(self) -> None:
         """JSON Schema must include 'mimeType' in properties."""
         from app.schemas import ExtractResponse
 
         schema = ExtractResponse.model_json_schema()
         assert "mimeType" in schema["properties"]
 
-    def test_json_schema_contains_extractedCharacters(self) -> None:
+    def test_json_schema_contains_extracted_characters(self) -> None:
         """JSON Schema must include 'extractedCharacters' in properties."""
         from app.schemas import ExtractResponse
 
@@ -263,7 +263,7 @@ class TestSchemaIntegration:
     """Integration tests verifying the complete schema contract."""
 
     def test_extract_response_json_schema_has_all_three_top_level_fields(self) -> None:
-        """Completion criterion: ExtractResponse.model_json_schema() must include pages, mimeType, extractedCharacters."""
+        """Completion: ExtractResponse.model_json_schema() must include pages, mimeType, extractedCharacters."""
         from app.schemas import ExtractResponse
 
         schema = ExtractResponse.model_json_schema()

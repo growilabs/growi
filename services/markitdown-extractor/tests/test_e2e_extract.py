@@ -76,7 +76,7 @@ class TestUnsupportedFormat:
     def test_unsupported_mime_returns_400(self, client, test_token):
         """Upload with unsupported MIME type must return 400 with unsupported_format code.
 
-        Req 1.6: ExtractionService raises UnsupportedFormat for MIME types not
+        Req 1.6: ExtractionService raises UnsupportedFormatError for MIME types not
         in the whitelist registry, and the router maps this to 400.
         """
         resp = client.post(

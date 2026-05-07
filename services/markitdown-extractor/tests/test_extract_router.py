@@ -8,10 +8,9 @@ Task 4.2 completion criteria:
 
 from __future__ import annotations
 
-import os
 from io import BytesIO
 from pathlib import Path
-from unittest.mock import AsyncMock, patch
+from unittest.mock import patch
 
 import pytest
 from fastapi import FastAPI
@@ -150,18 +149,14 @@ class TestExtractHappyPath:
 class TestExtractAuth:
     """Bearer auth enforcement on POST /extract."""
 
-    def test_no_auth_returns_401(
-        self, extract_client: TestClient, sample_txt_bytes: bytes
-    ) -> None:
+    def test_no_auth_returns_401(self, extract_client: TestClient, sample_txt_bytes: bytes) -> None:
         response = extract_client.post(
             "/extract",
             files={"file": ("sample.txt", BytesIO(sample_txt_bytes), "text/plain")},
         )
         assert response.status_code == 401
 
-    def test_wrong_token_returns_401(
-        self, extract_client: TestClient, sample_txt_bytes: bytes
-    ) -> None:
+    def test_wrong_token_returns_401(self, extract_client: TestClient, sample_txt_bytes: bytes) -> None:
         response = extract_client.post(
             "/extract",
             headers={"Authorization": "Bearer wrong-token"},
@@ -169,9 +164,7 @@ class TestExtractAuth:
         )
         assert response.status_code == 401
 
-    def test_401_body_has_code(
-        self, extract_client: TestClient, sample_txt_bytes: bytes
-    ) -> None:
+    def test_401_body_has_code(self, extract_client: TestClient, sample_txt_bytes: bytes) -> None:
         response = extract_client.post(
             "/extract",
             files={"file": ("sample.txt", BytesIO(sample_txt_bytes), "text/plain")},
@@ -183,10 +176,8 @@ class TestExtractAuth:
 class TestExtractErrorCodes:
     """Error code → HTTP status mapping."""
 
-    def test_unsupported_format_returns_400(
-        self, extract_client: TestClient, auth_headers: dict[str, str]
-    ) -> None:
-        """An unsupported file type triggers UnsupportedFormat → 400."""
+    def test_unsupported_format_returns_400(self, extract_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """An unsupported file type triggers UnsupportedFormatError → 400."""
         response = extract_client.post(
             "/extract",
             headers=auth_headers,
@@ -196,15 +187,13 @@ class TestExtractErrorCodes:
         body = response.json()
         assert body.get("code") == "unsupported_format"
 
-    def test_file_too_large_returns_413(
-        self, extract_client: TestClient, auth_headers: dict[str, str]
-    ) -> None:
-        """A file exceeding MAX_FILE_SIZE_MB triggers FileTooLarge → 413."""
-        from app.limits import FileTooLarge
+    def test_file_too_large_returns_413(self, extract_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """A file exceeding MAX_FILE_SIZE_MB triggers FileTooLargeError → 413."""
+        from app.limits import FileTooLargeError
 
         # Trigger lazy init by making a real request first (creates limits instance).
         # Then patch the Limits.enforce_size method on the class level.
-        with patch("app.limits.Limits.enforce_size", side_effect=FileTooLarge("too big")):
+        with patch("app.limits.Limits.enforce_size", side_effect=FileTooLargeError("too big")):
             response = extract_client.post(
                 "/extract",
                 headers=auth_headers,
@@ -214,13 +203,11 @@ class TestExtractErrorCodes:
         body = response.json()
         assert body.get("code") == "file_too_large"
 
-    def test_extraction_timeout_returns_408(
-        self, extract_client: TestClient, auth_headers: dict[str, str]
-    ) -> None:
-        """ExtractionTimeout → 408."""
-        from app.limits import ExtractionTimeout
+    def test_extraction_timeout_returns_408(self, extract_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """ExtractionTimeoutError → 408."""
+        from app.limits import ExtractionTimeoutError
 
-        with patch("app.limits.Limits.with_timeout", side_effect=ExtractionTimeout("timed out")):
+        with patch("app.limits.Limits.with_timeout", side_effect=ExtractionTimeoutError("timed out")):
             response = extract_client.post(
                 "/extract",
                 headers=auth_headers,
@@ -230,17 +217,16 @@ class TestExtractErrorCodes:
         body = response.json()
         assert body.get("code") == "extraction_timeout"
 
-    def test_service_busy_returns_503(
-        self, extract_client: TestClient, auth_headers: dict[str, str]
-    ) -> None:
-        """ServiceBusy → 503."""
-        from app.limits import ServiceBusy
+    def test_service_busy_returns_503(self, extract_client: TestClient, auth_headers: dict[str, str]) -> None:
+        """ServiceBusyError → 503."""
         from contextlib import asynccontextmanager
+
+        from app.limits import ServiceBusyError
 
         @asynccontextmanager
         async def busy_slot(self_):
-            raise ServiceBusy("busy")
-            yield  # noqa: unreachable — needed for asynccontextmanager
+            raise ServiceBusyError("busy")
+            yield  # unreachable — needed for asynccontextmanager
 
         with patch("app.limits.Limits.acquire_slot", busy_slot):
             response = extract_client.post(
@@ -252,9 +238,7 @@ class TestExtractErrorCodes:
         body = response.json()
         assert body.get("code") == "service_busy"
 
-    def test_missing_file_returns_422(
-        self, extract_client: TestClient, auth_headers: dict[str, str]
-    ) -> None:
+    def test_missing_file_returns_422(self, extract_client: TestClient, auth_headers: dict[str, str]) -> None:
         """Omitting the required `file` field returns 422 (FastAPI validation)."""
         response = extract_client.post(
             "/extract",

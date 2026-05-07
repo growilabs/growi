@@ -3,10 +3,10 @@
 MIME resolution order:
   1. ``mime_hint`` (from Content-Type header) — used if present and in registry
   2. File extension fallback via EXTENSION_TO_MIME
-  3. ``UnsupportedFormat`` raised if no match found in the whitelist registry
+  3. ``UnsupportedFormatError`` raised if no match found in the whitelist registry
 
 Requirement 1.1: returns list[PageInfo] for supported formats.
-Requirement 1.6: raises UnsupportedFormat for unsupported MIME types.
+Requirement 1.6: raises UnsupportedFormatError for unsupported MIME types.
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ from __future__ import annotations
 import os
 
 from app.schemas import PageInfo
-from app.services.extractors import EXTRACTOR_REGISTRY, EXTENSION_TO_MIME
+from app.services.extractors import EXTENSION_TO_MIME, EXTRACTOR_REGISTRY
 
 
-class UnsupportedFormat(Exception):
+class UnsupportedFormatError(Exception):
     """Raised when the resolved MIME type is not in the extractor registry.
 
     Corresponds to ErrorCode.unsupported_format (Requirement 1.6).
@@ -33,7 +33,7 @@ async def extract(
 
     MIME resolution uses ``mime_hint`` first (e.g., the Content-Type header
     value), then falls back to the file extension.  If the resolved MIME type
-    is not in the whitelist registry, ``UnsupportedFormat`` is raised.
+    is not in the whitelist registry, ``UnsupportedFormatError`` is raised.
 
     Args:
         data: Raw bytes of the uploaded file.
@@ -46,14 +46,13 @@ async def extract(
         A list of PageInfo objects representing the extracted pages/sections.
 
     Raises:
-        UnsupportedFormat: The resolved MIME type is not in EXTRACTOR_REGISTRY.
+        UnsupportedFormatError: The resolved MIME type is not in EXTRACTOR_REGISTRY.
     """
     mime = _resolve_mime(filename, mime_hint)
     extractor = EXTRACTOR_REGISTRY.get(mime)
     if extractor is None:
-        raise UnsupportedFormat(
-            f"MIME type {mime!r} is not supported. "
-            "Supported types: " + ", ".join(sorted(EXTRACTOR_REGISTRY))
+        raise UnsupportedFormatError(
+            f"MIME type {mime!r} is not supported. Supported types: " + ", ".join(sorted(EXTRACTOR_REGISTRY))
         )
     return extractor(data, filename)
 

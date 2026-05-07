@@ -9,10 +9,9 @@ These tests verify that ``app.security.apply_xxe_hardening()`` correctly:
 
 from __future__ import annotations
 
-import importlib
 import logging
-import xml.etree.ElementTree as _original_ET
-from unittest.mock import patch
+
+import pytest
 
 
 class TestApplyXxeHardeningImport:
@@ -42,8 +41,7 @@ class TestDefuseStdlib:
 
         # defuse_stdlib() replaces ET.parse with defusedxml.common.parse
         assert "defusedxml" in ET.parse.__module__, (
-            f"Expected xml.etree.ElementTree.parse to be from defusedxml, "
-            f"but got module: {ET.parse.__module__}"
+            f"Expected xml.etree.ElementTree.parse to be from defusedxml, but got module: {ET.parse.__module__}"
         )
 
     def test_etree_fromstring_replaced_with_defusedxml(self) -> None:
@@ -68,11 +66,7 @@ class TestDefuseStdlib:
         import xml.etree.ElementTree as ET
 
         xxe_payload = (
-            '<?xml version="1.0"?>'
-            "<!DOCTYPE foo ["
-            '  <!ENTITY xxe SYSTEM "file:///etc/passwd">'
-            "]>"
-            "<root>&xxe;</root>"
+            '<?xml version="1.0"?><!DOCTYPE foo [  <!ENTITY xxe SYSTEM "file:///etc/passwd">]><root>&xxe;</root>'
         )
 
         raised = False
@@ -113,7 +107,7 @@ class TestDefuseStdlib:
 class TestLogging:
     """Verify that apply_xxe_hardening() emits the expected INFO log message."""
 
-    def test_logs_info_message_on_success(self, caplog: "pytest.LogCaptureFixture") -> None:
+    def test_logs_info_message_on_success(self, caplog: pytest.LogCaptureFixture) -> None:
         """apply_xxe_hardening() must log an INFO message confirming hardening was applied."""
         from app.security import apply_xxe_hardening
 
@@ -121,9 +115,7 @@ class TestLogging:
             apply_xxe_hardening()
 
         assert any(
-            "XXE hardening applied" in record.message
-            for record in caplog.records
-            if record.levelno == logging.INFO
+            "XXE hardening applied" in record.message for record in caplog.records if record.levelno == logging.INFO
         ), f"Expected INFO log with 'XXE hardening applied' but got: {[r.message for r in caplog.records]}"
 
 

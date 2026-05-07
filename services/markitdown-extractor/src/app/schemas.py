@@ -5,7 +5,7 @@ Defines the data contracts for:
 - Error responses (ErrorResponse, ErrorCode)
 """
 
-from enum import Enum
+from enum import StrEnum
 
 from pydantic import BaseModel
 
@@ -17,7 +17,8 @@ class PageInfo(BaseModel):
     page concept (e.g. plain text files).
     """
 
-    pageNumber: int | None  # 1-based; None when the format has no page concept
+    # Field names use camelCase per API contract (OpenAPI / JSON wire format).
+    pageNumber: int | None  # noqa: N815 — 1-based; None when the format has no page concept
     label: str | None  # Display label (slide number string / sheet name / page number string)
     content: str  # Extracted Markdown text for this page/section
 
@@ -29,12 +30,13 @@ class ExtractResponse(BaseModel):
     is provided for audit logging and metrics purposes (Req 1.1).
     """
 
+    # Field names use camelCase per API contract (OpenAPI / JSON wire format).
     pages: list[PageInfo]
-    mimeType: str  # MIME type as confirmed server-side
-    extractedCharacters: int  # Total character count across all pages
+    mimeType: str  # noqa: N815 — MIME type as confirmed server-side
+    extractedCharacters: int  # noqa: N815 — Total character count across all pages
 
 
-class ErrorCode(str, Enum):
+class ErrorCode(StrEnum):
     """Machine-readable error codes for all defined failure modes.
 
     Extends str so that values serialize as plain JSON strings rather than

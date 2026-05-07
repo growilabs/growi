@@ -5,18 +5,18 @@ Provides:
 
 Processing order per design.md:
   1. Bearer auth (enforced by BearerAuthMiddleware at the app level)
-  2. Semaphore slot acquisition (ServiceBusy → 503)
-  3. File size check (FileTooLarge → 413)
-  4. MIME resolution (UnsupportedFormat → 400)
-  5. Extraction with timeout wrap (ExtractionTimeout → 408)
+  2. Semaphore slot acquisition (ServiceBusyError → 503)
+  3. File size check (FileTooLargeError → 413)
+  4. MIME resolution (UnsupportedFormatError → 400)
+  5. Extraction with timeout wrap (ExtractionTimeoutError → 408)
   6. ExtractResponse assembly
 
 Error responses follow ErrorResponse schema with consistent HTTP status
 mapping:
-  UnsupportedFormat  → 400 unsupported_format
-  FileTooLarge       → 413 file_too_large
-  ExtractionTimeout  → 408 extraction_timeout
-  ServiceBusy        → 503 service_busy
+  UnsupportedFormatError  → 400 unsupported_format
+  FileTooLargeError       → 413 file_too_large
+  ExtractionTimeoutError  → 408 extraction_timeout
+  ServiceBusyError        → 503 service_busy
   Exception          → 500 extraction_failed
 
 Requirements: 1.1, 1.6, 2.1, 2.2, 2.3, 3.3
@@ -24,13 +24,13 @@ Requirements: 1.1, 1.6, 2.1, 2.2, 2.3, 3.3
 
 from __future__ import annotations
 
-from fastapi import APIRouter, File, Form, HTTPException, UploadFile
+from fastapi import APIRouter, File, Form, UploadFile
 from fastapi.responses import JSONResponse
 
 from app.config import Settings
-from app.limits import ExtractionTimeout, FileTooLarge, Limits, ServiceBusy
+from app.limits import ExtractionTimeoutError, FileTooLargeError, Limits, ServiceBusyError
 from app.schemas import ErrorCode, ErrorResponse, ExtractResponse
-from app.services.extraction_service import UnsupportedFormat, extract
+from app.services.extraction_service import UnsupportedFormatError, extract
 
 # ---------------------------------------------------------------------------
 # Module-level Limits instance (lazily initialised)
@@ -58,6 +58,7 @@ def _get_limits() -> Limits:
         )
     return limits
 
+
 # ---------------------------------------------------------------------------
 # Router
 # ---------------------------------------------------------------------------
@@ -77,13 +78,13 @@ def _error_response(code: ErrorCode, message: str, status_code: int) -> JSONResp
     summary="Extract text from an uploaded file",
 )
 async def post_extract(
-    file: UploadFile = File(..., description="File to extract text from"),
-    mimeType: str | None = Form(None, description="Optional MIME type hint"),
+    file: UploadFile = File(..., description="File to extract text from"),  # noqa: B008
+    mimeType: str | None = Form(None, description="Optional MIME type hint"),  # noqa: B008, N803
 ) -> JSONResponse | ExtractResponse:
     """Receive a multipart upload and return extracted text as ExtractResponse.
 
     Processing order:
-    1. Acquire concurrency slot (non-blocking; raises ServiceBusy if full)
+    1. Acquire concurrency slot (non-blocking; raises ServiceBusyError if full)
     2. Read file bytes and enforce size limit
     3. Dispatch to extractor with timeout guard
     4. Assemble and return ExtractResponse
@@ -104,7 +105,7 @@ async def post_extract(
             data = await file.read()
             try:
                 await _limits.enforce_size(data)
-            except FileTooLarge as exc:
+            except FileTooLargeError as exc:
                 return _error_response(
                     ErrorCode.file_too_large,
                     str(exc),
@@ -113,16 +114,14 @@ async def post_extract(
 
             # Step 3: Dispatch with timeout.
             try:
-                pages = await _limits.with_timeout(
-                    extract(data, filename, mime_hint=mime_hint)
-                )
-            except UnsupportedFormat as exc:
+                pages = await _limits.with_timeout(extract(data, filename, mime_hint=mime_hint))
+            except UnsupportedFormatError as exc:
                 return _error_response(
                     ErrorCode.unsupported_format,
                     str(exc),
                     400,
                 )
-            except ExtractionTimeout as exc:
+            except ExtractionTimeoutError as exc:
                 return _error_response(
                     ErrorCode.extraction_timeout,
                     str(exc),
@@ -135,7 +134,7 @@ async def post_extract(
                     500,
                 )
 
-    except ServiceBusy as exc:
+    except ServiceBusyError as exc:
         return _error_response(
             ErrorCode.service_busy,
             str(exc),
@@ -146,6 +145,7 @@ async def post_extract(
     # Use mime_hint if given; otherwise fall back to what the extractor used.
     # We re-derive from the filename extension to avoid a separate round-trip.
     from app.services.extraction_service import _resolve_mime  # noqa: PLC0415
+
     resolved_mime = _resolve_mime(filename, mime_hint)
 
     # Step 5: Assemble response.
