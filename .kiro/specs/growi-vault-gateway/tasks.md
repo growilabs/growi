@@ -26,7 +26,7 @@
 _要件: 9_
 _Boundary: `packages/core/src/interfaces/vault/`_
 
-### 1.1 vault-instruction.ts の作成
+### [x] 1.1 vault-instruction.ts の作成
 
 `packages/core/src/interfaces/vault/vault-instruction.ts` を新規作成する。
 
@@ -38,7 +38,7 @@ _Boundary: `packages/core/src/interfaces/vault/`_
 - 全型を named export する
 - **完了確認**: TypeScript コンパイルが通ること。各型に意図が明確なコメントが付いていること
 
-### 1.2 vault-compose-view.ts の作成
+### [x] 1.2 vault-compose-view.ts の作成
 
 `packages/core/src/interfaces/vault/vault-compose-view.ts` を新規作成する。
 
@@ -47,7 +47,7 @@ _Boundary: `packages/core/src/interfaces/vault/`_
 - 全型を named export する
 - **完了確認**: TypeScript コンパイルが通ること
 
-### 1.3 vault-storage-stats.ts の作成
+### [x] 1.3 vault-storage-stats.ts の作成
 
 `packages/core/src/interfaces/vault/vault-storage-stats.ts` を新規作成する。
 
@@ -55,7 +55,7 @@ _Boundary: `packages/core/src/interfaces/vault/`_
 - 全型を named export する
 - **完了確認**: TypeScript コンパイルが通ること
 
-### 1.4 vault index.ts バレルと package.json exports 追加
+### [x] 1.4 vault index.ts バレルと package.json exports 追加
 
 `packages/core/src/interfaces/vault/index.ts` を作成して全型を re-export する。
 
