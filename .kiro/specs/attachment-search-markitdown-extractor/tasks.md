@@ -134,7 +134,7 @@
   - _Boundary: ExtractRouter_
   - _Depends: 2.1, 2.2, 3.5_
 
-- [ ] 4.3 FastAPI app factory (`main.py`) を実装
+- [x] 4.3 FastAPI app factory (`main.py`) を実装
   - 起動時に `config` 読み込み (token 未設定で fail fast) → defusedxml 適用 → PDF capability probe → ルータ配線 → BearerAuthMiddleware 配線 → 構造化 JSON ログ middleware 配線
   - `/openapi.json` が Pydantic schema ベースの OpenAPI 3.x を返すことを確認 (FastAPI 自動生成)
   - 完了条件: `uv run uvicorn app.main:app --port 8000` で起動し、`/healthz` / `/readyz` / `/openapi.json` / `/extract` (auth 必須) が期待どおり応答
