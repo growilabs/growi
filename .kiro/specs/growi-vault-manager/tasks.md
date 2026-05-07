@@ -156,8 +156,8 @@
 
 ---
 
-- [ ] 6. VaultViewComposer の実装
-- [ ] 6.1 full merge と cache hit の実装
+- [x] 6. VaultViewComposer の実装
+- [x] 6.1 full merge と cache hit の実装
   - `src/services/vault-view-composer.ts` を作成する
   - `compose(userId, namespaces)` を実装する
   - `vault_namespace_state` から各 namespace の commitOid を取得し `currentVersions` を構築する
@@ -168,7 +168,7 @@
   - _Requirements: 4.1–4.3, 4.5, 4.7_
   - _Boundary: apps/growi-vault-manager/src/services/vault-view-composer.ts_
 
-- [ ] 6.2 delta merge の実装
+- [x] 6.2 delta merge の実装
   - `vault-view-composer.ts` に delta merge（`applyNamespaceDeltas`）を追加する
   - 変動した namespace のみ subtree を再計算し、変動なし namespace の subtree OID を base から継承する
   - base tree が gc で消失している場合は full merge にフォールバックする
@@ -176,7 +176,7 @@
   - _Requirements: 4.4, 4.8_
   - _Boundary: apps/growi-vault-manager/src/services/vault-view-composer.ts_
 
-- [ ] 6.3 衝突解消ロジックの実装
+- [x] 6.3 衝突解消ロジックの実装
   - 同一 path に複数 namespace からのエントリが存在する場合の優先順位を実装する
   - 優先順位: `user-<uid>-only-me` > `group-*` > `restricted-link` > `public`
   - ユニットテストで各衝突パターンの解決結果を検証すること

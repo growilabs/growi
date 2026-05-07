@@ -301,7 +301,7 @@ _要件: 5_
 _Boundary: `apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts`_
 _Depends: 3.1, 3.2, 5.1_
 
-### 9.1 vault-bootstrapper.ts の作成
+### [x] 9.1 vault-bootstrapper.ts の作成
 
 `apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts` を新規作成する。
 
@@ -323,7 +323,7 @@ _Depends: 3.1, 3.2, 5.1_
 - named export する
 - **完了確認**: bootstrap の各フェーズが正しく遷移することの単体テストが通ること
 
-### 9.2 VaultBootstrapper の単体テスト
+### [x] 9.2 VaultBootstrapper の単体テスト
 
 `apps/app/src/features/growi-vault/server/services/vault-bootstrapper.spec.ts` を作成する。
 
@@ -344,7 +344,7 @@ _要件: 1, 2.4, 10_
 _Boundary: `apps/app/src/features/growi-vault/server/routes/vault-gateway.ts`_
 _Depends: 4.1, 5.1, 6.1, 8.1_
 
-### 10.1 vault-gateway.ts の作成
+### [x] 10.1 vault-gateway.ts の作成
 
 `apps/app/src/features/growi-vault/server/routes/vault-gateway.ts` を新規作成する。
 
@@ -370,7 +370,7 @@ _Depends: 4.1, 5.1, 6.1, 8.1_
 - named export する
 - **完了確認**: 各 HTTP パスの正常系・異常系が期待通りのステータスコードを返すことをテストで確認すること
 
-### 10.2 VaultGatewayRouter の統合テスト
+### [x] 10.2 VaultGatewayRouter の統合テスト
 
 `apps/app/src/features/growi-vault/server/routes/vault-gateway.spec.ts` を作成する。
 
