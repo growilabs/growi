@@ -203,7 +203,7 @@
 
 ## 7. コンテナ化と配布 artifacts
 
-- [ ] 7.1 Dockerfile (multi-stage) を作成
+- [x] 7.1 Dockerfile (multi-stage) を作成
   - Builder stage: `python:3.12-slim-bookworm` + `uv` で `uv sync --locked --no-dev` 実行し `.venv` 生成
   - Runtime stage: `python:3.12-slim-bookworm`、`.venv` のみコピー、非 root (uid 10001) で起動、WORKDIR `/app`
   - `USER 10001`、entrypoint `uvicorn app.main:app --host 0.0.0.0 --port 8000 --workers ${WORKERS:-2}`
