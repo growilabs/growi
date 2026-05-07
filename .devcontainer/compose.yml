@@ -16,6 +16,7 @@ services:
   mongo:
     image: mongo:8.2
     restart: unless-stopped
+    command: ["--replSet", "rs0", "--bind_ip_all"]
     ports:
       - 27017
     volumes:
@@ -26,8 +27,9 @@ services:
       timeout: 5s
       retries: 20
 
-  # Ensures MongoDB Feature Compatibility Version matches the mongo image.
-  # Required when the mongo image is upgraded while existing data persists in the volume.
+  # Initializes the replica set and ensures Feature Compatibility Version matches the mongo image.
+  # The replica set (single node `rs0`) is required for transactions and change streams used in development.
+  # FCV update is required when the mongo image is upgraded while existing data persists in the volume.
   # https://www.mongodb.com/ja-jp/docs/upcoming/release-notes/8.2-upgrade-standalone/
   mongo-init:
     image: mongo:8.2
@@ -42,6 +44,25 @@ services:
       - mongo:27017
       - --eval
       - |
+        // 1. Initiate the replica set (single node) if not already initialized.
+        try {
+          const status = rs.status();
+          print(`Replica set already initialized: $${status.set}`);
+        } catch (e) {
+          if (e.codeName === 'NotYetInitialized') {
+            print('Initiating replica set rs0...');
+            rs.initiate({ _id: 'rs0', members: [{ _id: 0, host: 'mongo:27017' }] });
+            // Wait until this node is elected primary so subsequent admin commands succeed.
+            while (!db.hello().isWritablePrimary) {
+              sleep(500);
+            }
+            print('Replica set initiated and primary is ready');
+          } else {
+            throw e;
+          }
+        }
+
+        // 2. Ensure FCV matches the mongo image.
         const target = '8.2';
         const result = db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 });
         if (result.featureCompatibilityVersion.version === target) {
