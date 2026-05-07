@@ -94,6 +94,7 @@ sequenceDiagram
   participant DB as MongoDB
 
   Cron->>Cron: getCronSchedule() = '0 0 * * *'（midnight 起動）
+  Cron->>Cron: configManager.getConfig('news:isDeliveryEnabled') が false? → スキップ
   Cron->>Cron: NEWS_FEED_URL 未設定? → スキップ
   Cron->>Cron: randomSleep（0–5 時間）でリクエスト時刻を分散
   Cron->>Feed: HTTP GET feed.json
@@ -170,11 +171,13 @@ sequenceDiagram
 
 | コンポーネント | 層 | Intent | 要件 | 主要依存 |
 |---|---|---|---|---|
-| NewsCronService | Server / Cron | フィード定期取得・DB 同期 | 1.1–1.7 | CronService (P0), NewsService (P0) |
+| NewsCronService | Server / Cron | フィード定期取得・DB 同期 | 1.1–1.7, 9.5, 9.6 | CronService (P0), NewsService (P0), configManager (P0) |
 | NewsItem Model | Server / Data | ニュースアイテムの永続化 | 2.1–2.4 | MongoDB (P0) |
 | NewsReadStatus Model | Server / Data | ユーザー既読状態の永続化 | 3.1–3.3 | MongoDB (P0) |
 | NewsService | Server / Domain | ニュース一覧・既読管理のビジネスロジック | 3.4–3.5, 4.1–4.2 | NewsItem Model (P0), NewsReadStatus Model (P0) |
 | News API | Server / API | HTTP エンドポイント提供 | 3.1–3.5, 4.1–4.2 | NewsService (P0) |
+| News Delivery Config | Server / Config | 配信フラグ `news:isDeliveryEnabled` の登録（DB 主体、defaultValue: true） | 9.1, 9.2 | configManager (P0) |
+| App Settings UI（拡張） | Client / Admin | `/admin/app` UI から配信フラグを切り替える | 9.3, 9.4 | News Delivery Config (P0), 既存 `app-settings` API (P0) |
 
 ---
 
@@ -187,6 +190,7 @@ sequenceDiagram
 
 **Responsibilities & Constraints**
 - 毎日 0 時に発火し、ランダムスリープで実取得時刻を 0–5 時に分散させる（cron 起動 `'0 0 * * *'` + `randomSleep(0–5h)`）
+- **配信フラグ判定**：cron 発火ごとに `configManager.getConfig('news:isDeliveryEnabled')` を読み、`false` ならフィード取得をスキップ（再起動不要、次回 tick から即時反映）
 - `NEWS_FEED_URL` 未設定時はスキップ（エラーなし）
 - 取得失敗時は既存 DB データを維持
 - `growiVersionRegExps` の照合はここで実施（DB には合致アイテムのみ保存）
@@ -388,6 +392,49 @@ GROWI の scope 階層は以下の意味論で運用する：
 - Integration: `apps/app/src/features/news/server/routes/news.ts` に新規作成。`createNewsRouter(crowi?: Crowi)` をエクスポートし、optional `Crowi` で受けてテスト時にミドルウェアを pass-through できる構造（型アサーションは使わない）
 - Validation: `newsItemId` は `mongoose.isValidObjectId()` で検証
 - Risks: ロールフィルタはサーバーサイドで強制。クライアントから `targetRoles` を受け取らない
+
+---
+
+#### News Delivery Config
+
+| Field | Detail |
+|---|---|
+| Intent | `news:isDeliveryEnabled` を configManager に登録し、cron／API／UI から共通で参照できるようにする |
+| Requirements | 9.1, 9.2 |
+
+**Responsibilities & Constraints**
+- `apps/app/src/server/service/config-manager/config-definition.ts` に CONFIG_KEYS と `defineConfig` の 2 箇所を追加
+- 既存先例 `OPENTELEMETRY_ENABLED`（`otel:enabled`）と完全に同形：`envVarName: 'NEWS_DELIVERY_ENABLED'` + `defaultValue: true`
+- `defaultValue: true` をコードに内蔵 → DB に値が無い状態で全顧客が ON
+- 値の優先順は configManager の既存仕様（DB > env > defaultValue）に従う
+
+**Dependencies**
+- Inbound: NewsCronService, App Settings UI
+- Outbound: configManager（既存）
+
+**Implementation Notes**
+- 通常運用では env を設定しないため `/admin` 環境変数一覧に現れない（DB 主体運用）
+- 開発時の override 用途で `.env.development.local` 等に `NEWS_DELIVERY_ENABLED` を書いた場合のみ env 値が効く
+- 設定変更時は configManager の `updateConfigs` がメモリキャッシュ更新と pubsub 通知（multi-pod 反映）を行う
+
+---
+
+#### App Settings UI（拡張）
+
+| Field | Detail |
+|---|---|
+| Intent | `/admin/app` 画面に「ニュース配信」ON/OFF トグルを追加する |
+| Requirements | 9.3, 9.4 |
+
+**Responsibilities & Constraints**
+- 既存 `app-settings` 画面・API（`PUT /apiv3/app-setting`）に項目を追加するパターンを踏襲
+- 認可：`accessTokenParser([SCOPE.WRITE.ADMIN.APP])` + `adminRequired` で admin のみに制限
+- トグル値の永続化先：`configManager.updateConfigs({ 'news:isDeliveryEnabled': boolean })`
+- UI 文言は i18n 対応（`ja_JP`, `en_US`, `zh_CN`, `ko_KR`, `fr_FR`）
+
+**Dependencies**
+- Inbound: 管理画面（admin user）
+- Outbound: News Delivery Config（configManager 経由）
 
 ---
 
