@@ -99,7 +99,7 @@
   - _Requirements: 1.3, 1.7_
   - _Boundary: XLSX Extractor_
 
-- [ ] 3.4 (P) Simple extractor (単一要素形式) を実装
+- [x] 3.4 (P) Simple extractor (単一要素形式) を実装
   - DOCX / HTML / CSV / TSV / JSON / XML / YAML / `.txt` `.log` `.md` / RTF / EPub / Jupyter Notebook (.ipynb) / Outlook MSG の 14 種を扱う
   - markitdown を `enable_plugins=False` + `llm_client=None` で呼び、結果を単一要素 `PageInfo(pageNumber=None, label=None, content=md)` として返却
   - 完了条件: 上記各形式の代表 fixture で `len(pages) == 1` かつ `pageNumber is None` / `label is None` が満たされるユニットテストが green
