@@ -20,7 +20,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 3.3_
   - _Boundary: Config_
 
-- [ ] 1.3 Pydantic スキーマ (`schemas.py`) を定義
+- [x] 1.3 Pydantic スキーマ (`schemas.py`) を定義
   - `PageInfo` (`pageNumber: int | None`, `label: str | None`, `content: str`) を定義
   - `ExtractResponse` (`pages: list[PageInfo]`, `mimeType: str`, `extractedCharacters: int`) を定義
   - `ErrorCode` 列挙型に `unauthorized` / `unsupported_format` / `file_too_large` / `extraction_timeout` / `service_busy` / `extraction_failed` を定義
