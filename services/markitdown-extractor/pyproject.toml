@@ -38,6 +38,7 @@ dev = [
     "pytest>=8.0",
     "httpx>=0.27",   # ASGI test client for FastAPI
     "ruff>=0.6",
+    "poethepoet>=0.29",  # task runner (npm scripts equivalent for pyproject.toml)
 ]
 
 [build-system]
@@ -87,3 +88,15 @@ line-ending = "lf"
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 asyncio_mode = "auto"
+
+# ---------------------------------------------------------------------------
+# Task runner (poethepoet) — invoke via `uv run poe <task>`
+# ---------------------------------------------------------------------------
+[tool.poe.tasks]
+dev            = "uvicorn app.main:app --reload --port 8000"
+test           = "pytest"
+lint           = "ruff check ."
+format         = "ruff format ."
+format-check   = "ruff format --check ."
+export-openapi = "python scripts/export_openapi.py --output ../../packages/markitdown-client/openapi.json"
+check          = ["lint", "format-check", "test"]
