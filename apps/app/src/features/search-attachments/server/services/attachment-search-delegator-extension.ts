@@ -97,6 +97,17 @@ export interface AttachmentIndexOperations {
     targetIndex: string,
     progress: (processed: number, total: number) => void,
   ): Promise<void>;
+  /**
+   * Initializes the attachments index and alias, with alias collision detection.
+   *
+   * Returns `{ initialized: true }` on success, or
+   * `{ initialized: false, reason: 'alias_conflict' }` when the `attachments`
+   * alias is found to point to a foreign (non-owned) index.
+   */
+  initializeAttachmentIndex(): Promise<{
+    initialized: boolean;
+    reason?: string;
+  }>;
 }
 
 /**
@@ -250,6 +261,89 @@ export class AttachmentSearchDelegatorExtension
     }
 
     throw new Error('Unsupported Elasticsearch version');
+  }
+
+  /**
+   * The set of index names owned by this feature module.
+   * An alias that points to any index outside this set is considered a collision.
+   */
+  private static readonly OWNED_INDEX_NAMES = [
+    'attachments',
+    'attachments-tmp',
+  ] as const;
+
+  /**
+   * Initializes the `attachments` index and alias, guarded by alias collision detection.
+   *
+   * Algorithm:
+   * 1. Query ES for any alias named `attachments`.
+   *    - If ES returns 404, the alias does not exist → safe to proceed.
+   * 2. For each index that carries the alias, verify it belongs to this spec.
+   *    - If any index is NOT in OWNED_INDEX_NAMES, emit WARN and abort.
+   * 3. Ensure the `attachments` index exists (create if absent).
+   * 4. Ensure the alias `attachments` points to the `attachments` index.
+   * 5. Return `{ initialized: true }`.
+   */
+  async initializeAttachmentIndex(): Promise<{
+    initialized: boolean;
+    reason?: string;
+  }> {
+    const aliasName = DEFAULT_ATTACHMENT_INDEX_NAME; // 'attachments'
+    const indexName = DEFAULT_ATTACHMENT_INDEX_NAME; // 'attachments'
+
+    // Step 1: Check for alias collision
+    let aliasInfo: Record<string, unknown> | null = null;
+    try {
+      aliasInfo = (await this.client.indices.getAlias({
+        name: aliasName,
+      })) as Record<string, unknown>;
+    } catch (err) {
+      // ES returns 404 when alias does not exist — treat as "alias absent, proceed"
+      const statusCode = (err as { statusCode?: number })?.statusCode;
+      if (statusCode !== 404) {
+        // Unexpected error: rethrow
+        throw err;
+      }
+    }
+
+    // Step 2: Collision detection
+    if (aliasInfo != null) {
+      for (const owningIndexName of Object.keys(aliasInfo)) {
+        if (
+          !(
+            AttachmentSearchDelegatorExtension.OWNED_INDEX_NAMES as readonly string[]
+          ).includes(owningIndexName)
+        ) {
+          logger.warn(
+            { foreignIndex: owningIndexName },
+            "'attachments' alias points to a foreign index — skipping attachment index initialization to prevent data corruption",
+          );
+          return { initialized: false, reason: 'alias_conflict' };
+        }
+      }
+    }
+
+    // Step 3: Ensure the index exists
+    const isExistsIndex = await this.client.indices.exists({
+      index: indexName,
+    });
+    if (!isExistsIndex) {
+      await this.createAttachmentIndex(indexName);
+    }
+
+    // Step 4: Ensure the alias points to the index
+    const isExistsAlias = await this.client.indices.existsAlias({
+      name: aliasName,
+      index: indexName,
+    });
+    if (!isExistsAlias) {
+      await this.client.indices.putAlias({
+        name: aliasName,
+        index: indexName,
+      });
+    }
+
+    return { initialized: true };
   }
 
   // ----------------------------------------------------------------

@@ -13,6 +13,13 @@ function makeClientMock() {
     indices: {
       create: vi.fn().mockResolvedValue({ acknowledged: true }),
       exists: vi.fn().mockResolvedValue(false),
+      existsAlias: vi.fn().mockResolvedValue(false),
+      putAlias: vi.fn().mockResolvedValue({ acknowledged: true }),
+      getAlias: vi.fn().mockRejectedValue(
+        Object.assign(new Error('alias_missing_exception'), {
+          statusCode: 404,
+        }),
+      ),
     },
   };
   return mock;
@@ -215,6 +222,82 @@ describe('AttachmentSearchDelegatorExtension', () => {
       const serialized = JSON.stringify(body);
       expect(serialized).toContain('hello');
       expect(serialized).toContain('content');
+    });
+  });
+
+  // ----------------------------------------------------------------
+  // initializeAttachmentIndex
+  // ----------------------------------------------------------------
+  describe('initializeAttachmentIndex', () => {
+    it('creates index and alias when neither exists, returns { initialized: true }', async () => {
+      // getAlias throws 404 → alias does not exist
+      client.indices.getAlias.mockRejectedValue(
+        Object.assign(new Error('alias_missing_exception'), {
+          statusCode: 404,
+        }),
+      );
+      // index does not exist
+      client.indices.exists.mockResolvedValue(false);
+      // alias does not exist on index
+      client.indices.existsAlias.mockResolvedValue(false);
+
+      const result = await ext.initializeAttachmentIndex();
+
+      expect(result).toEqual({ initialized: true });
+      expect(client.indices.create).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 'attachments' }),
+      );
+      expect(client.indices.putAlias).toHaveBeenCalledWith(
+        expect.objectContaining({ name: 'attachments', index: 'attachments' }),
+      );
+    });
+
+    it('returns { initialized: false, reason: "alias_conflict" } when alias points to a foreign index', async () => {
+      // getAlias resolves — alias "attachments" points to "some-foreign-index"
+      client.indices.getAlias.mockResolvedValue({
+        'some-foreign-index': { aliases: { attachments: {} } },
+      });
+
+      const result = await ext.initializeAttachmentIndex();
+
+      expect(result).toEqual({ initialized: false, reason: 'alias_conflict' });
+      // Must NOT create any index or alias
+      expect(client.indices.create).not.toHaveBeenCalled();
+      expect(client.indices.putAlias).not.toHaveBeenCalled();
+    });
+
+    it('proceeds normally when alias already points to the owned "attachments" index', async () => {
+      // getAlias resolves — alias "attachments" points to owned index
+      client.indices.getAlias.mockResolvedValue({
+        attachments: { aliases: { attachments: {} } },
+      });
+      // index already exists
+      client.indices.exists.mockResolvedValue(true);
+      // alias already set on attachments index
+      client.indices.existsAlias.mockResolvedValue(true);
+
+      const result = await ext.initializeAttachmentIndex();
+
+      expect(result).toEqual({ initialized: true });
+      // Index already exists → create must NOT be called
+      expect(client.indices.create).not.toHaveBeenCalled();
+      // Alias already set → putAlias must NOT be called
+      expect(client.indices.putAlias).not.toHaveBeenCalled();
+    });
+
+    it('proceeds normally when alias points to owned "attachments-tmp" index', async () => {
+      // getAlias resolves — alias "attachments" points to owned tmp index
+      client.indices.getAlias.mockResolvedValue({
+        'attachments-tmp': { aliases: { attachments: {} } },
+      });
+      // index already exists
+      client.indices.exists.mockResolvedValue(true);
+      // alias already set
+      client.indices.existsAlias.mockResolvedValue(true);
+
+      const result = await ext.initializeAttachmentIndex();
+
+      expect(result).toEqual({ initialized: true });
     });
   });
 
