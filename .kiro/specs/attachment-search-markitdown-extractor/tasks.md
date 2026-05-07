@@ -106,7 +106,7 @@
   - _Requirements: 1.5, 1.7_
   - _Boundary: Simple Extractor_
 
-- [ ] 3.5 Extractor registry と `ExtractionService` オーケストレータを実装
+- [x] 3.5 Extractor registry と `ExtractionService` オーケストレータを実装
   - `services/extractors/__init__.py` で MIME → extractor callable の whitelist registry を定義
   - `services/extraction_service.py` で MIME ヘッダ優先 + 拡張子フォールバックの判定を行い、whitelist 外は `UnsupportedFormat` を raise
   - 対応 extractor に `(bytes, filename)` を渡し `list[PageInfo]` を受け取る
