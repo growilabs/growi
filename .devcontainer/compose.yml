@@ -20,6 +20,36 @@ services:
       - 27017
     volumes:
       - /data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  # Ensures MongoDB Feature Compatibility Version matches the mongo image.
+  # Required when the mongo image is upgraded while existing data persists in the volume.
+  # https://www.mongodb.com/ja-jp/docs/upcoming/release-notes/8.2-upgrade-standalone/
+  mongo-init:
+    image: mongo:8.2
+    depends_on:
+      mongo:
+        condition: service_healthy
+    restart: 'no'
+    entrypoint:
+      - mongosh
+      - --quiet
+      - --host
+      - mongo:27017
+      - --eval
+      - |
+        const target = '8.2';
+        const result = db.adminCommand({ getParameter: 1, featureCompatibilityVersion: 1 });
+        if (result.featureCompatibilityVersion.version === target) {
+          print(`FCV already ${target}`);
+        } else {
+          db.adminCommand({ setFeatureCompatibilityVersion: target, confirm: true });
+          print(`FCV upgraded: ${result.featureCompatibilityVersion.version} -> ${target}`);
+        }
 
   # This container requires '../../growi-docker-compose' repository
   #   cloned from https://github.com/growilabs/growi-docker-compose.git

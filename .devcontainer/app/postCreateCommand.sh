@@ -35,6 +35,3 @@ turbo run bootstrap
 
 # Install Lefthook git hooks
 pnpm lefthook install
-
-# Ensure MongoDB Feature Compatibility Version matches the mongo image.
-node /workspace/growi/.devcontainer/app/postCreateCommand/ensure-mongo-fcv.ts
