@@ -23,8 +23,10 @@
  * The viewRef is stored as a git namespace ref:
  *   refs/namespaces/<viewRef>/refs/heads/main
  */
-import type { Namespace } from '@growi/core/dist/interfaces/vault';
-import type { ComposeViewResponse } from '@growi/core/dist/interfaces/vault';
+import type {
+  ComposeViewResponse,
+  Namespace,
+} from '@growi/core/dist/interfaces/vault';
 /**
  * Performs a full merge of all namespace trees into a single merged tree.
  * Conflict resolution: higher-priority namespace wins for the same filePath.

@@ -185,8 +185,8 @@
 
 ---
 
-- [ ] 7. HTTP Controllers の実装
-- [ ] 7.1 `ComposeViewController` の実装
+- [x] 7. HTTP Controllers の実装
+- [x] 7.1 `ComposeViewController` の実装
   - `src/controllers/compose-view-controller.ts` を作成する
   - `POST /internal/compose-view` を `@BodyParams` で `ComposeViewRequest` を受け取り、`VaultViewComposer.compose` に委譲して `ComposeViewResponse` を返す
   - `SharedSecretAuth` を middleware として適用する
@@ -194,7 +194,7 @@
   - _Requirements: 4.1_
   - _Boundary: apps/growi-vault-manager/src/controllers/compose-view-controller.ts_
 
-- [ ] 7.2 `GitProxyController` の実装
+- [x] 7.2 `GitProxyController` の実装
   - `src/controllers/git-proxy-controller.ts` を作成する
   - `GET /internal/git/info/refs` を実装する（`X-Vault-View-Ref` ヘッダ → `VaultUploadPackSpawner.spawn({ mode: 'advertise', viewRef })`、stdout を HTTP body に stream）
   - `POST /internal/git/git-upload-pack` を実装する（`X-Vault-View-Ref` ヘッダ + request body stdin → `VaultUploadPackSpawner.spawn({ mode: 'rpc', viewRef, stdin: body })`、stdout を HTTP body に stream）
@@ -203,7 +203,7 @@
   - _Requirements: 5.1–5.5_
   - _Boundary: apps/growi-vault-manager/src/controllers/git-proxy-controller.ts_
 
-- [ ] 7.3 `HealthController` の実装
+- [x] 7.3 `HealthController` の実装
   - `src/controllers/health-controller.ts` を作成する
   - `GET /health` で MongoDB 接続・change stream 稼働状態・bare repo ディレクトリ到達性を確認する
   - 全チェック正常 → 200 `{"status":"ok"}`、いずれか失敗 → 503 `{"status":"error","details":{...}}`
@@ -212,7 +212,7 @@
   - _Requirements: 8.1–8.4_
   - _Boundary: apps/growi-vault-manager/src/controllers/health-controller.ts_
 
-- [ ] 7.4 `StorageStatsController` の実装
+- [x] 7.4 `StorageStatsController` の実装
   - `src/controllers/storage-stats-controller.ts` を作成する
   - `GET /internal/storage-stats` を実装し、`@growi/core` の `StorageStatsResponse` を返す
   - `vault_namespace_state` を集約して `namespaceCount` と `totalCommitCount` を取得する（O(repo size) の重い処理を行わない）
@@ -226,8 +226,8 @@
 
 ---
 
-- [ ] 8. VaultUploadPackSpawner の実装
-- [ ] 8.1 `VaultUploadPackSpawner` の実装
+- [x] 8. VaultUploadPackSpawner の実装
+- [x] 8.1 `VaultUploadPackSpawner` の実装
   - `src/services/vault-upload-pack-spawner.ts` を作成する
   - `spawn({ mode: 'advertise', viewRef })` → `git upload-pack --stateless-rpc --advertise-refs <repoPath>` を `GIT_NAMESPACE=<viewRef>` 環境変数付きで child_process.spawn する
   - `spawn({ mode: 'rpc', viewRef, stdin })` → `git upload-pack --stateless-rpc <repoPath>` を spawn し、stdin を pipe する

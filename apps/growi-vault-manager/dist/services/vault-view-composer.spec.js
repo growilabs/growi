@@ -232,17 +232,32 @@ describe('fullMergeTreesByPath — tree building', () => {
       }
       if (oid === 'docs-oid-public') {
         return [
-          { mode: '100644', path: 'page-a.md', oid: 'blob-a', type: 'blob' },
+          {
+            mode: '100644',
+            path: 'page-a.md',
+            oid: 'blob-a',
+            type: 'blob',
+          },
         ];
       }
       if (oid === COMMIT_OID_GROUP) {
         return [
-          { mode: '040000', path: 'docs', oid: 'docs-oid-group', type: 'tree' },
+          {
+            mode: '040000',
+            path: 'docs',
+            oid: 'docs-oid-group',
+            type: 'tree',
+          },
         ];
       }
       if (oid === 'docs-oid-group') {
         return [
-          { mode: '100644', path: 'page-b.md', oid: 'blob-b', type: 'blob' },
+          {
+            mode: '100644',
+            path: 'page-b.md',
+            oid: 'blob-b',
+            type: 'blob',
+          },
         ];
       }
       return [];
@@ -366,7 +381,12 @@ describe('compose — conflict resolution (same path, multiple namespaces)', () 
     mockReadTree.mockImplementation(async (oid) => {
       if (oid === commitOid) {
         return [
-          { mode: '100644', path: 'page.md', oid: blobOid, type: 'blob' },
+          {
+            mode: '100644',
+            path: 'page.md',
+            oid: blobOid,
+            type: 'blob',
+          },
         ];
       }
       return [];
@@ -401,12 +421,22 @@ describe('compose — conflict resolution (same path, multiple namespaces)', () 
     mockReadTree.mockImplementation(async (oid) => {
       if (oid === commitOnlyMe) {
         return [
-          { mode: '100644', path: 'page.md', oid: BLOB_ONLY_ME, type: 'blob' },
+          {
+            mode: '100644',
+            path: 'page.md',
+            oid: BLOB_ONLY_ME,
+            type: 'blob',
+          },
         ];
       }
       if (oid === commitPublic) {
         return [
-          { mode: '100644', path: 'page.md', oid: BLOB_PUBLIC, type: 'blob' },
+          {
+            mode: '100644',
+            path: 'page.md',
+            oid: BLOB_PUBLIC,
+            type: 'blob',
+          },
         ];
       }
       return [];
@@ -442,7 +472,12 @@ describe('compose — conflict resolution (same path, multiple namespaces)', () 
     mockReadTree.mockImplementation(async (oid) => {
       if (oid === commitGroup) {
         return [
-          { mode: '100644', path: 'page.md', oid: BLOB_GROUP, type: 'blob' },
+          {
+            mode: '100644',
+            path: 'page.md',
+            oid: BLOB_GROUP,
+            type: 'blob',
+          },
         ];
       }
       if (oid === commitRestricted) {
@@ -484,7 +519,12 @@ describe('compose — conflict resolution (same path, multiple namespaces)', () 
     mockReadTree.mockImplementation(async (oid) => {
       if (oid === commitPublic) {
         return [
-          { mode: '100644', path: 'page.md', oid: BLOB_PUBLIC, type: 'blob' },
+          {
+            mode: '100644',
+            path: 'page.md',
+            oid: BLOB_PUBLIC,
+            type: 'blob',
+          },
         ];
       }
       if (oid === commitRestricted) {
@@ -528,12 +568,22 @@ describe('compose — conflict resolution (same path, multiple namespaces)', () 
     mockReadTree.mockImplementation(async (oid) => {
       if (oid === commitOnlyMe) {
         return [
-          { mode: '100644', path: 'page.md', oid: BLOB_ONLY_ME, type: 'blob' },
+          {
+            mode: '100644',
+            path: 'page.md',
+            oid: BLOB_ONLY_ME,
+            type: 'blob',
+          },
         ];
       }
       if (oid === commitGroup) {
         return [
-          { mode: '100644', path: 'page.md', oid: BLOB_GROUP, type: 'blob' },
+          {
+            mode: '100644',
+            path: 'page.md',
+            oid: BLOB_GROUP,
+            type: 'blob',
+          },
         ];
       }
       if (oid === commitRestricted) {

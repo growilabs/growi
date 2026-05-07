@@ -390,7 +390,7 @@ _要件: 8_
 _Boundary: `apps/app/src/features/growi-vault/server/routes/vault-admin.ts`_
 _Depends: 6.1, 9.1_
 
-### 11.1 vault-admin.ts の作成
+### [x] 11.1 vault-admin.ts の作成
 
 `apps/app/src/features/growi-vault/server/routes/vault-admin.ts` を新規作成する。
 
