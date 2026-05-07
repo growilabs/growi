@@ -39,7 +39,7 @@
 
 ## 2. Core: リソース保護とセキュリティ中核
 
-- [ ] 2.1 リソース制限モジュール (`limits.py`) を実装
+- [x] 2.1 リソース制限モジュール (`limits.py`) を実装
   - グローバル `asyncio.Semaphore(MAX_CONCURRENCY)` を non-blocking 取得 (`acquire_nowait` 相当) で試行し、失敗時に `ServiceBusy` 例外を raise
   - multipart ストリーム受信時の累積バイト数計測で上限超過時に `FileTooLarge` 例外を raise (`Content-Length` 詐称対策を含む)
   - `asyncio.wait_for(coro, TIMEOUT_S)` で extractor 呼び出しをラップし、超過時に `ExtractionTimeout` 例外を raise
