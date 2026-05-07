@@ -151,7 +151,7 @@
 
 ## 5. OpenAPI エクスポートスクリプト
 
-- [ ] 5.1 `scripts/export_openapi.py` を実装
+- [x] 5.1 `scripts/export_openapi.py` を実装
   - `--output <path>` で書き出し先を指定可能。`app.openapi()` の結果を JSON として指定パスに出力
   - CI から `--output ../../packages/markitdown-client/openapi.json` で呼ばれることを想定 (本 spec は書き出しのみ担当、パッケージ配置は下流 spec 責務)
   - 完了条件: `uv run python scripts/export_openapi.py --output /tmp/openapi.json` 実行で有効な OpenAPI 3.x JSON が生成され、`ExtractResponse` / `ErrorResponse` / `ErrorCode` の全 schema を含む
