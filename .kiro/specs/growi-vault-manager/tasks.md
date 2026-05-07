@@ -278,21 +278,21 @@
 
 ---
 
-- [ ] 11. インテグレーションテストと E2E 検証
-- [ ] 11.1 clone E2E インテグレーションテスト
+- [x] 11. インテグレーションテストと E2E 検証
+- [x] 11.1 clone E2E インテグレーションテスト
   - docker-compose で vault-manager + MongoDB + 共有 fs を起動し、実際に `git clone` を実行してファイル一覧と内容を検証するテストを作成する
   - PAT なしの `/health` 確認 → `compose-view` RPC → `info/refs` → `git-upload-pack` の一連フローが通ること
   - _Requirements: 1.1, 5.1–5.3, 8.4_
   - _Boundary: apps/growi-vault-manager/src/**/*.integ.ts_
 
-- [ ] 11.2 instruction 冪等性インテグレーションテスト
+- [x] 11.2 instruction 冪等性インテグレーションテスト
   - 同一 `upsert` instruction を 2 回処理して namespace ref OID が同一に収束することを確認する
   - `bulk-upsert` 1000 entries で `$in` 1 クエリ・1 commit・1 ref update が成立することを確認する
   - `rename-prefix` で blob 再書き込みなしで subtree が移動することを確認する
   - _Requirements: 2.2, 2.4, 2.7_
   - _Boundary: apps/growi-vault-manager/src/**/*.integ.ts_
 
-- [ ] 11.3 compose-view キャッシュとメンテナンスのインテグレーションテスト
+- [x] 11.3 compose-view キャッシュとメンテナンスのインテグレーションテスト
   - 同一 `sourceVersions` で compose-view を 2 回呼び出し、2 回目でキャッシュヒット（recompose なし）を確認する
   - 1000+ commit を namespace ref に積み上げ後に squash が自動 trigger され、ref が depth=1 に縮約されることを確認する
   - gc 実行中に clone を開始しても clone が破壊されないことを確認する

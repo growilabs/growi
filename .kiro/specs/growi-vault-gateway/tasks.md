@@ -481,7 +481,7 @@ _要件: 1–10_
 _Boundary: `apps/app/src/features/growi-vault/__tests__/`_
 _Depends: 10.1, 11.1, 12.1, 13.1, 13.2_
 
-### 14.1 clone E2E 統合テストの作成
+### [x] 14.1 clone E2E 統合テストの作成
 
 `apps/app/src/features/growi-vault/__tests__/clone-e2e.integ.ts` を作成する。
 
@@ -490,7 +490,7 @@ _Depends: 10.1, 11.1, 12.1, 13.1, 13.2_
 - clone 結果のファイル一覧と内容が期待通りであることを確認する
 - **完了確認**: `pnpm vitest run clone-e2e.integ` が通ること
 
-### 14.2 ACL 隔離・bootstrap・coalesce の統合テスト
+### [x] 14.2 ACL 隔離・bootstrap・coalesce の統合テスト
 
 `apps/app/src/features/growi-vault/__tests__/vault-gateway.integ.ts` を作成する。
 
