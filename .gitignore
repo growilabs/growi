@@ -53,3 +53,23 @@ yarn-error.log*
 out
 
 .devcontainer/compose.extend.yml
+
+# Python (services/markitdown-extractor)
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+.env
+*.egg-info/
+dist/
+build/
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+*.pyo
