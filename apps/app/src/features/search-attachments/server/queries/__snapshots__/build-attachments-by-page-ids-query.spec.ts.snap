@@ -1,0 +1,100 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildAttachmentsByPageIdsQuery > matches snapshot 1`] = `
+{
+  "query": {
+    "bool": {
+      "filter": [
+        {
+          "terms": {
+            "pageId": [
+              "page1",
+              "page2",
+              "page3",
+            ],
+          },
+        },
+      ],
+      "must": [
+        {
+          "multi_match": {
+            "fields": [
+              "content",
+              "content.ja",
+              "content.en",
+              "fileName",
+              "originalName",
+            ],
+            "query": "hello world",
+            "type": "most_fields",
+          },
+        },
+      ],
+    },
+  },
+  "size": 20,
+}
+`;
+
+exports[`buildAttachmentsByPageIdsQuery > matches snapshot with highlight 1`] = `
+{
+  "highlight": {
+    "fields": {
+      "content": {
+        "fragment_size": 40,
+      },
+      "content.en": {
+        "fragment_size": 40,
+      },
+      "content.ja": {
+        "fragment_size": 40,
+      },
+      "fileName": {
+        "fragment_size": 80,
+      },
+      "originalName": {
+        "fragment_size": 80,
+      },
+    },
+    "fragmenter": "simple",
+    "max_analyzed_offset": 999999,
+    "post_tags": [
+      "</em>",
+    ],
+    "pre_tags": [
+      "<em class='highlighted-keyword'>",
+    ],
+  },
+  "query": {
+    "bool": {
+      "filter": [
+        {
+          "terms": {
+            "pageId": [
+              "page1",
+              "page2",
+              "page3",
+            ],
+          },
+        },
+      ],
+      "must": [
+        {
+          "multi_match": {
+            "fields": [
+              "content",
+              "content.ja",
+              "content.en",
+              "fileName",
+              "originalName",
+            ],
+            "query": "hello world",
+            "type": "most_fields",
+          },
+        },
+      ],
+    },
+  },
+  "size": 10,
+}
+`;

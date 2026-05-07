@@ -118,4 +118,14 @@ export class ES7ClientDelegator {
   async search(params: ES7SearchQuery): Promise<estypes.SearchResponse> {
     return (await this.client.search<estypes.SearchResponse>(params)).body;
   }
+
+  async deleteByQuery(params: {
+    index: string;
+    body: { query: Record<string, unknown> };
+    conflicts?: 'abort' | 'proceed';
+  }): Promise<estypes.DeleteByQueryResponse> {
+    return (
+      await this.client.deleteByQuery<estypes.DeleteByQueryResponse>(params)
+    ).body;
+  }
 }

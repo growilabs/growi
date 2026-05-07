@@ -1,0 +1,80 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`buildAttachmentSearchQuery > matches snapshot (default options) 1`] = `
+{
+  "from": 0,
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "multi_match": {
+            "fields": [
+              "content",
+              "content.ja",
+              "content.en",
+              "fileName",
+              "originalName",
+            ],
+            "query": "hello world",
+            "type": "most_fields",
+          },
+        },
+      ],
+    },
+  },
+  "size": 20,
+}
+`;
+
+exports[`buildAttachmentSearchQuery > matches snapshot (with highlight) 1`] = `
+{
+  "from": 0,
+  "highlight": {
+    "fields": {
+      "content": {
+        "fragment_size": 40,
+      },
+      "content.en": {
+        "fragment_size": 40,
+      },
+      "content.ja": {
+        "fragment_size": 40,
+      },
+      "fileName": {
+        "fragment_size": 80,
+      },
+      "originalName": {
+        "fragment_size": 80,
+      },
+    },
+    "fragmenter": "simple",
+    "max_analyzed_offset": 999999,
+    "post_tags": [
+      "</em>",
+    ],
+    "pre_tags": [
+      "<em class='highlighted-keyword'>",
+    ],
+  },
+  "query": {
+    "bool": {
+      "must": [
+        {
+          "multi_match": {
+            "fields": [
+              "content",
+              "content.ja",
+              "content.en",
+              "fileName",
+              "originalName",
+            ],
+            "query": "hello world",
+            "type": "most_fields",
+          },
+        },
+      ],
+    },
+  },
+  "size": 10,
+}
+`;

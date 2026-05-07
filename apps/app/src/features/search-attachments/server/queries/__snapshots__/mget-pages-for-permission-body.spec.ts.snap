@@ -1,0 +1,23 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`mgetPagesForPermissionBody > matches snapshot 1`] = `
+{
+  "_source": {
+    "includes": [
+      "_id",
+      "grant",
+      "grantedUsers",
+      "grantedGroups",
+      "creator",
+      "path",
+      "title",
+      "updatedAt",
+    ],
+  },
+  "ids": [
+    "id1",
+    "id2",
+    "id3",
+  ],
+}
+`;
