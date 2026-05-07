@@ -35,7 +35,7 @@
   - _Requirements: 2.2, 2.5, 9.2_
   - _Boundary: ESDelegator extension / mappings_
 
-- [ ] 2.3 (P) feature module の DTO / interface ファイルを用意する
+- [x] 2.3 (P) feature module の DTO / interface ファイルを用意する
   - `apps/app/src/features/search-attachments/interfaces/attachment-search.ts` に `IAttachmentHit` / `ISnippetSegment` / `IAttachmentEsDoc` / `ExtractionOutcome` / `ExtractedPage` / `ExtractionFailureEntry` / `IPrimarySearchResult` / `ISecondarySearchResult` / `AttachmentSearchConfig` / `AttachmentSearchConfigUpdate` を定義する
   - `ExtractionOutcome` は `success` / `unsupported` / `tooLarge` / `timeout` / `serviceBusy` / `serviceUnreachable` / `failed` の判別共用体を export する
   - 型定義のみで runtime コードを含まず、型レベルでの利用が他タスクから可能になる
