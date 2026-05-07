@@ -276,6 +276,40 @@
 
 ---
 
+## Spec Organization Decision
+
+> 本セクションは「なぜ GROWI Vault を 3-spec 構成(umbrella + gateway + manager)で組織化したか」の意思決定記録。技術的アーキテクチャの決定(上記 Design Decisions 1-8)とは別の、spec 組織化レベルの決定として独立に記録する。
+
+### Decision: アンブレラを最小化した 3-spec 構成
+
+- `growi-vault`(umbrella) — user-facing 要件 8 件 + Boundary Commitments + 子 spec ポインタ + 共有契約サマリ
+- `growi-vault-gateway` — `apps/app` 側の全責務(gateway / 認証 / ACL 評価 / dispatch / bootstrap / admin UI)
+- `growi-vault-manager` — `apps/growi-vault-manager` 側の全責務(instruction watcher / namespace builder / view composer / repo storage / upload-pack spawner / maintenance)
+
+### Why
+
+1. **物理境界が明確** — `apps/app` と新規アプリ `apps/growi-vault-manager` の 2 アプリに自然に対応
+2. **適正規模超過の解消** — 単一 spec の design.md が約 1,700 行・コンポーネント 20 個超まで膨張し、30+ task が見込まれた
+3. **要件のドリフト防止** — user-facing 要件(8 件)を umbrella に残すことで、子 spec 間で同一 user-facing 仕様の重複定義/矛盾を防ぐ
+4. **並列実装の解放** — 共有契約(`vault_instructions` schema / `compose-view` RPC / shared secret / namespace ref scheme / `vault_sync_state` field-level owner)が固定されているため、gateway と manager は相互に hard dependency なしで並列開発可能
+
+### Rejected Alternatives
+
+- **2-spec(gateway + manager のみ・umbrella 廃止)**
+  - 不採用理由: user-facing 要件と共通契約の置き場がなくなり、両子 spec 間で重複定義/ドリフトが発生しやすい
+- **分割せず単一 spec 継続**
+  - 不採用理由: レビュー粒度が粗くなり、実装フェーズでも 1 アプリの修正が他アプリの review を巻き込む。並列実装も困難
+
+### When to Reconsider
+
+以下の状況になった場合、この組織化を再評価する:
+
+- gateway と manager の境界が曖昧になり、共有 service が増えてきた → spec 統合を検討
+- gateway 側だけで 3 つ以上の独立した sub-feature が増えた → gateway の更なる分割を検討
+- umbrella が再び肥大化する兆候(共有契約が 10 項目超など) → 共有契約の一部を別 spec に切り出すことを検討
+
+---
+
 ## References
 
 - [git smart HTTP protocol spec](https://git-scm.com/docs/http-protocol)
