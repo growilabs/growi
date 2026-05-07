@@ -57,7 +57,7 @@
   - _Requirements: 3.3_
   - _Boundary: BearerAuthMiddleware_
 
-- [ ] 2.3 XXE ハードニングブート処理を実装
+- [x] 2.3 XXE ハードニングブート処理を実装
   - app factory の起動パスで `defusedxml.defuse_stdlib()` を呼び `xml.etree` / `xml.sax` / `xml.dom` を差し替え
   - `lxml` が import 可能な場合、`XMLParser(resolve_entities=False, no_network=True)` が default であることを assert し、違反時は fail fast
   - 起動時 assertion が通過したことを INFO log に記録
