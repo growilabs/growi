@@ -504,6 +504,41 @@ _Depends: 10.1, 11.1, 12.1, 13.1, 13.2_
 
 ---
 
+## タスク 15: Admin 画面への VaultAdminSettings 導線追加
+
+_要件: 8_
+_Boundary: `apps/app/src/pages/admin/vault.page.tsx`_
+_Depends: 12.1_
+
+### [ ] 15.1 admin/vault.page.tsx の作成
+
+`apps/app/src/pages/admin/vault.page.tsx` を新規作成する。
+
+- Next.js Pages Router の規約に従い `VaultAdminSettings` コンポーネントを表示するページを実装する
+- 既存の admin ページ（例: `apps/app/src/pages/admin/app.page.tsx`）を参考に `AdminLayout` でラップする
+- admin サイドバーのナビゲーションに "GROWI Vault" エントリを追加する（既存の admin ナビ定義ファイルを確認して追記する）
+- **完了確認**: `http://localhost:3000/admin/vault` にアクセスして VaultAdminSettings が表示されること。"Prepare GROWI Vault" ボタンが押下可能であること
+
+---
+
+## タスク 16: bootstrap 未完了時の git クライアント向けメッセージ改善
+
+_要件: 1.5_
+_Boundary: `apps/app/src/features/growi-vault/server/routes/vault-gateway.ts`_
+_Depends: 10.1_
+
+### [ ] 16.1 503 レスポンスボディへの状態詳細追加
+
+`vault-gateway.ts` の `assertGatewayReady` 関数を修正する。
+
+- `bootstrapState` が `'pending'` の場合: `"GROWI Vault has not been initialised. Please ask your administrator to run the bootstrap from the Admin UI (/admin/vault)."` を返す
+- `bootstrapState` が `'running'` の場合: `"GROWI Vault is initialising (bootstrap in progress). Please retry in a few minutes."` を返す（既存の Retry-After ヘッダーは維持する）
+- `bootstrapState` が `'failed'` の場合: `"GROWI Vault initialisation failed. Please ask your administrator to re-run the bootstrap from the Admin UI (/admin/vault)."` を返す
+- エラーメッセージにページリスト・存在情報を含めないこと（セキュリティ要件維持）
+- **完了確認**: bootstrap 未実行の状態で `git clone` を実行したとき、git クライアントのエラー出力に上記メッセージが表示されること。`pnpm vitest run vault-gateway.spec` が全テスト通過すること
+
+---
+
 ## タスク完了チェックリスト
 
 すべてのタスク完了後に以下を確認する:
