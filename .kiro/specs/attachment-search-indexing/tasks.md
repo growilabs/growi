@@ -65,7 +65,7 @@
   - _Requirements: 5.2_
   - _Boundary: features/search-attachments/server/services (helper)_
 
-- [ ] 3.2 (P) `AttachmentTextExtractorService` 本体を実装する
+- [x] 3.2 (P) `AttachmentTextExtractorService` 本体を実装する
   - FileUploader からバイト取得し `markitdown-client` に multipart 送信、503 `service_busy` で exponential backoff + jitter 1 回 retry、2 回目 503 で `serviceBusy` 正規化
   - 毎回 `configManager.getConfig('app:attachmentFullTextSearch:extractorToken')` を取得して `Authorization: Bearer` を付与、未設定時は `serviceUnreachable` 正規化
   - 上流 401 は `serviceUnreachable` 正規化 + pino ERROR + FailureLog 対象
