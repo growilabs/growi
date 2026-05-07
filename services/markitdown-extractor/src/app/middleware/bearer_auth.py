@@ -28,9 +28,7 @@ from starlette.responses import Response
 # Paths that are exempt from Bearer token verification.
 BYPASS_PATHS: frozenset[str] = frozenset({"/healthz", "/readyz", "/openapi.json"})
 
-_UNAUTHORIZED_BODY = json.dumps(
-    {"code": "unauthorized", "message": "Missing or invalid Bearer token"}
-)
+_UNAUTHORIZED_BODY = json.dumps({"code": "unauthorized", "message": "Missing or invalid Bearer token"})
 
 
 class BearerAuthMiddleware(BaseHTTPMiddleware):
@@ -62,7 +60,7 @@ class BearerAuthMiddleware(BaseHTTPMiddleware):
         if not auth_header.startswith("Bearer "):
             return _unauthorized_response()
 
-        provided_token = auth_header[len("Bearer "):]
+        provided_token = auth_header[len("Bearer ") :]
 
         # Constant-time comparison prevents timing attacks.
         if not hmac.compare_digest(provided_token, self._token):

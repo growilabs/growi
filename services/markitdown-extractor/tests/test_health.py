@@ -8,8 +8,6 @@ Task 4.1 completion criteria:
 
 from __future__ import annotations
 
-import os
-
 import pytest
 from fastapi import FastAPI
 from starlette.testclient import TestClient
@@ -54,9 +52,7 @@ class TestHealthz:
 
     def test_auth_header_ignored(self, health_client: TestClient) -> None:
         """Even an invalid auth header should not block the liveness probe."""
-        response = health_client.get(
-            "/healthz", headers={"Authorization": "Bearer wrong-token"}
-        )
+        response = health_client.get("/healthz", headers={"Authorization": "Bearer wrong-token"})
         assert response.status_code == 200
 
 

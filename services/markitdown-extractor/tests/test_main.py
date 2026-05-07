@@ -91,9 +91,7 @@ class TestOpenApiIntegration:
         body = response.json()
         # FastAPI auto-generates schemas from Pydantic models under components/schemas
         schemas = body.get("components", {}).get("schemas", {})
-        assert "ExtractResponse" in schemas, (
-            f"ExtractResponse not found in OpenAPI schemas: {list(schemas.keys())}"
-        )
+        assert "ExtractResponse" in schemas, f"ExtractResponse not found in OpenAPI schemas: {list(schemas.keys())}"
 
     def test_openapi_contains_extract_endpoint(self, client) -> None:
         """OpenAPI schema must declare the /extract POST endpoint."""
@@ -200,9 +198,7 @@ class TestExtractSuccessIntegration:
         assert isinstance(body["extractedCharacters"], int)
         assert body["extractedCharacters"] >= 0
 
-    def test_extract_extracted_characters_matches_page_content_sum(
-        self, client, test_token
-    ) -> None:
+    def test_extract_extracted_characters_matches_page_content_sum(self, client, test_token) -> None:
         """extractedCharacters must equal the sum of all page content lengths."""
         sample_bytes = (FIXTURES_DIR / "sample.txt").read_bytes()
         response = client.post(

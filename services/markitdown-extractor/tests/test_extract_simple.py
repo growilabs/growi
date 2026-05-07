@@ -16,11 +16,8 @@ All assertions:
 from __future__ import annotations
 
 import json
-import struct
 from pathlib import Path
 from unittest.mock import MagicMock, patch
-
-import pytest
 
 from app.schemas import PageInfo
 from app.services.extractors.simple_extractor import extract_simple
@@ -32,6 +29,7 @@ FIXTURES_DIR = Path(__file__).parent / "fixtures"
 # Helpers
 # ---------------------------------------------------------------------------
 
+
 def _assert_single_page(pages: list[PageInfo]) -> None:
     """Assert exactly one PageInfo with pageNumber=None and label=None."""
     assert len(pages) == 1
@@ -42,6 +40,7 @@ def _assert_single_page(pages: list[PageInfo]) -> None:
 # ---------------------------------------------------------------------------
 # Real fixture files
 # ---------------------------------------------------------------------------
+
 
 class TestTxtFixture:
     def test_returns_single_page(self) -> None:
@@ -76,6 +75,7 @@ class TestJsonFixture:
 # Empty content edge case
 # ---------------------------------------------------------------------------
 
+
 class TestEmptyContent:
     def test_empty_txt_returns_single_page(self) -> None:
         """Even if markitdown returns empty text, we still return one PageInfo."""
@@ -91,12 +91,11 @@ class TestEmptyContent:
 # markitdown initialisation contract
 # ---------------------------------------------------------------------------
 
+
 class TestMarkitdownInit:
     def test_enable_plugins_false(self) -> None:
         """MarkItDown must be initialised with enable_plugins=False."""
-        with patch(
-            "app.services.extractors.simple_extractor.MarkItDown"
-        ) as mock_cls:
+        with patch("app.services.extractors.simple_extractor.MarkItDown") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.convert_stream.return_value = MagicMock(text_content="hi")
             mock_cls.return_value = mock_instance
@@ -109,9 +108,7 @@ class TestMarkitdownInit:
 
     def test_llm_client_none(self) -> None:
         """MarkItDown must be initialised with llm_client=None."""
-        with patch(
-            "app.services.extractors.simple_extractor.MarkItDown"
-        ) as mock_cls:
+        with patch("app.services.extractors.simple_extractor.MarkItDown") as mock_cls:
             mock_instance = MagicMock()
             mock_instance.convert_stream.return_value = MagicMock(text_content="hi")
             mock_cls.return_value = mock_instance
@@ -128,6 +125,7 @@ class TestMarkitdownInit:
 # The goal is to prove the extractor routes the extension correctly and
 # returns the correct PageInfo structure regardless of content richness.
 # ---------------------------------------------------------------------------
+
 
 class TestHtml:
     def test_returns_single_page(self) -> None:
@@ -180,27 +178,29 @@ class TestLog:
 
 class TestIpynb:
     def test_returns_single_page(self) -> None:
-        notebook = json.dumps({
-            "nbformat": 4,
-            "nbformat_minor": 5,
-            "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"}},
-            "cells": [
-                {
-                    "cell_type": "markdown",
-                    "metadata": {},
-                    "source": ["# Test Notebook\n"],
-                    "id": "cell1",
-                },
-                {
-                    "cell_type": "code",
-                    "metadata": {},
-                    "source": ["print('hello')\n"],
-                    "outputs": [],
-                    "execution_count": None,
-                    "id": "cell2",
-                },
-            ],
-        }).encode()
+        notebook = json.dumps(
+            {
+                "nbformat": 4,
+                "nbformat_minor": 5,
+                "metadata": {"kernelspec": {"name": "python3", "display_name": "Python 3", "language": "python"}},
+                "cells": [
+                    {
+                        "cell_type": "markdown",
+                        "metadata": {},
+                        "source": ["# Test Notebook\n"],
+                        "id": "cell1",
+                    },
+                    {
+                        "cell_type": "code",
+                        "metadata": {},
+                        "source": ["print('hello')\n"],
+                        "outputs": [],
+                        "execution_count": None,
+                        "id": "cell2",
+                    },
+                ],
+            }
+        ).encode()
         pages = extract_simple(notebook, "notebook.ipynb")
         _assert_single_page(pages)
 
@@ -318,9 +318,7 @@ class TestMsg:
 
         mock_result = MagicMock(spec=DocumentConverterResult)
         mock_result.text_content = "From: test@example.com\nSubject: Test"
-        with patch(
-            "app.services.extractors.simple_extractor.MarkItDown"
-        ) as mock_md:
+        with patch("app.services.extractors.simple_extractor.MarkItDown") as mock_md:
             mock_instance = MagicMock()
             mock_instance.convert_stream.return_value = mock_result
             mock_md.return_value = mock_instance

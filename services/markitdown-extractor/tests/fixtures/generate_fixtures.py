@@ -39,8 +39,12 @@ def generate_pdf(dest: Path) -> None:
         pdf.set_font("Helvetica", "B", 16)
         pdf.cell(0, 10, f"Page {page_num}", new_x="LMARGIN", new_y="NEXT")
         pdf.set_font("Helvetica", size=12)
-        pdf.multi_cell(0, 8, f"This is the body text of page {page_num} in the sample PDF fixture.\n"
-                              "It contains enough text to verify that the PDF extractor reads each page.")
+        pdf.multi_cell(
+            0,
+            8,
+            f"This is the body text of page {page_num} in the sample PDF fixture.\n"
+            "It contains enough text to verify that the PDF extractor reads each page.",
+        )
     pdf.output(str(dest))
     print(f"  [OK]   {dest.name}")
 
@@ -100,8 +104,10 @@ def generate_docx(dest: Path) -> None:
     doc = Document()
     doc.add_heading("Sample DOCX Fixture", level=1)
     doc.add_paragraph("This is the first paragraph of the sample DOCX fixture.")
-    doc.add_paragraph("This is the second paragraph, used to verify that the DOCX extractor "
-                       "returns all text in a single PageInfo element.")
+    doc.add_paragraph(
+        "This is the second paragraph, used to verify that the DOCX extractor "
+        "returns all text in a single PageInfo element."
+    )
     doc.save(str(dest))
     print(f"  [OK]   {dest.name}")
 

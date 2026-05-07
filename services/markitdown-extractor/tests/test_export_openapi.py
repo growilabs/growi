@@ -14,8 +14,6 @@ import subprocess
 import sys
 from pathlib import Path
 
-import pytest
-
 # ---------------------------------------------------------------------------
 # Locate the script under test
 # ---------------------------------------------------------------------------
@@ -110,8 +108,7 @@ def test_export_required_schemas_present(tmp_path: Path) -> None:
 
     for required_schema in ("ExtractResponse", "ErrorResponse", "ErrorCode"):
         assert required_schema in components_schemas, (
-            f"'{required_schema}' not found in components/schemas. "
-            f"Found: {list(components_schemas.keys())}"
+            f"'{required_schema}' not found in components/schemas. Found: {list(components_schemas.keys())}"
         )
 
 
@@ -155,9 +152,7 @@ def test_export_via_subprocess(tmp_path: Path) -> None:
     )
 
     assert result.returncode == 0, (
-        f"Script exited with code {result.returncode}.\n"
-        f"stdout: {result.stdout}\n"
-        f"stderr: {result.stderr}"
+        f"Script exited with code {result.returncode}.\nstdout: {result.stdout}\nstderr: {result.stderr}"
     )
     assert output_file.exists(), "Subprocess run did not produce an output file"
 
@@ -165,6 +160,4 @@ def test_export_via_subprocess(tmp_path: Path) -> None:
     components_schemas = schema.get("components", {}).get("schemas", {})
 
     for required_schema in ("ExtractResponse", "ErrorResponse", "ErrorCode"):
-        assert required_schema in components_schemas, (
-            f"'{required_schema}' not found after subprocess run"
-        )
+        assert required_schema in components_schemas, f"'{required_schema}' not found after subprocess run"

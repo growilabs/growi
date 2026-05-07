@@ -16,10 +16,10 @@ from starlette.requests import Request
 from starlette.responses import JSONResponse
 from starlette.testclient import TestClient
 
-
 # ---------------------------------------------------------------------------
 # Minimal FastAPI test app — isolates middleware without requiring app.main
 # ---------------------------------------------------------------------------
+
 
 def _make_test_app(token: str) -> FastAPI:
     """Build a minimal FastAPI app with BearerAuthMiddleware applied."""
@@ -50,6 +50,7 @@ def _make_test_app(token: str) -> FastAPI:
 # ---------------------------------------------------------------------------
 # Fixtures
 # ---------------------------------------------------------------------------
+
 
 @pytest.fixture()
 def auth_client(test_token: str) -> TestClient:

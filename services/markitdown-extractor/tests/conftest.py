@@ -47,6 +47,7 @@ def test_token() -> str:
 # TestClient fixture — lazy: skips if app.main does not exist yet
 # ---------------------------------------------------------------------------
 
+
 @pytest.fixture()
 def client(test_token: str):  # noqa: ANN201 — return type depends on import availability
     """Return an httpx-based ``TestClient`` wrapping the FastAPI application.

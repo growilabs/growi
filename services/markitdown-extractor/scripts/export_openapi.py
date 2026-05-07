@@ -35,9 +35,10 @@ def main() -> None:
         os.environ["MARKITDOWN_SERVICE_TOKEN"] = "export-only-dummy-token"  # noqa: S105
 
     # Defer the import until after the env var is set.
+    from pydantic import TypeAdapter  # noqa: PLC0415
+
     from app.main import app  # noqa: PLC0415
     from app.schemas import ErrorCode, ErrorResponse  # noqa: PLC0415
-    from pydantic import TypeAdapter  # noqa: PLC0415
 
     schema = app.openapi()
 

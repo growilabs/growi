@@ -26,6 +26,7 @@ router = APIRouter(tags=["health"])
 # and attempt a dynamic import so the value updates automatically when the
 # module becomes available.
 
+
 def _get_pdf_extraction_strategy() -> str:
     """Return the current PDF extraction strategy identifier.
 
@@ -35,6 +36,7 @@ def _get_pdf_extraction_strategy() -> str:
     """
     try:
         from app.services.extractors.pdf_extractor import PDF_EXTRACTION_STRATEGY  # type: ignore[import-not-found]
+
         return PDF_EXTRACTION_STRATEGY
     except ImportError:
         return "pdfminer_fallback"
@@ -73,12 +75,14 @@ async def readyz() -> dict[str, object]:
     dependencies: dict[str, str] = {}
     try:
         import markitdown as _md  # noqa: F401
+
         dependencies["markitdown"] = "ok"
     except ImportError as exc:
         dependencies["markitdown"] = f"error: {exc}"
 
     try:
         import pydantic as _pydantic  # noqa: F401
+
         dependencies["pydantic"] = "ok"
     except ImportError as exc:
         dependencies["pydantic"] = f"error: {exc}"

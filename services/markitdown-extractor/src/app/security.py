@@ -62,6 +62,4 @@ def apply_xxe_hardening() -> None:
         # lxml is optional; if not installed there is nothing to check.
         pass
 
-    logger.info(
-        "XXE hardening applied: stdlib XML parsers replaced with defusedxml variants"
-    )
+    logger.info("XXE hardening applied: stdlib XML parsers replaced with defusedxml variants")
