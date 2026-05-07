@@ -1,0 +1,30 @@
+# Python bytecode
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+
+# Virtual environments
+.venv/
+venv/
+env/
+
+# uv
+.python-version.bak
+
+# Environment files
+.env
+
+# Build / dist
+*.egg-info/
+dist/
+build/
+
+# Test / coverage
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Linter / type checker caches
+.ruff_cache/
+.mypy_cache/
