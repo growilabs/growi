@@ -117,7 +117,7 @@
 
 ## 4. Core: HTTP レイヤ (FastAPI app)
 
-- [ ] 4.1 Health ルータ (`routers/health.py`) を実装
+- [x] 4.1 Health ルータ (`routers/health.py`) を実装
   - `GET /healthz` はプロセス生存確認のみで `{"status": "ok"}` を返却
   - `GET /readyz` は semaphore 余裕 + 依存モジュール import 成功 + PDF strategy (`pdf_extraction_strategy`) を応答 JSON に含めて返却。未 ready なら 503 `not_ready`
   - 両エンドポイントは認証不要
@@ -125,7 +125,7 @@
   - _Requirements: 3.2, 3.4_
   - _Boundary: HealthRouter_
 
-- [ ] 4.2 Extract ルータ (`routers/extract.py`) を実装
+- [x] 4.2 Extract ルータ (`routers/extract.py`) を実装
   - `POST /extract` を multipart で受け付け、`file` (必須) / `mimeType` (任意 hint) パラメータを扱う
   - 処理順序: Bearer 認証 → semaphore 取得 → サイズ check → MIME 判定 → extractor dispatch (timeout 包み) → `ExtractResponse` 組み立て (`extractedCharacters` は全 pages content 合計長)
   - 例外 → `ErrorResponse` + 対応 HTTP ステータス (400/401/408/413/500/503) のマッピングを一貫適用

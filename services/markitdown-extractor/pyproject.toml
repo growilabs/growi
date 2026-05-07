@@ -19,6 +19,8 @@ dependencies = [
     # HTTP framework and ASGI server (all MIT)
     "fastapi>=0.115.0",
     "uvicorn[standard]>=0.30.0",
+    # Multipart form parsing required by FastAPI for file upload endpoints (MIT)
+    "python-multipart>=0.0.9",
     # Schema / settings (MIT)
     "pydantic>=2",
     "pydantic-settings>=2",
