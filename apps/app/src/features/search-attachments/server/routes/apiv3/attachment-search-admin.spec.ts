@@ -11,6 +11,9 @@
  *  7. requiresReindex: true when mongoCount > esCount
  *  8. requiresReindex: false when disabled
  *  9. requiresReindex cache: PUT invalidates it, next GET recomputes
+ * 10. GET /failures: returns items and total
+ * 11. GET /failures: with limit and since params
+ * 12. GET /failures: non-admin → 403
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -44,6 +47,19 @@ vi.mock('~/server/models/attachment', () => ({
   },
 }));
 
+// Mock ExtractionFailureLogService
+const mockListRecent = vi.fn();
+const mockTotalRecent = vi.fn();
+vi.mock(
+  '~/features/search-attachments/server/services/extraction-failure-log-service',
+  () => ({
+    ExtractionFailureLogService: vi.fn().mockImplementation(() => ({
+      listRecent: mockListRecent,
+      totalRecent: mockTotalRecent,
+    })),
+  }),
+);
+
 // ---------------------------------------------------------------------------
 // Imports (after mocks)
 // ---------------------------------------------------------------------------
@@ -52,6 +68,7 @@ import { configManager } from '~/server/service/config-manager';
 
 import {
   type AttachmentSearchConfig,
+  attachmentSearchAdminFactory,
   computeRequiresReindex,
   invalidateRequiresReindexCache,
 } from './attachment-search-admin';
@@ -370,5 +387,173 @@ describe('attachment-search-admin', () => {
       expect(third).toBe(false);
       expect(esClient.search).toHaveBeenCalledTimes(2); // recomputed
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// GET /failures — route-level tests using supertest
+// ---------------------------------------------------------------------------
+
+import express from 'express';
+import supertest from 'supertest';
+
+// The login-required and admin-required factories are vi.mock'd below at the
+// top of the describe block context. Vitest hoists vi.mock() calls to the
+// top of the file, so the order relative to imports does not matter.
+vi.mock('~/server/middlewares/login-required', () => ({
+  default:
+    () =>
+    (
+      _req: express.Request,
+      _res: express.Response,
+      next: express.NextFunction,
+    ) =>
+      next(),
+}));
+
+vi.mock('~/server/middlewares/admin-required', () => ({
+  default:
+    (_crowi: unknown) =>
+    (
+      req: express.Request & { user?: { admin?: boolean } },
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      if (req.user?.admin) {
+        return next();
+      }
+      return res.status(403).json({ error: 'Forbidden' });
+    },
+}));
+
+vi.mock('~/server/middlewares/access-token-parser', () => ({
+  accessTokenParser:
+    () =>
+    (
+      _req: express.Request,
+      _res: express.Response,
+      next: express.NextFunction,
+    ) =>
+      next(),
+}));
+
+/**
+ * Builds a minimal express app that wraps the admin router under /admin/attachment-search.
+ * `isAdmin` controls whether the adminRequired middleware allows the request.
+ */
+function buildTestApp(isAdmin: boolean) {
+  const app = express();
+  app.use(express.json());
+
+  // Inject req.user with admin flag for the mocked adminRequired middleware
+  app.use(
+    (
+      req: express.Request,
+      _res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      // biome-ignore lint/suspicious/noExplicitAny: test helper — attaches minimal user fixture
+      (req as any).user = { admin: isAdmin };
+      next();
+    },
+  );
+
+  // Attach apiv3 / apiv3Err helpers matching GROWI's API layer
+  app.use(
+    (
+      _req: express.Request,
+      res: express.Response,
+      next: express.NextFunction,
+    ) => {
+      // biome-ignore lint/suspicious/noExplicitAny: test-only response helper
+      (res as any).apiv3 = (data: unknown) => res.status(200).json(data);
+      // biome-ignore lint/suspicious/noExplicitAny: test-only response helper
+      (res as any).apiv3Err = (err: unknown, status: number) =>
+        res.status(status).json({ error: err });
+      next();
+    },
+  );
+
+  // Create a minimal Crowi stub
+  const crowiStub = {
+    searchService: { fullTextSearchDelegator: null },
+  };
+
+  const router = attachmentSearchAdminFactory(crowiStub as never);
+  app.use('/admin/attachment-search', router);
+
+  return app;
+}
+
+describe('GET /failures', () => {
+  beforeEach(() => {
+    mockListRecent.mockReset();
+    mockTotalRecent.mockReset();
+    vi.mocked(configManager.getConfig).mockReset();
+  });
+
+  it('10. returns items and total with defaults (limit=50, no since)', async () => {
+    const fakeItems = [
+      {
+        attachmentId: 'att1',
+        pageId: 'page1',
+        fileName: 'doc.pdf',
+        fileFormat: 'pdf',
+        fileSize: 1024,
+        reasonCode: 'extractor_error',
+        message: 'timeout',
+        occurredAt: new Date('2025-01-01T00:00:00Z'),
+      },
+    ];
+
+    mockListRecent.mockResolvedValue(fakeItems);
+    mockTotalRecent.mockResolvedValue(1);
+
+    const app = buildTestApp(true);
+    const res = await supertest(app).get('/admin/attachment-search/failures');
+
+    expect(res.status).toBe(200);
+    expect(res.body.total).toBe(1);
+    expect(res.body.items).toHaveLength(1);
+    expect(res.body.items[0].attachmentId).toBe('att1');
+
+    // Verify defaults were passed to the service
+    expect(mockListRecent).toHaveBeenCalledWith({
+      limit: 50,
+      since: undefined,
+    });
+    expect(mockTotalRecent).toHaveBeenCalledWith(undefined);
+  });
+
+  it('11. passes limit and since query params to the service', async () => {
+    mockListRecent.mockResolvedValue([]);
+    mockTotalRecent.mockResolvedValue(0);
+
+    const app = buildTestApp(true);
+    const sinceIso = '2025-06-01T00:00:00.000Z';
+    const res = await supertest(app).get(
+      `/admin/attachment-search/failures?limit=10&since=${encodeURIComponent(sinceIso)}`,
+    );
+
+    expect(res.status).toBe(200);
+    expect(res.body.items).toEqual([]);
+    expect(res.body.total).toBe(0);
+
+    // limit should be 10, since should be a Date matching the ISO string
+    expect(mockListRecent).toHaveBeenCalledWith({
+      limit: 10,
+      since: new Date(sinceIso),
+    });
+    expect(mockTotalRecent).toHaveBeenCalledWith(new Date(sinceIso));
+  });
+
+  it('12. returns 403 when user is not an admin', async () => {
+    const app = buildTestApp(false);
+    const res = await supertest(app).get('/admin/attachment-search/failures');
+
+    expect(res.status).toBe(403);
+    // Service must not be called at all
+    expect(mockListRecent).not.toHaveBeenCalled();
+    expect(mockTotalRecent).not.toHaveBeenCalled();
   });
 });

@@ -5,18 +5,39 @@ import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
+/**
+ * Returns true when the attachment full-text search feature is fully configured.
+ * Mirrors the logic in require-search-attachments-enabled.ts.
+ *
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {boolean}
+ */
+function isAttachmentSearchEnabled(crowi) {
+  const extractorUri = configManager.getConfig(
+    'app:attachmentFullTextSearch:extractorUri',
+  );
+  const extractorToken = configManager.getConfig(
+    'app:attachmentFullTextSearch:extractorToken',
+  );
+  return (
+    crowi.searchService?.isConfigured === true &&
+    extractorUri != null &&
+    extractorUri !== '' &&
+    extractorToken != null &&
+    extractorToken !== ''
+  );
+}
+
 const logger = loggerFactory('growi:routes:apiv3:search');
 
 const express = require('express');
 const { body } = require('express-validator');
-
-const router = express.Router();
-
 const noCache = require('nocache');
 
 /**
@@ -102,6 +123,8 @@ const noCache = require('nocache');
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
+  const router = express.Router();
+
   const loginRequired = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -136,7 +159,7 @@ module.exports = (crowi) => {
     }),
     loginRequired,
     adminRequired,
-    async (req, res) => {
+    async (_req, res) => {
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
@@ -179,7 +202,7 @@ module.exports = (crowi) => {
     loginRequired,
     adminRequired,
     addActivity,
-    async (req, res) => {
+    async (_req, res) => {
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
@@ -208,6 +231,7 @@ module.exports = (crowi) => {
 
   const validatorForPutIndices = [
     body('operation').isString().isIn(['rebuild', 'normalize']),
+    body('includeAttachments').optional().isBoolean(),
   ];
 
   /**
@@ -253,6 +277,7 @@ module.exports = (crowi) => {
     apiV3FormValidator,
     async (req, res) => {
       const operation = req.body.operation;
+      const includeAttachments = req.body.includeAttachments === true;
 
       const { searchService } = crowi;
 
@@ -287,6 +312,58 @@ module.exports = (crowi) => {
               .status(200)
               .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
+            if (includeAttachments) {
+              // Guard: attachment search feature must be enabled
+              if (!isAttachmentSearchEnabled(crowi)) {
+                return res.apiv3Err(
+                  new ErrorV3(
+                    'Attachment full-text search feature is disabled',
+                    'feature_disabled',
+                  ),
+                  503,
+                );
+              }
+
+              // Guard: batch service must be registered (done in task 9.1)
+              const batch = crowi.attachmentReindexBatch;
+              if (batch == null) {
+                return res.apiv3Err(
+                  new ErrorV3(
+                    'Attachment reindex batch service is not available',
+                    'feature_disabled',
+                  ),
+                  503,
+                );
+              }
+
+              const tmpIndexName = 'attachments-tmp';
+              try {
+                batch.begin(tmpIndexName);
+                // Rebuild page/comment index (awaited so we sequence attachments after)
+                await searchService.rebuildIndex();
+
+                await batch.addAllAttachments(
+                  tmpIndexName,
+                  (processed, total) => {
+                    logger.debug(
+                      `Attachment reindex progress: ${processed}/${total}`,
+                    );
+                  },
+                );
+              } finally {
+                batch.end();
+              }
+
+              activityEvent.emit('update', res.locals.activity._id, {
+                action: SupportedAction.ACTION_ADMIN_SEARCH_INDICES_REBUILD,
+              });
+
+              return res
+                .status(200)
+                .send({ message: 'Operation is successfully processed.' });
+            }
+
+            // includeAttachments=false: existing fire-and-forget page rebuild
             // NOT wait the processing is terminated
             searchService.rebuildIndex();
 

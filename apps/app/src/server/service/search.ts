@@ -9,11 +9,16 @@ import {
   removeAiMenthion,
 } from '~/features/search/utils/ai';
 import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
+import type {
+  AttachmentSearchResultAggregator,
+  IPrimarySearchResult,
+} from '~/features/search-attachments/server/services/attachment-search-result-aggregator';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
   ISearchResult,
+  ISearchResultData,
 } from '~/interfaces/search';
 import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
@@ -96,6 +101,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
   fullTextSearchDelegator: any & ElasticsearchDelegator;
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
+
+  private attachmentSearchResultAggregator: AttachmentSearchResultAggregator | null =
+    null;
 
   constructor(crowi: Crowi) {
     this.crowi = crowi;
@@ -443,6 +451,68 @@ class SearchService implements SearchQueryParser, SearchResolver {
       await delegator.search(data, user, userGroups, searchOpts),
       delegator.name ?? null,
     ];
+  }
+
+  /**
+   * Register an AttachmentSearchResultAggregator for faceted search routing.
+   * Called by initAttachmentFullTextSearch (task 9.1) after setup.
+   */
+  setAttachmentSearchResultAggregator(
+    agg: AttachmentSearchResultAggregator,
+  ): void {
+    this.attachmentSearchResultAggregator = agg;
+  }
+
+  /**
+   * Facet-aware search entry point.
+   *
+   * facet=pages (default): existing page-only path — no attachment index touched.
+   * facet=all | facet=attachments: routed through AttachmentSearchResultAggregator.
+   * Falls back to page-only when the aggregator is not yet initialised.
+   */
+  async searchByFacet(
+    keyword: string,
+    options: {
+      facet?: 'pages' | 'all' | 'attachments';
+      from?: number;
+      size?: number;
+    },
+  ): Promise<IPrimarySearchResult> {
+    const facet = options.facet ?? 'pages';
+    const from = options.from ?? 0;
+    const size = options.size ?? 20;
+
+    if (facet !== 'pages' && this.attachmentSearchResultAggregator != null) {
+      return this.attachmentSearchResultAggregator.searchPrimary(keyword, {
+        facet,
+        from,
+        size,
+      });
+    }
+
+    // Page-only fallback: delegate to the existing full-text search delegator
+    const parsedQuery = await this.parseSearchQuery(keyword, null);
+    const [delegator, data] = await this.resolve(parsedQuery);
+    this.validateSearchableData(delegator, data);
+    const result = await delegator.search(data, undefined, undefined, {
+      from,
+      size,
+    });
+
+    return {
+      facet: 'pages',
+      primarySlot: 'pages',
+      items: (result.data as ISearchResultData[]).map((d) => ({
+        data: { _id: d._id, ...d._source } as IPageWithSearchMeta['data'],
+        meta: {
+          elasticSearchResult: {
+            snippet: d._highlight?.body?.[0] ?? null,
+            highlightedPath: d._highlight?.path?.[0] ?? null,
+          },
+        },
+      })),
+      meta: { total: result.meta.total },
+    };
   }
 
   parseQueryString(_queryString: string): QueryTerms {

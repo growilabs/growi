@@ -77,7 +77,7 @@
 
 ## 4. Core: ES delegator 拡張と query builder 群
 
-- [ ] 4.1 (P) `attachment-search-delegator-extension` に index ライフサイクル / bulk 操作を実装する
+- [x] 4.1 (P) `attachment-search-delegator-extension` に index ライフサイクル / bulk 操作を実装する
   - `createAttachmentIndex(indexName)` (default `attachments`、rebuild 時 `attachments-tmp`) / `syncAttachmentIndexed(..., targetIndexes)` / `syncAttachmentRemoved(..., targetIndexes)` / `addAllAttachments(targetIndex, progress)` を追加する
   - doc ID を `${attachmentId}_${pageNumber ?? 0}` で決定し、`targetIndexes` 複数指定時は 1 回の `_bulk` で書き切る (2 回別 API コールにしない)
   - 既存 `ElasticsearchDelegator` と composition で合成し、既存 Page 系メソッドは不変であることを確認する
@@ -85,14 +85,14 @@
   - _Boundary: ESDelegator extension_
   - _Depends: 2.2_
 
-- [ ] 4.2 (P) `attachments` alias 衝突検出を起動時に組み込む
+- [x] 4.2 (P) `attachments` alias 衝突検出を起動時に組み込む
   - `initializeSearchIndex` 相当の処理で `attachments` alias が本 spec 所有以外の実 index を指している場合に WARN ログを出し initialize を続行しない
   - 既存 OSS デプロイで衝突がある場合にログが出て human intervention を促すことを test で確認
   - _Requirements: 2.5, 9.2_
   - _Boundary: ESDelegator extension_
   - _Depends: 4.1_
 
-- [ ] 4.3 (P) 検索クエリ builder 群を pure function として追加する
+- [x] 4.3 (P) 検索クエリ builder 群を pure function として追加する
   - `queries/build-attachment-search-query.ts`: attachments_index content match body (権限フィルタを一切含めない) を組み立てる
   - `queries/build-attachments-by-page-ids-query.ts`: `terms: { pageId: primaryIds }` + content match body を組み立て、`pageIds.length > ページサイズ` で assert throw
   - `mgetPagesForPermissionBody(pageIds)`: `_source_includes: ['_id','grant','grantedUsers','grantedGroups','creator','path','title','updatedAt']` のみで mget body を返す
@@ -100,7 +100,7 @@
   - _Requirements: 4.1, 4.3, 4.4_
   - _Boundary: features/search-attachments/server/queries_
 
-- [ ] 4.4 (P) ES highlighter 出力 → `ISnippetSegment[]` parser を実装する
+- [x] 4.4 (P) ES highlighter 出力 → `ISnippetSegment[]` parser を実装する
   - `queries/build-snippet-segments.ts` を pure function として追加し、`<em>...</em>` で囲まれた部分のみ `highlighted: true` に、それ以外を平文 segment に分割する
   - `<script>` / `<img onerror>` / 不正な `<em>` 入れ子を含む入力で crash せず、非 `<em>` タグは text セグメント内にそのまま保持され React text node で自動 escape される想定を test で固定
   - _Requirements: 9.3_
@@ -108,13 +108,13 @@
 
 ## 5. Core: FailureLog 永続化
 
-- [ ] 5.1 `ExtractionFailureLog` Mongoose model を追加する
+- [x] 5.1 `ExtractionFailureLog` Mongoose model を追加する
   - `attachmentId` / `pageId` / `fileName` / `fileFormat` / `fileSize` / `reasonCode` (enum: `unsupportedFormat` / `fileTooLarge` / `extractionTimeout` / `serviceBusy` / `serviceUnreachable` / `extractionFailed`) / `message` / `occurredAt` / `retentionGroupHash` を schema 化する
   - `occurredAt` 90 日 TTL index を設定し、TTL が機能することを integ test で確認 (期限切れ doc が MongoDB から自動削除される)
   - _Requirements: 8.3_
   - _Boundary: features/search-attachments/server/models_
 
-- [ ] 5.2 `ExtractionFailureLogService` を実装する
+- [x] 5.2 `ExtractionFailureLogService` を実装する
   - `record` / `listRecent({ limit, since })` / `totalRecent(since)` を提供する
   - `record` は `retentionGroupHash` により重複を抑制する (同 attachmentId + reasonCode が時間窓内で収斂)
   - failure を pino 構造化ログと二重経路で記録し、admin API から取得可能な状態になることを unit test で確認
@@ -124,7 +124,7 @@
 
 ## 6. Core: Indexer と Rebuild Batch
 
-- [ ] 6.1 `AttachmentSearchIndexer` を実装する (dual-write 対応込み)
+- [x] 6.1 `AttachmentSearchIndexer` を実装する (dual-write 対応込み)
   - `isFeatureEnabled()` 算出 (`searchService.isConfigured && extractorUri != null && extractorUri !== '' && extractorToken != null && extractorToken !== ''`) で早期 return
   - 成功時は `attachments` (live alias) に bulk upsert、**権限フィールドは一切書き込まない** (Option D 構造的担保)
   - 失敗時 (`unsupported` / `tooLarge` / `timeout` / `serviceBusy` / `serviceUnreachable` / `failed`) は metadata-only 1 文書 upsert + `ExtractionFailureLogService.record`
@@ -136,7 +136,7 @@
   - _Boundary: features/search-attachments/server/services_
   - _Depends: 3.2, 4.1, 5.2_
 
-- [ ] 6.2 `AttachmentOrphanSweeper.sweep(targetIndex)` を実装する
+- [x] 6.2 `AttachmentOrphanSweeper.sweep(targetIndex)` を実装する
   - 指定 index 上の unique pageId 集合を取得し、Page collection に存在しない pageId を持つ doc を tmp index から削除する
   - 失敗しても throw せず `{ removed, failed }` を返し、呼び出し側 rebuild 本体の成功を阻害しない
   - 独立トリガ (cron / pageEvent) を**持たない** ことを test で固定 (rebuildIndex 内からのみ呼ばれる)
@@ -144,7 +144,7 @@
   - _Boundary: features/search-attachments/server/services_
   - _Depends: 4.1_
 
-- [ ] 6.3 `AttachmentReindexBatch` を実装する
+- [x] 6.3 `AttachmentReindexBatch` を実装する
   - `addAllAttachments(targetIndex, progress)`: MongoDB の全 attachment を cursor で走査し、FileUploader からバイト取得 → extractor 経由 → `syncAttachmentIndexed` で tmp index に bulk upsert、個別失敗は `ExtractionFailureLogService.record` してスキップ継続
   - `begin(tmpIndexName)` / `end()` / `isRebuilding()` / `getTmpIndexName()` の in-memory lifecycle state を提供し、`begin()` 重複で 409 conflict を throw する
   - Socket.io `AddAttachmentProgress` / `FinishAddAttachment` / `RebuildingFailed` を既存 progress チャネルで発行する
@@ -156,7 +156,7 @@
 
 ## 7. Core: 検索結果 Aggregator
 
-- [ ] 7.1 `AttachmentSearchResultAggregator.searchPrimary` を実装する
+- [x] 7.1 `AttachmentSearchResultAggregator.searchPrimary` を実装する
   - facet=`pages` は既存 Page 検索経路のみを呼び attachments_index を一切叩かない (完全互換)
   - facet=`all` かつ `from==0` で `_msearch` により page_index (viewer filter 付き) と attachments_index (content only) を並列取得し、解釈 A (primary 20 件と pageId 一致する添付のみを埋め込み、不一致は破棄) を適用する
   - facet=`all` かつ `from>0` では attachments_index を叩かない
@@ -167,7 +167,7 @@
   - _Boundary: SearchService extension (AttachmentSearchResultAggregator)_
   - _Depends: 4.3, 4.4_
 
-- [ ] 7.2 `AttachmentSearchResultAggregator.resolveSecondary` を実装する
+- [x] 7.2 `AttachmentSearchResultAggregator.resolveSecondary` を実装する
   - `primaryIds.length > ページサイズ` で 400 相当のエラーを返す
   - facet=`all` で `terms: { pageId: primaryIds }` + content match を発行し、permission 再チェックはしない (primary で通過済)
   - primary → secondary の時間差対策として軽量 mget で pageId の存在と viewer permission を再検証し、消失 / 権限失効ページを enrichment 対象から除外する
@@ -177,7 +177,7 @@
   - _Boundary: SearchService extension (AttachmentSearchResultAggregator)_
   - _Depends: 4.3, 7.1_
 
-- [ ] 7.3 permission mget の fail-close 分岐を実装・固定する
+- [x] 7.3 permission mget の fail-close 分岐を実装・固定する
   - partial failure (一部 `found:false` / 一部 `errors` 配列) の挙動として、**成功分のみを許可、残りは一律除外**する fail-close 実装を `searchPrimary` / `resolveSecondary` 両方に適用する
   - 一部成功で全件許可する fail-open 分岐が存在しないことを unit test で明示的に固定 (3 ケース: 全 200 / 一部 404 / errors 配列)
   - _Requirements: 4.1, 4.2, 4.4_
@@ -186,14 +186,14 @@
 
 ## 8. Core: apiv3 エンドポイント群と `requiresReindex` 算出
 
-- [ ] 8.1 (P) `require-search-attachments-enabled` middleware を実装する
+- [x] 8.1 (P) `require-search-attachments-enabled` middleware を実装する
   - 算出値 `isAttachmentFullTextSearchEnabled` が false のとき 503 `feature_disabled` を返し、true のときのみ next を呼ぶ
   - 各 apiv3 route から共通利用されることを確認する (機能無効時 / URI 空文字 / token 未設定の各経路で 503 が返る)
   - _Requirements: 2.3, 5.4, 7.3_
   - _Boundary: features/search-attachments/server/middlewares_
   - _Depends: 2.1_
 
-- [ ] 8.2 `POST /_api/v3/attachments/:id/reextract` を実装する
+- [x] 8.2 `POST /_api/v3/attachments/:id/reextract` を実装する
   - `accessTokenParser([SCOPE.WRITE.FEATURES.ATTACHMENT])` + `loginRequiredStrictly` + `require-search-attachments-enabled` を適用する
   - **handler 内で毎回 Page current grant を参照** して admin OR page editor を判定 (session / middleware cache を使わない)、不可なら 403 forbidden
   - `AttachmentSearchIndexer.reindex(attachmentId)` を同期呼び出し、`{ outcome: ExtractionOutcome }` を返す
@@ -202,7 +202,7 @@
   - _Boundary: features/search-attachments/server/routes/apiv3_
   - _Depends: 6.1, 8.1_
 
-- [ ] 8.3 (P) `GET /_api/v3/search/attachments` (secondary enrichment) を実装する
+- [x] 8.3 (P) `GET /_api/v3/search/attachments` (secondary enrichment) を実装する
   - `?q=&pageIds=id1,id2,...` を受理し `AttachmentSearchResultAggregator.resolveSecondary` に委譲する
   - `pageIds` 必須、要素数がページサイズ (default 20) を超過すると 400、空で 400
   - 機能無効時は 503 `feature_disabled`
@@ -210,7 +210,7 @@
   - _Boundary: features/search-attachments/server/routes/apiv3_
   - _Depends: 7.2, 8.1_
 
-- [ ] 8.4 (P) admin config エンドポイントと `requiresReindex` 算出サービスを実装する
+- [x] 8.4 (P) admin config エンドポイントと `requiresReindex` 算出サービスを実装する
   - `GET /_api/v3/admin/attachment-search/config`: `extractorUri` / `hasExtractorToken` (存在判定のみ、値は返さない) / `timeoutMs` / `maxFileSizeBytes` / `isAttachmentFullTextSearchEnabled` / `requiresReindex` を返す
   - `PUT /_api/v3/admin/attachment-search/config`: `extractorUri` (null / 空文字で soft-disable、allowlist 検証 400) / `extractorToken` (write-only、null で削除、encrypted storage 経由で save) / `timeoutMs` / `maxFileSizeBytes` を受理
   - `requiresReindex` は `Attachment.countDocuments()` > ES `attachments` cardinality 集計の算出、**Config collection に persist しない**、30 秒 TTL in-memory cache + `PUT config` 成功時 invalidate
@@ -219,14 +219,14 @@
   - _Boundary: features/search-attachments/server/routes/apiv3, Config service_
   - _Depends: 2.1, 3.1, 4.1_
 
-- [ ] 8.5 (P) `GET /_api/v3/admin/attachment-search/failures` を実装する
+- [x] 8.5 (P) `GET /_api/v3/admin/attachment-search/failures` を実装する
   - `?limit=N&since=iso` を受理し `ExtractionFailureLogService.listRecent` + `totalRecent` に委譲する
   - admin middleware で gate し、非 admin は 403 forbidden
   - _Requirements: 8.4_
   - _Boundary: features/search-attachments/server/routes/apiv3_
   - _Depends: 5.2_
 
-- [ ] 8.6 `PUT /_api/v3/search/indices` の `includeAttachments` フラグ受理を追加する
+- [x] 8.6 `PUT /_api/v3/search/indices` の `includeAttachments` フラグ受理を追加する
   - 既存 route に `includeAttachments?: boolean` を受理するよう最小差分で拡張する
   - `includeAttachments=true` かつ 機能有効時に `AttachmentReindexBatch.begin()` → Page 再インデックス (既存) → `addAllAttachments(tmp)` → orphan sweep → alias swap → `Batch.end()` を **try/finally で** 実行する経路を組み立てる
   - `includeAttachments=false` のときは従来どおり Page/Comment のみ処理し `attachments` alias は据え置き、機能無効時は 503
@@ -236,7 +236,7 @@
 
 ## 9. Integration: Crowi 配線 / SSR prop / AttachmentService handler
 
-- [ ] 9.1 `initAttachmentFullTextSearch(crowi)` を Crowi 初期化から呼び出す
+- [x] 9.1 `initAttachmentFullTextSearch(crowi)` を Crowi 初期化から呼び出す
   - `apps/app/src/server/crowi/index.ts` に searchService / attachmentService 初期化完了後の配線点を追加する
   - feature module 内で `attachmentService.addAttachHandler(indexer.onAttach)` / `addDetachHandler(indexer.onDetach)` / Aggregator の SearchService への注入を行う
   - 機能無効時 (URI 未設定) は一切の拡張ロジックが走らず、既存挙動と完全互換であることを integ test で確認
@@ -244,7 +244,7 @@
   - _Boundary: apps/app crowi init, features/search-attachments/server entry_
   - _Depends: 6.1, 7.1_
 
-- [ ] 9.2 SearchService の multi-index 経路として Aggregator を組み込む
+- [x] 9.2 SearchService の multi-index 経路として Aggregator を組み込む
   - `apps/app/src/server/service/search.ts` の search entry に `facet` / `resolve` パラメタを受け、Aggregator.searchPrimary を呼ぶ分岐を追加する
   - facet=`pages` では既存 Page 検索経路のみを維持 (attachments 関連コードを通らない non-refactoring を observe)
   - **`registerUpdateEvent()` への添付向け pageEvent リスナ追加は行わない** ことをコメントで明記 (Option D)
@@ -252,7 +252,7 @@
   - _Boundary: SearchService_
   - _Depends: 7.1, 7.2_
 
-- [ ] 9.3 (P) `SearchConfigurationProps.searchConfig` SSR prop を拡張する
+- [x] 9.3 (P) `SearchConfigurationProps.searchConfig` SSR prop を拡張する
   - `apps/app/src/pages/basic-layout-page/types.ts` に `isAttachmentFullTextSearchEnabled?: boolean` を optional として追加する (hydrate 層で `?? false` に正規化する責務は下流 UI spec)
   - `apps/app/src/pages/basic-layout-page/get-server-side-props/search-configurations.ts` の `getServerSideSearchConfigurationProps` で `searchService.isConfigured && extractorUri != null && extractorUri !== '' && extractorToken != null && extractorToken !== ''` を算出して props に含める
   - SSR props に `extractorToken` の値を含めない (boolean 算出の入力にのみ用いる) ことを unit test で固定

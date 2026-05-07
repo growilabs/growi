@@ -18,6 +18,7 @@ import { initializeOpenaiService } from '~/features/openai/server/services/opena
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
+import { initAttachmentFullTextSearch } from '~/features/search-attachments/server';
 import type { SessionConfig } from '~/interfaces/session-config';
 import { startCron as startAccessTokenCron } from '~/server/service/access-token';
 import { projectRoot } from '~/server/util/project-dir-utils';
@@ -292,6 +293,9 @@ class Crowi {
       this.setupSyncPageStatusService(),
       this.setUpCustomize(), // depends on pluginService
     ]);
+
+    // Wire attachment full-text search after searchService + attachmentService are ready.
+    initAttachmentFullTextSearch(this);
 
     await Promise.all([
       // globalNotification depends on slack and mailer

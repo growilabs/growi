@@ -1,8 +1,9 @@
 /**
  * Admin API endpoints for attachment full-text search configuration.
  *
- * GET  /_api/v3/admin/attachment-search/config  — read current config values
- * PUT  /_api/v3/admin/attachment-search/config  — update config values
+ * GET  /_api/v3/admin/attachment-search/config    — read current config values
+ * PUT  /_api/v3/admin/attachment-search/config    — update config values
+ * GET  /_api/v3/admin/attachment-search/failures  — list recent extraction failures
  *
  * Security note: `extractorToken` is WRITE-ONLY and must never appear in
  * GET responses.  Only `hasExtractorToken: boolean` is exposed.
@@ -13,6 +14,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 import { body } from 'express-validator';
 
+import { ExtractionFailureLogService } from '~/features/search-attachments/server/services/extraction-failure-log-service';
 import { validateExtractorUri } from '~/features/search-attachments/server/services/validate-extractor-uri';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -160,6 +162,8 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
 
+  const failureLogService = new ExtractionFailureLogService();
+
   // -------------------------------------------------------------------------
   // GET /config
   // -------------------------------------------------------------------------
@@ -291,6 +295,37 @@ export const attachmentSearchAdminFactory = (crowi: Crowi): express.Router => {
         logger.error({ err }, 'PUT /config failed');
         return res.apiv3Err(
           new ErrorV3('Failed to update attachment search config'),
+          500,
+        );
+      }
+    },
+  );
+
+  // -------------------------------------------------------------------------
+  // GET /failures
+  // -------------------------------------------------------------------------
+  router.get(
+    '/failures',
+    loginRequiredStrictly,
+    adminRequired,
+    async (req, res: ApiV3Response) => {
+      try {
+        const limit = Number(req.query.limit ?? 50);
+        const since =
+          req.query.since != null
+            ? new Date(req.query.since as string)
+            : undefined;
+
+        const [items, total] = await Promise.all([
+          failureLogService.listRecent({ limit, since }),
+          failureLogService.totalRecent(since),
+        ]);
+
+        return res.apiv3({ items, total });
+      } catch (err) {
+        logger.error({ err }, 'GET /failures failed');
+        return res.apiv3Err(
+          new ErrorV3('Failed to retrieve extraction failure logs'),
           500,
         );
       }
