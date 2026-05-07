@@ -19,10 +19,10 @@ import { TreeItemLayout, TreeNameInput } from '~/features/page-tree/components';
 import type { IPageForItem } from '~/interfaces/page';
 import type { OnDeletedFunction, OnDuplicatedFunction } from '~/interfaces/ui';
 import { useCurrentPagePath, useFetchCurrentPage } from '~/states/page';
+import { useIsMobile } from '~/states/ui/device';
 import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
 import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
-import { useSidebarMode } from '~/states/ui/sidebar';
 import { mutateAllPageInfo } from '~/stores/page';
 import { mutatePageList, mutatePageTree } from '~/stores/page-listing';
 import { mutateSearching } from '~/stores/search';
@@ -133,8 +133,7 @@ export const PageTreeItem: FC<TreeItemProps> = ({
     ],
   );
 
-  const { isDrawerMode } = useSidebarMode();
-  const drawerMode = isDrawerMode();
+  const [isMobile] = useIsMobile();
 
   const { Control } = usePageItemControl();
 
@@ -185,9 +184,9 @@ export const PageTreeItem: FC<TreeItemProps> = ({
       onToggle={onToggle}
       onClickDuplicateMenuItem={onClickDuplicateMenuItem}
       onClickDeleteMenuItem={onClickDeleteMenuItem}
-      customEndComponents={drawerMode ? undefined : [CountBadgeForPageTreeItem]}
-      customHoveredEndComponents={drawerMode ? undefined : pageControls}
-      customPinnedEndComponents={drawerMode ? pageControls : undefined}
+      customEndComponents={isMobile ? undefined : [CountBadgeForPageTreeItem]}
+      customHoveredEndComponents={isMobile ? undefined : pageControls}
+      customPinnedEndComponents={isMobile ? pageControls : undefined}
       showAlternativeContent={isRenaming(item) || isCreatingPlaceholder(item)}
       customAlternativeComponents={[TreeNameInput]}
     />

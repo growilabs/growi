@@ -29,6 +29,10 @@ $grw-bookmark-item-padding-left: 35px;
       display: none;
     }
 
+    :global(.grw-visible-on-hover.grw-pinned) {
+      display: block;
+    }
+
     &:hover {
       :global(.grw-visible-on-hover) {
         display: block;

@@ -18,8 +18,8 @@ import type {
 } from '~/interfaces/bookmark-info';
 import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info';
 import type { onDeletedBookmarkFolderFunction } from '~/interfaces/ui';
+import { useIsMobile } from '~/states/ui/device';
 import { useDeleteBookmarkFolderModalActions } from '~/states/ui/modal/delete-bookmark-folder';
-import { useSidebarMode } from '~/states/ui/sidebar';
 
 import { BookmarkFolderItemControl } from './BookmarkFolderItemControl';
 import { BookmarkFolderNameInput } from './BookmarkFolderNameInput';
@@ -73,7 +73,7 @@ export const BookmarkFolderItem: FC<BookmarkFolderItemProps> = (
 
   const { open: openDeleteBookmarkFolderModal } =
     useDeleteBookmarkFolderModalActions();
-  const { isDrawerMode } = useSidebarMode();
+  const [isMobile] = useIsMobile();
 
   const childrenExists = hasChildren({ childFolder, bookmarks });
 
@@ -366,7 +366,7 @@ export const BookmarkFolderItem: FC<BookmarkFolderItemProps> = (
               >
                 <DropdownToggle
                   color="transparent"
-                  className={`border-0 rounded btn-page-item-control p-0 ${isDrawerMode() ? '' : 'grw-visible-on-hover'} me-1`}
+                  className={`border-0 rounded btn-page-item-control p-0 grw-visible-on-hover ${isMobile ? 'grw-pinned' : ''} me-1`}
                   onClick={(event) => {
                     event.stopPropagation();
                   }}
@@ -379,7 +379,7 @@ export const BookmarkFolderItem: FC<BookmarkFolderItemProps> = (
                 <button
                   id="create-bookmark-folder-button"
                   type="button"
-                  className={`border-0 rounded btn btn-page-item-control p-0 ${isDrawerMode() ? '' : 'grw-visible-on-hover'}`}
+                  className={`border-0 rounded btn btn-page-item-control p-0 grw-visible-on-hover ${isMobile ? 'grw-pinned' : ''}`}
                   onClick={onClickPlusButton}
                 >
                   <span className="material-symbols-outlined">add_circle</span>
