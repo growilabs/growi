@@ -1,6 +1,7 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import express from 'express';
 
+import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server';
 import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
 
 import { accessTokenParser } from '../middlewares/access-token-parser';
@@ -69,6 +70,9 @@ module.exports = (crowi, app) => {
 
   // Rate limiter
   app.use(rateLimiterFactory());
+
+  // GROWI Vault git gateway — must be registered before the catch-all page routes
+  app.use('/_vault/repo.git', createVaultGatewayRouterWithDeps(crowi));
 
   // API v3 for admin
   app.use('/_api/v3', apiV3AdminRouter);

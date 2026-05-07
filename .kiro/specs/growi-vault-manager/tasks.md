@@ -258,8 +258,8 @@
 
 ---
 
-- [ ] 10. VaultMaintenanceScheduler の実装
-- [ ] 10.1 Squash スケジューラの実装
+- [x] 10. VaultMaintenanceScheduler の実装
+- [x] 10.1 Squash スケジューラの実装
   - `src/services/vault-maintenance-scheduler.ts` を作成する
   - `start()` で 5 分間隔の `setInterval` を設定し、全 namespace の commit 数と最終 squash 経過時間を確認する
   - commit 数 > `VAULT_SQUASH_COMMIT_THRESHOLD`（デフォルト 1000）または経過時間 > `VAULT_SQUASH_AGE_HOURS`（デフォルト 1h）で squash を実行する
@@ -268,7 +268,7 @@
   - _Requirements: 6.1–6.3, 6.6_
   - _Boundary: apps/growi-vault-manager/src/services/vault-maintenance-scheduler.ts_
 
-- [ ] 10.2 GC スケジューラの実装
+- [x] 10.2 GC スケジューラの実装
   - `vault-maintenance-scheduler.ts` に gc スケジューラを追加する
   - loose object 数 > `VAULT_GC_LOOSE_OBJECT_THRESHOLD`（デフォルト 50,000）または前回 gc から `VAULT_GC_INTERVAL_HOURS`（デフォルト 24h）経過で `git gc --prune=2.weeks.ago` を spawn する
   - `triggerGc()` が手動トリガとして動作し、before/after の object 数と実行時間を返すこと

@@ -242,7 +242,7 @@ _Depends: 3.1, 5.1_
 - 親 grant 変更 → `grant-change-prefix` が発行されることをテストする
 - **完了確認**: `pnpm vitest run vault-dispatcher.spec` が全テスト通過すること
 
-### 7.3 PageService event 購読の組み込み
+### [x] 7.3 PageService event 購読の組み込み
 
 `apps/app/src/features/growi-vault/server/index.ts`（または feature 登録ファイル）に VaultDispatcher の event 購読を追加する。
 
@@ -455,7 +455,7 @@ _要件: 1、7_
 _Boundary: `apps/app/src/features/growi-vault/server/index.ts`、`apps/app/src/server/routes/index.ts`_
 _Depends: 7.3, 10.1, 11.1_
 
-### 13.1 feature 登録ファイルの作成
+### [x] 13.1 feature 登録ファイルの作成
 
 `apps/app/src/features/growi-vault/server/index.ts` を新規作成する。
 
@@ -465,7 +465,7 @@ _Depends: 7.3, 10.1, 11.1_
 - named export する
 - **完了確認**: apps/app 起動時に vault feature が正しく初期化されることを確認すること
 
-### 13.2 VaultGatewayRouter の routes/index.ts への登録
+### [x] 13.2 VaultGatewayRouter の routes/index.ts への登録
 
 `apps/app/src/server/routes/index.ts`（または app 起動箇所）を編集する。
 
