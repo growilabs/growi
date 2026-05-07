@@ -48,7 +48,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 4.2_
   - _Boundary: Limits_
 
-- [ ] 2.2 Bearer 認証 middleware (`middleware/bearer_auth.py`) を実装
+- [x] 2.2 Bearer 認証 middleware (`middleware/bearer_auth.py`) を実装
   - `Authorization: Bearer <token>` ヘッダを `hmac.compare_digest` で `MARKITDOWN_SERVICE_TOKEN` と照合
   - `POST /extract` には適用、`GET /healthz` / `GET /readyz` / `GET /openapi.json` は bypass
   - 不一致/欠落時は size check / semaphore 取得の**前**に 401 `unauthorized` + `ErrorResponse` を返却
