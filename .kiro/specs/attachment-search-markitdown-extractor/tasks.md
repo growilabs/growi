@@ -13,7 +13,7 @@
   - _Requirements: 1.7_
   - _Boundary: Project scaffold_
 
-- [ ] 1.2 設定ローダ (`config.py`) を実装
+- [x] 1.2 設定ローダ (`config.py`) を実装
   - `pydantic-settings` ベースで `MAX_FILE_SIZE_MB` (default 50) / `TIMEOUT_S` (default 60) / `MAX_CONCURRENCY` (default `max(2, workers*2)`) / `MAX_EXTRACTED_BYTES` (default 500*1024*1024) / `LOG_LEVEL` (default `INFO`) / `MARKITDOWN_SERVICE_TOKEN` (必須、未設定で起動失敗) を環境変数から読み込み
   - `MARKITDOWN_SERVICE_TOKEN` が未設定または空文字の場合、設定生成時に例外を raise し fail fast
   - 完了条件: 環境変数未設定でインスタンス化すると `ValidationError` (or 同等) が raise され、すべて設定した状態では全フィールドが型付きで参照できる
