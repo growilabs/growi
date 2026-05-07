@@ -18,6 +18,10 @@ import type {
 import loggerFactory from '~/utils/logger';
 
 import { buildAttachmentSearchQuery } from '../queries/build-attachment-search-query';
+import {
+  buildAttachmentsByPageIdsQuery,
+  DEFAULT_PAGE_SIZE,
+} from '../queries/build-attachments-by-page-ids-query';
 import { buildSnippetSegments } from '../queries/build-snippet-segments';
 import { mgetPagesForPermissionBody } from '../queries/mget-pages-for-permission-body';
 
@@ -73,11 +77,13 @@ export interface AttachmentSearchResponse {
 }
 
 /**
- * Single mget doc entry (simplified — covers found/not-found shape).
+ * Single mget doc entry (simplified — covers found/not-found/error shapes).
+ * `error` is present when ES returns a per-doc error (e.g. shard failure).
  */
 export interface MgetDoc {
   _id: string;
   found: boolean;
+  error?: unknown;
 }
 
 /**
@@ -120,11 +126,22 @@ export interface ISecondarySearchResult {
   attachmentHitsByPageId: Record<string, IAttachmentHit[]>;
 }
 
+/**
+ * Result of resolveSecondary — enrichment data keyed by pageId.
+ */
+export interface IResolvedSecondaryResult {
+  facet: 'all' | 'attachments';
+  enrichments: Record<string, { attachmentHits?: IAttachmentHit[] }>;
+}
+
 // ---------------------------------------------------------------------------
 // Over-fetch multiplier for facet=attachments
 // ---------------------------------------------------------------------------
 
 const OVER_FETCH_MULTIPLIER = 1.5;
+
+// Secondary enrichment timeout (ms)
+const SECONDARY_TIMEOUT_MS = 500;
 
 // ---------------------------------------------------------------------------
 // Helper: resolve ES total count
@@ -192,6 +209,15 @@ const withTimeout = <T>(promise: Promise<T>, ms: number): Promise<T> => {
     ),
   ]);
 };
+
+// ---------------------------------------------------------------------------
+// Helper: fail-close mget filter
+// Includes ONLY docs where found===true AND no error field is present.
+// This is the single authoritative fail-close gate used by both searchPrimary
+// (facet=attachments) and resolveSecondary (facet=all).
+// ---------------------------------------------------------------------------
+export const filterMgetDocs = (docs: MgetDoc[]): string[] =>
+  docs.filter((d) => d.found === true && !('error' in d)).map((d) => d._id);
 
 // ---------------------------------------------------------------------------
 // AttachmentSearchResultAggregator
@@ -446,9 +472,9 @@ export class AttachmentSearchResultAggregator {
       };
     }
 
-    // Build set of authorized pageIds (found:true = authorized)
+    // Build set of authorized pageIds — fail-close: only found:true AND no error
     const authorizedPageIds = new Set<string>(
-      mgetResponse.docs.filter((doc) => doc.found).map((doc) => doc._id),
+      filterMgetDocs(mgetResponse.docs),
     );
 
     // Filter attachment hits to only those whose pageId is authorized
@@ -483,6 +509,108 @@ export class AttachmentSearchResultAggregator {
         primaryResultIncomplete,
       },
     };
+  }
+
+  // --------------------------------------------------------------------------
+  // resolveSecondary — enrichment phase after primary search
+  // --------------------------------------------------------------------------
+
+  /**
+   * Resolves secondary enrichment data for a set of primary page IDs.
+   *
+   * facet=attachments: primary already performed mget permission filtering,
+   *   so there is nothing additional to do — returns empty enrichments.
+   *
+   * facet=all: performs a time-lag defense mget to verify pages still exist,
+   *   then searches the attachments index filtered by the surviving page IDs.
+   *   Results are grouped by pageId and returned as enrichments.
+   *
+   * If secondary latency exceeds 500ms, returns empty enrichments (graceful
+   * degradation — the primary result is still usable).
+   *
+   * @throws {RangeError} when primaryIds.length > DEFAULT_PAGE_SIZE (guard
+   *   against unbounded terms queries; callers must split large batches)
+   */
+  async resolveSecondary(
+    query: string,
+    options: {
+      facet: 'all' | 'attachments';
+      primaryIds: string[];
+    },
+  ): Promise<IResolvedSecondaryResult> {
+    const { facet, primaryIds } = options;
+
+    // facet=attachments: primary already did mget permission check — no-op
+    if (facet === 'attachments') {
+      return { facet: 'attachments', enrichments: {} };
+    }
+
+    // facet=all: enrich with attachment hits grouped by pageId
+    return this.resolveSecondaryAll(query, primaryIds);
+  }
+
+  private async resolveSecondaryAll(
+    query: string,
+    primaryIds: string[],
+  ): Promise<IResolvedSecondaryResult> {
+    // Guard: primaryIds must not exceed the maximum page size
+    if (primaryIds.length > DEFAULT_PAGE_SIZE) {
+      throw new RangeError(
+        `primaryIds.length (${primaryIds.length}) exceeds the maximum allowed page size (${DEFAULT_PAGE_SIZE}). ` +
+          'Split the request into smaller batches.',
+      );
+    }
+
+    const enrichments: IResolvedSecondaryResult['enrichments'] = {};
+
+    try {
+      const result = await withTimeout(
+        this.doResolveSecondaryAll(query, primaryIds),
+        SECONDARY_TIMEOUT_MS,
+      );
+      return { facet: 'all', enrichments: result };
+    } catch (err) {
+      // Safety net: secondary timeout → return empty enrichments, primary result still usable
+      logger.warn(
+        { err, querySnippet: query.slice(0, 50) },
+        'resolveSecondaryAll: secondary timeout — returning empty enrichments',
+      );
+      return { facet: 'all', enrichments };
+    }
+  }
+
+  private async doResolveSecondaryAll(
+    query: string,
+    primaryIds: string[],
+  ): Promise<IResolvedSecondaryResult['enrichments']> {
+    // Time-lag defense: mget to verify pages still exist and are accessible
+    const mgetResponse = await this.attachmentClient.mgetPages(primaryIds);
+
+    // Fail-close: only include pages where found===true AND no error
+    const validIds = filterMgetDocs(mgetResponse.docs);
+
+    if (validIds.length === 0) {
+      return {};
+    }
+
+    // Search attachments filtered to the valid page IDs
+    const searchBody = buildAttachmentsByPageIdsQuery(query, validIds, {
+      highlight: true,
+    });
+    const attachmentResponse =
+      await this.attachmentClient.searchAttachments(searchBody);
+
+    // Group hits by pageId
+    const enrichments: IResolvedSecondaryResult['enrichments'] = {};
+    for (const hit of attachmentResponse.hits.hits) {
+      const pageId = hit._source.pageId;
+      if (enrichments[pageId] == null) {
+        enrichments[pageId] = { attachmentHits: [] };
+      }
+      enrichments[pageId].attachmentHits?.push(toAttachmentHit(hit));
+    }
+
+    return enrichments;
   }
 }
 

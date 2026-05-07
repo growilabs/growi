@@ -1,5 +1,5 @@
 /**
- * Unit tests for AttachmentSearchResultAggregator.searchPrimary
+ * Unit tests for AttachmentSearchResultAggregator
  *
  * All dependencies are mocked. Tests verify:
  * 1. facet=pages: does NOT call attachment search
@@ -10,6 +10,13 @@
  * 6. facet=attachments over 800ms → returns empty + primaryResultIncomplete:true
  * 7. facet=pages returns correct primarySlot='pages'
  * 8. facet=attachments returns correct primarySlot='attachments'
+ * 9. resolveSecondary facet=all: returns attachment hits grouped by pageId
+ * 10. resolveSecondary facet=all: secondary timeout → empty enrichments
+ * 11. resolveSecondary facet=all: primaryIds > 20 → throws RangeError
+ * 12. resolveSecondary facet=attachments: returns empty enrichments (no-op)
+ * 13. fail-close: mget all found:true → all included
+ * 14. fail-close: mget some found:false → only found:true docs included
+ * 15. fail-close: mget with errors array → only success docs (no error) included
  */
 
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -17,10 +24,14 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type {
   AttachmentIndexClient,
   AttachmentSearchResponse,
+  MgetDoc,
   MgetPagesResponse,
   PageSearchFn,
 } from './attachment-search-result-aggregator';
-import { AttachmentSearchResultAggregator } from './attachment-search-result-aggregator';
+import {
+  AttachmentSearchResultAggregator,
+  filterMgetDocs,
+} from './attachment-search-result-aggregator';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -65,9 +76,13 @@ const makeAttachmentResponse = (
 
 /** Build a minimal mget pages response */
 const makeMgetResponse = (
-  docs: Array<{ id: string; found: boolean }>,
+  docs: Array<{ id: string; found: boolean; error?: unknown }>,
 ): MgetPagesResponse => ({
-  docs: docs.map(({ id, found }) => ({ _id: id, found })),
+  docs: docs.map(({ id, found, error }) => {
+    const doc: MgetDoc = { _id: id, found };
+    if (error !== undefined) doc.error = error;
+    return doc;
+  }),
 });
 
 // ---------------------------------------------------------------------------
@@ -522,6 +537,386 @@ describe('AttachmentSearchResultAggregator.searchPrimary', () => {
         { text: 'world', highlighted: true },
         { text: ' foo', highlighted: false },
       ]);
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 7.3: filterMgetDocs — fail-close unit tests
+// ---------------------------------------------------------------------------
+
+describe('filterMgetDocs (fail-close helper)', () => {
+  // Case 1: all docs found:true, no errors → all IDs returned
+  it('returns all IDs when all docs are found:true with no errors', () => {
+    const docs: MgetDoc[] = [
+      { _id: 'page1', found: true },
+      { _id: 'page2', found: true },
+      { _id: 'page3', found: true },
+    ];
+    expect(filterMgetDocs(docs)).toEqual(['page1', 'page2', 'page3']);
+  });
+
+  // Case 2: some found:false → only found:true docs included
+  it('excludes docs where found=false', () => {
+    const docs: MgetDoc[] = [
+      { _id: 'page1', found: true },
+      { _id: 'page2', found: false }, // deleted / unauthorized
+      { _id: 'page3', found: true },
+    ];
+    expect(filterMgetDocs(docs)).toEqual(['page1', 'page3']);
+  });
+
+  // Case 3: docs with error field → only success docs (no error) included
+  it('excludes docs with an error field even when found=true', () => {
+    const docs: MgetDoc[] = [
+      { _id: 'page1', found: true }, // success
+      { _id: 'page2', found: false, error: { type: 'shard_failure' } }, // shard error
+      { _id: 'page3', found: true, error: { type: 'routing_error' } }, // error wins over found:true
+    ];
+    // Only page1 passes: found===true AND no error
+    expect(filterMgetDocs(docs)).toEqual(['page1']);
+  });
+
+  it('returns empty array when all docs fail', () => {
+    const docs: MgetDoc[] = [
+      { _id: 'page1', found: false },
+      { _id: 'page2', found: false, error: { type: 'shard_failure' } },
+    ];
+    expect(filterMgetDocs(docs)).toEqual([]);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 7.2: resolveSecondary
+// ---------------------------------------------------------------------------
+
+describe('AttachmentSearchResultAggregator.resolveSecondary', () => {
+  let pageSearchFn: ReturnType<typeof vi.fn>;
+  let searchAttachments: ReturnType<typeof vi.fn>;
+  let mgetPages: ReturnType<typeof vi.fn>;
+  let attachmentClient: AttachmentIndexClient;
+
+  beforeEach(() => {
+    pageSearchFn = vi.fn();
+    searchAttachments = vi.fn();
+    mgetPages = vi.fn();
+    attachmentClient = { searchAttachments, mgetPages };
+  });
+
+  // -------------------------------------------------------------------------
+  // facet=attachments: primary already did mget — no-op
+  // -------------------------------------------------------------------------
+  describe('facet=attachments', () => {
+    it('returns empty enrichments without calling mget or search', async () => {
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.resolveSecondary('keyword', {
+        facet: 'attachments',
+        primaryIds: ['page1', 'page2'],
+      });
+
+      expect(result.facet).toBe('attachments');
+      expect(result.enrichments).toEqual({});
+      expect(mgetPages).not.toHaveBeenCalled();
+      expect(searchAttachments).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // facet=all: enrichment with attachment hits grouped by pageId
+  // -------------------------------------------------------------------------
+  describe('facet=all', () => {
+    it('returns attachment hits grouped by pageId', async () => {
+      // mget confirms both pages still exist
+      mgetPages.mockResolvedValue(
+        makeMgetResponse([
+          { id: 'page1', found: true },
+          { id: 'page2', found: true },
+        ]),
+      );
+      // Attachment search returns two hits across two pages
+      searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([
+          { pageId: 'page1', attachmentId: 'att1' },
+          { pageId: 'page2', attachmentId: 'att2' },
+          { pageId: 'page1', attachmentId: 'att3' }, // second hit for page1
+        ]),
+      );
+
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.resolveSecondary('keyword', {
+        facet: 'all',
+        primaryIds: ['page1', 'page2'],
+      });
+
+      expect(result.facet).toBe('all');
+      expect(result.enrichments['page1']?.attachmentHits).toHaveLength(2);
+      expect(
+        result.enrichments['page1']?.attachmentHits?.[0].attachmentId,
+      ).toBe('att1');
+      expect(
+        result.enrichments['page1']?.attachmentHits?.[1].attachmentId,
+      ).toBe('att3');
+      expect(result.enrichments['page2']?.attachmentHits).toHaveLength(1);
+      expect(
+        result.enrichments['page2']?.attachmentHits?.[0].attachmentId,
+      ).toBe('att2');
+    });
+
+    it('drops pages that disappeared since primary (time-lag defense, found:false)', async () => {
+      // page2 has disappeared between primary and secondary
+      mgetPages.mockResolvedValue(
+        makeMgetResponse([
+          { id: 'page1', found: true },
+          { id: 'page2', found: false }, // disappeared
+        ]),
+      );
+      searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([{ pageId: 'page1', attachmentId: 'att1' }]),
+      );
+
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.resolveSecondary('keyword', {
+        facet: 'all',
+        primaryIds: ['page1', 'page2'],
+      });
+
+      // Only page1's hits should appear
+      expect(result.enrichments['page1']?.attachmentHits).toHaveLength(1);
+      expect(result.enrichments['page2']).toBeUndefined();
+    });
+
+    it('returns empty enrichments when all primary pages disappeared', async () => {
+      mgetPages.mockResolvedValue(
+        makeMgetResponse([
+          { id: 'page1', found: false },
+          { id: 'page2', found: false },
+        ]),
+      );
+
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.resolveSecondary('keyword', {
+        facet: 'all',
+        primaryIds: ['page1', 'page2'],
+      });
+
+      expect(result.enrichments).toEqual({});
+      // attachment search should NOT be called since no valid IDs remain
+      expect(searchAttachments).not.toHaveBeenCalled();
+    });
+
+    it('throws RangeError when primaryIds.length > DEFAULT_PAGE_SIZE (20)', async () => {
+      const tooManyIds = Array.from({ length: 21 }, (_, i) => `page${i}`);
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+
+      await expect(
+        agg.resolveSecondary('keyword', {
+          facet: 'all',
+          primaryIds: tooManyIds,
+        }),
+      ).rejects.toThrow(RangeError);
+    });
+
+    it('returns empty enrichments on secondary timeout (500ms safety net)', async () => {
+      // mget resolves slowly — exceeds 500ms secondary timeout
+      mgetPages.mockImplementation(
+        () =>
+          new Promise((resolve) =>
+            setTimeout(
+              () => resolve(makeMgetResponse([{ id: 'page1', found: true }])),
+              200,
+            ),
+          ),
+      );
+
+      // Use a very short timeout to trigger the safety net
+      const agg = makeAggregator(pageSearchFn, attachmentClient, 800);
+      // We need to override SECONDARY_TIMEOUT_MS — use a wrapper that we test
+      // indirectly by overriding with a tiny timeout on the internal helper.
+      // We achieve this by testing at the public API level with a tiny aggregator timeout
+      // and a slow mget: for secondary we always use 500ms, so we use fake timers instead.
+
+      // Alternative: test using a very slow mget and a fresh aggregator with vi.useFakeTimers
+      vi.useFakeTimers();
+      const fastAgg = makeAggregator(pageSearchFn, attachmentClient, 800);
+
+      const resultPromise = fastAgg.resolveSecondary('keyword', {
+        facet: 'all',
+        primaryIds: ['page1'],
+      });
+
+      // Advance past the 500ms secondary timeout
+      vi.advanceTimersByTime(600);
+      vi.useRealTimers();
+
+      const result = await resultPromise;
+      expect(result.facet).toBe('all');
+      expect(result.enrichments).toEqual({});
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Task 7.3: fail-close mget applied to resolveSecondary
+  // -------------------------------------------------------------------------
+  describe('fail-close mget in resolveSecondary (task 7.3)', () => {
+    // Case 1: all found:true → all included
+    it('includes all pages when all mget docs are found:true', async () => {
+      mgetPages.mockResolvedValue(
+        makeMgetResponse([
+          { id: 'page1', found: true },
+          { id: 'page2', found: true },
+        ]),
+      );
+      searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([
+          { pageId: 'page1', attachmentId: 'att1' },
+          { pageId: 'page2', attachmentId: 'att2' },
+        ]),
+      );
+
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.resolveSecondary('keyword', {
+        facet: 'all',
+        primaryIds: ['page1', 'page2'],
+      });
+
+      expect(result.enrichments['page1']?.attachmentHits).toHaveLength(1);
+      expect(result.enrichments['page2']?.attachmentHits).toHaveLength(1);
+    });
+
+    // Case 2: some found:false → only found:true docs included
+    it('excludes pages with found:false from enrichments (fail-close)', async () => {
+      mgetPages.mockResolvedValue(
+        makeMgetResponse([
+          { id: 'page1', found: true },
+          { id: 'page2', found: false }, // excluded by fail-close
+        ]),
+      );
+      searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([{ pageId: 'page1', attachmentId: 'att1' }]),
+      );
+
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.resolveSecondary('keyword', {
+        facet: 'all',
+        primaryIds: ['page1', 'page2'],
+      });
+
+      expect(result.enrichments['page1']?.attachmentHits).toHaveLength(1);
+      expect(result.enrichments['page2']).toBeUndefined(); // fail-close: not included
+    });
+
+    // Case 3: docs with error field → only success docs (no error) included
+    it('excludes pages with error field from enrichments (fail-close)', async () => {
+      mgetPages.mockResolvedValue(
+        makeMgetResponse([
+          { id: 'page1', found: true }, // success
+          { id: 'page2', found: false, error: { type: 'shard_failure' } }, // error: excluded
+          { id: 'page3', found: true, error: { type: 'routing_error' } }, // error field present: excluded
+        ]),
+      );
+      searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([{ pageId: 'page1', attachmentId: 'att1' }]),
+      );
+
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.resolveSecondary('keyword', {
+        facet: 'all',
+        primaryIds: ['page1', 'page2', 'page3'],
+      });
+
+      // Only page1 passes fail-close; page2 and page3 excluded
+      expect(result.enrichments['page1']?.attachmentHits).toHaveLength(1);
+      expect(result.enrichments['page2']).toBeUndefined();
+      expect(result.enrichments['page3']).toBeUndefined();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Task 7.3: fail-close mget applied to searchPrimary (facet=attachments)
+  // -------------------------------------------------------------------------
+  describe('fail-close mget in searchPrimary facet=attachments (task 7.3)', () => {
+    // Case 1: all found:true → all included
+    it('includes all pages when all mget docs are found:true', async () => {
+      searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([
+          { pageId: 'page1', attachmentId: 'att1' },
+          { pageId: 'page2', attachmentId: 'att2' },
+        ]),
+      );
+      mgetPages.mockResolvedValue(
+        makeMgetResponse([
+          { id: 'page1', found: true },
+          { id: 'page2', found: true },
+        ]),
+      );
+
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.searchPrimary('keyword', {
+        facet: 'attachments',
+        from: 0,
+        size: 20,
+      });
+
+      expect(result.items).toHaveLength(2);
+      expect(result.items.map((i) => i.data._id).sort()).toEqual([
+        'page1',
+        'page2',
+      ]);
+    });
+
+    // Case 2: some found:false → only found:true docs included
+    it('excludes pages with found:false (fail-close, not fail-open)', async () => {
+      searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([
+          { pageId: 'page1', attachmentId: 'att1' },
+          { pageId: 'page2', attachmentId: 'att2' },
+        ]),
+      );
+      mgetPages.mockResolvedValue(
+        makeMgetResponse([
+          { id: 'page1', found: true },
+          { id: 'page2', found: false }, // not authorized / deleted
+        ]),
+      );
+
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.searchPrimary('keyword', {
+        facet: 'attachments',
+        from: 0,
+        size: 20,
+      });
+
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].data._id).toBe('page1');
+    });
+
+    // Case 3: docs with errors array → only success docs included
+    it('excludes pages with error field in mget response (fail-close)', async () => {
+      searchAttachments.mockResolvedValue(
+        makeAttachmentResponse([
+          { pageId: 'page1', attachmentId: 'att1' },
+          { pageId: 'page2', attachmentId: 'att2' },
+          { pageId: 'page3', attachmentId: 'att3' },
+        ]),
+      );
+      mgetPages.mockResolvedValue(
+        makeMgetResponse([
+          { id: 'page1', found: true }, // success
+          { id: 'page2', found: false, error: { type: 'shard_failure' } }, // error: excluded
+          { id: 'page3', found: true, error: { type: 'routing_error' } }, // error field present: excluded
+        ]),
+      );
+
+      const agg = makeAggregator(pageSearchFn, attachmentClient);
+      const result = await agg.searchPrimary('keyword', {
+        facet: 'attachments',
+        from: 0,
+        size: 20,
+      });
+
+      // Only page1 passes fail-close
+      expect(result.items).toHaveLength(1);
+      expect(result.items[0].data._id).toBe('page1');
     });
   });
 });

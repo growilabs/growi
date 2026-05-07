@@ -37,6 +37,10 @@ export const SocketEventName = {
   FinishAddPage: 'finishAddPage',
   RebuildingFailed: 'rebuildingFailed',
 
+  // Attachment full-text search reindex
+  AddAttachmentProgress: 'addAttachmentProgress',
+  FinishAddAttachment: 'finishAddAttachment',
+
   // External user group sync
   externalUserGroup: generateGroupSyncEvents(),
 
