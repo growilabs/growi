@@ -6,7 +6,9 @@ import mongoose from 'mongoose';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { NewsService } from '../services/news-service';
@@ -54,6 +56,10 @@ export const createNewsRouter = (crowi?: Crowi): express.Router => {
   const loginRequiredStrictly =
     crowi != null
       ? loginRequiredFactory(crowi)
+      : (_req: unknown, _res: unknown, next: () => void) => next();
+  const adminRequired =
+    crowi != null
+      ? adminRequiredFactory(crowi)
       : (_req: unknown, _res: unknown, next: () => void) => next();
 
   /**
@@ -175,6 +181,55 @@ export const createNewsRouter = (crowi?: Crowi): express.Router => {
         return res.json({ ok: true });
       } catch (err) {
         logger.error('POST /news/mark-all-read failed', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+    },
+  );
+
+  /**
+   * GET /news/admin/delivery-setting
+   * Returns the current value of `news:isDeliveryEnabled` (admin only)
+   */
+  router.get(
+    '/admin/delivery-setting',
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP]),
+    loginRequiredStrictly,
+    adminRequired,
+    (_req, res) => {
+      try {
+        const isDeliveryEnabled = configManager.getConfig(
+          'news:isDeliveryEnabled',
+        );
+        return res.json({ isDeliveryEnabled });
+      } catch (err) {
+        logger.error('GET /news/admin/delivery-setting failed', err);
+        return res.status(500).json({ error: 'Internal server error' });
+      }
+    },
+  );
+
+  /**
+   * POST /news/admin/delivery-setting
+   * Updates `news:isDeliveryEnabled` (admin only). Body: `{ flag: boolean }`.
+   * The new value is persisted to the `Config` collection and reflected on
+   * the next cron tick without a restart.
+   */
+  router.post(
+    '/admin/delivery-setting',
+    accessTokenParser([SCOPE.WRITE.ADMIN.APP]),
+    loginRequiredStrictly,
+    adminRequired,
+    async (req, res) => {
+      try {
+        const { flag } = req.body;
+        if (typeof flag !== 'boolean') {
+          return res.status(400).json({ error: '`flag` must be a boolean' });
+        }
+
+        await configManager.updateConfigs({ 'news:isDeliveryEnabled': flag });
+        return res.json({ isDeliveryEnabled: flag });
+      } catch (err) {
+        logger.error('POST /news/admin/delivery-setting failed', err);
         return res.status(500).json({ error: 'Internal server error' });
       }
     },

@@ -9,6 +9,8 @@ const mocks = vi.hoisted(() => {
   const getUnreadCount = vi.fn();
   const markRead = vi.fn();
   const markAllRead = vi.fn();
+  const getConfig = vi.fn<(key: string) => unknown>();
+  const updateConfigs = vi.fn();
   return {
     NewsService: vi.fn(() => ({
       listForUser,
@@ -20,11 +22,20 @@ const mocks = vi.hoisted(() => {
     getUnreadCount,
     markRead,
     markAllRead,
+    getConfig,
+    updateConfigs,
   };
 });
 
 vi.mock('../services/news-service', () => ({
   NewsService: mocks.NewsService,
+}));
+
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: {
+    getConfig: mocks.getConfig,
+    updateConfigs: mocks.updateConfigs,
+  },
 }));
 
 // Middleware mocks - bypass auth
@@ -284,6 +295,65 @@ describe('News API routes', () => {
       expect(res.status).toBe(200);
       expect(res.body).toEqual({ ok: true });
       expect(mocks.markAllRead).toHaveBeenCalled();
+    });
+  });
+
+  describe('GET /apiv3/news/admin/delivery-setting', () => {
+    test('should return current value from configManager', async () => {
+      mocks.getConfig.mockReturnValue(true);
+
+      const app = buildApp();
+      const res = await request(app).get('/apiv3/news/admin/delivery-setting');
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ isDeliveryEnabled: true });
+      expect(mocks.getConfig).toHaveBeenCalledWith('news:isDeliveryEnabled');
+    });
+
+    test('should reflect false when delivery is disabled', async () => {
+      mocks.getConfig.mockReturnValue(false);
+
+      const app = buildApp();
+      const res = await request(app).get('/apiv3/news/admin/delivery-setting');
+
+      expect(res.body).toEqual({ isDeliveryEnabled: false });
+    });
+  });
+
+  describe('POST /apiv3/news/admin/delivery-setting', () => {
+    test('should update delivery setting via configManager', async () => {
+      mocks.updateConfigs.mockResolvedValue(undefined);
+
+      const app = buildApp();
+      const res = await request(app)
+        .post('/apiv3/news/admin/delivery-setting')
+        .send({ flag: false });
+
+      expect(res.status).toBe(200);
+      expect(res.body).toEqual({ isDeliveryEnabled: false });
+      expect(mocks.updateConfigs).toHaveBeenCalledWith({
+        'news:isDeliveryEnabled': false,
+      });
+    });
+
+    test('should return 400 when flag is not boolean', async () => {
+      const app = buildApp();
+      const res = await request(app)
+        .post('/apiv3/news/admin/delivery-setting')
+        .send({ flag: 'true' });
+
+      expect(res.status).toBe(400);
+      expect(mocks.updateConfigs).not.toHaveBeenCalled();
+    });
+
+    test('should return 400 when flag is missing', async () => {
+      const app = buildApp();
+      const res = await request(app)
+        .post('/apiv3/news/admin/delivery-setting')
+        .send({});
+
+      expect(res.status).toBe(400);
+      expect(mocks.updateConfigs).not.toHaveBeenCalled();
     });
   });
 });
