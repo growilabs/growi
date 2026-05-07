@@ -1,0 +1,31 @@
+services:
+  markitdown-extractor:
+    build:
+      context: ../../services/markitdown-extractor
+      dockerfile: Dockerfile
+    image: markitdown-extractor:local
+    env_file:
+      - .env
+    ports:
+      - "8000:8000"
+    networks:
+      - internal
+    healthcheck:
+      test:
+        - "CMD"
+        - "python"
+        - "-c"
+        - "import urllib.request; urllib.request.urlopen('http://localhost:8000/healthz')"
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 10s
+    read_only: true
+    tmpfs:
+      - /tmp:size=512m
+    user: "10001:10001"
+
+networks:
+  internal:
+    driver: bridge
+    internal: true  # egress blocked: outbound traffic from containers is disallowed

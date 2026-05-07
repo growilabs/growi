@@ -213,7 +213,7 @@
   - _Boundary: Dockerfile_
   - _Depends: 4.3_
 
-- [ ] 7.2 docker-compose エントリを追加
+- [x] 7.2 docker-compose エントリを追加
   - `infra/docker/compose.yaml` に `markitdown-extractor` service を追加 (build/image、env、depends_on 不要)
   - `networks:` に `internal: true` の user-defined bridge を定義し egress を遮断 (default 構成で opt-in 不要)
   - `MARKITDOWN_SERVICE_TOKEN` を env file 経由で注入する書式を同梱 (値は空欄の `.env.example`)

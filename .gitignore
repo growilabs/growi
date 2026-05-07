@@ -53,3 +53,6 @@ yarn-error.log*
 out
 
 .devcontainer/compose.extend.yml
+
+# docker env files (secrets — never commit)
+infra/docker/.env
