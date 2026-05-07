@@ -89,6 +89,7 @@
     "@growi/core": "workspace:^",
     "@growi/emoji-mart-data": "workspace:^",
     "@growi/logger": "workspace:*",
+    "@growi/markitdown-client": "workspace:^",
     "@growi/pdf-converter-client": "workspace:^",
     "@growi/pluginkit": "workspace:^",
     "@growi/presentation": "workspace:^",

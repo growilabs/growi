@@ -1,0 +1,259 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Markitdown Extractor",
+    "description": "Attachment text extraction microservice for GROWI.",
+    "version": "1.0.0"
+  },
+  "paths": {
+    "/healthz": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Liveness probe",
+        "description": "Return 200 OK to confirm the process is alive.\n\nThis handler intentionally does no dependency checking \u2014 it exists only\nto tell the orchestrator that the process has not crashed.",
+        "operationId": "healthz_healthz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": {
+                    "type": "string"
+                  },
+                  "type": "object",
+                  "title": "Response Healthz Healthz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/readyz": {
+      "get": {
+        "tags": ["health"],
+        "summary": "Readiness probe",
+        "description": "Return readiness status including the PDF extraction strategy.\n\nChecks:\n- Core dependency imports succeed (markitdown, pydantic, fastapi)\n- PDF extraction strategy is resolvable\n\nReturns a 200 with ready=True when the service can accept traffic.\nCurrently always returns ready because semaphore state changes per-request;\na 503 path would be added if startup-time checks ever fail.",
+        "operationId": "readyz_readyz_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "additionalProperties": true,
+                  "type": "object",
+                  "title": "Response Readyz Readyz Get"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/extract": {
+      "post": {
+        "tags": ["extract"],
+        "summary": "Extract text from an uploaded file",
+        "description": "Receive a multipart upload and return extracted text as ExtractResponse.\n\nProcessing order:\n1. Acquire concurrency slot (non-blocking; raises ServiceBusyError if full)\n2. Read file bytes and enforce size limit\n3. Dispatch to extractor with timeout guard\n4. Assemble and return ExtractResponse\n\nAuthentication is handled upstream by BearerAuthMiddleware; this handler\nwill only be reached by authenticated requests.",
+        "operationId": "post_extract_extract_post",
+        "requestBody": {
+          "content": {
+            "multipart/form-data": {
+              "schema": {
+                "$ref": "#/components/schemas/Body_post_extract_extract_post"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ExtractResponse"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "Body_post_extract_extract_post": {
+        "properties": {
+          "file": {
+            "type": "string",
+            "contentMediaType": "application/octet-stream",
+            "title": "File",
+            "description": "File to extract text from"
+          },
+          "mimeType": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Mimetype",
+            "description": "Optional MIME type hint"
+          }
+        },
+        "type": "object",
+        "required": ["file"],
+        "title": "Body_post_extract_extract_post"
+      },
+      "ExtractResponse": {
+        "properties": {
+          "pages": {
+            "items": {
+              "$ref": "#/components/schemas/PageInfo"
+            },
+            "type": "array",
+            "title": "Pages"
+          },
+          "mimeType": {
+            "type": "string",
+            "title": "Mimetype"
+          },
+          "extractedCharacters": {
+            "type": "integer",
+            "title": "Extractedcharacters"
+          }
+        },
+        "type": "object",
+        "required": ["pages", "mimeType", "extractedCharacters"],
+        "title": "ExtractResponse",
+        "description": "Successful extraction response returned by POST /extract.\n\nextractedCharacters is the sum of len(page.content) across all pages and\nis provided for audit logging and metrics purposes (Req 1.1)."
+      },
+      "HTTPValidationError": {
+        "properties": {
+          "detail": {
+            "items": {
+              "$ref": "#/components/schemas/ValidationError"
+            },
+            "type": "array",
+            "title": "Detail"
+          }
+        },
+        "type": "object",
+        "title": "HTTPValidationError"
+      },
+      "PageInfo": {
+        "properties": {
+          "pageNumber": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Pagenumber"
+          },
+          "label": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Label"
+          },
+          "content": {
+            "type": "string",
+            "title": "Content"
+          }
+        },
+        "type": "object",
+        "required": ["pageNumber", "label", "content"],
+        "title": "PageInfo",
+        "description": "Information extracted from a single logical page or section of a document.\n\npageNumber and label are None when the source format has no positional\npage concept (e.g. plain text files)."
+      },
+      "ValidationError": {
+        "properties": {
+          "loc": {
+            "items": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "integer"
+                }
+              ]
+            },
+            "type": "array",
+            "title": "Location"
+          },
+          "msg": {
+            "type": "string",
+            "title": "Message"
+          },
+          "type": {
+            "type": "string",
+            "title": "Error Type"
+          },
+          "input": {
+            "title": "Input"
+          },
+          "ctx": {
+            "type": "object",
+            "title": "Context"
+          }
+        },
+        "type": "object",
+        "required": ["loc", "msg", "type"],
+        "title": "ValidationError"
+      },
+      "ErrorCode": {
+        "description": "Machine-readable error codes for all defined failure modes.\n\nExtends str so that values serialize as plain JSON strings rather than\nenum objects, ensuring compatibility with FastAPI's OpenAPI generation.",
+        "enum": [
+          "unauthorized",
+          "unsupported_format",
+          "file_too_large",
+          "extraction_timeout",
+          "service_busy",
+          "extraction_failed"
+        ],
+        "title": "ErrorCode",
+        "type": "string"
+      },
+      "ErrorResponse": {
+        "description": "Error response body returned for all 4xx/5xx responses from POST /extract.",
+        "properties": {
+          "code": {
+            "$ref": "#/components/schemas/ErrorCode"
+          },
+          "message": {
+            "title": "Message",
+            "type": "string"
+          }
+        },
+        "required": ["code", "message"],
+        "title": "ErrorResponse",
+        "type": "object"
+      }
+    }
+  }
+}
