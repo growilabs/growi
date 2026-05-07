@@ -44,9 +44,9 @@ export interface VaultAdminRouterDeps {
  * Create an Express router that exposes the admin-only Vault management API.
  *
  * Endpoints:
- *   GET  /_api/admin/vault/status    — bootstrap status + storage stats
- *   POST /_api/admin/vault/bootstrap — trigger bootstrap
- *   PUT  /_api/admin/vault/enabled   — toggle vaultEnabled flag
+ *   GET  /_api/v3/vault/status    — bootstrap status + storage stats
+ *   POST /_api/v3/vault/bootstrap — trigger bootstrap
+ *   PUT  /_api/v3/vault/enabled   — toggle vaultEnabled flag
  */
 export const createVaultAdminRouter = (deps: VaultAdminRouterDeps = {}) => {
   const {

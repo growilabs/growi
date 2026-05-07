@@ -91,7 +91,7 @@ async function probeGitReceivePackGet(): Promise<number> {
  * Requires GROWI_ADMIN_TOKEN.
  */
 async function setVaultEnabled(enabled: boolean): Promise<void> {
-  const url = `${BASE_URL}/api/v3/admin/vault`;
+  const url = `${BASE_URL}/api/v3/vault`;
   await fetch(url, {
     method: 'PUT',
     headers: {
@@ -177,7 +177,7 @@ describe.skip('GROWI Vault gateway integration (requires docker-compose)', () =>
       // The exact endpoint depends on the admin API implementation; adjust as
       // needed to force bootstrapState to 'running'.
       expect(ADMIN_TOKEN, 'GROWI_ADMIN_TOKEN must be set').toBeTruthy();
-      await fetch(`${BASE_URL}/api/v3/admin/vault/bootstrap-state`, {
+      await fetch(`${BASE_URL}/api/v3/vault/bootstrap-state`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -189,7 +189,7 @@ describe.skip('GROWI Vault gateway integration (requires docker-compose)', () =>
 
     afterAll(async () => {
       // Reset bootstrapState to 'done' so the gateway is operational again.
-      await fetch(`${BASE_URL}/api/v3/admin/vault/bootstrap-state`, {
+      await fetch(`${BASE_URL}/api/v3/vault/bootstrap-state`, {
         method: 'PUT',
         headers: {
           'Content-Type': 'application/json',
@@ -363,7 +363,7 @@ describe.skip('GROWI Vault gateway integration (requires docker-compose)', () =>
       // Retrieve vault_instructions written after the batch via an admin endpoint.
       // The endpoint is expected to return a list of instruction documents.
       const instructionsRes = await fetch(
-        `${BASE_URL}/api/v3/admin/vault/instructions?namespace=${encodeURIComponent(namespace)}&limit=10`,
+        `${BASE_URL}/api/v3/vault/instructions?namespace=${encodeURIComponent(namespace)}&limit=10`,
         {
           headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
         },

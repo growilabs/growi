@@ -375,7 +375,7 @@ const AuditLogFilterSection = (): JSX.Element => {
 export const VaultAdminSettings = (): JSX.Element => {
   // ---- SWR polling ----
   const { data, mutate } = useSWR<VaultStatusData>(
-    '/admin/vault/status',
+    '/vault/status',
     (endpoint: string) =>
       apiv3Get<{ data: VaultStatusData }>(endpoint).then(
         (res) => res.data.data,
@@ -395,7 +395,7 @@ export const VaultAdminSettings = (): JSX.Element => {
 
   const handleToggle = useCallback(async (enabled: boolean) => {
     try {
-      await apiv3Put('/admin/vault/enabled', { enabled });
+      await apiv3Put('/vault/enabled', { enabled });
       setVaultEnabled(enabled);
       toastSuccess(
         `GROWI Vault ${enabled ? 'enabled' : 'disabled'} successfully.`,
@@ -407,7 +407,7 @@ export const VaultAdminSettings = (): JSX.Element => {
 
   const handleBootstrap = useCallback(async () => {
     try {
-      await apiv3Post('/admin/vault/bootstrap', {});
+      await apiv3Post('/vault/bootstrap', {});
       toastSuccess(
         'Bootstrap started. Monitor progress in the Bootstrap Status section.',
       );
