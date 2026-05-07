@@ -20,6 +20,7 @@
  * - Kill the git child process on client disconnect or error (requirement 5.5).
  */
 
+import { pipeline } from 'node:stream/promises';
 import { HeaderParams, Req, Res, UseBefore } from '@tsed/common';
 import { Controller } from '@tsed/di';
 import { Get, Post } from '@tsed/schema';
@@ -30,6 +31,24 @@ import { spawnUploadPack } from '../services/vault-upload-pack-spawner.js';
 
 /** Header name that carries the per-user view ref name. */
 const VIEW_REF_HEADER = 'x-vault-view-ref';
+
+/**
+ * Smart-HTTP service-advertisement header prepended to /info/refs responses.
+ *
+ * `git upload-pack --advertise-refs` does not emit this prefix; the HTTP layer
+ * (normally `git-http-backend` CGI) is responsible for adding it. Without it
+ * the client reports "fatal: invalid server response".
+ *
+ * Format (pkt-line):
+ *   001e# service=git-upload-pack\n
+ *   0000
+ *
+ * 0x001e = length of `# service=git-upload-pack\n` (26) + 4 length bytes = 30.
+ */
+const SERVICE_ADVERTISEMENT_PREFIX = Buffer.from(
+  '001e# service=git-upload-pack\n0000',
+  'utf8',
+);
 
 @Controller('/internal/git')
 @UseBefore(SharedSecretAuth)
@@ -49,11 +68,11 @@ export class GitProxyController {
    * @param res     - Express response (stdout is piped here).
    */
   @Get('/info/refs')
-  advertiseRefs(
+  async advertiseRefs(
     @HeaderParams(VIEW_REF_HEADER) viewRef: string,
     @Req() req: Request,
     @Res() res: Response,
-  ): void {
+  ): Promise<void> {
     res.setHeader(
       'Content-Type',
       'application/x-git-upload-pack-advertisement',
@@ -72,19 +91,27 @@ export class GitProxyController {
       process.stderr.write(`[git-proxy advertise stderr] ${chunk.toString()}`);
     });
 
-    stdout.pipe(res);
+    // Prepend the smart-HTTP service-advertisement header that
+    // `git upload-pack --advertise-refs` does not emit on its own.
+    res.write(SERVICE_ADVERTISEMENT_PREFIX);
 
-    exitCode.then((code) => {
-      if (code !== 0) {
-        process.stderr.write(
-          `[git-proxy advertise] git upload-pack exited with code ${code}\n`,
-        );
-        // The response may already be partially written; end it to signal EOF.
-        if (!res.writableEnded) {
-          res.status(502).end();
-        }
+    try {
+      await pipeline(stdout, res);
+    } catch (err) {
+      process.stderr.write(
+        `[git-proxy advertise] pipeline error: ${(err as Error).message}\n`,
+      );
+    }
+
+    const code = await exitCode;
+    if (code !== 0) {
+      process.stderr.write(
+        `[git-proxy advertise] git upload-pack exited with code ${code}\n`,
+      );
+      if (!res.writableEnded) {
+        res.status(502).end();
       }
-    });
+    }
   }
 
   /**
@@ -102,11 +129,11 @@ export class GitProxyController {
    * @param res     - Express response; git stdout is piped here.
    */
   @Post('/git-upload-pack')
-  uploadPack(
+  async uploadPack(
     @HeaderParams(VIEW_REF_HEADER) viewRef: string,
     @Req() req: Request,
     @Res() res: Response,
-  ): void {
+  ): Promise<void> {
     res.setHeader('Content-Type', 'application/x-git-upload-pack-result');
     res.setHeader('Cache-Control', 'no-cache');
 
@@ -126,17 +153,22 @@ export class GitProxyController {
       );
     });
 
-    stdout.pipe(res);
+    try {
+      await pipeline(stdout, res);
+    } catch (err) {
+      process.stderr.write(
+        `[git-proxy upload-pack] pipeline error: ${(err as Error).message}\n`,
+      );
+    }
 
-    exitCode.then((code) => {
-      if (code !== 0) {
-        process.stderr.write(
-          `[git-proxy upload-pack] git upload-pack exited with code ${code}\n`,
-        );
-        if (!res.writableEnded) {
-          res.status(502).end();
-        }
+    const code = await exitCode;
+    if (code !== 0) {
+      process.stderr.write(
+        `[git-proxy upload-pack] git upload-pack exited with code ${code}\n`,
+      );
+      if (!res.writableEnded) {
+        res.status(502).end();
       }
-    });
+    }
   }
 }
