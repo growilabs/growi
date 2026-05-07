@@ -15,7 +15,7 @@ import type {
   ComposeViewRequest,
   ComposeViewResponse,
 } from '@growi/core/dist/interfaces/vault';
-import { Logger } from '@tsed/logger';
+import type { Logger } from '@tsed/logger';
 export declare class ComposeViewController {
   private readonly logger;
   constructor(logger: Logger);

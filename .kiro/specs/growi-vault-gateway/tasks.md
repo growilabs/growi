@@ -416,7 +416,7 @@ _要件: 8_
 _Boundary: `apps/app/src/features/growi-vault/client/admin/VaultAdminSettings.tsx`_
 _Depends: 11.1_
 
-### 12.1 VaultAdminSettings.tsx の作成
+### [x] 12.1 VaultAdminSettings.tsx の作成
 
 `apps/app/src/features/growi-vault/client/admin/VaultAdminSettings.tsx` を新規作成する。
 
@@ -441,7 +441,7 @@ _Depends: 11.1_
 - named export する
 - **完了確認**: コンポーネントが TypeScript エラーなくビルドできること。各セクションが意図通りにレンダリングされることを確認すること
 
-### 12.2 admin UI の index.ts バレル
+### [x] 12.2 admin UI の index.ts バレル
 
 `apps/app/src/features/growi-vault/client/admin/index.ts` を作成し、`VaultAdminSettings` を re-export する。
 

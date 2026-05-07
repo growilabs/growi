@@ -238,8 +238,8 @@
 
 ---
 
-- [ ] 9. VaultInstructionWatcher の実装
-- [ ] 9.1 change stream 購読と起動時 drain の実装
+- [x] 9. VaultInstructionWatcher の実装
+- [x] 9.1 change stream 購読と起動時 drain の実装
   - `src/services/vault-instruction-watcher.ts` を作成する
   - `start()` で `vault_sync_state` から `resumeToken` を取得して change stream を開始する
   - 並行して `vault_instructions.find({ processedAt: null }).cursor()` で起動時 drain を実行する
@@ -249,7 +249,7 @@
   - _Requirements: 1.1–1.4, 1.6_
   - _Boundary: apps/growi-vault-manager/src/services/vault-instruction-watcher.ts_
 
-- [ ] 9.2 失敗時リトライ処理の実装
+- [x] 9.2 失敗時リトライ処理の実装
   - `VaultNamespaceBuilder.applyInstruction` が失敗した場合に `attempts++` / `lastError` を書き込み、`processedAt: null` を維持する
   - 次回 drain または change stream イベントで retry される動作をユニットテストで確認する
   - 処理成功時のみ `processedAt` を更新することを確認すること

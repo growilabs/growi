@@ -15,7 +15,6 @@
 import { BodyParams, UseBefore } from '@tsed/common';
 import { Controller } from '@tsed/di';
 import { InternalServerError } from '@tsed/exceptions';
-import { Logger } from '@tsed/logger';
 import { Post, Returns } from '@tsed/schema';
 import { __decorate, __metadata, __param } from 'tslib';
 
@@ -66,7 +65,7 @@ ComposeViewController = __decorate(
   [
     Controller('/internal/compose-view'),
     UseBefore(SharedSecretAuth),
-    __metadata('design:paramtypes', [Logger]),
+    __metadata('design:paramtypes', [Function]),
   ],
   ComposeViewController,
 );
