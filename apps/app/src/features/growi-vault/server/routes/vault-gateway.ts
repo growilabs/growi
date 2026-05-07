@@ -51,7 +51,7 @@ export interface VaultGatewayRouterDeps {
  * Returns true when the gateway should proceed, false when a 503 was already sent.
  */
 async function assertGatewayReady(
-  req: Request,
+  _req: Request,
   res: Response,
 ): Promise<boolean> {
   // Feature flag check (req 1.4)
@@ -134,7 +134,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
         user: undefined,
         snapshot: {},
       }).catch((err) =>
-        logger.warn('Failed to record auth-failure activity', err),
+        logger.warn({ err }, 'Failed to record auth-failure activity'),
       );
       return;
     }
@@ -147,7 +147,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
       namespaces =
         await vaultNamespaceMapper.computeAccessibleNamespaces(userId);
     } catch (err) {
-      logger.error('Failed to compute accessible namespaces', err);
+      logger.error({ err }, 'Failed to compute accessible namespaces');
       res.status(500).send('Internal Server Error');
       return;
     }
@@ -161,7 +161,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
       });
       viewRef = composed.viewRef;
     } catch (err) {
-      logger.warn('compose-view RPC failed', err);
+      logger.warn({ err }, 'compose-view RPC failed');
       // Distinguish connection errors (503) from RPC errors (502)
       const isConnectionError =
         err instanceof Error &&
@@ -180,7 +180,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
       user: userId ?? undefined,
       snapshot: {},
     }).catch((err) =>
-      logger.warn('Failed to record clone-prepare activity', err),
+      logger.warn({ err }, 'Failed to record clone-prepare activity'),
     );
 
     // Proxy the git info/refs response from vault-manager (req 6.2)
@@ -197,7 +197,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
         ).toString(),
       });
     } catch (err) {
-      logger.warn('git proxy request failed (info/refs)', err);
+      logger.warn({ err }, 'git proxy request failed (info/refs)');
       const isConnectionError =
         err instanceof Error &&
         (err.message.includes('ECONNREFUSED') ||
@@ -222,7 +222,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
     try {
       await pipeline(proxyResult.body, res);
     } catch (err) {
-      logger.warn('Stream pipeline error (info/refs)', err);
+      logger.warn({ err }, 'Stream pipeline error (info/refs)');
     }
   });
 
@@ -251,7 +251,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
         user: undefined,
         snapshot: {},
       }).catch((err) =>
-        logger.warn('Failed to record auth-failure activity', err),
+        logger.warn({ err }, 'Failed to record auth-failure activity'),
       );
       return;
     }
@@ -264,7 +264,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
       namespaces =
         await vaultNamespaceMapper.computeAccessibleNamespaces(userId);
     } catch (err) {
-      logger.error('Failed to compute accessible namespaces', err);
+      logger.error({ err }, 'Failed to compute accessible namespaces');
       res.status(500).send('Internal Server Error');
       return;
     }
@@ -278,7 +278,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
       });
       viewRef = composed.viewRef;
     } catch (err) {
-      logger.warn('compose-view RPC failed (git-upload-pack)', err);
+      logger.warn({ err }, 'compose-view RPC failed (git-upload-pack)');
       const isConnectionError =
         err instanceof Error &&
         (err.message.includes('ECONNREFUSED') ||
@@ -300,7 +300,7 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
         requestBody: req,
       });
     } catch (err) {
-      logger.warn('git proxy request failed (git-upload-pack)', err);
+      logger.warn({ err }, 'git proxy request failed (git-upload-pack)');
       const isConnectionError =
         err instanceof Error &&
         (err.message.includes('ECONNREFUSED') ||
@@ -330,13 +330,13 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
       user: userId ?? undefined,
       snapshot: {},
     }).catch((err) =>
-      logger.warn('Failed to record clone-complete activity', err),
+      logger.warn({ err }, 'Failed to record clone-complete activity'),
     );
 
     try {
       await pipeline(proxyResult.body, res);
     } catch (err) {
-      logger.warn('Stream pipeline error (git-upload-pack)', err);
+      logger.warn({ err }, 'Stream pipeline error (git-upload-pack)');
     }
   });
 
