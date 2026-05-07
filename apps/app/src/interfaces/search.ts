@@ -4,12 +4,15 @@ import type {
   IPageHasId,
 } from '@growi/core';
 
+import type { IAttachmentHit } from '~/features/search-attachments/interfaces/attachment-search';
+
 export type IPageSearchMeta = {
   bookmarkCount?: number;
   elasticSearchResult?: {
     snippet?: string | null;
     highlightedPath?: string | null;
   };
+  attachmentHits?: IAttachmentHit[];
 };
 
 export const isIPageSearchMeta = (meta: any): meta is IPageSearchMeta => {

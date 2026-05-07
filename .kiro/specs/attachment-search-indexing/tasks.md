@@ -42,7 +42,7 @@
   - _Requirements: 1.4, 2.5, 8.3, 9.3, 9.4_
   - _Boundary: features/search-attachments/interfaces_
 
-- [ ] 2.4 (P) `IPageWithSearchMeta.attachmentHits?: IAttachmentHit[]` optional を既存応答型に追加する
+- [x] 2.4 (P) `IPageWithSearchMeta.attachmentHits?: IAttachmentHit[]` optional を既存応答型に追加する
   - `apps/app/src/interfaces/search.ts` に optional フィールドを追加し、既存 shape を破壊しない
   - 型エクスポート後に既存 Page 検索コードを build し、既存 caller のコンパイルが通ることを observe する
   - _Requirements: 9.3, 9.4_
