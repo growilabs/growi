@@ -4,6 +4,12 @@ const mocks = vi.hoisted(() => {
   const deleteItemsNotInFeed = vi.fn();
   const mockFetch = vi.fn();
   const getGrowiVersion = vi.fn(() => '7.5.0');
+  // Default delivery to enabled so existing tests behave as before.
+  // Tests that need OFF state can override via mocks.getConfig.mockImplementationOnce.
+  const getConfig = vi.fn<(key: string) => unknown>((key: string) => {
+    if (key === 'news:isDeliveryEnabled') return true;
+    return undefined;
+  });
 
   return {
     NewsService: vi.fn(() => ({
@@ -14,6 +20,7 @@ const mocks = vi.hoisted(() => {
     deleteItemsNotInFeed,
     mockFetch,
     getGrowiVersion,
+    getConfig,
   };
 });
 
@@ -23,6 +30,12 @@ vi.mock('../services/news-service', () => ({
 
 vi.mock('~/utils/growi-version', () => ({
   getGrowiVersion: mocks.getGrowiVersion,
+}));
+
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: {
+    getConfig: mocks.getConfig,
+  },
 }));
 
 // Mock global fetch
@@ -82,6 +95,31 @@ describe('NewsCronService', () => {
   });
 
   describe('executeJob', () => {
+    test('should skip when news:isDeliveryEnabled is false', async () => {
+      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
+      mocks.getConfig.mockImplementationOnce((key: string) =>
+        key === 'news:isDeliveryEnabled' ? false : undefined,
+      );
+
+      await service.executeJob();
+
+      // Delivery flag short-circuits before any network call or DB write
+      expect(mocks.mockFetch).not.toHaveBeenCalled();
+      expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
+    });
+
+    test('should run when news:isDeliveryEnabled is true (default)', async () => {
+      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
+      mocks.mockFetch.mockResolvedValue(
+        mockResponse({ version: '1.0', items: [] }),
+      );
+
+      await service.executeJob();
+
+      expect(mocks.getConfig).toHaveBeenCalledWith('news:isDeliveryEnabled');
+      expect(mocks.mockFetch).toHaveBeenCalled();
+    });
+
     test('should skip when NEWS_FEED_URL is not set', async () => {
       delete process.env.NEWS_FEED_URL;
 

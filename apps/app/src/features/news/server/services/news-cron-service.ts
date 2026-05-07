@@ -1,3 +1,4 @@
+import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
@@ -67,6 +68,14 @@ export class NewsCronService extends CronService {
   }
 
   override async executeJob(): Promise<void> {
+    // Read the delivery toggle (DB > env > defaultValue: true) on every tick so
+    // an admin's UI change takes effect from the next scheduled run, with no
+    // pod restart required (Requirements 9.5, 9.6).
+    if (!configManager.getConfig('news:isDeliveryEnabled')) {
+      logger.debug('News delivery is disabled, skipping news feed sync');
+      return;
+    }
+
     const feedUrl = process.env.NEWS_FEED_URL;
 
     if (!feedUrl || feedUrl.trim() === '') {
