@@ -116,8 +116,8 @@
 
 ---
 
-- [ ] 5. VaultNamespaceBuilder の実装
-- [ ] 5.1 `upsert` / `remove` op の実装
+- [x] 5. VaultNamespaceBuilder の実装
+- [x] 5.1 `upsert` / `remove` op の実装
   - `src/services/vault-namespace-builder.ts` を作成し、`applyInstruction(instruction: VaultInstructionDoc)` メソッドを実装する（`op` は `instruction.op` のトップレベルフィールドで参照し、ページ固有フィールドは `instruction.payload.*` でアクセスする）
   - `upsert`: `VaultPathMapper.map` → `revisions.findOne` → `VaultBlobHasher.hashBlob` → `writeBlob` → tree 更新 → `writeTree`（root まで再帰）→ `writeCommit` → `updateRef` → `vault_namespace_state.upsert` の順で実装する
   - `remove`: tree から entry 削除 → tree 再計算 → commit → updateRef → state update
@@ -126,7 +126,7 @@
   - _Requirements: 2.1, 2.3, 2.7, 2.8_
   - _Boundary: apps/growi-vault-manager/src/services/vault-namespace-builder.ts_
 
-- [ ] 5.2 `bulk-upsert` op の実装
+- [x] 5.2 `bulk-upsert` op の実装
   - `vault-namespace-builder.ts` に `bulk-upsert` ハンドラを追加する
   - `revisions.find({_id: {$in: revisionIds}}, {body}).cursor()` で 1 クエリ取得する
   - `Promise.all`（concurrency 16）で各 entry の `VaultPathMapper.map` + `VaultBlobHasher.hashBlob` を並列計算する
@@ -135,7 +135,7 @@
   - _Requirements: 2.2, 2.7_
   - _Boundary: apps/growi-vault-manager/src/services/vault-namespace-builder.ts_
 
-- [ ] 5.3 `rename-prefix` / `grant-change-prefix` op の実装
+- [x] 5.3 `rename-prefix` / `grant-change-prefix` op の実装
   - `vault-namespace-builder.ts` に prefix 操作ハンドラを追加する
   - `rename-prefix`: `VaultPathMapper.mapPrefix` → oldFilePrefix 配下の subtree 抽出 → newFilePrefix 下に mount → oldFilePrefix 削除 → tree 再 hash → commit → updateRef
   - `grant-change-prefix`: fromNamespace から subtree 切り離し → namespace（移動先）に mount → 両 namespace で commit + updateRef（namespace 単位 atomic）
@@ -143,7 +143,7 @@
   - _Requirements: 2.4, 2.5, 2.7_
   - _Boundary: apps/growi-vault-manager/src/services/vault-namespace-builder.ts_
 
-- [ ] 5.4 `reset-all` op の実装
+- [x] 5.4 `reset-all` op の実装
   - `vault-namespace-builder.ts` に `reset-all` ハンドラを追加する
   - `reset-all` は `payload.namespace` が undefined であることを前提とし、全 namespace ref の一括削除を実行する（`instruction.payload.namespace` は参照しない）
   - 全 namespace の `refs/namespaces/<ns>/refs/heads/main` を `VaultRepoStorage.deleteRef` で削除する

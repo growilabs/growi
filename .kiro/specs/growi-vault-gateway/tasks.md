@@ -212,7 +212,7 @@ _要件: 4_
 _Boundary: `apps/app/src/features/growi-vault/server/services/vault-dispatcher.ts`_
 _Depends: 3.1, 5.1_
 
-### 7.1 vault-dispatcher.ts の作成
+### [x] 7.1 vault-dispatcher.ts の作成
 
 `apps/app/src/features/growi-vault/server/services/vault-dispatcher.ts` を新規作成する。
 
@@ -229,7 +229,7 @@ _Depends: 3.1, 5.1_
 - named export する
 - **完了確認**: イベント種別ごとの単体テストが全て通ること
 
-### 7.2 VaultDispatcher の単体テスト
+### [x] 7.2 VaultDispatcher の単体テスト
 
 `apps/app/src/features/growi-vault/server/services/vault-dispatcher.spec.ts` を作成する。
 
@@ -258,7 +258,7 @@ _要件: 6_
 _Boundary: `apps/app/src/features/growi-vault/server/services/vault-manager-client.ts`_
 _Depends: 1.2, 6.1_
 
-### 8.1 vault-manager-client.ts の作成
+### [x] 8.1 vault-manager-client.ts の作成
 
 `apps/app/src/features/growi-vault/server/services/vault-manager-client.ts` を新規作成する。
 
@@ -281,7 +281,7 @@ _Depends: 1.2, 6.1_
 - named export する
 - **完了確認**: shared secret の付与、proxy stream の正常系・異常系、getStorageStats の正常系・異常系の単体テストが通ること
 
-### 8.2 VaultManagerClient の単体テスト
+### [x] 8.2 VaultManagerClient の単体テスト
 
 `apps/app/src/features/growi-vault/server/services/vault-manager-client.spec.ts` を作成する。
 
