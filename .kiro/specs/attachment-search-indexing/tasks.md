@@ -58,7 +58,7 @@
 
 ## 3. Core: 抽出クライアントラッパ (`AttachmentTextExtractorService`)
 
-- [ ] 3.1 extractor URI allowlist バリデータを実装する
+- [x] 3.1 extractor URI allowlist バリデータを実装する
   - URI 文字列 parse で `http` / `https` 以外のスキームを reject、クラウドメタデータ IP literal (`169.254.169.254` / `fd00:ec2::254` / `100.100.100.200` / `192.0.0.192`) を reject する pure function を実装する
   - k8s 内部 DNS (`.cluster.local` / `.svc`) / loopback / RFC1918 は受理する
   - `file://` / `ftp://` / `data:` / metadata IP を含む URI が reject され、正当な k8s / docker-compose URI が受理される単体テストが通る
