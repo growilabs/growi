@@ -289,7 +289,7 @@ export const BookmarkItem = (props: Props): JSX.Element => {
           >
             <DropdownToggle
               color="transparent"
-              className={`border-0 rounded btn-page-item-control p-0 grw-visible-on-hover ${isMobile ? 'grw-pinned' : ''} me-1`}
+              className={`border-0 rounded btn-page-item-control p-0 ${isMobile ? '' : 'grw-visible-on-hover'} me-1`}
             >
               <span className="material-symbols-outlined p-1">more_vert</span>
             </DropdownToggle>
