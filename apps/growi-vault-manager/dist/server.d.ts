@@ -1,4 +1,4 @@
-import { PlatformApplication } from '@tsed/common';
+import type { PlatformApplication } from '@tsed/common';
 import '@tsed/swagger';
 import '@tsed/terminus';
 import '@tsed/platform-express';

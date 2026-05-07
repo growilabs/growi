@@ -89,7 +89,7 @@ _Boundary: `apps/app/src/server/models/config-definition.ts`_
 _要件: 4、5_
 _Boundary: `apps/app/src/features/growi-vault/server/models/`_
 
-### 3.1 vault-instruction Mongoose model の作成
+### [x] 3.1 vault-instruction Mongoose model の作成
 
 `apps/app/src/features/growi-vault/server/models/vault-instruction.ts` を新規作成する。
 
@@ -100,7 +100,7 @@ _Boundary: `apps/app/src/features/growi-vault/server/models/`_
 - Mongoose モデルを named export する
 - **完了確認**: TypeScript コンパイルが通ること。スキーマが `VaultInstructionDoc` インターフェースと整合していること
 
-### 3.2 vault-sync-state Mongoose model の作成
+### [x] 3.2 vault-sync-state Mongoose model の作成
 
 `apps/app/src/features/growi-vault/server/models/vault-sync-state.ts` を新規作成する。
 
@@ -118,7 +118,7 @@ _要件: 2_
 _Boundary: `apps/app/src/features/growi-vault/server/middlewares/vault-pat-auth.ts`_
 _Depends: 1.1_
 
-### 4.1 vault-pat-auth.ts の作成
+### [x] 4.1 vault-pat-auth.ts の作成
 
 `apps/app/src/features/growi-vault/server/middlewares/vault-pat-auth.ts` を新規作成する。
 
@@ -133,7 +133,7 @@ _Depends: 1.1_
 - named export する
 - **完了確認**: 有効 PAT・無効 PAT・匿名・scope 制限の各パターンで単体テストが通ること
 
-### 4.2 VaultPatAuth の単体テスト
+### [x] 4.2 VaultPatAuth の単体テスト
 
 `apps/app/src/features/growi-vault/server/middlewares/vault-pat-auth.spec.ts` を作成する。
 

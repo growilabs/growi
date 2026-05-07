@@ -30,8 +30,8 @@
 
 ---
 
-- [ ] 2. Mongoose データモデル
-- [ ] 2.1 `vault_instructions` Mongoose model（read + processedAt 更新）
+- [x] 2. Mongoose データモデル
+- [x] 2.1 `vault_instructions` Mongoose model（read + processedAt 更新）
   - `src/models/vault-instruction.ts` を作成する
   - change stream watch・`processedAt` / `attempts` / `lastError` の書き込みメソッドを実装する
   - TTL index（`processedAt: 1, expireAfterSeconds: 86400`）と検索インデックス（`processedAt: 1, issuedAt: 1`）の定義を含む
@@ -39,28 +39,28 @@
   - _Requirements: 1.1–1.6_
   - _Boundary: apps/growi-vault-manager/src/models/vault-instruction.ts_
 
-- [ ] 2.2 `revisions` 読み取り専用 Mongoose model（ID lookup 専用）
+- [x] 2.2 `revisions` 読み取り専用 Mongoose model（ID lookup 専用）
   - `src/models/revision.ts` を作成する
   - `_id` と `body` フィールドのみ含む read-only schema
   - `findOne({_id: revisionId}, {body})` と `find({_id: {$in: ids}}, {body}).cursor()` が動作すること
   - _Requirements: 2.1, 2.2_
   - _Boundary: apps/growi-vault-manager/src/models/revision.ts_
 
-- [ ] 2.3 `vault_namespace_state` Mongoose model（owned）
+- [x] 2.3 `vault_namespace_state` Mongoose model（owned）
   - `src/models/vault-namespace-state.ts` を作成する
   - `namespace` / `commitOid` / `version` / `updatedAt` フィールドと unique インデックス（`namespace: 1`）を定義する
   - `upsert({ namespace, commitOid, version: ++ })` が正しく動作すること
   - _Requirements: 2.1, 4.2_
   - _Boundary: apps/growi-vault-manager/src/models/vault-namespace-state.ts_
 
-- [ ] 2.4 `vault_user_views` Mongoose model（owned）
+- [x] 2.4 `vault_user_views` Mongoose model（owned）
   - `src/models/vault-user-view.ts` を作成する
   - `userId` / `viewRef` / `viewCommitOid` / `mergedTreeOid` / `sourceVersions` / `composedAt` フィールドと sparse unique インデックス（`userId: 1`）を定義する
   - `upsert` の動作が正しいこと
   - _Requirements: 4.2–4.8_
   - _Boundary: apps/growi-vault-manager/src/models/vault-user-view.ts_
 
-- [ ] 2.5 `vault_sync_state` Mongoose model（resumeToken / watcher fields のみ書き込み）
+- [x] 2.5 `vault_sync_state` Mongoose model（resumeToken / watcher fields のみ書き込み）
   - `src/models/vault-sync-state.ts` を作成する
   - singleton doc（`_id: 'singleton'`）で `resumeToken` / `lastProcessedAt` / `watcherInstanceId` の書き込みと `bootstrapState` の read のみを実装する
   - `vault_sync_state.findOne({_id: 'singleton'})` が動作し `resumeToken` を返すこと
