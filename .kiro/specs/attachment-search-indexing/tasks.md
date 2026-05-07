@@ -48,7 +48,7 @@
   - _Requirements: 9.3, 9.4_
   - _Boundary: interfaces/search_
 
-- [ ] 2.5 feature module の entry point を雛形として置く
+- [x] 2.5 feature module の entry point を雛形として置く
   - `apps/app/src/features/search-attachments/server/index.ts` に `initAttachmentFullTextSearch(crowi)` の空関数を export する (後続タスクで実装を肉付け)
   - `features/search-attachments/server/{services,models,mappings,queries,routes/apiv3,middlewares}` ディレクトリ構成を作成する
   - 他タスクから import できる scaffolding が揃い、後続のサービス追加が既存コードに手を入れずに可能になる
