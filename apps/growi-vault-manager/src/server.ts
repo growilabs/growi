@@ -6,6 +6,11 @@ import '@tsed/terminus';
 
 import '@tsed/platform-express';
 
+import { ComposeViewController } from './controllers/compose-view-controller.js';
+import { GitProxyController } from './controllers/git-proxy-controller.js';
+import { HealthController } from './controllers/health-controller.js';
+import { StorageStatsController } from './controllers/storage-stats-controller.js';
+
 // Default port per requirement 10.1
 const PORT = Number(process.env.PORT || 3001);
 
@@ -13,7 +18,12 @@ const PORT = Number(process.env.PORT || 3001);
   port: PORT,
   acceptMimes: ['application/json'],
   mount: {
-    '/': [],
+    '/': [
+      ComposeViewController,
+      GitProxyController,
+      HealthController,
+      StorageStatsController,
+    ],
   },
   middlewares: [
     'json-parser',
