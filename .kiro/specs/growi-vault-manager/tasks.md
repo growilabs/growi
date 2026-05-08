@@ -411,25 +411,25 @@
 
 ---
 
-- [ ] 17. ユーザ向けドキュメント整備（umbrella spec 由来 / **P1 / Important**）
+- [x] 17. ユーザ向けドキュメント整備（umbrella spec 由来 / **P1 / Important**）
 
   umbrella spec [`growi-vault/design.md`](../growi-vault/design.md#L253) の "User-facing Documentation Deliverables" として宣言された 3 件（要件 2.6 path-to-filename マッピング規則、要件 2.8 `git sparse-checkout` 手順、要件 8 MVP 範囲外項目）が成果物として未配置。配置先は manager の design.md "ファイル構成" にも宣言されている `apps/growi-vault-manager/README.md` とする。
 
-- [ ] 17.1 `apps/growi-vault-manager/README.md` を新規作成し path-to-filename マッピング規則を記載
+- [x] 17.1 `apps/growi-vault-manager/README.md` を新規作成し path-to-filename マッピング規則を記載
   - `apps/growi-vault-manager/README.md` を新規作成する
   - `VaultPathMapper` のエンコード規則（Windows 予約文字 `%XX`、予約ファイル名 `_` プレフィックス、大文字 suffix `__<hash8>`、orphan `_orphaned/`）をユーザが「GROWI ページパス → clone 後のファイルパス」を予測できる粒度で表形式または例示形式で記述する
   - サンプル: `/Sandbox/Markdown` → `Sandbox/Markdown__<hash8>.md`、`/CON/notes` → `_CON__<hash8>/notes.md` など
   - _Requirements: 要件 2.6 (umbrella)_
   - _Boundary: apps/growi-vault-manager/README.md_
 
-- [ ] 17.2 README に `git sparse-checkout` で `/user` 配下を除外する手順を追記
+- [x] 17.2 README に `git sparse-checkout` で `/user` 配下を除外する手順を追記
   - 17.1 で作成した README に「`/user` 配下を除外する」セクションを追加する
   - `git clone --no-checkout`、`git sparse-checkout init --cone`、`git sparse-checkout set '/*' '!user'` の具体的なコマンド列を記載する
   - 注意点として「sparse-checkout は手元の checkout 範囲のみ制御し、サーバ側で配信される object 範囲は変わらない」旨を明記する
   - _Requirements: 要件 2.8 (umbrella)_
   - _Boundary: apps/growi-vault-manager/README.md_
 
-- [ ] 17.3 README に MVP 範囲外項目を明示
+- [x] 17.3 README に MVP 範囲外項目を明示
   - 17.1 で作成した README に「MVP では非対応の項目」セクションを追加する
   - `git push`（書き込み）、添付ファイル、コメント / いいね / ブックマーク / タグ等のページ間メタデータ、機能有効化以前の revision 履歴、下書き / 未公開ページの 5 項目を箇条書きで明記する
   - 関連 spec として gateway / manager design.md と umbrella requirements 8 へのリンクを併記する
