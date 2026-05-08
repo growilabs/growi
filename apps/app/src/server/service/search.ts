@@ -28,7 +28,6 @@ import type {
   SearchQueryParser,
   SearchResolver,
 } from '../interfaces/search';
-import type { ActivityDocument } from '../models/activity';
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
@@ -117,6 +116,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     if (this.isConfigured) {
       this.fullTextSearchDelegator.init();
       this.registerUpdateEvent();
+      this.registerAuditlogUpdateEvent();
     }
   }
 
@@ -271,6 +271,22 @@ class SearchService implements SearchQueryParser, SearchResolver {
     );
   }
 
+  registerAuditlogUpdateEvent() {
+    const activityEvent = this.crowi.events.activity;
+    activityEvent.on(
+      'created',
+      this.fullTextSearchDelegator.updateOrInsertAuditlog.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    activityEvent.on(
+      'updated',
+      this.fullTextSearchDelegator.updateOrInsertAuditlog.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+  }
+
   resetErrorStatus() {
     this.isErrorOccuredOnHealthcheck = false;
     this.isErrorOccuredOnSearching = false;
@@ -324,11 +340,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   async normalizeAuditlogIndices() {
     return this.fullTextSearchDelegator.normalizeAuditlogIndices();
-  }
-
-  async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
-    if (!this.isConfigured) return;
-    return this.fullTextSearchDelegator.updateOrInsertAuditlog(activity);
   }
 
   async rebuildIndex() {
