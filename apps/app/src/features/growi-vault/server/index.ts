@@ -157,14 +157,21 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
     // syncDescendantsUpdate fires after a bulk rename completes.
     // targetPage.path is already the NEW path at this point; the old path
     // prefix is not carried by the event, so we cannot construct a full
-    // rename-prefix instruction here. Log a warning so operators are aware.
+    // rename-prefix instruction here.
+    //
+    // MVP limitation (P1 future work — growi-vault-gateway task 21.1):
+    // rename-prefix and grant-change-prefix propagation are not implemented.
+    // After a bulk rename or bulk grant change, the vault contents will become
+    // stale. Operators must re-run bootstrap from the Admin UI (/admin/vault)
+    // to bring the vault back in sync.
     pageEvent.on(
       'syncDescendantsUpdate',
       (_targetPage: unknown, _user: unknown) => {
         logger.warn(
-          'vault-dispatcher: received syncDescendantsUpdate but cannot construct ' +
-            'rename-prefix instruction without the old path prefix. ' +
-            'A full re-bootstrap may be required after bulk rename operations.',
+          'vault-dispatcher: received syncDescendantsUpdate but rename-prefix propagation ' +
+            'is not implemented in MVP (P1 future work). ' +
+            'The vault contents may now be stale. ' +
+            'Please re-run bootstrap from the Admin UI (/admin/vault) to bring the vault up to date.',
         );
       },
     );

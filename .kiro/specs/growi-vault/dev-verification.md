@@ -184,6 +184,39 @@ await db.collection('vault_sync_state').updateOne(
    db.vault_user_views.find({}, { mergedTreeOid: 1 }).toArray();
    ```
 
+### rename / grant 一括変更後に vault の内容が古くなる（MVP 既知制限）
+
+**背景**: MVP では親ページの rename および grant 一括変更の伝播が未実装（`growi-vault-gateway` タスク 21.2 / P1 future work）。
+
+- **rename 操作**: `pageEvent.emit('syncDescendantsUpdate')` が発火されるが、vault-dispatcher は旧パス prefix を取得できないため `rename-prefix` instruction を発行せず WARN ログを出力する（no-op）。
+- **grant 一括変更**: `grant-change-prefix` instruction を発行するイベント経路が存在しない（no-op）。
+
+**症状**: rename または grant 一括変更後、`git fetch` を実行しても変更が反映されない（または古い namespace で参照される）。
+
+**回避手順**: 以下の手順で vault を再初期化する。
+
+1. bootstrap state をリセットする:
+   ```js
+   db.vault_sync_state.updateOne(
+     { _id: 'singleton' },
+     {
+       $set: {
+         bootstrapState: 'pending',
+         bootstrapCursor: null,
+         bootstrapProcessed: 0,
+       },
+     },
+   );
+   ```
+
+2. `VAULT_BOOTSTRAP_ON_START=true` で apps/app を再起動するか、admin UI (`/admin/vault`) から "Prepare GROWI Vault" を実行する。
+
+3. bootstrap 完了後（`bootstrapState === 'done'`）、`git fetch` または `git clone` で最新内容が反映されることを確認する。
+
+> **Note**: rename / grant 一括変更の自動伝播は P1 フューチャーワーク（`growi-vault-gateway` タスク 21.1）として追跡される。実装完了後は本手動手順は不要になる。
+
+---
+
 ### 起動コマンドが ENOENT/script not found で失敗する
 
 ルート `package.json` に `dev:vault-manager` の alias は無い。必ず以下のいずれかを使う:

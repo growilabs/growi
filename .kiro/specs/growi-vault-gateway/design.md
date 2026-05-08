@@ -406,10 +406,12 @@ interface VaultDispatcher {
 - coalesce 対象は `create` / `update` のみ（`remove` / `rename-prefix` / `grant-change-prefix` は混在させない）
 - chunk size 上限はデフォルト 1000 entries / instruction
 
-**prefix primitive（親ページのバルク操作）**
+**prefix primitive（親ページのバルク操作）** — **[Out of scope (MVP) — P1 future work]**
 
-- 親ページ rename: 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）
-- 親ページ grant 変更: `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` 1 件
+> _以下の 2 つの op は `VaultInstructionOp` 型・`onBulkOperation` API として設計・定義されているが、MVP では PageEvent からの呼び出し経路が実装されていないため dead code となっている。rename / grant 一括変更後は vault の内容が古くなるため、管理者は admin UI から bootstrap を再実行する必要がある。本機能は P1 フューチャーワークとして追跡される（タスク 21.2）。_
+
+- 親ページ rename: 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）— **MVP 未実装**
+- 親ページ grant 変更: `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` 1 件 — **MVP 未実装**
 
 **実装ノート**
 - 既存 GROWI `PageEvent`（`apps/app/src/server/events/page.ts`）に subscribe

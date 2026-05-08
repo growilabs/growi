@@ -222,12 +222,12 @@ _Depends: 3.1, 5.1_
   - `delete` イベント → current namespace に `remove` instruction を挿入する（pagePath は削除直前の値）
   - ACL 変更時 → `previous` namespace に `remove` + `current` namespace に `upsert` の 2 件を挿入する
   - coalesce window（既定 1 秒）内に同一 namespace で 100 件以上の `upsert` が発生した場合は `bulk-upsert` にまとめる（chunk size 上限 1000）
-- `onBulkOperation(event: BulkPageOperationEvent)` を実装する:
-  - 親ページ rename → 影響 namespace ごとに `rename-prefix` instruction を挿入する
-  - 親ページ grant 一括変更 → `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` instruction を挿入する
+- `onBulkOperation(event: BulkPageOperationEvent)` を定義する（インターフェース実装として存在するが、MVP では dead code。P1 フューチャーワークとして追跡される — タスク 21.2）:
+  - ~~親ページ rename → 影響 namespace ごとに `rename-prefix` instruction を挿入する~~ **[MVP 未実装 — Out of scope]**
+  - ~~親ページ grant 一括変更 → `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` instruction を挿入する~~ **[MVP 未実装 — Out of scope]**
 - 書き込み失敗時は WARN ログ + リトライ（ページ編集 response とは切り離す）
 - named export する
-- **完了確認**: イベント種別ごとの単体テストが全て通ること
+- **完了確認**: イベント種別ごとの単体テストが全て通ること（`onBulkOperation` の rename-prefix / grant-change-prefix テストは MVP 範囲外）
 
 ### [x] 7.2 VaultDispatcher の単体テスト
 
@@ -238,17 +238,20 @@ _Depends: 3.1, 5.1_
 - ACL 変更イベント → `remove` + `upsert` の 2 件が発行されることをテストする
 - 同 namespace への高頻度 event（100+）が `bulk-upsert` に coalesce されることをテストする
 - coalesce window 外の event は単発 `upsert` で発行されることをテストする
-- 親 rename → `rename-prefix` が発行されることをテストする
-- 親 grant 変更 → `grant-change-prefix` が発行されることをテストする
+- ~~親 rename → `rename-prefix` が発行されることをテストする~~ **[MVP 未実装 — Out of scope / タスク 21.2]**
+- ~~親 grant 変更 → `grant-change-prefix` が発行されることをテストする~~ **[MVP 未実装 — Out of scope / タスク 21.2]**
 - **完了確認**: `pnpm vitest run vault-dispatcher.spec` が全テスト通過すること
 
-### [x] 7.3 PageService event 購読の組み込み
+### [ ] 7.3 PageService event 購読の組み込み（**部分実装 — rename / syncDescendants は MVP 未実装**）
 
 `apps/app/src/features/growi-vault/server/index.ts`（または feature 登録ファイル）に VaultDispatcher の event 購読を追加する。
 
-- 既存 `PageEvent`（`apps/app/src/server/events/page.ts`）の `'create' | 'update' | 'delete' | 'rename' | 'syncDescendants'` に subscribe する
-- feature 有効時（vaultEnabled）のみ購読を開始する
-- **完了確認**: apps/app 起動時に VaultDispatcher が PageEvent を受信できることを確認すること
+- 既存 `PageEvent`（`apps/app/src/server/events/page.ts`）の `'create' | 'update' | 'delete'` に subscribe する（**実装済み**）
+- ~~`'rename' | 'syncDescendants'` に subscribe する~~ **[MVP 未実装 — Out of scope / タスク 21.2]**
+  - `syncDescendantsUpdate` イベントは現状 WARN ログ + no-op（「old prefix が取得できないため rename-prefix を発行できない」という運用メッセージを出力。rename 後は admin UI から bootstrap 再実行が必要）
+  - `'rename'` イベントは現状購読されていない
+- feature 有効時（vaultEnabled）のみ購読を開始する（**実装済み**）
+- **完了確認**: `'create' | 'update' | 'delete'` の 3 イベントで VaultDispatcher が動作することを確認すること。rename / grant 一括変更の伝播は P1 フューチャーワーク（タスク 21.1 で実装予定）
 
 ---
 
@@ -710,7 +713,7 @@ dispatcher の `onBulkOperation`（rename-prefix / grant-change-prefix 発火）
   - 親ページ rename → 影響 namespace 数 M 件の rename-prefix instruction が発行されることを単体テスト + 結合試験で検証
   - 親ページ grant 一括変更 → ペアごとに grant-change-prefix instruction が発行されることを単体テストで検証
 
-### [ ] 21.2 MVP スコープアウトとして要件・設計・タスクを同期更新
+### [x] 21.2 MVP スコープアウトとして要件・設計・タスクを同期更新
 
 - `requirements.md` の要件 4.4 / 4.5 を「Out of scope (MVP)」へ移動、または「P1 future work」と明示する
 - `growi-vault-gateway/design.md` の「VaultDispatcher prefix primitive」記述に MVP 外表記を追加する（または `onBulkOperation` API 自体を MVP 範囲から削除）

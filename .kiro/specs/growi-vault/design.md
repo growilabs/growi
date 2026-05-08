@@ -139,6 +139,8 @@ graph TB
 - vault-manager への外部からの直接アクセス(常に apps/app gateway 経由)
 - bare repo の delta 圧縮・pack format 実装(git binary に委譲)
 - 監査ログ専用コレクションの新設(既存 audit log に統合)
+- **[MVP Out of scope — P1 future work]** 親ページ rename に伴う `rename-prefix` instruction の伝播: `PageEvent` から旧パス prefix を取り出す経路が MVP 未整備。rename 操作後は vault の内容が古くなるため、管理者は admin UI から bootstrap を再実行する必要がある（`growi-vault-gateway` タスク 21.2）
+- **[MVP Out of scope — P1 future work]** grant 一括変更に伴う `grant-change-prefix` instruction の伝播: `(fromNamespace, toNamespace)` ペアを構築するイベント経路が MVP 未整備。grant 一括変更後も同様に bootstrap 再実行が必要（`growi-vault-gateway` タスク 21.2）
 
 ### Revalidation Triggers(umbrella レベル)
 
@@ -264,6 +266,13 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 
 ## Open Items
 
-> 本 spec 時点で未解決の設計課題は **なし**。
->
 > **災害復旧**: bare repo 全消失時の再構築は "Initial Bootstrap フロー" と完全に同一のコードパスで吸収される(apps/app から `reset-all` + 全 page bulk-upsert を再発行)。詳細は `growi-vault-gateway/design.md` の VaultBootstrapper 節を参照。
+
+### P1 Future Work
+
+| # | 課題 | 関連タスク |
+|---|------|-----------|
+| 1 | **rename-prefix 伝播の実装**: 親ページ rename 後、`PageEvent` から旧パス prefix を取り出して `rename-prefix` instruction を発行する経路を実装する。MVP では `syncDescendantsUpdate` イベントを受信しても WARN ログを出力するだけの no-op であり、rename 後は admin UI から bootstrap を再実行する必要がある。 | `growi-vault-gateway` タスク 21.1 |
+| 2 | **grant-change-prefix 伝播の実装**: 親ページ grant 一括変更後、`(fromNamespace, toNamespace)` ペアを構築して `grant-change-prefix` instruction を発行する経路を実装する。MVP では未実装であり、grant 一括変更後も bootstrap 再実行が必要。 | `growi-vault-gateway` タスク 21.1 |
+
+> **MVP 運用上の注意**: 上記 P1 機能が未実装の間、親ページの rename または grant 一括変更を行った場合は、vault の内容が古くなる可能性がある。変更後は admin UI (`/admin/vault`) から "Prepare GROWI Vault" を再実行して vault を最新化すること。詳細は `growi-vault/dev-verification.md` のトラブルシュート節を参照。
