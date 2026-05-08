@@ -6,6 +6,7 @@ import mongoose from 'mongoose';
 import { checkMongoConnection, checkRequiredEnvVars } from './preflight.js';
 import Server from './server.js';
 import { createVaultInstructionWatcher } from './services/vault-instruction-watcher.js';
+import { getSchedulerInstance } from './services/vault-maintenance-scheduler-instance.js';
 import { init as initRepo } from './services/vault-repo-storage.js';
 
 function hasProcessFlag(flag: string): boolean {
@@ -49,6 +50,20 @@ checkMongoConnection(mongoUri)
     $log.info(`Bare repository ready: ${process.env.VAULT_REPO_PATH}`);
     const watcher = createVaultInstructionWatcher();
     await watcher.start();
+
+    const scheduler = getSchedulerInstance();
+    scheduler.start();
+    $log.info('Maintenance scheduler started');
+
+    // Graceful shutdown: stop scheduler before exiting.
+    const shutdown = async (signal: string) => {
+      $log.info(`Received ${signal}; shutting down...`);
+      scheduler.stop();
+      process.exit(0);
+    };
+    process.once('SIGTERM', () => shutdown('SIGTERM'));
+    process.once('SIGINT', () => shutdown('SIGINT'));
+
     bootstrap();
   })
   .catch((err: Error) => {

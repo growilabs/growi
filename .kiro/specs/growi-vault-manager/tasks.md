@@ -368,11 +368,11 @@
 
 ---
 
-- [ ] 15. VaultMaintenanceScheduler の production 配線（**P0 / Critical**）
+- [x] 15. VaultMaintenanceScheduler の production 配線（**P0 / Critical**）
 
   Task 10.1/10.2 で `createVaultMaintenanceScheduler()` factory は実装されたが、`apps/growi-vault-manager/src/index.ts` の bootstrap で一切起動されていない。`apps/growi-vault-manager/src/controllers/storage-stats-controller.ts:166-168` も `lastSquashAt: null` / `lastGcAt: null` をハードコードし、コメントで `// VaultMaintenanceScheduler is not yet implemented — return null` と明示している。これにより要件 6.7（外部 cron 不要での自走）と要件 11.4（lastSquashAt/lastGcAt の値を返す）が成立していない。
 
-- [ ] 15.1 `index.ts` で MaintenanceScheduler を起動し module-level singleton として保持
+- [x] 15.1 `index.ts` で MaintenanceScheduler を起動し module-level singleton として保持
   - `apps/growi-vault-manager/src/index.ts` の `checkMongoConnection().then(...)` 内、`watcher.start()` の後に `const scheduler = createVaultMaintenanceScheduler(); scheduler.start();` を追加する
   - scheduler インスタンスは `apps/growi-vault-manager/src/services/vault-maintenance-scheduler-instance.ts`（または同等の module）で module-level singleton として export し、`StorageStatsController` から import 可能にする
   - SIGTERM / SIGINT 受信時に `scheduler.stop()` を呼ぶよう terminus または process listener と統合する
