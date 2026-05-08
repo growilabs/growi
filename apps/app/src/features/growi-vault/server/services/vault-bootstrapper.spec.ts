@@ -533,6 +533,93 @@ describe('VaultBootstrapper', () => {
   });
 
   // -------------------------------------------------------------------------
+  // Null revision skip
+  // -------------------------------------------------------------------------
+
+  describe('null revision skip', () => {
+    it('does NOT include a page with revision == null in any bulk-upsert payload', async () => {
+      await setupSyncState('pending');
+
+      const pageWithRevision = buildPage({
+        _id: { toString: () => 'id-with-rev' },
+        path: '/with-revision',
+        revision: { toString: () => 'rev-abc' },
+      });
+      const pageWithoutRevision = buildPage({
+        _id: { toString: () => 'id-no-rev' },
+        path: '/no-revision',
+        revision: undefined,
+      });
+
+      await setupPageModel([pageWithRevision, pageWithoutRevision]);
+
+      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
+      const mapper = buildMapper(['public']);
+      const bootstrapper = createVaultBootstrapper(mapper);
+
+      await bootstrapper.start({ triggerSource: 'admin-ui' });
+
+      const bulkCalls = instructionCreateSpy.mock.calls.filter(
+        (c) => c[0].op === 'bulk-upsert',
+      );
+      const allEntries = bulkCalls.flatMap(
+        (c) => c[0].payload.entries as { pageId: string; revisionId: string }[],
+      );
+
+      // The page with a valid revision must appear
+      expect(allEntries.some((e) => e.pageId === 'id-with-rev')).toBe(true);
+
+      // The page without a revision must NOT appear
+      expect(allEntries.some((e) => e.pageId === 'id-no-rev')).toBe(false);
+
+      // No entry should have an empty revisionId
+      expect(allEntries.every((e) => e.revisionId !== '')).toBe(true);
+    });
+
+    it('increments bootstrapProcessed for both skipped and non-skipped pages', async () => {
+      await setupSyncState('pending');
+
+      const VaultSyncState = await getVaultSyncState();
+
+      const pageWithRevision = buildPage({
+        _id: { toString: () => 'id-with-rev' },
+        path: '/with-revision',
+        revision: { toString: () => 'rev-abc' },
+      });
+      const pageWithoutRevision = buildPage({
+        _id: { toString: () => 'id-no-rev' },
+        path: '/no-revision',
+        revision: undefined,
+      });
+
+      await setupPageModel([pageWithRevision, pageWithoutRevision]);
+
+      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
+      const mapper = buildMapper(['public']);
+      const bootstrapper = createVaultBootstrapper(mapper);
+
+      await bootstrapper.start({ triggerSource: 'admin-ui' });
+
+      // Find all updateOne calls that set bootstrapProcessed
+      const updateCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
+      const processedValues = updateCalls
+        .filter(
+          (c) =>
+            (c[1] as UpdateQuery<VaultSyncStateDocument>).$set
+              ?.bootstrapProcessed != null,
+        )
+        .map(
+          (c) =>
+            (c[1] as UpdateQuery<VaultSyncStateDocument>).$set!
+              .bootstrapProcessed as number,
+        );
+
+      // bootstrapProcessed should reach 2 (both pages counted, including skipped)
+      expect(Math.max(...processedValues)).toBe(2);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // getStatus
   // -------------------------------------------------------------------------
 

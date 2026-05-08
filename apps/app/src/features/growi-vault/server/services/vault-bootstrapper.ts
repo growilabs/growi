@@ -192,6 +192,28 @@ export const createVaultBootstrapper = (
         const cursor = Page.find(query).cursor();
 
         for await (const page of cursor as AsyncIterable<PageDocument>) {
+          processed += 1;
+
+          // Skip auto-generated intermediate path pages that have no revision.
+          // Passing revisionId: '' to vault-manager causes a MongoDB ObjectId
+          // cast failure, breaking the vault.
+          if (page.revision == null) {
+            logger.debug(
+              { pageId: page._id!.toString(), pagePath: page.path },
+              'vault-bootstrapper: skipping page without revision',
+            );
+            await VaultSyncState.updateOne(
+              { _id: 'singleton' },
+              {
+                $set: {
+                  bootstrapCursor: page._id,
+                  bootstrapProcessed: processed,
+                },
+              },
+            );
+            continue;
+          }
+
           const { current } = namespaceMapper.computePageNamespaces(
             page as unknown as IPage,
           );
@@ -204,7 +226,7 @@ export const createVaultBootstrapper = (
             buf.push({
               pageId: page._id!.toString(),
               pagePath: page.path ?? '',
-              revisionId: page.revision?.toString() ?? '',
+              revisionId: page.revision.toString(),
             });
 
             // Flush this namespace's buffer when CHUNK_SIZE is reached
@@ -217,8 +239,6 @@ export const createVaultBootstrapper = (
               namespaceBuffers.set(ns, []);
             }
           }
-
-          processed += 1;
 
           // Update cursor and processed count after each page
           await VaultSyncState.updateOne(
