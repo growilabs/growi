@@ -543,7 +543,7 @@ describe('VaultBootstrapper', () => {
       const pageWithRevision = buildPage({
         _id: { toString: () => 'id-with-rev' },
         path: '/with-revision',
-        revision: { toString: () => 'rev-abc' },
+        revision: { toString: () => 'rev-abc' } as never,
       });
       const pageWithoutRevision = buildPage({
         _id: { toString: () => 'id-no-rev' },
@@ -584,7 +584,7 @@ describe('VaultBootstrapper', () => {
       const pageWithRevision = buildPage({
         _id: { toString: () => 'id-with-rev' },
         path: '/with-revision',
-        revision: { toString: () => 'rev-abc' },
+        revision: { toString: () => 'rev-abc' } as never,
       });
       const pageWithoutRevision = buildPage({
         _id: { toString: () => 'id-no-rev' },
