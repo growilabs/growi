@@ -465,7 +465,7 @@
   - _Requirements: 10.2, 10.3_
   - _Boundary: apps/growi-vault-manager/Dockerfile_
 
-- [ ] 18.3 専用 Dockerfile.dockerignore の追加
+- [x] 18.3 専用 Dockerfile.dockerignore の追加
   - `apps/growi-vault-manager/Dockerfile.dockerignore` を新規作成し、`apps/app/docker/Dockerfile.dockerignore` に倣って build artifact（`**/node_modules`, `**/.next`, `**/.turbo`, `out`）/ `.git` / test（`**/*.spec.*`, `**/__tests__/`）/ `**/*.md`（locale を除外する必要がなければ単純除外）/ `.changeset` / `.github` / IDE 設定 / `.claude` / `.kiro` を除外する
   - vault-manager 固有の調整として、ビルドに不要な他 apps（`apps/app`, `apps/pdf-converter`, `apps/slackbot-proxy`）の除外、および sparse-checkout 用 fixture 等が test 配下にある場合の追加除外を行う
   - **完了確認**: `docker build` のコンテキスト送信サイズがリファクタ前と比較して有意に減少することをログ（`Sending build context to Docker daemon`）で確認すること
