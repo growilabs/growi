@@ -390,4 +390,151 @@ describe.skip('GROWI Vault gateway integration (requires docker-compose)', () =>
       ).toBe(0);
     }, 10_000); // Allow extra time for the async coalesce flush.
   });
+
+  // --------------------------------------------------------------------------
+  // Scenario 7: Intermediate-path pages (revision == null) are excluded from
+  //             bootstrap and clone output
+  //
+  // Background:
+  //   GROWI auto-generates "intermediate path" pages when a deeply nested page
+  //   is created before its parent pages exist.  These auto-generated pages
+  //   have no revision document (page.revision == null).  If vault-bootstrapper
+  //   included them in a bulk-upsert instruction payload, vault-manager would
+  //   receive revisionId: '' and attempt to cast it to a MongoDB ObjectId,
+  //   causing a CastError that breaks the entire bootstrap.
+  //
+  //   The fix (task 18.1) adds an explicit null-revision guard in
+  //   vault-bootstrapper.ts:
+  //     if (page.revision == null) { ... continue; }
+  //
+  //   This scenario (Scenario 7) is the integration-level regression gate:
+  //   it seeds a null-revision page via the GROWI admin API, triggers a full
+  //   bootstrap, and then verifies that:
+  //     a) The bootstrap completes with state='done' (no CastError).
+  //     b) The null-revision page does NOT appear in the cloned repository.
+  //
+  //   Fixture note:
+  //     The test uses the path /test-null-revision/child to cause GROWI to
+  //     create an intermediate parent page at /test-null-revision without a
+  //     revision.  Alternatively, the admin API can be used to insert a page
+  //     document directly with revision: null.
+  //
+  //   Without the null-revision guard (i.e., reverting task 18.1's fix), this
+  //   test would fail because:
+  //     - bootstrap would emit a bulk-upsert entry with revisionId: ''
+  //     - vault-manager would throw a MongoDB CastError
+  //     - bootstrapState would transition to 'failed' instead of 'done'
+  // --------------------------------------------------------------------------
+  describe('null-revision intermediate path page regression', () => {
+    const NULL_REVISION_PARENT_DIR = 'test-null-revision';
+    const NULL_REVISION_CHILD_PATH = `/test-null-revision/child`;
+
+    beforeAll(async () => {
+      // Seed the fixture: create a child page under a path that does not yet
+      // exist.  GROWI will auto-create the parent path page without a revision.
+      expect(ADMIN_TOKEN, 'GROWI_ADMIN_TOKEN must be set').toBeTruthy();
+
+      await fetch(`${BASE_URL}/api/v3/page`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          Authorization: `Bearer ${ADMIN_TOKEN}`,
+        },
+        body: JSON.stringify({
+          path: NULL_REVISION_CHILD_PATH,
+          body: '# Child page\nThis page has a valid revision.',
+        }),
+      });
+
+      // Trigger a full bootstrap so that vault-manager processes the page set
+      // (including the auto-generated null-revision parent).
+      await fetch(`${BASE_URL}/api/v3/vault/bootstrap`, {
+        method: 'POST',
+        headers: {
+          Authorization: `Bearer ${ADMIN_TOKEN}`,
+        },
+      });
+
+      // Wait for the bootstrap to complete (poll with a reasonable timeout).
+      const POLL_INTERVAL_MS = 500;
+      const POLL_TIMEOUT_MS = 30_000;
+      const deadline = Date.now() + POLL_TIMEOUT_MS;
+
+      while (Date.now() < deadline) {
+        const statusRes = await fetch(`${BASE_URL}/api/v3/vault/bootstrap`, {
+          headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+        });
+        if (statusRes.ok) {
+          const { status } = (await statusRes.json()) as {
+            status: { state: string };
+          };
+          if (status.state === 'done' || status.state === 'failed') {
+            break;
+          }
+        }
+        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
+      }
+    });
+
+    it('bootstrap completes with state=done even when null-revision pages are present in the fixture', async () => {
+      // Verify that the bootstrap reached 'done' and not 'failed'.
+      // A 'failed' result indicates that the null-revision guard is missing
+      // and vault-manager threw a CastError for revisionId: ''.
+      const statusRes = await fetch(`${BASE_URL}/api/v3/vault/bootstrap`, {
+        headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+      });
+      expect(statusRes.ok).toBe(true);
+
+      const { status } = (await statusRes.json()) as {
+        status: { state: string };
+      };
+      expect(
+        status.state,
+        'Bootstrap must complete with state=done; a failed state indicates the null-revision guard is missing',
+      ).toBe('done');
+    });
+
+    it('null-revision intermediate path page does not appear in the cloned repository', async () => {
+      // Clone the repository and verify that the auto-generated intermediate
+      // path page (which has no revision) is absent from the tracked files.
+      expect(TEST_PAT, 'GROWI_TEST_PAT must be set').toBeTruthy();
+
+      const cloneDir = await gitClone(TEST_PAT);
+      tmpDirs.push(cloneDir);
+
+      const files = await listClonedFiles(cloneDir);
+
+      // The null-revision parent page must NOT appear as a tracked file.
+      // Adjust the filename mapping to match VaultNamespaceMapper output for
+      // the path /test-null-revision (e.g. "test-null-revision.md").
+      const nullRevisionFiles = files.filter(
+        (f) => f.includes(NULL_REVISION_PARENT_DIR) && !f.includes('child'),
+      );
+
+      expect(
+        nullRevisionFiles,
+        'The auto-generated null-revision parent page must not appear in the cloned repository',
+      ).toHaveLength(0);
+    });
+
+    it('child page with a valid revision does appear in the cloned repository', async () => {
+      // Confirm that only the null-revision page is excluded, not the child
+      // page that has a proper revision document.
+      expect(TEST_PAT, 'GROWI_TEST_PAT must be set').toBeTruthy();
+
+      const cloneDir = await gitClone(TEST_PAT);
+      tmpDirs.push(cloneDir);
+
+      const files = await listClonedFiles(cloneDir);
+
+      // The child page (which has a valid revision) must appear.
+      // Adjust filename mapping as needed to match VaultNamespaceMapper output.
+      const childFiles = files.filter((f) => f.includes('child'));
+
+      expect(
+        childFiles.length,
+        'The child page (with a valid revision) must appear in the cloned repository',
+      ).toBeGreaterThan(0);
+    });
+  }, 60_000); // Extended timeout to account for bootstrap polling.
 });
