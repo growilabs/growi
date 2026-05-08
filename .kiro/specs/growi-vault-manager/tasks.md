@@ -360,7 +360,7 @@
   - **完了確認**: `pnpm vitest run vault-view-composer.spec` が 16/16 PASS、リポジトリ全体で `pnpm vitest run` の終了コードが 0 になること
   - _Boundary: apps/growi-vault-manager/src/services/vault-view-composer.spec.ts_
 
-- [ ] 14.2 enumerate 形式の `vi.mock` を partial mock パターンへ移行（再発防止）
+- [x] 14.2 enumerate 形式の `vi.mock` を partial mock パターンへ移行（再発防止）
   - `apps/growi-vault-manager/src/**/*.spec.ts` 配下で `vault-repo-storage.js` を mock している全 spec ファイル（vault-view-composer.spec / vault-namespace-builder.spec / vault-maintenance-scheduler.spec ほか）の `vi.mock('./vault-repo-storage.js', () => ({ ... }))` を `vi.mock(import('./vault-repo-storage.js'), async (importOriginal) => ({ ...(await importOriginal()), readRef: vi.fn(), ... }))` 形式に置換する
   - 同様に `'../models/*.js'` を mock している箇所も対象モデルに新しい export が増えても回帰しないよう partial mock 化を検討する（モデル側は class member 中心のため範囲は限定的）
   - **完了確認**: `apps/growi-vault-manager/src/services/vault-repo-storage.ts` に新規 export を試験的に追加しても全 spec が引き続き PASS することを CI で確認する（実検証は手元での dry-run でも可）

@@ -26,13 +26,18 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mocks — declared before importing the module under test
 // ---------------------------------------------------------------------------
 
-vi.mock('./vault-repo-storage.js', () => ({
-  getRepoPath: vi.fn(() => '/data/vault-repo.git'),
-  readTree: vi.fn(),
-  writeTree: vi.fn(),
-  writeCommit: vi.fn(),
-  updateRef: vi.fn(),
-}));
+vi.mock('./vault-repo-storage.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./vault-repo-storage.js')>();
+  return {
+    ...actual,
+    getRepoPath: vi.fn(() => '/data/vault-repo.git'),
+    readTree: vi.fn(),
+    writeTree: vi.fn(),
+    writeCommit: vi.fn(),
+    updateRef: vi.fn(),
+  };
+});
 
 vi.mock('../models/vault-namespace-state.js', () => ({
   VaultNamespaceStateModel: {

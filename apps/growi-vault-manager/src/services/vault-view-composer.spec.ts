@@ -25,14 +25,19 @@ vi.mock('../models/vault-user-view.js', () => ({
   },
 }));
 
-vi.mock('./vault-repo-storage.js', () => ({
-  readRef: vi.fn(),
-  readTree: vi.fn(),
-  writeTree: vi.fn(),
-  writeCommit: vi.fn(),
-  updateRef: vi.fn(),
-  ensureNamespaceHead: vi.fn(),
-}));
+vi.mock('./vault-repo-storage.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./vault-repo-storage.js')>();
+  return {
+    ...actual,
+    readRef: vi.fn(),
+    readTree: vi.fn(),
+    writeTree: vi.fn(),
+    writeCommit: vi.fn(),
+    updateRef: vi.fn(),
+    ensureNamespaceHead: vi.fn(),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Imports (after vi.mock declarations)

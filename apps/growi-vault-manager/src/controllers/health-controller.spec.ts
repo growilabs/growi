@@ -13,9 +13,14 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Mocks — declared before importing the module under test
 // ---------------------------------------------------------------------------
 
-vi.mock('../services/vault-repo-storage.js', () => ({
-  getRepoPath: vi.fn(() => '/data/vault-repo.git'),
-}));
+vi.mock('../services/vault-repo-storage.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('../services/vault-repo-storage.js')>();
+  return {
+    ...actual,
+    getRepoPath: vi.fn(() => '/data/vault-repo.git'),
+  };
+});
 
 // ---------------------------------------------------------------------------
 // Module under test (imported after mocks are declared)

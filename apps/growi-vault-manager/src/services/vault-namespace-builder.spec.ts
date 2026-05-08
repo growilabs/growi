@@ -14,15 +14,20 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 // Mocks — must be declared before importing the module under test
 // ---------------------------------------------------------------------------
 
-vi.mock('./vault-repo-storage.js', () => ({
-  readRef: vi.fn(),
-  updateRef: vi.fn(),
-  deleteRef: vi.fn(),
-  readTree: vi.fn(),
-  writeTree: vi.fn(),
-  writeBlob: vi.fn(),
-  writeCommit: vi.fn(),
-}));
+vi.mock('./vault-repo-storage.js', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./vault-repo-storage.js')>();
+  return {
+    ...actual,
+    readRef: vi.fn(),
+    updateRef: vi.fn(),
+    deleteRef: vi.fn(),
+    readTree: vi.fn(),
+    writeTree: vi.fn(),
+    writeBlob: vi.fn(),
+    writeCommit: vi.fn(),
+  };
+});
 
 vi.mock('./vault-blob-hasher.js', () => ({
   hashBlob: vi.fn(),
