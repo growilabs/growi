@@ -22,14 +22,13 @@ import { loggerFactory } from '@growi/logger';
 
 import { RevisionModel } from '../models/revision.js';
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
-
-const logger = loggerFactory('growi:vault-manager:vault-namespace-builder');
-
 import { VaultUserViewModel } from '../models/vault-user-view.js';
 import * as VaultBlobHasher from './vault-blob-hasher.js';
 import * as VaultPathMapper from './vault-path-mapper.js';
 import type { TreeEntry } from './vault-repo-storage.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
+
+const logger = loggerFactory('growi:vault-manager:vault-namespace-builder');
 
 // ---------------------------------------------------------------------------
 // Constants
