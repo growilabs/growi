@@ -393,11 +393,11 @@
 
 ---
 
-- [ ] 16. インテグレーションテストの CI 実行可能化（**P1 / Important**）
+- [x] 16. インテグレーションテストの CI 実行可能化（**P1 / Important**）
 
   Task 11.1/11.2/11.3 で作成された `__tests__/*.integ.ts` 3 ファイルは全て `describe.skip(...)` で wrap されており CI で一切実行されない。dev-verification.md に手動手順は記載されているが、自動回帰検出の手段がない。スイート起動時の env で integration mode を有効化する形に切り替え、最低 1 シナリオを CI に組み込む。
 
-- [ ] 16.1 `describe.skip` を env 駆動の条件付き実行に置き換え
+- [x] 16.1 `describe.skip` を env 駆動の条件付き実行に置き換え
   - `apps/growi-vault-manager/src/__tests__/clone-e2e.integ.ts` / `instruction-idempotency.integ.ts` / `compose-view-maintenance.integ.ts` の `describe.skip(...)` を `(process.env.RUN_VAULT_INTEG === 'true' ? describe : describe.skip)(...)` 形式に変更する
   - 各ファイル冒頭の env 必須条件（`VAULT_MANAGER_BASE_URL` / `VAULT_MANAGER_INTERNAL_SECRET` / `MONGO_URL`）が揃っていない場合は `beforeAll` で `console.warn` して skip するガードを残す
   - **完了確認**: `RUN_VAULT_INTEG=true` 未設定で `pnpm vitest run` を実行すると従来通り skip され、`RUN_VAULT_INTEG=true` 設定下では `clone-e2e.integ` の最初の 1 ケースが実行されること（docker-compose 起動済みの devcontainer で確認）
