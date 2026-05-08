@@ -43,6 +43,13 @@ export interface IVaultSyncState {
   /** Number of pages processed so far in the current bootstrap run. */
   bootstrapProcessed: number;
 
+  /**
+   * Error message recorded when the most recent bootstrap run transitioned to
+   * 'failed'. Cleared (set to null) when a new run starts. Surfaced to the
+   * admin UI so operators can diagnose failures without trawling logs.
+   */
+  bootstrapLastError: string | null;
+
   // -------------------------------------------------------------------------
   // vault-manager owned fields (apps/app reads only)
   // -------------------------------------------------------------------------
@@ -101,6 +108,7 @@ const vaultSyncStateSchema = new Schema<
     bootstrapCompletedAt: { type: Date, default: null },
     bootstrapTotalEstimated: { type: Number, default: null },
     bootstrapProcessed: { type: Number, required: true, default: 0 },
+    bootstrapLastError: { type: String, default: null },
 
     // vault-manager owned fields (read-only for apps/app)
     resumeToken: { type: Schema.Types.Mixed, default: null },

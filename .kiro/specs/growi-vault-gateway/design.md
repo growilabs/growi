@@ -632,7 +632,8 @@ interface VaultSettingsService {
   bootstrapStartedAt: Date | null,
   bootstrapCompletedAt: Date | null,
   bootstrapTotalEstimated: number | null,
-  bootstrapProcessed: number
+  bootstrapProcessed: number,
+  bootstrapLastError: string | null       // 失敗時のメッセージ。BootstrapStatus.lastError として API に surface
 }
 ```
 

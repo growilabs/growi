@@ -97,7 +97,8 @@ export const createVaultBootstrapper = (
      * 7. Transition bootstrapState to 'done' and record bootstrapCompletedAt.
      *
      * On any thrown error: transition bootstrapState to 'failed' and record
-     * the error message in lastError.
+     * the error message in bootstrapLastError (surfaced as `lastError` in the
+     * BootstrapStatus contract).
      *
      * Resume: if bootstrapCursor is non-null in vault_sync_state, the page
      * query is filtered to { _id: { $gt: bootstrapCursor } } so that a
@@ -133,7 +134,7 @@ export const createVaultBootstrapper = (
             bootstrapStartedAt: new Date(),
             bootstrapProcessed: 0,
             bootstrapCompletedAt: null,
-            lastError: null,
+            bootstrapLastError: null,
           },
         },
         { upsert: true, new: true },
@@ -281,7 +282,7 @@ export const createVaultBootstrapper = (
           {
             $set: {
               bootstrapState: 'failed',
-              lastError: errorMessage,
+              bootstrapLastError: errorMessage,
             },
           },
         );
@@ -313,7 +314,7 @@ export const createVaultBootstrapper = (
         cursor: doc.bootstrapCursor?.toString() ?? null,
         startedAt: doc.bootstrapStartedAt ?? null,
         completedAt: doc.bootstrapCompletedAt ?? null,
-        lastError: (doc as unknown as { lastError?: string }).lastError ?? null,
+        lastError: doc.bootstrapLastError ?? null,
       };
     },
   };

@@ -206,7 +206,7 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 
 | フィールド | Owner(write) | 用途 |
 |-----------|------------|------|
-| `bootstrapState` / `bootstrapCursor` / `bootstrapStartedAt` / `bootstrapCompletedAt` / `bootstrapTotalEstimated` / `bootstrapProcessed` | `growi-vault-gateway` | bootstrap 進捗(gateway は read + write、manager は read のみ) |
+| `bootstrapState` / `bootstrapCursor` / `bootstrapStartedAt` / `bootstrapCompletedAt` / `bootstrapTotalEstimated` / `bootstrapProcessed` / `bootstrapLastError` | `growi-vault-gateway` | bootstrap 進捗(gateway は read + write、manager は read のみ)。`bootstrapLastError` は失敗時にメッセージを記録し admin UI に surface する |
 | `resumeToken` / `lastProcessedAt` / `watcherInstanceId` | `growi-vault-manager` | change stream resume(gateway は read のみ) |
 
 両者の write は disjoint なフィールド集合のため write 競合は発生しない。

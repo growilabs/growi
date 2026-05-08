@@ -442,7 +442,8 @@ describe('VaultBootstrapper', () => {
       );
       expect(failedCall).toBeDefined();
       expect(
-        (failedCall![1] as UpdateQuery<VaultSyncStateDocument>).$set!.lastError,
+        (failedCall![1] as UpdateQuery<VaultSyncStateDocument>).$set!
+          .bootstrapLastError,
       ).toBe('DB down');
     });
   });
@@ -655,7 +656,7 @@ describe('VaultBootstrapper', () => {
           bootstrapCursor: { toString: () => 'cursor-xyz' },
           bootstrapStartedAt: startedAt,
           bootstrapCompletedAt: null,
-          lastError: null,
+          bootstrapLastError: null,
         }),
       } as never);
 
