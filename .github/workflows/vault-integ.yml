@@ -26,17 +26,6 @@ jobs:
       matrix:
         node-version: [24.x]
 
-    services:
-      mongodb:
-        image: mongo:6.0
-        ports:
-          - 27017/tcp
-        options: >-
-          --health-cmd "mongosh --quiet --eval \"db.adminCommand('ping').ok\""
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
     steps:
       - uses: actions/checkout@v4
 
@@ -67,6 +56,40 @@ jobs:
         run: |
           turbo run build --filter @growi/vault-manager
 
+      # vault-manager subscribes to MongoDB change streams at startup, which
+      # require a replica-set deployment. The standalone services: container
+      # used elsewhere in this repo is not sufficient — start mongo manually
+      # with --replSet and run rs.initiate before launching vault-manager.
+      - name: Start MongoDB (replica set)
+        run: |
+          docker run -d --name mongodb -p 27017:27017 \
+            mongo:6.0 mongod --replSet rs0 --bind_ip_all
+
+          echo "Waiting for mongod to accept connections..."
+          for i in $(seq 1 30); do
+            if docker exec mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" 2>/dev/null | grep -q 1; then
+              echo "mongod is up"
+              break
+            fi
+            sleep 2
+          done
+
+          docker exec mongodb mongosh --quiet --eval \
+            "rs.initiate({_id:'rs0', members:[{_id:0, host:'localhost:27017'}]})"
+
+          echo "Waiting for replica set primary..."
+          for i in $(seq 1 30); do
+            state=$(docker exec mongodb mongosh --quiet --eval "rs.status().myState" 2>/dev/null || echo "")
+            if [ "$state" = "1" ]; then
+              echo "primary is ready"
+              exit 0
+            fi
+            sleep 2
+          done
+          echo "Replica set primary did not become ready in time"
+          docker logs mongodb || true
+          exit 1
+
       - name: Start vault-manager
         working-directory: apps/growi-vault-manager
         run: |
@@ -74,14 +97,14 @@ jobs:
           echo "VAULT_MANAGER_PID=$!" >> "$GITHUB_ENV"
         env:
           NODE_ENV: production
-          MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-vault-integ
+          MONGO_URI: mongodb://localhost:27017/growi-vault-integ?replicaSet=rs0
           VAULT_MANAGER_INTERNAL_SECRET: ${{ secrets.VAULT_MANAGER_INTERNAL_SECRET || 'test-secret-for-integration' }}
           VAULT_REPO_PATH: ${{ runner.temp }}/vault-repo
 
       - name: Wait for vault-manager to be ready
         run: |
           for i in $(seq 1 30); do
-            if curl -sf http://localhost:3001/healthz > /dev/null 2>&1; then
+            if curl -sf http://localhost:3001/health > /dev/null 2>&1; then
               echo "vault-manager is ready"
               exit 0
             fi
@@ -98,7 +121,6 @@ jobs:
           RUN_VAULT_INTEG: "true"
           VAULT_MANAGER_BASE_URL: http://localhost:3001
           VAULT_MANAGER_INTERNAL_SECRET: ${{ secrets.VAULT_MANAGER_INTERNAL_SECRET || 'test-secret-for-integration' }}
-          MONGO_URL: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-vault-integ
 
       - name: Stop vault-manager
         if: always()
@@ -106,3 +128,8 @@ jobs:
           if [ -n "$VAULT_MANAGER_PID" ]; then
             kill "$VAULT_MANAGER_PID" || true
           fi
+
+      - name: Stop MongoDB
+        if: always()
+        run: |
+          docker rm -f mongodb || true

@@ -28,7 +28,7 @@ These rules are versioned (v1) and are **immutable after the first release**.
 |----------------|------------------------|---------------------|
 | `/normal/page` | *(any)* | `normal/page.md` |
 | `/Sandbox/Markdown` | `507f1f77` | `Sandbox/Markdown__507f1f77.md` |
-| `/CON/notes` | `507f1f77` | `_CON__507f1f77/notes.md` |
+| `/CON/notes` | `507f1f77` | `_CON/notes__507f1f77.md` |
 | `/con/notes` | *(any)* | `_con/notes.md` |
 | `/page<name` | *(any, lowercase)* | `page%3Cname.md` |
 | `/page*name` | *(any, lowercase)* | `page%2Aname.md` |
