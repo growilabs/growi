@@ -665,7 +665,7 @@ _Depends: 4.1, 4.2_
 
 既存単体テスト [vault-pat-auth.spec.ts:121,151,260](../../../apps/app/src/features/growi-vault/server/middlewares/vault-pat-auth.spec.ts#L121) は `scopes` を直接生やしたモックを返しており、`.select('user')` の制約が観測できないため緑のままこの欠陥を見逃している（essential-test-design の "Arrange That Serves the Assert" アンチパターン）。
 
-### [ ] 20.1 access-token / vault-pat-auth で scopes を実取得する
+### [x] 20.1 access-token / vault-pat-auth で scopes を実取得する
 
 以下のいずれかを採用する:
 
@@ -677,7 +677,7 @@ _Depends: 4.1, 4.2_
 - **完了確認**:
   - 採用した修正後、`vault-pat-auth.ts:134` で実際にスコープ配列が読み出せることを **mock を経由しない単体テスト or 統合テスト** で検証する（タスク 20.2 で対応）
 
-### [ ] 20.2 .select() 制約を尊重したテストの追加
+### [x] 20.2 .select() 制約を尊重したテストの追加
 
 production の `findUserIdByToken` 戻り値が `.scopes` を含むことを mock 越しでなく検証する。
 

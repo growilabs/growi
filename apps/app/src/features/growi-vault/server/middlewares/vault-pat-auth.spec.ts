@@ -6,6 +6,10 @@ import { AccessToken } from '~/server/models/access-token';
 import { createVaultPatAuth } from './vault-pat-auth';
 
 // Mock the AccessToken model so tests do not require a real MongoDB connection.
+// NOTE: This mock bypasses the real Mongoose query projection, so it cannot
+// verify that .select('user scopes') is used. The production shape — i.e. that
+// findUserIdByToken actually returns a document with the scopes field populated —
+// is verified without mocks in src/server/models/access-token.integ.ts (task 20.2).
 vi.mock('~/server/models/access-token', () => ({
   AccessToken: {
     findUserIdByToken: vi.fn(),
