@@ -31,6 +31,7 @@ vi.mock('./vault-repo-storage.js', () => ({
   writeTree: vi.fn(),
   writeCommit: vi.fn(),
   updateRef: vi.fn(),
+  ensureNamespaceHead: vi.fn(),
 }));
 
 // ---------------------------------------------------------------------------
@@ -58,6 +59,7 @@ const mockReadTree = vi.mocked(VaultRepoStorage.readTree);
 const mockWriteTree = vi.mocked(VaultRepoStorage.writeTree);
 const mockWriteCommit = vi.mocked(VaultRepoStorage.writeCommit);
 const mockUpdateRef = vi.mocked(VaultRepoStorage.updateRef);
+const mockEnsureNamespaceHead = vi.mocked(VaultRepoStorage.ensureNamespaceHead);
 
 // ---------------------------------------------------------------------------
 // Common test data
@@ -149,6 +151,9 @@ beforeEach(() => {
 
   // Default: updateRef resolves immediately
   mockUpdateRef.mockResolvedValue(undefined);
+
+  // Default: ensureNamespaceHead resolves immediately
+  mockEnsureNamespaceHead.mockResolvedValue(undefined);
 });
 
 // ---------------------------------------------------------------------------

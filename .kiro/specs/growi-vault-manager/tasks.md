@@ -347,3 +347,91 @@
   - 可能なら `StorageStatsController` のレスポンスに `stuckInstructionCount` を追加し、admin UI から観測できるようにする
   - **完了確認**: `db.vault_instructions.find({attempts: {$gte: 5}, processedAt: null})` が非空のとき、`/internal/storage-stats` レスポンスに反映されること、および watcher のログに 1 件あたり 1 行のエラーが出ること（再試行ループでログ氾濫しないよう、attempts 5 到達時のみ出力）
   - _Boundary: apps/growi-vault-manager/src/services/vault-instruction-watcher.ts、apps/growi-vault-manager/src/controllers/storage-stats-controller.ts_
+
+---
+
+- [x] 14. ユニットテスト回帰修正（**P0 / Critical**）
+
+  コミット `705b3257fe` で `VaultRepoStorage.ensureNamespaceHead` が追加されたが `vault-view-composer.spec.ts` の `vi.mock('./vault-repo-storage.js', ...)` が enumerate 形式のため mock に追従できておらず、`pnpm vitest run` で 10/152 ケースが `[vitest] No "ensureNamespaceHead" export is defined on the "./vault-repo-storage.js" mock` で失敗する。canonical テストスイートを緑に戻したうえで、enumerate 形式の脆性自体を partial mock パターンに置換する。
+
+- [x] 14.1 `vault-view-composer.spec.ts` の mock に `ensureNamespaceHead` を追加して緑化（最小修正）
+  - `apps/growi-vault-manager/src/services/vault-view-composer.spec.ts` の `vi.mock('./vault-repo-storage.js', () => ({ ... }))` ブロックに `ensureNamespaceHead: vi.fn()` を 1 行追加する
+  - 必要に応じて beforeEach で `vi.mocked(VaultRepoStorage.ensureNamespaceHead).mockResolvedValue(undefined)` を設定する
+  - **完了確認**: `pnpm vitest run vault-view-composer.spec` が 16/16 PASS、リポジトリ全体で `pnpm vitest run` の終了コードが 0 になること
+  - _Boundary: apps/growi-vault-manager/src/services/vault-view-composer.spec.ts_
+
+- [ ] 14.2 enumerate 形式の `vi.mock` を partial mock パターンへ移行（再発防止）
+  - `apps/growi-vault-manager/src/**/*.spec.ts` 配下で `vault-repo-storage.js` を mock している全 spec ファイル（vault-view-composer.spec / vault-namespace-builder.spec / vault-maintenance-scheduler.spec ほか）の `vi.mock('./vault-repo-storage.js', () => ({ ... }))` を `vi.mock(import('./vault-repo-storage.js'), async (importOriginal) => ({ ...(await importOriginal()), readRef: vi.fn(), ... }))` 形式に置換する
+  - 同様に `'../models/*.js'` を mock している箇所も対象モデルに新しい export が増えても回帰しないよう partial mock 化を検討する（モデル側は class member 中心のため範囲は限定的）
+  - **完了確認**: `apps/growi-vault-manager/src/services/vault-repo-storage.ts` に新規 export を試験的に追加しても全 spec が引き続き PASS することを CI で確認する（実検証は手元での dry-run でも可）
+  - _Boundary: apps/growi-vault-manager/src/services/*.spec.ts、apps/growi-vault-manager/src/__tests__/*.integ.ts_
+
+---
+
+- [ ] 15. VaultMaintenanceScheduler の production 配線（**P0 / Critical**）
+
+  Task 10.1/10.2 で `createVaultMaintenanceScheduler()` factory は実装されたが、`apps/growi-vault-manager/src/index.ts` の bootstrap で一切起動されていない。`apps/growi-vault-manager/src/controllers/storage-stats-controller.ts:166-168` も `lastSquashAt: null` / `lastGcAt: null` をハードコードし、コメントで `// VaultMaintenanceScheduler is not yet implemented — return null` と明示している。これにより要件 6.7（外部 cron 不要での自走）と要件 11.4（lastSquashAt/lastGcAt の値を返す）が成立していない。
+
+- [ ] 15.1 `index.ts` で MaintenanceScheduler を起動し module-level singleton として保持
+  - `apps/growi-vault-manager/src/index.ts` の `checkMongoConnection().then(...)` 内、`watcher.start()` の後に `const scheduler = createVaultMaintenanceScheduler(); scheduler.start();` を追加する
+  - scheduler インスタンスは `apps/growi-vault-manager/src/services/vault-maintenance-scheduler-instance.ts`（または同等の module）で module-level singleton として export し、`StorageStatsController` から import 可能にする
+  - SIGTERM / SIGINT 受信時に `scheduler.stop()` を呼ぶよう terminus または process listener と統合する
+  - **完了確認**: `node --import @swc-node/register/esm-register src/index.ts --ci` 起動でログに「scheduler started」相当の info ログが出力されること、`pnpm vitest run` 全件 PASS（既存 scheduler unit test に影響なし）
+  - _Boundary: apps/growi-vault-manager/src/index.ts、apps/growi-vault-manager/src/services/vault-maintenance-scheduler-instance.ts_
+
+- [ ] 15.2 `StorageStatsController` を scheduler singleton に接続して実値を返す
+  - `apps/growi-vault-manager/src/controllers/storage-stats-controller.ts` の `lastSquashAt: null` / `lastGcAt: null` ハードコードを削除し、15.1 の singleton から `getLastSquashAt()` / `getLastGcAt()` を呼んで `Date | null` → `string | null`（ISO 8601）に変換して返す
+  - `// VaultMaintenanceScheduler is not yet implemented — return null` コメントも削除する
+  - 起動時 5 分以内など scheduler 未実行の状態では各メソッドが `null` を返すため、要件 11.4 の「未実行時は null」を満たす
+  - **完了確認**: 起動直後の `GET /internal/storage-stats` が `lastSquashAt: null, lastGcAt: null` を返し、squash 1 回後に該当フィールドが ISO 8601 文字列を返すこと（手動確認で可、または integration test で検証）
+  - _Boundary: apps/growi-vault-manager/src/controllers/storage-stats-controller.ts_
+
+- [ ] 15.3 `storage-stats-controller.spec.ts` を scheduler singleton 経由のレスポンスで再構成
+  - `apps/growi-vault-manager/src/controllers/storage-stats-controller.spec.ts` で 15.1 の singleton module を `vi.mock` し、`getLastSquashAt()` が `null` を返すケースと Date を返すケースの 2 シナリオでレスポンスシリアライズを検証する
+  - **完了確認**: `pnpm vitest run storage-stats-controller.spec` が PASS、`lastSquashAt`/`lastGcAt` の null と ISO 文字列の双方が assertion 対象になっていること
+  - _Boundary: apps/growi-vault-manager/src/controllers/storage-stats-controller.spec.ts_
+
+---
+
+- [ ] 16. インテグレーションテストの CI 実行可能化（**P1 / Important**）
+
+  Task 11.1/11.2/11.3 で作成された `__tests__/*.integ.ts` 3 ファイルは全て `describe.skip(...)` で wrap されており CI で一切実行されない。dev-verification.md に手動手順は記載されているが、自動回帰検出の手段がない。スイート起動時の env で integration mode を有効化する形に切り替え、最低 1 シナリオを CI に組み込む。
+
+- [ ] 16.1 `describe.skip` を env 駆動の条件付き実行に置き換え
+  - `apps/growi-vault-manager/src/__tests__/clone-e2e.integ.ts` / `instruction-idempotency.integ.ts` / `compose-view-maintenance.integ.ts` の `describe.skip(...)` を `(process.env.RUN_VAULT_INTEG === 'true' ? describe : describe.skip)(...)` 形式に変更する
+  - 各ファイル冒頭の env 必須条件（`VAULT_MANAGER_BASE_URL` / `VAULT_MANAGER_INTERNAL_SECRET` / `MONGO_URL`）が揃っていない場合は `beforeAll` で `console.warn` して skip するガードを残す
+  - **完了確認**: `RUN_VAULT_INTEG=true` 未設定で `pnpm vitest run` を実行すると従来通り skip され、`RUN_VAULT_INTEG=true` 設定下では `clone-e2e.integ` の最初の 1 ケースが実行されること（docker-compose 起動済みの devcontainer で確認）
+  - _Boundary: apps/growi-vault-manager/src/__tests__/*.integ.ts_
+
+- [ ] 16.2 docker-compose と CI ジョブで integration テストを最低 1 ジョブ実行可能にする
+  - `docker-compose.yml` または `apps/growi-vault-manager/docker-compose.integ.yml`（新規）で vault-manager + MongoDB + 共有 fs を立ち上げ、`RUN_VAULT_INTEG=true pnpm vitest run` を実行するスクリプトを `package.json` の `scripts.test:integ` として追加する
+  - GitHub Actions（または既存 CI）に「integration」ジョブを 1 つ追加し、`scripts.test:integ` を実行する
+  - **完了確認**: CI で `clone-e2e.integ` 系の 1 シナリオが PASS すること、PR に対して回帰検出が機能すること
+  - _Boundary: apps/growi-vault-manager/package.json、docker-compose.yml またはルートの CI 定義（.github/workflows/）_
+
+---
+
+- [ ] 17. ユーザ向けドキュメント整備（umbrella spec 由来 / **P1 / Important**）
+
+  umbrella spec [`growi-vault/design.md`](../growi-vault/design.md#L253) の "User-facing Documentation Deliverables" として宣言された 3 件（要件 2.6 path-to-filename マッピング規則、要件 2.8 `git sparse-checkout` 手順、要件 8 MVP 範囲外項目）が成果物として未配置。配置先は manager の design.md "ファイル構成" にも宣言されている `apps/growi-vault-manager/README.md` とする。
+
+- [ ] 17.1 `apps/growi-vault-manager/README.md` を新規作成し path-to-filename マッピング規則を記載
+  - `apps/growi-vault-manager/README.md` を新規作成する
+  - `VaultPathMapper` のエンコード規則（Windows 予約文字 `%XX`、予約ファイル名 `_` プレフィックス、大文字 suffix `__<hash8>`、orphan `_orphaned/`）をユーザが「GROWI ページパス → clone 後のファイルパス」を予測できる粒度で表形式または例示形式で記述する
+  - サンプル: `/Sandbox/Markdown` → `Sandbox/Markdown__<hash8>.md`、`/CON/notes` → `_CON__<hash8>/notes.md` など
+  - _Requirements: 要件 2.6 (umbrella)_
+  - _Boundary: apps/growi-vault-manager/README.md_
+
+- [ ] 17.2 README に `git sparse-checkout` で `/user` 配下を除外する手順を追記
+  - 17.1 で作成した README に「`/user` 配下を除外する」セクションを追加する
+  - `git clone --no-checkout`、`git sparse-checkout init --cone`、`git sparse-checkout set '/*' '!user'` の具体的なコマンド列を記載する
+  - 注意点として「sparse-checkout は手元の checkout 範囲のみ制御し、サーバ側で配信される object 範囲は変わらない」旨を明記する
+  - _Requirements: 要件 2.8 (umbrella)_
+  - _Boundary: apps/growi-vault-manager/README.md_
+
+- [ ] 17.3 README に MVP 範囲外項目を明示
+  - 17.1 で作成した README に「MVP では非対応の項目」セクションを追加する
+  - `git push`（書き込み）、添付ファイル、コメント / いいね / ブックマーク / タグ等のページ間メタデータ、機能有効化以前の revision 履歴、下書き / 未公開ページの 5 項目を箇条書きで明記する
+  - 関連 spec として gateway / manager design.md と umbrella requirements 8 へのリンクを併記する
+  - _Requirements: 要件 8 (umbrella)_
+  - _Boundary: apps/growi-vault-manager/README.md_
