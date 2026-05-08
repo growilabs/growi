@@ -9,8 +9,8 @@
  *   - totalCommitCount    — sum of version fields across all namespace documents
  *   - looseObjectCount    — loose objects from `git count-objects`
  *   - repoSizeBytes       — total byte size of the bare repo directory
- *   - lastSquashAt        — null (VaultMaintenanceScheduler not yet implemented)
- *   - lastGcAt            — null (VaultMaintenanceScheduler not yet implemented)
+ *   - lastSquashAt        — ISO 8601 timestamp of the last squash run, or null if never run
+ *   - lastGcAt            — ISO 8601 timestamp of the last GC run, or null if never run
  *
  * Returns 200 with StorageStatsResponse on success.
  * Returns 500 on any collection or git failure.
@@ -26,6 +26,7 @@ import type { Response } from 'express';
 import { SharedSecretAuth } from '../middlewares/shared-secret-auth.js';
 import { VaultInstructionModel } from '../models/vault-instruction.js';
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
+import { getSchedulerInstance } from '../services/vault-maintenance-scheduler-instance.js';
 import { getRepoPath } from '../services/vault-repo-storage.js';
 
 /**
@@ -163,9 +164,9 @@ export class StorageStatsController {
         }),
       ]);
 
-      // VaultMaintenanceScheduler is not yet implemented — return null
-      const lastSquashAt: string | null = null;
-      const lastGcAt: string | null = null;
+      const scheduler = getSchedulerInstance();
+      const lastSquashAt = scheduler.getLastSquashAt()?.toISOString() ?? null;
+      const lastGcAt = scheduler.getLastGcAt()?.toISOString() ?? null;
 
       const body: StorageStatsResponse = {
         namespaceCount: namespaceStats.namespaceCount,

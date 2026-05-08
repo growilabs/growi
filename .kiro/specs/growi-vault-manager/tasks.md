@@ -379,7 +379,7 @@
   - **完了確認**: `node --import @swc-node/register/esm-register src/index.ts --ci` 起動でログに「scheduler started」相当の info ログが出力されること、`pnpm vitest run` 全件 PASS（既存 scheduler unit test に影響なし）
   - _Boundary: apps/growi-vault-manager/src/index.ts、apps/growi-vault-manager/src/services/vault-maintenance-scheduler-instance.ts_
 
-- [ ] 15.2 `StorageStatsController` を scheduler singleton に接続して実値を返す
+- [x] 15.2 `StorageStatsController` を scheduler singleton に接続して実値を返す
   - `apps/growi-vault-manager/src/controllers/storage-stats-controller.ts` の `lastSquashAt: null` / `lastGcAt: null` ハードコードを削除し、15.1 の singleton から `getLastSquashAt()` / `getLastGcAt()` を呼んで `Date | null` → `string | null`（ISO 8601）に変換して返す
   - `// VaultMaintenanceScheduler is not yet implemented — return null` コメントも削除する
   - 起動時 5 分以内など scheduler 未実行の状態では各メソッドが `null` を返すため、要件 11.4 の「未実行時は null」を満たす
