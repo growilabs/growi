@@ -135,11 +135,6 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
           },
         });
 
-        // debug: log all chunks from the full stream
-        // for await (const chunk of stream.fullStream) {
-        //   console.log(chunk);
-        // }
-
         // Use pipeUIMessageStreamToResponse for Express servers
         // Express requires piping to ServerResponse object, not returning Web API Response
         // See: https://ai-sdk.dev/cookbook/api-servers/express#ui-message-stream
@@ -150,8 +145,13 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             // Workaround for https://github.com/mastra-ai/mastra/issues/11884#issuecomment-3799153269
             // toAISdkStream() returns a ReadableStream that lacks [Symbol.asyncIterator]
             // in the TypeScript types, so iterate manually via a reader.
-            const reader = toAISdkStream(stream, { from: 'agent' }).getReader();
+            const reader = toAISdkStream(stream, {
+              from: 'agent',
+              sendReasoning: true,
+            }).getReader();
+
             while (true) {
+              // biome-ignore lint/performance/noAwaitInLoops: necessary to read stream sequentially
               const { value, done } = await reader.read();
               if (done) break;
               writer.write(value);
