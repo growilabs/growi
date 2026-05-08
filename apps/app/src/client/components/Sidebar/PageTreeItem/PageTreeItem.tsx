@@ -19,6 +19,7 @@ import { TreeItemLayout, TreeNameInput } from '~/features/page-tree/components';
 import type { IPageForItem } from '~/interfaces/page';
 import type { OnDeletedFunction, OnDuplicatedFunction } from '~/interfaces/ui';
 import { useCurrentPagePath, useFetchCurrentPage } from '~/states/page';
+import { useIsMobile } from '~/states/ui/device';
 import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
 import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
@@ -132,6 +133,8 @@ export const PageTreeItem: FC<TreeItemProps> = ({
     ],
   );
 
+  const [isMobile] = useIsMobile();
+
   const { Control } = usePageItemControl();
 
   // Rename feature from usePageRename hook
@@ -140,6 +143,8 @@ export const PageTreeItem: FC<TreeItemProps> = ({
   // Page create feature
   const { cancelCreating, CreateButton, isCreatingPlaceholder } =
     usePageCreate();
+
+  const pageControls = [Control, CreateButton];
 
   // Manage placeholder renaming mode (auto-start, track, and cancel on Esc)
   usePlaceholderRenameEffect({
@@ -179,8 +184,9 @@ export const PageTreeItem: FC<TreeItemProps> = ({
       onToggle={onToggle}
       onClickDuplicateMenuItem={onClickDuplicateMenuItem}
       onClickDeleteMenuItem={onClickDeleteMenuItem}
-      customEndComponents={[CountBadgeForPageTreeItem]}
-      customHoveredEndComponents={[Control, CreateButton]}
+      customEndComponents={isMobile ? undefined : [CountBadgeForPageTreeItem]}
+      customHoveredEndComponents={isMobile ? undefined : pageControls}
+      customPinnedEndComponents={isMobile ? pageControls : undefined}
       showAlternativeContent={isRenaming(item) || isCreatingPlaceholder(item)}
       customAlternativeComponents={[TreeNameInput]}
     />
