@@ -336,7 +336,7 @@
   - **完了確認**: `bodyQueryByIds(['', 'not-an-oid', '<valid-oid>'])` が throw せず `<valid-oid>` のみ照会する単体テストが通ること（`pnpm vitest run revision.spec`）
   - _Boundary: apps/growi-vault-manager/src/models/revision.ts_
 
-- [ ] 13.2 bulk-upsert ハンドラで invalid revisionId を skip し warn ログに残す（タスク 5.2 の追補）
+- [x] 13.2 bulk-upsert ハンドラで invalid revisionId を skip し warn ログに残す（タスク 5.2 の追補）
   - `apps/growi-vault-manager/src/services/vault-namespace-builder.ts` の `applyBulkUpsert` で 13.1 の API を使う
   - revisionMap に hit しなかった entry は現状の `revisionMap.get(...) ?? ''` で body 空として扱われるため追加分岐は不要だが、`logger.warn` で「skipped N invalid revisionIds in instruction <id>」を構造化ログとして出力する
   - **完了確認**: 1000 entries のうち 10 件が空文字列 revisionId の fixture で bulk-upsert が成功し、`attempts: 0, processedAt != null` で完了するインテグレーションテストを追加すること

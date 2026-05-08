@@ -54,6 +54,19 @@ vi.mock('../models/vault-user-view.js', () => ({
   },
 }));
 
+const { mockLoggerWarn } = vi.hoisted(() => ({
+  mockLoggerWarn: vi.fn(),
+}));
+
+vi.mock('@growi/logger', () => ({
+  loggerFactory: () => ({
+    warn: mockLoggerWarn,
+    info: vi.fn(),
+    error: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
 // ---------------------------------------------------------------------------
 // Imports — after vi.mock declarations
 // ---------------------------------------------------------------------------
@@ -479,6 +492,65 @@ describe('op: bulk-upsert', () => {
     await expect(applyInstruction(instruction)).rejects.toThrow(
       'missing required payload fields',
     );
+  });
+
+  it('N=1000 with 10 invalid (empty) revisionIds: succeeds and emits 1 warn with instructionId', async () => {
+    const N = 1000;
+    const INVALID_COUNT = 10;
+
+    // 990 valid revisions
+    const validRevisions = Array.from(
+      { length: N - INVALID_COUNT },
+      (_, i) => ({
+        _id: `rev-${i}`,
+        body: `body-${i}`,
+      }),
+    );
+
+    // entries: first 10 have empty revisionId, rest are valid
+    const entries = Array.from({ length: N }, (_, i) => ({
+      pageId: `p${i}`,
+      pagePath: `/pages/p${i}`,
+      revisionId: i < INVALID_COUNT ? '' : `rev-${i - INVALID_COUNT}`,
+    }));
+
+    const cursor = makeBulkCursor(validRevisions);
+    // bodyQueryByIds returns the valid query and skippedIds for the empty strings
+    const skippedIds = entries.slice(0, INVALID_COUNT).map((e) => e.revisionId);
+    asMock(RevisionModel.bodyQueryByIds).mockReturnValue({
+      query: { cursor: () => cursor },
+      skippedIds,
+    });
+    asMock(VaultPathMapper.map).mockImplementation(
+      (_path: unknown, _id: unknown) => `pages/p${_id}.md`,
+    );
+    asMock(VaultBlobHasher.hashBlob).mockResolvedValue('blob-oid');
+    asMock(VaultRepoStorage.writeTree).mockResolvedValue('tree-bulk-mixed');
+    asMock(VaultRepoStorage.writeCommit).mockResolvedValue('commit-bulk-mixed');
+
+    const instruction = makeInstruction({
+      _id: 'inst-bulk-mixed',
+      op: 'bulk-upsert',
+      payload: { namespace: 'public', entries },
+    });
+
+    // Should not throw
+    await expect(applyInstruction(instruction)).resolves.toBeUndefined();
+
+    // logger.warn should have been called exactly once for the skipped IDs
+    expect(mockLoggerWarn).toHaveBeenCalledTimes(1);
+    // The warn call should include the instructionId
+    expect(mockLoggerWarn).toHaveBeenCalledWith(
+      expect.objectContaining({
+        instructionId: 'inst-bulk-mixed',
+        skippedCount: INVALID_COUNT,
+      }),
+      expect.stringContaining('skipped'),
+    );
+
+    // updateRef should still be called (990 valid entries committed)
+    expect(VaultRepoStorage.updateRef).toHaveBeenCalledTimes(1);
+    expect(VaultRepoStorage.writeCommit).toHaveBeenCalledTimes(1);
   });
 });
 

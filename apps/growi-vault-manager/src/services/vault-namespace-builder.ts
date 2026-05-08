@@ -466,8 +466,12 @@ async function applyBulkUpsert(
   const { query, skippedIds } = RevisionModel.bodyQueryByIds(revisionIds);
   if (skippedIds.length > 0) {
     logger.warn(
-      { skippedCount: skippedIds.length, skippedIds },
-      'bulk-upsert: skipped invalid revisionId(s) — invalid ObjectId format',
+      {
+        instructionId: String(instruction._id),
+        skippedCount: skippedIds.length,
+        skippedIds,
+      },
+      'bulk-upsert: skipped invalid revisionId(s) in instruction',
     );
   }
   const cursor = query.cursor();
