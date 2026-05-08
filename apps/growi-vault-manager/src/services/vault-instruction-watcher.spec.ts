@@ -15,6 +15,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 // Fake change stream that extends EventEmitter so we can emit events manually.
 class FakeChangeStream extends EventEmitter {
   closed = false;
+  // biome-ignore lint/suspicious/useAwait: mirrors the real ChangeStream.close() async signature
   async close() {
     this.closed = true;
   }
@@ -109,6 +110,7 @@ function makeCursor(docs: object[]) {
   return {
     [Symbol.asyncIterator]() {
       return {
+        // biome-ignore lint/suspicious/useAwait: AsyncIterator.next() must return a Promise to satisfy the protocol
         async next() {
           if (index < docs.length) {
             return { value: docs[index++], done: false };

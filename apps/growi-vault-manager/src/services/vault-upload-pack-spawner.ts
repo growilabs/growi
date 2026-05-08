@@ -98,8 +98,8 @@ export function spawnUploadPack(opts: SpawnOptions): SpawnResult {
 
   // In 'rpc' mode, pipe the caller-supplied readable into child stdin so that
   // the git process can read the client's want/have lines.
-  if (mode === 'rpc' && stdin != null) {
-    stdin.pipe(child.stdin!);
+  if (mode === 'rpc' && stdin != null && child.stdin != null) {
+    stdin.pipe(child.stdin);
   } else {
     // In 'advertise' mode git does not read stdin; close it immediately to
     // prevent the process from hanging waiting for input.

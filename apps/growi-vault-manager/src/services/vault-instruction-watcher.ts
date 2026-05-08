@@ -149,6 +149,7 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
     // Flush buffered change stream events that arrived during the drain.
     for (const bufferedDoc of eventBuffer) {
       if (stopping) break;
+      // biome-ignore lint/performance/noAwaitInLoops: instructions must be processed in arrival order to preserve causal ordering
       await processInstruction(bufferedDoc);
     }
     eventBuffer.length = 0;

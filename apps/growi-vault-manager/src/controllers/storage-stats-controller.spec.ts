@@ -63,6 +63,7 @@ vi.mock(
 // ---------------------------------------------------------------------------
 
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
+import type { VaultMaintenanceScheduler } from '../services/vault-maintenance-scheduler.js';
 import { getSchedulerInstance } from '../services/vault-maintenance-scheduler-instance.js';
 import { StorageStatsController } from './storage-stats-controller.js';
 
@@ -143,7 +144,7 @@ describe('StorageStatsController', () => {
     vi.mocked(getSchedulerInstance).mockReturnValue({
       getLastSquashAt: () => null,
       getLastGcAt: () => null,
-    } as any);
+    } as VaultMaintenanceScheduler);
 
     // Default fs mocks: repo dir contains two files of 1024 bytes each.
     vi.spyOn(fs.promises, 'readdir').mockResolvedValue(
@@ -318,7 +319,7 @@ describe('StorageStatsController', () => {
         vi.mocked(getSchedulerInstance).mockReturnValue({
           getLastSquashAt: () => null,
           getLastGcAt: () => null,
-        } as any);
+        } as VaultMaintenanceScheduler);
       });
 
       it('includes lastSquashAt: null in the response', async () => {
@@ -356,7 +357,7 @@ describe('StorageStatsController', () => {
         vi.mocked(getSchedulerInstance).mockReturnValue({
           getLastSquashAt: () => squashDate,
           getLastGcAt: () => gcDate,
-        } as any);
+        } as VaultMaintenanceScheduler);
       });
 
       it('serializes lastSquashAt as an ISO 8601 string', async () => {

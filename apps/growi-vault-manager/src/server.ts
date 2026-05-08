@@ -40,9 +40,7 @@ const PORT = Number(process.env.PORT || 3001);
     signals: ['SIGINT', 'SIGTERM'],
   },
 })
-class Server {
+export class Server {
   @Inject()
   app: PlatformApplication | undefined;
 }
-
-export default Server;

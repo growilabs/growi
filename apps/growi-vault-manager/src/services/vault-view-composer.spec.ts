@@ -6,6 +6,9 @@
  * repository or MongoDB connection.
  */
 
+// biome-ignore-all lint/suspicious/useAwait: vitest mockImplementation accepts async fns whose body returns a sync value; await is unnecessary
+// biome-ignore-all lint/style/noNonNullAssertion: tests use ! after expect().toBeDefined() to narrow type when the assertion already guarantees non-null
+
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -70,9 +73,6 @@ const mockEnsureNamespaceHead = vi.mocked(VaultRepoStorage.ensureNamespaceHead);
 // Common test data
 // ---------------------------------------------------------------------------
 
-const TREE_OID_PUBLIC = 'aaaa000000000000000000000000000000000000';
-const TREE_OID_GROUP = 'bbbb000000000000000000000000000000000000';
-const TREE_OID_ONLY_ME = 'cccc000000000000000000000000000000000000';
 const TREE_OID_MERGED = 'dddd000000000000000000000000000000000000';
 const COMMIT_OID_PUBLIC = '1111000000000000000000000000000000000000';
 const COMMIT_OID_GROUP = '2222000000000000000000000000000000000000';
@@ -454,30 +454,6 @@ describe('compose — conflict resolution (same path, multiple namespaces)', () 
   const BLOB_RESTRICTED = 'blob-from-restricted-link-000000000000';
   const BLOB_ONLY_ME = 'blob-from-only-me-0000000000000000000000';
 
-  /**
-   * Sets up readRef + readTree so that each namespace has exactly one blob at
-   * 'page.md' with the given blobOid.
-   */
-  function setupNamespaceBlob(ns: string, commitOid: string, blobOid: string) {
-    mockReadRef.mockImplementation(async (refPath: string) => {
-      if (refPath.includes(`/${ns}/`)) return commitOid;
-      return null;
-    });
-    mockReadTree.mockImplementation(async (oid: string) => {
-      if (oid === commitOid) {
-        return [
-          {
-            mode: '100644',
-            path: 'page.md',
-            oid: blobOid,
-            type: 'blob' as const,
-          },
-        ];
-      }
-      return [];
-    });
-  }
-
   beforeEach(() => {
     mockFindByUserId.mockResolvedValue(null);
     mockWriteCommit.mockResolvedValue(COMMIT_OID_VIEW_NEW);
@@ -593,9 +569,7 @@ describe('compose — conflict resolution (same path, multiple namespaces)', () 
       return [];
     });
 
-    mockWriteTree.mockImplementation(async (entries) => {
-      return TREE_OID_MERGED;
-    });
+    mockWriteTree.mockImplementation(async () => TREE_OID_MERGED);
 
     await compose(USER_ID, ['restricted-link', 'group-eng']);
 

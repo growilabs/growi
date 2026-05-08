@@ -109,6 +109,7 @@ async function waitForProcessed(
   }
 
   while (Date.now() < deadline) {
+    // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
     const doc = await db
       .collection('vault_instructions')
       .findOne({ _id: new ObjectId(instructionId) });

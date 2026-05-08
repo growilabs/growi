@@ -168,7 +168,7 @@ export async function init(): Promise<void> {
  * @param content - Raw bytes to store as a git blob.
  * @returns 40-character SHA-1 OID.
  */
-export async function writeBlob(content: Buffer): Promise<string> {
+export function writeBlob(content: Buffer): Promise<string> {
   const repoPath = getRepoPath();
   return git.writeBlob({
     fs,
@@ -183,9 +183,7 @@ export async function writeBlob(content: Buffer): Promise<string> {
  * @param entries - List of tree entries (blobs and subtrees).
  * @returns 40-character SHA-1 OID.
  */
-export async function writeTree(
-  entries: ReadonlyArray<TreeEntry>,
-): Promise<string> {
+export function writeTree(entries: ReadonlyArray<TreeEntry>): Promise<string> {
   const repoPath = getRepoPath();
   return git.writeTree({
     fs,
@@ -200,7 +198,7 @@ export async function writeTree(
  * @param opts - Commit metadata and tree/parent references.
  * @returns 40-character SHA-1 OID.
  */
-export async function writeCommit(opts: CommitOptions): Promise<string> {
+export function writeCommit(opts: CommitOptions): Promise<string> {
   const repoPath = getRepoPath();
 
   // timezoneOffset is expressed in minutes west of UTC.

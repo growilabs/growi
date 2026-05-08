@@ -137,6 +137,7 @@ async function upsertPageAndWait(opts: {
   // Poll until processedAt is set.
   const deadline = Date.now() + 15_000;
   while (Date.now() < deadline) {
+    // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
     const doc = await db
       .collection('vault_instructions')
       .findOne({ _id: new ObjectId(instrId) });
@@ -368,6 +369,7 @@ async function triggerGcAndWait(): Promise<{
       // Wait for all instructions to be processed (allow up to 5 minutes for 1001 commits).
       const drainDeadline = Date.now() + 5 * 60 * 1000;
       while (Date.now() < drainDeadline) {
+        // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
         const unprocessedCount = await db
           .collection('vault_instructions')
           .countDocuments({
@@ -403,6 +405,7 @@ async function triggerGcAndWait(): Promise<{
       let squashed = false;
 
       while (Date.now() < squashDeadline) {
+        // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
         const stateDoc = await db
           .collection('vault_namespace_state')
           .findOne({ namespace: squashNs });
@@ -465,6 +468,7 @@ async function triggerGcAndWait(): Promise<{
       for (let i = 0; i < setupPageCount; i++) {
         const pageId = new ObjectId().toHexString();
         const revisionId = new ObjectId().toHexString();
+        // biome-ignore lint/performance/noAwaitInLoops: pages must be inserted sequentially to avoid concurrent writes to the same bare repo
         await upsertPageAndWait({
           namespace: concurrencyNs,
           pageId,

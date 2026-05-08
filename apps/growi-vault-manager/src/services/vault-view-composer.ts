@@ -130,9 +130,8 @@ async function collectLeafBlobs(
       }
     } else {
       // entry.type === 'tree'
-      // biome-ignore lint/performance/noAwaitInLoops: tree structure must be traversed depth-first
+      // biome-ignore lint/performance/noAwaitInLoops: tree structure must be traversed depth-first; child OIDs depend on parent
       const childEntries = await VaultRepoStorage.readTree(entry.oid);
-      // biome-ignore lint/performance/noAwaitInLoops: recursive tree traversal
       await collectLeafBlobs(childEntries, fullPath, namespace, result);
     }
   }
@@ -159,11 +158,12 @@ function insertIntoTreeMap(
   const dirSegments = segments.slice(0, -1);
   const dirKey = dirSegments.length === 0 ? '.' : dirSegments.join('/');
 
-  if (!treeMap.has(dirKey)) {
-    treeMap.set(dirKey, []);
+  let dirEntries = treeMap.get(dirKey);
+  if (dirEntries == null) {
+    dirEntries = [];
+    treeMap.set(dirKey, dirEntries);
   }
 
-  const dirEntries = treeMap.get(dirKey)!;
   const blobEntry: TreeEntry = {
     mode: '100644',
     path: filename,
@@ -180,14 +180,14 @@ function insertIntoTreeMap(
   // Ensure all ancestor directories are represented in the map.
   for (let d = 0; d < dirSegments.length; d++) {
     const parentKey = d === 0 ? '.' : dirSegments.slice(0, d).join('/');
-    const childKey = dirSegments.slice(0, d + 1).join('/');
     const childName = dirSegments[d];
 
-    if (!treeMap.has(parentKey)) {
-      treeMap.set(parentKey, []);
+    let parentEntries = treeMap.get(parentKey);
+    if (parentEntries == null) {
+      parentEntries = [];
+      treeMap.set(parentKey, parentEntries);
     }
 
-    const parentEntries = treeMap.get(parentKey)!;
     if (!parentEntries.some((e) => e.path === childName && e.type === 'tree')) {
       // Placeholder — will be replaced with real OID after writeTree pass
       parentEntries.push({
@@ -287,6 +287,7 @@ export async function fullMergeTreesByPath(
   const merged = new Map<string, { namespace: string; blobOid: string }>();
 
   for (const ns of namespaces) {
+    // biome-ignore lint/performance/noAwaitInLoops: namespace blob collection mutates a shared priority-resolved map; sequential is required
     const refOid = await VaultRepoStorage.readRef(nsRefPath(ns));
     if (refOid == null) {
       // Namespace has no commits yet — skip.
@@ -294,9 +295,7 @@ export async function fullMergeTreesByPath(
     }
 
     // readTree peels a commit OID to its root tree automatically.
-    // biome-ignore lint/performance/noAwaitInLoops: each namespace tree must be loaded before collecting blobs
     const rootEntries = await VaultRepoStorage.readTree(refOid);
-    // biome-ignore lint/performance/noAwaitInLoops: recursive blob collection
     await collectLeafBlobs(rootEntries, '', ns, merged);
   }
 
@@ -340,14 +339,14 @@ export async function fullMergeTreesByPath(
  * namespaces because their root tree OIDs have not changed and readTree hits
  * the OS page cache.
  *
- * @param baseTreeOid         - OID of the existing merged root tree.
+ * @param _baseTreeOid        - OID of the existing merged root tree (currently unused; reserved for future surgical delta updates).
  * @param allNamespaces       - All namespaces in the view (not just changed ones).
  * @param changedNamespaces   - Subset of namespaces whose commitOid changed.
  * @returns OID of the updated merged root tree.
  * @throws Error when the base tree cannot be read (gc pruned) — caller must fall back to full merge.
  */
 export async function applyNamespaceDeltas(
-  baseTreeOid: string,
+  _baseTreeOid: string,
   allNamespaces: ReadonlyArray<string>,
   changedNamespaces: ReadonlyArray<string>,
 ): Promise<string> {
@@ -366,21 +365,19 @@ export async function applyNamespaceDeltas(
     if (changedSet.has(ns)) {
       continue; // will be processed in step 2
     }
+    // biome-ignore lint/performance/noAwaitInLoops: namespace blob collection mutates a shared priority-resolved map; sequential is required
     const refOid = await VaultRepoStorage.readRef(nsRefPath(ns));
     if (refOid == null) continue;
-    // biome-ignore lint/performance/noAwaitInLoops: sequential reads needed; tree OIDs are typically cached
     const rootEntries = await VaultRepoStorage.readTree(refOid);
-    // biome-ignore lint/performance/noAwaitInLoops: recursive traversal
     await collectLeafBlobs(rootEntries, '', ns, merged);
   }
 
   // Step 2: Collect blobs from changed namespaces (re-reads latest commits).
   for (const ns of changedNamespaces) {
+    // biome-ignore lint/performance/noAwaitInLoops: namespace blob collection mutates a shared priority-resolved map; sequential is required
     const refOid = await VaultRepoStorage.readRef(nsRefPath(ns));
     if (refOid == null) continue; // namespace may have been removed
-    // biome-ignore lint/performance/noAwaitInLoops: sequential reads needed
     const rootEntries = await VaultRepoStorage.readTree(refOid);
-    // biome-ignore lint/performance/noAwaitInLoops: recursive traversal
     await collectLeafBlobs(rootEntries, '', ns, merged);
   }
 
