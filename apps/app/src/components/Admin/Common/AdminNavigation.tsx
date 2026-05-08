@@ -105,6 +105,13 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('audit_log_management.audit_log')}
         </>
       );
+    case 'vault':
+      return (
+        <>
+          <span className="material-symbols-outlined me-1">lock</span>
+          GROWI Vault
+        </>
+      );
     case 'plugins':
       return (
         <>
@@ -275,6 +282,11 @@ export const AdminNavigation = (): JSX.Element => {
             isActive={isActiveMenu('/audit-log')}
           />
           <MenuLink
+            menu="vault"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/vault')}
+          />
+          <MenuLink
             menu="plugins"
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/plugins')}
@@ -338,6 +350,7 @@ export const AdminNavigation = (): JSX.Element => {
             )}
             {isActiveMenu('/search') && <MenuLabel menu="search" />}
             {isActiveMenu('/audit-log') && <MenuLabel menu="audit-log" />}
+            {isActiveMenu('/vault') && <MenuLabel menu="vault" />}
             {isActiveMenu('/plugins') && <MenuLabel menu="plugins" />}
             {isActiveMenu('/data-transfer') && (
               <MenuLabel menu="data-transfer" />

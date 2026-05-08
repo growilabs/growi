@@ -510,7 +510,7 @@ _要件: 8_
 _Boundary: `apps/app/src/pages/admin/vault.page.tsx`_
 _Depends: 12.1_
 
-### [ ] 15.1 admin/vault.page.tsx の作成
+### [x] 15.1 admin/vault.page.tsx の作成
 
 `apps/app/src/pages/admin/vault.page.tsx` を新規作成する。
 
