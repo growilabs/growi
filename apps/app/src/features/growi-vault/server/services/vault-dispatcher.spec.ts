@@ -156,6 +156,89 @@ describe('VaultDispatcher', () => {
   });
 
   // -------------------------------------------------------------------------
+  // null revision page skip (task 18.2)
+  // -------------------------------------------------------------------------
+
+  describe('onPageChanged — null/empty revisionId skip', () => {
+    it('does NOT emit any instruction when type=create and revisionId is empty string', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['public'] });
+      const dispatcher = createVaultDispatcher(mapper);
+
+      const page = buildPage({ path: '/auto-generated' });
+      await dispatcher.onPageChanged({
+        type: 'create',
+        page,
+        revisionId: '',
+      });
+
+      // Advance the coalesce timer — no instruction should be written.
+      await vi.runAllTimersAsync();
+
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('does NOT emit any instruction when type=create and revisionId is undefined', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['public'] });
+      const dispatcher = createVaultDispatcher(mapper);
+
+      const page = buildPage({ path: '/auto-generated' });
+      await dispatcher.onPageChanged({
+        type: 'create',
+        page,
+        // revisionId intentionally omitted (undefined)
+      });
+
+      await vi.runAllTimersAsync();
+
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('does NOT emit any instruction when type=update and revisionId is undefined', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['public'] });
+      const dispatcher = createVaultDispatcher(mapper);
+
+      const page = buildPage({ path: '/auto-generated' });
+      await dispatcher.onPageChanged({
+        type: 'update',
+        page,
+        // revisionId intentionally omitted (undefined)
+      });
+
+      await vi.runAllTimersAsync();
+
+      expect(createSpy).not.toHaveBeenCalled();
+    });
+
+    it('does NOT emit an acl-change upsert instruction when revisionId is empty string (remove instructions are still emitted)', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['group-new'] });
+      const dispatcher = createVaultDispatcher(mapper);
+
+      const page = buildPage({ path: '/acl-no-revision' });
+      await dispatcher.onPageChanged({
+        type: 'acl-change',
+        page,
+        revisionId: '',
+        previousNamespaces: ['public'],
+      });
+
+      // The remove for 'public' should still be emitted.
+      expect(createSpy).toHaveBeenCalledOnce();
+      const call = createSpy.mock.calls[0][0];
+      expect(call.op).toBe('remove');
+
+      // No upsert for 'group-new'.
+      const upsertCalls = createSpy.mock.calls.filter(
+        (c) => c[0].op === 'upsert',
+      );
+      expect(upsertCalls).toHaveLength(0);
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // delete event → remove
   // -------------------------------------------------------------------------
 

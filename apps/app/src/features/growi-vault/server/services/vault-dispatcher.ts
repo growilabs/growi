@@ -303,6 +303,16 @@ export const createVaultDispatcher = (
       const revisionId = event.revisionId ?? '';
 
       if (type === 'create' || type === 'update') {
+        // Skip pages that have no revision yet (e.g. auto-generated intermediate
+        // path pages). vault-manager would fail with a MongoDB ObjectId cast error
+        // if we forwarded an empty revisionId.
+        if (!revisionId) {
+          logger.debug(
+            { pageId, pagePath },
+            'vault-dispatcher: skipping upsert for page without revision',
+          );
+          return;
+        }
         // Compute current namespaces and enqueue an upsert per namespace.
         const { current } = namespaceMapper.computePageNamespaces(page);
         for (const ns of current) {
@@ -334,6 +344,32 @@ export const createVaultDispatcher = (
       if (type === 'acl-change') {
         const previousNamespaces = event.previousNamespaces ?? [];
         const { current } = namespaceMapper.computePageNamespaces(page);
+
+        // Emit remove instructions for all previous namespaces concurrently.
+        // Upsert instructions for current namespaces are only emitted when
+        // revisionId is present — pages without a revision (e.g. auto-generated
+        // intermediate paths) would cause a MongoDB ObjectId cast error in
+        // vault-manager if forwarded.
+        if (!revisionId) {
+          logger.debug(
+            { pageId, pagePath },
+            'vault-dispatcher: skipping acl-change upsert for page without revision',
+          );
+          await Promise.all(
+            previousNamespaces.map((ns) =>
+              writeWithRetry(
+                () =>
+                  VaultInstruction.create({
+                    op: 'remove',
+                    payload: { namespace: ns, pageId, pagePath },
+                    issuedAt: new Date(),
+                  }).then(() => undefined),
+                `acl-remove namespace=${ns} pageId=${pageId}`,
+              ),
+            ),
+          );
+          return;
+        }
 
         // Emit remove instructions for all previous namespaces and upsert
         // instructions for all current namespaces, both concurrently.
