@@ -47,7 +47,7 @@ import {
   isUploadEnabledAtom,
 } from '~/states/server-configurations';
 import { useDeviceLargerThanMd } from '~/states/ui/device';
-import { useEditorMode } from '~/states/ui/editor';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
 import {
   PageAccessoriesModalContents,
   usePageAccessoriesModalActions,
@@ -323,7 +323,7 @@ const GrowiContextualSubNavigation = (
   const revisionId =
     revision != null && isPopulated(revision) ? revision._id : undefined;
 
-  const { editorMode } = useEditorMode();
+  const { editorMode, setEditorMode } = useEditorMode();
   const pageId = useCurrentPageId(true);
   const currentUser = useCurrentUser();
   const isGuestUser = useIsGuestUser();
@@ -390,6 +390,7 @@ const GrowiContextualSubNavigation = (
 
         if (isCompletely) {
           // redirect to NotFound Page
+          setEditorMode(EditorMode.View);
           router.push(path);
         } else if (currentPathname != null) {
           router.push(currentPathname);
@@ -408,6 +409,7 @@ const GrowiContextualSubNavigation = (
       openDeleteModal,
       router,
       mutatePageInfo,
+      setEditorMode,
     ],
   );
 
