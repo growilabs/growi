@@ -342,7 +342,7 @@
   - **完了確認**: 1000 entries のうち 10 件が空文字列 revisionId の fixture で bulk-upsert が成功し、`attempts: 0, processedAt != null` で完了するインテグレーションテストを追加すること
   - _Boundary: apps/growi-vault-manager/src/services/vault-namespace-builder.ts_
 
-- [ ] 13.3 dead-letter 検知の強化
+- [x] 13.3 dead-letter 検知の強化
   - 同一 instruction の `attempts >= 5` を観測した場合、`VaultInstructionWatcher` が構造化ログで `severity: error` 相当の出力をする（現状は `recordFailure` で attempts/lastError は更新するが、上限到達時の通知はない）
   - 可能なら `StorageStatsController` のレスポンスに `stuckInstructionCount` を追加し、admin UI から観測できるようにする
   - **完了確認**: `db.vault_instructions.find({attempts: {$gte: 5}, processedAt: null})` が非空のとき、`/internal/storage-stats` レスポンスに反映されること、および watcher のログに 1 件あたり 1 行のエラーが出ること（再試行ループでログ氾濫しないよう、attempts 5 到達時のみ出力）

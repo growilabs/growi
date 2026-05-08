@@ -24,6 +24,16 @@ vi.mock('../models/vault-namespace-state.js', () => ({
   },
 }));
 
+const { mockCountDocuments } = vi.hoisted(() => ({
+  mockCountDocuments: vi.fn(),
+}));
+
+vi.mock('../models/vault-instruction.js', () => ({
+  VaultInstructionModel: {
+    countDocuments: mockCountDocuments,
+  },
+}));
+
 vi.mock('node:child_process', async (importOriginal) => {
   const original = await importOriginal<typeof import('node:child_process')>();
   return { ...original, execFile: vi.fn() };
@@ -106,6 +116,9 @@ describe('StorageStatsController', () => {
   beforeEach(() => {
     controller = new StorageStatsController();
 
+    // Default: no stuck instructions.
+    mockCountDocuments.mockResolvedValue(0);
+
     // Default fs mocks: repo dir contains two files of 1024 bytes each.
     vi.spyOn(fs.promises, 'readdir').mockResolvedValue(
       // Cast because readdir has multiple overloads; we only use the
@@ -184,6 +197,54 @@ describe('StorageStatsController', () => {
       expect(json).toHaveBeenCalledWith(
         expect.objectContaining({ namespaceCount: 0, totalCommitCount: 0 }),
       );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 13.3 — stuckInstructionCount
+  // -------------------------------------------------------------------------
+
+  describe('stuckInstructionCount (task 13.3)', () => {
+    it('includes stuckInstructionCount in the response when there are stuck instructions', async () => {
+      mockAggregate(2, 8);
+      mockExecFile('3 objects, 10 kilobytes\n');
+      mockCountDocuments.mockResolvedValue(3);
+
+      const { res, status, json } = makeRes();
+      await controller.getStorageStats(res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({ stuckInstructionCount: 3 }),
+      );
+    });
+
+    it('includes stuckInstructionCount: 0 when no instructions are stuck', async () => {
+      mockAggregate(1, 4);
+      mockExecFile('0 objects, 0 kilobytes\n');
+      mockCountDocuments.mockResolvedValue(0);
+
+      const { res, status, json } = makeRes();
+      await controller.getStorageStats(res);
+
+      expect(status).toHaveBeenCalledWith(200);
+      expect(json).toHaveBeenCalledWith(
+        expect.objectContaining({ stuckInstructionCount: 0 }),
+      );
+    });
+
+    it('queries VaultInstructionModel.countDocuments with processedAt: null and attempts $gte 5', async () => {
+      mockAggregate(1, 2);
+      mockExecFile('0 objects, 0 kilobytes\n');
+      mockCountDocuments.mockResolvedValue(0);
+
+      const { res } = makeRes();
+      await controller.getStorageStats(res);
+
+      expect(mockCountDocuments).toHaveBeenCalledWith({
+        processedAt: null,
+        attempts: { $gte: 5 },
+      });
     });
   });
 

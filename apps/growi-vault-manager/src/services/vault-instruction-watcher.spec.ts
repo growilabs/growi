@@ -33,6 +33,18 @@ vi.mock('../models/vault-instruction.js', () => ({
   },
 }));
 
+// Mock @growi/logger
+const mockLoggerError = vi.fn();
+
+vi.mock('@growi/logger', () => ({
+  loggerFactory: () => ({
+    error: mockLoggerError,
+    warn: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
+}));
+
 // Mock VaultSyncStateModel
 const mockGetSingleton = vi.fn();
 const mockSaveResumeToken = vi.fn();
@@ -138,6 +150,7 @@ describe('VaultInstructionWatcher', () => {
 
   beforeEach(() => {
     vi.clearAllMocks();
+    mockLoggerError.mockReset();
 
     fakeStream = new FakeChangeStream();
     mockWatchInserts.mockReturnValue(fakeStream);
@@ -320,6 +333,78 @@ describe('VaultInstructionWatcher', () => {
 
       expect(doc.markProcessed).toHaveBeenCalledOnce();
       expect(doc.recordFailure).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 13.3 — Dead-letter detection
+  // -------------------------------------------------------------------------
+
+  describe('dead-letter detection (task 13.3)', () => {
+    it('emits logger.error when attempts reaches 5 (doc.attempts === 4 before failure)', async () => {
+      // attempts is 4 before this failure — recordFailure will make it 5.
+      const doc = makeDoc({ processedAt: null });
+      doc.attempts = 4;
+      mockDrainCursor.mockReturnValue(stubDrainCursor([doc]));
+      mockApplyInstruction.mockRejectedValue(new Error('persistent error'));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(doc.recordFailure).toHaveBeenCalledWith('persistent error');
+      expect(mockLoggerError).toHaveBeenCalledOnce();
+      expect(mockLoggerError).toHaveBeenCalledWith(
+        expect.objectContaining({
+          instructionId: String(doc._id),
+          attempts: 5,
+        }),
+        expect.any(String),
+      );
+    });
+
+    it('does NOT emit logger.error when attempts is below the threshold (doc.attempts === 3)', async () => {
+      // attempts is 3 before this failure — recordFailure will make it 4, below threshold.
+      const doc = makeDoc({ processedAt: null });
+      doc.attempts = 3;
+      mockDrainCursor.mockReturnValue(stubDrainCursor([doc]));
+      mockApplyInstruction.mockRejectedValue(new Error('transient'));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(doc.recordFailure).toHaveBeenCalledOnce();
+      expect(mockLoggerError).not.toHaveBeenCalled();
+    });
+
+    it('does NOT emit logger.error on the first failure (doc.attempts === 0)', async () => {
+      const doc = makeDoc({ processedAt: null });
+      doc.attempts = 0;
+      mockDrainCursor.mockReturnValue(stubDrainCursor([doc]));
+      mockApplyInstruction.mockRejectedValue(new Error('first failure'));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(mockLoggerError).not.toHaveBeenCalled();
+    });
+
+    it('does NOT emit logger.error again when already past threshold (doc.attempts === 5)', async () => {
+      // attempts is already 5 — recordFailure will make it 6 (beyond threshold).
+      // The log must NOT fire again to prevent flooding on subsequent retries.
+      const doc = makeDoc({ processedAt: null });
+      doc.attempts = 5;
+      mockDrainCursor.mockReturnValue(stubDrainCursor([doc]));
+      mockApplyInstruction.mockRejectedValue(new Error('still failing'));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(doc.recordFailure).toHaveBeenCalledOnce();
+      expect(mockLoggerError).not.toHaveBeenCalled();
     });
   });
 

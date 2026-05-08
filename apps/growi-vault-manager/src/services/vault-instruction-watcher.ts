@@ -18,6 +18,7 @@
  */
 
 import type { VaultInstructionDoc } from '@growi/core/dist/interfaces/vault';
+import { loggerFactory } from '@growi/logger';
 
 import {
   type IVaultInstructionDocument,
@@ -26,6 +27,11 @@ import {
 } from '../models/vault-instruction.js';
 import { VaultSyncStateModel } from '../models/vault-sync-state.js';
 import * as VaultNamespaceBuilder from './vault-namespace-builder.js';
+
+const logger = loggerFactory('growi:vault-manager:vault-instruction-watcher');
+
+// Number of attempts after which an instruction is considered dead-lettered.
+const DEAD_LETTER_THRESHOLD = 5;
 
 // ---------------------------------------------------------------------------
 // Public interface
@@ -101,6 +107,22 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
       // Failure: record the error; processedAt remains null for retry.
       const errorMessage = err instanceof Error ? err.message : String(err);
       await doc.recordFailure(errorMessage);
+
+      // Log an error only at the exact moment the instruction reaches the
+      // dead-letter threshold. Using === (not >=) prevents log flooding when
+      // the instruction continues to be retried beyond the threshold.
+      const attemptsAfter = (doc.attempts ?? 0) + 1;
+      if (attemptsAfter === DEAD_LETTER_THRESHOLD) {
+        logger.error(
+          {
+            instructionId: String(doc._id),
+            op: (doc as unknown as { op: string }).op,
+            attempts: attemptsAfter,
+            lastError: errorMessage,
+          },
+          'vault-instruction-watcher: instruction reached dead-letter threshold',
+        );
+      }
     }
   }
 
@@ -179,8 +201,9 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
 
     stream.on('error', (err: Error) => {
       // Do not throw here — the error listener must not propagate synchronously.
-      process.stderr.write(
-        `[VaultInstructionWatcher] change stream error: ${err.message}\n`,
+      logger.error(
+        { changeStreamError: err.message },
+        'vault-instruction-watcher: change stream error',
       );
     });
   }

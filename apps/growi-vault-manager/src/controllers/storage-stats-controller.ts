@@ -24,6 +24,7 @@ import { Controller, Get, Res, Use } from '@tsed/common';
 import type { Response } from 'express';
 
 import { SharedSecretAuth } from '../middlewares/shared-secret-auth.js';
+import { VaultInstructionModel } from '../models/vault-instruction.js';
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
 import { getRepoPath } from '../services/vault-repo-storage.js';
 
@@ -147,12 +148,20 @@ export class StorageStatsController {
       const repoPath = getRepoPath();
 
       // Run all I/O concurrently for minimal latency
-      const [namespaceStats, looseObjectCount, repoSizeBytes] =
-        await Promise.all([
-          collectNamespaceStats(),
-          getLooseObjectCount(repoPath),
-          computeDirectorySizeBytes(repoPath),
-        ]);
+      const [
+        namespaceStats,
+        looseObjectCount,
+        repoSizeBytes,
+        stuckInstructionCount,
+      ] = await Promise.all([
+        collectNamespaceStats(),
+        getLooseObjectCount(repoPath),
+        computeDirectorySizeBytes(repoPath),
+        VaultInstructionModel.countDocuments({
+          processedAt: null,
+          attempts: { $gte: 5 },
+        }),
+      ]);
 
       // VaultMaintenanceScheduler is not yet implemented — return null
       const lastSquashAt: string | null = null;
@@ -167,7 +176,10 @@ export class StorageStatsController {
         lastGcAt,
       };
 
-      res.status(200).json(body);
+      // stuckInstructionCount is not part of the shared StorageStatsResponse type;
+      // extend the response locally so admin UIs can observe dead-lettered instructions
+      // without modifying @growi/core.
+      res.status(200).json({ ...body, stuckInstructionCount });
     } catch (err) {
       // Log context so operators can diagnose failures without leaking details
       // to the caller
