@@ -302,19 +302,19 @@
 ---
 
 - [ ] 12. 起動時プリフライトチェック
-- [ ] 12.1 必須環境変数の検証
+- [x] 12.1 必須環境変数の検証
   - `src/index.ts` の `bootstrap()` 呼び出し前に必須環境変数の存在チェックを行う
   - 必須変数: `VAULT_MANAGER_INTERNAL_SECRET`、`MONGODB_URI`、`VAULT_REPO_PATH`
   - いずれかが未設定または空文字の場合は `process.exit(1)` し、欠けている変数名をエラーメッセージに列挙する
   - _Boundary: apps/growi-vault-manager/src/index.ts_
 
-- [ ] 12.2 MongoDB 接続確認
+- [x] 12.2 MongoDB 接続確認
   - 環境変数チェック通過後、`bootstrap()` 呼び出し前に `mongoose.connect()` + `db.command({ ping: 1 })` で MongoDB への疎通を確認する
   - タイムアウト（5 秒）以内に接続できない場合は `process.exit(1)` し、`MONGODB_URI` のホスト部とタイムアウト秒数をエラーメッセージに含める
   - 接続確認後は接続を閉じず、Ts.ED bootstrap に引き継ぐ
   - _Boundary: apps/growi-vault-manager/src/index.ts_
 
-- [ ] 12.3 プリフライトチェックの単体テスト
+- [x] 12.3 プリフライトチェックの単体テスト
   - `src/preflight.ts`（または `src/index.ts` から抽出した純粋関数）として環境変数チェックと MongoDB ping ロジックを切り出し、単体テスト可能にする
   - 必須変数が1つ以上欠けている場合に欠落変数名を列挙したエラーを throw することをテストする
   - 全必須変数が揃っている場合に正常終了することをテストする

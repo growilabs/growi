@@ -3,6 +3,7 @@ import { PlatformExpress } from '@tsed/platform-express';
 import dotenvFlow from 'dotenv-flow';
 import mongoose from 'mongoose';
 
+import { checkMongoConnection, checkRequiredEnvVars } from './preflight.js';
 import Server from './server.js';
 import { createVaultInstructionWatcher } from './services/vault-instruction-watcher.js';
 import { init as initRepo } from './services/vault-repo-storage.js';
@@ -30,9 +31,18 @@ async function bootstrap() {
 
 dotenvFlow.config();
 
+// Preflight: validate required env vars before attempting any connection
+try {
+  checkRequiredEnvVars();
+} catch (err) {
+  $log.error(`Preflight failed: ${(err as Error).message}`);
+  process.exit(1);
+}
+
 const mongoUri = process.env.MONGO_URI ?? 'mongodb://localhost:27017/growi';
-mongoose
-  .connect(mongoUri)
+
+// Preflight: verify MongoDB connectivity before starting the server
+checkMongoConnection(mongoUri)
   .then(async () => {
     $log.info(`MongoDB connected: ${mongoUri}`);
     await initRepo();
@@ -41,7 +51,7 @@ mongoose
     await watcher.start();
     bootstrap();
   })
-  .catch((err) => {
+  .catch((err: Error) => {
     $log.error(`Startup failed: ${err.message}`);
     process.exit(1);
   });
