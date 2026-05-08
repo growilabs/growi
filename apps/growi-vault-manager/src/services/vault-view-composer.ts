@@ -492,8 +492,11 @@ export async function compose(
     committer: { ...VAULT_BOT, timestamp: now },
   });
 
-  // Step 7: Update the view ref.
+  // Step 7: Update the view ref and ensure the namespace HEAD symref exists.
   await VaultRepoStorage.updateRef(viewRefPath(viewRef), commitOid);
+  // git upload-pack needs refs/namespaces/<viewRef>/HEAD to advertise
+  // symref=HEAD:refs/heads/main so that `git clone` can checkout the branch.
+  await VaultRepoStorage.ensureNamespaceHead(viewRef);
 
   // Step 8: Persist the updated cache.
   await VaultUserViewModel.upsertView(userId, {

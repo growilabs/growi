@@ -144,8 +144,12 @@ export class GitProxyController {
       stdin: req,
     });
 
-    // Kill the child process when the client disconnects early.
-    req.on('close', kill);
+    // Kill the child process if the RESPONSE channel closes prematurely
+    // (i.e. the upstream client disconnected before receiving the pack).
+    // Do NOT listen on req.close: when req body is fully consumed Node.js
+    // emits 'close' on req even though the response is still in flight,
+    // which would kill git before it produces any output.
+    res.on('close', kill);
 
     stderr.on('data', (chunk: Buffer) => {
       process.stderr.write(

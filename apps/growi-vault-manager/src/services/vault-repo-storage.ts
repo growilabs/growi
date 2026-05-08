@@ -330,3 +330,32 @@ export async function deleteRef(refPath: string): Promise<void> {
     throw err;
   }
 }
+
+/**
+ * Writes a symbolic HEAD file for a git namespace so that `git upload-pack`
+ * advertises `symref=HEAD:refs/heads/main` in its capability string.
+ *
+ * Without this file, `git clone` does not know which branch to check out
+ * and emits "warning: remote HEAD refers to nonexistent ref".
+ *
+ * @param namespace - Namespace name (e.g. 'anonymous-view', 'user-<id>-view').
+ */
+export async function ensureNamespaceHead(namespace: string): Promise<void> {
+  const headPath = path.join(
+    getRepoPath(),
+    'refs',
+    'namespaces',
+    namespace,
+    'HEAD',
+  );
+  await fs.promises.mkdir(path.dirname(headPath), { recursive: true });
+  // The HEAD file must use the INTERNAL (un-stripped) ref path so that git
+  // can resolve it and advertise symref=HEAD:refs/heads/main to clients.
+  // Using the external path (refs/heads/main) fails to resolve because the
+  // namespace-stripped version has no bare refs/heads/main in the git-dir.
+  await fs.promises.writeFile(
+    headPath,
+    `ref: refs/namespaces/${namespace}/refs/heads/main\n`,
+    'utf8',
+  );
+}
