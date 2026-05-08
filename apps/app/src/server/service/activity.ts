@@ -69,6 +69,11 @@ class ActivityService {
             return;
           }
 
+          if (activity == null) {
+            logger.error(`Activity not found for id: ${activityId}`);
+            return;
+          }
+
           if (generatePreNotify != null) {
             const preNotify = generatePreNotify(
               activity,
@@ -167,7 +172,7 @@ class ActivityService {
       return null;
     }
 
-    await this.crowi.searchService.updateOrInsertAuditlog(activity);
+    this.activityEvent.emit('created', activity);
 
     return activity;
   };
