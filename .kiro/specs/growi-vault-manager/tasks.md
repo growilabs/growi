@@ -386,7 +386,7 @@
   - **完了確認**: 起動直後の `GET /internal/storage-stats` が `lastSquashAt: null, lastGcAt: null` を返し、squash 1 回後に該当フィールドが ISO 8601 文字列を返すこと（手動確認で可、または integration test で検証）
   - _Boundary: apps/growi-vault-manager/src/controllers/storage-stats-controller.ts_
 
-- [ ] 15.3 `storage-stats-controller.spec.ts` を scheduler singleton 経由のレスポンスで再構成
+- [x] 15.3 `storage-stats-controller.spec.ts` を scheduler singleton 経由のレスポンスで再構成
   - `apps/growi-vault-manager/src/controllers/storage-stats-controller.spec.ts` で 15.1 の singleton module を `vi.mock` し、`getLastSquashAt()` が `null` を返すケースと Date を返すケースの 2 シナリオでレスポンスシリアライズを検証する
   - **完了確認**: `pnpm vitest run storage-stats-controller.spec` が PASS、`lastSquashAt`/`lastGcAt` の null と ISO 文字列の双方が assertion 対象になっていること
   - _Boundary: apps/growi-vault-manager/src/controllers/storage-stats-controller.spec.ts_

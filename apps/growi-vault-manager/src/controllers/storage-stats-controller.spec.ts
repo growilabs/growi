@@ -44,11 +44,26 @@ vi.mock('node:child_process', async (importOriginal) => {
   return { ...original, execFile: vi.fn() };
 });
 
+vi.mock(
+  '../services/vault-maintenance-scheduler-instance.js',
+  async (importOriginal) => {
+    const actual =
+      await importOriginal<
+        typeof import('../services/vault-maintenance-scheduler-instance.js')
+      >();
+    return {
+      ...actual,
+      getSchedulerInstance: vi.fn(),
+    };
+  },
+);
+
 // ---------------------------------------------------------------------------
 // Module under test (imported after mocks)
 // ---------------------------------------------------------------------------
 
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
+import { getSchedulerInstance } from '../services/vault-maintenance-scheduler-instance.js';
 import { StorageStatsController } from './storage-stats-controller.js';
 
 // ---------------------------------------------------------------------------
@@ -123,6 +138,12 @@ describe('StorageStatsController', () => {
 
     // Default: no stuck instructions.
     mockCountDocuments.mockResolvedValue(0);
+
+    // Default: scheduler returns null for both timestamps.
+    vi.mocked(getSchedulerInstance).mockReturnValue({
+      getLastSquashAt: () => null,
+      getLastGcAt: () => null,
+    } as any);
 
     // Default fs mocks: repo dir contains two files of 1024 bytes each.
     vi.spyOn(fs.promises, 'readdir').mockResolvedValue(
@@ -284,6 +305,89 @@ describe('StorageStatsController', () => {
       await controller.getStorageStats(res);
 
       expect(status).toHaveBeenCalledWith(500);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 15.3 — scheduler singleton response serialization
+  // -------------------------------------------------------------------------
+
+  describe('scheduler singleton response serialization (task 15.3)', () => {
+    describe('scenario 1: scheduler returns null for both timestamps', () => {
+      beforeEach(() => {
+        vi.mocked(getSchedulerInstance).mockReturnValue({
+          getLastSquashAt: () => null,
+          getLastGcAt: () => null,
+        } as any);
+      });
+
+      it('includes lastSquashAt: null in the response', async () => {
+        mockAggregate(1, 4);
+        mockExecFile('0 objects, 0 kilobytes\n');
+
+        const { res, status, json } = makeRes();
+        await controller.getStorageStats(res);
+
+        expect(status).toHaveBeenCalledWith(200);
+        expect(json).toHaveBeenCalledWith(
+          expect.objectContaining({ lastSquashAt: null }),
+        );
+      });
+
+      it('includes lastGcAt: null in the response', async () => {
+        mockAggregate(1, 4);
+        mockExecFile('0 objects, 0 kilobytes\n');
+
+        const { res, status, json } = makeRes();
+        await controller.getStorageStats(res);
+
+        expect(status).toHaveBeenCalledWith(200);
+        expect(json).toHaveBeenCalledWith(
+          expect.objectContaining({ lastGcAt: null }),
+        );
+      });
+    });
+
+    describe('scenario 2: scheduler returns Date for both timestamps', () => {
+      const squashDate = new Date('2026-01-01T00:00:00.000Z');
+      const gcDate = new Date('2026-01-02T00:00:00.000Z');
+
+      beforeEach(() => {
+        vi.mocked(getSchedulerInstance).mockReturnValue({
+          getLastSquashAt: () => squashDate,
+          getLastGcAt: () => gcDate,
+        } as any);
+      });
+
+      it('serializes lastSquashAt as an ISO 8601 string', async () => {
+        mockAggregate(1, 4);
+        mockExecFile('0 objects, 0 kilobytes\n');
+
+        const { res, status, json } = makeRes();
+        await controller.getStorageStats(res);
+
+        expect(status).toHaveBeenCalledWith(200);
+        expect(json).toHaveBeenCalledWith(
+          expect.objectContaining({
+            lastSquashAt: squashDate.toISOString(),
+          }),
+        );
+      });
+
+      it('serializes lastGcAt as an ISO 8601 string', async () => {
+        mockAggregate(1, 4);
+        mockExecFile('0 objects, 0 kilobytes\n');
+
+        const { res, status, json } = makeRes();
+        await controller.getStorageStats(res);
+
+        expect(status).toHaveBeenCalledWith(200);
+        expect(json).toHaveBeenCalledWith(
+          expect.objectContaining({
+            lastGcAt: gcDate.toISOString(),
+          }),
+        );
+      });
     });
   });
 });
