@@ -443,7 +443,7 @@
 
   `apps/app/docker/Dockerfile` は最近 DHI（Docker Hardened Images）採用と turbo prune ベースの多段ビルドへリファクタされた（`dhi.io/node:24-debian13-dev` を build / `dhi.io/node:24-debian13` を runtime、`base` → `pruner` → `deps` → `builder` → `release` の 5 stage 構成、`pnpm store` の cache mount、OCI 標準 label、専用 `Dockerfile.dockerignore`）。一方 `apps/growi-vault-manager/Dockerfile` は依然として `node:24-alpine` + `apk add git` + 単一 `builder` stage という旧構成のままで、ビルドキャッシュ効率・runtime 攻撃面・monorepo subset 抽出の点で apps/app と齟齬がある。本タスクで apps/app と同じ流儀に揃え、vault-manager 固有の制約（runtime で `git upload-pack` を spawn するため git binary v2.30+ が必須）に対応する。
 
-- [ ] 18.1 release stage の git binary 取得戦略を確定（前提調査）
+- [x] 18.1 release stage の git binary 取得戦略を確定（前提調査）
   - vault-manager は `VaultUploadPackSpawner` が runtime で `git upload-pack --stateless-rpc` を `child_process.spawn` するため、release stage に git v2.30+ の実行可能 binary が必須である（apps/app には存在しない制約）
   - DHI distroless 系（`dhi.io/node:24-debian13`）は shell も任意 binary も持たないため、以下の選択肢から方針を確定し design.md または本 task の備考に記録する:
     - (a) `dhi.io/node:24-debian13-dev`（git/shell を含む dev variant）を runtime に流用する

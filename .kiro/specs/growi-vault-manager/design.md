@@ -195,6 +195,96 @@ apps/growi-vault-manager/
 
 ---
 
+## Dockerfile 構成戦略
+
+### 背景と制約
+
+`apps/growi-vault-manager` は `apps/app` と異なり、runtime stage に git binary v2.30+ の実行可能体が **必須** である。具体的には `VaultUploadPackSpawner`（`apps/growi-vault-manager/src/services/vault-upload-pack-spawner.ts`）が Node.js の `child_process.spawn` を介して `git upload-pack --stateless-rpc` を起動するためで、要件 5（git smart HTTP の lower-half 提供）と要件 10.2（Dockerfile に node + git binary v2.30+ を同梱）の両方からの制約である。
+
+apps/app では DHI（Docker Hardened Images）化に際して runtime に追加 binary を一切載せない方針が採られたが（`.kiro/specs/official-docker-image/research.md` 参照）、その判断は「runtime が shell も git も不要」という apps/app 固有の前提に立つ。vault-manager にはこの前提が成立しない。
+
+### 候補方針の評価
+
+| 方針 | 概要 | 採否 | 理由 |
+|------|------|------|------|
+| (a) `dhi.io/node:24-debian13-dev` を runtime に流用 | dev variant を release stage の base に使う | **採用** | git/bash/coreutils が pre-installed。COPY 操作不要で、DHI が公式に維持する image をそのまま使えるため、DHI 更新追随が無コストで済む |
+| (b) git を含む別 DHI variant を採用 | DHI が node-git 等の variant を提供しているならそれを使う | **却下** | DHI catalog（`dhi.io/node` 配下）の available tag は `24-debian13` と `24-debian13-dev` の 2 種のみ（`.kiro/specs/official-docker-image/research.md` line 31）。git 同梱の third variant は存在しない |
+| (c) distroless runtime に git binary を `COPY --from=builder` | `dhi.io/node:24-debian13` をベースに、builder stage から `/usr/bin/git` と関連 binary・shared library を選択的に copy する | **却下** | Debian 13 の git は `/usr/lib/git-core/` 配下の補助 binary（`git-upload-pack` / `git-pack-objects` など）を runtime exec する構造のため、最低でも `/usr/bin/git` + `/usr/lib/git-core/` ディレクトリ全体 + 依存共有ライブラリ（libpcre2, libcurl, libssl, libcrypto, libz, libexpat 等）を tracking しながら copy する必要がある。DHI image の更新で依存関係が変わる度に追従が要求され、CVE 対応の遅延リスクが高い。さらに distroless には `ldconfig` も無いため runtime での lib 解決にも追加配慮が必要 |
+
+### 採用方針: (a) DHI dev variant を runtime に流用
+
+- **要旨**: `release` stage の base image に `dhi.io/node:24-debian13-dev` を採用する。git binary v2.30+ は image に pre-installed されるため、`apt-get install` も `COPY --from=...` も不要。
+- **トレードオフ**:
+  - **セキュリティ**: dev variant には apt / bash / util-linux / coreutils 等が含まれるため、distroless（`24-debian13`）に比べ攻撃面が広い。ただし vault-manager の runtime 必須要件として git を含めた時点で、shell-less 完全 distroless は技術的に成立しない（git の補助 binary 構造に起因）。dev variant は引き続き DHI として 95% CVE 削減の対象であり、`node:24-alpine` よりは大幅に堅牢。
+  - **イメージサイズ**: dev variant は distroless より大きい（おおよそ 2〜3 倍）。ただし vault-manager は単発の microservice として deploy されるため、apps/app のような大規模 runtime と比べれば絶対値は小さい。
+  - **保守性**: DHI が公式に維持する image をそのまま使えるため、手動の binary tracking や ldd 監視が不要。長期保守コストが (c) と比べ圧倒的に低い。
+
+### 18.2 で適用する具体的な Dockerfile 構造
+
+```dockerfile
+# build stage (apps/app と同じ)
+FROM dhi.io/node:24-debian13-dev AS base
+# ... pnpm + turbo install ...
+
+FROM base AS pruner
+COPY . .
+RUN turbo prune @growi/vault-manager --docker
+
+FROM base AS deps
+COPY --from=pruner $OPT_DIR/out/json/ .
+RUN pnpm install --frozen-lockfile
+
+FROM deps AS builder
+COPY --from=pruner $OPT_DIR/out/full/ .
+COPY tsconfig.base.json .
+RUN turbo run build --filter @growi/vault-manager
+# ... pnpm deploy + /tmp/release/ への artifact 集約 ...
+
+# release stage（apps/app と異なり dev variant を使用）
+FROM dhi.io/node:24-debian13-dev AS release
+ENV NODE_ENV="production"
+WORKDIR ${appDir}
+COPY --from=builder --chown=node:node /tmp/release/ ${appDir}/
+EXPOSE 3001
+ENTRYPOINT ["node", "dist/index.js"]
+```
+
+**重要点**:
+
+1. **base image 参照**: build stage は `dhi.io/node:24-debian13-dev`、release stage は **同じく** `dhi.io/node:24-debian13-dev`（apps/app の `24-debian13` distroless とは異なる）。
+2. **git binary の混入経路**: dev variant に pre-installed のため、`apt-get install git` も `COPY --from=builder /usr/bin/git` も書かない。
+3. **追加 `apt-get install` の有無**: 不要。dev variant に必要な build tool は揃っている（pdf-converter のような chromium 等の追加 deps はない）。
+4. **追加 `COPY --from=...` の有無**: artifact（`/tmp/release/`）の copy のみで、binary や shared library の cherry-pick は行わない。
+
+### 18.2 完了時の検証手順（手動チェックリスト）
+
+devcontainer には Docker daemon が無いため、以下は Docker daemon が利用可能な環境で手動実施する想定。検証ログを task 18.2 完了時に design.md または task 備考に追記する。
+
+```bash
+# 1. ビルドが成功すること
+docker build -f apps/growi-vault-manager/Dockerfile -t growi-vault-manager:dev .
+# 期待: 全 stage が成功し、最終 release image が生成される
+
+# 2. runtime image に git v2.30+ が存在すること
+docker run --rm growi-vault-manager:dev git --version
+# 期待: "git version 2.x.y" が出力され、x >= 30
+
+# 3. runtime image 内で git upload-pack が実行可能であること（bare repo を用意して確認）
+docker run --rm -v /tmp/test-repo:/repo growi-vault-manager:dev \
+  sh -c 'git init --bare /repo && git -C /repo upload-pack --stateless-rpc --advertise-refs /repo'
+# 期待: pkt-line 形式の advertised refs が stdout に出力される（capabilities^{} 等を含む）
+
+# 4. image size の確認（参考）
+docker images growi-vault-manager:dev --format '{{.Size}}'
+# 期待: alpine ベースの旧構成と比べ大きく逸脱しないこと（数百 MB オーダーであれば許容）
+```
+
+**備考**:
+- 検証 3 で sh を使うのは検証スクリプト都合であり、本番 runtime では `git upload-pack` は Node.js から `child_process.spawn` で直接起動されるため shell は経由しない。dev variant に bash/sh が含まれているという事実は本番 attack surface に追加で利用されることを意味しない（vault-manager の Node.js コードからは shell を呼び出さない）。
+- task 18.5 の integration test（`RUN_VAULT_INTEG=true`）が image 経由でも PASS することで、`VaultUploadPackSpawner` が runtime image 内の git binary と正しく結線されていることが end-to-end に確認できる。
+
+---
+
 ## システムフロー
 
 ### フロー 1: instruction 処理（page edit → vault sync）
