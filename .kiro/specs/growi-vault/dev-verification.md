@@ -95,6 +95,86 @@ ls /tmp/mygrowirepos
 
 `fatal: the remote end hung up unexpectedly` で止まった場合は次節へ。
 
+---
+
+## 結合試験（integ テスト）の手動実行手順
+
+`apps/app/src/features/growi-vault/__tests__/` 配下の integ テストは `describe.skip` のまま運用する。
+Vitest CI では何も実行されない（正式承認済み — `growi-vault-gateway` タスク 23.2 選択肢 B）。
+以下の手動手順がタスク 14.1 / 14.2 / 18.3 の完了基準に相当する。
+
+### clone-e2e.integ.ts の手動確認（タスク 14.1 / 18.3）
+
+**前提**: 起動手順に従って apps/app + vault-manager + MongoDB を起動済みで、PAT が seed 済みであること。
+
+```bash
+# describe.skip を一時的に describe に変更して実行
+# または GROWI_TEST_PAT / GROWI_TEST_URL をエクスポートした上で vitest run を使用
+export GROWI_TEST_URL="http://localhost:3000"
+export GROWI_TEST_PAT="${TOKEN}"   # PAT seed で得たトークン
+cd /workspace/growi-vault/apps/app
+pnpm vitest run clone-e2e.integ --reporter verbose
+```
+
+**確認項目**:
+- 有効 PAT で `git clone` が成功し、クローンディレクトリに `.md` ファイルが 1 件以上存在すること
+- 無効 PAT で clone が失敗（認証エラー）すること
+- null-revision ページ（中間パス自動生成）がクローン結果に含まれないこと（タスク 18.3）
+
+### vault-gateway.integ.ts の手動確認（タスク 14.2 / 18.3）
+
+**前提**: `GROWI_ADMIN_TOKEN` が設定済みであること。
+
+```bash
+export GROWI_TEST_URL="http://localhost:3000"
+export GROWI_TEST_PAT="${TOKEN}"
+export GROWI_ADMIN_TOKEN="${ADMIN_TOKEN}"
+cd /workspace/growi-vault/apps/app
+pnpm vitest run vault-gateway.integ --reporter verbose
+```
+
+**手動補完が必要なシナリオ**:
+
+**Scenario 2（bootstrapState=running）**: このシナリオは自動化できない。以下の手順で手動検証する:
+
+1. MongoDB で bootstrapState を強制的に `'running'` に設定:
+   ```js
+   db.vault_sync_state.updateOne(
+     { _id: 'singleton' },
+     { $set: { bootstrapState: 'running' } },
+     { upsert: true }
+   );
+   ```
+2. `/_vault/repo.git/info/refs?service=git-upload-pack` にリクエストを送り、503 + `Retry-After` ヘッダーが返ることを確認
+3. `git clone http://x:${TOKEN}@localhost:3000/_vault/repo.git /tmp/test` が失敗することを確認
+4. bootstrapState を `'done'` に戻す:
+   ```js
+   db.vault_sync_state.updateOne({ _id: 'singleton' }, { $set: { bootstrapState: 'done' } });
+   ```
+
+**Scenario 6（coalesce behaviour）**: vault_instructions の検証は MongoDB 直接読み取りで行う:
+
+1. 150 ページを `/test-coalesce` 配下に一括作成:
+   ```bash
+   for i in $(seq 0 149); do
+     curl -s -X POST "${BASE_URL}/_api/v3/page" \
+       -H "Content-Type: application/json" \
+       -H "Authorization: Bearer ${ADMIN_TOKEN}" \
+       -d "{\"path\": \"/test-coalesce/page-${i}\", \"body\": \"# Page ${i}\"}" > /dev/null
+   done
+   ```
+2. 1.5 秒待機後、MongoDB で bulk-upsert instruction の存在を確認:
+   ```js
+   db.vault_instructions
+     .find({ 'payload.namespace': '/test-coalesce' })
+     .sort({ issuedAt: -1 })
+     .limit(10)
+     .toArray();
+   ```
+   期待: `op === 'bulk-upsert'` のドキュメントが 1 件以上、`op === 'upsert'` が 0 件。
+
+---
+
 ## トラブルシュート
 
 ### `the remote end hung up unexpectedly` で clone が止まる

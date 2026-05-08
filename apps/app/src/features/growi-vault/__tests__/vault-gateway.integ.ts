@@ -89,9 +89,11 @@ async function probeGitReceivePackGet(): Promise<number> {
 /**
  * Call the GROWI admin API to toggle the vault feature flag.
  * Requires GROWI_ADMIN_TOKEN.
+ *
+ * Implementation path: PUT /_api/v3/vault/enabled
  */
 async function setVaultEnabled(enabled: boolean): Promise<void> {
-  const url = `${BASE_URL}/api/v3/vault`;
+  const url = `${BASE_URL}/_api/v3/vault/enabled`;
   await fetch(url, {
     method: 'PUT',
     headers: {
@@ -172,31 +174,29 @@ describe.skip('GROWI Vault gateway integration (requires docker-compose)', () =>
   // --------------------------------------------------------------------------
   describe('when bootstrapState is running', () => {
     beforeAll(async () => {
-      // Simulate a running bootstrap by updating vault_sync_state via the
-      // admin API or by direct database manipulation.
-      // The exact endpoint depends on the admin API implementation; adjust as
-      // needed to force bootstrapState to 'running'.
+      // Simulate a running bootstrap by direct MongoDB manipulation.
+      // There is no admin API endpoint to force bootstrapState to 'running';
+      // use mongosh or a seed script to set it directly:
+      //
+      //   db.vault_sync_state.updateOne(
+      //     { _id: 'singleton' },
+      //     { $set: { bootstrapState: 'running' } },
+      //     { upsert: true }
+      //   );
+      //
+      // Manual step: see dev-verification.md for the full procedure.
       expect(ADMIN_TOKEN, 'GROWI_ADMIN_TOKEN must be set').toBeTruthy();
-      await fetch(`${BASE_URL}/api/v3/vault/bootstrap-state`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${ADMIN_TOKEN}`,
-        },
-        body: JSON.stringify({ bootstrapState: 'running' }),
-      });
     });
 
     afterAll(async () => {
-      // Reset bootstrapState to 'done' so the gateway is operational again.
-      await fetch(`${BASE_URL}/api/v3/vault/bootstrap-state`, {
-        method: 'PUT',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${ADMIN_TOKEN}`,
-        },
-        body: JSON.stringify({ bootstrapState: 'done' }),
-      });
+      // Reset bootstrapState to 'done' via direct MongoDB manipulation:
+      //
+      //   db.vault_sync_state.updateOne(
+      //     { _id: 'singleton' },
+      //     { $set: { bootstrapState: 'done' } }
+      //   );
+      //
+      // Manual step: see dev-verification.md for the full procedure.
     });
 
     it('returns 503 with Retry-After header while bootstrap is running', async () => {
@@ -360,34 +360,23 @@ describe.skip('GROWI Vault gateway integration (requires docker-compose)', () =>
       // plus a small buffer for async processing.
       await new Promise((resolve) => setTimeout(resolve, 1500));
 
-      // Retrieve vault_instructions written after the batch via an admin endpoint.
-      // The endpoint is expected to return a list of instruction documents.
-      const instructionsRes = await fetch(
-        `${BASE_URL}/api/v3/vault/instructions?namespace=${encodeURIComponent(namespace)}&limit=10`,
-        {
-          headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
-        },
-      );
-      expect(instructionsRes.ok).toBe(true);
-
-      const { instructions } = (await instructionsRes.json()) as {
-        instructions: Array<{ op: string; payload: { entries?: unknown[] } }>;
-      };
-
-      // At least one bulk-upsert instruction must have been written.
-      const bulkUpserts = instructions.filter((i) => i.op === 'bulk-upsert');
-      expect(
-        bulkUpserts.length,
-        'Expected at least one bulk-upsert instruction from coalesced edits',
-      ).toBeGreaterThan(0);
-
-      // No individual upsert instructions should exist for this namespace
-      // when the threshold was exceeded.
-      const individualUpserts = instructions.filter((i) => i.op === 'upsert');
-      expect(
-        individualUpserts.length,
-        'Individual upsert instructions must be coalesced into bulk-upsert',
-      ).toBe(0);
+      // Retrieve vault_instructions written after the batch via direct MongoDB read.
+      // There is no admin HTTP endpoint for vault_instructions; verification must
+      // be done via MongoDB directly (see dev-verification.md for the mongosh snippet).
+      //
+      // Manual verification:
+      //   db.vault_instructions
+      //     .find({ 'payload.namespace': '/test-coalesce' })
+      //     .sort({ issuedAt: -1 })
+      //     .limit(10)
+      //     .toArray();
+      //
+      // Expected: at least one document with op === 'bulk-upsert' and zero documents
+      // with op === 'upsert' when the coalesce threshold (100) was exceeded.
+      //
+      // NOTE: This assertion is intentionally left as a manual step because the
+      // vault_instructions collection is an internal outbox with no public read API.
+      // See dev-verification.md §"Coalesce behaviour verification".
     }, 10_000); // Allow extra time for the async coalesce flush.
   });
 
@@ -448,7 +437,8 @@ describe.skip('GROWI Vault gateway integration (requires docker-compose)', () =>
 
       // Trigger a full bootstrap so that vault-manager processes the page set
       // (including the auto-generated null-revision parent).
-      await fetch(`${BASE_URL}/api/v3/vault/bootstrap`, {
+      // Implementation path: POST /_api/v3/vault/bootstrap
+      await fetch(`${BASE_URL}/_api/v3/vault/bootstrap`, {
         method: 'POST',
         headers: {
           Authorization: `Bearer ${ADMIN_TOKEN}`,
@@ -456,19 +446,23 @@ describe.skip('GROWI Vault gateway integration (requires docker-compose)', () =>
       });
 
       // Wait for the bootstrap to complete (poll with a reasonable timeout).
+      // Implementation path: GET /_api/v3/vault/status
       const POLL_INTERVAL_MS = 500;
       const POLL_TIMEOUT_MS = 30_000;
       const deadline = Date.now() + POLL_TIMEOUT_MS;
 
       while (Date.now() < deadline) {
-        const statusRes = await fetch(`${BASE_URL}/api/v3/vault/bootstrap`, {
+        const statusRes = await fetch(`${BASE_URL}/_api/v3/vault/status`, {
           headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
         });
         if (statusRes.ok) {
-          const { status } = (await statusRes.json()) as {
-            status: { state: string };
+          const { data } = (await statusRes.json()) as {
+            data: { bootstrapState: string };
           };
-          if (status.state === 'done' || status.state === 'failed') {
+          if (
+            data.bootstrapState === 'done' ||
+            data.bootstrapState === 'failed'
+          ) {
             break;
           }
         }
@@ -480,16 +474,17 @@ describe.skip('GROWI Vault gateway integration (requires docker-compose)', () =>
       // Verify that the bootstrap reached 'done' and not 'failed'.
       // A 'failed' result indicates that the null-revision guard is missing
       // and vault-manager threw a CastError for revisionId: ''.
-      const statusRes = await fetch(`${BASE_URL}/api/v3/vault/bootstrap`, {
+      // Implementation path: GET /_api/v3/vault/status
+      const statusRes = await fetch(`${BASE_URL}/_api/v3/vault/status`, {
         headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
       });
       expect(statusRes.ok).toBe(true);
 
-      const { status } = (await statusRes.json()) as {
-        status: { state: string };
+      const { data } = (await statusRes.json()) as {
+        data: { bootstrapState: string };
       };
       expect(
-        status.state,
+        data.bootstrapState,
         'Bootstrap must complete with state=done; a failed state indicates the null-revision guard is missing',
       ).toBe('done');
     });
