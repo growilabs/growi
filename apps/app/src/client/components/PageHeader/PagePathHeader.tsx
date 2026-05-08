@@ -14,6 +14,7 @@ import {
 } from '~/client/util/use-input-validator';
 import type { IPageForItem } from '~/interfaces/page';
 import { LinkedPagePath } from '~/models/linked-page-path';
+import { useIsMobile } from '~/states/ui/device';
 import { usePageSelectModalActions } from '~/states/ui/modal/page-select';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
@@ -45,6 +46,7 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
 
   const [isRenameInputShown, setRenameInputShown] = useState(false);
   const [isHover, setHover] = useState(false);
+  const [isMobile] = useIsMobile();
 
   const { open: openPageSelectModal } = usePageSelectModalActions();
 
@@ -166,7 +168,7 @@ export const PagePathHeader = memo((props: Props): JSX.Element => {
       </div>
 
       <div
-        className={`page-path-header-buttons d-flex align-items-center ms-2 ${isHover && !isRenameInputShown ? '' : 'invisible'}`}
+        className={`page-path-header-buttons d-flex align-items-center ms-2 ${(isMobile || isHover) && !isRenameInputShown ? '' : 'invisible'}`}
       >
         <button
           type="button"
