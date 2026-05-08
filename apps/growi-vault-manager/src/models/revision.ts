@@ -22,6 +22,16 @@ export interface IRevisionDocument
 
 // ---- Model interface ----
 
+/**
+ * Result of bodyQueryByIds.
+ * query: the Mongoose query filtered to valid ObjectId IDs only.
+ * skippedIds: IDs that were excluded because they failed ObjectId validation.
+ */
+export interface BodyQueryResult {
+  readonly query: ReturnType<IRevisionModel['find']>;
+  readonly skippedIds: ReadonlyArray<string>;
+}
+
 export interface IRevisionModel extends Model<IRevisionDocument> {
   /**
    * Fetch a single revision's body by its _id.
@@ -31,13 +41,15 @@ export interface IRevisionModel extends Model<IRevisionDocument> {
   findBodyById(id: string): Promise<IRevisionLean | null>;
 
   /**
-   * Returns a Mongoose query for { _id, body } over the given id list.
+   * Returns a { query, skippedIds } result for { _id, body } over the given id list.
+   * Only IDs that pass mongoose.Types.ObjectId.isValid() are included in the query.
+   * skippedIds contains any IDs that were filtered out due to invalid format.
    * Enables memory-efficient streaming during bulk-upsert instruction processing.
-   * Usage: const cursor = RevisionModel.bodyQueryByIds(ids); for await (const doc of cursor) { ... }
+   * Usage: const { query, skippedIds } = RevisionModel.bodyQueryByIds(ids);
+   *        const cursor = query.cursor();
+   *        for await (const doc of cursor) { ... }
    */
-  bodyQueryByIds(
-    ids: ReadonlyArray<string>,
-  ): ReturnType<IRevisionModel['find']>;
+  bodyQueryByIds(ids: ReadonlyArray<string>): BodyQueryResult;
 }
 
 // ---- Schema ----
@@ -74,8 +86,20 @@ revisionSchema.statics.findBodyById = function (
 revisionSchema.statics.bodyQueryByIds = function (
   this: IRevisionModel,
   ids: ReadonlyArray<string>,
-) {
-  return this.find({ _id: { $in: ids } }, { body: 1 });
+): BodyQueryResult {
+  const validIds: string[] = [];
+  const skippedIds: string[] = [];
+
+  for (const id of ids) {
+    if (mongoose.Types.ObjectId.isValid(id)) {
+      validIds.push(id);
+    } else {
+      skippedIds.push(id);
+    }
+  }
+
+  const query = this.find({ _id: { $in: validIds } }, { body: 1 });
+  return { query, skippedIds };
 };
 
 // ---- Model export ----

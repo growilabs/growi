@@ -18,9 +18,13 @@
  */
 
 import type { VaultInstructionDoc } from '@growi/core/dist/interfaces/vault';
+import { loggerFactory } from '@growi/logger';
 
 import { RevisionModel } from '../models/revision.js';
 import { VaultNamespaceStateModel } from '../models/vault-namespace-state.js';
+
+const logger = loggerFactory('growi:vault-manager:vault-namespace-builder');
+
 import { VaultUserViewModel } from '../models/vault-user-view.js';
 import * as VaultBlobHasher from './vault-blob-hasher.js';
 import * as VaultPathMapper from './vault-path-mapper.js';
@@ -460,7 +464,14 @@ async function applyBulkUpsert(
   const revisionIds = entries.map((e) => e.revisionId);
   const revisionMap = new Map<string, string>(); // revisionId → body
 
-  const cursor = RevisionModel.bodyQueryByIds(revisionIds).cursor();
+  const { query, skippedIds } = RevisionModel.bodyQueryByIds(revisionIds);
+  if (skippedIds.length > 0) {
+    logger.warn(
+      { skippedCount: skippedIds.length, skippedIds },
+      'bulk-upsert: skipped invalid revisionId(s) — invalid ObjectId format',
+    );
+  }
+  const cursor = query.cursor();
   for await (const rawDoc of cursor) {
     // Mongoose document cursor yields typed documents; cast for safe field access.
     const doc = rawDoc as { _id: unknown; body: string };

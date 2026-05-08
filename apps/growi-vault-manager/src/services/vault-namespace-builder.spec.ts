@@ -370,7 +370,8 @@ describe('op: bulk-upsert', () => {
   it('N=1: fetches revision, writes blob, builds tree, creates single commit', async () => {
     const cursor = makeBulkCursor([{ _id: 'rev-001', body: 'body-1' }]);
     asMock(RevisionModel.bodyQueryByIds).mockReturnValue({
-      cursor: () => cursor,
+      query: { cursor: () => cursor },
+      skippedIds: [],
     });
     asMock(VaultPathMapper.map).mockReturnValue('pages/p1.md');
     asMock(VaultBlobHasher.hashBlob).mockResolvedValue('blob-1');
@@ -409,7 +410,8 @@ describe('op: bulk-upsert', () => {
 
     const cursor = makeBulkCursor(revisions);
     asMock(RevisionModel.bodyQueryByIds).mockReturnValue({
-      cursor: () => cursor,
+      query: { cursor: () => cursor },
+      skippedIds: [],
     });
     asMock(VaultPathMapper.map).mockImplementation(
       (_path: unknown, _id: unknown) => `pages/p${_id}.md`,
@@ -447,7 +449,8 @@ describe('op: bulk-upsert', () => {
 
     const cursor = makeBulkCursor(revisions);
     asMock(RevisionModel.bodyQueryByIds).mockReturnValue({
-      cursor: () => cursor,
+      query: { cursor: () => cursor },
+      skippedIds: [],
     });
     asMock(VaultPathMapper.map).mockImplementation(
       (_path: unknown, _id: unknown) => `pages/p${_id}.md`,

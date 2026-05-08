@@ -329,7 +329,7 @@
 
   apps/app から渡される `bulk-upsert` / `upsert` instruction の `revisionId` に空文字列または ObjectId 形式違反値が混入した場合、現状は `RevisionModel.bodyQueryByIds(['', ...])` が Mongoose の `Cast to ObjectId failed for value ""` で throw し、bulk-upsert が `attempts=5` まで失敗継続する。バグの一次責務は apps/app 側（`growi-vault-gateway` タスク 18 で修正）だが、vault-manager 側でも防御層を追加し、apps/app 側のリグレッション・将来追加されるデータソースに対して耐性を持たせる。
 
-- [ ] 13.1 RevisionModel に valid-id フィルタリングを追加（タスク 2.2 の追補）
+- [x] 13.1 RevisionModel に valid-id フィルタリングを追加（タスク 2.2 の追補）
   - `apps/growi-vault-manager/src/models/revision.ts` の `bodyQueryByIds` を「ObjectId として valid な ID のみで `$in` 検索する」実装に変更する（または `bodyQueryByValidIds` を新設して既存メソッドは deprecated JSDoc を付与する）
   - 内部で `mongoose.Types.ObjectId.isValid(id)` で filter してから `find({_id: {$in: validIds}}, {body})` を構築する
   - filter で取り除いた件数を返す or logger に warn で出力できるように、戻り値に `{ cursor, skippedIds }` を含める設計を検討する（必須ではないが 13.2 のログ出力で使う）
