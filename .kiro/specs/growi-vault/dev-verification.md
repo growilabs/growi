@@ -145,6 +145,45 @@ await db.collection('vault_sync_state').updateOne(
 
 その後 `apps/app/.env.development.local` に `VAULT_BOOTSTRAP_ON_START=true` を追加して apps/app を再起動するか、admin UI から bootstrap を再実行する。
 
+### null revision ページ起因の "Cast to ObjectId failed" 修復手順（管理者向けマイグレーション）
+
+**症状**: GROWI が自動生成する中間パスページ（`/user`、`/empty` 等、`revision` フィールドなし）が bootstrap 中に
+`revisionId: ''` として instruction に積まれ、vault-manager 側で `Cast to ObjectId failed for value "" at path "_id"` が発生。
+該当 instruction が `attempts >= 5` まで失敗し続け、`git clone` が `the remote end hung up unexpectedly` で停止する。
+
+**前提条件**: 以下の修正が両サービスに適用済みであること:
+- `growi-vault-gateway` タスク 18.1/18.2 — bootstrapper と dispatcher が null revision ページをスキップ
+- `growi-vault-manager` タスク 13.1/13.2 — `bodyQueryByIds` が invalid ObjectId をフィルタ
+
+**修復手順**:
+
+1. 詰まった instruction を削除する（`attempts >= 1` かつ未処理のもの）:
+   ```js
+   db.vault_instructions.deleteMany({ processedAt: null, attempts: { $gte: 1 } });
+   ```
+
+2. bootstrap state をリセットする:
+   ```js
+   db.vault_sync_state.updateOne(
+     { _id: 'singleton' },
+     {
+       $set: {
+         bootstrapState: 'pending',
+         bootstrapCursor: null,
+         bootstrapProcessed: 0,
+       },
+     },
+   );
+   ```
+
+3. `VAULT_BOOTSTRAP_ON_START=true` で apps/app を再起動するか、admin UI (`/admin/vault`) から "Prepare GROWI Vault" を実行する。
+
+4. bootstrap 完了後、`git clone http://x:<PAT>@<host>/_vault/repo.git` が成功してファイル一覧が取得できることを確認する。
+   また、`vault_user_views.<viewRef>.mergedTreeOid` が `4b825dc642cb6eb9a060e54bf8d69288fbee4904`（empty tree SHA）以外の値になっていることを確認する:
+   ```js
+   db.vault_user_views.find({}, { mergedTreeOid: 1 }).toArray();
+   ```
+
 ### 起動コマンドが ENOENT/script not found で失敗する
 
 ルート `package.json` に `dev:vault-manager` の alias は無い。必ず以下のいずれかを使う:
