@@ -301,7 +301,7 @@
 
 ---
 
-- [ ] 12. 起動時プリフライトチェック
+- [x] 12. 起動時プリフライトチェック
 - [x] 12.1 必須環境変数の検証
   - `src/index.ts` の `bootstrap()` 呼び出し前に必須環境変数の存在チェックを行う
   - 必須変数: `VAULT_MANAGER_INTERNAL_SECRET`、`MONGODB_URI`、`VAULT_REPO_PATH`
@@ -325,7 +325,7 @@
 
 ---
 
-- [ ] 13. invalid revisionId 防御策の追加（**P0 / 最優先・結合試験ブロッカー**）
+- [x] 13. invalid revisionId 防御策の追加（**P0 / 最優先・結合試験ブロッカー**）
 
   apps/app から渡される `bulk-upsert` / `upsert` instruction の `revisionId` に空文字列または ObjectId 形式違反値が混入した場合、現状は `RevisionModel.bodyQueryByIds(['', ...])` が Mongoose の `Cast to ObjectId failed for value ""` で throw し、bulk-upsert が `attempts=5` まで失敗継続する。バグの一次責務は apps/app 側（`growi-vault-gateway` タスク 18 で修正）だが、vault-manager 側でも防御層を追加し、apps/app 側のリグレッション・将来追加されるデータソースに対して耐性を持たせる。
 
