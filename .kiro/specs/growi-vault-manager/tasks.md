@@ -472,7 +472,7 @@
   - _Requirements: 10.2_
   - _Boundary: apps/growi-vault-manager/Dockerfile.dockerignore_
 
-- [ ] 18.4 OCI 標準 label の付与
+- [x] 18.4 OCI 標準 label の付与
   - release stage に `org.opencontainers.image.source` / `title` / `description` / `vendor` の OCI 標準 label を追加する（apps/app と同じ vendor `WESEEK, Inc.`、source URL `https://github.com/weseek/growi` を流用、title / description は vault-manager 固有のものを設定）
   - 既存の `LABEL maintainer="Yuki Takei <yuki@weseek.co.jp>"` は `org.opencontainers.image.authors` に置き換えるか、両者併存とするかを apps/app の方針と揃える
   - **完了確認**: `docker inspect <image>` の `Config.Labels` に OCI 標準 label が出現すること

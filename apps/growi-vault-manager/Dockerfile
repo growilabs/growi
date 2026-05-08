@@ -101,7 +101,6 @@ RUN mkdir -p /tmp/release/apps/growi-vault-manager && \
 ## release — DHI dev variant runtime (git binary required for git upload-pack spawn)
 ##
 FROM dhi.io/node:24-debian13-dev AS release
-LABEL maintainer="Yuki Takei <yuki@weseek.co.jp>"
 
 ARG OPT_DIR
 
@@ -114,6 +113,13 @@ COPY --from=builder --chown=node:node /tmp/release/ ${appDir}/
 
 USER root
 WORKDIR ${appDir}/apps/growi-vault-manager
+
+# OCI standard labels
+LABEL org.opencontainers.image.source="https://github.com/weseek/growi"
+LABEL org.opencontainers.image.title="GROWI Vault Manager"
+LABEL org.opencontainers.image.description="GROWI Vault internal execution engine: namespace tree builder + git upload-pack server"
+LABEL org.opencontainers.image.vendor="WESEEK, Inc."
+LABEL org.opencontainers.image.authors="Yuki Takei <yuki@weseek.co.jp>"
 
 EXPOSE 3001
 
