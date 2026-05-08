@@ -122,11 +122,18 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             resource: thread.resourceId,
           },
           // Configure the OpenAI Responses API to emit reasoning summary
-          // chunks. Without `reasoningSummary`, reasoning happens internally
-          // (and is billed) but no human-readable trace reaches the UI.
-          // Note: `reasoningSummary` requires a verified OpenAI organization.
-          // `effort: 'low'` keeps reasoning-token volume bounded; raise per
-          // user preference if deeper traces are desired.
+          // chunks. Reasoning is always executed (and billed) for reasoning
+          // models; this option controls only whether the summary text is
+          // surfaced to the UI.
+          //
+          // Important: surfacing reasoning summary requires a verified OpenAI
+          // organization. Without verification, summary parts are emitted as
+          // empty (`reasoning-start` / `reasoning-end` only, no delta), so
+          // the UI shows the trigger but no body.
+          //
+          // `effort: 'low'` bounds reasoning-token volume for cost; raise it
+          // when richer reasoning depth is desired (also tends to produce
+          // fuller summaries when verification is in place).
           providerOptions: {
             openai: {
               reasoningEffort: 'low',
