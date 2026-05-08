@@ -261,9 +261,21 @@ describe('NewsCronService', () => {
           },
         ],
       };
-      mocks.mockFetch.mockResolvedValue({
-        ok: true,
-        json: () => Promise.resolve(feed),
+      mocks.mockFetch.mockResolvedValue(mockResponse(feed));
+
+      await service.executeJob();
+
+      // The argument is the *full* feed externalId list, not the
+      // version-matched subset. Items absent from this list (e.g. an
+      // earlier `removed-from-feed` item still in the DB) will be
+      // deleted by the service via `$nin`.
+      expect(mocks.deleteItemsNotInFeed).toHaveBeenCalledWith([
+        'still-present-1',
+        'still-present-2',
+        'version-filtered',
+      ]);
+    });
+
     test('should skip when response body exceeds size limit (5 MiB)', async () => {
       process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       // Build a string that exceeds 5 MiB
@@ -324,15 +336,6 @@ describe('NewsCronService', () => {
 
       await service.executeJob();
 
-      // The argument is the *full* feed externalId list, not the
-      // version-matched subset. Items absent from this list (e.g. an
-      // earlier `removed-from-feed` item still in the DB) will be
-      // deleted by the service via `$nin`.
-      expect(mocks.deleteItemsNotInFeed).toHaveBeenCalledWith([
-        'still-present-1',
-        'still-present-2',
-        'version-filtered',
-      ]);
       expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
     });
   });
