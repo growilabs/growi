@@ -398,14 +398,14 @@ _Depends: 6.1, 9.1_
 `apps/app/src/features/growi-vault/server/routes/vault-admin.ts` を新規作成する。
 
 - Express Router を作成する（管理者認証ミドルウェアを適用）
-- `GET /_api/admin/vault/status` エンドポイントを実装する:
+- `GET /_api/v3/vault/status` エンドポイントを実装する:
   - VaultBootstrapper.getStatus() の結果を返す
   - `VaultManagerClient.getStorageStats()` を呼び出して `StorageStatsResponse`（namespaceCount / totalCommitCount / looseObjectCount / repoSizeBytes / lastSquashAt / lastGcAt）をレスポンスに含める
   - vault-manager 側のエラー時は storage stats を null として返し、admin UI 側で「取得失敗」を表示できるようにする（bootstrap status は引き続き返す）
-- `POST /_api/admin/vault/bootstrap` エンドポイントを実装する:
+- `POST /_api/v3/vault/bootstrap` エンドポイントを実装する:
   - VaultBootstrapper.start({ triggerSource: 'admin-ui' }) を呼び出す
   - bootstrapState が既に 'running' の場合は 409 を返す
-- `PUT /_api/admin/vault/enabled` エンドポイントを実装する:
+- `PUT /_api/v3/vault/enabled` エンドポイントを実装する:
   - リクエスト body の `enabled` フィールド（boolean）を受け取る
   - VaultSettingsService 経由で `app:vaultEnabled` を更新する
 - named export する
@@ -424,20 +424,20 @@ _Depends: 11.1_
 `apps/app/src/features/growi-vault/client/admin/VaultAdminSettings.tsx` を新規作成する。
 
 - React 関数コンポーネントとして実装する
-- SWR を使用して `GET /_api/admin/vault/status` を定期ポーリングする
+- SWR を使用して `GET /_api/v3/vault/status` を定期ポーリングする
 - Feature toggle セクション:
   - `vaultEnabled` ON/OFF トグルを表示する
   - bootstrapState が `done` でない状態で enable にしようとした場合は警告を表示する
-  - トグル変更時に `PUT /_api/admin/vault/enabled` を呼び出す
+  - トグル変更時に `PUT /_api/v3/vault/enabled` を呼び出す
 - Bootstrap operation セクション:
   - "Prepare GROWI Vault" ボタンを表示する
-  - ボタン押下時に `POST /_api/admin/vault/bootstrap` を呼び出す
+  - ボタン押下時に `POST /_api/v3/vault/bootstrap` を呼び出す
   - bootstrapState が `running` の間はボタンを disabled にする
 - Bootstrap status セクション:
   - `state` / `processed` / `totalEstimated` / `startedAt` / `completedAt` / `lastError` を表示する
   - `running` の間は進捗バー（processed / totalEstimated）を表示する
 - Storage observability セクション:
-  - `GET /_api/admin/vault/status` のレスポンスから storage stats を取得し、namespace 数 / 合計 commit 数 / loose object 数 / repo size / 最終 squash・gc 時刻を表示する
+  - `GET /_api/v3/vault/status` のレスポンスから storage stats を取得し、namespace 数 / 合計 commit 数 / loose object 数 / repo size / 最終 squash・gc 時刻を表示する
   - storage stats が null の場合（vault-manager 取得失敗時）は「取得失敗」を表示する
 - Audit log filter link セクション:
   - 既存 audit log UI に "vault.*" フィルターを適用するリンクを表示する
@@ -796,7 +796,7 @@ _Depends: 11.1_
 
 要件 8.3 / タスク 11.1 は `POST /_api/admin/vault/bootstrap` 等を要求しているが、実装は GROWI の既存 admin route 慣例に従って [apiv3/index.js:82](../../../apps/app/src/server/routes/apiv3/index.js#L82) で `/_api/v3/vault/...` にマウントされている（`/admin` セグメント無し、`/v3` セグメント有り）。クライアント [VaultAdminSettings.tsx:378,398,410](../../../apps/app/src/features/growi-vault/client/admin/VaultAdminSettings.tsx#L378) と server は辻褄が合っているので動作するが、要件文書と乖離している。
 
-### [ ] 24.1 要件 / 設計 / タスク文書を実装に揃える
+### [x] 24.1 要件 / 設計 / タスク文書を実装に揃える
 
 GROWI 既存慣例（`/_api/v3/<resource>` 配下）に合わせるのが現実的:
 

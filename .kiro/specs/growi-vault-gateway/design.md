@@ -572,7 +572,7 @@ interface VaultSettingsService {
 | セクション | 内容 |
 |---|---|
 | Feature toggle | `vaultEnabled` の ON/OFF トグル |
-| Bootstrap operation | "Prepare GROWI Vault" ボタン（`POST /_api/admin/vault/bootstrap` を発火） |
+| Bootstrap operation | "Prepare GROWI Vault" ボタン（`POST /_api/v3/vault/bootstrap` を発火） |
 | Bootstrap status | `state` (pending/running/done/failed) + 進捗バー (`processed / totalEstimated`) + `startedAt` / `completedAt` / `lastError` |
 | Storage observability | `GET /internal/storage-stats` 経由で取得した namespace 数 / 合計 commit 数 / loose object 数 / repo size / 最終 squash・gc 時刻（vault_namespace_state を直接 read しない） |
 | Audit log filter link | 既存 audit log UI に "vault.*" フィルターを適用するリンク |

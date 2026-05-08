@@ -162,7 +162,7 @@
 
 1. When 管理者が管理 UI から `vaultEnabled` トグルを操作した場合, the GROWI Vault Gateway shall 設定を永続化し、即座に機能の有効化・無効化を反映する
 2. The GROWI Vault Gateway shall admin UI に bootstrap の `state` / `processed` / `totalEstimated` / `startedAt` / `completedAt` / `lastError` を表示する進捗セクションを提供する
-3. When "Prepare GROWI Vault" ボタンが押された場合, the GROWI Vault Gateway shall `POST /_api/admin/vault/bootstrap` を呼び出し bootstrap を開始する
+3. When "Prepare GROWI Vault" ボタンが押された場合, the GROWI Vault Gateway shall `POST /_api/v3/vault/bootstrap` を呼び出し bootstrap を開始する
 4. When bootstrapState が `done` でない状態で `vaultEnabled` を ON にしようとした場合, the GROWI Vault Gateway shall admin UI に警告を表示する（ユーザーは 503 を受け取ることになるため）
 5. The GROWI Vault Gateway shall admin UI に既存 audit log UI への "vault.*" フィルター付きリンクを提供する
 6. The GROWI Vault Gateway shall admin UI に `GET /internal/storage-stats` 経由で取得した namespace 数・合計 commit 数・loose object 数・repo size・最終 squash/gc 時刻を表示するストレージ観測セクションを提供する（vault_namespace_state を直接 read しない）
