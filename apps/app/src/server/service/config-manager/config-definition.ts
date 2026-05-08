@@ -1220,7 +1220,6 @@ export const CONFIG_DEFINITIONS = {
 
   // News Settings
   'news:isDeliveryEnabled': defineConfig<boolean>({
-    envVarName: 'NEWS_DELIVERY_ENABLED',
     defaultValue: true,
   }),
 
