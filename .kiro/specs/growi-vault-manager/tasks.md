@@ -403,7 +403,7 @@
   - **完了確認**: `RUN_VAULT_INTEG=true` 未設定で `pnpm vitest run` を実行すると従来通り skip され、`RUN_VAULT_INTEG=true` 設定下では `clone-e2e.integ` の最初の 1 ケースが実行されること（docker-compose 起動済みの devcontainer で確認）
   - _Boundary: apps/growi-vault-manager/src/__tests__/*.integ.ts_
 
-- [ ] 16.2 docker-compose と CI ジョブで integration テストを最低 1 ジョブ実行可能にする
+- [x] 16.2 docker-compose と CI ジョブで integration テストを最低 1 ジョブ実行可能にする
   - `docker-compose.yml` または `apps/growi-vault-manager/docker-compose.integ.yml`（新規）で vault-manager + MongoDB + 共有 fs を立ち上げ、`RUN_VAULT_INTEG=true pnpm vitest run` を実行するスクリプトを `package.json` の `scripts.test:integ` として追加する
   - GitHub Actions（または既存 CI）に「integration」ジョブを 1 つ追加し、`scripts.test:integ` を実行する
   - **完了確認**: CI で `clone-e2e.integ` 系の 1 シナリオが PASS すること、PR に対して回帰検出が機能すること

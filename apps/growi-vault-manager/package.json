@@ -15,7 +15,8 @@
     "lint:typecheck": "tsc --noEmit",
     "lint": "run-p lint:**",
     "build": "pnpm tsc -p tsconfig.build.json",
-    "test": "vitest run"
+    "test": "vitest run",
+    "test:integ": "RUN_VAULT_INTEG=true vitest run src/__tests__"
   },
   "dependencies": {
     "@godaddy/terminus": "^4.12.1",

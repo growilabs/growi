@@ -1,0 +1,108 @@
+name: Vault Manager Integration Tests
+
+on:
+  workflow_dispatch:
+  push:
+    branches-ignore:
+      - release/**
+      - rc/**
+      - changeset-release/**
+      - mergify/merge-queue/**
+      - tmp-mergify/merge-queue/**
+    paths:
+      - apps/growi-vault-manager/**
+      - .github/workflows/vault-integ.yml
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+
+jobs:
+  vault-manager-integ:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+
+    services:
+      mongodb:
+        image: mongo:6.0
+        ports:
+          - 27017/tcp
+        options: >-
+          --health-cmd "mongosh --quiet --eval \"db.adminCommand('ping').ok\""
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - name: Cache/Restore dist
+        uses: actions/cache@v4
+        with:
+          path: |
+            **/.turbo
+            **/dist
+            **/node_modules/.cache/turbo
+          key: dist-vault-integ-${{ runner.OS }}-node${{ matrix.node-version }}-${{ github.sha }}
+          restore-keys: |
+            dist-vault-integ-${{ runner.OS }}-node${{ matrix.node-version }}-
+
+      - name: Install dependencies
+        run: |
+          pnpm add turbo --global
+          pnpm install --frozen-lockfile
+
+      - name: Build vault-manager
+        run: |
+          turbo run build --filter @growi/vault-manager
+
+      - name: Start vault-manager
+        working-directory: apps/growi-vault-manager
+        run: |
+          node dist/index.js &
+          echo "VAULT_MANAGER_PID=$!" >> "$GITHUB_ENV"
+        env:
+          NODE_ENV: production
+          MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-vault-integ
+          VAULT_MANAGER_INTERNAL_SECRET: ${{ secrets.VAULT_MANAGER_INTERNAL_SECRET || 'test-secret-for-integration' }}
+          VAULT_REPO_PATH: ${{ runner.temp }}/vault-repo
+
+      - name: Wait for vault-manager to be ready
+        run: |
+          for i in $(seq 1 30); do
+            if curl -sf http://localhost:3001/healthz > /dev/null 2>&1; then
+              echo "vault-manager is ready"
+              exit 0
+            fi
+            echo "Waiting... ($i/30)"
+            sleep 2
+          done
+          echo "vault-manager did not become ready in time"
+          exit 1
+
+      - name: Run integration tests
+        run: |
+          pnpm --filter @growi/vault-manager test:integ
+        env:
+          RUN_VAULT_INTEG: "true"
+          VAULT_MANAGER_BASE_URL: http://localhost:3001
+          VAULT_MANAGER_INTERNAL_SECRET: ${{ secrets.VAULT_MANAGER_INTERNAL_SECRET || 'test-secret-for-integration' }}
+          MONGO_URL: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-vault-integ
+
+      - name: Stop vault-manager
+        if: always()
+        run: |
+          if [ -n "$VAULT_MANAGER_PID" ]; then
+            kill "$VAULT_MANAGER_PID" || true
+          fi

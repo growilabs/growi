@@ -1,0 +1,53 @@
+# docker-compose configuration for running vault-manager integration tests.
+#
+# Usage:
+#   docker compose -f apps/growi-vault-manager/docker-compose.integ.yml up --build -d
+#   # wait for services to be healthy, then run tests:
+#   RUN_VAULT_INTEG=true \
+#     VAULT_MANAGER_BASE_URL=http://localhost:3001 \
+#     VAULT_MANAGER_INTERNAL_SECRET=test-secret-for-integration \
+#     MONGO_URL=mongodb://localhost:27017/growi-vault-integ \
+#     pnpm --filter @growi/vault-manager test:integ
+
+name: growi-vault-integ
+
+services:
+
+  mongo:
+    image: mongo:6.0
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    healthcheck:
+      test: ["CMD", "mongosh", "--quiet", "--eval", "db.adminCommand('ping').ok"]
+      interval: 5s
+      timeout: 5s
+      retries: 20
+
+  vault-manager:
+    build:
+      context: ../..
+      dockerfile: apps/growi-vault-manager/Dockerfile
+    depends_on:
+      mongo:
+        condition: service_healthy
+    ports:
+      - "3001:3001"
+    environment:
+      NODE_ENV: production
+      MONGO_URI: mongodb://mongo:27017/growi-vault-integ
+      VAULT_MANAGER_INTERNAL_SECRET: test-secret-for-integration
+      VAULT_REPO_PATH: /data/vault-repo
+    volumes:
+      - vault_repo:/data/vault-repo
+    healthcheck:
+      test: ["CMD", "wget", "-qO-", "http://localhost:3001/healthz"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+
+volumes:
+  mongo_data:
+  vault_repo:
