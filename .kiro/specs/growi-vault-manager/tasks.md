@@ -436,3 +436,52 @@
   - 関連 spec として gateway / manager design.md と umbrella requirements 8 へのリンクを併記する
   - _Requirements: 要件 8 (umbrella)_
   - _Boundary: apps/growi-vault-manager/README.md_
+
+---
+
+- [ ] 18. Dockerfile を DHI 採用のモダン構成にリファクタ（**P1 / Important**）
+
+  `apps/app/docker/Dockerfile` は最近 DHI（Docker Hardened Images）採用と turbo prune ベースの多段ビルドへリファクタされた（`dhi.io/node:24-debian13-dev` を build / `dhi.io/node:24-debian13` を runtime、`base` → `pruner` → `deps` → `builder` → `release` の 5 stage 構成、`pnpm store` の cache mount、OCI 標準 label、専用 `Dockerfile.dockerignore`）。一方 `apps/growi-vault-manager/Dockerfile` は依然として `node:24-alpine` + `apk add git` + 単一 `builder` stage という旧構成のままで、ビルドキャッシュ効率・runtime 攻撃面・monorepo subset 抽出の点で apps/app と齟齬がある。本タスクで apps/app と同じ流儀に揃え、vault-manager 固有の制約（runtime で `git upload-pack` を spawn するため git binary v2.30+ が必須）に対応する。
+
+- [ ] 18.1 release stage の git binary 取得戦略を確定（前提調査）
+  - vault-manager は `VaultUploadPackSpawner` が runtime で `git upload-pack --stateless-rpc` を `child_process.spawn` するため、release stage に git v2.30+ の実行可能 binary が必須である（apps/app には存在しない制約）
+  - DHI distroless 系（`dhi.io/node:24-debian13`）は shell も任意 binary も持たないため、以下の選択肢から方針を確定し design.md または本 task の備考に記録する:
+    - (a) `dhi.io/node:24-debian13-dev`（git/shell を含む dev variant）を runtime に流用する
+    - (b) DHI に git を含む別 variant が存在する場合はそれを採用する
+    - (c) `builder` stage（debian-dev）から `/usr/bin/git` と依存共有ライブラリ（`ldd /usr/bin/git` で列挙）を release stage に `COPY --from=builder` で持ち込む static copy 戦略
+  - **完了確認**: 採用方針と検証ログ（`git --version` が 2.30 以上を返し、`git upload-pack --stateless-rpc --advertise-refs <repo>` が動作することを runtime image 内で確認した記録）を design.md または tasks.md に追記すること
+  - _Requirements: 10.2, 10.3_
+  - _Boundary: apps/growi-vault-manager/Dockerfile（または .kiro/specs/growi-vault-manager/design.md の補足記述）_
+
+- [ ] 18.2 multi-stage 構成へリファクタ（DHI base + turbo prune）
+  - `apps/app/docker/Dockerfile` に倣って `base` / `pruner` / `deps` / `builder` / `release` の 5 stage 構成に書き換える
+  - `base` stage は `dhi.io/node:24-debian13-dev` をベースに pnpm（standalone install script）と turbo を導入する
+  - `pruner` stage で `turbo prune @growi/vault-manager --docker` を実行し monorepo subset（`out/json` / `out/full`）を生成する
+  - `deps` stage は `pruner` の `out/json` のみ COPY し、`--mount=type=cache,target=$PNPM_HOME/store,sharing=locked` 付きで `pnpm install --frozen-lockfile` を実行する
+  - `builder` stage は `pruner` の `out/full` を deps の上に COPY し、`tsconfig.base.json` を root から COPY したうえで `turbo run build --filter @growi/vault-manager` でビルドする
+  - artifact stage では `pnpm deploy --prod --legacy --filter @growi/vault-manager` で生成した `node_modules` と `dist` のみを clean directory に集約する（apps/app の `/tmp/release/` 方式に倣う）
+  - `release` stage は 18.1 で確定した git binary 戦略を適用したうえで artifact を `COPY --from=builder` する
+  - **完了確認**: `docker build apps/growi-vault-manager` が成功し、`docker run --rm <image> git --version` が 2.30 以上を返すこと、最終 image size が現状（alpine ベース）から逸脱なく許容範囲内であること
+  - _Requirements: 10.2, 10.3_
+  - _Boundary: apps/growi-vault-manager/Dockerfile_
+
+- [ ] 18.3 専用 Dockerfile.dockerignore の追加
+  - `apps/growi-vault-manager/Dockerfile.dockerignore` を新規作成し、`apps/app/docker/Dockerfile.dockerignore` に倣って build artifact（`**/node_modules`, `**/.next`, `**/.turbo`, `out`）/ `.git` / test（`**/*.spec.*`, `**/__tests__/`）/ `**/*.md`（locale を除外する必要がなければ単純除外）/ `.changeset` / `.github` / IDE 設定 / `.claude` / `.kiro` を除外する
+  - vault-manager 固有の調整として、ビルドに不要な他 apps（`apps/app`, `apps/pdf-converter`, `apps/slackbot-proxy`）の除外、および sparse-checkout 用 fixture 等が test 配下にある場合の追加除外を行う
+  - **完了確認**: `docker build` のコンテキスト送信サイズがリファクタ前と比較して有意に減少することをログ（`Sending build context to Docker daemon`）で確認すること
+  - _Requirements: 10.2_
+  - _Boundary: apps/growi-vault-manager/Dockerfile.dockerignore_
+
+- [ ] 18.4 OCI 標準 label の付与
+  - release stage に `org.opencontainers.image.source` / `title` / `description` / `vendor` の OCI 標準 label を追加する（apps/app と同じ vendor `WESEEK, Inc.`、source URL `https://github.com/weseek/growi` を流用、title / description は vault-manager 固有のものを設定）
+  - 既存の `LABEL maintainer="Yuki Takei <yuki@weseek.co.jp>"` は `org.opencontainers.image.authors` に置き換えるか、両者併存とするかを apps/app の方針と揃える
+  - **完了確認**: `docker inspect <image>` の `Config.Labels` に OCI 標準 label が出現すること
+  - _Requirements: 10.2_
+  - _Boundary: apps/growi-vault-manager/Dockerfile_
+
+- [ ] 18.5 既存ワークフロー / CI 互換性確認
+  - 別リポジトリ `growi-docker-compose` から本 Dockerfile を参照している箇所（image build 設定）が新構成でも機能することを README または関連 spec で告知する（リポジトリ越境のため変更は別 PR）
+  - `.github/workflows/vault-integ.yml` は現状 docker build を経由せず直接 `node` で起動しているため Dockerfile 変更の直接影響は受けないが、回帰確認として `docker build` を CI に追加するか検討し、追加する場合は本 task に subtask を切る
+  - **完了確認**: 新 Dockerfile で build した image が devcontainer 内で起動し、`/health` が 200 を返すこと、`RUN_VAULT_INTEG=true` 経由の integration test が image 経由でも PASS すること（手動確認可）
+  - _Requirements: 10.2, 10.3_
+  - _Boundary: apps/growi-vault-manager/README.md（必要に応じて）、.github/workflows/vault-integ.yml（必要に応じて）_
