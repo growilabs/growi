@@ -734,7 +734,7 @@ _Depends: 5.1, 10.1, 20.1_
 
 タスク 20 で PAT scopes を取得できるようになっても、`computeAccessibleNamespaces` のシグネチャが `(userId)` のみで、gateway router も `authResult.scopes` を破棄して呼び出している（[vault-gateway.ts:163,280](../../../apps/app/src/features/growi-vault/server/routes/vault-gateway.ts#L163)）。要件 2.5 を満たすには namespace 計算側でスコープを受け取る経路が必要。
 
-### [ ] 22.1 computeAccessibleNamespaces に scopes 引数を追加
+### [x] 22.1 computeAccessibleNamespaces に scopes 引数を追加
 
 `vault-namespace-mapper.ts` を編集する。
 
@@ -745,7 +745,7 @@ _Depends: 5.1, 10.1, 20.1_
   - 現状の MVP では実質スコープ依存の絞り込みは無いが、入り口だけ整える方針で良い（その旨をコメントで明示）
 - **完了確認**: 単体テストで scopes 引数が伝播されること、既存の挙動（全 namespace 返却）が破壊されないことを確認
 
-### [ ] 22.2 vault-gateway router からスコープを伝播
+### [x] 22.2 vault-gateway router からスコープを伝播
 
 `vault-gateway.ts` の `info/refs` および `git-upload-pack` ハンドラで、`authResult.scopes` を `computeAccessibleNamespaces` に渡す。
 

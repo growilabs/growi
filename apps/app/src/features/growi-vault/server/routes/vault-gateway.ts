@@ -155,12 +155,15 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
     }
 
     const userId = authResult?.userId ?? null;
+    const scopes = authResult?.scopes;
 
-    // Compute accessible namespaces (req 3)
+    // Compute accessible namespaces (req 3, req 2.5)
     let namespaces: ReadonlyArray<string>;
     try {
-      namespaces =
-        await vaultNamespaceMapper.computeAccessibleNamespaces(userId);
+      namespaces = await vaultNamespaceMapper.computeAccessibleNamespaces(
+        userId,
+        scopes,
+      );
     } catch (err) {
       logger.error({ err }, 'Failed to compute accessible namespaces');
       res.status(500).send('Internal Server Error');
@@ -272,12 +275,15 @@ export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
     }
 
     const userId = authResult?.userId ?? null;
+    const scopes = authResult?.scopes;
 
-    // Compute accessible namespaces (req 3)
+    // Compute accessible namespaces (req 3, req 2.5)
     let namespaces: ReadonlyArray<string>;
     try {
-      namespaces =
-        await vaultNamespaceMapper.computeAccessibleNamespaces(userId);
+      namespaces = await vaultNamespaceMapper.computeAccessibleNamespaces(
+        userId,
+        scopes,
+      );
     } catch (err) {
       logger.error({ err }, 'Failed to compute accessible namespaces');
       res.status(500).send('Internal Server Error');

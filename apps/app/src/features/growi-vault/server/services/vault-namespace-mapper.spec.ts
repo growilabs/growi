@@ -117,6 +117,14 @@ describe('VaultNamespaceMapper.computeAccessibleNamespaces', () => {
       expect(ugr.findAllUserGroupIdsRelatedToUser).not.toHaveBeenCalled();
       expect(eugr.findAllUserGroupIdsRelatedToUser).not.toHaveBeenCalled();
     });
+
+    it('accepts a scopes argument without changing the result (req 2.5 MVP)', async () => {
+      // MVP: scopes are accepted but do not restrict anonymous access further
+      const namespaces = await mapper.computeAccessibleNamespaces(null, [
+        'read:features:page',
+      ]);
+      expect(namespaces).toEqual(['public']);
+    });
   });
 
   describe('authenticated user with no group memberships', () => {
@@ -130,6 +138,33 @@ describe('VaultNamespaceMapper.computeAccessibleNamespaces', () => {
         'restricted-link',
         `user-${userId}-only-me`,
       ]);
+    });
+
+    it('returns the same namespaces when scopes are provided (req 2.5 MVP)', async () => {
+      const userId = 'user-abc-123';
+
+      // MVP: scopes are accepted but do not alter the namespace result for authenticated users
+      const namespacesWithScopes = await mapper.computeAccessibleNamespaces(
+        userId,
+        ['read:features:page'],
+      );
+      const namespacesWithoutScopes =
+        await mapper.computeAccessibleNamespaces(userId);
+
+      expect(namespacesWithScopes).toEqual(namespacesWithoutScopes);
+    });
+
+    it('returns the same namespaces when an empty scopes array is provided', async () => {
+      const userId = 'user-abc-456';
+
+      const namespacesWithEmpty = await mapper.computeAccessibleNamespaces(
+        userId,
+        [],
+      );
+      const namespacesWithoutScopes =
+        await mapper.computeAccessibleNamespaces(userId);
+
+      expect(namespacesWithEmpty).toEqual(namespacesWithoutScopes);
     });
   });
 

@@ -408,6 +408,31 @@ describe('VaultGatewayRouter', () => {
       );
     });
 
+    it('GET /info/refs propagates PAT scopes to computeAccessibleNamespaces (req 2.5)', async () => {
+      (
+        vaultManagerClient.proxyGitRequest as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(
+        makeProxyOkResponse('application/x-git-upload-pack-advertisement'),
+      );
+
+      const mockScopes = ['read:features:page'];
+      const successfulAuth = {
+        authenticate: vi
+          .fn()
+          .mockResolvedValue({ userId: mockUserId, scopes: mockScopes }),
+      };
+
+      const app = buildApp({ vaultPatAuth: successfulAuth });
+      await request(app).get(
+        '/_vault/repo.git/info/refs?service=git-upload-pack',
+      );
+
+      // computeAccessibleNamespaces must be called with both userId and scopes
+      expect(
+        vaultNamespaceMapper.computeAccessibleNamespaces,
+      ).toHaveBeenCalledWith(mockUserId, mockScopes);
+    });
+
     it('POST /git-upload-pack calls composeView and proxyGitRequest, returns 200', async () => {
       (
         vaultManagerClient.proxyGitRequest as ReturnType<typeof vi.fn>
@@ -447,6 +472,32 @@ describe('VaultGatewayRouter', () => {
       expect(createActivity).toHaveBeenCalledWith(
         expect.objectContaining({ action: 'VAULT_CLONE_COMPLETE' }),
       );
+    });
+
+    it('POST /git-upload-pack propagates PAT scopes to computeAccessibleNamespaces (req 2.5)', async () => {
+      (
+        vaultManagerClient.proxyGitRequest as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(
+        makeProxyOkResponse('application/x-git-upload-pack-result'),
+      );
+
+      const mockScopes = ['read:features:page'];
+      const successfulAuth = {
+        authenticate: vi
+          .fn()
+          .mockResolvedValue({ userId: mockUserId, scopes: mockScopes }),
+      };
+
+      const app = buildApp({ vaultPatAuth: successfulAuth });
+      await request(app)
+        .post('/_vault/repo.git/git-upload-pack')
+        .set('Content-Type', 'application/x-git-upload-pack-request')
+        .send(Buffer.from('0011want abc\n0000'));
+
+      // computeAccessibleNamespaces must be called with both userId and scopes
+      expect(
+        vaultNamespaceMapper.computeAccessibleNamespaces,
+      ).toHaveBeenCalledWith(mockUserId, mockScopes);
     });
   });
 

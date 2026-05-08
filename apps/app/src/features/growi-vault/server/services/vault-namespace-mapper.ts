@@ -16,6 +16,7 @@ import UserGroupRelation from '~/server/models/user-group-relation';
 export interface VaultNamespaceMapper {
   computeAccessibleNamespaces(
     userId: string | null,
+    scopes?: ReadonlyArray<string>,
   ): Promise<ReadonlyArray<Namespace>>;
 
   computePageNamespaces(page: IPage): {
@@ -106,9 +107,18 @@ export const createVaultNamespaceMapper = (): VaultNamespaceMapper => {
      * Anonymous (userId === null): only the 'public' namespace.
      * Authenticated: 'public', 'restricted-link', one 'group-<gid>' per group,
      *   and 'user-<uid>-only-me' for the user's own private pages.
+     *
+     * @param userId - The authenticated user's ID, or null for anonymous access.
+     * @param scopes - PAT scopes from the authentication result (req 2.5).
+     *   MVP: scopes filtering not applied; future vault-specific scopes can
+     *   restrict namespace access here (e.g. a 'read:vault:public-only' scope
+     *   could limit the result to ['public']). The parameter is accepted now
+     *   so the call-site API is stable and callers can propagate scopes without
+     *   further interface changes.
      */
     async computeAccessibleNamespaces(
       userId: string | null,
+      _scopes?: ReadonlyArray<string>,
     ): Promise<ReadonlyArray<Namespace>> {
       // Anonymous users can only access public content (req 3.2)
       if (userId === null) {
