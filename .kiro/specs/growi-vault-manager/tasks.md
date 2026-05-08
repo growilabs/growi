@@ -322,3 +322,28 @@
   - MongoDB ping 成功時に正常終了することをテストする
   - `pnpm vitest run preflight.spec` が全テスト通過すること
   - _Boundary: apps/growi-vault-manager/src/preflight.ts、apps/growi-vault-manager/src/preflight.spec.ts_
+
+---
+
+- [ ] 13. invalid revisionId 防御策の追加（**P0 / 最優先・結合試験ブロッカー**）
+
+  apps/app から渡される `bulk-upsert` / `upsert` instruction の `revisionId` に空文字列または ObjectId 形式違反値が混入した場合、現状は `RevisionModel.bodyQueryByIds(['', ...])` が Mongoose の `Cast to ObjectId failed for value ""` で throw し、bulk-upsert が `attempts=5` まで失敗継続する。バグの一次責務は apps/app 側（`growi-vault-gateway` タスク 18 で修正）だが、vault-manager 側でも防御層を追加し、apps/app 側のリグレッション・将来追加されるデータソースに対して耐性を持たせる。
+
+- [ ] 13.1 RevisionModel に valid-id フィルタリングを追加（タスク 2.2 の追補）
+  - `apps/growi-vault-manager/src/models/revision.ts` の `bodyQueryByIds` を「ObjectId として valid な ID のみで `$in` 検索する」実装に変更する（または `bodyQueryByValidIds` を新設して既存メソッドは deprecated JSDoc を付与する）
+  - 内部で `mongoose.Types.ObjectId.isValid(id)` で filter してから `find({_id: {$in: validIds}}, {body})` を構築する
+  - filter で取り除いた件数を返す or logger に warn で出力できるように、戻り値に `{ cursor, skippedIds }` を含める設計を検討する（必須ではないが 13.2 のログ出力で使う）
+  - **完了確認**: `bodyQueryByIds(['', 'not-an-oid', '<valid-oid>'])` が throw せず `<valid-oid>` のみ照会する単体テストが通ること（`pnpm vitest run revision.spec`）
+  - _Boundary: apps/growi-vault-manager/src/models/revision.ts_
+
+- [ ] 13.2 bulk-upsert ハンドラで invalid revisionId を skip し warn ログに残す（タスク 5.2 の追補）
+  - `apps/growi-vault-manager/src/services/vault-namespace-builder.ts` の `applyBulkUpsert` で 13.1 の API を使う
+  - revisionMap に hit しなかった entry は現状の `revisionMap.get(...) ?? ''` で body 空として扱われるため追加分岐は不要だが、`logger.warn` で「skipped N invalid revisionIds in instruction <id>」を構造化ログとして出力する
+  - **完了確認**: 1000 entries のうち 10 件が空文字列 revisionId の fixture で bulk-upsert が成功し、`attempts: 0, processedAt != null` で完了するインテグレーションテストを追加すること
+  - _Boundary: apps/growi-vault-manager/src/services/vault-namespace-builder.ts_
+
+- [ ] 13.3 dead-letter 検知の強化
+  - 同一 instruction の `attempts >= 5` を観測した場合、`VaultInstructionWatcher` が構造化ログで `severity: error` 相当の出力をする（現状は `recordFailure` で attempts/lastError は更新するが、上限到達時の通知はない）
+  - 可能なら `StorageStatsController` のレスポンスに `stuckInstructionCount` を追加し、admin UI から観測できるようにする
+  - **完了確認**: `db.vault_instructions.find({attempts: {$gte: 5}, processedAt: null})` が非空のとき、`/internal/storage-stats` レスポンスに反映されること、および watcher のログに 1 件あたり 1 行のエラーが出ること（再試行ループでログ氾濫しないよう、attempts 5 到達時のみ出力）
+  - _Boundary: apps/growi-vault-manager/src/services/vault-instruction-watcher.ts、apps/growi-vault-manager/src/controllers/storage-stats-controller.ts_

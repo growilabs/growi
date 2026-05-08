@@ -539,6 +539,94 @@ _Depends: 10.1_
 
 ---
 
+## タスク 17: Vault 関連 env の configManager 経由読み込みへの統一
+
+_要件: 7_
+_Boundary: `apps/app/src/features/growi-vault/server/services/vault-settings-service.ts`、`apps/app/src/features/growi-vault/server/index.ts`、`apps/app/src/server/service/config-manager/config-definition.ts`_
+_Depends: 2.1, 6.1, 13.1_
+
+### [ ] 17.1 managerEndpoint / managerInternalSecret を configManager から読む
+
+`apps/app/src/features/growi-vault/server/services/vault-settings-service.ts` を修正する。
+
+- 現状は `process.env.VAULT_MANAGER_ENDPOINT` / `process.env.VAULT_MANAGER_INTERNAL_SECRET` を直接参照しているが、両キーはすでに `config-definition.ts` に `app:vaultManagerEndpoint` / `app:vaultManagerInternalSecret` として登録されているため、configManager から取得するように統一する
+- env-only を強制するために `configManager.getConfig('app:vaultManagerEndpoint', ConfigSource.env)` のように `ConfigSource.env` を明示的に渡す（DB へのフォールバックを禁止）
+- `ConfigSource` は `@growi/core/dist/interfaces` から import する（`config-manager.ts` と同一パターン）
+- `app:vaultEnabled` も既に configManager 経由になっているので変更不要
+- **背景**: env からの直接読み込みは config-definition.ts の登録を迂回しており、設定キーの一元管理（型安全な参照、isSecret マスキング、テスト時の上書き API）を破る。configManager 経由に統一することで env-only という制約を保ちつつ、他の設定キーと同一の仕組みに揃える
+- **完了確認**:
+  - `pnpm vitest run vault-settings-service` が通ること
+  - `process.env` への直接参照が `vault-settings-service.ts` から消えていること（`grep -n "process.env" apps/app/src/features/growi-vault/server/services/vault-settings-service.ts` が 0 件）
+  - 既存の Vault 関連テスト（vault-manager-client.spec、vault-gateway.spec、vault-bootstrapper.spec 等）に regression がないこと
+
+### [ ] 17.2 VAULT_BOOTSTRAP_ON_START を config-definition に登録し configManager から読む
+
+`apps/app/src/server/service/config-manager/config-definition.ts` と `apps/app/src/features/growi-vault/server/index.ts` を修正する。
+
+- `config-definition.ts` の Vault Settings セクションに `app:vaultBootstrapOnStart` を追加する:
+  - `envVarName: 'VAULT_BOOTSTRAP_ON_START'`
+  - `defaultValue: false`（boolean）
+  - `isSecret: false`、`publishToClient: false`
+  - 既存 `app:vaultEnabled` と同等の挙動（env または DB から読める）でよい。ただし「起動時の bootstrap 自動起動」というフラグの性質上、運用上は env で渡すケースを想定
+- `apps/app/src/features/growi-vault/server/index.ts` の `process.env.VAULT_BOOTSTRAP_ON_START === 'true'` 判定を `configManager.getConfig('app:vaultBootstrapOnStart')` に置き換える
+  - boolean 化は configManager 側のキャストに任せる（envVar は文字列で渡るので `getConfig` 経由なら自動で型変換される）
+- **背景**: 現状はこの env 変数のみ config-definition に登録されておらず、Vault feature 内で唯一 `process.env` 直参照が残る。タスク 17.1 と合わせて Vault feature 全体で「環境変数は必ず config-definition に登録 → configManager 経由で読む」という方針に統一する
+- **完了確認**:
+  - `apps/app/src/features/growi-vault/server/` 配下に `process.env.` 直参照が 0 件であること（`grep -rn "process.env" apps/app/src/features/growi-vault/server/ | grep -v ".spec.ts" | grep -v "__tests__"` が 0 件）
+  - `VAULT_BOOTSTRAP_ON_START=true` で起動した際に bootstrap が自動起動することを動作確認する
+  - `turbo run build --filter @growi/app` がエラーなく通ること
+
+---
+
+## タスク 18: bulk-upsert 障害修正（**P0 / 最優先・結合試験ブロッカー**）
+
+_要件: 5（タスク 9 の追補）_
+_Boundary: `apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts`、`apps/app/src/features/growi-vault/server/services/vault-dispatcher.ts`、`apps/app/src/features/growi-vault/__tests__/`_
+_Depends: 9.1, 9.2, 14.1_
+
+GROWI が階層整合性のために自動生成する「revision を持たないページ」（例: `/user`、`/empty`、`/user/<name>/メモ/2025/12` 等の中間パスページ）を bulk-upsert / upsert instruction の entries から除外する。
+
+**現象**: これらのページは `revisionId: ''`（空文字列）で payload に積まれる。vault-manager 側の `RevisionModel.bodyQueryByIds` が `find({_id:{$in: ids}}, {body})` を発行する際、Mongoose の ObjectId キャストが空文字列で `Cast to ObjectId failed for value "" (type string) at path "_id" for model "Revision"` を throw。`vault_instructions` の対象ドキュメントが `attempts >= 5` まで失敗継続し、`vault_user_views.<viewRef>.mergedTreeOid` が empty tree（`4b825dc642cb6eb9a060e54bf8d69288fbee4904`）のまま固定され、`git clone` が `the remote end hung up unexpectedly` で停止する。
+
+**一次原因箇所**: [vault-bootstrapper.ts:204-208](../../../apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts#L204-L208) の `revisionId: page.revision?.toString() ?? ''` フォールバック。
+
+### [ ] 18.1 bootstrapper で null revision page をスキップする
+
+`apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts` を修正する。
+
+- pages cursor の各イテレーション冒頭で `page.revision == null` を判定し、空であれば当該 page を全 namespace buffer への push 前に `continue` する
+- `revisionId: page.revision?.toString() ?? ''` のフォールバック空文字列を撤去し、`revisionId: page.revision.toString()` に変更する
+- `bootstrapProcessed` カウンタは「cursor で見たページ全件」を引き続き計上する（進捗表示の連続性を保つ）。スキップ件数は `logger.debug` で記録する
+- **完了確認**: 既存の `vault-bootstrapper.spec.ts` に「revision フィールド未設定の page は payload に積まれない」テストを追加し `pnpm vitest run vault-bootstrapper.spec` が通ること
+
+### [ ] 18.2 dispatcher で null revision page をスキップする
+
+`apps/app/src/features/growi-vault/server/services/vault-dispatcher.ts` を修正する（PageEvent 起点の `upsert` instruction 発行経路）。
+
+- `upsert` instruction 発行前に `revisionId` が空または null の場合は instruction 発行をスキップし `logger.debug` で記録する
+- **完了確認**: 親パス自動生成イベントを模した PageEvent（revision 未設定）を発火し、`VaultInstruction.create` が呼ばれないことを単体テストで確認する
+
+### [ ] 18.3 結合試験 fixture へ null revision page を追加し回帰防止する
+
+`apps/app/src/features/growi-vault/__tests__/clone-e2e.integ.ts`（または vault-gateway.integ.ts）を更新する。
+
+- fixture seed に「中間パス自動生成ページ」（revision 未設定）を最低 1 件含める
+- これらの page が clone 結果のディレクトリに現れない（または body 空ファイルとして現れる、設計上の選択を文書化）ことを assert する
+- **完了確認**: 修正前のコードで本テストが失敗し、修正後に成功すること（タスク 18.1 と 18.2 の修正適用前後で diff 検証）
+
+### [ ] 18.4 既存 DB の修復手順をリリースノート相当でドキュメント化
+
+`growi-vault/dev-verification.md` の「トラブルシュート」節を参照しつつ、apps/app の `CHANGELOG.md` または admin 向けマイグレーション通知に以下の手順を記載する:
+
+1. `db.vault_instructions.deleteMany({processedAt: null, attempts: {$gte: 1}})` で詰まった instruction を削除
+2. `db.vault_sync_state.updateOne({_id: 'singleton'}, {$set: {bootstrapState: 'pending', bootstrapCursor: null, bootstrapProcessed: 0}})` で state をリセット
+3. `VAULT_BOOTSTRAP_ON_START=true` で apps/app を再起動するか admin UI から bootstrap を再実行
+4. `vault_user_views.<viewRef>.mergedTreeOid` が empty tree 以外の値になることを確認
+
+- **完了確認**: 詰まった環境を再現した上で本手順を実行し、`git clone http://x:<PAT>@localhost:3000/_vault/repo.git` が成功してファイル一覧が取得できること
+
+---
+
 ## タスク完了チェックリスト
 
 すべてのタスク完了後に以下を確認する:
