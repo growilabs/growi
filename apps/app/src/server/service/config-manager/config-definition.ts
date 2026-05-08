@@ -81,6 +81,7 @@ export const CONFIG_KEYS = [
   'app:vaultEnabled',
   'app:vaultManagerEndpoint',
   'app:vaultManagerInternalSecret',
+  'app:vaultBootstrapOnStart',
 
   // Content-Disposition settings for MIME types
   'attachments:contentDisposition:inlineMimeTypes',
@@ -547,6 +548,11 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'VAULT_MANAGER_INTERNAL_SECRET',
     defaultValue: undefined,
     isSecret: true,
+  }),
+  'app:vaultBootstrapOnStart': defineConfig<boolean>({
+    envVarName: 'VAULT_BOOTSTRAP_ON_START',
+    defaultValue: false,
+    isSecret: false,
   }),
 
   // Attachment Content-Disposition settings

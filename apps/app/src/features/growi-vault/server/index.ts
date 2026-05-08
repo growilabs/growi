@@ -1,5 +1,6 @@
 import type { IPage } from '@growi/core';
 
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { createVaultAdminRouter } from './routes/vault-admin';
@@ -191,7 +192,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   // ------------------------------------------------------------------
   const bootstrapper = createVaultBootstrapper(vaultNamespaceMapper);
 
-  if (process.env.VAULT_BOOTSTRAP_ON_START === 'true') {
+  if (configManager.getConfig('app:vaultBootstrapOnStart')) {
     logger.info(
       'GROWI Vault: VAULT_BOOTSTRAP_ON_START=true — starting bootstrap on startup',
     );

@@ -545,7 +545,7 @@ _要件: 7_
 _Boundary: `apps/app/src/features/growi-vault/server/services/vault-settings-service.ts`、`apps/app/src/features/growi-vault/server/index.ts`、`apps/app/src/server/service/config-manager/config-definition.ts`_
 _Depends: 2.1, 6.1, 13.1_
 
-### [ ] 17.1 managerEndpoint / managerInternalSecret を configManager から読む
+### [x] 17.1 managerEndpoint / managerInternalSecret を configManager から読む
 
 `apps/app/src/features/growi-vault/server/services/vault-settings-service.ts` を修正する。
 
@@ -559,7 +559,7 @@ _Depends: 2.1, 6.1, 13.1_
   - `process.env` への直接参照が `vault-settings-service.ts` から消えていること（`grep -n "process.env" apps/app/src/features/growi-vault/server/services/vault-settings-service.ts` が 0 件）
   - 既存の Vault 関連テスト（vault-manager-client.spec、vault-gateway.spec、vault-bootstrapper.spec 等）に regression がないこと
 
-### [ ] 17.2 VAULT_BOOTSTRAP_ON_START を config-definition に登録し configManager から読む
+### [x] 17.2 VAULT_BOOTSTRAP_ON_START を config-definition に登録し configManager から読む
 
 `apps/app/src/server/service/config-manager/config-definition.ts` と `apps/app/src/features/growi-vault/server/index.ts` を修正する。
 

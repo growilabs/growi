@@ -1,3 +1,5 @@
+import { ConfigSource } from '@growi/core/dist/interfaces';
+
 import { configManager } from '~/server/service/config-manager';
 
 /**
@@ -16,8 +18,8 @@ export interface VaultSettings {
  * Service that resolves GROWI Vault configuration from config sources.
  *
  * - `enabled`: resolved via ConfigManager (supports both DB and env var).
- * - `managerEndpoint`: read from process.env only — intentionally NOT stored in DB.
- * - `managerInternalSecret`: read from process.env only — intentionally NOT stored in DB.
+ * - `managerEndpoint`: resolved via ConfigManager with ConfigSource.env to prevent DB fallback.
+ * - `managerInternalSecret`: resolved via ConfigManager with ConfigSource.env to prevent DB fallback.
  */
 export interface VaultSettingsService {
   getSettings(): Promise<VaultSettings>;
@@ -30,11 +32,16 @@ class VaultSettingsServiceImpl implements VaultSettingsService {
     const enabled = configManager.getConfig('app:vaultEnabled') ?? false;
 
     // managerEndpoint and managerInternalSecret are security-sensitive values
-    // that must never be written to the database. Read them directly from the
-    // process environment to guarantee they stay env-only.
-    const managerEndpoint = process.env.VAULT_MANAGER_ENDPOINT ?? '';
+    // that must never be written to the database. Pass ConfigSource.env to
+    // configManager to guarantee env-only resolution with no DB fallback.
+    const managerEndpoint =
+      configManager.getConfig('app:vaultManagerEndpoint', ConfigSource.env) ??
+      '';
     const managerInternalSecret =
-      process.env.VAULT_MANAGER_INTERNAL_SECRET ?? '';
+      configManager.getConfig(
+        'app:vaultManagerInternalSecret',
+        ConfigSource.env,
+      ) ?? '';
 
     return {
       enabled,
