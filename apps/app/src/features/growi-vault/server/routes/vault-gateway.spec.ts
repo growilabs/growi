@@ -136,7 +136,7 @@ describe('VaultGatewayRouter', () => {
   // -------------------------------------------------------------------------
 
   describe('when bootstrapState !== done', () => {
-    it('returns 503 + Retry-After for GET info/refs', async () => {
+    it('returns 503 + Retry-After for GET info/refs when bootstrapState=running', async () => {
       (
         vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
       ).mockResolvedValue(enabledSettings);
@@ -153,7 +153,7 @@ describe('VaultGatewayRouter', () => {
       expect(res.headers['retry-after']).toBe('60');
     });
 
-    it('returns 503 + Retry-After for POST git-upload-pack', async () => {
+    it('returns 503 without Retry-After for POST git-upload-pack when bootstrapState=pending', async () => {
       (
         vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
       ).mockResolvedValue(enabledSettings);
@@ -165,7 +165,96 @@ describe('VaultGatewayRouter', () => {
       const res = await request(app).post('/_vault/repo.git/git-upload-pack');
 
       expect(res.status).toBe(503);
-      expect(res.headers['retry-after']).toBe('60');
+      expect(res.headers['retry-after']).toBeUndefined();
+    });
+
+    it('returns 503 with "has not been initialised" message when bootstrapState=pending', async () => {
+      (
+        vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(enabledSettings);
+      (VaultSyncState.findById as ReturnType<typeof vi.fn>).mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ bootstrapState: 'pending' }),
+      });
+
+      const app = buildApp();
+      const res = await request(app).get(
+        '/_vault/repo.git/info/refs?service=git-upload-pack',
+      );
+
+      expect(res.status).toBe(503);
+      expect(res.text).toContain('has not been initialised');
+    });
+
+    it('returns 503 with "initialising (bootstrap in progress)" message when bootstrapState=running', async () => {
+      (
+        vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(enabledSettings);
+      (VaultSyncState.findById as ReturnType<typeof vi.fn>).mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ bootstrapState: 'running' }),
+      });
+
+      const app = buildApp();
+      const res = await request(app).get(
+        '/_vault/repo.git/info/refs?service=git-upload-pack',
+      );
+
+      expect(res.status).toBe(503);
+      expect(res.text).toContain('initialising (bootstrap in progress)');
+    });
+
+    it('returns 503 with "initialisation failed" message when bootstrapState=failed', async () => {
+      (
+        vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(enabledSettings);
+      (VaultSyncState.findById as ReturnType<typeof vi.fn>).mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ bootstrapState: 'failed' }),
+      });
+
+      const app = buildApp();
+      const res = await request(app).get(
+        '/_vault/repo.git/info/refs?service=git-upload-pack',
+      );
+
+      expect(res.status).toBe(503);
+      expect(res.text).toContain('initialisation failed');
+    });
+
+    it('returns 503 without Retry-After when bootstrapState=failed', async () => {
+      (
+        vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(enabledSettings);
+      (VaultSyncState.findById as ReturnType<typeof vi.fn>).mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ bootstrapState: 'failed' }),
+      });
+
+      const app = buildApp();
+      const res = await request(app).get(
+        '/_vault/repo.git/info/refs?service=git-upload-pack',
+      );
+
+      expect(res.status).toBe(503);
+      expect(res.headers['retry-after']).toBeUndefined();
+    });
+
+    it('does not include page list or existence information in 503 body (req 1.5 security)', async () => {
+      (
+        vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(enabledSettings);
+      (VaultSyncState.findById as ReturnType<typeof vi.fn>).mockReturnValue({
+        lean: vi.fn().mockResolvedValue({ bootstrapState: 'pending' }),
+      });
+
+      const app = buildApp();
+      const res = await request(app).get(
+        '/_vault/repo.git/info/refs?service=git-upload-pack',
+      );
+
+      expect(res.status).toBe(503);
+      // Must not expose page names, page paths, or existence information (req 1.5 security)
+      // Note: admin UI paths like /admin/vault are allowed; only wiki page paths are restricted
+      expect(res.text).not.toMatch(
+        /page.*list|pages exist|\/wiki|page not found/i,
+      );
     });
   });
 

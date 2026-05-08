@@ -527,7 +527,7 @@ _要件: 1.5_
 _Boundary: `apps/app/src/features/growi-vault/server/routes/vault-gateway.ts`_
 _Depends: 10.1_
 
-### [ ] 16.1 503 レスポンスボディへの状態詳細追加
+### [x] 16.1 503 レスポンスボディへの状態詳細追加
 
 `vault-gateway.ts` の `assertGatewayReady` 関数を修正する。
 

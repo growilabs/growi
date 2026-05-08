@@ -65,8 +65,23 @@ async function assertGatewayReady(
   const syncState = await VaultSyncState.findById('singleton').lean();
   const bootstrapState = syncState?.bootstrapState ?? 'pending';
   if (bootstrapState !== 'done') {
-    res.set('Retry-After', '60');
-    res.status(503).send('GROWI Vault is initialising; retry later');
+    // Only 'running' gets Retry-After since 'pending' and 'failed' won't change without admin action
+    if (bootstrapState === 'running') {
+      res.set('Retry-After', '60');
+    }
+    const message = (() => {
+      switch (bootstrapState) {
+        case 'pending':
+          return 'GROWI Vault has not been initialised. Please ask your administrator to run the bootstrap from the Admin UI (/admin/vault).';
+        case 'running':
+          return 'GROWI Vault is initialising (bootstrap in progress). Please retry in a few minutes.';
+        case 'failed':
+          return 'GROWI Vault initialisation failed. Please ask your administrator to re-run the bootstrap from the Admin UI (/admin/vault).';
+        default:
+          return 'GROWI Vault is not ready. Please retry later.';
+      }
+    })();
+    res.status(503).send(message);
     return false;
   }
 
