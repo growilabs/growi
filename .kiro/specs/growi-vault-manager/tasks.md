@@ -439,7 +439,7 @@
 
 ---
 
-- [ ] 18. Dockerfile を DHI 採用のモダン構成にリファクタ（**P1 / Important**）
+- [x] 18. Dockerfile を DHI 採用のモダン構成にリファクタ（**P1 / Important**）
 
   `apps/app/docker/Dockerfile` は最近 DHI（Docker Hardened Images）採用と turbo prune ベースの多段ビルドへリファクタされた（`dhi.io/node:24-debian13-dev` を build / `dhi.io/node:24-debian13` を runtime、`base` → `pruner` → `deps` → `builder` → `release` の 5 stage 構成、`pnpm store` の cache mount、OCI 標準 label、専用 `Dockerfile.dockerignore`）。一方 `apps/growi-vault-manager/Dockerfile` は依然として `node:24-alpine` + `apk add git` + 単一 `builder` stage という旧構成のままで、ビルドキャッシュ効率・runtime 攻撃面・monorepo subset 抽出の点で apps/app と齟齬がある。本タスクで apps/app と同じ流儀に揃え、vault-manager 固有の制約（runtime で `git upload-pack` を spawn するため git binary v2.30+ が必須）に対応する。
 
@@ -479,7 +479,7 @@
   - _Requirements: 10.2_
   - _Boundary: apps/growi-vault-manager/Dockerfile_
 
-- [ ] 18.5 既存ワークフロー / CI 互換性確認
+- [x] 18.5 既存ワークフロー / CI 互換性確認
   - 別リポジトリ `growi-docker-compose` から本 Dockerfile を参照している箇所（image build 設定）が新構成でも機能することを README または関連 spec で告知する（リポジトリ越境のため変更は別 PR）
   - `.github/workflows/vault-integ.yml` は現状 docker build を経由せず直接 `node` で起動しているため Dockerfile 変更の直接影響は受けないが、回帰確認として `docker build` を CI に追加するか検討し、追加する場合は本 task に subtask を切る
   - **完了確認**: 新 Dockerfile で build した image が devcontainer 内で起動し、`/health` が 200 を返すこと、`RUN_VAULT_INTEG=true` 経由の integration test が image 経由でも PASS すること（手動確認可）
