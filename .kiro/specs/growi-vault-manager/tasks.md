@@ -453,7 +453,7 @@
   - _Requirements: 10.2, 10.3_
   - _Boundary: apps/growi-vault-manager/Dockerfile（または .kiro/specs/growi-vault-manager/design.md の補足記述）_
 
-- [ ] 18.2 multi-stage 構成へリファクタ（DHI base + turbo prune）
+- [x] 18.2 multi-stage 構成へリファクタ（DHI base + turbo prune）
   - `apps/app/docker/Dockerfile` に倣って `base` / `pruner` / `deps` / `builder` / `release` の 5 stage 構成に書き換える
   - `base` stage は `dhi.io/node:24-debian13-dev` をベースに pnpm（standalone install script）と turbo を導入する
   - `pruner` stage で `turbo prune @growi/vault-manager --docker` を実行し monorepo subset（`out/json` / `out/full`）を生成する
