@@ -13,6 +13,14 @@ import { NewsService } from '../services/news-service';
 
 const logger = loggerFactory('growi:feature:news:routes');
 
+/**
+ * Maximum number of news items returnable per request.
+ * Caps caller-supplied `limit` so a misuse cannot make a single request
+ * pull an unbounded result set into memory.
+ */
+const MAX_LIST_LIMIT = 100;
+const DEFAULT_LIST_LIMIT = 10;
+
 type NewsRequest = CrowiRequest & { user: IUserHasId };
 
 /**
@@ -20,6 +28,19 @@ type NewsRequest = CrowiRequest & { user: IUserHasId };
  */
 const getUserRoles = (user: IUserHasId): string[] => {
   return user.admin ? ['admin'] : ['general'];
+};
+
+/**
+ * Resolve the effective list limit from a query value.
+ * Falls back to `DEFAULT_LIST_LIMIT` for missing/invalid input,
+ * and silently caps the result to `[1, MAX_LIST_LIMIT]`.
+ */
+const resolveLimit = (raw: unknown): number => {
+  const requested =
+    raw != null
+      ? parseInt(String(raw), 10) || DEFAULT_LIST_LIMIT
+      : DEFAULT_LIST_LIMIT;
+  return Math.min(Math.max(requested, 1), MAX_LIST_LIMIT);
 };
 
 /**
@@ -50,10 +71,7 @@ export const createNewsRouter = (crowi?: Crowi): express.Router => {
         const user = req.user;
         const userRoles = getUserRoles(user);
 
-        const limit =
-          req.query.limit != null
-            ? parseInt(String(req.query.limit), 10) || 10
-            : 10;
+        const limit = resolveLimit(req.query.limit);
         const offset =
           req.query.offset != null
             ? parseInt(String(req.query.offset), 10) || 0

@@ -128,6 +128,81 @@ describe('News API routes', () => {
       );
     });
 
+    test('should silently cap limit at 100 when caller exceeds the upper bound', async () => {
+      mocks.listForUser.mockResolvedValue({
+        docs: [],
+        totalDocs: 0,
+        limit: 100,
+        offset: 0,
+        page: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false,
+        nextPage: null,
+        prevPage: null,
+        pagingCounter: 1,
+      });
+
+      const app = buildApp();
+      await request(app).get('/apiv3/news/list?limit=99999');
+
+      expect(mocks.listForUser).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(Array),
+        expect.objectContaining({ limit: 100 }),
+      );
+    });
+
+    test('should fall back to default limit when caller passes a non-numeric value', async () => {
+      mocks.listForUser.mockResolvedValue({
+        docs: [],
+        totalDocs: 0,
+        limit: 10,
+        offset: 0,
+        page: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false,
+        nextPage: null,
+        prevPage: null,
+        pagingCounter: 1,
+      });
+
+      const app = buildApp();
+      await request(app).get('/apiv3/news/list?limit=abc');
+
+      expect(mocks.listForUser).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(Array),
+        expect.objectContaining({ limit: 10 }),
+      );
+    });
+
+    test('should clamp limit up to 1 when caller passes a negative value', async () => {
+      mocks.listForUser.mockResolvedValue({
+        docs: [],
+        totalDocs: 0,
+        limit: 1,
+        offset: 0,
+        page: 1,
+        totalPages: 1,
+        hasNextPage: false,
+        hasPrevPage: false,
+        nextPage: null,
+        prevPage: null,
+        pagingCounter: 1,
+      });
+
+      const app = buildApp();
+      await request(app).get('/apiv3/news/list?limit=-5');
+
+      expect(mocks.listForUser).toHaveBeenCalledWith(
+        expect.anything(),
+        expect.any(Array),
+        expect.objectContaining({ limit: 1 }),
+      );
+    });
+
     test('should pass onlyUnread=true when query param is set', async () => {
       mocks.listForUser.mockResolvedValue({
         docs: [],
