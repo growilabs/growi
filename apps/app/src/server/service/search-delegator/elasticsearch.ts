@@ -830,7 +830,10 @@ class ElasticsearchDelegator
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
 
-  async updateOrInsertAuditlog(activity: ActivityDocument): Promise<void> {
+  async updateOrInsertAuditlog(
+    activity: ActivityDocument | null,
+  ): Promise<void> {
+    if (activity == null) return;
     const body = this.prepareBodyForAuditlog(activity);
     if (body.length === 0) return;
 
