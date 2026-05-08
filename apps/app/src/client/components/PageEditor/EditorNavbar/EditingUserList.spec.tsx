@@ -18,20 +18,29 @@ import userEvent from '@testing-library/user-event';
 vi.mock('@growi/ui/dist/components', () => ({
   UserPicture: ({
     user,
-    className,
     noTooltip,
+    testId,
+    rootClassName,
+    rootStyle,
+    onClick,
   }: {
     user: EditingClient;
-    className?: string;
     noTooltip?: boolean;
+    testId?: string;
+    rootClassName?: string;
+    rootStyle?: Record<string, string>;
+    onClick?: () => void;
   }) => (
-    <span
-      data-testid={`user-picture-${user.clientId}`}
+    <button
+      type="button"
+      data-testid={testId ?? `user-picture-${user.clientId}`}
       data-no-tooltip={noTooltip ? 'true' : undefined}
-      className={className}
+      className={rootClassName}
+      style={rootStyle}
+      onClick={onClick}
     >
       {user.name}
-    </span>
+    </button>
   ),
 }));
 
@@ -212,15 +221,19 @@ describe('EditingUserList — Task 16.1', () => {
 /**
  * Task 20.4 — EditingUserList tooltip integration
  * Requirements: 7.2
+ *
+ * Tooltip is provided by UserPicture's built-in UncontrolledTooltip.
+ * noTooltip must NOT be passed so the tooltip renders for all avatars.
+ * The testId prop routes the data-testid onto UserPicture's root element,
+ * which is the tooltip target — click and tooltip coexist on the same node.
  */
 describe('EditingUserList — Task 20.4 (tooltip integration)', () => {
   describe('Req 7.2 — UserPicture rendered without noTooltip so tooltip is active', () => {
     it('does not pass noTooltip to UserPicture for direct avatars', () => {
       render(<EditingUserList clientList={[clientAlice]} />);
 
-      const pic = screen.getByTestId('user-picture-1');
-      // data-no-tooltip attribute is only set when noTooltip=true; should be absent
-      expect(pic.getAttribute('data-no-tooltip')).toBeNull();
+      const wrapper = screen.getByTestId('avatar-wrapper-1');
+      expect(wrapper.getAttribute('data-no-tooltip')).toBeNull();
     });
 
     it('does not pass noTooltip to UserPicture for all first-4 direct avatars', () => {
@@ -231,8 +244,8 @@ describe('EditingUserList — Task 20.4 (tooltip integration)', () => {
       );
 
       for (const client of [clientAlice, clientBob, clientCarol, clientDave]) {
-        const pic = screen.getByTestId(`user-picture-${client.clientId}`);
-        expect(pic.getAttribute('data-no-tooltip')).toBeNull();
+        const wrapper = screen.getByTestId(`avatar-wrapper-${client.clientId}`);
+        expect(wrapper.getAttribute('data-no-tooltip')).toBeNull();
       }
     });
 
@@ -249,11 +262,10 @@ describe('EditingUserList — Task 20.4 (tooltip integration)', () => {
         />,
       );
 
-      // Open the overflow popover
       await userEvent.click(screen.getByRole('button', { name: /^\+1$/ }));
 
-      const evePic = screen.getByTestId('user-picture-5');
-      expect(evePic.getAttribute('data-no-tooltip')).toBeNull();
+      const eveWrapper = screen.getByTestId('avatar-wrapper-5');
+      expect(eveWrapper.getAttribute('data-no-tooltip')).toBeNull();
     });
   });
 });
