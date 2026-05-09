@@ -5550,6 +5550,11 @@ class PageService implements IPageService {
       configManager.getConfig('app:wipPageExpirationSeconds') ?? 172800;
     const collection = mongoose.connection.collection('pages');
 
+    // DELETEME: migrations never runs on test environment (which should be fixed),
+    // until then, create collection if it does not exist to avoid the error when creating an index.
+    // MongoServerError: ns does not exist: growi_test_x.pages
+    await mongoose.connection.createCollection('pages').catch(() => {});
+
     try {
       const targetField = 'ttlTimestamp_1';
 
