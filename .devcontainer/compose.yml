@@ -15,6 +15,7 @@ services:
 
   mongo:
     image: mongo:8.2
+    command: ["mongod", "--replSet", "rs0", "--bind_ip_all"]
     restart: unless-stopped
     ports:
       - 27017
@@ -50,6 +51,14 @@ services:
           db.adminCommand({ setFeatureCompatibilityVersion: target, confirm: true });
           print(`FCV upgraded: $${result.featureCompatibilityVersion.version} -> $${target}`);
         }
+
+  mongo-init-rs:
+    image: mongo:8.2
+    depends_on:
+      - mongo
+    entrypoint: >
+      mongosh --host mongo --eval 'rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "mongo:27017" }] })'
+    restart: no
 
   # This container requires '../../growi-docker-compose' repository
   #   cloned from https://github.com/growilabs/growi-docker-compose.git
