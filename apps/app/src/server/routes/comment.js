@@ -1,7 +1,7 @@
 import { getIdStringForRef } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 
-import { Comment, CommentEvent, commentEvent } from '~/features/comment/server';
+import { CommentEvent, commentEvent } from '~/features/comment/server';
 import {
   SupportedAction,
   SupportedEventModel,
@@ -61,7 +61,7 @@ import { preNotifyService } from '../service/pre-notify';
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:comment');
-  const { User, Page } = crowi.models;
+  const { Page } = crowi.models;
   const ApiResponse = require('../util/apiResponse');
 
   const activityEvent = crowi.events.activity;
