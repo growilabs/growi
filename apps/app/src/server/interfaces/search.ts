@@ -10,6 +10,12 @@ export type QueryTerms = {
   not_prefix: string[];
   tag: string[];
   not_tag: string[];
+  author: string[];
+  not_author: string[];
+  editor: string[];
+  not_editor: string[];
+  group: string[];
+  not_group: string[];
 };
 
 export type ParsedQuery = {
