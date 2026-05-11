@@ -374,19 +374,26 @@ const factory = (crowi) => {
     return userStatus;
   };
 
-  userSchema.statics.isEmailValid = (email, callback) => {
+  userSchema.statics.isEmailValid = (email) => {
     validateCrowi();
 
     const whitelist = configManager.getConfig('security:registrationWhitelist');
 
-    if (Array.isArray(whitelist) && whitelist.length > 0) {
-      return whitelist.some((allowedEmail) => {
-        const re = new RegExp(`${allowedEmail}$`);
-        return re.test(email);
-      });
+    if (!Array.isArray(whitelist) || whitelist.length === 0) {
+      return true;
     }
 
-    return true;
+    const normalizedEmail = email.toLowerCase();
+
+    return whitelist.some((entry) => {
+      const normalizedEntry = entry.toLowerCase();
+      if (normalizedEntry.startsWith('@')) {
+        // Domain match: e.g. "@example.com" allows any address ending with "@example.com"
+        return normalizedEmail.endsWith(normalizedEntry);
+      }
+      // Exact match: e.g. "user@example.com" allows only that specific address
+      return normalizedEmail === normalizedEntry;
+    });
   };
 
   userSchema.statics.findUsers = function (options, callback) {

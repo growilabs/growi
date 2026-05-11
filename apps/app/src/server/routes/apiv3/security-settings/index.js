@@ -77,8 +77,22 @@ const validator = {
     body('registrationWhitelist')
       .if((value) => value != null)
       .isArray()
-      .customSanitizer((value, { req }) => {
-        return value.filter((email) => email !== '');
+      .customSanitizer((value) => value.filter((entry) => entry !== ''))
+      .custom((entries) => {
+        const isValidEntry = (entry) => {
+          if (entry.startsWith('@')) {
+            return /^@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(
+              entry,
+            );
+          }
+          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry);
+        };
+        if (!entries.every(isValidEntry)) {
+          throw new Error(
+            'Each entry must be a valid email address or a domain starting with @',
+          );
+        }
+        return true;
       }),
   ],
   ldapAuth: [

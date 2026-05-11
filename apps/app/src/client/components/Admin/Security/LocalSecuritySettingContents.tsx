@@ -202,9 +202,13 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
               <p className="form-text text-muted small">
                 {t('security_settings.restrict_emails')}
                 <br />
-                {t('security_settings.for_example')}
+                {t('security_settings.whitelist_domain_desc')}
                 <code>@growi.org</code>
-                {t('security_settings.in_this_case')}
+                {t('security_settings.whitelist_domain_suffix')}
+                <br />
+                {t('security_settings.whitelist_exact_desc')}
+                <code>user@growi.org</code>
+                {t('security_settings.whitelist_exact_suffix')}
                 <br />
                 {t('security_settings.insert_single')}
               </p>
