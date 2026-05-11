@@ -31,6 +31,7 @@
     "whitelist_exact_desc": " Pour autoriser une adresse précise, écrire l'adresse complète comme ",
     "whitelist_exact_suffix": ".",
     "insert_single": "Insérer une entrée par ligne.",
+    "whitelist_invalid_format": "Format invalide. Utilisez @example.com pour un domaine ou user@example.com pour une adresse exacte.",
     "page_list_and_search_results": "Affichage des pages",
     "page_listing_1": "Liste et recherche de pages<br>restreint à 'Seulement moi'",
     "page_listing_1_desc": "Voir les pages restreintes à 'Seulement moi' lors de la recherche",

@@ -31,6 +31,7 @@
     "whitelist_exact_desc": " 특정 주소만 허용하려면 전체 주소를 입력하세요. 예: ",
     "whitelist_exact_suffix": ".",
     "insert_single": "한 줄에 하나의 항목을 입력하십시오.",
+    "whitelist_invalid_format": "형식이 올바르지 않습니다. 도메인은 @example.com, 정확한 주소는 user@example.com 형식으로 입력하세요.",
     "page_list_and_search_results": "페이지 목록 / 검색 결과",
     "page_listing_1": "'나만'으로 제한된 페이지 목록/검색<br>",
     "page_listing_1_desc": "목록/검색 시 '나만' 옵션으로 제한된 페이지 표시",

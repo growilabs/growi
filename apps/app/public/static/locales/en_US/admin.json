@@ -31,6 +31,7 @@
     "whitelist_exact_desc": " To allow only a specific address, write a full address like ",
     "whitelist_exact_suffix": ".",
     "insert_single": "Please insert one entry per line.",
+    "whitelist_invalid_format": "Invalid format. Use @example.com for domain or user@example.com for exact address.",
     "page_list_and_search_results": "Page list / Search results",
     "page_listing_1": "Page listing/searching<br>restricted by 'Only me'",
     "page_listing_1_desc": "Show pages that are restricted by 'Only me' option when listing/searching",

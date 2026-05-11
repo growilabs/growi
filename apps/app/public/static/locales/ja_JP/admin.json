@@ -40,6 +40,7 @@
     "whitelist_exact_desc": "特定のアドレスのみ許可する場合は",
     "whitelist_exact_suffix": "のように完全なメールアドレスを入力します。",
     "insert_single": "1行に1エントリ入力してください。",
+    "whitelist_invalid_format": "無効なフォーマットです。ドメイン指定は @example.com 、アドレス完全一致は user@example.com の形式で入力してください。",
     "page_list_and_search_results": "ページリスト・検索結果",
     "page_listing_1": "ページのリスト表示と検索<br>'自分のみ'に閲覧制限しているページ",
     "page_listing_1_desc": "ページのリスト表示や検索結果において、'自分のみ'に閲覧制限をしているページをアクセス権のないユーザーにも表示します。",

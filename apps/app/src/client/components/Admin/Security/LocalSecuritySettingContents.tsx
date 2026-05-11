@@ -22,7 +22,12 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
   const { t } = useTranslation('admin');
   const isMailerSetup = useAtomValue(isMailerSetupAtom);
 
-  const { register, handleSubmit, reset } = useForm();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm();
 
   const {
     registrationMode,
@@ -196,9 +201,32 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
             </div>
             <div className="col-12 col-md-8">
               <textarea
-                className="form-control"
-                {...register('registrationWhitelist')}
+                className={`form-control ${errors.registrationWhitelist ? 'is-invalid' : ''}`}
+                {...register('registrationWhitelist', {
+                  validate: (value) => {
+                    const isValidEntry = (entry: string) => {
+                      if (entry.startsWith('@')) {
+                        return /^@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(
+                          entry,
+                        );
+                      }
+                      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry);
+                    };
+                    const invalid = value
+                      .split('\n')
+                      .filter((e: string) => e !== '' && !isValidEntry(e));
+                    return (
+                      invalid.length === 0 ||
+                      t('security_settings.whitelist_invalid_format')
+                    );
+                  },
+                })}
               />
+              {errors.registrationWhitelist && (
+                <div className="invalid-feedback">
+                  {errors.registrationWhitelist.message as string}
+                </div>
+              )}
               <p className="form-text text-muted small">
                 {t('security_settings.restrict_emails')}
                 <br />
