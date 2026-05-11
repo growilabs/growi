@@ -256,7 +256,22 @@ export const ChatSidebar = (): JSX.Element => {
                   })}
                 </div>
               ))}
-              {status === 'submitted' && <Loader />}
+              {(() => {
+                // Keep the spinner up until *some* part of the assistant
+                // reply (reasoning trigger or text body) is mounted.
+                // `status === 'submitted'` covers the wait before the stream
+                // opens; `status === 'streaming'` with an empty assistant
+                // message covers the gap between stream open and the first
+                // chunk (notable for reasoning models that pause to think
+                // before emitting anything).
+                if (status !== 'submitted' && status !== 'streaming') {
+                  return null;
+                }
+                const last = messages.at(-1);
+                const awaitingFirstPart =
+                  last?.role !== 'assistant' || (last.parts?.length ?? 0) === 0;
+                return awaitingFirstPart ? <Loader /> : null;
+              })()}
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
