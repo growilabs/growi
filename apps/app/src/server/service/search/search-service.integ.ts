@@ -145,6 +145,12 @@ describe('SearchService test', () => {
           not_prefix: ['/pre2'],
           tag: ['Tag1'],
           not_tag: ['Tag2'],
+          author: ['author1'],
+          not_author: ['author2'],
+          editor: ['editor1'],
+          not_editor: ['editor2'],
+          group: ['group1'],
+          not_group: ['group2'],
         },
       };
 
