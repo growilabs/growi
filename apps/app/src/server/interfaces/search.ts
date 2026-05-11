@@ -56,6 +56,7 @@ export interface SearchDelegator<
 export type SearchableData<T = Partial<QueryTerms>> = {
   queryString: string;
   terms: T;
+  resolvedFilterData?: ResolvedFilterData;
 };
 
 export type UpdateOrInsertPagesOpts = {
@@ -77,9 +78,22 @@ export type ESTermsKey =
   | 'prefix'
   | 'not_prefix'
   | 'tag'
-  | 'not_tag';
+  | 'not_tag'
+  | 'author'
+  | 'not_author'
+  | 'editor'
+  | 'not_editor'
+  | 'group'
+  | 'not_group';
 export type MongoTermsKey = 'match' | 'not_match' | 'prefix' | 'not_prefix';
 
 // Query Terms types
 export type ESQueryTerms = Pick<QueryTerms, ESTermsKey>;
 export type MongoQueryTerms = Pick<QueryTerms, MongoTermsKey>;
+
+export type ResolvedFilterData = {
+  editorPageIds: string[];
+  notEditorPageIds: string[];
+  groupMemberUsernames: string[];
+  notGroupMemberUsernames: string[];
+};
