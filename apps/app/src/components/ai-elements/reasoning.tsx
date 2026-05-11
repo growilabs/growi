@@ -122,10 +122,10 @@ export const Reasoning: React.NamedExoticComponent<ReasoningProps> = memo(
 export type ReasoningTriggerProps = ComponentProps<typeof CollapsibleTrigger>;
 
 const getThinkingMessage = (isStreaming: boolean, duration?: number) => {
-  if (isStreaming || duration === 0) {
-    return <Shimmer duration={1}>Thinking...</Shimmer>;
+  if (isStreaming) {
+    return <Shimmer>Thinking...</Shimmer>;
   }
-  if (duration === undefined) {
+  if (duration == null || duration === 0) {
     return <p>Thought for a few seconds</p>;
   }
   return <p>Thought for {duration} seconds</p>;

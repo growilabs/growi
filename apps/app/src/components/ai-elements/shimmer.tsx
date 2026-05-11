@@ -9,10 +9,6 @@ export type TextShimmerProps = {
   children: string;
   as?: ElementType;
   className?: string;
-  /** @deprecated kept for API compatibility; the pulse animation has fixed timing */
-  duration?: number;
-  /** @deprecated kept for API compatibility; the pulse animation does not use spread */
-  spread?: number;
 };
 
 const ShimmerComponent = ({
