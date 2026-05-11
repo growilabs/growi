@@ -1,5 +1,6 @@
 import type { IPage, IPageHasId, IUser } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import note from 'mermaid/dist/dagre-wrapper/shapes/note.js';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
@@ -457,6 +458,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const notPrefixPaths: string[] = [];
     const tags: string[] = [];
     const notTags: string[] = [];
+    const authors: string[] = [];
+    const notAuthors: string[] = [];
+    const editors: string[] = [];
+    const notEditors: string[] = [];
+    const groups: string[] = [];
+    const notGroups: string[] = [];
 
     // First: Parse phrase keywords
     const phraseRegExp = new RegExp(/(-?"[^"]+")/g);
@@ -491,6 +498,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
           notPrefixPaths.push(matchNegative[2]);
         } else if (matchNegative[1] === 'tag:') {
           notTags.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'author:') {
+          notAuthors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'editor:') {
+          notEditors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'group:') {
+          notGroups.push(matchNegative[2]);
         } else {
           notMatchWords.push(matchNegative[2]);
         }
@@ -499,6 +512,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
           prefixPaths.push(matchPositive[2]);
         } else if (matchPositive[1] === 'tag:') {
           tags.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'author:') {
+          authors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'editor') {
+          editors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'group:') {
+          groups.push(matchPositive[2]);
         } else {
           matchWords.push(matchPositive[2]);
         }
@@ -514,6 +533,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
       not_prefix: notPrefixPaths,
       tag: tags,
       not_tag: notTags,
+      authors: authors,
+      notAuthors: notAuthors,
+      editors: editors,
+      notEditors: notEditors,
+      groups: groups,
+      notGroups: notGroups,
     };
 
     return terms;
