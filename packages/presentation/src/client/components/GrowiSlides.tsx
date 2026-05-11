@@ -24,10 +24,11 @@ export const GrowiSlides = (props: Props): JSX.Element => {
   const { rendererOptions, isDarkMode, disableSeparationByHeader } = options;
 
   if (
+    rendererOptions == null ||
     rendererOptions.remarkPlugins == null ||
     rendererOptions.components == null
   ) {
-    // biome-ignore lint/complexity/noUselessFragments: This is for type checking only. The actual code will never reach here.
+    // biome-ignore lint/complexity/noUselessFragments: early return when rendererOptions is null
     return <></>;
   }
 
