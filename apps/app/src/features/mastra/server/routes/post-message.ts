@@ -154,6 +154,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             // in the TypeScript types, so iterate manually via a reader.
             const reader = toAISdkStream(stream, {
               from: 'agent',
+              version: 'v6',
               sendReasoning: true,
             }).getReader();
 
