@@ -533,12 +533,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
       not_prefix: notPrefixPaths,
       tag: tags,
       not_tag: notTags,
-      authors: authors,
-      notAuthors: notAuthors,
-      editors: editors,
-      notEditors: notEditors,
-      groups: groups,
-      notGroups: notGroups,
+      author: authors,
+      not_author: notAuthors,
+      editor: editors,
+      not_editor: notEditors,
+      group: groups,
+      not_group: notGroups,
     };
 
     return terms;
