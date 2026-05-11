@@ -7,6 +7,7 @@ import uniqueValidator from 'mongoose-unique-validator';
 
 import { i18n } from '^/config/next-i18next.config';
 
+import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
 
@@ -383,17 +384,7 @@ const factory = (crowi) => {
       return true;
     }
 
-    const normalizedEmail = email.toLowerCase();
-
-    return whitelist.some((entry) => {
-      const normalizedEntry = entry.toLowerCase();
-      if (normalizedEntry.startsWith('@')) {
-        // Domain match: e.g. "@example.com" allows any address ending with "@example.com"
-        return normalizedEmail.endsWith(normalizedEntry);
-      }
-      // Exact match: e.g. "user@example.com" allows only that specific address
-      return normalizedEmail === normalizedEntry;
-    });
+    return whitelist.some((entry) => isEmailMatchedByEntry(email, entry));
   };
 
   userSchema.statics.findUsers = function (options, callback) {

@@ -15,6 +15,7 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import ShareLink from '~/server/models/share-link';
 import { configManager } from '~/server/service/config-manager';
+import { isValidWhitelistEntry } from '~/utils/email-whitelist';
 import loggerFactory from '~/utils/logger';
 import {
   prepareDeleteConfigValuesForCalc,
@@ -79,15 +80,7 @@ const validator = {
       .isArray()
       .customSanitizer((value) => value.filter((entry) => entry !== ''))
       .custom((entries) => {
-        const isValidEntry = (entry) => {
-          if (entry.startsWith('@')) {
-            return /^@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(
-              entry,
-            );
-          }
-          return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry);
-        };
-        if (!entries.every(isValidEntry)) {
+        if (!entries.every(isValidWhitelistEntry)) {
           throw new Error(
             'Each entry must be a valid email address or a domain starting with @',
           );

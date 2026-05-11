@@ -8,6 +8,7 @@ import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurit
 import AdminLocalSecurityContainer from '~/client/services/AdminLocalSecurityContainer';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { isMailerSetupAtom } from '~/states/server-configurations';
+import { isValidWhitelistEntry } from '~/utils/email-whitelist';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -27,7 +28,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm();
+  } = useForm({ mode: 'onChange' });
 
   const {
     registrationMode,
@@ -201,20 +202,14 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
             </div>
             <div className="col-12 col-md-8">
               <textarea
-                className={`form-control ${errors.registrationWhitelist ? 'is-invalid' : ''}`}
+                className={`form-control${errors.registrationWhitelist ? ' is-invalid' : ''}`}
                 {...register('registrationWhitelist', {
                   validate: (value) => {
-                    const isValidEntry = (entry: string) => {
-                      if (entry.startsWith('@')) {
-                        return /^@[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9-]*[a-zA-Z0-9])?)+$/.test(
-                          entry,
-                        );
-                      }
-                      return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(entry);
-                    };
                     const invalid = value
                       .split('\n')
-                      .filter((e: string) => e !== '' && !isValidEntry(e));
+                      .filter(
+                        (e: string) => e !== '' && !isValidWhitelistEntry(e),
+                      );
                     return (
                       invalid.length === 0 ||
                       t('security_settings.whitelist_invalid_format')
