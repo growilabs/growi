@@ -61,7 +61,7 @@ describe('SearchService test', () => {
   describe('parseQueryString()', () => {
     it('should parse queryString', async () => {
       const queryString =
-        'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
+        'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2 author:author1 -author:author2 editor:editor1 -editor:editor2 group:group1 -group:group2';
       const terms = await searchService.parseQueryString(queryString);
 
       const expected = {
