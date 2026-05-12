@@ -237,25 +237,23 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
     [editorKey, markDirty],
   );
 
-  const fetchUsers = useMemo<FetchUsersFn>(() => {
-    return async (query: string) => {
-      try {
-        const res = await apiv3Get<{
-          paginateResult: { docs: { username: string; name: string }[] };
-        }>('/users/', {
-          searchText: query,
-          sort: 'username',
-          sortOrder: 'asc',
-          page: 1,
-        });
-        return (res.data.paginateResult?.docs ?? []).map((user) => ({
-          username: user.username,
-          name: user.name,
-        }));
-      } catch {
-        return [];
-      }
-    };
+  const fetchUsers = useCallback<FetchUsersFn>(async (query: string) => {
+    try {
+      const res = await apiv3Get<{
+        paginateResult: { docs: { username: string; name: string }[] };
+      }>('/users/', {
+        searchText: query,
+        sort: 'username',
+        sortOrder: 'asc',
+        page: 1,
+      });
+      return (res.data.paginateResult?.docs ?? []).map((user) => ({
+        username: user.username,
+        name: user.name,
+      }));
+    } catch {
+      return [];
+    }
   }, []);
 
   const mentionExtension = useMemo(
