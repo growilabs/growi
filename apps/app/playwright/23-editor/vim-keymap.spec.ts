@@ -60,6 +60,12 @@ test.describe
     test('Write command (:w) should save the page successfully', async ({
       page,
     }) => {
+      // Focus the editor and ensure Normal mode — beforeEach re-navigates, so
+      // the editor may not have focus yet and CodeMirror's Vim extension may
+      // need a keystroke to settle into Normal mode on webkit.
+      await page.locator('.cm-content').click();
+      await page.keyboard.press('Escape');
+
       // Enter command mode
       await page.keyboard.type(':');
       await expect(page.locator('.cm-vim-panel')).toBeVisible();
