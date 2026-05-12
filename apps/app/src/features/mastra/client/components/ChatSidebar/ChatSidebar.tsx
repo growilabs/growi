@@ -1,3 +1,5 @@
+// ref: https://elements.ai-sdk.dev/examples/chatbot
+
 import { Fragment, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
