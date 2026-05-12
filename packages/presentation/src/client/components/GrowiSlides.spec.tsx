@@ -1,4 +1,4 @@
-import { render } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 import { GrowiSlides } from './GrowiSlides';
@@ -21,33 +21,38 @@ vi.mock('./RichSlideSection', () => ({
   PresentationRichSlideSection: () => <div />,
 }));
 
+const validRendererOptions = {
+  remarkPlugins: [],
+  rehypePlugins: [],
+  components: {},
+};
+
 describe('GrowiSlides', () => {
   it('does not throw when rendererOptions is undefined', () => {
     expect(() =>
       render(
-        <GrowiSlides options={{ rendererOptions: undefined as any }}>
+        <GrowiSlides options={{ rendererOptions: undefined }}>
           {'# Slide'}
         </GrowiSlides>,
       ),
     ).not.toThrow();
   });
 
-  it('does not throw when rendererOptions is null', () => {
-    expect(() =>
-      render(
-        <GrowiSlides options={{ rendererOptions: null as any }}>
-          {'# Slide'}
-        </GrowiSlides>,
-      ),
-    ).not.toThrow();
-  });
-
-  it('renders nothing when rendererOptions is null', () => {
+  it('renders nothing when rendererOptions is undefined', () => {
     const { container } = render(
-      <GrowiSlides options={{ rendererOptions: null as any }}>
+      <GrowiSlides options={{ rendererOptions: undefined }}>
         {'# Slide'}
       </GrowiSlides>,
     );
     expect(container.firstChild).toBeNull();
+  });
+
+  it('renders slides content when rendererOptions is valid', () => {
+    render(
+      <GrowiSlides options={{ rendererOptions: validRendererOptions }}>
+        {'# Slide 1'}
+      </GrowiSlides>,
+    );
+    expect(screen.queryByText('Slide 1')).toBeTruthy();
   });
 });
