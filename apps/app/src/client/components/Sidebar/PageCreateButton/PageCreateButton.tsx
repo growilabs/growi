@@ -1,4 +1,4 @@
-import React, { type JSX, useState } from 'react';
+import React, { type JSX, useEffect, useRef, useState } from 'react';
 import { Dropdown } from 'reactstrap';
 
 import { useCreateTemplatePage } from '~/client/services/create-page';
@@ -11,10 +11,27 @@ import { DropendMenu } from './DropendMenu';
 import { DropendToggle } from './DropendToggle';
 import { useCreateNewPage, useCreateTodaysMemo } from './hooks';
 
+import styles from './PageCreateButton.module.scss';
+
 export const PageCreateButton = React.memo((): JSX.Element => {
   const [isHovered, setIsHovered] = useState(false);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
+  const fieldsetRef = useRef<HTMLFieldSetElement>(null);
+
+  useEffect(() => {
+    const handleClickOutside = (e: MouseEvent) => {
+      if (
+        fieldsetRef.current &&
+        !fieldsetRef.current.contains(e.target as Node)
+      ) {
+        setDropdownOpen(false);
+        setIsHovered(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, []);
 
   const { open: openPageCreateModal } = usePageCreateModalActions();
   const currentPagePath = useCurrentPagePath();
@@ -42,14 +59,14 @@ export const PageCreateButton = React.memo((): JSX.Element => {
   };
 
   const onMouseLeaveHandler = () => {
-    setIsHovered(false);
-    setDropdownOpen(false);
+    if (!dropdownOpen) setIsHovered(false);
   };
 
   const toggle = () => setDropdownOpen(!dropdownOpen);
 
   return (
     <fieldset
+      ref={fieldsetRef}
       className="d-flex flex-row mt-2 border-0 p-0 m-0"
       onMouseEnter={onMouseEnterHandler}
       onMouseLeave={onMouseLeaveHandler}
@@ -65,27 +82,25 @@ export const PageCreateButton = React.memo((): JSX.Element => {
           }
         />
       </div>
-      {isHovered && (
-        <Dropdown
-          isOpen={dropdownOpen}
-          toggle={toggle}
-          direction="end"
-          className="position-absolute"
-        >
-          <DropendToggle />
-          <DropendMenu
-            onClickCreateNewPage={createNewPageWithToastr}
-            onClickOpenPageCreateModal={() =>
-              openPageCreateModal(currentPagePath)
-            }
-            onClickCreateTodaysMemo={createTodaysMemoWithToastr}
-            onClickCreateTemplate={
-              isTemplatePageCreatable ? createTemplateWithToastr : undefined
-            }
-            todaysPath={todaysPath}
-          />
-        </Dropdown>
-      )}
+      <Dropdown
+        isOpen={dropdownOpen}
+        toggle={toggle}
+        direction="end"
+        className={`position-absolute ${styles['dropend-toggle']} ${isHovered ? styles['is-hovered'] : ''}`}
+      >
+        <DropendToggle isOpen={dropdownOpen} />
+        <DropendMenu
+          onClickCreateNewPage={createNewPageWithToastr}
+          onClickOpenPageCreateModal={() =>
+            openPageCreateModal(currentPagePath)
+          }
+          onClickCreateTodaysMemo={createTodaysMemoWithToastr}
+          onClickCreateTemplate={
+            isTemplatePageCreatable ? createTemplateWithToastr : undefined
+          }
+          todaysPath={todaysPath}
+        />
+      </Dropdown>
     </fieldset>
   );
 });

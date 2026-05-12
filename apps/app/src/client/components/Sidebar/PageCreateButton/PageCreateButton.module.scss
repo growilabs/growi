@@ -1,0 +1,30 @@
+@keyframes slide-in {
+  from {
+    opacity: 0;
+    transform: scaleX(0.8);
+  }
+  to {
+    opacity: 1;
+    transform: scaleX(1.1);
+  }
+}
+
+@keyframes slide-out {
+  from {
+    opacity: 1;
+    transform: scaleX(1.1);
+  }
+  to {
+    opacity: 0;
+    transform: scaleX(0.8);
+  }
+}
+
+.dropend-toggle {
+  transform-origin: left;
+  animation: slide-out 0.3s ease forwards;
+}
+
+.dropend-toggle.is-hovered {
+  animation: slide-in 0.3s ease forwards;
+}
