@@ -28,7 +28,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
     handleSubmit,
     reset,
     formState: { errors },
-  } = useForm({ mode: 'onChange' });
+  } = useForm({ mode: 'onBlur' });
 
   const {
     registrationMode,
@@ -219,7 +219,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
               />
               {errors.registrationWhitelist && (
                 <div className="invalid-feedback">
-                  {errors.registrationWhitelist.message as string}
+                  {errors.registrationWhitelist.message}
                 </div>
               )}
               <p className="form-text text-muted small">
@@ -228,6 +228,10 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                 {t('security_settings.whitelist_domain_desc')}
                 <code>@growi.org</code>
                 {t('security_settings.whitelist_domain_suffix')}
+                <br />
+                {t('security_settings.whitelist_subdomain_desc')}
+                <code>@*.growi.org</code>
+                {t('security_settings.whitelist_subdomain_suffix')}
                 <br />
                 {t('security_settings.whitelist_exact_desc')}
                 <code>user@growi.org</code>
