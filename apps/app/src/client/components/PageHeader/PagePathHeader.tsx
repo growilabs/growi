@@ -13,7 +13,7 @@ import {
   ValidationTarget,
 } from '~/client/util/use-input-validator';
 import type { IPageForItem } from '~/interfaces/page';
-import LinkedPagePath from '~/models/linked-page-path';
+import { LinkedPagePath } from '~/models/linked-page-path';
 import { usePageSelectModalActions } from '~/states/ui/modal/page-select';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';

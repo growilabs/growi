@@ -10,7 +10,6 @@ import {
   normalizePath,
 } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
-import escapeStringRegexp from 'escape-string-regexp';
 import type mongoose from 'mongoose';
 import type {
   AnyObject,
@@ -348,7 +347,7 @@ export class PageQueryBuilder {
     const pathNormalized = normalizePath(path);
     const pathWithTrailingSlash = addTrailingSlash(path);
 
-    const startsPattern = escapeStringRegexp(pathWithTrailingSlash);
+    const startsPattern = RegExp.escape(pathWithTrailingSlash);
 
     this.query = this.query.and({
       $or: [
@@ -373,7 +372,7 @@ export class PageQueryBuilder {
 
     const pathWithTrailingSlash = addTrailingSlash(path);
 
-    const startsPattern = escapeStringRegexp(pathWithTrailingSlash);
+    const startsPattern = RegExp.escape(pathWithTrailingSlash);
 
     this.query = this.query.and({ path: new RegExp(`^${startsPattern}`) });
 
@@ -409,7 +408,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const startsPattern = escapeStringRegexp(path);
+    const startsPattern = RegExp.escape(path);
 
     this.query = this.query.and({ path: new RegExp(`^${startsPattern}`) });
 
@@ -424,7 +423,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const startsPattern = escapeStringRegexp(str);
+    const startsPattern = RegExp.escape(str);
 
     this.query = this.query.and({
       path: new RegExp(`^(?!${startsPattern}).*$`),
@@ -440,7 +439,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const startsPattern = escapeStringRegexp(path);
+    const startsPattern = RegExp.escape(path);
 
     this.query = this.query.and({
       path: { $not: new RegExp(`^${startsPattern}(/|$)`) },
@@ -455,7 +454,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const match = escapeStringRegexp(str);
+    const match = RegExp.escape(str);
 
     this.query = this.query.and({ path: new RegExp(`^(?=.*${match}).*$`) });
 
@@ -468,7 +467,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const match = escapeStringRegexp(str);
+    const match = RegExp.escape(str);
 
     this.query = this.query.and({ path: new RegExp(`^(?!.*${match}).*$`) });
 

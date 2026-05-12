@@ -1,32 +1,44 @@
-@mixin expand-modal-fullscreen($hasModalHeader: true, $hasModalFooter: true, $margin: 1rem) {
+@mixin expand-modal-fullscreen($hasModalHeader: true, $hasModalFooter: true, $margin: 1rem, $css-modules: false) {
   // full-screen modal
   width: auto;
   max-width: unset !important;
   height: calc(100vh - $margin * 2);
   margin: $margin !important;
 
-  .modal-content {
-    height: calc(100vh - $margin * 2);
-  }
-  .modal-body {
-    padding: $margin;
+  // Use :global() for CSS Modules to keep Bootstrap class names unhashed
+  @if $css-modules {
+    :global(.modal-content) {
+      height: calc(100vh - $margin * 2);
+    }
+  } @else {
+    .modal-content {
+      height: calc(100vh - $margin * 2);
+    }
   }
 
   // expand .modal-body (with calculating height)
-  .modal-body {
-    $modal-header: 54px;
-    $modal-footer: 46px;
-    $margin-body: 0;
+  $modal-header: 54px;
+  $modal-footer: 46px;
+  $margin-body: 0;
 
-    @if $hasModalHeader {
-      $margin-body: $margin-body + $modal-header;
+  @if $hasModalHeader {
+    $margin-body: $margin-body + $modal-header;
+  }
+
+  @if $hasModalFooter {
+    $margin-body: $margin-body + $modal-footer;
+  }
+
+  @if $css-modules {
+    :global(.modal-body) {
+      height: calc(100% - #{$margin-body});
+      padding: $margin;
     }
-
-    @if $hasModalFooter {
-      $margin-body: $margin-body + $modal-footer;
+  } @else {
+    .modal-body {
+      height: calc(100% - #{$margin-body});
+      padding: $margin;
     }
-
-    height: calc(100% - #{$margin-body});
   }
 }
 

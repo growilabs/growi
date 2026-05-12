@@ -1,6 +1,6 @@
 import { Origin, YDocStatus } from '@growi/core';
 import type { Delta } from '@growi/editor';
-import type { Document } from 'y-socket.io/dist/server';
+import type { WSSharedDoc } from 'y-websocket/bin/utils';
 
 import loggerFactory from '~/utils/logger';
 
@@ -22,7 +22,7 @@ type Context = {
  */
 export const syncYDoc = async (
   mdb: MongodbPersistence,
-  doc: Document,
+  doc: WSSharedDoc,
   context: true | Context,
 ): Promise<void> => {
   const pageId = doc.name;

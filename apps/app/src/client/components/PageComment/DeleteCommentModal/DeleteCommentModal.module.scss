@@ -1,7 +1,7 @@
 // modal
-.page-comment-delete-modal :global {
-  .modal-content .modal-body {
-    .comment-body {
+.page-comment-delete-modal {
+  :global(.modal-content .modal-body) {
+    :global(.comment-body) {
       max-height: 13em;
 
       // scrollable

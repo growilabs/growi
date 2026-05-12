@@ -1,0 +1,24 @@
+{
+  "feature_name": "auto-scroll",
+  "created_at": "2026-04-02T00:00:00.000Z",
+  "updated_at": "2026-04-07T12:00:00.000Z",
+  "cleanup_completed": true,
+  "language": "en",
+  "phase": "implementation-complete",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true,
+      "notes": "All tasks (1–8) complete. Design updated to reflect final architecture after module reorganization."
+    }
+  },
+  "ready_for_implementation": true
+}

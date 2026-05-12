@@ -38,16 +38,19 @@ export const validateReferer = (
     refererUrl.hostname !== siteUrl.hostname ||
     refererUrl.port !== siteUrl.port
   ) {
-    logger.warn('The hostname or port mismatched.', {
-      refererUrl: {
-        hostname: refererUrl.hostname,
-        port: refererUrl.port,
+    logger.warn(
+      {
+        refererUrl: {
+          hostname: refererUrl.hostname,
+          port: refererUrl.port,
+        },
+        siteUrl: {
+          hostname: siteUrl.hostname,
+          port: siteUrl.port,
+        },
       },
-      siteUrl: {
-        hostname: siteUrl.hostname,
-        port: siteUrl.port,
-      },
-    });
+      'The hostname or port mismatched.',
+    );
     return false;
   }
 
@@ -60,7 +63,10 @@ export const validateReferer = (
     return false;
   }
   if (match.groups?.shareLinkId == null) {
-    logger.warn(`The pathname ('${refererUrl.pathname}') is invalid.`, match);
+    logger.warn(
+      { match },
+      `The pathname ('${refererUrl.pathname}') is invalid.`,
+    );
     return false;
   }
 

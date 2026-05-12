@@ -2,11 +2,15 @@ import next from 'next';
 import http from 'node:http';
 import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
+import { createHttpLoggerMiddleware } from '@growi/logger';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import type { Express } from 'express';
 import mongoose from 'mongoose';
 
+import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
+import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
+import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
@@ -14,6 +18,7 @@ import { initializeOpenaiService } from '~/features/openai/server/services/opena
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
+import type { SessionConfig } from '~/interfaces/session-config';
 import { startCron as startAccessTokenCron } from '~/server/service/access-token';
 import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
@@ -46,7 +51,7 @@ import {
 } from '../service/g2g-transfer';
 import { GrowiBridgeService } from '../service/growi-bridge';
 import { initializeImportService } from '../service/import';
-import InAppNotificationService from '../service/in-app-notification';
+import { InAppNotificationService } from '../service/in-app-notification';
 import { InstallerService } from '../service/installer';
 import { normalizeData } from '../service/normalize-data';
 import PageService from '../service/page';
@@ -83,19 +88,6 @@ type ActivityServiceType = any;
 type CommentServiceType = any;
 type SyncPageStatusServiceType = any;
 type CrowiDevType = any;
-
-interface SessionConfig {
-  rolling: boolean;
-  secret: string;
-  resave: boolean;
-  saveUninitialized: boolean;
-  cookie: {
-    maxAge: number;
-  };
-  genid: (req: { path: string }) => string;
-  name?: string;
-  store?: unknown;
-}
 
 interface CrowiEvents {
   user: UserEvent;
@@ -448,6 +440,20 @@ class Crowi {
     }
     pageBulkExportJobCleanUpCronService.startCron();
 
+    instantiateAuditLogBulkExportJobCronService(this);
+    checkAuditLogExportJobInProgressCronService.startCron();
+
+    instantiateAuditLogBulkExportJobCleanUpCronService(this);
+    const { auditLogBulkExportJobCleanUpCronService } = await import(
+      '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron'
+    );
+    if (auditLogBulkExportJobCleanUpCronService == null) {
+      throw new Error(
+        'auditLogBulkExportJobCleanUpCronService is not initialized',
+      );
+    }
+    auditLogBulkExportJobCleanUpCronService.startCron();
+
     startOpenaiCronIfEnabled();
     startAccessTokenCron();
   }
@@ -554,8 +560,16 @@ class Crowi {
     await this.buildServer();
 
     // setup Next.js
+    // Save ts-node's .ts extension hook before Next.js prepare() destroys it.
+    // Next.js's next.config.ts transpiler registers/deregisters its own require hooks,
+    // and deregisterHook() deletes require.extensions['.ts'] instead of restoring the previous hook.
+    const savedTsHook = require.extensions['.ts'];
     this.nextApp = next({ dev });
     await this.nextApp.prepare();
+    // Restore ts-node's .ts hook if Next.js removed it
+    if (savedTsHook && !require.extensions['.ts']) {
+      require.extensions['.ts'] = savedTsHook;
+    }
 
     // setup CrowiDev
     if (dev) {
@@ -580,7 +594,11 @@ class Crowi {
     this.socketIoService.attachServer(httpServer);
 
     // Initialization YjsService
-    initializeYjsService(this.socketIoService.io);
+    initializeYjsService(
+      httpServer,
+      this.socketIoService.io,
+      this.sessionConfig,
+    );
 
     await this.autoInstall();
 
@@ -613,22 +631,16 @@ class Crowi {
 
     require('./express-init')(this, express);
 
-    // use bunyan
-    if (env === 'production') {
-      const expressBunyanLogger = require('express-bunyan-logger');
-      const bunyanLogger = loggerFactory('express');
-      express.use(
-        expressBunyanLogger({
-          logger: bunyanLogger,
-          excludes: ['*'],
-        }),
-      );
-    }
-    // use morgan
-    else {
-      const morgan = require('morgan');
-      express.use(morgan('dev'));
-    }
+    // HTTP request logging via @growi/logger (encapsulates pino-http)
+    const httpLogger = await createHttpLoggerMiddleware({
+      // suppress logging for Next.js static files in development mode
+      ...(env !== 'production' && {
+        autoLogging: {
+          ignore: (req) => req.url?.startsWith('/_next/static/') ?? false,
+        },
+      }),
+    });
+    express.use(httpLogger);
 
     this.express = express;
   }

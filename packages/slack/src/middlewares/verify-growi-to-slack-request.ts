@@ -1,8 +1,8 @@
+import { loggerFactory } from '@growi/logger';
 import type { NextFunction, Response } from 'express';
 import createError from 'http-errors';
 
 import type { RequestFromGrowi } from '../interfaces/request-between-growi-and-proxy';
-import loggerFactory from '../utils/logger';
 
 const logger = loggerFactory(
   '@growi/slack:middlewares:verify-growi-to-slack-request',
@@ -22,7 +22,7 @@ export const verifyGrowiToSlackRequest = (
   if (str == null) {
     const message =
       "The value of header 'x-growi-gtop-tokens' must not be empty.";
-    logger.warn(message, { body: req.body });
+    logger.warn({ body: req.body }, message);
     next(createError(400, message));
     return;
   }
@@ -31,7 +31,7 @@ export const verifyGrowiToSlackRequest = (
   if (tokens.length === 0) {
     const message =
       "The value of header 'x-growi-gtop-tokens' must include at least one or more tokens.";
-    logger.warn(message, { body: req.body });
+    logger.warn({ body: req.body }, message);
     next(createError(400, message));
     return;
   }

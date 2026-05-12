@@ -3,19 +3,19 @@
 $grw-sidebar-content-header-height: 58px;
 $grw-sidebar-content-footer-height: 50px;
 
-.user-page-footer :global {
-  .grw-user-page-list-m {
-    .growi-custom-icons {
+.user-page-footer {
+  :global(.grw-user-page-list-m) {
+    :global(.growi-custom-icons) {
       font-size: 1.1em;
     }
-    .list-group {
-      .list-group-item {
-        .grw-visible-on-hover {
+    :global(.list-group) {
+      :global(.list-group-item) {
+        :global(.grw-visible-on-hover) {
           display: none;
         }
 
         &:hover {
-          .grw-visible-on-hover {
+          :global(.grw-visible-on-hover) {
             display: block;
           }
         }
@@ -23,47 +23,47 @@ $grw-sidebar-content-footer-height: 50px;
         min-height: 40px;
         border-radius: 0;
 
-        &.grw-bookmark-item-list {
-          .user-picture {
+        &:global(.grw-bookmark-item-list) {
+          :global(.user-picture) {
             width: 16px;
             height: 16px;
             vertical-align: text-bottom;
 
-            &.user-picture-md {
+            &:global(.user-picture-md) {
               width: 20px;
               height: 20px;
             }
           }
-          svg {
+          :global(svg) {
             width: 14px;
             height: 14px;
           }
-          .grw-foldertree-control {
+          :global(.grw-foldertree-control) {
             margin-left: 1rem;
           }
         }
       }
     }
 
-    .grw-foldertree-item-container {
-      input {
+    :global(.grw-foldertree-item-container) {
+      :global(input) {
         max-width: 25%;
       }
     }
-    .grw-foldertree-title-anchor {
+    :global(.grw-foldertree-title-anchor) {
       width: fit-content !important;
       margin-right: 20px;
     }
-    .new-bookmark-folder {
+    :global(.new-bookmark-folder) {
       max-height: 30px;
     }
-    .grw-expand-compress-btn {
+    :global(.grw-expand-compress-btn) {
       max-height: 40px;
     }
-    .grw-folder-tree-container {
-      .grw-drop-item-area {
+    :global(.grw-folder-tree-container) {
+      :global(.grw-drop-item-area) {
         padding: 1rem;
-        .grw-accept-drop-item {
+        :global(.grw-accept-drop-item) {
           padding: 0.5rem;
           border-style: dashed;
           border-width: 0.15rem;

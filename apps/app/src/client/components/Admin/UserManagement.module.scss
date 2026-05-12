@@ -1,18 +1,18 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
 // styles for admin user search
-.search-typeahead :global {
+.search-typeahead {
   position: relative;
   width: 100%;
 
   // corner radius
   border-top-right-radius: bs.$border-radius;
   border-bottom-right-radius: bs.$border-radius;
-  .rbt-input-main,
-  input {
+  :global(.rbt-input-main),
+  :global(input) {
     padding-right: 36px;
   }
-  .search-clear {
+  :global(.search-clear) {
     position: absolute;
     top: 50%;
     right: 6px;
@@ -25,22 +25,22 @@
     transform: translateY(-50%);
   }
 
-  .rbt-menu {
+  :global(.rbt-menu) {
     max-height: none !important;
     margin-top: 3px;
 
-    li a span {
-      .page-path {
+    :global(li a span) {
+      :global(.page-path) {
         display: inline;
         padding: 0 4px;
         color: inherit;
       }
 
-      .page-list-meta {
+      :global(.page-list-meta) {
         font-size: 0.9em;
         color: bs.$gray-400;
 
-        > span {
+        > :global(span) {
           margin-right: 0.3rem;
         }
       }

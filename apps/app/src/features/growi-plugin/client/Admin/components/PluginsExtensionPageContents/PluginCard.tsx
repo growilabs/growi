@@ -84,9 +84,7 @@ export const PluginCard = (props: Props): JSX.Element => {
         <div className="row mb-3">
           <div className="col-9">
             <h2 className="card-title h3 border-bottom pb-2 mb-3">
-              <Link href={`${url}`} legacyBehavior>
-                {name}
-              </Link>
+              <Link href={`${url}`}>{name}</Link>
             </h2>
             <p className="card-text text-muted">{desc}</p>
           </div>

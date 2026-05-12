@@ -6,7 +6,6 @@ import {
   PageGrant,
 } from '@growi/core';
 import { pagePathUtils, pageUtils, pathUtils } from '@growi/core/dist/utils';
-import escapeStringRegexp from 'escape-string-regexp';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
@@ -590,10 +589,7 @@ class PageGrantService implements IPageGrantService {
     };
 
     const commonCondition = {
-      path: new RegExp(
-        `^${escapeStringRegexp(addTrailingSlash(targetPath))}`,
-        'i',
-      ),
+      path: new RegExp(`^${RegExp.escape(addTrailingSlash(targetPath))}`, 'i'),
       isEmpty: false,
     };
 

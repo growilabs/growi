@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import React, { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import canvasToBlob from 'async-canvas-to-blob';
 import { useTranslation } from 'react-i18next';
 import ReactCrop from 'react-image-crop';
@@ -7,7 +7,8 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import { toastError } from '~/client/util/toastr';
 import loggerFactory from '~/utils/logger';
-import 'react-image-crop/dist/ReactCrop.css';
+
+import './ImageCropModal.vendor-styles.prebuilt';
 
 const logger = loggerFactory('growi:ImageCropModal');
 

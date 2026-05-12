@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "GROWI UI Libraries",
   "license": "MIT",
-  "private": "true",
+  "private": true,
   "keywords": [
     "growi"
   ],
@@ -23,13 +23,14 @@
       "import": "./dist/utils/index.js"
     },
     "./dist/style": {
+      "style": "./dist/style.css",
       "import": "./dist/style.css"
     },
     "./scss/*": "./scss/*.scss"
   },
   "scripts": {
     "build": "vite build",
-    "clean": "shx rm -rf dist",
+    "clean": "rimraf dist",
     "dev": "vite build --mode dev",
     "watch": "pnpm run dev -w --emptyOutDir=false",
     "lint:biome": "biome check",
@@ -47,7 +48,7 @@
     "reactstrap": "^9.2.2"
   },
   "peerDependencies": {
-    "next": "^14",
+    "next": "^16",
     "react": "^18.2.0",
     "react-dom": "^18.2.0"
   }

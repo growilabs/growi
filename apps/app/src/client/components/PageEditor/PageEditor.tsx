@@ -57,6 +57,7 @@ import {
   useWaitingSaveProcessingActions,
 } from '~/states/ui/editor';
 import { useSetEditingClients } from '~/states/ui/editor/editing-clients';
+import { useSetScrollToRemoteCursor } from '~/states/ui/editor/scroll-to-remote-cursor';
 import { useEditorSettings } from '~/stores/editor';
 import { useSWRxCurrentGrantData } from '~/stores/page';
 import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
@@ -74,7 +75,7 @@ import { EditorNavbarBottom } from './EditorNavbarBottom';
 import Preview from './Preview';
 import { useScrollSync } from './ScrollSyncHelper';
 
-import '@growi/editor/dist/style.css';
+import '../GrowiEditor.vendor-styles.prebuilt';
 
 const logger = loggerFactory('growi:PageEditor');
 
@@ -128,6 +129,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   );
   const user = useCurrentUser();
   const setEditingClients = useSetEditingClients();
+  const setScrollToRemoteCursor = useSetScrollToRemoteCursor();
   const onConflict = useConflictResolver();
   const reservedNextCaretLine = useReservedNextCaretLineValue();
   const setReservedNextCaretLine = useSetReservedNextCaretLine();
@@ -221,10 +223,10 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   const save: Save = useCallback(
     async (revisionId, markdown, opts, onConflict) => {
       if (pageId == null || selectedGrant == null) {
-        logger.error('Some materials to save are invalid', {
-          pageId,
-          selectedGrant,
-        });
+        logger.error(
+          { pageId, selectedGrant },
+          'Some materials to save are invalid',
+        );
         throw new Error('Some materials to save are invalid');
       }
 
@@ -251,7 +253,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
 
         return page;
       } catch (error) {
-        logger.error('failed to save', error);
+        logger.error({ err: error }, 'failed to save');
 
         const remoteRevisionData = extractRemoteRevisionDataFromErrorObj(error);
         if (remoteRevisionData != null) {
@@ -329,9 +331,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   const uploadHandler = useCallback(
     (files: File[]) => {
       if (pageId == null) {
-        logger.error('pageId is invalid', {
-          pageId,
-        });
+        logger.error({ pageId }, 'pageId is invalid');
         throw new Error('pageId is invalid');
       }
 
@@ -476,6 +476,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
           pageId={pageId ?? undefined}
           editorSettings={editorSettings}
           onEditorsUpdated={setEditingClients}
+          onScrollToRemoteCursorReady={setScrollToRemoteCursor}
           cmProps={cmProps}
         />
       </div>

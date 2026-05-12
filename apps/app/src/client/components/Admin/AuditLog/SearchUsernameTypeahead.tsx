@@ -29,21 +29,30 @@ type UserDataType = {
 
 type Props = {
   onChange: (text: string[]) => void;
+  initialUsernames?: string[];
 };
 
 const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   IClearable,
   Props
 > = (props: Props, ref) => {
-  const { onChange } = props;
+  const { onChange, initialUsernames } = props;
   const { t } = useTranslation();
 
   const typeaheadRef = useRef<TypeaheadRef>(null);
+
+  const toUserDataItem = (username: string): UserDataType => ({
+    username,
+    category: Categories.activeUser,
+  });
 
   /*
    * State
    */
   const [searchKeyword, setSearchKeyword] = useState<string>('');
+  const [selectedItems, setSelectedItems] = useState<UserDataType[]>(() =>
+    (initialUsernames ?? []).map(toUserDataItem),
+  );
 
   /*
    * Fetch
@@ -87,6 +96,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
    */
   const changeHandler = useCallback(
     (userData: UserDataType[]) => {
+      setSelectedItems(userData);
       const usernames = userData.map((user) => user.username);
       onChange(usernames);
     },
@@ -148,6 +158,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
         placeholder={t('admin:audit_log_management.username')}
         isLoading={isLoading}
         options={allUser}
+        selected={selectedItems}
         onSearch={searchHandler}
         onChange={changeHandler}
         renderMenu={renderMenu}

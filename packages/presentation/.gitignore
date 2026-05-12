@@ -1,1 +1,3 @@
 /dist
+# Generated at build time by scripts/extract-marpit-css.ts
+*.vendor-styles.prebuilt.*

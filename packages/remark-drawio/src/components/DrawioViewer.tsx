@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import { debounce } from 'throttle-debounce';
 
 import type { IGraphViewerGlobal } from '..';
@@ -127,6 +128,11 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
   useEffect(() => {
     if (error != null) {
       onRenderingUpdated?.(null);
+      // finish rendering to allow auto-scroll system to detect the upcoming layout shift
+      drawioContainerRef.current?.setAttribute(
+        GROWI_IS_CONTENT_RENDERING_ATTR,
+        'false',
+      );
     }
   }, [error, onRenderingUpdated]);
 
@@ -141,8 +147,11 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
 
         const mxgraphData = target.dataset.mxgraph;
         if (mxgraphData != null) {
-          const mxgraph = JSON.parse(mxgraphData);
-          onRenderingUpdated?.(mxgraph.xml);
+          onRenderingUpdated?.(JSON.parse(mxgraphData).xml);
+          drawioContainerRef.current?.setAttribute(
+            GROWI_IS_CONTENT_RENDERING_ATTR,
+            'false',
+          );
         }
       }
     };
@@ -163,8 +172,12 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
 
     const observer = new ResizeObserver((entries) => {
       for (const _entry of entries) {
-        // setElementWidth(entry.contentRect.width);
         onRenderingStart?.();
+        // Signal re-rendering in progress so the auto-scroll system can detect the upcoming layout shift
+        drawioContainerRef.current?.setAttribute(
+          GROWI_IS_CONTENT_RENDERING_ATTR,
+          'true',
+        );
         renderDrawioWithDebounce();
       }
     });
@@ -182,6 +195,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
       className={`drawio-viewer ${styles['drawio-viewer']} p-2`}
       data-begin-line-number-of-markdown={bol}
       data-end-line-number-of-markdown={eol}
+      {...{ [GROWI_IS_CONTENT_RENDERING_ATTR]: 'true' }}
     >
       {/* show error */}
       {error != null && (

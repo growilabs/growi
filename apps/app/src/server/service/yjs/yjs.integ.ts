@@ -1,3 +1,4 @@
+import http from 'node:http';
 import { YDocStatus } from '@growi/core/dist/consts';
 import { Types } from 'mongoose';
 import type { Server } from 'socket.io';
@@ -8,11 +9,15 @@ import type { MongodbPersistence } from './extended/mongodb-persistence';
 import type { IYjsService } from './yjs';
 import { getYjsService, initializeYjsService } from './yjs';
 
-vi.mock('y-socket.io/dist/server', () => {
-  const YSocketIO = vi.fn();
-  YSocketIO.prototype.on = vi.fn();
-  YSocketIO.prototype.initialize = vi.fn();
-  return { YSocketIO };
+vi.mock('y-websocket/bin/utils', () => {
+  const docs = new Map();
+  return {
+    docs,
+    setPersistence: vi.fn(),
+    setupWSConnection: vi.fn(),
+    getYDoc: vi.fn(),
+    setContentInitializor: vi.fn(),
+  };
 });
 
 vi.mock('../revision/normalize-latest-revision-if-broken', () => ({
@@ -30,16 +35,25 @@ describe('YjsService', () => {
   describe('getYDocStatus()', () => {
     beforeAll(() => {
       const ioMock = mock<Server>();
+      const httpServer = http.createServer();
+      const sessionConfig = {
+        rolling: true,
+        secret: 'test-secret',
+        resave: false,
+        saveUninitialized: true,
+        cookie: { maxAge: 86400000 },
+        genid: () => 'test-session-id',
+      };
 
       // initialize
-      initializeYjsService(ioMock);
+      initializeYjsService(httpServer, ioMock, sessionConfig);
+    });
+
+    afterEach(async () => {
+      await Revision.deleteMany({});
     });
 
     afterAll(async () => {
-      // flush revisions
-      await Revision.deleteMany({});
-
-      // flush yjs-writings
       const yjsService = getYjsService();
       const privateMdb = getPrivateMdbInstance(yjsService);
       try {
@@ -48,7 +62,8 @@ describe('YjsService', () => {
         // Ignore errors that can occur due to async index creation:
         // - 26: NamespaceNotFound (collection not yet created)
         // - 276: IndexBuildAborted (cleanup during index creation)
-        if (error.code !== 26 && error.code !== 276) {
+        const code = (error as { code?: number }).code;
+        if (code !== 26 && code !== 276) {
           throw error;
         }
       }

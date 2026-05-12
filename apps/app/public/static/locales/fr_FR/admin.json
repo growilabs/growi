@@ -413,6 +413,7 @@
     "azure_storage_account_name": "Nom du compte de stockage",
     "azure_storage_container_name": "Nom du conteneur",
     "azure_note_for_the_only_env_option": "Les paramètres sont définis par des variables d'environnement.<br>Pour modifier ce paramètre, supprimer la variable d'environnement <code>{{env}}</code> .",
+    "azure_note_for_the_only_env_option_cloud": "Les paramètres Azure peuvent être modifiés depuis le panneau d'administration GROWI.cloud.",
     "file_upload": "Téléversement de fichiers",
     "test_connection": "Essai de la connection e-mail",
     "change_setting": "Si ce paramètre n'est pas complètement configuré, les fichiers existants seront inaccessibles.",
@@ -425,7 +426,8 @@
     "enable": "Activer",
     "disable": "Désactiver",
     "use_env_var_if_empty": "Si la valeur dans la base de données est vide, la valeur de variable d'environnement <code>{{variable}}</code> est utilisé.",
-    "note_for_the_only_env_option": "Les paramètres sont définis par des variables d'environnement.<br>Pour modifier ce paramètre, supprimer la variable d'environnement <code>{{env}}</code> ."
+    "note_for_the_only_env_option": "Les paramètres sont définis par des variables d'environnement.<br>Pour modifier ce paramètre, supprimer la variable d'environnement <code>{{env}}</code> .",
+    "note_for_the_only_env_option_cloud": "Les paramètres GCS peuvent être modifiés depuis le panneau d'administration GROWI.cloud."
   },
   "markdown_settings": {
     "markdown_settings": "Markdown",
@@ -781,7 +783,8 @@
       "revoke_read_only_access": "Révoquer permission de lecture",
       "grant_read_only_access": "Permission de lecture-seule",
       "send_invitation_email": "Envoyer courriel d'invitation",
-      "resend_invitation_email": "Renvoyer courriel d'invitation"
+      "resend_invitation_email": "Renvoyer courriel d'invitation",
+      "deleted_user": "(Utilisateur supprimé)"
     },
     "reset_password": "Réinitialiser mot de passe",
     "reset_password_modal": {
@@ -880,6 +883,14 @@
     "available_action_list_explanation": "Liste des actions pouvant être recherchées/vues",
     "action_list": "Liste d'actions",
     "disable_mode_explanation": "Cette fonctionnalité est désactivée. Afin de l'activer, mettre à jour <code>AUDIT_LOG_ENABLED</code> pour true.",
+    "export": "Exporter",
+    "export_audit_log": "Exporter le journal d'audit",
+    "export_requested": "Demande d'exportation acceptée. Vous serez averti lorsque l'exportation sera terminée.",
+    "export_failed": "Échec du démarrage de l'exportation",
+    "duplicate_export_confirm": "Une exportation avec les mêmes conditions est déjà en cours. Voulez-vous la redémarrer ?",
+    "restart_export": "Redémarrer l'exportation",
+    "confirm_export": "Confirmer l'exportation",
+    "disable_mode_explanation_cloud": "Le journal d'audit est actuellement désactivé. Pour l'activer, veuillez modifier les paramètres de l'application depuis l'écran de gestion GROWI.cloud.",
     "docs_url": {
       "log_type": "https://docs.growi.org/en/admin-guide/admin-cookbook/audit-log-setup.html#log-types"
     }
@@ -905,7 +916,9 @@
     "confirm": "Supprimer le plugin?"
   },
   "cloud_setting_management": {
-    "to_cloud_settings": "Ouvrir paramètres GROWI.cloud"
+    "to_cloud_settings": "Ouvrir paramètres GROWI.cloud",
+    "change_from_cloud": "Vous pouvez modifier les paramètres depuis le panneau d'administration GROWI.cloud.",
+    "storage_change_from_cloud": "La méthode de téléversement actuelle est {{fileUploadType}}. Les paramètres peuvent être modifiés depuis le panneau d'administration GROWI.cloud."
   },
   "audit_log_action_category": {
     "Page": "Page",

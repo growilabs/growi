@@ -5,10 +5,13 @@ GROWI is a team collaboration wiki platform using Markdown, designed to help tea
 ## Core Capabilities
 
 1. **Hierarchical Wiki Pages**: Tree-structured page organization with path-based navigation (`/path/to/page`)
-2. **Markdown-First Editing**: Rich Markdown support with extensions (drawio, lsx, math) and real-time collaborative editing
-3. **Authentication Integrations**: Multiple auth methods (LDAP, SAML, OAuth, Passkey) for enterprise environments
-4. **Plugin System**: Extensible architecture via `@growi/pluginkit` for custom remark plugins and functionality
-5. **Multi-Service Architecture**: Modular services (PDF export, Slack integration) deployed independently
+2. **Markdown-First Editing**: Rich Markdown support with extensions (drawio, lsx, math) and Yjs-based real-time collaborative editing
+3. **AI-Assisted Editing**: OpenAI/Azure OpenAI integration for editor assistance, page path suggestion, and customizable AI assistants with knowledge bases (vector stores)
+4. **Authentication Integrations**: Multiple auth methods (LDAP, SAML, OAuth, Passkey) for enterprise environments
+5. **Plugin System**: Extensible architecture via `@growi/pluginkit` for custom remark plugins and functionality
+6. **Audit & Compliance**: Activity logging, audit log search (Elasticsearch-backed), and bulk export for compliance needs
+7. **Multi-Service Architecture**: Modular services (PDF export, Slack integration) deployed independently
+8. **Observability**: OpenTelemetry integration for monitoring and tracing
 
 ## Target Use Cases
 
@@ -31,4 +34,5 @@ GROWI is a team collaboration wiki platform using Markdown, designed to help tea
 - **Microservices**: Optional services (pdf-converter, slackbot-proxy) for enhanced functionality
 
 ---
+_Updated: 2026-04-16. Added AI assistant, audit/compliance, and observability capabilities._
 _Focus on patterns and purpose, not exhaustive feature lists_

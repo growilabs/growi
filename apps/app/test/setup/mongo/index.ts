@@ -4,7 +4,7 @@ import { afterAll, beforeAll } from 'vitest';
 
 import { mongoOptions } from '~/server/util/mongoose-utils';
 
-import { getTestDbConfig } from './utils';
+import { getTestDbConfig, MONGOMS_BINARY_OPTS } from './utils';
 
 let mongoServer: MongoMemoryServer | undefined;
 
@@ -27,18 +27,11 @@ beforeAll(async () => {
   }
 
   // Use MongoMemoryServer for local development
-  // set debug flag
   process.env.MONGOMS_DEBUG = process.env.VITE_MONGOMS_DEBUG;
 
-  // set version
   mongoServer = await MongoMemoryServer.create({
-    instance: {
-      dbName,
-    },
-    binary: {
-      version: process.env.VITE_MONGOMS_VERSION,
-      downloadDir: 'node_modules/.cache/mongodb-binaries',
-    },
+    instance: { dbName },
+    binary: MONGOMS_BINARY_OPTS,
   });
 
   // biome-ignore lint/suspicious/noConsole: Allow logging

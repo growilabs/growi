@@ -2,7 +2,7 @@
 @use '@growi/core-styles/scss/variables/growi-official-colors';
 @use '@growi/ui/scss/atoms/btn-muted';
 
-.grw-ai-assistant-sidebar :global {
+.grw-ai-assistant-sidebar {
   z-index: bs.$zindex-fixed + 2;
   width: 100%;
 
@@ -10,31 +10,31 @@
     width: 500px;
   }
 
-  .textarea-ask {
+  :global(.textarea-ask) {
     max-height: 30vh;
   }
 
-  .btn-submit {
+  :global(.btn-submit) {
     font-size: 1.1em;
   }
 
-  .thread-title-sticky {
+  :global(.thread-title-sticky) {
     -webkit-backdrop-filter: blur(10px);
     backdrop-filter: blur(10px);
   }
 
-  .input-form-area {
+  :global(.input-form-area) {
     box-shadow: 0 -10px 20px 10px rgba(var(--bs-body-bg-rgb), 1);
   }
 }
 
 // == Colors
-.grw-ai-assistant-sidebar :global {
-  .growi-ai-chat-icon {
+.grw-ai-assistant-sidebar {
+  :global(.growi-ai-chat-icon) {
     color: growi-official-colors.$growi-ai-purple;
   }
 
-  .btn-submit {
+  :global(.btn-submit) {
     @include btn-muted.colorize(bs.$purple, bs.$purple);
   }
 }

@@ -1,26 +1,26 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.grw-users-info :global {
-  .users-meta {
+.grw-users-info {
+  :global(.users-meta) {
     margin-left: 30px;
   }
 
-  .user-page-name {
+  :global(.user-page-name) {
     margin: 0;
     font-size: 2.5em;
     color: bs.$secondary;
   }
 
-  .user-picture {
+  :global(.user-picture) {
     width: 120px;
     height: 120px;
   }
 
-  div.user-page-meta {
+  :global(div.user-page-meta) {
     padding-left: 0;
     color: bs.$gray-400;
 
-    .user-page-username {
+    :global(.user-page-username) {
       font-weight: bold;
     }
   }

@@ -1,12 +1,12 @@
-.revision-history-main :global {
-  img.user-picture-lg {
+.revision-history-main {
+  :global(img.user-picture-lg) {
     width: 32px;
     height: 32px;
   }
 }
 
-.revision-history-main-nodiff :global {
-  .picture-container {
+.revision-history-main-nodiff {
+  :global(.picture-container) {
     min-width: 32px;
     text-align: center; // centering .picture
   }

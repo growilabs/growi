@@ -31,7 +31,7 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
       };
     }
 
-    logger.debug('loadFromEnv', envConfig);
+    logger.debug({ envConfig }, 'loadFromEnv');
 
     return envConfig;
   }
@@ -62,7 +62,7 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
       };
     }
 
-    logger.debug('loadFromDB', dbConfig);
+    logger.debug({ dbConfig }, 'loadFromDB');
     return dbConfig;
   }
 

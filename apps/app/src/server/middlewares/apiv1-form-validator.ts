@@ -8,9 +8,9 @@ import ApiResponse from '../util/apiResponse';
 const logger = loggerFactory('growi:middlewares:ApiV1FormValidator');
 
 export default (req: Request, res: Response, next: NextFunction): void => {
-  logger.debug('req.query', req.query);
-  logger.debug('req.params', req.params);
-  logger.debug('req.body', req.body);
+  logger.debug({ query: req.query }, 'req.query');
+  logger.debug({ params: req.params }, 'req.params');
+  logger.debug({ body: req.body }, 'req.body');
 
   const errObjArray = validationResult(req);
   if (errObjArray.isEmpty()) {

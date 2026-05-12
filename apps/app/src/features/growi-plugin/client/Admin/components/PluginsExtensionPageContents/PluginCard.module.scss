@@ -1,14 +1,14 @@
 /* stylelint-disable selector-class-pattern */
 
 // TODO: Rewrite according to guidelines
-.plugin_card :global {
+.plugin_card {
 
-  .switch__label {
+  :global(.switch__label) {
     position: relative;
     display: inline-block;
     width: 50px;
   }
-  .switch__content {
+  :global(.switch__content) {
     position: relative;
     display: block;
     height: 31px;
@@ -16,7 +16,7 @@
     cursor: pointer;
     border-radius: 30px;
   }
-  .switch__content::before {
+  :global(.switch__content::before) {
     position: absolute;
     top: 0;
     left: 0;
@@ -28,7 +28,7 @@
     border: 1.5px solid #E5E5EA;
     border-radius: 30px;
   }
-  .switch__content::after {
+  :global(.switch__content::after) {
     position: absolute;
     top: 50%;
     left: 50%;
@@ -40,11 +40,11 @@
     border-radius: 30px;
     transition: all .5s;
   }
-  .switch__input {
+  :global(.switch__input) {
     display: none;
   }
 
-  .switch__circle {
+  :global(.switch__circle) {
     position: absolute;
     top: 2px;
     left: 2px;
@@ -56,11 +56,11 @@
     box-shadow: 0 2px 6px #999;
     transition: all .5s;
   }
-  .switch__input:checked ~ .switch__circle {
+  :global(.switch__input:checked ~ .switch__circle) {
     left: 21px;
   }
 
-  .switch__input:checked ~ .switch__content::after {
+  :global(.switch__input:checked ~ .switch__content::after) {
     top: 0;
     left: 0;
     width: 100%;

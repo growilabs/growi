@@ -1,9 +1,9 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.drawio-viewer-with-edit-button :global {
+.drawio-viewer-with-edit-button {
   position: relative;
 
-  .btn-edit-drawio {
+  :global(.btn-edit-drawio) {
     position: absolute;
     top: 11px;
     right: 10px;
@@ -16,8 +16,8 @@
   }
 }
 
-.drawio-viewer-with-edit-button:hover :global {
-  .btn-edit-drawio {
+.drawio-viewer-with-edit-button:hover {
+  :global(.btn-edit-drawio) {
     opacity: 1;
   }
 }

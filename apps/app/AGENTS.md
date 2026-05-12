@@ -159,3 +159,11 @@ Plus all global skills (monorepo-overview, tech-stack).
 ---
 
 For detailed patterns and examples, refer to the Skills in `.claude/skills/`.
+
+## Rules (Always Applied)
+
+The following rules in `.claude/rules/` are always applied when working in this directory:
+
+| Rule | Description |
+|------|-------------|
+| **package-dependencies** | Turbopack dependency classification — when to use `dependencies` vs `devDependencies`, verification procedure |

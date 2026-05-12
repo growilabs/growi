@@ -71,7 +71,7 @@ export function createOAuth2Client(
 
   const client = nodemailer.createTransport(option);
 
-  logger.debug('mailer set up for OAuth2', client);
+  logger.debug('mailer set up for OAuth2');
 
   return client;
 }

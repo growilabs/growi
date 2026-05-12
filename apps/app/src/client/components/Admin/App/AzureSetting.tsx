@@ -15,6 +15,7 @@ export type AzureSettingMoleculeProps = {
   envAzureStorageAccountName?: string;
   envAzureStorageContainerName?: string;
   onChangeAzureReferenceFileWithRelayMode: (val: boolean) => void;
+  isCloud: boolean;
 };
 
 export const AzureSettingMolecule = (
@@ -30,6 +31,7 @@ export const AzureSettingMolecule = (
     envAzureClientSecret,
     envAzureStorageAccountName,
     envAzureStorageContainerName,
+    isCloud,
   } = props;
 
   return (
@@ -84,17 +86,25 @@ export const AzureSettingMolecule = (
         </div>
       </div>
 
-      {azureUseOnlyEnvVars && (
-        <p
-          className="alert alert-info"
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: includes <br> and <code> from i18n strings
-          dangerouslySetInnerHTML={{
-            __html: t('admin:app_setting.azure_note_for_the_only_env_option', {
-              env: 'AZURE_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
-            }),
-          }}
-        />
-      )}
+      {azureUseOnlyEnvVars &&
+        (isCloud ? (
+          <p className="alert alert-info">
+            {t('admin:app_setting.azure_note_for_the_only_env_option_cloud')}
+          </p>
+        ) : (
+          <p
+            className="alert alert-info"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes <br> and <code> from i18n strings
+            dangerouslySetInnerHTML={{
+              __html: t(
+                'admin:app_setting.azure_note_for_the_only_env_option',
+                {
+                  env: 'AZURE_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+                },
+              ),
+            }}
+          />
+        ))}
       <table
         className={`table settings-table ${azureUseOnlyEnvVars && 'use-only-env-vars'}`}
       >

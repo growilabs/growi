@@ -24,13 +24,13 @@ export const onSeen = async (
     const page = await Page.findById(pageId);
 
     if (page == null) {
-      logger.warn('onSeen: page not found', { pageId });
+      logger.warn({ pageId }, 'onSeen: page not found');
       return;
     }
 
     await page.seen(user);
-    logger.debug('onSeen: successfully marked page as seen', { pageId });
+    logger.debug({ pageId }, 'onSeen: successfully marked page as seen');
   } catch (err) {
-    logger.error('onSeen: failed to mark page as seen', err);
+    logger.error({ err }, 'onSeen: failed to mark page as seen');
   }
 };

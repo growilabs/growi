@@ -371,7 +371,7 @@ export const PageItemControlSubstance = (
 
   const {
     data: fetchedPageInfo,
-    error: fetchError,
+    isLoading: isFetchLoading,
     mutate: mutatePageInfo,
   } = useSWRxPageInfo(shouldFetch ? pageId : null);
 
@@ -399,9 +399,8 @@ export const PageItemControlSubstance = (
     [mutatePageInfo, onClickBookmarkMenuItem, shouldFetch],
   );
 
-  // isLoading should be true only when fetching is in progress (data and error are both undefined)
-  const isLoading =
-    shouldFetch && fetchedPageInfo == null && fetchError == null;
+  // Delegate to SWR's isLoading so that a skipped request (null key) is not treated as loading
+  const isLoading = shouldFetch && isFetchLoading;
   const isDataUnavailable =
     !isLoading && fetchedPageInfo == null && presetPageInfo == null;
 

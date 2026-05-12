@@ -1,34 +1,34 @@
-.slides-styles :global {
+.slides-styles {
   // Reset _wiki.scss, vendor.scss and other css in <div class=slides marpit>.
   // This ensures that Marp is rendered currently.
-  .slides {
-    *, *::before, *::after {
+  :global(.slides) {
+    :global(*), :global(*::before), :global(*::after) {
       box-sizing: initial;
     }
 
-    *::before, *::after {
+    :global(*::before), :global(*::after) {
       all: initial;
     }
 
-    h1,
-    h2,
-    h3,
-    h4,
-    h5,
-    h6,
-    p {
+    :global(h1),
+    :global(h2),
+    :global(h3),
+    :global(h4),
+    :global(h5),
+    :global(h6),
+    :global(p) {
       font-weight: initial;
       line-height: initial;
       border: initial;
     }
 
-    code {
+    :global(code) {
       color: unset;
     }
 
   }
 
-  section {
+  :global(section) {
     padding: 0;
     border: none;
   }

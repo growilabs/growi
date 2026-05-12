@@ -116,23 +116,23 @@ function isValidCommonEachRouteProps(
       p.nextjsRoutingPage !== undefined
     ) {
       logger.warn(
-        'isValidCommonEachRouteProps: nextjsRoutingPage is not a string or null',
         { nextjsRoutingPage: p.nextjsRoutingPage },
+        'isValidCommonEachRouteProps: nextjsRoutingPage is not a string or null',
       );
       return false;
     }
   }
   if (typeof p.currentPathname !== 'string') {
     logger.warn(
-      'isValidCommonEachRouteProps: currentPathname is not a string',
       { currentPathname: p.currentPathname },
+      'isValidCommonEachRouteProps: currentPathname is not a string',
     );
     return false;
   }
   if (typeof p.isMaintenanceMode !== 'boolean') {
     logger.warn(
-      'isValidCommonEachRouteProps: isMaintenanceMode is not a boolean',
       { isMaintenanceMode: p.isMaintenanceMode },
+      'isValidCommonEachRouteProps: isMaintenanceMode is not a boolean',
     );
     return false;
   }

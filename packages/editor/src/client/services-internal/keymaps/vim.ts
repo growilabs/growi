@@ -1,13 +1,25 @@
-import type { Extension } from '@codemirror/state';
-import { Vim, vim } from '@replit/codemirror-vim';
+import { Prec } from '@codemirror/state';
 
-// vim useful keymap custom
-Vim.map('jj', '<Esc>', 'insert');
-Vim.map('jk', '<Esc>', 'insert');
+import type { KeymapFactory } from './types';
 
-export const vimKeymap = (onSave?: () => void): Extension => {
+let initialized = false;
+
+export const vimKeymap: KeymapFactory = async (onSave) => {
+  const { Vim, vim } = await import('@replit/codemirror-vim');
+
+  if (!initialized) {
+    Vim.map('jj', '<Esc>', 'insert');
+    Vim.map('jk', '<Esc>', 'insert');
+    initialized = true;
+  }
+
   if (onSave != null) {
     Vim.defineEx('write', 'w', onSave);
   }
-  return vim();
+
+  return {
+    extension: vim(),
+    precedence: Prec.high,
+    overrides: [],
+  };
 };

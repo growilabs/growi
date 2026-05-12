@@ -385,7 +385,10 @@ export class SlackCtrl {
     @Res() res: Res,
     // biome-ignore lint/suspicious/noConfusingVoidType: TODO: fix in https://redmine.weseek.co.jp/issues/168174
   ): Promise<void | string | Res | WebAPICallResult> {
-    logger.info('receive interaction', req.authorizeResult);
+    logger.info(
+      { authorizeResult: req.authorizeResult },
+      'receive interaction',
+    );
     logger.debug('receive interaction', req.body);
 
     const {
@@ -583,7 +586,7 @@ export class SlackCtrl {
     const installPromise = new Promise<Installation>((resolve, reject) => {
       this.installerService.installer.handleCallback(req, serverRes, {
         success: async (installation, metadata) => {
-          logger.info('Success to install', { installation, metadata });
+          logger.info({ installation, metadata }, 'Success to install');
           resolve(installation);
         },
         failure: async (error) => {

@@ -280,7 +280,7 @@ module.exports = (crowi) => {
   };
 
   function getRespondUtil(responseUrl) {
-    const proxyUri = slackIntegrationService.proxyUriForCurrentType ?? null; // can be null
+    const proxyUri = slackIntegrationService.proxyUriForCurrentType;
 
     const appSiteUrl = growiInfoService.getSiteUrl();
     if (appSiteUrl == null || appSiteUrl === '') {

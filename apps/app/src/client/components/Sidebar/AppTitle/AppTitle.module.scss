@@ -1,12 +1,12 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 @use '@growi/core-styles/scss/variables/growi-official-colors';
-@use '~/styles/variables' as var;
+@use 'styles/variables' as var;
 @use '../button-styles';
-@use '~/styles/mixins';
+@use 'styles/mixins';
 
 // GROWI Logo
-.grw-app-title :global {
-  .grw-logo {
+.grw-app-title {
+  :global(.grw-logo) {
     $width: var.$grw-sidebar-nav-width;
     $height: var.$grw-sidebar-nav-width; // declare $height with the same value as the sidebar nav width
     $logomark-width: 27.7px;
@@ -14,14 +14,14 @@
 
     width: $width;
 
-    svg {
+    :global(svg) {
       width: $width;
       height: $height;
       padding: (($height - $logomark-height) * 0.5) (($width - $logomark-width) * 0.5);
     }
   }
 
-  .confidential-tooltip {
+  :global(.confidential-tooltip) {
     max-width: 180px;
   }
 }
@@ -29,8 +29,8 @@
 // == GROWI Logo when Editor mode
 @include mixins.at-editing() {
   @include bs.media-breakpoint-up(xl) {
-    .grw-app-title :global {
-      .grw-logo {
+    .grw-app-title {
+      :global(.grw-logo) {
           opacity: 0.5;
           transition: opacity 0.8s ease;
 
@@ -130,8 +130,8 @@
 
 
 // == Colors
-.grw-app-title :global {
-  .grw-site-name {
+.grw-app-title {
+  :global(.grw-site-name) {
     --bs-link-color-rgb: var(--grw-app-title-color-rgb, var(--bs-tertiary-color-rgb));
     --bs-link-opacity: 0.5;
   }

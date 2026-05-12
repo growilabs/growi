@@ -110,8 +110,8 @@ const WarnForGroups = ({ errors }: WarnForGroupsProps): JSX.Element => {
   return (
     <div className="alert alert-warning">
       <ul>
-        {errors.map((error, index) => {
-          return <li key={`${error.message}-${index}`}>{error.message}</li>;
+        {errors.map((error) => {
+          return <li key={error.message}>{error.message}</li>;
         })}
       </ul>
     </div>

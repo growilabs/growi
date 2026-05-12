@@ -45,9 +45,7 @@ const validator = {
   ),
   pageIdsOrPathRequired: [
     // type check independent of existence check
-    query('pageIds')
-      .isArray()
-      .optional(),
+    query('pageIds').isArray().optional(),
     query('path').isString().optional(),
     // existence check
     oneOf(

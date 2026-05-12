@@ -1,8 +1,8 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
 
-.btn-group-switching :global {
-  .btn {
+.btn-group-switching {
+  :global(.btn) {
     --bs-btn-border-width: 2px;
 
     width: 60px;
@@ -18,8 +18,8 @@
 
 // == Colors
 @include bs.color-mode(light) {
-  .btn-group-switching :global {
-    .btn {
+  .btn-group-switching {
+    :global(.btn) {
       $bg: var(--bs-gray-500);
 
       --bs-btn-border-color: #{$bg};
@@ -33,8 +33,8 @@
 }
 
 @include bs.color-mode(dark) {
-  .btn-group-switching :global {
-    .btn {
+  .btn-group-switching {
+    :global(.btn) {
       $bg: var(--bs-gray-800);
 
       --bs-btn-border-color: #{$bg};

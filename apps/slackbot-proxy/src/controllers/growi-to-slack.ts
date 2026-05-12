@@ -106,7 +106,7 @@ export class GrowiToSlackCtrl {
       .leftJoinAndSelect('relation.installation', 'installation')
       .getMany();
 
-    logger.debug(`${relations.length} relations found`, relations);
+    logger.debug({ relations }, `${relations.length} relations found`);
 
     // key: tokenGtoP, value: botToken
     const botTokenResolverMapping: { [tokenGtoP: string]: string } = {};
@@ -176,7 +176,7 @@ export class GrowiToSlackCtrl {
 
     // Returns the result of the test if it already exists
     if (relation != null) {
-      logger.debug('relation found', relation);
+      logger.debug({ relation }, 'relation found');
 
       const token = relation.installation.data.bot?.token;
       if (token == null) {
@@ -228,7 +228,7 @@ export class GrowiToSlackCtrl {
       throw createError(400, `failed to request to GROWI. err: ${err.message}`);
     }
 
-    logger.debug('order found', order);
+    logger.debug({ order }, 'order found');
 
     const token = order.installation.data.bot?.token;
     if (token == null) {
@@ -240,7 +240,7 @@ export class GrowiToSlackCtrl {
       throw createError(400, `failed to get connection. err: ${status.error}`);
     }
 
-    logger.debug('relation test is success', order);
+    logger.debug({ order }, 'relation test is success');
 
     // temporary cache for 48 hours
     const expiredAtCommands = addHours(new Date(), 48);
@@ -356,7 +356,7 @@ export class GrowiToSlackCtrl {
   ): Promise<WebclientRes> {
     const { tokenGtoPs } = req;
 
-    logger.debug('Slack API called: ', { method });
+    logger.debug({ method }, 'Slack API called: ');
 
     if (tokenGtoPs.length !== 1) {
       return res.simulateWebAPIPlatformError(

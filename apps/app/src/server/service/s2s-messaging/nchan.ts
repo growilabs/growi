@@ -67,7 +67,7 @@ class NchanDelegator extends AbstractS2sMessagingService {
 
     const url = this.constructUrl(this.publishPath).toString();
 
-    logger.debug('Publish message', s2sMessage, `to ${url}`);
+    logger.debug({ s2sMessage, url }, 'Publish message');
 
     return axios.post(url, s2sMessage);
   }
@@ -134,7 +134,7 @@ class NchanDelegator extends AbstractS2sMessagingService {
       logger.info('WebSocket client disconnected');
     });
     socket.addEventListener('error', (error) => {
-      logger.error('WebSocket error occured:', error.message);
+      logger.error({ err: error }, 'WebSocket error occured');
     });
 
     socket.addEventListener('open', () => {
@@ -163,8 +163,8 @@ class NchanDelegator extends AbstractS2sMessagingService {
       // check uid
       if (s2sMessage.publisherUid === this.uid) {
         logger.debug(
-          `Skip processing by ${handlable.constructor.name} because this message is sent by the publisher itself:`,
-          `from ${this.uid}`,
+          { publisherUid: this.uid },
+          `Skip processing by ${handlable.constructor.name} because this message is sent by the publisher itself`,
         );
         return;
       }
@@ -172,16 +172,15 @@ class NchanDelegator extends AbstractS2sMessagingService {
       // check shouldHandleS2sMessage
       const shouldHandle = handlable.shouldHandleS2sMessage(s2sMessage);
       logger.debug(
-        `${handlable.constructor.name}.shouldHandleS2sMessage(`,
-        s2sMessage,
-        `) => ${shouldHandle}`,
+        { s2sMessage, shouldHandle },
+        `${handlable.constructor.name}.shouldHandleS2sMessage`,
       );
 
       if (shouldHandle) {
         handlable.handleS2sMessage(s2sMessage);
       }
     } catch (err) {
-      logger.warn('Could not handle a message: ', err.message);
+      logger.warn({ err }, 'Could not handle a message');
     }
   }
 }

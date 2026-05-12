@@ -1,9 +1,9 @@
-.page-tree-item :global {
-  li {
+.page-tree-item {
+  :global(li) {
     min-height: 36px;
   }
 
-  input[type="checkbox"] {
+  :global(input[type="checkbox"]) {
     margin-left: auto;
     cursor: pointer;
   }

@@ -1,4 +1,5 @@
-import emojiData from '@emoji-mart/data/sets/15/native.json';
+// Re-run `turbo run build --filter @growi/emoji-mart-data` whenever @emoji-mart/data is upgraded.
+import emojiNativeLookup from '@growi/emoji-mart-data';
 import type { Root } from 'mdast';
 import { findAndReplace } from 'mdast-util-find-and-replace';
 import type { Plugin } from 'unified';
@@ -10,7 +11,7 @@ export const remarkPlugin: Plugin = () => {
       /:(\+1|[-\w]+):/g,
 
       (_, $1: string) => {
-        const emoji = emojiData.emojis[$1]?.skins[0].native;
+        const emoji = emojiNativeLookup[$1]?.skins[0].native;
         return emoji ?? false;
       },
     ]);

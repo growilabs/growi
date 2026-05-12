@@ -2,12 +2,12 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
 // == Colors
-.grw-ai-assistant-management :global {
-  .growi-ai-assistant-icon {
+.grw-ai-assistant-management {
+  :global(.growi-ai-assistant-icon) {
     color: growi-official-colors.$growi-ai-purple;
   }
-  .growi-ai-assistant-name {
-    .form-control:focus {
+  :global(.growi-ai-assistant-name) {
+    :global(.form-control:focus) {
       border-color: var(--bs-primary) !important;
       box-shadow: none;
     }

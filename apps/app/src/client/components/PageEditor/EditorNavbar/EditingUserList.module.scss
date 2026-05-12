@@ -1,5 +1,7 @@
 @use '@growi/ui/scss/molecules/user-list-popover';
 
-.user-list-popover :global {
+.user-list-popover {
   @extend %user-list-popover;
 }
+
+

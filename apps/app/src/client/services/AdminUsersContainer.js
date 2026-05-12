@@ -25,8 +25,8 @@ export default class AdminUsersContainer extends Container {
 
     this.state = {
       users: [],
-      sort: 'id',
-      sortOrder: 'asc',
+      sort: 'createdAt',
+      sortOrder: 'desc',
       isPasswordResetModalShown: false,
       isUserInviteModalShown: false,
       userForPasswordResetModal: null,
@@ -119,8 +119,8 @@ export default class AdminUsersContainer extends Container {
 
   async resetAllChanges() {
     await this.setState({
-      sort: 'id',
-      sortOrder: 'asc',
+      sort: 'createdAt',
+      sortOrder: 'desc',
       searchText: '',
       selectedStatusList: new Set(['all']),
     });

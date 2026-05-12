@@ -1,4 +1,5 @@
 import { pathUtils } from '@growi/core/dist/utils';
+import { loggerFactory } from '@growi/logger';
 import type {
   LeafGrowiPluginDirective,
   TextGrowiPluginDirective,
@@ -9,8 +10,6 @@ import type { Schema as SanitizeOption } from 'hast-util-sanitize';
 import { selectAll } from 'hast-util-select';
 import type { Plugin } from 'unified';
 import { visit } from 'unist-util-visit';
-
-import loggerFactory from '../../../utils/logger';
 
 const logger = loggerFactory(
   'growi:remark-attachment-refs:services:renderer:refs',
@@ -104,7 +103,7 @@ export const remarkPlugin: Plugin = () => (tree) => {
         return;
       }
 
-      logger.debug('a node detected', attributes);
+      logger.debug({ attributes }, 'a node detected');
 
       // kebab case to camel case
       attributes.maxWidth = attributes['max-width'];

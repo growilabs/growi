@@ -56,17 +56,14 @@ describe.concurrent('convertToNewAffiliationPath test', () => {
     expect(result === 'parent/child').toBe(false);
   });
 
-  test.concurrent(
-    'Parent and Child path names are switched unexpectedly',
-    () => {
-      const result = convertToNewAffiliationPath(
-        'parent/',
-        'parent4/',
-        'parent/child',
-      );
-      expect(result === 'child/parent4').toBe(false);
-    },
-  );
+  test.concurrent('Parent and Child path names are switched unexpectedly', () => {
+    const result = convertToNewAffiliationPath(
+      'parent/',
+      'parent4/',
+      'parent/child',
+    );
+    expect(result === 'child/parent4').toBe(false);
+  });
 });
 
 describe.concurrent('isCreatablePage test', () => {
@@ -149,41 +146,32 @@ describe.concurrent('isCreatablePage test', () => {
       );
     });
 
-    test.concurrent(
-      'Should omit when some paths are at duplicated area',
-      () => {
-        const paths = ['/A', '/A/A', '/A/B/A', '/B', '/B/A', '/AA'];
-        const expectedPaths = ['/A', '/B', '/AA'];
+    test.concurrent('Should omit when some paths are at duplicated area', () => {
+      const paths = ['/A', '/A/A', '/A/B/A', '/B', '/B/A', '/AA'];
+      const expectedPaths = ['/A', '/B', '/AA'];
 
-        expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
-          expectedPaths,
-        );
-      },
-    );
+      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
+        expectedPaths,
+      );
+    });
 
-    test.concurrent(
-      'Should omit when some long paths are at duplicated area',
-      () => {
-        const paths = ['/A/B/C', '/A/B/C/D', '/A/B/C/D/E'];
-        const expectedPaths = ['/A/B/C'];
+    test.concurrent('Should omit when some long paths are at duplicated area', () => {
+      const paths = ['/A/B/C', '/A/B/C/D', '/A/B/C/D/E'];
+      const expectedPaths = ['/A/B/C'];
 
-        expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
-          expectedPaths,
-        );
-      },
-    );
+      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
+        expectedPaths,
+      );
+    });
 
-    test.concurrent(
-      'Should omit when some long paths are at duplicated area [case insensitivity]',
-      () => {
-        const paths = ['/a/B/C', '/A/b/C/D', '/A/B/c/D/E'];
-        const expectedPaths = ['/a/B/C'];
+    test.concurrent('Should omit when some long paths are at duplicated area [case insensitivity]', () => {
+      const paths = ['/a/B/C', '/A/b/C/D', '/A/B/c/D/E'];
+      const expectedPaths = ['/a/B/C'];
 
-        expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
-          expectedPaths,
-        );
-      },
-    );
+      expect(omitDuplicateAreaPathFromPaths(paths)).toStrictEqual(
+        expectedPaths,
+      );
+    });
   });
 
   describe.concurrent('Test getUsernameByPath', () => {

@@ -104,7 +104,7 @@ schema.statics.findAllRelation = function () {
  * @memberof UserGroupRelation
  */
 schema.statics.findAllRelationForUserGroup = function (userGroup) {
-  logger.debug('findAllRelationForUserGroup is called', userGroup);
+  logger.debug({ userGroup }, 'findAllRelationForUserGroup is called');
   // biome-ignore lint/plugin: allow populate for backward compatibility
   return this.find({ relatedGroup: userGroup }).populate('relatedUser').exec();
 };
@@ -236,7 +236,7 @@ schema.statics.findUserByNotRelatedGroup = function (userGroup, queryOptions) {
       $or: searthField,
     };
 
-    logger.debug('findUserByNotRelatedGroup ', query);
+    logger.debug({ query }, 'findUserByNotRelatedGroup');
     return User.find(query).exec();
   });
 };

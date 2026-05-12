@@ -8,13 +8,14 @@ type GetDelegatorOptions = {
 };
 
 type IsAny<T> = 'dummy' extends T & 'dummy' ? true : false;
-type Delegator<Opts extends GetDelegatorOptions> = IsAny<Opts> extends true
-  ? IOpenaiClientDelegator
-  : Opts extends { openaiServiceType: 'openai' }
-    ? OpenaiClientDelegator
-    : Opts extends { openaiServiceType: 'azure-openai' }
-      ? AzureOpenaiClientDelegator
-      : IOpenaiClientDelegator;
+type Delegator<Opts extends GetDelegatorOptions> =
+  IsAny<Opts> extends true
+    ? IOpenaiClientDelegator
+    : Opts extends { openaiServiceType: 'openai' }
+      ? OpenaiClientDelegator
+      : Opts extends { openaiServiceType: 'azure-openai' }
+        ? AzureOpenaiClientDelegator
+        : IOpenaiClientDelegator;
 
 // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
 let instance;

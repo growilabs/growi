@@ -1,12 +1,12 @@
-import React, { type JSX, Suspense, useCallback, useRef } from 'react';
+import { type JSX, Suspense, useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { isIPageInfoForOperation } from '@growi/core/dist/interfaces';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
-import { scroller } from 'react-scroll';
 
+import { scrollToElement } from '~/client/util/smooth-scroll';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 import { showPageSideAuthorsAtom } from '~/states/server-configurations';
 import { useDescendantsPageListModalActions } from '~/states/ui/modal/descendants-page-list';
@@ -158,9 +158,9 @@ export const PageSideContents = (props: PageSideContentsProps): JSX.Element => {
                   : undefined
               }
               onClick={() =>
-                scroller.scrollTo('comments-container', {
-                  smooth: false,
+                scrollToElement('comments-container', {
                   offset: -120,
+                  duration: 0.3,
                 })
               }
             />

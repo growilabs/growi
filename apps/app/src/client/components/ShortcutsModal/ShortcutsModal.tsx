@@ -3,10 +3,12 @@ import { useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
+import { useGrowiDocumentationUrl } from '~/states/context';
 import {
   useShortcutsModalActions,
   useShortcutsModalStatus,
 } from '~/states/ui/modal/shortcuts';
+import { getLocale } from '~/utils/locale-utils';
 
 import styles from './ShortcutsModal.module.scss';
 
@@ -14,8 +16,10 @@ import styles from './ShortcutsModal.module.scss';
  * ShortcutsModalSubstance - Presentation component (heavy logic, rendered only when isOpen)
  */
 const ShortcutsModalSubstance = (): React.JSX.Element => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { close } = useShortcutsModalActions();
+  const documentationUrl = useGrowiDocumentationUrl();
+  const langCode = getLocale(i18n.language).code === 'ja' ? 'ja' : 'en';
 
   // Memoize OS-specific class
   const additionalClassByOs = useMemo(() => {
@@ -514,6 +518,17 @@ const ShortcutsModalSubstance = (): React.JSX.Element => {
       </ModalHeader>
       <ModalBody className="p-md-4 mb-3 grw-modal-body-style overflow-auto">
         {bodyContent}
+        <div className="mt-4 ps-3">
+          <a
+            href={`${documentationUrl}/${langCode}/guide/features/shortcut-keys`}
+            target="_blank"
+            rel="noreferrer"
+            className="d-inline-flex align-items-center gap-2 px-3 py-2 border border-2 rounded text-secondary text-decoration-none"
+          >
+            <span className="material-symbols-outlined fs-5">help</span>
+            {t('modal_shortcuts.Other Shortcuts')}
+          </a>
+        </div>
       </ModalBody>
     </>
   );

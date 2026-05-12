@@ -1,6 +1,6 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.editor-navbar :global {
+.editor-navbar {
   min-height: 72px;
 
   @include bs.media-breakpoint-down(sm) {

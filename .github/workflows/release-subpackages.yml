@@ -14,6 +14,11 @@ on:
     branches:
       - master
 
+permissions:
+  id-token: write
+  contents: write
+  pull-requests: write
+
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -32,21 +37,13 @@ jobs:
 
     - uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '24'
         cache: 'pnpm'
 
     - name: Install dependencies
       run: |
         pnpm add turbo --global
         pnpm install --frozen-lockfile
-
-    - name: Setup .npmrc
-      run: |
-        cat << EOF > "$HOME/.npmrc"
-          //registry.npmjs.org/:_authToken=$NPM_TOKEN
-        EOF
-      env:
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
     - name: Retrieve changesets information
       id: changesets-status
@@ -61,7 +58,6 @@ jobs:
         pnpm run release-subpackages:snapshot
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}
 
 
   release-subpackages:
@@ -75,7 +71,7 @@ jobs:
 
     - uses: actions/setup-node@v4
       with:
-        node-version: '20'
+        node-version: '24'
         cache: 'pnpm'
 
     - name: Install dependencies
@@ -92,4 +88,3 @@ jobs:
         publish: pnpm run release-subpackages
       env:
         GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        NPM_TOKEN: ${{ secrets.NPM_TOKEN }}

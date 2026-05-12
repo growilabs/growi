@@ -1,6 +1,6 @@
+import type { Logger } from '@growi/logger';
 import { generateWebClient } from '@growi/slack/dist/utils/webclient-factory';
 import { IMiddleware, Middleware, Req } from '@tsed/common';
-import Logger from 'bunyan';
 
 import { SlackOauthReq } from '~/interfaces/slack-to-growi/slack-oauth-req';
 import loggerFactory from '~/utils/logger';

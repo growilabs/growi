@@ -1,11 +1,11 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 @use '../variables' as sidebarVar;
 
-.grw-skeleton-item :global {
+.grw-skeleton-item {
   height: sidebarVar.$grw-sidebar-button-height;
   padding: .75rem;
 
-  .grw-skeleton {
+  :global(.grw-skeleton) {
     background-color: var(--bs-secondary-bg-subtle);
   }
 }

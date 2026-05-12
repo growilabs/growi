@@ -1,4 +1,5 @@
-import React, { type JSX, useState } from 'react';
+import { type JSX, useState } from 'react';
+import dynamic from 'next/dynamic';
 import type { IRevisionHasId } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
@@ -10,7 +11,13 @@ import {
   DropdownToggle,
 } from 'reactstrap';
 
-import { RevisionDiff } from '../PageHistory/RevisionDiff';
+// diff2html is a large library used only for interactive diff viewing.
+// ssr: false skips server-side rendering for performance; the package itself must
+// stay in dependencies because Turbopack still externalises it via static import analysis.
+const RevisionDiff = dynamic(
+  () => import('../PageHistory/RevisionDiff').then((mod) => mod.RevisionDiff),
+  { ssr: false },
+);
 
 import styles from './RevisionComparer.module.scss';
 

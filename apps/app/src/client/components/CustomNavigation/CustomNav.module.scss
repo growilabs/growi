@@ -1,15 +1,15 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.grw-custom-nav-tab :global {
-  .nav-title {
+.grw-custom-nav-tab {
+  :global(.nav-title) {
     flex-wrap: nowrap;
   }
 
-  .nav-link {
+  :global(.nav-link) {
     padding: 1rem 1.5rem;
   }
 
-  .grw-nav-slide-hr {
+  :global(.grw-nav-slide-hr) {
     border-top: 0;
     border-bottom: 3px solid;
     transition: 0.3s ease-in-out;

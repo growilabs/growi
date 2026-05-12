@@ -13,14 +13,7 @@ export const omitInsecureAttributes = <U extends IUser>(
 ): IUserSerializedSecurely<U> => {
   const leanDoc = user instanceof Document ? user.toObject<U>() : user;
 
-  const {
-    // biome-ignore lint/correctness/noUnusedVariables: ignore
-    password,
-    // biome-ignore lint/correctness/noUnusedVariables: ignore
-    apiToken,
-    email,
-    ...rest
-  } = leanDoc;
+  const { password, apiToken, email, ...rest } = leanDoc;
 
   const secureUser: IUserSerializedSecurely<U> = rest;
 

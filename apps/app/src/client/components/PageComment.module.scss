@@ -1,19 +1,19 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.page-comment-styles :global {
-  .page-comments {
-    h4 {
+.page-comment-styles {
+  :global(.page-comments) {
+    :global(h4) {
       margin-bottom: 1em;
     }
   }
 
   // reply button
-  .btn-comment-reply {
+  :global(.btn-comment-reply) {
     backdrop-filter: blur(10px);
   }
 
   // TODO: Refacotr Soft-coding
-  .page-comment-button-skeleton {
+  :global(.page-comment-button-skeleton) {
     width: 70.0167px;
     height: 26.3833px;
     margin-top: 0.5em;
@@ -23,8 +23,8 @@
 
 // // Light mode color
 @include bs.color-mode(light) {
-  .page-comment-styles :global {
-    .btn-comment-reply {
+  .page-comment-styles {
+    :global(.btn-comment-reply) {
       --bs-btn-color: #{( bs.$gray-600 )};
       --bs-btn-hover-color:  #{( bs.$gray-700 )};
       --bs-btn-bg: #{rgba( bs.$gray-200, 0.3 )};
@@ -37,8 +37,8 @@
 
 // dark mode color
 @include bs.color-mode(dark) {
-  .page-comment-styles :global {
-    .btn-comment-reply {
+  .page-comment-styles {
+    :global(.btn-comment-reply) {
       --bs-btn-color: #{( bs.$gray-500 )};
       --bs-btn-hover-color:  #{( bs.$gray-400 )};
       --bs-btn-bg: #{rgba( bs.$gray-800, 0.3 )};

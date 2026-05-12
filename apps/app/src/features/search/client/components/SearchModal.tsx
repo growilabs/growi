@@ -4,9 +4,12 @@ import Downshift, {
   type DownshiftState,
   type StateChangeOptions,
 } from 'downshift';
+import { useAtomValue } from 'jotai';
 import { Modal, ModalBody } from 'reactstrap';
 
+import { useCurrentPagePath } from '~/states/page';
 import { useSetSearchKeyword } from '~/states/search';
+import { isSearchScopeChildrenAsDefaultAtom } from '~/states/server-configurations';
 
 import { isIncludeAiMenthion, removeAiMenthion } from '../../utils/ai';
 import type { DownshiftItem } from '../interfaces/downshift';
@@ -164,17 +167,34 @@ const SearchModal = (): JSX.Element => {
   const { close: closeSearchModal } = useSearchModalActions();
 
   const setSearchKeyword = useSetSearchKeyword();
+  const isSearchScopeChildrenAsDefault = useAtomValue(
+    isSearchScopeChildrenAsDefaultAtom,
+  );
+  const currentPagePath = useCurrentPagePath();
 
   const searchHandler = useCallback(
     (keyword: string) => {
       // invoke override function if exists
       if (onSearchOverride != null) {
         onSearchOverride(keyword);
-      } else {
-        setSearchKeyword(keyword);
+        return;
       }
+
+      // Respect the admin setting: scope search to the current page tree by default
+      const shouldScopeToChildren =
+        isSearchScopeChildrenAsDefault && currentPagePath != null;
+      const finalKeyword = shouldScopeToChildren
+        ? `prefix:${currentPagePath} ${keyword}`
+        : keyword;
+
+      setSearchKeyword(finalKeyword);
     },
-    [onSearchOverride, setSearchKeyword],
+    [
+      onSearchOverride,
+      setSearchKeyword,
+      isSearchScopeChildrenAsDefault,
+      currentPagePath,
+    ],
   );
 
   return (

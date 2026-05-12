@@ -1,12 +1,10 @@
 import type { FC, JSX } from 'react';
-import { useCallback, useEffect, useRef } from 'react';
+import { useCallback, useRef } from 'react';
 import dynamic from 'next/dynamic';
 import type { IPageToDeleteWithMeta, IPageToRenameWithMeta } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
 import { useTranslation } from 'next-i18next';
-import { animateScroll } from 'react-scroll';
 import { DropdownItem } from 'reactstrap';
-import { debounce } from 'throttle-debounce';
 
 import type {
   AdditionalMenuItemsRendererProps,
@@ -34,6 +32,8 @@ import {
 } from '~/stores/page-listing';
 import { useSearchResultOptions } from '~/stores/renderer';
 import { mutateSearching } from '~/stores/search';
+
+import { useKeywordRescroll } from './use-keyword-rescroll';
 
 import styles from './SearchResultContent.module.scss';
 
@@ -89,9 +89,6 @@ const AdditionalMenuItems = (props: AdditionalMenuItemsProps): JSX.Element => {
   );
 };
 
-const SCROLL_OFFSET_TOP = 30;
-const MUTATION_OBSERVER_CONFIG = { childList: true, subtree: true }; // omit 'subtree: true'
-
 type Props = {
   pageWithMeta: IPageWithSearchMeta;
   highlightKeywords?: string[];
@@ -99,60 +96,18 @@ type Props = {
   forceHideMenuItems?: ForceHideMenuItems;
 };
 
-const scrollToFirstHighlightedKeyword = (scrollElement: HTMLElement): void => {
-  // use querySelector to intentionally get the first element found
-  const toElem = scrollElement.querySelector(
-    '.highlighted-keyword',
-  ) as HTMLElement | null;
-  if (toElem == null) {
-    return;
-  }
-
-  const distance =
-    toElem.getBoundingClientRect().top -
-    scrollElement.getBoundingClientRect().top -
-    SCROLL_OFFSET_TOP;
-  animateScroll.scrollMore(distance, {
-    containerId: scrollElement.id,
-    duration: 200,
-  });
-};
-const scrollToFirstHighlightedKeywordDebounced = debounce(
-  500,
-  scrollToFirstHighlightedKeyword,
-);
-
 export const SearchResultContent: FC<Props> = (props: Props) => {
   const scrollElementRef = useRef<HTMLDivElement | null>(null);
 
-  // ***************************  Auto Scroll  ***************************
-  useEffect(() => {
-    const scrollElement = scrollElementRef.current;
+  const { pageWithMeta } = props;
+  const page = pageWithMeta.data;
 
-    if (scrollElement == null) return;
+  useKeywordRescroll({ scrollElementRef, key: page._id });
 
-    const observer = new MutationObserver(() => {
-      scrollToFirstHighlightedKeywordDebounced(scrollElement);
-    });
-    observer.observe(scrollElement, MUTATION_OBSERVER_CONFIG);
-
-    // no cleanup function -- 2023.07.31 Yuki Takei
-    // see: https://developer.mozilla.org/en-US/docs/Web/API/MutationObserver/observe
-    // > You can call observe() multiple times on the same MutationObserver
-    // > to watch for changes to different parts of the DOM tree and/or different types of changes.
-  });
-  // *******************************  end  *******************************
-
-  const {
-    pageWithMeta,
-    highlightKeywords,
-    showPageControlDropdown,
-    forceHideMenuItems,
-  } = props;
+  const { highlightKeywords, showPageControlDropdown, forceHideMenuItems } =
+    props;
 
   const { t } = useTranslation();
-
-  const page = pageWithMeta.data;
   const { open: openDuplicateModal } = usePageDuplicateModalActions();
   const { open: openRenameModal } = usePageRenameModalActions();
   const { open: openDeleteModal } = usePageDeleteModalActions();

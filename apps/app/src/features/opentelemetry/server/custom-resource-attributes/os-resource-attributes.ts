@@ -28,7 +28,7 @@ export function getOsResourceAttributes(): Attributes {
     'os.totalmem': osInfo.totalmem,
   };
 
-  logger.info('OS resource attributes collected', { attributes });
+  logger.info({ attributes }, 'OS resource attributes collected');
 
   return attributes;
 }

@@ -1,9 +1,9 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
-@use '~/styles/variables' as var;
+@use 'styles/variables' as var;
 
 
-.grw-drawer-toggler :global {
-  .btn {
+.grw-drawer-toggler {
+  :global(.btn) {
     --bs-btn-color: rgba(var(--bs-tertiary-color-rgb), 0.5);
     --bs-btn-bg: transparent;
     --bs-btn-hover-color: rgba(var(--bs-tertiary-color-rgb), 0.7);

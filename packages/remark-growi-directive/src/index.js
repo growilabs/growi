@@ -8,4 +8,5 @@ export {
   TextGrowiPluginDirectiveData,
 } from './mdast-util-growi-directive';
 
+// biome-ignore lint/style/noDefaultExport: remark plugins are conventionally consumed as default imports
 export default remarkGrowiDirectivePlugin;

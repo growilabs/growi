@@ -3,7 +3,7 @@
 
 // == Colors
 @include bs.color-mode(light) {
-  .grw-sidebar-head :global {
+  .grw-sidebar-head {
     background-color: var(
       --grw-sidebar-head-bg,
       var(
@@ -15,7 +15,7 @@
 }
 
 @include bs.color-mode(dark) {
-  .grw-sidebar-head :global {
+  .grw-sidebar-head {
     background-color: var(
       --grw-sidebar-head-bg,
       var(

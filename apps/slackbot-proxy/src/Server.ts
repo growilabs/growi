@@ -3,13 +3,13 @@ import '@tsed/swagger';
 import '@tsed/typeorm'; // !! DO NOT MODIFY !! -- https://github.com/tsedio/tsed/issues/1332#issuecomment-837840612
 
 import { createTerminus } from '@godaddy/terminus';
+import { createHttpLoggerMiddleware } from '@growi/logger';
 import { HttpServer, PlatformApplication } from '@tsed/common';
 import { Configuration, Inject, InjectorService } from '@tsed/di';
 import bodyParser from 'body-parser';
 import compress from 'compression';
 import cookieParser from 'cookie-parser';
 import type { Express } from 'express';
-import expressBunyanLogger from 'express-bunyan-logger';
 import helmet from 'helmet';
 import methodOverride from 'method-override';
 import type { ConnectionOptions } from 'typeorm';
@@ -122,7 +122,7 @@ export class Server {
     }
   }
 
-  $beforeRoutesInit(): void {
+  async $beforeRoutesInit(): Promise<void> {
     this.app
       .use(cookieParser())
       .use(compress({}))
@@ -134,7 +134,7 @@ export class Server {
         }),
       );
 
-    this.setupLogger();
+    await this.setupLogger();
   }
 
   $afterRoutesInit(): void {
@@ -161,22 +161,8 @@ export class Server {
   /**
    * Setup logger for requests
    */
-  private setupLogger(): void {
-    // use bunyan
-    if (isProduction) {
-      const logger = loggerFactory('express');
-
-      this.app.use(
-        expressBunyanLogger({
-          logger,
-          excludes: ['*'],
-        }),
-      );
-    }
-    // use morgan
-    else {
-      const morgan = require('morgan');
-      this.app.use(morgan('dev'));
-    }
+  private async setupLogger(): Promise<void> {
+    const httpLogger = await createHttpLoggerMiddleware();
+    this.app.use(httpLogger);
   }
 }

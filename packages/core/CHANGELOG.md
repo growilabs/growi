@@ -1,5 +1,17 @@
 # @growi/core
 
+## 2.3.0
+
+### Minor Changes
+
+- [#10853](https://github.com/growilabs/growi/pull/10853) [`3c50530`](https://github.com/growilabs/growi/commit/3c50530a105d85058076f31f1800c6304850f5d5) Thanks [@miya](https://github.com/miya)! - Add const for content rendering
+
+## 2.2.0
+
+### Minor Changes
+
+- [`ef1c8b0`](https://github.com/growilabs/growi/commit/ef1c8b0e8b605c8c84c23e7650e02bd168817ff5) Thanks [@yuki-takei](https://github.com/yuki-takei)! - add YJS_WEBSOCKET_BASE_PATH
+
 ## 2.1.0
 
 ### Minor Changes

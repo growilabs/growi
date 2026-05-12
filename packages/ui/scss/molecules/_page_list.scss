@@ -1,11 +1,11 @@
-.page-list :global {
-  .btn-page-item-control {
+.page-list {
+  :global(.btn-page-item-control) {
     width: 20px;
     height: 20px;
     padding: 0px;
   }
 
-  .page-list-ul {
+  :global(.page-list-ul) {
     padding-left: 0;
     margin: 0;
 
@@ -22,18 +22,18 @@
       }
     }
 
-    .user-picture {
+    :global(.user-picture) {
       width: 16px;
       height: 16px;
       vertical-align: text-bottom;
 
-      &.user-picture-md {
+      &:global(.user-picture-md) {
         width: 20px;
         height: 20px;
       }
     }
 
-    .page-list-meta {
+    :global(.page-list-meta) {
       font-size: 0.9em;
 
       > span {
@@ -44,42 +44,42 @@
         margin-right: 2px;
       }
 
-      .seen-users-count {
-        &.strength-0,
-        &.strength-1,
-        &.strength-2 {
+      :global(.seen-users-count) {
+        &:global(.strength-0),
+        &:global(.strength-1),
+        &:global(.strength-2) {
           font-weight: bold;
         }
-        &.strength-3 {
+        &:global(.strength-3) {
           font-weight: normal;
         }
-        &.strength-4 {
+        &:global(.strength-4) {
           opacity: 0.5;
         }
       }
     }
 
     // after second level indent
-    .page-list-ul {
+    :global(.page-list-ul) {
       padding-left: 2rem;
     }
 
     // override .page-list-ul
-    &.page-list-ul-flat {
+    &:global(.page-list-ul-flat) {
       padding-left: 0;
     }
   }
 
   // List group
-  .list-group {
-    .list-group-item {
+  :global(.list-group) {
+    :global(.list-group-item) {
       min-height: 136px;
 
-      .page-list-updated-at {
+      :global(.page-list-updated-at) {
         font-size: 12px;
       }
 
-      &.list-group-item-action {
+      &:global(.list-group-item-action) {
         border-left: solid 3px transparent;
       }
     }

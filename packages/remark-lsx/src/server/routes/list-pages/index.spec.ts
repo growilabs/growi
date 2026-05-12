@@ -186,7 +186,9 @@ describe('listPages', () => {
       // setup
       const pagePath = '/parent';
       const optionsFilter = '^child';
-      const expectedRegex = /^\/parent\/child/;
+      const expectedRegex = new RegExp(
+        `^${RegExp.escape('/parent/')}${RegExp.escape('child')}`,
+      );
 
       // when
       addFilterCondition(queryMock, pagePath, optionsFilter);
@@ -199,7 +201,9 @@ describe('listPages', () => {
       // setup
       const pagePath = '/parent';
       const optionsFilter = 'child';
-      const expectedRegex = /^\/parent\/.*child/;
+      const expectedRegex = new RegExp(
+        `^${RegExp.escape('/parent/')}.*${RegExp.escape('child')}`,
+      );
 
       // when
       addFilterCondition(queryMock, pagePath, optionsFilter);
@@ -225,7 +229,9 @@ describe('listPages', () => {
       // setup
       const pagePath = '/parent';
       const optionsFilter = 'child';
-      const expectedRegex = /^\/parent\/.*child/;
+      const expectedRegex = new RegExp(
+        `^${RegExp.escape('/parent/')}.*${RegExp.escape('child')}`,
+      );
 
       // when
       addFilterCondition(queryMock, pagePath, optionsFilter, true);
@@ -313,7 +319,9 @@ describe('when excludedPaths is handled', () => {
     await handler(reqMock, resMock);
 
     // check if the logic generates the correct regex: ^\/(user|tmp)(\/|$)
-    const expectedRegex = /^\/(user|tmp)(\/|$)/;
+    const expectedRegex = new RegExp(
+      `^\\/(${RegExp.escape('user')}|${RegExp.escape('tmp')})(\\/|$)`,
+    );
     expect(queryMock.and).toHaveBeenCalledWith([
       {
         path: { $not: expectedRegex },

@@ -27,8 +27,8 @@ export const slackLegacyUtilFactory = (
     try {
       await webhook.send(messageObj);
     } catch (error) {
-      logger.debug('Post error', error);
-      logger.debug('Sent data to slack is:', messageObj);
+      logger.debug({ err: error }, 'Post error');
+      logger.debug({ messageObj }, 'Sent data to slack');
       throw error;
     }
   };
@@ -38,8 +38,8 @@ export const slackLegacyUtilFactory = (
     try {
       await client.chat.postMessage(messageObj);
     } catch (error) {
-      logger.debug('Post error', error);
-      logger.debug('Sent data to slack is:', messageObj);
+      logger.debug({ err: error }, 'Post error');
+      logger.debug({ messageObj }, 'Sent data to slack');
       throw error;
     }
   };

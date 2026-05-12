@@ -1,13 +1,18 @@
 import react from '@vitejs/plugin-react';
 import tsconfigPaths from 'vite-tsconfig-paths';
-import { defineConfig, defineWorkspace, mergeConfig } from 'vitest/config';
+import {
+  defaultExclude,
+  defineConfig,
+  defineWorkspace,
+  mergeConfig,
+} from 'vitest/config';
 
 const configShared = defineConfig({
   plugins: [tsconfigPaths()],
   test: {
     clearMocks: true,
     globals: true,
-    exclude: ['playwright/**'],
+    exclude: [...defaultExclude, 'playwright/**', 'tmp/**'],
   },
 });
 
@@ -27,10 +32,19 @@ export default defineWorkspace([
       // Prefer require (CJS) for server-side packages
       conditions: ['require', 'node', 'default'],
     },
+    ssr: {
+      resolve: {
+        // Vite 6+: SSR uses ssr.resolve.conditions (default: ['node', 'import']).
+        // Override to match resolve.conditions so CJS-only server packages resolve correctly.
+        conditions: ['require', 'node', 'default'],
+      },
+    },
     test: {
       name: 'app-integration',
       environment: 'node',
       include: ['**/*.integ.ts'],
+      // Pre-download the MongoDB binary before workers start to avoid lock-file race conditions
+      globalSetup: ['./test/setup/mongo/global-setup.ts'],
       setupFiles: [
         './test/setup/migrate-mongo.ts',
         './test/setup/mongo/index.ts',

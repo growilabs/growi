@@ -2,6 +2,7 @@
 
 # dependencies
 node_modules
+node_modules.*
 /.pnp
 .pnp.js
 .pnpm-store
@@ -41,6 +42,9 @@ yarn-error.log*
 *.orig
 *.code-workspace
 *.timestamp-*.mjs
+
+# UTCP configuration file
+.utcp_config.json
 
 # turborepo
 .turbo

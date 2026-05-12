@@ -1,9 +1,9 @@
-.grw-ai-assistant-management-page-tree-selection :global {
-  .next-button {
+.grw-ai-assistant-management-page-tree-selection {
+  :global(.next-button) {
     width: 30%;
   }
 
-  .page-tree-container {
+  :global(.page-tree-container) {
     min-height: 200px;
     max-height: 50vh;
     overflow-y: auto;

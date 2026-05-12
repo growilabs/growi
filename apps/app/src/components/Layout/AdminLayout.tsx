@@ -3,6 +3,7 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
 import GrowiLogo from '~/components/Common/GrowiLogo';
+import { useSetupAdminSocket } from '~/features/admin/states/socket-io';
 
 import { RawLayout } from './RawLayout';
 
@@ -32,6 +33,8 @@ type Props = {
 };
 
 const AdminLayout = ({ children, componentTitle }: Props): JSX.Element => {
+  useSetupAdminSocket();
+
   return (
     <RawLayout>
       <div className={`admin-page ${styles['admin-page']}`}>

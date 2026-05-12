@@ -1,7 +1,7 @@
-@use '~/styles/variables' as var;
+@use 'styles/variables' as var;
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.grw-page-status-alert :global {
+.grw-page-status-alert {
   $margin-bottom: var.$grw-navbar-bottom-height + 10px;
 
   box-shadow: 0 2px 4px #0000004d;
@@ -10,10 +10,10 @@
   @include bs.media-breakpoint-down(sm) {
     margin: 0 10px $margin-bottom;
 
-    .grw-card-label-container {
+    :global(.grw-card-label-container) {
       text-align: center;
     }
-    .grw-card-btn-container {
+    :global(.grw-card-btn-container) {
       text-align: center;
     }
   }
@@ -22,14 +22,14 @@
     width: 700px;
     margin: 0 auto $margin-bottom;
 
-    .card-body {
+    :global(.card-body) {
       display: flex;
       align-items: center;
       justify-content: space-between;
     }
 
-    .grw-card-label-container,
-    .grw-card-btn-container {
+    :global(.grw-card-label-container),
+    :global(.grw-card-btn-container) {
       margin: 0;
     }
   }

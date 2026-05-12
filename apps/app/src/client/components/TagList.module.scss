@@ -1,7 +1,7 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.grw-tag-list :global {
-  .list-group {
+.grw-tag-list {
+  :global(.list-group) {
     // remove border
     --bs-border-width: 0;
   }
@@ -10,8 +10,8 @@
 
 // == Colors
 @include bs.color-mode(light) {
-  .grw-tag-list :global {
-    .grw-tag-count {
+  .grw-tag-list {
+    :global(.grw-tag-count) {
       color: var(--bs-gray-600);
       background-color: var(--grw-highlight-100);
     }
@@ -19,8 +19,8 @@
 }
 
 @include bs.color-mode(dark) {
-  .grw-tag-list :global {
-    .grw-tag-count {
+  .grw-tag-list {
+    :global(.grw-tag-count) {
       color: var(--bs-gray-500);
       background-color: var(--grw-highlight-800);
     }

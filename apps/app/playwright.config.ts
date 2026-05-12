@@ -52,7 +52,7 @@ export default defineConfig({
   reporter: process.env.CI ? [['github'], ['blob']] : 'list',
 
   webServer: {
-    command: 'pnpm run server',
+    command: process.env.GROWI_WEBSERVER_COMMAND ?? 'pnpm run server',
     url: 'http://localhost:3000',
     reuseExistingServer: !process.env.CI,
     stdout: 'ignore',

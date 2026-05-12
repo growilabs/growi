@@ -9,70 +9,70 @@
   --callout-accent-caution: var(--bs-danger);
 }
 
-.callout-viewer :global{
+.callout-viewer{
 
-  .callout {
+  :global(.callout) {
     padding: 0.5rem 1rem;
     margin: 1rem 0rem;
     color: inherit;
   }
 
-  .callout-indicator {
+  :global(.callout-indicator) {
     display: flex;
     align-items: center;
     margin-bottom: 16px;
     line-height: 1;
   }
 
-  .callout-hint {
+  :global(.callout-hint) {
     display: inline-block;
     margin-right: 0.3rem;
     vertical-align: text-bottom;
     fill: currentColor;
   }
 
-  .callout-note {
-    .callout-indicator {
+  :global(.callout-note) {
+    :global(.callout-indicator) {
       color: var(--callout-accent-note);
     }
     border-left: .25em solid var(--callout-accent-note);
   }
 
-  .callout-tip {
-    .callout-indicator {
+  :global(.callout-tip) {
+    :global(.callout-indicator) {
       color: var(--callout-accent-tip);
     }
     border-left: .25em solid var(--callout-accent-tip);
   }
 
-  .callout-warning {
-    .callout-indicator {
+  :global(.callout-warning) {
+    :global(.callout-indicator) {
       color: var(--callout-accent-warning);
     }
     border-left:.25em solid var(--callout-accent-warning);
   }
 
-  .callout-caution {
-    .callout-indicator {
+  :global(.callout-caution) {
+    :global(.callout-indicator) {
       color: var(--callout-accent-caution);
     }
     border-left:.25em solid var(--callout-accent-caution);
   }
 
-  .callout-important {
-    .callout-indicator {
+  :global(.callout-important) {
+    :global(.callout-indicator) {
       color: var(--callout-accent-important);
     }
     border-left:.25em solid var(--callout-accent-important);
   }
 
-  .callout-content:first-child,
-  .callout-content:only-child {
+  :global(.callout-content:first-child),
+  :global(.callout-content:only-child) {
     margin-block-start: 0;
   }
 
-  .callout-content:last-child,
-  .callout-content:only-child {
+  :global(.callout-content:last-child),
+  :global(.callout-content:only-child) {
     margin-block-end: 0;
   }
 }

@@ -9,12 +9,8 @@
  * outputs: .layout-root.editing .component-class_LOCAL_ID { visibility: hidden; }
  */
 @mixin at-editing() {
-  :global {
-    .layout-root.editing {
-      :local {
-        @content;
-      }
-    }
+  @at-root :global(.layout-root.editing) #{&} {
+    @content;
   }
 }
 
@@ -30,9 +26,7 @@
  */
 
 @mixin with-editing() {
-  &:global {
-    &.layout-root.editing {
-      @content;
-    }
+  &:global(.layout-root.editing) {
+    @content;
   }
 }

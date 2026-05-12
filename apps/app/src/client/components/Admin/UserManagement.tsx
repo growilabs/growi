@@ -183,6 +183,7 @@ const UserManagement = (props: UserManagementProps) => {
               {renderCheckbox('active', 'Active', 'success')}
               {renderCheckbox('suspended', 'Suspended', 'warning')}
               {renderCheckbox('invited', 'Invited', 'secondary')}
+              {renderCheckbox('deleted', 'Deleted', 'danger')}
             </div>
             <div>
               {isNotifyCommentShow && (

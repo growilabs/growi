@@ -1,20 +1,25 @@
-import React, { type JSX, useEffect } from 'react';
+import { useEffect } from 'react';
 
 import {
   useShortcutsModalActions,
   useShortcutsModalStatus,
 } from '~/states/ui/modal/shortcuts';
 
+import type { HotkeyBindingDef } from '../HotkeysManager';
+
 type Props = {
   onDeleteRender: () => void;
 };
-const ShowShortcutsModal = (props: Props): JSX.Element => {
+
+export const hotkeyBindings: HotkeyBindingDef = {
+  keys: ['Control+/', 'Meta+/'],
+  category: 'modifier',
+};
+
+const ShowShortcutsModal = ({ onDeleteRender }: Props): null => {
   const status = useShortcutsModalStatus();
   const { open } = useShortcutsModalActions();
 
-  const { onDeleteRender } = props;
-
-  // setup effect
   useEffect(() => {
     if (status == null) {
       return;
@@ -22,16 +27,11 @@ const ShowShortcutsModal = (props: Props): JSX.Element => {
 
     if (!status.isOpened) {
       open();
-      // remove this
       onDeleteRender();
     }
   }, [onDeleteRender, open, status]);
 
-  return <></>;
+  return null;
 };
 
-ShowShortcutsModal.getHotkeyStrokes = () => {
-  return [['/+ctrl'], ['/+meta']];
-};
-
-export default ShowShortcutsModal;
+export { ShowShortcutsModal };

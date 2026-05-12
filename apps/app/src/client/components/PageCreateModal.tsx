@@ -21,12 +21,14 @@ import { debounce } from 'throttle-debounce';
 import { useCreateTemplatePage } from '~/client/services/create-page';
 import { useCreatePage } from '~/client/services/create-page/use-create-page';
 import { useToastrOnError } from '~/client/services/use-toastr-on-error';
+import { useGrowiDocumentationUrl } from '~/states/context';
 import { useCurrentUser } from '~/states/global';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 import {
   usePageCreateModalActions,
   usePageCreateModalStatus,
 } from '~/states/ui/modal/page-create';
+import { getLocale } from '~/utils/locale-utils';
 
 import PagePathAutoComplete from './PagePathAutoComplete';
 
@@ -35,9 +37,10 @@ import styles from './PageCreateModal.module.scss';
 const { isCreatablePage, isUsersHomepage } = pagePathUtils;
 
 const PageCreateModal: React.FC = () => {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const currentUser = useCurrentUser();
+  const documentationUrl = useGrowiDocumentationUrl();
 
   const { isOpened, path: pathname = '' } = usePageCreateModalStatus();
   const { close: closeCreateModal } = usePageCreateModalActions();
@@ -70,6 +73,9 @@ const PageCreateModal: React.FC = () => {
       ].join('/'),
     [userHomepagePath, t, now],
   );
+
+  const docsLang = getLocale(i18n.language).code === 'ja' ? 'ja' : 'en';
+  const templateHelpUrl = `${documentationUrl}/${docsLang}/guide/features/template.html`;
 
   const [todayInput, setTodayInput] = useState('');
   const [pageNameInput, setPageNameInput] = useState(pageNameInputInitialValue);
@@ -295,6 +301,16 @@ const PageCreateModal: React.FC = () => {
         <fieldset className="col-12">
           <h3 className="pb-2">
             {t('template.modal_label.Create template under')}
+            <a
+              href={templateHelpUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="ms-1"
+            >
+              <span className="material-symbols-outlined fs-6 text-secondary">
+                help
+              </span>
+            </a>
             <br />
             <code className="h6" data-testid="grw-page-create-modal-path-name">
               {pathname}
@@ -353,6 +369,7 @@ const PageCreateModal: React.FC = () => {
     isOpened,
     pathname,
     template,
+    templateHelpUrl,
     onChangeTemplateHandler,
     createTemplateWithToastr,
     t,

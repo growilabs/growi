@@ -4,7 +4,7 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:opentelemetry:diag');
 
-class DiagLoggerBunyanAdapter implements DiagLogger {
+class DiagLoggerPinoAdapter implements DiagLogger {
   private parseMessage(
     message: string,
     args: unknown[],
@@ -47,27 +47,32 @@ class DiagLoggerBunyanAdapter implements DiagLogger {
   }
 
   error(message: string, ...args): void {
-    logger.error(...this.parseMessage(message, args));
+    const [msg, data] = this.parseMessage(message, args);
+    logger.error(data, msg);
   }
 
   warn(message: string, ...args): void {
-    logger.warn(...this.parseMessage(message, args));
+    const [msg, data] = this.parseMessage(message, args);
+    logger.warn(data, msg);
   }
 
   info(message: string, ...args): void {
-    logger.info(...this.parseMessage(message, args));
+    const [msg, data] = this.parseMessage(message, args);
+    logger.info(data, msg);
   }
 
   debug(message: string, ...args): void {
-    logger.debug(...this.parseMessage(message, args));
+    const [msg, data] = this.parseMessage(message, args);
+    logger.debug(data, msg);
   }
 
   verbose(message: string, ...args): void {
-    logger.trace(...this.parseMessage(message, args));
+    const [msg, data] = this.parseMessage(message, args);
+    logger.trace(data, msg);
   }
 }
 
 export const initLogger = (): void => {
   // Enable global logger for OpenTelemetry
-  diag.setLogger(new DiagLoggerBunyanAdapter());
+  diag.setLogger(new DiagLoggerPinoAdapter());
 };

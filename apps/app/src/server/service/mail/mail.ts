@@ -82,8 +82,8 @@ class MailService implements S2sMessageHandlable {
         await s2sMessagingService.publish(s2sMessage);
       } catch (e) {
         logger.error(
-          'Failed to publish update message with S2sMessagingService: ',
-          e.message,
+          { err: e },
+          'Failed to publish update message with S2sMessagingService',
         );
       }
     }
@@ -161,14 +161,17 @@ class MailService implements S2sMessageHandlable {
     for (let attempt = 1; attempt <= maxRetries; attempt++) {
       try {
         const result = await this.mailer.sendMail(config);
-        logger.info('OAuth 2.0 email sent successfully', {
-          messageId: result.messageId,
-          from: config.from,
-          recipient: config.to,
-          attempt,
-          clientId: maskedClientId,
-          tag: 'oauth2_email_success',
-        });
+        logger.info(
+          {
+            messageId: result.messageId,
+            from: config.from,
+            recipient: config.to,
+            attempt,
+            clientId: maskedClientId,
+            tag: 'oauth2_email_success',
+          },
+          'OAuth 2.0 email sent successfully',
+        );
         return result;
       } catch (error: unknown) {
         const err = error as Error & { code?: string };
@@ -182,9 +185,8 @@ class MailService implements S2sMessageHandlable {
         }
 
         logger.error(
-          `OAuth 2.0 email send failed (attempt ${attempt}/${maxRetries})`,
           {
-            error: err.message,
+            err,
             code: err.code,
             user: config.from,
             recipient: config.to,
@@ -193,6 +195,7 @@ class MailService implements S2sMessageHandlable {
             timestamp: new Date().toISOString(),
             tag: monitoringTag,
           },
+          `OAuth 2.0 email send failed (attempt ${attempt}/${maxRetries})`,
         );
 
         if (attempt === maxRetries) {
@@ -232,17 +235,23 @@ class MailService implements S2sMessageHandlable {
 
       await FailedEmail.create(failedEmail);
 
-      logger.error('Failed email stored for manual review', {
-        recipient: config.to,
-        errorMessage: error.message,
-        errorCode: error.code,
-      });
+      logger.error(
+        {
+          recipient: config.to,
+          errorMessage: error.message,
+          errorCode: error.code,
+        },
+        'Failed email stored for manual review',
+      );
     } catch (err: unknown) {
       const storeError = err as Error;
-      logger.error('Failed to store failed email', {
-        error: storeError.message,
-        originalError: error.message,
-      });
+      logger.error(
+        {
+          err: storeError,
+          originalError: error.message,
+        },
+        'Failed to store failed email',
+      );
       throw new Error(`Failed to store failed email: ${storeError.message}`);
     }
   }
@@ -270,11 +279,14 @@ class MailService implements S2sMessageHandlable {
 
     // Use sendWithRetry for OAuth 2.0 to handle token refresh failures with exponential backoff
     if (transmissionMethod === 'oauth2') {
-      logger.debug('Sending email via OAuth2 with config:', {
-        from: mailConfig.from,
-        to: mailConfig.to,
-        subject: mailConfig.subject,
-      });
+      logger.debug(
+        {
+          from: mailConfig.from,
+          to: mailConfig.to,
+          subject: mailConfig.subject,
+        },
+        'Sending email via OAuth2 with config',
+      );
       return this.sendWithRetry(mailConfig as EmailConfig);
     }
 

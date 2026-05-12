@@ -63,7 +63,7 @@ export const useLazyLoader = <T extends Record<string, unknown>>(
     null,
   );
 
-  const memoizedImportFn = useCallback(importFn, []);
+  const memoizedImportFn = useCallback(importFn, [importFn]);
 
   useEffect(() => {
     if (isActive && !Component) {

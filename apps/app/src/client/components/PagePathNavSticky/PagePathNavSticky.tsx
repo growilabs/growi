@@ -4,7 +4,7 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import Sticky from 'react-stickynode';
 
 import { usePrintMode } from '~/client/services/use-print-mode';
-import LinkedPagePath from '~/models/linked-page-path';
+import { LinkedPagePath } from '~/models/linked-page-path';
 import { usePageControlsX } from '~/states/ui/page';
 import { useCurrentProductNavWidth, useSidebarMode } from '~/states/ui/sidebar';
 

@@ -13,3 +13,8 @@ export const YDocStatus = {
   ISOLATED: 'isolated',
 } as const;
 export type YDocStatus = (typeof YDocStatus)[keyof typeof YDocStatus];
+
+/**
+ * The base path for Yjs WebSocket connections.
+ */
+export const YJS_WEBSOCKET_BASE_PATH = '/yjs';

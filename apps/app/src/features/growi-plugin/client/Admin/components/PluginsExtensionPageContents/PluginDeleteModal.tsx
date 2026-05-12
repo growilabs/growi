@@ -65,9 +65,7 @@ const PluginDeleteModalSubstance = ({
       </ModalHeader>
       <ModalBody>
         <div className="card well mt-2 p-2" key={id}>
-          <Link href={`${url}`} legacyBehavior>
-            {name}
-          </Link>
+          <Link href={`${url}`}>{name}</Link>
         </div>
       </ModalBody>
       <ModalFooter>

@@ -1,5 +1,6 @@
 import { faker } from '@faker-js/faker';
-import { addDays, subDays } from 'date-fns';
+import { addDays } from 'date-fns/addDays';
+import { subDays } from 'date-fns/subDays';
 import { Types } from 'mongoose';
 
 import { ThreadType } from '../../../../interfaces/thread-relation';

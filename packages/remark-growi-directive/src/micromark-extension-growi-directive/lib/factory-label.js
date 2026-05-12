@@ -22,7 +22,7 @@ import { ok as assert } from 'uvu/assert';
  * @param {string} stringType
  * @param {boolean} [disallowEol=false]
  */
-// biome-ignore lint/nursery/useMaxParams: This module is transplanted from micromark and we want to keep the signature same.
+// biome-ignore lint/complexity/useMaxParams: This module is transplanted from micromark and we want to keep the signature same.
 export function factoryLabel(
   effects,
   ok,

@@ -1,28 +1,23 @@
 {
   "$schema": "./node_modules/@biomejs/biome/configuration_schema.json",
+  "vcs": {
+    "enabled": true,
+    "clientKind": "git",
+    "useIgnoreFile": true
+  },
   "files": {
     "includes": [
       "**",
-      "!**/.pnpm-store",
       "!**/.terraform",
-      "!**/coverage",
-      "!**/dist",
-      "!**/.next",
-      "!**/node_modules",
-      "!**/vite.*.ts.timestamp-*",
       "!**/*.grit",
       "!**/turbo.json",
       "!**/.devcontainer",
       "!**/.stylelintrc.json",
       "!**/package.json",
-      "!.turbo",
       "!.vscode",
       "!.claude",
       "!tsconfig.base.json",
-      "!apps/app/src/styles/prebuilt",
-      "!apps/app/tmp",
-      "!apps/pdf-converter/specs",
-      "!apps/slackbot-proxy/src/public/bootstrap",
+      "!apps/app/src/generated",
       "!packages/pdf-converter-client/src/index.ts",
       "!packages/pdf-converter-client/specs"
     ]
@@ -46,9 +41,16 @@
               ":BLANK_LINE:",
               "~/**",
               ":BLANK_LINE:",
-              [":PATH:", "!**/*.css", "!**/*.scss"],
+              [
+                ":PATH:",
+                "!../**/*.css",
+                "!./*.css",
+                "!../**/*.scss",
+                "!./*.scss"
+              ],
               ":BLANK_LINE:",
-              ["**/*.css", "**/*.scss"]
+              ["../**/*.scss", "../**/*.css"],
+              ["./*.scss", "./*.css"]
             ]
           }
         }
@@ -76,7 +78,7 @@
       "correctness": {
         "useUniqueElementIds": "warn"
       },
-      "nursery": {
+      "complexity": {
         "useMaxParams": "warn"
       }
     }
@@ -91,7 +93,11 @@
   },
   "overrides": [
     {
-      "includes": ["**/vite*.config.ts", "vitest*.config.ts"],
+      "includes": [
+        "**/vite*.config.ts",
+        "vitest*.config.ts",
+        "**/declaration.d.ts"
+      ],
       "linter": {
         "rules": {
           "style": {

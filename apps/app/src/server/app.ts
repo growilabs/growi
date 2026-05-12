@@ -1,5 +1,3 @@
-import type Logger from 'bunyan';
-
 import {
   initInstrumentation,
   setupAdditionalResourceAttributes,
@@ -8,17 +6,17 @@ import {
 import loggerFactory from '~/utils/logger';
 import { hasProcessFlag } from '~/utils/process-utils';
 
-const logger: Logger = loggerFactory('growi');
+const logger = loggerFactory('growi');
 
 /** **********************************
  *          Main Process
  ********************************** */
 process.on('uncaughtException', (err?: Error) => {
-  logger.error('Uncaught Exception: ', err);
+  logger.error({ err }, 'Uncaught Exception');
 });
 
 process.on('unhandledRejection', (reason, p) => {
-  logger.error('Unhandled Rejection: Promise:', p, 'Reason:', reason);
+  logger.error({ reason, promise: p }, 'Unhandled Rejection');
 });
 
 async function main() {

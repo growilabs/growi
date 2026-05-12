@@ -27,6 +27,7 @@ export default defineConfig({
         index: 'src/client/index.ts',
       },
       name: 'remark-lsx-libs',
+      cssFileName: 'style',
       formats: ['es'],
     },
   },

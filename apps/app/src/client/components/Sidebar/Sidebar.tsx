@@ -40,8 +40,6 @@ import { ResizableAreaFallback } from './ResizableArea/ResizableAreaFallback';
 import { SidebarHead } from './SidebarHead';
 import { SidebarNav, type SidebarNavProps } from './SidebarNav';
 
-import 'simplebar-react/dist/simplebar.min.css';
-
 import styles from './Sidebar.module.scss';
 
 const SidebarContents = dynamic(

@@ -1,4 +1,3 @@
-import nodePath from 'node:path';
 import type { IUser } from '@growi/core/dist/interfaces';
 
 import type Crowi from '~/server/crowi';
@@ -12,6 +11,7 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
+import { resolveLocalePath } from '../../util/safe-path-utils';
 import type { GlobalNotificationEventVars } from './types';
 
 const _logger = loggerFactory('growi:service:GlobalNotificationMailService');
@@ -89,17 +89,26 @@ class GlobalNotificationMailService {
     triggeredBy: IUser,
     { comment, oldPath }: GlobalNotificationEventVars,
   ): MailOption {
-    const locale = configManager.getConfig('app:globalLang');
-    // validate for all events
     if (event == null || page == null || triggeredBy == null) {
       throw new Error(
-        `invalid vars supplied to GlobalNotificationMailService.generateOption for event ${event}`,
+        `Invalid vars supplied to GlobalNotificationMailService.generateOption: event=${event}`,
       );
     }
+    const validEvents = Object.values(
+      GlobalNotificationSettingEvent,
+    ) as string[];
+    if (!validEvents.includes(event)) {
+      _logger.error(`Unknown global notification event: ${event}`);
+      throw new Error(`Unknown global notification event: ${event}`);
+    }
 
-    const template = nodePath.join(
+    const castedEvent =
+      event as (typeof GlobalNotificationSettingEvent)[keyof typeof GlobalNotificationSettingEvent];
+    const locale = configManager.getConfig('app:globalLang');
+    const template = resolveLocalePath(
+      locale,
       this.crowi.localeDir,
-      `${locale}/notifications/${event}.ejs`,
+      `notifications/${castedEvent}.ejs`,
     );
 
     const path = page.path;
@@ -115,7 +124,7 @@ class GlobalNotificationMailService {
       username: triggeredBy.username,
     };
 
-    switch (event) {
+    switch (castedEvent) {
       case GlobalNotificationSettingEvent.PAGE_CREATE:
         subject = `#${event} - ${triggeredBy.username} created ${path} at URL: ${pageUrl}`;
         break;

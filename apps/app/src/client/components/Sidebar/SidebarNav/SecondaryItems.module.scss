@@ -2,8 +2,8 @@
 @use '../button-styles';
 
 
-.grw-secondary-items :global {
-  .btn {
+.grw-secondary-items {
+  :global(.btn) {
     @extend %btn-basis;
 
     opacity: 0.6;
@@ -16,15 +16,15 @@
 }
 
 // == Colors
-.grw-secondary-items :global {
-  .btn.btn-primary {
+.grw-secondary-items {
+  :global(.btn.btn-primary) {
     @extend %btn-primary-color-vars;
   }
 }
 
 @include bs.color-mode(light) {
-  .grw-secondary-items :global {
-    .btn-primary {
+  .grw-secondary-items {
+    :global(.btn-primary) {
       --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-primary-600));
       --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-300));
     }
@@ -32,8 +32,8 @@
 }
 
 @include bs.color-mode(dark) {
-  .grw-secondary-items :global {
-    .btn-primary {
+  .grw-secondary-items {
+    :global(.btn-primary) {
       --bs-btn-color: var(--grw-sidebar-nav-btn-color, var(--grw-primary-500));
       --bs-btn-hover-bg: var(--grw-sidebar-nav-btn-hover-bg, var(--grw-highlight-700));
     }

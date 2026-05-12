@@ -61,17 +61,20 @@ const factory = (whitelistOfHosts: string[]) => {
         const isWhitelisted = isInWhitelist(whitelistOfHosts, redirectTo);
         if (isWhitelisted) {
           logger.debug(
+            { whitelist: whitelistOfHosts },
             `Requested redirect URL (${redirectTo}) is in whitelist.`,
-            `whitelist=${whitelistOfHosts}`,
           );
           return res.redirect(redirectTo);
         }
         logger.debug(
+          { whitelist: whitelistOfHosts },
           `Requested redirect URL (${redirectTo}) is NOT in whitelist.`,
-          `whitelist=${whitelistOfHosts}`,
         );
       } catch (err) {
-        logger.warn(`Requested redirect URL (${redirectTo}) is invalid.`, err);
+        logger.warn(
+          { err },
+          `Requested redirect URL (${redirectTo}) is invalid.`,
+        );
       }
 
       logger.warn(

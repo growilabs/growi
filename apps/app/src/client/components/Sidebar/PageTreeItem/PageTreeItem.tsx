@@ -173,6 +173,7 @@ export const PageTreeItem: FC<TreeItemProps> = ({
       isWipPageShown={isWipPageShown}
       isEnableActions={isEnableActions}
       isReadOnlyUser={isReadOnlyUser}
+      asLink
       onClick={itemSelectedHandler}
       onWheelClick={itemSelectedByWheelClickHandler}
       onToggle={onToggle}

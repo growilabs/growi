@@ -1,5 +1,5 @@
 import type { JSX, ReactNode } from 'react';
-import React, {
+import {
   useCallback,
   useEffect,
   useLayoutEffect,
@@ -35,11 +35,11 @@ import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '../NotAvailableFo
 import { CommentPreview } from './CommentPreview';
 import { SwitchingButtonGroup } from './SwitchingButtonGroup';
 
-import '@growi/editor/dist/style.css';
-
 import styles from './CommentEditor.module.scss';
 
-const logger = loggerFactory('growi:components:CommentEditor');
+import '../GrowiEditor.vendor-styles.prebuilt';
+
+const _logger = loggerFactory('growi:components:CommentEditor');
 
 const SlackNotification = dynamic(
   () => import('../SlackNotification').then((mod) => mod.SlackNotification),

@@ -11,9 +11,9 @@ export const apiV3FormValidator = (
   res: Response & { apiv3Err },
   next: NextFunction,
 ): void => {
-  logger.debug('req.query', req.query);
-  logger.debug('req.params', req.params);
-  logger.debug('req.body', req.body);
+  logger.debug({ query: req.query }, 'req.query');
+  logger.debug({ params: req.params }, 'req.params');
+  logger.debug({ body: req.body }, 'req.body');
 
   const errObjArray = validationResult(req);
   if (errObjArray.isEmpty()) {

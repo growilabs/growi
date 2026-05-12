@@ -1,5 +1,5 @@
 import { type JSX, useCallback } from 'react';
-import Head from 'next/head';
+import Script from 'next/script';
 import type { IGraphViewerGlobal } from '@growi/remark-drawio';
 
 import { generateViewerMinJsUrl } from './use-viewer-min-js-url';
@@ -40,13 +40,10 @@ export const DrawioViewerScript = ({ drawioUri }: Props): JSX.Element => {
   const viewerMinJsSrc = generateViewerMinJsUrl(drawioUri);
 
   return (
-    <Head>
-      <script
-        type="text/javascript"
-        async
-        src={viewerMinJsSrc}
-        onLoad={loadedHandler}
-      />
-    </Head>
+    <Script
+      src={viewerMinJsSrc}
+      strategy="afterInteractive"
+      onLoad={loadedHandler}
+    />
   );
 };

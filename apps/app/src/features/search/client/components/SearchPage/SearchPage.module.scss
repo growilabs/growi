@@ -1,8 +1,8 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 @use '@growi/ui/scss/atoms/btn-muted';
 
-.search-page :global {
-  .btn.btn-muted-danger {
+.search-page {
+  :global(.btn.btn-muted-danger) {
     @include btn-muted.colorize(bs.$danger, bs.$secondary);
 
     --bs-btn-active-bg: rgba(var(--bs-danger-rgb), 0.3);

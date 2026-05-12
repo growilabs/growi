@@ -12,6 +12,7 @@ export type GcsSettingMoleculeProps = {
   envGcsBucket?: string;
   envGcsUploadNamespace?: string;
   onChangeGcsReferenceFileWithRelayMode: (val: boolean) => void;
+  isCloud: boolean;
 };
 
 export const GcsSettingMolecule = (
@@ -25,6 +26,7 @@ export const GcsSettingMolecule = (
     envGcsApiKeyJsonPath,
     envGcsBucket,
     envGcsUploadNamespace,
+    isCloud,
   } = props;
 
   return (
@@ -79,17 +81,22 @@ export const GcsSettingMolecule = (
         </div>
       </div>
 
-      {gcsUseOnlyEnvVars && (
-        <p
-          className="alert alert-info"
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
-          dangerouslySetInnerHTML={{
-            __html: t('admin:app_setting.note_for_the_only_env_option', {
-              env: 'GCS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
-            }),
-          }}
-        />
-      )}
+      {gcsUseOnlyEnvVars &&
+        (isCloud ? (
+          <p className="alert alert-info">
+            {t('admin:app_setting.note_for_the_only_env_option_cloud')}
+          </p>
+        ) : (
+          <p
+            className="alert alert-info"
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes markup from i18n strings
+            dangerouslySetInnerHTML={{
+              __html: t('admin:app_setting.note_for_the_only_env_option', {
+                env: 'GCS_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+              }),
+            }}
+          />
+        ))}
       <table
         className={`table settings-table ${gcsUseOnlyEnvVars && 'use-only-env-vars'}`}
       >

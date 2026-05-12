@@ -18,7 +18,7 @@ import { useSWRxGrowiThemeSetting } from '../../../stores/admin/customize';
 
 import styles from './RevisionDiff.module.scss';
 
-import 'diff2html/bundles/css/diff2html.min.css';
+import './RevisionDiff.vendor-styles.prebuilt';
 
 const moduleClass = styles['revision-diff-container'];
 

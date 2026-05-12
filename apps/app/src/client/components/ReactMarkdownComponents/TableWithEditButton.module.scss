@@ -3,10 +3,10 @@
 /**
  * for table with handsontable modal button
  */
-.editable-with-handsontable :global {
+.editable-with-handsontable {
   position: relative;
 
-  .handsontable-modal-trigger {
+  :global(.handsontable-modal-trigger) {
     position: absolute;
     top: 8px;
     right: 10px;
@@ -24,8 +24,8 @@
   }
 }
 
-.editable-with-handsontable:hover :global {
-  .handsontable-modal-trigger {
+.editable-with-handsontable:hover {
+  :global(.handsontable-modal-trigger) {
     opacity: 1;
   }
 }

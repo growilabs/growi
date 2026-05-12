@@ -1,40 +1,40 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.grw-grid-edit-modal :global {
-  .desktop-preview,
-  .tablet-preview,
-  .mobile-preview {
-    .row {
+.grw-grid-edit-modal {
+  :global(.desktop-preview),
+  :global(.tablet-preview),
+  :global(.mobile-preview) {
+    :global(.row) {
       height: 140px;
       margin: 0;
     }
   }
-  .desktop-preview {
-    .row {
-      div {
+  :global(.desktop-preview) {
+    :global(.row) {
+      :global(div) {
         padding: 0;
       }
     }
   }
 
-  .tablet-preview {
-    .row {
-      div {
+  :global(.tablet-preview) {
+    :global(.row) {
+      :global(div) {
         padding: 0;
       }
     }
   }
 
-  .mobile-preview {
+  :global(.mobile-preview) {
     width: 75%;
-    .row {
-      div {
+    :global(.row) {
+      :global(div) {
         padding: 0;
       }
     }
   }
 
-  .grid-division-menu {
+  :global(.grid-division-menu) {
     width: 60vw;
 
     @include bs.media-breakpoint-down(lg) {

@@ -1,26 +1,19 @@
-:root {
-  :global {
-    /* stylelint-disable-next-line no-invalid-position-at-import-rule */
-    @import 'reveal.js/dist/reveal.css';
-  }
-}
-
 .grw-presentation {
   // workaround from https://github.com/css-modules/css-modules/issues/295#issuecomment-952885628
-  &:global(.reveal) :global {
-    .slides {
+  &:global(.reveal) {
+    :global(.slides) {
       text-align: unset;
 
-      section {
+      :global(section) {
         position: absolute;
         width: 100%;
       }
     }
-    .controls {
+    :global(.controls) {
       bottom: 24px;
       color: var(--bs-body-color);
     }
-    .progress {
+    :global(.progress) {
       color: var(--bs-primary);
     }
   }
@@ -30,20 +23,17 @@
 // adjust marp default theme
 :root[data-bs-theme='light'] {
   .grw-presentation {
-    &:global {
-      &.reveal-viewport {
-        background-color: #fff;
-      }
+    &:global(.reveal-viewport) {
+      background-color: #fff;
     }
   }
 }
 
 :root[data-bs-theme='dark'] {
+  // stylelint-disable-next-line no-descending-specificity -- false positive: different theme context from 'light' variant above
   .grw-presentation {
-    &:global {
-      &.reveal-viewport {
-        background-color: #0d1117;
-      }
+    &:global(.reveal-viewport) {
+      background-color: #0d1117;
     }
   }
 }

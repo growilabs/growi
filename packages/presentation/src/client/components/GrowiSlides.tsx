@@ -2,12 +2,11 @@ import type { JSX } from 'react';
 import Head from 'next/head';
 import ReactMarkdown from 'react-markdown';
 
-import type { PresentationOptions } from '../consts';
+import { MARP_CONTAINER_CLASS_NAME, type PresentationOptions } from '../consts';
 import {
-  MARP_CONTAINER_CLASS_NAME,
-  presentationMarpit,
-  slideMarpit,
-} from '../services/growi-marpit';
+  PRESENTATION_MARPIT_CSS,
+  SLIDE_MARPIT_CSS,
+} from '../consts/marpit-base-css.vendor-styles.prebuilt';
 import * as extractSections from '../services/renderer/extract-sections';
 import {
   PresentationRichSlideSection,
@@ -25,11 +24,11 @@ export const GrowiSlides = (props: Props): JSX.Element => {
   const { rendererOptions, isDarkMode, disableSeparationByHeader } = options;
 
   if (
-    rendererOptions == null ||
     rendererOptions.remarkPlugins == null ||
     rendererOptions.components == null
   ) {
-    return;
+    // biome-ignore lint/complexity/noUselessFragments: This is for type checking only. The actual code will never reach here.
+    return <></>;
   }
 
   rendererOptions.remarkPlugins.push([
@@ -43,8 +42,7 @@ export const GrowiSlides = (props: Props): JSX.Element => {
     ? PresentationRichSlideSection
     : RichSlideSection;
 
-  const marpit = presentation ? presentationMarpit : slideMarpit;
-  const { css } = marpit.render('');
+  const css = presentation ? PRESENTATION_MARPIT_CSS : SLIDE_MARPIT_CSS;
   return (
     <>
       <Head>

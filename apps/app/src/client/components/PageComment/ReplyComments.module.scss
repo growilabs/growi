@@ -1,5 +1,5 @@
 
 // remove margin after hidden replies
-.page-comments-hidden-replies + .page-comment-reply :global {
+.page-comments-hidden-replies + .page-comment-reply {
   margin-top: 0;
 }

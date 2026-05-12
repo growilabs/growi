@@ -1,13 +1,13 @@
-@use '~/styles/variables' as var;
-@use '~/styles/mixins';
+@use 'styles/variables' as var;
+@use 'styles/mixins';
 
-.grw-navbar-bottom :global {
+.grw-navbar-bottom {
   // apply transition
   transition-property: bottom;
 
   @include mixins.apply-navigation-transition();
 
-  .navbar {
+  :global(.navbar) {
     height: var.$grw-navbar-bottom-height;
   }
 }
@@ -17,8 +17,8 @@
 }
 
 // centering icons
-.grw-navbar-bottom :global {
-  .nav-link {
+.grw-navbar-bottom {
+  :global(.nav-link) {
     display: flex;
     align-items: center;
   }

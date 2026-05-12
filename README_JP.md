@@ -81,16 +81,15 @@ Crowi からの移行は **[こちら](https://docs.growi.org/en/admin-guide/mig
 
 ## 依存関係
 
-- Node.js v18.x or v20.x
-- npm 6.x
-- pnpm 9.x
+- Node.js v24.x
+- pnpm 10.x
 - [Turborepo](https://turbo.build/repo)
 - MongoDB v6.x or v8.x
 
 ### オプションの依存関係
 
 - Redis 3.x
-- ElasticSearch 7.x or 8.x (needed when using Full-text search)
+- ElasticSearch 7.x or 8.x or 9.x (needed when using Full-text search)
   - **注意: 次のプラグインが必要です**
     - [Japanese (kuromoji) Analysis plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/analysis-kuromoji.html)
     - [ICU Analysis Plugin](https://www.elastic.co/guide/en/elasticsearch/plugins/current/analysis-icu.html)

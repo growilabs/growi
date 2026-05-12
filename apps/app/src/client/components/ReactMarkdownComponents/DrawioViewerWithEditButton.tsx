@@ -16,9 +16,9 @@ import {
 import { useShareLinkId } from '~/states/page/hooks';
 import { useIsRevisionOutdated } from '~/stores/page';
 
-import '@growi/remark-drawio/dist/style.css';
-
 import styles from './DrawioViewerWithEditButton.module.scss';
+
+import './DrawioViewerWithEditButton.vendor-styles.prebuilt';
 
 export const DrawioViewerWithEditButton = React.memo(
   (props: DrawioViewerProps): JSX.Element => {

@@ -9,7 +9,6 @@ on:
       - .github/mergify.yml
       - .github/workflows/ci-app-prod.yml
       - .github/workflows/reusable-app-prod.yml
-      - .github/workflows/reusable-app-reg-suit.yml
       - tsconfig.base.json
       - turbo.json
       - pnpm-lock.yaml
@@ -23,7 +22,6 @@ on:
       - .github/mergify.yml
       - .github/workflows/ci-app-prod.yml
       - .github/workflows/reusable-app-prod.yml
-      - .github/workflows/reusable-app-reg-suit.yml
       - tsconfig.base.json
       - pnpm-lock.yaml
       - turbo.json
@@ -39,7 +37,21 @@ concurrency:
 
 jobs:
 
-  test-prod-node18:
+  # test-prod-node22:
+  #   uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
+  #   if: |
+  #     ( github.event_name == 'push'
+  #       || github.base_ref == 'master'
+  #       || github.base_ref == 'dev/7.*.x'
+  #       || startsWith( github.base_ref, 'release/' )
+  #       || startsWith( github.head_ref, 'mergify/merge-queue/' ))
+  #   with:
+  #     node-version: 22.x
+  #     skip-e2e-test: true
+  #   secrets:
+  #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+  test-prod-node24:
     uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
     if: |
       ( github.event_name == 'push'
@@ -48,38 +60,7 @@ jobs:
         || startsWith( github.base_ref, 'release/' )
         || startsWith( github.head_ref, 'mergify/merge-queue/' ))
     with:
-      node-version: 18.x
-      skip-e2e-test: true
-    secrets:
-      SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-
-  test-prod-node20:
-    uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
-    if: |
-      ( github.event_name == 'push'
-        || github.base_ref == 'master'
-        || github.base_ref == 'dev/7.*.x'
-        || startsWith( github.base_ref, 'release/' )
-        || startsWith( github.head_ref, 'mergify/merge-queue/' ))
-    with:
-      node-version: 20.x
+      node-version: 24.x
       skip-e2e-test: ${{ contains( github.event.pull_request.labels.*.name, 'dependencies' ) }}
     secrets:
       SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
-  # run-reg-suit-node20:
-  #   needs: [test-prod-node20]
-
-  #   uses: growilabs/growi/.github/workflows/reusable-app-reg-suit.yml@master
-
-  #   if: always()
-
-  #   with:
-  #     node-version: 20.x
-  #     skip-reg-suit: ${{ contains( github.event.pull_request.labels.*.name, 'dependencies' ) }}
-  #   secrets:
-  #     REG_NOTIFY_GITHUB_PLUGIN_CLIENTID: ${{ secrets.REG_NOTIFY_GITHUB_PLUGIN_CLIENTID }}
-  #     AWS_ACCESS_KEY_ID: ${{ secrets.AWS_ACCESS_KEY_ID }}
-  #     AWS_SECRET_ACCESS_KEY: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
-  #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

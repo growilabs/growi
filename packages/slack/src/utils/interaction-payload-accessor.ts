@@ -1,8 +1,8 @@
 import assert from 'node:assert';
+import { loggerFactory } from '@growi/logger';
 
 import type { IChannel } from '../interfaces/channel';
 import type { IInteractionPayloadAccessor } from '../interfaces/request-from-slack';
-import loggerFactory from './logger';
 
 const logger = loggerFactory('@growi/slack:utils:interaction-payload-accessor');
 
@@ -101,7 +101,7 @@ export class InteractionPayloadAccessor implements IInteractionPayloadAccessor {
     try {
       parsedOriginalData = JSON.parse(originalData);
     } catch (err) {
-      logger.error('Failed to parse original data:\n', err);
+      logger.error({ err }, 'Failed to parse original data:');
       return null;
     }
 

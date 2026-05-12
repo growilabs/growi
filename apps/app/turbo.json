@@ -3,21 +3,31 @@
   "extends": ["//"],
   "tasks": {
 
-    "pre:styles": {
+    "pre:styles-commons": {
       "dependsOn": ["@growi/ui#build"],
       "outputs": ["src/styles/prebuilt/**"],
       "inputs": [
-        "vite.styles-prebuilt.config.ts",
+        "vite.vendor-styles-commons.ts",
         "src/styles/**/*.scss",
         "../../packages/core/scss/**"
       ],
       "outputLogs": "new-only"
     },
+    "pre:styles-components": {
+      "dependsOn": ["^build"],
+      "outputs": ["src/**/*.vendor-styles.prebuilt.*"],
+      "inputs": [
+        "vite.vendor-styles-components.ts",
+        "src/**/*.vendor-styles.ts",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    },
     "build": {
-      "dependsOn": ["^build", "pre:styles"],
+      "dependsOn": ["^build", "pre:styles-commons", "pre:styles-components"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
       "inputs": [
-        "next.config.js",
+        "next.config.ts",
         "config/**",
         "public/**",
         "resource/**",
@@ -33,30 +43,41 @@
       "inputs": ["src/migrations/*.js"],
       "outputLogs": "new-only"
     },
-    "dev:pre:styles": {
+    "dev:pre:styles-commons": {
       "dependsOn": ["@growi/ui#dev"],
       "outputs": ["src/styles/prebuilt/**"],
       "inputs": [
-        "vite.styles-prebuilt.config.ts",
+        "vite.vendor-styles-commons.ts",
         "src/styles/**/*.scss",
         "!src/styles/prebuilt/**",
         "../../packages/core/scss/**"
       ],
       "outputLogs": "new-only"
     },
+    "dev:pre:styles-components": {
+      "dependsOn": ["^dev"],
+      "outputs": ["src/**/*.vendor-styles.prebuilt.*"],
+      "inputs": [
+        "vite.vendor-styles-components.ts",
+        "src/**/*.vendor-styles.*",
+        "!src/**/*.vendor-styles.prebuilt.*",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    },
     "dev": {
-      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles"],
+      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles-commons", "dev:pre:styles-components"],
       "cache": false,
       "persistent": true
     },
 
     "launch-dev:ci": {
-      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles"],
+      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles-commons", "dev:pre:styles-components"],
       "cache": false
     },
 
     "lint": {
-      "dependsOn": ["^dev", "dev:pre:styles"]
+      "dependsOn": ["^dev", "dev:pre:styles-commons", "dev:pre:styles-components"]
     },
 
     "test": {

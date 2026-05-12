@@ -1,4 +1,4 @@
-import { useCallback, useEffect } from 'react';
+import { useCallback, useEffect, useRef } from 'react';
 import type { HtmlElementNode } from 'rehype-toc';
 import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr';
 
@@ -30,12 +30,22 @@ export const useViewOptions = (): SWRResponse<RendererOptions, Error> => {
   const rendererConfig = useRendererConfigExt();
   const setTocNode = useSetTocNode();
 
-  const storeTocNodeHandler = useCallback(
-    (toc: HtmlElementNode) => {
-      setTocNode(toc);
-    },
-    [setTocNode],
-  );
+  // Store TOC node in a ref during render phase (called by rehype plugin inside ReactMarkdown),
+  // then sync to atom after commit to avoid "Cannot update a component while rendering a different component"
+  const pendingTocNodeRef = useRef<HtmlElementNode | null>(null);
+
+  const storeTocNodeHandler = useCallback((toc: HtmlElementNode) => {
+    pendingTocNodeRef.current = toc;
+  }, []);
+
+  // No dependency array: runs after every render because the ref mutation
+  // is invisible to React's dependency tracking
+  useEffect(() => {
+    if (pendingTocNodeRef.current != null) {
+      setTocNode(pendingTocNodeRef.current);
+      pendingTocNodeRef.current = null;
+    }
+  });
 
   const isAllDataValid = currentPagePath != null && rendererConfig != null;
   const customGenerater =

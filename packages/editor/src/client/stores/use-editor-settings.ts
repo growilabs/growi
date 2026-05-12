@@ -17,6 +17,7 @@ import {
   insertNewRowToMarkdownTable,
   isInTable,
 } from '../services-internal';
+import type { KeymapResult } from '../services-internal/keymaps';
 import { useEditorShortcuts } from './use-editor-shortcuts';
 
 const useStyleActiveLine = (
@@ -88,8 +89,8 @@ const useKeymapExtension = (
   codeMirrorEditor?: UseCodeMirrorEditor,
   keymapMode?: KeyMapMode,
   onSave?: () => void,
-): void => {
-  const [keymapExtension, setKeymapExtension] = useState<Extension | undefined>(
+): KeymapResult | undefined => {
+  const [keymapResult, setKeymapResult] = useState<KeymapResult | undefined>(
     undefined,
   );
 
@@ -104,20 +105,22 @@ const useKeymapExtension = (
     const settingKeyMap = async (name?: KeyMapMode) => {
       // Pass a stable wrapper function that delegates to the ref
       const stableOnSave = () => onSaveRef.current?.();
-      setKeymapExtension(await getKeymap(name, stableOnSave));
+      setKeymapResult(await getKeymap(name, stableOnSave));
     };
     settingKeyMap(keymapMode);
   }, [keymapMode]);
 
   useEffect(() => {
-    if (keymapExtension == null) {
+    if (keymapResult == null) {
       return;
     }
     const cleanupFunction = codeMirrorEditor?.appendExtensions(
-      Prec.low(keymapExtension),
+      keymapResult.precedence(keymapResult.extension),
     );
     return cleanupFunction;
-  }, [codeMirrorEditor, keymapExtension]);
+  }, [codeMirrorEditor, keymapResult]);
+
+  return keymapResult;
 };
 
 export const useEditorSettings = (
@@ -125,9 +128,13 @@ export const useEditorSettings = (
   editorSettings?: EditorSettings,
   onSave?: () => void,
 ): void => {
-  useEditorShortcuts(codeMirrorEditor, editorSettings?.keymapMode);
+  const keymapResult = useKeymapExtension(
+    codeMirrorEditor,
+    editorSettings?.keymapMode,
+    onSave,
+  );
+  useEditorShortcuts(codeMirrorEditor, keymapResult?.overrides);
   useStyleActiveLine(codeMirrorEditor, editorSettings?.styleActiveLine);
   useEnterKeyHandler(codeMirrorEditor, editorSettings?.autoFormatMarkdownTable);
   useThemeExtension(codeMirrorEditor, editorSettings?.theme);
-  useKeymapExtension(codeMirrorEditor, editorSettings?.keymapMode, onSave);
 };

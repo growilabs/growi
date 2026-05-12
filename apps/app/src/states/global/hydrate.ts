@@ -1,3 +1,5 @@
+import { useEffect } from 'react';
+import { useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 
 import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
@@ -69,11 +71,29 @@ export const useHydrateGlobalInitialAtoms = (
 export const useHydrateGlobalEachAtoms = (
   commonEachProps: CommonEachProps,
 ): void => {
+  // Initial hydration: ensure atoms are populated before children read them on first render
   const tuples = [
     createAtomTuple(currentPathnameAtom, commonEachProps.currentPathname),
     createAtomTuple(currentUserAtom, commonEachProps.currentUser),
     createAtomTuple(isMaintenanceModeAtom, commonEachProps.isMaintenanceMode),
   ];
+  useHydrateAtoms(tuples);
 
-  useHydrateAtoms(tuples, { dangerouslyForceHydrate: true });
+  // Subsequent sync (e.g. route transitions): run in effect to avoid
+  // "setState during render of a different component" warnings
+  const setCurrentPathname = useSetAtom(currentPathnameAtom);
+  const setCurrentUser = useSetAtom(currentUserAtom);
+  const setIsMaintenanceMode = useSetAtom(isMaintenanceModeAtom);
+
+  useEffect(() => {
+    setCurrentPathname(commonEachProps.currentPathname);
+  }, [commonEachProps.currentPathname, setCurrentPathname]);
+
+  useEffect(() => {
+    setCurrentUser(commonEachProps.currentUser);
+  }, [commonEachProps.currentUser, setCurrentUser]);
+
+  useEffect(() => {
+    setIsMaintenanceMode(commonEachProps.isMaintenanceMode);
+  }, [commonEachProps.isMaintenanceMode, setIsMaintenanceMode]);
 };

@@ -29,7 +29,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
 
     steps:
     - uses: actions/checkout@v4
@@ -65,7 +65,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
 
     steps:
     - uses: actions/checkout@v4
@@ -104,7 +104,7 @@ jobs:
 
     strategy:
       matrix:
-        node-version: [20.x]
+        node-version: [24.x]
 
     steps:
     - uses: actions/checkout@v4
@@ -142,7 +142,7 @@ jobs:
     - name: Assembling all dependencies
       run: |
         rm -rf out
-        pnpm deploy out --prod --filter @growi/pdf-converter
+        pnpm deploy out --prod --legacy --filter @growi/pdf-converter
         rm -rf apps/pdf-converter/node_modules && mv out/node_modules apps/pdf-converter/node_modules
 
     - name: pnpm run start:prod:ci

@@ -1,3 +1,4 @@
+import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import {
   addTrailingSlash,
   hasHeadingSlash,
@@ -25,6 +26,7 @@ const SUPPORTED_ATTRIBUTES = [
   'filter',
   'except',
   'isSharedPage',
+  GROWI_IS_CONTENT_RENDERING_ATTR,
 ];
 
 type DirectiveAttributes = Record<string, string>;

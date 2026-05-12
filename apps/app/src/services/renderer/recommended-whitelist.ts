@@ -3,9 +3,8 @@ import deepmerge from 'ts-deepmerge';
 
 type Attributes = typeof defaultSchema.attributes;
 
-type ExtractPropertyDefinition<T> = T extends Record<string, (infer U)[]>
-  ? U
-  : never;
+type ExtractPropertyDefinition<T> =
+  T extends Record<string, (infer U)[]> ? U : never;
 
 type PropertyDefinition = ExtractPropertyDefinition<NonNullable<Attributes>>;
 

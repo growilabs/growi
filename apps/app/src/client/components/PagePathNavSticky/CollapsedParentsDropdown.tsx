@@ -7,7 +7,7 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import type LinkedPagePath from '~/models/linked-page-path';
+import type { LinkedPagePath } from '~/models/linked-page-path';
 
 import styles from './CollapsedParentsDropdown.module.scss';
 
@@ -47,11 +47,7 @@ export const CollapsedParentsDropdown = (props: Props): JSX.Element => {
       >
         {ancestorPathAndPathNames.map((data) => (
           <DropdownItem key={data.path}>
-            <Link href={data.path} legacyBehavior>
-              <a role="menuitem" href={data.path}>
-                {data.pathName}
-              </a>
-            </Link>
+            <Link href={data.path}>{data.pathName}</Link>
           </DropdownItem>
         ))}
       </DropdownMenu>

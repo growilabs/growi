@@ -1,40 +1,40 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 @use '@growi/ui/scss/atoms/btn-muted';
 
-.revision-compare :global {
-  .revision-compare-container {
+.revision-compare {
+  :global(.revision-compare-container) {
     min-height: 100px;
 
-    &.nodiff {
+    &:global(.nodiff) {
       display: flex;
       align-items: center;
       justify-content: center;
     }
   }
-  .d2h-file-header {
+  :global(.d2h-file-header) {
     display: none;
   }
 
-  .grw-copy-dropdown {
-    .btn.btn-copy {
+  :global(.grw-copy-dropdown) {
+    :global(.btn.btn-copy) {
       @include btn-muted.colorize(bs.$gray-500);
     }
 
-    .dropdown-menu {
+    :global(.dropdown-menu) {
       min-width: 310px;
 
-      .dropdown-header {
+      :global(.dropdown-header) {
         margin-bottom: 0.5em;
         font-size: 1.1em;
       }
 
       // unset active styles
-      .dropdown-item:active {
+      :global(.dropdown-item:active) {
         color: unset;
         background-color: unset;
       }
 
-      .card {
+      :global(.card) {
         font-size: 0.7em;
         word-break: break-all;
       }

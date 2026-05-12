@@ -1,37 +1,35 @@
-.lsx :global {
+.lsx {
   // workaround
   // https://stackoverflow.com/a/57667536
-  .lsx-blink {
-    & :local {
-      animation: lsx-fade-in 1s ease 0s infinite alternate;
-    }
+  :global(.lsx-blink) {
+    animation: lsx-fade-in 1s ease 0s infinite alternate;
   }
 
-  .lsx-load-more-row {
+  :global(.lsx-load-more-row) {
     opacity: .5;
 
-    .start-items-label {
+    :global(.start-items-label) {
       display: none;
     }
-    .btn-load-more {
+    :global(.btn-load-more) {
       border-right-style: hidden;
       border-bottom-style: hidden;
       border-left-style: hidden;
       border-radius: 0;
     }
   }
-  .lsx-load-more-row:hover {
+  :global(.lsx-load-more-row:hover) {
     opacity: 1;
 
-    .start-items-label {
+    :global(.start-items-label) {
       display: inline;
     }
-    .btn-load-more {
+    :global(.btn-load-more) {
       border-style: solid;
     }
   }
 
-  .lsx-load-more-container {
+  :global(.lsx-load-more-container) {
     max-width: 250px;
     border-top: 1px black;
   }

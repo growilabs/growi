@@ -162,7 +162,7 @@ export class RegisterService
       await this.insertOrderRecord(authorizeResult, interactionPayloadAccessor);
     } catch (err) {
       if (err instanceof InvalidUrlError) {
-        logger.error('Failed to register:\n', err);
+        logger.error({ err }, 'Failed to register:');
         await respond(interactionPayloadAccessor.getResponseUrl(), {
           text: 'Invalid URL',
           blocks: [markdownSectionBlock('Please enter a valid URL')],

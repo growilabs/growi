@@ -1,14 +1,14 @@
 @use '@growi/core-styles/scss/bootstrap/init' as bs;
 
-.card-timeline :global {
+.card-timeline {
   margin-bottom: 3rem;
   border: 1px solid bs.$gray-300;
 
-  .card-header {
+  :global(.card-header) {
     background-color: bs.$gray-300;
   }
 
-  .card-body {
+  :global(.card-body) {
     min-height: 15vh;
   }
 }

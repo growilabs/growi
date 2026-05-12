@@ -28,6 +28,9 @@ type Props = CodeMirrorEditorProps & {
   enableCollaboration?: boolean;
   enableUnifiedMergeView?: boolean;
   onEditorsUpdated?: (clientList: EditingClient[]) => void;
+  onScrollToRemoteCursorReady?: (
+    scrollFn: ((clientId: number) => void) | null,
+  ) => void;
 };
 
 export const CodeMirrorEditorMain = (props: Props): JSX.Element => {
@@ -39,6 +42,7 @@ export const CodeMirrorEditorMain = (props: Props): JSX.Element => {
     cmProps,
     onSave,
     onEditorsUpdated,
+    onScrollToRemoteCursorReady,
     ...otherProps
   } = props;
 
@@ -50,6 +54,7 @@ export const CodeMirrorEditorMain = (props: Props): JSX.Element => {
     user,
     pageId,
     onEditorsUpdated,
+    onScrollToRemoteCursorReady,
     reviewMode: enableUnifiedMergeView,
   });
 

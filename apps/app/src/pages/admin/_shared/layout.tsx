@@ -28,10 +28,7 @@ export function createAdminPageLayout<P extends AdminCommonProps>(
           : options.title;
       const title = useCustomTitle(rawTitle);
 
-      const factories = useMemo(
-        () => options.containerFactories ?? [],
-        [options.containerFactories],
-      );
+      const factories = useMemo(() => options.containerFactories ?? [], []);
       const containers = useUnstatedContainers(factories);
 
       return (

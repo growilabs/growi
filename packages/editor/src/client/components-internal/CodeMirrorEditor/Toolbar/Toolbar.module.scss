@@ -1,8 +1,33 @@
-.codemirror-editor-toolbar :global {
-  @import './scss/toolbar-button';
+// border
+.codemirror-editor-toolbar {
+  :global(.btn-toolbar-button) {
+    --bs-btn-border-width: 0;
+  }
+}
 
-  // center the toolbar vertically
-  .simplebar-offset {
+// size
+.codemirror-editor-toolbar {
+  :global(.btn-toolbar-button) {
+    --bs-btn-padding-x: 0;
+    --bs-btn-padding-y: 0;
+
+    width: 24px !important;
+    height: 24px !important;
+  }
+}
+
+// center the icon
+.codemirror-editor-toolbar {
+  :global(.btn-toolbar-button) {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+}
+
+// center the toolbar vertically
+.codemirror-editor-toolbar {
+  :global(.simplebar-offset) {
     display: flex;
     align-items: center;
   }

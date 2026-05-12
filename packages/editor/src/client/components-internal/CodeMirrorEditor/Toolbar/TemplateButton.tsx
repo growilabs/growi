@@ -1,4 +1,6 @@
-import { type JSX, useCallback } from 'react';
+import { type JSX, useCallback, useId } from 'react';
+import { useTranslation } from 'react-i18next';
+import { UncontrolledTooltip } from 'reactstrap';
 
 import { useTemplateModalActions } from '../../../../states/modal/template';
 import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
@@ -9,6 +11,10 @@ type Props = {
 
 export const TemplateButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
+
+  const id = useId();
+  const { t } = useTranslation('translation');
+
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
   const { open: openTemplateModal } = useTemplateModalActions();
 
@@ -23,13 +29,19 @@ export const TemplateButton = (props: Props): JSX.Element => {
   }, [codeMirrorEditor?.view, openTemplateModal]);
 
   return (
-    <button
-      type="button"
-      className="btn btn-toolbar-button"
-      onClick={onClickTempleteButton}
-      data-testid="open-template-button"
-    >
-      <span className="material-symbols-outlined fs-5">file_copy</span>
-    </button>
+    <>
+      <button
+        id={id}
+        type="button"
+        className="btn btn-toolbar-button"
+        onClick={onClickTempleteButton}
+        data-testid="open-template-button"
+      >
+        <span className="material-symbols-outlined fs-5">file_copy</span>
+      </button>
+      <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
+        {t('toolbar.template')}
+      </UncontrolledTooltip>
+    </>
   );
 };

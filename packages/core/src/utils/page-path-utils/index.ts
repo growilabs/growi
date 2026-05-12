@@ -1,5 +1,3 @@
-import escapeStringRegexp from 'escape-string-regexp';
-
 import { isValidObjectId } from '../objectid-utils';
 import { addTrailingSlash } from '../path-utils';
 import { isTopPage as _isTopPage } from './is-top-page';
@@ -149,7 +147,7 @@ export const convertToNewAffiliationPath = (
   if (newPath == null) {
     throw new Error('Please input the new page path');
   }
-  const pathRegExp = new RegExp(`^${escapeStringRegexp(oldPath)}`, 'i');
+  const pathRegExp = new RegExp(`^${RegExp.escape(oldPath)}`, 'i');
   return childPath.replace(pathRegExp, newPath);
 };
 
@@ -239,8 +237,8 @@ export const isEitherOfPathAreaOverlap = (
   const path1WithSlash = addTrailingSlash(path1);
   const path2WithSlash = addTrailingSlash(path2);
 
-  const path1Area = new RegExp(`^${escapeStringRegexp(path1WithSlash)}`, 'i');
-  const path2Area = new RegExp(`^${escapeStringRegexp(path2WithSlash)}`, 'i');
+  const path1Area = new RegExp(`^${RegExp.escape(path1WithSlash)}`, 'i');
+  const path2Area = new RegExp(`^${RegExp.escape(path2WithSlash)}`, 'i');
 
   if (path1Area.test(path2) || path2Area.test(path1)) {
     return true;
@@ -266,10 +264,7 @@ export const isPathAreaOverlap = (
 
   const pathWithSlash = addTrailingSlash(pathToTest);
 
-  const pathAreaToTest = new RegExp(
-    `^${escapeStringRegexp(pathWithSlash)}`,
-    'i',
-  );
+  const pathAreaToTest = new RegExp(`^${RegExp.escape(pathWithSlash)}`, 'i');
   if (pathAreaToTest.test(pathToBeTested)) {
     return true;
   }

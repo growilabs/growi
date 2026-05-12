@@ -27,7 +27,10 @@ export const parserForApiToken = async (
     return;
   }
 
-  logger.debug('accessToken is', accessToken);
+  logger.debug(
+    { accessToken: `${accessToken.slice(0, 4)}...${accessToken.slice(-4)}` },
+    'accessToken is',
+  );
 
   const User = mongoose.model<HydratedDocument<IUser>, { findUserByApiToken }>(
     'User',

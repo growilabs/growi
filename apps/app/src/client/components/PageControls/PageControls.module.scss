@@ -3,16 +3,16 @@
 @use './button-styles';
 
 // PageItemControl styles
-.grw-page-controls :global {
-  .btn-page-item-control {
+.grw-page-controls {
+  :global(.btn-page-item-control) {
     @extend %btn-basis;
   }
 }
 
 // == Colors
 // PageItemControl colors
-.grw-page-controls :global {
-  .btn-page-item-control {
+.grw-page-controls {
+  :global(.btn-page-item-control) {
     @include btn-muted.colorize(bs.$gray-500);
   }
 }

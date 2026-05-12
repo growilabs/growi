@@ -70,11 +70,11 @@ const add: Add = async function (
       commentPosition,
       replyTo,
     });
-    logger.debug('Comment saved.', data);
+    logger.debug({ data }, 'Comment saved.');
 
     return data;
   } catch (err) {
-    logger.debug('Error on saving comment.', err);
+    logger.debug({ err }, 'Error on saving comment.');
     throw err;
   }
 };

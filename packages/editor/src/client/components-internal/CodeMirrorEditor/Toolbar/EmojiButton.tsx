@@ -1,10 +1,23 @@
-import { type CSSProperties, type JSX, useCallback, useState } from 'react';
-import emojiData from '@emoji-mart/data';
-import Picker from '@emoji-mart/react';
-import { Modal } from 'reactstrap';
+import {
+  type ComponentType,
+  type CSSProperties,
+  type JSX,
+  useCallback,
+  useEffect,
+  useId,
+  useState,
+} from 'react';
+import { useTranslation } from 'react-i18next';
+import { Modal, UncontrolledTooltip } from 'reactstrap';
 
 import { useResolvedTheme } from '../../../../states/ui/resolved-theme';
 import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
+
+type PickerProps = {
+  onEmojiSelect: (emoji: { shortcodes: string }) => void;
+  theme: string | undefined;
+  data: unknown;
+};
 
 type Props = {
   editorKey: string;
@@ -13,11 +26,26 @@ type Props = {
 export const EmojiButton = (props: Props): JSX.Element => {
   const { editorKey } = props;
 
+  const id = useId();
+  const { t } = useTranslation('translation');
+
   const [isOpen, setIsOpen] = useState(false);
+  const [Picker, setPicker] = useState<ComponentType<PickerProps> | null>(null);
+  const [emojiData, setEmojiData] = useState<unknown>(null);
 
   const { data: codeMirrorEditor } = useCodeMirrorEditorIsolated(editorKey);
   const resolvedTheme = useResolvedTheme();
-  const toggle = useCallback(() => setIsOpen(!isOpen), [isOpen]);
+  const toggle = useCallback(() => setIsOpen((prev) => !prev), []);
+
+  useEffect(() => {
+    if (!isOpen || Picker != null) return;
+    Promise.all([import('@emoji-mart/react'), import('@emoji-mart/data')]).then(
+      ([pickerMod, dataMod]) => {
+        setPicker(() => pickerMod.default as ComponentType<PickerProps>);
+        setEmojiData(dataMod.default);
+      },
+    );
+  }, [isOpen, Picker]);
 
   const selectEmoji = useCallback(
     (emoji: { shortcodes: string }): void => {
@@ -66,10 +94,18 @@ export const EmojiButton = (props: Props): JSX.Element => {
 
   return (
     <>
-      <button type="button" className="btn btn-toolbar-button" onClick={toggle}>
+      <button
+        id={id}
+        type="button"
+        className="btn btn-toolbar-button"
+        onClick={toggle}
+      >
         <span className="material-symbols-outlined fs-5">emoji_emotions</span>
       </button>
-      {isOpen && (
+      <UncontrolledTooltip placement="top" target={CSS.escape(id)}>
+        {t('toolbar.emoji')}
+      </UncontrolledTooltip>
+      {isOpen && Picker != null && emojiData != null && (
         <div className="mb-2 d-none d-md-block">
           <Modal
             isOpen={isOpen}

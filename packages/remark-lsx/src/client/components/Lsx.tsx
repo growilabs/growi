@@ -1,4 +1,5 @@
 import React, { type JSX, useCallback, useMemo } from 'react';
+import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 
 import { useSWRxLsx } from '../stores/lsx';
@@ -149,7 +150,10 @@ const LsxSubstance = React.memo(
     }, [data, setSize]);
 
     return (
-      <div className={`lsx ${styles.lsx}`}>
+      <div
+        className={`lsx ${styles.lsx}`}
+        {...{ [GROWI_IS_CONTENT_RENDERING_ATTR]: isLoading ? 'true' : 'false' }}
+      >
         <ErrorMessage />
         <Loading />
         {contents}
