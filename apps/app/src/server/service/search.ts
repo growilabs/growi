@@ -489,9 +489,13 @@ class SearchService implements SearchQueryParser, SearchResolver {
       }
 
       // https://regex101.com/r/pN9XfK/1
-      const matchNegative = word.match(/^-(prefix:|tag:)?(.+)$/);
+      const matchNegative = word.match(
+        /^-(prefix:|tag:|author:|editor:|group:)?(.+)$/,
+      );
       // https://regex101.com/r/3qw9FQ/1
-      const matchPositive = word.match(/^(prefix:|tag:)?(.+)$/);
+      const matchPositive = word.match(
+        /^(prefix:|tag:|author:|editor:|group:)?(.+)$/,
+      );
 
       if (matchNegative != null) {
         if (matchNegative[1] === 'prefix:') {
@@ -514,7 +518,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
           tags.push(matchPositive[2]);
         } else if (matchPositive[1] === 'author:') {
           authors.push(matchPositive[2]);
-        } else if (matchPositive[1] === 'editor') {
+        } else if (matchPositive[1] === 'editor:') {
           editors.push(matchPositive[2]);
         } else if (matchPositive[1] === 'group:') {
           groups.push(matchPositive[2]);
