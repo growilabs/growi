@@ -54,6 +54,7 @@ describe('ContributionAggregationService (Essential)', () => {
     const results = await service.runAggregationPipeline({
       userId: userId.toString(),
       startDate: new Date('2025-11-01T00:00:00Z'),
+      endDate: new Date(),
     });
 
     // Assert: Verify the final outcome
@@ -89,6 +90,7 @@ describe('ContributionAggregationService (Essential)', () => {
     const results = await service.runAggregationPipeline({
       userId: userId.toString(),
       startDate: new Date('2025-11-01T00:00:00Z'),
+      endDate: new Date(),
     });
 
     expect(results).toHaveLength(1);
@@ -127,6 +129,7 @@ describe('ContributionAggregationService (Essential)', () => {
     const results = await service.runAggregationPipeline({
       userId: userId.toString(),
       startDate: new Date('2026-03-23T00:00:00Z'),
+      endDate: new Date(),
     });
 
     // We expect two distinct entries in the results

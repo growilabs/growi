@@ -19,12 +19,14 @@ export const migrateContributions = async (userId: string) => {
   const activityExpirySeconds =
     configManager.getConfig('app:activityExpirationSeconds') ?? 2592000;
   const startDate = new Date(Date.now() - activityExpirySeconds * 1000);
+  const endDate = new Date();
 
   // Aggregate all Activity documents that counts as contributions
   const activityContributions =
     await contributionAggregationService.runAggregationPipeline({
       userId,
       startDate,
+      endDate,
     });
 
   const contributions: IContribution[] = activityContributions.map(
