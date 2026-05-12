@@ -116,6 +116,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     if (this.isConfigured) {
       this.fullTextSearchDelegator.init();
       this.registerUpdateEvent();
+      this.registerAuditlogUpdateEvent();
     }
   }
 
@@ -265,6 +266,22 @@ class SearchService implements SearchQueryParser, SearchResolver {
     commentEvent.on(
       CommentEvent.DELETE,
       this.fullTextSearchDelegator.syncCommentChanged.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+  }
+
+  registerAuditlogUpdateEvent() {
+    const activityEvent = this.crowi.events.activity;
+    activityEvent.on(
+      'created',
+      this.fullTextSearchDelegator.updateOrInsertAuditlog.bind(
+        this.fullTextSearchDelegator,
+      ),
+    );
+    activityEvent.on(
+      'updated',
+      this.fullTextSearchDelegator.updateOrInsertAuditlog.bind(
         this.fullTextSearchDelegator,
       ),
     );
