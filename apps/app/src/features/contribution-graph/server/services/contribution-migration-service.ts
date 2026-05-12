@@ -1,6 +1,7 @@
+import mongoose from 'mongoose';
+
 import { configManager } from '~/server/service/config-manager';
 
-import type { IContribution } from '../../interfaces/contribution';
 import Contribution from '../models/contribution-model';
 import { ContributionAggregationService } from './aggregation-service';
 
@@ -10,7 +11,7 @@ const contributionAggregationService = new ContributionAggregationService();
  * Migrates Activity documents that counts as contribution into Contribution documents.
  */
 export const migrateContributions = async (userId: string) => {
-  if (userId == null) {
+  if (userId == null || !mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error(
       'User ID invalid: Could not perform contribution migration',
     );
@@ -22,20 +23,20 @@ export const migrateContributions = async (userId: string) => {
   const endDate = new Date();
 
   // Aggregate all Activity documents that counts as contributions
-  const activityContributions =
+  const contributions =
     await contributionAggregationService.runAggregationPipeline({
       userId,
       startDate,
       endDate,
     });
 
-  const contributions: IContribution[] = activityContributions.map(
-    (activity) => ({
-      user: userId,
-      date: new Date(activity.date),
-      count: activity.count,
-    }),
+  await Contribution.bulkWrite(
+    contributions.map((c) => ({
+      updateOne: {
+        filter: { user: userId, date: c.date },
+        update: { $inc: { count: c.count } },
+        upsert: true,
+      },
+    })),
   );
-
-  await Contribution.insertMany(contributions);
 };
