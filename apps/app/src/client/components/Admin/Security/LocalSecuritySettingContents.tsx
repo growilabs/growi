@@ -219,7 +219,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
               />
               {errors.registrationWhitelist && (
                 <div className="invalid-feedback">
-                  {errors.registrationWhitelist.message}
+                  {errors.registrationWhitelist.message?.toString()}
                 </div>
               )}
               <p className="form-text text-muted small">
