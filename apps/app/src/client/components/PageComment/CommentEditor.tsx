@@ -21,6 +21,7 @@ import { useTranslation } from 'next-i18next';
 import { TabContent, TabPane } from 'reactstrap';
 
 import { uploadAttachments } from '~/client/services/upload-attachments';
+import { apiv3Get } from '~/client/util/apiv3-client';
 import { toastError } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
 import { useCurrentPagePath } from '~/states/page';
@@ -239,17 +240,18 @@ export const CommentEditor = (props: CommentEditorProps): JSX.Element => {
   const fetchUsers = useMemo<FetchUsersFn>(() => {
     return async (query: string) => {
       try {
-        const res = await fetch(
-          `/_api/v3/users/?searchText=${encodeURIComponent(query)}&sort=username&sortOrder=asc&page=1`,
-        );
-        if (!res.ok) return [];
-        const data = await res.json();
-        return (data.paginateResult?.docs ?? []).map(
-          (user: { username: string; name: string }) => ({
-            username: user.username,
-            name: user.name,
-          }),
-        );
+        const res = await apiv3Get<{
+          paginateResult: { docs: { username: string; name: string }[] };
+        }>('/users/', {
+          searchText: query,
+          sort: 'username',
+          sortOrder: 'asc',
+          page: 1,
+        });
+        return (res.data.paginateResult?.docs ?? []).map((user) => ({
+          username: user.username,
+          name: user.name,
+        }));
       } catch {
         return [];
       }
