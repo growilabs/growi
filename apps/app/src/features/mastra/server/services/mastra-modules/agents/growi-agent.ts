@@ -6,7 +6,7 @@ import { getOpenaiProvider } from '../../ai-sdk-modules/get-openai-provider';
 import { memory } from '../memory';
 import { fileSearchTool } from '../tools/file-search-tool';
 
-const model = configManager.getConfig('openai:assistantModel:chat');
+const model = configManager.getConfig('openai:assistantModel:mastraAgent');
 
 export const growiAgent = new Agent({
   id: 'growiAgent',
@@ -19,21 +19,6 @@ export const growiAgent = new Agent({
   - Use the fileSearch tool when the question relates to the user's wiki content.
   - Keep answers concise and well-structured with headings, lists, and links where helpful.
   `,
-
-  //TODO:  https://redmine.weseek.co.jp/issues/182496
-  //  instructions: `You are an AI assistant that shows detailed reasoning.
-
-  // # CRITICAL INSTRUCTION
-  // - ALWAYS RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT.
-
-  // For every response, structure your thinking as:
-  // 1. ANALYSIS: What information do I need? What tools should I use?
-  // 2. TOOL EXECUTION: Execute necessary tools with clear reasoning
-  // 3. SYNTHESIS: How do the tool results answer the question?
-  // 4. CONCLUSION: Final answer based on evidence
-
-  // Always use the structured output format to organize your reasoning.
-  // `,
 
   model: getOpenaiProvider()(model),
   tools: { fileSearchTool },

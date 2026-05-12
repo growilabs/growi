@@ -11,7 +11,6 @@ import {
 } from 'ai';
 import type { Request, RequestHandler } from 'express';
 import { body, type ValidationChain } from 'express-validator';
-import { z } from 'zod';
 
 import AiAssistantModel from '~/features/openai/server/models/ai-assistant';
 import { getOpenaiService } from '~/features/openai/server/services/openai';
@@ -39,18 +38,6 @@ type Req = Request<undefined, Response, ReqBody> & {
 type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
 
 const requestContext = new RequestContext<{ vectorStoreId: string }>();
-
-//TODO:  https://redmine.weseek.co.jp/issues/182496
-// const reasoningSchema = z.object({
-//   thoughtProcess: z.array(
-//     z.object({
-//       step: z.string(),
-//       reasoning: z.string(),
-//       conclusion: z.string(),
-//     }),
-//   ),
-//   finalAnswer: z.string(),
-// });
 
 export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   crowi,
@@ -129,20 +116,31 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
       try {
         const stream = await growiAgent.stream(messages, {
-          // structuredOutput: {
-          //   schema: reasoningSchema,
-          // },
           requestContext,
           memory: {
             thread: thread.id,
             resource: thread.resourceId,
           },
+          // Configure the OpenAI Responses API to emit reasoning summary
+          // chunks. Reasoning is always executed (and billed) for reasoning
+          // models; this option controls only whether the summary text is
+          // surfaced to the UI.
+          //
+          // Important: surfacing reasoning summary requires a verified OpenAI
+          // organization. Without verification, summary parts are emitted as
+          // empty (`reasoning-start` / `reasoning-end` only, no delta), so
+          // the UI shows the trigger but no body.
+          //
+          // `effort: 'low'` bounds reasoning-token volume for cost; raise it
+          // when richer reasoning depth is desired (also tends to produce
+          // fuller summaries when verification is in place).
+          providerOptions: {
+            openai: {
+              reasoningEffort: 'low',
+              reasoningSummary: 'auto',
+            },
+          },
         });
-
-        // debug: log all chunks from the full stream
-        // for await (const chunk of stream.fullStream) {
-        //   console.log(chunk);
-        // }
 
         // Use pipeUIMessageStreamToResponse for Express servers
         // Express requires piping to ServerResponse object, not returning Web API Response
@@ -154,8 +152,14 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             // Workaround for https://github.com/mastra-ai/mastra/issues/11884#issuecomment-3799153269
             // toAISdkStream() returns a ReadableStream that lacks [Symbol.asyncIterator]
             // in the TypeScript types, so iterate manually via a reader.
-            const reader = toAISdkStream(stream, { from: 'agent' }).getReader();
+            const reader = toAISdkStream(stream, {
+              from: 'agent',
+              version: 'v6',
+              sendReasoning: true,
+            }).getReader();
+
             while (true) {
+              // biome-ignore lint/performance/noAwaitInLoops: necessary to read stream sequentially
               const { value, done } = await reader.read();
               if (done) break;
               writer.write(value);
