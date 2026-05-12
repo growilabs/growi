@@ -1,7 +1,5 @@
 import { expect, test } from '@playwright/test';
 
-import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUntilContains';
-
 test('Presentation', async ({ page }) => {
   await page.goto('/');
 
@@ -23,20 +21,32 @@ test('Slide page (slide: true frontmatter) renders without crashing', async ({
 }) => {
   await page.goto('/Sandbox/slide-test');
 
-  // create slide content
+  // open the editor
   await page.getByTestId('editor-button').click();
   await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
-  await appendTextToEditorUntilContains(
-    page,
-    '---\nslide: true\n---\n# Slide 1\n---\n# Slide 2',
-  );
+
+  // fill the editor with slide content
+  await page
+    .locator('.cm-content')
+    .fill('---\nslide: true\n---\n# Slide 1\n---\n# Slide 2');
+
+  // The editor preview must finish rendering both slides through the marpit
+  // pipeline before saving — this is the slide-mode observable contract and
+  // also proves the preview did not crash on slide content.
+  const previewSlides = page
+    .getByTestId('page-editor-preview-body')
+    .locator('svg[data-marpit-svg]');
+  await expect(previewSlides).toHaveCount(2);
+
+  // save
   await page.keyboard.press('Control+s');
 
-  // verify slide view renders
+  // view mode must render the slide deck after save
   await page.getByTestId('view-button').click();
   await expect(page.locator('.slides')).toBeVisible();
 
-  // reload to verify SWR loading path does not crash
+  // reload exercises the SWR loading path where rendererOptions is briefly
+  // undefined; the slide page must still render without crashing.
   await page.reload();
   await expect(page.locator('.slides')).toBeVisible();
 });
