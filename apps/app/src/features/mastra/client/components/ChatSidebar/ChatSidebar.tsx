@@ -262,7 +262,7 @@ export const ChatSidebar = (): JSX.Element => {
                   value={input}
                 />
               </PromptInputBody>
-              <PromptInputFooter>
+              <PromptInputFooter className="tw:justify-end">
                 <PromptInputSubmit
                   disabled={!input && !status}
                   status={status}
