@@ -9,6 +9,7 @@ import { ContributionGraphActions } from '../../interfaces/supported-actions';
 export interface PipelineParams {
   userId: string;
   startDate: Date;
+  endDate: Date;
 }
 
 export class ContributionAggregationService {
@@ -22,8 +23,7 @@ export class ContributionAggregationService {
   }
 
   public buildPipeline(params: PipelineParams): PipelineStage[] {
-    const { userId, startDate } = params;
-    const endDate = new Date();
+    const { userId, startDate, endDate } = params;
 
     return [
       {

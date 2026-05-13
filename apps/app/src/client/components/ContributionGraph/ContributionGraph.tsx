@@ -36,9 +36,9 @@ export const ContributionGraph = ({ userId }: { userId: string }) => {
   return (
     <div className={styles['contribution-box']}>
       <div className={styles['month-labels']} style={{ marginLeft: '32px' }}>
-        {monthLabels.map((label, i) => (
+        {monthLabels.map((label) => (
           <span
-            key={`${label.month}-${i}`}
+            key={`${label.month}-${label.index}`}
             style={{ gridColumnStart: label.index + 1 }}
           >
             {label.month}
