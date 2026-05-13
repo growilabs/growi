@@ -207,6 +207,7 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
                   validate: (value) => {
                     const invalid = value
                       .split('\n')
+                      .map((e: string) => e.trim())
                       .filter(
                         (e: string) => e !== '' && !isValidWhitelistEntry(e),
                       );

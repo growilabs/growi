@@ -78,7 +78,9 @@ const validator = {
     body('registrationWhitelist')
       .if((value) => value != null)
       .isArray()
-      .customSanitizer((value) => value.filter((entry) => entry !== ''))
+      .customSanitizer((value) =>
+        value.map((entry) => entry.trim()).filter((entry) => entry !== ''),
+      )
       .custom((entries) => {
         if (!entries.every(isValidWhitelistEntry)) {
           throw new Error(
