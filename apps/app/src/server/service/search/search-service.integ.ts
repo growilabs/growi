@@ -41,7 +41,7 @@ describe('SearchService test', () => {
     };
 
     dummyAliasOf =
-      'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
+      'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2 author:author1 -author:author2 editor:editor1 -editor:editor2 group:group1 -group:group2';
 
     // Check if named queries already exist
     const existingNQ1 = await NamedQuery.findOne({
@@ -61,7 +61,7 @@ describe('SearchService test', () => {
   describe('parseQueryString()', () => {
     it('should parse queryString', async () => {
       const queryString =
-        'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2';
+        'match -notmatch "phrase" -"notphrase" prefix:/pre1 -prefix:/pre2 tag:Tag1 -tag:Tag2 author:author1 -author:author2 editor:editor1 -editor:editor2 group:group1 -group:group2';
       const terms = await searchService.parseQueryString(queryString);
 
       const expected = {
@@ -74,6 +74,12 @@ describe('SearchService test', () => {
         not_prefix: ['/pre2'],
         tag: ['Tag1'],
         not_tag: ['Tag2'],
+        author: ['author1'],
+        not_author: ['author2'],
+        editor: ['editor1'],
+        not_editor: ['editor2'],
+        group: ['group1'],
+        not_group: ['group2'],
       };
 
       expect(terms).toStrictEqual(expected);
@@ -101,6 +107,12 @@ describe('SearchService test', () => {
           not_prefix: [],
           tag: [],
           not_tag: [],
+          author: [],
+          not_author: [],
+          editor: [],
+          not_editor: [],
+          group: [],
+          not_group: [],
         },
       };
 
@@ -125,6 +137,12 @@ describe('SearchService test', () => {
           not_prefix: ['/pre2'],
           tag: ['Tag1'],
           not_tag: ['Tag2'],
+          author: ['author1'],
+          not_author: ['author2'],
+          editor: ['editor1'],
+          not_editor: ['editor2'],
+          group: ['group1'],
+          not_group: ['group2'],
         },
       };
 
@@ -145,6 +163,12 @@ describe('SearchService test', () => {
           not_prefix: ['/pre2'],
           tag: ['Tag1'],
           not_tag: ['Tag2'],
+          author: ['author1'],
+          not_author: ['author2'],
+          editor: ['editor1'],
+          not_editor: ['editor2'],
+          group: ['group1'],
+          not_group: ['group2'],
         },
       };
 
@@ -170,6 +194,12 @@ describe('SearchService test', () => {
           not_prefix: [],
           tag: [],
           not_tag: [],
+          author: [],
+          not_author: [],
+          editor: [],
+          not_editor: [],
+          group: [],
+          not_group: [],
         },
       };
 

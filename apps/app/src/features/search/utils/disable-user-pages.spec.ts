@@ -25,6 +25,12 @@ describe('excludeUserPagesFromQuery()', () => {
       not_prefix: [],
       tag: [],
       not_tag: [],
+      author: [],
+      not_author: [],
+      editor: [],
+      not_editor: [],
+      group: [],
+      not_group: [],
     };
 
     excludeUserPagesFromQuery(query);
@@ -76,6 +82,12 @@ describe('excludeUserPagesFromQuery()', () => {
       not_prefix: [],
       tag: [],
       not_tag: [],
+      author: [],
+      not_author: [],
+      editor: [],
+      not_editor: [],
+      group: [],
+      not_group: [],
     };
 
     excludeUserPagesFromQuery(query);
@@ -118,6 +130,12 @@ describe('excludeUserPagesFromQuery()', () => {
       not_prefix: [],
       tag: [],
       not_tag: [],
+      author: [],
+      not_author: [],
+      editor: [],
+      not_editor: [],
+      group: [],
+      not_group: [],
     };
 
     excludeUserPagesFromQuery(query);
@@ -139,6 +157,12 @@ describe('excludeUserPagesFromQuery()', () => {
       not_prefix: [userString, userString],
       tag: [],
       not_tag: [],
+      author: [],
+      not_author: [],
+      editor: [],
+      not_editor: [],
+      group: [],
+      not_group: [],
     };
 
     excludeUserPagesFromQuery(query);
