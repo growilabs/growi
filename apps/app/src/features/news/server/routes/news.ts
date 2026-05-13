@@ -192,7 +192,7 @@ export const createNewsRouter = (crowi?: Crowi): express.Router => {
    */
   router.get(
     '/admin/delivery-setting',
-    accessTokenParser([SCOPE.WRITE.ADMIN.APP]),
+    accessTokenParser([SCOPE.READ.ADMIN.APP]),
     loginRequiredStrictly,
     adminRequired,
     (_req, res) => {
