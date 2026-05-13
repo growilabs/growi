@@ -12,7 +12,7 @@
 
 ### Goals
 
-- 外部フィード（`NEWS_FEED_URL`）を cron で定期取得し、MongoDB にキャッシュする
+- 外部フィード（コードにハードコードされた配信元 URL）を cron で定期取得し、MongoDB にキャッシュする
 - InAppNotification パネルで通知とニュースを統合表示する
 - ニュースの既読/未読状態をユーザー単位で管理する
 - ロール別表示制御（admin/general）をサーバーサイドで強制する
@@ -75,7 +75,7 @@ graph TB
 | Layer | 選択 / バージョン | 役割 |
 |---|---|---|
 | Backend Cron | node-cron（既存） | フィード定期取得スケジューリング |
-| Backend HTTP | node `fetch` / axios（既存） | `NEWS_FEED_URL` から feed.json 取得 |
+| Backend HTTP | node `fetch` / axios（既存） | コードに内蔵された配信元 URL から feed.json 取得 |
 | Data Store | MongoDB + Mongoose（既存） | NewsItem, NewsReadStatus の永続化 |
 | Frontend Data | SWR `useSWRInfinite`（既存） | ニュース・通知の無限スクロール取得 |
 | Frontend State | React `useState`（既存パターン） | フィルタタブ・未読トグルのローカル state |
@@ -94,7 +94,7 @@ sequenceDiagram
   participant DB as MongoDB
 
   Cron->>Cron: getCronSchedule() = '0 0 * * *'（midnight 起動）
-  Cron->>Cron: NEWS_FEED_URL 未設定? → スキップ
+  Cron->>Cron: configManager.getConfig('news:isDeliveryEnabled') が false? → スキップ
   Cron->>Cron: randomSleep（0–5 時間）でリクエスト時刻を分散
   Cron->>Feed: HTTP GET feed.json
   alt 取得失敗
@@ -170,11 +170,13 @@ sequenceDiagram
 
 | コンポーネント | 層 | Intent | 要件 | 主要依存 |
 |---|---|---|---|---|
-| NewsCronService | Server / Cron | フィード定期取得・DB 同期 | 1.1–1.7 | CronService (P0), NewsService (P0) |
+| NewsCronService | Server / Cron | フィード定期取得・DB 同期 | 1.1–1.7, 9.5, 9.6 | CronService (P0), NewsService (P0), configManager (P0) |
 | NewsItem Model | Server / Data | ニュースアイテムの永続化 | 2.1–2.4 | MongoDB (P0) |
 | NewsReadStatus Model | Server / Data | ユーザー既読状態の永続化 | 3.1–3.3 | MongoDB (P0) |
 | NewsService | Server / Domain | ニュース一覧・既読管理のビジネスロジック | 3.4–3.5, 4.1–4.2 | NewsItem Model (P0), NewsReadStatus Model (P0) |
 | News API | Server / API | HTTP エンドポイント提供 | 3.1–3.5, 4.1–4.2 | NewsService (P0) |
+| News Delivery Config | Server / Config | 配信フラグ `news:isDeliveryEnabled` の登録（DB 主体、defaultValue: true） | 9.1, 9.2 | configManager (P0) |
+| App Settings UI（拡張） | Client / Admin | `/admin/app` UI から配信フラグを切り替える | 9.3, 9.4 | News Delivery Config (P0), 既存 `app-settings` API (P0) |
 
 ---
 
@@ -187,7 +189,8 @@ sequenceDiagram
 
 **Responsibilities & Constraints**
 - 毎日 0 時に発火し、ランダムスリープで実取得時刻を 0–5 時に分散させる（cron 起動 `'0 0 * * *'` + `randomSleep(0–5h)`）
-- `NEWS_FEED_URL` 未設定時はスキップ（エラーなし）
+- **配信フラグ判定**：cron 発火ごとに `configManager.getConfig('news:isDeliveryEnabled')` を読み、`false` ならフィード取得をスキップ（再起動不要、次回 tick から即時反映）
+- **配信元 URL はコードにハードコード**（`https://growilabs.github.io/growi-news-feed/feed.json`）。env による上書き経路は持たず、ユーザー（admin 含む）・運用者ともに変更不可
 - 取得失敗時は既存 DB データを維持
 - `growiVersionRegExps` の照合はここで実施（DB には合致アイテムのみ保存）
 
@@ -197,13 +200,13 @@ sequenceDiagram
 **Dependencies**
 - Inbound: node-cron — スケジュール実行（P0）
 - Outbound: NewsService — upsert/delete（P0）
-- External: `NEWS_FEED_URL` の HTTP エンドポイント — feed.json 取得（P0）
+- External: 弊社管理の HTTP エンドポイント（コードに内蔵された URL） — feed.json 取得（P0）
 
 **Contracts**: Batch [x]
 
 ##### Batch / Job Contract
 - Trigger: `node-cron` スケジュール `'0 0 * * *'`（実取得は randomSleep を経て 0–5 時に分散）
-- Input: `NEWS_FEED_URL` 環境変数、GROWI バージョン文字列
+- Input: GROWI バージョン文字列（配信元 URL はコードに内蔵）
 - Output: MongoDB の NewsItem コレクションを最新フィードと同期
 - Idempotency: `externalId` ユニークインデックスにより冪等。再実行しても重複なし
 
@@ -219,7 +222,7 @@ const MAX_RANDOM_SLEEP_MS = 5 * 60 * 60 * 1000;  // 5 hours
 
 **Implementation Notes**
 - Integration: `server/service/cron.ts` の `CronService` を継承。`startCron()` をアプリ起動時に呼ぶ
-- Validation: `NEWS_FEED_URL` の URL 検証は以下のルールで行う。`https://` で始まる URL は常に許可。`http://localhost` または `http://127.0.0.1` で始まる URL はローカル開発用として許可。それ以外の `http://` は拒否する。`growiVersionRegExps` は try-catch で個別評価し、不正 regex はスキップ
+- Validation: 配信元 URL はコードにハードコードされており、ランタイムの URL 検証は不要（外部入力経路がない）。`growiVersionRegExps` は try-catch で個別評価し、不正 regex はスキップ
 - Risks: フィード取得タイムアウト（10秒推奨）。外部依存のため失敗を前提に設計する
 
 ---
@@ -388,6 +391,49 @@ GROWI の scope 階層は以下の意味論で運用する：
 - Integration: `apps/app/src/features/news/server/routes/news.ts` に新規作成。`createNewsRouter(crowi?: Crowi)` をエクスポートし、optional `Crowi` で受けてテスト時にミドルウェアを pass-through できる構造（型アサーションは使わない）
 - Validation: `newsItemId` は `mongoose.isValidObjectId()` で検証
 - Risks: ロールフィルタはサーバーサイドで強制。クライアントから `targetRoles` を受け取らない
+
+---
+
+#### News Delivery Config
+
+| Field | Detail |
+|---|---|
+| Intent | `news:isDeliveryEnabled` を configManager に登録し、cron／API／UI から共通で参照できるようにする |
+| Requirements | 9.1, 9.2 |
+
+**Responsibilities & Constraints**
+- `apps/app/src/server/service/config-manager/config-definition.ts` に CONFIG_KEYS と `defineConfig` の 2 箇所を追加
+- `defineConfig` パターンを踏襲しつつ、**`envVarName` を意図的に持たせない**（`defaultValue: true` のみ）。これにより env からの上書きを禁じ、admin UI 経由の DB 操作のみが ON/OFF を変えられる経路となる
+- `defaultValue: true` をコードに内蔵 → DB に値が無い状態で全顧客が ON
+- 値の優先順は configManager の既存仕様（DB > env > defaultValue）に従う
+
+**Dependencies**
+- Inbound: NewsCronService, App Settings UI
+- Outbound: configManager（既存）
+
+**Implementation Notes**
+- env 変数として一切暴露しないため `/admin` 環境変数一覧には決して現れない（DB 単独運用）
+- 開発時に強制的に値を変更したい場合は、ローカルで DB レコードを直接書き換えるか、コードを一時編集する
+- 設定変更時は configManager の `updateConfigs` がメモリキャッシュ更新と pubsub 通知（multi-pod 反映）を行う
+
+---
+
+#### App Settings UI（拡張）
+
+| Field | Detail |
+|---|---|
+| Intent | `/admin/app` 画面に「ニュース配信」ON/OFF トグルを追加する |
+| Requirements | 9.3, 9.4 |
+
+**Responsibilities & Constraints**
+- 既存 `app-settings` 画面・API（`PUT /apiv3/app-setting`）に項目を追加するパターンを踏襲
+- 認可：`accessTokenParser([SCOPE.WRITE.ADMIN.APP])` + `adminRequired` で admin のみに制限
+- トグル値の永続化先：`configManager.updateConfigs({ 'news:isDeliveryEnabled': boolean })`
+- UI 文言は i18n 対応（`ja_JP`, `en_US`, `zh_CN`, `ko_KR`, `fr_FR`）
+
+**Dependencies**
+- Inbound: 管理画面（admin user）
+- Outbound: News Delivery Config（configManager 経由）
 
 ---
 
@@ -654,7 +700,7 @@ interface INewsItemWithReadStatus {
 | カテゴリ | エラー | 対応 |
 |---|---|---|
 | Cron / External | フィード取得失敗（ネットワーク、タイムアウト） | `logger.error` + 既存 DB データ維持。次回 cron で再試行 |
-| Cron / Config | `NEWS_FEED_URL` 未設定 | スキップ（ログなし）。設定されるまで無害に動作 |
+| Cron / Config | `news:isDeliveryEnabled` が `false` | スキップ（debug ログ）。admin が再度 ON にするまで無害に停止 |
 | Cron / Validation | `growiVersionRegExps` に不正 regex | try-catch で該当アイテムをスキップ、`logger.warn` |
 | API / Auth | 未認証リクエスト | 401（`loginRequiredStrictly` が処理） |
 | API / Validation | 不正な `newsItemId` フォーマット | 400（`mongoose.isValidObjectId()` チェック） |
@@ -671,7 +717,7 @@ interface INewsItemWithReadStatus {
 
 ### Unit Tests
 
-- `NewsCronService.executeJob()`: 正常取得 → upsert、取得失敗 → DB 変更なし、`NEWS_FEED_URL` 未設定 → スキップ
+- `NewsCronService.executeJob()`: 正常取得 → upsert、取得失敗 → DB 変更なし、`news:isDeliveryEnabled` が `false` → スキップ
 - `NewsCronService.executeJob()`: `growiVersionRegExps` 一致 → 保存、不一致 → 除外
 - `NewsService.listForUser()`: `targetRoles` フィルタ（admin のみ、general 除外）
 - `NewsService.listForUser()`: `onlyUnread=true` で未読のみ返す
@@ -698,7 +744,7 @@ interface INewsItemWithReadStatus {
 - すべての `/apiv3/news/*` エンドポイントに `loginRequiredStrictly` を適用する
 - アクセストークン用 scope は **`features.in_app_notification`** を使用する（read / write）。設定 CRUD 用の `user_settings.in_app_notification` とはセマンティクスが異なるため流用しない。アクセストークン発行時にユーザーが意図した粒度でアクセスを許可できるようにする
 - `conditions.targetRoles` のフィルタリングはサーバーサイドの `NewsService.listForUser()` で強制する。クライアントから `targetRoles` パラメータを受け付けない
-- `NEWS_FEED_URL` は `https://` で始まる URL は常に許可。`http://localhost` または `http://127.0.0.1` で始まる URL はローカル開発用として許可。それ以外の `http://` は拒否する
+- 配信元 URL はコードにハードコードされており、ランタイムで変更できる経路を持たない。env 変数による上書きもサポートしない
 - フィードから取得したデータはそのまま DB に保存し、クライアントへのレスポンス時に Mongoose スキーマで型安全に扱う
 
 ## Performance & Scalability

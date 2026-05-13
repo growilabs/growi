@@ -4,6 +4,12 @@ const mocks = vi.hoisted(() => {
   const deleteItemsNotInFeed = vi.fn();
   const mockFetch = vi.fn();
   const getGrowiVersion = vi.fn(() => '7.5.0');
+  // Default delivery to enabled so existing tests behave as before.
+  // Tests that need OFF state can override via mocks.getConfig.mockImplementationOnce.
+  const getConfig = vi.fn<(key: string) => unknown>((key: string) => {
+    if (key === 'news:isDeliveryEnabled') return true;
+    return undefined;
+  });
 
   return {
     NewsService: vi.fn(() => ({
@@ -14,6 +20,7 @@ const mocks = vi.hoisted(() => {
     deleteItemsNotInFeed,
     mockFetch,
     getGrowiVersion,
+    getConfig,
   };
 });
 
@@ -23,6 +30,12 @@ vi.mock('../services/news-service', () => ({
 
 vi.mock('~/utils/growi-version', () => ({
   getGrowiVersion: mocks.getGrowiVersion,
+}));
+
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: {
+    getConfig: mocks.getConfig,
+  },
 }));
 
 // Mock global fetch
@@ -62,17 +75,12 @@ const mockResponse = (
 
 describe('NewsCronService', () => {
   let service: NewsCronService;
-  const originalEnv = process.env.NEWS_FEED_URL;
 
   beforeEach(() => {
     service = new NewsCronService();
     vi.clearAllMocks();
     // Reset random mock
     vi.spyOn(Math, 'random').mockReturnValue(0);
-  });
-
-  afterEach(() => {
-    process.env.NEWS_FEED_URL = originalEnv;
   });
 
   describe('getCronSchedule', () => {
@@ -82,63 +90,41 @@ describe('NewsCronService', () => {
   });
 
   describe('executeJob', () => {
-    test('should skip when NEWS_FEED_URL is not set', async () => {
-      delete process.env.NEWS_FEED_URL;
+    test('should skip when news:isDeliveryEnabled is false', async () => {
+      mocks.getConfig.mockImplementationOnce((key: string) =>
+        key === 'news:isDeliveryEnabled' ? false : undefined,
+      );
 
       await service.executeJob();
 
+      // Delivery flag short-circuits before any network call or DB write
       expect(mocks.mockFetch).not.toHaveBeenCalled();
       expect(mocks.upsertNewsItems).not.toHaveBeenCalled();
     });
 
-    test('should skip when NEWS_FEED_URL is empty string', async () => {
-      process.env.NEWS_FEED_URL = '';
+    test('should run when news:isDeliveryEnabled is true (default)', async () => {
+      mocks.mockFetch.mockResolvedValue(
+        mockResponse({ version: '1.0', items: [] }),
+      );
 
       await service.executeJob();
 
-      expect(mocks.mockFetch).not.toHaveBeenCalled();
+      expect(mocks.getConfig).toHaveBeenCalledWith('news:isDeliveryEnabled');
+      expect(mocks.mockFetch).toHaveBeenCalled();
     });
 
-    test('should skip when NEWS_FEED_URL uses non-allowed http', async () => {
-      process.env.NEWS_FEED_URL = 'http://example.com/feed.json';
-
-      await service.executeJob();
-
-      expect(mocks.mockFetch).not.toHaveBeenCalled();
-    });
-
-    test('should allow https:// URLs', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
+    test('should fetch from the hardcoded vendor URL', async () => {
       mocks.mockFetch.mockResolvedValue(mockResponse(VALID_FEED));
 
       await service.executeJob();
 
       expect(mocks.mockFetch).toHaveBeenCalledWith(
-        'https://example.com/feed.json',
+        'https://growilabs.github.io/growi-news-feed/feed.json',
         expect.any(Object),
       );
     });
 
-    test('should allow http://localhost URLs', async () => {
-      process.env.NEWS_FEED_URL = 'http://localhost:8099/feed.json';
-      mocks.mockFetch.mockResolvedValue(mockResponse(VALID_FEED));
-
-      await service.executeJob();
-
-      expect(mocks.mockFetch).toHaveBeenCalled();
-    });
-
-    test('should allow http://127.0.0.1 URLs', async () => {
-      process.env.NEWS_FEED_URL = 'http://127.0.0.1:8099/feed.json';
-      mocks.mockFetch.mockResolvedValue(mockResponse(VALID_FEED));
-
-      await service.executeJob();
-
-      expect(mocks.mockFetch).toHaveBeenCalled();
-    });
-
     test('should upsert items on successful fetch', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       mocks.mockFetch.mockResolvedValue(mockResponse(VALID_FEED));
 
       await service.executeJob();
@@ -151,7 +137,6 @@ describe('NewsCronService', () => {
     });
 
     test('should NOT update DB when fetch fails', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       mocks.mockFetch.mockResolvedValue({ ok: false, status: 500 });
 
       await service.executeJob();
@@ -161,7 +146,6 @@ describe('NewsCronService', () => {
     });
 
     test('should NOT update DB when fetch throws', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       mocks.mockFetch.mockRejectedValue(new Error('Network error'));
 
       await expect(service.executeJob()).resolves.not.toThrow();
@@ -170,7 +154,6 @@ describe('NewsCronService', () => {
     });
 
     test('should filter items by growiVersionRegExps', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       mocks.getGrowiVersion.mockReturnValue('7.5.0');
       const feedWithVersionFilter = {
         version: '1.0',
@@ -199,7 +182,6 @@ describe('NewsCronService', () => {
     });
 
     test('should skip items with invalid growiVersionRegExps', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       mocks.getGrowiVersion.mockReturnValue('7.5.0');
       const feedWithInvalidRegex = {
         version: '1.0',
@@ -237,7 +219,6 @@ describe('NewsCronService', () => {
     // cleaned up. The cron must now hand the full set of feed externalIds
     // to `deleteItemsNotInFeed`, which uses a $nin filter to remove the rest.
     test('should pass every feed externalId to deleteItemsNotInFeed (regression for stale-item bug)', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       const feed = {
         version: '1.0',
         items: [
@@ -277,7 +258,6 @@ describe('NewsCronService', () => {
     });
 
     test('should skip when response body exceeds size limit (5 MiB)', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       // Build a string that exceeds 5 MiB
       const oversizedText = 'x'.repeat(5 * 1024 * 1024 + 1);
       mocks.mockFetch.mockResolvedValue({
@@ -292,7 +272,6 @@ describe('NewsCronService', () => {
     });
 
     test('should abort when top-level shape is invalid', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       // Missing `items` field — top-level schema check fails
       mocks.mockFetch.mockResolvedValue(mockResponse({ version: '1.0' }));
 
@@ -303,7 +282,6 @@ describe('NewsCronService', () => {
     });
 
     test('should skip individual invalid items but keep valid ones', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       const feedWithMixedItems = {
         version: '1.0',
         items: [
@@ -328,7 +306,6 @@ describe('NewsCronService', () => {
     });
 
     test('should skip when response body is not valid JSON', async () => {
-      process.env.NEWS_FEED_URL = 'https://example.com/feed.json';
       mocks.mockFetch.mockResolvedValue({
         ok: true,
         text: () => Promise.resolve('not-a-json{'),

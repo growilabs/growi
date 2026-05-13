@@ -1,3 +1,4 @@
+import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
@@ -22,14 +23,12 @@ const FETCH_TIMEOUT_MS = 10_000;
 const MAX_RESPONSE_SIZE_BYTES = 5 * 1024 * 1024;
 
 /**
- * Check if the given URL is allowed for fetching
+ * Vendor-controlled news feed URL. Hardcoded so a fresh deployment delivers
+ * news without any infrastructure-side env injection. Users (incl. admins)
+ * cannot change this; opt-out is performed via the `news:isDeliveryEnabled`
+ * config flag managed in the admin UI.
  */
-const isAllowedUrl = (url: string): boolean => {
-  if (url.startsWith('https://')) return true;
-  if (url.startsWith('http://localhost')) return true;
-  if (url.startsWith('http://127.0.0.1')) return true;
-  return false;
-};
+const FEED_URL = 'https://growilabs.github.io/growi-news-feed/feed.json';
 
 /**
  * Check if the item matches the current GROWI version
@@ -67,17 +66,11 @@ export class NewsCronService extends CronService {
   }
 
   override async executeJob(): Promise<void> {
-    const feedUrl = process.env.NEWS_FEED_URL;
-
-    if (!feedUrl || feedUrl.trim() === '') {
-      logger.debug('NEWS_FEED_URL is not set, skipping news feed sync');
-      return;
-    }
-
-    if (!isAllowedUrl(feedUrl)) {
-      logger.warn(
-        `NEWS_FEED_URL "${feedUrl}" is not allowed. Only https:// and http://localhost or http://127.0.0.1 are permitted.`,
-      );
+    // Read the delivery toggle (DB > defaultValue: true) on every tick so
+    // an admin's UI change takes effect from the next scheduled run, with no
+    // pod restart required (Requirements 9.5, 9.6).
+    if (!configManager.getConfig('news:isDeliveryEnabled')) {
+      logger.debug('News delivery is disabled, skipping news feed sync');
       return;
     }
 
@@ -86,7 +79,7 @@ export class NewsCronService extends CronService {
 
     let rawJson: unknown;
     try {
-      const response = await fetch(feedUrl, {
+      const response = await fetch(FEED_URL, {
         signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
       });
 
