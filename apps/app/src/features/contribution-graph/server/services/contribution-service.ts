@@ -7,9 +7,19 @@ export const getContributions = async (userId: string) => {
     throw new Error('User ID is invalid');
   }
 
+  const oneYearAgo = new Date();
+  oneYearAgo.setUTCFullYear(oneYearAgo.getUTCFullYear() - 1);
+  oneYearAgo.setUTCHours(0, 0, 0, 0);
+
   try {
-    const contributions = await Contribution.find({ user: userId })
+    const contributions = await Contribution.find({
+      user: userId,
+      date: {
+        $gte: oneYearAgo,
+      },
+    })
       .select('date count -_id')
+      .sort({ date: 1 })
       .lean();
 
     const formattedContributions = contributions.map((c) => ({
