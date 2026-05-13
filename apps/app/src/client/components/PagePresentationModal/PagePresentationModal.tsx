@@ -5,7 +5,6 @@ import type { PresentationProps } from '@growi/presentation/dist/client';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useFullScreen } from '@growi/ui/dist/utils';
-import type { Options as ReactMarkdownOptions } from 'react-markdown';
 import { Modal, ModalBody } from 'reactstrap';
 
 import { useCurrentPageData } from '~/states/page';
@@ -87,7 +86,7 @@ const PagePresentationModalSubstance: React.FC = () => {
         {rendererOptions != null && isEnabledMarp != null && (
           <Presentation
             options={{
-              rendererOptions: rendererOptions as ReactMarkdownOptions,
+              rendererOptions,
               revealOptions: {
                 embedded: true,
                 hash: true,
