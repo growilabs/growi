@@ -1,27 +1,22 @@
 @keyframes slide-in {
   from {
-    opacity: 0;
-    transform: scaleX(0.8);
+    transform: translateX(-12px);
   }
   to {
-    opacity: 1;
-    transform: scaleX(1.1);
+    transform: translateX(0);
   }
 }
 
 @keyframes slide-out {
   from {
-    opacity: 1;
-    transform: scaleX(1.1);
+    transform: translateX(0);
   }
   to {
-    opacity: 0;
-    transform: scaleX(0.8);
+    transform: translateX(-12px);
   }
 }
 
 .dropend-toggle {
-  transform-origin: left;
   animation: slide-out 0.3s ease forwards;
 }
 
