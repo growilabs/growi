@@ -1,6 +1,5 @@
-import type { IPage, IPageHasId, IUser } from '@growi/core';
+import type { IPage, IPageHasId } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import note from 'mermaid/dist/dagre-wrapper/shapes/note.js';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
