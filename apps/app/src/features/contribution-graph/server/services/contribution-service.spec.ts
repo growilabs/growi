@@ -1,8 +1,9 @@
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
+import type { IContribution } from '../../interfaces/contribution';
 import Contribution from '../models/contribution-model';
-import { addContribution } from './contribution-service';
+import { addContribution, getContributions } from './contribution-service';
 
 describe('addContribution', () => {
   const userId = new mongoose.Types.ObjectId().toString();
@@ -63,5 +64,58 @@ describe('addContribution', () => {
     // Verify we now have two separate documents
     const contributions = await Contribution.countDocuments({ user: userId });
     expect(contributions).toBe(2);
+  });
+});
+
+describe('getContributions', () => {
+  const userId = new mongoose.Types.ObjectId().toString();
+
+  let mongod: MongoMemoryServer;
+
+  beforeAll(async () => {
+    mongod = await MongoMemoryServer.create();
+    const uri = mongod.getUri();
+    await mongoose.connect(uri);
+  });
+
+  beforeEach(async () => {
+    await Contribution.deleteMany({});
+  });
+
+  afterAll(async () => {
+    await mongoose.connection.dropDatabase();
+    await mongoose.connection.close();
+    await mongod.stop();
+  });
+
+  it('should return one year of contributions if they exist in the database', async () => {
+    const today = new Date();
+    today.setUTCHours(0, 0, 0, 0);
+
+    const currentDate = new Date(today);
+    currentDate.setUTCFullYear(currentDate.getUTCFullYear() - 1);
+
+    const mockContributions: IContribution[] = [];
+
+    // Fill one year of mock contributions
+    while (currentDate <= today) {
+      const mockContribution: IContribution = {
+        user: userId,
+        count: 1,
+        date: new Date(currentDate),
+      };
+      mockContributions.push(mockContribution);
+
+      currentDate.setUTCDate(currentDate.getUTCDate() + 1);
+    }
+
+    // Insert mock contributions into database
+    await Contribution.insertMany(mockContributions);
+
+    const contributions = await getContributions(userId);
+
+    const expectedLength = mockContributions.length;
+    expect(contributions).toBeDefined();
+    expect(contributions.contributions).toHaveLength(expectedLength);
   });
 });
