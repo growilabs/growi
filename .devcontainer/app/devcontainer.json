@@ -7,8 +7,9 @@
   "workspaceFolder": "/workspace/growi",
 
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "24.14.0"
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "24",
+      "pnpmVersion": "11.1.1"
     },
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },

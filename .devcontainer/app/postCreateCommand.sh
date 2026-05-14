@@ -17,11 +17,6 @@ curl -LsSf https://astral.sh/uv/install.sh | sh
 # Install Claude Code
 curl -fsSL https://claude.ai/install.sh | bash
 
-# Setup pnpm
-SHELL=bash pnpm setup
-eval "$(cat /home/vscode/.bashrc)"
-pnpm config set store-dir /workspace/.pnpm-store
-
 # Install turbo
 pnpm install turbo --global
 
