@@ -5,19 +5,14 @@ ARG OPT_DIR="/opt"
 ARG PNPM_HOME="/root/.local/share/pnpm"
 
 ##
-## base — DHI dev image with pnpm + turbo
+## base — official Node.js image with pnpm + turbo
 ##
-FROM dhi.io/node:24-debian13-dev AS base
+FROM node:24-bookworm AS base
 
 ARG OPT_DIR
 ARG PNPM_HOME
 
 WORKDIR $OPT_DIR
-
-# Install build dependencies
-RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  apt-get update && apt-get install -y --no-install-recommends ca-certificates gzip wget
 
 # Install pnpm (standalone script, no version hardcoding)
 RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL=/bin/sh sh -
