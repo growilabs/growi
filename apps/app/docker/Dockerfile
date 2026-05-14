@@ -17,11 +17,10 @@ WORKDIR $OPT_DIR
 # Install pnpm (standalone script, no version hardcoding)
 RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL=/bin/sh sh -
 ENV PNPM_HOME=$PNPM_HOME
-ENV PATH="$PNPM_HOME:$PATH"
+ENV PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
 
 # Install turbo globally
-RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
-  pnpm add turbo --global
+RUN pnpm add turbo --global
 
 
 ##
@@ -51,7 +50,7 @@ ARG OPT_DIR
 ARG PNPM_HOME
 
 ENV PNPM_HOME=$PNPM_HOME
-ENV PATH="$PNPM_HOME:$PATH"
+ENV PATH="$PNPM_HOME:$PNPM_HOME/bin:$PATH"
 
 WORKDIR $OPT_DIR
 
@@ -59,10 +58,13 @@ WORKDIR $OPT_DIR
 COPY --from=pruner $OPT_DIR/out/json/ .
 
 # Install build tools and dependencies
-RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
-  pnpm add node-gyp --global
-RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
-  pnpm install --frozen-lockfile
+# No cache mount for global installs: standalone pnpm stores @pnpm/exe via symlinks into
+# $PNPM_HOME/store; overlaying that path with a BuildKit cache breaks the pnpm binary.
+RUN pnpm add node-gyp --global
+# Separate store path keeps the BuildKit cache mount away from the pnpm bootstrap store.
+# --ignore-scripts: postinstall (prisma generate) needs full source, runs in builder stage.
+RUN --mount=type=cache,target=/root/.pnpm-store,sharing=locked \
+  pnpm install --frozen-lockfile --ignore-scripts --store-dir /root/.pnpm-store
 
 
 ##
