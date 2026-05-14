@@ -57,10 +57,6 @@ WORKDIR $OPT_DIR
 # Copy only package manifests and lockfile for dependency caching
 COPY --from=pruner $OPT_DIR/out/json/ .
 
-# Install build tools and dependencies
-# No cache mount for global installs: standalone pnpm stores @pnpm/exe via symlinks into
-# $PNPM_HOME/store; overlaying that path with a BuildKit cache breaks the pnpm binary.
-RUN pnpm add node-gyp --global
 # Separate store path keeps the BuildKit cache mount away from the pnpm bootstrap store.
 # --ignore-scripts: postinstall (prisma generate) needs full source, runs in builder stage.
 RUN --mount=type=cache,target=/root/.pnpm-store,sharing=locked \

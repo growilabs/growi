@@ -33,8 +33,7 @@ WORKDIR ${optDir}
 
 COPY . .
 
-RUN pnpm add node-gyp --global
-RUN pnpm install ---frozen-lockfile
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # build
 RUN turbo run build --filter @growi/slackbot-proxy
