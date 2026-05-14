@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "7.5.3-RC.0",
+  "version": "7.5.4-RC.0",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
   "private": true,
@@ -68,8 +68,8 @@
     "mock-require": "^3.0.3",
     "nodemon": "^3.1.14",
     "npm-run-all2": "^8.0.4",
-    "rollup-plugin-node-externals": "^6.1.1",
     "rimraf": "^6.1.3",
+    "rollup-plugin-node-externals": "^6.1.1",
     "stylelint": "^16.5.0",
     "stylelint-config-recess-order": "^5.0.1",
     "stylelint-config-recommended-scss": "^14.0.0",
