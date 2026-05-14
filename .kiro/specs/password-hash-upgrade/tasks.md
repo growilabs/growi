@@ -57,6 +57,7 @@
 
 - [ ] 3. (P) Passport LocalStrategy の async 化と lazy migration 統合
 - [ ] 3.1 Passport LocalStrategy を async 化し lazy migration をトリガーする
+  - `findUserByUsernameOrEmail` をコールバックスタイルから Promise ベース（async/await）に変更またはラップする
   - LocalStrategy コールバックを async 関数に変更し、try/catch で全エラーを `done(err)` に渡す
   - `VerifyResult.needsRehash === true` の場合（legacy 認証成功時）: `await user.setPassword(password)` + `await user.save()` を実行してから `done(null, user)` を返す
   - lazy migration の `save()` 失敗時はエラーログを記録するが、ログイン自体は成功させる（次回ログインでリトライ可能）
