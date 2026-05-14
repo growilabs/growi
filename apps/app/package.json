@@ -11,7 +11,7 @@
     "build:client": "next build",
     "build:server": "cross-env NODE_ENV=production tspc -p tsconfig.build.server.json",
     "postbuild:server": "node bin/postbuild-server.ts",
-    "clean": "rimraf dist transpiled .next next.config.js",
+    "clean": "rimraf dist transpiled .next next.config.js src/generated/prisma",
     "server": "cross-env NODE_ENV=production node -r dotenv-flow/config dist/server/app.js",
     "server:ci": "pnpm run server --ci",
     "preserver": "cross-env NODE_ENV=production pnpm run migrate",
