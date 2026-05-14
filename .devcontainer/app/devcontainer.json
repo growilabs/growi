@@ -21,12 +21,12 @@
   // Use 'postCreateCommand' to run commands after the container is created.
   "postCreateCommand": "/bin/bash ./.devcontainer/app/postCreateCommand.sh",
 
-  // Expose pnpm's global bin to every shell spawned by VS Code (integrated terminal,
-  // lifecycle commands, and extension shells such as Claude Code) without relying on
-  // ~/.bashrc, which non-interactive shells don't source.
+  // Expose tool install dirs (pnpm global, uv/claude) to every shell spawned by VS Code
+  // (integrated terminal, lifecycle commands, and extension shells such as Claude Code)
+  // without relying on ~/.bashrc, which non-interactive shells don't source.
   "remoteEnv": {
     "PNPM_HOME": "/home/vscode/.local/share/pnpm",
-    "PATH": "/home/vscode/.local/share/pnpm:${containerEnv:PATH}"
+    "PATH": "/home/vscode/.local/share/pnpm/bin:/home/vscode/.local/bin:${containerEnv:PATH}"
   },
 
   // Configure tool-specific properties.
