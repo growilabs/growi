@@ -1,0 +1,50 @@
+.editor-guide-modal {
+  position: fixed !important;
+  top: var(--egm-top) !important;
+  left: var(--egm-left) !important;
+  display: flex !important;
+  align-items: center;
+  justify-content: center;
+  width: var(--egm-width) !important;
+  height: var(--egm-height) !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+}
+
+.editor-guide-backdrop {
+  position: fixed !important;
+  top: var(--egm-top) !important;
+  left: var(--egm-left) !important;
+  width: var(--egm-width) !important;
+  height: var(--egm-height) !important;
+}
+
+.card-body-scrollable {
+  overflow-y: auto;
+}
+
+.editor-guide-tabs-container {
+  &:not(#_) {
+    .nav-tabs, ul {
+      display: flex;
+      flex-wrap: nowrap;
+      justify-content: space-between;
+      width: 100%;
+      padding: 0;
+      margin: 0;
+      list-style: none;
+    }
+
+    .nav-item, li {
+      flex: 1 1 0;
+      min-width: 100px;
+      text-align: center;
+    }
+
+    .nav-link, button, a {
+      display: block;
+      width: 100%;
+      white-space: nowrap;
+    }
+  }
+}
