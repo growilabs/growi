@@ -112,6 +112,12 @@ jobs:
     needs: [build-prod]
     runs-on: ubuntu-latest
 
+    # The extracted production tarball does not include pnpm-workspace.yaml or
+    # packages/*, so pnpm v11's pre-run dep status check would trigger a
+    # `pnpm install` that fails to resolve `workspace:^` references. Skip it.
+    env:
+      pnpm_config_verify_deps_before_run: "false"
+
     strategy:
       matrix:
         mongodb-version: ['6.0', '8.0']
@@ -179,6 +185,12 @@ jobs:
       # Match the Playwright version
       # https://github.com/microsoft/playwright/issues/20010
       image: mcr.microsoft.com/playwright:v1.58.2-jammy
+
+    # Playwright spawns `pnpm run server` inside the extracted prod dir via
+    # GROWI_WEBSERVER_COMMAND. That dir lacks pnpm-workspace.yaml and packages/*,
+    # so pnpm v11's pre-run dep status check would fail. Skip it.
+    env:
+      pnpm_config_verify_deps_before_run: "false"
 
     strategy:
       fail-fast: false
