@@ -35,7 +35,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
 
     - uses: actions/setup-node@v4
       with:
@@ -144,8 +144,8 @@ jobs:
       run: |
         tar -xf ${{ needs.build-prod.outputs.PROD_FILES }}
 
-    # Run after extraction so pnpm/action-setup@v4 can read packageManager from package.json
-    - uses: pnpm/action-setup@v4
+    # Run after extraction so pnpm/action-setup@v6 can read packageManager from package.json
+    - uses: pnpm/action-setup@v6
 
     - name: pnpm run server:ci
       working-directory: ./apps/app
@@ -204,7 +204,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
 
     - uses: actions/setup-node@v4
       with:
@@ -311,7 +311,7 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
 
     - uses: actions/setup-node@v4
       with:
