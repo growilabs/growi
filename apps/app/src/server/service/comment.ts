@@ -2,7 +2,8 @@ import type { IPage, IUser } from '@growi/core';
 import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { Comment, CommentEvent, commentEvent } from '~/features/comment/server';
+import { CommentEvent, commentEvent } from '~/features/comment/server';
+import { prisma } from '~/utils/prisma';
 
 import loggerFactory from '../../utils/logger';
 import type Crowi from '../crowi';
@@ -34,7 +35,7 @@ class CommentService {
     commentEvent.on(CommentEvent.CREATE, async (savedComment) => {
       try {
         const Page = mongoose.model<IPage, PageModel>('Page');
-        await Page.updateCommentCount(savedComment.page);
+        await Page.updateCommentCount(savedComment.pageId);
       } catch (err) {
         logger.error(
           'Error occurred while handling the comment create event:\n',
@@ -50,7 +51,7 @@ class CommentService {
     commentEvent.on(CommentEvent.DELETE, async (removedComment) => {
       try {
         const Page = mongoose.model<IPage, PageModel>('Page');
-        await Page.updateCommentCount(removedComment.page);
+        await Page.updateCommentCount(removedComment.pageId);
       } catch (err) {
         logger.error('Error occurred while updating the comment count:\n', err);
       }
@@ -63,7 +64,14 @@ class CommentService {
     const User = mongoose.model<IUser>('User');
 
     // Get comment by comment ID
-    const commentData = await Comment.findOne({ _id: commentId });
+    const commentData = await prisma.comments.findUnique({
+      select: {
+        comment: true,
+      },
+      where: {
+        id: commentId.toString(),
+      },
+    });
 
     // not found
     if (commentData == null) {
