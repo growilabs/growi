@@ -79,7 +79,7 @@
     "@codemirror/language-data": "^6.5.1",
     "@codemirror/merge": "^6.8.0",
     "@codemirror/state": "^6.5.2",
-    "@codemirror/view": "^6.39.14",
+    "@codemirror/view": "^6.42.1",
     "@cspell/dynamic-import": "^8.15.4",
     "@elastic/elasticsearch7": "npm:@elastic/elasticsearch@^7.17.4",
     "@elastic/elasticsearch8": "npm:@elastic/elasticsearch@^8.18.2",
