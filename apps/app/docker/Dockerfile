@@ -16,11 +16,12 @@ WORKDIR $OPT_DIR
 # "packageManager" field is used (avoids drift between Dockerfile and local/CI).
 RUN corepack enable
 ENV PNPM_HOME="/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
+ENV PATH="$PNPM_HOME/bin:$PATH"
 
 # Install turbo globally
-RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
-  pnpm add turbo --global
+# Note: no cache mount here — pnpm global install links binaries into the store,
+# and the BuildKit cache mount would be unmounted after RUN, breaking those links.
+RUN pnpm add turbo --global
 
 
 ##
