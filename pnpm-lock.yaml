@@ -199,7 +199,7 @@ importers:
         specifier: ^6.8.0
         version: 6.8.0
       '@codemirror/state':
-        specifier: ^6.5.2
+        specifier: ^6.6.0
         version: 6.6.0
       '@codemirror/view':
         specifier: ^6.42.1
@@ -1282,7 +1282,7 @@ importers:
         specifier: ^6.8.0
         version: 6.8.0
       '@codemirror/state':
-        specifier: ^6.5.2
+        specifier: ^6.6.0
         version: 6.6.0
       '@codemirror/view':
         specifier: ^6.42.1
