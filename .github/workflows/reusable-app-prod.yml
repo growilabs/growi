@@ -35,9 +35,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'pnpm'
@@ -69,16 +69,19 @@ jobs:
         tar -zcf production.tar.gz --exclude ./apps/app/.next/cache \
           package.json \
           node_modules \
+          tsconfig.base.json \
           apps/app/.next \
           apps/app/config \
           apps/app/dist \
+          apps/app/prisma \
           apps/app/public \
           apps/app/resource \
           apps/app/tmp \
           apps/app/.env.production* \
           apps/app/node_modules \
           apps/app/next.config.js \
-          apps/app/package.json
+          apps/app/package.json \
+          apps/app/tsconfig.json
         echo "file=production.tar.gz" >> $GITHUB_OUTPUT
 
     - name: Upload production files as artifact
@@ -109,6 +112,12 @@ jobs:
     needs: [build-prod]
     runs-on: ubuntu-latest
 
+    # The extracted production tarball does not include pnpm-workspace.yaml or
+    # packages/*, so pnpm v11's pre-run dep status check would trigger a
+    # `pnpm install` that fails to resolve `workspace:^` references. Skip it.
+    env:
+      pnpm_config_verify_deps_before_run: "false"
+
     strategy:
       matrix:
         mongodb-version: ['6.0', '8.0']
@@ -124,9 +133,11 @@ jobs:
         - 9200/tcp
         env:
           discovery.type: single-node
+          # ES 9.x enables security (HTTPS + auth) by default; disable for plaintext CI access
+          xpack.security.enabled: false
 
     steps:
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.node-version }}
 
@@ -139,8 +150,8 @@ jobs:
       run: |
         tar -xf ${{ needs.build-prod.outputs.PROD_FILES }}
 
-    # Run after extraction so pnpm/action-setup@v4 can read packageManager from package.json
-    - uses: pnpm/action-setup@v4
+    # Run after extraction so pnpm/action-setup@v6 can read packageManager from package.json
+    - uses: pnpm/action-setup@v6
 
     - name: pnpm run server:ci
       working-directory: ./apps/app
@@ -175,6 +186,12 @@ jobs:
       # https://github.com/microsoft/playwright/issues/20010
       image: mcr.microsoft.com/playwright:v1.58.2-jammy
 
+    # Playwright spawns `pnpm run server` inside the extracted prod dir via
+    # GROWI_WEBSERVER_COMMAND. That dir lacks pnpm-workspace.yaml and packages/*,
+    # so pnpm v11's pre-run dep status check would fail. Skip it.
+    env:
+      pnpm_config_verify_deps_before_run: "false"
+
     strategy:
       fail-fast: false
       matrix:
@@ -193,13 +210,15 @@ jobs:
         - 9200/tcp
         env:
           discovery.type: single-node
+          # ES 9.x enables security (HTTPS + auth) by default; disable for plaintext CI access
+          xpack.security.enabled: false
 
     steps:
     - uses: actions/checkout@v4
 
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'pnpm'
@@ -304,9 +323,9 @@ jobs:
     steps:
     - uses: actions/checkout@v4
 
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v6
       with:
         node-version: ${{ inputs.node-version }}
         cache: 'pnpm'

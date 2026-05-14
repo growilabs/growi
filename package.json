@@ -1,6 +1,6 @@
 {
   "name": "growi",
-  "version": "7.5.2",
+  "version": "7.5.3-RC.0",
   "description": "Team collaboration software using markdown",
   "license": "MIT",
   "private": true,
@@ -20,7 +20,7 @@
   "bugs": {
     "url": "https://github.com/growilabs/growi/issues"
   },
-  "packageManager": "pnpm@10.32.1",
+  "packageManager": "pnpm@11.1.1",
   "scripts": {
     "bootstrap": "pnpm install",
     "start": "pnpm run app:server",
@@ -86,48 +86,6 @@
     "vite-tsconfig-paths": "^5.1.4",
     "vitest": "^3.2.4",
     "vitest-mock-extended": "^3.1.0"
-  },
-  "// comments for pnpm.overrides": {
-    "@lykmapipo/common>flat": "flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
-    "@lykmapipo/common>mime": "mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
-    "@lykmapipo/common>parse-json": "parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version",
-    "axios": "CVE-2025-XXXXX: CRLF Injection + Prototype Pollution combo leads to HTTP Request Smuggling (CVSS 10.0). All versions < 1.15.0 are vulnerable."
-  },
-  "// comments for pnpm.packageExtensions": {
-    "@orval/core": "@orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime, but @orval/core does not declare lodash as a dependency"
-  },
-  "pnpm": {
-    "overrides": {
-      "@lykmapipo/common>flat": "5.0.2",
-      "@lykmapipo/common>mime": "3.0.0",
-      "@lykmapipo/common>parse-json": "5.2.0",
-      "axios": "^1.15.0"
-    },
-    "packageExtensions": {
-      "@orval/core": {
-        "dependencies": {
-          "lodash": "*"
-        }
-      }
-    },
-    "ignoredBuiltDependencies": [
-      "@swc/core",
-      "core-js",
-      "esbuild",
-      "leveldown",
-      "protobufjs",
-      "puppeteer",
-      "ttf2woff2"
-    ],
-    "onlyBuiltDependencies": [
-      "lefthook"
-    ],
-    "// comments for patchedDependencies": {
-      "@marp-team/marp-core": "The patch excludes mathjax-full from the dependency graph of Marp Core."
-    },
-    "patchedDependencies": {
-      "@marp-team/marp-core": "packages/presentation/patches/@marp-team__marp-core.patch"
-    }
   },
   "engines": {
     "node": "^24"
