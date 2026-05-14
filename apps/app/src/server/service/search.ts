@@ -15,7 +15,10 @@ import type {
   IPageWithSearchMeta,
   ISearchResult,
 } from '~/interfaces/search';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import {
+  USER_FIELDS_EXCEPT_CONFIDENTIAL,
+  UserStatus,
+} from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
@@ -348,6 +351,44 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   async rebuildAuditlogIndex() {
     return this.fullTextSearchDelegator.rebuildAuditlogIndex();
+  }
+
+  async searchAuditlogs(
+    q: string,
+    offset: number,
+    limit: number,
+  ): Promise<{
+    activeUsernames: string[];
+    inactiveUsernames: string[];
+  }> {
+    const usernames = await this.fullTextSearchDelegator.searchAuditlogs(
+      q,
+      offset,
+      limit,
+    );
+
+    const User = mongoose.model<IUser>('User');
+
+    const activeUsers = await User.find({
+      username: { $in: usernames },
+      status: UserStatus.STATUS_ACTIVE,
+    })
+      .select('username')
+      .lean();
+    const activeUsernames = activeUsers.map((u) => u.username);
+
+    const activeUsernameSet = new Set(activeUsernames);
+    const inactiveUsers = await User.find({
+      username: { $in: usernames },
+      status: { $ne: UserStatus.STATUS_ACTIVE },
+    })
+      .select('username')
+      .lean();
+    const inactiveUsernames = inactiveUsers
+      .map((u) => u.username)
+      .filter((u) => !activeUsernameSet.has(u));
+
+    return { activeUsernames, inactiveUsernames };
   }
 
   async parseSearchQuery(
