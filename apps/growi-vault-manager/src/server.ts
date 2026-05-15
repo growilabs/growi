@@ -9,6 +9,7 @@ import '@tsed/platform-express';
 import { ComposeViewController } from './controllers/compose-view-controller.js';
 import { GitProxyController } from './controllers/git-proxy-controller.js';
 import { HealthController } from './controllers/health-controller.js';
+import { MaintenanceController } from './controllers/maintenance-controller.js';
 import { StorageStatsController } from './controllers/storage-stats-controller.js';
 
 // Default port per requirement 10.1
@@ -22,6 +23,7 @@ const PORT = Number(process.env.PORT || 3001);
       ComposeViewController,
       GitProxyController,
       HealthController,
+      MaintenanceController,
       StorageStatsController,
     ],
   },

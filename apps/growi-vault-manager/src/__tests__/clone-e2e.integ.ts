@@ -237,7 +237,9 @@ async function callComposeView(
     // Test 3: actual `git clone` succeeds end-to-end
     // -------------------------------------------------------------------------
 
-    it('git clone via smart HTTP succeeds and produces a valid local repo', async () => {
+    it('git clone via smart HTTP succeeds and produces a valid local repo', {
+      timeout: 30_000,
+    }, async () => {
       // Step 1: Obtain a view ref so we can use it as GIT_NAMESPACE via the header.
       // In the real flow the git client sends the Authorization and view-ref headers
       // via a git credential helper or git config http.extraheader.

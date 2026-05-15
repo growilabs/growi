@@ -23,7 +23,7 @@
 import { pipeline } from 'node:stream/promises';
 import { HeaderParams, Req, Res, UseBefore } from '@tsed/common';
 import { Controller } from '@tsed/di';
-import { Get, Post } from '@tsed/schema';
+import { AcceptMime, Get, Post } from '@tsed/schema';
 import type { Request, Response } from 'express';
 
 import { SharedSecretAuth } from '../middlewares/shared-secret-auth.js';
@@ -68,6 +68,7 @@ export class GitProxyController {
    * @param res     - Express response (stdout is piped here).
    */
   @Get('/info/refs')
+  @AcceptMime('application/x-git-upload-pack-advertisement')
   async advertiseRefs(
     @HeaderParams(VIEW_REF_HEADER) viewRef: string,
     @Req() req: Request,
@@ -129,6 +130,7 @@ export class GitProxyController {
    * @param res     - Express response; git stdout is piped here.
    */
   @Post('/git-upload-pack')
+  @AcceptMime('application/x-git-upload-pack-result')
   async uploadPack(
     @HeaderParams(VIEW_REF_HEADER) viewRef: string,
     @Req() req: Request,

@@ -216,7 +216,9 @@ async function getStorageStats(): Promise<{
     // Test 1: upsert idempotency — same instruction twice → same ref OID
     // -------------------------------------------------------------------------
 
-    it('processing the same upsert instruction twice converges to the same namespace ref OID', async () => {
+    it('processing the same upsert instruction twice converges to the same namespace ref OID', {
+      timeout: 30_000,
+    }, async () => {
       // We simulate idempotency by inserting two instructions with the same
       // (namespace, pagePath, pageId, revisionId) payload.  Because the vault
       // stores blobs content-addressed and always derives the same filePath from
@@ -303,7 +305,9 @@ async function getStorageStats(): Promise<{
     // Test 2: bulk-upsert efficiency — 1000 entries → 1 query · 1 commit · 1 ref update
     // -------------------------------------------------------------------------
 
-    it('bulk-upsert with 1000 entries issues a single $in query, one commit, and one ref update', async () => {
+    it('bulk-upsert with 1000 entries issues a single $in query, one commit, and one ref update', {
+      timeout: 120_000,
+    }, async () => {
       // Generate 1000 (pageId, pagePath, revisionId) triples.
       const entryCount = 1000;
 
@@ -398,7 +402,9 @@ async function getStorageStats(): Promise<{
     // Test 3: rename-prefix — subtree moves without blob re-writes
     // -------------------------------------------------------------------------
 
-    it('rename-prefix moves a subtree without rewriting any blobs', async () => {
+    it('rename-prefix moves a subtree without rewriting any blobs', {
+      timeout: 30_000,
+    }, async () => {
       // Setup: upsert a page under /docs-rename-src/ so we have something to rename.
       const pageId = randomUUID().replace(/-/g, '').slice(0, 24);
       const revisionId = randomUUID().replace(/-/g, '').slice(0, 24);

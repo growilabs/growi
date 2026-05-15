@@ -62,8 +62,16 @@ function getEnvFloat(name: string, defaultValue: number): number {
 // Constants
 // ---------------------------------------------------------------------------
 
-/** Interval between maintenance checks, in milliseconds. */
-const CHECK_INTERVAL_MS = 5 * 60 * 1000; // 5 minutes
+/**
+ * Default interval between maintenance checks, in milliseconds.
+ * Overridable via `VAULT_MAINTENANCE_TICK_MS` for integration tests so the
+ * 5-minute production cadence does not bottleneck CI.
+ */
+const DEFAULT_CHECK_INTERVAL_MS = 5 * 60 * 1000;
+
+function resolveCheckIntervalMs(): number {
+  return getEnvInt('VAULT_MAINTENANCE_TICK_MS', DEFAULT_CHECK_INTERVAL_MS);
+}
 
 /** Default maximum commit count before a namespace is squashed. */
 const DEFAULT_SQUASH_COMMIT_THRESHOLD = 1000;
@@ -434,7 +442,7 @@ export function createVaultMaintenanceScheduler(): VaultMaintenanceScheduler {
         tick().catch(() => {
           /* swallowed — tick handles its own error logging */
         });
-      }, CHECK_INTERVAL_MS);
+      }, resolveCheckIntervalMs());
     },
 
     stop(): void {

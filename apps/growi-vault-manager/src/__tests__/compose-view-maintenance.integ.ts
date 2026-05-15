@@ -216,7 +216,9 @@ async function triggerGcAndWait(): Promise<{
     // Test 1: compose-view cache hit on identical sourceVersions
     // -------------------------------------------------------------------------
 
-    it('calling compose-view twice with the same sourceVersions returns the same commitOid (cache hit)', async () => {
+    it('calling compose-view twice with the same sourceVersions returns the same commitOid (cache hit)', {
+      timeout: 30_000,
+    }, async () => {
       // Use a dedicated namespace and user for this test to avoid cross-test
       // interference from namespace state mutations.
       const cacheTestNs = 'integ-cache-test-public';
@@ -265,7 +267,9 @@ async function triggerGcAndWait(): Promise<{
       );
     });
 
-    it('compose-view returns a fresh commitOid after the namespace receives a new commit (cache miss)', async () => {
+    it('compose-view returns a fresh commitOid after the namespace receives a new commit (cache miss)', {
+      timeout: 30_000,
+    }, async () => {
       const cacheTestNs = 'integ-cache-invalidation-ns';
       const cacheTestUserId = 'cafebabedeadbeef00000002';
       const namespaces = [cacheTestNs];
@@ -302,7 +306,24 @@ async function triggerGcAndWait(): Promise<{
     // Test 2: squash auto-trigger after 1000+ commits
     // -------------------------------------------------------------------------
 
-    it('namespace history is squashed to depth=1 after exceeding VAULT_SQUASH_COMMIT_THRESHOLD commits', async () => {
+    // The scheduler tick interval is configurable via VAULT_MAINTENANCE_TICK_MS
+    // (default 5 minutes in production). In CI the test harness sets a short
+    // value (e.g. 5 s) so the squash trigger fires quickly after the
+    // namespace's commit count exceeds the threshold.
+    const tickIntervalMs = Number.parseInt(
+      process.env.VAULT_MAINTENANCE_TICK_MS ?? `${5 * 60 * 1000}`,
+      10,
+    );
+    // Allow up to 12 ticks of waiting for the squash to fire, capped at 8 min.
+    const squashWaitMs = Math.min(tickIntervalMs * 12, 8 * 60 * 1000);
+    // Drain budget: 1001 sequential upserts take ~50 ms each on healthy CI,
+    // but allow generous slack so a slow runner does not flake.
+    const drainWaitMs = 3 * 60 * 1000;
+    const squashTestTimeoutMs = drainWaitMs + squashWaitMs + 30_000;
+
+    it('namespace history is squashed to depth=1 after exceeding VAULT_SQUASH_COMMIT_THRESHOLD commits', {
+      timeout: squashTestTimeoutMs,
+    }, async () => {
       // This test inserts 1001 sequential upsert instructions into a dedicated
       // namespace to drive the version counter past the squash threshold
       // (default: 1000).  It then waits for the maintenance scheduler to fire
@@ -366,8 +387,8 @@ async function triggerGcAndWait(): Promise<{
       await db.collection('revisions').insertMany(revisionDocs);
       await db.collection('vault_instructions').insertMany(instructions);
 
-      // Wait for all instructions to be processed (allow up to 5 minutes for 1001 commits).
-      const drainDeadline = Date.now() + 5 * 60 * 1000;
+      // Wait for all instructions to be processed within the drain budget.
+      const drainDeadline = Date.now() + drainWaitMs;
       while (Date.now() < drainDeadline) {
         // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
         const unprocessedCount = await db
@@ -400,8 +421,9 @@ async function triggerGcAndWait(): Promise<{
         .findOne({ namespace: squashNs });
       expect(stateBeforeSquash?.version).toBeGreaterThanOrEqual(COMMIT_COUNT);
 
-      // Wait for the squash tick (scheduler fires every 5 minutes; allow 8 minutes).
-      const squashDeadline = Date.now() + 8 * 60 * 1000;
+      // Wait for the next scheduler tick to perform the squash within the
+      // computed squash budget.
+      const squashDeadline = Date.now() + squashWaitMs;
       let squashed = false;
 
       while (Date.now() < squashDeadline) {
@@ -415,7 +437,10 @@ async function triggerGcAndWait(): Promise<{
           break;
         }
 
-        await new Promise((resolve) => setTimeout(resolve, 10_000));
+        // Poll every ~tick/2 so we notice the squash promptly without burning
+        // CPU; clamp between 500 ms and 5 s for sane behavior.
+        const pollMs = Math.min(Math.max(tickIntervalMs / 2, 500), 5_000);
+        await new Promise((resolve) => setTimeout(resolve, pollMs));
       }
 
       // After squash, version must be reset to 1.
@@ -441,7 +466,9 @@ async function triggerGcAndWait(): Promise<{
     // Test 3: gc / clone concurrency — clone must not be corrupted by gc
     // -------------------------------------------------------------------------
 
-    it('a git clone started concurrently with gc completes successfully without corruption', async () => {
+    it('a git clone started concurrently with gc completes successfully without corruption', {
+      timeout: 180_000,
+    }, async () => {
       // This test exercises the requirement that git gc (which prunes loose
       // objects and rewrites packs) must not corrupt an in-flight clone.
       // The git protocol uses pack negotiation (stateless RPC over HTTP), so

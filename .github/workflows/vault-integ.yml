@@ -100,6 +100,9 @@ jobs:
           MONGO_URI: mongodb://localhost:27017/growi-vault-integ?replicaSet=rs0
           VAULT_MANAGER_INTERNAL_SECRET: ${{ secrets.VAULT_MANAGER_INTERNAL_SECRET || 'test-secret-for-integration' }}
           VAULT_REPO_PATH: ${{ runner.temp }}/vault-repo
+          # Run the maintenance scheduler on a short tick so integration tests
+          # don't have to wait for the 5-minute production cadence.
+          VAULT_MAINTENANCE_TICK_MS: '5000'
 
       - name: Wait for vault-manager to be ready
         run: |
@@ -121,6 +124,10 @@ jobs:
           RUN_VAULT_INTEG: "true"
           VAULT_MANAGER_BASE_URL: http://localhost:3001
           VAULT_MANAGER_INTERNAL_SECRET: ${{ secrets.VAULT_MANAGER_INTERNAL_SECRET || 'test-secret-for-integration' }}
+          MONGO_URL: mongodb://localhost:27017/growi-vault-integ?replicaSet=rs0
+          # Must match the value used to start vault-manager so the test
+          # adapts its squash-wait deadline to the same tick interval.
+          VAULT_MAINTENANCE_TICK_MS: '5000'
 
       - name: Stop vault-manager
         if: always()
