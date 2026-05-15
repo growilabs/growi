@@ -33,6 +33,7 @@ import * as keywordHighlighter from '~/services/renderer/rehype-plugins/keyword-
 import * as relocateToc from '~/services/renderer/rehype-plugins/relocate-toc';
 import * as attachment from '~/services/renderer/remark-plugins/attachment';
 import * as codeBlock from '~/services/renderer/remark-plugins/codeblock';
+import * as mention from '~/services/renderer/remark-plugins/mention';
 import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table';
 import {
   generateCommonOptions,
@@ -204,6 +205,7 @@ export const generateSimpleViewOptions = (
     callout.remarkPlugin,
     lsxGrowiDirective.remarkPlugin,
     refsGrowiDirective.remarkPlugin,
+    mention.remarkPlugin,
   );
 
   const isEnabledLinebreaks =
@@ -228,6 +230,7 @@ export const generateSimpleViewOptions = (
             lsxGrowiDirective.sanitizeOption,
             refsGrowiDirective.sanitizeOption,
             codeBlock.sanitizeOption,
+            mention.sanitizeOption,
           ),
         ]
       : () => {};
