@@ -144,10 +144,16 @@ _Generated: 2026-05-15_
 
 ### 5.3 Research Needed（design 中に確認）
 
-- **R-1**: `findByIdAndViewer(null user)` の挙動（理論上到達しないが防御的に確認）
-- **R-2**: Mastra ランタイムで `execute` が throw した場合、UI ストリームに何が流れるか（agent が再試行するか、エラーチャンクとして流れるか）
-- **R-3**: GRANT_RESTRICTED（リンク共有）のページが agent の RAG コンテキストに混入することの是非（要件側の合意取得 or design で許容を明文化）
+- ~~**R-1**: `findByIdAndViewer(null user)` の挙動~~ → design レビューで `user._id` のみ参照と確認済み（Synthesis 6.3-7）。tool 内で `{ _id }` 形状を組み立てて渡せばよい
+- **R-2**: Mastra ランタイムで `execute` が throw した場合、UI ストリームに何が流れるか（agent が再試行するか、エラーチャンクとして流れるか）— 本 spec は throw しない方針なので影響なし、回帰防止 unit test で担保
+- **R-3**: GRANT_RESTRICTED（リンク共有）のページが agent の RAG コンテキストに混入することの是非（要件側の合意取得 or design で許容を明文化）— design レビューで「既存挙動踏襲、integration test で明文化」と決定
 - **R-4**: `fileSearchTool` コメントアウト後、未使用 import / 未使用 dependency による lint / build エラーが出ないか
+
+### 5.5 design レビューで追加判明した事項
+
+- **`@mastra/core` の `RequestContext` は自動隔離機構を持たない**: ソース読み（[chunk-4RQN7U3L.js:20](node_modules/.pnpm/@mastra+core@1.32.1_*/node_modules/@mastra/core/dist/chunk-4RQN7U3L.js)）の結果、`RequestContext` は単なる `Map` ラッパー。AsyncLocalStorage / cls-hooked のような request-scoped storage は使われない。`stream()` 呼び出し時のスナップショットもしない
+- 影響: モジュールスコープで singleton 化された場合、並列リクエスト下で他リクエストの値が `get()` で読まれるレースが発生する
+- 対処: 本 spec では `RequestContext` をハンドラ関数内で `new` する構造に変更（Synthesis 6.3-1）
 
 ### 5.4 テスト戦略案
 
@@ -181,12 +187,13 @@ _Generated: 2026-05-15_
 
 設計を最小限に保つために以下を決定:
 
-1. **`requestContext` のシングルトン問題は本 spec で修正しない** — 既存挙動を踏襲。並列リクエストでの干渉懸念は別タスクで議論（spec の主目的を逸らさない）
+1. **`requestContext` のリクエストスコープ化を本 spec で実施**（design レビューで方針変更）— `@mastra/core` の `RequestContext` は自動隔離機構を持たない単純な `Map` ラッパーであることがソース読み（[chunk-4RQN7U3L.js:20](node_modules/.pnpm/@mastra+core@1.32.1_*/node_modules/@mastra/core/dist/chunk-4RQN7U3L.js)）で判明。モジュールスコープ singleton のままだと並列リクエスト下で `userId` 漏洩によって grant invariant が破られるため、本 spec でハンドラ関数内 `new RequestContext()` 化を In-Boundary に含める（数行差分）
 2. **tool 出力は discriminated union で 3 状態返却**: `{ result: 'ok' | 'not_found_or_forbidden' | 'missing_input' | 'context_error', page?: {...} }`。execute 内で **throw しない**（agent ループの中断を避けて、エラー情報を agent が次の判断に使えるようにする）
 3. **入力スキーマは `z.object({ pageId, pagePath }).refine(...)` で「少なくとも一方必須」を表現** — execute 内の if 文より宣言的
 4. **`fileSearchTool` の暫定無効化は agent 側の `tools` 登録と `import` の両方をコメントアウト** — `tools/file-search-tool.ts` 本体には触らない（要件 4.2「リポジトリから削除しない」を維持）
 5. **ファクトリパターン / 抽象基底クラスは導入しない** — tool は 1 ファイル、単純な named export 1 つで完結
 6. **GRANT_RESTRICTED（リンク共有）の扱いは既存メソッドの挙動に従う** — tool 内で除外しない。リスクは Research Needed R-3 で別途記録するが、本 spec では「既存挙動を踏襲」とする
+7. **`findByIdAndViewer` の `user` 引数は `{ _id: ObjectId }` の最小オブジェクトで十分**（design レビューで実コード確認）— [generateGrantCondition (page.ts:1287)](apps/app/src/server/models/page.ts#L1287) と [findAllUserGroupIdsRelatedToUser (user-group-relation.ts:170)](apps/app/src/server/models/user-group-relation.ts#L170) の両方とも `user._id` のみ参照することを確認。tool 内で `User.findById()` を挟む必要なし
 
 ### 6.4 Open Decisions（design.md で確定）
 
