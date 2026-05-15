@@ -1,3 +1,5 @@
+import type { estypes as estypes7 } from '@elastic/elasticsearch7';
+import type { estypes as estypes9 } from '@elastic/elasticsearch9';
 import { getIdStringForRef, type IPage } from '@growi/core';
 import gc from 'expose-gc/function';
 import mongoose from 'mongoose';
@@ -851,6 +853,67 @@ class ElasticsearchDelegator
     } catch (err) {
       logger.error('updateOrInsertAuditlog failed.', err);
     }
+  }
+
+  async searchAuditlogs(username: string, limit: number): Promise<string[]> {
+    if (isES7ClientDelegator(this.client)) {
+      const result = await this.client.search({
+        index: this.auditlogIndexName,
+        body: {
+          size: 0,
+          query: {
+            bool: {
+              should: [
+                { wildcard: { username: { value: `*${username}*` } } },
+                { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
+              ],
+            },
+          },
+          aggs: {
+            unique_usernames: {
+              terms: { field: 'username', size: limit },
+            },
+          },
+        },
+      });
+      const agg = result.aggregations?.unique_usernames as
+        | estypes7.AggregationsStringTermsAggregate
+        | undefined;
+      const buckets = (agg?.buckets ??
+        []) as estypes7.AggregationsStringTermsBucket[];
+      return buckets.map((bucket) => bucket.key as string);
+    }
+
+    if (
+      isES8ClientDelegator(this.client) ||
+      isES9ClientDelegator(this.client)
+    ) {
+      const result = await this.client.search({
+        index: this.auditlogIndexName,
+        size: 0,
+        query: {
+          bool: {
+            should: [
+              { wildcard: { username: { value: `*${username}*` } } },
+              { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
+            ],
+          },
+        },
+        aggs: {
+          unique_usernames: {
+            terms: { field: 'username', size: limit },
+          },
+        },
+      });
+      const agg = result.aggregations?.unique_usernames as
+        | estypes9.AggregationsStringTermsAggregate
+        | undefined;
+      const buckets = (agg?.buckets ??
+        []) as estypes9.AggregationsStringTermsBucket[];
+      return buckets.map((bucket) => bucket.key as string);
+    }
+
+    return [];
   }
 
   deletePages(pages) {

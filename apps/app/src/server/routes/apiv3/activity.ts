@@ -7,7 +7,12 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
-import type { IActivity, ISearchFilter } from '~/interfaces/activity';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+  IActivity,
+  ISearchFilter,
+} from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -21,6 +26,14 @@ import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 
+interface ISuggestionsRequest
+  extends Request<
+    undefined,
+    undefined,
+    undefined,
+    { field?: string | string[]; q?: string; offset?: number; limit?: number }
+  > {}
+
 const validator = {
   list: [
     query('limit')
@@ -32,6 +45,33 @@ const validator = {
       .optional()
       .isString()
       .withMessage('query must be a string'),
+  ],
+  suggestions: [
+    query('field')
+      .optional()
+      .custom((value) => {
+        const values: unknown[] = Array.isArray(value) ? value : [value];
+        const validFields: AuditlogSuggestionField[] = [
+          'username',
+          'ip',
+          'url',
+        ];
+        return values.every((v) =>
+          validFields.includes(v as AuditlogSuggestionField),
+        );
+      })
+      .withMessage('field must be one or more of: username, ip, url'),
+    query('q').optional().isString().withMessage('q must be a string'),
+    query('offset')
+      .optional()
+      .isInt()
+      .toInt()
+      .withMessage('offset must be a number'),
+    query('limit')
+      .optional()
+      .isInt({ max: 100 })
+      .toInt()
+      .withMessage('limit must be a number less than or equal to 100'),
   ],
 };
 
@@ -314,6 +354,83 @@ module.exports = (crowi: Crowi): Router => {
         return res.apiv3({ serializedPaginationResult });
       } catch (err) {
         logger.error('Failed to get paginated activity', err);
+        return res.apiv3Err(err, 500);
+      }
+    },
+  );
+
+  /**
+   * @swagger
+   *
+   * /activity/suggestions:
+   *   get:
+   *     summary: /activity/suggestions
+   *     tags: [Activity]
+   *     security:
+   *       - bearer: []
+   *       - accessTokenInQuery: []
+   *     parameters:
+   *       - name: field
+   *         in: query
+   *         required: true
+   *         schema:
+   *           type: string
+   *           enum: [username]
+   *       - name: q
+   *         in: query
+   *         required: false
+   *         schema:
+   *           type: string
+   *       - name: offset
+   *         in: query
+   *         required: false
+   *         schema:
+   *           type: integer
+   *       - name: limit
+   *         in: query
+   *         required: false
+   *         schema:
+   *           type: integer
+   *     responses:
+   *       200:
+   *         description: Suggestions fetched successfully
+   */
+  router.get(
+    '/suggestions',
+    accessTokenParser([SCOPE.READ.ADMIN.AUDIT_LOG], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    validator.suggestions,
+    apiV3FormValidator,
+    // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
+    // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
+    async (req: ISuggestionsRequest, res: ApiV3Response) => {
+      const { field, q = '', offset = 0, limit = 5 } = req.query;
+
+      const ALL_FIELDS: AuditlogSuggestionField[] = ['username', 'ip', 'url'];
+      const fields: AuditlogSuggestionField[] =
+        field == null
+          ? ALL_FIELDS
+          : ((Array.isArray(field)
+              ? field
+              : [field]) as AuditlogSuggestionField[]);
+
+      const { searchService } = crowi;
+
+      if (!searchService.isConfigured) {
+        return res.apiv3({} satisfies AuditlogSuggestionsResponse);
+      }
+
+      try {
+        const result = await searchService.searchAuditlogSuggestions(
+          fields,
+          q,
+          offset,
+          limit,
+        );
+        return res.apiv3(result);
+      } catch (err) {
+        logger.error('Failed to get suggestions', err);
         return res.apiv3Err(err, 500);
       }
     },

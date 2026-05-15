@@ -9,13 +9,20 @@ import {
   removeAiMenthion,
 } from '~/features/search/utils/ai';
 import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+} from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
   ISearchResult,
 } from '~/interfaces/search';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import {
+  USER_FIELDS_EXCEPT_CONFIDENTIAL,
+  UserStatus,
+} from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
@@ -348,6 +355,36 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   async rebuildAuditlogIndex() {
     return this.fullTextSearchDelegator.rebuildAuditlogIndex();
+  }
+
+  async searchAuditlogSuggestions(
+    fields: AuditlogSuggestionField[],
+    q: string,
+    _offset: number,
+    limit: number,
+  ): Promise<AuditlogSuggestionsResponse> {
+    const response: AuditlogSuggestionsResponse = {};
+
+    if (fields.includes('username')) {
+      const usernames = await this.fullTextSearchDelegator.searchAuditlogs(
+        q,
+        limit,
+      );
+      const User = mongoose.model<IUser>('User');
+      const users = await User.find({ username: { $in: usernames } })
+        .select('username status')
+        .lean();
+      response.username = {
+        activeUsernames: users
+          .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+        inactiveUsernames: users
+          .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+      };
+    }
+
+    return response;
   }
 
   async parseSearchQuery(
