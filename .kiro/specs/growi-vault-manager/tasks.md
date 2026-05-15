@@ -408,7 +408,7 @@
   - GitHub Actions に integration ジョブを 1 つ追加し、`scripts.test:integ` を実行する
   - 本番運用は別リポジトリの growi-docker-compose、dev は devcontainer 内で直起動するため、本リポジトリ内に CI 専用の docker-compose ファイルは設けず、CI workflow 内で MongoDB（replica set 必須・change stream 前提）と vault-manager をそれぞれ起動する
   - **完了確認**: CI で `clone-e2e.integ` 系の 1 シナリオが PASS すること、PR に対して回帰検出が機能すること
-  - _Boundary: apps/growi-vault-manager/package.json、.github/workflows/vault-integ.yml_
+  - _Boundary: apps/growi-vault-manager/package.json、.github/workflows/ci-vault.yml_
 
 ---
 
@@ -481,7 +481,7 @@
 
 - [x] 18.5 既存ワークフロー / CI 互換性確認
   - 別リポジトリ `growi-docker-compose` から本 Dockerfile を参照している箇所（image build 設定）が新構成でも機能することを README または関連 spec で告知する（リポジトリ越境のため変更は別 PR）
-  - `.github/workflows/vault-integ.yml` は現状 docker build を経由せず直接 `node` で起動しているため Dockerfile 変更の直接影響は受けないが、回帰確認として `docker build` を CI に追加するか検討し、追加する場合は本 task に subtask を切る
+  - `.github/workflows/ci-vault.yml` は現状 docker build を経由せず直接 `node` で起動しているため Dockerfile 変更の直接影響は受けないが、回帰確認として `docker build` を CI に追加するか検討し、追加する場合は本 task に subtask を切る
   - **完了確認**: 新 Dockerfile で build した image が devcontainer 内で起動し、`/health` が 200 を返すこと、`RUN_VAULT_INTEG=true` 経由の integration test が image 経由でも PASS すること（手動確認可）
   - _Requirements: 10.2, 10.3_
-  - _Boundary: apps/growi-vault-manager/README.md（必要に応じて）、.github/workflows/vault-integ.yml（必要に応じて）_
+  - _Boundary: apps/growi-vault-manager/README.md（必要に応じて）、.github/workflows/ci-vault.yml（必要に応じて）_

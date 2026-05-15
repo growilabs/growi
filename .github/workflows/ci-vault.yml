@@ -11,7 +11,7 @@ on:
       - tmp-mergify/merge-queue/**
     paths:
       - apps/growi-vault-manager/**
-      - .github/workflows/vault-integ.yml
+      - .github/workflows/ci-vault.yml
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}

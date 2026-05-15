@@ -86,9 +86,9 @@ Highlights of the refactor:
 
 The separate [`growi-docker-compose`](https://github.com/weseek/growi-docker-compose) repository may reference this `Dockerfile` (e.g. via an image-build target or a published image tag). When a new vault-manager image built from this refactored Dockerfile is published, the `growi-docker-compose` repository **must be checked separately** to confirm that its compose definitions still build / run against the new image. That cross-repository update is intentionally out of scope for this PR — it must land as a separate PR in `growi-docker-compose`.
 
-### CI compatibility: `.github/workflows/vault-integ.yml`
+### CI compatibility: `.github/workflows/ci-vault.yml`
 
-The Dockerfile refactor has **no direct effect** on `.github/workflows/vault-integ.yml`. The integration-test workflow does not run `docker build` against this Dockerfile; instead it:
+The Dockerfile refactor has **no direct effect** on `.github/workflows/ci-vault.yml`. The integration-test workflow does not run `docker build` against this Dockerfile; instead it:
 
 1. Installs dependencies with `pnpm install --frozen-lockfile`.
 2. Builds the package with `turbo run build --filter @growi/vault-manager`.
@@ -113,7 +113,7 @@ Until `docker build` is wired into CI, the DHI-based image is verified manually.
    docker run --rm growi-vault-manager:local git --version
    ```
 
-3. **Start the image** with the same env vars used by `vault-integ.yml`, pointing at a MongoDB replica set reachable from the container (e.g. a `mongo:6.0 --replSet rs0` container on the same Docker network):
+3. **Start the image** with the same env vars used by `ci-vault.yml`, pointing at a MongoDB replica set reachable from the container (e.g. a `mongo:6.0 --replSet rs0` container on the same Docker network):
 
    ```bash
    docker run --rm -p 3001:3001 \
