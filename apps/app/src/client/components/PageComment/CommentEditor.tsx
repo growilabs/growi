@@ -12,8 +12,8 @@ import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/Co
 import {
   createMentionCompletionExtension,
   type FetchUsersFn,
-} from '@growi/editor/dist/client/services-internal/extensions/mentionAutocompletionSettings';
-import { mentionDecorationSettings } from '@growi/editor/dist/client/services-internal/extensions/mentionDecorationSettings';
+  mentionDecorationSettings,
+} from '@growi/editor/dist/client/services';
 import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
