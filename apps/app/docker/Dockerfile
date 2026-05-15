@@ -2,31 +2,26 @@
 
 ARG NODE_VERSION=24
 ARG OPT_DIR="/opt"
-ARG PNPM_HOME="/root/.local/share/pnpm"
 
 ##
-## base — DHI dev image with pnpm + turbo
+## base — official Node.js image with pnpm + turbo
 ##
-FROM dhi.io/node:24-debian13-dev AS base
+FROM node:24-bookworm AS base
 
 ARG OPT_DIR
-ARG PNPM_HOME
 
 WORKDIR $OPT_DIR
 
-# Install build dependencies
-RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  apt-get update && apt-get install -y --no-install-recommends ca-certificates gzip wget
-
-# Install pnpm (standalone script, no version hardcoding)
-RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL=/bin/sh sh -
-ENV PNPM_HOME=$PNPM_HOME
-ENV PATH="$PNPM_HOME:$PATH"
+# Activate corepack so the pnpm version pinned in the workspace package.json
+# "packageManager" field is used (avoids drift between Dockerfile and local/CI).
+RUN corepack enable
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME/bin:$PATH"
 
 # Install turbo globally
-RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
-  pnpm add turbo --global
+# Note: no cache mount here — pnpm global install links binaries into the store,
+# and the BuildKit cache mount would be unmounted after RUN, breaking those links.
+RUN pnpm add turbo --global
 
 
 ##
@@ -53,21 +48,15 @@ RUN turbo prune @growi/app @growi/pdf-converter --docker
 FROM base AS deps
 
 ARG OPT_DIR
-ARG PNPM_HOME
-
-ENV PNPM_HOME=$PNPM_HOME
-ENV PATH="$PNPM_HOME:$PATH"
 
 WORKDIR $OPT_DIR
 
 # Copy only package manifests and lockfile for dependency caching
 COPY --from=pruner $OPT_DIR/out/json/ .
 
-# Install build tools and dependencies
-RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
-  pnpm add node-gyp --global
-RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
-  pnpm install --frozen-lockfile
+# --ignore-scripts: postinstall (prisma generate) needs full source, runs in builder stage.
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+  pnpm install --frozen-lockfile --ignore-scripts
 
 
 ##

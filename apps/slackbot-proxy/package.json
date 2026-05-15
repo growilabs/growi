@@ -1,6 +1,6 @@
 {
   "name": "@growi/slackbot-proxy",
-  "version": "7.5.3-slackbot-proxy.0",
+  "version": "7.5.4-slackbot-proxy.0",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -21,11 +21,11 @@
     "lint:typecheck": "tsc --noEmit",
     "lint": "run-p lint:*",
     "ts-node": "node -r ts-node/register/transpile-only -r tsconfig-paths/register -r dotenv-flow/config",
-    "version:patch": "pnpm version patch",
-    "version:prerelease": "pnpm version prerelease --preid=slackbot-proxy",
-    "version:prepatch": "pnpm version prepatch --preid=slackbot-proxy",
-    "version:preminor": "pnpm version preminor --preid=slackbot-proxy",
-    "version:premajor": "pnpm version premajor --preid=slackbot-proxy"
+    "version:patch": "pnpm version patch --no-git-tag-version --no-git-checks",
+    "version:prerelease": "pnpm version prerelease --preid=slackbot-proxy --no-git-tag-version --no-git-checks",
+    "version:prepatch": "pnpm version prepatch --preid=slackbot-proxy --no-git-tag-version --no-git-checks",
+    "version:preminor": "pnpm version preminor --preid=slackbot-proxy --no-git-tag-version --no-git-checks",
+    "version:premajor": "pnpm version premajor --preid=slackbot-proxy --no-git-tag-version --no-git-checks"
   },
   "// comments for dependencies": {
     "@tsed/*": "v6.133.1 causes 'TypeError: Cannot read properties of undefined (reading 'prototype')' with `@Middleware()`",
