@@ -369,24 +369,17 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
     const User = mongoose.model<IUser>('User');
 
-    const activeUsers = await User.find({
+    const users = await User.find({
       username: { $in: usernames },
-      status: UserStatus.STATUS_ACTIVE,
     })
       .select('username')
       .lean();
-    const activeUsernames = activeUsers.map((u) => u.username);
-
-    const activeUsernameSet = new Set(activeUsernames);
-    const inactiveUsers = await User.find({
-      username: { $in: usernames },
-      status: { $ne: UserStatus.STATUS_ACTIVE },
-    })
-      .select('username')
-      .lean();
-    const inactiveUsernames = inactiveUsers
-      .map((u) => u.username)
-      .filter((u) => !activeUsernameSet.has(u));
+    const activeUsernames = users
+      .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+      .map((u) => u.username);
+    const inactiveUsernames = users
+      .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
+      .map((u) => u.username);
 
     return { activeUsernames, inactiveUsernames };
   }
