@@ -154,17 +154,63 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       },
     );
 
-    // updateMany fires after a bulk rename of descendants completes. The payload
-    // `pages` contains the descendant pages with their NEW paths already applied.
-    // For Stage 1 (task 21.1-A) we dispatch a per-page upsert so that the new
-    // paths appear in clones. The OLD paths are not yet removed — that requires
-    // GROWI core to carry oldPagePathPrefix in the event payload, which is
-    // Stage 2 work (task 21.1-B).
+    // ------------------------------------------------------------------
+    // Stage 2 (task 21.1-B) — rename / grant-change-prefix propagation
+    // ------------------------------------------------------------------
     //
-    // Fan-out safety: dispatcher.onPageChanged() applies a per-namespace
-    // coalesce window that collapses high-frequency upserts into a single
-    // bulk-upsert instruction (see VaultDispatcher), so dispatching one call
-    // per page on large bulk renames does not cause instruction explosion.
+    // 'rename' (single page): GROWI core was extended to carry
+    //   { page, oldPath, newPath, user }. We translate this into a
+    //   rename-prefix instruction per affected namespace.
+    pageEvent.on(
+      'rename',
+      (payload?: {
+        page?: IPage & { _id: { toString(): string } };
+        oldPath?: string;
+        newPath?: string;
+        user?: unknown;
+      }) => {
+        if (
+          payload == null ||
+          payload.page == null ||
+          payload.oldPath == null ||
+          payload.newPath == null
+        ) {
+          logger.debug(
+            'vault-dispatcher: skipping rename without { page, oldPath, newPath } payload',
+          );
+          return;
+        }
+        const { current } = vaultNamespaceMapper.computePageNamespaces(
+          payload.page,
+        );
+        if (current.length === 0) return;
+        dispatcher
+          .onBulkOperation({
+            type: 'rename-prefix',
+            namespaces: current,
+            oldPrefix: payload.oldPath,
+            newPrefix: payload.newPath,
+          })
+          .catch((err) => {
+            logger.warn(
+              { err },
+              'vault-dispatcher: error handling rename event',
+            );
+          });
+      },
+    );
+
+    // 'updateMany' (bulk rename of descendants): GROWI core was extended to
+    // carry a 4th argument { oldPagePathPrefix, newPagePathPrefix }. When
+    // present, we emit a single rename-prefix instruction per affected
+    // namespace — that collapses N descendant updates into M (= namespace
+    // count) instructions. When absent (legacy callers / non-rename emits),
+    // we fall back to per-page upserts so behaviour is at least correct, if
+    // less efficient.
+    //
+    // Coalesce safety: dispatcher.onPageChanged() coalesces high-frequency
+    // upserts on the same namespace into bulk-upsert instructions, so the
+    // fallback path is safe at scale.
     pageEvent.on(
       'updateMany',
       (
@@ -175,11 +221,43 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
           }
         >,
         _user: unknown,
+        extras?: { oldPagePathPrefix?: string; newPagePathPrefix?: string },
       ) => {
-        if (!Array.isArray(pages)) return;
+        if (!Array.isArray(pages) || pages.length === 0) return;
+
+        // Stage 2 fast path: GROWI core sent us prefix info → rename-prefix.
+        if (
+          extras?.oldPagePathPrefix != null &&
+          extras?.newPagePathPrefix != null
+        ) {
+          // The namespaces a bulk rename affects are the union of the
+          // namespaces of every descendant page. Grant is unchanged by a
+          // rename, so we can read it off the (unchanged) in-memory pages.
+          const namespaceSet = new Set<string>();
+          for (const page of pages) {
+            const { current } =
+              vaultNamespaceMapper.computePageNamespaces(page);
+            for (const ns of current) namespaceSet.add(ns);
+          }
+          if (namespaceSet.size === 0) return;
+          dispatcher
+            .onBulkOperation({
+              type: 'rename-prefix',
+              namespaces: Array.from(namespaceSet),
+              oldPrefix: extras.oldPagePathPrefix,
+              newPrefix: extras.newPagePathPrefix,
+            })
+            .catch((err) => {
+              logger.warn(
+                { err },
+                'vault-dispatcher: error handling updateMany (rename-prefix)',
+              );
+            });
+          return;
+        }
+
+        // Fallback: per-page upsert.
         for (const page of pages) {
-          // Skip pages without a revision (auto-generated intermediate paths;
-          // mirror the guard in vault-bootstrapper / vault-dispatcher).
           if (page.revision == null) continue;
           const revisionId =
             typeof page.revision === 'object' && '_id' in page.revision
@@ -199,21 +277,16 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       },
     );
 
-    // syncDescendantsUpdate fires after a bulk rename completes.
-    // Stage 1 (task 21.1-A): the new paths are already handled via 'updateMany'
-    // above. The OLD paths still linger in the vault because GROWI's event
-    // payload does not carry the oldPagePathPrefix. Stage 2 (task 21.1-B) will
-    // extend the event payload and dispatch a `rename-prefix` instruction here
-    // to remove the old paths in a single instruction per affected namespace.
+    // syncDescendantsUpdate fires after a bulk rename completes. Now that
+    // Stage 2 routes the bulk rename via 'updateMany' + rename-prefix, this
+    // signal is informational only — vault has already been updated by the
+    // time this fires. Kept as a debug log so operators can correlate logs
+    // during incident response.
     pageEvent.on(
       'syncDescendantsUpdate',
       (_targetPage: unknown, _user: unknown) => {
-        logger.warn(
-          'vault-dispatcher: received syncDescendantsUpdate. Stage 1 (task 21.1-A) ' +
-            'reflects new paths via the updateMany event, but old paths still ' +
-            'remain in the vault until Stage 2 (task 21.1-B) lands. ' +
-            'Re-run bootstrap from the Admin UI (/admin/vault) if a clean vault ' +
-            'state is required.',
+        logger.debug(
+          'vault-dispatcher: received syncDescendantsUpdate (handled by updateMany subscriber)',
         );
       },
     );
@@ -226,6 +299,84 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
         'vault-dispatcher: received syncDescendantsDelete (no-op for vault)',
       );
     });
+
+    // 'descendantsGrantChanged' fires after updateChildPagesGrant has applied
+    // a bulk grant change to descendant pages. Without this signal, GROWI's
+    // updateChildPagesGrant performs a silent Page.bulkWrite() that leaves the
+    // vault holding the pre-change grant — an ACL leak.
+    //
+    // We translate the bulk event into N per-page acl-change events: each
+    // affected page gets remove instructions for its previous namespaces and
+    // upsert instructions for its current namespaces. The dispatcher already
+    // handles acl-change atomically (see VaultDispatcher.onPageChanged), so
+    // routing through it keeps the well-tested code path on the critical ACL
+    // path.
+    pageEvent.on(
+      'descendantsGrantChanged',
+      (payload?: {
+        affectedPages?: Array<{
+          page: IPage & { _id: { toString(): string }; revision?: unknown };
+          previousGrant: unknown;
+          previousGrantedGroups: unknown;
+          previousGrantedUsers: unknown;
+          newGrant: unknown;
+          newGrantedGroups: unknown;
+          newGrantedUsers: unknown;
+        }>;
+        user?: unknown;
+      }) => {
+        const items = payload?.affectedPages;
+        if (!Array.isArray(items) || items.length === 0) return;
+
+        for (const item of items) {
+          // Build a minimal page view with the PREVIOUS grant state so the
+          // namespace mapper computes the old namespaces correctly.
+          const previousPageView = {
+            ...item.page,
+            grant: item.previousGrant,
+            grantedGroups: item.previousGrantedGroups,
+            grantedUsers: item.previousGrantedUsers,
+          } as unknown as IPage;
+          const previousNamespaces =
+            vaultNamespaceMapper.computePageNamespaces(
+              previousPageView,
+            ).current;
+
+          // Build a "current state" view so the dispatcher computes new
+          // namespaces against the post-change grant.
+          const currentPageView = {
+            ...item.page,
+            grant: item.newGrant,
+            grantedGroups: item.newGrantedGroups,
+            grantedUsers: item.newGrantedUsers,
+          } as unknown as IPage & { _id: { toString(): string } };
+
+          const revisionId =
+            item.page.revision == null
+              ? undefined
+              : typeof item.page.revision === 'object' &&
+                  '_id' in (item.page.revision as object)
+                ? (
+                    item.page.revision as { _id: { toString(): string } }
+                  )._id.toString()
+                : (item.page.revision as { toString(): string }).toString();
+
+          dispatcher
+            .onPageChanged({
+              type: 'acl-change',
+              page: currentPageView,
+              previousNamespaces,
+              revisionId,
+            })
+            .catch((err) => {
+              logger.warn(
+                { err },
+                'vault-dispatcher: error handling descendantsGrantChanged entry',
+              );
+            });
+        }
+      },
+    );
 
     logger.info(
       'GROWI Vault: VaultDispatcher subscribed to PageService events',

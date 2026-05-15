@@ -406,20 +406,18 @@ interface VaultDispatcher {
 - coalesce 対象は `create` / `update` のみ（`remove` / `rename-prefix` / `grant-change-prefix` は混在させない）
 - chunk size 上限はデフォルト 1000 entries / instruction
 
-**prefix primitive（親ページのバルク操作）** — **[MVP・段階実装]**
+**prefix primitive（親ページのバルク操作）** — **[MVP・実装完了]**
 
-> _本機能は MVP スコープ。実装は GROWI core 側の event payload 拡張の有無で 2 段階に分かれる:_
+> _MVP として 2 段階で実装完了:_
 >
-> - **Stage 1 (本 PR / タスク 21.1-A)**: GROWI core を変更せず、現行イベント payload で取れる範囲を実装する。
->   - `'updateMany'` イベント（bulk rename 後に新パスの pages 配列を carry）を購読し、各 page に対して `upsert` instruction を発行する。これにより bulk rename 後の新パスが clone に現れるようになる。
->   - 旧パス削除（`rename-prefix`）と grant 一括変更（`grant-change-prefix`）は Stage 1 範囲外。Stage 2 完了までは管理者による bootstrap 再実行で対処する運用とする。
-> - **Stage 2 (次 PR / タスク 21.1-B)**: GROWI core の event payload を拡張して oldPath / oldGrant を carry し、本来の `rename-prefix` / `grant-change-prefix` instruction を発行する。
->   - `pageEvent.emit('rename', { page, oldPath, newPath, user })` に拡張
->   - `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` に拡張
->   - `updateChildPagesGrant` から新規イベント `pageEvent.emit('descendantsGrantChanged', { parentPage, oldGrant, newGrant, affectedPages })` を発火
+> - **Stage 1 (タスク 21.1-A、実装済み)**: `'updateMany'` を購読し、4 つ目の payload が無い legacy emit ではフォールバックとして per-page upsert を発行する。
+> - **Stage 2 (タスク 21.1-B、実装済み)**: GROWI core の event payload を拡張し、subscriber がそれらを受け取って instruction を発行する:
+>   - `pageEvent.emit('rename', { page, oldPath, newPath, user })` → vault subscriber が `rename-prefix` instruction を namespace 数ぶん発行
+>   - `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` → vault subscriber が影響 namespace 集合を de-dup して `rename-prefix` を 1 件 / namespace 発行
+>   - 新規イベント `pageEvent.emit('descendantsGrantChanged', { affectedPages, user })` → vault subscriber が per-page `acl-change` instruction（remove + upsert）を発行（既存 dispatcher 経路を流用）
 
-- 親ページ rename: 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）— **Stage 2 で実装**（Stage 1 では bulk rename の新パスのみ `updateMany` 経由で `upsert` する）
-- 親ページ grant 一括変更: `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` 1 件 — **Stage 2 で実装**（Stage 1 では event 自体が発火しないため検知不可）
+- 親ページ rename: 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）— **実装済み**
+- 親ページ grant 一括変更: 影響を受けた各 page に対して per-page `acl-change` instruction を発行（remove from previous namespaces + upsert to current namespaces）— **実装済み**（`grant-change-prefix` op は subtree 単位の prefix scope を持たないため、将来の vault-manager 設計改修まで使用しない）
 
 **実装ノート**
 - 既存 GROWI `PageEvent`（`apps/app/src/server/events/page.ts`）に subscribe

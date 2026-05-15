@@ -264,21 +264,21 @@ await db.collection('vault_sync_state').updateOne(
    db.vault_user_views.find({}, { mergedTreeOid: 1 }).toArray();
    ```
 
-### rename / grant 一括変更後に vault の内容が部分的に古くなる（MVP Stage 2 完了までの既知制限）
+### rename / grant 一括変更の vault 伝播（MVP Stage 2 完了で自動化済み）
 
-**背景**: MVP は段階実装中（`growi-vault-gateway` タスク 21.1）。Stage 1 で `'updateMany'` 経由の per-page upsert は実装済みだが、旧パス削除と grant 一括変更の自動伝播は Stage 2 で実装予定。
+**背景**: タスク 21.1-A（Stage 1）および 21.1-B（Stage 2）の完了により、rename / grant 一括変更は GROWI core から vault へ自動伝播するようになった。本セクションは過去の運用回避手順を残しつつ、現在の自動伝播経路を記録する。
 
-| 操作 | Stage 1 (現在の挙動) | Stage 2 (今後) |
-|---|---|---|
-| 単一ページ rename | 検知できず（`'rename'` event の payload が空）。WARN ログのみ。 | event payload を拡張して `rename-prefix` を発行 |
-| 子孫ページ一括 rename | `'updateMany'` 経由で新パスを per-page upsert（**clone に新パスは現れる**）。旧パスのファイルは vault に残り続ける | event payload に `oldPagePathPrefix` を追加して旧パスも `rename-prefix` で削除 |
-| 親ページ grant 一括変更 | **検知できない**（`updateChildPagesGrant` が event を発火しない）。ACL 整合性が崩れたまま | 新規イベント `'descendantsGrantChanged'` を追加して `grant-change-prefix` を発行 |
+| 操作 | 伝播経路（実装済み） |
+|---|---|
+| 単一ページ rename | `pageEvent.emit('rename', { page, oldPath, newPath, user })` → vault subscriber が `rename-prefix` instruction を namespace 数ぶん発行 |
+| 子孫ページ一括 rename | `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` → vault subscriber が影響 namespace 集合を de-dup して `rename-prefix` を 1 件 / namespace 発行 |
+| 親ページ grant 一括変更 | `updateChildPagesGrant` 内 `Page.bulkWrite()` 直後に `pageEvent.emit('descendantsGrantChanged', { affectedPages, user })` → vault subscriber が per-page `acl-change` instruction（remove + upsert）を発行 |
 
-**症状（Stage 2 完了まで）**:
-- rename 後: 新パスは現れるが旧パスのファイルが clone に残ったまま
-- grant 一括変更後: 変更前の namespace のままで clone される（ACL 漏洩リスク）
+**手動 bootstrap 再実行が依然必要なケース**:
+- 既存 vault が Stage 2 リリース以前の状態でリレジリエンスが取れていない場合（初回マイグレーション扱い）
+- vault-manager 側で instruction 処理が失敗してリトライ上限を超えた場合（`vault_instructions.attempts >= 5` のドキュメントが残っている等）
 
-**回避手順**: 以下の手順で vault を再初期化する。
+**手動回避手順**（必要時のみ）:
 
 1. bootstrap state をリセットする:
    ```js
@@ -298,7 +298,7 @@ await db.collection('vault_sync_state').updateOne(
 
 3. bootstrap 完了後（`bootstrapState === 'done'`）、`git fetch` または `git clone` で最新内容が反映されることを確認する。
 
-> **Note**: 上記の手動回避は MVP Stage 2（`growi-vault-gateway` タスク 21.1-B）完了で不要になる。特に grant 一括変更による ACL 漏洩は Stage 2 完了まで運用ルールでカバーすること（権限のある管理者のみが grant 一括変更を行い、操作後に必ず bootstrap を再実行する等）。
+> **Note**: 通常運用では本手動手順は不要。rename / grant 一括変更は GROWI core からの emit によって vault 側に自動伝播される。`syncDescendantsUpdate` の WARN ログは Stage 1 で警告メッセージを出していたが、Stage 2 完了に伴い debug ログに格下げされた（`'updateMany'` で吸収済みのため）。
 
 ---
 

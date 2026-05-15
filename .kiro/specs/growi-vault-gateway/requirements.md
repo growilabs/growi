@@ -108,10 +108,10 @@
 1. When ページが作成または更新された場合, the GROWI Vault Gateway shall 対応する namespace に `op: 'upsert'` instruction を vault_instructions に挿入する（pageId・pagePath・revisionId・issuedAt を含む）
 2. When ページが削除された場合, the GROWI Vault Gateway shall 対応する namespace に `op: 'remove'` instruction を vault_instructions に挿入する（pagePath は削除直前の値）
 3. When 単一ページの ACL が変更された場合, the GROWI Vault Gateway shall 旧 namespace に `op: 'remove'` + 新 namespace に `op: 'upsert'` の 2 件を vault_instructions に挿入する
-4. **[MVP]** When 親ページが rename された場合, the GROWI Vault Gateway shall 影響を受ける各 namespace に `op: 'rename-prefix'` instruction を 1 件ずつ挿入する（descendants 数に依らず namespace 数 M 件で収束する）
-   > _実装は 2 段階で行う。Stage 1 (本 PR): `'updateMany'` イベント購読により bulk rename 後の新パスを per-page upsert で反映する（旧パスのファイルは clone に残る）。Stage 2 (次 PR / タスク 21.1-B): GROWI page service の `'rename'` / `'updateMany'` イベント payload を拡張して oldPath を carry し、`rename-prefix` instruction で旧パスを完全に削除する。Stage 1 完了までは rename 後の旧パス残存は admin UI からの bootstrap 再実行で解消する。_
-5. **[MVP]** When 親ページの grant が一括変更された場合, the GROWI Vault Gateway shall 移動元・移動先 namespace ペアごとに `op: 'grant-change-prefix'` instruction を 1 件ずつ挿入する
-   > _Stage 2 (タスク 21.1-B) で実装する。GROWI page service の `updateChildPagesGrant` は現状 `Page.bulkWrite` を直接呼んでおり event 発火がないため、新規イベント `'descendantsGrantChanged'` を追加して payload に `(oldGrant, newGrant, parentPage, affectedPages)` を含める。実装までは grant 一括変更後は admin UI からの bootstrap 再実行で ACL 整合性を保つ運用とする。_
+4. **[MVP・実装済み]** When 親ページが rename された場合, the GROWI Vault Gateway shall 影響を受ける各 namespace に `op: 'rename-prefix'` instruction を 1 件ずつ挿入する（descendants 数に依らず namespace 数 M 件で収束する）
+   > _実装完了: GROWI page service の `'rename'` / `'updateMany'` event payload を拡張し（タスク 21.1-B）、`{ oldPath, newPath, user, page }` ないし `{ oldPagePathPrefix, newPagePathPrefix }` を carry する。vault subscriber が影響 namespace を計算して `rename-prefix` instruction を発行する。_
+5. **[MVP・実装済み]** When 親ページの grant が一括変更された場合, the GROWI Vault Gateway shall 影響を受けた各 page に対して per-page `acl-change` instruction を発行する（remove from previous namespaces + upsert to current namespaces）
+   > _実装完了: GROWI page service の `updateChildPagesGrant` から新規イベント `'descendantsGrantChanged'` を発火し（タスク 21.1-B）、payload に `{ affectedPages: [{ page, previousGrant, previousGrantedGroups, previousGrantedUsers, newGrant, newGrantedGroups, newGrantedUsers }], user }` を含める。vault subscriber が per-page で `acl-change` instruction を発行する（既存 dispatcher 経路を流用）。当初設計で想定した `grant-change-prefix` op は subtree 単位の prefix scope を持たないため、将来の vault-manager 設計改修まで使用しない。_
 6. When 同一 namespace 向けの `upsert` イベントが coalesce window（既定 1 秒）内に 100 件以上発生した場合, the GROWI Vault Gateway shall それらを 1 件の `op: 'bulk-upsert'` instruction にまとめる（chunk size 上限 1000 entries）
 7. When vault_instructions への書き込みが一時的に失敗した場合, the GROWI Vault Gateway shall WARN ログを記録してリトライする（ページ編集レスポンスとは切り離して処理する）
 

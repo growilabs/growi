@@ -139,7 +139,7 @@ graph TB
 - vault-manager への外部からの直接アクセス(常に apps/app gateway 経由)
 - bare repo の delta 圧縮・pack format 実装(git binary に委譲)
 - 監査ログ専用コレクションの新設(既存 audit log に統合)
-- **[MVP・段階実装]** 親ページ rename / grant 一括変更に伴う `rename-prefix` / `grant-change-prefix` instruction の伝播: MVP スコープとして 2 段階で実装する。Stage 1 (タスク 21.1-A) は GROWI core を変更せず `'updateMany'` イベントから per-page upsert を発行し、bulk rename 後の新パスを clone に反映する。Stage 2 (タスク 21.1-B) で GROWI page service の event payload を拡張し、`rename-prefix` / `grant-change-prefix` の本来の prefix primitive を発行して旧パス削除と grant 一括変更を完全に伝播する。Stage 2 完了までは旧パス残存および grant 一括変更後の不整合は管理者の bootstrap 再実行で解消する運用とする（詳細は `growi-vault-gateway/design.md` および `growi-vault/dev-verification.md` 参照）
+- **[MVP・実装完了]** 親ページ rename / grant 一括変更に伴う vault 伝播: MVP スコープとして 2 段階で実装完了。Stage 1 (タスク 21.1-A) で `'updateMany'` イベントの per-page upsert フォールバック経路、Stage 2 (タスク 21.1-B) で GROWI page service の event payload を拡張（`'rename'`、`'updateMany'`、新規 `'descendantsGrantChanged'`）。vault は `rename-prefix` instruction（rename）と per-page `acl-change` instruction（grant 一括変更、既存 dispatcher 経路を流用）で自動伝播する。`grant-change-prefix` op は subtree 単位の prefix scope を持たないため将来の vault-manager 設計改修まで使用しない（詳細は `growi-vault-gateway/design.md` および `growi-vault/dev-verification.md` 参照）
 
 ### Revalidation Triggers(umbrella レベル)
 
@@ -267,11 +267,11 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 
 > **災害復旧**: bare repo 全消失時の再構築は "Initial Bootstrap フロー" と完全に同一のコードパスで吸収される(apps/app から `reset-all` + 全 page bulk-upsert を再発行)。詳細は `growi-vault-gateway/design.md` の VaultBootstrapper 節を参照。
 
-### MVP 段階実装の現在地
+### MVP 段階実装の完了状況
 
-| # | 課題 | Stage 1 (本 PR) | Stage 2 (次 PR) | 関連タスク |
+| # | 課題 | Stage 1（実装済み） | Stage 2（実装済み） | 関連タスク |
 |---|------|-----------------|-----------------|-----------|
-| 1 | **rename 伝播**: 親ページ rename 後、旧パス削除 + 新パス追加を vault に反映する | `'updateMany'` を購読し新パスを per-page upsert（旧パスは残る） | GROWI core の event payload を拡張し `rename-prefix` instruction で旧パスも削除 | `growi-vault-gateway` タスク 21.1-A / 21.1-B |
-| 2 | **grant 一括変更伝播**: 親ページ grant 一括変更を vault に反映する | 検知不可（`updateChildPagesGrant` が `Page.bulkWrite` を直接呼び event 発火なし） | GROWI core に新規イベント `'descendantsGrantChanged'` を追加し `grant-change-prefix` instruction を発行 | `growi-vault-gateway` タスク 21.1-B |
+| 1 | **rename 伝播**: 親ページ rename 後、旧パス削除 + 新パス追加を vault に反映する | `'updateMany'` 購読のフォールバック経路（per-page upsert） | GROWI core の `'rename'` / `'updateMany'` payload を拡張し、vault subscriber が `rename-prefix` instruction を namespace 数ぶん発行 | `growi-vault-gateway` タスク 21.1-A / 21.1-B |
+| 2 | **grant 一括変更伝播**: 親ページ grant 一括変更を vault に反映する | — | GROWI core に新規イベント `'descendantsGrantChanged'` を追加し、vault subscriber が per-page `acl-change` instruction（既存 dispatcher 経路）を発行 | `growi-vault-gateway` タスク 21.1-B |
 
-> **MVP Stage 2 完了までの運用注意**: 親ページの rename 後は旧パスのファイルが clone に残るため、ACL/データ整合性を完全に揃えるには admin UI (`/admin/vault`) から "Prepare GROWI Vault" を再実行する必要がある。親ページ grant 一括変更後は vault が完全に古いままなので bootstrap 再実行は必須。詳細は `growi-vault/dev-verification.md` のトラブルシュート節を参照。
+> **運用注意**: rename / grant 一括変更は GROWI core からの emit によって vault に自動伝播される。通常運用では手動 bootstrap 再実行は不要。例外として、既存 vault が Stage 2 リリース以前の状態でリレジリエンスが取れていない場合や vault-manager 側で instruction 処理が失敗してリトライ上限を超えた場合のみ手動 bootstrap が必要（手順は `growi-vault/dev-verification.md` のトラブルシュート節を参照）。

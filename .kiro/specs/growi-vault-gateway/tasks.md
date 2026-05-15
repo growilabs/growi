@@ -222,9 +222,9 @@ _Depends: 3.1, 5.1_
   - `delete` イベント → current namespace に `remove` instruction を挿入する（pagePath は削除直前の値）
   - ACL 変更時 → `previous` namespace に `remove` + `current` namespace に `upsert` の 2 件を挿入する
   - coalesce window（既定 1 秒）内に同一 namespace で 100 件以上の `upsert` が発生した場合は `bulk-upsert` にまとめる（chunk size 上限 1000）
-- `onBulkOperation(event: BulkPageOperationEvent)` を定義する（API は実装済み。発火経路は MVP 段階実装 — タスク 21.1-A / 21.1-B）:
-  - 親ページ rename → 影響 namespace ごとに `rename-prefix` instruction を挿入する — **タスク 21.1-B（Stage 2）で配線**
-  - 親ページ grant 一括変更 → `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` instruction を挿入する — **タスク 21.1-B（Stage 2）で配線**
+- `onBulkOperation(event: BulkPageOperationEvent)` を定義する（API・発火経路ともに実装済み — タスク 21.1-A / 21.1-B）:
+  - 親ページ rename → 影響 namespace ごとに `rename-prefix` instruction を挿入する — **タスク 21.1-B で配線済み**
+  - 親ページ grant 一括変更 → 個別ページ単位の `acl-change` instruction（既存 dispatcher 経路）で per-page に remove + upsert を発行する — **タスク 21.1-B で配線済み**（`grant-change-prefix` op は subtree 単位の prefix scope を持たないため将来の vault-manager 設計改修まで使用しない）
 - 書き込み失敗時は WARN ログ + リトライ（ページ編集 response とは切り離す）
 - named export する
 - **完了確認**: イベント種別ごとの単体テストが全て通ること（`onBulkOperation` の rename-prefix / grant-change-prefix 発火は Stage 2 で実装）
@@ -238,19 +238,23 @@ _Depends: 3.1, 5.1_
 - ACL 変更イベント → `remove` + `upsert` の 2 件が発行されることをテストする
 - 同 namespace への高頻度 event（100+）が `bulk-upsert` に coalesce されることをテストする
 - coalesce window 外の event は単発 `upsert` で発行されることをテストする
-- 親 rename → `rename-prefix` が発行されることをテストする — **タスク 21.1-B（Stage 2）で実装**
-- 親 grant 変更 → `grant-change-prefix` が発行されることをテストする — **タスク 21.1-B（Stage 2）で実装**
+- 親 rename → `rename-prefix` が発行されることをテストする — **タスク 21.1-B 実装済み（`server/index.spec.ts` の Stage 2 describe ブロック）**
+- 親 grant 変更 → per-page `acl-change`（remove + upsert）が発行されることをテストする — **タスク 21.1-B 実装済み（同上）**
 - **完了確認**: `pnpm vitest run vault-dispatcher.spec` が全テスト通過すること
 
-### [x] 7.3 PageService event 購読の組み込み（**段階実装中 — Stage 1 はタスク 21.1-A、Stage 2 はタスク 21.1-B で実装**）
+### [x] 7.3 PageService event 購読の組み込み（**全 Stage 実装完了 — Stage 1: タスク 21.1-A, Stage 2: タスク 21.1-B**）
 
-`apps/app/src/features/growi-vault/server/index.ts`（または feature 登録ファイル）に VaultDispatcher の event 購読を追加する。
+`apps/app/src/features/growi-vault/server/index.ts` で VaultDispatcher の event 購読を実装する。
 
-- 既存 `PageEvent`（`apps/app/src/server/events/page.ts`）の `'create' | 'update' | 'delete'` に subscribe する（**実装済み**）
-- `'updateMany'` に subscribe する — **タスク 21.1-A（Stage 1）で追加**
-- `'rename'` の payload 拡張 / `'descendantsGrantChanged'` の新規追加とそれぞれの購読 — **タスク 21.1-B（Stage 2）で実装**
+- `'create' | 'update' | 'delete'` に subscribe する（**実装済み**）
+- `'updateMany'` に subscribe する：
+  - 4 つ目の payload `{ oldPagePathPrefix, newPagePathPrefix }` が存在する場合 → 影響 namespace 集合を計算し `rename-prefix` instruction を 1 件 / namespace 発行（Stage 2 fast path）
+  - 4 つ目の payload が無い場合（legacy emit） → per-page upsert にフォールバック（Stage 1 fallback）
+- `'rename'` の `{ page, oldPath, newPath, user }` payload を subscribe → `rename-prefix` instruction を 1 件 / namespace 発行（**実装済み**）
+- `'descendantsGrantChanged'` の `{ affectedPages, user }` payload を subscribe → per-page `acl-change` instruction を発行（既存 dispatcher 経路を流用）（**実装済み**）
+- `'syncDescendantsUpdate'` / `'syncDescendantsDelete'` は debug ログのみの no-op（前者は `'updateMany'` で、後者は per-page `'delete'` で吸収されるため）
 - feature 有効時（vaultEnabled）のみ購読を開始する（**実装済み**）
-- **完了確認**: `'create' | 'update' | 'delete'` の 3 イベントで VaultDispatcher が動作することを確認すること。`'updateMany'` 購読は Stage 1（タスク 21.1-A）、`rename-prefix` / `grant-change-prefix` 発火は Stage 2（タスク 21.1-B）で配線する
+- **完了確認**: `server/index.spec.ts` に 14 件のテストを実装。全イベントで dispatcher が期待通り呼び出されることを検証済み。`pnpm vitest run src/features/growi-vault/server/index.spec.ts` PASS
 
 ---
 
@@ -704,7 +708,7 @@ _Depends: 7.1, 7.3_
 - **Stage 1（21.1-A、本 PR）**: GROWI core を変更せず、現行 event payload の範囲で実装する
 - **Stage 2（21.1-B、次 PR）**: GROWI core の event payload を拡張して残ったギャップを埋める
 
-### [ ] 21.1-A Stage 1: `'updateMany'` 購読による新パス反映（GROWI core 変更なし）
+### [x] 21.1-A Stage 1: `'updateMany'` 購読による新パス反映（GROWI core 変更なし）
 
 `apps/app/src/features/growi-vault/server/index.ts` を編集する。
 
@@ -720,7 +724,7 @@ _Depends: 7.1, 7.3_
   - `vault-dispatcher.spec.ts` の既存 upsert 動作に regression がないこと（`pnpm vitest run vault-dispatcher.spec` と `vault-pat-auth.spec` 系全件 pass）
   - `dev-verification.md` に Stage 1 / Stage 2 のスコープと、Stage 2 完了までの運用回避策（bootstrap 再実行）を明記すること
 
-### [ ] 21.1-B Stage 2: GROWI core event payload 拡張による完全実装
+### [x] 21.1-B Stage 2: GROWI core event payload 拡張による完全実装
 
 `apps/app/src/server/service/page/index.ts` と `apps/app/src/features/growi-vault/server/index.ts` を編集する。
 

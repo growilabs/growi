@@ -32,8 +32,21 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-const dispatcherOnPageChanged = vi.fn().mockResolvedValue(undefined);
-const dispatcherOnBulkOperation = vi.fn().mockResolvedValue(undefined);
+// Shared spies for dispatcher + namespace mapper. Declared via vi.hoisted so
+// they survive vi.mock's hoisting transform and are reachable from the
+// factories below.
+const {
+  dispatcherOnPageChanged,
+  dispatcherOnBulkOperation,
+  namespaceMapperComputePageNamespaces,
+} = vi.hoisted(() => ({
+  dispatcherOnPageChanged: vi.fn().mockResolvedValue(undefined),
+  dispatcherOnBulkOperation: vi.fn().mockResolvedValue(undefined),
+  namespaceMapperComputePageNamespaces: vi.fn(() => ({
+    current: ['public'] as ReadonlyArray<string>,
+    previous: undefined as ReadonlyArray<string> | undefined,
+  })),
+}));
 
 vi.mock('./services/vault-dispatcher', () => ({
   createVaultDispatcher: vi.fn(() => ({
@@ -49,11 +62,12 @@ vi.mock('./services/vault-bootstrapper', () => ({
   })),
 }));
 
-// Other named exports used by the SUT but not relevant to subscription tests.
+// vault-namespace-mapper is exercised by Stage 2 subscribers (rename /
+// descendantsGrantChanged) so we share a stub that tests can configure.
 vi.mock('./services/vault-namespace-mapper', () => ({
   vaultNamespaceMapper: {
     computeAccessibleNamespaces: vi.fn(),
-    computePageNamespaces: vi.fn(),
+    computePageNamespaces: namespaceMapperComputePageNamespaces,
   },
 }));
 
@@ -238,5 +252,236 @@ describe('initializeVaultFeature — updateMany subscription (task 21.1-A / Stag
       { err: expect.any(Error) },
       'vault-dispatcher: error handling updateMany entry',
     );
+  });
+});
+
+describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    enableVaultSettings();
+    namespaceMapperComputePageNamespaces.mockReturnValue({
+      current: ['public'],
+      previous: undefined,
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 'rename' — single page
+  // -------------------------------------------------------------------------
+
+  describe("'rename' event", () => {
+    it('dispatches one rename-prefix per namespace with old/new path', async () => {
+      namespaceMapperComputePageNamespaces.mockReturnValue({
+        current: ['group-eng', 'public'],
+        previous: undefined,
+      });
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      const page = { _id: { toString: () => 'p1' }, path: '/new/path' };
+      crowi.events.page.emit('rename', {
+        page,
+        oldPath: '/old/path',
+        newPath: '/new/path',
+        user: { _id: 'u1' },
+      });
+      await flush();
+
+      expect(dispatcherOnBulkOperation).toHaveBeenCalledTimes(1);
+      expect(dispatcherOnBulkOperation).toHaveBeenCalledWith({
+        type: 'rename-prefix',
+        namespaces: ['group-eng', 'public'],
+        oldPrefix: '/old/path',
+        newPrefix: '/new/path',
+      });
+    });
+
+    it('skips when payload is missing required fields', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      // Legacy callers that emit without payload — must not crash, must not
+      // dispatch any bulk op.
+      crowi.events.page.emit('rename');
+      crowi.events.page.emit('rename', { oldPath: '/x', newPath: '/y' });
+      await flush();
+
+      expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
+    });
+
+    it('skips when computePageNamespaces returns no current namespaces', async () => {
+      namespaceMapperComputePageNamespaces.mockReturnValue({
+        current: [],
+        previous: undefined,
+      });
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      crowi.events.page.emit('rename', {
+        page: { _id: { toString: () => 'p1' }, path: '/x' },
+        oldPath: '/old',
+        newPath: '/x',
+        user: { _id: 'u1' },
+      });
+      await flush();
+
+      expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 'updateMany' — bulk rename Stage 2 fast path
+  // -------------------------------------------------------------------------
+
+  describe("'updateMany' with prefix extras", () => {
+    it('collapses bulk rename into one rename-prefix per affected namespace (de-duped)', async () => {
+      namespaceMapperComputePageNamespaces
+        .mockReturnValueOnce({ current: ['public'], previous: undefined })
+        .mockReturnValueOnce({
+          current: ['public', 'group-eng'],
+          previous: undefined,
+        })
+        .mockReturnValueOnce({ current: ['group-eng'], previous: undefined });
+
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      const pages = [
+        { _id: { toString: () => 'p1' }, path: '/new/a' },
+        { _id: { toString: () => 'p2' }, path: '/new/b' },
+        { _id: { toString: () => 'p3' }, path: '/new/c' },
+      ];
+
+      crowi.events.page.emit(
+        'updateMany',
+        pages,
+        { _id: 'u1' },
+        { oldPagePathPrefix: '/old/', newPagePathPrefix: '/new/' },
+      );
+      await flush();
+
+      // One bulk op, not three per-page upserts.
+      expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+      expect(dispatcherOnBulkOperation).toHaveBeenCalledTimes(1);
+
+      const call = dispatcherOnBulkOperation.mock.calls[0][0] as Parameters<
+        typeof dispatcherOnBulkOperation
+      >[0];
+      expect(call.type).toBe('rename-prefix');
+      expect(call.oldPrefix).toBe('/old/');
+      expect(call.newPrefix).toBe('/new/');
+      // De-duped union of the three pages' namespaces, order-insensitive.
+      expect((call.namespaces as ReadonlyArray<string>).slice().sort()).toEqual(
+        ['group-eng', 'public'],
+      );
+    });
+
+    it('falls back to per-page upsert when extras is omitted (legacy emit)', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      const pages = [
+        { _id: { toString: () => 'p1' }, path: '/x', revision: 'r1' },
+      ];
+      // No 4th arg — legacy contract.
+      crowi.events.page.emit('updateMany', pages, { _id: 'u1' });
+      await flush();
+
+      expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
+      expect(dispatcherOnPageChanged).toHaveBeenCalledTimes(1);
+      expect(dispatcherOnPageChanged).toHaveBeenCalledWith({
+        type: 'update',
+        page: pages[0],
+        revisionId: 'r1',
+      });
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // 'descendantsGrantChanged' — bulk grant change
+  // -------------------------------------------------------------------------
+
+  describe("'descendantsGrantChanged' event", () => {
+    it('dispatches an acl-change per affected page with previous + current namespaces', async () => {
+      // First call returns the OLD namespaces (public), second call (post)
+      // returns NEW namespaces (group-eng) per page.
+      namespaceMapperComputePageNamespaces
+        .mockReturnValueOnce({ current: ['public'], previous: undefined }) // previousPageView for p1
+        .mockReturnValueOnce({ current: ['public'], previous: undefined }); // previousPageView for p2
+
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      const pageDocs = [
+        { _id: { toString: () => 'p1' }, path: '/p1', revision: 'rev1' },
+        { _id: { toString: () => 'p2' }, path: '/p2', revision: 'rev2' },
+      ];
+
+      crowi.events.page.emit('descendantsGrantChanged', {
+        affectedPages: [
+          {
+            page: pageDocs[0],
+            previousGrant: 1, // public
+            previousGrantedGroups: [],
+            previousGrantedUsers: [],
+            newGrant: 5, // group
+            newGrantedGroups: ['g1'],
+            newGrantedUsers: [],
+          },
+          {
+            page: pageDocs[1],
+            previousGrant: 1,
+            previousGrantedGroups: [],
+            previousGrantedUsers: [],
+            newGrant: 5,
+            newGrantedGroups: ['g1'],
+            newGrantedUsers: [],
+          },
+        ],
+        user: { _id: 'u1' },
+      });
+      await flush();
+
+      expect(dispatcherOnPageChanged).toHaveBeenCalledTimes(2);
+      const first = dispatcherOnPageChanged.mock.calls[0][0] as Parameters<
+        typeof dispatcherOnPageChanged
+      >[0];
+      expect(first.type).toBe('acl-change');
+      expect(
+        (first as { previousNamespaces: ReadonlyArray<string> })
+          .previousNamespaces,
+      ).toEqual(['public']);
+      expect(first.revisionId).toBe('rev1');
+    });
+
+    it('does nothing for an empty affectedPages list', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      crowi.events.page.emit('descendantsGrantChanged', {
+        affectedPages: [],
+        user: { _id: 'u1' },
+      });
+      await flush();
+
+      expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+    });
+
+    it('does not crash on a malformed payload', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      expect(() =>
+        crowi.events.page.emit('descendantsGrantChanged'),
+      ).not.toThrow();
+      expect(() =>
+        crowi.events.page.emit('descendantsGrantChanged', {
+          affectedPages: null,
+        }),
+      ).not.toThrow();
+      await flush();
+
+      expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+    });
   });
 });
