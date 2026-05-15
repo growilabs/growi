@@ -1,7 +1,9 @@
+// ref: https://elements.ai-sdk.dev/examples/chatbot
+
 import { Fragment, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
-import { CopyIcon, GlobeIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
+import { CopyIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
 import { v7 as uuid } from 'uuid';
 
 import { Action, Actions } from '~/components/ai-elements/actions';
@@ -14,24 +16,11 @@ import { Loader } from '~/components/ai-elements/loader';
 import { Message, MessageContent } from '~/components/ai-elements/message';
 import {
   PromptInput,
-  PromptInputActionAddAttachments,
-  PromptInputActionMenu,
-  PromptInputActionMenuContent,
-  PromptInputActionMenuTrigger,
-  PromptInputAttachment,
-  PromptInputAttachments,
   PromptInputBody,
-  PromptInputButton,
   PromptInputFooter,
   type PromptInputMessage,
-  PromptInputModelSelect,
-  PromptInputModelSelectContent,
-  PromptInputModelSelectItem,
-  PromptInputModelSelectTrigger,
-  PromptInputModelSelectValue,
   PromptInputSubmit,
   PromptInputTextarea,
-  PromptInputTools,
 } from '~/components/ai-elements/prompt-input';
 import {
   Reasoning,
@@ -55,23 +44,10 @@ import { useSWRINFxRecentThreads } from '../../stores/thread';
 
 import styles from './ChatSidebar.module.scss';
 
-const models = [
-  {
-    name: 'GPT 4o',
-    value: 'openai/gpt-4o',
-  },
-  {
-    name: 'Deepseek R1',
-    value: 'deepseek/deepseek-r1',
-  },
-];
-
 const moduleClass = styles['grw-chat-sidebar'] ?? '';
 
 export const ChatSidebar = (): JSX.Element => {
   const [input, setInput] = useState('');
-  const [model, setModel] = useState<string>(models[0].value);
-  const [webSearch, setWebSearch] = useState(false);
 
   const chatSidebarStatus = useChatSidebarStatus();
   const { close } = useChatSidebarActions();
@@ -130,7 +106,6 @@ export const ChatSidebar = (): JSX.Element => {
     sendMessage(
       {
         text: message.text || 'Hello World',
-        files: message.files,
       },
       {
         body: {
@@ -280,55 +255,14 @@ export const ChatSidebar = (): JSX.Element => {
             <PromptInput
               onSubmit={handleSubmit}
               inputGroupClassName="tw:rounded-xl"
-              globalDrop
-              multiple
             >
               <PromptInputBody>
-                <PromptInputAttachments>
-                  {(attachment) => <PromptInputAttachment data={attachment} />}
-                </PromptInputAttachments>
                 <PromptInputTextarea
                   onChange={(e) => setInput(e.target.value)}
                   value={input}
                 />
               </PromptInputBody>
-              <PromptInputFooter>
-                <PromptInputTools>
-                  <PromptInputActionMenu>
-                    <PromptInputActionMenuTrigger />
-                    <PromptInputActionMenuContent>
-                      <PromptInputActionAddAttachments />
-                    </PromptInputActionMenuContent>
-                  </PromptInputActionMenu>
-                  <PromptInputButton
-                    className="tw:rounded-full"
-                    variant={webSearch ? 'default' : 'ghost'}
-                    onClick={() => setWebSearch(!webSearch)}
-                  >
-                    <GlobeIcon size={16} />
-                    <span>Search</span>
-                  </PromptInputButton>
-                  <PromptInputModelSelect
-                    onValueChange={(value) => {
-                      setModel(value);
-                    }}
-                    value={model}
-                  >
-                    <PromptInputModelSelectTrigger>
-                      <PromptInputModelSelectValue />
-                    </PromptInputModelSelectTrigger>
-                    <PromptInputModelSelectContent>
-                      {models.map((model) => (
-                        <PromptInputModelSelectItem
-                          key={model.value}
-                          value={model.value}
-                        >
-                          {model.name}
-                        </PromptInputModelSelectItem>
-                      ))}
-                    </PromptInputModelSelectContent>
-                  </PromptInputModelSelect>
-                </PromptInputTools>
+              <PromptInputFooter className="tw:justify-end">
                 <PromptInputSubmit
                   disabled={!input && !status}
                   status={status}
