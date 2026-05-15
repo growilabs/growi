@@ -154,24 +154,66 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       },
     );
 
-    // syncDescendantsUpdate fires after a bulk rename completes.
-    // targetPage.path is already the NEW path at this point; the old path
-    // prefix is not carried by the event, so we cannot construct a full
-    // rename-prefix instruction here.
+    // updateMany fires after a bulk rename of descendants completes. The payload
+    // `pages` contains the descendant pages with their NEW paths already applied.
+    // For Stage 1 (task 21.1-A) we dispatch a per-page upsert so that the new
+    // paths appear in clones. The OLD paths are not yet removed — that requires
+    // GROWI core to carry oldPagePathPrefix in the event payload, which is
+    // Stage 2 work (task 21.1-B).
     //
-    // MVP limitation (P1 future work — growi-vault-gateway task 21.1):
-    // rename-prefix and grant-change-prefix propagation are not implemented.
-    // After a bulk rename or bulk grant change, the vault contents will become
-    // stale. Operators must re-run bootstrap from the Admin UI (/admin/vault)
-    // to bring the vault back in sync.
+    // Fan-out safety: dispatcher.onPageChanged() applies a per-namespace
+    // coalesce window that collapses high-frequency upserts into a single
+    // bulk-upsert instruction (see VaultDispatcher), so dispatching one call
+    // per page on large bulk renames does not cause instruction explosion.
+    pageEvent.on(
+      'updateMany',
+      (
+        pages: Array<
+          IPage & {
+            _id: { toString(): string };
+            revision?: unknown;
+          }
+        >,
+        _user: unknown,
+      ) => {
+        if (!Array.isArray(pages)) return;
+        for (const page of pages) {
+          // Skip pages without a revision (auto-generated intermediate paths;
+          // mirror the guard in vault-bootstrapper / vault-dispatcher).
+          if (page.revision == null) continue;
+          const revisionId =
+            typeof page.revision === 'object' && '_id' in page.revision
+              ? (
+                  page.revision as { _id: { toString(): string } }
+                )._id.toString()
+              : (page.revision as { toString(): string }).toString();
+          dispatcher
+            .onPageChanged({ type: 'update', page, revisionId })
+            .catch((err) => {
+              logger.warn(
+                { err },
+                'vault-dispatcher: error handling updateMany entry',
+              );
+            });
+        }
+      },
+    );
+
+    // syncDescendantsUpdate fires after a bulk rename completes.
+    // Stage 1 (task 21.1-A): the new paths are already handled via 'updateMany'
+    // above. The OLD paths still linger in the vault because GROWI's event
+    // payload does not carry the oldPagePathPrefix. Stage 2 (task 21.1-B) will
+    // extend the event payload and dispatch a `rename-prefix` instruction here
+    // to remove the old paths in a single instruction per affected namespace.
     pageEvent.on(
       'syncDescendantsUpdate',
       (_targetPage: unknown, _user: unknown) => {
         logger.warn(
-          'vault-dispatcher: received syncDescendantsUpdate but rename-prefix propagation ' +
-            'is not implemented in MVP (P1 future work). ' +
-            'The vault contents may now be stale. ' +
-            'Please re-run bootstrap from the Admin UI (/admin/vault) to bring the vault up to date.',
+          'vault-dispatcher: received syncDescendantsUpdate. Stage 1 (task 21.1-A) ' +
+            'reflects new paths via the updateMany event, but old paths still ' +
+            'remain in the vault until Stage 2 (task 21.1-B) lands. ' +
+            'Re-run bootstrap from the Admin UI (/admin/vault) if a clean vault ' +
+            'state is required.',
         );
       },
     );
