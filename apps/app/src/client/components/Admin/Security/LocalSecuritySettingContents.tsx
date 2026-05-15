@@ -8,6 +8,7 @@ import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurit
 import AdminLocalSecurityContainer from '~/client/services/AdminLocalSecurityContainer';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { isMailerSetupAtom } from '~/states/server-configurations';
+import { isValidWhitelistEntry } from '~/utils/email-whitelist';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -22,7 +23,12 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
   const { t } = useTranslation('admin');
   const isMailerSetup = useAtomValue(isMailerSetupAtom);
 
-  const { register, handleSubmit, reset } = useForm();
+  const {
+    register,
+    handleSubmit,
+    reset,
+    formState: { errors },
+  } = useForm({ mode: 'onBlur' });
 
   const {
     registrationMode,
@@ -196,15 +202,41 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
             </div>
             <div className="col-12 col-md-8">
               <textarea
-                className="form-control"
-                {...register('registrationWhitelist')}
+                className={`form-control${errors.registrationWhitelist ? ' is-invalid' : ''}`}
+                {...register('registrationWhitelist', {
+                  validate: (value) => {
+                    const invalid = value
+                      .split('\n')
+                      .map((e: string) => e.trim())
+                      .filter(
+                        (e: string) => e !== '' && !isValidWhitelistEntry(e),
+                      );
+                    return (
+                      invalid.length === 0 ||
+                      t('security_settings.whitelist_invalid_format')
+                    );
+                  },
+                })}
               />
+              {errors.registrationWhitelist && (
+                <div className="invalid-feedback">
+                  {errors.registrationWhitelist.message?.toString()}
+                </div>
+              )}
               <p className="form-text text-muted small">
                 {t('security_settings.restrict_emails')}
                 <br />
-                {t('security_settings.for_example')}
+                {t('security_settings.whitelist_domain_desc')}
                 <code>@growi.org</code>
-                {t('security_settings.in_this_case')}
+                {t('security_settings.whitelist_domain_suffix')}
+                <br />
+                {t('security_settings.whitelist_subdomain_desc')}
+                <code>@*.growi.org</code>
+                {t('security_settings.whitelist_subdomain_suffix')}
+                <br />
+                {t('security_settings.whitelist_exact_desc')}
+                <code>user@growi.org</code>
+                {t('security_settings.whitelist_exact_suffix')}
                 <br />
                 {t('security_settings.insert_single')}
               </p>

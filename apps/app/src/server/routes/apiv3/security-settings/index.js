@@ -15,6 +15,7 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import ShareLink from '~/server/models/share-link';
 import { configManager } from '~/server/service/config-manager';
+import { isValidWhitelistEntry } from '~/utils/email-whitelist';
 import loggerFactory from '~/utils/logger';
 import {
   prepareDeleteConfigValuesForCalc,
@@ -77,8 +78,16 @@ const validator = {
     body('registrationWhitelist')
       .if((value) => value != null)
       .isArray()
-      .customSanitizer((value, { req }) => {
-        return value.filter((email) => email !== '');
+      .customSanitizer((value) =>
+        value.map((entry) => entry.trim()).filter((entry) => entry !== ''),
+      )
+      .custom((entries) => {
+        if (!entries.every(isValidWhitelistEntry)) {
+          throw new Error(
+            'Each entry must be a valid email address or a domain starting with @',
+          );
+        }
+        return true;
       }),
   ],
   ldapAuth: [
