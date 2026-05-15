@@ -169,7 +169,7 @@
     "helmet": "^4.6.0",
     "http-errors": "^2.0.0",
     "i18next": "^23.16.5",
-    "i18next-http-backend": "^2.6.2",
+    "i18next-http-backend": "^3.0.5",
     "i18next-localstorage-backend": "^4.2.0",
     "i18next-resources-to-backend": "^1.2.1",
     "is-absolute-url": "^4.0.1",
