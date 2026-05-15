@@ -56,39 +56,11 @@ jobs:
         run: |
           turbo run build --filter @growi/vault-manager
 
-      # vault-manager subscribes to MongoDB change streams at startup, which
-      # require a replica-set deployment. The standalone services: container
-      # used elsewhere in this repo is not sufficient — start mongo manually
-      # with --replSet and run rs.initiate before launching vault-manager.
       - name: Start MongoDB (replica set)
-        run: |
-          docker run -d --name mongodb -p 27017:27017 \
-            mongo:6.0 mongod --replSet rs0 --bind_ip_all
-
-          echo "Waiting for mongod to accept connections..."
-          for i in $(seq 1 30); do
-            if docker exec mongodb mongosh --quiet --eval "db.adminCommand('ping').ok" 2>/dev/null | grep -q 1; then
-              echo "mongod is up"
-              break
-            fi
-            sleep 2
-          done
-
-          docker exec mongodb mongosh --quiet --eval \
-            "rs.initiate({_id:'rs0', members:[{_id:0, host:'localhost:27017'}]})"
-
-          echo "Waiting for replica set primary..."
-          for i in $(seq 1 30); do
-            state=$(docker exec mongodb mongosh --quiet --eval "rs.status().myState" 2>/dev/null || echo "")
-            if [ "$state" = "1" ]; then
-              echo "primary is ready"
-              exit 0
-            fi
-            sleep 2
-          done
-          echo "Replica set primary did not become ready in time"
-          docker logs mongodb || true
-          exit 1
+        uses: supercharge/mongodb-github-action@1.12.1
+        with:
+          mongodb-version: '6.0'
+          mongodb-replica-set: rs0
 
       - name: Start vault-manager
         working-directory: apps/growi-vault-manager
@@ -136,7 +108,3 @@ jobs:
             kill "$VAULT_MANAGER_PID" || true
           fi
 
-      - name: Stop MongoDB
-        if: always()
-        run: |
-          docker rm -f mongodb || true
