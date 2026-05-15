@@ -7,7 +7,12 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
-import type { IActivity, ISearchFilter } from '~/interfaces/activity';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+  IActivity,
+  ISearchFilter,
+} from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -26,7 +31,7 @@ interface ISuggestionsRequest
     undefined,
     undefined,
     undefined,
-    { field?: string; q?: string; offset?: number; limit?: number }
+    { field?: string | string[]; q?: string; offset?: number; limit?: number }
   > {}
 
 const validator = {
@@ -43,9 +48,19 @@ const validator = {
   ],
   suggestions: [
     query('field')
-      .isString()
-      .isIn(['username'])
-      .withMessage('field must be one of: username'),
+      .optional()
+      .custom((value) => {
+        const values: unknown[] = Array.isArray(value) ? value : [value];
+        const validFields: AuditlogSuggestionField[] = [
+          'username',
+          'ip',
+          'url',
+        ];
+        return values.every((v) =>
+          validFields.includes(v as AuditlogSuggestionField),
+        );
+      })
+      .withMessage('field must be one or more of: username, ip, url'),
     query('q').optional().isString().withMessage('q must be a string'),
     query('offset')
       .optional()
@@ -392,19 +407,31 @@ module.exports = (crowi: Crowi): Router => {
     async (req: ISuggestionsRequest, res: ApiV3Response) => {
       const { field, q = '', offset = 0, limit = 5 } = req.query;
 
+      const ALL_FIELDS: AuditlogSuggestionField[] = ['username', 'ip', 'url'];
+      const fields: AuditlogSuggestionField[] =
+        field == null
+          ? ALL_FIELDS
+          : ((Array.isArray(field)
+              ? field
+              : [field]) as AuditlogSuggestionField[]);
+
       const { searchService } = crowi;
 
-      if (field === 'username') {
-        if (!searchService.isConfigured) {
-          return res.apiv3({ activeUsernames: [], inactiveUsernames: [] });
-        }
-        try {
-          const result = await searchService.searchAuditlogs(q, offset, limit);
-          return res.apiv3(result);
-        } catch (err) {
-          logger.error('Failed to get username suggestions', err);
-          return res.apiv3Err(err, 500);
-        }
+      if (!searchService.isConfigured) {
+        return res.apiv3({} satisfies AuditlogSuggestionsResponse);
+      }
+
+      try {
+        const result = await searchService.searchAuditlogSuggestions(
+          fields,
+          q,
+          offset,
+          limit,
+        );
+        return res.apiv3(result);
+      } catch (err) {
+        logger.error('Failed to get suggestions', err);
+        return res.apiv3Err(err, 500);
       }
     },
   );
