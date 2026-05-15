@@ -1,0 +1,104 @@
+# Implementation Plan
+
+- [ ] 1. Foundation: リクエストスコープ化と userId 伝搬の確立
+- [ ] 1.1 post-message handler の RequestContext をリクエストスコープ化し userId をセット
+  - 既存のモジュールスコープ `const requestContext = new RequestContext<...>()` 定義を削除
+  - ハンドラ関数内で `new RequestContext<{ vectorStoreId: string; userId: string }>()` を生成
+  - `requestContext.set('vectorStoreId', vectorStoreId)` の直後に `requestContext.set('userId', req.user._id.toString())` を追加
+  - 既存ミドルウェアチェーン（accessTokenParser / loginRequiredStrictly / validator）と AI SDK ストリーミング応答層（`toAISdkStream` / `createUIMessageStream` / `pipeUIMessageStreamToResponse`）には一切触れない
+  - 観察可能完了: 認証済みリクエスト下で tool 実行時の `context.requestContext.get('userId')` が `req.user._id` 文字列を返し、`vectorStoreId` も従来通り取得できる。ストリーミング応答に関するコードは差分に含まれない
+  - _Requirements: 3.1, 3.4, 5.4_
+  - _Boundary: Post-Message Handler_
+
+- [ ] 2. Core: ES 全文検索 tool の実装とテスト
+- [ ] 2.1 ES 全文検索 tool 本体の実装
+  - `createTool` を用いて Mastra tool を新設
+  - 入力 zod schema: `query: z.string().min(1)`、`limit?: z.number().int().positive().max(20).default(10)`
+  - 出力 zod schema を discriminated union（`'ok' | 'error' | 'context_error'`）で表現
+  - execute 内で `requestContext.get('userId')` を取り出し、`{ _id: new ObjectId(userId) }` 形状を `SearchService.searchKeyword(query, null, user, null, { limit })` に渡す
+  - 戻り値は **タプル `[ISearchResult, delegatorName]`** として分解し、`result.data[i]` から以下のマッピングで `hits` を組み立てる: `pageId ← _id` / `pagePath ← _source.path` / `snippet ← _highlight?.body?.[0]` / `totalCount ← result.meta.total`
+  - **`_source` を spread しない**: ES に index 済みの `body`（Markdown 本文）が混入しないよう、必要フィールドだけを明示的に取り出す（要件 6.5 と役割分離の維持）
+  - execute からは例外を throw せず、try/catch で SearchService 例外を `result: 'error'` に変換
+  - 観察可能完了: 4 ケース（空クエリ拒否 / context 欠如 / SearchService 成功 / SearchService 例外）すべてで対応する `result` 値が返り、`ok` 時の `hits` 配列に `pagePath` が含まれ、`body` を含むキーが一切現れない
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 3.2_
+  - _Boundary: FullTextSearchTool_
+
+- [ ] 2.2 (P) ES 全文検索 tool の unit test
+  - SearchService をモックし、4 種の result（ok / error / context_error / 空クエリ拒否）を網羅
+  - 戻り値マッピングで `body` が削除されること、`pagePath` / `pageId` / `snippet` が正しく抽出されることを assert
+  - SearchService の reject を mock しても execute が throw せず `result: 'error'` を返すことを確認
+  - `userId` が ObjectId 形状で SearchService に渡されることを assert
+  - 観察可能完了: `pnpm vitest run full-text-search-tool.spec` が緑、上記すべての挙動が assert される
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8_
+  - _Boundary: FullTextSearchTool_
+  - _Depends: 2.1_
+
+- [ ] 2.3 (P) ES 全文検索 tool の integration test
+  - 実 MongoDB + Elasticsearch + SearchService で、`GRANT_PUBLIC` / `GRANT_OWNER` / `GRANT_USER_GROUP` の各 grant パターンを setup
+  - 各パターンで認可ユーザー・非認可ユーザーから tool を呼び、hits に含まれる/含まれないが期待通りであることを assert
+  - ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を確認
+  - 観察可能完了: `pnpm vitest run full-text-search-tool.integ` が緑、grant 反映が ES 経由で確認される
+  - _Requirements: 6.1, 6.7_
+  - _Boundary: FullTextSearchTool_
+  - _Depends: 2.1_
+
+- [ ] 3. Core: ページ本文取得 tool の実装とテスト
+- [ ] 3.1 ページ本文取得 tool 本体の実装
+  - `createTool` を用いて Mastra tool を新設
+  - 入力 zod schema を「pageId, pagePath いずれかが必須」になるよう `refine` で表現
+  - 出力 zod schema を discriminated union（`'ok' | 'not_found_or_forbidden' | 'missing_input' | 'context_error'`）で表現
+  - execute 内で `requestContext.get('userId')` を取り出し、`{ _id: new ObjectId(userId) }` 形状の最小オブジェクトを `Page.findByIdAndViewer` または `Page.findByPathAndViewer` に渡す
+  - 取得結果から revision を populate し `body`（Markdown 改変なし）/ `path` / `updatedAt` を返す
+  - execute からは例外を throw せず、4 種の result すべてを戻り値で表現する
+  - 観察可能完了: 入力欠如・context 欠如・取得失敗・成功の 4 ケースで、それぞれ対応する `result` 値が返り、`ok` 時のみ `page` フィールドが含まれる
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 3.2, 3.3, 5.3_
+  - _Boundary: GetPageContentTool_
+
+- [ ] 3.2 (P) ページ本文取得 tool の unit test
+  - Page モデルをモックし、4 種の result（ok / missing_input / context_error / not_found_or_forbidden）を網羅
+  - `pageId` 指定で `findByIdAndViewer` が、`pagePath` 指定で `findByPathAndViewer` が呼ばれることを assert
+  - 成功ケースで `body` が改変されないことを確認
+  - Mongoose の reject を mock しても execute が throw せず共通失敗戻り値を返すことを確認
+  - 観察可能完了: `pnpm vitest run get-page-content-tool.spec` が緑、上記すべての挙動が assert される
+  - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.2, 3.3_
+  - _Boundary: GetPageContentTool_
+  - _Depends: 3.1_
+
+- [ ] 3.3 (P) ページ本文取得 tool の integration test
+  - 実 MongoDB + 実 Page/Revision モデルで、`GRANT_PUBLIC` / `GRANT_OWNER` / `GRANT_USER_GROUP` / `GRANT_RESTRICTED` の各 grant パターンを setup
+  - 各パターンで認可ユーザー・非認可ユーザーから tool を呼び、期待 `result` を返すことを assert
+  - 存在しない `pageId` で `not_found_or_forbidden` を返すこと（権限なしと区別されないこと）を assert
+  - 既存 `page.integ.ts` の `findByIdAndViewer` テストの fixture / setup パターンを踏襲
+  - 観察可能完了: `pnpm vitest run get-page-content-tool.integ` が緑、上記 grant パターンと存在しない pageId の挙動が確認される
+  - _Requirements: 2.1, 2.2, 2.4, 2.7_
+  - _Boundary: GetPageContentTool_
+  - _Depends: 3.1_
+
+- [ ] 4. Integration: agent 配線と instructions 調整
+- [ ] 4.1 (P) growiAgent への新 tool 2 つの登録と既存 fileSearchTool の暫定無効化
+  - `import { fullTextSearchTool } from '../tools/full-text-search-tool'` と `import { getPageContentTool } from '../tools/get-page-content-tool'` を追加
+  - `tools` オブジェクトを `{ ...(crowi.searchService.isElasticsearchEnabled ? { fullTextSearchTool } : {}), getPageContentTool }` の形で組み立て、**ES 未設定環境では `fullTextSearchTool` を agent から見えなくする**
+  - 既存 `fileSearchTool` の `import` 行と `tools` 登録行をコメントアウト（ソースファイル本体は削除しない）
+  - `instructions` に「wiki コンテンツ関連の質問はまず全文検索 tool でヒット候補を集め、必要に応じて本文取得 tool を呼んで引用パスを回答に含めよ」の旨を英語で 1〜2 行追記
+  - 既存の `memory` / `model` / `name` 等の設定は変更しない
+  - 観察可能完了: ES URI が設定された環境で起動すると `growiAgent.tools` のキー一覧に `fullTextSearchTool` と `getPageContentTool` が含まれ、ES URI 未設定で起動すると `fullTextSearchTool` のキーが含まれない。両環境とも `fileSearchTool` は含まれず、`instructions` 文字列に全文検索 → 本文取得 → 引用パスの利用順序が含まれる
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3_
+  - _Boundary: growiAgent_
+  - _Depends: 2.1, 3.1_
+
+- [ ] 5. Validation: 静的チェックと任意の軽量統合テスト
+- [ ] 5.1 lint / typecheck / build の green 確認
+  - `pnpm run lint:biome` を通過させる
+  - `pnpm run lint:typecheck` を通過させる
+  - `pnpm run build` を通過させる
+  - 既存テストスイート（`turbo run test --filter @growi/app`）に退行がないことを確認
+  - 観察可能完了: 4 コマンドすべて exit 0、コメントアウトされた fileSearchTool の import が lint warn を出さない
+  - _Requirements: 4.3_
+
+- [ ]* 5.2 (任意) 軽量 agent integration test
+  - `growiAgent.tools` のキー一覧で `fullTextSearchTool` / `getPageContentTool` の存在と `fileSearchTool` の非存在を assert（ES 有効環境想定）
+  - `crowi.searchService.isElasticsearchEnabled` を false にモックして agent を組み立てた場合、`fullTextSearchTool` のキーが含まれないことを assert
+  - mock model を使って 1 ターン回し、agent が両 tool を tool として参照可能であることを確認
+  - 観察可能完了: 該当 spec ファイルが緑、本 spec の暫定無効化と新 tool 2 つの登録、および ES ガード分岐の回帰防止が成立
+  - _Requirements: 4.1, 6.1_
+  - _Boundary: growiAgent_
