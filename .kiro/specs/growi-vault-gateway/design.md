@@ -406,12 +406,20 @@ interface VaultDispatcher {
 - coalesce 対象は `create` / `update` のみ（`remove` / `rename-prefix` / `grant-change-prefix` は混在させない）
 - chunk size 上限はデフォルト 1000 entries / instruction
 
-**prefix primitive（親ページのバルク操作）** — **[Out of scope (MVP) — P1 future work]**
+**prefix primitive（親ページのバルク操作）** — **[MVP・段階実装]**
 
-> _以下の 2 つの op は `VaultInstructionOp` 型・`onBulkOperation` API として設計・定義されているが、MVP では PageEvent からの呼び出し経路が実装されていないため dead code となっている。rename / grant 一括変更後は vault の内容が古くなるため、管理者は admin UI から bootstrap を再実行する必要がある。本機能は P1 フューチャーワークとして追跡される（タスク 21.2）。_
+> _本機能は MVP スコープ。実装は GROWI core 側の event payload 拡張の有無で 2 段階に分かれる:_
+>
+> - **Stage 1 (本 PR / タスク 21.1-A)**: GROWI core を変更せず、現行イベント payload で取れる範囲を実装する。
+>   - `'updateMany'` イベント（bulk rename 後に新パスの pages 配列を carry）を購読し、各 page に対して `upsert` instruction を発行する。これにより bulk rename 後の新パスが clone に現れるようになる。
+>   - 旧パス削除（`rename-prefix`）と grant 一括変更（`grant-change-prefix`）は Stage 1 範囲外。Stage 2 完了までは管理者による bootstrap 再実行で対処する運用とする。
+> - **Stage 2 (次 PR / タスク 21.1-B)**: GROWI core の event payload を拡張して oldPath / oldGrant を carry し、本来の `rename-prefix` / `grant-change-prefix` instruction を発行する。
+>   - `pageEvent.emit('rename', { page, oldPath, newPath, user })` に拡張
+>   - `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` に拡張
+>   - `updateChildPagesGrant` から新規イベント `pageEvent.emit('descendantsGrantChanged', { parentPage, oldGrant, newGrant, affectedPages })` を発火
 
-- 親ページ rename: 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）— **MVP 未実装**
-- 親ページ grant 変更: `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` 1 件 — **MVP 未実装**
+- 親ページ rename: 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）— **Stage 2 で実装**（Stage 1 では bulk rename の新パスのみ `updateMany` 経由で `upsert` する）
+- 親ページ grant 一括変更: `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` 1 件 — **Stage 2 で実装**（Stage 1 では event 自体が発火しないため検知不可）
 
 **実装ノート**
 - 既存 GROWI `PageEvent`（`apps/app/src/server/events/page.ts`）に subscribe

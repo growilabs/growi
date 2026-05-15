@@ -222,12 +222,12 @@ _Depends: 3.1, 5.1_
   - `delete` イベント → current namespace に `remove` instruction を挿入する（pagePath は削除直前の値）
   - ACL 変更時 → `previous` namespace に `remove` + `current` namespace に `upsert` の 2 件を挿入する
   - coalesce window（既定 1 秒）内に同一 namespace で 100 件以上の `upsert` が発生した場合は `bulk-upsert` にまとめる（chunk size 上限 1000）
-- `onBulkOperation(event: BulkPageOperationEvent)` を定義する（インターフェース実装として存在するが、MVP では dead code。P1 フューチャーワークとして追跡される — タスク 21.2）:
-  - ~~親ページ rename → 影響 namespace ごとに `rename-prefix` instruction を挿入する~~ **[MVP 未実装 — Out of scope]**
-  - ~~親ページ grant 一括変更 → `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` instruction を挿入する~~ **[MVP 未実装 — Out of scope]**
+- `onBulkOperation(event: BulkPageOperationEvent)` を定義する（API は実装済み。発火経路は MVP 段階実装 — タスク 21.1-A / 21.1-B）:
+  - 親ページ rename → 影響 namespace ごとに `rename-prefix` instruction を挿入する — **タスク 21.1-B（Stage 2）で配線**
+  - 親ページ grant 一括変更 → `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` instruction を挿入する — **タスク 21.1-B（Stage 2）で配線**
 - 書き込み失敗時は WARN ログ + リトライ（ページ編集 response とは切り離す）
 - named export する
-- **完了確認**: イベント種別ごとの単体テストが全て通ること（`onBulkOperation` の rename-prefix / grant-change-prefix テストは MVP 範囲外）
+- **完了確認**: イベント種別ごとの単体テストが全て通ること（`onBulkOperation` の rename-prefix / grant-change-prefix 発火は Stage 2 で実装）
 
 ### [x] 7.2 VaultDispatcher の単体テスト
 
@@ -238,20 +238,19 @@ _Depends: 3.1, 5.1_
 - ACL 変更イベント → `remove` + `upsert` の 2 件が発行されることをテストする
 - 同 namespace への高頻度 event（100+）が `bulk-upsert` に coalesce されることをテストする
 - coalesce window 外の event は単発 `upsert` で発行されることをテストする
-- ~~親 rename → `rename-prefix` が発行されることをテストする~~ **[MVP 未実装 — Out of scope / タスク 21.2]**
-- ~~親 grant 変更 → `grant-change-prefix` が発行されることをテストする~~ **[MVP 未実装 — Out of scope / タスク 21.2]**
+- 親 rename → `rename-prefix` が発行されることをテストする — **タスク 21.1-B（Stage 2）で実装**
+- 親 grant 変更 → `grant-change-prefix` が発行されることをテストする — **タスク 21.1-B（Stage 2）で実装**
 - **完了確認**: `pnpm vitest run vault-dispatcher.spec` が全テスト通過すること
 
-### [x] 7.3 PageService event 購読の組み込み（**部分実装承認 — rename / syncDescendants は MVP 範囲外、タスク 21.2 で承認済み**）
+### [x] 7.3 PageService event 購読の組み込み（**段階実装中 — Stage 1 はタスク 21.1-A、Stage 2 はタスク 21.1-B で実装**）
 
 `apps/app/src/features/growi-vault/server/index.ts`（または feature 登録ファイル）に VaultDispatcher の event 購読を追加する。
 
 - 既存 `PageEvent`（`apps/app/src/server/events/page.ts`）の `'create' | 'update' | 'delete'` に subscribe する（**実装済み**）
-- ~~`'rename' | 'syncDescendants'` に subscribe する~~ **[MVP 未実装 — Out of scope / タスク 21.2]**
-  - `syncDescendantsUpdate` イベントは現状 WARN ログ + no-op（「old prefix が取得できないため rename-prefix を発行できない」という運用メッセージを出力。rename 後は admin UI から bootstrap 再実行が必要）
-  - `'rename'` イベントは現状購読されていない
+- `'updateMany'` に subscribe する — **タスク 21.1-A（Stage 1）で追加**
+- `'rename'` の payload 拡張 / `'descendantsGrantChanged'` の新規追加とそれぞれの購読 — **タスク 21.1-B（Stage 2）で実装**
 - feature 有効時（vaultEnabled）のみ購読を開始する（**実装済み**）
-- **完了確認**: `'create' | 'update' | 'delete'` の 3 イベントで VaultDispatcher が動作することを確認すること。rename / grant 一括変更の伝播は P1 フューチャーワーク（タスク 21.1 で実装予定）
+- **完了確認**: `'create' | 'update' | 'delete'` の 3 イベントで VaultDispatcher が動作することを確認すること。`'updateMany'` 購読は Stage 1（タスク 21.1-A）、`rename-prefix` / `grant-change-prefix` 発火は Stage 2（タスク 21.1-B）で配線する
 
 ---
 
@@ -694,38 +693,50 @@ production の `findUserIdByToken` 戻り値が `.scopes` を含むことを moc
 
 ---
 
-## タスク 21: rename / grant 一括変更の方針確定と要件整合（**P1 / 要件 4.4・4.5**）
+## タスク 21: rename / grant 一括変更の MVP 段階実装（**MVP / 要件 4.4・4.5**）
 
 _要件: 4.4, 4.5_
-_Boundary: `apps/app/src/features/growi-vault/server/services/vault-dispatcher.ts`、`apps/app/src/features/growi-vault/server/index.ts`、`requirements.md`、`design.md`、`tasks.md`_
+_Boundary: `apps/app/src/features/growi-vault/server/services/vault-dispatcher.ts`、`apps/app/src/features/growi-vault/server/index.ts`、`apps/app/src/server/service/page/index.ts`、`requirements.md`、`design.md`、`dev-verification.md`_
 _Depends: 7.1, 7.3_
 
-dispatcher の `onBulkOperation`（rename-prefix / grant-change-prefix 発火）API は実装されているが、PageEvent からの呼び出し経路が無く dead code 化している。[server/index.ts:161-179](../../../apps/app/src/features/growi-vault/server/index.ts#L161-L179) は `syncDescendantsUpdate` ハンドラで「old prefix が来ないので組み立てられない」と WARN ログ吐きの no-op、`pageEvent.emit('rename')`（[apps/app/src/server/service/page/index.ts:771,1063](../../../apps/app/src/server/service/page/index.ts#L771)）は購読されていない。タスク 7.3 完了基準「`'create'｜'update'｜'delete'｜'rename'｜'syncDescendants'` に subscribe」を満たしていない。
+要件 4.4 / 4.5 を MVP 必須機能として再定義する（以前は P1 future work としていた）。実装は GROWI core の event payload 変更の有無で 2 段階に分割する:
 
-以下のいずれかを採用する:
+- **Stage 1（21.1-A、本 PR）**: GROWI core を変更せず、現行 event payload の範囲で実装する
+- **Stage 2（21.1-B、次 PR）**: GROWI core の event payload を拡張して残ったギャップを埋める
 
-- **選択肢 A（要件を実装する）**: 21.1 に進む
-- **選択肢 B（MVP スコープアウトする）**: 21.2 に進む
+### [ ] 21.1-A Stage 1: `'updateMany'` 購読による新パス反映（GROWI core 変更なし）
 
-### [ ] 21.1 rename / grant 一括変更の本実装
+`apps/app/src/features/growi-vault/server/index.ts` を編集する。
 
-`'rename'` イベントから oldPath / newPath を取り、影響 namespace を計算して `dispatcher.onBulkOperation({ type: 'rename-prefix', namespaces, oldPrefix, newPrefix })` を呼ぶ。grant 一括変更も `'updateMany'` 等から `(fromNamespace, toNamespace)` ペアを構築して `'grant-change-prefix'` を呼ぶ。
-
-- 既存 GROWI イベントが old prefix を carry していない箇所は、emit 側に payload 追加が必要かを確認する
+- 既存 PageEvent サブスクリプションに `'updateMany'` を追加する
+- payload `(pages, user)` の `pages` 各要素に対し `dispatcher.onPageChanged({ type: 'update', page })` を呼び出して per-page upsert を発行する
+- `revision` フィールドが未設定の page はスキップする（タスク 18.2 の既存ガードを尊重）
+- `syncDescendantsUpdate` の WARN ログメッセージを更新し、「Stage 1 では新パスを per-page upsert、旧パス削除は Stage 2 で実装予定」と明示する
+- **背景・制約**:
+  - `pageEvent.emit('rename')`（単一 rename、payload 空）と `updateChildPagesGrant` の bulkWrite（event 発火なし）は Stage 1 では検知できない
+  - `'updateMany'` は `renameDescendants` 系から `(pages: 新パス確定後の pages, user)` で発火しており、bulk rename 後の新パスを vault に反映できる。ただし旧パスのファイルは clone に残る（Stage 2 で `rename-prefix` により削除）
 - **完了確認**:
-  - 親ページ rename → 影響 namespace 数 M 件の rename-prefix instruction が発行されることを単体テスト + 結合試験で検証
-  - 親ページ grant 一括変更 → ペアごとに grant-change-prefix instruction が発行されることを単体テストで検証
+  - bulk rename 後、新パスの pages が `upsert` instruction として発行されることを単体テストで検証
+  - `vault-dispatcher.spec.ts` の既存 upsert 動作に regression がないこと（`pnpm vitest run vault-dispatcher.spec` と `vault-pat-auth.spec` 系全件 pass）
+  - `dev-verification.md` に Stage 1 / Stage 2 のスコープと、Stage 2 完了までの運用回避策（bootstrap 再実行）を明記すること
 
-### [x] 21.2 MVP スコープアウトとして要件・設計・タスクを同期更新
+### [ ] 21.1-B Stage 2: GROWI core event payload 拡張による完全実装
 
-- `requirements.md` の要件 4.4 / 4.5 を「Out of scope (MVP)」へ移動、または「P1 future work」と明示する
-- `growi-vault-gateway/design.md` の「VaultDispatcher prefix primitive」記述に MVP 外表記を追加する（または `onBulkOperation` API 自体を MVP 範囲から削除）
-- umbrella `growi-vault/design.md` の Out of Boundary / Open Items に追記する
-- 現状の WARN ログ no-op が「rename 後は再 bootstrap が必要」という運用要件であることを `dev-verification.md` のトラブルシュートに明記する
-- 既存タスク 7.1 / 7.2 / 7.3 の `onBulkOperation` 関連サブタスクを未実装扱いに戻す（`[x]` → `[ ]` または削除）
+`apps/app/src/server/service/page/index.ts` と `apps/app/src/features/growi-vault/server/index.ts` を編集する。
+
+- `pageEvent.emit('rename')`（L771, L1063）を `pageEvent.emit('rename', { page, oldPath, newPath, user })` に拡張する
+- `pageEvent.emit('updateMany', pages, user)`（L1152, L1216）を `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` に拡張する（`renameDescendants` 系の関数引数 `oldPagePathPrefix` / `newPagePathPrefix` をそのまま渡す）
+- `updateChildPagesGrant`（L3129）に新規イベント `pageEvent.emit('descendantsGrantChanged', { parentPage, oldGrant, newGrant, affectedPages })` を追加する。`oldGrant` は `updatePageSubOperation` の `exPage.grant` を carry する
+- vault-dispatcher 側で以下を実装する:
+  - `'rename'` 拡張 payload を購読し `dispatcher.onBulkOperation({ type: 'rename-prefix', ... })` を呼ぶ
+  - `'updateMany'` 拡張 payload から `oldPagePathPrefix` / `newPagePathPrefix` を取り出して `'rename-prefix'` instruction を発行する（Stage 1 の per-page upsert は Stage 2 と重複するため、`updateMany` の `rename-prefix` 化に置き換えるか、両者の差異を整理する）
+  - `'descendantsGrantChanged'` を購読し `'grant-change-prefix'` instruction を発行する
+- **既存サブスクライバ互換性**: 追加引数を無視するだけなので後方互換。既存 reg テスト（page service 系の単体・統合）に regression が出ないことを確認する
 - **完了確認**:
-  - 3 文書（requirements / design / tasks）と umbrella の整合がとれていること
-  - 「rename / grant 一括変更は MVP では伝播しない」という挙動が運用ドキュメントに明示されていること
+  - 親ページ rename → 影響 namespace 数 M 件の `rename-prefix` instruction が発行されることを単体テスト + 結合試験で検証
+  - 親ページ grant 一括変更 → `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` instruction が発行されることを単体テストで検証
+  - 既存 GROWI page service の event reg テスト（`page.integ.ts` 等）が全件 pass
+  - `dev-verification.md` のトラブルシュート節「rename / grant 一括変更後に vault の内容が古くなる」セクションを削除し、Stage 2 完了で自動伝播するようになった旨を明示
 
 ---
 
