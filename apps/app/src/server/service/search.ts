@@ -9,6 +9,10 @@ import {
   removeAiMenthion,
 } from '~/features/search/utils/ai';
 import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+} from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
   IFormattedSearchResult,
@@ -353,35 +357,34 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.rebuildAuditlogIndex();
   }
 
-  async searchAuditlogs(
+  async searchAuditlogSuggestions(
+    fields: AuditlogSuggestionField[],
     q: string,
-    offset: number,
+    _offset: number,
     limit: number,
-  ): Promise<{
-    activeUsernames: string[];
-    inactiveUsernames: string[];
-  }> {
-    const usernames = await this.fullTextSearchDelegator.searchAuditlogs(
-      q,
-      offset,
-      limit,
-    );
+  ): Promise<AuditlogSuggestionsResponse> {
+    const response: AuditlogSuggestionsResponse = {};
 
-    const User = mongoose.model<IUser>('User');
+    if (fields.includes('username')) {
+      const usernames = await this.fullTextSearchDelegator.searchAuditlogs(
+        q,
+        limit,
+      );
+      const User = mongoose.model<IUser>('User');
+      const users = await User.find({ username: { $in: usernames } })
+        .select('username status')
+        .lean();
+      response.username = {
+        activeUsernames: users
+          .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+        inactiveUsernames: users
+          .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+      };
+    }
 
-    const users = await User.find({
-      username: { $in: usernames },
-    })
-      .select('username')
-      .lean();
-    const activeUsernames = users
-      .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
-      .map((u) => u.username);
-    const inactiveUsernames = users
-      .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
-      .map((u) => u.username);
-
-    return { activeUsernames, inactiveUsernames };
+    return response;
   }
 
   async parseSearchQuery(

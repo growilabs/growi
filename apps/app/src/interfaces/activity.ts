@@ -725,3 +725,11 @@ export type ISearchFilter = {
   dates?: { startDate: string | null; endDate: string | null };
   actions?: SupportedActionType[];
 };
+
+export type AuditlogSuggestionField = 'username' | 'ip' | 'url';
+
+export type AuditlogSuggestionsResponse = {
+  username?: { activeUsernames: string[]; inactiveUsernames: string[] };
+  ip?: string[];
+  url?: string[];
+};
