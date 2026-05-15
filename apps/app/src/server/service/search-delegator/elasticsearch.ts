@@ -855,11 +855,7 @@ class ElasticsearchDelegator
     }
   }
 
-  async searchAuditlogs(
-    username: string,
-    _offset: number,
-    limit: number,
-  ): Promise<string[]> {
+  async searchAuditlogs(username: string, limit: number): Promise<string[]> {
     if (isES7ClientDelegator(this.client)) {
       const result = await this.client.search({
         index: this.auditlogIndexName,
