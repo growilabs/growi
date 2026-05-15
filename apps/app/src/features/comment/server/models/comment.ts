@@ -1,44 +1,10 @@
-import type { IUser } from '@growi/core/dist/interfaces';
-import type { Document, Model, Query, Types } from 'mongoose';
-import { Schema } from 'mongoose';
+import { model, Schema } from 'mongoose';
 
-import type { IComment } from '~/interfaces/comment';
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
-import loggerFactory from '~/utils/logger';
+import { Prisma } from '~/generated/prisma/client';
 
-const logger = loggerFactory('growi:models:comment');
-
-export interface CommentDocument extends IComment, Document {
-  removeWithReplies: () => Promise<void>;
-  findCreatorsByPage: (pageId: Types.ObjectId) => Promise<CommentDocument[]>;
-}
-
-type Add = (
-  pageId: Types.ObjectId,
-  creatorId: Types.ObjectId,
-  revisionId: Types.ObjectId,
-  comment: string,
-  commentPosition: number,
-  replyTo?: Types.ObjectId | null,
-) => Promise<CommentDocument>;
-type FindCommentsByPageId = (
-  pageId: Types.ObjectId,
-) => Query<CommentDocument[], CommentDocument>;
-type FindCommentsByRevisionId = (
-  revisionId: Types.ObjectId,
-) => Query<CommentDocument[], CommentDocument>;
-type FindCreatorsByPage = (pageId: Types.ObjectId) => Promise<IUser[]>;
-type CountCommentByPageId = (pageId: Types.ObjectId) => Promise<number>;
-
-export interface CommentModel extends Model<CommentDocument> {
-  add: Add;
-  findCommentsByPageId: FindCommentsByPageId;
-  findCommentsByRevisionId: FindCommentsByRevisionId;
-  findCreatorsByPage: FindCreatorsByPage;
-  countCommentByPageId: CountCommentByPageId;
-}
-
-const commentSchema = new Schema<CommentDocument, CommentModel>(
+// TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
+// Until then, use mongoose to automatically create collections and indexes when connected.
+const commentSchema = new Schema(
   {
     page: { type: Schema.Types.ObjectId, ref: 'Page', index: true },
     creator: { type: Schema.Types.ObjectId, ref: 'User', index: true },
@@ -51,58 +17,98 @@ const commentSchema = new Schema<CommentDocument, CommentModel>(
     timestamps: true,
   },
 );
+model('Comment', commentSchema);
 
-const add: Add = async function (
-  this: CommentModel,
-  pageId,
-  creatorId,
-  revisionId,
-  comment,
-  commentPosition,
-  replyTo?,
-): Promise<CommentDocument> {
-  try {
-    const data = await this.create({
-      page: pageId.toString(),
-      creator: creatorId.toString(),
-      revision: revisionId.toString(),
-      comment,
-      commentPosition,
-      replyTo,
-    });
-    logger.debug({ data }, 'Comment saved.');
+export const extension = Prisma.defineExtension((client) => {
+  return client.$extends({
+    model: {
+      comments: {
+        add(
+          pageId: string,
+          creatorId: string,
+          revisionId: string,
+          comment: string,
+          commentPosition: number,
+          replyToId?: string | null,
+        ) {
+          const context = Prisma.getExtensionContext(this);
+          return context.create({
+            data: {
+              pageId,
+              creatorId,
+              revisionId,
+              comment,
+              commentPosition,
+              replyToId,
+            },
+          });
+        },
 
-    return data;
-  } catch (err) {
-    logger.debug({ err }, 'Error on saving comment.');
-    throw err;
-  }
-};
-commentSchema.statics.add = add;
+        findCommentsByPageId(
+          pageId: string,
+          options: Omit<Prisma.commentsFindManyArgs, 'where'>,
+        ) {
+          const context = Prisma.getExtensionContext(this);
+          return context.findMany({
+            where: { pageId },
+            orderBy: {
+              createdAt: 'desc',
+              ...options.orderBy,
+            },
+            ...options,
+          });
+        },
 
-commentSchema.statics.findCommentsByPageId = function (id) {
-  return this.find({ page: id }).sort({ createdAt: -1 });
-};
+        findCommentsByRevisionId(
+          revisionId: string,
+          options: Omit<Prisma.commentsFindManyArgs, 'where'>,
+        ) {
+          const context = Prisma.getExtensionContext(this);
+          return context.findMany({
+            where: { revisionId },
+            orderBy: {
+              createdAt: 'desc',
+              ...options.orderBy,
+            },
+            ...options,
+          });
+        },
 
-commentSchema.statics.findCommentsByRevisionId = function (id) {
-  return this.find({ revision: id }).sort({ createdAt: -1 });
-};
+        async findCreatorsByPage(pageId: string) {
+          const context = Prisma.getExtensionContext(this);
+          const creators = await context.findMany({
+            where: { pageId },
+            select: { creator: true },
+            distinct: ['creatorId'],
+          });
+          return creators
+            .map((c) => c.creator)
+            .filter((c): c is Exclude<typeof c, null> => c !== null);
+        },
 
-commentSchema.statics.findCreatorsByPage = async function (page) {
-  return this.distinct('creator', { page }).exec();
-};
+        countCommentByPageId(pageId: string) {
+          const context = Prisma.getExtensionContext(this);
+          return context.count({
+            where: { pageId },
+          });
+        },
 
-commentSchema.statics.countCommentByPageId = async function (page) {
-  return this.count({ page });
-};
-
-commentSchema.statics.removeWithReplies = async function (comment) {
-  await this.deleteMany({
-    $or: [{ replyTo: comment._id }, { _id: comment._id }],
+        async removeWithReplies(commentId: string) {
+          const context = Prisma.getExtensionContext(this);
+          await client.$transaction([
+            context.deleteMany({
+              where: {
+                replyToId: commentId,
+              },
+            }),
+            context.delete({
+              where: {
+                id: commentId,
+              },
+            }),
+          ]);
+        },
+      },
+    },
   });
-};
-
-export const Comment = getOrCreateModel<CommentDocument, CommentModel>(
-  'Comment',
-  commentSchema,
-);
+});

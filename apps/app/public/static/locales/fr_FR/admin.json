@@ -332,6 +332,13 @@
     "migration_succeeded": "Conversion réussie! Le mode maintenance peut être désactivée et GROWI utilisé.",
     "migration_failed": "Conversion échouée. Lire la documentation GROWI pour des informations supplémentaires."
   },
+  "news_delivery": {
+    "section_title": "Diffusion des actualités",
+    "label": "Diffusion des actualités",
+    "enable": "Activer la diffusion des actualités",
+    "description": "Contrôle si la tâche cron récupère le flux d'actualités et met à jour le cache local. Les actualités déjà en cache restent visibles lorsque la diffusion est désactivée.",
+    "update_succeeded": "Paramètre de diffusion des actualités mis à jour"
+  },
   "maintenance_mode": {
     "maintenance_mode": "Mode maintenance",
     "under_maintenance_mode": "Mode maintenance activé",

@@ -341,6 +341,13 @@
     "migration_succeeded": "您的升级已经成功完成! 退出维护模式，可以使用GROWI。",
     "migration_failed": "升级失败。请参考GROWI的文档，了解在失败情况下该如何处理。"
   },
+  "news_delivery": {
+    "section_title": "新闻推送",
+    "label": "新闻推送",
+    "enable": "启用新闻推送",
+    "description": "控制 cron 任务是否拉取新闻订阅源并更新本地缓存。停用期间，已缓存的新闻仍可显示。",
+    "update_succeeded": "新闻推送设置已更新"
+  },
   "maintenance_mode": {
     "maintenance_mode": "维护模式",
     "under_maintenance_mode": "在维护模式下",

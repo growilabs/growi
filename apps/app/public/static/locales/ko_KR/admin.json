@@ -332,6 +332,13 @@
     "migration_succeeded": "업그레이드가 성공적으로 완료되었습니다! 유지 보수 모드를 종료하면 GROWI를 사용할 수 있습니다.",
     "migration_failed": "업그레이드 실패. 실패 시 수행할 작업에 대한 정보는 GROWI 문서를 참조하십시오."
   },
+  "news_delivery": {
+    "section_title": "뉴스 배포",
+    "label": "뉴스 배포",
+    "enable": "뉴스 배포 활성화",
+    "description": "외부 피드에서 뉴스를 가져와 로컬 캐시를 업데이트하는 cron 작업의 동작을 제어합니다. 비활성화해도 캐시된 뉴스는 계속 표시됩니다.",
+    "update_succeeded": "뉴스 배포 설정이 업데이트되었습니다"
+  },
   "maintenance_mode": {
     "maintenance_mode": "유지 보수 모드",
     "under_maintenance_mode": "유지 보수 모드 중",

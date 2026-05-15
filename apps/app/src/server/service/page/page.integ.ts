@@ -9,9 +9,7 @@ import type { MockInstance } from 'vitest';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type { CommentModel } from '~/features/comment/server';
 import type { IBookmark } from '~/interfaces/bookmark-info';
-import type { IComment } from '~/interfaces/comment';
 import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
@@ -73,7 +71,6 @@ describe('PageService', () => {
   let Revision: Model<IRevision>;
   let User: Model<IUser>;
   let Bookmark: BookmarkModel;
-  let Comment: CommentModel;
   let ShareLink: ShareLinkModel;
   let generalXssFilterProcessSpy: MockInstance;
 
@@ -85,7 +82,6 @@ describe('PageService', () => {
     Page = mongoose.model('Page') as PageModel;
     Revision = mongoose.model<IRevision>('Revision');
     Bookmark = mongoose.model<IBookmark, BookmarkModel>('Bookmark');
-    Comment = mongoose.model<IComment, CommentModel>('Comment');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
 
     // Create test users if they don't exist

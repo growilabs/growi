@@ -5,6 +5,8 @@ services:
       - ..:/workspace/growi:delegated
       - pnpm-store:/workspace/.pnpm-store
       - ${HOME}/.claude:/home/vscode/.claude
+      - ${HOME}/.config/gh:/home/vscode/.config/gh
+      - ${HOME}/.config/glab-cli:/home/vscode/.config/glab-cli
       - ../../growi-docker-compose:/workspace/growi-docker-compose:delegated
       - ../../share:/workspace/share:delegated
       - page_bulk_export_tmp:/tmp/page-bulk-export

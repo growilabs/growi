@@ -22,6 +22,3 @@ phases:
     commands:
       - docker push $IMAGE_TAG
 
-cache:
-  paths:
-    - .pnpm-store/**/*
