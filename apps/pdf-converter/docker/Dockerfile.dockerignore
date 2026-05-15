@@ -7,4 +7,4 @@
 **/.turbo
 out
 apps/**
-!apps/slackbot-proxy
+!apps/pdf-converter

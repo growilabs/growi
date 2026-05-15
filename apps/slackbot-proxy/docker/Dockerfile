@@ -11,13 +11,15 @@ ENV optDir="/opt"
 
 WORKDIR ${optDir}
 
-# install pnpm
-RUN apt-get update && apt-get install -y ca-certificates wget --no-install-recommends \
-  && wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL="$(which sh)" PNPM_VERSION="10.32.1" sh -
-ENV PNPM_HOME="/root/.local/share/pnpm"
-ENV PATH="$PNPM_HOME:$PATH"
+# Activate corepack so the pnpm version pinned in the workspace package.json
+# "packageManager" field is used (avoids drift between Dockerfile and local/CI).
+RUN corepack enable
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME/bin:$PATH"
 
 # install turbo
+# Note: no cache mount here — pnpm global install links binaries into the store,
+# and the BuildKit cache mount would be unmounted after RUN, breaking those links.
 RUN pnpm add turbo --global
 
 
@@ -33,8 +35,8 @@ WORKDIR ${optDir}
 
 COPY . .
 
-RUN pnpm add node-gyp --global
-RUN pnpm install ---frozen-lockfile
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
+  pnpm install --frozen-lockfile --ignore-scripts
 
 # build
 RUN turbo run build --filter @growi/slackbot-proxy

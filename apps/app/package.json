@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "7.5.3-RC.0",
+  "version": "7.5.4-RC.0",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -11,7 +11,7 @@
     "build:client": "next build",
     "build:server": "cross-env NODE_ENV=production tspc -p tsconfig.build.server.json",
     "postbuild:server": "node bin/postbuild-server.ts",
-    "clean": "rimraf dist transpiled .next next.config.js",
+    "clean": "rimraf dist transpiled .next next.config.js src/generated/prisma",
     "server": "cross-env NODE_ENV=production node -r dotenv-flow/config dist/server/app.js",
     "server:ci": "pnpm run server --ci",
     "preserver": "cross-env NODE_ENV=production pnpm run migrate",
@@ -55,11 +55,11 @@
     "openapi:generate-spec:apiv3": "sh bin/openapi/generate-spec-apiv3.sh",
     "openapi:generate-spec:apiv1": "sh bin/openapi/generate-spec-apiv1.sh",
     "ts-node": "node -r ts-node/register/transpile-only -r tsconfig-paths/register -r dotenv-flow/config",
-    "version:patch": "pnpm version patch",
-    "version:prerelease": "pnpm version prerelease --preid=RC",
-    "version:prepatch": "pnpm version prepatch --preid=RC",
-    "version:preminor": "pnpm version preminor --preid=RC",
-    "version:premajor": "pnpm version premajor --preid=RC"
+    "version:patch": "pnpm version patch --no-git-tag-version --no-git-checks",
+    "version:prerelease": "pnpm version prerelease --preid=RC --no-git-tag-version --no-git-checks",
+    "version:prepatch": "pnpm version prepatch --preid=RC --no-git-tag-version --no-git-checks",
+    "version:preminor": "pnpm version preminor --preid=RC --no-git-tag-version --no-git-checks",
+    "version:premajor": "pnpm version premajor --preid=RC --no-git-tag-version --no-git-checks"
   },
   "// comments for dependencies": {
     "@keycloak/keycloak-admin-client": "19.0.0 or above exports only ESM. API breaking changes require separate migration effort."
@@ -78,8 +78,8 @@
     "@codemirror/language": "^6.12.1",
     "@codemirror/language-data": "^6.5.1",
     "@codemirror/merge": "^6.8.0",
-    "@codemirror/state": "^6.5.2",
-    "@codemirror/view": "^6.39.14",
+    "@codemirror/state": "^6.6.0",
+    "@codemirror/view": "^6.42.1",
     "@cspell/dynamic-import": "^8.15.4",
     "@elastic/elasticsearch7": "npm:@elastic/elasticsearch@^7.17.4",
     "@elastic/elasticsearch8": "npm:@elastic/elasticsearch@^8.18.2",
