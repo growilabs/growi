@@ -353,8 +353,8 @@ _Depends: 4.1, 5.1, 6.1, 8.1_
 
 - Express Router を作成する
 - `GET /_vault/repo.git/info/refs` ハンドラーを実装する:
-  - vaultEnabled フラグを確認し false なら 503 を返す
-  - bootstrapState を確認し done 以外なら 503 + Retry-After を返す
+  - vaultEnabled フラグを確認し false なら 404 を返す（永続的な設定状態であり Retry-After は付与しない）
+  - bootstrapState を確認し done 以外なら 503 + Retry-After を返す（bootstrap は一時的な状態のため 503 が適切）
   - `service=git-upload-pack` のみ許可し、それ以外は 400 を返す
   - VaultPatAuth.authenticate を呼び出す（認証失敗時は 401）
   - VaultNamespaceMapper.computeAccessibleNamespaces を呼び出す
@@ -377,7 +377,7 @@ _Depends: 4.1, 5.1, 6.1, 8.1_
 
 `apps/app/src/features/growi-vault/server/routes/vault-gateway.spec.ts` を作成する。
 
-- `vaultEnabled=false` の場合に 503 を返すことをテストする
+- `vaultEnabled=false` の場合に 404 を返すことをテストする（Retry-After なし）
 - `bootstrapState !== 'done'` の場合に 503 + Retry-After を返すことをテストする
 - push 試行（git-receive-pack）が 403 を返すことをテストする
 - 認証失敗時に 401 + WWW-Authenticate を返すことをテストする（ページ情報を含まない）
@@ -474,7 +474,7 @@ _Depends: 7.3, 10.1, 11.1_
 
 - `VaultGatewayRouter` を `/_vault` パス配下に登録する
 - `VaultAdminRouter` を適切な admin ルート配下に登録する
-- **完了確認**: `GET /_vault/repo.git/info/refs` が 503（feature disabled 時）または正常なレスポンスを返すこと
+- **完了確認**: `GET /_vault/repo.git/info/refs` が 404（feature disabled 時）または正常なレスポンスを返すこと
 
 ---
 
@@ -498,7 +498,7 @@ _Depends: 10.1, 11.1, 12.1, 13.1, 13.2_
 
 `apps/app/src/features/growi-vault/__tests__/vault-gateway.integ.ts` を作成する。
 
-- vaultEnabled=false の場合に全リクエストが 503 を返すことを確認する
+- vaultEnabled=false の場合に `info/refs` および `git-upload-pack` が 404 を返すことを確認する（Retry-After なし）
 - bootstrapState が running の間 clone が 503+Retry-After を返すことを確認する
 - push 試行が 403 を返すことを確認する
 - bootstrap 完了後に clone が成功することを確認する
@@ -853,6 +853,6 @@ _Depends: 3.2, 9.1, 9.2_
 - [ ] `turbo run test --filter @growi/app` が全テスト通過すること
 - [ ] `turbo run build --filter @growi/core` がエラーなく通ること
 - [ ] `packages/core/src/interfaces/vault/` の全型が `@growi/core/interfaces/vault` からインポートできること
-- [ ] `apps/app` が vault-manager なしで起動したとき、`vaultEnabled=false` では 503 のみを返し例外が発生しないこと
+- [ ] `apps/app` が vault-manager なしで起動したとき、`vaultEnabled=false` では `info/refs` / `git-upload-pack` は 404、`git-receive-pack` は 403 を返し例外が発生しないこと
 - [ ] 認証失敗レスポンスにページリスト・存在情報が含まれていないこと
 - [ ] vault_instructions への書き込みに shared secret が含まれていないこと

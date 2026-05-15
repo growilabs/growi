@@ -100,7 +100,7 @@ describe('VaultGatewayRouter', () => {
   // -------------------------------------------------------------------------
 
   describe('when vaultEnabled=false', () => {
-    it('returns 503 for GET info/refs', async () => {
+    it('returns 404 for GET info/refs (feature is disabled, not transient unavailability)', async () => {
       (
         vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
       ).mockResolvedValue({
@@ -113,10 +113,12 @@ describe('VaultGatewayRouter', () => {
         '/_vault/repo.git/info/refs?service=git-upload-pack',
       );
 
-      expect(res.status).toBe(503);
+      expect(res.status).toBe(404);
+      // Must not emit Retry-After — disabled is not a transient state
+      expect(res.headers['retry-after']).toBeUndefined();
     });
 
-    it('returns 503 for POST git-upload-pack', async () => {
+    it('returns 404 for POST git-upload-pack (feature is disabled, not transient unavailability)', async () => {
       (
         vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
       ).mockResolvedValue({
@@ -127,7 +129,8 @@ describe('VaultGatewayRouter', () => {
       const app = buildApp();
       const res = await request(app).post('/_vault/repo.git/git-upload-pack');
 
-      expect(res.status).toBe(503);
+      expect(res.status).toBe(404);
+      expect(res.headers['retry-after']).toBeUndefined();
     });
   });
 

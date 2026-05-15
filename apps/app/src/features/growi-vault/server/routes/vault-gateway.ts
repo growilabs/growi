@@ -48,16 +48,19 @@ export interface VaultGatewayRouterDeps {
 
 /**
  * Check that vaultEnabled=true and bootstrapState==='done'.
- * Returns true when the gateway should proceed, false when a 503 was already sent.
+ * Returns true when the gateway should proceed, false when a 404/503 was already sent.
  */
 async function assertGatewayReady(
   _req: Request,
   res: Response,
 ): Promise<boolean> {
-  // Feature flag check (req 1.4)
+  // Feature flag check (req 1.4).
+  // 404 (not 503) because a disabled feature is a permanent configuration state,
+  // not a transient unavailability — there is no Retry-After that would help.
+  // From the client's perspective the repository simply does not exist on this server.
   const settings = await vaultSettingsService.getSettings();
   if (!settings.enabled) {
-    res.status(503).send('GROWI Vault is not enabled');
+    res.status(404).send('GROWI Vault is not enabled');
     return false;
   }
 

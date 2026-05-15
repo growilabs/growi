@@ -179,8 +179,8 @@ sequenceDiagram
     participant Audit as 既存 audit log
 
     Cli->>App: GET /_vault/repo.git/info/refs?service=git-upload-pack
-    App->>App: vaultEnabled フラグ確認 → false なら 503
-    App->>App: bootstrapState 確認 → done 以外なら 503 + Retry-After
+    App->>App: vaultEnabled フラグ確認 → false なら 404（永続無効化）
+    App->>App: bootstrapState 確認 → done 以外なら 503 + Retry-After（一時的）
     App->>Auth: HTTP Basic Auth → PAT 検証
     Auth-->>App: { userId, scopes } または null（匿名）
     App->>Map: computeAccessibleNamespaces(userId)
@@ -272,14 +272,14 @@ sequenceDiagram
 
 | Method | Endpoint | Auth | Response Content-Type | Errors |
 |--------|----------|------|----------------------|--------|
-| GET | `/_vault/repo.git/info/refs?service=git-upload-pack` | HTTP Basic | `application/x-git-upload-pack-advertisement` | 401, 503 |
-| POST | `/_vault/repo.git/git-upload-pack` | HTTP Basic | `application/x-git-upload-pack-result` | 401, 503 |
+| GET | `/_vault/repo.git/info/refs?service=git-upload-pack` | HTTP Basic | `application/x-git-upload-pack-advertisement` | 401, 404, 503 |
+| POST | `/_vault/repo.git/git-upload-pack` | HTTP Basic | `application/x-git-upload-pack-result` | 401, 404, 503 |
 | ANY | `/_vault/repo.git/git-receive-pack` | — | — | 403 |
 | OTHER | `/_vault/repo.git/*` | — | — | 404 |
 
 **責務と制約**
-- `vaultEnabled` が false の場合、全 `/_vault/` リクエストに 503
-- `bootstrapState !== 'done'` の場合、全 clone / fetch に `503 + Retry-After`
+- `vaultEnabled` が false の場合、`info/refs` および `git-upload-pack` に対して 404 を返す（永続的な設定状態であり「一時的に処理できない」を意味する 503 ではない。Retry-After も付与しない）
+- `bootstrapState !== 'done'` の場合、全 clone / fetch に `503 + Retry-After`（bootstrap は一時的な状態であり 503 が適切）
 - `git-receive-pack` への全リクエストに 403 `read-only repository`
 - 成功・失敗とも既存 audit log にイベントを記録する
 - apps/app は git wire format を解釈せず、HTTP body を vault-manager にパイプし stdout をクライアントにパイプするだけ
@@ -578,7 +578,7 @@ interface VaultSettingsService {
 | Audit log filter link | 既存 audit log UI に "vault.*" フィルターを適用するリンク |
 
 **UX のポイント**
-- `vaultEnabled=true` への切替前に bootstrap done でなければ警告を表示（503 が継続するため）
+- `vaultEnabled=true` への切替前に bootstrap done でなければ警告を表示（切替後も 503 が継続するため）
 - bootstrap 中の `vault_instructions.processedAt` の遅れは内部観測のみ（admin に過剰情報を出さない）
 
 ---
@@ -724,8 +724,8 @@ export interface StorageStatsResponse {
 | エラー種別 | HTTP 応答 | 挙動 |
 |-----------|---------|------|
 | 認証失敗 | 401 + `WWW-Authenticate` | ページ情報を含まないメッセージ |
-| 機能無効（`vaultEnabled=false`） | 503 + git エラー文字列 | 全リクエストに適用 |
-| bootstrap 未完了 | 503 + `Retry-After` | bootstrapState が done 以外 |
+| 機能無効（`vaultEnabled=false`） | 404 + git エラー文字列 | `info/refs` / `git-upload-pack` に適用。永続的な設定状態のため 503 ではなく 404。Retry-After なし |
+| bootstrap 未完了 | 503 + `Retry-After` | bootstrapState が done 以外（一時的な状態） |
 | push 試行 | 403 `read-only repository` | git クライアントに表示 |
 | ACL 評価エラー | 500 | ログ記録後、接続を閉じる |
 | compose-view RPC 失敗 | 502 | apps/app から client へ |
@@ -765,8 +765,8 @@ export interface StorageStatsResponse {
 - **ACL 隔離**: ユーザー A の clone に、A が閲覧権限を持たないページのファイル名・中間ディレクトリが存在しないことを確認（要件 3）
 - **匿名アクセス**: PAT なしで public ページのみが取得できる（要件 2.4、3.2）
 - **push 拒否**: `git push` が 403（要件 1.3）
-- **機能無効化**: `vaultEnabled=false` で全 request が 503（要件 1.4、7）
-- **bootstrap 中の 503 gating**: bootstrapState が running の間、clone が 503 + Retry-After を返す（要件 1.5）
+- **機能無効化**: `vaultEnabled=false` で `info/refs` / `git-upload-pack` が 404 を返す（要件 1.4、7）
+- **bootstrap 中の 503 gating**: bootstrapState が running の間、clone が 503 + Retry-After を返す（一時的な状態のため 503 が適切）（要件 1.5）
 - **ACL 変更伝播**: grant 変更後、後続 fetch でファイル追加 / 削除（要件 4.3）
 - **shared secret 不一致**: vault-manager が apps/app 以外からの request を 401 で拒否
 - **Initial Bootstrap（apps/app 主導、bulk-upsert）**: 数千ページ規模の seed DB に対し `VaultBootstrapper.start()` を実行。`reset-all` + namespace 単位 `bulk-upsert` が発行され、bootstrapState 遷移と clone 503 gating を確認。再起動による cursor resume、CHUNK_SIZE 境界（999/1000/1001）での flush 動作を確認（要件 5）

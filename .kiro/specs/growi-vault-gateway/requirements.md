@@ -67,7 +67,7 @@
 1. When `GET /_vault/repo.git/info/refs?service=git-upload-pack` リクエストを受信した場合, the GROWI Vault Gateway shall HTTP Basic Auth を要求し、PAT 認証を行い、vault-manager へ compose-view RPC を発行してから git body proxy で応答を返す
 2. When `POST /_vault/repo.git/git-upload-pack` リクエストを受信した場合, the GROWI Vault Gateway shall 認証済みリクエストの HTTP body を vault-manager へ透過的にプロキシし、レスポンス body をクライアントへストリーム転送する
 3. When `/_vault/repo.git/git-receive-pack` に対するリクエスト（push 試行）を受信した場合, the GROWI Vault Gateway shall HTTP 403 `read-only repository` を返し書き込みを拒否する
-4. When vaultEnabled 設定が false の場合, the GROWI Vault Gateway shall すべての `/_vault/` リクエストに対して HTTP 503 を返す
+4. When vaultEnabled 設定が false の場合, the GROWI Vault Gateway shall `/_vault/repo.git/info/refs` および `/_vault/repo.git/git-upload-pack` に対して HTTP 404 を返す（永続的な設定状態であり Retry-After は付与しない。git-receive-pack は機能フラグに関わらず常に 403 read-only を返す）
 5. When bootstrapState が `done` 以外（`pending` または `running`）の場合, the GROWI Vault Gateway shall すべての clone / fetch リクエストに対して `503 Service Unavailable` と `Retry-After` ヘッダーを返す
 6. The GROWI Vault Gateway shall 各 clone / fetch 操作の成功・失敗を既存 audit log（タイムスタンプ・ユーザー・操作種別）に記録する
 7. The GROWI Vault Gateway shall `git-upload-pack` に関係しない URL パス（例: `/_vault/repo.git/HEAD` 等）に対して HTTP 404 を返す
