@@ -153,3 +153,45 @@ _Generated: 2026-05-15_
 
 - **unit (`get-page-content-tool.spec.ts`)**: zod 入出力、execute の guard（id/path 不在 → エラー戻り値、userId 不在 → 失敗戻り値）、Page モデルをモックして戻り値変換確認
 - **integration (`get-page-content-tool.integ.ts`)**: 実 PageModel と Revision を使い、GRANT_PUBLIC / GRANT_OWNER / GRANT_USER_GROUP / GRANT_RESTRICTED 各パターンで取得可否を確認。`page.integ.ts` の `findByIdAndViewer` テストを参考
+
+---
+
+## 6. Synthesis（Design 前の整理）
+
+### 6.1 Generalization
+
+検証した結果、本 spec の機能群は **一般化対象なし**:
+
+- 「ページ本文取得」は単独機能であり、検索 tool・タグ tool・関連 tool 等とは目的・入出力が異なる
+- 共通基盤化（tool ファクトリ等）は tool 数が 2〜3 個では費用対効果が薄い（Option B 不採用の根拠）
+- 本 spec は単一 tool の新設に集中、抽象化は将来 tool 数が増えた時点で検討
+
+### 6.2 Build vs Adopt
+
+| 機能 | 採用 | 理由 |
+|---|---|---|
+| Tool 定義フレーム | **Adopt** `@mastra/core` の `createTool` | 既存 `fileSearchTool` で実証済み |
+| ユーザー文脈伝搬 | **Adopt** Mastra の `RequestContext` | 既存パターンを型拡張のみで再利用 |
+| ページ取得 + 権限 | **Adopt** `Page.findByIdAndViewer` / `findByPathAndViewer` | grant ロジックを自前実装しない（R2 #7） |
+| Revision 取得 | **Adopt** `populateDataToShowRevision()` | revision body 取得の既存経路 |
+| 入出力検証 | **Adopt** `zod`（既存 tools が使用） | 同一スキーマ言語維持 |
+| Build したもの | tool execute 内のオーケストレーション（最小） | 新規実装はこれだけ |
+
+### 6.3 Simplification 決定
+
+設計を最小限に保つために以下を決定:
+
+1. **`requestContext` のシングルトン問題は本 spec で修正しない** — 既存挙動を踏襲。並列リクエストでの干渉懸念は別タスクで議論（spec の主目的を逸らさない）
+2. **tool 出力は discriminated union で 3 状態返却**: `{ result: 'ok' | 'not_found_or_forbidden' | 'missing_input' | 'context_error', page?: {...} }`。execute 内で **throw しない**（agent ループの中断を避けて、エラー情報を agent が次の判断に使えるようにする）
+3. **入力スキーマは `z.object({ pageId, pagePath }).refine(...)` で「少なくとも一方必須」を表現** — execute 内の if 文より宣言的
+4. **`fileSearchTool` の暫定無効化は agent 側の `tools` 登録と `import` の両方をコメントアウト** — `tools/file-search-tool.ts` 本体には触らない（要件 4.2「リポジトリから削除しない」を維持）
+5. **ファクトリパターン / 抽象基底クラスは導入しない** — tool は 1 ファイル、単純な named export 1 つで完結
+6. **GRANT_RESTRICTED（リンク共有）の扱いは既存メソッドの挙動に従う** — tool 内で除外しない。リスクは Research Needed R-3 で別途記録するが、本 spec では「既存挙動を踏襲」とする
+
+### 6.4 Open Decisions（design.md で確定）
+
+以下は synthesis で方向性は決めたが、最終的な型定義 / 文言 / 実装パターンは design.md の Components & Interfaces セクションで確定する:
+
+- discriminated union の正確なフィールド名
+- `growiAgent.instructions` への具体的追記文
+- integration test の grant ケース選定（GRANT_USER_GROUP の bypass 検証など）
