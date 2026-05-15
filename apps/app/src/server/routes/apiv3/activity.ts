@@ -394,17 +394,17 @@ module.exports = (crowi: Crowi): Router => {
 
       const { searchService } = crowi;
 
-      try {
-        if (field === 'username') {
-          if (!searchService.isConfigured) {
-            return res.apiv3({ activeUsernames: [], inactiveUsernames: [] });
-          }
+      if (field === 'username') {
+        if (!searchService.isConfigured) {
+          return res.apiv3({ activeUsernames: [], inactiveUsernames: [] });
+        }
+        try {
           const result = await searchService.searchAuditlogs(q, offset, limit);
           return res.apiv3(result);
+        } catch (err) {
+          logger.error('Failed to get username suggestions', err);
+          return res.apiv3Err(err, 500);
         }
-      } catch (err) {
-        logger.error('Failed to get activity suggestions', err);
-        return res.apiv3Err(err, 500);
       }
     },
   );
