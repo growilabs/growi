@@ -2,6 +2,7 @@ import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
+import { migrateContributions } from '~/features/contribution-graph/server/services/contribution-migration-service';
 import { addContribution } from '~/features/contribution-graph/server/services/contribution-service';
 import type { IActivity, SupportedActionType } from '~/interfaces/activity';
 import {
@@ -64,17 +65,47 @@ class ActivityService {
         );
 
         if (shouldGenerateContribution) {
-          const user =
-            parameters.event?.creator || parameters.target?.lastUpdateUser;
+          try {
+            const user =
+              parameters.event?.creator || parameters.target?.lastUpdateUser;
 
-          if (user) {
-            addContribution(user).catch((err) => {
-              logger.error(`Failed to update contribution: ${err.message}`);
-            });
-          } else {
-            logger.warn(
-              'Could not find a valid user for contribution. Parameters:',
-              parameters,
+            if (user == null) {
+              logger.warn(
+                'Could not find a valid user for contribution snapshot.',
+              );
+            } else if (user.contributionsMigratedAt != null) {
+              await addContribution(user);
+            } else {
+              const User = mongoose.model('User');
+              const freshUser = await User.findById(user._id);
+
+              if (freshUser == null) {
+                logger.error(
+                  `Migration aborted: User ID ${user._id} not found in database.`,
+                );
+              } else if (freshUser.contributionsMigratedAt != null) {
+                user.contributionsMigratedAt =
+                  freshUser.contributionsMigratedAt;
+                await addContribution(freshUser);
+              } else {
+                await migrateContributions(user._id);
+
+                const updatedUser = await User.findOneAndUpdate(
+                  { _id: user._id },
+                  { contributionsMigratedAt: new Date() },
+                  { new: true },
+                );
+
+                user.contributionsMigratedAt =
+                  updatedUser.contributionsMigratedAt;
+
+                await addContribution(updatedUser);
+              }
+            }
+          } catch (error) {
+            logger.error(
+              'Failed to process contribution tracking or migration sequence:',
+              error,
             );
           }
         }
