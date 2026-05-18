@@ -1,17 +1,12 @@
 /**
  * Gateway contract tests for the GROWI Vault.
  *
- * Fixture (apps/app + vault-manager + mongo + seeded users/pages) is provided
- * by the globalSetup at `test/setup/vault-e2e/global-setup.ts`. The setup
- * exports the `MONGO_URI` so individual test suites can perform direct DB
- * writes to set up scenarios (vaultEnabled toggle, bootstrap state, etc.)
- * without depending on admin-session auth.
+ * The fixture (vault-manager + mounted gateway + seeded users/pages) is
+ * provisioned once per run by `test/setup/vault-e2e/index.ts`. Tests drive
+ * scenario state via direct mongoose writes and `configManager.updateConfigs`
+ * — no admin-session auth required.
  *
- * Until the globalSetup ships, `isVaultE2eFixtureReady()` returns false and
- * this suite is skipped. Once it lands, env vars are always set and these
- * tests run unconditionally on every CI run.
- *
- * Each contract is documented inline with what regression it would catch.
+ * Each contract below is documented with the regression it would catch.
  */
 
 import { execFile } from 'node:child_process';
@@ -22,7 +17,7 @@ import { promisify } from 'node:util';
 import mongoose from 'mongoose';
 import { afterAll, afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { getVaultE2eHandle } from '../../../../test/setup/vault-e2e/fixture-handle';
+import { getVaultE2eHandle } from '../../../../test/setup/vault-e2e';
 import { VAULT_E2E_CONFIG, VAULT_E2E_PAGES } from './fixture-contract';
 
 const execFileAsync = promisify(execFile);

@@ -1,14 +1,9 @@
 /**
  * End-to-end git clone contract test for the GROWI Vault gateway.
  *
- * The fixture is provisioned by the globalSetup at
- * `test/setup/vault-e2e/global-setup.ts`. The setup spawns a real
- * vault-manager, mounts the vault routes on a test Express server, and
- * seeds two users + the pages declared in `fixture-contract.ts`.
- *
- * Until the globalSetup ships, `isVaultE2eFixtureReady()` returns false
- * and this suite is skipped. Once it lands, the env var is always set
- * and these tests run unconditionally on every CI run.
+ * The fixture is provisioned once per run by `test/setup/vault-e2e/index.ts`,
+ * which spawns vault-manager, mounts the gateway router on an Express server,
+ * and seeds two users + the pages declared in `fixture-contract.ts`.
  *
  * The assertions below intentionally encode observable contracts only:
  *  - HTTP status codes returned by the gateway
