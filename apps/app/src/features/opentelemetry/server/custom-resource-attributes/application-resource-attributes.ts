@@ -28,8 +28,9 @@ export async function getApplicationResourceAttributes(): Promise<Attributes> {
       'growi.attachment.type': growiInfo.additionalInfo?.attachmentType,
 
       // Installation information (fixed values)
-      'growi.installedAt': growiInfo.additionalInfo?.installedAt?.toISOString(),
-      'growi.installedAt.by_oldest_user':
+      'growi.installed_at':
+        growiInfo.additionalInfo?.installedAt?.toISOString(),
+      'growi.installed_at.by_oldest_user':
         growiInfo.additionalInfo?.installedAtByOldestUser?.toISOString(),
     };
 

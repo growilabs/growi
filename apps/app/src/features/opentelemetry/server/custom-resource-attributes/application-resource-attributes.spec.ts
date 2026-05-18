@@ -40,8 +40,8 @@ describe('getApplicationResourceAttributes', () => {
       'growi.service.type': 'app',
       'growi.deployment.type': 'standalone',
       'growi.attachment.type': 'local',
-      'growi.installedAt': '2023-01-01T00:00:00.000Z',
-      'growi.installedAt.by_oldest_user': '2023-01-01T00:00:00.000Z',
+      'growi.installed_at': '2023-01-01T00:00:00.000Z',
+      'growi.installed_at.by_oldest_user': '2023-01-01T00:00:00.000Z',
     });
     expect(mockGrowiInfoService.getGrowiInfo).toHaveBeenCalledWith({
       includeInstalledInfo: true,
@@ -63,8 +63,8 @@ describe('getApplicationResourceAttributes', () => {
       'growi.service.type': 'app',
       'growi.deployment.type': 'standalone',
       'growi.attachment.type': undefined,
-      'growi.installedAt': undefined,
-      'growi.installedAt.by_oldest_user': undefined,
+      'growi.installed_at': undefined,
+      'growi.installed_at.by_oldest_user': undefined,
     });
   });
 
@@ -96,8 +96,8 @@ describe('getApplicationResourceAttributes', () => {
       'growi.service.type': 'app',
       'growi.deployment.type': 'docker',
       'growi.attachment.type': 'gridfs',
-      'growi.installedAt': undefined,
-      'growi.installedAt.by_oldest_user': undefined,
+      'growi.installed_at': undefined,
+      'growi.installed_at.by_oldest_user': undefined,
     });
   });
 });
