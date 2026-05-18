@@ -240,6 +240,10 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { userId } = req.params;
 
+      if (userId !== req.user._id.toString()) {
+        return res.apiv3Err('forbidden', 403);
+      }
+
       const getBookmarkFolders = async (
         userId: Types.ObjectId | string,
         parentFolderId?: Types.ObjectId | string,
@@ -340,6 +344,13 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { id } = req.params;
       try {
+        const folder = await BookmarkFolder.findById(id);
+        if (folder == null) {
+          return res.apiv3Err('bookmark_folder_not_found', 404);
+        }
+        if (folder.owner.toString() !== req.user._id.toString()) {
+          return res.apiv3Err('forbidden', 403);
+        }
         const result = await BookmarkFolder.deleteFolderAndChildren(id);
         const { deletedCount } = result;
         return res.apiv3({ deletedCount });
