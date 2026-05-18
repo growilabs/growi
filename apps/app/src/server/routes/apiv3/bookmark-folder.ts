@@ -344,11 +344,14 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { id } = req.params;
       try {
-        const folder = await BookmarkFolder.findById(id);
+        const { folder, isOwner } = await BookmarkFolder.findByIdAndOwner(
+          id,
+          req.user._id,
+        );
         if (folder == null) {
           return res.apiv3Err('bookmark_folder_not_found', 404);
         }
-        if (folder.owner.toString() !== req.user._id.toString()) {
+        if (!isOwner) {
           return res.apiv3Err('forbidden', 403);
         }
         const result = await BookmarkFolder.deleteFolderAndChildren(id);
