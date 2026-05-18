@@ -91,18 +91,8 @@ export const VAULT_E2E_CONFIG = {
   },
 } as const;
 
-/**
- * Returns true when the globalSetup has provisioned the fixture.
- *
- * Used by integ test files to skip themselves cleanly when the setup module
- * has not yet shipped (during incremental rollout). Once the setup is in
- * place this returns true unconditionally and tests run on every CI run.
- *
- * INTENT: this flag exists ONLY as a transient gate during the rollout of
- * the self-contained setup. Once `globalSetup` lands in
- * `apps/app/vitest.workspace.mts` and seeds the fixture, the env var
- * `VAULT_E2E_FIXTURE_READY=1` is always set, and the gate disappears.
- */
-export function isVaultE2eFixtureReady(): boolean {
-  return process.env.VAULT_E2E_FIXTURE_READY === '1';
-}
+// Deliberately no isVaultE2eFixtureReady() / describe.skipIf gate.
+// The vitest setupFile guarantees the fixture is provisioned before any
+// test runs; if it can't be, the beforeAll throws and every test in the
+// suite fails. We do NOT silently skip — silent skip was the prior failure
+// mode that hid regressions in CI.
