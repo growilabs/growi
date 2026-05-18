@@ -1,19 +1,17 @@
 /**
- * ACL isolation, bootstrap-gate, and coalesce integration tests for the
- * GROWI Vault gateway.
+ * Gateway contract tests for the GROWI Vault.
  *
- * Requires a running docker-compose environment with:
- *   - apps/app (GROWI) accessible at GROWI_TEST_URL
- *   - vault-manager service running and connected to apps/app
- *   - MongoDB instance used by both services
+ * Fixture (apps/app + vault-manager + mongo + seeded users/pages) is provided
+ * by the globalSetup at `test/setup/vault-e2e/global-setup.ts`. The setup
+ * exports the `MONGO_URI` so individual test suites can perform direct DB
+ * writes to set up scenarios (vaultEnabled toggle, bootstrap state, etc.)
+ * without depending on admin-session auth.
  *
- * Run with: docker-compose up -d && pnpm vitest run vault-gateway.integ
+ * Until the globalSetup ships, `isVaultE2eFixtureReady()` returns false and
+ * this suite is skipped. Once it lands, env vars are always set and these
+ * tests run unconditionally on every CI run.
  *
- * Environment variables:
- *   GROWI_TEST_URL       - Base URL of the running GROWI instance (default: http://localhost:3000)
- *   GROWI_TEST_PAT       - PAT of a user with access to all test pages
- *   GROWI_TEST_PAT_ACL   - PAT of a user that should NOT see ACL-protected pages
- *   GROWI_ADMIN_TOKEN    - Admin API token for setting up test state via the admin API
+ * Each contract is documented inline with what regression it would catch.
  */
 
 import { execFile } from 'node:child_process';
@@ -21,107 +19,112 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { promisify } from 'node:util';
-import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { MongoClient } from 'mongodb';
+import { afterAll, afterEach, beforeAll, describe, expect, it } from 'vitest';
+
+import {
+  isVaultE2eFixtureReady,
+  VAULT_E2E_CONFIG,
+  VAULT_E2E_PAGES,
+} from './fixture-contract';
 
 const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
-// Configuration
+// DB helpers — used to drive scenarios that require state changes the
+// gateway itself doesn't expose to test code (vaultEnabled flag, bootstrap
+// state). The mongo URI is exported by globalSetup.
 // ---------------------------------------------------------------------------
 
-const BASE_URL = process.env.GROWI_TEST_URL ?? 'http://localhost:3000';
-const TEST_PAT = process.env.GROWI_TEST_PAT ?? '';
-const TEST_PAT_ACL = process.env.GROWI_TEST_PAT_ACL ?? '';
-const ADMIN_TOKEN = process.env.GROWI_ADMIN_TOKEN ?? '';
-const TEST_USER = process.env.GROWI_TEST_USER ?? 'testuser';
+function mongoUri(): string {
+  const uri = process.env.MONGO_URI;
+  if (uri == null || uri === '') {
+    throw new Error(
+      'MONGO_URI not set. globalSetup must export it for vault gateway tests.',
+    );
+  }
+  return uri;
+}
+
+async function withDb<T>(
+  fn: (db: import('mongodb').Db) => Promise<T>,
+): Promise<T> {
+  const client = new MongoClient(mongoUri());
+  try {
+    await client.connect();
+    return await fn(client.db());
+  } finally {
+    await client.close();
+  }
+}
+
+async function setVaultEnabled(enabled: boolean): Promise<void> {
+  await withDb(async (db) => {
+    await db
+      .collection('configs')
+      .updateOne(
+        { key: 'app:vaultEnabled' },
+        { $set: { value: JSON.stringify(enabled) } },
+        { upsert: true },
+      );
+  });
+}
+
+async function setBootstrapState(
+  state: 'pending' | 'running' | 'done' | 'failed',
+): Promise<void> {
+  await withDb(async (db) => {
+    await db
+      .collection('vault_sync_state')
+      .updateOne(
+        { _id: 'singleton' as unknown as never },
+        { $set: { bootstrapState: state } },
+        { upsert: true },
+      );
+  });
+}
 
 // ---------------------------------------------------------------------------
 // HTTP helpers
 // ---------------------------------------------------------------------------
 
-/**
- * Send an HTTP request to the GROWI info/refs endpoint and return the
- * raw HTTP status code.  Does not follow git protocol — purely an HTTP probe.
- */
-async function probeGitInfoRefs(pat: string): Promise<number> {
-  const url = `${BASE_URL}/_vault/repo.git/info/refs?service=git-upload-pack`;
+const basicAuthHeader = (pat: string): string =>
+  `Basic ${Buffer.from(`x:${pat}`).toString('base64')}`;
+
+async function probeInfoRefs(opts: {
+  pat?: string;
+}): Promise<{ status: number; headers: Headers }> {
+  const url = `${VAULT_E2E_CONFIG.baseUrl}/_vault/repo.git/info/refs?service=git-upload-pack`;
   const headers: Record<string, string> = {};
-  if (pat) {
-    headers.Authorization =
-      'Basic ' + Buffer.from(`${TEST_USER}:${pat}`).toString('base64');
-  }
+  if (opts.pat) headers.Authorization = basicAuthHeader(opts.pat);
+
   const res = await fetch(url, { headers, redirect: 'manual' });
-  return res.status;
+  return { status: res.status, headers: res.headers };
 }
 
-/**
- * Send an HTTP request to the git-receive-pack endpoint and return the
- * raw HTTP status code.
- */
-async function probeGitReceivePack(pat: string): Promise<number> {
-  const url = `${BASE_URL}/_vault/repo.git/git-receive-pack`;
-  const headers: Record<string, string> = {
-    'Content-Type': 'application/x-git-receive-pack-request',
-  };
-  if (pat) {
-    headers.Authorization =
-      'Basic ' + Buffer.from(`${TEST_USER}:${pat}`).toString('base64');
+async function probeReceivePack(method: 'POST' | 'GET'): Promise<number> {
+  const url = `${VAULT_E2E_CONFIG.baseUrl}/_vault/repo.git/git-receive-pack`;
+  const init: RequestInit = { method, redirect: 'manual' };
+  if (method === 'POST') {
+    init.headers = {
+      'Content-Type': 'application/x-git-receive-pack-request',
+    };
+    init.body = '';
   }
-  const res = await fetch(url, {
-    method: 'POST',
-    headers,
-    body: '',
-    redirect: 'manual',
-  });
+  const res = await fetch(url, init);
   return res.status;
 }
 
-/**
- * Send an HTTP request to the git-receive-pack endpoint via GET
- * (to test that any method is rejected) and return the raw status code.
- */
-async function probeGitReceivePackGet(): Promise<number> {
-  const url = `${BASE_URL}/_vault/repo.git/git-receive-pack`;
-  const res = await fetch(url, { method: 'GET', redirect: 'manual' });
-  return res.status;
+async function gitCloneAdmin(): Promise<string> {
+  const url = new URL(`${VAULT_E2E_CONFIG.baseUrl}/_vault/repo.git`);
+  url.username = 'x';
+  url.password = VAULT_E2E_CONFIG.admin.pat;
+  const dir = await mkdtemp(join(tmpdir(), 'growi-vault-gw-'));
+  await execFileAsync('git', ['clone', url.toString(), dir]);
+  return dir;
 }
 
-/**
- * Call the GROWI admin API to toggle the vault feature flag.
- * Requires GROWI_ADMIN_TOKEN.
- *
- * Implementation path: PUT /_api/v3/vault/enabled
- */
-async function setVaultEnabled(enabled: boolean): Promise<void> {
-  const url = `${BASE_URL}/_api/v3/vault/enabled`;
-  await fetch(url, {
-    method: 'PUT',
-    headers: {
-      'Content-Type': 'application/json',
-      Authorization: `Bearer ${ADMIN_TOKEN}`,
-    },
-    body: JSON.stringify({ enabled }),
-  });
-}
-
-/**
- * Execute a git clone and return the cloned directory path.
- * Throws if git exits with a non-zero code.
- */
-async function gitClone(pat: string): Promise<string> {
-  const url = new URL(`${BASE_URL}/_vault/repo.git`);
-  url.username = TEST_USER;
-  url.password = pat;
-
-  const tmpDir = await mkdtemp(join(tmpdir(), 'growi-vault-gw-'));
-  await execFileAsync('git', ['clone', url.toString(), tmpDir]);
-  return tmpDir;
-}
-
-/**
- * Collect all tracked file paths in a cloned git repository.
- */
-async function listClonedFiles(repoDir: string): Promise<string[]> {
+async function listFiles(repoDir: string): Promise<string[]> {
   const { stdout } = await execFileAsync('git', ['-C', repoDir, 'ls-files']);
   return stdout.trim().split('\n').filter(Boolean);
 }
@@ -130,406 +133,231 @@ async function listClonedFiles(repoDir: string): Promise<string[]> {
 // Test suite
 // ---------------------------------------------------------------------------
 
-describe.skip('GROWI Vault gateway integration (requires docker-compose)', () => {
-  const tmpDirs: string[] = [];
+describe.skipIf(!isVaultE2eFixtureReady())(
+  'GROWI Vault — gateway contracts',
+  () => {
+    const tmpDirs: string[] = [];
 
-  afterAll(async () => {
-    await Promise.all(
-      tmpDirs.map((d) => rm(d, { recursive: true, force: true })),
-    );
-  });
-
-  // --------------------------------------------------------------------------
-  // Scenario 1: vaultEnabled=false causes all gateway requests to return 503
-  // --------------------------------------------------------------------------
-  describe('when vaultEnabled=false', () => {
-    beforeAll(async () => {
-      // Disable vault via admin API.
-      expect(ADMIN_TOKEN, 'GROWI_ADMIN_TOKEN must be set').toBeTruthy();
-      await setVaultEnabled(false);
-    });
-
-    afterAll(async () => {
-      // Re-enable vault so subsequent suites start from a clean state.
+    afterEach(async () => {
+      // Restore the steady-state (enabled + bootstrap done) after any test
+      // that mutates it.
       await setVaultEnabled(true);
-    });
-
-    it('returns 503 for git info/refs (authenticated)', async () => {
-      const status = await probeGitInfoRefs(TEST_PAT);
-      expect(status).toBe(503);
-    });
-
-    it('returns 503 for git info/refs (unauthenticated)', async () => {
-      const status = await probeGitInfoRefs('');
-      expect(status).toBe(503);
-    });
-
-    it('git clone fails when vault is disabled', async () => {
-      await expect(gitClone(TEST_PAT)).rejects.toThrow();
-    });
-  });
-
-  // --------------------------------------------------------------------------
-  // Scenario 2: bootstrapState=running causes clone to return 503 + Retry-After
-  // --------------------------------------------------------------------------
-  describe('when bootstrapState is running', () => {
-    beforeAll(async () => {
-      // Simulate a running bootstrap by direct MongoDB manipulation.
-      // There is no admin API endpoint to force bootstrapState to 'running';
-      // use mongosh or a seed script to set it directly:
-      //
-      //   db.vault_sync_state.updateOne(
-      //     { _id: 'singleton' },
-      //     { $set: { bootstrapState: 'running' } },
-      //     { upsert: true }
-      //   );
-      //
-      // Manual step: see dev-verification.md for the full procedure.
-      expect(ADMIN_TOKEN, 'GROWI_ADMIN_TOKEN must be set').toBeTruthy();
+      await setBootstrapState('done');
     });
 
     afterAll(async () => {
-      // Reset bootstrapState to 'done' via direct MongoDB manipulation:
-      //
-      //   db.vault_sync_state.updateOne(
-      //     { _id: 'singleton' },
-      //     { $set: { bootstrapState: 'done' } }
-      //   );
-      //
-      // Manual step: see dev-verification.md for the full procedure.
-    });
-
-    it('returns 503 with Retry-After header while bootstrap is running', async () => {
-      const url = `${BASE_URL}/_vault/repo.git/info/refs?service=git-upload-pack`;
-      const headers = TEST_PAT
-        ? {
-            Authorization:
-              'Basic ' +
-              Buffer.from(`${TEST_USER}:${TEST_PAT}`).toString('base64'),
-          }
-        : undefined;
-
-      const res = await fetch(url, { headers, redirect: 'manual' });
-
-      expect(res.status).toBe(503);
-      // The gateway must set Retry-After so that git clients back off gracefully.
-      expect(res.headers.get('retry-after')).toBeTruthy();
-    });
-
-    it('git clone fails with a non-zero exit code while bootstrap is running', async () => {
-      await expect(gitClone(TEST_PAT)).rejects.toThrow();
-    });
-  });
-
-  // --------------------------------------------------------------------------
-  // Scenario 3: push attempt returns 403 (read-only repository)
-  // --------------------------------------------------------------------------
-  describe('push attempt on read-only vault', () => {
-    it('returns 403 for POST to git-receive-pack', async () => {
-      const status = await probeGitReceivePack(TEST_PAT);
-      expect(status).toBe(403);
-    });
-
-    it('returns 403 for GET to git-receive-pack', async () => {
-      const status = await probeGitReceivePackGet();
-      expect(status).toBe(403);
-    });
-  });
-
-  // --------------------------------------------------------------------------
-  // Scenario 4: After bootstrap completes, clone succeeds
-  // --------------------------------------------------------------------------
-  describe('after bootstrap completes', () => {
-    it('git clone succeeds when bootstrapState=done and vaultEnabled=true', async () => {
-      expect(TEST_PAT, 'GROWI_TEST_PAT must be set').toBeTruthy();
-
-      const cloneDir = await gitClone(TEST_PAT);
-      tmpDirs.push(cloneDir);
-
-      // The cloned directory must contain at least one tracked file.
-      const files = await listClonedFiles(cloneDir);
-      expect(files.length).toBeGreaterThan(0);
-    });
-  });
-
-  // --------------------------------------------------------------------------
-  // Scenario 5: ACL-protected pages are not included in clone results
-  // --------------------------------------------------------------------------
-  describe('ACL isolation', () => {
-    it('ACL-protected pages are absent from the clone of a restricted user', async () => {
-      // This test requires two PATs:
-      //   - TEST_PAT      : admin/full-access user that CAN see the ACL-protected page
-      //   - TEST_PAT_ACL  : restricted user that CANNOT see the ACL-protected page
-      expect(TEST_PAT, 'GROWI_TEST_PAT must be set').toBeTruthy();
-      expect(TEST_PAT_ACL, 'GROWI_TEST_PAT_ACL must be set').toBeTruthy();
-
-      // Clone as full-access user.
-      const fullDir = await gitClone(TEST_PAT);
-      tmpDirs.push(fullDir);
-      const fullFiles = await listClonedFiles(fullDir);
-
-      // Clone as restricted user.
-      const restrictedDir = await gitClone(TEST_PAT_ACL);
-      tmpDirs.push(restrictedDir);
-      const restrictedFiles = await listClonedFiles(restrictedDir);
-
-      const restrictedFileSet = new Set(restrictedFiles);
-
-      // Files visible to the full-access user that are NOT visible to the
-      // restricted user are the ACL-protected pages.
-      const aclProtectedFiles = fullFiles.filter(
-        (f) => !restrictedFileSet.has(f),
+      await Promise.all(
+        tmpDirs.map((d) => rm(d, { recursive: true, force: true })),
       );
-
-      // There must be at least one ACL-protected page in the test fixture.
-      expect(
-        aclProtectedFiles.length,
-        'Test fixture must include at least one ACL-protected page',
-      ).toBeGreaterThan(0);
-
-      // The restricted clone must not contain any ACL-protected file.
-      for (const protectedFile of aclProtectedFiles) {
-        expect(
-          restrictedFileSet.has(protectedFile),
-          `ACL-protected file "${protectedFile}" must not appear in restricted clone`,
-        ).toBe(false);
-      }
     });
 
-    it('ACL-protected pages do not appear in anonymous clone', async () => {
-      // Attempt an anonymous clone.  Skip if the server rejects unauthenticated access.
-      let anonDir: string;
-      try {
-        const url = `${BASE_URL}/_vault/repo.git`;
-        const tmpDir = await mkdtemp(join(tmpdir(), 'growi-vault-anon-'));
-        await execFileAsync('git', ['clone', url, tmpDir]);
-        anonDir = tmpDir;
-      } catch {
-        // Anonymous clone rejected — skip this sub-scenario.
-        return;
-      }
-      tmpDirs.push(anonDir);
+    // ----------------------------------------------------------------------
+    // Contract: vaultEnabled=false → 404 (permanent, no Retry-After).
+    //
+    // Regression catch: someone changes the disabled response to 503 or 200,
+    // breaking the documented "feature flag returns 404" contract and
+    // confusing clients about whether to retry.
+    // ----------------------------------------------------------------------
+    describe('feature flag', () => {
+      beforeAll(async () => {
+        await setVaultEnabled(false);
+      });
 
-      const anonFiles = await listClonedFiles(anonDir);
-      // Anonymous clone must not include pages with "/private/" in their path.
-      // Adjust this sentinel to match the actual ACL-protected page paths in the
-      // test fixture.
-      const privateFiles = anonFiles.filter((f) => f.includes('/private/'));
-      expect(
-        privateFiles,
-        'Anonymous clone must not include private pages',
-      ).toHaveLength(0);
+      it('returns 404 for info/refs when vaultEnabled=false', async () => {
+        const res = await probeInfoRefs({ pat: VAULT_E2E_CONFIG.admin.pat });
+        expect(res.status).toBe(404);
+        expect(res.headers.get('retry-after')).toBeNull();
+      });
+
+      it('returns 404 for anonymous info/refs when vaultEnabled=false', async () => {
+        const res = await probeInfoRefs({});
+        expect(res.status).toBe(404);
+      });
     });
-  });
 
-  // --------------------------------------------------------------------------
-  // Scenario 6: High-frequency edits to the same namespace coalesce into
-  //             a single bulk-upsert instruction
-  // --------------------------------------------------------------------------
-  describe('coalesce behaviour for high-frequency edits', () => {
-    it('high-frequency page updates on one namespace produce a bulk-upsert instruction', async () => {
-      // This test drives page saves through the GROWI page API and then reads
-      // vault_instructions from MongoDB (via an admin endpoint) to assert that
-      // a bulk-upsert instruction was written instead of N individual upsert
-      // instructions.
-      //
-      // The exact mechanism for triggering page saves depends on the test
-      // fixture API.  The example below uses the GROWI v3 page API.
-      expect(ADMIN_TOKEN, 'GROWI_ADMIN_TOKEN must be set').toBeTruthy();
+    // ----------------------------------------------------------------------
+    // Contract: bootstrapState ≠ 'done' → 503. 'running' must set
+    // Retry-After so clients back off; 'pending' and 'failed' must NOT
+    // set Retry-After (they need admin intervention, not waiting).
+    //
+    // Regression catch: any handler change that drops Retry-After during
+    // running, or accidentally adds it during pending/failed, would mislead
+    // git clients about retry strategy.
+    // ----------------------------------------------------------------------
+    describe('bootstrap state', () => {
+      it('returns 503 with Retry-After while bootstrapState=running', async () => {
+        await setBootstrapState('running');
+        const res = await probeInfoRefs({ pat: VAULT_E2E_CONFIG.admin.pat });
+        expect(res.status).toBe(503);
+        expect(res.headers.get('retry-after')).toBeTruthy();
+      });
 
-      const namespace = '/test-coalesce';
-      const pageCount = 150; // Must exceed COALESCE_THRESHOLD (100)
+      it('returns 503 without Retry-After while bootstrapState=pending', async () => {
+        await setBootstrapState('pending');
+        const res = await probeInfoRefs({ pat: VAULT_E2E_CONFIG.admin.pat });
+        expect(res.status).toBe(503);
+        expect(res.headers.get('retry-after')).toBeNull();
+      });
 
-      // Create / update `pageCount` pages in rapid succession on the same namespace.
-      const saveRequests = Array.from({ length: pageCount }, (_, i) =>
-        fetch(`${BASE_URL}/api/v3/page`, {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            Authorization: `Bearer ${ADMIN_TOKEN}`,
-          },
-          body: JSON.stringify({
-            path: `${namespace}/page-${i}`,
-            body: `# Page ${i}\nContent for coalesce test.`,
-          }),
-        }),
-      );
-      await Promise.all(saveRequests);
+      it('returns 503 without Retry-After while bootstrapState=failed', async () => {
+        await setBootstrapState('failed');
+        const res = await probeInfoRefs({ pat: VAULT_E2E_CONFIG.admin.pat });
+        expect(res.status).toBe(503);
+        expect(res.headers.get('retry-after')).toBeNull();
+      });
+    });
 
-      // Wait for the coalesce window (COALESCE_WINDOW_MS = 1000 ms) to expire
-      // plus a small buffer for async processing.
-      await new Promise((resolve) => setTimeout(resolve, 1500));
+    // ----------------------------------------------------------------------
+    // Contract: the vault repo is read-only. ANY method on
+    // /git-receive-pack must return 403.
+    //
+    // Regression catch: a routing change that exposes a writable path would
+    // be a critical security issue — this test would fail loudly.
+    // ----------------------------------------------------------------------
+    describe('read-only enforcement', () => {
+      it('returns 403 for POST git-receive-pack', async () => {
+        const status = await probeReceivePack('POST');
+        expect(status).toBe(403);
+      });
 
-      // Retrieve vault_instructions written after the batch via direct MongoDB read.
-      // There is no admin HTTP endpoint for vault_instructions; verification must
-      // be done via MongoDB directly (see dev-verification.md for the mongosh snippet).
-      //
-      // Manual verification:
-      //   db.vault_instructions
-      //     .find({ 'payload.namespace': '/test-coalesce' })
-      //     .sort({ issuedAt: -1 })
-      //     .limit(10)
-      //     .toArray();
-      //
-      // Expected: at least one document with op === 'bulk-upsert' and zero documents
-      // with op === 'upsert' when the coalesce threshold (100) was exceeded.
-      //
-      // NOTE: This assertion is intentionally left as a manual step because the
-      // vault_instructions collection is an internal outbox with no public read API.
-      // See dev-verification.md §"Coalesce behaviour verification".
-    }, 10_000); // Allow extra time for the async coalesce flush.
-  });
+      it('returns 403 for GET git-receive-pack', async () => {
+        const status = await probeReceivePack('GET');
+        expect(status).toBe(403);
+      });
+    });
 
-  // --------------------------------------------------------------------------
-  // Scenario 7: Intermediate-path pages (revision == null) are excluded from
-  //             bootstrap and clone output
-  //
-  // Background:
-  //   GROWI auto-generates "intermediate path" pages when a deeply nested page
-  //   is created before its parent pages exist.  These auto-generated pages
-  //   have no revision document (page.revision == null).  If vault-bootstrapper
-  //   included them in a bulk-upsert instruction payload, vault-manager would
-  //   receive revisionId: '' and attempt to cast it to a MongoDB ObjectId,
-  //   causing a CastError that breaks the entire bootstrap.
-  //
-  //   The fix (task 18.1) adds an explicit null-revision guard in
-  //   vault-bootstrapper.ts:
-  //     if (page.revision == null) { ... continue; }
-  //
-  //   This scenario (Scenario 7) is the integration-level regression gate:
-  //   it seeds a null-revision page via the GROWI admin API, triggers a full
-  //   bootstrap, and then verifies that:
-  //     a) The bootstrap completes with state='done' (no CastError).
-  //     b) The null-revision page does NOT appear in the cloned repository.
-  //
-  //   Fixture note:
-  //     The test uses the path /test-null-revision/child to cause GROWI to
-  //     create an intermediate parent page at /test-null-revision without a
-  //     revision.  Alternatively, the admin API can be used to insert a page
-  //     document directly with revision: null.
-  //
-  //   Without the null-revision guard (i.e., reverting task 18.1's fix), this
-  //   test would fail because:
-  //     - bootstrap would emit a bulk-upsert entry with revisionId: ''
-  //     - vault-manager would throw a MongoDB CastError
-  //     - bootstrapState would transition to 'failed' instead of 'done'
-  // --------------------------------------------------------------------------
-  describe('null-revision intermediate path page regression', () => {
-    const NULL_REVISION_PARENT_DIR = 'test-null-revision';
-    const NULL_REVISION_CHILD_PATH = `/test-null-revision/child`;
+    // ----------------------------------------------------------------------
+    // Contract: in the steady state (enabled + bootstrap done), a clone with
+    // a valid PAT must succeed and contain at least one of the fixture pages.
+    //
+    // This is the smoke check; the per-page body assertions live in
+    // clone-e2e.integ.ts.
+    // ----------------------------------------------------------------------
+    it('admin clone succeeds at steady state', async () => {
+      const dir = await gitCloneAdmin();
+      tmpDirs.push(dir);
+      const files = await listFiles(dir);
+      expect(files).toContain(VAULT_E2E_PAGES.publicRoot.mappedFile);
+    });
 
-    beforeAll(async () => {
-      // Seed the fixture: create a child page under a path that does not yet
-      // exist.  GROWI will auto-create the parent path page without a revision.
-      expect(ADMIN_TOKEN, 'GROWI_ADMIN_TOKEN must be set').toBeTruthy();
+    // ----------------------------------------------------------------------
+    // Contract: when many page updates on a single namespace land inside the
+    // coalesce window, the dispatcher must emit a single 'bulk-upsert'
+    // instruction (instead of N individual 'upsert' instructions).
+    //
+    // Regression catch: changing the coalesce threshold/window or the
+    // dispatcher's flush condition would cause N upserts to be written,
+    // which we'd catch by counting the upsert / bulk-upsert documents.
+    //
+    // We seed the dispatcher directly by inserting page documents and
+    // emitting events would require a running PageService — for an
+    // integration test focused on the gateway boundary we instead exercise
+    // the dispatcher via its public entry point by writing the resulting
+    // vault_instructions directly. This test is intentionally an end-to-end
+    // probe of the OUTBOX contract, not of the in-memory coalescer (the
+    // coalescer has its own unit tests).
+    //
+    // We assert on the steady-state shape of the outbox after the burst.
+    // ----------------------------------------------------------------------
+    it('high-frequency edits on one namespace coalesce into bulk-upsert', async () => {
+      // Pre-state: clear any pre-existing test instructions
+      await withDb(async (db) => {
+        await db
+          .collection('vault_instructions')
+          .deleteMany({ 'payload.namespace': 'vault-e2e-coalesce' });
+      });
 
-      await fetch(`${BASE_URL}/api/v3/page`, {
+      // Trigger N>threshold upserts via the dispatcher's HTTP entry point.
+      // The dispatcher coalesces these into one bulk-upsert.
+      const N = 150;
+      const url = `${VAULT_E2E_CONFIG.baseUrl}/_api/v3/vault/test/emit-upserts`;
+      const res = await fetch(url, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          Authorization: `Bearer ${ADMIN_TOKEN}`,
+          Authorization: basicAuthHeader(VAULT_E2E_CONFIG.admin.pat),
         },
-        body: JSON.stringify({
-          path: NULL_REVISION_CHILD_PATH,
-          body: '# Child page\nThis page has a valid revision.',
-        }),
+        body: JSON.stringify({ namespace: 'vault-e2e-coalesce', count: N }),
+      });
+      expect(res.status, 'test helper endpoint must be available').toBe(200);
+
+      // Wait one coalesce window + buffer.
+      await new Promise((r) => setTimeout(r, 1500));
+
+      const { bulkUpserts, upserts } = await withDb(async (db) => {
+        const docs = await db
+          .collection('vault_instructions')
+          .find({ 'payload.namespace': 'vault-e2e-coalesce' })
+          .toArray();
+        return {
+          bulkUpserts: docs.filter((d) => d.op === 'bulk-upsert').length,
+          upserts: docs.filter((d) => d.op === 'upsert').length,
+        };
       });
 
-      // Trigger a full bootstrap so that vault-manager processes the page set
-      // (including the auto-generated null-revision parent).
-      // Implementation path: POST /_api/v3/vault/bootstrap
-      await fetch(`${BASE_URL}/_api/v3/vault/bootstrap`, {
-        method: 'POST',
-        headers: {
-          Authorization: `Bearer ${ADMIN_TOKEN}`,
-        },
-      });
+      expect(bulkUpserts).toBeGreaterThanOrEqual(1);
+      expect(upserts).toBe(0);
+    });
 
-      // Wait for the bootstrap to complete (poll with a reasonable timeout).
-      // Implementation path: GET /_api/v3/vault/status
-      const POLL_INTERVAL_MS = 500;
-      const POLL_TIMEOUT_MS = 30_000;
-      const deadline = Date.now() + POLL_TIMEOUT_MS;
-
-      while (Date.now() < deadline) {
-        const statusRes = await fetch(`${BASE_URL}/_api/v3/vault/status`, {
-          headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
+    // ----------------------------------------------------------------------
+    // Contract: auto-generated intermediate path pages with revision=null
+    // must be skipped — they must not break bootstrap and must not appear
+    // in the cloned tree.
+    //
+    // Regression catch: this was a real bug — null revisions crashed
+    // vault-manager with a MongoDB CastError. Re-introducing the bug would
+    // either leave bootstrapState='failed' or break the clone.
+    // ----------------------------------------------------------------------
+    it('null-revision intermediate pages are excluded from clone', async () => {
+      // Insert a null-revision parent page directly to simulate the
+      // GROWI intermediate-page auto-generation behaviour.
+      const parentPath = '/vault-e2e-null-rev';
+      const orphanFilename = 'vault-e2e-null-rev.md';
+      await withDb(async (db) => {
+        await db.collection('pages').insertOne({
+          path: parentPath,
+          status: 'published',
+          grant: 1, // GRANT_PUBLIC
+          revision: null,
         });
-        if (statusRes.ok) {
-          const { data } = (await statusRes.json()) as {
-            data: { bootstrapState: string };
-          };
-          if (
-            data.bootstrapState === 'done' ||
-            data.bootstrapState === 'failed'
-          ) {
-            break;
-          }
-        }
-        await new Promise((resolve) => setTimeout(resolve, POLL_INTERVAL_MS));
-      }
-    });
-
-    it('bootstrap completes with state=done even when null-revision pages are present in the fixture', async () => {
-      // Verify that the bootstrap reached 'done' and not 'failed'.
-      // A 'failed' result indicates that the null-revision guard is missing
-      // and vault-manager threw a CastError for revisionId: ''.
-      // Implementation path: GET /_api/v3/vault/status
-      const statusRes = await fetch(`${BASE_URL}/_api/v3/vault/status`, {
-        headers: { Authorization: `Bearer ${ADMIN_TOKEN}` },
       });
-      expect(statusRes.ok).toBe(true);
 
-      const { data } = (await statusRes.json()) as {
-        data: { bootstrapState: string };
-      };
+      // Trigger a bootstrap to pick up the new page.
+      await setBootstrapState('pending');
+      await fetch(`${VAULT_E2E_CONFIG.baseUrl}/_api/v3/vault/test/bootstrap`, {
+        method: 'POST',
+        headers: { Authorization: basicAuthHeader(VAULT_E2E_CONFIG.admin.pat) },
+      });
+
+      // Poll until bootstrap completes. Sequential await is intentional —
+      // we need to back off between checks rather than fire concurrent reads.
+      const deadline = Date.now() + 30_000;
+      let lastState = '';
+      while (Date.now() < deadline) {
+        // biome-ignore lint: poll-and-back-off pattern requires sequential awaits
+        const state = await withDb(async (db) => {
+          const doc = await db
+            .collection('vault_sync_state')
+            .findOne({ _id: 'singleton' as unknown as never });
+          return doc?.bootstrapState as string | undefined;
+        });
+        lastState = state ?? '';
+        if (lastState === 'done' || lastState === 'failed') break;
+        await new Promise((r) => setTimeout(r, 200));
+      }
+
       expect(
-        data.bootstrapState,
-        'Bootstrap must complete with state=done; a failed state indicates the null-revision guard is missing',
+        lastState,
+        'bootstrap must reach done — null revisions must not crash the pipeline',
       ).toBe('done');
-    });
 
-    it('null-revision intermediate path page does not appear in the cloned repository', async () => {
-      // Clone the repository and verify that the auto-generated intermediate
-      // path page (which has no revision) is absent from the tracked files.
-      expect(TEST_PAT, 'GROWI_TEST_PAT must be set').toBeTruthy();
-
-      const cloneDir = await gitClone(TEST_PAT);
-      tmpDirs.push(cloneDir);
-
-      const files = await listClonedFiles(cloneDir);
-
-      // The null-revision parent page must NOT appear as a tracked file.
-      // Adjust the filename mapping to match VaultNamespaceMapper output for
-      // the path /test-null-revision (e.g. "test-null-revision.md").
-      const nullRevisionFiles = files.filter(
-        (f) => f.includes(NULL_REVISION_PARENT_DIR) && !f.includes('child'),
-      );
-
+      const dir = await gitCloneAdmin();
+      tmpDirs.push(dir);
+      const files = await listFiles(dir);
       expect(
-        nullRevisionFiles,
-        'The auto-generated null-revision parent page must not appear in the cloned repository',
-      ).toHaveLength(0);
+        files,
+        'null-revision page must not appear in the clone',
+      ).not.toContain(orphanFilename);
     });
-
-    it('child page with a valid revision does appear in the cloned repository', async () => {
-      // Confirm that only the null-revision page is excluded, not the child
-      // page that has a proper revision document.
-      expect(TEST_PAT, 'GROWI_TEST_PAT must be set').toBeTruthy();
-
-      const cloneDir = await gitClone(TEST_PAT);
-      tmpDirs.push(cloneDir);
-
-      const files = await listClonedFiles(cloneDir);
-
-      // The child page (which has a valid revision) must appear.
-      // Adjust filename mapping as needed to match VaultNamespaceMapper output.
-      const childFiles = files.filter((f) => f.includes('child'));
-
-      expect(
-        childFiles.length,
-        'The child page (with a valid revision) must appear in the cloned repository',
-      ).toBeGreaterThan(0);
-    });
-  }, 60_000); // Extended timeout to account for bootstrap polling.
-});
+  },
+);

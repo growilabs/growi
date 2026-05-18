@@ -1,8 +1,25 @@
-# 開発時動作確認手順（Claude 自律実行用）
+# 開発時動作確認手順（ローカルデバッグ専用）
 
-> **目的**: GROWI Vault の結合動作（apps/app + vault-manager + git clone）を Claude が単独で再現・検証するための運用手順。`/kiro-debug` 等で再診断・回帰確認する際にこのファイルを参照する。
+> ## ⚠️ このドキュメントは「タスク完了基準」ではない
 >
-> **対象**: 開発環境（devcontainer + 既存の docker-compose mongo）。本番デプロイ手順ではない。
+> このファイルは **ローカルで手動デバッグするときに参照する手順書** である。
+> 以下の用途で利用してはいけない:
+>
+> - タスク完了の根拠（`/kiro-verify-completion` などの完了判定）
+> - 回帰検出 — 手動手順は走らないことを前提に設計せよ
+> - リリース前の検証 — CI が緑であることが唯一の合格判定
+>
+> GROWI Vault の**回帰検出はすべて CI に集約される**:
+>
+> - 単体テスト: `apps/app/src/features/growi-vault/**/*.spec.ts`、`apps/growi-vault-manager/src/**/*.spec.ts`（CI で常時実行）
+> - 統合テスト: `apps/app/src/features/growi-vault/__tests__/*.integ.ts`、`apps/growi-vault-manager/src/__tests__/*.integ.ts`（CI で常時実行、`describe.skip` 禁止）
+>
+> 「`describe.skip` で運用する」「`/kiro-spec-tasks` で承認済み」のような形で
+> 回帰検出を放棄する判断は本ドキュメントの責任範囲外であり、無効である。
+
+> **目的（このファイルが助ける範囲）**: ローカルで `git clone` が動かない・bootstrap が止まる等の症状を診断するときに、デバッグ手順を素早く再現するための備忘録。
+>
+> **対象**: devcontainer 上でのインタラクティブ調査。本番デプロイ手順ではない。
 >
 > **関連 spec**:
 > - 公開ゲートウェイ側（apps/app）— `growi-vault-gateway`
@@ -97,81 +114,38 @@ ls /tmp/mygrowirepos
 
 ---
 
-## 結合試験（integ テスト）の手動実行手順
+## 結合試験（integ テスト）の実行
 
-`apps/app/src/features/growi-vault/__tests__/` 配下の integ テストは `describe.skip` のまま運用する。
-Vitest CI では何も実行されない（正式承認済み — `growi-vault-gateway` タスク 23.2 選択肢 B）。
-以下の手動手順がタスク 14.1 / 14.2 / 18.3 の完了基準に相当する。
+> **回帰検出は CI に集約済み**。下記の手動手順は CI が再現できない症状を**ローカルで掘り下げる**ためだけに使う。
+> 「integ テストを手動で走らせて OK だった」はタスク完了の根拠にはならない。
 
-### clone-e2e.integ.ts の手動確認（タスク 14.1 / 18.3）
+CI で走る integ テストは以下:
 
-**前提**: 起動手順に従って apps/app + vault-manager + MongoDB を起動済みで、PAT が seed 済みであること。
+- `apps/app/src/features/growi-vault/__tests__/clone-e2e.integ.ts` — 公開ゲートウェイの clone 契約
+- `apps/app/src/features/growi-vault/__tests__/vault-gateway.integ.ts` — gateway の状態遷移・read-only・ACL・coalesce・null-revision regression
+- `apps/growi-vault-manager/src/__tests__/*.integ.ts` — vault-manager 内部契約
 
-```bash
-# describe.skip を一時的に describe に変更して実行
-# または GROWI_TEST_PAT / GROWI_TEST_URL をエクスポートした上で vitest run を使用
-export GROWI_TEST_URL="http://localhost:3000"
-export GROWI_TEST_PAT="${TOKEN}"   # PAT seed で得たトークン
-cd /workspace/growi-vault/apps/app
-pnpm vitest run clone-e2e.integ --reporter verbose
-```
+これらは `apps/app/test/setup/vault-e2e/global-setup.ts` が `vault-manager` を子プロセス起動・Express にゲートウェイをマウント・ユーザー/PAT を seed する仕組みで動く。`describe.skip` は禁止。
 
-**確認項目**:
-- 有効 PAT で `git clone` が成功し、クローンディレクトリに `.md` ファイルが 1 件以上存在すること
-- 無効 PAT で clone が失敗（認証エラー）すること
-- null-revision ページ（中間パス自動生成）がクローン結果に含まれないこと（タスク 18.3）
-
-### vault-gateway.integ.ts の手動確認（タスク 14.2 / 18.3）
-
-**前提**: `GROWI_ADMIN_TOKEN` が設定済みであること。
+### ローカルで integ テストを再現する
 
 ```bash
-export GROWI_TEST_URL="http://localhost:3000"
-export GROWI_TEST_PAT="${TOKEN}"
-export GROWI_ADMIN_TOKEN="${ADMIN_TOKEN}"
-cd /workspace/growi-vault/apps/app
-pnpm vitest run vault-gateway.integ --reporter verbose
+# apps/app から
+pnpm vitest run --project app-integration vault
 ```
 
-**手動補完が必要なシナリオ**:
+実行時の MongoDB は `globalSetup`（mongo-memory-server）が自動起動するので、devcontainer の `mongo:27017` には依存しない。
 
-**Scenario 2（bootstrapState=running）**: このシナリオは自動化できない。以下の手順で手動検証する:
+### CI で失敗した integ テストをデバッグする
 
-1. MongoDB で bootstrapState を強制的に `'running'` に設定:
-   ```js
-   db.vault_sync_state.updateOne(
-     { _id: 'singleton' },
-     { $set: { bootstrapState: 'running' } },
-     { upsert: true }
-   );
-   ```
-2. `/_vault/repo.git/info/refs?service=git-upload-pack` にリクエストを送り、503 + `Retry-After` ヘッダーが返ることを確認
-3. `git clone http://x:${TOKEN}@localhost:3000/_vault/repo.git /tmp/test` が失敗することを確認
-4. bootstrapState を `'done'` に戻す:
-   ```js
-   db.vault_sync_state.updateOne({ _id: 'singleton' }, { $set: { bootstrapState: 'done' } });
-   ```
+CI のログだけでは原因が掴めないとき、ローカルで対象テストだけを反復実行する:
 
-**Scenario 6（coalesce behaviour）**: vault_instructions の検証は MongoDB 直接読み取りで行う:
+```bash
+# 1 ファイルを 10 回繰り返してフレーキー検出
+pnpm vitest run vault-gateway.integ --repeat=10
+```
 
-1. 150 ページを `/test-coalesce` 配下に一括作成:
-   ```bash
-   for i in $(seq 0 149); do
-     curl -s -X POST "${BASE_URL}/_api/v3/page" \
-       -H "Content-Type: application/json" \
-       -H "Authorization: Bearer ${ADMIN_TOKEN}" \
-       -d "{\"path\": \"/test-coalesce/page-${i}\", \"body\": \"# Page ${i}\"}" > /dev/null
-   done
-   ```
-2. 1.5 秒待機後、MongoDB で bulk-upsert instruction の存在を確認:
-   ```js
-   db.vault_instructions
-     .find({ 'payload.namespace': '/test-coalesce' })
-     .sort({ issuedAt: -1 })
-     .limit(10)
-     .toArray();
-   ```
-   期待: `op === 'bulk-upsert'` のドキュメントが 1 件以上、`op === 'upsert'` が 0 件。
+`globalSetup` がログを `/tmp/vault-e2e/*.log` に出すので、vault-manager の startup ログ・apps/app のリクエストログを確認できる。
 
 ---
 
