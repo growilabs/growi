@@ -1,5 +1,5 @@
 import { pipeline } from 'node:stream/promises';
-import type { Request, Response } from 'express';
+import type { Request, Response, Router } from 'express';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
@@ -102,7 +102,9 @@ async function assertGatewayReady(
  * Mount point: `/_vault/repo.git`
  * (Registered by the app's top-level router at `/_vault/repo.git`.)
  */
-export const createVaultGatewayRouter = (deps: VaultGatewayRouterDeps = {}) => {
+export const createVaultGatewayRouter = (
+  deps: VaultGatewayRouterDeps = {},
+): Router => {
   const auth = deps.vaultPatAuth ?? defaultVaultPatAuth;
   const createActivity = deps.createActivity;
 

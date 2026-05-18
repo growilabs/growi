@@ -1,4 +1,5 @@
 import type { StorageStatsResponse } from '@growi/core/dist/interfaces/vault';
+import type { Router } from 'express';
 import express from 'express';
 import { body, validationResult } from 'express-validator';
 
@@ -48,7 +49,9 @@ export interface VaultAdminRouterDeps {
  *   POST /_api/v3/vault/bootstrap — trigger bootstrap
  *   PUT  /_api/v3/vault/enabled   — toggle vaultEnabled flag
  */
-export const createVaultAdminRouter = (deps: VaultAdminRouterDeps = {}) => {
+export const createVaultAdminRouter = (
+  deps: VaultAdminRouterDeps = {},
+): Router => {
   const {
     crowi,
     bootstrapper: injectedBootstrapper,

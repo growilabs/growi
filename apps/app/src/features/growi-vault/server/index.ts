@@ -1,4 +1,5 @@
 import type { IPage } from '@growi/core';
+import type { Router } from 'express';
 
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -27,7 +28,7 @@ export { createVaultGatewayRouter } from './routes/vault-gateway';
  * @param crowi - The Crowi application instance.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const createVaultGatewayRouterWithDeps = (crowi: any) => {
+export const createVaultGatewayRouterWithDeps = (crowi: any): Router => {
   const createActivity =
     crowi.activityService != null
       ? crowi.activityService.createActivity.bind(crowi.activityService)
@@ -46,7 +47,7 @@ export const createVaultGatewayRouterWithDeps = (crowi: any) => {
  * @param crowi - The Crowi application instance.
  */
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
-export const createVaultAdminRouterWithDeps = (crowi: any) => {
+export const createVaultAdminRouterWithDeps = (crowi: any): Router => {
   const bootstrapper = createVaultBootstrapper(vaultNamespaceMapper);
   return createVaultAdminRouter({ crowi, bootstrapper });
 };
