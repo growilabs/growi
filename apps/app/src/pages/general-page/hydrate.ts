@@ -112,5 +112,5 @@ export const useHydrateGeneralPageConfigurationAtoms = (
           createAtomTuple(disableUserPagesAtom, serverConfig.disableUserPages),
         ];
 
-  useHydrateAtoms(tuples);
+  useHydrateAtoms(tuples, { dangerouslyForceHydrate: true });
 };
