@@ -302,7 +302,6 @@ export const generateCommentViewOptions = (
         'sanitize plugin not found; mention sanitize option will not be applied',
       );
     }
-    verifySanitizePlugin(options, false);
   }
 
   return options;
