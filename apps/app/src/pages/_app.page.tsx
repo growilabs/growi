@@ -112,7 +112,7 @@ function GrowiApp(props: GrowiAppProps): JSX.Element {
 
 // inject userLocale by context
 GrowiApp.getInitialProps = async (appContext: AppContext) => {
-  const appProps = App.getInitialProps(appContext);
+  const appProps = await App.getInitialProps(appContext);
   const userLocale = getLocaleAtServerSide(
     appContext.ctx.req as unknown as CrowiRequest,
   );
