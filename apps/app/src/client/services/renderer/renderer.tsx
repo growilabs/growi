@@ -267,6 +267,11 @@ export const generateSimpleViewOptions = (
   return options;
 };
 
+// Mention highlighting applies to comments only. Applying it in search results, timeline,
+// or sidebar would falsely treat @tokens in non-comment content as user mentions.
+// Mention plugin and its sanitize schema are injected via post-processing on top of
+// generateSimpleViewOptions rather than forking the base builder — the same extension
+// pattern as generatePresentationViewOptions.
 export const generateCommentViewOptions = (
   config: RendererConfigExt,
   pagePath: string,
