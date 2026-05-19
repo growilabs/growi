@@ -205,7 +205,6 @@ export const generateSimpleViewOptions = (
     callout.remarkPlugin,
     lsxGrowiDirective.remarkPlugin,
     refsGrowiDirective.remarkPlugin,
-    mention.remarkPlugin,
   );
 
   const isEnabledLinebreaks =
@@ -230,7 +229,6 @@ export const generateSimpleViewOptions = (
             lsxGrowiDirective.sanitizeOption,
             refsGrowiDirective.sanitizeOption,
             codeBlock.sanitizeOption,
-            mention.sanitizeOption,
           ),
         ]
       : () => {};
@@ -266,6 +264,46 @@ export const generateSimpleViewOptions = (
   if (config.isEnabledXssPrevention) {
     verifySanitizePlugin(options, false);
   }
+  return options;
+};
+
+// Mention highlighting applies to comments only. Applying it in search results, timeline,
+// or sidebar would falsely treat @tokens in non-comment content as user mentions.
+// Mention plugin and its sanitize schema are injected via post-processing on top of
+// generateSimpleViewOptions rather than forking the base builder — the same extension
+// pattern as generatePresentationViewOptions.
+export const generateCommentViewOptions = (
+  config: RendererConfigExt,
+  pagePath: string,
+  overrideIsEnabledLinebreaks?: boolean,
+): RendererOptions => {
+  const options = generateSimpleViewOptions(
+    config,
+    pagePath,
+    undefined,
+    overrideIsEnabledLinebreaks,
+  );
+  const { remarkPlugins, rehypePlugins } = options;
+
+  remarkPlugins.push(mention.remarkPlugin);
+
+  if (config.isEnabledXssPrevention) {
+    const idx = rehypePlugins.findIndex(
+      (p) => Array.isArray(p) && p[0] === sanitize,
+    );
+    if (idx === -1) {
+      logger.warn(
+        'sanitize plugin not found; mention sanitize option will not be applied',
+      );
+    } else {
+      const [, existingSchema] = rehypePlugins[idx] as [unknown, object];
+      rehypePlugins[idx] = [
+        sanitize,
+        deepmerge(existingSchema, mention.sanitizeOption),
+      ];
+    }
+  }
+
   return options;
 };
 
