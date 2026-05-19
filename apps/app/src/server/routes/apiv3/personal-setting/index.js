@@ -91,7 +91,10 @@ module.exports = (crowi) => {
       body('email')
         .isEmail()
         .custom((email) => {
-          if (!User.isEmailValid(email))
+          const isLocalEnabled = crowi.configManager.getConfig(
+            'security:passport-local:isEnabled',
+          );
+          if (isLocalEnabled && !User.isEmailValid(email))
             throw new Error('email is not included in whitelist');
           return true;
         }),

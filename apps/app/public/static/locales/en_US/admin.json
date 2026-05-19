@@ -771,6 +771,7 @@
       "send_temporary_password": "If you have not sent an invitation email, copy the temporary password on this screen and contact the inviter.",
       "send_email": "You can also send or resend the invitation email from the drop-down in the users table.",
       "existing_email": "The following emails already exist",
+      "whitelist_violation": "The following email addresses are not allowed by the whitelist:",
       "issue": "Issue"
     },
     "user_table": {

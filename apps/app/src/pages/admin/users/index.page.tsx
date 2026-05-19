@@ -3,7 +3,10 @@ import dynamic from 'next/dynamic';
 import { useHydrateAtoms } from 'jotai/utils';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import { isMailerSetupAtom } from '~/states/server-configurations';
+import {
+  isMailerSetupAtom,
+  registrationWhitelistAtom,
+} from '~/states/server-configurations';
 
 import type { NextPageWithLayout } from '../../_app.page';
 import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
@@ -19,14 +22,18 @@ const UserManagement = dynamic(
   { ssr: false },
 );
 
-type PageProps = { isMailerSetup: boolean };
+type PageProps = { isMailerSetup: boolean; registrationWhitelist: string[] };
 type Props = AdminCommonProps & PageProps;
 
 const AdminUserManagementPage: NextPageWithLayout<Props> = (props: Props) => {
   // hydrate
-  useHydrateAtoms([[isMailerSetupAtom, props.isMailerSetup]], {
-    dangerouslyForceHydrate: true,
-  });
+  useHydrateAtoms(
+    [
+      [isMailerSetupAtom, props.isMailerSetup],
+      [registrationWhitelistAtom, props.registrationWhitelist],
+    ],
+    { dangerouslyForceHydrate: true },
+  );
   return <UserManagement />;
 };
 
@@ -49,10 +56,14 @@ export const getServerSideProps: GetServerSideProps<Props> = async (
 
   const req: CrowiRequest = context.req as CrowiRequest;
   const { crowi } = req;
-  const { mailService } = crowi;
+  const { mailService, configManager } = crowi;
 
   const fragment = {
-    props: { isMailerSetup: mailService.isMailerSetup },
+    props: {
+      isMailerSetup: mailService.isMailerSetup,
+      registrationWhitelist:
+        configManager.getConfig('security:registrationWhitelist') ?? [],
+    },
   } satisfies { props: PageProps };
   return mergeGetServerSidePropsResults(baseResult, fragment);
 };
