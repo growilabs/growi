@@ -19,20 +19,6 @@ export const PageCreateButton = React.memo((): JSX.Element => {
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
 
-  useEffect(() => {
-    const handleClickOutside = (e: MouseEvent) => {
-      if (
-        fieldsetRef.current &&
-        !fieldsetRef.current.contains(e.target as Node)
-      ) {
-        setDropdownOpen(false);
-        setIsHovered(false);
-      }
-    };
-    document.addEventListener('mousedown', handleClickOutside);
-    return () => document.removeEventListener('mousedown', handleClickOutside);
-  }, []);
-
   const { open: openPageCreateModal } = usePageCreateModalActions();
   const currentPagePath = useCurrentPagePath();
 
@@ -62,7 +48,11 @@ export const PageCreateButton = React.memo((): JSX.Element => {
     if (!dropdownOpen) setIsHovered(false);
   };
 
-  const toggle = () => setDropdownOpen(!dropdownOpen);
+  const toggle = () => {
+    const next = !dropdownOpen;
+    setDropdownOpen(next);
+    if (!next) setIsHovered(false);
+  };
 
   return (
     <fieldset
@@ -86,7 +76,7 @@ export const PageCreateButton = React.memo((): JSX.Element => {
         isOpen={dropdownOpen}
         toggle={toggle}
         direction="end"
-        className={`position-absolute ${styles['dropend-toggle']} ${isHovered ? styles['is-hovered'] : ''}`}
+        className={`position-absolute ${styles['dropend-wrapper']} ${isHovered ? styles['is-hovered'] : ''}`}
       >
         <DropendToggle isOpen={dropdownOpen} />
         <DropendMenu

@@ -16,10 +16,18 @@
   }
 }
 
-.dropend-toggle {
+.dropend-wrapper {
+  transform: translateX(-12px);
+}
+
+.dropend-wrapper.is-hovered {
+  animation: slide-in 0.3s ease forwards;
+}
+
+.dropend-wrapper:not(.is-hovered) {
   animation: slide-out 0.3s ease forwards;
 }
 
-.dropend-toggle.is-hovered {
-  animation: slide-in 0.3s ease forwards;
+@media (prefers-reduced-motion: reduce) {
+  .dropend-toggle { transform: none; animation: none; }
 }
