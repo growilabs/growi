@@ -562,10 +562,7 @@ _Depends: 2.1, 6.1, 13.1_
 - `ConfigSource` は `@growi/core/dist/interfaces` から import する（`config-manager.ts` と同一パターン）
 - `app:vaultEnabled` も既に configManager 経由になっているので変更不要
 - **背景**: env からの直接読み込みは config-definition.ts の登録を迂回しており、設定キーの一元管理（型安全な参照、isSecret マスキング、テスト時の上書き API）を破る。configManager 経由に統一することで env-only という制約を保ちつつ、他の設定キーと同一の仕組みに揃える
-- **完了確認**:
-  - `pnpm vitest run vault-settings-service` が通ること
-  - `process.env` への直接参照が `vault-settings-service.ts` から消えていること（`grep -n "process.env" apps/app/src/features/growi-vault/server/services/vault-settings-service.ts` が 0 件）
-  - 既存の Vault 関連テスト（vault-manager-client.spec、vault-gateway.spec、vault-bootstrapper.spec 等）に regression がないこと
+- **完了確認**: process.env 直接参照が消え、`ConfigSource.env` 経由に統一されていること
 
 ### [x] 17.2 VAULT_BOOTSTRAP_ON_START を config-definition に登録し configManager から読む
 
@@ -579,10 +576,7 @@ _Depends: 2.1, 6.1, 13.1_
 - `apps/app/src/features/growi-vault/server/index.ts` の `process.env.VAULT_BOOTSTRAP_ON_START === 'true'` 判定を `configManager.getConfig('app:vaultBootstrapOnStart')` に置き換える
   - boolean 化は configManager 側のキャストに任せる（envVar は文字列で渡るので `getConfig` 経由なら自動で型変換される）
 - **背景**: 現状はこの env 変数のみ config-definition に登録されておらず、Vault feature 内で唯一 `process.env` 直参照が残る。タスク 17.1 と合わせて Vault feature 全体で「環境変数は必ず config-definition に登録 → configManager 経由で読む」という方針に統一する
-- **完了確認**:
-  - `apps/app/src/features/growi-vault/server/` 配下に `process.env.` 直参照が 0 件であること（`grep -rn "process.env" apps/app/src/features/growi-vault/server/ | grep -v ".spec.ts" | grep -v "__tests__"` が 0 件）
-  - `VAULT_BOOTSTRAP_ON_START=true` で起動した際に bootstrap が自動起動することを動作確認する
-  - `turbo run build --filter @growi/app` がエラーなく通ること
+- **完了確認**: Vault feature 配下から process.env 直参照が消え、configManager 経由で読まれていること
 
 ---
 
@@ -657,10 +651,7 @@ src/features/growi-vault/server/services/vault-bootstrapper.spec.ts(546,9): erro
 - 選択肢 A: `revision: { toString: () => 'rev-abc' } as never` で型キャストする（最小差分）
 - 選択肢 B: `buildPage` ヘルパの戻り型を `Partial<IPage>` ベースから外し、test-only の loose 型で受ける
 - どちらを採用しても、production 側 [vault-bootstrapper.ts:200-215](../../../apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts#L200-L215) の `page.revision == null` 判定が観測できることを保つ
-- **完了確認**:
-  - `pnpm run lint:typecheck` がエラーなく通ること
-  - `pnpm vitest run vault-bootstrapper.spec` が引き続き全件通過すること
-  - `turbo run build --filter @growi/app` が通ること
+- **完了確認**: 型エラー解消、`vault-bootstrapper.spec` 全件通過、ビルド成功
 
 ---
 
@@ -683,8 +674,7 @@ _Depends: 4.1, 4.2_
 - **選択肢 B**: `vault-pat-auth.ts` 側で `findUserIdByToken` の戻り値から `_id` を取り、`AccessToken.findById(_id).select('user scopes')` で再 fetch する
   - production 1 リクエストあたり DB 往復が 1 回増える
 
-- **完了確認**:
-  - 採用した修正後、`vault-pat-auth.ts:134` で実際にスコープ配列が読み出せることを **mock を経由しない単体テスト or 統合テスト** で検証する（タスク 20.2 で対応）
+- **完了確認**: 実 Mongoose schema 経由で scopes が読み出せることをタスク 20.2 で検証
 
 ### [x] 20.2 .select() 制約を尊重したテストの追加
 
@@ -692,8 +682,7 @@ production の `findUserIdByToken` 戻り値が `.scopes` を含むことを moc
 
 - `apps/app/src/server/models/access-token.spec.ts` か新規 `vault-pat-auth.integ.ts` を追加し、実 Mongoose schema に対してドキュメントを insert → `findUserIdByToken` の戻り値が `scopes` フィールドを持つことを assert する
 - 既存の `vault-pat-auth.spec.ts` のモックは現実のクエリ整形（`.select('user')` 的な狭めた projection）を反映するよう調整するか、コメントで「production シェイプは別 spec で検証」と明示する
-- **完了確認**:
-  - 修正前のコード（`.select('user')` のまま）でテストが失敗し、修正後（`.select('user scopes')`）で成功すること
+- **完了確認**: production シェイプを反映したテストで `.select` の projection 制約が観測されること
 
 ---
 
@@ -719,10 +708,7 @@ _Depends: 7.1, 7.3_
 - **背景・制約**:
   - `pageEvent.emit('rename')`（単一 rename、payload 空）と `updateChildPagesGrant` の bulkWrite（event 発火なし）は Stage 1 では検知できない
   - `'updateMany'` は `renameDescendants` 系から `(pages: 新パス確定後の pages, user)` で発火しており、bulk rename 後の新パスを vault に反映できる。ただし旧パスのファイルは clone に残る（Stage 2 で `rename-prefix` により削除）
-- **完了確認**:
-  - bulk rename 後、新パスの pages が `upsert` instruction として発行されることを単体テストで検証
-  - `vault-dispatcher.spec.ts` の既存 upsert 動作に regression がないこと（`pnpm vitest run vault-dispatcher.spec` と `vault-pat-auth.spec` 系全件 pass）
-  - `dev-verification.md` に Stage 1 / Stage 2 のスコープと、Stage 2 完了までの運用回避策（bootstrap 再実行）を明記すること
+- **完了確認**: bulk rename 後の新パスが per-page upsert で発行され、既存 dispatcher テストに regression がないこと
 
 ### [x] 21.1-B Stage 2: GROWI core event payload 拡張による完全実装
 
@@ -736,11 +722,7 @@ _Depends: 7.1, 7.3_
   - `'updateMany'` 拡張 payload から `oldPagePathPrefix` / `newPagePathPrefix` を取り出して `'rename-prefix'` instruction を発行する（Stage 1 の per-page upsert は Stage 2 と重複するため、`updateMany` の `rename-prefix` 化に置き換えるか、両者の差異を整理する）
   - `'descendantsGrantChanged'` を購読し `'grant-change-prefix'` instruction を発行する
 - **既存サブスクライバ互換性**: 追加引数を無視するだけなので後方互換。既存 reg テスト（page service 系の単体・統合）に regression が出ないことを確認する
-- **完了確認**:
-  - 親ページ rename → 影響 namespace 数 M 件の `rename-prefix` instruction が発行されることを単体テスト + 結合試験で検証
-  - 親ページ grant 一括変更 → `(fromNamespace, toNamespace)` ペアごとに `grant-change-prefix` instruction が発行されることを単体テストで検証
-  - 既存 GROWI page service の event reg テスト（`page.integ.ts` 等）が全件 pass
-  - `dev-verification.md` のトラブルシュート節「rename / grant 一括変更後に vault の内容が古くなる」セクションを削除し、Stage 2 完了で自動伝播するようになった旨を明示
+- **完了確認**: 親 rename / grant 一括変更時に namespace 数ぶんの `rename-prefix` / per-page `acl-change` が自動伝播し、既存 page service テストに regression がないこと
 
 ---
 
@@ -767,9 +749,7 @@ _Depends: 5.1, 10.1, 20.1_
 
 `vault-gateway.ts` の `info/refs` および `git-upload-pack` ハンドラで、`authResult.scopes` を `computeAccessibleNamespaces` に渡す。
 
-- **完了確認**:
-  - `pnpm vitest run vault-gateway.spec` が通ること
-  - `pnpm vitest run vault-namespace-mapper.spec` が通ること
+- **完了確認**: gateway router からスコープが伝播され、namespace-mapper と gateway 双方のテストが通ること
 
 ---
 
@@ -797,9 +777,7 @@ integ ファイル内の以下を実装と整合させる:
 - **選択肢 A**: integ を Vitest CI で動かす（docker-compose を CI で起動）。`describe.skip` を解除し、CI 設定に integ job を追加する
 - **選択肢 B**: integ を `dev-verification.md` の手動確認手順としてのみ運用する。`describe.skip` のまま正式承認とし、tasks.md の 14.1 / 14.2 / 18.3 の完了基準を「`dev-verification.md` の対応セクション実行」に書き換える
 
-- **完了確認**:
-  - tasks.md の関連完了基準と実態（CI で走る or 手動手順）が一致していること
-  - 「タスク完了基準で `pnpm vitest run *.integ` を要求するが describe.skip にしている」という矛盾が解消していること
+- **完了確認**: 完了基準と実態（CI / 手動手順）が一致し、describe.skip と完了基準の矛盾が解消していること
 
 ---
 
@@ -856,6 +834,65 @@ _Depends: 3.2, 9.1, 9.2_
 - `growi-vault/design.md` の field-level owner 分離表に `bootstrapLastError` を apps/app owned として追記
 - `growi-vault-gateway/design.md` の `vault_sync_state` スキーマスケッチに `bootstrapLastError: string | null` を追加し、`BootstrapStatus.lastError` との対応を明記
 - **完了確認**: 両 design.md と実装で field 名が一致していること
+
+---
+
+## Implementation Notes
+
+実装を経て判明した、refactor 時に押さえるべき設計上の課題・教訓を記録する。
+
+### Bootstrap resilience の構造的欠陥（再設計対象）
+
+現状の `VaultBootstrapper.start()` には「真にレジリエントな resume」を阻む 3 つの問題が同居している:
+
+1. **完了時に `bootstrapCursor` を null にリセットしていない** ([vault-bootstrapper.ts:264-272](../../../apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts#L264-L272))
+   - `bootstrapState: 'done'` 後に再度 `start()` が呼ばれると、前回最後のページ ID から resume してしまう
+   - → `VAULT_BOOTSTRAP_ON_START=true` を「つけっぱなし」にすると、再起動のたびに既存 vault 全消失リスクがある
+
+2. **二重起動ガードが `running` 状態しかブロックしない** ([vault-bootstrapper.ts:113-124](../../../apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts#L113-L124))
+   - `done` / `failed` / `pending` 状態での再 `start()` は全て新規実行扱い
+
+3. **`reset-all` instruction を resume でも無条件発行する** ([vault-bootstrapper.ts:171-175](../../../apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts#L171-L175))
+   - 「resume」と呼んでいるが apps/app 側のページ stream の中断点復帰のみで、vault-manager 側には毎回 wipe を要求する
+   - resume cursor が non-null かつ reset-all を発行すると、cursor 以前のページが永久に欠落する
+
+4. **fire-and-forget で失敗が握り潰される** ([growi-vault/server/index.ts:401-404](../../../apps/app/src/features/growi-vault/server/index.ts#L401-L404))
+   - bootstrap 失敗は log のみで、再起動時の自動再試行・進捗継続の仕組みがない
+
+5. **既存 cron / scheduler は data 補修をしない** ([vault-maintenance-scheduler.ts](../../../apps/growi-vault-manager/src/services/vault-maintenance-scheduler.ts))
+   - vault-manager の `VaultMaintenanceScheduler` は squash / gc のみで、MongoDB のページと vault tree の reconciliation は行わない
+   - bootstrap で欠落したページは、後続の page event が発火するまで永久に同期されない
+
+→ 真にレジリエントな resume を実装するには、これら 5 つを統合的に解決する設計が必要（別 spec で扱う）。
+
+### スケール特性（refactor 時の前提）
+
+- bootstrap 時間 ≈ O(N) where N = 公開ページ数。律速は (a) apps/app の毎ページ `vault_sync_state.updateOne`、(b) vault-manager の sequential tree rebuild、(c) instruction watcher の sequential 処理
+- bulk-upsert エントリ総数は N × 平均 (1 ページあたりの granted namespace 数) で膨らむ。GRANT_USER_GROUP × 多人数グループのページ密度が高いと commit 数が大幅に増える
+- ユーザー数自体は bootstrap 時間に直接影響しない（per-user view は lazy compose）
+
+### スキーマと API 名の意図的分離
+
+- DB カラム名 `bootstrapLastError` と API/UI フィールド名 `lastError` は意図的に分離している（task 25 を参照）
+- 永続層では `bootstrap*` プレフィクスで apps/app 所有フィールドを明示し、vault-manager 所有フィールド（`resumeToken` 等）と紛れないようにする
+- 公開契約 `BootstrapStatus.lastError` の互換性は bootstrapper の `getStatus()` で吸収する
+
+### テスト設計の落とし穴
+
+タスク 20 / 25 で発覚した「Arrange That Serves the Assert」アンチパターン:
+
+- **task 20**: spec が `scopes` を直接生やしたモックを返したため、production の `.select('user')` が scopes を返さない欠陥を見逃した
+- **task 25**: spec が `updateOne` の引数だけ assert したため、`vault_sync_state` schema に `bootstrapLastError` が定義されておらず Mongoose strict mode で silent drop されている欠陥を見逃した
+
+→ DB 永続化に絡む契約は、できる限り**実 Mongoose schema 経由で persistence を検証**する（mock を経由しない）。
+
+### Null revision page の取り扱い
+
+GROWI が階層整合性のために自動生成する中間パスページ（例: `/user`、`/empty`）は `revision` フィールドが null で、`revisionId: ''` で instruction に積むと vault-manager 側の ObjectId キャストで失敗する。bootstrapper / dispatcher 双方で `page.revision == null` を判定してスキップする（task 18）。新しい instruction op を追加する際も同じガードを適用すること。
+
+### Stage 2 で残った設計負債
+
+`grant-change-prefix` op は subtree 単位の prefix scope を持たないため未使用。現状は `'descendantsGrantChanged'` → per-page `acl-change` instruction（remove + upsert）でカバーしているが、descendants が多い場合の効率は悪い。vault-manager 側で「namespace 間 subtree 移動」の API を再設計する際に解消できる。
 
 ---
 

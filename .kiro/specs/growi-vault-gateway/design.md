@@ -406,18 +406,11 @@ interface VaultDispatcher {
 - coalesce 対象は `create` / `update` のみ（`remove` / `rename-prefix` / `grant-change-prefix` は混在させない）
 - chunk size 上限はデフォルト 1000 entries / instruction
 
-**prefix primitive（親ページのバルク操作）** — **[MVP・実装完了]**
+**prefix primitive（親ページのバルク操作）**
 
-> _MVP として 2 段階で実装完了:_
->
-> - **Stage 1 (タスク 21.1-A、実装済み)**: `'updateMany'` を購読し、4 つ目の payload が無い legacy emit ではフォールバックとして per-page upsert を発行する。
-> - **Stage 2 (タスク 21.1-B、実装済み)**: GROWI core の event payload を拡張し、subscriber がそれらを受け取って instruction を発行する:
->   - `pageEvent.emit('rename', { page, oldPath, newPath, user })` → vault subscriber が `rename-prefix` instruction を namespace 数ぶん発行
->   - `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` → vault subscriber が影響 namespace 集合を de-dup して `rename-prefix` を 1 件 / namespace 発行
->   - 新規イベント `pageEvent.emit('descendantsGrantChanged', { affectedPages, user })` → vault subscriber が per-page `acl-change` instruction（remove + upsert）を発行（既存 dispatcher 経路を流用）
-
-- 親ページ rename: 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）— **実装済み**
-- 親ページ grant 一括変更: 影響を受けた各 page に対して per-page `acl-change` instruction を発行（remove from previous namespaces + upsert to current namespaces）— **実装済み**（`grant-change-prefix` op は subtree 単位の prefix scope を持たないため、将来の vault-manager 設計改修まで使用しない）
+- 親ページ rename: 影響を受ける各 namespace に `rename-prefix` 1 件（descendants 数 N によらず namespace 数 M 件）。GROWI core 側の `pageEvent.emit('rename', { page, oldPath, newPath, user })` と `pageEvent.emit('updateMany', pages, user, { oldPagePathPrefix, newPagePathPrefix })` を購読する
+- 親ページ grant 一括変更: 影響を受けた各 page に対して per-page `acl-change` instruction を発行（remove from previous namespaces + upsert to current namespaces）。`pageEvent.emit('descendantsGrantChanged', { affectedPages, user })` を購読する
+- 当初設計で想定した `grant-change-prefix` op は subtree 単位の prefix scope を持たないため、現状は使用していない（将来の vault-manager 設計改修で再評価）
 
 **実装ノート**
 - 既存 GROWI `PageEvent`（`apps/app/src/server/events/page.ts`）に subscribe
@@ -749,34 +742,6 @@ export interface StorageStatsResponse {
 - **認証失敗レスポンス**: エラーメッセージにページリスト・存在情報を含めない（要件 2.3）
 - **既存 audit log への統合**: 認証失敗（auth-failure）も記録しブルートフォース検出を可能にする
 - **レート制限**: 既存 GROWI の rate limiting を `/_vault/*` にも適用する
-
----
-
-## テスト戦略
-
-### 単体テスト（apps/app side）
-
-- **`VaultNamespaceMapper.computeAccessibleNamespaces`**: GRANT 種別ごと（public / restricted-link / group / only-me）、認証済み / 匿名、scope 制限の組み合わせ（要件 3）
-- **`VaultNamespaceMapper.computePageNamespaces`**: 各 grant パターン、ACL 変更時の previous/current（要件 3.7）
-- **`VaultDispatcher.onPageChanged`**: イベント種別ごとに正しい instruction が発行されるか（要件 4）。同 namespace への高頻度 event が `bulk-upsert` に coalesce されること、coalesce window 外の event は単発 `upsert` で発行されること
-- **`VaultBootstrapper.start`**: `reset-all` 発行 → pages cursor stream → namespace 単位バッファ蓄積 → CHUNK_SIZE で `bulk-upsert` 発行 → 残バッファ flush の順序、resume 時の cursor 続行（要件 5）
-- **`VaultPatAuth`**: 有効 / 無効 / 期限切れ / scope 不足の各 PAT パターン（要件 2）
-- **`VaultManagerClient`**: shared secret 付与、proxy stream の正常系・異常系（要件 6）
-- **`VaultSettingsService`**: env-only 設定の DB 非保存確認（要件 7）
-
-### 統合テスト
-
-- **clone E2E**: apps/app + vault-manager + MongoDB を docker-compose で起動し、実際に `git clone` を実行してファイル一覧と内容を検証（要件 1、9）
-- **incremental fetch**: ページ更新後 `git fetch`、変更ファイルのみ転送（要件 1.2、4）
-- **ACL 隔離**: ユーザー A の clone に、A が閲覧権限を持たないページのファイル名・中間ディレクトリが存在しないことを確認（要件 3）
-- **匿名アクセス**: PAT なしで public ページのみが取得できる（要件 2.4、3.2）
-- **push 拒否**: `git push` が 403（要件 1.3）
-- **機能無効化**: `vaultEnabled=false` で `info/refs` / `git-upload-pack` が 404 を返す（要件 1.4、7）
-- **bootstrap 中の 503 gating**: bootstrapState が running の間、clone が 503 + Retry-After を返す（一時的な状態のため 503 が適切）（要件 1.5）
-- **ACL 変更伝播**: grant 変更後、後続 fetch でファイル追加 / 削除（要件 4.3）
-- **shared secret 不一致**: vault-manager が apps/app 以外からの request を 401 で拒否
-- **Initial Bootstrap（apps/app 主導、bulk-upsert）**: 数千ページ規模の seed DB に対し `VaultBootstrapper.start()` を実行。`reset-all` + namespace 単位 `bulk-upsert` が発行され、bootstrapState 遷移と clone 503 gating を確認。再起動による cursor resume、CHUNK_SIZE 境界（999/1000/1001）での flush 動作を確認（要件 5）
-- **coalesce 動作**: 同 namespace に 1 秒間に 500 page edit event を発生させ、`bulk-upsert` に coalesce されることを確認（要件 4.6）
 
 ---
 

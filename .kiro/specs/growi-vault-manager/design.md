@@ -197,91 +197,14 @@ apps/growi-vault-manager/
 
 ## Dockerfile 構成戦略
 
-### 背景と制約
+vault-manager は `VaultUploadPackSpawner` が `child_process.spawn` で `git upload-pack` を起動するため、release stage に **git binary v2.30+ の実行可能体が必須**。これは apps/app（DHI distroless で git 不要）にはない制約である。
 
-`apps/growi-vault-manager` は `apps/app` と異なり、runtime stage に git binary v2.30+ の実行可能体が **必須** である。具体的には `VaultUploadPackSpawner`（`apps/growi-vault-manager/src/services/vault-upload-pack-spawner.ts`）が Node.js の `child_process.spawn` を介して `git upload-pack --stateless-rpc` を起動するためで、要件 5（git smart HTTP の lower-half 提供）と要件 10.2（Dockerfile に node + git binary v2.30+ を同梱）の両方からの制約である。
+**採用**: release stage に `dhi.io/node:24-debian13-dev`（DHI dev variant、git/bash/coreutils を pre-installed）を流用する。
 
-apps/app では DHI（Docker Hardened Images）化に際して runtime に追加 binary を一切載せない方針が採られたが（`.kiro/specs/official-docker-image/research.md` 参照）、その判断は「runtime が shell も git も不要」という apps/app 固有の前提に立つ。vault-manager にはこの前提が成立しない。
-
-### 候補方針の評価
-
-| 方針 | 概要 | 採否 | 理由 |
-|------|------|------|------|
-| (a) `dhi.io/node:24-debian13-dev` を runtime に流用 | dev variant を release stage の base に使う | **採用** | git/bash/coreutils が pre-installed。COPY 操作不要で、DHI が公式に維持する image をそのまま使えるため、DHI 更新追随が無コストで済む |
-| (b) git を含む別 DHI variant を採用 | DHI が node-git 等の variant を提供しているならそれを使う | **却下** | DHI catalog（`dhi.io/node` 配下）の available tag は `24-debian13` と `24-debian13-dev` の 2 種のみ（`.kiro/specs/official-docker-image/research.md` line 31）。git 同梱の third variant は存在しない |
-| (c) distroless runtime に git binary を `COPY --from=builder` | `dhi.io/node:24-debian13` をベースに、builder stage から `/usr/bin/git` と関連 binary・shared library を選択的に copy する | **却下** | Debian 13 の git は `/usr/lib/git-core/` 配下の補助 binary（`git-upload-pack` / `git-pack-objects` など）を runtime exec する構造のため、最低でも `/usr/bin/git` + `/usr/lib/git-core/` ディレクトリ全体 + 依存共有ライブラリ（libpcre2, libcurl, libssl, libcrypto, libz, libexpat 等）を tracking しながら copy する必要がある。DHI image の更新で依存関係が変わる度に追従が要求され、CVE 対応の遅延リスクが高い。さらに distroless には `ldconfig` も無いため runtime での lib 解決にも追加配慮が必要 |
-
-### 採用方針: (a) DHI dev variant を runtime に流用
-
-- **要旨**: `release` stage の base image に `dhi.io/node:24-debian13-dev` を採用する。git binary v2.30+ は image に pre-installed されるため、`apt-get install` も `COPY --from=...` も不要。
-- **トレードオフ**:
-  - **セキュリティ**: dev variant には apt / bash / util-linux / coreutils 等が含まれるため、distroless（`24-debian13`）に比べ攻撃面が広い。ただし vault-manager の runtime 必須要件として git を含めた時点で、shell-less 完全 distroless は技術的に成立しない（git の補助 binary 構造に起因）。dev variant は引き続き DHI として 95% CVE 削減の対象であり、`node:24-alpine` よりは大幅に堅牢。
-  - **イメージサイズ**: dev variant は distroless より大きい（おおよそ 2〜3 倍）。ただし vault-manager は単発の microservice として deploy されるため、apps/app のような大規模 runtime と比べれば絶対値は小さい。
-  - **保守性**: DHI が公式に維持する image をそのまま使えるため、手動の binary tracking や ldd 監視が不要。長期保守コストが (c) と比べ圧倒的に低い。
-
-### 18.2 で適用する具体的な Dockerfile 構造
-
-```dockerfile
-# build stage (apps/app と同じ)
-FROM dhi.io/node:24-debian13-dev AS base
-# ... pnpm + turbo install ...
-
-FROM base AS pruner
-COPY . .
-RUN turbo prune @growi/vault-manager --docker
-
-FROM base AS deps
-COPY --from=pruner $OPT_DIR/out/json/ .
-RUN pnpm install --frozen-lockfile
-
-FROM deps AS builder
-COPY --from=pruner $OPT_DIR/out/full/ .
-COPY tsconfig.base.json .
-RUN turbo run build --filter @growi/vault-manager
-# ... pnpm deploy + /tmp/release/ への artifact 集約 ...
-
-# release stage（apps/app と異なり dev variant を使用）
-FROM dhi.io/node:24-debian13-dev AS release
-ENV NODE_ENV="production"
-WORKDIR ${appDir}
-COPY --from=builder --chown=node:node /tmp/release/ ${appDir}/
-EXPOSE 3001
-ENTRYPOINT ["node", "dist/index.js"]
-```
-
-**重要点**:
-
-1. **base image 参照**: build stage は `dhi.io/node:24-debian13-dev`、release stage は **同じく** `dhi.io/node:24-debian13-dev`（apps/app の `24-debian13` distroless とは異なる）。
-2. **git binary の混入経路**: dev variant に pre-installed のため、`apt-get install git` も `COPY --from=builder /usr/bin/git` も書かない。
-3. **追加 `apt-get install` の有無**: 不要。dev variant に必要な build tool は揃っている（pdf-converter のような chromium 等の追加 deps はない）。
-4. **追加 `COPY --from=...` の有無**: artifact（`/tmp/release/`）の copy のみで、binary や shared library の cherry-pick は行わない。
-
-### 18.2 完了時の検証手順（手動チェックリスト）
-
-devcontainer には Docker daemon が無いため、以下は Docker daemon が利用可能な環境で手動実施する想定。検証ログを task 18.2 完了時に design.md または task 備考に追記する。
-
-```bash
-# 1. ビルドが成功すること
-docker build -f apps/growi-vault-manager/Dockerfile -t growi-vault-manager:dev .
-# 期待: 全 stage が成功し、最終 release image が生成される
-
-# 2. runtime image に git v2.30+ が存在すること
-docker run --rm growi-vault-manager:dev git --version
-# 期待: "git version 2.x.y" が出力され、x >= 30
-
-# 3. runtime image 内で git upload-pack が実行可能であること（bare repo を用意して確認）
-docker run --rm -v /tmp/test-repo:/repo growi-vault-manager:dev \
-  sh -c 'git init --bare /repo && git -C /repo upload-pack --stateless-rpc --advertise-refs /repo'
-# 期待: pkt-line 形式の advertised refs が stdout に出力される（capabilities^{} 等を含む）
-
-# 4. image size の確認（参考）
-docker images growi-vault-manager:dev --format '{{.Size}}'
-# 期待: alpine ベースの旧構成と比べ大きく逸脱しないこと（数百 MB オーダーであれば許容）
-```
-
-**備考**:
-- 検証 3 で sh を使うのは検証スクリプト都合であり、本番 runtime では `git upload-pack` は Node.js から `child_process.spawn` で直接起動されるため shell は経由しない。dev variant に bash/sh が含まれているという事実は本番 attack surface に追加で利用されることを意味しない（vault-manager の Node.js コードからは shell を呼び出さない）。
-- task 18.5 の integration test（`RUN_VAULT_INTEG=true`）が image 経由でも PASS することで、`VaultUploadPackSpawner` が runtime image 内の git binary と正しく結線されていることが end-to-end に確認できる。
+**理由**:
+- DHI distroless（`24-debian13`）に git を `COPY --from=builder` で持ち込むと、`/usr/lib/git-core/` の補助 binary と libpcre2 / libcurl / libssl / libcrypto / libz / libexpat 等の共有ライブラリを tracking する必要があり、DHI 更新追随コストが高い
+- vault-manager の Node.js コード自体は shell を経由しないため、dev variant に shell が含まれることが追加の攻撃面にはならない
+- 5 stage 構成（`base` → `pruner` → `deps` → `builder` → `release`）と turbo prune ベースの monorepo subset 抽出、`pnpm store` cache mount は apps/app と揃える
 
 ---
 
@@ -976,79 +899,6 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 
 ---
 
-## テスト戦略
-
-### ユニットテスト
-
-**VaultPathMapper**:
-- `map()`: 特殊文字エンコーディング・大文字 suffix が pageId に対する純関数化・orphan 配置（要件 3.1–3.7）
-- `mapPrefix()`: prefix mapping の純関数性（同入力で常に同 filePath prefix）
-- Windows 予約文字・ファイル名の各ケース
-- 境界: `apps/growi-vault-manager/src/services/vault-path-mapper.ts`
-
-**VaultNamespaceBuilder.applyInstruction**:
-- `upsert`: tree 更新・commit 構築・ref 更新の冪等性
-- `bulk-upsert`: N entries の `$in` lookup・並列 hash（concurrency 16）・1 tree rebuild・1 commit。N=1/1000/1001 での冪等性・再実行 no-op 性
-- `remove`: tree entry 削除後の ref 更新
-- `rename-prefix`: subtree 抽出 → 別 prefix mount、blob 再書き込みなし
-- `grant-change-prefix`: 2 namespace 跨ぎの subtree 移動、両 namespace の ref 更新
-- `reset-all`: 全 ref 削除 + state クリア、object pool は保持
-- 境界: `vault-namespace-builder.ts`
-
-**VaultViewComposer.compose**:
-- tree merge 正常系・versions 一致時のキャッシュヒット（要件 4.3）
-- delta merge（1 namespace のみ変動）・full merge（initial / フォールバック）
-- 衝突解消の優先順位検証
-- 境界: `vault-view-composer.ts`
-
-**VaultBlobHasher**:
-- 同一内容 → 同一 OID（content-addressing 保証）
-- 境界: `vault-blob-hasher.ts`
-
-**VaultInstructionWatcher**:
-- change stream 受信・起動時 drain・processedAt 確認による冪等性（要件 1.3）
-- 失敗時の `attempts++` / `lastError` 記録、`processedAt: null` 維持（要件 1.5）
-- resume token の保存
-- 境界: `vault-instruction-watcher.ts`
-
-**VaultMaintenanceScheduler**:
-- commit 数閾値・age 閾値・loose object 数閾値の各 trigger 発火（要件 6.1–6.2）
-- squash 動作（ref 上書き + state version 更新）（要件 6.3）
-- env var による閾値 override（要件 6.5）
-- 境界: `vault-maintenance-scheduler.ts`
-
-**SharedSecretAuth**:
-- 正常 token → 通過
-- 不一致 token → 401
-- Authorization ヘッダなし → 401
-- constant-time 比較（`crypto.timingSafeEqual` 利用）
-- 境界: `shared-secret-auth.ts`
-
-### インテグレーションテスト
-
-- **clone E2E**: docker-compose で vault-manager + MongoDB + 共有 fs を起動、実際に `git clone` を実行してファイル一覧と内容を検証（要件 1.1, 5.1–5.3）
-- **incremental fetch**: ページ更新後 `git fetch`、変更ファイルのみ転送（要件 1.2, 4.3）
-- **shared secret 不一致**: 不正 token で 401 を返す（要件 7.2）
-- **instruction 冪等性**: 同一 instruction を 2 回送り、namespace ref が同一 OID に収束（要件 1.3, 2.7）
-- **bulk-upsert 1000 entries**: `$in` 1 クエリ・1 commit・1 ref update が成立（要件 2.2）
-- **rename-prefix E2E**: blob 再書き込みなしで subtree が移動（要件 2.4）
-- **reset-all → bulk-upsert**: object pool を保持したまま全 ref が再構築（要件 2.6, 9.3）
-- **compose-view キャッシュ**: 同一 sourceVersions で recompose なし（要件 4.3）
-- **delta merge**: 1 namespace 変動時に changed namespace の subtree のみ再計算（要件 4.4）
-- **VaultMaintenanceScheduler 自走**: 1000+ commit 積み上げ後に squash が自動 trigger → ref が depth=1 に縮約（要件 6.2–6.3）
-- **gc と upload-pack 並行**: gc 実行中に clone しても進行中 clone が破壊されない（要件 6.4）
-- **vault-manager から pages 直接 read 不在**: `pages` コレクションへの read query が一切発行されないことを確認（境界テスト）
-
-### パフォーマンス / 負荷テスト
-
-- **10K / 30K ページ clone**: vault-manager pod RSS < 50MB（要件 5.3 メモリ O(1)）
-- **100 同時 clone**: 1 pod でのスループット限界確認
-- **compose-view cold latency**: `1 user × 50 namespaces × 30K pages` 構成で p50 < 500ms / p95 < 1500ms
-- **compose-view delta latency**: 1 namespace のみ変動時に p95 が cold の 1/10 以下
-- **bootstrap 完走時間**: 10K page < 10 分 / 30K page < 30 分（Filestore 上）
-- **bulk-upsert スループット**: 45 件の bulk-upsert instruction で 30K page を処理し、単発 upsert と比較して 100 倍以上のスループット改善を確認
-
----
 
 ## セキュリティ考慮事項
 
