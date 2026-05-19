@@ -291,16 +291,16 @@ export const generateCommentViewOptions = (
     const idx = rehypePlugins.findIndex(
       (p) => Array.isArray(p) && p[0] === sanitize,
     );
-    if (idx !== -1) {
+    if (idx === -1) {
+      logger.warn(
+        'sanitize plugin not found; mention sanitize option will not be applied',
+      );
+    } else {
       const [, existingSchema] = rehypePlugins[idx] as [unknown, object];
       rehypePlugins[idx] = [
         sanitize,
         deepmerge(existingSchema, mention.sanitizeOption),
       ];
-    } else {
-      logger.warn(
-        'sanitize plugin not found; mention sanitize option will not be applied',
-      );
     }
   }
 
