@@ -1,0 +1,33 @@
+@keyframes slide-in {
+  from {
+    transform: translateX(-12px);
+  }
+  to {
+    transform: translateX(0);
+  }
+}
+
+@keyframes slide-out {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(-12px);
+  }
+}
+
+.dropend-wrapper {
+  transform: translateX(-12px);
+}
+
+.dropend-wrapper.is-hovered {
+  animation: slide-in 0.3s ease forwards;
+}
+
+.dropend-wrapper:not(.is-hovered) {
+  animation: slide-out 0.3s ease forwards;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .dropend-toggle { transform: none; animation: none; }
+}

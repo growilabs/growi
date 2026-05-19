@@ -40,19 +40,14 @@
 
 .btn-toggle {
   :global(svg) {
-    fill: var(--grw-primary-400);
-  }
-}
-
-.btn-toggle:hover {
-  :global(svg) {
-    fill: var(--grw-primary-400);
-  }
-}
-
-.btn-toggle:active {
-  :global(svg) {
     fill: var(--grw-primary-600);
+  }
+}
+
+.btn-toggle:active,
+.btn-toggle.is-active {
+  :global(svg) {
+    fill: var(--grw-primary-400);
   }
 }
 

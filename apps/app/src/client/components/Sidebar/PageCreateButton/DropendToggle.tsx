@@ -1,4 +1,5 @@
 import type { JSX } from 'react';
+import clsx from 'clsx';
 import { DropdownToggle } from 'reactstrap';
 
 import { Hexagon } from './Hexagon';
@@ -6,13 +7,23 @@ import { Hexagon } from './Hexagon';
 import styles from './DropendToggle.module.scss';
 
 const moduleClass = styles['btn-toggle'];
+const activeClass = styles['is-active'];
 
-export const DropendToggle = (): JSX.Element => {
+type Props = {
+  isOpen: boolean;
+};
+
+export const DropendToggle = ({ isOpen }: Props): JSX.Element => {
   return (
     <DropdownToggle
       color="primary"
-      className={`position-absolute z-1 ${moduleClass}`}
-      aria-expanded={false}
+      className={clsx(
+        'position-absolute',
+        'z-1',
+        moduleClass,
+        isOpen && activeClass,
+      )}
+      aria-expanded={isOpen}
       aria-label="Open create page menu"
       data-testid="grw-page-create-button-dropend-toggle"
     >
