@@ -70,6 +70,7 @@ import {
   useConflictEffect,
   useConflictResolver,
 } from './conflict';
+import { EditorGuideModalLazyLoaded } from './EditorGuideModal/dynamic';
 import { EditorNavbar } from './EditorNavbar';
 import { EditorNavbarBottom } from './EditorNavbarBottom';
 import Preview from './Preview';
@@ -462,38 +463,41 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   }
 
   return (
-    <div className={`flex-expand-horiz ${props.visibility ? '' : 'd-none'}`}>
-      <div className="page-editor-editor-container flex-expand-vert border-end">
-        <CodeMirrorEditorMain
-          enableUnifiedMergeView={isEnableUnifiedMergeView}
-          enableCollaboration={editorMode === EditorMode.Editor}
-          onSave={saveWithShortcut}
-          onUpload={uploadHandler}
-          acceptedUploadFileType={acceptedUploadFileType}
-          onScroll={scrollEditorHandlerThrottle}
-          indentSize={currentIndentSize ?? defaultIndentSize}
-          user={user ?? undefined}
-          pageId={pageId ?? undefined}
-          editorSettings={editorSettings}
-          onEditorsUpdated={setEditingClients}
-          onScrollToRemoteCursorReady={setScrollToRemoteCursor}
-          cmProps={cmProps}
-        />
+    <>
+      <div className={`flex-expand-horiz ${props.visibility ? '' : 'd-none'}`}>
+        <div className="page-editor-editor-container flex-expand-vert border-end">
+          <CodeMirrorEditorMain
+            enableUnifiedMergeView={isEnableUnifiedMergeView}
+            enableCollaboration={editorMode === EditorMode.Editor}
+            onSave={saveWithShortcut}
+            onUpload={uploadHandler}
+            acceptedUploadFileType={acceptedUploadFileType}
+            onScroll={scrollEditorHandlerThrottle}
+            indentSize={currentIndentSize ?? defaultIndentSize}
+            user={user ?? undefined}
+            pageId={pageId ?? undefined}
+            editorSettings={editorSettings}
+            onEditorsUpdated={setEditingClients}
+            onScrollToRemoteCursorReady={setScrollToRemoteCursor}
+            cmProps={cmProps}
+          />
+        </div>
+        <div
+          ref={previewRef}
+          onScroll={scrollPreviewHandlerThrottle}
+          className="page-editor-preview-container flex-expand-vert overflow-y-auto d-none d-lg-flex position-relative"
+        >
+          <Preview
+            rendererOptions={rendererOptions}
+            markdown={markdownToPreview}
+            pagePath={currentPagePath}
+            expandContentWidth={shouldExpandContent}
+            style={pastEndStyle}
+          />
+        </div>
       </div>
-      <div
-        ref={previewRef}
-        onScroll={scrollPreviewHandlerThrottle}
-        className="page-editor-preview-container flex-expand-vert overflow-y-auto d-none d-lg-flex"
-      >
-        <Preview
-          rendererOptions={rendererOptions}
-          markdown={markdownToPreview}
-          pagePath={currentPagePath}
-          expandContentWidth={shouldExpandContent}
-          style={pastEndStyle}
-        />
-      </div>
-    </div>
+      <EditorGuideModalLazyLoaded containerRef={previewRef} />
+    </>
   );
 };
 

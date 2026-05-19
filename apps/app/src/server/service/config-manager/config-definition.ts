@@ -280,6 +280,9 @@ export const CONFIG_KEYS = [
   'otel:anonymizeInBestEffort',
   'otel:serviceInstanceId',
 
+  // News Settings
+  'news:isDeliveryEnabled',
+
   // S2S Messaging Pubsub Settings
   's2sMessagingPubsub:serverType',
   's2sMessagingPubsub:nchan:publishPath',
@@ -1213,6 +1216,11 @@ export const CONFIG_DEFINITIONS = {
   'otel:serviceInstanceId': defineConfig<string | undefined>({
     envVarName: 'OPENTELEMETRY_SERVICE_INSTANCE_ID',
     defaultValue: undefined,
+  }),
+
+  // News Settings
+  'news:isDeliveryEnabled': defineConfig<boolean>({
+    defaultValue: true,
   }),
 
   // S2S Messaging Pubsub Settings

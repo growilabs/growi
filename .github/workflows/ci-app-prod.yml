@@ -46,7 +46,7 @@ jobs:
   #       || startsWith( github.base_ref, 'release/' )
   #       || startsWith( github.head_ref, 'mergify/merge-queue/' ))
   #   with:
-  #     node-version: 22.x
+  #     node-version: 24.x
   #     skip-e2e-test: true
   #   secrets:
   #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}

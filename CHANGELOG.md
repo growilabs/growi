@@ -1,8 +1,30 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.5.2...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.5.3...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.5.3](https://github.com/growilabs/compare/v7.5.2...v7.5.3) - 2026-05-14
+
+### 🐛 Bug Fixes
+
+* fix: GrowiSlides throws an unhandled exception when the rendererOptions are undefined (#11110) @Ryosei-Fukushima
+* fix: Rebalance blockquote margins in wiki and page comments (#11072) @yuki-takei
+* fix(drawio): Prevent host CSS leaking into <foreignObject> (#11068) @yuki-takei
+* fix(search): resolve nested <button> DOM warning in search result list (#11065) @yuki-takei
+* fix: Page publish/unpublish IDOR bypasses page grant system (#11032) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: switch pnpm install to corepack & devcontainer node:2 (#11157) @yuki-takei
+* ci(deps): bump next from 16.2.3 to 16.2.6 (#11117) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump @opentelemetry/auto-instrumentations-node from 0.60.1 to 0.75.0 (#11112) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump @opentelemetry/sdk-node from 0.202.0 to 0.217.0 (#11114) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Figma plugin (#11069) @satof3
+* ci(deps): bump next from 16.2.1 to 16.2.3 (#10995) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump mongoose from 6.13.8 to 6.13.9 (#11083) @[dependabot[bot]](https://github.com/apps/dependabot)
+* support: Add vulnerability hunters (#11071) @hikaru-n-cpu
+* support: Fix ES security settings for CI (#11048) @yuki-takei
 
 ## [v7.5.2](https://github.com/growilabs/compare/v7.5.1...v7.5.2) - 2026-04-22
 
