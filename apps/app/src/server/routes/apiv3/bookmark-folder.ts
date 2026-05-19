@@ -240,10 +240,6 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { userId } = req.params;
 
-      if (userId !== req.user._id.toString()) {
-        return res.apiv3Err('forbidden', 403);
-      }
-
       const getBookmarkFolders = async (
         userId: Types.ObjectId | string,
         parentFolderId?: Types.ObjectId | string,
