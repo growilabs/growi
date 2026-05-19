@@ -12,7 +12,7 @@ This feature extends GROWI's existing inline search operator system with three n
 
 - `author:username` filters pages whose creator matches that username (direct ES `username` field — already indexed)
 - `editor:username` filters pages last edited by that user (MongoDB pre-resolution → page IDs → ES `ids` clause)
-- `group:groupname` filters pages authored by members of the named group (MongoDB pre-resolution → member usernames → ES `terms` clause)
+- `group:groupname` filters pages granted to the named group (group name → group ID → intersect with requesting user's groups → ES `granted_groups` clause)
 - Negation variants (`-author:`, `-editor:`, `-group:`) consistent with existing `-prefix:` / `-tag:` behavior
 - Zero regression on existing operators and existing search behavior
 
@@ -53,10 +53,7 @@ This feature extends GROWI's existing inline search operator system with three n
 
 - `UserGroup.findOne({ name })` — read-only
 - `ExternalUserGroup.findOne({ name })` — read-only (external groups must be included; see research.md D3)
-- `UserGroupRelation.findAllUserIdsForUserGroups(ids[])` — existing static method, read-only
-- `ExternalUserGroupRelation.findAllUserIdsForUserGroups(ids[])` — existing static method, read-only
 - `User.findOne({ username })` — read-only (editor resolution step 1)
-- `User.find({ _id: { $in: ids } }).select('username')` — read-only (group resolution step 3)
 - `Page.find({ lastUpdateUser: userId }).select('_id').limit(EDITOR_PAGE_ID_LIMIT)` — read-only
 
 ### Revalidation Triggers
@@ -98,7 +95,7 @@ graph TB
     P -->|QueryTerms| R
     R -->|editor terms| DB
     R -->|group terms| DB
-    DB -->|pageIds and memberUsernames| R
+    DB -->|pageIds and groupIds| R
     R -->|ResolvedFilterData| A
     P -->|author terms direct| A
     A -->|bool filter clauses| ES
@@ -154,10 +151,9 @@ sequenceDiagram
     SS->>SS: resolveOperatorTerms(terms)
     SS->>DB: User.findOne({username:'alice'}) → aliceId
     SS->>DB: Page.find({lastUpdateUser:aliceId}).select('_id').limit(1000) → pageIds[]
-    SS->>DB: UserGroup.findOne({name:'dev'}) + ExternalUserGroup.findOne({name:'dev'}) → groupIds[]
-    SS->>DB: UserGroupRelation + ExternalUserGroupRelation.findAllUserIdsForUserGroups(groupIds) → memberIds[]
-    SS->>DB: User.find({_id:{$in:memberIds}}).select('username') → memberUsernames[]
-    Note over SS: ResolvedFilterData {editorPageIds:[...], groupMemberUsernames:[...]}
+    SS->>DB: UserGroup.findOne({name:'dev'}) + ExternalUserGroup.findOne({name:'dev'}) → resolvedGroupIds[]
+    Note over SS: Intersect resolvedGroupIds with userGroups → validGroupIds[]
+    Note over SS: ResolvedFilterData {editorPageIds:[...], groupIds:[...]}
     SS->>ED: delegator.search({terms, resolvedFilterData}, user, userGroups, opts)
     ED->>ED: appendCriteriaForQueryString(query, terms, resolvedFilterData)
     Note over ED: Pushes author term, ids clause, terms clause into bool.filter[]
@@ -179,13 +175,14 @@ sequenceDiagram
 | 2.2 | `editor:` + keywords combined | `appendCriteriaForQueryString` | AND via bool.filter |
 | 2.3 | `editor:` not in full-text | `parseQueryString` | Token not added to `match[]` |
 | 2.4 | `editor:` empty → ignore | `parseQueryString` | Empty value guard; token dropped |
-| 3.1 | `group:` returns member-authored pages | `resolveOperatorTerms` + `appendCriteriaForQueryString` | MongoDB → memberUsernames → `terms` clause |
+| 3.1 | `group:` returns pages granted to group | `resolveOperatorTerms` + `appendCriteriaForQueryString` | group name → ID → intersect with user's groups → `granted_groups` clause |
 | 3.2 | `group:` + keywords combined | `appendCriteriaForQueryString` | AND via bool.filter |
 | 3.3 | `group:` not in full-text | `parseQueryString` | Token not added to `match[]` |
 | 3.4 | `group:` empty → ignore | `parseQueryString` | Empty value guard; token dropped |
+| 3.5 | Group filter limited to user's own groups | `resolveOperatorTerms` | Intersect resolved group IDs with `userGroups` parameter; non-member groups yield `groupIds = []` |
 | 4.1 | `-author:` excludes creator | `parseQueryString` + `appendCriteriaForQueryString` | `must_not: { term: { username } }` |
 | 4.2 | `-editor:` excludes last editor | `resolveOperatorTerms` + `appendCriteriaForQueryString` | `must_not: { ids: { values: notEditorPageIds } }` |
-| 4.3 | `-group:` excludes group members | `resolveOperatorTerms` + `appendCriteriaForQueryString` | `must_not: { terms: { username: notGroupMemberUsernames } }` |
+| 4.3 | `-group:` excludes pages granted to group | `resolveOperatorTerms` + `appendCriteriaForQueryString` | `must_not: { terms: { granted_groups: notGroupIds } }`; non-member groups silently ignored |
 | 4.4 | All constraints AND | `appendCriteriaForQueryString` | All pushed to `bool.filter[]` |
 | 5.1 | Multiple operators AND | `appendCriteriaForQueryString` | All in `bool.filter[]` array |
 | 5.2 | New + existing operators | `appendCriteriaForQueryString` | All filter clauses merged into same `bool.filter[]` |
@@ -194,7 +191,10 @@ sequenceDiagram
 | 6.1 | Unknown `author:` → empty | `appendCriteriaForQueryString` | ES `term` on non-existent username → no match |
 | 6.2 | Unknown `editor:` → empty | `resolveOperatorTerms` | `User.findOne()` null → `editorPageIds = []` → no ES match |
 | 6.3 | Unknown `group:` → empty | `resolveOperatorTerms` | Both group lookups null → `memberUsernames = []` → no ES match |
-| 6.4 | Group with no members → empty | `resolveOperatorTerms` | `findAllUserIdsForUserGroups` returns `[]` → `memberUsernames = []` |
+| 6.4 | Group with no granted pages → empty | `appendCriteriaForQueryString` | `terms: { granted_groups }` matches no documents — natural ES behavior |
+| 7.1–7.3 | Access control not widened | Architecture | New clauses pushed to `bool.filter[]` (AND); cannot override existing permission filter already in same array |
+| 7.4 | No page existence inference | Architecture | Empty clause = empty result; no metadata exposed |
+| 7.5 | Group intersection enforced | `resolveOperatorTerms` | Non-member group IDs excluded before ES clause is built |
 
 ---
 
@@ -227,8 +227,8 @@ export type QueryTerms = {
 export type ResolvedFilterData = {
   editorPageIds: string[];
   notEditorPageIds: string[];
-  groupMemberUsernames: string[];
-  notGroupMemberUsernames: string[];
+  groupIds: string[];           // group IDs the user belongs to AND specified in filter
+  notGroupIds: string[];
 };
 
 // Extended SearchableData
@@ -289,7 +289,7 @@ if (matchPositive[1] === 'author:') {
 **Contracts**: Service [x]
 
 ```typescript
-private async resolveOperatorTerms(terms: QueryTerms): Promise<ResolvedFilterData>
+private async resolveOperatorTerms(terms: QueryTerms, userGroups: IGrantedGroup[]): Promise<ResolvedFilterData>
 ```
 
 - Called in `searchKeyword()` between `resolve()` and `delegator.search()`
@@ -316,23 +316,19 @@ for each groupName:
     UserGroup.findOne({ name: groupName }).lean(),
     ExternalUserGroup.findOne({ name: groupName }).lean(),
   ])
-  groupIds = [internalGroup?._id, externalGroup?._id].filter(Boolean)
-  if groupIds is empty → contribute no usernames (Req 6.3)
+  resolvedIds = [internalGroup?._id, externalGroup?._id].filter(Boolean).map(id => id.toString())
+  if resolvedIds is empty → contribute no group IDs (Req 6.3)
   else:
-    [internalMemberIds, externalMemberIds] = await Promise.all([
-      UserGroupRelation.findAllUserIdsForUserGroups(groupIds),
-      ExternalUserGroupRelation.findAllUserIdsForUserGroups(groupIds),
-    ])
-    memberIds = deduplicated union of both
-    if memberIds is empty → contribute no usernames (Req 6.4)
+    userGroupIdStrings = userGroups.map(g => g._id.toString())
+    validIds = resolvedIds.filter(id => userGroupIdStrings.includes(id))
+    if validIds is empty → contribute no group IDs (Req 3.5, 7.5 — user not a member of this group)
     else:
-      users = await User.find({ _id: { $in: memberIds } }).select('username').lean()
-      collect user.username strings
+      collect validIds
 ```
 
 **Implementation Notes**
 - `EDITOR_PAGE_ID_LIMIT = 1000` — documented limitation: if a user's last-edit history exceeds 1000 pages, only the 1000 most recently updated are matched.
-- Multiple `editor:` or `group:` tokens accumulate: page IDs and member usernames are merged across all tokens in the same array before building ES clauses.
+- Multiple `editor:` or `group:` tokens accumulate: page IDs and group IDs are merged across all tokens in the same array before building ES clauses.
 - `ExternalUserGroup.findOne({ name })` uses only `name` — since external group names are not globally unique (compound index `{name, provider}`), a `group:` token may match both an internal group and the first external group with that name. This is an acceptable approximation for V1.
 
 ---
@@ -363,8 +359,8 @@ New clauses appended to `query.body.query.bool.filter[]`:
 | `-author:jim` | `{ bool: { must_not: [{ term: { username: 'jim' } }] } }` | `terms.not_author.length > 0` |
 | `editor:alice` | `{ bool: { must: [{ ids: { values: editorPageIds } }] } }` | `editorPageIds.length > 0` |
 | `-editor:alice` | `{ bool: { must_not: [{ ids: { values: notEditorPageIds } }] } }` | `notEditorPageIds.length > 0` |
-| `group:dev` | `{ bool: { must: [{ terms: { username: groupMemberUsernames } }] } }` | `groupMemberUsernames.length > 0` |
-| `-group:dev` | `{ bool: { must_not: [{ terms: { username: notGroupMemberUsernames } }] } }` | `notGroupMemberUsernames.length > 0` |
+| `group:dev` | `{ bool: { must: [{ terms: { granted_groups: groupIds } }] } }` | `groupIds.length > 0` |
+| `-group:dev` | `{ bool: { must_not: [{ terms: { granted_groups: notGroupIds } }] } }` | `notGroupIds.length > 0` |
 
 - When `resolvedFilterData` is absent or an array is empty, the corresponding clause is not pushed — no-op (Req 5.4 regression safety, 6.2–6.4 empty result).
 - `AVAILABLE_KEYS` constant updated with all six new `QueryTerms` key names.
@@ -377,8 +373,9 @@ New clauses appended to `query.body.query.bool.filter[]`:
 |----------|----------|-------------|
 | Unknown `author:` username | ES `term` on non-existent username → 0 results | 6.1 |
 | Unknown `editor:` username | `User.findOne()` returns null → `editorPageIds = []` → clause skipped → 0 results | 6.2 |
-| Unknown `group:` name | Both group lookups return null → `memberUsernames = []` → clause skipped → 0 results | 6.3 |
-| Group with no members | `findAllUserIdsForUserGroups` returns `[]` → `memberUsernames = []` → 0 results | 6.4 |
+| Unknown `group:` name | Both group lookups return null → `groupIds = []` → clause skipped → 0 results | 6.3 |
+| Group user doesn't belong to | Resolved group ID not in `userGroups` → `groupIds = []` → clause skipped → 0 results | 3.5, 7.5 |
+| Group with no granted pages | `terms: { granted_groups: [id] }` matches no documents → empty result (natural ES behavior) | 6.4 |
 | `editor:` user > 1000 last-edited pages | Only 1000 most recently updated matched; documented limit | — |
 | Empty operator value (`author:`) | Parser drops token; no terms array entry; no ES clause | 1.4, 2.4, 3.4 |
 | All operators absent | `resolvedFilterData` not populated; existing delegator behavior unchanged | 5.4 |
@@ -398,14 +395,14 @@ New clauses appended to `query.body.query.bool.filter[]`:
 | `parseQueryString('regular keyword')` | Existing behavior unchanged (Req 5.4 regression) |
 | `resolveOperatorTerms` — known editor | Returns non-empty `editorPageIds` (Req 2.1) |
 | `resolveOperatorTerms` — unknown editor | `User.findOne()` null → `editorPageIds: []` (Req 6.2) |
-| `resolveOperatorTerms` — known group | Both UserGroup + ExternalUserGroup queried; returns `groupMemberUsernames` (Req 3.1) |
-| `resolveOperatorTerms` — unknown group | Both lookups null → `groupMemberUsernames: []` (Req 6.3) |
-| `resolveOperatorTerms` — empty group | `findAllUserIdsForUserGroups` returns `[]` → `groupMemberUsernames: []` (Req 6.4) |
+| `resolveOperatorTerms` — known group, user is member | Both UserGroup + ExternalUserGroup queried; group ID in `userGroups` → returns `groupIds` (Req 3.1) |
+| `resolveOperatorTerms` — known group, user not member | Group ID not in `userGroups` → `groupIds: []` (Req 3.5, 7.5) |
+| `resolveOperatorTerms` — unknown group | Both lookups null → `groupIds: []` (Req 6.3) |
 | `appendCriteriaForQueryString` — `author` terms | `bool.filter` contains `term: { username }` (Req 1.1) |
 | `appendCriteriaForQueryString` — `not_author` terms | `bool.filter` contains `must_not: { term: { username } }` (Req 4.1) |
 | `appendCriteriaForQueryString` — non-empty `editorPageIds` | `bool.filter` contains `ids: { values: [...] }` (Req 2.1) |
 | `appendCriteriaForQueryString` — empty `editorPageIds` | No `ids` clause added (Req 6.2) |
-| `appendCriteriaForQueryString` — `groupMemberUsernames` | `bool.filter` contains `terms: { username: [...] }` (Req 3.1) |
+| `appendCriteriaForQueryString` — `groupIds` | `bool.filter` contains `terms: { granted_groups: [...] }` (Req 3.1) |
 | `appendCriteriaForQueryString` — no resolvedFilterData | `bool.filter` unchanged from pre-extension behavior (Req 5.4) |
 
 ### Integration Tests
@@ -413,7 +410,9 @@ New clauses appended to `query.body.query.bool.filter[]`:
 | Scenario | What to verify |
 |----------|---------------|
 | `searchKeyword('author:jim report')` end-to-end | ES query has `bool.filter` with `term: { username: 'jim' }` and `bool.must` with `multi_match` on `report` |
-| `searchKeyword('group:dev-team')` end-to-end | MongoDB resolution produces member usernames; ES query has `terms: { username: [...] }` |
+| `searchKeyword('group:dev-team')` end-to-end, user is member | Group ID resolved and present in user's groups; ES query has `terms: { granted_groups: [groupId] }` |
 | `searchKeyword('author:jim tag:wiki prefix:/team')` | All three filter clauses present in `bool.filter`; existing operators unaffected |
 | `searchKeyword('author:nonexistent')` | Returns empty result set, not a server error |
 | `searchKeyword('group:nonexistent-group')` | Returns empty result set, not a server error |
+| `searchKeyword('group:dev')` where user is not a member of `dev` | Returns empty result; no `granted_groups` clause built (Req 3.5, 7.5) |
+| `searchKeyword('group:A group:C')` where user belongs to A but not C | `granted_groups` clause contains only A's ID; C silently excluded (Req 7.5) |

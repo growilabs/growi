@@ -40,14 +40,15 @@ GROWI team wiki users currently have no way to narrow search results by page aut
 
 ### Requirement 3: Group Filter Operator
 
-**Objective:** As a GROWI user, I want to type `group:groupname` in the search box so that I can find pages authored by members of a specific team or group.
+**Objective:** As a GROWI user, I want to type `group:groupname` in the search box so that I can find pages accessible to a specific team or group.
 
 #### Acceptance Criteria
 
-1. When a user submits a search query containing `group:<groupname>`, the Search Service shall return only pages whose creator is a member of the user group with that name.
-2. When `group:<groupname>` is combined with free-text keywords, the Search Service shall return only pages matching both the group membership criterion and the remaining keywords.
+1. When a user submits a search query containing `group:<groupname>`, the Search Service shall return only pages that are granted access to the user group with that name (matched via the `granted_groups` Elasticsearch field).
+2. When `group:<groupname>` is combined with free-text keywords, the Search Service shall return only pages matching both the group access criterion and the remaining keywords.
 3. The Search Service shall treat the `group:` token as a filter and shall not include it as a keyword in full-text or relevance scoring.
 4. If the `group:` token has no value, the Search Service shall ignore that token and apply no group filter.
+5. When the requesting user does not belong to the specified group, the Search Service shall silently exclude that group from the filter and produce no results for that constraint.
 
 ---
 
@@ -59,7 +60,7 @@ GROWI team wiki users currently have no way to narrow search results by page aut
 
 1. When a user submits `-author:<username>`, the Search Service shall exclude all pages created by that user from the results.
 2. When a user submits `-editor:<username>`, the Search Service shall exclude all pages whose most recent editor has that username from the results.
-3. When a user submits `-group:<groupname>`, the Search Service shall exclude all pages whose creator is a member of that group from the results.
+3. When a user submits `-group:<groupname>`, the Search Service shall exclude all pages granted access to that group from the results; if the requesting user does not belong to the specified group, the constraint is silently ignored.
 4. When negation operators are combined with positive operators or keywords, the Search Service shall apply all constraints simultaneously.
 
 ---
@@ -86,4 +87,18 @@ GROWI team wiki users currently have no way to narrow search results by page aut
 1. If the username in an `author:` operator does not match any known GROWI user, the Search Service shall return an empty result set rather than an error response.
 2. If the username in an `editor:` operator does not match any known GROWI user, the Search Service shall return an empty result set rather than an error response.
 3. If the group name in a `group:` operator does not match any known GROWI user group, the Search Service shall return an empty result set rather than an error response.
-4. If a group exists but has no members, the Search Service shall return an empty result set for queries using that `group:` operator.
+4. If a group exists, the requesting user belongs to it, but no pages are granted to that group, the Search Service shall return an empty result set for queries using that `group:` operator.
+
+---
+
+### Requirement 7: Access Control Enforcement
+
+**Objective:** As a GROWI administrator, I want search filter results to always respect page-level access controls, so that users cannot use the new operators to discover pages they are not permitted to view.
+
+#### Acceptance Criteria
+
+1. The Search Service shall never return a page in filter results that the requesting user does not have read permission for, regardless of which operator combination is used.
+2. When an `author:`, `editor:`, or `group:` filter matches pages that the requesting user cannot access, the Search Service shall silently exclude those pages from the result set without any error or indication that hidden pages exist.
+3. The access control applied to filtered results shall be identical to the access control applied to unfiltered search results — the new operators must not widen the visible page set.
+4. The new filter operators shall not provide any mechanism to infer the existence or content of a page the requesting user cannot access (no count leakage, no partial metadata).
+5. When a `group:` filter is applied, the Search Service shall intersect the specified group names with the groups the requesting user belongs to; groups the user is not a member of shall be silently excluded with no indication that pages in those groups exist.
