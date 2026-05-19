@@ -37,7 +37,8 @@
     "lint:biome": "biome check",
     "lint:styles": "stylelint --allow-empty-input \"src/**/*.scss\" \"src/**/*.css\"",
     "lint:typecheck": "tsgo --noEmit",
-    "lint": "run-p lint:*"
+    "lint": "run-p lint:*",
+    "test": "vitest run"
   },
   "dependencies": {
   },

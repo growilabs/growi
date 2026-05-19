@@ -48,6 +48,7 @@ export default defineWorkspace([
       setupFiles: [
         './test/setup/migrate-mongo.ts',
         './test/setup/mongo/index.ts',
+        './test/setup/prisma.ts',
       ],
       deps: {
         // Transform inline modules (allows ESM in require context)
