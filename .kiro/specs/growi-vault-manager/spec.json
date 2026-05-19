@@ -1,0 +1,23 @@
+{
+  "feature_name": "growi-vault-manager",
+  "created_at": "2026-05-07T00:00:00.000Z",
+  "updated_at": "2026-05-19T00:00:00.000Z",
+  "language": "ja",
+  "phase": "implementation-complete",
+  "cleaned_up_at": "2026-05-19T00:00:00.000Z",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}
