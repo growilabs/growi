@@ -62,9 +62,8 @@ class UserInviteModal extends React.Component {
     }
   }
 
-  renderModalBody() {
+  renderModalBody(whitelistViolations) {
     const { t } = this.props;
-    const whitelistViolations = this.getWhitelistViolations();
 
     return (
       <>
@@ -121,7 +120,7 @@ class UserInviteModal extends React.Component {
     );
   }
 
-  renderModalFooter() {
+  renderModalFooter(whitelistViolations) {
     const { t, isMailerSetup } = this.props;
     const { isCreateUserButtonPushed } = this.state;
 
@@ -178,7 +177,7 @@ class UserInviteModal extends React.Component {
             disabled={
               !this.validEmail() ||
               isCreateUserButtonPushed ||
-              this.getWhitelistViolations().length > 0
+              whitelistViolations.length > 0
             }
           >
             {t('admin:user_management.invite_modal.issue')}
@@ -273,6 +272,8 @@ class UserInviteModal extends React.Component {
   }
 
   async handleSubmit() {
+    if (this.getWhitelistViolations().length > 0) return;
+
     const { adminUsersContainer } = this.props;
 
     this.setState({ isCreateUserButtonPushed: true });
@@ -332,6 +333,7 @@ class UserInviteModal extends React.Component {
   render() {
     const { t, adminUsersContainer } = this.props;
     const { invitedEmailList } = this.state;
+    const whitelistViolations = this.getWhitelistViolations();
 
     return (
       <Modal isOpen={adminUsersContainer.state.isUserInviteModalShown}>
@@ -340,12 +342,12 @@ class UserInviteModal extends React.Component {
         </ModalHeader>
         <ModalBody>
           {invitedEmailList == null
-            ? this.renderModalBody()
+            ? this.renderModalBody(whitelistViolations)
             : this.renderCreatedModalBody()}
         </ModalBody>
         <ModalFooter className="d-flex">
           {invitedEmailList == null
-            ? this.renderModalFooter()
+            ? this.renderModalFooter(whitelistViolations)
             : this.renderCreatedModalFooter()}
         </ModalFooter>
       </Modal>
