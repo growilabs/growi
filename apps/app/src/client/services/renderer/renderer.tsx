@@ -297,6 +297,10 @@ export const generateCommentViewOptions = (
         sanitize,
         deepmerge(existingSchema, mention.sanitizeOption),
       ];
+    } else {
+      logger.warn(
+        'sanitize plugin not found; mention sanitize option will not be applied',
+      );
     }
     verifySanitizePlugin(options, false);
   }
