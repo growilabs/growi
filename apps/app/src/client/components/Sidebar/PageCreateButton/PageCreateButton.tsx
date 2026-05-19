@@ -1,4 +1,5 @@
-import React, { type JSX, useEffect, useRef, useState } from 'react';
+import React, { type JSX, useRef, useState } from 'react';
+import clsx from 'clsx';
 import { Dropdown } from 'reactstrap';
 
 import { useCreateTemplatePage } from '~/client/services/create-page';
@@ -76,7 +77,11 @@ export const PageCreateButton = React.memo((): JSX.Element => {
         isOpen={dropdownOpen}
         toggle={toggle}
         direction="end"
-        className={`position-absolute ${styles['dropend-wrapper']} ${isHovered ? styles['is-hovered'] : ''}`}
+        className={clsx(
+          'position-absolute',
+          styles['dropend-wrapper'],
+          isHovered && styles['is-hovered'],
+        )}
       >
         <DropendToggle isOpen={dropdownOpen} />
         <DropendMenu
