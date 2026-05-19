@@ -7,13 +7,19 @@ import { MediumActionGroup } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 
 import Contribution from '../models/contribution-model';
-import { migrateContributions } from './contribution-migration-service';
+import { ActivityAggregationService } from './activity-aggregation-service';
+import { ContributionMigrationService } from './contribution-migration-service';
 
 vi.mock('~/server/service/config-manager/config-manager', () => ({
   configManager: {
     getConfig: vi.fn(),
   },
 }));
+
+const activityAggregationService = new ActivityAggregationService();
+const contributionMigrationService = new ContributionMigrationService(
+  activityAggregationService,
+);
 
 describe('migrateContributions', () => {
   const userId = new mongoose.Types.ObjectId().toString();
@@ -69,7 +75,7 @@ describe('migrateContributions', () => {
     await Activity.insertMany(activities);
 
     // Act
-    await migrateContributions(userId);
+    await contributionMigrationService.migrateContributions(userId);
 
     // Assert
     const activitiesInDatabase = await Activity.find({ user: userId });
@@ -119,7 +125,7 @@ describe('migrateContributions', () => {
     await Activity.insertMany(activities);
 
     // Act
-    await migrateContributions(userId);
+    await contributionMigrationService.migrateContributions(userId);
 
     // Assert
     const activitiesInDatabase = await Activity.find({ user: userId });
