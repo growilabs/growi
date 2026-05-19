@@ -1,0 +1,173 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
+.contribution-box {
+  :global([data-bs-theme="light"]) & {
+    --cb-lvl-0: #ebedf0;
+    --cb-lvl-1: #9be9a8;
+    --cb-lvl-2: #40c463;
+    --cb-lvl-3: #30a14e;
+    --cb-lvl-4: #216e39;
+    --cb-bg: #ffffff;
+    --cb-border: #a6acb3;
+    --cb-text: #434951;
+    --cb-sq-outline: rgba(27, 31, 35, 0.06);
+    --cb-tooltip-bg: #24292f;
+  }
+
+  :global([data-bs-theme="dark"]) & {
+    --cb-lvl-0: #1d232b;
+    --cb-lvl-1: #0e4429;
+    --cb-lvl-2: #006d32;
+    --cb-lvl-3: #26a641;
+    --cb-lvl-4: #39d353;
+    --cb-bg: #0d1117;
+    --cb-border: #60666d;
+    --cb-text: #bbc3cb;
+    --cb-sq-outline: rgba(255, 255, 255, 0.05);
+    --cb-tooltip-bg: #6e7681;
+  }
+
+  // Component layout
+  display: inline-block;
+  padding: 16px;
+  color: var(--cb-text);
+  background-color: var(--cb-bg);
+  border: 1px solid var(--cb-border);
+  border-radius: 6px;
+  transform: scale(0.9);
+  transform-origin: top left;
+
+  .graph-and-days {
+    display: flex;
+    gap: 8px;
+    align-items: flex-start;
+  }
+
+  .graph-grid {
+    display: grid;
+    grid-template-rows: repeat(7, 12px);
+    grid-template-columns: repeat(53, 12px);
+    grid-auto-flow: column;
+    gap: 3px;
+  }
+
+  // The Squares
+  .graph-square {
+    position: relative;
+    width: 12px;
+    height: 12px;
+    cursor: pointer;
+    border-radius: 2px;
+    outline: 1px solid var(--cb-sq-outline);
+    outline-offset: -1px;
+    transition: transform 0.1s ease-in-out;
+
+    &.level-0 { background-color: var(--cb-lvl-0) !important; }
+    &.level-1 { background-color: var(--cb-lvl-1) !important; }
+    &.level-2 { background-color: var(--cb-lvl-2) !important; }
+    &.level-3 { background-color: var(--cb-lvl-3) !important; }
+    &.level-4 { background-color: var(--cb-lvl-4) !important; }
+
+    &:hover {
+      z-index: 10;
+      filter: brightness(1.1);
+      transform: scale(1.2);
+
+      &::after {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        padding: 4px 8px;
+        font-size: 11px;
+        color: #fff;
+        white-space: nowrap;
+        pointer-events: none;
+        content: attr(data-tooltip);
+        background: var(--cb-tooltip-bg);
+        border-radius: 4px;
+        box-shadow: 0 3px 12px rgba(0, 0, 0, 0.2);
+        transform: translateX(-50%) translateY(-8px);
+      }
+
+      // Tooltip Triangle
+      &::before {
+        position: absolute;
+        bottom: 100%;
+        left: 50%;
+        pointer-events: none;
+        content: '';
+        border: 5px solid transparent;
+        border-top-color: var(--cb-tooltip-bg);
+        transform: translateX(-50%) translateY(0);
+      }
+    }
+  }
+
+  // UI Labels
+  .month-labels {
+    display: grid;
+    grid-template-columns: repeat(53, 12px);
+    gap: 3px;
+    margin-bottom: 4px;
+    font-size: 14px;
+    span { grid-row: 1; white-space: nowrap; }
+  }
+
+  .color-guide {
+    display: flex;
+    flex-direction: row;
+    gap: 4px;
+    align-items: center;
+    white-space: nowrap;
+
+    span {
+      margin: 0 2px;
+    }
+
+    // Disable hover effects for the squares inside the legend bar
+    .graph-square {
+      cursor: default;
+      &:hover {
+        transform: none;
+        &::after, &::before { display: none; }
+      }
+    }
+  }
+
+  .day-labels {
+    display: grid;
+    grid-template-rows: repeat(7, 12px);
+    gap: 3px;
+    span {
+      font-size: 14px;
+      line-height: 12px;
+      &:nth-child(odd) { visibility: hidden; }
+    }
+  }
+
+  .info-bar {
+    display: flex;
+    flex-direction: row;
+    align-items: center;
+    justify-content: space-between;
+    width: 100%;
+    margin-top: 12px;
+    font-size: 14px;
+  }
+}
+
+.search-menu-item {
+  :global(li) {
+    cursor: pointer;
+  }
+
+  @include bs.color-mode(light) {
+    :global(li.active) { background-color: var(--grw-primary-100); }
+    :global(li:hover) { background-color: bs.$gray-200; }
+  }
+
+  @include bs.color-mode(dark) {
+    :global(li.active) { background-color: var(--grw-primary-800); }
+    :global(li:hover) { background-color: bs.$gray-800; }
+  }
+}

@@ -1017,6 +1017,7 @@
   },
   "user_home_page": {
     "bookmarks": "书签",
+    "contribution_graph": "贡献图",
     "recently_created": "最近创建页面",
     "recent_activity": "最近动态",
     "unknown_action": "进行了未指明的更改",

@@ -1,6 +1,8 @@
 import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
+import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
+import { addContribution } from '~/features/contribution-graph/server/services/contribution-service';
 import type { IActivity, SupportedActionType } from '~/interfaces/activity';
 import {
   ActionGroupSize,
@@ -57,6 +59,25 @@ class ActivityService {
       ) => {
         let activity: ActivityDocument;
         const shoudUpdate = this.shoudUpdateActivity(parameters.action);
+        const shouldGenerateContribution = this.shouldGenerateContribution(
+          parameters.action,
+        );
+
+        if (shouldGenerateContribution) {
+          const user =
+            parameters.event?.creator || parameters.target?.lastUpdateUser;
+
+          if (user) {
+            addContribution(user).catch((err) => {
+              logger.error(`Failed to update contribution: ${err.message}`);
+            });
+          } else {
+            logger.warn(
+              'Could not find a valid user for contribution. Parameters:',
+              parameters,
+            );
+          }
+        }
 
         if (shoudUpdate) {
           try {
@@ -150,6 +171,13 @@ class ActivityService {
 
   shoudUpdateActivity = function (action: SupportedActionType): boolean {
     return this.getAvailableActions().includes(action);
+  };
+
+  shouldGenerateContribution = (action: SupportedActionType): boolean => {
+    const contributionActions: readonly SupportedActionType[] = Object.values(
+      ContributionGraphActions,
+    );
+    return contributionActions.includes(action);
   };
 
   // for GET request
