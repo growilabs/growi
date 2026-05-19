@@ -38,6 +38,7 @@ import { createVaultGatewayRouter } from '~/features/growi-vault/server/routes/v
 import type { VaultBootstrapper } from '~/features/growi-vault/server/services/vault-bootstrapper';
 import type { VaultDispatcher } from '~/features/growi-vault/server/services/vault-dispatcher';
 
+import { getTestDbConfig } from '../mongo/utils';
 import { seedVaultE2eFixture } from './seed';
 import { spawnVaultManager } from './spawn-vault-manager';
 
@@ -126,10 +127,24 @@ async function provisionVaultE2eFixture(): Promise<void> {
         'Ensure ./test/setup/mongo/index.ts has run before this setup file.',
     );
   }
-  const mongoUri = process.env.MONGO_URI;
+  // Re-derive the worker-suffixed URI from getTestDbConfig() so vault-manager
+  // opens its change stream on the same per-worker DB mongoose is connected
+  // to (growi_test_<workerId>), without mutating process.env.MONGO_URI to
+  // do it. getTestDbConfig() returns null only when no MONGO_URI is set at
+  // all — the MongoMemoryServer branch in mongo/index.ts sets MONGO_URI on
+  // its uri, so this is null only if the mongo setup did not run.
+  const { mongoUri } = getTestDbConfig();
   if (mongoUri == null || mongoUri === '') {
     throw new Error('MONGO_URI must be exported by the mongo setup');
   }
+
+  // Drop the DB before anything connects so vault-manager opens its change
+  // stream on a clean collection set. When CI uses a shared external MongoDB,
+  // residual `pages` / `vault_instructions` / `vault_sync_state` documents
+  // from prior runs cause the bootstrapper to emit one instruction per stale
+  // page, blowing past the drain timeout. The vault E2E project doesn't run
+  // migrate-mongo, so a full drop is safe.
+  await mongoose.connection.dropDatabase();
 
   const internalSecret = crypto.randomBytes(32).toString('hex');
   const vm = await spawnVaultManager({ mongoUri, internalSecret });
