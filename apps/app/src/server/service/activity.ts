@@ -2,6 +2,7 @@ import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
+import { ensureUserHasMigrated } from '~/features/contribution-graph/server/services/contribution-migration-service';
 import { addContribution } from '~/features/contribution-graph/server/services/contribution-service';
 import type { IActivity, SupportedActionType } from '~/interfaces/activity';
 import {
@@ -64,17 +65,22 @@ class ActivityService {
         );
 
         if (shouldGenerateContribution) {
-          const user =
-            parameters.event?.creator || parameters.target?.lastUpdateUser;
+          try {
+            const user =
+              parameters.event?.creator || parameters.target?.lastUpdateUser;
 
-          if (user) {
-            addContribution(user).catch((err) => {
-              logger.error(`Failed to update contribution: ${err.message}`);
-            });
-          } else {
-            logger.warn(
-              'Could not find a valid user for contribution. Parameters:',
-              parameters,
+            if (user != null) {
+              const userId = await ensureUserHasMigrated(user);
+              await addContribution(userId);
+            } else {
+              logger.warn(
+                'Could not find a valid user for contribution snapshot.',
+              );
+            }
+          } catch (error) {
+            logger.error(
+              'Failed to process contribution migration sequence:',
+              error,
             );
           }
         }

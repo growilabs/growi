@@ -5,16 +5,16 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 
-import { ContributionAggregationService } from './aggregation-service';
+import { ActivityAggregationService } from './activity-aggregation-service';
 
 describe('ContributionAggregationService (Essential)', () => {
-  let service: ContributionAggregationService;
+  let service: ActivityAggregationService;
   let mongoServer: MongoMemoryServer;
 
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
-    service = new ContributionAggregationService();
+    service = new ActivityAggregationService();
   });
 
   afterAll(async () => {
