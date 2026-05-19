@@ -8,7 +8,11 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import AdminUsersContainer from '~/client/services/AdminUsersContainer';
 import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
-import { isMailerSetupAtom } from '~/states/server-configurations';
+import {
+  isMailerSetupAtom,
+  registrationWhitelistAtom,
+} from '~/states/server-configurations';
+import { isEmailMatchedByEntry } from '~/utils/email-whitelist';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
@@ -60,6 +64,7 @@ class UserInviteModal extends React.Component {
 
   renderModalBody() {
     const { t } = this.props;
+    const whitelistViolations = this.getWhitelistViolations();
 
     return (
       <>
@@ -83,6 +88,18 @@ class UserInviteModal extends React.Component {
           <p className="m-2 text-danger">
             {t('admin:user_management.invite_modal.valid_email')}
           </p>
+        )}
+        {whitelistViolations.length > 0 && (
+          <div className="m-2 text-danger">
+            <p className="mb-1">
+              {t('admin:user_management.invite_modal.whitelist_violation')}
+            </p>
+            <ul className="mb-0">
+              {whitelistViolations.map((email) => (
+                <li key={email}>{email}</li>
+              ))}
+            </ul>
+          </div>
         )}
       </>
     );
@@ -158,7 +175,11 @@ class UserInviteModal extends React.Component {
             type="button"
             className="btn btn-primary"
             onClick={this.handleSubmit}
-            disabled={!this.validEmail() || isCreateUserButtonPushed}
+            disabled={
+              !this.validEmail() ||
+              isCreateUserButtonPushed ||
+              this.getWhitelistViolations().length > 0
+            }
           >
             {t('admin:user_management.invite_modal.issue')}
           </button>
@@ -232,6 +253,23 @@ class UserInviteModal extends React.Component {
 
   validEmail() {
     return this.state.emailInputValue.match(/.+@.+\..+/) != null;
+  }
+
+  getWhitelistViolations() {
+    const { registrationWhitelist } = this.props;
+    if (!registrationWhitelist || registrationWhitelist.length === 0) {
+      return [];
+    }
+    return this.state.emailInputValue
+      .split('\n')
+      .map((e) => e.trim())
+      .filter((e) => e.match(/.+@.+\..+/))
+      .filter(
+        (email) =>
+          !registrationWhitelist.some((entry) =>
+            isEmailMatchedByEntry(email, entry),
+          ),
+      );
   }
 
   async handleSubmit() {
@@ -318,8 +356,14 @@ class UserInviteModal extends React.Component {
 const UserInviteModalWrapperFC = (props) => {
   const { t } = useTranslation();
   const isMailerSetup = useAtomValue(isMailerSetupAtom);
+  const registrationWhitelist = useAtomValue(registrationWhitelistAtom);
   return (
-    <UserInviteModal t={t} isMailerSetup={isMailerSetup ?? false} {...props} />
+    <UserInviteModal
+      t={t}
+      isMailerSetup={isMailerSetup ?? false}
+      registrationWhitelist={registrationWhitelist ?? []}
+      {...props}
+    />
   );
 };
 
@@ -335,6 +379,7 @@ UserInviteModal.propTypes = {
   t: PropTypes.func.isRequired, // i18next
   adminUsersContainer: PropTypes.instanceOf(AdminUsersContainer).isRequired,
   isMailerSetup: PropTypes.bool.isRequired,
+  registrationWhitelist: PropTypes.arrayOf(PropTypes.string).isRequired,
 };
 
 export default UserInviteModalWrapper;
