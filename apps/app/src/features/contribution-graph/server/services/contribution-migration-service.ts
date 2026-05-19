@@ -29,15 +29,17 @@ export const migrateContributions = async (userId: string): Promise<void> => {
     },
   );
 
-  await Contribution.bulkWrite(
-    contributions.map((c) => ({
-      updateOne: {
-        filter: { user: userId, date: c.date },
-        update: { $inc: { count: c.count } },
-        upsert: true,
-      },
-    })),
-  );
+  if (contributions.length > 0) {
+    await Contribution.bulkWrite(
+      contributions.map((c) => ({
+        updateOne: {
+          filter: { user: userId, date: c.date },
+          update: { $inc: { count: c.count } },
+          upsert: true,
+        },
+      })),
+    );
+  }
 };
 
 export const ensureUserHasMigrated = async (
@@ -65,7 +67,9 @@ export const ensureUserHasMigrated = async (
         { new: true },
       );
 
-      user.contributionsMigratedAt = updatedUser.contributionsMigratedAt;
+      if (updatedUser != null) {
+        user.contributionsMigratedAt = updatedUser.contributionsMigratedAt;
+      }
 
       return updatedUser._id.toString();
     }
