@@ -4,7 +4,7 @@
 
 - [ ] 1. 基盤: schema 拡張 / config 拡張 / audit 定数 / migration
 
-- [ ] 1.1 vault_sync_state schema を 7-state 化し新規 14 フィールドを追加
+- [x] 1.1 vault_sync_state schema を 7-state 化し新規 14 フィールドを追加
   - BootstrapState enum を `'pending' | 'running' | 'verifying' | 'done' | 'failed' | 'retrying' | 'escalated'` の 7 値に拡張
   - 新規フィールド 14 件（`bootstrapInstanceId` / `bootstrapHeartbeatAt` / `bootstrapLastTriggerSource` / `bootstrapRetryAttempts` / `bootstrapRetryNextAt` / `bootstrapRetryAborted` / `bootstrapCompletenessLastCheckedAt` / `bootstrapCompletenessLastResult` / `bootstrapStreamSnapshotMaxId` / `driftLastWatermark` / `driftLastSweepAt` / `driftDetectedSinceBoot` / `driftRepairsEmittedSinceBoot` / `driftLastError`）を Mongoose schema に追加し、適切な default 値を設定
   - schema 単体テストで全 14 新規フィールド + 拡張 enum の default / 型制約を確認

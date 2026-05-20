@@ -6,14 +6,27 @@ import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
 /**
  * Bootstrap lifecycle states managed by apps/app (VaultBootstrapper).
+ *
+ * States added in resilience phase (requirements 1.11, 1.12):
+ *   verifying — post-sync completeness check in progress
+ *   retrying  — waiting for the next automatic retry after a transient failure
+ *   escalated — retry budget exhausted; manual intervention required
  */
-export type BootstrapState = 'pending' | 'running' | 'done' | 'failed';
+export type BootstrapState =
+  | 'pending'
+  | 'running'
+  | 'verifying'
+  | 'done'
+  | 'failed'
+  | 'retrying'
+  | 'escalated';
 
 /**
  * Plain interface for the vault_sync_state singleton document.
  *
  * Field ownership:
  *   - bootstrap* fields — owned and written by apps/app (VaultBootstrapper)
+ *   - drift* fields     — owned and written by apps/app (DriftSweeper)
  *   - resumeToken / lastProcessedAt / watcherInstanceId — owned and written by
  *     vault-manager; apps/app reads these fields but MUST NOT write them.
  */
@@ -49,6 +62,88 @@ export interface IVaultSyncState {
    * admin UI so operators can diagnose failures without trawling logs.
    */
   bootstrapLastError: string | null;
+
+  /**
+   * Unique identifier of the running bootstrapper instance.
+   * Used for distributed lock / heartbeat detection (requirement 3.5).
+   */
+  bootstrapInstanceId: string | null;
+
+  /**
+   * Timestamp of the last heartbeat written by the active bootstrapper instance.
+   * A stale heartbeat indicates a crashed or dead instance (requirement 3.5).
+   */
+  bootstrapHeartbeatAt: Date | null;
+
+  /**
+   * Source that triggered the most recent bootstrap run.
+   * Helps diagnose unexpected re-runs (requirements 5.1, 5.2).
+   */
+  bootstrapLastTriggerSource: 'env-true' | 'env-force' | 'admin-ui' | null;
+
+  /**
+   * Number of automatic retries attempted for the current failure sequence.
+   * Reset to 0 when bootstrap succeeds (requirements 1.11, 1.12).
+   */
+  bootstrapRetryAttempts: number;
+
+  /**
+   * Scheduled time for the next automatic retry.
+   * Null when no retry is pending (requirements 1.11, 1.12).
+   */
+  bootstrapRetryNextAt: Date | null;
+
+  /**
+   * True when the retry sequence has been deliberately aborted (e.g. escalated
+   * state reached). Prevents further automatic retries (requirements 1.11, 1.12).
+   */
+  bootstrapRetryAborted: boolean;
+
+  /**
+   * Timestamp of the most recent post-sync completeness check (requirement 1.12).
+   */
+  bootstrapCompletenessLastCheckedAt: Date | null;
+
+  /**
+   * Result of the most recent completeness check: 'ok' or 'failed' (requirement 1.12).
+   */
+  bootstrapCompletenessLastResult: 'ok' | 'failed' | null;
+
+  /**
+   * The maximum page _id seen in the change-stream snapshot taken at bootstrap
+   * start. Used to bound which pages the completeness check must verify (requirement 1.12).
+   */
+  bootstrapStreamSnapshotMaxId: mongoose.Types.ObjectId | null;
+
+  // -------------------------------------------------------------------------
+  // apps/app owned fields (DriftSweeper writes these — requirement 5.3)
+  // -------------------------------------------------------------------------
+
+  /**
+   * High-watermark timestamp for drift detection; pages modified before this
+   * point have already been reconciled.
+   */
+  driftLastWatermark: Date | null;
+
+  /** Timestamp of the most recent drift sweep execution. */
+  driftLastSweepAt: Date | null;
+
+  /**
+   * Cumulative count of drift events detected since the process last started.
+   * Reset on restart (in-memory semantics reflected here for persistence).
+   */
+  driftDetectedSinceBoot: number;
+
+  /**
+   * Cumulative count of repair instructions emitted since the process last started.
+   */
+  driftRepairsEmittedSinceBoot: number;
+
+  /**
+   * Error message from the most recent failed drift sweep.
+   * Null when last sweep succeeded.
+   */
+  driftLastError: string | null;
 
   // -------------------------------------------------------------------------
   // vault-manager owned fields (apps/app reads only)
@@ -96,10 +191,18 @@ const vaultSyncStateSchema = new Schema<
   {
     _id: { type: String, default: 'singleton' },
 
-    // apps/app owned fields
+    // apps/app owned fields — bootstrap lifecycle
     bootstrapState: {
       type: String,
-      enum: ['pending', 'running', 'done', 'failed'] satisfies BootstrapState[],
+      enum: [
+        'pending',
+        'running',
+        'verifying',
+        'done',
+        'failed',
+        'retrying',
+        'escalated',
+      ] satisfies BootstrapState[],
       required: true,
       default: 'pending',
     },
@@ -109,6 +212,35 @@ const vaultSyncStateSchema = new Schema<
     bootstrapTotalEstimated: { type: Number, default: null },
     bootstrapProcessed: { type: Number, required: true, default: 0 },
     bootstrapLastError: { type: String, default: null },
+
+    // apps/app owned fields — resilience additions (requirements 3.5, 5.1, 5.2, 5.3)
+    bootstrapInstanceId: { type: String, default: null },
+    bootstrapHeartbeatAt: { type: Date, default: null },
+    bootstrapLastTriggerSource: {
+      type: String,
+      enum: ['env-true', 'env-force', 'admin-ui', null],
+      default: null,
+    },
+    bootstrapRetryAttempts: { type: Number, required: true, default: 0 },
+    bootstrapRetryNextAt: { type: Date, default: null },
+    bootstrapRetryAborted: { type: Boolean, required: true, default: false },
+    bootstrapCompletenessLastCheckedAt: { type: Date, default: null },
+    bootstrapCompletenessLastResult: {
+      type: String,
+      enum: ['ok', 'failed', null],
+      default: null,
+    },
+    bootstrapStreamSnapshotMaxId: {
+      type: Schema.Types.ObjectId,
+      default: null,
+    },
+
+    // apps/app owned fields — drift sweeper (requirement 5.3)
+    driftLastWatermark: { type: Date, default: null },
+    driftLastSweepAt: { type: Date, default: null },
+    driftDetectedSinceBoot: { type: Number, required: true, default: 0 },
+    driftRepairsEmittedSinceBoot: { type: Number, required: true, default: 0 },
+    driftLastError: { type: String, default: null },
 
     // vault-manager owned fields (read-only for apps/app)
     resumeToken: { type: Schema.Types.Mixed, default: null },

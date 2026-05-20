@@ -28,7 +28,14 @@ export const CHUNK_SIZE = 1000;
 // ---------------------------------------------------------------------------
 
 export interface BootstrapStatus {
-  state: 'pending' | 'running' | 'done' | 'failed';
+  state:
+    | 'pending'
+    | 'running'
+    | 'verifying'
+    | 'done'
+    | 'failed'
+    | 'retrying'
+    | 'escalated';
   processed: number;
   totalEstimated: number | null;
   cursor: string | null;
