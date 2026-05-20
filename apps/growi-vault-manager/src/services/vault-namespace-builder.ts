@@ -425,6 +425,11 @@ async function applyRemove(instruction: VaultInstructionDoc): Promise<void> {
     );
   }
 
+  // Skip excluded paths (e.g. /trash/) — no commit, no vault_namespace_state update.
+  if (VaultPathMapper.isExcludedFromVault(pagePath)) {
+    return;
+  }
+
   const filePath = VaultPathMapper.map(pagePath, pageId);
   const rootEntries = await readRootTree(namespace);
   const newTreeOid = await removeEntryFromTree(
@@ -459,8 +464,17 @@ async function applyBulkUpsert(
     );
   }
 
+  // Filter out excluded paths (e.g. /trash/) before processing.
+  const filteredEntries = entries.filter(
+    (e) => !VaultPathMapper.isExcludedFromVault(e.pagePath),
+  );
+  if (filteredEntries.length === 0) {
+    // Trash-only instruction — no commit, no vault_namespace_state update.
+    return;
+  }
+
   // Fetch all revision bodies in one query using cursor streaming.
-  const revisionIds = entries.map((e) => e.revisionId);
+  const revisionIds = filteredEntries.map((e) => e.revisionId);
   const revisionMap = new Map<string, string>(); // revisionId → body
 
   const { query, skippedIds } = RevisionModel.bodyQueryByIds(revisionIds);
@@ -483,7 +497,7 @@ async function applyBulkUpsert(
 
   // Compute (filePath, blobOid) in parallel with concurrency 16.
   const tasks: Array<() => Promise<{ filePath: string; blobOid: string }>> =
-    entries.map((entry) => async () => {
+    filteredEntries.map((entry) => async () => {
       const filePath = VaultPathMapper.map(entry.pagePath, entry.pageId);
       const body = revisionMap.get(entry.revisionId) ?? '';
       const bodyBuffer = Buffer.from(body);
@@ -498,13 +512,13 @@ async function applyBulkUpsert(
   const rootEntries = await readRootTree(namespace);
   const newTreeOid = await applyPatchesToTree(rootEntries, patches);
 
-  const firstEntry = entries[0];
-  const lastEntry = entries[entries.length - 1];
+  const firstEntry = filteredEntries[0];
+  const lastEntry = filteredEntries[filteredEntries.length - 1];
 
   const message =
-    `vault: ${namespace} bulk-upsert ${entries.length} entries\n\n` +
+    `vault: ${namespace} bulk-upsert ${filteredEntries.length} entries\n\n` +
     `operation: bulk-upsert\n` +
-    `entryCount: ${entries.length}\n` +
+    `entryCount: ${filteredEntries.length}\n` +
     `firstPageId: ${firstEntry.pageId}\n` +
     `lastPageId: ${lastEntry.pageId}\n` +
     `issuedAt: ${instruction.issuedAt.toISOString()}`;

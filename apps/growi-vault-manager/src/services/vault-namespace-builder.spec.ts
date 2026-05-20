@@ -36,6 +36,7 @@ vi.mock('./vault-blob-hasher.js', () => ({
 vi.mock('./vault-path-mapper.js', () => ({
   map: vi.fn(),
   mapPrefix: vi.fn(),
+  isExcludedFromVault: vi.fn(),
 }));
 
 vi.mock('../models/revision.js', () => ({
@@ -142,6 +143,8 @@ beforeEach(() => {
   asMock(VaultPathMapper.map).mockReturnValue('pages/page.md');
   // Default: mapPrefix returns a directory prefix.
   asMock(VaultPathMapper.mapPrefix).mockReturnValue('pages');
+  // Default: isExcludedFromVault returns false (no filtering).
+  asMock(VaultPathMapper.isExcludedFromVault).mockReturnValue(false);
 
   // Default: upsertNamespace resolves.
   asMock(VaultNamespaceStateModel.upsertNamespace).mockResolvedValue({
@@ -673,5 +676,112 @@ describe('op: reset-all', () => {
     expect(VaultRepoStorage.deleteRef).not.toHaveBeenCalled();
     expect(VaultNamespaceStateModel.deleteAll).toHaveBeenCalled();
     expect(VaultUserViewModel.deleteAll).toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// isExcludedFromVault filtering (Requirements 6.3, 6.4)
+// ---------------------------------------------------------------------------
+
+describe('isExcludedFromVault filtering', () => {
+  function makeBulkCursor(bodies: Array<{ _id: string; body: string }>) {
+    return {
+      // biome-ignore lint/suspicious/useAwait: generator needs to be async for for-await compatibility
+      [Symbol.asyncIterator]: async function* () {
+        for (const doc of bodies) {
+          yield doc;
+        }
+      },
+    };
+  }
+
+  beforeEach(() => {
+    asMock(VaultRepoStorage.readTree).mockResolvedValue([]);
+  });
+
+  it('bulk-upsert: trash-only entries → commitAndUpdateRef not called (no-op)', async () => {
+    // All entries are excluded (e.g. /trash/foo paths)
+    asMock(VaultPathMapper.isExcludedFromVault).mockReturnValue(true);
+
+    const cursor = makeBulkCursor([]);
+    asMock(RevisionModel.bodyQueryByIds).mockReturnValue({
+      query: { cursor: () => cursor },
+      skippedIds: [],
+    });
+
+    const instruction = makeInstruction({
+      op: 'bulk-upsert',
+      payload: {
+        namespace: 'public',
+        entries: [
+          { pageId: 'p1', pagePath: '/trash/foo', revisionId: 'rev-001' },
+          { pageId: 'p2', pagePath: '/trash/bar', revisionId: 'rev-002' },
+        ],
+      },
+    });
+
+    await applyInstruction(instruction);
+
+    // No commit should be created for a trash-only instruction.
+    expect(VaultRepoStorage.writeCommit).not.toHaveBeenCalled();
+    expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
+    expect(VaultNamespaceStateModel.upsertNamespace).not.toHaveBeenCalled();
+  });
+
+  it('bulk-upsert: mixed (trash + normal) entries → only normal entries committed', async () => {
+    // isExcludedFromVault returns true only for /trash/ paths
+    asMock(VaultPathMapper.isExcludedFromVault).mockImplementation(
+      (p: string) => p.startsWith('/trash/'),
+    );
+
+    const cursor = makeBulkCursor([{ _id: 'rev-002', body: 'normal body' }]);
+    asMock(RevisionModel.bodyQueryByIds).mockReturnValue({
+      query: { cursor: () => cursor },
+      skippedIds: [],
+    });
+    asMock(VaultPathMapper.map).mockReturnValue('pages/normal.md');
+    asMock(VaultBlobHasher.hashBlob).mockResolvedValue('blob-normal');
+    asMock(VaultRepoStorage.writeTree).mockResolvedValue('tree-mixed');
+    asMock(VaultRepoStorage.writeCommit).mockResolvedValue('commit-mixed');
+
+    const instruction = makeInstruction({
+      op: 'bulk-upsert',
+      payload: {
+        namespace: 'public',
+        entries: [
+          { pageId: 'p1', pagePath: '/trash/foo', revisionId: 'rev-001' },
+          { pageId: 'p2', pagePath: '/pages/normal', revisionId: 'rev-002' },
+        ],
+      },
+    });
+
+    await applyInstruction(instruction);
+
+    // Exactly one commit should be created (for the normal entry only).
+    expect(VaultRepoStorage.writeCommit).toHaveBeenCalledTimes(1);
+    expect(VaultRepoStorage.updateRef).toHaveBeenCalledTimes(1);
+    // RevisionModel should be called with only the non-excluded revisionId.
+    expect(RevisionModel.bodyQueryByIds).toHaveBeenCalledWith(['rev-002']);
+  });
+
+  it('remove: trash-only entry → no-op (commitAndUpdateRef not called)', async () => {
+    // The single entry is excluded (trash path)
+    asMock(VaultPathMapper.isExcludedFromVault).mockReturnValue(true);
+
+    const instruction = makeInstruction({
+      op: 'remove',
+      payload: {
+        namespace: 'public',
+        pageId: 'p1',
+        pagePath: '/trash/foo',
+      },
+    });
+
+    await applyInstruction(instruction);
+
+    // No commit should be created for a trash remove.
+    expect(VaultRepoStorage.writeCommit).not.toHaveBeenCalled();
+    expect(VaultRepoStorage.updateRef).not.toHaveBeenCalled();
+    expect(VaultNamespaceStateModel.upsertNamespace).not.toHaveBeenCalled();
   });
 });
