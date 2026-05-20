@@ -874,7 +874,7 @@ class ElasticsearchDelegator
         index: this.auditlogIndexName,
         body: {
           size: 0,
-          query: query,
+          query,
           aggs: {
             unique_usernames: {
               terms: { field: 'username', size: limit },
@@ -897,7 +897,7 @@ class ElasticsearchDelegator
       const result = await this.client.search({
         index: this.auditlogIndexName,
         size: 0,
-        query: query,
+        query,
         aggs: {
           unique_usernames: {
             terms: { field: 'username', size: limit },
