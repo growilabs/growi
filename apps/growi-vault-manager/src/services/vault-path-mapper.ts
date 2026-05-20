@@ -14,8 +14,11 @@
  *    prepend '_' to that segment
  *  - Pages with uppercase letters -> append '__<first-8-chars-of-pageId>'
  *    suffix to the filename (collision protection on case-insensitive fs)
- *  - Orphan pages (path starts with /trash) -> placed under '_orphaned/'
  *  - All paths receive a '.md' extension
+ *
+ * Note: Callers are responsible for checking isExcludedFromVault() before
+ * calling map(). The mapper itself does not apply any special prefix for
+ * excluded paths such as /trash.
  */
 
 /**
@@ -116,10 +119,13 @@ function hasUpperCase(pagePath: string): boolean {
 }
 
 /**
- * Returns true when the page is considered an orphan.
+ * Returns true when the page path should be excluded from vault processing.
  * Currently defined as: pages whose path is /trash or starts with /trash/.
+ *
+ * Callers must check this before calling map() and handle excluded pages
+ * according to their own policy (e.g. skip, route to a separate store, etc.).
  */
-function isOrphan(pagePath: string): boolean {
+export function isExcludedFromVault(pagePath: string): boolean {
   return pagePath === '/trash' || pagePath.startsWith('/trash/');
 }
 
@@ -146,9 +152,10 @@ function splitPagePath(pagePath: string): string[] {
  *  2. If pagePath contains uppercase letters, the last filename component
  *     receives a '__<pageId[0..7]>' suffix before the '.md' extension.
  *  3. '.md' extension is appended to the final filename.
- *  4. Orphan pages (/trash and subtree) are prefixed with '_orphaned/'.
  *
  * This is a pure function: identical inputs always produce identical outputs.
+ * Excluded paths (e.g. /trash) are NOT given any special prefix — callers
+ * must call isExcludedFromVault() and handle them before invoking map().
  *
  * @param pagePath - GROWI page path (must start with '/').
  * @param pageId   - Unique page identifier (ObjectId string or similar).
@@ -166,14 +173,7 @@ export function map(pagePath: string, pageId: string): string {
   const filename = `${lastSegment}${suffix}.md`;
 
   const pathParts = [...encodedSegments, filename];
-  const relativePath = pathParts.join('/');
-
-  // Orphan pages are relocated under _orphaned/.
-  if (isOrphan(pagePath)) {
-    return `_orphaned/${relativePath}`;
-  }
-
-  return relativePath;
+  return pathParts.join('/');
 }
 
 /**

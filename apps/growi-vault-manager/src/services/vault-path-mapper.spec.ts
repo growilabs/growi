@@ -12,7 +12,7 @@
 
 import { describe, expect, it } from 'vitest';
 
-import { map, mapPrefix } from './vault-path-mapper.js';
+import { isExcludedFromVault, map, mapPrefix } from './vault-path-mapper.js';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -204,31 +204,49 @@ describe('map — uppercase suffix', () => {
 });
 
 // ---------------------------------------------------------------------------
-// Orphan pages
+// isExcludedFromVault
 // ---------------------------------------------------------------------------
 
-describe('map — orphan pages (_orphaned/ placement)', () => {
-  it('places /trash page under _orphaned/', () => {
-    const result = map('/trash', PAGE_ID);
-    expect(result.startsWith('_orphaned/')).toBe(true);
+describe('isExcludedFromVault', () => {
+  it('returns true for /trash', () => {
+    expect(isExcludedFromVault('/trash')).toBe(true);
   });
 
-  it('places pages under /trash/ in _orphaned/', () => {
-    const result = map('/trash/old-page', PAGE_ID);
-    expect(result.startsWith('_orphaned/')).toBe(true);
-    expect(result).toContain('trash');
-    expect(result).toContain('old-page');
+  it('returns true for pages under /trash/', () => {
+    expect(isExcludedFromVault('/trash/foo')).toBe(true);
   });
 
-  it('does not place regular pages in _orphaned/', () => {
-    const result = map('/notes/my-note', PAGE_ID);
+  it('returns false for regular pages', () => {
+    expect(isExcludedFromVault('/foo')).toBe(false);
+  });
+
+  it('returns false for paths that merely contain "trash" elsewhere', () => {
+    expect(isExcludedFromVault('/my-trash')).toBe(false);
+    expect(isExcludedFromVault('/notes/trash')).toBe(false);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// map — trash pages (caller's responsibility, no _orphaned/ prefix)
+// ---------------------------------------------------------------------------
+
+describe('map — trash pages are mapped without _orphaned/ prefix', () => {
+  it('maps /trash/foo without _orphaned/ prefix', () => {
+    const result = map('/trash/foo', PAGE_ID);
     expect(result.startsWith('_orphaned/')).toBe(false);
+    expect(result).toBe('trash/foo.md');
   });
 
-  it('preserves the encoded relative path inside _orphaned/', () => {
+  it('maps /trash itself without _orphaned/ prefix', () => {
+    const result = map('/trash', PAGE_ID);
+    expect(result.startsWith('_orphaned/')).toBe(false);
+    expect(result).toBe('trash.md');
+  });
+
+  it('maps /trash/A/B with uppercase suffix, no _orphaned/ prefix', () => {
     const result = map('/trash/A/B', PAGE_ID);
-    // Path has uppercase → suffix is added
-    expect(result).toBe(`_orphaned/trash/A/B__${PAGE_ID_8}.md`);
+    expect(result.startsWith('_orphaned/')).toBe(false);
+    expect(result).toBe(`trash/A/B__${PAGE_ID_8}.md`);
   });
 });
 
