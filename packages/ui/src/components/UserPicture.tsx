@@ -5,7 +5,7 @@ import {
   memo,
   type ReactNode,
   useCallback,
-  useRef,
+  useState,
 } from 'react';
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
@@ -188,9 +188,14 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
     .filter(Boolean)
     .join(' ');
 
-  // ref is always called unconditionally to satisfy React hooks rules.
-  // Passed to the root element so UncontrolledTooltip can target it.
-  const rootRef = useRef<HTMLSpanElement>(null);
+  // Callback ref into state so the tooltip mounts AFTER the host span is in
+  // the DOM. reactstrap's UncontrolledTooltip resolves `target.current` once
+  // in componentDidMount; when the tooltip is a child of the target span,
+  // React's bottom-up commit order leaves the parent ref unset at that
+  // moment, so the tooltip permanently fails to attach listeners. The race
+  // is masked in dev by next/dynamic's slower resolution but fires in
+  // production builds.
+  const [rootEl, setRootEl] = useState<HTMLSpanElement | null>(null);
 
   const tooltipClassName = `${moduleTooltipClass} user-picture-tooltip-${size ?? 'md'}`;
 
@@ -200,10 +205,10 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
   const children = (
     <>
       {imgElement}
-      {showTooltip && (
+      {rootEl != null && showTooltip && (
         <UncontrolledTooltip
           placement="bottom"
-          target={rootRef}
+          target={rootEl}
           popperClassName={tooltipClassName}
           delay={0}
           fade={false}
@@ -223,7 +228,7 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
   if (username == null || noLink) {
     return (
       <UserPictureRootWithoutLink
-        ref={rootRef}
+        ref={setRootEl}
         displayName={displayName}
         size={size}
         onClick={onClick}
@@ -238,7 +243,7 @@ export const UserPicture = memo((userProps: Props): JSX.Element => {
 
   return (
     <UserPictureRootWithLink
-      ref={rootRef}
+      ref={setRootEl}
       displayName={displayName}
       size={size}
       username={username}
