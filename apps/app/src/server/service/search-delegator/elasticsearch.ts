@@ -864,7 +864,11 @@ class ElasticsearchDelegator
           query: {
             bool: {
               should: [
-                { wildcard: { username: { value: `*${username}*` } } },
+                {
+                  wildcard: {
+                    username: { value: `${username}*`, case_insensitive: true },
+                  },
+                },
                 { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
               ],
             },
@@ -894,7 +898,11 @@ class ElasticsearchDelegator
         query: {
           bool: {
             should: [
-              { wildcard: { username: { value: `*${username}*` } } },
+              {
+                wildcard: {
+                  username: { value: `${username}*`, case_insensitive: true },
+                },
+              },
               { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
             ],
           },
