@@ -12,7 +12,7 @@
   - _Requirements: 1.11, 1.12, 3.5, 5.1, 5.2, 5.3_
   - _Boundary: vault-sync-state model_
 
-- [ ] 1.2 (P) resilience 関連 config keys を config-definition.ts に追加
+- [x] 1.2 (P) resilience 関連 config keys を config-definition.ts に追加
   - `app:vaultBootstrapOnStart` を boolean → `'true' | 'false' | 'force'` enum に変更
   - 8 件の新規 config（`app:vaultBootstrapRetryMax` / `app:vaultBootstrapRetryBaseMs` / `app:vaultBootstrapRetryMaxMs` / `app:vaultBootstrapHeartbeatIntervalMs` / `app:vaultBootstrapHeartbeatStaleMs` / `app:vaultBootstrapRetryDisabled` / `app:vaultDriftDetectionIntervalMs` / `app:vaultDriftMaxPagesPerTick` / `app:vaultDriftDetectionDisabled`）を `defineConfig` パターンで追加
   - env var の dispatch を単体テストで確認
@@ -20,7 +20,7 @@
   - _Requirements: 1.13, 3.1, 3.6, 4.4_
   - _Boundary: config-definition_
 
-- [ ] 1.3 (P) ACTION_VAULT_RESILIENCE_* audit 定数を interfaces/activity.ts に追加
+- [x] 1.3 (P) ACTION_VAULT_RESILIENCE_* audit 定数を interfaces/activity.ts に追加
   - 15 種の event 定数を export: `vault.resilience.bootstrap-started`、`vault.resilience.bootstrap-completed`、`vault.resilience.bootstrap-failed`、`vault.resilience.completeness-check-failed`、`vault.resilience.retry-scheduled`、`vault.resilience.retry-failed`、`vault.resilience.retry-escalated`、`vault.resilience.retry-aborted`、`vault.resilience.force-warning-active`、`vault.resilience.stale-running-detected`、`vault.resilience.drift-sweep-started`、`vault.resilience.drift-detected`、`vault.resilience.drift-repaired`、`vault.resilience.drift-sweep-failed`、`vault.resilience.drift-sweep-out-of-scope`
   - 既存 ACTION_VAULT_* との並びを揃え、命名規則と export 順を統一
   - 観測可能完了条件: 全 15 定数が export され、型補完が効き、`interfaces/activity.ts` の test snapshot が更新される
