@@ -516,7 +516,7 @@ class ElasticsearchDelegator
     );
 
     const readStream = Activity.find()
-      .select('snapshot.username')
+      .select('snapshot.username createdAt')
       .lean()
       .cursor();
     const batchStream = createBatchStream(bulkSize);
@@ -667,15 +667,20 @@ class ElasticsearchDelegator
   }
 
   private prepareBodyForAuditlog(
-    activity: Pick<ActivityDocument, '_id' | 'snapshot'>,
-  ): [] | [{ index: { _index: string; _id: string } }, { username: string }] {
+    activity: Pick<ActivityDocument, '_id' | 'snapshot' | 'createdAt'>,
+  ):
+    | []
+    | [
+        { index: { _index: string; _id: string } },
+        { username: string; created_at: Date },
+      ] {
     const username = activity.snapshot?.username;
     if (username == null || username === '') return [];
     return [
       {
         index: { _index: this.auditlogAliasName, _id: activity._id.toString() },
       },
-      { username },
+      { username, created_at: activity.createdAt },
     ];
   }
 

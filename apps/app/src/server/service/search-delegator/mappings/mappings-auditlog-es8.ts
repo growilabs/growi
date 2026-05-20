@@ -8,6 +8,7 @@ export const mappings: Mappings = {
   mappings: {
     properties: {
       username: { type: 'keyword' },
+      created_at: { type: 'date' },
     },
   },
 };
