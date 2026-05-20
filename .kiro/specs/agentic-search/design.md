@@ -2,16 +2,16 @@
 
 ## Overview
 
-**Purpose**: 既存 Mastra `growiAgent` に「ページ本文取得 tool」を追加し、全文検索 tool（既存）と組み合わせた RAG 的反復ループを成立させる。これにより、GROWI ユーザーが自然言語の問い合わせから根拠つき Markdown 回答を得られるようにする。
+**Purpose**: 既存 Mastra `growiAgent` に「ES 全文検索 tool」と「ページ本文取得 tool」の 2 本を新設し、両者を組み合わせた RAG 的反復ループを成立させる。これにより、GROWI ユーザーが自然言語の問い合わせから根拠つき Markdown 回答を得られるようにする。
 
 **Users**: GROWI の認証済みユーザー（既存 ChatSidebar / `useChat` 経由のすべての利用者）。
 
-**Impact**: agent の `tools` 構成を変更（新 tool 追加 + 既存 `fileSearchTool` 暫定無効化）、`RequestContext` 型を拡張し `userId` を伝搬。既存ストリーミング応答層・メモリ・スレッド管理は不変。
+**Impact**: agent の `tools` 構成を変更（新 tool 2 本追加 + 既存 `fileSearchTool` 暫定無効化）、`RequestContext` 型を拡張し `userId` を伝搬。既存ストリーミング応答層・メモリ・スレッド管理は不変。
 
 ### Goals
 - `growiAgent` が「全文検索 → 本文取得 → 必要に応じて再検索 → 合成」を自律的に反復する agentic ループを成立させる
 - ページ本文取得経路がページ閲覧権限（grant）を完全に既存メソッドへ委譲する
-- 新規 tool 1 本 + 既存 2 ファイルの軽微修正で実装を完結させる
+- 新規 tool 2 本（`fullTextSearchTool` + `getPageContentTool`）+ 既存ファイルの軽微修正で実装を完結させる
 
 ### Non-Goals
 - タグを主軸とした専用 tool（`fullTextSearchTool` とは独立した、タグ一覧・ファセット・関連ページ提示等の新規 tool）の新設（別 spec）
@@ -61,7 +61,7 @@
 - `Page.findByIdAndViewer` または `Page.findByPathAndViewer` のシグネチャ・戻り値仕様変更
 - `RequestContext` ジェネリクスを共有する他コンポーネントの追加 / 型変更（key 衝突発生時）
 - `@mastra/core` の `createTool` / `Agent.stream()` API の破壊的変更
-- 既存全文検索 tool の出力スキーマ変更（特に `pageId` / `pagePath` フィールドの整合）
+- `SearchService.searchKeyword()` のシグネチャ・戻り値スキーマ変更（特に ES delegator の `result.data[i]._id` / `_source.path` / `_highlight.body` の整合）
 - 既存 `growiAgent.instructions` の英語ベース構造を逸脱する変更（多言語応答ルールの再検証要）
 - `@mastra/core` の `RequestContext` 実装が AsyncLocalStorage 等のリクエスト隔離機構に変わった場合（本 spec のリクエストスコープ化が冗長になる）
 
@@ -185,7 +185,7 @@ apps/app/src/features/mastra/server/
 | `tools/get-page-content-tool.spec.ts` | unit test。zod 入力検証、guard ロジック、Page モデルをモックして戻り値変換を確認 |
 | `tools/get-page-content-tool.integ.ts` | integration test。実 MongoDB 上で GRANT_* 各パターンの取得可否を確認 |
 
-各ファイルは単一責務。新規 export は `getPageContentTool`（tool 定数）と内部 helper のみ（barrel 不要）。
+各ファイルは単一責務。新規 export は `fullTextSearchTool` / `getPageContentTool`（tool 定数）と内部 helper のみ（barrel 不要）。
 
 ## System Flows
 
@@ -259,7 +259,7 @@ Key 決定:
 
 | Req | Summary | Components | Interfaces | Flows |
 |---|---|---|---|---|
-| 1.1 | 全文検索 tool 呼び出し | growiAgent (Agent Layer) | `Agent.stream` + 既存 tools | 反復ループ Sequence |
+| 1.1 | 全文検索 tool 呼び出し | growiAgent, FullTextSearchTool | `Agent.stream` + tool call | 反復ループ Sequence |
 | 1.2 | 必要なら本文取得 tool 呼び出し | growiAgent, GetPageContentTool | tool call + instructions | 反復ループ Sequence |
 | 1.3 | 不足時の再検索 / 他ページ取得 | growiAgent | LLM 自律ループ | 反復ループ Sequence |
 | 1.4 | 想定 5 類型をループでサポート | growiAgent | instructions | 反復ループ Sequence |
