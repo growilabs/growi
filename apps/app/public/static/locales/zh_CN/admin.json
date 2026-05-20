@@ -781,6 +781,7 @@
       "send_email": "你也可以从用户表中的下拉菜单中发送或重新发送邀请邮件。",
       "existing_email": "以下电子邮件已存在",
       "whitelist_violation": "以下电子邮件地址不在白名单中：",
+      "reason_email_not_in_whitelist": "不在白名单中",
       "issue": "发布"
     },
     "user_table": {

@@ -566,7 +566,7 @@ module.exports = (crowi) => {
           } else {
             acc.invalidEmailList.push({
               email,
-              reason: 'email is not included in whitelist',
+              reason: 'email_not_in_whitelist',
             });
           }
           return acc;

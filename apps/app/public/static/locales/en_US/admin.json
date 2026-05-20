@@ -772,6 +772,7 @@
       "send_email": "You can also send or resend the invitation email from the drop-down in the users table.",
       "existing_email": "The following emails already exist",
       "whitelist_violation": "The following email addresses are not allowed by the whitelist:",
+      "reason_email_not_in_whitelist": "Not included in whitelist",
       "issue": "Issue"
     },
     "user_table": {

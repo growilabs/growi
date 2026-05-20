@@ -272,8 +272,6 @@ class UserInviteModal extends React.Component {
   }
 
   async handleSubmit() {
-    if (this.getWhitelistViolations().length > 0) return;
-
     const { adminUsersContainer } = this.props;
 
     this.setState({ isCreateUserButtonPushed: true });
@@ -306,7 +304,13 @@ class UserInviteModal extends React.Component {
       if (emailList.failedEmailList.length > 0) {
         const failedEmailList = emailList.failedEmailList.map(
           (failed, index) => {
-            let messgage = `email: ${failed.email}<br>・reason: ${failed.reason}`;
+            const reason =
+              failed.reason === 'email_not_in_whitelist'
+                ? t(
+                    'admin:user_management.invite_modal.reason_email_not_in_whitelist',
+                  )
+                : failed.reason;
+            let messgage = `email: ${failed.email}<br>・reason: ${reason}`;
             if (index !== emailList.failedEmailList.length - 1) {
               messgage += '<br>';
             }
