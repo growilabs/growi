@@ -856,23 +856,25 @@ class ElasticsearchDelegator
   }
 
   async searchAuditlogs(username: string, limit: number): Promise<string[]> {
+    const escaped = username.replace(/([*?\\])/g, '\\$1');
+    const query = {
+      bool: {
+        should: [
+          {
+            wildcard: {
+              username: { value: `${escaped}*`, case_insensitive: true },
+            },
+          },
+          { fuzzy: { username: { value: escaped, fuzziness: 'AUTO' } } },
+        ],
+      },
+    };
     if (isES7ClientDelegator(this.client)) {
       const result = await this.client.search({
         index: this.auditlogIndexName,
         body: {
           size: 0,
-          query: {
-            bool: {
-              should: [
-                {
-                  wildcard: {
-                    username: { value: `${username}*`, case_insensitive: true },
-                  },
-                },
-                { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
-              ],
-            },
-          },
+          query: query,
           aggs: {
             unique_usernames: {
               terms: { field: 'username', size: limit },
@@ -895,18 +897,7 @@ class ElasticsearchDelegator
       const result = await this.client.search({
         index: this.auditlogIndexName,
         size: 0,
-        query: {
-          bool: {
-            should: [
-              {
-                wildcard: {
-                  username: { value: `${username}*`, case_insensitive: true },
-                },
-              },
-              { fuzzy: { username: { value: username, fuzziness: 'AUTO' } } },
-            ],
-          },
-        },
+        query: query,
         aggs: {
           unique_usernames: {
             terms: { field: 'username', size: limit },

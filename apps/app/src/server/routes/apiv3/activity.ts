@@ -31,7 +31,7 @@ interface ISuggestionsRequest
     undefined,
     undefined,
     undefined,
-    { field?: string | string[]; q?: string; offset?: number; limit?: number }
+    { field?: string | string[]; q?: string; limit?: number }
   > {}
 
 const validator = {
@@ -62,11 +62,6 @@ const validator = {
       })
       .withMessage('field must be one or more of: username, ip, url'),
     query('q').optional().isString().withMessage('q must be a string'),
-    query('offset')
-      .optional()
-      .isInt()
-      .toInt()
-      .withMessage('offset must be a number'),
     query('limit')
       .optional()
       .isInt({ max: 100 })
@@ -381,11 +376,6 @@ module.exports = (crowi: Crowi): Router => {
    *         required: false
    *         schema:
    *           type: string
-   *       - name: offset
-   *         in: query
-   *         required: false
-   *         schema:
-   *           type: integer
    *       - name: limit
    *         in: query
    *         required: false
@@ -405,7 +395,7 @@ module.exports = (crowi: Crowi): Router => {
     // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
     // @ts-ignore - Scope type causes "Type instantiation is excessively deep" with tsgo
     async (req: ISuggestionsRequest, res: ApiV3Response) => {
-      const { field, q = '', offset = 0, limit = 5 } = req.query;
+      const { field, q = '', limit = 5 } = req.query;
 
       const ALL_FIELDS: AuditlogSuggestionField[] = ['username', 'ip', 'url'];
       const fields: AuditlogSuggestionField[] =
@@ -425,7 +415,6 @@ module.exports = (crowi: Crowi): Router => {
         const result = await searchService.searchAuditlogSuggestions(
           fields,
           q,
-          offset,
           limit,
         );
         return res.apiv3(result);

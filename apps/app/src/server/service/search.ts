@@ -360,7 +360,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
   async searchAuditlogSuggestions(
     fields: AuditlogSuggestionField[],
     q: string,
-    _offset: number,
     limit: number,
   ): Promise<AuditlogSuggestionsResponse> {
     const response: AuditlogSuggestionsResponse = {};
