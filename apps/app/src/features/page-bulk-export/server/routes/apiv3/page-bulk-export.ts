@@ -9,6 +9,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import { PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE } from '../../../interfaces/page-bulk-export';
 import {
   DuplicateBulkExportJobError,
   pageBulkExportService,
@@ -61,7 +62,7 @@ module.exports = (crowi: Crowi): Router => {
           return res.apiv3Err(
             new ErrorV3(
               'Duplicate bulk export job is in progress',
-              'page_export.duplicate_bulk_export_job_error',
+              PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE,
               undefined,
               { duplicateJob: { createdAt: err.duplicateJob.createdAt } },
             ),
