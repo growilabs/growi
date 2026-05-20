@@ -14,14 +14,16 @@
 - 新規 tool 1 本 + 既存 2 ファイルの軽微修正で実装を完結させる
 
 ### Non-Goals
-- タグ検索 / 関連ページ / クエリ再構成等の新規 tool（別 spec）
+- タグを主軸とした専用 tool（`fullTextSearchTool` とは独立した、タグ一覧・ファセット・関連ページ提示等の新規 tool）の新設（別 spec）
+- 関連ページ / 最近更新ページ / クエリ再構成等の新規 tool（別 spec）
 - ベクトル検索・埋め込み統合（別 spec）
 - ChatSidebar / Chat UI 改修（別 spec）
 - アクセスログ・検索品質評価基盤（別 spec）
-- `fileSearchTool` の最終削除（フォローアップ別タスク）
+- `fileSearchTool` の最終削除(フォローアップ別タスク)
 - `RequestContext` のモジュールシングルトン構造の根本修正（既存挙動踏襲、別タスクで議論）
 - 書き込み系プロンプト・wiki 外知識への明示対応
-- 「タグ検索 tool」(`fullTextSearchTool` とは独立した、タグを主軸にした列挙・ファセット・関連ページ提示等の新規 tool) の新設。本 spec では既存 `SearchService.parseQueryString` の `tag:` 構文を `fullTextSearchTool` の `query` 文字列経由でそのまま使えるようにするだけであり、タグ専用の API / instructions / UX を追加しない（要件 6 の自然言語クエリ範囲内に閉じる）
+
+> **タグによる絞り込み自体は本 spec の対象**: `fullTextSearchTool.query` の演算子として `tag:foo` / `-tag:foo` を agent に開示し、`SearchService.parseQueryString` 経由で利用可能にする（後述「サポートするクエリ構文」）。Non-Goals に含まれるのは「タグ専用の新規 tool」「タグ一覧 / ファセット UX」のみで、タグを使った検索の **能力** そのものは in scope。
 
 ## Boundary Commitments
 
@@ -338,10 +340,13 @@ Key 決定:
 
 **根拠と意思決定**:
 - (a) RAG ループの効率: `prefix:` による subtree 絞り込みは「手順抽出」「曖昧クエリの段階的洗練」（Req 1.4）でループ短縮効果が大きい。`-` 除外もノイズ削減に有効
-- (b) 隠蔽コストが高い: 一部だけ開示（例: `prefix:` のみ）にしようとすると tool 層に query パーサ相当のサニタイザを実装する必要があり、`SearchService.parseQueryString` と二重実装になる（Out of Boundary）
-- (c) スコープ宣言との整合: requirements で「out of scope」とした「タグ絞り込み前提クエリ」は **タグを主軸にした列挙・ファセット・関連ページ提示等の新規 UX/tool** を指しており、自然言語クエリ内で agent が opportunistic に `tag:foo` を組み込むこと自体は Req 6.1（自然言語クエリでの検索）に内包される
+- (b) `tag:` を含めるメリット: 「タグ絞り込み前提クエリ」（Req 想定類型）を `fullTextSearchTool` 内で完結させられ、別 tool を新設せずに対応できる。grant フィルタは既存経路（`SearchService.filterPagesByViewer`）が一括で担保するため安全性も既存ページ検索と同等
+- (c) 隠蔽コストが高い: 一部だけ開示（例: `prefix:` のみ）にしようとすると tool 層に query パーサ相当のサニタイザを実装する必要があり、`SearchService.parseQueryString` と二重実装になる（Out of Boundary）
 
-**Trade-off**: agent が学習データから `tag:` を自発的に使う可能性はあるが、その結果は依然として `SearchService` の grant フィルタを通る（Req 6.7）ため安全性上の問題はない。タグ専用の tool / instructions / UX は追加しないため、スコープ宣言には抵触しない（Non-Goals に明記）。
+**スコープとの関係**:
+- 本 spec の **対象**: agent が `tag:foo` / `-tag:foo` を `query` 演算子として使うこと（タグでの絞り込み能力）
+- 本 spec の **非対象（別 spec）**: タグ一覧・ファセット UI・関連ページ提示など、タグを主軸にした **専用 tool / UX** の新設
+- 検索結果に grant フィルタが二重で効くため、agent が `tag:` を opportunistic に使っても権限漏洩は発生しない（Req 6.7 と一致）
 
 **Dependencies**
 - Inbound: `growiAgent.tools` — agent から呼び出される（P0）
