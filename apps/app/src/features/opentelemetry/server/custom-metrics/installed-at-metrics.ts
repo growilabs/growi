@@ -21,7 +21,7 @@ const loggerDiag = diag.createComponentLogger({
   namespace: 'growi:custom-metrics:installed-at',
 });
 
-function toUnixSeconds(date: Date | undefined): number | undefined {
+function toUnixSeconds(date: Date | null | undefined): number | undefined {
   if (date == null) return undefined;
   return Math.floor(date.getTime() / 1000);
 }
