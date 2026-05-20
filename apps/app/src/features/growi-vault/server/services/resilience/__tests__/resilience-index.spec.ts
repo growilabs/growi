@@ -62,20 +62,23 @@ function makeNamespaceMapper() {
   };
 }
 
-function makeConfigManager() {
+function makeConfigManager(): VaultResilienceLayerDeps['configManager'] {
+  const config: Record<string, number | string> = {
+    'app:vaultBootstrapOnStart': 'true' as 'true' | 'false' | 'force',
+    'app:vaultBootstrapRetryMax': 5,
+    'app:vaultBootstrapRetryBaseMs': 30_000,
+    'app:vaultBootstrapRetryMaxMs': 1_800_000,
+    'app:vaultBootstrapHeartbeatIntervalMs': 15_000,
+    'app:vaultBootstrapHeartbeatStaleMs': 120_000,
+    'app:vaultDriftDetectionIntervalMs': 300_000,
+    'app:vaultDriftMaxPagesPerTick': 10_000,
+  };
+  // Cast via unknown to satisfy the overloaded interface while keeping a
+  // vi.fn() mock that tests can inspect for call count / arguments.
   return {
-    getConfig: vi.fn((key: string) => {
-      const config: Record<string, number> = {
-        'app:vaultBootstrapRetryMax': 5,
-        'app:vaultBootstrapRetryBaseMs': 30_000,
-        'app:vaultBootstrapRetryMaxMs': 1_800_000,
-        'app:vaultBootstrapHeartbeatIntervalMs': 15_000,
-        'app:vaultBootstrapHeartbeatStaleMs': 120_000,
-        'app:vaultDriftDetectionIntervalMs': 300_000,
-        'app:vaultDriftMaxPagesPerTick': 10_000,
-      };
-      return config[key] ?? 0;
-    }),
+    getConfig: vi.fn(
+      (key: string) => config[key] ?? 0,
+    ) as unknown as VaultResilienceLayerDeps['configManager']['getConfig'],
   };
 }
 

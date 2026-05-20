@@ -498,20 +498,39 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   await runVaultSyncStateMigration();
 
   // ------------------------------------------------------------------
-  // Step 2: VaultBootstrapper — auto-start when VAULT_BOOTSTRAP_ON_START=true
+  // Step 2: VaultBootstrapper — BootstrapTriggerResolver-driven startup.
+  //
+  // initOnStartup() reads VAULT_BOOTSTRAP_ON_START internally and dispatches
+  // to the resilience layer with the correct trigger source:
+  //   'true'  → bootstrap('env-true')  via trigger resolver (skip if done)
+  //   'force' → bootstrap('env-force') via trigger resolver (always wipe)
+  //   'false' → no bootstrap; drift detector still starts
+  //
+  // The drift detector starts in all cases so that drift sweeps run once
+  // bootstrapState reaches 'done', regardless of the env value.
   // ------------------------------------------------------------------
   const bootstrapper = createVaultBootstrapper(vaultNamespaceMapper);
 
   const vaultBootstrapOnStart = configManager.getConfig(
     'app:vaultBootstrapOnStart',
   );
-  if (vaultBootstrapOnStart === 'true' || vaultBootstrapOnStart === 'force') {
-    logger.info(
-      `GROWI Vault: VAULT_BOOTSTRAP_ON_START=${vaultBootstrapOnStart} — starting bootstrap on startup`,
-    );
-    // Fire-and-forget: bootstrap is a long-running background operation.
-    bootstrapper.start({ triggerSource: 'env-var' }).catch((err) => {
-      logger.error({ err }, 'GROWI Vault: bootstrap failed during startup');
+  logger.info(
+    `GROWI Vault: VAULT_BOOTSTRAP_ON_START=${vaultBootstrapOnStart} — initialising resilience layer`,
+  );
+
+  // initOnStartup() handles trigger resolution and drift detector startup.
+  // For env=true: blocks until the full bootstrap stream completes, then starts drift detector.
+  // For env=force / env=false: returns promptly (bootstrap is background or skipped).
+  await bootstrapper.initOnStartup();
+
+  // ------------------------------------------------------------------
+  // Graceful shutdown: stop heartbeat and drift scheduler on process exit.
+  // ------------------------------------------------------------------
+  const stopBootstrapper = () => {
+    bootstrapper.stop().catch((err) => {
+      logger.error({ err }, 'GROWI Vault: error stopping resilience layer');
     });
-  }
+  };
+  process.once('SIGTERM', stopBootstrapper);
+  process.once('SIGINT', stopBootstrapper);
 };

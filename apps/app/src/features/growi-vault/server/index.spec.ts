@@ -1,5 +1,10 @@
 import { EventEmitter } from 'node:events';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+// Task 5.2 tests register SIGTERM/SIGINT handlers via initializeVaultFeature.
+// Raise the limit early (module-load time) to suppress the Node.js memory-leak
+// warning that fires when more than 10 listeners are added to the process emitter.
+process.setMaxListeners(50);
 
 // ---------------------------------------------------------------------------
 // Module mocks — must be declared before the SUT import.
@@ -68,6 +73,8 @@ vi.mock('./services/vault-bootstrapper', () => ({
   createVaultBootstrapper: vi.fn(() => ({
     start: vi.fn().mockResolvedValue(undefined),
     getStatus: vi.fn(),
+    initOnStartup: vi.fn().mockResolvedValue(undefined),
+    stop: vi.fn().mockResolvedValue(undefined),
   })),
 }));
 
@@ -96,6 +103,7 @@ import { configManager } from '~/server/service/config-manager';
 
 import { initializeVaultFeature, runVaultSyncStateMigration } from './index';
 import { VaultSyncState } from './models/vault-sync-state';
+import { createVaultBootstrapper } from './services/vault-bootstrapper';
 import { vaultSettingsService } from './services/vault-settings-service';
 
 // ---------------------------------------------------------------------------
@@ -858,5 +866,153 @@ describe('runVaultSyncStateMigration', () => {
       });
       expect(normalizationCall).toBeUndefined();
     });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// initializeVaultFeature — BootstrapTriggerResolver-driven startup (Task 5.2)
+// Requirements: 1.3, 1.4, 1.5, 1.6, 1.7, 1.13
+// ---------------------------------------------------------------------------
+
+describe('initializeVaultFeature — resilience layer startup (task 5.2)', () => {
+  // Increase process max listeners to suppress the Node.js warning that fires
+  // when multiple tests each register SIGTERM/SIGINT handlers via initializeVaultFeature.
+  const originalMaxListeners = process.getMaxListeners();
+
+  // Capture the bootstrapper mock instance returned by createVaultBootstrapper.
+  // vi.mocked + .mock.results[0].value gives us the object created by the factory.
+  function getBootstrapperMock() {
+    const result = vi.mocked(createVaultBootstrapper).mock.results[0];
+    return result?.value as {
+      initOnStartup: ReturnType<typeof vi.fn>;
+      stop: ReturnType<typeof vi.fn>;
+      start: ReturnType<typeof vi.fn>;
+    };
+  }
+
+  beforeEach(() => {
+    // Raise the limit before each test so that signal listener registrations
+    // during initializeVaultFeature do not trigger Node.js memory-leak warnings.
+    process.setMaxListeners(50);
+    vi.clearAllMocks();
+    // Remove any SIGTERM/SIGINT listeners added by previous test runs to avoid
+    // inter-test interference.
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+
+    enableVaultSettings();
+  });
+
+  afterEach(() => {
+    // Always remove signal listeners and restore max-listener count after each
+    // test so that no leftover handler fires during Vitest's teardown phase.
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+    process.setMaxListeners(originalMaxListeners);
+  });
+
+  it('calls initOnStartup() regardless of the env value (env=true)', async () => {
+    (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
+      'true',
+    );
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const mock = getBootstrapperMock();
+    expect(mock.initOnStartup).toHaveBeenCalledOnce();
+    // start() must NOT be called — the new path uses initOnStartup() exclusively
+    expect(mock.start).not.toHaveBeenCalled();
+  });
+
+  it('calls initOnStartup() when env=force', async () => {
+    (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
+      'force',
+    );
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const mock = getBootstrapperMock();
+    expect(mock.initOnStartup).toHaveBeenCalledOnce();
+    expect(mock.start).not.toHaveBeenCalled();
+  });
+
+  it('calls initOnStartup() even when env=false (drift detector must always start)', async () => {
+    (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
+      'false',
+    );
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const mock = getBootstrapperMock();
+    expect(mock.initOnStartup).toHaveBeenCalledOnce();
+    expect(mock.start).not.toHaveBeenCalled();
+  });
+
+  it('registers stop() on SIGTERM for graceful shutdown', async () => {
+    (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
+      'false',
+    );
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const mock = getBootstrapperMock();
+    expect(mock.stop).not.toHaveBeenCalled();
+
+    // Simulate SIGTERM — stop() must be called
+    process.emit('SIGTERM');
+    await flush();
+
+    expect(mock.stop).toHaveBeenCalledOnce();
+  });
+
+  it('registers stop() on SIGINT for graceful shutdown', async () => {
+    (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
+      'false',
+    );
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const mock = getBootstrapperMock();
+    process.emit('SIGINT');
+    await flush();
+
+    expect(mock.stop).toHaveBeenCalledOnce();
+  });
+
+  it('does not call stop() twice on double SIGTERM (process.once semantics)', async () => {
+    (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
+      'false',
+    );
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const mock = getBootstrapperMock();
+    process.emit('SIGTERM');
+    process.emit('SIGTERM');
+    await flush();
+
+    // process.once ensures the handler is removed after the first call
+    expect(mock.stop).toHaveBeenCalledOnce();
+  });
+
+  it('migration runs before initOnStartup() dispatch', async () => {
+    (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
+      'true',
+    );
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    // Migration step 1 (findOneAndUpdate) must have run
+    expect(VaultSyncState.findOneAndUpdate).toHaveBeenCalledOnce();
+    // And initOnStartup was called after migration
+    const mock = getBootstrapperMock();
+    expect(mock.initOnStartup).toHaveBeenCalledOnce();
   });
 });

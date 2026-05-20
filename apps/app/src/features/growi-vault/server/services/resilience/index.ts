@@ -69,6 +69,7 @@ export interface VaultResilienceLayerDeps {
    * configManager type.
    */
   configManager: {
+    getConfig(key: 'app:vaultBootstrapOnStart'): 'true' | 'false' | 'force';
     getConfig(key: 'app:vaultBootstrapRetryMax'): number;
     getConfig(key: 'app:vaultBootstrapRetryBaseMs'): number;
     getConfig(key: 'app:vaultBootstrapRetryMaxMs'): number;
@@ -118,6 +119,8 @@ export function createVaultResilienceLayer(
   // -------------------------------------------------------------------------
   // Step 1: Extract config values
   // -------------------------------------------------------------------------
+
+  const bootstrapOnStart = configManager.getConfig('app:vaultBootstrapOnStart');
 
   const retryConfig: RetryConfig = {
     maxAttempts: configManager.getConfig('app:vaultBootstrapRetryMax'),
@@ -172,8 +175,32 @@ export function createVaultResilienceLayer(
   return {
     bootstrap: (opts) => runner.bootstrap(opts),
 
+    /**
+     * Startup initialisation:
+     *  - Reads env var to determine trigger source (env-true / env-force / skip).
+     *  - Fires or awaits bootstrap with the right trigger source when env is 'true' or 'force'.
+     *  - Always starts the drift detector regardless of the env value so that
+     *    drift sweeps run even when bootstrapOnStart is 'false'.
+     *
+     * For 'true': awaits runner.initOnStartup() which ensures the singleton doc
+     * exists, then awaits the full bootstrap stream to completion (blocking).
+     * The drift detector starts after bootstrap finishes.
+     * For 'force': fires bootstrap('env-force') as a background task (no await),
+     * then immediately starts the drift detector.
+     * For 'false' / unknown: only starts the drift detector.
+     */
     async initOnStartup(): Promise<void> {
-      await runner.initOnStartup();
+      if (bootstrapOnStart === 'true') {
+        await runner.initOnStartup();
+      } else if (bootstrapOnStart === 'force') {
+        // runner.initOnStartup() hardcodes env-true; for force we call bootstrap
+        // directly so the trigger resolver sees envValue='force' → forceWipe.
+        runner.bootstrap({ triggerSource: 'env-force' }).catch((err) => {
+          // Error already logged by runner internally; suppress unhandled rejection at barrel boundary.
+          void err;
+        });
+      }
+      // Drift detector always starts so it can sweep once bootstrapState reaches 'done'.
       driftDetector.start();
     },
 

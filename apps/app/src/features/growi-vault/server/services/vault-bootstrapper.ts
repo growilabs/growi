@@ -58,10 +58,17 @@ export type BootstrapStatus = ResilienceStatus['bootstrap'];
  * The getStatus() return type is intentionally kept as BootstrapStatus (the
  * bootstrap-only subset of ResilienceStatus) so that existing callers that
  * access status.state, status.processed, etc. at the top level continue to work.
+ *
+ * initOnStartup() and stop() expose the resilience layer lifecycle to the
+ * vault feature initialisation in index.ts (task 5.2):
+ *   - initOnStartup(): reads env var, dispatches bootstrap if needed, starts drift detector.
+ *   - stop(): stops heartbeat and drift scheduler on graceful shutdown.
  */
 export interface VaultBootstrapper {
   start(opts?: { triggerSource: 'admin-ui' | 'env-var' }): Promise<void>;
   getStatus(): Promise<BootstrapStatus>;
+  initOnStartup(): Promise<void>;
+  stop(): Promise<void>;
 }
 
 // ---------------------------------------------------------------------------
@@ -156,6 +163,27 @@ export const createVaultBootstrapper = (
     async getStatus(): Promise<BootstrapStatus> {
       const status = await resilienceLayer.getStatus();
       return status.bootstrap;
+    },
+
+    /**
+     * Startup lifecycle: reads env var, dispatches bootstrap with the right
+     * trigger source if enabled, and always starts the drift detector.
+     *
+     * Delegates to resilienceLayer.initOnStartup() which handles the env-aware
+     * dispatch logic internally.
+     */
+    async initOnStartup(): Promise<void> {
+      await resilienceLayer.initOnStartup();
+    },
+
+    /**
+     * Stop lifecycle: halts heartbeat and drift scheduler.
+     *
+     * Must be called on graceful shutdown (SIGTERM / SIGINT) to release
+     * setInterval handles so the process can exit cleanly.
+     */
+    async stop(): Promise<void> {
+      await resilienceLayer.stop();
     },
   };
 };
