@@ -27,7 +27,7 @@
   - _Requirements: 5.7_
   - _Boundary: interfaces/activity_
 
-- [ ] 1.4 起動時 migration 処理（2 段階分離 + stale running 正規化）
+- [x] 1.4 起動時 migration 処理（2 段階分離 + stale running 正規化）
   - ステップ 1: `findOneAndUpdate({ _id: 'singleton' }, { $setOnInsert: { 全 default 値 } }, { upsert: true })` で fresh install を保証
   - ステップ 2: `updateOne({ _id: 'singleton', bootstrapRetryAttempts: { $exists: false } }, { $set: { 新フィールド 14 件 } })` で既存 doc を migrate（upsert なし、duplicate key error を回避）
   - ステップ 3: `bootstrapState === 'running' && bootstrapInstanceId == null` の検出時に `failed` 正規化 + `bootstrapLastError` 記録
