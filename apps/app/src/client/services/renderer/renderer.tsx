@@ -5,6 +5,7 @@ import * as refsGrowiDirective from '@growi/remark-attachment-refs/dist/client';
 import * as drawio from '@growi/remark-drawio';
 import * as lsxGrowiDirective from '@growi/remark-lsx/dist/client';
 import assert from 'assert';
+import type { Schema as SanitizeOption } from 'hast-util-sanitize';
 import katex from 'rehype-katex';
 import sanitize from 'rehype-sanitize';
 import slug from 'rehype-slug';
@@ -180,6 +181,49 @@ export const generateTocOptions = (
   return options;
 };
 
+const getSanitizePluginForSimpleView = (
+  config: RendererConfigExt,
+  additionalOptions?: SanitizeOption,
+): Pluggable | (() => void) => {
+  return config.isEnabledXssPrevention
+    ? [
+        sanitize,
+        deepmerge(
+          getCommonSanitizeOption(config),
+          presentation.sanitizeOption,
+          drawio.sanitizeOption,
+          mermaidSanitizeOption,
+          plantuml.sanitizeOption,
+          callout.sanitizeOption,
+          attachment.sanitizeOption,
+          lsxGrowiDirective.sanitizeOption,
+          refsGrowiDirective.sanitizeOption,
+          codeBlock.sanitizeOption,
+          additionalOptions ?? {},
+        ),
+      ]
+    : () => {};
+};
+
+const replaceSanitizePlugin = (
+  rehypePlugins: Pluggable[],
+  config: RendererConfigExt,
+  sanitizePlugin: Pluggable | (() => void),
+): void => {
+  if (!config.isEnabledXssPrevention) return;
+
+  const idx = rehypePlugins.findIndex(
+    (p) => Array.isArray(p) && p[0] === sanitize,
+  );
+  if (idx === -1) {
+    logger.warn(
+      'sanitize plugin not found; sanitize options will not be applied',
+    );
+    return;
+  }
+  rehypePlugins[idx] = sanitizePlugin;
+};
+
 export const generateSimpleViewOptions = (
   config: RendererConfigExt,
   pagePath: string,
@@ -214,24 +258,7 @@ export const generateSimpleViewOptions = (
     remarkPlugins.push(breaks);
   }
 
-  const rehypeSanitizePlugin: Pluggable | (() => void) =
-    config.isEnabledXssPrevention
-      ? [
-          sanitize,
-          deepmerge(
-            getCommonSanitizeOption(config),
-            presentation.sanitizeOption,
-            drawio.sanitizeOption,
-            mermaidSanitizeOption,
-            plantuml.sanitizeOption,
-            callout.sanitizeOption,
-            attachment.sanitizeOption,
-            lsxGrowiDirective.sanitizeOption,
-            refsGrowiDirective.sanitizeOption,
-            codeBlock.sanitizeOption,
-          ),
-        ]
-      : () => {};
+  const rehypeSanitizePlugin = getSanitizePluginForSimpleView(config);
 
   // add rehype plugins
   rehypePlugins.push(
@@ -270,8 +297,7 @@ export const generateSimpleViewOptions = (
 // Mention highlighting applies to comments only. Applying it in search results, timeline,
 // or sidebar would falsely treat @tokens in non-comment content as user mentions.
 // Mention plugin and its sanitize schema are injected via post-processing on top of
-// generateSimpleViewOptions rather than forking the base builder — the same extension
-// pattern as generatePresentationViewOptions.
+// generateSimpleViewOptions rather than forking the base builder.
 export const generateCommentViewOptions = (
   config: RendererConfigExt,
   pagePath: string,
@@ -286,23 +312,11 @@ export const generateCommentViewOptions = (
   const { remarkPlugins, rehypePlugins } = options;
 
   remarkPlugins.push(mention.remarkPlugin);
-
-  if (config.isEnabledXssPrevention) {
-    const idx = rehypePlugins.findIndex(
-      (p) => Array.isArray(p) && p[0] === sanitize,
-    );
-    if (idx === -1) {
-      logger.warn(
-        'sanitize plugin not found; mention sanitize option will not be applied',
-      );
-    } else {
-      const [, existingSchema] = rehypePlugins[idx] as [unknown, object];
-      rehypePlugins[idx] = [
-        sanitize,
-        deepmerge(existingSchema, mention.sanitizeOption),
-      ];
-    }
-  }
+  replaceSanitizePlugin(
+    rehypePlugins,
+    config,
+    getSanitizePluginForSimpleView(config, mention.sanitizeOption),
+  );
 
   return options;
 };
@@ -316,17 +330,16 @@ export const generatePresentationViewOptions = (
 
   const { rehypePlugins } = options;
 
-  const rehypeSanitizePlugin: Pluggable | (() => void) =
-    config.isEnabledXssPrevention
-      ? [sanitize, deepmerge(addLineNumberAttribute.sanitizeOption)]
-      : () => {};
+  rehypePlugins.push(addLineNumberAttribute.rehypePlugin);
+  replaceSanitizePlugin(
+    rehypePlugins,
+    config,
+    getSanitizePluginForSimpleView(
+      config,
+      addLineNumberAttribute.sanitizeOption,
+    ),
+  );
 
-  // add rehype plugins
-  rehypePlugins.push(addLineNumberAttribute.rehypePlugin, rehypeSanitizePlugin);
-
-  if (config.isEnabledXssPrevention) {
-    verifySanitizePlugin(options, false);
-  }
   return options;
 };
 
