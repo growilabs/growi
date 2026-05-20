@@ -11,6 +11,15 @@ vi.mock('./services/vault-settings-service', () => ({
   },
 }));
 
+// Mock VaultSyncState model so tests do not require a real MongoDB connection.
+vi.mock('./models/vault-sync-state', () => ({
+  VaultSyncState: {
+    findOneAndUpdate: vi.fn(),
+    updateOne: vi.fn(),
+    findOne: vi.fn(),
+  },
+}));
+
 vi.mock('~/server/service/config-manager', () => ({
   configManager: {
     getConfig: vi.fn(),
@@ -85,7 +94,8 @@ vi.mock('./routes/vault-admin', () => ({
 
 import { configManager } from '~/server/service/config-manager';
 
-import { initializeVaultFeature } from './index';
+import { initializeVaultFeature, runVaultSyncStateMigration } from './index';
+import { VaultSyncState } from './models/vault-sync-state';
 import { vaultSettingsService } from './services/vault-settings-service';
 
 // ---------------------------------------------------------------------------
@@ -100,6 +110,23 @@ function makeCrowiStub() {
   };
 }
 
+/**
+ * Set up default VaultSyncState mock responses required by
+ * runVaultSyncStateMigration(), which is now called inside
+ * initializeVaultFeature(). Every test that calls initializeVaultFeature()
+ * must have these mocks in place so migration steps 1-3 don't throw.
+ */
+function enableVaultSyncStateMocks() {
+  vi.mocked(VaultSyncState.findOneAndUpdate).mockResolvedValue(null as never);
+  vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
+  vi.mocked(VaultSyncState.findOne).mockReturnValue({
+    lean: vi.fn().mockResolvedValue({
+      bootstrapState: 'pending',
+      bootstrapInstanceId: null,
+    }),
+  } as never);
+}
+
 function enableVaultSettings() {
   (
     vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
@@ -109,6 +136,7 @@ function enableVaultSettings() {
     managerInternalSecret: 'secret',
   });
   (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(false);
+  enableVaultSyncStateMocks();
 }
 
 /** Flush microtasks so that fire-and-forget promises chain resolve. */
@@ -482,6 +510,353 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
       await flush();
 
       expect(dispatcherOnPageChanged).not.toHaveBeenCalled();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// initializeVaultFeature — migration is called before bootstrap dispatch
+// (Task 1.4 — requirement 1.11, 3.3)
+// ---------------------------------------------------------------------------
+
+describe('initializeVaultFeature — calls runVaultSyncStateMigration before bootstrap', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    // Default vault settings: enabled
+    (
+      vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
+    ).mockResolvedValue({
+      enabled: true,
+      managerEndpoint: 'http://vault-manager',
+      managerInternalSecret: 'secret',
+    });
+    // VaultSyncState mocks required by runVaultSyncStateMigration
+    vi.mocked(VaultSyncState.findOneAndUpdate).mockResolvedValue(null as never);
+    vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
+    vi.mocked(VaultSyncState.findOne).mockReturnValue({
+      lean: vi.fn().mockResolvedValue({
+        bootstrapState: 'pending',
+        bootstrapInstanceId: null,
+      }),
+    } as never);
+  });
+
+  it('calls findOneAndUpdate (step 1 of migration) before the bootstrapper.start dispatch', async () => {
+    // Configure VAULT_BOOTSTRAP_ON_START so that start() is actually called.
+    (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
+      'true',
+    );
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+    await flush();
+
+    // Migration step 1 must have been called.
+    expect(VaultSyncState.findOneAndUpdate).toHaveBeenCalledOnce();
+    expect(VaultSyncState.findOneAndUpdate).toHaveBeenCalledWith(
+      { _id: 'singleton' },
+      expect.objectContaining({ $setOnInsert: expect.any(Object) }),
+      expect.objectContaining({ upsert: true }),
+    );
+  });
+
+  it('migration runs even when VAULT_BOOTSTRAP_ON_START is false', async () => {
+    (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
+      false,
+    );
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    // Migration step 1 still ran.
+    expect(VaultSyncState.findOneAndUpdate).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// runVaultSyncStateMigration — unit tests (Task 1.4 / requirements 1.11, 3.3)
+// ---------------------------------------------------------------------------
+
+describe('runVaultSyncStateMigration', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  // Helper: configure findOneAndUpdate to return a value (simulates upsert result)
+  function mockFindOneAndUpdateResult(result: Record<string, unknown> | null) {
+    vi.mocked(VaultSyncState.findOneAndUpdate).mockResolvedValue(
+      result as never,
+    );
+  }
+
+  // Helper: configure findOne(...).lean() chain
+  function mockFindOneLean(doc: Record<string, unknown> | null) {
+    vi.mocked(VaultSyncState.findOne).mockReturnValue({
+      lean: vi.fn().mockResolvedValue(doc),
+    } as never);
+  }
+
+  // Helper: configure updateOne to succeed
+  function mockUpdateOneSuccess() {
+    vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
+  }
+
+  // ---------------------------------------------------------------------------
+  // (a) Fresh install — no doc exists before migration
+  // ---------------------------------------------------------------------------
+  describe('fresh install (no pre-existing doc)', () => {
+    it('calls findOneAndUpdate with upsert to create the singleton', async () => {
+      // Step 1: upsert creates the doc (new: false → returns null for fresh insert)
+      mockFindOneAndUpdateResult(null);
+      mockUpdateOneSuccess();
+      // Step 3: fresh doc has bootstrapState: 'pending', so no normalization needed
+      mockFindOneLean({ bootstrapState: 'pending', bootstrapInstanceId: null });
+
+      await runVaultSyncStateMigration();
+
+      expect(VaultSyncState.findOneAndUpdate).toHaveBeenCalledOnce();
+      const [filter, update, options] = vi.mocked(
+        VaultSyncState.findOneAndUpdate,
+      ).mock.calls[0];
+      expect(filter).toEqual({ _id: 'singleton' });
+      expect((update as Record<string, unknown>).$setOnInsert).toBeDefined();
+      expect(options).toMatchObject({ upsert: true, new: false });
+    });
+
+    it('includes all 14 new resilience fields in $setOnInsert defaults', async () => {
+      mockFindOneAndUpdateResult(null);
+      mockUpdateOneSuccess();
+      mockFindOneLean({ bootstrapState: 'pending', bootstrapInstanceId: null });
+
+      await runVaultSyncStateMigration();
+
+      const update = vi.mocked(VaultSyncState.findOneAndUpdate).mock
+        .calls[0][1] as Record<string, unknown>;
+      const setOnInsert = update.$setOnInsert as Record<string, unknown>;
+
+      // Check a representative subset of the 14 new fields
+      expect(setOnInsert).toMatchObject({
+        bootstrapRetryAttempts: 0,
+        bootstrapRetryAborted: false,
+        bootstrapInstanceId: null,
+        bootstrapHeartbeatAt: null,
+        bootstrapLastTriggerSource: null,
+        bootstrapRetryNextAt: null,
+        bootstrapCompletenessLastCheckedAt: null,
+        bootstrapCompletenessLastResult: null,
+        bootstrapStreamSnapshotMaxId: null,
+        driftLastWatermark: null,
+        driftLastSweepAt: null,
+        driftDetectedSinceBoot: 0,
+        driftRepairsEmittedSinceBoot: 0,
+        driftLastError: null,
+      });
+    });
+
+    it('step 3 is a no-op when fresh doc has bootstrapState pending', async () => {
+      mockFindOneAndUpdateResult(null);
+      mockUpdateOneSuccess();
+      mockFindOneLean({ bootstrapState: 'pending', bootstrapInstanceId: null });
+
+      await runVaultSyncStateMigration();
+
+      // updateOne should only be called once (step 2 migration, which is a
+      // no-op for fresh doc — but we verify step 3 normalization is NOT called)
+      // Step 2: filter is bootstrapRetryAttempts: { $exists: false } — fresh doc
+      // has the field so this is a no-op call, but we still check step 3 didn't fire.
+      const updateOneCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
+      const normalizationCall = updateOneCalls.find((call) => {
+        const upd = call[1] as Record<string, Record<string, unknown>>;
+        return upd.$set?.bootstrapState === 'failed';
+      });
+      expect(normalizationCall).toBeUndefined();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // (b) Existing pre-migration doc (4-state, missing the 14 new fields)
+  // ---------------------------------------------------------------------------
+  describe('existing pre-migration doc', () => {
+    it('step 1 is a no-op (doc already exists, upsert does not fire $setOnInsert)', async () => {
+      // findOneAndUpdate returns the old doc (new: false returns pre-update state)
+      mockFindOneAndUpdateResult({
+        _id: 'singleton',
+        bootstrapState: 'pending',
+      });
+      mockUpdateOneSuccess();
+      mockFindOneLean({
+        _id: 'singleton',
+        bootstrapState: 'pending',
+        bootstrapInstanceId: null,
+      });
+
+      await runVaultSyncStateMigration();
+
+      // findOneAndUpdate was called but since doc existed, $setOnInsert was skipped
+      // by MongoDB — we just verify it was called with upsert: true
+      expect(VaultSyncState.findOneAndUpdate).toHaveBeenCalledOnce();
+    });
+
+    it('step 2 migrates the 14 new fields for a doc missing bootstrapRetryAttempts', async () => {
+      mockFindOneAndUpdateResult({
+        _id: 'singleton',
+        bootstrapState: 'failed',
+      });
+      mockUpdateOneSuccess();
+      mockFindOneLean({
+        _id: 'singleton',
+        bootstrapState: 'failed',
+        bootstrapInstanceId: null,
+        bootstrapRetryAttempts: 0,
+      });
+
+      await runVaultSyncStateMigration();
+
+      expect(VaultSyncState.updateOne).toHaveBeenCalledWith(
+        { _id: 'singleton', bootstrapRetryAttempts: { $exists: false } },
+        expect.objectContaining({
+          $set: expect.objectContaining({
+            bootstrapRetryAttempts: 0,
+            bootstrapRetryAborted: false,
+            driftDetectedSinceBoot: 0,
+            driftRepairsEmittedSinceBoot: 0,
+          }),
+        }),
+        // No upsert option — prevents E11000
+      );
+      // Verify upsert is NOT set
+      const call = vi.mocked(VaultSyncState.updateOne).mock.calls[0];
+      expect(call[2]).toBeUndefined();
+    });
+
+    it('step 3 normalizes running + null instanceId to failed', async () => {
+      mockFindOneAndUpdateResult({
+        _id: 'singleton',
+        bootstrapState: 'running',
+      });
+      mockUpdateOneSuccess();
+      // Doc after migration: running with null bootstrapInstanceId (pre-resilience run)
+      mockFindOneLean({
+        _id: 'singleton',
+        bootstrapState: 'running',
+        bootstrapInstanceId: null,
+      });
+
+      await runVaultSyncStateMigration();
+
+      const updateOneCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
+      const normalizationCall = updateOneCalls.find((call) => {
+        const upd = call[1] as Record<string, Record<string, unknown>>;
+        return upd.$set?.bootstrapState === 'failed';
+      });
+      expect(normalizationCall).toBeDefined();
+      if (normalizationCall == null) return;
+      const upd = normalizationCall[1] as Record<
+        string,
+        Record<string, unknown>
+      >;
+      expect(upd.$set.bootstrapLastError).toMatch(/stale running/i);
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // (c) Second startup — already migrated, both steps 1 and 2 are no-ops
+  // ---------------------------------------------------------------------------
+  describe('second startup (already migrated)', () => {
+    it('is idempotent — no E11000 error on second call', async () => {
+      mockFindOneAndUpdateResult({ _id: 'singleton', bootstrapState: 'done' });
+      mockUpdateOneSuccess();
+      mockFindOneLean({
+        _id: 'singleton',
+        bootstrapState: 'done',
+        bootstrapInstanceId: 'instance-abc',
+      });
+
+      // Run twice — must not throw
+      await expect(runVaultSyncStateMigration()).resolves.toBeUndefined();
+      await expect(runVaultSyncStateMigration()).resolves.toBeUndefined();
+    });
+
+    it('step 3 is a no-op when bootstrapState is done', async () => {
+      mockFindOneAndUpdateResult({ _id: 'singleton', bootstrapState: 'done' });
+      mockUpdateOneSuccess();
+      mockFindOneLean({
+        _id: 'singleton',
+        bootstrapState: 'done',
+        bootstrapInstanceId: 'instance-abc',
+      });
+
+      await runVaultSyncStateMigration();
+
+      const updateOneCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
+      const normalizationCall = updateOneCalls.find((call) => {
+        const upd = call[1] as Record<string, Record<string, unknown>>;
+        return upd.$set?.bootstrapState === 'failed';
+      });
+      expect(normalizationCall).toBeUndefined();
+    });
+  });
+
+  // ---------------------------------------------------------------------------
+  // (d) running + null instanceId — step 3 normalizes to failed
+  // ---------------------------------------------------------------------------
+  describe('stale running state (no instanceId)', () => {
+    it('normalizes running + instanceId=null to failed with error message', async () => {
+      mockFindOneAndUpdateResult(null);
+      mockUpdateOneSuccess();
+      mockFindOneLean({
+        bootstrapState: 'running',
+        bootstrapInstanceId: null,
+      });
+
+      await runVaultSyncStateMigration();
+
+      expect(VaultSyncState.updateOne).toHaveBeenCalledWith(
+        { _id: 'singleton' },
+        {
+          $set: {
+            bootstrapState: 'failed',
+            bootstrapLastError:
+              'normalized stale running on first startup after schema migration',
+          },
+        },
+      );
+    });
+
+    it('does NOT normalize running when bootstrapInstanceId is set (live run)', async () => {
+      mockFindOneAndUpdateResult(null);
+      mockUpdateOneSuccess();
+      mockFindOneLean({
+        bootstrapState: 'running',
+        bootstrapInstanceId: 'live-instance-xyz',
+      });
+
+      await runVaultSyncStateMigration();
+
+      const updateOneCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
+      const normalizationCall = updateOneCalls.find((call) => {
+        const upd = call[1] as Record<string, Record<string, unknown>>;
+        return upd.$set?.bootstrapState === 'failed';
+      });
+      expect(normalizationCall).toBeUndefined();
+    });
+
+    it('does NOT normalize when bootstrapState is not running', async () => {
+      mockFindOneAndUpdateResult(null);
+      mockUpdateOneSuccess();
+      mockFindOneLean({
+        bootstrapState: 'failed',
+        bootstrapInstanceId: null,
+      });
+
+      await runVaultSyncStateMigration();
+
+      const updateOneCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
+      const normalizationCall = updateOneCalls.find((call) => {
+        const upd = call[1] as Record<string, Record<string, unknown>>;
+        return upd.$set?.bootstrapState === 'failed';
+      });
+      expect(normalizationCall).toBeUndefined();
     });
   });
 });

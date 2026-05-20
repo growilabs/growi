@@ -4,6 +4,7 @@ import type { Router } from 'express';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
+import { VaultSyncState } from './models/vault-sync-state';
 import { createVaultAdminRouter } from './routes/vault-admin';
 import { createVaultGatewayRouter } from './routes/vault-gateway';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
@@ -53,6 +54,105 @@ export const createVaultAdminRouterWithDeps = (crowi: any): Router => {
 };
 
 const logger = loggerFactory('growi:features:growi-vault:server');
+
+// ---------------------------------------------------------------------------
+// Resilience layer: startup migration
+// ---------------------------------------------------------------------------
+
+/**
+ * Run the vault_sync_state startup migration.
+ *
+ * Idempotent — safe to call on every boot regardless of DB state.
+ *
+ * Step 1: Ensure the singleton document exists (handles fresh installs).
+ *         Uses $setOnInsert so existing documents are never overwritten.
+ *
+ * Step 2: Back-fill the 14 new resilience fields on pre-migration documents.
+ *         The filter `bootstrapRetryAttempts: { $exists: false }` is a
+ *         one-time predicate — once migrated the update becomes a no-op.
+ *         No upsert option to prevent E11000 on concurrent runs.
+ *
+ * Step 3: Normalize a stale 'running' state that has no instanceId.
+ *         A running document without an instanceId means the previous process
+ *         crashed before the resilience schema was applied; mark it 'failed'
+ *         so the bootstrapper can decide whether to retry.
+ *
+ * Requirements: 1.11, 3.3
+ */
+export const runVaultSyncStateMigration = async (): Promise<void> => {
+  // Step 1: ensure singleton exists (fresh install)
+  await VaultSyncState.findOneAndUpdate(
+    { _id: 'singleton' },
+    {
+      $setOnInsert: {
+        bootstrapState: 'pending',
+        bootstrapCursor: null,
+        bootstrapStartedAt: null,
+        bootstrapCompletedAt: null,
+        bootstrapTotalEstimated: null,
+        bootstrapProcessed: 0,
+        bootstrapLastError: null,
+        bootstrapInstanceId: null,
+        bootstrapHeartbeatAt: null,
+        bootstrapLastTriggerSource: null,
+        bootstrapRetryAttempts: 0,
+        bootstrapRetryNextAt: null,
+        bootstrapRetryAborted: false,
+        bootstrapCompletenessLastCheckedAt: null,
+        bootstrapCompletenessLastResult: null,
+        bootstrapStreamSnapshotMaxId: null,
+        resumeToken: null,
+        lastProcessedAt: null,
+        watcherInstanceId: null,
+        driftLastWatermark: null,
+        driftLastSweepAt: null,
+        driftDetectedSinceBoot: 0,
+        driftRepairsEmittedSinceBoot: 0,
+        driftLastError: null,
+      },
+    },
+    { upsert: true, new: false },
+  );
+
+  // Step 2: back-fill resilience fields on existing pre-migration documents.
+  // No upsert — prevents E11000 on concurrent boots.
+  await VaultSyncState.updateOne(
+    { _id: 'singleton', bootstrapRetryAttempts: { $exists: false } },
+    {
+      $set: {
+        bootstrapInstanceId: null,
+        bootstrapHeartbeatAt: null,
+        bootstrapLastTriggerSource: null,
+        bootstrapRetryAttempts: 0,
+        bootstrapRetryNextAt: null,
+        bootstrapRetryAborted: false,
+        bootstrapCompletenessLastCheckedAt: null,
+        bootstrapCompletenessLastResult: null,
+        bootstrapStreamSnapshotMaxId: null,
+        driftLastWatermark: null,
+        driftLastSweepAt: null,
+        driftDetectedSinceBoot: 0,
+        driftRepairsEmittedSinceBoot: 0,
+        driftLastError: null,
+      },
+    },
+  );
+
+  // Step 3: normalize stale 'running' with no instanceId to 'failed'.
+  const doc = await VaultSyncState.findOne({ _id: 'singleton' }).lean();
+  if (doc?.bootstrapState === 'running' && doc?.bootstrapInstanceId == null) {
+    await VaultSyncState.updateOne(
+      { _id: 'singleton' },
+      {
+        $set: {
+          bootstrapState: 'failed',
+          bootstrapLastError:
+            'normalized stale running on first startup after schema migration',
+        },
+      },
+    );
+  }
+};
 
 // ---------------------------------------------------------------------------
 // Vault feature initialization
@@ -387,6 +487,15 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       'GROWI Vault: feature is disabled; VaultDispatcher not subscribed',
     );
   }
+
+  // ------------------------------------------------------------------
+  // Step 1.5: Run startup state migration before bootstrapper dispatch.
+  // This is idempotent and must execute on every boot so that:
+  //   - fresh installs get a singleton doc with all required fields,
+  //   - pre-resilience installs get the 14 new fields back-filled, and
+  //   - stale 'running' states (no instanceId) are normalized to 'failed'.
+  // ------------------------------------------------------------------
+  await runVaultSyncStateMigration();
 
   // ------------------------------------------------------------------
   // Step 2: VaultBootstrapper — auto-start when VAULT_BOOTSTRAP_ON_START=true
