@@ -199,6 +199,12 @@ class PageGrantService implements IPageGrantService {
 
     const Page = mongoose.model<IPage, PageModel>('Page');
 
+    // GRANT_RESTRICTED pages are link-only and orthogonal to the page tree hierarchy.
+    // They are intentionally permitted under any parent grant.
+    if (target.grant === Page.GRANT_RESTRICTED) {
+      return true;
+    }
+
     /*
      * ancestor side
      */

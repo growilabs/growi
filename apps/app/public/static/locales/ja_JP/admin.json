@@ -341,6 +341,13 @@
     "migration_succeeded": "アップグレードが正常に完了しました！メンテナンスモードを終了して、GROWI を使用することができます。",
     "migration_failed": "アップグレードが失敗しました。失敗した場合の対処法は GROWI docs を参照してください。"
   },
+  "news_delivery": {
+    "section_title": "ニュース配信",
+    "label": "ニュース配信",
+    "enable": "ニュース配信を有効にする",
+    "description": "外部フィードからニュースを取得してローカルにキャッシュする cron ジョブの動作を制御します。無効にしてもキャッシュ済みのニュースは引き続き表示されます。",
+    "update_succeeded": "ニュース配信設定を更新しました"
+  },
   "maintenance_mode": {
     "maintenance_mode": "メンテナンスモード",
     "under_maintenance_mode": "メンテナンスモード中",

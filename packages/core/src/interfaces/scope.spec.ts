@@ -63,9 +63,9 @@ describe('Scope type', () => {
     // Expected count based on the SCOPE_SEED structure:
     // Admin: 17 leaf scopes + 1 wildcard = 18
     // User Settings: 6 leaf + 2 nested (api) + 2 wildcards = 10
-    // Features: 6 leaf scopes + 1 wildcard = 7
-    // Total per action: 35
-    // Total: 35 * 2 (read/write) = 70
+    // Features: 7 leaf scopes + 1 wildcard = 8
+    // Total per action: 36
+    // Total: 36 * 2 (read/write) = 72
     // But some wildcards are at category level, so actual count may vary
 
     // Just ensure we have a reasonable number of scopes

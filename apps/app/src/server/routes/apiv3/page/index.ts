@@ -606,7 +606,7 @@ module.exports = (crowi: Crowi) => {
       const parentPageGroupGrantData =
         await pageGrantService.getPageGroupGrantData(parentPage, req.user);
       const parentPageGrant: IPageGrantData = {
-        grant,
+        grant: parentPage.grant,
         groupGrantData: parentPageGroupGrantData,
       };
 
