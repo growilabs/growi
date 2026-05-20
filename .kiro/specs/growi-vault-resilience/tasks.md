@@ -170,7 +170,7 @@
   - _Requirements: 1.12_
   - _Boundary: vault-bootstrapper facade_
 
-- [ ] 5.2 (P) 起動分岐を BootstrapTriggerResolver 経由に置き換え
+- [x] 5.2 (P) 起動分岐を BootstrapTriggerResolver 経由に置き換え
   - `features/growi-vault/server/index.ts` の L396-404 周辺の bootstrap 起動分岐のみを置換（L396-404 区間が boundary、L1-395 の migration block は 1.4 の boundary）
   - 起動シーケンス: 1.4 の migration → trigger resolver → action 解釈 → resilience layer init → drift detector start
   - graceful shutdown フック（既存）で heartbeat / drift scheduler を `stop()` 呼び出しで停止
