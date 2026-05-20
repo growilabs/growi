@@ -119,7 +119,7 @@
   - _Requirements: 1.9, 3.3_
   - _Boundary: bootstrap-heartbeat_
 
-- [ ] 4.2 (P) BootstrapRunner の I/O orchestrator
+- [x] 4.2 (P) BootstrapRunner の I/O orchestrator
   - state machine / trigger resolver / heartbeat / retry policy を組み立てる唯一の orchestrator
   - bootstrap 実行フロー: trigger resolver で action 決定 → reset-all emit（forceWipe のみ）→ page stream で `streamSnapshotMaxId` 記録 → bulk-upsert per chunk → `verifying` 遷移 → structural completeness check (3 条件 AND) → `done` (cursor null reset) または `failed`
   - structural completeness check: (i) cursor が `streamSnapshotMaxId` に到達、(ii) `namespaceBuffers` が空、(iii) 最後の bulk-upsert instruction が `vault_instructions` に commit 済み、の AND
@@ -133,7 +133,7 @@
   - _Requirements: 1.1, 1.2, 1.7, 1.8, 1.10, 1.12, 2.1, 2.2, 2.4, 2.5, 2.6, 3.1, 3.5, 3.6, 3.7, 5.4, 5.7_
   - _Boundary: bootstrap-runner_
 
-- [ ] 4.3 (P) DriftDetector の周期 sweep と out-of-scope シグナル
+- [x] 4.3 (P) DriftDetector の周期 sweep と out-of-scope シグナル
   - `VAULT_DRIFT_DETECTION_INTERVAL_MS`（default 5 分）の setInterval、`bootstrapState !== 'done'` で早期 return
   - `pages.find({ updatedAt: { $gt: driftLastWatermark } })` を cursor で読む（trash filter なし、status filter なし）
   - 各ページの `computePageNamespaces(page)` 出力に対して各 namespace へ `bulk-upsert` instruction を発行（`remove` は v1 では発行しない）
