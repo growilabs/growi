@@ -18,10 +18,13 @@
 - **収集情報**: サービスインスタンスID、サイトURL、Wiki種別、外部認証タイプ
 
 #### 3. Custom Metrics
-- **実装場所**: `src/features/opentelemetry/server/custom-metrics/user-counts-metrics.ts`
-- **メトリクス**: 
+- **ユーザー数メトリクス**: `src/features/opentelemetry/server/custom-metrics/user-counts-metrics.ts`
   - `growi.users.total` - 総ユーザー数
   - `growi.users.active` - アクティブユーザー数
+- **Installed-at メトリクス**: `src/features/opentelemetry/server/custom-metrics/installed-at-metrics.ts`
+  - `growi.installed_at.timestamp.seconds` - インストール日時 (Unix epoch seconds)
+  - `growi.installed_at.by_oldest_user.timestamp.seconds` - 最古ユーザー作成日時 (Unix epoch seconds)
+  - Resource Attribute 側の `growi.installed_at` (ISO 8601) と並列に提供し、Prometheus 上での数値比較を可能にする
 
 #### 4. 統合作業
 - **node-sdk-configuration.ts**: OS情報のResource Attributes統合済み
@@ -56,9 +59,11 @@ setResource(sdkInstance, updatedResource);
 
 #### メトリクス収集の統合
 ```typescript
-// generateNodeSDKConfiguration内で初期化
+// setupCustomMetrics 内で初期化
 addApplicationMetrics();
+addInstalledAtMetrics();
 addUserCountsMetrics();
+addPageCountsMetrics();
 ```
 
 ## ファイル構成
@@ -70,8 +75,9 @@ src/features/opentelemetry/server/
 │   ├── os-resource-attributes.ts          # OS情報
 │   └── application-resource-attributes.ts # アプリケーション情報
 ├── custom-metrics/
-│   ├── application-metrics.ts             # Config Metrics (更新済み)
-│   └── user-counts-metrics.ts             # ユーザー数メトリクス (新規)
+│   ├── application-metrics.ts             # Config Metrics
+│   ├── installed-at-metrics.ts            # Installed-at メトリクス
+│   └── user-counts-metrics.ts             # ユーザー数メトリクス
 └── docs/
     ├── custom-metrics-architecture.md     # アーキテクチャ文書
     └── implementation-guide.md            # このファイル

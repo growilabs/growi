@@ -34,8 +34,10 @@ src/features/opentelemetry/server/custom-resource-attributes/
 - `growi.service.type` - サービスタイプ
 - `growi.deployment.type` - デプロイメントタイプ
 - `growi.attachment.type` - ファイルアップロードタイプ
-- `growi.installedAt` - インストール日時
-- `growi.installedAt.by_oldest_user` - 最古ユーザー作成日時
+- `growi.installed_at` - インストール日時 (ISO 8601 文字列)
+- `growi.installed_at.by_oldest_user` - 最古ユーザー作成日時 (ISO 8601 文字列)
+
+> **Note**: `growi.installed_at` 系は `target_info` 内の文字列ラベルとして引き続き提供されます。数値比較したい場合は後述の **Installed-at Metrics** (`growi.installed_at.timestamp.seconds` 等) を使用してください。
 
 ### Config Metrics
 
@@ -64,13 +66,30 @@ growi_info{service_instance_id="abc123",site_url="https://wiki.example.com",wiki
 #### 実装場所
 ```
 src/features/opentelemetry/server/custom-metrics/
-├── application-metrics.ts  # Config Metrics (既存)
-└── user-counts-metrics.ts  # ユーザー数メトリクス (新規作成)
+├── application-metrics.ts    # Config Metrics
+├── installed-at-metrics.ts   # Installed-at メトリクス
+└── user-counts-metrics.ts    # ユーザー数メトリクス
 ```
 
 #### ユーザー数メトリクス (`user-counts-metrics.ts`)
 - `growi.users.total` - 総ユーザー数
 - `growi.users.active` - アクティブユーザー数
+
+#### Installed-at メトリクス (`installed-at-metrics.ts`)
+
+インストール日時を Unix timestamp (秒) として独立メトリクス化したもの。Resource Attribute (`target_info`) 内の `growi.installed_at` は ISO 8601 文字列のため Prometheus 上で数値比較できないが、本メトリクスは数値なので `time() - growi_installed_at_timestamp_seconds` のような経過秒の算出に直接利用できる。
+
+- `growi.installed_at.timestamp.seconds` - インストール日時 (Unix epoch seconds)
+- `growi.installed_at.by_oldest_user.timestamp.seconds` - 最古ユーザー作成日時 (Unix epoch seconds)
+
+OTel → Prometheus 変換 (`.` → `_`) により、Prometheus 上では以下の名前で露出される:
+
+| OTel メトリクス名 | Prometheus 露出名 |
+|---|---|
+| `growi.installed_at.timestamp.seconds` | `growi_installed_at_timestamp_seconds` |
+| `growi.installed_at.by_oldest_user.timestamp.seconds` | `growi_installed_at_by_oldest_user_timestamp_seconds` |
+
+`service.instance.id` は Resource Attribute から自動付与されるため、Prometheus 側のラベル衝突回避で `exported_instance` ラベルとして出現する。
 
 ## 収集間隔・設定タイミング
 
@@ -121,3 +140,4 @@ growi_info{external_auth_types!=""}
 - ユーザー数の時系列グラフ
 - Wiki種別の分布円グラフ
 - 外部認証プロバイダーの利用状況
+- インストールからの経過時間: `time() - growi_installed_at_timestamp_seconds`
