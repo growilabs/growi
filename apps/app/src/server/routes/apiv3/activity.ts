@@ -51,16 +51,12 @@ const validator = {
       .optional()
       .custom((value) => {
         const values: unknown[] = Array.isArray(value) ? value : [value];
-        const validFields: AuditlogSuggestionField[] = [
-          'username',
-          'ip',
-          'url',
-        ];
+        const validFields: AuditlogSuggestionField[] = ['username'];
         return values.every((v) =>
           validFields.includes(v as AuditlogSuggestionField),
         );
       })
-      .withMessage('field must be one or more of: username, ip, url'),
+      .withMessage('field must be username'),
     query('q').optional().isString().withMessage('q must be a string'),
     query('limit')
       .optional()
@@ -397,10 +393,9 @@ module.exports = (crowi: Crowi): Router => {
     async (req: ISuggestionsRequest, res: ApiV3Response) => {
       const { field, q = '', limit = 5 } = req.query;
 
-      const ALL_FIELDS: AuditlogSuggestionField[] = ['username', 'ip', 'url'];
       const fields: AuditlogSuggestionField[] =
         field == null
-          ? ALL_FIELDS
+          ? ['username']
           : ((Array.isArray(field)
               ? field
               : [field]) as AuditlogSuggestionField[]);
