@@ -393,9 +393,12 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   // ------------------------------------------------------------------
   const bootstrapper = createVaultBootstrapper(vaultNamespaceMapper);
 
-  if (configManager.getConfig('app:vaultBootstrapOnStart')) {
+  const vaultBootstrapOnStart = configManager.getConfig(
+    'app:vaultBootstrapOnStart',
+  );
+  if (vaultBootstrapOnStart === 'true' || vaultBootstrapOnStart === 'force') {
     logger.info(
-      'GROWI Vault: VAULT_BOOTSTRAP_ON_START=true — starting bootstrap on startup',
+      `GROWI Vault: VAULT_BOOTSTRAP_ON_START=${vaultBootstrapOnStart} — starting bootstrap on startup`,
     );
     // Fire-and-forget: bootstrap is a long-running background operation.
     bootstrapper.start({ triggerSource: 'env-var' }).catch((err) => {

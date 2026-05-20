@@ -82,6 +82,15 @@ export const CONFIG_KEYS = [
   'app:vaultManagerEndpoint',
   'app:vaultManagerInternalSecret',
   'app:vaultBootstrapOnStart',
+  'app:vaultBootstrapRetryMax',
+  'app:vaultBootstrapRetryBaseMs',
+  'app:vaultBootstrapRetryMaxMs',
+  'app:vaultBootstrapHeartbeatIntervalMs',
+  'app:vaultBootstrapHeartbeatStaleMs',
+  'app:vaultBootstrapRetryDisabled',
+  'app:vaultDriftDetectionIntervalMs',
+  'app:vaultDriftMaxPagesPerTick',
+  'app:vaultDriftDetectionDisabled',
 
   // Content-Disposition settings for MIME types
   'attachments:contentDisposition:inlineMimeTypes',
@@ -552,10 +561,46 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
     isSecret: true,
   }),
-  'app:vaultBootstrapOnStart': defineConfig<boolean>({
+  'app:vaultBootstrapOnStart': defineConfig<'true' | 'false' | 'force'>({
     envVarName: 'VAULT_BOOTSTRAP_ON_START',
-    defaultValue: false,
+    defaultValue: 'false',
     isSecret: false,
+  }),
+  'app:vaultBootstrapRetryMax': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX',
+    defaultValue: 5,
+  }),
+  'app:vaultBootstrapRetryBaseMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_BASE_MS',
+    defaultValue: 30_000,
+  }),
+  'app:vaultBootstrapRetryMaxMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX_MS',
+    defaultValue: 1_800_000, // 30 * 60_000
+  }),
+  'app:vaultBootstrapHeartbeatIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_INTERVAL_MS',
+    defaultValue: 10_000,
+  }),
+  'app:vaultBootstrapHeartbeatStaleMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_STALE_MS',
+    defaultValue: 60_000,
+  }),
+  'app:vaultBootstrapRetryDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultDriftDetectionIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_DETECTION_INTERVAL_MS',
+    defaultValue: 300_000, // 5 * 60_000
+  }),
+  'app:vaultDriftMaxPagesPerTick': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_MAX_PAGES_PER_TICK',
+    defaultValue: 10_000,
+  }),
+  'app:vaultDriftDetectionDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_DRIFT_DETECTION_DISABLED',
+    defaultValue: false,
   }),
 
   // Attachment Content-Disposition settings
