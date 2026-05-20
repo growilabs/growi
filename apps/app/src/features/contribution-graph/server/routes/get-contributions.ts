@@ -1,6 +1,7 @@
 import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { query } from 'express-validator';
+import mongoose from 'mongoose';
 
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
@@ -9,6 +10,7 @@ import type Crowi from '../../../../server/crowi';
 import { apiV3FormValidator } from '../../../../server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '../../../../server/routes/apiv3/interfaces/apiv3-response';
 import { assembleEmptyGraph } from '../../utils/contribution-graph-utils';
+import { ensureUserHasMigrated } from '../services/contribution-migration-service';
 import { getContributions } from '../services/contribution-service';
 
 const logger = loggerFactory('growi:routes:apiv3:contribution');
@@ -27,6 +29,19 @@ type ContributionRequest = Request<
 export const getContributionsHandler = (crowi: Crowi): RequestHandler => {
   return async (req: ContributionRequest, res: ApiV3Response) => {
     const { targetUserId } = req.query;
+
+    try {
+      const User = mongoose.model('User');
+      const user = await User.findById(targetUserId);
+
+      if (user == null) {
+        return res.apiv3Err('User not found', 404);
+      }
+
+      await ensureUserHasMigrated(user);
+    } catch (err) {
+      logger.error('Failed migrate contributions', err);
+    }
 
     try {
       const contributions = await getContributions(targetUserId);
