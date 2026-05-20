@@ -86,17 +86,14 @@ describe('migrateContributions', () => {
       },
     });
 
-    if (sameDayContribution == null) {
-      throw new Error('Test: Contribution migration failed');
-    }
-
+    expect(sameDayContribution).not.toBeNull();
     expect(contributionsInDatabase.length).toBe(2);
-    expect(sameDayContribution.count).toBe(2);
+    expect(sameDayContribution!.count).toBe(2);
 
     vi.useRealTimers();
   });
 
-  it('should not create contribution documents from activities older or same as Activity TTL', async () => {
+  it('should not create contribution documents from activities older than Activity TTL', async () => {
     // Arrange
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
@@ -104,19 +101,19 @@ describe('migrateContributions', () => {
     const commentCreateActivity: IActivity = {
       user: userId,
       action: ContributionGraphActions.ACTION_COMMENT_CREATE,
-      createdAt: new Date('2025-10-11T00:00:00Z'), // 29 days ago
+      createdAt: new Date('2025-10-11T00:00:00Z'), // 30 days ago
     };
 
     const pageCreateActivity: IActivity = {
       user: userId,
       action: ContributionGraphActions.ACTION_PAGE_CREATE,
-      createdAt: new Date('2025-10-10T00:00:00Z'), // 30 days ago
+      createdAt: new Date('2025-10-10T00:00:00Z'), // 31 days ago
     };
 
     const pageUpdateActivity: IActivity = {
       user: userId,
-      action: ContributionGraphActions.ACTION_PAGE_CREATE,
-      createdAt: new Date('2025-10-09T00:00:00Z'), // 31 days ago
+      action: ContributionGraphActions.ACTION_PAGE_UPDATE,
+      createdAt: new Date('2025-10-09T00:00:00Z'), // 32 days ago
     };
 
     const activities = [
@@ -149,21 +146,13 @@ describe('migrateContributions', () => {
     const nonContributionActions = AllSupportedActions.filter(
       (action) => !contributionActionValues.includes(action),
     );
-    const nonContributionAction = nonContributionActions[0];
+    const samples = nonContributionActions.slice(0, 2);
 
-    const pageBookmarkActivity: IActivity = {
+    const activities: IActivity[] = samples.map((action, i) => ({
       user: userId,
-      action: nonContributionAction,
-      createdAt: new Date('2025-11-03T00:00:00Z'), // 7 days ago
-    };
-
-    const pageLikeActivity: IActivity = {
-      user: userId,
-      action: nonContributionAction,
-      createdAt: new Date('2025-11-02T00:00:00Z'), // 8 days ago
-    };
-
-    const activities = [pageBookmarkActivity, pageLikeActivity];
+      action,
+      createdAt: new Date(`2025-11-0${3 + i}T00:00:00Z`),
+    }));
 
     await Activity.insertMany(activities);
 
@@ -178,7 +167,7 @@ describe('migrateContributions', () => {
     vi.useRealTimers();
   });
 
-  it('should not change count if migration is ran twice mistakenly', async () => {
+  it('should be idempotent when run twice (count should not change)', async () => {
     // Arrange
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
@@ -192,7 +181,7 @@ describe('migrateContributions', () => {
     await Activity.create(pageUpdateActivity);
     await migrateContributions(userId);
 
-    // Make sure first migration is successfull
+    // Make sure first migration is successful
     const contributionsInDatabaseOnFirstMigration = await Contribution.find({
       user: userId,
     });
