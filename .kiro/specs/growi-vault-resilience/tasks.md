@@ -57,7 +57,7 @@
   - _Requirements: 6.4_
   - _Boundary: vault-path-mapper (vault-manager)_
 
-- [ ] 2.3 applyBulkUpsert / applyRemove の入口に isExcludedFromVault filter を追加
+- [x] 2.3 applyBulkUpsert / applyRemove の入口に isExcludedFromVault filter を追加
   - 両 op handler の冒頭で `entries.filter((e) => !isExcludedFromVault(e.pagePath))` を実行
   - 空 entry になった instruction は commit 発生なし / vault_namespace_state 更新なしで ack
   - vault-namespace-builder.spec.ts に (a) trash entry のみの bulk-upsert → no-op ack（`commitAndUpdateRef` が呼ばれない）、(b) trash + 通常 entry 混在 → 通常 entry のみ commit、(c) trash path を狙った remove → no-op ack、を追加
@@ -66,7 +66,7 @@
   - _Requirements: 6.3, 6.4_
   - _Boundary: vault-namespace-builder (vault-manager)_
 
-- [ ] 2.4 vault-dispatcher の delete event 経路 回帰確認
+- [x] 2.4 vault-dispatcher の delete event 経路 回帰確認
   - vault-dispatcher.spec.ts を実行し、pre-deletion state で `remove` instruction が grant 由来 namespace に対して発行される flow が変わらないことを確認
   - 必要に応じて mapper の trash filter 削除に起因する snapshot 差分を test 側で調整
   - 観測可能完了条件: 既存 vault-dispatcher.spec.ts が全て pass、回帰なし
@@ -108,7 +108,7 @@
 
 - [ ] 4. I/O bound モジュール: heartbeat / runner / drift detector / facade composition
 
-- [ ] 4.1 BootstrapHeartbeat の instance ID 管理と stale 検知
+- [x] 4.1 BootstrapHeartbeat の instance ID 管理と stale 検知
   - `acquireInstance()` で UUID 生成し vault_sync_state に書き込み
   - `refresh()` で `VAULT_BOOTSTRAP_HEARTBEAT_INTERVAL_MS`（default 10s）周期に `bootstrapHeartbeatAt` を更新する setInterval
   - `detectStaleRunning()` で `bootstrapHeartbeatAt` が `VAULT_BOOTSTRAP_HEARTBEAT_STALE_MS`（default 60s）以上古ければ stale 判定
