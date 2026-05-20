@@ -41,7 +41,7 @@
 
 - [ ] 2. Trash 責務分離: apps/app 層を trash-agnostic 化 / vault-manager 側で exclusion filter
 
-- [ ] 2.1 (P) vault-namespace-mapper から trash filter / status filter を削除
+- [x] 2.1 (P) vault-namespace-mapper から trash filter / status filter を削除
   - `derivePageNamespaces` 冒頭の `if (page.path?.startsWith('/trash')) return []` および `if (page.status !== STATUS_PUBLISHED) return []` の 2 ガードを撤廃
   - grant 情報のみから namespace を導く純関数に純化
   - vault-namespace-mapper.spec.ts に (a) trashed path (`/trash/foo`) でも grant 由来 namespace が返る、(b) `status !== published` でも grant 由来 namespace が返る、の 2 ケースを追加
@@ -49,7 +49,7 @@
   - _Requirements: 6.3_
   - _Boundary: vault-namespace-mapper (apps/app)_
 
-- [ ] 2.2 (P) vault-path-mapper に isExcludedFromVault helper を新設し _orphaned/ 振り分けを撤廃
+- [x] 2.2 (P) vault-path-mapper に isExcludedFromVault helper を新設し _orphaned/ 振り分けを撤廃
   - internal `isOrphan` 関数を `isExcludedFromVault` に rename して export 化（純関数: `pagePath === '/trash' || pagePath.startsWith('/trash/')`）
   - `map()` 内の `if (isOrphan(pagePath)) return _orphaned/${relativePath};` 分岐を削除し、純粋な path → encoded git path 変換関数に純化
   - vault-path-mapper.spec.ts を更新: 既存 `_orphaned/` テストを削除し、(a) `isExcludedFromVault('/trash/foo') === true`、(b) `isExcludedFromVault('/foo') === false`、(c) `map('/trash/foo', pageId)` が `_orphaned/` prefix なしの encoded path を返す、を追加
@@ -78,7 +78,7 @@
 
 - [ ] 3. 純関数モジュール: state machine / trigger resolver / retry policy
 
-- [ ] 3.1 (P) BootstrapStateMachine の純関数遷移
+- [x] 3.1 (P) BootstrapStateMachine の純関数遷移
   - 7 値の `BootstrapState` union と `BootstrapEvent` / `TransitionResult` / `SideEffect` 型定義
   - `transition(current, event)` で全 (state × event) ペアを定義
   - 不変条件を実装: (i) `running → done` は必ず `verifying` を経由、(ii) `forceOverride` は任意 state → running を許可（reset-all 副作用記述を含む）、(iii) `done → running` は forceOverride 経由のみ可（通常 start イベントでは不可）
@@ -87,7 +87,7 @@
   - _Requirements: 1.6, 1.9, 1.11, 3.2_
   - _Boundary: bootstrap-state-machine_
 
-- [ ] 3.2 (P) BootstrapTriggerResolver の env + state → action 解決
+- [x] 3.2 (P) BootstrapTriggerResolver の env + state → action 解決
   - `resolveAction(envValue, currentState, retryAllowed, isStaleRunning)` で 4 種の `BootstrapAction`（`skip` / `startNew` / `resumeFromCursor` / `forceWipe`）を決定
   - env=force は常に forceWipe、env=false / unknown は常に skip、env=true + done は skip、env=true + pending は startNew、env=true + failed/escalated/stale + retryAllowed は resumeFromCursor
   - bootstrap-trigger-resolver.spec.ts で env (4 値) × state (7 値) × retryAllowed (2) × isStaleRunning (2) の組み合わせ table テスト
@@ -95,7 +95,7 @@
   - _Requirements: 1.3, 1.4, 1.5, 1.6, 1.13, 3.4_
   - _Boundary: bootstrap-trigger-resolver_
 
-- [ ] 3.3 (P) RetryPolicy の exponential backoff 計算
+- [x] 3.3 (P) RetryPolicy の exponential backoff 計算
   - `decideRetry(config, previousAttempts)` で `{ shouldRetry, attemptNo, backoffMs }` を返す純関数
   - backoff: `min(maxBackoffMs, baseBackoffMs * 2 ** previousAttempts) + jitter`
   - `previousAttempts >= maxAttempts` で `shouldRetry: false`（escalated 遷移トリガー）
