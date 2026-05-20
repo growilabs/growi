@@ -330,7 +330,9 @@ export const generatePresentationViewOptions = (
 
   const { rehypePlugins } = options;
 
-  rehypePlugins.push(addLineNumberAttribute.rehypePlugin);
+  // addLineNumberAttribute must run before sanitize so that the data-line attributes
+  // it adds are preserved by the sanitize schema.
+  rehypePlugins.unshift(addLineNumberAttribute.rehypePlugin);
   replaceSanitizePlugin(
     rehypePlugins,
     config,
