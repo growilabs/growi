@@ -1,4 +1,4 @@
-import { type IPage, PageGrant, PageStatus } from '@growi/core';
+import { type IPage, PageGrant } from '@growi/core';
 import type { Namespace } from '@growi/core/dist/interfaces/vault';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
@@ -52,20 +52,12 @@ const resolveGroupIds = async (userId: string): Promise<string[]> => {
 /**
  * Derive the namespace list for a page based on its grant and grantedGroups.
  *
- * Returns an empty array when the page should be excluded from all namespaces
- * (i.e. pages under /trash or not in "published" status).
+ * This function is intentionally trash-agnostic and status-agnostic.
+ * Exclusion of trashed or non-published pages is the vault-manager's
+ * responsibility (via isExcludedFromVault() in op handlers), not the
+ * apps/app layer's (req 6.3).
  */
 const derivePageNamespaces = (page: IPage): ReadonlyArray<Namespace> => {
-  // Pages under /trash are excluded from all namespaces (req 3.6)
-  if (page.path?.startsWith('/trash')) {
-    return [];
-  }
-
-  // Non-published pages are excluded from all namespaces (req 3.6)
-  if (page.status !== PageStatus.STATUS_PUBLISHED) {
-    return [];
-  }
-
   switch (page.grant) {
     case PageGrant.GRANT_PUBLIC:
       return ['public'];

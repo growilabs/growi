@@ -355,50 +355,52 @@ describe('VaultNamespaceMapper.computePageNamespaces', () => {
   });
 
   // -------------------------------------------------------------------------
-  // /trash pages (req 3.6)
+  // /trash pages — trash filter removed; apps/app is trash-agnostic (req 6.3)
   // -------------------------------------------------------------------------
 
   describe('page under /trash', () => {
-    it('returns empty current namespaces regardless of grant', () => {
+    it('returns grant-derived namespace for trashed path (/trash/foo) — trash exclusion is vault-manager responsibility', () => {
       const page = buildPage({
-        path: '/trash/some/page',
+        path: '/trash/foo',
         grant: PageGrant.GRANT_PUBLIC,
       });
       const result = mapper.computePageNamespaces(page);
-      expect(result.current).toEqual([]);
+      // apps/app layer must NOT filter out trash pages; vault-manager handles it via isExcludedFromVault()
+      expect(result.current).toEqual(['public']);
     });
 
-    it('treats /trash itself as a trash path', () => {
+    it('returns grant-derived namespace for /trash itself', () => {
       const page = buildPage({
         path: '/trash',
         grant: PageGrant.GRANT_PUBLIC,
       });
       const result = mapper.computePageNamespaces(page);
-      expect(result.current).toEqual([]);
+      expect(result.current).toEqual(['public']);
     });
   });
 
   // -------------------------------------------------------------------------
-  // Non-published pages (req 3.6)
+  // Non-published pages — status filter removed; apps/app is status-agnostic (req 6.3)
   // -------------------------------------------------------------------------
 
   describe('non-published page', () => {
-    it('returns empty current namespaces for deleted pages', () => {
+    it('returns grant-derived namespace for status !== published (e.g. deleted) — status exclusion is vault-manager responsibility', () => {
       const page = buildPage({
         status: PageStatus.STATUS_DELETED,
         grant: PageGrant.GRANT_PUBLIC,
       });
       const result = mapper.computePageNamespaces(page);
-      expect(result.current).toEqual([]);
+      // apps/app layer must NOT filter out non-published pages; vault-manager handles it
+      expect(result.current).toEqual(['public']);
     });
 
-    it('returns empty current namespaces for unknown status values', () => {
+    it('returns grant-derived namespace for unknown status values', () => {
       const page = buildPage({
         status: 'draft' as never,
         grant: PageGrant.GRANT_PUBLIC,
       });
       const result = mapper.computePageNamespaces(page);
-      expect(result.current).toEqual([]);
+      expect(result.current).toEqual(['public']);
     });
   });
 
