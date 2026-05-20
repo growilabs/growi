@@ -9,7 +9,10 @@ import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useCurrentPagePath } from '~/states/page';
 import { isPdfBulkExportEnabledAtom } from '~/states/server-configurations';
 
-import { PageBulkExportFormat } from '../../interfaces/page-bulk-export';
+import {
+  PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE,
+  PageBulkExportFormat,
+} from '../../interfaces/page-bulk-export';
 import {
   usePageBulkExportSelectModalActions,
   usePageBulkExportSelectModalStatus,
@@ -38,7 +41,7 @@ const PageBulkExportSelectModalSubstance = (): JSX.Element => {
         close();
       } catch (e) {
         const errorCode = e?.[0].code ?? 'page_export.failed_to_export';
-        if (errorCode === 'page_export.duplicate_bulk_export_job_error') {
+        if (errorCode === PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE) {
           // Keep the substance mounted so the restart modal can render.
           // Closing here would unmount the substance and discard isRestartModalOpened.
           setDuplicateJobInfo(e[0].args.duplicateJob);
