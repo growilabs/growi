@@ -726,10 +726,8 @@ export type ISearchFilter = {
   actions?: SupportedActionType[];
 };
 
-export type AuditlogSuggestionField = 'username' | 'ip' | 'url';
+export type AuditlogSuggestionField = 'username';
 
 export type AuditlogSuggestionsResponse = {
   username?: { activeUsernames: string[]; inactiveUsernames: string[] };
-  ip?: string[];
-  url?: string[];
 };
