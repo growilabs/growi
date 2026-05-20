@@ -34,7 +34,7 @@ export const migrateContributions = async (userId: string) => {
     contributions.map((c) => ({
       updateOne: {
         filter: { user: userId, date: c.date },
-        update: { $set: { count: c.count } },
+        update: { $inc: { count: c.count } },
         upsert: true,
       },
     })),
