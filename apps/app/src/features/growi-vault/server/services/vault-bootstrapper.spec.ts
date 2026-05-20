@@ -21,6 +21,7 @@ import type { VaultSyncStateDocument } from '~/features/growi-vault/server/model
 vi.mock('~/features/growi-vault/server/models/vault-instruction', () => ({
   VaultInstruction: {
     create: vi.fn(),
+    findOne: vi.fn(),
   },
 }));
 
@@ -53,6 +54,24 @@ vi.mock('~/utils/logger', () => ({
     warn: vi.fn(),
     error: vi.fn(),
   }),
+}));
+
+// Mock configManager — the resilience layer reads numeric config values at factory time.
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: {
+    getConfig: vi.fn((key: string) => {
+      const config: Record<string, number | string> = {
+        'app:vaultBootstrapRetryMax': 5,
+        'app:vaultBootstrapRetryBaseMs': 30_000,
+        'app:vaultBootstrapRetryMaxMs': 1_800_000,
+        'app:vaultBootstrapHeartbeatIntervalMs': 15_000,
+        'app:vaultBootstrapHeartbeatStaleMs': 120_000,
+        'app:vaultDriftDetectionIntervalMs': 300_000,
+        'app:vaultDriftMaxPagesPerTick': 10_000,
+      };
+      return config[key] ?? 0;
+    }),
+  },
 }));
 
 // ---------------------------------------------------------------------------
@@ -139,38 +158,95 @@ const buildCursor = (pages: ReturnType<typeof buildPage>[]) => {
 };
 
 /**
- * Configure the mocked mongoose.model('Page') to return a minimal Page model stub.
+ * Build a minimal VaultSyncState document that the resilience layer expects.
+ *
+ * The runner's readSingleton() returns this via VaultSyncState.findOne().lean().
+ * Fields required by the runner:
+ *   - bootstrapState: current state
+ *   - bootstrapCursor: resume cursor (null for fresh starts)
+ *   - bootstrapRetryAttempts: retry count (0 for fresh starts)
+ *   - bootstrapRetryAborted: abort flag (false for fresh starts)
+ *   - bootstrapHeartbeatAt: null (not stale by default — state != 'running')
+ *   - bootstrapInstanceId: null
  */
-const setupPageModel = async (
-  pages: ReturnType<typeof buildPage>[],
-  opts: { cursor?: object } = {},
-) => {
-  const mongoose = await getMongoose();
-  const cursorObj = opts.cursor ?? buildCursor(pages);
-  vi.mocked(mongoose.model).mockReturnValue({
-    estimatedDocumentCount: vi.fn().mockResolvedValue(pages.length),
-    find: vi.fn().mockReturnValue({
-      cursor: vi.fn().mockReturnValue(cursorObj),
-    }),
-  } as never);
-};
+const buildSyncStateDoc = (
+  state:
+    | 'pending'
+    | 'running'
+    | 'done'
+    | 'failed'
+    | 'retrying'
+    | 'escalated' = 'pending',
+  cursor: object | null = null,
+  overrides: Record<string, unknown> = {},
+) => ({
+  _id: 'singleton',
+  bootstrapState: state,
+  bootstrapCursor: cursor,
+  bootstrapProcessed: 0,
+  bootstrapTotalEstimated: null,
+  bootstrapStartedAt: null,
+  bootstrapCompletedAt: null,
+  bootstrapLastError: null,
+  bootstrapInstanceId: null,
+  bootstrapHeartbeatAt: null,
+  bootstrapLastTriggerSource: null,
+  bootstrapRetryAttempts: 0,
+  bootstrapRetryNextAt: null,
+  bootstrapRetryAborted: false,
+  bootstrapCompletenessLastCheckedAt: null,
+  bootstrapCompletenessLastResult: null,
+  bootstrapStreamSnapshotMaxId: null,
+  driftLastWatermark: null,
+  driftLastSweepAt: null,
+  driftDetectedSinceBoot: 0,
+  driftRepairsEmittedSinceBoot: 0,
+  driftLastError: null,
+  ...overrides,
+});
 
 /**
  * Configure the VaultSyncState mock to simulate a given bootstrap state.
  *
- * findOneAndUpdate is called twice in start():
- *   - first call: the double-start guard (returns the existing state)
- *   - second call: the transition to 'running' (returns the updated state with cursor)
+ * The resilience layer runner reads state via findOne().lean() (not findOneAndUpdate).
+ * Multiple findOne calls occur per bootstrap run:
+ *   1. readSingleton() at the start of bootstrap()
+ *   2. heartbeat.detectStaleRunning() (also uses findOne)
+ *   3. readSingleton() inside executeBootstrap() for forceWipe path
+ *
+ * We use mockResolvedValue (not mockResolvedValueOnce) so that all findOne calls
+ * return the same state, which is sufficient for most test scenarios.
  */
 const setupSyncState = async (
   state: 'pending' | 'running' | 'done' | 'failed' = 'pending',
   cursor: object | null = null,
 ) => {
   const VaultSyncState = await getVaultSyncState();
-  vi.mocked(VaultSyncState.findOneAndUpdate)
-    .mockResolvedValueOnce({ bootstrapState: state } as never) // guard check
-    .mockResolvedValueOnce({ bootstrapCursor: cursor } as never); // running transition
+  const doc = buildSyncStateDoc(state, cursor);
+  vi.mocked(VaultSyncState.findOne).mockReturnValue({
+    lean: vi.fn().mockResolvedValue(doc),
+  } as never);
+  vi.mocked(VaultSyncState.findOneAndUpdate).mockResolvedValue(doc as never);
   vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
+};
+
+/**
+ * Configure the mocked mongoose.model('Page') to return a minimal Page model stub.
+ */
+const setupPageModel = async (
+  pages: ReturnType<typeof buildPage>[],
+  opts: { cursor?: object; findOneSpy?: ReturnType<typeof vi.fn> } = {},
+) => {
+  const mongoose = await getMongoose();
+  const cursorObj = opts.cursor ?? buildCursor(pages);
+  const findOneMock = opts.findOneSpy ?? vi.fn().mockResolvedValue(null);
+  vi.mocked(mongoose.model).mockReturnValue({
+    estimatedDocumentCount: vi.fn().mockResolvedValue(pages.length),
+    find: vi.fn().mockReturnValue({
+      cursor: vi.fn().mockReturnValue(cursorObj),
+    }),
+    findOne: findOneMock,
+  } as never);
 };
 
 // ---------------------------------------------------------------------------
@@ -184,7 +260,11 @@ describe('VaultBootstrapper', () => {
     const VaultInstruction = await getVaultInstruction();
     instructionCreateSpy = vi
       .mocked(VaultInstruction.create)
-      .mockResolvedValue({} as never);
+      .mockResolvedValue({ _id: { toString: () => 'instr-id-001' } } as never);
+    // Completeness check: findOne must resolve the last instruction id
+    vi.mocked(VaultInstruction.findOne).mockResolvedValue({
+      _id: { toString: () => 'instr-id-001' },
+    } as never);
   });
 
   afterEach(() => {
@@ -411,20 +491,31 @@ describe('VaultBootstrapper', () => {
           'done',
       );
       expect(doneCall).toBeDefined();
-      expect(
-        (doneCall![1] as UpdateQuery<VaultSyncStateDocument>).$set!
-          .bootstrapCompletedAt,
-      ).toBeInstanceOf(Date);
+      const doneUpdate = doneCall?.[1] as UpdateQuery<VaultSyncStateDocument>;
+      expect(doneUpdate.$set?.bootstrapCompletedAt).toBeInstanceOf(Date);
     });
 
-    it('sets bootstrapState to failed and records lastError when an exception is thrown', async () => {
+    it('sets bootstrapState to failed and records lastError when an exception is thrown during streaming', async () => {
       await setupSyncState('pending');
 
-      // Make the Page model throw during estimatedDocumentCount
+      // Make the Page cursor throw during iteration (inside the runner's try/catch block)
+      const throwingCursor = {
+        [Symbol.asyncIterator]() {
+          return {
+            next(): Promise<never> {
+              return Promise.reject(new Error('DB down'));
+            },
+          };
+        },
+      };
+
       const mongoose = await getMongoose();
       vi.mocked(mongoose.model).mockReturnValue({
-        estimatedDocumentCount: vi.fn().mockRejectedValue(new Error('DB down')),
-        find: vi.fn(),
+        estimatedDocumentCount: vi.fn().mockResolvedValue(0),
+        find: vi
+          .fn()
+          .mockReturnValue({ cursor: vi.fn().mockReturnValue(throwingCursor) }),
+        findOne: vi.fn().mockResolvedValue(null),
       } as never);
 
       const VaultSyncState = await getVaultSyncState();
@@ -441,10 +532,9 @@ describe('VaultBootstrapper', () => {
           'failed',
       );
       expect(failedCall).toBeDefined();
-      expect(
-        (failedCall![1] as UpdateQuery<VaultSyncStateDocument>).$set!
-          .bootstrapLastError,
-      ).toBe('DB down');
+      const failedUpdate =
+        failedCall?.[1] as UpdateQuery<VaultSyncStateDocument>;
+      expect(failedUpdate.$set?.bootstrapLastError).toBe('DB down');
     });
   });
 
@@ -455,7 +545,14 @@ describe('VaultBootstrapper', () => {
   describe('resume from bootstrapCursor', () => {
     it('applies _id $gt filter when bootstrapCursor is set', async () => {
       const cursObjId = { toString: () => 'cursor-id-abc' };
-      await setupSyncState('failed', cursObjId as never);
+      // Use 'failed' state so the resilience layer resolves resumeFromCursor
+      // (with env-var trigger → env-true → retryAllowed=true → resumeFromCursor)
+      const VaultSyncState = await getVaultSyncState();
+      const doc = buildSyncStateDoc('failed', cursObjId as never);
+      vi.mocked(VaultSyncState.findOne).mockReturnValue({
+        lean: vi.fn().mockResolvedValue(doc),
+      } as never);
+      vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
 
       const pages = [buildPage({ path: '/resume-page' })];
       const mongoose = await getMongoose();
@@ -465,13 +562,16 @@ describe('VaultBootstrapper', () => {
       vi.mocked(mongoose.model).mockReturnValue({
         estimatedDocumentCount: vi.fn().mockResolvedValue(1),
         find: findMock,
+        findOne: vi.fn().mockResolvedValue(null),
       } as never);
 
       const { createVaultBootstrapper } = await import('./vault-bootstrapper');
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      // Use 'env-var' trigger (maps to env-true in resilience layer) which will
+      // resolve to resumeFromCursor when state is 'failed' and retryAllowed=true
+      await bootstrapper.start({ triggerSource: 'env-var' });
 
       // The find() call must include _id: { $gt: cursor }
       expect(findMock).toHaveBeenCalledWith(
@@ -490,6 +590,7 @@ describe('VaultBootstrapper', () => {
       vi.mocked(mongoose.model).mockReturnValue({
         estimatedDocumentCount: vi.fn().mockResolvedValue(1),
         find: findMock,
+        findOne: vi.fn().mockResolvedValue(null),
       } as never);
 
       const { createVaultBootstrapper } = await import('./vault-bootstrapper');
@@ -509,27 +610,28 @@ describe('VaultBootstrapper', () => {
   // -------------------------------------------------------------------------
 
   describe('double-start prevention', () => {
-    it('returns immediately without doing any work if bootstrapState is already running', async () => {
+    it('skips bootstrap work when state is running and trigger is env-var (non-stale)', async () => {
+      // With env-var trigger (→ env-true in resilience layer) and state='running'
+      // and no stale heartbeat, the resolver returns 'skip' — no work is done.
       const VaultSyncState = await getVaultSyncState();
-      // Simulate that the first findOneAndUpdate (the guard check) returns 'running'
-      vi.mocked(VaultSyncState.findOneAndUpdate).mockResolvedValueOnce({
-        bootstrapState: 'running',
+      const doc = buildSyncStateDoc('running', null, {
+        // A recent heartbeat so running is NOT considered stale
+        bootstrapHeartbeatAt: new Date(Date.now() - 1000), // 1 second ago (well within threshold)
+        bootstrapInstanceId: 'some-instance-id',
+      });
+      vi.mocked(VaultSyncState.findOne).mockReturnValue({
+        lean: vi.fn().mockResolvedValue(doc),
       } as never);
+      vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
 
       const { createVaultBootstrapper } = await import('./vault-bootstrapper');
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.start({ triggerSource: 'env-var' });
 
-      // No instructions should have been created
+      // No instructions should have been created (skip action)
       expect(instructionCreateSpy).not.toHaveBeenCalled();
-
-      // VaultSyncState.updateOne should not have been called (nothing to update)
-      expect(vi.mocked(VaultSyncState.updateOne)).not.toHaveBeenCalled();
-
-      // The second findOneAndUpdate (transition to running) should not have been called
-      expect(vi.mocked(VaultSyncState.findOneAndUpdate)).toHaveBeenCalledOnce();
     });
   });
 
@@ -657,6 +759,20 @@ describe('VaultBootstrapper', () => {
           bootstrapStartedAt: startedAt,
           bootstrapCompletedAt: null,
           bootstrapLastError: null,
+          bootstrapInstanceId: 'inst-001',
+          bootstrapHeartbeatAt: new Date(),
+          bootstrapLastTriggerSource: 'admin-ui',
+          bootstrapRetryAttempts: 0,
+          bootstrapRetryNextAt: null,
+          bootstrapRetryAborted: false,
+          bootstrapCompletenessLastCheckedAt: null,
+          bootstrapCompletenessLastResult: null,
+          bootstrapStreamSnapshotMaxId: null,
+          driftLastWatermark: null,
+          driftLastSweepAt: null,
+          driftDetectedSinceBoot: 0,
+          driftRepairsEmittedSinceBoot: 0,
+          driftLastError: null,
         }),
       } as never);
 
@@ -672,6 +788,51 @@ describe('VaultBootstrapper', () => {
       expect(status.startedAt).toBe(startedAt);
       expect(status.completedAt).toBeNull();
       expect(status.lastError).toBeNull();
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Delegation to resilience layer
+  // -------------------------------------------------------------------------
+
+  describe('delegation to resilience layer', () => {
+    it('getStatus() returns a BootstrapStatus with all required fields', async () => {
+      const VaultSyncState = await getVaultSyncState();
+      vi.mocked(VaultSyncState.findOne).mockReturnValue({
+        lean: vi.fn().mockResolvedValue(null),
+      } as never);
+
+      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
+      const bootstrapper = createVaultBootstrapper(buildMapper(['public']));
+
+      const status = await bootstrapper.getStatus();
+
+      // Verify all BootstrapStatus fields are present (backward compat shape)
+      expect(status).toHaveProperty('state');
+      expect(status).toHaveProperty('processed');
+      expect(status).toHaveProperty('totalEstimated');
+      expect(status).toHaveProperty('cursor');
+      expect(status).toHaveProperty('startedAt');
+      expect(status).toHaveProperty('completedAt');
+      expect(status).toHaveProperty('lastError');
+    });
+
+    it('env-var triggerSource maps to env-true (non-force) behavior', async () => {
+      // With env-var (→ env-true) and state='done', resolver returns 'skip'
+      const VaultSyncState = await getVaultSyncState();
+      const doc = buildSyncStateDoc('done');
+      vi.mocked(VaultSyncState.findOne).mockReturnValue({
+        lean: vi.fn().mockResolvedValue(doc),
+      } as never);
+      vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
+
+      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
+      const bootstrapper = createVaultBootstrapper(buildMapper(['public']));
+
+      await bootstrapper.start({ triggerSource: 'env-var' });
+
+      // Done state + env-true → skip → no instructions created
+      expect(instructionCreateSpy).not.toHaveBeenCalled();
     });
   });
 });

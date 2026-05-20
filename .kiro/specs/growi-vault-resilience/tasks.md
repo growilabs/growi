@@ -145,7 +145,7 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5, 4.6, 4.7, 4.8, 4.9, 5.7_
   - _Boundary: drift-detector_
 
-- [ ] 4.4 resilience/index.ts barrel と createVaultResilienceLayer factory
+- [x] 4.4 resilience/index.ts barrel と createVaultResilienceLayer factory
   - `apps/app/src/features/growi-vault/server/services/resilience/index.ts` を新設し、`createVaultResilienceLayer(deps)` factory を export
   - factory 内部で BootstrapStateMachine / BootstrapTriggerResolver / RetryPolicy / BootstrapHeartbeat / BootstrapRunner / DriftDetector を組み立て、`VaultResilienceLayer` interface（`bootstrap` / `initOnStartup` / `getStatus` / `abortAutoRetry` / `stop`）を返す
   - `ResilienceStatus` / `BootstrapStatus` / `RetryStatus` / `DriftStatus` 型を再 export
@@ -160,7 +160,7 @@
 
 - [ ] 5. 統合 surface: facade delegation / startup branch / admin API / admin UI
 
-- [ ] 5.1 VaultBootstrapper facade を resilience layer への delegation に書き換え
+- [x] 5.1 VaultBootstrapper facade を resilience layer への delegation に書き換え
   - 既存 `VaultBootstrapper` interface と `createVaultBootstrapper(namespaceMapper)` factory の signature を維持
   - 内部実装を `createVaultResilienceLayer(...)` 呼び出しへの delegation に置換
   - 既存 `BootstrapStatus` 型を `ResilienceStatus.bootstrap` の subset として再 export（後方互換）
