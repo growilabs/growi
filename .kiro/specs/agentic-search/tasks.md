@@ -14,8 +14,10 @@
 - [ ] 2.1 ES 全文検索 tool 本体の実装
   - `createTool` を用いて Mastra tool を新設
   - 入力 zod schema: `query: z.string().min(1)`、`limit?: z.number().int().positive().max(20).default(10)`
+  - **`query.describe()` には `SearchService.parseQueryString` が解釈する全演算子を例示する**（`"phrase"` / `-word` / `-"phrase"` / `prefix:/path` / `-prefix:/path` / `tag:foo` / `-tag:foo`）。design.md「サポートするクエリ構文」の表と一致させる
   - 出力 zod schema を discriminated union（`'ok' | 'error' | 'context_error'`）で表現
   - execute 内で `requestContext.get('userId')` を取り出し、`{ _id: new ObjectId(userId) }` 形状を `SearchService.searchKeyword(query, null, user, null, { limit })` に渡す
+  - **`query` を tool 層でサニタイズ・改変しない**: `prefix:` / `tag:` / `"..."` / `-` 等の演算子はそのまま `SearchService.searchKeyword` の第 1 引数に渡し、`parseQueryString` に解釈させる（Plan A: design.md「サポートするクエリ構文」参照）
   - 戻り値は **タプル `[ISearchResult, delegatorName]`** として分解し、`result.data[i]` から以下のマッピングで `hits` を組み立てる: `pageId ← _id` / `pagePath ← _source.path` / `snippet ← _highlight?.body?.[0]` / `totalCount ← result.meta.total`
   - **`_source` を spread しない**: ES に index 済みの `body`（Markdown 本文）が混入しないよう、必要フィールドだけを明示的に取り出す（要件 6.5 と役割分離の維持）
   - execute からは例外を throw せず、try/catch で SearchService 例外を `result: 'error'` に変換
@@ -28,6 +30,7 @@
   - 戻り値マッピングで `body` が削除されること、`pagePath` / `pageId` / `snippet` が正しく抽出されることを assert
   - SearchService の reject を mock しても execute が throw せず `result: 'error'` を返すことを確認
   - `userId` が ObjectId 形状で SearchService に渡されることを assert
+  - **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡した場合に、tool 層で文字列が改変されず `SearchService.searchKeyword` の第 1 引数にそのまま渡ることを assert（サニタイザ不在の保証、Plan A 採用根拠の回帰防止）
   - 観察可能完了: `pnpm vitest run full-text-search-tool.spec` が緑、上記すべての挙動が assert される
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8_
   - _Boundary: FullTextSearchTool_
@@ -79,9 +82,11 @@
   - `import { fullTextSearchTool } from '../tools/full-text-search-tool'` と `import { getPageContentTool } from '../tools/get-page-content-tool'` を追加
   - `tools` オブジェクトを `{ ...(crowi.searchService.isElasticsearchEnabled ? { fullTextSearchTool } : {}), getPageContentTool }` の形で組み立て、**ES 未設定環境では `fullTextSearchTool` を agent から見えなくする**
   - 既存 `fileSearchTool` の `import` 行と `tools` 登録行をコメントアウト（ソースファイル本体は削除しない）
-  - `instructions` に「wiki コンテンツ関連の質問はまず全文検索 tool でヒット候補を集め、必要に応じて本文取得 tool を呼んで引用パスを回答に含めよ」の旨を英語で 1〜2 行追記
+  - `instructions` に以下の趣旨を英語短文で追記（合計 3〜4 行、既存トーン維持）:
+    - 「wiki コンテンツ関連の質問はまず `fullTextSearch` tool でヒット候補を集め、必要に応じて `getPageContent` tool を呼んで引用パスを回答に含めよ」
+    - 「`fullTextSearch` の `query` には自然言語に加えて `"phrase"` / `-word` / `prefix:/path` / `tag:foo`（および `-prefix:` / `-tag:`）を必要に応じて組み合わせて良い（全て AND）。subtree / タグ絞り込み・ノイズ除去に有用な場合に使う」
   - 既存の `memory` / `model` / `name` 等の設定は変更しない
-  - 観察可能完了: ES URI が設定された環境で起動すると `growiAgent.tools` のキー一覧に `fullTextSearchTool` と `getPageContentTool` が含まれ、ES URI 未設定で起動すると `fullTextSearchTool` のキーが含まれない。両環境とも `fileSearchTool` は含まれず、`instructions` 文字列に全文検索 → 本文取得 → 引用パスの利用順序が含まれる
+  - 観察可能完了: ES URI が設定された環境で起動すると `growiAgent.tools` のキー一覧に `fullTextSearchTool` と `getPageContentTool` が含まれ、ES URI 未設定で起動すると `fullTextSearchTool` のキーが含まれない。両環境とも `fileSearchTool` は含まれず、`instructions` 文字列に「全文検索 → 本文取得 → 引用パス」の利用順序と「`"phrase"` / `-word` / `prefix:` / `tag:` 等の演算子組み合わせ可」の旨が含まれる
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3_
   - _Boundary: growiAgent_
   - _Depends: 2.1, 3.1_
