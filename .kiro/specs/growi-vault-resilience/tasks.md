@@ -207,7 +207,7 @@
 
 - [ ] 6. E2E 検証: resilience-flow.integ.ts による実 MongoDB end-to-end
 
-- [ ] 6.1 fresh install / migration 冪等性 / 通常 bootstrap flow の E2E 検証
+- [x] 6.1 fresh install / migration 冪等性 / 通常 bootstrap flow の E2E 検証
   - 実 MongoDB（devcontainer の `mongo` service）を使った integration test
   - シナリオ: (a) `VAULT_BOOTSTRAP_ON_START=true` で fresh install 起動 → migration ステップ 1 で singleton 作成 → bootstrap 完了 → cursor null reset → drift sweep 開始、(b) 同じプロセスを 2 回目起動 → migration が duplicate key error を出さない（Issue 1 fix 担保）、(c) 既存 4-state doc を migrate → 7-state + 14 新フィールドが揃う
   - 既存 vault-bootstrapper.spec.ts の resume シナリオが regress しないこと（facade 後方互換）
