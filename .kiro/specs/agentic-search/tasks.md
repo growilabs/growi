@@ -1,24 +1,25 @@
 # Implementation Plan
 
-- [ ] 1. Foundation: 共有型定義、リクエストスコープ化、userId / searchService 伝搬の確立
+- [ ] 1. Foundation: 共有型定義、リクエストスコープ化、user / searchService 伝搬の確立
 - [ ] 1.0 共有型定義ファイルの新設 (`services/mastra-modules/types/request-context.ts`)
   - 新規ファイル `apps/app/src/features/mastra/server/services/mastra-modules/types/request-context.ts` を作成
-  - `import type SearchService from '~/server/service/search'`（`SearchService` は default export、[search.ts:673](apps/app/src/server/service/search.ts#L673) で確認済み）
-  - `export type MastraRequestContextShape = { vectorStoreId: string; userId: string; searchService: SearchService }` を export
+  - `import type { IUserHasId } from '@growi/core'` と `import type SearchService from '~/server/service/search'` を追加（`SearchService` は default export、[search.ts:673](apps/app/src/server/service/search.ts#L673) で確認済み）
+  - `export type MastraRequestContextShape = { vectorStoreId: string; user: IUserHasId; searchService: SearchService }` を export
+  - 短い JSDoc を付与し、「`user` は認証ミドルウェア通過後の `req.user` をそのまま載せる」「tool 側で `_id` のみ取り出す / `User.findById` 再解決は不要」を明文化
   - 型ファイル単独のため tests は不要。lint / typecheck で構文確認のみ
   - 観察可能完了: post-message.ts および各 tool ファイルが `import type { MastraRequestContextShape } from '...'` で参照可能になる。`pnpm run lint:typecheck` が通る
-  - _Requirements: 3.1, 3.2, 3.3, 6.6（型レベルで「key の存在」を担保）_
+  - _Requirements: 3.1, 3.2, 3.3, 6.6_
   - _Boundary: Shared Types (MastraRequestContextShape)_
 
-- [ ] 1.1 post-message handler の RequestContext をリクエストスコープ化し userId / searchService をセット
+- [ ] 1.1 post-message handler の RequestContext をリクエストスコープ化し user / searchService をセット
   - 既存のモジュールスコープ `const requestContext = new RequestContext<...>()` 定義を削除
   - `import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context'` を追加
-  - ハンドラ関数内で `new RequestContext<MastraRequestContextShape>()` を生成
+  - ハンドラ関数内で `new RequestContext<MastraRequestContextShape>()` を生成（リクエストスコープ化、並列リクエスト干渉防止）
   - `requestContext.set('vectorStoreId', vectorStoreId)` の直後に以下 2 つの set を追加:
-    - `requestContext.set('userId', req.user._id.toString())`
+    - `requestContext.set('user', req.user)` ← `req.user` は `loginRequiredStrictly` 通過後 `IUserHasId` として確定済み
     - `requestContext.set('searchService', crowi.searchService)` ← route factory 引数 `crowi` から取得
   - 既存ミドルウェアチェーン（accessTokenParser / loginRequiredStrictly / validator）と AI SDK ストリーミング応答層（`toAISdkStream` / `createUIMessageStream` / `pipeUIMessageStreamToResponse`）には一切触れない
-  - 観察可能完了: 認証済みリクエスト下で tool 実行時の `context.requestContext.get('userId')` が `req.user._id` 文字列を返し、`get('searchService')` が `crowi.searchService` の同一インスタンスを返し、`vectorStoreId` も従来通り取得できる。ストリーミング応答に関するコードは差分に含まれない。`MastraRequestContextShape` の key を 1 つでも set 忘れすると typecheck で警告される
+  - 観察可能完了: 認証済みリクエスト下で tool 実行時の `context.requestContext.get('user')` が `req.user` と参照同一の `IUserHasId` を返し、`get('searchService')` が `crowi.searchService` の同一インスタンスを返し、`vectorStoreId` も従来通り取得できる。ストリーミング応答に関するコードは差分に含まれない。`MastraRequestContextShape` の key を 1 つでも set 忘れすると typecheck で警告される
   - _Requirements: 3.1, 3.4, 5.4, 6.6_
   - _Boundary: Post-Message Handler_
   - _Depends: 1.0_
@@ -30,11 +31,11 @@
   - **`query.describe()` には `SearchService.parseQueryString` が解釈する全演算子を例示する**（`"phrase"` / `-word` / `-"phrase"` / `prefix:/path` / `-prefix:/path` / `tag:foo` / `-tag:foo`）。design.md「サポートするクエリ構文」の表と一致させる
   - 出力 zod schema を discriminated union（`'ok' | 'error' | 'context_error'`）で表現
   - **共有型を import**: `import type { MastraRequestContextShape } from '../types/request-context'`、`import type { RequestContext } from '@mastra/core/request-context'`
-  - execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>` で型付きキャストした後、`ctx.get('userId')` と `ctx.get('searchService')` を取り出す。**`crowi` を import しない**（依存方向: HTTP Layer → Tool Layer の片方向を維持）
+  - execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>` で型付きキャストした後、`ctx.get('user')` と `ctx.get('searchService')` を取り出す。**`crowi` を import しない**（依存方向: HTTP Layer → Tool Layer の片方向を維持）
   - 取得した値で以下のガードを順に評価し、いずれかに該当したら早期 return:
-    - `userId` または `searchService` が `undefined` → `result: 'context_error'`
+    - `user` または `searchService` が `undefined` → `result: 'context_error'`
     - `searchService.isElasticsearchEnabled === false` → `result: 'error', reason: 'elasticsearch_not_configured'`（`searchKeyword` は呼ばない）
-  - ガード通過後、`{ _id: new ObjectId(userId) }` 形状を `searchService.searchKeyword(query, null, user, null, { limit })` に渡す
+  - ガード通過後、**`requestContext.get('user')` の戻り値（`IUserHasId`）をそのまま** `searchService.searchKeyword(query, null, user, null, { limit })` に渡す。合成 user (`{ _id: ObjectId }`) の組み立て、`User.findById` での再解決は行わない（design.md 「Implementation Notes」記載の方針）
   - **`query` を tool 層でサニタイズ・改変しない**: `prefix:` / `tag:` / `"..."` / `-` 等の演算子はそのまま `searchService.searchKeyword` の第 1 引数に渡し、`parseQueryString` に解釈させる（Plan A: design.md「サポートするクエリ構文」参照）
   - 戻り値は **タプル `[ISearchResult, delegatorName]`** として分解し、`result.data[i]` から以下のマッピングで `hits` を組み立てる: `pageId ← _id` / `pagePath ← _source.path` / `snippet ← _highlight?.body?.[0]` / `totalCount ← result.meta.total`
   - **`_source` を spread しない**: ES に index 済みの `body`（Markdown 本文）が混入しないよう、必要フィールドだけを明示的に取り出す（要件 6.5 と役割分離の維持）
@@ -45,16 +46,16 @@
   - _Depends: 1.0_
 
 - [ ] 2.2 (P) ES 全文検索 tool の unit test
-  - **モック構造**: `requestContext` に `userId` (string) / `searchService` (object) を任意に set/未 set できるテストハーネスを用意。`searchService` は `{ isElasticsearchEnabled: boolean, searchKeyword: vi.fn() }` の最小形を持つ
+  - **モック構造**: `requestContext` に `user` (`IUserHasId` 形状の最小 mock) / `searchService` (object) を任意に set/未 set できるテストハーネスを用意。`searchService` は `{ isElasticsearchEnabled: boolean, searchKeyword: vi.fn() }` の最小形を持つ
   - 以下 5 種の result を網羅:
     1. **空クエリ拒否**: `query: ''` で zod 段階拒否（execute 未到達）
-    2. **context 欠如 (userId)**: `userId` 未 set → `result: 'context_error'`
+    2. **context 欠如 (user)**: `user` 未 set → `result: 'context_error'`
     3. **context 欠如 (searchService)**: `searchService` 未 set → `result: 'context_error'`
     4. **ES disabled**: `searchService.isElasticsearchEnabled === false` → `result: 'error', reason: 'elasticsearch_not_configured'`、**`searchKeyword` が呼ばれないことを assert**
     5. **SearchService 例外**: `searchKeyword.mockRejectedValue(...)` → `result: 'error'`、execute が throw しない
   - 成功ケース: `searchKeyword.mockResolvedValue([{ data: [...], meta: { total } }, 'delegator'])` で戻り値マッピングを assert
   - 戻り値マッピングで `body` が削除されること、`pagePath` / `pageId` / `snippet` が正しく抽出されることを assert
-  - `userId` が ObjectId 形状で `searchKeyword` 第 3 引数に渡されることを assert
+  - **`user` 参照同一性の assert**: `requestContext.set('user', mockUser)` でセットした `mockUser` オブジェクトが、`searchKeyword.mock.calls[0][2]` と `===` で一致すること（合成 user に組み替えていない、`User.findById` でも置き換えていない）を確認（design.md test #8、要件 6.7 / Issue 1 C 案の回帰防止）
   - **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡した場合に、tool 層で文字列が改変されず `searchKeyword` の第 1 引数にそのまま渡ることを assert（サニタイザ不在の保証、Plan A 採用根拠の回帰防止）
   - 観察可能完了: `pnpm vitest run full-text-search-tool.spec` が緑、上記すべての挙動が assert される
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8_
@@ -63,7 +64,7 @@
 
 - [ ] 2.3 (P) ES 全文検索 tool の integration test
   - 実 MongoDB + Elasticsearch + SearchService で、`GRANT_PUBLIC` / `GRANT_OWNER` / `GRANT_USER_GROUP` の各 grant パターンを setup
-  - 各パターンで認可ユーザー・非認可ユーザーから tool を呼び、hits に含まれる/含まれないが期待通りであることを assert
+  - 各パターンで認可ユーザー・非認可ユーザー（実 User ドキュメント）から tool を呼び、hits に含まれる/含まれないが期待通りであることを assert
   - ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を確認
   - 観察可能完了: `pnpm vitest run full-text-search-tool.integ` が緑、grant 反映が ES 経由で確認される
   - _Requirements: 6.1, 6.7_
@@ -76,7 +77,7 @@
   - 入力 zod schema を「pageId, pagePath いずれかが必須」になるよう `refine` で表現
   - 出力 zod schema を discriminated union（`'ok' | 'not_found_or_forbidden' | 'missing_input' | 'context_error'`）で表現
   - **共有型を import**: `import type { MastraRequestContextShape } from '../types/request-context'`、`import type { RequestContext } from '@mastra/core/request-context'`
-  - execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>` で型付きキャストした後、`ctx.get('userId')` を取り出し、`{ _id: new ObjectId(userId) }` 形状の最小オブジェクトを `Page.findByIdAndViewer` または `Page.findByPathAndViewer` に渡す
+  - execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>` で型付きキャストした後、`ctx.get('user')` を取り出し、**`IUserHasId` をそのまま** `Page.findByIdAndViewer` または `Page.findByPathAndViewer` の第 2 引数に渡す。合成 user (`{ _id: ObjectId }`) の組み立て、`User.findById` での再解決は行わない（design.md 「Implementation Notes」記載の方針）
   - 取得結果から revision を populate し `body`（Markdown 改変なし）/ `path` / `updatedAt` を返す
   - execute からは例外を throw せず、4 種の result すべてを戻り値で表現する
   - 観察可能完了: 入力欠如・context 欠如・取得失敗・成功の 4 ケースで、それぞれ対応する `result` 値が返り、`ok` 時のみ `page` フィールドが含まれる
@@ -86,7 +87,9 @@
 
 - [ ] 3.2 (P) ページ本文取得 tool の unit test
   - Page モデルをモックし、4 種の result（ok / missing_input / context_error / not_found_or_forbidden）を網羅
+  - **context 欠如 (user)**: `requestContext.get('user')` が `undefined` のとき `result: 'context_error'` を返す
   - `pageId` 指定で `findByIdAndViewer` が、`pagePath` 指定で `findByPathAndViewer` が呼ばれることを assert
+  - **`user` 参照同一性の assert**: `requestContext.set('user', mockUser)` でセットした `mockUser` オブジェクトが、`findByIdAndViewer` / `findByPathAndViewer` の第 2 引数と `===` で一致すること（合成 user に組み替えていない）を確認（要件 2.7 / Issue 1 C 案の回帰防止）
   - 成功ケースで `body` が改変されないことを確認
   - Mongoose の reject を mock しても execute が throw せず共通失敗戻り値を返すことを確認
   - 観察可能完了: `pnpm vitest run get-page-content-tool.spec` が緑、上記すべての挙動が assert される
@@ -96,7 +99,7 @@
 
 - [ ] 3.3 (P) ページ本文取得 tool の integration test
   - 実 MongoDB + 実 Page/Revision モデルで、`GRANT_PUBLIC` / `GRANT_OWNER` / `GRANT_USER_GROUP` / `GRANT_RESTRICTED` の各 grant パターンを setup
-  - 各パターンで認可ユーザー・非認可ユーザーから tool を呼び、期待 `result` を返すことを assert
+  - 各パターンで認可ユーザー・非認可ユーザー（実 User ドキュメント）から tool を呼び、期待 `result` を返すことを assert
   - 存在しない `pageId` で `not_found_or_forbidden` を返すこと（権限なしと区別されないこと）を assert
   - 既存 `page.integ.ts` の `findByIdAndViewer` テストの fixture / setup パターンを踏襲
   - 観察可能完了: `pnpm vitest run get-page-content-tool.integ` が緑、上記 grant パターンと存在しない pageId の挙動が確認される
@@ -128,7 +131,7 @@
   - 観察可能完了: 4 コマンドすべて exit 0、コメントアウトされた fileSearchTool の import が lint warn を出さない
   - _Requirements: 4.3_
 
-- [ ]* 5.2 (任意) 軽量 agent integration test
+- [ ]* 5.2 (P) (任意) 軽量 agent integration test
   - `growiAgent.tools` のキー一覧で `fullTextSearchTool` / `getPageContentTool` の存在と `fileSearchTool` の非存在を assert
   - `growiAgent.instructions` 文字列に対し以下を assert（FB Issue 2 の回帰防止）:
     - 「fullTextSearch → getPageContent → 引用パス」の利用順序を示す英語短文が含まれる
@@ -138,3 +141,4 @@
   - 観察可能完了: 該当 spec ファイルが緑、本 spec の暫定無効化（tool 登録 + instructions）と新 tool 2 つの登録の回帰防止が成立
   - _Requirements: 4.1, 6.1_
   - _Boundary: growiAgent_
+  - _Depends: 4.1_
