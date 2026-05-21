@@ -54,7 +54,7 @@ function makeEmptyPageModel() {
       cursor: () => ({
         [Symbol.asyncIterator]() {
           return {
-            next: async () => ({ value: undefined, done: true }),
+            next: async () => ({ value: undefined, done: true as const }),
           };
         },
       }),
@@ -275,7 +275,7 @@ describe('Scenario (c): 4-state legacy doc migrates to 7-state + 14 fields', () 
     // It has only the original 4 fields and intentionally lacks
     // bootstrapRetryAttempts (the migration predicate).
     await mongoose.connection.collection('vault_sync_state').insertOne({
-      _id: 'singleton',
+      _id: 'singleton' as unknown as never,
       bootstrapState: 'pending',
       bootstrapCursor: null,
       bootstrapStartedAt: null,
@@ -313,7 +313,7 @@ describe('Scenario (c): 4-state legacy doc migrates to 7-state + 14 fields', () 
     ];
 
     await mongoose.connection.collection('vault_sync_state').insertOne({
-      _id: 'singleton',
+      _id: 'singleton' as unknown as never,
       bootstrapState: 'pending',
       bootstrapCursor: null,
       bootstrapStartedAt: null,
@@ -331,7 +331,7 @@ describe('Scenario (c): 4-state legacy doc migrates to 7-state + 14 fields', () 
     // Insert a legacy 'running' doc that has no bootstrapInstanceId.
     // Migration Step 3 must normalize it to 'failed'.
     await mongoose.connection.collection('vault_sync_state').insertOne({
-      _id: 'singleton',
+      _id: 'singleton' as unknown as never,
       bootstrapState: 'running',
       bootstrapCursor: null,
       bootstrapStartedAt: new Date(),
@@ -353,7 +353,7 @@ describe('Scenario (c): 4-state legacy doc migrates to 7-state + 14 fields', () 
     // Insert a resilience-era 'running' doc that already has an instanceId.
     // Migration Step 3 must NOT touch it (it already has instanceId — not stale).
     await mongoose.connection.collection('vault_sync_state').insertOne({
-      _id: 'singleton',
+      _id: 'singleton' as unknown as never,
       bootstrapState: 'running',
       bootstrapCursor: null,
       bootstrapStartedAt: new Date(),
