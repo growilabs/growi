@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. Foundation: 共有型定義、リクエストスコープ化、user / searchService 伝搬の確立
-- [ ] 1.0 共有型定義ファイルの新設 (`services/mastra-modules/types/request-context.ts`)
+- [x] 1.0 共有型定義ファイルの新設 (`services/mastra-modules/types/request-context.ts`)
   - 新規ファイル `apps/app/src/features/mastra/server/services/mastra-modules/types/request-context.ts` を作成
   - `import type { IUserHasId } from '@growi/core'` と `import type SearchService from '~/server/service/search'` を追加（`SearchService` は default export、[search.ts:673](apps/app/src/server/service/search.ts#L673) で確認済み）
   - `export type MastraRequestContextShape = { vectorStoreId: string; user: IUserHasId; searchService: SearchService }` を export
