@@ -8,7 +8,7 @@
   - _Requirements: 1.1, 1.3_
   - _Boundary: OsResourceAttributes_
 
-- [ ] 1.2 (P) Remove growi.attachment.type from application resource attributes
+- [x] 1.2 (P) Remove growi.attachment.type from application resource attributes
   - `application-resource-attributes.ts` の返り値 attributes から `'growi.attachment.type'` 行を削除する。
   - 同ファイル内の `growiInfoService.getGrowiInfo({ includeAttachmentInfo: true })` 呼び出しから `includeAttachmentInfo: true` を除去する（このモジュールからは `attachmentType` を参照しなくなるため）。
   - `application-resource-attributes.spec.ts` から `growi.attachment.type` 関連の期待値・スタブを削除する。
