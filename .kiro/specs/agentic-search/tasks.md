@@ -72,7 +72,7 @@
   - _Depends: 2.1_
 
 - [ ] 3. Core: ページ本文取得 tool の実装とテスト
-- [ ] 3.1 ページ本文取得 tool 本体の実装
+- [x] 3.1 ページ本文取得 tool 本体の実装
   - `createTool` を用いて Mastra tool を新設
   - 入力 zod schema を「pageId, pagePath いずれかが必須」になるよう `refine` で表現
   - 出力 zod schema を discriminated union（`'ok' | 'not_found_or_forbidden' | 'missing_input' | 'context_error'`）で表現
