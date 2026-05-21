@@ -53,7 +53,7 @@
   - _Requirements: 1.4, 1.5_
   - _Boundary: TargetResolver_
 
-- [ ] 2.2 (P) ConcurrencyController: `tryRunInBackground` 1 本に集約した in-memory slot 管理を実装
+- [x] 2.2 (P) ConcurrencyController: `tryRunInBackground` 1 本に集約した in-memory slot 管理を実装
   - public API は `tryRunInBackground(opts: { userId, isAdmin, work })` / `getActiveCount` / `reset`（test のみ）の 3 つ
   - 内部で sync な acquire（per-user counter + system-wide counter の check-then-increment）→ `Promise.resolve().then(async () => { try { await work() } finally { release() } })` を schedule → 戻り値で `ok: true | false`
   - admin で `adminBypassCapacityLimit === true` の場合は system-wide 上限を skip
