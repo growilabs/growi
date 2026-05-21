@@ -172,9 +172,15 @@ const PageBulkExportSettings = (): JSX.Element => {
 
       <ConfirmModal
         isModalOpen={isReloadModalOpen}
+        title={t('admin:app_setting.page_bulk_export_reload_title')}
+        headerClassName="text-primary"
+        iconName="refresh"
         warningMessage={t('admin:app_setting.page_bulk_export_reload_prompt')}
         supplymentaryMessage={null}
         confirmButtonTitle={t('admin:app_setting.reload_page')}
+        cancelButtonTitle={t(
+          'admin:app_setting.page_bulk_export_reload_dismiss',
+        )}
         onConfirm={() => {
           window.location.reload();
           return Promise.resolve();
