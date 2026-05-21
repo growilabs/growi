@@ -44,7 +44,7 @@
 
 - [ ] 2. Core: reconcile service の各責務 module を実装
 
-- [ ] 2.1 (P) TargetResolver: target spec → MongoDB FilterQuery の純関数を実装
+- [x] 2.1 (P) TargetResolver: target spec → MongoDB FilterQuery の純関数を実装
   - `targetType: 'page' | 'sub-tree'` と `targetPath` を受け取り、`{ ok: true, query }` または `{ ok: false, reason: 'invalid-target' }` を返す
   - page → `{ path: targetPath }`、sub-tree → 自身 + descendants（`$or: [{ path }, { path: { $regex: '^' + escaped + '/' } }]`）
   - regex injection 対策として正規表現メタ文字を必ず escape、null / 空文字 / 改行を含む path は invalid
