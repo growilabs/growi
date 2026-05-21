@@ -216,7 +216,7 @@
   - _Requirements: 1.1, 1.2, 1.4, 4.1, 6.1, 6.2, 6.5, 6.6_
   - _Boundary: resilience-flow integration (fresh / migration / normal flow)_
 
-- [ ] 6.2 異常系 / force / abort の E2E 検証
+- [x] 6.2 異常系 / force / abort の E2E 検証
   - シナリオ: (a) 異常終了で `running` 残留 → 次回起動で heartbeat 期限切れ stale 検知 → retry 経由 resume、(b) max retry 到達 → escalated 状態で停留 → `POST /vault/retry/abort` で failed 降格 → env=true 再起動で resume 可能、(c) `VAULT_BOOTSTRAP_ON_START=force` 起動 → 既存 vault データ全 wipe + 新規 bootstrap + `forceWarningActive` が persist
   - 観測可能完了条件: 上記 3 シナリオが pass し、`vault.resilience.*` audit log に対応する event が emit、`force` 完了後に admin UI banner が立つ
   - _Depends: 6.1_
