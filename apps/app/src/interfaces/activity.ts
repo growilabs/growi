@@ -237,6 +237,14 @@ const ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_FAILED =
 const ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_OUT_OF_SCOPE =
   'vault.resilience.drift-sweep-out-of-scope';
 
+// GROWI Vault reconcile audit log actions
+export const ACTION_VAULT_RECONCILE_STARTED = 'vault.reconcile.started';
+export const ACTION_VAULT_RECONCILE_COMPLETED = 'vault.reconcile.completed';
+export const ACTION_VAULT_RECONCILE_FAILED = 'vault.reconcile.failed';
+export const ACTION_VAULT_RECONCILE_REJECTED = 'vault.reconcile.rejected';
+export const ACTION_VAULT_RECONCILE_PARTIAL_ACL_FILTERED =
+  'vault.reconcile.partial-acl-filtered';
+
 export const SupportedTargetModel = {
   MODEL_PAGE,
   MODEL_USER,
@@ -440,6 +448,12 @@ export const SupportedAction = {
   ACTION_VAULT_RESILIENCE_DRIFT_REPAIRED,
   ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_FAILED,
   ACTION_VAULT_RESILIENCE_DRIFT_SWEEP_OUT_OF_SCOPE,
+  // GROWI Vault reconcile actions
+  ACTION_VAULT_RECONCILE_STARTED,
+  ACTION_VAULT_RECONCILE_COMPLETED,
+  ACTION_VAULT_RECONCILE_FAILED,
+  ACTION_VAULT_RECONCILE_REJECTED,
+  ACTION_VAULT_RECONCILE_PARTIAL_ACL_FILTERED,
 } as const;
 
 // Action required for notification

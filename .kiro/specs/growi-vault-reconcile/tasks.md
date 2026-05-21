@@ -17,7 +17,7 @@
   - _Requirements: 5.1_
   - _Boundary: VaultReconcileLog model_
 
-- [ ] 1.2 (P) `vault.reconcile.*` の audit action 定数を追加
+- [x] 1.2 (P) `vault.reconcile.*` の audit action 定数を追加
   - `apps/app/src/interfaces/activity.ts` に `ACTION_VAULT_RECONCILE_STARTED` / `_COMPLETED` / `_FAILED` / `_REJECTED` / `_PARTIAL_ACL_FILTERED` の 5 定数を追加（既存 `ACTION_VAULT_RESILIENCE_*` の並びの直後）
   - 既存 audit log の type union に新規定数が含まれることを TypeScript 側で確認
   - 観察可能: 新規 5 定数が export され、TypeScript の `Action` union 型に新値が含まれる
