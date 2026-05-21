@@ -108,7 +108,7 @@
   - _Depends: 3.1_
 
 - [ ] 4. Integration: agent 配線と instructions 調整
-- [ ] 4.1 (P) growiAgent への新 tool 2 つの無条件登録と既存 fileSearchTool の暫定無効化
+- [x] 4.1 (P) growiAgent への新 tool 2 つの無条件登録と既存 fileSearchTool の暫定無効化
   - `import { fullTextSearchTool } from '../tools/full-text-search-tool'` と `import { getPageContentTool } from '../tools/get-page-content-tool'` を追加
   - `tools` オブジェクトを `{ fullTextSearchTool, getPageContentTool }` で **無条件登録**。**ES 有効/無効の判定は agent 側で行わない**（tool execute 内 `searchService.isElasticsearchEnabled` ガードに委譲、Task 2.1 参照）。`growi-agent.ts` から `crowi` を import しない
   - 既存 `fileSearchTool` の `import` 行と `tools` 登録行をコメントアウト（ソースファイル本体は削除しない）
