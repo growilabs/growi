@@ -191,7 +191,7 @@
   - _Requirements: 3.6, 5.1, 5.2, 5.3, 5.7_
   - _Boundary: vault-admin route_
 
-- [ ] 5.4 VaultAdminSettings UI を 3 セクション + 1 banner + confirm modal で拡張
+- [x] 5.4 VaultAdminSettings UI を 3 セクション + 1 banner + confirm modal で拡張
   - Completion Reliability セクション: 最終 completeness check 時刻、結果、processed / estimated、トリガー源（`env-true` / `env-force` / `admin-ui`）
   - Auto-Retry Status セクション: attemptNo / nextAttemptAt / lastError、abort ボタン（`retry.aborted === true` で disabled）、escalated 状態の reactstrap Alert 強調
   - Drift Activity セクション: lastSweepAt / lastWatermark / detectedSinceBoot / repairsEmittedSinceBoot / lastError（out-of-scope メッセージを含む）

@@ -1,6 +1,14 @@
 import type { JSX } from 'react';
 import { useCallback, useId, useState } from 'react';
 import type { StorageStatsResponse } from '@growi/core/dist/interfaces/vault';
+import {
+  Alert,
+  Button,
+  Modal,
+  ModalBody,
+  ModalFooter,
+  ModalHeader,
+} from 'reactstrap';
 import useSWR from 'swr';
 
 import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
@@ -10,7 +18,16 @@ import { toastError, toastSuccess } from '~/client/util/toastr';
 // Types
 // ============================================================================
 
-type BootstrapState = 'pending' | 'running' | 'done' | 'failed';
+type BootstrapState =
+  | 'pending'
+  | 'running'
+  | 'done'
+  | 'failed'
+  | 'retrying'
+  | 'escalated'
+  | 'verifying';
+
+type TriggerSource = 'env-true' | 'env-force' | 'admin-ui';
 
 interface VaultStatusData {
   bootstrapState: BootstrapState;
@@ -20,6 +37,39 @@ interface VaultStatusData {
   completedAt: string | null;
   lastError: string | null;
   storageStats: StorageStatsResponse | null;
+}
+
+interface ResilienceBootstrapStatus {
+  state: BootstrapState;
+  cursor: string | null;
+  startedAt: Date | null;
+  completedAt: Date | null;
+  totalEstimated: number | null;
+  processed: number;
+  lastError: string | null;
+}
+
+interface ResilienceRetryStatus {
+  attemptNo: number;
+  nextAttemptAt: Date | null;
+  lastError: string | null;
+  aborted: boolean;
+}
+
+interface ResilienceDriftStatus {
+  lastSweepAt: Date | null;
+  lastWatermark: Date | null;
+  detectedSinceBoot: number;
+  repairsEmittedSinceBoot: number;
+  lastError: string | null;
+}
+
+interface ResilienceStatusData {
+  bootstrap: ResilienceBootstrapStatus;
+  retry: ResilienceRetryStatus | null;
+  drift: ResilienceDriftStatus | null;
+  lastTriggerSource: TriggerSource | null;
+  forceWarningActive: boolean;
 }
 
 // ============================================================================
@@ -116,64 +166,6 @@ const FeatureToggleSection = ({
                 Enabling it now will cause git clients to receive 503 errors.
               </div>
             )}
-          </div>
-        </div>
-      </div>
-    </div>
-  );
-};
-
-/** Bootstrap operation: trigger the initial bootstrap. */
-const BootstrapOperationSection = ({
-  bootstrapState,
-  onBootstrap,
-}: {
-  bootstrapState: BootstrapState | undefined;
-  onBootstrap: () => Promise<void>;
-}): JSX.Element => {
-  const [isStarting, setIsStarting] = useState(false);
-  const isRunning = bootstrapState === 'running';
-
-  const handleClick = useCallback(async () => {
-    setIsStarting(true);
-    try {
-      await onBootstrap();
-    } finally {
-      setIsStarting(false);
-    }
-  }, [onBootstrap]);
-
-  return (
-    <div className="row mb-5">
-      <div className="col-lg-12">
-        <h2 className="admin-setting-header">Bootstrap Operation</h2>
-
-        <div className="row">
-          <div className="col-md-3"></div>
-          <div className="col-md-9">
-            <button
-              type="button"
-              className="btn btn-primary"
-              disabled={isRunning || isStarting}
-              onClick={handleClick}
-            >
-              {isRunning || isStarting ? (
-                <>
-                  <span
-                    className="spinner-border spinner-border-sm me-2"
-                    role="status"
-                    aria-hidden="true"
-                  />
-                  Running...
-                </>
-              ) : (
-                'Prepare GROWI Vault'
-              )}
-            </button>
-            <p className="form-text text-muted mt-2">
-              Seeds all GROWI pages into the Vault git repository. Run this once
-              before enabling the Vault feature for the first time.
-            </p>
           </div>
         </div>
       </div>
@@ -355,6 +347,188 @@ const AuditLogFilterSection = (): JSX.Element => {
   );
 };
 
+/** Completion Reliability section: last completeness check time, result, counts, trigger source. */
+const CompletionReliabilitySection = ({
+  resilienceData,
+}: {
+  resilienceData: ResilienceStatusData | undefined;
+}): JSX.Element => {
+  const bootstrap = resilienceData?.bootstrap;
+
+  return (
+    <div className="row mb-5">
+      <div className="col-lg-12">
+        <h2 className="admin-setting-header">Completion Reliability</h2>
+
+        <table className="table table-sm table-bordered">
+          <tbody>
+            <tr>
+              <th className="col-md-4">Check Result</th>
+              <td>
+                <span className="badge bg-secondary">
+                  {bootstrap?.state ?? '—'}
+                </span>
+              </td>
+            </tr>
+            <tr>
+              <th>Last Completed At</th>
+              <td>
+                {bootstrap?.completedAt != null
+                  ? new Date(bootstrap.completedAt).toLocaleString()
+                  : '—'}
+              </td>
+            </tr>
+            <tr>
+              <th>Processed / Estimated</th>
+              <td>
+                {bootstrap?.processed ?? 0} / {bootstrap?.totalEstimated ?? '—'}
+              </td>
+            </tr>
+            <tr>
+              <th>Trigger Source</th>
+              <td>{resilienceData?.lastTriggerSource ?? '—'}</td>
+            </tr>
+            {bootstrap?.lastError != null && (
+              <tr>
+                <th>Last Error</th>
+                <td className="text-danger">{bootstrap.lastError}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+};
+
+/** Auto-Retry Status section: attempt info, abort button, escalation emphasis. */
+const AutoRetryStatusSection = ({
+  retryStatus,
+  bootstrapState,
+  onAbort,
+}: {
+  retryStatus: ResilienceRetryStatus;
+  bootstrapState: BootstrapState | undefined;
+  onAbort: () => Promise<void>;
+}): JSX.Element => {
+  const [isAborting, setIsAborting] = useState(false);
+  const isEscalated = bootstrapState === 'escalated';
+
+  const handleAbort = useCallback(async () => {
+    setIsAborting(true);
+    try {
+      await onAbort();
+    } finally {
+      setIsAborting(false);
+    }
+  }, [onAbort]);
+
+  return (
+    <div className="row mb-5">
+      <div className="col-lg-12">
+        <h2 className="admin-setting-header">Auto-Retry Status</h2>
+
+        {isEscalated && (
+          <Alert color="danger" className="mb-3">
+            <span className="material-symbols-outlined me-1 align-middle">
+              error
+            </span>
+            Bootstrap has reached the <strong>escalated</strong> state.
+            Auto-retry has been exhausted. Manual intervention is required.
+          </Alert>
+        )}
+
+        <table className="table table-sm table-bordered">
+          <tbody>
+            <tr>
+              <th className="col-md-4">Attempt No.</th>
+              <td>{retryStatus.attemptNo}</td>
+            </tr>
+            <tr>
+              <th>Next Attempt At</th>
+              <td>
+                {retryStatus.nextAttemptAt != null
+                  ? new Date(retryStatus.nextAttemptAt).toLocaleString()
+                  : '—'}
+              </td>
+            </tr>
+            {retryStatus.lastError != null && (
+              <tr>
+                <th>Last Error</th>
+                <td className="text-danger">{retryStatus.lastError}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        <Button
+          color="warning"
+          disabled={retryStatus.aborted || isAborting}
+          onClick={handleAbort}
+        >
+          {isAborting ? 'Aborting…' : 'Abort Auto-Retry'}
+        </Button>
+      </div>
+    </div>
+  );
+};
+
+/** Drift Activity section: sweep stats and out-of-scope notice. */
+const DriftActivitySection = ({
+  driftStatus,
+}: {
+  driftStatus: ResilienceDriftStatus;
+}): JSX.Element => {
+  return (
+    <div className="row mb-5">
+      <div className="col-lg-12">
+        <h2 className="admin-setting-header">Drift Activity</h2>
+
+        <table className="table table-sm table-bordered">
+          <tbody>
+            <tr>
+              <th className="col-md-4">Last Sweep At</th>
+              <td>
+                {driftStatus.lastSweepAt != null
+                  ? new Date(driftStatus.lastSweepAt).toLocaleString()
+                  : '—'}
+              </td>
+            </tr>
+            <tr>
+              <th>Last Watermark</th>
+              <td>
+                {driftStatus.lastWatermark != null
+                  ? new Date(driftStatus.lastWatermark).toLocaleString()
+                  : '—'}
+              </td>
+            </tr>
+            <tr>
+              <th>Detected Since Boot</th>
+              <td>{driftStatus.detectedSinceBoot}</td>
+            </tr>
+            <tr>
+              <th>Repairs Emitted Since Boot</th>
+              <td>{driftStatus.repairsEmittedSinceBoot}</td>
+            </tr>
+            {driftStatus.lastError != null && (
+              <tr>
+                <th>Last Error</th>
+                <td className="text-danger">{driftStatus.lastError}</td>
+              </tr>
+            )}
+          </tbody>
+        </table>
+
+        <p className="form-text text-muted mt-2">
+          <strong>Note (out-of-scope):</strong> Path change drift (rename / hard
+          delete) and grant drop drift are not detected in v1. These require
+          future <code>growi-vault-ha</code> support.
+        </p>
+      </div>
+    </div>
+  );
+};
+
 // ============================================================================
 // Main component
 // ============================================================================
@@ -364,16 +538,19 @@ const AuditLogFilterSection = (): JSX.Element => {
  *
  * Sections:
  *   1. Feature toggle  — enable / disable the Vault feature
- *   2. Bootstrap       — trigger the initial data seeding
+ *   2. Bootstrap       — trigger the initial data seeding (with confirm modal when state is 'done')
  *   3. Bootstrap status — progress and timestamps
- *   4. Storage observability — repository stats from vault-manager
- *   5. Audit log filter link — quick link to vault-related audit log entries
+ *   4. Completion Reliability — completeness check metrics from resilience layer
+ *   5. Auto-Retry Status — retry attempt info (shown only when retry data exists)
+ *   6. Drift Activity — drift detection sweep stats (shown only when drift data exists)
+ *   7. Storage observability — repository stats from vault-manager
+ *   8. Audit log filter link — quick link to vault-related audit log entries
  *
  * Data is polled every 5 s via SWR so operators can watch bootstrap progress
  * without manually refreshing the page.
  */
 export const VaultAdminSettings = (): JSX.Element => {
-  // ---- SWR polling ----
+  // ---- SWR polling: existing /vault/status (backward compat) ----
   const { data, mutate } = useSWR<VaultStatusData>(
     '/vault/status',
     (endpoint: string) =>
@@ -383,14 +560,23 @@ export const VaultAdminSettings = (): JSX.Element => {
     { refreshInterval: 5000 },
   );
 
+  // ---- SWR polling: new /vault/resilience-status ----
+  const { data: resilienceData, mutate: mutateResilience } =
+    useSWR<ResilienceStatusData>(
+      '/vault/resilience-status',
+      (endpoint: string) =>
+        apiv3Get<{ data: ResilienceStatusData }>(endpoint).then(
+          (res) => res.data.data,
+        ),
+      { refreshInterval: 5000 },
+    );
+
   // ---- Derived state ----
   // vaultEnabled is not part of /status — we track it locally.
-  // The API response does not expose the config flag directly; the
-  // feature-gate check is the canonical source of truth (bootstrapState
-  // being 'done' implies the operator enabled it at some point), but we
-  // maintain a local toggle state and keep it in sync via optimistic updates.
   const [vaultEnabled, setVaultEnabled] = useState<boolean>(false);
 
+  // ---- Confirm modal state for "done-state" re-bootstrap ----
+  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   // ---- Handlers ----
 
   const handleToggle = useCallback(async (enabled: boolean) => {
@@ -405,34 +591,150 @@ export const VaultAdminSettings = (): JSX.Element => {
     }
   }, []);
 
-  const handleBootstrap = useCallback(async () => {
+  const executeBootstrap = useCallback(async () => {
     try {
       await apiv3Post('/vault/bootstrap', {});
       toastSuccess(
         'Bootstrap started. Monitor progress in the Bootstrap Status section.',
       );
-      // Immediately refresh status so the running state appears without waiting
-      // for the next polling tick.
       await mutate();
+      await mutateResilience();
     } catch (errs) {
       toastError(errs);
     }
-  }, [mutate]);
+  }, [mutate, mutateResilience]);
+
+  const handleBootstrap = useCallback(async () => {
+    // When bootstrap is already done, require explicit confirmation because
+    // re-running involves a full wipe (requirement 1.10).
+    if (data?.bootstrapState === 'done') {
+      setIsConfirmModalOpen(true);
+      return;
+    }
+    await executeBootstrap();
+  }, [data?.bootstrapState, executeBootstrap]);
+
+  const handleConfirmBootstrap = useCallback(async () => {
+    setIsConfirmModalOpen(false);
+    await executeBootstrap();
+  }, [executeBootstrap]);
+
+  const handleAbortRetry = useCallback(async () => {
+    try {
+      await apiv3Post('/vault/retry/abort', {});
+      toastSuccess('Auto-retry aborted.');
+      await mutateResilience();
+    } catch (errs) {
+      toastError(errs);
+    }
+  }, [mutateResilience]);
 
   return (
     <div data-testid="growi-vault-admin-settings">
+      {/* Force Warning Banner — persistent danger alert when env-force is still active */}
+      {resilienceData?.forceWarningActive === true && (
+        <Alert color="danger" className="mb-4">
+          <span className="material-symbols-outlined me-1 align-middle">
+            warning
+          </span>
+          <strong>Warning:</strong> The last bootstrap was triggered by{' '}
+          <code>VAULT_BOOTSTRAP_ON_START=force</code>. Restarting the server
+          while this env var is still set to <code>force</code> will wipe all
+          vault data again. Please change the env var to <code>true</code> or{' '}
+          <code>false</code>.
+        </Alert>
+      )}
+
       <FeatureToggleSection
         vaultEnabled={vaultEnabled}
         bootstrapState={data?.bootstrapState}
         onToggle={handleToggle}
       />
 
-      <BootstrapOperationSection
-        bootstrapState={data?.bootstrapState}
-        onBootstrap={handleBootstrap}
-      />
+      {/* Bootstrap operation with done-state confirm modal */}
+      <div className="row mb-5">
+        <div className="col-lg-12">
+          <h2 className="admin-setting-header">Bootstrap Operation</h2>
+
+          <div className="row">
+            <div className="col-md-3"></div>
+            <div className="col-md-9">
+              <button
+                type="button"
+                className="btn btn-primary"
+                disabled={
+                  data?.bootstrapState === 'running' ||
+                  data?.bootstrapState === 'verifying'
+                }
+                onClick={handleBootstrap}
+              >
+                {data?.bootstrapState === 'running' ||
+                data?.bootstrapState === 'verifying' ? (
+                  <>
+                    <span
+                      className="spinner-border spinner-border-sm me-2"
+                      role="status"
+                      aria-hidden="true"
+                    />
+                    Running...
+                  </>
+                ) : (
+                  'Prepare GROWI Vault'
+                )}
+              </button>
+              <p className="form-text text-muted mt-2">
+                Seeds all GROWI pages into the Vault git repository. Run this
+                once before enabling the Vault feature for the first time.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Confirm modal: shown when bootstrap is already done (re-run = full wipe) */}
+      <Modal
+        isOpen={isConfirmModalOpen}
+        toggle={() => setIsConfirmModalOpen(false)}
+      >
+        <ModalHeader toggle={() => setIsConfirmModalOpen(false)}>
+          Confirm Re-Bootstrap
+        </ModalHeader>
+        <ModalBody>
+          <p>
+            Bootstrap has already completed. Running it again will perform a{' '}
+            <strong>full wipe</strong> of all existing vault data before
+            re-seeding from MongoDB.
+          </p>
+          <p>Are you sure you want to proceed?</p>
+        </ModalBody>
+        <ModalFooter>
+          <Button color="danger" onClick={handleConfirmBootstrap}>
+            Confirm
+          </Button>
+          <Button
+            color="secondary"
+            onClick={() => setIsConfirmModalOpen(false)}
+          >
+            Cancel
+          </Button>
+        </ModalFooter>
+      </Modal>
 
       <BootstrapStatusSection data={data} />
+
+      <CompletionReliabilitySection resilienceData={resilienceData} />
+
+      {resilienceData?.retry != null && (
+        <AutoRetryStatusSection
+          retryStatus={resilienceData.retry}
+          bootstrapState={resilienceData.bootstrap.state}
+          onAbort={handleAbortRetry}
+        />
+      )}
+
+      {resilienceData?.drift != null && (
+        <DriftActivitySection driftStatus={resilienceData.drift} />
+      )}
 
       <StorageObservabilitySection storageStats={data?.storageStats} />
 
