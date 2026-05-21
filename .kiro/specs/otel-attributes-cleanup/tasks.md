@@ -24,7 +24,7 @@
   - _Requirements: 2.1, 2.2, 2.3_
   - _Boundary: ApplicationMetrics_
 
-- [ ] 3. (P) Implement and test SystemMetrics module
+- [x] 3. (P) Implement and test SystemMetrics module
   - `apps/app/src/features/opentelemetry/server/custom-metrics/system-metrics.ts` を新規作成し、`addSystemMetrics(): void` を export する。`loggerFactory('growi:opentelemetry:custom-metrics:system')` と `diag.createComponentLogger({ namespace: 'growi:custom-metrics:system' })` を既存 `application-metrics.ts` と同様のパターンで初期化する。
   - 単一 Meter `growi-system-metrics`（version `'1.0.0'`）を `metrics.getMeter` で取得し、`createObservableGauge` で 6 つの gauge を作成する: `system.memory.limit`, `system.host.memory.total`, `process.memory.usage`, `process.runtime.v8.heap.used`, `process.runtime.v8.heap.total`, `process.runtime.v8.heap.external`。すべて unit は `By`。
   - 1 つの `addBatchObservableCallback` 内で `process.constrainedMemory()` / `os.totalmem()` / `process.memoryUsage()` / `v8.getHeapStatistics()` を 1 回ずつ呼び、戻り値をローカル変数に保持してから各 gauge を `result.observe(...)` で観測する。`process.constrainedMemory()` の戻り値が 0 もしくは falsy のときは `system.memory.limit` のみスキップし、他 5 メトリクスは常に観測する。
