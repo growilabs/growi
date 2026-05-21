@@ -34,7 +34,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.2_
   - _Boundary: SystemMetrics_
 
-- [ ] 4. Wire addSystemMetrics into setupCustomMetrics
+- [x] 4. Wire addSystemMetrics into setupCustomMetrics
   - `custom-metrics/index.ts` のトップに `export { addSystemMetrics } from './system-metrics';` を追加する。
   - `setupCustomMetrics()` 内で既存 3 関数（`addApplicationMetrics`, `addUserCountsMetrics`, `addPageCountsMetrics`）と同じ dynamic import パターンで `system-metrics` をロードし、`addSystemMetrics()` を呼ぶ。
   - 完了状態: サーバー起動時のログに `growi:opentelemetry:custom-metrics:system` namespace の "Starting system metrics collection" / "...started successfully" が出力される。`pnpm vitest run` で既存の opentelemetry 関連テスト（特に node-sdk.spec）がパスする。
