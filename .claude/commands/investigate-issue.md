@@ -1,9 +1,9 @@
 ---
-name: invest-issue
-description: Investigate a GitHub issue - fetch info, update labels, analyze code/reproduce, report findings, and optionally fix. Usage: /invest-issue <issue-url-or-number>
+name: investigate-issue
+description: Investigate a GitHub issue - fetch info, update labels, analyze code/reproduce, report findings, and optionally fix. Usage: /investigate-issue <issue-url-or-number>
 ---
 
-# /invest-issue — Issue Investigation
+# /investigate-issue — Issue Investigation
 
 Investigate a GROWI GitHub issue end-to-end: fetch details, label it, analyze or reproduce the problem, report findings, and proceed to fix if approved.
 

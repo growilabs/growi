@@ -23,8 +23,13 @@
       ],
       "outputLogs": "new-only"
     },
+    "prisma:generate": {
+      "outputs": ["src/generated/prisma/**"],
+      "inputs": ["prisma/schema.prisma"],
+      "outputLogs": "new-only"
+    },
     "build": {
-      "dependsOn": ["^build", "pre:styles-commons", "pre:styles-components"],
+      "dependsOn": ["^build", "pre:styles-commons", "pre:styles-components", "prisma:generate"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
       "inputs": [
         "next.config.ts",

@@ -238,11 +238,22 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
 
   return (
     <li key={pageData._id}>
-      <button
-        type="button"
+      {/* biome-ignore lint/a11y/useSemanticElements: cannot use <button> here because PageItemControl renders a nested <button> (DropdownToggle) */}
+      <div
+        role="button"
+        tabIndex={0}
         className={`list-group-item d-flex align-items-center px-3 px-md-1 text-start w-100 ${styleListGroupItem} ${styleActive}`}
         data-testid="page-list-item-L"
         onClick={clickHandler}
+        onKeyDown={(e) => {
+          if (
+            e.target === e.currentTarget &&
+            (e.key === 'Enter' || e.key === ' ')
+          ) {
+            e.preventDefault();
+            clickHandler();
+          }
+        }}
       >
         <div className="text-break w-100">
           <div className="d-flex">
@@ -365,7 +376,7 @@ const PageListItemLSubstance: ForwardRefRenderFunction<ISelectable, Props> = (
           </div>
         </div>
         {/* TODO: adjust snippet position */}
-      </button>
+      </div>
     </li>
   );
 };

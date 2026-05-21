@@ -18,7 +18,7 @@ export async function getApplicationResourceAttributes(): Promise<Attributes> {
     const { growiInfoService } = await import('~/server/service/growi-info');
 
     const growiInfo = await growiInfoService.getGrowiInfo({
-      includeInstalledInfo: true,
+      includeAttachmentInfo: true,
     });
 
     const attributes: Attributes = {
@@ -26,11 +26,6 @@ export async function getApplicationResourceAttributes(): Promise<Attributes> {
       'growi.service.type': growiInfo.type,
       'growi.deployment.type': growiInfo.deploymentType,
       'growi.attachment.type': growiInfo.additionalInfo?.attachmentType,
-
-      // Installation information (fixed values)
-      'growi.installedAt': growiInfo.additionalInfo?.installedAt?.toISOString(),
-      'growi.installedAt.by_oldest_user':
-        growiInfo.additionalInfo?.installedAtByOldestUser?.toISOString(),
     };
 
     logger.info({ attributes }, 'Application resource attributes collected');
