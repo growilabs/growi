@@ -1,9 +1,9 @@
 {
   "feature_name": "otel-attributes-cleanup",
   "created_at": "2026-05-21T00:00:00.000Z",
-  "updated_at": "2026-05-21T02:00:00.000Z",
+  "updated_at": "2026-05-21T03:30:00.000Z",
   "language": "ja",
-  "phase": "design-generated",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -11,12 +11,12 @@
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "tasks": {
-      "generated": false,
-      "approved": false
+      "generated": true,
+      "approved": true
     }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true
 }
