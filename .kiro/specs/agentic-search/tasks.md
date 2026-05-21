@@ -45,7 +45,7 @@
   - _Boundary: FullTextSearchTool_
   - _Depends: 1.0_
 
-- [ ] 2.2 (P) ES 全文検索 tool の unit test
+- [x] 2.2 (P) ES 全文検索 tool の unit test
   - **モック構造**: `requestContext` に `user` (`IUserHasId` 形状の最小 mock) / `searchService` (object) を任意に set/未 set できるテストハーネスを用意。`searchService` は `{ isElasticsearchEnabled: boolean, searchKeyword: vi.fn() }` の最小形を持つ
   - 以下 5 種の result を網羅:
     1. **空クエリ拒否**: `query: ''` で zod 段階拒否（execute 未到達）
