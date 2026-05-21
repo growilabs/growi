@@ -1,16 +1,27 @@
 # Implementation Plan
 
-- [ ] 1. Foundation: リクエストスコープ化と userId 伝搬の確立
+- [ ] 1. Foundation: 共有型定義、リクエストスコープ化、userId / searchService 伝搬の確立
+- [ ] 1.0 共有型定義ファイルの新設 (`services/mastra-modules/types/request-context.ts`)
+  - 新規ファイル `apps/app/src/features/mastra/server/services/mastra-modules/types/request-context.ts` を作成
+  - `import type SearchService from '~/server/service/search'`（`SearchService` は default export、[search.ts:673](apps/app/src/server/service/search.ts#L673) で確認済み）
+  - `export type MastraRequestContextShape = { vectorStoreId: string; userId: string; searchService: SearchService }` を export
+  - 型ファイル単独のため tests は不要。lint / typecheck で構文確認のみ
+  - 観察可能完了: post-message.ts および各 tool ファイルが `import type { MastraRequestContextShape } from '...'` で参照可能になる。`pnpm run lint:typecheck` が通る
+  - _Requirements: 3.1, 3.2, 3.3, 6.6（型レベルで「key の存在」を担保）_
+  - _Boundary: Shared Types (MastraRequestContextShape)_
+
 - [ ] 1.1 post-message handler の RequestContext をリクエストスコープ化し userId / searchService をセット
   - 既存のモジュールスコープ `const requestContext = new RequestContext<...>()` 定義を削除
-  - ハンドラ関数内で `new RequestContext<{ vectorStoreId: string; userId: string; searchService: SearchService }>()` を生成
+  - `import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context'` を追加
+  - ハンドラ関数内で `new RequestContext<MastraRequestContextShape>()` を生成
   - `requestContext.set('vectorStoreId', vectorStoreId)` の直後に以下 2 つの set を追加:
     - `requestContext.set('userId', req.user._id.toString())`
     - `requestContext.set('searchService', crowi.searchService)` ← route factory 引数 `crowi` から取得
   - 既存ミドルウェアチェーン（accessTokenParser / loginRequiredStrictly / validator）と AI SDK ストリーミング応答層（`toAISdkStream` / `createUIMessageStream` / `pipeUIMessageStreamToResponse`）には一切触れない
-  - 観察可能完了: 認証済みリクエスト下で tool 実行時の `context.requestContext.get('userId')` が `req.user._id` 文字列を返し、`get('searchService')` が `crowi.searchService` の同一インスタンスを返し、`vectorStoreId` も従来通り取得できる。ストリーミング応答に関するコードは差分に含まれない
+  - 観察可能完了: 認証済みリクエスト下で tool 実行時の `context.requestContext.get('userId')` が `req.user._id` 文字列を返し、`get('searchService')` が `crowi.searchService` の同一インスタンスを返し、`vectorStoreId` も従来通り取得できる。ストリーミング応答に関するコードは差分に含まれない。`MastraRequestContextShape` の key を 1 つでも set 忘れすると typecheck で警告される
   - _Requirements: 3.1, 3.4, 5.4, 6.6_
   - _Boundary: Post-Message Handler_
+  - _Depends: 1.0_
 
 - [ ] 2. Core: ES 全文検索 tool の実装とテスト
 - [ ] 2.1 ES 全文検索 tool 本体の実装
@@ -18,7 +29,8 @@
   - 入力 zod schema: `query: z.string().min(1)`、`limit?: z.number().int().positive().max(20).default(10)`
   - **`query.describe()` には `SearchService.parseQueryString` が解釈する全演算子を例示する**（`"phrase"` / `-word` / `-"phrase"` / `prefix:/path` / `-prefix:/path` / `tag:foo` / `-tag:foo`）。design.md「サポートするクエリ構文」の表と一致させる
   - 出力 zod schema を discriminated union（`'ok' | 'error' | 'context_error'`）で表現
-  - execute 内で `requestContext.get('userId')` と **`requestContext.get('searchService')`** を取り出す。**`crowi` を import しない**（依存方向: HTTP Layer → Tool Layer の片方向を維持）
+  - **共有型を import**: `import type { MastraRequestContextShape } from '../types/request-context'`、`import type { RequestContext } from '@mastra/core/request-context'`
+  - execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>` で型付きキャストした後、`ctx.get('userId')` と `ctx.get('searchService')` を取り出す。**`crowi` を import しない**（依存方向: HTTP Layer → Tool Layer の片方向を維持）
   - 取得した値で以下のガードを順に評価し、いずれかに該当したら早期 return:
     - `userId` または `searchService` が `undefined` → `result: 'context_error'`
     - `searchService.isElasticsearchEnabled === false` → `result: 'error', reason: 'elasticsearch_not_configured'`（`searchKeyword` は呼ばない）
@@ -30,6 +42,7 @@
   - 観察可能完了: 5 ケース（空クエリ拒否 / context 欠如 / ES disabled / SearchService 成功 / SearchService 例外）すべてで対応する `result` 値が返り、`ok` 時の `hits` 配列に `pagePath` が含まれ、`body` を含むキーが一切現れない
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 3.2_
   - _Boundary: FullTextSearchTool_
+  - _Depends: 1.0_
 
 - [ ] 2.2 (P) ES 全文検索 tool の unit test
   - **モック構造**: `requestContext` に `userId` (string) / `searchService` (object) を任意に set/未 set できるテストハーネスを用意。`searchService` は `{ isElasticsearchEnabled: boolean, searchKeyword: vi.fn() }` の最小形を持つ
@@ -62,12 +75,14 @@
   - `createTool` を用いて Mastra tool を新設
   - 入力 zod schema を「pageId, pagePath いずれかが必須」になるよう `refine` で表現
   - 出力 zod schema を discriminated union（`'ok' | 'not_found_or_forbidden' | 'missing_input' | 'context_error'`）で表現
-  - execute 内で `requestContext.get('userId')` を取り出し、`{ _id: new ObjectId(userId) }` 形状の最小オブジェクトを `Page.findByIdAndViewer` または `Page.findByPathAndViewer` に渡す
+  - **共有型を import**: `import type { MastraRequestContextShape } from '../types/request-context'`、`import type { RequestContext } from '@mastra/core/request-context'`
+  - execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>` で型付きキャストした後、`ctx.get('userId')` を取り出し、`{ _id: new ObjectId(userId) }` 形状の最小オブジェクトを `Page.findByIdAndViewer` または `Page.findByPathAndViewer` に渡す
   - 取得結果から revision を populate し `body`（Markdown 改変なし）/ `path` / `updatedAt` を返す
   - execute からは例外を throw せず、4 種の result すべてを戻り値で表現する
   - 観察可能完了: 入力欠如・context 欠如・取得失敗・成功の 4 ケースで、それぞれ対応する `result` 値が返り、`ok` 時のみ `page` フィールドが含まれる
   - _Requirements: 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 2.7, 3.2, 3.3, 5.3_
   - _Boundary: GetPageContentTool_
+  - _Depends: 1.0_
 
 - [ ] 3.2 (P) ページ本文取得 tool の unit test
   - Page モデルをモックし、4 種の result（ok / missing_input / context_error / not_found_or_forbidden）を網羅

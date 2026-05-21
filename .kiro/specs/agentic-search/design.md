@@ -153,8 +153,10 @@ Key 決定:
 ```
 apps/app/src/features/mastra/server/
 ├── routes/
-│   └── post-message.ts                         # Modified: RequestContext 型拡張 + userId set + リクエストスコープ化
+│   └── post-message.ts                         # Modified: RequestContext 型拡張 + userId / searchService set + リクエストスコープ化
 └── services/mastra-modules/
+    ├── types/
+    │   └── request-context.ts                  # New: 共有型 MastraRequestContextShape の単一情報源
     ├── agents/
     │   └── growi-agent.ts                      # Modified: tools 構成変更 + instructions 微調整
     └── tools/
@@ -172,12 +174,13 @@ apps/app/src/features/mastra/server/
 | File | 変更内容 |
 |---|---|
 | `agents/growi-agent.ts` | `fileSearchTool` の import + `tools` 登録をコメントアウト。`fullTextSearchTool` / `getPageContentTool` の import 追加と `tools` への **無条件登録**（ES 判定は tool execute 側）。`instructions` の既存 `Use the fileSearch tool ...` 行をコメントアウトし、「全文検索 → 必要なら本文取得 → 引用パス含有」と「`fullTextSearch` の `query` は `"..."` / `-word` / `prefix:/path` / `tag:foo` 等の演算子を組み合わせ可」を英語短文で追記 |
-| `routes/post-message.ts` | **モジュールスコープの `const requestContext = new RequestContext<...>()` を削除し、ハンドラ関数内で `new RequestContext<{ vectorStoreId: string; userId: string; searchService: SearchService }>()` を生成する構造に変更**（並列リクエスト干渉防止）。`requestContext.set('vectorStoreId', ...)` の直後に `requestContext.set('userId', req.user._id.toString())` と `requestContext.set('searchService', crowi.searchService)` を追加 |
+| `routes/post-message.ts` | **モジュールスコープの `const requestContext = new RequestContext<...>()` を削除し、ハンドラ関数内で `new RequestContext<MastraRequestContextShape>()` を生成する構造に変更**（並列リクエスト干渉防止、`MastraRequestContextShape` は `services/mastra-modules/types/request-context.ts` から import）。`requestContext.set('vectorStoreId', ...)` の直後に `requestContext.set('userId', req.user._id.toString())` と `requestContext.set('searchService', crowi.searchService)` を追加 |
 
 ### New Files
 
 | File | 責務 |
 |---|---|
+| `types/request-context.ts` | **共有型の単一情報源**。`MastraRequestContextShape = { vectorStoreId: string; userId: string; searchService: SearchService }` を export。post-message.ts / 各 tool / 将来追加される tool が全て import して `RequestContext<MastraRequestContextShape>` および `context.requestContext as RequestContext<MastraRequestContextShape>` の形で参照する |
 | `tools/full-text-search-tool.ts` | Mastra tool の定義（`createTool` 呼び出し、zod schema、execute）。`SearchService.searchKeyword()` の薄い adapter |
 | `tools/full-text-search-tool.spec.ts` | unit test。zod 入力検証、guard ロジック、SearchService をモックして戻り値変換を確認 |
 | `tools/full-text-search-tool.integ.ts` | integration test。実 MongoDB / Elasticsearch 上で GRANT_* 各パターンの検索ヒット可否を確認 |
@@ -185,7 +188,7 @@ apps/app/src/features/mastra/server/
 | `tools/get-page-content-tool.spec.ts` | unit test。zod 入力検証、guard ロジック、Page モデルをモックして戻り値変換を確認 |
 | `tools/get-page-content-tool.integ.ts` | integration test。実 MongoDB 上で GRANT_* 各パターンの取得可否を確認 |
 
-各ファイルは単一責務。新規 export は `fullTextSearchTool` / `getPageContentTool`（tool 定数）と内部 helper のみ（barrel 不要）。
+各ファイルは単一責務。新規 export は `MastraRequestContextShape`（共有型）、`fullTextSearchTool` / `getPageContentTool`（tool 定数）と内部 helper のみ（barrel 不要）。
 
 ## System Flows
 
@@ -309,14 +312,46 @@ Key 決定:
 
 ## Components and Interfaces
 
+### Shared Types
+
+#### MastraRequestContextShape (新規)
+
+| Field | Detail |
+|---|---|
+| Intent | post-message handler が `set` し、各 Mastra tool の execute が `get` する全 key の型シェイプを単一情報源として定義 |
+| Requirements | 3.1, 3.2, 3.3, 6.6 (型レベルで「key の存在」を担保) |
+| File | `services/mastra-modules/types/request-context.ts` |
+
+```typescript
+import type SearchService from '~/server/service/search';
+
+/**
+ * post-message handler が set し、Mastra tool の execute が get する
+ * RequestContext key 群の型シェイプ。
+ * - 追加 / リネーム時はこの 1 ファイルを更新するだけで型不整合が
+ *   handler / 全 tool 側に伝播する。
+ */
+export type MastraRequestContextShape = {
+  vectorStoreId: string;
+  userId: string;
+  searchService: SearchService;
+};
+```
+
+**利用パターン**:
+- **post-message.ts (writer)**: `new RequestContext<MastraRequestContextShape>()` で生成
+- **各 tool の execute (reader)**: `context.requestContext as RequestContext<MastraRequestContextShape>` で型付きキャスト後 `get('searchService')` 等を呼ぶ。Mastra ランタイムが `context` を typed で渡せない場合の保険として、`typeof returnValue` のランタイム型ガードは引き続き残す（既存 `fileSearchTool` パターンと整合）
+- **将来 tool 追加時**: 新 key を `MastraRequestContextShape` に追加 → 影響箇所が TypeScript エラーで全列挙される
+
 ### Summary
 
 | Component | Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |---|---|---|---|---|---|
-| `FullTextSearchTool` | Tool | 自然言語クエリで wiki 検索ヒット（pagePath / pageId / snippet）を grant 委譲取得。ES 未設定環境では execute 内で早期 `result: 'error'` を返す | 6.1–6.8, 3.2 | `SearchService.searchKeyword` (P0), `SearchService.isElasticsearchEnabled` (P0), `RequestContext` (P0) | Service |
-| `GetPageContentTool` | Tool | `pageId` / `pagePath` で本文を grant 委譲取得 | 2.1–2.7, 3.2, 3.3, 5.3 | `Page.findByIdAndViewer` (P0), `RequestContext` (P0), `populateDataToShowRevision` (P0) | Service |
+| `MastraRequestContextShape` (Shared Type) | Types | post-message handler と全 tool 間で `RequestContext` の key 契約を共有 | 3.1, 3.2, 3.3, 6.6 | `SearchService` (type, P0) | — |
+| `FullTextSearchTool` | Tool | 自然言語クエリで wiki 検索ヒット（pagePath / pageId / snippet）を grant 委譲取得。ES 未設定環境では execute 内で早期 `result: 'error'` を返す | 6.1–6.8, 3.2 | `MastraRequestContextShape` (P0), `SearchService.searchKeyword` (P0, via requestContext), `SearchService.isElasticsearchEnabled` (P0, via requestContext) | Service |
+| `GetPageContentTool` | Tool | `pageId` / `pagePath` で本文を grant 委譲取得 | 2.1–2.7, 3.2, 3.3, 5.3 | `MastraRequestContextShape` (P0), `Page.findByIdAndViewer` (P0), `populateDataToShowRevision` (P0) | Service |
 | `growiAgent` (Extension) | Agent | RAG ループの自律実行 + tools 構成 + instructions | 1.1–1.6, 4.1–4.3, 5.1–5.3 | `fullTextSearchTool` (P0), `getPageContentTool` (P0), Memory (P0) | Service |
-| Post-Message Handler (Extension) | HTTP | `userId` の `requestContext` 付与 + リクエストスコープ化 | 3.1, 3.4, 5.4 | `RequestContext` (P0), `loginRequiredStrictly` (P0), `IUserHasId` (P0) | API |
+| Post-Message Handler (Extension) | HTTP | `userId` / `searchService` の `requestContext` 付与 + リクエストスコープ化 | 3.1, 3.4, 5.4, 6.6 | `MastraRequestContextShape` (P0), `loginRequiredStrictly` (P0), `IUserHasId` (P0) | API |
 
 ### Tool Layer
 
@@ -378,7 +413,13 @@ Key 決定:
 
 ```typescript
 import type { Tool } from '@mastra/core/tools';
+import type { RequestContext } from '@mastra/core/request-context';
 import { z } from 'zod';
+
+import type { MastraRequestContextShape } from '../types/request-context';
+
+// execute 内で参照する型: 共有型を使った typed view
+type TypedRequestContext = RequestContext<MastraRequestContextShape>;
 
 const fullTextSearchInputSchema = z.object({
   query: z
@@ -453,7 +494,7 @@ export const fullTextSearchTool: Tool<
 - **Invariants**: 閲覧権限のないページが `hits` 配列に決して現れない（SearchService の `filterPagesByViewer` に委譲、二重実装なし）
 
 **Implementation Notes**
-- **`searchService` の取得**: `const searchService = context.requestContext.get('searchService')` で実行時に取得する（`growi-agent.ts` モジュールから `crowi` を import しない方針）。Post-Message Handler 側の `crowi.searchService` 参照を tool まで `RequestContext` 経由で持ち回ることで、`growi-agent.ts` の module-level export を保ったまま条件分岐を tool 層に閉じ込められる。`searchService` が不在の場合は `result: 'context_error'`
+- **`searchService` の取得**: execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>; const searchService = ctx.get('searchService');` の形で **共有型経由で型付き取得**（`growi-agent.ts` モジュールから `crowi` を import しない方針）。Post-Message Handler 側の `crowi.searchService` 参照を tool まで `RequestContext` 経由で持ち回ることで、`growi-agent.ts` の module-level export を保ったまま条件分岐を tool 層に閉じ込められる。`searchService` が `undefined` の場合は `result: 'context_error'`（共有型上は必須キーだが、Mastra ランタイムの動的取得である以上、防御的に型ガードを残す）
 - Integration: `searchService.searchKeyword(keyword, nqName, user, userGroups, searchOpts)` を呼ぶ。`nqName: null`、`userGroups: null`（SearchService 内部で user から自動解決）、`searchOpts` で limit を渡す。**戻り値は `Promise<[ISearchResult<unknown>, string | null]>` のタプル** であり、`const [result, _delegatorName] = await searchService.searchKeyword(...)` の形で分解する。
 - マッピング規則（[elasticsearch.ts:470-484](apps/app/src/server/service/search-delegator/elasticsearch.ts#L470-L484) の ES index 投入ロジックと [elasticsearch.ts:736-750](apps/app/src/server/service/search-delegator/elasticsearch.ts#L736-L750) の delegator 戻り値を根拠）:
 
@@ -498,7 +539,13 @@ export const fullTextSearchTool: Tool<
 
 ```typescript
 import type { Tool } from '@mastra/core/tools';
+import type { RequestContext } from '@mastra/core/request-context';
 import { z } from 'zod';
+
+import type { MastraRequestContextShape } from '../types/request-context';
+
+// execute 内で参照する型: 共有型を使った typed view
+type TypedRequestContext = RequestContext<MastraRequestContextShape>;
 
 const getPageContentInputSchema = z
   .object({
@@ -632,7 +679,7 @@ export const growiAgent = new Agent({
 | Requirements | 3.1, 3.4, 5.4 |
 
 **Responsibilities & Constraints**
-- `RequestContext<{ vectorStoreId: string }>` を **`RequestContext<{ vectorStoreId: string; userId: string; searchService: SearchService }>`** に拡張
+- `RequestContext<{ vectorStoreId: string }>` を **`RequestContext<MastraRequestContextShape>`** に拡張（`MastraRequestContextShape` は `services/mastra-modules/types/request-context.ts` から import）
 - **`RequestContext` インスタンスをハンドラ関数内で `new` する**（モジュールスコープ singleton を廃止）。これにより並列リクエスト下で他リクエストの `userId` / `searchService` が tool に渡る可能性を排除
 - 既存の `accessTokenParser` → `loginRequiredStrictly` → `validator` ミドルウェアチェーンを変更しない
 - 既存の `requestContext.set('vectorStoreId', ...)` の直後に以下 2 つの `set` を追加:
@@ -643,7 +690,7 @@ export const growiAgent = new Agent({
 **Dependencies**
 - Inbound: Next.js / Express ルーティング（P0）
 - Outbound: `growiAgent.stream(messages, { requestContext, memory, providerOptions })`（P0）
-- Outbound: `RequestContext` ジェネリクス型 — 共有型として全 tool が参照（P0）
+- Outbound: `MastraRequestContextShape` ジェネリクス型 — 共有型として全 tool が参照（P0）
 
 **Contracts**: Service [ ] / API [x] / Event [ ] / Batch [ ] / State [ ]
 
@@ -657,6 +704,7 @@ export const growiAgent = new Agent({
 
 **Implementation Notes**
 - Integration: `@mastra/core` の `RequestContext` は単純な `Map` ラッパーであり AsyncLocalStorage 等の自動隔離機構を持たない（[chunk-4RQN7U3L.js:20](node_modules/.pnpm/@mastra+core@1.32.1_*/node_modules/@mastra/core/dist/chunk-4RQN7U3L.js)）。そのため本 spec では `new RequestContext()` をハンドラ関数内に閉じ、リクエストごとに独立した Map インスタンスを使う。`vectorStoreId` の値の意味は不変
+- **共有型の参照**: `import type { MastraRequestContextShape } from '~/features/mastra/server/services/mastra-modules/types/request-context'`。`SearchService` 型は当該ファイルが `~/server/service/search` の **default export** ([search.ts:673](apps/app/src/server/service/search.ts#L673)) を `import type SearchService` する形で間接的に参照
 - Validation: 既存 `validator` チェーンで `req.user` が `IUserHasId` として保証されるため、`req.user._id.toString()` 直呼び出しは安全
 - Risks: なし（リクエストスコープ化により既存の潜在的レースコンディションを解消する）
 
