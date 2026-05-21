@@ -1,13 +1,15 @@
 # Implementation Plan
 
 - [ ] 1. Foundation: リクエストスコープ化と userId 伝搬の確立
-- [ ] 1.1 post-message handler の RequestContext をリクエストスコープ化し userId をセット
+- [ ] 1.1 post-message handler の RequestContext をリクエストスコープ化し userId / searchService をセット
   - 既存のモジュールスコープ `const requestContext = new RequestContext<...>()` 定義を削除
-  - ハンドラ関数内で `new RequestContext<{ vectorStoreId: string; userId: string }>()` を生成
-  - `requestContext.set('vectorStoreId', vectorStoreId)` の直後に `requestContext.set('userId', req.user._id.toString())` を追加
+  - ハンドラ関数内で `new RequestContext<{ vectorStoreId: string; userId: string; searchService: SearchService }>()` を生成
+  - `requestContext.set('vectorStoreId', vectorStoreId)` の直後に以下 2 つの set を追加:
+    - `requestContext.set('userId', req.user._id.toString())`
+    - `requestContext.set('searchService', crowi.searchService)` ← route factory 引数 `crowi` から取得
   - 既存ミドルウェアチェーン（accessTokenParser / loginRequiredStrictly / validator）と AI SDK ストリーミング応答層（`toAISdkStream` / `createUIMessageStream` / `pipeUIMessageStreamToResponse`）には一切触れない
-  - 観察可能完了: 認証済みリクエスト下で tool 実行時の `context.requestContext.get('userId')` が `req.user._id` 文字列を返し、`vectorStoreId` も従来通り取得できる。ストリーミング応答に関するコードは差分に含まれない
-  - _Requirements: 3.1, 3.4, 5.4_
+  - 観察可能完了: 認証済みリクエスト下で tool 実行時の `context.requestContext.get('userId')` が `req.user._id` 文字列を返し、`get('searchService')` が `crowi.searchService` の同一インスタンスを返し、`vectorStoreId` も従来通り取得できる。ストリーミング応答に関するコードは差分に含まれない
+  - _Requirements: 3.1, 3.4, 5.4, 6.6_
   - _Boundary: Post-Message Handler_
 
 - [ ] 2. Core: ES 全文検索 tool の実装とテスト
@@ -16,21 +18,31 @@
   - 入力 zod schema: `query: z.string().min(1)`、`limit?: z.number().int().positive().max(20).default(10)`
   - **`query.describe()` には `SearchService.parseQueryString` が解釈する全演算子を例示する**（`"phrase"` / `-word` / `-"phrase"` / `prefix:/path` / `-prefix:/path` / `tag:foo` / `-tag:foo`）。design.md「サポートするクエリ構文」の表と一致させる
   - 出力 zod schema を discriminated union（`'ok' | 'error' | 'context_error'`）で表現
-  - execute 内で `requestContext.get('userId')` を取り出し、`{ _id: new ObjectId(userId) }` 形状を `SearchService.searchKeyword(query, null, user, null, { limit })` に渡す
-  - **`query` を tool 層でサニタイズ・改変しない**: `prefix:` / `tag:` / `"..."` / `-` 等の演算子はそのまま `SearchService.searchKeyword` の第 1 引数に渡し、`parseQueryString` に解釈させる（Plan A: design.md「サポートするクエリ構文」参照）
+  - execute 内で `requestContext.get('userId')` と **`requestContext.get('searchService')`** を取り出す。**`crowi` を import しない**（依存方向: HTTP Layer → Tool Layer の片方向を維持）
+  - 取得した値で以下のガードを順に評価し、いずれかに該当したら早期 return:
+    - `userId` または `searchService` が `undefined` → `result: 'context_error'`
+    - `searchService.isElasticsearchEnabled === false` → `result: 'error', reason: 'elasticsearch_not_configured'`（`searchKeyword` は呼ばない）
+  - ガード通過後、`{ _id: new ObjectId(userId) }` 形状を `searchService.searchKeyword(query, null, user, null, { limit })` に渡す
+  - **`query` を tool 層でサニタイズ・改変しない**: `prefix:` / `tag:` / `"..."` / `-` 等の演算子はそのまま `searchService.searchKeyword` の第 1 引数に渡し、`parseQueryString` に解釈させる（Plan A: design.md「サポートするクエリ構文」参照）
   - 戻り値は **タプル `[ISearchResult, delegatorName]`** として分解し、`result.data[i]` から以下のマッピングで `hits` を組み立てる: `pageId ← _id` / `pagePath ← _source.path` / `snippet ← _highlight?.body?.[0]` / `totalCount ← result.meta.total`
   - **`_source` を spread しない**: ES に index 済みの `body`（Markdown 本文）が混入しないよう、必要フィールドだけを明示的に取り出す（要件 6.5 と役割分離の維持）
   - execute からは例外を throw せず、try/catch で SearchService 例外を `result: 'error'` に変換
-  - 観察可能完了: 4 ケース（空クエリ拒否 / context 欠如 / SearchService 成功 / SearchService 例外）すべてで対応する `result` 値が返り、`ok` 時の `hits` 配列に `pagePath` が含まれ、`body` を含むキーが一切現れない
+  - 観察可能完了: 5 ケース（空クエリ拒否 / context 欠如 / ES disabled / SearchService 成功 / SearchService 例外）すべてで対応する `result` 値が返り、`ok` 時の `hits` 配列に `pagePath` が含まれ、`body` を含むキーが一切現れない
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8, 3.2_
   - _Boundary: FullTextSearchTool_
 
 - [ ] 2.2 (P) ES 全文検索 tool の unit test
-  - SearchService をモックし、4 種の result（ok / error / context_error / 空クエリ拒否）を網羅
+  - **モック構造**: `requestContext` に `userId` (string) / `searchService` (object) を任意に set/未 set できるテストハーネスを用意。`searchService` は `{ isElasticsearchEnabled: boolean, searchKeyword: vi.fn() }` の最小形を持つ
+  - 以下 5 種の result を網羅:
+    1. **空クエリ拒否**: `query: ''` で zod 段階拒否（execute 未到達）
+    2. **context 欠如 (userId)**: `userId` 未 set → `result: 'context_error'`
+    3. **context 欠如 (searchService)**: `searchService` 未 set → `result: 'context_error'`
+    4. **ES disabled**: `searchService.isElasticsearchEnabled === false` → `result: 'error', reason: 'elasticsearch_not_configured'`、**`searchKeyword` が呼ばれないことを assert**
+    5. **SearchService 例外**: `searchKeyword.mockRejectedValue(...)` → `result: 'error'`、execute が throw しない
+  - 成功ケース: `searchKeyword.mockResolvedValue([{ data: [...], meta: { total } }, 'delegator'])` で戻り値マッピングを assert
   - 戻り値マッピングで `body` が削除されること、`pagePath` / `pageId` / `snippet` が正しく抽出されることを assert
-  - SearchService の reject を mock しても execute が throw せず `result: 'error'` を返すことを確認
-  - `userId` が ObjectId 形状で SearchService に渡されることを assert
-  - **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡した場合に、tool 層で文字列が改変されず `SearchService.searchKeyword` の第 1 引数にそのまま渡ることを assert（サニタイザ不在の保証、Plan A 採用根拠の回帰防止）
+  - `userId` が ObjectId 形状で `searchKeyword` 第 3 引数に渡されることを assert
+  - **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡した場合に、tool 層で文字列が改変されず `searchKeyword` の第 1 引数にそのまま渡ることを assert（サニタイザ不在の保証、Plan A 採用根拠の回帰防止）
   - 観察可能完了: `pnpm vitest run full-text-search-tool.spec` が緑、上記すべての挙動が assert される
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6, 6.7, 6.8_
   - _Boundary: FullTextSearchTool_
@@ -78,15 +90,16 @@
   - _Depends: 3.1_
 
 - [ ] 4. Integration: agent 配線と instructions 調整
-- [ ] 4.1 (P) growiAgent への新 tool 2 つの登録と既存 fileSearchTool の暫定無効化
+- [ ] 4.1 (P) growiAgent への新 tool 2 つの無条件登録と既存 fileSearchTool の暫定無効化
   - `import { fullTextSearchTool } from '../tools/full-text-search-tool'` と `import { getPageContentTool } from '../tools/get-page-content-tool'` を追加
-  - `tools` オブジェクトを `{ ...(crowi.searchService.isElasticsearchEnabled ? { fullTextSearchTool } : {}), getPageContentTool }` の形で組み立て、**ES 未設定環境では `fullTextSearchTool` を agent から見えなくする**
+  - `tools` オブジェクトを `{ fullTextSearchTool, getPageContentTool }` で **無条件登録**。**ES 有効/無効の判定は agent 側で行わない**（tool execute 内 `searchService.isElasticsearchEnabled` ガードに委譲、Task 2.1 参照）。`growi-agent.ts` から `crowi` を import しない
   - 既存 `fileSearchTool` の `import` 行と `tools` 登録行をコメントアウト（ソースファイル本体は削除しない）
-  - `instructions` に以下の趣旨を英語短文で追記（合計 3〜4 行、既存トーン維持）:
-    - 「wiki コンテンツ関連の質問はまず `fullTextSearch` tool でヒット候補を集め、必要に応じて `getPageContent` tool を呼んで引用パスを回答に含めよ」
-    - 「`fullTextSearch` の `query` には自然言語に加えて `"phrase"` / `-word` / `prefix:/path` / `tag:foo`（および `-prefix:` / `-tag:`）を必要に応じて組み合わせて良い（全て AND）。subtree / タグ絞り込み・ノイズ除去に有用な場合に使う」
+  - `instructions` の編集（既存トーン維持、英語短文）:
+    - **既存の `- Use the fileSearch tool when the question relates to the user's wiki content.` 行をコメントアウト**（即時削除しない理由: `fileSearchTool` 復活時の rollback コストを下げる、要件 4.2 と同一方針）
+    - 新規追記: 「wiki コンテンツ関連の質問はまず `fullTextSearch` tool でヒット候補を集め、必要に応じて `getPageContent` tool を呼んで引用パスを回答に含めよ」
+    - 新規追記: 「`fullTextSearch` の `query` には自然言語に加えて `"phrase"` / `-word` / `prefix:/path` / `tag:foo`（および `-prefix:` / `-tag:`）を必要に応じて組み合わせて良い（全て AND）。subtree / タグ絞り込み・ノイズ除去に有用な場合に使う」
   - 既存の `memory` / `model` / `name` 等の設定は変更しない
-  - 観察可能完了: ES URI が設定された環境で起動すると `growiAgent.tools` のキー一覧に `fullTextSearchTool` と `getPageContentTool` が含まれ、ES URI 未設定で起動すると `fullTextSearchTool` のキーが含まれない。両環境とも `fileSearchTool` は含まれず、`instructions` 文字列に「全文検索 → 本文取得 → 引用パス」の利用順序と「`"phrase"` / `-word` / `prefix:` / `tag:` 等の演算子組み合わせ可」の旨が含まれる
+  - 観察可能完了: `growiAgent.tools` のキー一覧に `fullTextSearchTool` と `getPageContentTool` が含まれ、`fileSearchTool` は含まれない。`instructions` 文字列に「全文検索 → 本文取得 → 引用パス」の利用順序と「`"phrase"` / `-word` / `prefix:` / `tag:` 等の演算子組み合わせ可」の旨が含まれ、コメントアウトされていない `Use the fileSearch tool` 行が存在しない
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3_
   - _Boundary: growiAgent_
   - _Depends: 2.1, 3.1_
@@ -101,9 +114,12 @@
   - _Requirements: 4.3_
 
 - [ ]* 5.2 (任意) 軽量 agent integration test
-  - `growiAgent.tools` のキー一覧で `fullTextSearchTool` / `getPageContentTool` の存在と `fileSearchTool` の非存在を assert（ES 有効環境想定）
-  - `crowi.searchService.isElasticsearchEnabled` を false にモックして agent を組み立てた場合、`fullTextSearchTool` のキーが含まれないことを assert
+  - `growiAgent.tools` のキー一覧で `fullTextSearchTool` / `getPageContentTool` の存在と `fileSearchTool` の非存在を assert
+  - `growiAgent.instructions` 文字列に対し以下を assert（FB Issue 2 の回帰防止）:
+    - 「fullTextSearch → getPageContent → 引用パス」の利用順序を示す英語短文が含まれる
+    - `query` 演算子（`prefix:` / `tag:` / `"..."` / `-`）の組み合わせ可能性が含まれる
+    - **コメントアウトされていない `Use the fileSearch tool` 行が含まれない**（コメント行内の出現は許可、行頭の `//` または `<!--` を取り除いて検出する）
   - mock model を使って 1 ターン回し、agent が両 tool を tool として参照可能であることを確認
-  - 観察可能完了: 該当 spec ファイルが緑、本 spec の暫定無効化と新 tool 2 つの登録、および ES ガード分岐の回帰防止が成立
+  - 観察可能完了: 該当 spec ファイルが緑、本 spec の暫定無効化（tool 登録 + instructions）と新 tool 2 つの登録の回帰防止が成立
   - _Requirements: 4.1, 6.1_
   - _Boundary: growiAgent_
