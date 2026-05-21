@@ -10,7 +10,11 @@ import type {
 
 import loggerFactory from '../../utils/logger';
 import { getOrCreateModel } from '../util/mongoose-utils';
-import { InvalidParentBookmarkFolderError } from './errors';
+import {
+  BookmarkFolderForbiddenError,
+  BookmarkFolderNotFoundError,
+  InvalidParentBookmarkFolderError,
+} from './errors';
 
 const logger = loggerFactory('growi:models:bookmark-folder');
 const Bookmark = monggoose.model('Bookmark');
@@ -26,12 +30,9 @@ export interface BookmarkFolderDocument extends Document {
 
 export interface BookmarkFolderModel extends Model<BookmarkFolderDocument> {
   createByParameters(params: IBookmarkFolder): Promise<BookmarkFolderDocument>;
-  findByIdAndOwner(
-    bookmarkFolderId: Types.ObjectId | string,
-    ownerId: Types.ObjectId | string,
-  ): Promise<{ folder: BookmarkFolderDocument | null; isOwner: boolean }>;
   deleteFolderAndChildren(
     bookmarkFolderId: Types.ObjectId | string,
+    ownerId?: Types.ObjectId | string,
   ): Promise<{ deletedCount: number }>;
   updateBookmarkFolder(
     bookmarkFolderId: string,
@@ -117,22 +118,19 @@ bookmarkFolderSchema.statics.createByParameters = async function (
   return bookmarkFolder;
 };
 
-bookmarkFolderSchema.statics.findByIdAndOwner = async function (
-  bookmarkFolderId: Types.ObjectId | string,
-  ownerId: Types.ObjectId | string,
-): Promise<{ folder: BookmarkFolderDocument | null; isOwner: boolean }> {
-  const folder = await this.findById(bookmarkFolderId);
-  if (folder == null) {
-    return { folder: null, isOwner: false };
-  }
-  const isOwner = folder.owner.toString() === ownerId.toString();
-  return { folder, isOwner };
-};
-
 bookmarkFolderSchema.statics.deleteFolderAndChildren = async function (
   bookmarkFolderId: Types.ObjectId | string,
+  ownerId?: Types.ObjectId | string,
 ): Promise<{ deletedCount: number }> {
   const bookmarkFolder = await this.findById(bookmarkFolderId);
+  if (ownerId != null) {
+    if (bookmarkFolder == null) {
+      throw new BookmarkFolderNotFoundError('Bookmark folder not found');
+    }
+    if (bookmarkFolder.owner.toString() !== ownerId.toString()) {
+      throw new BookmarkFolderForbiddenError('Forbidden');
+    }
+  }
   // Delete parent and all children folder
   let deletedCount = 0;
   if (bookmarkFolder != null) {

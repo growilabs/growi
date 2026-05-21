@@ -8,7 +8,11 @@ import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { InvalidParentBookmarkFolderError } from '~/server/models/errors';
+import {
+  BookmarkFolderForbiddenError,
+  BookmarkFolderNotFoundError,
+  InvalidParentBookmarkFolderError,
+} from '~/server/models/errors';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
 import loggerFactory from '~/utils/logger';
 
@@ -340,20 +344,19 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { id } = req.params;
       try {
-        const { folder, isOwner } = await BookmarkFolder.findByIdAndOwner(
+        const result = await BookmarkFolder.deleteFolderAndChildren(
           id,
           req.user._id,
         );
-        if (folder == null) {
-          return res.apiv3Err('bookmark_folder_not_found', 404);
-        }
-        if (!isOwner) {
-          return res.apiv3Err('forbidden', 403);
-        }
-        const result = await BookmarkFolder.deleteFolderAndChildren(id);
         const { deletedCount } = result;
         return res.apiv3({ deletedCount });
       } catch (err) {
+        if (err instanceof BookmarkFolderNotFoundError) {
+          return res.apiv3Err('bookmark_folder_not_found', 404);
+        }
+        if (err instanceof BookmarkFolderForbiddenError) {
+          return res.apiv3Err('forbidden', 403);
+        }
         logger.error(err);
         return res.apiv3Err(err, 500);
       }
