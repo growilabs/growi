@@ -50,7 +50,7 @@
   - 完了状態: 上記 3 コマンドすべてが exit code 0 で終了する。
   - _Requirements: 6.1_
 
-- [ ] 5.2 Author operator migration mapping in PR description
+- [x] 5.2 Author operator migration mapping in PR description
   - PR 本文に「削除 Resource Attribute → 代替メトリクス／ラベル」の対応表を記載する。具体的には `os.totalmem` → `system.host.memory.total` および `system.memory.limit`（cgroup 設定時）の 2 メトリクス、`growi.attachment.type` → `growi.configs` の `attachment_type` ラベル、の 2 行。
   - 新規追加された 6 メトリクスの一覧（名前と単位 `By`）を併記する。
   - 完了状態: otel-infra 管理者が PR 本文 1 ページ内で「何が消え、どこに移ったか」「新たに何が出るようになったか」をワンビューで把握できる状態となる。
