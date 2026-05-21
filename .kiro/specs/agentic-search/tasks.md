@@ -25,7 +25,7 @@
   - _Depends: 1.0_
 
 - [ ] 2. Core: ES 全文検索 tool の実装とテスト
-- [ ] 2.1 ES 全文検索 tool 本体の実装
+- [x] 2.1 ES 全文検索 tool 本体の実装
   - `createTool` を用いて Mastra tool を新設
   - 入力 zod schema: `query: z.string().min(1)`、`limit?: z.number().int().positive().max(20).default(10)`
   - **`query.describe()` には `SearchService.parseQueryString` が解釈する全演算子を例示する**（`"phrase"` / `-word` / `-"phrase"` / `prefix:/path` / `-prefix:/path` / `tag:foo` / `-tag:foo`）。design.md「サポートするクエリ構文」の表と一致させる
