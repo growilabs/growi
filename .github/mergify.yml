@@ -7,11 +7,6 @@ queue_rules:
       - -check-failure ~= ci-app-
       - -check-failure ~= ci-slackbot-
       - -check-failure ~= test-prod-node24 /
-      # Explicitly enumerate sub-checks of test-prod-node24 so that matrix-
-      # job level failures (e.g. `run-playwright (chromium, 2/2, 6.0)`)
-      # reliably block merges. The broader `-check-failure ~= test-prod-node24 /`
-      # has historically let such failures through (observed on run
-      # 24828684287 for PR #11032).
       - -check-failure ~= test-prod-node24 / build-prod
       - -check-failure ~= test-prod-node24 / launch-prod
       - -check-failure ~= test-prod-node24 / run-playwright
@@ -22,12 +17,14 @@ queue_rules:
       - check-success ~= ci-app-launch-dev
       - check-success = test-prod-node24 / build-prod
       - check-success ~= test-prod-node24 / launch-prod
-      - check-success ~= test-prod-node24 / run-playwright
+      # Gate on report-playwright (not individual run-playwright shards).
+      # report-playwright runs after ALL shards complete (needs: [run-playwright])
+      # and fails if any shard did not succeed (including cancelled), so a single
+      # SUCCESS here guarantees every playwright matrix job passed — no race condition.
+      - check-success = test-prod-node24 / report-playwright
       - -check-failure ~= ci-app-
       - -check-failure ~= ci-slackbot-
       - -check-failure ~= test-prod-node24 /
-      # Defensive: same explicit enumeration as queue_conditions so the
-      # merge-time gate cannot be bypassed by a matrix-job level failure.
       - -check-failure ~= test-prod-node24 / build-prod
       - -check-failure ~= test-prod-node24 / launch-prod
       - -check-failure ~= test-prod-node24 / run-playwright
