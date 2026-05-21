@@ -31,7 +31,7 @@
   - _Requirements: 4.4, 6.1, 6.6, 6.7, 6.10_
   - _Boundary: config-definition.ts_
 
-- [ ] 1.4 (P) reject 理由と submit feedback の i18n message key を追加
+- [x] 1.4 (P) reject 理由と submit feedback の i18n message key を追加
   - `growi-vault.reconcile.rejected.invalid-target` / `.bootstrap-not-done` / `.page-count-exceeds-user-limit` / `.page-count-exceeds-admin-limit` / `.user-concurrency-limit` / `.system-concurrency-limit` の 6 key を ja / en で追加
   - `growi-vault.reconcile.accepted.message` / `growi-vault.reconcile.section.title` 等の submit feedback / admin UI 用 key を追加
   - 観察可能: i18n locale ファイルから新規 key が引け、ja / en で内容が揃っている
