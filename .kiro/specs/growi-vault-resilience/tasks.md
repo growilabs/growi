@@ -180,7 +180,7 @@
   - _Requirements: 1.3, 1.4, 1.5, 1.6, 1.7, 1.13_
   - _Boundary: features/growi-vault/server/index.ts L396-404 bootstrap dispatch only_
 
-- [ ] 5.3 (P) vault-admin route に resilience-status / retry-abort endpoint を追加
+- [x] 5.3 (P) vault-admin route に resilience-status / retry-abort endpoint を追加
   - `GET /vault/resilience-status` で `ResilienceStatus` JSON を返す
   - `POST /vault/retry/abort` で `abortAutoRetry()` を呼び `{ aborted: boolean }` を返す（409 if retry 中でない、500 on error）
   - 既存 `GET /vault/status` は後方互換のため維持（内部で resilience-status から bootstrap 部分を抽出）
