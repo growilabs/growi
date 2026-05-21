@@ -6,7 +6,7 @@
 
 **Users**: GROWI の認証済みユーザー（既存 ChatSidebar / `useChat` 経由のすべての利用者）。
 
-**Impact**: agent の `tools` 構成を変更（新 tool 2 本追加 + 既存 `fileSearchTool` 暫定無効化）、`RequestContext` 型を拡張し `userId` を伝搬。既存ストリーミング応答層・メモリ・スレッド管理は不変。
+**Impact**: agent の `tools` 構成を変更（新 tool 2 本追加 + 既存 `fileSearchTool` 暫定無効化）、`RequestContext` 型を拡張し `user: IUserHasId` と `searchService` を伝搬。既存ストリーミング応答層・メモリ・スレッド管理は不変。
 
 ### Goals
 - `growiAgent` が「全文検索 → 本文取得 → 必要に応じて再検索 → 合成」を自律的に反復する agentic ループを成立させる
@@ -31,9 +31,9 @@
 - `fullTextSearchTool`（新規 Mastra tool）の入出力契約、execute 実装、テスト
 - `getPageContentTool`（新規 Mastra tool）の入出力契約、execute 実装、テスト
 - `growiAgent.tools` の構成変更（新 tool 2 つ登録 + `fileSearchTool` のコメントアウト）と `growiAgent.instructions` の文言調整（旧 `fileSearch` 行のコメントアウトを含む）
-- `RequestContext` の型シェイプ拡張（`{ vectorStoreId; userId; searchService }`）
-- `post-message.ts` における `userId` および `searchService` の `requestContext` セット
-- **`RequestContext` のリクエストスコープ化**: 既存のモジュールスコープ singleton（[post-message.ts:40](apps/app/src/features/mastra/server/routes/post-message.ts#L40)）をハンドラ関数内で `new RequestContext(...)` する構造に変更し、並列リクエスト下での `userId` 漏洩を防止する
+- `RequestContext` の型シェイプ拡張（`{ vectorStoreId; user; searchService }`）。`user` は `IUserHasId` 全体（`_id` 単独ではなく）を載せ、ES delegator や `findByIdAndViewer` が必要とする可能性のあるフィールドにそのまま委譲できる形にする
+- `post-message.ts` における `user`（= 認証ミドルウェア通過後の `req.user: IUserHasId`）および `searchService` の `requestContext` セット
+- **`RequestContext` のリクエストスコープ化**: 既存のモジュールスコープ singleton（[post-message.ts:40](apps/app/src/features/mastra/server/routes/post-message.ts#L40)）をハンドラ関数内で `new RequestContext(...)` する構造に変更し、並列リクエスト下での `user` 漏洩を防止する
 
 ### Out of Boundary
 - `SearchService.searchKeyword()` / `ElasticsearchDelegator` 内部実装の変更（既存メソッドを呼ぶだけで、内部の検索アルゴリズムや grant ロジックは触らない）
@@ -71,11 +71,11 @@
 
 | 既存要素 | 役割 | 本 spec での扱い |
 |---|---|---|
-| `post-message.ts` Express route | 認証・スレッド確保・`agent.stream()` の呼び出し・SSE 中継 | 軽微修正（userId セット） |
+| `post-message.ts` Express route | 認証・スレッド確保・`agent.stream()` の呼び出し・SSE 中継 | 軽微修正（user セット + リクエストスコープ化） |
 | `mastra-modules/index.ts` の `Mastra` instance | `growiAgent` 登録 | 不変 |
 | `growiAgent` (Agent) | tools / memory / instructions を保持 | 構成差分のみ修正 |
 | `fileSearchTool` | OpenAI Files ベクトル検索 | コメントアウトで暫定無効化 |
-| `RequestContext<{ vectorStoreId }>` | tool 実行時の文脈伝搬 | 型に `userId` と `searchService` を追加 |
+| `RequestContext<{ vectorStoreId }>` | tool 実行時の文脈伝搬 | 型に `user` (IUserHasId) と `searchService` を追加 |
 | `Page.findByIdAndViewer` / `findByPathAndViewer` | grant 込みでページ取得 | 委譲先として利用 |
 
 既存パターンの維持事項:
@@ -92,7 +92,7 @@
 graph TB
     subgraph HTTP_Layer
         PostMessage[Post-Message Handler]
-        ReqCtx[RequestContext userId]
+        ReqCtx[RequestContext user]
     end
     subgraph Agent_Layer
         GrowiAgent[growiAgent]
@@ -131,7 +131,7 @@ graph TB
 Key 決定:
 - tool 層は agent / HTTP 層を逆参照しない（依存方向は片方向）
 - `GetPageContentTool` は `Page.findByIdAndViewer` のみを呼ぶ adapter であり、grant の自前判定をしない
-- `RequestContext` 経由で渡る `userId` は HTTP 層の信頼境界を通過済み（認証ミドルウェア後）
+- `RequestContext` 経由で渡る `user: IUserHasId` は HTTP 層の信頼境界を通過済み（認証ミドルウェア後）。tool 側で `User.findById` 等の再解決は不要
 - `fileSearchTool` は agent との配線のみコメントアウト、ファイル本体・import 行はコメントとして残置
 
 ### Technology Stack
@@ -153,7 +153,7 @@ Key 決定:
 ```
 apps/app/src/features/mastra/server/
 ├── routes/
-│   └── post-message.ts                         # Modified: RequestContext 型拡張 + userId / searchService set + リクエストスコープ化
+│   └── post-message.ts                         # Modified: RequestContext 型拡張 + user / searchService set + リクエストスコープ化
 └── services/mastra-modules/
     ├── types/
     │   └── request-context.ts                  # New: 共有型 MastraRequestContextShape の単一情報源
@@ -174,13 +174,13 @@ apps/app/src/features/mastra/server/
 | File | 変更内容 |
 |---|---|
 | `agents/growi-agent.ts` | `fileSearchTool` の import + `tools` 登録をコメントアウト。`fullTextSearchTool` / `getPageContentTool` の import 追加と `tools` への **無条件登録**（ES 判定は tool execute 側）。`instructions` の既存 `Use the fileSearch tool ...` 行をコメントアウトし、「全文検索 → 必要なら本文取得 → 引用パス含有」と「`fullTextSearch` の `query` は `"..."` / `-word` / `prefix:/path` / `tag:foo` 等の演算子を組み合わせ可」を英語短文で追記 |
-| `routes/post-message.ts` | **モジュールスコープの `const requestContext = new RequestContext<...>()` を削除し、ハンドラ関数内で `new RequestContext<MastraRequestContextShape>()` を生成する構造に変更**（並列リクエスト干渉防止、`MastraRequestContextShape` は `services/mastra-modules/types/request-context.ts` から import）。`requestContext.set('vectorStoreId', ...)` の直後に `requestContext.set('userId', req.user._id.toString())` と `requestContext.set('searchService', crowi.searchService)` を追加 |
+| `routes/post-message.ts` | **モジュールスコープの `const requestContext = new RequestContext<...>()` を削除し、ハンドラ関数内で `new RequestContext<MastraRequestContextShape>()` を生成する構造に変更**（並列リクエスト干渉防止、`MastraRequestContextShape` は `services/mastra-modules/types/request-context.ts` から import）。`requestContext.set('vectorStoreId', ...)` の直後に `requestContext.set('user', req.user)` と `requestContext.set('searchService', crowi.searchService)` を追加 |
 
 ### New Files
 
 | File | 責務 |
 |---|---|
-| `types/request-context.ts` | **共有型の単一情報源**。`MastraRequestContextShape = { vectorStoreId: string; userId: string; searchService: SearchService }` を export。post-message.ts / 各 tool / 将来追加される tool が全て import して `RequestContext<MastraRequestContextShape>` および `context.requestContext as RequestContext<MastraRequestContextShape>` の形で参照する |
+| `types/request-context.ts` | **共有型の単一情報源**。`MastraRequestContextShape = { vectorStoreId: string; user: IUserHasId; searchService: SearchService }` を export。post-message.ts / 各 tool / 将来追加される tool が全て import して `RequestContext<MastraRequestContextShape>` および `context.requestContext as RequestContext<MastraRequestContextShape>` の形で参照する |
 | `tools/full-text-search-tool.ts` | Mastra tool の定義（`createTool` 呼び出し、zod schema、execute）。`SearchService.searchKeyword()` の薄い adapter |
 | `tools/full-text-search-tool.spec.ts` | unit test。zod 入力検証、guard ロジック、SearchService をモックして戻り値変換を確認 |
 | `tools/full-text-search-tool.integ.ts` | integration test。実 MongoDB / Elasticsearch 上で GRANT_* 各パターンの検索ヒット可否を確認 |
@@ -210,16 +210,16 @@ sequenceDiagram
     User->>ChatSidebar: 質問入力
     ChatSidebar->>PostMessage: POST /_api/v3/mastra/message
     PostMessage->>PostMessage: 認証 + threadId 確保
-    PostMessage->>PostMessage: new RequestContext + set vectorStoreId + userId + searchService
+    PostMessage->>PostMessage: new RequestContext + set vectorStoreId + user + searchService
     PostMessage->>Agent: stream messages requestContext
     Agent->>FullText: tool call query
-    FullText->>FullText: read userId and searchService from requestContext
+    FullText->>FullText: read user and searchService from requestContext
     FullText->>FullText: gate on searchService.isElasticsearchEnabled
     FullText->>SearchSvc: searchKeyword query user
     SearchSvc-->>FullText: grant filtered hits
     FullText-->>Agent: hit candidates path id snippet
     Agent->>GetPage: tool call pageId or pagePath
-    GetPage->>GetPage: read userId from requestContext
+    GetPage->>GetPage: read user from requestContext
     GetPage->>Page: findByIdAndViewer or findByPathAndViewer
     Page->>Mongo: find with grant condition
     Mongo-->>Page: page document or null
@@ -234,14 +234,14 @@ sequenceDiagram
 
 主な決定:
 - `Agent` のループ判断はモデル任せ（明示の Workflow を組まない）
-- `GetPageContentTool` は `RequestContext` から `userId` を取り出して `findByIdAndViewer` に渡す
+- `GetPageContentTool` は `RequestContext` から `user: IUserHasId` を取り出してそのまま `findByIdAndViewer(id, user)` に渡す（`_id` 抽出や `User.findById` 再解決は不要）
 - `Mongo` 側で grant 条件が AND されるため、tool 層で追加フィルタを掛けない
 
 ### Tool Execute 分岐 — GetPageContentTool (Process)
 
 ```mermaid
 flowchart TD
-    Start([execute inputData context]) --> CheckCtx{userId in requestContext?}
+    Start([execute inputData context]) --> CheckCtx{user in requestContext?}
     CheckCtx -- No --> ContextError[return result context_error]
     CheckCtx -- Yes --> CheckInput{pageId or pagePath present?}
     CheckInput -- Neither --> MissingInput[return result missing_input]
@@ -258,7 +258,7 @@ flowchart TD
 
 ```mermaid
 flowchart TD
-    Start2([execute inputData context]) --> CheckUser{userId and searchService in requestContext?}
+    Start2([execute inputData context]) --> CheckUser{user and searchService in requestContext?}
     CheckUser -- No --> CtxErr[return result context_error]
     CheckUser -- Yes --> CheckES{searchService.isElasticsearchEnabled?}
     CheckES -- false --> EsDisabled[return result error reason elasticsearch_not_configured]
@@ -270,7 +270,7 @@ flowchart TD
 
 Key 決定:
 - `execute` は **throw しない**（agent の反復継続のため、必ず discriminated union を返す）
-- `userId` 不在は実運用上発生しないが防御的に判定（R3 #3 由来）
+- `user` 不在は実運用上発生しないが防御的に判定（R3 #3 由来）
 - `not_found` と `forbidden` は既存メソッドが区別不可なので 1 つのケースに統合（R2 #4 と合致）
 
 ## Requirements Traceability
@@ -290,9 +290,9 @@ Key 決定:
 | 2.5 | Markdown を改変せず返す | GetPageContentTool | output `body` | — |
 | 2.6 | 応答に `path` を含める | GetPageContentTool | output schema | — |
 | 2.7 | grant 自前実装禁止 | GetPageContentTool | `findByIdAndViewer` 委譲 | Tool Execute 分岐 |
-| 3.1 | userId を requestContext へ付与 | Post-Message Handler | `RequestContext.set('userId', ...)` | 反復ループ Sequence (step 4) |
-| 3.2 | tool 内で呼び出しユーザー判別可 | GetPageContentTool | `RequestContext.get('userId')` | Tool Execute 分岐 |
-| 3.3 | userId 取得不可で本文返さない | GetPageContentTool | discriminated union `context_error` | Tool Execute 分岐 |
+| 3.1 | user 識別情報を requestContext へ付与 | Post-Message Handler | `RequestContext.set('user', req.user)` | 反復ループ Sequence (step 4) |
+| 3.2 | tool 内で呼び出しユーザー判別可 | GetPageContentTool | `RequestContext.get('user')` | Tool Execute 分岐 |
+| 3.3 | user 取得不可で本文返さない | GetPageContentTool | discriminated union `context_error` | Tool Execute 分岐 |
 | 3.4 | 認証通過済みのみ tool 実行 | Post-Message Handler | 既存 `loginRequiredStrictly` | 反復ループ Sequence (step 3) |
 | 4.1 | agent から fileSearchTool を保持しない | growiAgent | tools 構成変更 | — |
 | 4.2 | fileSearchTool ソースは削除しない | growiAgent | import コメントアウト | — |
@@ -306,7 +306,7 @@ Key 決定:
 | 6.3 | `pageId` 形式 ObjectId 文字列 | FullTextSearchTool | output schema | — |
 | 6.4 | `snippet` を含める（推奨） | FullTextSearchTool | output schema | — |
 | 6.5 | 本文を返さない | FullTextSearchTool | output schema | — |
-| 6.6 | userId 取得不可で失敗戻り値 | FullTextSearchTool | discriminated union `context_error` | Tool Execute 分岐 |
+| 6.6 | user 取得不可で失敗戻り値 | FullTextSearchTool | discriminated union `context_error` | Tool Execute 分岐 |
 | 6.7 | grant 自前実装禁止 | FullTextSearchTool | `SearchService.searchKeyword` 委譲 | 反復ループ Sequence |
 | 6.8 | 例外を throw せず戻り値変換 | FullTextSearchTool | discriminated union `error` | — |
 
@@ -323,6 +323,8 @@ Key 決定:
 | File | `services/mastra-modules/types/request-context.ts` |
 
 ```typescript
+import type { IUserHasId } from '@growi/core';
+
 import type SearchService from '~/server/service/search';
 
 /**
@@ -330,10 +332,14 @@ import type SearchService from '~/server/service/search';
  * RequestContext key 群の型シェイプ。
  * - 追加 / リネーム時はこの 1 ファイルを更新するだけで型不整合が
  *   handler / 全 tool 側に伝播する。
+ * - `user` は認証ミドルウェア通過後の `req.user` をそのまま載せる。
+ *   tool 側で `_id` のみ取り出す or `User.findById` で再解決する必要はない
+ *   (findByIdAndViewer / SearchService.searchKeyword は user オブジェクト
+ *   全体を受け取って必要なフィールドを内部で参照する)。
  */
 export type MastraRequestContextShape = {
   vectorStoreId: string;
-  userId: string;
+  user: IUserHasId;
   searchService: SearchService;
 };
 ```
@@ -347,11 +353,11 @@ export type MastraRequestContextShape = {
 
 | Component | Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |---|---|---|---|---|---|
-| `MastraRequestContextShape` (Shared Type) | Types | post-message handler と全 tool 間で `RequestContext` の key 契約を共有 | 3.1, 3.2, 3.3, 6.6 | `SearchService` (type, P0) | — |
+| `MastraRequestContextShape` (Shared Type) | Types | post-message handler と全 tool 間で `RequestContext` の key 契約を共有 | 3.1, 3.2, 3.3, 6.6 | `IUserHasId` (type, P0), `SearchService` (type, P0) | — |
 | `FullTextSearchTool` | Tool | 自然言語クエリで wiki 検索ヒット（pagePath / pageId / snippet）を grant 委譲取得。ES 未設定環境では execute 内で早期 `result: 'error'` を返す | 6.1–6.8, 3.2 | `MastraRequestContextShape` (P0), `SearchService.searchKeyword` (P0, via requestContext), `SearchService.isElasticsearchEnabled` (P0, via requestContext) | Service |
 | `GetPageContentTool` | Tool | `pageId` / `pagePath` で本文を grant 委譲取得 | 2.1–2.7, 3.2, 3.3, 5.3 | `MastraRequestContextShape` (P0), `Page.findByIdAndViewer` (P0), `populateDataToShowRevision` (P0) | Service |
 | `growiAgent` (Extension) | Agent | RAG ループの自律実行 + tools 構成 + instructions | 1.1–1.6, 4.1–4.3, 5.1–5.3 | `fullTextSearchTool` (P0), `getPageContentTool` (P0), Memory (P0) | Service |
-| Post-Message Handler (Extension) | HTTP | `userId` / `searchService` の `requestContext` 付与 + リクエストスコープ化 | 3.1, 3.4, 5.4, 6.6 | `MastraRequestContextShape` (P0), `loginRequiredStrictly` (P0), `IUserHasId` (P0) | API |
+| Post-Message Handler (Extension) | HTTP | `user` (IUserHasId) / `searchService` の `requestContext` 付与 + リクエストスコープ化 | 3.1, 3.4, 5.4, 6.6 | `MastraRequestContextShape` (P0), `loginRequiredStrictly` (P0), `IUserHasId` (P0) | API |
 
 ### Tool Layer
 
@@ -364,10 +370,10 @@ export type MastraRequestContextShape = {
 
 **Responsibilities & Constraints**
 - 入力検証（`query: string` 非空）
-- `requestContext` からの `userId` 取得（不在時は失敗戻り値）
+- `requestContext` からの `user: IUserHasId` 取得（不在時は失敗戻り値）
 - **`requestContext` から `searchService: SearchService` を取得**（不在時は `result: 'context_error'`）。`crowi` 全体ではなく `searchService` のみを渡すことで、tool 層が触れる surface を最小化する
 - **`searchService.isElasticsearchEnabled === false` のとき early return**: `result: 'error', reason: 'elasticsearch_not_configured'` を返し、SearchService を呼ばない（要件 6.8 の例外抑制と同じ戻り値型に統合）
-- `userId` から `{ _id: new ObjectId(userId) }` 形状の最小オブジェクトを組み立て、`searchService.searchKeyword(query, null, user, null, options)` に渡す
+- 取得した `user: IUserHasId` をそのまま `searchService.searchKeyword(query, null, user, null, options)` に渡す（合成 user の組み立ては行わない — ES delegator 内部参照フィールドの確定的な根拠が現時点で limit されており、安全側に倒して `req.user` を全体引き渡し）
 - 検索結果から `pagePath` / `pageId` / `snippet` を抽出した配列にマップ
 - ページ本文（`body`）は **返さない**（責務分離）
 - 戻り値の discriminated union 整形（`'ok' | 'error' | 'context_error'`）
@@ -489,12 +495,12 @@ export const fullTextSearchTool: Tool<
 >;
 ```
 
-- **Preconditions**: `requestContext` に `userId` と `searchService` の両方がセットされている。`searchService` が `isElasticsearchEnabled === true` の場合のみ検索を実行する
+- **Preconditions**: `requestContext` に `user: IUserHasId` と `searchService` の両方がセットされている。`searchService` が `isElasticsearchEnabled === true` の場合のみ検索を実行する
 - **Postconditions**: 戻り値は必ず `fullTextSearchOutputSchema` を満たす。例外は throw されない
 - **Invariants**: 閲覧権限のないページが `hits` 配列に決して現れない（SearchService の `filterPagesByViewer` に委譲、二重実装なし）
 
 **Implementation Notes**
-- **`searchService` の取得**: execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>; const searchService = ctx.get('searchService');` の形で **共有型経由で型付き取得**（`growi-agent.ts` モジュールから `crowi` を import しない方針）。Post-Message Handler 側の `crowi.searchService` 参照を tool まで `RequestContext` 経由で持ち回ることで、`growi-agent.ts` の module-level export を保ったまま条件分岐を tool 層に閉じ込められる。`searchService` が `undefined` の場合は `result: 'context_error'`（共有型上は必須キーだが、Mastra ランタイムの動的取得である以上、防御的に型ガードを残す）
+- **`user` / `searchService` の取得**: execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>; const user = ctx.get('user'); const searchService = ctx.get('searchService');` の形で **共有型経由で型付き取得**（`growi-agent.ts` モジュールから `crowi` を import しない方針）。Post-Message Handler 側の `req.user` / `crowi.searchService` 参照を tool まで `RequestContext` 経由で持ち回ることで、`growi-agent.ts` の module-level export を保ったまま条件分岐を tool 層に閉じ込められる。`user` または `searchService` が `undefined` の場合は `result: 'context_error'`（共有型上は必須キーだが、Mastra ランタイムの動的取得である以上、防御的に型ガードを残す）
 - Integration: `searchService.searchKeyword(keyword, nqName, user, userGroups, searchOpts)` を呼ぶ。`nqName: null`、`userGroups: null`（SearchService 内部で user から自動解決）、`searchOpts` で limit を渡す。**戻り値は `Promise<[ISearchResult<unknown>, string | null]>` のタプル** であり、`const [result, _delegatorName] = await searchService.searchKeyword(...)` の形で分解する。
 - マッピング規則（[elasticsearch.ts:470-484](apps/app/src/server/service/search-delegator/elasticsearch.ts#L470-L484) の ES index 投入ロジックと [elasticsearch.ts:736-750](apps/app/src/server/service/search-delegator/elasticsearch.ts#L736-L750) の delegator 戻り値を根拠）:
 
@@ -519,8 +525,8 @@ export const fullTextSearchTool: Tool<
 
 **Responsibilities & Constraints**
 - 入力検証（少なくとも `pageId` または `pagePath`）
-- `requestContext` からの `userId` 取得（不在時は失敗戻り値）
-- `Page.findByIdAndViewer` / `findByPathAndViewer` への委譲
+- `requestContext` からの `user: IUserHasId` 取得（不在時は失敗戻り値）
+- 取得した `user` をそのまま `Page.findByIdAndViewer` / `findByPathAndViewer` の第 2 引数に渡す（`_id` のみ抽出 / `User.findById` 再解決は行わない）
 - revision の populate と `body` の抽出
 - 戻り値の discriminated union 整形
 - **grant 判定の自前実装をしない**（必ず既存メソッド経由）
@@ -600,12 +606,12 @@ export const getPageContentTool: Tool<
 >;
 ```
 
-- **Preconditions**: `requestContext` に `userId` がセットされている（`Post-Message Handler` の責務）
+- **Preconditions**: `requestContext` に `user: IUserHasId` がセットされている（`Post-Message Handler` の責務）
 - **Postconditions**: 戻り値は必ず `getPageContentOutputSchema` を満たす。例外は throw されない
 - **Invariants**: 閲覧権限のないページの内容は決して `result: 'ok'` の `page.body` に現れない（grant 委譲不変条件）
 
 **Implementation Notes**
-- Integration: `Page.findByIdAndViewer(id, user)` の `user` 引数は内部で `user._id` のみ参照する（[generateGrantCondition (page.ts:1287)](apps/app/src/server/models/page.ts#L1287) と [findAllUserGroupIdsRelatedToUser (user-group-relation.ts:170)](apps/app/src/server/models/user-group-relation.ts#L170) の両方で `_id` 以外のフィールドを使用しないことを確認済み）。tool 内では `requestContext` の `userId: string` から `{ _id: new mongoose.Types.ObjectId(userId) }` 形状の最小オブジェクトを組み立てて渡せばよく、**追加の `User.findById()` クエリは不要**
+- Integration: `Page.findByIdAndViewer(id, user)` には `requestContext.get('user')` で取得した `IUserHasId` をそのまま渡す。**合成 user の組み立てや追加の `User.findById()` クエリは不要**。`req.user` は認証ミドルウェア (`loginRequiredStrictly`) 通過後に Mongoose document として既に解決済みのため、`_id` だけでなく `findByIdAndViewer` / `findAllUserGroupIdsRelatedToUser` が将来必要とする可能性のあるフィールド（`status` 等）も同時に伝搬される（参考: [generateGrantCondition (page.ts:1287)](apps/app/src/server/models/page.ts#L1287)、[findAllUserGroupIdsRelatedToUser (user-group-relation.ts:170)](apps/app/src/server/models/user-group-relation.ts#L170) は現状 `_id` のみ参照だが、本 spec ではその前提に依存せず安全側に倒す）
 - Validation: zod の `refine` で「id/path どちらか必須」を表現、execute 内で zod の validation 結果を直接戻り値に変換しない（Mastra が `outputSchema` 検証を行うため）
 - Risks: 既存 `findByIdAndViewer` が `includeAnyoneWithTheLink: true` を内部固定するため、GRANT_RESTRICTED ページが RAG コンテキストに混入する（research.md R-3）。本 spec では既存挙動を踏襲し integration test で挙動を明文化
 
@@ -675,15 +681,15 @@ export const growiAgent = new Agent({
 
 | Field | Detail |
 |---|---|
-| Intent | `RequestContext` 型を拡張し、認証済みユーザーの `_id` を `userId` として tool 実行コンテキストにセットする |
+| Intent | `RequestContext` 型を拡張し、認証済みユーザー `req.user: IUserHasId` を `user` として tool 実行コンテキストにセットする |
 | Requirements | 3.1, 3.4, 5.4 |
 
 **Responsibilities & Constraints**
 - `RequestContext<{ vectorStoreId: string }>` を **`RequestContext<MastraRequestContextShape>`** に拡張（`MastraRequestContextShape` は `services/mastra-modules/types/request-context.ts` から import）
-- **`RequestContext` インスタンスをハンドラ関数内で `new` する**（モジュールスコープ singleton を廃止）。これにより並列リクエスト下で他リクエストの `userId` / `searchService` が tool に渡る可能性を排除
+- **`RequestContext` インスタンスをハンドラ関数内で `new` する**（モジュールスコープ singleton を廃止）。これにより並列リクエスト下で他リクエストの `user` / `searchService` が tool に渡る可能性を排除
 - 既存の `accessTokenParser` → `loginRequiredStrictly` → `validator` ミドルウェアチェーンを変更しない
 - 既存の `requestContext.set('vectorStoreId', ...)` の直後に以下 2 つの `set` を追加:
-  - `requestContext.set('userId', req.user._id.toString())`
+  - `requestContext.set('user', req.user)` ← `req.user` は `loginRequiredStrictly` 通過後 `IUserHasId` として確定済み
   - `requestContext.set('searchService', crowi.searchService)` ← `crowi` は route factory 引数として既に scope に存在する
 - ストリーミング応答層（`toAISdkStream` / `pipeUIMessageStreamToResponse`）は変更しない
 
@@ -704,8 +710,8 @@ export const growiAgent = new Agent({
 
 **Implementation Notes**
 - Integration: `@mastra/core` の `RequestContext` は単純な `Map` ラッパーであり AsyncLocalStorage 等の自動隔離機構を持たない（[chunk-4RQN7U3L.js:20](node_modules/.pnpm/@mastra+core@1.32.1_*/node_modules/@mastra/core/dist/chunk-4RQN7U3L.js)）。そのため本 spec では `new RequestContext()` をハンドラ関数内に閉じ、リクエストごとに独立した Map インスタンスを使う。`vectorStoreId` の値の意味は不変
-- **共有型の参照**: `import type { MastraRequestContextShape } from '~/features/mastra/server/services/mastra-modules/types/request-context'`。`SearchService` 型は当該ファイルが `~/server/service/search` の **default export** ([search.ts:673](apps/app/src/server/service/search.ts#L673)) を `import type SearchService` する形で間接的に参照
-- Validation: 既存 `validator` チェーンで `req.user` が `IUserHasId` として保証されるため、`req.user._id.toString()` 直呼び出しは安全
+- **共有型の参照**: `import type { MastraRequestContextShape } from '~/features/mastra/server/services/mastra-modules/types/request-context'`。`SearchService` 型は当該ファイルが `~/server/service/search` の **default export** ([search.ts:673](apps/app/src/server/service/search.ts#L673)) を `import type SearchService` する形で、`IUserHasId` は `@growi/core` から `import type { IUserHasId }` する形で参照
+- Validation: 既存 `validator` チェーンで `req.user` が `IUserHasId` として保証されるため、`requestContext.set('user', req.user)` は型安全
 - Risks: なし（リクエストスコープ化により既存の潜在的レースコンディションを解消する）
 
 ## Data Models
@@ -744,7 +750,7 @@ export const growiAgent = new Agent({
 |---|---|---|---|
 | Input validation | `result: 'missing_input'` | `pageId` も `pagePath` も与えられない | tool 内 zod refine、`reason` に英語短文 |
 | Access denial / missing | `result: 'not_found_or_forbidden'` | `Page.findByIdAndViewer` が `null` を返す | `reason` に「存在しないか閲覧権限がない」旨を含める |
-| Context missing | `result: 'context_error'` | `requestContext` から `userId` を取り出せない | 防御的判定、運用上は到達しない（R3 #4 の認証ミドルウェアで保証） |
+| Context missing | `result: 'context_error'` | `requestContext` から `user` を取り出せない | 防御的判定、運用上は到達しない（R3 #4 の認証ミドルウェアで保証） |
 | Unexpected Mongoose error | log + 共通失敗戻り値（`not_found_or_forbidden`）にフォールバック | DB 接続喪失等 | `logger.error` で記録、agent には共通失敗で返す |
 
 #### FullTextSearchTool
@@ -752,7 +758,7 @@ export const growiAgent = new Agent({
 | Category | 戻り値 | 発生条件 | Handler |
 |---|---|---|---|
 | Input validation | （zod `min(1)` で空クエリ拒否）| `query` が空文字列 | Mastra ランタイムが zod 検証段階で弾く（tool execute に到達しない） |
-| Context missing | `result: 'context_error'` | `requestContext` から `userId` または `searchService` を取り出せない | 防御的判定、運用上は到達しない |
+| Context missing | `result: 'context_error'` | `requestContext` から `user` または `searchService` を取り出せない | 防御的判定、運用上は到達しない |
 | Elasticsearch disabled | `result: 'error', reason: 'elasticsearch_not_configured'` | `searchService.isElasticsearchEnabled === false` | OSS デプロイで ES URI 未設定の場合に発生。agent は LLM 標準挙動で他の応答方針に切り替える |
 | Search exception | `result: 'error', reason: <message>` | `searchService.searchKeyword(...)` が reject | `logger.error` で記録、agent には `'error'` で返す（要件 6.8） |
 
@@ -767,19 +773,19 @@ export const growiAgent = new Agent({
 ### Unit Tests (`full-text-search-tool.spec.ts`)
 
 1. zod 入力 schema が空クエリを弾く（6.1）
-2. `requestContext.get('userId')` が `undefined` のとき `result: 'context_error'` を返す（6.6, 3.2）
+2. `requestContext.get('user')` が `undefined` のとき `result: 'context_error'` を返す（6.6, 3.2）
 3. `requestContext.get('searchService')` が `undefined` のとき `result: 'context_error'` を返す（6.6）
 4. `searchService.isElasticsearchEnabled === false` のとき `result: 'error', reason: 'elasticsearch_not_configured'` を返し、`searchKeyword` は呼ばれない（要件 6.1 / OSS デプロイ対応）
 5. `searchService.searchKeyword` をモックして結果配列を `{ pageId, pagePath, snippet }` 形にマップ（6.2, 6.3, 6.4）
 6. SearchService の戻り値に `body` が含まれていても tool 出力には含めないこと（6.5）
 7. SearchService が reject された場合に `result: 'error'` を返し execute が throw しないこと（6.8）
-8. `userId` が ObjectId 文字列として SearchService に渡されること（6.7）
+8. `requestContext` 経由の `user: IUserHasId` がそのまま `SearchService.searchKeyword` の第 3 引数に渡ること（合成オブジェクトでなく `req.user` の参照同一性が保たれること、6.7）
 9. **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡したとき、tool 層で文字列が改変されず `SearchService.searchKeyword` の第 1 引数にそのまま渡ること（サニタイザ不在の保証、本 spec の Plan A 採用根拠）
 
 ### Unit Tests (`get-page-content-tool.spec.ts`)
 
 1. zod 入力 schema が `pageId` も `pagePath` も無いケースを `missing_input` で弾く（2.3）
-2. `requestContext.get('userId')` が `undefined` のとき `result: 'context_error'` を返す（3.3）
+2. `requestContext.get('user')` が `undefined` のとき `result: 'context_error'` を返す（3.3）
 3. `Page.findByIdAndViewer` をモックして `null` 返却時に `result: 'not_found_or_forbidden'` を返す（2.4）
 4. モックされた成功ケースで `result: 'ok'` + 正しい `path` / `body` / `updatedAt` を返し、`body` が改変されない（2.5, 2.6）
 5. `pageId` 指定時に `findByIdAndViewer` が呼ばれ、`findByPathAndViewer` は呼ばれない（2.1）
@@ -818,7 +824,7 @@ export const growiAgent = new Agent({
 ## Security Considerations
 
 - **grant 委譲の完全性（R2 #7）**: tool 内で MongoDB クエリを自前構築しない。すべての本文取得は `findByIdAndViewer` / `findByPathAndViewer` 経由に統一。レビューで既存メソッド以外の Page 読み取り経路を許可しない
-- **`requestContext` のリクエスト隔離（本 spec で対処）**: `userId` は認証ミドルウェア通過後の `req.user._id` から派生するため改竄の余地なし。`searchService` も route factory 引数 `crowi` から取得するため改竄不可。`@mastra/core` の `RequestContext` は内部的に単純な `Map` ラッパーで自動的なリクエスト隔離機構を持たないため、本 spec ではモジュールスコープ singleton を廃止しハンドラ関数内で `new RequestContext()` する。この変更により、並列リクエスト下で他リクエストの `userId` / `searchService` が tool 内 `get(...)` で読み出される可能性を排除する
+- **`requestContext` のリクエスト隔離（本 spec で対処）**: `user` は認証ミドルウェア通過後の `req.user: IUserHasId` をそのまま載せるため改竄の余地なし。`searchService` も route factory 引数 `crowi` から取得するため改竄不可。`@mastra/core` の `RequestContext` は内部的に単純な `Map` ラッパーで自動的なリクエスト隔離機構を持たないため、本 spec ではモジュールスコープ singleton を廃止しハンドラ関数内で `new RequestContext()` する。この変更により、並列リクエスト下で他リクエストの `user` / `searchService` が tool 内 `get(...)` で読み出される可能性を排除する
 - **`searchService` を `requestContext` に載せる根拠**: `crowi` 全体を渡すと tool 層から DB / メール / 設定など全機能にアクセス可能になりレイヤリングが崩れる。本 spec では「`fullTextSearchTool` が必要とする最小 surface = `searchService`」のみを `RequestContext` に格納し、tool 層の触れる API を意図的に狭める
 - **失敗戻り値の情報漏洩防止**: `not_found_or_forbidden` を共通化することで「存在するが閲覧不可」と「そもそも存在しない」を agent に区別させない。回答経由でユーザーに非公開ページの存在が漏れない
 - **GRANT_RESTRICTED の扱い**: 既存 `findByIdAndViewer` の `includeAnyoneWithTheLink: true` 仕様により、リンク共有ページが RAG コンテキストに含まれる可能性がある。本 spec ではこれを既存仕様として許容、integration test 5.5 で挙動を明文化（research.md R-3）
@@ -837,8 +843,9 @@ design 段階で残る未確定事項（実装中に解決）:
 - **R-4**: `fileSearchTool` のコメントアウト後の lint 挙動 — Biome は未使用 import / コメント行を警告しない想定。実装時に build を回して確認
 
 design レビューで解消した項目（参考）:
-- ~~**R-1**: `Page.findByIdAndViewer` の `user` 引数最小要件~~ → `user._id` のみ参照と判明。tool 内で `{ _id: new ObjectId(userId) }` を組み立てるだけで十分、追加クエリ不要
+- ~~**R-1**: `Page.findByIdAndViewer` の `user` 引数最小要件~~ → `user._id` のみ参照と判明したが、ES delegator (`searchKeyword` → `delegator.search`) 経路で同じ前提が成立する確証が現時点で不足するため、合成 user (`{ _id: ObjectId }`) を組み立てる方針は採らず、認証ミドルウェア通過後の `req.user: IUserHasId` を `RequestContext` 経由で tool まで持ち回り、そのまま既存メソッドに渡す方針に変更（kiro-validate-design Issue 1 / C 案）
 - ~~**RequestContext シングルトン問題**~~ → 本 spec で `new RequestContext()` をハンドラ内に閉じる対応を In-Boundary に含めることで解消
 - ~~**`crowi.searchService` を `growi-agent.ts` から参照する経路**~~ → `searchService` を `RequestContext` 経由で tool に渡す方針に変更し、`growi-agent.ts` の module-level export を維持しつつ ES 判定を tool execute 内に閉じ込めることで解消（FB Issue 1）
+- ~~**`{ _id: ObjectId } ` 合成 user で全 grant 経路が成立するか~~ → ES delegator 経路の確証が不足するため、合成せず `req.user: IUserHasId` を `RequestContext` 経由でそのまま伝搬する方針に切替（kiro-validate-design Issue 1 / C 案、上述）
 
 詳細は [research.md](./research.md) Section 5.3 を参照。
