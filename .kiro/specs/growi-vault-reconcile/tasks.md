@@ -63,7 +63,7 @@
   - _Requirements: 6.6, 6.7, 7.6_
   - _Boundary: ConcurrencyController_
 
-- [ ] 2.3 (P) AclEvaluator: `PageQueryBuilder.addConditionToFilteringByViewer` を使った grant filter adapter を実装（**count は持たない**）
+- [x] 2.3 (P) AclEvaluator: `PageQueryBuilder.addConditionToFilteringByViewer` を使った grant filter adapter を実装（**count は持たない**）
   - 入力 `{ user, isAdmin, baseQuery }` に対し `{ eligibleQuery }` のみを返す純 query builder（受付ゲートの上限判定は ReconcileService 側 `descendantCount` ベースに移譲、ACL filter 由来の差分判定は orchestrator 完了時に `processedCount < plannedPageCount` の heuristic で行う）
   - admin: `eligibleQuery = baseQuery` をそのまま返し DB I/O を発行しない
   - 非 admin: `pageGrantService.getUserRelatedGroups(user)` で group 解決 →  `PageQueryBuilder` で `addConditionToFilteringByViewer(user, groupIds, false, false, false)` を merge → `getFilter()` で eligibleQuery を抽出
