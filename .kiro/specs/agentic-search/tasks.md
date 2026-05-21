@@ -123,7 +123,7 @@
   - _Depends: 2.1, 3.1_
 
 - [ ] 5. Validation: 静的チェックと任意の軽量統合テスト
-- [ ] 5.1 lint / typecheck / build の green 確認
+- [x] 5.1 lint / typecheck / build の green 確認
   - `pnpm run lint:biome` を通過させる
   - `pnpm run lint:typecheck` を通過させる
   - `pnpm run build` を通過させる
