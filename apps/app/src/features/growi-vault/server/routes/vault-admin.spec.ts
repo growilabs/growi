@@ -56,6 +56,8 @@ const mockBootstrapper = {
   start: vi.fn(),
   initOnStartup: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn().mockResolvedValue(undefined),
+  getResilienceStatus: vi.fn(),
+  abortAutoRetry: vi.fn(),
 };
 
 const mockManagerClient = {
@@ -68,6 +70,8 @@ const mockManagerClient = {
 // Import mocked singletons so tests can reconfigure them.
 // ---------------------------------------------------------------------------
 
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 
 // ---------------------------------------------------------------------------
@@ -105,6 +109,34 @@ const storageStatsFixture = {
   namespaceCount: 5,
   totalCommitCount: 1000,
   repoSizeBytes: 512000,
+};
+
+/** A ResilienceStatus fixture covering all fields. */
+const resilienceStatusFixture = {
+  bootstrap: {
+    state: 'done' as const,
+    processed: 1000,
+    totalEstimated: 1000,
+    cursor: null,
+    startedAt: new Date('2024-01-01T00:00:00Z'),
+    completedAt: new Date('2024-01-01T01:00:00Z'),
+    lastError: null,
+  },
+  retry: {
+    attemptNo: 2,
+    nextAttemptAt: null,
+    lastError: null,
+    aborted: false,
+  },
+  drift: {
+    lastSweepAt: null,
+    lastWatermark: null,
+    detectedSinceBoot: 0,
+    repairsEmittedSinceBoot: 0,
+    lastError: null,
+  },
+  lastTriggerSource: 'startup' as const,
+  forceWarningActive: false,
 };
 
 // ---------------------------------------------------------------------------
@@ -287,6 +319,154 @@ describe('VaultAdminRouter', () => {
       const res = await request(app)
         .put('/_api/admin/vault/enabled')
         .send({ enabled: true });
+
+      expect(res.status).toBe(500);
+      expect(res.body.ok).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // GET /resilience-status
+  // -------------------------------------------------------------------------
+
+  describe('GET /resilience-status', () => {
+    it('applies auth middleware when crowi is provided', async () => {
+      mockBootstrapper.getResilienceStatus.mockResolvedValue(
+        resilienceStatusFixture,
+      );
+
+      const mockCrowi = {};
+      const app = express();
+      app.use(express.json());
+      app.use(
+        '/_api/admin/vault',
+        createVaultAdminRouter({
+          bootstrapper: mockBootstrapper,
+          managerClient: mockManagerClient,
+          crowi: mockCrowi,
+        }),
+      );
+
+      await request(app).get('/_api/admin/vault/resilience-status');
+
+      // Both middleware factories must have been called with the crowi instance.
+      expect(loginRequiredFactory).toHaveBeenCalledWith(mockCrowi);
+      expect(adminRequiredFactory).toHaveBeenCalledWith(mockCrowi);
+    });
+
+    it('returns 200 with full ResilienceStatus on success', async () => {
+      mockBootstrapper.getResilienceStatus.mockResolvedValue(
+        resilienceStatusFixture,
+      );
+
+      const app = buildApp();
+      const res = await request(app).get('/_api/admin/vault/resilience-status');
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data.bootstrap.state).toBe('done');
+      expect(res.body.data.bootstrap.processed).toBe(1000);
+      expect(res.body.data.retry).toMatchObject({ attemptNo: 2 });
+      expect(res.body.data.drift).not.toBeNull();
+      expect(res.body.data.lastTriggerSource).toBe('startup');
+      expect(res.body.data.forceWarningActive).toBe(false);
+    });
+
+    it('returns 500 when getResilienceStatus throws', async () => {
+      mockBootstrapper.getResilienceStatus.mockRejectedValue(
+        new Error('DB connection error'),
+      );
+
+      const app = buildApp();
+      const res = await request(app).get('/_api/admin/vault/resilience-status');
+
+      expect(res.status).toBe(500);
+      expect(res.body.ok).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /retry/abort
+  // -------------------------------------------------------------------------
+
+  describe('POST /retry/abort', () => {
+    it('applies auth middleware when crowi is provided', async () => {
+      mockBootstrapper.getStatus.mockResolvedValue({
+        ...doneStatus,
+        state: 'failed',
+      });
+      mockBootstrapper.abortAutoRetry.mockResolvedValue(undefined);
+
+      const mockCrowi = {};
+      const app = express();
+      app.use(express.json());
+      app.use(
+        '/_api/admin/vault',
+        createVaultAdminRouter({
+          bootstrapper: mockBootstrapper,
+          managerClient: mockManagerClient,
+          crowi: mockCrowi,
+        }),
+      );
+
+      await request(app).post('/_api/admin/vault/retry/abort');
+
+      expect(loginRequiredFactory).toHaveBeenCalledWith(mockCrowi);
+      expect(adminRequiredFactory).toHaveBeenCalledWith(mockCrowi);
+    });
+
+    it('returns 200 with aborted:true when bootstrap is in failed state', async () => {
+      mockBootstrapper.getStatus.mockResolvedValue({
+        ...doneStatus,
+        state: 'failed',
+      });
+      mockBootstrapper.abortAutoRetry.mockResolvedValue(undefined);
+
+      const app = buildApp();
+      const res = await request(app).post('/_api/admin/vault/retry/abort');
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data).toMatchObject({ aborted: true });
+      expect(mockBootstrapper.abortAutoRetry).toHaveBeenCalledOnce();
+    });
+
+    it('returns 200 with aborted:true when bootstrap is in retrying state', async () => {
+      mockBootstrapper.getStatus.mockResolvedValue({
+        ...doneStatus,
+        state: 'retrying',
+      });
+      mockBootstrapper.abortAutoRetry.mockResolvedValue(undefined);
+
+      const app = buildApp();
+      const res = await request(app).post('/_api/admin/vault/retry/abort');
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.data).toMatchObject({ aborted: true });
+    });
+
+    it('returns 409 when bootstrap is not in a retriable state', async () => {
+      mockBootstrapper.getStatus.mockResolvedValue({
+        ...doneStatus,
+        state: 'idle',
+      });
+
+      const app = buildApp();
+      const res = await request(app).post('/_api/admin/vault/retry/abort');
+
+      expect(res.status).toBe(409);
+      expect(res.body.ok).toBe(false);
+      expect(res.body.error).toMatch(/cannot abort retry/i);
+      // abortAutoRetry must NOT be called when not in a retriable state.
+      expect(mockBootstrapper.abortAutoRetry).not.toHaveBeenCalled();
+    });
+
+    it('returns 500 when getStatus throws', async () => {
+      mockBootstrapper.getStatus.mockRejectedValue(new Error('DB error'));
+
+      const app = buildApp();
+      const res = await request(app).post('/_api/admin/vault/retry/abort');
 
       expect(res.status).toBe(500);
       expect(res.body.ok).toBe(false);

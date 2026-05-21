@@ -8,7 +8,10 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
-import type { VaultBootstrapper } from '../services/vault-bootstrapper';
+import type {
+  ResilienceStatus,
+  VaultBootstrapper,
+} from '../services/vault-bootstrapper';
 import { vaultBootstrapperFactory } from '../services/vault-bootstrapper';
 import type { VaultManagerClient } from '../services/vault-manager-client';
 import { vaultManagerClient as defaultManagerClient } from '../services/vault-manager-client';
@@ -148,6 +151,66 @@ export const createVaultAdminRouter = (
       return res.json({ ok: true });
     } catch (err) {
       logger.error({ err }, 'Failed to start vault bootstrap');
+      return res
+        .status(500)
+        .json({ ok: false, error: 'Internal server error' });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // GET /resilience-status
+  // --------------------------------------------------------------------------
+
+  /**
+   * Return the full ResilienceStatus (bootstrap + retry + drift + trigger info).
+   *
+   * Unlike GET /status (which returns a flat bootstrap-only subset for backward
+   * compat), this endpoint exposes the entire ResilienceStatus structure so the
+   * admin UI can render retry and drift information without extra round-trips.
+   */
+  router.get('/resilience-status', ...authMiddlewares, async (_req, res) => {
+    try {
+      const resilienceStatus: ResilienceStatus =
+        await bootstrapper.getResilienceStatus();
+      return res.json({ ok: true, data: resilienceStatus });
+    } catch (err) {
+      logger.error({ err }, 'Failed to retrieve resilience status');
+      return res
+        .status(500)
+        .json({ ok: false, error: 'Internal server error' });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // POST /retry/abort
+  // --------------------------------------------------------------------------
+
+  /**
+   * Abort the current auto-retry schedule.
+   *
+   * Returns 409 Conflict when the bootstrap state is not in a retriable state
+   * (i.e., not 'failed', 'retrying', or 'escalated'), because aborting retry
+   * is meaningless when no retry is active or pending.
+   */
+  router.post('/retry/abort', ...authMiddlewares, async (_req, res) => {
+    try {
+      const status = await bootstrapper.getStatus();
+      const retriableStates = ['failed', 'retrying', 'escalated'] as const;
+      if (
+        !retriableStates.includes(
+          status.state as (typeof retriableStates)[number],
+        )
+      ) {
+        return res.status(409).json({
+          ok: false,
+          error: `Cannot abort retry: bootstrap is in '${status.state}' state`,
+        });
+      }
+
+      await bootstrapper.abortAutoRetry();
+      return res.json({ ok: true, data: { aborted: true } });
+    } catch (err) {
+      logger.error({ err }, 'Failed to abort auto-retry');
       return res
         .status(500)
         .json({ ok: false, error: 'Internal server error' });

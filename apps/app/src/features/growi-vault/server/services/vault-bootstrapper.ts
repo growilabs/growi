@@ -28,6 +28,8 @@ import {
 } from './resilience/index';
 import type { VaultNamespaceMapper } from './vault-namespace-mapper';
 
+export type { ResilienceStatus };
+
 const logger = loggerFactory(
   'growi:features:growi-vault:service:vault-bootstrapper',
 );
@@ -67,6 +69,10 @@ export type BootstrapStatus = ResilienceStatus['bootstrap'];
 export interface VaultBootstrapper {
   start(opts?: { triggerSource: 'admin-ui' | 'env-var' }): Promise<void>;
   getStatus(): Promise<BootstrapStatus>;
+  /** Return the full ResilienceStatus (bootstrap + retry + drift + trigger info). */
+  getResilienceStatus(): Promise<ResilienceStatus>;
+  /** Abort the current auto-retry schedule. */
+  abortAutoRetry(): Promise<void>;
   initOnStartup(): Promise<void>;
   stop(): Promise<void>;
 }
@@ -163,6 +169,26 @@ export const createVaultBootstrapper = (
     async getStatus(): Promise<BootstrapStatus> {
       const status = await resilienceLayer.getStatus();
       return status.bootstrap;
+    },
+
+    /**
+     * Return the full ResilienceStatus (bootstrap + retry + drift + trigger info).
+     *
+     * Used by GET /vault/resilience-status to expose the complete status to the
+     * admin UI without losing any resilience layer fields.
+     */
+    getResilienceStatus(): Promise<ResilienceStatus> {
+      return resilienceLayer.getStatus();
+    },
+
+    /**
+     * Abort the current auto-retry schedule.
+     *
+     * Delegates to the resilience layer which persists the abort flag and
+     * downgrades 'escalated' → 'failed' so operators can inspect the state.
+     */
+    async abortAutoRetry(): Promise<void> {
+      await resilienceLayer.abortAutoRetry();
     },
 
     /**
