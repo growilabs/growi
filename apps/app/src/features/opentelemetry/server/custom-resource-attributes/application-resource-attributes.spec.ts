@@ -21,7 +21,25 @@ describe('getApplicationResourceAttributes', () => {
     vi.clearAllMocks();
   });
 
-  it('should return complete application resource attributes when growi info is available', async () => {
+  it('should return only service and deployment type attributes when growi info is available', async () => {
+    const mockGrowiInfo = {
+      type: 'app',
+      deploymentType: 'standalone',
+    };
+
+    mockGrowiInfoService.getGrowiInfo.mockResolvedValue(mockGrowiInfo);
+
+    const result = await getApplicationResourceAttributes();
+
+    expect(result).toEqual({
+      'growi.service.type': 'app',
+      'growi.deployment.type': 'standalone',
+    });
+    expect(result).not.toHaveProperty('growi.attachment.type');
+    expect(mockGrowiInfoService.getGrowiInfo).toHaveBeenCalledWith({});
+  });
+
+  it('should not include growi.attachment.type even when additionalInfo is present', async () => {
     const mockGrowiInfo = {
       type: 'app',
       deploymentType: 'standalone',
@@ -34,31 +52,10 @@ describe('getApplicationResourceAttributes', () => {
 
     const result = await getApplicationResourceAttributes();
 
+    expect(result).not.toHaveProperty('growi.attachment.type');
     expect(result).toEqual({
       'growi.service.type': 'app',
       'growi.deployment.type': 'standalone',
-      'growi.attachment.type': 'local',
-    });
-    expect(mockGrowiInfoService.getGrowiInfo).toHaveBeenCalledWith({
-      includeAttachmentInfo: true,
-    });
-  });
-
-  it('should handle missing additionalInfo gracefully', async () => {
-    const mockGrowiInfo = {
-      type: 'app',
-      deploymentType: 'standalone',
-      additionalInfo: undefined,
-    };
-
-    mockGrowiInfoService.getGrowiInfo.mockResolvedValue(mockGrowiInfo);
-
-    const result = await getApplicationResourceAttributes();
-
-    expect(result).toEqual({
-      'growi.service.type': 'app',
-      'growi.deployment.type': 'standalone',
-      'growi.attachment.type': undefined,
     });
   });
 
