@@ -27,8 +27,6 @@ describe('getApplicationResourceAttributes', () => {
       deploymentType: 'standalone',
       additionalInfo: {
         attachmentType: 'local',
-        installedAt: new Date('2023-01-01T00:00:00.000Z'),
-        installedAtByOldestUser: new Date('2023-01-01T00:00:00.000Z'),
       },
     };
 
@@ -40,11 +38,9 @@ describe('getApplicationResourceAttributes', () => {
       'growi.service.type': 'app',
       'growi.deployment.type': 'standalone',
       'growi.attachment.type': 'local',
-      'growi.installedAt': '2023-01-01T00:00:00.000Z',
-      'growi.installedAt.by_oldest_user': '2023-01-01T00:00:00.000Z',
     });
     expect(mockGrowiInfoService.getGrowiInfo).toHaveBeenCalledWith({
-      includeInstalledInfo: true,
+      includeAttachmentInfo: true,
     });
   });
 
@@ -63,8 +59,6 @@ describe('getApplicationResourceAttributes', () => {
       'growi.service.type': 'app',
       'growi.deployment.type': 'standalone',
       'growi.attachment.type': undefined,
-      'growi.installedAt': undefined,
-      'growi.installedAt.by_oldest_user': undefined,
     });
   });
 
@@ -76,28 +70,5 @@ describe('getApplicationResourceAttributes', () => {
     const result = await getApplicationResourceAttributes();
 
     expect(result).toEqual({});
-  });
-
-  it('should handle partial additionalInfo data', async () => {
-    const mockGrowiInfo = {
-      type: 'app',
-      deploymentType: 'docker',
-      additionalInfo: {
-        attachmentType: 'gridfs',
-        // Missing installedAt and installedAtByOldestUser
-      },
-    };
-
-    mockGrowiInfoService.getGrowiInfo.mockResolvedValue(mockGrowiInfo);
-
-    const result = await getApplicationResourceAttributes();
-
-    expect(result).toEqual({
-      'growi.service.type': 'app',
-      'growi.deployment.type': 'docker',
-      'growi.attachment.type': 'gridfs',
-      'growi.installedAt': undefined,
-      'growi.installedAt.by_oldest_user': undefined,
-    });
   });
 });
