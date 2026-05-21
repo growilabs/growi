@@ -2,7 +2,9 @@ import type { RequestContext } from '@mastra/core/request-context';
 import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import type { ISearchResultData } from '~/interfaces/search';
+import UserGroupRelation from '~/server/models/user-group-relation';
 import loggerFactory from '~/utils/logger';
 
 import type { MastraRequestContextShape } from '../types/request-context';
@@ -103,15 +105,25 @@ export const fullTextSearchTool = createTool({
     }
 
     try {
+      // Resolve user-group ids the same way as the existing /_search route
+      // (server/routes/search.ts:143-151): SearchService does NOT resolve
+      // them internally, so GRANT_USER_GROUP pages would be hidden from
+      // members otherwise.
+      const userGroups = [
+        ...(await UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)),
+        ...(await ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(
+          user,
+        )),
+      ];
+
       // Pass query through unchanged: SearchService.parseQueryString interprets
       // operators (prefix:, tag:, "phrase", -word, ...). Do NOT sanitize or
       // rewrite the query string here — that would duplicate the parser.
-      // userGroups is null: SearchService resolves it from the user internally.
       const [searchResult, _delegatorName] = await searchService.searchKeyword(
         query,
         null,
         user,
-        null,
+        userGroups,
         { limit },
       );
 

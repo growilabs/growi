@@ -62,7 +62,7 @@
   - _Boundary: FullTextSearchTool_
   - _Depends: 2.1_
 
-- [ ] 2.3 (P) ES 全文検索 tool の integration test
+- [x] 2.3 (P) ES 全文検索 tool の integration test
   - 実 MongoDB + Elasticsearch + SearchService で、`GRANT_PUBLIC` / `GRANT_OWNER` / `GRANT_USER_GROUP` の各 grant パターンを setup
   - 各パターンで認可ユーザー・非認可ユーザー（実 User ドキュメント）から tool を呼び、hits に含まれる/含まれないが期待通りであることを assert
   - ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を確認
@@ -142,3 +142,8 @@
   - _Requirements: 4.1, 6.1_
   - _Boundary: growiAgent_
   - _Depends: 4.1_
+
+## Implementation Notes
+
+- Task 2.3 (integ test) detected a real bug in Task 2.1's call to `searchService.searchKeyword`: passing `null` for `userGroups` caused `GRANT_USER_GROUP` pages to be invisible to members. `SearchService` does NOT auto-resolve groups (despite the original design.md line 504 claim). Fix: resolve `userGroups` inside `fullTextSearchTool.execute` via `UserGroupRelation.findAllUserGroupIdsRelatedToUser` + `ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser`, matching the canonical pattern at `apps/app/src/server/routes/search.ts:143-151`. `getPageContentTool` (Task 3.1) does NOT need this — `Page.findByIdAndViewer` takes only `user`.
+- Elasticsearch is available in the devcontainer at `http://elasticsearch:9200`. Integration tests can drive a real ES via per-worker unique index names; remember to set `crowi.searchService.delegator` / config so `isElasticsearchEnabled` is true, then `syncPagesUpdated` + wait for refresh.

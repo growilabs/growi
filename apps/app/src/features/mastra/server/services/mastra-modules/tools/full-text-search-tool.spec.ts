@@ -19,6 +19,31 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
+// Mock both user-group relation models. The tool resolves user-group ids the
+// same way as the existing /_search route — these calls must be controllable
+// from the test so we can pass deterministic ids (or an empty array) into
+// SearchService.searchKeyword's 4th argument.
+const mocks = vi.hoisted(() => ({
+  userGroupRelationFindAllMock: vi.fn(),
+  externalUserGroupRelationFindAllMock: vi.fn(),
+}));
+
+vi.mock('~/server/models/user-group-relation', () => ({
+  default: {
+    findAllUserGroupIdsRelatedToUser: mocks.userGroupRelationFindAllMock,
+  },
+}));
+
+vi.mock(
+  '~/features/external-user-group/server/models/external-user-group-relation',
+  () => ({
+    default: {
+      findAllUserGroupIdsRelatedToUser:
+        mocks.externalUserGroupRelationFindAllMock,
+    },
+  }),
+);
+
 // Helper to construct a typed RequestContext used by the tool.
 const buildRequestContext = (): RequestContext<MastraRequestContextShape> =>
   new RequestContext<MastraRequestContextShape>();
@@ -67,6 +92,11 @@ const invokeExecute = (
 describe('fullTextSearchTool', () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    // Default: both relation lookups return empty arrays. Individual tests
+    // override these with mockResolvedValueOnce / mockRejectedValueOnce when
+    // they need specific group ids or a thrown error.
+    mocks.userGroupRelationFindAllMock.mockResolvedValue([]);
+    mocks.externalUserGroupRelationFindAllMock.mockResolvedValue([]);
   });
 
   describe('input validation (zod)', () => {
@@ -324,9 +354,72 @@ describe('fullTextSearchTool', () => {
       // 2nd arg (nqName) must be null — SearchService resolves the default
       // delegator name internally; the tool must not pass a string here.
       expect(mockSearchService.searchKeyword.mock.calls[0][1]).toBeNull();
-      // 4th arg (userGroups) must be null — SearchService derives groups
-      // from `user` internally.
-      expect(mockSearchService.searchKeyword.mock.calls[0][3]).toBeNull();
+      // 4th arg (userGroups) must be the resolved array — SearchService does
+      // NOT derive groups from `user` internally. With both relation mocks
+      // returning [] in beforeEach, the resolved array is [].
+      expect(mockSearchService.searchKeyword.mock.calls[0][3]).toEqual([]);
+    });
+  });
+
+  describe('userGroups resolution (Task 2.1 fix — see server/routes/search.ts:143-151)', () => {
+    it('concatenates UserGroupRelation + ExternalUserGroupRelation ids into the 4th argument', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      const searchResult: ISearchResult<unknown> = {
+        data: [],
+        meta: { total: 0, hitsCount: 0 },
+      };
+      mockSearchService.searchKeyword.mockResolvedValue([
+        searchResult,
+        'es-delegator',
+      ]);
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', asSearchService(mockSearchService));
+
+      const gid1 = 'group-id-internal';
+      const gid2 = 'group-id-external';
+      mocks.userGroupRelationFindAllMock.mockResolvedValueOnce([gid1]);
+      mocks.externalUserGroupRelationFindAllMock.mockResolvedValueOnce([gid2]);
+
+      await invokeExecute({ query: 'hello', limit: 5 }, requestContext);
+
+      expect(mockSearchService.searchKeyword).toHaveBeenCalledTimes(1);
+      // Order matters: internal relation ids first, then external ones —
+      // matches the spread order in full-text-search-tool.ts.
+      expect(mockSearchService.searchKeyword.mock.calls[0][3]).toEqual([
+        gid1,
+        gid2,
+      ]);
+      // Both relation lookups must have received the same user reference.
+      expect(mocks.userGroupRelationFindAllMock).toHaveBeenCalledWith(mockUser);
+      expect(mocks.externalUserGroupRelationFindAllMock).toHaveBeenCalledWith(
+        mockUser,
+      );
+    });
+
+    it("converts exceptions thrown by findAllUserGroupIdsRelatedToUser into result: 'error' without throwing out of execute (requirement 6.8)", async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', asSearchService(mockSearchService));
+
+      mocks.userGroupRelationFindAllMock.mockRejectedValueOnce(
+        new Error('user-group-relation-failed'),
+      );
+
+      // Must NOT throw — the try/catch envelope around the resolution + search
+      // call converts the exception into a structured error value.
+      const result = (await invokeExecute(
+        { query: 'hello', limit: 5 },
+        requestContext,
+      )) as { result: string; reason?: string };
+
+      expect(result.result).toBe('error');
+      expect(result.reason).toBe('user-group-relation-failed');
+      // searchKeyword must not be reached when group resolution fails.
+      expect(mockSearchService.searchKeyword).not.toHaveBeenCalled();
     });
   });
 });
