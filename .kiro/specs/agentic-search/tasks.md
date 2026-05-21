@@ -131,7 +131,7 @@
   - 観察可能完了: 4 コマンドすべて exit 0、コメントアウトされた fileSearchTool の import が lint warn を出さない
   - _Requirements: 4.3_
 
-- [ ]* 5.2 (P) (任意) 軽量 agent integration test
+- [x]* 5.2 (P) (任意) 軽量 agent integration test
   - `growiAgent.tools` のキー一覧で `fullTextSearchTool` / `getPageContentTool` の存在と `fileSearchTool` の非存在を assert
   - `growiAgent.instructions` 文字列に対し以下を assert（FB Issue 2 の回帰防止）:
     - 「fullTextSearch → getPageContent → 引用パス」の利用順序を示す英語短文が含まれる
