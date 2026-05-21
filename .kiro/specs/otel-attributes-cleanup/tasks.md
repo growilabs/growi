@@ -16,7 +16,7 @@
   - _Requirements: 1.2, 1.3_
   - _Boundary: ApplicationResourceAttributes_
 
-- [ ] 2. (P) Add attachment_type label to growi.configs info gauge
+- [x] 2. (P) Add attachment_type label to growi.configs info gauge
   - `application-metrics.ts` の `result.observe(growiInfoGauge, 1, { ... })` のラベルオブジェクトに `attachment_type: growiInfo.additionalInfo?.attachmentType ?? ''` を追加する。既存の `getGrowiInfo({ includeAttachmentInfo: true })` 呼び出しはそのまま維持する。
   - `application-metrics.spec.ts` に attachment_type ラベル付与の検証を追加する: 通常ケース（例: `attachmentType: 'aws'`）と未取得フォールバックケース（`additionalInfo: undefined` で `attachment_type: ''`）の 2 系統。
   - 既存テストケース（site_url / site_url_hashed / wiki_type / external_auth_types）の期待ラベルオブジェクトに `attachment_type` を追加し、5 ラベル並存を明示的に検証する。
