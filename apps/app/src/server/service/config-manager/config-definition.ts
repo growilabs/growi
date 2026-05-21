@@ -91,6 +91,14 @@ export const CONFIG_KEYS = [
   'app:vaultDriftDetectionIntervalMs',
   'app:vaultDriftMaxPagesPerTick',
   'app:vaultDriftDetectionDisabled',
+  'app:vaultReconcileMaxPagesPerUserRequest',
+  'app:vaultReconcileMaxPagesPerAdminRequest',
+  'app:vaultReconcileMaxConcurrentPerUser',
+  'app:vaultReconcileMaxConcurrentSystem',
+  'app:vaultReconcileChunkSize',
+  'app:vaultReconcileHistoryRetentionDays',
+  'app:vaultReconcileRejectWhenBootstrapNotDone',
+  'app:vaultReconcileAdminBypassCapacityLimit',
 
   // Content-Disposition settings for MIME types
   'attachments:contentDisposition:inlineMimeTypes',
@@ -600,6 +608,38 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:vaultDriftDetectionDisabled': defineConfig<boolean>({
     envVarName: 'VAULT_DRIFT_DETECTION_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultReconcileMaxPagesPerUserRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_USER_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxPagesPerAdminRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_ADMIN_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxConcurrentPerUser': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_PER_USER',
+    defaultValue: 1,
+  }),
+  'app:vaultReconcileMaxConcurrentSystem': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_SYSTEM',
+    defaultValue: 3,
+  }),
+  'app:vaultReconcileChunkSize': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_CHUNK_SIZE',
+    defaultValue: 100,
+  }),
+  'app:vaultReconcileHistoryRetentionDays': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_HISTORY_RETENTION_DAYS',
+    defaultValue: 30,
+  }),
+  'app:vaultReconcileRejectWhenBootstrapNotDone': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_REJECT_WHEN_BOOTSTRAP_NOT_DONE',
+    defaultValue: true,
+  }),
+  'app:vaultReconcileAdminBypassCapacityLimit': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_ADMIN_BYPASS_CAPACITY_LIMIT',
     defaultValue: false,
   }),
 

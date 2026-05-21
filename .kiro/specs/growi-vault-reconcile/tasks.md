@@ -24,7 +24,7 @@
   - _Requirements: 5.4, 6.8_
   - _Boundary: activity.ts interface_
 
-- [ ] 1.3 (P) reconcile 関連の config キーを追加
+- [x] 1.3 (P) reconcile 関連の config キーを追加
   - `apps/app/src/server/service/config-manager/config-definition.ts` に `app:vaultReconcileMaxPagesPerUserRequest`（**default 1000**）/ `_MaxPagesPerAdminRequest`（**default 1000**）/ `_MaxConcurrentPerUser`（default 1）/ `_MaxConcurrentSystem`（**default 3**）/ `_ChunkSize`（default 100）/ `_HistoryRetentionDays`（default 30）/ `_RejectWhenBootstrapNotDone`（default true）/ `_AdminBypassCapacityLimit`（default false）の 8 key を追加
   - 各 key に対応する env var name を既存 pattern に合わせて宣言
   - 観察可能: `configManager.getConfig('app:vaultReconcileMaxPagesPerUserRequest')` 等を呼び出すテストで全 8 key が default 値（user/admin upper limit = 1000、system concurrency = 3）を返し、env var override も効く
