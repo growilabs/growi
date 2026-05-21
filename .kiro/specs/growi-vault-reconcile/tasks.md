@@ -74,7 +74,7 @@
   - _Requirements: 2.2, 2.3, 2.4, 2.5_
   - _Boundary: AclEvaluator_
 
-- [ ] 2.4 HistoryStore: `vault_reconcile_log` 操作の CRUD wrapper を実装
+- [x] 2.4 HistoryStore: `vault_reconcile_log` 操作の CRUD wrapper を実装
   - `create` / `updateStatus` / `listRecent` / `normalizeStaleLifecycle` の 4 操作を提供
   - `normalizeStaleLifecycle()` は **`status: { $in: ['running', 'pending'] }`** の record を `{ status: 'failed', lastError: 'process-restarted', completedAt: now }` に bulk update し、件数を返す。`pending` を対象に含めるのは、accept gate が log を `pending` で insert した直後に process crash した場合の残留を吸収するため
   - `listRecent({ limit, offset })` は triggeredAt desc で取得
