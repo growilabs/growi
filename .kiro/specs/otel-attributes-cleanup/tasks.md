@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. Resource Attribute cleanup
-- [ ] 1.1 (P) Remove os.totalmem from OS resource attributes
+- [x] 1.1 (P) Remove os.totalmem from OS resource attributes
   - `os-resource-attributes.ts` の `osInfo` オブジェクトおよび返り値 attributes から `totalmem` 関連の行を削除する。`os.type` / `os.platform` / `os.arch` は維持する。
   - `os-resource-attributes.spec.ts` の `vi.mock('node:os')` のスタブから `totalmem: vi.fn()` を除去し、3 つの既存テストケースから `os.totalmem` 関連の期待値および `mockOs.totalmem` 呼び出し検証を削除する。
   - 完了状態: `pnpm vitest run os-resource-attributes.spec` がパスし、`getOsResourceAttributes()` の戻り値が `os.type` / `os.platform` / `os.arch` の 3 キーのみとなる。
