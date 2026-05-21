@@ -97,7 +97,7 @@
   - _Boundary: GetPageContentTool_
   - _Depends: 3.1_
 
-- [ ] 3.3 (P) ページ本文取得 tool の integration test
+- [x] 3.3 (P) ページ本文取得 tool の integration test
   - 実 MongoDB + 実 Page/Revision モデルで、`GRANT_PUBLIC` / `GRANT_OWNER` / `GRANT_USER_GROUP` / `GRANT_RESTRICTED` の各 grant パターンを setup
   - 各パターンで認可ユーザー・非認可ユーザー（実 User ドキュメント）から tool を呼び、期待 `result` を返すことを assert
   - 存在しない `pageId` で `not_found_or_forbidden` を返すこと（権限なしと区別されないこと）を assert
