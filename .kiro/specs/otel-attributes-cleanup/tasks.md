@@ -43,7 +43,7 @@
   - _Boundary: CustomMetricsIndex_
 
 - [ ] 5. Project-wide verification and operator handoff
-- [ ] 5.1 Verify lint, typecheck, tests, and build pass
+- [x] 5.1 Verify lint, typecheck, tests, and build pass
   - `turbo run lint --filter @growi/app` を実行し、Biome / TypeScript エラーがないことを確認する。
   - `turbo run test --filter @growi/app` を実行し、変更対象の 4 spec（os-resource-attributes / application-resource-attributes / application-metrics / system-metrics）および既存全テストがパスすることを確認する。
   - `turbo run build --filter @growi/app` を実行し、Turbopack による本番ビルドがエラーなく完了することを確認する。
