@@ -11,7 +11,7 @@
   - _Requirements: 3.1, 3.2, 3.3, 6.6_
   - _Boundary: Shared Types (MastraRequestContextShape)_
 
-- [ ] 1.1 post-message handler の RequestContext をリクエストスコープ化し user / searchService をセット
+- [x] 1.1 post-message handler の RequestContext をリクエストスコープ化し user / searchService をセット
   - 既存のモジュールスコープ `const requestContext = new RequestContext<...>()` 定義を削除
   - `import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context'` を追加
   - ハンドラ関数内で `new RequestContext<MastraRequestContextShape>()` を生成（リクエストスコープ化、並列リクエスト干渉防止）

@@ -22,6 +22,7 @@ import loggerFactory from '~/utils/logger';
 
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
+import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
@@ -36,8 +37,6 @@ type Req = Request<undefined, Response, ReqBody> & {
 };
 
 type PostMessageHandlersFactory = (crowi: Crowi) => RequestHandler[];
-
-const requestContext = new RequestContext<{ vectorStoreId: string }>();
 
 export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   crowi,
@@ -70,6 +69,8 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
     async (req: Req, res: ApiV3Response) => {
       const { threadId, aiAssistantId, messages } = req.body;
 
+      const requestContext = new RequestContext<MastraRequestContextShape>();
+
       const openaiService = getOpenaiService();
       if (openaiService == null) {
         return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
@@ -100,6 +101,8 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       const vectorStoreId =
         aiAssistantWithPopulatedVectorStore.vectorStore.vectorStoreId;
       requestContext.set('vectorStoreId', vectorStoreId);
+      requestContext.set('user', req.user);
+      requestContext.set('searchService', crowi.searchService);
 
       const growiAgent = mastra.getAgent('growiAgent');
       const memory = await growiAgent.getMemory();
