@@ -2,6 +2,7 @@ import { type JSX, useCallback } from 'react';
 import Script from 'next/script';
 import type { IGraphViewerGlobal } from '@growi/remark-drawio';
 
+import { patchStencilRegistryUrls } from './patch-stencil-registry-urls';
 import { generateViewerMinJsUrl } from './use-viewer-min-js-url';
 
 declare global {
@@ -13,25 +14,7 @@ type Props = {
   drawioUri: string;
 };
 
-// viewer-static.min.js defaults all resource paths to viewer.diagrams.net.
-// For local draw.io instances the default is unreachable, so we replace those
-// URLs in mxStencilRegistry.libraries (which are fetched lazily on first use)
-// with paths on the configured local origin before any diagram is rendered.
-// refs: https://github.com/growilabs/growi/issues/10726
 const DEFAULT_DRAWIO_ORIGIN = 'https://embed.diagrams.net';
-const VIEWER_DIAGRAMS_NET_ORIGIN = 'https://viewer.diagrams.net';
-
-const patchStencilRegistryUrls = (localOrigin: string): void => {
-  const libs = mxStencilRegistry?.libraries;
-  if (libs == null) return;
-  for (const key of Object.keys(libs)) {
-    libs[key] = libs[key].map((url) =>
-      typeof url === 'string'
-        ? url.replace(VIEWER_DIAGRAMS_NET_ORIGIN, localOrigin)
-        : url,
-    );
-  }
-};
 
 export const DrawioViewerScript = ({ drawioUri }: Props): JSX.Element => {
   const loadedHandler = useCallback(() => {
@@ -53,7 +36,7 @@ export const DrawioViewerScript = ({ drawioUri }: Props): JSX.Element => {
     try {
       const origin = new URL(drawioUri).origin;
       if (origin !== DEFAULT_DRAWIO_ORIGIN) {
-        patchStencilRegistryUrls(origin);
+        patchStencilRegistryUrls(mxStencilRegistry?.libraries, origin);
       }
     } catch {
       // skip patching if drawioUri cannot be parsed
