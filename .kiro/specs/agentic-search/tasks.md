@@ -85,7 +85,7 @@
   - _Boundary: GetPageContentTool_
   - _Depends: 1.0_
 
-- [ ] 3.2 (P) ページ本文取得 tool の unit test
+- [x] 3.2 (P) ページ本文取得 tool の unit test
   - Page モデルをモックし、4 種の result（ok / missing_input / context_error / not_found_or_forbidden）を網羅
   - **context 欠如 (user)**: `requestContext.get('user')` が `undefined` のとき `result: 'context_error'` を返す
   - `pageId` 指定で `findByIdAndViewer` が、`pagePath` 指定で `findByPathAndViewer` が呼ばれることを assert
