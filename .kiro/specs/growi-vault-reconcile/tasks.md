@@ -99,7 +99,7 @@
   - _Depends: 2.4_
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6, 5.4, 5.5, 6.10, 6.11, 7.5, 7.8_
 
-- [ ] 2.6 VaultReconcileService: 受付ゲート + barrel + factory を実装
+- [x] 2.6 VaultReconcileService: 受付ゲート + barrel + factory を実装
   - acceptance gate を以下順序で同期評価: (1) TargetResolver で targetPath を validate (2) VaultResilienceLayer.getStatus + config で bootstrap reject (3) **`pageModel.findOne({ path: targetPath }, { descendantCount: 1, grant: 1, grantedUsers: 1, grantedGroups: 1 }).lean()` で target page を取得（null なら invalid-target）** (4) `plannedPageCount = (targetType === 'page') ? 1 : 1 + targetPage.descendantCount` を計算し role 別 roleLimit と比較、超過なら page-count-exceeds-*-limit reject（response body には raw `descendantCount` と `roleLimit` を含める） (5) AclEvaluator.buildEligibleQuery で `{ eligibleQuery }` を構築 (6) HistoryStore.create で `status: pending, descendantCount, reconcileId, triggeredAt: now` を insert (7) `ConcurrencyController.tryRunInBackground({ work: () => orchestrator.run({ reconcileId, eligibleQuery, plannedPageCount, ... }) })`
   - **accept gate は `findOne` 1 件 + 非 admin 時のみ `getUserRelatedGroups` 1 query のみ**（`countDocuments` 等の全 scan 系 query は発行しない、要件 6.2）
   - tryRunInBackground の戻り値 ok: false 時は HistoryStore.updateStatus で `status: 'rejected', rejectReason` を記録し audit `rejected` を emit
