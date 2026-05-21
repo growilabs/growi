@@ -376,6 +376,8 @@
     "page_bulk_export_explanation": "Enables a feature that allows all users to export a page and all it's child pages at once from the menu. Exported data will be automatically deleted after the storage period has passed.",
     "page_bulk_export_warning": "The bulk page export feature is available to all users. In order to maintain system resources, we ask for your cooperation in using the minimum amount necessary. If you are an administrator, please inform all users of this.",
     "page_bulk_export_storage_period": "Storage period",
+    "page_bulk_export_reload_prompt": "You need to reload the page to reflect the setting change. Reload now?",
+    "reload_page": "Reload",
     "update": "Update",
     "mail_settings": "E-mail Settings",
     "mailer_is_not_set_up": "E-mail setting is not set up.",

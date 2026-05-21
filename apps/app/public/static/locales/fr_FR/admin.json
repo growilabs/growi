@@ -376,6 +376,8 @@
     "page_bulk_export_explanation": "Active une fonctionnalité qui permet à tous les utilisateurs d'exporter simultanément toutes les pages sélectionnées dans le menu des pages et leurs pages subordonnées. Les données exportées seront automatiquement supprimées une fois la période de conservation écoulée.",
     "page_bulk_export_warning": "La fonctionnalité d’exportation de pages en masse est disponible pour tous les utilisateurs. Afin de maintenir les ressources du système, nous demandons votre coopération pour utiliser le montant minimum nécessaire. Si vous êtes administrateur, veuillez en informer tous les utilisateurs.",
     "page_bulk_export_storage_period": "Date limite de téléchargement",
+    "page_bulk_export_reload_prompt": "Un rechargement de la page est nécessaire pour appliquer le changement de paramètre. Recharger maintenant ?",
+    "reload_page": "Recharger",
     "update": "Sauvegarder",
     "mail_settings": "SMTP",
     "mailer_is_not_set_up": "Paramètres d'envoi de courriels non configurés.",
