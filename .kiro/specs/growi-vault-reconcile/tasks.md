@@ -83,7 +83,7 @@
   - _Depends: 1.1_
   - _Requirements: 5.1, 5.5_
 
-- [ ] 2.5 ReconcileOrchestrator: async cursor stream + namespace 計算 + `bulk-upsert` 発行 worker を実装
+- [x] 2.5 ReconcileOrchestrator: async cursor stream + namespace 計算 + `bulk-upsert` 発行 worker を実装
   - `run({ reconcileId, eligibleQuery, plannedPageCount, triggeredBy, targetType, targetPath })` を提供（`plannedPageCount` は ReconcileService が `(targetType === 'page') ? 1 : 1 + descendantCount` で計算した処理予定 page 数）
   - 開始時に HistoryStore.updateStatus で `status: 'running', startedAt: now` に更新し audit `started`（payload に `descendantCount` / `plannedPageCount` を含む）を emit
   - **`pageModel.find(eligibleQuery).limit(plannedPageCount + 1).lean().cursor()` で stream を構築**（`.lean()` で Mongoose document inflate を回避、`limit(plannedPageCount + 1)` でハードキャップを付与）
