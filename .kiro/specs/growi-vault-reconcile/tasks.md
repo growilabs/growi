@@ -8,7 +8,7 @@
 
 - [ ] 1. Foundation: 永続化スキーマ・audit 定数・config キー・i18n key の整備
 
-- [ ] 1.1 (P) `vault_reconcile_log` の Mongoose model と schema を新規実装
+- [x] 1.1 (P) `vault_reconcile_log` の Mongoose model と schema を新規実装
   - フィールドは reconcileId（UUID v4、unique index）/ triggeredBy.userId+isAdmin / targetType / targetPath / **descendantCount（number \| null、target page から読んだ raw 値。target が解決できない reject では null）** / processedCount / status enum / rejectReason / triggeredAt / startedAt / completedAt / lastError を持つ
   - `plannedPageCount` は schema に持たず、`(targetType === 'page') ? 1 : 1 + descendantCount` として導出する（schema は source データ寄せ）
   - `triggeredAt` に TTL index を張り、retention 日数は config から `expireAfterSeconds` を解決する
