@@ -1,5 +1,7 @@
 # Memory Leak Investigation — Verification Report
 
+> **Status**: Phase 5 (initial measurement) は完了。Phase 6（mandatory re-measurement）が **pending** — L2 ランタイム計測 / L3 sustained-load / L4 retainer 分析 / dist server 計測の 4 項目を実施することで本 report の verdict は再評価される。詳細は [Section 7. Pending: Phase 6 Re-measurement](#7-pending-phase-6-re-measurement) を参照。
+
 ## 1. Environment
 
 | Item | Before (no fixes) | After (all fixes) |
@@ -184,3 +186,42 @@ Snapshot files are **not committed** to the repository. Local paths and checksum
 | snapshot-a.heapsnapshot | 112 MB | `7de193c66091cd67fc506785efb6d314e2d5090409692a66f17b36e292a43401` |
 | snapshot-b.heapsnapshot | 112 MB | `56269f2b1d28ed07d2820c3a20d1f9a9ef75b405d6e192b88639690770f74659` |
 | snapshot-c.heapsnapshot | 112 MB | `eee42b429dafa31a51360d84fcb5ccfa8baf952816f287e619437eff112c6f1f` |
+
+---
+
+## 7. Pending: Phase 6 Re-measurement
+
+Phase 5 の初回計測は以下の制約により partial verification となった。これらを解消する **必須再計測** を Phase 6 として実施することで、本 report の verdict は最終確定する（[tasks.md / Phase 6](./tasks.md#6-mandatory-re-measurement-phase-6) と対応）。
+
+### 7.1 L2 ランタイム baseline RSS（Task 6.1）
+
+- **Status**: PENDING
+- **Reason**: 初回計測は `OPENTELEMETRY_ENABLED=false` で実施したため、OTel allow-list の実効性は unit test ベースのみ。
+- **Required action**: `OPENTELEMETRY_ENABLED=true` で before / after を再計測し、Baseline 5 分 idle 後の平均 RSS の delta を MB 単位で記録する。
+
+### 7.2 L3 Y.Doc accumulation の sustained-load 評価（Task 6.2）
+
+- **Status**: PENDING — L3 verdict は INCONCLUSIVE のまま
+- **Reason**: Yjs sessions=5（合計）、drain=60s と縮小したため、accumulation が観察されなかった。
+- **Required action**: `LOAD_YJS_CLEAN_CLOSE=50` / `LOAD_YJS_ABORT=50` / `DRAIN_IDLE_SECONDS=300` で再計測し、`Y.Doc` 残存数 delta を確認する。+5 を超えれば L3 を `confirmed` に更新し Phase 7 / Task 7.1（YjsIdleSweeper）を起動。
+
+### 7.3 L4 retainer 分析（Task 6.3）
+
+- **Status**: PENDING — L4 verdict は INCONCLUSIVE のまま
+- **Reason**: page-edit=10 / drain=60s では retainer chain の鈍さが顕在化しない。詳細 retainer 分析（Chrome DevTools）も未実施。
+- **Required action**: `LOAD_PAGE_EDIT=20` / `DRAIN_IDLE_SECONDS=300` で再計測 + Chrome DevTools の Memory タブで snapshot C を開き、Retainers ビューで `Activity` と page-edit closure を辿る。
+
+### 7.4 Production dist server (Node.js v24) 起動下での計測（Task 6.4）
+
+- **Status**: PENDING
+- **Reason**: `dist/generated/prisma/client.js` の ESM/CJS 不整合（`ReferenceError: exports is not defined in ES module scope`）により、dist server 起動が失敗。Phase 5 は dev server (ts-node + SWC) で代替実施した。
+- **Required action**: Prisma client 生成設定 or bundle 設定で ESM 不整合を解消し、`node --inspect dist/server/app.js` で 1 周計測する。dev server との数値差を report に追記する。
+
+### 7.5 Phase 6 results の統合（Task 6.5）
+
+Phase 6 / Task 6.1–6.4 の結果が揃った段階で、本 report の以下セクションを再生成する:
+
+- Section 1. Environment — Phase 6 runs を追記
+- Section 2. Per-finding Verdicts — L2 ランタイム計測値を反映、L3 / L4 の verdict を確定（confirmed / refuted）
+- Section 3. RSS Delta — OTel 有効化下での baseline 比較を追加
+- Section 5. Open Issues — Production dist 計測結果の追記、解消済み項目を closed に更新

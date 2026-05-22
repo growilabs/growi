@@ -289,34 +289,37 @@ packages/logger/src/transport-factory.ts
   - **採用**: `undici`（Node 24 標準・既存依存）で順次 HTTP リクエスト発行する custom スクリプト。シナリオごとに request 列を別 module。
   - **不採用**: `k6`（別バイナリ）、`autocannon`（throughput-focused でシナリオ表現力が弱い）、`@playwright/test`（browser 駆動が過剰）。
   - y-websocket セッションの open/close は `ws` + minimal `Y.Doc` client で模擬。abort（half-close）は `socket.destroy()`。
-- **Implications**: 新規 runtime dependency なし。スクリプトは `apps/app/tools/memory-profiling/`。
+- **Implications**: 新規 runtime dependency なし。スクリプトは `bin/memory-profiling/`（`@growi/bin` workspace package）に集約。
+  > **Update**: 初期 design では `apps/app/tools/memory-profiling/` 配下に置く想定だったが、実装過程で workspace 分離（`bin/`）に移行した（commit `b8e3efa4c7`）。
 
-### Integration Risk — SIGUSR2 ハンドラ
+### Integration Risk — SIGUSR2 ハンドラ（実装中に棄却）
 - **Context**: GROWI server に SIGUSR2 ハンドラを追加することの安全性確認。
 - **Sources Consulted**: `apps/app/src/server/app.ts`, Node.js signal docs
 - **Findings**:
   - SIGUSR2 は Node の内部利用（debugger）と衝突しうる。`MEMORY_PROFILING_ENABLED=true` の場合のみハンドラ登録する形が安全。
-- **Implications**: ハンドラは新規 file `apps/app/src/server/util/heap-snapshot-handler.ts` に隔離し、env var ガード必須。Production には登録しない。
+- **Implications (revised)**: ハンドラは当初 `apps/app/src/server/util/heap-snapshot-handler.ts` に隔離する設計だったが、実装中に CDP (Chrome DevTools Protocol) クライアントが信頼できる主経路として確立したため SIGUSR2 経路は **完全に削除** した（commit `b8e3efa4c7`）。`apps/app` への signal handler 追加面と新規 env var はゼロとなった。
 
 ## Architecture Pattern Evaluation
 
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
 | Inline profiling code in server | Snapshot 取得・シナリオ実行を server 内に組み込む | Single process | Production にも profiling code 混入、責務肥大 | 不採用 |
-| **External sidecar + signal hook**（採用） | server には minimal SIGUSR2 hook のみ。シナリオ実行と CDP-based snapshot 取得は別プロセス | 関心の分離、production への影響最小、再利用容易 | 起動・接続手順がやや複雑（README で吸収） | 採用 |
+| **External sidecar (CDP-only)**（採用） | server は通常起動（`--inspect`）のみ。シナリオ実行と CDP-based snapshot 取得は別プロセス・別 workspace | 関心の分離、production への影響ゼロ（apps/app への追加面なし）、再利用容易 | 起動・接続手順がやや複雑（README で吸収） | 採用 |
+| External sidecar + SIGUSR2 hook | 上記 + CDP 不可時の SIGUSR2 fallback | CDP 不可時の retreat | apps/app への signal handler 追加が必要 | 初期採用 → 実装中に削除 |
 | Forked profiling binary（`clinic` 系） | 別ツールに丸投げ | 自前実装ゼロ | 実行モデル不一致、custom シナリオ表現困難 | 不採用 |
 
 ## Design Decisions
 
-### Decision: External sidecar + signal hook で profiling を分離する
+### Decision: External sidecar (CDP-only) で profiling を分離する
 - **Context**: profiling 機能を server 本体にどこまで埋め込むか。
 - **Alternatives Considered**:
   1. Server に常駐させて env var で gate
-  2. **External sidecar が CDP + SIGUSR2 を駆動し、server 側は minimal hook のみ**
-- **Selected Approach**: 2 を採用。Sidecar / シナリオ / RSS ロガーは `apps/app/tools/memory-profiling/`、server 側は `MEMORY_PROFILING_ENABLED=true` ガード付きの 1 ファイルだけ。
-- **Rationale**: production への影響を「env var で gate された 1 ファイル」に限定でき、profiling ツールはアプリと独立してメンテできる。
-- **Trade-offs**: + production 安全 / + 関心の分離 / − 利用手順が 2 段（server 起動 + sidecar 起動、README で吸収）。
-- **Follow-up**: SIGUSR2 と inspector の競合は Node 24 で再確認。
+  2. External sidecar が CDP + SIGUSR2 を駆動し、server 側は minimal hook のみ
+  3. **External sidecar が CDP のみで完結し、server 側は通常通り `--inspect` で起動するだけ**
+- **Selected Approach**: 当初 2 を採用したが、実装過程で 3 に切り替えた。Sidecar / シナリオ / RSS ロガーは `bin/memory-profiling/`（`@growi/bin` workspace）、server 側は **追加面ゼロ**（CDP のみで完結）。
+- **Rationale**: CDP `HeapProfiler.takeHeapSnapshot` が devcontainer 環境で安定動作することが確認できたため、SIGUSR2 fallback は不要と判断。`apps/app` への signal handler 追加と新規 env var を排除することで production への影響を完全にゼロにできた。
+- **Trade-offs**: + production 安全 / + apps/app への追加面ゼロ / + 関心の分離 / − CDP 不可時の fallback がないが、devcontainer では `--inspect` 起動が前提のため実質問題なし。
+- **Follow-up**: CDP の挙動は Node 24 で再確認済。将来 SIGUSR2 fallback が必要になった場合は本 spec で再評価。
 
 ### Decision: L1 / L2 の env var は新規追加とし、未指定時 default を本 spec 推奨値とする
 - **Context**: 既存 production の default を変更すると無告知の振る舞い変化が起きる。

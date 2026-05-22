@@ -37,9 +37,10 @@
 
 1. When 調査担当者が profiling モードで GROWI server を起動した時, the profiling workflow shall devcontainer の `mongo:27017` (replica set `rs0`) と `elasticsearch:9200` に接続した状態で server を立ち上げ、外部の snapshot 取得ツールから到達可能な inspector インターフェースを公開する。
 2. When 調査担当者が外部ツールから heap snapshot の取得を要求した時, the profiling workflow shall `.heapsnapshot` 形式のスナップショットを生成し、指定された出力ディレクトリ配下にファイル名で識別可能な形で保存する。
-3. While GROWI server が profiling モードで稼働中である間, the profiling workflow shall SIGUSR2 シグナルを受け取ることで in-process でも heap snapshot を出力でき、外部 inspector が利用できない状況でも代替手段を持つ。
-4. The profiling workflow shall heap snapshot およびその他の計測成果物（RSS 時系列ログ等）を `tmp/memory-leak-investigation/` 配下に集約し、リポジトリには直接コミットされないパスへ書き出す。
-5. If profiling 中に snapshot 取得が失敗した場合, the profiling workflow shall エラー内容を標準ログに出力した上で、GROWI server 本体の動作には影響を与えない（プロセスを停止させない）。
+3. The profiling workflow shall heap snapshot およびその他の計測成果物（RSS 時系列ログ等）を `apps/app/tmp/memory-leak-investigation/` 配下に集約し、リポジトリには直接コミットされないパスへ書き出す。
+4. If profiling 中に snapshot 取得が失敗した場合, the profiling workflow shall エラー内容を標準ログに出力した上で、GROWI server 本体の動作には影響を与えない（プロセスを停止させない）。
+
+> **Note**: 初期 spec では SIGUSR2 in-process fallback（旧 Acceptance Criteria 3）を要求していたが、実装過程で CDP (Chrome DevTools Protocol) クライアントが信頼できる主経路として確立したため、SIGUSR2 経路は冗長と判断して削除した（commit `b8e3efa4c7`）。CDP 接続不能時の fallback が将来再び必要になった場合は本 spec で再評価する。
 
 ### Requirement 2: 検証シナリオの再現可能な実行
 
@@ -52,6 +53,9 @@
 3. While 各段階を実行している間, the profiling workflow shall プロセスの RSS / V8 heap used / V8 heap total / external メモリの各値を一定間隔で時系列ログとして記録し、段階の境界（Baseline / Load / Drain）が後から特定できる形で残す。
 4. The profiling workflow shall 各段階の境界（Baseline 終了時点 = snapshot A、Load 終了時点 = snapshot B、Drain 終了時点 = snapshot C）で heap snapshot を取得する。
 5. When 同じ調査セッションを別環境で再実行した時, the profiling workflow shall シナリオ定義（操作の種類・回数・タイミング）が同一であれば、再現可能な範囲で比較可能な計測結果を生成する。
+6. The profiling workflow shall production `dist/server/app.js` 起動下で 1 周の計測を完了できる（dev server 経由の SWC transpile / source-map overhead を含まない計測値も取得可能）。
+
+> **Note**: AC 6 は実装過程で発覚した Prisma client の ESM/CJS 不整合（`ReferenceError: exports is not defined in ES module scope` on Node.js v24）への対応として Phase 6 で扱う。
 
 ### Requirement 3: ベースライン RSS の削減（L1 + L2）
 
@@ -65,6 +69,16 @@
 4. Where 運用者が従来の挙動（接続プール上限の引き上げ、auto-instrumentation 全有効）を必要とする場合, the GROWI server shall 環境変数による override 手段を提供し、再ビルドなしで切り替えられる。
 5. When L1 + L2 を適用したビルドで Requirement 2 の検証シナリオを実行した時, the verification report shall 適用前後の Baseline RSS の差分を数値（MB 単位）で記録し、有意な削減があったか判定可能な形にする。
 6. The GROWI server shall L1 / L2 の変更によって既存の機能要件（page CRUD、検索、認証、y-websocket 編集、OTel メトリクス／トレース送出）を破壊しない。
+
+### Requirement 3-bis: L1 / L2 ランタイム計測の完了
+
+**Objective:** メモリ調査担当者として、L1 / L2 の効果を **production 相当のランタイム条件下で実測値として残し**、定量的根拠を verification report に記録できるようにしたい。
+
+#### Acceptance Criteria
+
+1. The verification workflow shall `OPENTELEMETRY_ENABLED=true` でのランタイム計測を before / after の両方で実施し、L2 (allow-list) による baseline RSS 削減量を MB 単位で記録する。
+2. The verification workflow shall MongoDB を空 DB に揃えた状態で before / after を再計測し、L1 の baseline RSS（retained growth ではなく steady-state baseline）の比較値を記録する。
+3. If 上記計測が devcontainer 制約で実施できない場合, the verification report shall 制約と推奨計測環境を明記する。
 
 ### Requirement 4: y-websocket Y.Doc の常時可観測化（L3 metric）
 
