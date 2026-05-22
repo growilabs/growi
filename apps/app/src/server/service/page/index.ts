@@ -25,7 +25,6 @@ import pathlib from 'path';
 import { Readable, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 
-import { Comment } from '~/features/comment/server';
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { isAiEnabled } from '~/features/openai/server/services';
@@ -62,6 +61,7 @@ import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
+import { prisma } from '~/utils/prisma';
 
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { Attachment } from '../../models/attachment';
@@ -2379,7 +2379,25 @@ class PageService implements IPageService {
     const attachments = await Attachment.find({ page: { $in: pageIds } });
 
     await Promise.all([
-      Comment.deleteMany({ page: { $in: pageIds } }),
+      prisma.$transaction([
+        prisma.comments.deleteMany({
+          where: {
+            pageId: {
+              in: pageIds,
+            },
+            replyToId: {
+              not: null,
+            },
+          },
+        }),
+        prisma.comments.deleteMany({
+          where: {
+            pageId: {
+              in: pageIds,
+            },
+          },
+        }),
+      ]),
       PageTagRelation.deleteMany({ relatedPage: { $in: pageIds } }),
       ShareLink.deleteMany({ relatedPage: { $in: pageIds } }),
       Revision.deleteMany({ pageId: { $in: pageIds } }),
@@ -5531,6 +5549,11 @@ class PageService implements IPageService {
     const wipPageExpirationSeconds =
       configManager.getConfig('app:wipPageExpirationSeconds') ?? 172800;
     const collection = mongoose.connection.collection('pages');
+
+    // DELETEME: migrations never runs on test environment (which should be fixed),
+    // until then, create collection if it does not exist to avoid the error when creating an index.
+    // MongoServerError: ns does not exist: growi_test_x.pages
+    await mongoose.connection.createCollection('pages').catch(() => {});
 
     try {
       const targetField = 'ttlTimestamp_1';
