@@ -64,7 +64,7 @@
 
 ## 3. Core — Profiling sidecar (parallel-capable; 独立ファイル群)
 
-- [ ] 3.1 (P) CDP snapshot client の実装
+- [x] 3.1 (P) CDP snapshot client の実装
   - `tools/memory-profiling/cdp-snapshot-client.ts` を作成し、inspector endpoint (`http://127.0.0.1:9229/json/list`) から `webSocketDebuggerUrl` を取得して WebSocket 接続する API を提供する。
   - `HeapProfiler.takeHeapSnapshot` を発行し、chunked snapshot bytes を結合して `.heapsnapshot` ファイルとして指定パスへ書き出す。
   - 接続失敗時は exponential backoff で最大 5 回 retry し、それでも駄目なら例外で fail する。
