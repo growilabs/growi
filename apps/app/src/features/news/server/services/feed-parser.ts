@@ -8,8 +8,8 @@ const FeedItemSchema = z.object({
   id: z.string().min(1),
   type: z.string().optional(),
   emoji: z.string().optional(),
-  title: z.record(z.string()),
-  body: z.record(z.string()).optional(),
+  title: z.record(z.string(), z.string()),
+  body: z.record(z.string(), z.string()).optional(),
   url: z.string().optional(),
   publishedAt: z.string().min(1),
   conditions: z
