@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import React, { useCallback } from 'react';
+import React, { useCallback, useState } from 'react';
 import type { IPageInfoExt, IPageToDeleteWithMeta } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
 import { useTranslation } from 'next-i18next';
@@ -13,6 +13,7 @@ import {
 } from '~/client/services/page-operation';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem';
+import { ReconcileTriggerModal } from '~/features/growi-vault/client/components/ReconcileTriggerModal';
 import type { TreeItemToolProps } from '~/features/page-tree/interfaces';
 import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark';
 import { useSWRMUTxPageInfo } from '~/stores/page';
@@ -110,12 +111,15 @@ export const usePageItemControl = (): UsePageItemControl => {
       }
     };
 
-    // Reconcile menu item renderer — wired into PageItemControl via additionalMenuItemRenderer.
-    // page.path is captured from the closure; pageInfo arg is not needed for reconcile.
+    // Reconcile menu item: modal state lives at this level (not inside the
+    // menu item) so the modal survives the parent Dropdown auto-closing.
     const pagePath = page.path;
+    const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
     const ReconcileMenuItems: FC = useCallback(() => {
       if (pagePath == null) return null;
-      return <PageReconcileMenuItem targetPath={pagePath} />;
+      return (
+        <PageReconcileMenuItem onClick={() => setIsReconcileModalOpen(true)} />
+      );
     }, [pagePath]);
 
     return (
@@ -148,6 +152,14 @@ export const usePageItemControl = (): UsePageItemControl => {
               </span>
             </DropdownToggle>
           </PageItemControl>
+          {pagePath != null && (
+            <ReconcileTriggerModal
+              isOpen={isReconcileModalOpen}
+              onClose={() => setIsReconcileModalOpen(false)}
+              apiEndpoint="/vault/page/reconcile"
+              defaultTargetPath={pagePath}
+            />
+          )}
         </div>
       </NotAvailableForGuest>
     );

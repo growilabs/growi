@@ -1,16 +1,13 @@
 import type { JSX } from 'react';
-import { useCallback, useState } from 'react';
 import { DropdownItem } from 'reactstrap';
-
-import { ReconcileTriggerModal } from './ReconcileTriggerModal';
 
 // ============================================================================
 // Types
 // ============================================================================
 
 type PageReconcileMenuItemProps = {
-  /** The page path to pre-fill in the modal's target path input */
-  targetPath: string;
+  /** Callback fired when the menu item is clicked. The parent owns modal state. */
+  onClick: () => void;
 };
 
 // ============================================================================
@@ -18,45 +15,28 @@ type PageReconcileMenuItemProps = {
 // ============================================================================
 
 /**
- * A dropdown menu item that opens a ReconcileTriggerModal for the user endpoint.
- * Pre-fills the target path with the given page path.
+ * A dropdown menu item that requests a vault reconcile for the current page.
  *
- * Manages modal open/close state internally.
+ * The modal is owned by the parent (not by this component) because a parent
+ * Dropdown auto-closes on outside-click, which would unmount any modal state
+ * held here. The parent renders ReconcileTriggerModal as a sibling of its
+ * Dropdown so the modal survives the dropdown closing.
  */
 export const PageReconcileMenuItem = (
   props: PageReconcileMenuItemProps,
 ): JSX.Element => {
-  const { targetPath } = props;
-
-  const [isModalOpen, setIsModalOpen] = useState(false);
-
-  const handleOpenModal = useCallback(() => {
-    setIsModalOpen(true);
-  }, []);
-
-  const handleCloseModal = useCallback(() => {
-    setIsModalOpen(false);
-  }, []);
+  const { onClick } = props;
 
   return (
-    <>
-      <DropdownItem
-        onClick={handleOpenModal}
-        className="grw-page-control-dropdown-item"
-        data-testid="page-reconcile-menu-item"
-      >
-        <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">
-          sync
-        </span>
-        Reconcile Vault
-      </DropdownItem>
-
-      <ReconcileTriggerModal
-        isOpen={isModalOpen}
-        onClose={handleCloseModal}
-        apiEndpoint="/v3/vault/page/reconcile"
-        defaultTargetPath={targetPath}
-      />
-    </>
+    <DropdownItem
+      onClick={onClick}
+      className="grw-page-control-dropdown-item"
+      data-testid="page-reconcile-menu-item"
+    >
+      <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">
+        sync
+      </span>
+      Reconcile Vault
+    </DropdownItem>
   );
 };

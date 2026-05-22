@@ -26,6 +26,7 @@ import { usePrintMode } from '~/client/services/use-print-mode';
 import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
 import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
 import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem';
+import { ReconcileTriggerModal } from '~/features/growi-vault/client/components/ReconcileTriggerModal';
 import { usePageBulkExportSelectModalActions } from '~/features/page-bulk-export/client/states/modal';
 import type {
   OnDeletedFunction,
@@ -353,6 +354,8 @@ const GrowiContextualSubNavigation = (
   const [isPageTemplateModalShown, setIsPageTempleteModalShown] =
     useState(false);
 
+  const [isReconcileModalOpen, setIsReconcileModalOpen] = useState(false);
+
   const duplicateItemClickedHandler = useCallback(
     async (page: IPageForPageDuplicateModal) => {
       const duplicatedHandler: OnDuplicatedFunction = (fromPath, toPath) => {
@@ -446,7 +449,9 @@ const GrowiContextualSubNavigation = (
         {path != null && (
           <>
             <DropdownItem divider />
-            <PageReconcileMenuItem targetPath={path} />
+            <PageReconcileMenuItem
+              onClick={() => setIsReconcileModalOpen(true)}
+            />
           </>
         )}
         {!isReadOnlyUser && (
@@ -563,6 +568,15 @@ const GrowiContextualSubNavigation = (
           path={path}
           isOpen={isPageTemplateModalShown}
           onClose={() => setIsPageTempleteModalShown(false)}
+        />
+      )}
+
+      {path != null && (
+        <ReconcileTriggerModal
+          isOpen={isReconcileModalOpen}
+          onClose={() => setIsReconcileModalOpen(false)}
+          apiEndpoint="/vault/page/reconcile"
+          defaultTargetPath={path}
         />
       )}
     </>
