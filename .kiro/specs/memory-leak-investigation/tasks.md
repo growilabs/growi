@@ -125,7 +125,7 @@
   - _Requirements: 1.4, 2.1, 2.4, 2.5_
   - _Boundary: ScenarioRunner_
 
-- [ ] 4.3 Lint / type-check / unit & integration test / build を pass させる
+- [x] 4.3 Lint / type-check / unit & integration test / build を pass させる
   - `turbo run lint --filter @growi/app` / `turbo run test --filter @growi/app` / `turbo run build --filter @growi/app` を順に実行する。
   - 失敗があれば `build-error-resolver` agent で最小差分修正を試みる。
   - 既存テストが破壊されないこと、新規テストが green であることを確認する。

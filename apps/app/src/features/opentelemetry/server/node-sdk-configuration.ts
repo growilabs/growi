@@ -1,7 +1,6 @@
 import { getNodeAutoInstrumentations } from '@opentelemetry/auto-instrumentations-node';
 import { OTLPMetricExporter } from '@opentelemetry/exporter-metrics-otlp-grpc';
 import { OTLPTraceExporter } from '@opentelemetry/exporter-trace-otlp-grpc';
-import type { Instrumentation } from '@opentelemetry/instrumentation';
 import type { Resource } from '@opentelemetry/resources';
 import { resourceFromAttributes } from '@opentelemetry/resources';
 import { PeriodicExportingMetricReader } from '@opentelemetry/sdk-metrics';
@@ -96,7 +95,9 @@ const ALLOW_LIST_INSTRUMENTATION_PACKAGES = new Set([
  * - "all": legacy behavior (only pino + fs disabled)
  * - unknown value: warn log + treat as "minimal"
  */
-export const buildInstrumentations = (opts?: Option): Instrumentation[] => {
+export const buildInstrumentations = (
+  opts?: Option,
+): ReturnType<typeof getNodeAutoInstrumentations>[] => {
   const profile = process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE ?? 'minimal';
   const httpInstrumentationConfig = opts?.enableAnonymization
     ? httpInstrumentationConfigForAnonymize
@@ -115,7 +116,7 @@ export const buildInstrumentations = (opts?: Option): Instrumentation[] => {
           ...httpInstrumentationConfig,
         },
       }),
-    ] as unknown as Instrumentation[];
+    ] as unknown as ReturnType<typeof getNodeAutoInstrumentations>[];
   }
 
   if (profile !== 'minimal') {
@@ -151,7 +152,7 @@ export const buildInstrumentations = (opts?: Option): Instrumentation[] => {
 
   return [
     getNodeAutoInstrumentations(instrumentationConfig),
-  ] as unknown as Instrumentation[];
+  ] as unknown as ReturnType<typeof getNodeAutoInstrumentations>[];
 };
 
 export const generateNodeSDKConfiguration = (opts?: Option): Configuration => {

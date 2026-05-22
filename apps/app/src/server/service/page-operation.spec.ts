@@ -76,10 +76,12 @@ describe('PageOperationService.autoUpdateExpiryDate', () => {
     vi.useFakeTimers();
 
     // Get mock logger
-    mockLogger = (loggerFactory as unknown as MockInstance)() as {
-      error: MockInstance;
-      warn: MockInstance;
-    };
+    mockLogger = (
+      loggerFactory as unknown as () => {
+        error: MockInstance;
+        warn: MockInstance;
+      }
+    )();
 
     // Reset mocks
     vi.mocked(PageOperation.extendExpiryDate).mockReset();

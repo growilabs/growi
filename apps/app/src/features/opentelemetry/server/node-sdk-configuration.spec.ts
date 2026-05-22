@@ -68,9 +68,12 @@ vi.mock('./semconv', () => ({
  */
 const getPassedConfig = (
   instrumentations: ReturnType<typeof buildInstrumentations>,
-): Record<string, { enabled?: boolean }> => {
+): Record<string, { enabled?: boolean; [key: string]: unknown }> => {
   const mocked = instrumentations[0] as unknown as {
-    __instrumentationConfig: Record<string, { enabled?: boolean }>;
+    __instrumentationConfig: Record<
+      string,
+      { enabled?: boolean; [key: string]: unknown }
+    >;
   };
   return mocked.__instrumentationConfig;
 };
@@ -224,7 +227,9 @@ describe('buildInstrumentations', () => {
       const httpConfig = config['@opentelemetry/instrumentation-http'];
       expect(httpConfig).toBeDefined();
       // Should contain anonymization hooks
-      expect(httpConfig).toMatchObject(anonymizeConfig);
+      expect(httpConfig).toMatchObject(
+        anonymizeConfig as Record<string, unknown>,
+      );
     });
 
     it('should NOT merge anonymization config when enableAnonymization=false', () => {
@@ -252,7 +257,9 @@ describe('buildInstrumentations', () => {
       const config = getPassedConfig(instrumentations);
 
       const httpConfig = config['@opentelemetry/instrumentation-http'];
-      expect(httpConfig).toMatchObject(anonymizeConfig);
+      expect(httpConfig).toMatchObject(
+        anonymizeConfig as Record<string, unknown>,
+      );
     });
   });
 });
