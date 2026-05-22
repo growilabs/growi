@@ -448,6 +448,61 @@ sequenceDiagram
 
 ---
 
+## Design Decisions
+
+将来 refactor 時に押さえるべき設計判断と、却下した代替案。
+
+### Decision: Reconcile orchestrator は resilience drift-detector pattern を独立に流用
+
+- **Context**: reconcile は `pageModel.find(query).cursor()` で stream → namespace 計算 → `bulk-upsert` 発行という I/O pattern を持ち、これは resilience の drift-detector とほぼ同じ。
+- **Rejected**:
+  1. drift-detector 内部を library 化して共有 — 過剰な抽象化。watermark 更新 / `bootstrapState !== 'done'` 早期 return 等は drift-detector 固有の責務
+  2. drift-detector の private 関数を export して再利用 — barrel 設計原則違反、internal 詳細の漏洩
+- **Selected**: 両 component は同 pattern を **independent** に実装。pure な page→namespace 計算 (`VaultNamespaceMapper`) のみ共有、instruction 発行は両者が独立に `VaultInstruction.create` を呼ぶ。
+- **Rationale**: drift-detector は「watermark sweep + observability」、reconcile orchestrator は「target-bounded sweep + user-triggered」と異なる責務に閉じる。同 pattern 2 箇所の duplication は spec boundary 維持コストより低い。
+- **Follow-up**: code duplication が痛点になれば、`services/_shared/` 等に pure helper（例: `streamPagesAndEmitBulkUpsert(query, mapper, ...)`）を抽出する検討（本 spec scope 外）。
+
+### Decision: Concurrency 制御は in-memory counter + MongoDB log で実装
+
+- **Context**: per-user + system-wide 同時実行上限の強制（要件 6.6 / 6.7）。
+- **Rejected**:
+  1. Redis lease — 分散環境前提、GROWI に Redis 依存を追加するコスト大
+  2. MongoDB atomic counter doc — race 制御は可能だが、in-memory より overhead 大
+- **Selected**: in-memory `Map<userId, count>` + system-wide active counter（Node.js single-thread の atomic 性に依存）。`vault_reconcile_log` は user-visible history の persist 専用で、concurrency 判定の source of truth ではない。
+- **Follow-up (multi-replica 化)**: `growi-vault-ha` 適用時に Redis lease 等への移行が必要 — Revalidation Triggers に記録済み。
+
+### Decision: Reject reason は enum 値で API 返却、UI 側で i18n key 解決
+
+- **Context**: reject 時の誘導メッセージ（「範囲を絞る or admin 依頼」「範囲を絞る or force re-bootstrap」）の表示（要件 6.3 / 6.4）。
+- **Rejected**: サーバー側で i18n された message string を直接返す — locale 解決をサーバー側に持たせる必要があり、既存 REST API pattern と不整合。
+- **Selected**: API response は `{ status: 'rejected', reason: RejectReason, descendantCount?, roleLimit? }` の形で enum 値を返し、UI が `growi-vault.reconcile.rejected.<reason>` の i18n key を解決してローカライズ表示。
+- **Rationale**: API contract が pure data、UI が presentation を担う既存 GROWI pattern と整合。
+
+### Decision: `bootstrapState !== 'done'` の reject は default 有効、env override 可能
+
+- **Context**: 要件 4.4 で「拒否を default とする」と明示。一方で resilience retry が長引いている間も reconcile を試したい運用ニーズもありうる。
+- **Selected**: `VAULT_RECONCILE_REJECT_WHEN_BOOTSTRAP_NOT_DONE` env var、default `true`。`false` 設定時は bootstrap state によらず reconcile を受け付ける。
+- **Trade-off**: override 時に reconcile が部分的にしか効果を持たない可能性（bootstrap がまだ partial にしか書いていない状態で reconcile しても、後続 bootstrap で上書きされる）— admin UI で「override 中」を可視化する。
+
+### Decision: Reconcile history は `vault_reconcile_log` 専用 collection に永続化
+
+- **Context**: 要件 5.1 で reconcile 履歴の永続化が必要。
+- **Rejected**:
+  1. `vault_sync_state` singleton 拡張 — singleton doc 肥大化、N 件管理困難
+  2. `activities` collection（既存 audit log）に統合 — audit log は append-only event 記録に特化、reconcile の status 更新（pending → running → completed）と相性が悪い
+- **Selected**: 新規 `vault_reconcile_log` collection、retention は env var `VAULT_RECONCILE_HISTORY_RETENTION_DAYS`（default 30 日）、TTL index を `triggeredAt` に張る。
+- **Caveat**: TTL の `expireAfterSeconds` は collection 作成時に固定。retention 日数を運用中に変更する場合は手動 `collMod` または index 再作成が必要。
+
+## Risks & Mitigations
+
+- **R1: 大量 reconcile による DoS** — per-user 同時 1（default）で個人レベルの暴走を抑制、system-wide 3（default）で全体上限。admin bypass option (`VAULT_RECONCILE_ADMIN_BYPASS_CAPACITY_LIMIT`、default `false`) で緊急対応経路を確保。
+- **R2: ACL 評価と実行中の ACL 変更の race** — 要件 2.5 通り、ACL 評価はリクエスト時点で確定し、実行中の変更は次回 reconcile で反映する。途中の ACL 変更は冪等性に委ねる（vault-manager の content-addressing で最終状態は一意収束）。
+- **R3: drift-detector と user-triggered reconcile の同時発行** — vault-manager の冪等性で最終状態が一意収束（要件 4.1）。outbox の processedAt + ack 機構で attempts 重複は許容範囲。実運用で観測すれば coalesce を後付け検討。
+- **R4: 一般ユーザーが上限超過 reject 時に状況把握できない** — reject response に `descendantCount` を含めて返し、UI で「N 件が対象でした。上限 M 件以下に絞ってください」と明示。
+- **R5: in-memory concurrency counter のプロセス再起動リセット** — 起動時 migration で `vault_reconcile_log.status === 'running' | 'pending'` を `failed: process-restarted` に正規化（resilience の stale-running detection と同 pattern）。
+
+---
+
 ## Components and Interfaces
 
 ### Summary
@@ -555,24 +610,19 @@ export function createVaultReconcileService(
 - Persistence & consistency: ACL filter の結果は受付時点で確定し、orchestrator 実行中の ACL 変更は次回 reconcile で反映する（要件 2.5）。
 - Concurrency strategy: ConcurrencyController が in-memory slot を管理。`submit` は `tryRunInBackground` の戻り値が `ok: false` ならその reason をそのまま reject reason に転写する。
 
-**Implementation Notes**
-- Integration: route handler は薄い adapter として動作し、`req.user` から triggeredBy を組み立て `submit` を呼ぶだけ。
-- Validation: target validate（要件 1.5）は TargetResolver に委譲、`submit` は最初に呼ぶ。
-- Acceptance gate の呼び出し順序（**accept gate は target page 1 件の findOne のみ追加 DB I/O**）:
-  1. TargetResolver で `targetPath` 構文を validate（invalid-target reject）
-  2. VaultResilienceLayer.getStatus で bootstrapState を確認（bootstrap-not-done reject）
-  3. `pageModel.findOne({ path: targetPath }, { descendantCount: 1, grant: 1, grantedUsers: 1, grantedGroups: 1 }).lean()` で target page を取得。null なら invalid-target reject。
-  4. `plannedPageCount = (targetType === 'page') ? 1 : 1 + targetPage.descendantCount` を計算し、`roleLimit`（default 1000）と比較。超過なら `page-count-exceeds-*-limit` reject（log insert with rejected + audit `rejected`、response body には raw `descendantCount` と `roleLimit` を含める）
-  5. AclEvaluator で `{ eligibleQuery }` を build（**count は取らない**）。非 admin の場合は base pageQuery と `userRelatedGroups` を使った grant filter を AND merge する。
-  6. log に `status: pending, descendantCount: targetPage.descendantCount, reconcileId, triggeredAt: now` を insert
-  7. `concurrency.tryRunInBackground({ userId, isAdmin, work: () => orchestrator.run({ reconcileId, eligibleQuery, plannedPageCount, ... }) })` を呼ぶ
-  8. 戻り値が `ok: false` なら log を status: rejected + rejectReason に更新し audit `rejected` を emit、reject を return
-  9. 戻り値が `ok: true` なら accepted（`{ reconcileId, descendantCount }`）を return（`partial-acl-filtered` 判定は orchestrator 完了時に行う）
-- Note: ACL 全除外による no-op completed（要件 2.6）は accept gate ではなく orchestrator 完了時に決定する。`processedCount === 0` のとき `status: 'completed', processedCount: 0` を記録し audit `completed` を emit する。
-- Lifecycle safety: 手順 6 で `status: 'pending'` を insert した直後、手順 7 の `tryRunInBackground` が microtask に work を schedule する前に process crash した場合、`pending` の log が残留する。これは起動時 migration が `pending` も対象に含めて `failed` 正規化することで吸収する（後述 §Migration Strategy）。
-- Risks:
-  - bootstrapState check の race（getStatus 直後に bootstrap が完了し reject されるケース）— 受付タイミングを優先する設計とし、UI 側に「リトライ可能」を提示する（reject reason `bootstrap-not-done`）。
-  - `descendantCount` の stale — eventually consistent なため、受付ゲートが見積もり違いをして orchestrator が上限超過の量を処理するリスクがある。orchestrator 側の `cursor.limit(plannedPageCount + 1)` ハードキャップで有界化する（要件 6.11）。
+**Acceptance gate ordering** (target page 1 件の findOne のみ追加 DB I/O):
+1. TargetResolver で `targetPath` を validate → invalid なら invalid-target reject
+2. VaultResilienceLayer.getStatus で bootstrap state 確認 → bootstrap-not-done reject
+3. `pageModel.findOne({ path: targetPath }, { descendantCount: 1, grant: 1, grantedUsers: 1, grantedGroups: 1 }).lean()` で target page 解決
+4. `plannedPageCount = (targetType === 'page') ? 1 : 1 + targetPage.descendantCount` を roleLimit と比較
+5. AclEvaluator で `{ eligibleQuery }` build（count は取らない）
+6. HistoryStore に `status: pending` insert
+7. `ConcurrencyController.tryRunInBackground` で work dispatch
+
+**Lifecycle invariants**:
+- ACL 全除外による no-op completed（要件 2.6）と `partial-acl-filtered` 判定は accept gate ではなく orchestrator 完了時の `processedCount` で決定する（accept gate は `countDocuments` を打たないため正確な ACL filter 件数を知らない）。
+- 手順 6（`pending` insert）と手順 7（microtask schedule）の間で process crash した場合、`pending` 残留 record は起動時 migration の `normalizeStaleLifecycle('running' + 'pending')` で `failed: process-restarted` に正規化される。
+- bootstrapState check の race（getStatus 直後に bootstrap 完了）は受付タイミングを優先し、UI 側でリトライ提示する設計。
 
 ---
 
@@ -600,9 +650,7 @@ export function resolveTarget(
 - `targetType === 'page'` → `{ path: targetPath }`（厳密一致、page 単体）。
 - `targetType === 'sub-tree'` → `{ $or: [{ path: targetPath }, { path: { $regex: '^' + escapeRegExp(targetPath) + '/' } }] }`（自身 + descendants）。
 
-**Implementation Notes**
-- Validation: 正規表現エスケープを必ず行う（regex injection 対策）。`null` / 空文字 / 改行を含む path は invalid。
-- Risks: 大量 descendant の page count を `countDocuments(query)` で取得する際の overhead — `estimatedDocumentCount` ではなく `countDocuments` を使う（filter 付きのため）。slow query は AclEvaluator 側で `limit` ヒントを使って打ち切る。
+**Design invariants**: 正規表現エスケープ必須（regex injection 対策）。`null` / 空文字 / 改行を含む path は invalid。
 
 ---
 
@@ -644,12 +692,10 @@ export function createAclEvaluator(deps: {
 - Outbound: PageQueryBuilder — purpose: `addConditionToFilteringByViewer` で grant 条件を Mongo FilterQuery にマージ (P0)
 - Outbound: IPageGrantService — purpose: `getUserRelatedGroups` で user の所属 group 解決 (P0)
 
-**Implementation Notes**
-- Integration: 既存の `Page.searchByPath`（[apps/app/src/server/models/page.ts:715](apps/app/src/server/models/page.ts#L715)）等が同 pattern で `PageQueryBuilder` を使っており、GROWI page list query の真実源として運用されている。reconcile は per-document の `isUserGrantedPageAccess` 再評価を行わず、orchestrator の cursor stream は `eligibleQuery` をそのまま使用する。
-- Semantics: `addConditionToFilteringByViewer(user, groups, false, false, false)` は GRANT_PUBLIC / 自分が所有する GRANT_OWNER / GRANT_SPECIFIED / 自分が所属する group の GRANT_USER_GROUP を許可する（GRANT_RESTRICTED は `includeAnyoneWithTheLink = false` で除外、自分が所属しない group の GRANT_USER_GROUP も除外）。GROWI の page-grant モデルでは「閲覧できる ≡ 編集できる」が原則（read-only 専用 grant は存在せず、`isRestricted` 等のフラグは別軸）であるため、本 spec の「編集権」要件 2.3 を viewer 条件で代用する。
-- Performance: 本 adapter は admin path で純粋に query build のみ行い DB I/O なし、非 admin path も `getUserRelatedGroups` の 1 query のみ。`countDocuments` は呼ばない（accept gate のコストは ReconcileService 側 `findOne` 1 件に集約される）。
-- Risks: grant filter の query 効率 — orchestrator の cursor stream で 1000 page 以下に有界化されているため、複雑 `$or` でも scan 量が小さい。
-- Side effects: 本 adapter は audit log を直接 emit しない。`partial-acl-filtered` event は orchestrator 完了時に `processedCount < plannedPageCount` で判定し emit する。
+**Design invariants**:
+- Grant semantics: `addConditionToFilteringByViewer(user, groups, false, false, false)` で GRANT_PUBLIC / GRANT_OWNER / GRANT_SPECIFIED / 所属 group の GRANT_USER_GROUP を許可（GRANT_RESTRICTED と非所属 group は除外）。GROWI page-grant model の「閲覧 ≡ 編集」原則（read-only 専用 grant なし）により viewer 条件で「編集権」要件 2.3 を代用する。
+- DB cost: admin path は DB I/O なし、非 admin path も `getUserRelatedGroups` の 1 query のみ。`countDocuments` は呼ばない（accept gate cost は ReconcileService 側 `findOne` 1 件に閉じる）。
+- 副作用なし。`partial-acl-filtered` 判定は orchestrator 完了時。
 
 ---
 
@@ -694,30 +740,7 @@ export function createConcurrencyController(config: {
 }): ConcurrencyController;
 ```
 
-**Internal implementation sketch**
-
-```typescript
-function tryRunInBackground({ userId, isAdmin, work }) {
-  // 1. sync check + increment（Node.js single-thread のため atomic）
-  const acquired = tryAcquire({ userId, isAdmin }); // private
-  if (!acquired.ok) return acquired;
-
-  // 2. acquire 直後に try/finally を microtask に流す。
-  //    Promise.resolve().then(callback) は callback を schedule するだけで throw しないため、
-  //    increment と try { ... } finally { release } の間に例外が入り込む隙間がない。
-  Promise.resolve().then(async () => {
-    try {
-      await work();
-    } catch (err) {
-      logger.error('reconcile background work failed', err);
-    } finally {
-      release({ userId }); // private
-    }
-  });
-
-  return { ok: true };
-}
-```
+**Internal contract**: `tryRunInBackground` は (a) Node.js single-thread の atomic な sync check-then-increment で acquire → (b) `Promise.resolve().then(...)` で `try { await work() } finally { release() }` を microtask schedule → (c) `ok: true | false` を即時 return。release は private に閉じ、caller は呼ばない。これにより increment と finally の間に例外が割り込む隙間がなく、release 漏れを型レベルで防ぐ。
 
 **State Management**
 - State model: `Map<userId, number>` + system-wide active count (number)。
@@ -765,18 +788,13 @@ export function createReconcileOrchestrator(deps: {
 }): ReconcileOrchestrator;
 ```
 
-- `run` 内部:
-  1. `vaultReconcileLog.updateOne({ reconcileId }, { status: 'running', startedAt: now })`
-  2. `createActivity?.({ action: 'vault.reconcile.started', ... })`
-  3. `cursor = pageModel.find(eligibleQuery).limit(plannedPageCount + 1).lean().cursor()` で stream を構築（**Mongoose document inflate を回避するため `.lean()` 必須**、ハードキャップで `plannedPageCount + 1` 件以上は読まない）
-  4. page を 1 件ずつ処理し namespace バッファに積む
-  5. buffer >= chunkSize 到達 → 該当 namespace の `bulk-upsert` instruction を `vault_instructions` に insert、buffer clear
-  6. **processed が `plannedPageCount + 1` に到達**したら stream を即時停止、`status: 'failed', lastError: 'limit-exceeded', completedAt` を記録し audit `failed` を emit して return（要件 6.11、`descendantCount` stale 等で受付ゲートが見積もり違いをした場合の defense-in-depth）
-  7. stream 終了後、残バッファを flush
-  8. 非 admin かつ `processedCount < plannedPageCount` のとき `vault.reconcile.partial-acl-filtered` audit を emit（ACL filter で差分があった可能性を示す observability signal。空 namespace を返す page や mid-flight に削除された page 等も差分に含まれる ambiguous な heuristic である点は accepted trade-off）
-  9. `vaultReconcileLog.updateOne({ reconcileId }, { status: 'completed', completedAt, processedCount })` + audit `completed`
-  10. 例外時は `status: 'failed'` + lastError 記録、audit `failed`
-- 注: `run` は `ConcurrencyController.tryRunInBackground` の `work` callback として呼ばれる。枠の release は controller 内部の finally 句で保証されるため、`run` 自身は slot 状態に依存せず純粋に「page を stream して instruction を発行する」責務に閉じる。
+**`run` の主要 invariants**:
+- `pageModel.find(eligibleQuery).limit(plannedPageCount + 1).lean().cursor()` で stream（`.lean()` 必須、`+1` ハードキャップで `descendantCount` stale 由来の暴走を有界化）
+- 各 page を `VaultNamespaceMapper.computePageNamespaces` で namespace 配列に展開、namespace ごとの buffer に積み、buffer ≥ `chunkSize` で `vault_instructions` に `bulk-upsert` instruction を発行、stream 完了後に残バッファ flush
+- `plannedPageCount + 1` 件目を見たら stream 停止、`status: 'failed', lastError: 'limit-exceeded'` で audit `failed` emit（要件 6.11、defense-in-depth）
+- 非 admin かつ `processedCount < plannedPageCount` のとき `vault.reconcile.partial-acl-filtered` audit を emit（ACL filter 由来か空 namespace page か mid-flight 削除かを区別できない ambiguous heuristic）
+- 例外時は `status: 'failed'`、自身のみ失敗（他の reconcile を巻き込まない）
+- slot release は `ConcurrencyController` の finally に閉じるため、`run` 自身は slot 状態に依存しない
 
 **Dependencies**
 - Outbound: Page model — purpose: cursor stream (P0)
@@ -809,10 +827,7 @@ export function createReconcileOrchestrator(deps: {
 - Persistence & consistency: 各遷移は単一 `updateOne` で atomic。
 - Concurrency strategy: 同一 reconcileId に対する run は 1 process 内で 1 回のみ。
 
-**Implementation Notes**
-- Integration: chunkSize は config（default 100）。drift detector の chunkSize と同等以下に保つ（要件 6.9）。
-- Validation: cursor stream 中の page deleted などは namespace 計算が空配列を返すケースとして許容（skip）。
-- Risks: 巨大 sub-tree の処理で memory pressure — namespace バッファは namespace ごとに独立、chunk flush ごとにクリアされるため一定上限を超えない。
+**Design invariants**: chunkSize は config（default 100、drift detector と同等以下）。空 namespace 配列を返す page は skip。namespace バッファは namespace 単位で独立し chunk flush でクリアされるため memory は有界。
 
 ---
 
@@ -854,7 +869,7 @@ export interface HistoryStore {
   /** 起動時 migration が呼ぶ。status が 'running' / 'pending' の record を
    *  status: 'failed', lastError: 'process-restarted', completedAt: now に bulk update し、件数を返す。
    *  'pending' を含めるのは accept gate が log insert 後 / orchestrator promotion 前に crash した場合の
-   *  残留 record を吸収するため（[Acceptance gate の呼び出し順序] §Lifecycle safety 参照）。 */
+   *  残留 record を吸収するため（VaultReconcileService の Acceptance gate ordering / Lifecycle invariants 参照）。 */
   normalizeStaleLifecycle(): Promise<number>;
 }
 ```
@@ -912,14 +927,7 @@ export interface HistoryStore {
 | Intent | 既存 VaultAdminSettings.tsx に Reconcile Section（trigger UI + history table）を追加。SWR で `/vault/reconcile-history` を 5 秒周期 refresh。 |
 | Requirements | 5.2, 5.3 |
 
-**Responsibilities & Constraints**
-- 既存 8 セクションの並びに 9 番目として追加。
-- trigger ボタン押下で `ReconcileTriggerModal` を表示。
-- modal は target type select（radio: page / sub-tree）+ path input + confirm。
-- submit 後は SWR の `mutate` で history を即時更新。
-
-**Implementation Notes**
-- summary-only component（presentational）。
+既存 8 セクションの並びに 9 番目として追加。trigger ボタン押下で `ReconcileTriggerModal` を表示、submit 後は SWR の `mutate` で history を即時更新。presentational のみで business logic を持たない。
 
 #### ReconcileTriggerModal
 
@@ -1013,44 +1021,6 @@ Emission point:
 
 ---
 
-## Testing Strategy
-
-### Unit Tests
-- `reconcile-target-resolver.spec.ts`: page / sub-tree それぞれの query 生成、invalid path（空文字 / 正規表現 metachar / 連続スラッシュ）の reject、regex escape の網羅。
-- `reconcile-acl-evaluator.spec.ts`: admin → filter skip（baseQuery がそのまま返る）、user → `PageQueryBuilder.addConditionToFilteringByViewer` で grant 条件が merge された `eligibleQuery` が返ること、`getUserRelatedGroups` が 1 回だけ呼ばれることを assertion。`countDocuments` を呼ばないことを spy で確認。
-- `reconcile-concurrency-controller.spec.ts`: `tryRunInBackground` の戻り値（ok / user-concurrency-limit / system-concurrency-limit）、admin bypass の動作、work callback の throw でも内部 finally で counter が必ず減算される、release が public surface に存在しない（型レベルチェック）。
-- `reconcile-history-store.spec.ts`: create / updateStatus / listRecent / `normalizeStaleLifecycle` の各動作。特に `normalizeStaleLifecycle` は `status: 'running'` と `status: 'pending'` の両方を `failed: process-restarted` に正規化することを assertion。
-
-### Integration Tests
-- `reconcile-service.spec.ts`: submit の受付ゲート path（invalid-target / bootstrap-not-done / page-count-exceeds-{user,admin}-limit / concurrency-limit / accepted）が結果と audit event の両面で正しく動く。accepted 時の戻り値が `{ status: 'accepted', reconcileId, descendantCount }` の shape であること、422 reject の戻り値が `{ status: 'rejected', reason, descendantCount, roleLimit }` の shape であることを型レベルでも assert する。
-- `reconcile-orchestrator.spec.ts`: cursor stream → namespace バッファ → chunk flush → `vault_instructions` insert の end-to-end。trash 配下の page が namespace 由来で `bulk-upsert` に乗ること（vault-manager 側 filter は test 範囲外）。例外時の `failed` 遷移を確認（slot release は controller 側で保証されるため orchestrator spec の対象外）。
-- `reconcile-flow.integ.ts`: 実 MongoDB（devcontainer の `mongo` service）を使った end-to-end。シナリオ: (a) admin が sub-tree 起動 → completed、(b) user が page 起動で ACL 一部除外 → partial-acl-filtered + completed、(c) page count 上限超過 → rejected、(d) system concurrency 上限超過 → rejected、(e) process restart で `running` / `pending` の両方が `failed: process-restarted` に正規化される（`normalizeStaleLifecycle` のカバレッジ）、(f) `bootstrapState !== 'done'` で default reject、(g) `descendantCount` が stale で受付ゲートが見積もり違い → orchestrator のハードキャップで `limit-exceeded` 失敗。
-
-### E2E / UI Tests
-- `/admin/vault` の Reconcile section 表示と trigger modal 操作（admin として全範囲指定 → reconcile id が返り、history に completed として表示される）。
-- PageTree の reconcile menu item 操作（一般ユーザーとして自分の page を reconcile → modal 内で accepted feedback が表示される）。
-- reject 時の modal メッセージ表示（page count 上限超過 / concurrency 上限超過 / bootstrap-not-done のそれぞれで reject reason に応じた i18n 翻訳された誘導メッセージが表示される）。
-
----
-
-## Migration Strategy
-
-```mermaid
-flowchart TB
-    Start[apps app 起動] --> Step1[既存 resilience migration<br/>vault_sync_state schema 等]
-    Step1 --> Step2[reconcile migration<br/>normalizeStaleLifecycle<br/>status running または pending を<br/>failed: process-restarted に正規化]
-    Step2 --> Step3[resilience layer init]
-    Step3 --> Step4[reconcile service init<br/>in memory concurrency reset]
-    Step4 --> Ready[routes ready]
-```
-
-- 新規 collection `vault_reconcile_log` は最初の write 時に自動作成される（Mongoose の auto collection creation）。手動 migration script は不要。
-- 起動時 `normalizeStaleLifecycle` は `status: { $in: ['running', 'pending'] }` の record を `status: 'failed', lastError: 'process-restarted', completedAt: now` に bulk update する。`pending` を含めるのは、accept gate が log を `pending` で insert した直後に process crash した場合の残留を吸収するため。
-- TTL index は schema 定義時に `index({ triggeredAt: 1 }, { expireAfterSeconds: ... })` で宣言。retention days は env var で上書き可能。
-- 既存 collection / schema への変更は **なし**。
-
----
-
 ## Security Considerations
 
 - 認証は GROWI 既存 web セッション middleware（`loginRequiredFactory` / `adminRequiredFactory`）に統一。PAT は使わない。
@@ -1096,5 +1066,9 @@ flowchart TB
 
 ## Supporting References
 
-- 詳細な discovery findings / design decisions / risks は `research.md` を参照。
-- 依存先 spec の関連 interface は `research.md` の References セクションから各 design.md にリンク。
+- `.kiro/specs/growi-vault-gateway/design.md` — PAT 認証 / ACL / `VaultNamespaceMapper` の既存 interface
+- `.kiro/specs/growi-vault-manager/design.md` — `applyBulkUpsert` の冪等性契約 / `isExcludedFromVault` filter
+- `.kiro/specs/growi-vault-resilience/design.md` — Trash 責務分離原則 / drift-detector の cursor stream pattern / 7-state bootstrap state machine / `vault_instructions` outbox
+- `apps/app/src/features/growi-vault/server/services/resilience/drift-detector.ts` — cursor stream + namespace 計算 + chunk flush の参照実装
+- `apps/app/src/features/growi-vault/server/routes/vault-admin.ts` — admin route の既存 pattern
+- `apps/app/src/features/growi-vault/client/admin/VaultAdminSettings.tsx` — admin UI セクション拡張の参照実装
