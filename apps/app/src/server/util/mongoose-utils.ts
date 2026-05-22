@@ -6,6 +6,32 @@ type ConnectionOptionsExtend = {
   useUnifiedTopology: boolean;
 };
 
+const DEFAULT_MAX_POOL_SIZE = 10;
+const DEFAULT_MIN_POOL_SIZE = 2;
+
+/**
+ * Reads MONGO_MAX_POOL_SIZE and MONGO_MIN_POOL_SIZE from environment variables
+ * and returns validated pool size configuration.
+ *
+ * - Invalid (NaN) values fall back to their respective defaults.
+ * - When minPoolSize > maxPoolSize, minPoolSize is clamped to maxPoolSize.
+ */
+export const getMongoPoolOptions = (): {
+  maxPoolSize: number;
+  minPoolSize: number;
+} => {
+  const rawMax = Number(process.env.MONGO_MAX_POOL_SIZE);
+  const rawMin = Number(process.env.MONGO_MIN_POOL_SIZE);
+
+  const maxPoolSize = Number.isFinite(rawMax) ? rawMax : DEFAULT_MAX_POOL_SIZE;
+  const parsedMin = Number.isFinite(rawMin) ? rawMin : DEFAULT_MIN_POOL_SIZE;
+
+  // Clamp minPoolSize so it never exceeds maxPoolSize
+  const minPoolSize = Math.min(parsedMin, maxPoolSize);
+
+  return { maxPoolSize, minPoolSize };
+};
+
 export const getMongoUri = (): string => {
   const { env } = process;
 
@@ -51,4 +77,5 @@ export const getOrCreateModel = <Interface, Method>(
 // see: https://mongoosejs.com/docs/migrating_to_6.html#no-more-deprecation-warning-options
 export const mongoOptions: ConnectOptions & ConnectionOptionsExtend = {
   useUnifiedTopology: true,
+  ...getMongoPoolOptions(),
 };

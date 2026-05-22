@@ -25,7 +25,7 @@
 
 ## 2. Core — Server-side fixes (parallel-capable; 異なるファイルへの独立変更)
 
-- [ ] 2.1 (P) L1: Mongoose connection pool の上限・下限を環境変数化
+- [x] 2.1 (P) L1: Mongoose connection pool の上限・下限を環境変数化
   - `mongoOptions` に `maxPoolSize` と `minPoolSize` を追加し、それぞれ `MONGO_MAX_POOL_SIZE`（default 10）と `MONGO_MIN_POOL_SIZE`（default 2）から読む。
   - `Number.isFinite` チェックで NaN は default にフォールバックする。
   - pool 周辺の他オプション（`useUnifiedTopology` 等）は変更しない。
