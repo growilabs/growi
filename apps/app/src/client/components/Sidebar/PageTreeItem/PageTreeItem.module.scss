@@ -27,6 +27,7 @@
   .page-tree-item {
     :global(.list-group-item-action) {
       :global(.btn-page-item-control) {
+        --bs-btn-color: var(--bs-tertiary-color);
         --bs-btn-bg: transparent;
         --bs-btn-hover-bg: var(--grw-primary-200);
         --bs-btn-active-bg: var(--grw-primary-300);
