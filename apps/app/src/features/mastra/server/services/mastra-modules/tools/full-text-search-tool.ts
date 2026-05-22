@@ -3,7 +3,11 @@ import { createTool } from '@mastra/core/tools';
 import { z } from 'zod';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import type { ISearchResultData } from '~/interfaces/search';
+import {
+  type ISearchResultData,
+  SORT_AXIS,
+  SORT_ORDER,
+} from '~/interfaces/search';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import loggerFactory from '~/utils/logger';
 
@@ -40,6 +44,29 @@ const inputSchema = z.object({
     .optional()
     .default(10)
     .describe('Maximum number of hits to return'),
+  sort: z
+    .enum([
+      SORT_AXIS.RELATION_SCORE,
+      SORT_AXIS.CREATED_AT,
+      SORT_AXIS.UPDATED_AT,
+    ])
+    .optional()
+    .default(SORT_AXIS.RELATION_SCORE)
+    .describe(
+      [
+        'Sort axis for the hits. Default is relevance (relationScore).',
+        'Use createdAt / updatedAt only when the user explicitly asks for newest or oldest pages',
+        '(e.g. "recently updated docs", "oldest meeting notes"); otherwise leave at the default so',
+        'relevance ranking is preserved.',
+      ].join(' '),
+    ),
+  order: z
+    .enum([SORT_ORDER.DESC, SORT_ORDER.ASC])
+    .optional()
+    .default(SORT_ORDER.DESC)
+    .describe(
+      'Sort direction. `desc` returns the highest values first (newest / most relevant); `asc` returns the lowest values first (oldest).',
+    ),
 });
 
 const outputSchema = z.discriminatedUnion('result', [
@@ -74,7 +101,7 @@ export const fullTextSearchTool = createTool({
   outputSchema,
 
   execute: async (inputData, context) => {
-    const { query, limit } = inputData;
+    const { query, limit, sort, order } = inputData;
 
     const ctx = context.requestContext as TypedRequestContext;
     const user = ctx.get('user');
@@ -119,12 +146,17 @@ export const fullTextSearchTool = createTool({
       // Pass query through unchanged: SearchService.parseQueryString interprets
       // operators (prefix:, tag:, "phrase", -word, ...). Do NOT sanitize or
       // rewrite the query string here — that would duplicate the parser.
+      // sort / order are forwarded verbatim — SearchService /
+      // ElasticsearchDelegator already maps SORT_AXIS values to ES field names
+      // (relationScore -> _score, createdAt -> created_at, updatedAt ->
+      // updated_at) via ES_SORT_AXIS, so the tool layer does not translate or
+      // alias them.
       const [searchResult, _delegatorName] = await searchService.searchKeyword(
         query,
         null,
         user,
         userGroups,
-        { limit },
+        { limit, sort, order },
       );
 
       // searchResult is typed as ISearchResult<unknown> at the SearchService

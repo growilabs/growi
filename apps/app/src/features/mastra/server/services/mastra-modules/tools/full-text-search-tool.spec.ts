@@ -77,7 +77,12 @@ const asSearchService = (m: MockSearchService): SearchService =>
 // Invoke the tool's execute. The mastra runtime calls execute with
 // `(inputData, { requestContext, ... })`, so tests mirror that shape.
 const invokeExecute = (
-  inputData: { query: string; limit?: number },
+  inputData: {
+    query: string;
+    limit?: number;
+    sort?: string;
+    order?: string;
+  },
   requestContext: RequestContext<MastraRequestContextShape>,
 ) => {
   // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
@@ -419,6 +424,96 @@ describe('fullTextSearchTool', () => {
       expect(result.result).toBe('error');
       expect(result.reason).toBe('user-group-relation-failed');
       // searchKeyword must not be reached when group resolution fails.
+      expect(mockSearchService.searchKeyword).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('sort / order pass-through (requirement 6.9)', () => {
+    it('forwards explicit sort: updatedAt + order: asc verbatim to searchKeyword (5th positional argument)', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      const searchResult: ISearchResult<unknown> = {
+        data: [],
+        meta: { total: 0, hitsCount: 0 },
+      };
+      mockSearchService.searchKeyword.mockResolvedValue([
+        searchResult,
+        'es-delegator',
+      ]);
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', asSearchService(mockSearchService));
+
+      await invokeExecute(
+        { query: 'hello', limit: 10, sort: 'updatedAt', order: 'asc' },
+        requestContext,
+      );
+
+      expect(mockSearchService.searchKeyword).toHaveBeenCalledTimes(1);
+      // The other 4 positional args remain as before — query/null/user/userGroups.
+      expect(mockSearchService.searchKeyword.mock.calls[0][0]).toBe('hello');
+      expect(mockSearchService.searchKeyword.mock.calls[0][1]).toBeNull();
+      expect(mockSearchService.searchKeyword.mock.calls[0][2]).toBe(mockUser);
+      expect(mockSearchService.searchKeyword.mock.calls[0][3]).toEqual([]);
+      // 5th positional argument (searchOpts) must include sort/order verbatim
+      // alongside the existing limit. Use deep equality on the whole object so
+      // that adding/removing keys requires updating this test deliberately.
+      expect(mockSearchService.searchKeyword.mock.calls[0][4]).toEqual({
+        limit: 10,
+        sort: 'updatedAt',
+        order: 'asc',
+      });
+    });
+
+    it('applies zod defaults when sort / order are omitted (sort: relationScore, order: desc)', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      const searchResult: ISearchResult<unknown> = {
+        data: [],
+        meta: { total: 0, hitsCount: 0 },
+      };
+      mockSearchService.searchKeyword.mockResolvedValue([
+        searchResult,
+        'es-delegator',
+      ]);
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', asSearchService(mockSearchService));
+
+      // Omit sort / order entirely; zod `.default(...)` should fire before
+      // execute is invoked, so the tool body receives the defaults.
+      await invokeExecute({ query: 'hello', limit: 5 }, requestContext);
+
+      expect(mockSearchService.searchKeyword).toHaveBeenCalledTimes(1);
+      // Use objectContaining (not strict toEqual) so that the limit value, which
+      // some other tests may change independently, does not over-constrain.
+      expect(mockSearchService.searchKeyword.mock.calls[0][4]).toEqual(
+        expect.objectContaining({
+          sort: 'relationScore',
+          order: 'desc',
+        }),
+      );
+    });
+
+    it('rejects an invalid sort enum value at the zod boundary without invoking searchKeyword', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      const mockSearchService = buildMockSearchService();
+      requestContext.set('user', mockUser);
+      requestContext.set('searchService', asSearchService(mockSearchService));
+
+      // 'unknown_axis' is not in SORT_AXIS; Mastra's validateToolInput wrapper
+      // must reject it before the execute body runs, mirroring the empty-query
+      // validation-error envelope.
+      const result = (await invokeExecute(
+        // biome-ignore lint/suspicious/noExplicitAny: intentional invalid input
+        { query: 'hello', limit: 5, sort: 'unknown_axis' as any },
+        requestContext,
+      )) as { error?: boolean; validationErrors?: unknown };
+
+      expect(result).toBeDefined();
+      expect(result.error).toBe(true);
+      expect(result.validationErrors).toBeDefined();
       expect(mockSearchService.searchKeyword).not.toHaveBeenCalled();
     });
   });

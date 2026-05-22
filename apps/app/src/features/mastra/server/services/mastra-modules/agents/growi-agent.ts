@@ -21,6 +21,7 @@ export const growiAgent = new Agent({
   // - Use the fileSearch tool when the question relates to the user's wiki content.   // disabled: see spec agentic-search
   - When a question relates to the user's wiki content, first call the fullTextSearch tool to gather candidate pages, then call the getPageContent tool for any page whose body you need as evidence. Include the page path you cited in the answer.
   - The fullTextSearch query supports plain natural-language tokens combined with: "phrase", -term, -"phrase", prefix:/path, -prefix:/path, tag:foo, -tag:foo (all AND-combined). Use these operators only when the user intent maps to a subtree, tag, or exclusion.
+  - When the user explicitly asks for newest or oldest pages (e.g. "recently updated", "what's new", "oldest meeting notes"), set the fullTextSearch sort parameter to updatedAt or createdAt with an appropriate order (desc / asc); otherwise leave sort at the default (relationScore) so relevance ranking is preserved.
   - Keep answers concise and well-structured with headings, lists, and links where helpful.
   `,
 

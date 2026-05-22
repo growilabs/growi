@@ -25,6 +25,8 @@
 
 > **タグによる絞り込み自体は本 spec の対象**: `fullTextSearchTool.query` の演算子として `tag:foo` / `-tag:foo` を agent に開示し、`SearchService.parseQueryString` 経由で利用可能にする（後述「サポートするクエリ構文」）。Non-Goals に含まれるのは「タグ専用の新規 tool」「タグ一覧 / ファセット UX」のみで、タグを使った検索の **能力** そのものは in scope。
 
+> **`sort` / `order` 入力パラメータも本 spec の対象**: `fullTextSearchTool` の zod `inputSchema` に `sort` (`relationScore` / `createdAt` / `updatedAt`) と `order` (`desc` / `asc`) を追加し、agent が「最新ページ」「古いページ」要求に応じて並び替えを指定できるようにする（後述「並び替えの開示」）。Non-Goals に含まれる「最近更新ページ / メタ・時系列クエリ専用 tool」とは別の話で、既存 tool への並び替えオプション追加は in scope。
+
 ## Boundary Commitments
 
 ### This Spec Owns
@@ -309,6 +311,7 @@ Key 決定:
 | 6.6 | user 取得不可で失敗戻り値 | FullTextSearchTool | discriminated union `context_error` | Tool Execute 分岐 |
 | 6.7 | grant 自前実装禁止 | FullTextSearchTool | `SearchService.searchKeyword` 委譲 | 反復ループ Sequence |
 | 6.8 | 例外を throw せず戻り値変換 | FullTextSearchTool | discriminated union `error` | — |
+| 6.9 | `sort` / `order` 入力を受理し `SearchService.searchKeyword` に forward | FullTextSearchTool | input schema (zod enum) + `searchOpts: { limit, sort, order }` | Tool Execute 分岐 |
 
 ## Components and Interfaces
 
@@ -374,6 +377,7 @@ export type MastraRequestContextShape = {
 - **`requestContext` から `searchService: SearchService` を取得**（不在時は `result: 'context_error'`）。`crowi` 全体ではなく `searchService` のみを渡すことで、tool 層が触れる surface を最小化する
 - **`searchService.isElasticsearchEnabled === false` のとき early return**: `result: 'error', reason: 'elasticsearch_not_configured'` を返し、SearchService を呼ばない（要件 6.8 の例外抑制と同じ戻り値型に統合）
 - 取得した `user: IUserHasId` をそのまま `searchService.searchKeyword(query, null, user, null, options)` に渡す（合成 user の組み立ては行わない — ES delegator 内部参照フィールドの確定的な根拠が現時点で limit されており、安全側に倒して `req.user` を全体引き渡し）
+- 入力の `sort` / `order` は zod default で必ず値が入った状態で `searchOpts: { limit, sort, order }` に詰めて `searchKeyword` に forward する（tool 層で別名・サニタイズなし、要件 6.9）
 - 検索結果から `pagePath` / `pageId` / `snippet` を抽出した配列にマップ
 - ページ本文（`body`）は **返さない**（責務分離）
 - 戻り値の discriminated union 整形（`'ok' | 'error' | 'context_error'`）
@@ -405,6 +409,20 @@ export type MastraRequestContextShape = {
 - 本 spec の **対象**: agent が `tag:foo` / `-tag:foo` を `query` 演算子として使うこと（タグでの絞り込み能力）
 - 本 spec の **非対象（別 spec）**: タグ一覧・ファセット UI・関連ページ提示など、タグを主軸にした **専用 tool / UX** の新設
 - 検索結果に grant フィルタが二重で効くため、agent が `tag:` を opportunistic に使っても権限漏洩は発生しない（Req 6.7 と一致）
+
+##### 並び替えの開示（`sort` / `order` 入力パラメータ）
+
+上記の inline 演算子とは別に、`fullTextSearchTool` は **`sort` / `order` を独立した入力パラメータ** として agent に開示する。これらは `query` 文字列の構文ではなく `inputSchema` の zod フィールドであり、agent は tool call の引数として明示的に指定する。
+
+| パラメータ | 受理値 | デフォルト | 由来 |
+|---|---|---|---|
+| `sort` | `relationScore` / `createdAt` / `updatedAt` | `relationScore` | `~/interfaces/search` の `SORT_AXIS` 定数 |
+| `order` | `desc` / `asc` | `desc` | `~/interfaces/search` の `SORT_ORDER` 定数 |
+
+**根拠と意思決定**:
+- 受理値は既存 `SORT_AXIS` / `SORT_ORDER` 定数からそのまま借用し、tool 層で別名やマッピングを定義しない（`SearchService` → `ElasticsearchDelegator.appendSortOrder` が内部で ES フィールド名（`_score` / `created_at` / `updated_at`）へ変換する）
+- agent instructions に「ユーザーが『最新』『古い』を明示的に求めたときのみ `updatedAt` / `createdAt` を指定する」旨を 1 行追記し、デフォルトの relevance 維持を促す（過剰指定によるランキング劣化を抑制）
+- 「メタ・時系列クエリ専用 tool」の新設は Non-Goal（別 spec）だが、既存全文検索 tool に並び替えオプションを追加することは tool surface の拡張であり in scope（演算子の `tag:` 開示と同じ判断基準）
 
 **Dependencies**
 - Inbound: `growiAgent.tools` — agent から呼び出される（P0）
@@ -452,6 +470,24 @@ const fullTextSearchInputSchema = z.object({
     .optional()
     .default(10)
     .describe('Maximum number of hits to return'),
+  sort: z
+    .enum([
+      SORT_AXIS.RELATION_SCORE,
+      SORT_AXIS.CREATED_AT,
+      SORT_AXIS.UPDATED_AT,
+    ])
+    .optional()
+    .default(SORT_AXIS.RELATION_SCORE)
+    .describe(
+      'Sort axis for the hits. Default is relevance (relationScore). Use createdAt / updatedAt only when the user explicitly asks for newest or oldest pages.',
+    ),
+  order: z
+    .enum([SORT_ORDER.DESC, SORT_ORDER.ASC])
+    .optional()
+    .default(SORT_ORDER.DESC)
+    .describe(
+      'Sort direction. `desc` returns the highest values first (newest / most relevant); `asc` returns the lowest values first (oldest).',
+    ),
 });
 
 type FullTextSearchHit = {
@@ -501,7 +537,7 @@ export const fullTextSearchTool: Tool<
 
 **Implementation Notes**
 - **`user` / `searchService` の取得**: execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>; const user = ctx.get('user'); const searchService = ctx.get('searchService');` の形で **共有型経由で型付き取得**（`growi-agent.ts` モジュールから `crowi` を import しない方針）。Post-Message Handler 側の `req.user` / `crowi.searchService` 参照を tool まで `RequestContext` 経由で持ち回ることで、`growi-agent.ts` の module-level export を保ったまま条件分岐を tool 層に閉じ込められる。`user` または `searchService` が `undefined` の場合は `result: 'context_error'`（共有型上は必須キーだが、Mastra ランタイムの動的取得である以上、防御的に型ガードを残す）
-- Integration: `searchService.searchKeyword(keyword, nqName, user, userGroups, searchOpts)` を呼ぶ。`nqName: null`、`userGroups` は tool 内で `UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` + `ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` を await して解決する（`SearchService` 自身は user から内部解決しない — 既存の `server/routes/search.ts:143-151` と同じパターン）、`searchOpts` で limit を渡す。**戻り値は `Promise<[ISearchResult<unknown>, string | null]>` のタプル** であり、`const [result, _delegatorName] = await searchService.searchKeyword(...)` の形で分解する。
+- Integration: `searchService.searchKeyword(keyword, nqName, user, userGroups, searchOpts)` を呼ぶ。`nqName: null`、`userGroups` は tool 内で `UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` + `ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` を await して解決する（`SearchService` 自身は user から内部解決しない — 既存の `server/routes/search.ts:143-151` と同じパターン）、`searchOpts` には `{ limit, sort, order }` を渡す（`sort` / `order` は `inputSchema` の zod default 経由で常に値が入る）。tool 層で別名やサニタイズは行わず、`SORT_AXIS` / `SORT_ORDER` の値をそのまま forward し、ES フィールド名への変換は `ElasticsearchDelegator.appendSortOrder` に委ねる。**戻り値は `Promise<[ISearchResult<unknown>, string | null]>` のタプル** であり、`const [result, _delegatorName] = await searchService.searchKeyword(...)` の形で分解する。
 - マッピング規則（[elasticsearch.ts:470-484](apps/app/src/server/service/search-delegator/elasticsearch.ts#L470-L484) の ES index 投入ロジックと [elasticsearch.ts:736-750](apps/app/src/server/service/search-delegator/elasticsearch.ts#L736-L750) の delegator 戻り値を根拠）:
 
   | tool 出力 | 取り出し元 |
@@ -657,6 +693,7 @@ export const growiAgent = new Agent({
   // - Use the fileSearch tool when the question relates to the user's wiki content.   // disabled: see spec agentic-search
   - When a question relates to the user's wiki content, first call the fullTextSearch tool to gather candidate pages, then call the getPageContent tool for any page whose body you need as evidence. Include the page path you cited in the answer.
   - The fullTextSearch query supports plain natural-language tokens combined with: "phrase", -term, -"phrase", prefix:/path, -prefix:/path, tag:foo, -tag:foo (all AND-combined). Use these operators only when the user intent maps to a subtree, tag, or exclusion.
+  - When the user explicitly asks for newest or oldest pages, set the fullTextSearch sort parameter to updatedAt or createdAt with an appropriate order (desc / asc); otherwise leave sort at the default (relationScore).
   - Keep answers concise and well-structured with headings, lists, and links where helpful.
   `,
   model: getOpenaiProvider()(model),
@@ -781,6 +818,9 @@ export const growiAgent = new Agent({
 7. SearchService が reject された場合に `result: 'error'` を返し execute が throw しないこと（6.8）
 8. `requestContext` 経由の `user: IUserHasId` がそのまま `SearchService.searchKeyword` の第 3 引数に渡ること（合成オブジェクトでなく `req.user` の参照同一性が保たれること、6.7）
 9. **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡したとき、tool 層で文字列が改変されず `SearchService.searchKeyword` の第 1 引数にそのまま渡ること（サニタイザ不在の保証、本 spec の Plan A 採用根拠）
+10. **`sort` / `order` 入力の素通し**: `sort: 'updatedAt', order: 'asc'` を指定したとき `searchKeyword` の第 5 引数 `searchOpts` に `{ limit, sort: 'updatedAt', order: 'asc' }` がそのまま渡ること（要件 6.9）
+11. **`sort` / `order` のデフォルト適用**: 呼び出し側で `sort` / `order` を省略したとき、zod default により `searchOpts.sort === 'relationScore'` / `searchOpts.order === 'desc'` で `searchKeyword` が呼ばれること（要件 6.9）
+12. **`sort` の不正値拒否**: `sort` に `SORT_AXIS` に含まれない値を渡したとき、Mastra の zod 入力検証段階で validation error envelope が返り `searchKeyword` が呼ばれないこと（要件 6.9）
 
 ### Unit Tests (`get-page-content-tool.spec.ts`)
 
@@ -801,6 +841,7 @@ export const growiAgent = new Agent({
 3. GRANT_USER_GROUP の所属メンバーは hits に含み、非所属メンバーは含まない（6.7）
 4. ヒットなしクエリで `result: 'ok'` かつ `hits: []`, `totalCount: 0`（6.1）
 5. Elasticsearch が停止している状態で `result: 'error'` を返し例外を throw しないこと（6.8、可能なら ES 接続文字列をモック）
+6. **`sort: 'updatedAt' + order: 'desc'` の順序反映**: 同一クエリにヒットする 2 ページのうち片方の `updatedAt` を過去日付に backdate して再 index した状態で tool を呼び、新しい方のページが古い方より前に並ぶこと（要件 6.9。relevance ベースの並びでは順序が変わるため、`sort`/`order` が実際に ES へ届いていることの end-to-end 確認）
 
 ### Integration Tests (`get-page-content-tool.integ.ts`)
 

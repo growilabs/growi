@@ -45,7 +45,12 @@ const sleep = (ms: number) =>
 
 // Helper to invoke the tool's execute the same way the Mastra runtime does.
 const invokeExecute = (
-  inputData: { query: string; limit?: number },
+  inputData: {
+    query: string;
+    limit?: number;
+    sort?: string;
+    order?: string;
+  },
   requestContext: RequestContext<MastraRequestContextShape>,
 ) => {
   // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
@@ -262,6 +267,23 @@ describe('fullTextSearchTool (integration)', () => {
     await ownerPage.save();
     await groupPage.save();
 
+    // Backdate one page's `updatedAt` so two pages visible to userA differ on
+    // the `updatedAt` axis. We backdate the OWNER page (visible only to A) to
+    // 7 days ago; the PUBLIC page keeps its fresh `Date.now()` default. This
+    // gives the sort-by-updatedAt integration test below two same-query hits
+    // with deterministically different timestamps.
+    //
+    // Page schema disables Mongoose's `timestamps.updatedAt` (see
+    // server/models/page.ts:266), so a direct $set on `updatedAt` is the
+    // canonical way to control its value without bypassing other middleware.
+    // ElasticsearchDelegator indexes `page.updatedAt` into the ES `updated_at`
+    // field (server/service/search-delegator/elasticsearch.ts:480-481), so the
+    // backdate must happen BEFORE the bulk index call below.
+    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    await Page.findByIdAndUpdate(ownerPage._id, {
+      $set: { updatedAt: sevenDaysAgo },
+    });
+
     // Index our three pages into ES.
     await searchService.fullTextSearchDelegator.updateOrInsertPages(() =>
       Page.find({
@@ -379,6 +401,30 @@ describe('fullTextSearchTool (integration)', () => {
       expect(pathsForA).toContain(pagePathGroup);
       // B is not a member of any group that owns the page.
       expect(pathsForB).not.toContain(pagePathGroup);
+    });
+  });
+
+  describe('sort / order (requirement 6.9)', () => {
+    it('returns the more recently updated page first when sort: updatedAt + order: desc', async () => {
+      // Both PUBLIC and OWNER pages match SCOPE_TOKEN and are visible to A.
+      // OWNER's `updatedAt` was backdated to 7 days ago in beforeAll; PUBLIC's
+      // is fresh. With sort: updatedAt + order: desc the PUBLIC page (newer)
+      // must appear BEFORE the OWNER page (older) in the hits array.
+      const result = (await invokeExecute(
+        { query: SCOPE_TOKEN, limit: 20, sort: 'updatedAt', order: 'desc' },
+        buildRequestContext(userA),
+      )) as FullTextSearchOkResult;
+
+      expect(result.result).toBe('ok');
+
+      const paths = result.hits.map((h) => h.pagePath);
+      // Sanity: both pages are present so the ordering assertion is meaningful.
+      expect(paths).toContain(pagePathPublic);
+      expect(paths).toContain(pagePathOwner);
+
+      const publicIdx = paths.indexOf(pagePathPublic);
+      const ownerIdx = paths.indexOf(pagePathOwner);
+      expect(publicIdx).toBeLessThan(ownerIdx);
     });
   });
 
