@@ -238,3 +238,119 @@ apps/app/src/server/routes/apiv3/installer.ts
 apps/app/src/server/routes/apiv3/page/create-page.ts
 packages/logger/src/transport-factory.ts
 ```
+
+---
+
+# Part 2 — Design Phase Discovery (2026-05-22)
+
+本セクションは design phase で実施した discovery / synthesis の成果を記録する。Part 1（上記、2026-05-21 の静的解析レポート）の各 finding L1-L5 を実装可能な設計へ落とし込むための情報を集約する。
+
+## Summary
+- **Discovery Scope**: Extension（既存 GROWI server への dynamic profiling 基盤追加 + 4 ファイルの局所修正 + custom-metrics モジュール 1 個追加）
+- **Key Findings**:
+  - 既存 OpenTelemetry custom-metrics 統合パス (`setupCustomMetrics()`) は dynamic import + 関数呼び出し列の形になっており、`yjs-metrics.ts` を 1 ファイル追加 + `index.ts` に 2 行追加するだけで L3 metric を組み込める（[apps/app/src/features/opentelemetry/server/custom-metrics/index.ts](../../apps/app/src/features/opentelemetry/server/custom-metrics/index.ts)）。
+  - `y-websocket/bin/utils` の `docs` (Map) は import 可能で、`.size` を読むだけで Y.Doc 件数を取得できる。lock や snapshot は不要（[apps/app/src/server/service/yjs/yjs.ts:7](../../apps/app/src/server/service/yjs/yjs.ts#L7)）。
+  - 既存 `node-sdk-configuration.ts` の `getNodeAutoInstrumentations(...)` 呼び出しは 1 か所のみ。allow-list 方式への置き換えは関数置換 1 か所で済む（[apps/app/src/features/opentelemetry/server/node-sdk-configuration.ts:51-66](../../apps/app/src/features/opentelemetry/server/node-sdk-configuration.ts#L51-L66)）。
+  - devcontainer の `mongo:27017` (replica set `rs0`) と `elasticsearch:9200` は常時到達可能。Part 1 で profiling を阻んだ MongoDB 4.2+ 入手不可問題は本セッションでは存在しない（参照: `.claude/rules/devcontainer.md`）。
+  - 本番 build 成果物 `apps/app/dist/server/app.js` が残存しており、再ビルドなしで `--inspect` 起動可能。
+
+## Research Log
+
+### Extension Point Analysis — OpenTelemetry custom-metrics
+- **Context**: L3 metric (`y-websocket docs count`) をどの統合点に追加するか確定する。
+- **Sources Consulted**: `custom-metrics/index.ts`, `custom-metrics/system-metrics.ts`, `.kiro/specs/opentelemetry/{requirements,design}.md`
+- **Findings**:
+  - `setupCustomMetrics()` は 4 module（application / user-counts / page-counts / system）を dynamic import → `add*Metrics()` 呼び出しの順で合成。新規 module 追加コストは barrel への 2 行追加 + dynamic import + 関数呼び出し 1 行。
+  - 既存 module は `meter.createObservableGauge(name, { description, unit })` + `addCallback` パターン。`yjs-metrics.ts` も同形式で揃える。
+  - `opentelemetry` spec Out of scope: 「既存メトリクスの名称変更や再構成」。新規 metric **追加** は in-scope。
+- **Implications**: `yjs-metrics.ts` を `custom-metrics/` 配下に新規追加し、`setupCustomMetrics()` のリストに加える設計が最小コスト。Metric 名は既存命名規約に従い `growi.yjs.docs.count`。
+
+### Extension Point Analysis — y-websocket docs Map access
+- **Context**: `y-websocket` の `docs` Map を安全に読み出す方法を確認する。
+- **Sources Consulted**: `apps/app/src/server/service/yjs/yjs.ts:7`, `y-websocket/bin/utils.js`
+- **Findings**:
+  - `docs` は module-level `Map<string, WSSharedDoc>`。`setupWSConnection` 内で add/delete される。
+  - `.size` 読み出しは同期 / lock-free / side-effect-free。Observable Gauge コールバック内で安全。
+  - `import { docs } from 'y-websocket/bin/utils'` は既に [yjs.ts:7](../../apps/app/src/server/service/yjs/yjs.ts#L7) で行われている。
+- **Implications**: L3 metric の callback は実質 1 行 (`observableResult.observe(docs.size)`)。後続の sweeper も同じ `docs` Map を iterate する。
+
+### Build vs. Adopt — Heap snapshot 取得手段
+- **Context**: heap snapshot 取得方法の選定。
+- **Sources Consulted**: Node.js Inspector / `v8.writeHeapSnapshot()`、Chrome DevTools Protocol、`clinic` / `heapdump` / `heapsnapshot-parser`
+- **Findings**:
+  - **採用**: `--inspect` 起動 + CDP over WebSocket（外部 sidecar） / `v8.writeHeapSnapshot(path)`（in-process、SIGUSR2 起動）。両方とも Node 標準機能で追加 runtime dependency 不要。
+  - **不採用**: `clinic` 系は profiling 用に node を fork する形で継続稼働モデルと噛み合わない。`heapdump` は Node 24 互換が不安定。
+- **Implications**: 新規 runtime dependency なし。Sidecar 側は `ws`（既存）+ minimal CDP client。
+
+### Build vs. Adopt — Load driver
+- **Context**: 負荷生成スクリプトの選定。
+- **Sources Consulted**: `autocannon`, `k6`, `undici`, 既存 `apps/app/test/integration/` パターン
+- **Findings**:
+  - **採用**: `undici`（Node 24 標準・既存依存）で順次 HTTP リクエスト発行する custom スクリプト。シナリオごとに request 列を別 module。
+  - **不採用**: `k6`（別バイナリ）、`autocannon`（throughput-focused でシナリオ表現力が弱い）、`@playwright/test`（browser 駆動が過剰）。
+  - y-websocket セッションの open/close は `ws` + minimal `Y.Doc` client で模擬。abort（half-close）は `socket.destroy()`。
+- **Implications**: 新規 runtime dependency なし。スクリプトは `apps/app/tools/memory-profiling/`。
+
+### Integration Risk — SIGUSR2 ハンドラ
+- **Context**: GROWI server に SIGUSR2 ハンドラを追加することの安全性確認。
+- **Sources Consulted**: `apps/app/src/server/app.ts`, Node.js signal docs
+- **Findings**:
+  - SIGUSR2 は Node の内部利用（debugger）と衝突しうる。`MEMORY_PROFILING_ENABLED=true` の場合のみハンドラ登録する形が安全。
+- **Implications**: ハンドラは新規 file `apps/app/src/server/util/heap-snapshot-handler.ts` に隔離し、env var ガード必須。Production には登録しない。
+
+## Architecture Pattern Evaluation
+
+| Option | Description | Strengths | Risks / Limitations | Notes |
+|--------|-------------|-----------|---------------------|-------|
+| Inline profiling code in server | Snapshot 取得・シナリオ実行を server 内に組み込む | Single process | Production にも profiling code 混入、責務肥大 | 不採用 |
+| **External sidecar + signal hook**（採用） | server には minimal SIGUSR2 hook のみ。シナリオ実行と CDP-based snapshot 取得は別プロセス | 関心の分離、production への影響最小、再利用容易 | 起動・接続手順がやや複雑（README で吸収） | 採用 |
+| Forked profiling binary（`clinic` 系） | 別ツールに丸投げ | 自前実装ゼロ | 実行モデル不一致、custom シナリオ表現困難 | 不採用 |
+
+## Design Decisions
+
+### Decision: External sidecar + signal hook で profiling を分離する
+- **Context**: profiling 機能を server 本体にどこまで埋め込むか。
+- **Alternatives Considered**:
+  1. Server に常駐させて env var で gate
+  2. **External sidecar が CDP + SIGUSR2 を駆動し、server 側は minimal hook のみ**
+- **Selected Approach**: 2 を採用。Sidecar / シナリオ / RSS ロガーは `apps/app/tools/memory-profiling/`、server 側は `MEMORY_PROFILING_ENABLED=true` ガード付きの 1 ファイルだけ。
+- **Rationale**: production への影響を「env var で gate された 1 ファイル」に限定でき、profiling ツールはアプリと独立してメンテできる。
+- **Trade-offs**: + production 安全 / + 関心の分離 / − 利用手順が 2 段（server 起動 + sidecar 起動、README で吸収）。
+- **Follow-up**: SIGUSR2 と inspector の競合は Node 24 で再確認。
+
+### Decision: L1 / L2 の env var は新規追加とし、未指定時 default を本 spec 推奨値とする
+- **Context**: 既存 production の default を変更すると無告知の振る舞い変化が起きる。
+- **Alternatives Considered**:
+  1. Default 据え置き、env var override のみ追加
+  2. **Default を本 spec 推奨値に変更し、env var で従来動作に戻せるようにする**
+- **Selected Approach**: 2 を採用。`MONGO_MAX_POOL_SIZE` default `10`, `MONGO_MIN_POOL_SIZE` default `2`。OTel allow-list は default で明示集合のみ enable、`OTEL_AUTO_INSTRUMENTATION_PROFILE=all` で従来動作復元。
+- **Rationale**: 本 spec の目的（RSS 削減）が default の変更で自動的に効き、運用者は env var で即座に戻せる。
+- **Trade-offs**: + 自動的に効果 / − 既存 deployment の振る舞い変化を release notes で告知する必要。
+- **Follow-up**: CHANGELOG への記載必須。
+
+### Decision: L5 は dynamic 検証なしで常時実装、L3 sweeper / L4 backpressure は条件付き
+- **Context**: defensive 修正は影響が小さく、確認なしでも入れた方が将来 debugging で得。
+- **Selected Approach**: L5 (try/catch + logger) は常時実装。L3 sweeper / L4 backpressure は Drain 後 snapshot の retained constructor 差分で問題量が確認された場合のみ実装。
+- **Rationale**: 要件と一致 / 不要実装回避。
+- **Follow-up**: verification report で sweeper / backpressure の判定根拠を明示。
+
+### Decision: Metric 名は `growi.yjs.docs.count`
+- **Context**: 既存 OTel custom-metrics の命名規約（`growi.*` for GROWI-specific）に従う。
+- **Selected Approach**: `growi.yjs.docs.count`（unit: `{document}`, type: Observable Gauge）。
+- **Rationale**: `opentelemetry` spec の Boundary に整合、receiver 側ダッシュボード命名の一貫性。
+- **Follow-up**: `opentelemetry` spec の Metric Schema 表を本 metric 追加に合わせて update（同 spec の Revalidation Trigger 該当）。
+
+## Risks & Mitigations
+- **R1: SIGUSR2 ハンドラと Node inspector の衝突** — `MEMORY_PROFILING_ENABLED` で gate し production では絶対に登録しない。devcontainer で `--inspect` 併用時の smoke を実装後に行う。
+- **R2: Mongoose pool size 縮小による性能リグレッション** — 大規模テナント（高トラフィック）では `maxPoolSize: 10` が飽和する可能性。env var で運用者 override 可能、release notes で「大規模テナントはチューニング推奨」と明示。
+- **R3: OTel auto-instrumentation 絞り込みでトレース欠落** — 「現状観測スパン種」と「絞り込み後スパン種」を実装前に diff。意図しない欠落があれば allow-list に追加。
+- **R4: Heap snapshot ファイルの肥大化** — Snapshot 1 枚 50–300 MB 想定。`tmp/memory-leak-investigation/` のみに置き、`.gitignore` 確認 + verification report には集計値のみ。
+- **R5: y-websocket abort シナリオ（half-close）再現困難** — TCP RST 送信は OS / Node 制約あり。`socket.destroy()` でカーネル close を強制。再現できない finding は inconclusive 扱い。
+
+## References
+- Part 1（本ファイル上部）— 静的解析レポート L1-L5
+- [.kiro/specs/memory-leak-investigation/brief.md](./brief.md)
+- [.kiro/specs/opentelemetry/design.md](../opentelemetry/design.md) — custom-metrics 統合パターン
+- [.claude/rules/devcontainer.md](../../.claude/rules/devcontainer.md)
+- Node.js: [Inspector](https://nodejs.org/api/inspector.html), [v8.writeHeapSnapshot](https://nodejs.org/api/v8.html#v8writeheapsnapshotfilename)
+- [Chrome DevTools Protocol — HeapProfiler](https://chromedevtools.github.io/devtools-protocol/v8/HeapProfiler/)
