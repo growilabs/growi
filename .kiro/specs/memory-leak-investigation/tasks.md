@@ -13,7 +13,7 @@
   - 観測可能な完了条件: `tools/memory-profiling/README.md` と `tmp/memory-leak-investigation/.gitkeep` が存在し、`.env.development` の差分に `MEMORY_PROFILING_ENABLED` 行が含まれる。
   - _Requirements: 1.4, 6.4, 6.5_
 
-- [ ] 1.2 Heap snapshot signal handler の実装と server boot 統合
+- [x] 1.2 Heap snapshot signal handler の実装と server boot 統合
   - `MEMORY_PROFILING_ENABLED` が truthy のときのみ SIGUSR2 を待ち受け、`v8.writeHeapSnapshot()` を `MEMORY_PROFILING_OUTPUT_DIR`（default: 上記ディレクトリ）配下のタイムスタンプ付きファイル名で書き出す。
   - server boot シーケンス（`apps/app/src/server/app.ts`）から env var ガード付きで 1 度だけ呼ばれる経路を作る。
   - signal callback 内例外を捕捉し `growi-logger` で構造化ログに残す（server プロセスは止めない）。
