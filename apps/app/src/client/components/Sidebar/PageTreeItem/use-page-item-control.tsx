@@ -12,6 +12,7 @@ import {
   unbookmark,
 } from '~/client/services/page-operation';
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem';
 import type { TreeItemToolProps } from '~/features/page-tree/interfaces';
 import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark';
 import { useSWRMUTxPageInfo } from '~/stores/page';
@@ -109,6 +110,14 @@ export const usePageItemControl = (): UsePageItemControl => {
       }
     };
 
+    // Reconcile menu item renderer — wired into PageItemControl via additionalMenuItemRenderer.
+    // page.path is captured from the closure; pageInfo arg is not needed for reconcile.
+    const pagePath = page.path;
+    const ReconcileMenuItems: FC = useCallback(() => {
+      if (pagePath == null) return null;
+      return <PageReconcileMenuItem targetPath={pagePath} />;
+    }, [pagePath]);
+
     return (
       <NotAvailableForGuest>
         <div className="grw-pagetree-control d-flex">
@@ -121,6 +130,7 @@ export const usePageItemControl = (): UsePageItemControl => {
             onClickRenameMenuItem={renameMenuItemClickHandler}
             onClickDeleteMenuItem={deleteMenuItemClickHandler}
             onClickPathRecoveryMenuItem={pathRecoveryMenuItemClickHandler}
+            additionalMenuItemRenderer={ReconcileMenuItems}
             isInstantRename
             // Todo: It is wanted to find a better way to pass operationProcessData to PageItemControl
             operationProcessData={page.processData}

@@ -4,6 +4,7 @@ import type { Router } from 'express';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
+import { VaultInstruction } from './models/vault-instruction';
 import { VaultReconcileLog } from './models/vault-reconcile-log';
 import { VaultSyncState } from './models/vault-sync-state';
 import { createVaultAdminRouter } from './routes/vault-admin';
@@ -580,22 +581,54 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   // controller + orchestrator. Must be created after initOnStartup() so the
   // bootstrapper is ready to answer getStatus() calls (req 4.3).
   // ------------------------------------------------------------------
+  // Resolve the Page Mongoose model via its factory; passing `crowi` so the
+  // model picks up the crowi-bound schema augmentations defined in
+  // ~/server/models/page.
+  const pageModelFactory = (await import('~/server/models/page')).default;
+  const pageModel = pageModelFactory(crowi);
+
+  // Adapter exposing the bootstrapper as the minimal ReconcileResilienceLayer
+  // shape expected by VaultReconcileService. getResilienceStatus() returns the
+  // full ResilienceStatus, which already carries a `bootstrap.state` field.
+  const reconcileResilienceLayer = {
+    getStatus: () => bootstrapper.getResilienceStatus(),
+  };
+
   _reconcileService = createVaultReconcileService({
-    pageModel: (await import('~/server/models/page')).default,
+    pageModel: pageModel as never,
     targetResolver: await import(
       './services/reconcile/reconcile-target-resolver'
     ),
     aclEvaluator: (
       await import('./services/reconcile/reconcile-acl-evaluator')
-    ).createAclEvaluator({}),
+    ).createAclEvaluator({
+      pageModel: pageModel as never,
+      pageGrantService: crowi.pageGrantService,
+    }),
     concurrencyController: (
       await import('./services/reconcile/reconcile-concurrency-controller')
-    ).createConcurrencyController(),
+    ).createConcurrencyController({
+      maxConcurrentPerUser: configManager.getConfig(
+        'app:vaultReconcileMaxConcurrentPerUser',
+      ),
+      maxConcurrentSystem: configManager.getConfig(
+        'app:vaultReconcileMaxConcurrentSystem',
+      ),
+      adminBypassCapacityLimit: configManager.getConfig(
+        'app:vaultReconcileAdminBypassCapacityLimit',
+      ),
+    }),
     historyStore,
     orchestrator: (
       await import('./services/reconcile/reconcile-orchestrator')
-    ).createReconcileOrchestrator({ historyStore }),
-    resilienceLayer: bootstrapper,
+    ).createReconcileOrchestrator({
+      pageModel: pageModel as never,
+      vaultInstruction: VaultInstruction,
+      vaultNamespaceMapper: vaultNamespaceMapper as never,
+      vaultReconcileLog: VaultReconcileLog,
+      chunkSize: configManager.getConfig('app:vaultReconcileChunkSize'),
+    }),
+    resilienceLayer: reconcileResilienceLayer,
     configManager,
   });
   logger.info('GROWI Vault: VaultReconcileService initialised');

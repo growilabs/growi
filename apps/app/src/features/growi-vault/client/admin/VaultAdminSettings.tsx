@@ -13,6 +13,10 @@ import useSWR from 'swr';
 
 import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import type { ReconcileLogEntry } from '~/features/growi-vault/server/services/reconcile';
+
+import { ReconcileHistoryTable } from '../components/ReconcileHistoryTable';
+import { ReconcileTriggerModal } from '../components/ReconcileTriggerModal';
 
 // ============================================================================
 // Types
@@ -473,6 +477,64 @@ const AutoRetryStatusSection = ({
   );
 };
 
+/** Reconcile section: trigger manual reconcile + history table. */
+const ReconcileSection = (): JSX.Element => {
+  const [isModalOpen, setIsModalOpen] = useState(false);
+
+  const {
+    data: historyData,
+    isLoading,
+    mutate: mutateHistory,
+  } = useSWR<{ entries: ReconcileLogEntry[]; total: number }>(
+    '/vault/reconcile-history',
+    (endpoint: string) =>
+      apiv3Get<{ data: { entries: ReconcileLogEntry[]; total: number } }>(
+        endpoint,
+      ).then((res) => res.data.data),
+    { refreshInterval: 5000 },
+  );
+
+  const handleAccepted = useCallback(() => {
+    mutateHistory();
+  }, [mutateHistory]);
+
+  return (
+    <div className="row mb-5">
+      <div className="col-lg-12">
+        <h2 className="admin-setting-header">Reconcile</h2>
+
+        <div className="row mb-3">
+          <div className="col-md-3"></div>
+          <div className="col-md-9">
+            <Button color="primary" onClick={() => setIsModalOpen(true)}>
+              <span className="material-symbols-outlined me-1 align-middle">
+                sync
+              </span>
+              Trigger Reconcile
+            </Button>
+            <p className="form-text text-muted mt-2">
+              Manually repair drift between MongoDB pages and vault git trees
+              without a full re-bootstrap.
+            </p>
+          </div>
+        </div>
+
+        <ReconcileHistoryTable
+          entries={historyData?.entries ?? []}
+          isLoading={isLoading}
+        />
+
+        <ReconcileTriggerModal
+          isOpen={isModalOpen}
+          onClose={() => setIsModalOpen(false)}
+          apiEndpoint="/v3/vault/reconcile"
+          onAccepted={handleAccepted}
+        />
+      </div>
+    </div>
+  );
+};
+
 /** Drift Activity section: sweep stats and out-of-scope notice. */
 const DriftActivitySection = ({
   driftStatus,
@@ -739,6 +801,8 @@ export const VaultAdminSettings = (): JSX.Element => {
       <StorageObservabilitySection storageStats={data?.storageStats} />
 
       <AuditLogFilterSection />
+
+      <ReconcileSection />
     </div>
   );
 };

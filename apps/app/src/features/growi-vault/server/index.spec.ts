@@ -1281,8 +1281,9 @@ describe('createVaultAdminRouterWithDeps — passes reconcileService after init 
 
     const adminRouterCall = vi.mocked(createVaultAdminRouter).mock.calls[0];
     expect(adminRouterCall).toBeDefined();
-    expect(adminRouterCall[0]).toHaveProperty('reconcileService');
-    expect(adminRouterCall[0].reconcileService).not.toBeUndefined();
+    const adminRouterArg = adminRouterCall![0] as Record<string, unknown>;
+    expect(adminRouterArg).toHaveProperty('reconcileService');
+    expect(adminRouterArg.reconcileService).not.toBeUndefined();
 
     process.removeAllListeners('SIGTERM');
     process.removeAllListeners('SIGINT');
@@ -1313,8 +1314,9 @@ describe('createVaultPageRouterWithDeps — exported and wires reconcileService 
 
     const pageRouterCall = vi.mocked(createVaultPageRouter).mock.calls[0];
     expect(pageRouterCall).toBeDefined();
-    expect(pageRouterCall[0]).toHaveProperty('reconcileService');
-    expect(pageRouterCall[0].reconcileService).not.toBeUndefined();
+    const pageRouterArg = pageRouterCall![0] as Record<string, unknown>;
+    expect(pageRouterArg).toHaveProperty('reconcileService');
+    expect(pageRouterArg.reconcileService).not.toBeUndefined();
 
     process.removeAllListeners('SIGTERM');
     process.removeAllListeners('SIGINT');

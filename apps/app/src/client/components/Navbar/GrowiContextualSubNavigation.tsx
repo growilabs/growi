@@ -25,6 +25,7 @@ import {
 import { usePrintMode } from '~/client/services/use-print-mode';
 import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
 import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
+import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem';
 import { usePageBulkExportSelectModalActions } from '~/features/page-bulk-export/client/states/modal';
 import type {
   OnDeletedFunction,
@@ -442,6 +443,12 @@ const GrowiContextualSubNavigation = (
           revisionId={revisionId}
           isLinkSharingDisabled={isLinkSharingDisabled}
         />
+        {path != null && (
+          <>
+            <DropdownItem divider />
+            <PageReconcileMenuItem targetPath={path} />
+          </>
+        )}
         {!isReadOnlyUser && (
           <>
             <DropdownItem divider />
@@ -452,7 +459,7 @@ const GrowiContextualSubNavigation = (
         )}
       </>
     );
-  }, [isLinkSharingDisabled, pageId, revisionId, isReadOnlyUser]);
+  }, [isLinkSharingDisabled, pageId, path, revisionId, isReadOnlyUser]);
 
   // hide sub controls when sticky on mobile device
   const hideSubControls = useMemo(() => {

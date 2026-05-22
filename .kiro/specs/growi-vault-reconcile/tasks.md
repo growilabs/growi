@@ -155,7 +155,7 @@
 
 - [ ] 4. Client: admin section + PageTree / SubNav 起動経路 + 共通 modal を構築
 
-- [ ] 4.1 (P) ReconcileTriggerModal: target type select + path input + confirm modal を新規実装
+- [x] 4.1 (P) ReconcileTriggerModal: target type select + path input + confirm modal を新規実装
   - reactstrap Modal で target type radio（page / sub-tree）、path input、confirm ボタンを持つ
   - submit 時に渡された API endpoint（admin / user 用を切替可能）を `apiv3Post` で呼ぶ
   - response が `accepted` なら modal close + 親に accepted feedback を渡す、`rejected` なら reason を i18n key 解決して内部にエラー表示
@@ -163,7 +163,7 @@
   - _Requirements: 5.3, 6.2, 6.3, 6.7_
   - _Boundary: ReconcileTriggerModal_
 
-- [ ] 4.2 (P) ReconcileHistoryTable: history list 表示 component を新規実装
+- [x] 4.2 (P) ReconcileHistoryTable: history list 表示 component を新規実装
   - column: triggeredAt / triggeredBy / target (type + path) / processed / status / completedAt / lastError
   - status が `failed` の行は reactstrap の danger badge、`rejected` は warning badge で視覚的に区別
   - prop で entries 配列と loading state を受け取り、empty state も描画
@@ -171,7 +171,7 @@
   - _Requirements: 5.2_
   - _Boundary: ReconcileHistoryTable_
 
-- [ ] 4.3 PageReconcileMenuItem: PageTree / SubNav 共通の reconcile 起動 menu component を新規実装
+- [x] 4.3 PageReconcileMenuItem: PageTree / SubNav 共通の reconcile 起動 menu component を新規実装
   - menu item の click handler から `ReconcileTriggerModal`（task 4.1）を user endpoint `/vault/page/reconcile` 設定 + `targetPath` default に現在の page path を fix した状態で起動する thin wrapper
   - 4.1 の modal を再利用し、本 component 自体は独自 modal を持たない（modal の責務は 4.1 に閉じる）
   - submit 結果（accepted / rejected）は 4.1 modal 側の feedback を受けて表示
@@ -180,14 +180,14 @@
   - _Requirements: 1.2, 6.2, 6.7_
   - _Boundary: PageReconcileMenuItem_
 
-- [ ] 4.4 PageTree item action に reconcile entry を組み込む
+- [x] 4.4 PageTree item action に reconcile entry を組み込む
   - `apps/app/src/client/components/Sidebar/PageTreeItem/use-page-item-control.tsx` に `onClickReconcile` callback と menu item rendering を追加
   - 既存の bookmark / rename / delete menu と同じ pattern で reconcile entry を表示
   - 観察可能: PageTree item の dropdown を開くと reconcile entry が見え、選択で PageReconcileMenuItem の modal が起動する
   - _Depends: 4.3, 3.2_
   - _Requirements: 1.2_
 
-- [ ] 4.5 (P) GrowiContextualSubNavigation に reconcile button を組み込む
+- [x] 4.5 (P) GrowiContextualSubNavigation に reconcile button を組み込む
   - `apps/app/src/client/components/Navbar/GrowiContextualSubNavigation.tsx`（または PageControls 配下）に reconcile button を追加し、PageReconcileMenuItem 経由の modal を起動
   - 既存 PageControls dropdown と同じ rendering pattern を踏襲
   - 4.4 とはファイル境界が別（PageTree vs SubNav）のため並列実行可能
@@ -196,7 +196,7 @@
   - _Requirements: 1.2_
   - _Boundary: GrowiContextualSubNavigation_
 
-- [ ] 4.6 VaultAdminSettings に Reconcile section を組み込む
+- [x] 4.6 VaultAdminSettings に Reconcile section を組み込む
   - 既存 8 セクションの並びに 9 番目として Reconcile section を追加
   - section 内に trigger ボタン（ReconcileTriggerModal を admin endpoint で起動）と ReconcileHistoryTable を配置
   - SWR で `GET /vault/reconcile-history` を 5 秒周期 refresh、submit 直後は `mutate` で即時更新

@@ -181,43 +181,54 @@ describe('VaultReconcileLog schema', () => {
   const getIndexes = () => VaultReconcileLog.schema.indexes();
 
   it('declares a unique index on reconcileId', () => {
-    const indexes = getIndexes();
-    const uniqueOnReconcileId = indexes.find(
-      ([fields, options]) =>
-        Object.keys(fields).length === 1 &&
-        (fields as Record<string, unknown>).reconcileId !== undefined &&
-        (options as Record<string, unknown>).unique === true,
-    );
+    const indexes = getIndexes() as unknown as ReadonlyArray<
+      [unknown, unknown]
+    >;
+    const uniqueOnReconcileId = indexes.find(([fields, options]) => {
+      const f = fields as Record<string, unknown>;
+      const o = options as Record<string, unknown>;
+      return (
+        Object.keys(f).length === 1 &&
+        f.reconcileId !== undefined &&
+        o.unique === true
+      );
+    });
     expect(uniqueOnReconcileId).toBeDefined();
   });
 
   it('declares a TTL index on triggeredAt', () => {
-    const indexes = getIndexes();
-    const ttlOnTriggeredAt = indexes.find(
-      ([fields, options]) =>
-        Object.keys(fields).length === 1 &&
-        (fields as Record<string, unknown>).triggeredAt !== undefined &&
-        typeof (options as Record<string, unknown>).expireAfterSeconds ===
-          'number',
-    );
+    const indexes = getIndexes() as unknown as ReadonlyArray<
+      [unknown, unknown]
+    >;
+    const ttlOnTriggeredAt = indexes.find(([fields, options]) => {
+      const f = fields as Record<string, unknown>;
+      const o = options as Record<string, unknown>;
+      return (
+        Object.keys(f).length === 1 &&
+        f.triggeredAt !== undefined &&
+        typeof o.expireAfterSeconds === 'number'
+      );
+    });
     expect(ttlOnTriggeredAt).toBeDefined();
   });
 
   it('TTL expireAfterSeconds equals RECONCILE_LOG_TTL_SECONDS constant', () => {
-    const indexes = getIndexes();
-    const ttlIndex = indexes.find(
-      ([fields, options]) =>
-        Object.keys(fields).length === 1 &&
-        (fields as Record<string, unknown>).triggeredAt !== undefined &&
-        typeof (options as Record<string, unknown>).expireAfterSeconds ===
-          'number',
-    );
+    const indexes = getIndexes() as unknown as ReadonlyArray<
+      [unknown, unknown]
+    >;
+    const ttlIndex = indexes.find(([fields, options]) => {
+      const f = fields as Record<string, unknown>;
+      const o = options as Record<string, unknown>;
+      return (
+        Object.keys(f).length === 1 &&
+        f.triggeredAt !== undefined &&
+        typeof o.expireAfterSeconds === 'number'
+      );
+    });
     expect(ttlIndex).toBeDefined();
     if (ttlIndex == null) return;
-    const [, options] = ttlIndex;
-    expect((options as Record<string, unknown>).expireAfterSeconds).toBe(
-      RECONCILE_LOG_TTL_SECONDS,
-    );
+    const options = ttlIndex[1] as Record<string, unknown>;
+    expect(options.expireAfterSeconds).toBe(RECONCILE_LOG_TTL_SECONDS);
   });
 
   it('RECONCILE_LOG_TTL_SECONDS equals 30 days in seconds', () => {
@@ -225,9 +236,11 @@ describe('VaultReconcileLog schema', () => {
   });
 
   it('declares a compound index on { status, triggeredAt }', () => {
-    const indexes = getIndexes();
-    const compoundStatusTriggeredAt = indexes.find(([fields]) => {
-      const keys = Object.keys(fields as Record<string, unknown>);
+    const indexes = getIndexes() as unknown as ReadonlyArray<
+      [unknown, unknown]
+    >;
+    const compoundStatusTriggeredAt = indexes.find((idx) => {
+      const keys = Object.keys(idx[0] as Record<string, unknown>);
       return (
         keys.length === 2 &&
         keys.includes('status') &&
@@ -238,9 +251,11 @@ describe('VaultReconcileLog schema', () => {
   });
 
   it('declares a compound index on { triggeredBy.userId, triggeredAt }', () => {
-    const indexes = getIndexes();
-    const compoundUserIdTriggeredAt = indexes.find(([fields]) => {
-      const keys = Object.keys(fields as Record<string, unknown>);
+    const indexes = getIndexes() as unknown as ReadonlyArray<
+      [unknown, unknown]
+    >;
+    const compoundUserIdTriggeredAt = indexes.find((idx) => {
+      const keys = Object.keys(idx[0] as Record<string, unknown>);
       return (
         keys.length === 2 &&
         keys.includes('triggeredBy.userId') &&
