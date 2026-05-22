@@ -116,7 +116,7 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _Boundary: YjsDocsMetric, opentelemetry custom-metrics index_
 
-- [ ] 4.2 (P) Scenario runner と sidecar エントリポイントの統合
+- [x] 4.2 (P) Scenario runner と sidecar エントリポイントの統合
   - `tools/memory-profiling/run-scenario.ts` を作成し、CLI 引数 / env var を解釈して `runScenario(opts)` を呼ぶ。
   - `runScenario` 内で `cdp-snapshot-client` を接続 → `rss-time-series-logger` start → `scenarios/baseline` → snapshot A → `scenarios/load` → snapshot B → `scenarios/drain` → snapshot C → CSV finalize → close の順序で orchestrate する。
   - 失敗時の exit code は 0 / 1 / 2（成功 / snapshot 取得失敗 / 接続失敗）で区別する。
