@@ -68,10 +68,14 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
   const installerDriver = createInstallerDriver(httpClient);
 
   // Session state populated by initInstaller().
+  // Stored as the name=value pair (without Set-Cookie attributes) so it can be
+  // passed as a Cookie request header in WebSocket upgrade requests.
   let sessionCookie: string | undefined;
 
   // Tracks created page paths for use in pageGet operations.
   const createdPaths: string[] = [];
+  // Tracks created page IDs (MongoDB ObjectIds) for Yjs WebSocket sessions.
+  const createdIds: string[] = [];
   let pageCounter = 0;
 
   // -------------------------------------------------------------------------
@@ -84,7 +88,9 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
     cookie: string;
   }> => {
     const result = await installerDriver.initInstaller();
-    sessionCookie = result.cookie;
+    // Store only the name=value portion (strip Set-Cookie attributes like Path, HttpOnly, etc.)
+    // so it can be used as a Cookie request header in WebSocket upgrade requests.
+    sessionCookie = result.cookie.split(';')[0];
     return result;
   };
 
@@ -103,13 +109,19 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
       const body = `# Load Driver Test Page ${idx}\n\nThis page was created by the memory-profiling load driver.`;
 
       // biome-ignore lint/performance/noAwaitInLoops: intentional serial execution — design mandates 直列発火
-      await httpClient.post('/_api/v3/page', {
+      const res = await httpClient.post('/_api/v3/page', {
         path,
         body,
         grant: 1, // Public
       });
 
       createdPaths.push(path);
+      // Store the page _id for Yjs WebSocket sessions (which require a real ObjectId).
+      const json = await res.json().catch(() => null);
+      const pageId: string | undefined = json?.page?._id;
+      if (pageId != null) {
+        createdIds.push(pageId);
+      }
     }
   };
 
@@ -131,13 +143,18 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
       const body = `# Edited Page ${idx}\n\nThis simulates an edit operation in the memory-profiling load driver.`;
 
       // biome-ignore lint/performance/noAwaitInLoops: intentional serial execution — design mandates 直列発火
-      await httpClient.post('/_api/v3/page', {
+      const res = await httpClient.post('/_api/v3/page', {
         path,
         body,
         grant: 1,
       });
 
       createdPaths.push(path);
+      const json = await res.json().catch(() => null);
+      const pageId: string | undefined = json?.page?._id;
+      if (pageId != null) {
+        createdIds.push(pageId);
+      }
     }
   };
 
@@ -206,8 +223,9 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
    * Yjs connection lifecycle, not to collaborate on real pages.
    */
   const yjsSessionCleanClose = async (count: number): Promise<void> => {
+    if (createdIds.length === 0) return; // skip if no pages were created
     for (let i = 0; i < count; i++) {
-      const pageId = `profiling-clean-${Date.now()}-${i}`;
+      const pageId = createdIds[i % createdIds.length];
       const session = createYjsSession(wsBaseUrl, pageId, sessionCookie);
       // biome-ignore lint/performance/noAwaitInLoops: intentional serial execution — design mandates 直列発火
       await session.connect();
@@ -227,8 +245,9 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
    * whether the server leaks Y.Doc entries in the `docs` Map (L3).
    */
   const yjsSessionAbort = async (count: number): Promise<void> => {
+    if (createdIds.length === 0) return; // skip if no pages were created
     for (let i = 0; i < count; i++) {
-      const pageId = `profiling-abort-${Date.now()}-${i}`;
+      const pageId = createdIds[i % createdIds.length];
       const session = createYjsSession(wsBaseUrl, pageId, sessionCookie);
       // biome-ignore lint/performance/noAwaitInLoops: intentional serial execution — design mandates 直列発火
       await session.connect();

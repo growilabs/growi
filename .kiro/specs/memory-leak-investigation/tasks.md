@@ -141,7 +141,7 @@
 
 ## 5. Validation — Dynamic profiling とレポート
 
-- [ ] 5.1 Fix なし build での baseline 計測（before スナップショット）
+- [x] 5.1 Fix なし build での baseline 計測（before スナップショット）
   - `git worktree add ../growi-before <fix 未適用の起点コミット>` で別 worktree を用意するか、もしくは現在のブランチで `git stash` または個別 revert によって 2.1 / 2.2 / 2.3 / 2.4 / 4.1 の差分を一時的に外す。**実行手順を `tools/memory-profiling/README.md` に明記**し、再現性を担保する。
   - **ただし 1.1 と 1.2（profiling 基盤）は除外しない**（before 側でも heap snapshot 取得は必須なので signal handler は両方で必要）。
   - `pnpm run build` を実行して `dist/server/app.js` を生成する。
@@ -152,14 +152,14 @@
   - _Depends: 1.1, 1.2, 4.2_
   - _Requirements: 2.1, 2.4, 3.5_
 
-- [ ] 5.2 Fix 適用 build での計測（after スナップショット）
+- [x] 5.2 Fix 適用 build での計測（after スナップショット）
   - 2.1 / 2.2 / 2.3 / 2.4 / 4.1 を全て適用した状態で再 build し、同じ scenario を 1 周回す。
   - 出力を `tmp/memory-leak-investigation/runs/after/` に隔離保存する。
   - 観測可能な完了条件: `runs/after/` 配下に snapshot 3 枚と CSV が 1 セット揃う。
   - _Depends: 5.1_
   - _Requirements: 2.1, 2.4, 3.5_
 
-- [ ] 5.3 各 finding の verdict 判定
+- [x] 5.3 各 finding の verdict 判定
   - `before` / `after` の snapshot C を Chrome DevTools または `heapsnapshot-parser` で開き、retained constructor count（`Y.Doc`, `Activity`, `Comment`, mongoose `Connection`, `EventEmitter`）を比較する。
   - L1: `after` の RSS が `before` 比でどれだけ削減されたかを RSS CSV の Drain 平均で算出する。
   - L2: `after` 起動ログから patch されている instrumentation の集合と、`before` の集合を diff し、削減項目とスパン欠落の有無を確認する。
@@ -170,7 +170,7 @@
   - _Depends: 5.2_
   - _Requirements: 5.4, 6.1_
 
-- [ ] 5.4 `verification-report.md` の作成
+- [x] 5.4 `verification-report.md` の作成
   - `.kiro/specs/memory-leak-investigation/verification-report.md` を新規作成し、design.md の `VerificationReport` で要求された 5 セクション（Environment / Per-finding verdicts / RSS delta / Behavior changes / Open issues）を埋める。
   - **Environment**: GROWI commit hash（before / after それぞれ）、Node.js version、MongoDB version、Elasticsearch version、実行日時、scenario op count。
   - **Per-finding verdicts**: 5.3 のメモを基に L1-L5 ごとに verdict と evidence を記載。

@@ -20,7 +20,6 @@
 import * as path from 'node:path';
 
 import { createCdpSnapshotClient } from './cdp-snapshot-client';
-import { createRssCommandSender } from './lib/rss-command-sender';
 import { createLoadDriver } from './load-driver';
 import { createRssTimeSeriesLogger } from './rss-time-series-logger';
 import { runBaseline } from './scenarios/baseline';
@@ -115,12 +114,30 @@ export async function runScenario(opts: ScenarioRunnerOptions): Promise<void> {
   console.log(`[run-scenario] Connected to CDP inspector at ${inspectorUrl}`);
 
   // -------------------------------------------------------------------------
-  // Build a sendCommand for the RSS logger.
-  // A separate connection is used so RSS polling does not interfere with
-  // HeapProfiler commands on the snapshot client's connection.
+  // Step 1.5: Establish admin session via installer API
   // -------------------------------------------------------------------------
-  const rssCommandSender = await createRssCommandSender(inspectorUrl);
-  const logger = createRssTimeSeriesLogger(resolvedOutputDir, rssCommandSender);
+  try {
+    await driver.initInstaller();
+    // biome-ignore lint/suspicious/noConsole: intentional CLI progress output
+    console.log('[run-scenario] Admin session established via installer');
+  } catch (err) {
+    // biome-ignore lint/suspicious/noConsole: intentional CLI progress output
+    console.warn(
+      '[run-scenario] initInstaller failed (GROWI may already be installed):',
+      String(err),
+    );
+  }
+
+  // -------------------------------------------------------------------------
+  // Build a sendCommand for the RSS logger.
+  // Share the cdpClient's WebSocket connection — Node.js inspector allows
+  // only one WebSocket client per target, so a second connection would kick
+  // out the snapshot client and cause 0-byte snapshots.
+  // -------------------------------------------------------------------------
+  const logger = createRssTimeSeriesLogger(
+    resolvedOutputDir,
+    (method, params) => cdpClient.sendCommand(method, params),
+  );
 
   // -------------------------------------------------------------------------
   // Step 2: Start RSS logger in baseline phase

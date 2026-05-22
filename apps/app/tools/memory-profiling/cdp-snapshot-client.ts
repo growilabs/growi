@@ -22,6 +22,11 @@ import WebSocket from 'ws';
 export interface CdpSnapshotClient {
   connect(inspectorUrl: string): Promise<void>;
   takeSnapshot(outputPath: string): Promise<void>;
+  /** Send an arbitrary CDP command on the shared WebSocket connection. */
+  sendCommand(
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<unknown>;
   close(): Promise<void>;
 }
 
@@ -226,28 +231,22 @@ export function createCdpSnapshotClient(): CdpSnapshotClient {
             msg.params != null
           ) {
             chunks.push(msg.params.chunk as string);
-          } else if (
-            msg.method === 'HeapProfiler.reportHeapSnapshotProgress' &&
-            msg.params != null
-          ) {
-            if (msg.params.finished === true) {
-              // Snapshot data collection complete; command result arrives separately but
-              // we can resolve as soon as 'finished' is signalled.
-              socket.off('message', messageHandler);
-              resolve();
-            }
           } else if (msg.id === id) {
-            // Command result arrived (may come before or after 'finished' event)
+            // In Node.js v24+ the command result arrives AFTER all chunk events,
+            // so resolving here guarantees chunks is fully populated.
+            socket.off('message', messageHandler);
             if (msg.error != null) {
-              socket.off('message', messageHandler);
               reject(
                 new Error(
                   `HeapProfiler.takeHeapSnapshot failed: ${msg.error.message}`,
                 ),
               );
+            } else {
+              resolve();
             }
-            // If no 'finished' event yet, keep waiting; resolve happens in the progress handler.
           }
+          // reportHeapSnapshotProgress is ignored: in Node.js v24+ it arrives
+          // before the chunk events, so it cannot be used as a completion signal.
         };
 
         socket.on('message', messageHandler);
@@ -289,5 +288,16 @@ export function createCdpSnapshotClient(): CdpSnapshotClient {
     return Promise.resolve();
   };
 
-  return { connect, takeSnapshot, close };
+  /** Exposes the internal sendCommand so callers can share this connection. */
+  const sendCommandPublic = (
+    method: string,
+    params?: Record<string, unknown>,
+  ): Promise<unknown> => {
+    if (ws == null) {
+      throw new Error('Not connected. Call connect() before sendCommand().');
+    }
+    return sendCommand(ws, method, params);
+  };
+
+  return { connect, takeSnapshot, sendCommand: sendCommandPublic, close };
 }
