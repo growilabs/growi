@@ -2,6 +2,9 @@
   "name": "@growi/bin",
   "version": "0.0.0",
   "private": true,
+  "exports": {
+    "./memory-profiling": "./memory-profiling/index.ts"
+  },
   "scripts": {
     "test": "vitest run"
   },

@@ -46,7 +46,7 @@
 
 ## 3. Core: Package boundary enforcement (`exports` field)
 
-- [ ] 3.1 `bin/package.json` への `exports` field 追加
+- [x] 3.1 `bin/package.json` への `exports` field 追加
   - `bin/package.json` の top-level に `"exports": { "./memory-profiling": "./memory-profiling/index.ts" }` を追加する。
   - 既存の `name`、`private`、`scripts`、`dependencies`、`devDependencies` は変更しない。
   - 追加後 `pnpm install` を再実行し、lockfile に差分が出ないことを確認する（dependency は変えていないため）。
