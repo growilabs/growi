@@ -160,6 +160,12 @@ vi.mock('./routes/vault-page', () => ({
   createVaultPageRouter: vi.fn(),
 }));
 
+// Page model is dynamically imported by initializeVaultFeature; mock it so
+// tests don't trigger the real EventEmitter binding in obsolete-page.js.
+vi.mock('~/server/models/page', () => ({
+  default: vi.fn(() => ({})),
+}));
+
 // ---------------------------------------------------------------------------
 // Import the SUT after the mocks are in place.
 // ---------------------------------------------------------------------------
