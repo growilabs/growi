@@ -4,9 +4,16 @@ import type { Router } from 'express';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
+import { VaultReconcileLog } from './models/vault-reconcile-log';
 import { VaultSyncState } from './models/vault-sync-state';
 import { createVaultAdminRouter } from './routes/vault-admin';
 import { createVaultGatewayRouter } from './routes/vault-gateway';
+import { createVaultPageRouter } from './routes/vault-page';
+import {
+  createVaultReconcileService,
+  type VaultReconcileService,
+} from './services/reconcile';
+import { createHistoryStore } from './services/reconcile/reconcile-history-store';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
 import { createVaultDispatcher } from './services/vault-dispatcher';
 import { vaultNamespaceMapper } from './services/vault-namespace-mapper';
@@ -14,6 +21,13 @@ import { vaultSettingsService } from './services/vault-settings-service';
 
 export { createVaultAdminRouter } from './routes/vault-admin';
 export { createVaultGatewayRouter } from './routes/vault-gateway';
+
+// ---------------------------------------------------------------------------
+// Module-level reconcile service singleton (set during initializeVaultFeature)
+// ---------------------------------------------------------------------------
+
+/** Module-level singleton set by initializeVaultFeature(). */
+let _reconcileService: VaultReconcileService | undefined;
 
 // ---------------------------------------------------------------------------
 // Crowi-bound router factories
@@ -50,7 +64,26 @@ export const createVaultGatewayRouterWithDeps = (crowi: any): Router => {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const createVaultAdminRouterWithDeps = (crowi: any): Router => {
   const bootstrapper = createVaultBootstrapper(vaultNamespaceMapper);
-  return createVaultAdminRouter({ crowi, bootstrapper });
+  return createVaultAdminRouter({
+    crowi,
+    bootstrapper,
+    reconcileService: _reconcileService,
+  });
+};
+
+/**
+ * Create the VaultPageRouter wired to the given Crowi instance.
+ *
+ * Passes the module-level reconcileService singleton (set by
+ * initializeVaultFeature) so the router can accept user-triggered reconcile
+ * requests. When called before initializeVaultFeature the reconcileService
+ * will be undefined and the endpoint returns 500 (graceful degradation).
+ *
+ * @param crowi - The Crowi application instance.
+ */
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export const createVaultPageRouterWithDeps = (crowi: any): Router => {
+  return createVaultPageRouter({ crowi, reconcileService: _reconcileService });
 };
 
 const logger = loggerFactory('growi:features:growi-vault:server');
@@ -498,6 +531,23 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   await runVaultSyncStateMigration();
 
   // ------------------------------------------------------------------
+  // Step 1.6: Reconcile history store — normalize stale lifecycle records.
+  //
+  // Any reconcile log entries left in 'running' or 'pending' state from a
+  // previous process run are marked 'failed' so the history is consistent
+  // after a restart. Must run before the resilience layer starts (req 7.3).
+  // ------------------------------------------------------------------
+  const historyStore = createHistoryStore({
+    vaultReconcileLog: VaultReconcileLog,
+  });
+  const staleCleaned = await historyStore.normalizeStaleLifecycle();
+  if (staleCleaned > 0) {
+    logger.info(
+      `GROWI Vault: normalized ${staleCleaned} stale reconcile log entries on startup`,
+    );
+  }
+
+  // ------------------------------------------------------------------
   // Step 2: VaultBootstrapper — BootstrapTriggerResolver-driven startup.
   //
   // initOnStartup() reads VAULT_BOOTSTRAP_ON_START internally and dispatches
@@ -524,13 +574,43 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   await bootstrapper.initOnStartup();
 
   // ------------------------------------------------------------------
-  // Graceful shutdown: stop heartbeat and drift scheduler on process exit.
+  // Step 3: VaultReconcileService — initialise after resilience layer is ready.
+  //
+  // createVaultReconcileService wires the acceptance gate + concurrency
+  // controller + orchestrator. Must be created after initOnStartup() so the
+  // bootstrapper is ready to answer getStatus() calls (req 4.3).
   // ------------------------------------------------------------------
-  const stopBootstrapper = () => {
+  _reconcileService = createVaultReconcileService({
+    pageModel: (await import('~/server/models/page')).default,
+    targetResolver: await import(
+      './services/reconcile/reconcile-target-resolver'
+    ),
+    aclEvaluator: (
+      await import('./services/reconcile/reconcile-acl-evaluator')
+    ).createAclEvaluator({}),
+    concurrencyController: (
+      await import('./services/reconcile/reconcile-concurrency-controller')
+    ).createConcurrencyController(),
+    historyStore,
+    orchestrator: (
+      await import('./services/reconcile/reconcile-orchestrator')
+    ).createReconcileOrchestrator({ historyStore }),
+    resilienceLayer: bootstrapper,
+    configManager,
+  });
+  logger.info('GROWI Vault: VaultReconcileService initialised');
+
+  // ------------------------------------------------------------------
+  // Graceful shutdown: stop heartbeat, drift scheduler, and reconcile service.
+  // ------------------------------------------------------------------
+  const stopAll = () => {
     bootstrapper.stop().catch((err) => {
       logger.error({ err }, 'GROWI Vault: error stopping resilience layer');
     });
+    _reconcileService?.stop().catch((err) => {
+      logger.error({ err }, 'GROWI Vault: error stopping reconcile service');
+    });
   };
-  process.once('SIGTERM', stopBootstrapper);
-  process.once('SIGINT', stopBootstrapper);
+  process.once('SIGTERM', stopAll);
+  process.once('SIGINT', stopAll);
 };

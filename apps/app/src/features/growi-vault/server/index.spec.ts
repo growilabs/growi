@@ -96,13 +96,87 @@ vi.mock('./routes/vault-admin', () => ({
 }));
 
 // ---------------------------------------------------------------------------
+// Reconcile module mocks (task 3.3)
+// ---------------------------------------------------------------------------
+
+// Shared spy for normalizeStaleLifecycle (task 3.3).
+const { normalizeStaleLifecycleSpy, reconcileServiceStopSpy } = vi.hoisted(
+  () => ({
+    normalizeStaleLifecycleSpy: vi.fn().mockResolvedValue(0),
+    reconcileServiceStopSpy: vi.fn().mockResolvedValue(undefined),
+  }),
+);
+
+vi.mock('./models/vault-reconcile-log', () => ({
+  VaultReconcileLog: {},
+}));
+
+vi.mock('./services/reconcile/reconcile-history-store', () => ({
+  createHistoryStore: vi.fn(() => ({
+    create: vi.fn().mockResolvedValue(undefined),
+    updateStatus: vi.fn().mockResolvedValue(undefined),
+    listRecent: vi.fn().mockResolvedValue([]),
+    normalizeStaleLifecycle: normalizeStaleLifecycleSpy,
+  })),
+}));
+
+vi.mock('./services/reconcile/reconcile-acl-evaluator', () => ({
+  createAclEvaluator: vi.fn(() => ({
+    buildEligibleQuery: vi.fn().mockResolvedValue({ eligibleQuery: {} }),
+  })),
+}));
+
+vi.mock('./services/reconcile/reconcile-concurrency-controller', () => ({
+  createConcurrencyController: vi.fn(() => ({
+    tryRunInBackground: vi.fn().mockReturnValue({ ok: true }),
+    getActiveCount: vi.fn().mockReturnValue(0),
+    reset: vi.fn(),
+  })),
+}));
+
+vi.mock('./services/reconcile/reconcile-orchestrator', () => ({
+  createReconcileOrchestrator: vi.fn(() => ({
+    run: vi.fn().mockResolvedValue(undefined),
+  })),
+}));
+
+vi.mock('./services/reconcile/reconcile-target-resolver', () => ({
+  resolveTarget: vi.fn().mockReturnValue({ ok: true, query: {} }),
+}));
+
+vi.mock('./services/reconcile', () => ({
+  createVaultReconcileService: vi.fn(() => ({
+    submit: vi.fn().mockResolvedValue({
+      status: 'accepted',
+      reconcileId: 'r1',
+      descendantCount: 0,
+    }),
+    listHistory: vi.fn().mockResolvedValue([]),
+    stop: reconcileServiceStopSpy,
+  })),
+}));
+
+vi.mock('./routes/vault-page', () => ({
+  createVaultPageRouter: vi.fn(),
+}));
+
+// ---------------------------------------------------------------------------
 // Import the SUT after the mocks are in place.
 // ---------------------------------------------------------------------------
 
 import { configManager } from '~/server/service/config-manager';
 
-import { initializeVaultFeature, runVaultSyncStateMigration } from './index';
+import {
+  createVaultAdminRouterWithDeps,
+  createVaultPageRouterWithDeps,
+  initializeVaultFeature,
+  runVaultSyncStateMigration,
+} from './index';
 import { VaultSyncState } from './models/vault-sync-state';
+import { createVaultAdminRouter } from './routes/vault-admin';
+import { createVaultPageRouter } from './routes/vault-page';
+import { createVaultReconcileService } from './services/reconcile';
+import { createHistoryStore } from './services/reconcile/reconcile-history-store';
 import { createVaultBootstrapper } from './services/vault-bootstrapper';
 import { vaultSettingsService } from './services/vault-settings-service';
 
@@ -1014,5 +1088,241 @@ describe('initializeVaultFeature — resilience layer startup (task 5.2)', () =>
     // And initOnStartup was called after migration
     const mock = getBootstrapperMock();
     expect(mock.initOnStartup).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 3.3: reconcile init wiring
+// Requirements: 4.3, 7.3, 7.5, 7.7
+// ---------------------------------------------------------------------------
+
+describe('initializeVaultFeature — reconcile init wiring (task 3.3)', () => {
+  const originalMaxListeners = process.getMaxListeners();
+
+  beforeEach(() => {
+    process.setMaxListeners(50);
+    vi.clearAllMocks();
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+    enableVaultSettings();
+  });
+
+  afterEach(() => {
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+    process.setMaxListeners(originalMaxListeners);
+  });
+
+  // -------------------------------------------------------------------------
+  // 3.3-1: normalizeStaleLifecycle is called during init
+  // -------------------------------------------------------------------------
+
+  it('calls historyStore.normalizeStaleLifecycle() during startup (req 7.3)', async () => {
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    expect(normalizeStaleLifecycleSpy).toHaveBeenCalledOnce();
+  });
+
+  it('calls normalizeStaleLifecycle() before initOnStartup() (startup ordering)', async () => {
+    // Capture call order using a shared counter.
+    const callOrder: string[] = [];
+    normalizeStaleLifecycleSpy.mockImplementation(() => {
+      callOrder.push('normalizeStaleLifecycle');
+      return Promise.resolve(0);
+    });
+
+    // Intercept the bootstrapper created inside initializeVaultFeature.
+    vi.mocked(createVaultBootstrapper).mockImplementationOnce(() => ({
+      start: vi.fn().mockResolvedValue(undefined),
+      getStatus: vi.fn(),
+      getResilienceStatus: vi
+        .fn()
+        .mockResolvedValue({ bootstrap: { state: 'done' } }),
+      abortAutoRetry: vi.fn().mockResolvedValue(undefined),
+      initOnStartup: vi.fn().mockImplementation(() => {
+        callOrder.push('initOnStartup');
+        return Promise.resolve();
+      }),
+      stop: vi.fn().mockResolvedValue(undefined),
+    }));
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const normalizeIdx = callOrder.indexOf('normalizeStaleLifecycle');
+    const initIdx = callOrder.indexOf('initOnStartup');
+    expect(normalizeIdx).toBeGreaterThanOrEqual(0);
+    expect(initIdx).toBeGreaterThanOrEqual(0);
+    expect(normalizeIdx).toBeLessThan(initIdx);
+  });
+
+  // -------------------------------------------------------------------------
+  // 3.3-2: createVaultReconcileService is called after resilience layer init
+  // -------------------------------------------------------------------------
+
+  it('calls createVaultReconcileService() during startup', async () => {
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    expect(createVaultReconcileService).toHaveBeenCalledOnce();
+  });
+
+  it('createVaultReconcileService is called after initOnStartup() (req 4.3)', async () => {
+    const callOrder: string[] = [];
+    vi.mocked(createVaultBootstrapper).mockImplementationOnce(() => ({
+      start: vi.fn().mockResolvedValue(undefined),
+      getStatus: vi.fn(),
+      getResilienceStatus: vi
+        .fn()
+        .mockResolvedValue({ bootstrap: { state: 'done' } }),
+      abortAutoRetry: vi.fn().mockResolvedValue(undefined),
+      initOnStartup: vi.fn().mockImplementation(() => {
+        callOrder.push('initOnStartup');
+        return Promise.resolve();
+      }),
+      stop: vi.fn().mockResolvedValue(undefined),
+    }));
+    vi.mocked(createVaultReconcileService).mockImplementation((_deps) => {
+      callOrder.push('createVaultReconcileService');
+      return {
+        submit: vi.fn(),
+        listHistory: vi.fn().mockResolvedValue([]),
+        stop: reconcileServiceStopSpy,
+      };
+    });
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const resilienceIdx = callOrder.indexOf('initOnStartup');
+    const reconcileIdx = callOrder.indexOf('createVaultReconcileService');
+    expect(resilienceIdx).toBeGreaterThanOrEqual(0);
+    expect(reconcileIdx).toBeGreaterThanOrEqual(0);
+    expect(resilienceIdx).toBeLessThan(reconcileIdx);
+  });
+
+  // -------------------------------------------------------------------------
+  // 3.3-3: createHistoryStore is called with VaultReconcileLog model
+  // -------------------------------------------------------------------------
+
+  it('creates HistoryStore bound to VaultReconcileLog model', async () => {
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    expect(createHistoryStore).toHaveBeenCalledOnce();
+    const callArg = vi.mocked(createHistoryStore).mock.calls[0][0];
+    // The first arg should be an object with vaultReconcileLog property
+    expect(callArg).toHaveProperty('vaultReconcileLog');
+  });
+
+  // -------------------------------------------------------------------------
+  // 3.3-4: reconcileService.stop() is called on SIGTERM (req 7.5)
+  // -------------------------------------------------------------------------
+
+  it('calls reconcileService.stop() on SIGTERM alongside bootstrapper stop (req 7.5)', async () => {
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    // Verify stop has not been called yet
+    expect(reconcileServiceStopSpy).not.toHaveBeenCalled();
+
+    process.emit('SIGTERM');
+    await flush();
+
+    expect(reconcileServiceStopSpy).toHaveBeenCalledOnce();
+  });
+
+  it('calls reconcileService.stop() on SIGINT (req 7.5)', async () => {
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    process.emit('SIGINT');
+    await flush();
+
+    expect(reconcileServiceStopSpy).toHaveBeenCalledOnce();
+  });
+
+  it('calls BOTH bootstrapper.stop() AND reconcileService.stop() on SIGTERM (parallel stop, req 7.5)', async () => {
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    const bootstrapperMock = vi.mocked(createVaultBootstrapper).mock.results[0]
+      ?.value as { stop: ReturnType<typeof vi.fn> };
+
+    process.emit('SIGTERM');
+    await flush();
+
+    expect(bootstrapperMock.stop).toHaveBeenCalledOnce();
+    expect(reconcileServiceStopSpy).toHaveBeenCalledOnce();
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Task 3.3: createVaultAdminRouterWithDeps / createVaultPageRouterWithDeps
+// Requirements: 7.7
+// ---------------------------------------------------------------------------
+
+describe('createVaultAdminRouterWithDeps — passes reconcileService after init (task 3.3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    enableVaultSettings();
+  });
+
+  it('passes reconcileService to createVaultAdminRouter after initializeVaultFeature', async () => {
+    process.setMaxListeners(50);
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    createVaultAdminRouterWithDeps(crowi);
+
+    const adminRouterCall = vi.mocked(createVaultAdminRouter).mock.calls[0];
+    expect(adminRouterCall).toBeDefined();
+    expect(adminRouterCall[0]).toHaveProperty('reconcileService');
+    expect(adminRouterCall[0].reconcileService).not.toBeUndefined();
+
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+  });
+});
+
+describe('createVaultPageRouterWithDeps — exported and wires reconcileService (task 3.3)', () => {
+  beforeEach(() => {
+    vi.clearAllMocks();
+    enableVaultSettings();
+  });
+
+  it('is exported from index', () => {
+    // createVaultPageRouterWithDeps must be defined (not undefined) as an export
+    expect(createVaultPageRouterWithDeps).toBeDefined();
+    expect(typeof createVaultPageRouterWithDeps).toBe('function');
+  });
+
+  it('calls createVaultPageRouter with reconcileService after initializeVaultFeature', async () => {
+    process.setMaxListeners(50);
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+
+    const crowi = makeCrowiStub();
+    await initializeVaultFeature(crowi);
+
+    createVaultPageRouterWithDeps(crowi);
+
+    const pageRouterCall = vi.mocked(createVaultPageRouter).mock.calls[0];
+    expect(pageRouterCall).toBeDefined();
+    expect(pageRouterCall[0]).toHaveProperty('reconcileService');
+    expect(pageRouterCall[0].reconcileService).not.toBeUndefined();
+
+    process.removeAllListeners('SIGTERM');
+    process.removeAllListeners('SIGINT');
+  });
+
+  it('can be called before initializeVaultFeature (reconcileService will be undefined)', () => {
+    // Before init, the router should still be created (graceful degradation).
+    // The router itself handles undefined reconcileService with a 500.
+    expect(() => createVaultPageRouterWithDeps({})).not.toThrow();
   });
 });

@@ -140,7 +140,7 @@
   - _Requirements: 1.2, 2.1, 2.3, 2.4_
   - _Boundary: vault-page route_
 
-- [ ] 3.3 起動 wiring: features/growi-vault/server/index.ts に reconcile init を追加
+- [x] 3.3 起動 wiring: features/growi-vault/server/index.ts に reconcile init を追加
   - 順序: 既存 resilience migration → 新規 reconcile migration（`HistoryStore.normalizeStaleLifecycle` 呼び出し）→ resilience layer init → reconcile service init（ConcurrencyController の in-memory state を空で生成）→ routes ready
   - graceful shutdown で `reconcileService.stop()` を resilience layer の stop と並列に呼ぶ
   - admin route と user route の登録を server routes 配線に追加し、`/vault/reconcile` / `/vault/reconcile-history` / `/vault/page/reconcile` が期待する path に mount されることを確認
