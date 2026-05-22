@@ -8,10 +8,10 @@ import { isUserPage } from '@growi/core/dist/utils/page-path-utils';
 import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { differenceInYears } from 'date-fns/differenceInYears';
 
-import { Comment } from '~/features/comment/server/models/comment';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { configManager } from '../service/config-manager';
 import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
@@ -307,7 +307,7 @@ export const getPageSchema = (crowi) => {
 
   pageSchema.statics.updateCommentCount = function (pageId) {
     validateCrowi();
-    return Comment.countCommentByPageId(pageId).then((count) => {
+    return prisma.comments.countCommentByPageId(pageId).then((count) => {
       this.update({ _id: pageId }, { commentCount: count }, {}, (err, data) => {
         if (err) {
           logger.debug('Update commentCount Error', err);

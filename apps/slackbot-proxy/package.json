@@ -1,6 +1,6 @@
 {
   "name": "@growi/slackbot-proxy",
-  "version": "7.5.4-slackbot-proxy.0",
+  "version": "8.0.0-slackbot-proxy.0",
   "license": "MIT",
   "private": true,
   "scripts": {

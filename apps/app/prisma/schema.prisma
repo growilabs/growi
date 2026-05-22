@@ -62,10 +62,12 @@ model activities {
   snapshot    ActivitiesSnapshot
   target      String?            @db.ObjectId
   targetModel String?
-  user        String?            @db.ObjectId
+  userId      String?            @map("user") @db.ObjectId
 
-  @@unique([user, target, action, createdAt], map: "user_1_target_1_action_1_createdAt_1")
-  @@index([user], map: "user_1")
+  user users? @relation(fields: [userId], references: [id])
+
+  @@unique([userId, target, action, createdAt], map: "user_1_target_1_action_1_createdAt_1")
+  @@index([userId], map: "user_1")
   @@index([snapshot.username], map: "snapshot.username_1")
   @@index([target, action], map: "target_1_action_1")
   @@index([createdAt], map: "createdAt_1")
@@ -83,16 +85,26 @@ model aiassistants {
 }
 
 model attachments {
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  creator  Json?
-  /// Field referred in an index, but found no data to define the type.
-  fileName Json?  @unique(map: "fileName_1")
-  /// Field referred in an index, but found no data to define the type.
-  page     Json?
+  id                    String    @id @default(auto()) @map("_id") @db.ObjectId
+  pageId                String?   @map("page") @db.ObjectId
+  creatorId             String?   @map("creator") @db.ObjectId
+  filePath              String?
+  fileName              String    @unique(map: "fileName_1")
+  fileFormat            String
+  fileSize              Int       @default(0)
+  originalName          String?
+  temporaryUrlCached    String?
+  temporaryUrlExpiredAt DateTime? @db.Date
+  attachmentType        String
+  createdAt             DateTime  @default(now()) @db.Date
+  updatedAt             DateTime  @updatedAt
 
-  @@index([page], map: "page_1")
-  @@index([creator], map: "creator_1")
+  creator              users?  @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  page                 pages?  @relation(fields: [pageId], references: [id])
+  userImageAttachments users[] @relation("UserImageAttachment")
+
+  @@index([pageId], map: "page_1")
+  @@index([creatorId], map: "creator_1")
 }
 
 model bookmarkfolders {
@@ -116,17 +128,26 @@ model bookmarks {
 }
 
 model comments {
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  creator  Json?
-  /// Field referred in an index, but found no data to define the type.
-  page     Json?
-  /// Field referred in an index, but found no data to define the type.
-  revision Json?
+  id              String   @id @default(auto()) @map("_id") @db.ObjectId
+  v               Int      @default(0) @map("__v")
+  pageId          String   @map("page") @db.ObjectId
+  creatorId       String?  @map("creator") @db.ObjectId
+  revisionId      String?  @map("revision") @db.ObjectId
+  comment         String
+  commentPosition Int      @default(-1)
+  replyToId       String?  @map("replyTo") @db.ObjectId
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
 
-  @@index([page], map: "page_1")
-  @@index([creator], map: "creator_1")
-  @@index([revision], map: "revision_1")
+  page     pages      @relation(fields: [pageId], references: [id])
+  creator  users?     @relation(fields: [creatorId], references: [id])
+  revision revisions? @relation(fields: [revisionId], references: [id])
+  replyTo  comments?  @relation("CommentToReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  replies  comments[] @relation("CommentToReply")
+
+  @@index([pageId], map: "page_1")
+  @@index([creatorId], map: "creator_1")
+  @@index([revisionId], map: "revision_1")
 }
 
 model configs {
@@ -267,11 +288,11 @@ model pageredirects {
 }
 
 model pages {
-  id                       String      @id @default(auto()) @map("_id") @db.ObjectId
-  v                        Int         @map("__v")
+  id                       String    @id @default(auto()) @map("_id") @db.ObjectId
+  v                        Int       @map("__v")
   commentCount             Int
-  createdAt                DateTime    @db.Date
-  creator                  String?     @db.ObjectId
+  createdAt                DateTime  @db.Date
+  creatorId                String?   @map("creator") @db.ObjectId
   descendantCount          Int
   grant                    Int
   /// Nested objects had no data in the sample dataset to introspect a nested type.
@@ -279,25 +300,32 @@ model pages {
   /// Could not determine type: the field only had null or empty values in the sample set.
   grantedUsers             Json?
   isEmpty                  Boolean
-  lastUpdateUser           String?     @db.ObjectId
+  lastUpdateUserId         String?   @map("lastUpdateUser") @db.ObjectId
   latestRevisionBodyLength Int?
   /// Could not determine type: the field only had null or empty values in the sample set.
   liker                    Json?
-  parent                   String?     @db.ObjectId
+  parentId                 String?   @map("parent") @db.ObjectId
   path                     String
-  revision                 String?     @db.ObjectId
+  revisionId               String?   @map("revision") @db.ObjectId
   seenUsers                String[]
   status                   String
-  ttlTimestamp             DateTime?   @db.Date
-  updatedAt                DateTime    @db.Date
+  ttlTimestamp             DateTime? @db.Date
+  updatedAt                DateTime  @db.Date
   wip                      Boolean?
-  revisions                revisions[]
 
-  @@index([parent], map: "parent_1")
+  creator        users?        @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  lastUpdateUser users?        @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  parent         pages?        @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children       pages[]       @relation("ParentChild")
+  revisions      revisions[]
+  comments       comments[]
+  attachments    attachments[]
+
+  @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
   @@index([status], map: "status_1")
   @@index([grant], map: "grant_1")
-  @@index([creator], map: "creator_1")
+  @@index([creatorId], map: "creator_1")
   @@index([createdAt], map: "createdAt_1")
   @@index([updatedAt], map: "updatedAt_1")
   @@index([ttlTimestamp], map: "ttlTimestamp_1")
@@ -327,14 +355,16 @@ model passwordresetorders {
 model revisions {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   v         Int      @map("__v")
-  author    String   @db.ObjectId
+  authorId  String   @map("author") @db.ObjectId
   body      String
   createdAt DateTime @db.Date
   format    String
   origin    String?
   pageId    String   @db.ObjectId
 
-  page pages @relation(fields: [pageId], references: [id])
+  author   users      @relation(fields: [authorId], references: [id])
+  page     pages      @relation(fields: [pageId], references: [id])
+  comments comments[]
 
   @@index([pageId], map: "pageId_1")
 }
@@ -443,31 +473,40 @@ model userregistrationorders {
 }
 
 model users {
-  id                      String   @id @default(auto()) @map("_id") @db.ObjectId
-  v                       Int      @map("__v")
-  admin                   Boolean
-  /// Field referred in an index, but found no data to define the type.
-  apiToken                Json?
-  createdAt               DateTime @db.Date
-  email                   String   @unique(map: "email_1")
-  imageUrlCached          String
-  isEmailPublished        Boolean
-  isGravatarEnabled       Boolean
-  isInvitationEmailSended Boolean
-  lang                    String
-  /// Field referred in an index, but found no data to define the type.
-  lastLoginAt             Json?
-  name                    String
-  password                String
-  readOnly                Boolean
-  /// Field referred in an index, but found no data to define the type.
-  slackMemberId           Json?    @unique(map: "slackMemberId_1")
-  status                  Int
-  updatedAt               DateTime @db.Date
-  username                String   @unique(map: "username_1")
+  id                      String    @id @default(auto()) @map("_id") @db.ObjectId
+  v                       Int       @default(0) @map("__v")
+  userId                  String?
+  image                   String?
+  imageAttachmentId       String?   @map("imageAttachment") @db.ObjectId
+  imageUrlCached          String?
+  isGravatarEnabled       Boolean   @default(false)
+  isEmailPublished        Boolean   @default(true)
+  googleId                String?
+  name                    String?
+  username                String    @unique(map: "username_1")
+  email                   String?   @unique(map: "email_1")
+  slackMemberId           String?   @unique(map: "slackMemberId_1")
+  introduction            String?
+  password                String?
+  apiToken                String?   @unique(map: "apiToken_1")
+  lang                    Lang      @default(en_US)
+  status                  Int       @default(2)
+  lastLoginAt             DateTime? @db.Date
+  admin                   Boolean   @default(false)
+  readOnly                Boolean   @default(false)
+  isInvitationEmailSended Boolean   @default(false)
+  createdAt               DateTime  @default(now()) @db.Date
+  updatedAt               DateTime  @updatedAt @db.Date
+
+  activities         activities[]
+  comments           comments[]
+  revisions          revisions[]
+  createdPages       pages[]       @relation("CreatedPages")
+  lastUpdatedPages   pages[]       @relation("LastUpdatedPages")
+  imageAttachment    attachments?  @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
+  createdAttachments attachments[] @relation("CreatedAttachments")
 
   @@index([name], map: "name_1")
-  @@index([apiToken], map: "apiToken_1")
   @@index([status], map: "status_1")
   @@index([lastLoginAt], map: "lastLoginAt_1")
   @@index([admin], map: "admin_1")
@@ -513,4 +552,12 @@ model yjs_writings {
   @@index([version, docName, metaKey], map: "version_1_docName_1_metaKey_1")
   @@index([docName, clock], map: "docName_1_clock_1")
   @@map("yjs-writings")
+}
+
+enum Lang {
+  en_US
+  ja_JP
+  zh_CN
+  fr_FR
+  ko_KR
 }
