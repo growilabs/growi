@@ -83,7 +83,7 @@
   - _Requirements: 2.2, 7.1_
   - _Boundary: LoadDriver_
 
-- [ ] 3.3 (P) RSS time-series logger の実装
+- [x] 3.3 (P) RSS time-series logger の実装
   - `tools/memory-profiling/rss-time-series-logger.ts` を作成し、CDP の `Runtime.evaluate` で `process.memoryUsage()` を 1 秒間隔で取得する。
   - 取得値（`rss`, `heapUsed`, `heapTotal`, `external`）を CSV 形式（schema: `timestamp,phase,rss,heap_used,heap_total,external`）で `tmp/memory-leak-investigation/rss-timeseries.csv` に追記する。
   - Phase ラベル（`baseline` / `load` / `drain`）は scenario runner から `mark(phase)` で切り替えられる。
