@@ -2,7 +2,7 @@
 /*
  * Shared design system for growi-vault infographics.
  *
- * Imported by every infographic-*.html in this directory.
+ * Imported by every *.html in this directory.
  * Per-page overrides (hero color theme, page-specific section styles) live in
  * each HTML's own <style> block.
  *
