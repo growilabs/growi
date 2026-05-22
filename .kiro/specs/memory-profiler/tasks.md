@@ -19,7 +19,7 @@
   - _Requirements: 6.4, 9.1, 9.2, 9.3_
   - _Boundary: bin/memory-profiling/index.ts_
 
-- [ ] 1.2 (P) scenarios sub-barrel の作成
+- [x] 1.2 (P) scenarios sub-barrel の作成
   - `bin/memory-profiling/scenarios/index.ts` を新規作成。
   - `runBaseline`、`runLoad`、`runDrain` 関数と 7 個の `LOAD_*` 定数（`LOAD_PAGE_CREATE` 等）を named export。
   - 観測可能な完了条件: `bin/memory-profiling/scenarios/index.ts` が存在し、`run-scenario.ts` から `import { runBaseline, runLoad, runDrain, LOAD_PAGE_CREATE, ... } from './scenarios'` が型エラーなく動く。
