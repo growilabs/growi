@@ -527,7 +527,7 @@ const ReconcileSection = (): JSX.Element => {
         <ReconcileTriggerModal
           isOpen={isModalOpen}
           onClose={() => setIsModalOpen(false)}
-          apiEndpoint="/v3/vault/reconcile"
+          apiEndpoint="/vault/reconcile"
           onAccepted={handleAccepted}
         />
       </div>
