@@ -130,7 +130,7 @@
   - _Requirements: 1.1, 2.1, 2.2, 5.2, 5.6_
   - _Boundary: vault-admin route_
 
-- [ ] 3.2 (P) 一般ユーザー route handler を `vault-page.ts` 新規ファイルとして追加
+- [x] 3.2 (P) 一般ユーザー route handler を `vault-page.ts` 新規ファイルとして追加
   - `POST /vault/page/reconcile`: body `{ targetType, targetPath }` を受け、`VaultReconcileService.submit({ ..., isAdmin: false })` を呼ぶ
   - 既存 `loginRequiredFactory(crowi)` のみで保護（admin 不要、PAT 認証も使わない）
   - admin route と同じ reject reason → HTTP status mapping
