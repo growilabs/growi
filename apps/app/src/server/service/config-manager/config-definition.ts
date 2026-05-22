@@ -1176,7 +1176,8 @@ export const CONFIG_DEFINITIONS = {
   // chunks consumed by the AI Elements Reasoning UI in the chat sidebar.
   'openai:assistantModel:mastraAgent': defineConfig<OpenAI.Chat.ChatModel>({
     envVarName: 'OPENAI_MASTRA_AGENT_MODEL',
-    defaultValue: 'o4-mini',
+    // defaultValue: 'o4-mini',
+    defaultValue: 'gpt-4.1-mini',
   }),
   'openai:threadDeletionCronExpression': defineConfig<string>({
     envVarName: 'OPENAI_THREAD_DELETION_CRON_EXPRESSION',
