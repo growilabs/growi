@@ -18,7 +18,7 @@ const mockPost = vi.fn().mockResolvedValue({
   ok: true,
   status: 200,
   headers: { get: () => null },
-  json: async () => ({ data: { _id: 'page-id-001' } }),
+  json: async () => ({ page: { _id: 'page-id-001' } }),
 });
 
 vi.mock('./lib/http-client', () => ({
@@ -226,9 +226,11 @@ describe('createLoadDriver', () => {
           adminPassword: string;
           cookie: string;
         }>;
+        pageCreate(count: number): Promise<void>;
         yjsSessionCleanClose(count: number): Promise<void>;
       };
       await driver.initInstaller();
+      await driver.pageCreate(2); // populate createdIds so Yjs tests don't early-return
       vi.clearAllMocks();
 
       await driver.yjsSessionCleanClose(2);
@@ -248,9 +250,11 @@ describe('createLoadDriver', () => {
           adminPassword: string;
           cookie: string;
         }>;
+        pageCreate(count: number): Promise<void>;
         yjsSessionAbort(count: number): Promise<void>;
       };
       await driver.initInstaller();
+      await driver.pageCreate(2); // populate createdIds so Yjs tests don't early-return
       vi.clearAllMocks();
 
       await driver.yjsSessionAbort(2);
