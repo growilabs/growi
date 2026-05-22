@@ -26,7 +26,7 @@
   - _Requirements: 1.4, 8.4_
   - _Boundary: bin/memory-profiling/scenarios/index.ts_
 
-- [ ] 1.3 (P) lib sub-barrel の作成
+- [x] 1.3 (P) lib sub-barrel の作成
   - `bin/memory-profiling/lib/index.ts` を新規作成。
   - `createHttpClient`、`createInstallerDriver`、`createYjsSession` factory を named export。
   - 観測可能な完了条件: `bin/memory-profiling/lib/index.ts` が存在し、`load-driver.ts` から `import { createHttpClient, createInstallerDriver, createYjsSession } from './lib'` が型エラーなく動く。
