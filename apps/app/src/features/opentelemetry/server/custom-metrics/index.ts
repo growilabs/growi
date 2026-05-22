@@ -9,10 +9,12 @@ export const setupCustomMetrics = async (): Promise<void> => {
   const { addUserCountsMetrics } = await import('./user-counts-metrics');
   const { addPageCountsMetrics } = await import('./page-counts-metrics');
   const { addSystemMetrics } = await import('./system-metrics');
+  const { addYjsMetrics } = await import('./yjs-metrics');
 
   // Add custom metrics
   addApplicationMetrics();
   addUserCountsMetrics();
   addPageCountsMetrics();
   addSystemMetrics();
+  addYjsMetrics();
 };

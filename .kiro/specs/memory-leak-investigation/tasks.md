@@ -105,7 +105,7 @@
 
 ## 4. Integration
 
-- [ ] 4.1 (P) `yjs-metrics` を custom-metrics 合成パスに組み込む
+- [x] 4.1 (P) `yjs-metrics` を custom-metrics 合成パスに組み込む
   - `apps/app/src/features/opentelemetry/server/custom-metrics/index.ts` に `export { addYjsMetrics } from './yjs-metrics'` を追加する。
   - 同ファイルの `setupCustomMetrics()` 内の dynamic import 列と `add*Metrics()` 呼び出し列に `yjs-metrics` を 1 行ずつ追加する。
   - 既存 4 metrics の登録順序・名称・schema は変更しない。
