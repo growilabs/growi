@@ -73,7 +73,7 @@
   - _Requirements: 1.1, 1.2, 1.5_
   - _Boundary: CdpSnapshotClient_
 
-- [ ] 3.2 (P) Load driver と HTTP / YJS lib の実装
+- [x] 3.2 (P) Load driver と HTTP / YJS lib の実装
   - `tools/memory-profiling/lib/installer-driver.ts` で `/api/v3/installer/` への自動 admin 作成（既存 endpoint の request payload を再利用）。
   - `tools/memory-profiling/lib/http-client.ts` で `undici` ベースの cookie-aware HTTP client を提供。
   - `tools/memory-profiling/lib/yjs-client.ts` で `ws` + minimal `Y.Doc` の y-websocket クライアント（open / clean close / abort via `socket.destroy()`）を提供。
