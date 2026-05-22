@@ -541,6 +541,7 @@ export function createBootstrapRunner(
 
         // Skip pages without revision (intermediate path pages)
         if (page.revision == null) {
+          finalCursor = page._id;
           await vaultSyncState.updateOne(
             { _id: 'singleton' },
             {
