@@ -38,7 +38,7 @@ const validator = {
   list: [
     query('limit')
       .optional()
-      .isInt({ min: 1, max: 100 })
+      .isInt({ max: 100 })
       .withMessage('limit must be a number less than or equal to 100'),
     query('offset').optional().isInt().withMessage('page must be a number'),
     query('searchFilter')
