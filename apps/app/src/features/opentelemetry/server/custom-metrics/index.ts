@@ -2,6 +2,7 @@ export { addApplicationMetrics } from './application-metrics';
 export { addPageCountsMetrics } from './page-counts-metrics';
 export { addSystemMetrics } from './system-metrics';
 export { addUserCountsMetrics } from './user-counts-metrics';
+export { addYjsMetrics } from './yjs-metrics';
 
 export const setupCustomMetrics = async (): Promise<void> => {
   const { addApplicationMetrics } = await import('./application-metrics');

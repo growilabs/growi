@@ -44,7 +44,7 @@
   - _Requirements: 3.3, 3.4, 3.6, 4.5, 7.1, 7.2_
   - _Boundary: OtelInstrumentationAllowList_
 
-- [ ] 2.3 (P) L3 metric: `growi.yjs.docs.count` Observable Gauge モジュールの新規作成
+- [x] 2.3 (P) L3 metric: `growi.yjs.docs.count` Observable Gauge モジュールの新規作成
   - `apps/app/src/features/opentelemetry/server/custom-metrics/yjs-metrics.ts` を新規作成し、既存 `system-metrics.ts` と同じパターン（`addYjsMetrics(): void` named export + `meter.createObservableGauge` + `addCallback`）で実装する。
   - Metric 名 `growi.yjs.docs.count`、unit `{document}`、description は collaborative document の current count を示す英文。
   - Callback は `y-websocket/bin/utils` の `docs.size` を読み出すのみ。`docs` が未初期化のときは 0 を返す defensive check を入れる。
