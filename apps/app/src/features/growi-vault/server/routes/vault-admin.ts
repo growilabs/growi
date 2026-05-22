@@ -8,6 +8,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
+import type { VaultReconcileService } from '../services/reconcile';
 import type {
   ResilienceStatus,
   VaultBootstrapper,
@@ -33,6 +34,12 @@ export interface VaultAdminRouterDeps {
   /** VaultManagerClient instance; defaults to the module-level singleton. */
   readonly managerClient?: VaultManagerClient;
   /**
+   * VaultReconcileService instance for admin-triggered reconcile endpoints.
+   * Must be provided at runtime (wired in task 3.3). When omitted, the reconcile
+   * endpoints return 500 (service not initialised).
+   */
+  readonly reconcileService?: VaultReconcileService;
+  /**
    * Crowi instance used to build admin-required middleware.
    * When omitted the router skips loginRequired/adminRequired (test mode only).
    */
@@ -48,9 +55,11 @@ export interface VaultAdminRouterDeps {
  * Create an Express router that exposes the admin-only Vault management API.
  *
  * Endpoints:
- *   GET  /_api/v3/vault/status    — bootstrap status + storage stats
- *   POST /_api/v3/vault/bootstrap — trigger bootstrap
- *   PUT  /_api/v3/vault/enabled   — toggle vaultEnabled flag
+ *   GET  /_api/v3/vault/status             — bootstrap status + storage stats
+ *   POST /_api/v3/vault/bootstrap          — trigger bootstrap
+ *   PUT  /_api/v3/vault/enabled            — toggle vaultEnabled flag
+ *   POST /_api/v3/vault/reconcile          — admin-triggered reconcile
+ *   GET  /_api/v3/vault/reconcile-history  — paginated reconcile history (admin)
  */
 export const createVaultAdminRouter = (
   deps: VaultAdminRouterDeps = {},
@@ -59,6 +68,7 @@ export const createVaultAdminRouter = (
     crowi,
     bootstrapper: injectedBootstrapper,
     managerClient: injectedManagerClient = defaultManagerClient,
+    reconcileService,
   } = deps;
 
   // Resolve the bootstrapper: prefer injected, fall back to creating one from
@@ -254,5 +264,111 @@ export const createVaultAdminRouter = (
     },
   );
 
+  // --------------------------------------------------------------------------
+  // POST /reconcile
+  // --------------------------------------------------------------------------
+
+  /**
+   * Admin-triggered targeted reconcile.
+   *
+   * Accepts { targetType, targetPath } and submits to VaultReconcileService
+   * with isAdmin: true. Returns 202 on accept or an error HTTP status based on
+   * the reject reason:
+   *   invalid-target                  → 400
+   *   bootstrap-not-done              → 409
+   *   page-count-exceeds-*-limit      → 422
+   *   *-concurrency-limit             → 429
+   */
+  router.post('/reconcile', ...authMiddlewares, async (req, res) => {
+    if (reconcileService == null) {
+      logger.error('VaultReconcileService is not initialised');
+      return res
+        .status(500)
+        .json({ ok: false, error: 'Reconcile service not available' });
+    }
+
+    const { targetType, targetPath } = req.body as {
+      targetType: string;
+      targetPath: string;
+    };
+
+    const user = (req as typeof req & { user?: { _id: string } }).user;
+    const userId = user?._id ?? 'unknown';
+
+    try {
+      const result = await reconcileService.submit({
+        targetType: targetType as 'page' | 'sub-tree',
+        targetPath,
+        triggeredBy: { userId: String(userId), isAdmin: true },
+      });
+
+      if (result.status === 'accepted') {
+        return res.status(202).json({ ok: true, data: result });
+      }
+
+      // Rejected — map reason to HTTP status.
+      const httpStatus = REJECT_REASON_TO_HTTP_STATUS[result.reason] ?? 500;
+      return res.status(httpStatus).json({ ok: false, data: result });
+    } catch (err) {
+      logger.error({ err }, 'Failed to submit reconcile request');
+      return res
+        .status(500)
+        .json({ ok: false, error: 'Internal server error' });
+    }
+  });
+
+  // --------------------------------------------------------------------------
+  // GET /reconcile-history
+  // --------------------------------------------------------------------------
+
+  /**
+   * Return paginated reconcile history (admin only).
+   *
+   * Query params: limit (number), offset (number).
+   * Response: { ok: true, data: { entries: ReconcileLogEntry[], total: number } }
+   */
+  router.get('/reconcile-history', ...authMiddlewares, async (req, res) => {
+    if (reconcileService == null) {
+      logger.error('VaultReconcileService is not initialised');
+      return res
+        .status(500)
+        .json({ ok: false, error: 'Reconcile service not available' });
+    }
+
+    const limit = req.query.limit != null ? Number(req.query.limit) : undefined;
+    const offset =
+      req.query.offset != null ? Number(req.query.offset) : undefined;
+
+    try {
+      const entries = await reconcileService.listHistory({ limit, offset });
+      return res.json({
+        ok: true,
+        data: { entries, total: entries.length },
+      });
+    } catch (err) {
+      logger.error({ err }, 'Failed to retrieve reconcile history');
+      return res
+        .status(500)
+        .json({ ok: false, error: 'Internal server error' });
+    }
+  });
+
   return router;
+};
+
+// ============================================================================
+// Constants
+// ============================================================================
+
+/**
+ * Maps a ReconcileRejectReason to the appropriate HTTP status code.
+ * Used by both admin (POST /reconcile) and user (POST /page/reconcile) routes.
+ */
+const REJECT_REASON_TO_HTTP_STATUS: Record<string, number> = {
+  'invalid-target': 400,
+  'bootstrap-not-done': 409,
+  'page-count-exceeds-user-limit': 422,
+  'page-count-exceeds-admin-limit': 422,
+  'user-concurrency-limit': 429,
+  'system-concurrency-limit': 429,
 };

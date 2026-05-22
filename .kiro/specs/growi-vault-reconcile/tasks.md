@@ -119,7 +119,7 @@
 
 - [ ] 3. Server: routes と起動シーケンスを既存 features/growi-vault に組み込む
 
-- [ ] 3.1 (P) admin route handler を `vault-admin.ts` に追加
+- [x] 3.1 (P) admin route handler を `vault-admin.ts` に追加
   - `POST /vault/reconcile`: body `{ targetType, targetPath }` を受け、`req.user` を triggeredBy として `VaultReconcileService.submit({ ..., isAdmin: true })` を呼ぶ薄い adapter
   - `GET /vault/reconcile-history`: query `{ limit, offset }` で `VaultReconcileService.listHistory` を呼び、entries + total を返す
   - 既存 `[loginRequiredFactory(crowi), adminRequiredFactory(crowi)]` middleware chain で保護（admin-only を route 層で強制）
