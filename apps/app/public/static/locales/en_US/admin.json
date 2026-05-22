@@ -1167,23 +1167,5 @@
     "ai_integration": "AI Integration",
     "disable_mode_explanation": "Currently, AI integration is disabled. To enable it, configure the <code>AI_ENABLED</code> environment variable along with the required additional variables.<br><br>For details, please refer to the <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>documentation</a>.",
     "ai_search_management": "AI search management"
-  },
-  "growi-vault": {
-    "reconcile": {
-      "section": {
-        "title": "Reconcile"
-      },
-      "rejected": {
-        "invalid-target": "Invalid target path specified.",
-        "bootstrap-not-done": "Vault is not ready. Please wait for bootstrap to complete and try again.",
-        "page-count-exceeds-user-limit": "The target contains too many pages. Please narrow the scope or ask an administrator to run the reconcile.",
-        "page-count-exceeds-admin-limit": "The target contains too many pages. Please narrow the scope or consider using VAULT_BOOTSTRAP_ON_START=force for a full re-bootstrap.",
-        "user-concurrency-limit": "You already have a reconcile in progress. Please wait for it to complete before starting another.",
-        "system-concurrency-limit": "The system reconcile limit has been reached. Please wait for a reconcile to complete before starting another."
-      },
-      "accepted": {
-        "message": "Reconcile started successfully."
-      }
-    }
   }
 }

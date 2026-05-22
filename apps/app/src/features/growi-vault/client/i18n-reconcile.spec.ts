@@ -46,8 +46,8 @@ function loadLocale(locale: string, file: string): Record<string, unknown> {
   return JSON.parse(raw) as Record<string, unknown>;
 }
 
-const enAdmin = loadLocale('en_US', 'admin.json');
-const jaAdmin = loadLocale('ja_JP', 'admin.json');
+const enCommons = loadLocale('en_US', 'commons.json');
+const jaCommons = loadLocale('ja_JP', 'commons.json');
 
 // ─────────────────────────────────────────────────────────────────────────────
 // Required keys for growi-vault reconcile (task 1.4)
@@ -69,33 +69,33 @@ const REQUIRED_KEYS = [
 // Tests
 // ─────────────────────────────────────────────────────────────────────────────
 describe('growi-vault reconcile i18n keys', () => {
-  describe('en_US/admin.json', () => {
+  describe('en_US/commons.json', () => {
     for (const key of REQUIRED_KEYS) {
       it(`has non-empty string for key: ${key}`, () => {
-        const value = getNestedValue(enAdmin, key);
+        const value = getNestedValue(enCommons, key);
         expect(
           value,
-          `key "${key}" not found or empty in en_US/admin.json`,
+          `key "${key}" not found or empty in en_US/commons.json`,
         ).toBeTypeOf('string');
         expect(
           (value as string).trim().length,
-          `key "${key}" is an empty string in en_US/admin.json`,
+          `key "${key}" is an empty string in en_US/commons.json`,
         ).toBeGreaterThan(0);
       });
     }
   });
 
-  describe('ja_JP/admin.json', () => {
+  describe('ja_JP/commons.json', () => {
     for (const key of REQUIRED_KEYS) {
       it(`has non-empty string for key: ${key}`, () => {
-        const value = getNestedValue(jaAdmin, key);
+        const value = getNestedValue(jaCommons, key);
         expect(
           value,
-          `key "${key}" not found or empty in ja_JP/admin.json`,
+          `key "${key}" not found or empty in ja_JP/commons.json`,
         ).toBeTypeOf('string');
         expect(
           (value as string).trim().length,
-          `key "${key}" is an empty string in ja_JP/admin.json`,
+          `key "${key}" is an empty string in ja_JP/commons.json`,
         ).toBeGreaterThan(0);
       });
     }

@@ -58,7 +58,7 @@ export const ReconcileTriggerModal = (
     onAccepted,
   } = props;
 
-  const { t } = useTranslation('admin');
+  const { t } = useTranslation('commons');
 
   const [targetType, setTargetType] = useState<ReconcileTargetType>('page');
   const [targetPath, setTargetPath] = useState<string>(defaultTargetPath);

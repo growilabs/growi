@@ -1176,23 +1176,5 @@
     "ai_integration": "AI 連携",
     "disable_mode_explanation": "現在、AI 連携は無効になっています。有効にする場合は環境変数 <code>AI_ENABLED</code> の他、必要な環境変数を設定してください。<br><br>詳細は<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}ja/guide/features/ai-knowledge-assistant.html>ドキュメント</a>を参照してください。",
     "ai_search_management": "AI 検索管理"
-  },
-  "growi-vault": {
-    "reconcile": {
-      "section": {
-        "title": "リコンサイル"
-      },
-      "rejected": {
-        "invalid-target": "指定されたターゲットパスが無効です。",
-        "bootstrap-not-done": "Vault の準備が完了していません。ブートストラップの完了をお待ちいただいてから再試行してください。",
-        "page-count-exceeds-user-limit": "対象のページ数が多すぎます。範囲を絞り込むか、管理者にリコンサイルの実行を依頼してください。",
-        "page-count-exceeds-admin-limit": "対象のページ数が多すぎます。範囲を絞り込むか、VAULT_BOOTSTRAP_ON_START=force を用いた全体再ブートストラップをご検討ください。",
-        "user-concurrency-limit": "すでにリコンサイルが実行中です。完了するまでお待ちいただいてから再試行してください。",
-        "system-concurrency-limit": "システム全体のリコンサイル上限に達しています。いずれかのリコンサイルが完了するまでお待ちください。"
-      },
-      "accepted": {
-        "message": "リコンサイルを開始しました。"
-      }
-    }
   }
 }
