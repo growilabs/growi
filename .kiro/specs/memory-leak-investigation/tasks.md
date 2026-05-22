@@ -34,7 +34,7 @@
   - _Requirements: 3.1, 3.2, 3.4, 3.6, 7.1, 7.2_
   - _Boundary: MongoosePoolConfig_
 
-- [ ] 2.2 (P) L2: OpenTelemetry auto-instrumentation を allow-list 方式へ置換
+- [x] 2.2 (P) L2: OpenTelemetry auto-instrumentation を allow-list 方式へ置換
   - `getNodeAutoInstrumentations(...)` の引数を、明示的 allow-list（`@opentelemetry/instrumentation-http`, `instrumentation-express`, `instrumentation-mongodb`, `instrumentation-mongoose`）以外を `enabled: false` にする形に置き換える。
   - `OTEL_AUTO_INSTRUMENTATION_PROFILE=all` のとき従来挙動（pino / fs のみ off）に戻す分岐を実装する。
   - 不明な profile 値は warn ログを残し `minimal` 扱いとする。
