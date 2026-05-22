@@ -178,35 +178,6 @@ if (filtered.length === 0) {
 
 - Path change drift（trash 移動 / rename の `remove` event 取りこぼし時の旧 path stale）/ grant drop drift / hard delete drift の構造的回収は本 spec の責務外（上記 §Drift Detector v1 のスコープ縮退 参照）。
 
-### Implementation Tasks Hint（最小分解）
-
-tasks phase で以下を独立タスクとして発行する想定:
-
-1. **vault-namespace-mapper.ts の trash filter / status filter 撤廃（apps/app 側）**
-   - [vault-namespace-mapper.ts:58-67](../../../apps/app/src/features/growi-vault/server/services/vault-namespace-mapper.ts#L58-L67) の 2 ガードを削除し、grant 情報のみから namespace を導く純関数にする。
-   - test: `vault-namespace-mapper.spec.ts` に trashed path / non-published でも namespace が返ることを assert する 2 ケースを追加。
-
-2. **vault-path-mapper.ts への `isExcludedFromVault()` helper 新設 + `_orphaned/` 撤廃（vault-manager 側）**
-   - 既存 internal `isOrphan` 関数（[vault-path-mapper.ts:122-124](../../../apps/growi-vault-manager/src/services/vault-path-mapper.ts#L122-L124)）を `isExcludedFromVault` に rename して export 化。
-   - `map()` 内の `if (isOrphan(pagePath)) return _orphaned/...;` 分岐（[vault-path-mapper.ts:172-174](../../../apps/growi-vault-manager/src/services/vault-path-mapper.ts#L172-L174)）を削除。
-   - test: `vault-path-mapper.spec.ts` の既存 `_orphaned/` 振り分けケースを削除し、以下に置換:
-     - `isExcludedFromVault('/trash/foo') === true`、`isExcludedFromVault('/trash') === true`、`isExcludedFromVault('/foo') === false`
-     - `map('/trash/foo', pageId)` が `_orphaned/` prefix なしの encoded path を返すこと（trash 判定は呼び側責務であることの担保）
-
-3. **`applyBulkUpsert` / `applyRemove` への `isExcludedFromVault()` filter 追加（vault-manager 側）**
-   - `vault-namespace-builder.ts` の両 op handler 入口で `entries.filter((e) => !isExcludedFromVault(e.pagePath))` を実行。
-   - 空 entry になった instruction は commit 発生なし / `vault_namespace_state` 更新なしで ack する（既存の ack 機構と整合）。
-   - test: `vault-namespace-builder.spec.ts` に以下を追加:
-     - trash entry のみの `bulk-upsert` → no-op で ack、`commitAndUpdateRef` が呼ばれないこと
-     - trash + 通常 entry 混在の `bulk-upsert` → 通常 entry のみ commit に含まれること
-     - trash path を狙った `remove` → no-op で ack
-
-4. **既存 dispatcher の delete event 回帰確認**
-   - `vault-dispatcher.spec.ts` を再実行し、`delete` event（pre-deletion state を渡す）経路で `remove` instruction が grant 由来 namespace に対して発行される flow が変わらないことを確認。
-   - pre-deletion pagePath は `/foo`（trash 移動 _前_）なので `isExcludedFromVault` は false → 通常通り削除される。
-
-タスク 1・2・3 は同時着手可能、4 は 1+2+3 完了後の verification。
-
 ---
 
 ## アーキテクチャ
@@ -898,105 +869,19 @@ export interface DriftStatus {
 - `bootstrapState` の遷移は `BootstrapStateMachine.transition` を通すことで invariants を担保（runner 内で enforce）。
 - vault-manager 側は新規フィールドを **読まない**（schema 拡張の影響なし）。
 
-### Migration
+### Migration Strategy
 
-既存 `vault_sync_state` singleton doc は本 spec 適用前から存在しうるため、`$setOnInsert` だけでは既存 doc に新規フィールド group が反映されない（既存 doc は insert ではなく update path に入る）。Mongoose 6.x は schema default を「読み出し時には補完しない」ので、undefined 読み出しを runner 側で扱うのも fragile。
+既存 `vault_sync_state` singleton doc は本 spec 適用前から存在しうるため、`$setOnInsert` だけでは既存 doc に新規フィールドが反映されない。また `findOneAndUpdate({ _id, <追加フィルタ> }, ..., { upsert: true })` を使うと、追加フィルタ不一致時に MongoDB が新規 insert を試みて **E11000 duplicate key error** を起こす。これを避けるため migration は **2 段階に分離** する:
 
-**重要な制約**: `findOneAndUpdate` で `{ _id: 'singleton', <追加フィルタ> }` + `upsert: true` を併用すると、追加フィルタが match しない（= 既に migrate 済の）ケースで MongoDB が `_id: 'singleton'` の新規 insert を試み、**E11000 duplicate key error** を起こす。これを避けるため、migration は **2 段階に分離**する。
+- **ステップ 1（fresh install 用、idempotent）**: `findOneAndUpdate({ _id: 'singleton' }, { $setOnInsert: { 全 default 値 } }, { upsert: true })` で doc が無いときだけ新規作成。`$setOnInsert` は doc 存在時に no-op。
+- **ステップ 2（既存 doc 用、no upsert）**: `updateOne({ _id: 'singleton', bootstrapRetryAttempts: { $exists: false } }, { $set: { 新フィールド 14 件 } })` で未 migrate doc のみに新フィールドを補完。`$exists: false` フィルタが idempotent guard として機能。
+- **ステップ 3（migration 直後の stale running 正規化）**: 上記実行直後に `bootstrapState === 'running' && bootstrapInstanceId == null` の doc を検出した場合、`failed` に正規化して `bootstrapLastError` を記録する。schema 移行前に crash で残った `running` doc と「真にクラッシュ直後の null」を区別不能なため、安全側に倒して常に stale 扱いとする。
 
-**ステップ 1: singleton doc の存在保証**（fresh install 用、doc が無いときだけ新規作成、あれば無変化）:
-
-```typescript
-await VaultSyncState.findOneAndUpdate(
-  { _id: 'singleton' },
-  {
-    $setOnInsert: {
-      bootstrapState: 'pending',
-      bootstrapCursor: null,
-      bootstrapStartedAt: null,
-      bootstrapCompletedAt: null,
-      bootstrapTotalEstimated: null,
-      bootstrapProcessed: 0,
-      bootstrapLastError: null,
-      bootstrapInstanceId: null,
-      bootstrapHeartbeatAt: null,
-      bootstrapLastTriggerSource: null,
-      bootstrapRetryAttempts: 0,
-      bootstrapRetryNextAt: null,
-      bootstrapRetryAborted: false,
-      bootstrapCompletenessLastCheckedAt: null,
-      bootstrapCompletenessLastResult: null,
-      bootstrapStreamSnapshotMaxId: null,
-      resumeToken: null,
-      lastProcessedAt: null,
-      watcherInstanceId: null,
-      driftLastWatermark: null,
-      driftLastSweepAt: null,
-      driftDetectedSinceBoot: 0,
-      driftRepairsEmittedSinceBoot: 0,
-      driftLastError: null,
-    },
-  },
-  { upsert: true },
-);
-```
-
-**ステップ 2: 未 migrate doc への新フィールド埋め**（既存環境用、upsert 無し）:
-
-```typescript
-await VaultSyncState.updateOne(
-  { _id: 'singleton', bootstrapRetryAttempts: { $exists: false } }, // 未 migrate doc のみ対象
-  {
-    $set: {
-      bootstrapInstanceId: null,
-      bootstrapHeartbeatAt: null,
-      bootstrapLastTriggerSource: null,
-      bootstrapRetryAttempts: 0,
-      bootstrapRetryNextAt: null,
-      bootstrapRetryAborted: false,
-      bootstrapCompletenessLastCheckedAt: null,
-      bootstrapCompletenessLastResult: null,
-      bootstrapStreamSnapshotMaxId: null,
-      driftLastWatermark: null,
-      driftLastSweepAt: null,
-      driftDetectedSinceBoot: 0,
-      driftRepairsEmittedSinceBoot: 0,
-      driftLastError: null,
-    },
-  },
-);
-```
-
-- ステップ 1 は何度実行しても安全（doc 存在時は `$setOnInsert` が無効化される）。
-- ステップ 2 は `upsert: false`（暗黙の `updateOne` default）のため、フィルタ不一致時は単に no-op し、duplicate key error を起こさない。
-- 条件 `{ bootstrapRetryAttempts: { $exists: false } }` は idempotent guard。既に migrate 済 doc を上書きしない。
-- 両ステップとも複数回起動で繰り返し実行されても無害（idempotent）。
-- `BootstrapState` enum 拡張（4 → 7 値）は Mongoose schema 側の enum 制約を更新するだけで、既存 doc の値（`pending` / `running` / `done` / `failed`）はそのまま valid。
-
-#### Migration 直後の stale running 正規化
-
-migration 実行直後、既存 doc が `bootstrapState === 'running'` かつ `bootstrapInstanceId == null` の状態になる可能性がある（schema 移行前にプロセスが crash で `running` のまま残っていたケース）。これは「真にクラッシュ直後の null」と「単に未 migrate の null」を区別不能 → **常に stale running として扱う**:
-
-```typescript
-// 起動時、上記 $set migration の直後に実行
-const doc = await VaultSyncState.findOne({ _id: 'singleton' }).lean();
-if (doc?.bootstrapState === 'running' && doc?.bootstrapInstanceId == null) {
-  // schema migration 直後 or 未 migrate からの起動 → 安全側に倒して failed 正規化
-  await VaultSyncState.updateOne(
-    { _id: 'singleton' },
-    {
-      $set: {
-        bootstrapState: 'failed',
-        bootstrapLastError: 'normalized stale running on first startup after schema migration',
-      },
-    },
-  );
-}
-```
-
-- 偽陽性（実際は正常 running だった）リスクは無い: schema migration は本 spec 適用後の初回起動 1 回限りで、その時点で同 process が `running` に書き込んだ instanceId は必ず非 null になる。
-- 偽陰性は排除される: `failed` 正規化後は retry resolver が exponential backoff で resume を試みる（要件 3.1 / 3.3）。
-- これにより `bootstrapInstanceId === null` を理由に stale 検知を skip する初期化分岐は **不要**（以前の §Open Questions に書かれていた緩和策は本節の正規化で置き換え）。
+**設計上の不変条件**:
+- 全ステップが冪等で、複数回起動で繰り返し実行されても無害。
+- `BootstrapState` enum 拡張（4 → 7 値）は schema 側 enum 制約の更新のみで足り、既存 doc の値（`pending` / `running` / `done` / `failed`）はそのまま valid。
+- ステップ 3 の偽陽性リスクは無い: schema migration は本 spec 適用後の初回起動 1 回限りで、その時点で `running` を書く同プロセスの instanceId は必ず非 null になる。
+- これにより `bootstrapInstanceId === null` を理由に stale 検知を skip する初期化分岐は **不要**。
 
 ### Config (config-definition.ts) 拡張
 
@@ -1038,49 +923,15 @@ if (doc?.bootstrapState === 'running' && doc?.bootstrapInstanceId == null) {
 
 ---
 
-## Testing Strategy
+## Test Approach
 
-### Unit Tests
-1. **bootstrap-state-machine.spec.ts** — 全 (state × event) ペアの transition 結果の網羅（正常 + 不正遷移）。`done → running` が `forceOverride` 以外でブロックされること。
-2. **bootstrap-trigger-resolver.spec.ts** — `env × currentState × retryAllowed × isStaleRunning` の組み合わせ table。`unknown` env 値の skip フォールバック。
-3. **retry-policy.spec.ts** — backoff 計算（exponential growth、max cap、jitter 範囲）、`attemptNo >= maxAttempts` の `shouldRetry: false`。
-4. **bootstrap-heartbeat.spec.ts** — `acquireInstance` の UUID 生成、`refresh` の周期更新、`detectStaleRunning` の閾値判定。
+- **純関数モジュール（state-machine / trigger-resolver / retry-policy / heartbeat 判定）**: discriminated union と純関数遷移を table-driven で網羅。`forceOverride` が全 state から `running` に遷移できることと、`done → running` が `forceOverride` 経由のみであることを構造的な不変条件として固定。
+- **I/O bound モジュール（runner / drift-detector）**: モック MongoDB で trigger × state の組み合わせを駆動し、`reset-all` の emit タイミング・cursor null reset・completeness check の 3 条件 AND・retry escalation・abort 後の in-flight 完走（採用方針 A）を検証。drift については v1 スコープ縮退の固定 test（`remove` を発行しない、上限超過時の scope-out 4 条件）を含める。
+- **trash 責務分離の境界検証**: apps/app 側 mapper の trash filter 撤廃を担保するテスト（trashed path / non-published でも grant 由来 namespace が返る）と、既存 dispatcher の delete event 経路に回帰がないことを並行確認。
+- **end-to-end**: 実 MongoDB（devcontainer の `mongo` service）で fresh install / 既存 doc migration / 異常終了 running 再開 / `env=force` 全 wipe / abort → 再起動の経路を通し、`vault.resilience.*` audit event の発火と admin UI surface への反映までを 1 系統で確認。
+- **UI**: completion / auto-retry / drift / force banner / confirm modal の状態遷移を component 単位で snapshot 検証。
 
-### Integration Tests
-1. **bootstrap-runner.spec.ts** — モック MongoDB で:
-   (a) `env=true` + `pending` → `done` 遷移、`reset-all` + bulk-upsert を発行、cursor が null になる
-   (b) `env=true` + `done` → no-op、`reset-all` が発行されない
-   (c) `env=force` + `done` → 全 wipe + 新規 bootstrap、警告 banner state が立つ
-   (d) `env=true` + `failed` → 自動 resume、`bulk-upsert` のみ発行（reset-all なし）
-   (e) `env=true` + stale `running` → 自動 resume
-   (f) completeness check 失敗 → `failed` 遷移、`bootstrapLastError` 記録
-   (g) max retry → `escalated`、`abortAutoRetry` で復旧可能
-2. **drift-detector.spec.ts** — モック MongoDB で:
-   (a) 既存 `done` 状態で published page を変更 → 次 tick で drift 検出 + `bulk-upsert` instruction 発行
-   (b) **trashed page (`path=/trash/foo`, `status=deleted`) を変更 → 次 tick で `bulk-upsert` が grant 由来の namespace に対して発行される**（apps/app 層が trash を判定しないことの担保。vault-manager 側 `applyBulkUpsert` 入口の `isExcludedFromVault()` filter で skip される動作は本テストの範囲外）
-   (c) **trash からの restore (`path=/foo`, `status=published`) → 次 tick で `bulk-upsert` が発行される**（exclusion semantics により旧 stale は最初から存在しないため、restore は drift sweep で完全 recover される）
-   (d) `bootstrapState !== 'done'` → tick が早期 return
-   (e) namespace 計算が throw → watermark 据え置き、次 tick で再 sweep
-   (f) **drift detector は `remove` instruction を発行しない**（v1 スコープ縮退の固定 test。grant drop / path change の stale 掃除責務が drift detector に漏れていないことを assert）
-   (g) **上限超過時のスコープアウト動作**: `VAULT_DRIFT_MAX_PAGES_PER_TICK=10` の状態で 11 件以上の changed page を準備 → 1 tick 実行 → (i) `vault_instructions` に instruction が 1 件も発行されない、(ii) `driftLastWatermark` が更新されない、(iii) `vault.resilience.drift-sweep-out-of-scope` audit event が emit、(iv) `driftLastError` に 2 択メッセージが格納されること
-3. **vault-namespace-mapper.spec.ts** — 既存テストを更新:
-   (a) trashed path (`/trash/foo`) でも grant に基づく namespace を返す（trash filter 削除の担保）
-   (b) `status !== published` でも grant に基づく namespace を返す（status filter 削除の担保）
-4. **vault-dispatcher.spec.ts** — 既存 delete event 経路の回帰がないこと（pre-deletion state で `remove` per namespace を emit する flow が変わらないこと）
-5. **resilience-flow.integ.ts** — 実 MongoDB（devcontainer の `mongo` service）で end-to-end:
-   (a) `VAULT_BOOTSTRAP_ON_START=true` 起動 → bootstrap 完了 → drift sweep 開始
-   (b) 既存 `vault-bootstrapper.spec.ts` の resume シナリオが回帰しないこと（facade の後方互換）
-
-### UI Tests
-1. **VaultAdminSettings completion section** — `bootstrap.completenessLastResult === 'failed'` の表示
-2. **VaultAdminSettings retry section** — `retry.aborted === true` で abort ボタン状態が disabled
-3. **VaultAdminSettings drift section** — 数値の累積表示が再起動で 0 にリセットされること
-4. **Force warning banner** — `forceWarningActive === true` で Alert が表示されること
-5. **Prepare GROWI Vault confirm modal** — `done` 状態でクリック → confirm モーダル表示
-
-### Performance / Load
-1. **Drift sweep tick** — 30,000 ページ × `updatedAt > watermark` のうち変更 100 件想定で 1 tick が `< 5s` で完了すること（既存 page cursor の典型性能の範囲内）
-2. **Heartbeat overhead** — 10s 間隔 heartbeat の DB 書き込みが 1 op/tick で済むこと（findOneAndUpdate 1 回）
+**Performance budget**: drift sweep 1 tick の対象を「前回 tick 以降の変更分」に限定することで、典型編集頻度では `< 5s` で完了する想定。heartbeat overhead は 10s 間隔の `findOneAndUpdate` 1 回のみ（vault-manager の `watcherInstanceId` パターンと同等）。
 
 ---
 
@@ -1097,6 +948,67 @@ if (doc?.bootstrapState === 'running' && doc?.bootstrapInstanceId == null) {
 - 新規 endpoint `POST /vault/retry/abort` は既存 admin auth middleware（`accessTokenParser + loginRequiredStrictly + adminRequired`）配下に置く（既存 vault-admin route と同じ構造）。
 - `VAULT_BOOTSTRAP_*` / `VAULT_DRIFT_*` env var に機密値なし（数値 + boolean + enum のみ）→ `isSecret: false`。
 - audit log の event payload には `triggerSource` / `attemptNo` / `detectedCount` 等の運用情報のみを含め、ページ内容や user 情報は含めない（既存 vault.* event と同等のスコープ）。
+
+---
+
+## Design Decisions
+
+本 spec 設計で確定した主要な意思決定。将来の refactor で「なぜこう作ったか」を辿る索引として残す（実装詳細ではなく方針を記録）。
+
+### Build vs Adopt
+
+| 対象 | 決定 | 根拠 |
+|------|------|------|
+| State machine library（XState 等）| **Build (純関数)** | 7 状態 + ~10 イベントで XState はオーバースペック。discriminated union + pure `transition()` で testability 十分 |
+| Exponential backoff library | **Build (純関数)** | `min(maxMs, baseMs * 2 ** attempt) + jitter` を inline 実装。依存追加コストの方が大きい |
+| Heartbeat / lease pattern | **Adopt (既存 watcherInstanceId パターン)** | vault-manager `vault-sync-state.ts` の pattern を bootstrapper にも対称適用 |
+| Periodic scheduler | **Adopt (setInterval パターン)** | vault-manager の `VaultMaintenanceScheduler` 5 分 tick と同じパターンを apps/app 側で独立実装。共通基盤を作るのは早計（YAGNI）|
+| Audit log | **Adopt (既存 ACTION_VAULT_* パターン)** | `interfaces/activity.ts` に `ACTION_VAULT_RESILIENCE_*` を並べる |
+| Drift detection algorithm | **Build (watermark-based)** | 4 候補（completion-only / watermark / hash-based / heuristic）から選定 |
+
+### Key Decisions
+
+1. **Drift 検出手法 = `pages.updatedAt` watermark-based incremental sweep**
+   - 却下: completion-only（経時 drift に無力）、hash-based（namespace 数依存で重い）、heuristic（決定論性不足）
+   - 採用理由: 既存フィールドを直接 watermark にできる、O(変更頻度) で overhead が予測可能、冪等性により重複は無害（要件 4.6）
+
+2. **`reset-all` op は既存 op を再利用、emit タイミングのみ変更**
+   - 却下: 新 op `reset-all-explicit` 追加（@growi/core breaking change）、payload に `{ mode: 'wipe' | 'noop' }` 追加（noop モードを manager が受信する意味が薄い）
+   - 採用理由: `applyResetAll` の動作（全 namespace ref + state doc 削除）は意味的に「明示的全 wipe」そのもの。apps/app 側で発行タイミングを「初回 + force のみ」に限定すれば要件 2 を満たし、`VaultInstructionOp` 型不変で vault-manager の冪等性契約を完全維持できる
+
+3. **異常終了 `running` 検知 = heartbeat + instanceId**
+   - 却下: lease+TTL（renewal タイミング不要だが複雑）、時刻判定単独（誤検知が多い）
+   - 採用理由: vault-manager の `watcherInstanceId` パターン（既存）を bootstrapper にも対称適用 → 学習コスト最小。`bootstrapInstanceId` + `bootstrapHeartbeatAt` の 2 フィールド追加で実現
+
+4. **状態モデル粒度 = `BootstrapState` を 4 → 7 値に拡張**
+   - 却下: 独立フィールドで sub-status を持たせる案（型整合が崩れる）
+   - 採用理由: discriminated union として TypeScript の型推論が効く。`verifying` 独立で「processed === estimated 未確認の中間状態」を構造的に表現、`retrying` / `escalated` 独立で admin UI 表示が単純化
+
+5. **Drift 補修 instruction 発行経路 = 直接 `VaultInstruction.create`（dispatcher bypass）**
+   - 却下: dispatcher 経由（PageService event の coalesce 統計を汚染）
+   - 採用理由: dispatcher の挙動は要件 6.3 で不変保証。bypass が責務境界として正しい。既存 op (`bulk-upsert`) を直接発行すれば vault-manager 側は既存処理経路で冪等に適用
+
+6. **completeness 判定 = 件数比較ではなく structural check の 3 条件 AND**
+   - 却下: `processed === bootstrapTotalEstimated` の件数比較（`estimatedDocumentCount()` は概算 + 並行更新で原理的に一致しない）
+   - 採用理由: (i) cursor が `streamSnapshotMaxId` 到達 + (ii) `namespaceBuffers` 空 + (iii) 最終 bulk-upsert instruction が commit 済み、の AND。並行 page 増減は incremental sync の責務として bootstrap 完了判定と分離
+
+7. **`abortAutoRetry` = 永続化スケジュール打ち切りのみ、in-flight には影響しない（採用方針 A）**
+   - 却下: AbortController で in-flight を中断（half-written 状態のリスク、伝搬コスト）
+   - 採用理由: in-flight は通常通り `done` / `failed` に到達させ、`bootstrapRetryAborted=true` は永続化して resolver が retry を起こさないようにする。admin は abort を「次の自動 retry を抑止する」操作として理解、強制 kill が必要ならプロセス再起動を選ぶ
+
+8. **本 spec は apps/app 内のみで完結**
+   - 例外: 既存 `vault-namespace-builder.ts` (`applyBulkUpsert` / `applyRemove` 入口の `isExcludedFromVault()` filter) と `vault-path-mapper.ts` (`isExcludedFromVault` helper 新設 + `_orphaned/` 撤廃) のみ vault-manager 側を変更
+   - @growi/core への変更なし、vault-manager の op handler 本体は不変
+
+### Simplification（検討段階から削減した構造）
+
+| 削減対象 | 理由 |
+|----------|------|
+| `bootstrap-completeness-verifier.ts` 独立モジュール | check は数 condition のみ。`BootstrapRunner` 内 inline する方が cohesive |
+| `resilience/activity-actions.ts` 独立ファイル | 既存 `interfaces/activity.ts` の `ACTION_VAULT_*` パターンに揃える方が一貫性高い |
+| 共通 `PeriodicScheduler` 抽象 | vault-manager の `MaintenanceScheduler` と apps/app の `DriftDetector` は独立で十分。共通基盤化は早計（YAGNI）|
+| State machine の sub-status field（status + retryCount を 2 フィールド分割案）| union 拡張で 1 フィールドに収めた方が型整合 |
+| 新規 `VaultInstructionOp` 追加 | 既存 `reset-all` の emit タイミング変更だけで要件 2 を満たす |
 
 ---
 
@@ -1118,7 +1030,6 @@ if (doc?.bootstrapState === 'running' && doc?.bootstrapInstanceId == null) {
 
 ## Supporting References
 
-- Gap analysis: [research.md](./research.md) — 既存資産と要件のマッピング、4 つの drift 検出候補比較、5 つの key decisions
 - Brief: [brief.md](./brief.md) — discovery 段階の問題定義 / desired outcome / boundary candidates
 - Roadmap: [../../steering/roadmap.md](../../steering/roadmap.md) — 関連 future spec（`growi-vault-ha`）の design direction
 - Existing reference specs（cleanup 済み、編集禁止）:
