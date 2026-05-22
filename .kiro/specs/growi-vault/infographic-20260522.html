@@ -3,406 +3,8 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>GROWI Vault — Status Report 2026-05-22</title>
-<style>
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
-
-*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
-:root {
-  --blue:   #4f8ef7;
-  --violet: #9b72f7;
-  --teal:   #2dd4bf;
-  --amber:  #f59e0b;
-  --rose:   #f97068;
-  --green:  #22c55e;
-  --gray:   #64748b;
-  --bg:     #08090f;
-  --s1:     #0e1018;
-  --s2:     #141620;
-  --s3:     #1c1f2d;
-  --border: #1f2235;
-  --t1:     #f1f5f9;
-  --t2:     #94a3b8;
-  --t3:     #475569;
-  --mono:   'JetBrains Mono', monospace;
-}
-
-html { scroll-behavior: smooth; }
-body {
-  font-family: 'Inter', system-ui, sans-serif;
-  background: var(--bg); color: var(--t1);
-  line-height: 1.6; font-size: 15px; overflow-x: hidden;
-}
-
-/* ── HERO ─────────────────────────────── */
-.hero {
-  min-height: 100vh;
-  display: flex; flex-direction: column;
-  align-items: center; justify-content: center;
-  text-align: center; padding: 80px 32px;
-  position: relative; overflow: hidden;
-}
-.hero-bg {
-  position: absolute; inset: 0;
-  background:
-    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(45,212,191,.18) 0%, transparent 60%),
-    radial-gradient(ellipse 60% 50% at 80% 80%,  rgba(79,142,247,.12) 0%, transparent 55%),
-    radial-gradient(ellipse 50% 40% at 10% 90%,  rgba(155,114,247,.08) 0%, transparent 50%);
-}
-.hero-grid {
-  position: absolute; inset: 0;
-  background-image:
-    linear-gradient(var(--border) 1px, transparent 1px),
-    linear-gradient(90deg, var(--border) 1px, transparent 1px);
-  background-size: 60px 60px;
-  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 100%);
-  opacity: .35;
-}
-.hero-content { position: relative; max-width: 900px; }
-.hero-eyebrow {
-  display: inline-flex; align-items: center; gap: 8px;
-  border: 1px solid rgba(45,212,191,.35); background: rgba(45,212,191,.08);
-  border-radius: 999px; padding: 5px 16px;
-  font-size: 12px; font-weight: 600; color: var(--teal);
-  letter-spacing: .1em; text-transform: uppercase; margin-bottom: 28px;
-}
-.hero-eyebrow .dot {
-  width: 6px; height: 6px; border-radius: 50%;
-  background: var(--teal); animation: pulse 2s infinite;
-}
-@keyframes pulse {
-  0%,100% { opacity: 1; transform: scale(1); }
-  50%      { opacity: .4; transform: scale(1.4); }
-}
-.hero h1 {
-  font-size: clamp(2.6rem, 7vw, 5.5rem);
-  font-weight: 900; line-height: 1.05; letter-spacing: -.03em;
-  background: linear-gradient(135deg, #fff 0%, #b8e8ff 40%, var(--teal) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-  margin-bottom: 8px;
-}
-.hero h1 .accent {
-  background: linear-gradient(135deg, var(--violet) 0%, var(--blue) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
-.hero-tagline {
-  font-size: clamp(1rem, 2.2vw, 1.2rem); color: var(--t2);
-  max-width: 660px; margin: 20px auto 12px;
-}
-.hero-audience {
-  display: inline-flex; align-items: center; gap: 8px;
-  background: rgba(79,142,247,.08); border: 1px solid rgba(79,142,247,.3);
-  border-radius: 8px; padding: 8px 16px;
-  font-size: 13px; color: var(--blue); margin-bottom: 40px;
-}
-.hero-stats {
-  display: flex; border: 1px solid var(--border);
-  border-radius: 16px; background: rgba(14,16,24,.7);
-  backdrop-filter: blur(12px); overflow: hidden; flex-wrap: wrap;
-  justify-content: center;
-}
-.hero-stat {
-  padding: 18px 28px; border-right: 1px solid var(--border);
-  text-align: center; flex: 1; min-width: 130px;
-}
-.hero-stat:last-child { border-right: none; }
-.hero-stat .val {
-  font-size: 1.8rem; font-weight: 800; line-height: 1;
-  background: linear-gradient(135deg, var(--teal), var(--blue));
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
-.hero-stat .label { font-size: 11px; color: var(--t3); margin-top: 4px; letter-spacing: .04em; }
-.scroll-hint {
-  position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
-  display: flex; flex-direction: column; align-items: center; gap: 6px;
-  color: var(--t3); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
-  animation: bob 2.5s ease-in-out infinite;
-}
-@keyframes bob { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(6px)} }
-
-/* ── LAYOUT ────────────────────────────── */
-.page { max-width: 1160px; margin: 0 auto; padding: 0 32px; }
-section { padding: 88px 0; border-top: 1px solid var(--border); }
-.section-label {
-  display: inline-flex; align-items: center; gap: 8px;
-  font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
-  color: var(--t3); margin-bottom: 14px;
-}
-.section-label::before { content: ''; width: 20px; height: 2px; background: currentColor; border-radius: 1px; }
-.section-title {
-  font-size: clamp(1.8rem, 4vw, 2.8rem);
-  font-weight: 800; letter-spacing: -.02em; line-height: 1.1; margin-bottom: 14px;
-}
-.section-sub { font-size: 1.05rem; color: var(--t2); max-width: 640px; margin-bottom: 48px; }
-
-/* ── UTILS ─────────────────────────────── */
-.gradient-text {
-  background: linear-gradient(135deg, var(--teal) 0%, var(--blue) 100%);
-  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
-}
-code {
-  font-family: var(--mono); font-size: .88em;
-  background: rgba(0,0,0,.35); border: 1px solid var(--border);
-  border-radius: 4px; padding: 1px 6px; color: var(--teal);
-}
-.note {
-  background: rgba(79,142,247,.06); border: 1px solid rgba(79,142,247,.2);
-  border-left: 3px solid var(--blue); border-radius: 0 8px 8px 0;
-  padding: 14px 18px; font-size: 13.5px; color: var(--t2); margin-top: 20px;
-}
-.note strong { color: var(--t1); }
-.warn {
-  background: rgba(245,158,11,.06); border: 1px solid rgba(245,158,11,.2);
-  border-left: 3px solid var(--amber); border-radius: 0 8px 8px 0;
-  padding: 14px 18px; font-size: 13.5px; color: var(--t2); margin-top: 16px;
-}
-.warn strong { color: var(--t1); }
-.chip {
-  display: inline-flex; align-items: center; gap: 5px;
-  border-radius: 8px; padding: 5px 12px;
-  font-size: 12.5px; font-weight: 500; border: 1px solid; white-space: nowrap;
-}
-.chip-blue   { border-color: rgba(79,142,247,.4);  color: #7baeff; background: rgba(79,142,247,.08); }
-.chip-amber  { border-color: rgba(245,158,11,.4);  color: #fbbf24; background: rgba(245,158,11,.08); }
-.chip-violet { border-color: rgba(155,114,247,.4); color: #b794f4; background: rgba(155,114,247,.08); }
-.chip-teal   { border-color: rgba(45,212,191,.4);  color: #5eead4; background: rgba(45,212,191,.08); }
-.chip-rose   { border-color: rgba(249,112,104,.4); color: #fca5a5; background: rgba(249,112,104,.08); }
-.chip-green  { border-color: rgba(34,197,94,.4);   color: #86efac; background: rgba(34,197,94,.08); }
-.chip-gray   { border-color: rgba(100,116,139,.4); color: #cbd5e1; background: rgba(100,116,139,.08); }
-
-/* ── STATUS BADGES ─────────────────────── */
-.status-badge {
-  display: inline-flex; align-items: center; gap: 6px;
-  border-radius: 999px; padding: 3px 12px;
-  font-size: 11px; font-weight: 700; letter-spacing: .04em;
-  border: 1px solid; text-transform: uppercase; white-space: nowrap;
-}
-.status-done   { border-color: rgba(45,212,191,.4); color: var(--teal);  background: rgba(45,212,191,.1); }
-.status-ref    { border-color: rgba(100,116,139,.5); color: #cbd5e1;       background: rgba(100,116,139,.1); }
-.status-future { border-color: rgba(155,114,247,.4); color: var(--violet); background: rgba(155,114,247,.1); }
-.status-todo   { border-color: rgba(245,158,11,.4); color: var(--amber);  background: rgba(245,158,11,.1); }
-
-/* ── TIMELINE ──────────────────────────── */
-.timeline {
-  position: relative;
-  padding-left: 32px;
-  border-left: 2px solid var(--border);
-}
-.tl-event {
-  position: relative;
-  margin-bottom: 28px;
-  padding-left: 8px;
-}
-.tl-event:last-child { margin-bottom: 0; }
-.tl-event::before {
-  content: '';
-  position: absolute;
-  left: -42px;
-  top: 6px;
-  width: 14px;
-  height: 14px;
-  border-radius: 50%;
-  border: 2px solid;
-  background: var(--bg);
-}
-.tl-event.tl-cleanup::before { border-color: var(--gray); }
-.tl-event.tl-mvp::before     { border-color: var(--blue); }
-.tl-event.tl-resilience::before { border-color: var(--amber); }
-.tl-event.tl-reconcile::before  { border-color: var(--teal); }
-.tl-event.tl-future::before     { border-color: var(--violet); border-style: dashed; }
-
-.tl-date {
-  font-family: var(--mono); font-size: 12px; font-weight: 600;
-  color: var(--t3); margin-bottom: 4px;
-}
-.tl-title {
-  font-size: 16px; font-weight: 700; margin-bottom: 6px;
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-}
-.tl-body {
-  font-size: 13.5px; color: var(--t2); line-height: 1.6;
-}
-.tl-body code { font-size: 12px; }
-.tl-meta {
-  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
-}
-
-/* ── SUB-SPEC GRID ─────────────────────── */
-.spec-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
-  gap: 16px;
-}
-.spec-card {
-  border: 1px solid var(--border); border-radius: 14px; padding: 22px;
-  background: var(--s1); position: relative; overflow: hidden;
-}
-.spec-card::before {
-  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
-}
-.spec-card.gateway::before    { background: linear-gradient(90deg, var(--amber), var(--gray)); }
-.spec-card.manager::before    { background: linear-gradient(90deg, var(--violet), var(--gray)); }
-.spec-card.resilience::before { background: linear-gradient(90deg, var(--amber), var(--teal)); }
-.spec-card.reconcile::before  { background: linear-gradient(90deg, var(--teal), var(--blue)); }
-.spec-card.ha::before         { background: linear-gradient(90deg, var(--violet), var(--rose)); opacity: .6; }
-.spec-card.ha {
-  border-style: dashed;
-  border-color: rgba(155,114,247,.3);
-}
-.spec-name {
-  font-family: var(--mono); font-size: 13.5px; font-weight: 700;
-  margin-bottom: 6px; color: var(--t1);
-}
-.spec-tagline {
-  font-size: 12.5px; color: var(--t2); line-height: 1.55;
-  margin-bottom: 14px; min-height: 38px;
-}
-.spec-meta {
-  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
-  margin-top: 10px;
-}
-.spec-stat {
-  font-size: 11px; color: var(--t3);
-}
-.spec-stat strong { color: var(--t1); font-weight: 600; }
-.spec-section {
-  border-top: 1px solid var(--border);
-  padding-top: 12px; margin-top: 12px;
-}
-.spec-section-label {
-  font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
-  text-transform: uppercase; color: var(--t3); margin-bottom: 6px;
-}
-.spec-section ul {
-  list-style: none; padding: 0;
-}
-.spec-section li {
-  font-size: 12px; color: var(--t2);
-  padding: 2px 0; padding-left: 14px;
-  position: relative;
-}
-.spec-section li::before {
-  content: '•';
-  position: absolute; left: 0; color: var(--t3);
-}
-
-/* ── FEATURE CARDS (resilience + reconcile deep-dive) ─── */
-.feat-grid {
-  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
-}
-@media (max-width: 800px) { .feat-grid { grid-template-columns: 1fr; } }
-.feat-block {
-  border: 1px solid; border-radius: 14px; padding: 24px;
-  position: relative;
-}
-.feat-block.f-res { border-color: rgba(245,158,11,.3); background: rgba(245,158,11,.04); }
-.feat-block.f-rec { border-color: rgba(45,212,191,.3); background: rgba(45,212,191,.04); }
-.feat-header {
-  display: flex; align-items: center; gap: 12px;
-  margin-bottom: 14px;
-}
-.feat-icon { font-size: 28px; }
-.feat-title {
-  font-size: 18px; font-weight: 800;
-}
-.f-res .feat-title { color: var(--amber); }
-.f-rec .feat-title { color: var(--teal); }
-.feat-tag {
-  display: inline-block;
-  font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
-  text-transform: uppercase; padding: 2px 10px;
-  border-radius: 999px; border: 1px solid;
-}
-.f-res .feat-tag { color: var(--amber); border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.08); }
-.f-rec .feat-tag { color: var(--teal); border-color: rgba(45,212,191,.4); background: rgba(45,212,191,.08); }
-.feat-tagline {
-  font-size: 13px; color: var(--t2); line-height: 1.6; margin-bottom: 18px;
-}
-.feat-list {
-  list-style: none; padding: 0;
-}
-.feat-list li {
-  font-size: 13.5px; color: var(--t1);
-  padding: 8px 0; padding-left: 22px;
-  position: relative;
-  border-bottom: 1px solid var(--border);
-}
-.feat-list li:last-child { border-bottom: none; }
-.feat-list li::before {
-  content: '▸';
-  position: absolute; left: 0; top: 8px;
-  font-size: 12px;
-}
-.f-res .feat-list li::before { color: var(--amber); }
-.f-rec .feat-list li::before { color: var(--teal); }
-.feat-list .sub {
-  font-size: 12px; color: var(--t2); margin-top: 2px; font-weight: 400;
-}
-.feat-list .strong {
-  font-weight: 700;
-}
-
-/* ── DEPENDENCY MAP ────────────────────── */
-.dep-grid {
-  display: grid;
-  grid-template-columns: 1fr 1fr;
-  gap: 14px;
-  margin-bottom: 18px;
-}
-@media (max-width: 700px) { .dep-grid { grid-template-columns: 1fr; } }
-.dep-node {
-  border: 1px solid; border-radius: 12px; padding: 16px 20px;
-  position: relative;
-}
-.dep-node.dep-ref { border-color: rgba(100,116,139,.3); background: rgba(100,116,139,.05); }
-.dep-node.dep-done { border-color: rgba(45,212,191,.3); background: rgba(45,212,191,.05); }
-.dep-node.dep-future { border-color: rgba(155,114,247,.3); background: rgba(155,114,247,.04); border-style: dashed; }
-.dep-name {
-  font-family: var(--mono); font-size: 13px; font-weight: 700;
-  display: flex; align-items: center; justify-content: space-between;
-  margin-bottom: 6px;
-}
-.dep-summary {
-  font-size: 12.5px; color: var(--t2); line-height: 1.55;
-}
-.dep-deps {
-  font-size: 11px; color: var(--t3); margin-top: 8px;
-  font-family: var(--mono);
-}
-.dep-deps strong { color: var(--t2); font-weight: 600; }
-
-/* ── DISCOVERED BUGS ───────────────────── */
-.bug-grid {
-  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
-  gap: 14px;
-}
-.bug-card {
-  border: 1px solid rgba(249,112,104,.25); background: rgba(249,112,104,.04);
-  border-radius: 12px; padding: 18px;
-}
-.bug-num {
-  display: inline-block;
-  width: 26px; height: 26px; line-height: 22px;
-  border: 1px solid rgba(249,112,104,.5); background: rgba(249,112,104,.1);
-  color: var(--rose); border-radius: 50%;
-  text-align: center; font-size: 12px; font-weight: 800;
-  margin-bottom: 10px;
-}
-.bug-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
-.bug-body  { font-size: 12.5px; color: var(--t2); line-height: 1.55; }
-.bug-fix {
-  margin-top: 8px; font-size: 11.5px; color: var(--teal);
-  display: flex; align-items: flex-start; gap: 6px;
-}
-.bug-fix::before { content: '✓'; font-weight: 700; }
-
-/* ── FOOTER ────────────────────────────── */
-footer {
-  border-top: 1px solid var(--border); padding: 40px 32px;
-  text-align: center; color: var(--t3); font-size: 13px;
-}
-footer code { font-size: 12px; }
-</style>
+<title>GROWI Vault — サービス提供ガイド (2026-05-22)</title>
+<link rel="stylesheet" href="infographic.css">
 </head>
 <body>
 
@@ -413,37 +15,36 @@ footer code { font-size: 12px; }
   <div class="hero-content">
     <div class="hero-eyebrow">
       <span class="dot"></span>
-      GROWI Vault · Status Report · 2026-05-22
+      GROWI.cloud · New Feature · 2026-05-22
     </div>
-    <h1>GROWI <span class="accent">Vault</span><br>サブ spec 進捗レポート</h1>
+    <h1>GROWI <span class="accent">Vault</span><br>サービス提供ガイド</h1>
     <p class="hero-tagline">
-      <strong>MVP リリース (2026-05-19) から 3 日間</strong>で<br>
-      <code>resilience</code> と <code>reconcile</code> の 2 つの後続 spec を完了し、<br>
-      残るは <code>ha</code> のみとなった現状をまとめる。
+      GROWI ページを <strong>git clone</strong> で取得できる新機能。<br>
+      GROWI.cloud でサービス提供するために必要なインフラ要件・デプロイ構成・運用手順を解説する。
     </p>
     <div class="hero-audience">
-      🎯 対象: GROWI.cloud サービス開発 / インフラメンバー · 前回 (2026-05-19) infographic を読了済み想定
+      🎯 対象: GROWI.cloud サービス開発メンバー / インフラメンバー
     </div>
     <div class="hero-stats">
       <div class="hero-stat">
-        <div class="val">5</div>
-        <div class="label">sub-spec 総数</div>
+        <div class="val">新規</div>
+        <div class="label">マイクロサービス追加</div>
       </div>
       <div class="hero-stat">
-        <div class="val">4</div>
-        <div class="label">完了 (implementation-complete)</div>
+        <div class="val">NFS</div>
+        <div class="label">Filestore 必須 (GCP)</div>
       </div>
       <div class="hero-stat">
-        <div class="val">1</div>
-        <div class="label">将来予定 (brief 段階)</div>
+        <div class="val">k8s</div>
+        <div class="label">StatefulSet + NetworkPolicy</div>
       </div>
       <div class="hero-stat">
-        <div class="val">585+</div>
-        <div class="label">tests pass (累計)</div>
+        <div class="val">PAT</div>
+        <div class="label">既存認証を再利用</div>
       </div>
       <div class="hero-stat">
-        <div class="val">0</div>
-        <div class="label">残存 [ ] task</div>
+        <div class="val">自動補修</div>
+        <div class="label">drift 検出 + reconcile</div>
       </div>
     </div>
   </div>
@@ -456,539 +57,915 @@ footer code { font-size: 12px; }
 </div>
 
 
-<!-- ═══════ TIMELINE ═══════ -->
+<!-- ═══════ WHAT IS VAULT ═══════ -->
 <section>
 <div class="page">
-  <div class="section-label" style="color:var(--blue)">Timeline</div>
-  <h2 class="section-title">この 16 日間で起きたこと</h2>
-  <p class="section-sub">前回 infographic (5/19) が「MVP として何を出荷したか」を伝えるドキュメントだったのに対し、本レポートはその直後 3 日間に行った <strong>resilience + reconcile + ha brief</strong> のスプリント結果を伝える。</p>
+  <div class="section-label" style="color:var(--blue)">Overview</div>
+  <h2 class="section-title">GROWI Vault とは何か</h2>
+  <p class="section-sub">ユーザーが自分の閲覧権限を持つ GROWI ページ群を git で取得できるようにする機能。GROWI.cloud のサービスメニューとして提供する。</p>
 
-  <div class="timeline">
-
-    <div class="tl-event tl-cleanup">
-      <div class="tl-date">2026-05-07</div>
-      <div class="tl-title">
-        <code>growi-vault-gateway</code> / <code>growi-vault-manager</code> cleanup
-        <span class="status-badge status-ref">REFERENCE</span>
+  <div class="overview-grid">
+    <div class="overview-text">
+      <div class="ov-point">
+        <span class="ov-icon">🖥️</span>
+        <div class="ov-body">
+          <h4>標準 git クライアントで clone できる</h4>
+          <p>追加ツール不要。<code>git clone https://growi.cloud/_vault/repo.git</code> だけで動く。認証は既存の Personal Access Token (PAT)。</p>
+        </div>
       </div>
-      <div class="tl-body">
-        両 sub-spec を <code>phase: implementation-complete</code> + <code>cleaned_up_at</code> にし、historical record として固定化。以後はここから「置き換え設計」を新 spec として切り出す pattern を採用。
+      <div class="ov-point">
+        <span class="ov-icon">📁</span>
+        <div class="ov-body">
+          <h4>ページ階層がそのままディレクトリ構造に</h4>
+          <p>GROWI の <code>/A/B/C</code> が clone 結果の <code>A/B/C.md</code> として現れる。AI エージェント・grep・Obsidian から直接参照できる。</p>
+        </div>
+      </div>
+      <div class="ov-point">
+        <span class="ov-icon">🔐</span>
+        <div class="ov-body">
+          <h4>ACL を git にも適用</h4>
+          <p>公開 / グループ / 自分だけ の GROWI 権限がそのまま git 経由でも適用される。他ユーザーの非公開ページは存在自体が観測不可能。</p>
+        </div>
+      </div>
+      <div class="ov-point">
+        <span class="ov-icon">🔄</span>
+        <div class="ov-body">
+          <h4>更新が自動で git に反映</h4>
+          <p>GROWI でページを編集すると次回 <code>git pull</code> で差分が取得できる。rename・権限変更も自動伝播。</p>
+        </div>
+      </div>
+      <div class="ov-point">
+        <span class="ov-icon">🛡️</span>
+        <div class="ov-body">
+          <h4>drift を自動検出して補修</h4>
+          <p><code>pages.updatedAt</code> watermark sweep で MongoDB と vault tree の乖離を検出。検出時は既存 instruction 経路で自動補修。bootstrap も resilient な state machine で再起動・失敗からの自動再開を保証。</p>
+        </div>
+      </div>
+      <div class="ov-point">
+        <span class="ov-icon">🎯</span>
+        <div class="ov-body">
+          <h4>UI から手動 reconcile も可能</h4>
+          <p>admin は全範囲、一般ユーザーは自分が write 権を持つ sub-tree のみを対象に、PageTree や GrowiContextualSubNavigation からピンポイントで再同期をトリガーできる。watermark sweep が拾えない局所 drift の救済経路。</p>
+        </div>
       </div>
     </div>
 
-    <div class="tl-event tl-mvp">
-      <div class="tl-date">2026-05-19</div>
-      <div class="tl-title">
-        MVP リリース + 前回 infographic 公開
-        <span class="status-badge status-done">MVP DONE</span>
+    <div class="before-after">
+      <div class="ba-box before">
+        <div class="ba-label">🔴 Before — 現状</div>
+        <div class="ba-flow" style="margin-bottom:10px">
+          <span class="node">GROWI ページ</span>
+          <span class="arr">→</span>
+          <span class="node">MongoDB のみ</span>
+        </div>
+        <div class="ba-flow" style="margin-bottom:10px">
+          <span class="node blocked">grep / find</span>
+          <span class="arr">→</span>
+          <span style="color:var(--rose);font-size:13px">❌ 使えない</span>
+        </div>
+        <div class="ba-flow" style="margin-bottom:10px">
+          <span class="node blocked">git clone</span>
+          <span class="arr">→</span>
+          <span style="color:var(--rose);font-size:13px">❌ 使えない</span>
+        </div>
+        <div class="ba-flow">
+          <span class="node blocked">AI エージェント</span>
+          <span class="arr">→</span>
+          <span style="color:var(--rose);font-size:13px">❌ 使えない</span>
+        </div>
       </div>
-      <div class="tl-body">
-        <code>git clone</code> / <code>git pull</code> による read-only アクセス、PAT 認証、ACL-scoped 同期、admin UI からの bootstrap 完了。一方で <strong>完了状態の信頼性</strong> (cursor リセット欠如 / reset-all 毎回発行 / fire-and-forget な失敗処理) と <strong>drift 検出機構の不在</strong>、<strong>user-triggered な部分再同期手段の不在</strong>という 3 つの構造的欠陥が残存。
-      </div>
-    </div>
-
-    <div class="tl-event tl-resilience">
-      <div class="tl-date">2026-05-21</div>
-      <div class="tl-title">
-        <code>growi-vault-resilience</code> GO
-        <span class="status-badge status-done">DONE</span>
-      </div>
-      <div class="tl-body">
-        <strong>system-triggered correctness</strong> の独立 spec として、resilient bootstrap state machine + 軽量 drift 検出 (watermark-based incremental sweep) + 起動時自動再試行 + heartbeat/instanceId + admin UI surface を 14 task で完成。<code>/kiro-validate-impl</code> GO (全 50 受け入れ基準 COVERED、338 tests pass)。
-      </div>
-      <div class="tl-meta">
-        <span class="chip chip-amber">14 tasks</span>
-        <span class="chip chip-teal">338 tests pass</span>
-        <span class="chip chip-blue">50/50 requirements COVERED</span>
-      </div>
-    </div>
-
-    <div class="tl-event tl-reconcile">
-      <div class="tl-date">2026-05-22</div>
-      <div class="tl-title">
-        <code>growi-vault-reconcile</code> GO + cleanup + roadmap 再編 + <code>growi-vault-ha</code> brief drafted
-        <span class="status-badge status-done">DONE</span>
-        <span class="status-badge status-future">+ brief</span>
-      </div>
-      <div class="tl-body">
-        <strong>user-triggered targeted reconcile</strong> を独立 spec として、admin + 一般ユーザー両経路、ACL-scoped、PageTree / GrowiContextualSubNavigation / admin UI 統合を 22 leaf task で完成。<code>/kiro-validate-impl</code> GO (vitest 247 pass + Playwright E2E 4 pass on chromium、要件 7/7 COVERED)。同日中に既存 <code>resilience</code> の cleanup と roadmap の repo-global 化、<code>growi-vault-ha</code> brief drafted を完了。
-      </div>
-      <div class="tl-meta">
-        <span class="chip chip-teal">22 leaf tasks</span>
-        <span class="chip chip-blue">247 vitest pass</span>
-        <span class="chip chip-violet">4 Playwright E2E pass</span>
-        <span class="chip chip-green">requirements 7/7 COVERED</span>
-      </div>
-    </div>
-
-    <div class="tl-event tl-future">
-      <div class="tl-date">未定 (将来)</div>
-      <div class="tl-title">
-        <code>growi-vault-ha</code> 実装
-        <span class="status-badge status-future">将来予定 · 未着手</span>
-      </div>
-      <div class="tl-body">
-        vault-manager の単一インスタンス前提を解消し、Competing Consumers + per-namespace lease で multi-replica 化する。<strong>brief.md のみ drafted、requirements / design / tasks はすべて未生成・未着手</strong>。着手時期と優先度は未定。
-      </div>
-      <div class="tl-meta">
-        <span class="chip chip-violet">brief drafted</span>
-        <span class="chip chip-gray">requirements 未着手</span>
-        <span class="chip chip-gray">design 未着手</span>
-        <span class="chip chip-gray">implementation 未着手</span>
+      <div style="text-align:center;padding:8px;color:var(--t3);font-size:22px">↓</div>
+      <div class="ba-box after">
+        <div class="ba-label">✅ After — GROWI Vault</div>
+        <div class="ba-flow" style="margin-bottom:10px">
+          <span class="node">GROWI ページ</span>
+          <span class="arr">→</span>
+          <span class="node">git repo</span>
+          <span class="arr">→</span>
+          <span class="node">ローカル .md</span>
+        </div>
+        <div class="ba-flow" style="margin-bottom:10px">
+          <span class="node">grep / find</span>
+          <span class="arr">→</span>
+          <span style="color:var(--teal);font-size:13px">✓ 動作する</span>
+        </div>
+        <div class="ba-flow" style="margin-bottom:10px">
+          <span class="node">git clone/pull</span>
+          <span class="arr">→</span>
+          <span style="color:var(--teal);font-size:13px">✓ 動作する</span>
+        </div>
+        <div class="ba-flow">
+          <span class="node">AI エージェント</span>
+          <span class="arr">→</span>
+          <span style="color:var(--teal);font-size:13px">✓ 動作する</span>
+        </div>
       </div>
     </div>
-
   </div>
 </div>
 </section>
 
 
-<!-- ═══════ SUB-SPEC STATUS GRID ═══════ -->
+<!-- ═══════ ARCHITECTURE ═══════ -->
 <section>
 <div class="page">
-  <div class="section-label" style="color:var(--violet)">Sub-spec Status</div>
-  <h2 class="section-title">5 つの sub-spec の現況</h2>
-  <p class="section-sub">umbrella spec <code>growi-vault</code> 配下に 5 つの sub-spec が並列している。flat な命名 (<code>growi-vault-{gateway,manager,resilience,reconcile,ha}</code>) で責務マップが並列に見える構造。</p>
+  <div class="section-label" style="color:var(--amber)">Architecture</div>
+  <h2 class="section-title">システム構成</h2>
+  <p class="section-sub">2 つのコンポーネントが協調する。セキュリティ境界は <strong>apps/app 一箇所</strong> に集約し、vault-manager は外部から完全に隔離する。</p>
 
-  <div class="spec-grid">
-
-    <div class="spec-card gateway">
-      <div class="spec-name">growi-vault-gateway</div>
-      <div class="spec-tagline">apps/app 内の vault gateway。PAT 認証 + ACL 評価 + read-only git smart HTTP + namespace 計算。</div>
-      <div class="spec-meta">
-        <span class="status-badge status-ref">REFERENCE</span>
-        <span class="spec-stat">cleaned_up_at: <strong>2026-05-19</strong></span>
-      </div>
-      <div class="spec-section">
-        <div class="spec-section-label">Role in stack</div>
-        <ul>
-          <li>外部からの唯一の窓口</li>
-          <li>PAT 認証 / ACL 評価の owner</li>
-          <li>後続 spec が依存する interface 提供</li>
-        </ul>
+  <div class="arch-wrap">
+    <div class="arch-layer l-ext">
+      <div class="arch-layer-label">外部 — ユーザーがアクセスする唯一の窓口</div>
+      <div class="arch-chips">
+        <span class="chip chip-blue">🖥️ git clone</span>
+        <span class="chip chip-blue">🔄 git fetch / pull</span>
+        <span class="chip chip-blue" style="opacity:.5;text-decoration:line-through">✗ git push (read-only)</span>
       </div>
     </div>
 
-    <div class="spec-card manager">
-      <div class="spec-name">growi-vault-manager</div>
-      <div class="spec-tagline">独立マイクロサービス。instruction → git materialization の冪等な consumer。<code>isExcludedFromVault</code> filter / namespace mapper を所有。</div>
-      <div class="spec-meta">
-        <span class="status-badge status-ref">REFERENCE</span>
-        <span class="spec-stat">cleaned_up_at: <strong>2026-05-19</strong></span>
-      </div>
-      <div class="spec-section">
-        <div class="spec-section-label">Role in stack</div>
-        <ul>
-          <li>vault_instructions の consumer</li>
-          <li>bare repo への write owner</li>
-          <li>冪等性契約の保証 (content-addressing + 純関数 path mapper)</li>
-        </ul>
+    <div class="arch-connector">🔒 HTTPS · git Smart HTTP · PAT 認証 (HTTP Basic Auth)</div>
+
+    <div class="arch-layer l-gw">
+      <div class="arch-layer-label">🛡️ apps/app 内 vault feature — 既存コンテナに同居 · 外部公開エンドポイント + correctness 保証 + reconcile 受付</div>
+      <div class="arch-chips">
+        <span class="chip chip-amber">VaultGatewayRouter</span>
+        <span class="chip chip-amber">VaultPatAuth (既存 PAT 再利用)</span>
+        <span class="chip chip-amber">VaultNamespaceMapper (ACL 評価)</span>
+        <span class="chip chip-amber">VaultDispatcher (page event → outbox)</span>
+        <span class="chip chip-amber">VaultBootstrapper (state machine)</span>
+        <span class="chip chip-amber">VaultResilienceLayer (drift + retry + heartbeat)</span>
+        <span class="chip chip-amber">VaultReconcileService (admin + user 受付ゲート)</span>
+        <span class="chip chip-amber">VaultManagerClient (RPC)</span>
+        <span class="chip chip-amber">VaultAdminSettings UI (拡張済)</span>
       </div>
     </div>
 
-    <div class="spec-card resilience">
-      <div class="spec-name">growi-vault-resilience</div>
-      <div class="spec-tagline">system-triggered correctness。resilient bootstrap state machine + watermark-based drift 検出 + 起動時自動再試行。</div>
-      <div class="spec-meta">
-        <span class="status-badge status-done">DONE</span>
-        <span class="spec-stat">GO: <strong>2026-05-21</strong> · cleanup: <strong>2026-05-22</strong></span>
-      </div>
-      <div class="spec-section">
-        <div class="spec-section-label">Role in stack</div>
-        <ul>
-          <li>bootstrap state machine の owner</li>
-          <li>vault_instructions outbox の write owner</li>
-          <li>後続 spec が共有する heartbeat / instanceId primitive を確立</li>
-        </ul>
+    <div class="arch-connector">🔑 shared secret Bearer · 内部 RPC のみ · k8s NetworkPolicy で保護</div>
+
+    <div class="arch-layer l-mgr">
+      <div class="arch-layer-label">⚙️ growi-vault-manager — 独立マイクロサービス · 内部専用 · ACL 知識ゼロの実行エンジン</div>
+      <div class="arch-chips">
+        <span class="chip chip-violet">ComposeViewController</span>
+        <span class="chip chip-violet">GitProxyController (upload-pack)</span>
+        <span class="chip chip-violet">VaultInstructionWatcher (change stream)</span>
+        <span class="chip chip-violet">VaultNamespaceBuilder (git objects)</span>
+        <span class="chip chip-violet">VaultViewComposer (per-user merge)</span>
+        <span class="chip chip-violet">VaultUploadPackSpawner</span>
+        <span class="chip chip-violet">VaultMaintenanceScheduler (squash / gc)</span>
       </div>
     </div>
 
-    <div class="spec-card reconcile">
-      <div class="spec-name">growi-vault-reconcile</div>
-      <div class="spec-tagline">user-triggered targeted reconcile。admin + 一般ユーザーの ACL-scoped reconcile を PageTree / SubNav / admin UI 統合で提供。</div>
-      <div class="spec-meta">
-        <span class="status-badge status-done">DONE</span>
-        <span class="spec-stat">GO: <strong>2026-05-22</strong> · cleanup: <strong>2026-05-22</strong></span>
+    <div class="arch-bottom">
+      <div>
+        <div class="arch-connector" style="margin-bottom:8px">📦 MongoDB change stream + R/W</div>
+        <div class="arch-layer l-db">
+          <div class="arch-layer-label">MongoDB (既存 replica set を共用)</div>
+          <div class="arch-chips">
+            <span class="chip chip-teal">vault_instructions (outbox)</span>
+            <span class="chip chip-teal">vault_namespace_state</span>
+            <span class="chip chip-teal">vault_user_views</span>
+            <span class="chip chip-teal">vault_sync_state (state machine)</span>
+            <span class="chip chip-teal">vault_reconcile_log (履歴)</span>
+            <span class="chip chip-teal">pages / revisions (read-only)</span>
+          </div>
+        </div>
       </div>
-      <div class="spec-section">
-        <div class="spec-section-label">Role in stack</div>
-        <ul>
-          <li>outbox 経路を相乗りする consumer</li>
-          <li>vault_reconcile_log collection の owner</li>
-          <li>新規 instruction op は追加せず、既存 <code>bulk-upsert</code> を再利用</li>
-        </ul>
-      </div>
-    </div>
-
-    <div class="spec-card ha">
-      <div class="spec-name">growi-vault-ha</div>
-      <div class="spec-tagline">vault-manager の冗長化 (Competing Consumers + per-namespace lease)。change stream 取りこぼしの構造的排除と scaling 両立を狙う。</div>
-      <div class="spec-meta">
-        <span class="status-badge status-future">将来予定 · 未着手</span>
-        <span class="spec-stat">brief drafted: <strong>2026-05-22</strong></span>
-      </div>
-      <div class="spec-section">
-        <div class="spec-section-label">Status</div>
-        <ul>
-          <li><strong>brief.md のみ存在</strong></li>
-          <li>requirements / design / tasks は未生成</li>
-          <li>実装着手時期は未定</li>
-        </ul>
+      <div>
+        <div class="arch-connector" style="margin-bottom:8px">📁 bare repo I/O · git binary v2.30+ · POSIX semantics 必須</div>
+        <div class="arch-layer l-fs">
+          <div class="arch-layer-label">🆕 共有ファイルシステム — GROWI.cloud: Filestore (GCP NFS) 必須</div>
+          <div class="arch-chips">
+            <span class="chip chip-rose">git bare repository</span>
+            <span class="chip chip-rose">namespace refs</span>
+            <span class="chip chip-rose">isomorphic-git v1.37</span>
+            <span class="chip chip-rose">git binary v2.30+</span>
+          </div>
+        </div>
       </div>
     </div>
-
   </div>
 
-  <div class="note" style="margin-top:24px">
-    <strong>cleanup pattern の到達点</strong>:
-    cleanup 済み reference spec を historical record として保ち、新 spec が「置き換え設計」を提示する pattern が 4 sub-spec で連続して機能。新 spec の `design.md` には <strong>This Spec Owns / Out of Boundary / Allowed Dependencies / Revalidation Triggers</strong> を必ず置き、reference spec の Implementation Notes には 1 行の波及記述を後付けする運用で、reference 性と進化を両立できている。
+  <div class="warn" style="margin-top:20px">
+    <strong>⚠️ GROWI.cloud ストレージ制約</strong>:
+    vault-manager は random small I/O + ref の atomic rename が必要なため、<strong>GCSFuse (object storage backed FUSE) は非対応</strong>。
+    必ず <strong>Filestore (GCP managed NFS)</strong> を利用すること。apps/pdf-converter が使うものとは workload profile が異なるため別途手配が必要。
   </div>
 </div>
 </section>
 
 
-<!-- ═══════ DEEP DIVE: RESILIENCE + RECONCILE ═══════ -->
+<!-- ═══════ MECHANISM ═══════ -->
 <section>
 <div class="page">
-  <div class="section-label" style="color:var(--teal)">What's New Since 5/19</div>
-  <h2 class="section-title">resilience と reconcile が解決したもの</h2>
-  <p class="section-sub">「誰がトリガーするか」を境界として system-triggered (自動) と user-triggered (手動) の 2 spec に分離。両者は <code>vault_instructions</code> outbox を共有し、vault-manager の冪等性契約に乗る。</p>
+  <div class="section-label" style="color:var(--teal)">Mechanism</div>
+  <h2 class="section-title">仕組みの解説</h2>
+  <p class="section-sub">MongoDB が唯一の真実の源 (SSOT)。vault は MongoDB の内容を git 形式に "投影" したものに過ぎない。bootstrap・通常更新・drift 自動補修・手動 reconcile の 4 経路がすべて同じ outbox を共有する。</p>
 
-  <div class="feat-grid">
+  <!-- ── SSOT 概念図 ── -->
+  <div class="ssot-diagram">
 
-    <div class="feat-block f-res">
-      <div class="feat-header">
-        <div class="feat-icon">🛡️</div>
-        <div class="feat-title">resilience</div>
-        <span class="feat-tag">System-triggered</span>
-      </div>
-      <p class="feat-tagline">
-        「<code>bootstrapState: 'done'</code> でも実体の完全性は保証されない」「失敗が fire-and-forget」「<code>VAULT_BOOTSTRAP_ON_START=true</code> でデータ消失リスク」という MVP 時点の 5 つの構造的欠陥を解消し、System 側の correctness 保証層を確立した。
-      </p>
-      <ul class="feat-list">
-        <li>
-          <span class="strong">7 状態の state union による bootstrap state machine</span>
-          <div class="sub">pending / running / verifying / done / failed / aborted / force-pending を明示状態として定義。<code>VAULT_BOOTSTRAP_ON_START=true</code> 再起動で reset-all が走らない不変条件を仕様化。</div>
-        </li>
-        <li>
-          <span class="strong">watermark-based drift detector v1</span>
-          <div class="sub"><code>pages.updatedAt</code> watermark sweep で編集 / trash 移動 / restore 由来の drift を検出。検出時は既存 <code>bulk-upsert</code> instruction 経路に再発火 (新規 op を増やさず)。O(N) 全件 scan を回避。</div>
-        </li>
-        <li>
-          <span class="strong">起動時自動再試行 (bounded exponential backoff)</span>
-          <div class="sub">前回 <code>failed</code> 状態で起動した場合、retry policy で resume を試行。limit 超過時に admin UI に <code>force warning</code> として surface し人手介入を求める escalation 経路。</div>
-        </li>
-        <li>
-          <span class="strong">heartbeat / instanceId / stale 正規化</span>
-          <div class="sub">startup migration で前回 process の crash 残留 (<code>running</code> + instanceId なし) を <code>failed: process-restarted</code> に正規化。後続 <code>reconcile</code> spec が同じ pattern を <code>pending</code> 残留にも適用 (<code>HistoryStore.normalizeStaleLifecycle</code>)。</div>
-        </li>
-        <li>
-          <span class="strong">admin UI 拡張</span>
-          <div class="sub"><code>/admin/vault</code> に Bootstrap state / Completion Reliability / Auto-Retry Status / Drift Activity / Force Warning Banner の 5 section を追加。完了状態の信頼性指標と自動補修活動を観測可能に。</div>
-        </li>
+    <div class="ssot-node">
+      <div class="sn-icon">🖥️</div>
+      <div class="sn-name">apps/app</div>
+      <div class="sn-desc">GROWI 本体 + vault feature</div>
+      <ul>
+        <li>pages の CRUD</li>
+        <li>revisions の保存</li>
+        <li>ACL 管理</li>
+        <li>state machine / drift / reconcile</li>
       </ul>
     </div>
 
-    <div class="feat-block f-rec">
-      <div class="feat-header">
-        <div class="feat-icon">🎯</div>
-        <div class="feat-title">reconcile</div>
-        <span class="feat-tag">User-triggered</span>
-      </div>
-      <p class="feat-tagline">
-        watermark drift detector が構造的に拾えない局所 drift (path change / grant drop / hard delete) を、ユーザーが UI から ACL-scoped に手動補修できる経路を提供。force bootstrap (全 wipe) と watermark sweep の間を埋めるピンポイント手段。
-      </p>
-      <ul class="feat-list">
-        <li>
-          <span class="strong">admin + 一般ユーザーの 2 経路</span>
-          <div class="sub">admin は全範囲 / 一般ユーザーは自分が write 権を持つ sub-tree のみ。<code>POST /vault/reconcile</code> (admin) と <code>POST /vault/page/reconcile</code> (user) の 2 endpoint で実現。</div>
-        </li>
-        <li>
-          <span class="strong">accept gate の I/O 制約</span>
-          <div class="sub">受付ゲート中の DB I/O を <code>findOne</code> × 1 + 非 admin 時のみ <code>getUserRelatedGroups</code> × 1 に固定。<code>countDocuments</code> 等の全 scan を発行しない設計で、accept gate p99 ≤ 200ms を達成。</div>
-        </li>
-        <li>
-          <span class="strong">defense-in-depth な hard cap</span>
-          <div class="sub">受付ゲートは <code>page.descendantCount</code> stale なら見積もり違いを起こすため、orchestrator 側で <code>limit(plannedPageCount + 1)</code> のハードキャップを再適用。stale 検知時は <code>failed: limit-exceeded</code> で停止。</div>
-        </li>
-        <li>
-          <span class="strong">PageTree / GrowiContextualSubNavigation 統合</span>
-          <div class="sub">一般ユーザーは自分のページの dropdown menu から 1 クリックで reconcile 起動可能。modal 内で path 確認 → submit → accepted feedback の simple flow。i18n は <code>commons</code> namespace で全ページ対応。</div>
-        </li>
-        <li>
-          <span class="strong">冪等性に委ねた競合許容</span>
-          <div class="sub">resilience の自動補修と reconcile の手動補修が同じ <code>vault_instructions</code> outbox を共有するため衝突しうるが、vault-manager の content-addressing 冪等性により最終状態が一意に収束する設計を両 spec で明示。</div>
-        </li>
+    <div class="ssot-h-arrow">
+      <div class="arrow-label">書き込み<br>(CRUD)</div>
+      <div class="arrow-tip">→</div>
+    </div>
+
+    <div class="ssot-node center">
+      <div class="sn-icon">🍃</div>
+      <div class="sn-name" style="color:var(--teal)">MongoDB</div>
+      <div class="sn-desc">全データの正本</div>
+      <ul>
+        <li>pages</li>
+        <li>revisions</li>
+        <li>users / groups</li>
+        <li>vault_instructions</li>
+      </ul>
+    </div>
+
+    <div class="ssot-h-arrow">
+      <div class="arrow-tip">→</div>
+      <div class="arrow-label">読み込み<br>(body のみ)</div>
+    </div>
+
+    <div class="ssot-node">
+      <div class="sn-icon">⚙️</div>
+      <div class="sn-name">vault-manager</div>
+      <div class="sn-desc">実行エンジン</div>
+      <ul>
+        <li>revisions.body を読む</li>
+        <li>pages は読まない</li>
+        <li>MongoDB へ書かない</li>
       </ul>
     </div>
 
   </div>
+
+  <!-- ── outbox ブリッジ ── -->
+  <div class="outbox-bridge">
+    <div class="ob-node">
+      <div class="ob-label">書き込み側</div>
+      <div class="ob-name" style="color:var(--amber)">VaultDispatcher<br>VaultBootstrapper<br>VaultResilienceLayer<br>VaultReconcileService</div>
+    </div>
+    <div class="ob-arrow">insert →</div>
+    <div class="ob-center">
+      <div class="ob-box">
+        <div class="ob-title">📋 vault_instructions</div>
+        <div class="ob-sub">durable outbox (MongoDB collection)<br>6 種の op を共有: upsert / bulk-upsert / remove /<br>rename-prefix / grant-change-prefix / reset-all</div>
+      </div>
+    </div>
+    <div class="ob-arrow">→ change stream</div>
+    <div class="ob-node">
+      <div class="ob-label">読み込み側</div>
+      <div class="ob-name" style="color:var(--violet)">VaultInstruction<br>Watcher</div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-bottom:40px">
+    <strong>設計の核心</strong>:
+    vault-manager は MongoDB の <strong>pages コレクションを直接読まない</strong>。
+    読むのは <code>revisions.body</code>（ID 指定の 1 フィールドのみ）と <code>vault_instructions</code>（指示書）だけ。
+    ACL 評価はすべて apps/app 側で行い、vault-manager には「どの namespace に書くか」という指示だけが届く。
+    bootstrap / drift detector / reconcile はいずれも apps/app 側に閉じ、<strong>全て同じ outbox 経路 + 既存 6 op</strong> を通って vault-manager に届く (新規 op を増やさない)。
+  </div>
+
+  <!-- ── 主 2 フロー ── -->
+  <div class="mech-cols">
+
+    <!-- 初回フロー -->
+    <div>
+      <div class="mech-col-header mch-init">🚀 初回フロー — Bootstrap (resilient state machine)</div>
+      <div class="mech-steps ms-init">
+
+        <div class="mstep">
+          <div class="mstep-num">1</div>
+          <div class="mstep-body">
+            <h4>管理者が Vault を有効化</h4>
+            <p>admin UI で「Prepare GROWI Vault」ボタンを押す。または <code>VAULT_BOOTSTRAP_ON_START=true / force</code> で自動起動も可能。</p>
+            <span class="mstep-tag tag-admin">管理者操作 or env</span>
+          </div>
+        </div>
+
+        <div class="mstep">
+          <div class="mstep-num">2</div>
+          <div class="mstep-body">
+            <h4>state machine が遷移を管理</h4>
+            <p><code>vault_sync_state.bootstrapState</code> は <code>pending → running → verifying → done</code> (失敗時は <code>failed / aborted / force-pending</code>) の 7 状態。<code>true</code> で再起動しても <code>done</code> 状態は破壊されない。</p>
+            <span class="mstep-tag tag-db">vault_sync_state</span>
+          </div>
+        </div>
+
+        <div class="mstep highlight">
+          <div class="mstep-num">3</div>
+          <div class="mstep-body">
+            <h4>cursor で全ページを stream + bulk-upsert を投入</h4>
+            <p>published かつ <code>/trash</code> 以外の全ページを cursor で読み出し、各ページの ACL から namespace を判定。namespace 単位で <code>bulk-upsert</code> instruction を chunk size ごとに outbox へ insert。</p>
+            <span class="mstep-tag tag-app">VaultBootstrapper</span>
+            <span class="mstep-tag tag-db">vault_instructions</span>
+          </div>
+        </div>
+
+        <div class="mstep">
+          <div class="mstep-num">4</div>
+          <div class="mstep-body">
+            <h4>vault-manager が change stream で受信して bare repo に書き込む</h4>
+            <p>Markdown 本文 → <strong>blob</strong> → <strong>tree</strong>（ディレクトリ構造）→ <strong>commit</strong> → namespace ref を更新。isomorphic-git で実装。</p>
+            <span class="mstep-tag tag-mgr">VaultNamespaceBuilder</span>
+            <span class="mstep-tag tag-git">bare repo</span>
+          </div>
+        </div>
+
+        <div class="mstep highlight">
+          <div class="mstep-num">5</div>
+          <div class="mstep-body">
+            <h4>completeness 検証 → state: done</h4>
+            <p>処理件数と推定全件数を比較する軽量検証を経て <code>verifying → done</code> に遷移。clone / fetch が解禁される。失敗時は <code>failed</code> で停留し、起動時 retry policy で有界 backoff 再試行 (上限超過は admin UI に escalate)。</p>
+            <span class="mstep-tag tag-db">vault_sync_state</span>
+            <span class="mstep-tag tag-app">VaultResilienceLayer</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- ページ更新フロー -->
+    <div>
+      <div class="mech-col-header mch-update">🔄 通常運用 — ページ更新フロー</div>
+      <div class="mech-steps ms-update">
+
+        <div class="mstep">
+          <div class="mstep-num">1</div>
+          <div class="mstep-body">
+            <h4>ユーザーがページを編集・保存</h4>
+            <p>通常の GROWI 編集操作。ユーザーは Vault の存在を意識しない。</p>
+            <span class="mstep-tag tag-app">GROWI ユーザー</span>
+          </div>
+        </div>
+
+        <div class="mstep highlight">
+          <div class="mstep-num">2</div>
+          <div class="mstep-body">
+            <h4>MongoDB に page + revision を永続化 (SSOT 更新)</h4>
+            <p><code>PageService</code> が MongoDB を更新する。<strong>これが唯一の正本更新</strong>。vault の更新はこの後に非同期で行われる。</p>
+            <span class="mstep-tag tag-db">MongoDB (SSOT)</span>
+          </div>
+        </div>
+
+        <div class="mstep">
+          <div class="mstep-num">3</div>
+          <div class="mstep-body">
+            <h4>PageService が in-process event を emit</h4>
+            <p><code>pageEvent.emit('create' | 'update' | 'delete' | 'rename' | ...)</code> を発火。</p>
+            <span class="mstep-tag tag-app">PageService</span>
+          </div>
+        </div>
+
+        <div class="mstep highlight">
+          <div class="mstep-num">4</div>
+          <div class="mstep-body">
+            <h4>VaultDispatcher が namespace を計算して outbox に投入</h4>
+            <p>ページの ACL から namespace を判定。ACL 変更の場合は旧 namespace に <code>remove</code>・新 namespace に <code>upsert</code> を発行。大量イベントは <code>bulk-upsert</code> に自動 coalesce (1s / 最大 1000 件)。</p>
+            <span class="mstep-tag tag-app">VaultDispatcher</span>
+            <span class="mstep-tag tag-db">vault_instructions</span>
+          </div>
+        </div>
+
+        <div class="mstep">
+          <div class="mstep-num">5</div>
+          <div class="mstep-body">
+            <h4>vault-manager が change stream で検知して bare repo を更新</h4>
+            <p><code>processedAt = null</code> の instruction を冪等に処理。<code>revisions.body</code> を ID 指定で取得 → blob → tree → commit → namespace ref を更新。次回 <code>git pull</code> で差分が手元に反映される。</p>
+            <span class="mstep-tag tag-mgr">vault-manager</span>
+            <span class="mstep-tag tag-git">bare repo</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /mech-cols (上段) -->
+
+  <!-- ── correctness layer 2 フロー ── -->
+  <h3 style="margin-top:48px; margin-bottom:8px; font-size:1.15rem; font-weight:700; color:var(--t1)">Correctness layer (発火源で 2 系統)</h3>
+  <p style="font-size:13.5px; color:var(--t2); margin-bottom:20px; max-width:760px">通常更新フローで取りこぼした drift を埋める仕組み。<strong>誰がトリガーするか</strong>で 2 系統に分離している。両者は同じ outbox 経路 + vault-manager の冪等性に乗るため、衝突しても最終状態は一意に収束する。</p>
+
+  <div class="mech-cols">
+
+    <!-- Drift detection -->
+    <div>
+      <div class="mech-col-header mch-drift">🛡️ 自動 (system-triggered) — drift detection</div>
+      <div class="mech-steps ms-drift">
+
+        <div class="mstep">
+          <div class="mstep-num">1</div>
+          <div class="mstep-body">
+            <h4>VaultResilienceLayer が定期 sweep を起動</h4>
+            <p>config 設定の周期で起動。<code>pages.updatedAt</code> 順で前回 watermark 以降の差分を読み出す。O(N) 全件 scan は避ける軽量設計。</p>
+            <span class="mstep-tag tag-app">VaultResilienceLayer</span>
+          </div>
+        </div>
+
+        <div class="mstep">
+          <div class="mstep-num">2</div>
+          <div class="mstep-body">
+            <h4>vault tree との乖離を判定</h4>
+            <p>編集 / trash 移動 / restore 由来の drift をカバー。<strong>path change / grant drop / hard delete drift は構造的に検出不能</strong> (それらは手動 reconcile に委ねる)。</p>
+            <span class="mstep-tag tag-db">pages.updatedAt</span>
+          </div>
+        </div>
+
+        <div class="mstep highlight">
+          <div class="mstep-num">3</div>
+          <div class="mstep-body">
+            <h4>既存 instruction op で補修発行 (新規 op は増やさない)</h4>
+            <p>検出された乖離に対し <code>bulk-upsert</code> / <code>remove</code> を outbox に投入。以降は通常フローと同じ経路で vault-manager が処理する。</p>
+            <span class="mstep-tag tag-db">vault_instructions</span>
+          </div>
+        </div>
+
+        <div class="mstep">
+          <div class="mstep-num">4</div>
+          <div class="mstep-body">
+            <h4>watermark 進捗を保存 + admin UI に observability surface</h4>
+            <p><code>vault_sync_state.driftDetector*</code> に sweep の最終位置と統計を保存。admin UI の Drift Activity セクションに件数と最終 sweep 時刻を表示。</p>
+            <span class="mstep-tag tag-db">vault_sync_state</span>
+            <span class="mstep-tag tag-admin">admin UI</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+    <!-- User reconcile -->
+    <div>
+      <div class="mech-col-header mch-reconcile">🎯 手動 (user-triggered) — targeted reconcile</div>
+      <div class="mech-steps ms-reconcile">
+
+        <div class="mstep">
+          <div class="mstep-num">1</div>
+          <div class="mstep-body">
+            <h4>admin または一般ユーザーが UI から起動</h4>
+            <p>admin: <code>/admin/vault</code> の Reconcile セクションから sub-tree 指定。一般ユーザー: PageTree や GrowiContextualSubNavigation の dropdown から自分のページに対して 1 クリック。</p>
+            <span class="mstep-tag tag-admin">admin</span>
+            <span class="mstep-tag tag-user">user</span>
+          </div>
+        </div>
+
+        <div class="mstep highlight">
+          <div class="mstep-num">2</div>
+          <div class="mstep-body">
+            <h4>VaultReconcileService の accept gate が判定</h4>
+            <p>target validation → bootstrap 完了確認 → role 別の page 数上限 (admin / user) → per-user / system-wide 同時実行上限 → ACL 評価 (一般ユーザーは write 権を持つ範囲のみ) を順番に通過。<code>findOne</code> × 1 + 非 admin 時のみ <code>getUserRelatedGroups</code> × 1 の軽量 I/O。</p>
+            <span class="mstep-tag tag-app">VaultReconcileService</span>
+            <span class="mstep-tag tag-db">vault_reconcile_log</span>
+          </div>
+        </div>
+
+        <div class="mstep">
+          <div class="mstep-num">3</div>
+          <div class="mstep-body">
+            <h4>非同期 orchestrator が cursor で stream + bulk-upsert を投入</h4>
+            <p>受付完了後は background で eligible page を cursor stream し、namespace 単位の <code>bulk-upsert</code> を outbox へ投入。orchestrator 側で <code>limit(plannedPageCount + 1)</code> のハードキャップを再適用 (受付ゲート見積もり stale 時の防御層)。</p>
+            <span class="mstep-tag tag-app">ReconcileOrchestrator</span>
+            <span class="mstep-tag tag-db">vault_instructions</span>
+          </div>
+        </div>
+
+        <div class="mstep">
+          <div class="mstep-num">4</div>
+          <div class="mstep-body">
+            <h4>履歴と監査ログに記録</h4>
+            <p>受付 / 開始 / 完了 / 失敗 / 拒否 / partial-acl-filtered の 5 種を audit event として emit。<code>vault_reconcile_log</code> に進捗と最終状態を保存し、admin UI の history table に表示。</p>
+            <span class="mstep-tag tag-db">vault_reconcile_log</span>
+            <span class="mstep-tag tag-admin">audit log + history table</span>
+          </div>
+        </div>
+
+      </div>
+    </div>
+
+  </div><!-- /mech-cols (下段) -->
 </div>
 </section>
 
 
-<!-- ═══════ DISCOVERED BUGS DURING E2E ═══════ -->
+<!-- ═══════ INFRA REQUIREMENTS ═══════ -->
 <section>
 <div class="page">
-  <div class="section-label" style="color:var(--rose)">E2E Findings</div>
-  <h2 class="section-title">Playwright 実走で発掘した 4 つの実バグ</h2>
-  <p class="section-sub">Task 5.3 (admin/user UI E2E シナリオ検証) を実装して chromium で実走したところ、unit test では拾えていなかった <strong>production wiring / client 統合層 / i18n 配置</strong> の defect が連続して見つかった。いずれも feature 境界内 (LOCAL) で修正し、upstream spec への影響はなし。<strong>「unit test だけでは production wiring の正しさは検証しきれない」</strong>という教訓が残った。</p>
+  <div class="section-label" style="color:var(--rose)">Infrastructure</div>
+  <h2 class="section-title">インフラ要件</h2>
+  <p class="section-sub">GROWI.cloud で Vault を提供するために新たに必要になるリソースと制約。</p>
 
-  <div class="bug-grid">
-
-    <div class="bug-card">
-      <div class="bug-num">1</div>
-      <div class="bug-title">apiv3 prefix の重複</div>
-      <div class="bug-body">
-        client component の <code>apiEndpoint</code> 値が <code>/v3/vault/reconcile</code> だったが、<code>apiv3Post</code> が自動で <code>/_api/v3</code> を prepend するため、実 URL は <code>/_api/v3/v3/vault/reconcile</code> となり 404。
-      </div>
-      <div class="bug-fix"><code>/v3/</code> prefix を削除 (admin / user 両 endpoint)</div>
+  <div class="infra-grid">
+    <div class="infra-card gcp">
+      <div class="infra-icon">🗄️</div>
+      <h3>Filestore (GCP NFS)</h3>
+      <p>bare repo の物理配置。POSIX semantics・atomic rename・真の file locking が必須。GCSFuse・S3 FUSE 等 object storage backed FS は<strong>非対応</strong>。</p>
+      <span class="infra-badge badge-must">🚨 新規手配必須</span>
     </div>
-
-    <div class="bug-card">
-      <div class="bug-num">2</div>
-      <div class="bug-title">production wiring の脱漏</div>
-      <div class="bug-body">
-        <code>apiv3/index.js</code> が <code>createVaultAdminRouter</code> を呼んでおり <code>createVaultAdminRouterWithDeps</code> (reconcileService singleton を注入する factory) を使っていなかった。<code>/reconcile-history</code> が 500、user route はそもそも mount されていない状態。
-      </div>
-      <div class="bug-fix">factory を WithDeps 版に切替 + user route mount を追加</div>
+    <div class="infra-card k8s">
+      <div class="infra-icon">☸️</div>
+      <h3>StatefulSet (replicas=1)</h3>
+      <p>vault-manager は single writer 前提。leader election 機構なし。k8s の StatefulSet で物理的に replicas=1 を保証する。Pod 再生成での不可時間は 1〜2 分。<strong>multi-replica 化は将来 spec (growi-vault-ha) で扱う</strong>。</p>
+      <span class="infra-badge badge-new">新規 StatefulSet</span>
     </div>
-
-    <div class="bug-card">
-      <div class="bug-num">3</div>
-      <div class="bug-title">Modal lifecycle leak (Dropdown 内)</div>
-      <div class="bug-body">
-        <code>PageReconcileMenuItem</code> 内に <code>useState</code> で modal を保持していたが、親の Dropdown が outside-click で auto-close すると component ごと unmount され Modal も消える race condition。
-      </div>
-      <div class="bug-fix">Modal を親 (<code>GrowiContextualSubNavigation</code> + <code>use-page-item-control</code>) に lift up。<code>PageDeleteModal</code> / <code>CreateTemplateModal</code> と同 pattern</div>
+    <div class="infra-card net">
+      <div class="infra-icon">🔒</div>
+      <h3>NetworkPolicy</h3>
+      <p>vault-manager への Ingress は <strong>apps/app Pod からのみ</strong> 許可。外部・他 namespace からの直接アクセスを NetworkPolicy で遮断する。認証境界が apps/app に集約されることで初めて成立する設計。</p>
+      <span class="infra-badge badge-new">NetworkPolicy 追加</span>
     </div>
-
-    <div class="bug-card">
-      <div class="bug-num">4</div>
-      <div class="bug-title">i18n namespace 配置ミス</div>
-      <div class="bug-body">
-        reconcile reject reason の i18n key が <code>admin.json</code> 配下に置かれていたが、reconcile modal は user-facing page からも開くため <code>admin</code> namespace 未読込のページで生キー文字列が表示される。
-      </div>
-      <div class="bug-fix"><code>growi-vault.reconcile.*</code> を <code>commons.json</code> へ移動 + <code>useTranslation('commons')</code> へ変更</div>
+    <div class="infra-card docker">
+      <div class="infra-icon">🐳</div>
+      <h3>Dockerfile (vault-manager)</h3>
+      <p>apps/app の distroless とは異なり <code>dhi.io/node:24-debian13-dev</code> を使用。<code>git upload-pack</code> spawn に git binary v2.30+ が必要なため。5 stage + turbo prune 構成は apps/app と揃える。</p>
+      <span class="infra-badge badge-new">新規 image</span>
     </div>
-
+    <div class="infra-card secret">
+      <div class="infra-icon">🔑</div>
+      <h3>k8s Secret (shared secret)</h3>
+      <p>apps/app と vault-manager の service-to-service 認証に使う <code>VAULT_MANAGER_INTERNAL_SECRET</code> を k8s Secret として両 Pod に注入。DB への保存禁止。ローテーション時は両 Pod を再起動。</p>
+      <span class="infra-badge badge-env">k8s Secret</span>
+    </div>
+    <div class="infra-card mongo">
+      <div class="infra-icon">🍃</div>
+      <h3>MongoDB (既存 replica set)</h3>
+      <p>新規コレクション 5 つ (<code>vault_instructions</code>, <code>vault_namespace_state</code>, <code>vault_user_views</code>, <code>vault_sync_state</code>, <code>vault_reconcile_log</code>) を追加。replica set 必須は既存要件。change stream 用の resume token 保持に対応済み。</p>
+      <span class="infra-badge badge-exist">既存 replica set を共用</span>
+    </div>
   </div>
 
-  <div class="note" style="margin-top:24px">
-    <strong>E2E の価値</strong>:
-    227 件の unit test と integration test が全 pass していたにも関わらず、上記 4 件は実 server を立てて UI を操作した時点で初めて顕在化した。Task 5.3 の追加コストは <strong>テストファイルそのもの + 4 件の bugfix</strong> という形で結果的に膨らんだが、それらは UI を実利用する前に発見されなかった以上、本来 production 障害として現れていたはずのもの。<strong>UI 機能を完成 (DONE) と宣言する直前の Playwright E2E は今後も必須</strong>。
+  <div class="note" style="margin-top:8px">
+    <strong>ストレージ環境別まとめ</strong>:
+    dev/docker-compose → local bind mount、
+    self-host 単一 Pod → local fs (SSD 推奨)、
+    self-host multi Pod → NFSv4 / Filestore / EFS、
+    <strong>GROWI.cloud → Filestore (GCP managed NFS) 必須</strong>。
   </div>
 </div>
 </section>
 
 
-<!-- ═══════ DEPENDENCY MAP ═══════ -->
+<!-- ═══════ ENV VARS ═══════ -->
 <section>
 <div class="page">
-  <div class="section-label" style="color:var(--blue)">Dependency Map</div>
-  <h2 class="section-title">sub-spec 間の依存関係</h2>
-  <p class="section-sub">各 sub-spec は <code>vault_instructions</code> outbox + 既存 instruction op を共有経路として、<strong>新規 op を増やさず</strong>冪等性契約を維持する設計。</p>
+  <div class="section-label" style="color:var(--amber)">Configuration</div>
+  <h2 class="section-title">環境変数・設定</h2>
+  <p class="section-sub">デプロイ時に設定が必要な環境変数。Reconcile / Resilience の細かなパラメータ (page 数上限・concurrency・retention 等) は admin UI と <code>configManager</code> 経由で実行時に変更可能。</p>
 
-  <div class="dep-grid">
-
-    <div class="dep-node dep-ref">
-      <div class="dep-name">
-        growi-vault-gateway
-        <span class="status-badge status-ref">REFERENCE</span>
-      </div>
-      <div class="dep-summary">
-        PAT 認証 + ACL 評価 + read-only git smart HTTP / read API の owner。state を持たない (per-replica で stateless)。
-      </div>
-      <div class="dep-deps"><strong>provides:</strong> VaultPatAuth · VaultNamespaceMapper · admin UI 基盤</div>
-    </div>
-
-    <div class="dep-node dep-ref">
-      <div class="dep-name">
-        growi-vault-manager
-        <span class="status-badge status-ref">REFERENCE</span>
-      </div>
-      <div class="dep-summary">
-        instruction → git materialization の冪等な consumer。<code>.git/index.lock</code> 物理制約により同一 namespace への並行書き込み不能。
-      </div>
-      <div class="dep-deps"><strong>provides:</strong> idempotent instruction op handler · bare repo write owner</div>
-    </div>
-
-    <div class="dep-node dep-done">
-      <div class="dep-name">
-        growi-vault-resilience
-        <span class="status-badge status-done">DONE</span>
-      </div>
-      <div class="dep-summary">
-        gateway の bootstrap 経路と manager の <code>reset-all</code> op を再設計対象とし、置き換え設計を提示する。
-      </div>
-      <div class="dep-deps">
-        <strong>depends on:</strong> gateway (interface) · manager (idempotency)<br>
-        <strong>provides:</strong> bootstrap state machine · vault_instructions outbox write owner · heartbeat / instanceId primitive
-      </div>
-    </div>
-
-    <div class="dep-node dep-done">
-      <div class="dep-name">
-        growi-vault-reconcile
-        <span class="status-badge status-done">DONE</span>
-      </div>
-      <div class="dep-summary">
-        outbox 経路を相乗りする consumer。<strong>新規 op を導入せず</strong>既存 <code>bulk-upsert</code> を再利用。
-      </div>
-      <div class="dep-deps">
-        <strong>depends on:</strong> gateway (PAT/ACL interface) · resilience (instruction outbox + state machine 前提)<br>
-        <strong>provides:</strong> user-triggered targeted reconcile · vault_reconcile_log
-      </div>
-    </div>
-
-    <div class="dep-node dep-future" style="grid-column: 1 / -1">
-      <div class="dep-name">
-        growi-vault-ha
-        <span class="status-badge status-future">将来予定 · 未着手</span>
-      </div>
-      <div class="dep-summary">
-        vault-manager の single-replica 前提を解消し、Competing Consumers + per-namespace lease で multi-replica 化。本 spec 適用後、<code>resilience</code> の drift detection は「observability 主、最小補修副」に縮小可能。
-      </div>
-      <div class="dep-deps">
-        <strong>depends on:</strong> resilience (heartbeat / instanceId primitive 共有) · reconcile (multi-replica 下での sub-tree reconcile lease / claim を本 spec scope に含めるか要検討)<br>
-        <strong>provides (予定):</strong> namespace_leases collection · vault_instructions atomic claim · failover (秒オーダー TTL)
-      </div>
-    </div>
-
-  </div>
-
-  <div class="note" style="margin-top:24px">
-    <strong>境界分離の鍵</strong>:
-    「機能の重さ」ではなく「<strong>誰がトリガーするか</strong>」を境界として spec を切り出したことで、responsibility map が clean に保たれた。同じ <code>vault_instructions</code> outbox を共有しつつも、resilience は system-triggered の write owner、reconcile はその consumer として競合許容方針 (冪等性で最終収束) を両 spec で明示している。
-  </div>
-</div>
-</section>
-
-
-<!-- ═══════ FUTURE: HA ═══════ -->
-<section>
-<div class="page">
-  <div class="section-label" style="color:var(--violet)">Future Work</div>
-  <h2 class="section-title">残るは <code>growi-vault-ha</code> のみ</h2>
-  <p class="section-sub">本セクションは <strong>「将来予定」</strong>のものを記述する。<code>brief.md</code> のみ drafted されており、<strong>requirements / design / tasks / 実装は全て未着手</strong>。着手時期は未定。</p>
-
-  <div style="border:2px dashed rgba(155,114,247,.4); border-radius:14px; padding:28px; background:rgba(155,114,247,.04); margin-bottom:24px">
-    <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap">
-      <span style="font-size:32px">🏗️</span>
-      <div style="flex:1; min-width:200px">
-        <div style="font-family:var(--mono); font-size:14px; font-weight:700; color:var(--t1)">growi-vault-ha</div>
-        <div style="font-size:12.5px; color:var(--t2); margin-top:2px">vault-manager の多重化 (Competing Consumers + per-namespace lease)</div>
-      </div>
-      <span class="status-badge status-future" style="font-size:12px; padding:5px 14px">将来予定 · 未着手</span>
-    </div>
-
-    <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:20px">
-      <div>
-        <div style="font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--t3); margin-bottom:8px">解決したい問題</div>
-        <ul style="list-style:none; padding:0">
-          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
-            <span style="position:absolute; left:0; color:var(--rose)">•</span>
-            長時間停止 → change stream resume token 失効 → 取りこぼし
-          </li>
-          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
-            <span style="position:absolute; left:0; color:var(--rose)">•</span>
-            single-replica の crash で分単位の MTTR
-          </li>
-          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
-            <span style="position:absolute; left:0; color:var(--rose)">•</span>
-            mass import / bulk-rename での queue 滞留
-          </li>
-          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
-            <span style="position:absolute; left:0; color:var(--rose)">•</span>
-            bootstrap や reconcile が incremental sync を阻害
-          </li>
-        </ul>
-      </div>
-      <div>
-        <div style="font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--t3); margin-bottom:8px">設計の方向性 (brief 段階)</div>
-        <ul style="list-style:none; padding:0">
-          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
-            <span style="position:absolute; left:0; color:var(--teal)">▸</span>
-            同一 image / config の N replica
-          </li>
-          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
-            <span style="position:absolute; left:0; color:var(--teal)">▸</span>
-            <code>vault_instructions</code> への atomic claim
-          </li>
-          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
-            <span style="position:absolute; left:0; color:var(--teal)">▸</span>
-            新規 <code>namespace_leases</code> collection で書き込み serialize
-          </li>
-          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
-            <span style="position:absolute; left:0; color:var(--teal)">▸</span>
-            failover は per-instruction TTL (秒オーダー)
-          </li>
-        </ul>
-      </div>
-    </div>
-
-    <div style="border-top:1px solid rgba(155,114,247,.2); padding-top:16px; margin-top:8px">
-      <div style="font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--t3); margin-bottom:8px">現在の状態 (2026-05-22 時点)</div>
-      <div style="display:flex; gap:8px; flex-wrap:wrap">
-        <span class="chip chip-violet">brief.md drafted</span>
-        <span class="chip chip-gray">requirements 未着手</span>
-        <span class="chip chip-gray">design 未着手</span>
-        <span class="chip chip-gray">tasks 未着手</span>
-        <span class="chip chip-gray">implementation 未着手</span>
-      </div>
-    </div>
-  </div>
+  <table class="env-table" style="background:var(--s1);border:1px solid var(--border);border-radius:12px;overflow:hidden;margin-bottom:24px">
+    <thead>
+      <tr>
+        <th>環境変数</th>
+        <th>設定先 Pod</th>
+        <th>必須 / 任意</th>
+        <th>説明</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr>
+        <td><code>VAULT_ENABLED</code></td>
+        <td>apps/app</td>
+        <td><span class="opt">任意</span></td>
+        <td>機能 ON/OFF の初期値。管理 UI でも変更可能 (<code>app:vaultEnabled</code>)</td>
+      </tr>
+      <tr>
+        <td><code>VAULT_BOOTSTRAP_ON_START</code></td>
+        <td>apps/app</td>
+        <td><span class="opt">任意</span></td>
+        <td><code>true</code> / <code>force</code> / 未設定。<code>true</code> で初回起動時のみ bootstrap、<code>done</code> 状態の再起動では何もしない (state machine による safe restart)。<code>force</code> は明示的に全 wipe + 再 bootstrap。</td>
+      </tr>
+      <tr>
+        <td><code>VAULT_MANAGER_ENDPOINT</code></td>
+        <td>apps/app</td>
+        <td><span class="req">必須</span></td>
+        <td>vault-manager の内部 URL (例: <code>http://vault-manager:3001</code>)。DB 保存禁止・env var only。</td>
+      </tr>
+      <tr>
+        <td><code>VAULT_MANAGER_INTERNAL_SECRET</code></td>
+        <td>apps/app + vault-manager</td>
+        <td><span class="req">必須</span></td>
+        <td>service-to-service 認証の shared secret。k8s Secret で両 Pod に同値を注入。DB 保存禁止。</td>
+      </tr>
+      <tr>
+        <td><code>VAULT_REPO_PATH</code></td>
+        <td>vault-manager</td>
+        <td><span class="req">必須</span></td>
+        <td>bare repo の物理パス。Filestore の mount point 配下に設定する。</td>
+      </tr>
+      <tr>
+        <td><code>VAULT_SQUASH_COMMIT_THRESHOLD</code></td>
+        <td>vault-manager</td>
+        <td><span class="opt">任意</span></td>
+        <td>squash トリガーの commit 数閾値 (デフォルト 1000)</td>
+      </tr>
+      <tr>
+        <td><code>VAULT_GC_INTERVAL_HOURS</code></td>
+        <td>vault-manager</td>
+        <td><span class="opt">任意</span></td>
+        <td>git gc の実行間隔 (デフォルト 24h)</td>
+      </tr>
+    </tbody>
+  </table>
 
   <div class="warn">
-    <strong>⚠️ 着手判断について</strong>:
-    本 spec の優先度と着手時期は<strong>未定</strong>。GROWI.cloud の実運用で single-replica の MTTR / 取りこぼしが顕在化した際、もしくは「vault は本番運用で常に動いていないと困る」要件が SLA レベルで確定した際に着手判断を行う想定。それまでは <code>brief.md</code> を一次情報源として、関連する観測データ (oplog window / replica restart 頻度 / change stream lag 等) を蓄積する期間。
+    <strong>⚠️ シークレット管理</strong>:
+    <code>VAULT_MANAGER_ENDPOINT</code> と <code>VAULT_MANAGER_INTERNAL_SECRET</code> は env var only で DB に保存されない。
+    k8s Secret として管理し、ローテーション時は apps/app・vault-manager 両 Pod を再起動すること。
   </div>
 
-  <div class="note" style="margin-top:16px">
-    <strong>brief.md の所在</strong>:
-    <code>.kiro/specs/growi-vault-ha/brief.md</code> に Problem / Current State / Desired Outcome / Approach / Scope / Boundary Candidates / Out of Boundary / Upstream-Downstream / Existing Spec Touchpoints / Constraints を <strong>121 行</strong>で記載済み。着手時はここから <code>/kiro-spec-requirements growi-vault-ha</code> に進む。
+  <div class="note">
+    <strong>Reconcile / Drift / Retry の設定</strong>:
+    role 別 page 数上限 (<code>app:vaultReconcileMaxPagesPer{User,Admin}Request</code>) / per-user および system-wide concurrency / chunk size / retention 日数 / drift sweep 間隔 / retry policy 等は <code>configManager</code> 配下のキーとして admin UI から実行時に変更可能。env var 経由の override も同名で受け付ける。
   </div>
 </div>
 </section>
 
 
-<!-- ═══════ NEXT STEPS ═══════ -->
+<!-- ═══════ DEPLOY CHECKLIST ═══════ -->
 <section>
 <div class="page">
-  <div class="section-label" style="color:var(--teal)">Next Steps</div>
-  <h2 class="section-title">次の自然な一歩</h2>
-  <p class="section-sub">resilience + reconcile の完了を踏まえ、vault initiative としては <strong>HA 着手の優先度判断</strong>がメイン議題になる。当面の作業は安定運用と観測。</p>
+  <div class="section-label" style="color:var(--teal)">Deployment</div>
+  <h2 class="section-title">デプロイ手順</h2>
+  <p class="section-sub">GROWI.cloud に Vault を追加するための作業ステップ。</p>
 
-  <ul style="list-style:none; padding:0">
-    <li style="border-bottom:1px solid var(--border); padding:18px 0; display:flex; gap:14px; align-items:flex-start">
-      <span style="font-size:22px">🔭</span>
-      <div>
-        <div style="font-size:15px; font-weight:700">本番運用での観測フェーズ</div>
-        <div style="font-size:13px; color:var(--t2); margin-top:4px">resilience の drift detector 発火頻度 / reconcile の手動発火頻度 / vault-manager の uptime / change stream lag を継続観測。HA 着手判断のための運用データを蓄積する。</div>
+  <div class="checklist">
+    <div class="cl-item">
+      <div class="cl-num new">1</div>
+      <div class="cl-body">
+        <h4>Filestore (GCP NFS) のプロビジョニング</h4>
+        <p>vault-manager が bare repo を置く共有 NFS を用意する。POSIX semantics と atomic rename が保証された Filestore を選択する。GCSFuse は非対応なので注意。</p>
+        <div class="cl-tags">
+          <span class="chip chip-rose">新規リソース</span>
+          <span class="chip chip-amber">GCP Filestore</span>
+        </div>
       </div>
-    </li>
-    <li style="border-bottom:1px solid var(--border); padding:18px 0; display:flex; gap:14px; align-items:flex-start">
-      <span style="font-size:22px">📚</span>
-      <div>
-        <div style="font-size:15px; font-weight:700">運用ドキュメントへの反映</div>
-        <div style="font-size:13px; color:var(--t2); margin-top:4px">前回 (5/19) infographic で示したデプロイ手順に、resilience の admin UI 経由の force/abort 操作 + reconcile の admin/user 経路 + audit log 種別の追加分を反映。GROWI.cloud のオンボーディング資料を更新する。</div>
+    </div>
+    <div class="cl-item">
+      <div class="cl-num new">2</div>
+      <div class="cl-body">
+        <h4>vault-manager コンテナ image のビルドと push</h4>
+        <p><code>apps/growi-vault-manager/Dockerfile</code> (Ts.ED + git binary 同梱) をビルドして registry に push する。base image は <code>dhi.io/node:24-debian13-dev</code>。</p>
+        <div class="cl-tags">
+          <span class="chip chip-rose">新規 image</span>
+          <span class="chip chip-violet">5 stage build</span>
+        </div>
       </div>
-    </li>
-    <li style="border-bottom:1px solid var(--border); padding:18px 0; display:flex; gap:14px; align-items:flex-start">
-      <span style="font-size:22px">📌</span>
-      <div>
-        <div style="font-size:15px; font-weight:700">HA 着手の trigger 設定</div>
-        <div style="font-size:13px; color:var(--t2); margin-top:4px">どの条件 (MTTR 何分超過 / 取りこぼし発生 / SLA レベル明文化など) を満たした時点で <code>growi-vault-ha</code> 着手するかを事前合意しておく。trigger 未確定のまま着手判断を後回しにすると、必要なタイミングで対応できない。</div>
+    </div>
+    <div class="cl-item">
+      <div class="cl-num new">3</div>
+      <div class="cl-body">
+        <h4>k8s Secret の作成 (VAULT_MANAGER_INTERNAL_SECRET)</h4>
+        <p>apps/app と vault-manager の両 Pod に同じ secret 値を注入する k8s Secret を作成する。</p>
+        <div class="cl-tags">
+          <span class="chip chip-amber">k8s Secret</span>
+        </div>
       </div>
-    </li>
-    <li style="padding:18px 0; display:flex; gap:14px; align-items:flex-start">
-      <span style="font-size:22px">🧹</span>
-      <div>
-        <div style="font-size:15px; font-weight:700">umbrella spec の整合性確認</div>
-        <div style="font-size:13px; color:var(--t2); margin-top:4px"><code>growi-vault</code> umbrella の <code>design.md</code> / <code>requirements.md</code> が 5 sub-spec 体制と整合しているか必要に応じて確認。<code>sub_specs</code> 配列には ha を追加済み (phase は <code>umbrella-minimized</code> を維持)。</div>
+    </div>
+    <div class="cl-item">
+      <div class="cl-num new">4</div>
+      <div class="cl-body">
+        <h4>vault-manager の StatefulSet・Service・NetworkPolicy を適用</h4>
+        <p>StatefulSet (replicas=1)・内部向け Service・Filestore の PersistentVolumeClaim・NetworkPolicy (apps/app Pod からの Ingress のみ許可) を apply する。</p>
+        <div class="cl-tags">
+          <span class="chip chip-rose">新規 StatefulSet</span>
+          <span class="chip chip-blue">NetworkPolicy</span>
+          <span class="chip chip-teal">PVC (Filestore)</span>
+        </div>
       </div>
-    </li>
-  </ul>
+    </div>
+    <div class="cl-item">
+      <div class="cl-num config">5</div>
+      <div class="cl-body">
+        <h4>apps/app の環境変数を設定してデプロイ</h4>
+        <p><code>VAULT_MANAGER_ENDPOINT</code> と <code>VAULT_MANAGER_INTERNAL_SECRET</code> を apps/app の環境変数に追加し、再デプロイする。</p>
+        <div class="cl-tags">
+          <span class="chip chip-amber">環境変数追加</span>
+          <span class="chip chip-green">既存 apps/app を更新</span>
+        </div>
+      </div>
+    </div>
+    <div class="cl-item">
+      <div class="cl-num config">6</div>
+      <div class="cl-body">
+        <h4>管理 UI から Vault を有効化 → Bootstrap 実行</h4>
+        <p>GROWI 管理画面の Vault 設定で <strong>Feature Toggle を ON</strong> にし、<strong>「Prepare GROWI Vault」ボタン</strong>を押して bootstrap を開始する。state machine が <code>pending → running → verifying → done</code> と遷移するまで clone/fetch は 503 で待機状態。進捗・retry 状況・drift 統計は admin UI の各セクションで観測可能。</p>
+        <div class="cl-tags">
+          <span class="chip chip-amber">管理者操作</span>
+          <span class="chip chip-violet">10K ページ → 約 10 分</span>
+        </div>
+      </div>
+    </div>
+    <div class="cl-item">
+      <div class="cl-num done">7</div>
+      <div class="cl-body">
+        <h4>動作確認</h4>
+        <p>PAT を使って <code>git clone https://&lt;growi-host&gt;/_vault/repo.git</code> を実行し、自分が閲覧権限を持つページが正しく clone されることを確認する。<code>/_vault/repo.git/git-receive-pack</code> が 403 を返すことも確認する。admin UI から手動 reconcile を起動 → history table に completed として現れることも確認。</p>
+        <div class="cl-tags">
+          <span class="chip chip-teal">動作確認</span>
+        </div>
+      </div>
+    </div>
+  </div>
+</div>
+</section>
+
+
+<!-- ═══════ CLONE FLOW ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--blue)">How It Works</div>
+  <h2 class="section-title">git clone のリクエストフロー</h2>
+  <p class="section-sub">ユーザーが <code>git clone</code> を実行したときに内部で何が起きているか。</p>
+
+  <div style="overflow-x:auto">
+    <div class="flow-track">
+      <div class="flow-node">
+        <div class="flow-bubble" style="border-color:rgba(79,142,247,.5);background:rgba(79,142,247,.1)">🖥️</div>
+        <div class="flow-label">git clone 実行
+          <div class="flow-sub">GET /_vault/<br>repo.git/info/refs</div>
+        </div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-bubble" style="border-color:rgba(249,112,104,.5);background:rgba(249,112,104,.1)">🚥</div>
+        <div class="flow-label">フラグ確認
+          <div class="flow-sub">vaultEnabled=false→404<br>bootstrap未完→503</div>
+        </div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-bubble" style="border-color:rgba(245,158,11,.5);background:rgba(245,158,11,.1)">🔑</div>
+        <div class="flow-label">PAT 認証
+          <div class="flow-sub">HTTP Basic Auth<br>→ access-token-parser</div>
+        </div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-bubble" style="border-color:rgba(45,212,191,.5);background:rgba(45,212,191,.1)">🗂️</div>
+        <div class="flow-label">namespace 計算
+          <div class="flow-sub">ACL 評価 →<br>アクセス可能 ns 集合</div>
+        </div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-bubble" style="border-color:rgba(155,114,247,.5);background:rgba(155,114,247,.1)">🔀</div>
+        <div class="flow-label">view ref 合成
+          <div class="flow-sub">compose-view RPC<br>→ vault-manager</div>
+        </div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-bubble" style="border-color:rgba(249,112,104,.5);background:rgba(249,112,104,.1)">📦</div>
+        <div class="flow-label">pack 配信
+          <div class="flow-sub">git upload-pack<br>spawn → O(1) stream</div>
+        </div>
+      </div>
+      <div class="flow-node">
+        <div class="flow-bubble" style="border-color:rgba(79,142,247,.5);background:rgba(79,142,247,.1)">📝</div>
+        <div class="flow-label">監査ログ
+          <div class="flow-sub">vault.clone-complete<br>audit log に記録</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:32px">
+    <strong>セキュリティ境界の保証</strong>:
+    ACL 評価 (ステップ 4) は apps/app で完結。vault-manager に渡るのは「アクセス可能な namespace 集合」のみで、
+    vault-manager は受け取った namespace をそのまま処理するだけ。
+    非公開ページの存在は refs 一覧・tree 内容・エラーメッセージのいずれからも観測不可能。
+  </div>
+</div>
+</section>
+
+
+<!-- ═══════ MONITORING ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--green)">Observability</div>
+  <h2 class="section-title">監視・観測</h2>
+  <p class="section-sub">運用時に確認できるエンドポイントと管理画面の観測ポイント。</p>
+
+  <div class="mon-grid">
+    <div class="mon-card">
+      <h4>💚 ヘルスチェック</h4>
+      <p>vault-manager の MongoDB 接続・change stream・bare repo 到達性を確認する。</p>
+      <div class="endpoint ep-green">GET /health</div>
+      <p style="margin-top:8px;font-size:12px;color:var(--t3)">正常: 200 <code>{"status":"ok"}</code> / 異常: 503 + details</p>
+    </div>
+    <div class="mon-card">
+      <h4>📊 ストレージ統計</h4>
+      <p>namespace 数・commit 数・loose object 数・repo サイズ・最終 squash/gc 時刻。管理 UI が表示する。</p>
+      <div class="endpoint ep-violet">GET /internal/storage-stats</div>
+      <p style="margin-top:8px;font-size:12px;color:var(--t3)">shared secret Bearer 認証。admin UI が 5〜10 秒でポーリング。</p>
+    </div>
+    <div class="mon-card">
+      <h4>🔄 Bootstrap 状態 + Completion Reliability</h4>
+      <p>state machine 状態 / 完了の信頼性指標 / force warning。管理 UI の Bootstrap Status + Completion Reliability セクション。</p>
+      <div class="endpoint ep-amber">vault_sync_state.bootstrapState</div>
+      <p style="margin-top:8px;font-size:12px;color:var(--t3"><code>pending</code> / <code>running</code> / <code>verifying</code> / <code>done</code> / <code>failed</code> / <code>aborted</code> / <code>force-pending</code> の 7 状態</p>
+    </div>
+    <div class="mon-card">
+      <h4>♻️ Auto-Retry Status</h4>
+      <p>起動時 retry の現在 attempt 数・次回 backoff 時刻・最終 error。retry 上限超過時は force warning banner で escalate。admin が abort 可能。</p>
+      <div class="endpoint ep-amber">GET /vault/resilience-status</div>
+      <p style="margin-top:8px;font-size:12px;color:var(--t3)">admin UI の Auto-Retry Status セクション (retry 中のみ表示)</p>
+    </div>
+    <div class="mon-card">
+      <h4>🛡️ Drift Activity</h4>
+      <p>watermark sweep の最終位置・補修発行件数・処理 lag。管理 UI の Drift Activity セクション。</p>
+      <div class="endpoint ep-violet">vault_sync_state.driftDetector*</div>
+      <p style="margin-top:8px;font-size:12px;color:var(--t3)">v1 では update drift のみ補修。path change / grant drop / hard delete drift は<strong>手動 reconcile に委ねる</strong>。</p>
+    </div>
+    <div class="mon-card">
+      <h4>🎯 Reconcile 履歴</h4>
+      <p>admin / user が起動した reconcile の triggered / status / processed / completedAt / error を一覧表示。管理 UI の Reconcile セクション。</p>
+      <div class="endpoint ep-violet">GET /vault/reconcile-history</div>
+      <p style="margin-top:8px;font-size:12px;color:var(--t3)"><code>vault_reconcile_log</code> collection。retention は config 設定 (default 30 日)。</p>
+    </div>
+    <div class="mon-card">
+      <h4>📝 監査ログ</h4>
+      <p>clone/fetch 完了・認証失敗・bootstrap・reconcile・drift sweep をタイムスタンプ・ユーザー・操作種別付きで既存 audit log に記録。</p>
+      <div class="endpoint ep-green">既存 audit log collection</div>
+      <p style="margin-top:8px;font-size:12px;color:var(--t3)"><code>vault.clone-complete</code> / <code>vault.auth-failure</code> / <code>vault.bootstrap-*</code> / <code>vault.reconcile-*</code> / <code>vault.resilience-*</code> でフィルタ可能。</p>
+    </div>
+    <div class="mon-card">
+      <h4>⚡ Instruction 処理遅延</h4>
+      <p>vault_instructions の未処理件数 (<code>processedAt: null</code>) がページ編集後に積み上がっていないかを確認。</p>
+      <div class="endpoint ep-amber">vault_instructions</div>
+      <p style="margin-top:8px;font-size:12px;color:var(--t3)">TTL 86400 秒で自動削除。retry 上限超過時は <code>lastError</code> フィールドに記録。</p>
+    </div>
+    <div class="mon-card">
+      <h4>🔧 Maintenance ログ</h4>
+      <p>squash (1000 commit 超 or 1h 経過) と git gc (24h ごと) の実行結果をログに記録。</p>
+      <div class="endpoint ep-violet">@growi/logger (pino)</div>
+      <p style="margin-top:8px;font-size:12px;color:var(--t3)">所要時間・対象 namespace 数・before/after object 数を出力。</p>
+    </div>
+  </div>
+
+  <div class="warn" style="margin-top:8px">
+    <strong>⚠️ 災害復旧</strong>:
+    bare repo が全消失した場合でも管理 UI から <strong>bootstrap を再実行</strong> するだけで完全復旧できる (<code>VAULT_BOOTSTRAP_ON_START=force</code> でも同等)。
+    実体に局所的な乖離が残った場合は admin / user UI から該当 sub-tree に対して <strong>手動 reconcile</strong> でピンポイント復旧可能。
+  </div>
+</div>
+</section>
+
+
+<!-- ═══════ SCOPE ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--violet)">Scope</div>
+  <h2 class="section-title">提供範囲</h2>
+  <p class="section-sub">本リリースで提供されるもの・将来予定のもの・提供しないものを明確にする。</p>
+
+  <div class="scope-grid" style="grid-template-columns:1fr 1fr 1fr">
+    <div class="scope-block scope-in-block">
+      <div class="scope-head">✅ 提供中</div>
+      <div class="scope-item"><span class="si-icon">✓</span><span><code>git clone / fetch / pull</code> による read-only アクセス</span></div>
+      <div class="scope-item"><span class="si-icon">✓</span><span>GROWI ページ階層をそのままディレクトリ構造として提供</span></div>
+      <div class="scope-item"><span class="si-icon">✓</span><span>ACL に基づく per-user フィルタリング (public / group / only-me)</span></div>
+      <div class="scope-item"><span class="si-icon">✓</span><span>既存 PAT 認証の再利用・匿名アクセス (public のみ)</span></div>
+      <div class="scope-item"><span class="si-icon">✓</span><span>ページ作成・更新・削除・rename・ACL 変更の自動同期</span></div>
+      <div class="scope-item"><span class="si-icon">✓</span><span>Resilient bootstrap state machine + 起動時自動再試行</span></div>
+      <div class="scope-item"><span class="si-icon">✓</span><span>watermark-based 自動 drift 検出と補修 (update drift 範囲)</span></div>
+      <div class="scope-item"><span class="si-icon">✓</span><span>admin + 一般ユーザーによる手動 reconcile (ACL-scoped)</span></div>
+      <div class="scope-item"><span class="si-icon">✓</span><span>squash / gc の自走メンテナンス (外部 cron 不要)</span></div>
+      <div class="scope-item"><span class="si-icon">✓</span><span>管理者による機能 ON/OFF・bootstrap・監査ログ</span></div>
+    </div>
+    <div class="scope-block scope-future-block">
+      <div class="scope-head">🏗️ 将来予定 (未着手)</div>
+      <div class="scope-item"><span class="si-icon">▸</span><span>vault-manager の冗長化 (HA / multi-replica) → <code>growi-vault-ha</code> spec で扱う予定 (brief のみ起草済、requirements / design / 実装はすべて<strong>未着手</strong>)</span></div>
+      <div class="scope-item"><span class="si-icon">▸</span><span>HA に伴う change stream 取りこぼし防止 (Competing Consumers + per-namespace lease 想定)</span></div>
+      <div class="scope-item"><span class="si-icon">▸</span><span>HA 適用後、drift 検出は「observability 主、補修副」に縮小可能</span></div>
+      <div class="scope-item"><span class="si-icon">▸</span><span>read sidecar による水平スケールアウト</span></div>
+      <div style="font-size:11px; color:var(--t3); margin-top:14px; padding-top:12px; border-top:1px dashed var(--border); line-height:1.5">
+        着手判断は GROWI.cloud の実運用観測 (MTTR / 取りこぼし頻度 / SLA 要件) を待って決定する想定。<br>brief: <code>.kiro/specs/growi-vault-ha/brief.md</code>
+      </div>
+    </div>
+    <div class="scope-block scope-out-block">
+      <div class="scope-head">🚫 対象外</div>
+      <div class="scope-item"><span class="si-icon">✗</span><span><code>git push</code> (書き込み) — vault は read-only 公開面のまま</span></div>
+      <div class="scope-item"><span class="si-icon">✗</span><span>双方向同期 / git → MongoDB push</span></div>
+      <div class="scope-item"><span class="si-icon">✗</span><span>添付ファイルの export</span></div>
+      <div class="scope-item"><span class="si-icon">✗</span><span>コメント・タグ・ブックマーク等メタデータの export</span></div>
+      <div class="scope-item"><span class="si-icon">✗</span><span>機能有効化以前の revision 履歴の import</span></div>
+      <div class="scope-item"><span class="si-icon">✗</span><span>下書き / 未公開ページの export</span></div>
+      <div class="scope-item"><span class="si-icon">✗</span><span>GitHub / GitLab 等との双方向同期</span></div>
+      <div class="scope-item"><span class="si-icon">✗</span><span>新規 instruction op の追加 (既存 6 op を再利用する制約)</span></div>
+    </div>
+  </div>
+
+  <div class="note" style="margin-top:24px">
+    <strong>「将来予定」の取り扱い</strong>:
+    <code>growi-vault-ha</code> は<strong>未着手</strong>である。優先度と着手時期は未確定で、実運用での MTTR / 取りこぼし観測が確定するまで本格着手しない方針。本リリースは <strong>single-replica + resilient state machine + drift sweep + 手動 reconcile</strong> の組み合わせで、典型的な障害シナリオを SLO 範囲内でカバーできる前提で提供する。
+  </div>
 </div>
 </section>
 
@@ -996,11 +973,10 @@ footer code { font-size: 12px; }
 <!-- ═══════ FOOTER ═══════ -->
 <footer>
   <div style="margin-bottom:8px">
-    <strong style="color:var(--t2)">GROWI Vault</strong> — Status Report 2026-05-22
+    <strong style="color:var(--t2)">GROWI Vault</strong> — サービス提供ガイド (2026-05-22)
   </div>
   Umbrella spec: <code>.kiro/specs/growi-vault/</code> &nbsp;·&nbsp;
-  Sub-spec roadmap: <code>.kiro/specs/growi-vault/roadmap.md</code> &nbsp;·&nbsp;
-  前回: <code>infographic-20260519.html</code><br>
+  Sub-spec roadmap: <code>.kiro/specs/growi-vault/roadmap.md</code><br>
   対象読者: GROWI.cloud サービス開発 / インフラメンバー
 </footer>
 
