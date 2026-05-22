@@ -226,7 +226,7 @@
   - _Depends: 2.5_
   - _Requirements: 4.1, 4.5, 6.10, 6.11, 7.1, 7.2_
 
-- [ ] 5.3 admin / user UI の E2E シナリオを検証
+- [x] 5.3 admin / user UI の E2E シナリオを検証
   - admin が `/admin/vault` の Reconcile section から sub-tree を指定 → 202 → history table に completed として表示されるまでの E2E
   - 一般ユーザーが PageTree の reconcile menu から自分の page を起動 → modal 内で accepted feedback が表示されるまでの E2E
   - reject path（page count 上限超過 / concurrency 上限超過 / bootstrap-not-done）で reject reason に応じた i18n 翻訳メッセージが modal に表示されることを確認
