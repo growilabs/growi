@@ -1,0 +1,1008 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>GROWI Vault — Status Report 2026-05-22</title>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&family=JetBrains+Mono:wght@400;600&display=swap');
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+:root {
+  --blue:   #4f8ef7;
+  --violet: #9b72f7;
+  --teal:   #2dd4bf;
+  --amber:  #f59e0b;
+  --rose:   #f97068;
+  --green:  #22c55e;
+  --gray:   #64748b;
+  --bg:     #08090f;
+  --s1:     #0e1018;
+  --s2:     #141620;
+  --s3:     #1c1f2d;
+  --border: #1f2235;
+  --t1:     #f1f5f9;
+  --t2:     #94a3b8;
+  --t3:     #475569;
+  --mono:   'JetBrains Mono', monospace;
+}
+
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Inter', system-ui, sans-serif;
+  background: var(--bg); color: var(--t1);
+  line-height: 1.6; font-size: 15px; overflow-x: hidden;
+}
+
+/* ── HERO ─────────────────────────────── */
+.hero {
+  min-height: 100vh;
+  display: flex; flex-direction: column;
+  align-items: center; justify-content: center;
+  text-align: center; padding: 80px 32px;
+  position: relative; overflow: hidden;
+}
+.hero-bg {
+  position: absolute; inset: 0;
+  background:
+    radial-gradient(ellipse 80% 60% at 50% -10%, rgba(45,212,191,.18) 0%, transparent 60%),
+    radial-gradient(ellipse 60% 50% at 80% 80%,  rgba(79,142,247,.12) 0%, transparent 55%),
+    radial-gradient(ellipse 50% 40% at 10% 90%,  rgba(155,114,247,.08) 0%, transparent 50%);
+}
+.hero-grid {
+  position: absolute; inset: 0;
+  background-image:
+    linear-gradient(var(--border) 1px, transparent 1px),
+    linear-gradient(90deg, var(--border) 1px, transparent 1px);
+  background-size: 60px 60px;
+  mask-image: radial-gradient(ellipse 80% 70% at 50% 40%, black 30%, transparent 100%);
+  opacity: .35;
+}
+.hero-content { position: relative; max-width: 900px; }
+.hero-eyebrow {
+  display: inline-flex; align-items: center; gap: 8px;
+  border: 1px solid rgba(45,212,191,.35); background: rgba(45,212,191,.08);
+  border-radius: 999px; padding: 5px 16px;
+  font-size: 12px; font-weight: 600; color: var(--teal);
+  letter-spacing: .1em; text-transform: uppercase; margin-bottom: 28px;
+}
+.hero-eyebrow .dot {
+  width: 6px; height: 6px; border-radius: 50%;
+  background: var(--teal); animation: pulse 2s infinite;
+}
+@keyframes pulse {
+  0%,100% { opacity: 1; transform: scale(1); }
+  50%      { opacity: .4; transform: scale(1.4); }
+}
+.hero h1 {
+  font-size: clamp(2.6rem, 7vw, 5.5rem);
+  font-weight: 900; line-height: 1.05; letter-spacing: -.03em;
+  background: linear-gradient(135deg, #fff 0%, #b8e8ff 40%, var(--teal) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+  margin-bottom: 8px;
+}
+.hero h1 .accent {
+  background: linear-gradient(135deg, var(--violet) 0%, var(--blue) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.hero-tagline {
+  font-size: clamp(1rem, 2.2vw, 1.2rem); color: var(--t2);
+  max-width: 660px; margin: 20px auto 12px;
+}
+.hero-audience {
+  display: inline-flex; align-items: center; gap: 8px;
+  background: rgba(79,142,247,.08); border: 1px solid rgba(79,142,247,.3);
+  border-radius: 8px; padding: 8px 16px;
+  font-size: 13px; color: var(--blue); margin-bottom: 40px;
+}
+.hero-stats {
+  display: flex; border: 1px solid var(--border);
+  border-radius: 16px; background: rgba(14,16,24,.7);
+  backdrop-filter: blur(12px); overflow: hidden; flex-wrap: wrap;
+  justify-content: center;
+}
+.hero-stat {
+  padding: 18px 28px; border-right: 1px solid var(--border);
+  text-align: center; flex: 1; min-width: 130px;
+}
+.hero-stat:last-child { border-right: none; }
+.hero-stat .val {
+  font-size: 1.8rem; font-weight: 800; line-height: 1;
+  background: linear-gradient(135deg, var(--teal), var(--blue));
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+.hero-stat .label { font-size: 11px; color: var(--t3); margin-top: 4px; letter-spacing: .04em; }
+.scroll-hint {
+  position: absolute; bottom: 32px; left: 50%; transform: translateX(-50%);
+  display: flex; flex-direction: column; align-items: center; gap: 6px;
+  color: var(--t3); font-size: 11px; letter-spacing: .1em; text-transform: uppercase;
+  animation: bob 2.5s ease-in-out infinite;
+}
+@keyframes bob { 0%,100%{transform:translateX(-50%) translateY(0)} 50%{transform:translateX(-50%) translateY(6px)} }
+
+/* ── LAYOUT ────────────────────────────── */
+.page { max-width: 1160px; margin: 0 auto; padding: 0 32px; }
+section { padding: 88px 0; border-top: 1px solid var(--border); }
+.section-label {
+  display: inline-flex; align-items: center; gap: 8px;
+  font-size: 11px; font-weight: 700; letter-spacing: .12em; text-transform: uppercase;
+  color: var(--t3); margin-bottom: 14px;
+}
+.section-label::before { content: ''; width: 20px; height: 2px; background: currentColor; border-radius: 1px; }
+.section-title {
+  font-size: clamp(1.8rem, 4vw, 2.8rem);
+  font-weight: 800; letter-spacing: -.02em; line-height: 1.1; margin-bottom: 14px;
+}
+.section-sub { font-size: 1.05rem; color: var(--t2); max-width: 640px; margin-bottom: 48px; }
+
+/* ── UTILS ─────────────────────────────── */
+.gradient-text {
+  background: linear-gradient(135deg, var(--teal) 0%, var(--blue) 100%);
+  -webkit-background-clip: text; -webkit-text-fill-color: transparent; background-clip: text;
+}
+code {
+  font-family: var(--mono); font-size: .88em;
+  background: rgba(0,0,0,.35); border: 1px solid var(--border);
+  border-radius: 4px; padding: 1px 6px; color: var(--teal);
+}
+.note {
+  background: rgba(79,142,247,.06); border: 1px solid rgba(79,142,247,.2);
+  border-left: 3px solid var(--blue); border-radius: 0 8px 8px 0;
+  padding: 14px 18px; font-size: 13.5px; color: var(--t2); margin-top: 20px;
+}
+.note strong { color: var(--t1); }
+.warn {
+  background: rgba(245,158,11,.06); border: 1px solid rgba(245,158,11,.2);
+  border-left: 3px solid var(--amber); border-radius: 0 8px 8px 0;
+  padding: 14px 18px; font-size: 13.5px; color: var(--t2); margin-top: 16px;
+}
+.warn strong { color: var(--t1); }
+.chip {
+  display: inline-flex; align-items: center; gap: 5px;
+  border-radius: 8px; padding: 5px 12px;
+  font-size: 12.5px; font-weight: 500; border: 1px solid; white-space: nowrap;
+}
+.chip-blue   { border-color: rgba(79,142,247,.4);  color: #7baeff; background: rgba(79,142,247,.08); }
+.chip-amber  { border-color: rgba(245,158,11,.4);  color: #fbbf24; background: rgba(245,158,11,.08); }
+.chip-violet { border-color: rgba(155,114,247,.4); color: #b794f4; background: rgba(155,114,247,.08); }
+.chip-teal   { border-color: rgba(45,212,191,.4);  color: #5eead4; background: rgba(45,212,191,.08); }
+.chip-rose   { border-color: rgba(249,112,104,.4); color: #fca5a5; background: rgba(249,112,104,.08); }
+.chip-green  { border-color: rgba(34,197,94,.4);   color: #86efac; background: rgba(34,197,94,.08); }
+.chip-gray   { border-color: rgba(100,116,139,.4); color: #cbd5e1; background: rgba(100,116,139,.08); }
+
+/* ── STATUS BADGES ─────────────────────── */
+.status-badge {
+  display: inline-flex; align-items: center; gap: 6px;
+  border-radius: 999px; padding: 3px 12px;
+  font-size: 11px; font-weight: 700; letter-spacing: .04em;
+  border: 1px solid; text-transform: uppercase; white-space: nowrap;
+}
+.status-done   { border-color: rgba(45,212,191,.4); color: var(--teal);  background: rgba(45,212,191,.1); }
+.status-ref    { border-color: rgba(100,116,139,.5); color: #cbd5e1;       background: rgba(100,116,139,.1); }
+.status-future { border-color: rgba(155,114,247,.4); color: var(--violet); background: rgba(155,114,247,.1); }
+.status-todo   { border-color: rgba(245,158,11,.4); color: var(--amber);  background: rgba(245,158,11,.1); }
+
+/* ── TIMELINE ──────────────────────────── */
+.timeline {
+  position: relative;
+  padding-left: 32px;
+  border-left: 2px solid var(--border);
+}
+.tl-event {
+  position: relative;
+  margin-bottom: 28px;
+  padding-left: 8px;
+}
+.tl-event:last-child { margin-bottom: 0; }
+.tl-event::before {
+  content: '';
+  position: absolute;
+  left: -42px;
+  top: 6px;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  border: 2px solid;
+  background: var(--bg);
+}
+.tl-event.tl-cleanup::before { border-color: var(--gray); }
+.tl-event.tl-mvp::before     { border-color: var(--blue); }
+.tl-event.tl-resilience::before { border-color: var(--amber); }
+.tl-event.tl-reconcile::before  { border-color: var(--teal); }
+.tl-event.tl-future::before     { border-color: var(--violet); border-style: dashed; }
+
+.tl-date {
+  font-family: var(--mono); font-size: 12px; font-weight: 600;
+  color: var(--t3); margin-bottom: 4px;
+}
+.tl-title {
+  font-size: 16px; font-weight: 700; margin-bottom: 6px;
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+}
+.tl-body {
+  font-size: 13.5px; color: var(--t2); line-height: 1.6;
+}
+.tl-body code { font-size: 12px; }
+.tl-meta {
+  display: flex; gap: 6px; flex-wrap: wrap; margin-top: 8px;
+}
+
+/* ── SUB-SPEC GRID ─────────────────────── */
+.spec-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 16px;
+}
+.spec-card {
+  border: 1px solid var(--border); border-radius: 14px; padding: 22px;
+  background: var(--s1); position: relative; overflow: hidden;
+}
+.spec-card::before {
+  content: ''; position: absolute; top: 0; left: 0; right: 0; height: 3px;
+}
+.spec-card.gateway::before    { background: linear-gradient(90deg, var(--amber), var(--gray)); }
+.spec-card.manager::before    { background: linear-gradient(90deg, var(--violet), var(--gray)); }
+.spec-card.resilience::before { background: linear-gradient(90deg, var(--amber), var(--teal)); }
+.spec-card.reconcile::before  { background: linear-gradient(90deg, var(--teal), var(--blue)); }
+.spec-card.ha::before         { background: linear-gradient(90deg, var(--violet), var(--rose)); opacity: .6; }
+.spec-card.ha {
+  border-style: dashed;
+  border-color: rgba(155,114,247,.3);
+}
+.spec-name {
+  font-family: var(--mono); font-size: 13.5px; font-weight: 700;
+  margin-bottom: 6px; color: var(--t1);
+}
+.spec-tagline {
+  font-size: 12.5px; color: var(--t2); line-height: 1.55;
+  margin-bottom: 14px; min-height: 38px;
+}
+.spec-meta {
+  display: flex; align-items: center; gap: 10px; flex-wrap: wrap;
+  margin-top: 10px;
+}
+.spec-stat {
+  font-size: 11px; color: var(--t3);
+}
+.spec-stat strong { color: var(--t1); font-weight: 600; }
+.spec-section {
+  border-top: 1px solid var(--border);
+  padding-top: 12px; margin-top: 12px;
+}
+.spec-section-label {
+  font-size: 10.5px; font-weight: 700; letter-spacing: .08em;
+  text-transform: uppercase; color: var(--t3); margin-bottom: 6px;
+}
+.spec-section ul {
+  list-style: none; padding: 0;
+}
+.spec-section li {
+  font-size: 12px; color: var(--t2);
+  padding: 2px 0; padding-left: 14px;
+  position: relative;
+}
+.spec-section li::before {
+  content: '•';
+  position: absolute; left: 0; color: var(--t3);
+}
+
+/* ── FEATURE CARDS (resilience + reconcile deep-dive) ─── */
+.feat-grid {
+  display: grid; grid-template-columns: 1fr 1fr; gap: 24px;
+}
+@media (max-width: 800px) { .feat-grid { grid-template-columns: 1fr; } }
+.feat-block {
+  border: 1px solid; border-radius: 14px; padding: 24px;
+  position: relative;
+}
+.feat-block.f-res { border-color: rgba(245,158,11,.3); background: rgba(245,158,11,.04); }
+.feat-block.f-rec { border-color: rgba(45,212,191,.3); background: rgba(45,212,191,.04); }
+.feat-header {
+  display: flex; align-items: center; gap: 12px;
+  margin-bottom: 14px;
+}
+.feat-icon { font-size: 28px; }
+.feat-title {
+  font-size: 18px; font-weight: 800;
+}
+.f-res .feat-title { color: var(--amber); }
+.f-rec .feat-title { color: var(--teal); }
+.feat-tag {
+  display: inline-block;
+  font-size: 10.5px; font-weight: 700; letter-spacing: .06em;
+  text-transform: uppercase; padding: 2px 10px;
+  border-radius: 999px; border: 1px solid;
+}
+.f-res .feat-tag { color: var(--amber); border-color: rgba(245,158,11,.4); background: rgba(245,158,11,.08); }
+.f-rec .feat-tag { color: var(--teal); border-color: rgba(45,212,191,.4); background: rgba(45,212,191,.08); }
+.feat-tagline {
+  font-size: 13px; color: var(--t2); line-height: 1.6; margin-bottom: 18px;
+}
+.feat-list {
+  list-style: none; padding: 0;
+}
+.feat-list li {
+  font-size: 13.5px; color: var(--t1);
+  padding: 8px 0; padding-left: 22px;
+  position: relative;
+  border-bottom: 1px solid var(--border);
+}
+.feat-list li:last-child { border-bottom: none; }
+.feat-list li::before {
+  content: '▸';
+  position: absolute; left: 0; top: 8px;
+  font-size: 12px;
+}
+.f-res .feat-list li::before { color: var(--amber); }
+.f-rec .feat-list li::before { color: var(--teal); }
+.feat-list .sub {
+  font-size: 12px; color: var(--t2); margin-top: 2px; font-weight: 400;
+}
+.feat-list .strong {
+  font-weight: 700;
+}
+
+/* ── DEPENDENCY MAP ────────────────────── */
+.dep-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 18px;
+}
+@media (max-width: 700px) { .dep-grid { grid-template-columns: 1fr; } }
+.dep-node {
+  border: 1px solid; border-radius: 12px; padding: 16px 20px;
+  position: relative;
+}
+.dep-node.dep-ref { border-color: rgba(100,116,139,.3); background: rgba(100,116,139,.05); }
+.dep-node.dep-done { border-color: rgba(45,212,191,.3); background: rgba(45,212,191,.05); }
+.dep-node.dep-future { border-color: rgba(155,114,247,.3); background: rgba(155,114,247,.04); border-style: dashed; }
+.dep-name {
+  font-family: var(--mono); font-size: 13px; font-weight: 700;
+  display: flex; align-items: center; justify-content: space-between;
+  margin-bottom: 6px;
+}
+.dep-summary {
+  font-size: 12.5px; color: var(--t2); line-height: 1.55;
+}
+.dep-deps {
+  font-size: 11px; color: var(--t3); margin-top: 8px;
+  font-family: var(--mono);
+}
+.dep-deps strong { color: var(--t2); font-weight: 600; }
+
+/* ── DISCOVERED BUGS ───────────────────── */
+.bug-grid {
+  display: grid; grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 14px;
+}
+.bug-card {
+  border: 1px solid rgba(249,112,104,.25); background: rgba(249,112,104,.04);
+  border-radius: 12px; padding: 18px;
+}
+.bug-num {
+  display: inline-block;
+  width: 26px; height: 26px; line-height: 22px;
+  border: 1px solid rgba(249,112,104,.5); background: rgba(249,112,104,.1);
+  color: var(--rose); border-radius: 50%;
+  text-align: center; font-size: 12px; font-weight: 800;
+  margin-bottom: 10px;
+}
+.bug-title { font-size: 14px; font-weight: 700; margin-bottom: 6px; }
+.bug-body  { font-size: 12.5px; color: var(--t2); line-height: 1.55; }
+.bug-fix {
+  margin-top: 8px; font-size: 11.5px; color: var(--teal);
+  display: flex; align-items: flex-start; gap: 6px;
+}
+.bug-fix::before { content: '✓'; font-weight: 700; }
+
+/* ── FOOTER ────────────────────────────── */
+footer {
+  border-top: 1px solid var(--border); padding: 40px 32px;
+  text-align: center; color: var(--t3); font-size: 13px;
+}
+footer code { font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- ═══════ HERO ═══════ -->
+<div class="hero">
+  <div class="hero-bg"></div>
+  <div class="hero-grid"></div>
+  <div class="hero-content">
+    <div class="hero-eyebrow">
+      <span class="dot"></span>
+      GROWI Vault · Status Report · 2026-05-22
+    </div>
+    <h1>GROWI <span class="accent">Vault</span><br>サブ spec 進捗レポート</h1>
+    <p class="hero-tagline">
+      <strong>MVP リリース (2026-05-19) から 3 日間</strong>で<br>
+      <code>resilience</code> と <code>reconcile</code> の 2 つの後続 spec を完了し、<br>
+      残るは <code>ha</code> のみとなった現状をまとめる。
+    </p>
+    <div class="hero-audience">
+      🎯 対象: GROWI.cloud サービス開発 / インフラメンバー · 前回 (2026-05-19) infographic を読了済み想定
+    </div>
+    <div class="hero-stats">
+      <div class="hero-stat">
+        <div class="val">5</div>
+        <div class="label">sub-spec 総数</div>
+      </div>
+      <div class="hero-stat">
+        <div class="val">4</div>
+        <div class="label">完了 (implementation-complete)</div>
+      </div>
+      <div class="hero-stat">
+        <div class="val">1</div>
+        <div class="label">将来予定 (brief 段階)</div>
+      </div>
+      <div class="hero-stat">
+        <div class="val">585+</div>
+        <div class="label">tests pass (累計)</div>
+      </div>
+      <div class="hero-stat">
+        <div class="val">0</div>
+        <div class="label">残存 [ ] task</div>
+      </div>
+    </div>
+  </div>
+  <div class="scroll-hint" aria-hidden="true">
+    <svg width="16" height="16" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+      <path d="M8 3v10M4 9l4 4 4-4" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/>
+    </svg>
+    scroll
+  </div>
+</div>
+
+
+<!-- ═══════ TIMELINE ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--blue)">Timeline</div>
+  <h2 class="section-title">この 16 日間で起きたこと</h2>
+  <p class="section-sub">前回 infographic (5/19) が「MVP として何を出荷したか」を伝えるドキュメントだったのに対し、本レポートはその直後 3 日間に行った <strong>resilience + reconcile + ha brief</strong> のスプリント結果を伝える。</p>
+
+  <div class="timeline">
+
+    <div class="tl-event tl-cleanup">
+      <div class="tl-date">2026-05-07</div>
+      <div class="tl-title">
+        <code>growi-vault-gateway</code> / <code>growi-vault-manager</code> cleanup
+        <span class="status-badge status-ref">REFERENCE</span>
+      </div>
+      <div class="tl-body">
+        両 sub-spec を <code>phase: implementation-complete</code> + <code>cleaned_up_at</code> にし、historical record として固定化。以後はここから「置き換え設計」を新 spec として切り出す pattern を採用。
+      </div>
+    </div>
+
+    <div class="tl-event tl-mvp">
+      <div class="tl-date">2026-05-19</div>
+      <div class="tl-title">
+        MVP リリース + 前回 infographic 公開
+        <span class="status-badge status-done">MVP DONE</span>
+      </div>
+      <div class="tl-body">
+        <code>git clone</code> / <code>git pull</code> による read-only アクセス、PAT 認証、ACL-scoped 同期、admin UI からの bootstrap 完了。一方で <strong>完了状態の信頼性</strong> (cursor リセット欠如 / reset-all 毎回発行 / fire-and-forget な失敗処理) と <strong>drift 検出機構の不在</strong>、<strong>user-triggered な部分再同期手段の不在</strong>という 3 つの構造的欠陥が残存。
+      </div>
+    </div>
+
+    <div class="tl-event tl-resilience">
+      <div class="tl-date">2026-05-21</div>
+      <div class="tl-title">
+        <code>growi-vault-resilience</code> GO
+        <span class="status-badge status-done">DONE</span>
+      </div>
+      <div class="tl-body">
+        <strong>system-triggered correctness</strong> の独立 spec として、resilient bootstrap state machine + 軽量 drift 検出 (watermark-based incremental sweep) + 起動時自動再試行 + heartbeat/instanceId + admin UI surface を 14 task で完成。<code>/kiro-validate-impl</code> GO (全 50 受け入れ基準 COVERED、338 tests pass)。
+      </div>
+      <div class="tl-meta">
+        <span class="chip chip-amber">14 tasks</span>
+        <span class="chip chip-teal">338 tests pass</span>
+        <span class="chip chip-blue">50/50 requirements COVERED</span>
+      </div>
+    </div>
+
+    <div class="tl-event tl-reconcile">
+      <div class="tl-date">2026-05-22</div>
+      <div class="tl-title">
+        <code>growi-vault-reconcile</code> GO + cleanup + roadmap 再編 + <code>growi-vault-ha</code> brief drafted
+        <span class="status-badge status-done">DONE</span>
+        <span class="status-badge status-future">+ brief</span>
+      </div>
+      <div class="tl-body">
+        <strong>user-triggered targeted reconcile</strong> を独立 spec として、admin + 一般ユーザー両経路、ACL-scoped、PageTree / GrowiContextualSubNavigation / admin UI 統合を 22 leaf task で完成。<code>/kiro-validate-impl</code> GO (vitest 247 pass + Playwright E2E 4 pass on chromium、要件 7/7 COVERED)。同日中に既存 <code>resilience</code> の cleanup と roadmap の repo-global 化、<code>growi-vault-ha</code> brief drafted を完了。
+      </div>
+      <div class="tl-meta">
+        <span class="chip chip-teal">22 leaf tasks</span>
+        <span class="chip chip-blue">247 vitest pass</span>
+        <span class="chip chip-violet">4 Playwright E2E pass</span>
+        <span class="chip chip-green">requirements 7/7 COVERED</span>
+      </div>
+    </div>
+
+    <div class="tl-event tl-future">
+      <div class="tl-date">未定 (将来)</div>
+      <div class="tl-title">
+        <code>growi-vault-ha</code> 実装
+        <span class="status-badge status-future">将来予定 · 未着手</span>
+      </div>
+      <div class="tl-body">
+        vault-manager の単一インスタンス前提を解消し、Competing Consumers + per-namespace lease で multi-replica 化する。<strong>brief.md のみ drafted、requirements / design / tasks はすべて未生成・未着手</strong>。着手時期と優先度は未定。
+      </div>
+      <div class="tl-meta">
+        <span class="chip chip-violet">brief drafted</span>
+        <span class="chip chip-gray">requirements 未着手</span>
+        <span class="chip chip-gray">design 未着手</span>
+        <span class="chip chip-gray">implementation 未着手</span>
+      </div>
+    </div>
+
+  </div>
+</div>
+</section>
+
+
+<!-- ═══════ SUB-SPEC STATUS GRID ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--violet)">Sub-spec Status</div>
+  <h2 class="section-title">5 つの sub-spec の現況</h2>
+  <p class="section-sub">umbrella spec <code>growi-vault</code> 配下に 5 つの sub-spec が並列している。flat な命名 (<code>growi-vault-{gateway,manager,resilience,reconcile,ha}</code>) で責務マップが並列に見える構造。</p>
+
+  <div class="spec-grid">
+
+    <div class="spec-card gateway">
+      <div class="spec-name">growi-vault-gateway</div>
+      <div class="spec-tagline">apps/app 内の vault gateway。PAT 認証 + ACL 評価 + read-only git smart HTTP + namespace 計算。</div>
+      <div class="spec-meta">
+        <span class="status-badge status-ref">REFERENCE</span>
+        <span class="spec-stat">cleaned_up_at: <strong>2026-05-19</strong></span>
+      </div>
+      <div class="spec-section">
+        <div class="spec-section-label">Role in stack</div>
+        <ul>
+          <li>外部からの唯一の窓口</li>
+          <li>PAT 認証 / ACL 評価の owner</li>
+          <li>後続 spec が依存する interface 提供</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="spec-card manager">
+      <div class="spec-name">growi-vault-manager</div>
+      <div class="spec-tagline">独立マイクロサービス。instruction → git materialization の冪等な consumer。<code>isExcludedFromVault</code> filter / namespace mapper を所有。</div>
+      <div class="spec-meta">
+        <span class="status-badge status-ref">REFERENCE</span>
+        <span class="spec-stat">cleaned_up_at: <strong>2026-05-19</strong></span>
+      </div>
+      <div class="spec-section">
+        <div class="spec-section-label">Role in stack</div>
+        <ul>
+          <li>vault_instructions の consumer</li>
+          <li>bare repo への write owner</li>
+          <li>冪等性契約の保証 (content-addressing + 純関数 path mapper)</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="spec-card resilience">
+      <div class="spec-name">growi-vault-resilience</div>
+      <div class="spec-tagline">system-triggered correctness。resilient bootstrap state machine + watermark-based drift 検出 + 起動時自動再試行。</div>
+      <div class="spec-meta">
+        <span class="status-badge status-done">DONE</span>
+        <span class="spec-stat">GO: <strong>2026-05-21</strong> · cleanup: <strong>2026-05-22</strong></span>
+      </div>
+      <div class="spec-section">
+        <div class="spec-section-label">Role in stack</div>
+        <ul>
+          <li>bootstrap state machine の owner</li>
+          <li>vault_instructions outbox の write owner</li>
+          <li>後続 spec が共有する heartbeat / instanceId primitive を確立</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="spec-card reconcile">
+      <div class="spec-name">growi-vault-reconcile</div>
+      <div class="spec-tagline">user-triggered targeted reconcile。admin + 一般ユーザーの ACL-scoped reconcile を PageTree / SubNav / admin UI 統合で提供。</div>
+      <div class="spec-meta">
+        <span class="status-badge status-done">DONE</span>
+        <span class="spec-stat">GO: <strong>2026-05-22</strong> · cleanup: <strong>2026-05-22</strong></span>
+      </div>
+      <div class="spec-section">
+        <div class="spec-section-label">Role in stack</div>
+        <ul>
+          <li>outbox 経路を相乗りする consumer</li>
+          <li>vault_reconcile_log collection の owner</li>
+          <li>新規 instruction op は追加せず、既存 <code>bulk-upsert</code> を再利用</li>
+        </ul>
+      </div>
+    </div>
+
+    <div class="spec-card ha">
+      <div class="spec-name">growi-vault-ha</div>
+      <div class="spec-tagline">vault-manager の冗長化 (Competing Consumers + per-namespace lease)。change stream 取りこぼしの構造的排除と scaling 両立を狙う。</div>
+      <div class="spec-meta">
+        <span class="status-badge status-future">将来予定 · 未着手</span>
+        <span class="spec-stat">brief drafted: <strong>2026-05-22</strong></span>
+      </div>
+      <div class="spec-section">
+        <div class="spec-section-label">Status</div>
+        <ul>
+          <li><strong>brief.md のみ存在</strong></li>
+          <li>requirements / design / tasks は未生成</li>
+          <li>実装着手時期は未定</li>
+        </ul>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="note" style="margin-top:24px">
+    <strong>cleanup pattern の到達点</strong>:
+    cleanup 済み reference spec を historical record として保ち、新 spec が「置き換え設計」を提示する pattern が 4 sub-spec で連続して機能。新 spec の `design.md` には <strong>This Spec Owns / Out of Boundary / Allowed Dependencies / Revalidation Triggers</strong> を必ず置き、reference spec の Implementation Notes には 1 行の波及記述を後付けする運用で、reference 性と進化を両立できている。
+  </div>
+</div>
+</section>
+
+
+<!-- ═══════ DEEP DIVE: RESILIENCE + RECONCILE ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--teal)">What's New Since 5/19</div>
+  <h2 class="section-title">resilience と reconcile が解決したもの</h2>
+  <p class="section-sub">「誰がトリガーするか」を境界として system-triggered (自動) と user-triggered (手動) の 2 spec に分離。両者は <code>vault_instructions</code> outbox を共有し、vault-manager の冪等性契約に乗る。</p>
+
+  <div class="feat-grid">
+
+    <div class="feat-block f-res">
+      <div class="feat-header">
+        <div class="feat-icon">🛡️</div>
+        <div class="feat-title">resilience</div>
+        <span class="feat-tag">System-triggered</span>
+      </div>
+      <p class="feat-tagline">
+        「<code>bootstrapState: 'done'</code> でも実体の完全性は保証されない」「失敗が fire-and-forget」「<code>VAULT_BOOTSTRAP_ON_START=true</code> でデータ消失リスク」という MVP 時点の 5 つの構造的欠陥を解消し、System 側の correctness 保証層を確立した。
+      </p>
+      <ul class="feat-list">
+        <li>
+          <span class="strong">7 状態の state union による bootstrap state machine</span>
+          <div class="sub">pending / running / verifying / done / failed / aborted / force-pending を明示状態として定義。<code>VAULT_BOOTSTRAP_ON_START=true</code> 再起動で reset-all が走らない不変条件を仕様化。</div>
+        </li>
+        <li>
+          <span class="strong">watermark-based drift detector v1</span>
+          <div class="sub"><code>pages.updatedAt</code> watermark sweep で編集 / trash 移動 / restore 由来の drift を検出。検出時は既存 <code>bulk-upsert</code> instruction 経路に再発火 (新規 op を増やさず)。O(N) 全件 scan を回避。</div>
+        </li>
+        <li>
+          <span class="strong">起動時自動再試行 (bounded exponential backoff)</span>
+          <div class="sub">前回 <code>failed</code> 状態で起動した場合、retry policy で resume を試行。limit 超過時に admin UI に <code>force warning</code> として surface し人手介入を求める escalation 経路。</div>
+        </li>
+        <li>
+          <span class="strong">heartbeat / instanceId / stale 正規化</span>
+          <div class="sub">startup migration で前回 process の crash 残留 (<code>running</code> + instanceId なし) を <code>failed: process-restarted</code> に正規化。後続 <code>reconcile</code> spec が同じ pattern を <code>pending</code> 残留にも適用 (<code>HistoryStore.normalizeStaleLifecycle</code>)。</div>
+        </li>
+        <li>
+          <span class="strong">admin UI 拡張</span>
+          <div class="sub"><code>/admin/vault</code> に Bootstrap state / Completion Reliability / Auto-Retry Status / Drift Activity / Force Warning Banner の 5 section を追加。完了状態の信頼性指標と自動補修活動を観測可能に。</div>
+        </li>
+      </ul>
+    </div>
+
+    <div class="feat-block f-rec">
+      <div class="feat-header">
+        <div class="feat-icon">🎯</div>
+        <div class="feat-title">reconcile</div>
+        <span class="feat-tag">User-triggered</span>
+      </div>
+      <p class="feat-tagline">
+        watermark drift detector が構造的に拾えない局所 drift (path change / grant drop / hard delete) を、ユーザーが UI から ACL-scoped に手動補修できる経路を提供。force bootstrap (全 wipe) と watermark sweep の間を埋めるピンポイント手段。
+      </p>
+      <ul class="feat-list">
+        <li>
+          <span class="strong">admin + 一般ユーザーの 2 経路</span>
+          <div class="sub">admin は全範囲 / 一般ユーザーは自分が write 権を持つ sub-tree のみ。<code>POST /vault/reconcile</code> (admin) と <code>POST /vault/page/reconcile</code> (user) の 2 endpoint で実現。</div>
+        </li>
+        <li>
+          <span class="strong">accept gate の I/O 制約</span>
+          <div class="sub">受付ゲート中の DB I/O を <code>findOne</code> × 1 + 非 admin 時のみ <code>getUserRelatedGroups</code> × 1 に固定。<code>countDocuments</code> 等の全 scan を発行しない設計で、accept gate p99 ≤ 200ms を達成。</div>
+        </li>
+        <li>
+          <span class="strong">defense-in-depth な hard cap</span>
+          <div class="sub">受付ゲートは <code>page.descendantCount</code> stale なら見積もり違いを起こすため、orchestrator 側で <code>limit(plannedPageCount + 1)</code> のハードキャップを再適用。stale 検知時は <code>failed: limit-exceeded</code> で停止。</div>
+        </li>
+        <li>
+          <span class="strong">PageTree / GrowiContextualSubNavigation 統合</span>
+          <div class="sub">一般ユーザーは自分のページの dropdown menu から 1 クリックで reconcile 起動可能。modal 内で path 確認 → submit → accepted feedback の simple flow。i18n は <code>commons</code> namespace で全ページ対応。</div>
+        </li>
+        <li>
+          <span class="strong">冪等性に委ねた競合許容</span>
+          <div class="sub">resilience の自動補修と reconcile の手動補修が同じ <code>vault_instructions</code> outbox を共有するため衝突しうるが、vault-manager の content-addressing 冪等性により最終状態が一意に収束する設計を両 spec で明示。</div>
+        </li>
+      </ul>
+    </div>
+
+  </div>
+</div>
+</section>
+
+
+<!-- ═══════ DISCOVERED BUGS DURING E2E ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--rose)">E2E Findings</div>
+  <h2 class="section-title">Playwright 実走で発掘した 4 つの実バグ</h2>
+  <p class="section-sub">Task 5.3 (admin/user UI E2E シナリオ検証) を実装して chromium で実走したところ、unit test では拾えていなかった <strong>production wiring / client 統合層 / i18n 配置</strong> の defect が連続して見つかった。いずれも feature 境界内 (LOCAL) で修正し、upstream spec への影響はなし。<strong>「unit test だけでは production wiring の正しさは検証しきれない」</strong>という教訓が残った。</p>
+
+  <div class="bug-grid">
+
+    <div class="bug-card">
+      <div class="bug-num">1</div>
+      <div class="bug-title">apiv3 prefix の重複</div>
+      <div class="bug-body">
+        client component の <code>apiEndpoint</code> 値が <code>/v3/vault/reconcile</code> だったが、<code>apiv3Post</code> が自動で <code>/_api/v3</code> を prepend するため、実 URL は <code>/_api/v3/v3/vault/reconcile</code> となり 404。
+      </div>
+      <div class="bug-fix"><code>/v3/</code> prefix を削除 (admin / user 両 endpoint)</div>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-num">2</div>
+      <div class="bug-title">production wiring の脱漏</div>
+      <div class="bug-body">
+        <code>apiv3/index.js</code> が <code>createVaultAdminRouter</code> を呼んでおり <code>createVaultAdminRouterWithDeps</code> (reconcileService singleton を注入する factory) を使っていなかった。<code>/reconcile-history</code> が 500、user route はそもそも mount されていない状態。
+      </div>
+      <div class="bug-fix">factory を WithDeps 版に切替 + user route mount を追加</div>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-num">3</div>
+      <div class="bug-title">Modal lifecycle leak (Dropdown 内)</div>
+      <div class="bug-body">
+        <code>PageReconcileMenuItem</code> 内に <code>useState</code> で modal を保持していたが、親の Dropdown が outside-click で auto-close すると component ごと unmount され Modal も消える race condition。
+      </div>
+      <div class="bug-fix">Modal を親 (<code>GrowiContextualSubNavigation</code> + <code>use-page-item-control</code>) に lift up。<code>PageDeleteModal</code> / <code>CreateTemplateModal</code> と同 pattern</div>
+    </div>
+
+    <div class="bug-card">
+      <div class="bug-num">4</div>
+      <div class="bug-title">i18n namespace 配置ミス</div>
+      <div class="bug-body">
+        reconcile reject reason の i18n key が <code>admin.json</code> 配下に置かれていたが、reconcile modal は user-facing page からも開くため <code>admin</code> namespace 未読込のページで生キー文字列が表示される。
+      </div>
+      <div class="bug-fix"><code>growi-vault.reconcile.*</code> を <code>commons.json</code> へ移動 + <code>useTranslation('commons')</code> へ変更</div>
+    </div>
+
+  </div>
+
+  <div class="note" style="margin-top:24px">
+    <strong>E2E の価値</strong>:
+    227 件の unit test と integration test が全 pass していたにも関わらず、上記 4 件は実 server を立てて UI を操作した時点で初めて顕在化した。Task 5.3 の追加コストは <strong>テストファイルそのもの + 4 件の bugfix</strong> という形で結果的に膨らんだが、それらは UI を実利用する前に発見されなかった以上、本来 production 障害として現れていたはずのもの。<strong>UI 機能を完成 (DONE) と宣言する直前の Playwright E2E は今後も必須</strong>。
+  </div>
+</div>
+</section>
+
+
+<!-- ═══════ DEPENDENCY MAP ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--blue)">Dependency Map</div>
+  <h2 class="section-title">sub-spec 間の依存関係</h2>
+  <p class="section-sub">各 sub-spec は <code>vault_instructions</code> outbox + 既存 instruction op を共有経路として、<strong>新規 op を増やさず</strong>冪等性契約を維持する設計。</p>
+
+  <div class="dep-grid">
+
+    <div class="dep-node dep-ref">
+      <div class="dep-name">
+        growi-vault-gateway
+        <span class="status-badge status-ref">REFERENCE</span>
+      </div>
+      <div class="dep-summary">
+        PAT 認証 + ACL 評価 + read-only git smart HTTP / read API の owner。state を持たない (per-replica で stateless)。
+      </div>
+      <div class="dep-deps"><strong>provides:</strong> VaultPatAuth · VaultNamespaceMapper · admin UI 基盤</div>
+    </div>
+
+    <div class="dep-node dep-ref">
+      <div class="dep-name">
+        growi-vault-manager
+        <span class="status-badge status-ref">REFERENCE</span>
+      </div>
+      <div class="dep-summary">
+        instruction → git materialization の冪等な consumer。<code>.git/index.lock</code> 物理制約により同一 namespace への並行書き込み不能。
+      </div>
+      <div class="dep-deps"><strong>provides:</strong> idempotent instruction op handler · bare repo write owner</div>
+    </div>
+
+    <div class="dep-node dep-done">
+      <div class="dep-name">
+        growi-vault-resilience
+        <span class="status-badge status-done">DONE</span>
+      </div>
+      <div class="dep-summary">
+        gateway の bootstrap 経路と manager の <code>reset-all</code> op を再設計対象とし、置き換え設計を提示する。
+      </div>
+      <div class="dep-deps">
+        <strong>depends on:</strong> gateway (interface) · manager (idempotency)<br>
+        <strong>provides:</strong> bootstrap state machine · vault_instructions outbox write owner · heartbeat / instanceId primitive
+      </div>
+    </div>
+
+    <div class="dep-node dep-done">
+      <div class="dep-name">
+        growi-vault-reconcile
+        <span class="status-badge status-done">DONE</span>
+      </div>
+      <div class="dep-summary">
+        outbox 経路を相乗りする consumer。<strong>新規 op を導入せず</strong>既存 <code>bulk-upsert</code> を再利用。
+      </div>
+      <div class="dep-deps">
+        <strong>depends on:</strong> gateway (PAT/ACL interface) · resilience (instruction outbox + state machine 前提)<br>
+        <strong>provides:</strong> user-triggered targeted reconcile · vault_reconcile_log
+      </div>
+    </div>
+
+    <div class="dep-node dep-future" style="grid-column: 1 / -1">
+      <div class="dep-name">
+        growi-vault-ha
+        <span class="status-badge status-future">将来予定 · 未着手</span>
+      </div>
+      <div class="dep-summary">
+        vault-manager の single-replica 前提を解消し、Competing Consumers + per-namespace lease で multi-replica 化。本 spec 適用後、<code>resilience</code> の drift detection は「observability 主、最小補修副」に縮小可能。
+      </div>
+      <div class="dep-deps">
+        <strong>depends on:</strong> resilience (heartbeat / instanceId primitive 共有) · reconcile (multi-replica 下での sub-tree reconcile lease / claim を本 spec scope に含めるか要検討)<br>
+        <strong>provides (予定):</strong> namespace_leases collection · vault_instructions atomic claim · failover (秒オーダー TTL)
+      </div>
+    </div>
+
+  </div>
+
+  <div class="note" style="margin-top:24px">
+    <strong>境界分離の鍵</strong>:
+    「機能の重さ」ではなく「<strong>誰がトリガーするか</strong>」を境界として spec を切り出したことで、responsibility map が clean に保たれた。同じ <code>vault_instructions</code> outbox を共有しつつも、resilience は system-triggered の write owner、reconcile はその consumer として競合許容方針 (冪等性で最終収束) を両 spec で明示している。
+  </div>
+</div>
+</section>
+
+
+<!-- ═══════ FUTURE: HA ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--violet)">Future Work</div>
+  <h2 class="section-title">残るは <code>growi-vault-ha</code> のみ</h2>
+  <p class="section-sub">本セクションは <strong>「将来予定」</strong>のものを記述する。<code>brief.md</code> のみ drafted されており、<strong>requirements / design / tasks / 実装は全て未着手</strong>。着手時期は未定。</p>
+
+  <div style="border:2px dashed rgba(155,114,247,.4); border-radius:14px; padding:28px; background:rgba(155,114,247,.04); margin-bottom:24px">
+    <div style="display:flex; align-items:center; gap:12px; margin-bottom:18px; flex-wrap:wrap">
+      <span style="font-size:32px">🏗️</span>
+      <div style="flex:1; min-width:200px">
+        <div style="font-family:var(--mono); font-size:14px; font-weight:700; color:var(--t1)">growi-vault-ha</div>
+        <div style="font-size:12.5px; color:var(--t2); margin-top:2px">vault-manager の多重化 (Competing Consumers + per-namespace lease)</div>
+      </div>
+      <span class="status-badge status-future" style="font-size:12px; padding:5px 14px">将来予定 · 未着手</span>
+    </div>
+
+    <div style="display:grid; grid-template-columns:1fr 1fr; gap:18px; margin-bottom:20px">
+      <div>
+        <div style="font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--t3); margin-bottom:8px">解決したい問題</div>
+        <ul style="list-style:none; padding:0">
+          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
+            <span style="position:absolute; left:0; color:var(--rose)">•</span>
+            長時間停止 → change stream resume token 失効 → 取りこぼし
+          </li>
+          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
+            <span style="position:absolute; left:0; color:var(--rose)">•</span>
+            single-replica の crash で分単位の MTTR
+          </li>
+          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
+            <span style="position:absolute; left:0; color:var(--rose)">•</span>
+            mass import / bulk-rename での queue 滞留
+          </li>
+          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
+            <span style="position:absolute; left:0; color:var(--rose)">•</span>
+            bootstrap や reconcile が incremental sync を阻害
+          </li>
+        </ul>
+      </div>
+      <div>
+        <div style="font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--t3); margin-bottom:8px">設計の方向性 (brief 段階)</div>
+        <ul style="list-style:none; padding:0">
+          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
+            <span style="position:absolute; left:0; color:var(--teal)">▸</span>
+            同一 image / config の N replica
+          </li>
+          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
+            <span style="position:absolute; left:0; color:var(--teal)">▸</span>
+            <code>vault_instructions</code> への atomic claim
+          </li>
+          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
+            <span style="position:absolute; left:0; color:var(--teal)">▸</span>
+            新規 <code>namespace_leases</code> collection で書き込み serialize
+          </li>
+          <li style="font-size:13px; color:var(--t2); padding:4px 0 4px 14px; position:relative">
+            <span style="position:absolute; left:0; color:var(--teal)">▸</span>
+            failover は per-instruction TTL (秒オーダー)
+          </li>
+        </ul>
+      </div>
+    </div>
+
+    <div style="border-top:1px solid rgba(155,114,247,.2); padding-top:16px; margin-top:8px">
+      <div style="font-size:11px; font-weight:700; letter-spacing:.08em; text-transform:uppercase; color:var(--t3); margin-bottom:8px">現在の状態 (2026-05-22 時点)</div>
+      <div style="display:flex; gap:8px; flex-wrap:wrap">
+        <span class="chip chip-violet">brief.md drafted</span>
+        <span class="chip chip-gray">requirements 未着手</span>
+        <span class="chip chip-gray">design 未着手</span>
+        <span class="chip chip-gray">tasks 未着手</span>
+        <span class="chip chip-gray">implementation 未着手</span>
+      </div>
+    </div>
+  </div>
+
+  <div class="warn">
+    <strong>⚠️ 着手判断について</strong>:
+    本 spec の優先度と着手時期は<strong>未定</strong>。GROWI.cloud の実運用で single-replica の MTTR / 取りこぼしが顕在化した際、もしくは「vault は本番運用で常に動いていないと困る」要件が SLA レベルで確定した際に着手判断を行う想定。それまでは <code>brief.md</code> を一次情報源として、関連する観測データ (oplog window / replica restart 頻度 / change stream lag 等) を蓄積する期間。
+  </div>
+
+  <div class="note" style="margin-top:16px">
+    <strong>brief.md の所在</strong>:
+    <code>.kiro/specs/growi-vault-ha/brief.md</code> に Problem / Current State / Desired Outcome / Approach / Scope / Boundary Candidates / Out of Boundary / Upstream-Downstream / Existing Spec Touchpoints / Constraints を <strong>121 行</strong>で記載済み。着手時はここから <code>/kiro-spec-requirements growi-vault-ha</code> に進む。
+  </div>
+</div>
+</section>
+
+
+<!-- ═══════ NEXT STEPS ═══════ -->
+<section>
+<div class="page">
+  <div class="section-label" style="color:var(--teal)">Next Steps</div>
+  <h2 class="section-title">次の自然な一歩</h2>
+  <p class="section-sub">resilience + reconcile の完了を踏まえ、vault initiative としては <strong>HA 着手の優先度判断</strong>がメイン議題になる。当面の作業は安定運用と観測。</p>
+
+  <ul style="list-style:none; padding:0">
+    <li style="border-bottom:1px solid var(--border); padding:18px 0; display:flex; gap:14px; align-items:flex-start">
+      <span style="font-size:22px">🔭</span>
+      <div>
+        <div style="font-size:15px; font-weight:700">本番運用での観測フェーズ</div>
+        <div style="font-size:13px; color:var(--t2); margin-top:4px">resilience の drift detector 発火頻度 / reconcile の手動発火頻度 / vault-manager の uptime / change stream lag を継続観測。HA 着手判断のための運用データを蓄積する。</div>
+      </div>
+    </li>
+    <li style="border-bottom:1px solid var(--border); padding:18px 0; display:flex; gap:14px; align-items:flex-start">
+      <span style="font-size:22px">📚</span>
+      <div>
+        <div style="font-size:15px; font-weight:700">運用ドキュメントへの反映</div>
+        <div style="font-size:13px; color:var(--t2); margin-top:4px">前回 (5/19) infographic で示したデプロイ手順に、resilience の admin UI 経由の force/abort 操作 + reconcile の admin/user 経路 + audit log 種別の追加分を反映。GROWI.cloud のオンボーディング資料を更新する。</div>
+      </div>
+    </li>
+    <li style="border-bottom:1px solid var(--border); padding:18px 0; display:flex; gap:14px; align-items:flex-start">
+      <span style="font-size:22px">📌</span>
+      <div>
+        <div style="font-size:15px; font-weight:700">HA 着手の trigger 設定</div>
+        <div style="font-size:13px; color:var(--t2); margin-top:4px">どの条件 (MTTR 何分超過 / 取りこぼし発生 / SLA レベル明文化など) を満たした時点で <code>growi-vault-ha</code> 着手するかを事前合意しておく。trigger 未確定のまま着手判断を後回しにすると、必要なタイミングで対応できない。</div>
+      </div>
+    </li>
+    <li style="padding:18px 0; display:flex; gap:14px; align-items:flex-start">
+      <span style="font-size:22px">🧹</span>
+      <div>
+        <div style="font-size:15px; font-weight:700">umbrella spec の整合性確認</div>
+        <div style="font-size:13px; color:var(--t2); margin-top:4px"><code>growi-vault</code> umbrella の <code>design.md</code> / <code>requirements.md</code> が 5 sub-spec 体制と整合しているか必要に応じて確認。<code>sub_specs</code> 配列には ha を追加済み (phase は <code>umbrella-minimized</code> を維持)。</div>
+      </div>
+    </li>
+  </ul>
+</div>
+</section>
+
+
+<!-- ═══════ FOOTER ═══════ -->
+<footer>
+  <div style="margin-bottom:8px">
+    <strong style="color:var(--t2)">GROWI Vault</strong> — Status Report 2026-05-22
+  </div>
+  Umbrella spec: <code>.kiro/specs/growi-vault/</code> &nbsp;·&nbsp;
+  Sub-spec roadmap: <code>.kiro/specs/growi-vault/roadmap.md</code> &nbsp;·&nbsp;
+  前回: <code>infographic-20260519.html</code><br>
+  対象読者: GROWI.cloud サービス開発 / インフラメンバー
+</footer>
+
+</body>
+</html>
