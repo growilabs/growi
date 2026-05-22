@@ -9,6 +9,10 @@ overrides:
   '@lykmapipo/common>mime': 3.0.0
   # parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
   '@lykmapipo/common>parse-json': 5.2.0
+    # p-map v5+ is provided only by ESM, but @mastra/core requires CommonJS version
+  '@mastra/core>p-map': 4.0.0
+  # uuid v12+ is provided only by ESM, but @mastra/mongodb requires CommonJS version
+  '@mastra/mongodb>uuid': 11.1.0
   # CVE-2025-XXXXX: CRLF Injection + Prototype Pollution combo leads to HTTP Request Smuggling (CVSS 10.0).
   # All versions < 1.15.0 are vulnerable.
   axios: ^1.15.0

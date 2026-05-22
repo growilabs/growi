@@ -8,6 +8,8 @@ overrides:
   '@lykmapipo/common>flat': 5.0.2
   '@lykmapipo/common>mime': 3.0.0
   '@lykmapipo/common>parse-json': 5.2.0
+  '@mastra/core>p-map': 4.0.0
+  '@mastra/mongodb>uuid': 11.1.0
   axios: ^1.15.0
 
 packageExtensionsChecksum: sha256-8AVTVG6XqA8Sdx2pyiL0NkxKdDqAh83Jgy7TwdlUUks=
@@ -19868,7 +19870,7 @@ snapshots:
       ignore: 7.0.5
       json-schema: 0.4.0
       lru-cache: 11.2.7
-      p-map: 7.0.4
+      p-map: 4.0.0
       p-retry: 7.1.1
       picomatch: 4.0.4
       posthog-node: 5.34.8(rxjs@7.8.1)
