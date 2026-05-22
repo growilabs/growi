@@ -35,7 +35,7 @@
 
 ## 2. Core: Sibling 間 import の barrel 経由への書き換え
 
-- [ ] 2.1 既存 sibling import を barrel path に変更
+- [x] 2.1 既存 sibling import を barrel path に変更
   - `run-scenario.ts` の `./scenarios/baseline` / `./scenarios/load` / `./scenarios/drain` の import を、`./scenarios` 経由（barrel 経由）に書き換える。
   - `load-driver.ts` の `./lib/installer-driver` / `./lib/http-client` / `./lib/yjs-client` の import を、`./lib` 経由（barrel 経由）に書き換える。
   - test ファイル（`scenarios.spec.ts` 等）の sibling import は今回は対象外（既存テストは internal を直接触っているケースがあり、それは internal test の自然な書き方として許容する）。

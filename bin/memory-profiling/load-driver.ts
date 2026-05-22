@@ -18,9 +18,11 @@
  *   tsx tools/memory-profiling/load-driver.ts --smoke
  */
 
-import { createHttpClient } from './lib/http-client';
-import { createInstallerDriver } from './lib/installer-driver';
-import { createYjsSession } from './lib/yjs-client';
+import {
+  createHttpClient,
+  createInstallerDriver,
+  createYjsSession,
+} from './lib';
 
 // ---------------------------------------------------------------------------
 // Types

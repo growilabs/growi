@@ -22,9 +22,7 @@ import * as path from 'node:path';
 import { createCdpSnapshotClient } from './cdp-snapshot-client';
 import { createLoadDriver } from './load-driver';
 import { createRssTimeSeriesLogger } from './rss-time-series-logger';
-import { runBaseline } from './scenarios/baseline';
-import { runDrain } from './scenarios/drain';
-import { runLoad } from './scenarios/load';
+import { runBaseline, runDrain, runLoad } from './scenarios';
 
 // ---------------------------------------------------------------------------
 // Types
