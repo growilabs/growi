@@ -6,7 +6,7 @@
 
 ## 1. Foundation
 
-- [ ] 1.1 Profiling 出力ディレクトリと環境変数前提の整備
+- [x] 1.1 Profiling 出力ディレクトリと環境変数前提の整備
   - `tmp/memory-leak-investigation/` 配下に `snapshots/` を含むサブディレクトリを生成し、`.gitignore` で除外されていることを確認する。
   - `apps/app/.env.development` に `MEMORY_PROFILING_ENABLED` と `MEMORY_PROFILING_OUTPUT_DIR` のコメントアウト例を追記する。
   - `apps/app/tools/memory-profiling/` ディレクトリを作成し、README で「起動手順 / 出力先 / heap snapshot を git にコミットしない方針」の見出しを用意する。
