@@ -7,6 +7,7 @@ import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
+import type { AuditlogSuggestionField } from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
@@ -855,39 +856,40 @@ class ElasticsearchDelegator
     }
   }
 
-  async searchAuditlogs(username: string, limit: number): Promise<string[]> {
-    const escaped = username.replace(/([*?\\])/g, '\\$1');
+  async searchAuditlogByFuzzyWildcard(
+    field: AuditlogSuggestionField,
+    q: string,
+    limit: number,
+  ): Promise<string[]> {
+    const escaped = q.replace(/([*?\\])/g, '\\$1');
     const query = {
       bool: {
         should: [
           {
             wildcard: {
-              username: { value: `${escaped}*`, case_insensitive: true },
+              [field]: { value: `${escaped}*`, case_insensitive: true },
             },
           },
-          { fuzzy: { username: { value: escaped, fuzziness: 'AUTO' } } },
+          { fuzzy: { [field]: { value: escaped, fuzziness: 'AUTO' } } },
         ],
       },
     };
+
     if (isES7ClientDelegator(this.client)) {
       const result = await this.client.search({
         index: this.auditlogIndexName,
         body: {
           size: 0,
           query,
-          aggs: {
-            unique_usernames: {
-              terms: { field: 'username', size: limit },
-            },
-          },
+          aggs: { unique_values: { terms: { field, size: limit } } },
         },
       });
-      const agg = result.aggregations?.unique_usernames as
+      const agg = result.aggregations?.unique_values as
         | estypes7.AggregationsStringTermsAggregate
         | undefined;
       const buckets = (agg?.buckets ??
         []) as estypes7.AggregationsStringTermsBucket[];
-      return buckets.map((bucket) => bucket.key as string);
+      return buckets.map((b) => b.key as string);
     }
 
     if (
@@ -898,18 +900,14 @@ class ElasticsearchDelegator
         index: this.auditlogIndexName,
         size: 0,
         query,
-        aggs: {
-          unique_usernames: {
-            terms: { field: 'username', size: limit },
-          },
-        },
+        aggs: { unique_values: { terms: { field, size: limit } } },
       });
-      const agg = result.aggregations?.unique_usernames as
+      const agg = result.aggregations?.unique_values as
         | estypes9.AggregationsStringTermsAggregate
         | undefined;
       const buckets = (agg?.buckets ??
         []) as estypes9.AggregationsStringTermsBucket[];
-      return buckets.map((bucket) => bucket.key as string);
+      return buckets.map((b) => b.key as string);
     }
 
     return [];

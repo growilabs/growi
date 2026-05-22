@@ -362,13 +362,17 @@ class SearchService implements SearchQueryParser, SearchResolver {
     q: string,
     limit: number,
   ): Promise<AuditlogSuggestionsResponse> {
+    if (q === '') return {};
+
     const response: AuditlogSuggestionsResponse = {};
 
     if (fields.includes('username')) {
-      const usernames = await this.fullTextSearchDelegator.searchAuditlogs(
-        q,
-        limit,
-      );
+      const usernames =
+        await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+          'username',
+          q,
+          limit,
+        );
       const User = mongoose.model<IUser>('User');
       const users = await User.find({ username: { $in: usernames } })
         .select('username status')
