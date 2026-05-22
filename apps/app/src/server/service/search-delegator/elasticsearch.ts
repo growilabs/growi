@@ -889,7 +889,7 @@ class ElasticsearchDelegator
         | undefined;
       const buckets = (agg?.buckets ??
         []) as estypes7.AggregationsStringTermsBucket[];
-      return buckets.map((b) => b.key as string);
+      return buckets.map((b) => String(b.key));
     }
 
     if (
@@ -907,7 +907,7 @@ class ElasticsearchDelegator
         | undefined;
       const buckets = (agg?.buckets ??
         []) as estypes9.AggregationsStringTermsBucket[];
-      return buckets.map((b) => b.key as string);
+      return buckets.map((b) => String(b.key));
     }
 
     return [];
