@@ -92,7 +92,7 @@
   - _Requirements: 2.3_
   - _Boundary: RssTimeSeriesLogger_
 
-- [ ] 3.4 (P) シナリオモジュールの実装
+- [x] 3.4 (P) シナリオモジュールの実装
   - `tools/memory-profiling/scenarios/baseline.ts` を作成し、5 分（env var で override 可）の idle phase を実行する。
   - `tools/memory-profiling/scenarios/load.ts` を作成し、page create / page edit / page get / page list / page search / yjs clean close / yjs abort の各 op 回数を const として定義し、それらを混在実行する。read / search 系は L2 (OTel allow-list) による検索パスの非破壊性を実測する目的を持つ（Req 7.1）。
   - 初期値は再現可能性とランタイム見積もりのバランスを取って次を採用する: `pageCreate=20`, `pageEdit=20`, `pageGet=50`, `pageList=10`, `pageSearch=30`, `yjsSessionsCleanClose=10`, `yjsSessionsAbort=10`。env var / CLI で override 可能。
