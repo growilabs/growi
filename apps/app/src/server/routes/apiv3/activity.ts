@@ -38,7 +38,7 @@ const validator = {
   list: [
     query('limit')
       .optional()
-      .isInt({ max: 100 })
+      .isInt({ min: 1, max: 100 })
       .withMessage('limit must be a number less than or equal to 100'),
     query('offset').optional().isInt().withMessage('page must be a number'),
     query('searchFilter')
@@ -57,10 +57,14 @@ const validator = {
         );
       })
       .withMessage('field must be username'),
-    query('q').optional().isString().withMessage('q must be a string'),
+    query('q')
+      .optional()
+      .isString()
+      .isLength({ max: 100 })
+      .withMessage('q must be a string'),
     query('limit')
       .optional()
-      .isInt({ max: 100 })
+      .isInt({ min: 1, max: 100 })
       .toInt()
       .withMessage('limit must be a number less than or equal to 100'),
   ],
@@ -363,7 +367,7 @@ module.exports = (crowi: Crowi): Router => {
    *     parameters:
    *       - name: field
    *         in: query
-   *         required: true
+   *         required: false
    *         schema:
    *           type: string
    *           enum: [username]
