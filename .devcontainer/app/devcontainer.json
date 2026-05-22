@@ -7,8 +7,9 @@
   "workspaceFolder": "/workspace/growi",
 
   "features": {
-    "ghcr.io/devcontainers/features/node:1": {
-      "version": "24.14.0"
+    "ghcr.io/devcontainers/features/node:2": {
+      "version": "24",
+      "pnpmVersion": "11.1.1"
     },
     "ghcr.io/devcontainers/features/github-cli:1": {}
   },
@@ -16,9 +17,17 @@
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   // "forwardPorts": [],
 
-  "initializeCommand": "/bin/bash .devcontainer/pdf-converter/initializeCommand.sh",
+  "initializeCommand": "/bin/bash .devcontainer/scripts/init-home.sh",
   // Use 'postCreateCommand' to run commands after the container is created.
-  "postCreateCommand": "/bin/bash ./.devcontainer/app/postCreateCommand/main.sh",
+  "postCreateCommand": "/bin/bash ./.devcontainer/app/postCreateCommand.sh",
+
+  // Expose tool install dirs (pnpm global, uv/claude) to every shell spawned by VS Code
+  // (integrated terminal, lifecycle commands, and extension shells such as Claude Code)
+  // without relying on ~/.bashrc, which non-interactive shells don't source.
+  "remoteEnv": {
+    "PNPM_HOME": "/home/vscode/.local/share/pnpm",
+    "PATH": "/home/vscode/.local/share/pnpm/bin:/home/vscode/.local/bin:${containerEnv:PATH}"
+  },
 
   // Configure tool-specific properties.
   "customizations": {
