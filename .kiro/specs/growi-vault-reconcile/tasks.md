@@ -210,14 +210,14 @@
 
 - [ ] 5. Integration: 実 MongoDB / UI レベルでのシナリオ検証
 
-- [ ] 5.1 reconcile-flow 実 MongoDB integration test を作成
+- [x] 5.1 reconcile-flow 実 MongoDB integration test を作成
   - `reconcile-flow.integ.ts` で devcontainer の `mongo` service に対し以下 7 シナリオを E2E で実行: (a) admin sub-tree 起動 → completed、(b) user page 起動で ACL 一部除外 → orchestrator 完了時に partial-acl-filtered + completed、(c) **target page の `descendantCount` が 1000 超 → 受付ゲートで rejected（accept gate 中の `countDocuments` 呼び出し回数が 0 であること、追加 query は `findOne` × 1 のみ）**、(d) system concurrency 上限（default 3）超過 → rejected、(e) `vault_reconcile_log` に `status: 'running'` と `status: 'pending'` の record を事前 seed → `HistoryStore.normalizeStaleLifecycle()`（task 3.3 の startup migration が呼ぶ実装）を直接呼んで両方 `failed: process-restarted` 正規化を assertion、(f) `bootstrapState !== 'done'` で default reject、(g) **`descendantCount` が stale で 999 と記録されているのに実際は 1500 件の descendants があるシナリオ → orchestrator が `limit(plannedPageCount + 1)` ハードキャップで停止し `status: 'failed', lastError: 'limit-exceeded'` で終了**
   - 各シナリオで `vault_reconcile_log` の最終状態と `vault_instructions` に積まれた `bulk-upsert` payload を assertion
   - 観察可能: vitest integ で 7 シナリオが全てパスし、test 後に collection が clean up される
   - _Depends: 2.6, 3.3_
   - _Requirements: 2.6, 4.4, 5.5, 6.1, 6.2, 6.7, 6.9, 6.11_
 
-- [ ] 5.2 ReconcileOrchestrator の overhead と冪等性を検証する integration test を追加
+- [x] 5.2 ReconcileOrchestrator の overhead と冪等性を検証する integration test を追加
   - **1000 件（default 上限）規模の page** を含む eligibleQuery に対し orchestrator を実行し、(i) accept gate latency が p99 ≤ 200ms、(ii) orchestrator 完了時間が ≤ 120s、(iii) `vault_instructions` insert 件数が `ceil(plannedPageCount / chunkSize) × (unique namespace 数)` に有界、(iv) process RSS の増加が 1 reconcile あたり 10 MB 以下に収まることを assertion
   - **`.lean()` 有無の比較テスト**: lean なしの cursor で同じ stream を実行した場合の memory 増分と比較し、`.lean()` 経由の方が memory 効率が良いことを確認
   - **同時 3 reconcile（system 上限）を並列実行**したシナリオで peak RSS と全 reconcile の完了を assertion（要件 6.7 の default 3）
