@@ -390,15 +390,3 @@ describe('Idempotency — orchestrator emits additive instructions', () => {
     expect(countAfterSecond).toBe(countAfterFirst * 2);
   });
 });
-
-// ---------------------------------------------------------------------------
-// Test 4: RSS measurement SKIPPED
-// ---------------------------------------------------------------------------
-
-describe('RSS measurement (skipped)', () => {
-  it.skip('RSS increase per reconcile should be < 10MB', // test environment. The MongoDB binary itself holds significant resident memory, // Skipped: RSS measurement is unreliable in the in-memory MongoMemoryReplSet
-  // and V8 GC timing is non-deterministic, making per-reconcile RSS deltas
-  // impossible to measure reliably without dedicated memory profiling tooling.
-  // Verify this threshold with heap profiling in a production-like environment.
-  () => {});
-});
