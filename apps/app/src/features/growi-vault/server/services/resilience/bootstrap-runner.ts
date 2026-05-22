@@ -352,6 +352,7 @@ export function createBootstrapRunner(
               bootstrapRetryAttempts: currentRetryAttempts,
             },
           },
+          { upsert: true },
         );
       } else if (isStaleResume && currentState === 'running') {
         // Stale running: running → staleRunningDetected → retrying → start → running
@@ -470,6 +471,7 @@ export function createBootstrapRunner(
               bootstrapRetryAttempts: currentRetryAttempts,
             },
           },
+          { upsert: true },
         );
       }
 
