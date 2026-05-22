@@ -52,7 +52,7 @@ The scenario drove a clear difference in retained RSS growth:
 
 Before the fix: no explicit `maxPoolSize` / `minPoolSize` → MongoDB driver default `maxPoolSize = 100`, allowing up to 100 open TCP connections per replica set member. Under load, connections accumulate in native memory and do not release within the 60-second drain window.
 
-After the fix: `MONGO_MAX_POOL_SIZE = 10`, `MONGO_MIN_POOL_SIZE = 2` → connections peak at 10, reducing native socket and buffer memory retained after drain.
+After the fix: `MONGO_MAX_POOL_SIZE = 10`, `MONGO_MIN_POOL_SIZE = 2` → connections peak at 10, reducing native socket and buffer memory retained after drain. (The shipped default was subsequently raised to `15` for additional burst headroom; see Section 4.)
 
 The retained-growth reduction of 389 MB far exceeds the 20–40 MB target.
 
@@ -134,8 +134,29 @@ The retained-growth comparison **substantially exceeds** the 20–40 MB target. 
 
 ## 4. Behavior Changes (operator-visible)
 
-- **`MONGO_MAX_POOL_SIZE` (default: 10)**: Operators can now cap MongoDB connection pool size via environment variable. Reducing the default from the driver's 100 to 10 lowers peak native memory by ~390 MB under load but may limit throughput under very high concurrent DB request rates. Operators can raise this with `MONGO_MAX_POOL_SIZE=50` if needed.
+- **`MONGO_MAX_POOL_SIZE` (default: 15)**: Operators can now cap MongoDB connection pool size via environment variable. Reducing the default from the driver's 100 to 15 lowers peak native memory substantially under load (measurements taken at `10`; see Section 2) while leaving modest burst headroom for typical small-to-mid deployments. See the sizing guidance below.
 - **`MONGO_MIN_POOL_SIZE` (default: 2)**: Keeps 2 connections warm at all times, avoiding cold-start latency on the first request after idle.
+
+#### Pool sizing guidance (per single Node.js process)
+
+The default `MONGO_MAX_POOL_SIZE = 15` is tuned for small-to-mid GROWI deployments (single-team to a few hundred users) and the GROWI.cloud per-tenant container shape. For larger self-hosted deployments, increase this value to match expected concurrent DB activity. The pool size is per-process; if you run N replicas behind a load balancer, total connections to MongoDB ≈ N × `MONGO_MAX_POOL_SIZE`.
+
+| Deployment scale (registered users) | Estimated peak concurrent users | Recommended `MONGO_MAX_POOL_SIZE` | Recommended `MONGO_MIN_POOL_SIZE` | Approx. native socket cost |
+|---|---|---|---|---|
+| Small (≤ 50) | 1–5 | **15** (default) | 2 | ~60 MB |
+| Mid (50–500) | 5–25 | **20–30** | 2–5 | ~80–120 MB |
+| Large (500–1500) | 25–75 | **50** | 5 | ~200 MB |
+| Very large (1500+, write-heavy, many concurrent editors) | 75+ | **100** (mongodb driver default before this change) | 5–10 | ~400 MB |
+
+Rule of thumb (Little's Law): `pool ≈ peak requests/sec × avg DB time per request`. Most GROWI requests issue 1–5 short-lived (<50 ms) Mongo queries, so a process rarely needs more than 50 connections even under heavy load.
+
+**When to raise the value** — observe one or more of:
+- `MongoPoolClearedError` or connection timeouts in application logs
+- `db.client.connections.usage` (OTel metric) sustained at the max
+- `db.serverStatus().connections.current` on the MongoDB side hitting a hard ceiling at peak hours
+- Sustained HTTP p95 latency spikes that recover at off-peak hours
+
+**Runtime change** — pool size is **not** runtime-mutable. The MongoDB Node.js driver fixes pool options at `MongoClient` construction time and exposes no public resize API. To change pool size in production, update the environment variable and restart the process (rolling restart for HA). Live reconnect via `mongoose.disconnect()` + `mongoose.connect()` would interrupt in-flight queries and is not recommended as a hot-reload mechanism.
 - **OTel allow-list** (`OTEL_AUTO_INSTRUMENTATION_PROFILE=minimal`): When `OPENTELEMETRY_ENABLED=true`, only 4 instrumentations are active by default (http, express, mongodb, mongoose). Operators requiring full instrumentation can set `OTEL_AUTO_INSTRUMENTATION_PROFILE=all`.
 - **`growi.yjs.docs.count` metric**: New observable gauge available in the OTel metrics stream. Reports the number of live collaborative documents. No impact on non-OTel deployments.
 - **`autoUpdateExpiryDate` error handling**: Errors in the background page-operation timer are now caught and logged instead of propagating silently. No behavioral change for operators; monitoring dashboards will now surface previously silent failures.

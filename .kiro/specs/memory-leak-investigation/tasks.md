@@ -22,7 +22,7 @@
 ## 2. Core — Server-side fixes (parallel-capable; 異なるファイルへの独立変更)
 
 - [x] 2.1 (P) L1: Mongoose connection pool の上限・下限を環境変数化
-  - `mongoOptions` に `maxPoolSize` と `minPoolSize` を追加し、それぞれ `MONGO_MAX_POOL_SIZE`（default 10）と `MONGO_MIN_POOL_SIZE`（default 2）から読む。
+  - `mongoOptions` に `maxPoolSize` と `minPoolSize` を追加し、それぞれ `MONGO_MAX_POOL_SIZE`（default 15）と `MONGO_MIN_POOL_SIZE`（default 2）から読む。
   - `Number.isFinite` チェックで NaN は default にフォールバックする。
   - pool 周辺の他オプション（`useUnifiedTopology` 等）は変更しない。
   - Unit test を追加し、未指定 / 正常値 / NaN / `min > max` 異常入力時の挙動を検証する。
@@ -130,7 +130,7 @@
   - _Requirements: 3.6, 7.1, 7.3_
 
 - [x] 4.4 (P) Default 値変更と新規 metric の CHANGESET 追加
-  - `npx changeset` で `@growi/app` 用 changeset を追加し、以下を明示する: (a) `MONGO_MAX_POOL_SIZE` default = 10, `MONGO_MIN_POOL_SIZE` default = 2 へ変更、(b) OTel auto-instrumentation default が allow-list 方式へ変更、(c) 新規 metric `growi.yjs.docs.count` の追加、(d) 従来動作復元の env var 一覧（`MONGO_MAX_POOL_SIZE`, `OTEL_AUTO_INSTRUMENTATION_PROFILE=all`）。
+  - `npx changeset` で `@growi/app` 用 changeset を追加し、以下を明示する: (a) `MONGO_MAX_POOL_SIZE` default = 15, `MONGO_MIN_POOL_SIZE` default = 2 へ変更、(b) OTel auto-instrumentation default が allow-list 方式へ変更、(c) 新規 metric `growi.yjs.docs.count` の追加、(d) 従来動作復元の env var 一覧（`MONGO_MAX_POOL_SIZE`, `OTEL_AUTO_INSTRUMENTATION_PROFILE=all`）。
   - 観測可能な完了条件: `.changeset/*.md` 新規ファイルが PR の差分に含まれ、上記 4 点の運用者向け説明が記述されている。
   - _Depends: 2.1, 2.2, 2.3, 4.1_
   - _Requirements: 7.2, 7.4_

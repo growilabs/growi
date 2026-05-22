@@ -6,7 +6,7 @@ type ConnectionOptionsExtend = {
   useUnifiedTopology: boolean;
 };
 
-const DEFAULT_MAX_POOL_SIZE = 10;
+const DEFAULT_MAX_POOL_SIZE = 15;
 const DEFAULT_MIN_POOL_SIZE = 2;
 
 /**

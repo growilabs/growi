@@ -42,7 +42,7 @@ return mongoose.connect(mongoUri, mongoOptions);
 ```ts
 export const mongoOptions = {
   useUnifiedTopology: true,
-  maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE ?? 10),
+  maxPoolSize: Number(process.env.MONGO_MAX_POOL_SIZE ?? 15),
   minPoolSize: Number(process.env.MONGO_MIN_POOL_SIZE ?? 2),
 };
 ```
@@ -326,7 +326,7 @@ packages/logger/src/transport-factory.ts
 - **Alternatives Considered**:
   1. Default 据え置き、env var override のみ追加
   2. **Default を本 spec 推奨値に変更し、env var で従来動作に戻せるようにする**
-- **Selected Approach**: 2 を採用。`MONGO_MAX_POOL_SIZE` default `10`, `MONGO_MIN_POOL_SIZE` default `2`。OTel allow-list は default で明示集合のみ enable、`OTEL_AUTO_INSTRUMENTATION_PROFILE=all` で従来動作復元。
+- **Selected Approach**: 2 を採用。`MONGO_MAX_POOL_SIZE` default `15`, `MONGO_MIN_POOL_SIZE` default `2`。OTel allow-list は default で明示集合のみ enable、`OTEL_AUTO_INSTRUMENTATION_PROFILE=all` で従来動作復元。
 - **Rationale**: 本 spec の目的（RSS 削減）が default の変更で自動的に効き、運用者は env var で即座に戻せる。
 - **Trade-offs**: + 自動的に効果 / − 既存 deployment の振る舞い変化を release notes で告知する必要。
 - **Follow-up**: CHANGELOG への記載必須。

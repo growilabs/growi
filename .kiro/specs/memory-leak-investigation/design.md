@@ -200,7 +200,7 @@ bin/                                                 # [NEW] @growi/bin workspac
 > SIGUSR2 in-process fallback（旧 `apps/app/src/server/util/heap-snapshot-handler.ts` + `app.ts` への登録 + `.env.development` への `MEMORY_PROFILING_ENABLED` コメント例）は実装中に削除した（commit `b8e3efa4c7`）。CDP-only に集約することで、`apps/app` の signal handler 設置面と新規 env var を排除している。
 
 ### Modified Files
-- `apps/app/src/server/util/mongoose-utils.ts` — `mongoOptions` に `maxPoolSize` / `minPoolSize` を追加。env var から読み出し（default 10 / 2）。
+- `apps/app/src/server/util/mongoose-utils.ts` — `mongoOptions` に `maxPoolSize` / `minPoolSize` を追加。env var から読み出し（default 15 / 2）。
 - `apps/app/src/features/opentelemetry/server/node-sdk-configuration.ts` — `getNodeAutoInstrumentations()` の引数を allow-list ベースに置換。allow set は `http`, `express`, `mongodb`, `mongoose`。`OTEL_AUTO_INSTRUMENTATION_PROFILE=all` で従来動作復元可能。
 - `apps/app/src/features/opentelemetry/server/custom-metrics/index.ts` — `yjs-metrics` の re-export を追加し、`setupCustomMetrics()` の dynamic import 列と `add*Metrics()` 呼び出し列に組み込む。
 - `apps/app/src/server/service/page-operation.ts` — `autoUpdateExpiryDate` の `setInterval` callback を try/catch でラップし、catch 内で `logger.error` を呼ぶ。
@@ -317,7 +317,7 @@ sequenceDiagram
 
 **Responsibilities & Constraints**
 - `mongoOptions` に `maxPoolSize` / `minPoolSize` を追加するのみ。pool 周辺の他オプション（read preference 等）は変更しない。
-- Default は `maxPoolSize=10`, `minPoolSize=2`。env var で override 可能。
+- Default は `maxPoolSize=15`, `minPoolSize=2`。env var で override 可能。サイジング根拠は [verification-report.md の Pool sizing guidance](./verification-report.md#pool-sizing-guidance-per-single-nodejs-process) を参照。
 
 **Dependencies**
 - Inbound: `apps/app/src/server/crowi/index.ts:352` — `mongoose.connect(uri, mongoOptions)` (P0)
@@ -328,13 +328,13 @@ sequenceDiagram
 ##### Config Contract
 | Env Var | Default | Allowed Range | Effect |
 |---------|---------|---------------|--------|
-| `MONGO_MAX_POOL_SIZE` | `10` | positive integer | mongoose pool 上限 |
+| `MONGO_MAX_POOL_SIZE` | `15` | positive integer | mongoose pool 上限 |
 | `MONGO_MIN_POOL_SIZE` | `2` | non-negative integer, `<= MONGO_MAX_POOL_SIZE` | mongoose pool 下限 |
 
 **Implementation Notes**
 - Integration: `mongoose-utils.ts:52` の `mongoOptions` を `{ useUnifiedTopology: true, maxPoolSize: ..., minPoolSize: ... }` に変更。
 - Validation: env var が NaN の場合は default にフォールバック（`Number.isFinite` チェック）。
-- Risks: 大規模テナントで `maxPoolSize=10` が飽和する可能性 → release notes で env var override を案内。
+- Risks: 大規模デプロイ（数百〜数千ユーザー）で `maxPoolSize=15` が飽和する可能性 → release notes と [verification-report.md の Pool sizing guidance](./verification-report.md#pool-sizing-guidance-per-single-nodejs-process) で env var override の指針を案内。
 
 ### Server / Observability
 
@@ -588,7 +588,7 @@ export function createLoadDriver(baseUrl: string): LoadDriver;
 
 ### Unit Tests
 1. **YjsDocsMetric**: `addYjsMetrics()` 呼出し後、`OpenTelemetry meter` から `growi.yjs.docs.count` が取得可能で、`docs.size` の現在値を返すこと（`y-websocket/bin/utils` の `docs` を mock）。
-2. **MongoosePoolConfig**: `MONGO_MAX_POOL_SIZE` / `MONGO_MIN_POOL_SIZE` env var が読み取られ、未指定で `10` / `2`、NaN で fallback、正常値でその値が `mongoOptions` に入ること。
+2. **MongoosePoolConfig**: `MONGO_MAX_POOL_SIZE` / `MONGO_MIN_POOL_SIZE` env var が読み取られ、未指定で `15` / `2`、NaN で fallback、正常値でその値が `mongoOptions` に入ること。
 3. **OtelInstrumentationAllowList**: `OTEL_AUTO_INSTRUMENTATION_PROFILE=minimal`（または未指定）で allow-list 由来の instrumentation のみ enabled、`=all` で従来挙動と等価になること。
 4. **DefensivePageOperationTimer**: `extendExpiryDate` が reject した時に `logger.error` が呼ばれ、`setInterval` 周期が継続することを fake timer で検証。
 
@@ -632,7 +632,7 @@ flowchart LR
 
 - **Target**: Baseline RSS 削減 20–40 MB（L1 + L2 適用後、Drain 後計測）。
 - **Measurement**: `process.memoryUsage().rss` を sidecar 経由（CDP `Runtime.evaluate`）で取得し、5 分 idle の平均を baseline 値とする。
-- **Trade-offs**: `maxPoolSize=10` は per-tenant low-traffic 想定。大規模テナントでは env var で引き上げ。auto-instrumentation 絞り込みでスパン種が減るが、減るのは GROWI が使っていない module の wrapping のみで、観測可能性に支障は出ない想定（実装前に diff で確認）。
+- **Trade-offs**: `maxPoolSize=15` は per-tenant low-traffic（数十〜数百ユーザー想定）。大規模デプロイ（500+ users）では env var で引き上げ — レンジ指針は [verification-report.md の Pool sizing guidance](./verification-report.md#pool-sizing-guidance-per-single-nodejs-process)。auto-instrumentation 絞り込みでスパン種が減るが、減るのは GROWI が使っていない module の wrapping のみで、観測可能性に支障は出ない想定（実装前に diff で確認）。
 
 ## Security Considerations
 

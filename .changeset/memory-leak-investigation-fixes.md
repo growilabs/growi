@@ -10,7 +10,7 @@ The connection pool size is now configurable via environment variables with expl
 
 | Variable | Default | Description |
 |---|---|---|
-| `MONGO_MAX_POOL_SIZE` | `10` | Maximum number of connections in the pool |
+| `MONGO_MAX_POOL_SIZE` | `15` | Maximum number of connections in the pool |
 | `MONGO_MIN_POOL_SIZE` | `2` | Minimum number of connections kept open |
 
 To restore the previous behavior (driver defaults), set `MONGO_MAX_POOL_SIZE` and `MONGO_MIN_POOL_SIZE` to the values your deployment requires.

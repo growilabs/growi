@@ -20,7 +20,7 @@ describe('getMongoPoolOptions', () => {
   it('returns defaults when no env vars are set', async () => {
     const { getMongoPoolOptions } = await import('./mongoose-utils');
     const result = getMongoPoolOptions();
-    expect(result.maxPoolSize).toBe(10);
+    expect(result.maxPoolSize).toBe(15);
     expect(result.minPoolSize).toBe(2);
   });
 
@@ -37,7 +37,7 @@ describe('getMongoPoolOptions', () => {
     process.env.MONGO_MAX_POOL_SIZE = 'abc';
     const { getMongoPoolOptions } = await import('./mongoose-utils');
     const result = getMongoPoolOptions();
-    expect(result.maxPoolSize).toBe(10);
+    expect(result.maxPoolSize).toBe(15);
   });
 
   it('falls back to default minPoolSize when MONGO_MIN_POOL_SIZE is NaN', async () => {
