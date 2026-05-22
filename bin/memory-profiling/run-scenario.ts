@@ -110,7 +110,6 @@ export async function runScenario(opts: ScenarioRunnerOptions): Promise<void> {
     );
   }
 
-  // biome-ignore lint/suspicious/noConsole: intentional CLI progress output
   console.log(`[run-scenario] Connected to CDP inspector at ${inspectorUrl}`);
 
   // -------------------------------------------------------------------------
@@ -118,10 +117,8 @@ export async function runScenario(opts: ScenarioRunnerOptions): Promise<void> {
   // -------------------------------------------------------------------------
   try {
     await driver.initInstaller();
-    // biome-ignore lint/suspicious/noConsole: intentional CLI progress output
     console.log('[run-scenario] Admin session established via installer');
   } catch (err) {
-    // biome-ignore lint/suspicious/noConsole: intentional CLI progress output
     console.warn(
       '[run-scenario] initInstaller failed (GROWI may already be installed):',
       String(err),
@@ -160,7 +157,6 @@ export async function runScenario(opts: ScenarioRunnerOptions): Promise<void> {
         err,
       );
     }
-    // biome-ignore lint/suspicious/noConsole: intentional CLI progress output
     console.log(`[run-scenario] Snapshot written: ${outputPath}`);
   };
 
@@ -168,7 +164,6 @@ export async function runScenario(opts: ScenarioRunnerOptions): Promise<void> {
     // -----------------------------------------------------------------------
     // Step 3: Baseline phase (Req 2.1)
     // -----------------------------------------------------------------------
-    // biome-ignore lint/suspicious/noConsole: intentional CLI progress output
     console.log('[run-scenario] Phase: baseline');
     await runBaseline(driver);
 
@@ -181,7 +176,6 @@ export async function runScenario(opts: ScenarioRunnerOptions): Promise<void> {
     // Step 5: Load phase (Req 2.1)
     // -----------------------------------------------------------------------
     logger.mark('load');
-    // biome-ignore lint/suspicious/noConsole: intentional CLI progress output
     console.log('[run-scenario] Phase: load');
     await runLoad(driver);
 
@@ -194,7 +188,6 @@ export async function runScenario(opts: ScenarioRunnerOptions): Promise<void> {
     // Step 7: Drain phase (Req 2.1)
     // -----------------------------------------------------------------------
     logger.mark('drain');
-    // biome-ignore lint/suspicious/noConsole: intentional CLI progress output
     console.log('[run-scenario] Phase: drain');
     await runDrain(driver);
 
@@ -231,29 +224,21 @@ export async function runScenario(opts: ScenarioRunnerOptions): Promise<void> {
 // ---------------------------------------------------------------------------
 
 function printSummary(outputDir: string): void {
-  // biome-ignore lint/suspicious/noConsole: intentional CLI summary output
   console.log('\n========== Memory Profiling Session Summary ==========');
-  // biome-ignore lint/suspicious/noConsole: intentional CLI summary output
   console.log(`Output directory: ${outputDir}`);
-  // biome-ignore lint/suspicious/noConsole: intentional CLI summary output
   console.log('Snapshots:');
-  // biome-ignore lint/suspicious/noConsole: intentional CLI summary output
   console.log(
     `  A (baseline boundary): ${path.join(outputDir, 'snapshot-a.heapsnapshot')}`,
   );
-  // biome-ignore lint/suspicious/noConsole: intentional CLI summary output
   console.log(
     `  B (load boundary):     ${path.join(outputDir, 'snapshot-b.heapsnapshot')}`,
   );
-  // biome-ignore lint/suspicious/noConsole: intentional CLI summary output
   console.log(
     `  C (drain boundary):    ${path.join(outputDir, 'snapshot-c.heapsnapshot')}`,
   );
-  // biome-ignore lint/suspicious/noConsole: intentional CLI summary output
   console.log(
     `RSS time series:         ${path.join(outputDir, 'rss-timeseries.csv')}`,
   );
-  // biome-ignore lint/suspicious/noConsole: intentional CLI summary output
   console.log('======================================================\n');
 }
 
@@ -288,7 +273,6 @@ function parseArgs(): ScenarioRunnerOptions {
   );
 
   if (baseUrl == null || baseUrl === '') {
-    // biome-ignore lint/suspicious/noConsole: CLI error message
     console.error(
       'Error: --baseUrl is required (or set GROWI_BASE_URL env var)',
     );
@@ -296,7 +280,6 @@ function parseArgs(): ScenarioRunnerOptions {
   }
 
   if (inspectorUrl == null || inspectorUrl === '') {
-    // biome-ignore lint/suspicious/noConsole: CLI error message
     console.error(
       'Error: --inspector is required (or set CDP_INSPECTOR_URL env var)',
     );
@@ -326,15 +309,10 @@ function parseArgs(): ScenarioRunnerOptions {
 async function main(): Promise<void> {
   const opts = parseArgs();
 
-  // biome-ignore lint/suspicious/noConsole: CLI entry point output
   console.log('[run-scenario] Starting memory profiling session...');
-  // biome-ignore lint/suspicious/noConsole: CLI entry point output
   console.log(`  Base URL:     ${opts.baseUrl}`);
-  // biome-ignore lint/suspicious/noConsole: CLI entry point output
   console.log(`  Inspector:    ${opts.inspectorUrl}`);
-  // biome-ignore lint/suspicious/noConsole: CLI entry point output
   console.log(`  Output dir:   ${opts.outputDir}`);
-  // biome-ignore lint/suspicious/noConsole: CLI entry point output
   console.log(`  Idle seconds: ${opts.idleSeconds}`);
 
   try {
@@ -342,13 +320,11 @@ async function main(): Promise<void> {
     process.exit(0);
   } catch (err) {
     if (err instanceof ScenarioRunnerError) {
-      // biome-ignore lint/suspicious/noConsole: CLI error output
       console.error(
         `[run-scenario] Error (exit ${err.exitCode}): ${err.message}`,
       );
       process.exit(err.exitCode);
     }
-    // biome-ignore lint/suspicious/noConsole: CLI unexpected error
     console.error('[run-scenario] Unexpected error:', err);
     process.exit(1);
   }

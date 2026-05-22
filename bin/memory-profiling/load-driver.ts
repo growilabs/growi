@@ -283,51 +283,36 @@ if (process.argv.includes('--smoke')) {
   const BASE_URL = process.env.GROWI_BASE_URL ?? 'http://localhost:3000';
 
   (async () => {
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log(`[smoke] targeting GROWI at ${BASE_URL}`);
     const driver = createLoadDriver(BASE_URL);
 
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] initInstaller...');
     const { adminEmail } = await driver.initInstaller();
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log(`[smoke] admin created: ${adminEmail}`);
 
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] pageCreate x1...');
     await driver.pageCreate(1);
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] pageCreate OK');
 
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] pageGet x1...');
     await driver.pageGet(1);
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] pageGet OK');
 
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] pageList x1...');
     await driver.pageList(1);
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] pageList OK');
 
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] pageSearch x1...');
     await driver.pageSearch(1);
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] pageSearch OK');
 
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] yjsSessionCleanClose x1...');
     await driver.yjsSessionCleanClose(1);
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] yjsSessionCleanClose OK');
 
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.log('[smoke] All smoke checks passed.');
     process.exit(0);
   })().catch((err) => {
-    // biome-ignore lint/suspicious/noConsole: CLI smoke-test output is intentional
     console.error('[smoke] FAILED:', err);
     process.exit(1);
   });

@@ -6,8 +6,6 @@ import {
 import loggerFactory from '~/utils/logger';
 import { hasProcessFlag } from '~/utils/process-utils';
 
-import { registerHeapSnapshotSignalHandler } from './util/heap-snapshot-handler';
-
 const logger = loggerFactory('growi');
 
 /** **********************************
@@ -23,11 +21,6 @@ process.on('unhandledRejection', (reason, p) => {
 
 async function main() {
   try {
-    // Register SIGUSR2 heap snapshot handler when profiling mode is enabled
-    if (process.env.MEMORY_PROFILING_ENABLED) {
-      registerHeapSnapshotSignalHandler();
-    }
-
     // Initialize OpenTelemetry
     await initInstrumentation();
 
