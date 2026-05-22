@@ -53,7 +53,7 @@
   - _Requirements: 4.1, 4.2, 4.5_
   - _Boundary: YjsDocsMetric_
 
-- [ ] 2.4 (P) L5: `autoUpdateExpiryDate` の defensive 例外捕捉
+- [x] 2.4 (P) L5: `autoUpdateExpiryDate` の defensive 例外捕捉
   - `apps/app/src/server/service/page-operation.ts` の `setInterval` callback を try/catch でラップし、catch 内で `growi-logger` を介して `{ err, operationId }` を含む `error` レベルの構造化ログを残す。
   - `setInterval` の周期自体は継続する（再 throw しない）。
   - 既存 caller (`apps/app/src/server/service/page/index.ts` の try/finally) と二重ハンドリングしないことを確認する。
