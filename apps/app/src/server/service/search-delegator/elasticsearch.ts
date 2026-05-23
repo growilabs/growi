@@ -24,7 +24,11 @@ import type {
 import type { PageModel } from '../../models/page';
 import { createBatchStream } from '../../util/batch-stream';
 import { configManager } from '../config-manager';
-import type { UpdateOrInsertPagesOpts } from '../interfaces/search';
+import type {
+  AddAllPagesOption,
+  RebuildIndexOption,
+  UpdateOrInsertPagesOpts,
+} from '../interfaces/search';
 import { aggregatePipelineToIndex } from './aggregate-to-index';
 import type {
   AggregatedPage,
@@ -211,7 +215,7 @@ class ElasticsearchDelegator
     const normalizeIndices = await this.normalizeIndices();
     if (this.isElasticsearchReindexOnBoot) {
       try {
-        await this.rebuildIndex();
+        await this.rebuildIndex({ shouldEmitProgress: false });
       } catch (err) {
         logger.error('Rebuild index on boot failed', err);
       }
@@ -333,8 +337,11 @@ class ElasticsearchDelegator
   /**
    * rebuild index
    */
-  async rebuildIndex(): Promise<void> {
+  async rebuildIndex(
+    option: RebuildIndexOption = { shouldEmitProgress: false },
+  ): Promise<void> {
     const { client, indexName, aliasName } = this;
+    const { shouldEmitProgress } = option;
 
     const tmpIndexName = `${indexName}-tmp`;
 
@@ -356,13 +363,15 @@ class ElasticsearchDelegator
         index: indexName,
       });
       await this.createIndex(indexName);
-      await this.addAllPages();
+      await this.addAllPages({ shouldEmitProgress });
     } catch (error) {
-      logger.error("An error occured while 'rebuildIndex'.", error);
-      logger.error('error.meta.body', error?.meta?.body);
+      logger.error({ err: error }, "An error occured while 'rebuildIndex'.");
+      logger.error({ body: error?.meta?.body }, 'error.meta.body');
 
-      const socket = this.socketIoService.getAdminSocket();
-      socket.emit(SocketEventName.RebuildingFailed, { error: error.message });
+      if (shouldEmitProgress) {
+        const socket = this.socketIoService.getAdminSocket();
+        socket.emit(SocketEventName.RebuildingFailed, { error: error.message });
+      }
 
       throw error;
     } finally {
@@ -502,10 +511,11 @@ class ElasticsearchDelegator
     body.push(command);
   }
 
-  addAllPages() {
+  addAllPages(option: AddAllPagesOption = { shouldEmitProgress: false }) {
+    const { shouldEmitProgress } = option;
     const Page = this.getPageModel();
     return this.updateOrInsertPages(() => Page.find(), {
-      shouldEmitProgress: true,
+      shouldEmitProgress,
       invokeGarbageCollection: true,
     });
   }
@@ -528,10 +538,12 @@ class ElasticsearchDelegator
    */
   async updateOrInsertPages(
     queryFactory,
-    option: UpdateOrInsertPagesOpts = {},
+    option: UpdateOrInsertPagesOpts = {
+      shouldEmitProgress: false,
+      invokeGarbageCollection: false,
+    },
   ): Promise<void> {
-    const { shouldEmitProgress = false, invokeGarbageCollection = false } =
-      option;
+    const { shouldEmitProgress, invokeGarbageCollection } = option;
 
     const Page = this.getPageModel();
     const { PageQueryBuilder } = Page;
