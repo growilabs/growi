@@ -10,12 +10,10 @@ import ElasticsearchDelegator from './elasticsearch';
 describe('ElasticsearchDelegator#init() with ELASTICSEARCH_REINDEX_ON_BOOT', () => {
   describe('when ELASTICSEARCH_REINDEX_ON_BOOT=true', () => {
     beforeAll(async () => {
-      process.env.ELASTICSEARCH_VERSION = '8';
       process.env.ELASTICSEARCH_REINDEX_ON_BOOT = 'true';
       await configManager.loadConfigs();
     });
     afterAll(() => {
-      delete process.env.ELASTICSEARCH_VERSION;
       delete process.env.ELASTICSEARCH_REINDEX_ON_BOOT;
     });
 
