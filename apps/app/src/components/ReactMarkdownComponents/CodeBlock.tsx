@@ -5,7 +5,7 @@ import { LightweightCodeBlock } from './LightweightCodeBlock';
 
 import styles from './CodeBlock.module.scss';
 
-type PrismHighlighterProps = { lang: string; children: ReactNode };
+type PrismHighlighterProps = { lang: string; children: string | string[] };
 
 // Cache the loaded module so all CodeBlock instances share a single import
 let prismModulePromise: Promise<ComponentType<PrismHighlighterProps>> | null =
