@@ -100,7 +100,7 @@ describe('migrateContributions', () => {
     vi.useRealTimers();
   });
 
-  it('should not create contribution documents from activities older than Activity TTL', async () => {
+  it('should include activity at TTL boundary but exclude activities past it', async () => {
     // Arrange
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
@@ -138,6 +138,9 @@ describe('migrateContributions', () => {
     const contributionsInDatabase = await Contribution.find({ user: userId });
 
     expect(contributionsInDatabase.length).toBe(1);
+    expect(contributionsInDatabase[0].date).toStrictEqual(
+      new Date('2025-10-11T00:00:00Z'),
+    ); // Exactly 30 days ago gets migrated
 
     vi.useRealTimers();
   });
