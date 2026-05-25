@@ -9,7 +9,7 @@
   - _Requirements: 5.1, 5.2_
 
 - [ ] 2. Core: buildInstrumentations の direct import 再実装
-- [ ] 2.1 buildInstrumentations を direct import 構成に書き換え
+- [x] 2.1 buildInstrumentations を direct import 構成に書き換え
   - `getNodeAutoInstrumentations` の import を削除し、`HttpInstrumentation`、`ExpressInstrumentation`、`MongoDBInstrumentation`、`MongooseInstrumentation` を 4 package から直接 import
   - `ALL_AUTO_INSTRUMENTATION_PACKAGES` および `ALLOW_LIST_INSTRUMENTATION_PACKAGES` 定数を削除
   - 関数本体を「4 instrumentation を `new` で構築して配列で返す」flat な direct factory 構成に置き換え
