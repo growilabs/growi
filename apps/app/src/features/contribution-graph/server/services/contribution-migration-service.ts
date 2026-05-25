@@ -30,6 +30,8 @@ export const migrateContributions = async (userId: string) => {
       endDate,
     });
 
+  // Using $set instead of $inc to make sure the count stays consistent in case
+  // the migration script runs more than one time.
   if (activities.length > 0) {
     await Contribution.bulkWrite(
       activities.map((c) => ({
