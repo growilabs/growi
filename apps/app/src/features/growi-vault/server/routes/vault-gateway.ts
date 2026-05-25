@@ -51,7 +51,7 @@ export interface VaultGatewayRouterDeps {
  * Returns true when the gateway should proceed, false when a 404/503 was already sent.
  */
 async function assertGatewayReady(
-  _req: Request,
+  req: Request,
   res: Response,
 ): Promise<boolean> {
   // Feature flag check (req 1.4).
@@ -60,6 +60,10 @@ async function assertGatewayReady(
   // From the client's perspective the repository simply does not exist on this server.
   const settings = await vaultSettingsService.getSettings();
   if (!settings.enabled) {
+    logger.info(
+      { path: req.originalUrl },
+      'Vault gateway rejected: feature flag is disabled (VAULT_ENABLED). Responding 404.',
+    );
     res.status(404).send('GROWI Vault is not enabled');
     return false;
   }
@@ -84,6 +88,10 @@ async function assertGatewayReady(
           return 'GROWI Vault is not ready. Please retry later.';
       }
     })();
+    logger.warn(
+      { path: req.originalUrl, bootstrapState },
+      `Vault gateway rejected: bootstrap is not done (state=${bootstrapState}). Responding 503. Run bootstrap from /admin/vault.`,
+    );
     res.status(503).send(message);
     return false;
   }
