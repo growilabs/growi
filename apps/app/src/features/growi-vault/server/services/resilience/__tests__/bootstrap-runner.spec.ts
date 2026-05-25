@@ -46,7 +46,11 @@ type MockState = {
   bootstrapLastError: string | null;
   bootstrapInstanceId: string | null;
   bootstrapHeartbeatAt: Date | null;
-  bootstrapLastTriggerSource: 'env-true' | 'env-force' | 'admin-ui' | null;
+  bootstrapLastTriggerSource:
+    | 'env-true'
+    | 'env-force'
+    | 'admin-force-wipe'
+    | null;
   bootstrapRetryAttempts: number;
   bootstrapRetryNextAt: Date | null;
   bootstrapRetryAborted: boolean;

@@ -219,87 +219,21 @@ describe('VaultAdminRouter', () => {
   });
 
   // -------------------------------------------------------------------------
-  // POST /bootstrap
+  // POST /bootstrap — endpoint removed (admin UI Prepare button was equivalent
+  // to Wipe and confusing; bootstrap from admin is only via /wipe now).
   // -------------------------------------------------------------------------
 
-  describe('POST /bootstrap', () => {
-    it('returns 200 and triggers bootstrap when state is not running', async () => {
-      mockBootstrapper.getStatus.mockResolvedValue({
-        ...doneStatus,
-        state: 'done',
-      });
-      mockBootstrapper.start.mockImplementation(
-        async (opts: { triggerSource: string; onRunning?: () => void }) => {
-          opts.onRunning?.();
-        },
-      );
-
+  describe('POST /bootstrap (removed)', () => {
+    it('returns 404 (endpoint no longer exists)', async () => {
       const app = buildApp();
       const res = await request(app).post('/_api/admin/vault/bootstrap');
-
-      expect(res.status).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(mockBootstrapper.start).toHaveBeenCalledWith(
-        expect.objectContaining({ triggerSource: 'admin-ui' }),
-      );
+      expect(res.status).toBe(404);
     });
 
-    it('does NOT return 200 until onRunning has fired', async () => {
-      mockBootstrapper.getStatus.mockResolvedValue({
-        ...doneStatus,
-        state: 'done',
-      });
-      let triggerOnRunning: (() => void) | undefined;
-      mockBootstrapper.start.mockImplementation(
-        (opts: { triggerSource: string; onRunning?: () => void }) => {
-          return new Promise<void>(() => {
-            triggerOnRunning = () => opts.onRunning?.();
-          });
-        },
-      );
-
+    it('does not call bootstrapper.start when /bootstrap is hit', async () => {
       const app = buildApp();
-      let responseStatus: number | undefined;
-      const responsePromise = request(app)
-        .post('/_api/admin/vault/bootstrap')
-        .then((res) => {
-          responseStatus = res.status;
-          return res;
-        });
-
-      await new Promise((resolve) => setTimeout(resolve, 50));
-      expect(mockBootstrapper.start).toHaveBeenCalledTimes(1);
-      expect(responseStatus).toBeUndefined();
-
-      triggerOnRunning?.();
-      const res = await responsePromise;
-      expect(res.status).toBe(200);
-    });
-
-    it('returns 409 when bootstrap is already running', async () => {
-      mockBootstrapper.getStatus.mockResolvedValue({
-        ...doneStatus,
-        state: 'running',
-      });
-
-      const app = buildApp();
-      const res = await request(app).post('/_api/admin/vault/bootstrap');
-
-      expect(res.status).toBe(409);
-      expect(res.body.ok).toBe(false);
-      expect(res.body.error).toMatch(/already running/i);
-      // start() must NOT be called when already running.
+      await request(app).post('/_api/admin/vault/bootstrap');
       expect(mockBootstrapper.start).not.toHaveBeenCalled();
-    });
-
-    it('returns 500 when getStatus throws', async () => {
-      mockBootstrapper.getStatus.mockRejectedValue(new Error('DB error'));
-
-      const app = buildApp();
-      const res = await request(app).post('/_api/admin/vault/bootstrap');
-
-      expect(res.status).toBe(500);
-      expect(res.body.ok).toBe(false);
     });
   });
 

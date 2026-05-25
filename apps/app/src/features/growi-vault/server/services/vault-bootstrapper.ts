@@ -68,22 +68,16 @@ export type BootstrapStatus = ResilienceStatus['bootstrap'];
  */
 export interface VaultBootstrapper {
   /**
-   * Start (or resume) the bootstrap process. Awaits the full pipeline by
-   * default. Callers that want to acknowledge "bootstrap has begun" before
-   * the pipeline completes (e.g. an HTTP route returning 202) can pass
-   * `onRunning` — the callback fires synchronously the moment the
-   * resilience layer commits state='running' to MongoDB, before the page
-   * stream begins.
-   */
-  start(opts?: {
-    triggerSource: 'admin-ui' | 'env-var';
-    onRunning?: () => void;
-  }): Promise<void>;
-  /**
    * Kill switch: forcibly wipe all vault repositories (via reset-all instruction)
-   * and re-seed from the current page set. Distinguished from start() only by
-   * the audit-log triggerSource — runtime behavior is the same forceWipe path.
-   * Accepts the same `onRunning` handshake hook as `start()`.
+   * and re-seed from the current page set. This is the only admin-triggered
+   * bootstrap entry point — a separate `start()` for the Prepare button used
+   * to exist but was removed because it mapped to the same forceWipe path
+   * (functionally identical to wipe) and confused admins.
+   *
+   * Returns once the resilience layer signals state='running' via the optional
+   * `onRunning` callback; the full bootstrap pipeline continues in the
+   * background. Background failures surface via bootstrapState='failed', not
+   * through this promise.
    */
   wipeAndRebootstrap(opts: {
     triggerSource: 'admin-force-wipe';
@@ -96,23 +90,6 @@ export interface VaultBootstrapper {
   abortAutoRetry(): Promise<void>;
   initOnStartup(): Promise<void>;
   stop(): Promise<void>;
-}
-
-// ---------------------------------------------------------------------------
-// TriggerSource mapping
-// ---------------------------------------------------------------------------
-
-/**
- * Map the legacy triggerSource values to the resilience layer's TriggerSource.
- *
- * Legacy: 'admin-ui' | 'env-var'
- * New:    'admin-ui' | 'env-true' | 'env-force'
- */
-function mapTriggerSource(
-  src: 'admin-ui' | 'env-var' | undefined,
-): 'admin-ui' | 'env-true' | 'env-force' {
-  if (src === 'env-var') return 'env-true';
-  return 'admin-ui';
 }
 
 // ---------------------------------------------------------------------------
@@ -169,28 +146,11 @@ export const createVaultBootstrapper = (
 
   return {
     /**
-     * Start (or resume) the bootstrap process.
-     *
-     * Delegates to the resilience layer's bootstrap() method.
-     * Maps legacy triggerSource 'env-var' to 'env-true' for the new API.
-     */
-    async start(opts?: {
-      triggerSource: 'admin-ui' | 'env-var';
-      onRunning?: () => void;
-    }): Promise<void> {
-      const triggerSource = mapTriggerSource(opts?.triggerSource);
-      await resilienceLayer.bootstrap({
-        triggerSource,
-        onRunning: opts?.onRunning,
-      });
-    },
-
-    /**
      * Force wipe + re-bootstrap. Used by the admin UI "Wipe Vault" kill switch.
      *
      * Delegates to the resilience layer's bootstrap() with the dedicated
-     * 'admin-force-wipe' triggerSource so audit logs can distinguish the
-     * destructive kill switch from a normal admin-initiated prepare.
+     * 'admin-force-wipe' triggerSource so audit logs can distinguish admin
+     * action from env-driven bootstrap.
      */
     async wipeAndRebootstrap(opts: {
       triggerSource: 'admin-force-wipe';

@@ -320,10 +320,14 @@ describe('GROWI Vault — gateway contracts', () => {
       revision: null,
     });
 
-    // Re-run the bootstrap so it sees the new page.
+    // Re-run the bootstrap so it sees the new page. Admin-triggered bootstrap
+    // is exclusively via wipeAndRebootstrap (the 'admin-ui' triggerSource and
+    // its bootstrapper.start() entry have been retired).
     await setBootstrapState('pending');
     const { bootstrapper } = getVaultE2eHandle();
-    await bootstrapper.start({ triggerSource: 'admin-ui' });
+    await bootstrapper.wipeAndRebootstrap({
+      triggerSource: 'admin-force-wipe',
+    });
 
     // Poll until bootstrap completes. Sequential await is intentional.
     const deadline = Date.now() + 30_000;

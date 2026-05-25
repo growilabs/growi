@@ -115,20 +115,20 @@
 
 ### 要件 5: bootstrap 主導（VaultBootstrapper）
 
-**目的:** GROWI 管理者として、初回有効化や災害復旧時に全ページを vault-manager に投入する bootstrap を admin UI または環境変数で開始できるようにしたい。また、緊急停止 (kill switch) として admin UI から全 repository を破棄し bootstrap 未完了状態へ戻せるようにしたい。
+**目的:** GROWI 管理者として、初回有効化や災害復旧時に全ページを vault-manager に投入する bootstrap を環境変数で開始でき、運用中の手動 re-bootstrap は admin UI の Wipe Vault (kill switch) を通じて実行できるようにしたい。
 
 #### 受入条件
 
-1. When admin UI の "Prepare GROWI Vault" ボタンが押された場合, the GROWI Vault Gateway shall `op: 'reset-all'` instruction を vault_instructions に発行し、bootstrapState を `running` に遷移させた後、pages cursor stream を走査して各ページの namespace を判定し namespace 単位の `op: 'bulk-upsert'` instructions を発行する
-2. When 環境変数 `VAULT_BOOTSTRAP_ON_START=true` が設定されている場合, the GROWI Vault Gateway shall apps/app 起動時に自動的に bootstrap を開始する
-3. When bootstrap が完了した場合, the GROWI Vault Gateway shall bootstrapState を `done` に遷移させる
-4. When bootstrap 中に failure が発生した場合, the GROWI Vault Gateway shall bootstrapState を `failed` に遷移させ、lastError を記録する
-5. When bootstrap が失敗後に再実行される場合, the GROWI Vault Gateway shall bootstrapCursor に保存された最後の page._id から処理を再開する（resume 可能）
-6. When pages cursor stream を走査する場合, the GROWI Vault Gateway shall `status: 'published'` かつ `/trash` 配下でないページのみを対象とし、namespace 単位のバッファに蓄積し CHUNK_SIZE（既定 1000）に達するたびに `bulk-upsert` instruction を発行する
-7. When bootstrapState が `running` または `pending` の場合, the GROWI Vault Gateway shall VaultBootstrapper.getStatus() が `state / processed / totalEstimated / cursor / startedAt / completedAt / lastError` を返す
-8. The GROWI Vault Gateway shall bootstrap の二重起動を防止するため、bootstrapState が `running` の間は新たな bootstrap を開始しない
-9. When admin UI の "Wipe Vault" ボタンが押された場合, the GROWI Vault Gateway shall triggerSource `admin-force-wipe` で forceWipe フローを発火し、`op: 'reset-all'` instruction を発行して全 namespace の repository を破棄し、bootstrapState を `running` に強制遷移させた後 pages cursor stream の再投入を開始する
-10. When admin UI から Wipe Vault が発火された場合, the GROWI Vault Gateway shall 操作を audit log に `vault.wipe` として記録する（タイムスタンプ・実行ユーザを含む）
+1. When 環境変数 `VAULT_BOOTSTRAP_ON_START=true` が設定されている場合, the GROWI Vault Gateway shall apps/app 起動時に自動的に bootstrap を開始する
+2. When bootstrap が完了した場合, the GROWI Vault Gateway shall bootstrapState を `done` に遷移させる
+3. When bootstrap 中に failure が発生した場合, the GROWI Vault Gateway shall bootstrapState を `failed` に遷移させ、lastError を記録する
+4. When bootstrap が失敗後に再実行される場合, the GROWI Vault Gateway shall bootstrapCursor に保存された最後の page._id から処理を再開する（resume 可能）
+5. When pages cursor stream を走査する場合, the GROWI Vault Gateway shall `status: 'published'` かつ `/trash` 配下でないページのみを対象とし、namespace 単位のバッファに蓄積し CHUNK_SIZE（既定 1000）に達するたびに `bulk-upsert` instruction を発行する
+6. When bootstrapState が `running` または `pending` の場合, the GROWI Vault Gateway shall VaultBootstrapper.getStatus() が `state / processed / totalEstimated / cursor / startedAt / completedAt / lastError` を返す
+7. The GROWI Vault Gateway shall bootstrap の二重起動を防止するため、bootstrapState が `running` の間は新たな bootstrap を開始しない
+8. When admin UI の "Wipe Vault" ボタンが押された場合, the GROWI Vault Gateway shall triggerSource `admin-force-wipe` で forceWipe フローを発火し、`op: 'reset-all'` instruction を発行して全 namespace の repository を破棄し、bootstrapState を `running` に強制遷移させた後 pages cursor stream の再投入を開始する。これが管理 UI からの唯一の bootstrap 発火経路である
+9. When admin UI から Wipe Vault が発火された場合, the GROWI Vault Gateway shall 操作を audit log に `vault.wipe` として記録する（タイムスタンプ・実行ユーザを含む）
+10. The GROWI Vault Gateway shall 「Prepare GROWI Vault」「Bootstrap」等の独立した非破壊的 bootstrap 発火 API・ボタンを提供しない。理由: admin UI の `admin-ui` triggerSource は内部的に Wipe と同じ forceWipe フローを通るため、ユーザにとって 2 つのボタンが同じ振る舞いをすることになり UX 混乱を招く
 
 ### 要件 6: vault-manager との通信（VaultManagerClient）
 
@@ -156,17 +156,17 @@
 
 ### 要件 8: 管理者 UI（VaultAdminSettings）
 
-**目的:** GROWI 管理者として、Vault 機能の状態を確認し、bootstrap 操作・緊急停止 (Wipe)・audit log を確認できる UI を使いたい。機能の ON/OFF はデプロイ時の環境変数で決定するため UI からは操作しない。
+**目的:** GROWI 管理者として、Vault 機能の状態を確認し、緊急停止 (Wipe)・audit log を確認できる UI を使いたい。機能の ON/OFF はデプロイ時の環境変数で決定するため UI からは操作せず、admin から bootstrap を発火する経路は Wipe Vault のみとする。
 
 #### 受入条件
 
 1. The GROWI Vault Gateway shall admin UI に現在の `VAULT_ENABLED` 設定値（read-only 表示）と bootstrap state を表示する
 2. The GROWI Vault Gateway shall admin UI に bootstrap の `state` / `processed` / `totalEstimated` / `startedAt` / `completedAt` / `lastError` を表示する進捗セクションを提供する
-3. When "Prepare GROWI Vault" ボタンが押された場合, the GROWI Vault Gateway shall `POST /_api/v3/vault/bootstrap` を呼び出し bootstrap を開始する
-4. When "Wipe Vault" ボタンが押された場合, the GROWI Vault Gateway shall 確認モーダル（テキスト入力不要、Yes/Cancel のみ）を表示し、確認後に `POST /_api/v3/vault/wipe` を呼び出して forceWipe フローを発火する
-5. The GROWI Vault Gateway shall admin UI に既存 audit log UI への "vault.*" フィルター付きリンクを提供する
-6. The GROWI Vault Gateway shall admin UI に `GET /internal/storage-stats` 経由で取得した namespace 数・合計 commit 数・loose object 数・repo size・最終 squash/gc 時刻を表示するストレージ観測セクションを提供する（vault_namespace_state を直接 read しない）
-7. The GROWI Vault Gateway shall admin UI から `vaultEnabled` を変更する操作（トグル等）を提供しない
+3. When "Wipe Vault" ボタンが押された場合, the GROWI Vault Gateway shall 確認モーダル（テキスト入力不要、Yes/Cancel のみ）を表示し、確認後に `POST /_api/v3/vault/wipe` を呼び出して forceWipe フローを発火する
+4. The GROWI Vault Gateway shall admin UI に既存 audit log UI への "vault.*" フィルター付きリンクを提供する
+5. The GROWI Vault Gateway shall admin UI に `GET /internal/storage-stats` 経由で取得した namespace 数・合計 commit 数・loose object 数・repo size・最終 squash/gc 時刻を表示するストレージ観測セクションを提供する（vault_namespace_state を直接 read しない）
+6. The GROWI Vault Gateway shall admin UI から `vaultEnabled` を変更する操作（トグル等）を提供しない
+7. The GROWI Vault Gateway shall admin UI に「Prepare GROWI Vault」「Bootstrap」等の独立した bootstrap 発火ボタンを提供しない。理由: admin UI からの bootstrap は内部的に Wipe と機能的に等価 (forceWipe フロー) であり、ボタンが 2 つあると admin が両者の違いを誤認しやすい
 
 ### 要件 9: 共通 DTO 型（@growi/core）
 

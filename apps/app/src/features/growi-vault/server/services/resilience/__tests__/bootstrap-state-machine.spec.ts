@@ -112,7 +112,7 @@ describe('transition — valid transitions from the table', () => {
   it('retrying + start → running (no side effects)', () => {
     assertValid(
       'retrying',
-      { type: 'start', triggerSource: 'admin-ui' },
+      { type: 'start', triggerSource: 'env-true' },
       'running',
       [],
     );
@@ -169,7 +169,7 @@ describe('transition — INVALID transitions', () => {
   });
 
   it('running + start → invalid (double-start prevention)', () => {
-    assertInvalid('running', { type: 'start', triggerSource: 'admin-ui' });
+    assertInvalid('running', { type: 'start', triggerSource: 'env-true' });
   });
 
   it('escalated + retryScheduled → invalid', () => {

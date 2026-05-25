@@ -14,11 +14,7 @@ export type BootstrapState =
   | 'retrying' // auto-retry waiting/running
   | 'escalated'; // max retries reached
 
-export type TriggerSource =
-  | 'env-true'
-  | 'env-force'
-  | 'admin-ui'
-  | 'admin-force-wipe';
+export type TriggerSource = 'env-true' | 'env-force' | 'admin-force-wipe';
 
 export type BootstrapEvent =
   | { type: 'start'; triggerSource: TriggerSource }

@@ -629,7 +629,7 @@ describe('initializeVaultFeature — calls runVaultSyncStateMigration before boo
     } as never);
   });
 
-  it('calls findOneAndUpdate (step 1 of migration) before the bootstrapper.start dispatch', async () => {
+  it('calls findOneAndUpdate (step 1 of migration) before the bootstrapper initOnStartup dispatch', async () => {
     // Configure VAULT_BOOTSTRAP_ON_START so that start() is actually called.
     (configManager.getConfig as ReturnType<typeof vi.fn>).mockReturnValue(
       'true',

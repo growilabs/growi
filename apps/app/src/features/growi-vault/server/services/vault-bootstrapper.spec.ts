@@ -287,7 +287,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       // The first instruction created should be reset-all
       const firstCall = instructionCreateSpy.mock.calls[0][0];
@@ -303,7 +305,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       const callOps = instructionCreateSpy.mock.calls.map((c) => c[0].op);
       const resetIdx = callOps.indexOf('reset-all');
@@ -344,7 +348,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       // After flush, there should be exactly one bulk-upsert for 'public'
       const bulkCalls = instructionCreateSpy.mock.calls.filter(
@@ -382,7 +388,9 @@ describe('VaultBootstrapper', () => {
       };
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       const bulkCalls = instructionCreateSpy.mock.calls.filter(
         (c) => c[0].op === 'bulk-upsert',
@@ -410,7 +418,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       // All 999 pages should be in one remaining-buffer flush (no mid-stream flush)
       const bulkCalls = instructionCreateSpy.mock.calls.filter(
@@ -433,7 +443,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       const bulkCalls = instructionCreateSpy.mock.calls.filter(
         (c) => c[0].op === 'bulk-upsert',
@@ -455,7 +467,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       const bulkCalls = instructionCreateSpy.mock.calls.filter(
         (c) => c[0].op === 'bulk-upsert',
@@ -484,7 +498,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       const updateCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
       const doneCall = updateCalls.find(
@@ -525,7 +541,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       const updateCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
       const failedCall = updateCalls.find(
@@ -542,45 +560,14 @@ describe('VaultBootstrapper', () => {
 
   // -------------------------------------------------------------------------
   // Resume from bootstrapCursor
+  //
+  // NOTE: env-driven resume (env-true triggerSource → resumeFromCursor when
+  // state='failed' with retryAllowed=true) is covered at the bootstrap-runner
+  // unit test level. Bootstrapper integration tests below only cover the
+  // forceWipe path (admin-force-wipe), which always resets the cursor.
   // -------------------------------------------------------------------------
 
   describe('resume from bootstrapCursor', () => {
-    it('applies _id $gt filter when bootstrapCursor is set', async () => {
-      const cursObjId = { toString: () => 'cursor-id-abc' };
-      // Use 'failed' state so the resilience layer resolves resumeFromCursor
-      // (with env-var trigger → env-true → retryAllowed=true → resumeFromCursor)
-      const VaultSyncState = await getVaultSyncState();
-      const doc = buildSyncStateDoc('failed', cursObjId as never);
-      vi.mocked(VaultSyncState.findOne).mockReturnValue({
-        lean: vi.fn().mockResolvedValue(doc),
-      } as never);
-      vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
-
-      const pages = [buildPage({ path: '/resume-page' })];
-      const mongoose = await getMongoose();
-      const findMock = vi.fn().mockReturnValue({
-        cursor: vi.fn().mockReturnValue(buildCursor(pages)),
-      });
-      vi.mocked(mongoose.model).mockReturnValue({
-        estimatedDocumentCount: vi.fn().mockResolvedValue(1),
-        find: findMock,
-        findOne: vi.fn().mockResolvedValue(null),
-      } as never);
-
-      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
-      const mapper = buildMapper(['public']);
-      const bootstrapper = createVaultBootstrapper(mapper);
-
-      // Use 'env-var' trigger (maps to env-true in resilience layer) which will
-      // resolve to resumeFromCursor when state is 'failed' and retryAllowed=true
-      await bootstrapper.start({ triggerSource: 'env-var' });
-
-      // The find() call must include _id: { $gt: cursor }
-      expect(findMock).toHaveBeenCalledWith(
-        expect.objectContaining({ _id: { $gt: cursObjId } }),
-      );
-    });
-
     it('does NOT apply _id filter when bootstrapCursor is null', async () => {
       await setupSyncState('pending', null);
 
@@ -599,7 +586,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       // The find() call must NOT include an _id filter
       const query = findMock.mock.calls[0][0];
@@ -611,31 +600,10 @@ describe('VaultBootstrapper', () => {
   // Double-start prevention
   // -------------------------------------------------------------------------
 
-  describe('double-start prevention', () => {
-    it('skips bootstrap work when state is running and trigger is env-var (non-stale)', async () => {
-      // With env-var trigger (→ env-true in resilience layer) and state='running'
-      // and no stale heartbeat, the resolver returns 'skip' — no work is done.
-      const VaultSyncState = await getVaultSyncState();
-      const doc = buildSyncStateDoc('running', null, {
-        // A recent heartbeat so running is NOT considered stale
-        bootstrapHeartbeatAt: new Date(Date.now() - 1000), // 1 second ago (well within threshold)
-        bootstrapInstanceId: 'some-instance-id',
-      });
-      vi.mocked(VaultSyncState.findOne).mockReturnValue({
-        lean: vi.fn().mockResolvedValue(doc),
-      } as never);
-      vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
-
-      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
-      const mapper = buildMapper(['public']);
-      const bootstrapper = createVaultBootstrapper(mapper);
-
-      await bootstrapper.start({ triggerSource: 'env-var' });
-
-      // No instructions should have been created (skip action)
-      expect(instructionCreateSpy).not.toHaveBeenCalled();
-    });
-  });
+  // NOTE: env-driven skip-when-running, skip-when-done, and aborted-skip
+  // behaviors are covered at the bootstrap-runner unit test level. Removed
+  // from here because they required the `start()` method that has since
+  // been retired (see VaultBootstrapper interface change).
 
   // -------------------------------------------------------------------------
   // Null revision skip
@@ -662,7 +630,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       const bulkCalls = instructionCreateSpy.mock.calls.filter(
         (c) => c[0].op === 'bulk-upsert',
@@ -703,7 +673,9 @@ describe('VaultBootstrapper', () => {
       const mapper = buildMapper(['public']);
       const bootstrapper = createVaultBootstrapper(mapper);
 
-      await bootstrapper.start({ triggerSource: 'admin-ui' });
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
 
       // Find all updateOne calls that set bootstrapProcessed
       const updateCalls = vi.mocked(VaultSyncState.updateOne).mock.calls;
@@ -763,7 +735,7 @@ describe('VaultBootstrapper', () => {
           bootstrapLastError: null,
           bootstrapInstanceId: 'inst-001',
           bootstrapHeartbeatAt: new Date(),
-          bootstrapLastTriggerSource: 'admin-ui',
+          bootstrapLastTriggerSource: 'admin-force-wipe',
           bootstrapRetryAttempts: 0,
           bootstrapRetryNextAt: null,
           bootstrapRetryAborted: false,
@@ -819,23 +791,11 @@ describe('VaultBootstrapper', () => {
       expect(status).toHaveProperty('lastError');
     });
 
-    it('env-var triggerSource maps to env-true (non-force) behavior', async () => {
-      // With env-var (→ env-true) and state='done', resolver returns 'skip'
-      const VaultSyncState = await getVaultSyncState();
-      const doc = buildSyncStateDoc('done');
-      vi.mocked(VaultSyncState.findOne).mockReturnValue({
-        lean: vi.fn().mockResolvedValue(doc),
-      } as never);
-      vi.mocked(VaultSyncState.updateOne).mockResolvedValue({} as never);
-
-      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
-      const bootstrapper = createVaultBootstrapper(buildMapper(['public']));
-
-      await bootstrapper.start({ triggerSource: 'env-var' });
-
-      // Done state + env-true → skip → no instructions created
-      expect(instructionCreateSpy).not.toHaveBeenCalled();
-    });
+    // NOTE: triggerSource → envValue mapping (env-true vs env-force vs
+    // admin-force-wipe) is verified at the bootstrap-runner unit test level
+    // via `triggerSourceToEnvValue`. Removed from here because the
+    // bootstrapper.start({ env-var }) entry that this test relied on no
+    // longer exists.
   });
 
   // -------------------------------------------------------------------------
@@ -924,41 +884,10 @@ describe('VaultBootstrapper', () => {
       expect(bulkUpsertCountAtCallback).toBe(0);
     });
 
-    it('start({admin-ui}) fires onRunning before the page stream emits bulk-upsert', async () => {
-      await setupSyncState('pending');
-      const pages = [
-        buildPage({ path: '/page1', grant: PageGrant.GRANT_PUBLIC }),
-      ];
-      await setupPageModel(pages);
-
-      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
-      const bootstrapper = createVaultBootstrapper(buildMapper(['public']));
-
-      let bulkUpsertCountAtCallback = -1;
-      const onRunning = vi.fn(() => {
-        bulkUpsertCountAtCallback = instructionCreateSpy.mock.calls.filter(
-          (c) => c[0]?.op === 'bulk-upsert',
-        ).length;
-      });
-
-      await bootstrapper.start({ triggerSource: 'admin-ui', onRunning });
-
-      expect(onRunning).toHaveBeenCalledTimes(1);
-      expect(bulkUpsertCountAtCallback).toBe(0);
-    });
-
-    it('does not call onRunning when bootstrap is skipped (state already done, env-true)', async () => {
-      // env-true with state='done' takes the resolver `skip` path — no
-      // state transition occurs, so onRunning must not fire.
-      await setupSyncState('done');
-      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
-      const bootstrapper = createVaultBootstrapper(buildMapper(['public']));
-
-      const onRunning = vi.fn();
-
-      await bootstrapper.start({ triggerSource: 'env-var', onRunning });
-
-      expect(onRunning).not.toHaveBeenCalled();
-    });
+    // NOTE: env-driven onRunning behavior (fires for env-true with state
+    // transition, does NOT fire when env-true skips because state='done') is
+    // covered at the bootstrap-runner unit test level. The admin-ui variant
+    // (functionally identical to admin-force-wipe) was removed along with
+    // the Prepare button — the wipeAndRebootstrap test above is sufficient.
   });
 });

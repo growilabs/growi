@@ -31,7 +31,7 @@ type BootstrapState =
   | 'escalated'
   | 'verifying';
 
-type TriggerSource = 'env-true' | 'env-force' | 'admin-ui' | 'admin-force-wipe';
+type TriggerSource = 'env-true' | 'env-force' | 'admin-force-wipe';
 
 interface VaultStatusData {
   /** Resolved from VAULT_ENABLED env var (read-only — fixed at deploy time). */
@@ -571,14 +571,17 @@ const DriftActivitySection = ({
  *
  * Sections:
  *   1. Feature status   — read-only display of VAULT_ENABLED env var
- *   2. Bootstrap        — trigger the initial data seeding
- *   3. Kill switch      — Wipe Vault (destructive, with confirm modal)
- *   4. Bootstrap status — progress and timestamps
- *   5. Completion Reliability — completeness check metrics from resilience layer
- *   6. Auto-Retry Status — retry attempt info (shown only when retry data exists)
- *   7. Drift Activity   — drift detection sweep stats (shown only when drift data exists)
- *   8. Storage observability — repository stats from vault-manager
- *   9. Audit log filter link — quick link to vault-related audit log entries
+ *   2. Kill switch      — Wipe Vault (destructive, with confirm modal).
+ *                         The ONLY admin-triggered bootstrap entry point — a
+ *                         separate "Prepare" button was removed because it was
+ *                         internally equivalent to Wipe (same forceWipe path)
+ *                         and misled admins about destructiveness.
+ *   3. Bootstrap status — progress and timestamps
+ *   4. Completion Reliability — completeness check metrics from resilience layer
+ *   5. Auto-Retry Status — retry attempt info (shown only when retry data exists)
+ *   6. Drift Activity   — drift detection sweep stats (shown only when drift data exists)
+ *   7. Storage observability — repository stats from vault-manager
+ *   8. Audit log filter link — quick link to vault-related audit log entries
  *
  * Data is polled every 5 s via SWR so operators can watch bootstrap progress
  * without manually refreshing the page.
@@ -628,24 +631,6 @@ export const VaultAdminSettings = (): JSX.Element => {
     [],
   );
 
-  const handleBootstrap = useCallback(async () => {
-    // Optimistic update first — `false` skips auto revalidate so we do not
-    // race the server with a refetch.
-    mutate(optimisticRunning, false);
-    try {
-      await apiv3Post('/vault/bootstrap', {});
-      toastSuccess(
-        'Bootstrap started. Monitor progress in the Bootstrap Status section.',
-      );
-      await mutate();
-      await mutateResilience();
-    } catch (errs) {
-      toastError(errs);
-      // Refetch authoritative state — rollback to whatever the server says.
-      await mutate();
-    }
-  }, [mutate, mutateResilience, optimisticRunning]);
-
   const handleConfirmWipe = useCallback(async () => {
     setIsWipeModalOpen(false);
     mutate(optimisticRunning, false);
@@ -693,43 +678,7 @@ export const VaultAdminSettings = (): JSX.Element => {
 
       <FeatureStatusSection vaultEnabled={data?.vaultEnabled} />
 
-      {/* Bootstrap operation */}
-      <div className="row mb-5">
-        <div className="col-lg-12">
-          <h2 className="admin-setting-header">Bootstrap Operation</h2>
-
-          <div className="row">
-            <div className="col-md-3"></div>
-            <div className="col-md-9">
-              <button
-                type="button"
-                className="btn btn-primary"
-                disabled={isBootstrapRunning}
-                onClick={handleBootstrap}
-              >
-                {isBootstrapRunning ? (
-                  <>
-                    <span
-                      className="spinner-border spinner-border-sm me-2"
-                      role="status"
-                      aria-hidden="true"
-                    />
-                    Running...
-                  </>
-                ) : (
-                  'Prepare GROWI Vault'
-                )}
-              </button>
-              <p className="form-text text-muted mt-2">
-                Seeds all GROWI pages into the Vault git repository. Safe to
-                re-run; for a destructive wipe use the kill switch below.
-              </p>
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Kill switch: Wipe Vault (destructive) */}
+      {/* Kill switch: Wipe Vault (the only admin-triggered bootstrap path) */}
       <div className="row mb-5">
         <div className="col-lg-12">
           <h2 className="admin-setting-header">Kill Switch</h2>

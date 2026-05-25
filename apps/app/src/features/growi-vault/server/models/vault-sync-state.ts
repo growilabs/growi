@@ -79,7 +79,11 @@ export interface IVaultSyncState {
    * Source that triggered the most recent bootstrap run.
    * Helps diagnose unexpected re-runs (requirements 5.1, 5.2).
    */
-  bootstrapLastTriggerSource: 'env-true' | 'env-force' | 'admin-ui' | null;
+  bootstrapLastTriggerSource:
+    | 'env-true'
+    | 'env-force'
+    | 'admin-force-wipe'
+    | null;
 
   /**
    * Number of automatic retries attempted for the current failure sequence.
@@ -218,7 +222,7 @@ const vaultSyncStateSchema = new Schema<
     bootstrapHeartbeatAt: { type: Date, default: null },
     bootstrapLastTriggerSource: {
       type: String,
-      enum: ['env-true', 'env-force', 'admin-ui', null],
+      enum: ['env-true', 'env-force', 'admin-force-wipe', null],
       default: null,
     },
     bootstrapRetryAttempts: { type: Number, required: true, default: 0 },

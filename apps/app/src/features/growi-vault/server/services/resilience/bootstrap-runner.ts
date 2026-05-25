@@ -254,7 +254,7 @@ async function flushBuffers(
 function triggerSourceToEnvValue(src: TriggerSource): BootstrapEnvValue {
   if (src === 'env-force') return 'force';
   if (src === 'env-true') return 'true';
-  // admin-ui and admin-force-wipe both behave like forceOverride
+  // admin-force-wipe behaves like forceOverride
   return 'force';
 }
 

@@ -234,15 +234,16 @@ sequenceDiagram
 
 ```mermaid
 sequenceDiagram
-    participant Op as Operator (admin UI)
+    participant Op as Operator (env or admin UI)
     participant Boot as VaultBootstrapper
     participant Map as VaultNamespaceMapper
     participant DB as MongoDB pages
     participant SS as MongoDB vault_sync_state
     participant Inst as MongoDB vault_instructions
 
-    Op->>Boot: start({ triggerSource: 'admin-ui' })
-    Boot->>SS: bootstrapState: 'pending' → 'running'
+    Note over Op,Boot: VAULT_BOOTSTRAP_ON_START=true → 'env-true'<br/>VAULT_BOOTSTRAP_ON_START=force → 'env-force'<br/>admin UI Wipe Vault → 'admin-force-wipe'
+    Op->>Boot: bootstrap({ triggerSource })
+    Boot->>SS: bootstrapState: ANY → 'running'
     Boot->>SS: bootstrapTotalEstimated = pages.estimatedDocumentCount()
     Boot->>Inst: insertOne({ op: 'reset-all', issuedAt })
     Boot->>DB: pages.find({status:'published', path:{$not:/^\/trash/}}).cursor()
@@ -254,6 +255,8 @@ sequenceDiagram
         Boot->>SS: bootstrapCursor = page._id
         Boot->>SS: bootstrapProcessed++
     end
+    Boot->>SS: bootstrapState: 'verifying'
+    Note over Boot,Inst: vault-manager が processedAt を書き戻すまで poll
     Boot->>SS: bootstrapState: 'done'
 ```
 
@@ -423,17 +426,24 @@ interface VaultDispatcher {
 
 | フィールド | 詳細 |
 |-----------|------|
-| Intent | 初回有効化 / 災害復旧時の bootstrap、および admin UI からの kill switch (forceWipe) を主導する。pages cursor stream を回し seed instructions を vault_instructions に発行することで vault-manager が steady state と同一パスで処理できるようにする |
+| Intent | 起動時の env-driven bootstrap、および admin UI からの kill switch (forceWipe) を主導する。pages cursor stream を回し seed instructions を vault_instructions に発行することで vault-manager が steady state と同一パスで処理できるようにする |
 | 要件カバレッジ | 5 |
 
 ```typescript
-type TriggerSource = 'env-true' | 'env-force' | 'admin-ui' | 'admin-force-wipe';
+type TriggerSource = 'env-true' | 'env-force' | 'admin-force-wipe';
 
 interface VaultBootstrapper {
-  start(opts?: { triggerSource: 'admin-ui'; forceWipe?: false }): Promise<void>;
-  wipeAndRebootstrap(opts: { triggerSource: 'admin-force-wipe' }): Promise<void>;
+  /**
+   * Kill switch from admin UI. Returns once state='running' is committed
+   * (and reset-all is queued); the full pipeline continues asynchronously.
+   * This is the only admin-triggered bootstrap entry point.
+   */
+  wipeAndRebootstrap(opts: {
+    triggerSource: 'admin-force-wipe';
+    onRunning?: () => void;
+  }): Promise<void>;
   getStatus(): Promise<{
-    state: 'pending' | 'running' | 'done' | 'failed';
+    state: 'pending' | 'running' | 'verifying' | 'done' | 'failed' | 'retrying' | 'escalated';
     processed: number;
     totalEstimated: number | null;
     cursor: string | null;
@@ -444,38 +454,21 @@ interface VaultBootstrapper {
 }
 ```
 
-**start() の挙動（通常 bootstrap）**
+> NOTE: 過去の MVP では `start({ triggerSource: 'admin-ui' })` および対応する管理 UI ボタン (Prepare GROWI Vault) を提供していたが、内部マッピング (`admin-ui` → `'force'` → FORCE_WIPE) により Wipe Vault と機能的に等価であった。admin が 2 つのボタンに別々の振る舞いを期待することによる UX 混乱を避けるため削除し、admin-triggered bootstrap は `wipeAndRebootstrap` のみに統一した。初回有効化は `VAULT_BOOTSTRAP_ON_START=true` env で行う。
 
-```
-1. bootstrapState が 'running' なら即リターン（二重起動防止）
-2. vault_sync_state.bootstrapState を 'pending' → 'running' に遷移
-3. vault_sync_state.bootstrapTotalEstimated = pages.estimatedDocumentCount()
-4. vault_instructions に op: 'reset-all' を 1 件 insert
-5. pages.find({status:'published', path:{$not:/^\/trash/}}).cursor() で stream 処理:
-   namespaceBuffers: Map<Namespace, VaultBulkUpsertEntry[]> = new Map()
-   for each page:
-     namespaces = VaultNamespaceMapper.computePageNamespaces(page)
-     for each ns in namespaces:
-       buf.push({ pageId, pagePath, revisionId })
-       if buf.length >= CHUNK_SIZE (default 1000):
-         insertOne(vault_instructions, { op: 'bulk-upsert', namespace: ns, entries: buf })
-         namespaceBuffers.set(ns, [])
-     vault_sync_state.bootstrapCursor = page._id
-     vault_sync_state.bootstrapProcessed++
-6. 残バッファを flush
-7. vault_sync_state.bootstrapState = 'done'
-```
+**wipeAndRebootstrap() の挙動**
 
-**wipeAndRebootstrap() の挙動（admin kill switch）**
-
-既存の `forceWipe` 経路（`VAULT_BOOTSTRAP_ON_START=force` で発火する経路）を再利用する。
+既存の `forceWipe` 経路（`VAULT_BOOTSTRAP_ON_START=force` で発火するのと同じパス）を共有する。
 
 ```
 1. triggerSource='admin-force-wipe' で executeBootstrap({ forceWipe: true, ... }) を呼び出す
 2. bootstrap state machine が forceOverride イベントで ANY state → running に強制遷移
 3. vault_instructions に op: 'reset-all' を 1 件 insert（vault-manager 側で全 namespace の repository が破棄される）
-4. 通常 bootstrap と同じ pages cursor stream を走査して seed instructions を再発行
-5. 完走で bootstrapState = 'done' へ
+4. onRunning callback を発火（HTTP route がここで 202 を返す）
+5. pages cursor stream を走査して seed instructions を発行
+6. bootstrapState = 'verifying' に遷移
+7. vault-manager が processedAt を書き戻すまで poll
+8. 完走で bootstrapState = 'done' へ
 ```
 
 > kill switch 中はもちろん `bootstrapState !== 'done'` のため、すべての clone / fetch リクエストは 503 + Retry-After で応答される。これにより repository が空 / 不完全な状態でユーザに不整合なデータが見えることはない。
@@ -589,14 +582,14 @@ interface VaultSettingsService {
 | セクション | 内容 |
 |---|---|
 | Feature status (read-only) | `VAULT_ENABLED` の現在値を表示（環境変数で設定されているため UI からは変更不可。変更は再起動を要する旨を併記） |
-| Bootstrap operation | "Prepare GROWI Vault" ボタン（`POST /_api/v3/vault/bootstrap` を発火） |
-| Kill switch | "Wipe Vault" ボタン（`POST /_api/v3/vault/wipe` を発火）。確認モーダル (Yes / Cancel) を表示。発火すると全 namespace の repository が破棄され bootstrapState は未完了状態に戻る |
-| Bootstrap status | `state` (pending/running/done/failed) + 進捗バー (`processed / totalEstimated`) + `startedAt` / `completedAt` / `lastError` |
+| Kill switch | "Wipe Vault" ボタン（`POST /_api/v3/vault/wipe` を発火）。確認モーダル (Yes / Cancel) を表示。発火すると全 namespace の repository が破棄され bootstrapState は未完了状態に戻る。これが admin UI からの唯一の bootstrap 発火経路 |
+| Bootstrap status | `state` (pending/running/verifying/done/failed/retrying/escalated) + 進捗バー (`processed / totalEstimated`) + `startedAt` / `completedAt` / `lastError` |
 | Storage observability | `GET /internal/storage-stats` 経由で取得した namespace 数 / 合計 commit 数 / loose object 数 / repo size / 最終 squash・gc 時刻（vault_namespace_state を直接 read しない） |
 | Audit log filter link | 既存 audit log UI に "vault.*" フィルターを適用するリンク |
 
 **UX のポイント**
 - `vaultEnabled` トグルは提供しない（環境変数 `VAULT_ENABLED` でデプロイ時に固定）
+- 「Prepare GROWI Vault」「Bootstrap」等の独立した非破壊的 bootstrap ボタンは提供しない。初回有効化は `VAULT_BOOTSTRAP_ON_START=true` env で行い、運用中の手動再 bootstrap は Wipe Vault で発火する
 - Wipe Vault は破壊的操作であるため確認モーダルを介する（テキスト入力は不要、Yes/Cancel のみ）。発火は audit log に `vault.wipe` として必ず記録する
 - bootstrap 中の `vault_instructions.processedAt` の遅れは内部観測のみ（admin に過剰情報を出さない）
 

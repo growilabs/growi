@@ -55,10 +55,11 @@ export interface VaultAdminRouterDeps {
  *
  * Endpoints:
  *   GET  /_api/v3/vault/status             — bootstrap status + storage stats
- *   POST /_api/v3/vault/bootstrap          — trigger bootstrap
- *   POST /_api/v3/vault/wipe               — kill switch: force wipe + re-bootstrap
+ *   POST /_api/v3/vault/wipe               — admin-triggered bootstrap (forceWipe + re-bootstrap)
  *   POST /_api/v3/vault/reconcile          — admin-triggered reconcile
  *   GET  /_api/v3/vault/reconcile-history  — paginated reconcile history (admin)
+ *
+ * Note: POST /_api/v3/vault/bootstrap was intentionally removed — see body comment.
  */
 export const createVaultAdminRouter = (
   deps: VaultAdminRouterDeps = {},
@@ -138,68 +139,16 @@ export const createVaultAdminRouter = (
   });
 
   // --------------------------------------------------------------------------
-  // POST /bootstrap
+  // POST /bootstrap intentionally NOT provided.
+  //
+  // The previous "Prepare GROWI Vault" admin button mapped internally to the
+  // forceWipe path (`admin-ui` triggerSource → `'force'` envValue → FORCE_WIPE
+  // action), making it functionally equivalent to Wipe Vault. Exposing both
+  // confused admins into thinking Prepare was non-destructive when it was not.
+  //
+  // Initial bootstrap: VAULT_BOOTSTRAP_ON_START=true env var (set at deploy).
+  // Admin-triggered re-bootstrap: POST /_api/v3/vault/wipe.
   // --------------------------------------------------------------------------
-
-  /**
-   * Trigger the bootstrap process.
-   *
-   * Returns 409 Conflict when bootstrap is already running to prevent duplicate runs.
-   * The bootstrapper itself also guards against double-start, but we surface the
-   * 409 here so the UI can display a meaningful message without polling.
-   */
-  router.post('/bootstrap', ...authMiddlewares, async (_req, res) => {
-    let status: Awaited<ReturnType<typeof bootstrapper.getStatus>>;
-    try {
-      status = await bootstrapper.getStatus();
-    } catch (err) {
-      logger.error({ err }, 'Failed to read bootstrap status');
-      return res
-        .status(500)
-        .json({ ok: false, error: 'Internal server error' });
-    }
-
-    if (status.state === 'running') {
-      return res
-        .status(409)
-        .json({ ok: false, error: 'Bootstrap is already running' });
-    }
-
-    // Wait for the resilience layer to durably commit state='running' before
-    // responding. The full pipeline continues in the background; failures
-    // after onRunning are observed via /vault/status, not surfaced here.
-    let resolveRunning: () => void;
-    let rejectEarly: (err: Error) => void;
-    const runningSignal = new Promise<void>((resolve, reject) => {
-      resolveRunning = resolve;
-      rejectEarly = reject;
-    });
-
-    let runningSeen = false;
-    const startPromise = bootstrapper.start({
-      triggerSource: 'admin-ui',
-      onRunning: () => {
-        runningSeen = true;
-        resolveRunning();
-      },
-    });
-    startPromise.catch((err) => {
-      logger.error({ err }, 'Bootstrap failed asynchronously');
-      if (!runningSeen) {
-        rejectEarly(err);
-      }
-    });
-
-    try {
-      await runningSignal;
-    } catch {
-      return res
-        .status(500)
-        .json({ ok: false, error: 'Internal server error' });
-    }
-
-    return res.json({ ok: true });
-  });
 
   // --------------------------------------------------------------------------
   // GET /resilience-status

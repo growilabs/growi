@@ -99,7 +99,7 @@ interface ResilienceStatusShape {
   bootstrap: BootstrapShape;
   retry: RetryShape | null;
   drift: DriftShape | null;
-  lastTriggerSource: 'env-true' | 'env-force' | 'admin-ui' | null;
+  lastTriggerSource: 'env-true' | 'env-force' | 'admin-force-wipe' | null;
   forceWarningActive: boolean;
 }
 
@@ -118,7 +118,7 @@ const makeResilienceStatus = (
     bootstrap?: Partial<BootstrapShape>;
     retry?: RetryShape | null;
     drift?: DriftShape | null;
-    lastTriggerSource?: 'env-true' | 'env-force' | 'admin-ui' | null;
+    lastTriggerSource?: 'env-true' | 'env-force' | 'admin-force-wipe' | null;
     forceWarningActive?: boolean;
   } = {},
 ): ResilienceStatusShape => ({
@@ -378,21 +378,25 @@ describe('VaultAdminSettings — Force Warning Banner', () => {
   });
 });
 
-describe('VaultAdminSettings — Bootstrap operation (no done-state confirm)', () => {
-  it('fires /vault/bootstrap directly without a confirm modal regardless of state', async () => {
-    const status = makeResilienceStatus({
-      bootstrap: { state: 'done' },
-    });
+describe('VaultAdminSettings — Bootstrap operation removed', () => {
+  // The "Prepare GROWI Vault" button was functionally equivalent to "Wipe
+  // Vault" (both went through the forceWipe path) and only confused
+  // operators. The Prepare button has been removed; admin-initiated
+  // bootstrap is exclusively via the Wipe Vault kill switch.
+  it('does NOT render a "Prepare GROWI Vault" button', () => {
+    setup(makeResilienceStatus(), 'done');
+    expect(screen.queryByText(/prepare growi vault/i)).toBeNull();
+  });
+
+  it('does NOT call /vault/bootstrap from any UI interaction at steady state', async () => {
     mocks.apiv3Post.mockClear();
-    mocks.apiv3Post.mockResolvedValueOnce({});
-    setup(status, 'done');
-    fireEvent.click(screen.getByText('Prepare GROWI Vault'));
-    // No confirm dialog should appear for /bootstrap. The destructive
-    // confirm flow lives on the separate "Wipe Vault" button.
-    expect(screen.queryByRole('dialog')).toBeNull();
-    await waitFor(() => {
-      expect(mocks.apiv3Post).toHaveBeenCalledWith('/vault/bootstrap', {});
-    });
+    setup(makeResilienceStatus(), 'done');
+    // Render alone must not fire any /bootstrap call.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    const bootstrapCalls = mocks.apiv3Post.mock.calls.filter(
+      (c) => c[0] === '/vault/bootstrap',
+    );
+    expect(bootstrapCalls.length).toBe(0);
   });
 });
 
@@ -484,34 +488,6 @@ describe('VaultAdminSettings — Wipe Vault (kill switch)', () => {
 // ---------------------------------------------------------------------------
 
 describe('VaultAdminSettings — optimistic UI', () => {
-  it('writes optimistic bootstrapState=running to /vault/status when Prepare is clicked', async () => {
-    // Use a delayed apiv3Post so we can observe state at the moment the
-    // button click handler runs, before the server response triggers
-    // revalidate.
-    mocks.apiv3Post.mockClear();
-    mocks.statusMutate.mockClear();
-    mocks.apiv3Post.mockImplementation(
-      () => new Promise(() => {}), // never resolves during test window
-    );
-
-    setup(makeResilienceStatus(), 'done');
-    fireEvent.click(screen.getByText('Prepare GROWI Vault'));
-
-    // Optimistic mutate must be invoked synchronously with the click. The
-    // optimistic payload sets bootstrapState to 'running' so SWR caches
-    // the new state immediately; the second argument disables auto
-    // revalidation (we revalidate ourselves after the API call settles).
-    await waitFor(() => {
-      const optimisticCall = mocks.statusMutate.mock.calls.find(
-        (c) =>
-          typeof c[0] === 'function' ||
-          (c[0] != null &&
-            (c[0] as { bootstrapState?: string }).bootstrapState === 'running'),
-      );
-      expect(optimisticCall).toBeDefined();
-    });
-  });
-
   it('writes optimistic bootstrapState=running to /vault/status when Wipe is confirmed', async () => {
     mocks.apiv3Post.mockClear();
     mocks.statusMutate.mockClear();

@@ -185,7 +185,10 @@ async function provisionVaultE2eFixture(): Promise<void> {
   const dispatcher = createVaultDispatcher(vaultNamespaceMapper);
   handle = { dispatcher, bootstrapper };
 
-  await bootstrapper.start({ triggerSource: 'admin-ui' });
+  // The bootstrapper.start() entry was retired along with the admin UI
+  // Prepare button — the only admin-triggered bootstrap path is now
+  // wipeAndRebootstrap with 'admin-force-wipe'.
+  await bootstrapper.wipeAndRebootstrap({ triggerSource: 'admin-force-wipe' });
   await waitForBootstrapDone(60_000);
   await waitForInstructionsDrained(30_000);
 

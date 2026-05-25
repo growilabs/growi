@@ -27,7 +27,7 @@ GROWI Vault は、GROWI 上のページを git プロトコル経由で read-onl
   - ACL (public / anyone-with-link / group / only-me) に基づくユーザ単位の可視範囲フィルタリング
   - 標準 git クライアント (`git clone` / `git fetch` / `git pull`) での read-only アクセス
   - GROWI 既存の認証情報を用いた認証と監査ログ記録
-  - デプロイ時環境変数による機能の有効化制御、管理者による bootstrap 操作および kill switch (wipe)、clone 活動の観測
+  - デプロイ時環境変数による機能の有効化制御、管理者による kill switch (wipe) と clone 活動の観測。初回 bootstrap は環境変数 (`VAULT_BOOTSTRAP_ON_START`) で発火し、運用中の手動再 bootstrap は Wipe Vault を通じて行う
 
 - **Out of scope (MVP)**:
   - 書き込み (branch push / server-side merge) — 将来 spec に委ねる
@@ -116,17 +116,18 @@ GROWI Vault は、GROWI 上のページを git プロトコル経由で read-onl
 
 ### Requirement 7: 機能制御と管理者による運用ハンドル
 
-**Objective:** As a GROWI 運用者および管理者, I want デプロイ時に GROWI Vault 機能の有効化を決定でき、運用中は bootstrap 操作・緊急停止 (kill switch) ・利用状況観測を管理 UI から実行したい, so that 運用とコンプライアンス要件を満たせる
+**Objective:** As a GROWI 運用者および管理者, I want デプロイ時に GROWI Vault 機能の有効化を決定でき、運用中は kill switch (Wipe) と利用状況観測を管理 UI から実行したい, so that 運用とコンプライアンス要件を満たせる
 
 #### Acceptance Criteria
 
 1. Where 環境変数 `VAULT_ENABLED` が `false` (またはデフォルト) の場合, the GROWI Vault shall 全ての clone / fetch リクエストを feature-disabled 応答で拒否し、PageEvent への購読を開始しない
-2. When `VAULT_ENABLED=true` で起動された場合, the GROWI Vault shall PageEvent への購読を開始し、bootstrap が完了した時点で認証された git clone / fetch リクエストの受付を開始する
+2. When `VAULT_ENABLED=true` で起動された場合, the GROWI Vault shall PageEvent への購読を開始し、`VAULT_BOOTSTRAP_ON_START` env に応じて初回 bootstrap を実行し、bootstrap が完了した時点で認証された git clone / fetch リクエストの受付を開始する
 3. When 管理者が管理 UI から kill switch (Wipe Vault) を発火した場合, the GROWI Vault shall 全 namespace の repository を破棄する `reset-all` instruction を発行し、bootstrap state を未完了状態へ戻すことで以降の clone / fetch リクエストを 503 で拒否する
 4. When 管理者が kill switch を発火した場合, the GROWI Vault shall 操作を audit log に記録する (タイムスタンプ・実行ユーザ・操作種別 `vault.wipe` を含む)
-5. When 管理者が管理 UI から bootstrap 操作 (Prepare GROWI Vault) を発火した場合, the GROWI Vault shall bootstrap を開始する
+5. When 管理者が運用中に手動で bootstrap を発火する必要が生じた場合 (例: 初回有効化、災害復旧、failed 状態からの復旧), the GROWI Vault shall Wipe Vault を介して再 bootstrap を実行できる (これが管理 UI における唯一の admin-triggered bootstrap 経路である)
 6. The GROWI Vault shall 管理者が監査に利用できる形で、最低限「タイムスタンプ・リクエスト元ユーザ・操作種別」を含む監査記録を提供する
 7. If GROWI Vault のストレージ使用量が運用者設定の閾値を超過した場合, then the GROWI Vault shall 当該状況を管理者へ surface する
+8. The GROWI Vault shall 管理 UI に「Prepare」「Bootstrap」等の独立した非破壊的 bootstrap ボタンを提供しない (Wipe と機能的に等価な経路を 2 つ用意することによる UX 混乱を避けるため)
 
 ### Requirement 8: 将来スコープの明示的除外
 

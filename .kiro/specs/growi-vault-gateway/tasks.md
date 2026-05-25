@@ -405,13 +405,12 @@ _Depends: 6.1, 9.1_
   - VaultBootstrapper.getStatus() の結果を返す
   - `VaultManagerClient.getStorageStats()` を呼び出して `StorageStatsResponse`（namespaceCount / totalCommitCount / looseObjectCount / repoSizeBytes / lastSquashAt / lastGcAt）をレスポンスに含める
   - vault-manager 側のエラー時は storage stats を null として返し、admin UI 側で「取得失敗」を表示できるようにする（bootstrap status は引き続き返す）
-- `POST /_api/v3/vault/bootstrap` エンドポイントを実装する:
-  - VaultBootstrapper.start({ triggerSource: 'admin-ui' }) を呼び出す
-  - bootstrapState が既に 'running' の場合は 409 を返す
-- `POST /_api/v3/vault/wipe` エンドポイントを実装する（kill switch）:
-  - VaultBootstrapper.wipeAndRebootstrap({ triggerSource: 'admin-force-wipe' }) を呼び出す
+- `POST /_api/v3/vault/wipe` エンドポイントを実装する（kill switch、admin UI からの唯一の bootstrap 発火経路）:
+  - VaultBootstrapper.wipeAndRebootstrap({ triggerSource: 'admin-force-wipe', onRunning }) を呼び出す
   - `op: 'reset-all'` が vault_instructions に発行され、bootstrapState が ANY state → running に強制遷移する
+  - onRunning が発火するまで route は待機し、その後 202 を返す（SWR revalidate がレース無く新状態を取得できるように）
   - audit log に `vault.wipe`（実行ユーザ・タイムスタンプを含む）を必ず記録する
+- `POST /_api/v3/vault/bootstrap` エンドポイントは提供しない（admin UI からの非破壊的 bootstrap は廃止）
 - `PUT /_api/v3/vault/enabled` エンドポイントは提供しない（`VAULT_ENABLED` は env のみ、ランタイム書き換え不可）
 - named export する
 - **完了確認**: 管理者 API の各エンドポイントが期待通りのレスポンスを返すことをテストで確認すること
@@ -433,15 +432,13 @@ _Depends: 11.1_
 - Feature status (read-only) セクション:
   - `VAULT_ENABLED` の現在値を read-only で表示する（環境変数による制御である旨を併記）
   - 変更には apps/app の再起動が必要である旨を併記する
-- Bootstrap operation セクション:
-  - "Prepare GROWI Vault" ボタンを表示する
-  - ボタン押下時に `POST /_api/v3/vault/bootstrap` を呼び出す
-  - bootstrapState が `running` の間はボタンを disabled にする
-- Kill switch セクション:
+- Kill switch セクション（admin UI からの唯一の bootstrap 発火経路）:
   - "Wipe Vault" ボタンを表示する（赤系の destructive スタイル）
   - 押下時に確認モーダル（Yes / Cancel、テキスト入力なし）を表示する
   - 確認後に `POST /_api/v3/vault/wipe` を呼び出す
-  - bootstrapState が `running` の間はボタンを disabled にする
+  - bootstrapState が `running` / `verifying` の間はボタンを disabled にする
+  - optimistic mutate でローカルキャッシュを即座に `running` に書き換え、UI に反応性を持たせる
+- ⚠ 「Prepare GROWI Vault」「Bootstrap」等の独立した bootstrap 発火ボタンは追加しない（Wipe と機能的に等価になり UX 混乱を招く。req 8.7 参照）
 - Bootstrap status セクション:
   - `state` / `processed` / `totalEstimated` / `startedAt` / `completedAt` / `lastError` を表示する
   - `running` の間は進捗バー（processed / totalEstimated）を表示する
@@ -531,7 +528,7 @@ _Depends: 12.1_
 - Next.js Pages Router の規約に従い `VaultAdminSettings` コンポーネントを表示するページを実装する
 - 既存の admin ページ（例: `apps/app/src/pages/admin/app.page.tsx`）を参考に `AdminLayout` でラップする
 - admin サイドバーのナビゲーションに "GROWI Vault" エントリを追加する（既存の admin ナビ定義ファイルを確認して追記する）
-- **完了確認**: `http://localhost:3000/admin/vault` にアクセスして VaultAdminSettings が表示されること。"Prepare GROWI Vault" ボタンが押下可能であること
+- **完了確認**: `http://localhost:3000/admin/vault` にアクセスして VaultAdminSettings が表示されること。"Wipe Vault" ボタンが押下可能であること
 
 ---
 
@@ -773,7 +770,7 @@ integ ファイル内の以下を実装と整合させる:
 
 - `${BASE_URL}/api/v3/vault/instructions` → 実装に該当エンドポイント無し。デバッグ用 admin API を新設するか、テストを MongoDB 直 read に置き換える
 - `${BASE_URL}/api/v3/vault/bootstrap-state` → 実装に該当無し。`/_api/v3/vault/status` を使う
-- `${BASE_URL}/api/v3/vault/bootstrap` → `/_api/v3/vault/bootstrap`（先頭 `_` 必須）
+- `${BASE_URL}/api/v3/vault/bootstrap` → endpoint 自体が廃止された。bootstrap 発火は env (`VAULT_BOOTSTRAP_ON_START`) または `/_api/v3/vault/wipe` 経由
 - gateway パス `/vault.git/...` は OK
 
 ### [x] 23.2 完了基準を実体に揃える
@@ -793,17 +790,17 @@ _要件: 8_
 _Boundary: `requirements.md`、`growi-vault-gateway/design.md`、`tasks.md`、（必要なら）`apps/app/src/server/routes/apiv3/index.js`、`apps/app/src/features/growi-vault/server/routes/vault-admin.ts`、`apps/app/src/features/growi-vault/client/admin/VaultAdminSettings.tsx`_
 _Depends: 11.1_
 
-要件 8.3 / タスク 11.1 は `POST /_api/admin/vault/bootstrap` 等を要求しているが、実装は GROWI の既存 admin route 慣例に従って [apiv3/index.js:82](../../../apps/app/src/server/routes/apiv3/index.js#L82) で `/_api/v3/vault/...` にマウントされている（`/admin` セグメント無し、`/v3` セグメント有り）。クライアント [VaultAdminSettings.tsx:378,398,410](../../../apps/app/src/features/growi-vault/client/admin/VaultAdminSettings.tsx#L378) と server は辻褄が合っているので動作するが、要件文書と乖離している。
+要件 8.3 / タスク 11.1 は `POST /_api/admin/vault/bootstrap` 等を要求していたが、実装は GROWI の既存 admin route 慣例に従って [apiv3/index.js:82](../../../apps/app/src/server/routes/apiv3/index.js#L82) で `/_api/v3/vault/...` にマウントされていた。
+
+> 補足: `POST /_api/v3/vault/bootstrap` は admin UI の Prepare ボタン削除に伴い廃止された。admin UI からの bootstrap 発火経路は `POST /_api/v3/vault/wipe` に統一されている。本タスクは Prepare 経路に関する文書整合性タスクとして既に解消済み。
 
 ### [x] 24.1 要件 / 設計 / タスク文書を実装に揃える
 
-GROWI 既存慣例（`/_api/v3/<resource>` 配下）に合わせるのが現実的:
+GROWI 既存慣例（`/_api/v3/<resource>` 配下）に合わせる:
 
-- `requirements.md` 要件 8.3 を `/_api/v3/vault/bootstrap` に書き換える
+- `requirements.md` 要件 8 は admin UI からの bootstrap 経路を `POST /_api/v3/vault/wipe` のみに統一済み
 - `growi-vault-gateway/design.md` の Admin API テーブルを実装パスに合わせる
 - 既存タスク 11.1 のサブタスク本文を実装と整合させる
-
-または、仕様を優先するなら実装側を `/_api/admin/vault/...` に移動する（推奨度低: 既存 admin route 慣例を破る）。
 
 - **完了確認**: 仕様文書・実装・クライアント・integ テスト（タスク 23.1 で修正済みのもの）の 4 点でパスが一致していること
 
