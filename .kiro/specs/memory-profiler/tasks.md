@@ -57,7 +57,7 @@
 
 ## 4. Core: Stable contract surface test の追加
 
-- [ ] 4.1 `stable-contract.spec.ts` の新規作成
+- [x] 4.1 `stable-contract.spec.ts` の新規作成
   - `bin/memory-profiling/stable-contract.spec.ts` を新規作成し、以下の 5 種類の assertion を含める:
   - **(a) Env var 名の存在検証**: `bin/memory-profiling/scenarios/load.ts` と `bin/memory-profiling/run-scenario.ts` の source を `fs.readFileSync` で読み込み、`LOAD_PAGE_CREATE` / `LOAD_PAGE_EDIT` / `LOAD_PAGE_GET` / `LOAD_PAGE_LIST` / `LOAD_PAGE_SEARCH` / `LOAD_YJS_CLEAN_CLOSE` / `LOAD_YJS_ABORT` / `BASELINE_IDLE_SECONDS` / `DRAIN_IDLE_SECONDS` の 9 個の文字列がそのまま含まれることを assertion。
   - **(b) Exit code 値の検証**: `ScenarioRunnerError` を `new ScenarioRunnerError('msg', 1)` / `new ScenarioRunnerError('msg', 2)` で構築でき、`err.exitCode === 1` / `err.exitCode === 2` であることを runtime assertion。TypeScript 上で `exitCode` の型が `1 | 2` であることを型 assertion（型関数 `Expect<Equal<T, 1 | 2>>` パターン）で検証。
