@@ -1,4 +1,6 @@
+import type { EventEmitter } from 'node:events';
 import mongoose from 'mongoose';
+import { mock } from 'vitest-mock-extended';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
@@ -20,19 +22,20 @@ import instanciatePageBulkExportJobCronService, {
  * is the single choke point that finalizes the status, so it now backfills `completedAt`.
  */
 describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
-  const crowi = {
-    events: { activity: { emit: vi.fn() } },
-  } as unknown as Crowi;
+  // `mock<Crowi>` auto-stubs `crowi.activityService.createActivity` (called by the
+  // private `notifyExportResult`). `events.activity` is the source `this.activityEvent`
+  // is bound to in the service constructor, so stubbing it here is enough to silence
+  // `this.activityEvent.emit('updated', ...)` without spying on the private method.
+  const crowi = mock<Crowi>({
+    events: {
+      activity: mock<EventEmitter>(),
+    },
+  });
 
   beforeAll(async () => {
     await configManager.loadConfigs();
     instanciatePageBulkExportJobCronService(crowi);
-    // Stub out side effects (notification + fs/resource cleanup); we only assert on the job document.
-    vi.spyOn(
-      // biome-ignore lint/suspicious/noExplicitAny: notifyExportResult is private
-      pageBulkExportJobCronService as any,
-      'notifyExportResult',
-    ).mockResolvedValue(undefined);
+    // The fs/resource cleanup step is unrelated to the completedAt contract under test.
     vi.spyOn(
       // biome-ignore lint/style/noNonNullAssertion: instanciated above
       pageBulkExportJobCronService!,
