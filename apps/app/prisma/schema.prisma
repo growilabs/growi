@@ -1,6 +1,10 @@
 generator client {
-  provider = "prisma-client"
-  output   = "../src/generated/prisma"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  // Force CJS output: the default ESM template emits `import.meta.url`, which Node's
+  // ESM auto-detection then trips on after tspc transpiles the file to CJS — yielding
+  // `ReferenceError: exports is not defined in ES module scope` at server startup.
+  moduleFormat = "cjs"
 }
 
 datasource db {
