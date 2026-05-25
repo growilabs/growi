@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
 import type { IActivity } from '~/interfaces/activity';
-import { AllSupportedActions } from '~/interfaces/activity';
+import { AllSupportedActions, SupportedAction } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 
@@ -150,19 +150,22 @@ describe('migrateContributions', () => {
     vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
 
-    const contributionActionValues: readonly string[] = Object.values(
-      ContributionGraphActions,
-    );
-    const nonContributionActions = AllSupportedActions.filter(
-      (action) => !contributionActionValues.includes(action),
-    );
-    const samples = nonContributionActions.slice(0, 2);
-
-    const activities: IActivity[] = samples.map((action, i) => ({
+    const loginFailureActivity: IActivity = {
       user: userId,
-      action,
-      createdAt: new Date(`2025-11-0${3 + i}T00:00:00Z`),
-    }));
+      action: SupportedAction.ACTION_USER_LOGIN_FAILURE,
+      createdAt: new Date('2025-11-03T00:00:00Z'), // 7 days ago
+    };
+
+    const passwordResetActivity: IActivity = {
+      user: userId,
+      action: SupportedAction.ACTION_USER_RESET_PASSWORD,
+      createdAt: new Date('2025-11-04T00:00:00Z'), // 8 days ago
+    };
+
+    const activities: IActivity[] = [
+      loginFailureActivity,
+      passwordResetActivity,
+    ];
 
     await Activity.insertMany(activities);
 
