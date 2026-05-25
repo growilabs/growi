@@ -33,7 +33,7 @@
   - _Requirements: 1.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5_
 
 - [ ] 4. Integration: build artifact と quality gates の検証
-- [ ] 4.1 production build と全 quality gates を実行し artifact を検証
+- [x] 4.1 production build と全 quality gates を実行し artifact を検証
   - リポジトリルートから `turbo run build --filter @growi/app`、`turbo run lint --filter @growi/app`、`turbo run test --filter @growi/app` をすべて green で通す
   - `ls apps/app/.next/node_modules/` で 4 instrumentation package のうち少なくとも 1 つが symlink として外部化されていることを確認
   - `ls apps/app/.next/node_modules/` から `@opentelemetry/auto-instrumentations-node` の symlink が消えていることを確認
