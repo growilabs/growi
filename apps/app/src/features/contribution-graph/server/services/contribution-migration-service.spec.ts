@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
 import type { IActivity } from '~/interfaces/activity';
-import { AllSupportedActions, SupportedAction } from '~/interfaces/activity';
+import { SupportedAction } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 
@@ -11,7 +11,7 @@ import Contribution from '../models/contribution-model';
 import { migrateContributions } from './contribution-migration-service';
 
 // Mock configManger to return an Activity TTL of 30 days (default value)
-vi.mock('~/server/service/config-manager/config-manager', () => ({
+vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig: vi.fn() },
 }));
 vi.mocked(configManager.getConfig).mockReturnValue(2592000);
@@ -22,12 +22,14 @@ describe('migrateContributions', () => {
   let mongod: MongoMemoryServer;
 
   beforeAll(async () => {
+    vi.useRealTimers();
     mongod = await MongoMemoryServer.create();
     const uri = mongod.getUri();
     await mongoose.connect(uri);
   });
 
   beforeEach(async () => {
+    vi.useFakeTimers();
     await Activity.deleteMany({});
     await Contribution.deleteMany({});
   });
@@ -36,11 +38,11 @@ describe('migrateContributions', () => {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
     await mongod.stop();
+    vi.useRealTimers();
   });
 
   it('should create new contribution documents based on activity documents that count as contributions', async () => {
     // Arrange
-    vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
 
     const pageCreateActivity: IActivity = {
@@ -96,13 +98,10 @@ describe('migrateContributions', () => {
     expect(contributionsInDatabase.length).toBe(2);
     expect(otherDayContribution!.count).toBe(1);
     expect(sameDayContribution!.count).toBe(2);
-
-    vi.useRealTimers();
   });
 
   it('should include activity at TTL boundary but exclude activities past it', async () => {
     // Arrange
-    vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
 
     const commentCreateActivity: IActivity = {
@@ -141,13 +140,10 @@ describe('migrateContributions', () => {
     expect(contributionsInDatabase[0].date).toStrictEqual(
       new Date('2025-10-11T00:00:00Z'),
     ); // Exactly 30 days ago gets migrated
-
-    vi.useRealTimers();
   });
 
   it('should not create contribution documents from activities that do not count as contributions', async () => {
     // Arrange
-    vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
 
     const loginFailureActivity: IActivity = {
@@ -176,13 +172,10 @@ describe('migrateContributions', () => {
     const contributionsInDatabase = await Contribution.find({ user: userId });
 
     expect(contributionsInDatabase.length).toBe(0);
-
-    vi.useRealTimers();
   });
 
   it('should be idempotent when run twice (count should not change)', async () => {
     // Arrange
-    vi.useFakeTimers();
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
 
     const pageUpdateActivity: IActivity = {
@@ -208,13 +201,19 @@ describe('migrateContributions', () => {
 
     expect(contributionsInDatabase.length).toBe(1);
     expect(contributionsInDatabase[0].count).toBe(1);
-
-    vi.useRealTimers();
   });
 
-  it('should throw if userId is invalid', async () => {
-    await expect(migrateContributions('invalid-id')).rejects.toThrow(
-      'User ID invalid',
-    );
+  it.each([
+    ['null', null, 'User ID invalid'],
+    ['undefined', undefined, 'User ID invalid'],
+    ['empty string', '', 'User ID invalid'],
+    ['invalid id', 'invalid-id', 'User ID invalid'],
+  ])('should throw when user is %s', async (_label, value, expectedMessage) => {
+    await expect(
+      // @ts-expect-error - testing runtime invalid-input handling
+      migrateContributions(value),
+    ).rejects.toThrow(expectedMessage);
+
+    expect(await Contribution.countDocuments()).toBe(0);
   });
 });
