@@ -91,8 +91,18 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
       return 'skipped';
     }
 
-    // Cast to VaultInstructionDoc for the builder (drops Mongoose internals).
-    const instruction = doc as unknown as VaultInstructionDoc;
+    // Build a plain VaultInstructionDoc view from the Mongoose document.
+    // _id is stringified at this boundary because Mongoose stores it as ObjectId
+    // while VaultInstructionDoc declares it as string.
+    const instruction: VaultInstructionDoc = {
+      _id: String(doc._id),
+      op: doc.op,
+      payload: doc.payload,
+      issuedAt: doc.issuedAt,
+      processedAt: doc.processedAt,
+      attempts: doc.attempts,
+      lastError: doc.lastError,
+    };
 
     try {
       await VaultNamespaceBuilder.applyInstruction(instruction);
@@ -114,10 +124,9 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
       await doc.recordFailure(errorMessage);
 
       const attemptsAfter = (doc.attempts ?? 0) + 1;
-      const op = (doc as unknown as { op: string }).op;
       const failurePayload = {
-        instructionId: String(doc._id),
-        op,
+        instructionId: instruction._id,
+        op: instruction.op,
         attempts: attemptsAfter,
         lastError: errorMessage,
       };
