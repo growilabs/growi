@@ -75,19 +75,26 @@ describe('migrateContributions', () => {
     // Assert
     const contributionsInDatabase = await Contribution.find({ user: userId });
 
-    const startOfDay = new Date('2025-11-03T00:00:00.000Z');
-    const endOfDay = new Date('2025-11-04T00:00:00.000Z');
-
     const sameDayContribution = await Contribution.findOne({
       user: userId,
       date: {
-        $gte: startOfDay,
-        $lt: endOfDay,
+        $gte: new Date('2025-11-03T00:00:00.000Z'), // 7 days ago
+        $lt: new Date('2025-11-04T00:00:00.000Z'), // 8 days ago,
+      },
+    });
+
+    const otherDayContribution = await Contribution.findOne({
+      user: userId,
+      date: {
+        $gte: new Date('2025-11-06T00:00:00.000Z'), // 4 days ago
+        $lt: new Date('2025-11-07T00:00:00.000Z'), // 5 days ago
       },
     });
 
     expect(sameDayContribution).not.toBeNull();
+    expect(sameDayContribution).not.toBeNull();
     expect(contributionsInDatabase.length).toBe(2);
+    expect(otherDayContribution!.count).toBe(1);
     expect(sameDayContribution!.count).toBe(2);
 
     vi.useRealTimers();
