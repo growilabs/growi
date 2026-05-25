@@ -70,7 +70,7 @@
         <span class="ov-icon">🖥️</span>
         <div class="ov-body">
           <h4>標準 git クライアントで clone できる</h4>
-          <p>追加ツール不要。<code>git clone https://growi.cloud/_vault/repo.git</code> だけで動く。認証は既存の Personal Access Token (PAT)。</p>
+          <p>追加ツール不要。<code>git clone https://growi.cloud/vault.git</code> だけで動く。認証は既存の Personal Access Token (PAT)。</p>
         </div>
       </div>
       <div class="ov-point">
@@ -770,7 +770,7 @@
       <div class="cl-num done">7</div>
       <div class="cl-body">
         <h4>動作確認</h4>
-        <p>PAT を使って <code>git clone https://&lt;growi-host&gt;/_vault/repo.git</code> を実行し、自分が閲覧権限を持つページが正しく clone されることを確認する。<code>/_vault/repo.git/git-receive-pack</code> が 403 を返すことも確認する。admin UI から手動 reconcile を起動 → history table に completed として現れることも確認。</p>
+        <p>PAT を使って <code>git clone https://&lt;growi-host&gt;/vault.git</code> を実行し、自分が閲覧権限を持つページが正しく clone されることを確認する。<code>/vault.git/git-receive-pack</code> が 403 を返すことも確認する。admin UI から手動 reconcile を起動 → history table に completed として現れることも確認。</p>
         <div class="cl-tags">
           <span class="chip chip-teal">動作確認</span>
         </div>
@@ -793,7 +793,7 @@
       <div class="flow-node">
         <div class="flow-bubble" style="border-color:rgba(79,142,247,.5);background:rgba(79,142,247,.1)">🖥️</div>
         <div class="flow-label">git clone 実行
-          <div class="flow-sub">GET /_vault/<br>repo.git/info/refs</div>
+          <div class="flow-sub">GET /vault.git/<br>info/refs</div>
         </div>
       </div>
       <div class="flow-node">

@@ -12,7 +12,7 @@ GROWI Vault 機能において、外部 git クライアントからの clone / 
 
 ## Desired Outcome
 
-- `apps/app` が `GET/POST /_vault/repo.git/...` を提供し、HTTP Basic Auth → PAT 認証 → ACL 評価 → vault-manager への透過 proxy を実現する
+- `apps/app` が `GET/POST /vault.git/...` を提供し、HTTP Basic Auth → PAT 認証 → ACL 評価 → vault-manager への透過 proxy を実現する
 - ページ変更イベントを購読して `vault_instructions` コレクションに durable な指示を発行する
 - 初回有効化時に bootstrap を主導し、pages cursor stream から seed instructions を発行する
 - 管理者が機能 ON/OFF・bootstrap 進捗・audit log を確認できる UI を提供する

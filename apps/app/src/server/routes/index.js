@@ -72,7 +72,7 @@ module.exports = (crowi, app) => {
   app.use(rateLimiterFactory());
 
   // GROWI Vault git gateway — must be registered before the catch-all page routes
-  app.use('/_vault/repo.git', createVaultGatewayRouterWithDeps(crowi));
+  app.use('/vault.git', createVaultGatewayRouterWithDeps(crowi));
 
   // API v3 for admin
   app.use('/_api/v3', apiV3AdminRouter);

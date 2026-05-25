@@ -6,7 +6,7 @@
 `apps/app` に git smart HTTP gateway・PAT 認証ミドルウェア・vault_instructions 書き込み機構・vault-manager RPC クライアント・管理 UI のいずれも未実装であるため、GROWI Vault 機能を外部に提供できない状態にある GROWI 管理者・エンドユーザー。
 
 ### 現状
-- `apps/app` には `/_vault/repo.git/...` エンドポイントが存在しない
+- `apps/app` には `/vault.git/...` エンドポイントが存在しない
 - PAT 認証の vault スコープ対応が存在しない
 - ページ変更を vault-manager に伝える outbox 機構が存在しない
 - 初回有効化時の bootstrap 主導ロジックが存在しない
@@ -28,7 +28,7 @@
 ## 境界コンテキスト
 
 **スコープ内（本 spec が実装する）**:
-- `VaultGatewayRouter` — `GET/POST /_vault/repo.git/...` エンドポイント
+- `VaultGatewayRouter` — `GET/POST /vault.git/...` エンドポイント
 - `VaultPatAuth` ミドルウェア — HTTP Basic → PAT → ユーザー解決
 - `VaultNamespaceMapper` — GROWI ACL → namespace 集合 / ページ → namespace 判定
 - `VaultDispatcher` — PageService event 購読 + vault_instructions 書き込み（coalesce 含む）
@@ -60,17 +60,17 @@
 
 ### 要件 1: git smart HTTP エンドポイント
 
-**目的:** GROWI ユーザーとして、既存の PAT を使って `git clone /_vault/repo.git` を実行できるようにしたい。
+**目的:** GROWI ユーザーとして、既存の PAT を使って `git clone /vault.git` を実行できるようにしたい。
 
 #### 受入条件
 
-1. When `GET /_vault/repo.git/info/refs?service=git-upload-pack` リクエストを受信した場合, the GROWI Vault Gateway shall HTTP Basic Auth を要求し、PAT 認証を行い、vault-manager へ compose-view RPC を発行してから git body proxy で応答を返す
-2. When `POST /_vault/repo.git/git-upload-pack` リクエストを受信した場合, the GROWI Vault Gateway shall 認証済みリクエストの HTTP body を vault-manager へ透過的にプロキシし、レスポンス body をクライアントへストリーム転送する
-3. When `/_vault/repo.git/git-receive-pack` に対するリクエスト（push 試行）を受信した場合, the GROWI Vault Gateway shall HTTP 403 `read-only repository` を返し書き込みを拒否する
-4. When vaultEnabled 設定が false の場合, the GROWI Vault Gateway shall `/_vault/repo.git/info/refs` および `/_vault/repo.git/git-upload-pack` に対して HTTP 404 を返す（永続的な設定状態であり Retry-After は付与しない。git-receive-pack は機能フラグに関わらず常に 403 read-only を返す）
+1. When `GET /vault.git/info/refs?service=git-upload-pack` リクエストを受信した場合, the GROWI Vault Gateway shall HTTP Basic Auth を要求し、PAT 認証を行い、vault-manager へ compose-view RPC を発行してから git body proxy で応答を返す
+2. When `POST /vault.git/git-upload-pack` リクエストを受信した場合, the GROWI Vault Gateway shall 認証済みリクエストの HTTP body を vault-manager へ透過的にプロキシし、レスポンス body をクライアントへストリーム転送する
+3. When `/vault.git/git-receive-pack` に対するリクエスト（push 試行）を受信した場合, the GROWI Vault Gateway shall HTTP 403 `read-only repository` を返し書き込みを拒否する
+4. When vaultEnabled 設定が false の場合, the GROWI Vault Gateway shall `/vault.git/info/refs` および `/vault.git/git-upload-pack` に対して HTTP 404 を返す（永続的な設定状態であり Retry-After は付与しない。git-receive-pack は機能フラグに関わらず常に 403 read-only を返す）
 5. When bootstrapState が `done` 以外（`pending` または `running`）の場合, the GROWI Vault Gateway shall すべての clone / fetch リクエストに対して `503 Service Unavailable` と `Retry-After` ヘッダーを返す
 6. The GROWI Vault Gateway shall 各 clone / fetch 操作の成功・失敗を既存 audit log（タイムスタンプ・ユーザー・操作種別）に記録する
-7. The GROWI Vault Gateway shall `git-upload-pack` に関係しない URL パス（例: `/_vault/repo.git/HEAD` 等）に対して HTTP 404 を返す
+7. The GROWI Vault Gateway shall `git-upload-pack` に関係しない URL パス（例: `/vault.git/HEAD` 等）に対して HTTP 404 を返す
 
 ### 要件 2: PAT 認証ミドルウェア
 
@@ -185,6 +185,6 @@
 
 1. When 認証失敗が発生した場合, the GROWI Vault Gateway shall ページリスト・存在情報を含まないエラーメッセージで 401 を返す
 2. When ACL 評価中にエラーが発生した場合, the GROWI Vault Gateway shall 500 を返しエラーをログに記録した後、接続を閉じる
-3. The GROWI Vault Gateway shall `/_vault/*` エンドポイントに既存 GROWI のレート制限を適用する
+3. The GROWI Vault Gateway shall `/vault.git/*` エンドポイントに既存 GROWI のレート制限を適用する
 4. The GROWI Vault Gateway shall 認証失敗（auth-failure）イベントを audit log に記録し、ブルートフォース検出を可能にする
 5. When compose-view RPC または upload-pack proxy が失敗した場合, the GROWI Vault Gateway shall vault-manager から受け取ったエラーに GROWI 内部情報を上乗せせずに 502 をクライアントに返す

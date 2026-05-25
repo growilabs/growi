@@ -32,8 +32,7 @@ const execFileAsync = promisify(execFile);
 // Helpers
 // ---------------------------------------------------------------------------
 
-const vaultRepoUrl = (): string =>
-  `${VAULT_E2E_CONFIG.baseUrl}/_vault/repo.git`;
+const vaultRepoUrl = (): string => `${VAULT_E2E_CONFIG.baseUrl}/vault.git`;
 
 /**
  * Clone the vault repo with an explicit Authorization header.
@@ -157,7 +156,7 @@ describe('GROWI Vault — clone E2E contract', () => {
   // <bad-pat> → 401".
   // ----------------------------------------------------------------------
   it('HTTP request with invalid PAT returns 401', async () => {
-    const url = `${VAULT_E2E_CONFIG.baseUrl}/_vault/repo.git/info/refs?service=git-upload-pack`;
+    const url = `${VAULT_E2E_CONFIG.baseUrl}/vault.git/info/refs?service=git-upload-pack`;
     const res = await fetch(url, {
       headers: {
         Authorization: `Basic ${Buffer.from('x:invalid-pat').toString('base64')}`,

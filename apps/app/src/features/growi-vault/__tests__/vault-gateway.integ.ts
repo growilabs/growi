@@ -68,7 +68,7 @@ const basicAuthHeader = (pat: string): string =>
 async function probeInfoRefs(opts: {
   pat?: string;
 }): Promise<{ status: number; headers: Headers }> {
-  const url = `${VAULT_E2E_CONFIG.baseUrl}/_vault/repo.git/info/refs?service=git-upload-pack`;
+  const url = `${VAULT_E2E_CONFIG.baseUrl}/vault.git/info/refs?service=git-upload-pack`;
   const headers: Record<string, string> = {};
   if (opts.pat) headers.Authorization = basicAuthHeader(opts.pat);
 
@@ -77,7 +77,7 @@ async function probeInfoRefs(opts: {
 }
 
 async function probeReceivePack(method: 'POST' | 'GET'): Promise<number> {
-  const url = `${VAULT_E2E_CONFIG.baseUrl}/_vault/repo.git/git-receive-pack`;
+  const url = `${VAULT_E2E_CONFIG.baseUrl}/vault.git/git-receive-pack`;
   const init: RequestInit = { method, redirect: 'manual' };
   if (method === 'POST') {
     init.headers = {
@@ -90,7 +90,7 @@ async function probeReceivePack(method: 'POST' | 'GET'): Promise<number> {
 }
 
 async function gitCloneAdmin(): Promise<string> {
-  const url = new URL(`${VAULT_E2E_CONFIG.baseUrl}/_vault/repo.git`);
+  const url = new URL(`${VAULT_E2E_CONFIG.baseUrl}/vault.git`);
   url.username = 'x';
   url.password = VAULT_E2E_CONFIG.admin.pat;
   const dir = await mkdtemp(join(tmpdir(), 'growi-vault-gw-'));

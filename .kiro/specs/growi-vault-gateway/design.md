@@ -8,7 +8,7 @@
 
 ### Goals
 
-- git smart HTTP エンドポイント `GET/POST /_vault/repo.git/...` を提供する
+- git smart HTTP エンドポイント `GET/POST /vault.git/...` を提供する
 - GROWI 既存 PAT 認証基盤を再利用し、HTTP Basic Auth → ユーザー解決を実現する
 - GROWI ACL に基づいて per-user の accessible namespace 集合を決定論的に計算する
 - ページ変更イベントを durable な `vault_instructions` outbox に書き込む
@@ -30,7 +30,7 @@
 
 ### apps/app の追加責務（`src/features/growi-vault/`）
 
-- `GET/POST /_vault/repo.git/...` を唯一の対外エンドポイントとして提供する
+- `GET/POST /vault.git/...` を唯一の対外エンドポイントとして提供する
 - HTTP Basic Auth → PAT 認証（既存 access-token-parser に委譲）→ ユーザー解決
 - ユーザーがアクセス可能な namespace 集合の決定（GROWI ACL 評価）
 - ページの所属 namespace の決定（grant / grantedGroups / creator から）
@@ -127,7 +127,7 @@ apps/app/src/features/growi-vault/
 │   └── index.ts
 ├── server/
 │   ├── routes/
-│   │   ├── vault-gateway.ts           # GET/POST /_vault/repo.git/* — auth + proxy
+│   │   ├── vault-gateway.ts           # GET/POST /vault.git/* — auth + proxy
 │   │   └── vault-admin.ts             # admin API（bootstrap 開始 / 進捗 / enable 切替）
 │   ├── services/
 │   │   ├── vault-namespace-mapper.ts  # ACL → namespace 集合 / page → namespace 計算
@@ -178,7 +178,7 @@ sequenceDiagram
     participant VM as vault-manager
     participant Audit as 既存 audit log
 
-    Cli->>App: GET /_vault/repo.git/info/refs?service=git-upload-pack
+    Cli->>App: GET /vault.git/info/refs?service=git-upload-pack
     App->>App: vaultEnabled フラグ確認 → false なら 404（永続無効化）
     App->>App: bootstrapState 確認 → done 以外なら 503 + Retry-After（一時的）
     App->>Auth: HTTP Basic Auth → PAT 検証
@@ -196,7 +196,7 @@ sequenceDiagram
     Client-->>App: stream
     App-->>Cli: 200 stream forward
 
-    Cli->>App: POST /_vault/repo.git/git-upload-pack
+    Cli->>App: POST /vault.git/git-upload-pack
     App->>Client: proxyGitRequest(POST /internal/git/git-upload-pack, viewRef, body)
     Client->>VM: POST /internal/git/git-upload-pack (body forward)
     VM-->>Client: pack data (stream)
@@ -272,10 +272,10 @@ sequenceDiagram
 
 | Method | Endpoint | Auth | Response Content-Type | Errors |
 |--------|----------|------|----------------------|--------|
-| GET | `/_vault/repo.git/info/refs?service=git-upload-pack` | HTTP Basic | `application/x-git-upload-pack-advertisement` | 401, 404, 503 |
-| POST | `/_vault/repo.git/git-upload-pack` | HTTP Basic | `application/x-git-upload-pack-result` | 401, 404, 503 |
-| ANY | `/_vault/repo.git/git-receive-pack` | — | — | 403 |
-| OTHER | `/_vault/repo.git/*` | — | — | 404 |
+| GET | `/vault.git/info/refs?service=git-upload-pack` | HTTP Basic | `application/x-git-upload-pack-advertisement` | 401, 404, 503 |
+| POST | `/vault.git/git-upload-pack` | HTTP Basic | `application/x-git-upload-pack-result` | 401, 404, 503 |
+| ANY | `/vault.git/git-receive-pack` | — | — | 403 |
+| OTHER | `/vault.git/*` | — | — | 404 |
 
 **責務と制約**
 - `vaultEnabled` が false の場合、`info/refs` および `git-upload-pack` に対して 404 を返す（永続的な設定状態であり「一時的に処理できない」を意味する 503 ではない。Retry-After も付与しない）
@@ -741,7 +741,7 @@ export interface StorageStatsResponse {
 - **情報漏洩防止**: ACL フィルターは apps/app の VaultNamespaceMapper で確定し、vault-manager に渡る namespace 集合は既にフィルター済み（要件 3.8 / Req 3.5）
 - **認証失敗レスポンス**: エラーメッセージにページリスト・存在情報を含めない（要件 2.3）
 - **既存 audit log への統合**: 認証失敗（auth-failure）も記録しブルートフォース検出を可能にする
-- **レート制限**: 既存 GROWI の rate limiting を `/_vault/*` にも適用する
+- **レート制限**: 既存 GROWI の rate limiting を `/vault.git/*` にも適用する
 
 ---
 

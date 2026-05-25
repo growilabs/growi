@@ -96,11 +96,11 @@ async function assertGatewayReady(
 // ============================================================================
 
 /**
- * Create and return the Express Router that handles all `/_vault/repo.git/*`
+ * Create and return the Express Router that handles all `/vault.git/*`
  * paths.
  *
- * Mount point: `/_vault/repo.git`
- * (Registered by the app's top-level router at `/_vault/repo.git`.)
+ * Mount point: `/vault.git`
+ * (Registered by the app's top-level router at `/vault.git`.)
  */
 export const createVaultGatewayRouter = (
   deps: VaultGatewayRouterDeps = {},
@@ -111,7 +111,7 @@ export const createVaultGatewayRouter = (
   const router = express.Router();
 
   // --------------------------------------------------------------------------
-  // ANY /_vault/repo.git/git-receive-pack → 403 read-only (req 1.3)
+  // ANY /vault.git/git-receive-pack → 403 read-only (req 1.3)
   // Must be registered before the more specific GET/POST handlers.
   // --------------------------------------------------------------------------
   router.all('/git-receive-pack', (_req: Request, res: Response) => {
@@ -119,7 +119,7 @@ export const createVaultGatewayRouter = (
   });
 
   // --------------------------------------------------------------------------
-  // GET /_vault/repo.git/info/refs  (clone / fetch discovery)
+  // GET /vault.git/info/refs  (clone / fetch discovery)
   // --------------------------------------------------------------------------
   router.get('/info/refs', async (req: Request, res: Response) => {
     // Feature flag + bootstrap gate (req 1.4, 1.5)
@@ -250,7 +250,7 @@ export const createVaultGatewayRouter = (
   });
 
   // --------------------------------------------------------------------------
-  // POST /_vault/repo.git/git-upload-pack  (clone / fetch pack transfer)
+  // POST /vault.git/git-upload-pack  (clone / fetch pack transfer)
   // --------------------------------------------------------------------------
   router.post('/git-upload-pack', async (req: Request, res: Response) => {
     // Feature flag + bootstrap gate (req 1.4, 1.5)
@@ -367,7 +367,7 @@ export const createVaultGatewayRouter = (
   });
 
   // --------------------------------------------------------------------------
-  // Catch-all: any other /_vault/repo.git/* path → 404 (req 1.7)
+  // Catch-all: any other /vault.git/* path → 404 (req 1.7)
   // --------------------------------------------------------------------------
   router.all('*', (_req: Request, res: Response) => {
     res.status(404).send('Not Found');

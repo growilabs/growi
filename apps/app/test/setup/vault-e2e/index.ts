@@ -162,7 +162,7 @@ async function provisionVaultE2eFixture(): Promise<void> {
 
   // Mount the gateway router on an ephemeral local port.
   const app = express();
-  app.use('/_vault/repo.git', createVaultGatewayRouter({}));
+  app.use('/vault.git', createVaultGatewayRouter({}));
   const server: Server = await new Promise((resolve, reject) => {
     const s = createServer(app);
     s.once('error', reject);

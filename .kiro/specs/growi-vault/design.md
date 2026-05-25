@@ -111,7 +111,7 @@ graph TB
 
 ### apps/app(`growi-vault-gateway`)の責務
 
-- git smart HTTP の唯一の対外エンドポイント `GET/POST /_vault/repo.git/...` を提供する
+- git smart HTTP の唯一の対外エンドポイント `GET/POST /vault.git/...` を提供する
 - HTTP Basic Auth → PAT 認証(既存 access-token-parser に委譲)
 - GROWI ACL に基づく per-user accessible namespace 集合の計算
 - ページ変更イベントの購読 → `vault_instructions` への durable 書き込み(coalesce / prefix primitives 含む)

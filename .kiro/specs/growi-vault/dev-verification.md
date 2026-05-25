@@ -30,10 +30,10 @@
 ## 前提知識（誤解しやすいポイント）
 
 1. **clone URL は必ず apps/app 側（port 3000）**
-   - `/_vault/repo.git` は `apps/app` の Express ルータ [routes/index.js](../../../apps/app/src/server/routes/index.js#L75) に mount されており、port **3000** でのみ提供される。
-   - `apps/growi-vault-manager`（port 3001）が公開するのは `/internal/git/...` だけで、`/_vault/repo.git` は存在しない（404）。`Authorization: Bearer <SECRET>` 必須の内部 API のため git クライアントから直接叩けない。
+   - `/vault.git` は `apps/app` の Express ルータ [routes/index.js](../../../apps/app/src/server/routes/index.js#L75) に mount されており、port **3000** でのみ提供される。
+   - `apps/growi-vault-manager`（port 3001）が公開するのは `/internal/git/...` だけで、`/vault.git` は存在しない（404）。`Authorization: Bearer <SECRET>` 必須の内部 API のため git クライアントから直接叩けない。
 2. **PAT が原則必須**
-   - `/_vault/repo.git` は HTTP Basic Auth の **password** 欄に PAT を要求する（username 部は無視）。
+   - `/vault.git` は HTTP Basic Auth の **password** 欄に PAT を要求する（username 部は無視）。
    - 匿名でも `public` namespace へのアクセスは設計上許容されるが、認証経路の動作確認のため通常は PAT を seed する。
    - PAT には `read:features:page` スコープが必須（[vault-pat-auth.ts:112](../../../apps/app/src/features/growi-vault/server/middlewares/vault-pat-auth.ts#L112)）。
 3. **bootstrap 完了が必要**
@@ -104,7 +104,7 @@ await mongoose.disconnect();
 
 ```bash
 # Basic Auth の username 部は実装上無視されるので任意（"x" など）
-git clone "http://x:${TOKEN}@localhost:3000/_vault/repo.git" /tmp/mygrowirepos
+git clone "http://x:${TOKEN}@localhost:3000/vault.git" /tmp/mygrowirepos
 ls /tmp/mygrowirepos
 ```
 
@@ -232,7 +232,7 @@ await db.collection('vault_sync_state').updateOne(
 
 3. `VAULT_BOOTSTRAP_ON_START=true` で apps/app を再起動するか、admin UI (`/admin/vault`) から "Prepare GROWI Vault" を実行する。
 
-4. bootstrap 完了後、`git clone http://x:<PAT>@<host>/_vault/repo.git` が成功してファイル一覧が取得できることを確認する。
+4. bootstrap 完了後、`git clone http://x:<PAT>@<host>/vault.git` が成功してファイル一覧が取得できることを確認する。
    また、`vault_user_views.<viewRef>.mergedTreeOid` が `4b825dc642cb6eb9a060e54bf8d69288fbee4904`（empty tree SHA）以外の値になっていることを確認する:
    ```js
    db.vault_user_views.find({}, { mergedTreeOid: 1 }).toArray();

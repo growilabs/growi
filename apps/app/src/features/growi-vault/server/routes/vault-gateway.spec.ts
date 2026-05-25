@@ -54,7 +54,7 @@ import { vaultSettingsService } from '../services/vault-settings-service';
 /** Create a minimal Express app that mounts the vault gateway router. */
 function buildApp(deps: Parameters<typeof createVaultGatewayRouter>[0] = {}) {
   const app = express();
-  app.use('/_vault/repo.git', createVaultGatewayRouter(deps));
+  app.use('/vault.git', createVaultGatewayRouter(deps));
   return app;
 }
 
@@ -110,7 +110,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp();
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
+        '/vault.git/info/refs?service=git-upload-pack',
       );
 
       expect(res.status).toBe(404);
@@ -127,7 +127,7 @@ describe('VaultGatewayRouter', () => {
       });
 
       const app = buildApp();
-      const res = await request(app).post('/_vault/repo.git/git-upload-pack');
+      const res = await request(app).post('/vault.git/git-upload-pack');
 
       expect(res.status).toBe(404);
       expect(res.headers['retry-after']).toBeUndefined();
@@ -149,7 +149,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp();
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
+        '/vault.git/info/refs?service=git-upload-pack',
       );
 
       expect(res.status).toBe(503);
@@ -165,7 +165,7 @@ describe('VaultGatewayRouter', () => {
       });
 
       const app = buildApp();
-      const res = await request(app).post('/_vault/repo.git/git-upload-pack');
+      const res = await request(app).post('/vault.git/git-upload-pack');
 
       expect(res.status).toBe(503);
       expect(res.headers['retry-after']).toBeUndefined();
@@ -181,7 +181,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp();
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
+        '/vault.git/info/refs?service=git-upload-pack',
       );
 
       expect(res.status).toBe(503);
@@ -198,7 +198,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp();
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
+        '/vault.git/info/refs?service=git-upload-pack',
       );
 
       expect(res.status).toBe(503);
@@ -215,7 +215,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp();
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
+        '/vault.git/info/refs?service=git-upload-pack',
       );
 
       expect(res.status).toBe(503);
@@ -232,7 +232,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp();
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
+        '/vault.git/info/refs?service=git-upload-pack',
       );
 
       expect(res.status).toBe(503);
@@ -249,7 +249,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp();
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
+        '/vault.git/info/refs?service=git-upload-pack',
       );
 
       expect(res.status).toBe(503);
@@ -268,7 +268,7 @@ describe('VaultGatewayRouter', () => {
   describe('ANY git-receive-pack', () => {
     it('returns 403 for GET git-receive-pack', async () => {
       const app = buildApp();
-      const res = await request(app).get('/_vault/repo.git/git-receive-pack');
+      const res = await request(app).get('/vault.git/git-receive-pack');
 
       expect(res.status).toBe(403);
       expect(res.text).toContain('read-only repository');
@@ -276,7 +276,7 @@ describe('VaultGatewayRouter', () => {
 
     it('returns 403 for POST git-receive-pack', async () => {
       const app = buildApp();
-      const res = await request(app).post('/_vault/repo.git/git-receive-pack');
+      const res = await request(app).post('/vault.git/git-receive-pack');
 
       expect(res.status).toBe(403);
       expect(res.text).toContain('read-only repository');
@@ -305,7 +305,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp({ vaultPatAuth: failingAuth });
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
+        '/vault.git/info/refs?service=git-upload-pack',
       );
 
       expect(res.status).toBe(401);
@@ -335,7 +335,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp({ vaultPatAuth: successfulAuth });
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-receive-pack',
+        '/vault.git/info/refs?service=git-receive-pack',
       );
 
       expect(res.status).toBe(400);
@@ -385,7 +385,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp({ vaultPatAuth: successfulAuth, createActivity });
       const res = await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
+        '/vault.git/info/refs?service=git-upload-pack',
       );
 
       expect(res.status).toBe(200);
@@ -426,9 +426,7 @@ describe('VaultGatewayRouter', () => {
       };
 
       const app = buildApp({ vaultPatAuth: successfulAuth });
-      await request(app).get(
-        '/_vault/repo.git/info/refs?service=git-upload-pack',
-      );
+      await request(app).get('/vault.git/info/refs?service=git-upload-pack');
 
       // computeAccessibleNamespaces must be called with both userId and scopes
       expect(
@@ -452,7 +450,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp({ vaultPatAuth: successfulAuth, createActivity });
       const res = await request(app)
-        .post('/_vault/repo.git/git-upload-pack')
+        .post('/vault.git/git-upload-pack')
         .set('Content-Type', 'application/x-git-upload-pack-request')
         .send(Buffer.from('0011want abc\n0000'));
 
@@ -493,7 +491,7 @@ describe('VaultGatewayRouter', () => {
 
       const app = buildApp({ vaultPatAuth: successfulAuth });
       await request(app)
-        .post('/_vault/repo.git/git-upload-pack')
+        .post('/vault.git/git-upload-pack')
         .set('Content-Type', 'application/x-git-upload-pack-request')
         .send(Buffer.from('0011want abc\n0000'));
 
@@ -508,17 +506,17 @@ describe('VaultGatewayRouter', () => {
   // Unknown paths
   // -------------------------------------------------------------------------
 
-  describe('unknown /_vault/repo.git/* paths', () => {
+  describe('unknown /vault.git/* paths', () => {
     it('returns 404 for GET /HEAD', async () => {
       const app = buildApp();
-      const res = await request(app).get('/_vault/repo.git/HEAD');
+      const res = await request(app).get('/vault.git/HEAD');
 
       expect(res.status).toBe(404);
     });
 
     it('returns 404 for GET /objects/info/packs', async () => {
       const app = buildApp();
-      const res = await request(app).get('/_vault/repo.git/objects/info/packs');
+      const res = await request(app).get('/vault.git/objects/info/packs');
 
       expect(res.status).toBe(404);
     });
