@@ -23,9 +23,12 @@ import { VAULT_E2E_CONFIG, VAULT_E2E_PAGES } from './fixture-contract';
 const execFileAsync = promisify(execFile);
 
 // ---------------------------------------------------------------------------
-// DB helpers — drive scenarios that require state changes the gateway itself
-// doesn't expose to test code (vaultEnabled flag, bootstrap state). We reuse
-// the mongoose connection established by the shared mongo setup file.
+// DB / env helpers — drive scenarios that require state changes the gateway
+// itself doesn't expose to test code (VAULT_ENABLED flag, bootstrap state).
+//
+// Note: VAULT_ENABLED is env-only. Mutating process.env.VAULT_ENABLED and
+// calling configManager.loadConfigs() rewrites the in-memory env config that
+// the in-process gateway resolves via VaultSettingsService.
 // ---------------------------------------------------------------------------
 
 function db(): import('mongodb').Db {
@@ -39,11 +42,12 @@ function db(): import('mongodb').Db {
 }
 
 async function setVaultEnabled(enabled: boolean): Promise<void> {
-  // Use configManager.updateConfigs so the in-memory cache is refreshed
-  // alongside the DB write — raw DB updates would not affect the gateway's
-  // resolved value until configManager.loadConfigs() runs again.
+  // VAULT_ENABLED is env-only — mutate process.env and reload configManager
+  // so the in-memory env cache reflects the new value. Direct DB writes have
+  // no effect because VaultSettingsService passes ConfigSource.env.
+  process.env.VAULT_ENABLED = enabled ? 'true' : 'false';
   const { configManager } = await import('~/server/service/config-manager');
-  await configManager.updateConfigs({ 'app:vaultEnabled': enabled });
+  await configManager.loadConfigs();
 }
 
 async function setBootstrapState(
@@ -124,28 +128,54 @@ describe('GROWI Vault — gateway contracts', () => {
   });
 
   // ----------------------------------------------------------------------
-  // Contract: vaultEnabled=false → 404 (permanent, no Retry-After).
+  // Contract: VAULT_ENABLED=false (env) → 404 (permanent, no Retry-After).
   //
   // Regression catch: someone changes the disabled response to 503 or 200,
   // breaking the documented "feature flag returns 404" contract and
-  // confusing clients about whether to retry.
+  // confusing clients about whether to retry. The flag is env-only — DB
+  // writes must NOT influence the gateway response.
   // ----------------------------------------------------------------------
-  describe('feature flag', () => {
+  describe('feature flag (env-only)', () => {
     // beforeEach (not beforeAll) — the outer afterEach restores the steady
     // state between tests, so each test inside this block must re-disable.
     beforeEach(async () => {
       await setVaultEnabled(false);
     });
 
-    it('returns 404 for info/refs when vaultEnabled=false', async () => {
+    it('returns 404 for info/refs when VAULT_ENABLED=false', async () => {
       const res = await probeInfoRefs({ pat: VAULT_E2E_CONFIG.admin.pat });
       expect(res.status).toBe(404);
       expect(res.headers.get('retry-after')).toBeNull();
     });
 
-    it('returns 404 for anonymous info/refs when vaultEnabled=false', async () => {
+    it('returns 404 for anonymous info/refs when VAULT_ENABLED=false', async () => {
       const res = await probeInfoRefs({});
       expect(res.status).toBe(404);
+    });
+
+    it('ignores DB-only vaultEnabled writes (env is authoritative)', async () => {
+      // Even if someone writes app:vaultEnabled=true to the DB, the gateway
+      // must continue to return 404 because the env var is still false.
+      // The configs collection has a unique index on `key`, so use key as the
+      // upsert filter to handle both insert and update cases idempotently.
+      await db()
+        .collection('configs')
+        .updateOne(
+          { key: 'app:vaultEnabled' },
+          { $set: { value: 'true' } },
+          { upsert: true },
+        );
+      // Reload to ensure DB values are in the cache (but env should still win).
+      const { configManager } = await import('~/server/service/config-manager');
+      await configManager.loadConfigs();
+
+      const res = await probeInfoRefs({ pat: VAULT_E2E_CONFIG.admin.pat });
+      expect(res.status).toBe(404);
+
+      // Cleanup: revert the DB row so it doesn't leak into other tests.
+      await db()
+        .collection('configs')
+        .updateOne({ key: 'app:vaultEnabled' }, { $set: { value: 'false' } });
     });
   });
 

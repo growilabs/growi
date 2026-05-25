@@ -21,17 +21,37 @@ describe('vaultSettingsService.getSettings()', () => {
     vi.resetAllMocks();
   });
 
-  it('reads enabled from configManager without ConfigSource.env', async () => {
+  it('reads enabled via configManager with ConfigSource.env (env-only)', async () => {
     vi.mocked(configManager.getConfig).mockImplementation((key, source) => {
-      if (key === 'app:vaultEnabled') return true;
+      if (key === 'app:vaultEnabled' && source === ConfigSource.env)
+        return true;
       return undefined;
     });
 
     const settings = await vaultSettingsService.getSettings();
 
     expect(settings.enabled).toBe(true);
-    // enabled does NOT pass ConfigSource.env
-    expect(configManager.getConfig).toHaveBeenCalledWith('app:vaultEnabled');
+    // enabled MUST pass ConfigSource.env to prevent DB fallback
+    expect(configManager.getConfig).toHaveBeenCalledWith(
+      'app:vaultEnabled',
+      ConfigSource.env,
+    );
+  });
+
+  it('ignores DB-only values for enabled (returns false when env is unset)', async () => {
+    // Simulate: env is unset, DB has true. The service must NOT fall back to DB.
+    vi.mocked(configManager.getConfig).mockImplementation((key, source) => {
+      if (key === 'app:vaultEnabled' && source === ConfigSource.env) {
+        return undefined;
+      }
+      // any other source (e.g. DB fallback) would return true — but the service
+      // should never query without ConfigSource.env.
+      return true;
+    });
+
+    const settings = await vaultSettingsService.getSettings();
+
+    expect(settings.enabled).toBe(false);
   });
 
   it('reads managerEndpoint via configManager with ConfigSource.env', async () => {

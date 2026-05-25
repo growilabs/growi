@@ -835,4 +835,53 @@ describe('VaultBootstrapper', () => {
       expect(instructionCreateSpy).not.toHaveBeenCalled();
     });
   });
+
+  // -------------------------------------------------------------------------
+  // wipeAndRebootstrap (kill switch)
+  // -------------------------------------------------------------------------
+
+  describe('wipeAndRebootstrap', () => {
+    it('issues reset-all even from done state (force wipe)', async () => {
+      // State is 'done' — start() with env-true would skip. wipeAndRebootstrap
+      // must always proceed regardless of current state.
+      await setupSyncState('done');
+      const pages = [buildPage({ path: '/page1' })];
+      await setupPageModel(pages);
+
+      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
+      const mapper = buildMapper(['public']);
+      const bootstrapper = createVaultBootstrapper(mapper);
+
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
+
+      const ops = instructionCreateSpy.mock.calls.map((c) => c[0].op);
+      expect(ops).toContain('reset-all');
+    });
+
+    it('seeds bulk-upsert instructions after reset-all', async () => {
+      await setupSyncState('done');
+      const pages = [
+        buildPage({ path: '/page1', grant: PageGrant.GRANT_PUBLIC }),
+      ];
+      await setupPageModel(pages);
+
+      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
+      const mapper = buildMapper(['public']);
+      const bootstrapper = createVaultBootstrapper(mapper);
+
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
+
+      const callOps = instructionCreateSpy.mock.calls.map((c) => c[0].op);
+      const resetIdx = callOps.indexOf('reset-all');
+      const bulkIdx = callOps.indexOf('bulk-upsert');
+      expect(resetIdx).toBeGreaterThanOrEqual(0);
+      if (bulkIdx >= 0) {
+        expect(resetIdx).toBeLessThan(bulkIdx);
+      }
+    });
+  });
 });

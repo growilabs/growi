@@ -6,7 +6,7 @@ import { configManager } from '~/server/service/config-manager';
  * Resolved Vault settings consumed by gateway components.
  */
 export interface VaultSettings {
-  /** Whether the GROWI Vault feature is enabled. Controlled via DB or VAULT_ENABLED env var. */
+  /** Whether the GROWI Vault feature is enabled. Read from VAULT_ENABLED env var only (no DB fallback). */
   readonly enabled: boolean;
   /** Internal URL of growi-vault-manager. Read from VAULT_MANAGER_ENDPOINT env var only. */
   readonly managerEndpoint: string;
@@ -17,9 +17,10 @@ export interface VaultSettings {
 /**
  * Service that resolves GROWI Vault configuration from config sources.
  *
- * - `enabled`: resolved via ConfigManager (supports both DB and env var).
- * - `managerEndpoint`: resolved via ConfigManager with ConfigSource.env to prevent DB fallback.
- * - `managerInternalSecret`: resolved via ConfigManager with ConfigSource.env to prevent DB fallback.
+ * All three settings are resolved via ConfigManager with ConfigSource.env to
+ * guarantee env-only resolution with no DB fallback. Runtime mutation of
+ * `app:vaultEnabled` via the admin UI is not supported — to disable the
+ * feature in an emergency, use the admin UI "Wipe Vault" kill switch instead.
  */
 export interface VaultSettingsService {
   getSettings(): Promise<VaultSettings>;
@@ -27,13 +28,11 @@ export interface VaultSettingsService {
 
 class VaultSettingsServiceImpl implements VaultSettingsService {
   async getSettings(): Promise<VaultSettings> {
-    // Resolve the feature flag through ConfigManager so that DB-stored values
-    // take precedence over the env var (consistent with other app:* flags).
-    const enabled = configManager.getConfig('app:vaultEnabled') ?? false;
-
-    // managerEndpoint and managerInternalSecret are security-sensitive values
-    // that must never be written to the database. Pass ConfigSource.env to
-    // configManager to guarantee env-only resolution with no DB fallback.
+    // All three settings are env-only. Pass ConfigSource.env to prevent DB
+    // fallback — DB writes to `app:vaultEnabled` must NOT influence the
+    // resolved value.
+    const enabled =
+      configManager.getConfig('app:vaultEnabled', ConfigSource.env) ?? false;
     const managerEndpoint =
       configManager.getConfig('app:vaultManagerEndpoint', ConfigSource.env) ??
       '';

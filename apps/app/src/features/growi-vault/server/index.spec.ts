@@ -1141,6 +1141,7 @@ describe('initializeVaultFeature — reconcile init wiring (task 3.3)', () => {
     // Intercept the bootstrapper created inside initializeVaultFeature.
     vi.mocked(createVaultBootstrapper).mockImplementationOnce(() => ({
       start: vi.fn().mockResolvedValue(undefined),
+      wipeAndRebootstrap: vi.fn().mockResolvedValue(undefined),
       getStatus: vi.fn(),
       getResilienceStatus: vi
         .fn()
@@ -1178,6 +1179,7 @@ describe('initializeVaultFeature — reconcile init wiring (task 3.3)', () => {
     const callOrder: string[] = [];
     vi.mocked(createVaultBootstrapper).mockImplementationOnce(() => ({
       start: vi.fn().mockResolvedValue(undefined),
+      wipeAndRebootstrap: vi.fn().mockResolvedValue(undefined),
       getStatus: vi.fn(),
       getResilienceStatus: vi
         .fn()

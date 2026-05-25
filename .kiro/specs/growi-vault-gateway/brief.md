@@ -30,12 +30,12 @@ GROWI Vault 機能において、外部 git クライアントからの clone / 
   - `VaultDispatcher` — PageService event 購読 + `vault_instructions` 書き込み(coalesce 含む)
   - `VaultBootstrapper` — 初回有効化時の reset-all + pages cursor stream + seed instructions
   - `VaultManagerClient` — vault-manager への HTTP RPC + git body proxy
-  - `VaultSettingsService` — `vaultEnabled` / endpoint / secret の取得
-  - `VaultAdminSettings` UI — 機能 ON/OFF + bootstrap 進捗 + audit log filter リンク
+  - `VaultSettingsService` — `vaultEnabled` / endpoint / secret の取得（全て env var only）
+  - `VaultAdminSettings` UI — 環境変数値表示 (read-only) + bootstrap 進捗 + Wipe Vault (kill switch) + audit log filter リンク
   - `vault_instructions` Mongoose model(write owned by apps/app)
   - `vault_sync_state` の `bootstrap*` フィールド owner として書き込み
   - 既存 audit log への clone / fetch / auth-failure イベント記録
-  - `app:vaultEnabled` / `app:vaultManagerEndpoint` / `app:vaultManagerInternalSecret` の config 定義(後者 2 つは env var only)
+  - `app:vaultEnabled` / `app:vaultManagerEndpoint` / `app:vaultManagerInternalSecret` の config 定義（いずれも env var only）
 
 - **Out**:
   - bare repo 操作・git object I/O・git upload-pack の spawn(→ `growi-vault-manager`)
@@ -52,7 +52,7 @@ GROWI Vault 機能において、外部 git クライアントからの clone / 
 - **dispatch 境界**: PageService event → instruction 種別判定 → coalesce 適用 → outbox write
 - **bootstrap 境界**: pages cursor stream の resume 可能化と進捗監視
 - **proxy 境界**: HTTP body の透過転送(stream pipe)と shared secret 付与
-- **admin UI 境界**: 機能 ON/OFF と bootstrap 進捗の admin 操作 / 観測
+- **admin UI 境界**: bootstrap 進捗・ストレージ観測・kill switch (Wipe) 発火の admin 操作 / 観測（機能 ON/OFF はデプロイ時 env で固定）
 
 ## Out of Boundary
 
@@ -88,4 +88,4 @@ GROWI Vault 機能において、外部 git クライアントからの clone / 
 - **leak 防止**(Req 3.5): clone 応答の ref 一覧 / tree / error message / object 転送のいかなる経路からも、ユーザが閲覧不可のページの存在が観測されないこと
 - **PAT 連携**: 既存 GROWI の access-token 機能が PAT を発行する。本 spec では access-token-parser を再利用するのみで、PAT 管理 UI は変更しない
 - **bootstrap 単一性**: bootstrap は StatefulSet replicas=1 が前提だが、本 spec の責務範囲では `vault_sync_state.bootstrapState` を check して二重起動を回避する程度に留める
-- **環境変数**: `VAULT_MANAGER_ENDPOINT` / `VAULT_MANAGER_INTERNAL_SECRET` は env var only(DB 保存禁止)。`vaultEnabled` のみ DB / env 両対応
+- **環境変数**: `VAULT_ENABLED` / `VAULT_MANAGER_ENDPOINT` / `VAULT_MANAGER_INTERNAL_SECRET` はいずれも env var only（DB 保存禁止）。ランタイムでの ON/OFF トグルは提供せず、緊急停止は admin UI の Wipe Vault で行う

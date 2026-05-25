@@ -17,9 +17,7 @@ vi.mock('../services/vault-bootstrapper', () => ({
 }));
 
 vi.mock('~/server/service/config-manager', () => ({
-  configManager: {
-    updateConfigs: vi.fn(),
-  },
+  configManager: {},
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -54,6 +52,7 @@ vi.mock('~/server/middlewares/login-required', () => ({
 const mockBootstrapper = {
   getStatus: vi.fn(),
   start: vi.fn(),
+  wipeAndRebootstrap: vi.fn(),
   initOnStartup: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn().mockResolvedValue(undefined),
   getResilienceStatus: vi.fn(),
@@ -72,7 +71,6 @@ const mockManagerClient = {
 
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { configManager } from '~/server/service/config-manager';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -254,71 +252,45 @@ describe('VaultAdminRouter', () => {
   });
 
   // -------------------------------------------------------------------------
-  // PUT /enabled
+  // PUT /enabled — endpoint removed (VAULT_ENABLED is env-only, no runtime toggle)
   // -------------------------------------------------------------------------
 
-  describe('PUT /enabled', () => {
-    it('updates vaultEnabled to true and returns 200', async () => {
-      (
-        configManager.updateConfigs as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(undefined);
-
+  describe('PUT /enabled (removed)', () => {
+    it('returns 404 (endpoint no longer exists)', async () => {
       const app = buildApp();
       const res = await request(app)
         .put('/_api/admin/vault/enabled')
         .send({ enabled: true });
 
-      expect(res.status).toBe(200);
+      expect(res.status).toBe(404);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // POST /wipe — kill switch (admin-force-wipe)
+  // -------------------------------------------------------------------------
+
+  describe('POST /wipe', () => {
+    it('invokes wipeAndRebootstrap with admin-force-wipe and returns 202', async () => {
+      mockBootstrapper.wipeAndRebootstrap.mockResolvedValue(undefined);
+
+      const app = buildApp();
+      const res = await request(app).post('/_api/admin/vault/wipe');
+
+      expect(res.status).toBe(202);
       expect(res.body.ok).toBe(true);
-      expect(configManager.updateConfigs).toHaveBeenCalledWith({
-        'app:vaultEnabled': true,
+      expect(mockBootstrapper.wipeAndRebootstrap).toHaveBeenCalledWith({
+        triggerSource: 'admin-force-wipe',
       });
     });
 
-    it('updates vaultEnabled to false and returns 200', async () => {
-      (
-        configManager.updateConfigs as ReturnType<typeof vi.fn>
-      ).mockResolvedValue(undefined);
-
-      const app = buildApp();
-      const res = await request(app)
-        .put('/_api/admin/vault/enabled')
-        .send({ enabled: false });
-
-      expect(res.status).toBe(200);
-      expect(res.body.ok).toBe(true);
-      expect(configManager.updateConfigs).toHaveBeenCalledWith({
-        'app:vaultEnabled': false,
+    it('returns 500 when wipeAndRebootstrap throws synchronously', async () => {
+      mockBootstrapper.wipeAndRebootstrap.mockImplementation(() => {
+        throw new Error('startup failure');
       });
-    });
-
-    it('returns 400 when enabled field is missing', async () => {
-      const app = buildApp();
-      const res = await request(app).put('/_api/admin/vault/enabled').send({});
-
-      expect(res.status).toBe(400);
-      expect(res.body.ok).toBe(false);
-    });
-
-    it('returns 400 when enabled is not a boolean', async () => {
-      const app = buildApp();
-      const res = await request(app)
-        .put('/_api/admin/vault/enabled')
-        .send({ enabled: 'yes' });
-
-      expect(res.status).toBe(400);
-      expect(res.body.ok).toBe(false);
-    });
-
-    it('returns 500 when updateConfigs throws', async () => {
-      (
-        configManager.updateConfigs as ReturnType<typeof vi.fn>
-      ).mockRejectedValue(new Error('DB write failed'));
 
       const app = buildApp();
-      const res = await request(app)
-        .put('/_api/admin/vault/enabled')
-        .send({ enabled: true });
+      const res = await request(app).post('/_api/admin/vault/wipe');
 
       expect(res.status).toBe(500);
       expect(res.body.ok).toBe(false);

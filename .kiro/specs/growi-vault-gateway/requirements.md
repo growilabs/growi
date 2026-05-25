@@ -67,7 +67,7 @@
 1. When `GET /vault.git/info/refs?service=git-upload-pack` リクエストを受信した場合, the GROWI Vault Gateway shall HTTP Basic Auth を要求し、PAT 認証を行い、vault-manager へ compose-view RPC を発行してから git body proxy で応答を返す
 2. When `POST /vault.git/git-upload-pack` リクエストを受信した場合, the GROWI Vault Gateway shall 認証済みリクエストの HTTP body を vault-manager へ透過的にプロキシし、レスポンス body をクライアントへストリーム転送する
 3. When `/vault.git/git-receive-pack` に対するリクエスト（push 試行）を受信した場合, the GROWI Vault Gateway shall HTTP 403 `read-only repository` を返し書き込みを拒否する
-4. When vaultEnabled 設定が false の場合, the GROWI Vault Gateway shall `/vault.git/info/refs` および `/vault.git/git-upload-pack` に対して HTTP 404 を返す（永続的な設定状態であり Retry-After は付与しない。git-receive-pack は機能フラグに関わらず常に 403 read-only を返す）
+4. When 環境変数 `VAULT_ENABLED` が `false`（またはデフォルト）の場合, the GROWI Vault Gateway shall `/vault.git/info/refs` および `/vault.git/git-upload-pack` に対して HTTP 404 を返す（環境変数による永続的な設定状態であり Retry-After は付与しない。git-receive-pack は機能フラグに関わらず常に 403 read-only を返す）
 5. When bootstrapState が `done` 以外（`pending` または `running`）の場合, the GROWI Vault Gateway shall すべての clone / fetch リクエストに対して `503 Service Unavailable` と `Retry-After` ヘッダーを返す
 6. The GROWI Vault Gateway shall 各 clone / fetch 操作の成功・失敗を既存 audit log（タイムスタンプ・ユーザー・操作種別）に記録する
 7. The GROWI Vault Gateway shall `git-upload-pack` に関係しない URL パス（例: `/vault.git/HEAD` 等）に対して HTTP 404 を返す
@@ -115,7 +115,7 @@
 
 ### 要件 5: bootstrap 主導（VaultBootstrapper）
 
-**目的:** GROWI 管理者として、初回有効化や災害復旧時に全ページを vault-manager に投入する bootstrap を admin UI または環境変数で開始できるようにしたい。
+**目的:** GROWI 管理者として、初回有効化や災害復旧時に全ページを vault-manager に投入する bootstrap を admin UI または環境変数で開始できるようにしたい。また、緊急停止 (kill switch) として admin UI から全 repository を破棄し bootstrap 未完了状態へ戻せるようにしたい。
 
 #### 受入条件
 
@@ -127,6 +127,8 @@
 6. When pages cursor stream を走査する場合, the GROWI Vault Gateway shall `status: 'published'` かつ `/trash` 配下でないページのみを対象とし、namespace 単位のバッファに蓄積し CHUNK_SIZE（既定 1000）に達するたびに `bulk-upsert` instruction を発行する
 7. When bootstrapState が `running` または `pending` の場合, the GROWI Vault Gateway shall VaultBootstrapper.getStatus() が `state / processed / totalEstimated / cursor / startedAt / completedAt / lastError` を返す
 8. The GROWI Vault Gateway shall bootstrap の二重起動を防止するため、bootstrapState が `running` の間は新たな bootstrap を開始しない
+9. When admin UI の "Wipe Vault" ボタンが押された場合, the GROWI Vault Gateway shall triggerSource `admin-force-wipe` で forceWipe フローを発火し、`op: 'reset-all'` instruction を発行して全 namespace の repository を破棄し、bootstrapState を `running` に強制遷移させた後 pages cursor stream の再投入を開始する
+10. When admin UI から Wipe Vault が発火された場合, the GROWI Vault Gateway shall 操作を audit log に `vault.wipe` として記録する（タイムスタンプ・実行ユーザを含む）
 
 ### 要件 6: vault-manager との通信（VaultManagerClient）
 
@@ -143,27 +145,28 @@
 
 ### 要件 7: 設定管理（VaultSettingsService）
 
-**目的:** GROWI 管理者として、vault 機能の有効化と vault-manager 接続先を設定できるようにしたい。
+**目的:** GROWI 運用者として、vault 機能の有効化と vault-manager 接続先を環境変数で設定できるようにしたい。これらの値はデプロイ時に固定され、ランタイムで変更されない。
 
 #### 受入条件
 
-1. When VaultSettingsService.getSettings() を呼び出す場合, the GROWI Vault Gateway shall `app:vaultEnabled`（DB / env 両対応）、`app:vaultManagerEndpoint`（env only）、`app:vaultManagerInternalSecret`（env only）を返す
-2. Where `app:vaultManagerEndpoint` と `app:vaultManagerInternalSecret` は, the GROWI Vault Gateway shall 環境変数からのみ読み込み、DB には保存しない
-3. When `app:vaultEnabled` を DB に保存する場合, the GROWI Vault Gateway shall 既存の `configs` コレクションの `app:vaultEnabled` document を更新する
-4. The GROWI Vault Gateway shall `app:vaultEnabled` のデフォルト値を `false` とする
+1. When VaultSettingsService.getSettings() を呼び出す場合, the GROWI Vault Gateway shall `app:vaultEnabled`、`app:vaultManagerEndpoint`、`app:vaultManagerInternalSecret` を全て環境変数のみから解決する（DB フォールバック無し）
+2. Where `app:vaultEnabled`・`app:vaultManagerEndpoint`・`app:vaultManagerInternalSecret` は, the GROWI Vault Gateway shall 環境変数からのみ読み込み、DB には保存しない
+3. The GROWI Vault Gateway shall `app:vaultEnabled` のデフォルト値を `false` とする
+4. The GROWI Vault Gateway shall `app:vaultEnabled` の値変更を反映するには apps/app の再起動が必要であることを前提とし、ランタイム書き換えの API・UI を提供しない
 
 ### 要件 8: 管理者 UI（VaultAdminSettings）
 
-**目的:** GROWI 管理者として、Vault 機能を有効化・無効化し、bootstrap の進捗や audit log を確認できる UI を使いたい。
+**目的:** GROWI 管理者として、Vault 機能の状態を確認し、bootstrap 操作・緊急停止 (Wipe)・audit log を確認できる UI を使いたい。機能の ON/OFF はデプロイ時の環境変数で決定するため UI からは操作しない。
 
 #### 受入条件
 
-1. When 管理者が管理 UI から `vaultEnabled` トグルを操作した場合, the GROWI Vault Gateway shall 設定を永続化し、即座に機能の有効化・無効化を反映する
+1. The GROWI Vault Gateway shall admin UI に現在の `VAULT_ENABLED` 設定値（read-only 表示）と bootstrap state を表示する
 2. The GROWI Vault Gateway shall admin UI に bootstrap の `state` / `processed` / `totalEstimated` / `startedAt` / `completedAt` / `lastError` を表示する進捗セクションを提供する
 3. When "Prepare GROWI Vault" ボタンが押された場合, the GROWI Vault Gateway shall `POST /_api/v3/vault/bootstrap` を呼び出し bootstrap を開始する
-4. When bootstrapState が `done` でない状態で `vaultEnabled` を ON にしようとした場合, the GROWI Vault Gateway shall admin UI に警告を表示する（ユーザーは 503 を受け取ることになるため）
+4. When "Wipe Vault" ボタンが押された場合, the GROWI Vault Gateway shall 確認モーダル（テキスト入力不要、Yes/Cancel のみ）を表示し、確認後に `POST /_api/v3/vault/wipe` を呼び出して forceWipe フローを発火する
 5. The GROWI Vault Gateway shall admin UI に既存 audit log UI への "vault.*" フィルター付きリンクを提供する
 6. The GROWI Vault Gateway shall admin UI に `GET /internal/storage-stats` 経由で取得した namespace 数・合計 commit 数・loose object 数・repo size・最終 squash/gc 時刻を表示するストレージ観測セクションを提供する（vault_namespace_state を直接 read しない）
+7. The GROWI Vault Gateway shall admin UI から `vaultEnabled` を変更する操作（トグル等）を提供しない
 
 ### 要件 9: 共通 DTO 型（@growi/core）
 

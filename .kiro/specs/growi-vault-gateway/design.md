@@ -39,7 +39,7 @@
 - vault-manager への compose-view RPC 呼び出し
 - git request body の vault-manager への透過 proxy
 - 既存 audit log への vault イベント記録
-- `vaultEnabled` 等の admin 設定 UI
+- bootstrap 操作 / Wipe Vault (kill switch) / 状態観測の admin 設定 UI
 
 ### 許可された依存関係
 
@@ -128,13 +128,13 @@ apps/app/src/features/growi-vault/
 ├── server/
 │   ├── routes/
 │   │   ├── vault-gateway.ts           # GET/POST /vault.git/* — auth + proxy
-│   │   └── vault-admin.ts             # admin API（bootstrap 開始 / 進捗 / enable 切替）
+│   │   └── vault-admin.ts             # admin API（bootstrap 開始 / 進捗 / wipe (kill switch) / storage stats）
 │   ├── services/
 │   │   ├── vault-namespace-mapper.ts  # ACL → namespace 集合 / page → namespace 計算
 │   │   ├── vault-dispatcher.ts        # PageService event 購読 + vault_instructions 書き込み
 │   │   ├── vault-bootstrapper.ts      # bootstrap 主導（reset-all + pages cursor → seed instructions）
 │   │   ├── vault-manager-client.ts    # vault-manager との HTTP RPC + body proxy
-│   │   └── vault-settings-service.ts  # vaultEnabled, endpoint, secret の取得
+│   │   └── vault-settings-service.ts  # vaultEnabled, endpoint, secret の取得（全て ConfigSource.env で env のみから読む）
 │   ├── middlewares/
 │   │   └── vault-pat-auth.ts          # access-token-parser を vault scope で composition
 │   ├── models/
@@ -179,7 +179,7 @@ sequenceDiagram
     participant Audit as 既存 audit log
 
     Cli->>App: GET /vault.git/info/refs?service=git-upload-pack
-    App->>App: vaultEnabled フラグ確認 → false なら 404（永続無効化）
+    App->>App: VAULT_ENABLED env 確認 → false なら 404（環境変数による永続無効化）
     App->>App: bootstrapState 確認 → done 以外なら 503 + Retry-After（一時的）
     App->>Auth: HTTP Basic Auth → PAT 検証
     Auth-->>App: { userId, scopes } または null（匿名）
@@ -278,7 +278,7 @@ sequenceDiagram
 | OTHER | `/vault.git/*` | — | — | 404 |
 
 **責務と制約**
-- `vaultEnabled` が false の場合、`info/refs` および `git-upload-pack` に対して 404 を返す（永続的な設定状態であり「一時的に処理できない」を意味する 503 ではない。Retry-After も付与しない）
+- `VAULT_ENABLED` 環境変数が false の場合、`info/refs` および `git-upload-pack` に対して 404 を返す（環境変数による永続的な設定状態であり「一時的に処理できない」を意味する 503 ではない。Retry-After も付与しない）
 - `bootstrapState !== 'done'` の場合、全 clone / fetch に `503 + Retry-After`（bootstrap は一時的な状態であり 503 が適切）
 - `git-receive-pack` への全リクエストに 403 `read-only repository`
 - 成功・失敗とも既存 audit log にイベントを記録する
@@ -423,12 +423,15 @@ interface VaultDispatcher {
 
 | フィールド | 詳細 |
 |-----------|------|
-| Intent | 初回有効化 / 災害復旧時の bootstrap を主導する。pages cursor stream を回し seed instructions を vault_instructions に発行することで vault-manager が steady state と同一パスで処理できるようにする |
+| Intent | 初回有効化 / 災害復旧時の bootstrap、および admin UI からの kill switch (forceWipe) を主導する。pages cursor stream を回し seed instructions を vault_instructions に発行することで vault-manager が steady state と同一パスで処理できるようにする |
 | 要件カバレッジ | 5 |
 
 ```typescript
+type TriggerSource = 'env-true' | 'env-force' | 'admin-ui' | 'admin-force-wipe';
+
 interface VaultBootstrapper {
-  start(opts?: { triggerSource: 'admin-ui' | 'env-var' }): Promise<void>;
+  start(opts?: { triggerSource: 'admin-ui'; forceWipe?: false }): Promise<void>;
+  wipeAndRebootstrap(opts: { triggerSource: 'admin-force-wipe' }): Promise<void>;
   getStatus(): Promise<{
     state: 'pending' | 'running' | 'done' | 'failed';
     processed: number;
@@ -441,7 +444,7 @@ interface VaultBootstrapper {
 }
 ```
 
-**start() の挙動**
+**start() の挙動（通常 bootstrap）**
 
 ```
 1. bootstrapState が 'running' なら即リターン（二重起動防止）
@@ -462,6 +465,20 @@ interface VaultBootstrapper {
 6. 残バッファを flush
 7. vault_sync_state.bootstrapState = 'done'
 ```
+
+**wipeAndRebootstrap() の挙動（admin kill switch）**
+
+既存の `forceWipe` 経路（`VAULT_BOOTSTRAP_ON_START=force` で発火する経路）を再利用する。
+
+```
+1. triggerSource='admin-force-wipe' で executeBootstrap({ forceWipe: true, ... }) を呼び出す
+2. bootstrap state machine が forceOverride イベントで ANY state → running に強制遷移
+3. vault_instructions に op: 'reset-all' を 1 件 insert（vault-manager 側で全 namespace の repository が破棄される）
+4. 通常 bootstrap と同じ pages cursor stream を走査して seed instructions を再発行
+5. 完走で bootstrapState = 'done' へ
+```
+
+> kill switch 中はもちろん `bootstrapState !== 'done'` のため、すべての clone / fetch リクエストは 503 + Retry-After で応答される。これにより repository が空 / 不完全な状態でユーザに不整合なデータが見えることはない。
 
 **Bootstrap SLA**
 
@@ -542,6 +559,7 @@ interface VaultSettingsService {
   isSecret: false,
   publishToClient: false,
   defaultValue: false,
+  // VaultSettingsService は ConfigSource.env を指定して env のみから読み込む
 },
 'app:vaultManagerEndpoint': {
   envVarName: 'VAULT_MANAGER_ENDPOINT',
@@ -563,21 +581,23 @@ interface VaultSettingsService {
 
 | フィールド | 詳細 |
 |-----------|------|
-| Intent | 管理者向けの Vault 機能 ON/OFF + bootstrap 操作 + 進捗観測 UI |
+| Intent | 管理者向けの Vault 状態観測 + bootstrap 操作 + kill switch (Wipe) + audit log リンク UI |
 | 要件カバレッジ | 8 |
 
 **画面構成**
 
 | セクション | 内容 |
 |---|---|
-| Feature toggle | `vaultEnabled` の ON/OFF トグル |
+| Feature status (read-only) | `VAULT_ENABLED` の現在値を表示（環境変数で設定されているため UI からは変更不可。変更は再起動を要する旨を併記） |
 | Bootstrap operation | "Prepare GROWI Vault" ボタン（`POST /_api/v3/vault/bootstrap` を発火） |
+| Kill switch | "Wipe Vault" ボタン（`POST /_api/v3/vault/wipe` を発火）。確認モーダル (Yes / Cancel) を表示。発火すると全 namespace の repository が破棄され bootstrapState は未完了状態に戻る |
 | Bootstrap status | `state` (pending/running/done/failed) + 進捗バー (`processed / totalEstimated`) + `startedAt` / `completedAt` / `lastError` |
 | Storage observability | `GET /internal/storage-stats` 経由で取得した namespace 数 / 合計 commit 数 / loose object 数 / repo size / 最終 squash・gc 時刻（vault_namespace_state を直接 read しない） |
 | Audit log filter link | 既存 audit log UI に "vault.*" フィルターを適用するリンク |
 
 **UX のポイント**
-- `vaultEnabled=true` への切替前に bootstrap done でなければ警告を表示（切替後も 503 が継続するため）
+- `vaultEnabled` トグルは提供しない（環境変数 `VAULT_ENABLED` でデプロイ時に固定）
+- Wipe Vault は破壊的操作であるため確認モーダルを介する（テキスト入力は不要、Yes/Cancel のみ）。発火は audit log に `vault.wipe` として必ず記録する
 - bootstrap 中の `vault_instructions.processedAt` の遅れは内部観測のみ（admin に過剰情報を出さない）
 
 ---
@@ -642,7 +662,7 @@ interface VaultSettingsService {
 
 | key | type | 設定方法 | 用途 |
 |-----|------|---------|------|
-| `app:vaultEnabled` | boolean | DB / env var | 機能 ON/OFF |
+| `app:vaultEnabled` | boolean | **env var only** | 機能 ON/OFF（デプロイ時固定、ランタイム変更不可） |
 | `app:vaultManagerEndpoint` | string | **env var only** | vault-manager の URL |
 | `app:vaultManagerInternalSecret` | string | **env var only** | shared secret |
 
@@ -723,7 +743,7 @@ export interface StorageStatsResponse {
 | エラー種別 | HTTP 応答 | 挙動 |
 |-----------|---------|------|
 | 認証失敗 | 401 + `WWW-Authenticate` | ページ情報を含まないメッセージ |
-| 機能無効（`vaultEnabled=false`） | 404 + git エラー文字列 | `info/refs` / `git-upload-pack` に適用。永続的な設定状態のため 503 ではなく 404。Retry-After なし |
+| 機能無効（`VAULT_ENABLED=false`） | 404 + git エラー文字列 | `info/refs` / `git-upload-pack` に適用。環境変数による永続的な設定状態のため 503 ではなく 404。Retry-After なし |
 | bootstrap 未完了 | 503 + `Retry-After` | bootstrapState が done 以外（一時的な状態） |
 | push 試行 | 403 `read-only repository` | git クライアントに表示 |
 | ACL 評価エラー | 500 | ログ記録後、接続を閉じる |

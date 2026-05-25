@@ -27,7 +27,7 @@ GROWI Vault は、GROWI 上のページを git プロトコル経由で read-onl
   - ACL (public / anyone-with-link / group / only-me) に基づくユーザ単位の可視範囲フィルタリング
   - 標準 git クライアント (`git clone` / `git fetch` / `git pull`) での read-only アクセス
   - GROWI 既存の認証情報を用いた認証と監査ログ記録
-  - 管理者による機能の有効化 / 無効化、および clone 活動の観測
+  - デプロイ時環境変数による機能の有効化制御、管理者による bootstrap 操作および kill switch (wipe)、clone 活動の観測
 
 - **Out of scope (MVP)**:
   - 書き込み (branch push / server-side merge) — 将来 spec に委ねる
@@ -40,7 +40,7 @@ GROWI Vault は、GROWI 上のページを git プロトコル経由で read-onl
 - **Adjacent expectations**:
   - GROWI の pages / revisions / user / group / page-acl モデルが本機能の source of truth であり、本機能は既存モデルのスキーマを変更しない
   - Yjs ベースのリアルタイム共同編集は別機能が担当し、GROWI Vault は revision が確定した時点の内容のみを反映する
-  - 管理者による GROWI Vault 機能の有効化は、既存の admin 設定 UI 経由で行う
+  - GROWI Vault 機能の有効化はデプロイ時の環境変数 (`VAULT_ENABLED`) でのみ制御し、ランタイムでの ON/OFF トグルは提供しない。緊急停止が必要な場合は管理者 UI から kill switch (wipe) を発火させ、リポジトリを破棄して bootstrap 未完了状態へ戻すことでアクセスを停止する
 
 ## Requirements
 
@@ -114,16 +114,19 @@ GROWI Vault は、GROWI 上のページを git プロトコル経由で read-onl
 2. When ページの ACL 変更によりユーザが新たに閲覧権限を得た場合, the GROWI Vault shall 当該ユーザの後続 fetch 応答に当該ページの現在の内容を含める
 3. The GROWI Vault shall ACL 変更をコンテンツ更新と同等の freshness 境界内で後続 fetch 応答に反映する
 
-### Requirement 7: 管理者による機能制御と観測
+### Requirement 7: 機能制御と管理者による運用ハンドル
 
-**Objective:** As a GROWI 管理者, I want GROWI Vault 機能を組織方針に応じて有効化・無効化し、利用状況を把握したい, so that 運用とコンプライアンス要件を満たせる
+**Objective:** As a GROWI 運用者および管理者, I want デプロイ時に GROWI Vault 機能の有効化を決定でき、運用中は bootstrap 操作・緊急停止 (kill switch) ・利用状況観測を管理 UI から実行したい, so that 運用とコンプライアンス要件を満たせる
 
 #### Acceptance Criteria
 
-1. Where GROWI Vault 機能が管理者により無効化されている場合, the GROWI Vault shall 全ての clone / fetch リクエストを feature-disabled 応答で拒否する
-2. When 管理者が GROWI Vault 機能を有効化した場合, the GROWI Vault shall 認証された git clone / fetch リクエストの受付を開始する
-3. The GROWI Vault shall 管理者が監査に利用できる形で、最低限「タイムスタンプ・リクエスト元ユーザ・操作種別」を含む監査記録を提供する
-4. If GROWI Vault のストレージ使用量が運用者設定の閾値を超過した場合, then the GROWI Vault shall 当該状況を管理者へ surface する
+1. Where 環境変数 `VAULT_ENABLED` が `false` (またはデフォルト) の場合, the GROWI Vault shall 全ての clone / fetch リクエストを feature-disabled 応答で拒否し、PageEvent への購読を開始しない
+2. When `VAULT_ENABLED=true` で起動された場合, the GROWI Vault shall PageEvent への購読を開始し、bootstrap が完了した時点で認証された git clone / fetch リクエストの受付を開始する
+3. When 管理者が管理 UI から kill switch (Wipe Vault) を発火した場合, the GROWI Vault shall 全 namespace の repository を破棄する `reset-all` instruction を発行し、bootstrap state を未完了状態へ戻すことで以降の clone / fetch リクエストを 503 で拒否する
+4. When 管理者が kill switch を発火した場合, the GROWI Vault shall 操作を audit log に記録する (タイムスタンプ・実行ユーザ・操作種別 `vault.wipe` を含む)
+5. When 管理者が管理 UI から bootstrap 操作 (Prepare GROWI Vault) を発火した場合, the GROWI Vault shall bootstrap を開始する
+6. The GROWI Vault shall 管理者が監査に利用できる形で、最低限「タイムスタンプ・リクエスト元ユーザ・操作種別」を含む監査記録を提供する
+7. If GROWI Vault のストレージ使用量が運用者設定の閾値を超過した場合, then the GROWI Vault shall 当該状況を管理者へ surface する
 
 ### Requirement 8: 将来スコープの明示的除外
 

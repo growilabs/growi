@@ -1,11 +1,9 @@
 import type { StorageStatsResponse } from '@growi/core/dist/interfaces/vault';
 import type { Router } from 'express';
 import express from 'express';
-import { body, validationResult } from 'express-validator';
 
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type { VaultReconcileService } from '../services/reconcile';
@@ -57,7 +55,7 @@ export interface VaultAdminRouterDeps {
  * Endpoints:
  *   GET  /_api/v3/vault/status             — bootstrap status + storage stats
  *   POST /_api/v3/vault/bootstrap          — trigger bootstrap
- *   PUT  /_api/v3/vault/enabled            — toggle vaultEnabled flag
+ *   POST /_api/v3/vault/wipe               — kill switch: force wipe + re-bootstrap
  *   POST /_api/v3/vault/reconcile          — admin-triggered reconcile
  *   GET  /_api/v3/vault/reconcile-history  — paginated reconcile history (admin)
  */
@@ -228,41 +226,56 @@ export const createVaultAdminRouter = (
   });
 
   // --------------------------------------------------------------------------
-  // PUT /enabled
+  // POST /wipe — kill switch (admin-force-wipe)
   // --------------------------------------------------------------------------
 
   /**
-   * Toggle the vaultEnabled feature flag.
+   * Wipe all vault repositories and re-bootstrap.
    *
-   * Expects a JSON body: { "enabled": boolean }
+   * Issues `op: 'reset-all'` via the resilience layer's forceWipe path, then
+   * re-seeds bulk-upsert instructions from the current page set. While the
+   * re-bootstrap is in progress the gateway responds with 503 to all
+   * clone / fetch requests, so this also acts as the runtime kill switch.
+   *
+   * Fire-and-forget: returns 202 immediately and lets the client poll /status.
    */
-  router.put(
-    '/enabled',
-    ...authMiddlewares,
-    body('enabled')
-      .exists()
-      .withMessage('enabled field is required')
-      .isBoolean()
-      .withMessage('enabled must be a boolean'),
-    async (req, res) => {
-      const errors = validationResult(req);
-      if (!errors.isEmpty()) {
-        return res.status(400).json({ ok: false, errors: errors.array() });
-      }
+  router.post('/wipe', ...authMiddlewares, async (req, res) => {
+    try {
+      // Kick off the wipe synchronously so synchronous throws (e.g. invalid
+      // state at entry) surface as 500, then continue as a background task.
+      const wipePromise = bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+      });
+      wipePromise.catch((err) => {
+        logger.error({ err }, 'Vault wipe failed asynchronously');
+      });
 
-      const { enabled } = req.body as { enabled: boolean };
-
+      // Best-effort audit log — vault.wipe is recorded with the acting user.
+      // Failures to write the audit row must not affect the wipe response.
       try {
-        await configManager.updateConfigs({ 'app:vaultEnabled': enabled });
-        return res.json({ ok: true });
+        const activityService = crowi?.activityService;
+        if (activityService?.createActivity != null) {
+          // req.user is populated by loginRequired middleware. Express's base
+          // Request type doesn't include it, so widen via a local cast.
+          const user = (req as { user?: unknown }).user ?? null;
+          await activityService.createActivity({
+            action: 'vault.wipe',
+            user,
+            ip: req.ip ?? '127.0.0.1',
+          });
+        }
       } catch (err) {
-        logger.error({ err }, 'Failed to update vaultEnabled config');
-        return res
-          .status(500)
-          .json({ ok: false, error: 'Internal server error' });
+        logger.warn({ err }, 'Failed to write vault.wipe audit log');
       }
-    },
-  );
+
+      return res.status(202).json({ ok: true });
+    } catch (err) {
+      logger.error({ err }, 'Failed to start vault wipe');
+      return res
+        .status(500)
+        .json({ ok: false, error: 'Internal server error' });
+    }
+  });
 
   // --------------------------------------------------------------------------
   // POST /reconcile

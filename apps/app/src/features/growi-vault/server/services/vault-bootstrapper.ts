@@ -68,6 +68,14 @@ export type BootstrapStatus = ResilienceStatus['bootstrap'];
  */
 export interface VaultBootstrapper {
   start(opts?: { triggerSource: 'admin-ui' | 'env-var' }): Promise<void>;
+  /**
+   * Kill switch: forcibly wipe all vault repositories (via reset-all instruction)
+   * and re-seed from the current page set. Distinguished from start() only by
+   * the audit-log triggerSource — runtime behavior is the same forceWipe path.
+   */
+  wipeAndRebootstrap(opts: {
+    triggerSource: 'admin-force-wipe';
+  }): Promise<void>;
   getStatus(): Promise<BootstrapStatus>;
   /** Return the full ResilienceStatus (bootstrap + retry + drift + trigger info). */
   getResilienceStatus(): Promise<ResilienceStatus>;
@@ -158,6 +166,19 @@ export const createVaultBootstrapper = (
     }): Promise<void> {
       const triggerSource = mapTriggerSource(opts?.triggerSource);
       await resilienceLayer.bootstrap({ triggerSource });
+    },
+
+    /**
+     * Force wipe + re-bootstrap. Used by the admin UI "Wipe Vault" kill switch.
+     *
+     * Delegates to the resilience layer's bootstrap() with the dedicated
+     * 'admin-force-wipe' triggerSource so audit logs can distinguish the
+     * destructive kill switch from a normal admin-initiated prepare.
+     */
+    async wipeAndRebootstrap(opts: {
+      triggerSource: 'admin-force-wipe';
+    }): Promise<void> {
+      await resilienceLayer.bootstrap({ triggerSource: opts.triggerSource });
     },
 
     /**

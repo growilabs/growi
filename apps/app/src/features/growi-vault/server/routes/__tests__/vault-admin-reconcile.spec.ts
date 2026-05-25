@@ -66,6 +66,7 @@ vi.mock('~/server/middlewares/login-required', () => ({
 const mockBootstrapper = {
   getStatus: vi.fn(),
   start: vi.fn(),
+  wipeAndRebootstrap: vi.fn(),
   initOnStartup: vi.fn().mockResolvedValue(undefined),
   stop: vi.fn().mockResolvedValue(undefined),
   getResilienceStatus: vi.fn(),
