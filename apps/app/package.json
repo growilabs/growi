@@ -306,7 +306,6 @@
   },
   "devDependencies": {
     "@apidevtools/swagger-parser": "^10.1.1",
-    "@opentelemetry/instrumentation": "^0.217.0",
     "@growi/core-styles": "workspace:^",
     "@growi/custom-icons": "workspace:^",
     "@growi/editor": "workspace:^",
