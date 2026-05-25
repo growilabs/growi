@@ -1,20 +1,41 @@
 import { buildInstrumentations } from './node-sdk-configuration';
 
 // Hoist mock variables so they are available inside vi.mock() factory closures
-const { mockWarn } = vi.hoisted(() => ({ mockWarn: vi.fn() }));
+const {
+  mockWarn,
+  mockHttpInstrumentationConstructor,
+  mockExpressConstructor,
+  mockMongoDBConstructor,
+  mockMongooseConstructor,
+} = vi.hoisted(() => ({
+  mockWarn: vi.fn(),
+  mockHttpInstrumentationConstructor: vi.fn(),
+  mockExpressConstructor: vi.fn(),
+  mockMongoDBConstructor: vi.fn(),
+  mockMongooseConstructor: vi.fn(),
+}));
 
-// Mock getNodeAutoInstrumentations to capture the config passed to it
-vi.mock('@opentelemetry/auto-instrumentations-node', () => ({
-  getNodeAutoInstrumentations: vi.fn((config) => ({
-    __instrumentationConfig: config,
-  })),
+// Mock all 4 instrumentation packages individually
+vi.mock('@opentelemetry/instrumentation-http', () => ({
+  HttpInstrumentation: mockHttpInstrumentationConstructor,
+}));
+
+vi.mock('@opentelemetry/instrumentation-express', () => ({
+  ExpressInstrumentation: mockExpressConstructor,
+}));
+
+vi.mock('@opentelemetry/instrumentation-mongodb', () => ({
+  MongoDBInstrumentation: mockMongoDBConstructor,
+}));
+
+vi.mock('@opentelemetry/instrumentation-mongoose', () => ({
+  MongooseInstrumentation: mockMongooseConstructor,
 }));
 
 // Mock anonymization module
 vi.mock('./anonymization', () => ({
   httpInstrumentationConfig: {
-    requestHook: vi.fn(),
-    responseHook: vi.fn(),
+    startIncomingSpanHook: vi.fn(),
   },
 }));
 
@@ -62,22 +83,6 @@ vi.mock('./semconv', () => ({
   ATTR_SERVICE_INSTANCE_ID: 'service.instance.id',
 }));
 
-/**
- * Helper to extract the config object that was passed to getNodeAutoInstrumentations
- * from the result of buildInstrumentations
- */
-const getPassedConfig = (
-  instrumentations: ReturnType<typeof buildInstrumentations>,
-): Record<string, { enabled?: boolean; [key: string]: unknown }> => {
-  const mocked = instrumentations[0] as unknown as {
-    __instrumentationConfig: Record<
-      string,
-      { enabled?: boolean; [key: string]: unknown }
-    >;
-  };
-  return mocked.__instrumentationConfig;
-};
-
 describe('buildInstrumentations', () => {
   const originalEnv = process.env;
 
@@ -92,172 +97,152 @@ describe('buildInstrumentations', () => {
     process.env = originalEnv;
   });
 
-  describe('minimal profile (default - env var unset)', () => {
-    it('should disable non-allow-list instrumentations (e.g. dns)', () => {
-      delete process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE;
-      const instrumentations = buildInstrumentations();
-      const config = getPassedConfig(instrumentations);
+  describe('returns exactly 4 instrumentations (Req 1.3)', () => {
+    it('should return an array of length 4 with all 4 constructors called once', () => {
+      const result = buildInstrumentations();
 
-      expect(config['@opentelemetry/instrumentation-dns']).toEqual({
-        enabled: false,
-      });
-    });
-
-    it('should enable the 4 allow-list instrumentations', () => {
-      delete process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE;
-      const instrumentations = buildInstrumentations();
-      const config = getPassedConfig(instrumentations);
-
-      // Allow-list items should not be set to disabled
-      expect(config['@opentelemetry/instrumentation-http']?.enabled).not.toBe(
-        false,
-      );
-      expect(
-        config['@opentelemetry/instrumentation-express']?.enabled,
-      ).not.toBe(false);
-      expect(
-        config['@opentelemetry/instrumentation-mongodb']?.enabled,
-      ).not.toBe(false);
-      expect(
-        config['@opentelemetry/instrumentation-mongoose']?.enabled,
-      ).not.toBe(false);
-    });
-
-    it('should also disable other non-allow-list instrumentations', () => {
-      delete process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE;
-      const instrumentations = buildInstrumentations();
-      const config = getPassedConfig(instrumentations);
-
-      expect(config['@opentelemetry/instrumentation-amqplib']).toEqual({
-        enabled: false,
-      });
-      expect(config['@opentelemetry/instrumentation-redis']).toEqual({
-        enabled: false,
-      });
-      expect(config['@opentelemetry/instrumentation-grpc']).toEqual({
-        enabled: false,
-      });
+      expect(result).toHaveLength(4);
+      expect(mockHttpInstrumentationConstructor).toHaveBeenCalledTimes(1);
+      expect(mockExpressConstructor).toHaveBeenCalledTimes(1);
+      expect(mockMongoDBConstructor).toHaveBeenCalledTimes(1);
+      expect(mockMongooseConstructor).toHaveBeenCalledTimes(1);
     });
   });
 
-  describe('minimal profile (explicitly set)', () => {
-    it('should disable non-allow-list instrumentations when OTEL_AUTO_INSTRUMENTATION_PROFILE=minimal', () => {
-      process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'minimal';
-      const instrumentations = buildInstrumentations();
-      const config = getPassedConfig(instrumentations);
+  describe('OTEL_AUTO_INSTRUMENTATION_PROFILE behavior', () => {
+    describe('unset (Req 4.1)', () => {
+      it('should return 4 instrumentations without deprecation warning when env var is unset', () => {
+        delete process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE;
 
-      expect(config['@opentelemetry/instrumentation-dns']).toEqual({
-        enabled: false,
-      });
-    });
-  });
+        const result = buildInstrumentations();
 
-  describe('all profile', () => {
-    it('should disable ONLY pino and fs (legacy behavior)', () => {
-      process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'all';
-      const instrumentations = buildInstrumentations();
-      const config = getPassedConfig(instrumentations);
-
-      expect(config['@opentelemetry/instrumentation-pino']).toEqual({
-        enabled: false,
-      });
-      expect(config['@opentelemetry/instrumentation-fs']).toEqual({
-        enabled: false,
+        expect(result).toHaveLength(4);
+        expect(mockWarn).not.toHaveBeenCalled();
       });
     });
 
-    it('should NOT disable dns (or other instrumentations not pino/fs)', () => {
-      process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'all';
-      const instrumentations = buildInstrumentations();
-      const config = getPassedConfig(instrumentations);
+    describe('=minimal (Req 4.2)', () => {
+      it('should return 4 instrumentations without deprecation warning when profile=minimal', () => {
+        process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'minimal';
 
-      // dns should not be disabled in "all" mode
-      expect(config['@opentelemetry/instrumentation-dns']?.enabled).not.toBe(
-        false,
-      );
-    });
+        const result = buildInstrumentations();
 
-    it('should enable http in all profile', () => {
-      process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'all';
-      const instrumentations = buildInstrumentations();
-      const config = getPassedConfig(instrumentations);
-
-      expect(config['@opentelemetry/instrumentation-http']?.enabled).toBe(true);
-    });
-  });
-
-  describe('unknown profile value', () => {
-    it('should treat unknown profile as minimal (disable non-allow-list)', () => {
-      process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'custom';
-      const instrumentations = buildInstrumentations();
-      const config = getPassedConfig(instrumentations);
-
-      // Should behave like minimal
-      expect(config['@opentelemetry/instrumentation-dns']).toEqual({
-        enabled: false,
+        expect(result).toHaveLength(4);
+        expect(mockWarn).not.toHaveBeenCalled();
       });
     });
 
-    it('should issue a warn for unknown profile values', () => {
-      process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'custom';
+    describe('=all (Req 4.3)', () => {
+      it('should emit deprecation warning exactly once and still return 4 instrumentations', () => {
+        process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'all';
 
-      buildInstrumentations();
+        const result = buildInstrumentations();
 
-      // Logger warn should have been called with the unknown profile value
-      expect(mockWarn).toHaveBeenCalledWith(
-        { profile: 'custom' },
-        expect.stringContaining('Unknown OTEL_AUTO_INSTRUMENTATION_PROFILE'),
-      );
+        expect(result).toHaveLength(4);
+        expect(mockWarn).toHaveBeenCalledTimes(1);
+        expect(mockWarn).toHaveBeenCalledWith(
+          expect.stringContaining(
+            'OTEL_AUTO_INSTRUMENTATION_PROFILE=all is deprecated',
+          ),
+        );
+      });
+    });
+
+    describe('unknown value (Req 4.4)', () => {
+      it('should emit warning with "Unknown OTEL_AUTO_INSTRUMENTATION_PROFILE value" and return 4 instrumentations', () => {
+        process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'custom';
+
+        const result = buildInstrumentations();
+
+        expect(result).toHaveLength(4);
+        expect(mockWarn).toHaveBeenCalledTimes(1);
+        expect(mockWarn).toHaveBeenCalledWith(
+          { profile: 'custom' },
+          expect.stringContaining(
+            'Unknown OTEL_AUTO_INSTRUMENTATION_PROFILE value',
+          ),
+        );
+      });
+    });
+
+    describe('never throws (Req 4.5)', () => {
+      it('should not throw for any profile value', () => {
+        const testValues = [
+          undefined,
+          'minimal',
+          'all',
+          'custom',
+          '',
+          'MINIMAL',
+          'ALL',
+        ];
+
+        for (const value of testValues) {
+          if (value === undefined) {
+            delete process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE;
+          } else {
+            process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = value;
+          }
+
+          expect(() => buildInstrumentations()).not.toThrow();
+          vi.clearAllMocks();
+        }
+      });
     });
   });
 
   describe('HTTP anonymization config merging', () => {
-    it('should merge anonymization config into http instrumentation when enableAnonymization=true', async () => {
+    it('should pass anonymization config to HttpInstrumentation when enableAnonymization=true (Req 3.1, Req 3.3)', async () => {
       delete process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE;
       const { httpInstrumentationConfig: anonymizeConfig } = await import(
         './anonymization'
       );
 
-      const instrumentations = buildInstrumentations({
-        enableAnonymization: true,
-      });
-      const config = getPassedConfig(instrumentations);
+      buildInstrumentations({ enableAnonymization: true });
 
-      // The anonymization config should be merged into http instrumentation
-      const httpConfig = config['@opentelemetry/instrumentation-http'];
-      expect(httpConfig).toBeDefined();
-      // Should contain anonymization hooks
-      expect(httpConfig).toMatchObject(
+      // The first argument passed to HttpInstrumentation constructor should contain anonymization config fields
+      const httpConstructorArg =
+        mockHttpInstrumentationConstructor.mock.calls[0][0];
+      expect(httpConstructorArg).toBeDefined();
+      expect(httpConstructorArg).toMatchObject(
         anonymizeConfig as Record<string, unknown>,
       );
     });
 
-    it('should NOT merge anonymization config when enableAnonymization=false', () => {
+    it('should NOT pass anonymization config to HttpInstrumentation when enableAnonymization=false (Req 3.2)', () => {
       delete process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE;
-      const instrumentations = buildInstrumentations({
-        enableAnonymization: false,
-      });
-      const config = getPassedConfig(instrumentations);
 
-      const httpConfig = config['@opentelemetry/instrumentation-http'];
-      // requestHook and responseHook should not be present if not anonymizing
-      expect(httpConfig?.requestHook).toBeUndefined();
-      expect(httpConfig?.responseHook).toBeUndefined();
+      buildInstrumentations({ enableAnonymization: false });
+
+      // The first argument passed to HttpInstrumentation constructor should be undefined (no anonymization config)
+      const httpConstructorArg =
+        mockHttpInstrumentationConstructor.mock.calls[0][0];
+      expect(httpConstructorArg).toBeUndefined();
     });
 
-    it('should merge anonymization config in all profile too', async () => {
+    it('should NOT pass anonymization config to HttpInstrumentation when enableAnonymization is unset (Req 3.2)', () => {
+      delete process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE;
+
+      buildInstrumentations();
+
+      // The first argument passed to HttpInstrumentation constructor should be undefined (no anonymization config)
+      const httpConstructorArg =
+        mockHttpInstrumentationConstructor.mock.calls[0][0];
+      expect(httpConstructorArg).toBeUndefined();
+    });
+
+    it('should pass anonymization config even when profile=all (Req 3.1)', async () => {
       process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE = 'all';
       const { httpInstrumentationConfig: anonymizeConfig } = await import(
         './anonymization'
       );
 
-      const instrumentations = buildInstrumentations({
-        enableAnonymization: true,
-      });
-      const config = getPassedConfig(instrumentations);
+      buildInstrumentations({ enableAnonymization: true });
 
-      const httpConfig = config['@opentelemetry/instrumentation-http'];
-      expect(httpConfig).toMatchObject(
+      const httpConstructorArg =
+        mockHttpInstrumentationConstructor.mock.calls[0][0];
+      expect(httpConstructorArg).toBeDefined();
+      expect(httpConstructorArg).toMatchObject(
         anonymizeConfig as Record<string, unknown>,
       );
     });

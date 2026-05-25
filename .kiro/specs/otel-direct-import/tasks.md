@@ -23,7 +23,7 @@
   - _Requirements: 1.1, 1.2, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5_
 
 - [ ] 3. Core: unit test の direct import 構造への書き換え
-- [ ] 3.1 node-sdk-configuration.spec.ts を 4 mock 構造に置き換え
+- [x] 3.1 node-sdk-configuration.spec.ts を 4 mock 構造に置き換え
   - `vi.mock('@opentelemetry/auto-instrumentations-node', ...)` を削除
   - 4 instrumentation package を個別に `vi.mock` し、各 constructor の mock を保持して `mock.calls` を検査できるようにする
   - `OTEL_AUTO_INSTRUMENTATION_PROFILE` が unset / `=minimal` / `=all` / unknown 値（例: `custom`）の 4 ケースそれぞれで、戻り値が長さ 4 の配列であり、4 constructor がちょうど 1 回ずつ呼ばれることを assert
