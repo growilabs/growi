@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. Foundation: package dependency 入れ替え
-- [ ] 1.1 apps/app/package.json と pnpm-lock.yaml を direct import 構成に更新
+- [x] 1.1 apps/app/package.json と pnpm-lock.yaml を direct import 構成に更新
   - `apps/app/package.json` の `dependencies` から `@opentelemetry/auto-instrumentations-node` を削除
   - `@opentelemetry/instrumentation-http` (`^0.217.0`)、`@opentelemetry/instrumentation-express` (`^0.65.0`)、`@opentelemetry/instrumentation-mongodb` (`^0.70.0`)、`@opentelemetry/instrumentation-mongoose` (`^0.63.0`) を `dependencies` に追加
   - リポジトリルートから `pnpm install` を実行し `pnpm-lock.yaml` を再生成
