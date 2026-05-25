@@ -23,20 +23,24 @@ export const migrateContributions = async (userId: string) => {
   const endDate = new Date();
 
   // Aggregate all Activity documents that counts as contributions
-  const contributions =
+  const activities =
     await contributionAggregationService.runAggregationPipeline({
       userId,
       startDate,
       endDate,
     });
 
-  await Contribution.bulkWrite(
-    contributions.map((c) => ({
-      updateOne: {
-        filter: { user: userId, date: c.date },
-        update: { $inc: { count: c.count } },
-        upsert: true,
-      },
-    })),
-  );
+  // Using $set instead of $inc to make sure the count stays consistent in case
+  // the migration script runs more than one time.
+  if (activities.length > 0) {
+    await Contribution.bulkWrite(
+      activities.map((c) => ({
+        updateOne: {
+          filter: { user: userId, date: c.date },
+          update: { $set: { count: c.count } },
+          upsert: true,
+        },
+      })),
+    );
+  }
 };
