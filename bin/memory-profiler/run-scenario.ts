@@ -10,7 +10,7 @@
  *   2 — CDP connection failure
  *
  * Usage:
- *   tsx tools/memory-profiling/run-scenario.ts \
+ *   tsx bin/memory-profiler/run-scenario.ts \
  *     --baseUrl http://localhost:3000 \
  *     --inspector http://127.0.0.1:9229 \
  *     [--outputDir tmp/memory-leak-investigation/] \

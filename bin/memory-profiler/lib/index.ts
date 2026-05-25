@@ -1,5 +1,5 @@
 /**
- * Public sub-barrel for the memory-profiling lib module.
+ * Public sub-barrel for the memory-profiler lib module.
  *
  * Exposes only the factory functions consumed by the LoadDriver. Internal
  * interfaces (HttpClient, InstallerDriver, YjsSession, etc.) are intentionally

@@ -2,7 +2,7 @@
 
 ## Introduction
 
-本 spec は、GROWI のメモリ調査用 profiling ツール群（`bin/memory-profiling/`、`@growi/bin` workspace package）を「公式仕様」としてベースライン化することを目的とする。既に実装され 58 unit tests が green で稼働している現状のツールを、requirements / design / tasks の 3 文書として明文化することで、(1) 今後のツール変更時の change review 基準を確立し、(2) downstream の memory 調査 spec（`memory-leak-investigation` 等）が本ツールに対して安定した consumer-side dependency を持てるようにする。
+本 spec は、GROWI のメモリ調査用 profiling ツール群（`bin/memory-profiler/`、`@growi/bin` workspace package）を「公式仕様」としてベースライン化することを目的とする。既に実装され 58 unit tests が green で稼働している現状のツールを、requirements / design / tasks の 3 文書として明文化することで、(1) 今後のツール変更時の change review 基準を確立し、(2) downstream の memory 調査 spec（`memory-leak-investigation` 等）が本ツールに対して安定した consumer-side dependency を持てるようにする。
 
 本 spec は **baseline-only ドキュメント spec** であり、コード変更は最小限。新規実装タスクは原則ゼロ、validation タスク（lint / test / interface 安定性チェック）のみを設定する。
 
@@ -11,7 +11,7 @@
 ## Boundary Context
 
 - **In scope**:
-  - `bin/memory-profiling/` 配下のすべてのモジュール（CDP snapshot client / load driver / lib / scenarios / rss-time-series logger / run-scenario）の振る舞い仕様化
+  - `bin/memory-profiler/` 配下のすべてのモジュール（CDP snapshot client / load driver / lib / scenarios / rss-time-series logger / run-scenario）の振る舞い仕様化
   - `@growi/bin` workspace package（`bin/package.json` + `pnpm-workspace.yaml` 登録）の境界定義
   - CLI interface（`run-scenario.ts` の引数・env var・exit code）の stable contract
   - LoadDriver の interface（op 関数のシグネチャ）の stable contract
@@ -99,7 +99,7 @@
 2. The memory profiling toolchain shall `BASELINE_IDLE_SECONDS` / `DRAIN_IDLE_SECONDS` / `LOAD_PAGE_CREATE` / `LOAD_PAGE_EDIT` / `LOAD_PAGE_GET` / `LOAD_PAGE_LIST` / `LOAD_PAGE_SEARCH` / `LOAD_YJS_CLEAN_CLOSE` / `LOAD_YJS_ABORT` の 9 種類の env var で挙動を制御可能とする。
 3. The memory profiling toolchain shall exit code を以下のとおり定義し維持する: `0` = 成功、`1` = snapshot 取得失敗、`2` = inspector 接続失敗。
 4. Where 本 spec の change review プロセス上で CLI 引数 / env var 名 / exit code 体系の変更が提案された場合, the memory profiling toolchain shall その変更を **breaking change** として扱い、本 spec の更新と downstream spec への影響評価を伴うことを README / design に明記する。
-5. The memory profiling toolchain shall 起動コマンドの代表例（GROWI server を `--inspect` 付きで起動 → scenario runner を起動 → 出力ファイルの所在）を `bin/memory-profiling/README.md` に記載する。
+5. The memory profiling toolchain shall 起動コマンドの代表例（GROWI server を `--inspect` 付きで起動 → scenario runner を起動 → 出力ファイルの所在）を `bin/memory-profiler/README.md` に記載する。
 
 ### Requirement 7: `@growi/bin` workspace package としての境界
 

@@ -2,9 +2,9 @@
 
 ## Overview
 
-本 spec は、GROWI のメモリ調査用 profiling ツール群（`bin/memory-profiling/`、`@growi/bin` workspace package）を **公式仕様としてベースライン化** する。既に実装され 58 unit tests が green の状態にある現状ツールを、requirements / design / tasks の 3 文書として明文化し、(1) 今後のツール変更時の change review 基準を確立し、(2) downstream の memory 調査 spec（`memory-leak-investigation` 等）が本ツールに対して安定した consumer-side dependency を持てるようにする。
+本 spec は、GROWI のメモリ調査用 profiling ツール群（`bin/memory-profiler/`、`@growi/bin` workspace package）を **公式仕様としてベースライン化** する。既に実装され 58 unit tests が green の状態にある現状ツールを、requirements / design / tasks の 3 文書として明文化し、(1) 今後のツール変更時の change review 基準を確立し、(2) downstream の memory 調査 spec（`memory-leak-investigation` 等）が本ツールに対して安定した consumer-side dependency を持てるようにする。
 
-**Purpose**: `bin/memory-profiling/` の現状アーキテクチャ・interface・operational procedure を spec として固定し、ツール本体の変更レビュー基準と downstream 提供 contract を確立する。
+**Purpose**: `bin/memory-profiler/` の現状アーキテクチャ・interface・operational procedure を spec として固定し、ツール本体の変更レビュー基準と downstream 提供 contract を確立する。
 
 **Users**: 現在および将来のメモリ調査担当者と、本ツールを利用する隣接 spec（`memory-leak-investigation` 等）のメンテナ。
 
@@ -21,20 +21,20 @@
 - 具体の memory 調査結果や finding（`memory-leak-investigation` 等の downstream spec の責務）。
 - 本 spec を起点とする新機能実装（OTLP 連携 / dist server / DSL 等）。
 - 汎用 npm package 化 / 外部公開。
-- `bin/memory-profiling/` 配下の architecture や interface の大幅な再設計（baseline-only spec）。
+- `bin/memory-profiler/` 配下の architecture や interface の大幅な再設計（baseline-only spec）。
 
 ## Boundary Commitments
 
 ### This Spec Owns
-- `bin/memory-profiling/` 配下の全モジュールの振る舞い仕様（要件 1–4 で定義）。
+- `bin/memory-profiler/` 配下の全モジュールの振る舞い仕様（要件 1–4 で定義）。
 - `bin/package.json` および `pnpm-workspace.yaml` の `bin` エントリ（`@growi/bin` workspace package 定義）と、`exports` field による公開境界。
 - **Stable contract（CLI surface）**: `run-scenario.ts` の引数 `--baseUrl` / `--inspector` / `--outputDir`、9 種類の env var、exit code `0` / `1` / `2`、出力ファイル命名規約。
-- **Stable contract（TypeScript public API）**: `bin/memory-profiling/index.ts`（top-level barrel）から re-export される `runScenario`、`ScenarioRunnerOptions`、`LoadOpCounts`、`ScenarioRunnerError`、`LoadDriver` 型。CLI surface と一貫した形で programmatic consumer にも安定供給する。
-- **Module Public Surface**（GROWI 共通規約に整合）: `bin/memory-profiling/` および各 sub-directory（`scenarios/`、`lib/`）に `index.ts` を 1 つ置き、sibling / parent からの import は barrel 経由とする（[.claude/rules/coding-style.md](../../.claude/rules/coding-style.md) の Module Public Surface 規約に準拠）。
+- **Stable contract（TypeScript public API）**: `bin/memory-profiler/index.ts`（top-level barrel）から re-export される `runScenario`、`ScenarioRunnerOptions`、`LoadOpCounts`、`ScenarioRunnerError`、`LoadDriver` 型。CLI surface と一貫した形で programmatic consumer にも安定供給する。
+- **Module Public Surface**（GROWI 共通規約に整合）: `bin/memory-profiler/` および各 sub-directory（`scenarios/`、`lib/`）に `index.ts` を 1 つ置き、sibling / parent からの import は barrel 経由とする（[.claude/rules/coding-style.md](../../.claude/rules/coding-style.md) の Module Public Surface 規約に準拠）。
 - **LoadDriver interface の stable contract**: 7 op 関数（`pageCreate` / `pageEdit` / `pageGet` / `pageList` / `pageSearch` / `yjsSessionCleanClose` / `yjsSessionAbort`）+ `initInstaller` のシグネチャ。top-level barrel から型として export。
 - **Scenario module の op count 規約**: 各 op 回数の env var 名と default 値。
 - **出力ディレクトリ構造規約**: `--outputDir` 引数で指定された run ディレクトリ配下に snapshot A/B/C + `rss-timeseries.csv` を配置する命名規約。default は user-controlled（ツール側で具体パスを hard-code しない）。
-- `bin/memory-profiling/README.md` の operational procedure 記述。
+- `bin/memory-profiler/README.md` の operational procedure 記述。
 - Test 戦略（unit test の scope、fake-LoadDriver パターン、co-located test、**stable contract surface test**）。
 
 ### Out of Boundary
@@ -53,7 +53,7 @@
 - **外部システム（profiling target）**: GROWI server の `--inspect` で公開される CDP endpoint（標準 Node.js inspector protocol）、HTTP API、y-websocket endpoint。
 - **devcontainer 前提**: `mongo:27017`（replica set `rs0`）/ `elasticsearch:9200` への到達性（参照: `.claude/rules/devcontainer.md`）。
 - **隣接 spec**: `opentelemetry` / `collaborative-editor` は adjacency としてのみ存在（profiling target としての挙動に影響）。本 spec から **import / depend on** することはない。
-- **依存方向**: `apps/app` → `bin/`（および `@growi/bin` → `@growi/app`）の依存方向はゼロ。`bin/memory-profiling/` 内では `run-scenario` → `cdp-snapshot-client` / `load-driver` / `rss-time-series-logger` / `scenarios/*`、`load-driver` → `lib/*` の単方向。
+- **依存方向**: `apps/app` → `bin/`（および `@growi/bin` → `@growi/app`）の依存方向はゼロ。`bin/memory-profiler/` 内では `run-scenario` → `cdp-snapshot-client` / `load-driver` / `rss-time-series-logger` / `scenarios/*`、`load-driver` → `lib/*` の単方向。
 
 ### Revalidation Triggers
 以下の変更が発生した場合、downstream consumer（`memory-leak-investigation` 等）への影響評価を伴う change review を要求する。
@@ -63,7 +63,7 @@
 - **LoadDriver interface の変更**: 7 op 関数のシグネチャ・命名・戻り値型の変更。
 - **`bin/package.json` の `exports` field の変更**: 公開する subpath や entry point の追加・削除。
 - **出力ファイル命名規約 / ディレクトリ構造の変更**: snapshot A/B/C のファイル命名、CSV schema (`timestamp,phase,rss,heap_used,heap_total,external`) の変更。
-- **依存方向の変更**: `bin/memory-profiling/` から `apps/app` への workspace 依存追加、または `@growi/bin` の workspace 登録解除。
+- **依存方向の変更**: `bin/memory-profiler/` から `apps/app` への workspace 依存追加、または `@growi/bin` の workspace 登録解除。
 - **runtime 前提の変更**: Node.js major version upgrade（v25+）、`ws` の major version upgrade、`y-websocket` の major version upgrade（minimal yjs client への影響）、`undici` API の major version 変更。
 - **CDP プロトコル前提の変更**: `HeapProfiler.takeHeapSnapshot` の signature 変化等（Node.js 側 protocol upgrade）。
 - **scenario op の追加・削除**: 7 op を超える新規 op の追加、または既存 op の廃止。
@@ -72,7 +72,7 @@
 
 ### Existing Architecture Analysis
 
-本 spec は既存実装のベースライン化のため、ここでは「現状アーキテクチャの明文化」を主目的とする。新規 architecture 探索は行わない。実装ソースは [bin/memory-profiling/](../../bin/memory-profiling/) に揃っており、本 design はそれを構造化して記述する。
+本 spec は既存実装のベースライン化のため、ここでは「現状アーキテクチャの明文化」を主目的とする。新規 architecture 探索は行わない。実装ソースは [bin/memory-profiler/](../../bin/memory-profiler/) に揃っており、本 design はそれを構造化して記述する。
 
 ### Architecture Pattern & Boundary Map
 
@@ -86,7 +86,7 @@ graph TB
             HttpApi[HTTP API]
             YjsWs[y-websocket Endpoint]
         end
-        subgraph BinMemoryProfiling[bin/memory-profiling - growi-bin workspace]
+        subgraph BinMemoryProfiler[bin/memory-profiler - growi-bin workspace]
             RunScenario[run-scenario CLI entry]
             CdpClient[cdp-snapshot-client]
             LoadDriver[load-driver]
@@ -122,7 +122,7 @@ graph TB
 
 **Architecture Integration**:
 - **Selected pattern**: External profiling sidecar (CDP-only) + workspace-isolated package（[research.md / Decision: ベースライン化方針](./research.md#design-decisions) 参照）。
-- **Domain/feature boundaries**: profiling tooling は `bin/memory-profiling/`（`@growi/bin` workspace）に完全隔離。`apps/app` への直接依存（import / workspace dep）はゼロ。GROWI server に対しては CDP（観測）と HTTP / WS（負荷）の 2 経路のみで到達する。
+- **Domain/feature boundaries**: profiling tooling は `bin/memory-profiler/`（`@growi/bin` workspace）に完全隔離。`apps/app` への直接依存（import / workspace dep）はゼロ。GROWI server に対しては CDP（観測）と HTTP / WS（負荷）の 2 経路のみで到達する。
 - **Dependency direction**:
   - **Module 間**: `run-scenario` → `{cdp-snapshot-client, load-driver, rss-time-series-logger, scenarios/*}`、`load-driver` → `lib/*`。逆方向の import はなし。
   - **Scenario → LoadDriver**: 型のみ（`import type`）で結合。実装には依存しない（fake-LoadDriver による test を可能にする）。
@@ -156,7 +156,7 @@ graph TB
 ```
 bin/                                        # @growi/bin workspace package
 ├── package.json                            # [MODIFY] exports field 追加（後述）
-├── memory-profiling/                       # Memory profiling toolchain (本 spec の対象)
+├── memory-profiler/                       # Memory profiling toolchain (本 spec の対象)
 │   ├── index.ts                            # [NEW] Top-level barrel: stable TypeScript public API
 │   ├── README.md                           # [MODIFY] stable contract 明記 / change-review プロセス追記
 │   ├── run-scenario.ts                     # CLI entry: parse args/env, orchestrate phases, exit codes
@@ -185,7 +185,7 @@ bin/                                        # @growi/bin workspace package
 
 #### Barrel Exposure Rules
 
-**`bin/memory-profiling/index.ts`（top-level barrel — 外部公開面）**
+**`bin/memory-profiler/index.ts`（top-level barrel — 外部公開面）**
 re-export するのは **stable contract** に該当するもののみ:
 
 | Symbol | Kind | Source |
@@ -198,12 +198,12 @@ re-export するのは **stable contract** に該当するもののみ:
 
 **含めない**: `createCdpSnapshotClient` / `createLoadDriver` / `createRssTimeSeriesLogger` / `CdpSnapshotClient` interface / `RssTimeSeriesLogger` interface / scenario の `run*` 関数 / scenario の `LOAD_*` 定数 / lib/* の全 symbol。これらは内部実装詳細。
 
-**`bin/memory-profiling/scenarios/index.ts`（sub-barrel — パッケージ内部公開面）**
+**`bin/memory-profiler/scenarios/index.ts`（sub-barrel — パッケージ内部公開面）**
 `run-scenario.ts` が import するためのもの。外部（barrel 経由 import するもの以外）には露出しない:
 - `runBaseline`、`runLoad`、`runDrain` 関数
 - `LOAD_PAGE_CREATE` 等の op count 定数
 
-**`bin/memory-profiling/lib/index.ts`（sub-barrel — パッケージ内部公開面）**
+**`bin/memory-profiler/lib/index.ts`（sub-barrel — パッケージ内部公開面）**
 `load-driver.ts` が import するためのもの:
 - `createHttpClient`、`createInstallerDriver`、`createYjsSession` factory
 
@@ -216,24 +216,24 @@ GROWI 他 private package（例: [`@growi/presentation`](../../packages/presenta
   "name": "@growi/bin",
   "private": true,
   "exports": {
-    "./memory-profiling": "./memory-profiling/index.ts"
+    "./memory-profiler": "./memory-profiler/index.ts"
   },
   // ...
 }
 ```
 
-これにより `import { runScenario } from '@growi/bin/memory-profiling'` のみが公式パスとなり、`'@growi/bin/memory-profiling/load-driver'` のような深い path での import は package boundary レベルで block される。
+これにより `import { runScenario } from '@growi/bin/memory-profiler'` のみが公式パスとなり、`'@growi/bin/memory-profiler/load-driver'` のような深い path での import は package boundary レベルで block される。
 
 ### Modified Files
 - `bin/package.json` — `exports` field 追加（top-level barrel のみ公開）。dependency は変更しない。
-- `bin/memory-profiling/run-scenario.ts` 等の既存ファイル — barrel 経由 import への書き換え（sibling 間も `./scenarios` / `./lib` のような barrel path に変更）。
-- `bin/memory-profiling/README.md` — stable contract（CLI 引数 / env var 名 / exit code / barrel 公開 symbol）の明記と、change-review プロセスを追記。
+- `bin/memory-profiler/run-scenario.ts` 等の既存ファイル — barrel 経由 import への書き換え（sibling 間も `./scenarios` / `./lib` のような barrel path に変更）。
+- `bin/memory-profiler/README.md` — stable contract（CLI 引数 / env var 名 / exit code / barrel 公開 symbol）の明記と、change-review プロセスを追記。
 
 ### New Files
-- `bin/memory-profiling/index.ts` — top-level barrel。
-- `bin/memory-profiling/scenarios/index.ts` — scenarios sub-barrel。
-- `bin/memory-profiling/lib/index.ts` — lib sub-barrel。
-- `bin/memory-profiling/stable-contract.spec.ts` — stable contract surface test（env var 名・exit code・出力ファイル命名・CSV header の文字列リテラル assertion）。
+- `bin/memory-profiler/index.ts` — top-level barrel。
+- `bin/memory-profiler/scenarios/index.ts` — scenarios sub-barrel。
+- `bin/memory-profiler/lib/index.ts` — lib sub-barrel。
+- `bin/memory-profiler/stable-contract.spec.ts` — stable contract surface test（env var 名・exit code・出力ファイル命名・CSV header の文字列リテラル assertion）。
 
 ## System Flows
 
@@ -250,7 +250,7 @@ sequenceDiagram
     participant Fs as apps/app/tmp/memory-leak-investigation/runs/name
     Op->>Server: pnpm run ts-node --inspect=0.0.0.0:9229 src/server/app.ts
     Server->>Server: open inspector endpoint :9229
-    Op->>Runner: pnpm run ts-node bin/memory-profiling/run-scenario.ts --baseUrl ... --inspector ... --outputDir ...
+    Op->>Runner: pnpm run ts-node bin/memory-profiler/run-scenario.ts --baseUrl ... --inspector ... --outputDir ...
     Runner->>CdpClient: connect(inspectorUrl)
     alt Connection succeeds within MAX_RETRIES
         CdpClient-->>Runner: ok
@@ -317,7 +317,7 @@ sequenceDiagram
 | 6.2 | env var 定義 | scenarios/load, ScenarioRunner | 9 種類の env var | — |
 | 6.3 | exit code 定義 | ScenarioRunner | `0` / `1` / `2` | — |
 | 6.4 | breaking change の change review | (process) | README + design.md 明記 | — |
-| 6.5 | README に起動手順 | (documentation) | `bin/memory-profiling/README.md` | — |
+| 6.5 | README に起動手順 | (documentation) | `bin/memory-profiler/README.md` | — |
 | 7.1 | workspace package 登録 | (package manifest) | `bin/package.json`、`pnpm-workspace.yaml` | — |
 | 7.2 | apps/app 依存ゼロ | (package manifest) | `bin/package.json` の dependency 限定 | — |
 | 7.3 | production 成果物に含めない | (build config) | apps/app 側の build がこの dir を参照しない | — |
@@ -649,7 +649,7 @@ export function runDrain(idleSeconds: number): Promise<void>;
   "private": true,
   "scripts": { "test": "vitest run" },
   "exports": {
-    "./memory-profiling": "./memory-profiling/index.ts"
+    "./memory-profiler": "./memory-profiler/index.ts"
   },
   "dependencies": { "ws": "^8.17.1" },
   "devDependencies": { "vitest": "^3.2.4" }
@@ -665,11 +665,11 @@ packages:
 ```
 
 **Implementation Notes**
-- Integration: 既存設定に `exports` field を追加する（本 spec で唯一の package.json 変更）。`@growi/bin` の package 名経由 import は `'@growi/bin/memory-profiling'` のみを許可し、深い path (`'@growi/bin/memory-profiling/load-driver'` 等) は package boundary レベルで block される。
+- Integration: 既存設定に `exports` field を追加する（本 spec で唯一の package.json 変更）。`@growi/bin` の package 名経由 import は `'@growi/bin/memory-profiler'` のみを許可し、深い path (`'@growi/bin/memory-profiler/load-driver'` 等) は package boundary レベルで block される。
 - Validation: 既存の `pnpm install` を再実行し、`pnpm --filter @growi/bin test` が green であることを確認。
 - Risks:
   - `apps/app` への workspace 依存が誤って追加される → change review で `bin/package.json` の diff を必須レビュー。
-  - 既存の relative path import（`bin/memory-profiling/` 内の sibling 間）は `exports` field の影響を受けないため、内部 import は barrel 経由に整理することで「内部からの見え方」も整える。
+  - 既存の relative path import（`bin/memory-profiler/` 内の sibling 間）は `exports` field の影響を受けないため、内部 import は barrel 経由に整理することで「内部からの見え方」も整える。
 
 ## Error Handling
 
@@ -693,16 +693,16 @@ packages:
 ### Unit Tests（既存）
 本 spec はベースライン化のため、既存の behavior test を維持する:
 
-1. **CdpSnapshotClient**（既存 [cdp-snapshot-client.spec.ts](../../bin/memory-profiling/cdp-snapshot-client.spec.ts)）: fake WS server で `connect()` / `takeSnapshot()` / `close()` の挙動を検証。retry / backoff の境界も含む。
-2. **LoadDriver**（既存 [load-driver.spec.ts](../../bin/memory-profiling/load-driver.spec.ts)）: fake http-client / yjs-client を注入し 7 op の挙動を検証。`SEARCH_QUERY` の固定性、`yjsSessionAbort` の destroy 呼出を assertion。
-3. **RssTimeSeriesLogger**（既存 [rss-time-series-logger.spec.ts](../../bin/memory-profiling/rss-time-series-logger.spec.ts)）: fake CdpClient と fake `node:fs` で CSV 出力 schema を検証。
-4. **ScenarioRunner**（既存 [run-scenario.spec.ts](../../bin/memory-profiling/run-scenario.spec.ts)）: fake CdpClient / LoadDriver / RssLogger を注入し、phase 順序・snapshot 出力呼出順・exit code を検証。
-5. **Scenarios**（既存 [scenarios.spec.ts](../../bin/memory-profiling/scenarios/scenarios.spec.ts)）: fake LoadDriver を渡して各 op が想定回数呼ばれることを assertion。
+1. **CdpSnapshotClient**（既存 [cdp-snapshot-client.spec.ts](../../bin/memory-profiler/cdp-snapshot-client.spec.ts)）: fake WS server で `connect()` / `takeSnapshot()` / `close()` の挙動を検証。retry / backoff の境界も含む。
+2. **LoadDriver**（既存 [load-driver.spec.ts](../../bin/memory-profiler/load-driver.spec.ts)）: fake http-client / yjs-client を注入し 7 op の挙動を検証。`SEARCH_QUERY` の固定性、`yjsSessionAbort` の destroy 呼出を assertion。
+3. **RssTimeSeriesLogger**（既存 [rss-time-series-logger.spec.ts](../../bin/memory-profiler/rss-time-series-logger.spec.ts)）: fake CdpClient と fake `node:fs` で CSV 出力 schema を検証。
+4. **ScenarioRunner**（既存 [run-scenario.spec.ts](../../bin/memory-profiler/run-scenario.spec.ts)）: fake CdpClient / LoadDriver / RssLogger を注入し、phase 順序・snapshot 出力呼出順・exit code を検証。
+5. **Scenarios**（既存 [scenarios.spec.ts](../../bin/memory-profiler/scenarios/scenarios.spec.ts)）: fake LoadDriver を渡して各 op が想定回数呼ばれることを assertion。
 
 ### Stable Contract Surface Tests（新規）
 **目的**: 「変えてはいけない」と宣言した stable contract（CLI 引数名・env var 名・exit code・出力ファイル命名・CSV header・barrel から export される symbol）の名前変更や削除を、リネーム時の偶発で見落とさないようにする mechanical な safety net。
 
-新規ファイル `bin/memory-profiling/stable-contract.spec.ts` に以下を含む:
+新規ファイル `bin/memory-profiler/stable-contract.spec.ts` に以下を含む:
 
 1. **Env var 名の存在検証**: `LOAD_PAGE_CREATE`、`LOAD_PAGE_EDIT`、`LOAD_PAGE_GET`、`LOAD_PAGE_LIST`、`LOAD_PAGE_SEARCH`、`LOAD_YJS_CLEAN_CLOSE`、`LOAD_YJS_ABORT`、`BASELINE_IDLE_SECONDS`、`DRAIN_IDLE_SECONDS` の 9 個が `scenarios/load.ts` または `run-scenario.ts` の source 文字列内に存在することを `fs.readFileSync` + 文字列マッチで検証。
 2. **Exit code 値の検証**: `ScenarioRunnerError` を `exitCode: 1` / `exitCode: 2` で構築でき、型上 `1 | 2` であることを TypeScript の型 assertion + runtime 比較で検証。
@@ -717,7 +717,7 @@ packages:
 - Downstream consumer の investigation セッションが integration test を兼ねる（`memory-leak-investigation` Phase 5 / 6）。
 
 ### E2E / Smoke
-- **CLI smoke**: `pnpm run ts-node bin/memory-profiling/run-scenario.ts --baseUrl http://localhost:3000 --inspector http://127.0.0.1:9229 --outputDir /tmp/smoke-test` を起動し、exit code 0、4 ファイル（snapshot A/B/C + CSV）の生成を目視確認。手動実行のみ（CI 自動化は本 spec の範囲外）。
+- **CLI smoke**: `pnpm run ts-node bin/memory-profiler/run-scenario.ts --baseUrl http://localhost:3000 --inspector http://127.0.0.1:9229 --outputDir /tmp/smoke-test` を起動し、exit code 0、4 ファイル（snapshot A/B/C + CSV）の生成を目視確認。手動実行のみ（CI 自動化は本 spec の範囲外）。
 
 ### Performance Tests
 - 本 spec では行わない（profiling tool 自体の性能は GROWI server の挙動次第で、optimization 対象は別 spec の調査結果次第）。
@@ -749,7 +749,7 @@ packages:
 
 - [research.md](./research.md) — 本 spec の discovery findings、design decisions、architecture pattern 評価
 - [brief.md](./brief.md) — Discovery 段階の問題設定とアプローチ
-- [bin/memory-profiling/README.md](../../bin/memory-profiling/README.md) — Operational procedure（起動手順、出力レイアウト）
+- [bin/memory-profiler/README.md](../../bin/memory-profiler/README.md) — Operational procedure（起動手順、出力レイアウト）
 - [.claude/rules/coding-style.md](../../.claude/rules/coding-style.md) — Module Public Surface、Pure Function Extraction、Single Responsibility 規約
 - [.claude/rules/devcontainer.md](../../.claude/rules/devcontainer.md) — devcontainer service 前提
 - [memory-leak-investigation spec](../memory-leak-investigation/) — 本 spec の主要 downstream consumer（歴史的に本ツールが生まれた経緯を持つ調査 spec）
