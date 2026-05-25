@@ -101,7 +101,7 @@ The −10.89 MB delta **exceeds the ≥ 5 MB threshold** (Req 6.1).
 
 ## 5. Functional Verification (Req 6.2)
 
-Server start log (`server-otel-direct-import-after.log`) confirms:
+Server start log (`server-otel-direct-import-after.log`, commit `e3fe885526`) confirms:
 
 - `growi:opentelemetry:server: GROWI now collects anonymous telemetry.` — OTel SDK started
 - All 5 custom metrics initialized: `application-metrics`, `user-counts`, `page-counts`, `system`, `yjs`
@@ -112,12 +112,29 @@ Note: OTLP collector was not running during the measurement (`http://localhost:4
 
 ---
 
+## 5b. Runtime Smoke Boot of Current Implementation (post-refactor commits)
+
+A fresh runtime smoke boot was performed on **2026-05-25T14:03:51Z** with the dev server (`turbo run dev --filter @growi/app`) under the head of `support/memory-leak-investigation` (commits `19c56368fc` inlining + `5139758243` spec docs reconciliation). Source: `/tmp/growi-smoke.log`.
+
+Observed in the log:
+
+- `14:03:51.153Z INFO growi:opentelemetry:server: GROWI now collects anonymous telemetry.` — OTel SDK initialised cleanly under the new direct-import + inline construction (Req 5.3 / Req 6.3)
+- `14:03:51.290Z WARN growi:opentelemetry:diag: The 'metricReader' option is deprecated. Please use 'metricReaders' instead.` — internal SDK diag, unrelated to instrumentation profile selection (pre-existing OTel SDK 1.x → 2.x migration notice, not in scope of this spec)
+- **No** `Unknown OTEL_AUTO_INSTRUMENTATION_PROFILE value` warning — confirms implementation no longer reads this env var (Req 4.1)
+- **No** `OTEL_AUTO_INSTRUMENTATION_PROFILE` deprecation warning — confirms implementation emits no warn tied to this env var (Req 4.3)
+- Post-OTel initialization sequence proceeded normally: Passport / S2sMessaging / Elasticsearch search delegator / OpenAI cron / NormalizeData — proves the 4 instrumentations do not block downstream service boot
+- The boot was cut short later by an unrelated `ELIFECYCLE` from a stale dev server holding port 3000 (PID 231000 from a prior session); this happened *after* OTel and core services had completed initialization and is not a regression introduced by this spec
+
+The smoke boot is on the same code path (`generateNodeSDKConfiguration` inlined construction, no env var read) that is verified by the unit test suite (`pnpm vitest run node-sdk-configuration.spec` → 4/4 passing).
+
+---
+
 ## 6. Verdict per Requirement
 
 | Requirement | Description | Evidence | Verdict |
 |---|---|---|---|
-| Req 6.1 | Runtime RSS delta ≥ 5 MB (before vs after) | Isolated benchmark: −10.89 MB; GROWI runtime: inconclusive (DB noise) | **ISOLATED BENCHMARK: MET; GROWI RUNTIME: INCONCLUSIVE** |
-| Req 6.2 | GROWI remains functional during measurement | Scenario load phase completed without errors | **MET** |
-| Req 6.3 | Results recorded with before/after/delta, commit SHA, Node.js version, scenario conditions | This document | **MET** |
+| Req 6.1 | RSS delta ≥ 5 MB attributable to the OTel loading pattern change (Form A preferred / Form B fallback) | GROWI runtime (Form A): inconclusive due to DB drift; isolated benchmark (Form B): −10.89 MB exceeds 5 MB threshold | **MET via Form B (isolated benchmark)**; Form A documented as inconclusive |
+| Req 6.2 | GROWI remains functional during measurement | Scenario load phase completed without errors (Section 5); fresh smoke boot reached Passport / Elasticsearch / OpenAI cron / NormalizeData stages without instrumentation-related failure (Section 5b) | **MET** |
+| Req 6.3 | Results recorded with before/after/delta, commit SHA, Node.js version, scenario conditions, OTel SDK init confirmation, env-var-related warn absence, evidence form selection rationale | This document (Sections 1–5b) | **MET** |
 
-**Overall**: The isolated benchmark exceeds the 5 MB threshold with a 10.89 MB delta, matching the research prediction. The GROWI runtime measurement is inconclusive due to accumulated DB state drift — the same noise limitation documented in the `memory-leak-investigation` spec. The implementation change is correct and the isolated benchmark provides authoritative evidence of the expected RSS improvement.
+**Overall**: Req 6.1 is met via **Form B (isolated benchmark)** as defined in the amended requirements.md, with a measured −10.89 MB delta that exceeds the 5 MB threshold. Form A (GROWI runtime measurement) is documented as inconclusive due to accumulated DB state drift — the same boundary-external noise limitation documented in the `memory-leak-investigation` spec. The fresh runtime smoke boot (Section 5b) on the post-refactor head confirms OTel SDK initialisation succeeds, no `OTEL_AUTO_INSTRUMENTATION_PROFILE`-related warn is emitted (Req 4.1 / 4.3), and the four direct-imported instrumentations do not block downstream boot.

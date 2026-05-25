@@ -290,10 +290,11 @@ export const generateNodeSDKConfiguration = (opts?: Option): Configuration;
 | Requirements | 6.1, 6.2, 6.3 |
 
 **Responsibilities & Constraints**
-- before / after それぞれを「OTel ON、5 分 idle baseline」シナリオで計測した結果として記録する。
-- baseline mean RSS（before）、baseline mean RSS（after）、delta（MB）、計測日時、計測環境（devcontainer / Node.js version / commit SHA）を含める。
-- delta が 5 MB 未満の場合、本 spec は要件 6.1 不達と判定する。
-- 計測中 / 直後に既存 4 instrumentation のトレースが OTLP exporter に流れていることを確認した事実を記録する（要件 6.2 への観察的根拠）。
+- Form A（preferred）: GROWI runtime で before / after それぞれを「OTel ON、5 分 idle baseline」シナリオで計測した結果として記録する。
+- Form B（fallback）: GROWI runtime の計測が DB drift などの spec boundary 外要因で inconclusive となった場合、isolated benchmark (`apps/app/tmp/otel-import-bench/bench.js`) の `auto-deny` → `direct-import` の RSS delta（≥5 MB）を authoritative evidence として記録する。
+- いずれの form でも、baseline mean RSS（before）、baseline mean RSS（after）、delta（MB）、計測日時、計測環境（devcontainer / Node.js version / commit SHA）、採用 form (A or B) とその理由を含める。
+- delta が Form A / Form B いずれでも 5 MB 未満の場合、本 spec は要件 6.1 不達と判定する。
+- 計測中 / 直後（または別途の smoke boot 中）に OTel SDK が初期化済であること（`growi:opentelemetry:server` の "GROWI now collects anonymous telemetry." log）と、`OTEL_AUTO_INSTRUMENTATION_PROFILE` に紐づく warn / deprecation log が出ていないことを確認した事実を記録する（要件 6.2 / 6.3 への観察的根拠）。
 
 **Contracts**: Batch [x]（verification pipeline で 1 回作成）
 

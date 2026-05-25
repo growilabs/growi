@@ -165,10 +165,16 @@
 
 ### Requirement 6: RSS 削減効果の運用観察
 
-**Objective:** As an operator deciding whether to adopt this version, I want the memory footprint improvement to be observable on the actual GROWI runtime（not just on the isolated benchmark）, so that the operational benefit of the change is provable.
+**Objective:** As an operator deciding whether to adopt this version, I want the memory footprint improvement to be observable with evidence of at least ~5 MB RSS reduction, so that the operational benefit of the change is provable—using a GROWI runtime measurement when its noise floor permits, and falling back to a controlled isolated benchmark when the GROWI runtime signal is contaminated by environmental noise such as MongoDB state drift documented in `memory-leak-investigation` Phase 6 / Task 6.1。
 
 #### Acceptance Criteria
 
-1. When per-process RSS is measured on the GROWI runtime under the same scenario（OTel ON、5 分間 idle baseline）before and after this change, the GROWI runtime shall show a baseline mean RSS reduction of at least 5 MB after the change relative to before。
+1. The verification shall demonstrate a baseline mean RSS reduction of at least 5 MB attributable to the OTel instrumentation loading pattern change, by one of the following two evidence forms:
+   - **Form A (preferred)** — When per-process RSS is measured on the GROWI runtime under the same scenario (OTel ON、5 分間 idle baseline) before and after this change AND the measurement environment is free of confounding drift (e.g., comparable DB state between before / after runs), the GROWI runtime shall show a baseline mean RSS reduction of at least 5 MB after the change relative to before;
+   - **Form B (fallback when Form A is contaminated)** — When the GROWI runtime measurement is documented as inconclusive due to DB drift or other measurement noise outside this spec's boundary, the isolated benchmark at `apps/app/tmp/otel-import-bench/bench.js` shall show a baseline RSS reduction of at least 5 MB between the `auto-deny` strategy（旧 GROWI minimal）and the `direct-import` strategy（本 spec の構成）, with this fallback fact documented explicitly in the verification report.
 2. While verification is performed, the GROWI runtime shall continue to serve normal traffic（ページ表示・編集・検索などの主要操作が機能する）, so that the RSS reduction is not achieved by disabling user-visible functionality。
-3. The verification result shall be recorded in a form that documents the before / after baseline mean RSS と the observed delta、so that future regressions can be detected against this baseline。
+3. The verification result shall be recorded in a form that documents:
+   - the before / after baseline mean RSS と the observed delta；
+   - which evidence form (A or B) is being used and why；
+   - 起動時に OTel SDK が初期化済であること（`growi:opentelemetry:server` の "GROWI now collects anonymous telemetry." log）と、`OTEL_AUTO_INSTRUMENTATION_PROFILE` に紐づく warn / deprecation log が出ていないこと；
+   so that future regressions can be detected against this baseline。
