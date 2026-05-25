@@ -1,23 +1,14 @@
 # Implementation Plan
 
-> 本 spec は **Foundation → Core → Integration → Validation (Phase 5) → Mandatory Re-measurement (Phase 6) → Conditional Follow-ups (Phase 7)** で進める。Core フェーズの sub-task は責務境界が分離しており、(P) マーク付きの並列実行が可能。
+> 本 spec は **Core (server-side fixes) → Integration → Validation (Phase 5) → Mandatory Re-measurement (Phase 6) → Conditional Follow-ups (Phase 7)** で進める。Core の sub-task は責務境界が分離しており、(P) マーク付きの並列実行が可能。
 >
 > **条件付きコンポーネント**（YjsIdleSweeper / HandlerBackpressure）は Phase 6 の re-measurement 結果が confirmed の場合のみ Phase 7 で着手する。
 >
-> **Scope change history**: Task 1.2（SIGUSR2 in-process fallback）は実装中に CDP-only 方針に切り替えたため削除した（commit `b8e3efa4c7`）。Task 1.1 で作成した `apps/app/tools/memory-profiling/` は `bin/memory-profiling/`（`@growi/bin` workspace package）に移動した（commit `b8e3efa4c7` / `359a74b405`）。各 task の文言は **現在の実装に揃えて更新済**。
-
-## 1. Foundation
-
-- [x] 1.1 Profiling 出力ディレクトリと workspace package の整備
-  - `apps/app/tmp/memory-leak-investigation/` 配下に `runs/` ディレクトリを生成し、`apps/app/.gitignore` の `/tmp/` ルールで除外されていることを確認する。
-  - `bin/memory-profiling/` ディレクトリを作成し、`pnpm-workspace.yaml` に `bin` を追加して `@growi/bin` workspace package として登録する。
-  - `bin/memory-profiling/README.md` に「起動手順 / 出力先 / heap snapshot を git にコミットしない方針」の見出しを用意する。
-  - 観測可能な完了条件: `bin/memory-profiling/README.md` が存在し、`apps/app/tmp/memory-leak-investigation/` が `apps/app/.gitignore` の `/tmp/` ルールで除外され、`@growi/bin` が `pnpm-workspace.yaml` に登録されている。
-  - _Requirements: 1.3, 6.4, 6.5_
-  - _Scope change_: 初期 spec では `apps/app/tools/memory-profiling/` を作成する予定だったが、実装中に `bin/memory-profiling/`（@growi/bin workspace）に移行した。
-
-> **Task 1.2（旧: Heap snapshot signal handler）は scope change により削除**
-> 初期 spec では `apps/app/src/server/util/heap-snapshot-handler.ts` で SIGUSR2 経由の in-process fallback を作る予定だったが、CDP (Chrome DevTools Protocol) クライアント（Task 3.1）が信頼できる主経路として確立したため削除した（commit `b8e3efa4c7`）。Requirements の旧 Req 1.3（SIGUSR2 fallback）も同時に削除済み。
+> **Dependency on `memory-profiler` spec**: Phase 5 以降のすべての検証セッションは `memory-profiler` spec が提供する profiling ツール（`bin/memory-profiling/`）を利用する。本 spec はそのツールの **consumer** であり、ツール本体の実装・interface・operational procedure の責務は持たない。
+>
+> **Scope change history**:
+> - Task 1.2（SIGUSR2 in-process fallback）は CDP-only 方針へ切り替えたため削除した（commit `b8e3efa4c7`）。
+> - 旧 Phase 1（Foundation）/ Phase 3（Core — Profiling sidecar）/ Task 4.2（Scenario runner integration）は profiling ツール開発タスクであり、`memory-profiler` spec に **責務移管**。本 spec からは削除し、Phase 5 以降で同ツールを **利用する** 文脈に置き換えた。
 
 ## 2. Core — Server-side fixes (parallel-capable; 異なるファイルへの独立変更)
 
@@ -58,7 +49,9 @@
   - _Requirements: 5.3_
   - _Boundary: DefensivePageOperationTimer_
 
-## 3. Core — Profiling sidecar (parallel-capable; 独立ファイル群)
+## 3. Core — Profiling sidecar (責務移管済み)
+
+> Profiling sidecar 群（CDP snapshot client / Load driver / RSS time-series logger / Scenarios）の **実装責務は `memory-profiler` spec に移管** した。ツールへの変更は同 spec を起点に行う。以下は歴史的記録（実装済み task）として残す。
 
 - [x] 3.1 (P) CDP snapshot client の実装
   - `bin/memory-profiling/cdp-snapshot-client.ts` を作成し、inspector endpoint (`http://127.0.0.1:9229/json/list`) から `webSocketDebuggerUrl` を取得して WebSocket 接続する API を提供する。
@@ -112,14 +105,9 @@
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _Boundary: YjsDocsMetric, opentelemetry custom-metrics index_
 
-- [x] 4.2 (P) Scenario runner と sidecar エントリポイントの統合
-  - `bin/memory-profiling/run-scenario.ts` を作成し、CLI 引数 / env var を解釈して `runScenario(opts)` を呼ぶ。
-  - `runScenario` 内で `cdp-snapshot-client` を接続 → `rss-time-series-logger` start → `scenarios/baseline` → snapshot A → `scenarios/load` → snapshot B → `scenarios/drain` → snapshot C → CSV finalize → close の順序で orchestrate する。
-  - 失敗時の exit code は 0 / 1 / 2（成功 / snapshot 取得失敗 / 接続失敗）で区別する。
-  - 観測可能な完了条件: `pnpm run ts-node bin/memory-profiling/run-scenario.ts --baseUrl http://localhost:3000 --inspector http://127.0.0.1:9229 --outputDir apps/app/tmp/memory-leak-investigation/runs/after` を実行すると `apps/app/tmp/memory-leak-investigation/runs/after/` に snapshot A/B/C と rss-timeseries.csv が生成され stdout に summary が出力される。
-  - _Depends: 3.1, 3.2, 3.3, 3.4_
-  - _Requirements: 1.4, 2.1, 2.4, 2.5_
-  - _Boundary: ScenarioRunner_
+- [x] 4.2 (移管済み) Scenario runner と sidecar エントリポイントの統合
+  - **責務移管**: `bin/memory-profiling/run-scenario.ts` の実装は `memory-profiler` spec の管理下。本 spec はその CLI を **利用する** のみ（Phase 5 / 6 で呼び出し）。
+  - 既に実装済み（commit `751aa3c67c`）であり、本 spec 内では cross-reference のために残す。
 
 - [x] 4.3 Lint / type-check / unit & integration test / build を pass させる
   - `turbo run lint --filter @growi/app` / `turbo run test --filter @growi/app` / `turbo run build --filter @growi/app` を順に実行する。さらに `pnpm --filter @growi/bin test` も含める。
@@ -138,14 +126,13 @@
 ## 5. Validation — Dynamic profiling とレポート
 
 - [x] 5.1 Fix なし build での baseline 計測（before スナップショット）
-  - 個別 revert によって 2.1 / 2.2 / 2.3 / 2.4 / 4.1 の差分を一時的に外す。**実行手順を `bin/memory-profiling/README.md` に明記**し、再現性を担保する。
-  - 起動方法: devcontainer で `pnpm run ts-node --inspect=0.0.0.0:9229 src/server/app.ts`（dist が Prisma ESM 不整合のため dev server を使用、詳細は Phase 6 / Task 6.4）。
-  - `pnpm run ts-node bin/memory-profiling/run-scenario.ts` を 1 周回す。
+  - 個別 revert によって 2.1 / 2.2 / 2.3 / 2.4 / 4.1 の差分を一時的に外す。手順は `memory-profiler` の README に従う。
+  - `memory-profiler` の scenario runner を 1 周回す（具体的な起動コマンド・引数は同 spec を参照）。
   - 出力された snapshot A / B / C と RSS time-series CSV を `apps/app/tmp/memory-leak-investigation/runs/before/` に隔離保存する。
   - 完了後、HEAD から fix を再適用して fix 適用状態に戻す。
-  - 観測可能な完了条件: `runs/before/` 配下に snapshot 3 枚と CSV が 1 セット揃う。手順が README に書かれている。
-  - _Depends: 1.1, 4.2_
-  - _Requirements: 2.1, 2.4, 3.5_
+  - 観測可能な完了条件: `runs/before/` 配下に snapshot 3 枚と CSV が 1 セット揃う。
+  - _Depends: `memory-profiler` の scenario runner が利用可能であること_
+  - _Requirements: 2.1, 2.2, 3.5_
   - _Known limitation_: dev server (ts-node + SWC) 経由のため、`dist/server/app.js` の production 計測値とは差異がある可能性。Phase 6 / Task 6.4 で dist server による再計測を実施。
 
 - [x] 5.2 Fix 適用 build での計測（after スナップショット）
@@ -207,10 +194,10 @@
 
 - [ ] 6.4 Production dist server (Node.js v24) の Prisma ESM 不整合を解消
   - `dist/generated/prisma/client.js` が `import.meta.url`（ESM）と `exports`（CJS）を併用しているため、Node.js v24 strict ESM 下で `ReferenceError: exports is not defined in ES module scope` で起動失敗している。Prisma client 生成設定または bundle 設定で解消する。
-  - 解消後、`node --inspect dist/server/app.js` を起動し Phase 6 シナリオを 1 周回す（profiling は CDP 経由のみで完結するため `MEMORY_PROFILING_ENABLED` 等の追加 env var は不要）。
+  - 解消後、`node --inspect dist/server/app.js` を起動し、`memory-profiler` の scenario runner を 1 周回す。
   - 観測可能な完了条件: `runs/after-dist/` に snapshot 3 枚と CSV が揃い、verification-report に dist server 経由の数値が追記される。
   - _Depends: 5.4_
-  - _Requirements: 2.6, 6.1_
+  - _Requirements: 2.3, 6.1_
 
 - [ ] 6.5 verification-report.md の Phase 6 update
   - Task 6.1–6.4 の結果を統合し、verification-report の各セクション（Environment / Per-finding verdicts / RSS Delta / Open Issues）を更新する。

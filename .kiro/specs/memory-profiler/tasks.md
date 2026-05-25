@@ -103,7 +103,7 @@
 
 > 直前のセッションで `memory-leak-investigation/` の 6 ファイルに対する「memory-profiler 参照化」の cleanup を `stash@{0}` に保留している（メッセージ: "WIP: memory-leak-investigation cleanup (defer until memory-profiler spec is fully generated)"）。memory-profiler が本 spec の Task 1-6 で確立した時点で、stash を pop してダウンストリーム側の参照を整える。
 
-- [ ] 7.1 `stash@{0}` を pop して mem-leak-inv 側 cleanup を reconcile
+- [x] 7.1 `stash@{0}` を pop して mem-leak-inv 側 cleanup を reconcile
   - `git stash list` で stash@{0} のメッセージが上記の WIP cleanup であることを確認。
   - `git stash pop stash@{0}` で `.kiro/specs/memory-leak-investigation/` 配下 6 ファイル（brief / design / requirements / research / spec.json / tasks）の変更を作業ツリーに戻す。
   - 取り込んだ変更を以下の観点で確認・必要に応じて調整:

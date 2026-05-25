@@ -5,6 +5,8 @@
 **Scope**: server-side (Node.js) memory characterization for GROWI.cloud per-tenant containers running the official GROWI Docker image
 **Method**: static code analysis (dynamic profiling was prevented by the sandbox's outbound network policy blocking MongoDB 4.2+ binary distribution endpoints — see Appendix A)
 
+> **Note (post-implementation)**: Part 2（Design Discovery）以降の profiling tooling に関する記述（Build vs. Adopt 等）は **歴史的記録**。実装責務は `memory-profiler` spec に移管済み。本 spec はそのツールの consumer。
+
 ---
 
 ## TL;DR

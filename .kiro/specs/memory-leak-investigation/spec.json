@@ -1,7 +1,7 @@
 {
   "feature_name": "memory-leak-investigation",
   "created_at": "2026-05-22T07:50:39Z",
-  "updated_at": "2026-05-22T13:00:00Z",
+  "updated_at": "2026-05-22T13:30:00Z",
   "language": "ja",
   "phase": "implementation-partial",
   "approvals": {
@@ -20,12 +20,12 @@
   },
   "ready_for_implementation": true,
   "implementation_progress": {
-    "phase_1_foundation": "completed (Task 1.2 dropped via scope change)",
     "phase_2_core_server_fixes": "completed",
-    "phase_3_core_profiling_sidecar": "completed",
-    "phase_4_integration": "completed",
+    "phase_3_profiling_sidecar": "transferred to memory-profiler spec (historical record only)",
+    "phase_4_integration": "completed (Task 4.2 transferred to memory-profiler)",
     "phase_5_initial_validation": "completed",
-    "phase_6_mandatory_remeasurement": "pending",
+    "phase_6_mandatory_remeasurement": "pending (uses memory-profiler tool)",
     "phase_7_conditional_followups": "blocked on Phase 6 verdicts"
-  }
+  },
+  "downstream_consumer_of": ["memory-profiler"]
 }

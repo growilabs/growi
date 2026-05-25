@@ -2,60 +2,58 @@
 
 ## Introduction
 
-本 spec は、GROWI のサーバサイド (`apps/app`, Node.js) のメモリ特性を計測・最適化する。`claude/investigate-growi-memory-leaks-09kl4` ブランチで作成された静的解析レポート（[research.md](./research.md)）の 5 findings (L1-L5) を、devcontainer 環境で実行可能となった dynamic profiling で **裏付ける／棄却する** ことを軸に、確認できた問題に対してのみ修正と監視を導入する。最終成果物は、(1) ベースライン RSS の低減（L1+L2）、(2) リーク面の常時可観測化（L3 metric）、(3) 検証根拠を残した `verification-report.md`、(4) 将来の調査で再利用可能な profiling 手順、の 4 点である。
+本 spec は、GROWI のサーバサイド (`apps/app`, Node.js) のメモリ特性を計測・最適化する。`claude/investigate-growi-memory-leaks-09kl4` ブランチで作成された静的解析レポート（[research.md](./research.md)）の 5 findings (L1-L5) を、devcontainer 環境で実行可能となった dynamic profiling で **裏付ける／棄却する** ことを軸に、確認できた問題に対してのみ修正と監視を導入する。最終成果物は、(1) ベースライン RSS の低減（L1+L2）、(2) リーク面の常時可観測化（L3 metric）、(3) 検証根拠を残した `verification-report.md`、の 3 点である。
+
+> **依存スペック**: profiling ツール本体（`bin/memory-profiling/` / `@growi/bin`）の実装・設計・interface 定義は別 spec `memory-profiler` の責務。本 spec は同ツールの **consumer** であり、片方向参照（investigation → profiler）。
 
 詳細な背景・アプローチ・スコープは [brief.md](./brief.md) を参照。
 
 ## Boundary Context
 
 - **In scope**:
-  - Dynamic profiling の実行（devcontainer 上の `mongo:27017` / `elasticsearch:9200` を利用）と、その結果を残す verification report。
   - 静的解析で確認済の 5 findings (L1-L5) の検証および、確認できたものに対する fix。
   - `y-websocket` が保持する Y.Doc 数の runtime metric 追加（既存 OpenTelemetry custom-metrics レイヤへ）。
   - 環境変数で挙動を制御可能な形での baseline-bloat 削減（pool size、auto-instrumentation 範囲）。
-  - 再利用可能な profiling スクリプトとシナリオの最小ドキュメント化。
+  - `memory-profiler` ツールを利用した検証セッションの実行と、verification report への結果集約。
 - **Out of scope**:
+  - **`memory-profiler` ツール本体（`bin/memory-profiling/`）の実装・設計・interface 定義** — 別 spec の責務。
   - ブラウザ／クライアント側のメモリ分析。
   - OpenTelemetry SDK ライフサイクル設計の再構築（`opentelemetry` spec の責務）。
   - `BatchSpanProcessor` / `PeriodicExportingMetricReader` のパラメータ全面チューニング。
   - 既存メトリクス（`growi.*` / `system.*` / `process.*`）の名称変更・schema 変更。
   - `y-websocket` persistence プロトコルの設計変更（`collaborative-editor` spec の責務）。
   - GROWI.cloud 本番監視ダッシュボードの設定変更。
-  - Profiling フレームワークの汎用 npm package 化。
 - **Adjacent expectations**:
+  - **`memory-profiler` spec** — 本 spec は同 spec が提供する profiling ツール（CDP snapshot client / load driver / scenarios / RSS logger / run-scenario）の **consumer**。ツールの interface と起動手順は `memory-profiler` spec の責務。本 spec は同 spec を **参照のみ**（依存方向は investigation → profiler の片方向）。
   - `opentelemetry` spec（`phase: implementation-complete`）の custom-metrics 合成基盤（`setupCustomMetrics()`）は本 spec が新規モジュール `yjs-metrics.ts` を追加する受け皿として維持される。metric 命名・unit 規約は同 spec に準拠する。
   - `collaborative-editor` spec が定義する `y-websocket` の `docs` Map の取り扱いは本 spec から変更しない。L3 mitigation の sweeper を実装する場合は、close 判定ロジックを `collaborative-editor` の責務と衝突しない範囲に留める。
   - devcontainer の MongoDB (`mongo:27017`, replica set `rs0`) および Elasticsearch (`elasticsearch:9200`) は常時到達可能である前提を取る（参照: `.claude/rules/devcontainer.md`）。
 
 ## Requirements
 
-### Requirement 1: Dynamic profiling 実行基盤
+### Requirement 1: 検証ツールの利用と検証成果物の保存
 
-**Objective:** メモリ調査担当者として、devcontainer 内で GROWI server を profiling 可能な状態で起動し、任意のタイミングで heap snapshot を取得して保存できるようにしたい。これにより、静的解析の各 finding を実測値で裏付け／棄却できる。
-
-#### Acceptance Criteria
-
-1. When 調査担当者が profiling モードで GROWI server を起動した時, the profiling workflow shall devcontainer の `mongo:27017` (replica set `rs0`) と `elasticsearch:9200` に接続した状態で server を立ち上げ、外部の snapshot 取得ツールから到達可能な inspector インターフェースを公開する。
-2. When 調査担当者が外部ツールから heap snapshot の取得を要求した時, the profiling workflow shall `.heapsnapshot` 形式のスナップショットを生成し、指定された出力ディレクトリ配下にファイル名で識別可能な形で保存する。
-3. The profiling workflow shall heap snapshot およびその他の計測成果物（RSS 時系列ログ等）を `apps/app/tmp/memory-leak-investigation/` 配下に集約し、リポジトリには直接コミットされないパスへ書き出す。
-4. If profiling 中に snapshot 取得が失敗した場合, the profiling workflow shall エラー内容を標準ログに出力した上で、GROWI server 本体の動作には影響を与えない（プロセスを停止させない）。
-
-> **Note**: 初期 spec では SIGUSR2 in-process fallback（旧 Acceptance Criteria 3）を要求していたが、実装過程で CDP (Chrome DevTools Protocol) クライアントが信頼できる主経路として確立したため、SIGUSR2 経路は冗長と判断して削除した（commit `b8e3efa4c7`）。CDP 接続不能時の fallback が将来再び必要になった場合は本 spec で再評価する。
-
-### Requirement 2: 検証シナリオの再現可能な実行
-
-**Objective:** メモリ調査担当者として、Baseline / Load / Drain の 3 段階からなる検証シナリオを再現可能な形で実行し、各 finding (L1-L5) の前後で計測値を比較できるようにしたい。
+**Objective:** メモリ調査担当者として、`memory-profiler` spec が提供する profiling ツール（`bin/memory-profiling/`）を利用し、各 finding を実測値で裏付け／棄却できる状態にする。
 
 #### Acceptance Criteria
 
-1. The profiling workflow shall **Baseline**（boot 後の idle 状態）/ **Load**（page 操作と y-websocket セッションを含む負荷）/ **Drain**（負荷停止後の idle 状態）の 3 段階を 1 回の調査セッション内で順序通り実行できる手順を提供する。
-2. When 調査担当者が Load 段階を実行した時, the profiling workflow shall page 作成・page 編集・y-websocket セッションの open/close／**clean close されない異常系セッション**（NAT half-close 相当）の各シナリオを混在させた負荷を生成する。
-3. While 各段階を実行している間, the profiling workflow shall プロセスの RSS / V8 heap used / V8 heap total / external メモリの各値を一定間隔で時系列ログとして記録し、段階の境界（Baseline / Load / Drain）が後から特定できる形で残す。
-4. The profiling workflow shall 各段階の境界（Baseline 終了時点 = snapshot A、Load 終了時点 = snapshot B、Drain 終了時点 = snapshot C）で heap snapshot を取得する。
-5. When 同じ調査セッションを別環境で再実行した時, the profiling workflow shall シナリオ定義（操作の種類・回数・タイミング）が同一であれば、再現可能な範囲で比較可能な計測結果を生成する。
-6. The profiling workflow shall production `dist/server/app.js` 起動下で 1 周の計測を完了できる（dev server 経由の SWC transpile / source-map overhead を含まない計測値も取得可能）。
+1. The investigation workflow shall `memory-profiler` spec が定義する Baseline / Load / Drain シナリオ実行ツールを利用して、devcontainer 内で 1 回の調査セッションを完遂できる。ツール本体の要件・設計・interface は `memory-profiler` spec に従う。
+2. The investigation workflow shall 取得した heap snapshot および RSS 時系列ログを `apps/app/tmp/memory-leak-investigation/runs/{before,after,...}/` 配下に保管し、リポジトリには直接コミットしない。
+3. If ツール起動・snapshot 取得・シナリオ実行のいずれかが失敗した場合, the investigation workflow shall 失敗内容を verification-report に記録する（ツール側の挙動仕様は `memory-profiler` spec の責務）。
 
-> **Note**: AC 6 は実装過程で発覚した Prisma client の ESM/CJS 不整合（`ReferenceError: exports is not defined in ES module scope` on Node.js v24）への対応として Phase 6 で扱う。
+> **Reference**: profiling ツールの実装・interface・operational procedure は `.kiro/specs/memory-profiler/` を参照。本 spec はそのツールの **consumer** であり、ツール開発の責務は持たない。
+
+### Requirement 2: 検証シナリオの op 設定
+
+**Objective:** メモリ調査担当者として、`memory-profiler` のシナリオに渡す op count / idle duration を本調査の目的に合わせて設定し、L1-L5 各 finding が観測できる規模で検証する。
+
+#### Acceptance Criteria
+
+1. The investigation workflow shall `memory-profiler` の env var / CLI 引数（`LOAD_PAGE_CREATE`, `LOAD_PAGE_EDIT`, `LOAD_PAGE_GET`, `LOAD_PAGE_LIST`, `LOAD_PAGE_SEARCH`, `LOAD_YJS_CLEAN_CLOSE`, `LOAD_YJS_ABORT`, `BASELINE_IDLE_SECONDS`, `DRAIN_IDLE_SECONDS`）を本調査の目的に合わせて設定する。
+2. The investigation workflow shall 各 finding の検証に必要な負荷規模（L3: Yjs sessions ≥ 50、drain ≥ 300s。L4: page-edit ≥ 20、drain ≥ 300s。L1/L2 ランタイム: baseline ≥ 300s）を Phase 6 で達成する。
+3. The investigation workflow shall production `dist/server/app.js` 起動下での 1 周計測を完遂する（Prisma ESM/CJS 不整合の解消を含む）。
+
+> **Reference**: 各シナリオの op count default / interface は `memory-profiler` spec を参照。
 
 ### Requirement 3: ベースライン RSS の削減（L1 + L2）
 
@@ -113,7 +111,7 @@
 1. The verification report shall 各 finding (L1, L2, L3, L4, L5) ごとに **confirmed / refuted / inconclusive** のいずれかの判定と、判定の根拠となる数値（snapshot 差分、retained constructor 数、RSS delta 等）を記録する。
 2. The verification report shall L1 + L2 適用前後の Baseline RSS の比較を数値（MB 単位）で示し、Desired Outcome の「20–40 MB 削減」目標に対する到達度を記録する。
 3. The verification report shall 検証時に使用した GROWI のコミットハッシュ、Node.js バージョン、MongoDB / Elasticsearch バージョン、実行日時、シナリオ設定（操作回数等）を記録する。
-4. The investigation workflow shall profiling 手順（起動コマンド、snapshot 取得方法、シナリオ実行スクリプトの場所と使い方）を本 spec 配下のドキュメントとして残し、将来の調査担当者が同じ手順を再実行できるようにする。
+4. The investigation workflow shall 本 spec の verification-report 内で、利用した `memory-profiler` の commit hash と本調査の env var / CLI 引数を記載し、将来の調査担当者が同じ手順を再実行できるようにする。手順本体（起動コマンド、snapshot 取得方法、シナリオ実行スクリプトの場所と使い方）は `memory-profiler` spec の README / design に従う。
 5. The investigation workflow shall heap snapshot ファイル本体（数十〜数百 MB）をリポジトリにコミットせず、verification report 内の集計値・差分・観察事項のみをコミット対象とする。
 
 ### Requirement 7: 既存運用への非破壊性
