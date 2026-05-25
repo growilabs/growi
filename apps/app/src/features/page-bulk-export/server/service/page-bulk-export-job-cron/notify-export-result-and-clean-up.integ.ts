@@ -48,7 +48,10 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
   });
 
   test('should set completedAt when a job is completed without it (duplicate-reuse path)', async () => {
-    // arrange: mimic the reuse path — completed-bound job without completedAt
+    // arrange: the only precondition the bug requires is "completedAt is null on entry";
+    // the initial status is irrelevant because notifyExportResultAndCleanUp overwrites it
+    // from the action argument. (Real duplicate-reuse path enters with status=completed,
+    // simplified to status=exporting here.)
     const job = await PageBulkExportJob.create({
       user: new mongoose.Types.ObjectId(),
       page: new mongoose.Types.ObjectId(),
@@ -105,6 +108,31 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
     // act
     await pageBulkExportJobCronService?.notifyExportResultAndCleanUp(
       SupportedAction.ACTION_PAGE_BULK_EXPORT_FAILED,
+      job,
+    );
+
+    // assert
+    const updated = await PageBulkExportJob.findById(job._id);
+    expect(updated?.status).toBe(PageBulkExportJobStatus.failed);
+    expect(updated?.completedAt).toBeUndefined();
+  });
+
+  // JOB_EXPIRED is a third action that flows through the same choke point.
+  // Under the current branch (`action === COMPLETED`) it is equivalent to
+  // FAILED, but pinning it ensures a future split between the two does not
+  // silently start backfilling completedAt on expired jobs.
+  test('should not set completedAt when the job expired', async () => {
+    // arrange
+    const job = await PageBulkExportJob.create({
+      user: new mongoose.Types.ObjectId(),
+      page: new mongoose.Types.ObjectId(),
+      format: PageBulkExportFormat.md,
+      status: PageBulkExportJobStatus.exporting,
+    });
+
+    // act
+    await pageBulkExportJobCronService?.notifyExportResultAndCleanUp(
+      SupportedAction.ACTION_PAGE_BULK_EXPORT_JOB_EXPIRED,
       job,
     );
 
