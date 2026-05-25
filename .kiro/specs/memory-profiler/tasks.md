@@ -71,7 +71,7 @@
 
 ## 5. Integration: README への stable contract と change-review プロセス記載
 
-- [ ] 5.1 `bin/memory-profiling/README.md` の更新
+- [x] 5.1 `bin/memory-profiling/README.md` の更新
   - **Stable Contract セクション** を README に追加し、以下を表で明示:
     - CLI 引数 3 個（`--baseUrl` / `--inspector` / `--outputDir`）
     - 9 個の env var 名と default 値
