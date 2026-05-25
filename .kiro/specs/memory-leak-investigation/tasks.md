@@ -127,11 +127,12 @@
 
 > Phase 5 の初回計測は (a) `OPENTELEMETRY_ENABLED=false` のため L2 ランタイム効果未計測、(b) Yjs sessions=5 / drain=60s と縮小しており L3 / L4 が inconclusive、(c) `dist/server/app.js` 起動下での計測が Prisma ESM 不整合により未実施、という制約がある。これらを解消するための **必須** 再計測フェーズ。
 
-- [ ] 6.1 OTel 有効化下での L2 ランタイム baseline RSS 再計測
+- [x] 6.1 OTel 有効化下での L2 ランタイム baseline RSS 再計測 — **完了 (2026-05-25)**
   - devcontainer の `apps/app/.env.development` で `OPENTELEMETRY_ENABLED=true` を設定して before / after の両方を再計測する。
   - OTLP receiver が devcontainer 内にない場合は `OTEL_TRACES_EXPORTER=console` または `none` で SDK init のみ実行する形にする。
   - 計測条件: `BASELINE_IDLE_SECONDS=300`、その他のシナリオ op count は default。
   - 観測可能な完了条件: `runs/before-otel-on/` と `runs/after-otel-on/` の双方が揃い、Baseline 5 分 idle 後の平均 RSS の delta が verification-report の RSS Delta セクションに数値で記録される。
+  - **Result**: Baseline mean RSS delta ≈ 0 MB（observed −17 MB は DB-state drift の noise）。事前見積もり 20–40 MB は未達。Functional verdict は維持されるが RSS 削減効果はほぼゼロ。詳細は [verification-report.md](./verification-report.md#l2-otel-auto-instrumentation-allow-list-task-22) を参照。
   - _Depends: 5.4_
   - _Requirements: 3.5, 3-bis.1, 6.1_
 

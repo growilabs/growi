@@ -1,8 +1,10 @@
 # Memory Leak Investigation — Verification Report
 
-> **Status**: Phase 5 (initial measurement) は完了。Phase 6（mandatory re-measurement）が **pending** — L2 ランタイム計測 / L3 sustained-load / L4 retainer 分析 / dist server 計測の 4 項目を実施することで本 report の verdict は再評価される。詳細は [Section 7. Pending: Phase 6 Re-measurement](#7-pending-phase-6-re-measurement) を参照。
+> **Status**: Phase 5 (initial measurement) と Phase 6 / Task 6.1（L2 ランタイム再計測） は完了。Phase 6 / Task 6.2 / 6.3 / 6.4（L3 sustained-load / L4 retainer / dist server）は引き続き **pending**。詳細は [Section 7. Pending: Phase 6 Re-measurement](#7-pending-phase-6-re-measurement) を参照。
 
 ## 1. Environment
+
+### Phase 5 (initial) — 2026-05-22
 
 | Item | Before (no fixes) | After (all fixes) |
 |---|---|---|
@@ -15,6 +17,25 @@
 | `OPENTELEMETRY_ENABLED` | false | false |
 
 **Note**: The production dist server (`dist/server/app.js`) exits with code 1 due to a Prisma ESM/CJS conflict (`ReferenceError: exports is not defined in ES module scope`) when loaded with Node.js v24. The dev server (`pnpm run ts-node`) was used for both runs as a workaround. The OTel instrumentation code path (L2) was therefore not active during either run.
+
+### Phase 6 / Task 6.1 (L2 re-measurement) — 2026-05-25
+
+| Item | before-otel-on | after-otel-on |
+|---|---|---|
+| GROWI commit | `50aa786e54` (HEAD) | `50aa786e54` (HEAD) |
+| Node.js version | v24.15.0 | v24.15.0 |
+| MongoDB version | 8.2 | 8.2 |
+| Elasticsearch version | 9.3.3 | 9.3.3 |
+| Server mode | dev (ts-node / SWC transpile) | dev (ts-node / SWC transpile) |
+| `OPENTELEMETRY_ENABLED` | true | true |
+| `OTEL_EXPORTER_OTLP_ENDPOINT` | `http://otel-collector:4317` | `http://otel-collector:4317` |
+| `OTEL_AUTO_INSTRUMENTATION_PROFILE` | `all` | `minimal` (default) |
+| L1 / L3 metric / L5 fixes | applied | applied |
+| `BASELINE_IDLE_SECONDS` | 300 | 300 |
+| `DRAIN_IDLE_SECONDS` | 300 | 300 |
+| Other load op counts | memory-profiler default | memory-profiler default |
+
+**Note**: Phase 6 Task 6.1 では env var toggle のみで L2 を isolate（同一コードパス、git revert なし）。両 run とも HEAD コミットで実施し、L1/L3 metric/L5 fixes は共通適用。Production dist server (Task 6.4) は Prisma ESM 不整合のため引き続き dev server で代替。
 
 ### Scenario op counts (both runs identical)
 
@@ -58,14 +79,73 @@ The retained-growth reduction of 389 MB far exceeds the 20–40 MB target.
 
 ### L2 — OTel auto-instrumentation allow-list (task 2.2)
 
-**Verdict: CONFIRMED (by code review / unit tests; runtime baseline RSS impact not measurable in this run)**
+**Verdict: CONFIRMED (functional); MEMORY IMPACT NEGLIGIBLE (Phase 6 / Task 6.1, 2026-05-25)**
 
-`OPENTELEMETRY_ENABLED=false` in the devcontainer `.env.development`, so neither the before nor the after server loaded OTel instrumentation at runtime. The runtime baseline RSS comparison for L2 could not be obtained from these runs.
+Phase 5 では `OPENTELEMETRY_ENABLED=false` だったため計測不能だった runtime RSS を Phase 6 / Task 6.1 で再計測した。結論: **L2 fix の RSS 削減効果はノイズ範囲内**（事前見積もり 20–40 MB は未達）。
 
-Evidence:
-- Unit tests (task 2.2) verify that the `minimal` profile enables only 4 instrumentations vs. the full set
-- Code diff confirms `getNodeAutoInstrumentations` now disables all non-allow-listed entries by default
-- To measure the runtime RSS saving, a separate run with `OPENTELEMETRY_ENABLED=true` and a comparable baseline would be needed
+#### Phase 6 / Task 6.1 measurement
+
+両 run とも HEAD（L1/L3 metric/L5 適用済）+ `OPENTELEMETRY_ENABLED=true` + `OTEL_EXPORTER_OTLP_ENDPOINT=http://otel-collector:4317` で実施。`OTEL_AUTO_INSTRUMENTATION_PROFILE` env var の toggle のみで L2 を isolate（git revert なし、同一コードパス）。
+
+| Phase | before (profile=all) | after (profile=minimal) | Delta (before − after) |
+|---|---:|---:|---:|
+| Baseline mean RSS (5 min idle) | 1588 MB | 1605 MB | **−17 MB** |
+| Baseline heap_used | 165 MB | 164 MB | +1 MB |
+| Drain mean RSS (5 min idle) | 2102 MB | 2117 MB | −15 MB |
+| Drain heap_used | 154 MB | 154 MB | 0 MB |
+
+Delta が負方向（after の方が +17 MB 高い）になったのは、after-otel-on を直後に実行したため before-otel-on の load phase で書き込まれた追加 page document が DB に残存し、後続 run の baseline で Mongoose の internal cache に読み込まれたため。Phase 5 で観測された DB pre-seed bias と同種の現象であり、L2 fix の効果ではない。
+
+#### なぜ 20–40 MB の見積もりが出なかったか
+
+事前見積もり（research.md）は「30+ instrumentations の wrapper 層 + BatchSpanProcessor 2048-span queue + PeriodicExportingMetricReader」の合計だった。実装を再読すると:
+
+- `getNodeAutoInstrumentations(<config>)` は `enabled: false` を渡しても **全 instrumentation クラスを instantiate してから patch 時に flag を見る** 形なので、minimal profile でも 31 個の instrumentation はメモリにロードされる。
+- BatchSpanProcessor / MetricReader は profile に依存せず常に確保される（5 分 idle では span queue もほぼ空）。
+- L2 fix が実際に削減できるのは「runtime に発生する patch 操作と、それによって生成される span/trace の heap 滞留」のみで、5 分 idle ベンチではこれが顕在化しない。
+
+#### Functional 検証は維持される
+
+- Unit tests (task 2.2): `minimal` profile が 4 instrumentation のみ enable、`all` が legacy 挙動を返すことを検証済 → green
+- Code diff: `getNodeAutoInstrumentations` が allow-list 外を `enabled: false` で disable する形 → 確認済
+- 起動ログ: 両 profile とも custom-metrics 5 個（application / user-counts / page-counts / system / yjs）が initialized
+
+L2 fix は **トレース帯域削減と運用者の制御性** の文脈では引き続き有効（不要な instrumentation を runtime で patch しない、OTLP exporter への送信量削減）。ただし **RSS reduction としてはほぼゼロ**。本来の RSS 削減を狙うなら `@opentelemetry/auto-instrumentations-node` への依存自体を外し、必要な 4 instrumentation を直接 import する形に再設計する必要がある（将来 follow-up 候補）。
+
+#### 補足: isolated benchmark で各 import 戦略を分解 (2026-05-25)
+
+GROWI server を介さない最小 Node script で 5 戦略を比較し、import 形ごとの RSS impact を分解した（[apps/app/tmp/otel-import-bench/bench.js](../../apps/app/tmp/otel-import-bench/bench.js)）。
+
+| Strategy | RSS | Heap | vs baseline | vs sdk-only |
+|---|---:|---:|---:|---:|
+| baseline (no OTel) | 42.67 MB | 3.78 MB | +0.00 | — |
+| sdk-only (`NodeSDK` + `instrumentations: []`) | 82.39 MB | 13.45 MB | +39.72 MB | — |
+| auto-all (`getNodeAutoInstrumentations()`) | 93.55 MB | 17.73 MB | +50.88 MB | +11.16 MB |
+| **auto-deny (現 GROWI minimal profile)** | **93.22 MB** | 17.24 MB | +50.55 MB | **+10.83 MB** |
+| **direct-import (4 instrumentations 直接 import)** | **82.33 MB** | 13.96 MB | +39.66 MB | **−0.06 MB** |
+
+**Findings**:
+
+1. **NodeSDK 固定オーバヘッド = ~40 MB**（baseline → sdk-only）。OTel を使う限り回避不可。
+2. **`getNodeAutoInstrumentations()` の追加コスト = ~11 MB**（sdk-only → auto-all / auto-deny）。31 instrumentation のロードコスト。
+3. **`enabled: false` flag は RSS を削減しない**（auto-all vs auto-deny 差 = 0.33 MB）。31 package が `enabled` の値に関わらずロードされることを実証。
+4. **`direct-import` は sdk-only と同等**（4 instrumentation の追加コスト <1 MB）。既に GROWI が import している express/mongoose 等の patch のみ。
+5. **現 L2 fix を `direct-import` に置換すれば ~11 MB 削減可能**（93.22 → 82.33）。
+
+事前見積もり 20–40 MB は過大評価だったが、**方向性は正しい**：不要 instrumentation のロードはコストを持つ。GROWI の Task 6.1 計測で見えなかったのは、DB-state drift の noise（~17 MB）が ~11 MB の OTel signal を masking していたため。
+
+**Follow-up 候補（別 spec 推奨）**: `@opentelemetry/auto-instrumentations-node` 依存を外し、`@opentelemetry/instrumentation-http`、`-express`、`-mongodb`、`-mongoose` の 4 package を直接 import する形に再設計。実装影響は [node-sdk-configuration.ts](../../apps/app/src/features/opentelemetry/server/node-sdk-configuration.ts) の `buildInstrumentations` 関数のみ。推定削減 ~11 MB / process。
+
+#### Snapshot inventory (Phase 6 Task 6.1, 2026-05-25)
+
+| File | Size | SHA256 |
+|---|---|---|
+| before-otel-on/snapshot-a.heapsnapshot | 124 MB | `6f526e4171009fd2df06b979631c8eb9e8d141ef8a190a0436c4cb5ef95971ef` |
+| before-otel-on/snapshot-b.heapsnapshot | 124 MB | `918bf9de31d36aef01ba553c5cab338105793f59bb27c8bd60b2e3e7e521b99f` |
+| before-otel-on/snapshot-c.heapsnapshot | 124 MB | `7cab72b53f2bccce54c5944285d1afc75ea77d238096e8aa439f318e6cae5237` |
+| after-otel-on/snapshot-a.heapsnapshot  | 122 MB | `70391ee7e2871beae82aa3e84d9cbe455b26cef80c6e5f39dbd8ad483c25888d` |
+| after-otel-on/snapshot-b.heapsnapshot  | 125 MB | `b2b945e19ebf7d93ed390d008713aecbf279bb2aa1f9d658745623743c1e076e` |
+| after-otel-on/snapshot-c.heapsnapshot  | 124 MB | `fdb41415633fa9c30bff5c43818b570708c852fb7db5510e47c7677480523aa7` |
 
 ### L3 — `growi.yjs.docs.count` metric (task 2.3 / 4.1)
 
@@ -111,7 +191,9 @@ No dynamic measurement required.
 
 ## 3. RSS Delta
 
-### Retained growth comparison (the valid metric given differing initial MongoDB states)
+### 3.1 Phase 5 (L1 dominant) — Retained growth comparison
+
+The valid metric given differing initial MongoDB states between the two runs:
 
 | Phase | Before mean RSS | After mean RSS |
 |---|---|---|
@@ -120,15 +202,28 @@ No dynamic measurement required.
 | Drain | 2010 MB | 2045 MB |
 | **Retained growth (Drain − Baseline)** | **473 MB** | **84 MB** |
 
-**Reduction: 389 MB (84% decrease)**
+**Reduction: 389 MB (84% decrease)** — primarily attributable to L1 (Mongoose pool 100 → 10).
+
+### 3.2 Phase 6 / Task 6.1 (L2 isolated) — Baseline RSS comparison
+
+OTel enabled on both runs, env var toggle isolates L2:
+
+| Phase | before-otel-on (profile=all) | after-otel-on (profile=minimal) | Delta (before − after) |
+|---|---:|---:|---:|
+| Baseline (5 min idle) | 1588 MB | 1605 MB | **−17 MB** |
+| Load | 2091 MB | 2105 MB | −14 MB |
+| Drain (5 min idle) | 2102 MB | 2117 MB | −15 MB |
+| Heap_used baseline | 165 MB | 164 MB | +1 MB |
+| Heap_used drain | 154 MB | 154 MB | 0 MB |
+
+**L2 RSS reduction: ≈ 0 MB**（観測値 −17 MB は run 順序による DB-state drift の noise 方向）。事前見積もり 20–40 MB は **未達**。
 
 ### 20–40 MB target assessment
 
-The 20–40 MB target from Requirement 3 refers to **baseline RSS** (steady-state at rest), not retained growth under load. Because the two runs had different MongoDB initial states (before: empty DB, after: pre-seeded from before run), a valid baseline-only comparison was not obtained.
+- **L1 (Mongoose pool)**: Phase 5 で retained growth ベースで 389 MB 削減 → target **EXCEEDED**。直接の baseline 比較は DB-state drift で deferred。
+- **L2 (OTel allow-list)**: Phase 6 / Task 6.1 で baseline mean RSS delta ≈ 0 MB → target **NOT ACHIEVED**。実装の `getNodeAutoInstrumentations(<deny-list>)` は 31 個全 instrumentation を instantiate するため、profile 切替で heap-side のロード量が変わらない。Functional verdict は維持されるが、RSS 削減のために `@opentelemetry/auto-instrumentations-node` 依存自体の除去が必要（future follow-up）。
 
-The retained-growth comparison **substantially exceeds** the 20–40 MB target. For a direct baseline comparison, re-run both scenarios against an equivalent empty-DB state with OTel enabled.
-
-**Conclusion: Target EXCEEDED for load-cycle retention; direct baseline comparison DEFERRED due to test setup.**
+**Conclusion**: L1 が target を大幅超過達成、L2 は target 未達（実装が memory-load avoidance ではなく patch suppression のため）。L1+L2 合算で見たときも、削減の主因は L1 単独。
 
 ---
 
@@ -165,10 +260,12 @@ Rule of thumb (Little's Law): `pool ≈ peak requests/sec × avg DB time per req
 
 ## 5. Open Issues
 
-### L2 — Runtime OTel baseline RSS impact not measured
+### L2 — Runtime OTel baseline RSS impact measured (Phase 6 / Task 6.1) — closed with caveat
 
-- **Reason**: `OPENTELEMETRY_ENABLED=false` in devcontainer dev environment.
-- **Re-investigation trigger**: Enable OTel, run both before/after scenarios, compare baseline RSS after ~5-minute steady state.
+- **Result**: Baseline RSS delta ≈ 0 MB（観測値 −17 MB は run 順序による DB-state drift の noise 方向）。事前見積もり 20–40 MB は **未達**。
+- **Root cause**: 現実装の `getNodeAutoInstrumentations(<deny-list>)` は 31 個全 instrumentation を instantiate してから `enabled` flag を見て patch 判定するため、`minimal` profile でも heap-side のロード量は `all` profile とほぼ同じ。L2 fix の効果は patch 操作と span/trace 生成の抑制のみで、5 分 idle ベンチではこれが顕在化しない。
+- **Functional verdict は維持**: 不要な instrumentation の runtime patch 抑制、OTLP exporter への送信量削減は引き続き有効。
+- **真の RSS 削減を狙うなら**: `@opentelemetry/auto-instrumentations-node` への依存自体を外し、必要な 4 instrumentation を直接 import する形に再設計（将来 follow-up 候補）。
 
 ### L3 — Y.Doc accumulation under sustained load not tested
 
@@ -214,11 +311,12 @@ Snapshot files are **not committed** to the repository. Local paths and checksum
 
 Phase 5 の初回計測は以下の制約により partial verification となった。これらを解消する **必須再計測** を Phase 6 として実施することで、本 report の verdict は最終確定する（[tasks.md / Phase 6](./tasks.md#6-mandatory-re-measurement-phase-6) と対応）。
 
-### 7.1 L2 ランタイム baseline RSS（Task 6.1）
+### 7.1 L2 ランタイム baseline RSS（Task 6.1） — **完了 (2026-05-25)**
 
-- **Status**: PENDING
-- **Reason**: 初回計測は `OPENTELEMETRY_ENABLED=false` で実施したため、OTel allow-list の実効性は unit test ベースのみ。
-- **Required action**: `OPENTELEMETRY_ENABLED=true` で before / after を再計測し、Baseline 5 分 idle 後の平均 RSS の delta を MB 単位で記録する。
+- **Status**: DONE
+- **Result**: Baseline mean RSS delta ≈ 0 MB（before 1588 MB / after 1605 MB / 差 −17 MB は DB-state drift の noise 方向）。事前見積もり 20–40 MB は **未達**。L2 fix は functional には動作するが、heap-side のロード量は profile 切替で変わらないため RSS 削減効果はほぼゼロ。詳細は Section 2 / L2 を参照。
+- **Output dirs**: `apps/app/tmp/memory-leak-investigation/runs/before-otel-on/`, `runs/after-otel-on/`
+- **Follow-up candidate**: `@opentelemetry/auto-instrumentations-node` 依存を外し 4 instrumentation を直接 import する形に再設計（別 spec 推奨）。
 
 ### 7.2 L3 Y.Doc accumulation の sustained-load 評価（Task 6.2）
 

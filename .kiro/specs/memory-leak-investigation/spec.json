@@ -1,7 +1,7 @@
 {
   "feature_name": "memory-leak-investigation",
   "created_at": "2026-05-22T07:50:39Z",
-  "updated_at": "2026-05-25T08:40:00Z",
+  "updated_at": "2026-05-25T10:05:00Z",
   "cleaned_up_at": "2026-05-25T08:40:00Z",
   "language": "ja",
   "phase": "implementation-partial",
@@ -24,8 +24,8 @@
     "phase_2_server_fixes": "completed (L1/L2/L3 metric/L5)",
     "phase_4_integration": "completed",
     "phase_5_initial_validation": "completed (verification-report.md)",
-    "phase_6_mandatory_remeasurement": "pending (OTel runtime / Yjs sustained load / L4 retainer / dist server)",
-    "phase_7_conditional_followups": "blocked on Phase 6 verdicts"
+    "phase_6_mandatory_remeasurement": "partial (6.1 done: L2 baseline RSS delta ~0MB / target not achieved; 6.2 / 6.3 / 6.4 pending)",
+    "phase_7_conditional_followups": "blocked on Phase 6 (6.2 / 6.3) verdicts"
   },
   "downstream_consumer_of": ["memory-profiler"]
 }
