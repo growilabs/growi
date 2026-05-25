@@ -180,15 +180,8 @@ profiling ツール本体のシーケンス図（CDP 接続、snapshot 取得、
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1 | profiling モード起動 | ScenarioRunner | `--inspect` で公開された CDP endpoint | Profiling Session Sequence (boot) |
-| 1.2 | CDP 経由 snapshot 保存 | CdpSnapshotClient | CDP `HeapProfiler.takeHeapSnapshot` | Profiling Session Sequence (snapshot) |
-| 1.3 | tmp ディレクトリ配下集約 | ScenarioRunner, RssTimeSeriesLogger | Output path = `apps/app/tmp/memory-leak-investigation/` | Profiling Session Sequence (write) |
-| 1.4 | snapshot 失敗時の非影響 | CdpSnapshotClient | try/catch + logger（GROWI server プロセスは止めない） | — |
-| 2.1 | 3 段階シナリオ | ScenarioRunner, scenarios/{baseline,load,drain}.ts | Phase enum | Profiling Session Sequence (phase boundaries) |
-| 2.2 | Load 段階の混在負荷 (page CRUD / search / read / abort 混在) | LoadDriver, YjsClient | `socket.destroy()` for abort、Elasticsearch search query 経由 | Profiling Session Sequence (Load) |
-| 2.3 | RSS 時系列ログ | RssTimeSeriesLogger | CSV schema (`timestamp,phase,rss,heap_used,heap_total,external`) | — |
-| 2.4 | 各段階境界で snapshot | ScenarioRunner | Phase-transition hook | Profiling Session Sequence (snapshots A/B/C) |
-| 2.5 | 再現可能性 | ScenarioRunner (deterministic op counts) | Scenario module の op count を const で公開 | — |
+| 1.x | profiling ツール利用と検証成果物の保存 | (consumer of `memory-profiler`) | `memory-profiler` の CLI / env var を本 spec 用 op count で起動 | Investigation Session Flow |
+| 2.x | 検証シナリオ op 設定 | (consumer of `memory-profiler`) | env var: `LOAD_*`, `BASELINE_IDLE_SECONDS`, `DRAIN_IDLE_SECONDS` | — |
 | 3.1, 3.2 | MongoDB pool 上下限の env 制御 | MongoosePoolConfig | `mongoOptions: ConnectOptions` extension | — |
 | 3.3 | OTel auto-instrumentation allow-list | OtelInstrumentationAllowList | `node-sdk-configuration.ts` の `instrumentations` 配列 | — |
 | 3.4 | 従来動作への切戻し | OtelInstrumentationAllowList, MongoosePoolConfig | env var `OTEL_AUTO_INSTRUMENTATION_PROFILE`, `MONGO_MAX_POOL_SIZE` | — |
@@ -206,9 +199,9 @@ profiling ツール本体のシーケンス図（CDP 接続、snapshot 取得、
 | 6.1 | finding ごとの verdict | VerificationReport | report の structured section | — |
 | 6.2 | L1+L2 数値比較 | VerificationReport | report の RSS delta section | — |
 | 6.3 | 環境メタ情報 | VerificationReport | report の environment section | — |
-| 6.4 | 手順ドキュメント化 | `bin/memory-profiling/README.md` | README structure | — |
+| 6.4 | 手順ドキュメント化 | (consumer of `memory-profiler`) | `memory-profiler` の README を参照 | — |
 | 6.5 | snapshot 非コミット | `.gitignore` 確認 / report への集計値のみ記載 | — | — |
-| 7.1 | 既存機能非破壊（page CRUD / 検索 / 認証 / yjs / OTel 送出） | 全 server-side コンポーネント, LoadDriver (search / read op で実測) | 既存テスト pass、profiling scenario の Load 段階 | Profiling Session Sequence (Load) |
+| 7.1 | 既存機能非破壊（page CRUD / 検索 / 認証 / yjs / OTel 送出） | 全 server-side コンポーネント | 既存テスト pass、`memory-profiler` の Load 段階で実測 | Investigation Session Flow |
 | 7.2 | env var による切戻し | MongoosePoolConfig, OtelInstrumentationAllowList | env var contracts | — |
 | 7.3 | lint/test/build pass | CI 既存パイプライン | turbo run lint/test/build | — |
 | 7.4 | metric 意味的変化の告知 | VerificationReport | report の "behavior changes" section | — |
@@ -225,13 +218,9 @@ profiling ツール本体のシーケンス図（CDP 接続、snapshot 取得、
 | DefensivePageOperationTimer | Server / Reliability | `autoUpdateExpiryDate` の例外を捕捉してログ | 5.3 | `growi-logger` (P0) | — |
 | YjsIdleSweeper (conditional) | Server / yjs | 確認時のみ idle session を `closeConn` | 5.1, 5.5 | `y-websocket/bin/utils` (P0) | Service |
 | HandlerBackpressure (conditional) | Server / events | 確認時のみ concurrent in-flight handler 上限 | 5.2 | EventEmitter (P0) | Service |
-| ScenarioRunner | Tooling / Profiling | Baseline → Load → Drain の orchestration | 1.4, 2.1, 2.4, 2.5 | scenarios/, cdp-client, rss-logger (P0) | Service |
-| CdpSnapshotClient | Tooling / Profiling | CDP 経由で heap snapshot を取得保存 | 1.1, 1.2, 1.5 | inspector endpoint (P0), `ws` (P0) | Service |
-| LoadDriver | Tooling / Profiling | page CRUD / search / page read / yjs / abort の混在負荷生成 | 2.2, 7.1 | `undici` (P0), yjs-client (P0) | Service |
-| RssTimeSeriesLogger | Tooling / Profiling | `process.memoryUsage` を CSV に記録 | 2.3 | none (P2) | Batch (output file) |
 | VerificationReport | Documentation | 検証結果の構造化レポート | 3.5, 5.4, 6.1, 6.2, 6.3, 7.4 | snapshots, RSS CSV (P0) | — |
 
-> 詳細ブロックは新規コンポーネントと既存コンポーネントへの **責務境界が増減するもの** に絞る。`DefensivePageOperationTimer` は単純な try/catch 追加のため Implementation Note のみで足る。
+> Profiling 経路の component（ScenarioRunner / CdpSnapshotClient / LoadDriver / RssTimeSeriesLogger）は `memory-profiler` spec の責務。本 spec はそれらを consumer として参照するのみ。詳細ブロックは新規コンポーネントと既存コンポーネントへの **責務境界が増減するもの** に絞る。`DefensivePageOperationTimer` は単純な try/catch 追加のため Implementation Note のみで足る。
 
 ### Server / Persistence
 

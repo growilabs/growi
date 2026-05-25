@@ -5,7 +5,7 @@
 **Scope**: server-side (Node.js) memory characterization for GROWI.cloud per-tenant containers running the official GROWI Docker image
 **Method**: static code analysis (dynamic profiling was prevented by the sandbox's outbound network policy blocking MongoDB 4.2+ binary distribution endpoints — see Appendix A)
 
-> **Note (post-implementation)**: Part 2（Design Discovery）以降の profiling tooling に関する記述（Build vs. Adopt 等）は **歴史的記録**。実装責務は `memory-profiler` spec に移管済み。本 spec はそのツールの consumer。
+> **Note (post-implementation)**: Profiling tool 本体の設計・実装責務は `memory-profiler` spec に移管済み。本 spec はそのツールの consumer であり、L1–L5 finding の検証と修正のみを所有する。
 
 ---
 
@@ -276,52 +276,9 @@ packages/logger/src/transport-factory.ts
   - `import { docs } from 'y-websocket/bin/utils'` は既に [yjs.ts:7](../../apps/app/src/server/service/yjs/yjs.ts#L7) で行われている。
 - **Implications**: L3 metric の callback は実質 1 行 (`observableResult.observe(docs.size)`)。後続の sweeper も同じ `docs` Map を iterate する。
 
-### Build vs. Adopt — Heap snapshot 取得手段
-- **Context**: heap snapshot 取得方法の選定。
-- **Sources Consulted**: Node.js Inspector / `v8.writeHeapSnapshot()`、Chrome DevTools Protocol、`clinic` / `heapdump` / `heapsnapshot-parser`
-- **Findings**:
-  - **採用**: `--inspect` 起動 + CDP over WebSocket（外部 sidecar） / `v8.writeHeapSnapshot(path)`（in-process、SIGUSR2 起動）。両方とも Node 標準機能で追加 runtime dependency 不要。
-  - **不採用**: `clinic` 系は profiling 用に node を fork する形で継続稼働モデルと噛み合わない。`heapdump` は Node 24 互換が不安定。
-- **Implications**: 新規 runtime dependency なし。Sidecar 側は `ws`（既存）+ minimal CDP client。
-
-### Build vs. Adopt — Load driver
-- **Context**: 負荷生成スクリプトの選定。
-- **Sources Consulted**: `autocannon`, `k6`, `undici`, 既存 `apps/app/test/integration/` パターン
-- **Findings**:
-  - **採用**: `undici`（Node 24 標準・既存依存）で順次 HTTP リクエスト発行する custom スクリプト。シナリオごとに request 列を別 module。
-  - **不採用**: `k6`（別バイナリ）、`autocannon`（throughput-focused でシナリオ表現力が弱い）、`@playwright/test`（browser 駆動が過剰）。
-  - y-websocket セッションの open/close は `ws` + minimal `Y.Doc` client で模擬。abort（half-close）は `socket.destroy()`。
-- **Implications**: 新規 runtime dependency なし。スクリプトは `bin/memory-profiling/`（`@growi/bin` workspace package）に集約。
-  > **Update**: 初期 design では `apps/app/tools/memory-profiling/` 配下に置く想定だったが、実装過程で workspace 分離（`bin/`）に移行した（commit `b8e3efa4c7`）。
-
-### Integration Risk — SIGUSR2 ハンドラ（実装中に棄却）
-- **Context**: GROWI server に SIGUSR2 ハンドラを追加することの安全性確認。
-- **Sources Consulted**: `apps/app/src/server/app.ts`, Node.js signal docs
-- **Findings**:
-  - SIGUSR2 は Node の内部利用（debugger）と衝突しうる。`MEMORY_PROFILING_ENABLED=true` の場合のみハンドラ登録する形が安全。
-- **Implications (revised)**: ハンドラは当初 `apps/app/src/server/util/heap-snapshot-handler.ts` に隔離する設計だったが、実装中に CDP (Chrome DevTools Protocol) クライアントが信頼できる主経路として確立したため SIGUSR2 経路は **完全に削除** した（commit `b8e3efa4c7`）。`apps/app` への signal handler 追加面と新規 env var はゼロとなった。
-
-## Architecture Pattern Evaluation
-
-| Option | Description | Strengths | Risks / Limitations | Notes |
-|--------|-------------|-----------|---------------------|-------|
-| Inline profiling code in server | Snapshot 取得・シナリオ実行を server 内に組み込む | Single process | Production にも profiling code 混入、責務肥大 | 不採用 |
-| **External sidecar (CDP-only)**（採用） | server は通常起動（`--inspect`）のみ。シナリオ実行と CDP-based snapshot 取得は別プロセス・別 workspace | 関心の分離、production への影響ゼロ（apps/app への追加面なし）、再利用容易 | 起動・接続手順がやや複雑（README で吸収） | 採用 |
-| External sidecar + SIGUSR2 hook | 上記 + CDP 不可時の SIGUSR2 fallback | CDP 不可時の retreat | apps/app への signal handler 追加が必要 | 初期採用 → 実装中に削除 |
-| Forked profiling binary（`clinic` 系） | 別ツールに丸投げ | 自前実装ゼロ | 実行モデル不一致、custom シナリオ表現困難 | 不採用 |
+> **Note**: Profiling tooling（heap snapshot 取得手段、load driver、sidecar アーキテクチャ）の選定や Build vs. Adopt 判断は `memory-profiler` spec の責務に移管済み。本 spec は同ツールを **利用するのみ** であり、ツール本体の設計判断は `.kiro/specs/memory-profiler/research.md` を参照。
 
 ## Design Decisions
-
-### Decision: External sidecar (CDP-only) で profiling を分離する
-- **Context**: profiling 機能を server 本体にどこまで埋め込むか。
-- **Alternatives Considered**:
-  1. Server に常駐させて env var で gate
-  2. External sidecar が CDP + SIGUSR2 を駆動し、server 側は minimal hook のみ
-  3. **External sidecar が CDP のみで完結し、server 側は通常通り `--inspect` で起動するだけ**
-- **Selected Approach**: 当初 2 を採用したが、実装過程で 3 に切り替えた。Sidecar / シナリオ / RSS ロガーは `bin/memory-profiling/`（`@growi/bin` workspace）、server 側は **追加面ゼロ**（CDP のみで完結）。
-- **Rationale**: CDP `HeapProfiler.takeHeapSnapshot` が devcontainer 環境で安定動作することが確認できたため、SIGUSR2 fallback は不要と判断。`apps/app` への signal handler 追加と新規 env var を排除することで production への影響を完全にゼロにできた。
-- **Trade-offs**: + production 安全 / + apps/app への追加面ゼロ / + 関心の分離 / − CDP 不可時の fallback がないが、devcontainer では `--inspect` 起動が前提のため実質問題なし。
-- **Follow-up**: CDP の挙動は Node 24 で再確認済。将来 SIGUSR2 fallback が必要になった場合は本 spec で再評価。
 
 ### Decision: L1 / L2 の env var は新規追加とし、未指定時 default を本 spec 推奨値とする
 - **Context**: 既存 production の default を変更すると無告知の振る舞い変化が起きる。
@@ -346,11 +303,10 @@ packages/logger/src/transport-factory.ts
 - **Follow-up**: `opentelemetry` spec の Metric Schema 表を本 metric 追加に合わせて update（同 spec の Revalidation Trigger 該当）。
 
 ## Risks & Mitigations
-- **R1: SIGUSR2 ハンドラと Node inspector の衝突** — `MEMORY_PROFILING_ENABLED` で gate し production では絶対に登録しない。devcontainer で `--inspect` 併用時の smoke を実装後に行う。
-- **R2: Mongoose pool size 縮小による性能リグレッション** — 大規模テナント（高トラフィック）では `maxPoolSize: 10` が飽和する可能性。env var で運用者 override 可能、release notes で「大規模テナントはチューニング推奨」と明示。
-- **R3: OTel auto-instrumentation 絞り込みでトレース欠落** — 「現状観測スパン種」と「絞り込み後スパン種」を実装前に diff。意図しない欠落があれば allow-list に追加。
-- **R4: Heap snapshot ファイルの肥大化** — Snapshot 1 枚 50–300 MB 想定。`tmp/memory-leak-investigation/` のみに置き、`.gitignore` 確認 + verification report には集計値のみ。
-- **R5: y-websocket abort シナリオ（half-close）再現困難** — TCP RST 送信は OS / Node 制約あり。`socket.destroy()` でカーネル close を強制。再現できない finding は inconclusive 扱い。
+- **R1: Mongoose pool size 縮小による性能リグレッション** — 大規模テナント（高トラフィック）では `maxPoolSize: 10` が飽和する可能性。env var で運用者 override 可能、release notes で「大規模テナントはチューニング推奨」と明示。
+- **R2: OTel auto-instrumentation 絞り込みでトレース欠落** — 「現状観測スパン種」と「絞り込み後スパン種」を実装前に diff。意図しない欠落があれば allow-list に追加。
+
+> Profiling tool 運用（snapshot ファイルサイズ管理、abort シナリオ再現性等）に関するリスクは `memory-profiler` spec が扱う。
 
 ## References
 - Part 1（本ファイル上部）— 静的解析レポート L1-L5

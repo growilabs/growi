@@ -51,46 +51,7 @@
 
 ## 3. Core — Profiling sidecar (責務移管済み)
 
-> Profiling sidecar 群（CDP snapshot client / Load driver / RSS time-series logger / Scenarios）の **実装責務は `memory-profiler` spec に移管** した。ツールへの変更は同 spec を起点に行う。以下は歴史的記録（実装済み task）として残す。
-
-- [x] 3.1 (P) CDP snapshot client の実装
-  - `bin/memory-profiling/cdp-snapshot-client.ts` を作成し、inspector endpoint (`http://127.0.0.1:9229/json/list`) から `webSocketDebuggerUrl` を取得して WebSocket 接続する API を提供する。
-  - `HeapProfiler.takeHeapSnapshot` を発行し、chunked snapshot bytes を結合して `.heapsnapshot` ファイルとして指定パスへ書き出す。
-  - 接続失敗時は exponential backoff で最大 5 回 retry し、それでも駄目なら例外で fail する。
-  - Snapshot 取得失敗時もコネクションは確実に close する（要件 1.5）。
-  - 観測可能な完了条件: scenario runner から `cdpClient.takeSnapshot('/tmp/.../baseline-a.heapsnapshot')` を呼ぶと当該パスに 1 MB 以上のバイナリファイルが生成される（devcontainer での単体動作確認）。
-  - _Requirements: 1.1, 1.2, 1.5_
-  - _Boundary: CdpSnapshotClient_
-
-- [x] 3.2 (P) Load driver と HTTP / YJS lib の実装
-  - `bin/memory-profiling/lib/installer-driver.ts` で `/api/v3/installer/` への自動 admin 作成（既存 endpoint の request payload を再利用）。
-  - `bin/memory-profiling/lib/http-client.ts` で `undici` ベースの cookie-aware HTTP client を提供。
-  - `bin/memory-profiling/lib/yjs-client.ts` で `ws` + minimal `Y.Doc` の y-websocket クライアント（open / clean close / abort via `socket.destroy()`）を提供。
-  - `bin/memory-profiling/load-driver.ts` で上記 lib を合成した `LoadDriver` interface（`pageCreate`, `pageEdit`, `pageGet`, `pageList`, `pageSearch`, `yjsSessionCleanClose`, `yjsSessionAbort`）を実装する。
-  - `pageSearch` は GROWI の Elasticsearch search endpoint を叩く（固定の query 文字列パターンを使い、再現可能性を担保）。`pageGet` / `pageList` は markdown render / page tree walk を経由する代表 endpoint を呼ぶ。
-  - 観測可能な完了条件: `pnpm --filter @growi/bin test` で load-driver の unit test が green。実機 smoke は Task 4.2 の scenario runner 経由でカバーする。
-  - _Requirements: 2.2, 7.1_
-  - _Boundary: LoadDriver_
-
-- [x] 3.3 (P) RSS time-series logger の実装
-  - `bin/memory-profiling/rss-time-series-logger.ts` を作成し、CDP の `Runtime.evaluate` で `process.memoryUsage()` を 1 秒間隔で取得する。
-  - 取得値（`rss`, `heapUsed`, `heapTotal`, `external`）を CSV 形式（schema: `timestamp,phase,rss,heap_used,heap_total,external`）で `apps/app/tmp/memory-leak-investigation/<runDir>/rss-timeseries.csv` に追記する。
-  - Phase ラベル（`baseline` / `load` / `drain`）は scenario runner から `mark(phase)` で切り替えられる。
-  - 既存 CSV があれば `rss-timeseries.{ISO8601}.csv` へ archive してから新規作成する。
-  - 観測可能な完了条件: 30 秒程度動かしたとき CSV が 30 行程度作成され、`phase` 列が想定通り切り替わる。
-  - _Requirements: 2.3_
-  - _Boundary: RssTimeSeriesLogger_
-
-- [x] 3.4 (P) シナリオモジュールの実装
-  - `bin/memory-profiling/scenarios/baseline.ts` を作成し、5 分（env var で override 可）の idle phase を実行する。
-  - `bin/memory-profiling/scenarios/load.ts` を作成し、page create / page edit / page get / page list / page search / yjs clean close / yjs abort の各 op 回数を const として定義し、それらを混在実行する。read / search 系は L2 (OTel allow-list) による検索パスの非破壊性を実測する目的を持つ（Req 7.1）。
-  - 初期値は再現可能性とランタイム見積もりのバランスを取って次を採用する: `pageCreate=20`, `pageEdit=20`, `pageGet=50`, `pageList=10`, `pageSearch=30`, `yjsSessionsCleanClose=10`, `yjsSessionsAbort=10`。env var / CLI で override 可能。
-  - `bin/memory-profiling/scenarios/drain.ts` を作成し、Load 後の 5 分 idle phase を実行する。
-  - 各 op 回数は scenario module から named export し、再現可能性のため source of truth とする。
-  - LoadDriver の interface は design.md の `Service Interface` 定義を型として受け取り、実装本体への依存は持たない（実際の wire-up は 4.2 の scenario runner が行う）。
-  - 観測可能な完了条件: 3 モジュールが LoadDriver interface を受ける関数として実装され、`pnpm vitest run scenarios` の fake-LoadDriver を渡す unit test が green。fake-LoadDriver に対し search / get / list が想定回数呼ばれたことが assertion される。
-  - _Requirements: 2.1, 2.2, 2.5, 7.1_
-  - _Boundary: scenarios baseline load drain_
+> Profiling sidecar 群（CDP snapshot client / Load driver / RSS time-series logger / Scenarios）の実装・interface・operational procedure は `memory-profiler` spec の責務。本 spec から実装履歴は削除し、同 spec の `tasks.md` / `design.md` を参照する。本 spec は同ツールの consumer として Phase 5 以降で利用する。
 
 ## 4. Integration
 
@@ -104,10 +65,6 @@
   - _Depends: 2.3_
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _Boundary: YjsDocsMetric, opentelemetry custom-metrics index_
-
-- [x] 4.2 (移管済み) Scenario runner と sidecar エントリポイントの統合
-  - **責務移管**: `bin/memory-profiling/run-scenario.ts` の実装は `memory-profiler` spec の管理下。本 spec はその CLI を **利用する** のみ（Phase 5 / 6 で呼び出し）。
-  - 既に実装済み（commit `751aa3c67c`）であり、本 spec 内では cross-reference のために残す。
 
 - [x] 4.3 Lint / type-check / unit & integration test / build を pass させる
   - `turbo run lint --filter @growi/app` / `turbo run test --filter @growi/app` / `turbo run build --filter @growi/app` を順に実行する。さらに `pnpm --filter @growi/bin test` も含める。
