@@ -184,7 +184,7 @@ describe('migrateContributions', () => {
 
     const pageUpdateActivity: IActivity = {
       user: userId,
-      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      action: ContributionGraphActions.ACTION_PAGE_UPDATE,
       createdAt: new Date('2025-11-05T00:00:00Z'), // 5 days ago
     };
 
