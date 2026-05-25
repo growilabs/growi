@@ -49,18 +49,38 @@ type GetPageContentResult =
   | GetPageContentFailureResult;
 
 // Helper to invoke the tool's execute the same way the Mastra runtime does.
-const invokeExecute = (
+// Narrows the return shape ONCE here so callers can branch on `result.result`
+// without per-call casts. The two `as never` args are unavoidable: Mastra's
+// `execute` signature uses `unknown` for both input and the context envelope.
+const invokeExecute = async (
   inputData: { pageId?: string; pagePath?: string },
   requestContext: RequestContext<MastraRequestContextShape>,
 ): Promise<GetPageContentResult> => {
   // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
-  return getPageContentTool.execute!(
+  const result = await getPageContentTool.execute!(
     inputData as never,
-    {
-      requestContext,
-    } as never,
-  ) as Promise<GetPageContentResult>;
+    { requestContext } as never,
+  );
+  return result as GetPageContentResult;
 };
+
+// Asserts the tool returned a success result and narrows the static type
+// to `GetPageContentOkResult`. Replaces per-call `as GetPageContentOkResult`
+// casts in callers — failure to receive `ok` fails the test loudly here.
+function assertOk(
+  result: GetPageContentResult,
+): asserts result is GetPageContentOkResult {
+  expect(result.result).toBe('ok');
+}
+
+// Asserts the tool returned a failure result and narrows the static type
+// to `GetPageContentFailureResult`. Mirrors `assertOk` for the negative side
+// so `result.reason` is statically available without a cast.
+function assertFailure(
+  result: GetPageContentResult,
+): asserts result is GetPageContentFailureResult {
+  expect(result.result).not.toBe('ok');
+}
 
 describe('getPageContentTool (integration)', () => {
   let Page: PageModel;
@@ -102,13 +122,27 @@ describe('getPageContentTool (integration)', () => {
     // configManager loading); the returned Crowi instance is not used here.
     await getInstance();
 
+    // `mongoose.model(name)` without generics returns `Model<any>`. Passing
+    // the document shape via the generic narrows it to the matching
+    // `Model<T>` for User/Revision/UserGroup/UserGroupRelation without per-
+    // call casts. Page keeps its `<PageDocument, PageModel>` form because
+    // its schema methods are typed on `PageModel`.
+    type RevisionDoc = {
+      pageId: mongoose.Types.ObjectId;
+      body: string;
+      format: string;
+      author: mongoose.Types.ObjectId;
+    };
+    type UserGroupRelationDoc = {
+      relatedGroup: mongoose.Types.ObjectId;
+      relatedUser: mongoose.Types.ObjectId;
+    };
     Page = mongoose.model<PageDocument, PageModel>('Page');
-    User = mongoose.model('User') as unknown as typeof User;
-    Revision = mongoose.model('Revision') as unknown as typeof Revision;
-    UserGroup = mongoose.model('UserGroup') as unknown as typeof UserGroup;
-    UserGroupRelation = mongoose.model(
-      'UserGroupRelation',
-    ) as unknown as typeof UserGroupRelation;
+    User = mongoose.model<IUserHasId>('User');
+    Revision = mongoose.model<RevisionDoc>('Revision');
+    UserGroup = mongoose.model<{ name: string }>('UserGroup');
+    UserGroupRelation =
+      mongoose.model<UserGroupRelationDoc>('UserGroupRelation');
 
     // Users: A (owner / group member) and B (non-owner / non-member).
     const userAName = `get-page-content-integ-userA-${WORKER_ID}`;
@@ -126,14 +160,19 @@ describe('getPageContentTool (integration)', () => {
         email: `${userBName}@example.com`,
       },
     ]);
-    userA = insertedUsers[0] as unknown as IUserHasId;
-    userB = insertedUsers[1] as unknown as IUserHasId;
+    // `User` is typed as `Model<IUserHasId>`, so insertMany returns
+    // `(IUserHasId & Document)[]` — already assignable to IUserHasId.
+    userA = insertedUsers[0];
+    userB = insertedUsers[1];
 
     // Group G containing only user A. User B is NOT a member.
     const groupName = `get-page-content-integ-group-${WORKER_ID}`;
     await UserGroup.deleteMany({ name: groupName });
     const insertedGroup = await UserGroup.create({ name: groupName });
-    groupG = insertedGroup as unknown as { _id: mongoose.Types.ObjectId };
+    // Mongoose's `Document._id` is loosely typed from Model.create's return
+    // shape; narrow to ObjectId via a single, scoped cast (the schema
+    // guarantees this; we only use _id below).
+    groupG = { _id: insertedGroup._id as mongoose.Types.ObjectId };
     await UserGroupRelation.deleteMany({ relatedGroup: groupG._id });
     await UserGroupRelation.create({
       relatedGroup: groupG._id,
@@ -284,12 +323,12 @@ describe('getPageContentTool (integration)', () => {
 
   describe('GRANT_PUBLIC', () => {
     it('returns ok with body and path for the owning user (A) via pageId', async () => {
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pageId: publicPageId },
         buildRequestContext(userA),
-      )) as GetPageContentOkResult;
+      );
 
-      expect(result.result).toBe('ok');
+      assertOk(result);
       expect(result.page.path).toBe(pagePathPublic);
       expect(result.page.body).toBe(bodyPublic);
       // updatedAt is the page's updatedAt (Date.toISOString() format).
@@ -297,12 +336,12 @@ describe('getPageContentTool (integration)', () => {
     });
 
     it('returns ok for a non-owner user (B) via pageId (PUBLIC is visible to all viewers)', async () => {
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pageId: publicPageId },
         buildRequestContext(userB),
-      )) as GetPageContentOkResult;
+      );
 
-      expect(result.result).toBe('ok');
+      assertOk(result);
       expect(result.page.path).toBe(pagePathPublic);
       expect(result.page.body).toBe(bodyPublic);
     });
@@ -310,22 +349,23 @@ describe('getPageContentTool (integration)', () => {
 
   describe('GRANT_OWNER', () => {
     it('returns ok for the owner (A) via pageId', async () => {
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pageId: ownerPageId },
         buildRequestContext(userA),
-      )) as GetPageContentOkResult;
+      );
 
-      expect(result.result).toBe('ok');
+      assertOk(result);
       expect(result.page.path).toBe(pagePathOwner);
       expect(result.page.body).toBe(bodyOwner);
     });
 
     it('returns not_found_or_forbidden for a non-owner (B) via pageId', async () => {
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pageId: ownerPageId },
         buildRequestContext(userB),
-      )) as GetPageContentFailureResult;
+      );
 
+      assertFailure(result);
       expect(result.result).toBe('not_found_or_forbidden');
       expect(typeof result.reason).toBe('string');
     });
@@ -333,22 +373,23 @@ describe('getPageContentTool (integration)', () => {
 
   describe('GRANT_USER_GROUP', () => {
     it('returns ok for a group member (A) via pageId', async () => {
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pageId: groupPageId },
         buildRequestContext(userA),
-      )) as GetPageContentOkResult;
+      );
 
-      expect(result.result).toBe('ok');
+      assertOk(result);
       expect(result.page.path).toBe(pagePathGroup);
       expect(result.page.body).toBe(bodyGroup);
     });
 
     it('returns not_found_or_forbidden for a non-member (B) via pageId', async () => {
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pageId: groupPageId },
         buildRequestContext(userB),
-      )) as GetPageContentFailureResult;
+      );
 
+      assertFailure(result);
       expect(result.result).toBe('not_found_or_forbidden');
       expect(typeof result.reason).toBe('string');
     });
@@ -356,12 +397,12 @@ describe('getPageContentTool (integration)', () => {
 
   describe('GRANT_RESTRICTED (link-share)', () => {
     it('returns ok for the page owner (A) via pageId', async () => {
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pageId: restrictedPageId },
         buildRequestContext(userA),
-      )) as GetPageContentOkResult;
+      );
 
-      expect(result.result).toBe('ok');
+      assertOk(result);
       expect(result.page.path).toBe(pagePathRestricted);
       expect(result.page.body).toBe(bodyRestricted);
     });
@@ -373,12 +414,12 @@ describe('getPageContentTool (integration)', () => {
     // tool inherits this existing behavior — it does NOT enforce its own
     // grant logic (requirement 2.7).
     it('returns ok for a non-owner (B) via pageId (link-share behavior of findByIdAndViewer)', async () => {
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pageId: restrictedPageId },
         buildRequestContext(userB),
-      )) as GetPageContentOkResult;
+      );
 
-      expect(result.result).toBe('ok');
+      assertOk(result);
       expect(result.page.path).toBe(pagePathRestricted);
       expect(result.page.body).toBe(bodyRestricted);
     });
@@ -387,12 +428,12 @@ describe('getPageContentTool (integration)', () => {
     // which internally sets `includeAnyoneWithTheLink = useFindOne = true`
     // (see page.ts line 841). Same documented behavior as the pageId path.
     it('returns ok for a non-owner (B) via pagePath (link-share behavior of findByPathAndViewer)', async () => {
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pagePath: pagePathRestricted },
         buildRequestContext(userB),
-      )) as GetPageContentOkResult;
+      );
 
-      expect(result.result).toBe('ok');
+      assertOk(result);
       expect(result.page.path).toBe(pagePathRestricted);
       expect(result.page.body).toBe(bodyRestricted);
     });
@@ -402,11 +443,12 @@ describe('getPageContentTool (integration)', () => {
     it('returns not_found_or_forbidden for a random non-existent ObjectId via pageId', async () => {
       const nonExistentId = new mongoose.Types.ObjectId().toString();
 
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pageId: nonExistentId },
         buildRequestContext(userA),
-      )) as GetPageContentFailureResult;
+      );
 
+      assertFailure(result);
       // Cannot be distinguished from "no permission" — this is the design
       // intent for information-leak prevention (design.md Security section).
       expect(result.result).toBe('not_found_or_forbidden');
@@ -416,11 +458,12 @@ describe('getPageContentTool (integration)', () => {
     it('returns not_found_or_forbidden for an unknown pagePath via pagePath', async () => {
       const nonExistentPath = `/get-page-content-integ/${WORKER_ID}/does-not-exist-${Date.now()}`;
 
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pagePath: nonExistentPath },
         buildRequestContext(userA),
-      )) as GetPageContentFailureResult;
+      );
 
+      assertFailure(result);
       expect(result.result).toBe('not_found_or_forbidden');
       expect(typeof result.reason).toBe('string');
     });
@@ -428,50 +471,52 @@ describe('getPageContentTool (integration)', () => {
 
   describe('pagePath lookup with grant enforcement', () => {
     it('returns ok for the GRANT_PUBLIC page via pagePath (both users)', async () => {
-      const resultForA = (await invokeExecute(
+      const resultForA = await invokeExecute(
         { pagePath: pagePathPublic },
         buildRequestContext(userA),
-      )) as GetPageContentOkResult;
-      const resultForB = (await invokeExecute(
+      );
+      const resultForB = await invokeExecute(
         { pagePath: pagePathPublic },
         buildRequestContext(userB),
-      )) as GetPageContentOkResult;
+      );
 
-      expect(resultForA.result).toBe('ok');
+      assertOk(resultForA);
+      assertOk(resultForB);
       expect(resultForA.page.path).toBe(pagePathPublic);
       expect(resultForA.page.body).toBe(bodyPublic);
-      expect(resultForB.result).toBe('ok');
       expect(resultForB.page.path).toBe(pagePathPublic);
       expect(resultForB.page.body).toBe(bodyPublic);
     });
 
     it('returns ok for the GRANT_OWNER page via pagePath for owner (A) but not_found_or_forbidden for non-owner (B)', async () => {
-      const resultForA = (await invokeExecute(
+      const resultForA = await invokeExecute(
         { pagePath: pagePathOwner },
         buildRequestContext(userA),
-      )) as GetPageContentOkResult;
-      const resultForB = (await invokeExecute(
+      );
+      const resultForB = await invokeExecute(
         { pagePath: pagePathOwner },
         buildRequestContext(userB),
-      )) as GetPageContentFailureResult;
+      );
 
-      expect(resultForA.result).toBe('ok');
+      assertOk(resultForA);
+      assertFailure(resultForB);
       expect(resultForA.page.path).toBe(pagePathOwner);
       expect(resultForA.page.body).toBe(bodyOwner);
       expect(resultForB.result).toBe('not_found_or_forbidden');
     });
 
     it('returns ok for the GRANT_USER_GROUP page via pagePath for member (A) but not_found_or_forbidden for non-member (B)', async () => {
-      const resultForA = (await invokeExecute(
+      const resultForA = await invokeExecute(
         { pagePath: pagePathGroup },
         buildRequestContext(userA),
-      )) as GetPageContentOkResult;
-      const resultForB = (await invokeExecute(
+      );
+      const resultForB = await invokeExecute(
         { pagePath: pagePathGroup },
         buildRequestContext(userB),
-      )) as GetPageContentFailureResult;
+      );
 
-      expect(resultForA.result).toBe('ok');
+      assertOk(resultForA);
+      assertFailure(resultForB);
       expect(resultForA.page.path).toBe(pagePathGroup);
       expect(resultForA.page.body).toBe(bodyGroup);
       expect(resultForB.result).toBe('not_found_or_forbidden');

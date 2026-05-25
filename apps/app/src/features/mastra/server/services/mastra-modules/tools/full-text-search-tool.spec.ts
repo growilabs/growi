@@ -50,6 +50,9 @@ const buildRequestContext = (): RequestContext<MastraRequestContextShape> =>
 
 // Minimal IUserHasId-shaped object. The tool MUST pass this through by
 // reference (no synthetic re-creation, no User.findById round-trip).
+// The single cast inside this builder is the ONLY boundary where we admit
+// that our test fixture isn't a full Mongoose document — every call site
+// stays cast-free.
 const buildMockUser = (): IUserHasId =>
   ({
     _id: 'user1',
@@ -62,21 +65,39 @@ type MockSearchService = {
   searchKeyword: ReturnType<typeof vi.fn>;
 };
 
+// Build a SearchService-typed mock. The cast inside this builder isolates
+// the boundary where the mock satisfies the SearchService interface — the
+// tool only reads `isElasticsearchEnabled` and `searchKeyword`, so a partial
+// stub typed as the real class is sufficient. Call sites stay cast-free.
 const buildMockSearchService = (
   overrides: Partial<MockSearchService> = {},
-): MockSearchService => ({
-  isElasticsearchEnabled: true,
-  searchKeyword: vi.fn(),
-  ...overrides,
-});
+): MockSearchService & SearchService => {
+  const mock: MockSearchService = {
+    isElasticsearchEnabled: true,
+    searchKeyword: vi.fn(),
+    ...overrides,
+  };
+  return mock as unknown as MockSearchService & SearchService;
+};
 
-// Cast helper: tests only exercise the two fields the tool actually reads.
-const asSearchService = (m: MockSearchService): SearchService =>
-  m as unknown as SearchService;
+// Discriminated union mirroring the tool's outputSchema. Defined locally so
+// callers can read `result.result === 'ok'` and access `.hits` / `.reason`
+// without per-call narrowing casts.
+type FullTextSearchToolResult =
+  | {
+      result: 'ok';
+      hits: Array<{ pageId: string; pagePath: string; snippet?: string }>;
+      totalCount: number;
+    }
+  | { result: 'error' | 'context_error'; reason: string };
+
+// Mastra's validateToolInput wrapper returns this envelope shape (not the
+// discriminated union) when zod input validation fails.
+type ValidationFailure = { error: true; validationErrors: unknown };
 
 // Invoke the tool's execute. The mastra runtime calls execute with
 // `(inputData, { requestContext, ... })`, so tests mirror that shape.
-const invokeExecute = (
+const invokeExecute = async (
   inputData: {
     query: string;
     limit?: number;
@@ -84,15 +105,23 @@ const invokeExecute = (
     order?: string;
   },
   requestContext: RequestContext<MastraRequestContextShape>,
-) => {
+): Promise<FullTextSearchToolResult | ValidationFailure> => {
+  // The Mastra runtime's `execute` signature is intentionally loose
+  // (`unknown` input / output), so a single `as never` per arg is unavoidable
+  // here. Narrow the return shape ONCE so callers don't repeat the cast.
   // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
-  return fullTextSearchTool.execute!(
+  const result = await fullTextSearchTool.execute!(
     inputData as never,
-    {
-      requestContext,
-    } as never,
+    { requestContext } as never,
   );
+  return result as FullTextSearchToolResult | ValidationFailure;
 };
+
+// Type-guard to discriminate the validation envelope from the success/error
+// discriminated union without a cast at the call site.
+const isValidationFailure = (
+  r: FullTextSearchToolResult | ValidationFailure,
+): r is ValidationFailure => 'error' in r && r.error === true;
 
 describe('fullTextSearchTool', () => {
   beforeEach(() => {
@@ -110,19 +139,21 @@ describe('fullTextSearchTool', () => {
       const mockUser = buildMockUser();
       const mockSearchService = buildMockSearchService();
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
       // Mastra wraps execute with validateToolInput. An empty `query` violates
       // the zod `min(1)` rule, so the wrapper returns a ValidationError object
       // without ever invoking the user-provided execute body.
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { query: '', limit: 5 },
         requestContext,
-      )) as { error?: boolean; validationErrors?: unknown };
+      );
 
       expect(result).toBeDefined();
-      expect(result.error).toBe(true);
-      expect(result.validationErrors).toBeDefined();
+      expect(isValidationFailure(result)).toBe(true);
+      if (isValidationFailure(result)) {
+        expect(result.validationErrors).toBeDefined();
+      }
       // The execute body never ran, so searchKeyword was not called.
       expect(mockSearchService.searchKeyword).not.toHaveBeenCalled();
     });
@@ -133,16 +164,20 @@ describe('fullTextSearchTool', () => {
       const requestContext = buildRequestContext();
       const mockSearchService = buildMockSearchService();
       // Intentionally do NOT set 'user'.
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { query: 'hello', limit: 5 },
         requestContext,
-      )) as { result: string; reason?: string };
+      );
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('context_error');
-      expect(typeof result.reason).toBe('string');
-      expect(result.reason?.length ?? 0).toBeGreaterThan(0);
+      if (result.result === 'context_error' || result.result === 'error') {
+        expect(typeof result.reason).toBe('string');
+        expect(result.reason.length).toBeGreaterThan(0);
+      }
       expect(mockSearchService.searchKeyword).not.toHaveBeenCalled();
     });
 
@@ -152,11 +187,13 @@ describe('fullTextSearchTool', () => {
       // Intentionally do NOT set 'searchService'.
       requestContext.set('user', mockUser);
 
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { query: 'hello', limit: 5 },
         requestContext,
-      )) as { result: string; reason?: string };
+      );
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('context_error');
     });
   });
@@ -169,15 +206,19 @@ describe('fullTextSearchTool', () => {
         isElasticsearchEnabled: false,
       });
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { query: 'hello', limit: 5 },
         requestContext,
-      )) as { result: string; reason?: string };
+      );
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('error');
-      expect(result.reason).toBe('elasticsearch_not_configured');
+      if (result.result === 'error' || result.result === 'context_error') {
+        expect(result.reason).toBe('elasticsearch_not_configured');
+      }
       // Critical: must short-circuit BEFORE delegating to the search service.
       expect(mockSearchService.searchKeyword).not.toHaveBeenCalled();
     });
@@ -190,7 +231,7 @@ describe('fullTextSearchTool', () => {
       const mockSearchService = buildMockSearchService();
       mockSearchService.searchKeyword.mockRejectedValue(new Error('boom'));
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
       // Must NOT throw — requirement 6.8 demands the agent loop keep running.
       await expect(
@@ -206,15 +247,19 @@ describe('fullTextSearchTool', () => {
         new Error('boom-detail'),
       );
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { query: 'anything', limit: 5 },
         requestContext,
-      )) as { result: string; reason?: string };
+      );
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('error');
-      expect(result.reason).toBe('boom-detail');
+      if (result.result === 'error' || result.result === 'context_error') {
+        expect(result.reason).toBe('boom-detail');
+      }
     });
   });
 
@@ -239,18 +284,17 @@ describe('fullTextSearchTool', () => {
         'es-delegator',
       ]);
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { query: 'hello', limit: 5 },
         requestContext,
-      )) as {
-        result: string;
-        hits: Array<{ pageId: string; pagePath: string; snippet?: string }>;
-        totalCount: number;
-      };
+      );
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
       expect(result.totalCount).toBe(1);
       // Exact shape — `body` must NOT appear on the hit.
       expect(result.hits).toHaveLength(1);
@@ -288,17 +332,17 @@ describe('fullTextSearchTool', () => {
         'es-delegator',
       ]);
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { query: 'hello', limit: 5 },
         requestContext,
-      )) as {
-        result: string;
-        hits: Array<{ pageId: string; pagePath: string; snippet?: string }>;
-      };
+      );
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
       expect(result.hits[0]).toEqual({
         pageId: 'noHighlight',
         pagePath: '/p2',
@@ -322,7 +366,7 @@ describe('fullTextSearchTool', () => {
         'es-delegator',
       ]);
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
       await invokeExecute({ query: 'hello', limit: 5 }, requestContext);
 
@@ -347,7 +391,7 @@ describe('fullTextSearchTool', () => {
         'es-delegator',
       ]);
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
       // Composite operator query: prefix:, exclusion, tag:, phrase.
       const rawQuery = 'prefix:/docs -draft tag:meeting "release notes"';
@@ -380,7 +424,7 @@ describe('fullTextSearchTool', () => {
         'es-delegator',
       ]);
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
       const gid1 = 'group-id-internal';
       const gid2 = 'group-id-external';
@@ -408,7 +452,7 @@ describe('fullTextSearchTool', () => {
       const mockUser = buildMockUser();
       const mockSearchService = buildMockSearchService();
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
       mocks.userGroupRelationFindAllMock.mockRejectedValueOnce(
         new Error('user-group-relation-failed'),
@@ -416,13 +460,17 @@ describe('fullTextSearchTool', () => {
 
       // Must NOT throw — the try/catch envelope around the resolution + search
       // call converts the exception into a structured error value.
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { query: 'hello', limit: 5 },
         requestContext,
-      )) as { result: string; reason?: string };
+      );
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('error');
-      expect(result.reason).toBe('user-group-relation-failed');
+      if (result.result === 'error' || result.result === 'context_error') {
+        expect(result.reason).toBe('user-group-relation-failed');
+      }
       // searchKeyword must not be reached when group resolution fails.
       expect(mockSearchService.searchKeyword).not.toHaveBeenCalled();
     });
@@ -442,7 +490,7 @@ describe('fullTextSearchTool', () => {
         'es-delegator',
       ]);
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
       await invokeExecute(
         { query: 'hello', limit: 10, sort: 'updatedAt', order: 'asc' },
@@ -478,7 +526,7 @@ describe('fullTextSearchTool', () => {
         'es-delegator',
       ]);
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
       // Omit sort / order entirely; zod `.default(...)` should fire before
       // execute is invoked, so the tool body receives the defaults.
@@ -500,20 +548,27 @@ describe('fullTextSearchTool', () => {
       const mockUser = buildMockUser();
       const mockSearchService = buildMockSearchService();
       requestContext.set('user', mockUser);
-      requestContext.set('searchService', asSearchService(mockSearchService));
+      requestContext.set('searchService', mockSearchService);
 
       // 'unknown_axis' is not in SORT_AXIS; Mastra's validateToolInput wrapper
       // must reject it before the execute body runs, mirroring the empty-query
       // validation-error envelope.
-      const result = (await invokeExecute(
-        // biome-ignore lint/suspicious/noExplicitAny: intentional invalid input
-        { query: 'hello', limit: 5, sort: 'unknown_axis' as any },
-        requestContext,
-      )) as { error?: boolean; validationErrors?: unknown };
+      // The cast is intentional: this test deliberately violates the input
+      // schema to verify zod rejection. `as unknown as ...` (rather than `any`)
+      // keeps the erasure scoped — we still type the invokeExecute parameter.
+      const invalidInput = {
+        query: 'hello',
+        limit: 5,
+        sort: 'unknown_axis',
+      } as unknown as { query: string; limit: number; sort: string };
+
+      const result = await invokeExecute(invalidInput, requestContext);
 
       expect(result).toBeDefined();
-      expect(result.error).toBe(true);
-      expect(result.validationErrors).toBeDefined();
+      expect(isValidationFailure(result)).toBe(true);
+      if (isValidationFailure(result)) {
+        expect(result.validationErrors).toBeDefined();
+      }
       expect(mockSearchService.searchKeyword).not.toHaveBeenCalled();
     });
   });

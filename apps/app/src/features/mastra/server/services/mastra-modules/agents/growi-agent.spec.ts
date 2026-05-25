@@ -93,6 +93,13 @@ describe('growiAgent', () => {
   });
 
   describe('instructions content (requirement 4.1, FB Issue 2 regression guard)', () => {
+    // Type guard that narrows an unknown value to { content: unknown } without
+    // a cast. Used in place of `(msg as { content: unknown }).content` inside
+    // the .map below — once this guard returns true, TypeScript narrows the
+    // variable's static type.
+    const hasContentField = (v: unknown): v is { content: unknown } =>
+      v != null && typeof v === 'object' && 'content' in v;
+
     const getInstructionsString = async (): Promise<string> => {
       const instructions = await growiAgent.getInstructions();
       // The agent declares instructions as a plain string. Defensive guard:
@@ -102,8 +109,8 @@ describe('growiAgent', () => {
         return instructions
           .map((msg: unknown) => {
             if (typeof msg === 'string') return msg;
-            if (msg != null && typeof msg === 'object' && 'content' in msg) {
-              const content = (msg as { content: unknown }).content;
+            if (hasContentField(msg)) {
+              const content = msg.content;
               return typeof content === 'string' ? content : '';
             }
             return '';
@@ -115,8 +122,12 @@ describe('growiAgent', () => {
 
     it('is a non-empty string', async () => {
       const instructions = await growiAgent.getInstructions();
+      // typeof check narrows `instructions` to `string` for the next line,
+      // so no `as string` cast is needed. The expect on typeof gates the
+      // .length read behind the narrowing.
       expect(typeof instructions).toBe('string');
-      expect((instructions as string).length).toBeGreaterThan(0);
+      if (typeof instructions !== 'string') return;
+      expect(instructions.length).toBeGreaterThan(0);
     });
 
     it('describes the fullTextSearch → getPageContent → cite-path order', async () => {

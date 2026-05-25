@@ -48,6 +48,9 @@ const buildRequestContext = (): RequestContext<MastraRequestContextShape> =>
 
 // Minimal IUserHasId-shaped object. The tool MUST pass this by reference into
 // findByIdAndViewer / findByPathAndViewer — no synthetic user reconstruction.
+// The single cast inside this builder is the ONLY boundary where we admit
+// that the test fixture isn't a full Mongoose document — every call site
+// stays cast-free.
 const buildMockUser = (): IUserHasId =>
   ({
     _id: 'user1',
@@ -74,20 +77,45 @@ const buildMockPage = (overrides: Partial<MockPage> = {}): MockPage => ({
   ...overrides,
 });
 
+// Discriminated union mirroring the tool's outputSchema. Defined locally so
+// callers can read `result.result === 'ok'` and access `.page` / `.reason`
+// without per-call narrowing casts.
+type GetPageContentToolResult =
+  | {
+      result: 'ok';
+      page: { path: string; body: string; updatedAt: string };
+    }
+  | {
+      result: 'not_found_or_forbidden' | 'missing_input' | 'context_error';
+      reason: string;
+    };
+
+// Mastra's validateToolInput wrapper returns this envelope shape (not the
+// discriminated union) when zod input validation fails.
+type ValidationFailure = { error: true; validationErrors: unknown };
+
 // Invoke the tool's execute. The mastra runtime calls execute with
 // `(inputData, { requestContext, ... })`, so tests mirror that shape.
-const invokeExecute = (
+const invokeExecute = async (
   inputData: { pageId?: string; pagePath?: string } | Record<string, never>,
   requestContext: RequestContext<MastraRequestContextShape>,
-) => {
+): Promise<GetPageContentToolResult | ValidationFailure> => {
+  // The Mastra runtime's `execute` signature is intentionally loose
+  // (`unknown` input / output), so a single `as never` per arg is unavoidable
+  // here. Narrow the return shape ONCE so callers don't repeat the cast.
   // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
-  return getPageContentTool.execute!(
+  const result = await getPageContentTool.execute!(
     inputData as never,
-    {
-      requestContext,
-    } as never,
+    { requestContext } as never,
   );
+  return result as GetPageContentToolResult | ValidationFailure;
 };
+
+// Type-guard to discriminate the validation envelope from the success/error
+// discriminated union without a cast at the call site.
+const isValidationFailure = (
+  r: GetPageContentToolResult | ValidationFailure,
+): r is ValidationFailure => 'error' in r && r.error === true;
 
 describe('getPageContentTool', () => {
   beforeEach(() => {
@@ -109,14 +137,13 @@ describe('getPageContentTool', () => {
       // violates the zod `.refine` rule, so the wrapper returns a
       // ValidationError-shaped object without ever invoking the user-provided
       // execute body (mirrors fullTextSearchTool's empty-query test).
-      const result = (await invokeExecute({}, requestContext)) as {
-        error?: boolean;
-        validationErrors?: unknown;
-      };
+      const result = await invokeExecute({}, requestContext);
 
       expect(result).toBeDefined();
-      expect(result.error).toBe(true);
-      expect(result.validationErrors).toBeDefined();
+      expect(isValidationFailure(result)).toBe(true);
+      if (isValidationFailure(result)) {
+        expect(result.validationErrors).toBeDefined();
+      }
       // The execute body never ran, so neither Mongoose accessor was called.
       expect(mocks.findByIdAndViewer).not.toHaveBeenCalled();
       expect(mocks.findByPathAndViewer).not.toHaveBeenCalled();
@@ -128,14 +155,15 @@ describe('getPageContentTool', () => {
       const requestContext = buildRequestContext();
       // Intentionally do NOT set 'user'.
 
-      const result = (await invokeExecute(
-        { pageId: 'abc' },
-        requestContext,
-      )) as { result: string; reason?: string };
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('context_error');
-      expect(typeof result.reason).toBe('string');
-      expect(result.reason?.length ?? 0).toBeGreaterThan(0);
+      if (result.result !== 'ok') {
+        expect(typeof result.reason).toBe('string');
+        expect(result.reason.length).toBeGreaterThan(0);
+      }
       // No DB calls when context is invalid.
       expect(mocks.findByIdAndViewer).not.toHaveBeenCalled();
       expect(mocks.findByPathAndViewer).not.toHaveBeenCalled();
@@ -149,11 +177,10 @@ describe('getPageContentTool', () => {
       requestContext.set('user', mockUser);
       mocks.findByIdAndViewer.mockResolvedValue(null);
 
-      const result = (await invokeExecute(
-        { pageId: 'abc' },
-        requestContext,
-      )) as { result: string; reason?: string };
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('not_found_or_forbidden');
       // Routing assertion — the path branch must not be touched when
       // pageId is supplied.
@@ -166,11 +193,13 @@ describe('getPageContentTool', () => {
       requestContext.set('user', mockUser);
       mocks.findByPathAndViewer.mockResolvedValue(null);
 
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { pagePath: '/some/path' },
         requestContext,
-      )) as { result: string; reason?: string };
+      );
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('not_found_or_forbidden');
       // Routing assertion — the id branch must not be touched when
       // pagePath is supplied.
@@ -205,15 +234,12 @@ describe('getPageContentTool', () => {
         },
       );
 
-      const result = (await invokeExecute(
-        { pageId: 'abc' },
-        requestContext,
-      )) as {
-        result: string;
-        page: { path: string; body: string; updatedAt: string };
-      };
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
       expect(result.page.path).toBe('/p1');
       // Byte-for-byte equality — the tool MUST NOT transform / re-escape the
       // Markdown body (requirement 2.5).
@@ -239,15 +265,12 @@ describe('getPageContentTool', () => {
         },
       );
 
-      const result = (await invokeExecute(
-        { pagePath: '/p1' },
-        requestContext,
-      )) as {
-        result: string;
-        page: { path: string; body: string; updatedAt: string };
-      };
+      const result = await invokeExecute({ pagePath: '/p1' }, requestContext);
 
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
       expect(result.page.path).toBe('/p1');
       expect(result.page.body).toBe('HELLO **WORLD**');
       expect(result.page.updatedAt).toBe('2026-01-15T10:00:00.000Z');
@@ -296,16 +319,17 @@ describe('getPageContentTool', () => {
         invokeExecute({ pageId: 'abc' }, requestContext),
       ).resolves.toMatchObject({ result: 'not_found_or_forbidden' });
 
-      const result = (await invokeExecute(
-        { pageId: 'abc' },
-        requestContext,
-      )) as { result: string; reason?: string };
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
       expect(result.result).toBe('not_found_or_forbidden');
       // The catch branch propagates the Error.message into reason when
       // available, otherwise falls back to 'fetch_failed'.
-      expect(typeof result.reason).toBe('string');
-      const reason = result.reason ?? '';
-      expect(reason === 'boom' || reason === 'fetch_failed').toBe(true);
+      if (result.result !== 'ok') {
+        expect(typeof result.reason).toBe('string');
+        const reason = result.reason;
+        expect(reason === 'boom' || reason === 'fetch_failed').toBe(true);
+      }
     });
   });
 });

@@ -43,8 +43,26 @@ const TEST_ES_URI = `${TEST_ES_HOST}/${TEST_INDEX_NAME}`;
 const sleep = (ms: number) =>
   new Promise<void>((resolve) => setTimeout(resolve, ms));
 
+type FullTextSearchOkResult = {
+  result: 'ok';
+  hits: Array<{ pageId: string; pagePath: string; snippet?: string }>;
+  totalCount: number;
+};
+
+type FullTextSearchFailureResult = {
+  result: 'error' | 'context_error';
+  reason: string;
+};
+
+type FullTextSearchResult =
+  | FullTextSearchOkResult
+  | FullTextSearchFailureResult;
+
 // Helper to invoke the tool's execute the same way the Mastra runtime does.
-const invokeExecute = (
+// Narrow the return shape ONCE here so callers can branch on `result.result`
+// without per-call casts. The two `as never` args are unavoidable: Mastra's
+// `execute` signature uses `unknown` for both input and the context envelope.
+const invokeExecute = async (
   inputData: {
     query: string;
     limit?: number;
@@ -52,21 +70,25 @@ const invokeExecute = (
     order?: string;
   },
   requestContext: RequestContext<MastraRequestContextShape>,
-) => {
+): Promise<FullTextSearchResult> => {
   // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
-  return fullTextSearchTool.execute!(
+  const result = await fullTextSearchTool.execute!(
     inputData as never,
-    {
-      requestContext,
-    } as never,
+    { requestContext } as never,
   );
+  return result as FullTextSearchResult;
 };
 
-type FullTextSearchOkResult = {
-  result: 'ok';
-  hits: Array<{ pageId: string; pagePath: string; snippet?: string }>;
-  totalCount: number;
-};
+// Asserts the tool returned a success result and narrows the static type to
+// `FullTextSearchOkResult`. Replaces the per-call `as FullTextSearchOkResult`
+// cast at every call site with a single typed assertion that also fails the
+// test if the tool returned an error envelope (which would otherwise mask the
+// real failure as an "undefined hits" error downstream).
+function assertOk(
+  result: FullTextSearchResult,
+): asserts result is FullTextSearchOkResult {
+  expect(result.result).toBe('ok');
+}
 
 // Unique token used across page bodies to scope the test query and ensure we
 // only match pages this suite created (no developer / migration data drift).
@@ -162,24 +184,57 @@ describe('fullTextSearchTool (integration)', () => {
     // Make sure the index actually exists (the alias too) before we attempt
     // to bulk write. The constructor's init() calls normalizeIndices() which
     // creates both — wait for it by polling indices.exists.
-    // biome-ignore lint/suspicious/noExplicitAny: client is dynamically typed.
-    const esClient = (searchService.fullTextSearchDelegator as any).client;
+    // The ES delegator's `client` field is not in any exported type; the
+    // ES SDK itself is also `unknown`-shaped for our purposes here. Narrow
+    // to the minimal `indices.exists` surface we actually call.
+    type EsIndicesClient = {
+      indices: { exists: (args: { index: string }) => Promise<unknown> };
+    };
+    const esClient = (
+      searchService.fullTextSearchDelegator as unknown as {
+        client: EsIndicesClient;
+      }
+    ).client;
+    // The ES JS SDK returns either a boolean (v8 transport) or a wrapper
+    // `{ body: boolean }` (older transport). Narrow via predicate to avoid
+    // any cast at the check site.
+    const isExistsTrue = (v: unknown): boolean => {
+      if (v === true) return true;
+      if (v != null && typeof v === 'object' && 'body' in v) {
+        return (v as { body: unknown }).body === true;
+      }
+      return false;
+    };
     const indexReadyDeadline = Date.now() + 30_000;
     while (Date.now() < indexReadyDeadline) {
       const exists = await esClient.indices.exists({ index: TEST_INDEX_NAME });
-      if (exists === true || exists?.body === true) {
+      if (isExistsTrue(exists)) {
         break;
       }
       await sleep(200);
     }
 
+    // `mongoose.model(name)` without generics returns `Model<any>`. Passing
+    // the declared document shape via the generic narrows it to the matching
+    // `Model<T>` for User/Revision/UserGroup/UserGroupRelation without per-
+    // call casts. Page keeps its existing `<PageDocument, PageModel>` form
+    // because its schema methods are typed on `PageModel`.
+    type RevisionDoc = {
+      pageId: mongoose.Types.ObjectId;
+      body: string;
+      format: string;
+      author: mongoose.Types.ObjectId;
+    };
+    type UserGroupRelationDoc = {
+      relatedGroup: mongoose.Types.ObjectId;
+      relatedUser: mongoose.Types.ObjectId;
+    };
     Page = mongoose.model<PageDocument, PageModel>('Page');
-    User = mongoose.model('User') as unknown as typeof User;
-    Revision = mongoose.model('Revision') as unknown as typeof Revision;
-    UserGroup = mongoose.model('UserGroup') as unknown as typeof UserGroup;
-    UserGroupRelation = mongoose.model(
-      'UserGroupRelation',
-    ) as unknown as typeof UserGroupRelation;
+    User = mongoose.model<IUserHasId>('User');
+    Revision = mongoose.model<RevisionDoc>('Revision');
+    UserGroup = mongoose.model<{ name: string }>('UserGroup');
+    UserGroupRelation =
+      mongoose.model<UserGroupRelationDoc>('UserGroupRelation');
 
     // Users: A and B (both real Mongo documents).
     const userAName = `agentic-search-integ-userA-${WORKER_ID}`;
@@ -197,14 +252,19 @@ describe('fullTextSearchTool (integration)', () => {
         email: `${userBName}@example.com`,
       },
     ]);
-    userA = insertedUsers[0] as unknown as IUserHasId;
-    userB = insertedUsers[1] as unknown as IUserHasId;
+    // `User` is typed as `Model<IUserHasId>`, so insertMany returns
+    // `(IUserHasId & Document)[]` — already assignable to IUserHasId.
+    userA = insertedUsers[0];
+    userB = insertedUsers[1];
 
     // Group containing only user A.
     const groupName = `agentic-search-integ-group-${WORKER_ID}`;
     await UserGroup.deleteMany({ name: groupName });
     const insertedGroup = await UserGroup.create({ name: groupName });
-    groupG = insertedGroup as unknown as { _id: mongoose.Types.ObjectId };
+    // Mongoose's `Document._id` is typed as `unknown` from Model.create's
+    // return shape; narrow to ObjectId via a single, scoped cast (the schema
+    // guarantees this; we only use _id below).
+    groupG = { _id: insertedGroup._id as mongoose.Types.ObjectId };
     await UserGroupRelation.deleteMany({ relatedGroup: groupG._id });
     await UserGroupRelation.create({
       relatedGroup: groupG._id,
@@ -313,8 +373,22 @@ describe('fullTextSearchTool (integration)', () => {
 
     try {
       // Tear down the unique ES index for this run.
-      // biome-ignore lint/suspicious/noExplicitAny: client is dynamically typed.
-      const client = (searchService?.fullTextSearchDelegator as any)?.client;
+      // The delegator's `client` field is not in any exported type; narrow
+      // to the minimal `indices.{delete,deleteAlias}` surface we actually use
+      // for teardown. `deleteAlias` is optional in some SDK versions.
+      type EsTeardownClient = {
+        indices: {
+          delete: (args: { index: string }) => Promise<unknown>;
+          deleteAlias?: (args: {
+            index: string;
+            name: string;
+          }) => Promise<unknown>;
+        };
+      };
+      const delegator = searchService?.fullTextSearchDelegator as unknown as
+        | { client?: EsTeardownClient }
+        | undefined;
+      const client = delegator?.client;
       if (client != null) {
         const aliasName = `${TEST_INDEX_NAME}-alias`;
         await client.indices
@@ -348,17 +422,17 @@ describe('fullTextSearchTool (integration)', () => {
 
   describe('grant scenarios via real Elasticsearch', () => {
     it('returns the GRANT_PUBLIC page to both user A and user B', async () => {
-      const resultForA = (await invokeExecute(
+      const resultForA = await invokeExecute(
         { query: SCOPE_TOKEN, limit: 20 },
         buildRequestContext(userA),
-      )) as FullTextSearchOkResult;
-      const resultForB = (await invokeExecute(
+      );
+      const resultForB = await invokeExecute(
         { query: SCOPE_TOKEN, limit: 20 },
         buildRequestContext(userB),
-      )) as FullTextSearchOkResult;
+      );
 
-      expect(resultForA.result).toBe('ok');
-      expect(resultForB.result).toBe('ok');
+      assertOk(resultForA);
+      assertOk(resultForB);
 
       const pathsForA = resultForA.hits.map((h) => h.pagePath);
       const pathsForB = resultForB.hits.map((h) => h.pagePath);
@@ -368,14 +442,17 @@ describe('fullTextSearchTool (integration)', () => {
     });
 
     it('returns the GRANT_OWNER page to its owner (A) but not to a non-owner (B)', async () => {
-      const resultForA = (await invokeExecute(
+      const resultForA = await invokeExecute(
         { query: SCOPE_TOKEN, limit: 20 },
         buildRequestContext(userA),
-      )) as FullTextSearchOkResult;
-      const resultForB = (await invokeExecute(
+      );
+      const resultForB = await invokeExecute(
         { query: SCOPE_TOKEN, limit: 20 },
         buildRequestContext(userB),
-      )) as FullTextSearchOkResult;
+      );
+
+      assertOk(resultForA);
+      assertOk(resultForB);
 
       const pathsForA = resultForA.hits.map((h) => h.pagePath);
       const pathsForB = resultForB.hits.map((h) => h.pagePath);
@@ -385,14 +462,17 @@ describe('fullTextSearchTool (integration)', () => {
     });
 
     it('returns the GRANT_USER_GROUP page to a member (A) but not to a non-member (B)', async () => {
-      const resultForA = (await invokeExecute(
+      const resultForA = await invokeExecute(
         { query: SCOPE_TOKEN, limit: 20 },
         buildRequestContext(userA),
-      )) as FullTextSearchOkResult;
-      const resultForB = (await invokeExecute(
+      );
+      const resultForB = await invokeExecute(
         { query: SCOPE_TOKEN, limit: 20 },
         buildRequestContext(userB),
-      )) as FullTextSearchOkResult;
+      );
+
+      assertOk(resultForA);
+      assertOk(resultForB);
 
       const pathsForA = resultForA.hits.map((h) => h.pagePath);
       const pathsForB = resultForB.hits.map((h) => h.pagePath);
@@ -410,12 +490,12 @@ describe('fullTextSearchTool (integration)', () => {
       // OWNER's `updatedAt` was backdated to 7 days ago in beforeAll; PUBLIC's
       // is fresh. With sort: updatedAt + order: desc the PUBLIC page (newer)
       // must appear BEFORE the OWNER page (older) in the hits array.
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         { query: SCOPE_TOKEN, limit: 20, sort: 'updatedAt', order: 'desc' },
         buildRequestContext(userA),
-      )) as FullTextSearchOkResult;
+      );
 
-      expect(result.result).toBe('ok');
+      assertOk(result);
 
       const paths = result.hits.map((h) => h.pagePath);
       // Sanity: both pages are present so the ordering assertion is meaningful.
@@ -437,15 +517,15 @@ describe('fullTextSearchTool (integration)', () => {
       // standard analyzer split into common subtokens that hit dev data.
       // Keep the query as a single pure-alpha word so it cannot tokenise
       // into anything indexed.
-      const result = (await invokeExecute(
+      const result = await invokeExecute(
         {
           query: 'zqxwcevbnmasdfghjklpoiuytrewqq',
           limit: 20,
         },
         buildRequestContext(userA),
-      )) as FullTextSearchOkResult;
+      );
 
-      expect(result.result).toBe('ok');
+      assertOk(result);
       expect(result.hits).toEqual([]);
       expect(result.totalCount).toBe(0);
     });
