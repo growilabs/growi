@@ -182,9 +182,14 @@ function createTestRunner(
   });
 
   const mockVaultInstructionFindOne = vi.fn().mockImplementation(() => {
-    // By default return the last instruction (simulating it was committed)
+    // By default simulate vault-manager has already processed the last
+    // instruction (processedAt != null) so the completeness check returns
+    // immediately. Tests that need to assert the timeout / unprocessed path
+    // override this with mockResolvedValueOnce.
     return Promise.resolve(
-      lastInstructionHolder.id ? { _id: lastInstructionHolder.id } : null,
+      lastInstructionHolder.id
+        ? { _id: lastInstructionHolder.id, processedAt: new Date() }
+        : null,
     );
   });
 
@@ -227,6 +232,11 @@ function createTestRunner(
     retryConfig: { maxAttempts: 3, baseBackoffMs: 100, maxBackoffMs: 1000 },
     heartbeatIntervalMs: 60_000,
     heartbeatStaleMs: 120_000,
+    // Short verify timeout — existing tests mock findOne to return
+    // processedAt=new Date() immediately, so the poll exits on the first
+    // iteration. Tests asserting the timeout-failure path still complete
+    // well under Vitest's 5s default test timeout.
+    verifyTimeoutMsOverride: 1_000,
     createActivity: mockCreateActivity,
   });
 
@@ -515,6 +525,119 @@ describe('BootstrapRunner', () => {
 
       expect(state.bootstrapState).toBe('failed');
       expect(state.bootstrapLastError).toContain('streamSnapshotMaxId');
+    });
+
+    it('sets failed state when vault-manager does not process the last instruction within verifyTimeoutMs', async () => {
+      // Simulate vault-manager not having processed the last instruction
+      // (processedAt remains null). The completeness check should poll until
+      // the timeout elapses, then fail.
+      const pages = [makePageDoc(FAKE_ID_A, '/page-a')];
+      const { state, mockVaultInstruction, runner } = createTestRunner(
+        { bootstrapState: 'pending' },
+        pages,
+      );
+
+      mockVaultInstruction.findOne.mockImplementation(() =>
+        Promise.resolve({ _id: 'instr-id', processedAt: null }),
+      );
+
+      await runner.bootstrap({ triggerSource: 'env-true' });
+
+      expect(state.bootstrapState).toBe('failed');
+      expect(state.bootstrapLastError).toContain(
+        'vault-manager did not process',
+      );
+    });
+
+    it('waits for vault-manager processedAt before transitioning to done', async () => {
+      // Simulate vault-manager processing on the 3rd poll iteration. Until
+      // then findOne returns processedAt=null and bootstrapState should NOT be
+      // 'done' yet — only after processedAt is set.
+      const pages = [makePageDoc(FAKE_ID_A, '/page-a')];
+      const { state, mockVaultInstruction, runner } = createTestRunner(
+        { bootstrapState: 'pending' },
+        pages,
+      );
+
+      let callCount = 0;
+      mockVaultInstruction.findOne.mockImplementation(() => {
+        callCount++;
+        return Promise.resolve({
+          _id: 'instr-id',
+          processedAt: callCount >= 3 ? new Date() : null,
+        });
+      });
+
+      await runner.bootstrap({ triggerSource: 'env-true' });
+
+      expect(callCount).toBeGreaterThanOrEqual(3);
+      expect(state.bootstrapState).toBe('done');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // onRunning callback — synchronous handshake for HTTP 202 responsiveness
+  // -------------------------------------------------------------------------
+
+  describe('onRunning callback', () => {
+    it('fires after state has been committed to running', async () => {
+      // The callback contract: when onRunning fires, the persisted
+      // bootstrapState must already be 'running'. Routes that await this
+      // signal to return 202 rely on this ordering — otherwise SWR
+      // revalidate after 202 could fetch the pre-transition state.
+      const pages = [makePageDoc(FAKE_ID_A, '/page-a')];
+      const { state, runner } = createTestRunner(
+        { bootstrapState: 'pending' },
+        pages,
+      );
+
+      let stateAtCallback: string | null = null;
+      const onRunning = vi.fn(() => {
+        stateAtCallback = state.bootstrapState;
+      });
+
+      await runner.bootstrap({ triggerSource: 'env-true', onRunning });
+
+      expect(onRunning).toHaveBeenCalledTimes(1);
+      expect(stateAtCallback).toBe('running');
+    });
+
+    it('fires after reset-all instruction has been written (forceWipe path)', async () => {
+      // For the destructive wipe path the callback must fire after both
+      // state='running' AND the reset-all instruction have been durably
+      // committed — otherwise a route returning 202 could acknowledge a
+      // wipe that vault-manager has not yet been told about.
+      const pages = [makePageDoc(FAKE_ID_A, '/page-a')];
+      const { mockVaultInstruction, runner } = createTestRunner(
+        { bootstrapState: 'done' },
+        pages,
+      );
+
+      let resetAllInsertCountAtCallback = -1;
+      const onRunning = vi.fn(() => {
+        resetAllInsertCountAtCallback =
+          mockVaultInstruction.create.mock.calls.filter(
+            (c) => c[0]?.op === 'reset-all',
+          ).length;
+      });
+
+      await runner.bootstrap({ triggerSource: 'env-force', onRunning });
+
+      expect(onRunning).toHaveBeenCalledTimes(1);
+      expect(resetAllInsertCountAtCallback).toBe(1);
+    });
+
+    it('is omitted gracefully when no callback is provided', async () => {
+      // Pre-existing callers must keep working — onRunning is optional.
+      const pages = [makePageDoc(FAKE_ID_A, '/page-a')];
+      const { state, runner } = createTestRunner(
+        { bootstrapState: 'pending' },
+        pages,
+      );
+
+      await runner.bootstrap({ triggerSource: 'env-true' });
+
+      expect(state.bootstrapState).toBe('done');
     });
   });
 

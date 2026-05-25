@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useCallback, useId, useState } from 'react';
+import { useCallback, useState } from 'react';
 import type { StorageStatsResponse } from '@growi/core/dist/interfaces/vault';
 import {
   Alert,
@@ -11,7 +11,7 @@ import {
 } from 'reactstrap';
 import useSWR from 'swr';
 
-import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
+import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { ReconcileLogEntry } from '~/features/growi-vault/server/services/reconcile';
 
@@ -31,9 +31,11 @@ type BootstrapState =
   | 'escalated'
   | 'verifying';
 
-type TriggerSource = 'env-true' | 'env-force' | 'admin-ui';
+type TriggerSource = 'env-true' | 'env-force' | 'admin-ui' | 'admin-force-wipe';
 
 interface VaultStatusData {
+  /** Resolved from VAULT_ENABLED env var (read-only — fixed at deploy time). */
+  vaultEnabled: boolean;
   bootstrapState: BootstrapState;
   processed: number;
   totalEstimated: number | null;
@@ -104,35 +106,18 @@ const formatDate = (iso: string | null | undefined): string => {
 // Sub-sections
 // ============================================================================
 
-/** Feature toggle: enable / disable the Vault feature. */
-const FeatureToggleSection = ({
+/**
+ * Feature status (read-only).
+ *
+ * VAULT_ENABLED is an env-only flag fixed at deploy time — the admin UI never
+ * mutates it. This section just surfaces the resolved value so operators can
+ * confirm the deployed configuration.
+ */
+const FeatureStatusSection = ({
   vaultEnabled,
-  bootstrapState,
-  onToggle,
 }: {
-  vaultEnabled: boolean;
-  bootstrapState: BootstrapState | undefined;
-  onToggle: (enabled: boolean) => Promise<void>;
+  vaultEnabled: boolean | undefined;
 }): JSX.Element => {
-  const [isUpdating, setIsUpdating] = useState(false);
-  const toggleId = useId();
-
-  const handleChange = useCallback(
-    async (e: React.ChangeEvent<HTMLInputElement>) => {
-      const next = e.target.checked;
-      setIsUpdating(true);
-      try {
-        await onToggle(next);
-      } finally {
-        setIsUpdating(false);
-      }
-    },
-    [onToggle],
-  );
-
-  // Warn when the user tries to enable Vault before bootstrap is complete.
-  const showBootstrapWarning = !vaultEnabled && bootstrapState !== 'done';
-
   return (
     <div className="row mb-5">
       <div className="col-lg-12">
@@ -140,36 +125,22 @@ const FeatureToggleSection = ({
 
         <div className="row form-group">
           <div className="col-md-3 text-md-end">
-            <label htmlFor="vaultEnabled" className="col-form-label">
-              Enable GROWI Vault
-            </label>
+            <span className="col-form-label">Feature Status</span>
           </div>
           <div className="col-md-9">
-            <div className="form-check form-switch">
-              <input
-                id={toggleId}
-                type="checkbox"
-                className="form-check-input"
-                checked={vaultEnabled}
-                disabled={isUpdating}
-                onChange={handleChange}
-              />
-              <label className="form-check-label" htmlFor={toggleId}>
-                {vaultEnabled ? 'Enabled' : 'Disabled'}
-              </label>
-            </div>
-
-            {/* Warning: bootstrap must be done before enabling */}
-            {showBootstrapWarning && (
-              <div className="alert alert-warning mt-2">
-                <span className="material-symbols-outlined me-1 align-middle">
-                  warning
-                </span>
-                GROWI Vault cannot serve requests until bootstrap is complete
-                (current state: <strong>{bootstrapState ?? '—'}</strong>).
-                Enabling it now will cause git clients to receive 503 errors.
-              </div>
+            {vaultEnabled === true ? (
+              <span className="badge bg-success">Enabled</span>
+            ) : vaultEnabled === false ? (
+              <span className="badge bg-secondary">Disabled</span>
+            ) : (
+              <span className="badge bg-light text-dark">—</span>
             )}
+            <p className="form-text text-muted mt-2 mb-0">
+              Controlled by the <code>VAULT_ENABLED</code> environment variable.
+              To change this value, update the deployment env and restart
+              apps/app. To stop serving clones at runtime without a restart, use
+              the <strong>Wipe Vault</strong> kill switch below.
+            </p>
           </div>
         </div>
       </div>
@@ -599,14 +570,15 @@ const DriftActivitySection = ({
  * Admin settings panel for GROWI Vault.
  *
  * Sections:
- *   1. Feature toggle  — enable / disable the Vault feature
- *   2. Bootstrap       — trigger the initial data seeding (with confirm modal when state is 'done')
- *   3. Bootstrap status — progress and timestamps
- *   4. Completion Reliability — completeness check metrics from resilience layer
- *   5. Auto-Retry Status — retry attempt info (shown only when retry data exists)
- *   6. Drift Activity — drift detection sweep stats (shown only when drift data exists)
- *   7. Storage observability — repository stats from vault-manager
- *   8. Audit log filter link — quick link to vault-related audit log entries
+ *   1. Feature status   — read-only display of VAULT_ENABLED env var
+ *   2. Bootstrap        — trigger the initial data seeding
+ *   3. Kill switch      — Wipe Vault (destructive, with confirm modal)
+ *   4. Bootstrap status — progress and timestamps
+ *   5. Completion Reliability — completeness check metrics from resilience layer
+ *   6. Auto-Retry Status — retry attempt info (shown only when retry data exists)
+ *   7. Drift Activity   — drift detection sweep stats (shown only when drift data exists)
+ *   8. Storage observability — repository stats from vault-manager
+ *   9. Audit log filter link — quick link to vault-related audit log entries
  *
  * Data is polled every 5 s via SWR so operators can watch bootstrap progress
  * without manually refreshing the page.
@@ -633,27 +605,33 @@ export const VaultAdminSettings = (): JSX.Element => {
       { refreshInterval: 5000 },
     );
 
-  // ---- Derived state ----
-  // vaultEnabled is not part of /status — we track it locally.
-  const [vaultEnabled, setVaultEnabled] = useState<boolean>(false);
+  // ---- Confirm modal state for "Wipe Vault" kill switch ----
+  const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
 
-  // ---- Confirm modal state for "done-state" re-bootstrap ----
-  const [isConfirmModalOpen, setIsConfirmModalOpen] = useState(false);
   // ---- Handlers ----
 
-  const handleToggle = useCallback(async (enabled: boolean) => {
-    try {
-      await apiv3Put('/vault/enabled', { enabled });
-      setVaultEnabled(enabled);
-      toastSuccess(
-        `GROWI Vault ${enabled ? 'enabled' : 'disabled'} successfully.`,
-      );
-    } catch (errs) {
-      toastError(errs);
-    }
-  }, []);
+  // Optimistic local-state patch shown the instant the admin clicks a
+  // destructive/preparatory button. Without this, the UI waits for the
+  // server response (50–200ms) + the next SWR revalidate before reflecting
+  // the new state, which feels unresponsive on a destructive action.
+  const optimisticRunning = useCallback(
+    (current: VaultStatusData | undefined): VaultStatusData => ({
+      vaultEnabled: current?.vaultEnabled ?? false,
+      bootstrapState: 'running',
+      processed: 0,
+      totalEstimated: current?.totalEstimated ?? null,
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      lastError: null,
+      storageStats: current?.storageStats ?? null,
+    }),
+    [],
+  );
 
-  const executeBootstrap = useCallback(async () => {
+  const handleBootstrap = useCallback(async () => {
+    // Optimistic update first — `false` skips auto revalidate so we do not
+    // race the server with a refetch.
+    mutate(optimisticRunning, false);
     try {
       await apiv3Post('/vault/bootstrap', {});
       toastSuccess(
@@ -663,23 +641,26 @@ export const VaultAdminSettings = (): JSX.Element => {
       await mutateResilience();
     } catch (errs) {
       toastError(errs);
+      // Refetch authoritative state — rollback to whatever the server says.
+      await mutate();
     }
-  }, [mutate, mutateResilience]);
+  }, [mutate, mutateResilience, optimisticRunning]);
 
-  const handleBootstrap = useCallback(async () => {
-    // When bootstrap is already done, require explicit confirmation because
-    // re-running involves a full wipe (requirement 1.10).
-    if (data?.bootstrapState === 'done') {
-      setIsConfirmModalOpen(true);
-      return;
+  const handleConfirmWipe = useCallback(async () => {
+    setIsWipeModalOpen(false);
+    mutate(optimisticRunning, false);
+    try {
+      await apiv3Post('/vault/wipe', {});
+      toastSuccess(
+        'Wipe started. The Vault is now serving 503 until re-bootstrap completes.',
+      );
+      await mutate();
+      await mutateResilience();
+    } catch (errs) {
+      toastError(errs);
+      await mutate();
     }
-    await executeBootstrap();
-  }, [data?.bootstrapState, executeBootstrap]);
-
-  const handleConfirmBootstrap = useCallback(async () => {
-    setIsConfirmModalOpen(false);
-    await executeBootstrap();
-  }, [executeBootstrap]);
+  }, [mutate, mutateResilience, optimisticRunning]);
 
   const handleAbortRetry = useCallback(async () => {
     try {
@@ -690,6 +671,9 @@ export const VaultAdminSettings = (): JSX.Element => {
       toastError(errs);
     }
   }, [mutateResilience]);
+
+  const isBootstrapRunning =
+    data?.bootstrapState === 'running' || data?.bootstrapState === 'verifying';
 
   return (
     <div data-testid="growi-vault-admin-settings">
@@ -707,13 +691,9 @@ export const VaultAdminSettings = (): JSX.Element => {
         </Alert>
       )}
 
-      <FeatureToggleSection
-        vaultEnabled={vaultEnabled}
-        bootstrapState={data?.bootstrapState}
-        onToggle={handleToggle}
-      />
+      <FeatureStatusSection vaultEnabled={data?.vaultEnabled} />
 
-      {/* Bootstrap operation with done-state confirm modal */}
+      {/* Bootstrap operation */}
       <div className="row mb-5">
         <div className="col-lg-12">
           <h2 className="admin-setting-header">Bootstrap Operation</h2>
@@ -724,14 +704,10 @@ export const VaultAdminSettings = (): JSX.Element => {
               <button
                 type="button"
                 className="btn btn-primary"
-                disabled={
-                  data?.bootstrapState === 'running' ||
-                  data?.bootstrapState === 'verifying'
-                }
+                disabled={isBootstrapRunning}
                 onClick={handleBootstrap}
               >
-                {data?.bootstrapState === 'running' ||
-                data?.bootstrapState === 'verifying' ? (
+                {isBootstrapRunning ? (
                   <>
                     <span
                       className="spinner-border spinner-border-sm me-2"
@@ -745,38 +721,61 @@ export const VaultAdminSettings = (): JSX.Element => {
                 )}
               </button>
               <p className="form-text text-muted mt-2">
-                Seeds all GROWI pages into the Vault git repository. Run this
-                once before enabling the Vault feature for the first time.
+                Seeds all GROWI pages into the Vault git repository. Safe to
+                re-run; for a destructive wipe use the kill switch below.
               </p>
             </div>
           </div>
         </div>
       </div>
 
-      {/* Confirm modal: shown when bootstrap is already done (re-run = full wipe) */}
-      <Modal
-        isOpen={isConfirmModalOpen}
-        toggle={() => setIsConfirmModalOpen(false)}
-      >
-        <ModalHeader toggle={() => setIsConfirmModalOpen(false)}>
-          Confirm Re-Bootstrap
+      {/* Kill switch: Wipe Vault (destructive) */}
+      <div className="row mb-5">
+        <div className="col-lg-12">
+          <h2 className="admin-setting-header">Kill Switch</h2>
+
+          <div className="row">
+            <div className="col-md-3"></div>
+            <div className="col-md-9">
+              <Button
+                color="danger"
+                disabled={isBootstrapRunning}
+                onClick={() => setIsWipeModalOpen(true)}
+              >
+                <span className="material-symbols-outlined me-1 align-middle">
+                  delete_forever
+                </span>
+                Wipe Vault
+              </Button>
+              <p className="form-text text-muted mt-2">
+                Destroys all vault repositories and re-bootstraps from MongoDB.
+                During the wipe, all <code>git clone</code> / <code>fetch</code>{' '}
+                requests are rejected with 503. The action is recorded in the
+                audit log as <code>vault.wipe</code>.
+              </p>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Confirm modal for Wipe Vault */}
+      <Modal isOpen={isWipeModalOpen} toggle={() => setIsWipeModalOpen(false)}>
+        <ModalHeader toggle={() => setIsWipeModalOpen(false)}>
+          Confirm Wipe Vault
         </ModalHeader>
         <ModalBody>
           <p>
-            Bootstrap has already completed. Running it again will perform a{' '}
-            <strong>full wipe</strong> of all existing vault data before
-            re-seeding from MongoDB.
+            This will <strong>destroy all vault repositories</strong> and
+            re-seed from MongoDB. During the rebuild, git clients will receive{' '}
+            <code>503 Service Unavailable</code>.
           </p>
           <p>Are you sure you want to proceed?</p>
         </ModalBody>
         <ModalFooter>
-          <Button color="danger" onClick={handleConfirmBootstrap}>
+          <Button color="danger" onClick={handleConfirmWipe}>
             Confirm
           </Button>
-          <Button
-            color="secondary"
-            onClick={() => setIsConfirmModalOpen(false)}
-          >
+          <Button color="secondary" onClick={() => setIsWipeModalOpen(false)}>
             Cancel
           </Button>
         </ModalFooter>

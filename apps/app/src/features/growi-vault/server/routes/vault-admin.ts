@@ -15,6 +15,7 @@ import { vaultBootstrapperFactory } from '../services/vault-bootstrapper';
 import type { VaultManagerClient } from '../services/vault-manager-client';
 import { vaultManagerClient as defaultManagerClient } from '../services/vault-manager-client';
 import { vaultNamespaceMapper } from '../services/vault-namespace-mapper';
+import { vaultSettingsService } from '../services/vault-settings-service';
 
 const logger = loggerFactory('growi:features:growi-vault:routes:vault-admin');
 
@@ -109,9 +110,16 @@ export const createVaultAdminRouter = (
         );
       }
 
+      // Resolve the env-only feature flag so the admin UI can render it as a
+      // read-only status (no UI mutation path exists — VAULT_ENABLED is fixed
+      // at deploy time).
+      const { enabled: vaultEnabled } =
+        await vaultSettingsService.getSettings();
+
       return res.json({
         ok: true,
         data: {
+          vaultEnabled,
           bootstrapState: bootstrapStatus.state,
           processed: bootstrapStatus.processed,
           totalEstimated: bootstrapStatus.totalEstimated,
@@ -141,28 +149,56 @@ export const createVaultAdminRouter = (
    * 409 here so the UI can display a meaningful message without polling.
    */
   router.post('/bootstrap', ...authMiddlewares, async (_req, res) => {
+    let status: Awaited<ReturnType<typeof bootstrapper.getStatus>>;
     try {
-      const status = await bootstrapper.getStatus();
-
-      if (status.state === 'running') {
-        return res
-          .status(409)
-          .json({ ok: false, error: 'Bootstrap is already running' });
-      }
-
-      // Fire-and-forget: bootstrap is a long-running background operation.
-      // We return 200 immediately and let the client poll /status for progress.
-      bootstrapper.start({ triggerSource: 'admin-ui' }).catch((err) => {
-        logger.error({ err }, 'Bootstrap failed asynchronously');
-      });
-
-      return res.json({ ok: true });
+      status = await bootstrapper.getStatus();
     } catch (err) {
-      logger.error({ err }, 'Failed to start vault bootstrap');
+      logger.error({ err }, 'Failed to read bootstrap status');
       return res
         .status(500)
         .json({ ok: false, error: 'Internal server error' });
     }
+
+    if (status.state === 'running') {
+      return res
+        .status(409)
+        .json({ ok: false, error: 'Bootstrap is already running' });
+    }
+
+    // Wait for the resilience layer to durably commit state='running' before
+    // responding. The full pipeline continues in the background; failures
+    // after onRunning are observed via /vault/status, not surfaced here.
+    let resolveRunning: () => void;
+    let rejectEarly: (err: Error) => void;
+    const runningSignal = new Promise<void>((resolve, reject) => {
+      resolveRunning = resolve;
+      rejectEarly = reject;
+    });
+
+    let runningSeen = false;
+    const startPromise = bootstrapper.start({
+      triggerSource: 'admin-ui',
+      onRunning: () => {
+        runningSeen = true;
+        resolveRunning();
+      },
+    });
+    startPromise.catch((err) => {
+      logger.error({ err }, 'Bootstrap failed asynchronously');
+      if (!runningSeen) {
+        rejectEarly(err);
+      }
+    });
+
+    try {
+      await runningSignal;
+    } catch {
+      return res
+        .status(500)
+        .json({ ok: false, error: 'Internal server error' });
+    }
+
+    return res.json({ ok: true });
   });
 
   // --------------------------------------------------------------------------
@@ -240,41 +276,71 @@ export const createVaultAdminRouter = (
    * Fire-and-forget: returns 202 immediately and lets the client poll /status.
    */
   router.post('/wipe', ...authMiddlewares, async (req, res) => {
-    try {
-      // Kick off the wipe synchronously so synchronous throws (e.g. invalid
-      // state at entry) surface as 500, then continue as a background task.
-      const wipePromise = bootstrapper.wipeAndRebootstrap({
-        triggerSource: 'admin-force-wipe',
-      });
-      wipePromise.catch((err) => {
-        logger.error({ err }, 'Vault wipe failed asynchronously');
-      });
+    // Wait for the resilience layer to durably commit state='running' (and
+    // the reset-all instruction) before responding 202. Without this
+    // handshake, the client SWR revalidate after 202 would race the state
+    // transition and the UI would briefly observe state='done' even though
+    // a wipe is mid-flight.
+    //
+    // The full bootstrap pipeline continues in the background after we
+    // respond — failures from there propagate to bootstrapState='failed',
+    // which the admin UI observes via /vault/status.
+    let resolveRunning: () => void;
+    let rejectEarly: (err: Error) => void;
+    const runningSignal = new Promise<void>((resolve, reject) => {
+      resolveRunning = resolve;
+      rejectEarly = reject;
+    });
 
-      // Best-effort audit log — vault.wipe is recorded with the acting user.
-      // Failures to write the audit row must not affect the wipe response.
-      try {
-        const activityService = crowi?.activityService;
-        if (activityService?.createActivity != null) {
-          // req.user is populated by loginRequired middleware. Express's base
-          // Request type doesn't include it, so widen via a local cast.
-          const user = (req as { user?: unknown }).user ?? null;
-          await activityService.createActivity({
-            action: 'vault.wipe',
-            user,
-            ip: req.ip ?? '127.0.0.1',
-          });
-        }
-      } catch (err) {
-        logger.warn({ err }, 'Failed to write vault.wipe audit log');
+    let runningSeen = false;
+    const wipePromise = bootstrapper.wipeAndRebootstrap({
+      triggerSource: 'admin-force-wipe',
+      onRunning: () => {
+        runningSeen = true;
+        resolveRunning();
+      },
+    });
+
+    // If the wipe promise rejects BEFORE onRunning fires (e.g. DB write
+    // failure during the state transition), surface the failure to the
+    // route so we can return 500. After onRunning, background failures are
+    // logged but not re-thrown — they show up via /vault/status polling.
+    wipePromise.catch((err) => {
+      logger.error({ err }, 'Vault wipe failed asynchronously');
+      if (!runningSeen) {
+        rejectEarly(err);
       }
+    });
 
-      return res.status(202).json({ ok: true });
-    } catch (err) {
-      logger.error({ err }, 'Failed to start vault wipe');
+    try {
+      await runningSignal;
+    } catch {
+      // The wipe rejected before state='running' was committed. The error
+      // itself was already logged via the wipePromise.catch handler above.
       return res
         .status(500)
         .json({ ok: false, error: 'Internal server error' });
     }
+
+    // Best-effort audit log — vault.wipe is recorded with the acting user.
+    // Failures to write the audit row must not affect the wipe response.
+    try {
+      const activityService = crowi?.activityService;
+      if (activityService?.createActivity != null) {
+        // req.user is populated by loginRequired middleware. Express's base
+        // Request type doesn't include it, so widen via a local cast.
+        const user = (req as { user?: unknown }).user ?? null;
+        await activityService.createActivity({
+          action: 'vault.wipe',
+          user,
+          ip: req.ip ?? '127.0.0.1',
+        });
+      }
+    } catch (err) {
+      logger.warn({ err }, 'Failed to write vault.wipe audit log');
+    }
+
+    return res.status(202).json({ ok: true });
   });
 
   // --------------------------------------------------------------------------

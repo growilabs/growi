@@ -67,14 +67,27 @@ export type BootstrapStatus = ResilienceStatus['bootstrap'];
  *   - stop(): stops heartbeat and drift scheduler on graceful shutdown.
  */
 export interface VaultBootstrapper {
-  start(opts?: { triggerSource: 'admin-ui' | 'env-var' }): Promise<void>;
+  /**
+   * Start (or resume) the bootstrap process. Awaits the full pipeline by
+   * default. Callers that want to acknowledge "bootstrap has begun" before
+   * the pipeline completes (e.g. an HTTP route returning 202) can pass
+   * `onRunning` — the callback fires synchronously the moment the
+   * resilience layer commits state='running' to MongoDB, before the page
+   * stream begins.
+   */
+  start(opts?: {
+    triggerSource: 'admin-ui' | 'env-var';
+    onRunning?: () => void;
+  }): Promise<void>;
   /**
    * Kill switch: forcibly wipe all vault repositories (via reset-all instruction)
    * and re-seed from the current page set. Distinguished from start() only by
    * the audit-log triggerSource — runtime behavior is the same forceWipe path.
+   * Accepts the same `onRunning` handshake hook as `start()`.
    */
   wipeAndRebootstrap(opts: {
     triggerSource: 'admin-force-wipe';
+    onRunning?: () => void;
   }): Promise<void>;
   getStatus(): Promise<BootstrapStatus>;
   /** Return the full ResilienceStatus (bootstrap + retry + drift + trigger info). */
@@ -163,9 +176,13 @@ export const createVaultBootstrapper = (
      */
     async start(opts?: {
       triggerSource: 'admin-ui' | 'env-var';
+      onRunning?: () => void;
     }): Promise<void> {
       const triggerSource = mapTriggerSource(opts?.triggerSource);
-      await resilienceLayer.bootstrap({ triggerSource });
+      await resilienceLayer.bootstrap({
+        triggerSource,
+        onRunning: opts?.onRunning,
+      });
     },
 
     /**
@@ -177,8 +194,12 @@ export const createVaultBootstrapper = (
      */
     async wipeAndRebootstrap(opts: {
       triggerSource: 'admin-force-wipe';
+      onRunning?: () => void;
     }): Promise<void> {
-      await resilienceLayer.bootstrap({ triggerSource: opts.triggerSource });
+      await resilienceLayer.bootstrap({
+        triggerSource: opts.triggerSource,
+        onRunning: opts.onRunning,
+      });
     },
 
     /**

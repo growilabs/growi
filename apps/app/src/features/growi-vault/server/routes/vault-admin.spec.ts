@@ -16,6 +16,16 @@ vi.mock('../services/vault-bootstrapper', () => ({
   vaultBootstrapperFactory: vi.fn(() => mockBootstrapper),
 }));
 
+vi.mock('../services/vault-settings-service', () => ({
+  vaultSettingsService: {
+    getSettings: vi.fn().mockResolvedValue({
+      enabled: true,
+      managerEndpoint: 'http://vault-manager:3100',
+      managerInternalSecret: 'test-secret',
+    }),
+  },
+}));
+
 vi.mock('~/server/service/config-manager', () => ({
   configManager: {},
 }));
@@ -71,6 +81,8 @@ const mockManagerClient = {
 
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
+
+import { vaultSettingsService } from '../services/vault-settings-service';
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -144,6 +156,13 @@ const resilienceStatusFixture = {
 describe('VaultAdminRouter', () => {
   beforeEach(() => {
     vi.resetAllMocks();
+    // resetAllMocks wipes mockResolvedValue set in the vi.mock factory, so
+    // re-arm the vault settings stub with a sensible default for each test.
+    vi.mocked(vaultSettingsService.getSettings).mockResolvedValue({
+      enabled: true,
+      managerEndpoint: 'http://vault-manager:3100',
+      managerInternalSecret: 'test-secret',
+    });
   });
 
   // -------------------------------------------------------------------------
@@ -209,19 +228,52 @@ describe('VaultAdminRouter', () => {
         ...doneStatus,
         state: 'done',
       });
-      mockBootstrapper.start.mockResolvedValue(undefined);
+      mockBootstrapper.start.mockImplementation(
+        async (opts: { triggerSource: string; onRunning?: () => void }) => {
+          opts.onRunning?.();
+        },
+      );
 
       const app = buildApp();
       const res = await request(app).post('/_api/admin/vault/bootstrap');
 
       expect(res.status).toBe(200);
       expect(res.body.ok).toBe(true);
-      // start() is called fire-and-forget; give the microtask queue a tick.
-      await vi.waitFor(() => {
-        expect(mockBootstrapper.start).toHaveBeenCalledWith({
-          triggerSource: 'admin-ui',
-        });
+      expect(mockBootstrapper.start).toHaveBeenCalledWith(
+        expect.objectContaining({ triggerSource: 'admin-ui' }),
+      );
+    });
+
+    it('does NOT return 200 until onRunning has fired', async () => {
+      mockBootstrapper.getStatus.mockResolvedValue({
+        ...doneStatus,
+        state: 'done',
       });
+      let triggerOnRunning: (() => void) | undefined;
+      mockBootstrapper.start.mockImplementation(
+        (opts: { triggerSource: string; onRunning?: () => void }) => {
+          return new Promise<void>(() => {
+            triggerOnRunning = () => opts.onRunning?.();
+          });
+        },
+      );
+
+      const app = buildApp();
+      let responseStatus: number | undefined;
+      const responsePromise = request(app)
+        .post('/_api/admin/vault/bootstrap')
+        .then((res) => {
+          responseStatus = res.status;
+          return res;
+        });
+
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockBootstrapper.start).toHaveBeenCalledTimes(1);
+      expect(responseStatus).toBeUndefined();
+
+      triggerOnRunning?.();
+      const res = await responsePromise;
+      expect(res.status).toBe(200);
     });
 
     it('returns 409 when bootstrap is already running', async () => {
@@ -272,22 +324,70 @@ describe('VaultAdminRouter', () => {
 
   describe('POST /wipe', () => {
     it('invokes wipeAndRebootstrap with admin-force-wipe and returns 202', async () => {
-      mockBootstrapper.wipeAndRebootstrap.mockResolvedValue(undefined);
+      mockBootstrapper.wipeAndRebootstrap.mockImplementation(
+        async (opts: { triggerSource: string; onRunning?: () => void }) => {
+          // Production behavior: resilience layer eventually fires
+          // onRunning. Stub it synchronously so the test does not hang.
+          opts.onRunning?.();
+        },
+      );
 
       const app = buildApp();
       const res = await request(app).post('/_api/admin/vault/wipe');
 
       expect(res.status).toBe(202);
       expect(res.body.ok).toBe(true);
-      expect(mockBootstrapper.wipeAndRebootstrap).toHaveBeenCalledWith({
-        triggerSource: 'admin-force-wipe',
-      });
+      expect(mockBootstrapper.wipeAndRebootstrap).toHaveBeenCalledWith(
+        expect.objectContaining({ triggerSource: 'admin-force-wipe' }),
+      );
     });
 
-    it('returns 500 when wipeAndRebootstrap throws synchronously', async () => {
-      mockBootstrapper.wipeAndRebootstrap.mockImplementation(() => {
-        throw new Error('startup failure');
-      });
+    it('does NOT return 202 until onRunning has fired', async () => {
+      // The route must observe the onRunning callback (state='running'
+      // committed in DB) before responding — otherwise SWR revalidate after
+      // 202 would race the state transition and the UI would briefly see
+      // state='done' even though a wipe is in progress.
+      let triggerOnRunning: (() => void) | undefined;
+      mockBootstrapper.wipeAndRebootstrap.mockImplementation(
+        (opts: { triggerSource: string; onRunning?: () => void }) => {
+          return new Promise<void>(() => {
+            // Full bootstrap promise never resolves — simulates a long
+            // pipeline. The route MUST rely on onRunning to decide when to
+            // respond, not on this outer promise.
+            triggerOnRunning = () => opts.onRunning?.();
+          });
+        },
+      );
+
+      const app = buildApp();
+      // Track whether the response has arrived without awaiting on the
+      // request — `request(app).post(...).then(...)` resolves only when the
+      // server actually sends the response.
+      let responseStatus: number | undefined;
+      const responsePromise = request(app)
+        .post('/_api/admin/vault/wipe')
+        .then((res) => {
+          responseStatus = res.status;
+          return res;
+        });
+
+      // Give the route a tick to call wipeAndRebootstrap and start awaiting.
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(mockBootstrapper.wipeAndRebootstrap).toHaveBeenCalledTimes(1);
+      // Before onRunning fires, the response must NOT have been sent.
+      expect(responseStatus).toBeUndefined();
+
+      // Fire onRunning — the route should now respond.
+      triggerOnRunning?.();
+
+      const res = await responsePromise;
+      expect(res.status).toBe(202);
+    });
+
+    it('returns 500 when wipeAndRebootstrap rejects before onRunning fires', async () => {
+      mockBootstrapper.wipeAndRebootstrap.mockImplementation(() =>
+        Promise.reject(new Error('startup failure')),
+      );
 
       const app = buildApp();
       const res = await request(app).post('/_api/admin/vault/wipe');

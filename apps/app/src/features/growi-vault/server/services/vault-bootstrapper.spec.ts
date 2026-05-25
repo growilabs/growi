@@ -261,9 +261,11 @@ describe('VaultBootstrapper', () => {
     instructionCreateSpy = vi
       .mocked(VaultInstruction.create)
       .mockResolvedValue({ _id: { toString: () => 'instr-id-001' } } as never);
-    // Completeness check: findOne must resolve the last instruction id
+    // Completeness check: findOne must resolve the last instruction with
+    // processedAt set (vault-manager processed it) so the poll exits quickly.
     vi.mocked(VaultInstruction.findOne).mockResolvedValue({
       _id: { toString: () => 'instr-id-001' },
+      processedAt: new Date(),
     } as never);
   });
 
@@ -882,6 +884,81 @@ describe('VaultBootstrapper', () => {
       if (bulkIdx >= 0) {
         expect(resetIdx).toBeLessThan(bulkIdx);
       }
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // onRunning handshake — HTTP routes use this to return 202 as soon as
+  // state='running' is durably committed, without waiting for the full
+  // bootstrap stream to finish.
+  // -------------------------------------------------------------------------
+
+  describe('onRunning callback', () => {
+    it('wipeAndRebootstrap fires onRunning before the page stream emits bulk-upsert', async () => {
+      // The callback fires after state='running' + reset-all are persisted
+      // but before bulk-upsert instructions are emitted from the page
+      // stream. Tests observe this by counting bulk-upsert at the moment
+      // onRunning fires.
+      await setupSyncState('done');
+      const pages = [
+        buildPage({ path: '/page1', grant: PageGrant.GRANT_PUBLIC }),
+      ];
+      await setupPageModel(pages);
+
+      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
+      const bootstrapper = createVaultBootstrapper(buildMapper(['public']));
+
+      let bulkUpsertCountAtCallback = -1;
+      const onRunning = vi.fn(() => {
+        bulkUpsertCountAtCallback = instructionCreateSpy.mock.calls.filter(
+          (c) => c[0]?.op === 'bulk-upsert',
+        ).length;
+      });
+
+      await bootstrapper.wipeAndRebootstrap({
+        triggerSource: 'admin-force-wipe',
+        onRunning,
+      });
+
+      expect(onRunning).toHaveBeenCalledTimes(1);
+      expect(bulkUpsertCountAtCallback).toBe(0);
+    });
+
+    it('start({admin-ui}) fires onRunning before the page stream emits bulk-upsert', async () => {
+      await setupSyncState('pending');
+      const pages = [
+        buildPage({ path: '/page1', grant: PageGrant.GRANT_PUBLIC }),
+      ];
+      await setupPageModel(pages);
+
+      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
+      const bootstrapper = createVaultBootstrapper(buildMapper(['public']));
+
+      let bulkUpsertCountAtCallback = -1;
+      const onRunning = vi.fn(() => {
+        bulkUpsertCountAtCallback = instructionCreateSpy.mock.calls.filter(
+          (c) => c[0]?.op === 'bulk-upsert',
+        ).length;
+      });
+
+      await bootstrapper.start({ triggerSource: 'admin-ui', onRunning });
+
+      expect(onRunning).toHaveBeenCalledTimes(1);
+      expect(bulkUpsertCountAtCallback).toBe(0);
+    });
+
+    it('does not call onRunning when bootstrap is skipped (state already done, env-true)', async () => {
+      // env-true with state='done' takes the resolver `skip` path — no
+      // state transition occurs, so onRunning must not fire.
+      await setupSyncState('done');
+      const { createVaultBootstrapper } = await import('./vault-bootstrapper');
+      const bootstrapper = createVaultBootstrapper(buildMapper(['public']));
+
+      const onRunning = vi.fn();
+
+      await bootstrapper.start({ triggerSource: 'env-var', onRunning });
+
+      expect(onRunning).not.toHaveBeenCalled();
     });
   });
 });

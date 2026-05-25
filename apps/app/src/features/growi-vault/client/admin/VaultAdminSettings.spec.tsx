@@ -1,12 +1,13 @@
 /**
  * VaultAdminSettings.spec.tsx
  *
- * Tests for the resilience-layer additions to VaultAdminSettings:
+ * Tests for VaultAdminSettings:
  *   (a) Completion Reliability section renders
  *   (b) Auto-Retry abort button disabled state
  *   (c) Drift counts displayed
  *   (d) Force Warning banner display condition
- *   (e) Done-state confirm modal on bootstrap button
+ *   (e) Feature status — read-only display, no toggle UI
+ *   (f) Wipe Vault — kill switch button with confirmation modal
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -16,21 +17,32 @@ import { describe, expect, it, vi } from 'vitest';
 const mocks = vi.hoisted(() => {
   const apiv3Get = vi.fn();
   const apiv3Post = vi.fn().mockResolvedValue({});
-  const apiv3Put = vi.fn().mockResolvedValue({});
   const toastError = vi.fn();
   const toastSuccess = vi.fn();
   const swrData: {
     status: unknown;
     resilience: unknown;
   } = { status: undefined, resilience: undefined };
+  // Persistent spies for SWR mutate so tests can assert optimistic-update
+  // behavior (e.g. that the button click writes 'running' to local state
+  // before the network round-trip completes).
+  const statusMutate = vi.fn();
+  const resilienceMutate = vi.fn();
 
-  return { apiv3Get, apiv3Post, apiv3Put, toastError, toastSuccess, swrData };
+  return {
+    apiv3Get,
+    apiv3Post,
+    toastError,
+    toastSuccess,
+    swrData,
+    statusMutate,
+    resilienceMutate,
+  };
 });
 
 vi.mock('~/client/util/apiv3-client', () => ({
   apiv3Get: mocks.apiv3Get,
   apiv3Post: mocks.apiv3Post,
-  apiv3Put: mocks.apiv3Put,
 }));
 
 vi.mock('~/client/util/toastr', () => ({
@@ -42,10 +54,13 @@ vi.mock('~/client/util/toastr', () => ({
 vi.mock('swr', () => ({
   default: (key: string, _fetcher: unknown, _opts?: unknown) => {
     if (key === '/vault/status') {
-      return { data: mocks.swrData.status, mutate: vi.fn() };
+      return { data: mocks.swrData.status, mutate: mocks.statusMutate };
     }
     if (key === '/vault/resilience-status') {
-      return { data: mocks.swrData.resilience, mutate: vi.fn() };
+      return {
+        data: mocks.swrData.resilience,
+        mutate: mocks.resilienceMutate,
+      };
     }
     return { data: undefined, mutate: vi.fn() };
   },
@@ -117,7 +132,8 @@ const makeResilienceStatus = (
   forceWarningActive: overrides.forceWarningActive ?? false,
 });
 
-const makeVaultStatus = (state = 'done') => ({
+const makeVaultStatus = (state = 'done', vaultEnabled = true) => ({
+  vaultEnabled,
   bootstrapState: state,
   processed: 100,
   totalEstimated: 100,
@@ -130,8 +146,9 @@ const makeVaultStatus = (state = 'done') => ({
 function setup(
   resilience: ResilienceStatusShape,
   vaultState = 'done',
+  vaultEnabled = true,
 ): ReturnType<typeof render> {
-  mocks.swrData.status = makeVaultStatus(vaultState);
+  mocks.swrData.status = makeVaultStatus(vaultState, vaultEnabled);
   mocks.swrData.resilience = resilience;
   return render(<VaultAdminSettings />);
 }
@@ -361,59 +378,160 @@ describe('VaultAdminSettings — Force Warning Banner', () => {
   });
 });
 
-describe('VaultAdminSettings — Bootstrap confirm modal', () => {
-  it('(e) shows confirm modal when "Prepare GROWI Vault" is clicked in done state', async () => {
+describe('VaultAdminSettings — Bootstrap operation (no done-state confirm)', () => {
+  it('fires /vault/bootstrap directly without a confirm modal regardless of state', async () => {
     const status = makeResilienceStatus({
       bootstrap: { state: 'done' },
     });
-    setup(status, 'done');
-    const btn = screen.getByText('Prepare GROWI Vault');
-    fireEvent.click(btn);
-    // Modal should appear
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeTruthy();
-    });
-  });
-
-  it('(e) modal contains a confirm button to proceed', async () => {
-    const status = makeResilienceStatus({
-      bootstrap: { state: 'done' },
-    });
-    setup(status, 'done');
-    fireEvent.click(screen.getByText('Prepare GROWI Vault'));
-    await waitFor(() => {
-      expect(screen.getByRole('dialog')).toBeTruthy();
-    });
-    // Confirm button must exist
-    expect(
-      screen.getByRole('button', { name: /confirm|proceed|yes/i }),
-    ).toBeTruthy();
-  });
-
-  it('(e) does NOT show modal when state is pending (just fires bootstrap)', async () => {
-    const status = makeResilienceStatus({
-      bootstrap: { state: 'pending' },
-    });
+    mocks.apiv3Post.mockClear();
     mocks.apiv3Post.mockResolvedValueOnce({});
-    setup(status, 'pending');
-    fireEvent.click(screen.getByText('Prepare GROWI Vault'));
-    // No dialog should appear
-    expect(screen.queryByRole('dialog')).toBeNull();
-  });
-
-  it('(e) confirm modal can be cancelled', async () => {
-    const status = makeResilienceStatus({
-      bootstrap: { state: 'done' },
-    });
     setup(status, 'done');
     fireEvent.click(screen.getByText('Prepare GROWI Vault'));
-    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
-    // Click cancel
-    const cancelBtn = screen.getByRole('button', { name: /cancel/i });
-    fireEvent.click(cancelBtn);
-    // Dialog should close
+    // No confirm dialog should appear for /bootstrap. The destructive
+    // confirm flow lives on the separate "Wipe Vault" button.
+    expect(screen.queryByRole('dialog')).toBeNull();
     await waitFor(() => {
-      expect(screen.queryByRole('dialog')).toBeNull();
+      expect(mocks.apiv3Post).toHaveBeenCalledWith('/vault/bootstrap', {});
+    });
+  });
+});
+
+describe('VaultAdminSettings — Feature status (read-only, env-only)', () => {
+  it('(e) renders a Feature Status section showing the enabled value', () => {
+    setup(makeResilienceStatus(), 'done', true);
+    // The section should expose the env-only VAULT_ENABLED status. Title is
+    // "Feature Status" (read-only, not a toggle).
+    expect(screen.getByText(/feature status/i)).toBeTruthy();
+  });
+
+  it('(e) shows "Enabled" when vaultEnabled=true', () => {
+    setup(makeResilienceStatus(), 'done', true);
+    // The displayed value must reflect the env. Look for an explicit Enabled
+    // indicator rather than relying on a checkbox.
+    expect(screen.getAllByText(/enabled/i).length).toBeGreaterThan(0);
+  });
+
+  it('(e) shows "Disabled" when vaultEnabled=false', () => {
+    setup(makeResilienceStatus(), 'done', false);
+    expect(screen.getAllByText(/disabled/i).length).toBeGreaterThan(0);
+  });
+
+  it('(e) does NOT render an enable/disable toggle (env-only)', () => {
+    setup(makeResilienceStatus(), 'done', true);
+    // No checkbox should exist for the feature flag — the UI is read-only.
+    // Other checkboxes (if any) outside the Vault feature flag are acceptable,
+    // but the legacy Enable label must not be rendered as a togglable control.
+    const checkboxes = screen.queryAllByRole('checkbox');
+    expect(checkboxes.length).toBe(0);
+  });
+});
+
+describe('VaultAdminSettings — Wipe Vault (kill switch)', () => {
+  it('(f) renders a "Wipe Vault" button', () => {
+    setup(makeResilienceStatus(), 'done');
+    expect(screen.getByRole('button', { name: /wipe vault/i })).toBeTruthy();
+  });
+
+  it('(f) shows confirm modal when "Wipe Vault" is clicked', async () => {
+    setup(makeResilienceStatus(), 'done');
+    fireEvent.click(screen.getByRole('button', { name: /wipe vault/i }));
+    await waitFor(() => {
+      expect(screen.getByRole('dialog')).toBeTruthy();
+    });
+  });
+
+  it('(f) confirm button POSTs to /vault/wipe', async () => {
+    mocks.apiv3Post.mockClear();
+    mocks.apiv3Post.mockResolvedValueOnce({});
+    setup(makeResilienceStatus(), 'done');
+    fireEvent.click(screen.getByRole('button', { name: /wipe vault/i }));
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    // The destructive confirm button uses "Confirm" / "Yes" wording.
+    const confirmBtn = screen.getByRole('button', {
+      name: /^(confirm|yes|proceed)$/i,
+    });
+    fireEvent.click(confirmBtn);
+    await waitFor(() => {
+      expect(mocks.apiv3Post).toHaveBeenCalledWith('/vault/wipe', {});
+    });
+  });
+
+  it('(f) confirm modal can be cancelled without calling /vault/wipe', async () => {
+    mocks.apiv3Post.mockClear();
+    setup(makeResilienceStatus(), 'done');
+    fireEvent.click(screen.getByRole('button', { name: /wipe vault/i }));
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(mocks.apiv3Post).not.toHaveBeenCalledWith('/vault/wipe', {});
+  });
+
+  it('(f) "Wipe Vault" button is disabled while bootstrap is running', () => {
+    setup(makeResilienceStatus({ bootstrap: { state: 'running' } }), 'running');
+    const wipeBtn = screen.getByRole('button', {
+      name: /wipe vault/i,
+    }) as HTMLButtonElement;
+    expect(wipeBtn.disabled).toBe(true);
+  });
+});
+
+// -- Optimistic UI -----------------------------------------------------------
+//
+// When admin clicks a destructive/preparatory button, the local SWR cache
+// should flip immediately to a non-'done' state so the UI feels responsive.
+// Without this, the user sees no change until the next 5s polling tick (or
+// the response-triggered revalidate), and may double-click.
+// ---------------------------------------------------------------------------
+
+describe('VaultAdminSettings — optimistic UI', () => {
+  it('writes optimistic bootstrapState=running to /vault/status when Prepare is clicked', async () => {
+    // Use a delayed apiv3Post so we can observe state at the moment the
+    // button click handler runs, before the server response triggers
+    // revalidate.
+    mocks.apiv3Post.mockClear();
+    mocks.statusMutate.mockClear();
+    mocks.apiv3Post.mockImplementation(
+      () => new Promise(() => {}), // never resolves during test window
+    );
+
+    setup(makeResilienceStatus(), 'done');
+    fireEvent.click(screen.getByText('Prepare GROWI Vault'));
+
+    // Optimistic mutate must be invoked synchronously with the click. The
+    // optimistic payload sets bootstrapState to 'running' so SWR caches
+    // the new state immediately; the second argument disables auto
+    // revalidation (we revalidate ourselves after the API call settles).
+    await waitFor(() => {
+      const optimisticCall = mocks.statusMutate.mock.calls.find(
+        (c) =>
+          typeof c[0] === 'function' ||
+          (c[0] != null &&
+            (c[0] as { bootstrapState?: string }).bootstrapState === 'running'),
+      );
+      expect(optimisticCall).toBeDefined();
+    });
+  });
+
+  it('writes optimistic bootstrapState=running to /vault/status when Wipe is confirmed', async () => {
+    mocks.apiv3Post.mockClear();
+    mocks.statusMutate.mockClear();
+    mocks.apiv3Post.mockImplementation(() => new Promise(() => {}));
+
+    setup(makeResilienceStatus(), 'done');
+    fireEvent.click(screen.getByRole('button', { name: /wipe vault/i }));
+    await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
+    fireEvent.click(
+      screen.getByRole('button', { name: /^(confirm|yes|proceed)$/i }),
+    );
+
+    await waitFor(() => {
+      const optimisticCall = mocks.statusMutate.mock.calls.find(
+        (c) =>
+          typeof c[0] === 'function' ||
+          (c[0] != null &&
+            (c[0] as { bootstrapState?: string }).bootstrapState === 'running'),
+      );
+      expect(optimisticCall).toBeDefined();
     });
   });
 });

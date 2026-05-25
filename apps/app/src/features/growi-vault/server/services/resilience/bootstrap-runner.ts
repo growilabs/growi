@@ -74,7 +74,21 @@ export interface ResilienceStatus {
 }
 
 export interface VaultResilienceLayer {
-  bootstrap(opts: { triggerSource: TriggerSource }): Promise<void>;
+  /**
+   * Run the bootstrap pipeline.
+   *
+   * `opts.onRunning` is invoked synchronously after the initial state
+   * transition to `'running'` has been committed to MongoDB (and, for
+   * forceWipe runs, after the `op: 'reset-all'` instruction has been
+   * issued). Callers that need to acknowledge "bootstrap has begun" to
+   * a user (e.g. an HTTP request that should return 202 once admin
+   * intent is durably recorded) can `await` on the moment this hook
+   * fires while the rest of the pipeline continues in the background.
+   */
+  bootstrap(opts: {
+    triggerSource: TriggerSource;
+    onRunning?: () => void;
+  }): Promise<void>;
   initOnStartup(): Promise<void>;
   getStatus(): Promise<ResilienceStatus>;
   abortAutoRetry(): Promise<void>;
@@ -153,7 +167,39 @@ export interface BootstrapRunnerDeps {
   heartbeatStaleMs: number;
   /** Optional audit log activity factory. */
   createActivity?: (activityData: ActivityData) => Promise<unknown>;
+  /**
+   * Override for the completeness verify timeout. Tests use a short value to
+   * exercise the timeout-failure path without waiting 5 minutes. Production
+   * callers omit this so the module-level default applies.
+   */
+  verifyTimeoutMsOverride?: number;
 }
+
+/**
+ * Max time to wait during completeness verification for vault-manager to
+ * mark the last emitted instruction as processed (processedAt != null).
+ *
+ * If the timeout elapses, completeness fails and bootstrap transitions to
+ * 'failed' so auto-retry can resume. While we wait, bootstrapState is
+ * 'verifying' — the gateway already treats anything other than 'done' as
+ * 503, so wipe / bootstrap kill-switch semantics hold for the full duration
+ * vault-manager is still catching up.
+ *
+ * 5 minutes is comfortable headroom for vault-manager to drain instructions
+ * for typical workspaces. Hardcoded rather than exposed as a config — if a
+ * deployment genuinely needs to extend this, the right answer is usually to
+ * fix vault-manager throughput, not to raise the timeout.
+ */
+const VERIFY_TIMEOUT_MS = 5 * 60 * 1000;
+
+/**
+ * Polling interval for the completeness verify wait loop.
+ *
+ * 500ms is a balance between responsiveness (state flips to 'done' soon after
+ * vault-manager processes the last instruction) and DB load (one findOne per
+ * poll).
+ */
+const VERIFY_POLL_INTERVAL_MS = 500;
 
 interface ActivityData {
   action: string;
@@ -228,7 +274,10 @@ export function createBootstrapRunner(
     heartbeatIntervalMs,
     heartbeatStaleMs,
     createActivity,
+    verifyTimeoutMsOverride,
   } = deps;
+
+  const verifyTimeoutMs = verifyTimeoutMsOverride ?? VERIFY_TIMEOUT_MS;
 
   const heartbeat = createBootstrapHeartbeat({
     // heartbeat only needs updateOne / findOne — cast to satisfy its narrower Pick type
@@ -288,18 +337,40 @@ export function createBootstrapRunner(
       return { ok: true, reason: null };
     }
 
-    // Condition (iii): last bulk-upsert instruction committed in vault_instructions
-    const committed = await vaultInstruction.findOne({
-      _id: lastInstructionId,
-    });
-    if (committed == null) {
-      return {
-        ok: false,
-        reason: 'Completeness check failed: last instruction not committed',
-      };
+    // Condition (iii): vault-manager has acknowledged processing of the last
+    // emitted instruction (processedAt != null). Poll until processed or until
+    // the verify timeout elapses — bootstrapState stays 'verifying' the whole
+    // time so the gateway keeps returning 503 while we wait.
+    //
+    // We poll rather than block on a change stream because the runner is
+    // intentionally lightweight; vault-manager normally processes within a few
+    // hundred ms but the timeout (default 5 min) tolerates slow or stuck
+    // processors and lets auto-retry handle persistent failures.
+    const deadline = Date.now() + verifyTimeoutMs;
+    while (true) {
+      const committed = await vaultInstruction.findOne({
+        _id: lastInstructionId,
+      });
+      if (committed == null) {
+        return {
+          ok: false,
+          reason: 'Completeness check failed: last instruction not committed',
+        };
+      }
+      if (committed.processedAt != null) {
+        return { ok: true, reason: null };
+      }
+      if (Date.now() >= deadline) {
+        return {
+          ok: false,
+          reason:
+            'Completeness check failed: vault-manager did not process last instruction within timeout',
+        };
+      }
+      await new Promise((resolve) =>
+        setTimeout(resolve, VERIFY_POLL_INTERVAL_MS),
+      );
     }
-
-    return { ok: true, reason: null };
   }
 
   // -------------------------------------------------------------------------
@@ -311,9 +382,15 @@ export function createBootstrapRunner(
     forceWipe: boolean;
     isStaleResume: boolean;
     currentRetryAttempts: number;
+    onRunning?: () => void;
   }): Promise<void> {
-    const { triggerSource, forceWipe, isStaleResume, currentRetryAttempts } =
-      opts;
+    const {
+      triggerSource,
+      forceWipe,
+      isStaleResume,
+      currentRetryAttempts,
+      onRunning,
+    } = opts;
 
     // --- Step 1: Acquire heartbeat instance ID
     await heartbeat.acquireInstance();
@@ -488,6 +565,15 @@ export function createBootstrapRunner(
         });
       }
     }
+
+    // Signal the synchronous handshake point. State is now 'running' in the
+    // DB, the reset-all instruction (if applicable) has been queued for
+    // vault-manager, and the audit trail has captured the destructive intent.
+    // Callers awaiting `onRunning` (typically an HTTP route returning 202)
+    // can now respond — subsequent work continues in the background but the
+    // gateway already returns 503 for any client clone, so no inconsistent
+    // state is observable.
+    onRunning?.();
 
     await createActivity?.({
       action: ACTION_BOOTSTRAP_STARTED,
@@ -699,8 +785,11 @@ export function createBootstrapRunner(
   // -------------------------------------------------------------------------
 
   return {
-    async bootstrap(opts: { triggerSource: TriggerSource }): Promise<void> {
-      const { triggerSource } = opts;
+    async bootstrap(opts: {
+      triggerSource: TriggerSource;
+      onRunning?: () => void;
+    }): Promise<void> {
+      const { triggerSource, onRunning } = opts;
 
       // Read current persisted state
       const doc = await readSingleton(vaultSyncState);
@@ -787,6 +876,7 @@ export function createBootstrapRunner(
         forceWipe,
         isStaleResume,
         currentRetryAttempts: retryAttempts,
+        onRunning,
       });
     },
 
