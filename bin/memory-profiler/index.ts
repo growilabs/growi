@@ -1,4 +1,4 @@
-// Public barrel for memory-profiling module.
+// Public barrel for memory-profiler module.
 // Exposes only the stable contract per design.md "Barrel Exposure Rules".
 // Internal symbols (factories, scenario `run*` functions, `LOAD_*` constants,
 // lib/* helpers) MUST NOT be re-exported here.

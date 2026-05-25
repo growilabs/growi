@@ -15,7 +15,7 @@
  * All write operations use the session established by initInstaller().
  *
  * Smoke-test entry point:
- *   tsx tools/memory-profiling/load-driver.ts --smoke
+ *   tsx bin/memory-profiler/load-driver.ts --smoke
  */
 
 import {
@@ -108,7 +108,7 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
     for (let i = 0; i < count; i++) {
       const idx = ++pageCounter;
       const path = `${PAGE_BASE_PATH}/page-${idx}-${Date.now()}`;
-      const body = `# Load Driver Test Page ${idx}\n\nThis page was created by the memory-profiling load driver.`;
+      const body = `# Load Driver Test Page ${idx}\n\nThis page was created by the memory-profiler load driver.`;
 
       // biome-ignore lint/performance/noAwaitInLoops: intentional serial execution — design mandates 直列発火
       const res = await httpClient.post('/_api/v3/page', {
@@ -142,7 +142,7 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
     for (let i = 0; i < count; i++) {
       const idx = ++pageCounter;
       const path = `${PAGE_BASE_PATH}/edited-${idx}-${Date.now()}`;
-      const body = `# Edited Page ${idx}\n\nThis simulates an edit operation in the memory-profiling load driver.`;
+      const body = `# Edited Page ${idx}\n\nThis simulates an edit operation in the memory-profiler load driver.`;
 
       // biome-ignore lint/performance/noAwaitInLoops: intentional serial execution — design mandates 直列発火
       const res = await httpClient.post('/_api/v3/page', {
@@ -279,7 +279,7 @@ export function createLoadDriver(baseUrl: string): LoadDriver {
  * that all endpoints are reachable and return non-error responses.
  *
  * Observable completion condition (Req 2.2, 7.1):
- *   tsx tools/memory-profiling/load-driver.ts --smoke
+ *   tsx bin/memory-profiler/load-driver.ts --smoke
  */
 if (process.argv.includes('--smoke')) {
   const BASE_URL = process.env.GROWI_BASE_URL ?? 'http://localhost:3000';

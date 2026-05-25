@@ -1,7 +1,7 @@
 /**
  * Scenarios sub-barrel
  *
- * Public surface for the memory-profiling scenarios module.  Exposes the
+ * Public surface for the memory-profiler scenarios module.  Exposes the
  * three phase functions (runBaseline / runLoad / runDrain) and the LOAD_*
  * op-count constants that act as the single source of truth for
  * reproducibility (Req 1.4, 8.4 — Barrel Exposure Rules).

@@ -5,7 +5,7 @@ See [design.md](../../.kiro/specs/memory-leak-investigation/design.md) for the o
 
 ## Stable Contract
 
-This section defines the **stable public surface** of the memory-profiling tool.
+This section defines the **stable public surface** of the memory-profiler tool.
 Any change to a symbol listed here is a **breaking change** (see [Change Review Process](#change-review-process) below).
 
 ### CLI arguments
@@ -57,7 +57,7 @@ timestamp,phase,rss,heap_used,heap_total,external
 
 ### TypeScript public API (top-level barrel)
 
-`bin/memory-profiling/index.ts` re-exports exactly the following five symbols, in this order:
+`bin/memory-profiler/index.ts` re-exports exactly the following five symbols, in this order:
 
 | # | Symbol | Kind | Description |
 |---|---|---|---|
@@ -74,11 +74,11 @@ Internal symbols (factory functions, `lib/*` helpers, per-scenario `run*` functi
 Consumers must import only from the top-level barrel:
 
 ```ts
-import { runScenario, ScenarioRunnerError } from '@growi/bin/memory-profiling';
-import type { ScenarioRunnerOptions, LoadOpCounts, LoadDriver } from '@growi/bin/memory-profiling';
+import { runScenario, ScenarioRunnerError } from '@growi/bin/memory-profiler';
+import type { ScenarioRunnerOptions, LoadOpCounts, LoadDriver } from '@growi/bin/memory-profiler';
 ```
 
-Deep paths such as `@growi/bin/memory-profiling/load-driver` or `@growi/bin/memory-profiling/lib/...` are **blocked by the `exports` field** in `bin/package.json` and must not be used.
+Deep paths such as `@growi/bin/memory-profiler/load-driver` or `@growi/bin/memory-profiler/lib/...` are **blocked by the `exports` field** in `bin/package.json` and must not be used.
 
 ## Change Review Process
 
@@ -106,7 +106,7 @@ NODE_ENV=development pnpm run ts-node --inspect=0.0.0.0:9229 src/server/app.ts &
 
 # 2. Run the scenario (shortened idle for CI; use default 300 s for full investigation)
 BASELINE_IDLE_SECONDS=60 DRAIN_IDLE_SECONDS=60 \
-  pnpm run ts-node ../../bin/memory-profiling/run-scenario.ts \
+  pnpm run ts-node ../../bin/memory-profiler/run-scenario.ts \
     --baseUrl http://localhost:3000 \
     --inspector http://127.0.0.1:9229 \
     --outputDir tmp/memory-leak-investigation/runs/after
@@ -139,7 +139,7 @@ NODE_ENV=development pnpm run ts-node --inspect=0.0.0.0:9229 src/server/app.ts &
 
 # Run scenario
 BASELINE_IDLE_SECONDS=60 DRAIN_IDLE_SECONDS=60 \
-  pnpm run ts-node ../../bin/memory-profiling/run-scenario.ts \
+  pnpm run ts-node ../../bin/memory-profiler/run-scenario.ts \
     --baseUrl http://localhost:3000 \
     --inspector http://127.0.0.1:9229 \
     --outputDir tmp/memory-leak-investigation/runs/before

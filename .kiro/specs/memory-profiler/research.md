@@ -4,7 +4,7 @@
 - **Feature**: `memory-profiler`
 - **Discovery Scope**: Extension（既存実装のベースライン化）— code archeology が中心。新機能の architecture 探索ではなく、現状実装を「公式仕様」として固定する作業。
 - **Key Findings**:
-  - `bin/memory-profiling/` 配下の全モジュールは `memory-leak-investigation` の Phase 1–4 で実装済み。58 unit tests が green。
+  - `bin/memory-profiler/` 配下の全モジュールは `memory-leak-investigation` の Phase 1–4 で実装済み。58 unit tests が green。
   - Architecture pattern は **External profiling sidecar (CDP-only) + workspace-isolated package**。SIGUSR2 fallback は実装中に棄却（commit `b8e3efa4c7`）。
   - Boundary 上、`apps/app` への依存方向はゼロ。GROWI server には CDP（観測）と HTTP / WS（負荷）の 2 経路のみで到達する。
   - Downstream consumer（`memory-leak-investigation` 等）から本 spec への片方向参照モデルを確立する必要がある。
@@ -12,14 +12,14 @@
 ## Research Log
 
 ### Architecture (実装状態の確認)
-- **Context**: `bin/memory-profiling/` の現状アーキテクチャを spec として固定するため、実装ソースから構成を読み取る。
+- **Context**: `bin/memory-profiler/` の現状アーキテクチャを spec として固定するため、実装ソースから構成を読み取る。
 - **Sources Consulted**:
-  - [bin/memory-profiling/cdp-snapshot-client.ts](../../bin/memory-profiling/cdp-snapshot-client.ts) — CDP WebSocket クライアント
-  - [bin/memory-profiling/load-driver.ts](../../bin/memory-profiling/load-driver.ts) — Load 合成
-  - [bin/memory-profiling/rss-time-series-logger.ts](../../bin/memory-profiling/rss-time-series-logger.ts) — RSS CSV ロガー
-  - [bin/memory-profiling/run-scenario.ts](../../bin/memory-profiling/run-scenario.ts) — シナリオオーケストレーター
-  - [bin/memory-profiling/scenarios/](../../bin/memory-profiling/scenarios/) — baseline / load / drain
-  - [bin/memory-profiling/lib/](../../bin/memory-profiling/lib/) — installer-driver / http-client / yjs-client
+  - [bin/memory-profiler/cdp-snapshot-client.ts](../../bin/memory-profiler/cdp-snapshot-client.ts) — CDP WebSocket クライアント
+  - [bin/memory-profiler/load-driver.ts](../../bin/memory-profiler/load-driver.ts) — Load 合成
+  - [bin/memory-profiler/rss-time-series-logger.ts](../../bin/memory-profiler/rss-time-series-logger.ts) — RSS CSV ロガー
+  - [bin/memory-profiler/run-scenario.ts](../../bin/memory-profiler/run-scenario.ts) — シナリオオーケストレーター
+  - [bin/memory-profiler/scenarios/](../../bin/memory-profiler/scenarios/) — baseline / load / drain
+  - [bin/memory-profiler/lib/](../../bin/memory-profiler/lib/) — installer-driver / http-client / yjs-client
 - **Findings**:
   - 全モジュールが named export + factory pattern (`createXxx()`) で実装されており、test 用に fake を差し替え可能。
   - `CdpSnapshotClient` は exponential backoff（base 1000ms, max 5 retries）を持ち、`HeapProfiler.takeHeapSnapshot` を chunk 結合で受信。

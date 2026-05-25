@@ -7,10 +7,10 @@
 **Purpose**: GROWI.cloud のテナント専用 `apps/app` コンテナの baseline RSS を、機能を損なわずに 20–40 MB 程度削減する。並行して、`y-websocket` の collaborative document 数を常時観測可能にし、production でのリーク兆候を OTel ダッシュボードから検知できるようにする。
 
 **Users**:
-- メモリ調査担当者 — `memory-profiler` spec が提供する profiling ツール（`bin/memory-profiling/`）を使って Baseline / Load / Drain シナリオを実行し、本 spec の verification-report に結果を記録する。
+- メモリ調査担当者 — `memory-profiler` spec が提供する profiling ツール（`bin/memory-profiler/`）を使って Baseline / Load / Drain シナリオを実行し、本 spec の verification-report に結果を記録する。
 - GROWI.cloud 運用担当者 — 環境変数で `MONGO_MAX_POOL_SIZE` / `MONGO_MIN_POOL_SIZE` / OTel auto-instrumentation profile を制御し、必要時に従来動作へ切り戻す。
 
-**Impact**: `apps/app` の server コードを 3 ファイル局所修正 + 1 新規 custom-metrics module（合計 4 server-side fix surface）。profiling ツール本体（`bin/memory-profiling/`）は **`memory-profiler` spec の責務**であり本 spec は変更しない。Default 値の変更（pool size、auto-instrumentation 範囲）は release notes / CHANGELOG で明示する。
+**Impact**: `apps/app` の server コードを 3 ファイル局所修正 + 1 新規 custom-metrics module（合計 4 server-side fix surface）。profiling ツール本体（`bin/memory-profiler/`）は **`memory-profiler` spec の責務**であり本 spec は変更しない。Default 値の変更（pool size、auto-instrumentation 範囲）は release notes / CHANGELOG で明示する。
 
 > **Dependency**: 本 spec は `memory-profiler` spec の **downstream consumer**。profiling ツールの interface 仕様・operational procedure は `memory-profiler` spec の design.md を参照。本 spec は同 spec の内容を引用せず、参照のみで完結する。
 
@@ -21,7 +21,7 @@
 - 全ての変更を環境変数で従来動作へ切り戻し可能とする（再ビルド不要）。
 
 ### Non-Goals
-- **profiling ツール本体（`bin/memory-profiling/`）の実装・設計変更** — `memory-profiler` spec の責務。
+- **profiling ツール本体（`bin/memory-profiler/`）の実装・設計変更** — `memory-profiler` spec の責務。
 - 既存 `growi.*` / `system.*` / `process.*` metrics の名称・schema 変更。
 - OpenTelemetry SDK ライフサイクルや `BatchSpanProcessor` の全面設計変更。
 - `y-websocket` persistence プロトコルや `WSSharedDoc` 構造の変更。
@@ -40,7 +40,7 @@
 - 関連する CHANGESET エントリ（default 値変更の告知）。
 
 ### Out of Boundary
-- **profiling ツール本体（`bin/memory-profiling/` / `@growi/bin`）の実装・設計・interface** — `memory-profiler` spec の責務。本 spec は同ツールの consumer。
+- **profiling ツール本体（`bin/memory-profiler/` / `@growi/bin`）の実装・設計・interface** — `memory-profiler` spec の責務。本 spec は同ツールの consumer。
 - 既存 `opentelemetry` spec が定義する SDK ライフサイクル、Resource Attribute 体系、HTTP anonymization、既存 4 custom-metrics module の構造。
 - 既存 `collaborative-editor` spec が定義する `y-websocket` セッションの寿命ポリシーと `create-mongodb-persistence.ts` の persistence プロトコル。
 - `BatchSpanProcessor` / `PeriodicExportingMetricReader` のパラメータチューニング（L2 の allow-list 化を超える変更）。
@@ -157,7 +157,7 @@ apps/app/
 └── verification-report.md                           # [Phase 5+] 検証結果の集約
 ```
 
-> `bin/memory-profiling/`（`@growi/bin` workspace）は `memory-profiler` spec が所有。本 spec はそのツールを利用するのみで、ファイル構造の責任は持たない。
+> `bin/memory-profiler/`（`@growi/bin` workspace）は `memory-profiler` spec が所有。本 spec はそのツールを利用するのみで、ファイル構造の責任は持たない。
 
 ### Modified Files
 - `apps/app/src/server/util/mongoose-utils.ts` — `mongoOptions` に `maxPoolSize` / `minPoolSize` を追加。env var から読み出し（default 15 / 2）。

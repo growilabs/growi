@@ -4,7 +4,7 @@
 
 本 spec は、GROWI のサーバサイド (`apps/app`, Node.js) のメモリ特性を計測・最適化する。`claude/investigate-growi-memory-leaks-09kl4` ブランチで作成された静的解析レポート（[research.md](./research.md)）の 5 findings (L1-L5) を、devcontainer 環境で実行可能となった dynamic profiling で **裏付ける／棄却する** ことを軸に、確認できた問題に対してのみ修正と監視を導入する。最終成果物は、(1) ベースライン RSS の低減（L1+L2）、(2) リーク面の常時可観測化（L3 metric）、(3) 検証根拠を残した `verification-report.md`、の 3 点である。
 
-> **依存スペック**: profiling ツール本体（`bin/memory-profiling/` / `@growi/bin`）の実装・設計・interface 定義は別 spec `memory-profiler` の責務。本 spec は同ツールの **consumer** であり、片方向参照（investigation → profiler）。
+> **依存スペック**: profiling ツール本体（`bin/memory-profiler/` / `@growi/bin`）の実装・設計・interface 定義は別 spec `memory-profiler` の責務。本 spec は同ツールの **consumer** であり、片方向参照（investigation → profiler）。
 
 詳細な背景・アプローチ・スコープは [brief.md](./brief.md) を参照。
 
@@ -16,7 +16,7 @@
   - 環境変数で挙動を制御可能な形での baseline-bloat 削減（pool size、auto-instrumentation 範囲）。
   - `memory-profiler` ツールを利用した検証セッションの実行と、verification report への結果集約。
 - **Out of scope**:
-  - **`memory-profiler` ツール本体（`bin/memory-profiling/`）の実装・設計・interface 定義** — 別 spec の責務。
+  - **`memory-profiler` ツール本体（`bin/memory-profiler/`）の実装・設計・interface 定義** — 別 spec の責務。
   - ブラウザ／クライアント側のメモリ分析。
   - OpenTelemetry SDK ライフサイクル設計の再構築（`opentelemetry` spec の責務）。
   - `BatchSpanProcessor` / `PeriodicExportingMetricReader` のパラメータ全面チューニング。
@@ -33,7 +33,7 @@
 
 ### Requirement 1: 検証ツールの利用と検証成果物の保存
 
-**Objective:** メモリ調査担当者として、`memory-profiler` spec が提供する profiling ツール（`bin/memory-profiling/`）を利用し、各 finding を実測値で裏付け／棄却できる状態にする。
+**Objective:** メモリ調査担当者として、`memory-profiler` spec が提供する profiling ツール（`bin/memory-profiler/`）を利用し、各 finding を実測値で裏付け／棄却できる状態にする。
 
 #### Acceptance Criteria
 

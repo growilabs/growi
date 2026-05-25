@@ -95,7 +95,7 @@ const { runDrain } = await import('./scenarios/drain');
 /** Default options for runScenario in tests */
 const defaultOpts = {
   inspectorUrl: 'http://127.0.0.1:9229',
-  outputDir: '/tmp/test-memory-profiling',
+  outputDir: '/tmp/test-memory-profiler',
   baseUrl: 'http://localhost:3000',
   idleSeconds: 5,
   loadOpCounts: {

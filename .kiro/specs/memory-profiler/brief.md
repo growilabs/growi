@@ -2,7 +2,7 @@
 
 ## Problem
 
-`bin/memory-profiling/`（`@growi/bin` workspace package）には、GROWI のメモリ調査に使う CDP-based heap snapshot client、HTTP / yjs 負荷ドライバ、RSS 時系列ロガー、Baseline / Load / Drain シナリオオーケストレーターが揃っている。しかし現状、これら一連のツール群を「公式仕様」として記述した spec が存在しない。歴史的経緯から `memory-leak-investigation` spec の design.md にツール構造の記述が含まれているが、同 spec は 1 回限りの調査記録として凍結されており、今後ツールに変更を加える際の参照元・レビュー基準として安定しない。
+`bin/memory-profiler/`（`@growi/bin` workspace package）には、GROWI のメモリ調査に使う CDP-based heap snapshot client、HTTP / yjs 負荷ドライバ、RSS 時系列ロガー、Baseline / Load / Drain シナリオオーケストレーターが揃っている。しかし現状、これら一連のツール群を「公式仕様」として記述した spec が存在しない。歴史的経緯から `memory-leak-investigation` spec の design.md にツール構造の記述が含まれているが、同 spec は 1 回限りの調査記録として凍結されており、今後ツールに変更を加える際の参照元・レビュー基準として安定しない。
 
 調査担当者が次回以降の調査で同ツールを利用するたびに、改善点や新しいシナリオが必要になるが、変更を受け入れる owner spec がないため:
 
@@ -16,7 +16,7 @@
 ```
 bin/                            # @growi/bin workspace package (private)
 ├── package.json                # ws, vitest を持つ private package
-├── memory-profiling/
+├── memory-profiler/
 │   ├── README.md               # 起動手順・出力レイアウト・コミット禁止ポリシー
 │   ├── cdp-snapshot-client.ts  # CDP WebSocket クライアント (HeapProfiler.takeHeapSnapshot)
 │   ├── cdp-snapshot-client.spec.ts
@@ -44,8 +44,8 @@ bin/                            # @growi/bin workspace package (private)
 
 ## Desired Outcome
 
-- `bin/memory-profiling/` の現状のアーキテクチャ・interface・operational procedure を、本 spec の requirements / design として **公式仕様化** する。コードは原則変更しない（必要な小修正のみ）。
-- 今後 `bin/memory-profiling/` に変更を加える際、本 spec が **change review の基準** として参照される。
+- `bin/memory-profiler/` の現状のアーキテクチャ・interface・operational procedure を、本 spec の requirements / design として **公式仕様化** する。コードは原則変更しない（必要な小修正のみ）。
+- 今後 `bin/memory-profiler/` に変更を加える際、本 spec が **change review の基準** として参照される。
 - 新しい memory 調査が始まった際、調査担当者は memory-leak-investigation を読まずに本 spec だけでツールの使い方とアーキテクチャを理解できる。
 - どの interface が stable（外部・将来の調査者向け）でどこが internal（実装詳細）かを明文化し、Module Public Surface ルールに沿った形で記述する。
 
@@ -62,7 +62,7 @@ bin/                            # @growi/bin workspace package (private)
 ## Scope
 
 - **In**:
-  - `bin/memory-profiling/` 配下の全モジュール（cdp-snapshot-client / load-driver / rss-time-series-logger / run-scenario / scenarios/* / lib/*）のアーキテクチャ仕様化
+  - `bin/memory-profiler/` 配下の全モジュール（cdp-snapshot-client / load-driver / rss-time-series-logger / run-scenario / scenarios/* / lib/*）のアーキテクチャ仕様化
   - `@growi/bin` workspace package 定義 (`bin/package.json`) の仕様化
   - CLI interface（`run-scenario.ts` の引数 / env var / exit code）の stable contract 定義
   - LoadDriver の interface（page CRUD / search / yjs op の関数シグネチャ）の stable contract 定義

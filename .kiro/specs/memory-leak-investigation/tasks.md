@@ -4,7 +4,7 @@
 >
 > **条件付きコンポーネント**（YjsIdleSweeper / HandlerBackpressure）は Phase 6 の re-measurement 結果が confirmed の場合のみ Phase 7 で着手する。
 >
-> **Dependency on `memory-profiler` spec**: Phase 5 以降のすべての検証セッションは `memory-profiler` spec が提供する profiling ツール（`bin/memory-profiling/`）を利用する。本 spec はそのツールの **consumer** であり、ツール本体の実装・interface・operational procedure の責務は持たない。
+> **Dependency on `memory-profiler` spec**: Phase 5 以降のすべての検証セッションは `memory-profiler` spec が提供する profiling ツール（`bin/memory-profiler/`）を利用する。本 spec はそのツールの **consumer** であり、ツール本体の実装・interface・operational procedure の責務は持たない。
 >
 > **Scope change history**:
 > - Task 1.2（SIGUSR2 in-process fallback）は CDP-only 方針へ切り替えたため削除した（commit `b8e3efa4c7`）。
