@@ -42,7 +42,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 5.3_
 
 - [ ] 5. Validation: RSS 削減効果と runtime トレース継続の運用観察
-- [ ] 5.1 memory-profiler scenario runner で before / after baseline mean RSS を計測し verification-report.md に記録
+- [x] 5.1 memory-profiler scenario runner で before / after baseline mean RSS を計測し verification-report.md に記録
   - HEAD（本 spec 適用前のコミット）と本 spec 適用後のコミットそれぞれで、`apps/app` の memory-profiler scenario runner を「OTel ON / 5 分 idle baseline」シナリオで実行
   - 取得した RSS sample 列から baseline mean RSS を算出し、`after - before` の delta を計算
   - 計測中に GROWI のページ表示・編集・検索が機能していることを目視確認し、http / express / mongodb / mongoose のトレースおよび custom metrics 5 個（application / user-counts / page-counts / system / yjs）が OTLP exporter に流れ続けていることをログまたは collector 側で観察
