@@ -722,20 +722,6 @@ packages:
 ### Performance Tests
 - 本 spec では行わない（profiling tool 自体の性能は GROWI server の挙動次第で、optimization 対象は別 spec の調査結果次第）。
 
-## Migration Strategy
-
-本 spec はベースライン化が中心だが、Module Public Surface 規約への整合（barrel 導入）と `exports` field 追加に伴う小規模 code migration が発生する。
-
-| Phase | Activity | Validation |
-|-------|----------|------------|
-| 1 | requirements / design / tasks を spec として fix | 既存実装を仕様と照合 |
-| 2 | `index.ts` barrel 3 つ（top-level / scenarios / lib）を追加し、sibling 間の import を barrel 経由に書き換え | barrel 経由 import で全 test green |
-| 3 | `bin/package.json` に `exports` field を追加 | 既存 import が壊れていないこと、深い path import が type error になることを確認 |
-| 4 | `stable-contract.spec.ts` を追加 | 新 test が green、stable contract surface の項目漏れがない |
-| 5 | README の change-review プロセス追記 | README diff レビュー |
-| 6 | `memory-leak-investigation` 側の参照 cleanup を取り込む（別作業） | stash@{0} を pop して reconcile（参照先 path と barrel 名の整合確認） |
-| 7 | spec 確定後、本 spec を `phase: implementation-complete` 相当として扱う | `pnpm --filter @growi/bin test` + lint の green を最終確認 |
-
 ## Performance & Scalability
 
 - **Profiling tool 自体の overhead**: CDP snapshot 取得時に GROWI server を一時 pause する（CDP の標準挙動）。ユーザー体感の数秒〜数十秒の遅延が発生するが、これは Node.js inspector の仕様であり本ツールの責務外。
