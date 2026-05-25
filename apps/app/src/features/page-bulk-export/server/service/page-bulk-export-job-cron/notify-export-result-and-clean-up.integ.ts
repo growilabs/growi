@@ -61,15 +61,21 @@ describe('PageBulkExportJobCronService.notifyExportResultAndCleanUp', () => {
     expect(job.completedAt).toBeUndefined();
 
     // act
+    const before = Date.now();
     await pageBulkExportJobCronService?.notifyExportResultAndCleanUp(
       SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED,
       job,
     );
+    const after = Date.now();
 
-    // assert
+    // assert: completedAt is a Date stamped during this call (not a sentinel
+    // like new Date(0) or a stale value), so the download-expiration query
+    // `{ completedAt: { $lt: thresholdDate } }` will correctly include it.
     const updated = await PageBulkExportJob.findById(job._id);
     expect(updated?.status).toBe(PageBulkExportJobStatus.completed);
-    expect(updated?.completedAt).toBeInstanceOf(Date);
+    const completedAtMs = updated?.completedAt?.getTime();
+    expect(completedAtMs).toBeGreaterThanOrEqual(before);
+    expect(completedAtMs).toBeLessThanOrEqual(after);
   });
 
   test('should preserve an already-set completedAt (normal completion path)', async () => {
