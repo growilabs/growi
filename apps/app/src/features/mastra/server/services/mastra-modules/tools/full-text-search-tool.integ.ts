@@ -12,27 +12,32 @@ import SearchService from '~/server/service/search';
 import type { MastraRequestContextShape } from '../types/request-context';
 import { fullTextSearchTool } from './full-text-search-tool';
 
-// 本テストは **real Elasticsearch には接続しない**。理由:
-// 1. リポジトリ既存の `apps/app/src/server/service/search/search-service.integ.ts` は
-//    `dummyFullTextSearchDelegator` を `searchService.nqDelegators` に注入する形を取って
-//    おり、本 spec はその慣例に従う。
-// 2. GitHub Actions の通常 test job (`pnpm run test` を回す workflow) には
-//    `services.elasticsearch` が定義されていない (定義されているのは
-//    `reusable-app-prod.yml` の production build/launch のみ)。実 ES に接続する integ
-//    test はリポジトリ初の試みになり、CI 不安定化や workflow 改修コストを払うに見合わない。
-// 3. ES の query DSL / `filterPagesByViewer` の grant 適用ロジックは **本 spec の責任範囲外**
-//    (`SearchService` / `ElasticsearchDelegator` 側の責務)。本 tool の test 価値は
-//    「tool layer から SearchService への引数渡しと戻り値 mapping」に絞る。
+// This integration test does NOT connect to a real Elasticsearch. Reasons:
+//   1. The existing `apps/app/src/server/service/search/search-service.integ.ts`
+//      follows the convention of injecting a `dummyFullTextSearchDelegator`
+//      into `searchService.nqDelegators`; this spec adopts the same pattern.
+//   2. The GitHub Actions test job that runs `pnpm run test` has no
+//      `services.elasticsearch` (one is defined only in `reusable-app-prod.yml`
+//      for production build / launch). Wiring up a real ES integration test
+//      would be a repo-first effort — the CI instability and workflow churn
+//      are not worth the marginal coverage gain.
+//   3. ES query DSL assembly and `filterPagesByViewer` grant enforcement are
+//      out of scope for this spec — they belong to `SearchService` /
+//      `ElasticsearchDelegator`. This tool's test value is scoped to
+//      "argument forwarding from the tool layer to SearchService and
+//      return-value mapping".
 //
-// 何が test できなくなるか:
-// - 実 ES での grant 反映の動作確認 (上記の通り別 layer の責任)
-// - ES query DSL の組み立て (同上)
+// What is intentionally NOT tested here:
+//   - Grant enforcement on a real ES index (covered by the layers above).
+//   - ES query DSL assembly (same).
 //
-// 何は維持されるか:
-// - tool が `SearchService.searchKeyword` を呼ぶ際の引数 (query / null / user / userGroups / searchOpts)
-// - 実 MongoDB 上の `UserGroupRelation` を経由して `userGroups` が解決されること
-// - dummy delegator の戻り値を tool が `{ pageId, pagePath, snippet }` 形に正しく mapping すること
-// - 失敗ケース (delegator が reject) で `result: 'error'` を返すこと
+// What is still tested:
+//   - The tool calls `SearchService.searchKeyword` with the correct
+//     positional arguments (query / null / user / userGroups / searchOpts).
+//   - `userGroups` is resolved from real MongoDB via `UserGroupRelation`.
+//   - Dummy delegator hits are mapped to `{ pageId, pagePath, snippet }`
+//     without leaking the page body.
+//   - Delegator exceptions become `{ result: 'error' }` without rethrowing.
 
 // Suppress logger noise from the tool body itself.
 vi.mock('~/utils/logger', () => ({

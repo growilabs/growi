@@ -834,14 +834,26 @@ export const growiAgent = new Agent({
 
 ### Integration Tests (`full-text-search-tool.integ.ts`)
 
-実 MongoDB + Elasticsearch + SearchService を使い、以下のシナリオを確認:
+**実 Elasticsearch には接続しない**。理由:
 
-1. GRANT_PUBLIC ページがインデックスされている状態でクエリ → `hits` に該当 path が含まれる（6.1, 6.7）
-2. GRANT_OWNER の他者ページは hits に含まれない（6.7）
-3. GRANT_USER_GROUP の所属メンバーは hits に含み、非所属メンバーは含まない（6.7）
-4. ヒットなしクエリで `result: 'ok'` かつ `hits: []`, `totalCount: 0`（6.1）
-5. Elasticsearch が停止している状態で `result: 'error'` を返し例外を throw しないこと（6.8、可能なら ES 接続文字列をモック）
-6. **`sort: 'updatedAt' + order: 'desc'` の順序反映**: 同一クエリにヒットする 2 ページのうち片方の `updatedAt` を過去日付に backdate して再 index した状態で tool を呼び、新しい方のページが古い方より前に並ぶこと（要件 6.9。relevance ベースの並びでは順序が変わるため、`sort`/`order` が実際に ES へ届いていることの end-to-end 確認）
+1. 既存の [`apps/app/src/server/service/search/search-service.integ.ts`](apps/app/src/server/service/search/search-service.integ.ts) が `dummyFullTextSearchDelegator` を `searchService.nqDelegators` に注入する慣例を採っており、本 spec もそれに倣う
+2. GitHub Actions の通常 test job (`pnpm run test` を回す workflow) には `services.elasticsearch` が定義されていない (定義されているのは `reusable-app-prod.yml` の production build/launch のみ)。リポジトリ初の real ES integ test を導入する CI 改修コストに見合わない
+3. ES query DSL / `filterPagesByViewer` の grant 適用ロジックは `SearchService` / `ElasticsearchDelegator` の責務であり本 spec の対象外
+
+ファイル冒頭のヘッダーコメントにも同じ意思決定を明記する (`full-text-search-tool.integ.ts` L15-40)。
+
+実 MongoDB + dummy `SearchDelegator` (search を `vi.fn()` 化) + 実 SearchService dispatch path で以下を確認:
+
+1. dummy delegator が返す合成 hit 配列を、tool が `{ pageId, pagePath, snippet }` 形に正しく mapping し、`_source.body` 等の余計なフィールドが出力に混入しないこと（要件 6.5）
+2. ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を返すこと（要件 6.1）
+3. 実 MongoDB 上の User / UserGroup / UserGroupRelation を経由して、tool が `userGroups` を解決し dummy delegator の `search` 第 3 引数に渡すこと、また第 2 引数 `user` が `requestContext.set` で渡した実 User document と参照同一であること（要件 6.7 / Issue 1 Plan C の回帰防止）
+4. dummy delegator の `search` が reject した場合に `result: 'error'` を返し execute が throw しないこと（要件 6.8）
+5. **`sort` / `order` の素通し**: 入力で `sort: 'updatedAt'` / `order: 'desc'` を渡したとき、dummy delegator の `search` 第 4 引数 `searchOpts` に `sort` / `order` がそのまま届くこと（要件 6.9。実 ES 上での `updated_at` ソート挙動は `ElasticsearchDelegator` の責務）
+
+**意図的に NOT 対象** (上位 layer の責務):
+- GRANT_PUBLIC / GRANT_OWNER / GRANT_USER_GROUP の **実 ES 上での grant 反映**: `ElasticsearchDelegator.filterPagesByViewer` の責務（別途 `ElasticsearchDelegator` 側の integ test で確認すべきだが、これは本 spec の範囲外）
+- ES の query DSL 組み立て: 同上
+- `sort` / `order` の **実 ES 上での実際の並び順**: 同上（tool 層で素通しされていることまでが本 spec の範囲）
 
 ### Integration Tests (`get-page-content-tool.integ.ts`)
 
