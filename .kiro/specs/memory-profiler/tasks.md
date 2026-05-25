@@ -91,7 +91,7 @@
 
 ## 6. Validation: lint / test green の最終確認
 
-- [ ] 6.1 `@growi/bin` 全 test と lint の green 確認
+- [x] 6.1 `@growi/bin` 全 test と lint の green 確認
   - `pnpm --filter @growi/bin test` を実行し、既存の 5 ファイル（cdp-snapshot-client.spec / load-driver.spec / rss-time-series-logger.spec / run-scenario.spec / scenarios/scenarios.spec）+ 新規 1 ファイル（stable-contract.spec）すべてが green であることを確認。
   - workspace 全体の lint（`turbo run lint`）にて `@growi/bin` 配下のファイルが biome の対象になっており、errors / warnings がゼロであることを確認。
   - `pnpm install` 後の `pnpm-lock.yaml` に diff がないこと（dependency は本 spec で変えていない）。

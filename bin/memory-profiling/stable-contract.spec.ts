@@ -141,7 +141,7 @@ describe('stable contract surface', () => {
     // paths without colliding with other describe blocks' mock state.
     const snapshotPaths: string[] = [];
 
-    beforeEach(async () => {
+    beforeEach(() => {
       snapshotPaths.length = 0;
       vi.resetModules();
 

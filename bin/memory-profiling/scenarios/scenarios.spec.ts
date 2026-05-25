@@ -25,8 +25,9 @@ function makeFakeDriver(): LoadDriver & { calls: CallRecord[] } {
 
   const makeOp =
     (method: string) =>
-    async (count: number): Promise<void> => {
+    (count: number): Promise<void> => {
       calls.push({ method, count });
+      return Promise.resolve();
     };
 
   return {
