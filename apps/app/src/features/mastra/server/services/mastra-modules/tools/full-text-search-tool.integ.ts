@@ -4,23 +4,35 @@ import mongoose, { type Model } from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import type Crowi from '~/server/crowi';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import { configManager } from '~/server/service/config-manager';
+import type { QueryTerms, SearchDelegator } from '~/server/interfaces/search';
 import SearchService from '~/server/service/search';
 
 import type { MastraRequestContextShape } from '../types/request-context';
 import { fullTextSearchTool } from './full-text-search-tool';
 
-// Integration test for the Mastra full-text search tool.
+// 本テストは **real Elasticsearch には接続しない**。理由:
+// 1. リポジトリ既存の `apps/app/src/server/service/search/search-service.integ.ts` は
+//    `dummyFullTextSearchDelegator` を `searchService.nqDelegators` に注入する形を取って
+//    おり、本 spec はその慣例に従う。
+// 2. GitHub Actions の通常 test job (`pnpm run test` を回す workflow) には
+//    `services.elasticsearch` が定義されていない (定義されているのは
+//    `reusable-app-prod.yml` の production build/launch のみ)。実 ES に接続する integ
+//    test はリポジトリ初の試みになり、CI 不安定化や workflow 改修コストを払うに見合わない。
+// 3. ES の query DSL / `filterPagesByViewer` の grant 適用ロジックは **本 spec の責任範囲外**
+//    (`SearchService` / `ElasticsearchDelegator` 側の責務)。本 tool の test 価値は
+//    「tool layer から SearchService への引数渡しと戻り値 mapping」に絞る。
 //
-// Approach (chosen: A): real MongoDB + real Elasticsearch + real SearchService.
+// 何が test できなくなるか:
+// - 実 ES での grant 反映の動作確認 (上記の通り別 layer の責任)
+// - ES query DSL の組み立て (同上)
 //
-// The devcontainer exposes Elasticsearch at http://elasticsearch:9200 and the
-// integration test runner provides a per-worker MongoDB instance. We bootstrap
-// a Crowi singleton, override `app:elasticsearchUri` to a unique per-run index
-// to avoid colliding with the developer's `/growi` data, then exercise the
-// tool against a small fixture of pages with different grant policies.
+// 何は維持されるか:
+// - tool が `SearchService.searchKeyword` を呼ぶ際の引数 (query / null / user / userGroups / searchOpts)
+// - 実 MongoDB 上の `UserGroupRelation` を経由して `userGroups` が解決されること
+// - dummy delegator の戻り値を tool が `{ pageId, pagePath, snippet }` 形に正しく mapping すること
+// - 失敗ケース (delegator が reject) で `result: 'error'` を返すこと
 
 // Suppress logger noise from the tool body itself.
 vi.mock('~/utils/logger', () => ({
@@ -32,16 +44,7 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-// Unique index name per test run to avoid cross-talk with developer data.
-// Workers in Vitest may run in parallel — include VITEST_WORKER_ID.
 const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
-const TEST_INDEX_NAME = `agentic-search-int-${WORKER_ID}-${Date.now()}`;
-const TEST_ES_HOST = 'http://elasticsearch:9200';
-const TEST_ES_URI = `${TEST_ES_HOST}/${TEST_INDEX_NAME}`;
-
-// Helper to wait for ES refresh after a bulk index write.
-const sleep = (ms: number) =>
-  new Promise<void>((resolve) => setTimeout(resolve, ms));
 
 type FullTextSearchOkResult = {
   result: 'ok';
@@ -58,10 +61,10 @@ type FullTextSearchResult =
   | FullTextSearchOkResult
   | FullTextSearchFailureResult;
 
-// Helper to invoke the tool's execute the same way the Mastra runtime does.
-// Narrow the return shape ONCE here so callers can branch on `result.result`
-// without per-call casts. The two `as never` args are unavoidable: Mastra's
-// `execute` signature uses `unknown` for both input and the context envelope.
+// Invoke the tool's execute the same way the Mastra runtime does. The two
+// `as never` args are unavoidable: Mastra's `execute` signature uses
+// `unknown` for both input and the context envelope. Narrowing the return
+// shape once here keeps every call site cast-free.
 const invokeExecute = async (
   inputData: {
     query: string;
@@ -79,32 +82,57 @@ const invokeExecute = async (
   return result as FullTextSearchResult;
 };
 
-// Asserts the tool returned a success result and narrows the static type to
-// `FullTextSearchOkResult`. Replaces the per-call `as FullTextSearchOkResult`
-// cast at every call site with a single typed assertion that also fails the
-// test if the tool returned an error envelope (which would otherwise mask the
-// real failure as an "undefined hits" error downstream).
+// Narrowing assertion: fails the test if the tool returned an error envelope,
+// which would otherwise mask the real failure as "undefined hits" downstream.
 function assertOk(
   result: FullTextSearchResult,
 ): asserts result is FullTextSearchOkResult {
   expect(result.result).toBe('ok');
 }
 
-// Unique token used across page bodies to scope the test query and ensure we
-// only match pages this suite created (no developer / migration data drift).
-const SCOPE_TOKEN = `agenticSearchIntegMarker${WORKER_ID}xyz`;
+// Asserts the tool returned an error/context_error envelope.
+function assertFailure(
+  result: FullTextSearchResult,
+): asserts result is FullTextSearchFailureResult {
+  expect(result.result === 'error' || result.result === 'context_error').toBe(
+    true,
+  );
+}
 
-describe('fullTextSearchTool (integration)', () => {
+// Mock SearchDelegator. The `as unknown as` cast at the return site isolates
+// the boundary where a vi.fn() is admitted as a SearchDelegator — the tool
+// only invokes `search`, so a partial stub is sufficient. Call sites cast-free.
+type SearchDelegatorMock = SearchDelegator & {
+  search: ReturnType<typeof vi.fn>;
+};
+
+const buildDummyFullTextDelegator = (
+  searchImpl?: (
+    ...args: unknown[]
+  ) => Promise<ISearchResult<ISearchResultData>>,
+): SearchDelegatorMock => {
+  const defaultImpl = (): Promise<ISearchResult<ISearchResultData>> =>
+    Promise.resolve({ data: [], meta: { total: 0, hitsCount: 0 } });
+  return {
+    name: 'FullTextSearch',
+    search: vi.fn(searchImpl ?? defaultImpl),
+    isTermsNormalized(
+      _terms: Partial<QueryTerms>,
+    ): _terms is Partial<QueryTerms> {
+      return true;
+    },
+    validateTerms() {
+      return [];
+    },
+  } as unknown as SearchDelegatorMock;
+};
+
+const DEFAULT_DELEGATOR_KEY = 'FullTextSearch';
+
+describe('fullTextSearchTool (integration, dummy delegator)', () => {
   let crowi: Crowi;
   let searchService: SearchService;
-  let Page: PageModel;
   let User: Model<IUserHasId>;
-  let Revision: Model<{
-    pageId: mongoose.Types.ObjectId;
-    body: string;
-    format: string;
-    author: mongoose.Types.ObjectId;
-  }>;
   let UserGroup: Model<{ name: string }>;
   let UserGroupRelation: Model<{
     relatedGroup: mongoose.Types.ObjectId;
@@ -112,304 +140,76 @@ describe('fullTextSearchTool (integration)', () => {
   }>;
 
   let userA: IUserHasId;
-  let userB: IUserHasId;
   let groupG: { _id: mongoose.Types.ObjectId };
 
-  const pagePathPublic = `/agentic-search-integ/${WORKER_ID}/public`;
-  const pagePathOwner = `/agentic-search-integ/${WORKER_ID}/owner`;
-  const pagePathGroup = `/agentic-search-integ/${WORKER_ID}/group`;
-
   beforeAll(async () => {
-    // The ES delegator reads `app:elasticsearchUri` at construction time.
-    // We must set the env var BEFORE Crowi loads configs the first time so
-    // that the singleton SearchService picks it up.
-    process.env.ELASTICSEARCH_URI = TEST_ES_URI;
-    process.env.ELASTICSEARCH_VERSION =
-      process.env.ELASTICSEARCH_VERSION ?? '9';
-
     crowi = await getInstance();
-
-    // Reload configs in case getInstance() ran earlier in the worker without
-    // ES set. updateConfig() persists to Mongo and triggers reload.
-    await configManager.loadConfigs();
-
-    // Grant filter at the ES delegator level needs these flags so the search
-    // query actually narrows by viewer. Defaults are `false` (show all),
-    // which would make every GRANT_OWNER / GRANT_USER_GROUP page visible to
-    // any logged-in user — defeating the purpose of this test.
-    await configManager.updateConfig(
-      'security:list-policy:hideRestrictedByOwner',
-      true,
-      { skipPubsub: true },
-    );
-    await configManager.updateConfig(
-      'security:list-policy:hideRestrictedByGroup',
-      true,
-      { skipPubsub: true },
-    );
-
     searchService = new SearchService(crowi);
 
-    if (searchService.isElasticsearchEnabled !== true) {
-      throw new Error(
-        'Elasticsearch is not enabled despite explicit ELASTICSEARCH_URI; aborting integration test setup.',
-      );
-    }
+    // The real SearchService constructor short-circuits its delegator setup
+    // when the Elasticsearch URI config is unset, leaving
+    // `nqDelegators[DEFAULT]` undefined and `isElasticsearchEnabled === false`.
+    // For these tests we want to exercise the real `searchKeyword` dispatch
+    // path against an injected dummy delegator, so we:
+    //   1. force `isElasticsearchEnabled` to true (the tool's guard reads it),
+    //   2. install our dummy delegator under the DEFAULT key so that
+    //      `resolve()` returns it.
+    // This mirrors the convention established by
+    // `apps/app/src/server/service/search/search-service.integ.ts`.
+    Object.defineProperty(searchService, 'isElasticsearchEnabled', {
+      configurable: true,
+      get: () => true,
+    });
 
-    // SearchService.constructor fires `fullTextSearchDelegator.init()` as
-    // fire-and-forget. Wait until the delegator has fully initialised the
-    // ES client + index + alias by polling `getInfoForHealth`. We must NOT
-    // call init() again ourselves — that would race the constructor and
-    // throw `resource_already_exists_exception` from createIndex.
-    const initDeadline = Date.now() + 30_000;
-    let lastErr: unknown;
-    while (Date.now() < initDeadline) {
-      try {
-        await searchService.getInfoForHealth();
-        lastErr = null;
-        break;
-      } catch (err) {
-        lastErr = err;
-        await sleep(200);
-      }
-    }
-    if (lastErr != null) {
-      throw new Error(
-        `Failed to reach Elasticsearch during init: ${
-          lastErr instanceof Error ? lastErr.message : String(lastErr)
-        }`,
-      );
-    }
-
-    // Make sure the index actually exists (the alias too) before we attempt
-    // to bulk write. The constructor's init() calls normalizeIndices() which
-    // creates both — wait for it by polling indices.exists.
-    // The ES delegator's `client` field is not in any exported type; the
-    // ES SDK itself is also `unknown`-shaped for our purposes here. Narrow
-    // to the minimal `indices.exists` surface we actually call.
-    type EsIndicesClient = {
-      indices: { exists: (args: { index: string }) => Promise<unknown> };
-    };
-    const esClient = (
-      searchService.fullTextSearchDelegator as unknown as {
-        client: EsIndicesClient;
-      }
-    ).client;
-    // The ES JS SDK returns either a boolean (v8 transport) or a wrapper
-    // `{ body: boolean }` (older transport). Narrow via predicate to avoid
-    // any cast at the check site.
-    const isExistsTrue = (v: unknown): boolean => {
-      if (v === true) return true;
-      if (v != null && typeof v === 'object' && 'body' in v) {
-        return (v as { body: unknown }).body === true;
-      }
-      return false;
-    };
-    const indexReadyDeadline = Date.now() + 30_000;
-    while (Date.now() < indexReadyDeadline) {
-      const exists = await esClient.indices.exists({ index: TEST_INDEX_NAME });
-      if (isExistsTrue(exists)) {
-        break;
-      }
-      await sleep(200);
-    }
-
-    // `mongoose.model(name)` without generics returns `Model<any>`. Passing
-    // the declared document shape via the generic narrows it to the matching
-    // `Model<T>` for User/Revision/UserGroup/UserGroupRelation without per-
-    // call casts. Page keeps its existing `<PageDocument, PageModel>` form
-    // because its schema methods are typed on `PageModel`.
-    type RevisionDoc = {
-      pageId: mongoose.Types.ObjectId;
-      body: string;
-      format: string;
-      author: mongoose.Types.ObjectId;
-    };
+    // Pass the document shape as a generic so the model is typed as
+    // `Model<T>` instead of `Model<any>`, eliminating per-call casts.
     type UserGroupRelationDoc = {
       relatedGroup: mongoose.Types.ObjectId;
       relatedUser: mongoose.Types.ObjectId;
     };
-    Page = mongoose.model<PageDocument, PageModel>('Page');
     User = mongoose.model<IUserHasId>('User');
-    Revision = mongoose.model<RevisionDoc>('Revision');
     UserGroup = mongoose.model<{ name: string }>('UserGroup');
     UserGroupRelation =
       mongoose.model<UserGroupRelationDoc>('UserGroupRelation');
 
-    // Users: A and B (both real Mongo documents).
     const userAName = `agentic-search-integ-userA-${WORKER_ID}`;
-    const userBName = `agentic-search-integ-userB-${WORKER_ID}`;
-    await User.deleteMany({ username: { $in: [userAName, userBName] } });
+    await User.deleteMany({ username: userAName });
     const insertedUsers = await User.insertMany([
       {
         name: userAName,
         username: userAName,
         email: `${userAName}@example.com`,
       },
-      {
-        name: userBName,
-        username: userBName,
-        email: `${userBName}@example.com`,
-      },
     ]);
-    // `User` is typed as `Model<IUserHasId>`, so insertMany returns
-    // `(IUserHasId & Document)[]` — already assignable to IUserHasId.
     userA = insertedUsers[0];
-    userB = insertedUsers[1];
 
-    // Group containing only user A.
+    // Group containing user A — used by the userGroups-resolution test below
+    // to verify the tool calls UserGroupRelation.findAllUserGroupIdsRelatedToUser
+    // against real MongoDB and forwards the result to searchKeyword.
     const groupName = `agentic-search-integ-group-${WORKER_ID}`;
     await UserGroup.deleteMany({ name: groupName });
     const insertedGroup = await UserGroup.create({ name: groupName });
     // Mongoose's `Document._id` is typed as `unknown` from Model.create's
-    // return shape; narrow to ObjectId via a single, scoped cast (the schema
-    // guarantees this; we only use _id below).
+    // return shape; narrow to ObjectId via a single, scoped cast.
     groupG = { _id: insertedGroup._id as mongoose.Types.ObjectId };
     await UserGroupRelation.deleteMany({ relatedGroup: groupG._id });
     await UserGroupRelation.create({
       relatedGroup: groupG._id,
       relatedUser: userA._id,
     });
-
-    // Clean any prior pages with the same paths (idempotency under reruns).
-    await Page.deleteMany({
-      path: { $in: [pagePathPublic, pagePathOwner, pagePathGroup] },
-    });
-
-    // Create pages first to get _ids, then create revisions and link them.
-    const publicPage = await Page.create({
-      path: pagePathPublic,
-      grant: Page.GRANT_PUBLIC,
-      creator: userA._id,
-      lastUpdateUser: userA._id,
-    });
-    const ownerPage = await Page.create({
-      path: pagePathOwner,
-      grant: Page.GRANT_OWNER,
-      grantedUsers: [userA._id],
-      creator: userA._id,
-      lastUpdateUser: userA._id,
-    });
-    const groupPage = await Page.create({
-      path: pagePathGroup,
-      grant: Page.GRANT_USER_GROUP,
-      grantedUsers: [],
-      grantedGroups: [{ item: groupG._id, type: 'UserGroup' }],
-      creator: userA._id,
-      lastUpdateUser: userA._id,
-    });
-
-    const revisions = await Revision.insertMany([
-      {
-        pageId: publicPage._id,
-        body: `Public page body ${SCOPE_TOKEN} hello world`,
-        format: 'markdown',
-        author: userA._id,
-      },
-      {
-        pageId: ownerPage._id,
-        body: `Owner page body ${SCOPE_TOKEN} hello world`,
-        format: 'markdown',
-        author: userA._id,
-      },
-      {
-        pageId: groupPage._id,
-        body: `Group page body ${SCOPE_TOKEN} hello world`,
-        format: 'markdown',
-        author: userA._id,
-      },
-    ]);
-
-    publicPage.revision = revisions[0]._id;
-    ownerPage.revision = revisions[1]._id;
-    groupPage.revision = revisions[2]._id;
-    await publicPage.save();
-    await ownerPage.save();
-    await groupPage.save();
-
-    // Backdate one page's `updatedAt` so two pages visible to userA differ on
-    // the `updatedAt` axis. We backdate the OWNER page (visible only to A) to
-    // 7 days ago; the PUBLIC page keeps its fresh `Date.now()` default. This
-    // gives the sort-by-updatedAt integration test below two same-query hits
-    // with deterministically different timestamps.
-    //
-    // Page schema disables Mongoose's `timestamps.updatedAt` (see
-    // server/models/page.ts:266), so a direct $set on `updatedAt` is the
-    // canonical way to control its value without bypassing other middleware.
-    // ElasticsearchDelegator indexes `page.updatedAt` into the ES `updated_at`
-    // field (server/service/search-delegator/elasticsearch.ts:480-481), so the
-    // backdate must happen BEFORE the bulk index call below.
-    const sevenDaysAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
-    await Page.findByIdAndUpdate(ownerPage._id, {
-      $set: { updatedAt: sevenDaysAgo },
-    });
-
-    // Index our three pages into ES.
-    await searchService.fullTextSearchDelegator.updateOrInsertPages(() =>
-      Page.find({
-        path: { $in: [pagePathPublic, pagePathOwner, pagePathGroup] },
-      }),
-    );
-
-    // Wait for ES to refresh; the delegator's bulk write does not request
-    // refresh. ES default refresh_interval is 1s — wait 2s to be safe.
-    await sleep(2000);
-  }, 60_000);
+  });
 
   afterAll(async () => {
-    // Best-effort teardown: delete pages, revisions, group, users and the ES
-    // index. Tolerate failures (e.g. ES already gone) so cleanup never masks
-    // assertion failures.
+    // Best-effort cleanup of the Mongo fixtures created above. Tolerate
+    // failures so cleanup never masks assertion failures.
     try {
-      await Page.deleteMany({
-        path: { $in: [pagePathPublic, pagePathOwner, pagePathGroup] },
-      });
       await UserGroupRelation.deleteMany({ relatedGroup: groupG?._id });
       await UserGroup.deleteMany({ _id: groupG?._id });
-      await User.deleteMany({ _id: { $in: [userA?._id, userB?._id] } });
+      await User.deleteMany({ _id: userA?._id });
     } catch {
       // ignore
     }
-
-    try {
-      // Tear down the unique ES index for this run.
-      // The delegator's `client` field is not in any exported type; narrow
-      // to the minimal `indices.{delete,deleteAlias}` surface we actually use
-      // for teardown. `deleteAlias` is optional in some SDK versions.
-      type EsTeardownClient = {
-        indices: {
-          delete: (args: { index: string }) => Promise<unknown>;
-          deleteAlias?: (args: {
-            index: string;
-            name: string;
-          }) => Promise<unknown>;
-        };
-      };
-      const delegator = searchService?.fullTextSearchDelegator as unknown as
-        | { client?: EsTeardownClient }
-        | undefined;
-      const client = delegator?.client;
-      if (client != null) {
-        const aliasName = `${TEST_INDEX_NAME}-alias`;
-        await client.indices
-          .delete({ index: TEST_INDEX_NAME })
-          .catch(() => undefined);
-        await client.indices
-          .delete({ index: `${TEST_INDEX_NAME}-tmp` })
-          .catch(() => undefined);
-        // best-effort alias removal; if the alias does not exist the call
-        // throws, which we swallow.
-        await client.indices
-          .deleteAlias?.({
-            index: TEST_INDEX_NAME,
-            name: aliasName,
-          })
-          .catch(() => undefined);
-      }
-    } catch {
-      // ignore
-    }
-  }, 30_000);
+  });
 
   const buildRequestContext = (
     user: IUserHasId,
@@ -420,114 +220,138 @@ describe('fullTextSearchTool (integration)', () => {
     return ctx;
   };
 
-  describe('grant scenarios via real Elasticsearch', () => {
-    it('returns the GRANT_PUBLIC page to both user A and user B', async () => {
-      const resultForA = await invokeExecute(
-        { query: SCOPE_TOKEN, limit: 20 },
-        buildRequestContext(userA),
+  // Install the supplied dummy delegator under the DEFAULT key. The
+  // searchService instance is shared across tests, so each test that depends
+  // on a specific delegator behaviour must call this helper at the top.
+  const installDelegator = (delegator: SearchDelegatorMock): void => {
+    searchService.nqDelegators = {
+      ...searchService.nqDelegators,
+      [DEFAULT_DELEGATOR_KEY]: delegator,
+    };
+  };
+
+  describe('mapping: hit shape', () => {
+    it('maps delegator hits to { pageId, pagePath, snippet } without leaking body', async () => {
+      const pageId = new mongoose.Types.ObjectId().toString();
+      const pagePath = `/agentic-search-integ/${WORKER_ID}/mapped`;
+      const snippet = '<em>match</em> highlighted body';
+      // `body` is intentionally included in `_source` to verify the tool
+      // strips it before returning — see requirement 6.5 (body retrieval
+      // belongs to getPageContentTool, not this tool).
+      const delegator = buildDummyFullTextDelegator(() =>
+        Promise.resolve({
+          data: [
+            {
+              _id: pageId,
+              _score: 1,
+              _source: {
+                path: pagePath,
+                body: 'FULL_BODY_THAT_MUST_NOT_LEAK',
+              },
+              _highlight: { body: [snippet] },
+            },
+          ],
+          meta: { total: 1, hitsCount: 1 },
+        }),
       );
-      const resultForB = await invokeExecute(
-        { query: SCOPE_TOKEN, limit: 20 },
-        buildRequestContext(userB),
-      );
+      installDelegator(delegator);
 
-      assertOk(resultForA);
-      assertOk(resultForB);
-
-      const pathsForA = resultForA.hits.map((h) => h.pagePath);
-      const pathsForB = resultForB.hits.map((h) => h.pagePath);
-
-      expect(pathsForA).toContain(pagePathPublic);
-      expect(pathsForB).toContain(pagePathPublic);
-    });
-
-    it('returns the GRANT_OWNER page to its owner (A) but not to a non-owner (B)', async () => {
-      const resultForA = await invokeExecute(
-        { query: SCOPE_TOKEN, limit: 20 },
-        buildRequestContext(userA),
-      );
-      const resultForB = await invokeExecute(
-        { query: SCOPE_TOKEN, limit: 20 },
-        buildRequestContext(userB),
-      );
-
-      assertOk(resultForA);
-      assertOk(resultForB);
-
-      const pathsForA = resultForA.hits.map((h) => h.pagePath);
-      const pathsForB = resultForB.hits.map((h) => h.pagePath);
-
-      expect(pathsForA).toContain(pagePathOwner);
-      expect(pathsForB).not.toContain(pagePathOwner);
-    });
-
-    it('returns the GRANT_USER_GROUP page to a member (A) but not to a non-member (B)', async () => {
-      const resultForA = await invokeExecute(
-        { query: SCOPE_TOKEN, limit: 20 },
-        buildRequestContext(userA),
-      );
-      const resultForB = await invokeExecute(
-        { query: SCOPE_TOKEN, limit: 20 },
-        buildRequestContext(userB),
-      );
-
-      assertOk(resultForA);
-      assertOk(resultForB);
-
-      const pathsForA = resultForA.hits.map((h) => h.pagePath);
-      const pathsForB = resultForB.hits.map((h) => h.pagePath);
-
-      // A is a member of group G; the page is granted to G.
-      expect(pathsForA).toContain(pagePathGroup);
-      // B is not a member of any group that owns the page.
-      expect(pathsForB).not.toContain(pagePathGroup);
-    });
-  });
-
-  describe('sort / order (requirement 6.9)', () => {
-    it('returns the more recently updated page first when sort: updatedAt + order: desc', async () => {
-      // Both PUBLIC and OWNER pages match SCOPE_TOKEN and are visible to A.
-      // OWNER's `updatedAt` was backdated to 7 days ago in beforeAll; PUBLIC's
-      // is fresh. With sort: updatedAt + order: desc the PUBLIC page (newer)
-      // must appear BEFORE the OWNER page (older) in the hits array.
       const result = await invokeExecute(
-        { query: SCOPE_TOKEN, limit: 20, sort: 'updatedAt', order: 'desc' },
+        { query: 'anything', limit: 20 },
         buildRequestContext(userA),
       );
 
       assertOk(result);
-
-      const paths = result.hits.map((h) => h.pagePath);
-      // Sanity: both pages are present so the ordering assertion is meaningful.
-      expect(paths).toContain(pagePathPublic);
-      expect(paths).toContain(pagePathOwner);
-
-      const publicIdx = paths.indexOf(pagePathPublic);
-      const ownerIdx = paths.indexOf(pagePathOwner);
-      expect(publicIdx).toBeLessThan(ownerIdx);
+      expect(result.totalCount).toBe(1);
+      expect(result.hits).toHaveLength(1);
+      // Strict equality on the hit shape — no extra keys (`body`, `_source`,
+      // `_score`, ...) must leak through.
+      expect(result.hits[0]).toStrictEqual({ pageId, pagePath, snippet });
+      // Defence in depth: scan the serialised result for the body marker.
+      expect(JSON.stringify(result)).not.toContain(
+        'FULL_BODY_THAT_MUST_NOT_LEAK',
+      );
     });
-  });
 
-  describe('no-hit query', () => {
-    it("returns { result: 'ok', hits: [], totalCount: 0 } when nothing matches", async () => {
-      // A single nonsense alphabetical token. The kuromoji tokenizer used by
-      // the `japanese` analyzer splits on digit boundaries (e.g. it would
-      // pull out `1` from `…1…` and that digit token then matches the path
-      // segment `/…/1/…` in our fixtures), and `_` / `-` would let the
-      // standard analyzer split into common subtokens that hit dev data.
-      // Keep the query as a single pure-alpha word so it cannot tokenise
-      // into anything indexed.
+    it("returns { result: 'ok', hits: [], totalCount: 0 } when delegator returns no hits", async () => {
+      installDelegator(buildDummyFullTextDelegator());
+
       const result = await invokeExecute(
-        {
-          query: 'zqxwcevbnmasdfghjklpoiuytrewqq',
-          limit: 20,
-        },
+        { query: 'anything', limit: 20 },
         buildRequestContext(userA),
       );
 
       assertOk(result);
       expect(result.hits).toEqual([]);
       expect(result.totalCount).toBe(0);
+    });
+  });
+
+  describe('userGroups resolved from real MongoDB', () => {
+    it('forwards the calling user and Mongo-resolved userGroups to delegator.search', async () => {
+      const delegator = buildDummyFullTextDelegator();
+      installDelegator(delegator);
+
+      await invokeExecute(
+        { query: 'anything', limit: 20 },
+        buildRequestContext(userA),
+      );
+
+      expect(delegator.search).toHaveBeenCalledTimes(1);
+      const callArgs = delegator.search.mock.calls[0];
+      // delegator.search(data, user, userGroups, opts) — assert positional
+      // arity AND identity for the user argument (must pass through by
+      // reference; no synthetic re-creation).
+      expect(callArgs[1]).toBe(userA);
+      // userGroups is the 3rd positional arg. It must contain the real Mongo
+      // _id of group G (resolved via UserGroupRelation.findAllUserGroupIdsRelatedToUser).
+      const userGroupsArg = callArgs[2] as unknown[];
+      expect(Array.isArray(userGroupsArg)).toBe(true);
+      const idStrings = userGroupsArg.map((id) => String(id));
+      expect(idStrings).toContain(groupG._id.toString());
+    });
+  });
+
+  describe('failure handling', () => {
+    it("returns { result: 'error' } when the delegator rejects (does not rethrow)", async () => {
+      const delegator = buildDummyFullTextDelegator(() =>
+        Promise.reject(new Error('synthetic ES failure')),
+      );
+      installDelegator(delegator);
+
+      const result = await invokeExecute(
+        { query: 'anything', limit: 20 },
+        buildRequestContext(userA),
+      );
+
+      assertFailure(result);
+      expect(result.result).toBe('error');
+      expect(result.reason.length).toBeGreaterThan(0);
+    });
+  });
+
+  describe('sort / order pass-through (requirement 6.9)', () => {
+    it('forwards sort and order to delegator.search via searchOpts', async () => {
+      const delegator = buildDummyFullTextDelegator();
+      installDelegator(delegator);
+
+      await invokeExecute(
+        { query: 'anything', limit: 5, sort: 'updatedAt', order: 'desc' },
+        buildRequestContext(userA),
+      );
+
+      expect(delegator.search).toHaveBeenCalledTimes(1);
+      // delegator.search(data, user, userGroups, opts) — opts is the 4th arg.
+      // Narrow to the keys the tool is responsible for forwarding; ignore any
+      // extra keys (e.g. `vector`) that SearchService.searchKeyword may inject.
+      const opts = delegator.search.mock.calls[0][3] as {
+        sort?: string;
+        order?: string;
+        limit?: number;
+      };
+      expect(opts.sort).toBe('updatedAt');
+      expect(opts.order).toBe('desc');
+      expect(opts.limit).toBe(5);
     });
   });
 });
