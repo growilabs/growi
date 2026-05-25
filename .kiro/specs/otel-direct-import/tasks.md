@@ -8,38 +8,38 @@
   - Observable: `apps/app/package.json` の `dependencies` に `auto-instrumentations-node` が無く、4 instrumentation package が存在することを `grep` / `jq` で確認できる
   - _Requirements: 5.1, 5.2_
 
-- [ ] 2. Core: buildInstrumentations の direct import 再実装
-- [x] 2.1 buildInstrumentations を direct import 構成に書き換え
+- [ ] 2. Core: generateNodeSDKConfiguration の instrumentations 配列を direct import 構成に書き換え
+- [x] 2.1 generateNodeSDKConfiguration を direct import 構成に書き換え
   - `getNodeAutoInstrumentations` の import を削除し、`HttpInstrumentation`、`ExpressInstrumentation`、`MongoDBInstrumentation`、`MongooseInstrumentation` を 4 package から直接 import
   - `ALL_AUTO_INSTRUMENTATION_PACKAGES` および `ALLOW_LIST_INSTRUMENTATION_PACKAGES` 定数を削除
-  - 関数本体を「4 instrumentation を `new` で構築して配列で返す」flat な direct factory 構成に置き換え
-  - HTTP instrumentation の構築時に `Option.enableAnonymization` が truthy なら `httpInstrumentationConfigForAnonymize` を merge、falsy / 未指定なら anonymization config を含めない
-  - `OTEL_AUTO_INSTRUMENTATION_PROFILE === 'all'` のとき deprecation 文言の warn ログを 1 回出し、その後も同じ 4 instrumentation 配列を返す
-  - `OTEL_AUTO_INSTRUMENTATION_PROFILE` が `minimal` でも `all` でもない値のとき、既存の `Unknown OTEL_AUTO_INSTRUMENTATION_PROFILE value` 文言の warn を出し、同じ 4 instrumentation 配列を返す
-  - 環境変数が unset または `=minimal` のときは warn を出さない
+  - 旧 `buildInstrumentations` helper を廃止し、`generateNodeSDKConfiguration` 内に「4 instrumentation を `new` で構築して `instrumentations` 配列に詰める」flat な inline 構成として吸収
+  - HTTP instrumentation の構築時に `Option.enableAnonymization` が truthy なら `httpInstrumentationConfigForAnonymize` を constructor 第 1 引数として渡し、falsy / 未指定なら constructor を引数 `undefined` で呼ぶ
+  - `OTEL_AUTO_INSTRUMENTATION_PROFILE` を含む `OTEL_AUTO_INSTRUMENTATION_*` 系の環境変数を一切参照しない（実装内に当該キー名・分岐・warn 出力を持たない）
   - いかなる環境変数値でも例外を投げない
-  - 戻り型を `Instrumentation[]`（`import type { Instrumentation } from '@opentelemetry/instrumentation'`）に正規化
-  - Observable: `buildInstrumentations()` の戻り値が常に長さ 4 の配列で、各要素がそれぞれ `HttpInstrumentation` / `ExpressInstrumentation` / `MongoDBInstrumentation` / `MongooseInstrumentation` の instance となる
-  - _Requirements: 1.1, 1.2, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5_
+  - 戻り値 `Configuration` の `instrumentations` 配列は常に長さ 4
+  - Observable: `generateNodeSDKConfiguration()` 呼び出し時、`vi.mock` 済の 4 constructor がそれぞれちょうど 1 回ずつ呼ばれ、戻り値の `instrumentations` 配列の長さが 4 となる
+  - _Requirements: 1.1, 1.2, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4_
 
 - [ ] 3. Core: unit test の direct import 構造への書き換え
 - [x] 3.1 node-sdk-configuration.spec.ts を 4 mock 構造に置き換え
   - `vi.mock('@opentelemetry/auto-instrumentations-node', ...)` を削除
   - 4 instrumentation package を個別に `vi.mock` し、各 constructor の mock を保持して `mock.calls` を検査できるようにする
-  - `OTEL_AUTO_INSTRUMENTATION_PROFILE` が unset / `=minimal` / `=all` / unknown 値（例: `custom`）の 4 ケースそれぞれで、戻り値が長さ 4 の配列であり、4 constructor がちょうど 1 回ずつ呼ばれることを assert
-  - `=all` で deprecation 文言の warn が 1 回呼ばれ、unknown 値で既存 `Unknown OTEL_AUTO_INSTRUMENTATION_PROFILE` 文言の warn が呼ばれ、unset / `=minimal` で warn が呼ばれないことを assert
-  - `enableAnonymization=true` のとき `HttpInstrumentation` の constructor 第 1 引数に anonymization config の field が含まれ、`enableAnonymization=false` / 未指定のとき含まれないことを assert
+  - `generateNodeSDKConfiguration()` 呼び出しで 4 constructor がそれぞれちょうど 1 回ずつ呼ばれることを assert
+  - `enableAnonymization=true` のとき `HttpInstrumentation` の constructor 第 1 引数に anonymization config の field が含まれることを `toMatchObject` 等で assert
+  - `enableAnonymization=false` / 未指定のとき `HttpInstrumentation` の constructor 第 1 引数が `undefined` であることを assert
+  - 本実装は `OTEL_AUTO_INSTRUMENTATION_PROFILE` 環境変数を参照しないため、当該変数に関するテストケース（unset / `minimal` / `all` / unknown 値・warn 出力検査）は spec から除去する
   - Observable: `pnpm vitest run node-sdk-configuration.spec` の出力で全テストケースが green になる
-  - _Requirements: 1.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5_
+  - _Requirements: 1.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4_
 
 - [ ] 4. Integration: build artifact と quality gates の検証
 - [x] 4.1 production build と全 quality gates を実行し artifact を検証
   - リポジトリルートから `turbo run build --filter @growi/app`、`turbo run lint --filter @growi/app`、`turbo run test --filter @growi/app` をすべて green で通す
-  - `ls apps/app/.next/node_modules/` で 4 instrumentation package のうち少なくとも 1 つが symlink として外部化されていることを確認
   - `ls apps/app/.next/node_modules/` から `@opentelemetry/auto-instrumentations-node` の symlink が消えていることを確認
+  - 4 instrumentation package は direct named import 化により Turbopack が chunk bundle 側に取り込むため、`.next/node_modules/` 配下に symlink は生成されない。代わりに `.next/server/chunks/` 配下のいずれかの chunk に 4 instrumentation の少なくとも 1 つの package 名 / module 識別子（例: `instrumentation-http` / `instrumentation-express` / `instrumentation-mongodb` / `instrumentation-mongoose`）が `grep -r` でヒットすることを確認（bundle 形式での同梱を観測）
+  - `bash apps/app/bin/check-next-symlinks.sh` が `OK: All apps/app/.next/node_modules symlinks resolve correctly.` を返し、broken symlink が 1 件もないことを確認
   - `node-sdk-configuration.spec.ts` 以外の既存テストが regression していないこと（test 件数 / pass 数が変更前と整合）
-  - Observable: 3 つの `turbo` コマンドが exit 0、`.next/node_modules/` 配下に 4 instrumentation のいずれかが externalised として存在し、`auto-instrumentations-node` の symlink が存在しない
-  - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 4.5, 5.3_
+  - Observable: 3 つの `turbo` コマンドが exit 0、`auto-instrumentations-node` の symlink が `.next/node_modules/` に存在しない、4 instrumentation のいずれかが `.next/server/chunks/` 配下で grep ヒットする、`check-next-symlinks.sh` が exit 0
+  - _Requirements: 1.1, 1.2, 1.3, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.3_
 
 - [ ] 5. Validation: RSS 削減効果と runtime トレース継続の運用観察
 - [x] 5.1 memory-profiler scenario runner で before / after baseline mean RSS を計測し verification-report.md に記録

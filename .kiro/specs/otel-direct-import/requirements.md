@@ -96,7 +96,7 @@
 - **In scope**:
   - 起動時に有効化される OTel instrumentation 集合（GROWI が実際に依存する 4 個）に対する観察可能な振る舞い
   - HTTP anonymization 設定の継続適用
-  - `OTEL_AUTO_INSTRUMENTATION_PROFILE` 環境変数の後方互換挙動と deprecation 通知
+  - `OTEL_AUTO_INSTRUMENTATION_PROFILE` 環境変数の参照を完全に停止すること（deprecation 通知すら持たず、当該変数の値は runtime 挙動に影響しない）
   - `@growi/app` の依存パッケージ表面（runtime dependencies の構成）
   - GROWI runtime での RSS 削減効果の観察可能性
 - **Out of scope**:
@@ -142,17 +142,16 @@
 2. Where the `enableAnonymization` option is not set, the OTel SDK shall instantiate the HTTP instrumentation without the anonymization configuration（既存と同じ behavior）。
 3. While HTTP instrumentation is active with `enableAnonymization` set, the OTel SDK shall apply anonymization to HTTP spans に対して、anonymization module が宣言する全項目（path / query / header 等の sanitization 対象）を従来と同等の方法で扱う。
 
-### Requirement 4: `OTEL_AUTO_INSTRUMENTATION_PROFILE` の後方互換性と deprecation
+### Requirement 4: `OTEL_AUTO_INSTRUMENTATION_PROFILE` 環境変数の参照停止
 
-**Objective:** As an operator who previously set `OTEL_AUTO_INSTRUMENTATION_PROFILE=all` or `=minimal` in production, I want my deployment to keep running without breakage and to be informed that the variable is being deprecated, so that the upgrade path is non-disruptive and the deprecation is discoverable.
+**Objective:** As an operator/maintainer, I want the OTel SDK to start with a fixed four-instrumentation set without reading the `OTEL_AUTO_INSTRUMENTATION_PROFILE` environment variable, so that the configuration surface is minimal and the variable—deprecated together with the deny-list approach—can no longer alter runtime behavior.
 
 #### Acceptance Criteria
 
-1. If `OTEL_AUTO_INSTRUMENTATION_PROFILE` is unset at startup, the OTel SDK shall start with the four-instrumentation set without emitting any deprecation warning specific to this variable。
-2. If `OTEL_AUTO_INSTRUMENTATION_PROFILE=minimal` is set at startup, the OTel SDK shall start with the four-instrumentation set and shall not emit a deprecation warning for this exact value（minimal は新 default と等価のため）。
-3. If `OTEL_AUTO_INSTRUMENTATION_PROFILE=all` is set at startup, the OTel SDK shall emit a warning log indicating that the variable is deprecated and that the four-instrumentation set is being used regardless, then shall start with the four-instrumentation set。
-4. If `OTEL_AUTO_INSTRUMENTATION_PROFILE` is set to any value other than `minimal` or `all`, the OTel SDK shall emit a warning log identifying the unknown value, then shall start with the four-instrumentation set（minimal 同等の縮退）。
-5. The OTel SDK shall not throw or abort startup based solely on the value of `OTEL_AUTO_INSTRUMENTATION_PROFILE`（既存運用者の deployment を破壊しないため）。
+1. The OTel SDK shall not read `process.env.OTEL_AUTO_INSTRUMENTATION_PROFILE` during startup（実装上、当該環境変数を参照する分岐ロジックを持たない）。
+2. Regardless of whether `OTEL_AUTO_INSTRUMENTATION_PROFILE` is unset、`minimal`、`all`、または任意の他の値であっても、the OTel SDK shall start with the same fixed four-instrumentation set。
+3. The OTel SDK shall not emit any warning log or deprecation message tied to the value of `OTEL_AUTO_INSTRUMENTATION_PROFILE`（このバージョンでは参照自体を行わないため、deprecation 通知の責務も持たない）。
+4. The OTel SDK shall not throw or abort startup based on the value of `OTEL_AUTO_INSTRUMENTATION_PROFILE`（既存運用者の deployment を破壊しないため）。
 
 ### Requirement 5: 依存パッケージ表面
 
