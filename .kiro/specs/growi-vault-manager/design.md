@@ -896,6 +896,14 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 - `/health` endpoint で MongoDB・change stream・bare repo 到達性をチェック
 - `vault_instructions` の未処理件数（`processedAt: null`）は apps/app の admin 画面に surface される（本 spec はログのみ）
 - `VaultMaintenanceScheduler` の job 実行結果（所要時間・対象 namespace 数・before/after object 数）をログに記録
+- `VaultInstructionWatcher` の起動時 drain は処理結果を以下の粒度でログ記録する:
+
+| イベント | レベル | 内容 |
+|---------|--------|------|
+| 起動 drain 完了 | INFO | `{ processed, failed, durationMs }` の 1 行 summary（0 件でも出力。watcher が drain phase を完走したことの観測点として機能） |
+| instruction 単発失敗 | DEBUG | `{ instructionId, op, attempts, lastError }`（`attempts < DEAD_LETTER_THRESHOLD` の段階の失敗を可視化。本番では default で抑制されるが、debug 有効時にリトライ挙動を追跡可能） |
+| dead-letter 到達 | ERROR | `attempts === DEAD_LETTER_THRESHOLD` の瞬間のみ。`>=` ではなく `===` で flooding を防ぐ |
+| change stream エラー | ERROR | change stream の `error` イベントを記録 |
 
 ---
 

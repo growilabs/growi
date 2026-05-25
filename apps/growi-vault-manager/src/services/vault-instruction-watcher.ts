@@ -77,14 +77,18 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
    * Idempotency: if processedAt is already set the instruction is skipped.
    * On success: processedAt is written and the resume token is saved (if provided).
    * On failure: attempts++ / lastError recorded; processedAt stays null.
+   *
+   * Returns an outcome tag so callers (drain) can aggregate counts.
    */
+  type InstructionOutcome = 'processed' | 'skipped' | 'failed';
+
   async function processInstruction(
     doc: IVaultInstructionDocument,
     resumeTokenToSave?: object,
-  ): Promise<void> {
+  ): Promise<InstructionOutcome> {
     // Idempotency check: skip already-processed instructions.
     if (doc.processedAt != null) {
-      return;
+      return 'skipped';
     }
 
     // Cast to VaultInstructionDoc for the builder (drops Mongoose internals).
@@ -103,26 +107,40 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
           : {}),
         lastProcessedAt: new Date(),
       });
+      return 'processed';
     } catch (err) {
       // Failure: record the error; processedAt remains null for retry.
       const errorMessage = err instanceof Error ? err.message : String(err);
       await doc.recordFailure(errorMessage);
 
-      // Log an error only at the exact moment the instruction reaches the
-      // dead-letter threshold. Using === (not >=) prevents log flooding when
-      // the instruction continues to be retried beyond the threshold.
       const attemptsAfter = (doc.attempts ?? 0) + 1;
+      const op = (doc as unknown as { op: string }).op;
+      const failurePayload = {
+        instructionId: String(doc._id),
+        op,
+        attempts: attemptsAfter,
+        lastError: errorMessage,
+      };
+
+      // Per-failure DEBUG log: visible only when debug logging is enabled.
+      // Suppressed by default in production so retries don't flood logs, but
+      // available for diagnosing transient failures that haven't yet reached
+      // the dead-letter threshold.
+      logger.debug(
+        failurePayload,
+        'vault-instruction-watcher: instruction processing failed',
+      );
+
+      // Dead-letter ERROR: emitted only at the exact moment attempts reaches
+      // the threshold. Using === (not >=) prevents log flooding when the
+      // instruction continues to be retried beyond the threshold.
       if (attemptsAfter === DEAD_LETTER_THRESHOLD) {
         logger.error(
-          {
-            instructionId: String(doc._id),
-            op: (doc as unknown as { op: string }).op,
-            attempts: attemptsAfter,
-            lastError: errorMessage,
-          },
+          failurePayload,
           'vault-instruction-watcher: instruction reached dead-letter threshold',
         );
       }
+      return 'failed';
     }
   }
 
@@ -133,15 +151,29 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
   /**
    * Drains all instructions with processedAt: null using a cursor.
    * Processes them sequentially ordered by issuedAt.
+   *
+   * Emits a single INFO summary log on completion so operators can observe
+   * the drain result without inspecting MongoDB. Idempotent-skip outcomes
+   * (already-processed docs encountered on retry paths) are excluded from
+   * the counts — only fresh work performed in this drain is reported.
    */
   async function runDrain(): Promise<void> {
+    const startedAt = Date.now();
+    let processed = 0;
+    let failed = 0;
+
+    const tally = (outcome: InstructionOutcome): void => {
+      if (outcome === 'processed') processed += 1;
+      else if (outcome === 'failed') failed += 1;
+    };
+
     const cursor = VaultInstructionModel.drainCursor().cursor();
 
     for await (const doc of cursor) {
       if (stopping) break;
       // During drain we do not have a resume token from the change stream event;
       // we skip saving one so we do not overwrite the token loaded from state.
-      await processInstruction(doc as IVaultInstructionDocument);
+      tally(await processInstruction(doc as IVaultInstructionDocument));
     }
 
     drainComplete = true;
@@ -150,9 +182,18 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
     for (const bufferedDoc of eventBuffer) {
       if (stopping) break;
       // biome-ignore lint/performance/noAwaitInLoops: instructions must be processed in arrival order to preserve causal ordering
-      await processInstruction(bufferedDoc);
+      tally(await processInstruction(bufferedDoc));
     }
     eventBuffer.length = 0;
+
+    logger.info(
+      {
+        processed,
+        failed,
+        durationMs: Date.now() - startedAt,
+      },
+      'vault-instruction-watcher: drain complete',
+    );
   }
 
   // ---------------------------------------------------------------------------

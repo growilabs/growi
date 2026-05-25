@@ -36,13 +36,15 @@ vi.mock('../models/vault-instruction.js', () => ({
 
 // Mock @growi/logger
 const mockLoggerError = vi.fn();
+const mockLoggerInfo = vi.fn();
+const mockLoggerDebug = vi.fn();
 
 vi.mock('@growi/logger', () => ({
   loggerFactory: () => ({
     error: mockLoggerError,
     warn: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
+    info: mockLoggerInfo,
+    debug: mockLoggerDebug,
   }),
 }));
 
@@ -153,6 +155,8 @@ describe('VaultInstructionWatcher', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockLoggerError.mockReset();
+    mockLoggerInfo.mockReset();
+    mockLoggerDebug.mockReset();
 
     fakeStream = new FakeChangeStream();
     mockWatchInserts.mockReturnValue(fakeStream);
@@ -222,6 +226,150 @@ describe('VaultInstructionWatcher', () => {
       await watcher.start();
 
       expect(mockWatchInserts).toHaveBeenCalledWith(token);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Drain summary logging
+  // -------------------------------------------------------------------------
+
+  describe('drain summary log', () => {
+    it('emits a summary info log after drain completes (with processed/failed counts and durationMs)', async () => {
+      const doc1 = makeDoc({ id: 'id-1', processedAt: null });
+      const doc2 = makeDoc({ id: 'id-2', processedAt: null });
+      mockDrainCursor.mockReturnValue(stubDrainCursor([doc1, doc2]));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      // Exactly one summary log per drain.
+      expect(mockLoggerInfo).toHaveBeenCalledOnce();
+      const [payload, message] = mockLoggerInfo.mock.calls[0];
+      expect(payload).toEqual(
+        expect.objectContaining({
+          processed: 2,
+          failed: 0,
+          durationMs: expect.any(Number),
+        }),
+      );
+      expect(typeof message).toBe('string');
+      expect(
+        (payload as { durationMs: number }).durationMs,
+      ).toBeGreaterThanOrEqual(0);
+    });
+
+    it('emits a summary info log even when no instructions are pending (0 processed, 0 failed)', async () => {
+      mockDrainCursor.mockReturnValue(stubDrainCursor([]));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(mockLoggerInfo).toHaveBeenCalledOnce();
+      expect(mockLoggerInfo).toHaveBeenCalledWith(
+        expect.objectContaining({
+          processed: 0,
+          failed: 0,
+          durationMs: expect.any(Number),
+        }),
+        expect.any(String),
+      );
+    });
+
+    it('counts failed instructions separately from processed (1 success + 1 failure → processed:1 failed:1)', async () => {
+      const ok = makeDoc({ id: 'ok', processedAt: null });
+      const ng = makeDoc({ id: 'ng', processedAt: null });
+      mockDrainCursor.mockReturnValue(stubDrainCursor([ok, ng]));
+      // First call succeeds, second throws.
+      mockApplyInstruction
+        .mockResolvedValueOnce(undefined)
+        .mockRejectedValueOnce(new Error('boom'));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(mockLoggerInfo).toHaveBeenCalledOnce();
+      expect(mockLoggerInfo).toHaveBeenCalledWith(
+        expect.objectContaining({ processed: 1, failed: 1 }),
+        expect.any(String),
+      );
+    });
+
+    it('does not count idempotent-skip instructions as processed (already-done docs are excluded)', async () => {
+      const skipped = makeDoc({ id: 'skipped', processedAt: new Date() });
+      const fresh = makeDoc({ id: 'fresh', processedAt: null });
+      mockDrainCursor.mockReturnValue(stubDrainCursor([skipped, fresh]));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(mockLoggerInfo).toHaveBeenCalledOnce();
+      expect(mockLoggerInfo).toHaveBeenCalledWith(
+        expect.objectContaining({ processed: 1, failed: 0 }),
+        expect.any(String),
+      );
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Per-failure debug logging (below dead-letter threshold)
+  // -------------------------------------------------------------------------
+
+  describe('per-failure debug log (below dead-letter threshold)', () => {
+    it('emits logger.debug on a single failure with instructionId / op / attempts / lastError', async () => {
+      const doc = makeDoc({ processedAt: null });
+      doc.attempts = 0;
+      mockDrainCursor.mockReturnValue(stubDrainCursor([doc]));
+      mockApplyInstruction.mockRejectedValue(new Error('transient io error'));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(mockLoggerDebug).toHaveBeenCalledOnce();
+      expect(mockLoggerDebug).toHaveBeenCalledWith(
+        expect.objectContaining({
+          instructionId: String(doc._id),
+          op: doc.op,
+          attempts: 1,
+          lastError: 'transient io error',
+        }),
+        expect.any(String),
+      );
+    });
+
+    it('still emits debug log even on the failure that reaches the dead-letter threshold', async () => {
+      // attempts is 4 before this failure — recordFailure pushes it to 5 (== threshold).
+      // The dead-letter ERROR log fires, AND the per-failure DEBUG log also fires.
+      const doc = makeDoc({ processedAt: null });
+      doc.attempts = 4;
+      mockDrainCursor.mockReturnValue(stubDrainCursor([doc]));
+      mockApplyInstruction.mockRejectedValue(new Error('persistent error'));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(mockLoggerError).toHaveBeenCalledOnce();
+      expect(mockLoggerDebug).toHaveBeenCalledOnce();
+      expect(mockLoggerDebug).toHaveBeenCalledWith(
+        expect.objectContaining({ attempts: 5, lastError: 'persistent error' }),
+        expect.any(String),
+      );
+    });
+
+    it('does not emit debug log on success', async () => {
+      const doc = makeDoc({ processedAt: null });
+      mockDrainCursor.mockReturnValue(stubDrainCursor([doc]));
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      expect(mockLoggerDebug).not.toHaveBeenCalled();
     });
   });
 
