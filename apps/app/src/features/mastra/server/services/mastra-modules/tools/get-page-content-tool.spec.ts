@@ -77,18 +77,55 @@ const buildMockPage = (overrides: Partial<MockPage> = {}): MockPage => ({
   ...overrides,
 });
 
+// Convenience builder: wire findByIdAndViewer to return a mockPage and have
+// populateDataToShowRevision attach { body } onto it. Centralising this
+// removes duplicated mockImplementation boilerplate from each success case.
+const setupPageWithBody = (body: string, viaPath = false): MockPage => {
+  const mockPage = buildMockPage();
+  if (viaPath) {
+    mocks.findByPathAndViewer.mockResolvedValue(mockPage);
+  } else {
+    mocks.findByIdAndViewer.mockResolvedValue(mockPage);
+  }
+  mocks.populateDataToShowRevision.mockImplementation(
+    async (page: MockPage) => {
+      page.revision = { body };
+      return page;
+    },
+  );
+  return mockPage;
+};
+
+// Outline entry shape mirroring the tool's outputSchema.
+type OutlineEntry = {
+  line: number;
+  level: number;
+  heading: string;
+};
+
 // Discriminated union mirroring the tool's outputSchema. Defined locally so
 // callers can read `result.result === 'ok'` and access `.page` / `.reason`
 // without per-call narrowing casts.
+type GetPageContentOkResult = {
+  result: 'ok';
+  page: {
+    path: string;
+    updatedAt: string;
+    content: string;
+    totalLines: number;
+    offset: number;
+    limit: number;
+    hasMore: boolean;
+    outline?: OutlineEntry[];
+  };
+};
+type GetPageContentFailureResult = {
+  result: 'not_found_or_forbidden' | 'missing_input' | 'context_error';
+  reason: string;
+};
 type GetPageContentToolResult =
-  | {
-      result: 'ok';
-      page: { path: string; body: string; updatedAt: string };
-    }
-  | {
-      result: 'not_found_or_forbidden' | 'missing_input' | 'context_error';
-      reason: string;
-    };
+  | GetPageContentOkResult
+  | GetPageContentFailureResult;
 
 // Mastra's validateToolInput wrapper returns this envelope shape (not the
 // discriminated union) when zod input validation fails.
@@ -97,7 +134,15 @@ type ValidationFailure = { error: true; validationErrors: unknown };
 // Invoke the tool's execute. The mastra runtime calls execute with
 // `(inputData, { requestContext, ... })`, so tests mirror that shape.
 const invokeExecute = async (
-  inputData: { pageId?: string; pagePath?: string } | Record<string, never>,
+  inputData:
+    | {
+        pageId?: string;
+        pagePath?: string;
+        offset?: number;
+        limit?: number;
+        includeOutline?: boolean;
+      }
+    | Record<string, never>,
   requestContext: RequestContext<MastraRequestContextShape>,
 ): Promise<GetPageContentToolResult | ValidationFailure> => {
   // The Mastra runtime's `execute` signature is intentionally loose
@@ -138,6 +183,28 @@ describe('getPageContentTool', () => {
       // ValidationError-shaped object without ever invoking the user-provided
       // execute body (mirrors fullTextSearchTool's empty-query test).
       const result = await invokeExecute({}, requestContext);
+
+      expect(result).toBeDefined();
+      expect(isValidationFailure(result)).toBe(true);
+      if (isValidationFailure(result)) {
+        expect(result.validationErrors).toBeDefined();
+      }
+      // The execute body never ran, so neither Mongoose accessor was called.
+      expect(mocks.findByIdAndViewer).not.toHaveBeenCalled();
+      expect(mocks.findByPathAndViewer).not.toHaveBeenCalled();
+    });
+
+    it('rejects limit > 500 at zod boundary without invoking execute body', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      requestContext.set('user', mockUser);
+
+      // zod's `.max(500)` should reject before the execute body runs.
+      // This mirrors the empty-query test in full-text-search-tool.spec.ts.
+      const result = await invokeExecute(
+        { pageId: 'abc', limit: 501 },
+        requestContext,
+      );
 
       expect(result).toBeDefined();
       expect(isValidationFailure(result)).toBe(true);
@@ -216,23 +283,14 @@ describe('getPageContentTool', () => {
   });
 
   describe('success path', () => {
-    it('returns ok with body unmodified when pageId resolves a page', async () => {
+    it('returns ok with content unmodified, defaults echoed, and outline auto-included when pageId resolves a page', async () => {
       const requestContext = buildRequestContext();
       const mockUser = buildMockUser();
-      const mockPage = buildMockPage({
-        path: '/p1',
-        updatedAt: new Date('2026-01-15T10:00:00Z'),
-      });
       requestContext.set('user', mockUser);
-      mocks.findByIdAndViewer.mockResolvedValue(mockPage);
-      // Mutate page.revision the same way populateDataToShowRevision would,
-      // so the tool's body extraction reads the populated revision object.
-      mocks.populateDataToShowRevision.mockImplementation(
-        async (page: MockPage) => {
-          page.revision = { body: 'HELLO **WORLD**' };
-          return page;
-        },
-      );
+      // Two lines, one ATX heading on line 1 — exercises content equality,
+      // totalLines, default offset / limit echo, hasMore=false, outline auto-include.
+      const body = '# H1\nbody text';
+      setupPageWithBody(body);
 
       const result = await invokeExecute({ pageId: 'abc' }, requestContext);
 
@@ -243,27 +301,27 @@ describe('getPageContentTool', () => {
       expect(result.page.path).toBe('/p1');
       // Byte-for-byte equality — the tool MUST NOT transform / re-escape the
       // Markdown body (requirement 2.5).
-      expect(result.page.body).toBe('HELLO **WORLD**');
+      expect(result.page.content).toBe(body);
       expect(result.page.updatedAt).toBe('2026-01-15T10:00:00.000Z');
+      // New required fields after Task 3.4: defaults are echoed back.
+      expect(result.page.totalLines).toBe(2);
+      expect(result.page.offset).toBe(1);
+      expect(result.page.limit).toBe(200);
+      expect(result.page.hasMore).toBe(false);
+      // Outline auto-included since offset is omitted (= first call).
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 1, heading: 'H1' },
+      ]);
       // Routing — pagePath branch was not touched.
       expect(mocks.findByPathAndViewer).not.toHaveBeenCalled();
     });
 
-    it('returns ok with body unmodified when pagePath resolves a page', async () => {
+    it('returns ok with content unmodified, defaults echoed, and outline auto-included when pagePath resolves a page', async () => {
       const requestContext = buildRequestContext();
       const mockUser = buildMockUser();
-      const mockPage = buildMockPage({
-        path: '/p1',
-        updatedAt: new Date('2026-01-15T10:00:00Z'),
-      });
       requestContext.set('user', mockUser);
-      mocks.findByPathAndViewer.mockResolvedValue(mockPage);
-      mocks.populateDataToShowRevision.mockImplementation(
-        async (page: MockPage) => {
-          page.revision = { body: 'HELLO **WORLD**' };
-          return page;
-        },
-      );
+      const body = '# H1\nbody text';
+      setupPageWithBody(body, /* viaPath */ true);
 
       const result = await invokeExecute({ pagePath: '/p1' }, requestContext);
 
@@ -272,8 +330,15 @@ describe('getPageContentTool', () => {
       expect(result.result).toBe('ok');
       if (result.result !== 'ok') return;
       expect(result.page.path).toBe('/p1');
-      expect(result.page.body).toBe('HELLO **WORLD**');
+      expect(result.page.content).toBe(body);
       expect(result.page.updatedAt).toBe('2026-01-15T10:00:00.000Z');
+      expect(result.page.totalLines).toBe(2);
+      expect(result.page.offset).toBe(1);
+      expect(result.page.limit).toBe(200);
+      expect(result.page.hasMore).toBe(false);
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 1, heading: 'H1' },
+      ]);
       // Routing — pageId branch was not touched.
       expect(mocks.findByIdAndViewer).not.toHaveBeenCalled();
     });
@@ -330,6 +395,288 @@ describe('getPageContentTool', () => {
         const reason = result.reason;
         expect(reason === 'boom' || reason === 'fetch_failed').toBe(true);
       }
+      // Defensive: the failure branch must NOT expose any `page` field
+      // (neither the old `body` nor the new `content` shape).
+      if (result.result !== 'ok') {
+        expect('page' in result).toBe(false);
+      }
+    });
+  });
+
+  describe('pagination — hasMore boundaries (requirement 2.10 / 2.11)', () => {
+    it('returns hasMore=false when offset equals totalLines (final line included)', async () => {
+      // Body with exactly 5 lines. offset=5 means we read the last line only.
+      const body = 'L1\nL2\nL3\nL4\nL5';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute(
+        { pageId: 'abc', offset: 5, limit: 200 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
+      expect(result.page.content).toBe('L5');
+      expect(result.page.totalLines).toBe(5);
+      expect(result.page.offset).toBe(5);
+      expect(result.page.hasMore).toBe(false);
+    });
+
+    it('returns hasMore=false when offset === totalLines - limit + 1 (read-to-end in one call)', async () => {
+      // 200 lines total. offset=101, limit=100 reads lines 101..200 inclusive.
+      const lines = Array.from({ length: 200 }, (_, i) => `L${i + 1}`);
+      const body = lines.join('\n');
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute(
+        { pageId: 'abc', offset: 101, limit: 100 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
+      expect(result.page.content.split('\n')).toHaveLength(100);
+      expect(result.page.content.split('\n')[0]).toBe('L101');
+      expect(result.page.content.split('\n')[99]).toBe('L200');
+      expect(result.page.totalLines).toBe(200);
+      expect(result.page.hasMore).toBe(false);
+    });
+
+    it('returns content="" and hasMore=false when offset > totalLines (range out of bounds, not an error)', async () => {
+      const body = 'L1\nL2\nL3\nL4\nL5';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute(
+        { pageId: 'abc', offset: 100, limit: 200 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      // Requirement 2.11: out-of-bounds is NOT an error — it stays result: 'ok'.
+      expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
+      expect(result.page.content).toBe('');
+      expect(result.page.totalLines).toBe(5);
+      expect(result.page.hasMore).toBe(false);
+    });
+  });
+
+  describe('outline auto-include rules (requirement 2.9)', () => {
+    it('includes outline when offset is omitted (= first call)', async () => {
+      const body = '# H1\n\n## H2\nbody';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 1, heading: 'H1' },
+        { line: 3, level: 2, heading: 'H2' },
+      ]);
+    });
+
+    it('includes outline when offset is explicitly 1 (auto-include trap avoidance)', async () => {
+      // The auto-include rule must treat `offset omitted` and `offset === 1`
+      // as equivalent — otherwise LLMs that fill `offset: 1` by type
+      // inference would silently miss the outline (design review #2).
+      const body = '# H1\n\n## H2\nbody';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute(
+        { pageId: 'abc', offset: 1 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 1, heading: 'H1' },
+        { line: 3, level: 2, heading: 'H2' },
+      ]);
+    });
+
+    it('omits outline by default when offset > 1', async () => {
+      // Long enough body so offset=2 is valid.
+      const body = '# H1\nL2\nL3\nL4';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute(
+        { pageId: 'abc', offset: 2 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      expect(result.page.outline).toBeUndefined();
+    });
+
+    it('includes outline when includeOutline=true is explicit, even with offset > 1', async () => {
+      const body = '# H1\nL2\nL3\nL4';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute(
+        { pageId: 'abc', offset: 2, includeOutline: true },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 1, heading: 'H1' },
+      ]);
+    });
+
+    it('omits outline when includeOutline=false is explicit, even with offset omitted', async () => {
+      const body = '# H1\n\n## H2\nbody';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute(
+        { pageId: 'abc', includeOutline: false },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      expect(result.page.outline).toBeUndefined();
+    });
+  });
+
+  describe('outline extraction (requirement 2.9)', () => {
+    it('excludes code-block / indented-code / HTML-block "headings" from outline', async () => {
+      // Real heading + 3 false positives that the MDAST parser must reject:
+      //  - fenced code block (``` ... ```)
+      //  - indented code block (4-space indent)
+      //  - HTML block (<pre>...</pre>)
+      // front matter is intentionally NOT tested — see design.md L702.
+      const body = [
+        '# Real',
+        '',
+        '```',
+        '# fake-heading-in-code',
+        '```',
+        '',
+        '    # fake-indented-heading',
+        '',
+        '<pre># fake-html-heading</pre>',
+      ].join('\n');
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 1, heading: 'Real' },
+      ]);
+    });
+
+    it('strips Markdown decorations from heading text via mdast-util-to-string', async () => {
+      const body = '## **Bold** [Link](url)';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 2, heading: 'Bold Link' },
+      ]);
+    });
+
+    it('extracts Setext headings with `line` pointing to the text line (not the underline)', async () => {
+      // Setext heading: text on its own line followed by an underline. The
+      // CommonMark spec assigns `position.start.line` to the text line, so
+      // an agent calling back with `offset: line` lands at the heading.
+      const body = 'My H1\n=====\n\nMy H2\n-----';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 1, heading: 'My H1' },
+        { line: 4, level: 2, heading: 'My H2' },
+      ]);
+    });
+
+    it('returns outline=[] when the page has no headings', async () => {
+      const body = 'just a paragraph\nanother line';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      // Auto-include rule fires (offset omitted), so `outline` is present
+      // and an empty array — distinct from `undefined`.
+      expect(result.page.outline).toEqual([]);
+    });
+  });
+
+  describe('newline handling (requirement 2.5)', () => {
+    it('splits CRLF-terminated pages correctly and preserves slicing semantics', async () => {
+      // 5 lines separated by CRLF. The tool splits on /\r?\n/, so totalLines
+      // must be 5 and `content` slicing must work the same as LF.
+      const body = 'L1\r\nL2\r\nL3\r\nL4\r\nL5';
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute(
+        { pageId: 'abc', offset: 2, limit: 2 },
+        requestContext,
+      );
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      expect(result.page.totalLines).toBe(5);
+      // The sliced output is joined by LF only — the tool deliberately
+      // normalises line endings on the way out.
+      expect(result.page.content).toBe('L2\nL3');
+      expect(result.page.offset).toBe(2);
+      expect(result.page.limit).toBe(2);
+      expect(result.page.hasMore).toBe(true);
     });
   });
 });

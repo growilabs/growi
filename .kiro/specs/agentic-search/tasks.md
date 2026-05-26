@@ -124,7 +124,7 @@
   - _Boundary: GetPageContentTool_
   - _Depends: 3.1_
 
-- [ ] 3.5 (P) ページ本文取得 tool の unit test を新仕様に追従 + ケース追加
+- [x] 3.5 (P) ページ本文取得 tool の unit test を新仕様に追従 + ケース追加
   - **既存 9 件の改修範囲を分類して網羅** (design review #6):
     - **success path 2 件** (pageId / pagePath): `body` → `content` リネーム + `totalLines` / `offset` / `limit` / `hasMore` / `outline?` の echo を assert。短い mock body の場合は `hasMore: false` / `outline: []` または auto-include 条件次第
     - **参照同一性 2 件** (`findByIdAndViewer` / `findByPathAndViewer` の 2nd 引数 `=== mockUser`): input 側の assertion なので **変更なし**
