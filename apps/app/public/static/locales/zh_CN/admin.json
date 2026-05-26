@@ -1176,5 +1176,87 @@
     "ai_integration": "AI 集成",
     "disable_mode_explanation": "目前，AI 集成已被禁用。若要启用，请配置 <code>AI_ENABLED</code> 环境变量以及其他必要的变量。<br><br>详细信息请参考<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>文档</a>。",
     "ai_search_management": "AI 搜索管理"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "警告：",
+        "message_html": "上一次引导是由 <code>VAULT_BOOTSTRAP_ON_START=force</code> 触发的。若在此环境变量仍为 <code>force</code> 的状态下重启服务器，将再次清空所有 Vault 数据。请将该环境变量更改为 <code>true</code> 或 <code>false</code>。"
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "功能状态",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "description_html": "由 <code>VAULT_ENABLED</code> 环境变量控制。要更改此值，请更新部署环境并重启 apps/app。若要在运行时不重启即停止提供克隆，请使用下方的 <strong>Wipe Vault</strong> 紧急开关。"
+      },
+      "kill-switch": {
+        "heading": "紧急开关",
+        "button": "清空 Vault",
+        "description_html": "销毁所有 Vault 仓库并从 MongoDB 重新引导。清空期间，所有 <code>git clone</code> / <code>fetch</code> 请求将以 503 拒绝。该操作将以 <code>vault.wipe</code> 记录到审计日志。",
+        "confirm-title": "确认清空 Vault",
+        "confirm-message_html": "此操作将<strong>销毁所有 Vault 仓库</strong>并从 MongoDB 重新填充。在重建期间，git 客户端将收到 <code>503 Service Unavailable</code>。",
+        "confirm-question": "确定要继续吗？",
+        "confirm-button": "确认",
+        "cancel-button": "取消",
+        "started-toast": "清空已开始。在重新引导完成之前，Vault 将返回 503。"
+      },
+      "bootstrap-status": {
+        "heading": "引导状态",
+        "state": "状态",
+        "processed-total": "已处理 / 总估算",
+        "started-at": "开始时间",
+        "completed-at": "完成时间",
+        "last-error": "最近错误",
+        "progress-label": "{{processed}} / {{total}} 页"
+      },
+      "completion-reliability": {
+        "heading": "完成性检查",
+        "check-result": "检查结果",
+        "last-completed-at": "最近完成时间",
+        "processed-estimated": "已处理 / 估算",
+        "trigger-source": "触发来源",
+        "last-error": "最近错误"
+      },
+      "auto-retry-status": {
+        "heading": "自动重试状态",
+        "escalated-warning_html": "引导已进入 <strong>escalated</strong> 状态。自动重试已用尽，需要人工介入。",
+        "attempt-no": "尝试次数",
+        "next-attempt-at": "下次尝试时间",
+        "last-error": "最近错误",
+        "abort-button": "中止自动重试",
+        "aborting": "中止中…",
+        "aborted-toast": "自动重试已中止。"
+      },
+      "drift-activity": {
+        "heading": "漂移活动",
+        "last-sweep-at": "最近扫描时间",
+        "last-watermark": "最近水位",
+        "detected-since-boot": "启动以来检测数",
+        "repairs-emitted-since-boot": "启动以来修复发出数",
+        "last-error": "最近错误",
+        "out-of-scope_html": "<strong>注意（范围外）：</strong> 路径变更漂移（重命名 / 硬删除）和权限撤销漂移在 v1 中不会被检测。它们需要将来 <code>growi-vault-ha</code> 的支持。"
+      },
+      "storage-observability": {
+        "heading": "存储可观测性",
+        "fetch-failed": "获取存储统计失败。vault-manager 可能无法访问。",
+        "namespace-count": "命名空间数量",
+        "total-commit-count": "总提交数",
+        "loose-object-count": "Loose 对象数量",
+        "repo-size": "仓库大小",
+        "last-squash": "最近 squash",
+        "last-gc": "最近 GC"
+      },
+      "audit-log": {
+        "heading": "审计日志",
+        "button": "查看 VAULT_* 审计日志条目",
+        "description": "打开按 Vault 相关操作（VAULT_*）筛选的管理员审计日志。"
+      },
+      "reconcile-admin": {
+        "heading": "对账",
+        "trigger-button": "触发对账",
+        "description": "在不进行完整重新引导的情况下，手动修复 MongoDB 页面与 Vault git 树之间的漂移。"
+      }
+    }
   }
 }

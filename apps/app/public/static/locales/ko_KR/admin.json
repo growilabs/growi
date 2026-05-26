@@ -1167,5 +1167,87 @@
     "ai_integration": "AI 통합",
     "disable_mode_explanation": "현재 AI 통합이 비활성화되어 있습니다. 활성화하려면 <code>AI_ENABLED</code> 환경 변수와 필요한 추가 변수를 구성하십시오.<br><br>자세한 내용은 <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>문서</a>를 참조하십시오.",
     "ai_search_management": "AI 검색 관리"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "경고:",
+        "message_html": "최근 부트스트랩은 <code>VAULT_BOOTSTRAP_ON_START=force</code> 에 의해 실행되었습니다. 이 환경 변수가 <code>force</code> 로 설정된 상태에서 서버를 다시 시작하면 모든 Vault 데이터가 다시 삭제됩니다. 환경 변수를 <code>true</code> 또는 <code>false</code> 로 변경해 주세요."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "기능 상태",
+        "enabled": "활성화됨",
+        "disabled": "비활성화됨",
+        "description_html": "<code>VAULT_ENABLED</code> 환경 변수로 제어됩니다. 이 값을 변경하려면 배포 환경을 업데이트하고 apps/app 을 다시 시작하십시오. 재시작 없이 런타임 중 클론 제공을 중단하려면 아래의 <strong>Wipe Vault</strong> 킬 스위치를 사용하십시오."
+      },
+      "kill-switch": {
+        "heading": "킬 스위치",
+        "button": "Vault 초기화",
+        "description_html": "모든 Vault 저장소를 파기하고 MongoDB 로부터 다시 부트스트랩합니다. 초기화 중에는 모든 <code>git clone</code> / <code>fetch</code> 요청이 503 으로 거부됩니다. 이 작업은 감사 로그에 <code>vault.wipe</code> 로 기록됩니다.",
+        "confirm-title": "Vault 초기화 확인",
+        "confirm-message_html": "이 작업은 <strong>모든 Vault 저장소를 파기</strong>하고 MongoDB 로부터 다시 시드합니다. 재구축 중에는 git 클라이언트가 <code>503 Service Unavailable</code> 을 받게 됩니다.",
+        "confirm-question": "정말로 진행하시겠습니까?",
+        "confirm-button": "확인",
+        "cancel-button": "취소",
+        "started-toast": "초기화를 시작했습니다. 재부트스트랩이 완료될 때까지 Vault 는 503 을 반환합니다."
+      },
+      "bootstrap-status": {
+        "heading": "부트스트랩 상태",
+        "state": "상태",
+        "processed-total": "처리됨 / 총 예상",
+        "started-at": "시작 시각",
+        "completed-at": "완료 시각",
+        "last-error": "최근 오류",
+        "progress-label": "{{processed}} / {{total}} 페이지"
+      },
+      "completion-reliability": {
+        "heading": "완료성 검사",
+        "check-result": "검사 결과",
+        "last-completed-at": "최근 완료 시각",
+        "processed-estimated": "처리됨 / 예상",
+        "trigger-source": "트리거 소스",
+        "last-error": "최근 오류"
+      },
+      "auto-retry-status": {
+        "heading": "자동 재시도 상태",
+        "escalated-warning_html": "부트스트랩이 <strong>escalated</strong> 상태에 도달했습니다. 자동 재시도가 소진되었으며, 수동 개입이 필요합니다.",
+        "attempt-no": "시도 횟수",
+        "next-attempt-at": "다음 시도 시각",
+        "last-error": "최근 오류",
+        "abort-button": "자동 재시도 중단",
+        "aborting": "중단 중…",
+        "aborted-toast": "자동 재시도가 중단되었습니다."
+      },
+      "drift-activity": {
+        "heading": "드리프트 활동",
+        "last-sweep-at": "최근 스윕 시각",
+        "last-watermark": "최근 워터마크",
+        "detected-since-boot": "부팅 이후 감지 건수",
+        "repairs-emitted-since-boot": "부팅 이후 복구 발행 건수",
+        "last-error": "최근 오류",
+        "out-of-scope_html": "<strong>주의 (범위 외):</strong> 경로 변경 드리프트(이름 변경 / 하드 삭제) 및 권한 해제 드리프트는 v1 에서 감지되지 않습니다. 이는 향후 <code>growi-vault-ha</code> 지원이 필요합니다."
+      },
+      "storage-observability": {
+        "heading": "스토리지 관측성",
+        "fetch-failed": "스토리지 통계를 가져오지 못했습니다. vault-manager 에 도달할 수 없을 수 있습니다.",
+        "namespace-count": "네임스페이스 수",
+        "total-commit-count": "총 커밋 수",
+        "loose-object-count": "Loose 오브젝트 수",
+        "repo-size": "저장소 크기",
+        "last-squash": "최근 squash",
+        "last-gc": "최근 GC"
+      },
+      "audit-log": {
+        "heading": "감사 로그",
+        "button": "VAULT_* 감사 로그 항목 보기",
+        "description": "Vault 관련 작업(VAULT_*)으로 필터링된 관리자 감사 로그를 엽니다."
+      },
+      "reconcile-admin": {
+        "heading": "리컨실",
+        "trigger-button": "리컨실 실행",
+        "description": "전체 재부트스트랩 없이 MongoDB 페이지와 Vault git 트리 간의 드리프트를 수동으로 복구합니다."
+      }
+    }
   }
 }

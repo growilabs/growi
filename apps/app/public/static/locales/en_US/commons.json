@@ -237,7 +237,20 @@
       },
       "accepted": {
         "message": "Reconcile started successfully."
-      }
+      },
+      "target-type": {
+        "legend": "Target Type",
+        "page": "Page (single page only)",
+        "sub-tree": "Sub-tree (page and all descendants)"
+      },
+      "target-path": {
+        "label": "Target Path"
+      },
+      "submit": {
+        "submitting": "Submitting…",
+        "start": "Start Reconcile"
+      },
+      "cancel": "Cancel"
     }
   }
 }

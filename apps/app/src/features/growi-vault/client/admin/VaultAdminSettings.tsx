@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import { useCallback, useState } from 'react';
 import type { StorageStatsResponse } from '@growi/core/dist/interfaces/vault';
+import { useTranslation } from 'next-i18next';
 import {
   Alert,
   Button,
@@ -118,29 +119,42 @@ const FeatureStatusSection = ({
 }: {
   vaultEnabled: boolean | undefined;
 }): JSX.Element => {
+  const { t } = useTranslation('admin');
+
   return (
     <div className="row mb-5">
       <div className="col-lg-12">
-        <h2 className="admin-setting-header">GROWI Vault</h2>
+        <h2 className="admin-setting-header">
+          {t('growi-vault.admin-settings.feature-status.heading')}
+        </h2>
 
         <div className="row form-group">
           <div className="col-md-3 text-md-end">
-            <span className="col-form-label">Feature Status</span>
+            <span className="col-form-label">
+              {t('growi-vault.admin-settings.feature-status.label')}
+            </span>
           </div>
           <div className="col-md-9">
             {vaultEnabled === true ? (
-              <span className="badge bg-success">Enabled</span>
+              <span className="badge bg-success">
+                {t('growi-vault.admin-settings.feature-status.enabled')}
+              </span>
             ) : vaultEnabled === false ? (
-              <span className="badge bg-secondary">Disabled</span>
+              <span className="badge bg-secondary">
+                {t('growi-vault.admin-settings.feature-status.disabled')}
+              </span>
             ) : (
               <span className="badge bg-light text-dark">—</span>
             )}
-            <p className="form-text text-muted mt-2 mb-0">
-              Controlled by the <code>VAULT_ENABLED</code> environment variable.
-              To change this value, update the deployment env and restart
-              apps/app. To stop serving clones at runtime without a restart, use
-              the <strong>Wipe Vault</strong> kill switch below.
-            </p>
+            <p
+              className="form-text text-muted mt-2 mb-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+              dangerouslySetInnerHTML={{
+                __html: t(
+                  'growi-vault.admin-settings.feature-status.description_html',
+                ),
+              }}
+            />
           </div>
         </div>
       </div>
@@ -154,6 +168,8 @@ const BootstrapStatusSection = ({
 }: {
   data: VaultStatusData | undefined;
 }): JSX.Element => {
+  const { t } = useTranslation('admin');
+
   const isRunning = data?.bootstrapState === 'running';
   const processed = data?.processed ?? 0;
   const totalEstimated = data?.totalEstimated ?? 0;
@@ -167,12 +183,16 @@ const BootstrapStatusSection = ({
   return (
     <div className="row mb-5">
       <div className="col-lg-12">
-        <h2 className="admin-setting-header">Bootstrap Status</h2>
+        <h2 className="admin-setting-header">
+          {t('growi-vault.admin-settings.bootstrap-status.heading')}
+        </h2>
 
         <table className="table table-sm table-bordered">
           <tbody>
             <tr>
-              <th className="col-md-3">State</th>
+              <th className="col-md-3">
+                {t('growi-vault.admin-settings.bootstrap-status.state')}
+              </th>
               <td>
                 <span
                   className={`badge ${
@@ -190,22 +210,32 @@ const BootstrapStatusSection = ({
               </td>
             </tr>
             <tr>
-              <th>Processed / Total Estimated</th>
+              <th>
+                {t(
+                  'growi-vault.admin-settings.bootstrap-status.processed-total',
+                )}
+              </th>
               <td>
                 {processed} / {totalEstimated ?? '—'}
               </td>
             </tr>
             <tr>
-              <th>Started At</th>
+              <th>
+                {t('growi-vault.admin-settings.bootstrap-status.started-at')}
+              </th>
               <td>{formatDate(data?.startedAt)}</td>
             </tr>
             <tr>
-              <th>Completed At</th>
+              <th>
+                {t('growi-vault.admin-settings.bootstrap-status.completed-at')}
+              </th>
               <td>{formatDate(data?.completedAt)}</td>
             </tr>
             {data?.lastError != null && (
               <tr>
-                <th>Last Error</th>
+                <th>
+                  {t('growi-vault.admin-settings.bootstrap-status.last-error')}
+                </th>
                 <td className="text-danger">{data.lastError}</td>
               </tr>
             )}
@@ -217,7 +247,13 @@ const BootstrapStatusSection = ({
           <div className="mt-2">
             <div className="d-flex justify-content-between mb-1">
               <small>
-                {processed} of {totalEstimated ?? '?'} pages
+                {t(
+                  'growi-vault.admin-settings.bootstrap-status.progress-label',
+                  {
+                    processed,
+                    total: totalEstimated ?? '?',
+                  },
+                )}
               </small>
               <small>{progressPct}%</small>
             </div>
@@ -244,44 +280,71 @@ const StorageObservabilitySection = ({
 }: {
   storageStats: StorageStatsResponse | null | undefined;
 }): JSX.Element => {
+  const { t } = useTranslation('admin');
+
   return (
     <div className="row mb-5">
       <div className="col-lg-12">
-        <h2 className="admin-setting-header">Storage Observability</h2>
+        <h2 className="admin-setting-header">
+          {t('growi-vault.admin-settings.storage-observability.heading')}
+        </h2>
 
         {storageStats == null ? (
           <div className="alert alert-warning">
             <span className="material-symbols-outlined me-1 align-middle">
               error
             </span>
-            Failed to retrieve storage statistics. vault-manager may be
-            unreachable.
+            {t('growi-vault.admin-settings.storage-observability.fetch-failed')}
           </div>
         ) : (
           <table className="table table-sm table-bordered">
             <tbody>
               <tr>
-                <th className="col-md-4">Namespace Count</th>
+                <th className="col-md-4">
+                  {t(
+                    'growi-vault.admin-settings.storage-observability.namespace-count',
+                  )}
+                </th>
                 <td>{storageStats.namespaceCount}</td>
               </tr>
               <tr>
-                <th>Total Commit Count</th>
+                <th>
+                  {t(
+                    'growi-vault.admin-settings.storage-observability.total-commit-count',
+                  )}
+                </th>
                 <td>{storageStats.totalCommitCount.toLocaleString()}</td>
               </tr>
               <tr>
-                <th>Loose Object Count</th>
+                <th>
+                  {t(
+                    'growi-vault.admin-settings.storage-observability.loose-object-count',
+                  )}
+                </th>
                 <td>{storageStats.looseObjectCount.toLocaleString()}</td>
               </tr>
               <tr>
-                <th>Repository Size</th>
+                <th>
+                  {t(
+                    'growi-vault.admin-settings.storage-observability.repo-size',
+                  )}
+                </th>
                 <td>{formatBytes(storageStats.repoSizeBytes)}</td>
               </tr>
               <tr>
-                <th>Last Squash</th>
+                <th>
+                  {t(
+                    'growi-vault.admin-settings.storage-observability.last-squash',
+                  )}
+                </th>
                 <td>{formatDate(storageStats.lastSquashAt)}</td>
               </tr>
               <tr>
-                <th>Last GC</th>
+                <th>
+                  {t(
+                    'growi-vault.admin-settings.storage-observability.last-gc',
+                  )}
+                </th>
                 <td>{formatDate(storageStats.lastGcAt)}</td>
               </tr>
             </tbody>
@@ -294,10 +357,14 @@ const StorageObservabilitySection = ({
 
 /** Audit log filter link: deep link to audit log filtered by VAULT_* actions. */
 const AuditLogFilterSection = (): JSX.Element => {
+  const { t } = useTranslation('admin');
+
   return (
     <div className="row mb-5">
       <div className="col-lg-12">
-        <h2 className="admin-setting-header">Audit Log</h2>
+        <h2 className="admin-setting-header">
+          {t('growi-vault.admin-settings.audit-log.heading')}
+        </h2>
 
         <div className="row">
           <div className="col-md-3"></div>
@@ -309,11 +376,10 @@ const AuditLogFilterSection = (): JSX.Element => {
               <span className="material-symbols-outlined me-1 align-middle">
                 manage_search
               </span>
-              View VAULT_* Audit Log Entries
+              {t('growi-vault.admin-settings.audit-log.button')}
             </a>
             <p className="form-text text-muted mt-2">
-              Opens the admin audit log filtered to Vault-related actions
-              (VAULT_*).
+              {t('growi-vault.admin-settings.audit-log.description')}
             </p>
           </div>
         </div>
@@ -328,17 +394,24 @@ const CompletionReliabilitySection = ({
 }: {
   resilienceData: ResilienceStatusData | undefined;
 }): JSX.Element => {
+  const { t } = useTranslation('admin');
   const bootstrap = resilienceData?.bootstrap;
 
   return (
     <div className="row mb-5">
       <div className="col-lg-12">
-        <h2 className="admin-setting-header">Completion Reliability</h2>
+        <h2 className="admin-setting-header">
+          {t('growi-vault.admin-settings.completion-reliability.heading')}
+        </h2>
 
         <table className="table table-sm table-bordered">
           <tbody>
             <tr>
-              <th className="col-md-4">Check Result</th>
+              <th className="col-md-4">
+                {t(
+                  'growi-vault.admin-settings.completion-reliability.check-result',
+                )}
+              </th>
               <td>
                 <span className="badge bg-secondary">
                   {bootstrap?.state ?? '—'}
@@ -346,7 +419,11 @@ const CompletionReliabilitySection = ({
               </td>
             </tr>
             <tr>
-              <th>Last Completed At</th>
+              <th>
+                {t(
+                  'growi-vault.admin-settings.completion-reliability.last-completed-at',
+                )}
+              </th>
               <td>
                 {bootstrap?.completedAt != null
                   ? new Date(bootstrap.completedAt).toLocaleString()
@@ -354,18 +431,30 @@ const CompletionReliabilitySection = ({
               </td>
             </tr>
             <tr>
-              <th>Processed / Estimated</th>
+              <th>
+                {t(
+                  'growi-vault.admin-settings.completion-reliability.processed-estimated',
+                )}
+              </th>
               <td>
                 {bootstrap?.processed ?? 0} / {bootstrap?.totalEstimated ?? '—'}
               </td>
             </tr>
             <tr>
-              <th>Trigger Source</th>
+              <th>
+                {t(
+                  'growi-vault.admin-settings.completion-reliability.trigger-source',
+                )}
+              </th>
               <td>{resilienceData?.lastTriggerSource ?? '—'}</td>
             </tr>
             {bootstrap?.lastError != null && (
               <tr>
-                <th>Last Error</th>
+                <th>
+                  {t(
+                    'growi-vault.admin-settings.completion-reliability.last-error',
+                  )}
+                </th>
                 <td className="text-danger">{bootstrap.lastError}</td>
               </tr>
             )}
@@ -386,6 +475,7 @@ const AutoRetryStatusSection = ({
   bootstrapState: BootstrapState | undefined;
   onAbort: () => Promise<void>;
 }): JSX.Element => {
+  const { t } = useTranslation('admin');
   const [isAborting, setIsAborting] = useState(false);
   const isEscalated = bootstrapState === 'escalated';
 
@@ -401,26 +491,40 @@ const AutoRetryStatusSection = ({
   return (
     <div className="row mb-5">
       <div className="col-lg-12">
-        <h2 className="admin-setting-header">Auto-Retry Status</h2>
+        <h2 className="admin-setting-header">
+          {t('growi-vault.admin-settings.auto-retry-status.heading')}
+        </h2>
 
         {isEscalated && (
           <Alert color="danger" className="mb-3">
             <span className="material-symbols-outlined me-1 align-middle">
               error
             </span>
-            Bootstrap has reached the <strong>escalated</strong> state.
-            Auto-retry has been exhausted. Manual intervention is required.
+            <span
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+              dangerouslySetInnerHTML={{
+                __html: t(
+                  'growi-vault.admin-settings.auto-retry-status.escalated-warning_html',
+                ),
+              }}
+            />
           </Alert>
         )}
 
         <table className="table table-sm table-bordered">
           <tbody>
             <tr>
-              <th className="col-md-4">Attempt No.</th>
+              <th className="col-md-4">
+                {t('growi-vault.admin-settings.auto-retry-status.attempt-no')}
+              </th>
               <td>{retryStatus.attemptNo}</td>
             </tr>
             <tr>
-              <th>Next Attempt At</th>
+              <th>
+                {t(
+                  'growi-vault.admin-settings.auto-retry-status.next-attempt-at',
+                )}
+              </th>
               <td>
                 {retryStatus.nextAttemptAt != null
                   ? new Date(retryStatus.nextAttemptAt).toLocaleString()
@@ -429,7 +533,9 @@ const AutoRetryStatusSection = ({
             </tr>
             {retryStatus.lastError != null && (
               <tr>
-                <th>Last Error</th>
+                <th>
+                  {t('growi-vault.admin-settings.auto-retry-status.last-error')}
+                </th>
                 <td className="text-danger">{retryStatus.lastError}</td>
               </tr>
             )}
@@ -441,7 +547,9 @@ const AutoRetryStatusSection = ({
           disabled={retryStatus.aborted || isAborting}
           onClick={handleAbort}
         >
-          {isAborting ? 'Aborting…' : 'Abort Auto-Retry'}
+          {isAborting
+            ? t('growi-vault.admin-settings.auto-retry-status.aborting')
+            : t('growi-vault.admin-settings.auto-retry-status.abort-button')}
         </Button>
       </div>
     </div>
@@ -450,6 +558,7 @@ const AutoRetryStatusSection = ({
 
 /** Reconcile section: trigger manual reconcile + history table. */
 const ReconcileSection = (): JSX.Element => {
+  const { t } = useTranslation('admin');
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const {
@@ -472,7 +581,9 @@ const ReconcileSection = (): JSX.Element => {
   return (
     <div className="row mb-5">
       <div className="col-lg-12">
-        <h2 className="admin-setting-header">Reconcile</h2>
+        <h2 className="admin-setting-header">
+          {t('growi-vault.admin-settings.reconcile-admin.heading')}
+        </h2>
 
         <div className="row mb-3">
           <div className="col-md-3"></div>
@@ -481,11 +592,10 @@ const ReconcileSection = (): JSX.Element => {
               <span className="material-symbols-outlined me-1 align-middle">
                 sync
               </span>
-              Trigger Reconcile
+              {t('growi-vault.admin-settings.reconcile-admin.trigger-button')}
             </Button>
             <p className="form-text text-muted mt-2">
-              Manually repair drift between MongoDB pages and vault git trees
-              without a full re-bootstrap.
+              {t('growi-vault.admin-settings.reconcile-admin.description')}
             </p>
           </div>
         </div>
@@ -512,15 +622,21 @@ const DriftActivitySection = ({
 }: {
   driftStatus: ResilienceDriftStatus;
 }): JSX.Element => {
+  const { t } = useTranslation('admin');
+
   return (
     <div className="row mb-5">
       <div className="col-lg-12">
-        <h2 className="admin-setting-header">Drift Activity</h2>
+        <h2 className="admin-setting-header">
+          {t('growi-vault.admin-settings.drift-activity.heading')}
+        </h2>
 
         <table className="table table-sm table-bordered">
           <tbody>
             <tr>
-              <th className="col-md-4">Last Sweep At</th>
+              <th className="col-md-4">
+                {t('growi-vault.admin-settings.drift-activity.last-sweep-at')}
+              </th>
               <td>
                 {driftStatus.lastSweepAt != null
                   ? new Date(driftStatus.lastSweepAt).toLocaleString()
@@ -528,7 +644,9 @@ const DriftActivitySection = ({
               </td>
             </tr>
             <tr>
-              <th>Last Watermark</th>
+              <th>
+                {t('growi-vault.admin-settings.drift-activity.last-watermark')}
+              </th>
               <td>
                 {driftStatus.lastWatermark != null
                   ? new Date(driftStatus.lastWatermark).toLocaleString()
@@ -536,27 +654,41 @@ const DriftActivitySection = ({
               </td>
             </tr>
             <tr>
-              <th>Detected Since Boot</th>
+              <th>
+                {t(
+                  'growi-vault.admin-settings.drift-activity.detected-since-boot',
+                )}
+              </th>
               <td>{driftStatus.detectedSinceBoot}</td>
             </tr>
             <tr>
-              <th>Repairs Emitted Since Boot</th>
+              <th>
+                {t(
+                  'growi-vault.admin-settings.drift-activity.repairs-emitted-since-boot',
+                )}
+              </th>
               <td>{driftStatus.repairsEmittedSinceBoot}</td>
             </tr>
             {driftStatus.lastError != null && (
               <tr>
-                <th>Last Error</th>
+                <th>
+                  {t('growi-vault.admin-settings.drift-activity.last-error')}
+                </th>
                 <td className="text-danger">{driftStatus.lastError}</td>
               </tr>
             )}
           </tbody>
         </table>
 
-        <p className="form-text text-muted mt-2">
-          <strong>Note (out-of-scope):</strong> Path change drift (rename / hard
-          delete) and grant drop drift are not detected in v1. These require
-          future <code>growi-vault-ha</code> support.
-        </p>
+        <p
+          className="form-text text-muted mt-2"
+          // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+          dangerouslySetInnerHTML={{
+            __html: t(
+              'growi-vault.admin-settings.drift-activity.out-of-scope_html',
+            ),
+          }}
+        />
       </div>
     </div>
   );
@@ -587,6 +719,8 @@ const DriftActivitySection = ({
  * without manually refreshing the page.
  */
 export const VaultAdminSettings = (): JSX.Element => {
+  const { t } = useTranslation('admin');
+
   // ---- SWR polling: existing /vault/status (backward compat) ----
   const { data, mutate } = useSWR<VaultStatusData>(
     '/vault/status',
@@ -636,26 +770,26 @@ export const VaultAdminSettings = (): JSX.Element => {
     mutate(optimisticRunning, false);
     try {
       await apiv3Post('/vault/wipe', {});
-      toastSuccess(
-        'Wipe started. The Vault is now serving 503 until re-bootstrap completes.',
-      );
+      toastSuccess(t('growi-vault.admin-settings.kill-switch.started-toast'));
       await mutate();
       await mutateResilience();
     } catch (errs) {
       toastError(errs);
       await mutate();
     }
-  }, [mutate, mutateResilience, optimisticRunning]);
+  }, [mutate, mutateResilience, optimisticRunning, t]);
 
   const handleAbortRetry = useCallback(async () => {
     try {
       await apiv3Post('/vault/retry/abort', {});
-      toastSuccess('Auto-retry aborted.');
+      toastSuccess(
+        t('growi-vault.admin-settings.auto-retry-status.aborted-toast'),
+      );
       await mutateResilience();
     } catch (errs) {
       toastError(errs);
     }
-  }, [mutateResilience]);
+  }, [mutateResilience, t]);
 
   const isBootstrapRunning =
     data?.bootstrapState === 'running' || data?.bootstrapState === 'verifying';
@@ -668,11 +802,15 @@ export const VaultAdminSettings = (): JSX.Element => {
           <span className="material-symbols-outlined me-1 align-middle">
             warning
           </span>
-          <strong>Warning:</strong> The last bootstrap was triggered by{' '}
-          <code>VAULT_BOOTSTRAP_ON_START=force</code>. Restarting the server
-          while this env var is still set to <code>force</code> will wipe all
-          vault data again. Please change the env var to <code>true</code> or{' '}
-          <code>false</code>.
+          <strong>{t('growi-vault.admin-settings.force-warning.label')}</strong>{' '}
+          <span
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+            dangerouslySetInnerHTML={{
+              __html: t(
+                'growi-vault.admin-settings.force-warning.message_html',
+              ),
+            }}
+          />
         </Alert>
       )}
 
@@ -681,7 +819,9 @@ export const VaultAdminSettings = (): JSX.Element => {
       {/* Kill switch: Wipe Vault (the only admin-triggered bootstrap path) */}
       <div className="row mb-5">
         <div className="col-lg-12">
-          <h2 className="admin-setting-header">Kill Switch</h2>
+          <h2 className="admin-setting-header">
+            {t('growi-vault.admin-settings.kill-switch.heading')}
+          </h2>
 
           <div className="row">
             <div className="col-md-3"></div>
@@ -694,14 +834,17 @@ export const VaultAdminSettings = (): JSX.Element => {
                 <span className="material-symbols-outlined me-1 align-middle">
                   delete_forever
                 </span>
-                Wipe Vault
+                {t('growi-vault.admin-settings.kill-switch.button')}
               </Button>
-              <p className="form-text text-muted mt-2">
-                Destroys all vault repositories and re-bootstraps from MongoDB.
-                During the wipe, all <code>git clone</code> / <code>fetch</code>{' '}
-                requests are rejected with 503. The action is recorded in the
-                audit log as <code>vault.wipe</code>.
-              </p>
+              <p
+                className="form-text text-muted mt-2"
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+                dangerouslySetInnerHTML={{
+                  __html: t(
+                    'growi-vault.admin-settings.kill-switch.description_html',
+                  ),
+                }}
+              />
             </div>
           </div>
         </div>
@@ -710,22 +853,25 @@ export const VaultAdminSettings = (): JSX.Element => {
       {/* Confirm modal for Wipe Vault */}
       <Modal isOpen={isWipeModalOpen} toggle={() => setIsWipeModalOpen(false)}>
         <ModalHeader toggle={() => setIsWipeModalOpen(false)}>
-          Confirm Wipe Vault
+          {t('growi-vault.admin-settings.kill-switch.confirm-title')}
         </ModalHeader>
         <ModalBody>
-          <p>
-            This will <strong>destroy all vault repositories</strong> and
-            re-seed from MongoDB. During the rebuild, git clients will receive{' '}
-            <code>503 Service Unavailable</code>.
-          </p>
-          <p>Are you sure you want to proceed?</p>
+          <p
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+            dangerouslySetInnerHTML={{
+              __html: t(
+                'growi-vault.admin-settings.kill-switch.confirm-message_html',
+              ),
+            }}
+          />
+          <p>{t('growi-vault.admin-settings.kill-switch.confirm-question')}</p>
         </ModalBody>
         <ModalFooter>
           <Button color="danger" onClick={handleConfirmWipe}>
-            Confirm
+            {t('growi-vault.admin-settings.kill-switch.confirm-button')}
           </Button>
           <Button color="secondary" onClick={() => setIsWipeModalOpen(false)}>
-            Cancel
+            {t('growi-vault.admin-settings.kill-switch.cancel-button')}
           </Button>
         </ModalFooter>
       </Modal>

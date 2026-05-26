@@ -1176,5 +1176,87 @@
     "ai_integration": "AI 連携",
     "disable_mode_explanation": "現在、AI 連携は無効になっています。有効にする場合は環境変数 <code>AI_ENABLED</code> の他、必要な環境変数を設定してください。<br><br>詳細は<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}ja/guide/features/ai-knowledge-assistant.html>ドキュメント</a>を参照してください。",
     "ai_search_management": "AI 検索管理"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "警告:",
+        "message_html": "直近のブートストラップは <code>VAULT_BOOTSTRAP_ON_START=force</code> により起動されました。この環境変数を <code>force</code> のままサーバーを再起動すると、Vault のすべてのデータが再度ワイプされます。環境変数を <code>true</code> または <code>false</code> に変更してください。"
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "機能ステータス",
+        "enabled": "有効",
+        "disabled": "無効",
+        "description_html": "<code>VAULT_ENABLED</code> 環境変数で制御されています。この値を変更するには、デプロイ環境を更新して apps/app を再起動してください。再起動なしに実行中のクローン配信を停止するには、下の <strong>Wipe Vault</strong> キルスイッチを利用してください。"
+      },
+      "kill-switch": {
+        "heading": "キルスイッチ",
+        "button": "Vault をワイプ",
+        "description_html": "すべての Vault リポジトリを破棄し、MongoDB から再ブートストラップします。ワイプ中はすべての <code>git clone</code> / <code>fetch</code> リクエストが 503 で拒否されます。この操作は監査ログに <code>vault.wipe</code> として記録されます。",
+        "confirm-title": "Vault ワイプの確認",
+        "confirm-message_html": "この操作は<strong>すべての Vault リポジトリを破棄</strong>し、MongoDB から再シードします。再構築中、git クライアントは <code>503 Service Unavailable</code> を受け取ります。",
+        "confirm-question": "本当に続行してよろしいですか？",
+        "confirm-button": "確認",
+        "cancel-button": "キャンセル",
+        "started-toast": "ワイプを開始しました。再ブートストラップが完了するまで Vault は 503 を返します。"
+      },
+      "bootstrap-status": {
+        "heading": "ブートストラップ状況",
+        "state": "状態",
+        "processed-total": "処理済み / 推定総数",
+        "started-at": "開始日時",
+        "completed-at": "完了日時",
+        "last-error": "直近のエラー",
+        "progress-label": "{{processed}} / {{total}} ページ"
+      },
+      "completion-reliability": {
+        "heading": "完了性チェック",
+        "check-result": "チェック結果",
+        "last-completed-at": "直近の完了日時",
+        "processed-estimated": "処理済み / 推定",
+        "trigger-source": "トリガー元",
+        "last-error": "直近のエラー"
+      },
+      "auto-retry-status": {
+        "heading": "自動リトライ状況",
+        "escalated-warning_html": "ブートストラップが <strong>escalated</strong> 状態に到達しました。自動リトライは尽きており、手動での対応が必要です。",
+        "attempt-no": "試行回数",
+        "next-attempt-at": "次回試行日時",
+        "last-error": "直近のエラー",
+        "abort-button": "自動リトライを中止",
+        "aborting": "中止中…",
+        "aborted-toast": "自動リトライを中止しました。"
+      },
+      "drift-activity": {
+        "heading": "ドリフト検知の状況",
+        "last-sweep-at": "直近のスイープ日時",
+        "last-watermark": "直近のウォーターマーク",
+        "detected-since-boot": "起動以降の検出件数",
+        "repairs-emitted-since-boot": "起動以降の修復発行件数",
+        "last-error": "直近のエラー",
+        "out-of-scope_html": "<strong>注意（対象外）:</strong> パス変更（rename / hard delete）に伴うドリフトおよび権限解除によるドリフトは v1 では検知されません。これらは将来の <code>growi-vault-ha</code> サポートが必要です。"
+      },
+      "storage-observability": {
+        "heading": "ストレージ可観測性",
+        "fetch-failed": "ストレージ統計の取得に失敗しました。vault-manager に接続できない可能性があります。",
+        "namespace-count": "ネームスペース数",
+        "total-commit-count": "総コミット数",
+        "loose-object-count": "Loose オブジェクト数",
+        "repo-size": "リポジトリサイズ",
+        "last-squash": "直近の squash",
+        "last-gc": "直近の GC"
+      },
+      "audit-log": {
+        "heading": "監査ログ",
+        "button": "VAULT_* の監査ログを表示",
+        "description": "Vault 関連のアクション（VAULT_*）でフィルタリングした管理者監査ログを開きます。"
+      },
+      "reconcile-admin": {
+        "heading": "リコンサイル",
+        "trigger-button": "リコンサイルを実行",
+        "description": "完全な再ブートストラップを行わずに、MongoDB のページと Vault の git ツリー間のドリフトを手動で修復します。"
+      }
+    }
   }
 }

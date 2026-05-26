@@ -1167,5 +1167,87 @@
     "ai_integration": "AI Integration",
     "disable_mode_explanation": "Currently, AI integration is disabled. To enable it, configure the <code>AI_ENABLED</code> environment variable along with the required additional variables.<br><br>For details, please refer to the <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>documentation</a>.",
     "ai_search_management": "AI search management"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "Warning:",
+        "message_html": "The last bootstrap was triggered by <code>VAULT_BOOTSTRAP_ON_START=force</code>. Restarting the server while this env var is still set to <code>force</code> will wipe all vault data again. Please change the env var to <code>true</code> or <code>false</code>."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "Feature Status",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "description_html": "Controlled by the <code>VAULT_ENABLED</code> environment variable. To change this value, update the deployment env and restart apps/app. To stop serving clones at runtime without a restart, use the <strong>Wipe Vault</strong> kill switch below."
+      },
+      "kill-switch": {
+        "heading": "Kill Switch",
+        "button": "Wipe Vault",
+        "description_html": "Destroys all vault repositories and re-bootstraps from MongoDB. During the wipe, all <code>git clone</code> / <code>fetch</code> requests are rejected with 503. The action is recorded in the audit log as <code>vault.wipe</code>.",
+        "confirm-title": "Confirm Wipe Vault",
+        "confirm-message_html": "This will <strong>destroy all vault repositories</strong> and re-seed from MongoDB. During the rebuild, git clients will receive <code>503 Service Unavailable</code>.",
+        "confirm-question": "Are you sure you want to proceed?",
+        "confirm-button": "Confirm",
+        "cancel-button": "Cancel",
+        "started-toast": "Wipe started. The Vault is now serving 503 until re-bootstrap completes."
+      },
+      "bootstrap-status": {
+        "heading": "Bootstrap Status",
+        "state": "State",
+        "processed-total": "Processed / Total Estimated",
+        "started-at": "Started At",
+        "completed-at": "Completed At",
+        "last-error": "Last Error",
+        "progress-label": "{{processed}} of {{total}} pages"
+      },
+      "completion-reliability": {
+        "heading": "Completion Reliability",
+        "check-result": "Check Result",
+        "last-completed-at": "Last Completed At",
+        "processed-estimated": "Processed / Estimated",
+        "trigger-source": "Trigger Source",
+        "last-error": "Last Error"
+      },
+      "auto-retry-status": {
+        "heading": "Auto-Retry Status",
+        "escalated-warning_html": "Bootstrap has reached the <strong>escalated</strong> state. Auto-retry has been exhausted. Manual intervention is required.",
+        "attempt-no": "Attempt No.",
+        "next-attempt-at": "Next Attempt At",
+        "last-error": "Last Error",
+        "abort-button": "Abort Auto-Retry",
+        "aborting": "Aborting…",
+        "aborted-toast": "Auto-retry aborted."
+      },
+      "drift-activity": {
+        "heading": "Drift Activity",
+        "last-sweep-at": "Last Sweep At",
+        "last-watermark": "Last Watermark",
+        "detected-since-boot": "Detected Since Boot",
+        "repairs-emitted-since-boot": "Repairs Emitted Since Boot",
+        "last-error": "Last Error",
+        "out-of-scope_html": "<strong>Note (out-of-scope):</strong> Path change drift (rename / hard delete) and grant drop drift are not detected in v1. These require future <code>growi-vault-ha</code> support."
+      },
+      "storage-observability": {
+        "heading": "Storage Observability",
+        "fetch-failed": "Failed to retrieve storage statistics. vault-manager may be unreachable.",
+        "namespace-count": "Namespace Count",
+        "total-commit-count": "Total Commit Count",
+        "loose-object-count": "Loose Object Count",
+        "repo-size": "Repository Size",
+        "last-squash": "Last Squash",
+        "last-gc": "Last GC"
+      },
+      "audit-log": {
+        "heading": "Audit Log",
+        "button": "View VAULT_* Audit Log Entries",
+        "description": "Opens the admin audit log filtered to Vault-related actions (VAULT_*)."
+      },
+      "reconcile-admin": {
+        "heading": "Reconcile",
+        "trigger-button": "Trigger Reconcile",
+        "description": "Manually repair drift between MongoDB pages and vault git trees without a full re-bootstrap."
+      }
+    }
   }
 }

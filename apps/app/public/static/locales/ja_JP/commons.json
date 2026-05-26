@@ -241,7 +241,20 @@
       },
       "accepted": {
         "message": "リコンサイルを開始しました。"
-      }
+      },
+      "target-type": {
+        "legend": "ターゲットタイプ",
+        "page": "ページ（単一ページのみ）",
+        "sub-tree": "サブツリー（ページとすべての子孫）"
+      },
+      "target-path": {
+        "label": "ターゲットパス"
+      },
+      "submit": {
+        "submitting": "送信中…",
+        "start": "リコンサイルを開始"
+      },
+      "cancel": "キャンセル"
     }
   }
 }

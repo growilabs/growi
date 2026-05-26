@@ -1166,5 +1166,87 @@
     "ai_integration": "Intégration de l'IA",
     "disable_mode_explanation": "Actuellement, l'intégration AI est désactivée. Pour l'activer, configurez la variable d'environnement <code>AI_ENABLED</code> ainsi que les autres variables nécessaires.<br><br>Pour plus de détails, veuillez consulter la <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>documentation</a>.",
     "ai_search_management": "Gestion de la recherche par l'IA"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "Avertissement :",
+        "message_html": "Le dernier amorçage a été déclenché par <code>VAULT_BOOTSTRAP_ON_START=force</code>. Redémarrer le serveur avec cette variable d'environnement toujours définie sur <code>force</code> effacera à nouveau toutes les données du coffre. Veuillez modifier la variable d'environnement en <code>true</code> ou <code>false</code>."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "État de la fonctionnalité",
+        "enabled": "Activé",
+        "disabled": "Désactivé",
+        "description_html": "Contrôlé par la variable d'environnement <code>VAULT_ENABLED</code>. Pour modifier cette valeur, mettez à jour l'environnement de déploiement et redémarrez apps/app. Pour cesser de servir les clones à l'exécution sans redémarrage, utilisez le coupe-circuit <strong>Wipe Vault</strong> ci-dessous."
+      },
+      "kill-switch": {
+        "heading": "Coupe-circuit",
+        "button": "Effacer le coffre",
+        "description_html": "Détruit tous les dépôts du coffre et relance l'amorçage depuis MongoDB. Pendant l'effacement, toutes les requêtes <code>git clone</code> / <code>fetch</code> sont rejetées avec 503. L'opération est enregistrée dans le journal d'audit comme <code>vault.wipe</code>.",
+        "confirm-title": "Confirmer l'effacement du coffre",
+        "confirm-message_html": "Cette opération va <strong>détruire tous les dépôts du coffre</strong> et les réamorcer depuis MongoDB. Pendant la reconstruction, les clients git recevront <code>503 Service Unavailable</code>.",
+        "confirm-question": "Êtes-vous sûr de vouloir continuer ?",
+        "confirm-button": "Confirmer",
+        "cancel-button": "Annuler",
+        "started-toast": "Effacement démarré. Le coffre renverra 503 jusqu'à la fin du ré-amorçage."
+      },
+      "bootstrap-status": {
+        "heading": "État de l'amorçage",
+        "state": "État",
+        "processed-total": "Traité / Total estimé",
+        "started-at": "Démarré le",
+        "completed-at": "Terminé le",
+        "last-error": "Dernière erreur",
+        "progress-label": "{{processed}} sur {{total}} pages"
+      },
+      "completion-reliability": {
+        "heading": "Fiabilité de complétion",
+        "check-result": "Résultat de la vérification",
+        "last-completed-at": "Dernière complétion",
+        "processed-estimated": "Traité / Estimé",
+        "trigger-source": "Source du déclencheur",
+        "last-error": "Dernière erreur"
+      },
+      "auto-retry-status": {
+        "heading": "État du réessai automatique",
+        "escalated-warning_html": "L'amorçage a atteint l'état <strong>escalated</strong>. Le réessai automatique est épuisé. Une intervention manuelle est requise.",
+        "attempt-no": "N° de tentative",
+        "next-attempt-at": "Prochaine tentative",
+        "last-error": "Dernière erreur",
+        "abort-button": "Annuler le réessai automatique",
+        "aborting": "Annulation…",
+        "aborted-toast": "Réessai automatique annulé."
+      },
+      "drift-activity": {
+        "heading": "Activité de dérive",
+        "last-sweep-at": "Dernier balayage",
+        "last-watermark": "Dernière marque de filigrane",
+        "detected-since-boot": "Détectés depuis le démarrage",
+        "repairs-emitted-since-boot": "Réparations émises depuis le démarrage",
+        "last-error": "Dernière erreur",
+        "out-of-scope_html": "<strong>Remarque (hors périmètre) :</strong> Les dérives de chemin (renommage / suppression définitive) et les dérives de perte de droits ne sont pas détectées dans la v1. Elles nécessiteront un support futur de <code>growi-vault-ha</code>."
+      },
+      "storage-observability": {
+        "heading": "Observabilité du stockage",
+        "fetch-failed": "Échec de récupération des statistiques de stockage. vault-manager peut être injoignable.",
+        "namespace-count": "Nombre de namespaces",
+        "total-commit-count": "Nombre total de commits",
+        "loose-object-count": "Nombre d'objets vrac",
+        "repo-size": "Taille du dépôt",
+        "last-squash": "Dernier squash",
+        "last-gc": "Dernier GC"
+      },
+      "audit-log": {
+        "heading": "Journal d'audit",
+        "button": "Voir les entrées du journal VAULT_*",
+        "description": "Ouvre le journal d'audit administrateur filtré sur les actions liées au coffre (VAULT_*)."
+      },
+      "reconcile-admin": {
+        "heading": "Réconcilier",
+        "trigger-button": "Lancer la réconciliation",
+        "description": "Répare manuellement la dérive entre les pages MongoDB et les arbres git du coffre sans ré-amorçage complet."
+      }
+    }
   }
 }

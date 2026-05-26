@@ -50,6 +50,40 @@ vi.mock('~/client/util/toastr', () => ({
   toastSuccess: mocks.toastSuccess,
 }));
 
+// Mock i18n so component renders en_US translations during tests.
+// We resolve keys against the actual en_US/admin.json so test assertions
+// can refer to display text and stay aligned with the shipped translations.
+import adminEn from '../../../../../public/static/locales/en_US/admin.json';
+
+const resolveTranslation = (
+  obj: unknown,
+  key: string,
+  vars?: Record<string, unknown>,
+): string => {
+  const parts = key.split('.');
+  let cursor: unknown = obj;
+  for (const part of parts) {
+    if (cursor != null && typeof cursor === 'object' && part in cursor) {
+      cursor = (cursor as Record<string, unknown>)[part];
+    } else {
+      return key;
+    }
+  }
+  if (typeof cursor !== 'string') return key;
+  if (vars == null) return cursor;
+  return cursor.replace(/\{\{(\w+)\}\}/g, (_, name: string) =>
+    vars[name] != null ? String(vars[name]) : `{{${name}}}`,
+  );
+};
+
+vi.mock('next-i18next', () => ({
+  useTranslation: () => ({
+    t: (key: string, vars?: Record<string, unknown>) =>
+      resolveTranslation(adminEn, key, vars),
+    i18n: { language: 'en_US' },
+  }),
+}));
+
 // Mock SWR to return controlled data without actual HTTP calls.
 vi.mock('swr', () => ({
   default: (key: string, _fetcher: unknown, _opts?: unknown) => {

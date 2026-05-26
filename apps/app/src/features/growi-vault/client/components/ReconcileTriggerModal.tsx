@@ -144,7 +144,9 @@ export const ReconcileTriggerModal = (
 
         {/* Target type selection */}
         <FormGroup tag="fieldset">
-          <legend className="col-form-label">Target Type</legend>
+          <legend className="col-form-label">
+            {t('growi-vault.reconcile.target-type.legend')}
+          </legend>
           <FormGroup check>
             <Input
               id="reconcile-target-type-page"
@@ -156,7 +158,7 @@ export const ReconcileTriggerModal = (
               disabled={submitting}
             />
             <Label check htmlFor="reconcile-target-type-page">
-              Page (single page only)
+              {t('growi-vault.reconcile.target-type.page')}
             </Label>
           </FormGroup>
           <FormGroup check>
@@ -170,14 +172,16 @@ export const ReconcileTriggerModal = (
               disabled={submitting}
             />
             <Label check htmlFor="reconcile-target-type-subtree">
-              Sub-tree (page and all descendants)
+              {t('growi-vault.reconcile.target-type.sub-tree')}
             </Label>
           </FormGroup>
         </FormGroup>
 
         {/* Target path input */}
         <FormGroup>
-          <Label htmlFor="reconcile-target-path">Target Path</Label>
+          <Label htmlFor="reconcile-target-path">
+            {t('growi-vault.reconcile.target-path.label')}
+          </Label>
           <Input
             id="reconcile-target-path"
             type="text"
@@ -203,14 +207,14 @@ export const ReconcileTriggerModal = (
                 role="status"
                 aria-hidden="true"
               />
-              Submitting…
+              {t('growi-vault.reconcile.submit.submitting')}
             </>
           ) : (
-            'Start Reconcile'
+            t('growi-vault.reconcile.submit.start')
           )}
         </Button>
         <Button color="secondary" onClick={handleClose} disabled={submitting}>
-          Cancel
+          {t('growi-vault.reconcile.cancel')}
         </Button>
       </ModalFooter>
     </Modal>
