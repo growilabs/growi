@@ -154,6 +154,11 @@ export function createVaultResilienceLayer(
     heartbeatIntervalMs,
     heartbeatStaleMs,
     createActivity: createActivity as BootstrapRunnerDeps['createActivity'],
+    // Read the env value lazily so getStatus() reflects the *current* value
+    // (configManager may be updated at runtime — though in practice the env
+    // is fixed at process start, this keeps the AND check honest).
+    getBootstrapOnStartEnv: () =>
+      configManager.getConfig('app:vaultBootstrapOnStart'),
   };
 
   const runner = createBootstrapRunner(runnerDeps);

@@ -168,6 +168,16 @@ export interface BootstrapRunnerDeps {
   /** Optional audit log activity factory. */
   createActivity?: (activityData: ActivityData) => Promise<unknown>;
   /**
+   * Returns the current value of `VAULT_BOOTSTRAP_ON_START` at status-read time.
+   *
+   * Called per `getStatus()` so the resulting ResilienceStatus can compare the
+   * *current* env value against `bootstrapLastTriggerSource`. The persistent
+   * "force still active" banner must only fire when both sides agree (last
+   * bootstrap was env-force AND env is still `force`); using only the
+   * persisted last-trigger-source produces stale warnings.
+   */
+  getBootstrapOnStartEnv: () => 'true' | 'false' | 'force';
+  /**
    * Override for the completeness verify timeout. Tests use a short value to
    * exercise the timeout-failure path without waiting 5 minutes. Production
    * callers omit this so the module-level default applies.
@@ -274,6 +284,7 @@ export function createBootstrapRunner(
     heartbeatIntervalMs,
     heartbeatStaleMs,
     createActivity,
+    getBootstrapOnStartEnv,
     verifyTimeoutMsOverride,
   } = deps;
 
@@ -958,7 +969,13 @@ export function createBootstrapRunner(
         : null;
 
       const lastTriggerSource = doc.bootstrapLastTriggerSource;
-      const forceWarningActive = lastTriggerSource === 'env-force';
+      // forceWarningActive: only true when BOTH the last bootstrap was env-force
+      // AND VAULT_BOOTSTRAP_ON_START is still 'force'. Banner copy reads
+      // "Restarting while this env var is still set to `force` will wipe...",
+      // so the warning is meaningful only while both sides remain true.
+      const forceWarningActive =
+        lastTriggerSource === 'env-force' &&
+        getBootstrapOnStartEnv() === 'force';
 
       return {
         bootstrap,

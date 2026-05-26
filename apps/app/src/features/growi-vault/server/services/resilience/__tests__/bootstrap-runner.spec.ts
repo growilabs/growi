@@ -143,6 +143,7 @@ interface RunnerSetup {
 function createTestRunner(
   initialState: Partial<MockState> = {},
   pages: object[] = [],
+  options: { bootstrapOnStartEnv?: 'true' | 'false' | 'force' } = {},
 ): RunnerSetup {
   const state: MockState = { ...makeDefaultState(), ...initialState };
 
@@ -242,6 +243,7 @@ function createTestRunner(
     // well under Vitest's 5s default test timeout.
     verifyTimeoutMsOverride: 1_000,
     createActivity: mockCreateActivity,
+    getBootstrapOnStartEnv: () => options.bootstrapOnStartEnv ?? 'false',
   });
 
   return {
@@ -400,9 +402,11 @@ describe('BootstrapRunner', () => {
       expect(state.bootstrapLastTriggerSource).toBe('env-force');
     });
 
-    it('sets forceWarningActive in status when triggerSource is env-force', async () => {
+    it('sets forceWarningActive in status when triggerSource is env-force AND env is still force', async () => {
       const pages = [makePageDoc(FAKE_ID_A, '/page-a')];
-      const { runner } = createTestRunner({ bootstrapState: 'done' }, pages);
+      const { runner } = createTestRunner({ bootstrapState: 'done' }, pages, {
+        bootstrapOnStartEnv: 'force',
+      });
 
       await runner.bootstrap({ triggerSource: 'env-force' });
 
@@ -780,15 +784,71 @@ describe('BootstrapRunner', () => {
       expect(status.drift!.repairsEmittedSinceBoot).toBe(2);
     });
 
-    it('forceWarningActive is true when lastTriggerSource is env-force', async () => {
-      const { runner } = createTestRunner({
-        bootstrapLastTriggerSource: 'env-force',
-        bootstrapState: 'done',
-      });
+    it('forceWarningActive is true when lastTriggerSource is env-force AND env is still force', async () => {
+      const { runner } = createTestRunner(
+        {
+          bootstrapLastTriggerSource: 'env-force',
+          bootstrapState: 'done',
+        },
+        [],
+        { bootstrapOnStartEnv: 'force' },
+      );
 
       const status = await runner.getStatus();
 
       expect(status.forceWarningActive).toBe(true);
+    });
+
+    it('forceWarningActive is false when lastTriggerSource is env-force but env was changed to true', async () => {
+      // Past bootstrap was env-force; admin then changed env to 'true' and restarted.
+      // The warning must NOT fire — its message is about the *current* env still being 'force'.
+      const { runner } = createTestRunner(
+        {
+          bootstrapLastTriggerSource: 'env-force',
+          bootstrapState: 'done',
+        },
+        [],
+        { bootstrapOnStartEnv: 'true' },
+      );
+
+      const status = await runner.getStatus();
+
+      expect(status.forceWarningActive).toBe(false);
+    });
+
+    it('forceWarningActive is false when lastTriggerSource is env-force but env was changed to false', async () => {
+      const { runner } = createTestRunner(
+        {
+          bootstrapLastTriggerSource: 'env-force',
+          bootstrapState: 'done',
+        },
+        [],
+        { bootstrapOnStartEnv: 'false' },
+      );
+
+      const status = await runner.getStatus();
+
+      expect(status.forceWarningActive).toBe(false);
+    });
+
+    it('forceWarningActive is false when env is force but the last bootstrap was NOT env-force', async () => {
+      // E.g. admin-wipe-driven bootstrap, while env is still force. The doc
+      // records 'admin-force-wipe' as the trigger source. No warning because
+      // the *last* bootstrap was not env-driven — the next restart would,
+      // however, trigger env-force; that is the watcher's concern, not this
+      // banner's. Banner only fires when both sides agree.
+      const { runner } = createTestRunner(
+        {
+          bootstrapLastTriggerSource: 'admin-force-wipe',
+          bootstrapState: 'done',
+        },
+        [],
+        { bootstrapOnStartEnv: 'force' },
+      );
+
+      const status = await runner.getStatus();
+
+      expect(status.forceWarningActive).toBe(false);
     });
   });
 
