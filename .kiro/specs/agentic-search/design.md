@@ -55,8 +55,9 @@
 - `Page.findByIdAndViewer` / `Page.findByPathAndViewer`（grant 委譲経路）
 - `populateDataToShowRevision()` または `.populate('revision')`（revision 取得）
 - `Revision` モデル（`body` 参照のみ）
-- `mdast-util-from-markdown`（既存依存、`getPageContentTool` の outline 抽出用 — CommonMark 準拠の AST 構築）
-- `unist-util-visit` / `mdast-util-to-string`（既存 remark 系の transitive、AST visitor とテキスト抽出。明示 dep が必要なら追加）
+- `mdast-util-from-markdown`（既存 direct dep、`apps/app/package.json` で `^2.0.1`。`getPageContentTool` の outline 抽出で MDAST を構築）
+- `unist-util-visit`（pnpm hoist 経由で `apps/app/node_modules` に存在 — `5.x`、ESM。既に `apps/app/src/services/renderer/remark-plugins/xsv-to-table.ts` が direct dep 宣言なしで直接 import している前例があり、本 PR でも同 convention に従って transitive hoist のまま使用する。新規 `package.json` 追加は **不要**）
+- `mdast-util-to-string`（`apps/app/node_modules` 直下に存在せず resolve 不能。本 PR で **`apps/app/package.json` の `dependencies` に `^4.0.0` を新規追加** する必要あり。`getPageContentTool` の outline 抽出で heading text のプレーン化に使用、ESM）
 - `~/utils/logger`（pino 経由のロガー）
 
 依存方向は **HTTP Layer → Agent Layer → Tool Layer → Page / Revision Model → Mongoose**。tool 層から HTTP 層を逆参照しない。
