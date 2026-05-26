@@ -15,20 +15,16 @@ The connection pool size is now configurable via environment variables with expl
 
 To restore the previous behavior (driver defaults), set `MONGO_MAX_POOL_SIZE` and `MONGO_MIN_POOL_SIZE` to the values your deployment requires.
 
-### OpenTelemetry auto-instrumentation now defaults to allow-list mode
+### OpenTelemetry instrumentation set is now fixed to the four GROWI uses
 
-The default `OTEL_AUTO_INSTRUMENTATION_PROFILE` is now `minimal`, which enables only the four instrumentations used by GROWI:
+`@opentelemetry/auto-instrumentations-node` is no longer used. The four instrumentations actually exercised by GROWI are now imported and instantiated directly:
 
 - `@opentelemetry/instrumentation-http`
 - `@opentelemetry/instrumentation-express`
 - `@opentelemetry/instrumentation-mongodb`
 - `@opentelemetry/instrumentation-mongoose`
 
-All other auto-instrumentations are disabled by default to reduce trace overhead. To restore the previous behavior (all instrumentations enabled except pino and fs), set:
-
-```
-OTEL_AUTO_INSTRUMENTATION_PROFILE=all
-```
+The `OTEL_AUTO_INSTRUMENTATION_PROFILE` environment variable that briefly existed in pre-release builds has been removed; there is no runtime knob to enable additional instrumentations. If you need an instrumentation not in this set, add it directly to `node-sdk-configuration.ts`.
 
 ### New metric: `growi.yjs.docs.count`
 
@@ -39,4 +35,4 @@ A new Observable Gauge metric `growi.yjs.docs.count` (unit: `{document}`) is emi
 | Change | Rollback env var |
 |---|---|
 | MongoDB pool size | `MONGO_MAX_POOL_SIZE=<previous-value>` |
-| OTel instrumentation scope | `OTEL_AUTO_INSTRUMENTATION_PROFILE=all` |
+| OTel instrumentation scope | No env var. Edit `node-sdk-configuration.ts` to add instrumentations. |

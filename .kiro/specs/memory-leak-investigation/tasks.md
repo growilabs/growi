@@ -9,6 +9,7 @@
 > **Scope change history**:
 > - Task 1.2（SIGUSR2 in-process fallback）は CDP-only 方針へ切り替えたため削除した（commit `b8e3efa4c7`）。
 > - 旧 Phase 1（Foundation）/ Phase 3（Core — Profiling sidecar）/ Task 4.2（Scenario runner integration）は profiling ツール開発タスクであり、`memory-profiler` spec に **責務移管**。本 spec からは削除し、Phase 5 以降で同ツールを **利用する** 文脈に置き換えた。
+> - Task 2.2（L2）は Phase 6 / Task 6.1 計測後に **設計を 2 度変更**: 初版 allow-list（`getNodeAutoInstrumentations(<deny-list>)` + `OTEL_AUTO_INSTRUMENTATION_PROFILE` env var）→ direct-import の `buildInstrumentations` 関数（commit `0f2cfb77d6`）→ `generateNodeSDKConfiguration` 内へインライン化し env var を撤去（commit `19c56368fc`）。最終 shipped 形は env var なしの直接 instantiate（[node-sdk-configuration.ts:53-58](../../apps/app/src/features/opentelemetry/server/node-sdk-configuration.ts)）。下記 Task 2.2 の本文は最終形に追従する形に書き直した。allow-list 中間形に対する Phase 6 / Task 6.1 計測結果は [verification-report.md / L2](./verification-report.md#l2--otel-instrumentation-set-task-22) に保存。
 
 ## 2. Core — Server-side fixes (parallel-capable; 異なるファイルへの独立変更)
 
@@ -21,15 +22,15 @@
   - _Requirements: 3.1, 3.2, 3.4, 3.6, 7.1, 7.2_
   - _Boundary: MongoosePoolConfig_
 
-- [x] 2.2 (P) L2: OpenTelemetry auto-instrumentation を allow-list 方式へ置換
-  - `getNodeAutoInstrumentations(...)` の引数を、明示的 allow-list（`@opentelemetry/instrumentation-http`, `instrumentation-express`, `instrumentation-mongodb`, `instrumentation-mongoose`）以外を `enabled: false` にする形に置き換える。
-  - `OTEL_AUTO_INSTRUMENTATION_PROFILE=all` のとき従来挙動（pino / fs のみ off）に戻す分岐を実装する。
-  - 不明な profile 値は warn ログを残し `minimal` 扱いとする。
+- [x] 2.2 (P) L2: OpenTelemetry instrumentation を direct-import 形へ固定
+  - `@opentelemetry/auto-instrumentations-node` への依存を廃止し、`HttpInstrumentation` / `ExpressInstrumentation` / `MongoDBInstrumentation` / `MongooseInstrumentation` の 4 つを直接 import & instantiate して `instrumentations` 配列へ渡す。
+  - `OTEL_AUTO_INSTRUMENTATION_PROFILE` env var は **存在させない**（外部 instrumentation を追加する場合は `node-sdk-configuration.ts` を編集する運用に統一）。
   - 既存の HTTP anonymization 設定 (`httpInstrumentationConfigForAnonymize`) との合成は維持する。
-  - Unit test で、`minimal` / `all` / 不明値の各分岐が期待される instrumentation 設定オブジェクトを返すことを検証する。
-  - 観測可能な完了条件: 現状の起動ログに現れる instrumentation patch ログから、`minimal` 設定では allow-list 由来の 4 種以外の patch 行が消失している。
+  - Unit test は 4 instrumentation がコンストラクタ呼び出しされ、`HttpInstrumentation` のみ anonymize-config 経由で初期化されることを検証する形に書き直す（[node-sdk-configuration.spec.ts](../../apps/app/src/features/opentelemetry/server/node-sdk-configuration.spec.ts) 参照）。
+  - 観測可能な完了条件: `generateNodeSDKConfiguration()` の戻り値 `instrumentations` が長さ 4、各要素の constructor name が allow-list と一致。31 instrumentation を抱える `getNodeAutoInstrumentations` 依存は import 文ごと消えている。
   - _Requirements: 3.3, 3.4, 3.6, 4.5, 7.1, 7.2_
-  - _Boundary: OtelInstrumentationAllowList_
+  - _Boundary: OtelDirectInstrumentations_
+  - _Design history_: 初版は allow-list（`getNodeAutoInstrumentations(<deny-list>)` + `OTEL_AUTO_INSTRUMENTATION_PROFILE` env var）で実装。Phase 6 / Task 6.1 計測で RSS delta ≈ 0 MB と判明したため、isolated bench（`apps/app/tmp/otel-import-bench/bench.js`）の予測 −11 MB を採用して direct-import へ再設計（commits `0f2cfb77d6`, `19c56368fc`, `7277daf43a`）。詳細経緯は [verification-report.md / L2](./verification-report.md#l2--otel-instrumentation-set-task-22)。
 
 - [x] 2.3 (P) L3 metric: `growi.yjs.docs.count` Observable Gauge モジュールの新規作成
   - `apps/app/src/features/opentelemetry/server/custom-metrics/yjs-metrics.ts` を新規作成し、既存 `system-metrics.ts` と同じパターン（`addYjsMetrics(): void` named export + `meter.createObservableGauge` + `addCallback`）で実装する。
@@ -75,7 +76,7 @@
   - _Requirements: 3.6, 7.1, 7.3_
 
 - [x] 4.4 (P) Default 値変更と新規 metric の CHANGESET 追加
-  - `npx changeset` で `@growi/app` 用 changeset を追加し、以下を明示する: (a) `MONGO_MAX_POOL_SIZE` default = 15, `MONGO_MIN_POOL_SIZE` default = 2 へ変更、(b) OTel auto-instrumentation default が allow-list 方式へ変更、(c) 新規 metric `growi.yjs.docs.count` の追加、(d) 従来動作復元の env var 一覧（`MONGO_MAX_POOL_SIZE`, `OTEL_AUTO_INSTRUMENTATION_PROFILE=all`）。
+  - `npx changeset` で `@growi/app` 用 changeset を追加し、以下を明示する: (a) `MONGO_MAX_POOL_SIZE` default = 15, `MONGO_MIN_POOL_SIZE` default = 2 へ変更、(b) OTel instrumentation set が `@opentelemetry/auto-instrumentations-node` 依存を廃止し 4 instrumentation の direct-import に固定、(c) 新規 metric `growi.yjs.docs.count` の追加、(d) 従来動作復元方法（`MONGO_MAX_POOL_SIZE`; OTel 側は env var なしで `node-sdk-configuration.ts` を編集）。
   - 観測可能な完了条件: `.changeset/*.md` 新規ファイルが PR の差分に含まれ、上記 4 点の運用者向け説明が記述されている。
   - _Depends: 2.1, 2.2, 2.3, 4.1_
   - _Requirements: 7.2, 7.4_
