@@ -148,7 +148,7 @@
   - _Boundary: GetPageContentTool_
   - _Depends: 3.4_
 
-- [ ] 3.6 (P) ページ本文取得 tool の integration test を新仕様に追従 + ケース追加
+- [x] 3.6 (P) ページ本文取得 tool の integration test を新仕様に追従 + ケース追加
   - **既存 14 件の改修範囲を分類して網羅** (design review #6):
     - **GRANT_PUBLIC / OWNER / USER_GROUP / RESTRICTED 系 (10 件程度)** の seed body は短い (1-2 行) ため、`page.body` 期待値を `page.content` に置き換えつつ、新規フィールド `totalLines: 1 or 2` / `offset: 1` / `limit: 200` / `hasMore: false` / `outline: []` (heading 無し seed のとき) を新たに assert
     - **non-existent page 系 (2 件程度)** の failure 系: `result: 'not_found_or_forbidden'` のみ assert (`page` フィールド不在のままで OK、変更なし)

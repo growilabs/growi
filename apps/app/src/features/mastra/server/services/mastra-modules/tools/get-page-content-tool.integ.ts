@@ -34,9 +34,26 @@ vi.mock('~/utils/logger', () => ({
 // developer / migration data already present in the test DB.
 const WORKER_ID = process.env.VITEST_WORKER_ID ?? '1';
 
+// Outline entry shape mirroring the tool's outputSchema. Mirrors the local
+// definition used in `get-page-content-tool.spec.ts`.
+type OutlineEntry = {
+  line: number;
+  level: number;
+  heading: string;
+};
+
 type GetPageContentOkResult = {
   result: 'ok';
-  page: { path: string; body: string; updatedAt: string };
+  page: {
+    path: string;
+    updatedAt: string;
+    content: string;
+    totalLines: number;
+    offset: number;
+    limit: number;
+    hasMore: boolean;
+    outline?: OutlineEntry[];
+  };
 };
 
 type GetPageContentFailureResult = {
@@ -53,7 +70,13 @@ type GetPageContentResult =
 // without per-call casts. The two `as never` args are unavoidable: Mastra's
 // `execute` signature uses `unknown` for both input and the context envelope.
 const invokeExecute = async (
-  inputData: { pageId?: string; pagePath?: string },
+  inputData: {
+    pageId?: string;
+    pagePath?: string;
+    offset?: number;
+    limit?: number;
+    includeOutline?: boolean;
+  },
   requestContext: RequestContext<MastraRequestContextShape>,
 ): Promise<GetPageContentResult> => {
   // biome-ignore lint/style/noNonNullAssertion: createTool always wires execute
@@ -105,17 +128,37 @@ describe('getPageContentTool (integration)', () => {
   const pagePathOwner = `/get-page-content-integ/${WORKER_ID}/owner`;
   const pagePathGroup = `/get-page-content-integ/${WORKER_ID}/group`;
   const pagePathRestricted = `/get-page-content-integ/${WORKER_ID}/restricted`;
+  const pagePathLong = `/get-page-content-integ/${WORKER_ID}/long`;
 
   const bodyPublic = `Public page body for ${WORKER_ID}`;
   const bodyOwner = `Owner page body for ${WORKER_ID}`;
   const bodyGroup = `Group page body for ${WORKER_ID}`;
   const bodyRestricted = `Restricted page body for ${WORKER_ID}`;
 
+  // Long-body page (300 lines) for offset/limit slicing + outline tests.
+  // Headings are interleaved at line 50 / 150 / 250 so each heading sits at a
+  // predictable position. Lines outside the heading positions are filler
+  // (`Line N`) so `content.split('\n')[i]` is trivial to assert against.
+  const LONG_PAGE_LINE_COUNT = 300;
+  const longPageHeadingLines = [50, 150, 250] as const;
+  const bodyLongLines = Array.from(
+    { length: LONG_PAGE_LINE_COUNT },
+    (_, i): string => {
+      const lineNumber = i + 1;
+      if (lineNumber === 50) return '# Section A';
+      if (lineNumber === 150) return '## Section B';
+      if (lineNumber === 250) return '### Section C';
+      return `Line ${lineNumber}`;
+    },
+  );
+  const bodyLong = bodyLongLines.join('\n');
+
   // Resolved page IDs for direct lookup assertions.
   let publicPageId: string;
   let ownerPageId: string;
   let groupPageId: string;
   let restrictedPageId: string;
+  let longPageId: string;
 
   beforeAll(async () => {
     // getInstance() is called for its side effects (model registration,
@@ -185,7 +228,13 @@ describe('getPageContentTool (integration)', () => {
     // `revision` _id, not by `pageId`.
     await Page.deleteMany({
       path: {
-        $in: [pagePathPublic, pagePathOwner, pagePathGroup, pagePathRestricted],
+        $in: [
+          pagePathPublic,
+          pagePathOwner,
+          pagePathGroup,
+          pagePathRestricted,
+          pagePathLong,
+        ],
       },
     });
 
@@ -220,6 +269,15 @@ describe('getPageContentTool (integration)', () => {
       creator: userA._id,
       lastUpdateUser: userA._id,
     });
+    // Long-body PUBLIC page for slicing / outline tests (Task 3.6 C1, C2).
+    // GRANT_PUBLIC keeps the focus on pagination semantics; grant-related
+    // permutations are already exercised by the four pages above.
+    const longPage = await Page.create({
+      path: pagePathLong,
+      grant: Page.GRANT_PUBLIC,
+      creator: userA._id,
+      lastUpdateUser: userA._id,
+    });
 
     const revisions = await Revision.insertMany([
       {
@@ -246,21 +304,30 @@ describe('getPageContentTool (integration)', () => {
         format: 'markdown',
         author: userA._id,
       },
+      {
+        pageId: longPage._id,
+        body: bodyLong,
+        format: 'markdown',
+        author: userA._id,
+      },
     ]);
 
     publicPage.revision = revisions[0]._id;
     ownerPage.revision = revisions[1]._id;
     groupPage.revision = revisions[2]._id;
     restrictedPage.revision = revisions[3]._id;
+    longPage.revision = revisions[4]._id;
     await publicPage.save();
     await ownerPage.save();
     await groupPage.save();
     await restrictedPage.save();
+    await longPage.save();
 
     publicPageId = String(publicPage._id);
     ownerPageId = String(ownerPage._id);
     groupPageId = String(groupPage._id);
     restrictedPageId = String(restrictedPage._id);
+    longPageId = String(longPage._id);
   }, 60_000);
 
   afterAll(async () => {
@@ -274,6 +341,7 @@ describe('getPageContentTool (integration)', () => {
             new mongoose.Types.ObjectId(ownerPageId),
             new mongoose.Types.ObjectId(groupPageId),
             new mongoose.Types.ObjectId(restrictedPageId),
+            new mongoose.Types.ObjectId(longPageId),
           ],
         },
       });
@@ -288,6 +356,7 @@ describe('getPageContentTool (integration)', () => {
             pagePathOwner,
             pagePathGroup,
             pagePathRestricted,
+            pagePathLong,
           ],
         },
       });
@@ -321,8 +390,29 @@ describe('getPageContentTool (integration)', () => {
     return ctx;
   };
 
+  // Shared expectations for short single-line seeds (bodyPublic, bodyOwner,
+  // bodyGroup, bodyRestricted). After Task 3.4 the output schema renames
+  // `body` → `content` and adds `totalLines` / `offset` / `limit` / `hasMore`
+  // plus an auto-included `outline`. None of these seeds contain headings, so
+  // `outline === []` is the expected sentinel (distinct from `undefined`).
+  const assertShortSeedShape = (
+    ok: GetPageContentOkResult,
+    expectedBody: string,
+  ): void => {
+    expect(ok.page.content).toBe(expectedBody);
+    expect(ok.page.totalLines).toBe(1);
+    expect(ok.page.offset).toBe(1);
+    expect(ok.page.limit).toBe(200);
+    expect(ok.page.hasMore).toBe(false);
+    // `offset` is omitted by every short-seed call site below, so the tool
+    // auto-includes the outline. Empty bodies-of-headings yield `[]` — this
+    // is the contract that lets agents distinguish "outline missing" from
+    // "outline present but no headings".
+    expect(ok.page.outline).toEqual([]);
+  };
+
   describe('GRANT_PUBLIC', () => {
-    it('returns ok with body and path for the owning user (A) via pageId', async () => {
+    it('returns ok with content and path for the owning user (A) via pageId', async () => {
       const result = await invokeExecute(
         { pageId: publicPageId },
         buildRequestContext(userA),
@@ -330,7 +420,7 @@ describe('getPageContentTool (integration)', () => {
 
       assertOk(result);
       expect(result.page.path).toBe(pagePathPublic);
-      expect(result.page.body).toBe(bodyPublic);
+      assertShortSeedShape(result, bodyPublic);
       // updatedAt is the page's updatedAt (Date.toISOString() format).
       expect(result.page.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
@@ -343,7 +433,7 @@ describe('getPageContentTool (integration)', () => {
 
       assertOk(result);
       expect(result.page.path).toBe(pagePathPublic);
-      expect(result.page.body).toBe(bodyPublic);
+      assertShortSeedShape(result, bodyPublic);
     });
   });
 
@@ -356,7 +446,7 @@ describe('getPageContentTool (integration)', () => {
 
       assertOk(result);
       expect(result.page.path).toBe(pagePathOwner);
-      expect(result.page.body).toBe(bodyOwner);
+      assertShortSeedShape(result, bodyOwner);
     });
 
     it('returns not_found_or_forbidden for a non-owner (B) via pageId', async () => {
@@ -380,7 +470,7 @@ describe('getPageContentTool (integration)', () => {
 
       assertOk(result);
       expect(result.page.path).toBe(pagePathGroup);
-      expect(result.page.body).toBe(bodyGroup);
+      assertShortSeedShape(result, bodyGroup);
     });
 
     it('returns not_found_or_forbidden for a non-member (B) via pageId', async () => {
@@ -404,7 +494,7 @@ describe('getPageContentTool (integration)', () => {
 
       assertOk(result);
       expect(result.page.path).toBe(pagePathRestricted);
-      expect(result.page.body).toBe(bodyRestricted);
+      assertShortSeedShape(result, bodyRestricted);
     });
 
     // Existing-behavior assertion (design.md ~line 812, research R-3):
@@ -421,7 +511,7 @@ describe('getPageContentTool (integration)', () => {
 
       assertOk(result);
       expect(result.page.path).toBe(pagePathRestricted);
-      expect(result.page.body).toBe(bodyRestricted);
+      assertShortSeedShape(result, bodyRestricted);
     });
 
     // Path-based lookup uses `findByPathAndViewer` with `useFindOne = true`,
@@ -435,7 +525,7 @@ describe('getPageContentTool (integration)', () => {
 
       assertOk(result);
       expect(result.page.path).toBe(pagePathRestricted);
-      expect(result.page.body).toBe(bodyRestricted);
+      assertShortSeedShape(result, bodyRestricted);
     });
   });
 
@@ -483,9 +573,9 @@ describe('getPageContentTool (integration)', () => {
       assertOk(resultForA);
       assertOk(resultForB);
       expect(resultForA.page.path).toBe(pagePathPublic);
-      expect(resultForA.page.body).toBe(bodyPublic);
+      assertShortSeedShape(resultForA, bodyPublic);
       expect(resultForB.page.path).toBe(pagePathPublic);
-      expect(resultForB.page.body).toBe(bodyPublic);
+      assertShortSeedShape(resultForB, bodyPublic);
     });
 
     it('returns ok for the GRANT_OWNER page via pagePath for owner (A) but not_found_or_forbidden for non-owner (B)', async () => {
@@ -501,7 +591,7 @@ describe('getPageContentTool (integration)', () => {
       assertOk(resultForA);
       assertFailure(resultForB);
       expect(resultForA.page.path).toBe(pagePathOwner);
-      expect(resultForA.page.body).toBe(bodyOwner);
+      assertShortSeedShape(resultForA, bodyOwner);
       expect(resultForB.result).toBe('not_found_or_forbidden');
     });
 
@@ -518,8 +608,71 @@ describe('getPageContentTool (integration)', () => {
       assertOk(resultForA);
       assertFailure(resultForB);
       expect(resultForA.page.path).toBe(pagePathGroup);
-      expect(resultForA.page.body).toBe(bodyGroup);
+      assertShortSeedShape(resultForA, bodyGroup);
       expect(resultForB.result).toBe('not_found_or_forbidden');
+    });
+  });
+
+  // Long-body page exercises offset/limit pagination and outline auto-include
+  // through the real Page / Revision lookup path. The same seed (300 lines,
+  // headings at lines 50 / 150 / 250) drives both cases — paired so the
+  // outline test can reference the heading layout that drove the slicing test.
+  describe('long-body page (offset/limit slicing + outline auto-include)', () => {
+    it('returns the requested slice (lines 200-299) with hasMore=true and outline undefined when offset > 1', async () => {
+      const result = await invokeExecute(
+        { pageId: longPageId, offset: 200, limit: 100 },
+        buildRequestContext(userA),
+      );
+
+      assertOk(result);
+      expect(result.page.path).toBe(pagePathLong);
+
+      // Slice math: startIdx = 199, sliced.length = 100, endIdx = 299.
+      // hasMore = (299 < 300) = true — line "Line 300" remains unread.
+      const lines = result.page.content.split('\n');
+      expect(lines).toHaveLength(100);
+      // Line 200 is filler (`Line 200`); line 250 sits at a heading position.
+      expect(lines[0]).toBe('Line 200');
+      // Last line of the slice corresponds to body line 299 (1-indexed),
+      // i.e. `Line 299` filler.
+      expect(lines[lines.length - 1]).toBe('Line 299');
+      // Heading at line 250 lands at array index 50 within the returned slice
+      // (250 - 200). Use this as a spot-check that the seed indexing is sane.
+      expect(lines[50]).toBe('### Section C');
+
+      expect(result.page.totalLines).toBe(LONG_PAGE_LINE_COUNT);
+      expect(result.page.offset).toBe(200);
+      expect(result.page.limit).toBe(100);
+      expect(result.page.hasMore).toBe(true);
+      // offset > 1 and no explicit includeOutline → outline must be omitted
+      // entirely (auto-include rule, requirement 2.9).
+      expect(result.page.outline).toBeUndefined();
+    });
+
+    it('auto-includes outline with ATX heading entries (line / level / heading) when offset is omitted', async () => {
+      const result = await invokeExecute(
+        { pageId: longPageId },
+        buildRequestContext(userA),
+      );
+
+      assertOk(result);
+      expect(result.page.path).toBe(pagePathLong);
+
+      // Default offset (1) and limit (200) — read lines 1..200, leaving
+      // lines 201..300 (which include "### Section C" at line 250) unread.
+      expect(result.page.offset).toBe(1);
+      expect(result.page.limit).toBe(200);
+      expect(result.page.totalLines).toBe(LONG_PAGE_LINE_COUNT);
+      expect(result.page.content.split('\n')).toHaveLength(200);
+      expect(result.page.hasMore).toBe(true);
+
+      // The outline reflects every heading in the FULL body (not just the
+      // returned slice) so an agent can decide where to drill next.
+      expect(result.page.outline).toEqual([
+        { line: longPageHeadingLines[0], level: 1, heading: 'Section A' },
+        { line: longPageHeadingLines[1], level: 2, heading: 'Section B' },
+        { line: longPageHeadingLines[2], level: 3, heading: 'Section C' },
+      ]);
     });
   });
 });
