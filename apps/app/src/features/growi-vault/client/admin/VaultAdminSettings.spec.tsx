@@ -2,12 +2,12 @@
  * VaultAdminSettings.spec.tsx
  *
  * Tests for VaultAdminSettings:
- *   (a) Completion Reliability section renders
+ *   (a) Reliability Status section renders
  *   (b) Auto-Retry abort button disabled state
  *   (c) Drift counts displayed
  *   (d) Force Warning banner display condition
  *   (e) Feature status — read-only display, no toggle UI
- *   (f) Wipe Vault — kill switch button with confirmation modal
+ *   (f) Rebuild Vault — kill switch button with confirmation modal
  */
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -189,10 +189,10 @@ function setup(
 
 // ── Test suites ──────────────────────────────────────────────────────────────
 
-describe('VaultAdminSettings — Completion Reliability section', () => {
+describe('VaultAdminSettings — Reliability Status section', () => {
   it('(a) renders the section heading', () => {
     setup(makeResilienceStatus());
-    expect(screen.getByText('Completion Reliability')).toBeTruthy();
+    expect(screen.getByText('Reliability Status')).toBeTruthy();
   });
 
   it('(a) shows completeness last checked date when completedAt is set', () => {
@@ -201,7 +201,7 @@ describe('VaultAdminSettings — Completion Reliability section', () => {
     });
     setup(status);
     // The completedAt is used as the completion check time proxy
-    expect(screen.getByText('Completion Reliability')).toBeTruthy();
+    expect(screen.getByText('Reliability Status')).toBeTruthy();
   });
 
   it('(a) shows processed / totalEstimated counts', () => {
@@ -223,14 +223,14 @@ describe('VaultAdminSettings — Completion Reliability section', () => {
     const status = makeResilienceStatus({ lastTriggerSource: null });
     setup(status);
     // Section should render even without trigger source
-    expect(screen.getByText('Completion Reliability')).toBeTruthy();
+    expect(screen.getByText('Reliability Status')).toBeTruthy();
   });
 
-  it('(a) shows bootstrap state as Check Result badge', () => {
+  it('(a) shows bootstrap state as Last Check Result badge', () => {
     const status = makeResilienceStatus({ bootstrap: { state: 'done' } });
     setup(status);
-    // "Check Result" row should display the bootstrap state value
-    const checkResultHeader = screen.getByText('Check Result');
+    // "Last Check Result" row should display the bootstrap state value
+    const checkResultHeader = screen.getByText('Last Check Result');
     expect(checkResultHeader).toBeTruthy();
     // The state badge should be visible near the header
     const badge = checkResultHeader.closest('tr')?.querySelector('.badge');
@@ -320,7 +320,7 @@ describe('VaultAdminSettings — Auto-Retry Status section', () => {
   });
 });
 
-describe('VaultAdminSettings — Drift Activity section', () => {
+describe('VaultAdminSettings — Data Inconsistency Detection section', () => {
   it('(c) renders when drift data is present', () => {
     const status = makeResilienceStatus({
       drift: {
@@ -332,7 +332,9 @@ describe('VaultAdminSettings — Drift Activity section', () => {
       },
     });
     setup(status);
-    expect(screen.getByText('Drift Activity')).toBeTruthy();
+    expect(
+      screen.getByText('Data Inconsistency Detection Status'),
+    ).toBeTruthy();
   });
 
   it('(c) shows detected count', () => {
@@ -383,7 +385,9 @@ describe('VaultAdminSettings — Drift Activity section', () => {
   it('(c) does not render section when drift is null', () => {
     const status = makeResilienceStatus({ drift: null });
     setup(status);
-    expect(screen.queryByText('Drift Activity')).toBeNull();
+    expect(
+      screen.queryByText('Data Inconsistency Detection Status'),
+    ).toBeNull();
   });
 });
 
@@ -416,7 +420,7 @@ describe('VaultAdminSettings — Bootstrap operation removed', () => {
   // The "Prepare GROWI Vault" button was functionally equivalent to "Wipe
   // Vault" (both went through the forceWipe path) and only confused
   // operators. The Prepare button has been removed; admin-initiated
-  // bootstrap is exclusively via the Wipe Vault kill switch.
+  // bootstrap is exclusively via the Rebuild Vault kill switch.
   it('does NOT render a "Prepare GROWI Vault" button', () => {
     setup(makeResilienceStatus(), 'done');
     expect(screen.queryByText(/prepare growi vault/i)).toBeNull();
@@ -464,15 +468,15 @@ describe('VaultAdminSettings — Feature status (read-only, env-only)', () => {
   });
 });
 
-describe('VaultAdminSettings — Wipe Vault (kill switch)', () => {
-  it('(f) renders a "Wipe Vault" button', () => {
+describe('VaultAdminSettings — Rebuild Vault (kill switch)', () => {
+  it('(f) renders a "Rebuild Vault" button', () => {
     setup(makeResilienceStatus(), 'done');
-    expect(screen.getByRole('button', { name: /wipe vault/i })).toBeTruthy();
+    expect(screen.getByRole('button', { name: /rebuild vault/i })).toBeTruthy();
   });
 
-  it('(f) shows confirm modal when "Wipe Vault" is clicked', async () => {
+  it('(f) shows confirm modal when "Rebuild Vault" is clicked', async () => {
     setup(makeResilienceStatus(), 'done');
-    fireEvent.click(screen.getByRole('button', { name: /wipe vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rebuild vault/i }));
     await waitFor(() => {
       expect(screen.getByRole('dialog')).toBeTruthy();
     });
@@ -482,7 +486,7 @@ describe('VaultAdminSettings — Wipe Vault (kill switch)', () => {
     mocks.apiv3Post.mockClear();
     mocks.apiv3Post.mockResolvedValueOnce({});
     setup(makeResilienceStatus(), 'done');
-    fireEvent.click(screen.getByRole('button', { name: /wipe vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rebuild vault/i }));
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
     // The destructive confirm button uses "Confirm" / "Yes" wording.
     const confirmBtn = screen.getByRole('button', {
@@ -497,17 +501,17 @@ describe('VaultAdminSettings — Wipe Vault (kill switch)', () => {
   it('(f) confirm modal can be cancelled without calling /vault/wipe', async () => {
     mocks.apiv3Post.mockClear();
     setup(makeResilienceStatus(), 'done');
-    fireEvent.click(screen.getByRole('button', { name: /wipe vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rebuild vault/i }));
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
     fireEvent.click(screen.getByRole('button', { name: /cancel/i }));
     await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
     expect(mocks.apiv3Post).not.toHaveBeenCalledWith('/vault/wipe', {});
   });
 
-  it('(f) "Wipe Vault" button is disabled while bootstrap is running', () => {
+  it('(f) "Rebuild Vault" button is disabled while bootstrap is running', () => {
     setup(makeResilienceStatus({ bootstrap: { state: 'running' } }), 'running');
     const wipeBtn = screen.getByRole('button', {
-      name: /wipe vault/i,
+      name: /rebuild vault/i,
     }) as HTMLButtonElement;
     expect(wipeBtn.disabled).toBe(true);
   });
@@ -528,7 +532,7 @@ describe('VaultAdminSettings — optimistic UI', () => {
     mocks.apiv3Post.mockImplementation(() => new Promise(() => {}));
 
     setup(makeResilienceStatus(), 'done');
-    fireEvent.click(screen.getByRole('button', { name: /wipe vault/i }));
+    fireEvent.click(screen.getByRole('button', { name: /rebuild vault/i }));
     await waitFor(() => expect(screen.getByRole('dialog')).toBeTruthy());
     fireEvent.click(
       screen.getByRole('button', { name: /^(confirm|yes|proceed)$/i }),

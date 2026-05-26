@@ -1181,29 +1181,29 @@
     "admin-settings": {
       "force-warning": {
         "label": "警告:",
-        "message_html": "直近のブートストラップは <code>VAULT_BOOTSTRAP_ON_START=force</code> により起動されました。この環境変数を <code>force</code> のままサーバーを再起動すると、Vault のすべてのデータが再度ワイプされます。環境変数を <code>true</code> または <code>false</code> に変更してください。"
+        "message_html": "直近の初期化処理は <code>VAULT_BOOTSTRAP_ON_START=force</code> により起動されました。この環境変数を <code>force</code> のままサーバーを再起動すると、Vault のすべてのデータが再度初期化されます。環境変数を <code>true</code> または <code>false</code> に変更してください。"
       },
       "feature-status": {
         "heading": "GROWI Vault",
         "label": "機能ステータス",
         "enabled": "有効",
         "disabled": "無効",
-        "description_html": "<code>VAULT_ENABLED</code> 環境変数で制御されています。この値を変更するには、デプロイ環境を更新して apps/app を再起動してください。再起動なしに実行中のクローン配信を停止するには、下の <strong>Wipe Vault</strong> キルスイッチを利用してください。"
+        "description_html": "<code>VAULT_ENABLED</code> 環境変数で制御されています。有効/無効を切り替えるには、環境変数を変更しサーバーを再起動してください。"
       },
       "kill-switch": {
-        "heading": "キルスイッチ",
-        "button": "Vault をワイプ",
-        "description_html": "すべての Vault リポジトリを破棄し、MongoDB から再ブートストラップします。ワイプ中はすべての <code>git clone</code> / <code>fetch</code> リクエストが 503 で拒否されます。この操作は監査ログに <code>vault.wipe</code> として記録されます。",
-        "confirm-title": "Vault ワイプの確認",
-        "confirm-message_html": "この操作は<strong>すべての Vault リポジトリを破棄</strong>し、MongoDB から再シードします。再構築中、git クライアントは <code>503 Service Unavailable</code> を受け取ります。",
+        "heading": "初期化",
+        "button": "Vault を初期化",
+        "description_html": "Git リポジトリ内のすべてのデータを破棄し、MongoDB 内のデータを元に Git データを再構築します。初期化中はすべての <code>git clone</code> / <code>fetch</code> リクエストが 503 で拒否されます。この操作は監査ログに <code>vault.wipe</code> として記録されます。",
+        "confirm-title": "Vault 初期化の確認",
+        "confirm-message_html": "この操作を実行すると、<strong>現在の Git リポジトリ内のすべてのデータが失われます</strong>。",
         "confirm-question": "本当に続行してよろしいですか？",
         "confirm-button": "確認",
         "cancel-button": "キャンセル",
-        "started-toast": "ワイプを開始しました。再ブートストラップが完了するまで Vault は 503 を返します。"
+        "started-toast": "初期化を開始しました。データの再構築が完了するまで Vault は 503 を返します。"
       },
       "bootstrap-status": {
-        "heading": "ブートストラップ状況",
-        "state": "状態",
+        "heading": "初期化ステータス",
+        "state": "ステータス",
         "processed-total": "処理済み / 推定総数",
         "started-at": "開始日時",
         "completed-at": "完了日時",
@@ -1211,16 +1211,16 @@
         "progress-label": "{{processed}} / {{total}} ページ"
       },
       "completion-reliability": {
-        "heading": "完了性チェック",
-        "check-result": "チェック結果",
-        "last-completed-at": "直近の完了日時",
+        "heading": "信頼性ステータス",
+        "check-result": "最終チェック結果",
+        "last-completed-at": "最終完了日時",
         "processed-estimated": "処理済み / 推定",
         "trigger-source": "トリガー元",
         "last-error": "直近のエラー"
       },
       "auto-retry-status": {
         "heading": "自動リトライ状況",
-        "escalated-warning_html": "ブートストラップが <strong>escalated</strong> 状態に到達しました。自動リトライは尽きており、手動での対応が必要です。",
+        "escalated-warning_html": "初期化処理に置ける自動リトライが失敗し、<strong>escalated</strong> 状態になっています。手動での対応が必要です。",
         "attempt-no": "試行回数",
         "next-attempt-at": "次回試行日時",
         "last-error": "直近のエラー",
@@ -1229,23 +1229,23 @@
         "aborted-toast": "自動リトライを中止しました。"
       },
       "drift-activity": {
-        "heading": "ドリフト検知の状況",
-        "last-sweep-at": "直近のスイープ日時",
-        "last-watermark": "直近のウォーターマーク",
-        "detected-since-boot": "起動以降の検出件数",
-        "repairs-emitted-since-boot": "起動以降の修復発行件数",
-        "last-error": "直近のエラー",
-        "out-of-scope_html": "<strong>注意（対象外）:</strong> パス変更（rename / hard delete）に伴うドリフトおよび権限解除によるドリフトは v1 では検知されません。これらは将来の <code>growi-vault-ha</code> サポートが必要です。"
+        "heading": "データ不整合検知ステータス",
+        "last-sweep-at": "最終スイープ日時",
+        "last-watermark": "最終ウォーターマーク",
+        "detected-since-boot": "サーバー起動時からの検出件数",
+        "repairs-emitted-since-boot": "サーバー起動時からの修復発行件数",
+        "last-error": "最後に検出されたエラー",
+        "out-of-scope_html": "<strong>注意（対象外）:</strong> パス変更（rename / hard delete）に伴うデータ不整合および権限解除による不整合は、現在の実装では検知できません。これらは将来の <code>growi-vault-ha</code> サポートが必要です。"
       },
       "storage-observability": {
-        "heading": "ストレージ可観測性",
+        "heading": "ストレージステータス",
         "fetch-failed": "ストレージ統計の取得に失敗しました。vault-manager に接続できない可能性があります。",
         "namespace-count": "ネームスペース数",
         "total-commit-count": "総コミット数",
         "loose-object-count": "Loose オブジェクト数",
         "repo-size": "リポジトリサイズ",
-        "last-squash": "直近の squash",
-        "last-gc": "直近の GC"
+        "last-squash": "最終 squash 日時",
+        "last-gc": "最終 GC 日時"
       },
       "audit-log": {
         "heading": "監査ログ",
@@ -1253,9 +1253,9 @@
         "description": "Vault 関連のアクション（VAULT_*）でフィルタリングした管理者監査ログを開きます。"
       },
       "reconcile-admin": {
-        "heading": "リコンサイル",
-        "trigger-button": "リコンサイルを実行",
-        "description": "完全な再ブートストラップを行わずに、MongoDB のページと Vault の git ツリー間のドリフトを手動で修復します。"
+        "heading": "修復管理",
+        "trigger-button": "修復を実行",
+        "description": "データ初期化を行わずに、MongoDB のページと Vault の git ツリー間のデータ不整合の手動修復を試みます。"
       }
     }
   }
