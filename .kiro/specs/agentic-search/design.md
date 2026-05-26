@@ -595,9 +595,14 @@ export const fullTextSearchTool: Tool<
 
 ```typescript
 import type { Tool } from '@mastra/core/tools';
+import type { RequestContext } from '@mastra/core/request-context';
 import { z } from 'zod';
 
-import { isIUserHasId, type MastraRequestContextShape } from '../types/request-context';
+import type { MastraRequestContextShape } from '../types/request-context';
+
+// execute 内では `context.requestContext as RequestContext<MastraRequestContextShape>` で
+// narrow する (既存 Tasks 3.1-3.3 と同じ pattern を維持)。`isIUserHasId` type guard 化は
+// 保留 task で後続対応 — Task 3.4 では既存キャスト pattern を変更しない (Implementation Notes 参照)。
 
 const getPageContentInputSchema = z
   .object({
@@ -696,14 +701,15 @@ export const getPageContentTool: Tool<
 - **Slicing**: `findByIdAndViewer` の戻り値を `populateDataToShowRevision(page, '')` で revision populate した後、`String(page.revision.body)` を `/\r?\n/` で split し (CRLF 耐性)、`Array.slice(offset - 1, offset - 1 + limit)` で部分配列を取り、`join('\n')` で文字列に戻す。これは **tool 内のメモリ上でのみ** 行われ、DB クエリは追加しない (PR #11204 review FB を受けた方針)
 - **Outline 抽出**: `mdast-util-from-markdown` の `fromMarkdown(body)` で `revision.body` 全文を MDAST (Markdown AST) に変換し、`unist-util-visit` で `'heading'` ノードを訪問。各ノードから `node.position.start.line` (1-indexed)、`node.depth` (1-6)、`mdast-util-to-string(node)` でプレーンテキスト化した heading text を取り出して `OutlineEntry` に変換する。本実装は CommonMark 仕様準拠であり、以下を **AST レベルで自動的に正しく扱う**:
   - ATX heading (`# heading`) と **Setext heading** (`heading\n====` / `heading\n----`) を両方とも `'heading'` ノードとして抽出 (Setext は `position.start.line` がテキスト行になるため、agent が `offset: line` で取得すると heading から始まる範囲が返る)
-  - Fenced code block (` ``` ` / `~~~`)、indented code block (4 スペースインデント)、front matter (`---` 区切り)、HTML block 内の `#` 行を heading として誤認しない
+  - Fenced code block (` ``` ` / `~~~`)、indented code block (4 スペースインデント)、HTML block 内の `#` 行を heading として誤認しない
   - heading text 内の Markdown 装飾 (`**bold**`、`*italic*`、`` `code` ``、`[link](url)` 等) を除去してプレーンテキストとして agent に渡す (`mdast-util-to-string` の挙動)。agent が heading 名を回答に引用するときに装飾の二重適用や URL 文字列混入を回避できる
   - 本 PR の outline 抽出はパーサー利用の唯一の箇所だが、将来 section slice / `findInPage` 等の機能追加時に同じ MDAST を再利用できる投資余地として位置づける
+  - **Front matter の扱い**: `fromMarkdown` は extension 無しで利用するため、YAML front matter (`--- ... ---`) を解釈せず内部は `thematicBreak` + `paragraph` 扱いになる。front matter 内に偶発的に `#` で始まる行が含まれていた場合は heading として抽出される可能性があるが、GROWI の wiki ページで front matter 内に heading 構文を含むケースは現実的に想定しないため許容する。必要な場合は将来別タスクで `mdast-util-frontmatter` の追加導入を検討
 - **Outline auto-include 条件**: `includeOutline` が `undefined` (= 省略) のとき、`offset == null || offset === 1` を満たす場合に outline を含める。これは「ページ先頭からの初回読み出し」を意味する **2 つの呼び出し方** (`offset` 省略と `offset: 1` 明示) を等価に扱うためで、agent が型推論で `offset: 1` を埋めても罠にならない (design review #2 で発見した境界トラップへの対処)。`includeOutline: true` / `false` が明示された場合はその値が優先
 - **`hasMore` の計算**: 仕様上の定義 `offset + 返却行数 < totalLines` (1-indexed `offset` と returned 行数のミックス) は、0-indexed の `endIdx` を経由した同等式 `const endIdx = (offset - 1) + sliced.length; hasMore = endIdx < totalLines;` で実装するのが直感的かつ off-by-one を起こしにくい。境界例: (a) `offset = totalLines, limit ≥ 1` → `sliced.length = 1`, `endIdx = totalLines`, `hasMore = false` (最終行を含み読了)、(b) `offset = totalLines - limit + 1` → ちょうど末尾まで読了して `hasMore = false`、(c) `offset > totalLines` → `sliced.length = 0`, `endIdx = offset - 1 ≥ totalLines`, `hasMore = false` (= Range out of bounds と整合)
 - **Range out of bounds**: `offset > totalLines` の場合 `content: ''`, `hasMore: false` を返す (`result: 'ok'`)。エラーとして扱わないことで、agent が `hasMore` のみで読了判断できる
 - **Per-request cache**: 同一 request 内で同じ `pageId` に対して `findByIdAndViewer` が複数回呼ばれる可能性があるが、キャッシュは導入しない (DB クエリ overhead は 5ms 程度で許容範囲、stateless 維持を優先)
-- **Type narrowing**: `requestContext.get('user')` の戻り値は `isIUserHasId` type guard で narrow する (本 PR 内で導入する保留タスクと整合)。本 spec はキャストではなく guard を使う方針
+- **Type narrowing**: `requestContext.get('user')` の戻り値は現状 `as TypedRequestContext` キャストで narrow する (既存 Tasks 3.1-3.3 と同じ pattern を維持)。`isIUserHasId` type guard 化は別タスク (本 PR の保留 task) で後続対応とし、Task 3.4 では既存キャスト pattern を変更しない
 - Validation: zod の `refine` で「id/path どちらか必須」を表現、execute 内で zod の validation 結果を直接戻り値に変換しない（Mastra が `outputSchema` 検証を行うため）
 - Risks: 既存 `findByIdAndViewer` が `includeAnyoneWithTheLink: true` を内部固定するため、GRANT_RESTRICTED ページが RAG コンテキストに混入する（research.md R-3）。本 spec では既存挙動を踏襲し integration test で挙動を明文化
 
@@ -894,7 +900,7 @@ export const growiAgent = new Agent({
     9c. `offset > totalLines` のとき `content: ''` / `hasMore: false` を返す (`result: 'ok'`、Range out of bounds = エラー化しない)
 10. `offset` 省略時 **および** `offset: 1` 明示時のいずれも、default では `outline` が response に含まれる。`offset > 1` のとき default では含まれない
 11. `includeOutline: true` を明示すると `offset > 1` でも outline が含まれる。`includeOutline: false` を明示すると `offset` が省略または `1` であっても outline は含まれない
-12. Outline 抽出: fenced code block (` ``` ` / `~~~`)、indented code block (4 スペース)、front matter (`---`)、HTML block 内の `#` 行は heading に **含まれない** (mdast パーサが AST レベルで自動判定)
+12. Outline 抽出: fenced code block (` ``` ` / `~~~`)、indented code block (4 スペース)、HTML block 内の `#` 行は heading に **含まれない** (mdast パーサが AST レベルで自動判定)。**front matter (`---`) は extension 無しのため許容範囲** — テストではコードブロック / HTML block のみを assertion 対象とする (design.md L702 「Front matter の扱い」参照)
 13. Outline 抽出: `heading` text は `mdast-util-to-string` でプレーン化される (例: `## **Bold** [Link](url)` → `heading: 'Bold Link'`)。Markdown 装飾は除去
 13b. Outline 抽出: **Setext heading** (`title\n====` / `title\n----`) も ATX heading と同様に抽出され、`line` はテキスト行 (下線の前の行) を指す
 14. CRLF 改行のページが正しく split され、`totalLines` / `content` が期待通り
