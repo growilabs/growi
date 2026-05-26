@@ -136,7 +136,7 @@ const MenuLabel = ({ menu }: { menu: string }) => {
     case 'cloud':
       return (
         <>
-          <span className="material-symbols-outlined me-1">share</span>
+          <span className="material-symbols-outlined me-1">tab_move</span>
           {t('cloud_setting_management.to_cloud_settings')}{' '}
         </>
       );
@@ -203,12 +203,29 @@ export const AdminNavigation = (): JSX.Element => {
     (isListGroupItems: boolean) => {
       return (
         <>
+          {growiCloudUri != null && growiAppIdForGrowiCloud != null && (
+            <>
+              <a
+                href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
+                className="list-group-item list-group-item-action border-0 round-corner"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MenuLabel menu="cloud" />
+              </a>
+              <hr />
+            </>
+          )}
+
           <MenuLink
             menu="home"
             isListGroupItems={isListGroupItems}
             isActive={pathname === '/admin'}
             isRoot
           />
+
+          <hr />
+
           <MenuLink
             menu="app"
             isListGroupItems={isListGroupItems}
@@ -230,35 +247,14 @@ export const AdminNavigation = (): JSX.Element => {
             isActive={isActiveMenu('/customize')}
           />
           <MenuLink
-            menu="importer"
+            menu="plugins"
             isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/importer')}
+            isActive={isActiveMenu('/plugins')}
           />
-          <MenuLink
-            menu="export"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/export')}
-          />
-          <MenuLink
-            menu="data-transfer"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/data-transfer')}
-          />
-          <MenuLink
-            menu="notification"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu(['/notification', '/global-notification'])}
-          />
-          <MenuLink
-            menu="slack-integration"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/slack-integration')}
-          />
-          <MenuLink
-            menu="slack-integration-legacy"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/slack-integration-legacy')}
-          />
+
+          <hr />
+
+          <small className="fw-bold ms-3 mt-4 text-secondary">ユーザー</small>
           <MenuLink
             menu="users"
             isListGroupItems={isListGroupItems}
@@ -274,26 +270,53 @@ export const AdminNavigation = (): JSX.Element => {
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/audit-log')}
           />
-          <MenuLink
-            menu="plugins"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/plugins')}
-          />
-          {/* Temporarily hiding */}
-          {/* <MenuLink menu="ai-integration" isListGroupItems={isListGroupItems} isActive={isActiveMenu('/aai-integration')} /> */}
+
+          <hr />
+
+          <small className="fw-bold ms-3 mt-4 text-secondary">データ</small>
           <MenuLink
             menu="search"
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/search')}
           />
-          {growiCloudUri != null && growiAppIdForGrowiCloud != null && (
-            <a
-              href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
-              className="list-group-item list-group-item-action border-0 round-corner"
-            >
-              <MenuLabel menu="cloud" />
-            </a>
-          )}
+          <MenuLink
+            menu="importer"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/importer')}
+          />
+          <MenuLink
+            menu="export"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/export')}
+          />
+          <MenuLink
+            menu="data-transfer"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/data-transfer')}
+          />
+
+          <hr />
+
+          <small className="fw-bold ms-3 mt-4 text-secondary">
+            外部通知連携
+          </small>
+          <MenuLink
+            menu="notification"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu(['/notification', '/global-notification'])}
+          />
+          <MenuLink
+            menu="slack-integration"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/slack-integration')}
+          />
+          <MenuLink
+            menu="slack-integration-legacy"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/slack-integration-legacy')}
+          />
+          {/* Temporarily hiding */}
+          {/* <MenuLink menu="ai-integration" isListGroupItems={isListGroupItems} isActive={isActiveMenu('/aai-integration')} /> */}
         </>
       );
     },
@@ -338,6 +361,7 @@ export const AdminNavigation = (): JSX.Element => {
             )}
             {isActiveMenu('/search') && <MenuLabel menu="search" />}
             {isActiveMenu('/audit-log') && <MenuLabel menu="audit-log" />}
+            {isActiveMenu('/vault') && <MenuLabel menu="vault" />}
             {isActiveMenu('/plugins') && <MenuLabel menu="plugins" />}
             {isActiveMenu('/data-transfer') && (
               <MenuLabel menu="data-transfer" />
