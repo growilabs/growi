@@ -180,6 +180,7 @@ const MenuLink = ({
 };
 
 export const AdminNavigation = (): JSX.Element => {
+  const { t } = useTranslation('admin');
   const pathname = window.location.pathname;
 
   const growiCloudUri = useGrowiCloudUri();
@@ -254,7 +255,9 @@ export const AdminNavigation = (): JSX.Element => {
 
           <hr />
 
-          <small className="fw-bold ms-3 mt-4 text-secondary">ユーザー</small>
+          <small className="fw-bold ms-3 mt-4 text-secondary">
+            {t('admin_navigation.section_users')}
+          </small>
           <MenuLink
             menu="users"
             isListGroupItems={isListGroupItems}
@@ -273,7 +276,9 @@ export const AdminNavigation = (): JSX.Element => {
 
           <hr />
 
-          <small className="fw-bold ms-3 mt-4 text-secondary">データ</small>
+          <small className="fw-bold ms-3 mt-4 text-secondary">
+            {t('admin_navigation.section_data')}
+          </small>
           <MenuLink
             menu="search"
             isListGroupItems={isListGroupItems}
@@ -298,7 +303,7 @@ export const AdminNavigation = (): JSX.Element => {
           <hr />
 
           <small className="fw-bold ms-3 mt-4 text-secondary">
-            外部通知連携
+            {t('admin_navigation.section_external_notifications')}
           </small>
           <MenuLink
             menu="notification"
@@ -320,7 +325,7 @@ export const AdminNavigation = (): JSX.Element => {
         </>
       );
     },
-    [growiAppIdForGrowiCloud, growiCloudUri, isActiveMenu, pathname],
+    [growiAppIdForGrowiCloud, growiCloudUri, isActiveMenu, pathname, t],
   );
 
   return (
