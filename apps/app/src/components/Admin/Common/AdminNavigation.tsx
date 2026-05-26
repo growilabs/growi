@@ -143,7 +143,7 @@ const MenuLabel = ({ menu }: { menu: string }) => {
     case 'cloud':
       return (
         <>
-          <span className="material-symbols-outlined me-1">share</span>
+          <span className="material-symbols-outlined me-1">tab_move</span>
           {t('cloud_setting_management.to_cloud_settings')}{' '}
         </>
       );
@@ -187,6 +187,7 @@ const MenuLink = ({
 };
 
 export const AdminNavigation = (): JSX.Element => {
+  const { t } = useTranslation('admin');
   const pathname = window.location.pathname;
 
   const growiCloudUri = useGrowiCloudUri();
@@ -210,12 +211,29 @@ export const AdminNavigation = (): JSX.Element => {
     (isListGroupItems: boolean) => {
       return (
         <>
+          {growiCloudUri != null && growiAppIdForGrowiCloud != null && (
+            <>
+              <a
+                href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
+                className="list-group-item list-group-item-action border-0 round-corner"
+                target="_blank"
+                rel="noopener noreferrer"
+              >
+                <MenuLabel menu="cloud" />
+              </a>
+              <hr />
+            </>
+          )}
+
           <MenuLink
             menu="home"
             isListGroupItems={isListGroupItems}
             isActive={pathname === '/admin'}
             isRoot
           />
+
+          <hr />
+
           <MenuLink
             menu="app"
             isListGroupItems={isListGroupItems}
@@ -237,35 +255,16 @@ export const AdminNavigation = (): JSX.Element => {
             isActive={isActiveMenu('/customize')}
           />
           <MenuLink
-            menu="importer"
+            menu="plugins"
             isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/importer')}
+            isActive={isActiveMenu('/plugins')}
           />
-          <MenuLink
-            menu="export"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/export')}
-          />
-          <MenuLink
-            menu="data-transfer"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/data-transfer')}
-          />
-          <MenuLink
-            menu="notification"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu(['/notification', '/global-notification'])}
-          />
-          <MenuLink
-            menu="slack-integration"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/slack-integration')}
-          />
-          <MenuLink
-            menu="slack-integration-legacy"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/slack-integration-legacy')}
-          />
+
+          <hr />
+
+          <small className="fw-bold ms-3 mt-4 text-secondary">
+            {t('admin_navigation.section_users')}
+          </small>
           <MenuLink
             menu="users"
             isListGroupItems={isListGroupItems}
@@ -281,35 +280,64 @@ export const AdminNavigation = (): JSX.Element => {
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/audit-log')}
           />
-          <MenuLink
-            menu="vault"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/vault')}
-          />
-          <MenuLink
-            menu="plugins"
-            isListGroupItems={isListGroupItems}
-            isActive={isActiveMenu('/plugins')}
-          />
-          {/* Temporarily hiding */}
-          {/* <MenuLink menu="ai-integration" isListGroupItems={isListGroupItems} isActive={isActiveMenu('/aai-integration')} /> */}
+
+          <hr />
+
+          <small className="fw-bold ms-3 mt-4 text-secondary">
+            {t('admin_navigation.section_data')}
+          </small>
           <MenuLink
             menu="search"
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/search')}
           />
-          {growiCloudUri != null && growiAppIdForGrowiCloud != null && (
-            <a
-              href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}
-              className="list-group-item list-group-item-action border-0 round-corner"
-            >
-              <MenuLabel menu="cloud" />
-            </a>
-          )}
+          <MenuLink
+            menu="importer"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/importer')}
+          />
+          <MenuLink
+            menu="export"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/export')}
+          />
+          <MenuLink
+            menu="data-transfer"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/data-transfer')}
+          />
+          <MenuLink
+            menu="vault"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/vault')}
+          />
+
+          <hr />
+
+          <small className="fw-bold ms-3 mt-4 text-secondary">
+            {t('admin_navigation.section_external_notifications')}
+          </small>
+          <MenuLink
+            menu="notification"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu(['/notification', '/global-notification'])}
+          />
+          <MenuLink
+            menu="slack-integration"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/slack-integration')}
+          />
+          <MenuLink
+            menu="slack-integration-legacy"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/slack-integration-legacy')}
+          />
+          {/* Temporarily hiding */}
+          {/* <MenuLink menu="ai-integration" isListGroupItems={isListGroupItems} isActive={isActiveMenu('/aai-integration')} /> */}
         </>
       );
     },
-    [growiAppIdForGrowiCloud, growiCloudUri, isActiveMenu, pathname],
+    [growiAppIdForGrowiCloud, growiCloudUri, isActiveMenu, pathname, t],
   );
 
   return (

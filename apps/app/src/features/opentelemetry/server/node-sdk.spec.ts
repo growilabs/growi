@@ -31,8 +31,6 @@ vi.mock('~/server/service/growi-info', () => ({
       deploymentType: 'standalone',
       additionalInfo: {
         attachmentType: 'local',
-        installedAt: new Date('2023-01-01T00:00:00.000Z'),
-        installedAtByOldestUser: new Date('2023-01-01T00:00:00.000Z'),
       },
     }),
   },

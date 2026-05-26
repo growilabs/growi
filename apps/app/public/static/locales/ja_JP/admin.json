@@ -385,6 +385,10 @@
     "page_bulk_export_explanation": "すべてのユーザーが、ページメニューから選択したページとその配下ページをまとめてエクスポートできる機能を有効化します。エクスポートされたデータは保存期間経過後に自動的に削除されます。",
     "page_bulk_export_warning": "ページ一括エクスポート機能は全ユーザーが利用可能です。システムリソースの維持のため、必要最小限の利用にご協力をお願いいたします。管理者の方は、この旨をユーザーの皆様にご周知ください。",
     "page_bulk_export_storage_period": "保存期間",
+    "page_bulk_export_reload_title": "ページの再読み込み",
+    "page_bulk_export_reload_prompt": "設定を反映するにはページの再読み込みが必要です。今すぐ再読み込みしますか？",
+    "page_bulk_export_reload_dismiss": "今はしない",
+    "reload_page": "再読み込み",
     "update": "更新",
     "mail_settings": "メールの設定",
     "mailer_is_not_set_up": "メール設定がセットアップされていません。",
@@ -1176,6 +1180,11 @@
     "ai_integration": "AI 連携",
     "disable_mode_explanation": "現在、AI 連携は無効になっています。有効にする場合は環境変数 <code>AI_ENABLED</code> の他、必要な環境変数を設定してください。<br><br>詳細は<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}ja/guide/features/ai-knowledge-assistant.html>ドキュメント</a>を参照してください。",
     "ai_search_management": "AI 検索管理"
+  },
+  "admin_navigation": {
+    "section_users": "ユーザー",
+    "section_data": "データ",
+    "section_external_notifications": "外部通知連携"
   },
   "growi-vault": {
     "admin-settings": {
