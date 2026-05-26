@@ -108,7 +108,7 @@ const MenuLabel = ({ menu }: { menu: string }) => {
     case 'vault':
       return (
         <>
-          <span className="material-symbols-outlined me-1">lock</span>
+          <span className="material-symbols-outlined me-1">database</span>
           GROWI Vault
         </>
       );
