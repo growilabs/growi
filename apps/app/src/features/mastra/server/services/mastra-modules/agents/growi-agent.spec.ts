@@ -160,6 +160,18 @@ describe('growiAgent', () => {
       expect(instructions).toMatch(/-term|-"phrase"|-prefix:|-tag:/);
     });
 
+    it('describes the outline + offset drill-down flow for getPageContent', async () => {
+      const instructions = await getInstructionsString();
+
+      // The drill-down guidance must mention:
+      //   - "outline" — directs the agent to use the heading list
+      //   - "offset" — the input parameter for jumping to a section
+      //   - "hasMore" — the pagination flag agents check to know if more lines remain
+      expect(instructions).toContain('outline');
+      expect(instructions).toContain('offset');
+      expect(instructions).toContain('hasMore');
+    });
+
     it('contains NO uncommented "Use the fileSearch tool" line (FB Issue 2)', async () => {
       const instructions = await getInstructionsString();
 

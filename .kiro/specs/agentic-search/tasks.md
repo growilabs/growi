@@ -176,7 +176,7 @@
   - _Boundary: growiAgent_
   - _Depends: 2.1, 3.1_
 
-- [ ] 4.2 (P) growiAgent instructions に outline → drill-down ガイダンスを追記 (PR #11204 FB)
+- [x] 4.2 (P) growiAgent instructions に outline → drill-down ガイダンスを追記 (PR #11204 FB)
   - 既存の `getPageContent` 利用ガイダンスを以下のフローを示す英文に書き換える: 「初回呼出 (`offset` 省略) で outline + 先頭 200 行を取得 → outline の `line` 番号を使って次回の `offset` を指定し、目的セクションに直接ジャンプ → 巨大ページ全文を 1 度に読まないこと」
   - 既存の `fullTextSearch` 利用ガイダンス・演算子説明・コメントアウトされた `fileSearch` 行は維持
   - 既存テスト (`growi-agent.spec.ts`) の instructions 文字列検査 assertion を新表現に合わせて更新 (例: `outline` / `offset` / `first call` 相当語の存在チェック)
