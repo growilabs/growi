@@ -55,6 +55,8 @@
 - `Page.findByIdAndViewer` / `Page.findByPathAndViewer`（grant 委譲経路）
 - `populateDataToShowRevision()` または `.populate('revision')`（revision 取得）
 - `Revision` モデル（`body` 参照のみ）
+- `mdast-util-from-markdown`（既存依存、`getPageContentTool` の outline 抽出用 — CommonMark 準拠の AST 構築）
+- `unist-util-visit` / `mdast-util-to-string`（既存 remark 系の transitive、AST visitor とテキスト抽出。明示 dep が必要なら追加）
 - `~/utils/logger`（pino 経由のロガー）
 
 依存方向は **HTTP Layer → Agent Layer → Tool Layer → Page / Revision Model → Mongoose**。tool 層から HTTP 層を逆参照しない。
@@ -248,12 +250,17 @@ flowchart TD
     CheckCtx -- Yes --> CheckInput{pageId or pagePath present?}
     CheckInput -- Neither --> MissingInput[return result missing_input]
     CheckInput -- pageId --> ById[Page.findByIdAndViewer]
-    CheckInput -- pagePath --> ByPath[Page.findByPathAndViewer]
+    CheckInput -- pagePath --> ByPath[Page.findByPathAndViewer useFindOne true]
     ById --> Result{page found?}
     ByPath --> Result
     Result -- null --> NotFound[return result not_found_or_forbidden]
-    Result -- found --> Populate[populate revision]
-    Populate --> Return[return result ok page body path updatedAt]
+    Result -- found --> Populate[populateDataToShowRevision]
+    Populate --> Split[split body by newline into allLines]
+    Split --> Outline{include outline?}
+    Outline -- yes default first call --> ExtractOutline[extract outline via mdast fromMarkdown visit heading]
+    Outline -- no --> Slice[slice offset-1 to offset-1+limit]
+    ExtractOutline --> Slice
+    Slice --> Return[return result ok page content totalLines offset limit hasMore outline]
 ```
 
 ### Tool Execute 分岐 — FullTextSearchTool (Process)
@@ -289,9 +296,13 @@ Key 決定:
 | 2.2 | `pagePath` で本文取得 | GetPageContentTool | execute(pagePath) | Tool Execute 分岐 |
 | 2.3 | 入力エラーで判別可能な戻り値 | GetPageContentTool | zod + discriminated union | Tool Execute 分岐 |
 | 2.4 | 存在しない/権限なしで共通戻り値 | GetPageContentTool | discriminated union `not_found_or_forbidden` | Tool Execute 分岐 |
-| 2.5 | Markdown を改変せず返す | GetPageContentTool | output `body` | — |
+| 2.5 | Markdown 行 slice を改変せず返す | GetPageContentTool | output content (sliced from body) | Tool Execute 分岐 |
 | 2.6 | 応答に `path` を含める | GetPageContentTool | output schema | — |
 | 2.7 | grant 自前実装禁止 | GetPageContentTool | `findByIdAndViewer` 委譲 | Tool Execute 分岐 |
+| 2.8 | offset/limit で部分取得 | GetPageContentTool | input.offset / input.limit, output content/limit | Tool Execute 分岐 |
+| 2.9 | 初回呼出で outline 自動付与 | GetPageContentTool | input.includeOutline (auto), output outline | Tool Execute 分岐 |
+| 2.10 | totalLines / hasMore / offset / limit 出力 | GetPageContentTool | output schema | Tool Execute 分岐 |
+| 2.11 | 範囲外 offset で result: 'ok' + 空 content | GetPageContentTool | Range out of bounds Implementation Note | Tool Execute 分岐 |
 | 3.1 | user 識別情報を requestContext へ付与 | Post-Message Handler | `RequestContext.set('user', req.user)` | 反復ループ Sequence (step 4) |
 | 3.2 | tool 内で呼び出しユーザー判別可 | GetPageContentTool | `RequestContext.get('user')` | Tool Execute 分岐 |
 | 3.3 | user 取得不可で本文返さない | GetPageContentTool | discriminated union `context_error` | Tool Execute 分岐 |
@@ -567,6 +578,8 @@ export const fullTextSearchTool: Tool<
 - 戻り値の discriminated union 整形
 - **grant 判定の自前実装をしない**（必ず既存メソッド経由）
 - **execute から例外を throw しない**（agent のループ継続を保証）
+- 入力 `offset` / `limit` を sanitize し (`offset: 1-indexed positive integer, default 1`、`limit: 1〜500, default 200`)、`revision.body` の split('\n') 配列に対して `slice(offset-1, offset-1+limit)` を適用する
+- 初回呼出 (`offset` 省略) 時、`outline` (ATX heading 一覧 + 行番号 + level) を併せて返す。`includeOutline` で明示的に上書き可
 
 **Dependencies**
 - Inbound: `growiAgent.tools` — agent から呼び出される（P0）
@@ -581,38 +594,56 @@ export const fullTextSearchTool: Tool<
 
 ```typescript
 import type { Tool } from '@mastra/core/tools';
-import type { RequestContext } from '@mastra/core/request-context';
 import { z } from 'zod';
 
-import type { MastraRequestContextShape } from '../types/request-context';
-
-// execute 内で参照する型: 共有型を使った typed view
-type TypedRequestContext = RequestContext<MastraRequestContextShape>;
+import { isIUserHasId, type MastraRequestContextShape } from '../types/request-context';
 
 const getPageContentInputSchema = z
   .object({
-    pageId: z
-      .string()
+    pageId: z.string().optional().describe('MongoDB ObjectId of the page'),
+    pagePath: z.string().optional().describe('Page path starting with "/"'),
+    offset: z
+      .number()
+      .int()
+      .positive()
       .optional()
-      .describe('MongoDB ObjectId of the page to fetch'),
-    pagePath: z
-      .string()
+      .describe(
+        '1-indexed start line. Omit on the first call to receive the page outline + first `limit` lines. Re-call with offset set to an outline entry\'s line number to jump to that section.',
+      ),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(500)
       .optional()
-      .describe('Page path starting with "/"'),
+      .default(200)
+      .describe('Maximum lines to return (default 200, max 500).'),
+    includeOutline: z
+      .boolean()
+      .optional()
+      .describe('Force-include / exclude the outline. By default it is auto-included only when offset is omitted.'),
   })
-  .refine(
-    (input) => input.pageId != null || input.pagePath != null,
-    {
-      message: 'Either pageId or pagePath must be provided',
-    },
-  );
+  .refine((i) => i.pageId != null || i.pagePath != null, {
+    message: 'Either pageId or pagePath must be provided',
+  });
+
+type OutlineEntry = {
+  line: number;     // 1-indexed
+  level: 1 | 2 | 3 | 4 | 5 | 6;
+  heading: string;  // raw text (Markdown chars preserved)
+};
 
 type GetPageContentSuccess = {
   result: 'ok';
   page: {
     path: string;
-    body: string;
     updatedAt: string;
+    content: string;          // the sliced lines, joined by '\n'
+    totalLines: number;
+    offset: number;           // sanitized echo
+    limit: number;            // sanitized echo
+    hasMore: boolean;         // (offset - 1) + sliced.length < totalLines
+    outline?: OutlineEntry[]; // included on first call (offset omitted) or when includeOutline=true
   };
 };
 
@@ -626,8 +657,21 @@ const getPageContentOutputSchema = z.discriminatedUnion('result', [
     result: z.literal('ok'),
     page: z.object({
       path: z.string(),
-      body: z.string(),
       updatedAt: z.string(),
+      content: z.string(),
+      totalLines: z.number().int().nonnegative(),
+      offset: z.number().int().positive(),
+      limit: z.number().int().positive(),
+      hasMore: z.boolean(),
+      outline: z
+        .array(
+          z.object({
+            line: z.number().int().positive(),
+            level: z.number().int().min(1).max(6),
+            heading: z.string(),
+          }),
+        )
+        .optional(),
     }),
   }),
   z.object({
@@ -643,11 +687,20 @@ export const getPageContentTool: Tool<
 ```
 
 - **Preconditions**: `requestContext` に `user: IUserHasId` がセットされている（`Post-Message Handler` の責務）
-- **Postconditions**: 戻り値は必ず `getPageContentOutputSchema` を満たす。例外は throw されない
-- **Invariants**: 閲覧権限のないページの内容は決して `result: 'ok'` の `page.body` に現れない（grant 委譲不変条件）
+- **Postconditions**: 戻り値は必ず `getPageContentOutputSchema` を満たす。例外は throw されない。返される `content` は **必ず `revision.body` の元のテキストの連続する 1 行以上の部分文字列を `\n` で結合したもの** (改変・要約・除去なし)
+- **Invariants**: 閲覧権限のないページの内容は決して `result: 'ok'` の `page.content` に現れない。`outline` 抽出はコードブロック内 (` ``` ` / `~~~` で囲まれた範囲) の `#` 始まり行を除外する
 
 **Implementation Notes**
-- Integration: `Page.findByIdAndViewer(id, user)` には `requestContext.get('user')` で取得した `IUserHasId` をそのまま渡す。**合成 user の組み立てや追加の `User.findById()` クエリは不要**。`req.user` は認証ミドルウェア (`loginRequiredStrictly`) 通過後に Mongoose document として既に解決済みのため、`_id` だけでなく `findByIdAndViewer` / `findAllUserGroupIdsRelatedToUser` が将来必要とする可能性のあるフィールド（`status` 等）も同時に伝搬される（参考: [generateGrantCondition (page.ts:1287)](apps/app/src/server/models/page.ts#L1287)、[findAllUserGroupIdsRelatedToUser (user-group-relation.ts:170)](apps/app/src/server/models/user-group-relation.ts#L170) は現状 `_id` のみ参照だが、本 spec ではその前提に依存せず安全側に倒す）
+- **Integration**: `Page.findByIdAndViewer(id, user)` には `requestContext.get('user')` で取得した `IUserHasId` をそのまま渡す。**合成 user の組み立てや追加の `User.findById()` クエリは不要**。`req.user` は認証ミドルウェア (`loginRequiredStrictly`) 通過後に Mongoose document として既に解決済み
+- **Slicing**: `findByIdAndViewer` の戻り値を `populateDataToShowRevision(page, '')` で revision populate した後、`String(page.revision.body)` を `/\r?\n/` で split し (CRLF 耐性)、`Array.slice(offset - 1, offset - 1 + limit)` で部分配列を取り、`join('\n')` で文字列に戻す。これは **tool 内のメモリ上でのみ** 行われ、DB クエリは追加しない (PR #11204 review FB を受けた方針)
+- **Outline 抽出**: `mdast-util-from-markdown` の `fromMarkdown(body)` で `revision.body` 全文を MDAST (Markdown AST) に変換し、`unist-util-visit` で `'heading'` ノードを訪問。各ノードから `node.position.start.line` (1-indexed)、`node.depth` (1-6)、`mdast-util-to-string(node)` でプレーンテキスト化した heading text を取り出して `OutlineEntry` に変換する。本実装は CommonMark 仕様準拠であり、以下を **AST レベルで自動的に正しく扱う**:
+  - ATX heading (`# heading`) と **Setext heading** (`heading\n====` / `heading\n----`) を両方とも `'heading'` ノードとして抽出 (Setext は `position.start.line` がテキスト行になるため、agent が `offset: line` で取得すると heading から始まる範囲が返る)
+  - Fenced code block (` ``` ` / `~~~`)、indented code block (4 スペースインデント)、front matter (`---` 区切り)、HTML block 内の `#` 行を heading として誤認しない
+  - heading text 内の Markdown 装飾 (`**bold**`、`*italic*`、`` `code` ``、`[link](url)` 等) を除去してプレーンテキストとして agent に渡す (`mdast-util-to-string` の挙動)。agent が heading 名を回答に引用するときに装飾の二重適用や URL 文字列混入を回避できる
+  - 本 PR の outline 抽出はパーサー利用の唯一の箇所だが、将来 section slice / `findInPage` 等の機能追加時に同じ MDAST を再利用できる投資余地として位置づける
+- **Range out of bounds**: `offset > totalLines` の場合 `content: ''`, `hasMore: false` を返す (`result: 'ok'`)。エラーとして扱わないことで、agent が `hasMore` のみで読了判断できる
+- **Per-request cache**: 同一 request 内で同じ `pageId` に対して `findByIdAndViewer` が複数回呼ばれる可能性があるが、キャッシュは導入しない (DB クエリ overhead は 5ms 程度で許容範囲、stateless 維持を優先)
+- **Type narrowing**: `requestContext.get('user')` の戻り値は `isIUserHasId` type guard で narrow する (本 PR 内で導入する保留タスクと整合)。本 spec はキャストではなく guard を使う方針
 - Validation: zod の `refine` で「id/path どちらか必須」を表現、execute 内で zod の validation 結果を直接戻り値に変換しない（Mastra が `outputSchema` 検証を行うため）
 - Risks: 既存 `findByIdAndViewer` が `includeAnyoneWithTheLink: true` を内部固定するため、GRANT_RESTRICTED ページが RAG コンテキストに混入する（research.md R-3）。本 spec では既存挙動を踏襲し integration test で挙動を明文化
 
@@ -762,7 +815,7 @@ export const growiAgent = new Agent({
 | Tool | `result` 値 | 補足 |
 |---|---|---|
 | `FullTextSearchTool` | `'ok'` / `'error'` / `'context_error'` | `'ok'` は `hits` + `totalCount`、その他は `reason: string` |
-| `GetPageContentTool` | `'ok'` / `'not_found_or_forbidden'` / `'missing_input'` / `'context_error'` | `'ok'` は `page { path, body, updatedAt }`、その他は `reason: string` |
+| `GetPageContentTool` | `'ok'` / `'not_found_or_forbidden'` / `'missing_input'` / `'context_error'` | `'ok'` は `page { path, updatedAt, content, totalLines, offset, limit, hasMore, outline? }`、その他は `reason: string` |
 
 ### Page / Revision（既存・参照のみ）
 
@@ -827,10 +880,19 @@ export const growiAgent = new Agent({
 1. zod 入力 schema が `pageId` も `pagePath` も無いケースを `missing_input` で弾く（2.3）
 2. `requestContext.get('user')` が `undefined` のとき `result: 'context_error'` を返す（3.3）
 3. `Page.findByIdAndViewer` をモックして `null` 返却時に `result: 'not_found_or_forbidden'` を返す（2.4）
-4. モックされた成功ケースで `result: 'ok'` + 正しい `path` / `body` / `updatedAt` を返し、`body` が改変されない（2.5, 2.6）
+4. モックされた成功ケースで `result: 'ok'` + 正しい `path` / `content` / `updatedAt` を返し、`content` が改変されない（2.5, 2.6）
 5. `pageId` 指定時に `findByIdAndViewer` が呼ばれ、`findByPathAndViewer` は呼ばれない（2.1）
 6. `pagePath` 指定時に `findByPathAndViewer` が呼ばれ、`findByIdAndViewer` は呼ばれない（2.2）
 7. tool 内で例外を throw しないこと（agent ループ継続保証のため、Mongoose mock を error reject にしても戻り値で返ること）
+8. `offset` 省略時 default `1`、`limit` 省略時 default `200` が input 解析後に適用される (output の echo で確認)
+9. `offset` が `totalLines` を超える場合、`result: 'ok'` + `content: ''` + `hasMore: false` を返す
+10. `offset: 1` (= 初回) のとき `outline` が response に含まれる。`offset > 1` のとき default では含まれない
+11. `includeOutline: true` を明示すると `offset > 1` でも outline が含まれる
+12. Outline 抽出: fenced code block (` ``` ` / `~~~`)、indented code block (4 スペース)、front matter (`---`)、HTML block 内の `#` 行は heading に **含まれない** (mdast パーサが AST レベルで自動判定)
+13. Outline 抽出: `heading` text は `mdast-util-to-string` でプレーン化される (例: `## **Bold** [Link](url)` → `heading: 'Bold Link'`)。Markdown 装飾は除去
+13b. Outline 抽出: **Setext heading** (`title\n====` / `title\n----`) も ATX heading と同様に抽出され、`line` はテキスト行 (下線の前の行) を指す
+14. CRLF 改行のページが正しく split され、`totalLines` / `content` が期待通り
+15. `limit > 500` は zod boundary で reject (Mastra validation error)、execute に到達しない
 
 ### Integration Tests (`full-text-search-tool.integ.ts`)
 
@@ -865,6 +927,8 @@ export const growiAgent = new Agent({
 4. GRANT_RESTRICTED（リンク共有）を path 指定で取得 → `result: 'ok'`（既存挙動明文化、research.md R-3）
 5. 存在しない pageId → `result: 'not_found_or_forbidden'`（権限なしと区別しないことの確認、2.4）
 6. `pagePath` 指定でも grant が反映されること（2.2, 2.7）
+7. 300+ 行の長文 seed page に対して `offset: 200, limit: 100` で正しく行 200-299 が `content` に返る
+8. 同 page に対して `offset` 省略時 `outline` に複数の heading entry が含まれる
 
 ### Agent Integration Tests（オプション、本 spec 必須ではない）
 
@@ -876,7 +940,7 @@ export const growiAgent = new Agent({
 
 ## Security Considerations
 
-- **grant 委譲の完全性（R2 #7）**: tool 内で MongoDB クエリを自前構築しない。すべての本文取得は `findByIdAndViewer` / `findByPathAndViewer` 経由に統一。レビューで既存メソッド以外の Page 読み取り経路を許可しない
+- **grant 委譲の完全性（R2 #7）**: tool 内で MongoDB クエリを自前構築しない。すべての本文取得は `findByIdAndViewer` / `findByPathAndViewer` 経由に統一。slice / outline 処理は `findByIdAndViewer` の戻り値 (`revision.body`) を tool execute 内のメモリ上でのみ加工する（DB クエリの追加なし）。レビューで既存メソッド以外の Page 読み取り経路を許可しない
 - **`requestContext` のリクエスト隔離（本 spec で対処）**: `user` は認証ミドルウェア通過後の `req.user: IUserHasId` をそのまま載せるため改竄の余地なし。`searchService` も route factory 引数 `crowi` から取得するため改竄不可。`@mastra/core` の `RequestContext` は内部的に単純な `Map` ラッパーで自動的なリクエスト隔離機構を持たないため、本 spec ではモジュールスコープ singleton を廃止しハンドラ関数内で `new RequestContext()` する。この変更により、並列リクエスト下で他リクエストの `user` / `searchService` が tool 内 `get(...)` で読み出される可能性を排除する
 - **`searchService` を `requestContext` に載せる根拠**: `crowi` 全体を渡すと tool 層から DB / メール / 設定など全機能にアクセス可能になりレイヤリングが崩れる。本 spec では「`fullTextSearchTool` が必要とする最小 surface = `searchService`」のみを `RequestContext` に格納し、tool 層の触れる API を意図的に狭める
 - **失敗戻り値の情報漏洩防止**: `not_found_or_forbidden` を共通化することで「存在するが閲覧不可」と「そもそも存在しない」を agent に区別させない。回答経由でユーザーに非公開ページの存在が漏れない

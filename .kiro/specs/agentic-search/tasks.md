@@ -107,6 +107,46 @@
   - _Boundary: GetPageContentTool_
   - _Depends: 3.1_
 
+- [ ] 3.4 ページ本文取得 tool を行ベース pagination + outline 抽出に拡張 (token 消費対策, PR #11204 FB)
+  - input zod schema に以下を追加: `offset: z.number().int().positive().optional()` (1-indexed 開始行)、`limit: z.number().int().positive().max(500).optional().default(200)`、`includeOutline: z.boolean().optional()`
+  - output schema の `page.body` を `page.content` にリネームし、`totalLines: number`、`offset: number` (sanitize 後 echo)、`limit: number` (同)、`hasMore: boolean`、`outline?: OutlineEntry[]` (optional) を追加。`OutlineEntry = { line: number; level: 1|2|3|4|5|6; heading: string }`
+  - execute 内で `String(page.revision.body).split(/\r?\n/)` → `Array.slice(offset-1, offset-1+limit)` → `join('\n')` で content 構築 (1-indexed → 0-indexed 変換)
+  - `outline` 抽出は `mdast-util-from-markdown` で MDAST を構築し、`unist-util-visit` で `'heading'` ノードを訪問、`mdast-util-to-string` で text を抽出。`node.position.start.line` / `node.depth` から `OutlineEntry` を組み立てる
+  - ATX heading (`# ...`) / Setext heading (`title\n===` / `title\n---`) の両方を抽出。コードブロック (fenced / indented)、front matter (`---`)、HTML block 内の `#` 行は AST レベルで自動的に除外される
+  - `outline` を含める条件: `includeOutline` が真、または (`includeOutline` 省略時に) `offset` が省略されている (= 初回呼出) とき。それ以外は省略
+  - `offset > totalLines` の場合は `result: 'ok'`、`content: ''`、`hasMore: false` を返す (エラー化しない)
+  - `Page.findByIdAndViewer` / `Page.findByPathAndViewer` / `populateDataToShowRevision` 呼出経路は不変
+  - 観察可能完了: 1000+ 行の long-body page に対する default 呼出で `content` の行数 ≤ 200 / `totalLines === 1000+` / `hasMore === true` / `outline` に複数 heading entry が含まれる。`offset: 500, limit: 100` 呼出で行 500-599 が `content` に返り、`outline === undefined` (auto なし)
+  - _Requirements: 2.5, 2.8, 2.9, 2.10, 2.11_
+  - _Boundary: GetPageContentTool_
+  - _Depends: 3.1_
+
+- [ ] 3.5 (P) ページ本文取得 tool の unit test を新仕様に追従 + ケース追加
+  - 既存 success path テスト (pageId / pagePath) の `body` 期待値を `content` + `totalLines` + `offset` + `limit` + `hasMore` に置換
+  - 新規ケース: `offset` 省略時 default `1` / `limit` 省略時 default `200` (output echo で確認)
+  - 新規ケース: `offset > totalLines` で `content: ''` + `hasMore: false` を返し `result: 'ok'`
+  - 新規ケース: `offset` 省略時に `outline` が response に含まれ、`offset > 1` のとき default では含まれない
+  - 新規ケース: `includeOutline: true` を明示すると `offset > 1` でも outline 含む。`includeOutline: false` で省略可能
+  - 新規ケース: code fence / indented code block / front matter / HTML block 内の `#` 行は outline に含まれない (mdast の AST 判定)
+  - 新規ケース: `heading` text は `mdast-util-to-string` でプレーン化される (`## **Bold** [Link](url)` → `'Bold Link'`)
+  - 新規ケース: Setext heading (`title\n====`) も level 1 として抽出され、`line` がテキスト行を指す
+  - 新規ケース: CRLF 改行のページが正しく split され、`totalLines` / `content` が期待通り
+  - 新規ケース: `limit > 500` は zod boundary で reject (Mastra validation envelope) され execute に到達しない
+  - 既存テスト (zod refine / context guard / 参照同一性 / 例外変換) は維持
+  - 観察可能完了: `pnpm vitest run get-page-content-tool.spec` が緑 (現状 9 件 + 新規 ~8 件)
+  - _Requirements: 2.5, 2.8, 2.9, 2.10, 2.11_
+  - _Boundary: GetPageContentTool_
+  - _Depends: 3.4_
+
+- [ ] 3.6 (P) ページ本文取得 tool の integration test を新仕様に追従 + ケース追加
+  - 既存 GRANT 系テストの `page.body` 期待値を `page.content` + `totalLines` + `offset` + `limit` + `hasMore` に置換 (短い seed body の場合は `hasMore: false`)
+  - 新規ケース: 長文 seed page (300+ 行、複数 heading を含む) に対して `offset: 200, limit: 100` で行 200-299 が `content` に返る
+  - 新規ケース: 同 page に対して `offset` 省略時 `outline` に複数の heading entry (`line` / `level` / `heading`) が含まれる
+  - 観察可能完了: `pnpm vitest run get-page-content-tool.integ` が緑 (現状 14 件 + 新規 ~2 件)
+  - _Requirements: 2.5, 2.8, 2.9, 2.10, 2.11_
+  - _Boundary: GetPageContentTool_
+  - _Depends: 3.4_
+
 - [ ] 4. Integration: agent 配線と instructions 調整
 - [x] 4.1 (P) growiAgent への新 tool 2 つの無条件登録と既存 fileSearchTool の暫定無効化
   - `import { fullTextSearchTool } from '../tools/full-text-search-tool'` と `import { getPageContentTool } from '../tools/get-page-content-tool'` を追加
@@ -121,6 +161,15 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3_
   - _Boundary: growiAgent_
   - _Depends: 2.1, 3.1_
+
+- [ ] 4.2 (P) growiAgent instructions に outline → drill-down ガイダンスを追記 (PR #11204 FB)
+  - 既存の `getPageContent` 利用ガイダンスを以下のフローを示す英文に書き換える: 「初回呼出 (`offset` 省略) で outline + 先頭 200 行を取得 → outline の `line` 番号を使って次回の `offset` を指定し、目的セクションに直接ジャンプ → 巨大ページ全文を 1 度に読まないこと」
+  - 既存の `fullTextSearch` 利用ガイダンス・演算子説明・コメントアウトされた `fileSearch` 行は維持
+  - 既存テスト (`growi-agent.spec.ts`) の instructions 文字列検査 assertion を新表現に合わせて更新 (例: `outline` / `offset` / `first call` 相当語の存在チェック)
+  - 観察可能完了: `growiAgent.instructions` 文字列に「outline」「offset」を含む drill-down ガイダンスが含まれ、コメントアウトされていない `Use the fileSearch tool` 行は依然として存在しない。`pnpm vitest run growi-agent.spec` が緑
+  - _Requirements: 2.9, 2.10_
+  - _Boundary: growiAgent_
+  - _Depends: 3.4_
 
 - [ ] 5. Validation: 静的チェックと任意の軽量統合テスト
 - [x] 5.1 lint / typecheck / build の green 確認
@@ -147,3 +196,4 @@
 
 - Task 2.3 (integ test) detected a real bug in Task 2.1's call to `searchService.searchKeyword`: passing `null` for `userGroups` caused `GRANT_USER_GROUP` pages to be invisible to members. `SearchService` does NOT auto-resolve groups (despite the original design.md line 504 claim). Fix: resolve `userGroups` inside `fullTextSearchTool.execute` via `UserGroupRelation.findAllUserGroupIdsRelatedToUser` + `ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser`, matching the canonical pattern at `apps/app/src/server/routes/search.ts:143-151`. `getPageContentTool` (Task 3.1) does NOT need this — `Page.findByIdAndViewer` takes only `user`.
 - Task 2.3 の integ test は post-impl で **dummy `SearchDelegator` パターン** に切り替えた (commit 9c7e2665f2)。理由は GitHub Actions の通常 test workflow に `elasticsearch` service が無く (定義されているのは `reusable-app-prod.yml` の production build/launch のみ)、リポジトリ初の real ES integ test を CI に導入するコストに見合わなかったため。既存の `apps/app/src/server/service/search/search-service.integ.ts` と同じ慣例 (`searchService.nqDelegators[DEFAULT]` を dummy で override) に揃えた。実 ES での grant 反映や query DSL 検証は本 spec の責任範囲外 (`SearchService` / `ElasticsearchDelegator` の責務)。詳細は `full-text-search-tool.integ.ts` ヘッダーと design.md の Testing Strategy 節を参照。
+- PR #11204 の review FB を受けて `getPageContentTool` を **行ベース pagination + outline** に拡張する方針を採用 (Plan A)。`Page.findByIdAndViewer` / `populateDataToShowRevision` 経路は不変、`String.split('\n')` → `Array.slice` および `mdast-util-from-markdown` ベースの outline 抽出 (ATX / Setext 両対応、コードブロック・front matter・HTML block 内 `#` の誤認なし) を **tool execute 内 (メモリ上)** で行う。仕様詳細 (1-indexed offset, default limit 200, max 500, outline auto-include on first call, heading text のプレーン化, no per-request cache 等) は本 spec の requirements.md AC 2.5/2.8-2.11 と design.md GetPageContentTool セクションを参照。実装は Task 3.4 / 3.5 / 3.6 / 4.2 として追加 (本 PR 内の follow-up commit で対応)。
