@@ -167,6 +167,17 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
               if (done) break;
               writer.write(value);
             }
+
+            const usage = await stream.usage;
+            logger.debug(
+              {
+                inputTokens: usage.inputTokens,
+                outputTokens: usage.outputTokens,
+                totalTokens: usage.totalTokens,
+                reasoningTokens: usage.reasoningTokens,
+              },
+              'Token usage',
+            );
           },
         });
 
