@@ -136,7 +136,7 @@ const FeatureStatusSection = ({
           </div>
           <div className="col-md-9">
             {vaultEnabled === true ? (
-              <span className="badge bg-success">
+              <span className="badge bg-info">
                 {t('growi-vault.admin-settings.feature-status.enabled')}
               </span>
             ) : vaultEnabled === false ? (
@@ -197,9 +197,9 @@ const BootstrapStatusSection = ({
                 <span
                   className={`badge ${
                     data?.bootstrapState === 'done'
-                      ? 'bg-success'
+                      ? 'bg-info'
                       : data?.bootstrapState === 'running'
-                        ? 'bg-primary'
+                        ? 'bg-success'
                         : data?.bootstrapState === 'failed'
                           ? 'bg-danger'
                           : 'bg-secondary'
@@ -413,7 +413,17 @@ const CompletionReliabilitySection = ({
                 )}
               </th>
               <td>
-                <span className="badge bg-secondary">
+                <span
+                  className={`badge ${
+                    bootstrap?.state === 'done'
+                      ? 'bg-info'
+                      : bootstrap?.state === 'running'
+                        ? 'bg-success'
+                        : bootstrap?.state === 'failed'
+                          ? 'bg-danger'
+                          : 'bg-secondary'
+                  }`}
+                >
                   {bootstrap?.state ?? '—'}
                 </span>
               </td>
