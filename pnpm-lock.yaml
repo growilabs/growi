@@ -597,6 +597,9 @@ importers:
       mdast-util-gfm-table:
         specifier: ^2.0.0
         version: 2.0.0
+      mdast-util-to-string:
+        specifier: ^4.0.0
+        version: 4.0.0
       mdast-util-wiki-link:
         specifier: ^0.1.2
         version: 0.1.2

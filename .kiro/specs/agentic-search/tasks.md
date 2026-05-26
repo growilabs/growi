@@ -107,7 +107,7 @@
   - _Boundary: GetPageContentTool_
   - _Depends: 3.1_
 
-- [ ] 3.4 ページ本文取得 tool を行ベース pagination + outline 抽出に拡張 (token 消費対策, PR #11204 FB)
+- [x] 3.4 ページ本文取得 tool を行ベース pagination + outline 抽出に拡張 (token 消費対策, PR #11204 FB)
   - **依存追加 (実装着手の前提)**: `apps/app/package.json` の `dependencies` に `mdast-util-to-string` (`^4.0.0`) を **1 パッケージのみ** 新規追加し、root から `pnpm install` を実行して lockfile を更新。Turbopack 観点では server-side runtime import なので `dependencies` (production) として追加すること (`devDependencies` は不可、`.claude/rules/package-dependencies.md` 参照)。`mdast-util-from-markdown` は既存 direct dep、`unist-util-visit` は既存 `xsv-to-table.ts` と同様に pnpm hoist 経由で resolve させる方針 (本 PR では明示追加しない)
   - input zod schema に以下を追加: `offset: z.number().int().positive().optional()` (1-indexed 開始行)、`limit: z.number().int().positive().max(500).optional().default(200)`、`includeOutline: z.boolean().optional()`
   - output schema の `page.body` を `page.content` にリネームし、`totalLines: number`、`offset: number` (sanitize 後 echo)、`limit: number` (同)、`hasMore: boolean`、`outline?: OutlineEntry[]` (optional) を追加。`OutlineEntry = { line: number; level: 1|2|3|4|5|6; heading: string }`

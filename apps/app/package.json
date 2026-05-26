@@ -211,6 +211,7 @@
     "md5": "^2.2.1",
     "mdast-util-from-markdown": "^2.0.1",
     "mdast-util-gfm-table": "^2.0.0",
+    "mdast-util-to-string": "^4.0.0",
     "mdast-util-wiki-link": "^0.1.2",
     "mermaid": "^11.10.0",
     "method-override": "^3.0.0",

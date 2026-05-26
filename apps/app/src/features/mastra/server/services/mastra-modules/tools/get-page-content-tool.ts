@@ -1,6 +1,10 @@
 import type { RequestContext } from '@mastra/core/request-context';
 import { createTool } from '@mastra/core/tools';
+import type { Heading } from 'mdast';
+import { fromMarkdown } from 'mdast-util-from-markdown';
+import { toString as mdastToString } from 'mdast-util-to-string';
 import mongoose from 'mongoose';
+import { visit } from 'unist-util-visit';
 import { z } from 'zod';
 
 import { populateDataToShowRevision } from '~/server/models/obsolete-page';
@@ -15,10 +19,56 @@ const logger = loggerFactory('growi:tools:get-page-content-tool');
 // ctx.get('user') is statically inferred.
 type TypedRequestContext = RequestContext<MastraRequestContextShape>;
 
+type OutlineEntry = {
+  line: number;
+  level: 1 | 2 | 3 | 4 | 5 | 6;
+  heading: string;
+};
+
+// Build an outline from the page body by parsing it into a MDAST tree and
+// visiting heading nodes. Handles ATX (`# h`) and Setext (`h\n===` / `h\n---`)
+// headings; code blocks / HTML blocks are correctly excluded by the parser.
+const extractOutline = (body: string): OutlineEntry[] => {
+  const tree = fromMarkdown(body);
+  const entries: OutlineEntry[] = [];
+  visit(tree, 'heading', (node: Heading) => {
+    // node.position is normally present for parsed input; guard defensively.
+    if (node.position == null) return;
+    entries.push({
+      line: node.position.start.line,
+      level: node.depth,
+      heading: mdastToString(node),
+    });
+  });
+  return entries;
+};
+
 const inputSchema = z
   .object({
     pageId: z.string().optional().describe('MongoDB ObjectId of the page'),
     pagePath: z.string().optional().describe('Page path starting with "/"'),
+    offset: z
+      .number()
+      .int()
+      .positive()
+      .optional()
+      .describe(
+        "1-indexed start line. Omit on the first call to receive the page outline + first `limit` lines. Re-call with offset set to an outline entry's line number to jump to that section.",
+      ),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(500)
+      .optional()
+      .default(200)
+      .describe('Maximum lines to return (default 200, max 500).'),
+    includeOutline: z
+      .boolean()
+      .optional()
+      .describe(
+        'Force-include / exclude the outline. By default it is auto-included on the first call (offset omitted or offset === 1).',
+      ),
   })
   .refine((input) => input.pageId != null || input.pagePath != null, {
     message: 'Either pageId or pagePath must be provided',
@@ -29,8 +79,21 @@ const outputSchema = z.discriminatedUnion('result', [
     result: z.literal('ok'),
     page: z.object({
       path: z.string(),
-      body: z.string(),
       updatedAt: z.string(),
+      content: z.string(),
+      totalLines: z.number().int().nonnegative(),
+      offset: z.number().int().positive(),
+      limit: z.number().int().positive(),
+      hasMore: z.boolean(),
+      outline: z
+        .array(
+          z.object({
+            line: z.number().int().positive(),
+            level: z.number().int().min(1).max(6),
+            heading: z.string(),
+          }),
+        )
+        .optional(),
     }),
   }),
   z.object({
@@ -46,12 +109,12 @@ const outputSchema = z.discriminatedUnion('result', [
 export const getPageContentTool = createTool({
   id: 'get-page-content-tool',
   description:
-    'Fetch the Markdown body of a wiki page by pageId or pagePath, respecting viewer permissions. Returns the body, page path, and last update time, or a structured failure result on missing input, missing context, or denied / missing page. Use this after full-text-search-tool to read the body of a promising hit.',
+    "Fetch the Markdown body of a wiki page by pageId or pagePath, respecting viewer permissions. On the first call (offset omitted) returns the page outline plus the first `limit` lines; re-call with `offset` set to an outline entry's `line` to drill into a section. Returns a structured failure on missing input, missing context, or denied / missing page. Use this after full-text-search-tool to read the body of a promising hit.",
   inputSchema,
   outputSchema,
 
   execute: async (inputData, context) => {
-    const { pageId, pagePath } = inputData;
+    const { pageId, pagePath, offset, limit, includeOutline } = inputData;
 
     const ctx = context.requestContext as TypedRequestContext;
     const user = ctx.get('user');
@@ -118,9 +181,45 @@ export const getPageContentTool = createTool({
       const path = page.path;
       const updatedAt = (page.updatedAt as Date).toISOString();
 
+      // Line-based pagination. Split on CRLF or LF to be newline-style agnostic.
+      // Slicing is done entirely in memory; no additional DB queries are issued
+      // (PR #11204 review FB: keep the Page.findByIdAndViewer path untouched).
+      const allLines = body.split(/\r?\n/);
+      const totalLines = allLines.length;
+
+      // zod's .positive() already rejects offset <= 0; Math.max stays as a
+      // defensive guard for clarity when offset is omitted.
+      const safeOffset = Math.max(1, offset ?? 1);
+      // zod's .default(200) should fire, but assign explicitly so safeLimit
+      // is statically narrowed to a number for the slice math below.
+      const safeLimit = limit ?? 200;
+
+      const startIdx = safeOffset - 1; // 0-indexed
+      const sliced = allLines.slice(startIdx, startIdx + safeLimit);
+      // 0-indexed exclusive end of the returned range. Equivalent to the
+      // 1-indexed spec form `offset + returnedLines < totalLines + 1`.
+      const endIdx = startIdx + sliced.length;
+      const hasMore = endIdx < totalLines;
+      const content = sliced.join('\n');
+
+      // Auto-include the outline only on the first call (offset omitted or 1).
+      // An explicit `includeOutline` value always wins so callers can opt in/out.
+      const shouldIncludeOutline =
+        includeOutline ?? (offset == null || offset === 1);
+      const outline = shouldIncludeOutline ? extractOutline(body) : undefined;
+
       return {
         result: 'ok' as const,
-        page: { path, body, updatedAt },
+        page: {
+          path,
+          updatedAt,
+          content,
+          totalLines,
+          offset: safeOffset,
+          limit: safeLimit,
+          hasMore,
+          ...(outline != null ? { outline } : {}),
+        },
       };
     } catch (err) {
       // Never throw out of execute: convert exceptions into a structured
