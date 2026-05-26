@@ -114,7 +114,8 @@
   - execute 内で `String(page.revision.body).split(/\r?\n/)` → `Array.slice(offset-1, offset-1+limit)` → `join('\n')` で content 構築 (1-indexed → 0-indexed 変換)
   - `outline` 抽出は `mdast-util-from-markdown` で MDAST を構築し、`unist-util-visit` で `'heading'` ノードを訪問、`mdast-util-to-string` で text を抽出。`node.position.start.line` / `node.depth` から `OutlineEntry` を組み立てる
   - ATX heading (`# ...`) / Setext heading (`title\n===` / `title\n---`) の両方を抽出。コードブロック (fenced / indented)、front matter (`---`)、HTML block 内の `#` 行は AST レベルで自動的に除外される
-  - `outline` を含める条件: `includeOutline` が真、または (`includeOutline` 省略時に) `offset` が省略されている (= 初回呼出) とき。それ以外は省略
+  - `outline` を含める条件: `includeOutline === true` のとき必ず含める / `includeOutline === false` のとき必ず省略 / `includeOutline` 省略時は `offset == null || offset === 1` (= ページ先頭からの初回読み出し) のとき含める。`offset: 1` 明示と省略を等価扱いすることで agent の型推論が罠にならないようにする (design review #2)
+  - `hasMore` の計算は 0-indexed 等価式 `const endIdx = (offset - 1) + sliced.length; hasMore = endIdx < totalLines;` で実装。境界 3 点 (`offset === totalLines` / `offset === totalLines - limit + 1` / `offset > totalLines`) を実装中に意識する (design review #3)
   - `offset > totalLines` の場合は `result: 'ok'`、`content: ''`、`hasMore: false` を返す (エラー化しない)
   - `Page.findByIdAndViewer` / `Page.findByPathAndViewer` / `populateDataToShowRevision` 呼出経路は不変
   - 観察可能完了: 1000+ 行の long-body page に対する default 呼出で `content` の行数 ≤ 200 / `totalLines === 1000+` / `hasMore === true` / `outline` に複数 heading entry が含まれる。`offset: 500, limit: 100` 呼出で行 500-599 が `content` に返り、`outline === undefined` (auto なし)
@@ -125,9 +126,9 @@
 - [ ] 3.5 (P) ページ本文取得 tool の unit test を新仕様に追従 + ケース追加
   - 既存 success path テスト (pageId / pagePath) の `body` 期待値を `content` + `totalLines` + `offset` + `limit` + `hasMore` に置換
   - 新規ケース: `offset` 省略時 default `1` / `limit` 省略時 default `200` (output echo で確認)
-  - 新規ケース: `offset > totalLines` で `content: ''` + `hasMore: false` を返し `result: 'ok'`
-  - 新規ケース: `offset` 省略時に `outline` が response に含まれ、`offset > 1` のとき default では含まれない
-  - 新規ケース: `includeOutline: true` を明示すると `offset > 1` でも outline 含む。`includeOutline: false` で省略可能
+  - 新規ケース (`hasMore` 境界 3 点): `offset === totalLines` で `sliced.length === 1` + `hasMore === false`、`offset === totalLines - limit + 1` で `hasMore === false` (ちょうど末尾まで読了)、`offset > totalLines` で `content: ''` + `hasMore: false` を返し `result: 'ok'`
+  - 新規ケース: `offset` 省略時 **および** `offset: 1` 明示時のいずれも default で `outline` が response に含まれる、`offset > 1` のとき default では含まれない (auto-include trap 回避の回帰防止)
+  - 新規ケース: `includeOutline: true` を明示すると `offset > 1` でも outline 含む。`includeOutline: false` を明示すると `offset` 省略 / `offset: 1` でも outline は省略される
   - 新規ケース: code fence / indented code block / front matter / HTML block 内の `#` 行は outline に含まれない (mdast の AST 判定)
   - 新規ケース: `heading` text は `mdast-util-to-string` でプレーン化される (`## **Bold** [Link](url)` → `'Bold Link'`)
   - 新規ケース: Setext heading (`title\n====`) も level 1 として抽出され、`line` がテキスト行を指す

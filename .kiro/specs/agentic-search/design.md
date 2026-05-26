@@ -699,6 +699,8 @@ export const getPageContentTool: Tool<
   - Fenced code block (` ``` ` / `~~~`)、indented code block (4 スペースインデント)、front matter (`---` 区切り)、HTML block 内の `#` 行を heading として誤認しない
   - heading text 内の Markdown 装飾 (`**bold**`、`*italic*`、`` `code` ``、`[link](url)` 等) を除去してプレーンテキストとして agent に渡す (`mdast-util-to-string` の挙動)。agent が heading 名を回答に引用するときに装飾の二重適用や URL 文字列混入を回避できる
   - 本 PR の outline 抽出はパーサー利用の唯一の箇所だが、将来 section slice / `findInPage` 等の機能追加時に同じ MDAST を再利用できる投資余地として位置づける
+- **Outline auto-include 条件**: `includeOutline` が `undefined` (= 省略) のとき、`offset == null || offset === 1` を満たす場合に outline を含める。これは「ページ先頭からの初回読み出し」を意味する **2 つの呼び出し方** (`offset` 省略と `offset: 1` 明示) を等価に扱うためで、agent が型推論で `offset: 1` を埋めても罠にならない (design review #2 で発見した境界トラップへの対処)。`includeOutline: true` / `false` が明示された場合はその値が優先
+- **`hasMore` の計算**: 仕様上の定義 `offset + 返却行数 < totalLines` (1-indexed `offset` と returned 行数のミックス) は、0-indexed の `endIdx` を経由した同等式 `const endIdx = (offset - 1) + sliced.length; hasMore = endIdx < totalLines;` で実装するのが直感的かつ off-by-one を起こしにくい。境界例: (a) `offset = totalLines, limit ≥ 1` → `sliced.length = 1`, `endIdx = totalLines`, `hasMore = false` (最終行を含み読了)、(b) `offset = totalLines - limit + 1` → ちょうど末尾まで読了して `hasMore = false`、(c) `offset > totalLines` → `sliced.length = 0`, `endIdx = offset - 1 ≥ totalLines`, `hasMore = false` (= Range out of bounds と整合)
 - **Range out of bounds**: `offset > totalLines` の場合 `content: ''`, `hasMore: false` を返す (`result: 'ok'`)。エラーとして扱わないことで、agent が `hasMore` のみで読了判断できる
 - **Per-request cache**: 同一 request 内で同じ `pageId` に対して `findByIdAndViewer` が複数回呼ばれる可能性があるが、キャッシュは導入しない (DB クエリ overhead は 5ms 程度で許容範囲、stateless 維持を優先)
 - **Type narrowing**: `requestContext.get('user')` の戻り値は `isIUserHasId` type guard で narrow する (本 PR 内で導入する保留タスクと整合)。本 spec はキャストではなく guard を使う方針
@@ -886,9 +888,12 @@ export const growiAgent = new Agent({
 6. `pagePath` 指定時に `findByPathAndViewer` が呼ばれ、`findByIdAndViewer` は呼ばれない（2.2）
 7. tool 内で例外を throw しないこと（agent ループ継続保証のため、Mongoose mock を error reject にしても戻り値で返ること）
 8. `offset` 省略時 default `1`、`limit` 省略時 default `200` が input 解析後に適用される (output の echo で確認)
-9. `offset` が `totalLines` を超える場合、`result: 'ok'` + `content: ''` + `hasMore: false` を返す
-10. `offset: 1` (= 初回) のとき `outline` が response に含まれる。`offset > 1` のとき default では含まれない
-11. `includeOutline: true` を明示すると `offset > 1` でも outline が含まれる
+9. `hasMore` の境界条件 (3 点):
+    9a. `offset === totalLines` のとき `sliced.length === 1` / `hasMore === false` (最終行を含み読了)
+    9b. `offset === totalLines - limit + 1` (ちょうど末尾までを 1 回で取得) のとき `hasMore === false`
+    9c. `offset > totalLines` のとき `content: ''` / `hasMore: false` を返す (`result: 'ok'`、Range out of bounds = エラー化しない)
+10. `offset` 省略時 **および** `offset: 1` 明示時のいずれも、default では `outline` が response に含まれる。`offset > 1` のとき default では含まれない
+11. `includeOutline: true` を明示すると `offset > 1` でも outline が含まれる。`includeOutline: false` を明示すると `offset` が省略または `1` であっても outline は含まれない
 12. Outline 抽出: fenced code block (` ``` ` / `~~~`)、indented code block (4 スペース)、front matter (`---`)、HTML block 内の `#` 行は heading に **含まれない** (mdast パーサが AST レベルで自動判定)
 13. Outline 抽出: `heading` text は `mdast-util-to-string` でプレーン化される (例: `## **Bold** [Link](url)` → `heading: 'Bold Link'`)。Markdown 装飾は除去
 13b. Outline 抽出: **Setext heading** (`title\n====` / `title\n----`) も ATX heading と同様に抽出され、`line` はテキスト行 (下線の前の行) を指す
