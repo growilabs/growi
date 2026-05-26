@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import type { StorageStatsResponse } from '@growi/core/dist/interfaces/vault';
 import { useTranslation } from 'next-i18next';
 import {
@@ -9,12 +9,14 @@ import {
   ModalBody,
   ModalFooter,
   ModalHeader,
+  Tooltip,
 } from 'reactstrap';
 import useSWR from 'swr';
 
 import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { ReconcileLogEntry } from '~/features/growi-vault/server/services/reconcile';
+import { useSiteUrl } from '~/states/global';
 
 import { ReconcileHistoryTable } from '../components/ReconcileHistoryTable';
 import { ReconcileTriggerModal } from '../components/ReconcileTriggerModal';
@@ -113,6 +115,9 @@ const formatDate = (iso: string | null | undefined): string => {
  * VAULT_ENABLED is an env-only flag fixed at deploy time — the admin UI never
  * mutates it. This section just surfaces the resolved value so operators can
  * confirm the deployed configuration.
+ *
+ * Also displays the `git clone <siteUrl>/vault.git` command (clipboard-copyable)
+ * directly under the feature status row so admins can quickly share the URL.
  */
 const FeatureStatusSection = ({
   vaultEnabled,
@@ -120,6 +125,44 @@ const FeatureStatusSection = ({
   vaultEnabled: boolean | undefined;
 }): JSX.Element => {
   const { t } = useTranslation('admin');
+  const siteUrl = useSiteUrl();
+
+  // Strip a trailing slash so we never produce `https://host//vault.git`.
+  const cloneCommand = useMemo(() => {
+    if (siteUrl == null || siteUrl === '') return null;
+    return `git clone ${siteUrl.replace(/\/$/, '')}/vault.git`;
+  }, [siteUrl]);
+
+  // Reactstrap Tooltip needs a stable target. A ref bypasses
+  // querySelectorAll (see apps/app/.claude/rules/ui-pitfalls.md — useId() output
+  // is not a valid CSS selector).
+  const copyButtonRef = useRef<HTMLButtonElement>(null);
+  const [isCopiedTooltipOpen, setIsCopiedTooltipOpen] = useState(false);
+  const copiedTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Clear any pending dismiss timer on unmount to avoid a setState on an
+  // unmounted component if the admin navigates away mid-copy.
+  useEffect(
+    () => () => {
+      if (copiedTimerRef.current != null) clearTimeout(copiedTimerRef.current);
+    },
+    [],
+  );
+
+  const handleCopy = useCallback(async () => {
+    if (cloneCommand == null) return;
+    try {
+      await navigator.clipboard.writeText(cloneCommand);
+      setIsCopiedTooltipOpen(true);
+      if (copiedTimerRef.current != null) clearTimeout(copiedTimerRef.current);
+      copiedTimerRef.current = setTimeout(
+        () => setIsCopiedTooltipOpen(false),
+        1500,
+      );
+    } catch (_err) {
+      toastError(t('growi-vault.admin-settings.clone-url.copy-failed'));
+    }
+  }, [cloneCommand, t]);
 
   return (
     <div className="row mb-5">
@@ -155,6 +198,63 @@ const FeatureStatusSection = ({
                 ),
               }}
             />
+          </div>
+        </div>
+
+        <div className="row form-group">
+          <div className="col-md-3 text-md-end">
+            <span className="col-form-label">
+              {t('growi-vault.admin-settings.clone-url.label')}
+            </span>
+          </div>
+          <div className="col-md-9">
+            {cloneCommand == null ? (
+              <p
+                className="form-text text-muted mb-0"
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+                dangerouslySetInnerHTML={{
+                  __html: t(
+                    'growi-vault.admin-settings.clone-url.no-site-url_html',
+                  ),
+                }}
+              />
+            ) : (
+              <>
+                <div className="input-group">
+                  <input
+                    type="text"
+                    className="form-control font-monospace"
+                    value={cloneCommand}
+                    readOnly
+                    onFocus={(e) => e.currentTarget.select()}
+                    aria-label={t('growi-vault.admin-settings.clone-url.label')}
+                  />
+                  <Button
+                    innerRef={copyButtonRef}
+                    color="secondary"
+                    outline
+                    onClick={handleCopy}
+                    aria-label={t(
+                      'growi-vault.admin-settings.clone-url.copy-button',
+                    )}
+                  >
+                    <span className="material-symbols-outlined align-middle">
+                      content_copy
+                    </span>
+                  </Button>
+                  <Tooltip
+                    isOpen={isCopiedTooltipOpen}
+                    target={copyButtonRef}
+                    placement="top"
+                  >
+                    {t('growi-vault.admin-settings.clone-url.copied-tooltip')}
+                  </Tooltip>
+                </div>
+                <p className="form-text text-muted mt-2 mb-0">
+                  {t('growi-vault.admin-settings.clone-url.description')}
+                </p>
+              </>
+            )}
           </div>
         </div>
       </div>
@@ -600,7 +700,7 @@ const ReconcileSection = (): JSX.Element => {
           <div className="col-md-9">
             <Button color="primary" onClick={() => setIsModalOpen(true)}>
               <span className="material-symbols-outlined me-1 align-middle">
-                sync
+                construction
               </span>
               {t('growi-vault.admin-settings.reconcile-admin.trigger-button')}
             </Button>
@@ -842,7 +942,7 @@ export const VaultAdminSettings = (): JSX.Element => {
                 onClick={() => setIsWipeModalOpen(true)}
               >
                 <span className="material-symbols-outlined me-1 align-middle">
-                  delete_forever
+                  cycle
                 </span>
                 {t('growi-vault.admin-settings.kill-switch.button')}
               </Button>

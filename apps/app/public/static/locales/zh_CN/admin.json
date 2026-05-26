@@ -1199,6 +1199,14 @@
         "disabled": "已禁用",
         "description_html": "由 <code>VAULT_ENABLED</code> 环境变量控制。要切换启用/禁用，请更改该环境变量并重启服务器。"
       },
+      "clone-url": {
+        "label": "克隆 URL",
+        "description": "在终端中执行此命令可克隆 Vault 仓库。",
+        "copy-button": "复制命令",
+        "copied-tooltip": "已复制！",
+        "copy-failed": "克隆命令复制失败。",
+        "no-site-url_html": "站点 URL 未配置，无法显示命令。请在 <a href=\"/admin/app\">应用设置</a> 中进行配置。"
+      },
       "kill-switch": {
         "heading": "重建",
         "button": "重建 Vault",

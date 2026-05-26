@@ -1190,6 +1190,14 @@
         "disabled": "Disabled",
         "description_html": "Controlled by the <code>VAULT_ENABLED</code> environment variable. To toggle enable/disable, change the env var and restart the server."
       },
+      "clone-url": {
+        "label": "Clone URL",
+        "description": "Run this command in your terminal to clone the Vault repository.",
+        "copy-button": "Copy command",
+        "copied-tooltip": "Copied!",
+        "copy-failed": "Failed to copy the clone command.",
+        "no-site-url_html": "Site URL is not configured. Set it in <a href=\"/admin/app\">App Settings</a> to display the clone command."
+      },
       "kill-switch": {
         "heading": "Rebuild",
         "button": "Rebuild Vault",

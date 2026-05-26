@@ -1199,6 +1199,14 @@
         "disabled": "無効",
         "description_html": "<code>VAULT_ENABLED</code> 環境変数で制御されています。有効/無効を切り替えるには、環境変数を変更しサーバーを再起動してください。"
       },
+      "clone-url": {
+        "label": "クローン URL",
+        "description": "このコマンドをターミナルで実行すると、Vault リポジトリをクローンできます。",
+        "copy-button": "コマンドをコピー",
+        "copied-tooltip": "コピーしました！",
+        "copy-failed": "クローンコマンドのコピーに失敗しました。",
+        "no-site-url_html": "サイト URL が未設定のため、コマンドを表示できません。<a href=\"/admin/app\">アプリ設定</a> から設定してください。"
+      },
       "kill-switch": {
         "heading": "初期化",
         "button": "Vault を初期化",

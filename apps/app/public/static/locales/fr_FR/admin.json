@@ -1189,6 +1189,14 @@
         "disabled": "Désactivé",
         "description_html": "Contrôlé par la variable d'environnement <code>VAULT_ENABLED</code>. Pour basculer activé/désactivé, modifiez la variable d'environnement et redémarrez le serveur."
       },
+      "clone-url": {
+        "label": "URL de clone",
+        "description": "Exécutez cette commande dans votre terminal pour cloner le dépôt du Vault.",
+        "copy-button": "Copier la commande",
+        "copied-tooltip": "Copié !",
+        "copy-failed": "Échec de la copie de la commande de clone.",
+        "no-site-url_html": "L'URL du site n'est pas configurée, la commande ne peut pas être affichée. Définissez-la dans les <a href=\"/admin/app\">Paramètres de l'application</a>."
+      },
       "kill-switch": {
         "heading": "Reconstruction",
         "button": "Reconstruire le Vault",

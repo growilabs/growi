@@ -9,8 +9,14 @@
  *   (e) Feature status — read-only display, no toggle UI
  *   (f) Rebuild Vault — kill switch button with confirmation modal
  */
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import {
+  cleanup,
+  fireEvent,
+  render,
+  screen,
+  waitFor,
+} from '@testing-library/react';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 // ── Hoisted mocks ────────────────────────────────────────────────────────────
 
@@ -28,6 +34,8 @@ const mocks = vi.hoisted(() => {
   // before the network round-trip completes).
   const statusMutate = vi.fn();
   const resilienceMutate = vi.fn();
+  // Mutable siteUrl for tests covering the git-clone command display.
+  const globalState: { siteUrl: string | undefined } = { siteUrl: undefined };
 
   return {
     apiv3Get,
@@ -37,6 +45,7 @@ const mocks = vi.hoisted(() => {
     swrData,
     statusMutate,
     resilienceMutate,
+    globalState,
   };
 });
 
@@ -48,6 +57,10 @@ vi.mock('~/client/util/apiv3-client', () => ({
 vi.mock('~/client/util/toastr', () => ({
   toastError: mocks.toastError,
   toastSuccess: mocks.toastSuccess,
+}));
+
+vi.mock('~/states/global', () => ({
+  useSiteUrl: () => mocks.globalState.siteUrl,
 }));
 
 // Mock i18n so component renders en_US translations during tests.
@@ -181,11 +194,22 @@ function setup(
   resilience: ResilienceStatusShape,
   vaultState = 'done',
   vaultEnabled = true,
+  // `null` is a sentinel for "no siteUrl configured". The default
+  // parameter cannot be plain `undefined` because JS applies the default
+  // both when the argument is omitted and when it is explicitly undefined.
+  siteUrl: string | null = 'https://example.com',
 ): ReturnType<typeof render> {
   mocks.swrData.status = makeVaultStatus(vaultState, vaultEnabled);
   mocks.swrData.resilience = resilience;
+  mocks.globalState.siteUrl = siteUrl ?? undefined;
   return render(<VaultAdminSettings />);
 }
+
+// RTL does not auto-cleanup under our vitest workspace config, so renders
+// from prior tests would otherwise leak into the document body.
+afterEach(() => {
+  cleanup();
+});
 
 // ── Test suites ──────────────────────────────────────────────────────────────
 
@@ -524,6 +548,70 @@ describe('VaultAdminSettings — Rebuild Vault (kill switch)', () => {
 // Without this, the user sees no change until the next 5s polling tick (or
 // the response-triggered revalidate), and may double-click.
 // ---------------------------------------------------------------------------
+
+// -- Clone URL display -------------------------------------------------------
+//
+// Right below the Feature Status section, the admin UI displays a
+// clipboard-copyable `git clone <siteUrl>/vault.git` command so admins can
+// easily share the clone URL with end users.
+// ---------------------------------------------------------------------------
+
+describe('VaultAdminSettings — Vault clone URL', () => {
+  it('(g) renders the git clone command built from siteUrl', () => {
+    setup(makeResilienceStatus(), 'done', true, 'https://example.com');
+    expect(
+      screen.getByDisplayValue('git clone https://example.com/vault.git'),
+    ).toBeTruthy();
+  });
+
+  it('(g) strips a trailing slash from siteUrl when building the command', () => {
+    setup(makeResilienceStatus(), 'done', true, 'https://example.com/');
+    expect(
+      screen.getByDisplayValue('git clone https://example.com/vault.git'),
+    ).toBeTruthy();
+  });
+
+  it('(g) does not render the clone command input when siteUrl is undefined', () => {
+    setup(makeResilienceStatus(), 'done', true, null);
+    expect(screen.queryByDisplayValue(/git clone/)).toBeNull();
+  });
+
+  it('(g) does not render the clone command input when siteUrl is empty', () => {
+    setup(makeResilienceStatus(), 'done', true, '');
+    expect(screen.queryByDisplayValue(/git clone/)).toBeNull();
+  });
+
+  it('(g) copies the clone command to clipboard on Copy click', async () => {
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(global.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    setup(makeResilienceStatus(), 'done', true, 'https://example.com');
+    fireEvent.click(screen.getByRole('button', { name: /copy command/i }));
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalledWith(
+        'git clone https://example.com/vault.git',
+      );
+    });
+  });
+
+  it('(g) does NOT show a success toast (uses an inline tooltip instead)', async () => {
+    mocks.toastSuccess.mockClear();
+    const writeText = vi.fn().mockResolvedValue(undefined);
+    Object.defineProperty(global.navigator, 'clipboard', {
+      configurable: true,
+      value: { writeText },
+    });
+    setup(makeResilienceStatus(), 'done', true, 'https://example.com');
+    fireEvent.click(screen.getByRole('button', { name: /copy command/i }));
+    // Wait for the clipboard write to settle before asserting absence.
+    await waitFor(() => {
+      expect(writeText).toHaveBeenCalled();
+    });
+    expect(mocks.toastSuccess).not.toHaveBeenCalled();
+  });
+});
 
 describe('VaultAdminSettings — optimistic UI', () => {
   it('writes optimistic bootstrapState=running to /vault/status when Wipe is confirmed', async () => {
