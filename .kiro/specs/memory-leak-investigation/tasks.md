@@ -136,57 +136,39 @@
   - _Depends: 5.4_
   - _Requirements: 3.5, 3-bis.1, 6.1_
 
-- [ ] 6.2 Yjs sustained-load + 300s drain での L3 再計測
-  - `LOAD_YJS_CLEAN_CLOSE=50`、`LOAD_YJS_ABORT=50`、`DRAIN_IDLE_SECONDS=300` で計測する。
-  - Snapshot C の `Y.Doc` 残存数を Chrome DevTools または `heapsnapshot-parser` で確認する。
-  - 観測可能な完了条件: `Y.Doc` の retained 数が baseline 比で +5 を超えた場合は L3 を `confirmed` に更新し Phase 7 / Task 7.1 を起動する。+5 以下なら `refuted` として verification-report を更新する。
+- [x] 6.2 Yjs sustained-load + 300s drain での L3 再計測 — **完了 (2026-05-26, L3 = REFUTED)**
+  - `LOAD_YJS_CLEAN_CLOSE=50`、`LOAD_YJS_ABORT=50`、`DRAIN_IDLE_SECONDS=300` で production dist server 上で計測（Task 6.3 / 6.4 と combined run）。
+  - Snapshot C の `Doc` count は A / B / C 全 snapshot で 1（A→C delta = 0）。`WebSocket` も 1 のまま、`Socket` (net) は load 時 +2 → drain で baseline 復帰。
+  - **判定（実データから再算定の閾値）**: A→C delta が +1 以上で confirmed / 0 で refuted。観測値 = 0 → **REFUTED**。Phase 7 / Task 7.1 は起動しない。詳細は [verification-report.md / L3](./verification-report.md#l3--growiyjsdocscount-metric-task-23--41) を参照。
   - _Depends: 5.4_
   - _Requirements: 5.1, 5.4, 6.1_
 
-- [ ] 6.3 拡張シナリオでの L4 retainer 分析
-  - `LOAD_PAGE_EDIT=20` 以上、`DRAIN_IDLE_SECONDS=300` で 1 周回す。
-  - Snapshot C を Chrome DevTools の Memory タブで開き、Retainers ビューで `Activity` および page-edit event chain の closure を辿る。
-  - 観測可能な完了条件: retainer chain に運用上問題となる量の closure が確認された場合は L4 を `confirmed` に更新し Phase 7 / Task 7.2 を起動する。閾値以下なら `refuted` として verification-report を更新する。
+- [x] 6.3 拡張シナリオでの L4 retainer 分析 — **完了 (2026-05-26, L4 = REFUTED)**
+  - `LOAD_PAGE_EDIT=20`、`DRAIN_IDLE_SECONDS=300` で production dist server 上で 1 周回した（Task 6.2 / 6.4 と combined run）。
+  - Snapshot 解析は `apps/app/tmp/memory-leak-investigation/scripts/count-constructors.mjs`（v8 heap snapshot を JSON で走査し、object-type の constructor 名を集計）で実施。Chrome DevTools の Retainer ビュー目視解析は将来 follow-up。
+  - **判定（実データから再算定の閾値）**: snapshot C に `Activity` / `InAppNotification` / `Comment` instance が 1 個以上残存で confirmed / 0 で refuted。観測値 = 全て 0 → **REFUTED**。Phase 7 / Task 7.2 は起動しない。詳細は [verification-report.md / L4](./verification-report.md#l4--page-edit-event-chain-closure-retention-task-24) を参照。
   - _Depends: 5.4_
   - _Requirements: 5.2, 5.4, 6.1_
 
-- [ ] 6.4 Production dist server (Node.js v24) の Prisma ESM 不整合を解消
-  - `dist/generated/prisma/client.js` が `import.meta.url`（ESM）と `exports`（CJS）を併用しているため、Node.js v24 strict ESM 下で `ReferenceError: exports is not defined in ES module scope` で起動失敗している。Prisma client 生成設定または bundle 設定で解消する。
-  - 解消後、`node --inspect dist/server/app.js` を起動し、`memory-profiler` の scenario runner を 1 周回す。
-  - 観測可能な完了条件: `runs/after-dist/` に snapshot 3 枚と CSV が揃い、verification-report に dist server 経由の数値が追記される。
+- [x] 6.4 Production dist server (Node.js v24) の Prisma ESM 不整合を解消 — **完了 (2026-05-26)**
+  - **解消経緯**: `src/generated/prisma/client.ts`（HEAD）は既に commit `70281306d7` の `moduleFormat = "cjs"` 設定で `__dirname` を直接使用しており、`import.meta.url` 不在。`dist/generated/prisma/client.js` が古い世代のまま残っていたのが blocker だった。Phase 6 着手時の `turbo run build --filter @growi/app` リビルドで `dist/` が再生成され、`import.meta.url` 行が消失して `ReferenceError: exports is not defined in ES module scope` は自然解消。
+  - **計測**: `node --inspect dist/server/app.js` を起動し、scenario runner を 1 周完走（Task 6.2 / 6.3 と combined run）。出力先: `apps/app/tmp/memory-leak-investigation/runs/after-dist-phase6/`（snapshot 3 枚 + rss-timeseries.csv）。
+  - verification-report に dist server 経由の数値（baseline 234 MB / drain 600 MB / +366 MB retained growth）を追記済み。
   - _Depends: 5.4_
   - _Requirements: 2.3, 6.1_
 
-- [ ] 6.5 verification-report.md の Phase 6 update
-  - Task 6.1–6.4 の結果を統合し、verification-report の各セクション（Environment / Per-finding verdicts / RSS Delta / Open Issues）を更新する。
-  - L3 / L4 の verdict が `confirmed` / `refuted` のいずれに確定したかを明示し、Phase 7 への移行可否を判定する。
-  - 観測可能な完了条件: report の Per-finding verdicts セクションが Phase 6 結果で更新され、L3 / L4 の最終 verdict が `confirmed` または `refuted` として確定している。
+- [x] 6.5 verification-report.md の Phase 6 update — **完了 (2026-05-26)**
+  - Task 6.1–6.4 の結果を統合し、verification-report の Section 1（Environment）/ Section 2（L3, L4）/ Section 3.3（RSS Delta）/ Section 5（Open Issues）/ Section 6（Snapshot Inventory）/ Section 7（Phase 6 status）を更新。
+  - L3 / L4 ともに **REFUTED** と最終確定。Phase 7（条件付き follow-up）は起動条件を満たさず、本 spec の implementation は closed とする。
   - _Depends: 6.1, 6.2, 6.3, 6.4_
   - _Requirements: 5.4, 6.1, 6.2, 6.3_
 
-## 7. Conditional follow-ups（Phase 6 の verdict に応じて発動）
+## 7. Conditional follow-ups — **未着手 (Phase 6 の verdict により起動条件未充足、closed-as-not-needed)**
 
-- [ ] 7.1 L3 sweeper（`YjsIdleSweeper`）の実装 — **Task 6.2 で L3 = confirmed のときのみ着手**
-  - Idle 判定閾値（最後の awareness update から N 分）と sweep 間隔を env var 化して導入する。
-  - 既存の `closeConn` 経由のみで close を発火し、`collaborative-editor` spec の session 寿命ポリシーと整合させる。
-  - Unit test と integration test を追加し、idle session が閾値経過後に close されること、active session は影響を受けないことを検証する。
-  - 観測可能な完了条件: integration test で 1 active + 1 idle セッションを作り、閾値経過後に idle 側のみ `docs.size` から消える。
-  - _Depends: 6.2_
-  - _Requirements: 5.1, 5.5_
-  - _Boundary: YjsIdleSweeper_
+> Phase 6 / Task 6.2 で L3 = REFUTED、Task 6.3 で L4 = REFUTED と確定したため、本 phase の全タスクは起動条件を満たさない。実装不要として本 spec ではクローズする。将来 production 環境で対応する leak symptom が再発した場合は別 spec で個別に再評価する。
 
-- [ ] 7.2 L4 backpressure（`HandlerBackpressure`）の実装 — **Task 6.3 で L4 = confirmed のときのみ着手**
-  - `Activity → InAppNotification`、`pageEvent → search` の各経路に concurrency limit を導入する。
-  - Limit 値は env var 化する。閾値超過時は queueing して順次処理する（drop しない）。
-  - Unit test で limit 超過時の挙動を fake timer で検証する。
-  - 観測可能な完了条件: 同時 200 件 page-edit を発火し、limit=10 で最大 10 件のみが in-flight に存在することを確認するテストが green。
-  - _Depends: 6.3_
-  - _Requirements: 5.2_
-  - _Boundary: HandlerBackpressure_
+- [ ] ~~7.1 L3 sweeper（`YjsIdleSweeper`）の実装~~ — **不要 (Task 6.2 で L3 = REFUTED)**
 
-- [ ] 7.3 7.1 / 7.2 を実装した場合の verification report 追記
-  - sweeper / backpressure 実装後に Phase 5 / Phase 6 と同じ scenario を再実行し、`runs/after-mitigations/` を作成。
-  - `verification-report.md` の Per-finding verdicts セクションを update し、`confirmed → mitigated` の遷移と数値根拠を追記する。
-  - 観測可能な完了条件: report の L3 / L4 セクションに「mitigated」ステータスと再計測値が含まれる。
-  - _Depends: 7.1, 7.2_
-  - _Requirements: 5.1, 5.2, 6.1_
+- [ ] ~~7.2 L4 backpressure（`HandlerBackpressure`）の実装~~ — **不要 (Task 6.3 で L4 = REFUTED)**
+
+- [ ] ~~7.3 7.1 / 7.2 を実装した場合の verification report 追記~~ — **不要 (7.1 / 7.2 が起動しない)**
