@@ -294,12 +294,16 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
     // ------------------------------------------------------------------
     //
     // 'rename' (single page): GROWI core was extended to carry
-    //   { page, oldPath, newPath, user }. We translate this into a
-    //   rename-prefix instruction per affected namespace.
+    //   { page, oldPath, newPath, user }. A page's own path is stored in the
+    //   namespace tree as a blob (`<name>.md`), not a directory, so a
+    //   rename-prefix (subtree move) cannot relocate it. We model the rename
+    //   as remove(oldPath) + upsert(newPath) via onPageRenamed instead.
+    //   Descendant relocation is handled separately by the 'updateMany'
+    //   subscriber's rename-prefix path.
     pageEvent.on(
       'rename',
       (payload?: {
-        page?: IPage & { _id: { toString(): string } };
+        page?: IPage & { _id: { toString(): string }; revision?: unknown };
         oldPath?: string;
         newPath?: string;
         user?: unknown;
@@ -315,16 +319,21 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
           );
           return;
         }
-        const { current } = vaultNamespaceMapper.computePageNamespaces(
-          payload.page,
-        );
-        if (current.length === 0) return;
+        const { page } = payload;
+        const revisionId =
+          page.revision != null
+            ? typeof page.revision === 'object' && '_id' in page.revision
+              ? (
+                  page.revision as { _id: { toString(): string } }
+                )._id.toString()
+              : (page.revision as { toString(): string }).toString()
+            : undefined;
         dispatcher
-          .onBulkOperation({
-            type: 'rename-prefix',
-            namespaces: current,
-            oldPrefix: payload.oldPath,
-            newPrefix: payload.newPath,
+          .onPageRenamed({
+            page,
+            oldPath: payload.oldPath,
+            newPath: payload.newPath,
+            revisionId,
           })
           .catch((err) => {
             logger.warn(

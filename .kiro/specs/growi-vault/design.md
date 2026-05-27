@@ -139,7 +139,7 @@ graph TB
 - vault-manager への外部からの直接アクセス(常に apps/app gateway 経由)
 - bare repo の delta 圧縮・pack format 実装(git binary に委譲)
 - 監査ログ専用コレクションの新設(既存 audit log に統合)
-- **[MVP・実装完了]** 親ページ rename / grant 一括変更に伴う vault 伝播: MVP スコープとして 2 段階で実装完了。Stage 1 (タスク 21.1-A) で `'updateMany'` イベントの per-page upsert フォールバック経路、Stage 2 (タスク 21.1-B) で GROWI page service の event payload を拡張（`'rename'`、`'updateMany'`、新規 `'descendantsGrantChanged'`）。vault は `rename-prefix` instruction（rename）と per-page `acl-change` instruction（grant 一括変更、既存 dispatcher 経路を流用）で自動伝播する。`grant-change-prefix` op は subtree 単位の prefix scope を持たないため将来の vault-manager 設計改修まで使用しない（詳細は `growi-vault-gateway/design.md` および `growi-vault/dev-verification.md` 参照）
+- **[MVP・実装完了]** 親ページ rename / grant 一括変更に伴う vault 伝播: MVP スコープとして 2 段階で実装完了。Stage 1 (タスク 21.1-A) で `'updateMany'` イベントの per-page upsert フォールバック経路、Stage 2 (タスク 21.1-B) で GROWI page service の event payload を拡張（`'rename'`、`'updateMany'`、新規 `'descendantsGrantChanged'`）。vault は rename を 2 経路で伝播する: rename されたページ自身の blob は `remove`+`upsert`（`onPageRenamed`）、descendants の subtree は `rename-prefix` instruction。`rename-prefix` は `type === 'tree'` のエントリ専用でページ自身の blob（`<name>.md`）には作用しないため、単一ページ rename では旧 blob が残らないよう remove+upsert を用いる。grant 一括変更は per-page `acl-change` instruction（既存 dispatcher 経路を流用）で伝播する。`grant-change-prefix` op は subtree 単位の prefix scope を持たないため将来の vault-manager 設計改修まで使用しない（詳細は `growi-vault-gateway/design.md` および `growi-vault/dev-verification.md` 参照）
 
 ### Revalidation Triggers(umbrella レベル)
 
@@ -271,7 +271,7 @@ refs/namespaces/anonymous-view/refs/heads/main          # 匿名 view ref
 
 | # | 課題 | Stage 1（実装済み） | Stage 2（実装済み） | 関連タスク |
 |---|------|-----------------|-----------------|-----------|
-| 1 | **rename 伝播**: 親ページ rename 後、旧パス削除 + 新パス追加を vault に反映する | `'updateMany'` 購読のフォールバック経路（per-page upsert） | GROWI core の `'rename'` / `'updateMany'` payload を拡張し、vault subscriber が `rename-prefix` instruction を namespace 数ぶん発行 | `growi-vault-gateway` タスク 21.1-A / 21.1-B |
+| 1 | **rename 伝播**: 親ページ rename 後、旧パス削除 + 新パス追加を vault に反映する | `'updateMany'` 購読のフォールバック経路（per-page upsert） | GROWI core の `'rename'` / `'updateMany'` payload を拡張。単一ページ rename はページ自身の blob を `remove`+`upsert`（`onPageRenamed`）で再配置し、descendants subtree は `rename-prefix` instruction を namespace 数ぶん発行（`rename-prefix` は subtree 専用で blob には作用しないため両経路を併用） | `growi-vault-gateway` タスク 21.1-A / 21.1-B |
 | 2 | **grant 一括変更伝播**: 親ページ grant 一括変更を vault に反映する | — | GROWI core に新規イベント `'descendantsGrantChanged'` を追加し、vault subscriber が per-page `acl-change` instruction（既存 dispatcher 経路）を発行 | `growi-vault-gateway` タスク 21.1-B |
 
 > **運用注意**: rename / grant 一括変更は GROWI core からの emit によって vault に自動伝播される。通常運用では手動 bootstrap 再実行は不要。例外として、既存 vault が Stage 2 リリース以前の状態でリレジリエンスが取れていない場合や vault-manager 側で instruction 処理が失敗してリトライ上限を超えた場合のみ手動 bootstrap が必要（手順は `growi-vault/dev-verification.md` のトラブルシュート節を参照）。

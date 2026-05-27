@@ -91,6 +91,27 @@ export interface BulkPageOperationEvent {
 // VaultDispatcher interface
 // ---------------------------------------------------------------------------
 
+/**
+ * Represents the rename of a single page (the page itself, not its descendants).
+ *
+ * A GROWI page is stored in the namespace tree as a blob (`<name>.md`), so a
+ * rename of the page's own path cannot be expressed as a directory-subtree
+ * `rename-prefix` (that op only relocates `type === 'tree'` entries). We model
+ * a single-page rename as remove(oldPath) + upsert(newPath) instead, which
+ * correctly moves the blob. Descendant relocation is still handled by the
+ * `rename-prefix` instruction emitted from the 'updateMany' event.
+ */
+export interface PageRenamedEvent {
+  /** The page object reflecting the current (post-rename) state. */
+  readonly page: IPage & { _id: { toString(): string } };
+  /** The page path before the rename. */
+  readonly oldPath: string;
+  /** The page path after the rename. */
+  readonly newPath: string;
+  /** Revision ID of the current revision (upsert is skipped when absent). */
+  readonly revisionId?: string;
+}
+
 export interface VaultDispatcher {
   /**
    * Handle a single-page lifecycle event.
@@ -99,6 +120,14 @@ export interface VaultDispatcher {
    * individual writes are batched into a single bulk-upsert instruction.
    */
   onPageChanged(event: PageChangedEvent): Promise<void>;
+
+  /**
+   * Handle the rename of a single page's own path.
+   * Emits a remove (old path) + upsert (new path) per namespace so the page's
+   * blob is relocated within the namespace tree. Grant is unchanged by a
+   * rename, so old and new paths live in the same namespace set.
+   */
+  onPageRenamed(event: PageRenamedEvent): Promise<void>;
 
   /**
    * Handle a bulk operation affecting many descendant pages.
@@ -404,6 +433,53 @@ export const createVaultDispatcher = (
         { type },
         'vault-dispatcher: received unknown PageChangedEvent type',
       );
+    },
+
+    async onPageRenamed(event: PageRenamedEvent): Promise<void> {
+      const { page, oldPath, newPath } = event;
+      const pageId = page._id.toString();
+      const revisionId = event.revisionId ?? '';
+
+      // Grant is unchanged by a rename, so the page lives in the same
+      // namespaces before and after. Remove the page's blob at the old path
+      // and re-add it at the new path in every namespace it belongs to.
+      const { current } = namespaceMapper.computePageNamespaces(page);
+
+      const removes = current.map((ns) =>
+        writeWithRetry(
+          () =>
+            VaultInstruction.create({
+              op: 'remove',
+              payload: { namespace: ns, pageId, pagePath: oldPath },
+              issuedAt: new Date(),
+            }).then(() => undefined),
+          `rename-remove namespace=${ns} pageId=${pageId}`,
+        ),
+      );
+
+      // Skip the upsert when no revision is available (e.g. auto-generated
+      // intermediate pages); vault-manager would fail on an empty revisionId.
+      // The old-path removal still runs so no orphan blob is left behind.
+      const upserts = revisionId
+        ? current.map((ns) =>
+            writeWithRetry(
+              () =>
+                VaultInstruction.create({
+                  op: 'upsert',
+                  payload: {
+                    namespace: ns,
+                    pageId,
+                    pagePath: newPath,
+                    revisionId,
+                  },
+                  issuedAt: new Date(),
+                }).then(() => undefined),
+              `rename-upsert namespace=${ns} pageId=${pageId}`,
+            ),
+          )
+        : [];
+
+      await Promise.all([...removes, ...upserts]);
     },
 
     async onBulkOperation(event: BulkPageOperationEvent): Promise<void> {

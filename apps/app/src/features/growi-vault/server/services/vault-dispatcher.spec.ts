@@ -327,6 +327,96 @@ describe('VaultDispatcher', () => {
   });
 
   // -------------------------------------------------------------------------
+  // onPageRenamed — single-page rename → remove (oldPath) + upsert (newPath)
+  // -------------------------------------------------------------------------
+
+  describe('onPageRenamed — single-page rename', () => {
+    it('emits a remove at oldPath and an upsert at newPath for each namespace', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['public'] });
+      const dispatcher = createVaultDispatcher(mapper);
+
+      // page reflects the post-rename state (path === newPath).
+      const page = buildPage({ path: '/test' });
+      await dispatcher.onPageRenamed({
+        page,
+        oldPath: '/Untitled-1',
+        newPath: '/test',
+        revisionId: 'rev-rename',
+      });
+
+      // 1 remove (old path) + 1 upsert (new path) for the single namespace.
+      expect(createSpy).toHaveBeenCalledTimes(2);
+
+      const removeCall = createSpy.mock.calls.find((c) => c[0].op === 'remove');
+      expect(removeCall?.[0].payload).toEqual(
+        expect.objectContaining({
+          namespace: 'public',
+          pageId: 'page-id-001',
+          pagePath: '/Untitled-1',
+        }),
+      );
+
+      const upsertCall = createSpy.mock.calls.find((c) => c[0].op === 'upsert');
+      expect(upsertCall?.[0].payload).toEqual(
+        expect.objectContaining({
+          namespace: 'public',
+          pageId: 'page-id-001',
+          pagePath: '/test',
+          revisionId: 'rev-rename',
+        }),
+      );
+    });
+
+    it('emits a remove+upsert pair per namespace when the page belongs to multiple namespaces', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['group-g1', 'group-g2'] });
+      const dispatcher = createVaultDispatcher(mapper);
+
+      await dispatcher.onPageRenamed({
+        page: buildPage({ path: '/new' }),
+        oldPath: '/old',
+        newPath: '/new',
+        revisionId: 'rev-x',
+      });
+
+      // 2 namespaces × (remove + upsert) = 4 instructions.
+      expect(createSpy).toHaveBeenCalledTimes(4);
+
+      const removes = createSpy.mock.calls.filter((c) => c[0].op === 'remove');
+      const upserts = createSpy.mock.calls.filter((c) => c[0].op === 'upsert');
+      expect(removes.map((c) => c[0].payload.namespace).sort()).toEqual([
+        'group-g1',
+        'group-g2',
+      ]);
+      expect(upserts.map((c) => c[0].payload.namespace).sort()).toEqual([
+        'group-g1',
+        'group-g2',
+      ]);
+      // All removes target the old path; all upserts target the new path.
+      expect(removes.every((c) => c[0].payload.pagePath === '/old')).toBe(true);
+      expect(upserts.every((c) => c[0].payload.pagePath === '/new')).toBe(true);
+    });
+
+    it('still removes the old path when revisionId is absent (upsert skipped)', async () => {
+      const { createVaultDispatcher } = await import('./vault-dispatcher');
+      const mapper = buildMapper({ current: ['public'] });
+      const dispatcher = createVaultDispatcher(mapper);
+
+      await dispatcher.onPageRenamed({
+        page: buildPage({ path: '/new' }),
+        oldPath: '/old',
+        newPath: '/new',
+      });
+
+      // Only the remove of the old path — no upsert without a revision.
+      expect(createSpy).toHaveBeenCalledOnce();
+      expect(createSpy.mock.calls[0][0].op).toBe('remove');
+      expect(createSpy.mock.calls[0][0].payload.pagePath).toBe('/old');
+    });
+  });
+
+  // -------------------------------------------------------------------------
   // Coalesce: 100+ upserts in same namespace → bulk-upsert
   // -------------------------------------------------------------------------
 

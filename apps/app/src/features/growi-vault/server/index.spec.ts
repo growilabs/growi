@@ -51,10 +51,12 @@ vi.mock('~/utils/logger', () => ({
 // factories below.
 const {
   dispatcherOnPageChanged,
+  dispatcherOnPageRenamed,
   dispatcherOnBulkOperation,
   namespaceMapperComputePageNamespaces,
 } = vi.hoisted(() => ({
   dispatcherOnPageChanged: vi.fn().mockResolvedValue(undefined),
+  dispatcherOnPageRenamed: vi.fn().mockResolvedValue(undefined),
   dispatcherOnBulkOperation: vi.fn().mockResolvedValue(undefined),
   namespaceMapperComputePageNamespaces: vi.fn(() => ({
     current: ['public'] as ReadonlyArray<string>,
@@ -65,6 +67,7 @@ const {
 vi.mock('./services/vault-dispatcher', () => ({
   createVaultDispatcher: vi.fn(() => ({
     onPageChanged: dispatcherOnPageChanged,
+    onPageRenamed: dispatcherOnPageRenamed,
     onBulkOperation: dispatcherOnBulkOperation,
   })),
 }));
@@ -386,11 +389,36 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
   // -------------------------------------------------------------------------
 
   describe("'rename' event", () => {
-    it('dispatches one rename-prefix per namespace with old/new path', async () => {
-      namespaceMapperComputePageNamespaces.mockReturnValue({
-        current: ['group-eng', 'public'],
-        previous: undefined,
+    it('dispatches onPageRenamed with the page, old/new path and resolved revisionId', async () => {
+      const crowi = makeCrowiStub();
+      await initializeVaultFeature(crowi);
+
+      const page = {
+        _id: { toString: () => 'p1' },
+        path: '/new/path',
+        revision: { _id: { toString: () => 'rev-9' } },
+      };
+      crowi.events.page.emit('rename', {
+        page,
+        oldPath: '/old/path',
+        newPath: '/new/path',
+        user: { _id: 'u1' },
       });
+      await flush();
+
+      // A single-page rename is a blob relocation, not a subtree move:
+      // it must NOT emit a rename-prefix.
+      expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
+      expect(dispatcherOnPageRenamed).toHaveBeenCalledTimes(1);
+      expect(dispatcherOnPageRenamed).toHaveBeenCalledWith({
+        page,
+        oldPath: '/old/path',
+        newPath: '/new/path',
+        revisionId: 'rev-9',
+      });
+    });
+
+    it('resolves revisionId as undefined when the page has no revision', async () => {
       const crowi = makeCrowiStub();
       await initializeVaultFeature(crowi);
 
@@ -403,12 +431,11 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
       });
       await flush();
 
-      expect(dispatcherOnBulkOperation).toHaveBeenCalledTimes(1);
-      expect(dispatcherOnBulkOperation).toHaveBeenCalledWith({
-        type: 'rename-prefix',
-        namespaces: ['group-eng', 'public'],
-        oldPrefix: '/old/path',
-        newPrefix: '/new/path',
+      expect(dispatcherOnPageRenamed).toHaveBeenCalledWith({
+        page,
+        oldPath: '/old/path',
+        newPath: '/new/path',
+        revisionId: undefined,
       });
     });
 
@@ -417,31 +444,12 @@ describe('initializeVaultFeature — Stage 2 subscriptions (task 21.1-B)', () =>
       await initializeVaultFeature(crowi);
 
       // Legacy callers that emit without payload — must not crash, must not
-      // dispatch any bulk op.
+      // dispatch a rename.
       crowi.events.page.emit('rename');
       crowi.events.page.emit('rename', { oldPath: '/x', newPath: '/y' });
       await flush();
 
-      expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
-    });
-
-    it('skips when computePageNamespaces returns no current namespaces', async () => {
-      namespaceMapperComputePageNamespaces.mockReturnValue({
-        current: [],
-        previous: undefined,
-      });
-      const crowi = makeCrowiStub();
-      await initializeVaultFeature(crowi);
-
-      crowi.events.page.emit('rename', {
-        page: { _id: { toString: () => 'p1' }, path: '/x' },
-        oldPath: '/old',
-        newPath: '/x',
-        user: { _id: 'u1' },
-      });
-      await flush();
-
-      expect(dispatcherOnBulkOperation).not.toHaveBeenCalled();
+      expect(dispatcherOnPageRenamed).not.toHaveBeenCalled();
     });
   });
 
