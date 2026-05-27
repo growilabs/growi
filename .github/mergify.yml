@@ -7,16 +7,28 @@ queue_rules:
       - -check-failure ~= ci-app-
       - -check-failure ~= ci-slackbot-
       - -check-failure ~= test-prod-node24 /
+      - -check-failure ~= test-prod-node24 / build-prod
+      - -check-failure ~= test-prod-node24 / launch-prod
+      - -check-failure ~= test-prod-node24 / run-playwright
+      - -check-failure ~= test-prod-node24 / report-playwright
     merge_conditions:
       - check-success ~= ci-app-lint
       - check-success ~= ci-app-test
       - check-success ~= ci-app-launch-dev
       - check-success = test-prod-node24 / build-prod
       - check-success ~= test-prod-node24 / launch-prod
-      - check-success ~= test-prod-node24 / run-playwright
+      # Gate on report-playwright (not individual run-playwright shards).
+      # report-playwright runs after ALL shards complete (needs: [run-playwright])
+      # and fails if any shard did not succeed (including cancelled), so a single
+      # SUCCESS here guarantees every playwright matrix job passed — no race condition.
+      - check-success = test-prod-node24 / report-playwright
       - -check-failure ~= ci-app-
       - -check-failure ~= ci-slackbot-
       - -check-failure ~= test-prod-node24 /
+      - -check-failure ~= test-prod-node24 / build-prod
+      - -check-failure ~= test-prod-node24 / launch-prod
+      - -check-failure ~= test-prod-node24 / run-playwright
+      - -check-failure ~= test-prod-node24 / report-playwright
 
 pull_request_rules:
   - name: Automatic queue to merge

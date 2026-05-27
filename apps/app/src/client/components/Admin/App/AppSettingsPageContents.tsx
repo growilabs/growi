@@ -3,6 +3,7 @@ import { useTranslation } from 'next-i18next';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastError } from '~/client/util/toastr';
+import { NewsDeliverySetting } from '~/features/news/client/components/admin/NewsDeliverySetting';
 import { useIsMaintenanceMode } from '~/states/global';
 import { useSWRxAppSettings } from '~/stores/admin/app-settings';
 import { toArrayIfNot } from '~/utils/array-utils';
@@ -130,6 +131,17 @@ const AppSettingsPageContents = (props: Props) => {
             {t('admin:app_setting.page_bulk_export_settings')}
           </h2>
           <PageBulkExportSettings />
+        </div>
+      </div>
+
+      <div className="row mt-5">
+        <div className="col-lg-12">
+          <h2 className="admin-setting-header" id="news-delivery">
+            {t('admin:news_delivery.section_title', {
+              defaultValue: 'News delivery',
+            })}
+          </h2>
+          <NewsDeliverySetting />
         </div>
       </div>
 

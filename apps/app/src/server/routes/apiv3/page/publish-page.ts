@@ -45,9 +45,15 @@ export const publishPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       const { pageId } = req.params;
 
       try {
-        const page = await Page.findById(pageId);
+        const page = await Page.findByIdAndViewer(pageId, req.user);
         if (page == null) {
-          return res.apiv3Err(new ErrorV3(`Page ${pageId} is not exist.`), 404);
+          return res.apiv3Err(
+            new ErrorV3(
+              'Page is unreachable or empty.',
+              'page_unreachable_or_empty',
+            ),
+            400,
+          );
         }
 
         page.publish();

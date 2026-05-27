@@ -48,6 +48,7 @@ const SCOPE_SEED_USER = {
     bookmark: {},
     attachment: {},
     page_bulk_export: {},
+    in_app_notification: {},
   },
 } as const;
 
@@ -124,6 +125,7 @@ type ReadFeaturesScope =
   | 'read:features:bookmark'
   | 'read:features:attachment'
   | 'read:features:page_bulk_export'
+  | 'read:features:in_app_notification'
   | 'read:features:*';
 
 // Write scopes - Admin
@@ -167,6 +169,7 @@ type WriteFeaturesScope =
   | 'write:features:bookmark'
   | 'write:features:attachment'
   | 'write:features:page_bulk_export'
+  | 'write:features:in_app_notification'
   | 'write:features:*';
 
 // Combined Scope type - all valid scope strings
