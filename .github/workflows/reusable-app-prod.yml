@@ -356,3 +356,10 @@ jobs:
         name: html-report
         path: playwright-report
         retention-days: 30
+
+    - name: Fail if any playwright shard did not succeed
+      if: needs.run-playwright.result != 'success'
+      run: |
+        echo "run-playwright aggregate result: ${{ needs.run-playwright.result }}"
+        echo "One or more Playwright shards failed or were cancelled. See html-report artifact for details."
+        exit 1
