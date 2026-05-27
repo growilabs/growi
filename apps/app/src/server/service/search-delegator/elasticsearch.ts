@@ -935,9 +935,6 @@ class ElasticsearchDelegator
       let failures: unknown[] | undefined;
       let versionConflicts: number | undefined;
 
-      // Use the alias so that deleteByQuery targets a valid index even during rebuildAuditlogIndex.
-      // conflicts=proceed: version conflicts are counted instead of aborting, so that a concurrent
-      // updateOrInsertAuditlog does not prevent the remaining expired documents from being deleted.
       if (isES7ClientDelegator(this.client)) {
         const result = await this.client.deleteByQuery({
           index: this.auditlogAliasName,
@@ -962,7 +959,6 @@ class ElasticsearchDelegator
         failures = result.failures;
         versionConflicts = result.version_conflicts;
       } else {
-        // this.client is not yet initialized (initClient() has not completed)
         logger.warn(
           'deleteExpiredAuditlogs skipped: Elasticsearch client is not ready.',
         );
