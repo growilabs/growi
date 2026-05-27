@@ -559,11 +559,10 @@ const CompletionReliabilitySection = ({
 
   return (
     <div className="row mb-5">
-      <div className="col-lg-12">
-        <h2 className="admin-setting-header">
-          {t('growi-vault.admin-settings.completion-reliability.heading')}
-        </h2>
-
+      <div className="col-md-3 text-md-end">
+        {t('growi-vault.admin-settings.completion-reliability.heading')}
+      </div>
+      <div className="col-md-9">
         <table className="table table-sm table-bordered">
           <tbody>
             <tr>
@@ -660,11 +659,10 @@ const AutoRetryStatusSection = ({
 
   return (
     <div className="row mb-5">
-      <div className="col-lg-12">
-        <h2 className="admin-setting-header">
-          {t('growi-vault.admin-settings.auto-retry-status.heading')}
-        </h2>
-
+      <div className="col-md-3 text-md-end">
+        {t('growi-vault.admin-settings.auto-retry-status.heading')}
+      </div>
+      <div className="col-md-9">
         {isEscalated && (
           <Alert color="danger" className="mb-3">
             <span className="material-symbols-outlined me-1 align-middle">
@@ -796,11 +794,10 @@ const DriftActivitySection = ({
 
   return (
     <div className="row mb-5">
-      <div className="col-lg-12">
-        <h2 className="admin-setting-header">
-          {t('growi-vault.admin-settings.drift-activity.heading')}
-        </h2>
-
+      <div className="col-md-3 text-md-end">
+        {t('growi-vault.admin-settings.drift-activity.heading')}
+      </div>
+      <div className="col-lg-9">
         <table className="table table-sm table-bordered">
           <tbody>
             <tr>
