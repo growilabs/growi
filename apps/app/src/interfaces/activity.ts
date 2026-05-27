@@ -726,7 +726,16 @@ export type ISearchFilter = {
   actions?: SupportedActionType[];
 };
 
-export type AuditlogSuggestionField = 'username';
+export const AUDITLOG_SUGGESTION_FIELDS = ['username'] as const;
+
+export type AuditlogSuggestionField =
+  (typeof AUDITLOG_SUGGESTION_FIELDS)[number];
+
+export const isAuditlogSuggestionField = (
+  value: unknown,
+): value is AuditlogSuggestionField =>
+  typeof value === 'string' &&
+  (AUDITLOG_SUGGESTION_FIELDS as readonly string[]).includes(value);
 
 export type AuditlogSuggestionsResponse = {
   username?: { activeUsernames: string[]; inactiveUsernames: string[] };
