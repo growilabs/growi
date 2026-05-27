@@ -7,11 +7,13 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
-import type {
-  AuditlogSuggestionField,
-  AuditlogSuggestionsResponse,
-  IActivity,
-  ISearchFilter,
+import {
+  AUDITLOG_SUGGESTION_FIELDS,
+  type AuditlogSuggestionField,
+  type AuditlogSuggestionsResponse,
+  type IActivity,
+  type ISearchFilter,
+  isAuditlogSuggestionField,
 } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
@@ -50,13 +52,12 @@ const validator = {
     query('field')
       .optional()
       .custom((value) => {
-        const values: unknown[] = Array.isArray(value) ? value : [value];
-        const validFields: AuditlogSuggestionField[] = ['username'];
-        return values.every((v) =>
-          validFields.includes(v as AuditlogSuggestionField),
-        );
+        const values = Array.isArray(value) ? value : [value];
+        return values.every(isAuditlogSuggestionField);
       })
-      .withMessage('field must be username'),
+      .withMessage(
+        `field must be one or more of: ${AUDITLOG_SUGGESTION_FIELDS.join(', ')}`,
+      ),
     query('q')
       .optional()
       .isString()
@@ -399,10 +400,10 @@ module.exports = (crowi: Crowi): Router => {
 
       const fields: AuditlogSuggestionField[] =
         field == null
-          ? ['username']
-          : ((Array.isArray(field)
-              ? field
-              : [field]) as AuditlogSuggestionField[]);
+          ? [...AUDITLOG_SUGGESTION_FIELDS]
+          : (Array.isArray(field) ? field : [field]).filter(
+              isAuditlogSuggestionField,
+            );
 
       const { searchService } = crowi;
 
