@@ -1,4 +1,4 @@
-name: Vault Manager Integration Tests
+name: Node CI for Vault Manager
 
 on:
   workflow_dispatch:
