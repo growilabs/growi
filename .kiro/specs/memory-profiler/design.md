@@ -2,11 +2,11 @@
 
 ## Overview
 
-本 spec は、GROWI のメモリ調査用 profiling ツール群（`bin/memory-profiler/`、`@growi/bin` workspace package）を **公式仕様としてベースライン化** する。既に実装され 58 unit tests が green の状態にある現状ツールを、requirements / design / tasks の 3 文書として明文化し、(1) 今後のツール変更時の change review 基準を確立し、(2) downstream の memory 調査 spec（`memory-leak-investigation` 等）が本ツールに対して安定した consumer-side dependency を持てるようにする。
+本 spec は、GROWI のメモリ調査用 profiling ツール群（`bin/memory-profiler/`、`@growi/bin` workspace package）を **公式仕様としてベースライン化** する。既に実装され 58 unit tests が green の状態にある現状ツールを、requirements / design / tasks の 3 文書として明文化し、(1) 今後のツール変更時の change review 基準を確立し、(2) 任意の memory 調査 spec が本ツールに対して安定した consumer-side dependency を持てるようにする。
 
 **Purpose**: `bin/memory-profiler/` の現状アーキテクチャ・interface・operational procedure を spec として固定し、ツール本体の変更レビュー基準と downstream 提供 contract を確立する。
 
-**Users**: 現在および将来のメモリ調査担当者と、本ツールを利用する隣接 spec（`memory-leak-investigation` 等）のメンテナ。
+**Users**: 現在および将来のメモリ調査担当者と、本ツールを consumer として利用する任意の隣接 spec のメンテナ。
 
 **Impact**: 既存実装に対するコード変更は最小限（lint / test / interface 安定性チェックのみ）。代わりに、CLI surface・env var contract・出力ファイル命名規約・LoadDriver interface が **stable contract** として固定され、downstream 参照の安定性が保証される。
 
@@ -18,7 +18,7 @@
 
 ### Non-Goals
 - `apps/app` の server-side コード変更（各 owner spec の責務）。
-- 具体の memory 調査結果や finding（`memory-leak-investigation` 等の downstream spec の責務）。
+- 個別の memory 調査結果や finding（各 downstream 調査 spec の責務）。
 - 本 spec を起点とする新機能実装（OTLP 連携 / dist server / DSL 等）。
 - 汎用 npm package 化 / 外部公開。
 - `bin/memory-profiler/` 配下の architecture や interface の大幅な再設計（baseline-only spec）。
@@ -41,7 +41,7 @@
 - `apps/app` の server-side コード（各 owner spec の責務）。
 - `apps/app/src/features/opentelemetry/` の custom metrics や SDK 構成（`opentelemetry` spec の責務）。
 - `apps/app/src/server/service/yjs/` の y-websocket persistence プロトコル（`collaborative-editor` spec の責務）。
-- 各 downstream consumer の調査内容・verdict・finding（`memory-leak-investigation` 等の責務）。
+- 各 downstream consumer の調査内容・verdict・finding（各 consumer spec の責務）。
 - 新シナリオ・新メトリクス・dist server サポート・OTLP 受信側連携の **実装**（必要時は follow-up spec で扱う）。
 - 本ツールの汎用 npm package 化や外部公開。
 - 本ツールの CI / GitHub Actions 組み込み（現状 devcontainer ローカル前提）。
@@ -56,7 +56,7 @@
 - **依存方向**: `apps/app` → `bin/`（および `@growi/bin` → `@growi/app`）の依存方向はゼロ。`bin/memory-profiler/` 内では `run-scenario` → `cdp-snapshot-client` / `load-driver` / `rss-time-series-logger` / `scenarios/*`、`load-driver` → `lib/*` の単方向。
 
 ### Revalidation Triggers
-以下の変更が発生した場合、downstream consumer（`memory-leak-investigation` 等）への影響評価を伴う change review を要求する。
+以下の変更が発生した場合、任意の downstream consumer（調査 spec 等）への影響評価を伴う change review を要求する。
 
 - **CLI surface の変更**: `run-scenario.ts` の引数名・env var 名・exit code 体系の変更（breaking change として扱う）。
 - **Top-level barrel から export される TypeScript public API の変更**: `runScenario` のシグネチャ、`ScenarioRunnerOptions` / `LoadOpCounts` / `ScenarioRunnerError` / `LoadDriver` の型定義の変更。
@@ -94,7 +94,7 @@ graph TB
             Scenarios[scenarios baseline load drain]
             Lib[lib installer-driver http-client yjs-client]
         end
-        subgraph OutputFs[apps/app/tmp/memory-leak-investigation]
+        subgraph OutputFs[apps/app/tmp/memory-profiler default]
             RunsDir[runs name dir]
             Snapshots[snapshot a b c heapsnapshot]
             RssCsv[rss-timeseries csv]
@@ -247,7 +247,7 @@ sequenceDiagram
     participant CdpClient as cdp-snapshot-client
     participant LoadDriver as load-driver
     participant RssLogger as rss-time-series-logger
-    participant Fs as apps/app/tmp/memory-leak-investigation/runs/name
+    participant Fs as outputDir runs name
     Op->>Server: pnpm run ts-node --inspect=0.0.0.0:9229 src/server/app.ts
     Server->>Server: open inspector endpoint :9229
     Op->>Runner: pnpm run ts-node bin/memory-profiler/run-scenario.ts --baseUrl ... --inspector ... --outputDir ...
@@ -714,7 +714,7 @@ packages:
 
 ### Integration Tests
 - 本 spec の範囲では integration test を新規追加しない（既存 unit test と CLI smoke で contract を確保）。
-- Downstream consumer の investigation セッションが integration test を兼ねる（`memory-leak-investigation` Phase 5 / 6）。
+- Downstream consumer による investigation セッションの実行が事実上の integration test を兼ねる。
 
 ### E2E / Smoke
 - **CLI smoke**: `pnpm run ts-node bin/memory-profiler/run-scenario.ts --baseUrl http://localhost:3000 --inspector http://127.0.0.1:9229 --outputDir /tmp/smoke-test` を起動し、exit code 0、4 ファイル（snapshot A/B/C + CSV）の生成を目視確認。手動実行のみ（CI 自動化は本 spec の範囲外）。
@@ -741,7 +741,7 @@ packages:
 
 - **Memory profiler の汎用化**: 本 spec は GROWI 専用ツール。汎用 npm package 化や別プロジェクトでの再利用は別 spec で扱う。
 - **OTLP receiver 連携**: profiling 中の `growi.yjs.docs.count` 等の OTel metrics を receiver 側で可視化する仕組み。`opentelemetry` spec との境界調整が必要。
-- **Dist server サポート**: Production `dist/server/app.js` 起動下での計測サポート。Prisma ESM 不整合等の解消が前提（[memory-leak-investigation Phase 6 / Task 6.4](../memory-leak-investigation/tasks.md) で扱う）。
+- **Dist server サポート**: Production `dist/server/app.js` 起動下での計測サポート。Prisma ESM 不整合などビルド成果物固有の制約は本ツール外で解消する前提（実証は consumer 側の調査タスクが受け持つ）。
 - **Scenario DSL 化**: YAML / JSON で scenario を宣言できる仕組み。現状はコードで定義。
 - **CI 組み込み**: GitHub Actions 等で定期 profiling を自動化する仕組み。現状は devcontainer ローカルの手動実行のみ。
 
@@ -752,4 +752,3 @@ packages:
 - [bin/memory-profiler/README.md](../../bin/memory-profiler/README.md) — Operational procedure（起動手順、出力レイアウト）
 - [.claude/rules/coding-style.md](../../.claude/rules/coding-style.md) — Module Public Surface、Pure Function Extraction、Single Responsibility 規約
 - [.claude/rules/devcontainer.md](../../.claude/rules/devcontainer.md) — devcontainer service 前提
-- [memory-leak-investigation spec](../memory-leak-investigation/) — 本 spec の主要 downstream consumer（歴史的に本ツールが生まれた経緯を持つ調査 spec）
