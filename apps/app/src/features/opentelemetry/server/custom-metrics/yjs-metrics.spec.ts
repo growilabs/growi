@@ -10,7 +10,14 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
+const { mockDiagError } = vi.hoisted(() => ({
+  mockDiagError: vi.fn(),
+}));
+
 vi.mock('@opentelemetry/api', () => ({
+  diag: {
+    createComponentLogger: vi.fn(() => ({ error: mockDiagError })),
+  },
   metrics: {
     getMeter: vi.fn(),
   },
@@ -31,6 +38,7 @@ describe('addYjsMetrics', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     mockDocs.clear();
+    mockDiagError.mockReset();
     vi.mocked(metrics.getMeter).mockReturnValue(mockMeter);
     mockMeter.createObservableGauge.mockReturnValue(mockGauge);
   });
@@ -126,6 +134,23 @@ describe('addYjsMetrics', () => {
       mockDocs.set('doc-b', {});
       await callback(mockResult);
       expect(mockResult.observe).toHaveBeenLastCalledWith(mockGauge, 2);
+    });
+
+    it('does not propagate errors and logs via diag when observation throws', async () => {
+      addYjsMetrics();
+
+      const throwingResult = {
+        observe: vi.fn().mockImplementation(() => {
+          throw new Error('otel observe failed');
+        }),
+      };
+      const callback = mockMeter.addBatchObservableCallback.mock.calls[0][0];
+
+      await expect(async () => callback(throwingResult)).not.toThrow();
+      expect(mockDiagError).toHaveBeenCalledWith(
+        expect.stringContaining('yjs'),
+        expect.objectContaining({ error: expect.any(Error) }),
+      );
     });
   });
 
