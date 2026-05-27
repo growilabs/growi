@@ -54,13 +54,16 @@ const G2GDataTransfer = (): JSX.Element => {
   // const [gcsBucket, setGcsBucket] = useState('');
   // const [gcsUploadNamespace, setGcsUploadNamespace] = useState('');
 
-  const updateSelectedCollections = (newSelectedCollections: Set<string>) => {
-    setSelectedCollections(newSelectedCollections);
-  };
+  const updateSelectedCollections = useCallback(
+    (newSelectedCollections: Set<string>) => {
+      setSelectedCollections(newSelectedCollections);
+    },
+    [],
+  );
 
-  const updateOptionsMap = (newOptionsMap: any) => {
+  const updateOptionsMap = useCallback((newOptionsMap: any) => {
     setOptionsMap(newOptionsMap);
-  };
+  }, []);
 
   const onChangeTransferKeyHandler = useCallback((e) => {
     setStartTransferKey(e.target.value);
