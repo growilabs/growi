@@ -39,6 +39,7 @@ import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
 import { hasIntersection } from '../util/compare-objectId';
+import { AuditlogCleanupCronService } from './auditlog-cleanup-cron';
 import { configManager } from './config-manager';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
@@ -104,6 +105,8 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
 
+  private auditlogCleanupCronService: AuditlogCleanupCronService | null = null;
+
   constructor(crowi: Crowi) {
     this.crowi = crowi;
 
@@ -124,6 +127,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
       this.fullTextSearchDelegator.init();
       this.registerUpdateEvent();
       this.registerAuditlogUpdateEvent();
+      this.auditlogCleanupCronService = new AuditlogCleanupCronService(
+        this.fullTextSearchDelegator,
+      );
+      this.auditlogCleanupCronService.startCron();
     }
   }
 

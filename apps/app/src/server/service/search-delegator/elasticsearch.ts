@@ -921,6 +921,73 @@ class ElasticsearchDelegator
 
     return [];
   }
+  async deleteExpiredAuditlogs(expirationSeconds: number): Promise<void> {
+    const expirationDate = new Date(Date.now() - expirationSeconds * 1000);
+    const query = {
+      range: {
+        created_at: { lt: expirationDate.toISOString() },
+      },
+    };
+
+    try {
+      let deleted: number | undefined;
+      let timedOut: boolean | undefined;
+      let failures: unknown[] | undefined;
+      let versionConflicts: number | undefined;
+
+      // Use the alias so that deleteByQuery targets a valid index even during rebuildAuditlogIndex.
+      // conflicts=proceed: version conflicts are counted instead of aborting, so that a concurrent
+      // updateOrInsertAuditlog does not prevent the remaining expired documents from being deleted.
+      if (isES7ClientDelegator(this.client)) {
+        const result = await this.client.deleteByQuery({
+          index: this.auditlogAliasName,
+          conflicts: 'proceed',
+          body: { query },
+        });
+        deleted = result.deleted;
+        timedOut = result.timed_out;
+        failures = result.failures;
+        versionConflicts = result.version_conflicts;
+      } else if (
+        isES8ClientDelegator(this.client) ||
+        isES9ClientDelegator(this.client)
+      ) {
+        const result = await this.client.deleteByQuery({
+          index: this.auditlogAliasName,
+          conflicts: 'proceed',
+          query,
+        });
+        deleted = result.deleted;
+        timedOut = result.timed_out;
+        failures = result.failures;
+        versionConflicts = result.version_conflicts;
+      } else {
+        // this.client is not yet initialized (initClient() has not completed)
+        logger.warn(
+          'deleteExpiredAuditlogs skipped: Elasticsearch client is not ready.',
+        );
+        return;
+      }
+
+      if (timedOut) {
+        logger.warn(
+          `deleteExpiredAuditlogs timed out. Some documents may not have been deleted. (deleted=${deleted ?? 0}, versionConflicts=${versionConflicts ?? 0})`,
+        );
+      } else {
+        logger.info(
+          `deleteExpiredAuditlogs completed. (deleted=${deleted ?? 0}, versionConflicts=${versionConflicts ?? 0})`,
+        );
+      }
+
+      if (failures != null && failures.length > 0) {
+        logger.error(
+          `deleteExpiredAuditlogs partial failures. (count=${failures.length})`,
+        );
+      }
+    } catch (err) {
+      logger.error('deleteExpiredAuditlogs failed.', err);
+    }
+  }
 
   deletePages(pages) {
     const body = [];

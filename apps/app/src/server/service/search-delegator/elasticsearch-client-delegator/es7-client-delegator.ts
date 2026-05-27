@@ -118,4 +118,12 @@ export class ES7ClientDelegator {
   async search(params: ES7SearchQuery): Promise<estypes.SearchResponse> {
     return (await this.client.search<estypes.SearchResponse>(params)).body;
   }
+
+  async deleteByQuery(
+    params: RequestParams.DeleteByQuery<{
+      query: estypes.QueryDslQueryContainer;
+    }>,
+  ): Promise<estypes.DeleteByQueryResponse> {
+    return (await this.client.deleteByQuery(params)).body;
+  }
 }
