@@ -1,16 +1,19 @@
-import { metrics } from '@opentelemetry/api';
+import { diag, metrics } from '@opentelemetry/api';
 import { docs } from 'y-websocket/bin/utils';
 
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:opentelemetry:custom-metrics:yjs');
+const loggerDiag = diag.createComponentLogger({
+  namespace: 'growi:custom-metrics:yjs',
+});
 
 /**
  * Returns the number of documents in the given map.
  * Returns 0 when the map is undefined or null (y-websocket not yet initialised).
  */
 export function getDocsCount(
-  d: Map<string, unknown> | undefined | null,
+  d: ReadonlyMap<string, unknown> | undefined | null,
 ): number {
   return d?.size ?? 0;
 }
@@ -31,7 +34,11 @@ export function addYjsMetrics(): void {
 
   meter.addBatchObservableCallback(
     (result) => {
-      result.observe(yjsDocsCountGauge, getDocsCount(docs));
+      try {
+        result.observe(yjsDocsCountGauge, getDocsCount(docs));
+      } catch (error) {
+        loggerDiag.error('Failed to collect yjs metrics', { error });
+      }
     },
     [yjsDocsCountGauge],
   );
