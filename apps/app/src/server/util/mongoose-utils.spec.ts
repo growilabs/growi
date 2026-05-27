@@ -47,6 +47,30 @@ describe('getMongoPoolOptions', () => {
     expect(result.minPoolSize).toBe(2);
   });
 
+  it('falls back to defaults when env vars are empty strings', async () => {
+    // Number('') === 0, which must not be treated as a valid pool size
+    process.env.MONGO_MAX_POOL_SIZE = '';
+    process.env.MONGO_MIN_POOL_SIZE = '';
+    const { getMongoPoolOptions } = await import('./mongoose-utils');
+    const result = getMongoPoolOptions();
+    expect(result.maxPoolSize).toBe(15);
+    expect(result.minPoolSize).toBe(2);
+  });
+
+  it('falls back to default maxPoolSize when MONGO_MAX_POOL_SIZE is not positive', async () => {
+    process.env.MONGO_MAX_POOL_SIZE = '0';
+    const { getMongoPoolOptions } = await import('./mongoose-utils');
+    const result = getMongoPoolOptions();
+    expect(result.maxPoolSize).toBe(15);
+  });
+
+  it('falls back to default minPoolSize when MONGO_MIN_POOL_SIZE is negative', async () => {
+    process.env.MONGO_MIN_POOL_SIZE = '-1';
+    const { getMongoPoolOptions } = await import('./mongoose-utils');
+    const result = getMongoPoolOptions();
+    expect(result.minPoolSize).toBe(2);
+  });
+
   it('clamps minPoolSize to maxPoolSize when min > max', async () => {
     process.env.MONGO_MAX_POOL_SIZE = '10';
     process.env.MONGO_MIN_POOL_SIZE = '15';

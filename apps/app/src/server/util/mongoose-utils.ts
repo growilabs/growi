@@ -13,18 +13,24 @@ const DEFAULT_MIN_POOL_SIZE = 2;
  * Reads MONGO_MAX_POOL_SIZE and MONGO_MIN_POOL_SIZE from environment variables
  * and returns validated pool size configuration.
  *
- * - Invalid (NaN) values fall back to their respective defaults.
+ * - Invalid values fall back to their respective defaults. A value is invalid
+ *   when it is not a positive finite number. This also rejects an empty-string
+ *   env var, which `Number('')` would otherwise coerce to 0 and break the
+ *   connection pool (maxPoolSize: 0).
  * - When minPoolSize > maxPoolSize, minPoolSize is clamped to maxPoolSize.
  */
 export const getMongoPoolOptions = (): {
   maxPoolSize: number;
   minPoolSize: number;
 } => {
+  const isValidPoolSize = (value: number): boolean =>
+    Number.isFinite(value) && value > 0;
+
   const rawMax = Number(process.env.MONGO_MAX_POOL_SIZE);
   const rawMin = Number(process.env.MONGO_MIN_POOL_SIZE);
 
-  const maxPoolSize = Number.isFinite(rawMax) ? rawMax : DEFAULT_MAX_POOL_SIZE;
-  const parsedMin = Number.isFinite(rawMin) ? rawMin : DEFAULT_MIN_POOL_SIZE;
+  const maxPoolSize = isValidPoolSize(rawMax) ? rawMax : DEFAULT_MAX_POOL_SIZE;
+  const parsedMin = isValidPoolSize(rawMin) ? rawMin : DEFAULT_MIN_POOL_SIZE;
 
   // Clamp minPoolSize so it never exceeds maxPoolSize
   const minPoolSize = Math.min(parsedMin, maxPoolSize);
