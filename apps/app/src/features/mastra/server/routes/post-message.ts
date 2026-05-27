@@ -169,7 +169,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             }
 
             const usage = await stream.usage;
-            logger.debug(
+            logger.info(
               {
                 inputTokens: usage.inputTokens,
                 outputTokens: usage.outputTokens,
