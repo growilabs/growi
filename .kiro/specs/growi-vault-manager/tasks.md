@@ -515,7 +515,7 @@
   - _Requirements: 4.9, 4.10, 4.11_
   - _Boundary: apps/growi-vault-manager/src/services/vault-tree-normalizer.ts, vault-tree-normalizer.spec.ts_
 
-- [ ] 19.4 VaultViewComposer に normalizer を配線（full / delta 双方）
+- [x] 19.4 VaultViewComposer に normalizer を配線（full / delta 双方）
   - `vault-view-composer.ts` の merged tree 確定後（full merge・delta merge 双方の出力）に VaultTreeNormalizer を適用してから commit / ref 更新を行う
   - delta merge では membership が変化したディレクトリのみ再正規化され、`sourceVersions` 一致のキャッシュヒット時は normalizer ごとスキップされること
   - 既存の ACL 優先順位衝突解消（6.3）とは別レイヤーであり、適用順序が ACL merge → tree 正規化であること

@@ -36,6 +36,7 @@ import {
 } from '../models/vault-user-view.js';
 import type { TreeEntry } from './vault-repo-storage.js';
 import * as VaultRepoStorage from './vault-repo-storage.js';
+import { normalizeTree, type TreeNode } from './vault-tree-normalizer.js';
 
 // ---------------------------------------------------------------------------
 // Constants
@@ -142,131 +143,144 @@ async function collectLeafBlobs(
 // ---------------------------------------------------------------------------
 
 /**
- * Inserts a single blob entry at the specified path segments into a nested
- * mutable tree map, then writes all touched tree nodes bottom-up.
+ * Builds a recursive TreeNode[] from a flat filePath → blobOid map.
  *
- * @param treeMap  - Mutable map of dirPath → TreeEntry[].  '.' represents root.
- * @param segments - File path split on '/'.
- * @param blobOid  - 40-char SHA-1 of the blob.
+ * This is a pure in-memory operation: no I/O is performed.  Blob OIDs are
+ * embedded directly; subtree OIDs are left as empty string placeholders
+ * (they are not needed since writeTreeNodes resolves them bottom-up).
+ *
+ * @param fileMap - Map of filePath (e.g. 'docs/api/page.md') → blobOid.
+ * @returns Root-level TreeNode array representing the complete tree hierarchy.
  */
-function insertIntoTreeMap(
-  treeMap: Map<string, TreeEntry[]>,
-  segments: ReadonlyArray<string>,
-  blobOid: string,
-): void {
-  const filename = segments[segments.length - 1];
-  const dirSegments = segments.slice(0, -1);
-  const dirKey = dirSegments.length === 0 ? '.' : dirSegments.join('/');
+function buildTreeNodes(fileMap: Map<string, string>): ReadonlyArray<TreeNode> {
+  // dirMap: dirPath ('.' = root) → map of childName → TreeNode (mutable during build)
+  const dirMap = new Map<string, Map<string, TreeNode>>();
+  dirMap.set('.', new Map());
 
-  let dirEntries = treeMap.get(dirKey);
-  if (dirEntries == null) {
-    dirEntries = [];
-    treeMap.set(dirKey, dirEntries);
-  }
+  for (const [filePath, blobOid] of fileMap) {
+    const segments = filePath.split('/');
+    const filename = segments[segments.length - 1];
+    const dirSegments = segments.slice(0, -1);
+    const dirKey = dirSegments.length === 0 ? '.' : dirSegments.join('/');
 
-  const blobEntry: TreeEntry = {
-    mode: '100644',
-    path: filename,
-    oid: blobOid,
-    type: 'blob',
-  };
-  const idx = dirEntries.findIndex((e) => e.path === filename);
-  if (idx >= 0) {
-    dirEntries[idx] = blobEntry;
-  } else {
-    dirEntries.push(blobEntry);
-  }
-
-  // Ensure all ancestor directories are represented in the map.
-  for (let d = 0; d < dirSegments.length; d++) {
-    const parentKey = d === 0 ? '.' : dirSegments.slice(0, d).join('/');
-    const childName = dirSegments[d];
-
-    let parentEntries = treeMap.get(parentKey);
-    if (parentEntries == null) {
-      parentEntries = [];
-      treeMap.set(parentKey, parentEntries);
+    // Ensure all ancestor directories exist in dirMap.
+    for (let d = 0; d < dirSegments.length; d++) {
+      const ancestorKey = d === 0 ? '.' : dirSegments.slice(0, d).join('/');
+      const childName = dirSegments[d];
+      const childKey = dirSegments.slice(0, d + 1).join('/');
+      if (!dirMap.has(childKey)) {
+        dirMap.set(childKey, new Map());
+      }
+      const parentMap = dirMap.get(ancestorKey);
+      if (parentMap != null && !parentMap.has(childName)) {
+        // Placeholder subtree node — children populated below.
+        parentMap.set(childName, {
+          entry: { mode: '040000', path: childName, oid: '', type: 'tree' },
+        });
+      }
     }
 
-    if (!parentEntries.some((e) => e.path === childName && e.type === 'tree')) {
-      // Placeholder — will be replaced with real OID after writeTree pass
-      parentEntries.push({
-        mode: '040000',
-        path: childName,
-        oid: '', // filled in bottom-up write pass
-        type: 'tree',
-      });
+    // Add the blob leaf to its directory.
+    let targetMap = dirMap.get(dirKey);
+    if (targetMap == null) {
+      targetMap = new Map();
+      dirMap.set(dirKey, targetMap);
     }
+    targetMap.set(filename, {
+      entry: { mode: '100644', path: filename, oid: blobOid, type: 'blob' },
+    });
   }
+
+  /**
+   * Recursively attaches children to subtree nodes by reading from dirMap.
+   */
+  function attachChildren(
+    prefix: string,
+    nodes: ReadonlyArray<TreeNode>,
+  ): ReadonlyArray<TreeNode> {
+    return nodes.map((node) => {
+      if (node.entry.type !== 'tree') return node;
+      const childKey =
+        prefix !== '' ? `${prefix}/${node.entry.path}` : node.entry.path;
+      const childMap = dirMap.get(childKey);
+      if (childMap == null || childMap.size === 0) {
+        return { ...node, children: [] };
+      }
+      const childNodes = Array.from(childMap.values());
+      return {
+        ...node,
+        children: attachChildren(childKey, childNodes),
+      };
+    });
+  }
+
+  const rootMap = dirMap.get('.') ?? new Map();
+  const rootNodes = Array.from(rootMap.values());
+  return attachChildren('', rootNodes);
 }
 
 /**
- * Builds a merged root tree from a flat map of filePath → blobOid.
- * The tree is written bottom-up (deepest directories first).
+ * Writes a recursive TreeNode[] structure to git storage bottom-up.
+ *
+ * Subtrees are written deepest-first so that child OIDs are available when
+ * parent trees reference them.
+ *
+ * @param nodes - Root-level TreeNode array (after normalization).
+ * @returns OID of the written root tree object.
+ */
+async function writeTreeNodes(nodes: ReadonlyArray<TreeNode>): Promise<string> {
+  /**
+   * Recursively writes a subtree and returns its OID.
+   */
+  async function writeNode(node: TreeNode): Promise<TreeEntry> {
+    if (node.entry.type === 'blob' || node.children == null) {
+      return node.entry;
+    }
+    // Recurse into children first (bottom-up).
+    const childEntries: TreeEntry[] = [];
+    for (const child of node.children) {
+      // biome-ignore lint/performance/noAwaitInLoops: bottom-up tree writes must be sequential — child OID must exist before parent can reference it
+      childEntries.push(await writeNode(child));
+    }
+    const subtreeOid = await VaultRepoStorage.writeTree(childEntries);
+    return { ...node.entry, oid: subtreeOid };
+  }
+
+  const rootEntries: TreeEntry[] = [];
+  for (const node of nodes) {
+    // biome-ignore lint/performance/noAwaitInLoops: bottom-up tree writes must be sequential — child OID must exist before parent can reference it
+    rootEntries.push(await writeNode(node));
+  }
+  return VaultRepoStorage.writeTree(rootEntries);
+}
+
+/**
+ * Builds a merged root tree from a flat map of filePath → blobOid, applying
+ * VaultTreeNormalizer to resolve case-insensitive name collisions before
+ * writing to storage.
+ *
+ * Order of operations (satisfies req 4.9):
+ *   1. Build in-memory TreeNode[] from the ACL-resolved flat file map.
+ *   2. Apply normalizeTree() — deterministic, pure, no I/O.
+ *   3. Write the normalized tree bottom-up to the git object store.
  *
  * @param fileMap - Map of filePath (e.g. 'docs/api/page.md') → blobOid.
  * @returns Root tree OID.
  */
-async function buildTreeFromFileMap(
-  fileMap: Map<string, string>,
-): Promise<string> {
-  // Build a mutable tree structure: dirPath → TreeEntry[]
-  const treeMap = new Map<string, TreeEntry[]>();
-  treeMap.set('.', []);
-
-  for (const [filePath, blobOid] of fileMap) {
-    const segments = filePath.split('/');
-    insertIntoTreeMap(treeMap, segments, blobOid);
-  }
-
+function buildTreeFromFileMap(fileMap: Map<string, string>): Promise<string> {
   if (fileMap.size === 0) {
-    // Empty merged tree
     return VaultRepoStorage.writeTree([]);
   }
 
-  // Collect all directory keys and sort deepest first so that child OIDs are
-  // known before parent trees reference them.
-  const allDirKeys = Array.from(treeMap.keys()).filter((k) => k !== '.');
-  allDirKeys.sort((a, b) => {
-    const depthA = a.split('/').length;
-    const depthB = b.split('/').length;
-    return depthB - depthA; // deepest first
-  });
+  // Step 1: Build in-memory recursive tree (pure, no I/O).
+  const rawNodes = buildTreeNodes(fileMap);
 
-  const oidMap = new Map<string, string>(); // dirPath → treeOid
+  // Step 2: Normalize — resolve case-insensitive collisions (req 4.9, 4.10, 4.11).
+  // Applied AFTER ACL priority resolution (which happened in collectLeafBlobs).
+  const normalizedNodes = normalizeTree(rawNodes);
 
-  // Write each non-root directory tree.
-  for (const dirKey of allDirKeys) {
-    const entries = treeMap.get(dirKey) ?? [];
-    // Replace any placeholder subtree entries with their real OIDs.
-    const resolvedEntries: TreeEntry[] = entries.map((e) => {
-      if (e.type === 'tree') {
-        const childKey = dirKey === '.' ? e.path : `${dirKey}/${e.path}`;
-        const realOid = oidMap.get(childKey);
-        if (realOid != null) {
-          return { ...e, oid: realOid };
-        }
-      }
-      return e;
-    });
-    // biome-ignore lint/performance/noAwaitInLoops: bottom-up tree writes must be sequential — child OID must exist before parent can reference it
-    const treeOid = await VaultRepoStorage.writeTree(resolvedEntries);
-    oidMap.set(dirKey, treeOid);
-  }
-
-  // Write the root tree.
-  const rootEntries = treeMap.get('.') ?? [];
-  const resolvedRoot: TreeEntry[] = rootEntries.map((e) => {
-    if (e.type === 'tree') {
-      const realOid = oidMap.get(e.path);
-      if (realOid != null) {
-        return { ...e, oid: realOid };
-      }
-    }
-    return e;
-  });
-
-  return VaultRepoStorage.writeTree(resolvedRoot);
+  // Step 3: Write the normalized tree bottom-up to the git object store.
+  return writeTreeNodes(normalizedNodes);
 }
 
 // ---------------------------------------------------------------------------

@@ -712,6 +712,203 @@ describe('compose — conflict resolution (same path, multiple namespaces)', () 
 });
 
 // ---------------------------------------------------------------------------
+// Test: normalizer integration — cross-namespace case collision
+// ---------------------------------------------------------------------------
+
+describe('compose — normalizer: cross-namespace case collision (4.9, 4.10, 4.11)', () => {
+  /**
+   * Scenario:
+   *   public namespace: provides `Foo.md` (upper-case F)
+   *   group-eng namespace: provides `foo.md` (lower-case f)
+   *
+   * After full merge → normalizer, both files exist in the view but with
+   * distinct `__<hash8>` suffixes so the client can distinguish them.
+   *
+   * The test verifies that writeTree is eventually called with entries whose
+   * paths differ from each other (i.e. both survived and were disambiguated).
+   */
+  it('disambiguates cross-namespace case collision with __<hash8> suffix after full merge', async () => {
+    const BLOB_FOO_PUBLIC = 'blob-foo-public-000000000000000000000000';
+    const BLOB_FOO_GROUP = 'blob-foo-group-00000000000000000000000000';
+    const COMMIT_PUBLIC_CASE = '1111aaaa0000000000000000000000000000000a';
+    const COMMIT_GROUP_CASE = '2222bbbb0000000000000000000000000000000b';
+
+    mockFindByUserId.mockResolvedValue(null);
+    mockGetCommitOidMap.mockResolvedValue({
+      public: COMMIT_PUBLIC_CASE,
+      'group-eng': COMMIT_GROUP_CASE,
+    });
+
+    mockReadRef.mockImplementation(async (refPath: string) => {
+      if (refPath.includes('/public/')) return COMMIT_PUBLIC_CASE;
+      if (refPath.includes('/group-eng/')) return COMMIT_GROUP_CASE;
+      return null;
+    });
+
+    // Each namespace root has a single file that only differs in case.
+    mockReadTree.mockImplementation(async (oid: string) => {
+      if (oid === COMMIT_PUBLIC_CASE) {
+        return [
+          {
+            mode: '100644',
+            path: 'Foo.md',
+            oid: BLOB_FOO_PUBLIC,
+            type: 'blob' as const,
+          },
+        ];
+      }
+      if (oid === COMMIT_GROUP_CASE) {
+        return [
+          {
+            mode: '100644',
+            path: 'foo.md',
+            oid: BLOB_FOO_GROUP,
+            type: 'blob' as const,
+          },
+        ];
+      }
+      return [];
+    });
+
+    // Capture all writeTree calls to inspect the final root entries.
+    const writtenEntryLists: Array<
+      ReadonlyArray<{ path: string; oid: string }>
+    > = [];
+    mockWriteTree.mockImplementation(async (entries) => {
+      writtenEntryLists.push(
+        entries as unknown as Array<{ path: string; oid: string }>,
+      );
+      return TREE_OID_MERGED;
+    });
+    mockWriteCommit.mockResolvedValue(COMMIT_OID_VIEW_NEW);
+
+    await compose(USER_ID, ['public', 'group-eng']);
+
+    // After normalization, the root tree must contain two entries (both files
+    // survived), and their names must differ from each other and from the
+    // original bare names (i.e. each has a suffix applied).
+    const rootEntries = writtenEntryLists[writtenEntryLists.length - 1];
+    expect(rootEntries).toBeDefined();
+
+    // Both blobs must be present (neither was silently dropped).
+    const pathsWritten = rootEntries.map((e) => e.path);
+    expect(pathsWritten).toHaveLength(2);
+
+    // Neither entry should be the original bare name (suffix must have been applied).
+    expect(pathsWritten).not.toContain('Foo.md');
+    expect(pathsWritten).not.toContain('foo.md');
+
+    // The two entries must be distinct from each other.
+    expect(new Set(pathsWritten).size).toBe(2);
+  });
+
+  /**
+   * Scenario: delta merge path — same cross-namespace case collision.
+   * Ensures normalizer runs on delta merge output too.
+   */
+  it('disambiguates case collision in the delta merge path', async () => {
+    const BLOB_FOO_PUBLIC = 'blob-foo-public-delta-0000000000000000000';
+    const BLOB_FOO_GROUP = 'blob-foo-group-delta-00000000000000000000';
+    const COMMIT_PUBLIC_DELTA = '1111cccc0000000000000000000000000000000c';
+    const COMMIT_GROUP_OLD = '2222dddd0000000000000000000000000000000d';
+    const COMMIT_GROUP_NEW = '2222eeee0000000000000000000000000000000e';
+
+    // Existing view (cache miss — group-eng changed)
+    mockFindByUserId.mockResolvedValue(
+      makeUserView({
+        sourceVersions: {
+          public: COMMIT_PUBLIC_DELTA,
+          'group-eng': COMMIT_GROUP_OLD,
+        },
+      }),
+    );
+
+    mockGetCommitOidMap.mockResolvedValue({
+      public: COMMIT_PUBLIC_DELTA,
+      'group-eng': COMMIT_GROUP_NEW,
+    });
+
+    mockReadRef.mockImplementation(async (refPath: string) => {
+      if (refPath.includes('/public/')) return COMMIT_PUBLIC_DELTA;
+      if (refPath.includes('/group-eng/')) return COMMIT_GROUP_NEW;
+      return null;
+    });
+
+    mockReadTree.mockImplementation(async (oid: string) => {
+      if (oid === COMMIT_PUBLIC_DELTA) {
+        return [
+          {
+            mode: '100644',
+            path: 'Foo.md',
+            oid: BLOB_FOO_PUBLIC,
+            type: 'blob' as const,
+          },
+        ];
+      }
+      if (oid === COMMIT_GROUP_NEW) {
+        return [
+          {
+            mode: '100644',
+            path: 'foo.md',
+            oid: BLOB_FOO_GROUP,
+            type: 'blob' as const,
+          },
+        ];
+      }
+      return [];
+    });
+
+    const writtenEntryLists: Array<
+      ReadonlyArray<{ path: string; oid: string }>
+    > = [];
+    mockWriteTree.mockImplementation(async (entries) => {
+      writtenEntryLists.push(
+        entries as unknown as Array<{ path: string; oid: string }>,
+      );
+      return TREE_OID_MERGED;
+    });
+    mockWriteCommit.mockResolvedValue(COMMIT_OID_VIEW_NEW);
+
+    await compose(USER_ID, ['public', 'group-eng']);
+
+    const rootEntries = writtenEntryLists[writtenEntryLists.length - 1];
+    expect(rootEntries).toBeDefined();
+
+    const pathsWritten = rootEntries.map((e) => e.path);
+    expect(pathsWritten).toHaveLength(2);
+    expect(pathsWritten).not.toContain('Foo.md');
+    expect(pathsWritten).not.toContain('foo.md');
+    expect(new Set(pathsWritten).size).toBe(2);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Test: cache hit → normalizer is skipped
+// ---------------------------------------------------------------------------
+
+describe('compose — cache hit skips normalizer (4.9)', () => {
+  it('does not call writeTree (and thus normalizer) when sourceVersions match', async () => {
+    // sourceVersions match current state → cache hit
+    const existingView = makeUserView({
+      sourceVersions: {
+        public: COMMIT_OID_PUBLIC,
+        'group-eng': COMMIT_OID_GROUP,
+        [`user-${USER_ID}-only-me`]: COMMIT_OID_ONLY_ME,
+      },
+    });
+    mockFindByUserId.mockResolvedValue(existingView);
+
+    await compose(USER_ID, NAMESPACES);
+
+    // Cache hit path must skip all merge and normalization work.
+    expect(mockReadRef).not.toHaveBeenCalled();
+    expect(mockReadTree).not.toHaveBeenCalled();
+    expect(mockWriteTree).not.toHaveBeenCalled();
+    expect(mockWriteCommit).not.toHaveBeenCalled();
+  });
+});
+
+// ---------------------------------------------------------------------------
 // Test: full merge fallback when base tree is gc-pruned
 // ---------------------------------------------------------------------------
 
