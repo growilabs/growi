@@ -4,9 +4,7 @@ import mongoose from 'mongoose';
 import { configManager } from '~/server/service/config-manager';
 
 import Contribution from '../models/contribution-model';
-import { ActivityAggregationService } from './activity-aggregation-service';
-
-const activityAggregationService = new ActivityAggregationService();
+import { getContributionActivities } from './activity-aggregation-service';
 
 export const migrateContributions = async (userId: string): Promise<void> => {
   if (userId == null || !mongoose.Types.ObjectId.isValid(userId)) {
@@ -21,12 +19,11 @@ export const migrateContributions = async (userId: string): Promise<void> => {
   const endDate = new Date();
 
   // Aggregate all Activity documents that counts as contributions
-  const activities =
-    await contributionAggregationService.runAggregationPipeline({
-      userId,
-      startDate,
-      endDate,
-    });
+  const activities = await getContributionActivities({
+    userId,
+    startDate,
+    endDate,
+  });
 
   // Using $set instead of $inc to make sure the count stays consistent in case
   // the migration script runs more than one time.

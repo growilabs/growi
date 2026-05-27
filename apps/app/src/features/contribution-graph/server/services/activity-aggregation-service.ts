@@ -3,7 +3,6 @@ import mongoose from 'mongoose';
 
 import Activity from '~/server/models/activity';
 
-import type { IActivityAggregationService } from '../../interfaces/activity-aggregation-service';
 import type { IContributionDay } from '../../interfaces/contribution-graph';
 import { ContributionGraphActions } from '../../interfaces/supported-actions';
 
@@ -13,47 +12,45 @@ export interface PipelineParams {
   endDate: Date;
 }
 
-export class ActivityAggregationService implements IActivityAggregationService {
-  runAggregationPipeline(
-    params: PipelineParams,
-  ): Aggregate<IContributionDay[]> {
-    const pipeline = this.buildPipeline(params);
-    const activityResults = Activity.aggregate(pipeline);
+export const getContributionActivities = (
+  params: PipelineParams,
+): Aggregate<IContributionDay[]> => {
+  const pipeline = buildPipeline(params);
+  const activityContributions = Activity.aggregate(pipeline);
 
-    return activityResults;
-  }
+  return activityContributions;
+};
 
-  private buildPipeline(params: PipelineParams): PipelineStage[] {
-    const { userId, startDate, endDate } = params;
+const buildPipeline = (params: PipelineParams): PipelineStage[] => {
+  const { userId, startDate, endDate } = params;
 
-    return [
-      {
-        $match: {
-          user: new mongoose.Types.ObjectId(userId),
-          action: { $in: Object.values(ContributionGraphActions) },
-          createdAt: { $gte: startDate, $lte: endDate },
-        },
+  return [
+    {
+      $match: {
+        user: new mongoose.Types.ObjectId(userId),
+        action: { $in: Object.values(ContributionGraphActions) },
+        createdAt: { $gte: startDate, $lte: endDate },
       },
-      {
-        $group: {
-          _id: {
-            $dateTrunc: {
-              date: '$createdAt',
-              unit: 'day',
-              timezone: 'UTC',
-            },
+    },
+    {
+      $group: {
+        _id: {
+          $dateTrunc: {
+            date: '$createdAt',
+            unit: 'day',
+            timezone: 'UTC',
           },
-          count: { $sum: 1 },
         },
+        count: { $sum: 1 },
       },
-      {
-        $project: {
-          _id: 0,
-          date: { $dateToString: { format: '%Y-%m-%d', date: '$_id' } },
-          count: '$count',
-        },
+    },
+    {
+      $project: {
+        _id: 0,
+        date: { $dateToString: { format: '%Y-%m-%d', date: '$_id' } },
+        count: '$count',
       },
-      { $sort: { date: 1 } },
-    ];
-  }
-}
+    },
+    { $sort: { date: 1 } },
+  ];
+};
