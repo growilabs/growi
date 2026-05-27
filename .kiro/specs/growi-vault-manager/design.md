@@ -172,7 +172,8 @@ apps/growi-vault-manager/
 │   │   ├── vault-namespace-builder.ts       # instruction → blob/tree/commit + ref 更新
 │   │   ├── vault-view-composer.ts           # 複数 namespace tree merge → user view ref
 │   │   ├── vault-repo-storage.ts            # bare repo 物理操作の抽象（git object I/O）
-│   │   ├── vault-path-mapper.ts             # ページパス → filePath（エンコード・衝突・orphan）
+│   │   ├── vault-path-mapper.ts             # ページパス → base filePath（エンコード・orphan、suffix なし）
+│   │   ├── vault-tree-normalizer.ts         # merged tree の compose-time 正規化（大小衝突 suffix）
 │   │   ├── vault-blob-hasher.ts             # isomorphic-git hashObject
 │   │   ├── vault-upload-pack-spawner.ts     # git upload-pack 子プロセス起動
 │   │   └── vault-maintenance-scheduler.ts  # squash + 周期 gc 自走スケジューラ
@@ -586,6 +587,13 @@ compose(userId, namespaces):
 **衝突解消（同一 path に複数 namespace のエントリ）**:
 優先順位: `user-<uid>-only-me` > `group-*` > `restricted-link` > `public`
 
+**Tree 正規化（compose-time, per-view / 要件 4.9–4.11）**:
+merged tree 確定後、view ごとに大小衝突解消を行う。merged tree の構造のみから決定論的に導出し、状態を永続化しない（reactive）。
+
+- **大小衝突解消**: 各ディレクトリ直下で小文字化キーが一致する 2 件以上のエントリ（blob・subtree 双方）に対し、各メンバー名へ `__<sha1(suffix付与前filePath)[0..7]>` を付与する。衝突が解消（メンバー 1 件）したら suffix を外す。
+
+実装は `vault-tree-normalizer.ts`（純関数: merged tree → normalized tree）に集約し、composer から呼ぶ。delta merge では membership が変化したディレクトリのみ再正規化すればよく、`sourceVersions` 一致時は正規化ごとスキップされる（キャッシュ維持）。
+
 **delta merge のフォールバック**: base tree が gc で消失している場合は full merge にフォールバック（要件 4.8）
 
 ---
@@ -643,8 +651,8 @@ interface CommitOptions {
 
 ```typescript
 interface VaultPathMapper {
-  // (pagePath, pageId) → filePath（純関数）
-  map(pagePath: string, pageId: string): string;
+  // pagePath → base filePath（純関数・tree state 非依存・suffix なし）
+  map(pagePath: string): string;
   // page path prefix → file path prefix（rename-prefix / grant-change-prefix 用）
   mapPrefix(pagePath: string): string;
 }
@@ -656,14 +664,16 @@ interface VaultPathMapper {
 - 制御文字（U+0000–U+001F, U+007F）→ `%XX`
 - Windows 予約ファイル名（CON / PRN / AUX / NUL / COM0–9 / LPT0–9）→ `_` プレフィックス付加
 
-**衝突解消規則**（純関数・tree state 非依存）:
-- 大文字を含む pagePath → `pageId` の SHA-1 先頭 8 文字を suffix として `<encoded-name>__<hash>.md` 形式で出力
-- 「衝突しないなら suffix を付けない」最適化は MVP では行わない（純関数性優先）
+**suffix 方針**:
+- `map()` は大小衝突回避の suffix を付与しない。素の `<encoded-name>.md`（base path）を返し、pageId を取らない
+- 大文字小文字非区別 fs での衝突解消は per-view の tree 正規化（VaultViewComposer / 要件 4）が担う。理由: 大小衝突の有無は ACL merge 後の view 単位でしか確定せず（例: `/Foo` が public、`/foo` が group namespace にあると merge 後の view で初めて衝突する）、純関数 `map()` の管轄外であるため
+- index 化（子を持つページの本文を `README.md` に集約）は行わない。子を持つページも `<name>.md` のままフォルダ `<name>/` の隣に置く（`.md` の有無で別名となり衝突しない）。これによりレイアウトが生きた子孫数に依存せず、子の増減で親ファイルが rename される churn を回避する
 
 **Orphan 規則**: 親ページが不可視または存在しない → `_orphaned/<encoded-path>.md`
 
 **Implementation Notes**:
-- エンコーディング規則は v1 確定後 immutable（Revalidation Trigger）
+- エンコーディング規則および tree 正規化規則（大小衝突 suffix）は v1 確定後 immutable（Revalidation Trigger）
+- `map()` は pageId を取らない（suffix を扱わないため）
 - `mapPrefix('/A/B')` はセグメント単位でエンコードして `/` 結合、末尾 `.md` なし
 
 ---

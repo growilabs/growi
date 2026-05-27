@@ -488,6 +488,60 @@
 
 ---
 
+- [ ] 19. markdown ファイル化ルールの見直し（collision-only・section-index 不採用）（**設計変更 / タスク 3.3・3.4・17.1 を supersede**）
+
+  当初の「大文字を含むパスに `pageId.slice(0,8)` の suffix を常時付与」ルール（3.3/3.4）には 2 つの問題があった。(a) ObjectId の先頭 8 文字は作成時刻（秒）であり、同一秒に作成されたページで suffix が衝突して一意性が成立しない実装バグ。(b) 大文字を含むほぼ全ページに `__hash` が付き clone が雑然とする。requirements 3.5 / 4.9–4.11 の改訂に従い、`map()` から suffix と pageId を除去し、大小衝突の解消のみを compose 時の per-view tree 正規化（collision-only・reactive）へ移す。section-index（子を持つページの本文を README.md へ集約）は、子の増減で親ファイルが rename される churn を理由に採用しない（子を持つページも `<name>.md` のままフォルダ `<name>/` の隣に置く）。
+
+- [ ] 19.1 VaultPathMapper から大文字 suffix と pageId 引数を除去（TDD）
+  - 先に `apps/growi-vault-manager/src/services/vault-path-mapper.spec.ts` を改訂し、大文字 suffix の期待値を削除して red にする（`map('/MyPage')` → `MyPage.md`、`map('/a/B/c')` → `a/B/c.md`、`map('/Sandbox/test')` → `Sandbox/test.md`）
+  - `vault-path-mapper.ts` の `hasUpperCase` と suffix 付与ロジック、`map` の `pageId` 引数を削除し `map(pagePath: string): string` にする。ヘッダコメントの immutable 規則一覧から「大文字 suffix」を除去する
+  - エンコード規則（Windows 予約文字・予約ファイル名・制御文字・先頭末尾空白・orphan・`.md` 付与）が不変であることを既存テストで保証する
+  - **完了確認**: `pnpm vitest run vault-path-mapper.spec` が全件 PASS し、`map()` の出力に `__<hash>` が一切現れないこと
+  - _Requirements: 3.1, 3.5_
+  - _Boundary: apps/growi-vault-manager/src/services/vault-path-mapper.ts, vault-path-mapper.spec.ts_
+
+- [ ] 19.2 map() 呼び出し側を新シグネチャに追従
+  - `vault-namespace-builder.ts` ほか `map(pagePath, pageId)` を呼ぶ全箇所を `map(pagePath)` に更新する（pageId は commit メタデータ用途では引き続き保持）
+  - 既存の builder ユニットテストが新シグネチャで PASS することを確認する
+  - **完了確認**: `pnpm vitest run vault-namespace-builder.spec` が PASS し、`turbo run build --filter @growi/vault-manager` の型チェックが通ること
+  - _Depends: 19.1_
+  - _Requirements: 3.5_
+  - _Boundary: apps/growi-vault-manager/src/services/vault-namespace-builder.ts_
+
+- [ ] 19.3 (P) VaultTreeNormalizer（compose 時の大小衝突 suffix・reactive）を新規実装（TDD）
+  - 先に `apps/growi-vault-manager/src/services/vault-tree-normalizer.spec.ts` を作成し red で定義する: (1) 衝突なし → 無変化、(2) 同一ディレクトリで小文字化一致する blob 2 件 → 双方に `__<sha1(付与前filePath)[0..7]>` 付与、(3) subtree 同士の大小衝突 → ディレクトリ名に suffix、(4) 衝突解消（メンバー 1 件化）→ suffix 除去
+  - `vault-tree-normalizer.ts` を純関数（merged tree → normalized tree）として実装する。hash は付与前 filePath の SHA-1 先頭 8 文字。付与有無の状態は永続化しない
+  - **完了確認**: `pnpm vitest run vault-tree-normalizer.spec` が全件 PASS し、衝突しないツリーでは suffix が一切付かないこと
+  - _Requirements: 4.9, 4.10, 4.11_
+  - _Boundary: apps/growi-vault-manager/src/services/vault-tree-normalizer.ts, vault-tree-normalizer.spec.ts_
+
+- [ ] 19.4 VaultViewComposer に normalizer を配線（full / delta 双方）
+  - `vault-view-composer.ts` の merged tree 確定後（full merge・delta merge 双方の出力）に VaultTreeNormalizer を適用してから commit / ref 更新を行う
+  - delta merge では membership が変化したディレクトリのみ再正規化され、`sourceVersions` 一致のキャッシュヒット時は normalizer ごとスキップされること
+  - 既存の ACL 優先順位衝突解消（6.3）とは別レイヤーであり、適用順序が ACL merge → tree 正規化であること
+  - **完了確認**: composer のユニットテストで、cross-namespace の大小衝突（`/Foo` public・`/foo` group）が view 内で別 suffix に解決されること、キャッシュヒット時に normalizer が呼ばれないことを assertion する
+  - _Depends: 19.3_
+  - _Requirements: 4.9, 4.10, 4.11_
+  - _Boundary: apps/growi-vault-manager/src/services/vault-view-composer.ts_
+
+- [ ] 19.5 (P) README のファイル名マッピング規則を新ルールに更新（タスク 17.1 の改訂）
+  - `apps/growi-vault-manager/README.md` から「大文字 suffix `__<hash8>` を常時付与」の記述とサンプル（`/Sandbox/Markdown` → `Sandbox/Markdown__<hash8>.md`）を削除する
+  - 新ルールを表または例示で記述する: suffix は大小衝突時のみ・collision-only、子を持つページも `<name>.md` でフォルダの隣（README 集約なし）。サンプル: `/Sandbox` → `Sandbox.md`（隣に `Sandbox/`）、`/Foo` と `/foo` が同一 view に共存する場合のみ双方に `__<hash8>` が付く
+  - **完了確認**: README に「大文字で常時 `__<hash8>` 付与」を示す記述が残っていないこと
+  - _Depends: 19.1_
+  - _Requirements: 3.5, 4.10_
+  - _Boundary: apps/growi-vault-manager/README.md_
+
+- [ ] 19.6 clone E2E インテグレーションテストを新ルールで検証（タスク 11.1 の追補）
+  - `apps/growi-vault-manager/src/__tests__/clone-e2e.integ.ts` に、衝突のないシード相当（`/Sandbox` + 子 `/Sandbox/Bootstrap5` 等）を投入し clone 結果が `Sandbox.md` + `Sandbox/Bootstrap5.md`（`__hash` なし）になることを検証する
+  - 大小衝突ケース（`/Foo` と `/foo`）を投入し、双方に異なる `__<hash8>` が付くことを検証する
+  - **完了確認**: `RUN_VAULT_INTEG=true` で当該シナリオが PASS すること
+  - _Depends: 19.4_
+  - _Requirements: 4.10, 4.11_
+  - _Boundary: apps/growi-vault-manager/src/__tests__/clone-e2e.integ.ts_
+
+---
+
 ## Implementation Notes
 
 実装を経て判明した、refactor 時に押さえるべき設計上の課題・教訓を記録する。

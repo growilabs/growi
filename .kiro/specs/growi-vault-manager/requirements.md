@@ -48,15 +48,15 @@
 
 ### 要件 3: ページパスの純関数マッピング
 
-**目的**: 開発者として、VaultPathMapper が `(pagePath, pageId)` のペアを同一の filePath に決定論的にマッピングしてほしい。これにより reverse-index コレクション不要で、30,000 ページ規模でも `vault_namespace_state` のドキュメントサイズが固定に保たれる。
+**目的**: 開発者として、VaultPathMapper が pagePath を同一の base filePath に決定論的にマッピングしてほしい。これにより reverse-index コレクション不要で、30,000 ページ規模でも `vault_namespace_state` のドキュメントサイズが固定に保たれる。大文字小文字非区別 fs での大小衝突回避は、ACL merge 後の view 構造に依存するため、純関数 `map()` ではなく per-view の tree 正規化（要件 4）が担う。なお、子を持つページの本文はフォルダの隣の `<name>.md` に置き（`<name>.md` とフォルダ `<name>/` は別名のため衝突しない）、index 化（README.md 集約）は行わない。
 
 #### 受け入れ基準
 
-1. 同一の `(pagePath, pageId)` ペアを入力したとき、VaultPathMapper は常に同一の filePath を返す（純関数性）
+1. 同一の pagePath を入力したとき、VaultPathMapper は常に同一の base filePath を返す（純関数性・tree state 非依存）
 2. GROWI ページパス `/A/B/C` を入力したとき、VaultPathMapper は `A/B/C.md` 形式の filePath を返し、先頭スラッシュを除去して `.md` を付与する
 3. Windows 予約文字（`<>:"/\|?*`）、先頭・末尾空白、制御文字を含むページパスを入力したとき、VaultPathMapper はそれらを `%XX` パーセントエンコーディングに変換する
 4. Windows 予約ファイル名（CON / PRN / AUX / NUL / COM[0-9] / LPT[0-9]）を含むページパスを入力したとき、VaultPathMapper はその名前の前に `_` プレフィックスを付加する
-5. 大文字を含む pagePath を入力したとき、VaultPathMapper は pageId の SHA-1 先頭 8 文字を suffix として `<encoded-name>__<hash>.md` 形式で出力する（大文字小文字非区別 fs での衝突防止）
+5. VaultPathMapper は大小衝突回避の suffix を付与しない。`map()` は suffix なしの素の `<encoded-name>.md`（base path）のみを返し、pageId 引数を取らない。大文字小文字非区別 fs での衝突解消は per-view の tree 正規化（要件 4）が担う
 6. 親ページが不可視または存在しない orphan ページを入力したとき、VaultPathMapper は `_orphaned/<encoded-path>.md` の形式で filePath を返す
 7. VaultPathMapper が `mapPrefix(pagePath)` を呼び出したとき、GROWI ページパスのセグメントをエンコードして `/` で結合したディレクトリ prefix を返し、末尾に `.md` を付けない
 
@@ -76,6 +76,9 @@
 6. 同一 path に複数 namespace からのエントリが衝突するとき、VaultViewComposer は `user-<uid>-only-me` > `group-*` > `restricted-link` > `public` の優先順位で解決する
 7. `userId: null` を受信したとき、VaultViewComposer は public namespace のみで合成して `anonymous-view` ref を返す
 8. VaultViewComposer が delta merge の base tree が gc により消失していることを検知したとき、full merge にフォールバックする
+9. VaultViewComposer は merged tree を生成したのち、その view の最終ファイル構造を確定する **tree 正規化**（大小衝突解消）を実行する。正規化は merged tree の構造のみから決定論的に導出され、reverse-index コレクションを必要としない
+10. （大小衝突解消）同一ディレクトリ直下で、小文字化して一致する名前が 2 件以上存在するとき（blob・subtree の双方を対象）、VaultViewComposer は各メンバーの名前に `__<hash8>` suffix を付与して衝突を解消する。`hash8` は当該エントリの suffix 付与前 filePath の SHA-1 先頭 8 文字とする（pagePath は GROWI 内で一意のため、衝突する各メンバーは必ず異なる suffix を得る）
+11. （reactive churn）衝突していたエントリの一方が view から消え、グループのメンバーが 1 件になったとき、VaultViewComposer は残ったエントリの suffix を取り除いて素の名前に戻す。suffix 付与の有無を示す状態は永続化しない
 
 ---
 
