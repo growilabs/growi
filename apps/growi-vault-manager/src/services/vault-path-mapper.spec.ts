@@ -5,7 +5,7 @@
  *  - Pure function property (same input → same output)
  *  - Windows reserved character encoding
  *  - Windows reserved filename prefixing
- *  - Uppercase suffix for case-insensitive fs collision avoidance
+ *  - No uppercase suffix (case-insensitive fs collision avoidance is handled by tree normalisation)
  *  - Orphan page relocation to _orphaned/
  *  - mapPrefix behaviour
  */
@@ -15,27 +15,20 @@ import { describe, expect, it } from 'vitest';
 import { isExcludedFromVault, map, mapPrefix } from './vault-path-mapper.js';
 
 // ---------------------------------------------------------------------------
-// Helpers
-// ---------------------------------------------------------------------------
-
-const PAGE_ID = '507f1f77bcf86cd799439011';
-const PAGE_ID_8 = PAGE_ID.slice(0, 8); // '507f1f77'
-
-// ---------------------------------------------------------------------------
 // Basic mapping
 // ---------------------------------------------------------------------------
 
 describe('map — basic path transformation', () => {
   it('strips the leading slash and appends .md for a simple lowercase path', () => {
-    expect(map('/hello/world', PAGE_ID)).toBe('hello/world.md');
+    expect(map('/hello/world')).toBe('hello/world.md');
   });
 
   it('handles a top-level page (single segment)', () => {
-    expect(map('/readme', PAGE_ID)).toBe('readme.md');
+    expect(map('/readme')).toBe('readme.md');
   });
 
   it('handles deeply nested lowercase paths', () => {
-    expect(map('/a/b/c/d', PAGE_ID)).toBe('a/b/c/d.md');
+    expect(map('/a/b/c/d')).toBe('a/b/c/d.md');
   });
 });
 
@@ -46,18 +39,11 @@ describe('map — basic path transformation', () => {
 describe('map — pure function property', () => {
   it('returns the same output for the same inputs when called multiple times', () => {
     const pagePath = '/Some/Path/With/Upper';
-    const first = map(pagePath, PAGE_ID);
-    const second = map(pagePath, PAGE_ID);
-    const third = map(pagePath, PAGE_ID);
+    const first = map(pagePath);
+    const second = map(pagePath);
+    const third = map(pagePath);
     expect(first).toBe(second);
     expect(second).toBe(third);
-  });
-
-  it('returns different outputs for different pageIds when path has uppercase', () => {
-    const pagePath = '/MyPage';
-    const id1 = '000000001111111122222222';
-    const id2 = 'aaaaaaaabbbbbbbbcccccccc';
-    expect(map(pagePath, id1)).not.toBe(map(pagePath, id2));
   });
 });
 
@@ -67,25 +53,25 @@ describe('map — pure function property', () => {
 
 describe('map — Windows reserved character encoding', () => {
   it('encodes < (less-than)', () => {
-    const result = map('/page<name', PAGE_ID);
+    const result = map('/page<name');
     expect(result).toContain('%3C');
     expect(result).not.toContain('<');
   });
 
   it('encodes > (greater-than)', () => {
-    const result = map('/page>name', PAGE_ID);
+    const result = map('/page>name');
     expect(result).toContain('%3E');
     expect(result).not.toContain('>');
   });
 
   it('encodes : (colon)', () => {
-    const result = map('/page:name', PAGE_ID);
+    const result = map('/page:name');
     expect(result).toContain('%3A');
     expect(result).not.toContain(':');
   });
 
   it('encodes " (double-quote)', () => {
-    const result = map('/page"name', PAGE_ID);
+    const result = map('/page"name');
     expect(result).toContain('%22');
     expect(result).not.toContain('"');
   });
@@ -96,25 +82,25 @@ describe('map — Windows reserved character encoding', () => {
     // path could somehow contain a literal slash inside a segment it should
     // be encoded. The mapper splits on '/' first, so this test is N/A for
     // normal usage. We test the segment encoding logic via backslash instead.
-    const result = map('/page\\name', PAGE_ID);
+    const result = map('/page\\name');
     expect(result).toContain('%5C');
     expect(result).not.toContain('\\');
   });
 
   it('encodes | (pipe)', () => {
-    const result = map('/page|name', PAGE_ID);
+    const result = map('/page|name');
     expect(result).toContain('%7C');
     expect(result).not.toContain('|');
   });
 
   it('encodes ? (question-mark)', () => {
-    const result = map('/page?name', PAGE_ID);
+    const result = map('/page?name');
     expect(result).toContain('%3F');
     expect(result).not.toContain('?');
   });
 
   it('encodes * (asterisk)', () => {
-    const result = map('/page*name', PAGE_ID);
+    const result = map('/page*name');
     expect(result).toContain('%2A');
     expect(result).not.toContain('*');
   });
@@ -153,53 +139,55 @@ describe('map — Windows reserved filename prefix', () => {
   for (const name of reservedNames) {
     it(`prefixes reserved filename '${name}' with underscore`, () => {
       const pagePath = `/${name}`;
-      const result = map(pagePath, PAGE_ID);
-      // Reserved names like CON/PRN are uppercase, so they also receive the
-      // pageId collision-avoidance suffix. The segment before .md must start
-      // with '_<name>' regardless of the suffix.
-      const segmentWithSuffix = result.replace(/\.md$/, '');
-      expect(segmentWithSuffix.startsWith(`_${name}`)).toBe(true);
+      const result = map(pagePath);
+      // Reserved names like CON/PRN are uppercase but no suffix is added.
+      // The segment before .md must start with '_<name>'.
+      const segmentWithoutExt = result.replace(/\.md$/, '');
+      expect(segmentWithoutExt.startsWith(`_${name}`)).toBe(true);
     });
   }
 
   it('is case-insensitive for reserved name detection (lowercase)', () => {
-    const result = map('/con', PAGE_ID);
-    // Lowercase 'con' has no uppercase letters, so no pageId suffix.
+    const result = map('/con');
     expect(result).toBe('_con.md');
   });
 
   it('does not prefix non-reserved names', () => {
-    expect(map('/notes', PAGE_ID)).toBe('notes.md');
-    expect(map('/contest', PAGE_ID)).toBe('contest.md');
+    expect(map('/notes')).toBe('notes.md');
+    expect(map('/contest')).toBe('contest.md');
   });
 });
 
 // ---------------------------------------------------------------------------
-// Uppercase suffix (case-insensitive fs collision avoidance)
+// Uppercase paths — no suffix applied (req 3.5)
 // ---------------------------------------------------------------------------
 
-describe('map — uppercase suffix', () => {
-  it('appends __<pageId[0..7]> suffix when pagePath contains uppercase letters', () => {
-    const result = map('/MyPage', PAGE_ID);
-    expect(result).toBe(`MyPage__${PAGE_ID_8}.md`);
+describe('map — uppercase paths produce no suffix', () => {
+  it('does NOT append any suffix when pagePath contains uppercase letters', () => {
+    const result = map('/MyPage');
+    expect(result).toBe('MyPage.md');
   });
 
   it('does NOT append suffix when pagePath is entirely lowercase', () => {
-    const result = map('/mypage', PAGE_ID);
+    const result = map('/mypage');
     expect(result).toBe('mypage.md');
   });
 
-  it('appends suffix for uppercase in any segment', () => {
-    const result = map('/a/B/c', PAGE_ID);
-    // Entire path has uppercase, suffix is on the last segment
-    expect(result).toBe(`a/B/c__${PAGE_ID_8}.md`);
+  it('returns plain encoded path even when uppercase appears in a middle segment', () => {
+    const result = map('/a/B/c');
+    expect(result).toBe('a/B/c.md');
   });
 
-  it('uses exactly the first 8 chars of pageId as the suffix', () => {
-    const id = 'abcdefgh12345678';
-    const result = map('/Upper', id);
-    expect(result).toContain('__abcdefgh');
-    expect(result).not.toContain('__abcdefghi');
+  it('returns Sandbox/test.md for /Sandbox/test', () => {
+    const result = map('/Sandbox/test');
+    expect(result).toBe('Sandbox/test.md');
+  });
+
+  it('output never contains __<hash> suffix', () => {
+    const paths = ['/MyPage', '/a/B/c', '/Sandbox/test', '/Upper', '/CON'];
+    for (const p of paths) {
+      expect(map(p)).not.toMatch(/__[0-9a-f]{8}/);
+    }
   });
 });
 
@@ -232,21 +220,21 @@ describe('isExcludedFromVault', () => {
 
 describe('map — trash pages are mapped without _orphaned/ prefix', () => {
   it('maps /trash/foo without _orphaned/ prefix', () => {
-    const result = map('/trash/foo', PAGE_ID);
+    const result = map('/trash/foo');
     expect(result.startsWith('_orphaned/')).toBe(false);
     expect(result).toBe('trash/foo.md');
   });
 
   it('maps /trash itself without _orphaned/ prefix', () => {
-    const result = map('/trash', PAGE_ID);
+    const result = map('/trash');
     expect(result.startsWith('_orphaned/')).toBe(false);
     expect(result).toBe('trash.md');
   });
 
-  it('maps /trash/A/B with uppercase suffix, no _orphaned/ prefix', () => {
-    const result = map('/trash/A/B', PAGE_ID);
+  it('maps /trash/A/B without suffix and without _orphaned/ prefix', () => {
+    const result = map('/trash/A/B');
     expect(result.startsWith('_orphaned/')).toBe(false);
-    expect(result).toBe(`trash/A/B__${PAGE_ID_8}.md`);
+    expect(result).toBe('trash/A/B.md');
   });
 });
 
