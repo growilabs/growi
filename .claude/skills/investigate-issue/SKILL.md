@@ -1,19 +1,50 @@
 ---
-name: invest-issue
-description: Investigate a GitHub issue - fetch info, update labels, analyze code/reproduce, report findings, and optionally fix. Usage: /invest-issue <issue-url-or-number>
+name: investigate-issue
+description: Investigate a GitHub issue - fetch info, update labels, analyze code/reproduce, report findings, and optionally fix. Usage: /investigate-issue <issue-url-or-number>
+allowed-tools: Read, Write, Edit, Bash, Grep, Glob, Agent, AskUserQuestion
+argument-hint: <issue-url-or-number> [--auto]
 ---
 
-# /invest-issue — Issue Investigation
+# investigate-issue
+
+## Overview
 
 Investigate a GROWI GitHub issue end-to-end: fetch details, label it, analyze or reproduce the problem, report findings, and proceed to fix if approved.
+
+This skill supports two execution modes:
+- **interactive** (default): stop gates ask the user at each decision point — original behavior
+- **autonomous** (pass `--auto` or when invoked from a routine): stop gates are crossed automatically when confidence is HIGH; only stop when confidence is MEDIUM or LOW
 
 ## Input
 
 `$ARGUMENTS` is either:
 - A full GitHub issue URL: `https://github.com/growilabs/growi/issues/99999`
 - An issue number: `99999`
+- Either of the above with `--auto` appended to enable autonomous mode
 
-Parse the issue number from whichever form is provided.
+Parse the issue number from whichever form is provided. Detect `--auto` flag to set `mode = autonomous`; otherwise `mode = interactive`.
+
+---
+
+## Confidence Framework
+
+At each decision gate, assess confidence before deciding whether to ask the user.
+
+**CONFIDENCE levels:**
+
+| Level | Meaning | Action in `autonomous` mode | Action in `interactive` mode |
+|-------|---------|---------------------------|------------------------------|
+| HIGH | Evidence is clear, risk is low, path forward is unambiguous | Proceed autonomously — state the evidence and the decision made | Ask user (present recommendation clearly) |
+| MEDIUM | Some evidence exists but ambiguity remains, or blast radius is larger than expected | Stop and ask — present findings and your recommendation | Ask user |
+| LOW | Evidence is thin, multiple theories, or the change is risky | Stop and ask — present what is known and what is missing | Ask user |
+
+When stopping in `autonomous` mode (MEDIUM or LOW), present:
+1. What evidence was gathered
+2. Why confidence is not HIGH (specifically what is missing or ambiguous)
+3. A recommended action with your reasoning
+4. The alternatives
+
+---
 
 ## Step 1: Fetch Issue Information
 
@@ -30,6 +61,8 @@ Extract and display:
 - Reported GROWI version (look for version info in the body/comments)
 - Steps to reproduce (if any)
 - Expected vs actual behavior
+
+---
 
 ## Step 2: Update Labels — Mark as Under Investigation
 
@@ -53,6 +86,8 @@ gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_UN
 
 If `phase/new` is not present, skip the removal step and only add `phase/under-investigation`.
 
+---
+
 ## Step 3: Analyze the Issue
 
 ### 3-A: Version Check
@@ -62,16 +97,25 @@ If `phase/new` is not present, skip the removal step and only add `phase/under-i
    ```bash
    cat apps/app/package.json | grep '"version"'
    ```
-3. If the reported major version matches master's major version → proceed with master-branch analysis.
-4. If the reported major version is **older** than master's major version → **STOP analysis** and ask the user:
+3. If the reported major version **matches** master's major version → proceed directly to Step 3-B.
+4. If the reported major version is **older** than master's major version:
 
-   > Reported version is v{X}.x, but master is v{Y}.x.
-   > Would you like me to:
-   > 1. **Check out v{X}.x tag/branch** and analyze on that version
-   > 2. **Continue on master** — the issue may still be relevant
-   > 3. **Close as outdated** — skip analysis
+   **Autonomous confidence assessment — before asking, gather evidence:**
 
-   **Wait for the user's response before continuing to Step 3-B.**
+   Spawn a subagent to do a targeted search in the current codebase for any code paths, symptoms, or identifiers mentioned in the issue (error messages, function names, UI element names, API endpoints). Instruct the subagent to determine whether the issue is likely still present in master.
+
+   Then assess confidence:
+
+   - **HIGH**: The subagent finds the exact buggy code path unchanged in master (same logic, same file, same behavior described). Proceed on master and note: _"Reported on v{X}.x; confirmed the same code path is present in master — continuing analysis on master."_
+   - **MEDIUM**: Code has changed but it is unclear whether the bug was fixed or remains. Stop and ask:
+     > Reported version is v{X}.x, master is v{Y}.x. Related code has changed significantly (see evidence below).
+     > **Recommendation**: Continue on master to check if the behavior persists.
+     > Would you like me to: 1) Continue on master, 2) Check out v{X}.x tag, 3) Close as outdated?
+   - **LOW**: Major version gap, completely different architecture, or the subagent finds no relevant code. Stop and ask:
+     > Reported version is v{X}.x, master is v{Y}.x. Could not locate relevant code in master.
+     > Would you like me to: 1) Check out v{X}.x tag, 2) Continue on master anyway, 3) Close as outdated?
+
+   In `interactive` mode, always ask regardless of confidence. Present the evidence gathered and your recommendation.
 
 ### 3-B: Code Investigation
 
@@ -107,10 +151,12 @@ gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_CO
 gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "type/bug"
 ```
 
+---
+
 ## Step 4: Report Findings
 
 > **CRITICAL**: Do NOT modify any source files in this step. Step 4 is analysis and planning only.
-> Implementing code changes before receiving explicit user approval is strictly forbidden.
+> Implementing code changes before the gate in Step 4-C is strictly forbidden.
 
 ### 4-A: Report in This Session
 
@@ -136,7 +182,6 @@ List specific files and changes needed, but do NOT apply them yet.}
 
 **CRITICAL — Language rule**: Detect the language of the issue body (from Step 1) and write the comment **strictly in that language**, regardless of the language used in this conversation.
 The issue body language takes absolute priority over the conversation language.
-For example, if the issue body is written in English, the comment MUST be in English even if the user conversed in Japanese — and vice versa.
 
 Post the findings as a GitHub issue comment:
 
@@ -161,23 +206,34 @@ EOF
 )"
 ```
 
-### 4-C: STOP — Ask for Direction
+### 4-C: Fix Decision Gate
 
-**STOP HERE. Do not proceed to Step 5 until the user explicitly approves.**
+**Confidence assessment — evaluate before deciding:**
 
-After reporting, ask the user:
+Assess confidence based on:
+- Root cause: **pinpointed** (exact file + lines identified) vs. **suspected** vs. **unknown**
+- Fix approach: **clear** (1-3 files, minimal blast radius, no architectural change) vs. **complex** vs. **unclear**
+- Risk: **low** (isolated logic, well-tested module) vs. **medium** vs. **high** (auth, data migration, shared utilities)
 
-> Investigation complete. Root cause [found / not yet confirmed].
-> Would you like me to:
-> 1. **Proceed with the fix** — I'll implement the fix now
-> 2. **Investigate further** — specify what additional analysis is needed
-> 3. **Stop here** — you'll handle the fix manually
+| Situation | Confidence |
+|-----------|-----------|
+| Root cause pinpointed + fix is surgical (1-3 files) + low risk | HIGH |
+| Root cause identified but fix touches multiple modules or has side effects | MEDIUM |
+| Root cause unconfirmed, multiple theories, or complex fix | LOW |
 
-**Wait for the user's response before doing anything else.**
+**In `autonomous` mode:**
+- **HIGH** → proceed to Step 5 automatically. State: _"Root cause confirmed at {file}:{line}. Fix approach is clear and low-risk — proceeding to implementation."_
+- **MEDIUM or LOW** → stop and ask:
+  > Investigation complete. Root cause [found/not confirmed]. Fix confidence: {MEDIUM/LOW} because {specific reason}.
+  > **Recommendation**: {your recommended action with reasoning}
+  > Would you like me to: 1) Proceed with the fix, 2) Investigate further ({what specifically}), 3) Stop here?
 
-## Step 5: Implement the Fix (Only if Approved)
+**In `interactive` mode:**
+Always ask, presenting confidence level and recommendation clearly.
 
-Proceed only after explicit user approval.
+---
+
+## Step 5: Implement the Fix (Only if approved or autonomous HIGH confidence)
 
 ### 5-A: Add WIP Label — BEFORE Any Code Changes
 
@@ -200,8 +256,6 @@ Branch naming convention: `fix/{ISSUE_NUMBER}-{short-description}`
 git checkout -b fix/{ISSUE_NUMBER}-{short-description}
 ```
 
-Example: `fix/12345-page-title-overflow`
-
 ### 5-C: Implement the Fix
 
 - Make the minimal targeted fix
@@ -217,21 +271,27 @@ Example: `fix/12345-page-title-overflow`
   Fixes #ISSUE_NUMBER
   ```
 
-### 5-D: STOP — Ask for PR Approval
+### 5-D: PR Decision Gate
 
-**STOP HERE. Do not create a PR until the user explicitly approves.**
+**Confidence assessment — evaluate after implementation:**
 
-Report the implementation summary and ask:
+| Situation | Confidence |
+|-----------|-----------|
+| All tests pass + lint passes + fix stays within originally scoped files | HIGH |
+| Tests pass but warnings exist, or fix expanded beyond original scope | MEDIUM |
+| Tests fail, lint errors, or unexpected scope expansion | LOW |
 
-> Implementation complete. Changes committed to `fix/{ISSUE_NUMBER}-{short-description}`.
-> Would you like me to:
-> 1. **Create a PR** — I'll open a pull request now
-> 2. **Review first** — you'll review the changes before PR
-> 3. **Stop here** — you'll handle the PR manually
+**In `autonomous` mode:**
+- **HIGH** → proceed to create PR automatically. State: _"Tests and lint pass. Fix is within scope — creating PR."_
+- **MEDIUM or LOW** → stop and ask:
+  > Implementation complete on `fix/{ISSUE_NUMBER}-{short-description}`. PR confidence: {MEDIUM/LOW} because {specific reason — e.g., "2 tests failing in unrelated module", "fix expanded to touch auth middleware"}.
+  > **Recommendation**: {your recommended action}
+  > Would you like me to: 1) Create a PR, 2) Review first, 3) Stop here?
 
-**Wait for the user's response before proceeding.**
+**In `interactive` mode:**
+Always ask, presenting confidence level and recommendation clearly.
 
-### 5-E: Open a Pull Request (Only if Approved)
+### 5-E: Open a Pull Request (Only if approved or autonomous HIGH confidence)
 
 ```bash
 gh pr create \
@@ -272,9 +332,12 @@ gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --remove-label "{EXACT_PHASE
 gh issue edit {ISSUE_NUMBER} --repo growilabs/growi --add-label "{EXACT_PHASE_RESOLVED_LABEL}"
 ```
 
+---
+
 ## Error Handling
 
 - If the issue number is invalid or not found: display error from `gh` and stop
 - If `gh` is not authenticated: instruct the user to run `gh auth login`
 - If a label does not exist in the repo: note it in output and skip (don't create new labels)
 - If the dev server fails to start: note this and rely on code analysis only
+- If a subagent returns inconclusive results during confidence assessment: treat as MEDIUM confidence

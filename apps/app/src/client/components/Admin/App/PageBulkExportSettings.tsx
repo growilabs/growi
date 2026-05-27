@@ -7,6 +7,7 @@ import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useSWRxAppSettings } from '~/stores/admin/app-settings';
 
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
+import { ConfirmModal } from './ConfirmModal';
 
 const PageBulkExportSettings = (): JSX.Element => {
   const { t } = useTranslation(['admin', 'commons']);
@@ -21,6 +22,8 @@ const PageBulkExportSettings = (): JSX.Element => {
     setBulkExportDownloadExpirationSeconds,
   ] = useState(data?.bulkExportDownloadExpirationSeconds);
 
+  const [isReloadModalOpen, setReloadModalOpen] = useState(false);
+
   const changeBulkExportDownloadExpirationSeconds = (
     bulkExportDownloadExpirationDays: number,
   ) => {
@@ -30,6 +33,11 @@ const PageBulkExportSettings = (): JSX.Element => {
   };
 
   const onSubmitHandler = useCallback(async () => {
+    // Only the enable flag affects the page-side export menu visibility, which
+    // is hydrated once per page load and therefore needs a reload to reflect.
+    // The expiration period is read server-side, so a reload prompt is unneeded.
+    const isEnabledFlagChanged =
+      isBulkExportPagesEnabled !== data?.isBulkExportPagesEnabled;
     try {
       await apiv3Put('/app-settings/page-bulk-export-settings', {
         isBulkExportPagesEnabled,
@@ -40,6 +48,9 @@ const PageBulkExportSettings = (): JSX.Element => {
           target: t('app_setting.page_bulk_export_settings'),
         }),
       );
+      if (isEnabledFlagChanged) {
+        setReloadModalOpen(true);
+      }
     } catch (err) {
       toastError(err);
     }
@@ -47,6 +58,7 @@ const PageBulkExportSettings = (): JSX.Element => {
   }, [
     isBulkExportPagesEnabled,
     bulkExportDownloadExpirationSeconds,
+    data,
     mutate,
     t,
   ]);
@@ -157,6 +169,24 @@ const PageBulkExportSettings = (): JSX.Element => {
           <AdminUpdateButtonRow onClick={onSubmitHandler} />
         </>
       )}
+
+      <ConfirmModal
+        isModalOpen={isReloadModalOpen}
+        title={t('admin:app_setting.page_bulk_export_reload_title')}
+        headerClassName="text-primary"
+        iconName="refresh"
+        warningMessage={t('admin:app_setting.page_bulk_export_reload_prompt')}
+        supplymentaryMessage={null}
+        confirmButtonTitle={t('admin:app_setting.reload_page')}
+        cancelButtonTitle={t(
+          'admin:app_setting.page_bulk_export_reload_dismiss',
+        )}
+        onConfirm={() => {
+          window.location.reload();
+          return Promise.resolve();
+        }}
+        onCancel={() => setReloadModalOpen(false)}
+      />
     </>
   );
 };
