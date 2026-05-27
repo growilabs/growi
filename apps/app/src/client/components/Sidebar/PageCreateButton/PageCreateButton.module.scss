@@ -31,7 +31,7 @@
 @media (prefers-reduced-motion: reduce) {
   .dropend-wrapper,
   .dropend-wrapper.is-hovered,
-  .dropend-wrapper:not(.is-hovered) {
+  .dropend-wrapper.has-hovered:not(.is-hovered) {
     transform: none;
     animation: none;
   }
