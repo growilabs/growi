@@ -1,5 +1,4 @@
-import React, { type JSX, useRef, useState } from 'react';
-import clsx from 'clsx';
+import React, { type JSX, useState } from 'react';
 import { Dropdown } from 'reactstrap';
 
 import { useCreateTemplatePage } from '~/client/services/create-page';
@@ -19,7 +18,6 @@ export const PageCreateButton = React.memo((): JSX.Element => {
   const [hasHovered, setHasHovered] = useState(false);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
-  const fieldsetRef = useRef<HTMLFieldSetElement>(null);
 
   const { open: openPageCreateModal } = usePageCreateModalActions();
   const currentPagePath = useCurrentPagePath();
@@ -59,7 +57,6 @@ export const PageCreateButton = React.memo((): JSX.Element => {
 
   return (
     <fieldset
-      ref={fieldsetRef}
       className="d-flex flex-row mt-2 border-0 p-0 m-0"
       onMouseEnter={onMouseEnterHandler}
       onMouseLeave={onMouseLeaveHandler}
@@ -79,14 +76,14 @@ export const PageCreateButton = React.memo((): JSX.Element => {
         isOpen={dropdownOpen}
         toggle={toggle}
         direction="end"
-        className={clsx(
+        className={[
           'position-absolute',
           styles['dropend-wrapper'],
-          hasHovered && styles['has-hovered'],
-          isHovered && styles['is-hovered'],
-        )}
+          hasHovered ? styles['has-hovered'] : '',
+          isHovered ? styles['is-hovered'] : '',
+        ].join(' ')}
       >
-        <DropendToggle isOpen={dropdownOpen} />
+        <DropendToggle isOpen={dropdownOpen} isVisible={isHovered} />
         <DropendMenu
           onClickCreateNewPage={createNewPageWithToastr}
           onClickOpenPageCreateModal={() =>
