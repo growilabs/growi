@@ -1,6 +1,6 @@
 /**
  * Integration test for setupCustomMetrics()
- * Verifies that all 5 metrics (existing 4 + yjs) are registered when setupCustomMetrics() is called.
+ * Verifies that the metric modules are registered when setupCustomMetrics() is called.
  */
 
 import { type Meter, metrics } from '@opentelemetry/api';
@@ -10,7 +10,10 @@ import { mock } from 'vitest-mock-extended';
 
 vi.mock('~/utils/logger', () => ({
   default: () => ({
+    debug: vi.fn(),
     info: vi.fn(),
+    warn: vi.fn(),
+    error: vi.fn(),
   }),
 }));
 
@@ -57,12 +60,13 @@ describe('setupCustomMetrics', () => {
     vi.restoreAllMocks();
   });
 
-  it('should call getMeter for all 5 metric modules (Req 4.2)', async () => {
+  it('should call getMeter for every registering metric module (Req 4.2)', async () => {
     const { setupCustomMetrics } = await import('./index');
     await setupCustomMetrics();
 
-    // Each add*Metrics() calls metrics.getMeter() once — there are 5 modules
-    expect(metrics.getMeter).toHaveBeenCalledTimes(5);
+    // setupCustomMetrics() wires 7 modules, but addMongooseConnectionPoolMetrics()
+    // skips registration (no mongoose client in this unit test), so 6 call getMeter.
+    expect(metrics.getMeter).toHaveBeenCalledTimes(6);
   });
 
   it('should register growi.yjs.docs.count gauge (Req 4.1)', async () => {
