@@ -42,16 +42,19 @@ type OutlineEntry = {
   heading: string;
 };
 
+// Content fields are optional: omitted in "outline mode" (offset omitted on a
+// long page) and present in "content mode" (offset provided) or under the
+// small-page optimization. `outline` is present only on the first call.
 type GetPageContentOkResult = {
   result: 'ok';
   page: {
     path: string;
     updatedAt: string;
-    content: string;
     totalLines: number;
-    offset: number;
-    limit: number;
-    hasMore: boolean;
+    content?: string;
+    offset?: number;
+    limit?: number;
+    hasMore?: boolean;
     outline?: OutlineEntry[];
   };
 };
@@ -75,7 +78,6 @@ const invokeExecute = async (
     pagePath?: string;
     offset?: number;
     limit?: number;
-    includeOutline?: boolean;
   },
   requestContext: RequestContext<MastraRequestContextShape>,
 ): Promise<GetPageContentResult> => {
@@ -613,12 +615,12 @@ describe('getPageContentTool (integration)', () => {
     });
   });
 
-  // Long-body page exercises offset/limit pagination and outline auto-include
-  // through the real Page / Revision lookup path. The same seed (300 lines,
-  // headings at lines 50 / 150 / 250) drives both cases — paired so the
-  // outline test can reference the heading layout that drove the slicing test.
-  describe('long-body page (offset/limit slicing + outline auto-include)', () => {
-    it('returns the requested slice (lines 200-299) with hasMore=true and outline undefined when offset > 1', async () => {
+  // Long-body page exercises the outline/content mode split through the real
+  // Page / Revision lookup path. The same seed (300 lines, headings at lines
+  // 50 / 150 / 250) drives both cases — paired so the outline-mode test can
+  // reference the heading layout that drove the content-mode slicing test.
+  describe('long-body page (content mode slicing + outline mode)', () => {
+    it('content mode: returns the requested slice (lines 200-299) with hasMore=true and outline undefined when offset is provided', async () => {
       const result = await invokeExecute(
         { pageId: longPageId, offset: 200, limit: 100 },
         buildRequestContext(userA),
@@ -629,7 +631,9 @@ describe('getPageContentTool (integration)', () => {
 
       // Slice math: startIdx = 199, sliced.length = 100, endIdx = 299.
       // hasMore = (299 < 300) = true — line "Line 300" remains unread.
-      const lines = result.page.content.split('\n');
+      const { content } = result.page;
+      if (content == null) throw new Error('expected content in content mode');
+      const lines = content.split('\n');
       expect(lines).toHaveLength(100);
       // Line 200 is filler (`Line 200`); line 250 sits at a heading position.
       expect(lines[0]).toBe('Line 200');
@@ -644,12 +648,12 @@ describe('getPageContentTool (integration)', () => {
       expect(result.page.offset).toBe(200);
       expect(result.page.limit).toBe(100);
       expect(result.page.hasMore).toBe(true);
-      // offset > 1 and no explicit includeOutline → outline must be omitted
-      // entirely (auto-include rule, requirement 2.9).
+      // content mode (offset provided) → outline must be omitted entirely
+      // (requirement 2.8 / 2.9).
       expect(result.page.outline).toBeUndefined();
     });
 
-    it('auto-includes outline with ATX heading entries (line / level / heading) when offset is omitted', async () => {
+    it('outline mode: returns outline only (no content fields) when offset is omitted on a long page (totalLines > limit)', async () => {
       const result = await invokeExecute(
         { pageId: longPageId },
         buildRequestContext(userA),
@@ -658,16 +662,16 @@ describe('getPageContentTool (integration)', () => {
       assertOk(result);
       expect(result.page.path).toBe(pagePathLong);
 
-      // Default offset (1) and limit (200) — read lines 1..200, leaving
-      // lines 201..300 (which include "### Section C" at line 250) unread.
-      expect(result.page.offset).toBe(1);
-      expect(result.page.limit).toBe(200);
+      // totalLines (300) > default limit (200) → outline mode: the body is
+      // NOT returned. The agent must drill in via an explicit offset.
       expect(result.page.totalLines).toBe(LONG_PAGE_LINE_COUNT);
-      expect(result.page.content.split('\n')).toHaveLength(200);
-      expect(result.page.hasMore).toBe(true);
+      expect(result.page.content).toBeUndefined();
+      expect(result.page.offset).toBeUndefined();
+      expect(result.page.limit).toBeUndefined();
+      expect(result.page.hasMore).toBeUndefined();
 
-      // The outline reflects every heading in the FULL body (not just the
-      // returned slice) so an agent can decide where to drill next.
+      // The outline reflects every heading in the FULL body so an agent can
+      // decide where to drill next.
       expect(result.page.outline).toEqual([
         { line: longPageHeadingLines[0], level: 1, heading: 'Section A' },
         { line: longPageHeadingLines[1], level: 2, heading: 'Section B' },

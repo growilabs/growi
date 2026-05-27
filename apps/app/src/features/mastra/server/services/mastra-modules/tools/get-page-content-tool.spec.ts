@@ -106,16 +106,19 @@ type OutlineEntry = {
 // Discriminated union mirroring the tool's outputSchema. Defined locally so
 // callers can read `result.result === 'ok'` and access `.page` / `.reason`
 // without per-call narrowing casts.
+// Content fields are optional: omitted in "outline mode" (offset omitted on a
+// long page) and present in "content mode" (offset provided) or under the
+// small-page optimization. `outline` is present only on the first call.
 type GetPageContentOkResult = {
   result: 'ok';
   page: {
     path: string;
     updatedAt: string;
-    content: string;
     totalLines: number;
-    offset: number;
-    limit: number;
-    hasMore: boolean;
+    content?: string;
+    offset?: number;
+    limit?: number;
+    hasMore?: boolean;
     outline?: OutlineEntry[];
   };
 };
@@ -140,7 +143,6 @@ const invokeExecute = async (
         pagePath?: string;
         offset?: number;
         limit?: number;
-        includeOutline?: boolean;
       }
     | Record<string, never>,
   requestContext: RequestContext<MastraRequestContextShape>,
@@ -443,9 +445,12 @@ describe('getPageContentTool', () => {
       if (isValidationFailure(result)) return;
       expect(result.result).toBe('ok');
       if (result.result !== 'ok') return;
-      expect(result.page.content.split('\n')).toHaveLength(100);
-      expect(result.page.content.split('\n')[0]).toBe('L101');
-      expect(result.page.content.split('\n')[99]).toBe('L200');
+      // content is always present in content mode (offset provided).
+      const { content } = result.page;
+      if (content == null) throw new Error('expected content');
+      expect(content.split('\n')).toHaveLength(100);
+      expect(content.split('\n')[0]).toBe('L101');
+      expect(content.split('\n')[99]).toBe('L200');
       expect(result.page.totalLines).toBe(200);
       expect(result.page.hasMore).toBe(false);
     });
@@ -472,8 +477,42 @@ describe('getPageContentTool', () => {
     });
   });
 
-  describe('outline auto-include rules (requirement 2.9)', () => {
-    it('includes outline when offset is omitted (= first call)', async () => {
+  describe('outline / content mode selection (requirement 2.8 / 2.9 / 2.10)', () => {
+    it('outline mode: offset omitted on a LONG page (totalLines > limit) returns outline only, no content fields', async () => {
+      // 250-line body with two ATX headings. Default limit is 200, so
+      // totalLines (250) > limit → the first call returns the outline ONLY.
+      const lines = Array.from({ length: 250 }, (_, i) => {
+        const n = i + 1;
+        if (n === 1) return '# H1';
+        if (n === 100) return '## H2';
+        return `L${n}`;
+      });
+      const body = lines.join('\n');
+      const requestContext = buildRequestContext();
+      requestContext.set('user', buildMockUser());
+      setupPageWithBody(body);
+
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      if (result.result !== 'ok') throw new Error('expected ok');
+      // totalLines is always present.
+      expect(result.page.totalLines).toBe(250);
+      // Outline is present (first call) and lists every heading in the body.
+      expect(result.page.outline).toEqual([
+        { line: 1, level: 1, heading: 'H1' },
+        { line: 100, level: 2, heading: 'H2' },
+      ]);
+      // Content fields are OMITTED in outline mode — the agent must drill in
+      // with an explicit `offset` to fetch a section.
+      expect(result.page.content).toBeUndefined();
+      expect(result.page.offset).toBeUndefined();
+      expect(result.page.limit).toBeUndefined();
+      expect(result.page.hasMore).toBeUndefined();
+    });
+
+    it('small-page optimization: offset omitted on a SHORT page (totalLines <= limit) returns outline AND content', async () => {
       const body = '# H1\n\n## H2\nbody';
       const requestContext = buildRequestContext();
       requestContext.set('user', buildMockUser());
@@ -484,16 +523,22 @@ describe('getPageContentTool', () => {
       expect(isValidationFailure(result)).toBe(false);
       if (isValidationFailure(result)) return;
       if (result.result !== 'ok') throw new Error('expected ok');
+      // Both outline and content are returned so the agent can answer in one
+      // round-trip when the whole page fits in a single page.
       expect(result.page.outline).toEqual([
         { line: 1, level: 1, heading: 'H1' },
         { line: 3, level: 2, heading: 'H2' },
       ]);
+      expect(result.page.content).toBe(body);
+      expect(result.page.offset).toBe(1);
+      expect(result.page.limit).toBe(200);
+      expect(result.page.hasMore).toBe(false);
     });
 
-    it('includes outline when offset is explicitly 1 (auto-include trap avoidance)', async () => {
-      // The auto-include rule must treat `offset omitted` and `offset === 1`
-      // as equivalent — otherwise LLMs that fill `offset: 1` by type
-      // inference would silently miss the outline (design review #2).
+    it('content mode: offset explicitly 1 returns content only, NO outline', async () => {
+      // In the redesign `offset: 1` is content mode, not a first call. The
+      // single rule is "omit offset to get the outline" — there is no
+      // includeOutline flag and offset===1 is no longer treated as first call.
       const body = '# H1\n\n## H2\nbody';
       const requestContext = buildRequestContext();
       requestContext.set('user', buildMockUser());
@@ -507,14 +552,12 @@ describe('getPageContentTool', () => {
       expect(isValidationFailure(result)).toBe(false);
       if (isValidationFailure(result)) return;
       if (result.result !== 'ok') throw new Error('expected ok');
-      expect(result.page.outline).toEqual([
-        { line: 1, level: 1, heading: 'H1' },
-        { line: 3, level: 2, heading: 'H2' },
-      ]);
+      expect(result.page.outline).toBeUndefined();
+      expect(result.page.content).toBe(body);
+      expect(result.page.offset).toBe(1);
     });
 
-    it('omits outline by default when offset > 1', async () => {
-      // Long enough body so offset=2 is valid.
+    it('content mode: offset > 1 returns content only, NO outline', async () => {
       const body = '# H1\nL2\nL3\nL4';
       const requestContext = buildRequestContext();
       requestContext.set('user', buildMockUser());
@@ -529,42 +572,7 @@ describe('getPageContentTool', () => {
       if (isValidationFailure(result)) return;
       if (result.result !== 'ok') throw new Error('expected ok');
       expect(result.page.outline).toBeUndefined();
-    });
-
-    it('includes outline when includeOutline=true is explicit, even with offset > 1', async () => {
-      const body = '# H1\nL2\nL3\nL4';
-      const requestContext = buildRequestContext();
-      requestContext.set('user', buildMockUser());
-      setupPageWithBody(body);
-
-      const result = await invokeExecute(
-        { pageId: 'abc', offset: 2, includeOutline: true },
-        requestContext,
-      );
-
-      expect(isValidationFailure(result)).toBe(false);
-      if (isValidationFailure(result)) return;
-      if (result.result !== 'ok') throw new Error('expected ok');
-      expect(result.page.outline).toEqual([
-        { line: 1, level: 1, heading: 'H1' },
-      ]);
-    });
-
-    it('omits outline when includeOutline=false is explicit, even with offset omitted', async () => {
-      const body = '# H1\n\n## H2\nbody';
-      const requestContext = buildRequestContext();
-      requestContext.set('user', buildMockUser());
-      setupPageWithBody(body);
-
-      const result = await invokeExecute(
-        { pageId: 'abc', includeOutline: false },
-        requestContext,
-      );
-
-      expect(isValidationFailure(result)).toBe(false);
-      if (isValidationFailure(result)) return;
-      if (result.result !== 'ok') throw new Error('expected ok');
-      expect(result.page.outline).toBeUndefined();
+      expect(result.page.content).toBe('L2\nL3\nL4');
     });
   });
 
