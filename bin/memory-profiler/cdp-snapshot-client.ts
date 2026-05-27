@@ -7,7 +7,7 @@
  * Usage:
  *   const client = createCdpSnapshotClient();
  *   await client.connect('http://127.0.0.1:9229');
- *   await client.takeSnapshot('/tmp/memory-leak-investigation/baseline-a.heapsnapshot');
+ *   await client.takeSnapshot('/tmp/memory-profiler/baseline-a.heapsnapshot');
  *   await client.close();
  */
 

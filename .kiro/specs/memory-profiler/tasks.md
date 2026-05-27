@@ -1,6 +1,6 @@
 # Implementation Plan
 
-> 本 spec は **baseline-only** spec で、コード変更は最小限。**Foundation** で barrel files を導入し、**Core** で sibling imports を barrel 経由に書き換え + `exports` field 追加 + stable contract surface test 追加、**Integration** で README に stable contract / change-review プロセスを明記、**Validation** で lint / test の green を確認、最後に downstream consumer (`memory-leak-investigation`) 側の参照 cleanup を取り込む。
+> 本 spec は **baseline-only** spec で、コード変更は最小限。**Foundation** で barrel files を導入し、**Core** で sibling imports を barrel 経由に書き換え + `exports` field 追加 + stable contract surface test 追加、**Integration** で README に stable contract / change-review プロセスを明記、**Validation** で lint / test の green を確認する。
 >
 > Critical issue 3 件への対応:
 > - **Issue 1 (exports field)**: Task 3.1
@@ -81,7 +81,7 @@
     - Package import path: `@growi/bin/memory-profiler`（深い path は `exports` field で block 済）
   - **Change Review Process セクション** を README に追加し、以下を明記:
     - 上記 stable contract の変更（rename / 削除 / 型変更 / exit code 体系変更）は **breaking change** として扱う
-    - Breaking change を入れる際は、本 spec（`memory-profiler`）の更新と、downstream consumer（`memory-leak-investigation` 等）への影響評価を伴う change review が必須
+    - Breaking change を入れる際は、本 spec（`memory-profiler`）の更新と、任意の downstream consumer への影響評価を伴う change review が必須
     - Stable contract に該当しない internal symbol（factory 関数等）の変更は通常の PR レビューで足りる
   - **Output Storage Policy セクション** を更新（または追加）し、`*.heapsnapshot` をリポジトリにコミットしない方針、`.gitignore` のルール、外部共有しない運用を明記。
   - 観測可能な完了条件: README に上記 3 セクションが追加され、Stable Contract 表の内容が `bin/memory-profiler/index.ts` の re-export 一覧と完全一致する（symbol 名・順序）。
@@ -99,20 +99,3 @@
   - 観測可能な完了条件: `pnpm --filter @growi/bin test` が exit code 0、`turbo run lint` が exit code 0、`git status` で `pnpm-lock.yaml` に変更がない、`exports` field による deep path block が手動 smoke で確認できる。
   - _Requirements: 1.1, 1.2, 1.3, 1.5, 2.1, 2.2, 2.3, 2.4, 2.5, 2.6, 3.1, 3.3, 3.5, 4.1, 4.2, 4.3, 4.4, 5.1, 5.4, 7.3, 8.1, 8.2, 8.3_
 
-## 7. Integration: `memory-leak-investigation` 側の参照 cleanup の取り込み
-
-> 直前のセッションで `memory-leak-investigation/` の 6 ファイルに対する「memory-profiler 参照化」の cleanup を `stash@{0}` に保留している（メッセージ: "WIP: memory-leak-investigation cleanup (defer until memory-profiler spec is fully generated)"）。memory-profiler が本 spec の Task 1-6 で確立した時点で、stash を pop してダウンストリーム側の参照を整える。
-
-- [x] 7.1 `stash@{0}` を pop して mem-leak-inv 側 cleanup を reconcile
-  - `git stash list` で stash@{0} のメッセージが上記の WIP cleanup であることを確認。
-  - `git stash pop stash@{0}` で `.kiro/specs/memory-leak-investigation/` 配下 6 ファイル（brief / design / requirements / research / spec.json / tasks）の変更を作業ツリーに戻す。
-  - 取り込んだ変更を以下の観点で確認・必要に応じて調整:
-    - mem-leak-inv が参照する path（`bin/memory-profiler/...` 等）が現状の実装と一致しているか
-    - memory-profiler spec 名（`memory-profiler`）と stable contract 名（CLI 引数名 / 9 env var / 5 barrel symbol）への参照が、本 spec の最終形と一致しているか
-    - mem-leak-inv の Phase 6 タスク（OTel 有効化下計測 / Yjs sustained-load / L4 retainer / dist server）の起動コマンドが、`bin/memory-profiler/README.md` の Stable Contract セクションと整合しているか
-  - 不整合があれば **mem-leak-inv 側の文書のみ** を調整する（memory-profiler 側は変更しない — downstream 片方向参照の原則）。
-  - Conflict が発生した場合は手動で resolve し、stash は最後に確実に消去する。
-  - 観測可能な完了条件: `git stash list` から stash@{0} が消え、mem-leak-inv の 6 ファイルが memory-profiler の名前・path・stable symbol を正しく参照している（grep で `apps/app/tools/memory-profiler`、`SIGUSR2`、`HeapSnapshotSignalHandler` 等の旧表現が mem-leak-inv 内に残っていない）。`pnpm --filter @growi/bin test` が依然 green。
-  - _Requirements: 9.1, 9.2_
-  - _Boundary: .kiro/specs/memory-leak-investigation/_
-  - _Depends: 5.1, 6.1_

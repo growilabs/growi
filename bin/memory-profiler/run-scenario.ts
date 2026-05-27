@@ -13,7 +13,7 @@
  *   tsx bin/memory-profiler/run-scenario.ts \
  *     --baseUrl http://localhost:3000 \
  *     --inspector http://127.0.0.1:9229 \
- *     [--outputDir tmp/memory-leak-investigation/] \
+ *     [--outputDir tmp/memory-profiler/] \
  *     [--idleSeconds 300]
  */
 
@@ -41,7 +41,7 @@ export interface LoadOpCounts {
 export interface ScenarioRunnerOptions {
   /** CDP inspector endpoint, e.g. "http://127.0.0.1:9229" */
   readonly inspectorUrl: string;
-  /** Output directory for snapshots and CSV, e.g. "tmp/memory-leak-investigation/" */
+  /** Output directory for snapshots and CSV, e.g. "tmp/memory-profiler/" */
   readonly outputDir: string;
   /** GROWI server base URL, e.g. "http://localhost:3000" */
   readonly baseUrl: string;
@@ -249,7 +249,7 @@ function printSummary(outputDir: string): void {
  * Supports:
  *   --baseUrl <url>        (required)
  *   --inspector <url>      (required)
- *   --outputDir <path>     (default: tmp/memory-leak-investigation/)
+ *   --outputDir <path>     (default: tmp/memory-profiler/)
  *   --idleSeconds <n>      (default: 300)
  */
 function parseArgs(): ScenarioRunnerOptions {
@@ -265,7 +265,7 @@ function parseArgs(): ScenarioRunnerOptions {
   const outputDir =
     get('--outputDir') ??
     process.env.MEMORY_PROFILING_OUTPUT_DIR ??
-    'tmp/memory-leak-investigation/';
+    'tmp/memory-profiler/';
   const idleSeconds = Number(
     get('--idleSeconds') ?? process.env.IDLE_SECONDS ?? 300,
   );

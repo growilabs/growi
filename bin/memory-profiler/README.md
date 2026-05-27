@@ -1,7 +1,7 @@
 # Memory Profiling Tools
 
-This directory contains tooling for the server-side memory-leak investigation of GROWI.
-See [design.md](../../.kiro/specs/memory-leak-investigation/design.md) for the overall approach.
+This directory contains tooling for server-side memory profiling of GROWI.
+See [design.md](../../.kiro/specs/memory-profiler/design.md) for the tool's architecture and stable contract.
 
 ## Stable Contract
 
@@ -85,7 +85,7 @@ Deep paths such as `@growi/bin/memory-profiler/load-driver` or `@growi/bin/memor
 - **Breaking change definition.** Any change to a symbol or value listed in [Stable Contract](#stable-contract) — including renames, deletions, type-shape changes, exit-code reassignment, CSV header changes, and output filename changes — is treated as a **breaking change**.
 - **Required for breaking changes.** A breaking change MUST come with:
   - An update to this spec (`.kiro/specs/memory-profiler/`) reflecting the new contract.
-  - An impact assessment for downstream consumers (currently `.kiro/specs/memory-leak-investigation/`, plus any future consumer).
+  - An impact assessment for any downstream investigation specs that consume this tool.
   - Explicit change-review approval before merging.
 - **Internal changes.** Changes that do not touch the Stable Contract — refactors inside `lib/`, additional internal scenarios, adjustments to the `CdpSnapshotClient` / `RssTimeSeriesLogger` internal interfaces, factory-function signatures, etc. — follow the normal PR review process and do not require spec updates.
 
@@ -109,67 +109,31 @@ BASELINE_IDLE_SECONDS=60 DRAIN_IDLE_SECONDS=60 \
   pnpm run ts-node ../../bin/memory-profiler/run-scenario.ts \
     --baseUrl http://localhost:3000 \
     --inspector http://127.0.0.1:9229 \
-    --outputDir tmp/memory-leak-investigation/runs/after
+    --outputDir tmp/memory-profiler/runs/after
 
 # 3. Stop the server
 kill %1
 ```
 
-### Before/after comparison (for verifying fix impact)
+### Before/after comparison
 
-#### Step A — "before" run (fixes not applied)
-
-Temporarily revert the fix commits in-place, start the server, run the scenario,
-then restore HEAD:
-
-```bash
-cd apps/app
-
-# Revert fix files to pre-fix state
-git checkout 5f37b69fbe -- \
-  src/server/util/mongoose-utils.ts \
-  src/features/opentelemetry/server/node-sdk-configuration.ts \
-  src/features/opentelemetry/server/custom-metrics/index.ts \
-  src/server/service/page-operation.ts
-git rm --cached src/features/opentelemetry/server/custom-metrics/yjs-metrics.ts
-rm -f src/features/opentelemetry/server/custom-metrics/yjs-metrics.ts
-
-# Start server with the reverted code
-NODE_ENV=development pnpm run ts-node --inspect=0.0.0.0:9229 src/server/app.ts &
-
-# Run scenario
-BASELINE_IDLE_SECONDS=60 DRAIN_IDLE_SECONDS=60 \
-  pnpm run ts-node ../../bin/memory-profiler/run-scenario.ts \
-    --baseUrl http://localhost:3000 \
-    --inspector http://127.0.0.1:9229 \
-    --outputDir tmp/memory-leak-investigation/runs/before
-
-kill %1
-
-# Restore HEAD
-git checkout HEAD -- \
-  src/server/util/mongoose-utils.ts \
-  src/features/opentelemetry/server/node-sdk-configuration.ts \
-  src/features/opentelemetry/server/custom-metrics/index.ts \
-  src/server/service/page-operation.ts \
-  src/features/opentelemetry/server/custom-metrics/yjs-metrics.ts
-```
-
-#### Step B — "after" run (current HEAD, all fixes applied)
-
-Follow the quick-start section above, pointing `--outputDir` at `runs/after`.
+To compare two builds (e.g., a fix branch vs. its base), run the scenario twice
+with different `--outputDir` values — typically `runs/before/` and `runs/after/`
+under `tmp/memory-profiler/`. Switch between builds with the usual git workflow
+(checkout, stash, revert) in between runs. Any consumer spec that needs a
+reproducible before/after comparison should document its own checkout steps.
 
 ## Output layout
 
 ```
-apps/app/tmp/memory-leak-investigation/
+apps/app/tmp/memory-profiler/
 ├── runs/
-│   ├── before/                 # pre-fix profiling run
+│   ├── before/                 # one profiling run (name is consumer-defined)
 │   │   ├── snapshot-a.heapsnapshot   (baseline boundary)
 │   │   ├── snapshot-b.heapsnapshot   (load boundary)
 │   │   ├── snapshot-c.heapsnapshot   (drain boundary)
 │   │   └── rss-timeseries.csv
-│   └── after/                  # post-fix profiling run
+│   └── after/                  # another profiling run
 │       ├── snapshot-a.heapsnapshot
 │       ├── snapshot-b.heapsnapshot
 │       ├── snapshot-c.heapsnapshot
@@ -192,5 +156,5 @@ confidential production-equivalent data.
 from your local working tree once findings have been recorded.
 
 **Record findings, not artifacts.** Write conclusions, retainer analysis, and graphs into
-`.kiro/specs/memory-leak-investigation/verification-report.md` (or the appropriate spec)
-rather than committing raw `.heapsnapshot` / `.csv` outputs.
+the appropriate investigation spec (e.g. its `verification-report.md`) rather than
+committing raw `.heapsnapshot` / `.csv` outputs.

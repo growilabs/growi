@@ -2,7 +2,7 @@
 
 ## Introduction
 
-本 spec は、GROWI のメモリ調査用 profiling ツール群（`bin/memory-profiler/`、`@growi/bin` workspace package）を「公式仕様」としてベースライン化することを目的とする。既に実装され 58 unit tests が green で稼働している現状のツールを、requirements / design / tasks の 3 文書として明文化することで、(1) 今後のツール変更時の change review 基準を確立し、(2) downstream の memory 調査 spec（`memory-leak-investigation` 等）が本ツールに対して安定した consumer-side dependency を持てるようにする。
+本 spec は、GROWI のメモリ調査用 profiling ツール群（`bin/memory-profiler/`、`@growi/bin` workspace package）を「公式仕様」としてベースライン化することを目的とする。既に実装され 58 unit tests が green で稼働している現状のツールを、requirements / design / tasks の 3 文書として明文化することで、(1) 今後のツール変更時の change review 基準を確立し、(2) 任意の memory 調査 spec が本ツールに対して安定した consumer-side dependency を持てるようにする。
 
 本 spec は **baseline-only ドキュメント spec** であり、コード変更は最小限。新規実装タスクは原則ゼロ、validation タスク（lint / test / interface 安定性チェック）のみを設定する。
 
@@ -19,12 +19,12 @@
   - Test 戦略（unit test の scope、fake-LoadDriver による scenario test パターン）の明文化
 - **Out of scope**:
   - `apps/app` の server-side コード変更（各 owner spec の責務）
-  - 具体の memory 調査結果や finding（`memory-leak-investigation` 等の downstream spec の責務）
-  - 本ツールを使った dist server 起動下での計測（`memory-leak-investigation` Phase 6 の責務）
+  - 個別の memory 調査結果や finding（各 downstream 調査 spec の責務）
+  - 本ツールを使った dist server 起動下での計測実証（consumer 側の調査タスクの責務）
   - OTLP receiver 連携、scenario DSL 化、CI 組み込み等の新機能（follow-up spec で扱う）
   - 汎用 npm package 化 / 外部公開
 - **Adjacent expectations**:
-  - 本 spec は **downstream consumer から参照される側**。`memory-leak-investigation` 等は本 spec が定義する CLI / interface に対して片方向参照を持つが、本 spec は consumer の調査内容に依存しない。
+  - 本 spec は **downstream consumer から参照される側**。任意の調査 spec は本 spec が定義する CLI / interface に対して片方向参照を持つが、本 spec は consumer の調査内容に依存しない。
   - devcontainer の `mongo:27017`（replica set `rs0`）/ `elasticsearch:9200` / Node.js v24（`--inspect`）が到達可能である前提を取る（参照: `.claude/rules/devcontainer.md`）。
   - GROWI server 側に追加の signal handler や env var は要求しない（CDP-only 方針）。
 
@@ -84,7 +84,7 @@
 
 #### Acceptance Criteria
 
-1. The memory profiling toolchain shall 出力ファイルを `apps/app/tmp/memory-leak-investigation/` 配下の指定された run ディレクトリ（既定: `runs/<name>/`）に書き出す。
+1. The memory profiling toolchain shall 出力ファイルを `--outputDir` で指定された run ディレクトリ（既定: `apps/app/tmp/memory-profiler/runs/<name>/`）に書き出す。
 2. The memory profiling toolchain shall `.heapsnapshot` 拡張子のファイルが `.gitignore` 等のリポジトリ除外ルールでコミット対象から外れていることを README で明示する。
 3. The memory profiling toolchain shall snapshot ファイルの命名を `snapshot-{a,b,c}.heapsnapshot` 形式（または等価な phase 識別可能な形式）に統一する。
 4. When 同じ run ディレクトリへの 2 回目の実行が行われた時, the memory profiling toolchain shall 既存の snapshot を上書きするか、または明確に区別可能な命名で並存させる。
@@ -125,11 +125,11 @@
 
 ### Requirement 9: Downstream consumer に対する stable interface 提供
 
-**Objective:** `memory-leak-investigation` や将来の memory 調査 spec の担当者として、本 spec が定義するツールを安定した downstream contract として扱い、調査内容と独立にツールを利用できるようにしたい。
+**Objective:** 任意の memory 調査 spec の担当者として、本 spec が定義するツールを安定した downstream contract として扱い、調査内容と独立にツールを利用できるようにしたい。
 
 #### Acceptance Criteria
 
-1. The memory profiling toolchain shall `memory-leak-investigation` を含むすべての downstream consumer の調査内容・verdict・finding に対し、ツール本体の挙動が依存しない（片方向参照: consumer → tool）。
+1. The memory profiling toolchain shall すべての downstream consumer の調査内容・verdict・finding に対し、ツール本体の挙動が依存しない（片方向参照: consumer → tool）。
 2. Where downstream consumer が本ツールを利用する場合, the memory profiling toolchain shall env var / CLI 引数 / exit code / 出力ファイル命名規約のみで consumer-side の判断を表現できるようにする（ツール内部の改変を要求させない）。
-3. While ツール本体の変更レビュー中である間, the memory profiling toolchain shall 既存の downstream consumer（`memory-leak-investigation` 等）の参照仕様との整合性を確認することを change review プロセスとして要求する（design.md に明記）。
+3. While ツール本体の変更レビュー中である間, the memory profiling toolchain shall 既知の downstream consumer の参照仕様との整合性を確認することを change review プロセスとして要求する（design.md に明記）。
 4. If downstream consumer 由来の新規要望（新シナリオ、新メトリクス、dist server サポート等）が発生した場合, the memory profiling toolchain shall それらを本 spec の更新または follow-up spec のいずれで受けるかを判断するルートを提供する（汎用化は別 spec で扱う方針を明記する）。

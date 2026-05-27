@@ -56,6 +56,5 @@ out
 
 # Memory profiling artifacts (heap snapshots are large and may contain sensitive data)
 *.heapsnapshot
-/tmp/memory-leak-investigation/snapshots/*
-!/tmp/memory-leak-investigation/snapshots/.gitkeep
-/tmp/memory-leak-investigation/rss-timeseries.csv
+/tmp/memory-profiler/
+/tmp/memory-leak-investigation/
