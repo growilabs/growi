@@ -63,12 +63,6 @@ const inputSchema = z
       .optional()
       .default(200)
       .describe('Maximum lines to return (default 200, max 500).'),
-    includeOutline: z
-      .boolean()
-      .optional()
-      .describe(
-        'Force-include / exclude the outline. By default it is auto-included on the first call (offset omitted or offset === 1).',
-      ),
   })
   .refine((input) => input.pageId != null || input.pagePath != null, {
     message: 'Either pageId or pagePath must be provided',
@@ -80,11 +74,16 @@ const outputSchema = z.discriminatedUnion('result', [
     page: z.object({
       path: z.string(),
       updatedAt: z.string(),
-      content: z.string(),
       totalLines: z.number().int().nonnegative(),
-      offset: z.number().int().positive(),
-      limit: z.number().int().positive(),
-      hasMore: z.boolean(),
+      // Content fields are present only in "content mode" (offset provided, or
+      // the small-page optimization on the first call). In "outline mode"
+      // (offset omitted on a long page) they are omitted and `outline` carries
+      // the heading list instead.
+      content: z.string().optional(),
+      offset: z.number().int().positive().optional(),
+      limit: z.number().int().positive().optional(),
+      hasMore: z.boolean().optional(),
+      // Outline is present only on the first call (offset omitted).
       outline: z
         .array(
           z.object({
@@ -114,7 +113,7 @@ export const getPageContentTool = createTool({
   outputSchema,
 
   execute: async (inputData, context) => {
-    const { pageId, pagePath, offset, limit, includeOutline } = inputData;
+    const { pageId, pagePath, offset, limit } = inputData;
 
     const ctx = context.requestContext as TypedRequestContext;
     const user = ctx.get('user');
@@ -187,37 +186,57 @@ export const getPageContentTool = createTool({
       const allLines = body.split(/\r?\n/);
       const totalLines = allLines.length;
 
-      // zod's .positive() already rejects offset <= 0; Math.max stays as a
-      // defensive guard for clarity when offset is omitted.
-      const safeOffset = Math.max(1, offset ?? 1);
       // zod's .default(200) should fire, but assign explicitly so safeLimit
       // is statically narrowed to a number for the slice math below.
       const safeLimit = limit ?? 200;
 
-      const startIdx = safeOffset - 1; // 0-indexed
-      const sliced = allLines.slice(startIdx, startIdx + safeLimit);
-      // 0-indexed exclusive end of the returned range. Equivalent to the
-      // 1-indexed spec form `offset + returnedLines < totalLines + 1`.
-      const endIdx = startIdx + sliced.length;
-      const hasMore = endIdx < totalLines;
-      const content = sliced.join('\n');
+      // === Mode selection (outline vs content) ===
+      // `offset` omitted  → outline mode  (return the heading list; the agent
+      //                      then drills into a section by re-calling with a
+      //                      heading's line number as `offset`).
+      // `offset` provided → content mode  (return the requested line slice).
+      // Small-page optimization: when the whole page fits in one page
+      // (totalLines <= limit), the first call also returns the content so the
+      // agent can answer in a single round-trip without a follow-up call.
+      const isFirstCall = offset == null;
+      const fitsInOnePage = totalLines <= safeLimit;
+      const includeOutline = isFirstCall;
+      const includeContent = !isFirstCall || fitsInOnePage;
 
-      // Auto-include the outline only on the first call (offset omitted or 1).
-      // An explicit `includeOutline` value always wins so callers can opt in/out.
-      const shouldIncludeOutline =
-        includeOutline ?? (offset == null || offset === 1);
-      const outline = shouldIncludeOutline ? extractOutline(body) : undefined;
+      const outline = includeOutline ? extractOutline(body) : undefined;
+
+      // content fields are only computed / returned when includeContent holds.
+      let contentFields:
+        | {
+            content: string;
+            offset: number;
+            limit: number;
+            hasMore: boolean;
+          }
+        | undefined;
+      if (includeContent) {
+        // zod's .positive() already rejects offset <= 0; Math.max stays as a
+        // defensive guard for clarity when offset is omitted (first call).
+        const safeOffset = Math.max(1, offset ?? 1);
+        const startIdx = safeOffset - 1; // 0-indexed
+        const sliced = allLines.slice(startIdx, startIdx + safeLimit);
+        // 0-indexed exclusive end of the returned range.
+        const endIdx = startIdx + sliced.length;
+        contentFields = {
+          content: sliced.join('\n'),
+          offset: safeOffset,
+          limit: safeLimit,
+          hasMore: endIdx < totalLines,
+        };
+      }
 
       return {
         result: 'ok' as const,
         page: {
           path,
           updatedAt,
-          content,
           totalLines,
-          offset: safeOffset,
-          limit: safeLimit,
-          hasMore,
+          ...(contentFields ?? {}),
           ...(outline != null ? { outline } : {}),
         },
       };
