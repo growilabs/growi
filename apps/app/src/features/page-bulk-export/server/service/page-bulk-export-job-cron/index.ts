@@ -256,6 +256,15 @@ class PageBulkExportJobCronService
         ? PageBulkExportJobStatus.completed
         : PageBulkExportJobStatus.failed;
 
+    // Guarantee completedAt is set for every completion path (including the
+    // duplicate-reuse path in createPageSnapshotsAsync, which marks the job as
+    // completed without setting completedAt). Without this, the download-expiration
+    // cleanup query `{ completedAt: { $lt } }` never matches such jobs (MongoDB
+    // type bracketing excludes null), so they accumulate forever.
+    if (action === SupportedAction.ACTION_PAGE_BULK_EXPORT_COMPLETED) {
+      pageBulkExportJob.completedAt ??= new Date();
+    }
+
     try {
       await pageBulkExportJob.save();
       await this.notifyExportResult(pageBulkExportJob, action);
