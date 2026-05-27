@@ -111,7 +111,8 @@ jobs:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
-      - name: Cache/Restore dist
+      - &cache-restore-dist-step
+        name: Cache/Restore dist
         uses: actions/cache@v4
         with:
           path: |
@@ -132,6 +133,7 @@ jobs:
           turbo run test --filter=@growi/app --filter=./packages/* --env-mode=loose
         env:
           MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
+          VITE_ELASTICSEARCH_URI: ""
 
       - name: Upload coverage report as artifact
         uses: actions/upload-artifact@v4
@@ -147,6 +149,76 @@ jobs:
         with:
           type: ${{ job.status }}
           job_name: '*Node CI for growi - test (${{ matrix.node-version }})*'
+          channel: '#ci'
+          isCompactMode: true
+          url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
+  ci-app-test-es:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+        mongodb-version: ['8.0']
+        elasticsearch-version: ['9']
+
+    services:
+      mongodb:
+        image: mongo:${{ matrix.mongodb-version }}
+        ports:
+          - 27017/tcp
+      elasticsearch:
+        image: docker.elastic.co/elasticsearch/elasticsearch:${{ matrix.elasticsearch-version }}
+        ports:
+          - 9200/tcp
+        env:
+          discovery.type: single-node
+          ES_JAVA_OPTS: -Xms256m -Xmx256m
+          xpack.security.enabled: "false"
+        options: >-
+          --health-cmd="curl -sf http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=30s || exit 1"
+          --health-interval=15s
+          --health-timeout=40s
+          --health-retries=5
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: pnpm/action-setup@v6
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ matrix.node-version }}
+          cache: 'pnpm'
+
+      - *cache-restore-dist-step
+
+      - name: Install dependencies
+        run: |
+          pnpm add turbo --global
+          pnpm install --frozen-lockfile
+
+      - name: Test
+        run: |
+          turbo run test --filter=@growi/app --env-mode=loose
+        env:
+          MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
+          VITE_ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
+
+      - name: Upload coverage report as artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: coverage-es9-mongo8.0
+          path: |
+            apps/app/coverage
+
+      - name: Slack Notification
+        uses: weseek/ghaction-slack-notification@master
+        if: failure()
+        with:
+          type: ${{ job.status }}
+          job_name: '*Node CI for growi - test-es (${{ matrix.node-version }})*'
           channel: '#ci'
           isCompactMode: true
           url: ${{ secrets.SLACK_WEBHOOK_URL }}
