@@ -1209,7 +1209,6 @@
         "started-toast": "Reconstruction démarrée. Le Vault renverra 503 jusqu'à la fin de la reconstruction des données."
       },
       "bootstrap-status": {
-        "heading": "Statut d'initialisation",
         "state": "Statut",
         "processed-total": "Traité / Total estimé",
         "started-at": "Démarré le",
@@ -1245,7 +1244,6 @@
         "out-of-scope_html": "<strong>Remarque (hors périmètre) :</strong> Les incohérences de données causées par des changements de chemin (renommage / suppression définitive) et la révocation de droits ne sont pas détectées dans l'implémentation actuelle. Elles nécessiteront un support futur de <code>growi-vault-ha</code>."
       },
       "storage-observability": {
-        "heading": "Statut du stockage",
         "fetch-failed": "Échec de récupération des statistiques de stockage. vault-manager peut être injoignable.",
         "namespace-count": "Nombre de namespaces",
         "total-commit-count": "Nombre total de commits",

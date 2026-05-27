@@ -1219,7 +1219,6 @@
         "started-toast": "重建已开始。在数据重建完成之前，Vault 将返回 503。"
       },
       "bootstrap-status": {
-        "heading": "初始化状态",
         "state": "状态",
         "processed-total": "已处理 / 总估算",
         "started-at": "开始时间",
@@ -1255,7 +1254,6 @@
         "out-of-scope_html": "<strong>注意（范围外）：</strong> 由路径变更（重命名 / 硬删除）以及权限撤销造成的数据不一致，在当前实现中无法检测。它们需要将来 <code>growi-vault-ha</code> 的支持。"
       },
       "storage-observability": {
-        "heading": "存储状态",
         "fetch-failed": "获取存储统计失败。vault-manager 可能无法访问。",
         "namespace-count": "命名空间数量",
         "total-commit-count": "总提交数",

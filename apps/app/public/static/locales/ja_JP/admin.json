@@ -1219,7 +1219,6 @@
         "started-toast": "初期化を開始しました。データの再構築が完了するまで Vault は 503 を返します。"
       },
       "bootstrap-status": {
-        "heading": "初期化ステータス",
         "state": "ステータス",
         "processed-total": "処理済み / 推定総数",
         "started-at": "開始日時",
@@ -1255,7 +1254,6 @@
         "out-of-scope_html": "<strong>注意（対象外）:</strong> パス変更（rename / hard delete）に伴うデータ不整合および権限解除による不整合は、現在の実装では検知できません。これらは将来の <code>growi-vault-ha</code> サポートが必要です。"
       },
       "storage-observability": {
-        "heading": "ストレージステータス",
         "fetch-failed": "ストレージ統計の取得に失敗しました。vault-manager に接続できない可能性があります。",
         "namespace-count": "ネームスペース数",
         "total-commit-count": "総コミット数",

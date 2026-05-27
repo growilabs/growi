@@ -1210,7 +1210,6 @@
         "started-toast": "재구축을 시작했습니다. 데이터 재구축이 완료될 때까지 Vault 는 503 을 반환합니다."
       },
       "bootstrap-status": {
-        "heading": "초기화 상태",
         "state": "상태",
         "processed-total": "처리됨 / 총 예상",
         "started-at": "시작 시각",
@@ -1246,7 +1245,6 @@
         "out-of-scope_html": "<strong>주의 (범위 외):</strong> 경로 변경(이름 변경 / 하드 삭제) 으로 인한 데이터 불일치 및 권한 해제로 인한 불일치는 현재 구현에서는 감지할 수 없습니다. 이는 향후 <code>growi-vault-ha</code> 지원이 필요합니다."
       },
       "storage-observability": {
-        "heading": "스토리지 상태",
         "fetch-failed": "스토리지 통계를 가져오지 못했습니다. vault-manager 에 도달할 수 없을 수 있습니다.",
         "namespace-count": "네임스페이스 수",
         "total-commit-count": "총 커밋 수",

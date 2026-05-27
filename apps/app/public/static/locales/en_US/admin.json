@@ -1210,7 +1210,6 @@
         "started-toast": "Rebuild started. The Vault will return 503 until the data is rebuilt."
       },
       "bootstrap-status": {
-        "heading": "Initialization Status",
         "state": "Status",
         "processed-total": "Processed / Total Estimated",
         "started-at": "Started At",
@@ -1246,7 +1245,6 @@
         "out-of-scope_html": "<strong>Note (out-of-scope):</strong> Data inconsistencies caused by path changes (rename / hard delete) and grant revocation are not detected in the current implementation. These require future <code>growi-vault-ha</code> support."
       },
       "storage-observability": {
-        "heading": "Storage Status",
         "fetch-failed": "Failed to retrieve storage statistics. vault-manager may be unreachable.",
         "namespace-count": "Namespace Count",
         "total-commit-count": "Total Commit Count",
