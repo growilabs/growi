@@ -18,24 +18,30 @@ These rules are versioned (v1) and are **immutable after the first release**.
 | Control characters | U+0000–U+001F or U+007F (DEL) appear in a segment | Percent-encode each character |
 | Leading / trailing spaces | Segment starts or ends with a space | Percent-encode the space (`%20`) |
 | Windows reserved filename | Segment stem matches `CON`, `PRN`, `AUX`, `NUL`, `COM0-9`, `LPT0-9` (case-insensitive) | Prepend `_` to the segment (e.g. `CON` → `_CON`) |
-| Uppercase letters anywhere in the full path | `pagePath !== pagePath.toLowerCase()` | Append `__<pageId[0..7]>` suffix to the **last** filename component before the `.md` extension |
+| Case collision (collision-only) | Two or more page paths in the same vault view differ only in case within the same directory (e.g. `/Foo` and `/foo` both exist) | Append `__<pageId[0..7]>` suffix to the **last** filename component before the `.md` extension for **each colliding path** |
 | Orphan pages | Path is `/trash` or starts with `/trash/` | Prefix the entire relative path with `_orphaned/` |
 | Extension | All pages | Append `.md` to the final filename component |
 
+> **Case collision is reactive**: the suffix is added only when a collision actually exists and disappears automatically if the collision resolves (e.g. one of the conflicting pages is deleted or its access grant changes).
+
 ### Examples
 
-| GROWI page path | pageId (first 8 chars) | Resulting file path |
-|----------------|------------------------|---------------------|
-| `/normal/page` | *(any)* | `normal/page.md` |
-| `/Sandbox/Markdown` | `507f1f77` | `Sandbox/Markdown__507f1f77.md` |
-| `/CON/notes` | `507f1f77` | `_CON/notes__507f1f77.md` |
-| `/con/notes` | *(any)* | `_con/notes.md` |
-| `/page<name` | *(any, lowercase)* | `page%3Cname.md` |
-| `/page*name` | *(any, lowercase)* | `page%2Aname.md` |
-| `/trash/old-page` | *(any, lowercase)* | `_orphaned/trash/old-page.md` |
-| `/trash/A/B` | `507f1f77` | `_orphaned/trash/A/B__507f1f77.md` |
+| GROWI page path | Condition | pageId (first 8 chars) | Resulting file path |
+|----------------|-----------|------------------------|---------------------|
+| `/normal/page` | — | *(any)* | `normal/page.md` |
+| `/Sandbox/Markdown` | no collision | *(any)* | `Sandbox/Markdown.md` |
+| `/Sandbox` | no collision; has child pages | *(any)* | `Sandbox.md` (folder `Sandbox/` coexists) |
+| `/Foo` | `/Foo` and `/foo` both exist in same view | `507f1f77` | `Foo__507f1f77.md` |
+| `/foo` | `/Foo` and `/foo` both exist in same view | `a1b2c3d4` | `foo__a1b2c3d4.md` |
+| `/CON/notes` | — | *(any)* | `_CON/notes.md` |
+| `/page<name` | *(any, lowercase)* | *(any)* | `page%3Cname.md` |
+| `/page*name` | *(any, lowercase)* | *(any)* | `page%2Aname.md` |
+| `/trash/old-page` | — | *(any)* | `_orphaned/trash/old-page.md` |
+| `/trash/A/B` | no collision | *(any)* | `_orphaned/trash/A/B.md` |
 
 > **Note on `/`**: The forward-slash is GROWI's path separator and is split into segments before encoding. A literal `/` that appears inside a segment would be encoded as `%2F`, but GROWI path semantics make this impossible in practice.
+
+> **Note on parent pages with children**: A page that has child pages does **not** produce a `README.md` inside a folder. Instead, the page's own content is stored as `<name>.md` alongside the `<name>/` folder that contains its children (e.g. `Sandbox.md` next to `Sandbox/`).
 
 ### `mapPrefix` (directory prefix variant)
 

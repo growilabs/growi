@@ -524,7 +524,7 @@
   - _Requirements: 4.9, 4.10, 4.11_
   - _Boundary: apps/growi-vault-manager/src/services/vault-view-composer.ts_
 
-- [ ] 19.5 (P) README のファイル名マッピング規則を新ルールに更新（タスク 17.1 の改訂）
+- [x] 19.5 (P) README のファイル名マッピング規則を新ルールに更新（タスク 17.1 の改訂）
   - `apps/growi-vault-manager/README.md` から「大文字 suffix `__<hash8>` を常時付与」の記述とサンプル（`/Sandbox/Markdown` → `Sandbox/Markdown__<hash8>.md`）を削除する
   - 新ルールを表または例示で記述する: suffix は大小衝突時のみ・collision-only、子を持つページも `<name>.md` でフォルダの隣（README 集約なし）。サンプル: `/Sandbox` → `Sandbox.md`（隣に `Sandbox/`）、`/Foo` と `/foo` が同一 view に共存する場合のみ双方に `__<hash8>` が付く
   - **完了確認**: README に「大文字で常時 `__<hash8>` 付与」を示す記述が残っていないこと
