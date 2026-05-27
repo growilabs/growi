@@ -341,6 +341,13 @@
     "migration_succeeded": "アップグレードが正常に完了しました！メンテナンスモードを終了して、GROWI を使用することができます。",
     "migration_failed": "アップグレードが失敗しました。失敗した場合の対処法は GROWI docs を参照してください。"
   },
+  "news_delivery": {
+    "section_title": "ニュース配信",
+    "label": "ニュース配信",
+    "enable": "ニュース配信を有効にする",
+    "description": "外部フィードからニュースを取得してローカルにキャッシュする cron ジョブの動作を制御します。無効にしてもキャッシュ済みのニュースは引き続き表示されます。",
+    "update_succeeded": "ニュース配信設定を更新しました"
+  },
   "maintenance_mode": {
     "maintenance_mode": "メンテナンスモード",
     "under_maintenance_mode": "メンテナンスモード中",
@@ -378,6 +385,10 @@
     "page_bulk_export_explanation": "すべてのユーザーが、ページメニューから選択したページとその配下ページをまとめてエクスポートできる機能を有効化します。エクスポートされたデータは保存期間経過後に自動的に削除されます。",
     "page_bulk_export_warning": "ページ一括エクスポート機能は全ユーザーが利用可能です。システムリソースの維持のため、必要最小限の利用にご協力をお願いいたします。管理者の方は、この旨をユーザーの皆様にご周知ください。",
     "page_bulk_export_storage_period": "保存期間",
+    "page_bulk_export_reload_title": "ページの再読み込み",
+    "page_bulk_export_reload_prompt": "設定を反映するにはページの再読み込みが必要です。今すぐ再読み込みしますか？",
+    "page_bulk_export_reload_dismiss": "今はしない",
+    "reload_page": "再読み込み",
     "update": "更新",
     "mail_settings": "メールの設定",
     "mailer_is_not_set_up": "メール設定がセットアップされていません。",
