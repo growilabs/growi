@@ -121,8 +121,10 @@ const formatDate = (iso: string | null | undefined): string => {
  */
 const FeatureStatusSection = ({
   vaultEnabled,
+  storageStats,
 }: {
   vaultEnabled: boolean | undefined;
+  storageStats: StorageStatsResponse | null | undefined;
 }): JSX.Element => {
   const { t } = useTranslation('admin');
   const siteUrl = useSiteUrl();
@@ -171,43 +173,9 @@ const FeatureStatusSection = ({
           {t('growi-vault.admin-settings.feature-status.heading')}
         </h2>
 
-        <div className="row form-group">
-          <div className="col-md-3 text-md-end">
-            <span className="col-form-label">
-              {t('growi-vault.admin-settings.feature-status.label')}
-            </span>
-          </div>
-          <div className="col-md-9">
-            {vaultEnabled === true ? (
-              <span className="badge bg-info">
-                {t('growi-vault.admin-settings.feature-status.enabled')}
-              </span>
-            ) : vaultEnabled === false ? (
-              <span className="badge bg-secondary">
-                {t('growi-vault.admin-settings.feature-status.disabled')}
-              </span>
-            ) : (
-              <span className="badge bg-light text-dark">—</span>
-            )}
-            <p
-              className="form-text text-muted mt-2 mb-0"
-              // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
-              dangerouslySetInnerHTML={{
-                __html: t(
-                  'growi-vault.admin-settings.feature-status.description_html',
-                ),
-              }}
-            />
-          </div>
-        </div>
-
-        <div className="row form-group">
-          <div className="col-md-3 text-md-end">
-            <span className="col-form-label">
-              {t('growi-vault.admin-settings.clone-url.label')}
-            </span>
-          </div>
-          <div className="col-md-9">
+        <div className="row form-group mt-5">
+          <div className="col-md-2"></div>
+          <div className="col-md-8">
             {cloneCommand == null ? (
               <p
                 className="form-text text-muted mb-0"
@@ -257,20 +225,124 @@ const FeatureStatusSection = ({
             )}
           </div>
         </div>
+
+        <div className="row form-group mt-5">
+          <div className="col-md-3 text-md-end">
+            <span className="col-form-label">
+              {t('growi-vault.admin-settings.feature-status.label')}
+            </span>
+          </div>
+          <div className="col-md-9">
+            {vaultEnabled === true ? (
+              <span className="badge bg-info">
+                {t('growi-vault.admin-settings.feature-status.enabled')}
+              </span>
+            ) : vaultEnabled === false ? (
+              <span className="badge bg-secondary">
+                {t('growi-vault.admin-settings.feature-status.disabled')}
+              </span>
+            ) : (
+              <span className="badge bg-light text-dark">—</span>
+            )}
+            <p
+              className="form-text text-muted mt-2 mb-0"
+              // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+              dangerouslySetInnerHTML={{
+                __html: t(
+                  'growi-vault.admin-settings.feature-status.description_html',
+                ),
+              }}
+            />
+          </div>
+        </div>
+
+        <div className="row mt-3">
+          <div className="col-md-3"></div>
+          <div className="col-md-9">
+            {storageStats == null ? (
+              <div className="alert alert-warning">
+                <span className="material-symbols-outlined me-1 align-middle">
+                  error
+                </span>
+                {t(
+                  'growi-vault.admin-settings.storage-observability.fetch-failed',
+                )}
+              </div>
+            ) : (
+              <table className="table table-sm table-bordered">
+                <tbody>
+                  <tr>
+                    <th className="col-md-4">
+                      {t(
+                        'growi-vault.admin-settings.storage-observability.namespace-count',
+                      )}
+                    </th>
+                    <td>{storageStats.namespaceCount}</td>
+                  </tr>
+                  <tr>
+                    <th>
+                      {t(
+                        'growi-vault.admin-settings.storage-observability.total-commit-count',
+                      )}
+                    </th>
+                    <td>{storageStats.totalCommitCount.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <th>
+                      {t(
+                        'growi-vault.admin-settings.storage-observability.loose-object-count',
+                      )}
+                    </th>
+                    <td>{storageStats.looseObjectCount.toLocaleString()}</td>
+                  </tr>
+                  <tr>
+                    <th>
+                      {t(
+                        'growi-vault.admin-settings.storage-observability.repo-size',
+                      )}
+                    </th>
+                    <td>{formatBytes(storageStats.repoSizeBytes)}</td>
+                  </tr>
+                  <tr>
+                    <th>
+                      {t(
+                        'growi-vault.admin-settings.storage-observability.last-squash',
+                      )}
+                    </th>
+                    <td>{formatDate(storageStats.lastSquashAt)}</td>
+                  </tr>
+                  <tr>
+                    <th>
+                      {t(
+                        'growi-vault.admin-settings.storage-observability.last-gc',
+                      )}
+                    </th>
+                    <td>{formatDate(storageStats.lastGcAt)}</td>
+                  </tr>
+                </tbody>
+              </table>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
 };
 
-/** Bootstrap status: progress bar and timestamps. */
+/** Bootstrap status: progress bar, timestamps, and kill switch. */
 const BootstrapStatusSection = ({
   data,
+  onConfirmWipe,
 }: {
   data: VaultStatusData | undefined;
+  onConfirmWipe: () => Promise<void>;
 }): JSX.Element => {
   const { t } = useTranslation('admin');
+  const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
 
   const isRunning = data?.bootstrapState === 'running';
+  const isBootstrapRunning =
+    data?.bootstrapState === 'running' || data?.bootstrapState === 'verifying';
   const processed = data?.processed ?? 0;
   const totalEstimated = data?.totalEstimated ?? 0;
 
@@ -281,177 +353,165 @@ const BootstrapStatusSection = ({
       : 0;
 
   return (
-    <div className="row mb-5">
-      <div className="col-lg-12">
-        <h2 className="admin-setting-header">
-          {t('growi-vault.admin-settings.bootstrap-status.heading')}
-        </h2>
+    <>
+      {/* Kill switch: Wipe Vault (the only admin-triggered bootstrap path) */}
+      <div className="row">
+        <div className="col-lg-12">
+          <h2 className="admin-setting-header">
+            {t('growi-vault.admin-settings.kill-switch.heading')}
+          </h2>
 
-        <table className="table table-sm table-bordered">
-          <tbody>
-            <tr>
-              <th className="col-md-3">
-                {t('growi-vault.admin-settings.bootstrap-status.state')}
-              </th>
-              <td>
-                <span
-                  className={`badge ${
-                    data?.bootstrapState === 'done'
-                      ? 'bg-info'
-                      : data?.bootstrapState === 'running'
-                        ? 'bg-success'
-                        : data?.bootstrapState === 'failed'
-                          ? 'bg-danger'
-                          : 'bg-secondary'
-                  }`}
-                >
-                  {data?.bootstrapState ?? '—'}
+          <div className="row">
+            <div className="col-md-3"></div>
+            <div className="col-md-9">
+              <Button
+                color="danger"
+                disabled={isBootstrapRunning}
+                onClick={() => setIsWipeModalOpen(true)}
+              >
+                <span className="material-symbols-outlined me-1 align-middle">
+                  cycle
                 </span>
-              </td>
-            </tr>
-            <tr>
-              <th>
-                {t(
-                  'growi-vault.admin-settings.bootstrap-status.processed-total',
-                )}
-              </th>
-              <td>
-                {processed} / {totalEstimated ?? '—'}
-              </td>
-            </tr>
-            <tr>
-              <th>
-                {t('growi-vault.admin-settings.bootstrap-status.started-at')}
-              </th>
-              <td>{formatDate(data?.startedAt)}</td>
-            </tr>
-            <tr>
-              <th>
-                {t('growi-vault.admin-settings.bootstrap-status.completed-at')}
-              </th>
-              <td>{formatDate(data?.completedAt)}</td>
-            </tr>
-            {data?.lastError != null && (
-              <tr>
-                <th>
-                  {t('growi-vault.admin-settings.bootstrap-status.last-error')}
-                </th>
-                <td className="text-danger">{data.lastError}</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-
-        {/* Progress bar visible while bootstrap is running */}
-        {isRunning && (
-          <div className="mt-2">
-            <div className="d-flex justify-content-between mb-1">
-              <small>
-                {t(
-                  'growi-vault.admin-settings.bootstrap-status.progress-label',
-                  {
-                    processed,
-                    total: totalEstimated ?? '?',
-                  },
-                )}
-              </small>
-              <small>{progressPct}%</small>
-            </div>
-            <div className="progress">
-              <div
-                className="progress-bar progress-bar-striped progress-bar-animated"
-                role="progressbar"
-                style={{ width: `${progressPct}%` }}
-                aria-valuenow={progressPct}
-                aria-valuemin={0}
-                aria-valuemax={100}
+                {t('growi-vault.admin-settings.kill-switch.button')}
+              </Button>
+              <p
+                className="form-text text-muted mt-2"
+                // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+                dangerouslySetInnerHTML={{
+                  __html: t(
+                    'growi-vault.admin-settings.kill-switch.description_html',
+                  ),
+                }}
               />
             </div>
           </div>
-        )}
+        </div>
       </div>
-    </div>
-  );
-};
 
-/** Storage observability: stats fetched via vault-manager. */
-const StorageObservabilitySection = ({
-  storageStats,
-}: {
-  storageStats: StorageStatsResponse | null | undefined;
-}): JSX.Element => {
-  const { t } = useTranslation('admin');
-
-  return (
-    <div className="row mb-5">
-      <div className="col-lg-12">
-        <h2 className="admin-setting-header">
-          {t('growi-vault.admin-settings.storage-observability.heading')}
-        </h2>
-
-        {storageStats == null ? (
-          <div className="alert alert-warning">
-            <span className="material-symbols-outlined me-1 align-middle">
-              error
-            </span>
-            {t('growi-vault.admin-settings.storage-observability.fetch-failed')}
-          </div>
-        ) : (
+      <div className="row mt-3">
+        <div className="col-md-3"></div>
+        <div className="col-md-9">
           <table className="table table-sm table-bordered">
             <tbody>
               <tr>
-                <th className="col-md-4">
-                  {t(
-                    'growi-vault.admin-settings.storage-observability.namespace-count',
-                  )}
+                <th className="col-md-3">
+                  {t('growi-vault.admin-settings.bootstrap-status.state')}
                 </th>
-                <td>{storageStats.namespaceCount}</td>
+                <td>
+                  <span
+                    className={`badge ${
+                      data?.bootstrapState === 'done'
+                        ? 'bg-info'
+                        : data?.bootstrapState === 'running'
+                          ? 'bg-success'
+                          : data?.bootstrapState === 'failed'
+                            ? 'bg-danger'
+                            : 'bg-secondary'
+                    }`}
+                  >
+                    {data?.bootstrapState ?? '—'}
+                  </span>
+                </td>
               </tr>
               <tr>
                 <th>
                   {t(
-                    'growi-vault.admin-settings.storage-observability.total-commit-count',
+                    'growi-vault.admin-settings.bootstrap-status.processed-total',
                   )}
                 </th>
-                <td>{storageStats.totalCommitCount.toLocaleString()}</td>
+                <td>
+                  {processed} / {totalEstimated ?? '—'}
+                </td>
+              </tr>
+              <tr>
+                <th>
+                  {t('growi-vault.admin-settings.bootstrap-status.started-at')}
+                </th>
+                <td>{formatDate(data?.startedAt)}</td>
               </tr>
               <tr>
                 <th>
                   {t(
-                    'growi-vault.admin-settings.storage-observability.loose-object-count',
+                    'growi-vault.admin-settings.bootstrap-status.completed-at',
                   )}
                 </th>
-                <td>{storageStats.looseObjectCount.toLocaleString()}</td>
+                <td>{formatDate(data?.completedAt)}</td>
               </tr>
-              <tr>
-                <th>
-                  {t(
-                    'growi-vault.admin-settings.storage-observability.repo-size',
-                  )}
-                </th>
-                <td>{formatBytes(storageStats.repoSizeBytes)}</td>
-              </tr>
-              <tr>
-                <th>
-                  {t(
-                    'growi-vault.admin-settings.storage-observability.last-squash',
-                  )}
-                </th>
-                <td>{formatDate(storageStats.lastSquashAt)}</td>
-              </tr>
-              <tr>
-                <th>
-                  {t(
-                    'growi-vault.admin-settings.storage-observability.last-gc',
-                  )}
-                </th>
-                <td>{formatDate(storageStats.lastGcAt)}</td>
-              </tr>
+              {data?.lastError != null && (
+                <tr>
+                  <th>
+                    {t(
+                      'growi-vault.admin-settings.bootstrap-status.last-error',
+                    )}
+                  </th>
+                  <td className="text-danger">{data.lastError}</td>
+                </tr>
+              )}
             </tbody>
           </table>
-        )}
+
+          {/* Progress bar visible while bootstrap is running */}
+          {isRunning && (
+            <div className="mt-2">
+              <div className="d-flex justify-content-between mb-1">
+                <small>
+                  {t(
+                    'growi-vault.admin-settings.bootstrap-status.progress-label',
+                    {
+                      processed,
+                      total: totalEstimated ?? '?',
+                    },
+                  )}
+                </small>
+                <small>{progressPct}%</small>
+              </div>
+              <div className="progress">
+                <div
+                  className="progress-bar progress-bar-striped progress-bar-animated"
+                  role="progressbar"
+                  style={{ width: `${progressPct}%` }}
+                  aria-valuenow={progressPct}
+                  aria-valuemin={0}
+                  aria-valuemax={100}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
-    </div>
+
+      {/* Confirm modal for Wipe Vault */}
+      <Modal isOpen={isWipeModalOpen} toggle={() => setIsWipeModalOpen(false)}>
+        <ModalHeader toggle={() => setIsWipeModalOpen(false)}>
+          {t('growi-vault.admin-settings.kill-switch.confirm-title')}
+        </ModalHeader>
+        <ModalBody>
+          <p
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
+            dangerouslySetInnerHTML={{
+              __html: t(
+                'growi-vault.admin-settings.kill-switch.confirm-message_html',
+              ),
+            }}
+          />
+          <p>{t('growi-vault.admin-settings.kill-switch.confirm-question')}</p>
+        </ModalBody>
+        <ModalFooter>
+          <Button
+            color="danger"
+            onClick={async () => {
+              setIsWipeModalOpen(false);
+              await onConfirmWipe();
+            }}
+          >
+            {t('growi-vault.admin-settings.kill-switch.confirm-button')}
+          </Button>
+          <Button color="secondary" onClick={() => setIsWipeModalOpen(false)}>
+            {t('growi-vault.admin-settings.kill-switch.cancel-button')}
+          </Button>
+        </ModalFooter>
+      </Modal>
+    </>
   );
 };
 
@@ -852,9 +912,6 @@ export const VaultAdminSettings = (): JSX.Element => {
       { refreshInterval: 5000 },
     );
 
-  // ---- Confirm modal state for "Wipe Vault" kill switch ----
-  const [isWipeModalOpen, setIsWipeModalOpen] = useState(false);
-
   // ---- Handlers ----
 
   // Optimistic local-state patch shown the instant the admin clicks a
@@ -876,7 +933,6 @@ export const VaultAdminSettings = (): JSX.Element => {
   );
 
   const handleConfirmWipe = useCallback(async () => {
-    setIsWipeModalOpen(false);
     mutate(optimisticRunning, false);
     try {
       await apiv3Post('/vault/wipe', {});
@@ -901,9 +957,6 @@ export const VaultAdminSettings = (): JSX.Element => {
     }
   }, [mutateResilience, t]);
 
-  const isBootstrapRunning =
-    data?.bootstrapState === 'running' || data?.bootstrapState === 'verifying';
-
   return (
     <div data-testid="growi-vault-admin-settings">
       {/* Force Warning Banner — persistent danger alert when env-force is still active */}
@@ -924,69 +977,10 @@ export const VaultAdminSettings = (): JSX.Element => {
         </Alert>
       )}
 
-      <FeatureStatusSection vaultEnabled={data?.vaultEnabled} />
-
-      {/* Kill switch: Wipe Vault (the only admin-triggered bootstrap path) */}
-      <div className="row mb-5">
-        <div className="col-lg-12">
-          <h2 className="admin-setting-header">
-            {t('growi-vault.admin-settings.kill-switch.heading')}
-          </h2>
-
-          <div className="row">
-            <div className="col-md-3"></div>
-            <div className="col-md-9">
-              <Button
-                color="danger"
-                disabled={isBootstrapRunning}
-                onClick={() => setIsWipeModalOpen(true)}
-              >
-                <span className="material-symbols-outlined me-1 align-middle">
-                  cycle
-                </span>
-                {t('growi-vault.admin-settings.kill-switch.button')}
-              </Button>
-              <p
-                className="form-text text-muted mt-2"
-                // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
-                dangerouslySetInnerHTML={{
-                  __html: t(
-                    'growi-vault.admin-settings.kill-switch.description_html',
-                  ),
-                }}
-              />
-            </div>
-          </div>
-        </div>
-      </div>
-
-      {/* Confirm modal for Wipe Vault */}
-      <Modal isOpen={isWipeModalOpen} toggle={() => setIsWipeModalOpen(false)}>
-        <ModalHeader toggle={() => setIsWipeModalOpen(false)}>
-          {t('growi-vault.admin-settings.kill-switch.confirm-title')}
-        </ModalHeader>
-        <ModalBody>
-          <p
-            // biome-ignore lint/security/noDangerouslySetInnerHtml: i18n string contains controlled HTML markup
-            dangerouslySetInnerHTML={{
-              __html: t(
-                'growi-vault.admin-settings.kill-switch.confirm-message_html',
-              ),
-            }}
-          />
-          <p>{t('growi-vault.admin-settings.kill-switch.confirm-question')}</p>
-        </ModalBody>
-        <ModalFooter>
-          <Button color="danger" onClick={handleConfirmWipe}>
-            {t('growi-vault.admin-settings.kill-switch.confirm-button')}
-          </Button>
-          <Button color="secondary" onClick={() => setIsWipeModalOpen(false)}>
-            {t('growi-vault.admin-settings.kill-switch.cancel-button')}
-          </Button>
-        </ModalFooter>
-      </Modal>
-
-      <BootstrapStatusSection data={data} />
+      <FeatureStatusSection
+        vaultEnabled={data?.vaultEnabled}
+        storageStats={data?.storageStats}
+      />
 
       <CompletionReliabilitySection resilienceData={resilienceData} />
 
@@ -1002,11 +996,11 @@ export const VaultAdminSettings = (): JSX.Element => {
         <DriftActivitySection driftStatus={resilienceData.drift} />
       )}
 
-      <StorageObservabilitySection storageStats={data?.storageStats} />
-
       <AuditLogFilterSection />
 
       <ReconcileSection />
+
+      <BootstrapStatusSection data={data} onConfirmWipe={handleConfirmWipe} />
     </div>
   );
 };
