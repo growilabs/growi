@@ -214,41 +214,70 @@ export function createVaultInstructionWatcher(): VaultInstructionWatcher {
    * Events received during the drain phase are buffered; after drain they
    * are processed immediately.
    */
+  /**
+   * Handles a single change stream event: resolves the live document and
+   * applies it (or buffers it while the drain is still running).
+   */
+  async function handleChangeEvent(event: {
+    fullDocument?: unknown;
+    _id?: unknown;
+  }): Promise<void> {
+    if (stopping) return;
+
+    // The fullDocument field carries the inserted MongoDB document.
+    // We need to wrap it as a Mongoose document for method access.
+    // Since we only watch inserts, fullDocument is always populated.
+    if (event.fullDocument == null) return;
+
+    // Look up the live Mongoose document so instance methods are available.
+    const rawDoc = event.fullDocument as { _id: unknown };
+    const liveDoc = await VaultInstructionModel.findById(rawDoc._id);
+    if (liveDoc == null) return;
+
+    const resumeToken = event._id as object | undefined;
+
+    if (!drainComplete) {
+      // Buffer the event; it will be flushed after drain completes.
+      eventBuffer.push(liveDoc);
+      return;
+    }
+
+    // Drain is done — process and persist the resume token.
+    await processInstruction(liveDoc, resumeToken ?? undefined);
+
+    if (resumeToken != null) {
+      await VaultSyncStateModel.saveResumeToken(resumeToken);
+    }
+  }
+
   function attachChangeStreamListener(stream: VaultChangeStream): void {
     // The MongoDB change stream emits typed ChangeStreamDocument objects.
     // We only watch inserts (see VaultInstructionModel.watchInserts), so
     // fullDocument is always present on the event.
-    stream.on(
-      'change',
-      async (event: { fullDocument?: unknown; _id?: unknown }) => {
-        if (stopping) return;
+    stream.on('change', (event: { fullDocument?: unknown; _id?: unknown }) => {
+      if (stopping) return;
 
-        // The fullDocument field carries the inserted MongoDB document.
-        // We need to wrap it as a Mongoose document for method access.
-        // Since we only watch inserts, fullDocument is always populated.
-        if (event.fullDocument == null) return;
-
-        // Look up the live Mongoose document so instance methods are available.
-        const rawDoc = event.fullDocument as { _id: unknown };
-        const liveDoc = await VaultInstructionModel.findById(rawDoc._id);
-        if (liveDoc == null) return;
-
-        const resumeToken = event._id as object | undefined;
-
-        if (!drainComplete) {
-          // Buffer the event; it will be flushed after drain completes.
-          eventBuffer.push(liveDoc);
-          return;
-        }
-
-        // Drain is done — process immediately and persist the resume token.
-        await processInstruction(liveDoc, resumeToken ?? undefined);
-
-        if (resumeToken != null) {
-          await VaultSyncStateModel.saveResumeToken(resumeToken);
-        }
-      },
-    );
+      // Chain each event synchronously (at arrival time) onto the single
+      // processing pipeline. This serializes instruction application — they
+      // are applied one at a time, in arrival order, after the startup drain.
+      //
+      // Serialization is REQUIRED for correctness, not just ordering:
+      // applyInstruction → commitAndUpdateRef performs a read-parent →
+      // writeCommit → updateRef sequence with no compare-and-swap. Two
+      // instructions on the same namespace applied concurrently would both
+      // read the same parent commit and the last updateRef would win — losing
+      // one update. A single-page rename emits remove(oldPath) + upsert(newPath)
+      // on the same namespace, so without serialization the remove is lost and
+      // the old file is left orphaned in the cloned repo.
+      pipelinePromise = pipelinePromise
+        .then(() => handleChangeEvent(event))
+        .catch((err: unknown) => {
+          logger.error(
+            { err: err instanceof Error ? err.message : String(err) },
+            'vault-instruction-watcher: change event processing error',
+          );
+        });
+    });
 
     stream.on('error', (err: Error) => {
       // Do not throw here — the error listener must not propagate synchronously.

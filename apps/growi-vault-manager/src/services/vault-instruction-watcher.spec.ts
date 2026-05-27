@@ -607,6 +607,50 @@ describe('VaultInstructionWatcher', () => {
       expect(liveDoc.recordFailure).toHaveBeenCalledWith('stream error');
       expect(liveDoc.markProcessed).not.toHaveBeenCalled();
     });
+
+    it('applies concurrently-arriving events serially (no overlapping applyInstruction)', async () => {
+      // commitAndUpdateRef is an unguarded read-modify-write on the namespace
+      // ref, so two instructions on the same namespace applied concurrently
+      // would lose an update (e.g. a rename's remove + upsert clobbering each
+      // other and orphaning the old file). The watcher must serialize them.
+      mockDrainCursor.mockReturnValue(stubDrainCursor([]));
+
+      const doc1 = makeDoc({ processedAt: null });
+      const doc2 = makeDoc({ processedAt: null });
+      mockFindById.mockResolvedValueOnce(doc1).mockResolvedValueOnce(doc2);
+
+      let active = 0;
+      let maxActive = 0;
+      mockApplyInstruction.mockImplementation(async () => {
+        active += 1;
+        maxActive = Math.max(maxActive, active);
+        await new Promise((r) => setTimeout(r, 10));
+        active -= 1;
+      });
+
+      const createWatcher = await getSut();
+      const watcher = createWatcher();
+      await watcher.start();
+
+      // Two inserts arriving back-to-back (as a rename's remove + upsert do).
+      fakeStream.emit('change', {
+        _id: { _data: 't1' },
+        fullDocument: { _id: 'doc-id-1' },
+      });
+      fakeStream.emit('change', {
+        _id: { _data: 't2' },
+        fullDocument: { _id: 'doc-id-2' },
+      });
+
+      // Wait for both serialized tasks (10ms each) to run to completion. They
+      // must NOT overlap, so two serial 10ms tasks take ~20ms — 100ms is ample.
+      await new Promise((r) => setTimeout(r, 100));
+
+      expect(mockApplyInstruction).toHaveBeenCalledTimes(2);
+      expect(maxActive).toBe(1);
+
+      await watcher.stop();
+    });
   });
 
   // -------------------------------------------------------------------------
