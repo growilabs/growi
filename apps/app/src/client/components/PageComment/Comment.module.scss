@@ -41,8 +41,16 @@
     // comment body
     :global(.page-comment-body) {
       word-wrap: break-word;
-      :global(.wiki p) {
-        margin: 8px 0;
+      :global(.wiki) {
+        p {
+          margin: 8px 0;
+        }
+        blockquote {
+          margin: 24px 0 8px;
+          &:first-child {
+            margin-top: 0;
+          }
+        }
       }
     }
 

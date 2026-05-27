@@ -11,7 +11,7 @@
   // Use 'forwardPorts' to make a list of ports inside the container available locally.
   // "forwardPorts": [],
 
-  "initializeCommand": "/bin/bash .devcontainer/pdf-converter/initializeCommand.sh",
+  "initializeCommand": "/bin/bash .devcontainer/scripts/init-home.sh",
   // Use 'postCreateCommand' to run commands after the container is created.
   "postCreateCommand": "/bin/bash ./.devcontainer/pdf-converter/postCreateCommand.sh",
 

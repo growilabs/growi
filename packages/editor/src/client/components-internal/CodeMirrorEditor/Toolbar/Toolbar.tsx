@@ -5,6 +5,7 @@ import SimpleBar from 'simplebar-react';
 import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
 import { AttachmentsDropup } from './AttachmentsDropup';
 import { DiagramButton } from './DiagramButton';
+import { EditorGuideButton } from './EditorGuideButton';
 import { EmojiButton } from './EmojiButton';
 import { TableButton } from './TableButton';
 import { TemplateButton } from './TemplateButton';
@@ -55,6 +56,7 @@ export const Toolbar = memo((props: Props): JSX.Element => {
               <TableButton editorKey={editorKey} />
               <DiagramButton editorKey={editorKey} />
               <TemplateButton editorKey={editorKey} />
+              <EditorGuideButton />
             </div>
           </SimpleBar>
         </div>

@@ -1,3 +1,49 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+
+overrides:
+  # flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
+  '@lykmapipo/common>flat': 5.0.2
+  # mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version
+  '@lykmapipo/common>mime': 3.0.0
+  # parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
+  '@lykmapipo/common>parse-json': 5.2.0
+  # CVE-2025-XXXXX: CRLF Injection + Prototype Pollution combo leads to HTTP Request Smuggling (CVSS 10.0).
+  # All versions < 1.15.0 are vulnerable.
+  axios: ^1.15.0
+
+packageExtensions:
+  # @orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime,
+  # but @orval/core does not declare lodash as a dependency.
+  '@orval/core':
+    dependencies:
+      lodash: '*'
+
+patchedDependencies:
+  # The patch excludes mathjax-full from the dependency graph of Marp Core.
+  '@marp-team/marp-core': packages/presentation/patches/@marp-team__marp-core.patch
+
+# pnpm v11+ unified allowlist: true=run install scripts, false=skip them.
+# Migrated from onlyBuiltDependencies (true) and ignoredBuiltDependencies (false).
+allowBuilds:
+  lefthook: true
+  '@swc/core': false
+  core-js: false
+  esbuild: false
+  leveldown: false
+  protobufjs: false
+  puppeteer: false
+  ttf2woff2: false
+  # Prisma: apps/app's `postinstall: prisma generate` covers the work that these
+  # packages' install scripts would do. In particular, `prisma generate` itself
+  # downloads the engine binary on demand (verified by removing
+  # libquery_engine-*.so.node and re-running `prisma generate` — the binary is
+  # restored byte-for-byte), so `@prisma/engines`' postinstall is redundant here.
+  '@prisma/client': false
+  '@prisma/engines': false
+  prisma: false
+  # sharp ships platform-specific prebuilt binaries via optional dependencies
+  # (e.g. @img/sharp-linux-x64, @img/sharp-libvips-linux-x64), so its install
+  # script (which would build libvips from source as a fallback) is not needed.
+  sharp: false

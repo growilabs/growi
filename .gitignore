@@ -43,6 +43,9 @@ yarn-error.log*
 *.code-workspace
 *.timestamp-*.mjs
 
+# UTCP configuration file
+.utcp_config.json
+
 # turborepo
 .turbo
 
