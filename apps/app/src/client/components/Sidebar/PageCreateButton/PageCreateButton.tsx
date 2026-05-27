@@ -16,6 +16,7 @@ import styles from './PageCreateButton.module.scss';
 
 export const PageCreateButton = React.memo((): JSX.Element => {
   const [isHovered, setIsHovered] = useState(false);
+  const [hasHovered, setHasHovered] = useState(false);
 
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const fieldsetRef = useRef<HTMLFieldSetElement>(null);
@@ -43,6 +44,7 @@ export const PageCreateButton = React.memo((): JSX.Element => {
 
   const onMouseEnterHandler = () => {
     setIsHovered(true);
+    setHasHovered(true);
   };
 
   const onMouseLeaveHandler = () => {
@@ -80,6 +82,7 @@ export const PageCreateButton = React.memo((): JSX.Element => {
         className={clsx(
           'position-absolute',
           styles['dropend-wrapper'],
+          hasHovered && styles['has-hovered'],
           isHovered && styles['is-hovered'],
         )}
       >
