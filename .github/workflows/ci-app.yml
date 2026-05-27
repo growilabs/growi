@@ -47,7 +47,7 @@ jobs:
         node-version: [24.x]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v6
 
@@ -102,7 +102,7 @@ jobs:
           - 27017/tcp
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v6
 
@@ -136,7 +136,7 @@ jobs:
           VITE_ELASTICSEARCH_URI: ""
 
       - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-mongo${{ matrix.mongodb-version }}
           path: |
@@ -183,7 +183,7 @@ jobs:
           --health-retries=5
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v6
 
@@ -207,7 +207,7 @@ jobs:
           VITE_ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
       - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: coverage-es9-mongo8.0
           path: |
@@ -239,7 +239,7 @@ jobs:
           - 27017/tcp
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
       - uses: pnpm/action-setup@v6
 
