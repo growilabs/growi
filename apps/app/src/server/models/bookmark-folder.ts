@@ -10,7 +10,11 @@ import type {
 
 import loggerFactory from '../../utils/logger';
 import { getOrCreateModel } from '../util/mongoose-utils';
-import { InvalidParentBookmarkFolderError } from './errors';
+import {
+  BookmarkFolderForbiddenError,
+  BookmarkFolderNotFoundError,
+  InvalidParentBookmarkFolderError,
+} from './errors';
 
 const logger = loggerFactory('growi:models:bookmark-folder');
 const Bookmark = monggoose.model('Bookmark');
@@ -28,6 +32,7 @@ export interface BookmarkFolderModel extends Model<BookmarkFolderDocument> {
   createByParameters(params: IBookmarkFolder): Promise<BookmarkFolderDocument>;
   deleteFolderAndChildren(
     bookmarkFolderId: Types.ObjectId | string,
+    ownerId?: Types.ObjectId | string,
   ): Promise<{ deletedCount: number }>;
   updateBookmarkFolder(
     bookmarkFolderId: string,
@@ -115,8 +120,17 @@ bookmarkFolderSchema.statics.createByParameters = async function (
 
 bookmarkFolderSchema.statics.deleteFolderAndChildren = async function (
   bookmarkFolderId: Types.ObjectId | string,
+  ownerId?: Types.ObjectId | string,
 ): Promise<{ deletedCount: number }> {
   const bookmarkFolder = await this.findById(bookmarkFolderId);
+  if (ownerId != null) {
+    if (bookmarkFolder == null) {
+      throw new BookmarkFolderNotFoundError('Bookmark folder not found');
+    }
+    if (bookmarkFolder.owner.toString() !== ownerId.toString()) {
+      throw new BookmarkFolderForbiddenError('Forbidden');
+    }
+  }
   // Delete parent and all children folder
   let deletedCount = 0;
   if (bookmarkFolder != null) {
