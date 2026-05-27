@@ -887,8 +887,10 @@ class ElasticsearchDelegator
       const agg = result.aggregations?.unique_values as
         | estypes7.AggregationsStringTermsAggregate
         | undefined;
-      const buckets = (agg?.buckets ??
-        []) as estypes7.AggregationsStringTermsBucket[];
+      const rawBuckets = agg?.buckets;
+      const buckets = Array.isArray(rawBuckets)
+        ? (rawBuckets as estypes7.AggregationsStringTermsBucket[])
+        : [];
       return buckets.map((b) => String(b.key));
     }
 
@@ -905,8 +907,10 @@ class ElasticsearchDelegator
       const agg = result.aggregations?.unique_values as
         | estypes9.AggregationsStringTermsAggregate
         | undefined;
-      const buckets = (agg?.buckets ??
-        []) as estypes9.AggregationsStringTermsBucket[];
+      const rawBuckets = agg?.buckets;
+      const buckets = Array.isArray(rawBuckets)
+        ? (rawBuckets as estypes9.AggregationsStringTermsBucket[])
+        : [];
       return buckets.map((b) => String(b.key));
     }
 
