@@ -161,7 +161,7 @@ jobs:
       matrix:
         node-version: [24.x]
         mongodb-version: ['8.0']
-        elasticsearch-version: ['9']
+        elasticsearch-version: ['9.3.3']
 
     services:
       mongodb:
