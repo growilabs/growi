@@ -383,7 +383,7 @@ async function applyUpsert(instruction: VaultInstructionDoc): Promise<void> {
     );
   }
 
-  const filePath = VaultPathMapper.map(pagePath, pageId);
+  const filePath = VaultPathMapper.map(pagePath);
 
   const revision = await RevisionModel.findBodyById(revisionId);
   if (revision == null) {
@@ -430,7 +430,7 @@ async function applyRemove(instruction: VaultInstructionDoc): Promise<void> {
     return;
   }
 
-  const filePath = VaultPathMapper.map(pagePath, pageId);
+  const filePath = VaultPathMapper.map(pagePath);
   const rootEntries = await readRootTree(namespace);
   const newTreeOid = await removeEntryFromTree(
     rootEntries,
@@ -498,7 +498,7 @@ async function applyBulkUpsert(
   // Compute (filePath, blobOid) in parallel with concurrency 16.
   const tasks: Array<() => Promise<{ filePath: string; blobOid: string }>> =
     filteredEntries.map((entry) => async () => {
-      const filePath = VaultPathMapper.map(entry.pagePath, entry.pageId);
+      const filePath = VaultPathMapper.map(entry.pagePath);
       const body = revisionMap.get(entry.revisionId) ?? '';
       const bodyBuffer = Buffer.from(body);
       const blobOid = await VaultBlobHasher.hashBlob(bodyBuffer);
