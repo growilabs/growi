@@ -1,9 +1,10 @@
 {
-  "feature_name": "comment-mention-ux",
+  "feature_name": "comment-mention",
   "created_at": "2026-04-03T00:00:00.000Z",
-  "updated_at": "2026-04-14T00:00:00.000Z",
-  "language": "ja",
-  "phase": "tasks-generated",
+  "updated_at": "2026-05-27T00:00:00.000Z",
+  "language": "en",
+  "phase": "implementation-complete",
+  "cleaned_up_at": "2026-05-27T00:00:00.000Z",
   "approvals": {
     "requirements": {
       "generated": true,
