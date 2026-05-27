@@ -17,12 +17,7 @@ export const DropendToggle = ({ isOpen, isVisible }: Props): JSX.Element => {
   return (
     <DropdownToggle
       color="primary"
-      className={[
-        'position-absolute',
-        'z-1',
-        moduleClass,
-        isOpen ? activeClass : '',
-      ].join(' ')}
+      className={`position-absolute z-1 ${moduleClass}${isOpen ? ` ${activeClass}` : ''}`}
       aria-expanded={isOpen}
       aria-label="Open create page menu"
       aria-hidden={!isVisible}

@@ -76,12 +76,7 @@ export const PageCreateButton = React.memo((): JSX.Element => {
         isOpen={dropdownOpen}
         toggle={toggle}
         direction="end"
-        className={[
-          'position-absolute',
-          styles['dropend-wrapper'],
-          hasHovered ? styles['has-hovered'] : '',
-          isHovered ? styles['is-hovered'] : '',
-        ].join(' ')}
+        className={`position-absolute ${styles['dropend-wrapper']}${hasHovered ? ` ${styles['has-hovered']}` : ''}${isHovered ? ` ${styles['is-hovered']}` : ''}`}
       >
         <DropendToggle isOpen={dropdownOpen} isVisible={isHovered} />
         <DropendMenu
