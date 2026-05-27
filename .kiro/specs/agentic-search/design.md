@@ -257,11 +257,14 @@ flowchart TD
     Result -- null --> NotFound[return result not_found_or_forbidden]
     Result -- found --> Populate[populateDataToShowRevision]
     Populate --> Split[split body by newline into allLines]
-    Split --> Outline{include outline?}
-    Outline -- yes default first call --> ExtractOutline[extract outline via mdast fromMarkdown visit heading]
-    Outline -- no --> Slice[slice offset-1 to offset-1+limit]
-    ExtractOutline --> Slice
-    Slice --> Return[return result ok page content totalLines offset limit hasMore outline]
+    Split --> Mode{offset omitted? first call}
+    Mode -- yes outline mode --> ExtractOutline[extract outline via mdast fromMarkdown visit heading]
+    Mode -- no content mode --> Slice[slice offset-1 to offset-1+limit]
+    ExtractOutline --> Fits{totalLines <= limit? small page}
+    Fits -- yes small-page opt --> SliceWithOutline[also slice first limit lines]
+    Fits -- no long page --> ReturnOutline[return result ok page outline only no content]
+    SliceWithOutline --> ReturnBoth[return result ok page outline + content totalLines offset limit hasMore]
+    Slice --> ReturnContent[return result ok page content totalLines offset limit hasMore no outline]
 ```
 
 ### Tool Execute 分岐 — FullTextSearchTool (Process)
@@ -300,10 +303,10 @@ Key 決定:
 | 2.5 | Markdown 行 slice を改変せず返す | GetPageContentTool | output content (sliced from body) | Tool Execute 分岐 |
 | 2.6 | 応答に `path` を含める | GetPageContentTool | output schema | — |
 | 2.7 | grant 自前実装禁止 | GetPageContentTool | `findByIdAndViewer` 委譲 | Tool Execute 分岐 |
-| 2.8 | offset/limit で部分取得 | GetPageContentTool | input.offset / input.limit, output content/limit | Tool Execute 分岐 |
-| 2.9 | 初回呼出で outline 自動付与 | GetPageContentTool | input.includeOutline (auto), output outline | Tool Execute 分岐 |
-| 2.10 | totalLines / hasMore / offset / limit 出力 | GetPageContentTool | output schema | Tool Execute 分岐 |
-| 2.11 | 範囲外 offset で result: 'ok' + 空 content | GetPageContentTool | Range out of bounds Implementation Note | Tool Execute 分岐 |
+| 2.8 | offset 指定で content mode（部分取得、outline なし） | GetPageContentTool | input.offset / input.limit, output content/offset/limit/hasMore | Tool Execute 分岐 |
+| 2.9 | offset 省略で outline mode（長ページは outline のみ / 小ページは outline + content） | GetPageContentTool | output outline (+ content on small page) | Tool Execute 分岐 |
+| 2.10 | totalLines 常時出力 + content 時の hasMore / offset / limit | GetPageContentTool | output schema (content fields optional) | Tool Execute 分岐 |
+| 2.11 | content mode で範囲外 offset → result: 'ok' + 空 content | GetPageContentTool | Range out of bounds Implementation Note | Tool Execute 分岐 |
 | 3.1 | user 識別情報を requestContext へ付与 | Post-Message Handler | `RequestContext.set('user', req.user)` | 反復ループ Sequence (step 4) |
 | 3.2 | tool 内で呼び出しユーザー判別可 | GetPageContentTool | `RequestContext.get('user')` | Tool Execute 分岐 |
 | 3.3 | user 取得不可で本文返さない | GetPageContentTool | discriminated union `context_error` | Tool Execute 分岐 |
@@ -579,8 +582,11 @@ export const fullTextSearchTool: Tool<
 - 戻り値の discriminated union 整形
 - **grant 判定の自前実装をしない**（必ず既存メソッド経由）
 - **execute から例外を throw しない**（agent のループ継続を保証）
-- 入力 `offset` / `limit` を sanitize し (`offset: 1-indexed positive integer, default 1`、`limit: 1〜500, default 200`)、`revision.body` の split('\n') 配列に対して `slice(offset-1, offset-1+limit)` を適用する
-- 初回呼出 (`offset` 省略) 時、`outline` (ATX heading 一覧 + 行番号 + level) を併せて返す。`includeOutline` で明示的に上書き可
+- **モード選択 (outline mode / content mode)**: `offset` の有無で応答内容を切り替える
+  - **outline mode (`offset` 省略 = 初回呼出)**: `outline` (heading 一覧 + 行番号 + level) を返す。長いページ (`totalLines > limit`) では `content` を返さず outline のみ (token 節約)。小ページ (`totalLines <= limit`) では小ページ最適化として `outline` に加えて `content` も返す
+  - **content mode (`offset` 指定 = ドリルダウン)**: `revision.body` の split('\n') 配列に対して `slice(offset-1, offset-1+limit)` を適用した `content` を返す。`outline` は返さない
+- 入力 `offset` / `limit` を sanitize する (`offset: 1-indexed positive integer`、`limit: 1〜500, default 200`)。`offset` 省略時は content mode に入らない (小ページ最適化を除く)
+- **`includeOutline` パラメータは設けない**: outline 付与は「`offset` 省略 = 初回読み出し」というモデルの自然な呼び出し方に紐付け、agent が制御フラグを覚える必要をなくす
 
 **Dependencies**
 - Inbound: `growiAgent.tools` — agent から呼び出される（P0）
@@ -614,7 +620,7 @@ const getPageContentInputSchema = z
       .positive()
       .optional()
       .describe(
-        '1-indexed start line. Omit on the first call to receive the page outline + first `limit` lines. Re-call with offset set to an outline entry\'s line number to jump to that section.',
+        "1-indexed start line. Omit on the first call to receive the page outline (a heading list with line numbers). Re-call with offset set to an outline entry's line number to fetch that section's content.",
       ),
     limit: z
       .number()
@@ -624,10 +630,6 @@ const getPageContentInputSchema = z
       .optional()
       .default(200)
       .describe('Maximum lines to return (default 200, max 500).'),
-    includeOutline: z
-      .boolean()
-      .optional()
-      .describe('Force-include / exclude the outline. By default it is auto-included only when offset is omitted.'),
   })
   .refine((i) => i.pageId != null || i.pagePath != null, {
     message: 'Either pageId or pagePath must be provided',
@@ -636,20 +638,24 @@ const getPageContentInputSchema = z
 type OutlineEntry = {
   line: number;     // 1-indexed
   level: 1 | 2 | 3 | 4 | 5 | 6;
-  heading: string;  // raw text (Markdown chars preserved)
+  heading: string;  // plain text (Markdown decorations stripped)
 };
 
+// Content fields (content / offset / limit / hasMore) are present only in
+// "content mode" (offset provided) or under the small-page optimization on the
+// first call. In "outline mode" (offset omitted on a long page) they are
+// omitted and `outline` carries the heading list instead.
 type GetPageContentSuccess = {
   result: 'ok';
   page: {
     path: string;
     updatedAt: string;
-    content: string;          // the sliced lines, joined by '\n'
     totalLines: number;
-    offset: number;           // sanitized echo
-    limit: number;            // sanitized echo
-    hasMore: boolean;         // (offset - 1) + sliced.length < totalLines
-    outline?: OutlineEntry[]; // included on first call (offset omitted) or when includeOutline=true
+    content?: string;          // the sliced lines, joined by '\n'
+    offset?: number;           // sanitized echo
+    limit?: number;            // sanitized echo
+    hasMore?: boolean;         // (offset - 1) + sliced.length < totalLines
+    outline?: OutlineEntry[];  // present only on the first call (offset omitted)
   };
 };
 
@@ -664,11 +670,14 @@ const getPageContentOutputSchema = z.discriminatedUnion('result', [
     page: z.object({
       path: z.string(),
       updatedAt: z.string(),
-      content: z.string(),
       totalLines: z.number().int().nonnegative(),
-      offset: z.number().int().positive(),
-      limit: z.number().int().positive(),
-      hasMore: z.boolean(),
+      // Content fields are present only in content mode (offset provided) or
+      // under the small-page optimization; omitted in outline mode.
+      content: z.string().optional(),
+      offset: z.number().int().positive().optional(),
+      limit: z.number().int().positive().optional(),
+      hasMore: z.boolean().optional(),
+      // Outline is present only on the first call (offset omitted).
       outline: z
         .array(
           z.object({
@@ -693,21 +702,27 @@ export const getPageContentTool: Tool<
 ```
 
 - **Preconditions**: `requestContext` に `user: IUserHasId` がセットされている（`Post-Message Handler` の責務）
-- **Postconditions**: 戻り値は必ず `getPageContentOutputSchema` を満たす。例外は throw されない。返される `content` は **必ず `revision.body` の元のテキストの連続する 1 行以上の部分文字列を `\n` で結合したもの** (改変・要約・除去なし)
-- **Invariants**: 閲覧権限のないページの内容は決して `result: 'ok'` の `page.content` に現れない。`outline` 抽出はコードブロック内 (` ``` ` / `~~~` で囲まれた範囲) の `#` 始まり行を除外する
+- **Postconditions**: 戻り値は必ず `getPageContentOutputSchema` を満たす。例外は throw されない。`content` を返す場合、それは **必ず `revision.body` の元のテキストの連続する 1 行以上の部分文字列を `\n` で結合したもの** (改変・要約・除去なし)。outline mode (長ページ初回) では `content` を返さない
+- **Invariants**: 閲覧権限のないページの内容は決して `result: 'ok'` の `page.content` / `page.outline` に現れない。`outline` 抽出はコードブロック内 (` ``` ` / `~~~` で囲まれた範囲) の `#` 始まり行を除外する
 
 **Implementation Notes**
 - **Integration**: `Page.findByIdAndViewer(id, user)` には `requestContext.get('user')` で取得した `IUserHasId` をそのまま渡す。**合成 user の組み立てや追加の `User.findById()` クエリは不要**。`req.user` は認証ミドルウェア (`loginRequiredStrictly`) 通過後に Mongoose document として既に解決済み
-- **Slicing**: `findByIdAndViewer` の戻り値を `populateDataToShowRevision(page, '')` で revision populate した後、`String(page.revision.body)` を `/\r?\n/` で split し (CRLF 耐性)、`Array.slice(offset - 1, offset - 1 + limit)` で部分配列を取り、`join('\n')` で文字列に戻す。これは **tool 内のメモリ上でのみ** 行われ、DB クエリは追加しない (PR #11204 review FB を受けた方針)
+- **モード選択 (実装)**: `findByIdAndViewer` の戻り値を `populateDataToShowRevision(page, '')` で revision populate した後、`String(page.revision.body)` を `/\r?\n/` で split (CRLF 耐性) して `allLines` / `totalLines` を得る。続いて以下の boolean を立てる:
+  - `isFirstCall = offset == null`
+  - `fitsInOnePage = totalLines <= limit`
+  - `includeOutline = isFirstCall`（初回呼出のときのみ outline を付ける）
+  - `includeContent = !isFirstCall || fitsInOnePage`（ドリルダウン、または小ページ最適化のとき content を付ける）
+- **Slicing (content mode / 小ページ最適化)**: `includeContent` が真のとき、`allLines.slice(offset - 1, offset - 1 + limit)` で部分配列を取り `join('\n')` で文字列に戻す。これは **tool 内のメモリ上でのみ** 行われ、DB クエリは追加しない (PR #11204 review FB を受けた方針)。`offset` 省略時 (小ページ最適化) は `offset = 1` として slice する
 - **Outline 抽出**: `mdast-util-from-markdown` の `fromMarkdown(body)` で `revision.body` 全文を MDAST (Markdown AST) に変換し、`unist-util-visit` で `'heading'` ノードを訪問。各ノードから `node.position.start.line` (1-indexed)、`node.depth` (1-6)、`mdast-util-to-string(node)` でプレーンテキスト化した heading text を取り出して `OutlineEntry` に変換する。本実装は CommonMark 仕様準拠であり、以下を **AST レベルで自動的に正しく扱う**:
   - ATX heading (`# heading`) と **Setext heading** (`heading\n====` / `heading\n----`) を両方とも `'heading'` ノードとして抽出 (Setext は `position.start.line` がテキスト行になるため、agent が `offset: line` で取得すると heading から始まる範囲が返る)
   - Fenced code block (` ``` ` / `~~~`)、indented code block (4 スペースインデント)、HTML block 内の `#` 行を heading として誤認しない
   - heading text 内の Markdown 装飾 (`**bold**`、`*italic*`、`` `code` ``、`[link](url)` 等) を除去してプレーンテキストとして agent に渡す (`mdast-util-to-string` の挙動)。agent が heading 名を回答に引用するときに装飾の二重適用や URL 文字列混入を回避できる
   - 本 PR の outline 抽出はパーサー利用の唯一の箇所だが、将来 section slice / `findInPage` 等の機能追加時に同じ MDAST を再利用できる投資余地として位置づける
   - **Front matter の扱い**: `fromMarkdown` は extension 無しで利用するため、YAML front matter (`--- ... ---`) を解釈せず内部は `thematicBreak` + `paragraph` 扱いになる。front matter 内に偶発的に `#` で始まる行が含まれていた場合は heading として抽出される可能性があるが、GROWI の wiki ページで front matter 内に heading 構文を含むケースは現実的に想定しないため許容する。必要な場合は将来別タスクで `mdast-util-frontmatter` の追加導入を検討
-- **Outline auto-include 条件**: `includeOutline` が `undefined` (= 省略) のとき、`offset == null || offset === 1` を満たす場合に outline を含める。これは「ページ先頭からの初回読み出し」を意味する **2 つの呼び出し方** (`offset` 省略と `offset: 1` 明示) を等価に扱うためで、agent が型推論で `offset: 1` を埋めても罠にならない (design review #2 で発見した境界トラップへの対処)。`includeOutline: true` / `false` が明示された場合はその値が優先
-- **`hasMore` の計算**: 仕様上の定義 `offset + 返却行数 < totalLines` (1-indexed `offset` と returned 行数のミックス) は、0-indexed の `endIdx` を経由した同等式 `const endIdx = (offset - 1) + sliced.length; hasMore = endIdx < totalLines;` で実装するのが直感的かつ off-by-one を起こしにくい。境界例: (a) `offset = totalLines, limit ≥ 1` → `sliced.length = 1`, `endIdx = totalLines`, `hasMore = false` (最終行を含み読了)、(b) `offset = totalLines - limit + 1` → ちょうど末尾まで読了して `hasMore = false`、(c) `offset > totalLines` → `sliced.length = 0`, `endIdx = offset - 1 ≥ totalLines`, `hasMore = false` (= Range out of bounds と整合)
-- **Range out of bounds**: `offset > totalLines` の場合 `content: ''`, `hasMore: false` を返す (`result: 'ok'`)。エラーとして扱わないことで、agent が `hasMore` のみで読了判断できる
+- **Outline 付与条件 (`includeOutline = isFirstCall`)**: outline は「`offset` 省略 = 対象ページへの初回読み出し」のときに **だけ** 付与する。`offset` が指定された 2 回目以降のドリルダウン呼出では outline を返さない (content mode)。`offset: 1` を明示した呼出は **content mode** として扱い outline を返さない (旧設計では `offset: 1` を初回扱いしていたが、新設計では「outline が欲しいなら offset を省略する」という単一の自然な呼び出し規約に統一し、`includeOutline` フラグも廃止した)。これにより agent が制御フラグを覚える必要がなくなり、ドリルダウン時に初回 200 行を無駄に取得する非効率も解消する (PR #11204 token 計測の知見)
+- **小ページ最適化 (`includeContent = !isFirstCall || fitsInOnePage`)**: 初回呼出 (`offset` 省略) でも `totalLines <= limit` のとき (ページ全体が 1 ページに収まる) は outline に加えて content も返す。これにより小さなページは 1 往復で回答でき、長いページのみ「outline → 該当セクションへ offset ドリルダウン」の 2 段階フローになる
+- **`hasMore` の計算 (content mode のみ)**: 仕様上の定義 `(offset - 1) + 返却行数 < totalLines` は 0-indexed の `endIdx` を経由した `const endIdx = (offset - 1) + sliced.length; hasMore = endIdx < totalLines;` で実装するのが直感的かつ off-by-one を起こしにくい。境界例: (a) `offset = totalLines, limit ≥ 1` → `sliced.length = 1`, `endIdx = totalLines`, `hasMore = false` (最終行を含み読了)、(b) `offset = totalLines - limit + 1` → ちょうど末尾まで読了して `hasMore = false`、(c) `offset > totalLines` → `sliced.length = 0`, `endIdx = offset - 1 ≥ totalLines`, `hasMore = false` (= Range out of bounds と整合)
+- **Range out of bounds (content mode のみ)**: `offset > totalLines` の場合 `content: ''`, `hasMore: false` を返す (`result: 'ok'`)。エラーとして扱わないことで、agent が `hasMore` のみで読了判断できる
 - **Per-request cache**: 同一 request 内で同じ `pageId` に対して `findByIdAndViewer` が複数回呼ばれる可能性があるが、キャッシュは導入しない (DB クエリ overhead は 5ms 程度で許容範囲、stateless 維持を優先)
 - **Type narrowing**: `requestContext.get('user')` の戻り値は現状 `as TypedRequestContext` キャストで narrow する (既存 Tasks 3.1-3.3 と同じ pattern を維持)。`isIUserHasId` type guard 化は別タスク (本 PR の保留 task) で後続対応とし、Task 3.4 では既存キャスト pattern を変更しない
 - Validation: zod の `refine` で「id/path どちらか必須」を表現、execute 内で zod の validation 結果を直接戻り値に変換しない（Mastra が `outputSchema` 検証を行うため）
@@ -728,7 +743,7 @@ export const getPageContentTool: Tool<
 - `fileSearchTool` の import 行と tools 登録行をコメントアウト（コードは残置）
 - `instructions` に以下の編集を行う（英語短文、既存トーン維持）:
   - **既存の `- Use the fileSearch tool when the question relates to the user's wiki content.` 行はコメントアウト**（即時削除しない理由: `fileSearchTool` 復活時の rollback コストを下げる、要件 4.2 と同一方針）
-  - 新規追記 (2〜3 行): 「wiki 内コンテンツ関連の質問はまず `fullTextSearch` tool を呼び、必要に応じて `getPageContent` tool で本文を取得して引用パスを回答に含めること」
+  - 新規追記: 「wiki 内コンテンツ関連の質問はまず `fullTextSearch` tool を呼ぶ。候補ページを読むときは `getPageContent` を **まず `offset` なしで** 呼んで outline (heading + 行番号) を得る。短いページは同じ呼び出しで `content` も返る。長いページは outline のみ返るので、回答に関係しそうな heading の `line` を `offset` に指定して再度 `getPageContent` を呼び該当セクションの `content` を取得する。`hasMore` でさらにページングするか判断する。巨大ページ全文を 1 度に取得しないこと。引用パスを回答に含めること」（PR #11204 token 計測 FB を受けた outline → drill-down フロー）
   - 新規追記: 「`fullTextSearch` の `query` には自然言語に加えて以下の演算子を必要に応じて組み合わせて良い: `"phrase"`, `-term`, `prefix:/path`, `tag:foo`, `-prefix:` / `-tag:`（全て AND）。これらは subtree / タグ絞り込み・ノイズ除去のために使う」
 - メモリ・スレッド・モデル設定は変更しない（4.3）
 
@@ -753,7 +768,7 @@ export const growiAgent = new Agent({
   - ALWAYS RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT.
   - Respond in Markdown. Do NOT wrap your response in JSON or code fences unless the user is asking for code.
   // - Use the fileSearch tool when the question relates to the user's wiki content.   // disabled: see spec agentic-search
-  - When a question relates to the user's wiki content, first call the fullTextSearch tool to gather candidate pages, then call the getPageContent tool for any page whose body you need as evidence. Include the page path you cited in the answer.
+  - When a question relates to the user's wiki content, first call the fullTextSearch tool to gather candidate pages. To read a candidate page, call getPageContent WITHOUT \`offset\` first: this returns the page outline (a heading list with line numbers). For a short page the body is small enough that \`content\` is returned in this same first call; for a long page only the \`outline\` comes back. In that case pick the heading whose section likely answers the question and call getPageContent again with \`offset\` set to that heading's \`line\` to fetch that section's \`content\`. Use \`hasMore\` to decide whether to page further with a larger \`offset\`. Do NOT fetch a whole large page at once — pages may exceed thousands of lines, so navigate via the outline. Include the page path you cited in the answer.
   - The fullTextSearch query supports plain natural-language tokens combined with: "phrase", -term, -"phrase", prefix:/path, -prefix:/path, tag:foo, -tag:foo (all AND-combined). Use these operators only when the user intent maps to a subtree, tag, or exclusion.
   - When the user explicitly asks for newest or oldest pages, set the fullTextSearch sort parameter to updatedAt or createdAt with an appropriate order (desc / asc); otherwise leave sort at the default (relationScore).
   - Keep answers concise and well-structured with headings, lists, and links where helpful.
@@ -824,7 +839,7 @@ export const growiAgent = new Agent({
 | Tool | `result` 値 | 補足 |
 |---|---|---|
 | `FullTextSearchTool` | `'ok'` / `'error'` / `'context_error'` | `'ok'` は `hits` + `totalCount`、その他は `reason: string` |
-| `GetPageContentTool` | `'ok'` / `'not_found_or_forbidden'` / `'missing_input'` / `'context_error'` | `'ok'` は `page { path, updatedAt, content, totalLines, offset, limit, hasMore, outline? }`、その他は `reason: string` |
+| `GetPageContentTool` | `'ok'` / `'not_found_or_forbidden'` / `'missing_input'` / `'context_error'` | `'ok'` は `page { path, updatedAt, totalLines, content?, offset?, limit?, hasMore?, outline? }`（content 系は content mode / 小ページ最適化時のみ、outline は初回呼出時のみ）、その他は `reason: string` |
 
 ### Page / Revision（既存・参照のみ）
 
@@ -889,17 +904,17 @@ export const growiAgent = new Agent({
 1. zod 入力 schema が `pageId` も `pagePath` も無いケースを `missing_input` で弾く（2.3）
 2. `requestContext.get('user')` が `undefined` のとき `result: 'context_error'` を返す（3.3）
 3. `Page.findByIdAndViewer` をモックして `null` 返却時に `result: 'not_found_or_forbidden'` を返す（2.4）
-4. モックされた成功ケースで `result: 'ok'` + 正しい `path` / `content` / `updatedAt` を返し、`content` が改変されない（2.5, 2.6）
+4. モックされた小ページ成功ケース (`totalLines <= limit`) で `result: 'ok'` + 正しい `path` / `content` / `updatedAt` を返し、`content` が改変されない。小ページ最適化で `outline` も併せて返る（2.5, 2.6, 2.9）
 5. `pageId` 指定時に `findByIdAndViewer` が呼ばれ、`findByPathAndViewer` は呼ばれない（2.1）
 6. `pagePath` 指定時に `findByPathAndViewer` が呼ばれ、`findByIdAndViewer` は呼ばれない（2.2）
 7. tool 内で例外を throw しないこと（agent ループ継続保証のため、Mongoose mock を error reject にしても戻り値で返ること）
-8. `offset` 省略時 default `1`、`limit` 省略時 default `200` が input 解析後に適用される (output の echo で確認)
-9. `hasMore` の境界条件 (3 点):
+8. content mode (`offset` 指定) で `limit` 省略時 default `200` が適用され、`offset` が echo される（2.8, 2.10）
+9. `hasMore` の境界条件 (3 点、いずれも content mode = `offset` 指定):
     9a. `offset === totalLines` のとき `sliced.length === 1` / `hasMore === false` (最終行を含み読了)
     9b. `offset === totalLines - limit + 1` (ちょうど末尾までを 1 回で取得) のとき `hasMore === false`
     9c. `offset > totalLines` のとき `content: ''` / `hasMore: false` を返す (`result: 'ok'`、Range out of bounds = エラー化しない)
-10. `offset` 省略時 **および** `offset: 1` 明示時のいずれも、default では `outline` が response に含まれる。`offset > 1` のとき default では含まれない
-11. `includeOutline: true` を明示すると `offset > 1` でも outline が含まれる。`includeOutline: false` を明示すると `offset` が省略または `1` であっても outline は含まれない
+10. **outline mode (長ページ初回 = `offset` 省略 + `totalLines > limit`)**: `outline` に複数 heading entry が含まれ、`content` / `offset` / `limit` / `hasMore` は **undefined** (省略される)
+11. **小ページ最適化 (`offset` 省略 + `totalLines <= limit`)**: `outline` と `content` の両方が返る。**content mode (`offset` 指定、`offset: 1` 明示を含む)**: `content` は返るが `outline` は **undefined** (省略される)
 12. Outline 抽出: fenced code block (` ``` ` / `~~~`)、indented code block (4 スペース)、HTML block 内の `#` 行は heading に **含まれない** (mdast パーサが AST レベルで自動判定)。**front matter (`---`) は extension 無しのため許容範囲** — テストではコードブロック / HTML block のみを assertion 対象とする (design.md L702 「Front matter の扱い」参照)
 13. Outline 抽出: `heading` text は `mdast-util-to-string` でプレーン化される (例: `## **Bold** [Link](url)` → `heading: 'Bold Link'`)。Markdown 装飾は除去
 13b. Outline 抽出: **Setext heading** (`title\n====` / `title\n----`) も ATX heading と同様に抽出され、`line` はテキスト行 (下線の前の行) を指す
@@ -939,8 +954,8 @@ export const growiAgent = new Agent({
 4. GRANT_RESTRICTED（リンク共有）を path 指定で取得 → `result: 'ok'`（既存挙動明文化、research.md R-3）
 5. 存在しない pageId → `result: 'not_found_or_forbidden'`（権限なしと区別しないことの確認、2.4）
 6. `pagePath` 指定でも grant が反映されること（2.2, 2.7）
-7. 300+ 行の長文 seed page に対して `offset: 200, limit: 100` で正しく行 200-299 が `content` に返る
-8. 同 page に対して `offset` 省略時 `outline` に複数の heading entry が含まれる
+7. 300+ 行の長文 seed page に対して `offset: 200, limit: 100` (content mode) で正しく行 200-299 が `content` に返り、`outline` は undefined
+8. 同 長文 page に対して `offset` 省略時 (outline mode、`totalLines > limit`) は `outline` に複数の heading entry が含まれ、`content` / `offset` / `limit` / `hasMore` は undefined
 
 ### Agent Integration Tests（オプション、本 spec 必須ではない）
 
