@@ -12,6 +12,7 @@
  */
 
 import { execFile } from 'node:child_process';
+import { createHash } from 'node:crypto';
 import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
@@ -45,6 +46,138 @@ const TEST_USER_ID = 'aabbccddeeff001122334455';
 
 /** Namespaces the test user has access to. */
 const TEST_NAMESPACES = ['public'];
+
+/**
+ * MongoDB connection URL for integration test seeding.
+ * Must match the MongoDB instance accessible by the vault-manager service.
+ */
+const MONGO_URL =
+  process.env.MONGO_URL ?? 'mongodb://localhost:27017/growi-vault-integ';
+
+// ---------------------------------------------------------------------------
+// Lazy mongoose import (only connected when normalization tests run)
+// ---------------------------------------------------------------------------
+
+let mongoose: typeof import('mongoose') | null = null;
+
+async function connectMongo(): Promise<void> {
+  mongoose = (await import('mongoose')).default as typeof import('mongoose');
+  await mongoose.connect(MONGO_URL);
+}
+
+async function disconnectMongo(): Promise<void> {
+  if (mongoose != null) {
+    await mongoose.disconnect();
+    mongoose = null;
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Helper: insert a vault upsert instruction and poll until processed
+// ---------------------------------------------------------------------------
+
+async function upsertPageAndWait(opts: {
+  namespace: string;
+  pageId: string;
+  pagePath: string;
+  revisionId: string;
+  bodyText: string;
+}): Promise<void> {
+  if (mongoose == null) {
+    throw new Error('Mongoose not connected');
+  }
+  const db = mongoose.connection.db;
+  if (db == null) {
+    throw new Error('Mongoose connection db is null');
+  }
+  const { ObjectId } = mongoose.mongo;
+
+  // Ensure the revision document exists.
+  await db.collection('revisions').updateOne(
+    { _id: new ObjectId(opts.revisionId) },
+    {
+      $setOnInsert: {
+        _id: new ObjectId(opts.revisionId),
+        body: opts.bodyText,
+        pageId: new ObjectId(opts.pageId),
+      },
+    },
+    { upsert: true },
+  );
+
+  // Insert the upsert instruction.
+  const result = await db.collection('vault_instructions').insertOne({
+    op: 'upsert',
+    payload: {
+      namespace: opts.namespace,
+      pageId: opts.pageId,
+      pagePath: opts.pagePath,
+      revisionId: opts.revisionId,
+    },
+    issuedAt: new Date(),
+    processedAt: null,
+    attempts: 0,
+    lastError: null,
+  });
+
+  const instrId = String(result.insertedId);
+
+  // Poll until processedAt is set (up to 15 s).
+  const deadline = Date.now() + 15_000;
+  while (Date.now() < deadline) {
+    // biome-ignore lint/performance/noAwaitInLoops: polling loop — must check state sequentially with delay between attempts
+    const doc = await db
+      .collection('vault_instructions')
+      .findOne({ _id: new ObjectId(instrId) });
+
+    if (doc?.processedAt != null) {
+      if (doc.lastError != null) {
+        throw new Error(`Instruction failed: ${doc.lastError as string}`);
+      }
+      return;
+    }
+
+    // biome-ignore lint/performance/noAwaitInLoops: polling delay between instruction-completion checks
+    await new Promise((resolve) => setTimeout(resolve, 200));
+  }
+
+  throw new Error(`Instruction ${instrId} was not processed within 15 s`);
+}
+
+// ---------------------------------------------------------------------------
+// Helper: collect all relative file paths in a cloned directory (recursive)
+// ---------------------------------------------------------------------------
+
+async function listFilesRecursive(dir: string): Promise<string[]> {
+  const result: string[] = [];
+
+  async function walk(current: string, relative: string): Promise<void> {
+    const entries = await fs.promises.readdir(current, { withFileTypes: true });
+    for (const entry of entries) {
+      // Skip .git directory.
+      if (entry.name === '.git') continue;
+      const entryRelative =
+        relative !== '' ? `${relative}/${entry.name}` : entry.name;
+      if (entry.isDirectory()) {
+        // biome-ignore lint/performance/noAwaitInLoops: recursive directory walk — must be sequential to build path list correctly
+        await walk(path.join(current, entry.name), entryRelative);
+      } else {
+        result.push(entryRelative);
+      }
+    }
+  }
+
+  await walk(dir, '');
+  return result;
+}
+
+// ---------------------------------------------------------------------------
+// Helper: compute the expected __<hash8> suffix for a pre-suffix filePath
+// ---------------------------------------------------------------------------
+
+function computeExpectedHash8(preSuffixFilePath: string): string {
+  return createHash('sha1').update(preSuffixFilePath).digest('hex').slice(0, 8);
+}
 
 // ---------------------------------------------------------------------------
 // Helper: send a raw HTTP request and return { status, body, headers }
@@ -316,6 +449,173 @@ async function callComposeView(
       });
 
       expect(res.status).toBe(401);
+    });
+
+    // -------------------------------------------------------------------------
+    // Test 5: Tree normalization — no-collision scenario (req 4.11)
+    // -------------------------------------------------------------------------
+
+    describe('Tree normalization: filename collision rules (req 4.10, 4.11)', () => {
+      let normCloneDir: string;
+
+      beforeAll(async () => {
+        await connectMongo();
+        normCloneDir = await fs.promises.mkdtemp(
+          path.join(os.tmpdir(), 'vault-norm-test-'),
+        );
+      });
+
+      afterAll(async () => {
+        await fs.promises.rm(normCloneDir, { recursive: true, force: true });
+        await disconnectMongo();
+      });
+
+      it('no-collision: /Sandbox and /Sandbox/Bootstrap5 produce plain filenames without __hash suffix (req 4.11)', {
+        timeout: 60_000,
+      }, async () => {
+        // Seed two pages into a dedicated namespace so they appear in the merged
+        // view.  /Sandbox and /Sandbox/Bootstrap5 differ only in hierarchy and
+        // have no lowercase-collision partner at their respective directory
+        // levels — so the normalizer must leave both names unchanged (req 4.11:
+        // group size 1 → no suffix).
+        const ns = 'integ-norm-no-collision-ns';
+        const userId = 'norm0000no00coll00000001';
+
+        if (mongoose == null) {
+          throw new Error('Mongoose not connected');
+        }
+        const { ObjectId } = mongoose.mongo;
+
+        await upsertPageAndWait({
+          namespace: ns,
+          pageId: new ObjectId().toHexString(),
+          pagePath: '/Sandbox',
+          revisionId: new ObjectId().toHexString(),
+          bodyText: '# Sandbox\nTop-level sandbox page.',
+        });
+
+        await upsertPageAndWait({
+          namespace: ns,
+          pageId: new ObjectId().toHexString(),
+          pagePath: '/Sandbox/Bootstrap5',
+          revisionId: new ObjectId().toHexString(),
+          bodyText: '# Bootstrap5\nBootstrap5 examples.',
+        });
+
+        // Compose a view that includes only the test namespace.
+        const { viewRef } = await callComposeView(userId, [ns]);
+
+        const cloneTarget = path.join(normCloneDir, 'no-collision-clone');
+
+        // Clone the view via smart HTTP.
+        await execFileAsync('git', [
+          'clone',
+          '--config',
+          `http.extraheader=Authorization: ${AUTH_HEADER}`,
+          '--config',
+          `http.extraheader=x-vault-view-ref: ${viewRef}`,
+          `${BASE_URL}/internal/git`,
+          cloneTarget,
+        ]);
+
+        const files = await listFilesRecursive(cloneTarget);
+
+        // Both pages must appear with their plain, suffix-free names.
+        expect(files).toContain('Sandbox.md');
+        expect(files).toContain('Sandbox/Bootstrap5.md');
+
+        // No file in the clone may carry a __<hex8> suffix — there are no
+        // case-insensitive collisions in this namespace.
+        const hashSuffixRe = /__[0-9a-f]{8}\./;
+        const suffixed = files.filter((f) => hashSuffixRe.test(f));
+        expect(suffixed).toHaveLength(0);
+      });
+
+      // -----------------------------------------------------------------------
+      // Test 6: Tree normalization — case collision scenario (req 4.10)
+      // -----------------------------------------------------------------------
+
+      it('case-collision: /Foo and /foo both receive distinct __<hash8> suffixes (req 4.10)', {
+        timeout: 60_000,
+      }, async () => {
+        // Seed two pages whose VaultPathMapper output differs only in case:
+        //   /Foo  → Foo.md  (filePath before suffix)
+        //   /foo  → foo.md  (filePath before suffix)
+        // 'foo.md'.toLowerCase() === 'Foo.md'.toLowerCase() → collision group
+        // size 2 → normalizer applies __<hash8> to both (req 4.10).
+        //
+        // The pre-suffix filePaths used as hash inputs are 'Foo.md' and
+        // 'foo.md' (the full path from tree root, since both are at root level).
+        const ns = 'integ-norm-case-collision-ns';
+        const userId = 'norm0000case0coll0000001';
+
+        if (mongoose == null) {
+          throw new Error('Mongoose not connected');
+        }
+        const { ObjectId } = mongoose.mongo;
+
+        // Pre-compute expected suffixed filenames so the assertion is
+        // self-documenting and matches the normalizer's deterministic output.
+        // hash8 = sha1(<preSuffixFilePath>).slice(0, 8)
+        const fooHash8 = computeExpectedHash8('Foo.md'); // sha1('Foo.md')[0..7]
+        const fooLcHash8 = computeExpectedHash8('foo.md'); // sha1('foo.md')[0..7]
+
+        // The two hashes must differ — this is guaranteed by sha1's collision
+        // resistance on distinct inputs, but we assert it explicitly so a test
+        // failure here gives an immediate diagnostic rather than a silent wrong
+        // assertion below.
+        expect(fooHash8).not.toBe(fooLcHash8);
+
+        const expectedFooFile = `Foo__${fooHash8}.md`;
+        const expectedFooLcFile = `foo__${fooLcHash8}.md`;
+
+        await upsertPageAndWait({
+          namespace: ns,
+          pageId: new ObjectId().toHexString(),
+          pagePath: '/Foo',
+          revisionId: new ObjectId().toHexString(),
+          bodyText: '# Foo\nUpper-case Foo page.',
+        });
+
+        await upsertPageAndWait({
+          namespace: ns,
+          pageId: new ObjectId().toHexString(),
+          pagePath: '/foo',
+          revisionId: new ObjectId().toHexString(),
+          bodyText: '# foo\nLower-case foo page.',
+        });
+
+        // Compose a view for this namespace.
+        const { viewRef } = await callComposeView(userId, [ns]);
+
+        const cloneTarget = path.join(normCloneDir, 'case-collision-clone');
+
+        // Clone the view.
+        await execFileAsync('git', [
+          'clone',
+          '--config',
+          `http.extraheader=Authorization: ${AUTH_HEADER}`,
+          '--config',
+          `http.extraheader=x-vault-view-ref: ${viewRef}`,
+          `${BASE_URL}/internal/git`,
+          cloneTarget,
+        ]);
+
+        const files = await listFilesRecursive(cloneTarget);
+
+        // Both suffixed filenames must be present.
+        expect(files).toContain(expectedFooFile);
+        expect(files).toContain(expectedFooLcFile);
+
+        // The two suffixed names must be distinct (req 4.10: each member gets a
+        // DIFFERENT suffix).
+        expect(expectedFooFile).not.toBe(expectedFooLcFile);
+
+        // Neither plain 'Foo.md' nor plain 'foo.md' may appear — the collision
+        // group has 2 members so both must carry a suffix.
+        expect(files).not.toContain('Foo.md');
+        expect(files).not.toContain('foo.md');
+      });
     });
   },
 );

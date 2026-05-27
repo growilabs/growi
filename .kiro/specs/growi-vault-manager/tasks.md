@@ -488,7 +488,7 @@
 
 ---
 
-- [ ] 19. markdown ファイル化ルールの見直し（collision-only・section-index 不採用）（**設計変更 / タスク 3.3・3.4・17.1 を supersede**）
+- [x] 19. markdown ファイル化ルールの見直し（collision-only・section-index 不採用）（**設計変更 / タスク 3.3・3.4・17.1 を supersede**）
 
   当初の「大文字を含むパスに `pageId.slice(0,8)` の suffix を常時付与」ルール（3.3/3.4）には 2 つの問題があった。(a) ObjectId の先頭 8 文字は作成時刻（秒）であり、同一秒に作成されたページで suffix が衝突して一意性が成立しない実装バグ。(b) 大文字を含むほぼ全ページに `__hash` が付き clone が雑然とする。requirements 3.5 / 4.9–4.11 の改訂に従い、`map()` から suffix と pageId を除去し、大小衝突の解消のみを compose 時の per-view tree 正規化（collision-only・reactive）へ移す。section-index（子を持つページの本文を README.md へ集約）は、子の増減で親ファイルが rename される churn を理由に採用しない（子を持つページも `<name>.md` のままフォルダ `<name>/` の隣に置く）。
 
@@ -532,7 +532,7 @@
   - _Requirements: 3.5, 4.10_
   - _Boundary: apps/growi-vault-manager/README.md_
 
-- [ ] 19.6 clone E2E インテグレーションテストを新ルールで検証（タスク 11.1 の追補）
+- [x] 19.6 clone E2E インテグレーションテストを新ルールで検証（タスク 11.1 の追補）
   - `apps/growi-vault-manager/src/__tests__/clone-e2e.integ.ts` に、衝突のないシード相当（`/Sandbox` + 子 `/Sandbox/Bootstrap5` 等）を投入し clone 結果が `Sandbox.md` + `Sandbox/Bootstrap5.md`（`__hash` なし）になることを検証する
   - 大小衝突ケース（`/Foo` と `/foo`）を投入し、双方に異なる `__<hash8>` が付くことを検証する
   - **完了確認**: `RUN_VAULT_INTEG=true` で当該シナリオが PASS すること
