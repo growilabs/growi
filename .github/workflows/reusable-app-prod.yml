@@ -175,8 +175,45 @@ jobs:
         url: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 
+  # Prime Playwright browser cache in a single job before the matrix fans out.
+  # Without this, all 12 matrix cells race to download ~340MB of browsers from
+  # cdn.playwright.dev simultaneously, which has been observed to stall.
+  prime-playwright-cache:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (!inputs.skip-e2e-test && startsWith(github.head_ref, 'mergify/merge-queue/'))
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm install --frozen-lockfile
+
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - name: Install Playwright browsers
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      run: |
+        pnpm playwright install
+
+
   run-playwright:
-    needs: [build-prod]
+    needs: [build-prod, prime-playwright-cache]
 
     if: |
       github.event_name == 'workflow_dispatch' ||
@@ -221,26 +258,21 @@ jobs:
       run: |
         pnpm install --frozen-lockfile
 
-    # Cache all browsers together: auth.setup project runs on chromium (Playwright default)
-    # regardless of matrix.browser, so every matrix cell needs chromium in addition to its own.
-    - name: Cache Playwright browsers
-      id: playwright-cache
-      uses: actions/cache@v4
+    # Browsers are pre-populated by `prime-playwright-cache`. Always a cache hit;
+    # restore-keys provides a partial fallback if the keyed cache was evicted.
+    - name: Restore Playwright browser cache
+      uses: actions/cache/restore@v4
       with:
         path: ~/.cache/ms-playwright
         key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
           playwright-${{ runner.os }}-
 
-    - name: Install Playwright browsers (cache miss)
-      if: steps.playwright-cache.outputs.cache-hit != 'true'
+    # `--with-deps` installs apt system libraries and re-downloads any browser
+    # that wasn't in the restored cache. With a primed cache, this only runs apt.
+    - name: Install Playwright system deps and any missing browsers
       run: |
         pnpm playwright install --with-deps
-
-    - name: Install Playwright system deps (cache hit)
-      if: steps.playwright-cache.outputs.cache-hit == 'true'
-      run: |
-        pnpm playwright install-deps
 
     - name: Start MongoDB (replica set)
       uses: supercharge/mongodb-github-action@1.12.1
