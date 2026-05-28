@@ -221,24 +221,26 @@ jobs:
       run: |
         pnpm install --frozen-lockfile
 
+    # Cache all browsers together: auth.setup project runs on chromium (Playwright default)
+    # regardless of matrix.browser, so every matrix cell needs chromium in addition to its own.
     - name: Cache Playwright browsers
       id: playwright-cache
       uses: actions/cache@v4
       with:
         path: ~/.cache/ms-playwright
-        key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml') }}
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
         restore-keys: |
-          playwright-${{ runner.os }}-${{ matrix.browser }}-
+          playwright-${{ runner.os }}-
 
     - name: Install Playwright browsers (cache miss)
       if: steps.playwright-cache.outputs.cache-hit != 'true'
       run: |
-        pnpm playwright install --with-deps ${{ matrix.browser }}
+        pnpm playwright install --with-deps
 
     - name: Install Playwright system deps (cache hit)
       if: steps.playwright-cache.outputs.cache-hit == 'true'
       run: |
-        pnpm playwright install-deps ${{ matrix.browser }}
+        pnpm playwright install-deps
 
     - name: Start MongoDB (replica set)
       uses: supercharge/mongodb-github-action@1.12.1
