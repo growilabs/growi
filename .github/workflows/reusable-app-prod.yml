@@ -175,18 +175,51 @@ jobs:
         url: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 
+  # Prime Playwright browser cache in a single job before the matrix fans out.
+  # Without this, all 12 matrix cells race to download ~340MB of browsers from
+  # cdn.playwright.dev simultaneously, which has been observed to stall.
+  prime-playwright-cache:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (!inputs.skip-e2e-test && startsWith(github.head_ref, 'mergify/merge-queue/'))
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm install --frozen-lockfile
+
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - name: Install Playwright browsers
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      run: |
+        pnpm playwright install
+
+
   run-playwright:
-    needs: [build-prod]
+    needs: [build-prod, prime-playwright-cache]
 
     if: |
       github.event_name == 'workflow_dispatch' ||
       (!inputs.skip-e2e-test && startsWith(github.head_ref, 'mergify/merge-queue/'))
 
     runs-on: ubuntu-latest
-    container:
-      # Match the Playwright version
-      # https://github.com/microsoft/playwright/issues/20010
-      image: mcr.microsoft.com/playwright:v1.58.2-jammy
 
     # Playwright spawns `pnpm run server` inside the extracted prod dir via
     # GROWI_WEBSERVER_COMMAND. That dir lacks pnpm-workspace.yaml and packages/*,
@@ -225,17 +258,27 @@ jobs:
       run: |
         pnpm install --frozen-lockfile
 
-    - name: Install Playwright browsers
-      run: |
-        pnpm playwright install --with-deps ${{ matrix.browser }}
+    # Browsers are pre-populated by `prime-playwright-cache`. Always a cache hit;
+    # restore-keys provides a partial fallback if the keyed cache was evicted.
+    - name: Restore Playwright browser cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          playwright-${{ runner.os }}-
 
-    # Cannot use `services.mongodb` because GitHub Actions services don't allow passing `--replSet`
-    # to the container command. Spawn mongod as a sibling container on the job's Actions network
-    # (created by `services.elasticsearch`) so the job container can reach it as `mongodb:27017`.
+    # `--with-deps` installs apt system libraries and re-downloads any browser
+    # that wasn't in the restored cache. With a primed cache, this only runs apt.
+    - name: Install Playwright system deps and any missing browsers
+      run: |
+        pnpm playwright install --with-deps
+
     - name: Start MongoDB (replica set)
-      run: .github/scripts/start-mongodb-replset.sh
-      env:
-        MONGODB_VERSION: ${{ matrix.mongodb-version }}
+      uses: supercharge/mongodb-github-action@1.12.1
+      with:
+        mongodb-version: ${{ matrix.mongodb-version }}
+        mongodb-replica-set: rs0
 
     - name: Download production files artifact
       uses: actions/download-artifact@v4
@@ -258,10 +301,9 @@ jobs:
         pnpm playwright test --project=chromium/installer
       env:
         DEBUG: pw:api
-        HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://mongodb:27017/growi-playwright-installer?replicaSet=rs0
-        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
+        MONGO_URI: mongodb://localhost:27017/growi-playwright-installer?replicaSet=rs0
+        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Copy dotenv file for automatic installation
       run: |
@@ -273,10 +315,9 @@ jobs:
         pnpm playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}
       env:
         DEBUG: pw:api
-        HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://mongodb:27017/growi-playwright?replicaSet=rs0
-        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
+        MONGO_URI: mongodb://localhost:27017/growi-playwright?replicaSet=rs0
+        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Copy dotenv file for automatic installation with allowing guest mode
       run: |
@@ -288,10 +329,9 @@ jobs:
         pnpm playwright test --project=${{ matrix.browser }}/guest-mode --shard=${{ matrix.shard }}
       env:
         DEBUG: pw:api
-        HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://mongodb:27017/growi-playwright-guest-mode?replicaSet=rs0
-        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
+        MONGO_URI: mongodb://localhost:27017/growi-playwright-guest-mode?replicaSet=rs0
+        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Generate shard ID
       id: shard-id
