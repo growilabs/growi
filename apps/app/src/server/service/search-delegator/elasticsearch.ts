@@ -670,7 +670,7 @@ class ElasticsearchDelegator
     if (username == null || username === '') return [];
     return [
       {
-        index: { _index: this.auditlogIndexName, _id: activity._id.toString() },
+        index: { _index: this.auditlogAliasName, _id: activity._id.toString() },
       },
       { username },
     ];
