@@ -1,31 +1,6 @@
 {
   "permissions": {
     "allow": [
-      "Bash(node --version)",
-      "Bash(npm --version)",
-      "Bash(npm view *)",
-      "Bash(pnpm --version)",
-      "Bash(turbo --version)",
-      "Bash(turbo run build)",
-      "Bash(turbo run lint)",
-      "Bash(pnpm run lint:*)",
-      "Bash(pnpm vitest run *)",
-      "Bash(pnpm biome check *)",
-      "Bash(pnpm ls *)",
-      "Bash(pnpm why *)",
-      "Bash(cat *)",
-      "Bash(echo *)",
-      "Bash(find *)",
-      "Bash(grep *)",
-      "Bash(git diff *)",
-      "Bash(gh issue view *)",
-      "Bash(gh pr view *)",
-      "Bash(gh pr diff *)",
-      "Bash(ls *)",
-      "WebFetch(domain:github.com)",
-      "mcp__plugin_context7_*",
-      "WebSearch",
-      "WebFetch"
     ]
   },
   "enableAllProjectMcpServers": true,
