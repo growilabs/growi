@@ -95,17 +95,6 @@ jobs:
         node-version: [24.x]
         mongodb-version: ['6.0', '8.0']
 
-    services:
-      mongodb:
-        image: mongo:${{ matrix.mongodb-version }}
-        ports:
-          - 27017/tcp
-        options: >-
-          --health-cmd "mongosh --quiet --eval \"db.adminCommand('ping').ok\""
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
     steps:
       - uses: actions/checkout@v4
 
@@ -132,17 +121,17 @@ jobs:
           pnpm add turbo --global
           pnpm install --frozen-lockfile
 
-      - name: Initialize MongoDB replica set
-        run: |
-          mongosh --port ${{ job.services.mongodb.ports['27017'] }} --eval '
-            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:${{ job.services.mongodb.ports['27017'] }}" }] })
-          '
+      - name: Start MongoDB (replica set)
+        uses: supercharge/mongodb-github-action@1.12.1
+        with:
+          mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-replica-set: rs0
 
       - name: Test
         run: |
           turbo run test --filter=@growi/app --filter=./packages/* --env-mode=loose
         env:
-          MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test?replicaSet=rs0
+          MONGO_URI: mongodb://localhost:27017/growi_test?replicaSet=rs0
 
       - name: Upload coverage report as artifact
         uses: actions/upload-artifact@v4
@@ -171,17 +160,6 @@ jobs:
         node-version: [24.x]
         mongodb-version: ['6.0', '8.0']
 
-    services:
-      mongodb:
-        image: mongo:${{ matrix.mongodb-version }}
-        ports:
-          - 27017/tcp
-        options: >-
-          --health-cmd "mongosh --quiet --eval \"db.adminCommand('ping').ok\""
-          --health-interval 5s
-          --health-timeout 5s
-          --health-retries 20
-
     steps:
       - uses: actions/checkout@v4
 
@@ -208,11 +186,11 @@ jobs:
           pnpm add turbo --global
           pnpm install --frozen-lockfile
 
-      - name: Initialize MongoDB replica set
-        run: |
-          mongosh --port ${{ job.services.mongodb.ports['27017'] }} --eval '
-            rs.initiate({ _id: "rs0", members: [{ _id: 0, host: "localhost:${{ job.services.mongodb.ports['27017'] }}" }] })
-          '
+      - name: Start MongoDB (replica set)
+        uses: supercharge/mongodb-github-action@1.12.1
+        with:
+          mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-replica-set: rs0
 
       - name: turbo run launch-dev:ci
         working-directory: ./apps/app
@@ -220,7 +198,7 @@ jobs:
           cp config/ci/.env.local.for-ci .env.development.local
           turbo run launch-dev:ci --env-mode=loose
         env:
-          MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_dev?replicaSet=rs0
+          MONGO_URI: mongodb://localhost:27017/growi_dev?replicaSet=rs0
 
       - name: Slack Notification
         uses: weseek/ghaction-slack-notification@master

@@ -1,6 +1,7 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  - 'bin'
 
 overrides:
   # flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
