@@ -147,11 +147,29 @@ export class AttachmentService implements IAttachmentService {
     const { fileUploadService } = this.crowi;
     const attachment = await Attachment.findById(attachmentId);
 
+    // No-op when the attachment is already gone. Two flows rely on this:
+    // (1) bulk-export cleanup may double-call this for sibling jobs that share
+    //     an attachment (the per-job loop runs concurrently), and (2) GridFS
+    //     chunks can be removed out-of-band, leaving a dangling metadata doc.
+    // Throwing here would re-surface those as cron errors on every tick.
     if (attachment == null) {
-      throw new Error(`Attachment not found: ${attachmentId}`);
+      logger.debug(
+        `removeAttachment: attachment already gone, skipping: ${attachmentId}`,
+      );
+      return;
     }
 
-    await fileUploadService.deleteFile(attachment);
+    try {
+      await fileUploadService.deleteFile(attachment);
+    } catch (err) {
+      // Same idempotency contract applies to the underlying file store: if the
+      // chunk was already deleted (e.g. a racing remove call), treat it as a
+      // no-op and continue to drop the metadata doc.
+      logger.warn(
+        `removeAttachment: deleteFile failed for ${attachmentId}, continuing to drop metadata`,
+        err,
+      );
+    }
     await attachment.remove();
 
     const detachedHandlerPromises = this.detachHandlers.map((handler) => {
