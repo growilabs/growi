@@ -959,7 +959,7 @@ export const growiAgent = new Agent({
 
 ### Agent Integration Tests（オプション、本 spec 必須ではない）
 
-`growiAgent.tools` のキー一覧で `fullTextSearchTool` と `getPageContentTool` の両方の存在、および `fileSearchTool` の非存在を assertion。さらに `growiAgent.instructions` 文字列に `fileSearch` の文字列が（コメントアウト行を除いて）含まれていないこと、新規追記の「fullTextSearch → getPageContent → 引用パス」と演算子説明が含まれることを assert。mock model で 1〜2 ターン回し agent が両 tool を tool として参照可能であることを確認。実装時に手間が小さいなら追加、`fileSearchTool` 暫定無効化（4.1）と instruction 矛盾（FB Issue 2）の回帰防止に有用。
+`growiAgent.tools` のキー一覧で `fullTextSearchTool` と `getPageContentTool` の両方の存在、および `fileSearchTool` の非存在を assertion。あわせて `growiAgent.instructions` 文字列に `Use the fileSearch tool` のコメントアウトされていない行が含まれないことを assert（FB Issue 2 の回帰防止）。**instructions の文言・利用順序・演算子キーワード等の substring-presence assertion は設けない** — プロンプト文言は反復改善が前提で、文字列マッチ assertion は反復ごとに更新負荷が累積する割に挙動を保証しない（実際のプロンプト挙動は agent の end-to-end 動作確認で検証する）。mock model で 1〜2 ターン回し agent が両 tool を tool として参照可能であることを確認。
 
 ### E2E / UI
 

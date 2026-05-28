@@ -170,7 +170,7 @@
     - 新規追記: 「wiki コンテンツ関連の質問はまず `fullTextSearch` tool でヒット候補を集め、必要に応じて `getPageContent` tool を呼んで引用パスを回答に含めよ」
     - 新規追記: 「`fullTextSearch` の `query` には自然言語に加えて `"phrase"` / `-word` / `prefix:/path` / `tag:foo`（および `-prefix:` / `-tag:`）を必要に応じて組み合わせて良い（全て AND）。subtree / タグ絞り込み・ノイズ除去に有用な場合に使う」
   - 既存の `memory` / `model` / `name` 等の設定は変更しない
-  - 観察可能完了: `growiAgent.tools` のキー一覧に `fullTextSearchTool` と `getPageContentTool` が含まれ、`fileSearchTool` は含まれない。`instructions` 文字列に「全文検索 → 本文取得 → 引用パス」の利用順序と「`"phrase"` / `-word` / `prefix:` / `tag:` 等の演算子組み合わせ可」の旨が含まれ、コメントアウトされていない `Use the fileSearch tool` 行が存在しない
+  - 観察可能完了: `growiAgent.tools` のキー一覧に `fullTextSearchTool` と `getPageContentTool` が含まれ、`fileSearchTool` は含まれない。`instructions` 文字列にコメントアウトされていない `Use the fileSearch tool` 行が存在しない（instructions の文言・表現に対する substring-presence assertion は維持コスト過大のため設けない — プロンプト挙動は agent の end-to-end 動作確認で検証する）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 4.1, 4.2, 4.3, 5.1, 5.2, 5.3_
   - _Boundary: growiAgent_
   - _Depends: 2.1, 3.1_
@@ -178,8 +178,8 @@
 - [x] 4.2 (P) growiAgent instructions に outline → drill-down ガイダンスを追記 (PR #11204 FB)
   - 既存の `getPageContent` 利用ガイダンスを以下のフローを示す英文に書き換える: 「初回呼出 (`offset` 省略) で outline + 先頭 200 行を取得 → outline の `line` 番号を使って次回の `offset` を指定し、目的セクションに直接ジャンプ → 巨大ページ全文を 1 度に読まないこと」
   - 既存の `fullTextSearch` 利用ガイダンス・演算子説明・コメントアウトされた `fileSearch` 行は維持
-  - 既存テスト (`growi-agent.spec.ts`) の instructions 文字列検査 assertion を新表現に合わせて更新 (例: `outline` / `offset` / `first call` 相当語の存在チェック)
-  - 観察可能完了: `growiAgent.instructions` 文字列に「outline」「offset」を含む drill-down ガイダンスが含まれ、コメントアウトされていない `Use the fileSearch tool` 行は依然として存在しない。`pnpm vitest run growi-agent.spec` が緑
+  - 既存テスト (`growi-agent.spec.ts`) の instructions 文字列 substring-presence assertion はメンテナンス負荷を理由に廃止済み。残すのは tools 登録と「コメントアウトされていない `Use the fileSearch tool` 行が無い」回帰ガードのみで、文言・順序・キーワードの存在は試験しない
+  - 観察可能完了: `growi-agent.ts` の instructions に drill-down ガイダンス（outline → offset によるセクション読み込み）が反映され、コメントアウトされていない `Use the fileSearch tool` 行は依然として存在しない。`pnpm vitest run growi-agent.spec` が緑
   - _Requirements: 2.9, 2.10_
   - _Boundary: growiAgent_
   - _Depends: 3.4_
@@ -195,10 +195,7 @@
 
 - [x]* 5.2 (P) (任意) 軽量 agent integration test
   - `growiAgent.tools` のキー一覧で `fullTextSearchTool` / `getPageContentTool` の存在と `fileSearchTool` の非存在を assert
-  - `growiAgent.instructions` 文字列に対し以下を assert（FB Issue 2 の回帰防止）:
-    - 「fullTextSearch → getPageContent → 引用パス」の利用順序を示す英語短文が含まれる
-    - `query` 演算子（`prefix:` / `tag:` / `"..."` / `-`）の組み合わせ可能性が含まれる
-    - **コメントアウトされていない `Use the fileSearch tool` 行が含まれない**（コメント行内の出現は許可、行頭の `//` または `<!--` を取り除いて検出する）
+  - `growiAgent.instructions` 文字列に対する assert は **「コメントアウトされていない `Use the fileSearch tool` 行が含まれない」** のみとする（FB Issue 2 の回帰防止。コメント行内の出現は許可、行頭の `//` または `<!--` を取り除いて検出する）。文言・順序・演算子キーワード等の substring-presence assertion は維持負荷が高い割に挙動を担保しないため設けない
   - mock model を使って 1 ターン回し、agent が両 tool を tool として参照可能であることを確認
   - 観察可能完了: 該当 spec ファイルが緑、本 spec の暫定無効化（tool 登録 + instructions）と新 tool 2 つの登録の回帰防止が成立
   - _Requirements: 4.1, 6.1_
