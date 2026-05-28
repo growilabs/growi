@@ -183,10 +183,6 @@ jobs:
       (!inputs.skip-e2e-test && startsWith(github.head_ref, 'mergify/merge-queue/'))
 
     runs-on: ubuntu-latest
-    container:
-      # Match the Playwright version
-      # https://github.com/microsoft/playwright/issues/20010
-      image: mcr.microsoft.com/playwright:v1.58.2-jammy
 
     # Playwright spawns `pnpm run server` inside the extracted prod dir via
     # GROWI_WEBSERVER_COMMAND. That dir lacks pnpm-workspace.yaml and packages/*,
@@ -225,17 +221,30 @@ jobs:
       run: |
         pnpm install --frozen-lockfile
 
-    - name: Install Playwright browsers
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ matrix.browser }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          playwright-${{ runner.os }}-${{ matrix.browser }}-
+
+    - name: Install Playwright browsers (cache miss)
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
       run: |
         pnpm playwright install --with-deps ${{ matrix.browser }}
 
-    # Cannot use `services.mongodb` because GitHub Actions services don't allow passing `--replSet`
-    # to the container command. Spawn mongod as a sibling container on the job's Actions network
-    # (created by `services.elasticsearch`) so the job container can reach it as `mongodb:27017`.
+    - name: Install Playwright system deps (cache hit)
+      if: steps.playwright-cache.outputs.cache-hit == 'true'
+      run: |
+        pnpm playwright install-deps ${{ matrix.browser }}
+
     - name: Start MongoDB (replica set)
-      run: .github/scripts/start-mongodb-replset.sh
-      env:
-        MONGODB_VERSION: ${{ matrix.mongodb-version }}
+      uses: supercharge/mongodb-github-action@1.12.1
+      with:
+        mongodb-version: ${{ matrix.mongodb-version }}
+        mongodb-replica-set: rs0
 
     - name: Download production files artifact
       uses: actions/download-artifact@v4
@@ -258,10 +267,9 @@ jobs:
         pnpm playwright test --project=chromium/installer
       env:
         DEBUG: pw:api
-        HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://mongodb:27017/growi-playwright-installer?replicaSet=rs0
-        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
+        MONGO_URI: mongodb://localhost:27017/growi-playwright-installer?replicaSet=rs0
+        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Copy dotenv file for automatic installation
       run: |
@@ -273,10 +281,9 @@ jobs:
         pnpm playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}
       env:
         DEBUG: pw:api
-        HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://mongodb:27017/growi-playwright?replicaSet=rs0
-        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
+        MONGO_URI: mongodb://localhost:27017/growi-playwright?replicaSet=rs0
+        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Copy dotenv file for automatic installation with allowing guest mode
       run: |
@@ -288,10 +295,9 @@ jobs:
         pnpm playwright test --project=${{ matrix.browser }}/guest-mode --shard=${{ matrix.shard }}
       env:
         DEBUG: pw:api
-        HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://mongodb:27017/growi-playwright-guest-mode?replicaSet=rs0
-        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
+        MONGO_URI: mongodb://localhost:27017/growi-playwright-guest-mode?replicaSet=rs0
+        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
 
     - name: Generate shard ID
       id: shard-id
