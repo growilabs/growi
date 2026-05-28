@@ -11,15 +11,21 @@ const DEFAULT_PROPS = {
 };
 
 export class ImportOptionForPages extends GrowiArchiveImportOption {
-  isOverwriteAuthorWithCurrentUser;
+  // `declare` keeps these as type-only members (no runtime field emit). Under
+  // `useDefineForClassFields` (target ESNext), a bare field declaration would
+  // emit `this.x = undefined` AFTER super(), clobbering the values the base
+  // constructor assigns from initProps — which then get dropped by
+  // JSON.stringify (undefined keys are omitted) and fail the server-side
+  // `isImportOptionForPages` guard. See generateOverwriteParams.
+  declare isOverwriteAuthorWithCurrentUser: boolean;
 
-  makePublicForGrant2;
+  declare makePublicForGrant2: boolean;
 
-  makePublicForGrant4;
+  declare makePublicForGrant4: boolean;
 
-  makePublicForGrant5;
+  declare makePublicForGrant5: boolean;
 
-  initPageMetadatas;
+  declare initPageMetadatas: boolean;
 
   constructor(
     collectionName: string,
