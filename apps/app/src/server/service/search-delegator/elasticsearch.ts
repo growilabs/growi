@@ -877,7 +877,7 @@ class ElasticsearchDelegator
 
     if (isES7ClientDelegator(this.client)) {
       const result = await this.client.search({
-        index: this.auditlogIndexName,
+        index: this.auditlogAliasName,
         body: {
           size: 0,
           query,
@@ -899,7 +899,7 @@ class ElasticsearchDelegator
       isES9ClientDelegator(this.client)
     ) {
       const result = await this.client.search({
-        index: this.auditlogIndexName,
+        index: this.auditlogAliasName,
         size: 0,
         query,
         aggs: { unique_values: { terms: { field, size: limit } } },
