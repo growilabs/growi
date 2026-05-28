@@ -1,8 +1,30 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.5.3...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.5.4...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.5.4](https://github.com/growilabs/compare/v7.5.3...v7.5.4) - 2026-05-27
+
+### 💎 Features
+
+* feat: Retrieve GROWI news (#10986) @ryotaro-nagahara
+* feat: Editor guide (#10847) @yuki-takei
+* feat(otel): Add growi_installed_at metrics (#11214) @ryotaro-nagahara
+* feat(otel): add yjs docs count and mongoose connection pool metrics (v7 backport) (#11218) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: UserPicture in order to show tooltip in production builds (#11192) @yuki-takei
+* fix: Correct parent grant value in /grant-data endpoint (#11181) @yuki-takei
+* fix: Permit GRANT_RESTRICTED child under any parent grant (#11182) @yuki-takei
+* fix(editor): Fix cursor stuck on wrapped lines by upgrading @codemirror/view to ^6.42.1 (#11153) @yuki-takei
+* fix(bookmark): Add owner authorization checks to bookmark folder api (#11178) @Ryosei-Fukushima
+* fix(bulk-export): Set completedAt on all bulk export completion paths (#11195) @tomoyuki-t-weseek
+* fix(admin): Prompt reload after toggling page bulk export setting (#11180) @tomoyuki-t-weseek
+* fix(drawio): draw.io stencil URLs for local instances (#11196) @yuki-takei
+* fix(bulk-export): Show bulk-export restart modal on duplicate-job error (#11186) @tomoyuki-t-weseek
+* fix(admin): stop infinite render loop on G2G data transfer page (#11166) @miya
 
 ## [v7.5.3](https://github.com/growilabs/compare/v7.5.2...v7.5.3) - 2026-05-14
 

@@ -41,12 +41,17 @@ test('Slide page (slide: true frontmatter) renders without crashing', async ({
   // save
   await page.keyboard.press('Control+s');
 
+  // The editor stays mounted but hidden (d-none) after switching to view mode,
+  // so its preview pane also contains a `.slides` deck. Scope to the visible
+  // deck to avoid a strict-mode violation against the hidden editor preview.
+  const viewSlides = page.locator('.slides').filter({ visible: true });
+
   // view mode must render the slide deck after save
   await page.getByTestId('view-button').click();
-  await expect(page.locator('.slides')).toBeVisible();
+  await expect(viewSlides).toBeVisible();
 
   // reload exercises the SWR loading path where rendererOptions is briefly
   // undefined; the slide page must still render without crashing.
   await page.reload();
-  await expect(page.locator('.slides')).toBeVisible();
+  await expect(viewSlides).toBeVisible();
 });
