@@ -29,7 +29,7 @@
   - _Depends: 1.1_
 
 - [ ] 3. Integration: OpenAPI advertisement of the header method
-- [ ] 3.1 (P) Declare the `accessTokenHeaderAuth` security scheme in the apiv1 and apiv3 definitions
+- [x] 3.1 (P) Declare the `accessTokenHeaderAuth` security scheme in the apiv1 and apiv3 definitions
   - Add an `apiKey` / `in: header` / `name: x-growi-access-token` scheme to the security schemes and to the top-level security array in both definition files
   - Independent of tasks 2.1/2.2 (separate boundary, no shared files), so it may run concurrently with the parser work
   - Observable: both definition files contain the new scheme while retaining the existing `bearer` and `accessTokenInQuery` schemes
