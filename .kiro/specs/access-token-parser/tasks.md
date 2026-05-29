@@ -13,7 +13,7 @@
   - _Boundary: extractAccessToken_
 
 - [ ] 2. Core: parser integration with header support
-- [ ] 2.1 (P) Route the scoped access-token parser through the shared extractor
+- [x] 2.1 (P) Route the scoped access-token parser through the shared extractor
   - Replace the inline token chain and type guard with the shared extractor; leave scope check, read-only rejection, and user serialization unchanged
   - Add an integration test: a valid scoped token supplied in the `X-GROWI-ACCESS-TOKEN` header with a satisfying scope authenticates the token owner
   - Observable: the access-token integration suite passes including the new header test, and the existing invalid-token / insufficient-scope / read-only tests remain green
