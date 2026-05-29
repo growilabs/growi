@@ -5,6 +5,7 @@ on:
     branches:
       - master
       - dev/7.*.x
+      - dev/8.*.x
     paths:
       - .github/mergify.yml
       - .github/workflows/ci-app-prod.yml
@@ -37,26 +38,13 @@ concurrency:
 
 jobs:
 
-  # test-prod-node22:
-  #   uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
-  #   if: |
-  #     ( github.event_name == 'push'
-  #       || github.base_ref == 'master'
-  #       || github.base_ref == 'dev/7.*.x'
-  #       || startsWith( github.base_ref, 'release/' )
-  #       || startsWith( github.head_ref, 'mergify/merge-queue/' ))
-  #   with:
-  #     node-version: 24.x
-  #     skip-e2e-test: true
-  #   secrets:
-  #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
-
   test-prod-node24:
-    uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
+    uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@dev/8.0.x
     if: |
       ( github.event_name == 'push'
         || github.base_ref == 'master'
         || github.base_ref == 'dev/7.*.x'
+        || github.base_ref == 'dev/8.*.x'
         || startsWith( github.base_ref, 'release/' )
         || startsWith( github.head_ref, 'mergify/merge-queue/' ))
     with:
