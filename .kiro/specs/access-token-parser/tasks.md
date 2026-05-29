@@ -28,16 +28,16 @@
   - _Boundary: parserForApiToken_
   - _Depends: 1.1_
 
-- [ ] 3. Integration: OpenAPI advertisement of the header method
+- [x] 3. Integration: OpenAPI advertisement of the header method
 - [x] 3.1 (P) Declare the `accessTokenHeaderAuth` security scheme in the apiv1 and apiv3 definitions
   - Add an `apiKey` / `in: header` / `name: x-growi-access-token` scheme to the security schemes and to the top-level security array in both definition files
   - Independent of tasks 2.1/2.2 (separate boundary, no shared files), so it may run concurrently with the parser work
   - Observable: both definition files contain the new scheme while retaining the existing `bearer` and `accessTokenInQuery` schemes
   - _Requirements: 5.1, 5.3_
   - _Boundary: OpenAPI definitions_
-- [ ] 3.2 Apply the header auth method to every advertising route
-  - Add an `accessTokenHeaderAuth` entry after every `accessTokenInQuery` block across the 8 current-master route files (25 sites): activity, user-activities, bookmark-folder, import, in-app-notification, page-listing, g2g-transfer, app-settings index. Do not apply PR #10443's route hunks verbatim — drive edits off the current-master `accessTokenInQuery` sites to absorb the `app-settings` path drift and the missing `user-activities`
-  - Observable: the number of added `accessTokenHeaderAuth` lines equals 25, and every route that advertises `accessTokenInQuery` also advertises `accessTokenHeaderAuth`
+- [x] 3.2 Apply the header auth method to every advertising route
+  - Add an `accessTokenHeaderAuth` entry after every `accessTokenInQuery` block across the 9 current-master route files (26 sites): activity, user-activities, bookmark-folder, import, in-app-notification, page-listing, g2g-transfer, app-settings index, and features/ai-tools/suggest-path. Do not apply PR #10443's route hunks verbatim — drive edits off a full-tree sweep (`grep -rn accessTokenInQuery apps/app/src`) to absorb the `app-settings` path drift, the missing `user-activities`, and the `features/` suggest-path route
+  - Observable: the number of added `accessTokenHeaderAuth` lines equals 26, and every route that advertises `accessTokenInQuery` also advertises `accessTokenHeaderAuth`
   - _Requirements: 5.2_
   - _Boundary: apiv3 route security blocks_
   - _Depends: 3.1_

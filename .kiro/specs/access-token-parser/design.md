@@ -135,13 +135,16 @@ apps/app/src/server/middlewares/access-token-parser/
 - `apps/app/bin/openapi/definition-apiv1.js` — add `accessTokenHeaderAuth` to
   `components.securitySchemes` and to the top-level `security` array.
 - `apps/app/bin/openapi/definition-apiv3.js` — same as apiv1.
-- The 8 apiv3 route files carrying `accessTokenInQuery` — add `- accessTokenHeaderAuth: []`
-  after every `- accessTokenInQuery: []` block (25 sites total). Authoritative set:
+- The 9 apiv3 route files carrying `accessTokenInQuery` — add `- accessTokenHeaderAuth: []`
+  after every `- accessTokenInQuery: []` block (26 sites total). Authoritative set:
   `activity.ts` (1), `user-activities.ts` (1), `bookmark-folder.ts` (6), `import.ts` (4),
   `in-app-notification.ts` (4), `page-listing.ts` (4), `g2g-transfer.ts` (2),
-  `app-settings/index.ts` (3). **Drift note**: PR #10443 targeted `app-settings.js`
-  (now `app-settings/index.ts`) and omitted `user-activities.ts`; do not apply the PR's
-  route hunks verbatim — drive edits off the current-master `accessTokenInQuery` sites.
+  `app-settings/index.ts` (3), and
+  `features/ai-tools/suggest-path/server/routes/apiv3/index.ts` (1). **Drift note**: PR
+  #10443 targeted `app-settings.js` (now `app-settings/index.ts`), omitted
+  `user-activities.ts`, and predated the `features/` suggest-path route; do not apply the
+  PR's route hunks verbatim — drive edits off a full-tree sweep of current-master
+  `accessTokenInQuery` sites (`grep -rn accessTokenInQuery apps/app/src`).
 
 ## Components and Interfaces
 

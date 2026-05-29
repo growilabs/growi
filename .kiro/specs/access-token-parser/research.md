@@ -148,3 +148,16 @@ signatures and all validation/authorization remain unchanged (reuse → R4, R2.2
 **Route-edit method (drift-proof)** — Drive OpenAPI route edits off current-master
 `accessTokenInQuery` sites (8 files / 25 blocks), NOT the PR #10443 file list. Add
 `- accessTokenHeaderAuth: []` after each. Self-check: added line count == 25.
+
+---
+
+## Coverage Correction (task 3.2 implementation)
+
+The gap-analysis route sweep grepped only `apps/app/src/server/routes` and undercounted.
+A full-tree sweep (`grep -rn accessTokenInQuery apps/app/src`) finds **26** sites across
+**9** files — the 8 originally listed plus
+`apps/app/src/features/ai-tools/suggest-path/server/routes/apiv3/index.ts` (1) in the
+`features/` tree. Requirement 5.2 ("every route advertising the query method also
+advertises the header method") requires this 9th file, so task 3.2's scope was extended
+to 26 sites. Lesson: sweep `apps/app/src` (including `features/`), not just
+`server/routes/apiv3`, when enumerating OpenAPI security blocks.
