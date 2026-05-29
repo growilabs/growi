@@ -6,6 +6,7 @@ import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
 const logger = loggerFactory('growi:service:auditlog-cleanup-cron');
 
+// TODO: https://redmine.weseek.co.jp/issues/184206
 export class AuditlogCleanupCronService extends CronService {
   private readonly delegator: ElasticsearchDelegator;
 
@@ -15,6 +16,7 @@ export class AuditlogCleanupCronService extends CronService {
   }
 
   getCronSchedule(): string {
+    // Runs hourly; expired documents may remain in ES up to ~1 hour after MongoDB TTL deletion.
     return '0 * * * *';
   }
 
