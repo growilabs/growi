@@ -1,3 +1,4 @@
+import EventEmitter from 'events';
 import { vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
@@ -146,5 +147,37 @@ describe('searchParseQuery()', () => {
     );
     expect(result.terms.not_prefix).toContain('/user');
     expect(result.terms.match).toContain('/user/my-private-page');
+  });
+});
+
+describe('SearchService.registerAuditlogUpdateEvent()', () => {
+  let searchService: TestSearchService;
+  let mockCrowi: MockProxy<Crowi>;
+  let activityEvent: EventEmitter;
+
+  beforeEach(() => {
+    activityEvent = new EventEmitter();
+    mockCrowi = mock<Crowi>();
+    mockCrowi.events.activity = activityEvent;
+    searchService = new TestSearchService(mockCrowi);
+    searchService.registerAuditlogUpdateEvent();
+  });
+
+  it('should call updateOrInsertAuditlog when "created" event fires', () => {
+    const activity = { _id: 'test-id', snapshot: { username: 'test-user' } };
+    activityEvent.emit('created', activity);
+
+    expect(
+      searchService.fullTextSearchDelegator.updateOrInsertAuditlog,
+    ).toHaveBeenCalledWith(activity);
+  });
+
+  it('should call updateOrInsertAuditlog when "updated" event fires', () => {
+    const activity = { _id: 'test-id', snapshot: { username: 'test-user' } };
+    activityEvent.emit('updated', activity);
+
+    expect(
+      searchService.fullTextSearchDelegator.updateOrInsertAuditlog,
+    ).toHaveBeenCalledWith(activity);
   });
 });
