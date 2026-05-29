@@ -90,7 +90,7 @@ describe('ElasticsearchDelegator', () => {
 
       expect(mockClient.bulk).toHaveBeenCalledWith({
         body: [
-          { index: { _index: 'auditlogs', _id: id.toString() } },
+          { index: { _index: 'auditlogs-alias', _id: id.toString() } },
           { username: 'test-user' },
         ],
       });
@@ -111,7 +111,10 @@ describe('ElasticsearchDelegator', () => {
 
       await delegator.updateOrInsertAuditlog(activity);
 
-      expect(mockError).toHaveBeenCalled();
+      expect(mockError).toHaveBeenCalledWith(
+        expect.objectContaining({ failedItems: expect.any(Array) }),
+        'updateOrInsertAuditlog bulk indexing had errors',
+      );
     });
 
     it('should call logger.error and not throw when bulk throws', async () => {
@@ -125,7 +128,10 @@ describe('ElasticsearchDelegator', () => {
       await expect(
         delegator.updateOrInsertAuditlog(activity),
       ).resolves.toBeUndefined();
-      expect(mockError).toHaveBeenCalled();
+      expect(mockError).toHaveBeenCalledWith(
+        'updateOrInsertAuditlog failed.',
+        expect.any(Error),
+      );
     });
   });
 });
