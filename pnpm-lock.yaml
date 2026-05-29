@@ -632,8 +632,8 @@ importers:
         specifier: ^15.8.1
         version: 15.8.1
       qs:
-        specifier: ^6.14.2
-        version: 6.14.2
+        specifier: ^6.15.2
+        version: 6.15.2
       rate-limiter-flexible:
         specifier: ^2.3.7
         version: 2.4.2
@@ -657,7 +657,7 @@ importers:
         version: 0.1.1(react@18.2.0)
       react-dnd:
         specifier: ^14.0.5
-        version: 14.0.5(@types/hoist-non-react-statics@3.3.5)(@types/node@24.12.3)(@types/react@18.3.3)(react@18.2.0)
+        version: 14.0.5(@types/hoist-non-react-statics@3.3.5)(@types/node@24.12.4)(@types/react@18.3.3)(react@18.2.0)
       react-dnd-html5-backend:
         specifier: ^14.1.0
         version: 14.1.0
@@ -789,7 +789,7 @@ importers:
         version: 6.2.0
       ts-node:
         specifier: ^10.9.2
-        version: 10.9.2(@swc/core@1.10.7(@swc/helpers@0.5.18))(@types/node@24.12.3)(typescript@5.9.3)
+        version: 10.9.2(@swc/core@1.10.7(@swc/helpers@0.5.18))(@types/node@24.12.4)(typescript@5.9.3)
       tsconfig-paths:
         specifier: ^4.2.0
         version: 4.2.0
@@ -804,7 +804,7 @@ importers:
         version: 2.1.5
       umzug:
         specifier: ^3.8.2
-        version: 3.8.2(@types/node@24.12.3)
+        version: 3.8.2(@types/node@24.12.4)
       unified:
         specifier: ^11.0.0
         version: 11.0.5
@@ -1835,8 +1835,8 @@ importers:
         specifier: ^2.0.0
         version: 2.0.1
       qs:
-        specifier: ^6.14.2
-        version: 6.14.2
+        specifier: ^6.15.2
+        version: 6.15.2
       url-join:
         specifier: ^4.0.0
         version: 4.0.1
@@ -5710,6 +5710,9 @@ packages:
 
   '@types/node@24.12.3':
     resolution: {integrity: sha512-8oljBDGun9cIsZRJR6fkihn0TSXJI0UDOOhncYaERq6M0JMDoPLxyscwruJcb4GKS6dvK/d8xebYBg27h/duaQ==}
+
+  '@types/node@24.12.4':
+    resolution: {integrity: sha512-GUUEShf+PBCGW2KaXwcIt3Yk+e3pkKwWKb9GSyM9WQVE+ep2jzmHdGsHzu4wgcZy5fN9FBdVzjpBQsYlpfpgLA==}
 
   '@types/nodemailer@6.4.22':
     resolution: {integrity: sha512-HV16KRsW7UyZBITE07B62k8PRAKFqRSFXn1T7vslurVjN761tMDBhk5Lbt17ehyTzK6XcyJnAgUpevrvkcVOzw==}
@@ -11748,8 +11751,8 @@ packages:
     resolution: {integrity: sha512-+38qI9SOr8tfZ4QmJNplMUxqjbe7LKvvZgWdExBOmd+egZTtjLB67Gu0HRX3u/XOq7UU2Nx6nsjvS16Z9uwfpg==}
     engines: {node: '>=0.6'}
 
-  qs@6.14.2:
-    resolution: {integrity: sha512-V/yCWTTF7VJ9hIh18Ugr2zhJMP01MY7c5kh4J870L7imm6/DIzBsNLTXzMwUA3yZ5b/KBqLx8Kp3uRvd7xSe3Q==}
+  qs@6.15.2:
+    resolution: {integrity: sha512-Rzq0KEyX/w/tEybncDgdkZrJgVUsUMk3xjh3t5bv3S1HTAtg+uOYt72+ZfwiQwKdysThkTBdL/rTi6HDmX9Ddw==}
     engines: {node: '>=0.6'}
 
   quansync@0.2.10:
@@ -12522,8 +12525,8 @@ packages:
   should@13.2.3:
     resolution: {integrity: sha512-ggLesLtu2xp+ZxI+ysJTmNjh2U0TsC+rQ/pfED9bUZZ4DKefP27D+7YJVVTvKsmjLpIi9jAa7itwDGkDDmt1GQ==}
 
-  side-channel-list@1.0.0:
-    resolution: {integrity: sha512-FCLHtRD/gnpCiCHEiJLOwdmFP+wzCmDEkc9y7NsYxeF4u7Btsn1ZuwgwJGxImImHicJArLP4R0yX4c2KCrMrTA==}
+  side-channel-list@1.0.1:
+    resolution: {integrity: sha512-mjn/0bi/oUURjc5Xl7IaWi/OJJJumuoJFQJfDDyO46+hBWsfaVM65TBHq2eoZBhzl9EchxOijpkbRC8SVBQU0w==}
     engines: {node: '>= 0.4'}
 
   side-channel-map@1.0.1:
@@ -18150,7 +18153,7 @@ snapshots:
   '@rollup/rollup-win32-x64-msvc@4.39.0':
     optional: true
 
-  '@rushstack/node-core-library@5.13.0(@types/node@24.12.3)':
+  '@rushstack/node-core-library@5.13.0(@types/node@24.12.4)':
     dependencies:
       ajv: 8.13.0
       ajv-draft-04: 1.0.0(ajv@8.13.0)
@@ -18161,7 +18164,7 @@ snapshots:
       resolve: 1.22.8
       semver: 7.5.4
     optionalDependencies:
-      '@types/node': 24.12.3
+      '@types/node': 24.12.4
 
   '@rushstack/node-core-library@5.21.0(@types/node@24.12.3)':
     dependencies:
@@ -18185,12 +18188,12 @@ snapshots:
       resolve: 1.22.8
       strip-json-comments: 3.1.1
 
-  '@rushstack/terminal@0.15.2(@types/node@24.12.3)':
+  '@rushstack/terminal@0.15.2(@types/node@24.12.4)':
     dependencies:
-      '@rushstack/node-core-library': 5.13.0(@types/node@24.12.3)
+      '@rushstack/node-core-library': 5.13.0(@types/node@24.12.4)
       supports-color: 8.1.1
     optionalDependencies:
-      '@types/node': 24.12.3
+      '@types/node': 24.12.4
 
   '@rushstack/terminal@0.22.4(@types/node@24.12.3)':
     dependencies:
@@ -18200,9 +18203,9 @@ snapshots:
     optionalDependencies:
       '@types/node': 24.12.3
 
-  '@rushstack/ts-command-line@4.23.7(@types/node@24.12.3)':
+  '@rushstack/ts-command-line@4.23.7(@types/node@24.12.4)':
     dependencies:
-      '@rushstack/terminal': 0.15.2(@types/node@24.12.3)
+      '@rushstack/terminal': 0.15.2(@types/node@24.12.4)
       '@types/argparse': 1.0.38
       argparse: 1.0.10
       string-argv: 0.3.2
@@ -20017,6 +20020,10 @@ snapshots:
       undici-types: 6.21.0
 
   '@types/node@24.12.3':
+    dependencies:
+      undici-types: 7.16.0
+
+  '@types/node@24.12.4':
     dependencies:
       undici-types: 7.16.0
 
@@ -26715,7 +26722,7 @@ snapshots:
     dependencies:
       side-channel: 1.1.0
 
-  qs@6.14.2:
+  qs@6.15.2:
     dependencies:
       side-channel: 1.1.0
 
@@ -26835,7 +26842,7 @@ snapshots:
     dependencies:
       dnd-core: 14.0.1
 
-  react-dnd@14.0.5(@types/hoist-non-react-statics@3.3.5)(@types/node@24.12.3)(@types/react@18.3.3)(react@18.2.0):
+  react-dnd@14.0.5(@types/hoist-non-react-statics@3.3.5)(@types/node@24.12.4)(@types/react@18.3.3)(react@18.2.0):
     dependencies:
       '@react-dnd/invariant': 2.0.0
       '@react-dnd/shallowequal': 2.0.0
@@ -26845,7 +26852,7 @@ snapshots:
       react: 18.2.0
     optionalDependencies:
       '@types/hoist-non-react-statics': 3.3.5
-      '@types/node': 24.12.3
+      '@types/node': 24.12.4
       '@types/react': 18.3.3
 
   react-dom@18.2.0(react@18.2.0):
@@ -27720,7 +27727,7 @@ snapshots:
       should-type-adaptors: 1.1.0
       should-util: 1.0.1
 
-  side-channel-list@1.0.0:
+  side-channel-list@1.0.1:
     dependencies:
       es-errors: 1.3.0
       object-inspect: 1.13.4
@@ -27744,7 +27751,7 @@ snapshots:
     dependencies:
       es-errors: 1.3.0
       object-inspect: 1.13.4
-      side-channel-list: 1.0.0
+      side-channel-list: 1.0.1
       side-channel-map: 1.0.1
       side-channel-weakmap: 1.0.2
 
@@ -28252,7 +28259,7 @@ snapshots:
       formidable: 3.5.4
       methods: 1.1.2
       mime: 2.6.0
-      qs: 6.14.2
+      qs: 6.15.2
     transitivePeerDependencies:
       - supports-color
 
@@ -28610,6 +28617,26 @@ snapshots:
     optionalDependencies:
       '@swc/core': 1.10.7(@swc/helpers@0.5.18)
 
+  ts-node@10.9.2(@swc/core@1.10.7(@swc/helpers@0.5.18))(@types/node@24.12.4)(typescript@5.9.3):
+    dependencies:
+      '@cspotcode/source-map-support': 0.8.1
+      '@tsconfig/node10': 1.0.9
+      '@tsconfig/node12': 1.0.11
+      '@tsconfig/node14': 1.0.3
+      '@tsconfig/node16': 1.0.3
+      '@types/node': 24.12.4
+      acorn: 8.16.0
+      acorn-walk: 8.3.2
+      arg: 4.1.3
+      create-require: 1.1.1
+      diff: 4.0.1
+      make-error: 1.3.6
+      typescript: 5.9.3
+      v8-compile-cache-lib: 3.0.1
+      yn: 3.1.1
+    optionalDependencies:
+      '@swc/core': 1.10.7(@swc/helpers@0.5.18)
+
   ts-patch@3.3.0:
     dependencies:
       chalk: 4.1.2
@@ -28845,9 +28872,9 @@ snapshots:
 
   uid2@0.0.4: {}
 
-  umzug@3.8.2(@types/node@24.12.3):
+  umzug@3.8.2(@types/node@24.12.4):
     dependencies:
-      '@rushstack/ts-command-line': 4.23.7(@types/node@24.12.3)
+      '@rushstack/ts-command-line': 4.23.7(@types/node@24.12.4)
       emittery: 0.13.1
       fast-glob: 3.3.3
       pony-cause: 2.1.11
