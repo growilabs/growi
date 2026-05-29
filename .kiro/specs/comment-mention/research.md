@@ -142,3 +142,51 @@
 - `packages/editor/src/client/services-internal/extensions/emojiAutocompletionSettings.ts` — Reference implementation for autocomplete
 - `apps/app/src/client/services/renderer/renderer.tsx` — `generateSimpleViewOptions` / `generateCommentViewOptions`
 - `apps/app/src/server/routes/apiv3/users.js` — User search API
+
+---
+
+# Gap Analysis: Autocomplete Facility / Source Separation (Requirement 4)
+
+> Added during reviewer validation, after Requirements 1–3 were merged. Scope: resolve the implicit dependency from mention completion onto the emoji extension. See `requirements.md` → Requirement 4 for acceptance criteria.
+
+## Summary
+
+- **Scope**: Decouple the generic CodeMirror `autocompletion()` facility from the emoji feature so that emoji and mention become independent peer consumers.
+- **Root coupling**: The only `autocompletion()` in `packages/editor` is bundled inside `emojiAutocompletionSettings`; `defaultExtensions` pulls it in only transitively. Mention registers a source only, so it silently depends on emoji being loaded.
+- **Verified facts** (grep over `packages/editor/src`): exactly one `autocompletion(` call site (`emojiAutocompletionSettings.ts:33`); `defaultExtensions` contains no standalone `autocompletion()`; `mentionAutocompletionSettings.ts` registers only `markdownLanguage.data.of`.
+- **Recommendation**: Option B — extract `autocompletion()` into a standalone shared default extension; emoji keeps only its glyph render + source.
+- **Effort/Risk**: S / Low (config-merge semantics make this safe; main residual risk is the missing emoji test coverage).
+
+## Current State Investigation
+
+- `packages/editor/src/client/stores/use-default-extensions.ts` — `defaultExtensions[]` includes `markdown({ base: markdownLanguage })` and `emojiAutocompletionSettings`. Consumed by `useDefaultExtensions`, which is called from the internal `CodeMirrorEditor` component — i.e. **every** editor (main page editor, comment editor, diff editor) gets it.
+- `packages/editor/src/client/services-internal/extensions/emojiAutocompletionSettings.ts` — exports an array `[ autocompletion({ addToOptions, icons:false }), markdownLanguage.data.of({ autocomplete: emojiAutocompletion }) ]`. The first element is the **shared facility**; the second is the **emoji source**. Trigger: `/:\w{2,}$/`.
+- `packages/editor/src/client/services/mentionAutocompletionSettings.ts` — `createMentionCompletionExtension(fetchUsers)` returns only `markdownLanguage.data.of({ autocomplete })`. Trigger: `/(?<!\w)@[\w.-]+$/`. No `autocompletion()`.
+- `apps/app/src/client/components/PageComment/CommentEditor.tsx` — appends `mentionDecorationSettings` and the mention completion extension via `appendExtensions`; relies on `defaultExtensions` (hence emoji) for the facility.
+
+## Requirement-to-Asset Map (gaps tagged)
+
+| Need (Req 4 AC) | Existing asset | Gap |
+|---|---|---|
+| Standalone shared `autocompletion()` in defaults (AC 1) | `defaultExtensions` array | **Missing** — facility lives inside emoji, not as its own entry |
+| Mention works without emoji (AC 2) | `mentionAutocompletionSettings.ts` (source only) | **Constraint** — currently coupled; must be proven independent |
+| emoji keeps glyph render + source (AC 3) | `emojiAutocompletionSettings.ts` `addToOptions` | Reusable — keep emoji-specific config on emoji |
+| emoji + mention coexist (AC 4) | both use `markdownLanguage.data.of` | Already satisfied since `override` was dropped; must not regress |
+| emoji not in fenced code blocks (AC 6) | language-data scoping (markdownLanguage) | Already satisfied; **must be locked by a regression test** (none today) |
+| No emoji completion test exists | — | **Missing** test coverage (pre-existing) |
+
+## Implementation Approach Options
+
+- **Option A — Extend in place (add a `WHY` comment only)**: Document the implicit dependency in `emojiAutocompletionSettings.ts`; no structural change. ✅ zero risk, fastest. ❌ leaves the responsibility inversion; emoji removal still breaks mention silently. Fallback only.
+- **Option B — Extract shared facility (recommended)**: Add a standalone `autocompletion({ icons:false })` (the shared base) to `defaultExtensions`; reduce `emojiAutocompletionSettings` to `autocompletion({ addToOptions:[emojiRender] }) + emoji source`; leave mention unchanged. CodeMirror merges the two `autocompletion()` configs. ✅ clean peer separation, satisfies AC 1–5,7. ❌ touches a shared default consumed by all editors → needs full-suite + manual emoji smoke.
+- **Option C — Each feature self-installs the facility**: Have both emoji and mention each call `autocompletion()`. ✅ fully self-contained features. ❌ redundant facility installs, and any future third consumer repeats it; less DRY than a shared base. Not recommended.
+
+## Effort & Risk
+
+- **Effort: S (1–3 days)** — small, localized edits in 2 editor files plus tests; established patterns.
+- **Risk: Low** — config-merge semantics are well-defined; blast radius is "all editors" but behavior is additive. Main residual risk is the **absence of emoji test coverage**, which Req 4 AC 2/4/6 ask the implementer to address. Runtime caveat: live dropdown click-test could not be run in this environment (devcontainer inotify file-watch limit blocks `turbo run dev`); rely on unit tests + a manual smoke after the limit is lifted, or in CI.
+
+## Recommendations for Design Phase
+
+- Adopt **Option B**. Key decisions to settle in `/kiro-spec-design`: the exact home for the shared `autocompletion()` (inline in `defaultExtensions` vs a new `autocompletionSettings` module), and where the regression tests live (`packages/editor` services specs).
+- Research items to carry forward: confirm CodeMirror 6 merge behavior for multiple `autocompletion()` configs against the installed version; decide a testable way to assert "no emoji completion inside fenced code blocks" (AC 6).

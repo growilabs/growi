@@ -1,23 +1,24 @@
 {
   "feature_name": "comment-mention",
   "created_at": "2026-04-03T00:00:00.000Z",
-  "updated_at": "2026-05-27T00:00:00.000Z",
+  "updated_at": "2026-05-29T00:00:00.000Z",
   "language": "en",
-  "phase": "implementation-complete",
+  "phase": "requirements-revised:autocomplete-facility-separation",
   "cleaned_up_at": "2026-05-27T00:00:00.000Z",
+  "handoff_note": "Requirements 1-3 are implemented and merged. Reviewer validation (2026-05-29) found an architectural coupling: the generic CodeMirror autocomplete facility lives inside the emoji extension, so mention completion implicitly depends on emoji being loaded. Requirement 4 (+ gap analysis in research.md) captures the decoupling work. Next step: an implementer runs /kiro-spec-design then /kiro-spec-tasks for Requirement 4 only. The emoji 'no completion inside fenced code blocks' behavior is intentional and must be preserved (Req 4 AC 6).",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "design": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "tasks": {
       "generated": true,
-      "approved": true
+      "approved": false
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": false
 }
