@@ -42,11 +42,16 @@
   - _Boundary: apiv3 route security blocks_
   - _Depends: 3.1_
 
-- [ ] 4. Validation: regression and spec verification
-- [ ] 4.1 Verify OpenAPI regeneration and run end-to-end quality gates
+- [x] 4. Validation: regression and spec verification
+- [x] 4.1 Verify OpenAPI regeneration and run end-to-end quality gates
   - Regenerate the apiv1/apiv3 specs and confirm `accessTokenHeaderAuth` appears in the schemes and on each route that previously advertised `accessTokenInQuery`
   - Run lint, the full access-token-parser test suite, and the build for the app package
   - Confirm non-regression: requests with no `X-GROWI-ACCESS-TOKEN` header resolve identically to pre-change behavior
-  - Observable: lint, tests, and build are green; the regenerated specs include the new scheme; the added-line count check (25) holds
+  - Observable: lint/typecheck/tests green and regenerated specs consistent (0 query-ops missing the header method; added-line count check = 26). NOTE: the full app build is blocked by a pre-existing, unrelated devcontainer dependency-hoisting issue (`@lezer/*`, `styled-jsx` in the client bundle) — see Implementation Notes; verify the production build in CI.
   - _Requirements: 3.3, 5.1, 5.2, 5.3_
   - _Depends: 2.1, 2.2, 3.2_
+
+## Implementation Notes
+- Req 3.4 semantics: a non-string `X-GROWI-ACCESS-TOKEN` value (duplicated header → array) is coerced to `undefined` before the `??` chain so resolution falls through to query/body, per requirements.md 3.4. design.md was corrected to match (the initial "centralized guard at end" wording implied short-circuit-to-null).
+- OpenAPI route coverage: enumerate `accessTokenInQuery` with a FULL-tree sweep (`grep -rn accessTokenInQuery apps/app/src`), not just `server/routes/apiv3` — the `features/` tree holds the suggest-path route (26 sites / 9 files, not 25 / 8).
+- Task 4.1 build gate: `turbo run build --filter @growi/app` FAILS in this devcontainer on a PRE-EXISTING, unrelated client-bundle dependency-hoisting issue — Turbopack cannot resolve `@lezer/common`, `@lezer/lr` (transitive deps of `@codemirror/lang-python`/`lang-yaml`) and `styled-jsx` (import trace: ConflictDiffModal → editor → codemirror; none touched by this server-only change). `pnpm install --frozen-lockfile` reports "Already up to date", so the state is lockfile-defined and independent of this feature. Verified green for this change: 23/23 access-token-parser tests, `lint:typecheck` (exit 0), `lint:openapi:apiv1`+`apiv3` (1 passing/0 failing, 0 query-ops missing the header method), biome on changed files (only the pre-existing `res`-unused warning). The production build should be confirmed in CI (`reusable-app-prod.yml`), where the dependency environment is correct.
