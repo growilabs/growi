@@ -62,9 +62,11 @@ const buildMockUser = (): IUserHasId =>
 // by populateDataToShowRevision. The .populate field is unused here because
 // we mock populateDataToShowRevision itself, but a .populate spy provides
 // defense-in-depth in case the tool changes to call .populate directly.
+// `updatedAt` is optional so we can simulate legacy pages predating the
+// timestamps schema (PR #11204 review FB: tool must not crash when null).
 type MockPage = {
   path: string;
-  updatedAt: Date;
+  updatedAt?: Date;
   revision: unknown;
   populate: ReturnType<typeof vi.fn>;
 };
@@ -113,7 +115,9 @@ type GetPageContentOkResult = {
   result: 'ok';
   page: {
     path: string;
-    updatedAt: string;
+    // Optional: legacy pages with `updatedAt == null` cause the tool to omit
+    // the field entirely (PR #11204 review FB).
+    updatedAt?: string;
     totalLines: number;
     content?: string;
     offset?: number;
@@ -343,6 +347,40 @@ describe('getPageContentTool', () => {
       ]);
       // Routing — pageId branch was not touched.
       expect(mocks.findByIdAndViewer).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('legacy data — missing updatedAt (PR #11204 review FB)', () => {
+    it('omits updatedAt from the response when page.updatedAt is null (must not crash)', async () => {
+      const requestContext = buildRequestContext();
+      const mockUser = buildMockUser();
+      requestContext.set('user', mockUser);
+      // Simulate a legacy page predating the timestamps schema: the body
+      // resolves normally but updatedAt is missing on the document. The tool
+      // MUST NOT throw a TypeError on `.toISOString()` (the bug the FB flags)
+      // and MUST omit the field from the response rather than emit a
+      // bogus default — downstream agents already distinguish presence.
+      const mockPage = buildMockPage({ updatedAt: undefined });
+      mocks.findByIdAndViewer.mockResolvedValue(mockPage);
+      mocks.populateDataToShowRevision.mockImplementation(
+        async (page: MockPage) => {
+          page.revision = { body: 'hello' };
+          return page;
+        },
+      );
+
+      const result = await invokeExecute({ pageId: 'abc' }, requestContext);
+
+      expect(isValidationFailure(result)).toBe(false);
+      if (isValidationFailure(result)) return;
+      expect(result.result).toBe('ok');
+      if (result.result !== 'ok') return;
+      // Critical: `updatedAt` must be omitted from the payload (not the
+      // string 'undefined', not an empty string). The output schema marks
+      // it optional precisely for this case.
+      expect('updatedAt' in result.page).toBe(false);
+      expect(result.page.path).toBe('/p1');
+      expect(result.page.content).toBe('hello');
     });
   });
 

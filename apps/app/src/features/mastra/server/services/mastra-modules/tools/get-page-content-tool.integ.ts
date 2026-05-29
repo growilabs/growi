@@ -49,7 +49,11 @@ type GetPageContentOkResult = {
   result: 'ok';
   page: {
     path: string;
-    updatedAt: string;
+    // Optional: legacy pages with `updatedAt == null` cause the tool to omit
+    // the field entirely (PR #11204 review FB). All fixtures in this suite
+    // create fresh pages via `Page.create` so updatedAt is always set at
+    // runtime, but the static type stays optional to match the tool schema.
+    updatedAt?: string;
     totalLines: number;
     content?: string;
     offset?: number;
@@ -423,8 +427,14 @@ describe('getPageContentTool (integration)', () => {
       assertOk(result);
       expect(result.page.path).toBe(pagePathPublic);
       assertShortSeedShape(result, bodyPublic);
-      // updatedAt is the page's updatedAt (Date.toISOString() format).
-      expect(result.page.updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
+      // updatedAt is the page's updatedAt (Date.toISOString() format). The
+      // field is now optional in the schema to tolerate legacy pages (PR
+      // #11204 review FB), so we narrow before the regex check — for this
+      // fresh fixture it must always be defined.
+      const { updatedAt } = result.page;
+      if (updatedAt == null)
+        throw new Error('expected updatedAt for fresh page');
+      expect(updatedAt).toMatch(/^\d{4}-\d{2}-\d{2}T/);
     });
 
     it('returns ok for a non-owner user (B) via pageId (PUBLIC is visible to all viewers)', async () => {

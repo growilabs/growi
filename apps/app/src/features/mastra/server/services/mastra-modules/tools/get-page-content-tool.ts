@@ -73,7 +73,10 @@ const outputSchema = z.discriminatedUnion('result', [
     result: z.literal('ok'),
     page: z.object({
       path: z.string(),
-      updatedAt: z.string(),
+      // Optional: legacy pages predating the timestamps schema can have
+      // `updatedAt == null` (the rest of the codebase guards this — see
+      // file-uploader-switch.ts / slack-integration.ts / customize.ts).
+      updatedAt: z.string().optional(),
       totalLines: z.number().int().nonnegative(),
       // Content fields are present only in "content mode" (offset provided, or
       // the small-page optimization on the first call). In "outline mode"
@@ -178,7 +181,14 @@ export const getPageContentTool = createTool({
           : '',
       );
       const path = page.path;
-      const updatedAt = (page.updatedAt as Date).toISOString();
+      // Legacy pages predating the timestamps schema can have `updatedAt`
+      // missing; omit the field from the response in that case rather than
+      // crashing on `.toISOString()`. Mirrors `updatedAt == null` guards used
+      // elsewhere in the codebase (e.g. file-uploader-switch.ts).
+      const updatedAt =
+        page.updatedAt != null
+          ? (page.updatedAt as Date).toISOString()
+          : undefined;
 
       // Line-based pagination. Split on CRLF or LF to be newline-style agnostic.
       // Slicing is done entirely in memory; no additional DB queries are issued
@@ -234,7 +244,7 @@ export const getPageContentTool = createTool({
         result: 'ok' as const,
         page: {
           path,
-          updatedAt,
+          ...(updatedAt != null ? { updatedAt } : {}),
           totalLines,
           ...(contentFields ?? {}),
           ...(outline != null ? { outline } : {}),

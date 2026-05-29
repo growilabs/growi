@@ -649,7 +649,11 @@ type GetPageContentSuccess = {
   result: 'ok';
   page: {
     path: string;
-    updatedAt: string;
+    // Optional: legacy pages predating the timestamps schema may have
+    // `updatedAt == null` (PR #11204 review FB). The tool omits the field
+    // rather than emitting a synthetic default; mirrors `updatedAt == null`
+    // guards used across the codebase.
+    updatedAt?: string;
     totalLines: number;
     content?: string;          // the sliced lines, joined by '\n'
     offset?: number;           // sanitized echo
@@ -669,7 +673,7 @@ const getPageContentOutputSchema = z.discriminatedUnion('result', [
     result: z.literal('ok'),
     page: z.object({
       path: z.string(),
-      updatedAt: z.string(),
+      updatedAt: z.string().optional(),
       totalLines: z.number().int().nonnegative(),
       // Content fields are present only in content mode (offset provided) or
       // under the small-page optimization; omitted in outline mode.
@@ -839,7 +843,7 @@ export const growiAgent = new Agent({
 | Tool | `result` 値 | 補足 |
 |---|---|---|
 | `FullTextSearchTool` | `'ok'` / `'error'` / `'context_error'` | `'ok'` は `hits` + `totalCount`、その他は `reason: string` |
-| `GetPageContentTool` | `'ok'` / `'not_found_or_forbidden'` / `'missing_input'` / `'context_error'` | `'ok'` は `page { path, updatedAt, totalLines, content?, offset?, limit?, hasMore?, outline? }`（content 系は content mode / 小ページ最適化時のみ、outline は初回呼出時のみ）、その他は `reason: string` |
+| `GetPageContentTool` | `'ok'` / `'not_found_or_forbidden'` / `'missing_input'` / `'context_error'` | `'ok'` は `page { path, updatedAt?, totalLines, content?, offset?, limit?, hasMore?, outline? }`（content 系は content mode / 小ページ最適化時のみ、outline は初回呼出時のみ、`updatedAt` は legacy ページで欠落時に省略）、その他は `reason: string` |
 
 ### Page / Revision（既存・参照のみ）
 
