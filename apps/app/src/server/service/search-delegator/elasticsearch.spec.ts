@@ -134,4 +134,114 @@ describe('ElasticsearchDelegator', () => {
       );
     });
   });
+
+  describe('normalizeAuditlogIndices()', () => {
+    let mockIndicesClient: {
+      exists: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
+      existsAlias: ReturnType<typeof vi.fn>;
+      putAlias: ReturnType<typeof vi.fn>;
+    };
+    let createAuditlogIndexSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      mockIndicesClient = {
+        exists: vi.fn(),
+        delete: vi.fn().mockResolvedValue({}),
+        existsAlias: vi.fn(),
+        putAlias: vi.fn().mockResolvedValue({}),
+      };
+
+      (
+        delegator as unknown as { client: ElasticsearchClientDelegator }
+      ).client = {
+        delegatorVersion: 8,
+        indices: mockIndicesClient,
+      } as unknown as ElasticsearchClientDelegator;
+
+      createAuditlogIndexSpy = vi
+        .spyOn(
+          delegator as unknown as {
+            createAuditlogIndex: (name: string) => Promise<void>;
+          },
+          'createAuditlogIndex',
+        )
+        .mockResolvedValue(undefined);
+    });
+
+    it('should delete tmp index when it exists', async () => {
+      mockIndicesClient.exists
+        .mockResolvedValueOnce(true) // auditlogs-tmp exists
+        .mockResolvedValueOnce(true); // auditlogs exists
+      mockIndicesClient.existsAlias.mockResolvedValue(true);
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockIndicesClient.delete).toHaveBeenCalledWith({
+        index: 'auditlogs-tmp',
+      });
+    });
+
+    it('should not delete tmp index when it does not exist', async () => {
+      mockIndicesClient.exists
+        .mockResolvedValueOnce(false) // auditlogs-tmp not exists
+        .mockResolvedValueOnce(true); // auditlogs exists
+      mockIndicesClient.existsAlias.mockResolvedValue(true);
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockIndicesClient.delete).not.toHaveBeenCalled();
+    });
+
+    it('should call createAuditlogIndex when main index does not exist', async () => {
+      mockIndicesClient.exists
+        .mockResolvedValueOnce(false) // auditlogs-tmp not exists
+        .mockResolvedValueOnce(false); // auditlogs not exists
+      mockIndicesClient.existsAlias.mockResolvedValue(true);
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(createAuditlogIndexSpy).toHaveBeenCalledWith('auditlogs');
+    });
+
+    it('should not call createAuditlogIndex when main index exists', async () => {
+      mockIndicesClient.exists
+        .mockResolvedValueOnce(false) // auditlogs-tmp not exists
+        .mockResolvedValueOnce(true); // auditlogs exists
+      mockIndicesClient.existsAlias.mockResolvedValue(true);
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(createAuditlogIndexSpy).not.toHaveBeenCalled();
+    });
+
+    it('should call putAlias when alias does not exist', async () => {
+      mockIndicesClient.exists
+        .mockResolvedValueOnce(false) // auditlogs-tmp not exists
+        .mockResolvedValueOnce(true); // auditlogs exists
+      mockIndicesClient.existsAlias.mockResolvedValue(false);
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockIndicesClient.existsAlias).toHaveBeenCalledWith({
+        index: 'auditlogs',
+        name: 'auditlogs-alias',
+      });
+      expect(mockIndicesClient.putAlias).toHaveBeenCalledWith({
+        name: 'auditlogs-alias',
+        index: 'auditlogs',
+      });
+    });
+
+    it('should not call putAlias when alias exists', async () => {
+      mockIndicesClient.exists
+        .mockResolvedValueOnce(false) // auditlogs-tmp not exists
+        .mockResolvedValueOnce(true); // auditlogs exists
+      mockIndicesClient.existsAlias.mockResolvedValue(true);
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockIndicesClient.putAlias).not.toHaveBeenCalled();
+    });
+  });
 });
