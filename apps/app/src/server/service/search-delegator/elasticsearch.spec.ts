@@ -1,0 +1,131 @@
+import mongoose from 'mongoose';
+import { vi } from 'vitest';
+import { type MockProxy, mock } from 'vitest-mock-extended';
+
+import type { ActivityDocument } from '~/server/models/activity';
+import { configManager } from '~/server/service/config-manager';
+import type { SocketIoService } from '~/server/service/socket-io';
+
+import ElasticsearchDelegator from './elasticsearch';
+import type { ElasticsearchClientDelegator } from './elasticsearch-client-delegator';
+
+const { mockError, mockWarn, mockInfo } = vi.hoisted(() => ({
+  mockError: vi.fn(),
+  mockWarn: vi.fn(),
+  mockInfo: vi.fn(),
+}));
+
+vi.mock('~/utils/logger', () => ({
+  default: vi.fn(() => ({
+    debug: vi.fn(),
+    info: mockInfo,
+    warn: mockWarn,
+    error: mockError,
+  })),
+}));
+
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: { getConfig: vi.fn() },
+}));
+
+describe('ElasticsearchDelegator', () => {
+  let delegator: ElasticsearchDelegator;
+  let mockSocketIo: MockProxy<SocketIoService>;
+  let mockClient: { delegatorVersion: 8; bulk: ReturnType<typeof vi.fn> };
+
+  beforeEach(() => {
+    vi.mocked(configManager.getConfig).mockImplementation((key) => {
+      if (key === 'app:elasticsearchVersion') return 8;
+      return false;
+    });
+
+    mockSocketIo = mock<SocketIoService>();
+    delegator = new ElasticsearchDelegator(mockSocketIo);
+
+    mockClient = {
+      delegatorVersion: 8,
+      bulk: vi.fn().mockResolvedValue({ errors: false, items: [] }),
+    };
+    (delegator as unknown as { client: ElasticsearchClientDelegator }).client =
+      mockClient as unknown as ElasticsearchClientDelegator;
+  });
+
+  describe('updateOrInsertAuditlog()', () => {
+    it('should not call bulk when activity is null', async () => {
+      await delegator.updateOrInsertAuditlog(null);
+
+      expect(mockClient.bulk).not.toHaveBeenCalled();
+    });
+
+    it('should not call bulk when snapshot.username is null', async () => {
+      const activity = {
+        _id: new mongoose.Types.ObjectId(),
+        snapshot: { username: null },
+      } as unknown as ActivityDocument;
+
+      await delegator.updateOrInsertAuditlog(activity);
+
+      expect(mockClient.bulk).not.toHaveBeenCalled();
+    });
+
+    it('should not call bulk when snapshot.username is empty string', async () => {
+      const activity = {
+        _id: new mongoose.Types.ObjectId(),
+        snapshot: { username: '' },
+      } as unknown as ActivityDocument;
+
+      await delegator.updateOrInsertAuditlog(activity);
+
+      expect(mockClient.bulk).not.toHaveBeenCalled();
+    });
+
+    it('should call bulk with correct body for valid activity', async () => {
+      const id = new mongoose.Types.ObjectId();
+      const activity = {
+        _id: id,
+        snapshot: { username: 'test-user' },
+      } as unknown as ActivityDocument;
+
+      await delegator.updateOrInsertAuditlog(activity);
+
+      expect(mockClient.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: id.toString() } },
+          { username: 'test-user' },
+        ],
+      });
+    });
+
+    it('should call logger.error when bulk response has errors', async () => {
+      const activity = {
+        _id: new mongoose.Types.ObjectId(),
+        snapshot: { username: 'test-user' },
+      } as unknown as ActivityDocument;
+
+      mockClient.bulk.mockResolvedValue({
+        errors: true,
+        items: [
+          { index: { error: { type: 'mapper_exception', reason: 'failed' } } },
+        ],
+      });
+
+      await delegator.updateOrInsertAuditlog(activity);
+
+      expect(mockError).toHaveBeenCalled();
+    });
+
+    it('should call logger.error and not throw when bulk throws', async () => {
+      const activity = {
+        _id: new mongoose.Types.ObjectId(),
+        snapshot: { username: 'test-user' },
+      } as unknown as ActivityDocument;
+
+      mockClient.bulk.mockRejectedValue(new Error('ES connection error'));
+
+      await expect(
+        delegator.updateOrInsertAuditlog(activity),
+      ).resolves.toBeUndefined();
+      expect(mockError).toHaveBeenCalled();
+    });
+  });
+});
