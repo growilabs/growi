@@ -26,8 +26,9 @@ export class AuditlogCleanupCronService extends CronService {
       );
       return;
     }
-    const expirationSeconds =
-      configManager.getConfig('app:activityExpirationSeconds') ?? 2592000;
+    const expirationSeconds = configManager.getConfig(
+      'app:activityExpirationSeconds',
+    );
     await this.delegator.deleteExpiredAuditlogs(expirationSeconds);
   }
 }
