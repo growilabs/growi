@@ -1,3 +1,5 @@
+@use '@growi/core-styles/scss/bootstrap/init' as bs;
+
 $grw-foldertree-item-padding-left: 15px;
 $grw-bookmark-item-padding-left: 35px;
 
@@ -19,6 +21,17 @@ $grw-bookmark-item-padding-left: 35px;
     margin: 1rem;
     border-style: dashed !important;
     border-width: 0.15rem !important;
+  }
+}
+
+@include bs.color-mode(light) {
+  .grw-foldertree {
+    :global(.list-group-item) {
+      :global(.grw-foldertree-triangle-btn),
+      :global(.btn-page-item-control) {
+        --bs-btn-color: var(--bs-tertiary-color);
+      }
+    }
   }
 }
 
