@@ -27,6 +27,7 @@ GROWI is a team collaboration wiki platform using Markdown, featuring hierarchic
 | **github-cli** | **CRITICAL**: gh CLI auth required; stop immediately if unauthenticated |
 
 | **testing** | Test commands, pnpm vitest usage |
+| **mongodb-regex** | `RegExp.escape()` breaks MongoDB PCRE2 for non-ASCII whitespace; use `escapeStringForMongoRegex` for query-bound patterns |
 
 ### On-Demand Skills
 
