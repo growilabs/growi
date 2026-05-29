@@ -959,6 +959,7 @@ class ElasticsearchDelegator
         failures = result.failures;
         versionConflicts = result.version_conflicts;
       } else {
+        // defensive: guards against uninitialized client or unsupported future ES versions
         logger.warn(
           'deleteExpiredAuditlogs skipped: Elasticsearch client is not ready.',
         );
