@@ -1,9 +1,9 @@
 {
   "feature_name": "growi-vault-gateway",
   "created_at": "2026-05-07T00:00:00.000Z",
-  "updated_at": "2026-05-19T00:00:00.000Z",
+  "updated_at": "2026-05-29T00:00:00.000Z",
   "language": "ja",
-  "phase": "implementation-complete",
+  "phase": "design",
   "cleaned_up_at": "2026-05-19T00:00:00.000Z",
   "approvals": {
     "requirements": {
@@ -12,12 +12,13 @@
     },
     "design": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "tasks": {
       "generated": true,
       "approved": true
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": false,
+  "revision_note": "Reopened to fix ACL guest-mode bypass (req 2.4a) and align /vault.git with the standard apps/app middleware composition (req 11); reverse-proxy Basic-auth coexistence (req 2.6) mechanism still TBD in design."
 }

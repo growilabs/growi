@@ -81,8 +81,10 @@
 1. When git クライアントが `Authorization: Basic base64(anyuser:PAT)` ヘッダーを送信した場合, the GROWI Vault Gateway shall 既存の access-token-parser を使用して PAT を検証し、対応するユーザーの userId と scopes を解決する
 2. When 提示された PAT が存在しない、無効、または revoke されている場合, the GROWI Vault Gateway shall `WWW-Authenticate: Basic realm="GROWI Vault"` ヘッダーを含む HTTP 401 を返す
 3. When 認証失敗応答を返す場合, the GROWI Vault Gateway shall エラーメッセージにページリストや存在情報を含めない
-4. When 認証ヘッダーが存在しない（匿名アクセス）場合, the GROWI Vault Gateway shall `userId: null` として処理を継続し、public namespace のみにアクセスさせる
+4. When 認証ヘッダーが存在せず、かつ `aclService.isGuestAllowedToRead()` が `true`（`security:wikiMode='public'` または `security:restrictGuestMode='Readonly'`）の場合, the GROWI Vault Gateway shall `userId: null`（匿名）として処理を継続し、public namespace のみにアクセスさせる
+4a. When 認証ヘッダーが存在せず、かつ `aclService.isGuestAllowedToRead()` が `false`（デフォルトの `security:restrictGuestMode='Deny'` や `security:wikiMode='private'` を含む）の場合, the GROWI Vault Gateway shall 匿名アクセスを拒否し、`WWW-Authenticate: Basic realm="GROWI Vault"` を含む HTTP 401 を返して PAT を要求する（public namespace すら応答しない）。これは既存 `loginRequired(crowi, isGuestAllowed=true)` が `isGuestAllowedToRead()` を参照して guest を弾くのと同一セマンティクスである
 5. Where PAT がスコープ制限を持つ場合, the GROWI Vault Gateway shall そのスコープを namespace 計算に反映させる
+6. While GROWI が Basic 認証を行う reverse proxy の背後に配置される場合, the GROWI Vault Gateway shall git クライアントが「proxy の Basic 認証資格情報」と「vault の PAT」を同時に提示でき、両者が単一の `Authorization` ヘッダー上で衝突しない認証手段を提供する（既存 GROWI API がトークンを `Authorization` 以外（`?access_token=` / body）でも受理して proxy Basic 認証と両立しているのと同等の到達性を確保する）。実現機構（PAT 専用のカスタムヘッダー受理 / クエリ経路 / reverse proxy 側で `/vault.git/*` を Basic 認証から除外する運用ガイド等）は design フェーズで決定する（本要件時点では未確定）
 
 ### 要件 3: ACL ベース namespace 計算（VaultNamespaceMapper）
 
@@ -91,7 +93,7 @@
 #### 受入条件
 
 1. When 認証済みユーザーの accessible namespace 集合を計算する場合, the GROWI Vault Gateway shall `['public', 'restricted-link', 'group-<gid>', ..., 'user-<uid>-only-me']` 形式で namespace 一覧を返す
-2. When 匿名ユーザーの accessible namespace 集合を計算する場合, the GROWI Vault Gateway shall `['public']` のみを返す
+2. When 匿名ユーザー（要件 2.4 によりゲスト読み取りが許可されている場合のみ到達する）の accessible namespace 集合を計算する場合, the GROWI Vault Gateway shall `['public']` のみを返す。ゲスト読み取りが許可されていない場合は要件 2.4a により namespace 計算前に 401 で拒否されるため、本計算には到達しない
 3. When GRANT_PUBLIC のページの namespace を計算する場合, the GROWI Vault Gateway shall `'public'` namespace を返す
 4. When GRANT_USER_GROUP のページの namespace を計算する場合, the GROWI Vault Gateway shall `'group-<gid>'` 形式で grantedGroups に対応する namespace を返す（複数グループが設定されている場合は複数の namespace を返す）
 5. When GRANT_OWNER のページの namespace を計算する場合, the GROWI Vault Gateway shall `'user-<creator-id>-only-me'` namespace を返す
@@ -191,3 +193,17 @@
 3. The GROWI Vault Gateway shall `/vault.git/*` エンドポイントに既存 GROWI のレート制限を適用する
 4. The GROWI Vault Gateway shall 認証失敗（auth-failure）イベントを audit log に記録し、ブルートフォース検出を可能にする
 5. When compose-view RPC または upload-pack proxy が失敗した場合, the GROWI Vault Gateway shall vault-manager から受け取ったエラーに GROWI 内部情報を上乗せせずに 502 をクライアントに返す
+
+### 要件 11: apps/app 標準 middleware 構成との整合（単一情報源・並行実装の排除）
+
+**目的:** GROWI 管理者として、ゲストモード・wikiMode・read-only ユーザー・将来の認可仕様変更が、別経路である vault gateway でも追加のコード変更なしに一貫適用されることを保証したい。gateway が認証・認可を独自に再実装して GROWI 本体と乖離する（例: ゲスト拒否設定下でも public ページが匿名 clone できてしまう）ことを防ぐ。
+
+> 背景: 現状の `/vault.git` ルータは apps/app 標準の middleware チェーン（`accessTokenParser` → `loginRequiredFactory(crowi, isGuestAllowed=true)` → …）を通さない独立実装であり、同一 feature 内の `vault-admin` / `vault-page` ルータが `loginRequiredFactory(crowi)` / `adminRequiredFactory(crowi)` を使うのとも不整合である。git smart HTTP のトランスポート差異（HTTP Basic→PAT）を超えて認可ロジックまで再実装したことが、要件 2.4a で是正する ACL すり抜けの根本原因であった。
+
+#### 受入条件
+
+1. The GROWI Vault Gateway shall 認可（ゲスト/匿名可否・ユーザー解決）を gateway 独自ロジックで再実装せず、apps/app 標準の middleware 構成（`accessTokenParser` 相当のトークン解決 + `loginRequiredFactory(crowi, isGuestAllowed=true)` の `isGuestAllowedToRead()` 判定）と同一セマンティクスを共有する
+2. The GROWI Vault Gateway shall git smart HTTP 固有の差異のみを明示的な adapter として局所化する。具体的には (a) `Authorization: Basic base64(x:PAT)` から PAT を取り出し標準トークン解決へ橋渡しする credential adapter、(b) 認証失敗時に `/login` へのリダイレクトではなく git 互換の `401 + WWW-Authenticate: Basic` を返す `loginRequired` の `fallback`、の 2 点に限定する
+3. The GROWI Vault Gateway shall `security:restrictGuestMode` / `security:wikiMode` / read-only ユーザー等の判定が、gateway 側のコード変更なしに clone / fetch の認可結果へ反映されることを保証する
+4. Where 標準チェーンの一部を git のために意図的に外す場合（例: ブラウザ専用の CSRF / `certifyOrigin`、read-only ユーザーの clone 可否）, the GROWI Vault Gateway shall その逸脱を設計上の明示的決定として文書化し、暗黙の差分として残さない
+5. The GROWI Vault Gateway shall 再検証トリガーとして `aclService` / `loginRequired` / `accessTokenParser` のインターフェース変更、および `security:restrictGuestMode` / `security:wikiMode` の仕様変更を扱う

@@ -31,7 +31,8 @@
 ### apps/app の追加責務（`src/features/growi-vault/`）
 
 - `GET/POST /vault.git/...` を唯一の対外エンドポイントとして提供する
-- HTTP Basic Auth → PAT 認証（既存 access-token-parser に委譲）→ ユーザー解決
+- 認証・認可は apps/app 標準 middleware 構成を共有する（要件 11）。git 固有の差異のみを 2 つの seam に局所化する: (a) `Authorization: Basic base64(x:PAT)` から PAT を抽出し標準トークン解決へ橋渡しする credential adapter、(b) 認証失敗時に `/login` リダイレクトではなく git 互換の `401 + WWW-Authenticate: Basic` を返す `loginRequired` の `fallback`
+- ゲスト/匿名アクセスの可否は `aclService.isGuestAllowedToRead()`（= `loginRequiredFactory(crowi, true)` の判定）に委譲する。許可されない場合（デフォルト `restrictGuestMode='Deny'` / `wikiMode='private'`）は匿名 clone を 401 で拒否する（要件 2.4a）
 - ユーザーがアクセス可能な namespace 集合の決定（GROWI ACL 評価）
 - ページの所属 namespace の決定（grant / grantedGroups / creator から）
 - ページ変更イベントの購読 → vault_instructions コレクション書き込み
@@ -44,7 +45,9 @@
 ### 許可された依存関係
 
 - 既存 `Page` / `Revision` Mongoose モデル（read-only）
-- `access-token-parser` ミドルウェア
+- `access-token-parser` ミドルウェア（標準トークン解決）
+- `loginRequiredFactory(crowi, isGuestAllowed, fallback)` ミドルウェア（ゲスト判定 + ユーザー必須化、第3引数で git 用 fallback を差し替え）
+- `aclService.isGuestAllowedToRead()`（ゲスト読み取り可否の単一情報源）
 - `page-grant.ts` の `isUserGrantedPageAccess`、`generateGrantCondition`
 - `UserGroupRelation` / `ExternalUserGroupRelation` の group resolution
 - 既存 audit log インフラ
@@ -53,7 +56,8 @@
 ### 再検証トリガー
 
 - GROWI Page モデルの grant / grantedGroups スキーマ変更
-- access-token-parser ミドルウェアのインターフェース変更
+- access-token-parser / `loginRequiredFactory` / `aclService` のインターフェース変更
+- `security:restrictGuestMode` / `security:wikiMode` の仕様変更（ゲスト判定への影響）
 - `@growi/core` の Vault DTO 型の breaking change
 - ページパスエンコーディング規則の変更
 
@@ -181,8 +185,10 @@ sequenceDiagram
     Cli->>App: GET /vault.git/info/refs?service=git-upload-pack
     App->>App: VAULT_ENABLED env 確認 → false なら 404（環境変数による永続無効化）
     App->>App: bootstrapState 確認 → done 以外なら 503 + Retry-After（一時的）
-    App->>Auth: HTTP Basic Auth → PAT 検証
-    Auth-->>App: { userId, scopes } または null（匿名）
+    App->>Auth: credential adapter: Authorization: Basic から PAT 抽出 → 標準トークン解決
+    Auth-->>App: { userId, scopes } または null（ヘッダ無し=匿名候補）
+    App->>App: loginRequired 相当: 認証失敗なら git fallback で 401 + WWW-Authenticate
+    App->>App: userId=null かつ aclService.isGuestAllowedToRead()=false なら 401（匿名拒否, 要件 2.4a）
     App->>Map: computeAccessibleNamespaces(userId)
     Map-->>App: ['public', 'group-eng', 'user-<uid>-only-me', ...]
     App->>Client: composeView({ userId, namespaces })
@@ -285,7 +291,44 @@ sequenceDiagram
 - `bootstrapState !== 'done'` の場合、全 clone / fetch に `503 + Retry-After`（bootstrap は一時的な状態であり 503 が適切）
 - `git-receive-pack` への全リクエストに 403 `read-only repository`
 - 成功・失敗とも既存 audit log にイベントを記録する
+- 認証・認可は標準 middleware チェーンに委譲する（下記「認証・認可ミドルウェア構成」参照）。匿名は `aclService.isGuestAllowedToRead()` が許可する場合のみ通す（要件 2.4a）
 - apps/app は git wire format を解釈せず、HTTP body を vault-manager にパイプし stdout をクライアントにパイプするだけ
+
+---
+
+### 認証・認可ミドルウェア構成（標準チェーンとの整合）
+
+| フィールド | 詳細 |
+|-----------|------|
+| Intent | `/vault.git/*` を apps/app 標準の middleware チェーンに乗せ、認可ロジックの並行実装を排除する |
+| 要件カバレッジ | 11, 2.4a, 10.3 |
+
+**標準チェーンとの対応**
+
+canonical な apiv3 ルート（例: `apiv3/pages`）は次の合成を使う:
+
+```
+rateLimiter → [maintenanceMode] → accessTokenParser([SCOPE...]) → loginRequired(crowi, true) → [excludeReadOnlyUser] → handler
+```
+
+`/vault.git/*` も同じ並びを共有し、git 固有の差異だけを 2 つの seam に局所化する:
+
+| チェーン要素 | vault gateway での扱い |
+|---|---|
+| rateLimiter | 既存をそのまま適用（mount は rate limiter の後段。要件 10.3） |
+| maintenanceMode | 標準 middleware を適用（停止時は gateway も一貫して unavailable を返す） |
+| トークン解決 | `accessTokenParser` と同一のトークン解決を共有。入口のみ Basic→PAT credential adapter（seam #1 = VaultPatAuth） |
+| ゲスト / ユーザー必須化 | `loginRequiredFactory(crowi, isGuestAllowed=true, gitFallback)` を再利用。`isGuestAllowedToRead()` がゲスト可否の単一情報源 |
+| 認証失敗時の応答 | seam #2: `gitFallback` が `/login` リダイレクトの代わりに `401 + WWW-Authenticate: Basic`（git 互換）を返す |
+| readOnly ユーザー | clone は read 操作のため `excludeReadOnlyUser` は適用しない（意図的逸脱・下記） |
+| CSRF / `certifyOrigin` | git クライアントは origin/CSRF を持たないため適用しない（意図的逸脱・下記） |
+
+**意図的逸脱（要件 11.4 — 暗黙差分にしない）**
+
+- **CSRF / `certifyOrigin` 非適用**: git smart HTTP はブラウザ same-origin の枠外。`info/refs`(GET) と `git-upload-pack`(POST) はいずれも GROWI のデータを変更しない read 系であり、認可は PAT で担保される。
+- **`excludeReadOnlyUser` 非適用**: vault clone は読み取り専用のため read-only ユーザーにも許可する。標準 `accessTokenParser` は readOnly ユーザーを一律弾く（`access-token.ts`）が、それは write 系 API 向けの制約であり read-only clone には過剰。この判断は design 上の明示決定として記録する。
+
+> これにより `vault-admin` / `vault-page` ルータ（既に `loginRequiredFactory(crowi)` を使用）と gateway の middleware 方針が feature 内で一貫する。
 
 ---
 
@@ -293,8 +336,8 @@ sequenceDiagram
 
 | フィールド | 詳細 |
 |-----------|------|
-| Intent | HTTP Basic Auth の password を PAT として解釈し、access-token-parser に委譲してユーザーを解決する |
-| 要件カバレッジ | 2 |
+| Intent | git 固有の認証トランスポートを標準 middleware 構成へ橋渡しする credential adapter（seam #1）。Basic password を PAT として解釈し、標準トークン解決でユーザーを解決する。認可判定（ゲスト可否・ユーザー必須化）は `loginRequired` / `aclService` に委譲し、自前で再実装しない（要件 11） |
+| 要件カバレッジ | 2, 11 |
 
 ```typescript
 type VaultAuthResult = {
@@ -308,11 +351,13 @@ interface VaultPatAuth {
 ```
 
 **実装ノート**
-- git クライアントは `Authorization: Basic base64(anyuser:TOKEN)` を送る
-- 検証は既存 `access-token-parser` の `findUserIdByToken(rawToken, requiredScopes)` を呼ぶ
-- 認証失敗時は `WWW-Authenticate: Basic realm="GROWI Vault"` を含む 401
+- git クライアントは `Authorization: Basic base64(anyuser:TOKEN)` を送る。adapter は password 部のみを PAT として取り出す（username は無視）
+- 検証は既存トークン解決（`AccessToken.findUserIdByToken(rawToken, [SCOPE.READ.FEATURES.PAGE])`）を共有する
+- `Authorization` ヘッダーが存在しない場合は `null`（匿名候補）を返す。匿名の最終可否は後段の guest gate（`aclService.isGuestAllowedToRead()`）が決める — adapter は可否を判断しない
+- 認証失敗（無効/期限切れ/revoke）および guest 拒否時は `WWW-Authenticate: Basic realm="GROWI Vault"` を含む 401。これは `loginRequiredFactory(crowi, true, gitFallback)` の `fallback` から返す（`/login` リダイレクトを git 用に置換）
 - エラーメッセージにページ情報を含めない（要件 2.3）
-- `Authorization` ヘッダーが存在しない場合は `null`（匿名）を返す
+
+> 設計移行ノート: 旧実装は adapter 内で「ヘッダ無し → 即 `['public']` 許可」を独自に決めていたため、`restrictGuestMode='Deny'` でも匿名 clone が通る ACL すり抜けがあった（要件 2.4a で是正）。可否判定を `aclService` に一本化し、adapter は transport 変換のみを担う。
 
 ---
 
@@ -349,7 +394,7 @@ interface VaultNamespaceMapper {
 
 **accessible namespaces 計算**
 - 認証済みユーザー: `['public', 'restricted-link', 'group-<g1>', ..., 'user-<uid>-only-me']`
-- 匿名: `['public']`（要件 3.2）
+- 匿名: `['public']`（要件 3.2）。ただしこの匿名分岐は guest gate を通過した場合のみ到達する（`isGuestAllowedToRead()=false` の匿名は gateway 層で 401 済み・要件 2.4a）
 
 **実装ノート**
 - 既存 `generateGrantCondition` / `isUserGrantedPageAccess` を再利用
@@ -737,6 +782,7 @@ export interface StorageStatsResponse {
 | エラー種別 | HTTP 応答 | 挙動 |
 |-----------|---------|------|
 | 認証失敗 | 401 + `WWW-Authenticate` | ページ情報を含まないメッセージ |
+| 匿名アクセス（ゲスト拒否設定） | 401 + `WWW-Authenticate` | `aclService.isGuestAllowedToRead()=false` のとき匿名 clone を拒否し PAT を要求（要件 2.4a）。public すら応答しない |
 | 機能無効（`VAULT_ENABLED=false`） | 404 + git エラー文字列 | `info/refs` / `git-upload-pack` に適用。環境変数による永続的な設定状態のため 503 ではなく 404。Retry-After なし |
 | bootstrap 未完了 | 503 + `Retry-After` | bootstrapState が done 以外（一時的な状態） |
 | push 試行 | 403 `read-only repository` | git クライアントに表示 |
@@ -756,6 +802,16 @@ export interface StorageStatsResponse {
 - **認証失敗レスポンス**: エラーメッセージにページリスト・存在情報を含めない（要件 2.3）
 - **既存 audit log への統合**: 認証失敗（auth-failure）も記録しブルートフォース検出を可能にする
 - **レート制限**: 既存 GROWI の rate limiting を `/vault.git/*` にも適用する
+- **ゲストモード準拠**: 匿名アクセスは `aclService.isGuestAllowedToRead()` が true の場合のみ許可。デフォルト（`restrictGuestMode='Deny'`）や private wiki では匿名 clone を 401 で拒否し、GROWI 本体の閲覧ポリシーと一致させる（要件 2.4a / 11）
+
+### reverse proxy の Basic 認証共存（未確定の設計決定 — 要件 2.6）
+
+GROWI が Basic 認証を行う reverse proxy 配下にある場合、proxy の Basic 資格情報と vault の PAT が単一の `Authorization` ヘッダーで衝突する。既存 GROWI API は `?access_token=` / body 経路で `Authorization` を回避して両立しているが、git はネイティブには Basic しか使わない。機構候補は次の通りで、**design レビューで決定する（本リビジョン時点では未確定）**:
+
+- **(案A) PAT 専用カスタムヘッダーを受理**: git 側は `git config http.<url>.extraHeader "X-Vault-Token: <PAT>"` で送る。`Authorization` を proxy 用に空けられるため最も堅牢。既存 API の「トークンを `Authorization` 以外で受ける」思想と一致
+- **(案B) `?access_token=<PAT>` クエリ経路**: 実装は容易だが URL / proxy ログ / reflog に漏れるため、非推奨経路として注記したうえでのみ採用
+- **(案C) reverse proxy 側で `/vault.git/*` を Basic 認証から除外する運用ガイドのみ**: コード変更なし。運用者依存（GitLab / Gitea の git-over-http と同じ定石）
+- 注: `Authorization: Bearer <PAT>` は結局 `Authorization` を占有するため proxy Basic とは両立しない（不採用）
 
 ---
 
@@ -764,8 +820,8 @@ export interface StorageStatsResponse {
 | 要件 | コンポーネント |
 |------|--------------|
 | 1（git HTTP エンドポイント） | VaultGatewayRouter |
-| 2（PAT 認証） | VaultPatAuth、VaultGatewayRouter |
-| 3（namespace 計算） | VaultNamespaceMapper |
+| 2（PAT 認証 / ゲスト gate / reverse proxy 共存） | VaultPatAuth（credential adapter）、認証・認可ミドルウェア構成、VaultGatewayRouter |
+| 3（namespace 計算） | VaultNamespaceMapper（匿名分岐はゲスト許可時のみ到達） |
 | 4（vault_instructions 書き込み） | VaultDispatcher、VaultInstructionModel |
 | 5（bootstrap） | VaultBootstrapper、VaultSyncStateModel |
 | 6（vault-manager 通信） | VaultManagerClient |
@@ -773,3 +829,4 @@ export interface StorageStatsResponse {
 | 8（admin UI） | VaultAdminSettings、vault-admin.ts |
 | 9（共通 DTO） | @growi/core interfaces/vault/ |
 | 10（エラーハンドリング / セキュリティ） | VaultGatewayRouter、VaultPatAuth |
+| 11（標準 middleware 構成との整合） | 認証・認可ミドルウェア構成、VaultPatAuth、VaultNamespaceMapper |
