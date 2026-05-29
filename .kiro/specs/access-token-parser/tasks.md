@@ -4,8 +4,8 @@
 > `imprv/x-access-token-header` branch, which carries unrelated MongoDB-regex work).
 > Test-first per repo TDD policy.
 
-- [ ] 1. Foundation: shared token-source extraction utility
-- [ ] 1.1 Create the shared token-source extractor with unit tests (test-first)
+- [x] 1. Foundation: shared token-source extraction utility
+- [x] 1.1 Create the shared token-source extractor with unit tests (test-first)
   - Write failing unit tests first, covering: precedence Bearer > `X-GROWI-ACCESS-TOKEN` header > query > body; non-string / array-valued header is ignored; header key resolves case-insensitively
   - Define the canonical header-name constant and implement the pure extractor that returns the resolved token string or null
   - Observable: a new unit test file passes, exercising every precedence, guard, and casing case; the no-header case resolves exactly to the prior Bearer/query/body result

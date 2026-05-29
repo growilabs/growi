@@ -164,8 +164,11 @@ apps/app/src/server/middlewares/access-token-parser/
 **Responsibilities & Constraints**
 - Resolve the token in order: Bearer → `X-GROWI-ACCESS-TOKEN` header → `access_token`
   query → `access_token` body.
-- Return the resolved token only when it is a single string; otherwise return `null`
-  (covers array-valued or absent header — 3.4).
+- A non-string (e.g. array-valued, from a duplicated header) `X-GROWI-ACCESS-TOKEN` value
+  is **skipped** so resolution falls through to the remaining sources, rather than
+  short-circuiting (3.4). Implement by coercing a non-string header to `undefined` before
+  the precedence chain so `??` continues past it.
+- Return `null` when no string-typed source resolves; otherwise return the string token.
 - Does not validate the token; resolution only.
 
 **Dependencies**
@@ -180,10 +183,9 @@ export const X_GROWI_ACCESS_TOKEN_HEADER_NAME = 'x-growi-access-token';
 export const extractAccessToken = (req: AccessTokenParserReq): string | null;
 ```
 - Preconditions: `req` is an Express request (`AccessTokenParserReq`).
-- Postconditions: returns a non-empty-or-empty string token, or `null` when no
-  string-typed source is present.
+- Postconditions: returns a string token, or `null` when no string-typed source resolves.
 - Invariants: precedence order is `Bearer ?? header ?? query ?? body`; Bearer always wins
-  when present (3.1).
+  when present (3.1); a non-string header is skipped so resolution falls through (3.4).
 
 #### parserForAccessToken / parserForApiToken (modified)
 
