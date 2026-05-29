@@ -12,7 +12,7 @@
   - _Requirements: 1.3, 3.1, 3.2, 3.3, 3.4_
   - _Boundary: extractAccessToken_
 
-- [ ] 2. Core: parser integration with header support
+- [x] 2. Core: parser integration with header support
 - [x] 2.1 (P) Route the scoped access-token parser through the shared extractor
   - Replace the inline token chain and type guard with the shared extractor; leave scope check, read-only rejection, and user serialization unchanged
   - Add an integration test: a valid scoped token supplied in the `X-GROWI-ACCESS-TOKEN` header with a satisfying scope authenticates the token owner
@@ -20,7 +20,7 @@
   - _Requirements: 1.1, 1.2, 4.1, 4.2, 4.3_
   - _Boundary: parserForAccessToken_
   - _Depends: 1.1_
-- [ ] 2.2 (P) Route the legacy api-token parser through the shared extractor
+- [x] 2.2 (P) Route the legacy api-token parser through the shared extractor
   - Replace the inline token chain and type guard with the shared extractor
   - Add an integration test: a valid legacy api-token supplied in the `X-GROWI-ACCESS-TOKEN` header authenticates the owner; confirm the `acceptLegacy` gating is unchanged (legacy token ignored when the route does not opt in)
   - Observable: the api-token integration suite passes including the new header test
