@@ -52,4 +52,16 @@ test('Installer', async ({ page }) => {
 
   await page.waitForURL('/', { timeout: 20000 });
   await expect(page).toHaveTitle(/\/ - GROWI/);
+
+  // Verify / page has content from welcome.md
+  await expect(
+    page.getByRole('heading', { name: /Welcome to GROWI/ }),
+  ).toBeVisible();
+
+  // Verify /Sandbox page was created with content from sandbox.md
+  await page.goto('/Sandbox');
+  await expect(page).toHaveTitle(/Sandbox/);
+  await expect(
+    page.getByRole('heading', { name: /GROWI Sandbox/ }),
+  ).toBeVisible();
 });
