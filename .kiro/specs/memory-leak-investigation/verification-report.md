@@ -76,7 +76,7 @@
 
 **Note**: Task 6.4 (Prisma ESM 不整合) は `src/generated/prisma/client.ts` が既に修正済み（`__dirname` を直接使用、`import.meta.url` 不在）であり、`dist/` が古い世代のままだった事による blocker だった。本 phase 直前のリビルド (`turbo run build --filter @growi/app`) で `dist/generated/prisma/client.js` が再生成され、`ReferenceError: exports is not defined in ES module scope` は解消。本 run は **production dist server 上で 1 回で 6.2 / 6.3 / 6.4 の評価をカバー** している（sustained Yjs load + page-edit load + dist target を同一 scenario で同時に測定）。
 
-### Scenario op counts (both runs identical)
+### Scenario op counts (Phase 5 initial run only)
 
 | Operation | Count |
 |---|---|
@@ -90,7 +90,7 @@
 | LOAD_YJS_CLEAN_CLOSE | 5 |
 | LOAD_YJS_ABORT | 5 |
 
-**Note**: Reduced op counts and idle times were used to allow both runs to complete within CI constraints. Full production runs would use the default 300 s idle and 20–50 op counts per type.
+**Note**: Phase 5 では CI 制約のため idle と op count を縮小。Phase 6 で本来の `BASELINE_IDLE_SECONDS=300` / `DRAIN_IDLE_SECONDS=300` / `LOAD_YJS_*=50` / `LOAD_PAGE_EDIT=20` で再計測（上の Phase 6 環境テーブル参照）。
 
 ---
 
@@ -440,39 +440,14 @@ Constructor 集計に使用したスクリプト: [apps/app/tmp/memory-leak-inve
 
 ---
 
-## 7. Phase 6 Re-measurement
+## 7. Phase 6 Re-measurement — Status
 
-Phase 5 の初回計測は以下の制約により partial verification となった。Phase 6 でこれらを解消し、本 report の verdict を最終確定（[tasks.md / Phase 6](./tasks.md#6-mandatory-re-measurement-phase-6) と対応）。
+Phase 5 初回計測は (a) OTel 無効、(b) Yjs sessions=5 / drain=60s、(c) dist server 起動が Prisma ESM 不整合で未実施、の制約があった。Phase 6 で全て解消し本 report の verdict を最終確定（[tasks.md / Phase 6](./tasks.md#6-mandatory-re-measurement-phase-6) と対応）。
 
-### 7.1 L2 ランタイム RSS（Task 6.1 → 6.1-bis） — **完了 (2026-05-25)**
-
-- **Status**: DONE（中間形と最終 shipped 形の両方を計測）
-- **Step 1 — allow-list 中間形 (Task 6.1)**: env var `OTEL_AUTO_INSTRUMENTATION_PROFILE` の toggle で profile=all vs profile=minimal を計測 → Drain mean RSS delta ≈ 0 MB（事前見積もり 20–40 MB 未達）。`getNodeAutoInstrumentations` が 31 個全 instrumentation を instantiate するため flag 切替では memory load が変わらないことを実証。
-- **Step 2 — direct-import 再設計 (Task 6.1-bis)**: isolated bench で auto-deny → direct-import で ~11 MB 削減見込みを確認後、`@opentelemetry/auto-instrumentations-node` 依存を撤廃し 4 instrumentation を直接 instantiate する形へ書き直し（commits `0f2cfb77d6`, `19c56368fc`, `7277daf43a`）。`OTEL_AUTO_INSTRUMENTATION_PROFILE` env var は削除。
-- **Final result**: direct-import shipped 形での dev-server 計測で drain mean RSS 2113 MB（auto-all 中間形 2102 MB 比で 27 個の不要 instrumentation 排除に整合）、heap_used 148 MB（中間形 154 MB 比で −6 MB の純減）。isolated bench の予測 ~−11 MB と整合。
-- **Output dirs**: `apps/app/tmp/memory-leak-investigation/runs/before-otel-on/`, `runs/after-otel-on/`（中間形）, `runs/otel-direct-import-after/`（最終形）
-- **Follow-up**: なし。最終形が確定。
-
-### 7.2 L3 Y.Doc accumulation の sustained-load 評価（Task 6.2） — **完了 (2026-05-26)**
-
-- **Status**: DONE
-- **Result**: `LOAD_YJS_CLEAN_CLOSE=50` / `LOAD_YJS_ABORT=50` / `DRAIN_IDLE_SECONDS=300` で再計測。production dist server 上で実施。`Doc` count は A / B / C 全 snapshot で 1（A→C delta = 0）。`WebSocket` も 1 のまま、`Socket` (net) は load 時 +2 → drain で baseline 復帰。
-- **Verdict**: **REFUTED**。Phase 7 / Task 7.1（YjsIdleSweeper）は起動しない。詳細は Section 2 / L3 を参照。
-- **Output dir**: `apps/app/tmp/memory-leak-investigation/runs/after-dist-phase6/`
-
-### 7.3 L4 retainer 分析（Task 6.3） — **完了 (2026-05-26)**
-
-- **Status**: DONE
-- **Result**: `LOAD_PAGE_EDIT=20` / `DRAIN_IDLE_SECONDS=300` で再計測（Task 6.2 と combined run）。`Activity` / `InAppNotification` / `Comment` instance は A / B / C 全 snapshot で 0、A→C delta = 0。
-- **Verdict**: **REFUTED**。Phase 7 / Task 7.2（HandlerBackpressure）は起動しない。詳細は Section 2 / L4 を参照。Chrome DevTools Retainer ビューの目視解析は将来 follow-up。
-
-### 7.4 Production dist server (Node.js v24) 起動下での計測（Task 6.4） — **完了 (2026-05-26)**
-
-- **Status**: DONE
-- **Result**: Prisma ESM 不整合は `src/generated/prisma/client.ts` 側が既に修正済み（commit `70281306d7` の `moduleFormat = "cjs"`）で、stale な `dist/` が残っていただけの blocker だった。Phase 6 着手時のリビルド (`turbo run build --filter @growi/app`) で `dist/generated/prisma/client.js` が再生成され、`import.meta.url` 行が消失。`node dist/server/app.js` の起動と scenario runner の 1 周完走を確認。
-- **Output dir**: `apps/app/tmp/memory-leak-investigation/runs/after-dist-phase6/`（Task 6.2 / 6.3 と同一 run）
-
-### 7.5 Phase 6 results の統合（Task 6.5） — **完了 (2026-05-26)**
-
-- **Status**: DONE — 本 report の Section 1（Environment）/ Section 2（L3, L4）/ Section 3.3（RSS Delta）/ Section 5（Open Issues）/ Section 6（Snapshot Inventory）/ Section 7（本セクション） を Phase 6 結果で更新済み。
-- **L3 / L4 最終 verdict**: 両者 REFUTED。Phase 7 / Task 7.1 / 7.2 / 7.3 は起動条件を満たさず、本 spec の implementation は **closed** とする。
+| Task | 対応 finding | Status | 結論 |
+|---|---|---|---|
+| 6.1 + 6.1-bis | L2 ランタイム RSS | DONE (2026-05-25) | 中間形は delta ≈ 0 MB → direct-import 再設計で ~11 MB 削減。詳細は Section 2 / L2 |
+| 6.2 | L3 Y.Doc 累積 (sustained-load) | DONE (2026-05-26) | **REFUTED** — Phase 7 / Task 7.1 起動せず |
+| 6.3 | L4 retainer 分析 | DONE (2026-05-26) | **REFUTED** — Phase 7 / Task 7.2 起動せず |
+| 6.4 | dist server (Node.js v24) 起動 | DONE (2026-05-26) | stale `dist/` がリビルドで解消、scenario 完走 |
+| 6.5 | report への統合 | DONE (2026-05-26) | 本 report が最終版。本 spec implementation は **closed** |
