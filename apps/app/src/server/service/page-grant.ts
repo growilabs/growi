@@ -5,7 +5,12 @@ import {
   type IGrantedGroup,
   PageGrant,
 } from '@growi/core';
-import { pagePathUtils, pageUtils, pathUtils } from '@growi/core/dist/utils';
+import {
+  escapeStringForMongoRegex,
+  pagePathUtils,
+  pageUtils,
+  pathUtils,
+} from '@growi/core/dist/utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
@@ -595,7 +600,10 @@ class PageGrantService implements IPageGrantService {
     };
 
     const commonCondition = {
-      path: new RegExp(`^${RegExp.escape(addTrailingSlash(targetPath))}`, 'i'),
+      path: new RegExp(
+        `^${escapeStringForMongoRegex(addTrailingSlash(targetPath))}`,
+        'i',
+      ),
       isEmpty: false,
     };
 

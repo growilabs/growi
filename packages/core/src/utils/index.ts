@@ -4,6 +4,7 @@ import * as _envUtils from './env-utils';
 export const envUtils = _envUtils;
 
 export * from './browser-utils';
+export * from './escape-string-for-regex';
 export * from './global-event-target';
 export * from './growi-theme-metadata';
 export * as deepEquals from './is-deep-equals';
