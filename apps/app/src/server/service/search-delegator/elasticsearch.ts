@@ -681,7 +681,7 @@ class ElasticsearchDelegator
       const validateQueryResponse = await (async () => {
         if (isES7ClientDelegator(this.client)) {
           const es7SearchQuery = query as ES7SearchQuery;
-          return this.client.indices.validateQuery({
+          return await this.client.indices.validateQuery({
             explain: true,
             index: es7SearchQuery.index,
             body: {
@@ -692,7 +692,7 @@ class ElasticsearchDelegator
 
         if (isES8ClientDelegator(this.client)) {
           const es8SearchQuery = query as ES8SearchQuery;
-          return this.client.indices.validateQuery({
+          return await this.client.indices.validateQuery({
             explain: true,
             index: es8SearchQuery.index,
             query: es8SearchQuery.body.query,
@@ -701,7 +701,7 @@ class ElasticsearchDelegator
 
         if (isES9ClientDelegator(this.client)) {
           const es9SearchQuery = query as ES9SearchQuery;
-          return this.client.indices.validateQuery({
+          return await this.client.indices.validateQuery({
             explain: true,
             index: es9SearchQuery.index,
             query: es9SearchQuery.body.query,
@@ -717,16 +717,16 @@ class ElasticsearchDelegator
 
     const searchResponse = await (async () => {
       if (isES7ClientDelegator(this.client)) {
-        return this.client.search(query as ES7SearchQuery);
+        return await this.client.search(query as ES7SearchQuery);
       }
 
       if (isES8ClientDelegator(this.client)) {
-        return this.client.search(query as ES8SearchQuery);
+        return await this.client.search(query as ES8SearchQuery);
       }
 
       if (isES9ClientDelegator(this.client)) {
         const { body, ...rest } = query as ES9SearchQuery;
-        return this.client.search({
+        return await this.client.search({
           ...rest,
           // Elimination of the body property since ES9
           // https://raw.githubusercontent.com/elastic/elasticsearch-js/2f6200eb397df0e54d23848d769a93614ee1fb45/docs/release-notes/breaking-changes.md
@@ -1117,7 +1117,7 @@ class ElasticsearchDelegator
 
     this.appendHighlight(query);
 
-    return this.searchKeyword(query);
+    return await this.searchKeyword(query);
   }
 
   isTermsNormalized(terms: Partial<QueryTerms>): terms is ESQueryTerms {
@@ -1141,7 +1141,7 @@ class ElasticsearchDelegator
 
   async syncPageUpdated(page, user) {
     logger.debug('SearchClient.syncPageUpdated', page.path);
-    return this.updateOrInsertPageById(page._id);
+    return await this.updateOrInsertPageById(page._id);
   }
 
   // remove pages whitch should nod Indexed
@@ -1159,7 +1159,7 @@ class ElasticsearchDelegator
   }
 
   async syncDescendantsPagesUpdated(parentPage, user) {
-    return this.updateOrInsertDescendantsPagesById(parentPage, user);
+    return await this.updateOrInsertDescendantsPagesById(parentPage, user);
   }
 
   async syncDescendantsPagesDeleted(pages, user) {
@@ -1187,19 +1187,19 @@ class ElasticsearchDelegator
   async syncBookmarkChanged(pageId) {
     logger.debug('SearchClient.syncBookmarkChanged', pageId);
 
-    return this.updateOrInsertPageById(pageId);
+    return await this.updateOrInsertPageById(pageId);
   }
 
   async syncCommentChanged(comment) {
     logger.debug('SearchClient.syncCommentChanged', comment);
 
-    return this.updateOrInsertPageById(comment.page);
+    return await this.updateOrInsertPageById(comment.page);
   }
 
   async syncTagChanged(page) {
     logger.debug('SearchClient.syncTagChanged', page.path);
 
-    return this.updateOrInsertPageById(page._id);
+    return await this.updateOrInsertPageById(page._id);
   }
 }
 
