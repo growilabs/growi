@@ -13,7 +13,8 @@ const hasElasticsearch = !!process.env.ELASTICSEARCH_URI;
 describe.skipIf(!hasElasticsearch)(
   'ElasticsearchDelegator#init() with ELASTICSEARCH_REINDEX_ON_BOOT',
   () => {
-    describe('when ELASTICSEARCH_REINDEX_ON_BOOT=true', () => {
+    // Execute sequentially to use the same index name
+    describe.sequential('when ELASTICSEARCH_REINDEX_ON_BOOT=true', () => {
       beforeAll(async () => {
         process.env.ELASTICSEARCH_REINDEX_ON_BOOT = 'true';
         await configManager.loadConfigs();
@@ -22,30 +23,60 @@ describe.skipIf(!hasElasticsearch)(
         delete process.env.ELASTICSEARCH_REINDEX_ON_BOOT;
       });
 
-      it('should invoke rebuildIndex and complete without error', async () => {
-        // arrange
-        const crowi = await getInstance();
-        // Use a SocketIoService without an attached HTTP server, as in actual boot.
-        // If rebuildIndex incorrectly emits progress, getAdminSocket() throws.
-        const socketIoService = new SocketIoService(crowi);
-        const delegator = new ElasticsearchDelegator(socketIoService);
-        type WithRebuildIndex = {
-          rebuildIndex: (option?: RebuildIndexOption) => Promise<void>;
-        };
-        const rebuildSpy = vi.spyOn(
-          delegator as unknown as WithRebuildIndex,
-          'rebuildIndex',
-        );
+      describe('with a SocketIoService attached to an HTTP server', () => {
+        it('should invoke rebuildIndex and complete without error', async () => {
+          // arrange
+          const crowi = await getInstance();
+          const delegator = new ElasticsearchDelegator(crowi.socketIoService);
+          type WithRebuildIndex = {
+            rebuildIndex: (option?: RebuildIndexOption) => Promise<void>;
+          };
+          const rebuildSpy = vi.spyOn(
+            delegator as unknown as WithRebuildIndex,
+            'rebuildIndex',
+          );
 
-        // act
-        await delegator.init();
+          // act
+          await delegator.init();
 
-        // assert
-        expect(rebuildSpy).toHaveBeenCalledOnce();
-        const { isNormalized } = await delegator.getInfoForAdmin();
-        expect(isNormalized).toBe(true);
-        await expect(rebuildSpy.mock.results[0].value).resolves.toBeUndefined();
-      }, 60_000);
+          // assert
+          expect(rebuildSpy).toHaveBeenCalledOnce();
+          const { isNormalized } = await delegator.getInfoForAdmin();
+          expect(isNormalized).toBe(true);
+          await expect(
+            rebuildSpy.mock.results[0].value,
+          ).resolves.toBeUndefined();
+        }, 60_000);
+      });
+
+      describe('with a SocketIoService without an attached HTTP server', () => {
+        it('should invoke rebuildIndex and complete without error', async () => {
+          // arrange
+          const crowi = await getInstance();
+          // Use a SocketIoService without an attached HTTP server, as in actual boot.
+          // If rebuildIndex incorrectly emits progress, getAdminSocket() throws.
+          const socketIoService = new SocketIoService(crowi);
+          const delegator = new ElasticsearchDelegator(socketIoService);
+          type WithRebuildIndex = {
+            rebuildIndex: (option?: RebuildIndexOption) => Promise<void>;
+          };
+          const rebuildSpy = vi.spyOn(
+            delegator as unknown as WithRebuildIndex,
+            'rebuildIndex',
+          );
+
+          // act
+          await delegator.init();
+
+          // assert
+          expect(rebuildSpy).toHaveBeenCalledOnce();
+          const { isNormalized } = await delegator.getInfoForAdmin();
+          expect(isNormalized).toBe(true);
+          await expect(
+            rebuildSpy.mock.results[0].value,
+          ).resolves.toBeUndefined();
+        }, 60_000);
+      });
     });
   },
 );
