@@ -502,6 +502,7 @@ class Crowi {
     this.searchService = await SearchService.create(this);
   }
 
+  // biome-ignore lint/suspicious/useAwait: all setup methods use async interface for consistency
   async setupMailer(): Promise<void> {
     const MailService = require('~/server/service/mail').default;
     this.mailService = new MailService(this);
