@@ -968,11 +968,7 @@ class ElasticsearchDelegator
     }
   }
 
-  async filterPagesByViewer(
-    query: SearchQuery,
-    user,
-    userGroups,
-  ): Promise<void> {
+  filterPagesByViewer(query: SearchQuery, user, userGroups): void {
     const showPagesRestrictedByOwner = !configManager.getConfig(
       'security:list-policy:hideRestrictedByOwner',
     );
@@ -1108,7 +1104,7 @@ class ElasticsearchDelegator
     const query = this.createSearchQuery();
 
     this.appendCriteriaForQueryString(query, terms);
-    await this.filterPagesByViewer(query, user, userGroups);
+    this.filterPagesByViewer(query, user, userGroups);
     await this.appendFunctionScore(query, queryString);
 
     this.appendResultSize(query, from, size);
