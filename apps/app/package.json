@@ -41,7 +41,7 @@
     "prelint:typecheck": "next typegen",
     "prelint:openapi:apiv3": "pnpm run openapi:generate-spec:apiv3",
     "prelint:openapi:apiv1": "pnpm run openapi:generate-spec:apiv1",
-    "test": "vitest run",
+    "test": "vitest run --project=app-unit --project=app-components",
     "test:coverage": "run-p test:coverage:* test:integ",
     "test:coverage:unit": "COLUMNS=200 vitest run --coverage --project=app-unit",
     "test:coverage:components": "COLUMNS=200 vitest run --coverage --project=app-components",

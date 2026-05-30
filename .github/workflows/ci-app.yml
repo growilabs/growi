@@ -133,7 +133,6 @@ jobs:
           turbo run test --filter=@growi/app --filter=./packages/* --env-mode=loose
         env:
           MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
-          VITE_ELASTICSEARCH_URI: ""
 
       - name: Upload coverage report as artifact
         uses: actions/upload-artifact@v7
@@ -154,7 +153,7 @@ jobs:
           url: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 
-  ci-app-test-es:
+  ci-app-test-integration:
     runs-on: ubuntu-latest
 
     strategy:
@@ -201,7 +200,7 @@ jobs:
 
       - name: Test
         run: |
-          turbo run test --filter=@growi/app --env-mode=loose
+          turbo run test:integ --filter=@growi/app --env-mode=loose
         env:
           MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
           VITE_ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
