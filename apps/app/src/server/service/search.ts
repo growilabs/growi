@@ -87,7 +87,7 @@ const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
 };
 
 class SearchService implements SearchQueryParser, SearchResolver {
-  private constructor() {}
+  protected constructor() {}
 
   crowi: Crowi;
 
