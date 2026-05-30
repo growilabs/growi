@@ -93,7 +93,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   isErrorOccuredOnSearching: boolean | null;
 
-  fullTextSearchDelegator: any & ElasticsearchDelegator;
+  fullTextSearchDelegator: ElasticsearchDelegator;
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
 
@@ -104,7 +104,11 @@ class SearchService implements SearchQueryParser, SearchResolver {
     this.isErrorOccuredOnSearching = null;
 
     try {
-      this.fullTextSearchDelegator = this.generateFullTextSearchDelegator();
+      const tmpFullTextSearchDelegator = this.generateFullTextSearchDelegator();
+      if (tmpFullTextSearchDelegator == null) {
+        throw new Error('Failed to initialize search delegator');
+      }
+      this.fullTextSearchDelegator = tmpFullTextSearchDelegator;
       this.nqDelegators = this.generateNQDelegators(
         this.fullTextSearchDelegator,
       );
