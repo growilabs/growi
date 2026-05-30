@@ -660,6 +660,7 @@ class Crowi {
         await mongoose.disconnect();
         return;
       },
+      // biome-ignore lint/suspicious/useAwait: onShutdown should be async
       onShutdown: async () => {
         logger.info('Cleanup finished, server is shutting down');
       },
