@@ -502,8 +502,7 @@ class Crowi {
     this.searchService = await SearchService.create(this);
   }
 
-  // biome-ignore lint/suspicious/useAwait: all setup methods use async interface for consistency
-  async setupMailer(): Promise<void> {
+  setupMailer(): void {
     const MailService = require('~/server/service/mail').default;
     this.mailService = new MailService(this);
 
@@ -708,7 +707,7 @@ class Crowi {
   /**
    * setup UserNotificationService
    */
-  async setUpUserNotification(): Promise<void> {
+  setUpUserNotification(): void {
     if (this.userNotificationService == null) {
       this.userNotificationService = new UserNotificationService(this);
     }
@@ -717,7 +716,7 @@ class Crowi {
   /**
    * setup AclService
    */
-  async setUpAcl(): Promise<void> {
+  setUpAcl(): void {
     this.aclService = aclServiceSingletonInstance;
   }
 
@@ -742,7 +741,7 @@ class Crowi {
   /**
    * setup AppService
    */
-  async setUpApp(): Promise<void> {
+  setUpApp(): void {
     if (this.appService == null) {
       this.appService = new AppService(this);
 
@@ -757,7 +756,7 @@ class Crowi {
   /**
    * setup FileUploadService
    */
-  async setUpFileUpload(isForceUpdate = false): Promise<void> {
+  setUpFileUpload(isForceUpdate = false): void {
     if (this.fileUploadService == null || isForceUpdate) {
       this.fileUploadService = getUploader(this);
     }
@@ -766,7 +765,7 @@ class Crowi {
   /**
    * setup FileUploaderSwitchService
    */
-  async setUpFileUploaderSwitchService(): Promise<void> {
+  setUpFileUploaderSwitchService(): void {
     const FileUploaderSwitchService = require('../service/file-uploader-switch');
     this.fileUploaderSwitchService = new FileUploaderSwitchService(this);
     // add as a message handler
@@ -785,7 +784,7 @@ class Crowi {
   /**
    * setup AttachmentService
    */
-  async setupAttachmentService(): Promise<void> {
+  setupAttachmentService(): void {
     if (this.attachmentService == null) {
       this.attachmentService = new AttachmentService(this);
     }
@@ -794,21 +793,21 @@ class Crowi {
   async setupUserGroupService(): Promise<void> {
     if (this.userGroupService == null) {
       this.userGroupService = new UserGroupService(this);
-      return this.userGroupService.init();
+      return await this.userGroupService.init();
     }
   }
 
-  async setUpGrowiBridge(): Promise<void> {
+  setUpGrowiBridge(): void {
     if (this.growiBridgeService == null) {
       this.growiBridgeService = new GrowiBridgeService(this);
     }
   }
 
-  async setupExport(): Promise<void> {
+  setupExport(): void {
     instanciateExportService(this);
   }
 
-  async setupImport(): Promise<void> {
+  setupImport(): void {
     initializeImportService(this);
   }
 
@@ -834,7 +833,7 @@ class Crowi {
     this.pageOperationService = instanciatePageOperationService(this);
   }
 
-  async setupInAppNotificationService(): Promise<void> {
+  setupInAppNotificationService(): void {
     if (this.inAppNotificationService == null) {
       this.inAppNotificationService = new InAppNotificationService(this);
     }
@@ -847,13 +846,13 @@ class Crowi {
     }
   }
 
-  async setupCommentService(): Promise<void> {
+  setupCommentService(): void {
     if (this.commentService == null) {
       this.commentService = new CommentService(this);
     }
   }
 
-  async setupSyncPageStatusService(): Promise<void> {
+  setupSyncPageStatusService(): void {
     if (this.syncPageStatusService == null) {
       this.syncPageStatusService = new SyncPageStatusService(
         this,
@@ -868,7 +867,7 @@ class Crowi {
     }
   }
 
-  async setupSlackIntegrationService(): Promise<void> {
+  setupSlackIntegrationService(): void {
     if (this.slackIntegrationService == null) {
       this.slackIntegrationService = new SlackIntegrationService(this);
     }
@@ -879,7 +878,7 @@ class Crowi {
     }
   }
 
-  async setupG2GTransferService(): Promise<void> {
+  setupG2GTransferService(): void {
     if (this.g2gTransferPusherService == null) {
       this.g2gTransferPusherService = new G2GTransferPusherService(this);
     }
