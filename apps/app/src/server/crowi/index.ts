@@ -482,12 +482,12 @@ class Crowi {
     this.passportService.setupSerializer();
     // setup strategies
     try {
-      this.passportService.setupStrategyById('local');
-      this.passportService.setupStrategyById('ldap');
-      this.passportService.setupStrategyById('saml');
-      this.passportService.setupStrategyById('oidc');
-      this.passportService.setupStrategyById('google');
-      this.passportService.setupStrategyById('github');
+      await this.passportService.setupStrategyById('local');
+      await this.passportService.setupStrategyById('ldap');
+      await this.passportService.setupStrategyById('saml');
+      await this.passportService.setupStrategyById('oidc');
+      await this.passportService.setupStrategyById('google');
+      await this.passportService.setupStrategyById('github');
     } catch (err) {
       logger.error(err);
     }
