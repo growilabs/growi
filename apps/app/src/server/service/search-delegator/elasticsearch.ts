@@ -347,6 +347,12 @@ class ElasticsearchDelegator
 
     try {
       // reindex to tmp index
+      const isExistsTmpIndex = await client.indices.exists({
+        index: tmpIndexName,
+      });
+      if (isExistsTmpIndex) {
+        await client.indices.delete({ index: tmpIndexName });
+      }
       await this.createIndex(tmpIndexName);
       await client.reindex(indexName, tmpIndexName);
 
