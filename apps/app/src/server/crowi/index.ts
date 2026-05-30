@@ -499,7 +499,7 @@ class Crowi {
   }
 
   async setupSearcher(): Promise<void> {
-    this.searchService = new SearchService(this);
+    this.searchService = await SearchService.create(this);
   }
 
   async setupMailer(): Promise<void> {

@@ -87,6 +87,8 @@ const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
 };
 
 class SearchService implements SearchQueryParser, SearchResolver {
+  private constructor() {}
+
   crowi: Crowi;
 
   isErrorOccuredOnHealthcheck: boolean | null;
@@ -97,30 +99,34 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
 
-  constructor(crowi: Crowi) {
-    this.crowi = crowi;
+  static async create(crowi: Crowi) {
+    const instance = new SearchService();
 
-    this.isErrorOccuredOnHealthcheck = null;
-    this.isErrorOccuredOnSearching = null;
+    instance.crowi = crowi;
+
+    instance.isErrorOccuredOnHealthcheck = null;
+    instance.isErrorOccuredOnSearching = null;
 
     try {
-      const tmpFullTextSearchDelegator = this.generateFullTextSearchDelegator();
+      const tmpFullTextSearchDelegator =
+        instance.generateFullTextSearchDelegator();
       if (tmpFullTextSearchDelegator == null) {
         throw new Error('Failed to initialize search delegator');
       }
-      this.fullTextSearchDelegator = tmpFullTextSearchDelegator;
-      this.nqDelegators = this.generateNQDelegators(
-        this.fullTextSearchDelegator,
+      instance.fullTextSearchDelegator = tmpFullTextSearchDelegator;
+      instance.nqDelegators = instance.generateNQDelegators(
+        instance.fullTextSearchDelegator,
       );
       logger.info('Succeeded to initialize search delegators');
     } catch (err) {
       logger.error(err);
     }
 
-    if (this.isConfigured) {
-      this.fullTextSearchDelegator.init();
-      this.registerUpdateEvent();
+    if (instance.isConfigured) {
+      await instance.fullTextSearchDelegator.init();
+      instance.registerUpdateEvent();
     }
+    return instance;
   }
 
   get isConfigured() {
