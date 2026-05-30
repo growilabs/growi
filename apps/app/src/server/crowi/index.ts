@@ -349,10 +349,10 @@ class Crowi {
     // mongoUri = mongodb://user:password@host/dbname
     const mongoUri = getMongoUri();
 
-    return mongoose.connect(mongoUri, mongoOptions);
+    return await mongoose.connect(mongoUri, mongoOptions);
   }
 
-  async setupSessionConfig(): Promise<void> {
+  setupSessionConfig(): void {
     const session = require('express-session');
     const sessionMaxAge =
       this.configManager.getConfig('security:sessionMaxAge') || 2592000000; // default: 30days
@@ -407,10 +407,10 @@ class Crowi {
 
   async setupConfigManager(): Promise<void> {
     this.configManager = configManagerSingletonInstance;
-    return this.configManager.loadConfigs();
+    return await this.configManager.loadConfigs();
   }
 
-  async setupS2sMessagingService(): Promise<void> {
+  setupS2sMessagingService(): void {
     const s2sMessagingService = require('../service/s2s-messaging')(this);
     if (s2sMessagingService != null) {
       s2sMessagingService.subscribe();
@@ -422,7 +422,7 @@ class Crowi {
     }
   }
 
-  async setupSocketIoService(): Promise<void> {
+  setupSocketIoService(): void {
     this.socketIoService = new SocketIoService(this);
   }
 
