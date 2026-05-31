@@ -5,6 +5,8 @@
 
 import { Prisma, type users } from '~/generated/prisma/client';
 
+// TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
+// Until then, use mongoose to automatically create collections and indexes when connected.
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
     result: {

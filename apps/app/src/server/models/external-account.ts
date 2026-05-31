@@ -11,6 +11,8 @@ import { UserStatus } from './user/conts';
 
 const logger = loggerFactory('growi:models:external-account');
 
+// TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
+// Until then, use mongoose to automatically create collections and indexes when connected.
 const schema = new Schema(
   {
     providerType: { type: String, required: true },
