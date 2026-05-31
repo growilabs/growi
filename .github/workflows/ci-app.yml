@@ -162,7 +162,11 @@ jobs:
       matrix:
         node-version: [24.x]
         mongodb-version: ['8.0']
-        elasticsearch-version: ['8.19.16', '9.3.3']
+        elasticsearch-version:
+          - env: 8
+            image: '8.19.16'
+          - env: 9
+            image: '9.3.3'
 
     services:
       mongodb:
@@ -170,7 +174,7 @@ jobs:
         ports:
           - 27017/tcp
       elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:${{ matrix.elasticsearch-version }}
+        image: docker.elastic.co/elasticsearch/elasticsearch:${{ matrix.elasticsearch-version.image }}
         ports:
           - 9200/tcp
         env:
@@ -200,11 +204,12 @@ jobs:
         env:
           MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
           VITE_ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
+          VITE_ELASTICSEARCH_VERSION: ${{ matrix.elasticsearch-version.env }}
 
       - name: Upload coverage report as artifact
         uses: actions/upload-artifact@v7
         with:
-          name: coverage-es${{ matrix.elasticsearch-version }}-mongo${{ matrix.mongodb-version }}
+          name: coverage-es${{ matrix.elasticsearch-version.env }}-mongo${{ matrix.mongodb-version }}
           path: |
             apps/app/coverage
 
