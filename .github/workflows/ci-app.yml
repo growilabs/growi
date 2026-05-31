@@ -106,7 +106,8 @@ jobs:
 
       - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v6
+      - &setup-node-step
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -123,7 +124,8 @@ jobs:
           restore-keys: |
             dist-ci-app-${{ runner.OS }}-node${{ matrix.node-version }}-
 
-      - name: Install dependencies
+      - &install-dependencies-step
+        name: Install dependencies
         run: |
           pnpm add turbo --global
           pnpm install --frozen-lockfile
@@ -186,17 +188,11 @@ jobs:
 
       - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v6
-        with:
-          node-version: ${{ matrix.node-version }}
-          cache: 'pnpm'
+      - *setup-node-step
 
       - *cache-restore-dist-step
 
-      - name: Install dependencies
-        run: |
-          pnpm add turbo --global
-          pnpm install --frozen-lockfile
+      - *install-dependencies-step
 
       - name: Test
         run: |
