@@ -123,15 +123,18 @@ model bookmarkfolders {
 }
 
 model bookmarks {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  page Json?
-  /// Field referred in an index, but found no data to define the type.
-  user Json?
+  id        String   @id @default(auto()) @map("_id") @db.ObjectId
+  v         Int      @default(0) @map("__v")
+  createdAt DateTime @default(now())
+  pageId    String   @map("page") @db.ObjectId
+  userId    String   @map("user") @db.ObjectId
 
-  @@unique([page, user], map: "page_1_user_1")
-  @@index([page], map: "page_1")
-  @@index([user], map: "user_1")
+  page pages @relation(fields: [pageId], references: [id])
+  user users @relation(fields: [userId], references: [id])
+
+  @@unique([pageId, userId], map: "page_1_user_1")
+  @@index([pageId], map: "page_1")
+  @@index([userId], map: "user_1")
 }
 
 model comments {
@@ -351,6 +354,7 @@ model pages {
   revisions      revisions[]
   comments       comments[]
   attachments    attachments[]
+  bookmarks      bookmarks[]
 
   @@index([parentId], map: "parent_1")
   @@index([path], map: "path_1")
@@ -538,6 +542,7 @@ model users {
   imageAttachment    attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
   createdAttachments attachments[]      @relation("CreatedAttachments")
   externalaccounts   externalaccounts[]
+  bookmarks          bookmarks[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")
