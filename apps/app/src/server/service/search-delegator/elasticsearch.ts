@@ -439,11 +439,7 @@ class ElasticsearchDelegator
     }
 
     if (isES9ClientDelegator(this.client)) {
-      const { mappings } =
-        process.env.CI == null
-          ? await import('./mappings/mappings-es9')
-          : await import('./mappings/mappings-es9-for-ci');
-
+      const { mappings } = await import('./mappings/mappings-es9');
       return this.client.indices.create({
         index,
         ...mappings,
