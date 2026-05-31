@@ -23,10 +23,10 @@ describe.skipIf(!hasElasticsearch)(
         delete process.env.ELASTICSEARCH_REINDEX_ON_BOOT;
       });
 
-      describe('with a SocketIoService attached to an HTTP server', () => {
+      describe('with a SocketIoService with an attached dummy HTTP server', () => {
         it('should invoke rebuildIndex and complete without error', async () => {
           // arrange
-          const crowi = await getInstance();
+          const crowi = await getInstance(); // attached SocketIoService with dummy server in setupCrowi.ts
           const delegator = new ElasticsearchDelegator(crowi.socketIoService);
           type WithRebuildIndex = {
             rebuildIndex: (option?: RebuildIndexOption) => Promise<void>;
