@@ -198,6 +198,20 @@ jobs:
 
       - *install-dependencies-step
 
+      - name: Install Elasticsearch plugins
+        run: |
+          docker exec ${{ job.services.elasticsearch.id }} elasticsearch-plugin install --batch analysis-kuromoji
+          docker exec ${{ job.services.elasticsearch.id }} elasticsearch-plugin install --batch analysis-icu
+          docker restart ${{ job.services.elasticsearch.id }}
+          for i in $(seq 1 30); do
+            if curl -sf "http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/_cluster/health?wait_for_status=yellow&timeout=5s" > /dev/null 2>&1; then
+              echo "Elasticsearch is healthy"
+              break
+            fi
+            echo "Waiting for Elasticsearch... ($i/30)"
+            sleep 5
+          done
+
       - name: Test
         run: |
           turbo run test:integ --filter=@growi/app --env-mode=loose
