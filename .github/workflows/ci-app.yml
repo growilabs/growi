@@ -164,28 +164,16 @@ jobs:
         mongodb-version: ['8.0']
         elasticsearch-version:
           - env: 8
-            image: '8.19.16'
+            stack-version: '8.19.16'
           - env: 9
-            image: '9.3.3'
+            stack-version: '9.3.3'
 
+    # [MEMO] Elasticsearch is started in a step to install plugins before starting it.
     services:
       mongodb:
         image: mongo:${{ matrix.mongodb-version }}
         ports:
           - 27017/tcp
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:${{ matrix.elasticsearch-version.image }}
-        ports:
-          - 9200/tcp
-        env:
-          discovery.type: single-node
-          ES_JAVA_OPTS: -Xms256m -Xmx256m
-          xpack.security.enabled: "false"
-        options: >-
-          --health-cmd="curl -sf http://localhost:9200/_cluster/health?wait_for_status=yellow&timeout=30s || exit 1"
-          --health-interval=15s
-          --health-timeout=40s
-          --health-retries=5
 
     steps:
       - uses: actions/checkout@v6
@@ -198,26 +186,31 @@ jobs:
 
       - *install-dependencies-step
 
-      - name: Install Elasticsearch plugins
+      - name: Start Elasticsearch with plugins
+        uses: elastic/elastic-github-actions/elasticsearch@master
+        with:
+          stack-version: ${{ matrix.elasticsearch-version.stack-version }}
+          plugins: |
+            analysis-kuromoji
+            analysis-icu
+          security-enabled: false
+
+      - name: Wait for Elasticsearch to be ready
         run: |
-          docker exec ${{ job.services.elasticsearch.id }} elasticsearch-plugin install --batch analysis-kuromoji
-          docker exec ${{ job.services.elasticsearch.id }} elasticsearch-plugin install --batch analysis-icu
-          docker restart ${{ job.services.elasticsearch.id }}
-          for i in $(seq 1 30); do
-            if curl -sf "http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/_cluster/health?wait_for_status=yellow&timeout=5s" > /dev/null 2>&1; then
-              echo "Elasticsearch is healthy"
-              break
-            fi
-            echo "Waiting for Elasticsearch... ($i/30)"
-            sleep 5
-          done
+          curl \
+            --no-progress-meter \
+            -X GET \
+            --retry 60 \
+            --retry-delay 1 \
+            --retry-connrefused \
+            http://localhost:9200/_cluster/health?wait_for_status=green
 
       - name: Test
         run: |
           turbo run test:integ --filter=@growi/app --env-mode=loose
         env:
           MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
-          VITE_ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
+          VITE_ELASTICSEARCH_URI: http://localhost:9200/growi
           VITE_ELASTICSEARCH_VERSION: ${{ matrix.elasticsearch-version.env }}
 
       - name: Upload coverage report as artifact
