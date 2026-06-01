@@ -52,7 +52,7 @@ jobs:
   #     SLACK_WEBHOOK_URL: ${{ secrets.SLACK_WEBHOOK_URL }}
 
   test-prod-node24:
-    uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@master
+    uses: .github/workflows/reusable-app-prod.yml
     if: |
       ( github.event_name == 'push'
         || github.base_ref == 'master'
