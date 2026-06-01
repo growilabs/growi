@@ -18,12 +18,14 @@ export const ContributionGraph = ({ userId }: { userId: string }) => {
     setIsClient(true);
   }, []);
 
+  const isMigrationInProgress = data?.isMigrationInProgress === true;
+
   const contributions = useMemo(() => {
-    if (!isClient || data == null) {
+    if (!isClient || data?.contributions == null || isMigrationInProgress) {
       return [];
     }
-    return getPaddedContributions(data, new Date());
-  }, [data, isClient]);
+    return getPaddedContributions(data.contributions, new Date());
+  }, [data, isClient, isMigrationInProgress]);
 
   const monthLabels = useMemo(() => {
     return getMonthLabels(contributions);
@@ -32,6 +34,17 @@ export const ContributionGraph = ({ userId }: { userId: string }) => {
   const totalContributions = useMemo(() => {
     return contributions.reduce((sum, cont) => sum + cont.count, 0);
   }, [contributions]);
+
+  if (isClient && isMigrationInProgress) {
+    return (
+      <div className={styles['contribution-box']}>
+        <div className={styles['graph-and-days']}></div>
+        <div className={styles['migration-in-progress']}>
+          Preparing your contribution data. Refresh in a moment to see it.
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles['contribution-box']}>
