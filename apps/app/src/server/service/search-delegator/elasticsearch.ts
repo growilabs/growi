@@ -921,6 +921,7 @@ class ElasticsearchDelegator
 
     return [];
   }
+
   async deleteAuditlog(id: mongoose.Types.ObjectId): Promise<void> {
     const body = [
       { delete: { _index: this.auditlogAliasName, _id: id.toString() } },

@@ -131,7 +131,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
       this.auditlogChangeStreamService = new AuditlogChangeStreamService(
         this.fullTextSearchDelegator,
       );
-      this.auditlogChangeStreamService.start();
+      this.auditlogChangeStreamService.start().catch((err) => {
+        logger.error(err, 'AuditlogChangeStreamService failed to start.');
+      });
     }
   }
 
