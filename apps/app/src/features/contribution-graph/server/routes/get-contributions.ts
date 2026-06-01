@@ -30,23 +30,25 @@ export const getContributionsHandler = (crowi: Crowi): RequestHandler => {
   return async (req: ContributionRequest, res: ApiV3Response) => {
     const { targetUserId } = req.query;
 
-    try {
-      const User = mongoose.model('User');
-      const user = await User.findById(targetUserId);
+    const User = mongoose.model('User');
+    const user = await User.findById(targetUserId);
 
-      if (user == null) {
-        return res.apiv3Err('User not found', 404);
-      }
+    if (user == null) {
+      return res.apiv3Err('User not found', 404);
+    }
 
-      await ensureUserHasMigrated(user);
-    } catch (err) {
-      logger.error('Failed migrate contributions', err);
+    const isMigrationInProgress = user.contributionsMigratedAt == null;
+
+    if (isMigrationInProgress) {
+      void ensureUserHasMigrated(user).catch((err) => {
+        logger.error('Background contribution migration failed', err);
+      });
     }
 
     try {
       const contributions = await getContributions(targetUserId);
 
-      return res.apiv3(contributions);
+      return res.apiv3({ ...contributions, isMigrationInProgress });
     } catch (err) {
       logger.error('Failed to get contributions', err);
 
@@ -55,6 +57,7 @@ export const getContributionsHandler = (crowi: Crowi): RequestHandler => {
       return res.apiv3({
         contributions: fallbackGraph,
         isTemporaryUnavailable: true,
+        isMigrationInProgress,
       });
     }
   };
