@@ -2,6 +2,7 @@ import {
   type ChangeEvent,
   type JSX,
   useCallback,
+  useId,
   useMemo,
   useState,
 } from 'react';
@@ -40,10 +41,12 @@ type Props = {
   adminUsersContainer: InstanceType<typeof AdminUsersContainer>;
 };
 
-const UserInviteModal = ({ adminUsersContainer }: Props): JSX.Element => {
+const UserInviteModalFC = ({ adminUsersContainer }: Props): JSX.Element => {
   const { t } = useTranslation();
   const isMailerSetup = useAtomValue(isMailerSetupAtom) ?? false;
   const registrationWhitelist = useAtomValue(registrationWhitelistAtom) ?? [];
+  const emailsInputId = useId();
+  const sendEmailId = useId();
 
   const [emailInputValue, setEmailInputValue] = useState('');
   const [sendEmail, setSendEmail] = useState(false);
@@ -212,7 +215,7 @@ const UserInviteModal = ({ adminUsersContainer }: Props): JSX.Element => {
   const renderModalBody = () => {
     return (
       <>
-        <label className="form-label" htmlFor="admin-invite-emails">
+        <label className="form-label" htmlFor={emailsInputId}>
           {t('admin:user_management.invite_modal.emails')}
         </label>
         <p>
@@ -222,7 +225,7 @@ const UserInviteModal = ({ adminUsersContainer }: Props): JSX.Element => {
         </p>
         <textarea
           className="form-control"
-          id="admin-invite-emails"
+          id={emailsInputId}
           placeholder="e.g.&#13;&#10;user1@growi.org&#13;&#10;user2@growi.org"
           style={{ height: '200px' }}
           value={emailInputValue}
@@ -269,14 +272,14 @@ const UserInviteModal = ({ adminUsersContainer }: Props): JSX.Element => {
         <div className="col text-start form-check form-check-info">
           <input
             type="checkbox"
-            id="sendEmail"
+            id={sendEmailId}
             className="form-check-input"
             name="sendEmail"
             checked={sendEmail}
             onChange={handleCheckBox}
             disabled={!isMailerSetup}
           />
-          <label className="form-label form-check-label" htmlFor="sendEmail">
+          <label className="form-label form-check-label" htmlFor={sendEmailId}>
             {t('admin:user_management.invite_modal.invite_thru_email')}
           </label>
           {isMailerSetup ? (
@@ -366,8 +369,6 @@ const UserInviteModal = ({ adminUsersContainer }: Props): JSX.Element => {
 /**
  * Wrapper component for using unstated
  */
-const UserInviteModalWrapper = withUnstatedContainers(UserInviteModal, [
+export const UserInviteModal = withUnstatedContainers(UserInviteModalFC, [
   AdminUsersContainer,
 ]);
-
-export default UserInviteModalWrapper;
