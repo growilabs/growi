@@ -115,7 +115,8 @@ describe('POST /invite', () => {
     // Import and mount the users router
     const usersModule = await import('./users');
     const usersRouterFactory =
-      (usersModule as Record<string, unknown>).default ?? usersModule;
+      (usersModule as unknown as Record<string, unknown>).default ??
+      usersModule;
     if (typeof usersRouterFactory !== 'function') {
       throw new Error('users module does not export a router factory function');
     }
