@@ -845,19 +845,14 @@ class ElasticsearchDelegator
     const body = this.prepareBodyForAuditlog(activity);
     if (body.length === 0) return;
 
-    try {
-      const bulkResponse = await this.client.bulk({ body });
-      if (bulkResponse.errors) {
-        const failedItems = (bulkResponse.items ?? []).filter(
-          (i) => i.index?.error,
-        );
-        logger.error(
-          { failedItems },
-          'updateOrInsertAuditlog bulk indexing had errors',
-        );
-      }
-    } catch (err) {
-      logger.error('updateOrInsertAuditlog failed.', err);
+    const bulkResponse = await this.client.bulk({ body });
+    if (bulkResponse.errors) {
+      const failedItems = (bulkResponse.items ?? []).filter(
+        (i) => i.index?.error,
+      );
+      throw new Error(
+        `updateOrInsertAuditlog bulk indexing had errors: ${JSON.stringify(failedItems)}`,
+      );
     }
   }
 
@@ -926,19 +921,14 @@ class ElasticsearchDelegator
     const body = [
       { delete: { _index: this.auditlogAliasName, _id: id.toString() } },
     ];
-    try {
-      const bulkResponse = await this.client.bulk({ body });
-      if (bulkResponse.errors) {
-        const failedItems = (bulkResponse.items ?? []).filter(
-          (i) => i.delete?.error,
-        );
-        logger.error(
-          { failedItems },
-          'deleteAuditlog bulk deletion had errors',
-        );
-      }
-    } catch (err) {
-      logger.error('deleteAuditlog failed.', err);
+    const bulkResponse = await this.client.bulk({ body });
+    if (bulkResponse.errors) {
+      const failedItems = (bulkResponse.items ?? []).filter(
+        (i) => i.delete?.error,
+      );
+      throw new Error(
+        `deleteAuditlog bulk deletion had errors: ${JSON.stringify(failedItems)}`,
+      );
     }
   }
 

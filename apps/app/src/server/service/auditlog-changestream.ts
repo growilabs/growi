@@ -75,6 +75,7 @@ export class AuditlogChangeStreamService {
           }
           await ResumeTokenStore.save(STREAM_KEY, event._id);
         } catch (err) {
+          // Token not advanced on failure; event will be retried on restart.
           logger.error(
             { err },
             'AuditlogChangeStreamService change event handling failed.',
