@@ -92,10 +92,4 @@ export class ES8ClientDelegator {
   search(params: estypes.SearchRequest): Promise<estypes.SearchResponse> {
     return this.client.search(params);
   }
-
-  deleteByQuery(
-    params: estypes.DeleteByQueryRequest,
-  ): Promise<estypes.DeleteByQueryResponse> {
-    return this.client.deleteByQuery(params);
-  }
 }

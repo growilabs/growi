@@ -921,68 +921,23 @@ class ElasticsearchDelegator
 
     return [];
   }
-  async deleteExpiredAuditlogs(expirationSeconds: number): Promise<void> {
-    const expirationDate = new Date(Date.now() - expirationSeconds * 1000);
-    const query = {
-      range: {
-        created_at: { lt: expirationDate.toISOString() },
-      },
-    };
-
+  async deleteAuditlog(id: mongoose.Types.ObjectId): Promise<void> {
+    const body = [
+      { delete: { _index: this.auditlogAliasName, _id: id.toString() } },
+    ];
     try {
-      let deleted: number | undefined;
-      let timedOut: boolean | undefined;
-      let failures: unknown[] | undefined;
-      let versionConflicts: number | undefined;
-
-      if (isES7ClientDelegator(this.client)) {
-        const result = await this.client.deleteByQuery({
-          index: this.auditlogAliasName,
-          conflicts: 'proceed',
-          body: { query },
-        });
-        deleted = result.deleted;
-        timedOut = result.timed_out;
-        failures = result.failures;
-        versionConflicts = result.version_conflicts;
-      } else if (
-        isES8ClientDelegator(this.client) ||
-        isES9ClientDelegator(this.client)
-      ) {
-        const result = await this.client.deleteByQuery({
-          index: this.auditlogAliasName,
-          conflicts: 'proceed',
-          query,
-        });
-        deleted = result.deleted;
-        timedOut = result.timed_out;
-        failures = result.failures;
-        versionConflicts = result.version_conflicts;
-      } else {
-        // defensive: guards against uninitialized client or unsupported future ES versions
-        logger.warn(
-          'deleteExpiredAuditlogs skipped: Elasticsearch client is not ready.',
+      const bulkResponse = await this.client.bulk({ body });
+      if (bulkResponse.errors) {
+        const failedItems = (bulkResponse.items ?? []).filter(
+          (i) => i.delete?.error,
         );
-        return;
-      }
-
-      if (timedOut) {
-        logger.warn(
-          `deleteExpiredAuditlogs timed out. Some documents may not have been deleted. (deleted=${deleted ?? 0}, versionConflicts=${versionConflicts ?? 0})`,
-        );
-      } else {
-        logger.info(
-          `deleteExpiredAuditlogs completed. (deleted=${deleted ?? 0}, versionConflicts=${versionConflicts ?? 0})`,
-        );
-      }
-
-      if (failures != null && failures.length > 0) {
         logger.error(
-          `deleteExpiredAuditlogs partial failures. (count=${failures.length})`,
+          { failedItems },
+          'deleteAuditlog bulk deletion had errors',
         );
       }
     } catch (err) {
-      logger.error('deleteExpiredAuditlogs failed.', err);
+      logger.error('deleteAuditlog failed.', err);
     }
   }
 
