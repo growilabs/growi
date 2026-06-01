@@ -44,7 +44,7 @@ export const migrateContributions = async (userId: string): Promise<void> => {
 };
 
 /**
- * Checks if a user's contributions has been migrated and migrates them if needed.
+ * Checks if a user's contributions have been migrated and migrates them if needed.
  */
 export const ensureUserHasMigrated = async (
   user: IUserHasId,
@@ -71,7 +71,7 @@ export const ensureUserHasMigrated = async (
   await migrateContributions(freshUser._id.toString());
 
   await User.updateOne(
-    { _id: user._id, contributionsMigratedAt: null },
+    { _id: freshUser._id, contributionsMigratedAt: null },
     { $set: { contributionsMigratedAt: new Date() } },
   );
 };

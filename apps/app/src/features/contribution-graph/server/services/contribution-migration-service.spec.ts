@@ -258,20 +258,23 @@ describe('ensureUserHasMigrated', () => {
     mongod = await MongoMemoryServer.create();
     await mongoose.connect(mongod.getUri());
     User = mongoose.model('User');
-    vi.useFakeTimers();
   });
 
   beforeEach(async () => {
+    vi.useFakeTimers();
     await Activity.deleteMany({});
     await Contribution.deleteMany({});
     await User.deleteMany({});
+  });
+
+  afterEach(() => {
+    vi.useRealTimers();
   });
 
   afterAll(async () => {
     await mongoose.connection.dropDatabase();
     await mongoose.connection.close();
     await mongod.stop();
-    vi.useRealTimers();
   });
 
   it('should throw error if user object is not populated', async () => {

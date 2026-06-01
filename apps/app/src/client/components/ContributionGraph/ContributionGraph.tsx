@@ -38,7 +38,6 @@ export const ContributionGraph = ({ userId }: { userId: string }) => {
   if (isClient && isMigrationInProgress) {
     return (
       <div className={styles['contribution-box']}>
-        <div className={styles['graph-and-days']}></div>
         <div className={styles['migration-in-progress']}>
           Preparing your contribution data. Refresh in a moment to see it.
         </div>

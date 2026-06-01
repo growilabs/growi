@@ -7,7 +7,7 @@ import Activity from '~/server/models/activity';
 
 import { getContributionActivities } from './activity-aggregation-service';
 
-describe('ContributionAggregationService (Essential)', () => {
+describe('getContributionActivities', () => {
   let mongoServer: MongoMemoryServer;
 
   beforeAll(async () => {

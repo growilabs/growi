@@ -10,6 +10,7 @@ export const useSWRxContributions = (
   {
     contributions: IContributionDay[];
     isMigrationInProgress: boolean;
+    isTemporaryUnavailable?: boolean;
   },
   Error
 > => {
