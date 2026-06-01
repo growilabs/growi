@@ -71,7 +71,7 @@ export const ensureUserHasMigrated = async (
   await migrateContributions(freshUser._id.toString());
 
   await User.updateOne(
-    { _id: user._id, contributionsMigratedAt: { $exists: false } },
+    { _id: user._id, contributionsMigratedAt: null },
     { $set: { contributionsMigratedAt: new Date() } },
   );
 };
