@@ -6,13 +6,19 @@ import type { IContributionDay } from '~/features/contribution-graph/interfaces/
 
 export const useSWRxContributions = (
   userId: string | null,
-): SWRResponse<IContributionDay[], Error> => {
+): SWRResponse<
+  {
+    contributions: IContributionDay[];
+    isMigrationInProgress: boolean;
+  },
+  Error
+> => {
   const key =
     userId != null ? `/user/contributions?targetUserId=${userId}` : null;
 
   return useSWR(key, (endpoint) =>
     apiv3Get(endpoint).then((response) => {
-      return response.data.contributions;
+      return response.data;
     }),
   );
 };
