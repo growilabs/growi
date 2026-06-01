@@ -104,6 +104,8 @@ export class AuditlogChangeStreamService {
     try {
       await this.close();
       await this.start();
+    } catch (err) {
+      logger.error(err, 'AuditlogChangeStreamService failed to restart.');
     } finally {
       this.restarting = false;
     }
