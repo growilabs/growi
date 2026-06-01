@@ -70,8 +70,8 @@ class ActivityService {
               parameters.event?.creator || parameters.target?.lastUpdateUser;
 
             if (user != null) {
-              const userId = await ensureUserHasMigrated(user);
-              await addContribution(userId);
+              await ensureUserHasMigrated(user);
+              await addContribution(user._id.toString());
             } else {
               logger.warn(
                 'Could not find a valid user for contribution snapshot.',

@@ -6,6 +6,9 @@ import { configManager } from '~/server/service/config-manager';
 import Contribution from '../models/contribution-model';
 import { getContributionActivities } from './activity-aggregation-service';
 
+/**
+ * Creates Contribution documents based on existing Activity documents that counts as contributions for a user.
+ */
 export const migrateContributions = async (userId: string): Promise<void> => {
   if (userId == null || !mongoose.Types.ObjectId.isValid(userId)) {
     throw new Error(
@@ -40,36 +43,35 @@ export const migrateContributions = async (userId: string): Promise<void> => {
   }
 };
 
+/**
+ * Checks if a user's contributions has been migrated and migrates them if needed.
+ */
 export const ensureUserHasMigrated = async (
   user: IUserHasId,
-): Promise<string> => {
-  if (user.contributionsMigratedAt != null) {
-    return user._id.toString();
-  } else {
-    const User = mongoose.model('User');
-    const freshUser = await User.findById(user._id);
-
-    if (freshUser == null) {
-      throw new Error(
-        `Failed to update migration timestamp for user ${user._id}`,
-      );
-    } else if (freshUser.contributionsMigratedAt != null) {
-      user.contributionsMigratedAt = freshUser.contributionsMigratedAt;
-      return freshUser._id.toString();
-    } else {
-      await migrateContributions(freshUser._id.toString());
-
-      const updatedUser = await User.findOneAndUpdate(
-        { _id: user._id },
-        { contributionsMigratedAt: new Date() },
-        { new: true },
-      );
-
-      if (updatedUser != null) {
-        user.contributionsMigratedAt = updatedUser.contributionsMigratedAt;
-      }
-
-      return updatedUser._id.toString();
-    }
+): Promise<void> => {
+  if (user?._id == null) {
+    throw new Error('ensureUserHasMigrated requires a populated user document');
   }
+
+  if (user.contributionsMigratedAt != null) {
+    return;
+  }
+
+  const User = mongoose.model('User');
+
+  // Checking current DB state in case received user object is stale
+  const freshUser = await User.findById(user._id);
+  if (freshUser == null) {
+    throw new Error(`User ${user._id} was not found`);
+  }
+  if (freshUser.contributionsMigratedAt != null) {
+    return;
+  }
+
+  await migrateContributions(freshUser._id.toString());
+
+  await User.updateOne(
+    { _id: user._id, contributionsMigratedAt: { $exists: false } },
+    { $set: { contributionsMigratedAt: new Date() } },
+  );
 };
