@@ -87,41 +87,35 @@ const UserInviteModalFC = ({ adminUsersContainer }: Props): JSX.Element => {
     [],
   );
 
-  const isValidEmail = useMemo(
-    () => /.+@.+\..+/.test(emailInputValue),
+  const validEmails = useMemo(
+    () =>
+      emailInputValue
+        .split('\n')
+        .map((e) => e.trim())
+        .filter((e) => /.+@.+\..+/.test(e)),
     [emailInputValue],
   );
+
+  const isValidEmail = validEmails.length > 0;
 
   const whitelistViolations = useMemo<string[]>(() => {
     if (registrationWhitelist.length === 0) {
       return [];
     }
-    return emailInputValue
-      .split('\n')
-      .map((e) => e.trim())
-      .filter((e) => /.+@.+\..+/.test(e))
-      .filter(
-        (email) =>
-          !registrationWhitelist.some((entry) =>
-            isEmailMatchedByEntry(email, entry),
-          ),
-      );
-  }, [emailInputValue, registrationWhitelist]);
+    return validEmails.filter(
+      (email) =>
+        !registrationWhitelist.some((entry) =>
+          isEmailMatchedByEntry(email, entry),
+        ),
+    );
+  }, [validEmails, registrationWhitelist]);
 
   const handleSubmit = useCallback(async () => {
     setIsCreateUserButtonPushed(true);
 
-    const array = emailInputValue.split('\n');
-    const emailList = array.filter((element) => {
-      return element.match(/.+@.+\..+/);
-    });
-    const shapedEmailList = emailList.map((email) => {
-      return email.trim();
-    });
-
     try {
       const result: InvitedEmailList =
-        await adminUsersContainer.createUserInvited(shapedEmailList, sendEmail);
+        await adminUsersContainer.createUserInvited(validEmails, sendEmail);
       setEmailInputValue('');
       setInvitedEmailList(result);
 
@@ -157,13 +151,7 @@ const UserInviteModalFC = ({ adminUsersContainer }: Props): JSX.Element => {
     } finally {
       setIsCreateUserButtonPushed(false);
     }
-  }, [
-    adminUsersContainer,
-    emailInputValue,
-    sendEmail,
-    showToasterByEmailList,
-    t,
-  ]);
+  }, [adminUsersContainer, validEmails, sendEmail, showToasterByEmailList, t]);
 
   const handleInput = useCallback((event: ChangeEvent<HTMLTextAreaElement>) => {
     setEmailInputValue(event.target.value);

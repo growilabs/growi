@@ -771,6 +771,7 @@
       "send_temporary_password": "Si un courriel d'invitation n'est pas envoyé, copiez le mot de passe temporaire",
       "send_email": "Le courriel d'invitation peut aussi être envoyé depuis la table utilisateur",
       "existing_email": "Des comptes avec les adresses courriel suivantes sont déjà existants",
+      "whitelist_violation": "Les adresses courriel suivantes ne sont pas autorisées par la liste blanche :",
       "reason_email_not_in_whitelist": "Not included in whitelist",
       "issue": "Créer"
     },
