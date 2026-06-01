@@ -1,5 +1,5 @@
 import type { Document, Model } from 'mongoose';
-import mongoose, { Schema } from 'mongoose';
+import { Schema } from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
