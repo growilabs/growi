@@ -1,4 +1,4 @@
-import { type IPage, isPopulated } from '@growi/core';
+import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';

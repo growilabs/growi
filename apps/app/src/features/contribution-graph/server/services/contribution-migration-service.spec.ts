@@ -278,25 +278,9 @@ describe('ensureUserHasMigrated', () => {
   });
 
   it('should throw error if user object is not populated', async () => {
-    const userObj = {} as IUserHasId;
+    const userId = new mongoose.Types.ObjectId().toString();
 
-    await expect(ensureUserHasMigrated(userObj)).rejects.toThrow(
-      'ensureUserHasMigrated requires a populated user document',
-    );
-  });
-
-  it('should short-circuit without touching the DB when caller already has contributionsMigratedAt', async () => {
-    const user = buildUser({ contributionsMigratedAt: new Date() });
-
-    await Activity.create({
-      user: user._id,
-      action: ContributionGraphActions.ACTION_PAGE_CREATE,
-      createdAt: new Date(),
-    });
-
-    await ensureUserHasMigrated(user);
-
-    expect(await Contribution.countDocuments()).toBe(0);
+    await expect(ensureUserHasMigrated(userId)).rejects.toThrow(/not found/);
   });
 
   it('should throw when the user does not exist in the database', async () => {
