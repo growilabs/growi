@@ -2,11 +2,12 @@ import type Crowi from '../crowi';
 import { Attachment } from '../models/attachment';
 import { AttachmentService } from './attachment';
 
-// Locks down the idempotent contract that the bulk-export cleanup cron relies
-// on (page-bulk-export-job-clean-up-cron.ts): removing an attachment whose
-// metadata doc is already gone must resolve without throwing, otherwise the
-// surrounding Promise.allSettled rejects the cleanup and leaves the parent job
-// record undeleted as a zombie.
+// Locks down two contracts of removeAttachment:
+// 1. Missing metadata doc is a no-op (the bulk-export cleanup cron relies on
+//    this to self-heal zombie job records without throwing).
+// 2. A genuine file-store failure propagates, so callers like the attachment
+//    delete API surface it instead of dropping the metadata doc and stranding
+//    an orphan blob.
 describe('AttachmentService.removeAttachment', () => {
   test('should resolve without throwing when the attachment is already gone', async () => {
     const findByIdSpy = vi
@@ -27,7 +28,7 @@ describe('AttachmentService.removeAttachment', () => {
     findByIdSpy.mockRestore();
   });
 
-  test('should still drop the metadata doc when the underlying file delete throws (race with concurrent remover)', async () => {
+  test('should propagate the error and not drop the metadata doc when the file store fails', async () => {
     const attachmentRemove = vi.fn().mockResolvedValue(undefined);
     const fakeAttachment = { _id: 'some-id', remove: attachmentRemove };
     const findByIdSpy = vi
@@ -36,19 +37,20 @@ describe('AttachmentService.removeAttachment', () => {
       .mockResolvedValue(fakeAttachment as any);
     const deleteFile = vi
       .fn()
-      .mockRejectedValue(new Error('File not found for id some-id'));
+      .mockRejectedValue(new Error('S3 is temporarily unavailable'));
     const crowi = {
       fileUploadService: { deleteFile },
-      detachHandlers: [],
     } as unknown as Crowi;
     const service = new AttachmentService(crowi);
-    // detachHandlers lives on the service instance, not crowi
     service.detachHandlers = [];
 
-    await expect(service.removeAttachment('some-id')).resolves.toBeUndefined();
+    await expect(service.removeAttachment('some-id')).rejects.toThrow(
+      'S3 is temporarily unavailable',
+    );
 
     expect(deleteFile).toHaveBeenCalledTimes(1);
-    expect(attachmentRemove).toHaveBeenCalledTimes(1);
+    // metadata doc must survive so the blob stays referenceable for retry
+    expect(attachmentRemove).not.toHaveBeenCalled();
     findByIdSpy.mockRestore();
   });
 });

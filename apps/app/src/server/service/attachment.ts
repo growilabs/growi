@@ -147,11 +147,11 @@ export class AttachmentService implements IAttachmentService {
     const { fileUploadService } = this.crowi;
     const attachment = await Attachment.findById(attachmentId);
 
-    // No-op when the attachment is already gone. Two flows rely on this:
-    // (1) bulk-export cleanup may double-call this for sibling jobs that share
-    //     an attachment (the per-job loop runs concurrently), and (2) GridFS
-    //     chunks can be removed out-of-band, leaving a dangling metadata doc.
-    // Throwing here would re-surface those as cron errors on every tick.
+    // No-op when the metadata doc is already gone. The bulk-export cleanup cron
+    // relies on this to self-heal: a job whose attachment was already removed by
+    // a previous tick (or by a concurrent remover that won an unsynchronized
+    // cross-process race) resolves cleanly here and gets deleted instead of
+    // lingering as a zombie record. Throwing would re-surface it every tick.
     if (attachment == null) {
       logger.debug(
         `removeAttachment: attachment already gone, skipping: ${attachmentId}`,
@@ -159,17 +159,13 @@ export class AttachmentService implements IAttachmentService {
       return;
     }
 
-    try {
-      await fileUploadService.deleteFile(attachment);
-    } catch (err) {
-      // Same idempotency contract applies to the underlying file store: if the
-      // chunk was already deleted (e.g. a racing remove call), treat it as a
-      // no-op and continue to drop the metadata doc.
-      logger.warn(
-        `removeAttachment: deleteFile failed for ${attachmentId}, continuing to drop metadata`,
-        err,
-      );
-    }
+    // Intentionally NOT swallowing deleteFile errors. A genuine file-store
+    // failure (S3/GridFS outage, permission error) must propagate so callers
+    // such as the attachment delete API surface it instead of dropping the
+    // metadata doc and stranding an unreferenceable orphan blob. "File already
+    // gone" is not an error path here: the underlying stores already no-op it
+    // (see gridfs deleteFile, which warns and returns when the file is missing).
+    await fileUploadService.deleteFile(attachment);
     await attachment.remove();
 
     const detachedHandlerPromises = this.detachHandlers.map((handler) => {
