@@ -64,6 +64,10 @@ class ActivityService {
           parameters.action,
         );
 
+        // Contribution handling MUST run before updateByParameters: the Activity is
+        // still ACTION_UNSETTLED at this point, so the migration aggregation does not count it.
+        // addContribution's $inc accounts for this event; settling the action afterward avoids
+        // a double count on a user's first contribution.
         if (shouldGenerateContribution) {
           try {
             const activity = await Activity.findById(activityId).select('user');
