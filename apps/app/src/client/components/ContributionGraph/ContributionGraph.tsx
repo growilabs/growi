@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'next-i18next';
 
 import { useSWRxContributions } from '~/stores/use-contributions';
 
@@ -11,6 +12,7 @@ import {
 import styles from './ContributionGraph.module.scss';
 
 export const ContributionGraph = ({ userId }: { userId: string }) => {
+  const { t } = useTranslation();
   const [isClient, setIsClient] = useState(false);
   const { data } = useSWRxContributions(userId);
 
@@ -39,7 +41,7 @@ export const ContributionGraph = ({ userId }: { userId: string }) => {
     return (
       <div className={styles['contribution-box']}>
         <div className={styles['migration-in-progress']}>
-          Preparing your contribution data. Refresh in a moment to see it.
+          {t('user_home_page.contribution_migration_in_progress')}
         </div>
       </div>
     );
