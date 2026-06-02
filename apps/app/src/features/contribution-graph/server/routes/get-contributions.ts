@@ -40,7 +40,7 @@ export const getContributionsHandler = (): RequestHandler => {
     const isMigrationInProgress = user.contributionsMigratedAt == null;
 
     if (isMigrationInProgress) {
-      void ensureUserHasMigrated(user).catch((err) => {
+      void ensureUserHasMigrated(targetUserId).catch((err) => {
         logger.error('Background contribution migration failed', err);
       });
     }
