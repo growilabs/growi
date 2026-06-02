@@ -1,4 +1,3 @@
-import type { IUserHasId } from '@growi/core';
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
@@ -230,26 +229,7 @@ describe('ensureUserHasMigrated', () => {
     mongoose.model('User', userSchema);
   }
 
-  // Helper to build a complete IUserHasId
-  const buildUser = (overrides: Partial<IUserHasId> = {}): IUserHasId =>
-    ({
-      _id: new mongoose.Types.ObjectId().toString(),
-      name: 'tester',
-      username: 'tester',
-      email: 'test@test.com',
-      password: 'pwd',
-      imageUrlCached: 'url',
-      isEmailPublished: true,
-      isGravatarEnabled: false,
-      admin: false,
-      readOnly: false,
-      isInvitationEmailSended: true,
-      lang: 'en_US',
-      createdAt: new Date(),
-      introduction: '',
-      status: 1,
-      ...overrides,
-    }) as IUserHasId;
+  const userId = new mongoose.Types.ObjectId().toString();
 
   let mongod: MongoMemoryServer;
   let User: mongoose.Model<{ contributionsMigratedAt?: Date }>;
@@ -278,30 +258,26 @@ describe('ensureUserHasMigrated', () => {
   });
 
   it('should throw error if user object is not populated', async () => {
-    const userId = new mongoose.Types.ObjectId().toString();
-
     await expect(ensureUserHasMigrated(userId)).rejects.toThrow(/not found/);
   });
 
   it('should throw when the user does not exist in the database', async () => {
-    const user = buildUser(); // valid id, but no user document in DB
-
+    // valid id, but no user document in DB
     await Activity.create({
-      user: user._id,
+      user: userId,
       action: ContributionGraphActions.ACTION_PAGE_CREATE,
       createdAt: new Date(),
     });
 
-    await expect(ensureUserHasMigrated(user)).rejects.toThrow(/not found/);
+    await expect(ensureUserHasMigrated(userId)).rejects.toThrow(/not found/);
     expect(await Contribution.countDocuments()).toBe(0);
   });
 
   it('should return without re-running migration if fresh DB user is already migrated', async () => {
     const dbUser = await User.create({
+      _id: userId,
       contributionsMigratedAt: new Date('2025-01-01T00:00:00Z'),
     });
-    // Caller passes a stale user object with no contributionsMigratedAt
-    const staleUser = buildUser({ _id: dbUser._id.toString() });
 
     // Activity that would become a contribution if migration ran
     await Activity.create({
@@ -310,7 +286,7 @@ describe('ensureUserHasMigrated', () => {
       createdAt: new Date(),
     });
 
-    await ensureUserHasMigrated(staleUser);
+    await ensureUserHasMigrated(userId);
 
     expect(await Contribution.countDocuments()).toBe(0);
   });
@@ -319,7 +295,6 @@ describe('ensureUserHasMigrated', () => {
     vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
 
     const dbUser = await User.create({}); // no contributionsMigratedAt
-    const user = buildUser({ _id: dbUser._id.toString() });
 
     await Activity.create({
       user: dbUser._id.toString(),
@@ -327,7 +302,7 @@ describe('ensureUserHasMigrated', () => {
       createdAt: new Date('2025-11-05T00:00:00Z'),
     });
 
-    await ensureUserHasMigrated(user);
+    await ensureUserHasMigrated(dbUser._id.toString());
 
     const contributions = await Contribution.find({
       user: dbUser._id.toString(),
