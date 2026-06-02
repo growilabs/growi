@@ -43,6 +43,57 @@ const extractOutline = (body: string): OutlineEntry[] => {
   return entries;
 };
 
+// Single-pass scanner: counts total lines and extracts a 1-indexed line range
+// without allocating one substring per line. Replaces an earlier
+// `body.split(/\r?\n/)` that materialised O(totalLines) line objects + array
+// even when the agent only needed `safeLimit` lines — wasteful for long pages
+// under the outline → drill-down access pattern (PR #11204 review FB).
+//
+// CRLF semantics match the previous `split(/\r?\n/).join('\n')` contract:
+//  - The \r preceding the closing \n of the last returned line is stripped
+//    (so the slice ends at the line content, not at the CR).
+//  - Internal \r\n sequences within the slice are normalised to \n.
+//  - A bare \r at end-of-body (no trailing \n) is preserved verbatim.
+const scanBody = (
+  text: string,
+  sliceFrom: number, // 1-indexed inclusive start of the slice
+  sliceCount: number, // number of lines to take
+): { totalLines: number; slice: string; hasMore: boolean } => {
+  const sliceTo = sliceFrom + sliceCount - 1; // 1-indexed inclusive end
+
+  let totalLines = 1;
+  let sliceStartPos: number | undefined = sliceFrom === 1 ? 0 : undefined;
+  let sliceEndPos: number | undefined;
+
+  let pos = 0;
+  while (true) {
+    const nl = text.indexOf('\n', pos);
+    if (nl === -1) break;
+    totalLines += 1;
+    // After this newline, line `totalLines` begins at nl + 1.
+    if (totalLines === sliceFrom) sliceStartPos = nl + 1;
+    if (totalLines === sliceTo + 1) {
+      // End of the requested range. Strip a preceding \r so the slice ends
+      // on the line's last visible char (CRLF normalisation parity).
+      sliceEndPos =
+        nl > 0 && text.charCodeAt(nl - 1) === 13 /* \r */ ? nl - 1 : nl;
+    }
+    pos = nl + 1;
+  }
+
+  // sliceFrom past EOF → empty slice, definitively no more pages.
+  if (sliceStartPos == null) {
+    return { totalLines, slice: '', hasMore: false };
+  }
+  if (sliceEndPos == null) sliceEndPos = text.length;
+
+  let slice = text.substring(sliceStartPos, sliceEndPos);
+  if (slice.indexOf('\r') !== -1) slice = slice.replace(/\r\n/g, '\n');
+
+  // hasMore iff a line numbered (sliceTo + 1) exists in the body.
+  return { totalLines, slice, hasMore: sliceTo < totalLines };
+};
+
 const inputSchema = z
   .object({
     pageId: z.string().optional().describe('MongoDB ObjectId of the page'),
@@ -190,15 +241,24 @@ export const getPageContentTool = createTool({
           ? (page.updatedAt as Date).toISOString()
           : undefined;
 
-      // Line-based pagination. Split on CRLF or LF to be newline-style agnostic.
-      // Slicing is done entirely in memory; no additional DB queries are issued
-      // (PR #11204 review FB: keep the Page.findByIdAndViewer path untouched).
-      const allLines = body.split(/\r?\n/);
-      const totalLines = allLines.length;
-
       // zod's .default(200) should fire, but assign explicitly so safeLimit
       // is statically narrowed to a number for the slice math below.
       const safeLimit = limit ?? 200;
+      // zod's .positive() already rejects offset <= 0; Math.max stays as a
+      // defensive guard for clarity when offset is omitted (first call).
+      const safeOffset = Math.max(1, offset ?? 1);
+
+      // Line-based pagination via a single-pass scan: counts totalLines AND
+      // extracts the requested slice without materialising every line as a
+      // separate string. PR #11204 review FB: avoid allocating an
+      // O(totalLines) string array for long pages when only `safeLimit` lines
+      // are actually returned. Slicing stays in memory; no extra DB queries
+      // (the Page.findByIdAndViewer path is unchanged).
+      const { totalLines, slice, hasMore } = scanBody(
+        body,
+        safeOffset,
+        safeLimit,
+      );
 
       // === Mode selection (outline vs content) ===
       // `offset` omitted  → outline mode  (return the heading list; the agent
@@ -215,30 +275,14 @@ export const getPageContentTool = createTool({
 
       const outline = includeOutline ? extractOutline(body) : undefined;
 
-      // content fields are only computed / returned when includeContent holds.
-      let contentFields:
-        | {
-            content: string;
-            offset: number;
-            limit: number;
-            hasMore: boolean;
+      const contentFields = includeContent
+        ? {
+            content: slice,
+            offset: safeOffset,
+            limit: safeLimit,
+            hasMore,
           }
-        | undefined;
-      if (includeContent) {
-        // zod's .positive() already rejects offset <= 0; Math.max stays as a
-        // defensive guard for clarity when offset is omitted (first call).
-        const safeOffset = Math.max(1, offset ?? 1);
-        const startIdx = safeOffset - 1; // 0-indexed
-        const sliced = allLines.slice(startIdx, startIdx + safeLimit);
-        // 0-indexed exclusive end of the returned range.
-        const endIdx = startIdx + sliced.length;
-        contentFields = {
-          content: sliced.join('\n'),
-          offset: safeOffset,
-          limit: safeLimit,
-          hasMore: endIdx < totalLines,
-        };
-      }
+        : undefined;
 
       return {
         result: 'ok' as const,
