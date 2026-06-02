@@ -1,6 +1,7 @@
 import { model, Schema } from 'mongoose';
 
 import { Prisma } from '~/generated/prisma/client';
+import type { prisma } from '~/utils/prisma';
 
 // TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
 // Until then, use mongoose to automatically create collections and indexes when connected.
@@ -31,7 +32,8 @@ export const extension = Prisma.defineExtension((client) => {
           commentPosition: number,
           replyToId?: string | null,
         ) {
-          const context = Prisma.getExtensionContext(this);
+          const context =
+            Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.create({
             data: {
               pageId,
@@ -48,7 +50,8 @@ export const extension = Prisma.defineExtension((client) => {
           pageId: string,
           options: Omit<Prisma.commentsFindManyArgs, 'where'>,
         ) {
-          const context = Prisma.getExtensionContext(this);
+          const context =
+            Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.findMany({
             where: { pageId },
             orderBy: {
@@ -63,7 +66,8 @@ export const extension = Prisma.defineExtension((client) => {
           revisionId: string,
           options: Omit<Prisma.commentsFindManyArgs, 'where'>,
         ) {
-          const context = Prisma.getExtensionContext(this);
+          const context =
+            Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.findMany({
             where: { revisionId },
             orderBy: {
@@ -75,7 +79,8 @@ export const extension = Prisma.defineExtension((client) => {
         },
 
         async findCreatorsByPage(pageId: string) {
-          const context = Prisma.getExtensionContext(this);
+          const context =
+            Prisma.getExtensionContext<typeof prisma.comments>(this);
           const creators = await context.findMany({
             where: { pageId },
             select: { creator: true },
@@ -87,14 +92,16 @@ export const extension = Prisma.defineExtension((client) => {
         },
 
         countCommentByPageId(pageId: string) {
-          const context = Prisma.getExtensionContext(this);
+          const context =
+            Prisma.getExtensionContext<typeof prisma.comments>(this);
           return context.count({
             where: { pageId },
           });
         },
 
         async removeWithReplies(commentId: string) {
-          const context = Prisma.getExtensionContext(this);
+          const context =
+            Prisma.getExtensionContext<typeof prisma.comments>(this);
           await client.$transaction([
             context.deleteMany({
               where: {

@@ -14,7 +14,6 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import Activity from '~/server/models/activity';
-import ExternalAccount from '~/server/models/external-account';
 import { serializePageSecurely } from '~/server/models/serializers';
 import { UserStatus } from '~/server/models/user/conts';
 import UserGroupRelation from '~/server/models/user-group-relation';
@@ -22,6 +21,7 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import { deleteCompletelyUserHomeBySystem } from '~/server/service/page/delete-completely-user-home-by-system';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -1001,7 +1001,11 @@ module.exports = (crowi) => {
         await UserGroupRelation.remove({ relatedUser: user });
         await ExternalUserGroupRelation.remove({ relatedUser: user });
         await user.statusDelete();
-        await ExternalAccount.remove({ user });
+        await prisma.externalaccounts.deleteMany({
+          where: {
+            userId: user._id.toString(),
+          },
+        });
 
         deleteUserAiAssistant(user);
 
@@ -1061,9 +1065,10 @@ module.exports = (crowi) => {
     async (req, res) => {
       const page = parseInt(req.query.page) || 1;
       try {
-        const paginateResult = await ExternalAccount.findAllWithPagination({
-          page,
-        });
+        const paginateResult =
+          await prisma.externalaccounts.findAllWithPagination({
+            page,
+          });
         return res.apiv3({ paginateResult });
       } catch (err) {
         const msg = 'Error occurred in fetching external-account list  ';
@@ -1115,7 +1120,11 @@ module.exports = (crowi) => {
       const { id } = req.params;
 
       try {
-        const externalAccount = await ExternalAccount.findByIdAndRemove(id);
+        const externalAccount = await prisma.externalaccounts.delete({
+          where: {
+            id,
+          },
+        });
 
         return res.apiv3({ externalAccount });
       } catch (err) {
