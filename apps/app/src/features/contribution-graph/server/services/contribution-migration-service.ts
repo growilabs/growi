@@ -1,4 +1,3 @@
-import type { IUserHasId } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { configManager } from '~/server/service/config-manager';
