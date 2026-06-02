@@ -70,8 +70,9 @@ class ActivityService {
         // a double count on a user's first contribution.
         if (shouldGenerateContribution) {
           try {
-            const activity = await Activity.findById(activityId).select('user');
-            const userId = activity?.user;
+            const generatedActivity =
+              await Activity.findById(activityId).select('user');
+            const userId = generatedActivity?.user;
 
             if (userId != null) {
               await ensureUserHasMigrated(userId.toString());
