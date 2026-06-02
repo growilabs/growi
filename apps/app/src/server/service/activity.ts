@@ -1,4 +1,4 @@
-import type { IPage } from '@growi/core';
+import { type IPage, isPopulated } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
@@ -66,12 +66,12 @@ class ActivityService {
 
         if (shouldGenerateContribution) {
           try {
-            const user =
-              parameters.event?.creator || parameters.target?.lastUpdateUser;
+            const activity = await Activity.findById(activityId).select('user');
+            const userId = activity?.user;
 
-            if (user != null) {
-              await ensureUserHasMigrated(user);
-              await addContribution(user._id.toString());
+            if (userId != null) {
+              await ensureUserHasMigrated(userId.toString());
+              await addContribution(userId.toString());
             } else {
               logger.warn(
                 'Could not find a valid user for contribution snapshot.',

@@ -46,23 +46,12 @@ export const migrateContributions = async (userId: string): Promise<void> => {
 /**
  * Checks if a user's contributions have been migrated and migrates them if needed.
  */
-export const ensureUserHasMigrated = async (
-  user: IUserHasId,
-): Promise<void> => {
-  if (user?._id == null) {
-    throw new Error('ensureUserHasMigrated requires a populated user document');
-  }
-
-  if (user.contributionsMigratedAt != null) {
-    return;
-  }
-
+export const ensureUserHasMigrated = async (userId: string): Promise<void> => {
   const User = mongoose.model('User');
 
-  // Checking current DB state in case received user object is stale
-  const freshUser = await User.findById(user._id);
+  const freshUser = await User.findById(userId);
   if (freshUser == null) {
-    throw new Error(`User ${user._id} was not found`);
+    throw new Error(`User ${userId} was not found`);
   }
   if (freshUser.contributionsMigratedAt != null) {
     return;
