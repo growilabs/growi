@@ -147,7 +147,9 @@ const UserInviteModalFC = ({ adminUsersContainer }: Props): JSX.Element => {
         showToasterByEmailList(failedMessages, 'error');
       }
     } catch (err) {
-      toastError(err instanceof Error ? err : String(err));
+      // apiv3Post throws an array of error objects (not an Error instance);
+      // toastError accepts string | Error | Error[], so pass it through as-is.
+      toastError(err as Error | Error[] | string);
     } finally {
       setIsCreateUserButtonPushed(false);
     }
