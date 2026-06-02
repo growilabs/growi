@@ -26,7 +26,7 @@ type ContributionRequest = Request<
   ReqQuery
 >;
 
-export const getContributionsHandler = (crowi: Crowi): RequestHandler => {
+export const getContributionsHandler = (): RequestHandler => {
   return async (req: ContributionRequest, res: ApiV3Response) => {
     const { targetUserId } = req.query;
 
@@ -80,6 +80,6 @@ export const getContributionsHandlerFactory = (
     loginRequiredStrictly,
     ...validator,
     apiV3FormValidator,
-    getContributionsHandler(crowi),
+    getContributionsHandler(),
   ];
 };

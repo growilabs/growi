@@ -3,7 +3,6 @@ import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 import { mockClear, mockDeep } from 'vitest-mock-extended';
 
-import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
 
@@ -26,7 +25,6 @@ if (mongoose.models.User == null) {
 const User = mongoose.model('User');
 
 describe('getContributionsHandler', () => {
-  const mockCrowi = mockDeep<Crowi>();
   const mockRes = mockDeep<ApiV3Response>();
   const targetUserId = new mongoose.Types.ObjectId();
 
@@ -54,7 +52,7 @@ describe('getContributionsHandler', () => {
       _id: targetUserId,
       contributionsMigratedAt: new Date(),
     });
-    const mainHandler = getContributionsHandler(mockCrowi);
+    const mainHandler = getContributionsHandler();
     const mockReq = mockDeep<Request>({
       query: { targetUserId: targetUserId.toString() },
     });
@@ -81,7 +79,7 @@ describe('getContributionsHandler', () => {
       _id: targetUserId,
       contributionsMigratedAt: new Date(),
     });
-    const mainHandler = getContributionsHandler(mockCrowi);
+    const mainHandler = getContributionsHandler();
     const mockReq = mockDeep<Request>({
       query: { targetUserId: targetUserId.toString() },
     });
@@ -105,7 +103,7 @@ describe('getContributionsHandler', () => {
 
   it('should return 404 when the user does not exist', async () => {
     // No user inserted in the DB
-    const mainHandler = getContributionsHandler(mockCrowi);
+    const mainHandler = getContributionsHandler();
     const mockReq = mockDeep<Request>({
       query: { targetUserId: targetUserId.toString() },
     });
@@ -118,7 +116,7 @@ describe('getContributionsHandler', () => {
 
   it('should return isMigrationInProgress=true when the user has not been migrated', async () => {
     await User.create({ _id: targetUserId }); // no contributionsMigratedAt
-    const mainHandler = getContributionsHandler(mockCrowi);
+    const mainHandler = getContributionsHandler();
     const mockReq = mockDeep<Request>({
       query: { targetUserId: targetUserId.toString() },
     });
