@@ -25,6 +25,8 @@
 
 > **タグによる絞り込み自体は本 spec の対象**: `fullTextSearchTool.query` の演算子として `tag:foo` / `-tag:foo` を agent に開示し、`SearchService.parseQueryString` 経由で利用可能にする（後述「サポートするクエリ構文」）。Non-Goals に含まれるのは「タグ専用の新規 tool」「タグ一覧 / ファセット UX」のみで、タグを使った検索の **能力** そのものは in scope。
 
+> **`sort` / `order` 入力パラメータも本 spec の対象**: `fullTextSearchTool` の zod `inputSchema` に `sort` (`relationScore` / `createdAt` / `updatedAt`) と `order` (`desc` / `asc`) を追加し、agent が「最新ページ」「古いページ」要求に応じて並び替えを指定できるようにする（後述「並び替えの開示」）。Non-Goals に含まれる「最近更新ページ / メタ・時系列クエリ専用 tool」とは別の話で、既存 tool への並び替えオプション追加は in scope。
+
 ## Boundary Commitments
 
 ### This Spec Owns
@@ -53,6 +55,9 @@
 - `Page.findByIdAndViewer` / `Page.findByPathAndViewer`（grant 委譲経路）
 - `populateDataToShowRevision()` または `.populate('revision')`（revision 取得）
 - `Revision` モデル（`body` 参照のみ）
+- `mdast-util-from-markdown`（既存 direct dep、`apps/app/package.json` で `^2.0.1`。`getPageContentTool` の outline 抽出で MDAST を構築）
+- `unist-util-visit`（既に `apps/app/package.json` の `dependencies` に `^5.0.0` で direct dep として宣言済み — Task 3.4 実装時の確認で判明。`apps/app/src/services/renderer/remark-plugins/xsv-to-table.ts` がこれを利用しており、`getPageContentTool` も同じ direct dep を再利用する。新規追加は **不要**）
+- `mdast-util-to-string`（`apps/app/node_modules` 直下に存在せず resolve 不能。本 PR で **`apps/app/package.json` の `dependencies` に `^4.0.0` を新規追加** する必要あり。`getPageContentTool` の outline 抽出で heading text のプレーン化に使用、ESM）
 - `~/utils/logger`（pino 経由のロガー）
 
 依存方向は **HTTP Layer → Agent Layer → Tool Layer → Page / Revision Model → Mongoose**。tool 層から HTTP 層を逆参照しない。
@@ -246,12 +251,20 @@ flowchart TD
     CheckCtx -- Yes --> CheckInput{pageId or pagePath present?}
     CheckInput -- Neither --> MissingInput[return result missing_input]
     CheckInput -- pageId --> ById[Page.findByIdAndViewer]
-    CheckInput -- pagePath --> ByPath[Page.findByPathAndViewer]
+    CheckInput -- pagePath --> ByPath[Page.findByPathAndViewer useFindOne true]
     ById --> Result{page found?}
     ByPath --> Result
     Result -- null --> NotFound[return result not_found_or_forbidden]
-    Result -- found --> Populate[populate revision]
-    Populate --> Return[return result ok page body path updatedAt]
+    Result -- found --> Populate[populateDataToShowRevision]
+    Populate --> Split[split body by newline into allLines]
+    Split --> Mode{offset omitted? first call}
+    Mode -- yes outline mode --> ExtractOutline[extract outline via mdast fromMarkdown visit heading]
+    Mode -- no content mode --> Slice[slice offset-1 to offset-1+limit]
+    ExtractOutline --> Fits{totalLines <= limit? small page}
+    Fits -- yes small-page opt --> SliceWithOutline[also slice first limit lines]
+    Fits -- no long page --> ReturnOutline[return result ok page outline only no content]
+    SliceWithOutline --> ReturnBoth[return result ok page outline + content totalLines offset limit hasMore]
+    Slice --> ReturnContent[return result ok page content totalLines offset limit hasMore no outline]
 ```
 
 ### Tool Execute 分岐 — FullTextSearchTool (Process)
@@ -287,9 +300,13 @@ Key 決定:
 | 2.2 | `pagePath` で本文取得 | GetPageContentTool | execute(pagePath) | Tool Execute 分岐 |
 | 2.3 | 入力エラーで判別可能な戻り値 | GetPageContentTool | zod + discriminated union | Tool Execute 分岐 |
 | 2.4 | 存在しない/権限なしで共通戻り値 | GetPageContentTool | discriminated union `not_found_or_forbidden` | Tool Execute 分岐 |
-| 2.5 | Markdown を改変せず返す | GetPageContentTool | output `body` | — |
+| 2.5 | Markdown 行 slice を改変せず返す | GetPageContentTool | output content (sliced from body) | Tool Execute 分岐 |
 | 2.6 | 応答に `path` を含める | GetPageContentTool | output schema | — |
 | 2.7 | grant 自前実装禁止 | GetPageContentTool | `findByIdAndViewer` 委譲 | Tool Execute 分岐 |
+| 2.8 | offset 指定で content mode（部分取得、outline なし） | GetPageContentTool | input.offset / input.limit, output content/offset/limit/hasMore | Tool Execute 分岐 |
+| 2.9 | offset 省略で outline mode（長ページは outline のみ / 小ページは outline + content） | GetPageContentTool | output outline (+ content on small page) | Tool Execute 分岐 |
+| 2.10 | totalLines 常時出力 + content 時の hasMore / offset / limit | GetPageContentTool | output schema (content fields optional) | Tool Execute 分岐 |
+| 2.11 | content mode で範囲外 offset → result: 'ok' + 空 content | GetPageContentTool | Range out of bounds Implementation Note | Tool Execute 分岐 |
 | 3.1 | user 識別情報を requestContext へ付与 | Post-Message Handler | `RequestContext.set('user', req.user)` | 反復ループ Sequence (step 4) |
 | 3.2 | tool 内で呼び出しユーザー判別可 | GetPageContentTool | `RequestContext.get('user')` | Tool Execute 分岐 |
 | 3.3 | user 取得不可で本文返さない | GetPageContentTool | discriminated union `context_error` | Tool Execute 分岐 |
@@ -309,6 +326,7 @@ Key 決定:
 | 6.6 | user 取得不可で失敗戻り値 | FullTextSearchTool | discriminated union `context_error` | Tool Execute 分岐 |
 | 6.7 | grant 自前実装禁止 | FullTextSearchTool | `SearchService.searchKeyword` 委譲 | 反復ループ Sequence |
 | 6.8 | 例外を throw せず戻り値変換 | FullTextSearchTool | discriminated union `error` | — |
+| 6.9 | `sort` / `order` 入力を受理し `SearchService.searchKeyword` に forward | FullTextSearchTool | input schema (zod enum) + `searchOpts: { limit, sort, order }` | Tool Execute 分岐 |
 
 ## Components and Interfaces
 
@@ -374,6 +392,7 @@ export type MastraRequestContextShape = {
 - **`requestContext` から `searchService: SearchService` を取得**（不在時は `result: 'context_error'`）。`crowi` 全体ではなく `searchService` のみを渡すことで、tool 層が触れる surface を最小化する
 - **`searchService.isElasticsearchEnabled === false` のとき early return**: `result: 'error', reason: 'elasticsearch_not_configured'` を返し、SearchService を呼ばない（要件 6.8 の例外抑制と同じ戻り値型に統合）
 - 取得した `user: IUserHasId` をそのまま `searchService.searchKeyword(query, null, user, null, options)` に渡す（合成 user の組み立ては行わない — ES delegator 内部参照フィールドの確定的な根拠が現時点で limit されており、安全側に倒して `req.user` を全体引き渡し）
+- 入力の `sort` / `order` は zod default で必ず値が入った状態で `searchOpts: { limit, sort, order }` に詰めて `searchKeyword` に forward する（tool 層で別名・サニタイズなし、要件 6.9）
 - 検索結果から `pagePath` / `pageId` / `snippet` を抽出した配列にマップ
 - ページ本文（`body`）は **返さない**（責務分離）
 - 戻り値の discriminated union 整形（`'ok' | 'error' | 'context_error'`）
@@ -405,6 +424,20 @@ export type MastraRequestContextShape = {
 - 本 spec の **対象**: agent が `tag:foo` / `-tag:foo` を `query` 演算子として使うこと（タグでの絞り込み能力）
 - 本 spec の **非対象（別 spec）**: タグ一覧・ファセット UI・関連ページ提示など、タグを主軸にした **専用 tool / UX** の新設
 - 検索結果に grant フィルタが二重で効くため、agent が `tag:` を opportunistic に使っても権限漏洩は発生しない（Req 6.7 と一致）
+
+##### 並び替えの開示（`sort` / `order` 入力パラメータ）
+
+上記の inline 演算子とは別に、`fullTextSearchTool` は **`sort` / `order` を独立した入力パラメータ** として agent に開示する。これらは `query` 文字列の構文ではなく `inputSchema` の zod フィールドであり、agent は tool call の引数として明示的に指定する。
+
+| パラメータ | 受理値 | デフォルト | 由来 |
+|---|---|---|---|
+| `sort` | `relationScore` / `createdAt` / `updatedAt` | `relationScore` | `~/interfaces/search` の `SORT_AXIS` 定数 |
+| `order` | `desc` / `asc` | `desc` | `~/interfaces/search` の `SORT_ORDER` 定数 |
+
+**根拠と意思決定**:
+- 受理値は既存 `SORT_AXIS` / `SORT_ORDER` 定数からそのまま借用し、tool 層で別名やマッピングを定義しない（`SearchService` → `ElasticsearchDelegator.appendSortOrder` が内部で ES フィールド名（`_score` / `created_at` / `updated_at`）へ変換する）
+- agent instructions に「ユーザーが『最新』『古い』を明示的に求めたときのみ `updatedAt` / `createdAt` を指定する」旨を 1 行追記し、デフォルトの relevance 維持を促す（過剰指定によるランキング劣化を抑制）
+- 「メタ・時系列クエリ専用 tool」の新設は Non-Goal（別 spec）だが、既存全文検索 tool に並び替えオプションを追加することは tool surface の拡張であり in scope（演算子の `tag:` 開示と同じ判断基準）
 
 **Dependencies**
 - Inbound: `growiAgent.tools` — agent から呼び出される（P0）
@@ -452,6 +485,24 @@ const fullTextSearchInputSchema = z.object({
     .optional()
     .default(10)
     .describe('Maximum number of hits to return'),
+  sort: z
+    .enum([
+      SORT_AXIS.RELATION_SCORE,
+      SORT_AXIS.CREATED_AT,
+      SORT_AXIS.UPDATED_AT,
+    ])
+    .optional()
+    .default(SORT_AXIS.RELATION_SCORE)
+    .describe(
+      'Sort axis for the hits. Default is relevance (relationScore). Use createdAt / updatedAt only when the user explicitly asks for newest or oldest pages.',
+    ),
+  order: z
+    .enum([SORT_ORDER.DESC, SORT_ORDER.ASC])
+    .optional()
+    .default(SORT_ORDER.DESC)
+    .describe(
+      'Sort direction. `desc` returns the highest values first (newest / most relevant); `asc` returns the lowest values first (oldest).',
+    ),
 });
 
 type FullTextSearchHit = {
@@ -501,7 +552,7 @@ export const fullTextSearchTool: Tool<
 
 **Implementation Notes**
 - **`user` / `searchService` の取得**: execute 内で `const ctx = context.requestContext as RequestContext<MastraRequestContextShape>; const user = ctx.get('user'); const searchService = ctx.get('searchService');` の形で **共有型経由で型付き取得**（`growi-agent.ts` モジュールから `crowi` を import しない方針）。Post-Message Handler 側の `req.user` / `crowi.searchService` 参照を tool まで `RequestContext` 経由で持ち回ることで、`growi-agent.ts` の module-level export を保ったまま条件分岐を tool 層に閉じ込められる。`user` または `searchService` が `undefined` の場合は `result: 'context_error'`（共有型上は必須キーだが、Mastra ランタイムの動的取得である以上、防御的に型ガードを残す）
-- Integration: `searchService.searchKeyword(keyword, nqName, user, userGroups, searchOpts)` を呼ぶ。`nqName: null`、`userGroups: null`（SearchService 内部で user から自動解決）、`searchOpts` で limit を渡す。**戻り値は `Promise<[ISearchResult<unknown>, string | null]>` のタプル** であり、`const [result, _delegatorName] = await searchService.searchKeyword(...)` の形で分解する。
+- Integration: `searchService.searchKeyword(keyword, nqName, user, userGroups, searchOpts)` を呼ぶ。`nqName: null`、`userGroups` は tool 内で `UserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` + `ExternalUserGroupRelation.findAllUserGroupIdsRelatedToUser(user)` を await して解決する（`SearchService` 自身は user から内部解決しない — 既存の `server/routes/search.ts:143-151` と同じパターン）、`searchOpts` には `{ limit, sort, order }` を渡す（`sort` / `order` は `inputSchema` の zod default 経由で常に値が入る）。tool 層で別名やサニタイズは行わず、`SORT_AXIS` / `SORT_ORDER` の値をそのまま forward し、ES フィールド名への変換は `ElasticsearchDelegator.appendSortOrder` に委ねる。**戻り値は `Promise<[ISearchResult<unknown>, string | null]>` のタプル** であり、`const [result, _delegatorName] = await searchService.searchKeyword(...)` の形で分解する。
 - マッピング規則（[elasticsearch.ts:470-484](apps/app/src/server/service/search-delegator/elasticsearch.ts#L470-L484) の ES index 投入ロジックと [elasticsearch.ts:736-750](apps/app/src/server/service/search-delegator/elasticsearch.ts#L736-L750) の delegator 戻り値を根拠）:
 
   | tool 出力 | 取り出し元 |
@@ -531,6 +582,11 @@ export const fullTextSearchTool: Tool<
 - 戻り値の discriminated union 整形
 - **grant 判定の自前実装をしない**（必ず既存メソッド経由）
 - **execute から例外を throw しない**（agent のループ継続を保証）
+- **モード選択 (outline mode / content mode)**: `offset` の有無で応答内容を切り替える
+  - **outline mode (`offset` 省略 = 初回呼出)**: `outline` (heading 一覧 + 行番号 + level) を返す。長いページ (`totalLines > limit`) では `content` を返さず outline のみ (token 節約)。小ページ (`totalLines <= limit`) では小ページ最適化として `outline` に加えて `content` も返す
+  - **content mode (`offset` 指定 = ドリルダウン)**: `revision.body` の split('\n') 配列に対して `slice(offset-1, offset-1+limit)` を適用した `content` を返す。`outline` は返さない
+- 入力 `offset` / `limit` を sanitize する (`offset: 1-indexed positive integer`、`limit: 1〜500, default 200`)。`offset` 省略時は content mode に入らない (小ページ最適化を除く)
+- **`includeOutline` パラメータは設けない**: outline 付与は「`offset` 省略 = 初回読み出し」というモデルの自然な呼び出し方に紐付け、agent が制御フラグを覚える必要をなくす
 
 **Dependencies**
 - Inbound: `growiAgent.tools` — agent から呼び出される（P0）
@@ -550,33 +606,60 @@ import { z } from 'zod';
 
 import type { MastraRequestContextShape } from '../types/request-context';
 
-// execute 内で参照する型: 共有型を使った typed view
-type TypedRequestContext = RequestContext<MastraRequestContextShape>;
+// execute 内では `context.requestContext as RequestContext<MastraRequestContextShape>` で
+// narrow する (既存 Tasks 3.1-3.3 と同じ pattern を維持)。`isIUserHasId` type guard 化は
+// 保留 task で後続対応 — Task 3.4 では既存キャスト pattern を変更しない (Implementation Notes 参照)。
 
 const getPageContentInputSchema = z
   .object({
-    pageId: z
-      .string()
+    pageId: z.string().optional().describe('MongoDB ObjectId of the page'),
+    pagePath: z.string().optional().describe('Page path starting with "/"'),
+    offset: z
+      .number()
+      .int()
+      .positive()
       .optional()
-      .describe('MongoDB ObjectId of the page to fetch'),
-    pagePath: z
-      .string()
+      .describe(
+        "1-indexed start line. Omit on the first call to receive the page outline (a heading list with line numbers). Re-call with offset set to an outline entry's line number to fetch that section's content.",
+      ),
+    limit: z
+      .number()
+      .int()
+      .positive()
+      .max(500)
       .optional()
-      .describe('Page path starting with "/"'),
+      .default(200)
+      .describe('Maximum lines to return (default 200, max 500).'),
   })
-  .refine(
-    (input) => input.pageId != null || input.pagePath != null,
-    {
-      message: 'Either pageId or pagePath must be provided',
-    },
-  );
+  .refine((i) => i.pageId != null || i.pagePath != null, {
+    message: 'Either pageId or pagePath must be provided',
+  });
 
+type OutlineEntry = {
+  line: number;     // 1-indexed
+  level: 1 | 2 | 3 | 4 | 5 | 6;
+  heading: string;  // plain text (Markdown decorations stripped)
+};
+
+// Content fields (content / offset / limit / hasMore) are present only in
+// "content mode" (offset provided) or under the small-page optimization on the
+// first call. In "outline mode" (offset omitted on a long page) they are
+// omitted and `outline` carries the heading list instead.
 type GetPageContentSuccess = {
   result: 'ok';
   page: {
     path: string;
-    body: string;
-    updatedAt: string;
+    // Optional: legacy pages predating the timestamps schema may have
+    // `updatedAt == null` (PR #11204 review FB). The tool omits the field
+    // rather than emitting a synthetic default; mirrors `updatedAt == null`
+    // guards used across the codebase.
+    updatedAt?: string;
+    totalLines: number;
+    content?: string;          // the sliced lines, joined by '\n'
+    offset?: number;           // sanitized echo
+    limit?: number;            // sanitized echo
+    hasMore?: boolean;         // (offset - 1) + sliced.length < totalLines
+    outline?: OutlineEntry[];  // present only on the first call (offset omitted)
   };
 };
 
@@ -590,8 +673,24 @@ const getPageContentOutputSchema = z.discriminatedUnion('result', [
     result: z.literal('ok'),
     page: z.object({
       path: z.string(),
-      body: z.string(),
-      updatedAt: z.string(),
+      updatedAt: z.string().optional(),
+      totalLines: z.number().int().nonnegative(),
+      // Content fields are present only in content mode (offset provided) or
+      // under the small-page optimization; omitted in outline mode.
+      content: z.string().optional(),
+      offset: z.number().int().positive().optional(),
+      limit: z.number().int().positive().optional(),
+      hasMore: z.boolean().optional(),
+      // Outline is present only on the first call (offset omitted).
+      outline: z
+        .array(
+          z.object({
+            line: z.number().int().positive(),
+            level: z.number().int().min(1).max(6),
+            heading: z.string(),
+          }),
+        )
+        .optional(),
     }),
   }),
   z.object({
@@ -607,11 +706,29 @@ export const getPageContentTool: Tool<
 ```
 
 - **Preconditions**: `requestContext` に `user: IUserHasId` がセットされている（`Post-Message Handler` の責務）
-- **Postconditions**: 戻り値は必ず `getPageContentOutputSchema` を満たす。例外は throw されない
-- **Invariants**: 閲覧権限のないページの内容は決して `result: 'ok'` の `page.body` に現れない（grant 委譲不変条件）
+- **Postconditions**: 戻り値は必ず `getPageContentOutputSchema` を満たす。例外は throw されない。`content` を返す場合、それは **必ず `revision.body` の元のテキストの連続する 1 行以上の部分文字列を `\n` で結合したもの** (改変・要約・除去なし)。outline mode (長ページ初回) では `content` を返さない
+- **Invariants**: 閲覧権限のないページの内容は決して `result: 'ok'` の `page.content` / `page.outline` に現れない。`outline` 抽出はコードブロック内 (` ``` ` / `~~~` で囲まれた範囲) の `#` 始まり行を除外する
 
 **Implementation Notes**
-- Integration: `Page.findByIdAndViewer(id, user)` には `requestContext.get('user')` で取得した `IUserHasId` をそのまま渡す。**合成 user の組み立てや追加の `User.findById()` クエリは不要**。`req.user` は認証ミドルウェア (`loginRequiredStrictly`) 通過後に Mongoose document として既に解決済みのため、`_id` だけでなく `findByIdAndViewer` / `findAllUserGroupIdsRelatedToUser` が将来必要とする可能性のあるフィールド（`status` 等）も同時に伝搬される（参考: [generateGrantCondition (page.ts:1287)](apps/app/src/server/models/page.ts#L1287)、[findAllUserGroupIdsRelatedToUser (user-group-relation.ts:170)](apps/app/src/server/models/user-group-relation.ts#L170) は現状 `_id` のみ参照だが、本 spec ではその前提に依存せず安全側に倒す）
+- **Integration**: `Page.findByIdAndViewer(id, user)` には `requestContext.get('user')` で取得した `IUserHasId` をそのまま渡す。**合成 user の組み立てや追加の `User.findById()` クエリは不要**。`req.user` は認証ミドルウェア (`loginRequiredStrictly`) 通過後に Mongoose document として既に解決済み
+- **モード選択 (実装)**: `findByIdAndViewer` の戻り値を `populateDataToShowRevision(page, '')` で revision populate した後、`String(page.revision.body)` を **`scanBody(body, safeOffset, safeLimit)` (シングルパス scanner)** に渡し `totalLines` / `slice` / `hasMore` を一度に得る。続いて以下の boolean を立てる:
+  - `isFirstCall = offset == null`
+  - `fitsInOnePage = totalLines <= limit`
+  - `includeOutline = isFirstCall`（初回呼出のときのみ outline を付ける）
+  - `includeContent = !isFirstCall || fitsInOnePage`（ドリルダウン、または小ページ最適化のとき content を付ける）
+- **Slicing (content mode / 小ページ最適化)**: `scanBody` は `body` を一度だけ走査し、`indexOf('\n')` で行境界を特定したうえで substring 1 回で要求範囲を切り出す。CRLF 改行は (a) 抽出 slice 末尾の `\r` を除去、(b) slice 内部の `\r\n` を `\n` に正規化、することで旧 `split(/\r?\n/).join('\n')` の出力契約と等価に保つ (PR #11204 review FB: 長ページの outline → drill-down 反復で `allLines: string[]` を O(totalLines) 個確保するコストを排除し、必要な `safeLimit` 行分の substring のみアロケートする)。`offset` 省略時 (小ページ最適化) は `safeOffset = 1` で slice を要求する。DB クエリは追加しない
+- **Outline 抽出**: `mdast-util-from-markdown` の `fromMarkdown(body)` で `revision.body` 全文を MDAST (Markdown AST) に変換し、`unist-util-visit` で `'heading'` ノードを訪問。各ノードから `node.position.start.line` (1-indexed)、`node.depth` (1-6)、`mdast-util-to-string(node)` でプレーンテキスト化した heading text を取り出して `OutlineEntry` に変換する。本実装は CommonMark 仕様準拠であり、以下を **AST レベルで自動的に正しく扱う**:
+  - ATX heading (`# heading`) と **Setext heading** (`heading\n====` / `heading\n----`) を両方とも `'heading'` ノードとして抽出 (Setext は `position.start.line` がテキスト行になるため、agent が `offset: line` で取得すると heading から始まる範囲が返る)
+  - Fenced code block (` ``` ` / `~~~`)、indented code block (4 スペースインデント)、HTML block 内の `#` 行を heading として誤認しない
+  - heading text 内の Markdown 装飾 (`**bold**`、`*italic*`、`` `code` ``、`[link](url)` 等) を除去してプレーンテキストとして agent に渡す (`mdast-util-to-string` の挙動)。agent が heading 名を回答に引用するときに装飾の二重適用や URL 文字列混入を回避できる
+  - 本 PR の outline 抽出はパーサー利用の唯一の箇所だが、将来 section slice / `findInPage` 等の機能追加時に同じ MDAST を再利用できる投資余地として位置づける
+  - **Front matter の扱い**: `fromMarkdown` は extension 無しで利用するため、YAML front matter (`--- ... ---`) を解釈せず内部は `thematicBreak` + `paragraph` 扱いになる。front matter 内に偶発的に `#` で始まる行が含まれていた場合は heading として抽出される可能性があるが、GROWI の wiki ページで front matter 内に heading 構文を含むケースは現実的に想定しないため許容する。必要な場合は将来別タスクで `mdast-util-frontmatter` の追加導入を検討
+- **Outline 付与条件 (`includeOutline = isFirstCall`)**: outline は「`offset` 省略 = 対象ページへの初回読み出し」のときに **だけ** 付与する。`offset` が指定された 2 回目以降のドリルダウン呼出では outline を返さない (content mode)。`offset: 1` を明示した呼出は **content mode** として扱い outline を返さない (旧設計では `offset: 1` を初回扱いしていたが、新設計では「outline が欲しいなら offset を省略する」という単一の自然な呼び出し規約に統一し、`includeOutline` フラグも廃止した)。これにより agent が制御フラグを覚える必要がなくなり、ドリルダウン時に初回 200 行を無駄に取得する非効率も解消する (PR #11204 token 計測の知見)
+- **小ページ最適化 (`includeContent = !isFirstCall || fitsInOnePage`)**: 初回呼出 (`offset` 省略) でも `totalLines <= limit` のとき (ページ全体が 1 ページに収まる) は outline に加えて content も返す。これにより小さなページは 1 往復で回答でき、長いページのみ「outline → 該当セクションへ offset ドリルダウン」の 2 段階フローになる
+- **`hasMore` の計算 (content mode のみ)**: 仕様上の定義 `(offset - 1) + 返却行数 < totalLines` は、scanner 内で `sliceTo = sliceFrom + sliceCount - 1` に対して `hasMore = sliceTo < totalLines` として等価に計算する (sliceTo+1 行目が存在するか)。境界例: (a) `offset = totalLines, limit ≥ 1` → `sliceTo = totalLines`, `hasMore = false` (最終行を含み読了)、(b) `offset = totalLines - limit + 1` → ちょうど末尾まで読了して `hasMore = false`、(c) `offset > totalLines` → `slice = ''`, `hasMore = false` (= Range out of bounds と整合)
+- **Range out of bounds (content mode のみ)**: `offset > totalLines` の場合 `content: ''`, `hasMore: false` を返す (`result: 'ok'`)。エラーとして扱わないことで、agent が `hasMore` のみで読了判断できる
+- **Per-request cache**: 同一 request 内で同じ `pageId` に対して `findByIdAndViewer` が複数回呼ばれる可能性があるが、キャッシュは導入しない (DB クエリ overhead は 5ms 程度で許容範囲、stateless 維持を優先)
+- **Type narrowing**: `requestContext.get('user')` の戻り値は現状 `as TypedRequestContext` キャストで narrow する (既存 Tasks 3.1-3.3 と同じ pattern を維持)。`isIUserHasId` type guard 化は別タスク (本 PR の保留 task) で後続対応とし、Task 3.4 では既存キャスト pattern を変更しない
 - Validation: zod の `refine` で「id/path どちらか必須」を表現、execute 内で zod の validation 結果を直接戻り値に変換しない（Mastra が `outputSchema` 検証を行うため）
 - Risks: 既存 `findByIdAndViewer` が `includeAnyoneWithTheLink: true` を内部固定するため、GRANT_RESTRICTED ページが RAG コンテキストに混入する（research.md R-3）。本 spec では既存挙動を踏襲し integration test で挙動を明文化
 
@@ -630,7 +747,7 @@ export const getPageContentTool: Tool<
 - `fileSearchTool` の import 行と tools 登録行をコメントアウト（コードは残置）
 - `instructions` に以下の編集を行う（英語短文、既存トーン維持）:
   - **既存の `- Use the fileSearch tool when the question relates to the user's wiki content.` 行はコメントアウト**（即時削除しない理由: `fileSearchTool` 復活時の rollback コストを下げる、要件 4.2 と同一方針）
-  - 新規追記 (2〜3 行): 「wiki 内コンテンツ関連の質問はまず `fullTextSearch` tool を呼び、必要に応じて `getPageContent` tool で本文を取得して引用パスを回答に含めること」
+  - 新規追記: 「wiki 内コンテンツ関連の質問はまず `fullTextSearch` tool を呼ぶ。候補ページを読むときは `getPageContent` を **まず `offset` なしで** 呼んで outline (heading + 行番号) を得る。短いページは同じ呼び出しで `content` も返る。長いページは outline のみ返るので、回答に関係しそうな heading の `line` を `offset` に指定して再度 `getPageContent` を呼び該当セクションの `content` を取得する。`hasMore` でさらにページングするか判断する。巨大ページ全文を 1 度に取得しないこと。引用パスを回答に含めること」（PR #11204 token 計測 FB を受けた outline → drill-down フロー）
   - 新規追記: 「`fullTextSearch` の `query` には自然言語に加えて以下の演算子を必要に応じて組み合わせて良い: `"phrase"`, `-term`, `prefix:/path`, `tag:foo`, `-prefix:` / `-tag:`（全て AND）。これらは subtree / タグ絞り込み・ノイズ除去のために使う」
 - メモリ・スレッド・モデル設定は変更しない（4.3）
 
@@ -655,8 +772,9 @@ export const growiAgent = new Agent({
   - ALWAYS RESPOND IN THE SAME LANGUAGE AS THE USER'S INPUT.
   - Respond in Markdown. Do NOT wrap your response in JSON or code fences unless the user is asking for code.
   // - Use the fileSearch tool when the question relates to the user's wiki content.   // disabled: see spec agentic-search
-  - When a question relates to the user's wiki content, first call the fullTextSearch tool to gather candidate pages, then call the getPageContent tool for any page whose body you need as evidence. Include the page path you cited in the answer.
+  - When a question relates to the user's wiki content, first call the fullTextSearch tool to gather candidate pages. To read a candidate page, call getPageContent WITHOUT \`offset\` first: this returns the page outline (a heading list with line numbers). For a short page the body is small enough that \`content\` is returned in this same first call; for a long page only the \`outline\` comes back. In that case pick the heading whose section likely answers the question and call getPageContent again with \`offset\` set to that heading's \`line\` to fetch that section's \`content\`. Use \`hasMore\` to decide whether to page further with a larger \`offset\`. Do NOT fetch a whole large page at once — pages may exceed thousands of lines, so navigate via the outline. Include the page path you cited in the answer.
   - The fullTextSearch query supports plain natural-language tokens combined with: "phrase", -term, -"phrase", prefix:/path, -prefix:/path, tag:foo, -tag:foo (all AND-combined). Use these operators only when the user intent maps to a subtree, tag, or exclusion.
+  - When the user explicitly asks for newest or oldest pages, set the fullTextSearch sort parameter to updatedAt or createdAt with an appropriate order (desc / asc); otherwise leave sort at the default (relationScore).
   - Keep answers concise and well-structured with headings, lists, and links where helpful.
   `,
   model: getOpenaiProvider()(model),
@@ -725,7 +843,7 @@ export const growiAgent = new Agent({
 | Tool | `result` 値 | 補足 |
 |---|---|---|
 | `FullTextSearchTool` | `'ok'` / `'error'` / `'context_error'` | `'ok'` は `hits` + `totalCount`、その他は `reason: string` |
-| `GetPageContentTool` | `'ok'` / `'not_found_or_forbidden'` / `'missing_input'` / `'context_error'` | `'ok'` は `page { path, body, updatedAt }`、その他は `reason: string` |
+| `GetPageContentTool` | `'ok'` / `'not_found_or_forbidden'` / `'missing_input'` / `'context_error'` | `'ok'` は `page { path, updatedAt?, totalLines, content?, offset?, limit?, hasMore?, outline? }`（content 系は content mode / 小ページ最適化時のみ、outline は初回呼出時のみ、`updatedAt` は legacy ページで欠落時に省略）、その他は `reason: string` |
 
 ### Page / Revision（既存・参照のみ）
 
@@ -781,26 +899,54 @@ export const growiAgent = new Agent({
 7. SearchService が reject された場合に `result: 'error'` を返し execute が throw しないこと（6.8）
 8. `requestContext` 経由の `user: IUserHasId` がそのまま `SearchService.searchKeyword` の第 3 引数に渡ること（合成オブジェクトでなく `req.user` の参照同一性が保たれること、6.7）
 9. **クエリ構文の素通し**: `query` に `prefix:/docs -draft tag:meeting "release notes"` 等の演算子を含む文字列を渡したとき、tool 層で文字列が改変されず `SearchService.searchKeyword` の第 1 引数にそのまま渡ること（サニタイザ不在の保証、本 spec の Plan A 採用根拠）
+10. **`sort` / `order` 入力の素通し**: `sort: 'updatedAt', order: 'asc'` を指定したとき `searchKeyword` の第 5 引数 `searchOpts` に `{ limit, sort: 'updatedAt', order: 'asc' }` がそのまま渡ること（要件 6.9）
+11. **`sort` / `order` のデフォルト適用**: 呼び出し側で `sort` / `order` を省略したとき、zod default により `searchOpts.sort === 'relationScore'` / `searchOpts.order === 'desc'` で `searchKeyword` が呼ばれること（要件 6.9）
+12. **`sort` の不正値拒否**: `sort` に `SORT_AXIS` に含まれない値を渡したとき、Mastra の zod 入力検証段階で validation error envelope が返り `searchKeyword` が呼ばれないこと（要件 6.9）
 
 ### Unit Tests (`get-page-content-tool.spec.ts`)
 
 1. zod 入力 schema が `pageId` も `pagePath` も無いケースを `missing_input` で弾く（2.3）
 2. `requestContext.get('user')` が `undefined` のとき `result: 'context_error'` を返す（3.3）
 3. `Page.findByIdAndViewer` をモックして `null` 返却時に `result: 'not_found_or_forbidden'` を返す（2.4）
-4. モックされた成功ケースで `result: 'ok'` + 正しい `path` / `body` / `updatedAt` を返し、`body` が改変されない（2.5, 2.6）
+4. モックされた小ページ成功ケース (`totalLines <= limit`) で `result: 'ok'` + 正しい `path` / `content` / `updatedAt` を返し、`content` が改変されない。小ページ最適化で `outline` も併せて返る（2.5, 2.6, 2.9）
 5. `pageId` 指定時に `findByIdAndViewer` が呼ばれ、`findByPathAndViewer` は呼ばれない（2.1）
 6. `pagePath` 指定時に `findByPathAndViewer` が呼ばれ、`findByIdAndViewer` は呼ばれない（2.2）
 7. tool 内で例外を throw しないこと（agent ループ継続保証のため、Mongoose mock を error reject にしても戻り値で返ること）
+8. content mode (`offset` 指定) で `limit` 省略時 default `200` が適用され、`offset` が echo される（2.8, 2.10）
+9. `hasMore` の境界条件 (3 点、いずれも content mode = `offset` 指定):
+    9a. `offset === totalLines` のとき `sliced.length === 1` / `hasMore === false` (最終行を含み読了)
+    9b. `offset === totalLines - limit + 1` (ちょうど末尾までを 1 回で取得) のとき `hasMore === false`
+    9c. `offset > totalLines` のとき `content: ''` / `hasMore: false` を返す (`result: 'ok'`、Range out of bounds = エラー化しない)
+10. **outline mode (長ページ初回 = `offset` 省略 + `totalLines > limit`)**: `outline` に複数 heading entry が含まれ、`content` / `offset` / `limit` / `hasMore` は **undefined** (省略される)
+11. **小ページ最適化 (`offset` 省略 + `totalLines <= limit`)**: `outline` と `content` の両方が返る。**content mode (`offset` 指定、`offset: 1` 明示を含む)**: `content` は返るが `outline` は **undefined** (省略される)
+12. Outline 抽出: fenced code block (` ``` ` / `~~~`)、indented code block (4 スペース)、HTML block 内の `#` 行は heading に **含まれない** (mdast パーサが AST レベルで自動判定)。**front matter (`---`) は extension 無しのため許容範囲** — テストではコードブロック / HTML block のみを assertion 対象とする (design.md L702 「Front matter の扱い」参照)
+13. Outline 抽出: `heading` text は `mdast-util-to-string` でプレーン化される (例: `## **Bold** [Link](url)` → `heading: 'Bold Link'`)。Markdown 装飾は除去
+13b. Outline 抽出: **Setext heading** (`title\n====` / `title\n----`) も ATX heading と同様に抽出され、`line` はテキスト行 (下線の前の行) を指す
+14. CRLF 改行のページが正しく split され、`totalLines` / `content` が期待通り
+15. `limit > 500` は zod boundary で reject (Mastra validation error)、execute に到達しない
 
 ### Integration Tests (`full-text-search-tool.integ.ts`)
 
-実 MongoDB + Elasticsearch + SearchService を使い、以下のシナリオを確認:
+**実 Elasticsearch には接続しない**。理由:
 
-1. GRANT_PUBLIC ページがインデックスされている状態でクエリ → `hits` に該当 path が含まれる（6.1, 6.7）
-2. GRANT_OWNER の他者ページは hits に含まれない（6.7）
-3. GRANT_USER_GROUP の所属メンバーは hits に含み、非所属メンバーは含まない（6.7）
-4. ヒットなしクエリで `result: 'ok'` かつ `hits: []`, `totalCount: 0`（6.1）
-5. Elasticsearch が停止している状態で `result: 'error'` を返し例外を throw しないこと（6.8、可能なら ES 接続文字列をモック）
+1. 既存の [`apps/app/src/server/service/search/search-service.integ.ts`](apps/app/src/server/service/search/search-service.integ.ts) が `dummyFullTextSearchDelegator` を `searchService.nqDelegators` に注入する慣例を採っており、本 spec もそれに倣う
+2. GitHub Actions の通常 test job (`pnpm run test` を回す workflow) には `services.elasticsearch` が定義されていない (定義されているのは `reusable-app-prod.yml` の production build/launch のみ)。リポジトリ初の real ES integ test を導入する CI 改修コストに見合わない
+3. ES query DSL / `filterPagesByViewer` の grant 適用ロジックは `SearchService` / `ElasticsearchDelegator` の責務であり本 spec の対象外
+
+ファイル冒頭のヘッダーコメントにも同じ意思決定を明記する (`full-text-search-tool.integ.ts` L15-40)。
+
+実 MongoDB + dummy `SearchDelegator` (search を `vi.fn()` 化) + 実 SearchService dispatch path で以下を確認:
+
+1. dummy delegator が返す合成 hit 配列を、tool が `{ pageId, pagePath, snippet }` 形に正しく mapping し、`_source.body` 等の余計なフィールドが出力に混入しないこと（要件 6.5）
+2. ヒットなしクエリで `result: 'ok'` / `hits: []` / `totalCount: 0` を返すこと（要件 6.1）
+3. 実 MongoDB 上の User / UserGroup / UserGroupRelation を経由して、tool が `userGroups` を解決し dummy delegator の `search` 第 3 引数に渡すこと、また第 2 引数 `user` が `requestContext.set` で渡した実 User document と参照同一であること（要件 6.7 / Issue 1 Plan C の回帰防止）
+4. dummy delegator の `search` が reject した場合に `result: 'error'` を返し execute が throw しないこと（要件 6.8）
+5. **`sort` / `order` の素通し**: 入力で `sort: 'updatedAt'` / `order: 'desc'` を渡したとき、dummy delegator の `search` 第 4 引数 `searchOpts` に `sort` / `order` がそのまま届くこと（要件 6.9。実 ES 上での `updated_at` ソート挙動は `ElasticsearchDelegator` の責務）
+
+**意図的に NOT 対象** (上位 layer の責務):
+- GRANT_PUBLIC / GRANT_OWNER / GRANT_USER_GROUP の **実 ES 上での grant 反映**: `ElasticsearchDelegator.filterPagesByViewer` の責務（別途 `ElasticsearchDelegator` 側の integ test で確認すべきだが、これは本 spec の範囲外）
+- ES の query DSL 組み立て: 同上
+- `sort` / `order` の **実 ES 上での実際の並び順**: 同上（tool 層で素通しされていることまでが本 spec の範囲）
 
 ### Integration Tests (`get-page-content-tool.integ.ts`)
 
@@ -812,10 +958,12 @@ export const growiAgent = new Agent({
 4. GRANT_RESTRICTED（リンク共有）を path 指定で取得 → `result: 'ok'`（既存挙動明文化、research.md R-3）
 5. 存在しない pageId → `result: 'not_found_or_forbidden'`（権限なしと区別しないことの確認、2.4）
 6. `pagePath` 指定でも grant が反映されること（2.2, 2.7）
+7. 300+ 行の長文 seed page に対して `offset: 200, limit: 100` (content mode) で正しく行 200-299 が `content` に返り、`outline` は undefined
+8. 同 長文 page に対して `offset` 省略時 (outline mode、`totalLines > limit`) は `outline` に複数の heading entry が含まれ、`content` / `offset` / `limit` / `hasMore` は undefined
 
 ### Agent Integration Tests（オプション、本 spec 必須ではない）
 
-`growiAgent.tools` のキー一覧で `fullTextSearchTool` と `getPageContentTool` の両方の存在、および `fileSearchTool` の非存在を assertion。さらに `growiAgent.instructions` 文字列に `fileSearch` の文字列が（コメントアウト行を除いて）含まれていないこと、新規追記の「fullTextSearch → getPageContent → 引用パス」と演算子説明が含まれることを assert。mock model で 1〜2 ターン回し agent が両 tool を tool として参照可能であることを確認。実装時に手間が小さいなら追加、`fileSearchTool` 暫定無効化（4.1）と instruction 矛盾（FB Issue 2）の回帰防止に有用。
+`growiAgent.tools` のキー一覧で `fullTextSearchTool` と `getPageContentTool` の両方の存在、および `fileSearchTool` の非存在を assertion。あわせて `growiAgent.instructions` 文字列に `Use the fileSearch tool` のコメントアウトされていない行が含まれないことを assert（FB Issue 2 の回帰防止）。**instructions の文言・利用順序・演算子キーワード等の substring-presence assertion は設けない** — プロンプト文言は反復改善が前提で、文字列マッチ assertion は反復ごとに更新負荷が累積する割に挙動を保証しない（実際のプロンプト挙動は agent の end-to-end 動作確認で検証する）。mock model で 1〜2 ターン回し agent が両 tool を tool として参照可能であることを確認。
 
 ### E2E / UI
 
@@ -823,7 +971,7 @@ export const growiAgent = new Agent({
 
 ## Security Considerations
 
-- **grant 委譲の完全性（R2 #7）**: tool 内で MongoDB クエリを自前構築しない。すべての本文取得は `findByIdAndViewer` / `findByPathAndViewer` 経由に統一。レビューで既存メソッド以外の Page 読み取り経路を許可しない
+- **grant 委譲の完全性（R2 #7）**: tool 内で MongoDB クエリを自前構築しない。すべての本文取得は `findByIdAndViewer` / `findByPathAndViewer` 経由に統一。slice / outline 処理は `findByIdAndViewer` の戻り値 (`revision.body`) を tool execute 内のメモリ上でのみ加工する（DB クエリの追加なし）。レビューで既存メソッド以外の Page 読み取り経路を許可しない
 - **`requestContext` のリクエスト隔離（本 spec で対処）**: `user` は認証ミドルウェア通過後の `req.user: IUserHasId` をそのまま載せるため改竄の余地なし。`searchService` も route factory 引数 `crowi` から取得するため改竄不可。`@mastra/core` の `RequestContext` は内部的に単純な `Map` ラッパーで自動的なリクエスト隔離機構を持たないため、本 spec ではモジュールスコープ singleton を廃止しハンドラ関数内で `new RequestContext()` する。この変更により、並列リクエスト下で他リクエストの `user` / `searchService` が tool 内 `get(...)` で読み出される可能性を排除する
 - **`searchService` を `requestContext` に載せる根拠**: `crowi` 全体を渡すと tool 層から DB / メール / 設定など全機能にアクセス可能になりレイヤリングが崩れる。本 spec では「`fullTextSearchTool` が必要とする最小 surface = `searchService`」のみを `RequestContext` に格納し、tool 層の触れる API を意図的に狭める
 - **失敗戻り値の情報漏洩防止**: `not_found_or_forbidden` を共通化することで「存在するが閲覧不可」と「そもそも存在しない」を agent に区別させない。回答経由でユーザーに非公開ページの存在が漏れない
