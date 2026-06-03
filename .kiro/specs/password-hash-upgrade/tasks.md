@@ -7,7 +7,7 @@
   - `import bcrypt from 'bcryptjs'` が TypeScript で型エラーなく解決されることが確認できる
   - _Requirements: 1.1_
 
-- [ ] 1.2 PasswordHashService を実装する
+- [x] 1.2 PasswordHashService を実装する
   - `hash(plaintext)` を実装: `bcrypt.hash(plaintext, BCRYPT_COST)` — 常に bcrypt のみ使用、PASSWORD_SEED は不使用。`BCRYPT_COST` は環境変数でカスタム可能（デフォルト 12）
   - `BCRYPT_COST` が 12 未満の場合は起動時に WARNING ログを出力する
   - `verify(plaintext, bcryptHash, legacyHash, passwordSeed)` を実装:
