@@ -63,7 +63,7 @@ describe('analyzeContent', () => {
       } satisfies ContentAnalysis);
     });
 
-    it('should extract 1-5 keywords prioritizing proper nouns and technical terms', async () => {
+    it('should extract 1-5 keywords prioritizing the subject and purpose of the content', async () => {
       mocks.chatCompletionMock.mockResolvedValue({
         choices: [
           {

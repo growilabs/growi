@@ -11,13 +11,15 @@ const VALID_INFORMATION_TYPES: readonly InformationType[] = ['flow', 'stock'];
 const SYSTEM_PROMPT = [
   'You are a content analysis assistant. Analyze the following content and return a JSON object with two fields:\n',
   '1. "keywords": An array of 1 to 5 search keywords extracted from the content. ',
-  'Prioritize proper nouns and technical terms over generic or common words.\n',
+  'Prioritize words that express the subject and purpose of the content — what it is fundamentally about — ',
+  'over terms that merely name the specific means of implementation (such as libraries, tools, APIs, protocols, or product names) used to realize it. ',
+  'Choose such an implementation-specific term as a keyword only when that term is itself the subject of the content.\n',
   '2. "informationType": Classify the content as either "flow" or "stock".\n\n',
   '## Classification Reference\n',
   instructionsForInformationTypes,
   '\n\n',
   'Return only the JSON object, no other text.\n',
-  'Example: {"keywords": ["React", "useState", "hooks"], "informationType": "stock"}',
+  'Example: {"keywords": ["keyword1", "keyword2", "keyword3"], "informationType": "stock"}',
 ].join('');
 
 const isValidContentAnalysis = (parsed: unknown): parsed is ContentAnalysis => {
