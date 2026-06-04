@@ -21,11 +21,10 @@ export const ChatSidebarLazyLoaded: FC = memo(() => {
     return null;
   }
 
-  // Force a fresh mount when the active thread or assistant changes so the
+  // Force a fresh mount when the active thread changes so the
   // session-scoped thread id inside ChatSidebar is regenerated.
-  const remountKey =
-    chatSidebarStatus?.threadId ??
-    `new-${chatSidebarStatus?.aiAssistantData?._id ?? 'unknown'}`;
+  // A new chat (no threadId) mounts under a stable 'new' key.
+  const remountKey = chatSidebarStatus?.threadId ?? 'new';
 
   return <ComponentToRender key={remountKey} />;
 });
