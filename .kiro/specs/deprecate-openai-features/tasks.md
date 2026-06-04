@@ -91,7 +91,7 @@
 
 - [ ] 5. features/openai のスリム化（削除と整理）
 
-- [ ] 5.1 アシスタント／ナレッジ／エディター／cron／神サービス等を削除
+- [x] 5.1 アシスタント／ナレッジ／エディター／cron／神サービス等を削除
   - assistant・editor-assistant・knowledge・cron・embeddings・normalize・統合サービス（神サービス）・生クライアント（client.ts）・アシスタント系ルート・アシスタント系インターフェイス・アシスタント系クライアント UI を削除する（接続設定 UI は残す）
   - suggest-path 用プロンプト定数ファイルは削除対象から除外し、消費側（assistant 配下）削除後に使用中の定数のみへトリムする（suggest-path の import は不変）
   - 観測可能な完了条件: openai 配下にアシスタント／FileSearch／vectorStore／ナレッジ／エディター関連コードが残らず、残置基盤（デリゲータ／AI 有効判定／認可ミドルウェア／serviceType 型／プロンプト定数）のみが残る
