@@ -626,6 +626,7 @@
     "to_cloud_settings": "GROWI.cloud 관리 화면 열기"
   },
   "ai_assistant_substance": {
+    "new_chat": "새 채팅",
     "add_assistant": "어시스턴트 추가",
     "my_assistants": "내 어시스턴트",
     "team_assistants": "팀 어시스턴트",

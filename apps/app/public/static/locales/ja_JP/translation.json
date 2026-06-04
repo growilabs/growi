@@ -699,6 +699,7 @@
     "to_cloud_settings": "GROWI.cloud の管理画面へ"
   },
   "ai_assistant_substance": {
+    "new_chat": "新規チャット",
     "add_assistant": "アシスタントを追加する",
     "my_assistants": "マイアシスタント",
     "team_assistants": "チームアシスタント",

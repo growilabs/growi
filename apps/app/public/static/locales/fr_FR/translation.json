@@ -661,6 +661,7 @@
     "to_cloud_settings": "Ouvrir les paramètres GROWI.cloud"
   },
   "ai_assistant_substance": {
+    "new_chat": "Nouvelle discussion",
     "add_assistant": "Ajouter un assistant",
     "my_assistants": "Mes assistants",
     "team_assistants": "Assistants d'équipe",
