@@ -150,6 +150,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Create bookmark folder
    *        description: Create a new bookmark folder
    *        requestBody:
@@ -215,6 +216,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: List bookmark folders of a user
    *        description: List bookmark folders of a user
    *        parameters:
@@ -316,6 +318,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Delete bookmark folder
    *        description: Delete a bookmark folder and its children
    *        parameters:
@@ -372,6 +375,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Update bookmark folder
    *        description: Update a bookmark folder
    *        requestBody:
@@ -437,6 +441,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Update bookmark folder
    *        description: Update a bookmark folder
    *        requestBody:
@@ -498,6 +503,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: Update bookmark in folder
    *        description: Update a bookmark in a folder
    *        requestBody:
