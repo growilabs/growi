@@ -109,3 +109,34 @@
 - mastra thread の `metadata.aiAssistantId` を参照している箇所（`get-or-create-thread.ts` 等）の assistant 非依存化方法と既存スレッド後方互換。
 - client-delegator / embeddings / `certifyAiService` のうち suggest-path 以外の隠れた利用者の有無。
 - `config-definition.ts` の `openai:*` / `app:aiEnabled` / cron 設定キーのうち、mastra 継続に必要な最小集合の切り分け。
+
+---
+
+## 設計フェーズ追記（2026-06-04 / Light Discovery + Synthesis）
+
+### 追加調査の確定事項
+
+**Prisma / config**
+- `ai-assistant`/`thread-relation`/`vector-store`/`vector-store-file-relation` の 4 モデルは `apps/app/prisma/schema.prisma` に直接定義（aiassistants:82-91, threadrelations:453-457, vectorstorefilerelations:555-565, vectorstores:567-571）。生成物 `src/generated/prisma/models/*` はアプリコードから未参照。→ schema.prisma から 4 モデル削除 + `prisma generate` 再生成のみ。Mongo コレクション破棄は別途マイグレーションで実施。
+- `config-definition.ts` の AI キー分類:
+  - **KEEP**: `app:aiEnabled`, `openai:serviceType`, `openai:apiKey`, `openai:assistantModel:mastraAgent`
+  - **REMOVE**: `openai:assistantModel:edit`, `openai:threadDeletion*`(3), `openai:vectorStoreFileDeletion*`(3), `openai:limitLearnablePageCountPerAssistant`, `app:openaiThreadDeletionCronMaxMinutesUntilRequest`, `app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest`
+  - **要検証**: `openai:assistantModel:chat` — file-search 用だった疑いがあり、file-search 削除後に未参照化する可能性。実装時に最終確認。
+  - 消費箇所: cron 2 ファイル / `openai.ts` / `configuration-props.ts`（admin 表示）/ `growi-agent.ts` / suggest-path `call-llm-for-json.ts`。
+
+**残置する OpenAI クライアント基盤（suggest-path / mastra が依存）**
+- suggest-path は **低レベルの client-delegator を直接利用**（`getClient`/`isStreamResponse`, `OpenaiServiceType`, `certifyAiService`, `instructionsForInformationTypes`）。`getOpenaiService()` 神サービスは不使用。
+- mastra の `getOpenaiService()` 利用は `isAiAssistantUsable()` のみ → アシスタント廃止で不要化。mastra が残す依存は `isAiEnabled` と configManager の AI キー、自前の `@ai-sdk/openai` provider。
+- 結論: **`openai.ts`（IOpenaiService 神サービス）は丸ごと削除**。残すのは `client-delegator/`（vectorStore/thread/file メソッドを除去してスリム化）、`is-ai-enabled.ts`, `client.ts`, `routes/middlewares/certify-ai-service.ts`, `interfaces/ai.ts`。
+- `instructionsForInformationTypes`（`assistant/instructions/commons.ts`）は suggest-path 専用利用 → **suggest-path 配下へ移設**（assistant ディレクトリ削除に伴うオーナーシップ移管）。
+
+**mastra のアシスタント非依存化（後方互換）**
+- `resourceId` は元々ユーザー ID のみ（assistant 非依存）。`metadata.aiAssistantId` の書込み/検証を外せば、既存スレッド（当該フィールド保持）は追加フィールドとして無視され、閲覧・再開可能 → 後方互換が成立。
+- `post-message`: ReqBody/validation から `aiAssistantId` 除去、`AiAssistantModel`/`getOpenaiService`/`vectorStoreId` 導出と file-search ツールを除去。
+- client `openChat(aiAssistantData, threadId?)` → `openChat(threadId?)`、`openEditor`/`isEditorAssistant`/`aiAssistantData` を atom から除去。ChatSidebar ヘッダはスレッドタイトル/汎用表示へ。
+- 左 AI パネル: 「Add assistant」+ assistant 一覧を撤去し、「新規チャット」ボタン + ThreadList の構成へ。`AiAssistantList.tsx` 削除。
+
+### Synthesis（3 レンズ）
+- **Generalization**: 「アシスタントに紐づくチャット」を「ユーザーに紐づくチャット」へ一般化。thread の所有軸を user 単独へ統一し、将来のスコープ付きチャットは interface 拡張で対応可能とする。
+- **Build vs Adopt**: 新規構築は行わず、既存 SidebarContents 拡張パターン・migrate-mongo・mastra Memory をそのまま採用。LLM クライアントは既存 client-delegator を流用（スリム化のみ）。
+- **Simplification**: 神サービス `openai.ts` を残してラップする案を却下し、低レベル client-delegator を直接残置（抽象の段数を削減）。チャット起動 atom を mastra `chatSidebarAtom` 1 系統へ統合し、openai 旧 `aiAssistantSidebarAtom` を廃止。
