@@ -187,7 +187,12 @@
                 },
                 "patterns": [
                   {
-                    "group": ["~/client/**", "**/client/**", "client/**"],
+                    "group": [
+                      "~/client/**",
+                      "**/client/**",
+                      "client/**",
+                      "!@prisma/client/**"
+                    ],
                     "message": "Importing from client/ directories is restricted."
                   },
                   {

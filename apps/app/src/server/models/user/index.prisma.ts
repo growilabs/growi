@@ -48,6 +48,20 @@ export const extension = Prisma.defineExtension((client) => {
             };
           },
         },
+        serializeSecurely: {
+          needs: {
+            password: true,
+            apiToken: true,
+            email: true,
+            isEmailPublished: true,
+          },
+          compute({ password, apiToken, email, ...user }) {
+            return () => ({
+              ...user,
+              email: user.isEmailPublished ? email : undefined,
+            });
+          },
+        },
       },
     },
   });
