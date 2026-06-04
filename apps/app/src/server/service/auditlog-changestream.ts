@@ -1,8 +1,4 @@
-import type {
-  ChangeStream,
-  ChangeStreamDocument,
-  ChangeStreamOptions,
-} from 'mongodb';
+import type { ChangeStream, ChangeStreamOptions } from 'mongodb';
 import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
@@ -55,9 +51,16 @@ export class AuditlogChangeStreamService {
 
     this.changeStream = Activity.watch<ActivityDocument>([], options);
 
-    this.changeStream.on(
-      'change',
-      async (event: ChangeStreamDocument<ActivityDocument>) => {
+    void this.processChangeStream();
+
+    logger.info('AuditlogChangeStreamService started.');
+  }
+
+  private async processChangeStream(): Promise<void> {
+    if (this.changeStream == null) return;
+
+    try {
+      for await (const event of this.changeStream) {
         try {
           if (
             event.operationType === 'insert' &&
@@ -69,9 +72,7 @@ export class AuditlogChangeStreamService {
             event.operationType === 'delete' &&
             'documentKey' in event
           ) {
-            await this.delegator.deleteAuditlog(
-              (event.documentKey as { _id: mongoose.Types.ObjectId })._id,
-            );
+            await this.delegator.deleteAuditlog(event.documentKey._id);
           }
           await ResumeTokenStore.save(STREAM_KEY, event._id);
         } catch (err) {
@@ -80,12 +81,11 @@ export class AuditlogChangeStreamService {
             { err },
             'AuditlogChangeStreamService change event handling failed.',
           );
+          break;
         }
-      },
-    );
-
-    this.changeStream.on('error', async (err: Error) => {
-      if (isChangeStreamHistoryLost(err)) {
+      }
+    } catch (err) {
+      if (isChangeStreamHistoryLost(err as Error)) {
         logger.warn(
           'Change stream history lost. Clearing resume token and restarting from current position.',
         );
@@ -93,10 +93,9 @@ export class AuditlogChangeStreamService {
       } else {
         logger.error(err, 'AuditlogChangeStreamService change stream error.');
       }
-      await this.restart();
-    });
+    }
 
-    logger.info('AuditlogChangeStreamService started.');
+    await this.restart();
   }
 
   private async restart(): Promise<void> {
