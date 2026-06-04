@@ -182,8 +182,8 @@ importers:
         specifier: ^6.18.4
         version: 6.18.4
       '@codemirror/commands':
-        specifier: ^6.8.0
-        version: 6.8.0
+        specifier: ^6.10.3
+        version: 6.10.3
       '@codemirror/lang-markdown':
         specifier: ^6.3.2
         version: 6.3.2
@@ -312,13 +312,13 @@ importers:
         version: 6.19.2(prisma@6.19.2(magicast@0.3.5)(typescript@5.9.3))(typescript@5.9.3)
       '@replit/codemirror-emacs':
         specifier: ^6.1.0
-        version: 6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
+        version: 6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.10.3)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
       '@replit/codemirror-vim':
         specifier: ^6.2.1
-        version: 6.2.1(@codemirror/commands@6.8.0)(@codemirror/language@6.12.3)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
+        version: 6.2.1(@codemirror/commands@6.10.3)(@codemirror/language@6.12.3)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
       '@replit/codemirror-vscode-keymap':
         specifier: ^6.0.2
-        version: 6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.3)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
+        version: 6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.10.3)(@codemirror/language@6.12.3)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
       '@slack/web-api':
         specifier: ^6.2.4
         version: 6.12.0
@@ -1265,8 +1265,8 @@ importers:
         specifier: ^6.18.4
         version: 6.18.4
       '@codemirror/commands':
-        specifier: ^6.8.0
-        version: 6.8.0
+        specifier: ^6.10.3
+        version: 6.10.3
       '@codemirror/lang-markdown':
         specifier: ^6.3.2
         version: 6.3.2
@@ -1308,13 +1308,13 @@ importers:
         version: 2.11.8
       '@replit/codemirror-emacs':
         specifier: ^6.1.0
-        version: 6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
+        version: 6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.10.3)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
       '@replit/codemirror-vim':
         specifier: ^6.2.1
-        version: 6.2.1(@codemirror/commands@6.8.0)(@codemirror/language@6.12.3)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
+        version: 6.2.1(@codemirror/commands@6.10.3)(@codemirror/language@6.12.3)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
       '@replit/codemirror-vscode-keymap':
         specifier: ^6.0.2
-        version: 6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.3)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
+        version: 6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.10.3)(@codemirror/language@6.12.3)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)
       '@types/react':
         specifier: ^18.2.14
         version: 18.3.3
@@ -2503,6 +2503,9 @@ packages:
 
   '@codemirror/autocomplete@6.18.4':
     resolution: {integrity: sha512-sFAphGQIqyQZfP2ZBsSHV7xQvo9Py0rV0dW7W3IMRdS+zDuNb2l3no78CvUaWKGfzFjI4FTrLdUSj86IGb2hRA==}
+
+  '@codemirror/commands@6.10.3':
+    resolution: {integrity: sha512-JFRiqhKu+bvSkDLI+rUhJwSxQxYb759W5GBezE8Uc8mHLqC9aV/9aTC7yJSqCtB3F00pylrLCwnyS91Ap5ej4Q==}
 
   '@codemirror/commands@6.8.0':
     resolution: {integrity: sha512-q8VPEFaEP4ikSlt6ZxjB3zW72+7osfAYW9i8Zu943uqbKuz6utc1+F170hyLUCUltXORjQXRyYQNfkckzA/bPQ==}
@@ -9735,6 +9738,7 @@ packages:
     resolution: {integrity: sha512-Quz3MvAwHxVYNXsOByL7xI5EB2WYOeFswqaHIA3qOK3isRWTxiplBEocmmru6XmxDB2L7jDNYtYA4FyimoAFEw==}
     engines: {node: '>=8.17.0'}
     hasBin: true
+    bundledDependencies: []
 
   jsonfile@3.0.1:
     resolution: {integrity: sha512-oBko6ZHlubVB5mRFkur5vgYR1UyqX+S6Y/oCfLhqNdcc2fYFlDpIoNc7AfKS1KOGcnNAkvsr0grLck9ANM815w==}
@@ -15748,6 +15752,13 @@ snapshots:
       '@codemirror/view': 6.43.0
       '@lezer/common': 1.5.2
 
+  '@codemirror/commands@6.10.3':
+    dependencies:
+      '@codemirror/language': 6.12.3
+      '@codemirror/state': 6.6.0
+      '@codemirror/view': 6.43.0
+      '@lezer/common': 1.5.2
+
   '@codemirror/commands@6.8.0':
     dependencies:
       '@codemirror/language': 6.12.3
@@ -18002,26 +18013,26 @@ snapshots:
       immutable: 4.3.6
       redux: 4.2.1
 
-  '@replit/codemirror-emacs@6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)':
+  '@replit/codemirror-emacs@6.1.0(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.10.3)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)':
     dependencies:
       '@codemirror/autocomplete': 6.18.4
-      '@codemirror/commands': 6.8.0
+      '@codemirror/commands': 6.10.3
       '@codemirror/search': 6.5.6
       '@codemirror/state': 6.6.0
       '@codemirror/view': 6.43.0
 
-  '@replit/codemirror-vim@6.2.1(@codemirror/commands@6.8.0)(@codemirror/language@6.12.3)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)':
+  '@replit/codemirror-vim@6.2.1(@codemirror/commands@6.10.3)(@codemirror/language@6.12.3)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)':
     dependencies:
-      '@codemirror/commands': 6.8.0
+      '@codemirror/commands': 6.10.3
       '@codemirror/language': 6.12.3
       '@codemirror/search': 6.5.6
       '@codemirror/state': 6.6.0
       '@codemirror/view': 6.43.0
 
-  '@replit/codemirror-vscode-keymap@6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.8.0)(@codemirror/language@6.12.3)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)':
+  '@replit/codemirror-vscode-keymap@6.0.2(@codemirror/autocomplete@6.18.4)(@codemirror/commands@6.10.3)(@codemirror/language@6.12.3)(@codemirror/lint@6.8.1)(@codemirror/search@6.5.6)(@codemirror/state@6.6.0)(@codemirror/view@6.43.0)':
     dependencies:
       '@codemirror/autocomplete': 6.18.4
-      '@codemirror/commands': 6.8.0
+      '@codemirror/commands': 6.10.3
       '@codemirror/language': 6.12.3
       '@codemirror/lint': 6.8.1
       '@codemirror/search': 6.5.6
