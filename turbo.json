@@ -82,9 +82,6 @@
     "test": {
       "outputLogs": "new-only"
     },
-    "test:integ": {
-      "outputLogs": "new-only"
-    },
 
     "//#version:patch": {
       "cache": false

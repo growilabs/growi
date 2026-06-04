@@ -130,19 +130,16 @@ jobs:
           pnpm add turbo --global
           pnpm install --frozen-lockfile
 
-      - name: Test
+      - name: Test (app - unit & component)
         run: |
-          turbo run test --filter=@growi/app --filter=./packages/* --env-mode=loose
+          turbo run test:unit test:components --filter=@growi/app --env-mode=loose
         env:
           MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
 
-      - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-mongo${{ matrix.mongodb-version }}
-          path: |
-            apps/app/coverage
-            packages/remark-growi-directive/coverage
+      - name: Test (packages)
+        run: |
+          turbo run test --filter=./packages/* --env-mode=loose
+
 
       - name: Slack Notification
         uses: weseek/ghaction-slack-notification@master
@@ -212,13 +209,6 @@ jobs:
           MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
           VITE_ELASTICSEARCH_URI: http://localhost:9200/growi
           VITE_ELASTICSEARCH_VERSION: ${{ matrix.elasticsearch-version.env }}
-
-      - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v7
-        with:
-          name: coverage-es${{ matrix.elasticsearch-version.env }}-mongo${{ matrix.mongodb-version }}
-          path: |
-            apps/app/coverage
 
       - name: Slack Notification
         uses: weseek/ghaction-slack-notification@master
