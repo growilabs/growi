@@ -13,8 +13,6 @@ import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bu
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
-import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
-import { initializeOpenaiService } from '~/features/openai/server/services/openai';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
@@ -188,10 +186,6 @@ class Crowi {
 
   commentService: CommentServiceType | null;
 
-  openaiThreadDeletionCronService: unknown | null;
-
-  openaiVectorStoreFileDeletionCronService: unknown | null;
-
   tokens: unknown | null;
 
   models: ModelsMapDependentOnCrowi;
@@ -233,8 +227,6 @@ class Crowi {
     this.inAppNotificationService = null;
     this.activityService = null;
     this.commentService = null;
-    this.openaiThreadDeletionCronService = null;
-    this.openaiVectorStoreFileDeletionCronService = null;
 
     this.tokens = null;
 
@@ -300,9 +292,6 @@ class Crowi {
       // depends on passport service
       this.setupExternalAccountService(),
       this.setupExternalUserGroupSyncService(),
-
-      // depends on AttachmentService
-      this.setupOpenaiService(),
     ]);
 
     await this.setupCron();
@@ -454,7 +443,6 @@ class Crowi {
     }
     auditLogBulkExportJobCleanUpCronService.startCron();
 
-    startOpenaiCronIfEnabled();
     startAccessTokenCron();
 
     // News feed sync cron
@@ -903,10 +891,6 @@ class Crowi {
       this.s2sMessagingService,
       this.socketIoService,
     );
-  }
-
-  setupOpenaiService(): void {
-    initializeOpenaiService(this);
   }
 }
 
