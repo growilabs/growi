@@ -42,7 +42,6 @@ GROWI is a team collaboration wiki platform using Markdown, featuring hierarchic
 
 | Command | Description |
 |---------|-------------|
-| **/tdd** | Test-driven development workflow |
 | **/learn** | Extract reusable patterns from sessions |
 
 **apps/app Skills** (load via Skill tool when working in apps/app):
@@ -91,7 +90,7 @@ growi/
     ├── rules/              # Always loaded into every session
     ├── skills/             # Load on demand via Skill tool
     ├── agents/             # Specialized subagents
-    └── commands/           # User-invocable commands (/tdd, /learn)
+    └── commands/           # User-invocable commands (/learn)
 ```
 
 ## Development Guidelines
