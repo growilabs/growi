@@ -99,7 +99,7 @@
   - _Boundary: app-wide integration_
   - _Depends: 1, 2.2, 2.3, 3.1, 3.3, 4.1, 4.2, 4.3, 4.4_
 
-- [ ] 5.2 LLM クライアントデリゲータをスリム化
+- [x] 5.2 LLM クライアントデリゲータをスリム化
   - クライアントデリゲータのインターフェイスと実装から vectorStore・thread・file 系メソッドを除去し、補完呼び出しなど残置に必要な面のみ残す
   - 観測可能な完了条件: デリゲータに vectorStore/thread/file メソッドが型・実装ともに存在せず、suggest-path の補完呼び出しが従来どおり動作する
   - _Requirements: 1.2, 6.1, 6.4_
