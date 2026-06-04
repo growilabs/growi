@@ -82,7 +82,7 @@
   - _Boundary: app-wide integration_
   - _Depends: 1_
 
-- [ ] 4.4 (P) ページ更新・ユーザー削除・起動時正規化の openai 連携を除去
+- [x] 4.4 (P) ページ更新・ユーザー削除・起動時正規化の openai 連携を除去
   - ページ作成・更新時の vectorStore 同期連携、ユーザー削除時のアシスタント削除連携、起動時の thread-relation／vector-store 正規化処理を取り除く
   - 観測可能な完了条件: ページ作成/更新・ユーザー削除・起動時に廃止 AI 連携処理が呼ばれない
   - _Requirements: 4.6, 6.2_
