@@ -1,34 +1,13 @@
-import type { Document, Model } from 'mongoose';
-import { Schema } from 'mongoose';
-
 import loggerFactory from '~/utils/logger';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 
 const logger = loggerFactory('growi:service:resume-token-store');
-
-interface ResumeTokenDocument extends Document {
-  key: string;
-  token: unknown;
-}
-
-const resumeTokenSchema = new Schema<ResumeTokenDocument>(
-  {
-    key: { type: String, required: true, unique: true },
-    token: { type: Schema.Types.Mixed, required: true },
-  },
-  { collection: 'changestream_resume_tokens' },
-);
-
-const ResumeTokenModel = getOrCreateModel<
-  ResumeTokenDocument,
-  Model<ResumeTokenDocument>
->('ChangeStreamResumeToken', resumeTokenSchema);
 
 export const ResumeTokenStore = {
   async load(key: string): Promise<unknown> {
     try {
-      const doc = await ResumeTokenModel.findOne({ key });
+      const doc = await ChangeStreamResumeToken.findOne({ key });
       return doc?.token ?? null;
     } catch (err) {
       logger.error('ResumeTokenStore.load failed.', err);
@@ -38,7 +17,7 @@ export const ResumeTokenStore = {
 
   async save(key: string, token: unknown): Promise<void> {
     try {
-      await ResumeTokenModel.findOneAndUpdate(
+      await ChangeStreamResumeToken.findOneAndUpdate(
         { key },
         { token },
         { upsert: true, new: true },
@@ -50,7 +29,7 @@ export const ResumeTokenStore = {
 
   async clear(key: string): Promise<void> {
     try {
-      await ResumeTokenModel.deleteOne({ key });
+      await ChangeStreamResumeToken.deleteOne({ key });
     } catch (err) {
       logger.error('ResumeTokenStore.clear failed.', err);
     }
