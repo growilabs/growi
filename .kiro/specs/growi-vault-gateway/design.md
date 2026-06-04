@@ -355,7 +355,9 @@ interface VaultPatAuth {
 - git クライアントは `Authorization: Basic base64(anyuser:TOKEN)` を送る。adapter は password 部のみを PAT として取り出す（username は無視）
 - トークンソース解決は PR #11244 の `extractAccessToken(req)`（`Bearer` > `X-GROWI-ACCESS-TOKEN` > query > body）を再利用し、それが null のとき `Authorization: Basic` の password 部を git ネイティブ fallback として使う。検証は `AccessToken.findUserIdByToken(rawToken, [SCOPE.READ.FEATURES.PAGE])` を共有する
 - `Authorization` ヘッダーが存在しない場合は `null`（匿名候補）を返す。匿名の最終可否は後段の guest gate（`aclService.isGuestAllowedToRead()`）が決める — adapter は可否を判断しない
-- 認証失敗（無効/期限切れ/revoke）および guest 拒否時は `WWW-Authenticate: Basic realm="GROWI Vault"` を含む 401。これは `loginRequiredFactory(crowi, true, gitFallback)` の `fallback` から返す（`/login` リダイレクトを git 用に置換）
+- 401 には 2 つの拒否点がある。いずれも `WWW-Authenticate: Basic realm="GROWI Vault"` を含む 401 を返す（`/login` リダイレクトを git 用に置換）:
+  - **資格情報が提示されたが無効/期限切れ/revoke の場合**: credential adapter が即座に fail-closed で 401 を返し `next()` を呼ばない（要件 2.2）。これは adapter 側で行う必要がある — `loginRequired` の `fallback` に委ねると、guest 許可設定下では「無効な資格情報」が `req.user` 未設定の匿名候補と区別できず public へ降格してしまうため
+  - **資格情報が無く（匿名候補）かつ guest 拒否設定の場合**: `loginRequiredFactory(crowi, true, gitFallback)` の `gitFallback` が 401 を返す（要件 2.4a）
 - エラーメッセージにページ情報を含めない（要件 2.3）
 
 > 設計移行ノート: 旧実装は adapter 内で「ヘッダ無し → 即 `['public']` 許可」を独自に決めていたため、`restrictGuestMode='Deny'` でも匿名 clone が通る ACL すり抜けがあった（要件 2.4a で是正）。可否判定を `aclService` に一本化し、adapter は transport 変換のみを担う。
