@@ -657,6 +657,7 @@ class Crowi {
       onSignal: async () => {
         logger.info('Server is starting cleanup');
 
+        await this.searchService?.close();
         await mongoose.disconnect();
         return;
       },

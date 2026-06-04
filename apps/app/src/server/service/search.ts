@@ -292,6 +292,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
     this.isErrorOccuredOnSearching = false;
   }
 
+  async close(): Promise<void> {
+    await this.auditlogChangeStreamService?.close();
+  }
+
   async reconnectClient() {
     logger.info('Try to reconnect...');
     this.fullTextSearchDelegator.initClient();

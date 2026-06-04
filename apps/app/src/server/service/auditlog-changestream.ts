@@ -78,10 +78,7 @@ export class AuditlogChangeStreamService {
             event.fullDocument != null
           ) {
             await this.delegator.updateOrInsertAuditlog(event.fullDocument);
-          } else if (
-            event.operationType === 'delete' &&
-            'documentKey' in event
-          ) {
+          } else if (event.operationType === 'delete') {
             await this.delegator.deleteAuditlog(event.documentKey._id);
           }
           await ResumeTokenStore.save(STREAM_KEY, event._id);
@@ -100,7 +97,8 @@ export class AuditlogChangeStreamService {
     } catch (err) {
       if (isChangeStreamHistoryLost(err)) {
         logger.warn(
-          'Change stream history lost. Clearing resume token and restarting from current position.',
+          'Change stream history lost (oplog truncated). Clearing resume token and restarting from current position.' +
+            ' Documents written during the gap are not in Elasticsearch; run reindex to restore consistency.',
         );
         await ResumeTokenStore.clear(STREAM_KEY);
       } else {
