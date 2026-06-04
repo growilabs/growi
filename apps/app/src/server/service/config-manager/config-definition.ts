@@ -75,8 +75,6 @@ export const CONFIG_KEYS = [
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
   'app:wipPageExpirationSeconds',
-  'app:openaiThreadDeletionCronMaxMinutesUntilRequest',
-  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
   'app:isReadOnlyForNewUser',
 
   // Content-Disposition settings for MIME types
@@ -264,16 +262,7 @@ export const CONFIG_KEYS = [
   // OpenAI Settings
   'openai:serviceType',
   'openai:apiKey',
-  'openai:assistantModel:chat',
-  'openai:assistantModel:edit',
   'openai:assistantModel:mastraAgent',
-  'openai:threadDeletionCronExpression',
-  'openai:threadDeletionBarchSize',
-  'openai:threadDeletionApiCallInterval',
-  'openai:vectorStoreFileDeletionCronExpression',
-  'openai:vectorStoreFileDeletionBarchSize',
-  'openai:vectorStoreFileDeletionApiCallInterval',
-  'openai:limitLearnablePageCountPerAssistant',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -519,16 +508,6 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'WIP_PAGE_EXPIRATION_SECONDS',
     defaultValue: 172800,
   }),
-  'app:openaiThreadDeletionCronMaxMinutesUntilRequest': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
-    defaultValue: 30,
-  }),
-  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest':
-    defineConfig<number>({
-      envVarName:
-        'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
-      defaultValue: 30,
-    }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
     defaultValue: false,
@@ -1164,47 +1143,11 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
     isSecret: true,
   }),
-  'openai:assistantModel:chat': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_CHAT_ASSISTANT_MODEL',
-    defaultValue: 'gpt-4.1-mini',
-  }),
-  'openai:assistantModel:edit': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_EDITOR_ASSISTANT_MODEL',
-    defaultValue: 'gpt-4.1-mini',
-  }),
   // Reasoning-capable model for the Mastra agent. Emits reasoning summary
   // chunks consumed by the AI Elements Reasoning UI in the chat sidebar.
   'openai:assistantModel:mastraAgent': defineConfig<OpenAI.Chat.ChatModel>({
     envVarName: 'OPENAI_MASTRA_AGENT_MODEL',
     defaultValue: 'o4-mini',
-  }),
-  'openai:threadDeletionCronExpression': defineConfig<string>({
-    envVarName: 'OPENAI_THREAD_DELETION_CRON_EXPRESSION',
-    defaultValue: '0 * * * *',
-  }),
-  'openai:threadDeletionBarchSize': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_BARCH_SIZE',
-    defaultValue: 100,
-  }),
-  'openai:threadDeletionApiCallInterval': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_API_CALL_INTERVAL',
-    defaultValue: 36000,
-  }),
-  'openai:vectorStoreFileDeletionCronExpression': defineConfig<string>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_EXPRESSION',
-    defaultValue: '0 * * * *',
-  }),
-  'openai:vectorStoreFileDeletionBarchSize': defineConfig<number>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_BARCH_SIZE',
-    defaultValue: 100,
-  }),
-  'openai:vectorStoreFileDeletionApiCallInterval': defineConfig<number>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_API_CALL_INTERVAL',
-    defaultValue: 36000,
-  }),
-  'openai:limitLearnablePageCountPerAssistant': defineConfig<number>({
-    envVarName: 'OPENAI_LIMIT_LEARNABLE_PAGE_COUNT_PER_ASSISTANT',
-    defaultValue: 3000,
   }),
 
   // OpenTelemetry Settings

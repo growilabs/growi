@@ -22,7 +22,6 @@ import {
   isUploadAllFileAllowedAtom,
   isUploadEnabledAtom,
   isUsersHomepageDeletionEnabledAtom,
-  limitLearnablePageCountPerAssistantAtom,
   rendererConfigAtom,
   showPageSideAuthorsAtom,
 } from '~/states/server-configurations';
@@ -43,10 +42,6 @@ export const useHydrateGeneralPageConfigurationAtoms = (
       ? []
       : [
           createAtomTuple(aiEnabledAtom, serverConfig.aiEnabled),
-          createAtomTuple(
-            limitLearnablePageCountPerAssistantAtom,
-            serverConfig.limitLearnablePageCountPerAssistant,
-          ),
           createAtomTuple(
             isUsersHomepageDeletionEnabledAtom,
             serverConfig.isUsersHomepageDeletionEnabled,

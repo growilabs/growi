@@ -70,9 +70,6 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
     props: {
       serverConfig: {
         aiEnabled: configManager.getConfig('app:aiEnabled'),
-        limitLearnablePageCountPerAssistant: configManager.getConfig(
-          'openai:limitLearnablePageCountPerAssistant',
-        ),
         isUsersHomepageDeletionEnabled: configManager.getConfig(
           'security:user-homepage-deletion:isEnabled',
         ),
