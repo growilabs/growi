@@ -2,21 +2,13 @@
 
 > 実装順序は design.md「Migration Strategy」に準拠: 前提移設 → mastra 契約変更（サーバ→クライアント）→ 横断参照除去 → openai スリム化 → データ層/設定/i18n → 統合検証。各フェーズ後に `turbo run lint/test/build --filter @growi/app` を実行する。
 
-- [ ] 1. Foundation: 残置範囲の確定と前提移設
-
-- [ ] 1.1 パス提案用プロンプト定数を features/openai の残置対象として保全
-  - suggest-path が使用するプロンプト定数（`instructionsForInformationTypes`）を features/openai 内に残し、共有定数ファイルを「使用中の定数のみ」に整理する（削除対象のアシスタント専用未使用定数を除去）
-  - suggest-path 側の import パス・参照は変更しない（suggest-path のソース・テストは触らない）
-  - 観測可能な完了条件: アシスタント関連削除後も suggest-path が同一 import のままビルド・テストが通り、当該定数ファイルには使用中の定数のみが残る
-  - _Requirements: 6.1, 6.4_
-  - _Boundary: OpenAI LLM Client Base_
-
-- [ ] 1.2 残置する LLM クライアント基盤の最小範囲を確定
-  - 残置対象（クライアントデリゲータ・AI 有効判定・認可ミドルウェア・serviceType 型・生クライアント）の実依存をたどり、suggest-path/mastra が必要とする最小公開面を列挙する
-  - 生クライアントの唯一の参照元が削除対象のエディターアシスタントであることを確認し、削除後に残すか否かを判定する
-  - エディターの差分マージ表示（unified merge view）連携が AI（エディターアシスタント）専用所有であり、通常編集に波及しないことを確認する
-  - 観測可能な完了条件: 「残す／削る」対象モジュールの一覧と、デリゲータから除去するメソッド群が確定し、後続タスクの削除範囲として参照できる
-  - _Requirements: 1.2, 2.5, 6.4_
+- [x] 1. Foundation: 残置範囲の確定（検証）
+  - 残置対象（クライアントデリゲータ・AI 有効判定・認可ミドルウェア・serviceType 型・suggest-path 用プロンプト定数）の実依存をたどり、最小公開面を確定して記録する
+  - 生クライアントの唯一の参照元が削除対象のエディターアシスタントであることを確認し、残置不要（削除可）と判定する
+  - エディターの差分マージ表示（unified merge view）連携が AI（エディターアシスタント）専用所有で通常編集に波及しないことを確認する
+  - suggest-path 用プロンプト定数（instructionsForInformationTypes）は残置対象とし、未使用の他定数のトリムは消費側を削除する 5.1 で行う（順序: 消費側削除 → トリム）
+  - 観測可能な完了条件: 「残す／削る」対象とデリゲータ除去メソッドが Implementation Notes に記録され、後続タスクの削除範囲として参照できる
+  - _Requirements: 1.2, 2.5, 6.1, 6.4_
 
 - [ ] 2. mastra チャットのアシスタント非依存化（サーバ）
 
@@ -88,7 +80,7 @@
   - 観測可能な完了条件: エディター内に AI 編集トグル・編集補助導線が存在せず、通常編集は従来どおり動作する
   - _Requirements: 2.2, 2.3, 2.5_
   - _Boundary: app-wide integration_
-  - _Depends: 1.2_
+  - _Depends: 1_
 
 - [ ] 4.4 (P) ページ更新・ユーザー削除・起動時正規化の openai 連携を除去
   - ページ作成・更新時の vectorStore 同期連携、ユーザー削除時のアシスタント削除連携、起動時の thread-relation／vector-store 正規化処理を取り除く
@@ -100,12 +92,12 @@
 - [ ] 5. features/openai のスリム化（削除と整理）
 
 - [ ] 5.1 アシスタント／ナレッジ／エディター／cron／神サービス等を削除
-  - assistant・editor-assistant・knowledge・cron・embeddings・normalize・統合サービス（神サービス）・アシスタント系ルート・アシスタント系インターフェイス・アシスタント系クライアント UI を削除する（接続設定 UI は残す）
-  - ただし 1.1 で保全した suggest-path 用プロンプト定数ファイルは削除対象から除外する
-  - 観測可能な完了条件: openai 配下にアシスタント／FileSearch／vectorStore／ナレッジ／エディター関連コードが残らない
+  - assistant・editor-assistant・knowledge・cron・embeddings・normalize・統合サービス（神サービス）・生クライアント（client.ts）・アシスタント系ルート・アシスタント系インターフェイス・アシスタント系クライアント UI を削除する（接続設定 UI は残す）
+  - suggest-path 用プロンプト定数ファイルは削除対象から除外し、消費側（assistant 配下）削除後に使用中の定数のみへトリムする（suggest-path の import は不変）
+  - 観測可能な完了条件: openai 配下にアシスタント／FileSearch／vectorStore／ナレッジ／エディター関連コードが残らず、残置基盤（デリゲータ／AI 有効判定／認可ミドルウェア／serviceType 型／プロンプト定数）のみが残る
   - _Requirements: 1.1, 2.1, 3.1_
   - _Boundary: app-wide integration_
-  - _Depends: 1.1, 2.2, 2.3, 3.1, 3.3, 4.1, 4.2, 4.3, 4.4_
+  - _Depends: 1, 2.2, 2.3, 3.1, 3.3, 4.1, 4.2, 4.3, 4.4_
 
 - [ ] 5.2 LLM クライアントデリゲータをスリム化
   - クライアントデリゲータのインターフェイスと実装から vectorStore・thread・file 系メソッドを除去し、補完呼び出しなど残置に必要な面のみ残す
@@ -170,3 +162,11 @@
   - 観測可能な完了条件: 上記 E2E パスがいずれも成功する
   - _Requirements: 2.2, 3.1, 3.2, 3.3, 3.5, 7.4, 8.1, 8.2, 9.1, 9.3_
   - _Depends: 7.1_
+
+## Implementation Notes
+
+- **Task 1 (Foundation 検証, 完了)** 残置/削除の確定:
+  - **残置（retained surface）**: `features/openai/server/services/client-delegator/`（vectorStore/thread/file メソッドを除去しスリム化）、`server/services/is-ai-enabled.ts`、`server/routes/middlewares/certify-ai-service.ts`、`interfaces/ai.ts`（OpenaiServiceType）、`server/services/assistant/instructions/commons.ts`（`instructionsForInformationTypes` のみ・5.1 でトリム）。
+  - **削除可と確定**: `server/services/client.ts`（`openaiClient`）の唯一の参照元は削除対象の `server/routes/edit/index.ts`（エディターアシスタント）。client-delegator は client.ts を import していないため client.ts は残置不要 → 5.1 で削除。
+  - **unified merge view** は `features/openai/client/states/unified-merge-view.ts` + `client/services/editor-assistant/use-editor-assistant.tsx` 由来で、消費は `PageEditor.tsx` のみ。AI（エディターアシスタント）専用所有のため、4.3 で PageEditor から参照除去して安全。
+  - **トリム順序の制約**: `commons.ts` の未使用3定数（system/injection/file-search）は `assistant/editor-assistant.ts`・`chat-assistant.ts` がまだ使用しているため、トリムは消費側削除と同じ 5.1 で実施（先行タスクでトリムするとビルドが壊れる）。

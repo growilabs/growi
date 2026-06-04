@@ -123,7 +123,6 @@ features/openai/
 │   ├── index.ts / get-client.ts / openai-client-delegator.ts / azure-openai-client-delegator.ts / is-stream-response.ts
 │   └── interfaces.ts                    # IOpenaiClientDelegator から vectorStore/thread/file を削除
 ├── server/services/is-ai-enabled.ts     # AI 有効判定（mastra/suggest-path が利用）
-├── server/services/client.ts            # 生 OpenAI クライアント（delegator が利用する範囲のみ）
 ├── server/routes/middlewares/certify-ai-service.ts  # suggest-path が利用
 ├── server/services/assistant/instructions/commons.ts # suggest-path 用 instructionsForInformationTypes のみ残置（他定数は除去、パス不変）
 └── interfaces/ai.ts                     # OpenaiServiceType
