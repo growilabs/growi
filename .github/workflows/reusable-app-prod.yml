@@ -309,8 +309,10 @@ jobs:
       run: |
         cat apps/app/config/ci/.env.local.for-ci >> /tmp/growi-prod/apps/app/.env.production.local
 
+    # The installer suite is not sharded, so run it once per mongodb-version
+    # (shard 1/2 only) rather than redundantly in every chromium shard job.
     - name: Playwright Run (--project=chromium/installer)
-      if: ${{ matrix.browser == 'chromium' }}
+      if: ${{ matrix.browser == 'chromium' && matrix.shard == '1/2' }}
       working-directory: ./apps/app
       run: |
         pnpm playwright test --project=chromium/installer
@@ -319,6 +321,19 @@ jobs:
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
         MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright-installer
         ELASTICSEARCH_URI: http://localhost:9200/growi
+
+    # Each `playwright test` run clears blob-report/ when it writes its report
+    # (the blob reporter empties its output dir), so move this run's blob out to a
+    # staging dir before the next run wipes it. Prefixing the mongodb-version keeps
+    # filenames unique once report-playwright flattens every artifact together.
+    - name: Stash installer blob report
+      if: ${{ always() && matrix.browser == 'chromium' && matrix.shard == '1/2' }}
+      run: |
+        mkdir -p apps/app/all-blobs
+        for f in apps/app/blob-report/*.zip; do
+          [ -e "$f" ] || continue
+          mv "$f" "apps/app/all-blobs/mongo${{ matrix.mongodb-version }}-$(basename "$f")"
+        done
 
     - name: Copy dotenv file for automatic installation
       run: |
@@ -334,6 +349,15 @@ jobs:
         MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright
         ELASTICSEARCH_URI: http://localhost:9200/growi
 
+    - name: Stash main blob report
+      if: always()
+      run: |
+        mkdir -p apps/app/all-blobs
+        for f in apps/app/blob-report/*.zip; do
+          [ -e "$f" ] || continue
+          mv "$f" "apps/app/all-blobs/mongo${{ matrix.mongodb-version }}-$(basename "$f")"
+        done
+
     - name: Copy dotenv file for automatic installation with allowing guest mode
       run: |
         cat apps/app/config/ci/.env.local.for-auto-install-with-allowing-guest >> /tmp/growi-prod/apps/app/.env.production.local
@@ -348,18 +372,13 @@ jobs:
         MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright-guest-mode
         ELASTICSEARCH_URI: http://localhost:9200/growi
 
-    # The blob reporter names files by project + shard only (e.g.
-    # report-chromium-guest-mode-1.zip), without the mongodb-version. report-playwright
-    # downloads every blob-report-* artifact into one directory with merge-multiple,
-    # so the 6.0 and 8.0 jobs would emit identical filenames that race and corrupt the
-    # zip. Prefix the mongodb-version to keep them unique across the whole matrix.
-    - name: Make blob report filenames unique across the matrix
+    - name: Stash guest-mode blob report
       if: always()
       run: |
-        cd apps/app/blob-report 2>/dev/null || exit 0
-        for f in *.zip; do
+        mkdir -p apps/app/all-blobs
+        for f in apps/app/blob-report/*.zip; do
           [ -e "$f" ] || continue
-          mv "$f" "mongo${{ matrix.mongodb-version }}-$f"
+          mv "$f" "apps/app/all-blobs/mongo${{ matrix.mongodb-version }}-$(basename "$f")"
         done
 
     - name: Generate shard ID
@@ -374,7 +393,7 @@ jobs:
       if: always()
       with:
         name: blob-report-${{ matrix.browser }}-mongo${{ matrix.mongodb-version }}-${{ steps.shard-id.outputs.shard_id }}
-        path: ./apps/app/blob-report
+        path: ./apps/app/all-blobs
         retention-days: 30
 
     - name: Slack Notification
