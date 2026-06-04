@@ -1,9 +1,12 @@
-import type { Request, Response } from 'express';
+import type { NextFunction, Response } from 'express';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { AccessToken } from '~/server/models/access-token';
 
-import { createVaultPatAuth } from './vault-pat-auth';
+import {
+  createVaultCredentialAdapter,
+  type VaultAuthenticatedReq,
+} from './vault-pat-auth';
 
 // Mock the AccessToken model so tests do not require a real MongoDB connection.
 // NOTE: This mock bypasses the real Mongoose query projection, so it cannot
@@ -15,6 +18,11 @@ vi.mock('~/server/models/access-token', () => ({
     findUserIdByToken: vi.fn(),
   },
 }));
+
+// serializeUserSecurely strips password/apiToken/email but preserves _id and
+// status — both of which loginRequiredFactory inspects. We do not mock it so
+// that the adapter's observable contract (req.user carries _id + status, no
+// secrets) is exercised against the real serializer.
 
 // Mock the logger to suppress log output during tests.
 vi.mock('~/utils/logger', () => ({
@@ -30,11 +38,15 @@ vi.mock('~/utils/logger', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
+type VaultReq = VaultAuthenticatedReq;
+
 /** Build a minimal Express Request mock with a given Authorization header. */
-const buildRequest = (authHeader?: string): Request => {
+const buildRequest = (authHeader?: string): VaultReq => {
   return {
     headers: authHeader != null ? { authorization: authHeader } : {},
-  } as unknown as Request;
+    ip: '127.0.0.1',
+    originalUrl: '/vault.git/info/refs',
+  } as unknown as VaultReq;
 };
 
 /**
@@ -46,20 +58,29 @@ const encodeBasic = (username: string, password: string): string => {
   return `Basic ${credentials}`;
 };
 
-/** Build a minimal Express Response mock that records status and headers. */
+/**
+ * Build a minimal Express Response mock that records status, headers, and
+ * whether the response was ended (finalised).
+ */
 const buildResponse = (): Response & {
   statusCode: number;
   headers: Record<string, string>;
+  ended: boolean;
 } => {
   const headers: Record<string, string> = {};
   let statusCode = 200;
+  let ended = false;
 
   return {
+    headersSent: false,
     get headers() {
       return headers;
     },
     get statusCode() {
       return statusCode;
+    },
+    get ended() {
+      return ended;
     },
     setHeader(name: string, value: string) {
       headers[name] = value;
@@ -69,123 +90,175 @@ const buildResponse = (): Response & {
       statusCode = code;
       return this;
     },
+    end() {
+      ended = true;
+      return this;
+    },
   } as unknown as Response & {
     statusCode: number;
     headers: Record<string, string>;
+    ended: boolean;
   };
+};
+
+/**
+ * Stub a found AccessToken document whose populate('user') resolves the given
+ * user. findUserIdByToken returns a document with a populate() method (mirrors
+ * the real Mongoose document contract) plus the token's scopes.
+ */
+const stubFoundToken = (
+  user: { _id: { toString(): string }; status?: number },
+  scopes: ReadonlyArray<string>,
+) => {
+  const populateMock = vi.fn().mockResolvedValue({ user });
+  vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue({
+    populate: populateMock,
+    scopes,
+    // biome-ignore lint/suspicious/noExplicitAny: Mongoose HydratedDocument shape is not reconstructible here
+  } as any);
 };
 
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('VaultPatAuth', () => {
+describe('vault credential adapter (seam #1)', () => {
   const VALID_PAT = 'valid-personal-access-token-abc123';
   const INVALID_PAT = 'invalid-or-revoked-token';
 
-  let auth: ReturnType<typeof createVaultPatAuth>;
-
   beforeEach(() => {
-    auth = createVaultPatAuth();
     vi.clearAllMocks();
   });
 
   // -------------------------------------------------------------------------
-  // Case 1: No Authorization header → anonymous (null)
+  // No Authorization header → anonymous candidate (req.user stays null)
   // -------------------------------------------------------------------------
 
   describe('when the Authorization header is absent', () => {
-    it('returns null for anonymous access without setting any response status', async () => {
+    it('leaves req.user unset and calls next() (guest decision deferred to loginRequired)', async () => {
+      const adapter = createVaultCredentialAdapter();
       const req = buildRequest(); // no Authorization header
       const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
 
-      const result = await auth.authenticate(req, res);
+      await adapter(req, res, next);
 
-      expect(result).toBeNull();
-      expect(res.statusCode).toBe(200); // unchanged
-      expect(res.headers['WWW-Authenticate']).toBeUndefined();
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).toBeUndefined();
+      expect(res.statusCode).toBe(200); // untouched
+      expect(res.ended).toBe(false);
     });
   });
 
   // -------------------------------------------------------------------------
-  // Case 2: Valid PAT → { userId, scopes }
+  // Valid PAT → req.user populated (with _id + status), scopes stashed
   // -------------------------------------------------------------------------
 
   describe('when a valid PAT is provided', () => {
-    it('returns userId and scopes for a token with no scope restrictions', async () => {
+    it('populates req.user with an ACTIVE user (id + status preserved) and stashes scopes, then calls next()', async () => {
       const userId = 'user-object-id-123';
       const tokenScopes = ['read:features:page'];
-
-      // Simulate a found token document with user and scopes.
-      const populateMock = vi.fn().mockResolvedValue({
-        user: { _id: { toString: () => userId } },
-      });
-      const tokenDoc = {
-        populate: populateMock,
-        scopes: tokenScopes,
-      };
-      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(
-        tokenDoc as any,
+      stubFoundToken(
+        { _id: { toString: () => userId }, status: 2 /* STATUS_ACTIVE */ },
+        tokenScopes,
       );
 
+      const adapter = createVaultCredentialAdapter();
       const req = buildRequest(encodeBasic('anyuser', VALID_PAT));
       const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
 
-      const result = await auth.authenticate(req, res);
+      await adapter(req, res, next);
 
-      expect(result).not.toBeNull();
-      expect(result?.userId).toBe(userId);
-      expect(result?.scopes).toEqual(tokenScopes);
-      expect(res.statusCode).toBe(200);
+      expect(next).toHaveBeenCalledTimes(1);
+      // loginRequiredFactory inspects req.user._id and req.user.status.
+      const resolved = req.user as { _id: unknown; status: number };
+      expect(resolved).not.toBeNull();
+      expect(String((resolved as { _id: { toString(): string } })._id)).toBe(
+        userId,
+      );
+      expect(resolved.status).toBe(2);
+      // Scopes are stashed for the handler to forward to namespace computation.
+      expect(req.vaultScopes).toEqual(tokenScopes);
+      // No challenge / rejection.
+      expect(res.ended).toBe(false);
+      expect(res.headers['WWW-Authenticate']).toBeUndefined();
+      // The PAT password (not the username) is validated.
       expect(AccessToken.findUserIdByToken).toHaveBeenCalledWith(VALID_PAT, [
         'read:features:page',
       ]);
     });
 
-    it('reflects scope restrictions in the returned scopes array (req 2.5)', async () => {
-      const userId = 'user-object-id-456';
-      // Token restricted to a subset of scopes
-      const restrictedScopes = ['read:features:page'];
-
-      const populateMock = vi.fn().mockResolvedValue({
-        user: { _id: { toString: () => userId } },
-      });
-      const tokenDoc = {
-        populate: populateMock,
-        scopes: restrictedScopes,
-      };
-      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(
-        tokenDoc as any,
+    it('does not leak secret attributes (password/apiToken) onto req.user', async () => {
+      const userId = 'user-object-id-secret';
+      stubFoundToken(
+        {
+          _id: { toString: () => userId },
+          status: 2,
+          // biome-ignore lint/suspicious/noExplicitAny: simulating a raw user doc with secrets
+        } as any,
+        [],
       );
-
-      const req = buildRequest(encodeBasic('git', VALID_PAT));
-      const res = buildResponse();
-
-      const result = await auth.authenticate(req, res);
-
-      expect(result?.scopes).toEqual(restrictedScopes);
-    });
-
-    it('ignores the username portion of Basic Auth credentials and uses only the password (PAT)', async () => {
-      const userId = 'user-object-id-789';
-      const populateMock = vi.fn().mockResolvedValue({
-        user: { _id: { toString: () => userId } },
-      });
+      // Inject secret fields the serializer must strip.
       vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue({
-        populate: populateMock,
+        populate: vi.fn().mockResolvedValue({
+          user: {
+            _id: { toString: () => userId },
+            status: 2,
+            password: 'hashed-secret',
+            apiToken: 'api-secret',
+          },
+        }),
         scopes: [],
+        // biome-ignore lint/suspicious/noExplicitAny: Mongoose HydratedDocument shape
       } as any);
 
-      // Different usernames should all resolve the same PAT
-      const reqA = buildRequest(encodeBasic('alice', VALID_PAT));
-      const reqB = buildRequest(encodeBasic('bob', VALID_PAT));
-      const resA = buildResponse();
-      const resB = buildResponse();
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(encodeBasic('anyuser', VALID_PAT));
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
 
-      await auth.authenticate(reqA, resA);
-      await auth.authenticate(reqB, resB);
+      await adapter(req, res, next);
 
-      // Both calls should have resolved the same PAT regardless of username
+      const resolved = req.user as Record<string, unknown>;
+      expect(resolved.password).toBeUndefined();
+      expect(resolved.apiToken).toBeUndefined();
+    });
+
+    it('reflects scope restrictions in req.vaultScopes (req 2.5)', async () => {
+      const restrictedScopes = ['read:features:page'];
+      stubFoundToken(
+        { _id: { toString: () => 'u' }, status: 2 },
+        restrictedScopes,
+      );
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(encodeBasic('git', VALID_PAT));
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(req.vaultScopes).toEqual(restrictedScopes);
+    });
+
+    it('ignores the username portion of Basic Auth and uses only the password (PAT)', async () => {
+      stubFoundToken({ _id: { toString: () => 'u' }, status: 2 }, []);
+
+      const adapter = createVaultCredentialAdapter();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(
+        buildRequest(encodeBasic('alice', VALID_PAT)),
+        buildResponse(),
+        next,
+      );
+      await adapter(
+        buildRequest(encodeBasic('bob', VALID_PAT)),
+        buildResponse(),
+        next,
+      );
+
       expect(AccessToken.findUserIdByToken).toHaveBeenNthCalledWith(
         1,
         VALID_PAT,
@@ -197,109 +270,153 @@ describe('VaultPatAuth', () => {
         expect.any(Array),
       );
     });
-  });
 
-  // -------------------------------------------------------------------------
-  // Case 3: Invalid / revoked PAT → 401 + WWW-Authenticate header
-  // -------------------------------------------------------------------------
-
-  describe('when an invalid or revoked PAT is provided', () => {
-    it('sets 401 status and WWW-Authenticate header, then throws', async () => {
-      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
-
-      const req = buildRequest(encodeBasic('anyuser', INVALID_PAT));
-      const res = buildResponse();
-
-      await expect(auth.authenticate(req, res)).rejects.toThrow();
-
-      expect(res.statusCode).toBe(401);
-      expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
-    });
-
-    it('does not include page list or existence information in the error message (req 2.3)', async () => {
-      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
-
-      const req = buildRequest(encodeBasic('anyuser', INVALID_PAT));
-      const res = buildResponse();
-
-      let errorMessage = '';
-      try {
-        await auth.authenticate(req, res);
-      } catch (err) {
-        if (err instanceof Error) {
-          errorMessage = err.message;
-        }
-      }
-
-      // The error message must not reveal page paths, page IDs, or existence info
-      expect(errorMessage).not.toMatch(/page/i);
-      expect(errorMessage).not.toMatch(/path/i);
-      expect(errorMessage).not.toMatch(/namespace/i);
-      expect(errorMessage).not.toMatch(/exist/i);
-    });
-
-    it('sets 401 when the Authorization header uses a non-Basic scheme', async () => {
-      const req = buildRequest('Bearer some-bearer-token');
-      const res = buildResponse();
-
-      await expect(auth.authenticate(req, res)).rejects.toThrow();
-
-      expect(res.statusCode).toBe(401);
-      expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Case 4: Token with no scopes → scopes field is an empty array
-  // -------------------------------------------------------------------------
-
-  describe('when a valid PAT has no explicit scopes', () => {
-    it('returns an empty scopes array', async () => {
-      const userId = 'user-object-id-000';
-      const populateMock = vi.fn().mockResolvedValue({
-        user: { _id: { toString: () => userId } },
-      });
-      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue({
-        populate: populateMock,
-        scopes: undefined, // no scopes stored
-      } as any);
-
-      const req = buildRequest(encodeBasic('anyuser', VALID_PAT));
-      const res = buildResponse();
-
-      const result = await auth.authenticate(req, res);
-
-      expect(result?.scopes).toEqual([]);
-    });
-  });
-
-  // -------------------------------------------------------------------------
-  // Case 5: PAT with colons in the password (edge case for Basic Auth parsing)
-  // -------------------------------------------------------------------------
-
-  describe('when the PAT itself contains colons', () => {
-    it('correctly extracts the PAT even when it contains colon characters', async () => {
+    it('correctly extracts a PAT that itself contains colon characters', async () => {
       const patWithColons = 'part1:part2:part3';
-      const userId = 'user-object-id-colon';
-      const populateMock = vi.fn().mockResolvedValue({
-        user: { _id: { toString: () => userId } },
-      });
-      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue({
-        populate: populateMock,
-        scopes: [],
-      } as any);
+      stubFoundToken({ _id: { toString: () => 'u' }, status: 2 }, []);
 
-      // Encode "anyuser:part1:part2:part3" — split on first colon only
+      const adapter = createVaultCredentialAdapter();
       const req = buildRequest(encodeBasic('anyuser', patWithColons));
       const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
 
-      await auth.authenticate(req, res);
+      await adapter(req, res, next);
 
-      // The full password portion "part1:part2:part3" should be passed as the PAT
       expect(AccessToken.findUserIdByToken).toHaveBeenCalledWith(
         patWithColons,
         expect.any(Array),
       );
+    });
+
+    it('allows a read-only user (vault clone is read-only — intentional deviation from accessTokenParser)', async () => {
+      // The standard parserForAccessToken rejects readOnly users; the vault
+      // credential adapter intentionally does NOT, so read-only users can clone.
+      stubFoundToken(
+        {
+          _id: { toString: () => 'ro-user' },
+          status: 2,
+          // biome-ignore lint/suspicious/noExplicitAny: readOnly is not on the minimal stub type
+        } as any,
+        [],
+      );
+      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue({
+        populate: vi.fn().mockResolvedValue({
+          user: {
+            _id: { toString: () => 'ro-user' },
+            status: 2,
+            readOnly: true,
+          },
+        }),
+        scopes: [],
+        // biome-ignore lint/suspicious/noExplicitAny: Mongoose HydratedDocument shape
+      } as any);
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(encodeBasic('anyuser', VALID_PAT));
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      // Resolved, not rejected.
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).not.toBeNull();
+      expect(res.ended).toBe(false);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Present-but-invalid / revoked / expired PAT → 401 + WWW-Authenticate + END
+  // (req 2.2 — loginRequiredFactory alone cannot do this: it would treat a
+  // missing user as anonymous and allow it when guests are permitted.)
+  // -------------------------------------------------------------------------
+
+  describe('when a present credential is invalid / revoked / expired', () => {
+    it('responds 401 + WWW-Authenticate, ends the response, and does NOT call next()', async () => {
+      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(encodeBasic('anyuser', INVALID_PAT));
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(res.statusCode).toBe(401);
+      expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
+      expect(res.ended).toBe(true);
+      // MUST NOT fall through to anonymous handling.
+      expect(next).not.toHaveBeenCalled();
+      expect(req.user).toBeUndefined();
+    });
+
+    it('records a VAULT_AUTH_FAILURE audit event when a present credential is invalid (req 10.4)', async () => {
+      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
+      const createActivity = vi.fn().mockResolvedValue(undefined);
+
+      const adapter = createVaultCredentialAdapter(createActivity);
+      const req = buildRequest(encodeBasic('anyuser', INVALID_PAT));
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(createActivity).toHaveBeenCalledWith(
+        expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
+      );
+    });
+
+    it('rejects a non-Basic Authorization scheme with 401 (fail-closed)', async () => {
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest('Bearer some-bearer-token');
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(res.statusCode).toBe(401);
+      expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
+      expect(next).not.toHaveBeenCalled();
+    });
+
+    it('does not include page/path/existence information in the rejection (req 2.3)', async () => {
+      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue(null);
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(encodeBasic('anyuser', INVALID_PAT));
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      // The challenge body is empty (.end() with no payload); only the
+      // WWW-Authenticate header is emitted.
+      expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Token with no scopes → vaultScopes is an empty array
+  // -------------------------------------------------------------------------
+
+  describe('when a valid PAT has no explicit scopes', () => {
+    it('stashes an empty scopes array', async () => {
+      vi.mocked(AccessToken.findUserIdByToken).mockResolvedValue({
+        populate: vi.fn().mockResolvedValue({
+          user: { _id: { toString: () => 'u' }, status: 2 },
+        }),
+        scopes: undefined,
+        // biome-ignore lint/suspicious/noExplicitAny: Mongoose HydratedDocument shape
+      } as any);
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(encodeBasic('anyuser', VALID_PAT));
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(req.vaultScopes).toEqual([]);
     });
   });
 });

@@ -1,13 +1,22 @@
 import { pipeline } from 'node:stream/promises';
-import type { Request, Response, Router } from 'express';
+import type {
+  NextFunction,
+  Request,
+  RequestHandler,
+  Response,
+  Router,
+} from 'express';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
-import { aclService } from '~/server/service/acl';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { generateUnavailableWhenMaintenanceModeMiddlewareForApi } from '~/server/middlewares/unavailable-when-maintenance-mode';
 import loggerFactory from '~/utils/logger';
 
-import type { VaultPatAuth } from '../middlewares/vault-pat-auth';
-import { vaultPatAuth as defaultVaultPatAuth } from '../middlewares/vault-pat-auth';
+import {
+  createVaultCredentialAdapter,
+  type VaultAuthenticatedReq,
+} from '../middlewares/vault-pat-auth';
 import { VaultSyncState } from '../models/vault-sync-state';
 import { vaultManagerClient } from '../services/vault-manager-client';
 import { vaultNamespaceMapper } from '../services/vault-namespace-mapper';
@@ -19,28 +28,42 @@ const logger = loggerFactory('growi:features:growi-vault:routes:vault-gateway');
 // Types
 // ============================================================================
 
+/** Activity-logger callback shape (see VaultGatewayRouterDeps.createActivity). */
+type CreateActivity = (params: {
+  ip: string | undefined;
+  endpoint: string;
+  action: string;
+  user: string | undefined;
+  snapshot: { username?: string };
+}) => Promise<void>;
+
 /**
  * Dependencies injected into the VaultGatewayRouter factory.
  * Using dependency injection keeps the router testable without side effects.
  */
 export interface VaultGatewayRouterDeps {
-  /** PAT authenticator; defaults to the module-level singleton. */
-  readonly vaultPatAuth?: VaultPatAuth;
+  /**
+   * Crowi instance used to build the standard middleware chain
+   * (maintenanceMode + loginRequiredFactory). When omitted, those middlewares
+   * are skipped (test mode only) — mirroring vault-page / vault-admin.
+   */
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  readonly crowi?: any;
+  /**
+   * Credential adapter (seam #1) Express middleware. Defaults to
+   * `createVaultCredentialAdapter(createActivity)`. Tests may inject a stub.
+   */
+  readonly vaultPatAuth?: RequestHandler;
   /**
    * Optional activity logger callback. Called fire-and-forget after a
-   * successful git operation. Accepts the same shape as
+   * successful git operation, and on auth failures (via the credential
+   * adapter / git fallback). Accepts the same shape as
    * activityService.createActivity().
    *
    * Keeping this as an optional callback (rather than accepting the full Crowi
    * object) limits coupling to the audit log interface alone.
    */
-  readonly createActivity?: (params: {
-    ip: string | undefined;
-    endpoint: string;
-    action: string;
-    user: string | undefined;
-    snapshot: { username?: string };
-  }) => Promise<void>;
+  readonly createActivity?: CreateActivity;
 }
 
 // ============================================================================
@@ -100,69 +123,60 @@ async function assertGatewayReady(
   return true;
 }
 
-/** Activity-logger callback shape (see VaultGatewayRouterDeps.createActivity). */
-type CreateActivity = NonNullable<VaultGatewayRouterDeps['createActivity']>;
-
 /**
- * Send the git-compatible 401 challenge and record an auth-failure activity.
+ * git-compatible fallback (seam #2) for `loginRequiredFactory`.
  *
- * Shared by the PAT-failure path and the guest gate so the response shape
- * (status, WWW-Authenticate header, empty body) and the audit log entry stay
- * identical across both gateway handlers and both rejection reasons.
- * The body intentionally carries no page content / list / existence info (req 2.3).
+ * The standard loginRequired fallback redirects an unauthenticated browser to
+ * `/login`. A git client cannot follow that — so this fallback returns the
+ * git-native challenge `401 + WWW-Authenticate: Basic realm="GROWI Vault"` and
+ * records a VAULT_AUTH_FAILURE audit event (req 10.4). This is the single point
+ * where the "anonymous + guests denied → 401" decision (req 2.4a) surfaces; the
+ * guest/user decision itself is made by loginRequiredFactory via
+ * `aclService.isGuestAllowedToRead()` (single source of truth — req 11).
+ *
+ * The response body intentionally carries no page content / list / existence
+ * information (req 2.3).
  */
-function rejectUnauthenticated(
-  req: Request,
-  res: Response,
-  createActivity: CreateActivity | undefined,
-): void {
-  if (!res.headersSent) {
-    res.setHeader('WWW-Authenticate', 'Basic realm="GROWI Vault"');
-    res.status(401).end();
-  } else {
-    res.end();
-  }
+function createGitFallback(createActivity: CreateActivity | undefined) {
+  return (req: Request, res: Response, _next: NextFunction): void => {
+    if (!res.headersSent) {
+      res.setHeader('WWW-Authenticate', 'Basic realm="GROWI Vault"');
+      res.status(401).end();
+    } else {
+      res.end();
+    }
 
-  // Log the auth failure to the audit log (req 10.4).
-  createActivity?.({
-    ip: req.ip,
-    endpoint: req.originalUrl,
-    action: SupportedAction.ACTION_VAULT_AUTH_FAILURE,
-    user: undefined,
-    snapshot: {},
-  }).catch((err) =>
-    logger.warn({ err }, 'Failed to record auth-failure activity'),
-  );
+    createActivity?.({
+      ip: req.ip,
+      endpoint: req.originalUrl,
+      action: SupportedAction.ACTION_VAULT_AUTH_FAILURE,
+      user: undefined,
+      snapshot: {},
+    }).catch((err) =>
+      logger.warn({ err }, 'Failed to record auth-failure activity'),
+    );
+  };
 }
 
 /**
- * Guest gate (req 2.4 / 2.4a).
+ * Read the authenticated identity off the request.
  *
- * When the request resolved to an anonymous identity (userId === null), defer
- * the guest read decision to the GROWI single source of truth —
- * `aclService.isGuestAllowedToRead()` — instead of re-implementing guest logic
- * here. This is the same semantics as `loginRequired(crowi, isGuestAllowed=true)`.
- *
- * Returns true when the request may continue (authenticated user, or guest read
- * allowed); returns false after responding 401 when an anonymous request is
- * rejected (default `restrictGuestMode='Deny'` / `wikiMode='private'`).
+ * The credential adapter (seam #1) populated `req.user` with a securely
+ * serialized user (when a valid PAT was presented) and stashed the PAT scopes
+ * on `req.vaultScopes`. An anonymous-but-allowed request (guest read permitted)
+ * reaches the handler with `req.user` unset → userId resolves to null and only
+ * the 'public' namespace is accessible (req 3.2).
  */
-function passesGuestGate(
-  req: Request,
-  res: Response,
-  userId: string | null,
-  createActivity: CreateActivity | undefined,
-): boolean {
-  if (userId != null) {
-    return true;
-  }
-
-  if (aclService.isGuestAllowedToRead()) {
-    return true;
-  }
-
-  rejectUnauthenticated(req, res, createActivity);
-  return false;
+function readIdentity(req: Request): {
+  userId: string | null;
+  scopes: ReadonlyArray<string> | undefined;
+} {
+  const authedReq = req as VaultAuthenticatedReq;
+  const rawUser = authedReq.user as
+    | { _id?: { toString(): string } }
+    | undefined;
+  const userId = rawUser?._id?.toString() ?? null;
+  return { userId, scopes: authedReq.vaultScopes };
 }
 
 // ============================================================================
@@ -175,18 +189,54 @@ function passesGuestGate(
  *
  * Mount point: `/vault.git`
  * (Registered by the app's top-level router at `/vault.git`.)
+ *
+ * Authentication / authorisation is composed from the canonical apps/app
+ * middleware chain so the gateway shares GROWI's single source of truth instead
+ * of re-implementing authz (req 11):
+ *
+ *   [maintenanceMode] → credentialAdapter (seam #1)
+ *     → loginRequiredFactory(crowi, isGuestAllowed=true, gitFallback) → handler
+ *
+ * The rate limiter is applied at the mount point (server/routes/index.js,
+ * req 10.3) so it is intentionally NOT added here.
+ *
+ * Intentional deviations from the standard write-API chain (req 11.4 — these
+ * are deliberate, not implicit drift):
+ *  - No CSRF / `certifyOrigin`: git clients have no browser origin, and both
+ *    `info/refs` (GET) and `git-upload-pack` (POST) are read-only.
+ *  - No `excludeReadOnlyUser`: vault clone is read-only, so read-only users are
+ *    allowed (the standard accessTokenParser rejects them for write-API safety).
  */
 export const createVaultGatewayRouter = (
   deps: VaultGatewayRouterDeps = {},
 ): Router => {
-  const auth = deps.vaultPatAuth ?? defaultVaultPatAuth;
-  const createActivity = deps.createActivity;
+  const { crowi, createActivity } = deps;
+  const credentialAdapter =
+    deps.vaultPatAuth ?? createVaultCredentialAdapter(createActivity);
 
   const router = express.Router();
 
   // --------------------------------------------------------------------------
+  // Standard middleware chain (req 11).
+  //
+  // When crowi is omitted (legacy unit tests) the maintenanceMode +
+  // loginRequired middlewares are skipped, mirroring vault-page / vault-admin.
+  // The credential adapter always runs so handlers can read req.user.
+  // --------------------------------------------------------------------------
+  const authMiddlewares: RequestHandler[] =
+    crowi != null
+      ? [
+          generateUnavailableWhenMaintenanceModeMiddlewareForApi(crowi),
+          credentialAdapter,
+          loginRequiredFactory(crowi, true, createGitFallback(createActivity)),
+        ]
+      : [credentialAdapter];
+
+  // --------------------------------------------------------------------------
   // ANY /vault.git/git-receive-pack → 403 read-only (req 1.3)
   // Must be registered before the more specific GET/POST handlers.
+  // Push rejection is unconditional and precedes auth — a write attempt is
+  // always refused regardless of credential.
   // --------------------------------------------------------------------------
   router.all('/git-receive-pack', (_req: Request, res: Response) => {
     res.status(403).type('text/plain').send('read-only repository');
@@ -195,234 +245,210 @@ export const createVaultGatewayRouter = (
   // --------------------------------------------------------------------------
   // GET /vault.git/info/refs  (clone / fetch discovery)
   // --------------------------------------------------------------------------
-  router.get('/info/refs', async (req: Request, res: Response) => {
-    // Feature flag + bootstrap gate (req 1.4, 1.5)
-    const ready = await assertGatewayReady(req, res);
-    if (!ready) return;
+  router.get(
+    '/info/refs',
+    ...authMiddlewares,
+    async (req: Request, res: Response) => {
+      // Feature flag + bootstrap gate (req 1.4, 1.5)
+      const ready = await assertGatewayReady(req, res);
+      if (!ready) return;
 
-    // Only git-upload-pack is supported (req 1.1 / Req 7)
-    const { service } = req.query;
-    if (service !== 'git-upload-pack') {
-      res.status(400).send('Only git-upload-pack is supported');
-      return;
-    }
+      // Only git-upload-pack is supported (req 1.1 / Req 7)
+      const { service } = req.query;
+      if (service !== 'git-upload-pack') {
+        res.status(400).send('Only git-upload-pack is supported');
+        return;
+      }
 
-    // PAT authentication (req 2)
-    let authResult: Awaited<ReturnType<VaultPatAuth['authenticate']>>;
-    try {
-      authResult = await auth.authenticate(req, res);
-    } catch {
-      // authenticate() already set status + WWW-Authenticate header, but does
-      // not finalise the response — emit the shared 401 + audit log.
-      rejectUnauthenticated(req, res, createActivity);
-      return;
-    }
+      // Identity resolved by the credential adapter + loginRequired chain.
+      const { userId, scopes } = readIdentity(req);
 
-    const userId = authResult?.userId ?? null;
-    const scopes = authResult?.scopes;
+      // Compute accessible namespaces (req 3, req 2.5)
+      let namespaces: ReadonlyArray<string>;
+      try {
+        namespaces = await vaultNamespaceMapper.computeAccessibleNamespaces(
+          userId,
+          scopes,
+        );
+      } catch (err) {
+        logger.error({ err }, 'Failed to compute accessible namespaces');
+        res.status(500).send('Internal Server Error');
+        return;
+      }
 
-    // Guest gate (req 2.4 / 2.4a): anonymous access is allowed only when the
-    // GROWI single source of truth (aclService.isGuestAllowedToRead()) permits it.
-    if (!passesGuestGate(req, res, userId, createActivity)) {
-      return;
-    }
+      // Compose per-user view in vault-manager (req 6.1)
+      let viewRef: string;
+      try {
+        const composed = await vaultManagerClient.composeView({
+          userId,
+          namespaces,
+        });
+        viewRef = composed.viewRef;
+      } catch (err) {
+        logger.warn({ err }, 'compose-view RPC failed');
+        // Distinguish connection errors (503) from RPC errors (502)
+        const isConnectionError =
+          err instanceof Error &&
+          (err.message.includes('ECONNREFUSED') ||
+            err.message.includes('ENOTFOUND') ||
+            err.message.includes('fetch failed'));
+        res.status(isConnectionError ? 503 : 502).send('Upstream error');
+        return;
+      }
 
-    // Compute accessible namespaces (req 3, req 2.5)
-    let namespaces: ReadonlyArray<string>;
-    try {
-      namespaces = await vaultNamespaceMapper.computeAccessibleNamespaces(
-        userId,
-        scopes,
+      // Audit log: clone-prepare (req 1.6)
+      createActivity?.({
+        ip: req.ip,
+        endpoint: req.originalUrl,
+        action: SupportedAction.ACTION_VAULT_CLONE_PREPARE,
+        user: userId ?? undefined,
+        snapshot: {},
+      }).catch((err) =>
+        logger.warn({ err }, 'Failed to record clone-prepare activity'),
       );
-    } catch (err) {
-      logger.error({ err }, 'Failed to compute accessible namespaces');
-      res.status(500).send('Internal Server Error');
-      return;
-    }
 
-    // Compose per-user view in vault-manager (req 6.1)
-    let viewRef: string;
-    try {
-      const composed = await vaultManagerClient.composeView({
-        userId,
-        namespaces,
-      });
-      viewRef = composed.viewRef;
-    } catch (err) {
-      logger.warn({ err }, 'compose-view RPC failed');
-      // Distinguish connection errors (503) from RPC errors (502)
-      const isConnectionError =
-        err instanceof Error &&
-        (err.message.includes('ECONNREFUSED') ||
-          err.message.includes('ENOTFOUND') ||
-          err.message.includes('fetch failed'));
-      res.status(isConnectionError ? 503 : 502).send('Upstream error');
-      return;
-    }
+      // Proxy the git info/refs response from vault-manager (req 6.2)
+      let proxyResult: Awaited<
+        ReturnType<typeof vaultManagerClient.proxyGitRequest>
+      >;
+      try {
+        proxyResult = await vaultManagerClient.proxyGitRequest({
+          method: 'GET',
+          path: '/internal/git/info/refs',
+          viewRef,
+          queryString: new URLSearchParams(
+            req.query as Record<string, string>,
+          ).toString(),
+        });
+      } catch (err) {
+        logger.warn({ err }, 'git proxy request failed (info/refs)');
+        const isConnectionError =
+          err instanceof Error &&
+          (err.message.includes('ECONNREFUSED') ||
+            err.message.includes('ENOTFOUND') ||
+            err.message.includes('fetch failed'));
+        res.status(isConnectionError ? 503 : 502).send('Upstream error');
+        return;
+      }
 
-    // Audit log: clone-prepare (req 1.6)
-    createActivity?.({
-      ip: req.ip,
-      endpoint: req.originalUrl,
-      action: SupportedAction.ACTION_VAULT_CLONE_PREPARE,
-      user: userId ?? undefined,
-      snapshot: {},
-    }).catch((err) =>
-      logger.warn({ err }, 'Failed to record clone-prepare activity'),
-    );
+      if (proxyResult.status >= 400) {
+        res.status(502).send('Upstream returned an error');
+        return;
+      }
 
-    // Proxy the git info/refs response from vault-manager (req 6.2)
-    let proxyResult: Awaited<
-      ReturnType<typeof vaultManagerClient.proxyGitRequest>
-    >;
-    try {
-      proxyResult = await vaultManagerClient.proxyGitRequest({
-        method: 'GET',
-        path: '/internal/git/info/refs',
-        viewRef,
-        queryString: new URLSearchParams(
-          req.query as Record<string, string>,
-        ).toString(),
-      });
-    } catch (err) {
-      logger.warn({ err }, 'git proxy request failed (info/refs)');
-      const isConnectionError =
-        err instanceof Error &&
-        (err.message.includes('ECONNREFUSED') ||
-          err.message.includes('ENOTFOUND') ||
-          err.message.includes('fetch failed'));
-      res.status(isConnectionError ? 503 : 502).send('Upstream error');
-      return;
-    }
+      // Forward Content-Type and status from the upstream response.
+      res.status(proxyResult.status);
+      const contentType =
+        proxyResult.headers['content-type'] ??
+        'application/x-git-upload-pack-advertisement';
+      res.setHeader('Content-Type', contentType);
 
-    if (proxyResult.status >= 400) {
-      res.status(502).send('Upstream returned an error');
-      return;
-    }
-
-    // Forward Content-Type and status from the upstream response.
-    res.status(proxyResult.status);
-    const contentType =
-      proxyResult.headers['content-type'] ??
-      'application/x-git-upload-pack-advertisement';
-    res.setHeader('Content-Type', contentType);
-
-    try {
-      await pipeline(proxyResult.body, res);
-    } catch (err) {
-      logger.warn({ err }, 'Stream pipeline error (info/refs)');
-    }
-  });
+      try {
+        await pipeline(proxyResult.body, res);
+      } catch (err) {
+        logger.warn({ err }, 'Stream pipeline error (info/refs)');
+      }
+    },
+  );
 
   // --------------------------------------------------------------------------
   // POST /vault.git/git-upload-pack  (clone / fetch pack transfer)
   // --------------------------------------------------------------------------
-  router.post('/git-upload-pack', async (req: Request, res: Response) => {
-    // Feature flag + bootstrap gate (req 1.4, 1.5)
-    const ready = await assertGatewayReady(req, res);
-    if (!ready) return;
+  router.post(
+    '/git-upload-pack',
+    ...authMiddlewares,
+    async (req: Request, res: Response) => {
+      // Feature flag + bootstrap gate (req 1.4, 1.5)
+      const ready = await assertGatewayReady(req, res);
+      if (!ready) return;
 
-    // PAT authentication (req 2)
-    let authResult: Awaited<ReturnType<VaultPatAuth['authenticate']>>;
-    try {
-      authResult = await auth.authenticate(req, res);
-    } catch {
-      rejectUnauthenticated(req, res, createActivity);
-      return;
-    }
+      // Identity resolved by the credential adapter + loginRequired chain.
+      const { userId, scopes } = readIdentity(req);
 
-    const userId = authResult?.userId ?? null;
-    const scopes = authResult?.scopes;
+      // Compute accessible namespaces (req 3, req 2.5)
+      let namespaces: ReadonlyArray<string>;
+      try {
+        namespaces = await vaultNamespaceMapper.computeAccessibleNamespaces(
+          userId,
+          scopes,
+        );
+      } catch (err) {
+        logger.error({ err }, 'Failed to compute accessible namespaces');
+        res.status(500).send('Internal Server Error');
+        return;
+      }
 
-    // Guest gate (req 2.4 / 2.4a): anonymous access is allowed only when the
-    // GROWI single source of truth (aclService.isGuestAllowedToRead()) permits it.
-    if (!passesGuestGate(req, res, userId, createActivity)) {
-      return;
-    }
+      // Compose per-user view in vault-manager (req 6.1)
+      let viewRef: string;
+      try {
+        const composed = await vaultManagerClient.composeView({
+          userId,
+          namespaces,
+        });
+        viewRef = composed.viewRef;
+      } catch (err) {
+        logger.warn({ err }, 'compose-view RPC failed (git-upload-pack)');
+        const isConnectionError =
+          err instanceof Error &&
+          (err.message.includes('ECONNREFUSED') ||
+            err.message.includes('ENOTFOUND') ||
+            err.message.includes('fetch failed'));
+        res.status(isConnectionError ? 503 : 502).send('Upstream error');
+        return;
+      }
 
-    // Compute accessible namespaces (req 3, req 2.5)
-    let namespaces: ReadonlyArray<string>;
-    try {
-      namespaces = await vaultNamespaceMapper.computeAccessibleNamespaces(
-        userId,
-        scopes,
+      // Proxy the pack upload to vault-manager (req 6.2)
+      let proxyResult: Awaited<
+        ReturnType<typeof vaultManagerClient.proxyGitRequest>
+      >;
+      try {
+        proxyResult = await vaultManagerClient.proxyGitRequest({
+          method: 'POST',
+          path: '/internal/git/git-upload-pack',
+          viewRef,
+          requestBody: req,
+        });
+      } catch (err) {
+        logger.warn({ err }, 'git proxy request failed (git-upload-pack)');
+        const isConnectionError =
+          err instanceof Error &&
+          (err.message.includes('ECONNREFUSED') ||
+            err.message.includes('ENOTFOUND') ||
+            err.message.includes('fetch failed'));
+        res.status(isConnectionError ? 503 : 502).send('Upstream error');
+        return;
+      }
+
+      if (proxyResult.status >= 400) {
+        res.status(502).send('Upstream returned an error');
+        return;
+      }
+
+      // Forward Content-Type and status.
+      res.status(proxyResult.status);
+      const contentType =
+        proxyResult.headers['content-type'] ??
+        'application/x-git-upload-pack-result';
+      res.setHeader('Content-Type', contentType);
+
+      // Audit log: clone-complete (req 1.6)
+      createActivity?.({
+        ip: req.ip,
+        endpoint: req.originalUrl,
+        action: SupportedAction.ACTION_VAULT_CLONE_COMPLETE,
+        user: userId ?? undefined,
+        snapshot: {},
+      }).catch((err) =>
+        logger.warn({ err }, 'Failed to record clone-complete activity'),
       );
-    } catch (err) {
-      logger.error({ err }, 'Failed to compute accessible namespaces');
-      res.status(500).send('Internal Server Error');
-      return;
-    }
 
-    // Compose per-user view in vault-manager (req 6.1)
-    let viewRef: string;
-    try {
-      const composed = await vaultManagerClient.composeView({
-        userId,
-        namespaces,
-      });
-      viewRef = composed.viewRef;
-    } catch (err) {
-      logger.warn({ err }, 'compose-view RPC failed (git-upload-pack)');
-      const isConnectionError =
-        err instanceof Error &&
-        (err.message.includes('ECONNREFUSED') ||
-          err.message.includes('ENOTFOUND') ||
-          err.message.includes('fetch failed'));
-      res.status(isConnectionError ? 503 : 502).send('Upstream error');
-      return;
-    }
-
-    // Proxy the pack upload to vault-manager (req 6.2)
-    let proxyResult: Awaited<
-      ReturnType<typeof vaultManagerClient.proxyGitRequest>
-    >;
-    try {
-      proxyResult = await vaultManagerClient.proxyGitRequest({
-        method: 'POST',
-        path: '/internal/git/git-upload-pack',
-        viewRef,
-        requestBody: req,
-      });
-    } catch (err) {
-      logger.warn({ err }, 'git proxy request failed (git-upload-pack)');
-      const isConnectionError =
-        err instanceof Error &&
-        (err.message.includes('ECONNREFUSED') ||
-          err.message.includes('ENOTFOUND') ||
-          err.message.includes('fetch failed'));
-      res.status(isConnectionError ? 503 : 502).send('Upstream error');
-      return;
-    }
-
-    if (proxyResult.status >= 400) {
-      res.status(502).send('Upstream returned an error');
-      return;
-    }
-
-    // Forward Content-Type and status.
-    res.status(proxyResult.status);
-    const contentType =
-      proxyResult.headers['content-type'] ??
-      'application/x-git-upload-pack-result';
-    res.setHeader('Content-Type', contentType);
-
-    // Audit log: clone-complete (req 1.6)
-    createActivity?.({
-      ip: req.ip,
-      endpoint: req.originalUrl,
-      action: SupportedAction.ACTION_VAULT_CLONE_COMPLETE,
-      user: userId ?? undefined,
-      snapshot: {},
-    }).catch((err) =>
-      logger.warn({ err }, 'Failed to record clone-complete activity'),
-    );
-
-    try {
-      await pipeline(proxyResult.body, res);
-    } catch (err) {
-      logger.warn({ err }, 'Stream pipeline error (git-upload-pack)');
-    }
-  });
+      try {
+        await pipeline(proxyResult.body, res);
+      } catch (err) {
+        logger.warn({ err }, 'Stream pipeline error (git-upload-pack)');
+      }
+    },
+  );
 
   // --------------------------------------------------------------------------
   // Catch-all: any other /vault.git/* path → 404 (req 1.7)

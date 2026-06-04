@@ -37,9 +37,12 @@ let _reconcileService: VaultReconcileService | undefined;
 /**
  * Create the VaultGatewayRouter wired to the given Crowi instance.
  *
- * Extracts the activityService.createActivity method from Crowi and passes it
- * to the router so that audit-log events are written without the router needing
- * to depend on the full Crowi object directly.
+ * Passes the Crowi instance so the router can build the standard middleware
+ * chain (maintenanceMode + loginRequiredFactory) — sharing GROWI's single
+ * source of truth for authorisation (req 11) — and extracts
+ * activityService.createActivity for audit-log events (auth failures, clone
+ * prepare/complete) without the router depending on the full Crowi object for
+ * logging.
  *
  * @param crowi - The Crowi application instance.
  */
@@ -50,7 +53,7 @@ export const createVaultGatewayRouterWithDeps = (crowi: any): Router => {
       ? crowi.activityService.createActivity.bind(crowi.activityService)
       : undefined;
 
-  return createVaultGatewayRouter({ createActivity });
+  return createVaultGatewayRouter({ crowi, createActivity });
 };
 
 /**

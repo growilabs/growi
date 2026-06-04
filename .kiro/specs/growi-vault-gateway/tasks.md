@@ -861,7 +861,7 @@ _Depends: 4.1, 10.1, 13.2_
 - `aclService` を mock で false / true 両方に振り分岐を検証する
 - **完了確認**: 上記テスト緑、RED 出力を記録。`pnpm vitest run vault-gateway.spec` PASS
 
-### [ ] 26.2 標準 middleware チェーンへ合成（要件 11）
+### [x] 26.2 標準 middleware チェーンへ合成（要件 11）
 
 - gateway router を canonical な並び（`maintenanceMode` → トークン解決 adapter（seam #1）→ `loginRequiredFactory(crowi, isGuestAllowed=true, gitFallback)` → handler）へ再構成する（`rateLimiter` は mount 側で適用済み）
 - `gitFallback`: 認証失敗時に `/login` リダイレクトではなく `401 + WWW-Authenticate: Basic realm="GROWI Vault"` を返す関数を実装し、`loginRequiredFactory` の第3引数に渡す
