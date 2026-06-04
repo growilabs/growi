@@ -127,14 +127,6 @@ jobs:
         image: mongo:${{ matrix.mongodb-version }}
         ports:
         - 27017/tcp
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:9.0.1
-        ports:
-        - 9200/tcp
-        env:
-          discovery.type: single-node
-          # ES 9.x enables security (HTTPS + auth) by default; disable for plaintext CI access
-          xpack.security.enabled: false
 
     steps:
     - uses: actions/setup-node@v6
@@ -153,6 +145,25 @@ jobs:
     # Run after extraction so pnpm/action-setup@v6 can read packageManager from package.json
     - uses: pnpm/action-setup@v6
 
+    - name: Start Elasticsearch with plugins
+      uses: elastic/elastic-github-actions/elasticsearch@master
+      with:
+        stack-version: 9.3.3
+        plugins: |
+          analysis-kuromoji
+          analysis-icu
+        security-enabled: false
+
+    - name: Wait for Elasticsearch to be ready
+      run: |
+        curl \
+          --no-progress-meter \
+          -X GET \
+          --retry 60 \
+          --retry-delay 1 \
+          --retry-connrefused \
+          http://localhost:9200/_cluster/health?wait_for_status=green
+
     - name: pnpm run server:ci
       working-directory: ./apps/app
       run: |
@@ -160,7 +171,7 @@ jobs:
         pnpm run server:ci
       env:
         MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi
-        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
+        ELASTICSEARCH_URI: http://localhost:9200/growi
 
     - name: Slack Notification
       uses: weseek/ghaction-slack-notification@master
