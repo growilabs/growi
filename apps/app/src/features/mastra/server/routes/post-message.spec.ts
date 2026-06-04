@@ -15,7 +15,7 @@ const createdChains: ChainRecorder[] = [];
 
 vi.mock('express-validator', () => {
   const body = (field: string): ChainRecorder => {
-    const recorder = { field, calls: [] } as ChainRecorder;
+    const recorder = { field, calls: [] } as unknown as ChainRecorder;
     const fluent = new Proxy(recorder, {
       get(target, prop: string) {
         if (prop === 'field' || prop === 'calls' || prop === 'customFn') {
