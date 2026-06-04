@@ -701,15 +701,22 @@ describe('Scenario (f): force bootstrap → forceWarningActive=true', () => {
     // We then wait for bootstrap to complete by polling getStatus().
     await layer.initOnStartup();
 
-    // Poll until bootstrapState reaches a terminal state (done/failed)
+    // Poll until the bootstrap settles. The background runner writes
+    // bootstrapState='done' to the DB *before* it emits the
+    // 'bootstrap-completed' audit event (state is the source of truth; the
+    // audit call is awaited afterwards). Polling on DB state alone would let
+    // this test observe 'done' and assert the audit event before it is
+    // recorded — a race that surfaces under slower CI I/O. So on the success
+    // path we also wait for the completion audit event; on failure we stop at
+    // 'failed'.
     let finalStatus = await layer.getStatus();
     const pollStart = Date.now();
     const pollTimeoutMs = 10_000;
-    while (
-      finalStatus.bootstrap.state !== 'done' &&
-      finalStatus.bootstrap.state !== 'failed' &&
-      Date.now() - pollStart < pollTimeoutMs
-    ) {
+    const isSettled = () =>
+      finalStatus.bootstrap.state === 'failed' ||
+      (finalStatus.bootstrap.state === 'done' &&
+        auditEvents.includes('vault.resilience.bootstrap-completed'));
+    while (!isSettled() && Date.now() - pollStart < pollTimeoutMs) {
       await new Promise((resolve) => setTimeout(resolve, 50));
       finalStatus = await layer.getStatus();
     }
