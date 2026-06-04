@@ -1,16 +1,11 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { AiAssistantHasId } from '~/features/openai/interfaces/ai-assistant';
-// import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
-
 /**
  * Type definition for Chat Sidebar status
  */
 export type ChatSidebarStatus = {
   isOpened: boolean;
-  isEditorAssistant?: boolean;
-  aiAssistantData?: AiAssistantHasId;
   threadId?: string;
 };
 
@@ -18,11 +13,13 @@ export type ChatSidebarStatus = {
  * Type definition for Chat Sidebar actions
  */
 export type ChatSidebarActions = {
-  openChat: (aiAssistantData: AiAssistantHasId, threadId?: string) => void;
-  openEditor: () => void;
+  /**
+   * Open the chat sidebar.
+   * @param threadId - Optional thread id to resume an existing thread.
+   *                    Omit to start a fresh chat.
+   */
+  openChat: (threadId?: string) => void;
   close: () => void;
-  // refreshAiAssistantData: (aiAssistantData?: AiAssistantHasId) => void;
-  // refreshThreadData: (threadData?: IThreadRelationHasId) => void;
 };
 
 /**
@@ -48,52 +45,21 @@ export const useChatSidebarActions = (): ChatSidebarActions => {
   const setSidebar = useSetAtom(chatSidebarAtom);
 
   const openChat = useCallback(
-    (aiAssistantData: AiAssistantHasId, threadId?: string) => {
-      setSidebar({ isOpened: true, aiAssistantData, threadId });
+    (threadId?: string) => {
+      setSidebar({ isOpened: true, threadId });
     },
     [setSidebar],
   );
 
-  const openEditor = useCallback(() => {
-    setSidebar({
-      isOpened: true,
-      isEditorAssistant: true,
-      aiAssistantData: undefined,
-    });
-  }, [setSidebar]);
-
   const close = useCallback(() => {
     setSidebar({
       isOpened: false,
-      isEditorAssistant: false,
-      aiAssistantData: undefined,
       threadId: undefined,
     });
   }, [setSidebar]);
 
-  // const refreshAiAssistantData = useCallback(
-  //   (aiAssistantData?: AiAssistantHasId) => {
-  //     setSidebar((currentState) => {
-  //       return { ...currentState, aiAssistantData };
-  //     });
-  //   },
-  //   [setSidebar],
-  // );
-
-  // const refreshThreadData = useCallback(
-  //   (threadData?: IThreadRelationHasId) => {
-  //     setSidebar((currentState) => {
-  //       return { ...currentState, threadData };
-  //     });
-  //   },
-  //   [setSidebar],
-  // );
-
   return {
     openChat,
-    openEditor,
     close,
-    // refreshAiAssistantData,
-    // refreshThreadData,
   };
 };
