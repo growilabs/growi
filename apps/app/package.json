@@ -75,7 +75,7 @@
     "@azure/openai": "^2.0.0",
     "@azure/storage-blob": "^12.16.0",
     "@codemirror/autocomplete": "^6.18.4",
-    "@codemirror/commands": "^6.8.0",
+    "@codemirror/commands": "^6.10.3",
     "@codemirror/lang-markdown": "^6.3.2",
     "@codemirror/language": "^6.12.1",
     "@codemirror/language-data": "^6.5.1",
