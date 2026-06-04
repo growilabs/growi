@@ -170,3 +170,12 @@
   - **削除可と確定**: `server/services/client.ts`（`openaiClient`）の唯一の参照元は削除対象の `server/routes/edit/index.ts`（エディターアシスタント）。client-delegator は client.ts を import していないため client.ts は残置不要 → 5.1 で削除。
   - **unified merge view** は `features/openai/client/states/unified-merge-view.ts` + `client/services/editor-assistant/use-editor-assistant.tsx` 由来で、消費は `PageEditor.tsx` のみ。AI（エディターアシスタント）専用所有のため、4.3 で PageEditor から参照除去して安全。
   - **トリム順序の制約**: `commons.ts` の未使用3定数（system/injection/file-search）は `assistant/editor-assistant.ts`・`chat-assistant.ts` がまだ使用しているため、トリムは消費側削除と同じ 5.1 で実施（先行タスクでトリムするとビルドが壊れる）。
+
+- **Task 7.1–7.3 検証エビデンス**:
+  - **Build**: `turbo run build --filter @growi/app` → 21/21 成功（全削除・移行後に未解決参照ゼロ。1.4）。
+  - **Typecheck**: `tsc --noEmit` → 残るエラーは 1 件のみで、master 由来の既存・無関係エラー（`20210913153942-...slack-app-integration-schema.integ.ts` の `.default`）。本仕様起因の型エラーなし。
+  - **Tests**: mastra + suggest-path 260 件パス。チャット契約（aiAssistantId 不要）・既存スレッド後方互換・suggest-path 継続を確認（6.1/8.3/9.2）。
+  - **AI 無効ゲート（10.4/8.4）**: mastra route factory `if(!isAiEnabled())`、get-openai-provider、左サイドバー nav（aiEnabledAtom）で維持を確認。
+  - **UI 不在（2.2/3.1/3.2/3.3/3.5）**: エディター AI トグル・アシスタント管理モーダル・マイ/チーム一覧・ページヘッダ起動ボタンの削除を grep+build で確認。
+  - **i18n（7.4）**: 削除キーへの live 参照ゼロ、共有キー保持を確認。
+  - **未実施（環境制約）**: ブラウザ Playwright による「新規チャット送受信」インタラクティブ E2E は、稼働中アプリ＋OpenAI 資格情報が必要なため本サンドボックスでは未実行。既存 E2E に AI 関連 spec は無く（cleanup 不要）。本フローは CI / 手動 QA での実機確認を推奨。`server:ci` 起動スモークは既存の migrate-mongo の `~` エイリアス解決問題（全 49 migration 共通の既存事象、本変更と無関係）により本環境では完走不可。
