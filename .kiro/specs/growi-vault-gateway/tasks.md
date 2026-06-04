@@ -880,7 +880,7 @@ _Depends: 4.1, 10.1, 13.2_
   - `X-GROWI-ACCESS-TOKEN: <PAT>` ヘッダで認証成功（reverse proxy 配下シナリオ）
   - `Authorization: Basic base64(x:PAT)`（git ネイティブ、proxy 無し）で認証成功
   - `Authorization: Basic base64(proxyUser:proxyPass)` かつ `X-GROWI-ACCESS-TOKEN` 未設定 → proxy パスワードを PAT と誤認せず 401（fail-closed）
-- **GREEN**: PAT 解決を `extractAccessToken(req)`（precedence `Bearer` > `X-GROWI-ACCESS-TOKEN` > query > body）に置き換え、null のとき `Authorization: Basic` の password 部を git ネイティブ fallback とする。`extractAccessToken` / `X_GROWI_ACCESS_TOKEN_HEADER_NAME` を `~/server/middlewares/access-token-parser` から import
+- **GREEN**: PAT 解決を `extractAccessToken(req)`（precedence `Bearer` > `X-GROWI-ACCESS-TOKEN` > query > body）に置き換え、null のとき `Authorization: Basic` の password 部を git ネイティブ fallback とする。`extractAccessToken` / `X_GROWI_ACCESS_TOKEN_HEADER_NAME` は barrel が re-export しないため `~/server/middlewares/access-token-parser/extract-access-token`（ファイル直）から import する
 - 旧 `extractPatFromBasicAuth` は Basic fallback としてのみ残す
 - **完了確認**: 上記テスト緑。proxy 配下（`X-GROWI-ACCESS-TOKEN`）と proxy 無し（Basic）の双方で clone 認証が成立すること
 
