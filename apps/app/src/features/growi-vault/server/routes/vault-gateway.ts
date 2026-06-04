@@ -3,6 +3,7 @@ import type { Request, Response, Router } from 'express';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
+import { aclService } from '~/server/service/acl';
 import loggerFactory from '~/utils/logger';
 
 import type { VaultPatAuth } from '../middlewares/vault-pat-auth';
@@ -99,6 +100,71 @@ async function assertGatewayReady(
   return true;
 }
 
+/** Activity-logger callback shape (see VaultGatewayRouterDeps.createActivity). */
+type CreateActivity = NonNullable<VaultGatewayRouterDeps['createActivity']>;
+
+/**
+ * Send the git-compatible 401 challenge and record an auth-failure activity.
+ *
+ * Shared by the PAT-failure path and the guest gate so the response shape
+ * (status, WWW-Authenticate header, empty body) and the audit log entry stay
+ * identical across both gateway handlers and both rejection reasons.
+ * The body intentionally carries no page content / list / existence info (req 2.3).
+ */
+function rejectUnauthenticated(
+  req: Request,
+  res: Response,
+  createActivity: CreateActivity | undefined,
+): void {
+  if (!res.headersSent) {
+    res.setHeader('WWW-Authenticate', 'Basic realm="GROWI Vault"');
+    res.status(401).end();
+  } else {
+    res.end();
+  }
+
+  // Log the auth failure to the audit log (req 10.4).
+  createActivity?.({
+    ip: req.ip,
+    endpoint: req.originalUrl,
+    action: SupportedAction.ACTION_VAULT_AUTH_FAILURE,
+    user: undefined,
+    snapshot: {},
+  }).catch((err) =>
+    logger.warn({ err }, 'Failed to record auth-failure activity'),
+  );
+}
+
+/**
+ * Guest gate (req 2.4 / 2.4a).
+ *
+ * When the request resolved to an anonymous identity (userId === null), defer
+ * the guest read decision to the GROWI single source of truth —
+ * `aclService.isGuestAllowedToRead()` — instead of re-implementing guest logic
+ * here. This is the same semantics as `loginRequired(crowi, isGuestAllowed=true)`.
+ *
+ * Returns true when the request may continue (authenticated user, or guest read
+ * allowed); returns false after responding 401 when an anonymous request is
+ * rejected (default `restrictGuestMode='Deny'` / `wikiMode='private'`).
+ */
+function passesGuestGate(
+  req: Request,
+  res: Response,
+  userId: string | null,
+  createActivity: CreateActivity | undefined,
+): boolean {
+  if (userId != null) {
+    return true;
+  }
+
+  if (aclService.isGuestAllowedToRead()) {
+    return true;
+  }
+
+  rejectUnauthenticated(req, res, createActivity);
+  return false;
+}
+
 // ============================================================================
 // Router factory
 // ============================================================================
@@ -146,29 +212,20 @@ export const createVaultGatewayRouter = (
     try {
       authResult = await auth.authenticate(req, res);
     } catch {
-      // authenticate() already set status + WWW-Authenticate header.
-      // Finalise the response (the authenticate() implementation sets the status
-      // code and throws, but does not call res.end()).
-      if (!res.headersSent) {
-        res.status(401).end();
-      } else {
-        res.end();
-      }
-      // Log the auth failure to the audit log (req 10.4).
-      createActivity?.({
-        ip: req.ip,
-        endpoint: req.originalUrl,
-        action: SupportedAction.ACTION_VAULT_AUTH_FAILURE,
-        user: undefined,
-        snapshot: {},
-      }).catch((err) =>
-        logger.warn({ err }, 'Failed to record auth-failure activity'),
-      );
+      // authenticate() already set status + WWW-Authenticate header, but does
+      // not finalise the response — emit the shared 401 + audit log.
+      rejectUnauthenticated(req, res, createActivity);
       return;
     }
 
     const userId = authResult?.userId ?? null;
     const scopes = authResult?.scopes;
+
+    // Guest gate (req 2.4 / 2.4a): anonymous access is allowed only when the
+    // GROWI single source of truth (aclService.isGuestAllowedToRead()) permits it.
+    if (!passesGuestGate(req, res, userId, createActivity)) {
+      return;
+    }
 
     // Compute accessible namespaces (req 3, req 2.5)
     let namespaces: ReadonlyArray<string>;
@@ -270,25 +327,18 @@ export const createVaultGatewayRouter = (
     try {
       authResult = await auth.authenticate(req, res);
     } catch {
-      if (!res.headersSent) {
-        res.status(401).end();
-      } else {
-        res.end();
-      }
-      createActivity?.({
-        ip: req.ip,
-        endpoint: req.originalUrl,
-        action: SupportedAction.ACTION_VAULT_AUTH_FAILURE,
-        user: undefined,
-        snapshot: {},
-      }).catch((err) =>
-        logger.warn({ err }, 'Failed to record auth-failure activity'),
-      );
+      rejectUnauthenticated(req, res, createActivity);
       return;
     }
 
     const userId = authResult?.userId ?? null;
     const scopes = authResult?.scopes;
+
+    // Guest gate (req 2.4 / 2.4a): anonymous access is allowed only when the
+    // GROWI single source of truth (aclService.isGuestAllowedToRead()) permits it.
+    if (!passesGuestGate(req, res, userId, createActivity)) {
+      return;
+    }
 
     // Compute accessible namespaces (req 3, req 2.5)
     let namespaces: ReadonlyArray<string>;

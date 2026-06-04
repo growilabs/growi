@@ -34,6 +34,15 @@ vi.mock('../services/vault-manager-client', () => ({
   },
 }));
 
+// The guest gate must consult the GROWI single source of truth for guest
+// read permission. Mocking the aclService singleton lets each test drive the
+// isGuestAllowedToRead() decision (true / false).
+vi.mock('~/server/service/acl', () => ({
+  aclService: {
+    isGuestAllowedToRead: vi.fn(),
+  },
+}));
+
 // ---------------------------------------------------------------------------
 // Import mocked modules so tests can configure them
 // ---------------------------------------------------------------------------
@@ -41,6 +50,8 @@ vi.mock('../services/vault-manager-client', () => ({
 // ---------------------------------------------------------------------------
 // Import mocked modules so tests can configure them
 // ---------------------------------------------------------------------------
+
+import { aclService } from '~/server/service/acl';
 
 import { VaultSyncState } from '../models/vault-sync-state';
 import { vaultManagerClient } from '../services/vault-manager-client';
@@ -313,6 +324,179 @@ describe('VaultGatewayRouter', () => {
 
       // The body must NOT expose page names, paths, or existence information (req 2.3)
       expect(res.text).not.toMatch(/\/|page|path|exist/i);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Guest gate: anonymous access must obey aclService.isGuestAllowedToRead()
+  // (req 2.4 / 2.4a — single source of truth, eliminates ACL bypass)
+  // -------------------------------------------------------------------------
+
+  describe('guest gate (no Authorization header)', () => {
+    /** Auth stub that mirrors the real adapter: no header → anonymous (null). */
+    const anonymousAuth = {
+      authenticate: vi.fn().mockResolvedValue(null),
+    };
+
+    beforeEach(() => {
+      (
+        vaultSettingsService.getSettings as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(enabledSettings);
+      mockSyncStateDone();
+      (
+        vaultNamespaceMapper.computeAccessibleNamespaces as ReturnType<
+          typeof vi.fn
+        >
+      ).mockResolvedValue(['public']);
+      (
+        vaultManagerClient.composeView as ReturnType<typeof vi.fn>
+      ).mockResolvedValue({ viewRef: 'guest-view', commitOid: 'abc' });
+      (
+        vaultManagerClient.proxyGitRequest as ReturnType<typeof vi.fn>
+      ).mockResolvedValue(
+        makeProxyOkResponse('application/x-git-upload-pack-advertisement'),
+      );
+    });
+
+    describe('when isGuestAllowedToRead() === false (default restrictGuestMode=Deny / private wiki)', () => {
+      beforeEach(() => {
+        (
+          aclService.isGuestAllowedToRead as ReturnType<typeof vi.fn>
+        ).mockReturnValue(false);
+      });
+
+      it('GET /info/refs returns 401 + WWW-Authenticate and exposes no page info', async () => {
+        const createActivity = vi.fn().mockResolvedValue(undefined);
+        const app = buildApp({ vaultPatAuth: anonymousAuth, createActivity });
+
+        const res = await request(app).get(
+          '/vault.git/info/refs?service=git-upload-pack',
+        );
+
+        expect(res.status).toBe(401);
+        expect(res.headers['www-authenticate']).toBe(
+          'Basic realm="GROWI Vault"',
+        );
+
+        // Must not leak any public page content / list / existence info (req 2.3)
+        expect(res.text).not.toMatch(/\/|page|path|exist/i);
+
+        // Anonymous access must be denied BEFORE namespace computation / view
+        // composition / upstream proxying (req 2.3 / 3.2).
+        expect(
+          vaultNamespaceMapper.computeAccessibleNamespaces,
+        ).not.toHaveBeenCalled();
+        expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
+        expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
+
+        // Recorded as an auth failure in the audit log (req 10.4).
+        expect(createActivity).toHaveBeenCalledWith(
+          expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
+        );
+      });
+
+      it('POST /git-upload-pack returns 401 + WWW-Authenticate and exposes no page info', async () => {
+        const createActivity = vi.fn().mockResolvedValue(undefined);
+        const app = buildApp({ vaultPatAuth: anonymousAuth, createActivity });
+
+        const res = await request(app)
+          .post('/vault.git/git-upload-pack')
+          .set('Content-Type', 'application/x-git-upload-pack-request')
+          .send(Buffer.from('0011want abc\n0000'));
+
+        expect(res.status).toBe(401);
+        expect(res.headers['www-authenticate']).toBe(
+          'Basic realm="GROWI Vault"',
+        );
+        expect(res.text).not.toMatch(/\/|page|path|exist/i);
+
+        expect(vaultManagerClient.composeView).not.toHaveBeenCalled();
+        expect(vaultManagerClient.proxyGitRequest).not.toHaveBeenCalled();
+
+        expect(createActivity).toHaveBeenCalledWith(
+          expect.objectContaining({ action: 'VAULT_AUTH_FAILURE' }),
+        );
+      });
+    });
+
+    describe('when isGuestAllowedToRead() === true (public wiki / restrictGuestMode=Readonly)', () => {
+      beforeEach(() => {
+        (
+          aclService.isGuestAllowedToRead as ReturnType<typeof vi.fn>
+        ).mockReturnValue(true);
+      });
+
+      it('GET /info/refs proceeds anonymously with userId=null (public namespaces only)', async () => {
+        const app = buildApp({ vaultPatAuth: anonymousAuth });
+
+        const res = await request(app).get(
+          '/vault.git/info/refs?service=git-upload-pack',
+        );
+
+        expect(res.status).toBe(200);
+
+        // computeAccessibleNamespaces(null) yields ['public'] only (existing behaviour)
+        expect(
+          vaultNamespaceMapper.computeAccessibleNamespaces,
+        ).toHaveBeenCalledWith(null, undefined);
+        expect(vaultManagerClient.composeView).toHaveBeenCalledWith({
+          userId: null,
+          namespaces: ['public'],
+        });
+      });
+
+      it('POST /git-upload-pack proceeds anonymously with userId=null', async () => {
+        (
+          vaultManagerClient.proxyGitRequest as ReturnType<typeof vi.fn>
+        ).mockResolvedValue(
+          makeProxyOkResponse('application/x-git-upload-pack-result'),
+        );
+        const app = buildApp({ vaultPatAuth: anonymousAuth });
+
+        const res = await request(app)
+          .post('/vault.git/git-upload-pack')
+          .set('Content-Type', 'application/x-git-upload-pack-request')
+          .send(Buffer.from('0011want abc\n0000'));
+
+        expect(res.status).toBe(200);
+        expect(
+          vaultNamespaceMapper.computeAccessibleNamespaces,
+        ).toHaveBeenCalledWith(null, undefined);
+        expect(vaultManagerClient.composeView).toHaveBeenCalledWith({
+          userId: null,
+          namespaces: ['public'],
+        });
+      });
+    });
+
+    it('does not consult the guest gate when a valid PAT authenticates (no regression)', async () => {
+      (
+        aclService.isGuestAllowedToRead as ReturnType<typeof vi.fn>
+      ).mockReturnValue(false);
+      (
+        vaultNamespaceMapper.computeAccessibleNamespaces as ReturnType<
+          typeof vi.fn
+        >
+      ).mockResolvedValue(['public', 'group-eng']);
+
+      const successfulAuth = {
+        authenticate: vi
+          .fn()
+          .mockResolvedValue({ userId: 'user-1', scopes: [] }),
+      };
+      const app = buildApp({ vaultPatAuth: successfulAuth });
+
+      const res = await request(app).get(
+        '/vault.git/info/refs?service=git-upload-pack',
+      );
+
+      // Even though guests are denied, a valid PAT still clones successfully.
+      expect(res.status).toBe(200);
+      expect(aclService.isGuestAllowedToRead).not.toHaveBeenCalled();
+      expect(vaultManagerClient.composeView).toHaveBeenCalledWith({
+        userId: 'user-1',
+        namespaces: ['public', 'group-eng'],
+      });
     });
   });
 

@@ -852,7 +852,7 @@ _Depends: 4.1, 10.1, 13.2_
 >
 > 本タスクは新規変更のため **TDD（RED → GREEN）** で進める。各サブタスクで失敗するテストを先に書き、RED 出力を記録してから実装する。
 
-### [ ] 26.1 ゲスト gate: 匿名アクセスを `isGuestAllowedToRead()` に従わせる（要件 2.4a）
+### [x] 26.1 ゲスト gate: 匿名アクセスを `isGuestAllowedToRead()` に従わせる（要件 2.4a）
 
 - **RED**: `vault-gateway.spec.ts`（必要なら `vault-pat-auth.spec.ts`）に次を先に追加し失敗を確認する:
   - `Authorization` ヘッダ無し かつ `aclService.isGuestAllowedToRead()=false`（デフォルト `restrictGuestMode='Deny'` / `wikiMode='private'`）→ `401 + WWW-Authenticate: Basic`、**body に public ページを含めない**
