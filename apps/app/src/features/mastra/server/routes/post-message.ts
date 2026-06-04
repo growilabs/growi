@@ -1,5 +1,5 @@
 import type { IUserHasId } from '@growi/core';
-import { isPopulated, SCOPE } from '@growi/core';
+import { SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { toAISdkStream } from '@mastra/ai-sdk';
 import { RequestContext } from '@mastra/core/request-context';
@@ -10,10 +10,7 @@ import {
   validateUIMessages,
 } from 'ai';
 import type { Request, RequestHandler } from 'express';
-import { body, type ValidationChain } from 'express-validator';
 
-import AiAssistantModel from '~/features/openai/server/models/ai-assistant';
-import { getOpenaiService } from '~/features/openai/server/services/openai';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -23,12 +20,12 @@ import loggerFactory from '~/utils/logger';
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
 import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context';
+import { buildPostMessageValidator } from './post-message-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
-  threadId: string;
-  aiAssistantId: string;
+  threadId?: string;
   messages: UIMessage[];
 };
 
@@ -44,20 +41,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   const loginRequiredStrictly =
     require('~/server/middlewares/login-required').default(crowi);
 
-  const validator: ValidationChain[] = [
-    body('threadId')
-      .isUUID()
-      .optional()
-      .withMessage('threadId must be a valid UUID'),
-
-    body('aiAssistantId')
-      .isMongoId()
-      .withMessage('aiAssistantId must be a valid MongoDB ObjectId'),
-
-    body('messages').custom(async (data) => {
-      await validateUIMessages({ messages: data });
-    }),
-  ];
+  const validator = buildPostMessageValidator(validateUIMessages);
 
   return [
     accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], {
@@ -67,40 +51,13 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
     validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
-      const { threadId, aiAssistantId, messages } = req.body;
+      const { threadId, messages } = req.body;
 
       const requestContext = new RequestContext<MastraRequestContextShape>();
 
-      const openaiService = getOpenaiService();
-      if (openaiService == null) {
-        return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
-      }
-
-      const isAiAssistantUsable = await openaiService.isAiAssistantUsable(
-        aiAssistantId,
-        req.user,
-      );
-      if (!isAiAssistantUsable) {
-        return res.apiv3Err(
-          new ErrorV3('The specified AI assistant is not usable'),
-          400,
-        );
-      }
-
-      const aiAssistant = await AiAssistantModel.findById(aiAssistantId);
-      if (aiAssistant == null) {
-        return res.apiv3Err(new ErrorV3('AI assistant not found'), 404);
-      }
-
-      const aiAssistantWithPopulatedVectorStore =
-        await aiAssistant.populate('vectorStore');
-      if (!isPopulated(aiAssistantWithPopulatedVectorStore.vectorStore)) {
-        return res.apiv3Err(new ErrorV3('Vector store not found'), 404);
-      }
-
-      const vectorStoreId =
-        aiAssistantWithPopulatedVectorStore.vectorStore.vectorStoreId;
-      requestContext.set('vectorStoreId', vectorStoreId);
+      // The chat endpoint is assistant-independent: no aiAssistantId lookup and
+      // no vectorStore-derived context. AI-enabled gating is enforced at the
+      // router level (see ./index.ts).
       requestContext.set('user', req.user);
       requestContext.set('searchService', crowi.searchService);
 
@@ -112,7 +69,6 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
 
       const thread = await getOrCreateThread({
         memory,
-        aiAssistantId,
         resourceId: req.user._id.toString(),
         threadId,
       });
