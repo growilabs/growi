@@ -40,7 +40,7 @@ export class InstallerService {
     }
 
     try {
-      await searchService.rebuildIndex();
+      await searchService.rebuildIndex(true);
     } catch (err) {
       logger.error('Rebuild index failed', err);
     }

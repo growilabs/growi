@@ -858,11 +858,13 @@ class PageGrantService implements IPageGrantService {
         applicableGroups: userRelatedGroups,
       };
     } else if (grant === PageGrant.GRANT_OWNER) {
-      const grantedUser = grantedUsers[0];
+      const grantedUser = grantedUsers?.[0];
 
-      const isUserApplicable = grantedUser.toString() === user._id.toString();
-
-      if (isUserApplicable) {
+      // grantedUsers may be empty due to data inconsistency; guard against TypeError
+      if (
+        grantedUser != null &&
+        grantedUser.toString() === user._id.toString()
+      ) {
         data[PageGrant.GRANT_OWNER] = null;
       }
     } else if (grant === PageGrant.GRANT_USER_GROUP) {
