@@ -348,6 +348,20 @@ jobs:
         MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright-guest-mode
         ELASTICSEARCH_URI: http://localhost:9200/growi
 
+    # The blob reporter names files by project + shard only (e.g.
+    # report-chromium-guest-mode-1.zip), without the mongodb-version. report-playwright
+    # downloads every blob-report-* artifact into one directory with merge-multiple,
+    # so the 6.0 and 8.0 jobs would emit identical filenames that race and corrupt the
+    # zip. Prefix the mongodb-version to keep them unique across the whole matrix.
+    - name: Make blob report filenames unique across the matrix
+      if: always()
+      run: |
+        cd apps/app/blob-report 2>/dev/null || exit 0
+        for f in *.zip; do
+          [ -e "$f" ] || continue
+          mv "$f" "mongo${{ matrix.mongodb-version }}-$f"
+        done
+
     - name: Generate shard ID
       id: shard-id
       if: always()
