@@ -872,7 +872,7 @@ _Depends: 4.1, 10.1, 13.2_
 - **RED → GREEN**: 「guest 拒否時 401」「guest 許可時 public 通過」「PAT 認証時 user 解決」「maintenance mode 時 unavailable」を spec 化
 - **完了確認**: gateway が標準チェーン経由になり `pnpm vitest run vault-gateway.spec` PASS。`turbo run lint:typecheck --filter @growi/app` clean
 
-### [ ] 26.3 credential adapter を `extractAccessToken` へ再配線 + Basic fallback（要件 2.6）
+### [x] 26.3 credential adapter を `extractAccessToken` へ再配線 + Basic fallback（要件 2.6）
 
 **前提**: PR #11244 が `feat/growi-vault` に到達済み（`extract-access-token.ts` が存在）。未到達なら本サブタスクは着手しない。
 

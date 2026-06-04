@@ -40,10 +40,29 @@ vi.mock('~/utils/logger', () => ({
 
 type VaultReq = VaultAuthenticatedReq;
 
-/** Build a minimal Express Request mock with a given Authorization header. */
-const buildRequest = (authHeader?: string): VaultReq => {
+/**
+ * Build a minimal Express Request mock.
+ *
+ * `headers` lets a test set arbitrary headers (e.g. `x-growi-access-token`,
+ * which is how a reverse proxy forwards the PAT — req 2.6). When `authHeader`
+ * is given it is merged in as the `authorization` header.
+ *
+ * IMPORTANT: this intentionally leaves `query` and `body` UNSET (undefined),
+ * matching the real `/vault.git/*` request shape — those routes have no body
+ * parser because the POST handler streams `req` (the raw IncomingMessage)
+ * straight to vault-manager and never touches `req.body`. The adapter must
+ * tolerate this without throwing when it calls `extractAccessToken(req)`.
+ */
+const buildRequest = (
+  authHeader?: string,
+  headers: Record<string, string> = {},
+): VaultReq => {
+  const mergedHeaders: Record<string, string> = { ...headers };
+  if (authHeader != null) {
+    mergedHeaders.authorization = authHeader;
+  }
   return {
-    headers: authHeader != null ? { authorization: authHeader } : {},
+    headers: mergedHeaders,
     ip: '127.0.0.1',
     originalUrl: '/vault.git/info/refs',
   } as unknown as VaultReq;
@@ -417,6 +436,163 @@ describe('vault credential adapter (seam #1)', () => {
       await adapter(req, res, next);
 
       expect(req.vaultScopes).toEqual([]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Reverse-proxy coexistence: PAT resolution shares the standard
+  // `extractAccessToken` precedence (Bearer > X-GROWI-ACCESS-TOKEN > query >
+  // body) with the git-native `Authorization: Basic` password as a fallback
+  // (req 2.6).
+  // -------------------------------------------------------------------------
+
+  describe('reverse-proxy coexistence (req 2.6)', () => {
+    const PROXY_PASS = 'reverse-proxy-basic-password';
+
+    /**
+     * Recognise only `VALID_PAT`; reject every other raw token. This lets the
+     * tests prove WHICH credential was extracted and validated (the observable
+     * contract) rather than spying on the extraction mechanism.
+     */
+    const recogniseOnlyValidPat = () => {
+      vi.mocked(AccessToken.findUserIdByToken).mockImplementation(
+        (rawToken: string) => {
+          if (rawToken !== VALID_PAT) {
+            return Promise.resolve(null);
+          }
+          return Promise.resolve({
+            populate: vi.fn().mockResolvedValue({
+              user: { _id: { toString: () => 'u' }, status: 2 },
+            }),
+            scopes: ['read:features:page'],
+            // biome-ignore lint/suspicious/noExplicitAny: Mongoose HydratedDocument shape
+          } as any);
+        },
+      );
+    };
+
+    it('authenticates a PAT delivered via the X-GROWI-ACCESS-TOKEN header (no Authorization)', async () => {
+      recogniseOnlyValidPat();
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(undefined, {
+        'x-growi-access-token': VALID_PAT,
+      });
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).not.toBeUndefined();
+      expect(res.ended).toBe(false);
+      expect(AccessToken.findUserIdByToken).toHaveBeenCalledWith(VALID_PAT, [
+        'read:features:page',
+      ]);
+    });
+
+    it('still authenticates the git-native Authorization: Basic base64(x:PAT) (no proxy — regression)', async () => {
+      recogniseOnlyValidPat();
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(encodeBasic('x', VALID_PAT));
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).not.toBeUndefined();
+      expect(res.ended).toBe(false);
+      expect(AccessToken.findUserIdByToken).toHaveBeenCalledWith(VALID_PAT, [
+        'read:features:page',
+      ]);
+    });
+
+    it('fails closed (401) when only a reverse-proxy Basic credential is present and its password is NOT a valid PAT', async () => {
+      // Behind a Basic-auth proxy WITHOUT the X-GROWI-ACCESS-TOKEN extraHeader:
+      // the Basic fallback extracts the proxy password, validation fails, and
+      // the adapter MUST reject rather than silently degrade to anonymous.
+      recogniseOnlyValidPat();
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(encodeBasic('proxyUser', PROXY_PASS));
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(res.statusCode).toBe(401);
+      expect(res.headers['WWW-Authenticate']).toBe('Basic realm="GROWI Vault"');
+      expect(res.ended).toBe(true);
+      expect(next).not.toHaveBeenCalled();
+      expect(req.user).toBeUndefined();
+    });
+
+    it('prefers the X-GROWI-ACCESS-TOKEN header over Authorization: Basic when both are present', async () => {
+      // Reverse-proxy scenario: the proxy injects its own Basic credential AND
+      // forwards the PAT via the extraHeader. extractAccessToken precedence puts
+      // the X-GROWI header ahead of the Basic fallback, so the PAT authenticates.
+      recogniseOnlyValidPat();
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(encodeBasic('proxyUser', PROXY_PASS), {
+        'x-growi-access-token': VALID_PAT,
+      });
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).not.toBeUndefined();
+      // The proxy password (Basic fallback) was never validated; the X-GROWI PAT was.
+      expect(AccessToken.findUserIdByToken).toHaveBeenCalledTimes(1);
+      expect(AccessToken.findUserIdByToken).toHaveBeenCalledWith(VALID_PAT, [
+        'read:features:page',
+      ]);
+    });
+
+    it('prefers a Bearer token over the X-GROWI-ACCESS-TOKEN header (extractAccessToken precedence)', async () => {
+      recogniseOnlyValidPat();
+
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(`Bearer ${VALID_PAT}`, {
+        'x-growi-access-token': 'some-other-token',
+      });
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      await adapter(req, res, next);
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).not.toBeUndefined();
+      expect(AccessToken.findUserIdByToken).toHaveBeenCalledWith(VALID_PAT, [
+        'read:features:page',
+      ]);
+    });
+  });
+
+  // -------------------------------------------------------------------------
+  // Runtime guard: /vault.git/* requests have no body parser, so req.body is
+  // undefined. extractAccessToken dereferences req.body.access_token last in
+  // its ?? chain, so the adapter must guard against the undefined body for the
+  // common anonymous / Basic-only paths (it must not throw).
+  // -------------------------------------------------------------------------
+
+  describe('when the request has no body parser (req.body undefined)', () => {
+    it('treats an anonymous request as anonymous without throwing', async () => {
+      const adapter = createVaultCredentialAdapter();
+      const req = buildRequest(); // no Authorization, no X-GROWI header, undefined body
+      const res = buildResponse();
+      const next = vi.fn() as unknown as NextFunction;
+
+      // Must not throw "Cannot read properties of undefined (reading 'access_token')".
+      await expect(adapter(req, res, next)).resolves.toBeUndefined();
+
+      expect(next).toHaveBeenCalledTimes(1);
+      expect(req.user).toBeUndefined();
+      expect(res.ended).toBe(false);
     });
   });
 });

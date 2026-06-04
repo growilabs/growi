@@ -4,6 +4,9 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { NextFunction, Request, Response } from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
+// extractAccessToken / X_GROWI_ACCESS_TOKEN_HEADER_NAME are NOT re-exported by the
+// access-token-parser barrel — import them directly from the file (PR #11244).
+import { extractAccessToken } from '~/server/middlewares/access-token-parser/extract-access-token';
 import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
 
@@ -53,9 +56,11 @@ export type VaultAuthenticatedReq = Request & {
  * The username portion is intentionally ignored; only the password (PAT) is used.
  * Returns null when the header is absent or not a valid Basic Auth header.
  *
- * NOTE: rewiring this to the standard `extractAccessToken` (precedence
- * Bearer > X-GROWI-ACCESS-TOKEN > query > body) plus a Basic fallback is task
- * 26.3 — out of scope here. This task keeps the existing Basic extraction.
+ * This is the git-native fallback only. PAT resolution first goes through the
+ * standard `extractAccessToken` (precedence Bearer > X-GROWI-ACCESS-TOKEN >
+ * query > body — req 2.6); this Basic extraction is consulted only when that
+ * yields nothing, so a reverse-proxy's own Basic credential does not collide
+ * with the vault PAT.
  */
 const extractPatFromBasicAuth = (
   authHeader: string | undefined,
@@ -165,9 +170,17 @@ const rejectWithChallenge = (
  * `loginRequiredFactory` (the single source of truth — req 11). It does NOT
  * decide guest access itself.
  *
+ * Token resolution shares the GROWI single source of truth (req 2.6):
+ *   PAT = extractAccessToken(req)                  // Bearer > X-GROWI-ACCESS-TOKEN > query > body
+ *      ?? <password part of Authorization: Basic>  // git-native fallback
+ * This lets a reverse proxy keep `Authorization` for its own Basic credential
+ * and forward the PAT via `X-GROWI-ACCESS-TOKEN`, while a proxy-less git client
+ * still authenticates with `Authorization: Basic base64(x:PAT)`.
+ *
  * Behaviour:
- *  - No Authorization header → leave `req.user` unset (anonymous candidate) and
- *    call next(). The guest gate (loginRequiredFactory + aclService) decides.
+ *  - No credential from ANY source → leave `req.user` unset (anonymous
+ *    candidate) and call next(). The guest gate (loginRequiredFactory +
+ *    aclService) decides.
  *  - Present but invalid / revoked / expired credential → respond 401 +
  *    `WWW-Authenticate: Basic realm="GROWI Vault"`, record VAULT_AUTH_FAILURE,
  *    and END (do not call next, do not fall through to anonymous). req 2.2 —
@@ -187,9 +200,28 @@ export const createVaultCredentialAdapter = (
   ): Promise<void> => {
     const authHeader = req.headers.authorization;
 
-    // No credential presented: anonymous candidate. The downstream guest gate
-    // owns the final decision — the adapter must not pre-empt it.
-    if (authHeader == null) {
+    // `extractAccessToken` reads `req.query.access_token` and `req.body.access_token`
+    // as the last items in its precedence chain. The `/vault.git/*` routes have NO
+    // body parser (the POST handler streams `req` itself, never `req.body`), so
+    // `req.body` — and sometimes `req.query` — is undefined and would throw
+    // "Cannot read properties of undefined". Default them to `{}` before calling.
+    // Mutating `req.body` here is SAFE precisely because the handler never reads it.
+    if (req.body == null) {
+      req.body = {};
+    }
+    if (req.query == null) {
+      // biome-ignore lint/suspicious/noExplicitAny: Express types `query` as non-optional, but it is absent without a query parser
+      (req as any).query = {};
+    }
+
+    // Resolve the PAT via the standard precedence first (Bearer >
+    // X-GROWI-ACCESS-TOKEN > query > body), falling back to the git-native Basic
+    // password so proxy-less clients keep working (req 2.6).
+    const pat = extractAccessToken(req) ?? extractPatFromBasicAuth(authHeader);
+
+    // No credential from any source: anonymous candidate. The downstream guest
+    // gate owns the final decision — the adapter must not pre-empt it.
+    if (pat == null) {
       next();
       return;
     }
@@ -197,12 +229,6 @@ export const createVaultCredentialAdapter = (
     // A credential IS present. Any failure from here is a present-but-invalid
     // credential and MUST fail closed with a 401 challenge (req 2.2) rather than
     // silently degrading to anonymous.
-    const pat = extractPatFromBasicAuth(authHeader);
-    if (pat == null) {
-      logger.debug('Invalid Authorization header format for vault PAT auth');
-      rejectWithChallenge(req, res, audit);
-      return;
-    }
 
     let resolved: Awaited<ReturnType<typeof resolvePatUser>>;
     try {
