@@ -4,12 +4,12 @@
 
 - [ ] 1. Foundation: 残置範囲の確定と前提移設
 
-- [ ] 1.1 (P) プロンプト定数を suggest-path へ移設し参照を切替
-  - 削除予定の assistant 配下にあるパス提案用プロンプト定数を suggest-path 内へ移し、内容は不変のまま suggest-path の参照元を自フィーチャ内へ変更する
-  - 移設に伴い影響する suggest-path のユニットテスト（モックパス）を更新する
-  - 観測可能な完了条件: suggest-path が openai の assistant 配下を一切参照せずにビルド・テストが通る
+- [ ] 1.1 パス提案用プロンプト定数を features/openai の残置対象として保全
+  - suggest-path が使用するプロンプト定数（`instructionsForInformationTypes`）を features/openai 内に残し、共有定数ファイルを「使用中の定数のみ」に整理する（削除対象のアシスタント専用未使用定数を除去）
+  - suggest-path 側の import パス・参照は変更しない（suggest-path のソース・テストは触らない）
+  - 観測可能な完了条件: アシスタント関連削除後も suggest-path が同一 import のままビルド・テストが通り、当該定数ファイルには使用中の定数のみが残る
   - _Requirements: 6.1, 6.4_
-  - _Boundary: suggest-path instructions_
+  - _Boundary: OpenAI LLM Client Base_
 
 - [ ] 1.2 残置する LLM クライアント基盤の最小範囲を確定
   - 残置対象（クライアントデリゲータ・AI 有効判定・認可ミドルウェア・serviceType 型・生クライアント）の実依存をたどり、suggest-path/mastra が必要とする最小公開面を列挙する
@@ -101,6 +101,7 @@
 
 - [ ] 5.1 アシスタント／ナレッジ／エディター／cron／神サービス等を削除
   - assistant・editor-assistant・knowledge・cron・embeddings・normalize・統合サービス（神サービス）・アシスタント系ルート・アシスタント系インターフェイス・アシスタント系クライアント UI を削除する（接続設定 UI は残す）
+  - ただし 1.1 で保全した suggest-path 用プロンプト定数ファイルは削除対象から除外する
   - 観測可能な完了条件: openai 配下にアシスタント／FileSearch／vectorStore／ナレッジ／エディター関連コードが残らない
   - _Requirements: 1.1, 2.1, 3.1_
   - _Boundary: app-wide integration_

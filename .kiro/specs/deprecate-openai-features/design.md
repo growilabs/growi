@@ -125,15 +125,18 @@ features/openai/
 ├── server/services/is-ai-enabled.ts     # AI 有効判定（mastra/suggest-path が利用）
 ├── server/services/client.ts            # 生 OpenAI クライアント（delegator が利用する範囲のみ）
 ├── server/routes/middlewares/certify-ai-service.ts  # suggest-path が利用
+├── server/services/assistant/instructions/commons.ts # suggest-path 用 instructionsForInformationTypes のみ残置（他定数は除去、パス不変）
 └── interfaces/ai.ts                     # OpenaiServiceType
 ```
+
+> **方針**: suggest-path の import を変更しないため、`commons.ts` は現在のパスのまま残置し、使用中の `instructionsForInformationTypes` のみに整理する。`assistant/` ディレクトリ名が残る点は許容（cosmetic）。将来この定数を中立パスへ移す場合は suggest-path 側の import 2 行の変更が必要。
 
 ### 削除（features/openai）
 ```
 features/openai/
 ├── client/**                            # AiAssistant/AiIntegration を除く全 UI・services・states・stores・utils（下記 MODIFY 除く）
 ├── server/services/openai.ts            # 神サービス（IOpenaiService）丸ごと
-├── server/services/assistant/**         # assistant ロジック（instructions/commons.ts は suggest-path へ移設）
+├── server/services/assistant/**         # assistant ロジック（ただし instructions/commons.ts は残置・トリムして除外）
 ├── server/services/editor-assistant/**  # エディターアシスタント
 ├── server/services/cron/**              # thread/vectorStoreFile 削除 cron
 ├── server/services/embeddings.ts / normalize-data/** / replace-annotation-with-page-link.ts
@@ -142,8 +145,8 @@ features/openai/
 └── interfaces/**                        # ai.ts 以外（ai-assistant, thread-relation, vector-store, *assistant schemas）
 ```
 
-### 移設（CREATE/RELOCATE）
-- `features/ai-tools/suggest-path/server/services/instructions.ts` — 削除される `assistant/instructions/commons.ts` の `instructionsForInformationTypes` を移設（内容不変、参照を suggest-path 内に切替）。
+### CREATE / RETAIN
+- `features/openai/server/services/assistant/instructions/commons.ts` — **残置**。suggest-path が使う `instructionsForInformationTypes` のみ残し、アシスタント専用の未使用定数（system/injection/file-search）を除去。suggest-path の import は不変。
 - `apps/app/src/migrations/<timestamp>-drop-openai-collections.js` — 新規マイグレーション（4 コレクション drop、冪等）。
 - mastra 左 AI パネルの「新規チャット」起点（`AiAssistantSubstance.tsx` を改修 or 新規 `NewChatButton`）。
 
@@ -237,7 +240,7 @@ graph LR
 | Left AI Panel | mastra client | 新規チャット起点 + ThreadList | 8.1, 8.4, 9.1, 9.3 | chat-sidebar state (P0), thread store (P1) | — |
 | Drop Collections Migration | data | 廃止コレクション破棄 | 4.2, 4.4 | MongoDB (P0) | Batch |
 | Config Cleanup | infra | AI 設定キー整理 | 10.1–10.3 | configManager (P0) | — |
-| suggest-path instructions | ai-tools server | プロンプト定数の所有権移管 | 6.1 | — | — |
+| Retained instructions | openai server (retained) | suggest-path 用プロンプト定数を残置・トリム（パス不変） | 6.1 | — | — |
 
 ### OpenAI server (retained)
 
