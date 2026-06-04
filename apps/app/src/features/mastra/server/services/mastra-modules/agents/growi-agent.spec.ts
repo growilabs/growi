@@ -141,9 +141,9 @@ describe('growiAgent', () => {
 
       // Split, trim, then identify any line that — after stripping a leading
       // `-` bullet marker — begins with "Use the fileSearch tool" AND is NOT
-      // commented out via `//` or `<!--`. The current "disabled" line on
-      // growi-agent.ts L21 starts with `//` and must remain accepted; an
-      // uncommented variant is the regression we guard against.
+      // commented out via `//` or `<!--`. The fileSearch tool has been removed
+      // from the agent, so no such line should exist; an uncommented variant is
+      // the regression we guard against.
       const lines = instructions.split('\n').map((l) => l.trim());
 
       const uncommentedFileSearchLines = lines.filter((line) => {

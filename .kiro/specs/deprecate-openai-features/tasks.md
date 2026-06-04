@@ -27,7 +27,7 @@
   - _Boundary: Mastra Message Route_
   - _Depends: 2.1_
 
-- [ ] 2.3 file-search ツールと vectorStore 依存コードを mastra から削除
+- [x] 2.3 file-search ツールと vectorStore 依存コードを mastra から削除
   - エージェントの利用ツールを全文検索とページ内容取得のみに限定し、file-search ツールおよび OpenAI file_search ラッパーを削除する
   - 観測可能な完了条件: mastra に file-search／vectorStore 依存コードが存在せず、エージェントが全文検索・ページ内容取得のみで応答する
   - _Requirements: 5.1, 5.4, 6.3_
