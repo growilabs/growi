@@ -189,7 +189,7 @@
     "mdast-util-from-markdown": "^2.0.1",
     "mdast-util-gfm-table": "^2.0.0",
     "mdast-util-wiki-link": "^0.1.2",
-    "mermaid": "^11.10.0",
+    "mermaid": "^11.15.0",
     "method-override": "^3.0.0",
     "micromark-extension-gfm-table": "^2.1.0",
     "micromark-extension-wiki-link": "^0.0.4",
