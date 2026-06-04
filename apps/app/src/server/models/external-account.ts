@@ -1,9 +1,10 @@
 import type { IUser, IUserHasId } from '@growi/core/dist/interfaces';
 import type { HydratedDocument, Model } from 'mongoose';
-import mongoose, { model, Schema } from 'mongoose';
+import mongoose, { Schema } from 'mongoose';
 
 import { Prisma } from '~/generated/prisma/client';
 import { NullUsernameToBeRegisteredError } from '~/server/models/errors';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 import type { prisma } from '~/utils/prisma';
 
@@ -19,7 +20,7 @@ const schema = new Schema({
   user: { type: Schema.Types.ObjectId, ref: 'User', required: true },
 });
 schema.index({ providerType: 1, accountId: 1 }, { unique: true });
-model('ExternalAccount', schema);
+getOrCreateModel('ExternalAccount', schema);
 
 /**
  * limit items num for pagination
