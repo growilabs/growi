@@ -3,7 +3,7 @@
   "created_at": "2026-05-07T00:00:00.000Z",
   "updated_at": "2026-05-29T00:00:00.000Z",
   "language": "ja",
-  "phase": "design",
+  "phase": "tasks",
   "cleaned_up_at": "2026-05-19T00:00:00.000Z",
   "approvals": {
     "requirements": {
@@ -12,13 +12,13 @@
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "tasks": {
       "generated": true,
-      "approved": true
+      "approved": false
     }
   },
   "ready_for_implementation": false,
-  "revision_note": "Reopened to fix ACL guest-mode bypass (req 2.4a) and align /vault.git with the standard apps/app middleware composition (req 11); reverse-proxy Basic-auth coexistence (req 2.6) mechanism still TBD in design."
+  "revision_note": "Reopened to fix ACL guest-mode bypass (req 2.4a) and align /vault.git with the standard apps/app middleware composition (req 11). Reverse-proxy Basic-auth coexistence (req 2.6) resolved by reusing PR #11244's X-GROWI-ACCESS-TOKEN header + extractAccessToken (arrives via master -> dev/8.0.x -> feat/growi-vault), with git-native Basic as fallback."
 }

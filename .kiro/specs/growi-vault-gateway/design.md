@@ -46,6 +46,7 @@
 
 - 既存 `Page` / `Revision` Mongoose モデル（read-only）
 - `access-token-parser` ミドルウェア（標準トークン解決）
+- `extractAccessToken` / `X_GROWI_ACCESS_TOKEN_HEADER_NAME`（PR #11244。token-source 単一情報源、`X-GROWI-ACCESS-TOKEN` 対応。master → dev/8.0.x → feat/growi-vault 経由で到達）
 - `loginRequiredFactory(crowi, isGuestAllowed, fallback)` ミドルウェア（ゲスト判定 + ユーザー必須化、第3引数で git 用 fallback を差し替え）
 - `aclService.isGuestAllowedToRead()`（ゲスト読み取り可否の単一情報源）
 - `page-grant.ts` の `isUserGrantedPageAccess`、`generateGrantCondition`
@@ -317,7 +318,7 @@ rateLimiter → [maintenanceMode] → accessTokenParser([SCOPE...]) → loginReq
 |---|---|
 | rateLimiter | 既存をそのまま適用（mount は rate limiter の後段。要件 10.3） |
 | maintenanceMode | 標準 middleware を適用（停止時は gateway も一貫して unavailable を返す） |
-| トークン解決 | `accessTokenParser` と同一のトークン解決を共有。入口のみ Basic→PAT credential adapter（seam #1 = VaultPatAuth） |
+| トークン解決 | `extractAccessToken`（PR #11244）と同一 precedence を共有（`Bearer` > `X-GROWI-ACCESS-TOKEN` > query > body）。git 用に Basic password の fallback を 1 段足すだけ（seam #1 = VaultPatAuth）。下記「reverse proxy の Basic 認証共存」参照 |
 | ゲスト / ユーザー必須化 | `loginRequiredFactory(crowi, isGuestAllowed=true, gitFallback)` を再利用。`isGuestAllowedToRead()` がゲスト可否の単一情報源 |
 | 認証失敗時の応答 | seam #2: `gitFallback` が `/login` リダイレクトの代わりに `401 + WWW-Authenticate: Basic`（git 互換）を返す |
 | readOnly ユーザー | clone は read 操作のため `excludeReadOnlyUser` は適用しない（意図的逸脱・下記） |
@@ -352,7 +353,7 @@ interface VaultPatAuth {
 
 **実装ノート**
 - git クライアントは `Authorization: Basic base64(anyuser:TOKEN)` を送る。adapter は password 部のみを PAT として取り出す（username は無視）
-- 検証は既存トークン解決（`AccessToken.findUserIdByToken(rawToken, [SCOPE.READ.FEATURES.PAGE])`）を共有する
+- トークンソース解決は PR #11244 の `extractAccessToken(req)`（`Bearer` > `X-GROWI-ACCESS-TOKEN` > query > body）を再利用し、それが null のとき `Authorization: Basic` の password 部を git ネイティブ fallback として使う。検証は `AccessToken.findUserIdByToken(rawToken, [SCOPE.READ.FEATURES.PAGE])` を共有する
 - `Authorization` ヘッダーが存在しない場合は `null`（匿名候補）を返す。匿名の最終可否は後段の guest gate（`aclService.isGuestAllowedToRead()`）が決める — adapter は可否を判断しない
 - 認証失敗（無効/期限切れ/revoke）および guest 拒否時は `WWW-Authenticate: Basic realm="GROWI Vault"` を含む 401。これは `loginRequiredFactory(crowi, true, gitFallback)` の `fallback` から返す（`/login` リダイレクトを git 用に置換）
 - エラーメッセージにページ情報を含めない（要件 2.3）
@@ -804,14 +805,23 @@ export interface StorageStatsResponse {
 - **レート制限**: 既存 GROWI の rate limiting を `/vault.git/*` にも適用する
 - **ゲストモード準拠**: 匿名アクセスは `aclService.isGuestAllowedToRead()` が true の場合のみ許可。デフォルト（`restrictGuestMode='Deny'`）や private wiki では匿名 clone を 401 で拒否し、GROWI 本体の閲覧ポリシーと一致させる（要件 2.4a / 11）
 
-### reverse proxy の Basic 認証共存（未確定の設計決定 — 要件 2.6）
+### reverse proxy の Basic 認証共存（確定 — 要件 2.6）
 
-GROWI が Basic 認証を行う reverse proxy 配下にある場合、proxy の Basic 資格情報と vault の PAT が単一の `Authorization` ヘッダーで衝突する。既存 GROWI API は `?access_token=` / body 経路で `Authorization` を回避して両立しているが、git はネイティブには Basic しか使わない。機構候補は次の通りで、**design レビューで決定する（本リビジョン時点では未確定）**:
+GROWI が Basic 認証を行う reverse proxy 配下にある場合、proxy の Basic 資格情報と vault の PAT が単一の `Authorization` ヘッダーで衝突する。**PR #11244** が GROWI 全体の解として `X-GROWI-ACCESS-TOKEN` リクエストヘッダーを追加し、`extractAccessToken(req)` を token-source の単一情報源にした（precedence: `Bearer` > `X-GROWI-ACCESS-TOKEN` > `?access_token=` > body）。vault gateway はこれを再利用する:
 
-- **(案A) PAT 専用カスタムヘッダーを受理**: git 側は `git config http.<url>.extraHeader "X-Vault-Token: <PAT>"` で送る。`Authorization` を proxy 用に空けられるため最も堅牢。既存 API の「トークンを `Authorization` 以外で受ける」思想と一致
-- **(案B) `?access_token=<PAT>` クエリ経路**: 実装は容易だが URL / proxy ログ / reflog に漏れるため、非推奨経路として注記したうえでのみ採用
-- **(案C) reverse proxy 側で `/vault.git/*` を Basic 認証から除外する運用ガイドのみ**: コード変更なし。運用者依存（GitLab / Gitea の git-over-http と同じ定石）
-- 注: `Authorization: Bearer <PAT>` は結局 `Authorization` を占有するため proxy Basic とは両立しない（不採用）
+- **proxy 配下**: git は `git config http.<url>.extraHeader "X-GROWI-ACCESS-TOKEN: <PAT>"` で PAT を送る。`Authorization` は proxy の Basic 用に空く。URL/ログにトークンを漏らさない（`?access_token=` の OWASP 漏洩問題を回避）
+- **proxy 無し（通常）**: git ネイティブの `Authorization: Basic base64(x:PAT)` をそのまま受理する
+
+**vault credential adapter（seam #1）の解決順序**:
+
+```
+PAT = extractAccessToken(req)                       // Bearer > X-GROWI-ACCESS-TOKEN > query > body
+   ?? <Authorization: Basic の password 部>          // git ネイティブ fallback
+```
+
+`extractAccessToken` は `Authorization: Basic` を Bearer ではないとして無視する（`extractBearerToken` が `'Bearer '` 始まりのみ受理）。したがって proxy 配下で `Authorization` に proxy の Basic 資格情報が載っていても、それが PAT と誤認されることはなく、`X-GROWI-ACCESS-TOKEN` が優先される。`X-GROWI-ACCESS-TOKEN` 未設定かつ proxy 有りの誤設定時は Basic fallback が proxy パスワードを PAT として検証して fail-closed（401）となる。
+
+> **依存と順序**: `extractAccessToken` / `X_GROWI_ACCESS_TOKEN_HEADER_NAME`（`apps/app/src/server/middlewares/access-token-parser/extract-access-token.ts`）は PR #11244 で **master** に入った。現ブランチ `feat/growi-vault` には **master → dev/8.0.x → feat/growi-vault** のマージ経由で到達する。vault gateway の本改修（seam #1 での `extractAccessToken` 再利用）は、その helper が現ブランチに入った後に実装する（tasks 側で依存順を明示する）。
 
 ---
 

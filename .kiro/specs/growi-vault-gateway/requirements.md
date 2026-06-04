@@ -84,7 +84,7 @@
 4. When 認証ヘッダーが存在せず、かつ `aclService.isGuestAllowedToRead()` が `true`（`security:wikiMode='public'` または `security:restrictGuestMode='Readonly'`）の場合, the GROWI Vault Gateway shall `userId: null`（匿名）として処理を継続し、public namespace のみにアクセスさせる
 4a. When 認証ヘッダーが存在せず、かつ `aclService.isGuestAllowedToRead()` が `false`（デフォルトの `security:restrictGuestMode='Deny'` や `security:wikiMode='private'` を含む）の場合, the GROWI Vault Gateway shall 匿名アクセスを拒否し、`WWW-Authenticate: Basic realm="GROWI Vault"` を含む HTTP 401 を返して PAT を要求する（public namespace すら応答しない）。これは既存 `loginRequired(crowi, isGuestAllowed=true)` が `isGuestAllowedToRead()` を参照して guest を弾くのと同一セマンティクスである
 5. Where PAT がスコープ制限を持つ場合, the GROWI Vault Gateway shall そのスコープを namespace 計算に反映させる
-6. While GROWI が Basic 認証を行う reverse proxy の背後に配置される場合, the GROWI Vault Gateway shall git クライアントが「proxy の Basic 認証資格情報」と「vault の PAT」を同時に提示でき、両者が単一の `Authorization` ヘッダー上で衝突しない認証手段を提供する（既存 GROWI API がトークンを `Authorization` 以外（`?access_token=` / body）でも受理して proxy Basic 認証と両立しているのと同等の到達性を確保する）。実現機構（PAT 専用のカスタムヘッダー受理 / クエリ経路 / reverse proxy 側で `/vault.git/*` を Basic 認証から除外する運用ガイド等）は design フェーズで決定する（本要件時点では未確定）
+6. While GROWI が Basic 認証を行う reverse proxy の背後に配置される場合, the GROWI Vault Gateway shall git クライアントが「proxy の Basic 認証資格情報」と「vault の PAT」を同時に提示でき、両者が単一の `Authorization` ヘッダー上で衝突しない認証手段を提供する。具体的には PAT を `X-GROWI-ACCESS-TOKEN` リクエストヘッダー（PR #11244 で GROWI 標準化。`Authorization` を proxy 用に空けたまま、URL/ログにトークンを漏らさず渡せる）で受理する。git クライアントは `git config http.<url>.extraHeader "X-GROWI-ACCESS-TOKEN: <PAT>"` で送る。proxy が無い通常ケースでは git ネイティブの `Authorization: Basic base64(x:PAT)` も従来どおり受理する
 
 ### 要件 3: ACL ベース namespace 計算（VaultNamespaceMapper）
 
