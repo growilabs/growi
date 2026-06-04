@@ -17,7 +17,11 @@ import type {
   Ref,
 } from '@growi/core/dist/interfaces';
 import { PageGrant } from '@growi/core/dist/interfaces';
-import { pagePathUtils, pathUtils } from '@growi/core/dist/utils';
+import {
+  escapeStringForMongoRegex,
+  pagePathUtils,
+  pathUtils,
+} from '@growi/core/dist/utils';
 import type EventEmitter from 'events';
 import type { Cursor, HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
@@ -3979,7 +3983,8 @@ class PageService implements IPageService {
     const ancestorPaths = paths.flatMap((p) => collectAncestorPaths(p, []));
     // targets' descendants
     const pathAndRegExpsToNormalize: (RegExp | string)[] = paths.map(
-      (p) => new RegExp(`^${RegExp.escape(addTrailingSlash(p))}`, 'i'),
+      (p) =>
+        new RegExp(`^${escapeStringForMongoRegex(addTrailingSlash(p))}`, 'i'),
     );
     // include targets' path
     pathAndRegExpsToNormalize.push(...paths);
@@ -4190,7 +4195,7 @@ class PageService implements IPageService {
           const parentId = parent._id;
 
           // Build filter
-          const parentPathEscaped = RegExp.escape(
+          const parentPathEscaped = escapeStringForMongoRegex(
             parent.path === '/' ? '' : parent.path,
           ); // adjust the path for RegExp
           const filter: any = {
@@ -5156,7 +5161,9 @@ class PageService implements IPageService {
     const wasOnTree = exPage.parent != null || isTopPage(exPage.path);
     const shouldBeOnTree = currentPage.grant !== PageGrant.GRANT_RESTRICTED;
     const isChildrenExist = await Page.count({
-      path: new RegExp(`^${RegExp.escape(addTrailingSlash(currentPage.path))}`),
+      path: new RegExp(
+        `^${escapeStringForMongoRegex(addTrailingSlash(currentPage.path))}`,
+      ),
       parent: { $ne: null },
     });
 
@@ -5288,7 +5295,7 @@ class PageService implements IPageService {
     const shouldBeOnTree = grant !== PageGrant.GRANT_RESTRICTED;
     const isChildrenExist = await Page.count({
       path: new RegExp(
-        `^${RegExp.escape(addTrailingSlash(clonedPageData.path))}`,
+        `^${escapeStringForMongoRegex(addTrailingSlash(clonedPageData.path))}`,
       ),
       parent: { $ne: null },
     });
