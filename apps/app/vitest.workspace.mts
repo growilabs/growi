@@ -55,6 +55,7 @@ export default defineWorkspace([
       // Pre-download the MongoDB binary before workers start to avoid lock-file race conditions
       globalSetup: ['./test/setup/mongo/global-setup.ts'],
       setupFiles: [
+        './test/setup/elasticsearch.ts',
         './test/setup/migrate-mongo.ts',
         './test/setup/mongo/index.ts',
         './test/setup/prisma.ts',
