@@ -17,16 +17,6 @@ type ActivitiesSnapshot {
   username String
 }
 
-type AiassistantsGrantedGroupsForAccessScope {
-  /// Field referred in an index, but found no data to define the type.
-  item Json?
-}
-
-type AiassistantsGrantedGroupsForShareScope {
-  /// Field referred in an index, but found no data to define the type.
-  item Json?
-}
-
 type PageoperationsExPage {
   /// Field referred in an index, but found no data to define the type.
   id   Json? @map("_id")
@@ -77,17 +67,6 @@ model activities {
   @@index([snapshot.username], map: "snapshot.username_1")
   @@index([target, action], map: "target_1_action_1")
   @@index([createdAt], map: "createdAt_1")
-}
-
-model aiassistants {
-  id                          String                                   @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  grantedGroupsForAccessScope AiassistantsGrantedGroupsForAccessScope?
-  /// Field referred in an index, but found no data to define the type.
-  grantedGroupsForShareScope  AiassistantsGrantedGroupsForShareScope?
-
-  @@index([grantedGroupsForShareScope.item], map: "grantedGroupsForShareScope.item_1")
-  @@index([grantedGroupsForAccessScope.item], map: "grantedGroupsForAccessScope.item_1")
 }
 
 model attachments {
@@ -450,12 +429,6 @@ model tags {
   name Json?  @unique(map: "name_1")
 }
 
-model threadrelations {
-  id       String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  threadId Json?  @unique(map: "threadId_1")
-}
-
 model transferkeys {
   id        String @id @default(auto()) @map("_id") @db.ObjectId
   /// Field referred in an index, but found no data to define the type.
@@ -550,24 +523,6 @@ model useruisettings {
   currentSidebarContents    String
   preferCollapsedModeByUser Boolean
   user                      String  @unique(map: "user_1") @db.ObjectId
-}
-
-model vectorstorefilerelations {
-  id                    String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  attachment            Json?
-  /// Field referred in an index, but found no data to define the type.
-  page                  Json?
-  /// Field referred in an index, but found no data to define the type.
-  vectorStoreRelationId Json?
-
-  @@unique([vectorStoreRelationId, page, attachment], map: "vectorStoreRelationId_1_page_1_attachment_1")
-}
-
-model vectorstores {
-  id            String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  vectorStoreId Json?  @unique(map: "vectorStoreId_1")
 }
 
 model yjs_writings {
