@@ -112,6 +112,24 @@ ls /tmp/mygrowirepos
 
 `fatal: the remote end hung up unexpectedly` で止まった場合は次節へ。
 
+### reverse proxy 配下での PAT 認証（要件 2.6）
+
+GROWI が **Basic 認証を行う reverse proxy の背後**にある場合、proxy の Basic 資格情報と vault の PAT が単一の `Authorization` ヘッダーで衝突する。この場合は PAT を `X-GROWI-ACCESS-TOKEN` リクエストヘッダーで渡し、`Authorization` を proxy 用に空けておく:
+
+```bash
+# proxy 配下: PAT は X-GROWI-ACCESS-TOKEN で渡し、Authorization は proxy の Basic 用に空ける
+git clone -c http.extraHeader="X-GROWI-ACCESS-TOKEN: ${TOKEN}" \
+  "https://proxyUser:proxyPass@growi.example.com/vault.git" /tmp/mygrowirepos
+
+# 永続設定する場合（clone 後 / 既存リポジトリ）:
+git config http.https://growi.example.com/vault.git/.extraHeader "X-GROWI-ACCESS-TOKEN: ${TOKEN}"
+```
+
+- proxy が**無い**通常ケースは従来どおり `git clone "https://x:${TOKEN}@host/vault.git"`（Basic password = PAT）でよい。
+- トークン解決の優先順位は `Bearer` > `X-GROWI-ACCESS-TOKEN` > `?access_token=` > body。`Authorization: Basic` の password 部は **proxy 無し時の git ネイティブ fallback** としてのみ使われる（[vault-pat-auth.ts](../../../apps/app/src/features/growi-vault/server/middlewares/vault-pat-auth.ts)）。
+- `X-GROWI-ACCESS-TOKEN` を使うと URL・ログにトークンが残らない（`?access_token=` の OWASP 漏洩問題を回避できる）。
+- `X-GROWI-ACCESS-TOKEN` 未設定で proxy の Basic 資格情報だけが届いた場合、その password は PAT として検証され、PAT でなければ **401（fail-closed）** になる（匿名 public に降格しない）。
+
 ---
 
 ## 結合試験（integ テスト）の実行

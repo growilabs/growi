@@ -884,7 +884,7 @@ _Depends: 4.1, 10.1, 13.2_
 - 旧 `extractPatFromBasicAuth` は Basic fallback としてのみ残す
 - **完了確認**: 上記テスト緑。proxy 配下（`X-GROWI-ACCESS-TOKEN`）と proxy 無し（Basic）の双方で clone 認証が成立すること
 
-### [ ] 26.4 運用ガイドの追記（要件 2.6）
+### [x] 26.4 運用ガイドの追記（要件 2.6）
 
 clone 手順ドキュメント（README 相当 / admin UI のヘルプ）に reverse proxy 配下での認証方法を追記する。
 
