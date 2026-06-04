@@ -576,125 +576,7 @@
     "latest_revision": "最新の本文",
     "selected_editable_revision": "保存するページ本文(編集可能)"
   },
-  "sidebar_ai_assistant": {
-    "reference_pages_label": "参照するページ",
-    "recent_chat": "最近のチャット",
-    "no_recent_chat": "チャットがありません",
-    "knowledge_assistant_placeholder": "ききたいことを入力してください",
-    "editor_assistant_placeholder": "お手伝いできることはありますか？",
-    "summary_mode_label": "要約モード",
-    "summary_mode_help": "2～3文以内の簡潔な回答",
-    "extended_thinking_mode_label": "拡張思考モード",
-    "extended_thinking_mode_help": "有効にすると、AIはより時間をかけて考え、より包括的な回答を提供します。",
-    "caution_against_hallucination": "情報が正しいか出典を確認しましょう",
-    "progress_label": "回答を生成しています",
-    "failed_to_create_or_retrieve_thread": "スレッドの作成または取得に失敗しました",
-    "budget_exceeded": "OpenAI の API の利用上限に達しました。ナレッジアシスタントを再度利用するには OpenAI の請求ページからクレジットを追加してください。",
-    "budget_exceeded_for_growi_cloud": "OpenAI の API の利用上限に達しました。ナレッジアシスタントを再度利用するには Hosted の場合は GROWI.cloud の管理画面から Owned の場合は OpenAI の請求ページからクレジットを追加してください。",
-    "error_message": "エラーが発生しました",
-    "show_error_detail": "詳細を表示",
-    "editor_assistant_long_context_warn_with_unit_line": "本文が長すぎるため、エディターアシスタントは {{startPosition}}行から{{endPosition}}行付近までを参照して回答します",
-    "editor_assistant_long_context_warn_with_unit_char": "本文が長すぎるため、エディターアシスタントは {{startPosition}}文字目から{{endPosition}}文字目までを参照して回答します",
-    "discard": "破棄",
-    "accept": "採用",
-    "use_assistant": "アシスタントを使用する",
-    "remove_assistant": "選択されているアシスタントの解除",
-    "text_generation_by_editor_assistant_label": "エディターアシスタントが文章を生成中",
-    "preset_menu": {
-      "summarize": {
-        "title": "この記事の要約をつくる",
-        "prompt": "マークダウンの内容を要約してください"
-      },
-      "correct": {
-        "title": "文章の誤りを修正する",
-        "prompt": "マークダウンの内の文章の誤りを修正してください"
-      }
-    }
-  },
-  "modal_ai_assistant": {
-    "header": {
-      "update_assistant": "アシスタントの更新",
-      "add_new_assistant": "新規アシスタントの追加"
-    },
-    "assistant_name_placeholder": "アシスタント名を入力",
-    "page_count": "{{count}} ページ",
-    "memo": {
-      "title": "アシスタントのメモ",
-      "optional": "任意",
-      "placeholder": "内容や用途のメモを表示させることができます",
-      "description": "メモの内容はアシスタントの処理に影響しません。"
-    },
-    "submit_button": {
-      "update_assistant": "アシスタントを更新する",
-      "create_assistant": "アシスタントを作成する"
-    },
-    "toaster": {
-      "create_success": "アシスタントが作成されました",
-      "update_success": "アシスタントが更新されました",
-      "create_failed": "アシスタントの作成に失敗しました",
-      "update_failed": "アシスタントの更新に失敗しました"
-    },
-    "select_source_pages": "アシスタントが参照するページを選択します",
-    "search_reference_pages_by_keyword": "アシスタントが参照するページをキーワードで検索",
-    "search_by_keyword": "キーワードで検索",
-    "enter_keywords": "キーワードを入力",
-    "max_items_space_separated_hint": "スペース区切りで最大5つまで入力できます",
-    "select_assistant_reference_pages": "アシスタントが参照するページを選択してください",
-    "reference_pages": "参照するページ",
-    "no_pages_selected": "ページが選択されていません",
-    "can_add_later": "あとからでも追加できます",
-    "next": "次へ",
-    "select_from_page_tree": "ページツリーから選択",
-    "edit_page_description": " アシスタントが参照するページを編集します。<br> 参照できるページは配下ページも含めて {{limitLearnablePageCountPerAssistant}} ページまでです。",
-    "default_instruction": "あなたはこのWikiの知識アシスタントです。\n\n## 多言語サポート:\nユーザーが入力で使用した言語と同じ言語で応答してください。\n",
-    "add_page_button": "ページを追加する",
-    "page_mode_title": {
-      "share": "アシスタントの共有",
-      "pages": "参照ページ",
-      "instruction": "アシスタントへの指示"
-    },
-    "share_assistant": "アシスタントを共有する",
-    "page_access_permission": "ページのアクセス権限",
-    "access_scope": {
-      "owner": "{{username}} がアクセス可能な全てのページ",
-      "groups": "グループを指定",
-      "publicOnly": "公開ページのみ"
-    },
-    "share_scope": {
-      "title": "アシスタントの共有範囲",
-      "owner": {
-        "label": "{{username}} のみ"
-      },
-      "publicOnly": {
-        "label": "全体公開",
-        "desc": "すべてのユーザーに共有されます"
-      },
-      "groups": {
-        "label": "グループを指定",
-        "desc": "選択したグループのメンバーにのみ共有されます"
-      },
-      "sameAsAccessScope": {
-        "label": "ページのアクセス権限と同じ範囲",
-        "desc": "ページのアクセス権限と同じ範囲で共有されます"
-      }
-    },
-    "instructions": {
-      "description": "アシスタントの振る舞いを決める指示文を設定できます。<br>この指示に従ってにアシスタントの回答や分析を行います。",
-      "reset_to_default": "デフォルトに戻す"
-    }
-  },
-  "share_scope_warning_modal": {
-    "header_title": "共有範囲の確認",
-    "warning_message": "このアシスタントには限定公開されているページが含まれています。<br />現在の設定では、アシスタントを通じてこれらのページの情報が、本来のアクセス権限を超えて共有される可能性があります。",
-    "selected_pages_label": "選択されているページパス",
-    "confirmation_message": "続行する場合、これらのページの内容がアシスタントの公開範囲内で共有される可能性があることを確認してください。",
-    "button": {
-      "review": "設定を見直す",
-      "proceed": "理解して続行する"
-    }
-  },
   "default_ai_assistant": {
-    "not_set": "デフォルトアシスタントが設定されていません",
     "open_cloud_settings_to_enable": "AI 連携を有効にするには GROWI.cloud の管理画面をご確認ください",
     "to_cloud_settings": "GROWI.cloud の管理画面へ"
   },
@@ -1205,7 +1087,6 @@
       "badge": "バッジ",
       "text_color": "テキストカラー",
       "back_color": "背景色",
-
       "placeholder": "テキストが入ります",
       "docs_title": "Bootstrap5 公式ドキュメント",
       "docs_badge": "バッジの詳細はこちら",
