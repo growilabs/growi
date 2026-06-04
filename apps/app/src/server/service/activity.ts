@@ -2,7 +2,10 @@ import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
-import { ensureUserHasMigrated } from '~/features/contribution-graph/server/services/contribution-migration-service';
+import {
+  ensureUserHasMigrated,
+  resolveContributor,
+} from '~/features/contribution-graph/server/services/contribution-migration-service';
 import { addContribution } from '~/features/contribution-graph/server/services/contribution-service';
 import type { IActivity, SupportedActionType } from '~/interfaces/activity';
 import {
@@ -59,6 +62,7 @@ class ActivityService {
         getAdditionalTargetUsers?: GetAdditionalTargetUsers,
       ) => {
         let activity: ActivityDocument;
+        const { contributor, ...activityParameters } = parameters;
         const shoudUpdate = this.shoudUpdateActivity(parameters.action);
         const shouldGenerateContribution = this.shouldGenerateContribution(
           parameters.action,
@@ -70,13 +74,14 @@ class ActivityService {
         // a double count on a user's first contribution.
         if (shouldGenerateContribution) {
           try {
-            const generatedActivity =
-              await Activity.findById(activityId).select('user');
-            const userId = generatedActivity?.user;
+            const contributorUser = await resolveContributor(
+              activityId,
+              contributor,
+            );
 
-            if (userId != null) {
-              await ensureUserHasMigrated(userId.toString());
-              await addContribution(userId.toString());
+            if (contributorUser != null) {
+              await ensureUserHasMigrated(contributorUser);
+              await addContribution(contributorUser._id.toString());
             } else {
               logger.warn(
                 'Could not find a valid user for contribution snapshot.',
@@ -94,7 +99,7 @@ class ActivityService {
           try {
             activity = await Activity.updateByParameters(
               activityId,
-              parameters,
+              activityParameters,
             );
           } catch (err) {
             logger.error('Update activity failed', err);

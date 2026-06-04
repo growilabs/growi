@@ -11,6 +11,7 @@ import Contribution from '../models/contribution-model';
 import {
   ensureUserHasMigrated,
   migrateContributions,
+  resolveContributor,
 } from './contribution-migration-service';
 
 // Mock configManger to return an Activity TTL of 30 days (default value)
@@ -229,8 +230,6 @@ describe('ensureUserHasMigrated', () => {
     mongoose.model('User', userSchema);
   }
 
-  const userId = new mongoose.Types.ObjectId().toString();
-
   let mongod: MongoMemoryServer;
   let User: mongoose.Model<{ contributionsMigratedAt?: Date }>;
 
@@ -257,25 +256,8 @@ describe('ensureUserHasMigrated', () => {
     await mongod.stop();
   });
 
-  it('should throw error if user object is not populated', async () => {
-    await expect(ensureUserHasMigrated(userId)).rejects.toThrow(/not found/);
-  });
-
-  it('should throw when the user does not exist in the database', async () => {
-    // valid id, but no user document in DB
-    await Activity.create({
-      user: userId,
-      action: ContributionGraphActions.ACTION_PAGE_CREATE,
-      createdAt: new Date(),
-    });
-
-    await expect(ensureUserHasMigrated(userId)).rejects.toThrow(/not found/);
-    expect(await Contribution.countDocuments()).toBe(0);
-  });
-
-  it('should return without re-running migration if fresh DB user is already migrated', async () => {
+  it('should return without re-running migration if the user is already migrated', async () => {
     const dbUser = await User.create({
-      _id: userId,
       contributionsMigratedAt: new Date('2025-01-01T00:00:00Z'),
     });
 
@@ -286,7 +268,7 @@ describe('ensureUserHasMigrated', () => {
       createdAt: new Date(),
     });
 
-    await ensureUserHasMigrated(userId);
+    await ensureUserHasMigrated(dbUser);
 
     expect(await Contribution.countDocuments()).toBe(0);
   });
@@ -302,7 +284,7 @@ describe('ensureUserHasMigrated', () => {
       createdAt: new Date('2025-11-05T00:00:00Z'),
     });
 
-    await ensureUserHasMigrated(dbUser._id.toString());
+    await ensureUserHasMigrated(dbUser);
 
     const contributions = await Contribution.find({
       user: dbUser._id.toString(),
@@ -314,5 +296,78 @@ describe('ensureUserHasMigrated', () => {
     expect(updated?.contributionsMigratedAt).toEqual(
       new Date('2025-11-10T00:00:00Z'),
     );
+  });
+});
+
+describe('resolveContributor', () => {
+  const userSchema = new mongoose.Schema({
+    contributionsMigratedAt: { type: Date },
+  });
+  if (mongoose.models.User == null) {
+    mongoose.model('User', userSchema);
+  }
+
+  let mongod: MongoMemoryServer;
+  let User: mongoose.Model<{ contributionsMigratedAt?: Date }>;
+
+  beforeAll(async () => {
+    mongod = await MongoMemoryServer.create();
+    await mongoose.connect(mongod.getUri());
+    User = mongoose.model('User');
+  });
+
+  beforeEach(async () => {
+    await Activity.deleteMany({});
+    await User.deleteMany({});
+  });
+
+  afterAll(async () => {
+    await mongoose.connection.dropDatabase();
+    await mongoose.connection.close();
+    await mongod.stop();
+  });
+
+  it('takes the fast path: returns the passed contributor regardless of DB state', async () => {
+    const contributor = {
+      _id: new mongoose.Types.ObjectId(),
+      contributionsMigratedAt: null,
+    };
+
+    // No activity exists for this id. The fast path must return the contributor
+    // without consulting the database — if it looked the activity up, it would
+    // resolve to null instead. This holds regardless of how the lookup is
+    // implemented (findById, findOne, aggregation, ...).
+    const result = await resolveContributor(
+      new mongoose.Types.ObjectId().toString(),
+      contributor,
+    );
+
+    expect(result).toBe(contributor);
+  });
+
+  it('takes the fallback path: resolves the activity user when no contributor is passed', async () => {
+    const dbUser = await User.create({});
+    const activity = await Activity.create({
+      user: dbUser._id,
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date(),
+    });
+
+    // With no contributor, the DB is the only possible source of this user,
+    // so returning it proves the fallback lookup ran.
+    const result = await resolveContributor(activity._id.toString(), null);
+
+    expect(result?._id.toString()).toBe(dbUser._id.toString());
+  });
+
+  it('returns null when the activity has no associated user', async () => {
+    const activity = await Activity.create({
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date(),
+    });
+
+    const result = await resolveContributor(activity._id.toString(), null);
+
+    expect(result).toBeNull();
   });
 });

@@ -1,7 +1,9 @@
 import mongoose from 'mongoose';
 
+import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 
+import type { IMigratableUser } from '../../interfaces/contribution-migration';
 import Contribution from '../models/contribution-model';
 import { getContributionActivities } from './activity-aggregation-service';
 
@@ -45,21 +47,35 @@ export const migrateContributions = async (userId: string): Promise<void> => {
 /**
  * Checks if a user's contributions have been migrated and migrates them if needed.
  */
-export const ensureUserHasMigrated = async (userId: string): Promise<void> => {
-  const User = mongoose.model('User');
-
-  const freshUser = await User.findById(userId);
-  if (freshUser == null) {
-    throw new Error(`User ${userId} was not found`);
-  }
-  if (freshUser.contributionsMigratedAt != null) {
+export const ensureUserHasMigrated = async (
+  user: IMigratableUser,
+): Promise<void> => {
+  if (user.contributionsMigratedAt != null) {
     return;
   }
 
-  await migrateContributions(freshUser._id.toString());
+  await migrateContributions(user._id.toString());
 
+  const User = mongoose.model('User');
   await User.updateOne(
-    { _id: freshUser._id, contributionsMigratedAt: null },
+    { _id: user._id, contributionsMigratedAt: null },
     { $set: { contributionsMigratedAt: new Date() } },
   );
+};
+
+export const resolveContributor = async (
+  activityId: string,
+  contributor?: IMigratableUser | null,
+): Promise<IMigratableUser | null> => {
+  if (contributor?._id != null) {
+    return contributor;
+  }
+
+  const activity = await Activity.findById(activityId).select('user');
+  if (activity?.user == null) {
+    return null;
+  }
+
+  const User = mongoose.model('User');
+  return User.findById(activity.user);
 };
