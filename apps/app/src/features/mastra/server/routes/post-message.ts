@@ -44,7 +44,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
   const validator = buildPostMessageValidator(validateUIMessages);
 
   return [
-    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], {
+    accessTokenParser([SCOPE.WRITE.FEATURES.AI], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,

@@ -36,7 +36,7 @@ export const deleteThreadHandlersFactory: DeleteThreadHandlersFactory = (
   ];
 
   return [
-    accessTokenParser([SCOPE.WRITE.FEATURES.AI_ASSISTANT], {
+    accessTokenParser([SCOPE.WRITE.FEATURES.AI], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,

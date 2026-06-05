@@ -148,7 +148,6 @@
         "user_group_management": "Grants permission to view user group management.",
         "audit_log": "Grants permission to view audit logs.",
         "plugin": "Grants permission to view plugin settings.",
-        "ai_integration": "Grants permission to view AI integration settings.",
         "full_text_search": "Grants permission to view full text search management."
       },
       "user_settings": {
@@ -166,7 +165,7 @@
       },
       "features": {
         "all": "Grants permission to view features.",
-        "ai_assistant": "Grants permission to view AI assistant features.",
+        "ai": "Grants permission to view AI assistant features.",
         "page": "Grants permission to view page features.",
         "share_link": "Grants permission to view share link features.",
         "bookmark": "Grants permission to view bookmark features.",
@@ -194,7 +193,6 @@
         "user_group_management": "Grants permission to edit user group management.",
         "audit_log": "Grants permission to edit audit logs.",
         "plugin": "Grants permission to edit plugin settings.",
-        "ai_integration": "Grants permission to edit AI integration settings.",
         "full_text_search": "Grants permission to edit full text search management."
       },
       "user_settings": {
@@ -212,7 +210,7 @@
       },
       "features": {
         "all": "Grants permission to edit features.",
-        "ai_assistant": "Grants permission to edit AI assistant features.",
+        "ai": "Grants permission to edit AI assistant features.",
         "page": "Grants permission to edit page features.",
         "share_link": "Grants permission to edit share link features.",
         "bookmark": "Grants permission to edit bookmark features.",
