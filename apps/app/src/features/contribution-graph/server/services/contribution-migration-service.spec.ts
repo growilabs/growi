@@ -286,6 +286,66 @@ describe('ensureUserHasMigrated', () => {
       new Date('2025-11-10T00:00:00Z'),
     );
   });
+
+  it('does not re-run migration when another path already claimed it, even if the input object is stale', async () => {
+    const migratedAt = new Date('2025-01-01T00:00:00Z');
+    const dbUser = await User.create({ contributionsMigratedAt: migratedAt });
+
+    // An activity that would produce a contribution if migration re-ran.
+    await Activity.create({
+      user: dbUser._id.toString(),
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date(),
+    });
+
+    const staleUser = { _id: dbUser._id, contributionsMigratedAt: null };
+    await ensureUserHasMigrated(staleUser);
+
+    expect(await Contribution.countDocuments()).toBe(0);
+    // The existing timestamp must be left untouched (claim only $sets on null).
+    const reloaded = await User.findById(dbUser._id);
+    expect(reloaded?.contributionsMigratedAt).toEqual(migratedAt);
+  });
+
+  it('releases the claim when migration fails so a later trigger retries successfully', async () => {
+    vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
+
+    const dbUser = await User.create({}); // no contributionsMigratedAt
+    await Activity.create({
+      user: dbUser._id.toString(),
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date('2025-11-05T00:00:00Z'),
+    });
+
+    // First trigger: fail the migration write once, then let the spy call through
+    // so the retry below exercises the real write path.
+    const bulkWriteSpy = vi
+      .spyOn(Contribution, 'bulkWrite')
+      .mockRejectedValueOnce(new Error('write failed'));
+
+    try {
+      await expect(ensureUserHasMigrated(dbUser)).rejects.toThrow(
+        'write failed',
+      );
+      expect(await Contribution.countDocuments()).toBe(0);
+
+      // Second trigger (write now succeeds): this only backfills if the claim was
+      // released. If the failed run had left the user flagged as migrated, the
+      // one-shot guard would skip and no contribution would be created.
+      await ensureUserHasMigrated({
+        _id: dbUser._id,
+        contributionsMigratedAt: null,
+      });
+
+      const contributions = await Contribution.find({
+        user: dbUser._id.toString(),
+      });
+      expect(contributions).toHaveLength(1);
+      expect(contributions[0].count).toBe(1);
+    } finally {
+      bulkWriteSpy.mockRestore();
+    }
+  });
 });
 
 describe('resolveContributor', () => {

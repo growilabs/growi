@@ -51,17 +51,32 @@ export const migrateContributions = async (userId: string): Promise<void> => {
 export const ensureUserHasMigrated = async (
   user: IMigratableUser,
 ): Promise<void> => {
+  // Fast path: skip the DB round-trip when the caller already knows it's migrated.
   if (user.contributionsMigratedAt != null) {
     return;
   }
 
-  await migrateContributions(user._id.toString());
-
   const User = mongoose.model<IUser>('User');
-  await User.updateOne(
+
+  const claimed = await User.findOneAndUpdate(
     { _id: user._id, contributionsMigratedAt: null },
     { $set: { contributionsMigratedAt: new Date() } },
   );
+  // Migration is already in progress.
+  if (claimed == null) {
+    return;
+  }
+
+  try {
+    await migrateContributions(user._id.toString());
+  } catch (err) {
+    // Release the claim so a later trigger can retry the migration.
+    await User.updateOne(
+      { _id: user._id },
+      { $set: { contributionsMigratedAt: null } },
+    );
+    throw err;
+  }
 };
 
 export const resolveContributor = async (
