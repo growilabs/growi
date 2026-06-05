@@ -225,6 +225,9 @@ class ElasticsearchDelegator
     const normalizeIndices = await this.normalizeIndices();
     try {
       await this.normalizeAuditlogIndices();
+      if (!this.isElasticsearchAuditlogReindexOnBoot) {
+        await this.rebuildAuditlogIndexIfMappingOutdated();
+      }
     } catch (err) {
       logger.error('Failed to normalize auditlog indices', err);
     }
@@ -473,6 +476,22 @@ class ElasticsearchDelegator
         index: indexName,
       });
     }
+  }
+
+  private async rebuildAuditlogIndexIfMappingOutdated(): Promise<void> {
+    const { client, auditlogIndexName: indexName } = this;
+
+    const isExists = await client.indices.exists({ index: indexName });
+    if (!isExists) return;
+
+    const mapping = await client.indices.getMapping({ index: indexName });
+    const properties = mapping[indexName]?.mappings?.properties;
+    if (properties == null || 'created_at' in properties) return;
+
+    logger.info(
+      'Auditlog index is missing created_at mapping. Triggering automatic reindex.',
+    );
+    await this.rebuildAuditlogIndex();
   }
 
   async normalizeAuditlogIndices(): Promise<void> {
