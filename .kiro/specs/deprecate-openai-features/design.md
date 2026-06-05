@@ -180,6 +180,10 @@ features/openai/
 - `migrations/20241107172359-rename-pageId-to-page.js` — `VectorStoreFileRelationModel` import を除去し自己完結化（直接コレクション操作）。
 - `prisma/schema.prisma` — 4 モデル定義削除 → `pnpm prisma:generate` 再生成。
 - `public/static/locales/{en_US,ja_JP,ko_KR,fr_FR,zh_CN}/{translation,admin}.json` — openai 専用キー削除、共有 `ai_assistant_substance.*` は保持。
+- `features/search/utils/ai.ts` — **削除**（`isIncludeAiMenthion` / `removeAiMenthion`。廃止された vectorStore 検索を起動する `@ai` メンション判定）。
+- `features/search/client/components/SearchModal.tsx` — `@ai` メンション状態・脳アイコン・`removeAiMenthion` を除去（通常検索アイコンへ統一、`searchInput` を直接使用）。
+- `server/service/search.ts` — `isIncludeAiMenthion`/`removeAiMenthion` import と `searchOpts.vector = true` 経路を除去。
+- `server/routes/search.ts` — 未消費の `vector` クエリパラメータ・`searchOpts.vector` 配線を除去。
 
 ## System Flows
 

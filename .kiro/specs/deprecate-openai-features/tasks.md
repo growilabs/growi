@@ -89,6 +89,13 @@
   - _Boundary: app-wide integration_
   - _Depends: 2.2_
 
+- [x] 4.5 (P) Elasticsearch 検索の `@ai` メンション・`vector` 検索オプションを除去
+  - 廃止された vectorStore 検索を起動していた `@ai` メンション判定（`features/search/utils/ai.ts`）を削除し、SearchModal の脳アイコン・メンション状態・`removeAiMenthion` 表示を撤去
+  - server `search.ts` の `isIncludeAiMenthion`/`removeAiMenthion` import と `searchOpts.vector = true` 経路、`routes/search.ts` の未消費 `vector` パラメータ配線を除去
+  - 観測可能な完了条件: `@ai` が通常検索語として扱われ（専用アイコン・vector フラグなし）、`aiMenthion`/`searchOpts.vector` の参照が src にゼロ・typecheck に新規エラーなし
+  - _Requirements: 6.6, 6.7_
+  - _Boundary: app-wide integration, Search_
+
 - [ ] 5. features/openai のスリム化（削除と整理）
 
 - [x] 5.1 アシスタント／ナレッジ／エディター／cron／神サービス等を削除

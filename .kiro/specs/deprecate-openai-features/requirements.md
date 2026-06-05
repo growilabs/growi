@@ -34,6 +34,7 @@ GROWI の AI 機能は `features/openai`（OpenAI/Azure ベースのアシスタ
   - `ai-assistant` / `thread-relation` / `vector-store` / `vector-store-file-relation` モデルの削除と、対応する MongoDB コレクションの破棄（マイグレーション）
   - 上記モデルに紐づく定期ジョブ、ページ作成/更新時の vectorStore 同期連携、ユーザー削除時のアシスタント削除連携、起動時の正規化処理の除去
   - `features/mastra` の vectorStore 依存および `file-search` ツールの除去
+  - Elasticsearch 検索の `@ai` メンション処理・`vector` 検索オプション（廃止された vectorStore 検索の起動経路で、現在は未消費の dead code）の除去
   - `features/openai` でのみ使用していた i18n キーの削除
   - 管理画面の AI 連携設定ページ（admin AI integration page）の廃止（接続/資格情報は環境変数のみで設定するため、管理画面の設定フォームは持たない）
   - `features/mastra` がまだ必要とする UI・コード・i18n の整理（移設または残置参照への置換）
@@ -117,6 +118,8 @@ GROWI の AI 機能は `features/openai`（OpenAI/Azure ベースのアシスタ
 3. The features/mastra feature shall アシスタント・vectorStore・削除済みモデルに依存せずに動作する。
 4. Where 残置された LLM クライアント基盤を `features/mastra` または `features/ai-tools/suggest-path` が必要とする場合, the application shall その参照を有効なまま維持する。
 5. Where `features/openai` に存在していた UI コンポーネントが `features/mastra` でなお必要とされる場合, the application shall それを `features/mastra` 配下から提供する。
+6. The application shall Elasticsearch 検索から、廃止された vectorStore 検索を起動していた `@ai` メンション処理および `vector` 検索オプションを除去する。
+7. When ユーザーが検索キーワードに `@ai` を入力したとき, the application shall それを特別扱いせず通常の検索語として扱う（専用アイコン・vector 検索フラグを伴わない）。
 
 ### Requirement 7: features/openai 専用 i18n の削除
 **Objective:** 開発者として、削除対象機能でのみ使用していた i18n を取り除きたい。これにより未使用の翻訳キーを残さない。
