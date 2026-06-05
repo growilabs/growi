@@ -42,7 +42,7 @@ export const PrimaryItems = memo((props: Props) => {
     return <></>;
   }
 
-  const aiAssistantNotAvailableTitle = (
+  const aiUnavailableTitle = (
     <>
       <p className="mb-2">
         {t('ai_unavailable.open_cloud_settings_to_enable')}
@@ -113,11 +113,7 @@ export const PrimaryItems = memo((props: Props) => {
         />
       ) : (
         isCloud && (
-          <NotAvailable
-            isDisabled
-            title={aiAssistantNotAvailableTitle}
-            placement="right"
-          >
+          <NotAvailable isDisabled title={aiUnavailableTitle} placement="right">
             <PrimaryItem
               sidebarMode={sidebarMode}
               contents={SidebarContentsType.AI}
