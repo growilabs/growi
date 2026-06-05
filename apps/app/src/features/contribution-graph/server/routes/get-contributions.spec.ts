@@ -7,6 +7,7 @@ import { mockClear, mockDeep } from 'vitest-mock-extended';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
 
+import { ensureUserHasMigrated } from '../services/contribution-migration-service';
 import * as ContributionService from '../services/contribution-service';
 import { getContributionsHandler } from './get-contributions';
 
@@ -14,6 +15,12 @@ vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig: vi.fn() },
 }));
 vi.mocked(configManager.getConfig).mockReturnValue(2592000);
+
+// The route fires `void ensureUserHasMigrated(user)` as a fire-and-forget side
+// effect.
+vi.mock('../services/contribution-migration-service', () => ({
+  ensureUserHasMigrated: vi.fn(),
+}));
 
 // Register a minimal User schema. Guarded against duplicate registration if
 // another spec in the same process registered it first.
@@ -45,6 +52,10 @@ describe('getContributionsHandler', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     mockClear(mockRes);
+    // Reset call history and re-establish the resolved value (restoreAllMocks
+    // strips the implementation, which would make the route call `.catch` on
+    // `undefined`).
+    vi.mocked(ensureUserHasMigrated).mockReset().mockResolvedValue(undefined);
     await User.deleteMany({});
   });
 
@@ -100,6 +111,8 @@ describe('getContributionsHandler', () => {
         isMigrationInProgress: false,
       }),
     );
+    // An already-migrated user must not trigger a re-migration.
+    expect(ensureUserHasMigrated).not.toHaveBeenCalled();
   });
 
   it('should return 404 when the user does not exist', async () => {
@@ -131,5 +144,7 @@ describe('getContributionsHandler', () => {
     expect(mockRes.apiv3).toHaveBeenCalledWith(
       expect.objectContaining({ isMigrationInProgress: true }),
     );
+    // An un-migrated user must trigger the background migration.
+    expect(ensureUserHasMigrated).toHaveBeenCalledOnce();
   });
 });
