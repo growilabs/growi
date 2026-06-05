@@ -349,10 +349,10 @@ class Crowi {
     // mongoUri = mongodb://user:password@host/dbname
     const mongoUri = getMongoUri();
 
-    return mongoose.connect(mongoUri, mongoOptions);
+    return await mongoose.connect(mongoUri, mongoOptions);
   }
 
-  async setupSessionConfig(): Promise<void> {
+  setupSessionConfig(): void {
     const session = require('express-session');
     const sessionMaxAge =
       this.configManager.getConfig('security:sessionMaxAge') || 2592000000; // default: 30days
@@ -407,10 +407,10 @@ class Crowi {
 
   async setupConfigManager(): Promise<void> {
     this.configManager = configManagerSingletonInstance;
-    return this.configManager.loadConfigs();
+    return await this.configManager.loadConfigs();
   }
 
-  async setupS2sMessagingService(): Promise<void> {
+  setupS2sMessagingService(): void {
     const s2sMessagingService = require('../service/s2s-messaging')(this);
     if (s2sMessagingService != null) {
       s2sMessagingService.subscribe();
@@ -422,7 +422,7 @@ class Crowi {
     }
   }
 
-  async setupSocketIoService(): Promise<void> {
+  setupSocketIoService(): void {
     this.socketIoService = new SocketIoService(this);
   }
 
@@ -482,12 +482,12 @@ class Crowi {
     this.passportService.setupSerializer();
     // setup strategies
     try {
-      this.passportService.setupStrategyById('local');
-      this.passportService.setupStrategyById('ldap');
-      this.passportService.setupStrategyById('saml');
-      this.passportService.setupStrategyById('oidc');
-      this.passportService.setupStrategyById('google');
-      this.passportService.setupStrategyById('github');
+      await this.passportService.setupStrategyById('local');
+      await this.passportService.setupStrategyById('ldap');
+      await this.passportService.setupStrategyById('saml');
+      await this.passportService.setupStrategyById('oidc');
+      await this.passportService.setupStrategyById('google');
+      await this.passportService.setupStrategyById('github');
     } catch (err) {
       logger.error(err);
     }
@@ -499,10 +499,10 @@ class Crowi {
   }
 
   async setupSearcher(): Promise<void> {
-    this.searchService = new SearchService(this);
+    this.searchService = await SearchService.create(this);
   }
 
-  async setupMailer(): Promise<void> {
+  setupMailer(): void {
     const MailService = require('~/server/service/mail').default;
     this.mailService = new MailService(this);
 
@@ -660,6 +660,7 @@ class Crowi {
         await mongoose.disconnect();
         return;
       },
+      // biome-ignore lint/suspicious/useAwait: onShutdown should be async
       onShutdown: async () => {
         logger.info('Cleanup finished, server is shutting down');
       },
@@ -707,7 +708,7 @@ class Crowi {
   /**
    * setup UserNotificationService
    */
-  async setUpUserNotification(): Promise<void> {
+  setUpUserNotification(): void {
     if (this.userNotificationService == null) {
       this.userNotificationService = new UserNotificationService(this);
     }
@@ -716,7 +717,7 @@ class Crowi {
   /**
    * setup AclService
    */
-  async setUpAcl(): Promise<void> {
+  setUpAcl(): void {
     this.aclService = aclServiceSingletonInstance;
   }
 
@@ -741,7 +742,7 @@ class Crowi {
   /**
    * setup AppService
    */
-  async setUpApp(): Promise<void> {
+  setUpApp(): void {
     if (this.appService == null) {
       this.appService = new AppService(this);
 
@@ -756,7 +757,7 @@ class Crowi {
   /**
    * setup FileUploadService
    */
-  async setUpFileUpload(isForceUpdate = false): Promise<void> {
+  setUpFileUpload(isForceUpdate = false): void {
     if (this.fileUploadService == null || isForceUpdate) {
       this.fileUploadService = getUploader(this);
     }
@@ -765,7 +766,7 @@ class Crowi {
   /**
    * setup FileUploaderSwitchService
    */
-  async setUpFileUploaderSwitchService(): Promise<void> {
+  setUpFileUploaderSwitchService(): void {
     const FileUploaderSwitchService = require('../service/file-uploader-switch');
     this.fileUploaderSwitchService = new FileUploaderSwitchService(this);
     // add as a message handler
@@ -784,7 +785,7 @@ class Crowi {
   /**
    * setup AttachmentService
    */
-  async setupAttachmentService(): Promise<void> {
+  setupAttachmentService(): void {
     if (this.attachmentService == null) {
       this.attachmentService = new AttachmentService(this);
     }
@@ -793,21 +794,21 @@ class Crowi {
   async setupUserGroupService(): Promise<void> {
     if (this.userGroupService == null) {
       this.userGroupService = new UserGroupService(this);
-      return this.userGroupService.init();
+      return await this.userGroupService.init();
     }
   }
 
-  async setUpGrowiBridge(): Promise<void> {
+  setUpGrowiBridge(): void {
     if (this.growiBridgeService == null) {
       this.growiBridgeService = new GrowiBridgeService(this);
     }
   }
 
-  async setupExport(): Promise<void> {
+  setupExport(): void {
     instanciateExportService(this);
   }
 
-  async setupImport(): Promise<void> {
+  setupImport(): void {
     initializeImportService(this);
   }
 
@@ -833,7 +834,7 @@ class Crowi {
     this.pageOperationService = instanciatePageOperationService(this);
   }
 
-  async setupInAppNotificationService(): Promise<void> {
+  setupInAppNotificationService(): void {
     if (this.inAppNotificationService == null) {
       this.inAppNotificationService = new InAppNotificationService(this);
     }
@@ -846,13 +847,13 @@ class Crowi {
     }
   }
 
-  async setupCommentService(): Promise<void> {
+  setupCommentService(): void {
     if (this.commentService == null) {
       this.commentService = new CommentService(this);
     }
   }
 
-  async setupSyncPageStatusService(): Promise<void> {
+  setupSyncPageStatusService(): void {
     if (this.syncPageStatusService == null) {
       this.syncPageStatusService = new SyncPageStatusService(
         this,
@@ -867,7 +868,7 @@ class Crowi {
     }
   }
 
-  async setupSlackIntegrationService(): Promise<void> {
+  setupSlackIntegrationService(): void {
     if (this.slackIntegrationService == null) {
       this.slackIntegrationService = new SlackIntegrationService(this);
     }
@@ -878,7 +879,7 @@ class Crowi {
     }
   }
 
-  async setupG2GTransferService(): Promise<void> {
+  setupG2GTransferService(): void {
     if (this.g2gTransferPusherService == null) {
       this.g2gTransferPusherService = new G2GTransferPusherService(this);
     }

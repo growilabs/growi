@@ -34,6 +34,11 @@ vi.mock('~/server/service/config-manager/config-manager', () => {
 });
 
 class TestSearchService extends SearchService {
+  constructor(crowi: Crowi) {
+    super();
+    this.crowi = crowi;
+  }
+
   override generateFullTextSearchDelegator(): ElasticsearchDelegator {
     return mock<ElasticsearchDelegator>();
   }

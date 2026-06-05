@@ -1,6 +1,6 @@
 ---
 name: essential-test-patterns
-description: GROWI testing patterns with Vitest, React Testing Library, and vitest-mock-extended.
+description: GROWI testing patterns with Vitest, React Testing Library, and vitest-mock-extended (type-safe mocking, avoid type assertions). Auto-invoked when writing or reviewing tests.
 ---
 
 # GROWI Testing Patterns
@@ -115,6 +115,77 @@ mockProps.onSubmit?.mockImplementation((value) => {
 - ✅ **Autocomplete**: IDE suggestions for all properties/methods
 - ✅ **Deep mocking**: Automatically mocks nested objects
 - ✅ **Vitest integration**: Works seamlessly with `vi.fn()`
+
+### `mock<T>()` vs `mockDeep<T>()` — and `mock<T>({ ...overrides })`
+
+```typescript
+import { mock, mockDeep } from 'vitest-mock-extended';
+
+// Auto-stub everything, override just the members the test touches.
+// The override object is type-checked against Crowi (PartialDeep<Crowi>),
+// and the return value IS a Crowi — no cast needed.
+const crowi = mock<Crowi>({
+  searchService: { searchKeyword: vi.fn() },
+});
+
+// mockDeep<T>() recursively proxies nested access (foo.bar.baz.method()
+// all return mocks lazily). Use when the code-under-test reaches deep into
+// nested members you don't want to enumerate.
+const configManager = mockDeep<IConfigManagerForApp>();
+```
+
+- `mock<T>(overrides?)` — shallow auto-stub + a typed partial override. The common
+  case for service/Crowi-style dependencies.
+- `mockDeep<T>()` — recursive proxy for arbitrarily deep nested access.
+
+### Avoid type assertions for mocks — `as any`, `as unknown as T`, `as T`
+
+All three assertion forms **disable the type checker** for the mock, just in
+different ways, so prefer `mock<T>()` over every one of them:
+
+- `as unknown as Crowi` — the usual escape hatch; compiles even when the real type
+  drifts (a method is renamed or removed), leaving the mock silently wrong, and lets
+  you assign members that do not exist.
+- `as Crowi` — same problem when it compiles; TypeScript only blocks it when the
+  object structurally clashes, which then pushes people to `as unknown as` or `as any`.
+- `as any` — the broadest hole: erases the type entirely, so *nothing* about the
+  mock is checked and IDE autocomplete dies too.
+
+`mock<T>({ ...overrides })` is both safer (the override is checked, so drift is a
+compile error) and shorter (no need to hand-build the object).
+
+```typescript
+// ❌ WRONG — every one of these escapes type checking and survives API drift
+const crowi = { searchService: { searchKeyword: vi.fn() } } as unknown as Crowi;
+const crowi = { searchService: { searchKeyword: vi.fn() } } as Crowi;
+const crowi = { searchService: { searchKeyword: vi.fn() } } as any;
+
+// ✅ CORRECT — type-checked, auto-stubs the rest, returns a real Crowi
+const crowi = mock<Crowi>({
+  searchService: { searchKeyword: vi.fn() },
+});
+```
+
+Anti-pattern to watch for: hand-writing a `Pick<T, ...>` shim type plus a builder
+function and *still* casting at the call site. That is more code than `mock<T>()`
+and is not type-safe — the worst of both. Replace it with `mock<T>({ ... })`.
+
+### Tolerance framework: when a type assertion is acceptable
+
+The deciding question is the cost: **how many lines (and how much clarity) does
+removing the assertion cost?**
+
+| Tier | Situation | Rule |
+|------|-----------|------|
+| **1 — Avoid (cost ≤ 0)** | Mocking an interface/class. `mock<T>()` is 1 line, type-safe, *shorter* than the manual object. | **No assertion.** Use `mock<T>()`. No exceptions. |
+| **2 — Localize (small cost)** | One field needs *real* behavior `mock<T>` can't give (e.g. a working `EventEmitter` whose listeners actually fire), and its type doesn't quite match. | Allowed, but **confine the cast to that one field**: `mock<Crowi>({ events: { page: realEmitter as unknown as PageEvent } })` — never cast the whole object. |
+| **3 — Allow + comment (large cost)** | No type exists for the target (untyped JS module, untyped third-party lib). `mock<T>` can't be built. | A 1-line cast is fine — **writing a dozens-of-lines shim just to delete it is overkill**. Leave a `// WHY:` comment (e.g. `// PageEvent is a JS file typed as 'any' in Crowi`). |
+| **4 — Forbidden** | A hand-built/`Pick<>` partial object that ends in a cast anyway. | Replace with `mock<T>()`. There is no reason to keep it. |
+
+Rule of thumb: if deleting the cast costs **≤ 0 lines**, it's mandatory (Tier 1);
+if it can be **localized to one field**, do that (Tier 2); if the **type itself is
+missing** and avoidance would cost dozens of lines, a commented 1-line cast is fine
+(Tier 3); a shim that still casts is never fine (Tier 4).
 
 ## React Testing Library Patterns
 

@@ -39,7 +39,7 @@ concurrency:
 jobs:
 
   test-prod-node24:
-    uses: growilabs/growi/.github/workflows/reusable-app-prod.yml@dev/8.0.x
+    uses: ./.github/workflows/reusable-app-prod.yml
     if: |
       ( github.event_name == 'push'
         || github.base_ref == 'master'

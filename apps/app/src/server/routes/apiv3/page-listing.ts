@@ -76,6 +76,7 @@ const routerFactory = (crowi: Crowi): Router => {
    *     security:
    *       - bearer: []
    *       - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
    *     summary: /page-listing/root
    *     description: Get the root page
    *     responses:
@@ -113,6 +114,7 @@ const routerFactory = (crowi: Crowi): Router => {
    *     security:
    *       - bearer: []
    *       - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
    *     summary: /page-listing/children
    *     description: Get the children of a page
    *     parameters:
@@ -193,6 +195,7 @@ const routerFactory = (crowi: Crowi): Router => {
    *     security:
    *       - bearer: []
    *       - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
    *     summary: /page-listing/info
    *     description: Get summary information of pages
    *     parameters:
@@ -354,6 +357,7 @@ const routerFactory = (crowi: Crowi): Router => {
    *     security:
    *       - bearer: []
    *       - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
    *     summary: /page-listing/item
    *     description: Get a single page item for tree display
    *     parameters:
