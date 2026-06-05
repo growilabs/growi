@@ -1,7 +1,7 @@
 import React, { memo, useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 
-import { AiAssistant } from '~/features/mastra/client/components/Sidebar/AiAssistant';
+import { AiSidebar } from '~/features/mastra/client/components/Sidebar/AiSidebar';
 import { SidebarContentsType } from '~/interfaces/ui';
 import { useIsGuestUser } from '~/states/context';
 import { aiEnabledAtom } from '~/states/server-configurations';
@@ -47,7 +47,7 @@ export const SidebarContents = memo(() => {
       case SidebarContentsType.AI_ASSISTANT:
         if (isAiEnabled == null) return () => <></>; // wait for isAiEnabled to be determined
         if (isAiEnabled) {
-          return AiAssistant;
+          return AiSidebar;
         }
         return PageTree;
       default:

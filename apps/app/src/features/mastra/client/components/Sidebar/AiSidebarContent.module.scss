@@ -1,5 +1,5 @@
 // == Colors
-.grw-ai-assistant-substance {
+.grw-ai-sidebar-content {
   :global(.grw-btn-actions) {
     :global(.btn-link) {
       &:hover {
@@ -9,13 +9,13 @@
   }
 }
 
-.grw-ai-assistant-substance {
-  :global(.grw-ai-assistant-substance-header) {
+.grw-ai-sidebar-content {
+  :global(.grw-ai-sidebar-content-header) {
     font-size: 14px;
   }
 }
 
-.grw-ai-assistant-substance {
+.grw-ai-sidebar-content {
   :global(.list-group-item) {
     height: 40px;
     padding-left: 4px;

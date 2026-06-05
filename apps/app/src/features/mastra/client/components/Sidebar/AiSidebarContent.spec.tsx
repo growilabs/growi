@@ -24,14 +24,14 @@ vi.mock('./ThreadList', () => ({
   ThreadList: () => <div data-testid="thread-list" />,
 }));
 
-describe('AiAssistantContent (Left AI Panel)', () => {
+describe('AiSidebarContent (Left AI Panel)', () => {
   beforeEach(() => {
     vi.clearAllMocks();
   });
 
   it('renders a New chat button and the ThreadList', async () => {
-    const { AiAssistantContent } = await import('./AiAssistantSubstance');
-    render(<AiAssistantContent />);
+    const { AiSidebarContent } = await import('./AiSidebarContent');
+    render(<AiSidebarContent />);
 
     expect(
       screen.getByText('ai_assistant_substance.new_chat'),
@@ -40,8 +40,8 @@ describe('AiAssistantContent (Left AI Panel)', () => {
   });
 
   it('opens a fresh chat via openChat() with no args when New chat is clicked', async () => {
-    const { AiAssistantContent } = await import('./AiAssistantSubstance');
-    render(<AiAssistantContent />);
+    const { AiSidebarContent } = await import('./AiSidebarContent');
+    render(<AiSidebarContent />);
 
     fireEvent.click(screen.getByText('ai_assistant_substance.new_chat'));
 

@@ -4,11 +4,11 @@ import { useTranslation } from 'react-i18next';
 import { useChatSidebarActions } from '../../status/chat-sidebar';
 import { ThreadList } from './ThreadList';
 
-import styles from './AiAssistantSubstance.module.scss';
+import styles from './AiSidebarContent.module.scss';
 
-const moduleClass = styles['grw-ai-assistant-substance'] ?? '';
+const moduleClass = styles['grw-ai-sidebar-content'] ?? '';
 
-export const AiAssistantContent = (): JSX.Element => {
+export const AiSidebarContent = (): JSX.Element => {
   const { t } = useTranslation();
   const { openChat } = useChatSidebarActions();
 
@@ -28,7 +28,7 @@ export const AiAssistantContent = (): JSX.Element => {
 
       <div className="d-flex flex-column gap-4">
         <div>
-          <h3 className="fw-bold grw-ai-assistant-substance-header">
+          <h3 className="fw-bold grw-ai-sidebar-content-header">
             {t('ai_assistant_substance.recent_threads')}
           </h3>
           <ThreadList />

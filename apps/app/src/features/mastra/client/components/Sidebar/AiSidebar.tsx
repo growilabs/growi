@@ -5,12 +5,12 @@ import { useTranslation } from 'react-i18next';
 import ItemsTreeContentSkeleton from '~/client/components/ItemsTree/ItemsTreeContentSkeleton';
 import { useIsGuestUser } from '~/states/context';
 
-const AiAssistantContent = dynamic(
-  () => import('./AiAssistantSubstance').then((mod) => mod.AiAssistantContent),
+const AiSidebarContent = dynamic(
+  () => import('./AiSidebarContent').then((mod) => mod.AiSidebarContent),
   { ssr: false },
 );
 
-export const AiAssistant = (): JSX.Element => {
+export const AiSidebar = (): JSX.Element => {
   const { t } = useTranslation();
   const isGuestUser = useIsGuestUser();
 
@@ -24,7 +24,7 @@ export const AiAssistant = (): JSX.Element => {
         <h4 className="fs-6">{t('Not available for guest')}</h4>
       ) : (
         <Suspense fallback={<ItemsTreeContentSkeleton />}>
-          <AiAssistantContent />
+          <AiSidebarContent />
         </Suspense>
       )}
     </div>
