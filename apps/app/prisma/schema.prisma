@@ -350,7 +350,7 @@ model pages {
   seenUsers                String[]
   status                   String    @default("published")
   ttlTimestamp             DateTime?
-  updatedAt                DateTime  @default(now())
+  updatedAt                DateTime  @updatedAt
   wip                      Boolean?
 
   creator        users?        @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
