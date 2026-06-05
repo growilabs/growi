@@ -14,7 +14,6 @@ import { getContributionsHandler } from './get-contributions';
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig: vi.fn() },
 }));
-vi.mocked(configManager.getConfig).mockReturnValue(2592000);
 
 // The route fires `void ensureUserHasMigrated(user)` as a fire-and-forget side
 // effect.
@@ -52,6 +51,9 @@ describe('getContributionsHandler', () => {
   beforeEach(async () => {
     vi.restoreAllMocks();
     mockClear(mockRes);
+    // restoreAllMocks strips configured return values, so re-establish them.
+    // The Activity TTL must be re-injected (otherwise getConfig returns undefined).
+    vi.mocked(configManager.getConfig).mockReturnValue(2592000);
     // Reset call history and re-establish the resolved value (restoreAllMocks
     // strips the implementation, which would make the route call `.catch` on
     // `undefined`).
