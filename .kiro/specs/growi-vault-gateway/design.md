@@ -169,106 +169,6 @@ packages/core/src/interfaces/vault/
 
 ---
 
-## システムフロー
-
-### clone / fetch / pull 同期フロー
-
-```mermaid
-sequenceDiagram
-    participant Cli as git client
-    participant App as VaultGatewayRouter
-    participant Auth as VaultPatAuth
-    participant Map as VaultNamespaceMapper
-    participant Client as VaultManagerClient
-    participant VM as vault-manager
-    participant Audit as 既存 audit log
-
-    Cli->>App: GET /vault.git/info/refs?service=git-upload-pack
-    App->>App: VAULT_ENABLED env 確認 → false なら 404（環境変数による永続無効化）
-    App->>App: bootstrapState 確認 → done 以外なら 503 + Retry-After（一時的）
-    App->>Auth: credential adapter: Authorization: Basic から PAT 抽出 → 標準トークン解決
-    Auth-->>App: { userId, scopes } または null（ヘッダ無し=匿名候補）
-    App->>App: loginRequired 相当: 認証失敗なら git fallback で 401 + WWW-Authenticate
-    App->>App: userId=null かつ aclService.isGuestAllowedToRead()=false なら 401（匿名拒否, 要件 2.4a）
-    App->>Map: computeAccessibleNamespaces(userId)
-    Map-->>App: ['public', 'group-eng', 'user-<uid>-only-me', ...]
-    App->>Client: composeView({ userId, namespaces })
-    Client->>VM: POST /internal/compose-view (Bearer secret)
-    VM-->>Client: { viewRef, commitOid }
-    Client-->>App: { viewRef, commitOid }
-    App->>Audit: log 'vault.clone-prepare'
-    App->>Client: proxyGitRequest(GET /internal/git/info/refs, viewRef)
-    Client->>VM: GET /internal/git/info/refs (X-Vault-View-Ref: viewRef)
-    VM-->>Client: pkt-line refs advertisement (stream)
-    Client-->>App: stream
-    App-->>Cli: 200 stream forward
-
-    Cli->>App: POST /vault.git/git-upload-pack
-    App->>Client: proxyGitRequest(POST /internal/git/git-upload-pack, viewRef, body)
-    Client->>VM: POST /internal/git/git-upload-pack (body forward)
-    VM-->>Client: pack data (stream)
-    Client-->>App: stream
-    App-->>Cli: 200 stream forward
-    App->>Audit: log 'vault.clone-complete'
-```
-
-### page edit → vault sync 非同期フロー
-
-```mermaid
-sequenceDiagram
-    participant U as User
-    participant App as apps/app PageService
-    participant Disp as VaultDispatcher
-    participant Map as VaultNamespaceMapper
-    participant Inst as MongoDB vault_instructions
-
-    U->>App: PUT /pages/:id
-    App->>App: page + revision 永続化
-    App->>App: in-process event emit
-    App->>Disp: onPageChanged(page, event)
-    Disp->>Map: computePageNamespaces(page)
-    Map-->>Disp: { current: ['group-eng'], previous?: ['public'] }
-    alt ACL 変更あり
-        Disp->>Inst: insertOne({ op: 'remove', namespace: 'public', pagePath, ... })
-        Disp->>Inst: insertOne({ op: 'upsert', namespace: 'group-eng', pagePath, revisionId, ... })
-    else 通常の編集
-        Disp->>Inst: insertOne({ op: 'upsert', namespace: 'group-eng', pagePath, revisionId, ... })
-    end
-    Note over Disp: 同 namespace 1s 内に 100+ event の場合<br/>bulk-upsert に coalesce（chunk 1000）
-```
-
-### Initial Bootstrap フロー
-
-```mermaid
-sequenceDiagram
-    participant Op as Operator (env or admin UI)
-    participant Boot as VaultBootstrapper
-    participant Map as VaultNamespaceMapper
-    participant DB as MongoDB pages
-    participant SS as MongoDB vault_sync_state
-    participant Inst as MongoDB vault_instructions
-
-    Note over Op,Boot: VAULT_BOOTSTRAP_ON_START=true → 'env-true'<br/>VAULT_BOOTSTRAP_ON_START=force → 'env-force'<br/>admin UI Wipe Vault → 'admin-force-wipe'
-    Op->>Boot: bootstrap({ triggerSource })
-    Boot->>SS: bootstrapState: ANY → 'running'
-    Boot->>SS: bootstrapTotalEstimated = pages.estimatedDocumentCount()
-    Boot->>Inst: insertOne({ op: 'reset-all', issuedAt })
-    Boot->>DB: pages.find({status:'published', path:{$not:/^\/trash/}}).cursor()
-    loop pages cursor stream
-        DB-->>Boot: page batch
-        Boot->>Map: computePageNamespaces(page)
-        Note over Boot: namespace 単位バッファに蓄積<br/>CHUNK_SIZE(1000) で flush
-        Boot->>Inst: insertOne({ op: 'bulk-upsert', namespace, entries: [...] })
-        Boot->>SS: bootstrapCursor = page._id
-        Boot->>SS: bootstrapProcessed++
-    end
-    Boot->>SS: bootstrapState: 'verifying'
-    Note over Boot,Inst: vault-manager が processedAt を書き戻すまで poll
-    Boot->>SS: bootstrapState: 'done'
-```
-
----
-
 ## コンポーネントとインターフェース
 
 ### VaultGatewayRouter
@@ -509,17 +409,6 @@ interface VaultBootstrapper {
 
 既存の `forceWipe` 経路（`VAULT_BOOTSTRAP_ON_START=force` で発火するのと同じパス）を共有する。
 
-```
-1. triggerSource='admin-force-wipe' で executeBootstrap({ forceWipe: true, ... }) を呼び出す
-2. bootstrap state machine が forceOverride イベントで ANY state → running に強制遷移
-3. vault_instructions に op: 'reset-all' を 1 件 insert（vault-manager 側で全 namespace の repository が破棄される）
-4. onRunning callback を発火（HTTP route がここで 202 を返す）
-5. pages cursor stream を走査して seed instructions を発行
-6. bootstrapState = 'verifying' に遷移
-7. vault-manager が processedAt を書き戻すまで poll
-8. 完走で bootstrapState = 'done' へ
-```
-
 > kill switch 中はもちろん `bootstrapState !== 'done'` のため、すべての clone / fetch リクエストは 503 + Retry-After で応答される。これにより repository が空 / 不完全な状態でユーザに不整合なデータが見えることはない。
 
 **Bootstrap SLA**
@@ -591,30 +480,6 @@ interface VaultSettings {
 interface VaultSettingsService {
   getSettings(): Promise<VaultSettings>;
 }
-```
-
-**config-definition.ts への追加**
-
-```typescript
-'app:vaultEnabled': {
-  envVarName: 'VAULT_ENABLED',
-  isSecret: false,
-  publishToClient: false,
-  defaultValue: false,
-  // VaultSettingsService は ConfigSource.env を指定して env のみから読み込む
-},
-'app:vaultManagerEndpoint': {
-  envVarName: 'VAULT_MANAGER_ENDPOINT',
-  isSecret: false,
-  publishToClient: false,
-  // env からのみ読み込み（DB ストア無効）
-},
-'app:vaultManagerInternalSecret': {
-  envVarName: 'VAULT_MANAGER_INTERNAL_SECRET',
-  isSecret: true,
-  publishToClient: false,
-  // env からのみ読み込み（DB ストア無効）
-},
 ```
 
 ---
@@ -710,73 +575,7 @@ interface VaultSettingsService {
 
 ### @growi/core 共通 DTO 型
 
-**packages/core/src/interfaces/vault/vault-instruction.ts**
-
-```typescript
-export type VaultInstructionOp =
-  | 'upsert'
-  | 'bulk-upsert'
-  | 'remove'
-  | 'rename-prefix'
-  | 'grant-change-prefix'
-  | 'reset-all';
-
-export type Namespace = string;
-
-export interface VaultBulkUpsertEntry {
-  readonly pageId: string;
-  readonly pagePath: string;
-  readonly revisionId: string;
-}
-
-export interface VaultInstructionPayload {
-  readonly namespace?: Namespace; // undefined when op === 'reset-all'
-  readonly pageId?: string;
-  readonly pagePath?: string;
-  readonly revisionId?: string;
-  readonly entries?: ReadonlyArray<VaultBulkUpsertEntry>;
-  readonly oldPrefix?: string;
-  readonly newPrefix?: string;
-  readonly fromNamespace?: Namespace;
-}
-
-export interface VaultInstructionDoc {
-  readonly _id: string;
-  readonly op: VaultInstructionOp;
-  readonly payload: VaultInstructionPayload;
-  readonly issuedAt: Date;
-  readonly processedAt: Date | null;
-  readonly attempts: number;
-  readonly lastError: string | null;
-}
-```
-
-**packages/core/src/interfaces/vault/vault-compose-view.ts**
-
-```typescript
-export interface ComposeViewRequest {
-  readonly userId: string | null;
-  readonly namespaces: ReadonlyArray<Namespace>;
-}
-
-export interface ComposeViewResponse {
-  readonly viewRef: string;
-  readonly commitOid: string;
-}
-```
-
-**packages/core/src/interfaces/vault/vault-storage-stats.ts**
-
-```typescript
-export interface StorageStatsResponse {
-  readonly namespaceCount: number;        // vault_namespace_state の distinct namespace 数
-  readonly totalCommitCount: number;       // 全 namespace の commit chain depth の合計
-  readonly looseObjectCount: number;       // bare repo 内の loose object 数
-  readonly repoSizeBytes: number;          // bare repo ディレクトリの総バイト数
-  readonly lastSquashAt: string | null;    // ISO 8601、未実行時は null
-  readonly lastGcAt: string | null;        // ISO 8601、未実行時は null
-}
-```
+型定義は `packages/core/src/interfaces/vault/` を参照（`VaultInstructionDoc` / `ComposeViewRequest`・`ComposeViewResponse` / `StorageStatsResponse`）。
 
 ---
 

@@ -77,7 +77,7 @@
 7. `userId: null` を受信したとき、VaultViewComposer は public namespace のみで合成して `anonymous-view` ref を返す
 8. VaultViewComposer が delta merge の base tree が gc により消失していることを検知したとき、full merge にフォールバックする
 9. VaultViewComposer は merged tree を生成したのち、その view の最終ファイル構造を確定する **tree 正規化**（大小衝突解消）を実行する。正規化は merged tree の構造のみから決定論的に導出され、reverse-index コレクションを必要としない
-10. （大小衝突解消）同一ディレクトリ直下で、小文字化して一致する名前が 2 件以上存在するとき（blob・subtree の双方を対象）、VaultViewComposer は各メンバーの名前に `__<hash8>` suffix を付与して衝突を解消する。`hash8` は当該エントリの suffix 付与前 filePath の SHA-1 先頭 8 文字とする（pagePath は GROWI 内で一意のため、衝突する各メンバーは必ず異なる suffix を得る）
+10. （大小衝突解消）同一ディレクトリ直下で、小文字化して一致する名前が 2 件以上存在するとき（blob・subtree の双方を対象）、VaultViewComposer は各メンバーの名前に `__<hash8>` suffix を付与して衝突を解消する。`hash8` は当該エントリの suffix 付与前 filePath の SHA-1 先頭 8 文字とする
 11. （reactive churn）衝突していたエントリの一方が view から消え、グループのメンバーが 1 件になったとき、VaultViewComposer は残ったエントリの suffix を取り除いて素の名前に戻す。suffix 付与の有無を示す状態は永続化しない
 
 ---

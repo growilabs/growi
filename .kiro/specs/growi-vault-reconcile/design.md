@@ -246,88 +246,6 @@ apps/app/src/features/growi-vault/client/
 
 ### Reconcile 受付 → accept/reject 判定 → async 処理
 
-```mermaid
-sequenceDiagram
-    participant User as User
-    participant Route as Route
-    participant Service as ReconcileService
-    participant Target as TargetResolver
-    participant Acl as AclEvaluator
-    participant Conc as ConcurrencyController
-    participant Res as VaultResilienceLayer
-    participant Log as HistoryStore
-    participant Orch as ReconcileOrchestrator
-    participant Audit as audit log
-
-    User->>Route: POST { targetType, targetPath }
-    Route->>Service: submit({ user, isAdmin, target })
-    Service->>Target: resolveQuery(targetType, targetPath)
-    Target-->>Service: pageQuery
-
-    alt invalid target
-        Service-->>Route: rejected: invalid-target
-        Route-->>User: HTTP 400
-    end
-
-    Service->>Res: getStatus()
-    alt bootstrapState !== 'done' && rejectWhenNotDone
-        Service-->>Route: rejected: bootstrap-not-done
-        Route-->>User: HTTP 409
-    end
-
-    Service->>Pages: findOne({ path: targetPath }, { descendantCount: 1, grant: 1, grantedUsers: 1, grantedGroups: 1 })
-    Pages-->>Service: targetPage (or null)
-
-    alt targetPage == null
-        Service-->>Route: rejected: invalid-target
-        Route-->>User: HTTP 400
-    end
-
-    Service->>Service: plannedPageCount = (targetType == 'page') ? 1 : 1 + targetPage.descendantCount
-    alt plannedPageCount > roleLimit
-        Service->>Audit: vault.reconcile.rejected
-        Service-->>Route: rejected: page-count-exceeds-*-limit
-        Route-->>User: HTTP 422 { descendantCount, roleLimit }
-    end
-
-    Service->>Acl: buildEligibleQuery(user, pageQuery, isAdmin)
-    Note over Acl: No countDocuments — just builds eligibleQuery via PageQueryBuilder.<br/>For non-admin, fetches userRelatedGroups once.
-    Acl-->>Service: { eligibleQuery }
-
-    Service->>Log: insert(status: pending, reconcileId, descendantCount)
-    Service->>Conc: tryRunInBackground(userId, isAdmin, work=() => Orch.run(reconcileId, ...))
-    alt slot unavailable (ok: false)
-        Service->>Log: update(status: rejected, rejectReason)
-        Service->>Audit: vault.reconcile.rejected
-        Service-->>Route: rejected: *-concurrency-limit
-        Route-->>User: HTTP 429
-    end
-
-    Service-->>Route: accepted: { reconcileId, descendantCount }
-    Route-->>User: HTTP 202 { reconcileId }
-
-    Note over Conc,Orch: tryRunInBackground 内部の microtask で開始
-    Conc->>Orch: run(reconcileId, eligibleQuery, plannedPageCount, ...) (work callback)
-    Orch->>Log: update(status: running, startedAt)
-    Orch->>Audit: vault.reconcile.started
-    Note over Orch: cursor = pageModel.find(eligibleQuery).limit(plannedPageCount + 1).lean().cursor()
-    loop per page chunk (until plannedPageCount + 1 or stream end)
-        Orch->>Orch: stream pages → computePageNamespaces → buffer
-        Orch->>Orch: flush bulk-upsert per namespace
-    end
-    alt limit-exceeded (processed > plannedPageCount)
-        Orch->>Log: update(status: failed, lastError: 'limit-exceeded')
-        Orch->>Audit: vault.reconcile.failed
-    else processed < plannedPageCount
-        opt processed < plannedPageCount && !isAdmin
-            Orch->>Audit: vault.reconcile.partial-acl-filtered
-        end
-        Orch->>Log: update(status: completed, completedAt, processedCount)
-        Orch->>Audit: vault.reconcile.completed
-    end
-    Note over Conc: controller 内部の finally で slot release（caller 関与なし）
-```
-
 **Key Decisions**:
 - 受付ゲートは **同期 cheap path** で実行し、target page 1 件の `findOne` のみ追加 DB I/O とする（要件 6.2 / 6.10）。accept/reject を即時に返す（要件 1.3）。
 - ACL filter は受付時点で確定し、実行中の ACL 変更は無視する（要件 2.5）。
@@ -354,37 +272,6 @@ flowchart TB
 - migration の順序は `resilience migration → reconcile migration → resilience init → reconcile init` で固定し、依存方向を守る。
 
 ### Reconcile orchestrator の内部処理
-
-```mermaid
-sequenceDiagram
-    participant Orch as ReconcileOrchestrator
-    participant Pages as pages collection
-    participant Mapper as VaultNamespaceMapper
-    participant Instr as vault_instructions
-    participant Log as vault_reconcile_log
-
-    Orch->>Pages: find(eligibleQuery).cursor()
-    Pages-->>Orch: cursor
-
-    loop per page
-        Orch->>Mapper: computePageNamespaces(page)
-        Mapper-->>Orch: namespaces[]
-        loop per namespace
-            Orch->>Orch: namespaceBuffer[ns].push(pageEntry)
-            alt buffer >= chunkSize
-                Orch->>Instr: create({op: 'bulk-upsert', namespace, entries})
-                Orch->>Orch: clear buffer[ns]
-            end
-        end
-    end
-
-    Note over Orch: stream 完了後
-    loop remaining buffers
-        Orch->>Instr: create({op: 'bulk-upsert', namespace, entries})
-    end
-
-    Orch->>Log: update(status: completed, processedCount, completedAt)
-```
 
 **Key Decisions**:
 - cursor stream pattern は resilience の bootstrap-runner / drift-detector と同 pattern（page-by-page、namespace バッファ、chunk flush）。
@@ -1007,12 +894,7 @@ Emission point:
 - **422 (page-count-exceeds-*-limit)**: response body に `descendantCount` と `roleLimit` と `targetType` を含め、UI 側で `plannedPageCount = (targetType === 'page') ? 1 : 1 + descendantCount` を計算して「N 件が対象、上限 M 件以下に絞る」または admin 依頼への誘導を表示。
 - **429 (concurrency-limit)**: response body に reason（user / system）を含め、UI に「進行中の reconcile 完了後に再試行」を表示。
 - **500 (unexpected)**: lastError を server log に記録、UI には generic error メッセージ。
-
-### Error Categories and Responses
-
-- **User Errors (4xx)**: 上記すべて、`reject reason` 列挙型を返し UI が i18n 翻訳。
-- **System Errors (5xx)**: 想定外の例外。reconcile log には `status: 'failed', lastError: <message>` を記録。
-- **Business Logic Errors**: ACL 全除外 → 422 ではなく 200 + `noop: true` で返す（要件 2.6）。
+- **200 + `noop: true`（ACL 全除外）**: ACL で対象が全除外された場合は 422 ではなく 200 + `noop: true` で返す（要件 2.6）。
 
 ### Monitoring
 

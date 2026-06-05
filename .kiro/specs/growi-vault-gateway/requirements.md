@@ -82,9 +82,9 @@
 2. When 提示された PAT が存在しない、無効、または revoke されている場合, the GROWI Vault Gateway shall `WWW-Authenticate: Basic realm="GROWI Vault"` ヘッダーを含む HTTP 401 を返す
 3. When 認証失敗応答を返す場合, the GROWI Vault Gateway shall エラーメッセージにページリストや存在情報を含めない
 4. When 認証ヘッダーが存在せず、かつ `aclService.isGuestAllowedToRead()` が `true`（`security:wikiMode='public'` または `security:restrictGuestMode='Readonly'`）の場合, the GROWI Vault Gateway shall `userId: null`（匿名）として処理を継続し、public namespace のみにアクセスさせる
-4a. When 認証ヘッダーが存在せず、かつ `aclService.isGuestAllowedToRead()` が `false`（デフォルトの `security:restrictGuestMode='Deny'` や `security:wikiMode='private'` を含む）の場合, the GROWI Vault Gateway shall 匿名アクセスを拒否し、`WWW-Authenticate: Basic realm="GROWI Vault"` を含む HTTP 401 を返して PAT を要求する（public namespace すら応答しない）。これは既存 `loginRequired(crowi, isGuestAllowed=true)` が `isGuestAllowedToRead()` を参照して guest を弾くのと同一セマンティクスである
+4a. When 認証ヘッダーが存在せず、かつ `aclService.isGuestAllowedToRead()` が `false`（デフォルトの `security:restrictGuestMode='Deny'` や `security:wikiMode='private'` を含む）の場合, the GROWI Vault Gateway shall 匿名アクセスを拒否し、`WWW-Authenticate: Basic realm="GROWI Vault"` を含む HTTP 401 を返して PAT を要求する（public namespace すら応答しない）
 5. Where PAT がスコープ制限を持つ場合, the GROWI Vault Gateway shall そのスコープを namespace 計算に反映させる
-6. While GROWI が Basic 認証を行う reverse proxy の背後に配置される場合, the GROWI Vault Gateway shall git クライアントが「proxy の Basic 認証資格情報」と「vault の PAT」を同時に提示でき、両者が単一の `Authorization` ヘッダー上で衝突しない認証手段を提供する。具体的には PAT を `X-GROWI-ACCESS-TOKEN` リクエストヘッダー（PR #11244 で GROWI 標準化。`Authorization` を proxy 用に空けたまま、URL/ログにトークンを漏らさず渡せる）で受理する。git クライアントは `git config http.<url>.extraHeader "X-GROWI-ACCESS-TOKEN: <PAT>"` で送る。proxy が無い通常ケースでは git ネイティブの `Authorization: Basic base64(x:PAT)` も従来どおり受理する
+6. While GROWI が Basic 認証を行う reverse proxy の背後に配置される場合, the GROWI Vault Gateway shall git クライアントが「proxy の Basic 認証資格情報」と「vault の PAT」を同時に提示でき、両者が単一の `Authorization` ヘッダー上で衝突しない認証手段を提供する。具体的には PAT を `X-GROWI-ACCESS-TOKEN` リクエストヘッダーで受理する。proxy が無い通常ケースでは git ネイティブの `Authorization: Basic base64(x:PAT)` も従来どおり受理する
 
 ### 要件 3: ACL ベース namespace 計算（VaultNamespaceMapper）
 
@@ -128,9 +128,9 @@
 5. When pages cursor stream を走査する場合, the GROWI Vault Gateway shall `status: 'published'` かつ `/trash` 配下でないページのみを対象とし、namespace 単位のバッファに蓄積し CHUNK_SIZE（既定 1000）に達するたびに `bulk-upsert` instruction を発行する
 6. When bootstrapState が `running` または `pending` の場合, the GROWI Vault Gateway shall VaultBootstrapper.getStatus() が `state / processed / totalEstimated / cursor / startedAt / completedAt / lastError` を返す
 7. The GROWI Vault Gateway shall bootstrap の二重起動を防止するため、bootstrapState が `running` の間は新たな bootstrap を開始しない
-8. When admin UI の "Wipe Vault" ボタンが押された場合, the GROWI Vault Gateway shall triggerSource `admin-force-wipe` で forceWipe フローを発火し、`op: 'reset-all'` instruction を発行して全 namespace の repository を破棄し、bootstrapState を `running` に強制遷移させた後 pages cursor stream の再投入を開始する。これが管理 UI からの唯一の bootstrap 発火経路である
+8. When admin UI の "Wipe Vault" ボタンが押された場合, the GROWI Vault Gateway shall triggerSource `admin-force-wipe` で forceWipe フローを発火し、`op: 'reset-all'` instruction を発行して全 namespace の repository を破棄し、bootstrapState を `running` に強制遷移させた後 pages cursor stream の再投入を開始する
 9. When admin UI から Wipe Vault が発火された場合, the GROWI Vault Gateway shall 操作を audit log に `vault.wipe` として記録する（タイムスタンプ・実行ユーザを含む）
-10. The GROWI Vault Gateway shall 「Prepare GROWI Vault」「Bootstrap」等の独立した非破壊的 bootstrap 発火 API・ボタンを提供しない。理由: admin UI の `admin-ui` triggerSource は内部的に Wipe と同じ forceWipe フローを通るため、ユーザにとって 2 つのボタンが同じ振る舞いをすることになり UX 混乱を招く
+10. The GROWI Vault Gateway shall 「Prepare GROWI Vault」「Bootstrap」等の独立した非破壊的 bootstrap 発火 API・ボタンを提供しない
 
 ### 要件 6: vault-manager との通信（VaultManagerClient）
 
@@ -168,7 +168,7 @@
 4. The GROWI Vault Gateway shall admin UI に既存 audit log UI への "vault.*" フィルター付きリンクを提供する
 5. The GROWI Vault Gateway shall admin UI に `GET /internal/storage-stats` 経由で取得した namespace 数・合計 commit 数・loose object 数・repo size・最終 squash/gc 時刻を表示するストレージ観測セクションを提供する（vault_namespace_state を直接 read しない）
 6. The GROWI Vault Gateway shall admin UI から `vaultEnabled` を変更する操作（トグル等）を提供しない
-7. The GROWI Vault Gateway shall admin UI に「Prepare GROWI Vault」「Bootstrap」等の独立した bootstrap 発火ボタンを提供しない。理由: admin UI からの bootstrap は内部的に Wipe と機能的に等価 (forceWipe フロー) であり、ボタンが 2 つあると admin が両者の違いを誤認しやすい
+7. The GROWI Vault Gateway shall admin UI に「Prepare GROWI Vault」「Bootstrap」等の独立した bootstrap 発火ボタンを提供しない
 
 ### 要件 9: 共通 DTO 型（@growi/core）
 

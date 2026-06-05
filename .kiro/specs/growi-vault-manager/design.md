@@ -198,89 +198,7 @@ apps/growi-vault-manager/
 
 ## Dockerfile 構成戦略
 
-vault-manager は `VaultUploadPackSpawner` が `child_process.spawn` で `git upload-pack` を起動するため、release stage に **git binary v2.30+ の実行可能体が必須**。これは apps/app（DHI distroless で git 不要）にはない制約である。
-
-**採用**: release stage に `dhi.io/node:24-debian13-dev`（DHI dev variant、git/bash/coreutils を pre-installed）を流用する。
-
-**理由**:
-- DHI distroless（`24-debian13`）に git を `COPY --from=builder` で持ち込むと、`/usr/lib/git-core/` の補助 binary と libpcre2 / libcurl / libssl / libcrypto / libz / libexpat 等の共有ライブラリを tracking する必要があり、DHI 更新追随コストが高い
-- vault-manager の Node.js コード自体は shell を経由しないため、dev variant に shell が含まれることが追加の攻撃面にはならない
-- 5 stage 構成（`base` → `pruner` → `deps` → `builder` → `release`）と turbo prune ベースの monorepo subset 抽出、`pnpm store` cache mount は apps/app と揃える
-
----
-
-## システムフロー
-
-### フロー 1: instruction 処理（page edit → vault sync）
-
-```mermaid
-sequenceDiagram
-    participant Inst as MongoDB vault_instructions
-    participant Watch as VaultInstructionWatcher
-    participant Build as VaultNamespaceBuilder
-    participant Revs as MongoDB revisions
-    participant FS as 共有 fs (bare repo)
-    participant State as MongoDB vault_namespace_state
-
-    Inst-->>Watch: change stream insert event
-    Watch->>Watch: processedAt != null ? skip : proceed
-    alt op == 'upsert'
-        Watch->>Revs: findOne({_id: revisionId}, {body})
-        Revs-->>Watch: { body }
-    else op == 'bulk-upsert'
-        Watch->>Revs: find({_id: {$in: revisionIds}}, {body}).cursor()
-        Revs-->>Watch: cursor stream
-    end
-    Watch->>Build: applyInstruction(payload)
-    Build->>Build: VaultPathMapper.map(pagePath, pageId)
-    Build->>FS: writeBlob / writeTree / writeCommit
-    Build->>FS: updateRef(refs/namespaces/<ns>/refs/heads/main)
-    Build->>State: upsert({ namespace, commitOid, version++ })
-    Watch->>Inst: updateOne({_id}, {$set: {processedAt: now}})
-    Watch->>Watch: saveResumeToken(event._id)
-```
-
-### フロー 2: clone / fetch（compose-view → upload-pack）
-
-```mermaid
-sequenceDiagram
-    participant App as apps/app VaultManagerClient
-    participant Auth as SharedSecretAuth
-    participant Compose as ComposeViewController
-    participant Comp as VaultViewComposer
-    participant GitProxy as GitProxyController
-    participant Spawner as VaultUploadPackSpawner
-    participant FS as 共有 fs
-
-    App->>Auth: POST /internal/compose-view Authorization: Bearer
-    Auth->>Compose: validated request
-    Compose->>Comp: compose(userId, namespaces)
-    Comp->>Comp: check sourceVersions cache
-    alt キャッシュヒット
-        Comp-->>Compose: { viewRef, commitOid: cached }
-    else 再合成
-        Comp->>Comp: delta merge or full merge
-        Comp->>FS: writeTree + writeCommit + updateRef
-        Comp-->>Compose: { viewRef, commitOid: new }
-    end
-    Compose-->>App: 200 { viewRef, commitOid }
-
-    App->>Auth: GET /internal/git/info/refs X-Vault-View-Ref: user-<uid>-view
-    Auth->>GitProxy: validated
-    GitProxy->>Spawner: spawn(advertise, viewRef)
-    Spawner->>FS: git upload-pack --advertise-refs GIT_NAMESPACE=<viewRef>
-    FS-->>Spawner: pkt-line refs
-    Spawner-->>GitProxy: stdout stream
-    GitProxy-->>App: 200 stream
-
-    App->>Auth: POST /internal/git/git-upload-pack body: want/have
-    Auth->>GitProxy: validated
-    GitProxy->>Spawner: spawn(rpc, viewRef, stdin=body)
-    Spawner->>FS: git upload-pack --stateless-rpc GIT_NAMESPACE=<viewRef>
-    FS-->>Spawner: pack stream
-    Spawner-->>GitProxy: stdout stream
-    GitProxy-->>App: 200 pack stream
-```
+vault-manager は `VaultUploadPackSpawner` が `git upload-pack` を spawn するため、release stage に **git binary v2.30+ が必須**（apps/app の DHI distroless にはない制約）。distroless に git を持ち込むと共有ライブラリの tracking コストが高いため、release stage には git/bash/coreutils を含む DHI dev variant（`dhi.io/node:24-debian13-dev`）を採用する。
 
 ---
 
@@ -417,12 +335,7 @@ interface StorageStatsResponse {
 }
 ```
 
-**Implementation Notes**
-- `namespaceCount` / `totalCommitCount` は `vault_namespace_state` の集約クエリで取得（commit chain depth は squash 後の depth=1 を仮定して `count` でも近似可能だが、本 spec では各 doc の `commitChainDepth` フィールドを参照するか、`git rev-list --count` を呼び出す）
-- `looseObjectCount` は `git count-objects` の出力をパースして取得
-- `repoSizeBytes` は `fs.stat` でディレクトリサイズを集計（深い再帰を避けるため `du -sb` 相当を Node.js で実装）
-- `lastSquashAt` / `lastGcAt` は `VaultMaintenanceScheduler.getStatus()` を呼び出して取得
-- レスポンスはキャッシュ可能（admin UI のポーリング間隔を 5–10 秒で許容）
+owner 越境を避け `vault_namespace_state` の集約と git 統計（`git count-objects` 等）で取得する。`lastSquashAt` / `lastGcAt` は `VaultMaintenanceScheduler.getStatus()` から取得し、未実行時は null。O(repo size) の重い走査は行わない。
 
 ---
 
@@ -442,25 +355,7 @@ interface VaultInstructionWatcher {
 }
 ```
 
-**Behavior**
-
-```
-start():
-  1. vault_sync_state.findOne({_id: 'singleton'}) → resumeToken
-  2. db.vault_instructions.watch([{$match: {operationType: 'insert'}}], { resumeAfter: resumeToken })
-  3. 並行に vault_instructions.find({ processedAt: null }).cursor() を drain
-  4. for each event/doc:
-       if doc.processedAt != null: skip
-       processInstruction(doc)
-       vault_instructions.updateOne({_id}, {$set: {processedAt: now}})
-       saveResumeToken(event._id)
-
-processInstruction(doc):
-  try:
-    await VaultNamespaceBuilder.applyInstruction(doc)
-  catch (err):
-    vault_instructions.updateOne({_id}, {$inc: {attempts: 1}, $set: {lastError: err.message}})
-```
+起動時に `resumeToken` で change stream を再開しつつ、並行して `processedAt: null` の未処理 instruction を drain する（resume token 期限切れ耐性）。`processedAt != null` チェックで at-least-once 配送を冪等化し、失敗時は `attempts++` / `lastError` を記録して retry に委ねる。
 
 ---
 
@@ -477,54 +372,14 @@ interface VaultNamespaceBuilder {
 }
 ```
 
-**各 op の動作**
+**各 op の動作（要点）**
 
-`instruction` は `VaultInstructionDoc` 型。`op` はトップレベルフィールド（`instruction.op`）でアクセスし、ページ固有フィールドは `instruction.payload.*` でアクセスする。例: `switch (instruction.op) { case 'upsert': ... instruction.payload.namespace ... }`
+`instruction` は `VaultInstructionDoc` 型。`op` はトップレベル（`instruction.op`）でアクセスし、ページ固有フィールドは `instruction.payload.*` でアクセスする。
 
-`op: 'upsert'`:
-1. `filePath = VaultPathMapper.map(pagePath, pageId)`
-2. `revisions.findOne({_id: revisionId}, {body})`
-3. `blobOid = VaultBlobHasher.hashBlob(body)`
-4. `RepoStorage.writeBlob(body)` （既存 OID なら no-op）
-5. 既存 namespace tree を取得 → `filePath` の entry を新 blobOid で置き換え or 追加
-6. root まで変更 tree を再計算 → 各 tree を write
-7. 新 commit を作成（parent = 旧 namespace HEAD）
-8. `updateRef(refs/namespaces/<ns>/refs/heads/main)`
-9. `vault_namespace_state.upsert({ namespace, commitOid, version++ })`
-
-`op: 'bulk-upsert'`:
-1. `revisions.find({_id: {$in: revisionIds}}, {body}).cursor()` で 1 クエリ
-2. 各 entry に対し並列（concurrency 16）で `filePath` + `blobOid` を計算
-3. 全 blob を object pool に write
-4. namespace tree を 1 度だけ取得 → 全 `(filePath, blobOid)` を一括 apply
-5. root まで tree を再計算 → write
-6. 1 件の新 commit を作成
-7. namespace ref を更新
-8. `vault_namespace_state.upsert({ version++ })` — N entries でも 1 step
-
-`op: 'remove'`:
-1. `filePath = VaultPathMapper.map(pagePath, pageId)`
-2. namespace tree から `filePath` の entry を削除
-3. tree 再計算 → write → commit → updateRef → state update
-
-`op: 'rename-prefix'`:
-1. `oldFilePrefix = VaultPathMapper.mapPrefix(oldPrefix)`、`newFilePrefix = VaultPathMapper.mapPrefix(newPrefix)`
-2. `oldFilePrefix` 配下の subtree を抽出
-3. `newFilePrefix` 配下に subtree を mount、`oldFilePrefix` 配下を削除
-4. 影響 tree を root まで再 hash → write → commit → updateRef → state update
-5. blob は再書き込み不要（content-addressing で OID 不変）
-
-`op: 'grant-change-prefix'`:
-1. `fromNamespace` から subtree を切り離す（rename-prefix の削除側相当）
-2. `namespace`（移動先）に同 subtree を mount
-3. 両 namespace で commit + updateRef（namespace 単位 atomic）
-
-`op: 'reset-all'`:
-- `instruction.payload.namespace` は **undefined**（`reset-all` は特定 namespace を対象としない全体操作）
-1. 全 namespace の `refs/namespaces/<ns>/refs/heads/main` を `VaultRepoStorage.deleteRef` で一括削除する（`namespace` フィールドは参照しない）
-2. `vault_namespace_state` の全 doc を削除する
-3. `vault_user_views` の全 doc を削除する
-4. object pool は**削除しない**（後続 upsert で content-addressing により再利用）
+- **upsert / remove**: `VaultPathMapper.map` で filePath を求め、blob write（content-addressed・既存 OID は no-op）→ tree を root まで再計算 → commit → `updateRef` → `vault_namespace_state.upsert({ version++ })`
+- **bulk-upsert**: revisions を `$in` 1 クエリで取得し、blob hash/write を並列（concurrency 16）化。全 entry を 1 度の tree rebuild・1 commit・1 ref update に集約する（N entries でも state は 1 step）
+- **rename-prefix / grant-change-prefix**: subtree を抽出し移動先 prefix / namespace に mount する。blob は再書き込み不要（content-addressing で OID 不変）。grant-change-prefix は両 namespace で namespace 単位 atomic に commit + updateRef
+- **reset-all**: `payload.namespace` は **undefined**（特定 namespace を対象としない全体操作）。全 namespace ref と `vault_namespace_state` / `vault_user_views` を wipe するが、**object pool は保持**し後続 upsert で content-addressing により再利用する
 
 **Commit message フォーマット**（要件 2.8）
 
@@ -558,31 +413,9 @@ interface VaultViewComposer {
 }
 ```
 
-**Behavior**
+**Behavior（要点）**
 
-```
-compose(userId, namespaces):
-  1. viewRef = userId ? `user-${userId}-view` : 'anonymous-view'
-  2. currentVersions = {}
-     for ns in namespaces:
-       state = vault_namespace_state.findOne({ namespace: ns })
-       currentVersions[ns] = state?.commitOid ?? EMPTY_TREE_OID
-  3. existing = vault_user_views.findOne({ userId })
-  4. if existing != null && existing.sourceVersions deep-equals currentVersions:
-       return { viewRef, commitOid: existing.viewCommitOid }  // キャッシュヒット
-  5. if existing == null:
-       mergedTreeOid = fullMergeTreesByPath(namespaces.map(ns => rootTreeOid(ns)))
-     else:
-       changedNs = namespaces.filter(ns => existing.sourceVersions[ns] != currentVersions[ns])
-       mergedTreeOid = applyNamespaceDeltas(
-         base: existing.mergedTreeOid,
-         changedSources: changedNs
-       )
-  6. commitOid = writeCommit({ tree: mergedTreeOid, parents: [existing?.viewCommitOid].filter(Boolean), message: 'vault: view composed' })
-  7. updateRef(`refs/namespaces/${viewRef}/refs/heads/main`, commitOid)
-  8. vault_user_views.upsert({ userId, viewCommitOid: commitOid, mergedTreeOid, sourceVersions: currentVersions, composedAt: now })
-  9. return { viewRef, commitOid }
-```
+`viewRef` は `userId ? 'user-<uid>-view' : 'anonymous-view'`。各 namespace の現 `commitOid` から `currentVersions` を構築し、既存 view の `sourceVersions` と deep-equal ならキャッシュヒットで既存 `viewCommitOid` を返す。初回は full merge（`fullMergeTreesByPath`）、それ以降は変動 namespace のみ再計算する delta merge（`applyNamespaceDeltas`、base から未変動 subtree OID を継承）。結果を commit → `updateRef` し `vault_user_views` を upsert する。
 
 **衝突解消（同一 path に複数 namespace のエントリ）**:
 優先順位: `user-<uid>-only-me` > `group-*` > `restricted-link` > `public`

@@ -46,6 +46,7 @@
   - Feature pattern: `src/features/{name}/server/{routes,services,models}` 構成
   - pdf-converter: Ts.ED ベースのマイクロサービス。GROWI Cloud では FUSE GCS マウント、dev では docker-compose で local volume
   - git 関連コードなし
+  - null-revision 中間パスページ: GROWI は階層整合のため `revision` フィールドが null の中間パスページ（`/user`、`/empty` 等。50 ページ fixture で約 9 件）を自動生成する。`revisionId: ''` で instruction に積むと vault-manager 側の ObjectId キャスト（`$in`）が失敗するため、bootstrapper / dispatcher で `revision == null` をスキップする（gateway タスク 18 / manager タスク 13 fixture の根拠）
   - MongoDB: replica set 必須（既存 transaction 要件）→ change stream 利用可能
   - @growi/core: IPage, IUser, IRevision, IUserGroup, IUserGroupRelation, PageGrant constants, Scope, Ref<T>, isPopulated 等が既に export 済み
 - **Implications**: apps/app の既存 ACL/PAT 評価ロジックをそのまま再利用できる。vault-manager は @growi/core の DTO 型のみ依存し、ドメインロジックを持たない設計が成立する

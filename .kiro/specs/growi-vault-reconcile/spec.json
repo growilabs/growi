@@ -1,10 +1,10 @@
 {
   "feature_name": "growi-vault-reconcile",
   "created_at": "2026-05-21T00:00:00.000Z",
-  "updated_at": "2026-05-22T00:00:00.000Z",
+  "updated_at": "2026-06-05T00:00:00.000Z",
   "language": "ja",
   "phase": "implementation-complete",
-  "cleaned_up_at": "2026-05-22T00:00:00.000Z",
+  "cleaned_up_at": "2026-06-05T00:00:00.000Z",
   "approvals": {
     "requirements": {
       "generated": true,

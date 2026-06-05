@@ -286,13 +286,7 @@ apps/app/src/features/growi-vault/server/services/resilience/
 ├── retry-policy.ts                   # exponential backoff 計算（純関数）
 ├── bootstrap-runner.ts               # Orchestrator: state machine + heartbeat + retry を駆動
 ├── drift-detector.ts                 # watermark-based sweep + 補修 instruction 発行
-└── __tests__/                        # *.spec.ts 群（テスト共置）
-    ├── bootstrap-state-machine.spec.ts
-    ├── bootstrap-trigger-resolver.spec.ts
-    ├── retry-policy.spec.ts
-    ├── bootstrap-runner.spec.ts
-    ├── drift-detector.spec.ts
-    └── resilience-flow.integ.ts      # MongoDB を含む end-to-end
+└── __tests__/                        # *.spec.ts 群（テスト共置）+ resilience-flow.integ.ts（MongoDB end-to-end）
 ```
 
 > 各サブモジュールは 1 つの責務のみを持つ。`bootstrap-runner.ts` は唯一の I/O orchestrator として state-machine / trigger-resolver / heartbeat / retry-policy を組み立てる。`drift-detector.ts` は独立した scheduler として動作。
@@ -301,7 +295,7 @@ apps/app/src/features/growi-vault/server/services/resilience/
 
 - [apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts](../../../apps/app/src/features/growi-vault/server/services/vault-bootstrapper.ts) — 公開 interface `VaultBootstrapper` と factory `createVaultBootstrapper` を維持し、内部実装を `resilience/createVaultResilienceLayer` への delegation に置き換える。既存 consumer（admin route、`index.ts:401`）は変更不要。
 - [apps/app/src/features/growi-vault/server/services/vault-namespace-mapper.ts](../../../apps/app/src/features/growi-vault/server/services/vault-namespace-mapper.ts) — **layering 違反の trash filter / status filter を削除**（§設計前提: Trash の責務分離 参照）。`derivePageNamespaces` の冒頭にある `if (page.path?.startsWith('/trash')) return [];` および `if (page.status !== STATUS_PUBLISHED) return [];` の 2 ガードを撤廃し、grant 情報のみから namespace を導く純関数にする。これにより drift detector / dispatcher / 将来 consumer が同じ mapper を例外なく使える。既存 dispatcher の delete event 経路は pre-deletion state を受け取るため挙動回帰なし——回帰テストは `vault-dispatcher.spec.ts` で確認する。
-- [apps/app/src/features/growi-vault/server/models/vault-sync-state.ts](../../../apps/app/src/features/growi-vault/server/models/vault-sync-state.ts) — `BootstrapState` enum に 3 値追加、新規フィールド 6 件追加（後述 §Data Models）
+- [apps/app/src/features/growi-vault/server/models/vault-sync-state.ts](../../../apps/app/src/features/growi-vault/server/models/vault-sync-state.ts) — `BootstrapState` enum に 3 値追加、新規フィールド 14 件追加（後述 §Data Models）
 - [apps/app/src/server/service/config-manager/config-definition.ts](../../../apps/app/src/server/service/config-manager/config-definition.ts) — `app:vaultBootstrapOnStart` を boolean から `'true' | 'false' | 'force'` の string enum に変更、新規 retry/drift 系 config 追加
 - [apps/app/src/features/growi-vault/server/index.ts](../../../apps/app/src/features/growi-vault/server/index.ts) — bootstrap 起動分岐（L396-404）を `BootstrapTriggerResolver` 経由に置き換え、resilience layer 初期化追加
 - [apps/app/src/features/growi-vault/server/routes/vault-admin.ts](../../../apps/app/src/features/growi-vault/server/routes/vault-admin.ts) — 新規 endpoint: `POST /vault/retry/abort`、`GET /vault/resilience-status`
@@ -315,26 +309,6 @@ apps/app/src/features/growi-vault/server/services/resilience/
 ## System Flows
 
 ### Bootstrap 状態遷移
-
-```mermaid
-stateDiagram-v2
-    [*] --> pending
-    pending --> running: start (env=true/force or admin)
-    running --> verifying: page stream 完了
-    verifying --> done: completeness ok
-    verifying --> failed: completeness ng
-    running --> failed: throw
-    failed --> retrying: 起動時 + retry 残あり
-    retrying --> running: backoff 経過 後の resume
-    retrying --> escalated: max retry 到達
-    running --> retrying: 起動時 + heartbeat 期限切れ stale running 検知
-    done --> running: forceOverride (force 起動 or admin UI 明示)
-    pending --> running: forceOverride
-    verifying --> running: forceOverride
-    failed --> running: forceOverride
-    retrying --> running: forceOverride
-    escalated --> running: forceOverride (admin abort 経由 or env=force 直接)
-```
 
 **Key Decisions**:
 - `verifying` を独立状態とすることで「page stream 完了 ≠ done」を構造的に担保する（要件 1.1）。
@@ -350,33 +324,6 @@ stateDiagram-v2
 
 ### Force 起動と暗黙トリガーの分岐
 
-```mermaid
-flowchart TB
-    Start[apps/app 起動] --> ResolveEnv{VAULT_BOOTSTRAP_ON_START}
-    ResolveEnv -->|false| Skip[何もしない]
-    ResolveEnv -->|unknown 値| Skip
-    ResolveEnv -->|true| CheckState{現在の state}
-    ResolveEnv -->|force| ForceFlow[全 wipe bootstrap]
-    CheckState -->|done| Skip
-    CheckState -->|pending| StartNew[新規 bootstrap]
-    CheckState -->|failed/escalated| RetryPath{retry 設定}
-    RetryPath -->|enabled & 残あり| RetryStart[backoff 後 resume]
-    RetryPath -->|disabled or 残なし| Skip
-    CheckState -->|running stale heartbeat| RecoverPath[stale 検知 → resume]
-    ForceFlow --> EmitResetAll[reset-all instruction 発行]
-    EmitResetAll --> StreamPages[pages cursor stream]
-    StartNew --> StreamPages
-    RetryStart --> StreamPagesFromCursor[pages stream cursor 以降のみ]
-    RecoverPath --> StreamPagesFromCursor
-    StreamPages --> Verifying[verifying]
-    StreamPagesFromCursor --> Verifying
-    Verifying -->|ok| Done[done + cursor null reset]
-    Verifying -->|ng| Failed[failed]
-    Done --> ForceWarn{trigger=force?}
-    ForceWarn -->|yes| WarnBanner[admin UI 強警告: env を true に戻すこと]
-    ForceWarn -->|no| End[完了]
-```
-
 **Key Decisions**:
 - `reset-all` instruction は **force / 新規 bootstrap でのみ発行**。resume / retry では発行しない（要件 2.1）。
 - 不明値（型外）は `false` 同等にフォールバック（要件 1.13）。
@@ -384,30 +331,6 @@ flowchart TB
 - **Schema migration step は env 解決の前に必ず実行**（§Data Models §Migration 参照）。migration 直後に `bootstrapState === 'running' && bootstrapInstanceId == null` の doc を検出した場合は `failed` に正規化してから env トリガーフローに入る → 上記 diagram の `CheckState -->|failed/escalated|` 経路に合流する（要件 3.3 と整合）。
 
 ### Drift Detector の周期処理
-
-```mermaid
-sequenceDiagram
-    participant Scheduler as DriftDetector ticker
-    participant State as vault_sync_state
-    participant Pages as pages collection
-    participant Mapper as VaultNamespaceMapper
-    participant Instr as vault_instructions
-    participant Audit as audit log
-
-    Scheduler->>State: read bootstrapState + driftWatermark
-    alt state != done
-        Scheduler-->>Scheduler: skip tick
-    else state == done
-        Scheduler->>Pages: find updatedAt > watermark
-        Pages-->>Scheduler: changed pages cursor
-        loop per page
-            Scheduler->>Mapper: computePageNamespaces(page)
-            Scheduler->>Instr: create 'bulk-upsert' instruction per namespace
-        end
-        Scheduler->>State: update driftWatermark = max(updatedAt)
-        Scheduler->>Audit: emit vault.resilience.drift-* events
-    end
-```
 
 **Key Decisions**:
 - Watermark は **`pages.updatedAt` の最大値**を `vault_sync_state.driftLastWatermark` に保存。次回 tick は `updatedAt > watermark` で sweep。
@@ -925,11 +848,10 @@ export interface DriftStatus {
 
 ## Test Approach
 
-- **純関数モジュール（state-machine / trigger-resolver / retry-policy / heartbeat 判定）**: discriminated union と純関数遷移を table-driven で網羅。`forceOverride` が全 state から `running` に遷移できることと、`done → running` が `forceOverride` 経由のみであることを構造的な不変条件として固定。
-- **I/O bound モジュール（runner / drift-detector）**: モック MongoDB で trigger × state の組み合わせを駆動し、`reset-all` の emit タイミング・cursor null reset・completeness check の 3 条件 AND・retry escalation・abort 後の in-flight 完走（採用方針 A）を検証。drift については v1 スコープ縮退の固定 test（`remove` を発行しない、上限超過時の scope-out 4 条件）を含める。
-- **trash 責務分離の境界検証**: apps/app 側 mapper の trash filter 撤廃を担保するテスト（trashed path / non-published でも grant 由来 namespace が返る）と、既存 dispatcher の delete event 経路に回帰がないことを並行確認。
-- **end-to-end**: 実 MongoDB（devcontainer の `mongo` service）で fresh install / 既存 doc migration / 異常終了 running 再開 / `env=force` 全 wipe / abort → 再起動の経路を通し、`vault.resilience.*` audit event の発火と admin UI surface への反映までを 1 系統で確認。
-- **UI**: completion / auto-retry / drift / force banner / confirm modal の状態遷移を component 単位で snapshot 検証。
+テストで固定すべき不変条件（手段ではなく契約）:
+
+- `forceOverride` は全 state から `running` への遷移を許可し、`done → running` は `forceOverride` 経由のみ。abort 後の in-flight は完走させる（採用方針 A）。
+- drift v1 は `remove` を発行せず、上限超過時は scope-out 4 条件で自動回収を見送る。
 
 **Performance budget**: drift sweep 1 tick の対象を「前回 tick 以降の変更分」に限定することで、典型編集頻度では `< 5s` で完了する想定。heartbeat overhead は 10s 間隔の `findOneAndUpdate` 1 回のみ（vault-manager の `watcherInstanceId` パターンと同等）。
 
