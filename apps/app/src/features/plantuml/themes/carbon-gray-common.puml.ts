@@ -42,9 +42,6 @@ skinparam defaultFontSize        12
 'skinparam dpi                    125
 skinparam shadowing              false
 skinparam roundcorner            0
-skinparam ParticipantPadding     30
-skinparam BoxPadding             30
-skinparam Padding                10
 skinparam ArrowColor             $GRAY
 skinparam stereotype {
     CBackgroundColor $SECONDARY_LIGHT
@@ -644,6 +641,16 @@ wbsDiagram {
   }
 
   noteBorderColor $DARK
+}
+
+sequenceDiagram {
+  participant {
+    Padding 30
+  }
+  box {
+    Padding 30
+  }
+  Padding 10
 }
 
 'Placeholder for adding wirediagram skins
