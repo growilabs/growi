@@ -143,7 +143,7 @@ accessTokenSchema.statics.findUserIdByToken = async function (
     tokenHash,
     expiredAt: { $gte: now },
     scopes: { $all: extractedScopes },
-  }).select('user');
+  }).select('user scopes');
 };
 
 accessTokenSchema.statics.findTokenByUserId = async function (

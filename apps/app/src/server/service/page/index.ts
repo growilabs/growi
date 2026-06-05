@@ -772,7 +772,15 @@ class PageService implements IPageService {
         toPath: newPagePathSanitized,
       });
     }
-    this.pageEvent.emit('rename');
+    // Carry the old path / new path so that subscribers (e.g. growi-vault) can
+    // propagate the rename without re-querying state. Existing subscribers that
+    // ignore arguments are unaffected.
+    this.pageEvent.emit('rename', {
+      page: renamedPage ?? page,
+      oldPath: page.path,
+      newPath: newPagePathSanitized,
+      user,
+    });
 
     // Set to Sub
     const pageOp = await PageOperation.findByIdAndUpdatePageActionStage(
@@ -1064,7 +1072,14 @@ class PageService implements IPageService {
       });
     }
 
-    this.pageEvent.emit('rename');
+    // Same payload contract as the v5+ rename path above — see the comment
+    // at the other emit('rename', ...) call site for rationale.
+    this.pageEvent.emit('rename', {
+      page: renamedPage,
+      oldPath: page.path,
+      newPath: newPagePathSanitized,
+      user,
+    });
 
     return renamedPage;
   }
@@ -1153,7 +1168,13 @@ class PageService implements IPageService {
       }
     }
 
-    this.pageEvent.emit('updateMany', pages, user);
+    // Carry the prefix shift so subscribers can propagate the bulk rename
+    // without re-deriving the prefix from individual pages. Optional 4th arg —
+    // existing subscribers that only read (pages, user) are unaffected.
+    this.pageEvent.emit('updateMany', pages, user, {
+      oldPagePathPrefix,
+      newPagePathPrefix,
+    });
   }
 
   private async renameDescendantsV4(
@@ -1217,7 +1238,12 @@ class PageService implements IPageService {
       }
     }
 
-    this.pageEvent.emit('updateMany', pages, user);
+    // Same payload contract as renameDescendants above — see the comment there
+    // for rationale on the optional 4th argument.
+    this.pageEvent.emit('updateMany', pages, user, {
+      oldPagePathPrefix,
+      newPagePathPrefix,
+    });
   }
 
   private async renameDescendantsWithStream(
@@ -3139,6 +3165,19 @@ class PageService implements IPageService {
   ): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
     const operations: any = [];
+    // Snapshot the old grant state per affected page so downstream subscribers
+    // (e.g. growi-vault) can compute previous namespaces after the bulkWrite.
+    // The in-memory `childPage` objects are not mutated by the bulkWrite, but
+    // we capture explicitly to keep the contract self-describing.
+    const affectedPages: Array<{
+      page: PageDocument;
+      previousGrant: PageGrant;
+      previousGrantedGroups: IGrantedGroup[];
+      previousGrantedUsers: PageDocument['grantedUsers'];
+      newGrant: PageGrant;
+      newGrantedGroups: IGrantedGroup[];
+      newGrantedUsers: PageDocument['grantedUsers'];
+    }> = [];
 
     pages.forEach((childPage) => {
       let newChildGrantedGroups: IGrantedGroup[] = [];
@@ -3157,13 +3196,24 @@ class PageService implements IPageService {
           newChildGrantedGroups,
         );
       if (canChangeGrant) {
+        const newGrantedUsers =
+          grant === PageGrant.GRANT_OWNER ? [user._id] : [];
+        affectedPages.push({
+          page: childPage,
+          previousGrant: childPage.grant,
+          previousGrantedGroups: childPage.grantedGroups,
+          previousGrantedUsers: childPage.grantedUsers,
+          newGrant: grant,
+          newGrantedGroups: newChildGrantedGroups,
+          newGrantedUsers,
+        });
         operations.push({
           updateOne: {
             filter: { _id: childPage._id },
             update: {
               $set: {
                 grant,
-                grantedUsers: grant === PageGrant.GRANT_OWNER ? [user._id] : [],
+                grantedUsers: newGrantedUsers,
                 grantedGroups: newChildGrantedGroups,
               },
             },
@@ -3172,6 +3222,17 @@ class PageService implements IPageService {
       }
     });
     await Page.bulkWrite(operations);
+
+    // Emit only when at least one descendant was actually changed. This event
+    // is bulk grant changes' only signal — `updateChildPagesGrant` does the
+    // mutation directly via bulkWrite without going through per-page event
+    // paths, so subscribers depend on this emit to react.
+    if (affectedPages.length > 0) {
+      this.pageEvent.emit('descendantsGrantChanged', {
+        affectedPages,
+        user,
+      });
+    }
   }
 
   /**

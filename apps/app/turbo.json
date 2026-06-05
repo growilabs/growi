@@ -86,7 +86,7 @@
     },
 
     "test": {
-      "dependsOn": ["^dev"],
+      "dependsOn": ["^dev", "@growi/vault-manager#build"],
       "outputLogs": "new-only"
     },
     "test:unit": {

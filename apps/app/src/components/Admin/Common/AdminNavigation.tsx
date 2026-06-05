@@ -105,6 +105,13 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('audit_log_management.audit_log')}
         </>
       );
+    case 'vault':
+      return (
+        <>
+          <span className="material-symbols-outlined me-1">database</span>
+          GROWI Vault
+        </>
+      );
     case 'plugins':
       return (
         <>
@@ -298,6 +305,11 @@ export const AdminNavigation = (): JSX.Element => {
             menu="data-transfer"
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/data-transfer')}
+          />
+          <MenuLink
+            menu="vault"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/vault')}
           />
 
           <hr />
