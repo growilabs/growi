@@ -2,7 +2,6 @@ import {
   ACTION_COMMENT_CREATE,
   ACTION_PAGE_CREATE,
   ACTION_PAGE_DUPLICATE,
-  ACTION_PAGE_REVERT,
   ACTION_PAGE_UPDATE,
 } from '~/interfaces/activity';
 
@@ -10,6 +9,5 @@ export const ContributionGraphActions = {
   ACTION_PAGE_CREATE,
   ACTION_PAGE_UPDATE,
   ACTION_PAGE_DUPLICATE,
-  ACTION_PAGE_REVERT,
   ACTION_COMMENT_CREATE,
 } as const;
