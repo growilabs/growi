@@ -76,3 +76,31 @@
   - Maximum count limit (10) works correctly
   - String replacement on candidate selection is correct
   - _Requirements: 3.1, 3.2, 3.3, 3.5_
+
+## Editor: Autocomplete Facility / Source Separation (Requirement 4)
+
+- [ ] 4.1 Promote the shared autocomplete facility to a standalone editor default and reduce the emoji extension to emoji-specific config
+  - Register the generic `autocompletion()` facility once as a standalone shared default extension, independent of any feature, placed before the emoji extension in the defaults
+  - Remove the `icons: false` option from the emoji extension's own `autocompletion()` call so that flag is owned solely by the shared base; the emoji extension keeps only its glyph renderer (`addToOptions`) and its `markdownLanguage.data.of` source
+  - Export the emoji completion source function (rename the internal `emojiAutocompletion` to `emojiCompletionSource` and export it) so regression tests can exercise it directly — this is the only production export change and belongs with the refactor, keeping the test task free of production edits
+  - Observable: `turbo run build --filter @growi/editor` stays green; in the comment editor both `:` emoji completion and `@` mention completion still appear, and the shared `autocompletion()` is no longer nested inside the emoji extension
+  - _Requirements: 4.1, 4.3, 4.7_
+  - _Boundary: use-default-extensions, emojiAutocompletionSettings_
+
+- [ ]* 4.2 Add regression tests proving facility/source decoupling
+  - **Coexistence (AC 4.4)** — in a new spec beside the emoji extension: call the exported emoji source with a `:smi` context and expect a non-null result, and separately call the mention source factory with an `@ab` context and expect a non-null result, proving neither source suppresses the other
+  - **Code-block scoping (AC 4.6)** — in the same new spec: assert the emoji source is excluded from fenced code blocks. The sublanguage MUST be nested **synchronously** — do NOT use `codeLanguages: languages` (async load; will not nest in a sync unit test and the assertion will fail, verified during design validation). Build a synchronous stub sublanguage instead:
+    ```typescript
+    const stubParser = StreamLanguage.define({ token: (s) => { s.next(); return null; } });
+    const jsDesc = LanguageDescription.of({ name: 'javascript', alias: ['js'], support: new LanguageSupport(stubParser) });
+    const state = EditorState.create({ doc: '```js\n:smi\n```\n\n:smi', extensions: [
+      markdown({ base: markdownLanguage, codeLanguages: [jsDesc] }),
+      emojiAutocompletionSettings,
+    ]});
+    ```
+    Then assert `state.languageDataAt<CompletionSource>('autocomplete', pos)` (an `EditorState` instance method from `@codemirror/state`) does NOT contain the emoji source at a position inside the ` ```js ``` ` block but DOES at a normal markdown position. (`StreamLanguage`, `LanguageSupport`, `LanguageDescription` come from `@codemirror/language`.)
+  - **Mention independence (AC 4.2)** — add a case to the existing mention spec asserting the mention source returns completions when no emoji extension is present in the editor state, locking the no-hidden-dependency guarantee
+  - Observable: `pnpm vitest run emojiAutocompletionSettings` and `pnpm vitest run mentionAutocompletionSettings` both pass, including the new code-block scoping and mention-independence cases
+  - _Requirements: 4.2, 4.4, 4.6_
+  - _Depends: 4.1_
+  - _Boundary: emojiAutocompletionSettings.spec, mentionAutocompletionSettings.spec_

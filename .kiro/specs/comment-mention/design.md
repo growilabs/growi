@@ -296,3 +296,222 @@ This feature involves no data model changes.
 
 - Log `logger.info` with the number of target users on each `insertMentionNotifications` call
 - Log `logger.warn` on the client side if `fetchUsers` response time exceeds 500ms
+
+---
+
+## Requirement 4: Autocomplete Facility / Source Responsibility Separation
+
+> **Added post-implementation.** Requirements 1–3 are implemented and merged. This section covers the architectural decoupling identified during reviewer validation.
+
+### Boundary Commitments
+
+#### This Spec Owns
+- Moving the shared `autocompletion()` facility from `emojiAutocompletionSettings` to `defaultExtensions` as a standalone entry
+- Exporting `emojiCompletionSource` from `emojiAutocompletionSettings.ts` to enable regression testing
+- Regression test coverage for 4.2 (mention without emoji), 4.4 (coexistence), 4.6 (no emoji in code blocks)
+
+#### Out of Boundary
+- `mentionAutocompletionSettings.ts` — no functional changes; it is already correctly structured as a source-only extension
+- `apps/app` code — the refactor is entirely within `packages/editor`
+- The body of the `emojiAutocompletion` / `emojiCompletionSource` function — logic is unchanged
+
+#### Allowed Dependencies
+- `@codemirror/autocomplete ^6.18.4` — `autocompletion()` factory; config-merge behavior is the mechanism this design relies on
+- `@codemirror/lang-markdown` — `markdownLanguage`, `markdown()` for test state setup (AC 6)
+- `@codemirror/language` — `StreamLanguage`, `LanguageSupport`, `LanguageDescription` to build a **synchronous stub sublanguage** for the AC 6 test (do NOT use `@codemirror/language-data`'s `languages`; it loads sublanguages asynchronously and will not nest in a sync unit test)
+- `@codemirror/state` — `EditorState` for test setup; `state.languageDataAt(name, pos)` is the verification API
+
+#### Revalidation Triggers
+- If `emojiAutocompletionSettings` is removed from `defaultExtensions`: emoji glyph renderer is lost; the shared `autocompletion()` facility persists independently (intended)
+- If `@codemirror/autocomplete` introduces breaking changes to `combineConfig` semantics in a major version: re-verify that `{ icons: false }` from base + `{ addToOptions }` from emoji still merge as `{ icons: false, addToOptions: [...] }`
+
+---
+
+### Architecture
+
+#### Before / After
+
+```
+BEFORE
+defaultExtensions ──► emojiAutocompletionSettings
+                           ├── autocompletion({ addToOptions, icons:false })  ← shared facility BUNDLED IN EMOJI
+                           └── markdownLanguage.data.of({ autocomplete: emojiAutocompletion })
+mentionAutocompletionSettings:
+  └── markdownLanguage.data.of({ autocomplete: mentionSource })  ← implicit runtime dependency on emoji
+
+AFTER
+defaultExtensions ──► autocompletion({ icons:false })          ← shared facility, standalone
+              ──────► emojiAutocompletionSettings
+                           ├── autocompletion({ addToOptions })  ← emoji-specific UI only
+                           └── markdownLanguage.data.of({ autocomplete: emojiCompletionSource })
+mentionAutocompletionSettings:
+  └── markdownLanguage.data.of({ autocomplete: mentionSource })  ← independent peer
+```
+
+#### Config-Merge Guarantee
+
+`autocompletion()` uses `Facet.define` with `combineConfig`. Multiple calls produce multiple facet inputs that are merged. Net effect of `autocompletion({ icons: false })` + `autocompletion({ addToOptions: [...] })` is `{ icons: false, addToOptions: [...] }`. Verified against `@codemirror/autocomplete ^6.18.4`.
+
+#### Technology Stack
+
+| Layer | Choice / Version | Role |
+|-------|-----------------|------|
+| Editor extensions | `@codemirror/autocomplete ^6.18.4` | `autocompletion()` facility, `CompletionSource` type |
+| Test state setup | `@codemirror/lang-markdown`, `@codemirror/language` (`StreamLanguage`/`LanguageSupport`/`LanguageDescription`) | AC 6 fenced-code scoping verification via a synchronous stub sublanguage (NOT `@codemirror/language-data`, which loads async) |
+| Test verification API | `EditorState.languageDataAt(name, pos)` (`@codemirror/state`) | Confirm scoping mechanism at a given cursor position |
+
+---
+
+### File Structure Plan
+
+```
+packages/editor/src/client/
+├── stores/
+│   └── use-default-extensions.ts                       # MODIFIED: add autocompletion({ icons:false }) to defaultExtensions
+└── services-internal/extensions/
+    ├── emojiAutocompletionSettings.ts                   # MODIFIED: remove icons:false; export emojiCompletionSource
+    └── emojiAutocompletionSettings.spec.ts              # NEW: AC 4.4 and 4.6 regression tests
+packages/editor/src/client/services/
+└── mentionAutocompletionSettings.spec.ts                # MODIFIED: add AC 4.2 explicit independence test
+```
+
+---
+
+### Requirements Traceability (Requirement 4)
+
+| Requirement | Summary | Component | Notes |
+|-------------|---------|-----------|-------|
+| 4.1 | `autocompletion()` as standalone shared entry | `defaultExtensions` | `icons:false` moves here |
+| 4.2 | Mention works without emoji | `mentionAutocompletionSettings` (unchanged) | Test makes independence explicit |
+| 4.3 | Emoji retains glyph renderer and source | `emojiAutocompletionSettings` | `addToOptions` and source preserved |
+| 4.4 | Emoji and mention coexist | Both `markdownLanguage.data.of` sources active | Not suppressed by each other |
+| 4.5 | Removing shared facility disables both | `defaultExtensions` is single shared dependency | Proven by design structure |
+| 4.6 | No emoji in fenced code blocks | `markdownLanguage.data.of` scoping | Locked by `state.languageDataAt` test |
+| 4.7 | Main page editor no regression | `defaultExtensions` consumed by all editors | `autocompletion()` merge is additive |
+
+---
+
+### Components and Interfaces
+
+#### `defaultExtensions` — `use-default-extensions.ts` (modified)
+
+| Field | Detail |
+|-------|--------|
+| Intent | Provide the shared CodeMirror `autocompletion()` facility as a standalone editor default |
+| Requirements | 4.1, 4.5, 4.7 |
+
+**Change**: Add `import { autocompletion } from '@codemirror/autocomplete'` and insert `autocompletion({ icons: false })` before `emojiAutocompletionSettings`:
+
+```typescript
+import { autocompletion } from '@codemirror/autocomplete';
+// ...
+const defaultExtensions: Extension[] = [
+  // ... existing extensions unchanged ...
+  autocompletion({ icons: false }),  // shared facility — not owned by any feature
+  emojiAutocompletionSettings,       // emoji-specific: glyph renderer + emoji source
+];
+```
+
+**Contracts**: No interface change. The `appendExtensions` API and all consumers are unaffected.
+
+---
+
+#### `emojiAutocompletionSettings` — `emojiAutocompletionSettings.ts` (modified)
+
+| Field | Detail |
+|-------|--------|
+| Intent | Provide emoji-specific CodeMirror config: glyph renderer and emoji completion source |
+| Requirements | 4.3, 4.6 |
+
+**Changes**:
+1. Replace `autocompletion({ addToOptions: [...], icons: false })` with `autocompletion({ addToOptions: [...] })`. `icons: false` is removed — it is now the shared base's responsibility.
+2. Export the internal `emojiAutocompletion` function under the name `emojiCompletionSource` to enable AC 4.6 scoping verification in tests.
+
+```typescript
+export const emojiCompletionSource = (context: CompletionContext): CompletionResult | null => {
+  /* body unchanged */
+};
+
+export const emojiAutocompletionSettings = [
+  autocompletion({ addToOptions: [emojiGlyphRenderer] }),  // emoji-specific UI
+  markdownLanguage.data.of({ autocomplete: emojiCompletionSource }),
+];
+```
+
+**Implementation Notes**
+- `icons: false` must not remain on the emoji `autocompletion()` call. Ownership is now the shared base; emoji must not implicitly re-claim it.
+- The export name `emojiCompletionSource` (over `emojiAutocompletion`) clarifies the type role: it is a `CompletionSource` function, not a settings object.
+
+---
+
+#### `emojiAutocompletionSettings.spec.ts` (new)
+
+Covers AC 4.4 (coexistence) and AC 4.6 (code-block scoping).
+
+**AC 4.4 test**: Call `emojiCompletionSource` with a `CompletionContext` containing `:smi` (no markdown language needed for direct function call). Separately call `createMentionCompletionSource(mockFetch)` with `@ab`. Both must return non-null results, confirming neither suppresses the other.
+
+**AC 4.6 test** (scoping verification using `state.languageDataAt`):
+
+> **Critical constraint (empirically verified):** The fenced-code sublanguage MUST be loaded **synchronously** for the scoping to be observable in a unit test. `@codemirror/language-data`'s `languages` loads sublanguages **asynchronously** (`LanguageDescription.load()`), so `codeLanguages: languages` does NOT nest a sublanguage in a synchronous test — the ` ```js ``` ` region stays plain markdown code text, markdown's language data applies throughout, and `state.languageDataAt('autocomplete', posInBlock)` still returns the emoji source (verified: `inBlock contains emojiSource: true`). The `.not.toContain` assertion would then FAIL. Since no concrete sublanguage parser (e.g. `@codemirror/lang-javascript`) is a dependency of `packages/editor`, the test MUST build a **synchronous stub sublanguage** via `StreamLanguage.define` + `LanguageDescription.of` and pass it as `codeLanguages: [stubDesc]`.
+
+```typescript
+import { EditorState } from '@codemirror/state';
+import { markdown, markdownLanguage } from '@codemirror/lang-markdown';
+import {
+  StreamLanguage,
+  LanguageSupport,
+  LanguageDescription,
+} from '@codemirror/language';
+import type { CompletionSource } from '@codemirror/autocomplete';
+
+it('scopes emoji source to markdown language — not active inside fenced code blocks', () => {
+  // A synchronously-loaded stub sublanguage so the ```js region actually nests in a unit test.
+  // codeLanguages: languages (from @codemirror/language-data) loads ASYNC and would NOT nest here.
+  const stubParser = StreamLanguage.define({ token: (s) => { s.next(); return null; } });
+  const jsDesc = LanguageDescription.of({
+    name: 'javascript',
+    alias: ['js'],
+    support: new LanguageSupport(stubParser),
+  });
+
+  const doc = '```js\n:smi\n```\n\n:smi';
+  const state = EditorState.create({
+    doc,
+    extensions: [
+      markdown({ base: markdownLanguage, codeLanguages: [jsDesc] }),
+      emojiAutocompletionSettings,
+    ],
+  });
+
+  const posInBlock = doc.indexOf(':smi') + 1;       // cursor inside ```js block
+  const posOutside = doc.lastIndexOf(':smi') + 1;   // cursor in normal markdown
+
+  // state.languageDataAt(name, pos) returns language-data values at the active language for pos
+  const sourcesInBlock = state.languageDataAt<CompletionSource>('autocomplete', posInBlock);
+  const sourcesOutside = state.languageDataAt<CompletionSource>('autocomplete', posOutside);
+
+  expect(sourcesInBlock).not.toContain(emojiCompletionSource);
+  expect(sourcesOutside).toContain(emojiCompletionSource);
+});
+```
+
+`state.languageDataAt` is an instance method on `EditorState` (from `@codemirror/state`). With a synchronous sublanguage nested inside ` ```js ``` `, the active language there is the stub (not markdown), so markdown's language data — including `emojiCompletionSource` — is not returned at `posInBlock` but IS returned at `posOutside`. This proves the `markdownLanguage.data.of` scoping mechanism that prevents emoji completions inside code blocks. (Both the failure of the async approach and the success of the stub approach were verified empirically against the installed CodeMirror versions during design validation.)
+
+---
+
+#### `mentionAutocompletionSettings.spec.ts` (modified)
+
+**AC 4.2 test** (new case): Create `createMentionCompletionSource(mockFetch)` in a state that has no `emojiAutocompletionSettings` extension. Call with `@ab`. Expect a non-null result. This documents and regression-locks the independence contract — the source already passes; the test makes the guarantee explicit.
+
+---
+
+### Testing Strategy
+
+| Test | File | AC | Assertion |
+|------|------|----|-----------|
+| `emojiCompletionSource` returns completions for `:smi` | `emojiAutocompletionSettings.spec.ts` | 4.4 | Source function is callable without emoji setup |
+| `createMentionCompletionSource` returns completions with no emoji in state | `mentionAutocompletionSettings.spec.ts` | 4.2 | Mention source independent of emoji extension |
+| `state.languageDataAt` at code-block pos does NOT contain emoji source | `emojiAutocompletionSettings.spec.ts` | 4.6 | Scoping mechanism prevents emoji in ` ```js ``` ` |
+| `state.languageDataAt` at normal pos DOES contain emoji source | `emojiAutocompletionSettings.spec.ts` | 4.6 | Positive control — source reachable in markdown context |
+
+Run verification: `pnpm vitest run emojiAutocompletionSettings` and `pnpm vitest run mentionAutocompletionSettings` from `packages/editor`.
