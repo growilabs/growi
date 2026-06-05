@@ -21,29 +21,44 @@ vi.mock('~/server/service/config-manager', () => ({
 }));
 vi.mocked(configManager.getConfig).mockReturnValue(2592000);
 
+// Register the User model once; shared by the ensureUserHasMigrated and
+// resolveContributor suites below.
+if (mongoose.models.User == null) {
+  mongoose.model(
+    'User',
+    new mongoose.Schema({ contributionsMigratedAt: { type: Date } }),
+  );
+}
+const User: mongoose.Model<{ contributionsMigratedAt?: Date }> =
+  mongoose.model<IUser>('User');
+
+// A single in-memory MongoDB instance is shared across every suite in this file.
+let mongod: MongoMemoryServer;
+
+beforeAll(async () => {
+  mongod = await MongoMemoryServer.create();
+  await mongoose.connect(mongod.getUri());
+});
+
+afterAll(async () => {
+  await mongoose.connection.dropDatabase();
+  await mongoose.connection.close();
+  await mongod.stop();
+});
+
+// Suites below enable fake timers per-test; always restore real timers afterward
+// so the shared async teardown is unaffected.
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('migrateContributions', () => {
   const userId = new mongoose.Types.ObjectId().toString();
-
-  let mongod: MongoMemoryServer;
-
-  beforeAll(async () => {
-    vi.useRealTimers();
-    mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
-    await mongoose.connect(uri);
-  });
 
   beforeEach(async () => {
     vi.useFakeTimers();
     await Activity.deleteMany({});
     await Contribution.deleteMany({});
-  });
-
-  afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod.stop();
-    vi.useRealTimers();
   });
 
   it('should create new contribution documents based on activity documents that count as contributions', async () => {
@@ -223,38 +238,11 @@ describe('migrateContributions', () => {
 });
 
 describe('ensureUserHasMigrated', () => {
-  const userSchema = new mongoose.Schema({
-    contributionsMigratedAt: { type: Date },
-  });
-  // Avoid re-registering if the test file is re-evaluated
-  if (mongoose.models.User == null) {
-    mongoose.model('User', userSchema);
-  }
-
-  let mongod: MongoMemoryServer;
-  let User: mongoose.Model<{ contributionsMigratedAt?: Date }>;
-
-  beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri());
-    User = mongoose.model<IUser>('User');
-  });
-
   beforeEach(async () => {
     vi.useFakeTimers();
     await Activity.deleteMany({});
     await Contribution.deleteMany({});
     await User.deleteMany({});
-  });
-
-  afterEach(() => {
-    vi.useRealTimers();
-  });
-
-  afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod.stop();
   });
 
   it('should return without re-running migration if the user is already migrated', async () => {
@@ -301,31 +289,9 @@ describe('ensureUserHasMigrated', () => {
 });
 
 describe('resolveContributor', () => {
-  const userSchema = new mongoose.Schema({
-    contributionsMigratedAt: { type: Date },
-  });
-  if (mongoose.models.User == null) {
-    mongoose.model('User', userSchema);
-  }
-
-  let mongod: MongoMemoryServer;
-  let User: mongoose.Model<{ contributionsMigratedAt?: Date }>;
-
-  beforeAll(async () => {
-    mongod = await MongoMemoryServer.create();
-    await mongoose.connect(mongod.getUri());
-    User = mongoose.model<IUser>('User');
-  });
-
   beforeEach(async () => {
     await Activity.deleteMany({});
     await User.deleteMany({});
-  });
-
-  afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod.stop();
   });
 
   it('takes the fast path: returns the passed contributor regardless of DB state', async () => {
