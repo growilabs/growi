@@ -11,6 +11,8 @@ import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
 const logger = loggerFactory('growi:service:auditlog-changestream');
 
+// Shared across all instances. Since the token is only saved after a successful ES write,
+// token N in the store guarantees event N is already in ES — conflicts cause extra reprocessing but not data loss.
 const STREAM_KEY = 'auditlogs';
 
 // MongoDB error code for ChangeStreamHistoryLost (oplog truncated)
