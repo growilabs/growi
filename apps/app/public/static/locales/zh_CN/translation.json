@@ -160,7 +160,6 @@
   "In-App Notification": "通知",
   "AI Assistant": "AI助手",
   "Knowledge Assistant": "知识助手 (测试版)",
-  "Editor Assistant": "编辑助理 (测试版)",
   "original_path": "Original path",
   "new_path": "New path",
   "duplicated_path": "Duplicated path",
@@ -365,7 +364,6 @@
       "file": "仅文件"
     },
     "editor_config": "编辑器配置",
-    "editor_assistant": "编辑助手",
     "Show active line": "显示活动行",
     "auto_format_table": "自动格式化表格",
     "overwrite_scopes": "{{operation}和覆盖所有子体的作用域",
@@ -540,22 +538,10 @@
   },
   "ai_assistant_substance": {
     "new_chat": "新建对话",
-    "add_assistant": "添加助手",
-    "my_assistants": "我的助手",
-    "team_assistants": "团队助手",
-    "thread_does_not_exist": "暂无会话",
     "recent_threads": "最近的项目",
     "toaster": {
-      "ai_assistant_deleted_success": "已删除助手",
-      "ai_assistant_deleted_failed": "删除助手失败",
       "thread_deleted_success": "已删除会话",
-      "thread_deleted_failed": "删除会话失败",
-      "ai_assistant_set_default_success": "已成功设置默认助手",
-      "ai_assistant_set_default_failed": "设置默认助手失败"
-    },
-    "delete_modal": {
-      "title": "删除助手",
-      "confirm_message": "确定要删除此助手吗？"
+      "thread_deleted_failed": "删除会话失败"
     }
   },
   "link_edit": {

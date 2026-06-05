@@ -40,21 +40,6 @@ describe('AiAssistantContent (Left AI Panel)', () => {
     expect(screen.getByTestId('thread-list')).toBeInTheDocument();
   });
 
-  it('does not render an Add assistant button or assistant lists', async () => {
-    const { AiAssistantContent } = await import('./AiAssistantSubstance');
-    render(<AiAssistantContent />);
-
-    expect(
-      screen.queryByText('ai_assistant_substance.add_assistant'),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('ai_assistant_substance.my_assistants'),
-    ).not.toBeInTheDocument();
-    expect(
-      screen.queryByText('ai_assistant_substance.team_assistants'),
-    ).not.toBeInTheDocument();
-  });
-
   it('opens a fresh chat via openChat() with no args when New chat is clicked', async () => {
     const { AiAssistantContent } = await import('./AiAssistantSubstance');
     render(<AiAssistantContent />);

@@ -155,7 +155,6 @@
   "In-App Notification": "Notifications",
   "AI Assistant": "Assistant IA",
   "Knowledge Assistant": "Assistant de Connaissances (Bêta)",
-  "Editor Assistant": "Assistante de rédaction (Bêta)",
   "original_path": "Chemin originel",
   "new_path": "Nouveau chemin",
   "duplicated_path": "Chemin dupliqué",
@@ -375,7 +374,6 @@
       "file": "Fichier seulement"
     },
     "editor_config": "Préférences de l'éditeur",
-    "editor_assistant": "Assistant d'édition",
     "Show active line": "Surligner la ligne active",
     "auto_format_table": "Formatter les tableaux",
     "overwrite_scopes": "{{operation}} et écraser les permissions des pages enfants",
@@ -544,22 +542,10 @@
   },
   "ai_assistant_substance": {
     "new_chat": "Nouvelle discussion",
-    "add_assistant": "Ajouter un assistant",
-    "my_assistants": "Mes assistants",
-    "team_assistants": "Assistants d'équipe",
-    "thread_does_not_exist": "Aucune discussion",
     "recent_threads": "Éléments récents",
     "toaster": {
-      "ai_assistant_deleted_success": "Assistant supprimé",
-      "ai_assistant_deleted_failed": "Échec de la suppression de l'assistant",
       "thread_deleted_success": "Discussion supprimée",
-      "thread_deleted_failed": "Échec de la suppression de la discussion",
-      "ai_assistant_set_default_success": "Assistant par défaut défini avec succès",
-      "ai_assistant_set_default_failed": "Échec de la définition de l'assistant par défaut"
-    },
-    "delete_modal": {
-      "title": "Supprimer l'assistant",
-      "confirm_message": "Êtes-vous sûr de vouloir supprimer cet assistant ?"
+      "thread_deleted_failed": "Échec de la suppression de la discussion"
     }
   },
   "link_edit": {

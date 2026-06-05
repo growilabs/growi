@@ -153,7 +153,6 @@
   "In-App Notification": "알림",
   "AI Assistant": "AI 어시스턴트",
   "Knowledge Assistant": "지식 어시스턴트 (베타)",
-  "Editor Assistant": "편집기 어시스턴트 (베타)",
   "original_path": "원본 경로",
   "new_path": "새 경로",
   "duplicated_path": "중복된 경로",
@@ -344,7 +343,6 @@
       "file": "파일만"
     },
     "editor_config": "편집기 구성",
-    "editor_assistant": "편집기 어시스턴트",
     "Show active line": "활성 줄 표시",
     "auto_format_table": "테이블 자동 서식",
     "overwrite_scopes": "{{operation}} 및 모든 하위 항목의 범위 덮어쓰기",
@@ -519,22 +517,10 @@
   },
   "ai_assistant_substance": {
     "new_chat": "새 채팅",
-    "add_assistant": "어시스턴트 추가",
-    "my_assistants": "내 어시스턴트",
-    "team_assistants": "팀 어시스턴트",
-    "thread_does_not_exist": "스레드가 존재하지 않습니다.",
     "recent_threads": "최근 항목",
     "toaster": {
-      "ai_assistant_deleted_success": "어시스턴트 삭제됨",
-      "ai_assistant_deleted_failed": "어시스턴트 삭제 실패",
       "thread_deleted_success": "스레드 삭제됨",
-      "thread_deleted_failed": "스레드 삭제 실패",
-      "ai_assistant_set_default_success": "기본 어시스턴트 설정 성공",
-      "ai_assistant_set_default_failed": "기본 어시스턴트 설정 실패"
-    },
-    "delete_modal": {
-      "title": "어시스턴트 삭제",
-      "confirm_message": "정말로 이 어시스턴트를 삭제하시겠습니까?"
+      "thread_deleted_failed": "스레드 삭제 실패"
     }
   },
   "link_edit": {

@@ -153,7 +153,6 @@
   "In-App Notification": "Notifications",
   "AI Assistant": "AI Assistant",
   "Knowledge Assistant": "Knowledge Assistant (Beta)",
-  "Editor Assistant": "Editor Assistant (Beta)",
   "original_path": "Original path",
   "new_path": "New path",
   "duplicated_path": "Duplicated path",
@@ -373,7 +372,6 @@
       "file": "File only"
     },
     "editor_config": "Editor Config",
-    "editor_assistant": "Editor Assistant",
     "Show active line": "Show active line",
     "auto_format_table": "Auto format table",
     "overwrite_scopes": "{{operation}} and Overwrite scopes of all descendants",
@@ -548,22 +546,10 @@
   },
   "ai_assistant_substance": {
     "new_chat": "New Chat",
-    "add_assistant": "Add Assistant",
-    "my_assistants": "My Assistants",
-    "team_assistants": "Team Assistants",
-    "thread_does_not_exist": "No threads exist",
     "recent_threads": "Recent Items",
     "toaster": {
-      "ai_assistant_deleted_success": "Assistant deleted",
-      "ai_assistant_deleted_failed": "Failed to delete assistant",
       "thread_deleted_success": "Thread deleted",
-      "thread_deleted_failed": "Failed to delete thread",
-      "ai_assistant_set_default_success": "Default assistant set successfully",
-      "ai_assistant_set_default_failed": "Failed to set default assistant"
-    },
-    "delete_modal": {
-      "title": "Delete Assistant",
-      "confirm_message": "Are you sure you want to delete this assistant?"
+      "thread_deleted_failed": "Failed to delete thread"
     }
   },
   "link_edit": {

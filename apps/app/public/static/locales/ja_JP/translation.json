@@ -155,7 +155,6 @@
   "In-App Notification": "通知",
   "AI Assistant": "AI アシスタント",
   "Knowledge Assistant": "ナレッジアシスタント (ベータ版)",
-  "Editor Assistant": "エディターアシスタント (ベータ版)",
   "original_path": "元のパス",
   "new_path": "新しいパス",
   "duplicated_path": "重複したパス",
@@ -407,7 +406,6 @@
       "file": "ファイルのみ"
     },
     "editor_config": "エディター設定",
-    "editor_assistant": "エディターアシスタント",
     "Show active line": "アクティブ行をハイライト",
     "auto_format_table": "表の自動整形",
     "overwrite_scopes": "{{operation}}と同時に全ての配下ページのスコープを上書き",
@@ -582,22 +580,10 @@
   },
   "ai_assistant_substance": {
     "new_chat": "新規チャット",
-    "add_assistant": "アシスタントを追加する",
-    "my_assistants": "マイアシスタント",
-    "team_assistants": "チームアシスタント",
-    "thread_does_not_exist": "スレッドが存在しません",
     "recent_threads": "最近の項目",
     "toaster": {
-      "ai_assistant_deleted_success": "アシスタントを削除しました",
-      "ai_assistant_deleted_failed": "アシスタントの削除に失敗しました",
       "thread_deleted_success": "スレッドを削除しました",
-      "thread_deleted_failed": "スレッドの削除に失敗しました",
-      "ai_assistant_set_default_success": "デフォルトアシスタントを設定しました",
-      "ai_assistant_set_default_failed": "デフォルトアシスタントの設定に失敗しました"
-    },
-    "delete_modal": {
-      "title": "アシスタントを削除する",
-      "confirm_message": "本当にアシスタントを削除しますか？"
+      "thread_deleted_failed": "スレッドの削除に失敗しました"
     }
   },
   "link_edit": {
