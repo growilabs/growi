@@ -1,4 +1,5 @@
 import type { MastraMemory, StorageThreadType } from '@mastra/core/memory';
+import { mock } from 'vitest-mock-extended';
 
 import { getOrCreateThread } from './get-or-create-thread';
 
@@ -8,8 +9,8 @@ describe('getOrCreateThread', () => {
   const createMemoryMock = (overrides?: {
     getThreadById?: MastraMemory['getThreadById'];
     createThread?: MastraMemory['createThread'];
-  }): MastraMemory => {
-    return {
+  }): MastraMemory =>
+    mock<MastraMemory>({
       getThreadById:
         overrides?.getThreadById ?? vi.fn().mockResolvedValue(null),
       createThread:
@@ -31,8 +32,7 @@ describe('getOrCreateThread', () => {
             metadata,
           }),
         ),
-    } as unknown as MastraMemory;
-  };
+    });
 
   it('creates a new thread whose metadata does NOT contain aiAssistantId', async () => {
     const memory = createMemoryMock();
@@ -44,8 +44,7 @@ describe('getOrCreateThread', () => {
       expect.objectContaining({ resourceId }),
     );
     // The metadata passed to createThread must not carry aiAssistantId
-    const createThreadArg = (memory.createThread as ReturnType<typeof vi.fn>)
-      .mock.calls[0][0];
+    const createThreadArg = vi.mocked(memory.createThread).mock.calls[0][0];
     expect(createThreadArg.metadata ?? {}).not.toHaveProperty('aiAssistantId');
   });
 

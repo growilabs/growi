@@ -15,6 +15,11 @@ const createdChains: ChainRecorder[] = [];
 
 vi.mock('express-validator', () => {
   const body = (field: string): ChainRecorder => {
+    // WHY (Tier-3 cast): ChainRecorder models a Proxy-based stand-in for
+    // express-validator's fluent ValidationChain. `mock<ValidationChain>()`
+    // cannot reproduce the field/method recording behavior these tests need,
+    // so a localized cast on this seed object is acceptable. The recorder gains
+    // its fluent methods via the Proxy below.
     const recorder = { field, calls: [] } as unknown as ChainRecorder;
     const fluent = new Proxy(recorder, {
       get(target, prop: string) {
@@ -42,6 +47,12 @@ beforeEach(() => {
   createdChains.length = 0;
 });
 
+// NOTE (test design): because express-validator cannot run in this sandbox
+// (lodash resolution), these tests introspect the validator's declared shape
+// rather than exercising real request pass/fail. The load-bearing contract is
+// "no aiAssistantId field"; the `.calls`/delegation assertions are a pragmatic
+// proxy. If express-validator becomes runnable here, prefer replacing them with
+// behavior tests that run the chain against sample request bodies.
 describe('buildPostMessageValidator', () => {
   const validateUIMessages = vi.fn().mockResolvedValue(undefined);
 

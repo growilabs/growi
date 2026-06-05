@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
+import type { StorageThreadType } from '@mastra/core/memory';
 import { fireEvent, render, screen } from '@testing-library/react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 import type { ThreadListOutput } from '~/features/mastra/interfaces/thread';
 
@@ -48,11 +49,9 @@ vi.mock('../../stores/thread', () => ({
 const makeThreadData = (
   threads: { id: string; title?: string }[],
 ): ThreadListOutput =>
-  ({
-    threads,
-    total: threads.length,
-    hasMore: false,
-  }) as unknown as ThreadListOutput;
+  mock<ThreadListOutput>({
+    threads: threads.map((t) => mock<StorageThreadType>(t)),
+  });
 
 describe('ThreadList', () => {
   beforeEach(() => {

@@ -1,4 +1,5 @@
 import type { StorageThreadType } from '@mastra/core/memory';
+import { mock } from 'vitest-mock-extended';
 
 import {
   buildMessageRequestBody,
@@ -7,13 +8,13 @@ import {
 } from './chat-sidebar-helpers';
 
 const makeThread = (id: string, title?: string): StorageThreadType =>
-  ({
+  mock<StorageThreadType>({
     id,
     title,
     resourceId: 'user-1',
     createdAt: new Date(),
     updatedAt: new Date(),
-  }) as unknown as StorageThreadType;
+  });
 
 describe('buildMessageRequestBody', () => {
   it('carries only the threadId', () => {
