@@ -1,4 +1,4 @@
-import type { ThreadWithMeta } from '~/features/mastra/interfaces/thread';
+import type { StorageThreadType } from '@mastra/core/memory';
 
 import {
   buildMessageRequestBody,
@@ -6,14 +6,14 @@ import {
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
 
-const makeThread = (id: string, title?: string): ThreadWithMeta =>
+const makeThread = (id: string, title?: string): StorageThreadType =>
   ({
     id,
     title,
     resourceId: 'user-1',
     createdAt: new Date(),
     updatedAt: new Date(),
-  }) as unknown as ThreadWithMeta;
+  }) as unknown as StorageThreadType;
 
 describe('buildMessageRequestBody', () => {
   it('carries only the threadId', () => {

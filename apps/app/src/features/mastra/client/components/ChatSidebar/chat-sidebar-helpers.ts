@@ -1,4 +1,4 @@
-import type { ThreadWithMeta } from '~/features/mastra/interfaces/thread';
+import type { StorageThreadType } from '@mastra/core/memory';
 
 /**
  * Body sent with each message POST to `/_api/v3/mastra/message`.
@@ -37,7 +37,7 @@ export const GENERIC_CHAT_HEADER_LABEL = 'AI Assistant';
  */
 export const resolveChatHeaderLabel = (
   threadId: string,
-  threads: readonly ThreadWithMeta[],
+  threads: readonly StorageThreadType[],
 ): string => {
   const title = threads.find((thread) => thread.id === threadId)?.title;
   return title != null && title !== '' ? title : GENERIC_CHAT_HEADER_LABEL;
