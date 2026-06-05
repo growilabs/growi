@@ -489,7 +489,7 @@ const HandsontableModalSubstance = (
   });
 
   const closeButton = (
-    <span>
+    <span className="ms-auto">
       <ExpandOrContractButton
         isWindowExpanded={isWindowExpanded}
         contractWindow={contractWindow}
