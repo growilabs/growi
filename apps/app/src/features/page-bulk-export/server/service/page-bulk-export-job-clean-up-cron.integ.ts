@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
@@ -37,13 +38,12 @@ vi.mock('./page-bulk-export-job-cron', () => {
 
 describe('PageBulkExportJobCleanUpCronService', () => {
   const removeAttachmentMock = vi.fn(() => Promise.resolve());
-  const crowi = {
+  const crowi = mock<Crowi>({
     attachmentService: {
       removeAttachment: removeAttachmentMock,
     },
-  } as unknown as Crowi;
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let user;
+  });
+  let user: Awaited<ReturnType<typeof User.create>>;
 
   beforeAll(async () => {
     await configManager.loadConfigs();

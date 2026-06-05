@@ -1,4 +1,7 @@
+import { mock } from 'vitest-mock-extended';
+
 import type Crowi from '../crowi';
+import type { IAttachmentDocument } from '../models/attachment';
 import { Attachment } from '../models/attachment';
 import { AttachmentService } from './attachment';
 
@@ -15,9 +18,9 @@ describe('AttachmentService.removeAttachment', () => {
       // biome-ignore lint/suspicious/noExplicitAny: Mongoose query shape is irrelevant to the contract under test
       .mockResolvedValue(null as any);
     const deleteFile = vi.fn();
-    const crowi = {
+    const crowi = mock<Crowi>({
       fileUploadService: { deleteFile },
-    } as unknown as Crowi;
+    });
     const service = new AttachmentService(crowi);
 
     await expect(
@@ -30,7 +33,9 @@ describe('AttachmentService.removeAttachment', () => {
 
   test('should propagate the error and not drop the metadata doc when the file store fails', async () => {
     const attachmentRemove = vi.fn().mockResolvedValue(undefined);
-    const fakeAttachment = { _id: 'some-id', remove: attachmentRemove };
+    const fakeAttachment = mock<IAttachmentDocument>({
+      remove: attachmentRemove,
+    });
     const findByIdSpy = vi
       .spyOn(Attachment, 'findById')
       // biome-ignore lint/suspicious/noExplicitAny: Mongoose query shape is irrelevant to the contract under test
@@ -38,9 +43,9 @@ describe('AttachmentService.removeAttachment', () => {
     const deleteFile = vi
       .fn()
       .mockRejectedValue(new Error('S3 is temporarily unavailable'));
-    const crowi = {
+    const crowi = mock<Crowi>({
       fileUploadService: { deleteFile },
-    } as unknown as Crowi;
+    });
     const service = new AttachmentService(crowi);
     service.detachHandlers = [];
 
