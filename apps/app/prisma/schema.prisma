@@ -165,7 +165,7 @@ model configs {
   v         Int?     @map("__v")
   createdAt DateTime
   key       String   @unique(map: "key_1")
-  updatedAt DateTime
+  updatedAt DateTime @updatedAt
   value     String
 }
 
@@ -497,7 +497,7 @@ model usergroups {
   name        String   @unique(map: "name_1")
   /// Could not determine type: the field only had null or empty values in the sample set.
   parent      Json?
-  updatedAt   DateTime
+  updatedAt   DateTime @updatedAt
 
   @@index([parent], map: "parent_1")
 }
