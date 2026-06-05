@@ -23,8 +23,11 @@ export const ChatSidebarLazyLoaded: FC = memo(() => {
 
   // Force a fresh mount when the active thread changes so the
   // session-scoped thread id inside ChatSidebar is regenerated.
-  // A new chat (no threadId) mounts under a stable 'new' key.
-  const remountKey = chatSidebarStatus?.threadId ?? 'new';
+  // A new chat has no threadId, so key it by `openSeq` instead — this keeps
+  // back-to-back "new chat" clicks distinct and remounts a clean session each
+  // time, rather than silently continuing the previous conversation.
+  const remountKey =
+    chatSidebarStatus?.threadId ?? `new-${chatSidebarStatus?.openSeq ?? 0}`;
 
   return <ComponentToRender key={remountKey} />;
 });

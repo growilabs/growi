@@ -56,6 +56,25 @@ describe('chat-sidebar state', () => {
     expect(result.current.status.threadId).toBe('thread-123');
   });
 
+  it('bumps openSeq on every openChat() so back-to-back new chats stay distinct', () => {
+    const { result } = renderChatSidebar();
+
+    act(() => {
+      result.current.actions.openChat();
+    });
+    const firstSeq = result.current.status.openSeq;
+
+    act(() => {
+      result.current.actions.openChat();
+    });
+    const secondSeq = result.current.status.openSeq;
+
+    // A new chat carries no threadId; the increasing openSeq is what lets the
+    // chat sidebar remount a fresh session instead of reusing the previous one.
+    expect(result.current.status.threadId).toBeUndefined();
+    expect(secondSeq).toBeGreaterThan(firstSeq);
+  });
+
   it('close() resets the sidebar state', () => {
     const { result } = renderChatSidebar();
 

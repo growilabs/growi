@@ -7,6 +7,15 @@ import { atom, useAtomValue, useSetAtom } from 'jotai';
 export type ChatSidebarStatus = {
   isOpened: boolean;
   threadId?: string;
+  /**
+   * Monotonically increasing counter bumped on every `openChat()` call.
+   *
+   * A new chat carries no `threadId`, so consumers cannot distinguish one new
+   * chat from the next by id alone. This sequence lets the chat sidebar force a
+   * fresh mount (and thus a freshly minted session thread id) every time the
+   * user starts a new chat, even back-to-back.
+   */
+  openSeq: number;
 };
 
 /**
@@ -27,6 +36,7 @@ export type ChatSidebarActions = {
  */
 const chatSidebarAtom = atom<ChatSidebarStatus>({
   isOpened: false,
+  openSeq: 0,
 });
 
 /**
@@ -46,16 +56,21 @@ export const useChatSidebarActions = (): ChatSidebarActions => {
 
   const openChat = useCallback(
     (threadId?: string) => {
-      setSidebar({ isOpened: true, threadId });
+      setSidebar((prev) => ({
+        isOpened: true,
+        threadId,
+        openSeq: prev.openSeq + 1,
+      }));
     },
     [setSidebar],
   );
 
   const close = useCallback(() => {
-    setSidebar({
+    setSidebar((prev) => ({
       isOpened: false,
       threadId: undefined,
-    });
+      openSeq: prev.openSeq,
+    }));
   }, [setSidebar]);
 
   return {
