@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "7.5.4-RC.0",
+  "version": "7.5.5-RC.0",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -175,7 +175,7 @@
     "is-absolute-url": "^4.0.1",
     "is-iso-date": "^0.0.1",
     "jotai": "^2.12.3",
-    "js-cookie": "^3.0.5",
+    "js-cookie": "^3.0.7",
     "js-tiktoken": "^1.0.15",
     "js-yaml": "^4.1.1",
     "jsonrepair": "^3.12.0",
@@ -223,7 +223,7 @@
     "pathe": "^2.0.3",
     "pretty-bytes": "^6.1.1",
     "prop-types": "^15.8.1",
-    "qs": "^6.14.2",
+    "qs": "^6.15.2",
     "rate-limiter-flexible": "^2.3.7",
     "react": "^18.2.0",
     "react-bootstrap-typeahead": "^6.3.2",
