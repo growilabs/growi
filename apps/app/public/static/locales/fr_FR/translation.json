@@ -535,11 +535,11 @@
     "latest_revision": "les autres",
     "selected_editable_revision": "Corps de page sélectionné (Modifiable)"
   },
-  "default_ai_assistant": {
+  "ai_unavailable": {
     "open_cloud_settings_to_enable": "Veuillez consulter l'écran de gestion GROWI.cloud pour activer l'intégration AI",
     "to_cloud_settings": "Ouvrir les paramètres GROWI.cloud"
   },
-  "ai_assistant_substance": {
+  "ai_sidebar": {
     "new_chat": "Nouvelle discussion",
     "recent_threads": "Éléments récents",
     "toaster": {

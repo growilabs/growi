@@ -531,11 +531,11 @@
     "latest_revision": "最新页面正文",
     "selected_editable_revision": "选定的可编辑页面正文"
   },
-  "default_ai_assistant": {
+  "ai_unavailable": {
     "open_cloud_settings_to_enable": "请查看 GROWI.cloud 管理界面以启用 AI 集成",
     "to_cloud_settings": "前往 GROWI.cloud 管理界面"
   },
-  "ai_assistant_substance": {
+  "ai_sidebar": {
     "new_chat": "新建对话",
     "recent_threads": "最近的项目",
     "toaster": {

@@ -573,11 +573,11 @@
     "latest_revision": "最新の本文",
     "selected_editable_revision": "保存するページ本文(編集可能)"
   },
-  "default_ai_assistant": {
+  "ai_unavailable": {
     "open_cloud_settings_to_enable": "AI 連携を有効にするには GROWI.cloud の管理画面をご確認ください",
     "to_cloud_settings": "GROWI.cloud の管理画面へ"
   },
-  "ai_assistant_substance": {
+  "ai_sidebar": {
     "new_chat": "新規チャット",
     "recent_threads": "最近の項目",
     "toaster": {

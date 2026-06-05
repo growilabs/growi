@@ -45,7 +45,7 @@ export const PrimaryItems = memo((props: Props) => {
   const aiAssistantNotAvailableTitle = (
     <>
       <p className="mb-2">
-        {t('default_ai_assistant.open_cloud_settings_to_enable')}
+        {t('ai_unavailable.open_cloud_settings_to_enable')}
       </p>
       <a href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}>
         <span
@@ -54,7 +54,7 @@ export const PrimaryItems = memo((props: Props) => {
         >
           share
         </span>
-        {t('default_ai_assistant.to_cloud_settings')}
+        {t('ai_unavailable.to_cloud_settings')}
       </a>
     </>
   );

@@ -21,15 +21,13 @@ export const AiSidebarContent = (): JSX.Element => {
         onClick={() => openChat()}
       >
         <span className="material-symbols-outlined fs-5 me-2">add</span>
-        <span className="fw-normal">
-          {t('ai_assistant_substance.new_chat')}
-        </span>
+        <span className="fw-normal">{t('ai_sidebar.new_chat')}</span>
       </button>
 
       <div className="d-flex flex-column gap-4">
         <div>
           <h3 className="fw-bold grw-ai-sidebar-content-header">
-            {t('ai_assistant_substance.recent_threads')}
+            {t('ai_sidebar.recent_threads')}
           </h3>
           <ThreadList />
         </div>

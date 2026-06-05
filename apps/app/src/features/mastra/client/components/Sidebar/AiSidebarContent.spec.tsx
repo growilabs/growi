@@ -33,9 +33,7 @@ describe('AiSidebarContent (Left AI Panel)', () => {
     const { AiSidebarContent } = await import('./AiSidebarContent');
     render(<AiSidebarContent />);
 
-    expect(
-      screen.getByText('ai_assistant_substance.new_chat'),
-    ).toBeInTheDocument();
+    expect(screen.getByText('ai_sidebar.new_chat')).toBeInTheDocument();
     expect(screen.getByTestId('thread-list')).toBeInTheDocument();
   });
 
@@ -43,7 +41,7 @@ describe('AiSidebarContent (Left AI Panel)', () => {
     const { AiSidebarContent } = await import('./AiSidebarContent');
     render(<AiSidebarContent />);
 
-    fireEvent.click(screen.getByText('ai_assistant_substance.new_chat'));
+    fireEvent.click(screen.getByText('ai_sidebar.new_chat'));
 
     expect(openChatMock).toHaveBeenCalledTimes(1);
     expect(openChatMock).toHaveBeenCalledWith();

@@ -30,9 +30,7 @@ export const ThreadList: React.FC = () => {
     async (threadId: string) => {
       try {
         await deleteThread({ threadId });
-        toastSuccess(
-          t('ai_assistant_substance.toaster.thread_deleted_success'),
-        );
+        toastSuccess(t('ai_sidebar.toaster.thread_deleted_success'));
 
         mutateRecentThreads();
 
@@ -45,7 +43,7 @@ export const ThreadList: React.FC = () => {
         }
       } catch (err) {
         logger.error(err);
-        toastError(t('ai_assistant_substance.toaster.thread_deleted_failed'));
+        toastError(t('ai_sidebar.toaster.thread_deleted_failed'));
       }
     },
     [

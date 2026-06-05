@@ -539,11 +539,11 @@
     "latest_revision": "theirs",
     "selected_editable_revision": "Selected Page Body (Editable)"
   },
-  "default_ai_assistant": {
+  "ai_unavailable": {
     "open_cloud_settings_to_enable": "Please check the GROWI.cloud management screen to enable AI integration",
     "to_cloud_settings": "Open GROWI.cloud Settings"
   },
-  "ai_assistant_substance": {
+  "ai_sidebar": {
     "new_chat": "New Chat",
     "recent_threads": "Recent Items",
     "toaster": {
