@@ -29,7 +29,8 @@ if (mongoose.models.User == null) {
     new mongoose.Schema({ contributionsMigratedAt: { type: Date } }),
   );
 }
-const User = mongoose.model<IUser>('User');
+const User: mongoose.Model<{ contributionsMigratedAt?: Date }> =
+  mongoose.model<IUser>('User');
 
 describe('getContributionsHandler', () => {
   const mockRes = mockDeep<ApiV3Response>();
