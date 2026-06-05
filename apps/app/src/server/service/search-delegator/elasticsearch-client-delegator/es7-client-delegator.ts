@@ -94,15 +94,6 @@ export class ES7ClientDelegator {
         await this.client.indices.stats<estypes.IndicesStatsResponse>(params)
       ).body;
     },
-    getMapping: async (
-      params: RequestParams.IndicesGetMapping,
-    ): Promise<estypes.IndicesGetMappingResponse> => {
-      return (
-        await this.client.indices.getMapping<estypes.IndicesGetMappingResponse>(
-          params,
-        )
-      ).body;
-    },
   };
 
   nodes = {

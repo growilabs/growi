@@ -225,9 +225,6 @@ class ElasticsearchDelegator
     const normalizeIndices = await this.normalizeIndices();
     try {
       await this.normalizeAuditlogIndices();
-      if (!this.isElasticsearchAuditlogReindexOnBoot) {
-        await this.rebuildAuditlogIndexIfMappingOutdated();
-      }
     } catch (err) {
       logger.error('Failed to normalize auditlog indices', err);
     }
@@ -478,22 +475,6 @@ class ElasticsearchDelegator
     }
   }
 
-  private async rebuildAuditlogIndexIfMappingOutdated(): Promise<void> {
-    const { client, auditlogIndexName: indexName } = this;
-
-    const isExists = await client.indices.exists({ index: indexName });
-    if (!isExists) return;
-
-    const mapping = await client.indices.getMapping({ index: indexName });
-    const properties = mapping[indexName]?.mappings?.properties;
-    if (properties == null || 'created_at' in properties) return;
-
-    logger.info(
-      'Auditlog index is missing created_at mapping. Triggering automatic reindex.',
-    );
-    await this.rebuildAuditlogIndex();
-  }
-
   async normalizeAuditlogIndices(): Promise<void> {
     const {
       client,
@@ -539,7 +520,7 @@ class ElasticsearchDelegator
     );
 
     const readStream = Activity.find()
-      .select('snapshot.username createdAt')
+      .select('snapshot.username')
       .lean()
       .cursor();
     const batchStream = createBatchStream(bulkSize);
@@ -690,20 +671,15 @@ class ElasticsearchDelegator
   }
 
   private prepareBodyForAuditlog(
-    activity: Pick<ActivityDocument, '_id' | 'snapshot' | 'createdAt'>,
-  ):
-    | []
-    | [
-        { index: { _index: string; _id: string } },
-        { username: string; created_at: Date },
-      ] {
+    activity: Pick<ActivityDocument, '_id' | 'snapshot'>,
+  ): [] | [{ index: { _index: string; _id: string } }, { username: string }] {
     const username = activity.snapshot?.username;
     if (username == null || username === '') return [];
     return [
       {
         index: { _index: this.auditlogAliasName, _id: activity._id.toString() },
       },
-      { username, created_at: activity.createdAt },
+      { username },
     ];
   }
 

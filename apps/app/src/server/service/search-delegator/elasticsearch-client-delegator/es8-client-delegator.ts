@@ -68,10 +68,6 @@ export class ES8ClientDelegator {
       params: estypes.IndicesStatsRequest,
     ): Promise<estypes.IndicesStatsResponse> =>
       this.client.indices.stats(params),
-    getMapping: (
-      params: estypes.IndicesGetMappingRequest,
-    ): Promise<estypes.IndicesGetMappingResponse> =>
-      this.client.indices.getMapping(params),
   };
 
   nodes = {
