@@ -1,0 +1,163 @@
+import type { IUser } from '@growi/core';
+import type { Model } from 'mongoose';
+import mongoose from 'mongoose';
+import { vi } from 'vitest';
+import { type MockProxy, mock } from 'vitest-mock-extended';
+
+import { SearchDelegatorName } from '~/interfaces/named-query';
+import type Crowi from '~/server/crowi';
+import { UserStatus } from '~/server/models/user/conts';
+import { configManager } from '~/server/service/config-manager/config-manager';
+
+import type { SearchDelegator } from '../interfaces/search';
+import SearchService from './search';
+import type ElasticsearchDelegator from './search-delegator/elasticsearch';
+
+vi.mock('~/server/models/named-query', () => ({
+  default: { findOne: vi.fn() },
+}));
+
+vi.mock('~/server/service/config-manager/config-manager', () => ({
+  default: { getConfig: vi.fn() },
+  configManager: { getConfig: vi.fn() },
+}));
+
+class TestSearchService extends SearchService {
+  override generateFullTextSearchDelegator(): ElasticsearchDelegator {
+    return mock<ElasticsearchDelegator>();
+  }
+
+  override generateNQDelegators(): {
+    [key in SearchDelegatorName]: SearchDelegator;
+  } {
+    return {
+      [SearchDelegatorName.DEFAULT]: mock<SearchDelegator>(),
+      [SearchDelegatorName.PRIVATE_LEGACY_PAGES]: mock<SearchDelegator>(),
+    };
+  }
+
+  override registerUpdateEvent(): void {}
+
+  override get isConfigured(): boolean {
+    return false;
+  }
+}
+
+type UserRecord = { username: string; status: number };
+
+const setupUserModelMock = (
+  userModel: MockProxy<Model<IUser>>,
+  users: UserRecord[],
+) => {
+  userModel.find.mockReturnValue({
+    select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(users) }),
+  } as unknown as ReturnType<typeof userModel.find>);
+  vi.spyOn(mongoose, 'model').mockReturnValue(
+    userModel as unknown as ReturnType<typeof mongoose.model>,
+  );
+};
+
+describe('SearchService.searchAuditlogSuggestions()', () => {
+  let searchService: TestSearchService;
+  let mockCrowi: MockProxy<Crowi>;
+  let mockUserModel: MockProxy<Model<IUser>>;
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+    mockCrowi = mock<Crowi>();
+    mockCrowi.configManager = configManager;
+    searchService = new TestSearchService(mockCrowi);
+    mockUserModel = mock<Model<IUser>>();
+  });
+
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  it('should return {} without calling ES when q is empty string', async () => {
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      '',
+      10,
+    );
+
+    expect(result).toEqual({});
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should return {} without calling ES when fields does not include username', async () => {
+    const result = await searchService.searchAuditlogSuggestions(
+      [],
+      'alice',
+      10,
+    );
+
+    expect(result).toEqual({});
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).not.toHaveBeenCalled();
+  });
+
+  it('should classify active and inactive usernames from ES results', async () => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockResolvedValue(['alice', 'bob']);
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+      { username: 'bob', status: UserStatus.STATUS_SUSPENDED },
+    ]);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      'ali',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: {
+        activeUsernames: ['alice'],
+        inactiveUsernames: ['bob'],
+      },
+    });
+  });
+
+  it('should exclude usernames not found in MongoDB', async () => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockResolvedValue(['alice', 'ghost']);
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+    ]);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      'ali',
+      10,
+    );
+
+    expect(result.username?.activeUsernames).toEqual(['alice']);
+    expect(result.username?.inactiveUsernames).toEqual([]);
+  });
+
+  it('should return empty arrays when ES returns []', async () => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockResolvedValue([]);
+    setupUserModelMock(mockUserModel, []);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      'nobody',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: {
+        activeUsernames: [],
+        inactiveUsernames: [],
+      },
+    });
+  });
+});
