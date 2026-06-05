@@ -1,5 +1,7 @@
 # Design Document: agentic-search
 
+> **更新メモ（vectorStore 廃止後）**: 本設計の確定後、AI のベクトルストア（OpenAI Files / vectorStore）依存が廃止された。現状では `fileSearchTool` とそのソースファイル（`tools/file-search-tool.ts`・`ai-sdk-modules/file-search.ts`）は**削除済み**（本設計が「暫定無効化・ソース残置」「最終削除はフォローアップ」としていた部分は完了）、`MastraRequestContextShape` は `{ user: IUserHasId; searchService: SearchService }`（`vectorStoreId` を**削除**）、`post-message.ts` も `requestContext` に `vectorStoreId` を set しない。以降、本文・図・型定義・タスク中の `vectorStoreId` および `fileSearchTool` に関する記述は策定当時の設計記録として読み替えること。現在の `growiAgent.tools` は `fullTextSearchTool` / `getPageContentTool` の 2 本。
+
 ## Overview
 
 **Purpose**: 既存 Mastra `growiAgent` に「ES 全文検索 tool」と「ページ本文取得 tool」の 2 本を新設し、両者を組み合わせた RAG 的反復ループを成立させる。これにより、GROWI ユーザーが自然言語の問い合わせから根拠つき Markdown 回答を得られるようにする。
