@@ -2,18 +2,11 @@ import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution';
+import type { IContributionsResponse } from '~/features/contribution-graph/interfaces/contribution';
 
 export const useSWRxContributions = (
   userId: string | null,
-): SWRResponse<
-  {
-    contributions: IContributionDay[];
-    isMigrationInProgress: boolean;
-    isTemporaryUnavailable?: boolean;
-  },
-  Error
-> => {
+): SWRResponse<IContributionsResponse, Error> => {
   const key =
     userId != null ? `/user/contributions?targetUserId=${userId}` : null;
 

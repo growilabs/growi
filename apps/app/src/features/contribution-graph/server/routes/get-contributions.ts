@@ -10,6 +10,7 @@ import loggerFactory from '~/utils/logger';
 import type Crowi from '../../../../server/crowi';
 import { apiV3FormValidator } from '../../../../server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '../../../../server/routes/apiv3/interfaces/apiv3-response';
+import type { IContributionsResponse } from '../../interfaces/contribution';
 import { assembleEmptyGraph } from '../../utils/contribution-graph-utils';
 import { ensureUserHasMigrated } from '../services/contribution-migration-service';
 import { getContributions } from '../services/contribution-service';
@@ -46,19 +47,22 @@ export const getContributionsHandler = (): RequestHandler => {
     }
 
     try {
-      const contributions = await getContributions(targetUserId);
-
-      return res.apiv3({ ...contributions, isMigrationInProgress });
+      const { contributions } = await getContributions(targetUserId);
+      const contributionsResponse: IContributionsResponse = {
+        contributions,
+        isMigrationInProgress,
+      };
+      return res.apiv3(contributionsResponse);
     } catch (err) {
       logger.error('Failed to get contributions', err);
 
-      const fallbackGraph = assembleEmptyGraph();
-
-      return res.apiv3({
-        contributions: fallbackGraph,
+      const fallbackResponse: IContributionsResponse = {
+        contributions: assembleEmptyGraph(),
         isTemporaryUnavailable: true,
         isMigrationInProgress,
-      });
+      };
+
+      return res.apiv3(fallbackResponse);
     }
   };
 };
