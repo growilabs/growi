@@ -500,7 +500,7 @@
   - _Requirements: 3.1, 3.5_
   - _Boundary: apps/growi-vault-manager/src/services/vault-path-mapper.ts, vault-path-mapper.spec.ts_
 
-- [ ] 19.2 map() 呼び出し側を新シグネチャに追従
+- [x] 19.2 map() 呼び出し側を新シグネチャに追従
   - `vault-namespace-builder.ts` ほか `map(pagePath, pageId)` を呼ぶ全箇所を `map(pagePath)` に更新する（pageId は commit メタデータ用途では引き続き保持）
   - 既存の builder ユニットテストが新シグネチャで PASS することを確認する
   - **完了確認**: `pnpm vitest run vault-namespace-builder.spec` が PASS し、`turbo run build --filter @growi/vault-manager` の型チェックが通ること
