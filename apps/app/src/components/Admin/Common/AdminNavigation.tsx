@@ -112,20 +112,6 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('plugins.plugins')}
         </>
       );
-    // Temporarily hiding
-    // case 'ai-integration':           return (
-    //   <>{/* TODO: unify sizing of growi-custom-icons so that simplify code -- 2024.10.09 Yuki Takei */}
-    //     <span
-    //       className="growi-custom-icons d-inline-block me-1"
-    //       style={{
-    //         fontSize: '18px', width: '24px', height: '24px', lineHeight: '24px', verticalAlign: 'bottom', paddingLeft: '2px',
-    //       }}
-    //     >
-    //       growi_ai
-    //     </span>
-    //     {t('ai_integration.ai_integration')}
-    //   </>
-    // );
     case 'search':
       return (
         <>
@@ -320,8 +306,6 @@ export const AdminNavigation = (): JSX.Element => {
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/slack-integration-legacy')}
           />
-          {/* Temporarily hiding */}
-          {/* <MenuLink menu="ai-integration" isListGroupItems={isListGroupItems} isActive={isActiveMenu('/aai-integration')} /> */}
         </>
       );
     },
@@ -371,8 +355,6 @@ export const AdminNavigation = (): JSX.Element => {
             {isActiveMenu('/data-transfer') && (
               <MenuLabel menu="data-transfer" />
             )}
-            {/* Temporarily hiding */}
-            {/* {isActiveMenu('/ai-integration')                && <MenuLabel menu="ai-integration" />} */}
           </span>
         </button>
         <div

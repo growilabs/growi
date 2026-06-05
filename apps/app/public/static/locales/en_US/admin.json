@@ -1167,10 +1167,6 @@
   "forbidden_page": {
     "do_not_have_admin_permission": "Users without administrative rights cannot access the administration screen"
   },
-  "ai_integration": {
-    "ai_integration": "AI Integration",
-    "disable_mode_explanation": "Currently, AI integration is disabled. To enable it, configure the <code>AI_ENABLED</code> environment variable along with the required additional variables.<br><br>For details, please refer to the <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>documentation</a>."
-  },
   "admin_navigation": {
     "section_users": "Users",
     "section_data": "Data",

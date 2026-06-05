@@ -35,12 +35,13 @@ GROWI の AI 機能は `features/openai`（OpenAI/Azure ベースのアシスタ
   - 上記モデルに紐づく定期ジョブ、ページ作成/更新時の vectorStore 同期連携、ユーザー削除時のアシスタント削除連携、起動時の正規化処理の除去
   - `features/mastra` の vectorStore 依存および `file-search` ツールの除去
   - `features/openai` でのみ使用していた i18n キーの削除
+  - 管理画面の AI 連携設定ページ（admin AI integration page）の廃止（接続/資格情報は環境変数のみで設定するため、管理画面の設定フォームは持たない）
   - `features/mastra` がまだ必要とする UI・コード・i18n の整理（移設または残置参照への置換）
   - 左サイドバーから右サイドバーチャットを開く導線の新設
 - **In scope（存続させる）**
   - `features/ai-tools/suggest-path`（ページパス提案）と、それが依存する OpenAI/Azure LLM クライアント基盤（クライアントデリゲータ・AI サービス認可・AI 有効判定等）
   - mastra が管理する thread 一覧（最近のスレッド）を表示する UI と、その閲覧・再開・削除
-  - 管理画面の AI 連携設定および `features/mastra` が利用する環境変数（OpenAI/Azure 資格情報）
+  - `features/mastra` および `features/ai-tools/suggest-path` が利用する環境変数（OpenAI/Azure 資格情報）による AI 連携設定
   - mastra の全文検索ツール・ページ内容取得ツールによる知識検索
 - **Out of scope（本仕様では行わない）**
   - `features/openai` ディレクトリの完全削除（LLM クライアント基盤は残置するため、ディレクトリは残る）
@@ -144,11 +145,13 @@ GROWI の AI 機能は `features/openai`（OpenAI/Azure ベースのアシスタ
 3. The thread 一覧 shall アシスタント概念の廃止後も、ページング表示およびスレッド削除を引き続き提供する。
 4. While アップグレードによりマイグレーションが完了した状態で, the application shall 既存の mastra スレッドを閲覧可能なまま保持する。
 
-### Requirement 10: 管理画面 AI 連携設定と環境変数の整理
-**Objective:** 運用者として、mastra と suggest-path が動作するために必要な AI 連携設定・環境変数を維持しつつ、廃止された機能の設定項目を取り除きたい。これにより設定画面が現行機能と一致する。
+### Requirement 10: AI 連携設定（環境変数）の維持と管理画面の廃止
+**Objective:** 運用者として、mastra と suggest-path が動作するために必要な AI 連携の環境変数を維持しつつ、実質的に空となった管理画面の AI 連携設定ページを取り除きたい。これにより設定面が現行機能（環境変数による設定）と一致する。
 
 #### Acceptance Criteria
-1. The application shall `features/mastra` および `features/ai-tools/suggest-path` が利用する AI 連携の環境変数（OpenAI/Azure 資格情報）を引き続きサポートする。
-2. The application shall 管理画面の AI 連携設定のうち、残置する AI 機能が必要とする接続設定を保持する。
-3. The application shall 管理画面の AI 連携設定から、アシスタント・vectorStore 専用の設定項目を取り除く。
+1. The application shall `features/mastra` および `features/ai-tools/suggest-path` が利用する AI 連携の環境変数（OpenAI/Azure 資格情報、`app:aiEnabled` 等）を引き続きサポートする。
+2. The application shall 管理画面の AI 連携設定ページ（admin AI integration page）を提供しない。
+3. The application shall AI 連携の接続・資格情報設定を環境変数のみで構成し、管理画面の設定フォームを持たない。
 4. While AI 連携に必要な資格情報が未設定の状態で, the application shall AI チャット機能を利用不可として扱う。
+
+> **改訂メモ**: 当初は「管理画面の AI 連携設定を残し、接続設定のみ保持」する方針だったが、接続/資格情報は元々環境変数で設定する構造であり、アシスタント設定削除後の管理画面が実質ヘッダのみの空ページとなった。協議の結果、当該ページ・コンポーネント・admin ナビ参照・専用 i18n を完全削除する方針に変更した（環境変数による設定は維持）。

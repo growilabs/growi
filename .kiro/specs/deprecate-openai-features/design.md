@@ -133,7 +133,7 @@ features/openai/
 ### 削除（features/openai）
 ```
 features/openai/
-├── client/**                            # AiAssistant/AiIntegration を除く全 UI・services・states・stores・utils（下記 MODIFY 除く）
+├── client/**                            # 全 UI・services・states・stores・utils を削除（AiIntegration 含む。admin AI 連携ページ廃止）
 ├── server/services/openai.ts            # 神サービス（IOpenaiService）丸ごと
 ├── server/services/assistant/**         # assistant ロジック（ただし instructions/commons.ts は残置・トリムして除外）
 ├── server/services/editor-assistant/**  # エディターアシスタント
@@ -174,7 +174,9 @@ features/openai/
 - `server/service/normalize-data/index.ts` + `delete-vector-stores-orphaned-from-ai-assistant.ts` — 除去。
 - `server/service/config-manager/config-definition.ts` — 廃止 7 キー除去（KEEP: `app:aiEnabled`,`openai:serviceType`,`openai:apiKey`,`openai:assistantModel:mastraAgent`）。
 - `pages/general-page/configuration-props.ts` — 除去キーの表示参照を整理。
-- `pages/admin/ai-integration.page.tsx` + `features/openai/client/components/AiIntegration/**` — 接続/資格情報設定は残し、assistant/vectorStore/検索管理 UI を除去（スリム化 MODIFY）。
+- `pages/admin/ai-integration.page.tsx` + `features/openai/client/components/AiIntegration/**` — **削除**（admin AI 連携ページ廃止。接続/資格情報は環境変数で設定するため管理画面フォームは不要）。
+- `components/Admin/Common/AdminNavigation.tsx` — ai-integration メニューのコメントアウト済みブロック（case / MenuLink / MenuLabel）を除去。
+- `public/static/locales/*/admin.json` — `ai_integration.*`（ラベル + `disable_mode_explanation`）を全ロケールから削除。
 - `migrations/20241107172359-rename-pageId-to-page.js` — `VectorStoreFileRelationModel` import を除去し自己完結化（直接コレクション操作）。
 - `prisma/schema.prisma` — 4 モデル定義削除 → `pnpm prisma:generate` 再生成。
 - `public/static/locales/{en_US,ja_JP,ko_KR,fr_FR,zh_CN}/{translation,admin}.json` — openai 専用キー削除、共有 `ai_assistant_substance.*` は保持。
@@ -226,7 +228,7 @@ graph LR
 | 7.1–7.4 | openai 専用 i18n 削除・共有保持 | locales MODIFY (5×2) | 翻訳キー整合 |
 | 8.1–8.4 | 左サイドバー→右チャット導線・AI 無効時非表示 | 左 AI パネル MODIFY, PrimaryItems/SidebarContents (aiEnabled gate) | openChat flow |
 | 9.1–9.4 | thread 一覧存続・既存スレッド互換 | ThreadList MODIFY, get-or-create-thread, interfaces/thread | thread metadata |
-| 10.1–10.4 | admin 設定整理・資格情報保持 | config-definition, ai-integration page/AiIntegration MODIFY | config keys |
+| 10.1–10.4 | AI 連携 env 維持・admin ページ廃止 | config-definition, ai-integration page/AiIntegration/AdminNavigation 削除, admin.json | config keys, env vars |
 
 ## Components and Interfaces
 
@@ -349,8 +351,8 @@ function isThreadWithMeta(t: unknown): t is StorageThreadType; // aiAssistantId 
 
 #### Config Cleanup（Summary-only）
 - 削除: `openai:assistantModel:edit`、`openai:threadDeletion*`(3)、`openai:vectorStoreFileDeletion*`(3)、`openai:limitLearnablePageCountPerAssistant`、`app:openaiThreadDeletion...`、`app:openaiVectorStoreFileDeletion...`。
-- 保持: `app:aiEnabled`、`openai:serviceType`、`openai:apiKey`、`openai:assistantModel:mastraAgent`。
-- `configuration-props.ts` と admin AI 設定 UI から削除キーの参照を除去。
+- 保持: `app:aiEnabled`、`openai:serviceType`、`openai:apiKey`、`openai:assistantModel:mastraAgent`（環境変数で設定。管理画面フォームは持たない）。
+- `configuration-props.ts` から削除キーの参照を除去。admin AI 連携ページ自体は廃止（上記 Modified Files 参照）。
 
 ## Data Models
 
@@ -403,5 +405,5 @@ graph TD
 
 ## Open Questions / Risks
 - `openai:assistantModel:chat` の最終的な要否（file-search 削除後に未参照化する可能性）。実装時にグローバル検索で確定。
-- admin `AiIntegration` コンポーネント内部の assistant/vectorStore 設定と接続設定の分離粒度（実装時にコンポーネント精査）。
+- ~~admin `AiIntegration` コンポーネント内部の分離粒度~~ → 解決済み。AiIntegration は実質空のため admin AI 連携ページごと廃止し、接続設定は環境変数のみとした。なお access-token scope（`admin:ai_integration` / `features.ai_assistant`）は別サブシステム（`@growi/core` のスコープ enum）であり、本仕様では除去対象外（必要なら別途 changeset を伴う対応）。
 - `client.ts`（生クライアント）と `client-delegator` の依存関係の最終確認（スリム化で削除しすぎないこと）。

@@ -129,11 +129,14 @@
   - _Boundary: Config Cleanup_
   - _Depends: 5.1_
 
-- [x] 6.4 (P) 管理画面 AI 連携 UI のスリム化
-  - 管理画面の AI 連携設定から、アシスタント・vectorStore・検索管理の設定要素を取り除き、接続・資格情報設定は残す
-  - 観測可能な完了条件: 管理画面に接続/資格情報設定のみが表示され、アシスタント/vectorStore 設定要素が存在しない
+- [x] 6.4 (P) 管理画面 AI 連携ページの廃止
+  - 当初は「検索管理ヘッダを除去して接続設定を残すスリム化」を実施したが、接続/資格情報は環境変数のみで設定する構造のため画面が実質空になることを受け、admin AI 連携ページを完全廃止に変更（後続コミットで対応）
+  - `pages/admin/ai-integration.page.tsx` と `features/openai/client/components/AiIntegration/**`（AiIntegration / AiIntegrationDisableMode）を削除
+  - `AdminNavigation.tsx` のコメントアウト済み ai-integration メニュー（case / MenuLink / MenuLabel）を除去
+  - `admin.json` の `ai_integration.*`（ラベル + disable_mode_explanation）を全5ロケールから削除
+  - 観測可能な完了条件: admin に AI 連携ページ・ナビ・専用 i18n が存在せず、環境変数による AI 連携設定は維持される（typecheck クリーン・参照ゼロ）
   - _Requirements: 10.2, 10.3_
-  - _Boundary: Config Cleanup_
+  - _Boundary: app-wide integration, i18n locales_
   - _Depends: 5.1_
 
 - [x] 6.5 (P) openai 専用 i18n キーを全ロケールから削除
@@ -179,3 +182,6 @@
   - **UI 不在（2.2/3.1/3.2/3.3/3.5）**: エディター AI トグル・アシスタント管理モーダル・マイ/チーム一覧・ページヘッダ起動ボタンの削除を grep+build で確認。
   - **i18n（7.4）**: 削除キーへの live 参照ゼロ、共有キー保持を確認。
   - **未実施（環境制約）**: ブラウザ Playwright による「新規チャット送受信」インタラクティブ E2E は、稼働中アプリ＋OpenAI 資格情報が必要なため本サンドボックスでは未実行。既存 E2E に AI 関連 spec は無く（cleanup 不要）。本フローは CI / 手動 QA での実機確認を推奨。`server:ci` 起動スモークは既存の migrate-mongo の `~` エイリアス解決問題（全 49 migration 共通の既存事象、本変更と無関係）により本環境では完走不可。
+
+- **追記（admin AI 連携ページの完全廃止）**: 6.4 当初のスリム化後、AiIntegration が実質空（接続/資格情報は環境変数管理）だったため、ページ・コンポーネント・admin ナビのコメント済み参照・`admin.json` の `ai_integration.*` を完全削除。admin ナビの ai-integration メニューは元々コメントアウト済み（到達不能）だった。typecheck クリーン、`ai-integration`/`AiIntegration` の src 参照ゼロを確認。
+  - **対象外（follow-up 候補）**: access-token scope の `admin:ai_integration`（read/write）と `features.ai_assistant` のスコープ定義・説明は `@growi/core` のスコープ enum 由来の別サブシステム。既存トークン/API 契約に関わり changeset を要するため本仕様では除去せず据え置き。
