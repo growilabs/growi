@@ -3,7 +3,7 @@ import mongoose from 'mongoose';
 
 import Activity from '~/server/models/activity';
 
-import type { IContributionDay } from '../../interfaces/contribution-graph';
+import type { IContributionDay } from '../../interfaces/contribution';
 import { ContributionGraphActions } from '../../interfaces/supported-actions';
 
 export interface PipelineParams {

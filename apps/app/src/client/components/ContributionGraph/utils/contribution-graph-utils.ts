@@ -1,4 +1,4 @@
-import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution-graph';
+import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution';
 
 const months = [
   'Jan',

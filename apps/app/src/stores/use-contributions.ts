@@ -2,7 +2,7 @@ import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution-graph';
+import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution';
 
 export const useSWRxContributions = (
   userId: string | null,

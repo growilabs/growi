@@ -7,7 +7,7 @@ import { setISOWeekYear } from 'date-fns/setISOWeekYear';
 import { startOfISOWeek } from 'date-fns/startOfISOWeek';
 import { subWeeks } from 'date-fns/subWeeks';
 
-import type { IContributionDay } from '../interfaces/contribution-graph';
+import type { IContributionDay } from '../interfaces/contribution';
 
 /**
  * Gets current week's ISO week ID, e.g 2025-W32
