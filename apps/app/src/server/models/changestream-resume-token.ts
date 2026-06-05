@@ -1,4 +1,4 @@
-import type { Document, Model } from 'mongoose';
+import type { Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
@@ -8,11 +8,7 @@ export interface IChangeStreamResumeToken {
   token: unknown;
 }
 
-export interface IChangeStreamResumeTokenDocument
-  extends IChangeStreamResumeToken,
-    Document {}
-
-const resumeTokenSchema = new Schema<IChangeStreamResumeTokenDocument>(
+const resumeTokenSchema = new Schema<IChangeStreamResumeToken>(
   {
     key: { type: String, required: true, unique: true },
     token: { type: Schema.Types.Mixed, required: true },
@@ -21,6 +17,6 @@ const resumeTokenSchema = new Schema<IChangeStreamResumeTokenDocument>(
 );
 
 export const ChangeStreamResumeToken = getOrCreateModel<
-  IChangeStreamResumeTokenDocument,
-  Model<IChangeStreamResumeTokenDocument>
+  IChangeStreamResumeToken,
+  Model<IChangeStreamResumeToken>
 >('ChangeStreamResumeToken', resumeTokenSchema);

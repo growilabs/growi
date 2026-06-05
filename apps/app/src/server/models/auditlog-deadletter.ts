@@ -1,4 +1,4 @@
-import type { Document, Model } from 'mongoose';
+import type { Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
 import { getOrCreateModel } from '../util/mongoose-utils';
@@ -10,11 +10,7 @@ export interface IAuditlogDeadletter {
   skippedAt: Date;
 }
 
-export interface IAuditlogDeadletterDocument
-  extends IAuditlogDeadletter,
-    Document {}
-
-const auditlogDeadletterSchema = new Schema<IAuditlogDeadletterDocument>(
+const auditlogDeadletterSchema = new Schema<IAuditlogDeadletter>(
   {
     token: { type: Schema.Types.Mixed, required: true },
     skippedAt: { type: Date, default: () => new Date(), expires: TTL_SECONDS },
@@ -23,6 +19,6 @@ const auditlogDeadletterSchema = new Schema<IAuditlogDeadletterDocument>(
 );
 
 export const AuditlogDeadletter = getOrCreateModel<
-  IAuditlogDeadletterDocument,
-  Model<IAuditlogDeadletterDocument>
+  IAuditlogDeadletter,
+  Model<IAuditlogDeadletter>
 >('AuditlogDeadletter', auditlogDeadletterSchema);
