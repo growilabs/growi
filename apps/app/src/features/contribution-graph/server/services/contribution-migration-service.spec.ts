@@ -1,3 +1,4 @@
+import type { IUser } from '@growi/core';
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
@@ -236,7 +237,7 @@ describe('ensureUserHasMigrated', () => {
   beforeAll(async () => {
     mongod = await MongoMemoryServer.create();
     await mongoose.connect(mongod.getUri());
-    User = mongoose.model('User');
+    User = mongoose.model<IUser>('User');
   });
 
   beforeEach(async () => {
@@ -313,7 +314,7 @@ describe('resolveContributor', () => {
   beforeAll(async () => {
     mongod = await MongoMemoryServer.create();
     await mongoose.connect(mongod.getUri());
-    User = mongoose.model('User');
+    User = mongoose.model<IUser>('User');
   });
 
   beforeEach(async () => {

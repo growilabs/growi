@@ -1,3 +1,4 @@
+import type { IUser } from '@growi/core';
 import type { Request, RequestHandler } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { query } from 'express-validator';
@@ -30,8 +31,7 @@ export const getContributionsHandler = (): RequestHandler => {
   return async (req: ContributionRequest, res: ApiV3Response) => {
     const { targetUserId } = req.query;
 
-    const User = mongoose.model('User');
-    const user = await User.findById(targetUserId);
+    const user = await mongoose.model<IUser>('User').findById(targetUserId);
 
     if (user == null) {
       return res.apiv3Err('User not found', 404);

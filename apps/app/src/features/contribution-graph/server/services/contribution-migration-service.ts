@@ -1,3 +1,4 @@
+import type { IUser } from '@growi/core';
 import mongoose from 'mongoose';
 
 import Activity from '~/server/models/activity';
@@ -56,7 +57,7 @@ export const ensureUserHasMigrated = async (
 
   await migrateContributions(user._id.toString());
 
-  const User = mongoose.model('User');
+  const User = mongoose.model<IUser>('User');
   await User.updateOne(
     { _id: user._id, contributionsMigratedAt: null },
     { $set: { contributionsMigratedAt: new Date() } },
@@ -76,6 +77,5 @@ export const resolveContributor = async (
     return null;
   }
 
-  const User = mongoose.model('User');
-  return User.findById(activity.user);
+  return await mongoose.model<IUser>('User').findById(activity.user);
 };

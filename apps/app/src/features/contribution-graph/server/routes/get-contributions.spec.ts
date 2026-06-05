@@ -1,3 +1,4 @@
+import type { IUser } from '@growi/core';
 import type { Request } from 'express';
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
@@ -22,7 +23,7 @@ if (mongoose.models.User == null) {
     new mongoose.Schema({ contributionsMigratedAt: { type: Date } }),
   );
 }
-const User = mongoose.model('User');
+const User = mongoose.model<IUser>('User');
 
 describe('getContributionsHandler', () => {
   const mockRes = mockDeep<ApiV3Response>();
