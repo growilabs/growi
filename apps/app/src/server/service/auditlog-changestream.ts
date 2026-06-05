@@ -15,7 +15,6 @@ const logger = loggerFactory('growi:service:auditlog-changestream');
 // token N in the store guarantees event N is already in ES — conflicts cause extra reprocessing but not data loss.
 const STREAM_KEY = 'auditlogs';
 
-// MongoDB error code for ChangeStreamHistoryLost (oplog truncated)
 const CHANGE_STREAM_HISTORY_LOST_CODE = 286;
 
 const isChangeStreamHistoryLost = (err: unknown): boolean => {
@@ -83,6 +82,7 @@ export class AuditlogChangeStreamService {
           } else if (event.operationType === 'delete') {
             await this.delegator.deleteAuditlog(event.documentKey._id);
           }
+          // Throttle if write frequency becomes a concern.
           await ResumeTokenStore.save(STREAM_KEY, event._id);
           this.consecutiveRestarts = 0;
           this.lastFailingToken = null;
