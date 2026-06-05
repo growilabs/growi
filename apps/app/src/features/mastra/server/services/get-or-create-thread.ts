@@ -7,10 +7,6 @@ type GetOrCreateThreadParams = {
   memory: MastraMemory;
   resourceId: string;
   threadId?: string;
-  // Accepted for backward compatibility with callers that still pass it, but
-  // intentionally ignored: thread lifecycle is assistant-independent and the
-  // identifier is never written to thread metadata. Removed by a later task.
-  aiAssistantId?: string;
 };
 
 export const getOrCreateThread = async ({
