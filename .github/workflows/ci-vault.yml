@@ -62,49 +62,19 @@ jobs:
           mongodb-version: '6.0'
           mongodb-replica-set: rs0
 
-      - name: Start vault-manager
-        working-directory: apps/growi-vault-manager
-        run: |
-          node dist/index.js &
-          echo "VAULT_MANAGER_PID=$!" >> "$GITHUB_ENV"
-        env:
-          NODE_ENV: production
-          MONGO_URI: mongodb://localhost:27017/growi-vault-integ?replicaSet=rs0
-          VAULT_MANAGER_INTERNAL_SECRET: ${{ secrets.VAULT_MANAGER_INTERNAL_SECRET || 'test-secret-for-integration' }}
-          VAULT_REPO_PATH: ${{ runner.temp }}/vault-repo
-          # Run the maintenance scheduler on a short tick so integration tests
-          # don't have to wait for the 5-minute production cadence.
-          VAULT_MAINTENANCE_TICK_MS: '5000'
-
-      - name: Wait for vault-manager to be ready
-        run: |
-          for i in $(seq 1 30); do
-            if curl -sf http://localhost:3001/health > /dev/null 2>&1; then
-              echo "vault-manager is ready"
-              exit 0
-            fi
-            echo "Waiting... ($i/30)"
-            sleep 2
-          done
-          echo "vault-manager did not become ready in time"
-          exit 1
-
       - name: Run integration tests
         run: |
           pnpm --filter @growi/vault-manager test:integ
         env:
           RUN_VAULT_INTEG: "true"
-          VAULT_MANAGER_BASE_URL: http://localhost:3001
+          # Base URI only. The per-worker test setup
+          # (src/__tests__/setup/integ-server.ts) derives an isolated database
+          # name (growi-vault-integ-<workerId>) and boots an in-process
+          # vault-manager bound to it, so test files run in parallel without
+          # sharing a single instruction-processing pipeline.
+          MONGO_URI: mongodb://localhost:27017/growi-vault-integ?replicaSet=rs0
           VAULT_MANAGER_INTERNAL_SECRET: ${{ secrets.VAULT_MANAGER_INTERNAL_SECRET || 'test-secret-for-integration' }}
-          MONGO_URL: mongodb://localhost:27017/growi-vault-integ?replicaSet=rs0
-          # Must match the value used to start vault-manager so the test
-          # adapts its squash-wait deadline to the same tick interval.
+          # Short maintenance tick so the squash test doesn't wait for the
+          # 5-minute production cadence.
           VAULT_MAINTENANCE_TICK_MS: '5000'
-
-      - name: Stop vault-manager
-        if: always()
-        run: |
-          if [ -n "$VAULT_MANAGER_PID" ]; then
-            kill "$VAULT_MANAGER_PID" || true
-          fi
 

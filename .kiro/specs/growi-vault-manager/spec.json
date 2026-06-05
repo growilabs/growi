@@ -3,8 +3,9 @@
   "created_at": "2026-05-07T00:00:00.000Z",
   "updated_at": "2026-06-05T00:00:00.000Z",
   "language": "ja",
-  "phase": "implementation-complete",
+  "phase": "implementation",
   "cleaned_up_at": "2026-05-19T00:00:00.000Z",
+  "revision_note": "2026-06-05: 実態調査の結果 phase を implementation-complete から implementation へ差し戻し。build green + unit 181 green だが、CI (ci-vault.yml, run 27002225696) で integ が timeout 失敗 (Instruction was not processed within 10s/15s)。根本原因 (ローカル再現で確定): logic バグや per-instruction 失敗ではなく、watcher の単一グローバル serialized pipeline (commit c25dc61b) に対し vitest が 3 つの integ ファイルを並行実行し、全ファイルの instruction が同一 pipeline に滞留して期限超過するもの。再現結果: 単一ファイル=PASS / 3 ファイル並行 (CI 既定)=該当 instruction timeout (CI 再現) / 3 ファイル直列=16/16 PASS。失敗 run でも全 instruction は最終的に processedAt 到達済み・lastError 0・dead-letter 0。serialized pipeline はクロス namespace まで直列化しており、これは growi-vault-ha が扱う throughput 制約と同根。対策 (実装済み・テスト直列化は不採用): integ テストを per-worker で分離。index.ts の bootstrap を server-runtime.ts の startServer() に抽出し、新 setupFile (src/__tests__/setup/integ-server.ts) が worker ごとに独立 DB (growi-vault-integ-<workerId>) / 独立 bare repo / 独立 port で vault-manager を in-process 起動 (apps/app の per-worker DB 分離と同型、子プロセス spawn なし・teardown は JS の server.stop())。ci-vault.yml の Start/Wait/Stop server step を削除し MONGO_URI(base) を渡すだけに簡素化。ローカル検証: typecheck+build green / unit 181 green (setupFile は RUN_VAULT_INTEG gate で no-op) / 並行 integ 16/16 PASS を 2 回連続再現。phase は commit/push 後の CI green 確認まで implementation 据え置き。",
   "approvals": {
     "requirements": {
       "generated": true,

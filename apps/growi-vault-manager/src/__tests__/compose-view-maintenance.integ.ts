@@ -49,16 +49,25 @@ const MONGO_URL =
 
 let mongoose: typeof import('mongoose') | null = null;
 
+// Set only when THIS file opened the connection (standalone runs). When the
+// in-process integ setup already connected mongoose, we reuse that connection
+// and must not disconnect it — the setup owns its lifecycle.
+let connectedHere = false;
+
 async function connectMongo(): Promise<void> {
   mongoose = (await import('mongoose')).default as typeof import('mongoose');
-  await mongoose.connect(MONGO_URL);
+  if (mongoose.connection.readyState !== 1) {
+    await mongoose.connect(MONGO_URL);
+    connectedHere = true;
+  }
 }
 
 async function disconnectMongo(): Promise<void> {
-  if (mongoose != null) {
+  if (mongoose != null && connectedHere) {
     await mongoose.disconnect();
-    mongoose = null;
+    connectedHere = false;
   }
+  mongoose = null;
 }
 
 // ---------------------------------------------------------------------------

@@ -45,6 +45,11 @@ const MONGO_URL =
 // which would fail in unit-test environments where no MongoDB is available.
 let mongoose: typeof import('mongoose') | null = null;
 
+// Set only when THIS file opened the connection (standalone runs). When the
+// in-process integ setup already connected mongoose, we reuse that connection
+// and must not disconnect it — the setup owns its lifecycle.
+let connectedHere = false;
+
 // ---------------------------------------------------------------------------
 // Helper: connect/disconnect mongoose
 // ---------------------------------------------------------------------------
@@ -52,14 +57,18 @@ let mongoose: typeof import('mongoose') | null = null;
 async function connectMongo(): Promise<void> {
   // Dynamic import so the file is parseable in unit-test environments.
   mongoose = (await import('mongoose')).default as typeof import('mongoose');
-  await mongoose.connect(MONGO_URL);
+  if (mongoose.connection.readyState !== 1) {
+    await mongoose.connect(MONGO_URL);
+    connectedHere = true;
+  }
 }
 
 async function disconnectMongo(): Promise<void> {
-  if (mongoose != null) {
+  if (mongoose != null && connectedHere) {
     await mongoose.disconnect();
-    mongoose = null;
+    connectedHere = false;
   }
+  mongoose = null;
 }
 
 // ---------------------------------------------------------------------------
