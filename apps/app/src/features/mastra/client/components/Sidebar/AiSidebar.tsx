@@ -17,7 +17,7 @@ export const AiSidebar = (): JSX.Element => {
   return (
     <div className="px-3">
       <div className="grw-sidebar-content-header py-4 d-flex">
-        <h3 className="fs-6 fw-bold mb-0">{t('Knowledge Assistant')}</h3>
+        <h3 className="fs-6 fw-bold mb-0">{t('AI Chat')}</h3>
       </div>
 
       {isGuestUser ? (

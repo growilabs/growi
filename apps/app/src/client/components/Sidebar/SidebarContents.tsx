@@ -44,7 +44,7 @@ export const SidebarContents = memo(() => {
           return InAppNotification;
         }
         return PageTree;
-      case SidebarContentsType.AI_ASSISTANT:
+      case SidebarContentsType.AI:
         if (isAiEnabled == null) return () => <></>; // wait for isAiEnabled to be determined
         if (isAiEnabled) {
           return AiSidebar;

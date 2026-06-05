@@ -105,8 +105,8 @@ export const PrimaryItems = memo((props: Props) => {
       {isAiEnabled ? (
         <PrimaryItem
           sidebarMode={sidebarMode}
-          contents={SidebarContentsType.AI_ASSISTANT}
-          label="AI Assistant"
+          contents={SidebarContentsType.AI}
+          label="AI Chat"
           iconName="growi_ai"
           isCustomIcon
           onHover={onItemHover}
@@ -120,8 +120,8 @@ export const PrimaryItems = memo((props: Props) => {
           >
             <PrimaryItem
               sidebarMode={sidebarMode}
-              contents={SidebarContentsType.AI_ASSISTANT}
-              label="AI Assistant"
+              contents={SidebarContentsType.AI}
+              label="AI Chat"
               iconName="growi_ai"
               isCustomIcon
             />

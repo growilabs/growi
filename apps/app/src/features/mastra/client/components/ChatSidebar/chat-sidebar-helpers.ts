@@ -26,7 +26,7 @@ export const buildMessageRequestBody = (
  * Generic fallback label shown in the chat header when no thread title is
  * available (e.g. a brand-new chat whose title has not been generated yet).
  */
-export const GENERIC_CHAT_HEADER_LABEL = 'AI Assistant';
+export const GENERIC_CHAT_HEADER_LABEL = 'AI Chat';
 
 /**
  * Resolve the chat header label.
