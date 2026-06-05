@@ -61,7 +61,7 @@ model activities {
   id          String             @id @default(auto()) @map("_id") @db.ObjectId
   v           Int                @map("__v")
   action      String
-  createdAt   DateTime           @db.Date
+  createdAt   DateTime
   endpoint    String
   event       String?            @db.ObjectId
   eventModel  String?
@@ -101,9 +101,9 @@ model attachments {
   fileSize              Int       @default(0)
   originalName          String?
   temporaryUrlCached    String?
-  temporaryUrlExpiredAt DateTime? @db.Date
+  temporaryUrlExpiredAt DateTime?
   attachmentType        String
-  createdAt             DateTime  @default(now()) @db.Date
+  createdAt             DateTime  @default(now())
   updatedAt             DateTime  @updatedAt
 
   creator              users?  @relation("CreatedAttachments", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -163,9 +163,9 @@ model comments {
 model configs {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   v         Int?     @map("__v")
-  createdAt DateTime @db.Date
+  createdAt DateTime
   key       String   @unique(map: "key_1")
-  updatedAt DateTime @db.Date
+  updatedAt DateTime
   value     String
 }
 
@@ -225,7 +225,7 @@ model inappnotifications {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   action      String
   activities  String[]
-  createdAt   DateTime @db.Date
+  createdAt   DateTime
   snapshot    String
   status      String
   target      String   @db.ObjectId
@@ -244,7 +244,7 @@ model inappnotificationsettings {
 
 model migrations {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  appliedAt DateTime @db.Date
+  appliedAt DateTime
   fileName  String
 }
 
@@ -325,7 +325,7 @@ model pages {
   id                       String    @id @default(auto()) @map("_id") @db.ObjectId
   v                        Int       @map("__v")
   commentCount             Int
-  createdAt                DateTime  @db.Date
+  createdAt                DateTime
   creatorId                String?   @map("creator") @db.ObjectId
   descendantCount          Int
   grant                    Int
@@ -343,8 +343,8 @@ model pages {
   revisionId               String?   @map("revision") @db.ObjectId
   seenUsers                String[]
   status                   String
-  ttlTimestamp             DateTime? @db.Date
-  updatedAt                DateTime  @db.Date
+  ttlTimestamp             DateTime?
+  updatedAt                DateTime
   wip                      Boolean?
 
   creator        users?        @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
@@ -392,7 +392,7 @@ model revisions {
   v             Int      @map("__v")
   authorId      String   @map("author") @db.ObjectId
   body          String
-  createdAt     DateTime @db.Date
+  createdAt     DateTime
   hasDiffToPrev Boolean?
   format        String
   origin        String?
@@ -417,7 +417,7 @@ model rlflx {
 
 model sessions {
   id      String   @id @map("_id")
-  expires DateTime @db.Date
+  expires DateTime
   session String
 
   @@index([expires], map: "expires_1")
@@ -484,7 +484,7 @@ model updateposts {
 model usergrouprelations {
   id           String   @id @default(auto()) @map("_id") @db.ObjectId
   v            Int      @map("__v")
-  createdAt    DateTime @db.Date
+  createdAt    DateTime
   relatedGroup String   @db.ObjectId
   relatedUser  String   @db.ObjectId
 }
@@ -492,12 +492,12 @@ model usergrouprelations {
 model usergroups {
   id          String   @id @default(auto()) @map("_id") @db.ObjectId
   v           Int      @map("__v")
-  createdAt   DateTime @db.Date
+  createdAt   DateTime
   description String
   name        String   @unique(map: "name_1")
   /// Could not determine type: the field only had null or empty values in the sample set.
   parent      Json?
-  updatedAt   DateTime @db.Date
+  updatedAt   DateTime
 
   @@index([parent], map: "parent_1")
 }
@@ -527,12 +527,12 @@ model users {
   apiToken                String?   @unique(map: "apiToken_1")
   lang                    Lang      @default(en_US)
   status                  Int       @default(2)
-  lastLoginAt             DateTime? @db.Date
+  lastLoginAt             DateTime?
   admin                   Boolean   @default(false)
   readOnly                Boolean   @default(false)
   isInvitationEmailSended Boolean   @default(false)
-  createdAt               DateTime  @default(now()) @db.Date
-  updatedAt               DateTime  @updatedAt @db.Date
+  createdAt               DateTime  @default(now())
+  updatedAt               DateTime  @updatedAt
 
   activities         activities[]
   comments           comments[]
