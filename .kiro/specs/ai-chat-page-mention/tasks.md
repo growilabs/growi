@@ -73,7 +73,7 @@
   - _Boundary: editor-state_
   - _Depends: 2.1, 2.2, 4.2_
 
-- [ ] 5.2 PageMentionInput アダプタと公開バレル
+- [x] 5.2 PageMentionInput アダプタと公開バレル
   - `EditorView` ライフサイクル管理、`value`↔doc 同期（外部リセット＝空文字化にのみ追従）、`MentionCandidateList` のキャレット配置、`NavCallback`→`next/router` 配線、公開バレル `index.ts`（`PageMentionInput` と公開型のみ re-export）
   - フォーム連携: 隠し `<input type="hidden" name="message">` を flatten 結果に同期、非セッション時の `Enter` でホストフォームの `requestSubmit()` を発火
   - 観察可能な完了条件: コンポーネントがマウントされ「doc 変更で `onChange(flatten)` 発火」「隠し `input[name=message]` が flatten 値を保持」「`value=''` で doc がクリア」「チップクリックで `next/router` 遷移」がテスト/動作で確認でき、バレル経由で `PageMentionInput` のみが公開される
