@@ -50,7 +50,7 @@
   - _Depends: 2.1, 2.2_
 
 - [ ] 4. Core: 候補リスト UI とキーマップ
-- [ ] 4.1 (P) MentionCandidateList コンポーネント
+- [x] 4.1 (P) MentionCandidateList コンポーネント
   - shadcn/Tailwind ドロップダウン。表示状態の出し分け（空クエリ=ヒント・検索未実行 / loading / 該当なし / 候補あり）、各候補にパス表示、行クリックで commit、`view.coordsAtPos` でキャレット座標に配置
   - 観察可能な完了条件: RTL テストで「空クエリ→ヒント表示かつ検索未実行」「1 文字以上→候補表示」「isLoading 中→loading 行」「結果空→該当なし行」「行クリック→commit コールバック発火」が通る
   - _Requirements: 1.1, 1.2, 1.4, 2.1, 2.4, 2.5, 2.6_

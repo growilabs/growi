@@ -1,0 +1,165 @@
+import { fireEvent, render, screen } from '@testing-library/react';
+import { mock } from 'vitest-mock-extended';
+
+import { MentionCandidateList } from './MentionCandidateList';
+import type { MentionController, PagePathCandidate } from './types';
+
+// i18n: return the key itself so assertions can target the stable key string
+// (mastra components use react-i18next's useTranslation, default namespace).
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key: string) => key }),
+}));
+
+const candidate = (pageId: string, path: string): PagePathCandidate => ({
+  pageId,
+  path,
+});
+
+const coords = { left: 10, top: 20, bottom: 40 };
+
+/**
+ * Build a controller mock with sensible open defaults, overridable per-test.
+ */
+const buildController = (
+  overrides: Partial<MentionController> = {},
+): MentionController =>
+  mock<MentionController>({
+    isOpen: true,
+    query: '',
+    highlightedIndex: 0,
+    coords,
+    candidates: [],
+    isLoading: false,
+    ...overrides,
+  });
+
+describe('MentionCandidateList', () => {
+  describe('visibility', () => {
+    it('renders nothing when the controller is closed', () => {
+      const controller = buildController({ isOpen: false, query: 'foo' });
+      const { container } = render(
+        <MentionCandidateList controller={controller} />,
+      );
+
+      expect(container).toBeEmptyDOMElement();
+    });
+  });
+
+  describe('4-state display (1.1 / 1.2 / 1.4 / 2.1 / 2.5 / 2.6)', () => {
+    it('shows the hint and NO candidates when the query is empty (1.1 / 1.2)', () => {
+      const controller = buildController({
+        query: '',
+        candidates: [candidate('id-a', '/foo/a')],
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      expect(screen.getByText('pageMention.hint')).toBeInTheDocument();
+      // Empty query must not surface candidates even if some are present.
+      expect(screen.queryByText('/foo/a')).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('pageMention.searching'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByText('pageMention.noResults'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('shows the loading row while searching (2.5)', () => {
+      const controller = buildController({ query: 'foo', isLoading: true });
+      render(<MentionCandidateList controller={controller} />);
+
+      expect(screen.getByText('pageMention.searching')).toBeInTheDocument();
+      expect(screen.queryByText('pageMention.hint')).not.toBeInTheDocument();
+    });
+
+    it('shows the no-results row when not loading and the result is empty (2.6)', () => {
+      const controller = buildController({
+        query: 'foo',
+        isLoading: false,
+        candidates: [],
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      expect(screen.getByText('pageMention.noResults')).toBeInTheDocument();
+    });
+
+    it('renders each candidate path as a row (1.4 / 2.1)', () => {
+      const controller = buildController({
+        query: 'foo',
+        candidates: [candidate('id-a', '/foo/a'), candidate('id-b', '/foo/b')],
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      expect(screen.getByText('/foo/a')).toBeInTheDocument();
+      expect(screen.getByText('/foo/b')).toBeInTheDocument();
+      expect(
+        screen.queryByText('pageMention.noResults'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('highlight (2.2 reflection)', () => {
+    it('marks the row at highlightedIndex as selected', () => {
+      const controller = buildController({
+        query: 'foo',
+        highlightedIndex: 1,
+        candidates: [candidate('id-a', '/foo/a'), candidate('id-b', '/foo/b')],
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      const rowA = screen.getByText('/foo/a').closest('[role="option"]');
+      const rowB = screen.getByText('/foo/b').closest('[role="option"]');
+
+      expect(rowA).toHaveAttribute('aria-selected', 'false');
+      expect(rowB).toHaveAttribute('aria-selected', 'true');
+    });
+  });
+
+  describe('commit on row click (2.3)', () => {
+    it('calls commit with the clicked row index', () => {
+      const commit = vi.fn();
+      const controller = buildController({
+        query: 'foo',
+        candidates: [candidate('id-a', '/foo/a'), candidate('id-b', '/foo/b')],
+        commit,
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      fireEvent.click(screen.getByText('/foo/b'));
+
+      expect(commit).toHaveBeenCalledWith(1);
+    });
+  });
+
+  describe('outside-click dismissal (2.4)', () => {
+    it('calls close when a mousedown lands outside the panel', () => {
+      const close = vi.fn();
+      const controller = buildController({
+        query: 'foo',
+        candidates: [candidate('id-a', '/foo/a')],
+        close,
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      fireEvent.mouseDown(document.body);
+
+      expect(close).toHaveBeenCalledTimes(1);
+    });
+
+    it('does NOT call close when the mousedown lands inside the panel', () => {
+      const close = vi.fn();
+      const commit = vi.fn();
+      const controller = buildController({
+        query: 'foo',
+        candidates: [candidate('id-a', '/foo/a')],
+        close,
+        commit,
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      fireEvent.mouseDown(screen.getByText('/foo/a'));
+
+      expect(close).not.toHaveBeenCalled();
+    });
+  });
+});
