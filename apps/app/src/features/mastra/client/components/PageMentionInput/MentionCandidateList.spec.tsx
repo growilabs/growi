@@ -15,8 +15,6 @@ const candidate = (pageId: string, path: string): PagePathCandidate => ({
   path,
 });
 
-const coords = { left: 10, top: 20, bottom: 40 };
-
 /**
  * Build a controller mock with sensible open defaults, overridable per-test.
  */
@@ -27,7 +25,6 @@ const buildController = (
     isOpen: true,
     query: '',
     highlightedIndex: 0,
-    coords,
     candidates: [],
     isLoading: false,
     ...overrides,

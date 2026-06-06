@@ -148,7 +148,7 @@ sequenceDiagram
     User->>Editor: 語境界で "@" を入力
     Editor->>Session: トランザクション解析
     Session->>Session: 起動判定(直前が空白/行頭か)
-    Session->>Controller: active=true, query="", coords
+    Session->>Controller: active=true, query=""
     Controller->>List: パネル即時オープン(空クエリ=ヒント表示)
     User->>Editor: "foo" を追記
     Session->>Controller: query="foo"
@@ -267,7 +267,7 @@ export interface PageMentionInputProps {
 - Integration: **純表示コンポーネント**。検索は行わず、`useMentionController` から `isOpen`・`query`・`candidates`・`isLoading`・`highlightedIndex` を読むだけ。各候補（既に `PagePathCandidate` にマップ済み）の**作成者アバター（`@growi/ui` の `UserPicture`、`noLink`/`noTooltip`）+ パス**を表示。確定/閉じる/ハイライト移動は controller のメソッド（`commit`/`close`/`setHighlightedIndex`）を呼ぶ。`useSWRxSearch` は直接呼ばない（検索の所有者は controller・単一所有）。
 - **downshift（controlled 描画ヘルパ）**: `<Downshift>` を controlled モードで使用（`isOpen`/`highlightedIndex`/`selectedItem` は controller から供給）。`getRootProps`/`getMenuProps`/`getItemProps` で ARIA 配線・行クリック・**マウスホバー**（→ `onStateChange` → `controller.setHighlightedIndex`）を得る。状態所有は持たず、キーボード操作は CM キーマップが担う。downshift 内蔵の scroll-into-view は無効化（`scrollIntoView={()=>{}}`）。
 - **スクロール**: `simplebar-react` をスクロールコンテナに使用（`maxHeight`）。ハイライト追従は、ハイライト行 ref への `scrollIntoView({ block: 'nearest' })`（最近接スクロール祖先＝SimpleBar のラッパーをスクロール）で実現。
-- **位置決め**: キャレット座標ではなく、`PageMentionInput` の `relative` ラッパー内で **CSS アンカー（`bottom-full`/`left-0`）により入力欄の真上に配置**する（チャットの定石）。`coords`（`coordsAtPos` 由来）は controller に用意されているが、現状この CSS 配置では消費していない。
+- **位置決め**: キャレット座標ではなく、`PageMentionInput` の `relative` ラッパー内で **CSS アンカー（`bottom-full`/`left-0`）により入力欄の真上に配置**する（チャットの定石）。`coordsAtPos` ベースの追従は不採用（`coords` は controller から提供しない）。
 - Validation（表示状態の出し分け）:
   - `query` 空（`@` 直後）→ **ヒント行**（例「ページ名を入力して検索」）を表示し検索は実行しない（1.2）。`@` 起動と同時にパネルは開く（1.1）。
   - `query` 1文字以上 + `isLoading` 中 → loading 行（2.5）。
@@ -282,7 +282,7 @@ export interface PageMentionInputProps {
 | Requirements | 1.3, 1.4, 2.2, 2.3, 2.7, 7.1, 7.2 |
 
 **Responsibilities & Constraints**
-- セッション state（query/範囲/coords）を React 側に取り込み、`useSWRxSearch(query)`（debounce・クエリ1文字以上で実行）で候補を取得（1.3/1.4/2.7/7.x）。
+- セッション state（query/範囲）を React 側に取り込み、`useSWRxSearch(query)`（debounce・クエリ1文字以上で実行）で候補を取得（1.3/1.4/2.7/7.x）。
 - `highlightedIndex` を保持し `moveUp`/`moveDown` で移動（2.2）、`commit` で選択候補を `addMention` として dispatch（2.3）、`close` でセッションを閉じる（2.4 の一部）。
 - **このフックがブリッジの所有者**であり、CM↔React 間の状態同期と呼び出し方向を一手に引き受ける。keymap・候補リスト・PageMentionInput は本フックの契約のみに依存する。
 
@@ -298,7 +298,6 @@ export interface MentionController {
   readonly isOpen: boolean;
   readonly query: string;
   readonly highlightedIndex: number;
-  readonly coords: { left: number; top: number; bottom: number } | null;
   readonly candidates: readonly PagePathCandidate[];
   readonly isLoading: boolean;
   // --- 操作（keymap / 候補リスト行クリックが呼ぶ） ---
@@ -312,9 +311,9 @@ export const useMentionController: (view: EditorView | null) => MentionControlle
 ```
 
 ##### State Management（双方向ブリッジ機構）
-- **CM → React（状態の取り込み）**: `PageMentionInput` が `createPageMentionExtensions` に `EditorView.updateListener` を組み込み、各トランザクションで `mentionSessionField` の値（active/from/to/query）と `view.coordsAtPos(from)` を React state へ push する。`useMentionController` はこの session state を入力に `query` を `useSWRxSearch` へ渡す。CM の doc/selection が**正本**、React state は派生。
+- **CM → React（状態の取り込み）**: `PageMentionInput` が `createPageMentionExtensions` に `EditorView.updateListener` を組み込み、各トランザクションで `mentionSessionField` の値（active/from/to/query）を React state へ push する。`useMentionController` はこの session state を入力に `query` を `useSWRxSearch` へ渡す。CM の doc/selection が**正本**、React state は派生。
 - **React → CM（操作の呼び出し）**: `commit`/`moveUp` 等は最新の controller を参照する必要があるため、controller のメソッドを **stable ref**（`useRef` で保持し毎レンダー更新）に格納する。`mention-keymap` は値ではなく **ref を保持する Facet** 経由で呼び出すことで、エディタ生成時に固定された stale クロージャを避ける（Issue 1）。
-- **coords の所有権（Issue 2）**: `coordsAtPos` は `useMentionController` 内（view を持つ唯一の所）で算出し `coords` として公開する（単一所有）。**ただし最終的な位置決めは CSS アンカー（`bottom-full` で入力欄の真上）を採用**したため、`coords` は現状 `MentionCandidateList` では消費していない（将来のレイアウト調整用に保持）。
+- **位置決め（Issue 2 の決着）**: 候補パネルの配置は **CSS アンカー（`bottom-full`/`left-0` で入力欄の真上）** で行う。当初検討した `coordsAtPos` ベースのキャレット追従は不採用とし、`MentionController` から `coords` は提供しない（デッドコード化を避けるため削除済み）。
 - Concurrency: 検索は SWR がキャッシュ/重複排除。`highlightedIndex` は候補数変化時に範囲内へクランプ。
 
 **Implementation Notes**

@@ -148,24 +148,10 @@ export const useMentionController = (
     setDismissedKey(sessionKey);
   }, [sessionKey]);
 
-  // Caret coordinates for positioning the panel; owned here because only the
-  // view can compute them. Layout may be 0 in happy-dom — acceptable.
-  const coords = useMemo(() => {
-    if (!isOpen || view == null) {
-      return null;
-    }
-    const c = view.coordsAtPos(session.from);
-    if (c == null) {
-      return null;
-    }
-    return { left: c.left, top: c.top, bottom: c.bottom };
-  }, [isOpen, view, session.from]);
-
   return {
     isOpen,
     query,
     highlightedIndex,
-    coords,
     candidates,
     isLoading: isLoading ?? false,
     moveUp,

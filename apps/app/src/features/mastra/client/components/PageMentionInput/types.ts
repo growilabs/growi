@@ -41,7 +41,6 @@ export interface MentionController {
   readonly isOpen: boolean;
   readonly query: string;
   readonly highlightedIndex: number;
-  readonly coords: { left: number; top: number; bottom: number } | null;
   readonly candidates: readonly PagePathCandidate[];
   readonly isLoading: boolean;
   // --- operations (called by the keymap / candidate row click) ---
