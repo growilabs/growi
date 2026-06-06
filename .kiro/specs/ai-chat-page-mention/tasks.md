@@ -18,7 +18,7 @@
   - _Requirements: 1.2, 2.5, 2.6_
 
 - [ ] 2. Core: CodeMirror 拡張（純ロジック層・React 非依存）
-- [ ] 2.1 (P) mention-session 拡張
+- [x] 2.1 (P) mention-session 拡張
   - `@` の語境界検出（行頭/空白直後のみ起動、メール様 `foo@` は非起動）と即起動（クエリ空でも `active=true`）
   - クエリ更新、空白入力でセッション終了、`@` シーケンス削除で終了、確定メンション内では再起動しない
   - 観察可能な完了条件: state テストで「語境界 `@`→active・query=""」「`@`+入力→query 更新」「空白→active=false」「`@` 削除→active=false」「メンション内非起動」が通る
