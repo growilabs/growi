@@ -33,7 +33,7 @@
   - _Boundary: mention-decoration_
   - _Depends: 1.1_
 
-- [ ] 2.3 (P) flatten 純関数
+- [x] 2.3 (P) flatten 純関数
   - doc から送信用パス文字列を生成（`doc.toString()` ベース）。送信テキスト変換の単一の変換点
   - 観察可能な完了条件: ユニットテストで「複数メンションを位置・順序どおりパス文字列化」「ページ本文を含まない」が通る
   - _Requirements: 6.1, 6.2, 6.3_
