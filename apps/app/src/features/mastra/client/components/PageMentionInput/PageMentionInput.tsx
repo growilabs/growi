@@ -38,7 +38,7 @@ const editorTheme = EditorView.theme({
   '.cm-content': {
     // padding (top right bottom left): nudge the caret/text start slightly down
     // (a bit more top padding) and slightly left (a bit less left padding).
-    padding: '10px 12px 8px 8px',
+    padding: '12px 12px 8px 8px',
     fontFamily: 'inherit',
     minHeight: '4rem',
     // Inherit the ambient (themed) text color so the native caret — which
