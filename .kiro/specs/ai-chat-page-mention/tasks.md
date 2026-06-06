@@ -6,7 +6,7 @@
 > `(P)` は直前 peer と並行実行可。CodeMirror 6・shadcn/Tailwind・`useSWRxSearch`・Vitest/RTL は既存依存として存在する前提（新規セットアップ不要）。
 
 - [ ] 1. Foundation: 型定義・マッピング・i18n
-- [ ] 1.1 型定義と検索結果マッピング
+- [x] 1.1 型定義と検索結果マッピング
   - `PagePathCandidate` / `MentionData` / `MentionSessionState` / `MentionController` インターフェース / `PageMentionInputProps` を定義
   - `IPageWithSearchMeta`（`data.path` / `data._id`）→ `PagePathCandidate` への純マッピング関数を実装
   - 観察可能な完了条件: 型が公開バレル経由で参照でき、ユニットテストで `IPageWithSearchMeta → PagePathCandidate` 変換（path/id の写像）が検証できる
