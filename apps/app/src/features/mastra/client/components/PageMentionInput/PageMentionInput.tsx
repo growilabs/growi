@@ -39,6 +39,11 @@ const editorTheme = EditorView.theme({
     padding: '0.5rem 0.75rem',
     fontFamily: 'inherit',
     minHeight: '4rem',
+    // Inherit the ambient (themed) text color so the native caret — which
+    // defaults to the text color — follows light/dark mode instead of CodeMirror's
+    // default black.
+    color: 'inherit',
+    caretColor: 'currentColor',
   },
   '.cm-scroller': {
     fontFamily: 'inherit',
