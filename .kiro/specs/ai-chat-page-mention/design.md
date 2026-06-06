@@ -264,6 +264,52 @@ export interface PageMentionInputProps {
   - `query` 1文字以上 + 結果あり → 候補リスト（1.4/2.1）。
 - Risks: キャレット座標追従（スクロール/折返し時）の再計算が必要。`view.coordsAtPos` を使用。
 
+#### useMentionController
+
+| Field | Detail |
+|-------|--------|
+| Intent | CodeMirror（命令的）と React 候補 UI（宣言的）を繋ぐ双方向ブリッジ。検索・ハイライト・確定の単一の窓口 |
+| Requirements | 1.3, 1.4, 2.2, 2.3, 2.7, 7.1, 7.2 |
+
+**Responsibilities & Constraints**
+- セッション state（query/範囲/coords）を React 側に取り込み、`useSWRxSearch(query)`（debounce・クエリ1文字以上で実行）で候補を取得（1.3/1.4/2.7/7.x）。
+- `highlightedIndex` を保持し `moveUp`/`moveDown` で移動（2.2）、`commit` で選択候補を `addMention` として dispatch（2.3）、`close` でセッションを閉じる（2.4 の一部）。
+- **このフックがブリッジの所有者**であり、CM↔React 間の状態同期と呼び出し方向を一手に引き受ける。keymap・候補リスト・PageMentionInput は本フックの契約のみに依存する。
+
+**Dependencies**
+- Inbound: PageMentionInput（EditorView を注入）、MentionCandidateList（state 購読）、mention-keymap（メソッド呼び出し）
+- Outbound: useSWRxSearch (P0), addMention 効果（mention-decoration, P0）, mentionSessionField（mention-session, P0）
+
+**Contracts**: State [x]
+
+```typescript
+export interface MentionController {
+  // --- 状態（候補リストが購読） ---
+  readonly isOpen: boolean;
+  readonly query: string;
+  readonly highlightedIndex: number;
+  readonly coords: { left: number; top: number; bottom: number } | null;
+  readonly candidates: readonly PagePathCandidate[];
+  readonly isLoading: boolean;
+  // --- 操作（keymap / 候補リスト行クリックが呼ぶ） ---
+  moveUp(): void;
+  moveDown(): void;
+  commit(index?: number): void;  // 省略時は highlightedIndex
+  close(): void;
+}
+export const useMentionController: (view: EditorView | null) => MentionController;
+```
+
+##### State Management（双方向ブリッジ機構）
+- **CM → React（状態の取り込み）**: `PageMentionInput` が `createPageMentionExtensions` に `EditorView.updateListener` を組み込み、各トランザクションで `mentionSessionField` の値（active/from/to/query）と `view.coordsAtPos(from)` を React state へ push する。`useMentionController` はこの session state を入力に `query` を `useSWRxSearch` へ渡す。CM の doc/selection が**正本**、React state は派生。
+- **React → CM（操作の呼び出し）**: `commit`/`moveUp` 等は最新の controller を参照する必要があるため、controller のメソッドを **stable ref**（`useRef` で保持し毎レンダー更新）に格納する。`mention-keymap` は値ではなく **ref を保持する Facet** 経由で呼び出すことで、エディタ生成時に固定された stale クロージャを避ける（Issue 1）。
+- **coords の所有権（Issue 2）**: `coordsAtPos` は `EditorView` を持つ `PageMentionInput`/updateListener 側で算出し、controller の `coords` として一元的に公開する。`MentionCandidateList` は `coords` を読むだけで自前計算しない（二重所有の回避）。
+- Concurrency: 検索は SWR がキャッシュ/重複排除。`highlightedIndex` は候補数変化時に範囲内へクランプ。
+
+**Implementation Notes**
+- Integration: `useSWRxSearch` は React フック内でのみ呼べるため、検索は本フック（React 側）に集約し、CM 拡張からは呼ばない。
+- Risks: stale ref/Facet の取り回しが本機能最大の実装リスク。タスク着手初期に CM↔React 往復のプロトタイプ検証を先行する（research.md のリスク項に合致）。
+
 ### CodeMirror Extension Layer
 
 #### mention-session
