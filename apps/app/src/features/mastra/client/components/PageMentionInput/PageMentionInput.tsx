@@ -1,7 +1,12 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
+import { defaultKeymap } from '@codemirror/commands';
 import { Compartment, EditorState } from '@codemirror/state';
-import { placeholder as cmPlaceholder, EditorView } from '@codemirror/view';
+import {
+  placeholder as cmPlaceholder,
+  EditorView,
+  keymap,
+} from '@codemirror/view';
 
 import { LinkedPagePath } from '~/models/linked-page-path';
 import { cn } from '~/utils/shadcn-ui';
@@ -163,6 +168,13 @@ export const PageMentionInput = ({
               }
             },
           }),
+          // Standard cursor-motion / editing keymap. The mention keymap is
+          // Prec.highest and returns false when no session is active, so arrows
+          // fall through to these. CodeMirror then owns caret motion on the doc
+          // model: ArrowRight in an empty doc no-ops (no jumping over the
+          // placeholder widget), and horizontal motion consults atomicRanges so
+          // the caret treats a mention chip as one unit.
+          keymap.of(defaultKeymap),
         ],
       }),
     });
