@@ -66,7 +66,7 @@
   - _Depends: 3.1_
 
 - [ ] 5. 統合: エディタ拡張合成と React アダプタ
-- [ ] 5.1 createPageMentionExtensions ファクトリ
+- [x] 5.1 createPageMentionExtensions ファクトリ
   - `mention-session` + `mention-decoration` + `mention-keymap` + `atomicRanges` を precedence 込みで合成し、`NavCallback` の注入口を提供
   - 観察可能な完了条件: 合成 state テストで「ファクトリが返す Extension を組み込んだ EditorState に全 StateField が存在し、atomicRanges が有効」になることが確認できる
   - _Requirements: 3.3_
