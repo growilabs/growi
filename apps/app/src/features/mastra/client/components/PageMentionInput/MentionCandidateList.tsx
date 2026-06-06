@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
+import SimpleBar from 'simplebar-react';
 
 import { cn } from '~/utils/shadcn-ui';
 
@@ -103,7 +104,7 @@ export const MentionCandidateList = ({
       )}
 
       {hasQuery && !isLoading && candidates.length > 0 && (
-        <div className="tw:max-h-72 tw:overflow-y-auto tw:p-1">
+        <SimpleBar style={{ maxHeight: '18rem' }} className="tw:p-1">
           {candidates.map((c, index) => {
             const highlighted = index === highlightedIndex;
             return (
@@ -137,7 +138,7 @@ export const MentionCandidateList = ({
               </div>
             );
           })}
-        </div>
+        </SimpleBar>
       )}
     </div>
   );
