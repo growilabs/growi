@@ -108,7 +108,7 @@ graph TB
 ```
 apps/app/src/features/mastra/client/components/PageMentionInput/
 ├── index.ts                          # 公開バレル: PageMentionInput と公開型のみ re-export
-├── PageMentionInput.tsx              # React adapter: EditorView ライフサイクル / value 同期 / Enter送信 / 候補リスト配置
+├── PageMentionInput.tsx              # React adapter: EditorView ライフサイクル / value 同期 / 隠しinput[name=message] / requestSubmit / 候補リスト配置
 ├── MentionCandidateList.tsx          # shadcn 候補ドロップダウン(loading/該当なし/行レンダリング/ハイライト)
 ├── use-mention-controller.ts         # セッション状態↔候補リストの橋渡しフック(検索・選択中index・commit/close)
 ├── types.ts                          # PagePathCandidate / MentionData / MentionSessionState / 公開Props
@@ -121,7 +121,7 @@ apps/app/src/features/mastra/client/components/PageMentionInput/
 ```
 
 ### Modified Files
-- `apps/app/src/features/mastra/client/components/ChatSidebar/ChatSidebar.tsx` — 入力リーフを `PromptInputTextarea` → `PageMentionInput` に差し替え。`onChange` を `(value: string) => setInput(value)` に変更し、`onSubmit` 用ハンドラを配線。新規文言を i18n 化。`PromptInput`/`PromptInputBody`/`PromptInputFooter`/`PromptInputSubmit`/`handleSubmit` は維持。
+- `apps/app/src/features/mastra/client/components/ChatSidebar/ChatSidebar.tsx` — 入力リーフを `PromptInputTextarea` → `PageMentionInput` に差し替え。`onChange` を `(value: string) => setInput(value)` に変更（`PageMentionInput` は文字列を直接返す）。送信は従来どおり `PromptInput` の `onSubmit={handleSubmit}` 経路を維持（`PageMentionInput` の Enter が `requestSubmit()` を発火するため ChatSidebar 側の送信配線は変更不要）。新規文言を i18n 化。`PromptInput`/`PromptInputBody`/`PromptInputFooter`/`PromptInputSubmit`/`handleSubmit` は維持。
 - GROWI i18n ロケールリソース — `pageMention.placeholder` / `pageMention.searching` / `pageMention.noResults` 等のキーを追加（既存ロケール配置規約に従う）。
 
 > 依存方向: `types` → `editor-state/*`(純CM) → `use-mention-controller` → `PageMentionInput`/`MentionCandidateList`(React) → `ChatSidebar`。左方向のみ import。`editor-state/*` は React/SWR に依存しない。
@@ -154,14 +154,17 @@ sequenceDiagram
     Controller->>Editor: dispatch(replace @foo → "/path" + addMention効果)
     Editor->>Doc: 本文に "/path" 挿入 + 原子装飾登録
     Note over Editor: atomicRanges によりチップは原子化
-    User->>Editor: メッセージ送信(Enter)
-    Editor->>Doc: flatten = doc.toString()
-    Doc-->>ChatSidebar: パス文字列を含むtext
+    Note over Editor: doc変更ごとに flatten を隠しinput[name=message]へ同期
+    User->>Editor: メッセージ送信(Enter, セッション非アクティブ)
+    Editor->>Editor: form.requestSubmit()
+    Editor->>ChatSidebar: PromptInput.handleSubmit が formData[message] を読取
+    ChatSidebar->>ChatSidebar: sendMessage({ text }) + setInput('')
 ```
 
 **主要な決定**:
-- メンションは **doc 本文にパス文字列そのものを保持**し、その範囲に `Decoration.replace({ widget })` を重ねてチップ表示する。これにより送信用テキストは `doc.toString()` で得られ、パス文字列のみが自然に反映される（6.1/6.2）。
-- セッション中の Nav 鍵（↑↓/Enter/Tab/Esc）は高優先度キーマップが横取りして候補リスト操作へ委譲し、非セッション時の Enter は送信に割り当てる。
+- メンションは **doc 本文にパス文字列そのものを保持**し、その範囲に `Decoration.replace({ widget })` を重ねてチップ表示する。これにより flatten 用テキストは `doc.toString()` で得られ、パス文字列のみが自然に反映される（6.1/6.2）。
+- 送信テキストは **隠し `input[name=message]`** を介して既存フォーム経路に渡す。CodeMirror はネイティブフォーム要素でないため、flatten 結果をこの隠し input に同期させて `formData.get('message')` で読めるようにする（Issue 1 対応）。
+- セッション中の Nav 鍵（↑↓/Enter/Tab/Esc）は高優先度キーマップが横取りして候補リスト操作へ委譲し、非セッション時の Enter は `requestSubmit()` で送信に割り当てる。
 
 ## Requirements Traceability
 
@@ -215,14 +218,16 @@ sequenceDiagram
 **Responsibilities & Constraints**
 - EditorView の生成・破棄、拡張の組み立て（`createPageMentionExtensions`）。
 - エディタ変更を購読し、`onChange(getMentionFlattenedText(state))` を発火（フラットなパス文字列を親へ）。
+- **隠しフォーム値の同期（Issue 1 対応）**: ネイティブな `<input type="hidden" name="message">` を描画し、その `value` を flatten 済みパス文字列に同期する。`PromptInput.handleSubmit` は非provider経路で `formData.get('message')` から送信テキストを読み、`form.reset()` で消す（[prompt-input.tsx:704-715](apps/app/src/components/ai-elements/prompt-input.tsx#L704-L715)）。CodeMirror はネイティブフォーム要素ではないため、この隠し input が無いと送信テキストが空になる。
+- **Enter 送信は既存 textarea と同じ機構を踏襲**: セッション非アクティブ時の Enter で、ホストフォームの `requestSubmit()` を呼ぶ（[prompt-input.tsx:819](apps/app/src/components/ai-elements/prompt-input.tsx#L819) の `form?.requestSubmit()` と同一）。これにより blob 変換・添付処理・clear を含む既存送信パイプラインをそのまま再利用する。`onSubmit` コールバック prop は持たない。
 - 親 `value` は **外部リセット（空文字化＝送信後 clear）にのみ追従**し、文字列からメンションを再構築しない（widget の正本はエディタ doc）。
 - `value` が空でエディタが空でない場合に doc をリセット。それ以外は一方向（editor→parent）。
 - 候補リスト（`MentionCandidateList`）をキャレット座標に配置。
-- Enter 送信は keymap 側で `onSubmit` を呼ぶ（セッション非アクティブ時のみ）。
 
 **Dependencies**
-- Inbound: ChatSidebar — value/onChange/onSubmit/placeholder/disabled (P0)
+- Inbound: ChatSidebar — value/onChange/placeholder/disabled (P0)
 - Outbound: useMentionController (P0), createPageMentionExtensions (P0)
+- External: ホスト `<form>`（`PromptInput` が描画）— `requestSubmit()` と `name="message"` 経由の送信（P0）
 
 **Contracts**: State [x]
 
@@ -230,14 +235,13 @@ sequenceDiagram
 export interface PageMentionInputProps {
   value: string;                       // フラット済みパス文字列(送信/空判定用)
   onChange: (value: string) => void;   // doc変更ごとにflatten結果を返す
-  onSubmit: () => void;                 // Enter送信(セッション非アクティブ時)
   placeholder?: string;
   disabled?: boolean;
 }
 ```
-- Preconditions: `~/components/ai-elements/prompt-input` の `PromptInputBody` 子として配置される。
-- Postconditions: `value` は常に doc のフラット表現と一致（送信に直接利用可能）。
-- Invariants: メンション widget はエディタ doc に対応するパス文字列範囲が正本。`value` 経由で widget を再構築しない。
+- Preconditions: `~/components/ai-elements/prompt-input` の `PromptInputBody` 子（=ホスト `<form>` の内側）として配置される。
+- Postconditions: `value` および隠し `input[name=message]` は常に doc のフラット表現と一致（既存フォーム送信経路で送出可能）。
+- Invariants: メンション widget はエディタ doc に対応するパス文字列範囲が正本。`value` 経由で widget を再構築しない。送信テキストの単一の出所は隠し `input[name=message]`（= flatten 結果）。
 
 #### MentionCandidateList
 
