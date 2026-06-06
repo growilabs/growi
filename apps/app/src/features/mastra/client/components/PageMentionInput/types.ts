@@ -1,10 +1,14 @@
+import type { IUser, Ref } from '@growi/core';
+
 /**
  * Display value object for a page-path search candidate.
- * Mapped from `IPageWithSearchMeta` (`data._id` / `data.path`).
+ * Mapped from `IPageWithSearchMeta` (`data._id` / `data.path` / `data.creator`).
  */
 export interface PagePathCandidate {
   readonly pageId: string;
   readonly path: string;
+  /** Page creator, populated by the /search endpoint; rendered as an avatar. */
+  readonly creator?: Ref<IUser> | null;
 }
 
 /**

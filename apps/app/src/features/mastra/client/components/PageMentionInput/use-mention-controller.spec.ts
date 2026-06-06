@@ -133,10 +133,17 @@ describe('useMentionController', () => {
         useMentionController(null, activeSession({ query: 'foo' })),
       );
 
-      expect(result.current.candidates).toEqual([
-        { pageId: 'id-a', path: '/foo/a' },
-        { pageId: 'id-b', path: '/foo/b' },
-      ]);
+      // pageId/path are the mapped contract; `creator` is carried through from
+      // the (mocked) search result and asserted separately in the mapper spec.
+      expect(result.current.candidates).toHaveLength(2);
+      expect(result.current.candidates[0]).toMatchObject({
+        pageId: 'id-a',
+        path: '/foo/a',
+      });
+      expect(result.current.candidates[1]).toMatchObject({
+        pageId: 'id-b',
+        path: '/foo/b',
+      });
     });
 
     it('reflects isLoading from the mocked SWR', () => {

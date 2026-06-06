@@ -1,4 +1,5 @@
 import { useEffect, useRef } from 'react';
+import { UserPicture } from '@growi/ui/dist/components';
 import Downshift from 'downshift';
 import { useTranslation } from 'react-i18next';
 import SimpleBar from 'simplebar-react';
@@ -159,13 +160,20 @@ export const MentionCandidateList = ({
                           }
                         }}
                         className={cn(
-                          'tw:flex tw:cursor-pointer tw:items-center tw:rounded-sm tw:px-2 tw:py-1.5 tw:text-sm',
+                          'tw:flex tw:cursor-pointer tw:items-center tw:gap-2 tw:rounded-sm tw:px-2 tw:py-1.5 tw:text-sm',
                           // Lighter path color; highlighted row keeps stronger contrast.
                           highlighted
                             ? 'tw:bg-accent tw:text-accent-foreground'
                             : 'tw:text-muted-foreground',
                         )}
                       >
+                        {/* Page creator avatar (no link/tooltip inside the dropdown). */}
+                        <UserPicture
+                          user={c.creator}
+                          size="sm"
+                          noLink
+                          noTooltip
+                        />
                         <span className="tw:truncate">{c.path}</span>
                       </div>
                     );

@@ -13,4 +13,6 @@ export const toPagePathCandidate = (
 ): PagePathCandidate => ({
   pageId: result.data._id,
   path: result.data.path,
+  // Populated + serialized by the /search endpoint; rendered as the creator avatar.
+  creator: result.data.creator ?? null,
 });
