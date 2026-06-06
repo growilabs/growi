@@ -1,7 +1,9 @@
 // @vitest-environment happy-dom
 
 import { EditorView } from '@codemirror/view';
-import { act, render } from '@testing-library/react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+
+import type { IFormattedSearchResult } from '~/interfaces/search';
 
 import type { ChatSidebarStatus } from '../../status/chat-sidebar';
 import { ChatSidebar } from './ChatSidebar';
@@ -38,11 +40,33 @@ vi.mock('../../stores/thread', () => ({
   useSWRINFxRecentThreads: () => ({ mutate: vi.fn() }),
 }));
 
-// Search store: PageMentionInput's controller calls useSWRxSearch. Stub it so
-// the editor renders without a real SWR/network dependency.
-vi.mock('~/stores/search', () => ({
-  useSWRxSearch: () => ({ data: undefined, isLoading: false }),
+// Search store: PageMentionInput's controller calls useSWRxSearch. Stub it with
+// a controllable return so a test can make candidates appear.
+const { searchState } = vi.hoisted(() => ({
+  searchState: {
+    current: {
+      data: undefined as IFormattedSearchResult | undefined,
+      isLoading: false,
+    },
+  },
 }));
+vi.mock('~/stores/search', () => ({
+  useSWRxSearch: () => searchState.current,
+}));
+
+/** Build a minimal search result with the given page paths. */
+const setSearchResult = (
+  pages: ReadonlyArray<{ id: string; path: string }>,
+): void => {
+  searchState.current = {
+    data: {
+      data: pages.map((p) => ({
+        data: { _id: p.id, path: p.path },
+      })),
+    } as unknown as IFormattedSearchResult,
+    isLoading: false,
+  };
+};
 
 // i18n: return the key itself so the placeholder assertion is deterministic.
 vi.mock('react-i18next', () => ({
@@ -89,6 +113,7 @@ const submitForm = async (container: HTMLElement): Promise<void> => {
 
 beforeEach(() => {
   sendMessage.mockClear();
+  searchState.current = { data: undefined, isLoading: false };
 });
 
 describe('ChatSidebar — PageMentionInput integration (6.1)', () => {
@@ -114,6 +139,38 @@ describe('ChatSidebar — PageMentionInput integration (6.1)', () => {
 
     // The hidden form field mirrors the flattened doc text.
     expect(hiddenMessageInput(container)?.value).toBe('/docs/foo');
+
+    await submitForm(container);
+
+    expect(sendMessage).toHaveBeenCalledWith(
+      expect.objectContaining({ text: expect.stringContaining('/docs/foo') }),
+      expect.anything(),
+    );
+  });
+
+  it('runs the full @ → select candidate → commit → submit flow', async () => {
+    setSearchResult([{ id: 'p1', path: '/docs/foo' }]);
+    const { container } = render(<ChatSidebar />);
+
+    // Type "@foo" to open a mention session (word boundary at line start).
+    const view = getView(container);
+    act(() => {
+      view.dispatch({
+        changes: { from: 0, insert: '@foo' },
+        selection: { anchor: 4 },
+      });
+    });
+
+    // The candidate list opens with the search result; select it.
+    const row = (await screen.findByText('/docs/foo')).closest(
+      '[role="option"]',
+    );
+    expect(row).not.toBeNull();
+    fireEvent.click(row as Element);
+
+    // Commit replaced "@foo" with the path (plus a trailing space), surfaced
+    // through the hidden input and into the submitted message text.
+    expect(hiddenMessageInput(container)?.value).toContain('/docs/foo');
 
     await submitForm(container);
 
