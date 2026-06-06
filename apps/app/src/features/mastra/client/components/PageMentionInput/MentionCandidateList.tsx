@@ -84,7 +84,8 @@ export const MentionCandidateList = ({
       data-slot="mention-candidate-list"
       className={cn(
         'tw:absolute tw:bottom-full tw:left-0 tw:z-50 tw:mb-1 tw:w-full tw:max-w-md tw:overflow-hidden',
-        'tw:rounded-md tw:border tw:bg-popover tw:text-popover-foreground tw:shadow-md',
+        // Lighter frame: faint border + softer shadow.
+        'tw:rounded-md tw:border tw:border-border/50 tw:bg-popover tw:text-popover-foreground tw:shadow-sm',
       )}
     >
       {/* Empty query: hint only, never candidates and never a search (1.1/1.2). */}
@@ -159,9 +160,10 @@ export const MentionCandidateList = ({
                         }}
                         className={cn(
                           'tw:flex tw:cursor-pointer tw:items-center tw:rounded-sm tw:px-2 tw:py-1.5 tw:text-sm',
+                          // Lighter path color; highlighted row keeps stronger contrast.
                           highlighted
                             ? 'tw:bg-accent tw:text-accent-foreground'
-                            : 'tw:text-foreground',
+                            : 'tw:text-muted-foreground',
                         )}
                       >
                         <span className="tw:truncate">{c.path}</span>
