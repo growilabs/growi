@@ -34,7 +34,8 @@ export const MentionCandidateList = ({
 }: MentionCandidateListProps): JSX.Element | null => {
   const { t } = useTranslation();
 
-  const { isOpen, query, candidates, isLoading, highlightedIndex } = controller;
+  const { isOpen, query, candidates, isLoading, highlightedIndex, close } =
+    controller;
 
   const panelRef = useRef<HTMLDivElement>(null);
   // Points to the currently highlighted row so it can be scrolled into view.
@@ -54,6 +55,9 @@ export const MentionCandidateList = ({
   // Esc is handled by the keymap (task 4.2); this only handles the pointer path.
   // A row click is a target inside the panel, so it never triggers this branch
   // before the click selection runs.
+  // Depend on the stable `close` callback (not the whole controller, which is a
+  // fresh object every render) so the listener is only re-registered when the
+  // session identity actually changes — not on every render.
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -67,11 +71,11 @@ export const MentionCandidateList = ({
       ) {
         return;
       }
-      controller.close();
+      close();
     };
     document.addEventListener('mousedown', handlePointerDown);
     return () => document.removeEventListener('mousedown', handlePointerDown);
-  }, [isOpen, controller]);
+  }, [isOpen, close]);
 
   if (!isOpen) {
     return null;
