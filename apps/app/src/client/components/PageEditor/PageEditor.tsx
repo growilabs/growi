@@ -28,6 +28,7 @@ import {
 import { uploadAttachments } from '~/client/services/upload-attachments';
 import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
 import { useIsEnableUnifiedMergeView } from '~/features/openai/client/states';
+import { UserGroupPageGrantStatus } from '~/interfaces/page';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import { useCurrentPathname, useCurrentUser } from '~/states/global';
 import {
@@ -108,7 +109,7 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   const currentPagePath = useCurrentPagePath();
   const currentPathname = useCurrentPathname();
   const currentPage = useCurrentPageData();
-  const [selectedGrant] = useSelectedGrant();
+  const [selectedGrant, setSelectedGrant] = useSelectedGrant();
   const editingMarkdown = useEditingMarkdown();
   const isEnabledAttachTitleHeader = useAtomValue(
     isEnabledAttachTitleHeaderAtom,
@@ -125,9 +126,24 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
   const defaultIndentSize = useAtomValue(defaultIndentSizeAtom);
   const acceptedUploadFileType = useAcceptedUploadFileType();
   const { data: editorSettings } = useEditorSettings();
-  const { mutate: mutateIsGrantNormalized } = useSWRxCurrentGrantData(
-    currentPage?._id,
-  );
+  const { data: grantData, mutate: mutateIsGrantNormalized } =
+    useSWRxCurrentGrantData(currentPage?._id);
+
+  // sync current page grant to selectedGrantAtom (especially for mobile where GrantSelector may not be mounted)
+  useEffect(() => {
+    const currentPageGrant = grantData?.grantData.currentPageGrant;
+    if (currentPageGrant == null) return;
+
+    const userRelatedGrantedGroups =
+      currentPageGrant.groupGrantData?.userRelatedGroups
+        .filter((group) => group.status === UserGroupPageGrantStatus.isGranted)
+        ?.map((group) => ({ item: group.id, type: group.type })) ?? [];
+    setSelectedGrant({
+      grant: currentPageGrant.grant,
+      userRelatedGrantedGroups,
+    });
+  }, [grantData, setSelectedGrant]);
+
   const user = useCurrentUser();
   const setEditingClients = useSetEditingClients();
   const setScrollToRemoteCursor = useSetScrollToRemoteCursor();
