@@ -49,8 +49,8 @@
 **Objective:** As an AI チャットの利用者, I want 候補リストをキーボードとマウスの両方で操作できる, so that 入力を中断せずに目的のページを選べる
 
 #### Acceptance Criteria
-1. While 候補リストが表示されている間, the AI Chat Input shall 各候補に対象ページのパス（および識別に十分な情報）を表示する。
-2. When ユーザーが上下キーを操作する, the AI Chat Input shall 候補リスト内の選択中項目を移動する。
+1. While 候補リストが表示されている間, the AI Chat Input shall 各候補に対象ページのパス（および識別に十分な情報）を表示する。（実装では識別補助として作成者アバターも併記する。）
+2. When ユーザーが上下キーを操作する, the AI Chat Input shall 候補リスト内の選択中項目を移動する。（端では循環（wrap-around）する。一般的なコンボボックスの挙動。）
 3. When ユーザーが選択中項目で確定操作（Enter またはクリック）を行う, the AI Chat Input shall その候補をメンションとして確定する。
 4. When ユーザーが Esc キーを押す、または候補リスト外をクリックする, the AI Chat Input shall メンションを挿入せずに候補リストを閉じる。
 5. While 検索結果を取得中である間, the AI Chat Input shall 読み込み中であることをユーザーに示す。
@@ -61,7 +61,7 @@
 **Objective:** As an AI チャットの利用者, I want 選択したページが他のテキストと区別できる形で入力欄に挿入される, so that メッセージ内のどこを参照しているか一目で分かる
 
 #### Acceptance Criteria
-1. When ユーザーが候補を確定する, the AI Chat Input shall `@` 以降の検索文字列を、選択したページを表すページメンション要素に置き換える。
+1. When ユーザーが候補を確定する, the AI Chat Input shall `@` 以降の検索文字列を、選択したページを表すページメンション要素に置き換える。（確定時、メンションの直後に半角スペースを 1 つ挿入し、続けて `@` を入力すれば即座に次のメンションを開始できるようにする。）
 2. The AI Chat Input shall ページメンション要素を、入力された他のテキストとは視覚的に区別できる表示にする。
 3. While ページメンションが入力欄に存在する間, the AI Chat Input shall 当該メンションを他テキストから独立した 1 つのまとまり（原子的な単位）として保持する。
 4. The AI Chat Input shall 1 つのメッセージ内に複数のページメンションを挿入できるようにする。

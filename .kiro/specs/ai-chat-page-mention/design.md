@@ -38,10 +38,14 @@
 
 ### Allowed Dependencies
 - 既存検索フック `useSWRxSearch`（`~/stores/search`）と検索結果型 `IPageWithSearchMeta`
-- 既存 CodeMirror 6 直接依存（`@codemirror/state` `^6.6`, `@codemirror/view` `^6.42`, `@codemirror/autocomplete` `^6.18`, `@codemirror/commands` `^6.8`）
+- 既存 CodeMirror 6 直接依存（`@codemirror/state` `^6.6`, `@codemirror/view` `^6.42`, `@codemirror/commands` `^6.8`（`defaultKeymap` を含む））
 - ページ遷移ヘルパ `LinkedPagePath`（`~/models/linked-page-path`）+ `next/router`
 - shadcn UI プリミティブ（`~/components/ui/*`）と `cn`（`~/utils/shadcn-ui`）、Tailwind（`tw:` 接頭辞）
 - `react-i18next` の `useTranslation`
+- `downshift`（既存依存）— 候補リストの **controlled な描画ヘルパ**（ARIA 配線・マウスホバー同期。状態所有は `MentionController` のまま。キーボード操作は CM キーマップが担当）
+- `simplebar-react`（既存依存）— 候補リストのスクロールコンテナ
+- `@growi/ui` の `UserPicture` — 候補行の作成者アバター表示
+- `usehooks-ts` の `useDebounce` — 検索クエリの debounce
 
 ### Revalidation Triggers
 - `PromptInput` の合成 API（children 受け渡し・`onSubmit` 契約・`InputGroup` ラップ）が変更された場合
@@ -96,10 +100,11 @@ graph TB
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | Frontend (editor) | `@codemirror/state` `^6.6`, `@codemirror/view` `^6.42` | エディタ・装飾・原子レンジ | 既存依存。新規追加なし |
-| Frontend (mention session) | `@codemirror/autocomplete` `^6.18`（補助）, `@codemirror/commands` | 起動規則の補助・キーマップ基盤 | 候補 UI は自前 React 実装、CM autocomplete のツールチップ描画は不使用 |
-| Frontend (UI) | React + shadcn (`~/components/ui/*`) + Tailwind 4 (`tw:`) | 候補リスト・チップ・配置 | Bootstrap 不使用 |
-| Data | `useSWRxSearch`（`/search`） | ページパス検索（権限フィルタ済み） | 既存。無改修 |
-| Navigation | `LinkedPagePath` + `next/router` | チップクリック遷移 | 既存ヘルパ |
+| Frontend (keymap) | `@codemirror/commands`（`defaultKeymap`） | mention キーマップ（`Prec.highest`）＋標準カーソル移動の合成 | 矢印/編集キーがドキュメントモデル基準。`@codemirror/autocomplete` は不使用 |
+| Frontend (候補UI) | `downshift`（controlled）+ `simplebar-react` + shadcn/Tailwind 4 (`tw:`) | 候補リストの ARIA/ホバー/クリック・スクロール・スタイル | downshift は状態非所有。Bootstrap 不使用 |
+| Frontend (avatar) | `@growi/ui` `UserPicture` | 候補行の作成者アバター | `noLink`/`noTooltip` |
+| Data | `useSWRxSearch`（`/search`） + `usehooks-ts` `useDebounce` | ページパス検索（権限フィルタ済み）・クエリ debounce | 既存。無改修 |
+| Navigation | `LinkedPagePath` + `next/router` | チップクリック遷移（SPA 同タブ） | 既存ヘルパ |
 | i18n | `react-i18next` | 新規 UI 文言 | ChatSidebar に新規導入 |
 
 ## File Structure Plan
@@ -153,7 +158,8 @@ sequenceDiagram
     User->>Editor: ArrowDown / Enter
     Editor->>Controller: keymap がNav鍵を委譲
     Controller->>List: ハイライト移動 / commit
-    Controller->>Editor: dispatch(replace @foo → "/path" + addMention効果)
+    Controller->>Editor: dispatch(replace @foo → "/path " + addMention効果)
+    Note over Editor: パス + 末尾スペースを挿入し、キャレットはスペース後ろへ（続けて @ で次のメンション可）。装飾(inclusive:false)はパスのみ被覆
     Editor->>Doc: 本文に "/path" 挿入 + 原子装飾登録
     Note over Editor: atomicRanges によりチップは原子化
     Note over Editor: doc変更ごとに flatten を隠しinput[name=message]へ同期
@@ -227,7 +233,9 @@ sequenceDiagram
 - **Enter 送信は既存 textarea と同じ機構を踏襲**: セッション非アクティブ時の Enter で、ホストフォームの `requestSubmit()` を呼ぶ（[prompt-input.tsx:819](apps/app/src/components/ai-elements/prompt-input.tsx#L819) の `form?.requestSubmit()` と同一）。これにより blob 変換・添付処理・clear を含む既存送信パイプラインをそのまま再利用する。`onSubmit` コールバック prop は持たない。
 - 親 `value` は **外部リセット（空文字化＝送信後 clear）にのみ追従**し、文字列からメンションを再構築しない（widget の正本はエディタ doc）。
 - `value` が空でエディタが空でない場合に doc をリセット。それ以外は一方向（editor→parent）。
-- 候補リスト（`MentionCandidateList`）をキャレット座標に配置。
+- 候補リスト（`MentionCandidateList`）を入力欄の真上に配置（CSS アンカー、上記参照）。
+- **標準カーソル移動キーマップ（`@codemirror/commands` の `defaultKeymap`）を mention キーマップ（`Prec.highest`）と併せて組み込む**。これにより非セッション時の矢印/編集キーがドキュメントモデル基準でカーソルを動かす: 空 doc での右矢印が placeholder ウィジェットを跨がず、横移動が `atomicRanges` を参照してメンションチップを 1 単位として扱う（5.x）。
+- **プレースホルダ/フォーカス/キャレット**: `placeholder` 拡張で空時の案内、`EditorView.contentAttributes` で `.cm-content` に `data-slot="input-group-control"` を付与し host `InputGroup` のフォーカスリングを発火、テーマで `min-height`・`caret-color: currentColor`（テーマ追従）を設定。
 
 **Dependencies**
 - Inbound: ChatSidebar — value/onChange/placeholder/disabled (P0)
@@ -256,13 +264,15 @@ export interface PageMentionInputProps {
 | Requirements | 1.2, 2.1, 2.4, 2.5, 2.6 |
 
 **Implementation Notes**
-- Integration: **純表示コンポーネント**。検索は行わず、`useMentionController` から `isOpen`・`query`・`candidates`・`isLoading`・`highlightedIndex`・`coords` を読むだけ。各候補（既に `PagePathCandidate` にマップ済み）のパスを表示。確定/閉じる/ハイライト移動は controller のメソッド（`commit`/`close`/`moveUp`/`moveDown`）を呼ぶ。`useSWRxSearch` は直接呼ばない（検索の所有者は controller・単一所有）。
+- Integration: **純表示コンポーネント**。検索は行わず、`useMentionController` から `isOpen`・`query`・`candidates`・`isLoading`・`highlightedIndex` を読むだけ。各候補（既に `PagePathCandidate` にマップ済み）の**作成者アバター（`@growi/ui` の `UserPicture`、`noLink`/`noTooltip`）+ パス**を表示。確定/閉じる/ハイライト移動は controller のメソッド（`commit`/`close`/`setHighlightedIndex`）を呼ぶ。`useSWRxSearch` は直接呼ばない（検索の所有者は controller・単一所有）。
+- **downshift（controlled 描画ヘルパ）**: `<Downshift>` を controlled モードで使用（`isOpen`/`highlightedIndex`/`selectedItem` は controller から供給）。`getRootProps`/`getMenuProps`/`getItemProps` で ARIA 配線・行クリック・**マウスホバー**（→ `onStateChange` → `controller.setHighlightedIndex`）を得る。状態所有は持たず、キーボード操作は CM キーマップが担う。downshift 内蔵の scroll-into-view は無効化（`scrollIntoView={()=>{}}`）。
+- **スクロール**: `simplebar-react` をスクロールコンテナに使用（`maxHeight`）。ハイライト追従は、ハイライト行 ref への `scrollIntoView({ block: 'nearest' })`（最近接スクロール祖先＝SimpleBar のラッパーをスクロール）で実現。
+- **位置決め**: キャレット座標ではなく、`PageMentionInput` の `relative` ラッパー内で **CSS アンカー（`bottom-full`/`left-0`）により入力欄の真上に配置**する（チャットの定石）。`coords`（`coordsAtPos` 由来）は controller に用意されているが、現状この CSS 配置では消費していない。
 - Validation（表示状態の出し分け）:
   - `query` 空（`@` 直後）→ **ヒント行**（例「ページ名を入力して検索」）を表示し検索は実行しない（1.2）。`@` 起動と同時にパネルは開く（1.1）。
   - `query` 1文字以上 + `isLoading` 中 → loading 行（2.5）。
   - `query` 1文字以上 + 結果空 → 該当なし行（2.6）。
   - `query` 1文字以上 + 結果あり → 候補リスト（1.4/2.1）。
-- Risks: キャレット座標追従（スクロール/折返し時）の再計算が必要。`view.coordsAtPos` を使用。
 
 #### useMentionController
 
@@ -292,9 +302,10 @@ export interface MentionController {
   readonly candidates: readonly PagePathCandidate[];
   readonly isLoading: boolean;
   // --- 操作（keymap / 候補リスト行クリックが呼ぶ） ---
-  moveUp(): void;
-  moveDown(): void;
-  commit(index?: number): void;  // 省略時は highlightedIndex
+  moveUp(): void;   // 端で循環（wrap）
+  moveDown(): void; // 端で循環（wrap）
+  setHighlightedIndex(index: number): void; // マウスホバー等から直接指定。負値は無視
+  commit(index?: number): void;  // 省略時は highlightedIndex。確定時はパス + 末尾スペースを挿入
   close(): void;
 }
 export const useMentionController: (view: EditorView | null) => MentionController;
@@ -303,7 +314,7 @@ export const useMentionController: (view: EditorView | null) => MentionControlle
 ##### State Management（双方向ブリッジ機構）
 - **CM → React（状態の取り込み）**: `PageMentionInput` が `createPageMentionExtensions` に `EditorView.updateListener` を組み込み、各トランザクションで `mentionSessionField` の値（active/from/to/query）と `view.coordsAtPos(from)` を React state へ push する。`useMentionController` はこの session state を入力に `query` を `useSWRxSearch` へ渡す。CM の doc/selection が**正本**、React state は派生。
 - **React → CM（操作の呼び出し）**: `commit`/`moveUp` 等は最新の controller を参照する必要があるため、controller のメソッドを **stable ref**（`useRef` で保持し毎レンダー更新）に格納する。`mention-keymap` は値ではなく **ref を保持する Facet** 経由で呼び出すことで、エディタ生成時に固定された stale クロージャを避ける（Issue 1）。
-- **coords の所有権（Issue 2）**: `coordsAtPos` は `EditorView` を持つ `PageMentionInput`/updateListener 側で算出し、controller の `coords` として一元的に公開する。`MentionCandidateList` は `coords` を読むだけで自前計算しない（二重所有の回避）。
+- **coords の所有権（Issue 2）**: `coordsAtPos` は `useMentionController` 内（view を持つ唯一の所）で算出し `coords` として公開する（単一所有）。**ただし最終的な位置決めは CSS アンカー（`bottom-full` で入力欄の真上）を採用**したため、`coords` は現状 `MentionCandidateList` では消費していない（将来のレイアウト調整用に保持）。
 - Concurrency: 検索は SWR がキャッシュ/重複排除。`highlightedIndex` は候補数変化時に範囲内へクランプ。
 
 **Implementation Notes**
@@ -395,7 +406,7 @@ export const getMentionFlattenedText: (state: EditorState) => string; // = doc.t
 ## Data Models
 
 ### Domain Model
-- **PagePathCandidate**（検索候補の表示用 VO）: `{ pageId: string; path: string }`。`IPageWithSearchMeta` から `data._id`/`data.path` をマップ。
+- **PagePathCandidate**（検索候補の表示用 VO）: `{ pageId: string; path: string; creator?: Ref<IUser> | null }`。`IPageWithSearchMeta` から `data._id`/`data.path`/`data.creator` をマップ。`creator` は `/search` が populate + `serializeUserSecurely` 済みの user で、候補行のアバター（`UserPicture`）に使用（無い場合は既定アバター）。
 - **MentionData**（確定メンションの値オブジェクト）: `{ path: string; pageId?: string }`。エディタ装飾と送信テキストの双方の正本はエディタ doc 上のパス文字列。
 - **MentionSessionState**（過渡状態）: アクティブな `@` クエリの範囲・文字列。永続化しない。
 
@@ -444,6 +455,6 @@ export const getMentionFlattenedText: (state: EditorState) => string; // = doc.t
 - チップ DOM はパス文字列を `textContent` として設定し、HTML 挿入は行わない（XSS 回避）。
 
 ## Open Questions / Risks
-- **候補 UI のキー委譲**: CM キーマップ（`Prec.highest`）と React ドロップダウンの連携が最大のリスク。代替として `@codemirror/autocomplete` 単独実装も可能だが、loading/該当なし表示（2.5/2.6）と shadcn スタイル要件で本設計（自前ドロップダウン）を採用。実装初期に委譲方式のプロトタイプ検証を推奨。
+- **候補 UI のキー委譲（決定済み）**: キーボードは CM キーマップ（`Prec.highest`）が所有し、`controller.moveUp/moveDown/commit/close` へ委譲（downshift にはキーが届かない）。候補リストは **downshift を controlled な描画ヘルパ**として採用し、ARIA・マウスホバー（`setHighlightedIndex` で同期）・クリックのみを担当。状態の所有は `MentionController` のまま。`@codemirror/autocomplete` 単独案は不採用。
 - **遷移方式（4.1）: 決定済み — Next.js ルーティング（SPA 同タブ遷移）**。`PageMentionInput` の `onNavigate` は `LinkedPagePath` の href を `useRouter().push(href)` で遷移する（`window.open`/新規タブは不採用）。要件 4.1 は「遷移する手段の提供」までを要求しており、SPA 同タブ遷移を採用。下書き保全は本機能では非対象（必要なら別途）。
 - **パスの区切り**: 空白を含むページパスを送信テキストに含めた際の AI 側可読性。要件 6 は「パス文字列」を要求するため本設計では区切り装飾を付けない（将来拡張余地）。
