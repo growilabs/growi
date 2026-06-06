@@ -78,7 +78,7 @@ graph TB
     MentionSessionField --> MentionController
     MentionKeymap --> MentionController
     MentionController --> MentionCandidateList
-    MentionCandidateList --> useSWRxSearch
+    MentionController --> useSWRxSearch
     useSWRxSearch --> SearchApi
 
     MentionWidget --> NavCallback
@@ -182,7 +182,7 @@ sequenceDiagram
 | 2.1 | 候補にパス表示 | MentionCandidateList | PagePathCandidate | — |
 | 2.2, 2.3 | ↑↓選択・Enter/クリック確定 | mention-keymap, use-mention-controller | MentionController | 挿入フロー |
 | 2.4 | Esc/外クリックで閉じる | mention-keymap, MentionCandidateList | MentionController.close | — |
-| 2.5, 2.6 | loading/該当なし表示 | MentionCandidateList | useSWRxSearch(isLoading) | — |
+| 2.5, 2.6 | loading/該当なし表示 | MentionCandidateList, use-mention-controller | MentionController(isLoading/candidates) | — |
 | 2.7 | 過剰検索抑制(debounce) | use-mention-controller | activateOnTypingDelay/debounce | — |
 | 3.1 | 検索文字列をチップに置換 | mention-decoration, use-mention-controller | addMention 効果 | 挿入フロー |
 | 3.2 | 視覚的区別 | mention-decoration(MentionWidget) | Tailwind チップ | — |
@@ -204,7 +204,7 @@ sequenceDiagram
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
 | PageMentionInput | UI adapter | CM 入力リーフ・value 同期・Enter送信・候補配置 | 1.x–6.x | EditorView (P0), useMentionController (P0) | State |
-| MentionCandidateList | UI | 候補表示・loading/該当なし・ハイライト | 2.1,2.4–2.6 | useSWRxSearch (P0) | — |
+| MentionCandidateList | UI | 候補表示・loading/該当なし・ハイライト（純表示） | 1.2,2.1,2.4–2.6 | useMentionController (P0) | — |
 | useMentionController | Logic hook | セッション↔候補の橋渡し・検索・確定 | 1.3,1.4,2.2,2.3,2.7,7.x | useSWRxSearch (P0), MentionSessionState (P0) | State |
 | mention-decoration | CM extension | 原子チップ装飾・atomicRanges・クリック遷移 | 3.x,4.x,5.x | @codemirror/view (P0), LinkedPagePath (P1) | State |
 | mention-session | CM extension | `@`起動規則・セッション追跡 | 1.1,1.5,1.6,1.7,5.5 | @codemirror/state (P0) | State |
@@ -256,7 +256,7 @@ export interface PageMentionInputProps {
 | Requirements | 1.2, 2.1, 2.4, 2.5, 2.6 |
 
 **Implementation Notes**
-- Integration: `useMentionController` から `query`・`isOpen`・`highlightedIndex`・`coords` を受け取り、`useSWRxSearch(query)` の `data`/`isLoading` を表示。各候補は `IPageWithSearchMeta.data.path`/`._id` を `PagePathCandidate` にマップして描画。確定/閉じるは controller のコールバックを呼ぶ。
+- Integration: **純表示コンポーネント**。検索は行わず、`useMentionController` から `isOpen`・`query`・`candidates`・`isLoading`・`highlightedIndex`・`coords` を読むだけ。各候補（既に `PagePathCandidate` にマップ済み）のパスを表示。確定/閉じる/ハイライト移動は controller のメソッド（`commit`/`close`/`moveUp`/`moveDown`）を呼ぶ。`useSWRxSearch` は直接呼ばない（検索の所有者は controller・単一所有）。
 - Validation（表示状態の出し分け）:
   - `query` 空（`@` 直後）→ **ヒント行**（例「ページ名を入力して検索」）を表示し検索は実行しない（1.2）。`@` 起動と同時にパネルは開く（1.1）。
   - `query` 1文字以上 + `isLoading` 中 → loading 行（2.5）。
