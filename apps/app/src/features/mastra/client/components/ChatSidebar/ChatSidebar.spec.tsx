@@ -2,8 +2,12 @@
 
 import { EditorView } from '@codemirror/view';
 import { act, fireEvent, render, screen } from '@testing-library/react';
+import { mock } from 'vitest-mock-extended';
 
-import type { IFormattedSearchResult } from '~/interfaces/search';
+import type {
+  IFormattedSearchResult,
+  IPageWithSearchMeta,
+} from '~/interfaces/search';
 
 import type { ChatSidebarStatus } from '../../status/chat-sidebar';
 import { ChatSidebar } from './ChatSidebar';
@@ -54,16 +58,18 @@ vi.mock('~/stores/search', () => ({
   useSWRxSearch: () => searchState.current,
 }));
 
-/** Build a minimal search result with the given page paths. */
+/** Build a minimal, type-safe search result with the given page paths. */
 const setSearchResult = (
   pages: ReadonlyArray<{ id: string; path: string }>,
 ): void => {
   searchState.current = {
-    data: {
-      data: pages.map((p) => ({
-        data: { _id: p.id, path: p.path },
-      })),
-    } as unknown as IFormattedSearchResult,
+    data: mock<IFormattedSearchResult>({
+      data: pages.map((p) =>
+        mock<IPageWithSearchMeta>({
+          data: mock<IPageWithSearchMeta['data']>({ _id: p.id, path: p.path }),
+        }),
+      ),
+    }),
     isLoading: false,
   };
 };

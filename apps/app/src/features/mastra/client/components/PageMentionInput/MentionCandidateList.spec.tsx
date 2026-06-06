@@ -138,6 +138,9 @@ describe('MentionCandidateList', () => {
     });
 
     it('scrolls the initially highlighted row into view on first render (2.2)', () => {
+      // WHY (mechanism proxy): happy-dom has no layout, so "the row is actually
+      // visible" cannot be observed. We assert scrollIntoView is invoked as a
+      // proxy; real visibility is covered by the manual smoke test (task 7.1).
       const scrollIntoView = vi
         .spyOn(HTMLElement.prototype, 'scrollIntoView')
         .mockImplementation(() => {});
@@ -162,6 +165,9 @@ describe('MentionCandidateList', () => {
     });
 
     it('scrolls the highlighted row into view when the highlight changes (2.2)', () => {
+      // WHY (mechanism proxy): see the first-render test above — happy-dom has
+      // no layout, so scrollIntoView invocation is the observable proxy; real
+      // visibility is covered by the manual smoke test (task 7.1).
       const scrollIntoView = vi
         .spyOn(HTMLElement.prototype, 'scrollIntoView')
         .mockImplementation(() => {});
