@@ -102,19 +102,21 @@ export const useMentionController = (
 
       const { from, to } = session;
       const { path, pageId } = candidate;
-      const insertEnd = from + path.length;
+      const mentionEnd = from + path.length;
 
-      // Replace the "@query" span with the path text, register the atomic
-      // mention decoration over the inserted range, and place the caret right
-      // after it (2.3 / 3.1).
+      // Replace the "@query" span with the path text plus a trailing space, so a
+      // new "@" typed right after the chip lands at a word boundary and can start
+      // the next mention (Claude Code-style). The atomic decoration covers only
+      // the path (inclusive:false), leaving the space as ordinary text; the caret
+      // is placed after the space.
       view.dispatch({
-        changes: { from, to, insert: path },
+        changes: { from, to, insert: `${path} ` },
         effects: addMention.of({
           from,
-          to: insertEnd,
+          to: mentionEnd,
           data: { path, pageId },
         }),
-        selection: EditorSelection.cursor(insertEnd),
+        selection: EditorSelection.cursor(mentionEnd + 1),
       });
 
       setHighlightedIndex(0);

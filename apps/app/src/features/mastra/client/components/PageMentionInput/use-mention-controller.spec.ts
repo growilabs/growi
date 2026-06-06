@@ -215,8 +215,11 @@ describe('useMentionController', () => {
 
       act(() => result.current.commit());
 
-      // The path replaced the "@foo" query span.
-      expect(view.state.doc.toString()).toBe('/foo/a');
+      // The path (plus a trailing space) replaced the "@foo" query span so the
+      // next "@" can start a new mention at a word boundary.
+      expect(view.state.doc.toString()).toBe('/foo/a ');
+      // Caret is placed after the trailing space.
+      expect(view.state.selection.main.head).toBe('/foo/a '.length);
 
       // The dispatched transaction carried the addMention effect over the
       // inserted path range.
