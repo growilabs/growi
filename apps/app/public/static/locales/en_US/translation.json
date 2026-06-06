@@ -1182,6 +1182,7 @@
     "placeholder": "Type a message... ( @ to mention a page )",
     "hint": "Type a page name to search",
     "searching": "Searching...",
-    "noResults": "No pages found"
+    "noResults": "No pages found",
+    "candidatesLabel": "Page candidates"
   }
 }

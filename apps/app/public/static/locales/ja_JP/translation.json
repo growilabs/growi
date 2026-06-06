@@ -1204,7 +1204,6 @@
       "badge": "バッジ",
       "text_color": "テキストカラー",
       "back_color": "背景色",
-
       "placeholder": "テキストが入ります",
       "docs_title": "Bootstrap5 公式ドキュメント",
       "docs_badge": "バッジの詳細はこちら",
@@ -1216,6 +1215,7 @@
     "placeholder": "メッセージを入力...（ @ でページを参照）",
     "hint": "ページ名を入力して検索",
     "searching": "検索中...",
-    "noResults": "該当するページがありません"
+    "noResults": "該当するページがありません",
+    "candidatesLabel": "ページ候補"
   }
 }

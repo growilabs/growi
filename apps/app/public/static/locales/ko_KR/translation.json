@@ -1130,7 +1130,6 @@
       "badge": "배지",
       "text_color": "텍스트 색상",
       "back_color": "배경 색상",
-
       "placeholder": "텍스트가 입력됩니다",
       "docs_title": "Bootstrap 5 공식 문서",
       "docs_badge": "배지 상세 정보",
@@ -1142,6 +1141,7 @@
     "placeholder": "Type a message... ( @ to mention a page )",
     "hint": "Type a page name to search",
     "searching": "Searching...",
-    "noResults": "No pages found"
+    "noResults": "No pages found",
+    "candidatesLabel": "Page candidates"
   }
 }

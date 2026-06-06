@@ -2,6 +2,7 @@ import { fireEvent, render, screen } from '@testing-library/react';
 import { mock } from 'vitest-mock-extended';
 
 import { MentionCandidateList } from './MentionCandidateList';
+import { MENTION_LISTBOX_ID, mentionOptionId } from './mention-aria';
 import type { MentionController, PagePathCandidate } from './types';
 
 // i18n: return the key itself so assertions can target the stable key string
@@ -241,6 +242,47 @@ describe('MentionCandidateList', () => {
       fireEvent.mouseDown(screen.getByText('/foo/a'));
 
       expect(close).not.toHaveBeenCalled();
+    });
+  });
+
+  describe('ARIA wiring (#10 / #15 / #16)', () => {
+    it('labels the listbox and gives it the shared id (#16)', () => {
+      const controller = buildController({
+        query: 'foo',
+        candidates: [candidate('id-a', '/foo/a')],
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      const listbox = screen.getByRole('listbox');
+      expect(listbox).toHaveAttribute('id', MENTION_LISTBOX_ID);
+      expect(listbox).toHaveAttribute(
+        'aria-label',
+        'pageMention.candidatesLabel',
+      );
+    });
+
+    it('gives each option the deterministic id referenced by aria-activedescendant (#10)', () => {
+      const controller = buildController({
+        query: 'foo',
+        candidates: [candidate('id-a', '/foo/a'), candidate('id-b', '/foo/b')],
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      expect(
+        screen.getByText('/foo/a').closest('[role="option"]'),
+      ).toHaveAttribute('id', mentionOptionId(0));
+      expect(
+        screen.getByText('/foo/b').closest('[role="option"]'),
+      ).toHaveAttribute('id', mentionOptionId(1));
+    });
+
+    it('exposes the empty-query hint as a polite live region (#15)', () => {
+      const controller = buildController({ query: '', candidates: [] });
+      render(<MentionCandidateList controller={controller} />);
+
+      const status = screen.getByRole('status');
+      expect(status).toHaveTextContent('pageMention.hint');
+      expect(status).toHaveAttribute('aria-live', 'polite');
     });
   });
 });

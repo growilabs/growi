@@ -17,6 +17,7 @@ import {
   mentionSessionField,
 } from './editor-state';
 import { MentionCandidateList } from './MentionCandidateList';
+import { MENTION_LISTBOX_ID, mentionOptionId } from './mention-aria';
 import type {
   MentionController,
   MentionData,
@@ -93,6 +94,11 @@ export const PageMentionInput = ({
   // without recreating the view.
   const editableCompartmentRef = useRef(new Compartment());
 
+  // Compartment for the combobox ARIA attributes on the editor's contentDOM
+  // (aria-controls / aria-activedescendant), reconfigured as the candidate
+  // session opens/closes and the highlight moves (#10).
+  const ariaCompartmentRef = useRef(new Compartment());
+
   // The mounted view, exposed to React so the controller and candidate list can
   // read from it. Set once the view is created in the mount effect.
   const [view, setView] = useState<EditorView | null>(null);
@@ -154,6 +160,9 @@ export const PageMentionInput = ({
           // Initialised editable; the `disabled` effect reconfigures this
           // compartment (reading `disabled` here would force a remount).
           editableCompartmentRef.current.of(EditorView.editable.of(true)),
+          // Combobox ARIA attributes; reconfigured by the effect below. Closed
+          // initially (no listbox to reference).
+          ariaCompartmentRef.current.of(EditorView.contentAttributes.of({})),
           createPageMentionExtensions({
             getController: () => controllerRef.current,
             onNavigate: navigate,
@@ -224,6 +233,28 @@ export const PageMentionInput = ({
       ),
     });
   }, [disabled]);
+
+  // Combobox ARIA bridge (#10): while the candidate listbox is open, expose
+  // `aria-controls` (the listbox) and `aria-activedescendant` (the highlighted
+  // option) on the editor's contentDOM so screen readers announce the active
+  // candidate as the user navigates with the keyboard. Cleared when closed.
+  useEffect(() => {
+    const v = viewRef.current;
+    if (v == null) {
+      return;
+    }
+    const attrs: Record<string, string> = controller.isOpen
+      ? {
+          'aria-controls': MENTION_LISTBOX_ID,
+          'aria-activedescendant': mentionOptionId(controller.highlightedIndex),
+        }
+      : {};
+    v.dispatch({
+      effects: ariaCompartmentRef.current.reconfigure(
+        EditorView.contentAttributes.of(attrs),
+      ),
+    });
+  }, [controller.isOpen, controller.highlightedIndex]);
 
   return (
     <div className="tw:relative tw:w-full">

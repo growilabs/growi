@@ -1163,7 +1163,6 @@
       "badge": "Badge",
       "text_color": "Couleur du texte",
       "back_color": "Couleur d'arrière-plan",
-
       "placeholder": "Le texte s'affiche ici",
       "docs_title": "Documentation officielle de Bootstrap 5",
       "docs_badge": "En savoir plus sur les Badges",
@@ -1175,6 +1174,7 @@
     "placeholder": "Type a message... ( @ to mention a page )",
     "hint": "Type a page name to search",
     "searching": "Searching...",
-    "noResults": "No pages found"
+    "noResults": "No pages found",
+    "candidatesLabel": "Page candidates"
   }
 }

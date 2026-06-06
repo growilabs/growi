@@ -4,6 +4,7 @@ import { EditorView } from '@codemirror/view';
 import { act, render } from '@testing-library/react';
 
 import { addMention } from './editor-state/mention-decoration';
+import { MENTION_LISTBOX_ID, mentionOptionId } from './mention-aria';
 import { PageMentionInput } from './PageMentionInput';
 
 // --- Search store mock (the data boundary) ---------------------------------
@@ -147,6 +148,42 @@ describe('PageMentionInput', () => {
 
       // SPA navigation via Next.js router (not a new tab).
       expect(pushMock).toHaveBeenCalledWith(path);
+    });
+  });
+
+  describe('combobox ARIA wiring (#10)', () => {
+    it('sets aria-controls / aria-activedescendant on the editor while a session is open, and clears them when closed', () => {
+      const { container } = render(
+        <PageMentionInput value="" onChange={vi.fn()} />,
+      );
+      const view = getView(container);
+
+      // No session yet → no combobox relationship.
+      expect(view.contentDOM.getAttribute('aria-controls')).toBeNull();
+      expect(view.contentDOM.getAttribute('aria-activedescendant')).toBeNull();
+
+      // Type "@foo" to open a mention session at the line-start boundary.
+      act(() => {
+        view.dispatch({
+          changes: { from: 0, insert: '@foo' },
+          selection: { anchor: 4 },
+        });
+      });
+
+      expect(view.contentDOM.getAttribute('aria-controls')).toBe(
+        MENTION_LISTBOX_ID,
+      );
+      expect(view.contentDOM.getAttribute('aria-activedescendant')).toBe(
+        mentionOptionId(0),
+      );
+
+      // Deleting the "@" closes the session → relationship is cleared.
+      act(() => {
+        view.dispatch({ changes: { from: 0, to: 4, insert: '' } });
+      });
+
+      expect(view.contentDOM.getAttribute('aria-controls')).toBeNull();
+      expect(view.contentDOM.getAttribute('aria-activedescendant')).toBeNull();
     });
   });
 });

@@ -6,6 +6,7 @@ import SimpleBar from 'simplebar-react';
 
 import { cn } from '~/utils/shadcn-ui';
 
+import { MENTION_LISTBOX_ID, mentionOptionId } from './mention-aria';
 import type { MentionController, PagePathCandidate } from './types';
 
 interface MentionCandidateListProps {
@@ -93,21 +94,35 @@ export const MentionCandidateList = ({
         'tw:rounded-md tw:border tw:border-border/50 tw:bg-popover tw:text-popover-foreground tw:shadow-sm',
       )}
     >
-      {/* Empty query: hint only, never candidates and never a search (1.1/1.2). */}
+      {/* Empty query: hint only, never candidates and never a search (1.1/1.2).
+          Status rows are polite live regions so screen readers announce the
+          hint / searching / no-results state changes (#15). */}
       {!hasQuery && (
-        <div className="tw:px-3 tw:py-2 tw:text-sm tw:text-muted-foreground">
+        <div
+          role="status"
+          aria-live="polite"
+          className="tw:px-3 tw:py-2 tw:text-sm tw:text-muted-foreground"
+        >
           {t('pageMention.hint')}
         </div>
       )}
 
       {hasQuery && isLoading && (
-        <div className="tw:px-3 tw:py-2 tw:text-sm tw:text-muted-foreground">
+        <div
+          role="status"
+          aria-live="polite"
+          className="tw:px-3 tw:py-2 tw:text-sm tw:text-muted-foreground"
+        >
           {t('pageMention.searching')}
         </div>
       )}
 
       {hasQuery && !isLoading && candidates.length === 0 && (
-        <div className="tw:px-3 tw:py-2 tw:text-sm tw:text-muted-foreground">
+        <div
+          role="status"
+          aria-live="polite"
+          className="tw:px-3 tw:py-2 tw:text-sm tw:text-muted-foreground"
+        >
           {t('pageMention.noResults')}
         </div>
       )}
@@ -142,13 +157,23 @@ export const MentionCandidateList = ({
           {({ getRootProps, getMenuProps, getItemProps }) => (
             <div {...getRootProps({}, { suppressRefError: true })}>
               <SimpleBar style={{ maxHeight: '18rem' }} className="tw:p-1">
-                <div {...getMenuProps()}>
+                {/* Stable listbox id + label: the editor's aria-controls /
+                    aria-activedescendant point here (#10/#16). */}
+                <div
+                  {...getMenuProps()}
+                  id={MENTION_LISTBOX_ID}
+                  role="listbox"
+                  aria-label={t('pageMention.candidatesLabel')}
+                >
                   {candidates.map((c, index) => {
                     const highlighted = index === highlightedIndex;
                     return (
                       <div
                         key={c.pageId}
                         {...getItemProps({ item: c, index })}
+                        // Stable id referenced by the editor's
+                        // aria-activedescendant when this row is highlighted (#10).
+                        id={mentionOptionId(index)}
                         ref={highlighted ? highlightedItemRef : null}
                         role="option"
                         aria-selected={highlighted}
