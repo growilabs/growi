@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/router';
 import { Compartment, EditorState } from '@codemirror/state';
-import { EditorView } from '@codemirror/view';
+import { placeholder as cmPlaceholder, EditorView } from '@codemirror/view';
 
 import { LinkedPagePath } from '~/models/linked-page-path';
 import { cn } from '~/utils/shadcn-ui';
@@ -27,13 +27,33 @@ const INACTIVE_SESSION: MentionSessionState = {
   query: '',
 };
 
-// Minimal theme approximating the prior textarea look (borderless, transparent;
-// the shadcn PromptInput shell owns the surrounding chrome).
+// Theme approximating the prior textarea look (borderless, transparent; the
+// shadcn PromptInput shell owns the surrounding chrome). Min-height raises the
+// default input height (~ the old textarea's min-h-16) and the scroller caps
+// growth with a scroll (~ the old max-h-48). Focus highlight is provided by the
+// host InputGroup (see contentAttributes data-slot below), so the editor itself
+// stays outline-less.
 const editorTheme = EditorView.theme({
   '&': { backgroundColor: 'transparent' },
-  '.cm-content': { padding: '0', fontFamily: 'inherit' },
-  '.cm-scroller': { fontFamily: 'inherit', lineHeight: 'inherit' },
+  '.cm-content': {
+    padding: '0.5rem 0.75rem',
+    fontFamily: 'inherit',
+    minHeight: '4rem',
+  },
+  '.cm-scroller': {
+    fontFamily: 'inherit',
+    lineHeight: 'inherit',
+    maxHeight: '12rem',
+    overflowY: 'auto',
+  },
   '&.cm-focused': { outline: 'none' },
+});
+
+// Marks the editable content as the InputGroup's focus target so the host
+// InputGroup applies its focus ring when the editor is focused (the old textarea
+// carried this data-slot). `:focus-visible` matches editable content on focus.
+const contentDataSlot = EditorView.contentAttributes.of({
+  'data-slot': 'input-group-control',
 });
 
 /**
@@ -117,6 +137,8 @@ export const PageMentionInput = ({
         extensions: [
           EditorView.lineWrapping,
           editorTheme,
+          contentDataSlot,
+          cmPlaceholder(placeholder ?? ''),
           // Initialised editable; the `disabled` effect reconfigures this
           // compartment (reading `disabled` here would force a remount).
           editableCompartmentRef.current.of(EditorView.editable.of(true)),
@@ -189,7 +211,6 @@ export const PageMentionInput = ({
       <div
         ref={containerRef}
         data-slot="page-mention-input"
-        data-placeholder={placeholder}
         className={cn(
           'tw:w-full tw:text-sm',
           disabled && 'tw:pointer-events-none tw:opacity-50',
