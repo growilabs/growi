@@ -26,7 +26,7 @@
   - _Boundary: mention-session_
   - _Depends: 1.1_
 
-- [ ] 2.2 (P) mention-decoration 拡張
+- [x] 2.2 (P) mention-decoration 拡張
   - `MentionWidget`（`tw:` クラスのチップ DOM、`textContent` でパス表示）、`Decoration.replace({ inclusive:false })` の装飾 `StateField`、`addMention` 効果、`EditorView.atomicRanges` 提供、`NavCallback` Facet、`mousedown.preventDefault` によるクリック/編集区別
   - 観察可能な完了条件: state テストで「addMention→装飾範囲生成」「atomicRanges facet が当該範囲を返す」「inclusive:false で隣接挿入が通常テキスト」「隣接編集で装飾が map・独立維持」、command テストで「`deleteCharBackward` が範囲を単位削除」、widget DOM click で NavCallback 発火が通る
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 4.1, 4.2, 5.1, 5.2, 5.3, 5.4_
