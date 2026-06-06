@@ -84,7 +84,7 @@ export const MentionCandidateList = ({
       ref={panelRef}
       data-slot="mention-candidate-list"
       className={cn(
-        'tw:absolute tw:bottom-full tw:left-0 tw:z-50 tw:mb-1 tw:w-full tw:max-w-md tw:overflow-hidden',
+        'tw:absolute tw:bottom-full tw:left-0 tw:z-50 tw:mb-2 tw:w-full tw:max-w-md tw:overflow-hidden',
         // Lighter frame: faint border + softer shadow.
         'tw:rounded-md tw:border tw:border-border/50 tw:bg-popover tw:text-popover-foreground tw:shadow-sm',
       )}
