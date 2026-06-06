@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { CopyIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { v7 as uuid } from 'uuid';
 
 import { Action, Actions } from '~/components/ai-elements/actions';
@@ -20,7 +21,6 @@ import {
   PromptInputFooter,
   type PromptInputMessage,
   PromptInputSubmit,
-  PromptInputTextarea,
 } from '~/components/ai-elements/prompt-input';
 import {
   Reasoning,
@@ -34,6 +34,7 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '~/components/ai-elements/sources';
+import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
 
 import {
   useChatSidebarActions,
@@ -47,6 +48,8 @@ import styles from './ChatSidebar.module.scss';
 const moduleClass = styles['grw-chat-sidebar'] ?? '';
 
 export const ChatSidebar = (): JSX.Element => {
+  const { t } = useTranslation();
+
   const [input, setInput] = useState('');
 
   const chatSidebarStatus = useChatSidebarStatus();
@@ -257,9 +260,10 @@ export const ChatSidebar = (): JSX.Element => {
               inputGroupClassName="tw:rounded-xl"
             >
               <PromptInputBody>
-                <PromptInputTextarea
-                  onChange={(e) => setInput(e.target.value)}
+                <PageMentionInput
                   value={input}
+                  onChange={setInput}
+                  placeholder={t('pageMention.placeholder')}
                 />
               </PromptInputBody>
               <PromptInputFooter className="tw:justify-end">

@@ -82,7 +82,7 @@
   - _Depends: 5.1, 4.1_
 
 - [ ] 6. 統合: ChatSidebar 差し替え
-- [ ] 6.1 ChatSidebar への組み込み
+- [x] 6.1 ChatSidebar への組み込み
   - 入力リーフを `PromptInputTextarea` → `PageMentionInput` に差し替え、`onChange` を `(value: string) => setInput(value)` に変更、`placeholder` を i18n 化。`PromptInput`/`PromptInputBody`/`PromptInputFooter`/`PromptInputSubmit`/`handleSubmit` と送信・添付フローは維持
   - 観察可能な完了条件: 統合テストで「メンション挿入後の送信で `sendMessage` に**パス文字列を含む text**が渡る」ことを確認し、既存の送信/添付フローが回帰しない
   - _Requirements: 6.1_
