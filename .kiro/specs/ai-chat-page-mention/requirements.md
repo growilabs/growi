@@ -15,5 +15,80 @@
 - クリックすると対象のページに遷移できる
 - 他の文字列と視覚的に区別できるようにする
 
+## Introduction
+本機能は、AI チャットの入力欄でユーザーが `@` に続けて文字列を入力すると、GROWI に保存されているページパスをインクリメンタルに検索し、候補リストから選択したページを「ページメンション」として入力欄に挿入できるようにする。挿入されたメンションは入力欄内の他のテキストとは独立した視覚的に区別できる要素（rich text）として表示され、クリックすると対象ページへ遷移できる。メッセージ送信時には、メンションは対象ページの**パス文字列**として AI に渡される。これにより、ユーザーは会話の中で特定のページを素早く参照先として指定できる。
+
+## Boundary Context
+- **In scope**:
+  - AI チャット入力欄での `@` 起動によるページパスのインクリメンタル検索と候補リスト表示
+  - 候補選択によるページメンション（rich text）の挿入、視覚的区別、クリックによるページ遷移
+  - メンションを原子的な単位として扱う編集・削除挙動
+  - メッセージ送信時にメンションを対象ページの**パス文字列**として AI に含めること
+- **Out of scope**:
+  - 参照先ページの**本文（コンテンツ）を AI のコンテキストとして付与する**こと。本機能で AI に渡されるのはパス文字列のみであり、本文取得・注入は行わない
+  - ユーザーや他エンティティ（タグ等）に対するメンション
+  - AI サーバ側の推論ロジックやプロンプト構築方法の変更（パス文字列を受け取ること以上の挙動）
+- **Adjacent expectations**:
+  - ページパス検索は既存の Elasticsearch ベースのページ検索機能に依拠する。候補として返るのはログインユーザーが閲覧権限を持つページのみであることを前提とする（既存検索 API の挙動に準拠し、本機能で独自の権限フィルタは新設しない）
+
 ## Requirements
-<!-- Will be generated in /kiro-spec-requirements phase -->
+
+### Requirement 1: メンション入力の起動とインクリメンタル検索
+**Objective:** As an AI チャットの利用者, I want `@` に続けて文字列を入力するとページパスがインクリメンタルに検索される, so that 参照したいページを素早く見つけられる
+
+#### Acceptance Criteria
+1. When ユーザーがチャット入力欄で `@` を入力する, the AI Chat Input shall ページメンションの検索モードを開始する。
+2. When ユーザーが `@` に続けて文字列を入力または変更する, the AI Chat Input shall 入力文字列を検索クエリとして既存のページ検索を実行し、候補リストを逐次更新する。
+3. While 検索モードが有効で検索クエリが 1 文字以上ある間, the AI Chat Input shall 直近の入力に対応するページパス候補リストを表示する。
+4. If `@` の直前が空白以外の文字（例: メールアドレスのような文字列の途中）である, then the AI Chat Input shall メンションの検索モードを開始しない。
+5. When ユーザーが検索モード中に対象の `@` シーケンスを削除する, the AI Chat Input shall 検索モードを終了し候補リストを閉じる。
+
+### Requirement 2: 候補リストの表示と操作
+**Objective:** As an AI チャットの利用者, I want 候補リストをキーボードとマウスの両方で操作できる, so that 入力を中断せずに目的のページを選べる
+
+#### Acceptance Criteria
+1. While 候補リストが表示されている間, the AI Chat Input shall 各候補に対象ページのパス（および識別に十分な情報）を表示する。
+2. When ユーザーが上下キーを操作する, the AI Chat Input shall 候補リスト内の選択中項目を移動する。
+3. When ユーザーが選択中項目で確定操作（Enter またはクリック）を行う, the AI Chat Input shall その候補をメンションとして確定する。
+4. When ユーザーが Esc キーを押す、または候補リスト外をクリックする, the AI Chat Input shall メンションを挿入せずに候補リストを閉じる。
+5. While 検索結果を取得中である間, the AI Chat Input shall 読み込み中であることをユーザーに示す。
+6. If 検索クエリに一致するページが存在しない, then the AI Chat Input shall 候補が無いことをユーザーに示す。
+7. The AI Chat Input shall 連続入力に対して過剰な検索要求を抑制し、入力に追従した応答的な候補更新を提供する。
+
+### Requirement 3: ページメンション（rich text）の挿入と視覚的区別
+**Objective:** As an AI チャットの利用者, I want 選択したページが他のテキストと区別できる形で入力欄に挿入される, so that メッセージ内のどこを参照しているか一目で分かる
+
+#### Acceptance Criteria
+1. When ユーザーが候補を確定する, the AI Chat Input shall `@` 以降の検索文字列を、選択したページを表すページメンション要素に置き換える。
+2. The AI Chat Input shall ページメンション要素を、入力された他のテキストとは視覚的に区別できる表示にする。
+3. While ページメンションが入力欄に存在する間, the AI Chat Input shall 当該メンションを他テキストから独立した 1 つのまとまり（原子的な単位）として保持する。
+4. The AI Chat Input shall 1 つのメッセージ内に複数のページメンションを挿入できるようにする。
+
+### Requirement 4: メンションからのページ遷移
+**Objective:** As an AI チャットの利用者, I want 入力欄のメンションをクリックすると対象ページへ遷移できる, so that 参照先の内容をその場で確認できる
+
+#### Acceptance Criteria
+1. When ユーザーが入力欄内のページメンションをクリックする, the AI Chat Input shall 対象ページへ遷移する手段を提供する。
+2. The AI Chat Input shall メンションのクリック操作と、入力欄内でのテキスト編集操作とを区別できるようにする。
+
+### Requirement 5: メンションの編集・削除
+**Objective:** As an AI チャットの利用者, I want メンションをひとまとまりとして編集・削除できる, so that 文字単位で崩れることなく参照を修正できる
+
+#### Acceptance Criteria
+1. When ユーザーがページメンションに対して削除操作（Backspace/Delete 等）を行う, the AI Chat Input shall 当該メンションを 1 単位として削除する。
+2. While ユーザーがメッセージ本文を編集している間, the AI Chat Input shall 既存のページメンションの表示と独立性を維持する。
+
+### Requirement 6: メッセージ送信時の内容
+**Objective:** As an AI チャットの利用者, I want メンションがパス文字列として AI に伝わる, so that AI がどのページを参照先として指定されたかを認識できる
+
+#### Acceptance Criteria
+1. When ユーザーがページメンションを含むメッセージを送信する, the AI Chat Input shall 各メンションを対象ページのパス文字列として、メッセージ本文の該当位置に含めて送信する。
+2. The AI Chat Input shall メッセージ送信時に、参照先ページの**本文（コンテンツ）を付与しない**（送信されるのはパス文字列であり、本文取得・注入は行わない）。
+3. While 送信されたメッセージにページメンションが含まれる場合, the AI Chat Input shall ユーザーが選択した順序・位置どおりにパス文字列を反映する。
+
+### Requirement 7: 検索対象スコープ
+**Objective:** As a GROWI の運用者, I want 候補に表示されるのが利用者の閲覧権限内のページに限られる, so that 権限のないページの存在や情報が漏えいしない
+
+#### Acceptance Criteria
+1. The AI Chat Input shall ページパス候補の取得に既存のページ検索機能を用いる。
+2. While 候補リストを表示する間, the AI Chat Input shall ログインユーザーが閲覧権限を持つページのみを候補として提示する（既存検索機能の権限挙動に準拠する）。
