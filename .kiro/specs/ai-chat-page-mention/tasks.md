@@ -95,3 +95,6 @@
   - キャレットがチップ内部に入らない（境界のみ・単位削除）こと、IME 変換確定 Enter で誤って候補確定/送信が起きないこと（Issue 2）を確認。手順は `apps/app/.claude/skills/app-commands/SKILL.md` の Smoke Testing に従う
   - 観察可能な完了条件: 上記フローと 2 つの挙動が実機で再現確認できる
   - _Requirements: 1.1, 3.3, 5.1, 5.3, 6.1_
+
+## Implementation Notes
+- vitest (esbuild) does NOT typecheck — code that passes `pnpm vitest run` can still fail `tsc`. In CodeMirror tests, an empty `const effects = []` infers as `never[]`; annotate as `StateEffect<{...}>[]`. Run `npx tsc --noEmit -p tsconfig.json | grep PageMentionInput` after each task to catch type-only errors before CI. (from task 2.3/3.1)
