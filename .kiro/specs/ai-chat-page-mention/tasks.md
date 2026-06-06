@@ -57,7 +57,7 @@
   - _Boundary: MentionCandidateList_
   - _Depends: 3.1_
 
-- [ ] 4.2 (P) mention-keymap 拡張
+- [x] 4.2 (P) mention-keymap 拡張
   - `Prec.highest` で `ArrowUp`/`ArrowDown`/`Enter`/`Tab`/`Escape` を bind。セッション中は controller（`moveUp`/`moveDown`/`commit`/`close`）へ委譲、非アクティブ時の `Enter` はホストフォーム `requestSubmit()`、`Shift-Enter` は改行
   - IME 合成ガード: Enter ハンドラは候補確定・送信の両方でまず `view.composing` を確認し、合成中は素通し（`return false`）
   - 観察可能な完了条件: controller モックを用いたテストで「セッション中の ↑↓/Enter/Esc が対応する controller メソッドを呼ぶ」「`view.composing=true` のとき Enter が候補確定・送信のいずれも発火しない」が通る
