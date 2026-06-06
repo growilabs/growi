@@ -194,6 +194,23 @@ describe('useMentionController', () => {
       expect(result.current.highlightedIndex).toBe(0);
     });
 
+    it('stays at 0 when wrapping with a single candidate', () => {
+      setSearchResult({
+        data: buildSearchResult([{ id: 'only', path: '/only' }]),
+        isLoading: false,
+      });
+      const { result } = renderHook(() =>
+        useMentionController(null, activeSession({ query: 'foo' })),
+      );
+
+      // With one candidate, both directions wrap to the single index 0
+      // (guards against modulo-by-1 / off-by-one regressions).
+      act(() => result.current.moveDown());
+      expect(result.current.highlightedIndex).toBe(0);
+      act(() => result.current.moveUp());
+      expect(result.current.highlightedIndex).toBe(0);
+    });
+
     it('setHighlightedIndex sets a valid index and ignores negatives', () => {
       const { result } = withTwoCandidates();
 
@@ -256,13 +273,15 @@ describe('useMentionController', () => {
       view.destroy();
     });
 
-    it('does nothing when there is no candidate', () => {
+    it('does nothing (doc/selection unchanged) when there is no candidate', () => {
       setSearchResult({ data: buildSearchResult([]), isLoading: false });
 
       const view = new EditorView({
-        state: EditorState.create({ doc: '@foo' }),
+        state: EditorState.create({
+          doc: '@foo',
+          selection: EditorSelection.cursor(4),
+        }),
       });
-      const dispatchSpy = vi.spyOn(view, 'dispatch');
 
       const { result } = renderHook(() =>
         useMentionController(view, activeSession({ query: 'foo' })),
@@ -270,7 +289,9 @@ describe('useMentionController', () => {
 
       act(() => result.current.commit());
 
-      expect(dispatchSpy).not.toHaveBeenCalled();
+      // Observable contract: nothing was inserted and the caret did not move.
+      expect(view.state.doc.toString()).toBe('@foo');
+      expect(view.state.selection.main.head).toBe(4);
       view.destroy();
     });
   });

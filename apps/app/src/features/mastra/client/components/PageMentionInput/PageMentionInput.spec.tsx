@@ -89,6 +89,25 @@ describe('PageMentionInput', () => {
 
       expect(view.state.doc.toString()).toBe('');
     });
+
+    it('does NOT reset the doc on a steady empty value (only on the non-empty→empty transition)', () => {
+      // Mount with an empty value; the parent never sets a non-empty value here.
+      const { container, rerender } = render(
+        <PageMentionInput value="" onChange={vi.fn()} />,
+      );
+
+      const view = getView(container);
+      act(() => {
+        view.dispatch({ changes: { from: 0, insert: '/typed' } });
+      });
+      expect(view.state.doc.toString()).toBe('/typed');
+
+      // Re-render with the SAME empty value (no non-empty→empty transition):
+      // editor-driven content must be preserved (guards the prevValue check).
+      rerender(<PageMentionInput value="" onChange={vi.fn()} />);
+
+      expect(view.state.doc.toString()).toBe('/typed');
+    });
   });
 
   describe('lifecycle', () => {

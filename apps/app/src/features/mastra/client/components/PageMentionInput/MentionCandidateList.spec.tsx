@@ -27,6 +27,13 @@ const buildController = (
     highlightedIndex: 0,
     candidates: [],
     isLoading: false,
+    // Explicit no-op spies so each test sees real, assertable callbacks even
+    // when it doesn't override them (rather than relying on auto-stubbing).
+    moveUp: vi.fn(),
+    moveDown: vi.fn(),
+    setHighlightedIndex: vi.fn(),
+    commit: vi.fn(),
+    close: vi.fn(),
     ...overrides,
   });
 
@@ -127,6 +134,30 @@ describe('MentionCandidateList', () => {
       fireEvent.mouseMove(rowB as Element);
 
       expect(setHighlightedIndex).toHaveBeenCalledWith(1);
+    });
+
+    it('scrolls the initially highlighted row into view on first render (2.2)', () => {
+      const scrollIntoView = vi
+        .spyOn(HTMLElement.prototype, 'scrollIntoView')
+        .mockImplementation(() => {});
+
+      render(
+        <MentionCandidateList
+          controller={buildController({
+            query: 'foo',
+            highlightedIndex: 1,
+            candidates: [
+              candidate('id-a', '/foo/a'),
+              candidate('id-b', '/foo/b'),
+            ],
+          })}
+        />,
+      );
+
+      // Even without a highlight *change*, the initially highlighted row must
+      // be brought into view.
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+      scrollIntoView.mockRestore();
     });
 
     it('scrolls the highlighted row into view when the highlight changes (2.2)', () => {
