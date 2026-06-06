@@ -115,7 +115,7 @@ apps/app/src/features/mastra/client/components/PageMentionInput/
 └── editor-state/
     ├── index.ts                      # サブバレル: 拡張ファクトリ createPageMentionExtensions() を公開
     ├── mention-decoration.ts         # MentionWidget(WidgetType) + 装飾StateField + addMention効果 + atomicRanges
-    ├── mention-session.ts            # @トリガ検出・セッションStateField・起動規則(1.4)・終了(1.5)
+    ├── mention-session.ts            # @トリガ検出・セッションStateField・起動規則(1.5)・終了(1.6/1.7)
     ├── mention-keymap.ts             # 高優先度キーマップ: セッション中はNav鍵をcontrollerへ委譲 / Enter送信・Shift+Enter改行
     └── flatten.ts                    # doc → 送信用パス文字列の取得(純関数, 6.1-6.3)
 ```
@@ -144,10 +144,12 @@ sequenceDiagram
     Editor->>Session: トランザクション解析
     Session->>Session: 起動判定(直前が空白/行頭か)
     Session->>Controller: active=true, query="", coords
+    Controller->>List: パネル即時オープン(空クエリ=ヒント表示)
     User->>Editor: "foo" を追記
     Session->>Controller: query="foo"
     Controller->>Search: useSWRxSearch("foo")
     Search-->>List: 候補(権限フィルタ済) / loading / 空
+    Note over Session: 空白入力 or "@"削除でセッション終了(パネル閉)
     User->>Editor: ArrowDown / Enter
     Editor->>Controller: keymap がNav鍵を委譲
     Controller->>List: ハイライト移動 / commit
@@ -170,10 +172,13 @@ sequenceDiagram
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1, 1.2 | `@`起動・逐次検索 | mention-session, use-mention-controller | MentionSessionState, useSWRxSearch | 挿入フロー |
-| 1.3 | 1文字以上で候補表示 | use-mention-controller, MentionCandidateList | — | 挿入フロー |
-| 1.4 | 語境界以外では非起動 | mention-session | isMentionTriggerBoundary() | — |
-| 1.5 | `@`削除でセッション終了 | mention-session | — | 挿入フロー |
+| 1.1 | `@`起動・候補パネル即時オープン | mention-session, PageMentionInput | MentionSessionState | 挿入フロー |
+| 1.2 | 空クエリ時はヒント表示 | MentionCandidateList | — | — |
+| 1.3 | `@`後入力で逐次検索 | mention-session, use-mention-controller | useSWRxSearch | 挿入フロー |
+| 1.4 | 1文字以上で候補表示 | use-mention-controller, MentionCandidateList | — | 挿入フロー |
+| 1.5 | 語境界以外では非起動 | mention-session | isMentionTriggerBoundary() | — |
+| 1.6 | 空白でセッション終了 | mention-session | — | — |
+| 1.7 | `@`削除でセッション終了 | mention-session | — | 挿入フロー |
 | 2.1 | 候補にパス表示 | MentionCandidateList | PagePathCandidate | — |
 | 2.2, 2.3 | ↑↓選択・Enter/クリック確定 | mention-keymap, use-mention-controller | MentionController | 挿入フロー |
 | 2.4 | Esc/外クリックで閉じる | mention-keymap, MentionCandidateList | MentionController.close | — |
@@ -200,9 +205,9 @@ sequenceDiagram
 |-----------|--------------|--------|--------------|------------------|-----------|
 | PageMentionInput | UI adapter | CM 入力リーフ・value 同期・Enter送信・候補配置 | 1.x–6.x | EditorView (P0), useMentionController (P0) | State |
 | MentionCandidateList | UI | 候補表示・loading/該当なし・ハイライト | 2.1,2.4–2.6 | useSWRxSearch (P0) | — |
-| useMentionController | Logic hook | セッション↔候補の橋渡し・検索・確定 | 1.2,1.3,2.2,2.3,2.7,7.x | useSWRxSearch (P0), MentionSessionState (P0) | State |
+| useMentionController | Logic hook | セッション↔候補の橋渡し・検索・確定 | 1.3,1.4,2.2,2.3,2.7,7.x | useSWRxSearch (P0), MentionSessionState (P0) | State |
 | mention-decoration | CM extension | 原子チップ装飾・atomicRanges・クリック遷移 | 3.x,4.x,5.x | @codemirror/view (P0), LinkedPagePath (P1) | State |
-| mention-session | CM extension | `@`起動規則・セッション追跡 | 1.1,1.4,1.5,5.5 | @codemirror/state (P0) | State |
+| mention-session | CM extension | `@`起動規則・セッション追跡 | 1.1,1.5,1.6,1.7,5.5 | @codemirror/state (P0) | State |
 | mention-keymap | CM extension | Nav鍵委譲・Enter送信 | 2.2,2.3,2.4 | @codemirror/view (P0), MentionController (P0) | — |
 | flatten | Pure util | doc→送信パス文字列 | 6.1–6.3 | @codemirror/state (P0) | Service |
 
@@ -248,11 +253,15 @@ export interface PageMentionInputProps {
 | Field | Detail |
 |-------|--------|
 | Intent | アクティブセッションの query に対する候補ドロップダウン（shadcn/Tailwind） |
-| Requirements | 2.1, 2.4, 2.5, 2.6 |
+| Requirements | 1.2, 2.1, 2.4, 2.5, 2.6 |
 
 **Implementation Notes**
 - Integration: `useMentionController` から `query`・`isOpen`・`highlightedIndex`・`coords` を受け取り、`useSWRxSearch(query)` の `data`/`isLoading` を表示。各候補は `IPageWithSearchMeta.data.path`/`._id` を `PagePathCandidate` にマップして描画。確定/閉じるは controller のコールバックを呼ぶ。
-- Validation: `isLoading` 中は loading 行（2.5）、結果空かつ非ローディングは該当なし行（2.6）を表示。
+- Validation（表示状態の出し分け）:
+  - `query` 空（`@` 直後）→ **ヒント行**（例「ページ名を入力して検索」）を表示し検索は実行しない（1.2）。`@` 起動と同時にパネルは開く（1.1）。
+  - `query` 1文字以上 + `isLoading` 中 → loading 行（2.5）。
+  - `query` 1文字以上 + 結果空 → 該当なし行（2.6）。
+  - `query` 1文字以上 + 結果あり → 候補リスト（1.4/2.1）。
 - Risks: キャレット座標追従（スクロール/折返し時）の再計算が必要。`view.coordsAtPos` を使用。
 
 ### CodeMirror Extension Layer
@@ -262,12 +271,13 @@ export interface PageMentionInputProps {
 | Field | Detail |
 |-------|--------|
 | Intent | `@` トリガの検出とメンションセッション状態の追跡 |
-| Requirements | 1.1, 1.4, 1.5, 5.5 |
+| Requirements | 1.1, 1.5, 1.6, 1.7, 5.5 |
 
 **Responsibilities & Constraints**
 - 各トランザクションで、キャレット直前のテキストを走査し `@` + 後続クエリ範囲を判定。
-- **起動規則（1.4）**: `@` の直前が行頭または空白文字のときのみセッション開始。直前が非空白文字（メールアドレス様）では開始しない。
-- セッション状態 `{ active, from, to, query }` を `StateField` で保持し、`@`〜クエリの削除で `active=false`（1.5）。
+- **起動規則（1.1/1.5）**: `@` の直前が行頭または空白文字のときのみセッション開始（`active=true`）。直前が非空白文字（メールアドレス様）では開始しない。起動と同時に候補パネルを開く（クエリ空でも `active=true`）。
+- **クエリ規約**: `query = doc.sliceString(from+1, to)`。クエリは空白を含まない連続文字列。**空白文字の入力でセッション終了**（`active=false`、入力テキストは通常テキストとして残置、1.6）。
+- セッション状態 `{ active, from, to, query }` を `StateField` で保持。`@`〜クエリの削除（1.7）、空白入力（1.6）、確定/Esc/範囲外移動で `active=false`。
 - 確定済みメンション内には新規セッションを張らない（5.5 の一貫性）。
 
 **Contracts**: State [x]
@@ -277,12 +287,12 @@ export interface MentionSessionState {
   readonly active: boolean;
   readonly from: number;   // "@" の位置
   readonly to: number;     // クエリ末尾(=キャレット)
-  readonly query: string;  // "@" 直後の検索文字列
+  readonly query: string;  // "@" 直後の検索文字列(空文字可)
 }
 export const mentionSessionField: StateField<MentionSessionState>;
-export const isMentionTriggerBoundary: (textBefore: string) => boolean; // 1.4 の純判定
+export const isMentionTriggerBoundary: (textBefore: string) => boolean; // 1.5 の純判定
 ```
-- Invariants: `active` のとき `from < to`、`query === doc.sliceString(from+1, to)`。
+- Invariants: `active` のとき `from < to` または `from+1 === to`（クエリ空）。`query === doc.sliceString(from+1, to)` かつ `query` は空白を含まない。
 
 #### mention-decoration
 
@@ -364,14 +374,14 @@ export const getMentionFlattenedText: (state: EditorState) => string; // = doc.t
 - **ピクセル単位のキャレット表示そのものは検証しない** — 「キャレットが境界のみで内部に入らない」(3.3/5.3) は CodeMirror が `atomicRanges` 設定から保証する**ライブラリ挙動**であり、我々は *atomicRanges に当該範囲が登録されていること*（facet 出力＝state レベル）を代理検証する。レンダリング後の実挙動は devcontainer 手動スモークで確認（自動ゲートにはしない）。
 
 ### Unit Tests（Vitest / jsdom, state・command レベル）
-- `isMentionTriggerBoundary`: 行頭/空白後の `@` は起動、非空白後（`foo@`, メール様）は非起動（1.4）。
-- `mention-session`: `@`+入力で `query` 更新（1.2）、`@` 削除で `active=false`（1.5）、確定メンション内で再起動しない（5.5）。
+- `isMentionTriggerBoundary`: 行頭/空白後の `@` は起動、非空白後（`foo@`, メール様）は非起動（1.5）。
+- `mention-session`: 語境界 `@` で `active=true`・`query=""`（即起動、1.1）、`@`+入力で `query` 更新（1.3）、**空白入力で `active=false`**（1.6）、`@` 削除で `active=false`（1.7）、確定メンション内で再起動しない（5.5）。
 - `mention-decoration`（state レベル）: `addMention` 後に decoration 範囲が生成される（3.1/3.4）、`EditorView.atomicRanges` facet が当該範囲を返す（3.3/5.3 の代理検証）、`inclusive:false` で隣接挿入が装飾外＝通常テキスト（5.4）、隣接編集で装飾が `map` され独立維持（5.2）。
 - `mention-decoration`（command レベル）: `EditorView` を jsdom で生成し `deleteCharBackward` 等のコマンドを dispatch、メンション範囲が**単位で消滅**し doc/selection が期待どおりになることを検証（5.1）。レイアウト計測に依存しない範囲に限定。
 - `flatten`: 複数メンションを位置・順序どおりパス文字列化し、ページ本文を含まない（6.1–6.3）。
 
 ### Component Tests（RTL / jsdom）
-- `MentionCandidateList`: query 1文字以上で候補表示（1.3/2.1）、`isLoading` 中 loading 表示（2.5）、空結果で該当なし表示（2.6）、行クリックで commit コールバック発火（2.3）。
+- `MentionCandidateList`: `@` 起動直後の空クエリでヒント行表示・検索未実行（1.1/1.2）、query 1文字以上で候補表示（1.4/2.1）、`isLoading` 中 loading 表示（2.5）、空結果で該当なし表示（2.6）、行クリックで commit コールバック発火（2.3）。
 - `useMentionController` / `PageMentionInput`（DOM 非依存部）: controller の `moveUp/moveDown` で `highlightedIndex` が変化（2.2 のロジック）、`commit` で `addMention` を dispatch しチップ挿入（2.3/3.1）、`close` で候補が閉じる（2.4）、チップ DOM の click で NavCallback 発火（4.1）。
 - `ChatSidebar` 統合: メンション挿入後、隠し `input[name=message]` が flatten 値を保持し、送信で `sendMessage` に**パス文字列を含む text**が渡る（6.1）。
 
