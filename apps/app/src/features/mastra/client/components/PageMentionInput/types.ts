@@ -43,6 +43,8 @@ export interface MentionController {
   // --- operations (called by the keymap / candidate row click) ---
   moveUp(): void;
   moveDown(): void;
+  /** Set the highlighted index directly (e.g. mouse hover from the candidate list). */
+  setHighlightedIndex(index: number): void;
   commit(index?: number): void; // defaults to highlightedIndex
   close(): void;
 }

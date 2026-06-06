@@ -1,10 +1,11 @@
 import { useEffect, useRef } from 'react';
+import Downshift from 'downshift';
 import { useTranslation } from 'react-i18next';
 import SimpleBar from 'simplebar-react';
 
 import { cn } from '~/utils/shadcn-ui';
 
-import type { MentionController } from './types';
+import type { MentionController, PagePathCandidate } from './types';
 
 interface MentionCandidateListProps {
   readonly controller: MentionController;
@@ -15,14 +16,17 @@ interface MentionCandidateListProps {
  *
  * It owns NO search and NO session logic: every value it renders
  * (`isOpen`/`query`/`candidates`/`isLoading`/`highlightedIndex`) is read from the
- * `MentionController`, and every action (commit/close) delegates back to the
- * controller. The 4-state display rule below mirrors the design table
- * (1.1/1.2/1.4/2.1/2.5/2.6).
+ * `MentionController`, and every action delegates back to the controller.
  *
- * Positioning: the panel is anchored to the input box (rendered directly ABOVE
- * it via `bottom-full` inside PageMentionInput's `relative` wrapper), not to the
- * caret pixel. This is the standard chat mention-picker placement and avoids the
- * fragile viewport-vs-container coordinate mismatch of `coordsAtPos`.
+ * Keyboard navigation lives in the CodeMirror keymap (the editor owns focus), so
+ * `downshift` is used here as a CONTROLLED rendering helper only: it provides the
+ * combobox/listbox ARIA wiring, mouse-hover highlighting (synced back via
+ * `setHighlightedIndex`), click selection, and automatic scroll-into-view of the
+ * highlighted item. The `highlightedIndex`/`isOpen` it renders are driven by the
+ * controller; downshift never owns that state.
+ *
+ * Positioning: anchored above the input box (`bottom-full` inside
+ * PageMentionInput's `relative` wrapper) — the standard chat mention placement.
  */
 export const MentionCandidateList = ({
   controller,
@@ -35,18 +39,20 @@ export const MentionCandidateList = ({
   // Points to the currently highlighted row so it can be scrolled into view.
   const highlightedItemRef = useRef<HTMLDivElement | null>(null);
 
-  // Keep the highlighted candidate visible: when the highlight moves past the
-  // visible area of the scrollable list (Arrow key navigation, 2.2), scroll it
-  // into view within the dropdown's own scroll container.
+  // Keep the highlighted candidate visible on keyboard navigation. downshift's
+  // own scroll-into-view targets the getMenuProps element, which is NOT the
+  // scroll container here (SimpleBar's content-wrapper is), so it has no effect.
+  // We scroll the highlighted row's nearest scrollable ancestor (the SimpleBar
+  // wrapper) instead. downshift's internal scroll is disabled below.
   // biome-ignore lint/correctness/useExhaustiveDependencies: scroll only when the highlighted index changes
   useEffect(() => {
     highlightedItemRef.current?.scrollIntoView({ block: 'nearest' });
   }, [highlightedIndex]);
 
   // Pointer dismissal (2.4): a mousedown outside the panel closes the session.
-  // Esc is handled by the keymap (task 4.2); this component only handles the
-  // pointer path. A row click is a separate `mousedown` target inside the panel,
-  // so it never triggers this branch before `commit` runs.
+  // Esc is handled by the keymap (task 4.2); this only handles the pointer path.
+  // A row click is a target inside the panel, so it never triggers this branch
+  // before the click selection runs.
   useEffect(() => {
     if (!isOpen) {
       return;
@@ -75,10 +81,7 @@ export const MentionCandidateList = ({
   return (
     <div
       ref={panelRef}
-      role="listbox"
       data-slot="mention-candidate-list"
-      // Anchored above the input box (the parent is `relative`); opens upward so
-      // it stays visible for a bottom-docked chat input.
       className={cn(
         'tw:absolute tw:bottom-full tw:left-0 tw:z-50 tw:mb-1 tw:w-full tw:max-w-md tw:overflow-hidden',
         'tw:rounded-md tw:border tw:bg-popover tw:text-popover-foreground tw:shadow-md',
@@ -104,41 +107,72 @@ export const MentionCandidateList = ({
       )}
 
       {hasQuery && !isLoading && candidates.length > 0 && (
-        <SimpleBar style={{ maxHeight: '18rem' }} className="tw:p-1">
-          {candidates.map((c, index) => {
-            const highlighted = index === highlightedIndex;
-            return (
-              <div
-                key={c.pageId}
-                ref={highlighted ? highlightedItemRef : null}
-                role="option"
-                aria-selected={highlighted}
-                // tabIndex -1: keeps the row out of the tab order (focus stays
-                // in the editor; arrow-key navigation is delegated to the
-                // CodeMirror keymap) while still allowing programmatic focus.
-                tabIndex={-1}
-                // Commit on click; runs as part of the same press inside the
-                // panel, so outside-close never preempts it (2.3).
-                onClick={() => controller.commit(index)}
-                // Keyboard parity for assistive tech that activates a focused
-                // option directly. Primary navigation remains the keymap (4.2).
-                onKeyDown={(e) => {
-                  if (e.key === 'Enter' || e.key === ' ') {
-                    controller.commit(index);
-                  }
-                }}
-                className={cn(
-                  'tw:flex tw:cursor-pointer tw:items-center tw:rounded-sm tw:px-2 tw:py-1.5 tw:text-sm',
-                  highlighted
-                    ? 'tw:bg-accent tw:text-accent-foreground'
-                    : 'tw:text-foreground',
-                )}
-              >
-                <span className="tw:truncate">{c.path}</span>
-              </div>
-            );
-          })}
-        </SimpleBar>
+        <Downshift<PagePathCandidate>
+          isOpen
+          highlightedIndex={highlightedIndex}
+          selectedItem={null}
+          itemToString={(item) => item?.path ?? ''}
+          // Disable downshift's internal scroll-into-view: it scrolls the
+          // getMenuProps element, but the real scroll container is SimpleBar's
+          // wrapper. Scroll-follow is handled by the effect above instead.
+          scrollIntoView={() => {}}
+          onSelect={(item) => {
+            if (item == null) {
+              return;
+            }
+            const index = candidates.findIndex((c) => c.pageId === item.pageId);
+            if (index >= 0) {
+              controller.commit(index);
+            }
+          }}
+          onStateChange={(changes) => {
+            // Mouse hover moves downshift's highlight; sync it back so keyboard
+            // and pointer share a single highlight (owned by the controller).
+            if (typeof changes.highlightedIndex === 'number') {
+              controller.setHighlightedIndex(changes.highlightedIndex);
+            }
+          }}
+        >
+          {({ getRootProps, getMenuProps, getItemProps }) => (
+            <div {...getRootProps({}, { suppressRefError: true })}>
+              <SimpleBar style={{ maxHeight: '18rem' }} className="tw:p-1">
+                <div {...getMenuProps()}>
+                  {candidates.map((c, index) => {
+                    const highlighted = index === highlightedIndex;
+                    return (
+                      <div
+                        key={c.pageId}
+                        {...getItemProps({ item: c, index })}
+                        ref={highlighted ? highlightedItemRef : null}
+                        role="option"
+                        aria-selected={highlighted}
+                        // tabIndex -1: focus stays in the editor (keyboard nav is
+                        // delegated to the CodeMirror keymap); allows programmatic
+                        // focus and satisfies the focusable-interactive a11y rule.
+                        tabIndex={-1}
+                        // Keyboard parity for assistive tech that activates a
+                        // focused option directly; primary nav remains the keymap.
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            controller.commit(index);
+                          }
+                        }}
+                        className={cn(
+                          'tw:flex tw:cursor-pointer tw:items-center tw:rounded-sm tw:px-2 tw:py-1.5 tw:text-sm',
+                          highlighted
+                            ? 'tw:bg-accent tw:text-accent-foreground'
+                            : 'tw:text-foreground',
+                        )}
+                      >
+                        <span className="tw:truncate">{c.path}</span>
+                      </div>
+                    );
+                  })}
+                </div>
+              </SimpleBar>
+            </div>
+          )}
+        </Downshift>
       )}
     </div>
   );

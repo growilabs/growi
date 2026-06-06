@@ -80,15 +80,34 @@ export const useMentionController = (
     setHighlightedIndex(0);
   }, [candidates]);
 
+  // Arrow navigation wraps around at the ends (circular), the common combobox
+  // behavior (2.2).
   const moveDown = useCallback(() => {
-    setHighlightedIndex((index) =>
-      clamp(index + 1, 0, Math.max(candidates.length - 1, 0)),
-    );
+    setHighlightedIndex((index) => {
+      const n = candidates.length;
+      return n === 0 ? 0 : (index + 1) % n;
+    });
   }, [candidates.length]);
 
   const moveUp = useCallback(() => {
-    setHighlightedIndex((index) => clamp(index - 1, 0, candidates.length - 1));
+    setHighlightedIndex((index) => {
+      const n = candidates.length;
+      return n === 0 ? 0 : (index - 1 + n) % n;
+    });
   }, [candidates.length]);
+
+  // Set the highlight directly (mouse hover from the candidate list). Negative
+  // indices (e.g. downshift reporting "no highlight" on mouse-leave) are ignored
+  // so they don't clear the keyboard highlight; valid indices are clamped.
+  const setHighlight = useCallback(
+    (index: number) => {
+      if (index < 0) {
+        return;
+      }
+      setHighlightedIndex(clamp(index, 0, Math.max(candidates.length - 1, 0)));
+    },
+    [candidates.length],
+  );
 
   const commit = useCallback(
     (index?: number) => {
@@ -151,6 +170,7 @@ export const useMentionController = (
     isLoading: isLoading ?? false,
     moveUp,
     moveDown,
+    setHighlightedIndex: setHighlight,
     commit,
     close,
   };

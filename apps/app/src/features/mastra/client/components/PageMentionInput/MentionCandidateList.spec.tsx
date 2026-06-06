@@ -114,6 +114,24 @@ describe('MentionCandidateList', () => {
       expect(rowB).toHaveAttribute('aria-selected', 'true');
     });
 
+    it('highlights an item on mouse hover via the controller (2.2)', () => {
+      const setHighlightedIndex = vi.fn();
+      const controller = buildController({
+        query: 'foo',
+        highlightedIndex: 0,
+        candidates: [candidate('id-a', '/foo/a'), candidate('id-b', '/foo/b')],
+        setHighlightedIndex,
+      });
+      render(<MentionCandidateList controller={controller} />);
+
+      const rowB = screen.getByText('/foo/b').closest('[role="option"]');
+      expect(rowB).not.toBeNull();
+      // Hovering moves downshift's highlight, synced back to the controller.
+      fireEvent.mouseMove(rowB as Element);
+
+      expect(setHighlightedIndex).toHaveBeenCalledWith(1);
+    });
+
     it('scrolls the highlighted row into view when the highlight changes (2.2)', () => {
       const scrollIntoView = vi
         .spyOn(HTMLElement.prototype, 'scrollIntoView')
@@ -133,7 +151,8 @@ describe('MentionCandidateList', () => {
         />,
       );
 
-      // Move the highlight; the newly highlighted row must be scrolled into view.
+      // Move the highlight; the newly highlighted row scrolls into view (the
+      // SimpleBar wrapper scrolls, since downshift's own scroll is disabled).
       rerender(
         <MentionCandidateList
           controller={buildController({

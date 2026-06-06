@@ -164,29 +164,38 @@ describe('useMentionController', () => {
       );
     };
 
-    it('starts highlighted at 0 and moveDown advances within bounds', () => {
+    it('starts highlighted at 0 and moveDown advances, wrapping at the end', () => {
       const { result } = withTwoCandidates();
       expect(result.current.highlightedIndex).toBe(0);
 
       act(() => result.current.moveDown());
       expect(result.current.highlightedIndex).toBe(1);
 
-      // Clamp at the last index.
+      // Wrap around from the last index back to the first.
       act(() => result.current.moveDown());
-      expect(result.current.highlightedIndex).toBe(1);
+      expect(result.current.highlightedIndex).toBe(0);
     });
 
-    it('moveUp decrements and clamps at 0', () => {
+    it('moveUp decrements, wrapping from the first index to the last', () => {
       const { result } = withTwoCandidates();
 
-      act(() => result.current.moveDown());
+      // Wrap around from the first index to the last.
+      act(() => result.current.moveUp());
       expect(result.current.highlightedIndex).toBe(1);
 
       act(() => result.current.moveUp());
       expect(result.current.highlightedIndex).toBe(0);
+    });
 
-      act(() => result.current.moveUp());
-      expect(result.current.highlightedIndex).toBe(0);
+    it('setHighlightedIndex sets a valid index and ignores negatives', () => {
+      const { result } = withTwoCandidates();
+
+      act(() => result.current.setHighlightedIndex(1));
+      expect(result.current.highlightedIndex).toBe(1);
+
+      // Negative (e.g. downshift "no highlight" on mouse-leave) is ignored.
+      act(() => result.current.setHighlightedIndex(-1));
+      expect(result.current.highlightedIndex).toBe(1);
     });
   });
 
