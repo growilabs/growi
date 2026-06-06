@@ -117,3 +117,24 @@ _対象要件: requirements.md (R1〜R7) / 実施日: 2026-06-06_
 - `@codemirror/autocomplete` の候補メニューを GROWI のデザイン（loading/該当なし表示・キーボード操作）に合わせるためのカスタマイズ範囲。
 - ファイル添付など `prompt-input.tsx` の既存機能を維持したまま入力本体だけを置換できるか（コンポーネント境界の確認）。
 - `ChatSidebar` への i18n 導入とクライアントテスト（RTL）の新設方針。
+
+---
+
+## 設計シンセシス（Design Synthesis） — 2026-06-06
+
+### 1. 一般化（Generalization）
+- R1〜R5 は「`@` 起動 → 検索 → 選択 → 原子トークン挿入」という**単一の合成ワークフロー**の側面。インターフェースは「メンションセッション（過渡状態）」と「メンション装飾（確定状態）」の2状態に一般化し、両者を `MentionController` で疎結合に橋渡しする。実装スコープは本要件（ページメンション）に限定し、汎用メンション（ユーザー等）へは広げない（インターフェースのみ拡張余地を残す）。
+- 送信時変換は `getMentionFlattenedText()` という**単一の変換点**に集約。チップ表現を将来変えても送信仕様（6.x）はこの関数だけで担保。
+
+### 2. Build vs Adopt
+- **Adopt**: 原子トークン挙動（3.3/5.x）は CodeMirror 6 の `Decoration.replace` + `EditorView.atomicRanges` を採用（既存直接依存・実績あり）。検索（7.x）は `useSWRxSearch` を採用。遷移（4.1）は `LinkedPagePath` を採用。→ 新規依存ゼロ。
+- **Build（理由付き）**: 候補ドロップダウン UI は**自前 React/shadcn 実装**を採用。`@codemirror/autocomplete` 単独だと (a) loading 表示（2.5）/該当なし表示（2.6）が困難、(b) shadcn/Tailwind スタイル統一が困難、のため却下。CM autocomplete は起動補助・キーマップ基盤としてのみ部分利用。
+- **Reject**: Lexical/ProseMirror 等の新規リッチエディタは、重量級依存追加・SSR 外部化ルール（tech.md）への影響・CodeMirror との技術二重化により却下。
+
+### 3. 簡素化（Simplification）
+- 当初検討した「imperative な `search-page-paths.ts` フェッチャ」は不要と判断し削除（候補検索は React 側 `useSWRxSearch` に集約）。
+- メンションのデータ表現は `MentionData { path; pageId? }` に最小化。送信・表示・遷移はすべて `path` から導出可能で、`pageId` は任意。
+- doc 本文に**パス文字列そのもの**を保持する設計により、別途「メンション→テキスト」の直列化レイヤを持たず、`doc.toString()` で送信テキストを得る（変換層を1つ削減）。
+
+### 主要リスク（実装順への影響）
+- 最大リスクは「CM 高優先度キーマップ ↔ React ドロップダウンのキー委譲」。実装初期にこの橋渡しのプロトタイプ検証を先行させる（タスク順序で前倒し）。
