@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
+import { useRouter } from 'next/router';
 import { Compartment, EditorState } from '@codemirror/state';
 import { EditorView } from '@codemirror/view';
 
@@ -89,11 +90,15 @@ export const PageMentionInput = ({
   const onChangeRef = useRef(onChange);
   onChangeRef.current = onChange;
 
-  const navigate = useCallback((data: MentionData) => {
-    const { href } = new LinkedPagePath(data.path);
-    // Open in a NEW TAB so the in-progress chat draft is preserved (4.1).
-    window.open(href, '_blank', 'noopener,noreferrer');
-  }, []);
+  const router = useRouter();
+  const navigate = useCallback(
+    (data: MentionData) => {
+      const { href } = new LinkedPagePath(data.path);
+      // Navigate within the SPA via Next.js routing (4.1).
+      router.push(href);
+    },
+    [router],
+  );
 
   // EditorView lifecycle: create once on mount, destroy on unmount. The bridges
   // read refs, so the dep array is intentionally empty (the view is never

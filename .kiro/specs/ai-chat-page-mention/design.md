@@ -445,5 +445,5 @@ export const getMentionFlattenedText: (state: EditorState) => string; // = doc.t
 
 ## Open Questions / Risks
 - **候補 UI のキー委譲**: CM キーマップ（`Prec.highest`）と React ドロップダウンの連携が最大のリスク。代替として `@codemirror/autocomplete` 単独実装も可能だが、loading/該当なし表示（2.5/2.6）と shadcn スタイル要件で本設計（自前ドロップダウン）を採用。実装初期に委譲方式のプロトタイプ検証を推奨。
-- **遷移時の下書き保全（4.1）**: 同タブ遷移は書きかけを失う。`LinkedPagePath` href を新規タブ（`target=_blank` 相当）で開く案を既定とするか、実装時に UX 確認。要件 4.1 は「遷移する手段の提供」までを要求しており、開き方は実装選択。
+- **遷移方式（4.1）: 決定済み — Next.js ルーティング（SPA 同タブ遷移）**。`PageMentionInput` の `onNavigate` は `LinkedPagePath` の href を `useRouter().push(href)` で遷移する（`window.open`/新規タブは不採用）。要件 4.1 は「遷移する手段の提供」までを要求しており、SPA 同タブ遷移を採用。下書き保全は本機能では非対象（必要なら別途）。
 - **パスの区切り**: 空白を含むページパスを送信テキストに含めた際の AI 側可読性。要件 6 は「パス文字列」を要求するため本設計では区切り装飾を付けない（将来拡張余地）。

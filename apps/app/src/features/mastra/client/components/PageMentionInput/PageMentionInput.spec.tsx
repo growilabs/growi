@@ -18,6 +18,12 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// next/router: chip-click navigation uses router.push (SPA navigation, 4.1).
+const { pushMock } = vi.hoisted(() => ({ pushMock: vi.fn() }));
+vi.mock('next/router', () => ({
+  useRouter: () => ({ push: pushMock }),
+}));
+
 /** Query the hidden form field that carries the submitted message text (6.1). */
 const hiddenMessageInput = (): HTMLInputElement | null =>
   document.querySelector('input[name="message"]');
@@ -99,10 +105,8 @@ describe('PageMentionInput', () => {
   });
 
   describe('navigation wiring (4.1)', () => {
-    it('opens the referenced page path in a new tab when a chip is clicked', () => {
-      const openSpy = vi
-        .spyOn(window, 'open')
-        .mockReturnValue(null as unknown as Window);
+    it('navigates to the referenced page path via Next.js routing when a chip is clicked', () => {
+      pushMock.mockClear();
 
       const { container } = render(
         <PageMentionInput value="" onChange={vi.fn()} />,
@@ -122,14 +126,8 @@ describe('PageMentionInput', () => {
       expect(chip).not.toBeNull();
       chip?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
 
-      // New-tab navigation preserves the in-progress chat draft (design default).
-      expect(openSpy).toHaveBeenCalledWith(
-        path,
-        '_blank',
-        expect.stringContaining('noopener'),
-      );
-
-      openSpy.mockRestore();
+      // SPA navigation via Next.js router (not a new tab).
+      expect(pushMock).toHaveBeenCalledWith(path);
     });
   });
 });
