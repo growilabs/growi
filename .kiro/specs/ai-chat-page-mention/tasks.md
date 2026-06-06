@@ -41,7 +41,7 @@
   - _Depends: 1.1_
 
 - [ ] 3. Core: 検索コントローラ
-- [ ] 3.1 useMentionController フック
+- [x] 3.1 useMentionController フック
   - セッション状態↔候補リストの橋渡し。`useSWRxSearch`（debounce 付き、クエリ 1 文字以上で実行）、`highlightedIndex` の `moveUp`/`moveDown`、`commit`（`addMention` を dispatch）、`close`
   - 候補は既存検索 API（権限フィルタ済み）に依拠し、閲覧可能ページのみを提示
   - 観察可能な完了条件: controller テストで「query 1 文字以上で `useSWRxSearch` 呼び出し」「`moveUp`/`moveDown` で index 変化」「`commit` で `addMention` dispatch」「`close` で非アクティブ化」が通る
