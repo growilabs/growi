@@ -359,19 +359,26 @@ export const getMentionFlattenedText: (state: EditorState) => string; // = doc.t
 
 ## Testing Strategy
 
-### Unit Tests（Vitest, 純 CM ロジック）
+**テスト層の方針（Issue 3 対応）**: CodeMirror のキャレット挙動は `EditorView` の DOM レイアウト計測（`coordsAtPos`・縦方向移動）に依存し、jsdom では信頼性が低い。本機能では **Playwright E2E を採用しない**ため、検証は以下の原則で層別する:
+- **state / command レベルに寄せて jsdom（Vitest）で検証する** — 我々が**著述するロジック**（session field、decoration field の内容、`atomicRanges` facet の出力、flatten、コマンド実行後の doc/selection）はレイアウト非依存で安定して検証できる。
+- **ピクセル単位のキャレット表示そのものは検証しない** — 「キャレットが境界のみで内部に入らない」(3.3/5.3) は CodeMirror が `atomicRanges` 設定から保証する**ライブラリ挙動**であり、我々は *atomicRanges に当該範囲が登録されていること*（facet 出力＝state レベル）を代理検証する。レンダリング後の実挙動は devcontainer 手動スモークで確認（自動ゲートにはしない）。
+
+### Unit Tests（Vitest / jsdom, state・command レベル）
 - `isMentionTriggerBoundary`: 行頭/空白後の `@` は起動、非空白後（`foo@`, メール様）は非起動（1.4）。
 - `mention-session`: `@`+入力で `query` 更新（1.2）、`@` 削除で `active=false`（1.5）、確定メンション内で再起動しない（5.5）。
-- `mention-decoration`: `addMention` で replace 装飾と atomicRanges を生成（3.3）、隣接入力が装飾外＝通常テキスト（5.4）、削除で範囲ごと消滅（5.1）、隣接編集で位置 map・独立維持（5.2）。
-- `flatten`: 複数メンションを位置・順序どおりパス文字列化し、本文を含まない（6.1–6.3）。
+- `mention-decoration`（state レベル）: `addMention` 後に decoration 範囲が生成される（3.1/3.4）、`EditorView.atomicRanges` facet が当該範囲を返す（3.3/5.3 の代理検証）、`inclusive:false` で隣接挿入が装飾外＝通常テキスト（5.4）、隣接編集で装飾が `map` され独立維持（5.2）。
+- `mention-decoration`（command レベル）: `EditorView` を jsdom で生成し `deleteCharBackward` 等のコマンドを dispatch、メンション範囲が**単位で消滅**し doc/selection が期待どおりになることを検証（5.1）。レイアウト計測に依存しない範囲に限定。
+- `flatten`: 複数メンションを位置・順序どおりパス文字列化し、ページ本文を含まない（6.1–6.3）。
 
-### Component Tests（RTL）
-- `MentionCandidateList`: query 1文字以上で候補表示（1.3/2.1）、`isLoading` 中 loading 表示（2.5）、空結果で該当なし表示（2.6）。
-- `PageMentionInput`: ↑↓でハイライト移動（2.2）、Enter/クリックで確定しチップ挿入（2.3/3.1/3.2）、Esc/外クリックで非挿入クローズ（2.4）、チップクリックで NavCallback 発火（4.1）、チップ隣接入力が通常テキスト化（5.4）。
-- `ChatSidebar` 統合: メンション挿入後の送信で `sendMessage` に**パス文字列を含む text**が渡る（6.1）。
+### Component Tests（RTL / jsdom）
+- `MentionCandidateList`: query 1文字以上で候補表示（1.3/2.1）、`isLoading` 中 loading 表示（2.5）、空結果で該当なし表示（2.6）、行クリックで commit コールバック発火（2.3）。
+- `useMentionController` / `PageMentionInput`（DOM 非依存部）: controller の `moveUp/moveDown` で `highlightedIndex` が変化（2.2 のロジック）、`commit` で `addMention` を dispatch しチップ挿入（2.3/3.1）、`close` で候補が閉じる（2.4）、チップ DOM の click で NavCallback 発火（4.1）。
+- `ChatSidebar` 統合: メンション挿入後、隠し `input[name=message]` が flatten 値を保持し、送信で `sendMessage` に**パス文字列を含む text**が渡る（6.1）。
 
-### E2E Tests（Playwright, 任意・クリティカルパス）
-- `@`入力 → 候補選択 → チップ表示 → 送信、までの一連フロー（1.1→3.1→6.1）。
+> ↑↓ハイライト移動（2.2）は「キー入力→`coordsAtPos`」ではなく **controller のメソッド呼び出し→state 変化** として検証する（キーマップが鍵を controller へ委譲する設計のため、ロジックは DOM 非依存）。実際のキー伝播はスモークで確認。
+
+### 手動スモーク（devcontainer, 自動ゲート外）
+- `@`入力 → 候補選択 → チップ表示 → 送信、の一連フロー（1.1→3.1→6.1）と、キャレットがチップ内部に入らない・IME 変換確定 Enter で誤送信しない（Issue 2）ことを実機確認。手順は `apps/app/.claude/skills/app-commands/SKILL.md` の Smoke Testing に従う。
 
 > 権限スコープ（7.x）は既存 `/search` の権限フィルタに委譲。本機能では候補取得が当該エンドポイント経由であることを確認するのみで、権限フィルタ自体の再テストは行わない。
 
