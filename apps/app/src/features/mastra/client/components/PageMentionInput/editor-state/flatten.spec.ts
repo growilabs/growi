@@ -1,3 +1,4 @@
+import type { StateEffect } from '@codemirror/state';
 import { EditorSelection, EditorState } from '@codemirror/state';
 
 import type { MentionData } from '../types';
@@ -24,7 +25,11 @@ const buildStateWithMentions = (
   });
 
   let pos = 0;
-  const effects = [];
+  const effects: StateEffect<{
+    from: number;
+    to: number;
+    data: MentionData;
+  }>[] = [];
   for (const seg of segments) {
     const text = typeof seg === 'string' ? seg : seg.path;
     if (typeof seg !== 'string') {
