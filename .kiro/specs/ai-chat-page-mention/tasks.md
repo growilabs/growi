@@ -12,7 +12,7 @@
   - 観察可能な完了条件: 型が公開バレル経由で参照でき、ユニットテストで `IPageWithSearchMeta → PagePathCandidate` 変換（path/id の写像）が検証できる
   - _Requirements: 2.1, 7.1_
 
-- [ ] 1.2 (P) i18n キー追加
+- [x] 1.2 (P) i18n キー追加
   - `pageMention.placeholder` / `pageMention.hint`（空クエリ時の案内）/ `pageMention.searching` / `pageMention.noResults` を既存ロケールリソースに追加
   - 観察可能な完了条件: 追加キーが各ロケールに存在し `useTranslation` で解決できる
   - _Requirements: 1.2, 2.5, 2.6_

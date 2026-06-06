@@ -1137,5 +1137,11 @@
       "docs_color": "색상 상세 정보",
       "docs_alert": "알림 블록 상세 정보"
     }
+  },
+  "pageMention": {
+    "placeholder": "Type a message... ( @ to mention a page )",
+    "hint": "Type a page name to search",
+    "searching": "Searching...",
+    "noResults": "No pages found"
   }
 }

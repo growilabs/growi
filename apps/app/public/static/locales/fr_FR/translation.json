@@ -1170,5 +1170,11 @@
       "docs_color": "En savoir plus sur les Couleurs",
       "docs_alert": "En savoir plus sur les Blocs d'alerte"
     }
+  },
+  "pageMention": {
+    "placeholder": "Type a message... ( @ to mention a page )",
+    "hint": "Type a page name to search",
+    "searching": "Searching...",
+    "noResults": "No pages found"
   }
 }

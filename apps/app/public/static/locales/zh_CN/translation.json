@@ -1183,5 +1183,11 @@
       "docs_color": "了解更多关于颜色的信息",
       "docs_alert": "了解更多关于警告框的信息"
     }
+  },
+  "pageMention": {
+    "placeholder": "Type a message... ( @ to mention a page )",
+    "hint": "Type a page name to search",
+    "searching": "Searching...",
+    "noResults": "No pages found"
   }
 }

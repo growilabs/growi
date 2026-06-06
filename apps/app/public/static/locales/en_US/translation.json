@@ -1177,5 +1177,11 @@
       "docs_color": "Learn more about Colors",
       "docs_alert": "Learn more about Alert Blocks"
     }
+  },
+  "pageMention": {
+    "placeholder": "Type a message... ( @ to mention a page )",
+    "hint": "Type a page name to search",
+    "searching": "Searching...",
+    "noResults": "No pages found"
   }
 }
