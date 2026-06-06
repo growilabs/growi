@@ -13,18 +13,22 @@ interface MentionCandidateListProps {
  * Pure presentational candidate dropdown for the `@` mention session.
  *
  * It owns NO search and NO session logic: every value it renders
- * (`isOpen`/`query`/`candidates`/`isLoading`/`highlightedIndex`/`coords`) is read
- * from the `MentionController`, and every action (commit/close) delegates back to
- * the controller. The 4-state display rule below mirrors the design table
+ * (`isOpen`/`query`/`candidates`/`isLoading`/`highlightedIndex`) is read from the
+ * `MentionController`, and every action (commit/close) delegates back to the
+ * controller. The 4-state display rule below mirrors the design table
  * (1.1/1.2/1.4/2.1/2.5/2.6).
+ *
+ * Positioning: the panel is anchored to the input box (rendered directly ABOVE
+ * it via `bottom-full` inside PageMentionInput's `relative` wrapper), not to the
+ * caret pixel. This is the standard chat mention-picker placement and avoids the
+ * fragile viewport-vs-container coordinate mismatch of `coordsAtPos`.
  */
 export const MentionCandidateList = ({
   controller,
 }: MentionCandidateListProps): JSX.Element | null => {
   const { t } = useTranslation();
 
-  const { isOpen, query, candidates, isLoading, highlightedIndex, coords } =
-    controller;
+  const { isOpen, query, candidates, isLoading, highlightedIndex } = controller;
 
   const panelRef = useRef<HTMLDivElement>(null);
 
@@ -57,21 +61,15 @@ export const MentionCandidateList = ({
 
   const hasQuery = query.length >= 1;
 
-  // Anchor the panel below the caret. Coords may be null in headless/early
-  // states; fall back to the top-left of the positioning context.
-  const style: React.CSSProperties = {
-    left: coords?.left ?? 0,
-    top: coords?.bottom ?? 0,
-  };
-
   return (
     <div
       ref={panelRef}
       role="listbox"
       data-slot="mention-candidate-list"
-      style={style}
+      // Anchored above the input box (the parent is `relative`); opens upward so
+      // it stays visible for a bottom-docked chat input.
       className={cn(
-        'tw:absolute tw:z-50 tw:min-w-64 tw:max-w-md tw:overflow-hidden',
+        'tw:absolute tw:bottom-full tw:left-0 tw:z-50 tw:mb-1 tw:w-full tw:max-w-md tw:overflow-hidden',
         'tw:rounded-md tw:border tw:bg-popover tw:text-popover-foreground tw:shadow-md',
       )}
     >
