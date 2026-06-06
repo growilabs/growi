@@ -49,6 +49,11 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// next/router: PageMentionInput uses useRouter for chip-click SPA navigation.
+vi.mock('next/router', () => ({
+  useRouter: () => ({ push: vi.fn() }),
+}));
+
 /** Locate the live EditorView mounted inside PageMentionInput. */
 const getView = (container: HTMLElement): EditorView => {
   const dom = container.querySelector<HTMLElement>('.cm-editor');

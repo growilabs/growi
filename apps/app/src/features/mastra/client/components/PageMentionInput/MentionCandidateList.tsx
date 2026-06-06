@@ -31,6 +31,16 @@ export const MentionCandidateList = ({
   const { isOpen, query, candidates, isLoading, highlightedIndex } = controller;
 
   const panelRef = useRef<HTMLDivElement>(null);
+  // Points to the currently highlighted row so it can be scrolled into view.
+  const highlightedItemRef = useRef<HTMLDivElement | null>(null);
+
+  // Keep the highlighted candidate visible: when the highlight moves past the
+  // visible area of the scrollable list (Arrow key navigation, 2.2), scroll it
+  // into view within the dropdown's own scroll container.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: scroll only when the highlighted index changes
+  useEffect(() => {
+    highlightedItemRef.current?.scrollIntoView({ block: 'nearest' });
+  }, [highlightedIndex]);
 
   // Pointer dismissal (2.4): a mousedown outside the panel closes the session.
   // Esc is handled by the keymap (task 4.2); this component only handles the
@@ -99,6 +109,7 @@ export const MentionCandidateList = ({
             return (
               <div
                 key={c.pageId}
+                ref={highlighted ? highlightedItemRef : null}
                 role="option"
                 aria-selected={highlighted}
                 // tabIndex -1: keeps the row out of the tab order (focus stays

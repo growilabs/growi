@@ -113,6 +113,40 @@ describe('MentionCandidateList', () => {
       expect(rowA).toHaveAttribute('aria-selected', 'false');
       expect(rowB).toHaveAttribute('aria-selected', 'true');
     });
+
+    it('scrolls the highlighted row into view when the highlight changes (2.2)', () => {
+      const scrollIntoView = vi
+        .spyOn(HTMLElement.prototype, 'scrollIntoView')
+        .mockImplementation(() => {});
+
+      const candidates = [
+        candidate('id-a', '/foo/a'),
+        candidate('id-b', '/foo/b'),
+      ];
+      const { rerender } = render(
+        <MentionCandidateList
+          controller={buildController({
+            query: 'foo',
+            highlightedIndex: 0,
+            candidates,
+          })}
+        />,
+      );
+
+      // Move the highlight; the newly highlighted row must be scrolled into view.
+      rerender(
+        <MentionCandidateList
+          controller={buildController({
+            query: 'foo',
+            highlightedIndex: 1,
+            candidates,
+          })}
+        />,
+      );
+
+      expect(scrollIntoView).toHaveBeenCalledWith({ block: 'nearest' });
+      scrollIntoView.mockRestore();
+    });
   });
 
   describe('commit on row click (2.3)', () => {
