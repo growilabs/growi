@@ -56,6 +56,7 @@
 5. While 検索結果を取得中である間, the AI Chat Input shall 読み込み中であることをユーザーに示す。
 6. If 検索クエリに一致するページが存在しない, then the AI Chat Input shall 候補が無いことをユーザーに示す。
 7. The AI Chat Input shall 連続入力に対して過剰な検索要求を抑制し、入力に追従した応答的な候補更新を提供する。
+8. The AI Chat Input shall 候補リストをキーボードとスクリーンリーダーで操作可能にする（標準的な ARIA コンボボックスパターン: フォーカスを持つ入力欄が `aria-controls`/`aria-activedescendant` でリストボックスとアクティブ候補を指し、リストボックスは role/ラベルを持ち、状態変化は `aria-live` で通知する）。
 
 ### Requirement 3: ページメンション（rich text）の挿入と視覚的区別
 **Objective:** As an AI チャットの利用者, I want 選択したページが他のテキストと区別できる形で入力欄に挿入される, so that メッセージ内のどこを参照しているか一目で分かる

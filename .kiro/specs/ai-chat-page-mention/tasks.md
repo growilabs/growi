@@ -13,9 +13,9 @@
   - _Requirements: 2.1, 7.1_
 
 - [x] 1.2 (P) i18n キー追加
-  - `pageMention.placeholder` / `pageMention.hint`（空クエリ時の案内）/ `pageMention.searching` / `pageMention.noResults` を既存ロケールリソースに追加
-  - 観察可能な完了条件: 追加キーが各ロケールに存在し `useTranslation` で解決できる
-  - _Requirements: 1.2, 2.5, 2.6_
+  - `pageMention.placeholder` / `pageMention.hint`（空クエリ時の案内）/ `pageMention.searching` / `pageMention.noResults` / `pageMention.candidatesLabel`（listbox の aria-label、a11y 対応で後から追加）を既存ロケールリソースに追加
+  - 観察可能な完了条件: 追加キーが各ロケール（en_US/ja_JP/ko_KR/zh_CN/fr_FR）に存在し `useTranslation` で解決できる
+  - _Requirements: 1.2, 2.5, 2.6, 2.8_
 
 - [ ] 2. Core: CodeMirror 拡張（純ロジック層・React 非依存）
 - [x] 2.1 (P) mention-session 拡張
@@ -98,3 +98,4 @@
 
 ## Implementation Notes
 - vitest (esbuild) does NOT typecheck — code that passes `pnpm vitest run` can still fail `tsc`. In CodeMirror tests, an empty `const effects = []` infers as `never[]`; annotate as `StateEffect<{...}>[]`. Run `npx tsc --noEmit -p tsconfig.json | grep PageMentionInput` after each task to catch type-only errors before CI. (from task 2.3/3.1)
+- Post-MVP UI/UX additions (beyond the original tasks, reflected in requirements/design): candidate UI uses `downshift` (controlled) + `simplebar-react` + creator avatar (`@growi/ui` `UserPicture`); commit inserts a trailing space; the editor installs `defaultKeymap` (caret motion / atomic traversal); a11y (Requirement 2.8) adds `mention-aria.ts` (`MENTION_LISTBOX_ID`/`mentionOptionId`), editor `aria-controls`/`aria-activedescendant`, listbox `aria-label` (`pageMention.candidatesLabel`), and `role=status` live regions. Navigation is SPA `router.push`.

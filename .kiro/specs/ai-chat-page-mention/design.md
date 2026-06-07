@@ -117,6 +117,7 @@ apps/app/src/features/mastra/client/components/PageMentionInput/
 ├── MentionCandidateList.tsx          # shadcn 候補ドロップダウン(loading/該当なし/行レンダリング/ハイライト)
 ├── use-mention-controller.ts         # セッション状態↔候補リストの橋渡しフック(検索・選択中index・commit/close)
 ├── types.ts                          # PagePathCandidate / MentionData / MentionSessionState / 公開Props
+├── mention-aria.ts                   # 共有ARIA id (MENTION_LISTBOX_ID / mentionOptionId) — エディタとlistboxの連携用
 └── editor-state/
     ├── index.ts                      # サブバレル: 拡張ファクトリ createPageMentionExtensions() を公開
     ├── mention-decoration.ts         # MentionWidget(WidgetType) + 装飾StateField + addMention効果 + atomicRanges
@@ -127,7 +128,7 @@ apps/app/src/features/mastra/client/components/PageMentionInput/
 
 ### Modified Files
 - `apps/app/src/features/mastra/client/components/ChatSidebar/ChatSidebar.tsx` — 入力リーフを `PromptInputTextarea` → `PageMentionInput` に差し替え。`onChange` を `(value: string) => setInput(value)` に変更（`PageMentionInput` は文字列を直接返す）。送信は従来どおり `PromptInput` の `onSubmit={handleSubmit}` 経路を維持（`PageMentionInput` の Enter が `requestSubmit()` を発火するため ChatSidebar 側の送信配線は変更不要）。新規文言を i18n 化。`PromptInput`/`PromptInputBody`/`PromptInputFooter`/`PromptInputSubmit`/`handleSubmit` は維持。
-- GROWI i18n ロケールリソース — `pageMention.placeholder` / `pageMention.searching` / `pageMention.noResults` 等のキーを追加（既存ロケール配置規約に従う）。
+- GROWI i18n ロケールリソース — `pageMention.placeholder` / `pageMention.hint` / `pageMention.searching` / `pageMention.noResults` / `pageMention.candidatesLabel`（listbox の aria-label）を全 5 ロケール（en_US/ja_JP/ko_KR/zh_CN/fr_FR）に追加。
 
 > 依存方向: `types` → `editor-state/*`(純CM) → `use-mention-controller` → `PageMentionInput`/`MentionCandidateList`(React) → `ChatSidebar`。左方向のみ import。`editor-state/*` は React/SWR に依存しない。
 
@@ -173,6 +174,7 @@ sequenceDiagram
 - メンションは **doc 本文にパス文字列そのものを保持**し、その範囲に `Decoration.replace({ widget })` を重ねてチップ表示する。これにより flatten 用テキストは `doc.toString()` で得られ、パス文字列のみが自然に反映される（6.1/6.2）。
 - 送信テキストは **隠し `input[name=message]`** を介して既存フォーム経路に渡す。CodeMirror はネイティブフォーム要素でないため、flatten 結果をこの隠し input に同期させて `formData.get('message')` で読めるようにする（Issue 1 対応）。
 - セッション中の Nav 鍵（↑↓/Enter/Tab/Esc）は高優先度キーマップが横取りして候補リスト操作へ委譲し、非セッション時の Enter は `requestSubmit()` で送信に割り当てる。
+- **ARIA 同期（a11y）**: セッションがアクティブな間、`PageMentionInput` がエディタの `contentDOM` に `aria-controls`（listbox）と `aria-activedescendant`（ハイライト中の option）を `EditorView.contentAttributes` の Compartment で同期する。`controller.isOpen` / `highlightedIndex` 変化のたびに再構成し、セッション終了で除去。これによりキーボードで候補を辿る際に SR がアクティブ候補を読み上げる。
 
 ## Requirements Traceability
 
@@ -190,6 +192,7 @@ sequenceDiagram
 | 2.4 | Esc/外クリックで閉じる | mention-keymap, MentionCandidateList | MentionController.close | — |
 | 2.5, 2.6 | loading/該当なし表示 | MentionCandidateList, use-mention-controller | MentionController(isLoading/candidates) | — |
 | 2.7 | 過剰検索抑制(debounce) | use-mention-controller | activateOnTypingDelay/debounce | — |
+| 2.8 | キーボード/SR アクセシビリティ | PageMentionInput, MentionCandidateList | aria-controls/activedescendant, listbox role+aria-label, role=status | — |
 | 3.1 | 検索文字列をチップに置換 | mention-decoration, use-mention-controller | addMention 効果 | 挿入フロー |
 | 3.2 | 視覚的区別 | mention-decoration(MentionWidget) | Tailwind チップ | — |
 | 3.3 | 原子的単位として保持 | mention-decoration | EditorView.atomicRanges | — |
@@ -261,14 +264,19 @@ export interface PageMentionInputProps {
 | Field | Detail |
 |-------|--------|
 | Intent | アクティブセッションの query に対する候補ドロップダウン（shadcn/Tailwind） |
-| Requirements | 1.2, 2.1, 2.4, 2.5, 2.6 |
+| Requirements | 1.2, 2.1, 2.4, 2.5, 2.6, 2.8 |
 
 **Implementation Notes**
 - Integration: **純表示コンポーネント**。検索は行わず、`useMentionController` から `isOpen`・`query`・`candidates`・`isLoading`・`highlightedIndex` を読むだけ。各候補（既に `PagePathCandidate` にマップ済み）の**作成者アバター（`@growi/ui` の `UserPicture`、`noLink`/`noTooltip`）+ パス**を表示。確定/閉じる/ハイライト移動は controller のメソッド（`commit`/`close`/`setHighlightedIndex`）を呼ぶ。`useSWRxSearch` は直接呼ばない（検索の所有者は controller・単一所有）。
 - **downshift（controlled 描画ヘルパ）**: `<Downshift>` を controlled モードで使用（`isOpen`/`highlightedIndex`/`selectedItem` は controller から供給）。`getRootProps`/`getMenuProps`/`getItemProps` で ARIA 配線・行クリック・**マウスホバー**（→ `onStateChange` → `controller.setHighlightedIndex`）を得る。状態所有は持たず、キーボード操作は CM キーマップが担う。downshift 内蔵の scroll-into-view は無効化（`scrollIntoView={()=>{}}`）。
 - **スクロール**: `simplebar-react` をスクロールコンテナに使用（`maxHeight`）。ハイライト追従は、ハイライト行 ref への `scrollIntoView({ block: 'nearest' })`（最近接スクロール祖先＝SimpleBar のラッパーをスクロール）で実現。
 - **位置決め**: キャレット座標ではなく、`PageMentionInput` の `relative` ラッパー内で **CSS アンカー（`bottom-full`/`left-0`）により入力欄の真上に配置**する（チャットの定石）。`coordsAtPos` ベースの追従は不採用（`coords` は controller から提供しない）。
-- Validation（表示状態の出し分け）:
+- **アクセシビリティ（ARIA combobox パターン）**: キーボードフォーカスは CM エディタ（textbox）に留まるため、**エディタ側に `aria-controls`／`aria-activedescendant`** を付与してリストボックスと連携する。
+  - listbox（getMenuProps の要素）: `id={MENTION_LISTBOX_ID}`・`role="listbox"`・`aria-label={t('pageMention.candidatesLabel')}`
+  - 各 option: `id={mentionOptionId(index)}`・`role="option"`・`aria-selected={highlighted}`
+  - ステータス行（hint/searching/no-results）: `role="status" aria-live="polite"` で状態変化を SR に通知
+  - 共有 id は `mention-aria.ts`（`MENTION_LISTBOX_ID`／`mentionOptionId`）が提供し、エディタ側（`PageMentionInput`）と listbox 側（本コンポーネント）で同一 id を参照する
+- Validation（表示状態の出し分け。各ステータス行は `role="status" aria-live="polite"`）:
   - `query` 空（`@` 直後）→ **ヒント行**（例「ページ名を入力して検索」）を表示し検索は実行しない（1.2）。`@` 起動と同時にパネルは開く（1.1）。
   - `query` 1文字以上 + `isLoading` 中 → loading 行（2.5）。
   - `query` 1文字以上 + 結果空 → 該当なし行（2.6）。
@@ -307,11 +315,14 @@ export interface MentionController {
   commit(index?: number): void;  // 省略時は highlightedIndex。確定時はパス + 末尾スペースを挿入
   close(): void;
 }
-export const useMentionController: (view: EditorView | null) => MentionController;
+export const useMentionController: (
+  view: EditorView | null,
+  session: MentionSessionState,
+) => MentionController;
 ```
 
 ##### State Management（双方向ブリッジ機構）
-- **CM → React（状態の取り込み）**: `PageMentionInput` が `createPageMentionExtensions` に `EditorView.updateListener` を組み込み、各トランザクションで `mentionSessionField` の値（active/from/to/query）を React state へ push する。`useMentionController` はこの session state を入力に `query` を `useSWRxSearch` へ渡す。CM の doc/selection が**正本**、React state は派生。
+- **CM → React（状態の取り込み）**: `PageMentionInput` が `createPageMentionExtensions` に `EditorView.updateListener` を組み込み、各トランザクションで `mentionSessionField` の値（active/from/to/query）を React state へ push する。`PageMentionInput` は **`view` と `session`（その React state）の両方を `useMentionController(view, session)` に渡し**、フックはこの session を入力に `query` を `useSWRxSearch` へ渡す。CM の doc/selection が**正本**、React state は派生。
 - **React → CM（操作の呼び出し）**: `commit`/`moveUp` 等は最新の controller を参照する必要があるため、controller のメソッドを **stable ref**（`useRef` で保持し毎レンダー更新）に格納する。`mention-keymap` は値ではなく **ref を保持する Facet** 経由で呼び出すことで、エディタ生成時に固定された stale クロージャを避ける（Issue 1）。
 - **位置決め（Issue 2 の決着）**: 候補パネルの配置は **CSS アンカー（`bottom-full`/`left-0` で入力欄の真上）** で行う。当初検討した `coordsAtPos` ベースのキャレット追従は不採用とし、`MentionController` から `coords` は提供しない（デッドコード化を避けるため削除済み）。
 - Concurrency: 検索は SWR がキャッシュ/重複排除。`highlightedIndex` は候補数変化時に範囲内へクランプ。
