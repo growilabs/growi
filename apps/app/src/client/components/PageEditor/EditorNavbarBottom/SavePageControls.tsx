@@ -17,8 +17,10 @@ import {
   UncontrolledButtonDropdown,
 } from 'reactstrap';
 
+import { UserGroupPageGrantStatus } from '~/interfaces/page';
 import {
   useCurrentPageData,
+  useCurrentPageId,
   useCurrentPagePath,
   useIsEditable,
 } from '~/states/page';
@@ -35,6 +37,7 @@ import {
   useWaitingSaveProcessing,
 } from '~/states/ui/editor';
 import { useSWRxSlackChannels } from '~/stores/editor';
+import { useSWRxCurrentGrantData } from '~/stores/page';
 import loggerFactory from '~/utils/logger';
 
 import { NotAvailable } from '../../NotAvailable';
@@ -227,6 +230,33 @@ export const SavePageControls = (): JSX.Element | null => {
       setIsSlackEnabled(false);
     }
   }, [editorMode, setIsSlackEnabled, slackChannelsDataString]);
+
+  // Initialize selectedGrantAtom from the current page's grant data.
+  // This must be done at SavePageControls level (always mounted) rather than
+  // inside GrantSelector, which on mobile is rendered only within a closed Modal
+  // and therefore never mounts — leaving selectedGrantAtom at its GRANT_PUBLIC default.
+  const currentPageId = useCurrentPageId();
+  const { data: grantData } = useSWRxCurrentGrantData(currentPageId);
+  const [, setSelectedGrant] = useSelectedGrant();
+
+  const applyCurrentPageGrantToSelectedGrant = useCallback(() => {
+    const currentPageGrant = grantData?.grantData.currentPageGrant;
+    if (currentPageGrant == null) return;
+
+    const userRelatedGrantedGroups =
+      currentPageGrant.groupGrantData?.userRelatedGroups
+        .filter((group) => group.status === UserGroupPageGrantStatus.isGranted)
+        ?.map((group) => ({ item: group.id, type: group.type })) ?? [];
+
+    setSelectedGrant({
+      grant: currentPageGrant.grant,
+      userRelatedGrantedGroups,
+    });
+  }, [grantData?.grantData.currentPageGrant, setSelectedGrant]);
+
+  useEffect(() => {
+    applyCurrentPageGrantToSelectedGrant();
+  }, [applyCurrentPageGrantToSelectedGrant]);
 
   const slackChannelsChangedHandler = useCallback((slackChannels: string) => {
     setSlackChannels(slackChannels);
