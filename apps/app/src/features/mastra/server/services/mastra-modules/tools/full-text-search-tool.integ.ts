@@ -149,7 +149,7 @@ describe('fullTextSearchTool (integration, dummy delegator)', () => {
 
   beforeAll(async () => {
     crowi = await getInstance();
-    searchService = new SearchService(crowi);
+    searchService = await SearchService.create(crowi);
 
     // The real SearchService constructor short-circuits its delegator setup
     // when the Elasticsearch URI config is unset, leaving
