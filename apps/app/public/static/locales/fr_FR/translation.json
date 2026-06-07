@@ -1171,10 +1171,10 @@
     }
   },
   "pageMention": {
-    "placeholder": "Type a message... ( @ to mention a page )",
-    "hint": "Type a page name to search",
-    "searching": "Searching...",
-    "noResults": "No pages found",
-    "candidatesLabel": "Page candidates"
+    "placeholder": "Saisissez un message... ( @ pour mentionner une page )",
+    "hint": "Saisissez un nom de page pour rechercher",
+    "searching": "Recherche en cours...",
+    "noResults": "Aucune page trouvée",
+    "candidatesLabel": "Pages suggérées"
   }
 }

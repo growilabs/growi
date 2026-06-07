@@ -1184,10 +1184,10 @@
     }
   },
   "pageMention": {
-    "placeholder": "Type a message... ( @ to mention a page )",
-    "hint": "Type a page name to search",
-    "searching": "Searching...",
-    "noResults": "No pages found",
-    "candidatesLabel": "Page candidates"
+    "placeholder": "输入消息...（ 输入 @ 提及页面 ）",
+    "hint": "输入页面名称进行搜索",
+    "searching": "搜索中...",
+    "noResults": "未找到页面",
+    "candidatesLabel": "页面候选"
   }
 }
