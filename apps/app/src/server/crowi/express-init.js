@@ -10,6 +10,7 @@ import {
 } from '../../features/growi-plugin/server/consts';
 import loggerFactory from '../../utils/logger';
 import CertifyOrigin from '../middlewares/certify-origin';
+import { denyUploadsDirectAccess } from '../middlewares/deny-uploads-direct-access';
 import registerSafeRedirectFactory from '../middlewares/safe-redirect';
 
 const logger = loggerFactory('growi:crowi:express-init');
@@ -92,6 +93,11 @@ module.exports = (crowi, app) => {
   app.set('port', crowi.port);
 
   const staticOption = crowi.node_env === 'production' ? { maxAge: '30d' } : {};
+  // Deny direct access to uploaded files (publicDir/uploads/**) BEFORE static
+  // serving. Uploads must be served only via the /attachment and /download
+  // routes, which apply authorization, Content-Disposition and CSP headers.
+  // see: src/server/middlewares/deny-uploads-direct-access.ts
+  app.use('/uploads', denyUploadsDirectAccess);
   app.use(express.static(crowi.publicDir, staticOption));
   app.use(
     '/static/preset-themes',
