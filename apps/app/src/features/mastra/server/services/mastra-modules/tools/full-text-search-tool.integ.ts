@@ -151,7 +151,7 @@ describe('fullTextSearchTool (integration, dummy delegator)', () => {
     crowi = await getInstance();
     searchService = await SearchService.create(crowi);
 
-    // The real SearchService constructor short-circuits its delegator setup
+    // SearchService.create short-circuits its delegator setup
     // when the Elasticsearch URI config is unset, leaving
     // `nqDelegators[DEFAULT]` undefined and `isElasticsearchEnabled === false`.
     // For these tests we want to exercise the real `searchKeyword` dispatch

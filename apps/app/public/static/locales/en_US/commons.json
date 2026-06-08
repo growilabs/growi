@@ -148,7 +148,6 @@
         "user_group_management": "Grants permission to view user group management.",
         "audit_log": "Grants permission to view audit logs.",
         "plugin": "Grants permission to view plugin settings.",
-        "ai_integration": "Grants permission to view AI integration settings.",
         "full_text_search": "Grants permission to view full text search management."
       },
       "user_settings": {
@@ -166,7 +165,7 @@
       },
       "features": {
         "all": "Grants permission to view features.",
-        "ai_assistant": "Grants permission to view AI assistant features.",
+        "ai": "Grants permission to view AI assistant features.",
         "page": "Grants permission to view page features.",
         "share_link": "Grants permission to view share link features.",
         "bookmark": "Grants permission to view bookmark features.",
@@ -194,7 +193,6 @@
         "user_group_management": "Grants permission to edit user group management.",
         "audit_log": "Grants permission to edit audit logs.",
         "plugin": "Grants permission to edit plugin settings.",
-        "ai_integration": "Grants permission to edit AI integration settings.",
         "full_text_search": "Grants permission to edit full text search management."
       },
       "user_settings": {
@@ -212,7 +210,7 @@
       },
       "features": {
         "all": "Grants permission to edit features.",
-        "ai_assistant": "Grants permission to edit AI assistant features.",
+        "ai": "Grants permission to edit AI assistant features.",
         "page": "Grants permission to edit page features.",
         "share_link": "Grants permission to edit share link features.",
         "bookmark": "Grants permission to edit bookmark features.",
@@ -220,6 +218,37 @@
         "page_bulk_export": "Grants permission to edit page bulk export features.",
         "in_app_notification": "Grants permission to edit in-app notification features."
       }
+    }
+  },
+  "growi-vault": {
+    "reconcile": {
+      "section": {
+        "title": "Reconcile"
+      },
+      "rejected": {
+        "invalid-target": "Invalid target path specified.",
+        "bootstrap-not-done": "Vault is not ready. Please wait for bootstrap to complete and try again.",
+        "page-count-exceeds-user-limit": "The target contains too many pages. Please narrow the scope or ask an administrator to run the reconcile.",
+        "page-count-exceeds-admin-limit": "The target contains too many pages. Please narrow the scope or consider using VAULT_BOOTSTRAP_ON_START=force for a full re-bootstrap.",
+        "user-concurrency-limit": "You already have a reconcile in progress. Please wait for it to complete before starting another.",
+        "system-concurrency-limit": "The system reconcile limit has been reached. Please wait for a reconcile to complete before starting another."
+      },
+      "accepted": {
+        "message": "Reconcile started successfully."
+      },
+      "target-type": {
+        "legend": "Target Type",
+        "page": "Page (single page only)",
+        "sub-tree": "Sub-tree (page and all descendants)"
+      },
+      "target-path": {
+        "label": "Target Path"
+      },
+      "submit": {
+        "submitting": "Submitting…",
+        "start": "Start Reconcile"
+      },
+      "cancel": "Cancel"
     }
   }
 }

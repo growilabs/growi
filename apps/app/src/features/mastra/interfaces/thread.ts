@@ -1,25 +1,12 @@
 import type { StorageThreadType } from '@mastra/core/memory';
 import type { PaginationInfo } from '@mastra/core/storage';
 
-export type ThreadWithMeta = Omit<StorageThreadType, 'metadata'> & {
-  metadata: {
-    aiAssistantId: string;
-  };
-};
-
-export const isThreadWithMeta = (
-  thread: StorageThreadType,
-): thread is ThreadWithMeta => {
-  return (
-    thread.metadata != null &&
-    typeof thread.metadata === 'object' &&
-    'aiAssistantId' in thread.metadata &&
-    typeof thread.metadata.aiAssistantId === 'string'
-  );
-};
+// Threads are assistant-independent (Mastra's StorageThreadType is used directly).
+// Legacy threads may still carry an `aiAssistantId` surplus field in metadata; it
+// is simply ignored — never required nor written for new threads.
 
 export type ThreadListOutput = PaginationInfo & {
-  threads: ThreadWithMeta[];
+  threads: StorageThreadType[];
 };
 
 export type IApiv3GetThreadsParams = {

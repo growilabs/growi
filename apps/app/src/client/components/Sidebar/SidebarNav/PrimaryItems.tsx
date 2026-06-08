@@ -42,10 +42,10 @@ export const PrimaryItems = memo((props: Props) => {
     return <></>;
   }
 
-  const aiAssistantNotAvailableTitle = (
+  const aiUnavailableTitle = (
     <>
       <p className="mb-2">
-        {t('default_ai_assistant.open_cloud_settings_to_enable')}
+        {t('ai_unavailable.open_cloud_settings_to_enable')}
       </p>
       <a href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}>
         <span
@@ -54,7 +54,7 @@ export const PrimaryItems = memo((props: Props) => {
         >
           share
         </span>
-        {t('default_ai_assistant.to_cloud_settings')}
+        {t('ai_unavailable.to_cloud_settings')}
       </a>
     </>
   );
@@ -105,23 +105,19 @@ export const PrimaryItems = memo((props: Props) => {
       {isAiEnabled ? (
         <PrimaryItem
           sidebarMode={sidebarMode}
-          contents={SidebarContentsType.AI_ASSISTANT}
-          label="AI Assistant"
+          contents={SidebarContentsType.AI}
+          label="AI Chat"
           iconName="growi_ai"
           isCustomIcon
           onHover={onItemHover}
         />
       ) : (
         isCloud && (
-          <NotAvailable
-            isDisabled
-            title={aiAssistantNotAvailableTitle}
-            placement="right"
-          >
+          <NotAvailable isDisabled title={aiUnavailableTitle} placement="right">
             <PrimaryItem
               sidebarMode={sidebarMode}
-              contents={SidebarContentsType.AI_ASSISTANT}
-              label="AI Assistant"
+              contents={SidebarContentsType.AI}
+              label="AI Chat"
               iconName="growi_ai"
               isCustomIcon
             />

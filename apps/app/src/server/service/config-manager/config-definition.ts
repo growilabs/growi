@@ -75,9 +75,28 @@ export const CONFIG_KEYS = [
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
   'app:wipPageExpirationSeconds',
-  'app:openaiThreadDeletionCronMaxMinutesUntilRequest',
-  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
   'app:isReadOnlyForNewUser',
+  'app:vaultEnabled',
+  'app:vaultManagerEndpoint',
+  'app:vaultManagerInternalSecret',
+  'app:vaultBootstrapOnStart',
+  'app:vaultBootstrapRetryMax',
+  'app:vaultBootstrapRetryBaseMs',
+  'app:vaultBootstrapRetryMaxMs',
+  'app:vaultBootstrapHeartbeatIntervalMs',
+  'app:vaultBootstrapHeartbeatStaleMs',
+  'app:vaultBootstrapRetryDisabled',
+  'app:vaultDriftDetectionIntervalMs',
+  'app:vaultDriftMaxPagesPerTick',
+  'app:vaultDriftDetectionDisabled',
+  'app:vaultReconcileMaxPagesPerUserRequest',
+  'app:vaultReconcileMaxPagesPerAdminRequest',
+  'app:vaultReconcileMaxConcurrentPerUser',
+  'app:vaultReconcileMaxConcurrentSystem',
+  'app:vaultReconcileChunkSize',
+  'app:vaultReconcileHistoryRetentionDays',
+  'app:vaultReconcileRejectWhenBootstrapNotDone',
+  'app:vaultReconcileAdminBypassCapacityLimit',
 
   // Content-Disposition settings for MIME types
   'attachments:contentDisposition:inlineMimeTypes',
@@ -264,16 +283,7 @@ export const CONFIG_KEYS = [
   // OpenAI Settings
   'openai:serviceType',
   'openai:apiKey',
-  'openai:assistantModel:chat',
-  'openai:assistantModel:edit',
   'openai:assistantModel:mastraAgent',
-  'openai:threadDeletionCronExpression',
-  'openai:threadDeletionBarchSize',
-  'openai:threadDeletionApiCallInterval',
-  'openai:vectorStoreFileDeletionCronExpression',
-  'openai:vectorStoreFileDeletionBarchSize',
-  'openai:vectorStoreFileDeletionApiCallInterval',
-  'openai:limitLearnablePageCountPerAssistant',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -519,18 +529,97 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'WIP_PAGE_EXPIRATION_SECONDS',
     defaultValue: 172800,
   }),
-  'app:openaiThreadDeletionCronMaxMinutesUntilRequest': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
-    defaultValue: 30,
-  }),
-  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest':
-    defineConfig<number>({
-      envVarName:
-        'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
-      defaultValue: 30,
-    }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
+    defaultValue: false,
+  }),
+  // Vault Settings
+  // Note: app:vaultManagerEndpoint and app:vaultManagerInternalSecret are read
+  // from environment variables only — the VaultSettingsService must use ConfigSource.env.
+  'app:vaultEnabled': defineConfig<boolean>({
+    envVarName: 'VAULT_ENABLED',
+    defaultValue: false,
+  }),
+  'app:vaultManagerEndpoint': defineConfig<string | undefined>({
+    envVarName: 'VAULT_MANAGER_ENDPOINT',
+    defaultValue: undefined,
+  }),
+  'app:vaultManagerInternalSecret': defineConfig<string | undefined>({
+    envVarName: 'VAULT_MANAGER_INTERNAL_SECRET',
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'app:vaultBootstrapOnStart': defineConfig<'true' | 'false' | 'force'>({
+    envVarName: 'VAULT_BOOTSTRAP_ON_START',
+    defaultValue: 'false',
+    isSecret: false,
+  }),
+  'app:vaultBootstrapRetryMax': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX',
+    defaultValue: 5,
+  }),
+  'app:vaultBootstrapRetryBaseMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_BASE_MS',
+    defaultValue: 30_000,
+  }),
+  'app:vaultBootstrapRetryMaxMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX_MS',
+    defaultValue: 1_800_000, // 30 * 60_000
+  }),
+  'app:vaultBootstrapHeartbeatIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_INTERVAL_MS',
+    defaultValue: 10_000,
+  }),
+  'app:vaultBootstrapHeartbeatStaleMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_STALE_MS',
+    defaultValue: 60_000,
+  }),
+  'app:vaultBootstrapRetryDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultDriftDetectionIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_DETECTION_INTERVAL_MS',
+    defaultValue: 300_000, // 5 * 60_000
+  }),
+  'app:vaultDriftMaxPagesPerTick': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_MAX_PAGES_PER_TICK',
+    defaultValue: 10_000,
+  }),
+  'app:vaultDriftDetectionDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_DRIFT_DETECTION_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultReconcileMaxPagesPerUserRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_USER_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxPagesPerAdminRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_ADMIN_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxConcurrentPerUser': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_PER_USER',
+    defaultValue: 1,
+  }),
+  'app:vaultReconcileMaxConcurrentSystem': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_SYSTEM',
+    defaultValue: 3,
+  }),
+  'app:vaultReconcileChunkSize': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_CHUNK_SIZE',
+    defaultValue: 100,
+  }),
+  'app:vaultReconcileHistoryRetentionDays': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_HISTORY_RETENTION_DAYS',
+    defaultValue: 30,
+  }),
+  'app:vaultReconcileRejectWhenBootstrapNotDone': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_REJECT_WHEN_BOOTSTRAP_NOT_DONE',
+    defaultValue: true,
+  }),
+  'app:vaultReconcileAdminBypassCapacityLimit': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_ADMIN_BYPASS_CAPACITY_LIMIT',
     defaultValue: false,
   }),
 
@@ -1164,47 +1253,11 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
     isSecret: true,
   }),
-  'openai:assistantModel:chat': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_CHAT_ASSISTANT_MODEL',
-    defaultValue: 'gpt-4.1-mini',
-  }),
-  'openai:assistantModel:edit': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_EDITOR_ASSISTANT_MODEL',
-    defaultValue: 'gpt-4.1-mini',
-  }),
   // Reasoning-capable model for the Mastra agent. Emits reasoning summary
   // chunks consumed by the AI Elements Reasoning UI in the chat sidebar.
   'openai:assistantModel:mastraAgent': defineConfig<OpenAI.Chat.ChatModel>({
     envVarName: 'OPENAI_MASTRA_AGENT_MODEL',
     defaultValue: 'o4-mini',
-  }),
-  'openai:threadDeletionCronExpression': defineConfig<string>({
-    envVarName: 'OPENAI_THREAD_DELETION_CRON_EXPRESSION',
-    defaultValue: '0 * * * *',
-  }),
-  'openai:threadDeletionBarchSize': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_BARCH_SIZE',
-    defaultValue: 100,
-  }),
-  'openai:threadDeletionApiCallInterval': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_API_CALL_INTERVAL',
-    defaultValue: 36000,
-  }),
-  'openai:vectorStoreFileDeletionCronExpression': defineConfig<string>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_EXPRESSION',
-    defaultValue: '0 * * * *',
-  }),
-  'openai:vectorStoreFileDeletionBarchSize': defineConfig<number>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_BARCH_SIZE',
-    defaultValue: 100,
-  }),
-  'openai:vectorStoreFileDeletionApiCallInterval': defineConfig<number>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_API_CALL_INTERVAL',
-    defaultValue: 36000,
-  }),
-  'openai:limitLearnablePageCountPerAssistant': defineConfig<number>({
-    envVarName: 'OPENAI_LIMIT_LEARNABLE_PAGE_COUNT_PER_ASSISTANT',
-    defaultValue: 3000,
   }),
 
   // OpenTelemetry Settings

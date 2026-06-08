@@ -42,6 +42,10 @@ import {
 } from '../../status/chat-sidebar';
 import { useSWRxMessages } from '../../stores/message';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
+import {
+  buildMessageRequestBody,
+  resolveChatHeaderLabel,
+} from './chat-sidebar-helpers';
 
 import styles from './ChatSidebar.module.scss';
 
@@ -64,7 +68,12 @@ export const ChatSidebar = (): JSX.Element => {
 
   const { data: savedMessages } = useSWRxMessages(threadId);
   const swrInfiniteThreads = useSWRINFxRecentThreads();
-  const { mutate: mutateRecentThreads } = swrInfiniteThreads;
+  const { data: threadPages, mutate: mutateRecentThreads } = swrInfiniteThreads;
+
+  const headerLabel = resolveChatHeaderLabel(
+    chatThreadId,
+    threadPages?.flatMap((page) => page.threads) ?? [],
+  );
 
   const { messages, sendMessage, status, regenerate, setMessages } = useChat({
     id: chatThreadId,
@@ -111,10 +120,7 @@ export const ChatSidebar = (): JSX.Element => {
         text: message.text || 'Hello World',
       },
       {
-        body: {
-          aiAssistantId: chatSidebarStatus?.aiAssistantData?._id,
-          threadId: chatThreadId,
-        },
+        body: buildMessageRequestBody(chatThreadId),
       },
     );
     setInput('');
@@ -127,9 +133,9 @@ export const ChatSidebar = (): JSX.Element => {
       <div className="tw:max-w-4xl tw:mx-auto tw:p-6 tw:relative tw:size-full twh-screen">
         <div className="tw:flex tw:flex-col tw:h-full">
           <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:pb-2 tw:border-b tw:border-border">
-            <span className="growi-custom-icons fs-4">ai_assistant</span>
+            <span className="growi-custom-icons fs-4">ai_chat</span>
             <span className="tw:flex-1 tw:font-semibold tw:truncate">
-              {chatSidebarStatus.aiAssistantData?.name ?? 'AI Assistant'}
+              {headerLabel}
             </span>
             <button
               type="button"

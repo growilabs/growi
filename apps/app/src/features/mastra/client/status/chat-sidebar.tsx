@@ -1,28 +1,34 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { AiAssistantHasId } from '~/features/openai/interfaces/ai-assistant';
-// import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
-
 /**
  * Type definition for Chat Sidebar status
  */
 export type ChatSidebarStatus = {
   isOpened: boolean;
-  isEditorAssistant?: boolean;
-  aiAssistantData?: AiAssistantHasId;
   threadId?: string;
+  /**
+   * Monotonically increasing counter bumped on every `openChat()` call.
+   *
+   * A new chat carries no `threadId`, so consumers cannot distinguish one new
+   * chat from the next by id alone. This sequence lets the chat sidebar force a
+   * fresh mount (and thus a freshly minted session thread id) every time the
+   * user starts a new chat, even back-to-back.
+   */
+  openSeq: number;
 };
 
 /**
  * Type definition for Chat Sidebar actions
  */
 export type ChatSidebarActions = {
-  openChat: (aiAssistantData: AiAssistantHasId, threadId?: string) => void;
-  openEditor: () => void;
+  /**
+   * Open the chat sidebar.
+   * @param threadId - Optional thread id to resume an existing thread.
+   *                    Omit to start a fresh chat.
+   */
+  openChat: (threadId?: string) => void;
   close: () => void;
-  // refreshAiAssistantData: (aiAssistantData?: AiAssistantHasId) => void;
-  // refreshThreadData: (threadData?: IThreadRelationHasId) => void;
 };
 
 /**
@@ -30,6 +36,7 @@ export type ChatSidebarActions = {
  */
 const chatSidebarAtom = atom<ChatSidebarStatus>({
   isOpened: false,
+  openSeq: 0,
 });
 
 /**
@@ -48,52 +55,26 @@ export const useChatSidebarActions = (): ChatSidebarActions => {
   const setSidebar = useSetAtom(chatSidebarAtom);
 
   const openChat = useCallback(
-    (aiAssistantData: AiAssistantHasId, threadId?: string) => {
-      setSidebar({ isOpened: true, aiAssistantData, threadId });
+    (threadId?: string) => {
+      setSidebar((prev) => ({
+        isOpened: true,
+        threadId,
+        openSeq: prev.openSeq + 1,
+      }));
     },
     [setSidebar],
   );
 
-  const openEditor = useCallback(() => {
-    setSidebar({
-      isOpened: true,
-      isEditorAssistant: true,
-      aiAssistantData: undefined,
-    });
-  }, [setSidebar]);
-
   const close = useCallback(() => {
-    setSidebar({
+    setSidebar((prev) => ({
       isOpened: false,
-      isEditorAssistant: false,
-      aiAssistantData: undefined,
       threadId: undefined,
-    });
+      openSeq: prev.openSeq,
+    }));
   }, [setSidebar]);
-
-  // const refreshAiAssistantData = useCallback(
-  //   (aiAssistantData?: AiAssistantHasId) => {
-  //     setSidebar((currentState) => {
-  //       return { ...currentState, aiAssistantData };
-  //     });
-  //   },
-  //   [setSidebar],
-  // );
-
-  // const refreshThreadData = useCallback(
-  //   (threadData?: IThreadRelationHasId) => {
-  //     setSidebar((currentState) => {
-  //       return { ...currentState, threadData };
-  //     });
-  //   },
-  //   [setSidebar],
-  // );
 
   return {
     openChat,
-    openEditor,
     close,
-    // refreshAiAssistantData,
-    // refreshThreadData,
   };
 };

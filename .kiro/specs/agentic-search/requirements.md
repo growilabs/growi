@@ -1,5 +1,7 @@
 # Requirements Document
 
+> **更新メモ（vectorStore 廃止後）**: 本 spec 完了後、AI のベクトルストア（OpenAI Files / vectorStore）依存が廃止された。これに伴い、本 spec が「暫定無効化（ソース残置）」「最終削除はフォローアップ」としていた `fileSearchTool` とそのソースファイルは**削除済み**であり、`MastraRequestContextShape` および `post-message.ts` の `requestContext` から `vectorStoreId` も**削除済み**。以降、本文中の `fileSearchTool` ／ `vectorStoreId` に関する記述（特に Requirement 4「暫定無効化」やリクエストコンテキストへの `vectorStoreId` 伝搬）は策定当時の記録であり、現状の実装ではない。現在の `growiAgent` の tools は `fullTextSearchTool` と `getPageContentTool` の 2 本のみ。
+
 ## Project Description (Input)
 
 GROWI のユーザーは「自然言語で問いを投げて根拠つきの回答を得る」体験を必要としているが、現在の全文検索はキーワード一致のリストを返すまでで止まっており、AI assistant 側にも ElasticSearch を活用した検索能力が組み込まれていない。そのため、既存 wiki 内コンテンツを根拠とした RAG 的な回答ができていない。

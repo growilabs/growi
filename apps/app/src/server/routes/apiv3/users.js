@@ -8,7 +8,6 @@ import { body, query } from 'express-validator';
 import { isEmail } from 'validator';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { deleteUserAiAssistant } from '~/features/openai/server/services/delete-ai-assistant';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
@@ -1006,8 +1005,6 @@ module.exports = (crowi) => {
             userId: user._id.toString(),
           },
         });
-
-        deleteUserAiAssistant(user);
 
         const serializedUser = serializeUserSecurely(user);
 

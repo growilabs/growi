@@ -39,7 +39,7 @@ export const getMessagesHandlersFactory: GetMessagesHandlersFactory = (
   ];
 
   return [
-    accessTokenParser([SCOPE.READ.FEATURES.AI_ASSISTANT], {
+    accessTokenParser([SCOPE.READ.FEATURES.AI], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,

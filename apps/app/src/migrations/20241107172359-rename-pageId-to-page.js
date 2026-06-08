@@ -1,6 +1,5 @@
 import mongoose from 'mongoose';
 
-import VectorStoreFileRelationModel from '~/features/openai/server/models/vector-store-file-relation';
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
@@ -34,10 +33,11 @@ module.exports = {
     );
 
     // Rename field (pageId -> page)
-    await VectorStoreFileRelationModel.updateMany({}, [
-      { $set: { page: '$pageId' } },
-      { $unset: ['pageId'] },
-    ]);
+    // Operate directly on the collection so this migration stays self-contained
+    // and does not depend on the (deprecated) Mongoose model.
+    await db
+      .collection('vectorstorefilerelations')
+      .updateMany({}, [{ $set: { page: '$pageId' } }, { $unset: ['pageId'] }]);
 
     // Create index
     const collection = mongoose.connection.collection(
