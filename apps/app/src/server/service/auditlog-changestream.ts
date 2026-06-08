@@ -4,9 +4,9 @@ import mongoose from 'mongoose';
 import loggerFactory from '~/utils/logger';
 
 import type { ActivityDocument } from '../models/activity';
+import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 import { AuditlogDeadletterStore } from './auditlog-deadletter-store';
 import { configManager } from './config-manager';
-import { ResumeTokenStore } from './resume-token-store';
 import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
 const logger = loggerFactory('growi:service:auditlog-changestream');
@@ -56,7 +56,7 @@ export class AuditlogChangeStreamService {
     }
 
     const Activity = mongoose.model<ActivityDocument>('Activity');
-    const token = await ResumeTokenStore.load(STREAM_KEY);
+    const token = await ChangeStreamResumeToken.load(STREAM_KEY);
     const options: ChangeStreamOptions =
       token != null ? { resumeAfter: token } : {};
 
@@ -83,7 +83,7 @@ export class AuditlogChangeStreamService {
             await this.delegator.deleteAuditlog(event.documentKey._id);
           }
           // Throttle if write frequency becomes a concern.
-          await ResumeTokenStore.save(STREAM_KEY, event._id);
+          await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
           this.consecutiveRestarts = 0;
           this.lastFailingToken = null;
         } catch (err) {
@@ -102,7 +102,7 @@ export class AuditlogChangeStreamService {
           'Change stream history lost (oplog truncated). Clearing resume token and restarting from current position.' +
             ' Documents written during the gap are not in Elasticsearch; run reindex to restore consistency.',
         );
-        await ResumeTokenStore.clear(STREAM_KEY);
+        await ChangeStreamResumeToken.clear(STREAM_KEY);
       } else {
         logger.error(err, 'AuditlogChangeStreamService change stream error.');
       }
@@ -127,7 +127,7 @@ export class AuditlogChangeStreamService {
           'Skipping poison pill event after consecutive failures.',
         );
         await AuditlogDeadletterStore.save(this.lastFailingToken);
-        await ResumeTokenStore.save(STREAM_KEY, this.lastFailingToken);
+        await ChangeStreamResumeToken.upsert(STREAM_KEY, this.lastFailingToken);
         this.consecutiveRestarts = 0;
         this.lastFailingToken = null;
       } else {
