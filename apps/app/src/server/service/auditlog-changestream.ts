@@ -36,6 +36,8 @@ export class AuditlogChangeStreamService {
 
   private changeStream: ChangeStream<ActivityDocument> | null = null;
 
+  private stopped = false;
+
   private restarting = false;
 
   private consecutiveRestarts = 0;
@@ -47,6 +49,7 @@ export class AuditlogChangeStreamService {
   }
 
   async start(): Promise<void> {
+    this.stopped = false;
     const auditLogEnabled = configManager.getConfig('app:auditLogEnabled');
     if (!auditLogEnabled) {
       logger.debug(
@@ -108,11 +111,13 @@ export class AuditlogChangeStreamService {
       }
     }
 
-    await this.restart();
+    if (!this.stopped) {
+      await this.restart();
+    }
   }
 
   private async restart(): Promise<void> {
-    if (this.restarting) return;
+    if (this.stopped || this.restarting) return;
     this.restarting = true;
     try {
       this.consecutiveRestarts++;
@@ -139,7 +144,8 @@ export class AuditlogChangeStreamService {
         await new Promise<void>((resolve) => setTimeout(resolve, delay));
       }
 
-      await this.close();
+      if (this.stopped) return;
+      await this.closeStream();
       await this.start();
     } catch (err) {
       logger.error(err, 'AuditlogChangeStreamService failed to restart.');
@@ -149,6 +155,11 @@ export class AuditlogChangeStreamService {
   }
 
   async close(): Promise<void> {
+    this.stopped = true;
+    await this.closeStream();
+  }
+
+  private async closeStream(): Promise<void> {
     if (this.changeStream != null) {
       await this.changeStream.close();
       this.changeStream = null;
