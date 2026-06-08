@@ -342,5 +342,20 @@ describe('ElasticsearchDelegator', () => {
       );
       expect(normalizeAuditlogIndicesSpy).toHaveBeenCalled();
     });
+
+    it('should call logger.error and re-throw original error when normalizeAuditlogIndices also fails', async () => {
+      const reindexError = new Error('reindex failed');
+      const normalizeError = new Error('normalize failed');
+      mockES8Client.reindex.mockRejectedValue(reindexError);
+      normalizeAuditlogIndicesSpy.mockRejectedValue(normalizeError);
+
+      await expect(delegator.rebuildAuditlogIndex()).rejects.toThrow(
+        'reindex failed',
+      );
+      expect(mockError).toHaveBeenCalledWith(
+        'Failed to restore auditlog indices',
+        normalizeError,
+      );
+    });
   });
 });
