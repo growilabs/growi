@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 import { vi } from 'vitest';
-import { mock } from 'vitest-mock-extended';
+import { type DeepMockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
@@ -8,6 +8,7 @@ import type { SocketIoService } from '~/server/service/socket-io';
 
 import ElasticsearchDelegator from './elasticsearch';
 import type { ElasticsearchClientDelegator } from './elasticsearch-client-delegator';
+import type { ES8ClientDelegator } from './elasticsearch-client-delegator/es8-client-delegator';
 
 vi.mock('~/utils/logger', () => ({
   default: vi.fn(() => ({
@@ -24,7 +25,7 @@ vi.mock('~/server/service/config-manager', () => ({
 
 describe('ElasticsearchDelegator', () => {
   let delegator: ElasticsearchDelegator;
-  let mockBulk: ReturnType<typeof vi.fn>;
+  let mockES8Client: DeepMockProxy<ES8ClientDelegator>;
 
   beforeEach(async () => {
     vi.mocked(configManager.getConfig).mockImplementation((key) => {
@@ -36,12 +37,13 @@ describe('ElasticsearchDelegator', () => {
     const mockSocketIo = mock<SocketIoService>();
     delegator = new ElasticsearchDelegator(mockSocketIo);
 
-    mockBulk = vi.fn().mockResolvedValue({ errors: false, items: [] });
+    mockES8Client = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
+    mockES8Client.bulk.mockResolvedValue({
+      errors: false,
+      items: [],
+    } as unknown as Awaited<ReturnType<typeof mockES8Client.bulk>>);
     (delegator as unknown as { client: ElasticsearchClientDelegator }).client =
-      {
-        delegatorVersion: 8,
-        bulk: mockBulk,
-      } as unknown as ElasticsearchClientDelegator;
+      mockES8Client;
 
     await Activity.deleteMany({});
   });
@@ -58,8 +60,8 @@ describe('ElasticsearchDelegator', () => {
 
       await delegator.addAllAuditlogs();
 
-      expect(mockBulk).toHaveBeenCalledOnce();
-      expect(mockBulk).toHaveBeenCalledWith({
+      expect(mockES8Client.bulk).toHaveBeenCalledOnce();
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
         body: expect.arrayContaining([
           { index: { _index: 'auditlogs-alias', _id: id1.toString() } },
           { username: 'alice' },
@@ -72,7 +74,7 @@ describe('ElasticsearchDelegator', () => {
     it('should not call bulk when no activities exist in MongoDB', async () => {
       await delegator.addAllAuditlogs();
 
-      expect(mockBulk).not.toHaveBeenCalled();
+      expect(mockES8Client.bulk).not.toHaveBeenCalled();
     });
   });
 });
