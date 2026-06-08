@@ -43,7 +43,9 @@ describe('PageBulkExportJobCleanUpCronService', () => {
       removeAttachment: removeAttachmentMock,
     },
   });
-  let user: Awaited<ReturnType<typeof User.create>>;
+  let user: mongoose.HydratedDocument<
+    mongoose.InferSchemaType<typeof userSchema>
+  >;
 
   beforeAll(async () => {
     await configManager.loadConfigs();
