@@ -14,7 +14,7 @@ GROWI's search page currently supports only keyword-based search with minimal co
 - Three new inline search operators — `author:username`, `editor:username`, `group:groupname` — and their negation variants (`-author:`, `-editor:`, `-group:`) work inside the existing search box alongside free-text keywords and existing operators
 - `author:username` returns only pages whose creator has that username
 - `editor:username` returns only pages whose most recent editor has that username
-- `group:groupname` returns only pages authored by members of the named user group (internal and external)
+- `group:groupname` returns only pages granted to the named user group (internal and external), scoped to groups the requesting user actually belongs to — specifying a group the user is not a member of yields no results for that group (e.g. a user in A,B who types `group:A,C` gets results for A only)
 - Unknown usernames and group names return an empty result set rather than an error
 - Zero regression on existing operators (`prefix:`, `tag:`, quoted phrases, negated keywords) and existing search behavior
 - No new UI components, no new URL parameters, no Elasticsearch schema changes
@@ -23,7 +23,7 @@ GROWI's search page currently supports only keyword-based search with minimal co
 **Extend the existing inline operator pipeline** — the same parse → resolve → delegate flow that already handles `prefix:` and `tag:`:
 
 1. **Parse**: extend the regex and branching in `parseQueryString()` to recognise the three new operator prefixes and populate six new `QueryTerms` fields (`author`, `not_author`, `editor`, `not_editor`, `group`, `not_group`)
-2. **Resolve**: add a `resolveOperatorTerms()` private method in `SearchService` that converts `editor` usernames to page IDs and `group` names to member usernames via read-only MongoDB queries, before the delegator is called; `author` terms need no resolution as `username` is already indexed
+2. **Resolve**: add a `resolveOperatorTerms()` private method in `SearchService` that converts `editor` usernames to page IDs, and `group` names to group IDs which are then intersected with the requesting user's own groups (so a user can only filter by groups they belong to), via read-only MongoDB queries, before the delegator is called; `author` terms need no resolution as `username` is already indexed
 3. **Delegate**: extend `appendCriteriaForQueryString()` to push the corresponding ES clauses (`term`, `ids`, `terms`) into `bool.filter[]` using the parsed and resolved data
 
 All changes are additive. No existing file's public surface is broken.
@@ -54,7 +54,7 @@ All changes are additive. No existing file's public surface is broken.
 - Modifying the existing `?q=` keyword parameter format or any existing operator regex branch
 - Changing the Elasticsearch index schema or mappings
 - Client-side code — no React, no Jotai, no SWR changes
-- `UserGroup`, `ExternalUserGroup`, `User`, `Page`, `UserGroupRelation`, `ExternalUserGroupRelation` models — called read-only, not modified
+- `UserGroup`, `ExternalUserGroup`, `User`, `Page` models — called read-only, not modified (`UserGroupRelation` / `ExternalUserGroupRelation` are not used: `group:` resolves a group ID and filters on the ES `granted_groups` field, with no member-user resolution)
 - Changes to the audit log search or any other ES query path outside `SearchService`
 
 ## Upstream / Downstream

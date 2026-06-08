@@ -44,7 +44,7 @@ This feature extends GROWI's existing inline search operator system with three n
 ### Out of Boundary
 
 - ES index mappings — no new fields added (`username` is already indexed; `editor:` avoids schema change via MongoDB resolution)
-- `UserGroup`, `ExternalUserGroup`, `User`, `Page`, `UserGroupRelation`, `ExternalUserGroupRelation` models — called read-only, not modified
+- `UserGroup`, `ExternalUserGroup`, `User`, `Page` models — called read-only, not modified (`UserGroupRelation` / `ExternalUserGroupRelation` are **not** touched — `group:` resolves a group ID and applies it to ES `granted_groups`, so no member-user relation query is needed)
 - Client-side code — no changes
 - `nq:` named query system — not touched
 - `MongoTermsKey` type — new operators are `ESTermsKey` only (no Mongo query path for these)
@@ -59,8 +59,9 @@ This feature extends GROWI's existing inline search operator system with three n
 ### Revalidation Triggers
 
 - `username` ES field renamed or type changed → `author:` clause breaks
-- `UserGroup.name` field renamed or type changed → `group:` name lookup breaks
-- `UserGroupRelation.findAllUserIdsForUserGroups()` or `ExternalUserGroupRelation.findAllUserIdsForUserGroups()` signature changed → `group:` resolution breaks
+- `UserGroup.name` / `ExternalUserGroup.name` field renamed or type changed → `group:` name lookup breaks
+- `granted_groups` ES field renamed or type changed → `group:` clause breaks
+- The `IGrantedGroup` shape passed into `searchKeyword()` changes such that `_id` is no longer comparable to a resolved group ID → membership intersect (Req 3.5, 7.5) breaks
 - `Page.lastUpdateUser` field renamed → `editor:` resolution breaks
 - `AVAILABLE_KEYS` or `ESTermsKey` not updated when `QueryTerms` is extended → `validateTerms()` rejects new operators
 
@@ -108,8 +109,8 @@ graph TB
 | Layer | Choice / Version | Role in Feature |
 |-------|-----------------|-----------------|
 | Query parsing | Regex (existing) | Extended to recognise `author:`, `editor:`, `group:` prefixes |
-| MongoDB | Mongoose (existing) | Read-only resolution: username → userId → pageIds; groupName → memberIds → memberUsernames |
-| Elasticsearch | Existing delegator | New `term`, `ids`, `terms` filter clauses in `bool.filter[]` |
+| MongoDB | Mongoose (existing) | Read-only resolution: `editor` username → userId → pageIds; `group` name → groupId (then intersected in-memory with the user's groups) |
+| Elasticsearch | Existing delegator | New `term` (`username`), `ids` (`_id`), `terms` (`granted_groups`) filter clauses in `bool.filter[]` |
 
 No new dependencies introduced.
 
@@ -190,7 +191,7 @@ sequenceDiagram
 | 5.4 | Existing operators unchanged | `parseQueryString` | Existing regex branches unmodified |
 | 6.1 | Unknown `author:` → empty | `appendCriteriaForQueryString` | ES `term` on non-existent username → no match |
 | 6.2 | Unknown `editor:` → empty | `resolveOperatorTerms` | `User.findOne()` null → `editorPageIds = []` → no ES match |
-| 6.3 | Unknown `group:` → empty | `resolveOperatorTerms` | Both group lookups null → `memberUsernames = []` → no ES match |
+| 6.3 | Unknown `group:` → empty | `resolveOperatorTerms` | Both group lookups null → `groupIds = []` → `granted_groups` clause skipped → no ES match |
 | 6.4 | Group with no granted pages → empty | `appendCriteriaForQueryString` | `terms: { granted_groups }` matches no documents — natural ES behavior |
 | 7.1–7.3 | Access control not widened | Architecture | New clauses pushed to `bool.filter[]` (AND); cannot override existing permission filter already in same array |
 | 7.4 | No page existence inference | Architecture | Empty clause = empty result; no metadata exposed |
@@ -219,7 +220,7 @@ export type QueryTerms = {
   not_author: string[];
   editor: string[];      // raw usernames from editor: tokens — resolved to pageIds by SearchService
   not_editor: string[];
-  group: string[];       // raw group names from group: tokens — resolved to memberUsernames by SearchService
+  group: string[];       // raw group names from group: tokens — resolved to group IDs (intersected with the user's groups) by SearchService
   not_group: string[];
 };
 
@@ -283,7 +284,7 @@ if (matchPositive[1] === 'author:') {
 
 | Field | Detail |
 |-------|--------|
-| Intent | Resolve `editor` usernames to page IDs and `group` names to member usernames via MongoDB |
+| Intent | Resolve `editor` usernames to page IDs via MongoDB, and `group` names to group IDs intersected with the requesting user's groups |
 | Requirements | 2.1, 2.2, 3.1, 3.2, 4.2, 4.3, 6.2, 6.3, 6.4 |
 
 **Contracts**: Service [x]

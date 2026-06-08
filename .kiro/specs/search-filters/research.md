@@ -65,9 +65,8 @@ Not in ES index — `editor:` must resolve `username → User._id → Page._id[]
 
 - `UserGroup.name` — required, globally unique string — the identifier users type in `group:groupname`
 - `ExternalUserGroup.name` — unique per `{name, provider}` compound index (not globally unique)
-- `UserGroupRelation.findAllUserIdsForUserGroups(groupIds[])` → `string[]` of user ObjectIds
-- `ExternalUserGroupRelation.findAllUserIdsForUserGroups(groupIds[])` — same signature
-- Both must be queried: the search route (`routes/search.ts:143–151`) already sets this pattern
+- Only the group **name → group ID** lookup is needed (`UserGroup.findOne({ name })` / `ExternalUserGroup.findOne({ name })`). The resolved group ID is used directly against the ES `granted_groups` field — there is **no** member-user resolution step, so `UserGroupRelation` / `ExternalUserGroupRelation` are not queried by this feature.
+- `IGrantedGroup[]` (the requesting user's groups, already passed into `searchKeyword()`) supplies the membership set the resolved group IDs are intersected against — no relation query is needed to obtain it.
 
 ### User.username
 
@@ -94,25 +93,29 @@ Since `last_update_username` is not in ES, `editor:alice` requires:
 
 `EDITOR_PAGE_ID_LIMIT = 1000` — documented limitation. Adding a new ES field was ruled out (no ES schema changes per requirements boundary).
 
-### D3: group: resolved via MongoDB to member usernames
+### D3: group: resolved to a group ID, intersected with the user's groups, applied to ES `granted_groups`
 
 `group:dev-team` requires:
-1. `UserGroup.findOne({ name: 'dev-team' })` + `ExternalUserGroup.findOne({ name: 'dev-team' })` → groupId(s)
-2. `UserGroupRelation.findAllUserIdsForUserGroups([...ids])` + `ExternalUserGroupRelation.findAllUserIdsForUserGroups([...ids])` → memberIds[]
-3. `User.find({ _id: { $in: memberIds } }).select('username')` → memberUsernames[]
-4. ES `terms: { username: memberUsernames }` clause in `bool.filter`
+1. `UserGroup.findOne({ name: 'dev-team' })` + `ExternalUserGroup.findOne({ name: 'dev-team' })` → resolved groupId(s)
+2. **Intersect** the resolved IDs with the requesting user's own groups (`IGrantedGroup[]` already passed into `searchKeyword()`). Only IDs the user belongs to survive.
+3. ES `terms: { granted_groups: [validGroupIds] }` clause in `bool.filter`
 
-Rationale: ExternalUserGroup must be included — the search route already uses both for access control.
+No member-user resolution: the page documents are already indexed with a `granted_groups` field, so a group ID matches pages directly. There is no `User.find` / `memberUsernames` step.
+
+**Intersection is a hard requirement, not an optimization (Req 3.5, 7.5).** A user who belongs to groups A and B but types `group:A,C` must get results scoped to **A only** — C is silently dropped because the user is not a member. Without the intersect, `group:C` would let a non-member enumerate pages granted to C, widening access. The resolved-then-intersected set can therefore only ever be a subset of the user's existing group access, so the clause can never broaden the permission filter that already lives in the same `bool.filter[]`.
+
+Rationale for including ExternalUserGroup: external groups also appear in `granted_groups` and in the user's `IGrantedGroup[]`, so both must be resolvable by name.
 
 ### D4: ResolvedFilterData separates parsed tokens from resolved values
 
-MongoDB-resolved values (`editorPageIds`, `groupMemberUsernames`) cannot live in `QueryTerms` (parsed strings only). A new `ResolvedFilterData` type is added to `SearchableData` and populated by `SearchService` before calling the delegator.
+MongoDB-resolved values (`editorPageIds`, `groupIds`, and their `not_` counterparts) cannot live in `QueryTerms` (parsed strings only). A new `ResolvedFilterData` type is added to `SearchableData` and populated by `SearchService` before calling the delegator.
 
 ### D5: Empty/unknown identifiers return empty results naturally
 
 - Unknown `author:` username → ES term matches nothing → empty result (no special handling)
 - Unknown `editor:` username → `User.findOne()` returns null → `editorPageIds = []` → ES `ids: { values: [] }` → no match
-- Unknown `group:` name → both group lookups return null → `memberUsernames = []` → ES `terms: { username: [] }` → no match
+- Unknown `group:` name → both group lookups return null → `groupIds = []` → `granted_groups` clause skipped → no match
+- `group:` name the user is not a member of → resolved ID survives the lookup but is dropped by the intersect → `groupIds = []` → clause skipped → no match (Req 3.5, 7.5)
 - Empty operator value (e.g., `author:` with no value) → parser skips token (regex or explicit guard)
 
 ### D6: Negation mirrors positive with must_not
@@ -127,6 +130,6 @@ MongoDB-resolved values (`editorPageIds`, `groupMemberUsernames`) cannot live in
 
 ## Synthesis Outcomes
 
-- **Generalization**: All three operators ultimately filter by `username` in ES (directly for `author:`, via resolved values for `editor:` and `group:`). The `bool.filter` push pattern is uniform.
-- **Build vs Adopt**: Pure extension — no new libraries, no new ES fields. `author:` reuses an already-indexed field.
-- **Simplification**: Three file changes only. No new files. `author:` follows `tag:` verbatim. The only new abstraction is `ResolvedFilterData` — required to keep MongoDB resolution out of the delegator.
+- **Generalization**: All three operators end up as `bool.filter` clauses, but on different ES fields — `author:` on `username` (direct), `editor:` on `_id` via resolved `ids` values, `group:` on `granted_groups` via resolved-then-intersected group IDs. The `bool.filter` push pattern is uniform even though the target fields differ.
+- **Build vs Adopt**: Pure extension — no new libraries, no new ES fields. `author:` reuses the already-indexed `username` field; `group:` reuses the already-indexed `granted_groups` field.
+- **Simplification**: Three file changes only. No new files. `author:` follows `tag:` verbatim. `group:` needs only a name→ID lookup plus the membership intersect — no member-user resolution. The only new abstraction is `ResolvedFilterData` — required to keep MongoDB resolution out of the delegator.
