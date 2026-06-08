@@ -5,16 +5,14 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { ActivityLogActions } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 
-import { ContributionAggregationService } from './aggregation-service';
+import { getContributionActivities } from './activity-aggregation-service';
 
-describe('ContributionAggregationService (Essential)', () => {
-  let service: ContributionAggregationService;
+describe('getContributionActivities', () => {
   let mongoServer: MongoMemoryServer;
 
   beforeAll(async () => {
     mongoServer = await MongoMemoryServer.create();
     await mongoose.connect(mongoServer.getUri());
-    service = new ContributionAggregationService();
   });
 
   afterAll(async () => {
@@ -51,7 +49,7 @@ describe('ContributionAggregationService (Essential)', () => {
     ]);
 
     // Act
-    const results = await service.runAggregationPipeline({
+    const results = await getContributionActivities({
       userId: userId.toString(),
       startDate: new Date('2025-11-01T00:00:00Z'),
       endDate: new Date(),
@@ -87,7 +85,7 @@ describe('ContributionAggregationService (Essential)', () => {
       },
     ]);
 
-    const results = await service.runAggregationPipeline({
+    const results = await getContributionActivities({
       userId: userId.toString(),
       startDate: new Date('2025-11-01T00:00:00Z'),
       endDate: new Date(),
@@ -126,7 +124,7 @@ describe('ContributionAggregationService (Essential)', () => {
     ]);
 
     // Run the pipeline starting from Monday
-    const results = await service.runAggregationPipeline({
+    const results = await getContributionActivities({
       userId: userId.toString(),
       startDate: new Date('2026-03-23T00:00:00Z'),
       endDate: new Date(),

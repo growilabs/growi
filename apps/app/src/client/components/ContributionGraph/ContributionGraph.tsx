@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'next-i18next';
 
 import { useSWRxContributions } from '~/stores/use-contributions';
 
@@ -11,6 +12,7 @@ import {
 import styles from './ContributionGraph.module.scss';
 
 export const ContributionGraph = ({ userId }: { userId: string }) => {
+  const { t } = useTranslation();
   const [isClient, setIsClient] = useState(false);
   const { data } = useSWRxContributions(userId);
 
@@ -18,12 +20,14 @@ export const ContributionGraph = ({ userId }: { userId: string }) => {
     setIsClient(true);
   }, []);
 
+  const isMigrationInProgress = data?.isMigrationInProgress === true;
+
   const contributions = useMemo(() => {
-    if (!isClient || data == null) {
+    if (!isClient || data?.contributions == null || isMigrationInProgress) {
       return [];
     }
-    return getPaddedContributions(data, new Date());
-  }, [data, isClient]);
+    return getPaddedContributions(data.contributions, new Date());
+  }, [data, isClient, isMigrationInProgress]);
 
   const monthLabels = useMemo(() => {
     return getMonthLabels(contributions);
@@ -32,6 +36,16 @@ export const ContributionGraph = ({ userId }: { userId: string }) => {
   const totalContributions = useMemo(() => {
     return contributions.reduce((sum, cont) => sum + cont.count, 0);
   }, [contributions]);
+
+  if (isClient && isMigrationInProgress) {
+    return (
+      <div className={styles['contribution-box']}>
+        <div className={styles['migration-in-progress']}>
+          {t('user_home_page.contribution_migration_in_progress')}
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className={styles['contribution-box']}>

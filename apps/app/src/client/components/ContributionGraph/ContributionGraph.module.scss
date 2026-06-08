@@ -171,3 +171,9 @@
     :global(li:hover) { background-color: bs.$gray-800; }
   }
 }
+
+.migration-in-progress {
+  padding: 16px;
+  color: var(--bs-secondary-color);
+  text-align: center;
+}

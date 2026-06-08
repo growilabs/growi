@@ -5,3 +5,14 @@ export type IContribution = {
   date: Date;
   count: number;
 };
+
+export interface IContributionDay {
+  date: string;
+  count: number;
+}
+
+export interface IContributionsResponse {
+  contributions: IContributionDay[];
+  isMigrationInProgress: boolean;
+  isTemporaryUnavailable?: boolean;
+}

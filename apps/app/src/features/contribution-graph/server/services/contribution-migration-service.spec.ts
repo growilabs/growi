@@ -1,3 +1,4 @@
+import type { IUser } from '@growi/core';
 import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
@@ -8,7 +9,11 @@ import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 
 import Contribution from '../models/contribution-model';
-import { migrateContributions } from './contribution-migration-service';
+import {
+  ensureUserHasMigrated,
+  migrateContributions,
+  resolveContributor,
+} from './contribution-migration-service';
 
 // Mock configManger to return an Activity TTL of 30 days (default value)
 vi.mock('~/server/service/config-manager', () => ({
@@ -16,29 +21,44 @@ vi.mock('~/server/service/config-manager', () => ({
 }));
 vi.mocked(configManager.getConfig).mockReturnValue(2592000);
 
+// Register the User model once; shared by the ensureUserHasMigrated and
+// resolveContributor suites below.
+if (mongoose.models.User == null) {
+  mongoose.model(
+    'User',
+    new mongoose.Schema({ contributionsMigratedAt: { type: Date } }),
+  );
+}
+const User: mongoose.Model<{ contributionsMigratedAt?: Date }> =
+  mongoose.model<IUser>('User');
+
+// A single in-memory MongoDB instance is shared across every suite in this file.
+let mongod: MongoMemoryServer;
+
+beforeAll(async () => {
+  mongod = await MongoMemoryServer.create();
+  await mongoose.connect(mongod.getUri());
+});
+
+afterAll(async () => {
+  await mongoose.connection.dropDatabase();
+  await mongoose.connection.close();
+  await mongod.stop();
+});
+
+// Suites below enable fake timers per-test; always restore real timers afterward
+// so the shared async teardown is unaffected.
+afterEach(() => {
+  vi.useRealTimers();
+});
+
 describe('migrateContributions', () => {
   const userId = new mongoose.Types.ObjectId().toString();
-
-  let mongod: MongoMemoryServer;
-
-  beforeAll(async () => {
-    vi.useRealTimers();
-    mongod = await MongoMemoryServer.create();
-    const uri = mongod.getUri();
-    await mongoose.connect(uri);
-  });
 
   beforeEach(async () => {
     vi.useFakeTimers();
     await Activity.deleteMany({});
     await Contribution.deleteMany({});
-  });
-
-  afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.connection.close();
-    await mongod.stop();
-    vi.useRealTimers();
   });
 
   it('should create new contribution documents based on activity documents that count as contributions', async () => {
@@ -93,7 +113,6 @@ describe('migrateContributions', () => {
       },
     });
 
-    expect(sameDayContribution).not.toBeNull();
     expect(sameDayContribution).not.toBeNull();
     expect(contributionsInDatabase.length).toBe(2);
     expect(otherDayContribution!.count).toBe(1);
@@ -215,5 +234,167 @@ describe('migrateContributions', () => {
     ).rejects.toThrow(expectedMessage);
 
     expect(await Contribution.countDocuments()).toBe(0);
+  });
+});
+
+describe('ensureUserHasMigrated', () => {
+  beforeEach(async () => {
+    vi.useFakeTimers();
+    await Activity.deleteMany({});
+    await Contribution.deleteMany({});
+    await User.deleteMany({});
+  });
+
+  it('should return without re-running migration if the user is already migrated', async () => {
+    const dbUser = await User.create({
+      contributionsMigratedAt: new Date('2025-01-01T00:00:00Z'),
+    });
+
+    // Activity that would become a contribution if migration ran
+    await Activity.create({
+      user: dbUser._id.toString(),
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date(),
+    });
+
+    await ensureUserHasMigrated(dbUser);
+
+    expect(await Contribution.countDocuments()).toBe(0);
+  });
+
+  it('should run migration and set contributionsMigratedAt when user has not been migrated', async () => {
+    vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
+
+    const dbUser = await User.create({}); // no contributionsMigratedAt
+
+    await Activity.create({
+      user: dbUser._id.toString(),
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date('2025-11-05T00:00:00Z'),
+    });
+
+    await ensureUserHasMigrated(dbUser);
+
+    const contributions = await Contribution.find({
+      user: dbUser._id.toString(),
+    });
+    expect(contributions).toHaveLength(1);
+    expect(contributions[0].count).toBe(1);
+
+    const updated = await User.findById(dbUser._id);
+    expect(updated?.contributionsMigratedAt).toEqual(
+      new Date('2025-11-10T00:00:00Z'),
+    );
+  });
+
+  it('does not re-run migration when another path already claimed it, even if the input object is stale', async () => {
+    const migratedAt = new Date('2025-01-01T00:00:00Z');
+    const dbUser = await User.create({ contributionsMigratedAt: migratedAt });
+
+    // An activity that would produce a contribution if migration re-ran.
+    await Activity.create({
+      user: dbUser._id.toString(),
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date(),
+    });
+
+    const staleUser = { _id: dbUser._id, contributionsMigratedAt: null };
+    await ensureUserHasMigrated(staleUser);
+
+    expect(await Contribution.countDocuments()).toBe(0);
+    // The existing timestamp must be left untouched (claim only $sets on null).
+    const reloaded = await User.findById(dbUser._id);
+    expect(reloaded?.contributionsMigratedAt).toEqual(migratedAt);
+  });
+
+  it('releases the claim when migration fails so a later trigger retries successfully', async () => {
+    vi.setSystemTime(new Date('2025-11-10T00:00:00Z'));
+
+    const dbUser = await User.create({}); // no contributionsMigratedAt
+    await Activity.create({
+      user: dbUser._id.toString(),
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date('2025-11-05T00:00:00Z'),
+    });
+
+    // First trigger: fail the migration write once, then let the spy call through
+    // so the retry below exercises the real write path.
+    const bulkWriteSpy = vi
+      .spyOn(Contribution, 'bulkWrite')
+      .mockRejectedValueOnce(new Error('write failed'));
+
+    try {
+      await expect(ensureUserHasMigrated(dbUser)).rejects.toThrow(
+        'write failed',
+      );
+      expect(await Contribution.countDocuments()).toBe(0);
+
+      // Second trigger (write now succeeds): this only backfills if the claim was
+      // released. If the failed run had left the user flagged as migrated, the
+      // one-shot guard would skip and no contribution would be created.
+      await ensureUserHasMigrated({
+        _id: dbUser._id,
+        contributionsMigratedAt: null,
+      });
+
+      const contributions = await Contribution.find({
+        user: dbUser._id.toString(),
+      });
+      expect(contributions).toHaveLength(1);
+      expect(contributions[0].count).toBe(1);
+    } finally {
+      bulkWriteSpy.mockRestore();
+    }
+  });
+});
+
+describe('resolveContributor', () => {
+  beforeEach(async () => {
+    await Activity.deleteMany({});
+    await User.deleteMany({});
+  });
+
+  it('takes the fast path: returns the passed contributor regardless of DB state', async () => {
+    const contributor = {
+      _id: new mongoose.Types.ObjectId(),
+      contributionsMigratedAt: null,
+    };
+
+    // No activity exists for this id. The fast path must return the contributor
+    // without consulting the database — if it looked the activity up, it would
+    // resolve to null instead. This holds regardless of how the lookup is
+    // implemented (findById, findOne, aggregation, ...).
+    const result = await resolveContributor(
+      new mongoose.Types.ObjectId().toString(),
+      contributor,
+    );
+
+    expect(result).toBe(contributor);
+  });
+
+  it('takes the fallback path: resolves the activity user when no contributor is passed', async () => {
+    const dbUser = await User.create({});
+    const activity = await Activity.create({
+      user: dbUser._id,
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date(),
+    });
+
+    // With no contributor, the DB is the only possible source of this user,
+    // so returning it proves the fallback lookup ran.
+    const result = await resolveContributor(activity._id.toString(), null);
+
+    expect(result?._id.toString()).toBe(dbUser._id.toString());
+  });
+
+  it('returns null when the activity has no associated user', async () => {
+    const activity = await Activity.create({
+      action: ContributionGraphActions.ACTION_PAGE_CREATE,
+      createdAt: new Date(),
+    });
+
+    const result = await resolveContributor(activity._id.toString(), null);
+
+    expect(result).toBeNull();
   });
 });
