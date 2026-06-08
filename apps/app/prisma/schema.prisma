@@ -323,33 +323,35 @@ model pageredirects {
 model pages {
   id                       String    @id @default(auto()) @map("_id") @db.ObjectId
   v                        Int       @map("__v")
-  commentCount             Int
+  commentCount             Int       @default(0)
   createdAt                DateTime  @default(now())
   creatorId                String?   @map("creator") @db.ObjectId
-  descendantCount          Int
-  grant                    Int
+  deletedAt                DateTime?
+  deleteUserId             String?   @map("deleteUser") @db.ObjectId
+  descendantCount          Int       @default(0)
+  expandContentWidth       Boolean?
+  grant                    Int       @default(1)
   /// Nested objects had no data in the sample dataset to introspect a nested type.
   grantedGroups            Json?
-  /// Could not determine type: the field only had null or empty values in the sample set.
-  grantedUsers             Json?
-  isEmpty                  Boolean
+  grantedUsers             String[]
+  isEmpty                  Boolean   @default(false)
   lastUpdateUserId         String?   @map("lastUpdateUser") @db.ObjectId
   latestRevisionBodyLength Int?
-  /// Could not determine type: the field only had null or empty values in the sample set.
-  liker                    Json?
+  liker                    String[]
   parentId                 String?   @map("parent") @db.ObjectId
   path                     String
   revisionId               String?   @map("revision") @db.ObjectId
   seenUsers                String[]
-  status                   String
+  status                   String    @default("published")
   ttlTimestamp             DateTime?
-  updatedAt                DateTime
+  updatedAt                DateTime  @default(now())
   wip                      Boolean?
 
   creator        users?        @relation("CreatedPages", fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   lastUpdateUser users?        @relation("LastUpdatedPages", fields: [lastUpdateUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   parent         pages?        @relation("ParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   children       pages[]       @relation("ParentChild")
+  deleteUser     users?        @relation("DeletedPages", fields: [deleteUserId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   revisions      revisions[]
   comments       comments[]
   attachments    attachments[]
@@ -537,6 +539,7 @@ model users {
   comments           comments[]
   revisions          revisions[]
   createdPages       pages[]            @relation("CreatedPages")
+  deletedPages       pages[]            @relation("DeletedPages")
   lastUpdatedPages   pages[]            @relation("LastUpdatedPages")
   imageAttachment    attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
   createdAttachments attachments[]      @relation("CreatedAttachments")
