@@ -28,7 +28,7 @@ const isChangeStreamHistoryLost = (err: unknown): boolean => {
 
 export class AuditlogChangeStreamService {
   // Backoff: 1,2,4,8,16,30,30s. Skip a repeatedly failing event after ~91s total (restart 8).
-  private static readonly MAX_CONSECUTIVE_RESTARTS = 8;
+  private static readonly MAX_CONSECUTIVE_EVENT_FAILURES = 8;
   private static readonly RESTART_BASE_DELAY_MS = 1000;
   private static readonly RESTART_MAX_DELAY_MS = 30000;
 
@@ -40,7 +40,7 @@ export class AuditlogChangeStreamService {
 
   private restarting = false;
 
-  private consecutiveRestarts = 0;
+  private consecutiveEventFailures = 0;
 
   private lastFailingToken: unknown = null;
 
@@ -87,7 +87,7 @@ export class AuditlogChangeStreamService {
           }
           // Throttle if write frequency becomes a concern.
           await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
-          this.consecutiveRestarts = 0;
+          this.consecutiveEventFailures = 0;
           this.lastFailingToken = null;
         } catch (err) {
           // Token not advanced on failure; event will be retried on restart.
@@ -95,6 +95,12 @@ export class AuditlogChangeStreamService {
             { err },
             'AuditlogChangeStreamService change event handling failed.',
           );
+          if (
+            JSON.stringify(event._id) !== JSON.stringify(this.lastFailingToken)
+          ) {
+            this.consecutiveEventFailures = 0;
+          }
+          this.consecutiveEventFailures++;
           this.lastFailingToken = event._id;
           break;
         }
@@ -120,12 +126,10 @@ export class AuditlogChangeStreamService {
     if (this.stopped || this.restarting) return;
     this.restarting = true;
     try {
-      this.consecutiveRestarts++;
-
       if (
         this.lastFailingToken != null &&
-        this.consecutiveRestarts >=
-          AuditlogChangeStreamService.MAX_CONSECUTIVE_RESTARTS
+        this.consecutiveEventFailures >=
+          AuditlogChangeStreamService.MAX_CONSECUTIVE_EVENT_FAILURES
       ) {
         logger.error(
           { token: this.lastFailingToken },
@@ -133,12 +137,12 @@ export class AuditlogChangeStreamService {
         );
         await AuditlogDeadletterStore.save(this.lastFailingToken);
         await ChangeStreamResumeToken.upsert(STREAM_KEY, this.lastFailingToken);
-        this.consecutiveRestarts = 0;
+        this.consecutiveEventFailures = 0;
         this.lastFailingToken = null;
       } else {
         const delay = Math.min(
           AuditlogChangeStreamService.RESTART_BASE_DELAY_MS *
-            2 ** (this.consecutiveRestarts - 1),
+            2 ** (this.consecutiveEventFailures - 1),
           AuditlogChangeStreamService.RESTART_MAX_DELAY_MS,
         );
         await new Promise<void>((resolve) => setTimeout(resolve, delay));
