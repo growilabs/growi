@@ -34,7 +34,7 @@ describe('SearchService test', () => {
 
   beforeAll(async () => {
     crowi = await getInstance();
-    searchService = new SearchService(crowi);
+    searchService = await SearchService.create(crowi);
     searchService.nqDelegators = {
       ...searchService.nqDelegators,
       [DEFAULT]: dummyFullTextSearchDelegator, // override with dummy full-text search delegator

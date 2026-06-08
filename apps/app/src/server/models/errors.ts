@@ -16,3 +16,6 @@ export class NullUsernameToBeRegisteredError extends ExtensibleCustomError {}
 
 // Invalid Parent bookmark folder error
 export class InvalidParentBookmarkFolderError extends ExtensibleCustomError {}
+
+export class BookmarkFolderNotFoundError extends ExtensibleCustomError {}
+export class BookmarkFolderForbiddenError extends ExtensibleCustomError {}

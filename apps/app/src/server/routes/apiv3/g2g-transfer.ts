@@ -615,6 +615,7 @@ module.exports = (crowi: Crowi): Router => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      requestBody:
    *        required: true
    *        content:
@@ -688,6 +689,7 @@ module.exports = (crowi: Crowi): Router => {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      requestBody:
    *        required: true
    *        content:

@@ -89,6 +89,18 @@
       "dependsOn": ["^dev"],
       "outputLogs": "new-only"
     },
+    "test:unit": {
+      "dependsOn": ["^dev"],
+      "outputLogs": "new-only"
+    },
+    "test:integ": {
+      "dependsOn": ["^dev"],
+      "outputLogs": "new-only"
+    },
+    "test:components": {
+      "dependsOn": ["^dev"],
+      "outputLogs": "new-only"
+    },
 
     "version:patch": {
       "cache": false,

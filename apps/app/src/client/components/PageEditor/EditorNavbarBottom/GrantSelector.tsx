@@ -377,7 +377,7 @@ export const GrantSelector = (props: Props): JSX.Element => {
     return (
       <button
         type="button"
-        className="btn border-0 text-muted"
+        className="btn border-0 text-muted ms-auto"
         onClick={() => setIsSelectGroupModalShown(false)}
       >
         <span className="material-symbols-outlined">close</span>
