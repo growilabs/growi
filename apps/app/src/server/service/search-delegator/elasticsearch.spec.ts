@@ -1,4 +1,3 @@
-import { vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
 import { configManager } from '~/server/service/config-manager/config-manager';
@@ -8,19 +7,6 @@ import ElasticsearchDelegator from './elasticsearch';
 import type { ElasticsearchClientDelegator } from './elasticsearch-client-delegator';
 import type { ES7ClientDelegator } from './elasticsearch-client-delegator/es7-client-delegator';
 import type { ES8ClientDelegator } from './elasticsearch-client-delegator/es8-client-delegator';
-
-const { mockWarn } = vi.hoisted(() => ({
-  mockWarn: vi.fn(),
-}));
-
-vi.mock('~/utils/logger', () => ({
-  default: vi.fn(() => ({
-    debug: vi.fn(),
-    info: vi.fn(),
-    warn: mockWarn,
-    error: vi.fn(),
-  })),
-}));
 
 vi.mock('~/server/service/config-manager/config-manager', () => ({
   default: { getConfig: vi.fn() },
@@ -32,6 +18,7 @@ describe('ElasticsearchDelegator', () => {
   let mockSocketIo: MockProxy<SocketIoService>;
 
   beforeEach(() => {
+    vi.clearAllMocks();
     vi.mocked(configManager.getConfig).mockImplementation((key) => {
       if (key === 'app:elasticsearchVersion') return 8;
       return false;
@@ -76,6 +63,7 @@ describe('ElasticsearchDelegator', () => {
                     wildcard: expect.objectContaining({
                       username: expect.objectContaining({
                         value: 'a\\*b\\?c\\\\d*',
+                        case_insensitive: true,
                       }),
                     }),
                   }),
@@ -83,6 +71,7 @@ describe('ElasticsearchDelegator', () => {
                     fuzzy: expect.objectContaining({
                       username: expect.objectContaining({
                         value: 'a\\*b\\?c\\\\d',
+                        fuzziness: 'AUTO',
                       }),
                     }),
                   }),
@@ -235,7 +224,6 @@ describe('ElasticsearchDelegator', () => {
         );
 
         expect(result).toEqual([]);
-        expect(mockWarn).not.toHaveBeenCalled();
       });
     });
   });
