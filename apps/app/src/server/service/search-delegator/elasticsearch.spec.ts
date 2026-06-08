@@ -244,4 +244,97 @@ describe('ElasticsearchDelegator', () => {
       expect(mockIndicesClient.putAlias).not.toHaveBeenCalled();
     });
   });
+
+  describe('rebuildAuditlogIndex()', () => {
+    let mockIndicesClient: {
+      updateAliases: ReturnType<typeof vi.fn>;
+      delete: ReturnType<typeof vi.fn>;
+    };
+    let mockReindex: ReturnType<typeof vi.fn>;
+    let createAuditlogIndexSpy: ReturnType<typeof vi.spyOn>;
+    let addAllAuditlogsSpy: ReturnType<typeof vi.spyOn>;
+    let normalizeAuditlogIndicesSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      mockIndicesClient = {
+        updateAliases: vi.fn().mockResolvedValue({}),
+        delete: vi.fn().mockResolvedValue({}),
+      };
+      mockReindex = vi.fn().mockResolvedValue({});
+
+      (
+        delegator as unknown as { client: ElasticsearchClientDelegator }
+      ).client = {
+        delegatorVersion: 8,
+        reindex: mockReindex,
+        indices: mockIndicesClient,
+      } as unknown as ElasticsearchClientDelegator;
+
+      createAuditlogIndexSpy = vi
+        .spyOn(
+          delegator as unknown as {
+            createAuditlogIndex: (name: string) => Promise<void>;
+          },
+          'createAuditlogIndex',
+        )
+        .mockResolvedValue(undefined);
+
+      addAllAuditlogsSpy = vi
+        .spyOn(delegator, 'addAllAuditlogs')
+        .mockResolvedValue(undefined);
+
+      normalizeAuditlogIndicesSpy = vi
+        .spyOn(delegator, 'normalizeAuditlogIndices')
+        .mockResolvedValue(undefined);
+    });
+
+    it('should execute reindex operations in the correct order', async () => {
+      const callOrder: string[] = [];
+      createAuditlogIndexSpy.mockImplementation((name: string) => {
+        callOrder.push(`createAuditlogIndex:${name}`);
+        return Promise.resolve();
+      });
+      mockReindex.mockImplementation(() => {
+        callOrder.push('reindex');
+        return Promise.resolve();
+      });
+      mockIndicesClient.updateAliases.mockImplementation(() => {
+        callOrder.push('updateAliases');
+        return Promise.resolve();
+      });
+      mockIndicesClient.delete.mockImplementation(
+        ({ index }: { index: string }) => {
+          callOrder.push(`delete:${index}`);
+          return Promise.resolve();
+        },
+      );
+      addAllAuditlogsSpy.mockImplementation(() => {
+        callOrder.push('addAllAuditlogs');
+        return Promise.resolve();
+      });
+
+      await delegator.rebuildAuditlogIndex();
+
+      expect(callOrder).toEqual([
+        'createAuditlogIndex:auditlogs-tmp',
+        'reindex',
+        'updateAliases',
+        'delete:auditlogs',
+        'createAuditlogIndex:auditlogs',
+        'addAllAuditlogs',
+        'updateAliases',
+        'delete:auditlogs-tmp',
+      ]);
+    });
+
+    it('should call normalizeAuditlogIndices and re-throw when an error occurs', async () => {
+      const error = new Error('reindex failed');
+      mockReindex.mockRejectedValue(error);
+
+      await expect(delegator.rebuildAuditlogIndex()).rejects.toThrow(
+        'reindex failed',
+      );
+      expect(normalizeAuditlogIndicesSpy).toHaveBeenCalled();
+    });
+  });
 });
