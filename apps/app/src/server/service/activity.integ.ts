@@ -1,5 +1,4 @@
 import EventEmitter from 'events';
-import mongoose from 'mongoose';
 import { vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
@@ -25,15 +24,6 @@ describe('ActivityService.createActivity()', () => {
   let activityService: ActivityService;
   let activityEvent: EventEmitter;
   let emitSpy: ReturnType<typeof vi.spyOn>;
-
-  beforeAll(async () => {
-    await mongoose.connect('mongodb://mongo:27017/growi-test-activity-spec');
-  });
-
-  afterAll(async () => {
-    await mongoose.connection.dropDatabase();
-    await mongoose.disconnect();
-  });
 
   beforeEach(() => {
     activityEvent = new EventEmitter();
