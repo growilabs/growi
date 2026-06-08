@@ -105,17 +105,6 @@ module.exports = (crowi, app) => {
 
   app.use(methodOverride());
 
-  // inject rawBody to req
-  app.use((req, res, next) => {
-    if (!req.is('multipart/form-data')) {
-      req.rawBody = '';
-      req.on('data', (chunk) => {
-        req.rawBody += chunk;
-      });
-    }
-
-    next();
-  });
   app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(cookieParser());

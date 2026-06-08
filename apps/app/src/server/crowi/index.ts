@@ -13,6 +13,7 @@ import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bu
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
+import { initializeVaultFeature } from '~/features/growi-vault/server';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
@@ -292,6 +293,8 @@ class Crowi {
       // depends on passport service
       this.setupExternalAccountService(),
       this.setupExternalUserGroupSyncService(),
+      // depends on pageService and activityService
+      this.setupVaultFeature(),
     ]);
 
     await this.setupCron();
@@ -892,6 +895,10 @@ class Crowi {
       this.s2sMessagingService,
       this.socketIoService,
     );
+  }
+
+  async setupVaultFeature(): Promise<void> {
+    await initializeVaultFeature(this);
   }
 }
 

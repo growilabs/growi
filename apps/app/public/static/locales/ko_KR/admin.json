@@ -1171,5 +1171,93 @@
     "section_users": "사용자",
     "section_data": "데이터",
     "section_external_notifications": "외부 알림 연동"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "경고:",
+        "message_html": "최근 초기화 처리는 <code>VAULT_BOOTSTRAP_ON_START=force</code> 에 의해 실행되었습니다. 이 환경 변수가 <code>force</code> 로 설정된 상태에서 서버를 다시 시작하면 모든 Vault 데이터가 다시 초기화됩니다. 환경 변수를 <code>true</code> 또는 <code>false</code> 로 변경해 주세요."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "기능 상태",
+        "enabled": "활성화됨",
+        "disabled": "비활성화됨",
+        "description_html": "<code>VAULT_ENABLED</code> 환경 변수로 제어됩니다. 활성화/비활성화를 전환하려면 환경 변수를 변경하고 서버를 다시 시작하십시오."
+      },
+      "clone-url": {
+        "label": "클론 URL",
+        "description": "이 명령을 터미널에서 실행하면 Vault 리포지토리를 클론할 수 있습니다.",
+        "copy-button": "명령 복사",
+        "copied-tooltip": "복사되었습니다!",
+        "copy-failed": "클론 명령 복사에 실패했습니다.",
+        "no-site-url_html": "사이트 URL 이 설정되지 않아 명령을 표시할 수 없습니다. <a href=\"/admin/app\">앱 설정</a> 에서 설정해 주세요."
+      },
+      "kill-switch": {
+        "heading": "재구축",
+        "button": "Vault 재구축",
+        "description_html": "Git 저장소의 모든 데이터를 파기하고 MongoDB 의 데이터를 기반으로 Git 데이터를 재구축합니다. 재구축 중에는 모든 <code>git clone</code> / <code>fetch</code> 요청이 503 으로 거부됩니다. 이 작업은 감사 로그에 <code>vault.wipe</code> 로 기록됩니다.",
+        "confirm-title": "Vault 재구축 확인",
+        "confirm-message_html": "이 작업을 실행하면 <strong>현재 Git 저장소의 모든 데이터가 손실됩니다</strong>.",
+        "confirm-question": "정말로 진행하시겠습니까?",
+        "confirm-button": "확인",
+        "cancel-button": "취소",
+        "started-toast": "재구축을 시작했습니다. 데이터 재구축이 완료될 때까지 Vault 는 503 을 반환합니다."
+      },
+      "bootstrap-status": {
+        "state": "상태",
+        "processed-total": "처리됨 / 총 예상",
+        "started-at": "시작 시각",
+        "completed-at": "완료 시각",
+        "last-error": "최근 오류",
+        "progress-label": "{{processed}} / {{total}} 페이지"
+      },
+      "completion-reliability": {
+        "heading": "신뢰성 상태",
+        "check-result": "최종 검사 결과",
+        "last-completed-at": "최종 완료 시각",
+        "processed-estimated": "처리됨 / 예상",
+        "trigger-source": "트리거 소스",
+        "last-error": "최근 오류"
+      },
+      "auto-retry-status": {
+        "heading": "자동 재시도 상태",
+        "escalated-warning_html": "초기화 처리에서의 자동 재시도가 실패하여 <strong>escalated</strong> 상태가 되었습니다. 수동 개입이 필요합니다.",
+        "attempt-no": "시도 횟수",
+        "next-attempt-at": "다음 시도 시각",
+        "last-error": "최근 오류",
+        "abort-button": "자동 재시도 중단",
+        "aborting": "중단 중…",
+        "aborted-toast": "자동 재시도가 중단되었습니다."
+      },
+      "drift-activity": {
+        "heading": "데이터 불일치 감지 상태",
+        "last-sweep-at": "최종 스윕 시각",
+        "last-watermark": "최종 워터마크",
+        "detected-since-boot": "서버 시작 이후 감지 건수",
+        "repairs-emitted-since-boot": "서버 시작 이후 복구 발행 건수",
+        "last-error": "마지막으로 감지된 오류",
+        "out-of-scope_html": "<strong>주의 (범위 외):</strong> 경로 변경(이름 변경 / 하드 삭제) 으로 인한 데이터 불일치 및 권한 해제로 인한 불일치는 현재 구현에서는 감지할 수 없습니다. 이는 향후 <code>growi-vault-ha</code> 지원이 필요합니다."
+      },
+      "storage-observability": {
+        "fetch-failed": "스토리지 통계를 가져오지 못했습니다. vault-manager 에 도달할 수 없을 수 있습니다.",
+        "namespace-count": "네임스페이스 수",
+        "total-commit-count": "총 커밋 수",
+        "loose-object-count": "Loose 오브젝트 수",
+        "repo-size": "저장소 크기",
+        "last-squash": "최종 squash 시각",
+        "last-gc": "최종 GC 시각"
+      },
+      "audit-log": {
+        "heading": "감사 로그",
+        "button": "VAULT_* 감사 로그 항목 보기",
+        "description": "Vault 관련 작업(VAULT_*)으로 필터링된 관리자 감사 로그를 엽니다."
+      },
+      "reconcile-admin": {
+        "heading": "리컨실",
+        "trigger-button": "리컨실 실행",
+        "description": "데이터 초기화를 수행하지 않고 MongoDB 페이지와 Vault git 트리 간의 데이터 불일치를 수동으로 복구합니다."
+      }
+    }
   }
 }

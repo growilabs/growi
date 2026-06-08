@@ -1171,5 +1171,93 @@
     "section_users": "Users",
     "section_data": "Data",
     "section_external_notifications": "External Notifications"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "Warning:",
+        "message_html": "The last initialization was triggered by <code>VAULT_BOOTSTRAP_ON_START=force</code>. Restarting the server while this env var is still set to <code>force</code> will reinitialize all Vault data again. Please change the env var to <code>true</code> or <code>false</code>."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "Feature Status",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "description_html": "Controlled by the <code>VAULT_ENABLED</code> environment variable. To toggle enable/disable, change the env var and restart the server."
+      },
+      "clone-url": {
+        "label": "Clone URL",
+        "description": "Run this command in your terminal to clone the Vault repository.",
+        "copy-button": "Copy command",
+        "copied-tooltip": "Copied!",
+        "copy-failed": "Failed to copy the clone command.",
+        "no-site-url_html": "Site URL is not configured. Set it in <a href=\"/admin/app\">App Settings</a> to display the clone command."
+      },
+      "kill-switch": {
+        "heading": "Rebuild",
+        "button": "Rebuild Vault",
+        "description_html": "Destroys all data in the Git repositories and rebuilds the Git data from MongoDB. During the rebuild, all <code>git clone</code> / <code>fetch</code> requests are rejected with 503. The action is recorded in the audit log as <code>vault.wipe</code>.",
+        "confirm-title": "Confirm Rebuild Vault",
+        "confirm-message_html": "Executing this action will <strong>lose all data in the current Git repositories</strong>.",
+        "confirm-question": "Are you sure you want to proceed?",
+        "confirm-button": "Confirm",
+        "cancel-button": "Cancel",
+        "started-toast": "Rebuild started. The Vault will return 503 until the data is rebuilt."
+      },
+      "bootstrap-status": {
+        "state": "Status",
+        "processed-total": "Processed / Total Estimated",
+        "started-at": "Started At",
+        "completed-at": "Completed At",
+        "last-error": "Last Error",
+        "progress-label": "{{processed}} of {{total}} pages"
+      },
+      "completion-reliability": {
+        "heading": "Reliability Status",
+        "check-result": "Last Check Result",
+        "last-completed-at": "Last Completed At",
+        "processed-estimated": "Processed / Estimated",
+        "trigger-source": "Trigger Source",
+        "last-error": "Last Error"
+      },
+      "auto-retry-status": {
+        "heading": "Auto-Retry Status",
+        "escalated-warning_html": "Auto-retry during initialization has failed, and the state has reached <strong>escalated</strong>. Manual intervention is required.",
+        "attempt-no": "Attempt No.",
+        "next-attempt-at": "Next Attempt At",
+        "last-error": "Last Error",
+        "abort-button": "Abort Auto-Retry",
+        "aborting": "Aborting…",
+        "aborted-toast": "Auto-retry aborted."
+      },
+      "drift-activity": {
+        "heading": "Data Inconsistency Detection Status",
+        "last-sweep-at": "Last Sweep At",
+        "last-watermark": "Last Watermark",
+        "detected-since-boot": "Detected Since Server Start",
+        "repairs-emitted-since-boot": "Repairs Emitted Since Server Start",
+        "last-error": "Last Detected Error",
+        "out-of-scope_html": "<strong>Note (out-of-scope):</strong> Data inconsistencies caused by path changes (rename / hard delete) and grant revocation are not detected in the current implementation. These require future <code>growi-vault-ha</code> support."
+      },
+      "storage-observability": {
+        "fetch-failed": "Failed to retrieve storage statistics. vault-manager may be unreachable.",
+        "namespace-count": "Namespace Count",
+        "total-commit-count": "Total Commit Count",
+        "loose-object-count": "Loose Object Count",
+        "repo-size": "Repository Size",
+        "last-squash": "Last Squash At",
+        "last-gc": "Last GC At"
+      },
+      "audit-log": {
+        "heading": "Audit Log",
+        "button": "View VAULT_* Audit Log Entries",
+        "description": "Opens the admin audit log filtered to Vault-related actions (VAULT_*)."
+      },
+      "reconcile-admin": {
+        "heading": "Reconcile",
+        "trigger-button": "Trigger Reconcile",
+        "description": "Manually reconcile data inconsistencies between MongoDB pages and Vault git trees without performing a full initialization."
+      }
+    }
   }
 }
