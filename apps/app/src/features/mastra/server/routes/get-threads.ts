@@ -48,7 +48,7 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
   ];
 
   return [
-    accessTokenParser([SCOPE.READ.FEATURES.AI_ASSISTANT], {
+    accessTokenParser([SCOPE.READ.FEATURES.AI], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,

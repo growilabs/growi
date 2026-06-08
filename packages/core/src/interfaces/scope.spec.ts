@@ -50,7 +50,7 @@ describe('Scope type', () => {
     // Verify features scopes
     expect(SCOPE.READ.FEATURES).toBeDefined();
     expect(SCOPE.READ.FEATURES.PAGE).toBe('read:features:page');
-    expect(SCOPE.READ.FEATURES.AI_ASSISTANT).toBe('read:features:ai_assistant');
+    expect(SCOPE.READ.FEATURES.AI).toBe('read:features:ai');
 
     // Verify write scopes
     expect(SCOPE.WRITE.ADMIN.TOP).toBe('write:admin:top');

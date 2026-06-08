@@ -1,0 +1,194 @@
+# Implementation Plan
+
+> 実装順序は design.md「Migration Strategy」に準拠: 前提移設 → mastra 契約変更（サーバ→クライアント）→ 横断参照除去 → openai スリム化 → データ層/設定/i18n → 統合検証。各フェーズ後に `turbo run lint/test/build --filter @growi/app` を実行する。
+
+- [x] 1. Foundation: 残置範囲の確定（検証）
+  - 残置対象（クライアントデリゲータ・AI 有効判定・認可ミドルウェア・serviceType 型・suggest-path 用プロンプト定数）の実依存をたどり、最小公開面を確定して記録する
+  - 生クライアントの唯一の参照元が削除対象のエディターアシスタントであることを確認し、残置不要（削除可）と判定する
+  - エディターの差分マージ表示（unified merge view）連携が AI（エディターアシスタント）専用所有で通常編集に波及しないことを確認する
+  - suggest-path 用プロンプト定数（instructionsForInformationTypes）は残置対象とし、未使用の他定数のトリムは消費側を削除する 5.1 で行う（順序: 消費側削除 → トリム）
+  - 観測可能な完了条件: 「残す／削る」対象とデリゲータ除去メソッドが Implementation Notes に記録され、後続タスクの削除範囲として参照できる
+  - _Requirements: 1.2, 2.5, 6.1, 6.4_
+
+- [ ] 2. mastra チャットのアシスタント非依存化（サーバ）
+
+- [x] 2.1 thread ライフサイクルからアシスタント紐付けを除去（後方互換）
+  - thread の生成・取得をユーザー識別子のみで行い、新規 thread のメタデータにアシスタント識別子を書き込まないようにする
+  - メタデータ判定を緩和し、アシスタント識別子を保持する既存 thread も余剰フィールドとして許容して閲覧・再開できるようにする
+  - 観測可能な完了条件: 新規 thread にアシスタント識別子が付与されず、既存 thread もエラーなく取得・再開できる（ユニットテストで確認）
+  - _Requirements: 9.2, 9.4_
+  - _Boundary: Thread Lifecycle_
+
+- [x] 2.2 チャット送信エンドポイントからアシスタント／vectorStore 依存を除去
+  - リクエスト本文と検証からアシスタント識別子を取り除き、アシスタント読み込み・利用可否判定・vectorStore 識別子の導出を削除する
+  - リクエストコンテキストから vectorStore 識別子を取り除く
+  - 観測可能な完了条件: アシスタント識別子なしのリクエストでチャットがストリーム応答を返し、既存スレッド識別子で会話を再開できる
+  - _Requirements: 5.2, 5.3, 8.3_
+  - _Boundary: Mastra Message Route_
+  - _Depends: 2.1_
+
+- [x] 2.3 file-search ツールと vectorStore 依存コードを mastra から削除
+  - エージェントの利用ツールを全文検索とページ内容取得のみに限定し、file-search ツールおよび OpenAI file_search ラッパーを削除する
+  - 観測可能な完了条件: mastra に file-search／vectorStore 依存コードが存在せず、エージェントが全文検索・ページ内容取得のみで応答する
+  - _Requirements: 5.1, 5.4, 6.3_
+  - _Boundary: Mastra Message Route_
+
+- [ ] 3. mastra チャットのアシスタント非依存化（クライアント）と新規チャット導線
+
+- [x] 3.1 チャット起動状態をアシスタント非依存へ統合
+  - 右サイドバーチャットの起動状態からアシスタントデータ・エディターアシスタント区分を取り除き、起動操作をスレッド識別子のみ任意で受ける形に変更する
+  - エディターアシスタント起動アクションを廃止する
+  - 観測可能な完了条件: アシスタントを選択せずにチャット起動状態を開閉でき、エディターアシスタント起動経路が存在しない
+  - _Requirements: 3.6, 8.3_
+  - _Boundary: Chat Sidebar State_
+  - _Depends: 2.2_
+
+- [x] 3.2 ChatSidebar の送信本文と表示をアシスタント非依存化
+  - メッセージ送信本文からアシスタント識別子を除去し、ヘッダ表示をスレッドタイトルまたは汎用表示に変更する
+  - 観測可能な完了条件: アシスタント名に依存しない表示でメッセージ送受信が成立する
+  - _Requirements: 5.2, 8.3_
+  - _Boundary: Chat Sidebar State_
+  - _Depends: 3.1_
+
+- [x] 3.3 左サイドバー AI パネルを「新規チャット」＋スレッド一覧に再構成
+  - 「アシスタント追加」とマイ／チームアシスタント一覧を撤去し、右サイドバーチャットを開く「新規チャット」ボタンとスレッド一覧のみで構成する
+  - スレッド一覧をアシスタント取得フックに依存させず、スレッド識別子のみで会話を再開できるようにする
+  - アシスタント一覧・アシスタント削除モーダルのコンポーネントを削除する
+  - 観測可能な完了条件: 左 AI パネルに「新規チャット」ボタンとスレッド一覧が表示され、ボタン押下で右サイドバーチャットが開き、AI 無効時はパネル導線が露出しない
+  - _Requirements: 3.1, 3.3, 6.5, 8.1, 8.2, 8.4, 9.1, 9.3_
+  - _Boundary: Left AI Panel_
+  - _Depends: 3.1_
+
+- [ ] 4. openai 由来コードの横断参照を除去
+
+- [x] 4.1 サーバ起動とルート登録から openai を除去
+  - アシスタント／エディターアシスタント／スレッド関連の API ルート登録を撤去し、起動処理から openai サービス初期化と廃止 cron の登録を取り除く
+  - 観測可能な完了条件: アシスタント系エンドポイントが公開されず、起動時に廃止 cron が登録されない
+  - _Requirements: 1.3, 2.4, 3.4, 4.5_
+  - _Boundary: app-wide integration_
+  - _Depends: 2.2_
+
+- [x] 4.2 (P) レイアウト・ページ操作 UI から openai を除去
+  - 共通レイアウトからアシスタント管理モーダルを外し、ページ操作ヘッダから既定アシスタント起動ボタンを取り除く
+  - 観測可能な完了条件: 画面上にアシスタント管理モーダルとページヘッダの起動ボタンが存在しない
+  - _Requirements: 3.2, 3.5_
+  - _Boundary: app-wide integration_
+  - _Depends: 3.1_
+
+- [x] 4.3 (P) エディターから AI 編集導線を除去
+  - エディターのアシスタント起動トグルを削除し、エディター本体から差分マージ表示連携の参照を取り除く
+  - 観測可能な完了条件: エディター内に AI 編集トグル・編集補助導線が存在せず、通常編集は従来どおり動作する
+  - _Requirements: 2.2, 2.3, 2.5_
+  - _Boundary: app-wide integration_
+  - _Depends: 1_
+
+- [x] 4.4 (P) ページ更新・ユーザー削除・起動時正規化の openai 連携を除去
+  - ページ作成・更新時の vectorStore 同期連携、ユーザー削除時のアシスタント削除連携、起動時の thread-relation／vector-store 正規化処理を取り除く
+  - 観測可能な完了条件: ページ作成/更新・ユーザー削除・起動時に廃止 AI 連携処理が呼ばれない
+  - _Requirements: 4.6, 6.2_
+  - _Boundary: app-wide integration_
+  - _Depends: 2.2_
+
+- [x] 4.5 (P) Elasticsearch 検索の `@ai` メンション・`vector` 検索オプションを除去
+  - 廃止された vectorStore 検索を起動していた `@ai` メンション判定（`features/search/utils/ai.ts`）を削除し、SearchModal の脳アイコン・メンション状態・`removeAiMenthion` 表示を撤去
+  - server `search.ts` の `isIncludeAiMenthion`/`removeAiMenthion` import と `searchOpts.vector = true` 経路、`routes/search.ts` の未消費 `vector` パラメータ配線を除去
+  - 観測可能な完了条件: `@ai` が通常検索語として扱われ（専用アイコン・vector フラグなし）、`aiMenthion`/`searchOpts.vector` の参照が src にゼロ・typecheck に新規エラーなし
+  - _Requirements: 6.6, 6.7_
+  - _Boundary: app-wide integration, Search_
+
+- [ ] 5. features/openai のスリム化（削除と整理）
+
+- [x] 5.1 アシスタント／ナレッジ／エディター／cron／神サービス等を削除
+  - assistant・editor-assistant・knowledge・cron・embeddings・normalize・統合サービス（神サービス）・生クライアント（client.ts）・アシスタント系ルート・アシスタント系インターフェイス・アシスタント系クライアント UI を削除する（接続設定 UI は残す）
+  - suggest-path 用プロンプト定数ファイルは削除対象から除外し、消費側（assistant 配下）削除後に使用中の定数のみへトリムする（suggest-path の import は不変）
+  - 観測可能な完了条件: openai 配下にアシスタント／FileSearch／vectorStore／ナレッジ／エディター関連コードが残らず、残置基盤（デリゲータ／AI 有効判定／認可ミドルウェア／serviceType 型／プロンプト定数）のみが残る
+  - _Requirements: 1.1, 2.1, 3.1_
+  - _Boundary: app-wide integration_
+  - _Depends: 1, 2.2, 2.3, 3.1, 3.3, 4.1, 4.2, 4.3, 4.4_
+
+- [x] 5.2 LLM クライアントデリゲータをスリム化
+  - クライアントデリゲータのインターフェイスと実装から vectorStore・thread・file 系メソッドを除去し、補完呼び出しなど残置に必要な面のみ残す
+  - 観測可能な完了条件: デリゲータに vectorStore/thread/file メソッドが型・実装ともに存在せず、suggest-path の補完呼び出しが従来どおり動作する
+  - _Requirements: 1.2, 6.1, 6.4_
+  - _Boundary: OpenAI LLM Client Base_
+  - _Depends: 5.1_
+
+- [ ] 6. データ層・設定・i18n の整理
+
+- [x] 6.1 (P) 廃止モデルの削除とコレクション破棄マイグレーション
+  - 4 つの廃止 Mongoose モデル定義を削除し、対応する 4 コレクションを破棄する冪等なマイグレーションを追加する（不存在時もエラーなく完了、リモート vector store は対象外）
+  - 削除対象モデルを参照していた既存マイグレーションを、モデルに依存しない自己完結形へ書き換える
+  - 観測可能な完了条件: マイグレーション実行で 4 コレクションが破棄され（または skip され）、モデル削除後も既存マイグレーション群が実行可能
+  - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.7_
+  - _Boundary: Drop Collections Migration_
+  - _Depends: 2.1, 5.1_
+
+- [x] 6.2 (P) Prisma スキーマから廃止モデルを削除し再生成
+  - スキーマ定義から 4 モデルを削除して生成物を再生成する
+  - 観測可能な完了条件: 生成物に 4 モデルが含まれず、ビルド・型チェックが通る
+  - _Requirements: 4.1_
+  - _Boundary: prisma schema_
+
+- [x] 6.3 (P) 廃止 AI 設定キーの削除と設定表示の整理
+  - エディターアシスタント／cron／vectorStore 専用の設定キーを削除し、接続・資格情報・mastra 用モデルキーは残す。設定表示からも削除キーの参照を取り除く
+  - 観測可能な完了条件: 廃止設定キーが定義・表示されず、残置 AI 機能が必要とする接続設定キーは維持される
+  - _Requirements: 10.1, 10.2, 10.3_
+  - _Boundary: Config Cleanup_
+  - _Depends: 5.1_
+
+- [x] 6.4 (P) 管理画面 AI 連携ページの廃止
+  - 当初は「検索管理ヘッダを除去して接続設定を残すスリム化」を実施したが、接続/資格情報は環境変数のみで設定する構造のため画面が実質空になることを受け、admin AI 連携ページを完全廃止に変更（後続コミットで対応）
+  - `pages/admin/ai-integration.page.tsx` と `features/openai/client/components/AiIntegration/**`（AiIntegration / AiIntegrationDisableMode）を削除
+  - `AdminNavigation.tsx` のコメントアウト済み ai-integration メニュー（case / MenuLink / MenuLabel）を除去
+  - `admin.json` の `ai_integration.*`（ラベル + disable_mode_explanation）を全5ロケールから削除
+  - 観測可能な完了条件: admin に AI 連携ページ・ナビ・専用 i18n が存在せず、環境変数による AI 連携設定は維持される（typecheck クリーン・参照ゼロ）
+  - _Requirements: 10.2, 10.3_
+  - _Boundary: app-wide integration, i18n locales_
+  - _Depends: 5.1_
+
+- [x] 6.5 (P) openai 専用 i18n キーを全ロケールから削除
+  - アシスタント管理・ナレッジ／エディターアシスタント・共有スコープ警告・既定アシスタント等の専用キーを全対応ロケールから削除し、mastra が利用する共有キーは保持する
+  - 観測可能な完了条件: 全対応ロケールで専用キーが削除され、残る UI が削除済みキーを参照せず未翻訳表示を出さない
+  - _Requirements: 7.1, 7.2, 7.3, 7.4_
+  - _Boundary: i18n locales_
+  - _Depends: 5.1_
+
+- [ ] 7. 統合検証
+
+- [x] 7.1 lint・test・build と型チェックの完走
+  - 全体の lint・ユニット/結合テスト・本番ビルド・型チェックを実行し、未解決参照やリグレッションがないことを確認する
+  - 観測可能な完了条件: lint/test/build が成功し、AI 以外の既存機能に影響がない
+  - _Requirements: 1.4, 1.5_
+  - _Depends: 5.1, 5.2, 6.1, 6.2, 6.3, 6.4, 6.5_
+
+- [x] 7.2 結合テスト: チャット契約・既存スレッド・suggest-path 継続
+  - アシスタント識別子なしのチャット送信、既存スレッド再開、AI 無効時の利用不可、suggest-path のパス提案が従来どおり動作することを検証する
+  - 観測可能な完了条件: 上記の結合テストがいずれも成功する
+  - _Requirements: 6.1, 8.3, 9.2, 10.4_
+  - _Depends: 7.1_
+
+- [ ] 7.3 E2E: 新規チャット導線・スレッド一覧・AI 機能の不在確認
+  - 左サイドバーからの新規チャット起動と送受信、スレッド一覧の再開・削除・ページング、エディターの AI 不在、アシスタント UI（管理モーダル・一覧・ヘッダ起動ボタン）の不在、各言語での i18n 整合を確認する
+  - 観測可能な完了条件: 上記 E2E パスがいずれも成功する
+  - _Requirements: 2.2, 3.1, 3.2, 3.3, 3.5, 7.4, 8.1, 8.2, 9.1, 9.3_
+  - _Depends: 7.1_
+
+## Implementation Notes
+
+- **Task 1 (Foundation 検証, 完了)** 残置/削除の確定:
+  - **残置（retained surface）**: `features/openai/server/services/client-delegator/`（vectorStore/thread/file メソッドを除去しスリム化）、`server/services/is-ai-enabled.ts`、`server/routes/middlewares/certify-ai-service.ts`、`interfaces/ai.ts`（OpenaiServiceType）、`server/services/assistant/instructions/commons.ts`（`instructionsForInformationTypes` のみ・5.1 でトリム）。
+  - **削除可と確定**: `server/services/client.ts`（`openaiClient`）の唯一の参照元は削除対象の `server/routes/edit/index.ts`（エディターアシスタント）。client-delegator は client.ts を import していないため client.ts は残置不要 → 5.1 で削除。
+  - **unified merge view** は `features/openai/client/states/unified-merge-view.ts` + `client/services/editor-assistant/use-editor-assistant.tsx` 由来で、消費は `PageEditor.tsx` のみ。AI（エディターアシスタント）専用所有のため、4.3 で PageEditor から参照除去して安全。
+  - **トリム順序の制約**: `commons.ts` の未使用3定数（system/injection/file-search）は `assistant/editor-assistant.ts`・`chat-assistant.ts` がまだ使用しているため、トリムは消費側削除と同じ 5.1 で実施（先行タスクでトリムするとビルドが壊れる）。
+
+- **Task 7.1–7.3 検証エビデンス**:
+  - **Build**: `turbo run build --filter @growi/app` → 21/21 成功（全削除・移行後に未解決参照ゼロ。1.4）。
+  - **Typecheck**: `tsc --noEmit` → 残るエラーは 1 件のみで、master 由来の既存・無関係エラー（`20210913153942-...slack-app-integration-schema.integ.ts` の `.default`）。本仕様起因の型エラーなし。
+  - **Tests**: mastra + suggest-path 260 件パス。チャット契約（aiAssistantId 不要）・既存スレッド後方互換・suggest-path 継続を確認（6.1/8.3/9.2）。
+  - **AI 無効ゲート（10.4/8.4）**: mastra route factory `if(!isAiEnabled())`、get-openai-provider、左サイドバー nav（aiEnabledAtom）で維持を確認。
+  - **UI 不在（2.2/3.1/3.2/3.3/3.5）**: エディター AI トグル・アシスタント管理モーダル・マイ/チーム一覧・ページヘッダ起動ボタンの削除を grep+build で確認。
+  - **i18n（7.4）**: 削除キーへの live 参照ゼロ、共有キー保持を確認。
+  - **未実施（環境制約）**: ブラウザ Playwright による「新規チャット送受信」インタラクティブ E2E は、稼働中アプリ＋OpenAI 資格情報が必要なため本サンドボックスでは未実行。既存 E2E に AI 関連 spec は無く（cleanup 不要）。本フローは CI / 手動 QA での実機確認を推奨。`server:ci` 起動スモークは既存の migrate-mongo の `~` エイリアス解決問題（全 49 migration 共通の既存事象、本変更と無関係）により本環境では完走不可。
+
+- **追記（admin AI 連携ページの完全廃止）**: 6.4 当初のスリム化後、AiIntegration が実質空（接続/資格情報は環境変数管理）だったため、ページ・コンポーネント・admin ナビのコメント済み参照・`admin.json` の `ai_integration.*` を完全削除。admin ナビの ai-integration メニューは元々コメントアウト済み（到達不能）だった。typecheck クリーン、`ai-integration`/`AiIntegration` の src 参照ゼロを確認。
+  - **対象外（follow-up 候補）**: access-token scope の `admin:ai_integration`（read/write）と `features.ai_assistant` のスコープ定義・説明は `@growi/core` のスコープ enum 由来の別サブシステム。既存トークン/API 契約に関わり changeset を要するため本仕様では除去せず据え置き。

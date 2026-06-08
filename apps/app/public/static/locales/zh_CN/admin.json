@@ -1176,11 +1176,6 @@
   "forbidden_page": {
     "do_not_have_admin_permission": "没有管理权限的用户无法访问管理屏幕"
   },
-  "ai_integration": {
-    "ai_integration": "AI 集成",
-    "disable_mode_explanation": "目前，AI 集成已被禁用。若要启用，请配置 <code>AI_ENABLED</code> 环境变量以及其他必要的变量。<br><br>详细信息请参考<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>文档</a>。",
-    "ai_search_management": "AI 搜索管理"
-  },
   "admin_navigation": {
     "section_users": "用户",
     "section_data": "数据",

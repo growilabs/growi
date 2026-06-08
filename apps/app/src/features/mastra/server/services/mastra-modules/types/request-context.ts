@@ -18,7 +18,6 @@ import type SearchService from '~/server/service/search';
  *   the fields they need internally.
  */
 export type MastraRequestContextShape = {
-  vectorStoreId: string;
   user: IUserHasId;
   searchService: SearchService;
 };

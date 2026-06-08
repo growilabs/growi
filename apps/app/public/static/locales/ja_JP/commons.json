@@ -131,7 +131,6 @@
     "once_transfer_key_used": "※ 移行キーは一度移行に利用するとそれ以降はご利用いただけなくなります。",
     "transfer_to_growi_cloud": "※ 詳しくは <a href='{{documentationUrl}}ja/admin-guide/management-cookbook/g2g-transfer.html'> GROWI お引越し機能</a>をご確認ください。"
   },
-
   "accesstoken_scopes_desc": {
     "read": {
       "all": "全ての閲覧権限を付与できます。",
@@ -152,7 +151,6 @@
         "user_group_management": "ユーザーグループ管理の閲覧権限を付与できます。",
         "audit_log": "監査ログの閲覧権限を付与できます。",
         "plugin": "プラグインの閲覧権限を付与できます。",
-        "ai_integration": "AI連携設定の閲覧権限を付与できます。",
         "full_text_search": "全文検索管理の閲覧権限を付与できます。"
       },
       "user_settings": {
@@ -170,7 +168,7 @@
       },
       "features": {
         "all": "機能の閲覧権限を付与できます。",
-        "ai_assistant": "AIアシスタント機能の閲覧権限を付与できます。",
+        "ai": "AIアシスタント機能の閲覧権限を付与できます。",
         "page": "ページ機能の閲覧権限を付与できます。",
         "share_link": "共有リンク機能の閲覧権限を付与できます。",
         "bookmark": "ブックマーク機能の閲覧権限を付与できます。",
@@ -198,7 +196,6 @@
         "user_group_management": "ユーザーグループ管理の編集権限を付与できます。",
         "audit_log": "監査ログの編集権限を付与できます。",
         "plugin": "プラグインの編集権限を付与できます。",
-        "ai_integration": "AI連携設定の編集権限を付与できます。",
         "full_text_search": "全文検索管理の編集権限を付与できます。"
       },
       "user_settings": {
@@ -216,7 +213,7 @@
       },
       "features": {
         "all": "機能の編集権限を付与できます。",
-        "ai_assistant": "AIアシスタント機能の編集権限を付与できます。",
+        "ai": "AIアシスタント機能の編集権限を付与できます。",
         "page": "ページ機能の編集権限を付与できます。",
         "share_link": "共有リンク機能の編集権限を付与できます。",
         "bookmark": "ブックマーク機能の編集権限を付与できます。",
