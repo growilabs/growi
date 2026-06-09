@@ -5,45 +5,45 @@
 // from these keyframes so its position is never shifted by the slide animation
 @keyframes svg-slide-in {
   from {
-    transform: translateX(-12px);
     opacity: 0;
+    transform: translateX(-12px);
   }
   to {
-    transform: translateX(0);
     opacity: 1;
+    transform: translateX(0);
   }
 }
 
 @keyframes svg-slide-out {
   from {
-    transform: translateX(0);
     opacity: 1;
+    transform: translateX(0);
   }
   to {
-    transform: translateX(-12px);
     opacity: 0;
+    transform: translateX(-12px);
   }
 }
 
 @keyframes icon-slide-in {
   from {
-    transform: translateX(-12px) translateY(-50%);
     opacity: 0;
+    transform: translateX(-12px) translateY(-50%);
   }
   to {
-    transform: translateX(0) translateY(-50%);
     opacity: 1;
+    transform: translateX(0) translateY(-50%);
   }
 }
 
 @keyframes icon-slide-out {
   from {
-    transform: translateX(0) translateY(-50%);
     opacity: 1;
+    transform: translateX(0) translateY(-50%);
   }
   to {
-    transform: translateX(-12px) translateY(-50%);
     opacity: 0;
+    transform: translateX(-12px) translateY(-50%);
   }
 }
 
@@ -75,17 +75,17 @@
 // visual defaults — hidden until first hover
 .btn-toggle {
   :global(svg) {
+    opacity: 0;
     fill: var(--grw-primary-600);
     transform: translateX(-12px);
-    opacity: 0;
   }
 
   :global(.icon) {
     top: 50%;
     right: 0;
     font-size: 22px;
-    transform: translateX(-12px) translateY(-50%);
     opacity: 0;
+    transform: translateX(-12px) translateY(-50%);
   }
 }
 
@@ -132,12 +132,12 @@
   }
 
   .btn-toggle.is-visible :global(svg) {
-    transform: translateX(0);
     opacity: 1;
+    transform: translateX(0);
   }
 
   .btn-toggle.is-visible :global(.icon) {
-    transform: translateX(0) translateY(-50%);
     opacity: 1;
+    transform: translateX(0) translateY(-50%);
   }
 }
