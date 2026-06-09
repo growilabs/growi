@@ -12,6 +12,7 @@ const PasswordResetRequestForm: FC = () => {
   const { t } = useTranslation();
   const isMailerSetup = useAtomValue(isMailerSetupAtom);
   const [email, setEmail] = useState('');
+  const [isSubmitting, setIsSubmitting] = useState(false);
 
   const changeEmail = useCallback((inputValue) => {
     setEmail(inputValue);
@@ -25,11 +26,14 @@ const PasswordResetRequestForm: FC = () => {
         return;
       }
 
+      setIsSubmitting(true);
       try {
         await apiv3Post('/forgot-password', { email });
         toastSuccess(t('forgot_password.success_to_send_email'));
       } catch (err) {
         toastError(err);
+      } finally {
+        setIsSubmitting(false);
       }
     },
     [t, email],
@@ -58,7 +62,7 @@ const PasswordResetRequestForm: FC = () => {
                 placeholder="E-mail Address"
                 className="form-control"
                 type="email"
-                disabled={!isMailerSetup}
+                disabled={!isMailerSetup || isSubmitting}
                 onChange={(e) => changeEmail(e.target.value)}
               />
             </div>
@@ -67,8 +71,15 @@ const PasswordResetRequestForm: FC = () => {
             <button
               className="btn btn-lg btn-primary"
               type="submit"
-              disabled={!isMailerSetup}
+              disabled={!isMailerSetup || isSubmitting}
             >
+              {isSubmitting && (
+                <span
+                  className="spinner-border spinner-border-sm me-1"
+                  role="status"
+                  aria-hidden="true"
+                />
+              )}
               {t('forgot_password.send')}
             </button>
           </div>
