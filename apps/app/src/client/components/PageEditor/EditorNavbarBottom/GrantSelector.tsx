@@ -141,6 +141,27 @@ export const GrantSelector = (props: Props): JSX.Element => {
    * Render grant selector DOM.
    */
   const renderGrantSelector = useCallback(() => {
+    // Until the current page grant is loaded, selectedGrant is null. Show a loading
+    // state instead of defaulting the toggle to "Public", which would mislead the
+    // user about the page's actual visibility. See issue #11272.
+    if (selectedGrant == null) {
+      return (
+        <div
+          className="grw-grant-selector mb-0"
+          data-testid="grw-grant-selector"
+        >
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm w-100 d-flex justify-content-center align-items-center"
+            disabled
+            data-testid="grw-grant-selector-loading"
+          >
+            <LoadingSpinner />
+          </button>
+        </div>
+      );
+    }
+
     let dropdownToggleBtnColor: string | undefined;
     let dropdownToggleLabelElm: ReactNode | undefined;
 

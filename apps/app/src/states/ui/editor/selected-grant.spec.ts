@@ -3,7 +3,7 @@ import { GroupType, PageGrant } from '@growi/core';
 import type { IPageGrantData } from '~/interfaces/page';
 import { UserGroupPageGrantStatus } from '~/interfaces/page';
 
-import { toSelectedGrant } from './selected-grant';
+import { toPageUpdateGrantParams, toSelectedGrant } from './selected-grant';
 
 describe('toSelectedGrant', () => {
   it('maps the grant of the current page', () => {
@@ -51,5 +51,32 @@ describe('toSelectedGrant', () => {
     expect(toSelectedGrant(currentPageGrant).userRelatedGrantedGroups).toEqual([
       { item: 'granted-group', type: GroupType.userGroup },
     ]);
+  });
+});
+
+describe('toPageUpdateGrantParams', () => {
+  // When the grant has not been chosen/loaded (null), the update must omit grant
+  // so the server preserves the page's existing grant — see issue #11272.
+  it('omits grant fields when no grant is selected (null)', () => {
+    expect(toPageUpdateGrantParams(null)).toEqual({
+      grant: undefined,
+      userRelatedGrantUserGroupIds: undefined,
+    });
+  });
+
+  it('passes through the selected grant and granted groups', () => {
+    const userRelatedGrantedGroups = [
+      { item: 'group-1', type: GroupType.userGroup },
+    ];
+
+    expect(
+      toPageUpdateGrantParams({
+        grant: PageGrant.GRANT_USER_GROUP,
+        userRelatedGrantedGroups,
+      }),
+    ).toEqual({
+      grant: PageGrant.GRANT_USER_GROUP,
+      userRelatedGrantUserGroupIds: userRelatedGrantedGroups,
+    });
   });
 });
