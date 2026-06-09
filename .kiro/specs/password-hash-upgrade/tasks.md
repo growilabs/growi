@@ -2,14 +2,16 @@
 
 - [ ] 1. Foundation: bcryptjs 依存関係と PasswordHashService の構築
 - [ ] 1.1 apps/app/package.json に bcryptjs を dependencies として追加する
-  - `bcryptjs` ^3.x と `@types/bcryptjs` を `apps/app/package.json` の `dependencies` に追加する（Turbopack SSR externalization rule: サーバーサイドの static import はすべて `dependencies` へ）
+  - `bcryptjs` ^3.x を `apps/app/package.json` の `dependencies` に追加する（Turbopack SSR externalization rule: サーバーサイドの static import はすべて `dependencies` へ）
+  - `@types/bcryptjs` は追加しない（bcryptjs v3 は型定義を本体にバンドル済み。`@types/bcryptjs` は v2 API 向けのため型不整合を招く）
   - `pnpm install` を実行してロックファイルを更新する
   - `import bcrypt from 'bcryptjs'` が TypeScript で型エラーなく解決されることが確認できる
   - _Requirements: 1.1_
 
 - [ ] 1.2 PasswordHashService を実装する
   - `hash(plaintext)` を実装: `bcrypt.hash(plaintext, BCRYPT_COST)` — 常に bcrypt のみ使用、PASSWORD_SEED は不使用。`BCRYPT_COST` は環境変数でカスタム可能（デフォルト 12）
-  - `BCRYPT_COST` が 12 未満の場合は起動時に WARNING ログを出力する
+  - `BCRYPT_COST` が 12 未満の場合は 12 にクランプし、起動時に WARNING ログを出力する
+  - `BCRYPT_COST` が 15 を超える場合は 15 にクランプし、起動時に WARNING ログを出力する（DoS リスク軽減）
   - `verify(plaintext, bcryptHash, legacyHash, passwordSeed)` を実装:
     - `bcryptHash` あり → `bcrypt.compare()` で検証（`needsRehash: false`）
     - `bcryptHash` なし・`legacyHash` あり → `SHA-256(SEED + plaintext)` で検証（`needsRehash: true`）
@@ -89,21 +91,23 @@
   - _Requirements: 3.1, 3.2_
   - _Boundary: Status migration script_
 
-- [ ] 4.2 (P) Cleanup migration script を実装する
-  - `20260514000002-password-hash-cleanup` マイグレーションを作成する
-  - `up()` 開始時に `legacyOnly` ユーザー数（`bcryptPassword` なし・`password` あり）を取得する
-  - `legacyOnly > 0` の場合: `throw new Error(...)` でマイグレーションを中断し、件数をエラーメッセージに含める（Req 3.4）
+- [ ] 4.2 (P) Cleanup standalone script を実装する
+  - `apps/app/src/server/scripts/password-hash-cleanup.ts` を作成する（migrate-mongo 対象外の standalone スクリプト）
+  - スクリプト開始時に `legacyOnly` ユーザー数（`bcryptPassword` なし・`password` あり）を取得する
+  - `legacyOnly > 0` の場合: エラーメッセージ（件数含む）を出力して process.exit(1) する（Req 3.4）
   - `legacyOnly === 0` の場合: `updateMany({ bcryptPassword: { $exists: true }, password: { $exists: true } }, { $unset: { password: '' } })` を実行する（Req 3.3）
   - `legacyOnly > 0` 時に abort されて DB に変更が加えられておらず、エラーメッセージに件数が含まれていることが確認できる
   - _Requirements: 3.3, 3.4_
   - _Boundary: Cleanup migration script_
 
-- [ ] 4.3 (P) Downgrade prep migration script を実装する
-  - `20260514000003-password-hash-downgrade-prep` マイグレーションを作成する
-  - `up()` 内でダウングレード後にログイン不可になるユーザー数（`bcryptPassword` あり・`password` なし）を集計してログ出力する（Req 4.1）
+- [ ] 4.3 (P) Downgrade prep standalone script を実装する
+  - `apps/app/src/server/scripts/password-hash-downgrade-prep.ts` を作成する（Crowi bootstrap が必要な standalone スクリプト）
+  - スクリプト内でダウングレード後にログイン不可になるユーザー数（`bcryptPassword` あり・`password` なし）を集計してログ出力する（Req 4.1）
   - 環境変数 `SEND_RESET_EMAILS` が `'true'` の場合:
     - 対象ユーザーごとに `PasswordResetOrder` を作成して既存メールサービスでリセットメールを送信する（Req 4.2）
-    - 対象ユーザーの `bcryptPassword` を `null` に設定してログイン不可化する（Req 4.3）
+    - **メール送信成功を確認してから**、成功したユーザーのみ `bcryptPassword` を `null` に設定してログイン不可化する（Req 4.3）
+    - 送信失敗ユーザーは `bcryptPassword` を null 化しない（次回再実行でリトライ可能）
+    - 成功・失敗件数を INFO/WARNING でそれぞれログ出力する
   - `SEND_RESET_EMAILS` 未設定時に集計カウントのみ出力されて DB が変更されないことが確認できる
   - _Requirements: 4.1, 4.2, 4.3_
   - _Boundary: Downgrade prep migration script_
@@ -117,17 +121,17 @@
   - _Requirements: 3.1, 3.2_
   - _Boundary: Status migration script_
 
-- [ ] 5.2 (P) Cleanup migration script の統合テストを作成する
-  - `legacyOnly` ユーザーが存在する状態で `up()` が abort し、ユーザードキュメントが変更されないことを確認する
+- [ ] 5.2 (P) Cleanup standalone script の統合テストを作成する
+  - `legacyOnly` ユーザーが存在する状態でスクリプト実行が中断し、ユーザードキュメントが変更されないことを確認する
   - 全ユーザーが `bcryptPassword` 移行済みの状態で `password` フィールドが `$unset` されることを確認する
   - 統合テストが PASS することが確認できる
   - _Requirements: 3.3, 3.4_
   - _Boundary: Cleanup migration script_
 
-- [ ] 5.3 (P) Downgrade prep migration script の統合テストを作成する
+- [ ] 5.3 (P) Downgrade prep standalone script の統合テストを作成する
   - `SEND_RESET_EMAILS` 未設定時に DB が変更されずカウントのみ出力されることを確認する
   - `SEND_RESET_EMAILS=true` 時に対象ユーザーの `PasswordResetOrder` が作成されることを確認する
-  - `SEND_RESET_EMAILS=true` 時に対象ユーザーの `bcryptPassword` が `null` になっていることを確認する
+  - `SEND_RESET_EMAILS=true` 時にメール送信成功ユーザーのみ `bcryptPassword` が `null` になり、送信失敗ユーザーの `bcryptPassword` が変更されないことを確認する
   - 統合テストが PASS することが確認できる
   - _Requirements: 4.1, 4.2, 4.3_
   - _Boundary: Downgrade prep migration script_

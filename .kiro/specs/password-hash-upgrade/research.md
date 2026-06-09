@@ -110,6 +110,8 @@
 - **Passport LocalStrategy の async 化** — 現行は同期コールバック。async 化でエラーハンドリングが変わる → try/catch で done(err) を明示的に呼ぶ
 - **bcryptjs の 72 バイト制限** — bcrypt は 72 バイト超を切り捨て。GROWI のパスワードポリシーが 72 バイト超を許可する場合に問題 → 要確認。通常の日本語ユーザーが入力するパスワードでは問題になりにくい
 - **Legacy ユーザーが長期ログインしない** — lazy migration のみでは永遠に SHA-256 のまま残るユーザーが存在しうる → Status migration で定期的に確認し、一定期間後に強制リセットを別途検討（本スコープ外）
+- **ユーザー列挙タイミング攻撃（bcrypt 化で顕在化）** — 存在しないユーザーは即時返却、存在するユーザーは bcrypt.compare() により ~200-400ms かかるため、応答時間差でユーザーの存在を推測できる。SHA-256 時代より差が桁違いに顕著になる。緩和: ユーザー不存在時もダミー bcrypt 比較を実行する（本スコープではログインエンドポイントのレート制限が既存か確認を推奨。なければ別タスク）
+- **legacy SHA-256 パスの非定数時間比較** — `this.password === generatePassword(password)` は厳密な定数時間比較ではないが、平文ではなくハッシュ同士を比較しているため実際の攻撃リスクは極めて低い。`PasswordHashService.verify()` の legacy パスで `crypto.timingSafeEqual` を使うことで完全に解消可能（必須ではない）
 
 ---
 
