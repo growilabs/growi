@@ -11,12 +11,8 @@ import { DropendMenu } from './DropendMenu';
 import { DropendToggle } from './DropendToggle';
 import { useCreateNewPage, useCreateTodaysMemo } from './hooks';
 
-import styles from './PageCreateButton.module.scss';
-
 export const PageCreateButton = React.memo((): JSX.Element => {
   const [isHovered, setIsHovered] = useState(false);
-  const [hasHovered, setHasHovered] = useState(false);
-
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const { open: openPageCreateModal } = usePageCreateModalActions();
@@ -42,18 +38,17 @@ export const PageCreateButton = React.memo((): JSX.Element => {
 
   const onMouseEnterHandler = () => {
     setIsHovered(true);
-    setHasHovered(true);
   };
 
   const onMouseLeaveHandler = () => {
-    if (!dropdownOpen) setIsHovered(false);
+    setIsHovered(false);
   };
 
   const toggle = () => {
-    const next = !dropdownOpen;
-    setDropdownOpen(next);
-    if (!next) setIsHovered(false);
+    setDropdownOpen((v) => !v);
   };
+
+  const isVisible = isHovered || dropdownOpen;
 
   return (
     <fieldset
@@ -76,9 +71,9 @@ export const PageCreateButton = React.memo((): JSX.Element => {
         isOpen={dropdownOpen}
         toggle={toggle}
         direction="end"
-        className={`position-absolute ${styles['dropend-wrapper']}${hasHovered ? ` ${styles['has-hovered']}` : ''}${isHovered ? ` ${styles['is-hovered']}` : ''}`}
+        className="position-absolute"
       >
-        <DropendToggle isOpen={dropdownOpen} isVisible={isHovered} />
+        <DropendToggle isOpen={dropdownOpen} isVisible={isVisible} />
         <DropendMenu
           onClickCreateNewPage={createNewPageWithToastr}
           onClickOpenPageCreateModal={() =>
