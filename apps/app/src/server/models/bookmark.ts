@@ -22,6 +22,24 @@ getOrCreateModel('Bookmark', bookmarkSchema);
 
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
+    result: {
+      bookmarks: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
+      },
+    },
     model: {
       bookmarks: {
         async countByPageId(pageId: Types.ObjectId | string): Promise<number> {
