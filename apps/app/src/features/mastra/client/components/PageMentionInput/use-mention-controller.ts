@@ -68,6 +68,12 @@ export const useMentionController = (
     limit: SEARCH_LIMIT,
   });
 
+  // While the live query has outrun the debounced one, the search for the latest
+  // keystrokes has not started yet (searchKeyword still points at the previous
+  // value or null). Treat this window as loading so the panel shows "searching"
+  // instead of momentarily flashing "no results" before the request fires.
+  const searchPending = isOpen && query.length >= 1 && debouncedQuery !== query;
+
   const candidates: readonly PagePathCandidate[] = useMemo(
     () => data?.data.map(toPagePathCandidate) ?? [],
     [data],
@@ -153,7 +159,9 @@ export const useMentionController = (
     query,
     highlightedIndex,
     candidates,
-    isLoading: isLoading ?? false,
+    // Fold the debounce-pending window into loading so the panel never flashes
+    // "no results" before the request for the latest query fires (#1).
+    isLoading: (isLoading ?? false) || searchPending,
     moveUp,
     moveDown,
     setHighlightedIndex: setHighlight,

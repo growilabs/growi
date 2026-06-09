@@ -157,6 +157,33 @@ describe('useMentionController', () => {
     });
   });
 
+  describe('loading state during debounce (#1)', () => {
+    it('reports loading while the live query has outrun the debounced search', () => {
+      // SWR stays idle (no result configured). Without folding the pending
+      // window into loading, the panel would see an empty candidate set the
+      // instant the user types and flash "no results" before the request fires.
+      const { result, rerender } = renderHook(
+        ({ s }) => useMentionController(null, s),
+        { initialProps: { s: activeSession({ query: '' }) } },
+      );
+
+      // User types the first query characters: the live query changes but the
+      // debounce has not settled, so the search for "foo" has not started yet.
+      act(() => rerender({ s: activeSession({ query: 'foo' }) }));
+
+      // Contract: the panel is told it is loading (→ "searching"), not that the
+      // result set is empty (→ "no results").
+      expect(result.current.isLoading).toBe(true);
+      expect(result.current.candidates).toHaveLength(0);
+
+      // Once the debounce flushes, loading reflects the real (idle) SWR state.
+      act(() => {
+        vi.runAllTimers();
+      });
+      expect(result.current.isLoading).toBe(false);
+    });
+  });
+
   describe('highlight navigation (2.2)', () => {
     const withTwoCandidates = () => {
       setSearchResult({
