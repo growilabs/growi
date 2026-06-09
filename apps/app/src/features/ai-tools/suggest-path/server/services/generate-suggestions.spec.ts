@@ -1,4 +1,5 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
+import { Lang } from '@growi/core/dist/interfaces';
 
 import type {
   ContentAnalysis,
@@ -53,6 +54,7 @@ vi.mock('~/utils/logger', () => ({
 const mockUser = {
   _id: 'user123',
   username: 'alice',
+  lang: Lang.ja_JP,
 } as unknown as IUserHasId;
 
 const mockUserGroups = [
@@ -186,11 +188,12 @@ describe('generateSuggestions', () => {
       expect(result[2].grant).toBe(4);
     });
 
-    it('should pass correct arguments to analyzeContent', async () => {
+    it("should pass the content body and the user's language to analyzeContent", async () => {
       await callGenerateSuggestions();
 
       expect(mocks.analyzeContentMock).toHaveBeenCalledWith(
         'Some page content',
+        Lang.ja_JP,
       );
     });
 
