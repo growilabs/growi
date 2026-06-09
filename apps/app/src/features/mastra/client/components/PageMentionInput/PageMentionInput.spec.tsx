@@ -2,6 +2,12 @@
 
 import { EditorView } from '@codemirror/view';
 import { act, render } from '@testing-library/react';
+import { mock } from 'vitest-mock-extended';
+
+import type {
+  IFormattedSearchResult,
+  IPageWithSearchMeta,
+} from '~/interfaces/search';
 
 import { addMention } from './editor-state/mention-decoration';
 import { MENTION_LISTBOX_ID, mentionOptionId } from './mention-aria';
@@ -9,10 +15,34 @@ import { PageMentionInput } from './PageMentionInput';
 
 // --- Search store mock (the data boundary) ---------------------------------
 // useMentionController (rendered inside PageMentionInput) calls useSWRxSearch.
-// Stub it so the component renders without a real network/SWR dependency.
-vi.mock('~/stores/search', () => ({
-  useSWRxSearch: () => ({ data: undefined, isLoading: false }),
+// Stub it with a controllable return so a test can make candidates appear.
+const { searchState } = vi.hoisted(() => ({
+  searchState: {
+    current: {
+      data: undefined as IFormattedSearchResult | undefined,
+      isLoading: false,
+    },
+  },
 }));
+vi.mock('~/stores/search', () => ({
+  useSWRxSearch: () => searchState.current,
+}));
+
+/** Build a minimal, type-safe search result with the given page paths. */
+const setSearchResult = (
+  pages: ReadonlyArray<{ id: string; path: string }>,
+): void => {
+  searchState.current = {
+    data: mock<IFormattedSearchResult>({
+      data: pages.map((p) =>
+        mock<IPageWithSearchMeta>({
+          data: mock<IPageWithSearchMeta['data']>({ _id: p.id, path: p.path }),
+        }),
+      ),
+    }),
+    isLoading: false,
+  };
+};
 
 // i18n: return the key itself (MentionCandidateList consumes useTranslation).
 vi.mock('react-i18next', () => ({
@@ -43,6 +73,10 @@ const getView = (container: HTMLElement): EditorView => {
 };
 
 describe('PageMentionInput', () => {
+  beforeEach(() => {
+    searchState.current = { data: undefined, isLoading: false };
+  });
+
   describe('hidden form field (6.1)', () => {
     it('renders a hidden input[name="message"]', () => {
       render(<PageMentionInput value="" onChange={vi.fn()} />);
@@ -151,8 +185,20 @@ describe('PageMentionInput', () => {
     });
   });
 
-  describe('combobox ARIA wiring (#10)', () => {
-    it('sets aria-controls / aria-activedescendant on the editor while a session is open, and clears them when closed', () => {
+  describe('combobox ARIA wiring (#10 / #2)', () => {
+    // The combobox relationship must point at the listbox/option ids only while
+    // those elements are actually rendered. Use fake timers to drive the search
+    // debounce deterministically (typing → "searching" → settled listbox).
+    beforeEach(() => {
+      vi.useFakeTimers();
+    });
+    afterEach(() => {
+      vi.runOnlyPendingTimers();
+      vi.useRealTimers();
+    });
+
+    it('references the listbox only once it renders (>= 1 candidate), then clears on close', () => {
+      setSearchResult([{ id: 'p1', path: '/docs/foo' }]);
       const { container } = render(
         <PageMentionInput value="" onChange={vi.fn()} />,
       );
@@ -170,6 +216,15 @@ describe('PageMentionInput', () => {
         });
       });
 
+      // During the debounce window the panel shows "searching" (no listbox yet),
+      // so the editor must not reference a not-yet-rendered listbox (#2).
+      expect(view.contentDOM.getAttribute('aria-controls')).toBeNull();
+
+      // Flush the debounce: the search settles, the listbox + options render,
+      // and only now does the editor point at them.
+      act(() => {
+        vi.runAllTimers();
+      });
       expect(view.contentDOM.getAttribute('aria-controls')).toBe(
         MENTION_LISTBOX_ID,
       );
@@ -181,7 +236,41 @@ describe('PageMentionInput', () => {
       act(() => {
         view.dispatch({ changes: { from: 0, to: 4, insert: '' } });
       });
+      expect(view.contentDOM.getAttribute('aria-controls')).toBeNull();
+      expect(view.contentDOM.getAttribute('aria-activedescendant')).toBeNull();
+    });
 
+    it('never references a non-existent listbox in the hint / no-results states (#2)', () => {
+      // No candidates configured → the search settles to the no-results state.
+      const { container } = render(
+        <PageMentionInput value="" onChange={vi.fn()} />,
+      );
+      const view = getView(container);
+
+      // Empty-query hint: session is open but only a hint row shows (no listbox).
+      act(() => {
+        view.dispatch({
+          changes: { from: 0, insert: '@' },
+          selection: { anchor: 1 },
+        });
+      });
+      act(() => {
+        vi.runAllTimers();
+      });
+      expect(view.contentDOM.getAttribute('aria-controls')).toBeNull();
+      expect(view.contentDOM.getAttribute('aria-activedescendant')).toBeNull();
+
+      // No-results: a query is present but the search returns nothing. Still no
+      // listbox in the DOM, so still no dangling references.
+      act(() => {
+        view.dispatch({
+          changes: { from: 1, insert: 'foo' },
+          selection: { anchor: 4 },
+        });
+      });
+      act(() => {
+        vi.runAllTimers();
+      });
       expect(view.contentDOM.getAttribute('aria-controls')).toBeNull();
       expect(view.contentDOM.getAttribute('aria-activedescendant')).toBeNull();
     });

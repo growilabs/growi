@@ -234,16 +234,27 @@ export const PageMentionInput = ({
     });
   }, [disabled]);
 
-  // Combobox ARIA bridge (#10): while the candidate listbox is open, expose
-  // `aria-controls` (the listbox) and `aria-activedescendant` (the highlighted
-  // option) on the editor's contentDOM so screen readers announce the active
-  // candidate as the user navigates with the keyboard. Cleared when closed.
+  // Combobox ARIA bridge (#10): expose `aria-controls` (the listbox) and
+  // `aria-activedescendant` (the highlighted option) on the editor's contentDOM
+  // so screen readers announce the active candidate during keyboard navigation.
+  //
+  // Emit them ONLY while the listbox and its options are actually in the DOM.
+  // MentionCandidateList renders the listbox under exactly this condition (open
+  // session + non-empty query + settled search + ≥1 candidate); in the hint /
+  // searching / no-results states it shows a status row with no listbox, so
+  // referencing the listbox / option ids there would dangle (#2). Keep this
+  // predicate in sync with MentionCandidateList's option-rendering branch.
+  const listboxVisible =
+    controller.isOpen &&
+    controller.query.length >= 1 &&
+    !controller.isLoading &&
+    controller.candidates.length > 0;
   useEffect(() => {
     const v = viewRef.current;
     if (v == null) {
       return;
     }
-    const attrs: Record<string, string> = controller.isOpen
+    const attrs: Record<string, string> = listboxVisible
       ? {
           'aria-controls': MENTION_LISTBOX_ID,
           'aria-activedescendant': mentionOptionId(controller.highlightedIndex),
@@ -254,7 +265,7 @@ export const PageMentionInput = ({
         EditorView.contentAttributes.of(attrs),
       ),
     });
-  }, [controller.isOpen, controller.highlightedIndex]);
+  }, [listboxVisible, controller.highlightedIndex]);
 
   return (
     <div className="tw:relative tw:w-full">
