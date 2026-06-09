@@ -11,12 +11,23 @@ const apiv3Root = '/_api/v3';
 const logger = loggerFactory('growi:apiv3');
 
 const apiv3ErrorHandler = (_err: any): any[] => {
+  const isAxiosErr = axios.isAxiosError(_err);
+
   // extract api errors from general 400 err
-  const err = axios.isAxiosError(_err) ? _err.response?.data.errors : _err;
-  const errs = toArrayIfNot(err);
-  const errorInfo = axios.isAxiosError(_err)
-    ? _err.response?.data.info
-    : undefined;
+  const err = isAxiosErr ? _err.response?.data?.errors : _err;
+  let errs = toArrayIfNot(err);
+
+  // Fallback: when no structured apiv3 errors can be extracted
+  // (network failure, request timeout, proxy/HTML error page, non-apiv3 endpoint),
+  // surface the underlying error instead of an empty array. Otherwise callers that
+  // do `toastError(err)` would silently show nothing, leaving the user unaware of
+  // the failure (see #11281).
+  if (errs.length === 0) {
+    const fallback = isAxiosErr ? new Error(_err.message) : _err;
+    errs = toArrayIfNot(fallback);
+  }
+
+  const errorInfo = isAxiosErr ? _err.response?.data?.info : undefined;
 
   for (const err of errs) {
     logger.error(err.message);
