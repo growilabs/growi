@@ -32,7 +32,7 @@ export const generateSuggestions = async (
   // 1st AI call: Content analysis (keyword extraction + flow/stock classification)
   let analysis: ContentAnalysis;
   try {
-    analysis = await analyzeContent(body);
+    analysis = await analyzeContent(body, user.lang);
   } catch (err) {
     logger.error('Content analysis failed, falling back to memo only:', err);
     return [memoSuggestion];
