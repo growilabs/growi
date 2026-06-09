@@ -780,6 +780,8 @@
       "send_temporary_password": "招待メールを送っていない場合、この画面で仮パスワードをコピーし、招待者へ連絡してください。",
       "send_email": "ユーザーテーブルのドロップダウンから招待メールの送信または再送信を行うこともできます。",
       "existing_email": "以下のEmailはすでに存在しています。",
+      "whitelist_violation": "以下のメールアドレスはホワイトリストに含まれていません：",
+      "reason_email_not_in_whitelist": "ホワイトリストに含まれていません",
       "issue": "発行"
     },
     "user_table": {

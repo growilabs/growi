@@ -558,8 +558,25 @@ module.exports = (crowi) => {
       const emailList = Array.from(new Set(req.body.shapedEmailList));
       let failedEmailList = [];
 
+      // Filter out emails that are not in the whitelist
+      const { validEmailList, invalidEmailList } = emailList.reduce(
+        (acc, email) => {
+          if (User.isEmailValid(email)) {
+            acc.validEmailList.push(email);
+          } else {
+            acc.invalidEmailList.push({
+              email,
+              reason: 'email_not_in_whitelist',
+            });
+          }
+          return acc;
+        },
+        { validEmailList: [], invalidEmailList: [] },
+      );
+      failedEmailList = failedEmailList.concat(invalidEmailList);
+
       // Create users
-      const createUser = await User.createUsersByEmailList(emailList);
+      const createUser = await User.createUsersByEmailList(validEmailList);
       if (createUser.failedToCreateUserEmailList.length > 0) {
         failedEmailList = failedEmailList.concat(
           createUser.failedToCreateUserEmailList,

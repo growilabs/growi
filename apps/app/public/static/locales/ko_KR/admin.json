@@ -771,6 +771,8 @@
       "send_temporary_password": "초대 이메일을 보내지 않은 경우, 이 화면에서 임시 비밀번호를 복사하여 초대자에게 연락하십시오.",
       "send_email": "사용자 테이블의 드롭다운에서 초대 이메일을 보내거나 다시 보낼 수도 있습니다.",
       "existing_email": "다음 이메일은 이미 존재합니다.",
+      "whitelist_violation": "다음 이메일 주소는 화이트리스트에 포함되어 있지 않습니다:",
+      "reason_email_not_in_whitelist": "화이트리스트에 포함되어 있지 않습니다",
       "issue": "발급"
     },
     "user_table": {
