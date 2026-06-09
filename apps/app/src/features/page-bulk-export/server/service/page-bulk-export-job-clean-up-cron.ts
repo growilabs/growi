@@ -85,8 +85,30 @@ class PageBulkExportJobCleanUpCronService extends CronService {
       completedAt: { $lt: thresholdDate },
     });
 
+    // Pick one "owner" job per shared attachment. When multiple jobs in this
+    // batch reference the same attachment (e.g. the duplicate-reuse path that
+    // re-binds an existing attachment to a new job), only the owner is allowed
+    // to call removeAttachment. Without this, the concurrent cleanup loop below
+    // would issue removeAttachment for the same attachment from each sibling,
+    // and the loser of the race would throw "Attachment not found" / GridFS
+    // "File not found", leaving its job record undeleted as a permanent zombie.
+    const attachmentOwnerJobIds = new Map<string, string>();
+    for (const job of downloadExpiredExportJobs) {
+      const attachmentKey = job.attachment?.toString();
+      if (attachmentKey == null) continue;
+      if (!attachmentOwnerJobIds.has(attachmentKey)) {
+        attachmentOwnerJobIds.set(attachmentKey, job._id.toString());
+      }
+    }
+
     const cleanUp = async (job: PageBulkExportJobDocument) => {
       await pageBulkExportJobCronService?.cleanUpExportJobResources(job);
+
+      const attachmentKey = job.attachment?.toString();
+      if (attachmentKey == null) return;
+      const isAttachmentOwner =
+        attachmentOwnerJobIds.get(attachmentKey) === job._id.toString();
+      if (!isAttachmentOwner) return;
 
       const hasSameAttachmentAndDownloadNotExpired =
         await PageBulkExportJob.findOne({
