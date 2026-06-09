@@ -59,5 +59,4 @@ export interface PageMentionInputProps {
   value: string; // flattened path string (for submission / empty check)
   onChange: (value: string) => void; // returns the flatten result on each doc change
   placeholder?: string;
-  disabled?: boolean;
 }

@@ -115,10 +115,20 @@ export const ChatSidebar = (): JSX.Element => {
   }, [savedMessages, setMessages]);
 
   const handleSubmit = (message: PromptInputMessage) => {
+    // The input stays editable while the assistant responds so the user can
+    // compose the next message, but starting a new request is suppressed until
+    // the current one settles. This guards both the submit button and the
+    // keymap's Enter→requestSubmit path against double-sending while busy (#5).
+    if (status === 'submitted' || status === 'streaming') {
+      return;
+    }
+    // Nothing to send for an empty (or whitespace-only) message.
+    const text = message.text ?? '';
+    if (text.trim().length === 0) {
+      return;
+    }
     sendMessage(
-      {
-        text: message.text || 'Hello World',
-      },
+      { text },
       {
         body: buildMessageRequestBody(chatThreadId),
       },

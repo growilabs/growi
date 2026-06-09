@@ -9,7 +9,6 @@ import {
 } from '@codemirror/view';
 
 import { LinkedPagePath } from '~/models/linked-page-path';
-import { cn } from '~/utils/shadcn-ui';
 
 import {
   createPageMentionExtensions,
@@ -85,14 +84,9 @@ export const PageMentionInput = ({
   value,
   onChange,
   placeholder,
-  disabled,
 }: PageMentionInputProps): JSX.Element => {
   const containerRef = useRef<HTMLDivElement>(null);
   const viewRef = useRef<EditorView | null>(null);
-
-  // Compartment so editability can be reconfigured when `disabled` changes
-  // without recreating the view.
-  const editableCompartmentRef = useRef(new Compartment());
 
   // Compartment for the combobox ARIA attributes on the editor's contentDOM
   // (aria-controls / aria-activedescendant), reconfigured as the candidate
@@ -157,9 +151,6 @@ export const PageMentionInput = ({
           editorTheme,
           contentDataSlot,
           cmPlaceholder(placeholder ?? ''),
-          // Initialised editable; the `disabled` effect reconfigures this
-          // compartment (reading `disabled` here would force a remount).
-          editableCompartmentRef.current.of(EditorView.editable.of(true)),
           // Combobox ARIA attributes; reconfigured by the effect below. Closed
           // initially (no listbox to reference).
           ariaCompartmentRef.current.of(EditorView.contentAttributes.of({})),
@@ -221,19 +212,6 @@ export const PageMentionInput = ({
     }
   }, [value]);
 
-  // Reflect the disabled prop onto the editor's editability.
-  useEffect(() => {
-    const v = viewRef.current;
-    if (v == null) {
-      return;
-    }
-    v.dispatch({
-      effects: editableCompartmentRef.current.reconfigure(
-        EditorView.editable.of(!disabled),
-      ),
-    });
-  }, [disabled]);
-
   // Combobox ARIA bridge (#10): expose `aria-controls` (the listbox) and
   // `aria-activedescendant` (the highlighted option) on the editor's contentDOM
   // so screen readers announce the active candidate during keyboard navigation.
@@ -272,10 +250,7 @@ export const PageMentionInput = ({
       <div
         ref={containerRef}
         data-slot="page-mention-input"
-        className={cn(
-          'tw:w-full tw:text-sm',
-          disabled && 'tw:pointer-events-none tw:opacity-50',
-        )}
+        className="tw:w-full tw:text-sm"
       />
 
       {/* Carries the flattened submit text to the existing form path (6.1). */}
