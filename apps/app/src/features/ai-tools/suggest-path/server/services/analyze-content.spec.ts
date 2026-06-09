@@ -1,5 +1,15 @@
+import { Lang } from '@growi/core/dist/interfaces';
+
 import type { ContentAnalysis } from '../../interfaces/suggest-path-types';
 import { analyzeContent } from './analyze-content';
+
+const getSystemPromptOfLastCall = (): string => {
+  const lastCall = mocks.chatCompletionMock.mock.calls.at(-1)?.[0] as {
+    messages: { role: string; content: string }[];
+  };
+  const systemMessage = lastCall.messages.find((m) => m.role === 'system');
+  return systemMessage?.content ?? '';
+};
 
 const mocks = vi.hoisted(() => {
   return {
@@ -210,6 +220,59 @@ describe('analyzeContent', () => {
       );
 
       expect(result.informationType).toBe('stock');
+    });
+  });
+
+  describe('keyword language alignment (#184974)', () => {
+    const okResponse = {
+      choices: [
+        {
+          message: {
+            content: JSON.stringify({
+              keywords: ['keyword'],
+              informationType: 'stock',
+            }),
+          },
+        },
+      ],
+    };
+
+    it("should instruct the LLM to emit keywords in the user's language when it is non-English", async () => {
+      mocks.chatCompletionMock.mockResolvedValue(okResponse);
+
+      await analyzeContent('プレゼンテーション機能の設計', Lang.ja_JP);
+
+      const systemPrompt = getSystemPromptOfLastCall();
+      expect(systemPrompt).toContain('Japanese');
+      // both-languages steering, so English-titled pages are still retrievable
+      expect(systemPrompt).toContain('English');
+    });
+
+    it('should not add a language instruction when language is unset (backward compatible)', async () => {
+      mocks.chatCompletionMock.mockResolvedValue(okResponse);
+
+      await analyzeContent('presentation feature design');
+
+      const systemPrompt = getSystemPromptOfLastCall();
+      expect(systemPrompt).not.toContain('The wiki this content will be saved');
+    });
+
+    it('should not add a language instruction when the user language is English', async () => {
+      mocks.chatCompletionMock.mockResolvedValue(okResponse);
+
+      await analyzeContent('presentation feature design', Lang.en_US);
+
+      const systemPrompt = getSystemPromptOfLastCall();
+      expect(systemPrompt).not.toContain('The wiki this content will be saved');
+    });
+
+    it('should reference the matching language name for a non-Japanese, non-English language', async () => {
+      mocks.chatCompletionMock.mockResolvedValue(okResponse);
+
+      await analyzeContent('présentation', Lang.fr_FR);
+
+      const systemPrompt = getSystemPromptOfLastCall();
+      expect(systemPrompt).toContain('French');
     });
   });
 
