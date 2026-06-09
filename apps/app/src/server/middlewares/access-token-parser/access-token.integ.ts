@@ -183,6 +183,44 @@ describe('access-token-parser middleware for access token with scopes', () => {
     expect(serializeUserSecurely).toHaveBeenCalledOnce();
   });
 
+  it('should authenticate with token supplied in X-GROWI-ACCESS-TOKEN header', async () => {
+    // arrange
+    const reqMock = mock<AccessTokenParserReq>({
+      user: undefined,
+    });
+    const resMock = mock<Response>();
+
+    expect(reqMock.user).toBeUndefined();
+
+    // prepare a user
+    const targetUser = await User.create({
+      name: faker.person.fullName(),
+      username: faker.string.uuid(),
+      password: faker.internet.password(),
+      lang: 'en_US',
+    });
+
+    // generate token with a wildcard (parent) scope
+    const { token } = await AccessToken.generateToken(
+      targetUser._id,
+      new Date(Date.now() + 1000 * 60 * 60 * 24),
+      [SCOPE.READ.USER_SETTINGS.ALL],
+    );
+
+    // act - supply the token via the X-GROWI-ACCESS-TOKEN header (Express lowercases keys),
+    // and require a narrower scope to also exercise scope satisfaction
+    reqMock.headers['x-growi-access-token'] = token;
+    await parserForAccessToken([SCOPE.READ.USER_SETTINGS.INFO])(
+      reqMock,
+      resMock,
+    );
+
+    // assert
+    expect(reqMock.user).toBeDefined();
+    expect(reqMock.user?._id).toStrictEqual(targetUser._id);
+    expect(serializeUserSecurely).toHaveBeenCalledOnce();
+  });
+
   it('should authenticate with wildcard scope', async () => {
     // arrange
     const reqMock = mock<AccessTokenParserReq>({
