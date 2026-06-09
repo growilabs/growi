@@ -1,10 +1,4 @@
-import React, {
-  type JSX,
-  type ReactNode,
-  useCallback,
-  useEffect,
-  useState,
-} from 'react';
+import React, { type JSX, type ReactNode, useCallback, useState } from 'react';
 import { GroupType, getIdForRef, PageGrant } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
@@ -22,7 +16,7 @@ import type { UserRelatedGroupsData } from '~/interfaces/page';
 import { UserGroupPageGrantStatus } from '~/interfaces/page';
 import { useCurrentUser } from '~/states/global';
 import { useCurrentPageId } from '~/states/page';
-import { useSelectedGrant } from '~/states/ui/editor';
+import { toSelectedGrant, useSelectedGrant } from '~/states/ui/editor';
 import { useSWRxCurrentGrantData } from '~/stores/page';
 
 const AVAILABLE_GRANTS = [
@@ -79,26 +73,14 @@ export const GrantSelector = (props: Props): JSX.Element => {
   const currentPageGrantData = grantData?.grantData.currentPageGrant;
   const groupGrantData = currentPageGrantData?.groupGrantData;
 
+  // Re-apply the current page grant when the user (re)opens the group selection,
+  // so the modal reflects the groups currently granted to the page.
+  // Initial sync of selectedGrantAtom is owned by useSyncSelectedGrantWithCurrentPage
+  // (called from the always-mounted SavePageControls) — see issue #11272.
   const applyCurrentPageGrantToSelectedGrant = useCallback(() => {
-    const currentPageGrant = grantData?.grantData.currentPageGrant;
-    if (currentPageGrant == null) return;
-
-    const userRelatedGrantedGroups =
-      currentPageGrant.groupGrantData?.userRelatedGroups
-        .filter((group) => group.status === UserGroupPageGrantStatus.isGranted)
-        ?.map((group) => {
-          return { item: group.id, type: group.type };
-        }) ?? [];
-    setSelectedGrant({
-      grant: currentPageGrant.grant,
-      userRelatedGrantedGroups,
-    });
-  }, [grantData?.grantData.currentPageGrant, setSelectedGrant]);
-
-  // sync grant data
-  useEffect(() => {
-    applyCurrentPageGrantToSelectedGrant();
-  }, [applyCurrentPageGrantToSelectedGrant]);
+    if (currentPageGrantData == null) return;
+    setSelectedGrant(toSelectedGrant(currentPageGrantData));
+  }, [currentPageGrantData, setSelectedGrant]);
 
   const showSelectGroupModal = useCallback(() => {
     setIsSelectGroupModalShown(true);
@@ -159,6 +141,27 @@ export const GrantSelector = (props: Props): JSX.Element => {
    * Render grant selector DOM.
    */
   const renderGrantSelector = useCallback(() => {
+    // Until the current page grant is loaded, selectedGrant is null. Show a loading
+    // state instead of defaulting the toggle to "Public", which would mislead the
+    // user about the page's actual visibility. See issue #11272.
+    if (selectedGrant == null) {
+      return (
+        <div
+          className="grw-grant-selector mb-0"
+          data-testid="grw-grant-selector"
+        >
+          <button
+            type="button"
+            className="btn btn-outline-secondary btn-sm w-100 d-flex justify-content-center align-items-center"
+            disabled
+            data-testid="grw-grant-selector-loading"
+          >
+            <LoadingSpinner />
+          </button>
+        </div>
+      );
+    }
+
     let dropdownToggleBtnColor: string | undefined;
     let dropdownToggleLabelElm: ReactNode | undefined;
 
