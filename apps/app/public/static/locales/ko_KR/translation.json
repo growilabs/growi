@@ -896,7 +896,7 @@
     "new_password": "새 비밀번호",
     "confirm_new_password": "새 비밀번호 확인",
     "email_is_required": "이메일은 필수입니다.",
-    "success_to_send_email": "이메일 전송 성공",
+    "email_sent_if_account_exists": "해당 이메일 주소의 계정이 존재하는 경우, 비밀번호 재설정 이메일을 전송했습니다.",
     "feature_is_unavailable": "이 기능은 사용할 수 없습니다.",
     "incorrect_token_or_expired_url": "토큰이 올바르지 않거나 URL이 만료되었습니다. 아래 링크를 통해 비밀번호 재설정 요청을 다시 보내십시오.",
     "password_and_confirm_password_does_not_match": "비밀번호와 비밀번호 확인이 일치하지 않습니다.",

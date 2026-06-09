@@ -29,7 +29,7 @@ const PasswordResetRequestForm: FC = () => {
       setIsSubmitting(true);
       try {
         await apiv3Post('/forgot-password', { email });
-        toastSuccess(t('forgot_password.success_to_send_email'));
+        toastSuccess(t('forgot_password.email_sent_if_account_exists'));
       } catch (err) {
         toastError(err);
       } finally {
