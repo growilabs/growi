@@ -130,9 +130,11 @@ describe('MentionCandidateList', () => {
       render(<MentionCandidateList controller={controller} />);
 
       const rowB = screen.getByText('/foo/b').closest('[role="option"]');
-      expect(rowB).not.toBeNull();
+      if (rowB == null) {
+        throw new Error('row B [role="option"] not found');
+      }
       // Hovering moves downshift's highlight, synced back to the controller.
-      fireEvent.mouseMove(rowB as Element);
+      fireEvent.mouseMove(rowB);
 
       expect(setHighlightedIndex).toHaveBeenCalledWith(1);
     });

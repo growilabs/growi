@@ -171,8 +171,10 @@ describe('ChatSidebar — PageMentionInput integration (6.1)', () => {
     const row = (await screen.findByText('/docs/foo')).closest(
       '[role="option"]',
     );
-    expect(row).not.toBeNull();
-    fireEvent.click(row as Element);
+    if (row == null) {
+      throw new Error('mention candidate [role="option"] not found');
+    }
+    fireEvent.click(row);
 
     // Commit replaced "@foo" with the path (plus a trailing space), surfaced
     // through the hidden input and into the submitted message text.

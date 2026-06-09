@@ -22,6 +22,20 @@ vi.mock('@codemirror/commands', () => ({
 }));
 
 /**
+ * Build a `state.facet` stub that resolves the mention-controller facet to the
+ * given getter. `facet` is an overloaded generic function that a single
+ * simplified stub cannot satisfy structurally, so the unavoidable cast is
+ * localized here and reused by every view mock below.
+ */
+const facetStub = (
+  resolveController: () => MentionController | null,
+): EditorView['state']['facet'] =>
+  ((facet: unknown) =>
+    facet === mentionControllerFacet
+      ? resolveController
+      : undefined) as EditorView['state']['facet'];
+
+/**
  * Build a mock EditorView whose state.facet returns a getter for the given
  * controller. `composing` mirrors CodeMirror's IME composition flag.
  * `requestSubmit` is exposed so the non-session Enter path can be asserted.
@@ -37,15 +51,9 @@ const buildView = (opts: {
 
   return mock<EditorView>({
     composing,
-    state: {
-      facet: ((facet: unknown) => {
-        if (facet === mentionControllerFacet) {
-          return () => controller;
-        }
-        return undefined;
-      }) as EditorView['state']['facet'],
-    },
+    state: { facet: facetStub(() => controller) },
     dom: {
+      // `closest` is an overloaded generic too; localize its cast to this field.
       closest: ((selector: string) =>
         selector === 'form' ? form : null) as HTMLElement['closest'],
     },
@@ -210,12 +218,7 @@ describe('mention-keymap commands', () => {
       let current: MentionController = first;
       const view = mock<EditorView>({
         composing: false,
-        state: {
-          facet: ((facet: unknown) =>
-            facet === mentionControllerFacet
-              ? () => current
-              : undefined) as EditorView['state']['facet'],
-        },
+        state: { facet: facetStub(() => current) },
       });
 
       expect(mentionArrowDown(view)).toBe(false);
