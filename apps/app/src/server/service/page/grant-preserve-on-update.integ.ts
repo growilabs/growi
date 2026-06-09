@@ -1,4 +1,4 @@
-import { type IUser, PageGrant } from '@growi/core';
+import { type IUserHasId, PageGrant } from '@growi/core';
 import type { HydratedDocument, Model } from 'mongoose';
 import mongoose from 'mongoose';
 import { vi } from 'vitest';
@@ -20,8 +20,8 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 describe('PageService.updatePage grant preservation', () => {
   let crowi: Crowi;
   let Page: PageModel;
-  let User: Model<IUser>;
-  let user: HydratedDocument<IUser>;
+  let User: Model<IUserHasId>;
+  let user: HydratedDocument<IUserHasId>;
 
   const create = async (
     path: string,
@@ -54,7 +54,7 @@ describe('PageService.updatePage grant preservation', () => {
     crowi = await getInstance();
     await crowi.configManager.updateConfig('app:isV5Compatible', true);
 
-    User = mongoose.model<IUser>('User');
+    User = mongoose.model<IUserHasId>('User');
     Page = mongoose.model<PageDocument, PageModel>('Page');
 
     // Suppress page events so their async listeners (e.g. obsolete-page onUpdate)
