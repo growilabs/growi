@@ -385,7 +385,7 @@ packages/editor/src/client/services/
 | 4.2 | Mention works without emoji | `mentionAutocompletionSettings` (unchanged) | Test makes independence explicit |
 | 4.3 | Emoji retains glyph renderer and source | `emojiAutocompletionSettings` | `addToOptions` and source preserved |
 | 4.4 | Emoji and mention coexist | Both `markdownLanguage.data.of` sources active | Not suppressed by each other |
-| 4.5 | Removing shared facility disables both | `defaultExtensions` is single shared dependency | Proven by design structure |
+| 4.5 | Mention depends on the shared facility (AC 1), not emoji | `defaultExtensions` standalone facility + `mentionAutocompletionSettings` | Expressed via AC 4.2; a literal "remove facility → both die" does **not** hold because emoji also calls `autocompletion()` (config-merge keeps the facility installed) |
 | 4.6 | No emoji in fenced code blocks | `markdownLanguage.data.of` scoping | Locked by `state.languageDataAt` test |
 | 4.7 | Main page editor no regression | `defaultExtensions` consumed by all editors | `autocompletion()` merge is additive |
 
@@ -448,7 +448,7 @@ export const emojiAutocompletionSettings = [
 
 Covers AC 4.4 (coexistence) and AC 4.6 (code-block scoping).
 
-**AC 4.4 test**: Call `emojiCompletionSource` with a `CompletionContext` containing `:smi` (no markdown language needed for direct function call). Separately call `createMentionCompletionSource(mockFetch)` with `@ab`. Both must return non-null results, confirming neither suppresses the other.
+**AC 4.4 test**: Call `emojiCompletionSource` with a `CompletionContext` for `:smi`. The source reads `syntaxTree(context.state)` and `context.state.sliceDoc()`, so it requires a real `EditorState`-backed `CompletionContext` — but the markdown language itself is **not** required. Separately call `createMentionCompletionSource(mockFetch)` with `@ab`; this source is debounced (300ms) and async, so use fake timers (`vi.useFakeTimers()` + `mockResolvedValue([...])` + `vi.runAllTimers()`) and have the mock return at least one user (an empty result resolves to `null`). Both must return non-null results, confirming neither suppresses the other.
 
 **AC 4.6 test** (scoping verification using `state.languageDataAt`):
 
@@ -501,7 +501,7 @@ it('scopes emoji source to markdown language — not active inside fenced code b
 
 #### `mentionAutocompletionSettings.spec.ts` (modified)
 
-**AC 4.2 test** (new case): Create `createMentionCompletionSource(mockFetch)` in a state that has no `emojiAutocompletionSettings` extension. Call with `@ab`. Expect a non-null result. This documents and regression-locks the independence contract — the source already passes; the test makes the guarantee explicit.
+**AC 4.2 test** (new case): Create `createMentionCompletionSource(mockFetch)` and invoke it with `@ab` from an `EditorState` that contains no `emojiAutocompletionSettings` extension. Expect a non-null result. This documents and regression-locks the independence contract — the source already passes today (every existing case in this spec already runs from an emoji-free `EditorState.create({ doc })`), so the test makes the existing guarantee **explicit** rather than adding new coverage. The mention source is debounced + async, so reuse the existing spec's `invoke` helper pattern (`vi.useFakeTimers()` + `mockResolvedValue([...])` + `vi.runAllTimers()`); the mock must return at least one user, as an empty result resolves to `null`.
 
 ---
 

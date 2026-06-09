@@ -88,7 +88,7 @@
   - _Boundary: use-default-extensions, emojiAutocompletionSettings_
 
 - [ ]* 4.2 Add regression tests proving facility/source decoupling
-  - **Coexistence (AC 4.4)** — in a new spec beside the emoji extension: call the exported emoji source with a `:smi` context and expect a non-null result, and separately call the mention source factory with an `@ab` context and expect a non-null result, proving neither source suppresses the other
+  - **Coexistence (AC 4.4)** — in a new spec beside the emoji extension: call the exported emoji source with a `:smi` context and expect a non-null result, and separately call the mention source factory with an `@ab` context and expect a non-null result, proving neither source suppresses the other. The emoji source needs a real `EditorState`-backed `CompletionContext` (it reads `syntaxTree`/`sliceDoc`) but not the markdown language; the mention source is debounced + async, so drive it with `vi.useFakeTimers()` + `mockResolvedValue([...])` + `vi.runAllTimers()` and return at least one user (empty → `null`)
   - **Code-block scoping (AC 4.6)** — in the same new spec: assert the emoji source is excluded from fenced code blocks. The sublanguage MUST be nested **synchronously** — do NOT use `codeLanguages: languages` (async load; will not nest in a sync unit test and the assertion will fail, verified during design validation). Build a synchronous stub sublanguage instead:
     ```typescript
     const stubParser = StreamLanguage.define({ token: (s) => { s.next(); return null; } });
@@ -99,7 +99,7 @@
     ]});
     ```
     Then assert `state.languageDataAt<CompletionSource>('autocomplete', pos)` (an `EditorState` instance method from `@codemirror/state`) does NOT contain the emoji source at a position inside the ` ```js ``` ` block but DOES at a normal markdown position. (`StreamLanguage`, `LanguageSupport`, `LanguageDescription` come from `@codemirror/language`.)
-  - **Mention independence (AC 4.2)** — add a case to the existing mention spec asserting the mention source returns completions when no emoji extension is present in the editor state, locking the no-hidden-dependency guarantee
+  - **Mention independence (AC 4.2)** — add a case to the existing mention spec asserting the mention source returns completions when no emoji extension is present in the editor state, locking the no-hidden-dependency guarantee. This is an **explicit regression-lock**, not new behavioral coverage: every existing case in that spec already runs from an emoji-free `EditorState.create({ doc })`, so reuse the spec's existing `invoke` helper (fake timers) and a mock returning ≥1 user
   - Observable: `pnpm vitest run emojiAutocompletionSettings` and `pnpm vitest run mentionAutocompletionSettings` both pass, including the new code-block scoping and mention-independence cases
   - _Requirements: 4.2, 4.4, 4.6_
   - _Depends: 4.1_
