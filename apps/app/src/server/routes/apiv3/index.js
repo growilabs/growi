@@ -5,6 +5,7 @@ import {
   createVaultAdminRouterWithDeps,
   createVaultPageRouterWithDeps,
 } from '~/features/growi-vault/server';
+import { factory as mastraRouteFactory } from '~/features/mastra/server/routes';
 import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed';
 import loggerFactory from '~/utils/logger';
 
