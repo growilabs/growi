@@ -15,8 +15,7 @@ describe('AttachmentService.removeAttachment', () => {
   test('should resolve without throwing when the attachment is already gone', async () => {
     const findByIdSpy = vi
       .spyOn(Attachment, 'findById')
-      // biome-ignore lint/suspicious/noExplicitAny: Mongoose query shape is irrelevant to the contract under test
-      .mockResolvedValue(null as any);
+      .mockResolvedValue(null);
     const deleteFile = vi.fn();
     const crowi = mock<Crowi>({
       fileUploadService: { deleteFile },
@@ -38,8 +37,7 @@ describe('AttachmentService.removeAttachment', () => {
     });
     const findByIdSpy = vi
       .spyOn(Attachment, 'findById')
-      // biome-ignore lint/suspicious/noExplicitAny: Mongoose query shape is irrelevant to the contract under test
-      .mockResolvedValue(fakeAttachment as any);
+      .mockResolvedValue(fakeAttachment);
     const deleteFile = vi
       .fn()
       .mockRejectedValue(new Error('S3 is temporarily unavailable'));
