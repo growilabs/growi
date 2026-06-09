@@ -190,3 +190,13 @@
 
 - Adopt **Option B**. Key decisions to settle in `/kiro-spec-design`: the exact home for the shared `autocompletion()` (inline in `defaultExtensions` vs a new `autocompletionSettings` module), and where the regression tests live (`packages/editor` services specs).
 - Research items to carry forward: confirm CodeMirror 6 merge behavior for multiple `autocompletion()` configs against the installed version; decide a testable way to assert "no emoji completion inside fenced code blocks" (AC 6).
+
+## Design Validation Findings (empirical, 2026-06-04)
+
+Verified against the installed CodeMirror versions (`@codemirror/autocomplete ^6.18.4`, `@codemirror/state ^6.6.0`, `@codemirror/lang-markdown ^6.3.2`, `@codemirror/language ^6.11.3`).
+
+1. **Config-merge confirmed (4.1 / 4.7)**: Two separate `autocompletion()` calls — `autocompletion({ icons: false })` (shared base) + `autocompletion({ addToOptions: [...] })` (emoji) — coexist in one `EditorState` with no duplicate-StateField error; `currentCompletions(state)` is readable. The shared base + emoji-specific config merge as intended. Core 4.1 change is sound.
+
+2. **`languageDataAt` is an `EditorState` instance method**, NOT a standalone export of `@codemirror/language`. Use `state.languageDataAt(name, pos)`.
+
+3. **AC 6 test trap — async sublanguage loading**: `codeLanguages: languages` (from `@codemirror/language-data`) loads sublanguages **asynchronously**. In a synchronous unit test the ` ```js ``` ` region is NOT nested as a sublanguage, so markdown's language data (incl. the emoji source) applies throughout and `state.languageDataAt('autocomplete', posInBlock)` returns the emoji source (`inBlock: true`) — the `.not.toContain` assertion FAILS. **Fix (verified working):** build a synchronous stub sublanguage with `StreamLanguage.define` + `LanguageDescription.of` + `LanguageSupport`, pass as `codeLanguages: [stubDesc]`. Result: `inBlock: false`, `outside: true`. No concrete sublanguage parser (`@codemirror/lang-javascript`) is a dependency of `packages/editor`, so the stub approach is required.
