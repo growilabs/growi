@@ -2,11 +2,11 @@ import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { toAISdkStream } from '@mastra/ai-sdk';
+import type { AIV6Type } from '@mastra/core/agent/message-list';
 import { RequestContext } from '@mastra/core/request-context';
 import {
   createUIMessageStream,
   pipeUIMessageStreamToResponse,
-  type UIMessage,
   validateUIMessages,
 } from 'ai';
 import type { Request, RequestHandler } from 'express';
@@ -26,7 +26,7 @@ const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
   threadId?: string;
-  messages: UIMessage[];
+  messages: AIV6Type.UIMessage[];
 };
 
 type Req = Request<undefined, Response, ReqBody> & {
