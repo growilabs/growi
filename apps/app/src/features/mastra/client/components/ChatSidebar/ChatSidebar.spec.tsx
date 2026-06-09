@@ -26,12 +26,12 @@ vi.mock('@ai-sdk/react', () => ({
   }),
 }));
 
-// Chat sidebar status: provide an opened sidebar with an assistant so
-// ChatSidebar renders its header + input without reaching into jotai.
+// Chat sidebar status: provide an opened sidebar so ChatSidebar renders its
+// header + input without reaching into jotai.
 vi.mock('../../status/chat-sidebar', () => ({
   useChatSidebarStatus: (): ChatSidebarStatus => ({
     isOpened: true,
-    aiAssistantData: undefined,
+    openSeq: 0,
   }),
   useChatSidebarActions: () => ({ close: vi.fn() }),
 }));
