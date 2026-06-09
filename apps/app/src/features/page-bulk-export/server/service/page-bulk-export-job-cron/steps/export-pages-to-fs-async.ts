@@ -8,6 +8,7 @@ import {
   normalizePath,
 } from '@growi/core/dist/utils/path-utils';
 import type { Root } from 'mdast';
+import type * as RemarkGfm from 'remark-gfm';
 import type * as RemarkHtml from 'remark-html';
 import type * as RemarkParse from 'remark-parse';
 import type * as Unified from 'unified';
@@ -44,6 +45,9 @@ async function getPageWritable(
   const remarkParse = (
     await dynamicImport<typeof RemarkParse>('remark-parse', __dirname)
   ).default;
+  const remarkGfm = (
+    await dynamicImport<typeof RemarkGfm>('remark-gfm', __dirname)
+  ).default;
   const remarkHtml = (
     await dynamicImport<typeof RemarkHtml>('remark-html', __dirname)
   ).default;
@@ -57,6 +61,9 @@ async function getPageWritable(
   // define before the stream starts to avoid creating multiple instances
   const htmlConverter = unified()
     .use(remarkParse)
+    // remark-gfm enables GFM extensions (tables, strikethrough, task lists, etc.).
+    // Without it, GFM syntax such as tables is emitted as raw text in the exported PDF/HTML.
+    .use(remarkGfm)
     // !!! DO NOT DISABLE HTML ESCAPING WHILE --no-sandbox IS PASSED TO PUPPETEER INSIDE pdf-converter !!!
     .use(remarkHtml);
   return new Writable({
