@@ -1,10 +1,13 @@
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
+import type { Model } from 'mongoose';
 import request from 'supertest';
+import { mock } from 'vitest-mock-extended';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import type AppService from '~/server/service/app';
 
 const mockActivityId = '507f1f77bcf86cd799439011';
 
@@ -58,12 +61,14 @@ vi.mock('~/server/service/config-manager', () => ({
 describe('POST /invite', () => {
   let app: express.Application;
   let crowiMock: Crowi;
+  let mockIsEmailValid: ReturnType<typeof vi.fn>;
   let mockCreateUsersByEmailList: ReturnType<typeof vi.fn>;
   let mockUpdateIsInvitationEmailSended: ReturnType<typeof vi.fn>;
   let mockMailServiceSend: ReturnType<typeof vi.fn>;
   let mockActivityEmit: ReturnType<typeof vi.fn>;
 
   beforeEach(async () => {
+    mockIsEmailValid = vi.fn().mockReturnValue(true);
     mockCreateUsersByEmailList = vi.fn().mockResolvedValue({
       createdUserList: [],
       existingEmailList: [],
@@ -73,25 +78,34 @@ describe('POST /invite', () => {
     mockMailServiceSend = vi.fn().mockResolvedValue(undefined);
     mockActivityEmit = vi.fn();
 
-    crowiMock = {
+    // The User model statics (isEmailValid / createUsersByEmailList /
+    // updateIsInvitationEmailSended) are defined on a plain Mongoose schema in
+    // user/index.js (untyped JS), so they are absent from the `Model<any>` type
+    // that `crowi.models.User` resolves to. A localized cast is required here;
+    // the rest of Crowi stays type-checked via `mock<Crowi>()`.
+    const userModelMock = {
+      isEmailValid: mockIsEmailValid,
+      createUsersByEmailList: mockCreateUsersByEmailList,
+      updateIsInvitationEmailSended: mockUpdateIsInvitationEmailSended,
+    } as unknown as Model<unknown>;
+
+    crowiMock = mock<Crowi>({
+      // `events.activity` and `mailService` are typed as `any` on Crowi, so plain
+      // partials are accepted without a cast.
       events: {
         activity: { emit: mockActivityEmit },
       },
       models: {
-        User: {
-          isEmailValid: vi.fn().mockReturnValue(true),
-          createUsersByEmailList: mockCreateUsersByEmailList,
-          updateIsInvitationEmailSended: mockUpdateIsInvitationEmailSended,
-        },
+        User: userModelMock,
       },
-      appService: {
+      appService: mock<AppService>({
         getAppTitle: vi.fn().mockReturnValue('GROWI'),
-      },
+      }),
       mailService: {
         send: mockMailServiceSend,
       },
       localeDir: '/app/locales/',
-    } as unknown as Crowi;
+    });
 
     // Setup express app
     app = express();
@@ -112,15 +126,16 @@ describe('POST /invite', () => {
     // in users.js would otherwise accumulate route handlers across beforeEach calls)
     vi.resetModules();
 
-    // Import and mount the users router
-    const usersModule = await import('./users');
-    const usersRouterFactory =
-      (usersModule as unknown as Record<string, unknown>).default ??
-      usersModule;
-    if (typeof usersRouterFactory !== 'function') {
-      throw new Error('users module does not export a router factory function');
-    }
-    app.use('/', usersRouterFactory(crowiMock));
+    // Import and mount the users router.
+    // users.js is an untyped CommonJS module (`module.exports = (crowi) => router`).
+    // TypeScript types the dynamic-import namespace without a call signature or a
+    // `.default`, so a cast to the real factory shape is required here — no usable
+    // type exists for the JS module. The cast still type-checks the call site:
+    // `crowiMock` is verified against `Crowi`.
+    const usersModule = (await import('./users')) as unknown as {
+      default: (crowi: Crowi) => express.Router;
+    };
+    app.use('/', usersModule.default(crowiMock));
   });
 
   afterEach(() => {
@@ -211,12 +226,7 @@ describe('POST /invite', () => {
 
     it('should put whitelist-rejected emails in failedEmailList with reason email_not_in_whitelist', async () => {
       // Simulate a whitelist that rejects the given email
-      (
-        crowiMock.models.User as unknown as Record<
-          string,
-          ReturnType<typeof vi.fn>
-        >
-      ).isEmailValid = vi.fn().mockReturnValue(false);
+      mockIsEmailValid.mockReturnValue(false);
 
       const response = await request(app)
         .post('/invite')
