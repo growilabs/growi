@@ -41,6 +41,8 @@ describe('GrantSelector', () => {
     const { queryByTestId } = renderGrantSelector();
 
     expect(queryByTestId('grw-grant-selector-loading')).not.toBeNull();
+    // ...and the selector dropdown is not shown yet (no misleading "Public").
+    expect(queryByTestId('grw-grant-selector-dropdown-menu')).toBeNull();
   });
 
   it('shows the grant selector once the grant is available', () => {

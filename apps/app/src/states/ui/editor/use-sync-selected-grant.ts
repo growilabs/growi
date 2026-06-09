@@ -8,11 +8,12 @@ import { toSelectedGrant, useSelectedGrant } from './selected-grant';
 /**
  * Sync selectedGrantAtom with the current page's grant.
  *
- * The atom defaults to GRANT_PUBLIC and only becomes meaningful once it has been
- * initialized from the current page's actual grant. This initialization must run
- * from an always-mounted component: on mobile, GrantSelector is rendered only
- * inside a closed Modal and therefore never mounts, which previously left the atom
- * at GRANT_PUBLIC and silently re-published owner/group-restricted pages on save.
+ * The atom starts as null (unresolved); this fills it with the page's actual
+ * grant so the editor reflects the real visibility. It must run from an
+ * always-mounted component: on mobile, GrantSelector is rendered only inside a
+ * closed Modal and therefore never mounts, so it cannot own this sync. (Saving
+ * while the atom is still null omits the grant, so the server preserves it — the
+ * pre-load race is handled separately in PageEditor's save path.)
  *
  * Call this once from an always-mounted editor component (e.g. SavePageControls).
  *

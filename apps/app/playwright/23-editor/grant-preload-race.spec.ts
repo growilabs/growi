@@ -7,68 +7,71 @@ import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUnti
  *
  * When the editor opens, the current page's grant is fetched asynchronously
  * (GET /_api/v3/page/grant-data) and synced into selectedGrantAtom. Until that
- * resolves, selectedGrant is null. Saving in that window must NOT send a grant,
- * so the update endpoint preserves the page's existing grant instead of
- * overwriting it with a default — otherwise a restricted (or inherited-restricted)
- * page would be silently published.
+ * resolves, selectedGrant is null. Saving in that window must NOT change the
+ * page's grant — otherwise a restricted page is silently published.
  *
- * Reproducing the "save immediately" case deterministically: hold the grant-data
- * response so the null window stays open, edit + save right away, and assert the
- * PUT /_api/v3/page body omits `grant`. If the fix regressed (a default grant is
- * sent again), grant-data would resolve to the page's grant and the PUT would
- * include it, failing this test.
+ * This drives the real cross-stack behavior:
+ *   1. create a GRANT_OWNER ("only me") page,
+ *   2. hold the grant-data response so the editor opens with selectedGrant still null,
+ *   3. edit and save immediately (a real save to the DB),
+ *   4. read the page's grant back and assert it is still GRANT_OWNER.
  *
- * The loading indicator shown during this window is covered by the unit test in
- * GrantSelector.spec.tsx; here we assert the save-payload contract.
+ * page.request (APIRequestContext) is not subject to page.route, so the setup and
+ * verification calls bypass the hold that only affects the browser's fetch.
  */
 
 const GRANT_DATA_ROUTE = '**/_api/v3/page/grant-data**';
-const PAGE_UPDATE_ROUTE = '**/_api/v3/page';
+const GRANT_OWNER = 4; // PageGrant.GRANT_OWNER
 
-test('omits grant on save while the page grant is still loading (#11272)', async ({
+const readGrant = async (
+  request: import('@playwright/test').APIRequestContext,
+  pageId: string,
+): Promise<number> => {
+  const res = await request.get('/_api/v3/page/grant-data', {
+    params: { pageId },
+  });
+  expect(res.ok()).toBeTruthy();
+  return (await res.json()).grantData.currentPageGrant.grant;
+};
+
+test('keeps an owner-only grant when saving before the grant loads (#11272)', async ({
   page,
 }) => {
-  // Hold grant-data for the whole test so selectedGrant stays null (unresolved).
+  const pagePath = `/grant-preload-race-${Date.now()}`;
+
+  // 1. Create an "only me" (GRANT_OWNER) page.
+  const createRes = await page.request.post('/_api/v3/page', {
+    data: { path: pagePath, body: 'initial body', grant: GRANT_OWNER },
+  });
+  expect(createRes.ok()).toBeTruthy();
+  const createdPageId: string = (await createRes.json()).page._id;
+  expect(await readGrant(page.request, createdPageId)).toBe(GRANT_OWNER);
+
+  // 2. Block the browser's grant-data fetch so the editor opens with
+  //    selectedGrant still unresolved (null) — the pre-load window. Aborting is a
+  //    deterministic stand-in for "not loaded yet". page.request (used below for
+  //    verification) is an APIRequestContext and is NOT affected by page.route.
   await page.route(GRANT_DATA_ROUTE, async (route) => {
-    if (route.request().method() !== 'GET') {
-      await route.continue();
+    if (route.request().method() === 'GET') {
+      await route.abort();
       return;
     }
-    await new Promise((resolve) => setTimeout(resolve, 30_000));
     await route.continue();
   });
 
-  // Capture the update payload and swallow the request so the DB is not mutated.
-  let updateBody: Record<string, unknown> | undefined;
-  await page.route(PAGE_UPDATE_ROUTE, async (route) => {
-    if (route.request().method() !== 'PUT') {
-      await route.continue();
-      return;
-    }
-    const data = route.request().postData();
-    updateBody = data != null ? JSON.parse(data) : {};
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: '{}',
-    });
-  });
-
-  await page.goto('/Sandbox');
-
+  await page.goto(pagePath);
   await page.getByTestId('editor-button').click();
   await expect(page.getByTestId('grw-editor-navbar-bottom')).toBeVisible();
 
-  // Edit and save immediately, before grant-data resolves.
-  await appendTextToEditorUntilContains(
-    page,
-    'pre-load race regression #11272',
+  // 3. Edit and save immediately, while selectedGrant is still null.
+  await appendTextToEditorUntilContains(page, 'edited before grant loaded');
+  const updateResponse = page.waitForResponse(
+    (res) =>
+      res.url().includes('/_api/v3/page') && res.request().method() === 'PUT',
   );
   await page.getByTestId('save-page-btn').click();
+  expect((await updateResponse).ok()).toBeTruthy();
 
-  // The update must be sent without a grant, so the server preserves the
-  // page's existing grant rather than overwriting it.
-  await expect.poll(() => updateBody).toBeDefined();
-  expect(updateBody).not.toHaveProperty('grant');
-  expect(updateBody).not.toHaveProperty('userRelatedGrantUserGroupIds');
+  // 4. The stored grant must still be owner-only (not published).
+  expect(await readGrant(page.request, createdPageId)).toBe(GRANT_OWNER);
 });
