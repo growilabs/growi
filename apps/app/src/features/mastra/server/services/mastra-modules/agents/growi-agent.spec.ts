@@ -1,4 +1,4 @@
-import type { LanguageModel } from 'ai';
+import type { MastraModelConfig } from '@mastra/core/llm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { MastraModelResolution } from '../../ai-sdk-modules/resolve-mastra-model';
@@ -78,10 +78,10 @@ vi.mock('../../ai-sdk-modules/resolve-mastra-model', () => ({
   resolveMastraModel: () => resolverMock.fn(),
 }));
 
-// A sentinel LanguageModel. The agent must hand back exactly this object from
-// its `model()` function when resolution is ok — proving it forwards the
-// resolver's model rather than constructing one itself.
-const sentinelModel = { id: 'sentinel-model' } as unknown as LanguageModel;
+// A sentinel model. The agent must hand back exactly this object from its
+// `model()` function when resolution is ok — proving it forwards the resolver's
+// model rather than constructing one itself.
+const sentinelModel = { id: 'sentinel-model' } as unknown as MastraModelConfig;
 
 // Importing growiAgent is the act under test for Req 4.3: module load (and
 // thus `new Agent(...)`) must complete WITHOUT calling the resolver. We import
@@ -98,7 +98,7 @@ import { growiAgent } from './growi-agent';
 const resolverCalledDuringImport = resolverMock.fn.mock.calls.length > 0;
 
 // Narrow the captured config's `model` to a callable without an assertion.
-const getModelFn = (): (() => LanguageModel) => {
+const getModelFn = (): (() => MastraModelConfig) => {
   const config =
     'getCapturedConfig' in growiAgent &&
     typeof growiAgent.getCapturedConfig === 'function'
@@ -108,7 +108,7 @@ const getModelFn = (): (() => LanguageModel) => {
   if (typeof model !== 'function') {
     throw new Error('Expected the agent model to be a dynamic function');
   }
-  return model as () => LanguageModel;
+  return model as () => MastraModelConfig;
 };
 
 describe('growiAgent', () => {

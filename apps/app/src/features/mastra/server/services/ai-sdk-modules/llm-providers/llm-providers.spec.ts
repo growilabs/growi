@@ -1,7 +1,8 @@
 import { LLM_VENDORS } from '~/features/mastra/interfaces/llm-vendor';
 
 // Each provider creator returns a "provider function" that, when called with a
-// model id, yields a LanguageModel. We mock the @ai-sdk/* boundary so we can
+// model id, yields a Mastra-compatible model (MastraModelConfig). We mock the
+// @ai-sdk/* boundary so we can
 // observe (a) the options the creator is constructed with and (b) the model id
 // applied to the returned provider function.
 // vi.hoisted keeps these spies available when the hoisted vi.mock factories run.

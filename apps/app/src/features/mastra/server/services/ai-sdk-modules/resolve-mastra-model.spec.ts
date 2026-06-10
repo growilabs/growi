@@ -1,4 +1,4 @@
-import type { LanguageModel } from 'ai';
+import type { MastraModelConfig } from '@mastra/core/llm';
 
 import type { LlmVendor } from '~/features/mastra/interfaces/llm-vendor';
 import type { ConfigKey } from '~/server/service/config-manager/config-definition';
@@ -318,9 +318,10 @@ describe('resolveMastraModel', () => {
   });
 });
 
-// Type-level guard: the returned model is assignable to LanguageModel via the
-// factory contract. This line type-checks the public surface; it never runs.
+// Type-level guard: the returned model is assignable to MastraModelConfig (the
+// type @mastra/core's Agent.model accepts) via the factory contract. This line
+// type-checks the public surface; it never runs.
 // eslint-disable-next-line @typescript-eslint/no-unused-vars
 const _typecheckModel = (
   r: MastraModelResolution,
-): LanguageModel | undefined => (r.status === 'ok' ? r.model : undefined);
+): MastraModelConfig | undefined => (r.status === 'ok' ? r.model : undefined);

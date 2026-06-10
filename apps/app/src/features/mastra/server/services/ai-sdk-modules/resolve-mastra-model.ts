@@ -1,4 +1,4 @@
-import type { LanguageModel } from 'ai';
+import type { MastraModelConfig } from '@mastra/core/llm';
 
 import type { LlmVendor } from '~/features/mastra/interfaces/llm-vendor';
 import { isLlmVendor } from '~/features/mastra/interfaces/llm-vendor';
@@ -13,7 +13,7 @@ export type MastraModelDisabledReason =
   | { type: 'api-key-missing'; vendor: LlmVendor };
 
 export type MastraModelResolution =
-  | { status: 'ok'; vendor: LlmVendor; model: LanguageModel }
+  | { status: 'ok'; vendor: LlmVendor; model: MastraModelConfig }
   | { status: 'disabled'; reason: MastraModelDisabledReason };
 
 // Per-vendor config key maps. Data-driven so the happy path has no per-vendor
@@ -33,10 +33,9 @@ const modelConfigKeys = {
   google: 'google:assistantModel:mastraAgent',
 } as const satisfies Record<LlmVendor, ConfigKey>;
 
-// Memoize the ok resolution (mirrors the old `let openAIProvider` singleton in
-// get-openai-provider.ts) so the native provider is not recreated per call.
-// Disabled results are intentionally NOT memoized: a config fix should take
-// effect on the next call without re-importing the module.
+// Memoize the ok resolution so the native provider object is built once and
+// reused across calls. Disabled results are intentionally NOT memoized: a
+// config fix should take effect on the next call without re-importing the module.
 let memoizedOk: Extract<MastraModelResolution, { status: 'ok' }> | undefined;
 
 export const resolveMastraModel = (): MastraModelResolution => {

@@ -1,5 +1,4 @@
 import { Agent } from '@mastra/core/agent';
-import type { MastraModelConfig } from '@mastra/core/llm';
 
 import { resolveMastraModel } from '../../ai-sdk-modules/resolve-mastra-model';
 import { memory } from '../memory';
@@ -37,14 +36,7 @@ export const growiAgent = new Agent({
         `Mastra LLM provider is not available: ${resolution.reason.type}`,
       );
     }
-    // `resolution.model` is the `ai` package's broad `LanguageModel` union,
-    // which is not directly assignable to Mastra's `MastraModelConfig`:
-    // @mastra/core bundles its own copy of `@ai-sdk/provider`, so its
-    // `LanguageModelV3` is nominally distinct from `ai`'s. At runtime the
-    // resolver always produces a concrete provider model object (built via
-    // createOpenAI/createAnthropic/createGoogle), never the bare model-id
-    // string form, so narrowing to MastraModelConfig here is sound.
-    return resolution.model as MastraModelConfig;
+    return resolution.model;
   },
   tools: {
     fullTextSearchTool,
