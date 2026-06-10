@@ -32,7 +32,15 @@ export const getContributionsHandler = (): RequestHandler => {
   return async (req: ContributionRequest, res: ApiV3Response) => {
     const { targetUserId } = req.query;
 
-    const user = await mongoose.model<IUser>('User').findById(targetUserId);
+    if (
+      typeof targetUserId !== 'string' ||
+      !mongoose.isValidObjectId(targetUserId)
+    ) {
+      return res.apiv3Err('Invalid user ID', 400);
+    }
+
+    const targetObjectId = new mongoose.Types.ObjectId(targetUserId);
+    const user = await mongoose.model<IUser>('User').findById(targetObjectId);
 
     if (user == null) {
       return res.apiv3Err('User not found', 404);
