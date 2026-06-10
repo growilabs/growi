@@ -1,0 +1,154 @@
+# Gap Analysis: multi-llm-provider
+
+_生成日: 2026-06-10 / 対象要件: requirements.md (Requirement 1–5)_
+
+## 分析サマリ
+
+- **現状**: mastra チャットエージェント（`growiAgent`）は OpenAI 専用。プロバイダー生成（`createOpenAI`）・モデル選択・API キー取得がモジュール読み込み時（import 時）にハードコードされており、ベンダー切り替えの抽象化が一切ない。
+- **設定基盤は再利用可能**: `defineConfig<T>({ envVarName, defaultValue, isSecret })` と Union 型設定（`openai:serviceType: 'openai'|'azure-openai'`）の前例があり、ベンダー選択キー・ベンダー別キーを同じ仕組みで追加できる。環境変数のみの構成（Req 2）と整合する。
+- **最大の構造的ギャップ**: エージェントは**モジュール読み込み時に singleton 生成**され、`getOpenaiProvider()` は設定不備時に `throw` する。Req 4（設定不備でも**アプリ起動継続**＋mastra のみ無効化＋ログ）を満たすには、生成を**遅延化／ガード化**して import 時に throw しない構造へ変える必要がある。
+- **ユーザーの設計論点（ai-sdk vs @mastra/core）には明確な選択肢がある**: Mastra v1.x の `Agent.model` は (a) ルーター文字列 `"provider/model"`、(b) 明示 `apiKey` を渡せる設定オブジェクト `{ id, apiKey, url, headers }`、(c) AI SDK の LanguageModel オブジェクト、の 3 形式を受け付ける。**Approach B（Mastra ルーターのオブジェクト形式）**なら新規依存ゼロかつ明示的キー注入が可能。**Approach A（`@ai-sdk/anthropic` / `@ai-sdk/google` を導入）**は推論オプション等の型付き制御が最も強い。
+- **スコープ確認済み**: suggest-path は独自の client-delegator 経由で LLM を呼びており mastra プロバイダーから独立。Req 5（mastra 限定・他機能据え置き）は技術的に成立する。
+
+---
+
+## 1. 現状調査（Current State）
+
+### 1.1 設定定義パターン
+`apps/app/src/server/service/config-manager/config-definition.ts`
+
+```typescript
+'app:aiEnabled': defineConfig<boolean>({ envVarName: 'AI_ENABLED', defaultValue: false }),
+'openai:serviceType': defineConfig<'openai' | 'azure-openai'>({ envVarName: 'OPENAI_SERVICE_TYPE', defaultValue: 'openai' }),
+'openai:apiKey': defineConfig<string | undefined>({ envVarName: 'OPENAI_API_KEY', defaultValue: undefined, isSecret: true }),
+'openai:assistantModel:mastraAgent': defineConfig<OpenAI.Chat.ChatModel>({ envVarName: 'OPENAI_MASTRA_AGENT_MODEL', defaultValue: 'o4-mini' }),
+```
+
+- `defineConfig<T>` は `@growi/core`（`packages/core/src/interfaces/config-manager.ts`）由来。フィールドは `envVarName?`, `defaultValue: T`, `isSecret?`。
+- **Union 型設定の前例あり**: `openai:serviceType`。検証は `apps/app/src/features/openai/interfaces/ai.ts` の `OpenaiServiceType` enum/`OpenaiServiceTypes` 配列で行う（`certify-ai-service.ts` が `includes()` で妥当性チェック）。
+- **モデル型は OpenAI 専用**: `OpenAI.Chat.ChatModel`（`openai` npm パッケージのリテラル Union）。多ベンダー化には `string` 等へ一般化が必要。
+
+### 1.2 設定の読み込み・env 解決
+`apps/app/src/server/service/config-manager/config-loader.ts` / `config-manager.ts`
+
+- env 値は `typeof defaultValue` に基づき型変換（boolean/number/object）。`getConfig(key)` の優先順位は「env-only グループは env のみ／それ以外は DB 値 ?? env 値」。
+- **起動時の設定妥当性検証は存在しない**。不備は `getOpenaiProvider()` の初回呼び出し時に `throw` される（lazy）。
+
+### 1.3 mastra プロバイダー／エージェントの結線
+- `apps/app/src/features/mastra/server/services/ai-sdk-modules/get-openai-provider.ts`
+  - `createOpenAI({ apiKey })` の singleton。`isAiEnabled()===false` または `apiKey==null` で `throw new Error('GROWI AI is not enabled')`。
+- `apps/app/src/features/mastra/server/services/mastra-modules/agents/growi-agent.ts`
+  - **module-level で `new Agent({ ..., model: getOpenaiProvider()(model) })`**。`model` は import 時に `configManager.getConfig('openai:assistantModel:mastraAgent')` で確定 → **ベンダー／モデル変更にはサーバー再起動が必要**。
+- `mastra-modules/index.ts`: `new Mastra({ agents: { growiAgent } })`。
+- リクエスト時は `mastra.getAgent('growiAgent')`（`server/routes/post-message.ts`）で取得。
+
+### 1.4 AI 有効化ゲート
+- `apps/app/src/features/openai/server/services/is-ai-enabled.ts`: `configManager.getConfig('app:aiEnabled')`。
+- ルーター: `mastra/server/routes/index.ts` で `!isAiEnabled()` のとき全ルートを **501** で短絡。
+- ミドルウェア `openai/server/routes/middlewares/certify-ai-service.ts`: AI 無効なら **403**、`serviceType` 不正なら **403**。
+
+### 1.5 suggest-path（独立経路・Req 5 の対象外）
+- `features/ai-tools/suggest-path/server/services/call-llm-for-json.ts` が `features/openai/server/services/client-delegator`（`get-client.ts`）経由で OpenAI/Azure を呼ぶ。**mastra プロバイダーとは別経路**で、本仕様では据え置き可能。
+
+### 1.6 テスト
+- 設定: `config-manager.spec.ts` / `config-loader.spec.ts` / `config-definition.spec.ts`
+- mastra: `mastra-modules/agents/growi-agent.spec.ts`（configManager・Agent・provider を `vi.mock`）, `routes/post-message.spec.ts`
+- 方針: Vitest + `vi.mock()`。実 API 呼び出しは行わずモック。
+
+### 1.7 依存パッケージ（`apps/app/package.json`）
+- 導入済: `@ai-sdk/openai ^3.0.63`, `@ai-sdk/react ^3.0.178`, `@mastra/core ^1.32.1`, `@mastra/ai-sdk ^1.4.1`, `@mastra/memory`, `@mastra/mongodb`, `@azure/openai ^2.0.0`, `openai ^4.96.2`。
+- **未導入**: `@ai-sdk/anthropic`, `@ai-sdk/google`。
+
+---
+
+## 2. Requirement-to-Asset マップ
+
+| 要件 | 既存資産 | ギャップ | タグ |
+|---|---|---|---|
+| **R1** ベンダー選択（OpenAI/Anthropic/Google・明示必須・既定なし） | `openai:serviceType` Union 型の前例 | ベンダー選択キー（例 `ai:llmVendor` の `'openai'\|'anthropic'\|'google'`）が無い。未指定＝設定不備として扱う分岐が無い | Missing |
+| **R2** env による接続設定（ベンダー/APIキー/モデル、モデルは任意・既定あり） | `defineConfig`／`OPENAI_API_KEY`／`OPENAI_MASTRA_AGENT_MODEL`、`isSecret` | Anthropic/Google の APIキー・モデルキーが無い。モデル型 `OpenAI.Chat.ChatModel` は OpenAI 限定で要一般化 | Missing / Constraint |
+| **R2-5** APIキーをログ等に出さない | `isSecret: true` で DB マスキング | エラーログ整形時に値を含めない実装規律が必要（既存 throw メッセージは値非出力で良好） | Constraint |
+| **R3** 1 App = 1 ベンダー | singleton provider/agent | ベンダー選択値で 1 つに解決するロジックが必要（複数キー併存時も選択 1 つのみ使用） | Missing |
+| **R4** 不備時に無効化＋ログ＋アプリ継続＋チャットはエラー応答 | 501/403 のゲート機構、`isAiEnabled` | **import 時 singleton 生成＋throw** が起動継続と矛盾。遅延化／ガード化が必須。「未指定/不正/欠落」を判別しログ出力する経路が無い | **Missing / Constraint（最重要）** |
+| **R5** mastra 限定・他機能据え置き | suggest-path は独立経路 | 影響範囲を mastra に閉じる設計が必要（既存 `openai:*` キーを openai ベンダーで再利用する場合の名前衝突に留意） | Constraint |
+
+---
+
+## 3. 技術的論点: LLM クライアント生成方式（ユーザー指定の検討事項）
+
+Mastra v1.x の `Agent.model`（型 `MastraModelConfig`）は次の 3 形式を受け付ける（出典: mastra.ai/docs/agents/overview, mastra.ai/blog/model-router）:
+1. ルーター文字列 `"openai/gpt-4o"` / `"anthropic/claude-..."` / `"google/gemini-..."`
+2. 設定オブジェクト `{ id: "anthropic/claude-...", apiKey, url?, headers? }` ← **明示 APIキー注入が可能（env 自動検出に依存しない）**
+3. AI SDK の LanguageModel（`createOpenAI({apiKey})(name)` 等の戻り値）
+
+| 観点 | **Approach A: `@ai-sdk/*` プロバイダー導入** | **Approach B: Mastra ルーターのオブジェクト形式** |
+|---|---|---|
+| 依存追加 | `@ai-sdk/anthropic` `@ai-sdk/google` の +2（openai も統一可） | **0**（`@mastra/core` に内蔵） |
+| 明示 APIキー注入（Req 2 必須） | ✅ `createAnthropic({apiKey})` / `createGoogleGenerativeAI({apiKey})` | ✅ `{ id, apiKey }` |
+| 型安全性 | 最強（`LanguageModelV2` と provider option が型付き） | 良（`id` は補完あり、provider option は緩め） |
+| 推論/thinking 等の制御 | first-class（`thinking`/`thinkingBudget`/`thinkingLevel` 等） | provider-options のパススルー中心で間接的 |
+| バージョン結合リスク | `@ai-sdk/*` の major を `@mastra/core` 対応 IF と揃える必要 | 最小（Mastra が内部で吸収） |
+| 現行 Mastra での idiom 度 | サポートされるがルーターが推奨パス | **v1.x で最も idiomatic** |
+
+### バージョン互換（npm 実データ 2026-06-10 時点）
+- `@ai-sdk/openai 3.0.69` / `@ai-sdk/anthropic 3.0.82` / `@ai-sdk/google 3.0.80` はいずれも `@ai-sdk/provider@3.0.10`（= AI SDK v6 系）で**相互整合**。既存 `@ai-sdk/openai ^3.x` に合わせ `^3.x` で導入すれば不整合なし。
+- 注意: `@ai-sdk/google` の "2.0.x" は旧 **ai-v5 dist-tag** で v6 系と不整合 → 使用しない。
+- `@mastra/core` は v5/v6 provider IF を両対応。**[Research Needed]** 現行ピン `^1.32.1` が v6 alias を確実に含むかは未検証（最新 1.4x では確認済み）。`LanguageModelV2` 型エラーが出たら `@mastra/core` を最新へ bump で解消見込み。
+
+### 明示 APIキーのオプション名（A の場合）
+- `createOpenAI({ apiKey })` / `createAnthropic({ apiKey })` / `createGoogleGenerativeAI({ apiKey })`。省略時の自動読み取り env は順に `OPENAI_API_KEY` / `ANTHROPIC_API_KEY` / `GOOGLE_GENERATIVE_AI_API_KEY`。Req 2 を満たすため**必ず明示注入**する。
+
+### モデル識別子の例
+| ベンダー | AI SDK id 例 | ルーター id 例 |
+|---|---|---|
+| OpenAI | `gpt-4o` / `o4-mini`(既定) | `openai/gpt-4o` |
+| Anthropic | `claude-sonnet-4-5` 等 | `anthropic/claude-...` |
+| Google | `gemini-2.5-pro` / `gemini-2.5-flash` | `google/gemini-2.5-pro` |
+
+> 既定モデル `o4-mini` は推論モデル。Anthropic/Google で推論/thinking の細かな制御が必要なら **Approach A** が有利。要件上はベンダー別「既定モデル」を持てれば足りる（Req 2-3）。
+
+---
+
+## 4. 実装アプローチ（Extend / New / Hybrid）
+
+### Option A: 既存ファイルを拡張
+- `get-openai-provider.ts` にベンダー分岐を追加し、`growi-agent.ts` 内で切替。
+- ✅ 新規ファイル最小。❌ `get-openai-provider` の責務肥大（要改名）、import 時 throw 問題が未解決のまま、テスト分離が難しい。
+
+### Option B: 新規プロバイダー解決モジュール
+- 例 `ai-sdk-modules/resolve-mastra-model.ts`（または `llm-provider/`）: ベンダー設定を受け、Mastra 互換の `model`（ルーターオブジェクト or AI SDK モデル）を返す純関数＋薄いアダプタ。
+- ✅ 単一責務・テスト容易・無効化を返り値で表現可能。❌ ファイル増・IF 設計が必要。
+
+### Option C: Hybrid（推奨ベース）
+- **新規**: ベンダー解決モジュール（純関数）＋ **エージェントの遅延/ガード生成**（import 時に throw しない／無効時は「無効」を表すパスへ）。
+- **拡張**: `config-definition.ts` にベンダー選択キーとベンダー別キーを追加（openai は既存 `openai:*` を再利用、anthropic/google を新設）。`growi-agent.ts` を解決モジュール利用へ差し替え。
+- **境界**: 変更は `features/mastra` と config 定義に閉じ、suggest-path/`features/openai` の LLM 経路は不変（Req 5）。
+- ✅ 既存設定基盤・ゲート機構を活かしつつ Req 4 の起動継続を満たせる。❌ 計画がやや複雑。
+
+> 方式（A/B for `model`）の最終決定は design フェーズ。制約（明示キー注入・新規依存最小）からは **Mastra ルーターのオブジェクト形式（外部研究の Approach B）** が第一候補だが、**推論オプションの型付き制御が要るなら `@ai-sdk/*` 導入（同 Approach A）** を選ぶ、という分岐で評価する。
+
+---
+
+## 5. Effort & Risk
+
+- **Effort: M（3–7 日）** — 設定キー追加・ベンダー解決モジュール・エージェント遅延化・テスト更新。新規パターンは限定的だが起動経路の改修を伴う。
+- **Risk: Medium** — (1) import 時 singleton→遅延/ガード化の改修が起動経路に触れる、(2) `@mastra/core ^1.32.1` の provider IF バージョン整合の未検証点、(3) 既定モデル/推論モデルのベンダー差異。いずれも既知の解決パスあり。
+
+---
+
+## 6. Research Needed（design へ持ち越し）
+
+1. `Agent.model` のオブジェクト形式 `{ id, apiKey, url?, headers? }` の正確なフィールド名を、導入予定の `@mastra/core` バージョンの型定義で byte-level 確認（ドキュメントは client-rendered で WebFetch 404 のため二次情報）。
+2. `@mastra/core ^1.32.1` が AI SDK v6（`@ai-sdk/provider@3.x`）provider IF を受理するか実機型チェックで確認。NG なら最新 1.4x へ bump 要否を判断。
+3. 設定キー設計の確定: 「ベンダー選択 + ベンダー別キー（`openai:*` 再利用 + `anthropic:*`/`google:*` 新設）」か「汎用キー（`ai:vendor`/`ai:apiKey`/`ai:model`）」か。env サーフェスと既存キー再利用のトレードオフ。
+4. ベンダー別「既定モデル」の具体値（Anthropic/Google）と、推論オプション制御の要否（→ 方式 A/B 選定に直結）。
+5. エージェント遅延/ガード生成の具体形（リクエスト時 lazy build か、起動時に有効/無効を確定して保持か）と、無効時のチャット応答（既存 501/403 を踏襲するか）。
+
+---
+
+## 7. 設計フェーズへの推奨
+
+- **推奨アプローチ**: Option C（Hybrid）。ベンダー解決を新規純関数に切り出し、`growi-agent` を遅延/ガード生成へ。設定は既存 `defineConfig`/Union 型前例を踏襲。
+- **キー設計の初期推奨**: ベンダー選択キー（Union 型）＋ベンダー別 APIキー/モデルキー。openai は `OPENAI_API_KEY`/`OPENAI_MASTRA_AGENT_MODEL` を再利用し、`anthropic:*`/`google:*` を新設。モデル型は `string` へ一般化。
+- **`model` 生成方式**: 第一候補は Mastra ルーターのオブジェクト形式（依存ゼロ・明示キー注入）。推論制御要件が固まれば `@ai-sdk/anthropic`/`@ai-sdk/google`（`^3.x`）導入へ切替検討。
+- **Req 4 最優先**: import 時 throw を排し、設定不備でもアプリ起動継続・mastra のみ無効化・原因をログ（APIキー非出力）・チャット時はエラー応答、という不変条件を設計の中心に据える。
