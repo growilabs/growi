@@ -4,7 +4,7 @@
 > 再実装は行わない（design 参照）。新規実装は test-first（red→green）で進める。
 
 - [ ] 1. Foundation: bulk-export 用プリコンパイル CSS
-- [ ] 1.1 `.wiki` 本文スタイルを単一 CSS アセットへプリコンパイルする
+- [x] 1.1 `.wiki` 本文スタイルを単一 CSS アセットへプリコンパイルする
   - `_wiki.scss` ＋ `@growi/core-styles`（bootstrap 基盤）＋ KaTeX CSS を読み込む自己完結エントリを用意し、ビルド時に単一 CSS へコンパイルする。既存 vendor-styles はブラウザ `document.head` 注入用（出力は `*.prebuilt.ts`）でサーバ `fs` 読み込み用ではないため、出力形態の異なる新規ビルドステップとして作る
   - 見た目が成立する条件まで生成物に含める: (a) `_wiki.scss` が参照する `--bs-*` カスタムプロパティ群、(b) `@extend .link-offset-2` 等で継承される bootstrap ユーティリティ class 定義、(c) KaTeX の `@font-face`（フォントは `src` を base64 data URI でインライン化し、外部 `url()` 参照を残さない）
   - 生成 CSS に `.wiki table` / `.wiki blockquote` / `.wiki h1`..`h6` / `.wiki code` / KaTeX のルールに加え、`--bs-*` カスタムプロパティ定義と `@extend` 先 class が含まれることをテストで確認する（observable）
