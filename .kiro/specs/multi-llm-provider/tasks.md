@@ -59,7 +59,7 @@
   - _Depends: 2.2, 3.1_
 
 - [ ] 4. Validation: 回帰と本番成果物確認
-- [ ] 4.1 (P) suggest-path 非影響の回帰確認
+- [x] 4.1 (P) suggest-path 非影響の回帰確認
   - mastra のベンダー選択（anthropic/google を含む）に関わらず、ページパス提案が現行の OpenAI 経路で動作することをテスト／検証で確認する
   - 観測可能: ベンダーを非 OpenAI に設定しても suggest-path が従来どおり動作する回帰テストが green になる
   - _Requirements: 5.2_
