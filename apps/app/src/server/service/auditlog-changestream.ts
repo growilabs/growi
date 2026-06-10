@@ -40,8 +40,11 @@ export class AuditlogChangeStreamService {
 
   private restarting = false;
 
-  // In-memory: resets on process restart. Events are replayed on restart, so at-least-once semantics hold.
+  // Same-token failures, for poison pill detection. Not used for backoff.
   private consecutiveEventFailures = 0;
+
+  // Restarts without forward progress, for backoff. Reset when the resume token advances.
+  private consecutiveRestarts = 0;
 
   private lastFailingToken: unknown = null;
 
@@ -91,6 +94,7 @@ export class AuditlogChangeStreamService {
           await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
           this.consecutiveEventFailures = 0;
           this.lastFailingToken = null;
+          this.consecutiveRestarts = 0;
         } catch (err) {
           // ResumeToken is typed as `unknown`; JSON.stringify compares structurally without type assertions.
           if (
@@ -111,6 +115,7 @@ export class AuditlogChangeStreamService {
             await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
             this.consecutiveEventFailures = 0;
             this.lastFailingToken = null;
+            this.consecutiveRestarts = 0;
             continue;
           }
 
@@ -144,9 +149,10 @@ export class AuditlogChangeStreamService {
     if (this.stopped || this.restarting) return;
     this.restarting = true;
     try {
+      this.consecutiveRestarts++;
       const delay = Math.min(
         AuditlogChangeStreamService.RESTART_BASE_DELAY_MS *
-          2 ** (this.consecutiveEventFailures - 1),
+          2 ** (this.consecutiveRestarts - 1),
         AuditlogChangeStreamService.RESTART_MAX_DELAY_MS,
       );
       await new Promise<void>((resolve) => setTimeout(resolve, delay));
