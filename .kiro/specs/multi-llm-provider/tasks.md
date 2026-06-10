@@ -32,7 +32,7 @@
   - _Boundary: llm-providers_
   - _Depends: 1.1, 1.2_
 
-- [ ] 2.2 モデルリゾルバ（判別共用体）
+- [x] 2.2 モデルリゾルバ（判別共用体）
   - セレクタ取得 → 妥当性検証 → API キー/モデル取得 → ファクトリ呼び出しを 1 関数に集約し、`ok` / `disabled`（理由: 未指定 / 不正ベンダー / API キー欠落）の判別共用体を返す。`ok` は memoize する
   - 選択ベンダーに対応するキーのみ参照する（複数キー併存でも 1 つのみ使用）。理由オブジェクトに API キー値を一切含めない
   - co-located unit test: 未指定→vendor-unset、不正→vendor-invalid、キー欠落→api-key-missing、各ベンダー正常→ok、モデル未指定→既定使用、理由に API キー非混入、memoize の各分岐
