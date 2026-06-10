@@ -1,5 +1,13 @@
 # @growi/core
 
+## 2.3.1
+
+### Patch Changes
+
+- [#11236](https://github.com/growilabs/growi/pull/11236) [`bd28252`](https://github.com/growilabs/growi/commit/bd28252c1a6e7f76f9bdadbdc3a07690f6bc0573) Thanks [@yuki-takei](https://github.com/yuki-takei)! - Fix page operations and v5 page migration failing for page paths that contain non-ASCII whitespace (e.g. U+3000 IDEOGRAPHIC SPACE)
+
+  Node.js 24's `RegExp.escape()` escapes non-ASCII whitespace (code points >= U+0100, such as U+3000) into `\uXXXX` form, which MongoDB's PCRE2 engine does not support (error 51091). Added `escapeStringForMongoRegex()`, which escapes only regex metacharacters and passes other characters through literally, and used it wherever the resulting pattern is sent to MongoDB.
+
 ## 2.3.0
 
 ### Minor Changes
