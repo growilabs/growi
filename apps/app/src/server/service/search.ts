@@ -497,11 +497,11 @@ class SearchService implements SearchQueryParser, SearchResolver {
         return;
       }
 
-      // https://regex101.com/r/pN9XfK/1
+      // https://regex101.com/r/pN9XfK/2
       const matchNegative = word.match(
         /^-(prefix:|tag:|author:|editor:|group:)?(.+)$/,
       );
-      // https://regex101.com/r/3qw9FQ/1
+      // https://regex101.com/r/3qw9FQ/2
       const matchPositive = word.match(
         /^(prefix:|tag:|author:|editor:|group:)?(.+)$/,
       );
