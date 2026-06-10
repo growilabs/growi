@@ -39,7 +39,7 @@
 - `~/features/openai/server/services`（`isAiEnabled`）。
 - `@mastra/core/agent`（`Agent`, `DynamicArgument<MastraModelConfig>`）, `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`, `ai`（`LanguageModel` 型）。
 - `@growi/logger`（pino）。
-- 依存方向（厳守）: `interfaces(llm-vendor)` → `config-definition` → `llm-providers(factories)` → `resolve-mastra-model` → `growi-agent` / `routes/index`。左方向のみ import 可。
+- 依存方向（厳守）: `config-definition`（core 層）と `interfaces(llm-vendor)`（feature 層）はそれぞれ独立した上流。`llm-providers(factories)` → `resolve-mastra-model`（`config-definition` と `interfaces` の双方を参照）→ `growi-agent` / `routes/index`。左方向のみ import 可。**core の `config-definition` は `features/mastra` を import しない**（`mastra:llmVendor` は `string` 型で定義し、`LlmVendor` への絞り込みは resolver 側で行う）。
 
 ### Revalidation Triggers
 - `mastra:llmVendor` の有効値集合（`LLM_VENDORS`）の変更。
@@ -244,7 +244,7 @@ export const isLlmVendor = (value: unknown): value is LlmVendor =>
 
 | 設定キー | 型 | env 名 | default | isSecret |
 |---|---|---|---|---|
-| `mastra:llmVendor` | `LlmVendor \| undefined` | `MASTRA_LLM_VENDOR` | `undefined` | no |
+| `mastra:llmVendor` | `string \| undefined`（resolver で `LlmVendor` に検証） | `MASTRA_LLM_VENDOR` | `undefined` | no |
 | `openai:apiKey`（既存・再利用） | `string \| undefined` | `OPENAI_API_KEY` | `undefined` | yes |
 | `openai:assistantModel:mastraAgent`（既存・再利用） | `OpenAI.Chat.ChatModel` | `OPENAI_MASTRA_AGENT_MODEL` | `o4-mini` | no |
 | `anthropic:apiKey`（新規） | `string \| undefined` | `ANTHROPIC_API_KEY` | `undefined` | yes |
@@ -256,7 +256,7 @@ export const isLlmVendor = (value: unknown): value is LlmVendor =>
 - Integration: openai は既存キーを再利用（`suggest-path` と共有のため Req 5 と整合）。anthropic/google を対称に新設。
 - **env-only の実装方針（確定）**: Req 2.4「env のみ」は **「設定用の管理画面 UI を持たない」** と解釈する（AI 連携設定画面は [deprecate-openai-features](../deprecate-openai-features/) で廃止済み）。新規キーは既存 `openai:apiKey` と同じ **DB＋env フォールバック**で統一し、**`ENV_ONLY_GROUPS` には登録しない**（openai キー再利用との非対称を回避）。これにより UI から書き込まれる経路が存在しないため、実運用上は env 駆動となり Req 2.4 を満たす。
 - **設定キー追加で編集する箇所**: `config-definition.ts` の `CONFIG_KEYS` 配列（手動追加）＋ `CONFIG_DEFINITIONS`（手動追加）。`ConfigKey` 型・`ConfigValues` 型は自動導出のため編集不要。`ENV_ONLY_GROUPS` は上記方針により追加しない。
-- Validation: `mastra:llmVendor` は型上 union 化せず raw 文字列として保持し、resolver で `isLlmVendor` 検証（Req 1.4 を resolver に追跡可能化）。
+- Validation: `mastra:llmVendor` は **`string | undefined`** で定義（union 化しない）。理由は2つ — (1) env 由来の不正値を保持できる必要があり、`isLlmVendor` 検証を resolver 側に置くことで Req 1.4 を追跡可能化、(2) `LlmVendor` 型で定義すると core 層の `config-definition.ts` が feature 層 `features/mastra/interfaces` を import する**依存逆転**になるため、これを避ける。`LlmVendor` への絞り込みは resolver の `isLlmVendor` で実施。
 - Secret: 新規 `anthropic:apiKey` / `google:apiKey` は `isSecret: true`。`openai:apiKey` 同様、クライアントへ返す apiv3 エンドポイントは存在せず（AI 設定画面廃止）露出経路なし（Req 2.5）。
 - Risks: model 既定値（anthropic/google）は最新提供モデルで確定（research D-5）。`OpenAI.Chat.ChatModel` 限定型は openai キーのみに留め、他は `string`。
 
