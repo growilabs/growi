@@ -13,6 +13,15 @@ vi.mock('~/server/service/config-manager/config-manager', () => ({
   configManager: { getConfig: vi.fn() },
 }));
 
+// type-assertion (unavoidable): no public seam to set the version-specific client.
+const injectClient = (
+  target: ElasticsearchDelegator,
+  client: ElasticsearchClientDelegator,
+) => {
+  (target as unknown as { client: ElasticsearchClientDelegator }).client =
+    client;
+};
+
 describe('ElasticsearchDelegator', () => {
   let delegator: ElasticsearchDelegator;
   let mockSocketIo: MockProxy<SocketIoService>;
@@ -37,14 +46,13 @@ describe('ElasticsearchDelegator', () => {
 
       beforeEach(() => {
         mockES8Client = mock<ES8ClientDelegator>({ delegatorVersion: 8 });
+        // type-assertion (unavoidable): ES search response is a huge union; cast minimal shape.
         mockES8Client.search.mockResolvedValue({
           aggregations: {
             unique_values: { buckets: makeBuckets(['alice', 'bob']) },
           },
         } as unknown as Awaited<ReturnType<typeof mockES8Client.search>>);
-        (
-          delegator as unknown as { client: ElasticsearchClientDelegator }
-        ).client = mockES8Client;
+        injectClient(delegator, mockES8Client);
       });
 
       it('should escape *, ?, \\ in query', async () => {
@@ -126,6 +134,7 @@ describe('ElasticsearchDelegator', () => {
       });
 
       it('should return [] when rawBuckets is not an array', async () => {
+        // type-assertion (unavoidable): invalid buckets on purpose to hit the non-array guard.
         mockES8Client.search.mockResolvedValue({
           aggregations: { unique_values: { buckets: 'invalid' } },
         } as unknown as Awaited<ReturnType<typeof mockES8Client.search>>);
@@ -145,14 +154,13 @@ describe('ElasticsearchDelegator', () => {
 
       beforeEach(() => {
         mockES7Client = mock<ES7ClientDelegator>({ delegatorVersion: 7 });
+        // type-assertion (unavoidable): see ES8 path — ES response is a large union.
         mockES7Client.search.mockResolvedValue({
           aggregations: {
             unique_values: { buckets: makeBuckets(['alice']) },
           },
         } as unknown as Awaited<ReturnType<typeof mockES7Client.search>>);
-        (
-          delegator as unknown as { client: ElasticsearchClientDelegator }
-        ).client = mockES7Client;
+        injectClient(delegator, mockES7Client);
       });
 
       it('should use auditlogs-alias as index', async () => {
@@ -209,14 +217,13 @@ describe('ElasticsearchDelegator', () => {
 
     describe('unknown client type', () => {
       beforeEach(() => {
-        (
-          delegator as unknown as { client: ElasticsearchClientDelegator }
-        ).client = {
+        // type-assertion (unavoidable): 0 is outside the 7|8|9 union, to hit the fallback.
+        injectClient(delegator, {
           delegatorVersion: 0,
-        } as unknown as ElasticsearchClientDelegator;
+        } as unknown as ElasticsearchClientDelegator);
       });
 
-      it('should return [] without warning', async () => {
+      it('should return []', async () => {
         const result = await delegator.searchAuditlogByFuzzyWildcard(
           'username',
           'alice',

@@ -1,8 +1,7 @@
 import type { IUser } from '@growi/core';
 import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
-import { vi } from 'vitest';
-import { type MockProxy, mock } from 'vitest-mock-extended';
+import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type Crowi from '~/server/crowi';
@@ -45,16 +44,25 @@ class TestSearchService extends SearchService {
 
 type UserRecord = { username: string; status: number };
 
+// Asymmetric matcher: set-equality for string[] (order/duplication-insensitive),
+// which matches $in semantics. Lets us stay inside toHaveBeenCalledWith with no cast.
+const sameStringSet = (expected: string[]) => ({
+  asymmetricMatch: (actual: unknown): boolean =>
+    Array.isArray(actual) &&
+    new Set(actual).size === new Set(expected).size &&
+    expected.every((e) => actual.includes(e)),
+  toString: () => `sameStringSet([${expected.join(', ')}])`,
+});
+
 const setupUserModelMock = (
   userModel: MockProxy<Model<IUser>>,
   users: UserRecord[],
 ) => {
-  userModel.find.mockReturnValue({
-    select: vi.fn().mockReturnValue({ lean: vi.fn().mockResolvedValue(users) }),
-  } as unknown as ReturnType<typeof userModel.find>);
-  vi.spyOn(mongoose, 'model').mockReturnValue(
-    userModel as unknown as ReturnType<typeof mongoose.model>,
-  );
+  const query = mockDeep<ReturnType<Model<IUser>['find']>>();
+  query.select.mockReturnValue(query);
+  query.lean.mockResolvedValue(users);
+  userModel.find.mockReturnValue(query);
+  vi.spyOn(mongoose, 'model').mockReturnValue(userModel);
 };
 
 describe('SearchService.searchAuditlogSuggestions()', () => {
@@ -121,6 +129,9 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
         inactiveUsernames: ['bob'],
       },
     });
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).toHaveBeenCalledWith('username', 'ali', 10);
   });
 
   it('should exclude usernames not found in MongoDB', async () => {
@@ -139,6 +150,10 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
 
     expect(result.username?.activeUsernames).toEqual(['alice']);
     expect(result.username?.inactiveUsernames).toEqual([]);
+    // Guard the $in narrowing: Mongo queried only for ES-returned names, else leaks others.
+    expect(mockUserModel.find).toHaveBeenCalledWith({
+      username: { $in: sameStringSet(['alice', 'ghost']) },
+    });
   });
 
   it('should return empty arrays when ES returns []', async () => {
