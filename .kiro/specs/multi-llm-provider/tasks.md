@@ -15,7 +15,7 @@
   - _Requirements: 1.1, 1.4_
   - _Boundary: llm-vendor interface_
 
-- [ ] 1.3 (P) ベンダー設定キーの定義
+- [x] 1.3 (P) ベンダー設定キーの定義
   - ベンダーセレクタ（`string | undefined`、env 由来、既定なし）と、Anthropic/Google の API キー（secret）・モデル（ベンダー既定値あり）の設定キーを追加する。OpenAI は既存キーを再利用する
   - 設定キー一覧の配列と定義オブジェクトの両方に登録する（キー型・値型は自動導出）。env-only グループには登録せず、既存 API キーと同じ DB+env フォールバックで統一する（管理 UI は追加しない）
   - 観測可能: 新 env（`MASTRA_LLM_VENDOR` / `ANTHROPIC_API_KEY` / `ANTHROPIC_MASTRA_AGENT_MODEL` / `GOOGLE_API_KEY` / `GOOGLE_MASTRA_AGENT_MODEL`）が設定として解決でき、モデル未指定時はベンダー既定値が返る。API キーは secret 扱いになる
@@ -72,3 +72,6 @@
   - _Requirements: 1.1, 1.2_
   - _Boundary: build artifact（.next/node_modules）, package.json_
   - _Depends: 1.1, 2.1_
+
+## Implementation Notes
+- 1.3: 既存ブランチに **pre-existing な型エラー** `apps/app/src/features/mastra/server/routes/post-message.ts(77,48)` TS2769（`growiAgent.stream(...)` の引数）が存在する。本機能の変更とは無関係（baseline で再現）。タスク 3.1/3.2/4.x で post-message/routes 周辺を触る際、この既存エラーを「新規混入」と誤認しないこと。`pnpm run lint:typecheck` はこの1件で赤になる前提。
