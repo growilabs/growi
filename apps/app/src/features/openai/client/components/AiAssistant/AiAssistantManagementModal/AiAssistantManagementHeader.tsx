@@ -29,7 +29,7 @@ export const AiAssistantManagementHeader = (props: Props): JSX.Element => {
     <ModalHeader
       tag="h4"
       close={
-        <button type="button" className="btn p-0" onClick={close}>
+        <button type="button" className="btn p-0 ms-auto" onClick={close}>
           <span className="material-symbols-outlined">close</span>
         </button>
       }

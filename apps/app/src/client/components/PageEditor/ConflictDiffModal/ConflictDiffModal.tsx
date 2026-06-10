@@ -100,7 +100,7 @@ const ConflictDiffModalSubstance = (
 
   const headerButtons = useMemo(
     () => (
-      <div className="d-flex align-items-center">
+      <div className="d-flex align-items-center ms-auto">
         <button
           type="button"
           className="btn"

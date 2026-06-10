@@ -47,6 +47,7 @@ import {
 } from '~/states/server-configurations';
 import {
   EditorMode,
+  toPageUpdateGrantParams,
   useCurrentIndentSize,
   useCurrentIndentSizeActions,
   useEditingMarkdown,
@@ -223,11 +224,8 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
 
   const save: Save = useCallback(
     async (revisionId, markdown, opts, onConflict) => {
-      if (pageId == null || selectedGrant == null) {
-        logger.error(
-          { pageId, selectedGrant },
-          'Some materials to save are invalid',
-        );
+      if (pageId == null) {
+        logger.error({ pageId }, 'Some materials to save are invalid');
         throw new Error('Some materials to save are invalid');
       }
 
@@ -239,9 +237,10 @@ export const PageEditorSubstance = (props: Props): JSX.Element => {
           revisionId,
           wip: opts?.wip,
           body: markdown ?? '',
-          grant: selectedGrant?.grant,
           origin: Origin.Editor,
-          userRelatedGrantUserGroupIds: selectedGrant?.userRelatedGrantedGroups,
+          // Omits grant when none is selected (null) so the server preserves the
+          // page's existing grant instead of overwriting it — see issue https://github.com/growilabs/growi/issues/11272.
+          ...toPageUpdateGrantParams(selectedGrant),
           ...(opts ?? {}),
         });
 

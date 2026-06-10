@@ -11,6 +11,8 @@ export default defineConfig({
       // Use jsdom for client-side tests
       ['**/client/**/*.spec.ts', 'jsdom'],
       ['**/client/**/*.test.ts', 'jsdom'],
+      ['**/client/**/*.spec.tsx', 'jsdom'],
+      ['**/client/**/*.test.tsx', 'jsdom'],
     ],
   },
 });

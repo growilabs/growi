@@ -1,3 +1,4 @@
+import { escapeStringForMongoRegex } from '../escape-string-for-regex';
 import { isTopPage } from './is-top-page';
 
 /**
@@ -10,5 +11,8 @@ export const generateChildrenRegExp = (path: string): RegExp => {
 
   // https://regex101.com/r/mrDJrx/1
   // ex. /parent/any_child OR /any_level1
-  return new RegExp(`^${RegExp.escape(path)}(\\/[^/]+)\\/?$`);
+  // NOTE: use escapeStringForMongoRegex (not RegExp.escape) because this pattern is sent to
+  // MongoDB ($regex). RegExp.escape would emit \uXXXX for non-ASCII whitespace (e.g. U+3000),
+  // which PCRE2 rejects (error 51091).
+  return new RegExp(`^${escapeStringForMongoRegex(path)}(\\/[^/]+)\\/?$`);
 };

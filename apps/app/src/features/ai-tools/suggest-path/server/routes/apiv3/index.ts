@@ -99,6 +99,7 @@ const validator = [
  *     security:
  *       - bearer: []
  *       - accessTokenInQuery: []
+ *       - accessTokenHeaderAuth: []
  *     requestBody:
  *       required: true
  *       content:
