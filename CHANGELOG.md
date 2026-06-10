@@ -1,8 +1,36 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.5.4...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.5.5...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.5.5](https://github.com/growilabs/compare/v7.5.4...v7.5.5) - 2026-06-10
+
+### 🚀 Improvement
+
+* imprv: Enable API token header "X-GROWI-ACCESS-TOKEN" (#11244) @yuki-takei
+
+### 🐛 Bug Fixes
+
+* fix: disable $lsx() and attachment-refs directives on share link pages to prevent Basic auth challenge (#11271) @yuki-takei
+* fix: Prevent bulk-export cleanup race on shared attachment (#11229) @tomoyuki-t-weseek
+* fix: Remove uglifycss to preserve CSS Color Level 4 syntax (#11277) @yuki-takei
+* fix: Index rebuild fails on boot when initializing a Crowi instance takes a long time (#11247) @ryu-sato
+* fix: Page operations and v5 page migration fail for paths containing non-ASCII whitespace (e.g. U+3000) (#11236) @yuki-takei
+* fix(editor): fix Shift+Arrow selection stuck on wrapped lines by upgrading @codemirror/commands to ^6.10.3 (#11264) @yuki-takei
+* fix(editor): Preserve page grant on mobile & before grant loads (#11272) (#11276) @yuki-takei
+* fix(ui): right-align ModalHeader close content wrapped in a custom element (#11269) @yuki-takei
+* fix(attachment): deny direct access to /uploads to prevent stored XSS (#11257) @miya
+* fix(page-grant): guard against TypeError when grantedUsers is empty in calcApplicableGrantData (#11211) @yuki-takei
+
+### 🧰 Maintenance
+
+* support: Verify initial pages are created with content after installation (#11234) @Ryosei-Fukushima
+* ci(deps): bump mermaid from 11.10.0 to 11.15.0 (#11121) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump axios from 1.15.0 to 1.16.0 (#11260) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump qs from 6.14.2 to 6.15.2 (#11209) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps-dev): bump turbo from 2.1.3 to 2.9.14 (#11202) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump js-cookie from 3.0.5 to 3.0.7 (#11205) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v7.5.4](https://github.com/growilabs/compare/v7.5.3...v7.5.4) - 2026-05-27
 
