@@ -39,7 +39,7 @@
 ### Allowed Dependencies
 - `~/server/service/config-manager`（`configManager.getConfig`）。
 - `@mastra/core/agent`（`Agent`, `DynamicArgument<MastraModelConfig>`）, `@mastra/core/llm`（`MastraModelConfig` 型）, `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`。
-- 依存方向（厳守）: `config-definition`（core 層）と `interfaces(llm-vendor)`（feature 層）はそれぞれ独立した上流。`llm-providers(factories)` → `resolve-mastra-model`（`config-definition` と `interfaces` の双方を参照）→ `growi-agent`。左方向のみ import 可。**core の `config-definition` は `features/mastra` を import しない**（`mastra:llmVendor` は `string` 型で定義し、`LlmVendor` への絞り込みは resolver 側で行う）。
+- 依存方向: `llm-providers(factories)` → `resolve-mastra-model`（`config-definition` と `interfaces` の双方を参照）→ `growi-agent`。`config-definition`（core 層）は `LlmVendor` を **型のみ（`import type`）** 参照する — 実行時に消えるため runtime の core→feature エッジは無く、`llm-vendor` は依存ゼロの leaf なので循環もない。型は DX 用で実行時強制ではないため、不正値検証は resolver の `isLlmVendor`。
 
 ### Revalidation Triggers
 - `mastra:llmVendor` の有効値集合（`LLM_VENDORS`）の変更。
@@ -121,7 +121,7 @@ apps/app/src/features/mastra/
 ```
 
 ### Modified Files
-- `apps/app/src/server/service/config-manager/config-definition.ts` — `CONFIG_KEYS` 配列と `CONFIG_DEFINITIONS` に `mastra:llmVendor` / `mastra:llmApiKey`（secret）/ `mastra:llmModel` を追加（`ConfigKey`/`ConfigValues` は自動導出。`ENV_ONLY_GROUPS` には追加しない）。
+- `apps/app/src/server/service/config-manager/config-definition.ts` — `CONFIG_KEYS` / `CONFIG_DEFINITIONS` に `mastra:llmVendor`（`LlmVendor` 型・type-only import）/ `mastra:llmApiKey`（secret）/ `mastra:llmModel` を追加し、未使用化した `openai:assistantModel:mastraAgent`（＋ `openai` 型 import）を削除（`ConfigKey`/`ConfigValues` は自動導出。`ENV_ONLY_GROUPS` には追加しない）。
 - `apps/app/src/features/mastra/server/services/mastra-modules/agents/growi-agent.ts` — `getOpenaiProvider()(model)` を `model: () => resolveMastraModel()` の dynamic function へ置換。
 - `apps/app/package.json` — `@ai-sdk/anthropic`・`@ai-sdk/google`（`^3.x`）を `dependencies` に追加。
 - `apps/app/src/features/mastra/server/services/mastra-modules/agents/growi-agent.spec.ts` — dynamic model / 使用時 throw 伝播を反映。
@@ -129,7 +129,7 @@ apps/app/src/features/mastra/
 ### Deleted Files
 - `apps/app/src/features/mastra/server/services/ai-sdk-modules/get-openai-provider.ts` — `llm-providers/openai.ts` + resolver に置換。
 
-> `routes/index.ts` は変更しない（FB により可用性ゲートを撤回）。`openai:apiKey`（suggest-path と共有）は不変。`openai:assistantModel:mastraAgent`（旧 mastra agent 専用）は本仕様後は未使用となる pre-existing キー（除去は別仕様の cleanup 候補）。
+> `routes/index.ts` は変更しない（FB により可用性ゲートを撤回）。`openai:apiKey`（suggest-path と共有）は不変。`openai:assistantModel:mastraAgent`（旧 mastra agent 専用・`OPENAI_MASTRA_AGENT_MODEL`）は未使用化したため**削除**（mastra は `mastra:llmModel` を使用）。
 
 ## System Flows
 
@@ -226,7 +226,7 @@ export const isLlmVendor = (value: unknown): value is LlmVendor =>
 
 | 設定キー | 型 | env 名 | default | isSecret |
 |---|---|---|---|---|
-| `mastra:llmVendor` | `'openai' \| 'anthropic' \| 'google'`（inline literal。実行時は resolver の `isLlmVendor` で再検証） | `MASTRA_LLM_VENDOR` | `'openai'` | no |
+| `mastra:llmVendor` | `LlmVendor`（共有型・type-only import。実行時は resolver の `isLlmVendor` で再検証） | `MASTRA_LLM_VENDOR` | `'openai'` | no |
 | `mastra:llmApiKey` | `string \| undefined` | `MASTRA_LLM_API_KEY` | `undefined` | yes |
 | `mastra:llmModel` | `string`（単一既定値。既定 vendor=OpenAI 向け） | `MASTRA_LLM_MODEL` | `o4-mini` | no |
 
@@ -234,7 +234,7 @@ export const isLlmVendor = (value: unknown): value is LlmVendor =>
 - Integration: 1 App = 1 Vendor のため**単一キーセット**。ベンダーは `mastra:llmVendor` で選択し、resolver がそれに応じて factory を選ぶ。`openai:apiKey` 等の既存キーは suggest-path 用に不変（mastra は参照しない）。
 - **env-only の実装方針（確定）**: Req 2.4「env のみ」は **「設定用の管理画面 UI を持たない」** と解釈する。新規キーは既存 `openai:apiKey` と同じ **DB＋env フォールバック**で統一し、**`ENV_ONLY_GROUPS` には登録しない**。UI から書き込まれる経路が存在しないため実運用上は env 駆動。
 - **設定キー追加で編集する箇所**: `config-definition.ts` の `CONFIG_KEYS` 配列＋`CONFIG_DEFINITIONS`。`ConfigKey`/`ConfigValues` は自動導出。
-- Validation: `mastra:llmVendor` は **inline literal union `'openai'|'anthropic'|'google'`** で型付け（`LlmVendor` を import せず＝core→feature 依存逆転を回避、`openai:serviceType` と同じ流儀）。**型は DX/補完のためで実行時強制ではない**（config-manager は env 文字列を宣言型で検証しない）。よって resolver は依然 `isLlmVendor` で実行時検証する（`MASTRA_LLM_VENDOR=azure` 等の untrusted env を弾く。Req 1.4）。default `'openai'` により未指定時は OpenAI（Req 1.3）。
+- Validation: `mastra:llmVendor` は共有 **`LlmVendor`** で型付け（`import type` の type-only＝実行時に消えるため依存逆転の実害なし・`llm-vendor` は leaf で循環なし・単一ソース）。**型は DX/補完のためで実行時強制ではない**（config-manager は env 文字列を宣言型で検証しない）。よって resolver は依然 `isLlmVendor` で実行時検証する（`MASTRA_LLM_VENDOR=azure` 等の untrusted env を弾く。Req 1.4）。default `'openai'` により未指定時は OpenAI（Req 1.3）。
 - Model 既定: `mastra:llmModel` は config の defaultValue（`o4-mini`、既定 vendor=OpenAI 向け）に集約。resolver は per-vendor 既定 map を持たない。非 OpenAI ベンダー利用時は `MASTRA_LLM_MODEL` の明示指定が必要。
 - Secret: `mastra:llmApiKey` は `isSecret: true`。クライアントへ返す apiv3 エンドポイントは存在せず露出経路なし（Req 2.5）。
 
@@ -360,6 +360,6 @@ export const growiAgent = new Agent({
 - **モデル既定値**: `mastra:llmModel` の単一 default は `o4-mini`（既定 vendor=OpenAI 向け）。per-vendor 既定 map は撤去。非 OpenAI ベンダー利用時は `MASTRA_LLM_MODEL` の明示指定が必要（未指定だと OpenAI 向け既定が非互換ベンダーへ渡る）。
 - **provider options パリティ（Out of scope・別仕様へ後追い）**: `post-message.ts` の `providerOptions.openai` は OpenAI 専用のまま現状維持。非 OpenAI ベンダーでは AI SDK 側で**無視される（検証済）** — `@ai-sdk/provider-utils@4.0.27` の `parseProviderOptions` は当該 provider 名前空間が無ければ `undefined` を返し throw しない。ベンダー別 reasoning パリティの調査は research.md D-7/D-8 に保持。
 - **依存分類（検証済 D-?）**: `@ai-sdk/anthropic`/`@ai-sdk/google` は Express サーバ（`dist/`、`build:server`）経由の server-only パッケージで `.next/node_modules` には externalise されない（既存 `@ai-sdk/openai` と同一）。`dependencies` 配置で正しい。確定的 prod ロード検証は CI Level 2（`server:ci`）。
-- **dead config キー**: `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）は本仕様後は未使用（mastra は `mastra:llmModel` を使用）。pre-existing キーのため除去は別仕様の cleanup 候補。
+- **削除した config キー**: `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）は未使用化したため本仕様で削除（`OpenAI.Chat.ChatModel` 用の `openai` 型 import も除去）。
 - **pre-existing branch 課題（本仕様スコープ外）**: `apiv3/index.js` の `mastraRouteFactory` import 欠落、`post-message.ts:77` TS2769。support/mastra ブランチのマージ未完状態で、別途対応が必要（tasks.md Implementation Notes 参照）。
 - **設定キー命名**: `mastra:llmVendor` / `mastra:llmApiKey` / `mastra:llmModel` は提案。レビューで調整余地あり。

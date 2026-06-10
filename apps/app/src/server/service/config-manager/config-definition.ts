@@ -5,8 +5,8 @@ import type {
   NonBlankString,
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
-import type OpenAI from 'openai';
 
+import type { LlmVendor } from '~/features/mastra/interfaces/llm-vendor';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
@@ -283,7 +283,6 @@ export const CONFIG_KEYS = [
   // OpenAI Settings
   'openai:serviceType',
   'openai:apiKey',
-  'openai:assistantModel:mastraAgent',
 
   // Mastra LLM Settings (vendor-agnostic: one vendor per app)
   'mastra:llmVendor',
@@ -1258,22 +1257,16 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
     isSecret: true,
   }),
-  // Reasoning-capable model for the Mastra agent. Emits reasoning summary
-  // chunks consumed by the AI Elements Reasoning UI in the chat sidebar.
-  'openai:assistantModel:mastraAgent': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_MASTRA_AGENT_MODEL',
-    defaultValue: 'o4-mini',
-  }),
 
   // Mastra LLM Settings (vendor-agnostic: one vendor per app)
   // Single set of keys regardless of vendor — the resolver reads `mastra:llmVendor`
   // to pick the provider client, then injects `mastra:llmApiKey` / `mastra:llmModel`.
-  // The vendor union is INLINED here (not imported from `features/mastra`) so this
-  // core-layer definition stays free of a feature import (avoids dependency
-  // inversion), mirroring `openai:serviceType`. The type aids DX/autocomplete but
-  // is NOT enforced at runtime for env-loaded values, so the resolver still
+  // Typed with the shared `LlmVendor` (single source of truth). This is a
+  // type-only import — erased at runtime, so there is no runtime core->feature
+  // edge, and the module is a dependency-free leaf (no cycle). The type aids DX
+  // but is NOT enforced at runtime for env-loaded values, so the resolver still
   // validates with `isLlmVendor` (untrusted env may carry an out-of-union string).
-  'mastra:llmVendor': defineConfig<'openai' | 'anthropic' | 'google'>({
+  'mastra:llmVendor': defineConfig<LlmVendor>({
     envVarName: 'MASTRA_LLM_VENDOR',
     defaultValue: 'openai',
   }),
