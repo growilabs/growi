@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. Foundation: 依存・型・設定
-- [ ] 1.1 LLM ベンダー SDK 依存の追加
+- [x] 1.1 LLM ベンダー SDK 依存の追加
   - `@ai-sdk/anthropic` と `@ai-sdk/google` を `^3.x`（既存 `@ai-sdk/openai ^3` と同じ provider IF）で `apps/app/package.json` の `dependencies` に追加し、ルートで `turbo run bootstrap` を実行して依存解決・lockfile を更新する
   - 観測可能: 両パッケージが `dependencies` に存在し `turbo run bootstrap` がエラーなく完了。`createAnthropic`（`@ai-sdk/anthropic`）/ `createGoogleGenerativeAI`（`@ai-sdk/google`）が型解決する
   - _Requirements: 1.1, 1.2_

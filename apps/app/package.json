@@ -67,6 +67,8 @@
     "@keycloak/keycloak-admin-client": "19.0.0 or above exports only ESM. API breaking changes require separate migration effort."
   },
   "dependencies": {
+    "@ai-sdk/anthropic": "^3.0.0",
+    "@ai-sdk/google": "^3.0.0",
     "@ai-sdk/openai": "^3.0.63",
     "@ai-sdk/react": "^3.0.178",
     "@akebifiky/remark-simple-plantuml": "^1.0.2",
