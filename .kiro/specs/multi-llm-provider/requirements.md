@@ -18,7 +18,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 
 本仕様は、自前ホスティングする GROWI の管理者・運用者が、mastra チャットエージェントで使用する LLM ベンダーを **OpenAI / Anthropic / Google** から選択できるようにすることを目的とする。ベンダー・API キー・モデルといった接続設定は、**環境変数のみ**で構成する（管理画面 UI は持たない）。これは、AI 機能を `features/mastra` に集約し AI 連携設定の管理画面を廃止して環境変数設定へ一本化する [deprecate-openai-features](../deprecate-openai-features/) の方針と整合する。
 
-1 つの GROWI アプリインスタンスでは、単一の LLM ベンダーのみを有効にする（同一アプリ内での複数ベンダー同時利用は対象外）。運用者がベンダーを明示指定しない場合、または設定に不備がある場合は、mastra チャットエージェントを無効化しつつアプリ本体の動作は継続する。
+1 つの GROWI アプリインスタンスでは、単一の LLM ベンダーのみを有効にする（同一アプリ内での複数ベンダー同時利用は対象外）。ベンダー未指定時は既定で OpenAI を使用する。設定に不備（対応外のベンダー名・API キー欠落）がある場合は、mastra チャットエージェントを無効化（モデル解決時に失敗）しつつアプリ本体の動作は継続する。
 
 本仕様の利害関係者は、AI チャットを利用する GROWI ユーザー、GROWI を運用する管理者・運用者、および GROWI コードベースを保守する開発者である。
 
@@ -26,7 +26,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 
 - **In scope（本仕様で扱う）**
   - mastra チャットエージェント（`growiAgent`）が使用する LLM ベンダーを OpenAI / Anthropic / Google から選択する仕組み
-  - ベンダー名・API キー・モデルの環境変数による接続設定（モデルは任意指定で、未指定時はベンダーごとの既定モデルを使用）
+  - ベンダー名・API キー・モデルの環境変数による接続設定（ベンダー未指定時は既定 OpenAI。モデルは任意指定で、未指定時は単一の既定モデル＝既定ベンダー OpenAI 向け）
   - 1 アプリインスタンス = 単一ベンダーの制約
   - ベンダー設定の不備（未指定・対応外ベンダー名・必須設定欠落）時の挙動（mastra チャットエージェント無効化＋ログ出力＋アプリ継続）
 - **Out of scope（本仕様で扱わない）**
@@ -49,7 +49,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 #### Acceptance Criteria
 1. The system shall OpenAI / Anthropic / Google を mastra チャットエージェントの選択可能な LLM ベンダーとしてサポートする
 2. When 運用者が環境変数で対応ベンダーのいずれかを指定したとき, the system shall そのベンダーを mastra チャットエージェントの LLM プロバイダーとして使用する
-3. Where ベンダーが環境変数で明示指定されていないとき, the system shall それを設定不備として扱い, 既定ベンダーへのフォールバックを行わない
+3. Where ベンダーが環境変数で指定されていないとき, the system shall 既定ベンダー（OpenAI）を使用する
 4. If 指定されたベンダー名が対応集合（OpenAI / Anthropic / Google）に含まれないとき, the system shall それを設定不備として扱う
 
 ### Requirement 2: 環境変数による接続設定
@@ -58,7 +58,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 #### Acceptance Criteria
 1. The system shall 選択されたベンダーの API キーを環境変数から取得する
 2. The system shall 選択されたベンダーで使用するモデル名を環境変数で設定できるようにする
-3. Where モデル名が環境変数で指定されていないとき, the system shall そのベンダーの既定モデルを使用する
+3. Where モデル名が環境変数で指定されていないとき, the system shall 単一の既定モデル（既定ベンダー OpenAI 向け）を使用する（非 OpenAI ベンダー利用時はモデルの明示指定が必要）
 4. The system shall ベンダー・API キー・モデルの接続設定を環境変数のみから受け付け, これらを設定する管理画面 UI を提供しない
 5. The system shall API キーを機密情報として扱い, ログ出力・エラーメッセージ・API 応答のいずれにも平文で含めない
 

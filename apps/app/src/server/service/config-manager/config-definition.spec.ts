@@ -207,9 +207,9 @@ describe('config-definition multi-llm-provider keys', () => {
         );
       });
 
-      it('has default value of undefined (no fallback vendor)', () => {
+      it('has default value openai', () => {
         expect(CONFIG_DEFINITIONS['mastra:llmVendor'].defaultValue).toBe(
-          undefined,
+          'openai',
         );
       });
 
@@ -243,9 +243,9 @@ describe('config-definition multi-llm-provider keys', () => {
         );
       });
 
-      it('has default value of undefined (resolver applies per-vendor default)', () => {
+      it('has default value o4-mini (single default tuned for the default vendor)', () => {
         expect(CONFIG_DEFINITIONS['mastra:llmModel'].defaultValue).toBe(
-          undefined,
+          'o4-mini',
         );
       });
 

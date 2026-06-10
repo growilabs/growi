@@ -66,13 +66,15 @@ beforeEach(() => {
 });
 
 describe('resolveMastraModel', () => {
-  describe('misconfiguration throws (Req 4.1, 1.3, 1.4)', () => {
-    it('throws when the vendor is unset and builds no provider (Req 1.3, 4.1)', async () => {
+  describe('misconfiguration throws (Req 1.4, 4.1)', () => {
+    it('throws for an out-of-union vendor value and builds no provider (Req 1.4)', async () => {
+      // `mastra:llmVendor` defaults to 'openai' at the config layer, but env is
+      // not runtime-validated against the union, so an out-of-union value must
+      // still be rejected here (untrusted env).
       applyConfig({ 'mastra:llmVendor': undefined });
       const { resolveMastraModel } = await loadResolver();
 
-      expect(() => resolveMastraModel()).toThrow(/MASTRA_LLM_VENDOR/);
-      // No fallback to a default vendor: no factory is constructed.
+      expect(() => resolveMastraModel()).toThrow(/Unsupported/);
       expect(openaiFactory).not.toHaveBeenCalled();
       expect(anthropicFactory).not.toHaveBeenCalled();
       expect(googleFactory).not.toHaveBeenCalled();
@@ -153,35 +155,24 @@ describe('resolveMastraModel', () => {
     });
   });
 
-  describe('model default (Req 2.3)', () => {
-    const defaults: ReadonlyArray<{ vendor: LlmVendor; model: string }> = [
-      { vendor: 'openai', model: 'o4-mini' },
-      { vendor: 'anthropic', model: 'claude-sonnet-4-5' },
-      { vendor: 'google', model: 'gemini-2.5-flash' },
-    ];
-
-    it.each(
-      defaults,
-    )('uses the $vendor default model when MASTRA_LLM_MODEL is unset', async ({
-      vendor,
-      model,
-    }) => {
+  describe('model (Req 2.2, 2.3)', () => {
+    it('passes the configured model through to the factory', async () => {
+      // The single default (o4-mini, tuned for the default openai vendor) lives
+      // in the config defaultValue; the resolver simply forwards getConfig's
+      // value — here a custom override.
       applyConfig({
-        'mastra:llmVendor': vendor,
+        'mastra:llmVendor': 'openai',
         'mastra:llmApiKey': 'sk-key',
-        // mastra:llmModel intentionally omitted -> per-vendor default
+        'mastra:llmModel': 'o4-mini',
       });
       const { resolveMastraModel } = await loadResolver();
 
       resolveMastraModel();
 
-      const factory =
-        vendor === 'openai'
-          ? openaiFactory
-          : vendor === 'anthropic'
-            ? anthropicFactory
-            : googleFactory;
-      expect(factory).toHaveBeenCalledWith({ apiKey: 'sk-key', model });
+      expect(openaiFactory).toHaveBeenCalledWith({
+        apiKey: 'sk-key',
+        model: 'o4-mini',
+      });
     });
   });
 

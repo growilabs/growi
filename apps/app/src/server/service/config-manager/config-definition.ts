@@ -1268,22 +1268,25 @@ export const CONFIG_DEFINITIONS = {
   // Mastra LLM Settings (vendor-agnostic: one vendor per app)
   // Single set of keys regardless of vendor — the resolver reads `mastra:llmVendor`
   // to pick the provider client, then injects `mastra:llmApiKey` / `mastra:llmModel`.
-  // `mastra:llmVendor` is typed `string | undefined` (not LlmVendor) to keep this
-  // core-layer definition free of any `features/mastra` import (avoids dependency
-  // inversion); validation against LlmVendor happens in the resolver.
-  'mastra:llmVendor': defineConfig<string | undefined>({
+  // The vendor union is INLINED here (not imported from `features/mastra`) so this
+  // core-layer definition stays free of a feature import (avoids dependency
+  // inversion), mirroring `openai:serviceType`. The type aids DX/autocomplete but
+  // is NOT enforced at runtime for env-loaded values, so the resolver still
+  // validates with `isLlmVendor` (untrusted env may carry an out-of-union string).
+  'mastra:llmVendor': defineConfig<'openai' | 'anthropic' | 'google'>({
     envVarName: 'MASTRA_LLM_VENDOR',
-    defaultValue: undefined,
+    defaultValue: 'openai',
   }),
   'mastra:llmApiKey': defineConfig<string | undefined>({
     envVarName: 'MASTRA_LLM_API_KEY',
     defaultValue: undefined,
     isSecret: true,
   }),
-  // Unset -> the resolver applies a per-vendor default model.
-  'mastra:llmModel': defineConfig<string | undefined>({
+  // Single default tuned for the default vendor (OpenAI). When a non-OpenAI
+  // vendor is selected, set MASTRA_LLM_MODEL to that vendor's model.
+  'mastra:llmModel': defineConfig<string>({
     envVarName: 'MASTRA_LLM_MODEL',
-    defaultValue: undefined,
+    defaultValue: 'o4-mini',
   }),
 
   // OpenTelemetry Settings
