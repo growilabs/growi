@@ -35,6 +35,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
   - ベンダー・API キー・モデルを設定するための管理画面 UI（環境変数のみで構成する）
   - OpenAI / Anthropic / Google 以外のベンダーの追加
   - LLM クライアントの生成方式（ai-sdk 由来プロバイダー vs `@mastra/core/agent`）の選定。これは設計上の論点であり design フェーズで比較・決定する
+  - ベンダー別 reasoning provider options のパリティ（`reasoningEffort` / `reasoningSummary` 相当）。reasoning オプションはモデル世代依存で保守コストが高いため、本仕様では OpenAI 既存挙動を維持し、Anthropic/Google は各モデル既定の reasoning に委ねる（providerOptions 未設定）。reasoning パリティは実モデルで検証できる別仕様へ後追いとする
 - **Adjacent expectations（隣接システム・前提）**
   - 既存の AI 有効化ゲート（環境変数 `AI_ENABLED` / `app:aiEnabled`）に依存する。mastra チャットエージェントが動作するには AI が有効であり、かつ有効なベンダー設定が存在する必要がある
   - 接続設定は既存の環境変数ベースの設定読み込み機構を通じて解決される

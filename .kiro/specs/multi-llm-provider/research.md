@@ -217,3 +217,50 @@ export type OpenAICompatibleConfig =
 
 - ベンダー別**既定モデル**の具体値（Anthropic/Google）は最新の提供モデルで確定する（暫定: anthropic=`claude-sonnet-4-5`, google=`gemini-2.5-flash`）。openai は既存 `o4-mini`。
 - `@ai-sdk/anthropic` / `@ai-sdk/google` の導入バージョンは既存 `@ai-sdk/openai@^3.x` に合わせ `^3.x`。導入後 `apps/app/.next/node_modules` で externalise を確認し `dependencies` 分類を検証（package-dependencies ルール）。
+
+---
+
+# Design Discovery (追補): ベンダー別 reasoning providerOptions（2026-06-10）
+
+_スコープ拡張: `post-message.ts` の `providerOptions` を解決済みベンダーに応じて出し分け、OpenAI の `reasoningEffort`/`reasoningSummary` に等価なオプションを各ベンダーで適用する。_
+
+## D-7. 検証: 各ベンダーの reasoning providerOptions（npm `.d.ts` 一次情報）
+
+対象: `@ai-sdk/anthropic@3.0.82` / `@ai-sdk/google@3.0.80`（いずれも `@ai-sdk/provider@3.0.10` = AI SDK v6 系。既存 `@ai-sdk/openai@^3` と整合）。
+
+| 意図 | OpenAI `providerOptions.openai` | Anthropic `providerOptions.anthropic` | Google `providerOptions.google` |
+|---|---|---|---|
+| ①reasoning コスト抑制 | `reasoningEffort: 'low'\|'medium'\|'high'` | `thinking: { type:'enabled', budgetTokens?:number }` / `{ type:'adaptive', display?:'omitted'\|'summarized' }`、または兄弟フィールド `effort: 'low'\|'medium'\|'high'\|'xhigh'\|'max'`（Opus 4.5+） | `thinkingConfig: { thinkingBudget?:number, includeThoughts?:boolean, thinkingLevel?:'minimal'\|'low'\|'medium'\|'high' }` |
+| ②サマリを UI に出す | `reasoningSummary: 'auto'` | `type:'enabled'` は reasoning を自動 emit。adaptive は `display:'summarized'` | `includeThoughts: true` |
+
+補足（検証済 / 一部は基盤 API ドキュメント由来）:
+- UI へ流す `sendReasoning: true` は `post-message.ts` の `toAISdkStream(..., { sendReasoning: true })` で**既に有効**。各 provider オプションで summary を「要求」すれば UI に届く。
+- `effort` は Anthropic では `thinking` の**兄弟**フィールド（ネストではない）。Opus 4.5+ 系で対応。Sonnet 系は `thinking.budgetTokens`（≥1024、基盤 API 制約）が無難。
+- Google は **Gemini 2.5 = `thinkingBudget`（数値）**、**Gemini 3 = `thinkingLevel`（列挙）** とモデル世代で異なる。混在不可。
+- AI SDK の `parseProviderOptions` は**アクティブ provider 自身の名前空間**のみ検証（`.strict()`）。他 provider のキーは無視。ただし**自 provider 名前空間内に当該モデル非対応の値を入れると runtime でエラー/無視**になり得る（モデル世代依存）。
+
+## D-8. 決定: ベンダー別固定値（既定モデル準拠）
+
+ユーザー選択により、reasoning providerOptions は**各ベンダーの既定モデルに適合する固定値**としてコードに持つ（env 上書きは導入しない＝MVP）。提案値（暫定。既定モデル確定とあわせて実装時に確定）:
+
+| Vendor | 既定モデル | providerOptions（提案・暫定） |
+|---|---|---|
+| openai | `o4-mini` | `{ openai: { reasoningEffort: 'low', reasoningSummary: 'auto' } }`（現状維持） |
+| anthropic | `claude-sonnet-4-5` | `{ anthropic: { thinking: { type: 'enabled', budgetTokens: 1024 } } }` |
+| google | `gemini-2.5-flash` | `{ google: { thinkingConfig: { thinkingBudget: 1024, includeThoughts: true } } }` |
+
+設計: `ai-sdk-modules` に**ベンダー→providerOptions の map と解決関数**（`resolveMastraModel()` の vendor を用いて map を引く純関数）を追加し、`post-message.ts` のハードコード `{ openai: {...} }` を当該関数の戻り値に置換。
+
+**残るリスク（運用者向けに明記）**: reasoning オプションはモデル世代依存（Gemini 3=`thinkingLevel`、Opus 4.5+=`effort`、adaptive=`display`）。運用者が既定モデルを上書きすると固定オプションが不整合になり得る。この場合でもチャット要求は失敗させない（オプション不適合は無視 or 当該 provider のバリデーションに委ねる）方針とし、Open Questions / 運用ドキュメントに明記する。
+
+---
+
+# D-9. 方針転換: reasoning providerOptions パリティを本仕様から除外（後追い）
+
+ユーザー協議の結果、ベンダー別 reasoning providerOptions（Req 6 として一旦追加）は**本仕様から除外**し、別仕様へ後追いとする。
+
+**理由**: reasoning オプションはベンダー横断で統一されておらず、同一ベンダー内でも世代依存（Gemini 2.5=`thinkingBudget` / 3=`thinkingLevel`、Claude Sonnet=`budgetTokens` / Opus 4.5+=`effort` / adaptive=`display`）。固定値で持つと値の継続的な保守・陳腐化リスクを本仕様（multi-vendor のコア）に持ち込むことになる。AI SDK / Mastra にも reasoning を抽象化した統一ノブは無い。
+
+**本仕様の扱い**: OpenAI は既存挙動を維持。Anthropic/Google は各モデル既定の reasoning に委ねる（`providerOptions` 未設定）。`post-message.ts` の `providerOptions.openai` は変更しない（非 OpenAI では無視＝D 検証済）。
+
+**保持**: D-7（各ベンダーの reasoning オプションの `.d.ts` 検証）/ D-8（マッピング案・固定値案）は、後追い仕様の着手時に再利用できるよう本ログに残す。後追い仕様では実モデルでの検証（オプションのモデル適合・サマリ表示・コスト）を前提に設計する。

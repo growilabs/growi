@@ -19,7 +19,7 @@
 - mastra チャットエージェント以外の LLM 利用機能（`suggest-path` 等）のベンダー切替。
 - ベンダー・モデル設定の管理画面 UI。
 - OpenAI/Anthropic/Google 以外のベンダー追加。
-- ベンダー間での推論オプション（reasoning summary 等）のパリティ確保（後述 Open Questions）。
+- ベンダー別 reasoning provider options のパリティ（`reasoningEffort` / `reasoningSummary` 相当）。モデル世代依存で保守コストが高いため、OpenAI は現状維持・Anthropic/Google はモデル既定に委ね、reasoning パリティは別仕様へ後追い（research D-7/D-8 参照）。
 
 ## Boundary Commitments
 
@@ -31,7 +31,7 @@
 ### Out of Boundary
 - `features/ai-tools/suggest-path` および `features/openai` の client-delegator 経由の LLM 呼び出し（現行どおり `openai:serviceType` / `openai:apiKey` を使用、不変）。
 - mastra の memory（`@mastra/mongodb`、ベンダー非依存）・tools・thread 機能。
-- `post-message.ts` の `providerOptions.openai`（OpenAI 専用。非 OpenAI ベンダーでは無視されるが本仕様では変更しない）。
+- `post-message.ts` の `providerOptions.openai`（OpenAI 専用。非 OpenAI ベンダーでは無視されるが本仕様では変更しない。ベンダー別 reasoning パリティは別仕様へ後追い）。
 - 管理画面 UI／AI 連携設定ページ（[deprecate-openai-features](../deprecate-openai-features/) で廃止済みの方針に従い env のみ）。
 
 ### Allowed Dependencies
@@ -419,7 +419,8 @@ export const growiAgent = new Agent({
 
 ## Open Questions / Risks
 - **モデル既定値**: anthropic/google の `defaultValue`（暫定 `claude-sonnet-4-5` / `gemini-2.5-flash`）は実装時に最新提供モデルで確定（research D-5）。
-- **provider options パリティ（Out of scope）**: `post-message.ts` の `providerOptions.openai`（reasoning summary/effort）は OpenAI 専用で、非 OpenAI ベンダーでは AI SDK 側で無視される。現状維持。将来ベンダー別 provider options 対応は別仕様。
+- **provider options パリティ（Out of scope・別仕様へ後追い）**: `post-message.ts` の `providerOptions.openai`（reasoning summary/effort）は OpenAI 専用のまま現状維持。非 OpenAI ベンダーでは AI SDK 側で**無視される（検証済）** — `@ai-sdk/provider-utils@4.0.27` の `parseProviderOptions` は当該 provider 名前空間が無ければ `undefined` を返し throw しない（クロス名前空間でエラーにならない）。
+  - Anthropic/Google は本仕様では各モデル既定の reasoning に委ねる（providerOptions 未設定）。ベンダー別 reasoning パリティ（コスト抑制・サマリ表示の出し分け）は、**モデル世代依存で保守コストが高い**ため別仕様へ後追い。調査結果（各ベンダーの reasoning オプション・マッピング案）は research.md D-7/D-8 に保持。
 - **依存分類**: `@ai-sdk/anthropic`/`@ai-sdk/google` 導入後、`apps/app/.next/node_modules` で externalise を確認し `dependencies` 分類を検証（package-dependencies ルール）。
 - **設定キー命名**: `mastra:llmVendor` は提案。レビューで `app:aiAssistant:*` 等への変更余地あり。
 - **suggest-path の OpenAI 依存（運用者向け明示）**: mastra ベンダーを anthropic/google にしても `suggest-path` は独立に `OPENAI_API_KEY` を要する（Req 5 で対象外）。運用者の誤解を避けるため、起動ログ／運用ドキュメントに「ベンダー選択は suggest-path に影響しない」旨を明示する（Req 5.2）。
