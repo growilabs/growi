@@ -127,7 +127,7 @@ apps/app/src/features/mastra/
 ```
 
 ### Modified Files
-- `apps/app/src/server/service/config-manager/config-definition.ts` — `mastra:llmVendor` と `anthropic:*` / `google:*`（apiKey・model）を追加。
+- `apps/app/src/server/service/config-manager/config-definition.ts` — `CONFIG_KEYS` 配列と `CONFIG_DEFINITIONS` に `mastra:llmVendor`・`anthropic:*`・`google:*`（apiKey・model）を追加（`ConfigKey`/`ConfigValues` は自動導出。`ENV_ONLY_GROUPS` には追加しない）。
 - `apps/app/src/features/mastra/server/services/mastra-modules/agents/growi-agent.ts` — `getOpenaiProvider()(model)` を `model: () => resolveMastraModel()` の dynamic function へ置換。
 - `apps/app/src/features/mastra/server/routes/index.ts` — 可用性ゲートを「`isAiEnabled()` かつ resolver=ok」に拡張、不備時に原因ログ＋エラールート。
 - `apps/app/package.json` — `@ai-sdk/anthropic`・`@ai-sdk/google`（`^3.x`）を `dependencies` に追加（導入後 Turbopack externalise 検証）。
@@ -254,7 +254,10 @@ export const isLlmVendor = (value: unknown): value is LlmVendor =>
 
 **Implementation Notes**
 - Integration: openai は既存キーを再利用（`suggest-path` と共有のため Req 5 と整合）。anthropic/google を対称に新設。
+- **env-only の実装方針（確定）**: Req 2.4「env のみ」は **「設定用の管理画面 UI を持たない」** と解釈する（AI 連携設定画面は [deprecate-openai-features](../deprecate-openai-features/) で廃止済み）。新規キーは既存 `openai:apiKey` と同じ **DB＋env フォールバック**で統一し、**`ENV_ONLY_GROUPS` には登録しない**（openai キー再利用との非対称を回避）。これにより UI から書き込まれる経路が存在しないため、実運用上は env 駆動となり Req 2.4 を満たす。
+- **設定キー追加で編集する箇所**: `config-definition.ts` の `CONFIG_KEYS` 配列（手動追加）＋ `CONFIG_DEFINITIONS`（手動追加）。`ConfigKey` 型・`ConfigValues` 型は自動導出のため編集不要。`ENV_ONLY_GROUPS` は上記方針により追加しない。
 - Validation: `mastra:llmVendor` は型上 union 化せず raw 文字列として保持し、resolver で `isLlmVendor` 検証（Req 1.4 を resolver に追跡可能化）。
+- Secret: 新規 `anthropic:apiKey` / `google:apiKey` は `isSecret: true`。`openai:apiKey` 同様、クライアントへ返す apiv3 エンドポイントは存在せず（AI 設定画面廃止）露出経路なし（Req 2.5）。
 - Risks: model 既定値（anthropic/google）は最新提供モデルで確定（research D-5）。`OpenAI.Chat.ChatModel` 限定型は openai キーのみに留め、他は `string`。
 
 ### services
@@ -419,3 +422,5 @@ export const growiAgent = new Agent({
 - **provider options パリティ（Out of scope）**: `post-message.ts` の `providerOptions.openai`（reasoning summary/effort）は OpenAI 専用で、非 OpenAI ベンダーでは AI SDK 側で無視される。現状維持。将来ベンダー別 provider options 対応は別仕様。
 - **依存分類**: `@ai-sdk/anthropic`/`@ai-sdk/google` 導入後、`apps/app/.next/node_modules` で externalise を確認し `dependencies` 分類を検証（package-dependencies ルール）。
 - **設定キー命名**: `mastra:llmVendor` は提案。レビューで `app:aiAssistant:*` 等への変更余地あり。
+- **suggest-path の OpenAI 依存（運用者向け明示）**: mastra ベンダーを anthropic/google にしても `suggest-path` は独立に `OPENAI_API_KEY` を要する（Req 5 で対象外）。運用者の誤解を避けるため、起動ログ／運用ドキュメントに「ベンダー選択は suggest-path に影響しない」旨を明示する（Req 5.2）。
+- **env-only 方針（解決済み）**: 新規ベンダーキーは DB＋env フォールバックで統一し `ENV_ONLY_GROUPS` 非登録。管理 UI 不在により Req 2.4 を充足（Components → config の Implementation Notes 参照）。
