@@ -27,7 +27,6 @@ import type {
 } from '../../interfaces/search';
 import type { PageModel } from '../../models/page';
 import { createBatchStream } from '../../util/batch-stream';
-import { AuditlogDeadletterStore } from '../auditlog-deadletter-store';
 import { configManager } from '../config-manager';
 import type { UpdateOrInsertPagesOpts } from '../interfaces/search';
 import { aggregatePipelineToIndex } from './aggregate-to-index';
@@ -430,9 +429,6 @@ class ElasticsearchDelegator
       });
 
       await client.indices.delete({ index: tmpIndexName });
-
-      // ES is now in sync with MongoDB; clear any dead-lettered events.
-      await AuditlogDeadletterStore.clear();
     } catch (error) {
       try {
         await this.normalizeAuditlogIndices();
