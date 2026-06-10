@@ -66,7 +66,7 @@ const loginRequiredFallback = (_req, res) => {
   return res.status(403).send('login required');
 };
 
-export const routesFactory = (crowi): Promise<Router> => {
+export const routesFactory = (crowi): Router => {
   const loginRequired = crowi.loginRequiredFactory(
     crowi,
     true,

@@ -13,7 +13,7 @@ import {
 } from '../../common-props';
 import {
   getServerSideGeneralPageProps,
-  getServerSideRendererConfigProps,
+  getServerSideShareLinkRendererConfigProps,
   isValidGeneralPageInitialProps,
 } from '../../general-page';
 import { addActivity } from '../../utils/activity';
@@ -58,7 +58,7 @@ export async function getServerSidePropsForInitial(
     getServerSideCommonEachProps(context),
     getServerSideCommonInitialProps(context),
     getServerSideGeneralPageProps(context),
-    getServerSideRendererConfigProps(context),
+    getServerSideShareLinkRendererConfigProps(context),
     getServerSideI18nProps(context, ['translation']),
     getPageDataForInitial(context),
   ]);
