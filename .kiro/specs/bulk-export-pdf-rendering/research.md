@@ -1,0 +1,85 @@
+# Research Log: bulk-export-pdf-rendering
+
+## Discovery Scope
+
+Extension（既存 bulk-export への統合）。対象は bulk-export の **サーバ側 Markdown→HTML 変換**。
+発端 PR #11288。診断セッションで判明済みの事実を確定情報として再利用し、設計に必要な追加調査
+（特に「ディレクティブ/アラートの描画経路」）を行った。
+
+## Key Investigations
+
+### I1. 現行 bulk-export 変換パイプライン
+- **Finding**: [export-pages-to-fs-async.ts](../../../apps/app/src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.ts) が `remark-parse → remark-gfm → remark-html` をアドホックに構築。ESM は `@cspell/dynamic-import` の `dynamicImport` で読み込む。PR #11288 は `remark-gfm` 追加＋Bootstrap 全量＋手書き表 CSS 注入。
+- **Implication**: dynamicImport 方式は実証済みで再利用可能。`remark-html` ステップと CSS 注入を置換する。
+
+### I2. CJS サーバでの ESM 静的 import 不可（実測）
+- **Finding**: `node -r ts-node/register/transpile-only` 環境で `services/renderer/renderer.tsx` を import → `ERR_REQUIRE_ESM`（`@growi/remark-growi-directive` 等）。React/SCSS を除いたプラグインのみのモジュールでも同様に失敗。ts-node が `import`→`require` 変換するため。
+- **Source**: 実測（2 回）。
+- **Implication**: Web レンダラや GROWI ローカル .ts プラグインを **静的 import で再利用することは不可**。サーバ側は npm ESM を `dynamicImport` で個別に読む方式が必須。
+
+### I3. リッチなアラート/コールアウトは React コンポーネント駆動
+- **Finding**:
+  - GitHub アラート `> [!NOTE]` は `remark-github-admonitions-to-directives`（npm）で `:::note` ディレクティブへ変換。
+  - `~/features/callout` の [callout.ts](../../../apps/app/src/features/callout/services/callout.ts) が既知コールアウト名の directive に `data.hName='callout'`、`hProperties`（type 等）を設定 → `<callout>` 要素ノード化。sanitize 許可タグに `callout` を追加。
+  - 実際の見た目（色・アイコン・タイトル/本文レイアウト）は React [CalloutViewer.tsx](../../../apps/app/src/features/callout/components/CalloutViewer.tsx) が `div.callout.callout-{type}` / `.callout-indicator` / `.callout-title` / `.callout-content` ＋ `CalloutViewer.module.scss` で描画。
+  - ローカル `echo-directive` は **スタイル描画ではなくディレクティブ構文をテキストでエコーするだけのフォールバック**。
+- **Implication**: サーバ HTML 生成（React なし）ではコールアウトの見た目を再利用できない。忠実再現には
+  React SSR が必要（ESM 化では解決しない）。**本 spec ではコールアウト描画を行わない**（非ゴール）。
+  アラートは blockquote、ディレクティブは可読テキストへ劣化（Req3）。色付きコールアウトは Phase 2
+  renderer-convergence（React SSR ベース）へ。
+
+### I4. テーブルのクラス付与もローカルプラグイン
+- **Finding**: Web レンダラは [add-class.ts](../../../apps/app/src/services/renderer/rehype-plugins/add-class.ts)（ローカル、`hast-util-select` 依存）で `<table>` に `table table-bordered` を付与。
+- **Implication**: bulk-export では `<table>` への class 付与を小さなインライン変換で再現（または CSS で素の `table` を直接装飾）。
+
+### I5. CSS の出所
+- **Finding**: `@growi/core-styles` は Bootstrap ベースのデザインシステム（SCSS）。Markdown 本文固有の体裁は app 側 SCSS（`styles/organisms/_wiki.scss` 等）と `CalloutViewer.module.scss` に分散。core-styles 単体にはコールアウト/`.wiki` 体裁は無い。
+- **Implication**: 注入 CSS は「core-styles（Bootstrap 基盤: 表/タイポ）＋ in-scope 要素（表/コールアウト/コード/見出し/引用）の最小 `.wiki` 系ルール」をビルド時にプリコンパイルした静的 CSS とする。本文を `.wiki` でラップして適用。リポジトリの vendor-styles プリコンパイル方式（`vendor-styles-components` skill）に倣う。
+
+### I6. Web レンダラのプラグイン構成（ドリフト基準）
+- **Finding**: 共有基盤は `generateCommonOptions`（[renderer.tsx](../../../apps/app/src/services/renderer/renderer.tsx)）= remark: gfm, emoji, pukiwikiLikeLinker, growiDirective, remarkDirective, echoDirective, remarkFrontmatter, codeBlock / rehype: relativeLinks×2, raw, addClass, addInlineProperty。各 view（`client/.../renderer.tsx`）が math, xsvToTable, admonitions, callout, lsx, drawio 等を追加。
+- **Implication**: bulk-export は npm かつ HTML 文字列化に意味のある部分集合＋インライン等価物を採用。drift テストは「Web 共通集合の各プラグインが、bulk-export 側で included / intentionally-excluded のいずれかに分類済み」を検査し、未分類の新規プラグイン出現で失敗させる。
+
+## Architecture Pattern Evaluation
+
+- **採用**: 既存の dynamicImport ベース単一 unified パイプラインを bulk-export feature 内に閉じて構築（サーバ専用 converter モジュール）。Web レンダラのコードは import しない（CJS/ESM 制約 I2）。
+- **却下**: (a) `renderer.tsx` 直接再利用 → I2 で不可。(b) react-markdown を `renderToStaticMarkup` で SSR → React コンポーネント群が client 専用依存（next/link, module.scss, 重い highlighter）で CJS 不可・高コスト。(c) pdf-converter 側でレンダリング → 契約変更大、将来フェーズ。
+
+## Design Decisions (build vs adopt / synthesis)
+
+> **Decision（ユーザー確定）**: コールアウト（アラート）は本 spec で行わない。理由: 視覚は React
+> `CalloutViewer`（JSX）駆動で HTML 文字列としての再利用元が存在せず、忠実再現には React SSR が要る
+> （ESM 化では解決しない、I3）。これにより **インライン変換・ローカル再実装が一切不要**になり、
+> 「同一機能が 2 箇所」を完全に回避できる。table-bordered は I-table の通り CSS のみで解決。
+
+- **Adopt（dynamicImport）**: remark-gfm, remark-frontmatter, remark-math, remark-rehype, rehype-raw, rehype-slug, rehype-sanitize, rehype-katex, rehype-stringify。
+- **No inline transforms / no local reimplementation**: テーブル/見出し/引用/コード等は素の HTML を
+  出力し `.wiki` 由来 CSS で装飾（I-table, I5）。directive/admonitions/callout プラグインは採用しない。
+- **Degrade**: GitHub アラート `> [!NOTE]` → blockquote（`.wiki blockquote`）。`:::note` 等 → 可読
+  テキスト。これらは仕様上のグレースフル劣化（Req3）。
+- **Defer（Phase 2 / renderer-convergence）**: 色付きコールアウト, emoji ショートコード, xsv-to-table,
+  シンタックスハイライト配色, drawio/lsx/mermaid/plantuml/attachment-refs。忠実なコールアウト等は
+  React SSR ベースの収れんで扱う。
+
+### I-table. テーブルはロジック不要（CSS のみ）
+- **Finding**: [_wiki.scss](../../../apps/app/src/styles/organisms/_wiki.scss#L4) は `.wiki { table {…} blockquote {…} h1..h6 {…} }` と **素の要素**を装飾する。
+  Web 側の `add-class`（`table table-bordered` 付与）が無くても、`.wiki` でラップすれば `.wiki table {}`
+  が当たる。PR #11288 の追加 CSS も素の `table` を装飾できていた（描画確認済み）。
+- **Implication**: テーブルのクラス付与変換は **不要**。`.wiki` ラップ＋CSS で解決し、二重実装は発生しない。
+
+## Risks
+
+- **R-css**: 注入 CSS のプリコンパイル機構（`_wiki.scss` ＋ `@growi/core-styles` ＋ KaTeX CSS の
+  SCSS/CSS→単一 CSS、CJS サーバからの読み込み、Turbopack/deploy への影響）。`dependencies` 分類・
+  `.next/node_modules` 検証が必要（tech.md）。
+- **R-katex**: 数式を出すなら KaTeX CSS の同梱が必須（無いと崩れる）。不要なら remark-math/rehype-katex
+  ごと外す選択も可（タスクで確定）。
+- **R-sanitize**: sanitize の許可リストが in-scope 要素（数式コンテナ, table, 見出し id 等）を通す必要。
+  エスケープ無効化は禁止（pdf-converter `--no-sandbox`）。
+
+## Boundary Decisions
+
+- **Owns**: bulk-export サーバ側変換パイプライン・注入 CSS（`.wiki` ラップ）・drift テスト。
+- **Out**: Web レンダラ改修（drift テスト用のプラグイン選定参照を除く）、インライン変換/ローカル再実装、
+  コールアウト描画、ローカル .ts プラグイン本体、ESM 化、dedup キャッシュ無効化、pdf-converter 内部。
+- **Revalidation triggers**: pdf-converter が読む HTML ファイル契約の変更／Web `generateCommonOptions` のプラグイン集合変更（drift テストが検知）／ESM 化完了（Phase 2 着手の合図）。
