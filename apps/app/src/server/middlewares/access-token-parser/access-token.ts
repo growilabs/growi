@@ -6,7 +6,7 @@ import type { Response } from 'express';
 import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
 
-import { extractBearerToken } from './extract-bearer-token';
+import { extractAccessToken } from './extract-access-token';
 
 const logger = loggerFactory(
   'growi:middleware:access-token-parser:access-token',
@@ -14,13 +14,8 @@ const logger = loggerFactory(
 
 export const parserForAccessToken = (scopes: Scope[]) => {
   return async (req: AccessTokenParserReq, res: Response): Promise<void> => {
-    // Extract token from Authorization header first
-    // It is more efficient to call it only once in "AccessTokenParser," which is the caller of the method
-    const bearerToken = extractBearerToken(req.headers.authorization);
-
-    const accessToken =
-      bearerToken ?? req.query.access_token ?? req.body.access_token;
-    if (accessToken == null || typeof accessToken !== 'string') {
+    const accessToken = extractAccessToken(req);
+    if (accessToken == null) {
       return;
     }
     if (scopes == null || scopes.length === 0) {

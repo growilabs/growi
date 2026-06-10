@@ -5,7 +5,12 @@ import {
   type IGrantedGroup,
   PageGrant,
 } from '@growi/core';
-import { pagePathUtils, pageUtils, pathUtils } from '@growi/core/dist/utils';
+import {
+  escapeStringForMongoRegex,
+  pagePathUtils,
+  pageUtils,
+  pathUtils,
+} from '@growi/core/dist/utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
 import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
@@ -595,7 +600,10 @@ class PageGrantService implements IPageGrantService {
     };
 
     const commonCondition = {
-      path: new RegExp(`^${RegExp.escape(addTrailingSlash(targetPath))}`, 'i'),
+      path: new RegExp(
+        `^${escapeStringForMongoRegex(addTrailingSlash(targetPath))}`,
+        'i',
+      ),
       isEmpty: false,
     };
 
@@ -850,11 +858,13 @@ class PageGrantService implements IPageGrantService {
         applicableGroups: userRelatedGroups,
       };
     } else if (grant === PageGrant.GRANT_OWNER) {
-      const grantedUser = grantedUsers[0];
+      const grantedUser = grantedUsers?.[0];
 
-      const isUserApplicable = grantedUser.toString() === user._id.toString();
-
-      if (isUserApplicable) {
+      // grantedUsers may be empty due to data inconsistency; guard against TypeError
+      if (
+        grantedUser != null &&
+        grantedUser.toString() === user._id.toString()
+      ) {
         data[PageGrant.GRANT_OWNER] = null;
       }
     } else if (grant === PageGrant.GRANT_USER_GROUP) {
