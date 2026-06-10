@@ -8,6 +8,7 @@ export * from './reserved-next-caret-line';
 export * from './selected-grant';
 export type { EditorMode as EditorModeType } from './types';
 export { EditorMode } from './types';
+export { useSyncSelectedGrantWithCurrentPage } from './use-sync-selected-grant';
 // Export utility functions that might be needed elsewhere
 export { determineEditorModeByHash } from './utils';
 export * from './waiting-save-processing';

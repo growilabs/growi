@@ -722,6 +722,102 @@ describe('PageGrantService', () => {
     });
   });
 
+  /*
+   * GRANT_RESTRICTED ("anyone with the link") is a link-only sharing mode
+   * and is intentionally orthogonal to the page tree hierarchy.
+   * A RESTRICTED child must be permitted under any parent grant.
+   * See: https://github.com/growilabs/growi/issues/9315
+   */
+  describe('Test isGrantNormalized method for GRANT_RESTRICTED target', () => {
+    it('Should return true when Ancestor: owned by User1, Target: anyone with the link', async () => {
+      const targetPath = `${pageE2User1Path}/NEW`;
+      const grant = Page.GRANT_RESTRICTED;
+      const grantedUserIds = undefined;
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
+      const shouldCheckDescendants = false;
+
+      const result = await pageGrantService.isGrantNormalized(
+        user1,
+        targetPath,
+        grant,
+        grantedUserIds,
+        grantedGroupIds,
+        shouldCheckDescendants,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('Should return true when Ancestor: owned by GroupParent, Target: anyone with the link', async () => {
+      const targetPath = `${pageE3GroupParentPath}/NEW`;
+      const grant = Page.GRANT_RESTRICTED;
+      const grantedUserIds = undefined;
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
+      const shouldCheckDescendants = false;
+
+      const result = await pageGrantService.isGrantNormalized(
+        user1,
+        targetPath,
+        grant,
+        grantedUserIds,
+        grantedGroupIds,
+        shouldCheckDescendants,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('Should return true when Ancestor: public, Target: anyone with the link', async () => {
+      const targetPath = `${pageE1PublicPath}/NEW`;
+      const grant = Page.GRANT_RESTRICTED;
+      const grantedUserIds = undefined;
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
+      const shouldCheckDescendants = false;
+
+      const result = await pageGrantService.isGrantNormalized(
+        user1,
+        targetPath,
+        grant,
+        grantedUserIds,
+        grantedGroupIds,
+        shouldCheckDescendants,
+      );
+
+      expect(result).toBe(true);
+    });
+
+    it('Should still return false when Ancestor: owned by User1, Target: public (regression guard for non-RESTRICTED targets under OWNER)', async () => {
+      const targetPath = `${pageE2User1Path}/NEW`;
+      const grant = Page.GRANT_PUBLIC;
+      const grantedUserIds = undefined;
+      const grantedGroupIds: {
+        item: mongoose.Types.ObjectId;
+        type: GroupType;
+      }[] = [];
+      const shouldCheckDescendants = false;
+
+      const result = await pageGrantService.isGrantNormalized(
+        user1,
+        targetPath,
+        grant,
+        grantedUserIds,
+        grantedGroupIds,
+        shouldCheckDescendants,
+      );
+
+      expect(result).toBe(false);
+    });
+  });
+
   describe('Test isGrantNormalized method with shouldCheckDescendants true', () => {
     it('Should return true when Target: public, Descendant: public', async () => {
       const targetPath = emptyPagePath1;

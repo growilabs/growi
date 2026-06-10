@@ -1,6 +1,7 @@
 import nodePath from 'node:path';
 import { GroupType, Origin } from '@growi/core';
 import {
+  escapeStringForMongoRegex,
   pagePathUtils,
   pathUtils,
   templateChecker,
@@ -11,10 +12,10 @@ import { differenceInYears } from 'date-fns/differenceInYears';
 import mongoose from 'mongoose';
 import urljoin from 'url-join';
 
-import { Comment } from '~/features/comment/server/models/comment';
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { configManager as _configManager } from '../service/config-manager';
 import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
@@ -310,7 +311,7 @@ export const getPageSchema = (crowi) => {
 
   pageSchema.statics.updateCommentCount = function (pageId) {
     validateCrowi();
-    return Comment.countCommentByPageId(pageId).then((count) => {
+    return prisma.comments.countCommentByPageId(pageId).then((count) => {
       this.update({ _id: pageId }, { commentCount: count }, {}, (err, data) => {
         if (err) {
           logger.debug('Update commentCount Error', err);
@@ -690,7 +691,7 @@ export const getPageSchema = (crowi) => {
     const regexpList = pathList.map((path) => {
       const pathWithTrailingSlash = pathUtils.addTrailingSlash(path);
       return new RegExp(
-        `^${RegExp.escape(pathWithTrailingSlash)}_{1,2}template$`,
+        `^${escapeStringForMongoRegex(pathWithTrailingSlash)}_{1,2}template$`,
       );
     });
 

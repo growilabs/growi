@@ -332,6 +332,13 @@
     "migration_succeeded": "Your upgrade has been successfully completed! Exit maintenance mode and GROWI can be used.",
     "migration_failed": "Upgrade failed. Please refer to the GROWI docs for information on what to do in the event of failure."
   },
+  "news_delivery": {
+    "section_title": "News delivery",
+    "label": "News delivery",
+    "enable": "Enable news delivery",
+    "description": "Controls whether the cron job pulls the news feed and updates the local cache. Existing cached items remain visible while delivery is disabled.",
+    "update_succeeded": "News delivery setting updated"
+  },
   "maintenance_mode": {
     "maintenance_mode": "Maintenance Mode",
     "under_maintenance_mode": "Under Maintenance Mode",
@@ -369,6 +376,10 @@
     "page_bulk_export_explanation": "Enables a feature that allows all users to export a page and all it's child pages at once from the menu. Exported data will be automatically deleted after the storage period has passed.",
     "page_bulk_export_warning": "The bulk page export feature is available to all users. In order to maintain system resources, we ask for your cooperation in using the minimum amount necessary. If you are an administrator, please inform all users of this.",
     "page_bulk_export_storage_period": "Storage period",
+    "page_bulk_export_reload_title": "Reload page",
+    "page_bulk_export_reload_prompt": "You need to reload the page to reflect the setting change. Reload now?",
+    "page_bulk_export_reload_dismiss": "Not now",
+    "reload_page": "Reload",
     "update": "Update",
     "mail_settings": "E-mail Settings",
     "mailer_is_not_set_up": "E-mail setting is not set up.",
@@ -1160,5 +1171,98 @@
     "ai_integration": "AI Integration",
     "disable_mode_explanation": "Currently, AI integration is disabled. To enable it, configure the <code>AI_ENABLED</code> environment variable along with the required additional variables.<br><br>For details, please refer to the <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>documentation</a>.",
     "ai_search_management": "AI search management"
+  },
+  "admin_navigation": {
+    "section_users": "Users",
+    "section_data": "Data",
+    "section_external_notifications": "External Notifications"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "Warning:",
+        "message_html": "The last initialization was triggered by <code>VAULT_BOOTSTRAP_ON_START=force</code>. Restarting the server while this env var is still set to <code>force</code> will reinitialize all Vault data again. Please change the env var to <code>true</code> or <code>false</code>."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "Feature Status",
+        "enabled": "Enabled",
+        "disabled": "Disabled",
+        "description_html": "Controlled by the <code>VAULT_ENABLED</code> environment variable. To toggle enable/disable, change the env var and restart the server."
+      },
+      "clone-url": {
+        "label": "Clone URL",
+        "description": "Run this command in your terminal to clone the Vault repository.",
+        "copy-button": "Copy command",
+        "copied-tooltip": "Copied!",
+        "copy-failed": "Failed to copy the clone command.",
+        "no-site-url_html": "Site URL is not configured. Set it in <a href=\"/admin/app\">App Settings</a> to display the clone command."
+      },
+      "kill-switch": {
+        "heading": "Rebuild",
+        "button": "Rebuild Vault",
+        "description_html": "Destroys all data in the Git repositories and rebuilds the Git data from MongoDB. During the rebuild, all <code>git clone</code> / <code>fetch</code> requests are rejected with 503. The action is recorded in the audit log as <code>vault.wipe</code>.",
+        "confirm-title": "Confirm Rebuild Vault",
+        "confirm-message_html": "Executing this action will <strong>lose all data in the current Git repositories</strong>.",
+        "confirm-question": "Are you sure you want to proceed?",
+        "confirm-button": "Confirm",
+        "cancel-button": "Cancel",
+        "started-toast": "Rebuild started. The Vault will return 503 until the data is rebuilt."
+      },
+      "bootstrap-status": {
+        "state": "Status",
+        "processed-total": "Processed / Total Estimated",
+        "started-at": "Started At",
+        "completed-at": "Completed At",
+        "last-error": "Last Error",
+        "progress-label": "{{processed}} of {{total}} pages"
+      },
+      "completion-reliability": {
+        "heading": "Reliability Status",
+        "check-result": "Last Check Result",
+        "last-completed-at": "Last Completed At",
+        "processed-estimated": "Processed / Estimated",
+        "trigger-source": "Trigger Source",
+        "last-error": "Last Error"
+      },
+      "auto-retry-status": {
+        "heading": "Auto-Retry Status",
+        "escalated-warning_html": "Auto-retry during initialization has failed, and the state has reached <strong>escalated</strong>. Manual intervention is required.",
+        "attempt-no": "Attempt No.",
+        "next-attempt-at": "Next Attempt At",
+        "last-error": "Last Error",
+        "abort-button": "Abort Auto-Retry",
+        "aborting": "Aborting…",
+        "aborted-toast": "Auto-retry aborted."
+      },
+      "drift-activity": {
+        "heading": "Data Inconsistency Detection Status",
+        "last-sweep-at": "Last Sweep At",
+        "last-watermark": "Last Watermark",
+        "detected-since-boot": "Detected Since Server Start",
+        "repairs-emitted-since-boot": "Repairs Emitted Since Server Start",
+        "last-error": "Last Detected Error",
+        "out-of-scope_html": "<strong>Note (out-of-scope):</strong> Data inconsistencies caused by path changes (rename / hard delete) and grant revocation are not detected in the current implementation. These require future <code>growi-vault-ha</code> support."
+      },
+      "storage-observability": {
+        "fetch-failed": "Failed to retrieve storage statistics. vault-manager may be unreachable.",
+        "namespace-count": "Namespace Count",
+        "total-commit-count": "Total Commit Count",
+        "loose-object-count": "Loose Object Count",
+        "repo-size": "Repository Size",
+        "last-squash": "Last Squash At",
+        "last-gc": "Last GC At"
+      },
+      "audit-log": {
+        "heading": "Audit Log",
+        "button": "View VAULT_* Audit Log Entries",
+        "description": "Opens the admin audit log filtered to Vault-related actions (VAULT_*)."
+      },
+      "reconcile-admin": {
+        "heading": "Reconcile",
+        "trigger-button": "Trigger Reconcile",
+        "description": "Manually reconcile data inconsistencies between MongoDB pages and Vault git trees without performing a full initialization."
+      }
+    }
   }
 }

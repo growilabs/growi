@@ -392,6 +392,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: /app-settings
    *        description: get app setting params
    *        responses:
@@ -1087,6 +1088,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: AccessToken supported.
    *        description: Update V5SchemaMigration
    *        responses:
@@ -1145,6 +1147,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: AccessToken supported.
    *        description: Update MaintenanceMode
    *        requestBody:

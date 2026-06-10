@@ -17,7 +17,11 @@ import type {
   Ref,
 } from '@growi/core/dist/interfaces';
 import { PageGrant } from '@growi/core/dist/interfaces';
-import { pagePathUtils, pathUtils } from '@growi/core/dist/utils';
+import {
+  escapeStringForMongoRegex,
+  pagePathUtils,
+  pathUtils,
+} from '@growi/core/dist/utils';
 import type EventEmitter from 'events';
 import type { Cursor, HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
@@ -25,7 +29,6 @@ import pathlib from 'path';
 import { Readable, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 
-import { Comment } from '~/features/comment/server';
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { isAiEnabled } from '~/features/openai/server/services';
@@ -62,6 +65,7 @@ import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
+import { prisma } from '~/utils/prisma';
 
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
 import { Attachment } from '../../models/attachment';
@@ -768,7 +772,15 @@ class PageService implements IPageService {
         toPath: newPagePathSanitized,
       });
     }
-    this.pageEvent.emit('rename');
+    // Carry the old path / new path so that subscribers (e.g. growi-vault) can
+    // propagate the rename without re-querying state. Existing subscribers that
+    // ignore arguments are unaffected.
+    this.pageEvent.emit('rename', {
+      page: renamedPage ?? page,
+      oldPath: page.path,
+      newPath: newPagePathSanitized,
+      user,
+    });
 
     // Set to Sub
     const pageOp = await PageOperation.findByIdAndUpdatePageActionStage(
@@ -1060,7 +1072,14 @@ class PageService implements IPageService {
       });
     }
 
-    this.pageEvent.emit('rename');
+    // Same payload contract as the v5+ rename path above — see the comment
+    // at the other emit('rename', ...) call site for rationale.
+    this.pageEvent.emit('rename', {
+      page: renamedPage,
+      oldPath: page.path,
+      newPath: newPagePathSanitized,
+      user,
+    });
 
     return renamedPage;
   }
@@ -1149,7 +1168,13 @@ class PageService implements IPageService {
       }
     }
 
-    this.pageEvent.emit('updateMany', pages, user);
+    // Carry the prefix shift so subscribers can propagate the bulk rename
+    // without re-deriving the prefix from individual pages. Optional 4th arg —
+    // existing subscribers that only read (pages, user) are unaffected.
+    this.pageEvent.emit('updateMany', pages, user, {
+      oldPagePathPrefix,
+      newPagePathPrefix,
+    });
   }
 
   private async renameDescendantsV4(
@@ -1213,7 +1238,12 @@ class PageService implements IPageService {
       }
     }
 
-    this.pageEvent.emit('updateMany', pages, user);
+    // Same payload contract as renameDescendants above — see the comment there
+    // for rationale on the optional 4th argument.
+    this.pageEvent.emit('updateMany', pages, user, {
+      oldPagePathPrefix,
+      newPagePathPrefix,
+    });
   }
 
   private async renameDescendantsWithStream(
@@ -2379,7 +2409,25 @@ class PageService implements IPageService {
     const attachments = await Attachment.find({ page: { $in: pageIds } });
 
     await Promise.all([
-      Comment.deleteMany({ page: { $in: pageIds } }),
+      prisma.$transaction([
+        prisma.comments.deleteMany({
+          where: {
+            pageId: {
+              in: pageIds,
+            },
+            replyToId: {
+              not: null,
+            },
+          },
+        }),
+        prisma.comments.deleteMany({
+          where: {
+            pageId: {
+              in: pageIds,
+            },
+          },
+        }),
+      ]),
       PageTagRelation.deleteMany({ relatedPage: { $in: pageIds } }),
       ShareLink.deleteMany({ relatedPage: { $in: pageIds } }),
       Revision.deleteMany({ pageId: { $in: pageIds } }),
@@ -3117,6 +3165,19 @@ class PageService implements IPageService {
   ): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
     const operations: any = [];
+    // Snapshot the old grant state per affected page so downstream subscribers
+    // (e.g. growi-vault) can compute previous namespaces after the bulkWrite.
+    // The in-memory `childPage` objects are not mutated by the bulkWrite, but
+    // we capture explicitly to keep the contract self-describing.
+    const affectedPages: Array<{
+      page: PageDocument;
+      previousGrant: PageGrant;
+      previousGrantedGroups: IGrantedGroup[];
+      previousGrantedUsers: PageDocument['grantedUsers'];
+      newGrant: PageGrant;
+      newGrantedGroups: IGrantedGroup[];
+      newGrantedUsers: PageDocument['grantedUsers'];
+    }> = [];
 
     pages.forEach((childPage) => {
       let newChildGrantedGroups: IGrantedGroup[] = [];
@@ -3135,13 +3196,24 @@ class PageService implements IPageService {
           newChildGrantedGroups,
         );
       if (canChangeGrant) {
+        const newGrantedUsers =
+          grant === PageGrant.GRANT_OWNER ? [user._id] : [];
+        affectedPages.push({
+          page: childPage,
+          previousGrant: childPage.grant,
+          previousGrantedGroups: childPage.grantedGroups,
+          previousGrantedUsers: childPage.grantedUsers,
+          newGrant: grant,
+          newGrantedGroups: newChildGrantedGroups,
+          newGrantedUsers,
+        });
         operations.push({
           updateOne: {
             filter: { _id: childPage._id },
             update: {
               $set: {
                 grant,
-                grantedUsers: grant === PageGrant.GRANT_OWNER ? [user._id] : [],
+                grantedUsers: newGrantedUsers,
                 grantedGroups: newChildGrantedGroups,
               },
             },
@@ -3150,6 +3222,17 @@ class PageService implements IPageService {
       }
     });
     await Page.bulkWrite(operations);
+
+    // Emit only when at least one descendant was actually changed. This event
+    // is bulk grant changes' only signal — `updateChildPagesGrant` does the
+    // mutation directly via bulkWrite without going through per-page event
+    // paths, so subscribers depend on this emit to react.
+    if (affectedPages.length > 0) {
+      this.pageEvent.emit('descendantsGrantChanged', {
+        affectedPages,
+        user,
+      });
+    }
   }
 
   /**
@@ -3961,7 +4044,8 @@ class PageService implements IPageService {
     const ancestorPaths = paths.flatMap((p) => collectAncestorPaths(p, []));
     // targets' descendants
     const pathAndRegExpsToNormalize: (RegExp | string)[] = paths.map(
-      (p) => new RegExp(`^${RegExp.escape(addTrailingSlash(p))}`, 'i'),
+      (p) =>
+        new RegExp(`^${escapeStringForMongoRegex(addTrailingSlash(p))}`, 'i'),
     );
     // include targets' path
     pathAndRegExpsToNormalize.push(...paths);
@@ -4172,7 +4256,7 @@ class PageService implements IPageService {
           const parentId = parent._id;
 
           // Build filter
-          const parentPathEscaped = RegExp.escape(
+          const parentPathEscaped = escapeStringForMongoRegex(
             parent.path === '/' ? '' : parent.path,
           ); // adjust the path for RegExp
           const filter: any = {
@@ -5138,7 +5222,9 @@ class PageService implements IPageService {
     const wasOnTree = exPage.parent != null || isTopPage(exPage.path);
     const shouldBeOnTree = currentPage.grant !== PageGrant.GRANT_RESTRICTED;
     const isChildrenExist = await Page.count({
-      path: new RegExp(`^${RegExp.escape(addTrailingSlash(currentPage.path))}`),
+      path: new RegExp(
+        `^${escapeStringForMongoRegex(addTrailingSlash(currentPage.path))}`,
+      ),
       parent: { $ne: null },
     });
 
@@ -5270,7 +5356,7 @@ class PageService implements IPageService {
     const shouldBeOnTree = grant !== PageGrant.GRANT_RESTRICTED;
     const isChildrenExist = await Page.count({
       path: new RegExp(
-        `^${RegExp.escape(addTrailingSlash(clonedPageData.path))}`,
+        `^${escapeStringForMongoRegex(addTrailingSlash(clonedPageData.path))}`,
       ),
       parent: { $ne: null },
     });
@@ -5531,6 +5617,11 @@ class PageService implements IPageService {
     const wipPageExpirationSeconds =
       configManager.getConfig('app:wipPageExpirationSeconds') ?? 172800;
     const collection = mongoose.connection.collection('pages');
+
+    // DELETEME: migrations never runs on test environment (which should be fixed),
+    // until then, create collection if it does not exist to avoid the error when creating an index.
+    // MongoServerError: ns does not exist: growi_test_x.pages
+    await mongoose.connection.createCollection('pages').catch(() => {});
 
     try {
       const targetField = 'ttlTimestamp_1';

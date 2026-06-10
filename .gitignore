@@ -43,6 +43,9 @@ yarn-error.log*
 *.code-workspace
 *.timestamp-*.mjs
 
+# UTCP configuration file
+.utcp_config.json
+
 # turborepo
 .turbo
 
@@ -50,3 +53,8 @@ yarn-error.log*
 out
 
 .devcontainer/compose.extend.yml
+
+# Memory profiling artifacts (heap snapshots are large and may contain sensitive data)
+*.heapsnapshot
+/tmp/memory-profiler/
+/tmp/memory-leak-investigation/

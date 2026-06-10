@@ -13,6 +13,7 @@ import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bu
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
+import { initializeVaultFeature } from '~/features/growi-vault/server';
 import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
 import { initializeOpenaiService } from '~/features/openai/server/services/openai';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
@@ -303,6 +304,8 @@ class Crowi {
 
       // depends on AttachmentService
       this.setupOpenaiService(),
+      // depends on pageService and activityService
+      this.setupVaultFeature(),
     ]);
 
     await this.setupCron();
@@ -349,10 +352,10 @@ class Crowi {
     // mongoUri = mongodb://user:password@host/dbname
     const mongoUri = getMongoUri();
 
-    return mongoose.connect(mongoUri, mongoOptions);
+    return await mongoose.connect(mongoUri, mongoOptions);
   }
 
-  async setupSessionConfig(): Promise<void> {
+  setupSessionConfig(): void {
     const session = require('express-session');
     const sessionMaxAge =
       this.configManager.getConfig('security:sessionMaxAge') || 2592000000; // default: 30days
@@ -407,7 +410,7 @@ class Crowi {
 
   async setupConfigManager(): Promise<void> {
     this.configManager = configManagerSingletonInstance;
-    return this.configManager.loadConfigs();
+    return await this.configManager.loadConfigs();
   }
 
   async setupS2sMessagingService(): Promise<void> {
@@ -425,7 +428,7 @@ class Crowi {
     }
   }
 
-  async setupSocketIoService(): Promise<void> {
+  setupSocketIoService(): void {
     this.socketIoService = new SocketIoService(this);
   }
 
@@ -459,6 +462,12 @@ class Crowi {
 
     startOpenaiCronIfEnabled();
     startAccessTokenCron();
+
+    // News feed sync cron
+    const { NewsCronService } = await import(
+      '~/features/news/server/services/news-cron-service'
+    );
+    new NewsCronService().startCron();
   }
 
   getSlack(): unknown {
@@ -479,12 +488,12 @@ class Crowi {
     this.passportService.setupSerializer();
     // setup strategies
     try {
-      this.passportService.setupStrategyById('local');
-      this.passportService.setupStrategyById('ldap');
-      this.passportService.setupStrategyById('saml');
-      this.passportService.setupStrategyById('oidc');
-      this.passportService.setupStrategyById('google');
-      this.passportService.setupStrategyById('github');
+      await this.passportService.setupStrategyById('local');
+      await this.passportService.setupStrategyById('ldap');
+      await this.passportService.setupStrategyById('saml');
+      await this.passportService.setupStrategyById('oidc');
+      await this.passportService.setupStrategyById('google');
+      await this.passportService.setupStrategyById('github');
     } catch (err) {
       logger.error(err);
     }
@@ -496,10 +505,10 @@ class Crowi {
   }
 
   async setupSearcher(): Promise<void> {
-    this.searchService = new SearchService(this);
+    this.searchService = await SearchService.create(this);
   }
 
-  async setupMailer(): Promise<void> {
+  setupMailer(): void {
     const MailService = require('~/server/service/mail').default;
     this.mailService = new MailService(this);
 
@@ -657,6 +666,7 @@ class Crowi {
         await mongoose.disconnect();
         return;
       },
+      // biome-ignore lint/suspicious/useAwait: onShutdown should be async
       onShutdown: async () => {
         logger.info('Cleanup finished, server is shutting down');
       },
@@ -704,7 +714,7 @@ class Crowi {
   /**
    * setup UserNotificationService
    */
-  async setUpUserNotification(): Promise<void> {
+  setUpUserNotification(): void {
     if (this.userNotificationService == null) {
       this.userNotificationService = new UserNotificationService(this);
     }
@@ -713,7 +723,7 @@ class Crowi {
   /**
    * setup AclService
    */
-  async setUpAcl(): Promise<void> {
+  setUpAcl(): void {
     this.aclService = aclServiceSingletonInstance;
   }
 
@@ -738,7 +748,7 @@ class Crowi {
   /**
    * setup AppService
    */
-  async setUpApp(): Promise<void> {
+  setUpApp(): void {
     if (this.appService == null) {
       this.appService = new AppService(this);
 
@@ -783,7 +793,7 @@ class Crowi {
   /**
    * setup AttachmentService
    */
-  async setupAttachmentService(): Promise<void> {
+  setupAttachmentService(): void {
     if (this.attachmentService == null) {
       this.attachmentService = new AttachmentService(this);
     }
@@ -792,21 +802,21 @@ class Crowi {
   async setupUserGroupService(): Promise<void> {
     if (this.userGroupService == null) {
       this.userGroupService = new UserGroupService(this);
-      return this.userGroupService.init();
+      return await this.userGroupService.init();
     }
   }
 
-  async setUpGrowiBridge(): Promise<void> {
+  setUpGrowiBridge(): void {
     if (this.growiBridgeService == null) {
       this.growiBridgeService = new GrowiBridgeService(this);
     }
   }
 
-  async setupExport(): Promise<void> {
+  setupExport(): void {
     instanciateExportService(this);
   }
 
-  async setupImport(): Promise<void> {
+  setupImport(): void {
     initializeImportService(this);
   }
 
@@ -832,7 +842,7 @@ class Crowi {
     this.pageOperationService = instanciatePageOperationService(this);
   }
 
-  async setupInAppNotificationService(): Promise<void> {
+  setupInAppNotificationService(): void {
     if (this.inAppNotificationService == null) {
       this.inAppNotificationService = new InAppNotificationService(this);
     }
@@ -845,13 +855,13 @@ class Crowi {
     }
   }
 
-  async setupCommentService(): Promise<void> {
+  setupCommentService(): void {
     if (this.commentService == null) {
       this.commentService = new CommentService(this);
     }
   }
 
-  async setupSyncPageStatusService(): Promise<void> {
+  setupSyncPageStatusService(): void {
     if (this.syncPageStatusService == null) {
       this.syncPageStatusService = new SyncPageStatusService(
         this,
@@ -866,7 +876,7 @@ class Crowi {
     }
   }
 
-  async setupSlackIntegrationService(): Promise<void> {
+  setupSlackIntegrationService(): void {
     if (this.slackIntegrationService == null) {
       this.slackIntegrationService = new SlackIntegrationService(this);
     }
@@ -877,7 +887,7 @@ class Crowi {
     }
   }
 
-  async setupG2GTransferService(): Promise<void> {
+  setupG2GTransferService(): void {
     if (this.g2gTransferPusherService == null) {
       this.g2gTransferPusherService = new G2GTransferPusherService(this);
     }
@@ -906,6 +916,10 @@ class Crowi {
 
   setupOpenaiService(): void {
     initializeOpenaiService(this);
+  }
+
+  async setupVaultFeature(): Promise<void> {
+    await initializeVaultFeature(this);
   }
 }
 

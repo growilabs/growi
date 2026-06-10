@@ -8,11 +8,11 @@ import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import EditorSettings from '../../../models/editor-settings';
-import ExternalAccount from '../../../models/external-account';
 import InAppNotificationSettings from '../../../models/in-app-notification-settings';
 import { deleteAccessTokenHandlersFactory } from './delete-access-token';
 import { deleteAllAccessTokensHandlersFactory } from './delete-all-access-tokens';
@@ -377,7 +377,11 @@ module.exports = (crowi) => {
       const userData = req.user;
 
       try {
-        const externalAccounts = await ExternalAccount.find({ user: userData });
+        const externalAccounts = await prisma.externalaccounts.findMany({
+          where: {
+            userId: userData._id.toString(),
+          },
+        });
         return res.apiv3({ externalAccounts });
       } catch (err) {
         logger.error(err);
@@ -641,7 +645,7 @@ module.exports = (crowi) => {
 
       try {
         await passport.authenticate('ldapauth');
-        const associateUser = await ExternalAccount.associate(
+        const associateUser = await prisma.externalaccounts.associate(
           'ldap',
           username,
           user,
@@ -697,15 +701,23 @@ module.exports = (crowi) => {
       const { providerType, accountId } = body;
 
       try {
-        const count = await ExternalAccount.count({ user });
+        const count = await prisma.externalaccounts.count({
+          where: {
+            userId: user._id.toString(),
+          },
+        });
         // make sure password set or this user has two or more ExternalAccounts
         if (user.password == null && count <= 1) {
           return res.apiv3Err('disassociate-ldap-account-failed');
         }
-        const disassociateUser = await ExternalAccount.findOneAndRemove({
-          providerType: { $eq: providerType },
-          accountId: { $eq: accountId },
-          user,
+        const disassociateUser = await prisma.externalaccounts.delete({
+          where: {
+            providerType_accountId: {
+              providerType,
+              accountId,
+            },
+            userId: user.id,
+          },
         });
 
         const parameters = {

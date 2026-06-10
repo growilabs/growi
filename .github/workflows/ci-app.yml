@@ -47,11 +47,11 @@ jobs:
         node-version: [24.x]
 
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -95,23 +95,19 @@ jobs:
         node-version: [24.x]
         mongodb-version: ['6.0', '8.0']
 
-    services:
-      mongodb:
-        image: mongo:${{ matrix.mongodb-version }}
-        ports:
-          - 27017/tcp
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - &setup-node-step
+        uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
 
-      - name: Cache/Restore dist
+      - &cache-restore-dist-step
+        name: Cache/Restore dist
         uses: actions/cache@v4
         with:
           path: |
@@ -122,24 +118,29 @@ jobs:
           restore-keys: |
             dist-ci-app-${{ runner.OS }}-node${{ matrix.node-version }}-
 
-      - name: Install dependencies
+      - &install-dependencies-step
+        name: Install dependencies
         run: |
           pnpm add turbo --global
           pnpm install --frozen-lockfile
 
+      - &start-mongodb-step
+        name: Start MongoDB (replica set)
+        uses: supercharge/mongodb-github-action@1.12.1
+        with:
+          mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-replica-set: rs0
+
       - name: Test
         run: |
-          turbo run test --filter=@growi/app --filter=./packages/* --env-mode=loose
+          turbo run test:unit test:components --filter=@growi/app --env-mode=loose
         env:
-          MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_test
+          MONGO_URI: mongodb://localhost:27017/growi_test?replicaSet=rs0
 
-      - name: Upload coverage report as artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: coverage-mongo${{ matrix.mongodb-version }}
-          path: |
-            apps/app/coverage
-            packages/remark-growi-directive/coverage
+      - name: Test (packages)
+        run: |
+          turbo run test --filter=./packages/* --env-mode=loose
+
 
       - name: Slack Notification
         uses: weseek/ghaction-slack-notification@master
@@ -147,6 +148,70 @@ jobs:
         with:
           type: ${{ job.status }}
           job_name: '*Node CI for growi - test (${{ matrix.node-version }})*'
+          channel: '#ci'
+          isCompactMode: true
+          url: ${{ secrets.SLACK_WEBHOOK_URL }}
+
+
+  ci-app-test-integration:
+    runs-on: ubuntu-latest
+
+    strategy:
+      matrix:
+        node-version: [24.x]
+        mongodb-version: ['8.0']
+        elasticsearch-version:
+          - env: 8
+            stack-version: '8.19.16'
+          - env: 9
+            stack-version: '9.3.3'
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: pnpm/action-setup@v6
+
+      - *setup-node-step
+
+      - *cache-restore-dist-step
+
+      - *install-dependencies-step
+
+      - *start-mongodb-step
+
+      - name: Start Elasticsearch with plugins
+        uses: elastic/elastic-github-actions/elasticsearch@master
+        with:
+          stack-version: ${{ matrix.elasticsearch-version.stack-version }}
+          plugins: |
+            analysis-kuromoji
+            analysis-icu
+          security-enabled: false
+
+      - name: Wait for Elasticsearch to be ready
+        run: |
+          curl \
+            --no-progress-meter \
+            -X GET \
+            --retry 60 \
+            --retry-delay 1 \
+            --retry-connrefused \
+            http://localhost:9200/_cluster/health?wait_for_status=green
+
+      - name: Test
+        run: |
+          turbo run test:integ --filter=@growi/app --env-mode=loose
+        env:
+          MONGO_URI: mongodb://localhost:27017/growi_test?replicaSet=rs0
+          VITE_ELASTICSEARCH_URI: http://localhost:9200/growi
+          VITE_ELASTICSEARCH_VERSION: ${{ matrix.elasticsearch-version.env }}
+
+      - name: Slack Notification
+        uses: weseek/ghaction-slack-notification@master
+        if: failure()
+        with:
+          type: ${{ job.status }}
+          job_name: '*Node CI for growi - test-es (${{ matrix.node-version }})*'
           channel: '#ci'
           isCompactMode: true
           url: ${{ secrets.SLACK_WEBHOOK_URL }}
@@ -160,18 +225,12 @@ jobs:
         node-version: [24.x]
         mongodb-version: ['6.0', '8.0']
 
-    services:
-      mongodb:
-        image: mongo:${{ matrix.mongodb-version }}
-        ports:
-          - 27017/tcp
-
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v6
 
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v6
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v6
         with:
           node-version: ${{ matrix.node-version }}
           cache: 'pnpm'
@@ -192,13 +251,19 @@ jobs:
           pnpm add turbo --global
           pnpm install --frozen-lockfile
 
+      - name: Start MongoDB (replica set)
+        uses: supercharge/mongodb-github-action@1.12.1
+        with:
+          mongodb-version: ${{ matrix.mongodb-version }}
+          mongodb-replica-set: rs0
+
       - name: turbo run launch-dev:ci
         working-directory: ./apps/app
         run: |
           cp config/ci/.env.local.for-ci .env.development.local
           turbo run launch-dev:ci --env-mode=loose
         env:
-          MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi_dev
+          MONGO_URI: mongodb://localhost:27017/growi_dev?replicaSet=rs0
 
       - name: Slack Notification
         uses: weseek/ghaction-slack-notification@master

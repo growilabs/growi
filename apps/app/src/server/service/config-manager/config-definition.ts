@@ -78,6 +78,27 @@ export const CONFIG_KEYS = [
   'app:openaiThreadDeletionCronMaxMinutesUntilRequest',
   'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
   'app:isReadOnlyForNewUser',
+  'app:vaultEnabled',
+  'app:vaultManagerEndpoint',
+  'app:vaultManagerInternalSecret',
+  'app:vaultBootstrapOnStart',
+  'app:vaultBootstrapRetryMax',
+  'app:vaultBootstrapRetryBaseMs',
+  'app:vaultBootstrapRetryMaxMs',
+  'app:vaultBootstrapHeartbeatIntervalMs',
+  'app:vaultBootstrapHeartbeatStaleMs',
+  'app:vaultBootstrapRetryDisabled',
+  'app:vaultDriftDetectionIntervalMs',
+  'app:vaultDriftMaxPagesPerTick',
+  'app:vaultDriftDetectionDisabled',
+  'app:vaultReconcileMaxPagesPerUserRequest',
+  'app:vaultReconcileMaxPagesPerAdminRequest',
+  'app:vaultReconcileMaxConcurrentPerUser',
+  'app:vaultReconcileMaxConcurrentSystem',
+  'app:vaultReconcileChunkSize',
+  'app:vaultReconcileHistoryRetentionDays',
+  'app:vaultReconcileRejectWhenBootstrapNotDone',
+  'app:vaultReconcileAdminBypassCapacityLimit',
 
   // Content-Disposition settings for MIME types
   'attachments:contentDisposition:inlineMimeTypes',
@@ -279,6 +300,9 @@ export const CONFIG_KEYS = [
   'otel:isAppSiteUrlHashed',
   'otel:anonymizeInBestEffort',
   'otel:serviceInstanceId',
+
+  // News Settings
+  'news:isDeliveryEnabled',
 
   // S2S Messaging Pubsub Settings
   's2sMessagingPubsub:serverType',
@@ -527,6 +551,95 @@ export const CONFIG_DEFINITIONS = {
     }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
+    defaultValue: false,
+  }),
+  // Vault Settings
+  // Note: app:vaultManagerEndpoint and app:vaultManagerInternalSecret are read
+  // from environment variables only — the VaultSettingsService must use ConfigSource.env.
+  'app:vaultEnabled': defineConfig<boolean>({
+    envVarName: 'VAULT_ENABLED',
+    defaultValue: false,
+  }),
+  'app:vaultManagerEndpoint': defineConfig<string | undefined>({
+    envVarName: 'VAULT_MANAGER_ENDPOINT',
+    defaultValue: undefined,
+  }),
+  'app:vaultManagerInternalSecret': defineConfig<string | undefined>({
+    envVarName: 'VAULT_MANAGER_INTERNAL_SECRET',
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'app:vaultBootstrapOnStart': defineConfig<'true' | 'false' | 'force'>({
+    envVarName: 'VAULT_BOOTSTRAP_ON_START',
+    defaultValue: 'false',
+    isSecret: false,
+  }),
+  'app:vaultBootstrapRetryMax': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX',
+    defaultValue: 5,
+  }),
+  'app:vaultBootstrapRetryBaseMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_BASE_MS',
+    defaultValue: 30_000,
+  }),
+  'app:vaultBootstrapRetryMaxMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX_MS',
+    defaultValue: 1_800_000, // 30 * 60_000
+  }),
+  'app:vaultBootstrapHeartbeatIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_INTERVAL_MS',
+    defaultValue: 10_000,
+  }),
+  'app:vaultBootstrapHeartbeatStaleMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_STALE_MS',
+    defaultValue: 60_000,
+  }),
+  'app:vaultBootstrapRetryDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultDriftDetectionIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_DETECTION_INTERVAL_MS',
+    defaultValue: 300_000, // 5 * 60_000
+  }),
+  'app:vaultDriftMaxPagesPerTick': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_MAX_PAGES_PER_TICK',
+    defaultValue: 10_000,
+  }),
+  'app:vaultDriftDetectionDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_DRIFT_DETECTION_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultReconcileMaxPagesPerUserRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_USER_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxPagesPerAdminRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_ADMIN_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxConcurrentPerUser': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_PER_USER',
+    defaultValue: 1,
+  }),
+  'app:vaultReconcileMaxConcurrentSystem': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_SYSTEM',
+    defaultValue: 3,
+  }),
+  'app:vaultReconcileChunkSize': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_CHUNK_SIZE',
+    defaultValue: 100,
+  }),
+  'app:vaultReconcileHistoryRetentionDays': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_HISTORY_RETENTION_DAYS',
+    defaultValue: 30,
+  }),
+  'app:vaultReconcileRejectWhenBootstrapNotDone': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_REJECT_WHEN_BOOTSTRAP_NOT_DONE',
+    defaultValue: true,
+  }),
+  'app:vaultReconcileAdminBypassCapacityLimit': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_ADMIN_BYPASS_CAPACITY_LIMIT',
     defaultValue: false,
   }),
 
@@ -1213,6 +1326,11 @@ export const CONFIG_DEFINITIONS = {
   'otel:serviceInstanceId': defineConfig<string | undefined>({
     envVarName: 'OPENTELEMETRY_SERVICE_INSTANCE_ID',
     defaultValue: undefined,
+  }),
+
+  // News Settings
+  'news:isDeliveryEnabled': defineConfig<boolean>({
+    defaultValue: true,
   }),
 
   // S2S Messaging Pubsub Settings

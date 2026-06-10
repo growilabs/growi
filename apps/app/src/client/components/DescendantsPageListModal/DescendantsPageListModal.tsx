@@ -112,7 +112,7 @@ const DescendantsPageListModalSubstance = ({
 
   const buttons = useMemo(
     () => (
-      <span className="me-3">
+      <span className="ms-auto me-3">
         <ExpandOrContractButton
           isWindowExpanded={isWindowExpanded}
           expandWindow={expandWindow}

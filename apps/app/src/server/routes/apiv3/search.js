@@ -254,6 +254,7 @@ module.exports = (crowi) => {
     async (req, res) => {
       const operation = req.body.operation;
 
+      // @type {import('~/server/service/search').SearchService}
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
@@ -288,7 +289,7 @@ module.exports = (crowi) => {
               .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
             // NOT wait the processing is terminated
-            searchService.rebuildIndex();
+            searchService.rebuildIndex(true);
 
             activityEvent.emit('update', res.locals.activity._id, {
               action: SupportedAction.ACTION_ADMIN_SEARCH_INDICES_REBUILD,

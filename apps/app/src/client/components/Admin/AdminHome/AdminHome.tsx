@@ -1,5 +1,5 @@
 import type { FC } from 'react';
-import { useId, useState } from 'react';
+import { useRef, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Tooltip } from 'reactstrap';
@@ -29,9 +29,7 @@ export const AdminHome: FC = () => {
     }, 500);
   };
 
-  // Generate CSS-safe ID by removing colons from useId() result
-  const copyButtonIdRaw = useId();
-  const copyButtonId = `copy-button-${copyButtonIdRaw.replace(/:/g, '')}`;
+  const copyIconRef = useRef<HTMLSpanElement>(null);
 
   return (
     <div data-testid="admin-home">
@@ -131,7 +129,7 @@ export const AdminHome: FC = () => {
                   onClick={(e) => e.preventDefault()}
                 >
                   <span
-                    id={copyButtonId}
+                    ref={copyIconRef}
                     className="material-symbols-outlined"
                     aria-hidden="true"
                   >
@@ -143,7 +141,7 @@ export const AdminHome: FC = () => {
               <Tooltip
                 placement="bottom"
                 isOpen={copyState === COPY_STATE.DONE}
-                target={copyButtonId}
+                target={copyIconRef}
                 fade={false}
               >
                 {t('admin:admin_top:copy_prefilled_host_information:done')}

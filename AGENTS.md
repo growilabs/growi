@@ -24,7 +24,10 @@ GROWI is a team collaboration wiki platform using Markdown, featuring hierarchic
 | **coding-style** | Coding conventions, naming, exports, immutability, comments |
 | **security** | Security checklist, secret management, OWASP vulnerability prevention |
 | **performance** | Model selection, context management, build troubleshooting |
+| **github-cli** | **CRITICAL**: gh CLI auth required; stop immediately if unauthenticated |
+
 | **testing** | Test commands, pnpm vitest usage |
+| **mongodb-regex** | `RegExp.escape()` breaks MongoDB PCRE2 for non-ASCII whitespace; use `escapeStringForMongoRegex` for query-bound patterns |
 
 ### On-Demand Skills
 
@@ -39,7 +42,6 @@ GROWI is a team collaboration wiki platform using Markdown, featuring hierarchic
 
 | Command | Description |
 |---------|-------------|
-| **/tdd** | Test-driven development workflow |
 | **/learn** | Extract reusable patterns from sessions |
 
 **apps/app Skills** (load via Skill tool when working in apps/app):
@@ -88,7 +90,7 @@ growi/
     ├── rules/              # Always loaded into every session
     ├── skills/             # Load on demand via Skill tool
     ├── agents/             # Specialized subagents
-    └── commands/           # User-invocable commands (/tdd, /learn)
+    └── commands/           # User-invocable commands (/learn)
 ```
 
 ## Development Guidelines

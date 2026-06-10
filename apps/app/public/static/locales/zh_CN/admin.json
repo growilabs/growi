@@ -341,6 +341,13 @@
     "migration_succeeded": "您的升级已经成功完成! 退出维护模式，可以使用GROWI。",
     "migration_failed": "升级失败。请参考GROWI的文档，了解在失败情况下该如何处理。"
   },
+  "news_delivery": {
+    "section_title": "新闻推送",
+    "label": "新闻推送",
+    "enable": "启用新闻推送",
+    "description": "控制 cron 任务是否拉取新闻订阅源并更新本地缓存。停用期间，已缓存的新闻仍可显示。",
+    "update_succeeded": "新闻推送设置已更新"
+  },
   "maintenance_mode": {
     "maintenance_mode": "维护模式",
     "under_maintenance_mode": "在维护模式下",
@@ -378,6 +385,10 @@
     "page_bulk_export_explanation": "启用一项功能，允许所有用户一次性导出从页面菜单中选择的所有页面及其下级页面。保留期限过后，导出的数据将自动删除。",
     "page_bulk_export_warning": "批量页面导出功能可供所有用户使用。为了维护系统资源，请您配合使用最低限度的资源。如果您是管理员，请将此事实告知所有用户。",
     "page_bulk_export_storage_period": "储存期限",
+    "page_bulk_export_reload_title": "重新加载页面",
+    "page_bulk_export_reload_prompt": "您需要重新加载页面以反映设置更改。现在重新加载吗？",
+    "page_bulk_export_reload_dismiss": "暂不",
+    "reload_page": "重新加载",
     "update": "更新",
     "mail_settings": "邮件设置",
     "mailer_is_not_set_up": "邮件设置尚未完成。",
@@ -1169,5 +1180,98 @@
     "ai_integration": "AI 集成",
     "disable_mode_explanation": "目前，AI 集成已被禁用。若要启用，请配置 <code>AI_ENABLED</code> 环境变量以及其他必要的变量。<br><br>详细信息请参考<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>文档</a>。",
     "ai_search_management": "AI 搜索管理"
+  },
+  "admin_navigation": {
+    "section_users": "用户",
+    "section_data": "数据",
+    "section_external_notifications": "外部通知"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "警告：",
+        "message_html": "上一次初始化处理由 <code>VAULT_BOOTSTRAP_ON_START=force</code> 触发。若在此环境变量仍为 <code>force</code> 的状态下重启服务器，将再次重新初始化所有 Vault 数据。请将该环境变量更改为 <code>true</code> 或 <code>false</code>。"
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "功能状态",
+        "enabled": "已启用",
+        "disabled": "已禁用",
+        "description_html": "由 <code>VAULT_ENABLED</code> 环境变量控制。要切换启用/禁用，请更改该环境变量并重启服务器。"
+      },
+      "clone-url": {
+        "label": "克隆 URL",
+        "description": "在终端中执行此命令可克隆 Vault 仓库。",
+        "copy-button": "复制命令",
+        "copied-tooltip": "已复制！",
+        "copy-failed": "克隆命令复制失败。",
+        "no-site-url_html": "站点 URL 未配置，无法显示命令。请在 <a href=\"/admin/app\">应用设置</a> 中进行配置。"
+      },
+      "kill-switch": {
+        "heading": "重建",
+        "button": "重建 Vault",
+        "description_html": "销毁 Git 仓库中的所有数据，并以 MongoDB 中的数据为基础重建 Git 数据。重建期间，所有 <code>git clone</code> / <code>fetch</code> 请求将以 503 拒绝。该操作将以 <code>vault.wipe</code> 记录到审计日志。",
+        "confirm-title": "确认重建 Vault",
+        "confirm-message_html": "执行此操作将<strong>丢失当前 Git 仓库中的所有数据</strong>。",
+        "confirm-question": "确定要继续吗？",
+        "confirm-button": "确认",
+        "cancel-button": "取消",
+        "started-toast": "重建已开始。在数据重建完成之前，Vault 将返回 503。"
+      },
+      "bootstrap-status": {
+        "state": "状态",
+        "processed-total": "已处理 / 总估算",
+        "started-at": "开始时间",
+        "completed-at": "完成时间",
+        "last-error": "最近错误",
+        "progress-label": "{{processed}} / {{total}} 页"
+      },
+      "completion-reliability": {
+        "heading": "可靠性状态",
+        "check-result": "最终检查结果",
+        "last-completed-at": "最终完成时间",
+        "processed-estimated": "已处理 / 估算",
+        "trigger-source": "触发来源",
+        "last-error": "最近错误"
+      },
+      "auto-retry-status": {
+        "heading": "自动重试状态",
+        "escalated-warning_html": "初始化处理中的自动重试失败，进入 <strong>escalated</strong> 状态。需要人工介入。",
+        "attempt-no": "尝试次数",
+        "next-attempt-at": "下次尝试时间",
+        "last-error": "最近错误",
+        "abort-button": "中止自动重试",
+        "aborting": "中止中…",
+        "aborted-toast": "自动重试已中止。"
+      },
+      "drift-activity": {
+        "heading": "数据不一致检测状态",
+        "last-sweep-at": "最终扫描时间",
+        "last-watermark": "最终水位",
+        "detected-since-boot": "服务器启动以来检测数",
+        "repairs-emitted-since-boot": "服务器启动以来修复发出数",
+        "last-error": "最近检测到的错误",
+        "out-of-scope_html": "<strong>注意（范围外）：</strong> 由路径变更（重命名 / 硬删除）以及权限撤销造成的数据不一致，在当前实现中无法检测。它们需要将来 <code>growi-vault-ha</code> 的支持。"
+      },
+      "storage-observability": {
+        "fetch-failed": "获取存储统计失败。vault-manager 可能无法访问。",
+        "namespace-count": "命名空间数量",
+        "total-commit-count": "总提交数",
+        "loose-object-count": "Loose 对象数量",
+        "repo-size": "仓库大小",
+        "last-squash": "最终 squash 时间",
+        "last-gc": "最终 GC 时间"
+      },
+      "audit-log": {
+        "heading": "审计日志",
+        "button": "查看 VAULT_* 审计日志条目",
+        "description": "打开按 Vault 相关操作（VAULT_*）筛选的管理员审计日志。"
+      },
+      "reconcile-admin": {
+        "heading": "对账",
+        "trigger-button": "触发对账",
+        "description": "在不进行完整初始化的情况下，手动对账 MongoDB 页面与 Vault git 树之间的数据不一致。"
+      }
+    }
   }
 }
