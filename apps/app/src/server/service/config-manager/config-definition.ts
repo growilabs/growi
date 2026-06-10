@@ -285,16 +285,10 @@ export const CONFIG_KEYS = [
   'openai:apiKey',
   'openai:assistantModel:mastraAgent',
 
-  // Mastra LLM Vendor Settings
+  // Mastra LLM Settings (vendor-agnostic: one vendor per app)
   'mastra:llmVendor',
-
-  // Anthropic Settings
-  'anthropic:apiKey',
-  'anthropic:assistantModel:mastraAgent',
-
-  // Google Settings
-  'google:apiKey',
-  'google:assistantModel:mastraAgent',
+  'mastra:llmApiKey',
+  'mastra:llmModel',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1271,37 +1265,25 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: 'o4-mini',
   }),
 
-  // Mastra LLM Vendor Settings
-  // Typed as `string | undefined` (not LlmVendor) to keep this core-layer
-  // definition free of any `features/mastra` import (avoids dependency
-  // inversion). Validation against LlmVendor happens in the resolver.
+  // Mastra LLM Settings (vendor-agnostic: one vendor per app)
+  // Single set of keys regardless of vendor — the resolver reads `mastra:llmVendor`
+  // to pick the provider client, then injects `mastra:llmApiKey` / `mastra:llmModel`.
+  // `mastra:llmVendor` is typed `string | undefined` (not LlmVendor) to keep this
+  // core-layer definition free of any `features/mastra` import (avoids dependency
+  // inversion); validation against LlmVendor happens in the resolver.
   'mastra:llmVendor': defineConfig<string | undefined>({
     envVarName: 'MASTRA_LLM_VENDOR',
     defaultValue: undefined,
   }),
-
-  // Anthropic Settings
-  'anthropic:apiKey': defineConfig<string | undefined>({
-    envVarName: 'ANTHROPIC_API_KEY',
+  'mastra:llmApiKey': defineConfig<string | undefined>({
+    envVarName: 'MASTRA_LLM_API_KEY',
     defaultValue: undefined,
     isSecret: true,
   }),
-  // Provisional default model (current generation); finalized at impl time.
-  'anthropic:assistantModel:mastraAgent': defineConfig<string>({
-    envVarName: 'ANTHROPIC_MASTRA_AGENT_MODEL',
-    defaultValue: 'claude-sonnet-4-5',
-  }),
-
-  // Google Settings
-  'google:apiKey': defineConfig<string | undefined>({
-    envVarName: 'GOOGLE_API_KEY',
+  // Unset -> the resolver applies a per-vendor default model.
+  'mastra:llmModel': defineConfig<string | undefined>({
+    envVarName: 'MASTRA_LLM_MODEL',
     defaultValue: undefined,
-    isSecret: true,
-  }),
-  // Provisional default model (current generation); finalized at impl time.
-  'google:assistantModel:mastraAgent': defineConfig<string>({
-    envVarName: 'GOOGLE_MASTRA_AGENT_MODEL',
-    defaultValue: 'gemini-2.5-flash',
   }),
 
   // OpenTelemetry Settings

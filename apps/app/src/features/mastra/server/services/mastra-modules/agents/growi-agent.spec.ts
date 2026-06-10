@@ -1,8 +1,6 @@
 import type { MastraModelConfig } from '@mastra/core/llm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { MastraModelResolution } from '../../ai-sdk-modules/resolve-mastra-model';
-
 // Mock heavy collaborators that the agent module pulls in transitively.
 //
 // Mastra's `@mastra/core/agent` Agent class triggers a chain of internal
@@ -71,7 +69,7 @@ vi.mock('../memory', () => ({
 // enough to vary behavior — no module reset / re-import is required (and
 // re-importing would re-register transitive Mongoose models and throw).
 const resolverMock = vi.hoisted(() => ({
-  fn: vi.fn<() => MastraModelResolution>(),
+  fn: vi.fn<() => MastraModelConfig>(),
 }));
 
 vi.mock('../../ai-sdk-modules/resolve-mastra-model', () => ({
@@ -79,17 +77,18 @@ vi.mock('../../ai-sdk-modules/resolve-mastra-model', () => ({
 }));
 
 // A sentinel model. The agent must hand back exactly this object from its
-// `model()` function when resolution is ok — proving it forwards the resolver's
-// model rather than constructing one itself.
+// `model()` function when resolution succeeds — proving it forwards the
+// resolver's model rather than constructing one itself.
 const sentinelModel = { id: 'sentinel-model' } as unknown as MastraModelConfig;
 
-// Importing growiAgent is the act under test for Req 4.3: module load (and
-// thus `new Agent(...)`) must complete WITHOUT calling the resolver. We import
-// while the resolver is in a disabled state and assert below that it was never
-// invoked during construction.
-resolverMock.fn.mockReturnValue({
-  status: 'disabled',
-  reason: { type: 'vendor-unset' },
+// Importing growiAgent is the act under test for Req 4.3: module load (and thus
+// `new Agent(...)`) must complete WITHOUT calling the resolver. We import while
+// the resolver is in a throwing (misconfigured) state and assert below that it
+// was never invoked during construction — if it were, the import would throw.
+resolverMock.fn.mockImplementation(() => {
+  throw new Error(
+    'Mastra LLM vendor is not configured (set MASTRA_LLM_VENDOR)',
+  );
 });
 
 import { growiAgent } from './growi-agent';
@@ -127,12 +126,8 @@ describe('growiAgent', () => {
   });
 
   describe('model supply (requirements 3.3, 5.1)', () => {
-    it('returns the resolved model when resolution is ok', () => {
-      resolverMock.fn.mockReturnValue({
-        status: 'ok',
-        vendor: 'openai',
-        model: sentinelModel,
-      });
+    it('returns the resolved model when resolution succeeds', () => {
+      resolverMock.fn.mockReturnValue(sentinelModel);
 
       const modelFn = getModelFn();
 
@@ -142,31 +137,31 @@ describe('growiAgent', () => {
     });
   });
 
-  describe('model supply when disabled (requirement 4.1 — error carries reason, not secrets)', () => {
-    it('throws carrying the reason type, never an apiKey, when resolution is disabled', () => {
-      resolverMock.fn.mockReturnValue({
-        status: 'disabled',
-        reason: { type: 'api-key-missing', vendor: 'openai' },
+  describe('model supply on misconfiguration (requirement 4.1, 4.3 — throw surfaces at use time)', () => {
+    it('propagates the resolver throw at use time without swallowing it', () => {
+      // On misconfiguration resolveMastraModel() throws; the agent's lazy
+      // `model()` must let it surface (handled by the post-message route's
+      // try/catch — Req 4.4), not swallow or replace it.
+      const resolverError = new Error(
+        'Mastra LLM API key is not configured for vendor "openai" (set MASTRA_LLM_API_KEY)',
+      );
+      resolverMock.fn.mockImplementation(() => {
+        throw resolverError;
       });
 
       const modelFn = getModelFn();
 
-      // Calling the dynamic function in a disabled state throws (Req 4.1).
+      // Calling the dynamic function in a misconfigured state throws (Req 4.1).
       let thrown: unknown;
       try {
         modelFn();
       } catch (e) {
         thrown = e;
       }
-      expect(thrown).toBeInstanceOf(Error);
+      expect(thrown).toBe(resolverError);
+      // Defense-in-depth: the surfaced message carries no secret material.
       const message = thrown instanceof Error ? thrown.message : '';
-
-      // The reason type must be present so the cause is diagnosable...
-      expect(message).toContain('api-key-missing');
-      // ...but no secret material may leak into the thrown message (Req 4.1 /
-      // 2.5 spirit). Guard against the actual key shape the resolver holds.
-      expect(message).not.toContain('test-api-key');
-      expect(message.toLowerCase()).not.toContain('apikey');
+      expect(message.toLowerCase()).not.toContain('sk-');
     });
   });
 

@@ -190,20 +190,12 @@ describe('config-definition multi-llm-provider keys', () => {
       expect(CONFIG_KEYS).toContain('mastra:llmVendor');
     });
 
-    it('contains anthropic:apiKey', () => {
-      expect(CONFIG_KEYS).toContain('anthropic:apiKey');
+    it('contains mastra:llmApiKey', () => {
+      expect(CONFIG_KEYS).toContain('mastra:llmApiKey');
     });
 
-    it('contains anthropic:assistantModel:mastraAgent', () => {
-      expect(CONFIG_KEYS).toContain('anthropic:assistantModel:mastraAgent');
-    });
-
-    it('contains google:apiKey', () => {
-      expect(CONFIG_KEYS).toContain('google:apiKey');
-    });
-
-    it('contains google:assistantModel:mastraAgent', () => {
-      expect(CONFIG_KEYS).toContain('google:assistantModel:mastraAgent');
+    it('contains mastra:llmModel', () => {
+      expect(CONFIG_KEYS).toContain('mastra:llmModel');
     });
   });
 
@@ -226,80 +218,39 @@ describe('config-definition multi-llm-provider keys', () => {
       });
     });
 
-    describe('anthropic:apiKey', () => {
-      it('has envVarName ANTHROPIC_API_KEY', () => {
-        expect(CONFIG_DEFINITIONS['anthropic:apiKey'].envVarName).toBe(
-          'ANTHROPIC_API_KEY',
+    describe('mastra:llmApiKey', () => {
+      it('has envVarName MASTRA_LLM_API_KEY', () => {
+        expect(CONFIG_DEFINITIONS['mastra:llmApiKey'].envVarName).toBe(
+          'MASTRA_LLM_API_KEY',
         );
       });
 
       it('has default value of undefined', () => {
-        expect(CONFIG_DEFINITIONS['anthropic:apiKey'].defaultValue).toBe(
+        expect(CONFIG_DEFINITIONS['mastra:llmApiKey'].defaultValue).toBe(
           undefined,
         );
       });
 
       it('is marked as secret', () => {
-        expect(CONFIG_DEFINITIONS['anthropic:apiKey'].isSecret).toBe(true);
+        expect(CONFIG_DEFINITIONS['mastra:llmApiKey'].isSecret).toBe(true);
       });
     });
 
-    describe('anthropic:assistantModel:mastraAgent', () => {
-      it('has envVarName ANTHROPIC_MASTRA_AGENT_MODEL', () => {
-        expect(
-          CONFIG_DEFINITIONS['anthropic:assistantModel:mastraAgent'].envVarName,
-        ).toBe('ANTHROPIC_MASTRA_AGENT_MODEL');
-      });
-
-      it('has provisional default model claude-sonnet-4-5', () => {
-        expect(
-          CONFIG_DEFINITIONS['anthropic:assistantModel:mastraAgent']
-            .defaultValue,
-        ).toBe('claude-sonnet-4-5');
-      });
-
-      it('is not marked as secret', () => {
-        expect(
-          CONFIG_DEFINITIONS['anthropic:assistantModel:mastraAgent'].isSecret,
-        ).toBeFalsy();
-      });
-    });
-
-    describe('google:apiKey', () => {
-      it('has envVarName GOOGLE_API_KEY', () => {
-        expect(CONFIG_DEFINITIONS['google:apiKey'].envVarName).toBe(
-          'GOOGLE_API_KEY',
+    describe('mastra:llmModel', () => {
+      it('has envVarName MASTRA_LLM_MODEL', () => {
+        expect(CONFIG_DEFINITIONS['mastra:llmModel'].envVarName).toBe(
+          'MASTRA_LLM_MODEL',
         );
       });
 
-      it('has default value of undefined', () => {
-        expect(CONFIG_DEFINITIONS['google:apiKey'].defaultValue).toBe(
+      it('has default value of undefined (resolver applies per-vendor default)', () => {
+        expect(CONFIG_DEFINITIONS['mastra:llmModel'].defaultValue).toBe(
           undefined,
         );
       });
 
-      it('is marked as secret', () => {
-        expect(CONFIG_DEFINITIONS['google:apiKey'].isSecret).toBe(true);
-      });
-    });
-
-    describe('google:assistantModel:mastraAgent', () => {
-      it('has envVarName GOOGLE_MASTRA_AGENT_MODEL', () => {
-        expect(
-          CONFIG_DEFINITIONS['google:assistantModel:mastraAgent'].envVarName,
-        ).toBe('GOOGLE_MASTRA_AGENT_MODEL');
-      });
-
-      it('has provisional default model gemini-2.5-flash', () => {
-        expect(
-          CONFIG_DEFINITIONS['google:assistantModel:mastraAgent'].defaultValue,
-        ).toBe('gemini-2.5-flash');
-      });
-
       it('is not marked as secret', () => {
-        expect(
-          CONFIG_DEFINITIONS['google:assistantModel:mastraAgent'].isSecret,
-        ).toBeFalsy();
+        expect(CONFIG_DEFINITIONS['mastra:llmModel'].isSecret).toBeFalsy();
       });
     });
   });

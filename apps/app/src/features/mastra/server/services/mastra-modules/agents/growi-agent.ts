@@ -20,24 +20,13 @@ export const growiAgent = new Agent({
   `,
 
   // Resolve the model lazily (DynamicArgument<MastraModelConfig>): the function
-  // runs at use time, not at import time, so constructing the agent never
-  // throws even when the vendor/API key are unconfigured (Req 4.3). The
-  // availability gate normally prevents reaching a disabled state here; the
-  // throw is a defense-in-depth fallback that carries ONLY the reason type —
-  // never the API key — so secrets cannot leak into logs (Req 4.1).
-  //
-  // The `_ctx` ({ requestContext, mastra }) parameter is required by the
-  // DynamicArgument function form but ignored: model resolution depends only on
-  // server config, not on the per-request context.
-  model: (_ctx) => {
-    const resolution = resolveMastraModel();
-    if (resolution.status !== 'ok') {
-      throw new Error(
-        `Mastra LLM provider is not available: ${resolution.reason.type}`,
-      );
-    }
-    return resolution.model;
-  },
+  // runs at use time, not at import time, so constructing the agent never throws
+  // even when the vendor/API key are unconfigured (Req 4.3). On misconfiguration
+  // resolveMastraModel() throws; the throw surfaces at request time and is
+  // handled by the post-message route's existing try/catch (Req 4.4). Its
+  // message carries only the vendor name / missing-var name — never the API key
+  // (Req 4.1, 2.5).
+  model: () => resolveMastraModel(),
   tools: {
     fullTextSearchTool,
     getPageContentTool,
