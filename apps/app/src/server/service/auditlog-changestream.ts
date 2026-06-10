@@ -20,13 +20,14 @@ const isChangeStreamHistoryLost = (err: unknown): boolean => {
   if (!(err instanceof Error)) return false;
   if ('code' in err && err.code === CHANGE_STREAM_HISTORY_LOST_CODE)
     return true;
+  // Message text may change between server versions; fallback for errors that lack the code.
   if (err.message.includes('Resume of change stream was not possible'))
     return true;
   return false;
 };
 
 export class AuditlogChangeStreamService {
-  // Backoff: 1,2,4,8,16,30,30s. Skip a repeatedly failing event after ~91s total (restart 8).
+  // Backoff: 1,2,4,8,16,30,30s. Skip a repeatedly failing event on its 8th failure (~91s total).
   private static readonly MAX_CONSECUTIVE_EVENT_FAILURES = 8;
   private static readonly RESTART_BASE_DELAY_MS = 1000;
   private static readonly RESTART_MAX_DELAY_MS = 30000;
@@ -85,6 +86,8 @@ export class AuditlogChangeStreamService {
           } else if (event.operationType === 'delete') {
             await this.delegator.deleteAuditlog(event.documentKey._id);
           }
+          // Per-event upsert doubles MongoDB writes but keeps the replay window minimal on restart.
+          // Throttle if write frequency becomes a concern.
           await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
           this.consecutiveEventFailures = 0;
           this.lastFailingToken = null;

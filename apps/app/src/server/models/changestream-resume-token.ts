@@ -9,6 +9,8 @@ const logger = loggerFactory('growi:models:changestream-resume-token');
 
 export interface IChangeStreamResumeToken {
   key: string;
+  // ResumeToken is an opaque value in the MongoDB driver (typed as `unknown`);
+  // its internal structure is not a public API, so it is stored as-is via Mixed.
   token: unknown;
 }
 
