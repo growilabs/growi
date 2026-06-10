@@ -1,4 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import type { LanguageModel } from 'ai';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { MastraModelResolution } from '../../ai-sdk-modules/resolve-mastra-model';
 
 // Mock heavy collaborators that the agent module pulls in transitively.
 //
@@ -12,29 +15,34 @@ import { describe, expect, it, vi } from 'vitest';
 // constructor configuration that growi-agent.ts hands in. A stub Agent that
 // stores the config and exposes it via the same listTools/getInstructions
 // surface gives us exactly that, without booting Mastra's runtime.
+interface CapturedAgentConfig {
+  id?: string;
+  name?: string;
+  instructions: unknown;
+  tools: Record<string, unknown>;
+  model?: unknown;
+  memory?: unknown;
+}
+
 vi.mock('@mastra/core/agent', () => {
   class StubAgent {
     name: string;
-    private __instructions: unknown;
-    private __tools: Record<string, unknown>;
-    constructor(config: {
-      id?: string;
-      name?: string;
-      instructions: unknown;
-      tools: Record<string, unknown>;
-      model?: unknown;
-      memory?: unknown;
-    }) {
+    private __config: CapturedAgentConfig;
+    constructor(config: CapturedAgentConfig) {
       this.name = config.name ?? config.id ?? 'stub-agent';
-      this.__instructions = config.instructions;
-      this.__tools = config.tools;
+      this.__config = config;
     }
     // Mirror the public surface used by callers.
     getInstructions(): unknown {
-      return this.__instructions;
+      return this.__config.instructions;
     }
     listTools(): Record<string, unknown> {
-      return this.__tools;
+      return this.__config.tools;
+    }
+    // Test-only accessor: expose the raw constructor config so the spec can
+    // read the `model` dynamic function that growi-agent.ts supplied.
+    getCapturedConfig(): CapturedAgentConfig {
+      return this.__config;
     }
   }
   return { Agent: StubAgent };
@@ -50,35 +58,118 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-// The agent module reads a single config value for the model id. Returning a
-// deterministic stub keeps the constructor's `model:` argument resolvable.
-vi.mock('~/server/service/config-manager', () => ({
-  configManager: {
-    getConfig: (key: string) => {
-      if (key === 'openai:assistantModel:mastraAgent') return 'gpt-test-model';
-      if (key === 'openai:apiKey') return 'test-api-key';
-      return undefined;
-    },
-  },
-}));
-
-// getOpenaiProvider()(model) — return a callable that yields a placeholder.
-// The stub Agent above doesn't touch this, but the module still calls it.
-vi.mock('../../ai-sdk-modules/get-openai-provider', () => ({
-  getOpenaiProvider: () => (modelId: string) => ({
-    id: modelId,
-    provider: 'stub-openai',
-  }),
-}));
-
 // Replace memory with an inert stub so we don't spin up MongoDBStore.
 vi.mock('../memory', () => ({
   memory: { id: 'stub-memory' },
 }));
 
+// The resolver is the single seam this module depends on for model supply.
+// A hoisted mutable holder lets each test choose the resolution that
+// `resolveMastraModel()` returns, while the mock itself stays declared once.
+// Because growi-agent.ts resolves the model lazily inside its `model()`
+// function (not at import time), changing this return value between tests is
+// enough to vary behavior — no module reset / re-import is required (and
+// re-importing would re-register transitive Mongoose models and throw).
+const resolverMock = vi.hoisted(() => ({
+  fn: vi.fn<() => MastraModelResolution>(),
+}));
+
+vi.mock('../../ai-sdk-modules/resolve-mastra-model', () => ({
+  resolveMastraModel: () => resolverMock.fn(),
+}));
+
+// A sentinel LanguageModel. The agent must hand back exactly this object from
+// its `model()` function when resolution is ok — proving it forwards the
+// resolver's model rather than constructing one itself.
+const sentinelModel = { id: 'sentinel-model' } as unknown as LanguageModel;
+
+// Importing growiAgent is the act under test for Req 4.3: module load (and
+// thus `new Agent(...)`) must complete WITHOUT calling the resolver. We import
+// while the resolver is in a disabled state and assert below that it was never
+// invoked during construction.
+resolverMock.fn.mockReturnValue({
+  status: 'disabled',
+  reason: { type: 'vendor-unset' },
+});
+
 import { growiAgent } from './growi-agent';
 
+// Snapshot whether the resolver was touched during the import above.
+const resolverCalledDuringImport = resolverMock.fn.mock.calls.length > 0;
+
+// Narrow the captured config's `model` to a callable without an assertion.
+const getModelFn = (): (() => LanguageModel) => {
+  const config =
+    'getCapturedConfig' in growiAgent &&
+    typeof growiAgent.getCapturedConfig === 'function'
+      ? growiAgent.getCapturedConfig()
+      : undefined;
+  const model = config?.model;
+  if (typeof model !== 'function') {
+    throw new Error('Expected the agent model to be a dynamic function');
+  }
+  return model as () => LanguageModel;
+};
+
 describe('growiAgent', () => {
+  beforeEach(() => {
+    resolverMock.fn.mockReset();
+  });
+
+  describe('construction (requirement 4.3 — import never throws)', () => {
+    it('constructs without invoking the resolver, so a disabled config cannot throw at import', () => {
+      // The module was imported (top of file) while the resolver reported
+      // disabled. Because model supply is a deferred dynamic function, the
+      // import must have succeeded AND never called the resolver (Req 4.3).
+      expect(growiAgent).toBeDefined();
+      expect(resolverCalledDuringImport).toBe(false);
+    });
+  });
+
+  describe('model supply (requirements 3.3, 5.1)', () => {
+    it('returns the resolved model when resolution is ok', () => {
+      resolverMock.fn.mockReturnValue({
+        status: 'ok',
+        vendor: 'openai',
+        model: sentinelModel,
+      });
+
+      const modelFn = getModelFn();
+
+      // The dynamic function forwards exactly the resolver's model (Req 3.3,
+      // 5.1) — a single vendor's single model, resolved at use time.
+      expect(modelFn()).toBe(sentinelModel);
+    });
+  });
+
+  describe('model supply when disabled (requirement 4.1 — error carries reason, not secrets)', () => {
+    it('throws carrying the reason type, never an apiKey, when resolution is disabled', () => {
+      resolverMock.fn.mockReturnValue({
+        status: 'disabled',
+        reason: { type: 'api-key-missing', vendor: 'openai' },
+      });
+
+      const modelFn = getModelFn();
+
+      // Calling the dynamic function in a disabled state throws (Req 4.1).
+      let thrown: unknown;
+      try {
+        modelFn();
+      } catch (e) {
+        thrown = e;
+      }
+      expect(thrown).toBeInstanceOf(Error);
+      const message = thrown instanceof Error ? thrown.message : '';
+
+      // The reason type must be present so the cause is diagnosable...
+      expect(message).toContain('api-key-missing');
+      // ...but no secret material may leak into the thrown message (Req 4.1 /
+      // 2.5 spirit). Guard against the actual key shape the resolver holds.
+      expect(message).not.toContain('test-api-key');
+      expect(message.toLowerCase()).not.toContain('apikey');
+    });
+  });
+
   describe('tools registration (requirements 4.1, 6.1)', () => {
     it('exposes fullTextSearchTool and getPageContentTool, and does NOT expose fileSearchTool', async () => {
       // listTools() may be sync (static config) or async (dynamic config).

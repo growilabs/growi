@@ -1,13 +1,10 @@
 import { Agent } from '@mastra/core/agent';
+import type { MastraModelConfig } from '@mastra/core/llm';
 
-import { configManager } from '~/server/service/config-manager';
-
-import { getOpenaiProvider } from '../../ai-sdk-modules/get-openai-provider';
+import { resolveMastraModel } from '../../ai-sdk-modules/resolve-mastra-model';
 import { memory } from '../memory';
 import { fullTextSearchTool } from '../tools/full-text-search-tool';
 import { getPageContentTool } from '../tools/get-page-content-tool';
-
-const model = configManager.getConfig('openai:assistantModel:mastraAgent');
 
 export const growiAgent = new Agent({
   id: 'growiAgent',
@@ -23,7 +20,32 @@ export const growiAgent = new Agent({
   - Keep answers concise and well-structured with headings, lists, and links where helpful.
   `,
 
-  model: getOpenaiProvider()(model),
+  // Resolve the model lazily (DynamicArgument<MastraModelConfig>): the function
+  // runs at use time, not at import time, so constructing the agent never
+  // throws even when the vendor/API key are unconfigured (Req 4.3). The
+  // availability gate normally prevents reaching a disabled state here; the
+  // throw is a defense-in-depth fallback that carries ONLY the reason type —
+  // never the API key — so secrets cannot leak into logs (Req 4.1).
+  //
+  // The `_ctx` ({ requestContext, mastra }) parameter is required by the
+  // DynamicArgument function form but ignored: model resolution depends only on
+  // server config, not on the per-request context.
+  model: (_ctx) => {
+    const resolution = resolveMastraModel();
+    if (resolution.status !== 'ok') {
+      throw new Error(
+        `Mastra LLM provider is not available: ${resolution.reason.type}`,
+      );
+    }
+    // `resolution.model` is the `ai` package's broad `LanguageModel` union,
+    // which is not directly assignable to Mastra's `MastraModelConfig`:
+    // @mastra/core bundles its own copy of `@ai-sdk/provider`, so its
+    // `LanguageModelV3` is nominally distinct from `ai`'s. At runtime the
+    // resolver always produces a concrete provider model object (built via
+    // createOpenAI/createAnthropic/createGoogle), never the bare model-id
+    // string form, so narrowing to MastraModelConfig here is sound.
+    return resolution.model as MastraModelConfig;
+  },
   tools: {
     fullTextSearchTool,
     getPageContentTool,

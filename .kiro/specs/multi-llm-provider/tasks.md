@@ -42,7 +42,7 @@
   - _Depends: 1.2, 1.3, 2.1_
 
 - [ ] 3. Integration: エージェントと可用性ゲート
-- [ ] 3.1 growiAgent のモデル供給を dynamic function 化
+- [x] 3.1 growiAgent のモデル供給を dynamic function 化
   - エージェントの `model` をリゾルバ経由の dynamic function に置換し、`disabled` 時は使用時に throw（理由 type のみ・API キー非出力）する。import 時には解決せず、構築時に例外を投げない
   - 旧 OpenAI 固定プロバイダー生成（`get-openai-provider`）を削除し、唯一の参照元を更新する。spec を dynamic model / 無効時 throw / 構築 no-throw に合わせて更新する
   - 観測可能: throw する設定でもエージェント構築（import）が例外を投げず、`ok` 設定で `model()` が言語モデルを返し、`disabled` 設定で `model()` が throw することをテストで確認できる
@@ -75,3 +75,5 @@
 
 ## Implementation Notes
 - 1.3: 既存ブランチに **pre-existing な型エラー** `apps/app/src/features/mastra/server/routes/post-message.ts(77,48)` TS2769（`growiAgent.stream(...)` の引数）が存在する。本機能の変更とは無関係（baseline で再現）。タスク 3.1/3.2/4.x で post-message/routes 周辺を触る際、この既存エラーを「新規混入」と誤認しないこと。`pnpm run lint:typecheck` はこの1件で赤になる前提。
+- 3.1: `ai` の `LanguageModel` と `@mastra/core` の `MastraModelConfig` は **別コピーの `@ai-sdk/provider`** 由来で nominal に非互換（research D-1 の「assignable」は楽観的だった）。growi-agent の dynamic model 戻り値に **単一の文書化済み `as MastraModelConfig` キャスト**（Tier-3、`as any`/`as unknown` ではない）で橋渡し。runtime 値は常に具象 provider model なので健全。
+- 3.1(follow-up): 削除した `get-openai-provider.ts` を参照する **コメントのみ**の残骸が `resolve-mastra-model.ts` と `llm-providers/openai.ts` に各1行（コード参照ゼロ）。境界外のため未修整。最終クリーンアップで除去予定。
