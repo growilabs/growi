@@ -23,7 +23,7 @@
   - _Boundary: config-definition_
 
 - [ ] 2. Core: プロバイダー生成とモデル解決
-- [ ] 2.1 ベンダー別 native provider ファクトリ
+- [x] 2.1 ベンダー別 native provider ファクトリ
   - 各ベンダーの native provider を**明示的な API キー注入**（env 自動検出に依存しない）で生成し、Mastra 互換の言語モデルを返す薄いアダプタを実装する（OpenAI / Anthropic / Google）
   - ベンダー→ファクトリの map を barrel で公開し、consumer がベンダー名で分岐しない構造にする
   - co-located unit test: 各ファクトリが対応する provider 生成関数を API キー付きで呼び、モデル名を適用することを確認（provider 生成関数を mock）
