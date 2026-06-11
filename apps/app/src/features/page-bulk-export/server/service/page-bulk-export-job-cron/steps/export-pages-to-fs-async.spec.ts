@@ -14,6 +14,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Writable } from 'node:stream';
+import type { IRevisionHasId } from '@growi/core';
 import { mock } from 'vitest-mock-extended';
 
 import {
@@ -44,12 +45,13 @@ function makeService(tmpDir: string): IPageBulkExportJobCronService {
  * Build a minimal PageBulkExportJobDocument mock for the given format.
  */
 function makeJob(format: PageBulkExportFormat): PageBulkExportJobDocument {
-  const job = mock<PageBulkExportJobDocument>();
-  (job as any).format = format;
-  (job as any).lastExportedPagePath = undefined;
-  (job as any).status = PageBulkExportJobStatus.exporting;
+  const job = mock<PageBulkExportJobDocument>({
+    format,
+    lastExportedPagePath: undefined,
+    status: PageBulkExportJobStatus.exporting,
+  });
   // save() must resolve for the Writable to call callback()
-  job.save.mockResolvedValue(job as any);
+  job.save.mockResolvedValue(job);
   return job;
 }
 
@@ -60,14 +62,11 @@ function makePageSnapshot(
   pagePath: string,
   markdownBody: string,
 ): PageBulkExportPageSnapshotDocument {
-  const snapshot = mock<PageBulkExportPageSnapshotDocument>();
-  (snapshot as any).path = pagePath;
-  // Simulate a populated revision (isPopulated() returns true when it's an object, not an ID).
-  (snapshot as any).revision = {
-    _id: 'rev-001',
-    body: markdownBody,
-  };
-  return snapshot;
+  return mock<PageBulkExportPageSnapshotDocument>({
+    path: pagePath,
+    // Simulate a populated revision (isPopulated() returns true when it's an object, not an ID).
+    revision: mock<IRevisionHasId>({ body: markdownBody }),
+  });
 }
 
 /**
@@ -129,7 +128,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
       // CSS must be non-empty
       const cssMatch = content.match(/<style>([\s\S]*?)<\/style>/);
       expect(cssMatch).not.toBeNull();
-      expect(cssMatch![1].trim().length).toBeGreaterThan(0);
+      expect(cssMatch?.[1]?.trim().length).toBeGreaterThan(0);
     }, 30_000); // allow time for dynamicImport on first run
   });
 
