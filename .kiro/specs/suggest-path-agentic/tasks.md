@@ -97,7 +97,7 @@
   - 既存のオーケストレータのテストが無修正で green、agentic reject 時に memo のみ返ることが新規テストで green
   - _Requirements: 4.3, 4.5, 5.2, 5.3_
 
-- [ ] 5.2 route への optional engine パラメータの追加
+- [x] 5.2 route への optional engine パラメータの追加
   - リクエストボディの optional な engine フィールドに enum validation（'oneshot' | 'agentic' のみ許可、不正値は 400）を追加し、ハンドラはオーケストレータへ受け渡すのみとする
   - 既存ミドルウェアチェーン・レスポンス形式は無変更
   - engine 未指定リクエストが現行と完全互換で動作し、不正値が 400 になる

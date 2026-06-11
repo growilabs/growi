@@ -16,7 +16,11 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { SearchService } from '../../../interfaces/suggest-path-types';
-import { generateSuggestions } from '../../services/generate-suggestions';
+import { SuggestPathEngineId } from '../../../interfaces/suggest-path-types';
+import {
+  type GenerateSuggestionsOptions,
+  generateSuggestions,
+} from '../../services/generate-suggestions';
 
 const logger = loggerFactory('growi:features:suggest-path:routes');
 
@@ -66,6 +70,9 @@ const logger = loggerFactory('growi:features:suggest-path:routes');
 
 type ReqBody = {
   body: string;
+  // Internal parameter for verification and operational switching; not
+  // exposed to the MCP tool input schema (see design "API Contract")
+  engine?: SuggestPathEngineId;
 };
 
 type SuggestPathReq = Request<
@@ -86,6 +93,12 @@ const validator = [
     .withMessage('body must not be empty')
     .isLength({ max: MAX_BODY_LENGTH })
     .withMessage(`body must not exceed ${MAX_BODY_LENGTH} characters`),
+  body('engine')
+    .optional()
+    .isIn(Object.values(SuggestPathEngineId))
+    .withMessage(
+      `engine must be one of: ${Object.values(SuggestPathEngineId).join(', ')}`,
+    ),
 ];
 
 /**
@@ -158,11 +171,17 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
           )),
         ];
 
+        // The conditional spread keeps the call 4-ary when engine is absent,
+        // preserving the pre-existing call contract exactly (Requirement 4.1)
+        const { engine } = req.body;
+        const engineOptions: [GenerateSuggestionsOptions] | [] =
+          engine != null ? [{ engine }] : [];
         const suggestions = await generateSuggestions(
           user,
           req.body.body,
           userGroups,
           typedSearchService,
+          ...engineOptions,
         );
         return res.apiv3({ suggestions });
       } catch (err) {
