@@ -4,29 +4,34 @@
 
 GROWI モノレポは現在、CJS と ESM が混在した状態で稼働している。`packages/` 配下の共有パッケージは 17 個中 12 個がすでに `"type": "module"` を宣言しているが、メインアプリケーション `apps/app` — ワークスペースルートと Express サーバビルドの両方 — は依然として既定で CommonJS として解決される。このミスマッチにより、以下の回避策を維持し続ける負担が累積している。
 
-- `apps/app/next.config.ts` の `transpilePackages` に、ESM-only ライブラリを SSR ランタイムに橋渡しするためだけのハードコード 42 件 + プレフィックスベースの動的グループ 6 種 (`remark-` / `rehype-` / `hast-` / `mdast-` / `micromark-` / `unist-`) が積まれている。
-- ルート `package.json` の `pnpm.overrides` が、サードパーティ製 CJS パッケージ `@lykmapipo/common` に追随させるために `flat` / `mime` / `parse-json` を古い CJS 互換バージョンに固定している。
+- `apps/app/next.config.ts` の `transpilePackages` に、ESM-only ライブラリを SSR ランタイムに橋渡しするためだけのハードコード 40 件 + プレフィックスベースの動的グループ 6 種 (`remark-` / `rehype-` / `hast-` / `mdast-` / `micromark-` / `unist-`) が積まれている。
+- `pnpm-workspace.yaml` の overrides (pnpm 11 化でルート `package.json` から移転) が、サードパーティ製 CJS パッケージ `@lykmapipo/common` に追随させるために `flat` / `mime` / `parse-json` を古い CJS 互換バージョンに固定している。
 - `@keycloak/keycloak-admin-client` v19+ のような ESM-only 依存は、ESM サーバビルドなしでは採用できない。
 
 本機能は、対象範囲のモノレポをネイティブ ESM に移行する。完了すると `apps/app` の CJS 出力が排除され、`transpilePackages` の除去もしくは大幅削減が可能になり、ESM 前提の依存アップグレードの道が開かれる。
 
 ### 現状サマリ
 
+> **Phase R 改訂 (2026-06-11)**: リリースターゲットを GROWI v8 (dev/8.0.x) に変更してマージ済み。下表は v8 マージ後ツリーの再 survey 値 (Phase 1/2 と task 3.0–3.3.b 完了を反映)。
+
 | 範囲 | 件数 | 状態 |
 |------|:---:|------|
-| ESM 化済み共有パッケージ | 12 / 17 | `core`, `editor`, `emoji-mart-data`, `logger`, `pluginkit`, `presentation`, `remark-attachment-refs`, `remark-drawio`, `remark-growi-directive`, `remark-lsx`, `slack`, `ui` |
-| CJS のまま残る共有パッケージ | 5 / 17 | `core-styles`, `custom-icons`, `pdf-converter-client`, `preset-templates`, `preset-themes` |
+| ESM 化済み共有パッケージ | 17 / 17 | **Phase 1 完了** — 全 `packages/*` が `"type": "module"` 宣言済み |
 | `apps/pdf-converter` | — | ESM 化済み |
+| `apps/growi-vault-manager` | — | v8 新規アプリ。ESM 化済み (`"type": "module"`) — 対応不要 |
+| `bin/` workspace | — | v8 新規。`type` 宣言なし (CJS 既定)。本 spec の必須範囲外 |
 | `apps/app` クライアント (Next.js) | — | Turbopack により ESM 互換 |
-| `apps/app` サーバ (Express) | — | **CommonJS** — `module.exports` を持つファイル 82、`require()` 出現箇所 176 (57 ファイル)、`__dirname` / `__filename` を使うファイル 3、`require('./x')(crowi, app)` 形式の factory DI 呼び出し 56 箇所 (`routes/index.js` に 12、`routes/apiv3/index.js` に 44) |
+| `apps/app` サーバ (Express) | — | **変換中** — `models/` `events/` `service/` は ESM 構文化済み (task 3.3.a/b)。残: `module.exports` 63 ファイル (middlewares 5 / util 6 / routes 50 / crowi 2)、`= require(` 94 箇所 (38 ファイル)、factory DI 呼び出し `routes/index.js` 11 + `routes/apiv3/index.js` 44、`__dirname` / `__filename` 3 ファイル |
 | `apps/slackbot-proxy` | — | **CommonJS** — 廃止予定のため対象外 |
-| ワークスペースルート `package.json` | — | `"type": "module"` 未宣言 |
+| ワークスペースルート `package.json` | — | `"type": "module"` **宣言済み** (task 2.3) |
 
 ### プラットフォーム前提
 
 - Node.js ^24 を実行基盤とし、`require(esm)` が安定機能として利用できる。
 - `apps/app` の SSR バンドラは開発・本番の双方で Turbopack を使用する。
 - `migrate-mongo` はマイグレーションファイルを CJS の `require()` で読み込み、ESM マイグレーションファイルをサポートしない。したがって `apps/app/src/migrations/` 配下の 60 本超のファイルは CJS として実行され続ける必要がある。
+- **(v8 追加)** pnpm 11 を使用し、`overrides` / `packageExtensions` / `patchedDependencies` / `allowBuilds` はルート `package.json` ではなく `pnpm-workspace.yaml` で管理される。
+- **(v8 追加)** Prisma + umzug によるマイグレーション系統が migrate-mongo と並走する。umzug は TS マイグレーション (`apps/app/prisma/migrate.ts`) を `pnpm run ts-node` 経由で実行するため、dev runner 置換 (Phase 3.7.b) の対象に含まれる。
 
 ## Boundary Context
 

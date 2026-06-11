@@ -6,7 +6,9 @@
 
 **Users**: GROWI メンテナと貢献者。ESM-only 依存のネイティブ採用、単純化されたビルド構成、モダンな依存更新経路を得る。
 
-**Impact**: `apps/app` のサーバビルド出力を CommonJS から ESM に変え、ワークスペースルート・`apps/app`・残 5 共有パッケージに `"type": "module"` を宣言する。`transpilePackages` (42 hardcoded + 6 prefix) を大幅削減し、3 件の CJS ピン overrides を見直す。CLI ツールが要求する箇所のみ `.cjs` またはディレクトリ隔離で CJS を残す。
+**Impact**: `apps/app` のサーバビルド出力を CommonJS から ESM に変え、ワークスペースルート・`apps/app`・残 5 共有パッケージに `"type": "module"` を宣言する。`transpilePackages` (40 hardcoded + 6 prefix — 2026-06-11 v8 マージ後再計測) を大幅削減し、3 件の CJS ピン overrides (pnpm 11 化に伴い `pnpm-workspace.yaml` に移転済み) を見直す。CLI ツールが要求する箇所のみ `.cjs` またはディレクトリ隔離で CJS を残す。
+
+> **Phase R (2026-06-11)**: リリースターゲットを GROWI v7 → **v8 (dev/8.0.x)** に変更し、dev/8.0.x をマージ済み。以降の記述のうち件数・ファイルパスは v8 マージ後ツリーの再 survey 値に更新済み。新しい「移行前基準」は dev/8.0.x HEAD (`447ddd20ad`) であり、Phase 0 ベースラインは全件再取得が必要 (tasks.md Phase R 参照)。
 
 ### Goals
 
@@ -36,13 +38,16 @@
 - 開発起動 (`pnpm dev`) のランナー置換 (`ts-node` + `tsconfig-paths` → ESM 対応 TS ランナー; 具体実装は Phase 3.7.a の bake-off で決定。本 spec は特定ツールに固定しない)
 - 本番起動の `-r` → `--import` 切替
 - `next.config.ts` の `transpilePackages` エントリ単位の削除評価
-- `pnpm.overrides` の CJS ピン 3 件の削除評価
+- `pnpm-workspace.yaml` overrides の CJS ピン 3 件の削除評価 (pnpm 11 化でルート `package.json` から移転済み)
 - `apps/app/config/*.js` の `.cjs` リネーム、`src/migrations/` のディレクトリ単位 CJS 隔離
 - 上記完了後の `// comments for dependencies` 整理とステアリング文書更新
 
 ### Out of Boundary
 
 - `apps/slackbot-proxy` パッケージ全体 (範囲外)
+- `apps/growi-vault-manager` (v8 新規アプリ。`"type": "module"` 宣言済みで対応不要)
+- `bin/` workspace (v8 新規のツール置き場。`package.json` に `type` 宣言なし = CJS 既定で現状動作。ESM 化は本 spec の必須範囲外、完了後の cleanup 候補として記録)
+- Prisma / umzug マイグレーション機構そのものの変更 (v8 で導入。本 spec は Phase 3.7.b で umzug 実行スクリプトのランナー移行のみ扱う)
 - `apps/app/src/migrations/*.js` の ESM 変換 (migrate-mongo 制約、CJS 維持)
 - `models/user` 周辺のビジネスロジック変更 (lazy 化の型適合と動作維持以外)
 - 新規依存の採用・既存依存のメジャーアップグレード (`@keycloak/keycloak-admin-client` 等、別 spec に委譲)
@@ -85,7 +90,9 @@ GROWI モノレポのモジュールシステムは層状になっている:
 - Factory DI (`require('./route')(crowi, app)`) は Crowi インスタンスをランタイム引数として渡す形で 2 中央ファイルに集中 (`routes/index.js` 12 箇所 / `routes/apiv3/index.js` 44 箇所)。
 - `models/user/index.js` がモジュールトップレベルで `configManager` と `aclService` を import し、`configManager` が `models/config` を動的 require する循環チェーンを形成。ESM の strict loading ではここが最初に破綻する候補。
 
-**循環依存ベースライン** (`madge --circular apps/app/src/server` 実行結果 — 2026-04-20 時点):
+**循環依存ベースライン** (`madge --circular apps/app/src/server` 実行結果 — 2026-04-20 時点、**2026-06-11 v8 マージ後に再計測済み**):
+
+> **再計測 (2026-06-11, Phase R.7)**: v8 マージ + task 3.3.a/3.3.b 完了後のツリーでサーバ循環 **25 件** (ハブ構造維持)。構成変化: ① `service/search-delegator/elasticsearch-client-delegator` の 1 件は `search-types.ts` 分離により**解消済み**、② `crowi/index.ts > service/file-uploader-switch.ts` が新規 +1、③ socket-io は上流のディレクトリ再編により `service/socket-io/index.ts > socket-io.ts` 経由の 2 エントリに変化 (旧 1 エントリ)。残る対処方針 (Crowi を引数経由のみで受け取る) は不変。
 
 - 合計 **25 件** の循環依存が CJS 状態で既に存在。全体のトポロジーは **`crowi/index.ts` がハブ** として機能し、25 件中 23 件が `crowi/index.ts` を経由する。
 - 主要グループ:
@@ -220,7 +227,7 @@ growi-esm/
 - `apps/app/package.json` — `dev` / `start` / `ts-node` スクリプトを Phase 3.7.a で選定した ESM 対応 TS ランナー + `--import dotenv-flow/config` ベースに書き換え。`"type": "module"` 追加。旧スクリプトから `ts-node` と `tsconfig-paths/register` を除去。
 - `apps/app/tsconfig.build.server.json` — `"module": "NodeNext"`, `"moduleResolution": "NodeNext"` に変更。
 - `apps/app/next.config.ts` — `getTranspilePackages()` の要素を ESM 化後に再評価して削減。残存要素ごとにインラインコメント付与。
-- `package.json` (root) — `pnpm.overrides` の `@lykmapipo/common>*` 3 件を個別削除判定。`axios` は変更しない。
+- `pnpm-workspace.yaml` — overrides の `@lykmapipo/common>*` 3 件を個別削除判定 (pnpm 11 化でルート `package.json` から移転済み)。`axios` は変更しない。
 - `.kiro/steering/tech.md` — Production Assembly / transpilePackages 記述の更新。
 - `.claude/skills/tech-stack/SKILL.md` と `.claude/skills/monorepo-overview/SKILL.md` — 現状記述の更新。
 
@@ -417,7 +424,7 @@ sequenceDiagram
   4. 三項 × factory invoke (例: `routes/apiv3/index.js:124` の `isInstalled ? alreadyInstalledMiddleware : require('./installer')(crowi)`) — 囲むスコープが non-async なので、invoke 側を **トップレベル hoist + 先行 `import`** に書換え、enclosing 関数を async 化しない
   5. 分割代入 require: `const { x } = require('pkg')` → `import { x } from 'pkg'`
   6. 部分名前空間利用: `require('pkg').member(...)` / `require('pkg').Class(...)` → `import { member, Class } from 'pkg'` (対象: `crowi/dev.js:65` `eazy-logger`, `crowi/index.ts:364` `uid-safe`, `models/attachment.ts:16` `crypto` など)
-  7. `require(dynamicPath)(ctx)` — 実コード 6 箇所 (`service/file-uploader/index.ts:16`, `service/s2s-messaging/index.ts:60`, `service/slack-integration.ts:287,322,354`) → `await import(dynamicPath)` + factory invoke。caller 側は **singleton memoize 必須** (hot path での再 import 禁止)。`file-uploader/getUploader()` は現状 memoize 無しのため codemod 後に明示的に追加する
+  7. `require(dynamicPath)(ctx)` — 実コード 6 箇所 (`service/file-uploader/index.ts:16`, `service/s2s-messaging/index.ts:60`, `service/slack-integration.ts:287,322,354`) → `await import(dynamicPath)` + factory invoke。**モジュールキャッシュは ESM ローダが担うため、明示的なインスタンスメモ化を追加してはならない** — 当初の「singleton memoize 必須」指示は誤った前提 (hot path は存在せず、caller 側がガード済み) であり、`getUploader()` へのメモ化追加は `setUpFileUpload(isForceUpdate=true)` の再初期化契約 (設定変更時の uploader 再生成) を壊す回帰を実際に生んだ (Phase R レビューで検出・修正済み。回帰防止テスト: `file-uploader/index.spec.ts`)。既存のインスタンス保持 (`s2s-messaging` の `this.delegator` 等、変換前から存在するもの) はそのまま維持する
   8. メソッド本体内の後期 `require` (例: `crowi/index.ts:500` setupMailer 内 `MailService = require('~/server/service/mail').default`) — **意図的な lazy cycle breaker であるため codemod は触らない**。明示的 exclusion list で保護
 - `config/*.cjs` リネーム境界 (Phase 2.2): `ts2esm` は `.js` しか補完しないため **codemod 側で specifier を `.cjs` に書換える** サブパスを追加する (対象: `^/config/next-i18next.config`, `^/config/i18next.config`, `^/config/migrate-mongo-config` を参照する server/client 両側の拡張子なし import、10+ 箇所)
 - 対象外 (手動置換): `__dirname` / `__filename` を参照する 3 ファイル、および上記パターン 8 の意図的 lazy 箇所
@@ -524,7 +531,7 @@ sequenceDiagram
 | Requirements | 3.1–3.5, 7.2 |
 
 **Responsibilities & Constraints**
-- 評価対象: 42 hardcoded + 6 prefix グループ (`remark-` / `rehype-` / `hast-` / `mdast-` / `micromark-` / `unist-`)
+- 評価対象: 40 hardcoded (2026-06-11 v8 マージ後再計測) + 6 prefix グループ (`remark-` / `rehype-` / `hast-` / `mdast-` / `micromark-` / `unist-`)
 - `experimentalOptimizePackageImports` の `@growi/*` 11 件は対象外 (最適化目的)
 - 評価プロトコル: 1 エントリ削除 → `turbo run build --filter @growi/app` → `.next/node_modules/` 確認 → `pnpm start` でサーバ起動 smoke → 失敗時は戻してインラインコメントで理由記録
 - 先に prefix グループを 1 つずつ試す (一括効果が大きい)、次に hardcoded を評価
@@ -544,7 +551,7 @@ sequenceDiagram
 
 | Field | Detail |
 |-------|--------|
-| Intent | `pnpm.overrides` の `@lykmapipo/common>{flat,mime,parse-json}` の 3 ピンを削除評価 |
+| Intent | `pnpm-workspace.yaml` overrides の `@lykmapipo/common>{flat,mime,parse-json}` の 3 ピンを削除評価 (pnpm 11 化でルート `package.json` から移転済み — Phase R) |
 | Requirements | 4.1–4.4, 7.3 |
 
 **Responsibilities & Constraints**
@@ -649,6 +656,8 @@ sequenceDiagram
 ### Baselines (Phase 0 で事前取得)
 
 Phase 1 以降の判定はすべて Phase 0 で捕捉した 4 ベースラインとの diff で行う。ベースラインなしでの前進は認めない。
+
+> **Phase R による全件失効 (2026-06-11)**: 以下のベースラインはすべて 2026-04 時点の master で捕捉されたものであり、v8 (dev/8.0.x) マージによりルート構成・middleware 構成・テスト集合・依存ツリー・ツールチェーン (pnpm 10→11, turbo 2.1→2.9) が変化したため、**diff の比較基準として無効**。Phase 3.8 以降のゲート判定に使用する前に、dev/8.0.x HEAD (`447ddd20ad`) を新基準として全件再取得すること (tasks.md R.6 / MANDATORY)。再取得完了までは Phase 3.8 を「ゲート通過」と判定してはならない。
 
 - **テスト結果ベースライン** (`.kiro/specs/esm-migration/test-baseline.md`): 移行前 master で `turbo run test --filter @growi/app` を 3 回連続実行し、per-spec pass/fail を記録。Req 2.9 / 6.3 の「新規失敗なし」判定はこの表との diff で行い、回ごとに揺れる既知 flaky と真の新規回帰を分離する。
 - **セキュリティ監査ベースライン** (`.kiro/specs/esm-migration/audit-baseline.json`): `pnpm audit --audit-level=moderate --json` の出力。Phase 5 の override 削除ごとに diff し、新規 HIGH/CRITICAL advisory が出現した場合は override を維持しつつ代替セキュリティピンを設定する。

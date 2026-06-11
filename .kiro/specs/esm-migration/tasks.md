@@ -136,17 +136,60 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 5.6, 6.6_
   - _Depends: 2.3_
 
+## Phase R: GROWI v8 (dev/8.0.x) 再統合 — 2026-06-11 追加
+
+約 2 ヶ月の中断後、リリースターゲットを GROWI v7 から **GROWI v8 (dev/8.0.x)** に変更して再開した。
+時系列上は task 3.3.b 完了後に実施。dev/8.0.x (= master 包含済み, HEAD `447ddd20ad`) を support/esm にマージし、
+これ以降の全 phase は v8 コードベースを前提とする。**新しい「移行前基準」は dev/8.0.x HEAD である。**
+
+- [x] R.1 dev/8.0.x を support/esm にマージ (`e66f9fdeb9`)
+  - コンフリクト 5 ファイル解消: root package.json (version 8.0.0-RC.0 + type:module 併存、pnpm セクションは pnpm 11 化に伴い pnpm-workspace.yaml へ移転)、apps/app/package.json (Prisma/umzug マイグレーション分割スクリプト × `.cjs` パスの合成)、crowi/index.ts (ESM 変換済みメソッドの async 版維持)、biome.json (除外 union)、pnpm-lock.yaml (theirs 起点で `pnpm install` 再整合)
+  - axios override の CVE placeholder → 実 advisory (CVE-2026-40175 / GHSA-fvcv-3m26-pcqx) を pnpm-workspace.yaml に引き継ぎ
+  - **auto-merge 意味的事故 1 件を検出・修正**: `setUpFileUpload` で上流の sync シグネチャ × 当方の `await` 本体が合成されパースエラー化 → async シグネチャ復元
+  - _Requirements: 6.6_
+
+- [x] R.2 task 3.3.b の add 漏れを補修 (`d841440551`)
+  - `search-types.ts` が import のみコミットされ実体未コミットで、**マージ前から build が TS2307 で破綻していた**
+  - merge-base の interfaces.ts 末尾の 4 型定義から cycle-free な型専用ファイルとして復元
+  - _Requirements: 2.6_
+
+- [x] R.3 codemod を dev/8.0.x の biome 基準に適合 (`16c66f5b35`)
+  - 上流の biome 強化で `tools/codemod/cjs-to-esm.cjs` が lint gate で fail → format 適用 + CLI usage の console.error に biome-ignore 付与
+
+- [x] R.4 Phase 1/2 ゲートをマージ後ツリーで再実行
+  - `turbo run build --filter @growi/app` 21/21 成功、`turbo run lint --filter @growi/app` 21/21 成功
+  - Phase 1/2 の成果 (全 17 パッケージの type:module、config/*.cjs、src/migrations 隔離、orval.config.cjs) の無傷をgrep 検証済み
+  - _Requirements: 6.6_
+
+- [x] R.5 マージ意味的衝突の深層レビュー完了確認
+  - 両側変更ファイル交差 11 件の 3-way 分析 + 不変条件 4 種 (async/await 対応、CJS 再流入、Phase 1/2 不変条件、上流新規コードの consumer 整合) + 指摘の敵対的検証を 20 エージェントで実施
+  - 結果: 指摘 9 件中 **確定 1 件** (残 8 件は「計画済み残作業 (task 3.5 の `__dirname`)」「上流自身の既存債務」「クリーン検証報告」として棄却)。網羅検証: tsgo `--noEmit` クリーン、src/server 全 64 `.js` の `node --check` クリーン、両側変更ファイル全件のバイト照合一致
+  - **確定指摘 (major) を修正済み**: task 3.3.b が design の旧「memoize 必須」指示に従い `getUploader` に導入した `cachedUploader` が、`setUpFileUpload(isForceUpdate=true)` の再初期化契約 (管理画面でのアップロード設定変更 / S2S 切替伝播 / G2G 移行の 3 経路) を silent failure 化していた。メモ化を撤去し、回帰防止の契約テスト (`file-uploader/index.spec.ts`) を TDD (red→green) で追加。design.md / tasks.md の誤指示も訂正
+
+- [ ] R.6 ベースライン全面再取得 (Phase 0 の v8 基準やり直し / MANDATORY)
+  - **理由**: Phase 0 成果物 6 点はすべて 2026-04 時点の master で捕捉されており、v8 マージ後はルート増加 (apiv3 require 行 45→46)、access-token-parser 改編、新規テスト追加、pnpm 11 / turbo 2.9 化により diff 比較が成立しない。再取得なしで Phase 3.8 ゲートを判定してはならない
+  - **基準**: `git worktree` で dev/8.0.x HEAD (`447ddd20ad`) を checkout し、support/esm から `tools/` の capture スクリプト群をコピーして実行する (v8 の移行前状態が比較基準)
+  - 0.1 test-baseline.md / 0.2 audit-baseline.json / 0.3 route-middleware-baseline.json / 0.3.1 authz-matrix-baseline.json / 0.3.2 ws-authz-baseline.json / 0.4-0.5 perf-baseline.md をすべて再取得し、旧ファイルを置換コミット
+  - 再取得時の環境条件 (Node 24.15, pnpm 11.1.1, ホスト条件) を perf-baseline.md に明記し、Phase 3.7.a bake-off と同一条件にする
+  - _Requirements: 2.9, 6.3, 6.5_
+  - _Depends: R.1_
+
+- [x] R.7 循環依存ベースラインの再計測 (task 3.0 の更新)
+  - マージ後ツリーで `madge --circular`: **サーバ循環 25 件** (ハブ構造は維持)
+  - 構成変化: `search-delegator/elasticsearch-client-delegator` の 1 件は search-types.ts 分離で**解消済み**、`service/file-uploader-switch` が新規 +1、socket-io は `service/socket-io/index.ts` 経由の 2 エントリに再編
+  - design.md の循環依存ベースライン節に反映済み
+
 ## Phase 3: apps/app サーバ層の ESM 化
 
 - [ ] 3. サーバソースから CJS 構文を排除し、ESM 出力に切替
-- [ ] 3.0 循環依存ベースラインの取得と記録
+- [x] 3.0 循環依存ベースラインの取得と記録
   - `npx madge --circular --extensions js,ts apps/app/src/server` を実行し結果を `research.md` または PR 本文に保存
   - 2026-04-20 時点の 25 件ベースラインと件数・ハブ構造が一致することを確認 (差分があれば design.md を更新)
   - `service/search-delegator/elasticsearch-client-delegator/interfaces.ts` の独立分離 (`crowi/index.ts` 非経由の 1 件) の対処計画を確定
   - _Requirements: 2.6_
   - _Boundary: Codemod Transform (pre-analysis)_
 
-- [ ] 3.1 `models/user/*` の service singleton 参照を lazy 化
+- [x] 3.1 `models/user/*` の service singleton 参照を lazy 化
   - `configManager` と `aclService` のモジュールトップ import を getter / ラッパ関数経由の遅延取得に置換
   - **実装規約 (MANDATORY)**: 遅延取得は **sync cached reference** で実装する (初回呼出しで cache に詰めて以降は同期取得)。`await import()` / 動的 `require()` を hot path (auth / ACL 毎 request 経路) に入れないこと。auth チェックは request-path のため、非同期化すると steady-state レイテンシに全量影響する
   - unit test で (a) cache が singleton、(b) 呼出しが同期関数、の 2 点を assert
@@ -156,7 +199,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Depends: 3.0_
   - _Boundary: Codemod Transform (models lazy-load)_
 
-- [ ] 3.2 jscodeshift カスタム transform を作成
+- [x] 3.2 jscodeshift カスタム transform を作成
   - `tools/codemod/cjs-to-esm.ts` を新規作成し、design.md の **8 パターン**を扱う:
     1. `module.exports` → named export
     2. 静的 `require('./x')` → `import`
@@ -164,7 +207,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
     4. 三項 × factory invoke (`routes/apiv3/index.js:124` `isInstalled ? ... : require('./installer')(crowi)`) — enclosing を async 化しない書換え
     5. 分割代入 require (`const { x } = require('pkg')`) → named import
     6. 部分名前空間利用 (`require('pkg').member(...)`) → named import (対象例: `crowi/dev.js:65`, `crowi/index.ts:364`, `models/attachment.ts:16`)
-    7. 動的 `require(modulePath)(ctx)` 6 箇所 (`service/file-uploader/index.ts:16`, `service/s2s-messaging/index.ts:60`, `service/slack-integration.ts:287,322,354`) → `await import(modulePath)` + singleton memoize
+    7. 動的 `require(modulePath)(ctx)` 6 箇所 (`service/file-uploader/index.ts:16`, `service/s2s-messaging/index.ts:60`, `service/slack-integration.ts:287,322,354`) → `await import(modulePath)` + factory invoke (**明示メモ化は禁止** — design.md パターン 7 の Phase R 訂正参照)
     8. **意図的 lazy の exclusion list**: `crowi/index.ts:500` setupMailer 内 `MailService = require('~/server/service/mail').default` 等、codemod で触ってはならない箇所をファイル+行で明示リスト化し、`transform` の先頭で AST マーカを確認してスキップする
   - 追加で `^/config/{migrate-mongo,next-i18next,i18next}-config` specifier の `.cjs` 書換えサブパスも組込む
   - ディレクトリ引数を受け取る CLI ラッパ (`pnpm codemod:cjs-to-esm -- <path>`) を実装し、step ごとに独立実行できるようにする
@@ -177,7 +220,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - 各 step は単一コミット。失敗時は当該 step のみ revert して原因修正後に再実行する (Req 6.6)
   - 各 step 完了後に `tsc --noEmit` を実行し、型エラー 0 件を確認 (NodeNext 切替前のため `.js` 拡張子エラーは許容)
 
-- [ ] 3.3.a (step 3.a) `models/` と `events/` を変換
+- [x] 3.3.a (step 3.a) `models/` と `events/` を変換
   - `pnpm codemod:cjs-to-esm -- apps/app/src/server/models apps/app/src/server/events` を実行
   - `module.exports` → named export、静的 `require` → `import` の 2 パターンが対象
   - `ReferenceError: Cannot access 'X' before initialization` が発生しないこと (dev build で確認)
@@ -189,7 +232,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - `service/search-delegator/elasticsearch-client-delegator/interfaces.ts` と `es7-client-delegator.ts` の循環を、型のみの独立ファイルに分離することで構造解消
   - `pnpm codemod:cjs-to-esm -- apps/app/src/server/service` を実行
   - 動的 `require(modulePath)(ctx)` → `await import(modulePath)` の対象を **6 箇所すべて** 明示的に検証:
-    - `service/file-uploader/index.ts:16` (getUploader — memoize 追加必須)
+    - `service/file-uploader/index.ts:16` (getUploader — ~~memoize 追加必須~~ **Phase R 訂正: メモ化禁止**。追加されたメモ化が `setUpFileUpload(true)` の再初期化契約を壊す回帰を生んだため撤去済み)
     - `service/s2s-messaging/index.ts:60` (既存 `this.delegator` memoize を維持)
     - `service/slack-integration.ts:287, 322, 354` (3 箇所、design.md 記述の "2 ファイル" から増補)
   - `*.integ.ts` のうち service 層を触るテストが pass
@@ -238,7 +281,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 - [ ] 3.3.g (step 3.g) `crowi/` を変換し `import/no-commonjs` 0 件を達成
   - `crowi/index.ts`, `crowi/setup-models.ts`, `crowi/dev.js` に codemod を適用
   - 変換完了後、ESLint `import/no-commonjs` が `apps/app/src/server/` 全域で 0 件検出
-  - 変換統計が想定規模 (約 82 ファイルの module.exports、176 箇所の require、56 箇所の factory invoke) と累計で一致
+  - 変換統計が想定規模と累計で一致。**規模は Phase R 再 survey 値を基準にする** (2026-06-11 マージ後ツリー: module.exports 残 63 ファイル = middlewares 5 / util 6 / routes 50 / crowi 2、`= require(` 残 94 箇所 38 ファイル、factory invoke 残 = routes/index.js 11 + apiv3/index.js 44)
   - _Requirements: 2.2, 2.3, 2.5, 2.6_
   - _Depends: 3.3.h_
   - _Boundary: Codemod Transform (crowi)_
@@ -285,6 +328,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 - [ ] 3.7.b 開発/本番起動スクリプトを選定ランナー / --import に切替
   - `apps/app/package.json` の `scripts.ts-node` を廃止し、`dev` / `launch-dev:ci` / `repl` / `dev:migrate-mongo` を **3.7.a で選定したランナー** ベースに書き換え
+  - **(Phase R 追加)** v8 で導入された umzug 系スクリプト (`migrate:umzug`, `dev:umzug` — `pnpm run ts-node prisma/migrate.ts` 経由で TS マイグレーションを実行) も同時に選定ランナーへ移行し、`pnpm run dev:migrate` end-to-end (migrate-mongo + umzug 両系統) を実 DB で再検証する
   - 本番起動スクリプトを `node --import dotenv-flow/config dist/server/app.js` に変更 (選定ランナーに依存しない共通部)
   - `pnpm dev` でサーバが起動し、`curl http://localhost:3000/_api/v3/healthcheck` が 200 を返す
   - 選定ランナー依存の追加パッケージを `devDependencies` に追加し、`ts-node` / `tsconfig-paths` を削除
@@ -374,7 +418,8 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 - [ ] 5. CJS 起因の override を除去し、文書を新状態に同期
 - [ ] 5.1 `@lykmapipo/common>flat` override を削除評価
-  - ルート `package.json` の overrides から `flat` ピンを削除
+  - **(Phase R 変更)** overrides は pnpm 11 化に伴い ルート `package.json` から **`pnpm-workspace.yaml`** に移転済み。本タスク以降の編集対象はすべて `pnpm-workspace.yaml` の `overrides:` セクション
+  - `pnpm-workspace.yaml` の overrides から `flat` ピンを削除
   - `pnpm install` 成功後 `turbo run build` を実行し、`pnpm why flat` で最新 ESM バージョンが解決されることを確認
   - サーバを起動し mongoose-gridfs 経由のファイルアップロードフローを smoke
   - **セキュリティ監査必須**: override 削除後に `pnpm audit --audit-level=moderate --json` を実行し、Phase 0.2 の `audit-baseline.json` と diff。新規 HIGH/CRITICAL advisory が解決バージョンに存在する場合は override を戻し、代替としてセキュリティ境界側の新ピン (最新修正版 >= との不等式ピン等) を設定し、CVE ID を参照する正当化コメントを付与する
@@ -400,8 +445,8 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 - [ ] 5.4 dependency コメントとインライン理由を整理
   - `package.json` の `// comments for dependencies` から解消済みの CJS/ESM ピン記述を削除
-  - 残存する `transpilePackages` / `pnpm.overrides` のすべてのエントリにインライン理由コメントが存在することを確認
-  - `axios` override のコメントに含まれる CVE ID プレースホルダ (`CVE-2025-XXXXX` 等) を正式な CVE 識別子もしくは内部アドバイザリ URL に置換する
+  - 残存する `transpilePackages` / `pnpm-workspace.yaml` overrides のすべてのエントリに理由コメント (YAML コメント) が存在することを確認
+  - ~~`axios` override の CVE ID プレースホルダ置換~~ → **Phase R.1 で完了済み** (pnpm-workspace.yaml に CVE-2026-40175 / GHSA-fvcv-3m26-pcqx を記載済み)。残作業はコメントの現状維持確認のみ
   - _Requirements: 7.1, 7.2, 7.3_
   - _Depends: 4.2, 5.3_
 
@@ -449,6 +494,22 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 Learnings captured during Phase 0 baseline capture (kiro-impl). Each entry is
 a cross-cutting insight meant to help later tasks avoid rediscovering the
 same issue.
+
+- **R.1 auto-merge は意味的衝突を静かに合成する**: dev/8.0.x は「await を含まない
+  async メソッドの sync 化」一斉変更を含み、当方の「await import 化」と同一メソッドで
+  交差すると、git は *シグネチャ行 (上流) + 本体行 (当方)* を無警告で合成する
+  (`setUpFileUpload` で実際に発生 — sync シグネチャ内に await が残りパースエラー)。
+  今後 dev/8.0.x を再マージする場合は、コンフリクトゼロでも crowi/index.ts と
+  service/ の async メソッド境界を必ず再 diff すること。
+
+- **R.2 タスク完了主張は build green が前提**: task 3.3.b は `search-types.ts` を
+  add し忘れたまま完了扱いになっており、ブランチが 2 ヶ月間ビルド不能だった。
+  3.3.x の各 step コミット前に `turbo run build --filter @growi/app` を必須化する
+  (3.8 の evidence 義務を step 単位にも縮小適用)。
+
+- **R.6 ベースラインは「基準ブランチ + 環境」のスナップショット**: pnpm major
+  (10→11) や turbo minor でも実行プロファイルが変わるため、ベースライン再取得時は
+  ツールチェーンのバージョンを成果物に併記し、比較時に環境差分を除外できるようにする。
 
 - **0.3 baseline scope**: The route-middleware snapshot tool exempts the
   terminal route-body slot from the "no anonymous function" guard because
