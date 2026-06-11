@@ -9,14 +9,11 @@ export type { FileUploader } from './file-uploader';
 
 const logger = loggerFactory('growi:service:FileUploaderServise');
 
-// Memoized uploader instance — lazily initialized on first call
-let cachedUploader: FileUploader | null = null;
-
+// Do NOT memoize the uploader instance here: Crowi.setUpFileUpload(isForceUpdate=true)
+// relies on every call re-reading app:fileUploadType and producing a fresh uploader
+// (admin settings change, S2S switch propagation, G2G transfer). The ESM loader
+// already caches the imported module, so only the lightweight factory re-runs.
 export const getUploader = async (crowi: Crowi): Promise<FileUploader> => {
-  if (cachedUploader != null) {
-    return cachedUploader;
-  }
-
   const method =
     EnvToModuleMappings[configManager.getConfig('app:fileUploadType')];
   const modulePath = `./${method}`;
@@ -28,7 +25,6 @@ export const getUploader = async (crowi: Crowi): Promise<FileUploader> => {
     logger.warn('Failed to initialize uploader.');
   }
 
-  cachedUploader = uploader;
   return uploader;
 };
 
