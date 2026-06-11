@@ -3,26 +3,28 @@
  *
  * Observable: "bulk-export と Web レンダラのプラグイン集合の乖離をテストで検知できる"
  *
- * Strategy: Static source analysis of the server-side renderer
- * (`services/renderer/renderer.tsx`) which uses ESM static imports that cannot
- * be required in the CJS test runtime.  We read the source with `fs.readFileSync`
- * and extract:
- *   1. The set of plugin variables used inside `generateCommonOptions` (remarkPlugins +
- *      rehypePlugins arrays, including those added by `generateSSRViewOptions`).
- *   2. A mapping from each variable identifier to its canonical npm/local plugin name
- *      (aligned with the naming convention in `plugin-set.ts`).
+ * Strategy: parse the server-side renderer source
+ * (`services/renderer/renderer.tsx`, which defines both `generateCommonOptions`
+ * and `generateSSRViewOptions`) with the TypeScript compiler and read its
+ * **import declarations** via the AST. A plugin can only be used by the renderer
+ * if it is imported, so the set of imported plugin packages is the authoritative
+ * universe of plugins the renderer depends on.
  *
- * Then for each web plugin we assert that it appears in either
- * `ADOPTED_PLUGIN_NAMES` or `EXCLUDED_PLUGIN_NAMES`.  Conversely, every entry in
- * `ADOPTED_PLUGIN_NAMES` must correspond to at least one web plugin reference
- * (no bulk-export-only plugins without a Web counterpart).
+ * AST-based import extraction is robust to formatting, comments, multi-line
+ * imports, and array-vs-push usage — unlike a regex scan of the plugin arrays,
+ * it does not need hand-maintained identifier blocklists and fails loudly
+ * (empty set / unreadable file) rather than silently under-reporting drift.
  *
- * A new plugin added to the Web renderer without being classified in
- * `plugin-set.ts` will cause this test to FAIL.
+ * For each imported plugin we assert it is classified in plugin-set.ts as either
+ * ADOPTED or INTENTIONALLY_EXCLUDED; conversely every ADOPTED plugin (minus the
+ * unified pipeline infrastructure the web renderer gets implicitly from
+ * react-markdown) must be imported by the renderer. A new plugin import added to
+ * the web renderer without classification makes this test FAIL.
  */
 
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import ts from 'typescript';
 import { describe, expect, it } from 'vitest';
 
 import { ADOPTED_PLUGIN_NAMES, EXCLUDED_PLUGIN_NAMES } from './plugin-set';
@@ -33,7 +35,8 @@ import { ADOPTED_PLUGIN_NAMES, EXCLUDED_PLUGIN_NAMES } from './plugin-set';
 
 /**
  * Absolute path to the server-side renderer source.
- * `generateCommonOptions` and `generateSSRViewOptions` live here.
+ * `generateCommonOptions` and `generateSSRViewOptions` both live here, and all
+ * their plugins are imported at the top of this file.
  */
 const SERVER_RENDERER_PATH = resolve(
   __dirname,
@@ -41,322 +44,179 @@ const SERVER_RENDERER_PATH = resolve(
 );
 
 // ---------------------------------------------------------------------------
-// Static source extraction helpers
+// Canonical-name mapping (import specifier → plugin-set.ts canonical name)
 // ---------------------------------------------------------------------------
 
 /**
- * Read the renderer source and return it as a string.
- * Throws clearly if the file cannot be found.
+ * Convert an npm package specifier to the canonical plugin name used in
+ * plugin-set.ts. Returns null for non-plugin packages (utilities, type imports).
  */
-function readRendererSource(): string {
+function npmPackageToCanonicalName(pkg: string): string | null {
+  if (pkg.startsWith('remark-') || pkg.startsWith('rehype-')) {
+    return pkg; // e.g. 'remark-gfm', 'rehype-slug', 'rehype-katex'
+  }
+  if (pkg === '@growi/remark-growi-directive') {
+    return 'growi-directive';
+  }
+  return null;
+}
+
+/** Local import basename → canonical name used in plugin-set.ts. */
+const LOCAL_PLUGIN_MAP: Record<string, string> = {
+  emoji: 'emoji',
+  'pukiwiki-like-linker': 'pukiwiki-like-linker',
+  'echo-directive': 'echo-directive',
+  codeblock: 'codeblock',
+  'xsv-to-table': 'xsv-to-table',
+  'add-class': 'add-class',
+  'add-inline-code-property': 'add-inline-code',
+  'relative-links': 'relative-links',
+  'relative-links-by-pukiwiki-like-linker': 'relative-links',
+};
+
+/**
+ * Convert a relative import path (e.g. './remark-plugins/emoji') to the
+ * canonical plugin short name. Returns null for non-plugin local modules.
+ */
+function localPathToCanonicalName(localPath: string): string | null {
+  const basename = localPath.split('/').pop() ?? '';
+  return LOCAL_PLUGIN_MAP[basename] ?? null;
+}
+
+/**
+ * Map an import specifier to its canonical plugin name, or null if it is not a
+ * rendering plugin.
+ */
+function specifierToCanonicalName(specifier: string): string | null {
+  return specifier.startsWith('.')
+    ? localPathToCanonicalName(specifier)
+    : npmPackageToCanonicalName(specifier);
+}
+
+// ---------------------------------------------------------------------------
+// AST import extraction
+// ---------------------------------------------------------------------------
+
+/**
+ * Parse the renderer source and return the set of canonical plugin names it
+ * imports. Uses the TypeScript AST so the result is independent of formatting,
+ * comments, and how the plugins are later referenced.
+ */
+function extractImportedPluginNames(source: string): Set<string> {
+  const sourceFile = ts.createSourceFile(
+    'renderer.tsx',
+    source,
+    ts.ScriptTarget.Latest,
+    /* setParentNodes */ true,
+    ts.ScriptKind.TSX,
+  );
+
+  const names = new Set<string>();
+  for (const statement of sourceFile.statements) {
+    if (
+      ts.isImportDeclaration(statement) &&
+      ts.isStringLiteral(statement.moduleSpecifier)
+    ) {
+      const canonical = specifierToCanonicalName(
+        statement.moduleSpecifier.text,
+      );
+      if (canonical != null) {
+        names.add(canonical);
+      }
+    }
+  }
+  return names;
+}
+
+let _webPlugins: Set<string> | undefined;
+
+/** Lazily parse the renderer once and cache the canonical plugin name set. */
+function getWebCanonicalPluginNames(): Set<string> {
+  if (_webPlugins != null) return _webPlugins;
   if (!existsSync(SERVER_RENDERER_PATH)) {
     throw new Error(
       `Cannot find server renderer at: ${SERVER_RENDERER_PATH}\n` +
         'If the file was moved, update SERVER_RENDERER_PATH in renderer-parity.spec.ts.',
     );
   }
-  return readFileSync(SERVER_RENDERER_PATH, 'utf-8');
+  _webPlugins = extractImportedPluginNames(
+    readFileSync(SERVER_RENDERER_PATH, 'utf-8'),
+  );
+  return _webPlugins;
 }
 
 /**
- * Build a map from the import identifier (as used in plugin arrays) to the
- * canonical plugin name (matching the naming convention of plugin-set.ts).
- *
- * Rules:
- *  - npm packages: use the package name directly
- *    e.g.  `import gfm from 'remark-gfm'`  →  gfm → 'remark-gfm'
- *    e.g.  `import slug from 'rehype-slug'` →  slug → 'rehype-slug'
- *    e.g.  `import growiDirective from '@growi/remark-growi-directive'` →
- *             growiDirective → 'growi-directive' (short name used in exclusion list)
- *  - Local plugins: map to the canonical short name used in plugin-set.ts
- *    e.g.  `import * as emoji from './remark-plugins/emoji'`  →
- *             emoji → 'emoji'
- *    e.g.  `import { pukiwikiLikeLinker } from './remark-plugins/pukiwiki-like-linker'` →
- *             pukiwikiLikeLinker → 'pukiwiki-like-linker'
- *
- * The returned map's keys are the TypeScript identifiers used in plugin arrays;
- * the values are canonical names matching plugin-set.ts.
+ * Unified pipeline infrastructure that the web renderer gets implicitly from
+ * react-markdown rather than importing as named plugins. The bulk-export
+ * pipeline builds these explicitly (it has no react-markdown), so they are
+ * ADOPTED but have no corresponding import in the web renderer.
  */
-function buildPluginIdentifierMap(source: string): Map<string, string> {
-  const map = new Map<string, string>();
-
-  // Pattern 1: default import from npm package
-  // e.g. import gfm from 'remark-gfm';
-  // e.g. import growiDirective from '@growi/remark-growi-directive';
-  for (const m of source.matchAll(/import\s+(\w+)\s+from\s+'([^']+)'/g)) {
-    const identifier = m[1];
-    const pkg = m[2];
-    const canonical = npmPackageToCanonicalName(pkg);
-    if (canonical !== null) {
-      map.set(identifier, canonical);
-    }
-  }
-
-  // Pattern 2: namespace import from local path
-  // e.g. import * as emoji from './remark-plugins/emoji';
-  // e.g. import * as addClass from './rehype-plugins/add-class';
-  for (const m of source.matchAll(
-    /import\s+\*\s+as\s+(\w+)\s+from\s+'(\.\/[^']+)'/g,
-  )) {
-    const identifier = m[1];
-    const localPath = m[2];
-    const canonical = localPathToCanonicalName(localPath);
-    if (canonical !== null) {
-      map.set(identifier, canonical);
-    }
-  }
-
-  // Pattern 3: named import from local path
-  // e.g. import { pukiwikiLikeLinker } from './remark-plugins/pukiwiki-like-linker';
-  // e.g. import { relativeLinks } from './rehype-plugins/relative-links';
-  for (const m of source.matchAll(
-    /import\s+\{\s*(\w+)(?:\s*,\s*\w+)*\s*\}\s+from\s+'(\.\/[^']+)'/g,
-  )) {
-    const identifier = m[1];
-    const localPath = m[2];
-    const canonical = localPathToCanonicalName(localPath);
-    if (canonical !== null) {
-      map.set(identifier, canonical);
-    }
-  }
-
-  return map;
-}
-
-/**
- * Convert an npm package name to the canonical plugin name used in plugin-set.ts.
- * Returns null for non-plugin packages (utilities, type imports, etc.)
- */
-function npmPackageToCanonicalName(pkg: string): string | null {
-  // Direct npm plugin packages (remark-*, rehype-*)
-  if (pkg.startsWith('remark-') || pkg.startsWith('rehype-')) {
-    return pkg; // e.g. 'remark-gfm', 'rehype-slug', 'rehype-katex'
-  }
-  // @growi scoped plugins
-  if (pkg === '@growi/remark-growi-directive') {
-    return 'growi-directive';
-  }
-  // Not a plugin
-  return null;
-}
-
-/**
- * Convert a local import path (relative to renderer.tsx) to the canonical
- * plugin short name used in plugin-set.ts.
- */
-function localPathToCanonicalName(localPath: string): string | null {
-  // Extract the basename: './remark-plugins/emoji' → 'emoji'
-  //                        './rehype-plugins/add-class' → 'add-class'
-  const basename = localPath.split('/').pop() ?? '';
-  // Map of local basename → canonical name (matching plugin-set.ts)
-  const LOCAL_PLUGIN_MAP: Record<string, string> = {
-    emoji: 'emoji',
-    'pukiwiki-like-linker': 'pukiwiki-like-linker',
-    'echo-directive': 'echo-directive',
-    codeblock: 'codeblock',
-    'xsv-to-table': 'xsv-to-table',
-    'add-class': 'add-class',
-    'add-inline-code-property': 'add-inline-code',
-    'relative-links': 'relative-links',
-    'relative-links-by-pukiwiki-like-linker': 'relative-links',
-  };
-  return LOCAL_PLUGIN_MAP[basename] ?? null;
-}
-
-// ---------------------------------------------------------------------------
-// Plugin usage extraction
-// ---------------------------------------------------------------------------
-
-/**
- * Extract plugin identifiers that appear in `remarkPlugins` or `rehypePlugins`
- * arrays inside `generateCommonOptions` and `generateSSRViewOptions`.
- *
- * Handles:
- *  - Array literal:  `remarkPlugins: [gfm, emoji.remarkPlugin, ...]`
- *  - Push call:      `remarkPlugins.push(math, xsvToTable.remarkPlugin)`
- *  - Tuple entry:    `[relativeLinks, { pagePath }]`
- */
-function extractWebPluginReferences(source: string): Set<string> {
-  const refs = new Set<string>();
-
-  // Capture the content between [ ] or ( ) after remarkPlugins/rehypePlugins
-  for (const m of source.matchAll(
-    /(?:remarkPlugins|rehypePlugins)[^;]*?(?:\[([^\]]*?)\]|\.push\(([^)]*)\))/gs,
-  )) {
-    const content = m[1] ?? m[2] ?? '';
-    extractIdentifiersFromContent(content, refs);
-  }
-
-  return refs;
-}
-
-/** Keywords that appear near plugin arrays but are not plugin identifiers. */
-const NON_PLUGIN_IDENTIFIERS = new Set([
-  'if',
-  'const',
-  'let',
-  'var',
-  'true',
-  'false',
-  'null',
-  'undefined',
-  'isEnabledLinebreaks',
-  'config',
-  'pagePath',
-  'shouldBeTheLastItem',
-  'options',
+const WEB_INFRASTRUCTURE_PLUGINS = new Set([
+  'remark-parse', // implicit unified base
+  'remark-rehype', // mdast→hast bridge
+  'rehype-raw', // materialises raw HTML (paired with allowDangerousHtml)
+  'rehype-stringify', // final serialiser
+  'rehype-sanitize', // web renderer applies this via react-markdown options
 ]);
 
-/**
- * From a string containing plugin entries (comma-separated), extract all
- * identifiers that could be plugin references.
- *
- * Handles:
- *  - `gfm`                      → 'gfm'
- *  - `emoji.remarkPlugin`       → 'emoji'
- *  - `[relativeLinks, { ... }]` → 'relativeLinks'
- *  - `() => {}`                 → skipped
- *  - `[sanitize, config]`       → 'sanitize'
- */
-function extractIdentifiersFromContent(
-  content: string,
-  refs: Set<string>,
-): void {
-  for (const m of content.matchAll(
-    /\[?\s*([A-Za-z_$][\w$]*)(?:\.([A-Za-z_$][\w$]*))?/g,
-  )) {
-    const base = m[1];
-    if (!NON_PLUGIN_IDENTIFIERS.has(base)) {
-      refs.add(base);
-    }
-  }
-}
-
 // ---------------------------------------------------------------------------
-// Shared parse state (lazily initialised once per test run)
+// Test suite
 // ---------------------------------------------------------------------------
 
-let _source: string | undefined;
-let _identifierMap: Map<string, string> | undefined;
-let _pluginRefs: Set<string> | undefined;
-
-/**
- * Resolve web plugin refs to canonical names.
- * Returns the set of canonical plugin names found in generateCommonOptions +
- * generateSSRViewOptions.
- */
-function getWebCanonicalPluginNames(): Set<string> {
-  _source ??= readRendererSource();
-  _identifierMap ??= buildPluginIdentifierMap(_source);
-  _pluginRefs ??= extractWebPluginReferences(_source);
-
-  const canonical = new Set<string>();
-  for (const ref of _pluginRefs) {
-    const name = _identifierMap.get(ref);
-    if (name != null) {
-      canonical.add(name);
-    }
-  }
-  return canonical;
-}
-
-// ---------------------------------------------------------------------------
-// Test suite: RendererParityGuard
-// ---------------------------------------------------------------------------
-
-describe('RendererParityGuard — Web renderer plugin drift detection', () => {
-  it('server renderer source file is reachable', () => {
-    expect(() => readRendererSource()).not.toThrow();
-  });
-
-  it('extracts a non-empty set of canonical web plugin names', () => {
+describe('RendererParityGuard — Web renderer plugin drift detection (AST)', () => {
+  it('parses the renderer source into a non-empty plugin set (fails loudly if unreadable)', () => {
     const names = getWebCanonicalPluginNames();
     expect(names.size).toBeGreaterThan(0);
   });
 
-  it('detects known remark-gfm in web plugin set (sanity)', () => {
+  it('detects known web renderer plugins from generateCommonOptions + generateSSRViewOptions (sanity)', () => {
     const names = getWebCanonicalPluginNames();
     expect(names.has('remark-gfm')).toBe(true);
-  });
-
-  it('detects known rehype-slug in web plugin set (sanity: SSRViewOptions addition)', () => {
-    const names = getWebCanonicalPluginNames();
-    expect(names.has('rehype-slug')).toBe(true);
-  });
-
-  it('detects known remark-math in web plugin set (sanity: SSRViewOptions addition)', () => {
-    const names = getWebCanonicalPluginNames();
-    expect(names.has('remark-math')).toBe(true);
+    expect(names.has('remark-frontmatter')).toBe(true);
+    expect(names.has('remark-math')).toBe(true); // SSRViewOptions addition
+    expect(names.has('rehype-slug')).toBe(true); // SSRViewOptions addition
+    expect(names.has('rehype-katex')).toBe(true); // SSRViewOptions addition
   });
 
   /**
    * Core assertion 1 (Requirement 6.2):
-   * Every plugin used by the Web renderer (generateCommonOptions +
-   * generateSSRViewOptions) must be classified in plugin-set.ts as either
-   * ADOPTED or INTENTIONALLY_EXCLUDED.
-   *
-   * Failure = unclassified new plugin added to the Web renderer.
+   * Every plugin imported by the web renderer must be classified in plugin-set.ts
+   * as ADOPTED or INTENTIONALLY_EXCLUDED. Failure = unclassified new plugin.
    */
-  it('every Web renderer plugin is classified as adopted or intentionally excluded', () => {
+  it('every web renderer plugin import is classified as adopted or intentionally excluded', () => {
     const webPlugins = getWebCanonicalPluginNames();
 
-    const unclassified: string[] = [];
-    for (const name of webPlugins) {
-      if (!ADOPTED_PLUGIN_NAMES.has(name) && !EXCLUDED_PLUGIN_NAMES.has(name)) {
-        unclassified.push(name);
-      }
-    }
+    const unclassified = [...webPlugins].filter(
+      (name) =>
+        !ADOPTED_PLUGIN_NAMES.has(name) && !EXCLUDED_PLUGIN_NAMES.has(name),
+    );
 
     expect(
       unclassified,
-      `The following Web renderer plugins are not classified in plugin-set.ts:\n` +
+      'The following web renderer plugins are not classified in plugin-set.ts:\n' +
         `  ${unclassified.join(', ')}\n` +
-        `Add each to ADOPTED_PLUGINS or INTENTIONALLY_EXCLUDED_PLUGINS.`,
+        'Add each to ADOPTED_PLUGINS or INTENTIONALLY_EXCLUDED_PLUGINS.',
     ).toHaveLength(0);
   });
 
   /**
    * Core assertion 2 (Requirement 6.1):
-   * Every plugin in ADOPTED_PLUGIN_NAMES must correspond to at least one plugin
-   * in the Web renderer's selection (either generateCommonOptions or
-   * generateSSRViewOptions).  This prevents bulk-export from adopting plugins
-   * that have no Web counterpart.
-   *
-   * Exception: infrastructure plugins that are implicit in the unified pipeline
-   * and are not listed as named identifiers in the web renderer's plugin arrays.
+   * Every ADOPTED bulk-export plugin (minus pipeline infrastructure the web
+   * renderer gets implicitly from react-markdown) must be imported by the web
+   * renderer — i.e. bulk-export does not adopt plugins with no web counterpart.
    */
-  it('every adopted bulk-export plugin corresponds to a Web renderer plugin', () => {
-    // These are part of the unified pipeline infrastructure: they are implicit
-    // in the Web renderer (remark() base, bridge, serialiser) and are not
-    // listed as named identifiers in the plugin arrays.
-    const WEB_INFRASTRUCTURE_PLUGINS = new Set([
-      'remark-parse', // implicit via remark() processor base
-      'rehype-stringify', // final serialiser — not in web plugin arrays
-      'remark-rehype', // mdast→hast bridge — not in web plugin arrays as a named var
-      'rehype-raw', // paired with remark-rehype allowDangerousHtml
-      // rehype-sanitize IS used by the web renderer but via an intermediate variable
-      // (`const rehypeSanitizePlugin = ...`).  The static identifier extractor resolves
-      // identifiers referenced directly in plugin arrays; it cannot follow local bindings.
-      'rehype-sanitize',
-    ]);
-
+  it('every adopted bulk-export plugin corresponds to a web renderer plugin import', () => {
     const webPlugins = getWebCanonicalPluginNames();
 
-    const orphanAdopted: string[] = [];
-    for (const name of ADOPTED_PLUGIN_NAMES) {
-      if (WEB_INFRASTRUCTURE_PLUGINS.has(name)) {
-        continue;
-      }
-      if (!webPlugins.has(name)) {
-        orphanAdopted.push(name);
-      }
-    }
+    const orphanAdopted = [...ADOPTED_PLUGIN_NAMES].filter(
+      (name) => !WEB_INFRASTRUCTURE_PLUGINS.has(name) && !webPlugins.has(name),
+    );
 
     expect(
       orphanAdopted,
-      `The following ADOPTED bulk-export plugins have no counterpart in the Web renderer:\n` +
+      'The following ADOPTED bulk-export plugins have no counterpart in the web renderer:\n' +
         `  ${orphanAdopted.join(', ')}\n` +
-        `Either the Web renderer should add them or they should be removed from ADOPTED_PLUGINS.`,
+        'Either the web renderer should import them or they should be removed from ADOPTED_PLUGINS.',
     ).toHaveLength(0);
   });
 });

@@ -131,6 +131,18 @@ describe('BULK_EXPORT_CSS', () => {
     it('contains base64 data URI for KaTeX fonts', () => {
       expect(BULK_EXPORT_CSS).toMatch(/url\(data:font\//);
     });
+
+    it('inlines only woff2 fonts (woff and ttf alternates are dropped to cut payload)', () => {
+      // Chromium (Puppeteer) supports woff2, so the woff/ttf alternates are
+      // stripped at build time — they accounted for ~2/3 of the font payload.
+      // Observable: there must be woff2 data URIs and NO woff/ttf data URIs.
+      expect(BULK_EXPORT_CSS).toMatch(/url\(data:font\/woff2;base64,/);
+      expect(BULK_EXPORT_CSS).not.toMatch(/data:font\/(?:woff[^2]|ttf)/);
+      // The dropped alternates' format() hints must not linger either.
+      expect(BULK_EXPORT_CSS).not.toMatch(
+        /format\(['"](?:woff|truetype)['"]\)/,
+      );
+    });
   });
 
   describe('production-viability: dependencies classification (Task 1.2)', () => {

@@ -2,7 +2,8 @@
  * Integration tests for export-pages-to-fs-async (Tasks 5.1, 7.1).
  *
  * Observable contract verified here:
- *  - PDF format: output HTML file contains <style> tag with CSS content.
+ *  - PDF format: output HTML file links the shared stylesheet via <link> (CSS
+ *    is written once per job, not inlined into each page).
  *  - PDF format: output HTML file contains <div class="wiki"> wrapper.
  *  - MD format: output file is written as-is (no HTML rendering applied).
  *  - Error handling: when renderToHtml rejects, the Writable write callback
@@ -122,7 +123,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
 
   // -------------------------------------------------------------------------
   describe('PDF format smoke test (Requirements 5.1, 2.1)', () => {
-    it('produces an HTML file with <style> tag and <div class="wiki"> wrapper for pdf format', async () => {
+    it('links the shared stylesheet and wraps content in .wiki, writing the CSS once per job', async () => {
       const job = makeJob(PageBulkExportFormat.pdf);
       const svc = makeService(tmpDir);
       const snapshot = makePageSnapshot(
@@ -130,7 +131,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
         '# Hello\n\nSome **bold** text.',
       );
 
-      const writable = getPageWritable.call(svc, job);
+      const writable = await getPageWritable.call(svc, job);
       await writeOneChunk(writable, snapshot);
 
       // The output file for pdf format has .html extension
@@ -139,18 +140,20 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
 
       const content = fs.readFileSync(outputPath, 'utf8');
 
-      // Must have a <style> block (CSS injected) — Requirement 2.1 / 5.1
-      expect(content).toMatch(/<style>/);
-      expect(content).toMatch(/<\/style>/);
+      // Links the shared stylesheet relatively — CSS is NOT inlined per page.
+      expect(content).toMatch(
+        /<link rel="stylesheet" href="[^"]*_bulk-export\.css">/,
+      );
+      expect(content).not.toContain('<style>');
 
       // Must have the .wiki wrapper — design.md § BulkExportStyleProvider
       expect(content).toContain('<div class="wiki">');
       expect(content).toContain('</div>');
 
-      // CSS must be non-empty
-      const cssMatch = content.match(/<style>([\s\S]*?)<\/style>/);
-      expect(cssMatch).not.toBeNull();
-      expect(cssMatch?.[1]?.trim().length).toBeGreaterThan(0);
+      // The shared stylesheet is written once per job, with non-empty CSS.
+      const cssPath = path.join(tmpDir, '_bulk-export.css');
+      expect(fs.existsSync(cssPath)).toBe(true);
+      expect(fs.readFileSync(cssPath, 'utf8').trim().length).toBeGreaterThan(0);
     }, 30_000); // allow time for dynamicImport on first run
   });
 
@@ -162,7 +165,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
       const markdownBody = '# Hello\n\nSome **bold** text.';
       const snapshot = makePageSnapshot('/test/page', markdownBody);
 
-      const writable = getPageWritable.call(svc, job);
+      const writable = await getPageWritable.call(svc, job);
       await writeOneChunk(writable, snapshot);
 
       // The output file for md format has .md extension
@@ -174,8 +177,10 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
       // Must be the original Markdown — no HTML rendering applied
       expect(content).toBe(markdownBody);
       // Must NOT have HTML artifacts
-      expect(content).not.toContain('<style>');
+      expect(content).not.toContain('<link rel="stylesheet"');
       expect(content).not.toContain('<div class="wiki">');
+      // md format does not produce the shared stylesheet (pdf-only).
+      expect(fs.existsSync(path.join(tmpDir, '_bulk-export.css'))).toBe(false);
     }, 10_000);
   });
 
@@ -194,6 +199,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
       const spy = vi
         .spyOn(RendererModule, 'createBulkExportMarkdownRenderer')
         .mockReturnValue({
+          getCss: vi.fn().mockReturnValue('/* css */'),
           renderToHtml: vi.fn().mockRejectedValue(renderError),
         });
 
@@ -201,7 +207,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
       const svc = makeService(tmpDir);
       const snapshot = makePageSnapshot('/error/page', '# Will fail');
 
-      const writable = getPageWritable.call(svc, job);
+      const writable = await getPageWritable.call(svc, job);
 
       // Observable: write callback is called WITH an error (not undefined).
       await expect(writeOneChunk(writable, snapshot)).rejects.toThrow(

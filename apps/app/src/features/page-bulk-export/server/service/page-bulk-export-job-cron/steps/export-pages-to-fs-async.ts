@@ -25,11 +25,29 @@ const logger = loggerFactory(
 );
 
 /**
+ * Filename of the shared stylesheet written once per job into the html output
+ * dir. Every page links to it relatively, so the CSS is not duplicated per page.
+ * The leading underscore keeps it out of the page namespace; pdf-converter only
+ * scans `*.html`, so this file is never mistaken for a page to convert.
+ */
+const SHARED_CSS_FILENAME = '_bulk-export.css';
+
+/**
+ * Compute the `<link href>` for the shared stylesheet, relative to the page's
+ * own HTML file. A page at `html/{jobId}/a/b.html` links to `../_bulk-export.css`.
+ * Path segments are URL-encoded so the href is valid even on deeply nested pages.
+ */
+function toCssHref(pageFilePath: string, cssFilePath: string): string {
+  const relativePath = path.relative(path.dirname(pageFilePath), cssFilePath);
+  return relativePath.split(path.sep).map(encodeURIComponent).join('/');
+}
+
+/**
  * Get a Writable that writes the page body temporarily to fs.
  *
- * For pdf format: Markdown is rendered to sanitized HTML via
- * BulkExportMarkdownRenderer, then wrapped with injected CSS and a .wiki
- * container by BulkExportStyleProvider (Requirements 5.1, 2.1, 2.2).
+ * For pdf format: Markdown is rendered to a sanitized HTML document that links
+ * the shared stylesheet (written once per job here) and wraps the content in a
+ * `.wiki` container (Requirements 5.1, 2.1, 2.2).
  *
  * For md format: Markdown is written as-is without any HTML rendering
  * (Requirement 5.2).
@@ -37,10 +55,10 @@ const logger = loggerFactory(
  * Resume logic (lastExportedPagePath) and error-callback behaviour are
  * preserved unchanged (Requirements 5.3, 3.2).
  */
-export function getPageWritable(
+export async function getPageWritable(
   this: IPageBulkExportJobCronService,
   pageBulkExportJob: PageBulkExportJobDocument,
-): Writable {
+): Promise<Writable> {
   const isHtmlPath = pageBulkExportJob.format === PageBulkExportFormat.pdf;
   const format =
     pageBulkExportJob.format === PageBulkExportFormat.pdf
@@ -49,9 +67,16 @@ export function getPageWritable(
   const outputDir = this.getTmpOutputDir(pageBulkExportJob, isHtmlPath);
 
   // Build renderer once — reused for every page in the job.
-  // BulkExportMarkdownRenderer caches the unified pipeline at module level and
-  // owns CSS injection + .wiki wrapping internally (design.md postcondition).
+  // BulkExportMarkdownRenderer caches the unified pipeline at module level.
   const renderer = createBulkExportMarkdownRenderer(__dirname);
+
+  // For pdf format, write the shared stylesheet once per job. Every page links
+  // to it relatively, so the (~MB) CSS is not duplicated into each page's HTML.
+  const cssFilePath = path.join(outputDir, SHARED_CSS_FILENAME);
+  if (isHtmlPath) {
+    await fs.promises.mkdir(outputDir, { recursive: true });
+    await fs.promises.writeFile(cssFilePath, renderer.getCss());
+  }
 
   return new Writable({
     objectMode: true,
@@ -73,12 +98,14 @@ export function getPageWritable(
           if (pageBulkExportJob.format === PageBulkExportFormat.md) {
             await fs.promises.writeFile(fileOutputPath, markdownBody);
           } else {
-            // Render Markdown → sanitized HTML fragment, then wrap with CSS + .wiki container.
+            // Render Markdown → sanitized HTML document linking the shared
+            // stylesheet (relative to this page) and wrapped in a .wiki container.
             // If renderToHtml rejects, the error propagates to callback(err) below,
             // letting the existing error-handling path update the job state (Req 3.2).
+            const cssHref = toCssHref(fileOutputPath, cssFilePath);
             let htmlString: string;
             try {
-              htmlString = await renderer.renderToHtml(markdownBody);
+              htmlString = await renderer.renderToHtml(markdownBody, cssHref);
             } catch (renderErr) {
               logger.warn(
                 'BulkExportMarkdownRenderer failed for page %s: %o',

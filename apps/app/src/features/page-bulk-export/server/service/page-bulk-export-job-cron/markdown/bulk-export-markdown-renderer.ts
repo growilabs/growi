@@ -1,7 +1,6 @@
 import path from 'node:path';
 import { dynamicImport } from '@cspell/dynamic-import';
 import type * as HastUtilSanitize from 'hast-util-sanitize';
-import type { Plugin } from 'unified';
 
 import { loadPlugins } from './esm-plugin-loader';
 import { createBulkExportStyleProvider } from './styles';
@@ -14,10 +13,21 @@ import { createBulkExportStyleProvider } from './styles';
  */
 export interface BulkExportMarkdownRenderer {
   /**
-   * Convert one page's markdown body into a sanitized, CSS-injected,
-   * .wiki-wrapped, self-contained HTML string (design.md § BulkExportMarkdownRenderer).
+   * The shared CSS to write once per job. Every rendered page links to this
+   * stylesheet (see renderToHtml) instead of inlining it, so the CSS is not
+   * duplicated across pages.
    */
-  renderToHtml(markdownBody: string): Promise<string>;
+  getCss(): string;
+  /**
+   * Convert one page's markdown body into a sanitized HTML document that links
+   * the shared stylesheet at `cssHref` and wraps the content in a `.wiki`
+   * container (design.md § BulkExportMarkdownRenderer).
+   *
+   * @param markdownBody - the page's raw markdown.
+   * @param cssHref - href (relative to the page's HTML file) of the shared
+   *   stylesheet written by the caller; emitted as `<link rel="stylesheet">`.
+   */
+  renderToHtml(markdownBody: string, cssHref: string): Promise<string>;
 }
 
 /**
@@ -64,31 +74,35 @@ async function buildSanitizeOptions(
 }
 
 /**
- * Build the unified processor with the full pipeline:
- *   remark-parse → remark-gfm + remark-frontmatter + remark-math
- *   → remark-rehype(allowDangerousHtml) → rehype-raw → rehype-slug
- *   → rehype-sanitize → rehype-katex → rehype-stringify
+ * Build the unified processor by iterating the plugins declared in
+ * plugin-set.ts (single source of truth) in order. No plugin is wired by hand
+ * here: adding/removing a plugin is a one-file change in plugin-set.ts.
+ *
+ * The only runtime-resolved option is rehype-sanitize's schema, which is built
+ * from the web renderer's whitelist via dynamicImport (see buildSanitizeOptions).
  *
  * Design: design.md § System Flows
  */
 async function buildProcessor(baseDir: string) {
-  const plugins = await loadPlugins(baseDir);
+  const { unified, plugins } = await loadPlugins(baseDir);
   const sanitizeOptions = await buildSanitizeOptions(baseDir);
 
-  return plugins
-    .unified()
-    .use(plugins.remarkParse)
-    .use(plugins.remarkGfm)
-    .use(plugins.remarkFrontmatter)
-    .use(plugins.remarkMath)
-    .use(plugins.remarkRehype as Plugin<[unknown]>, {
-      allowDangerousHtml: true,
-    })
-    .use(plugins.rehypeRaw)
-    .use(plugins.rehypeSlug)
-    .use(plugins.rehypeSanitize as Plugin<[unknown]>, sanitizeOptions)
-    .use(plugins.rehypeKatex)
-    .use(plugins.rehypeStringify);
+  // unified().use() mutates the processor in place and returns `this`, so we
+  // call it for its side effect on a single instance. (Reassigning would force
+  // the variable's tree-type generics to change at each step.)
+  const processor = unified();
+  for (const { name, plugin, options } of plugins) {
+    // rehype-sanitize's schema is resolved at runtime (single-source whitelist);
+    // all other plugins use the static options declared in plugin-set.ts.
+    const resolvedOptions: unknown =
+      name === 'rehype-sanitize' ? sanitizeOptions : options;
+    if (resolvedOptions != null) {
+      processor.use(plugin, resolvedOptions);
+    } else {
+      processor.use(plugin);
+    }
+  }
+  return processor;
 }
 
 /**
@@ -105,12 +119,15 @@ export function createBulkExportMarkdownRenderer(
 ): BulkExportMarkdownRenderer {
   const styleProvider = createBulkExportStyleProvider();
   return {
-    async renderToHtml(markdownBody: string): Promise<string> {
+    getCss(): string {
+      return styleProvider.getCss();
+    },
+    async renderToHtml(markdownBody: string, cssHref: string): Promise<string> {
       if (cachedProcessor == null) {
         cachedProcessor = await buildProcessor(baseDir);
       }
       const htmlFragment = String(await cachedProcessor.process(markdownBody));
-      return styleProvider.wrap(htmlFragment);
+      return styleProvider.wrap(htmlFragment, cssHref);
     },
   };
 }

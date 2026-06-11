@@ -1,12 +1,12 @@
 /**
- * Tests for BulkExportStyleProvider (Task 4.1).
+ * Tests for BulkExportStyleProvider.
  *
  * Observable contract:
- *  - getCss() returns the precompiled CSS string (non-empty, same as BULK_EXPORT_CSS)
- *  - wrap(html) returns a string containing <style>…</style>\n<div class="wiki">…</div>
- *  - The CSS inside <style> is non-empty
+ *  - getCss() returns the precompiled CSS string (non-empty, == BULK_EXPORT_CSS)
+ *  - wrap(html, cssHref) links the shared stylesheet via <link rel="stylesheet">
+ *    and wraps the fragment in <div class="wiki">…</div>
+ *  - The CSS is NOT inlined into the wrapped output (it lives in the shared file)
  *  - The original html fragment is preserved inside the .wiki div
- *  - Edge case: wrap('') still produces the correct structure
  *
  * Requirements covered: 2.1, 2.2, 2.3
  */
@@ -17,6 +17,7 @@ import { createBulkExportStyleProvider } from './bulk-export-styles';
 
 describe('BulkExportStyleProvider', () => {
   const provider = createBulkExportStyleProvider();
+  const CSS_HREF = '../_bulk-export.css';
 
   describe('getCss()', () => {
     it('returns a non-empty string', () => {
@@ -31,77 +32,65 @@ describe('BulkExportStyleProvider', () => {
   });
 
   describe('wrap()', () => {
-    it('output contains a <style> tag (Req 2.1: styles injected)', () => {
-      const result = provider.wrap('<p>Hello</p>');
-      expect(result).toMatch(/<style>/);
+    it('links the shared stylesheet at the given href (Req 2.1: styles applied)', () => {
+      const result = provider.wrap('<p>Hello</p>', CSS_HREF);
+      expect(result).toContain(`<link rel="stylesheet" href="${CSS_HREF}">`);
     });
 
-    it('output contains a closing </style> tag', () => {
-      const result = provider.wrap('<p>Hello</p>');
-      expect(result).toMatch(/<\/style>/);
+    it('does NOT inline the CSS into the wrapped output (no per-page duplication)', () => {
+      const result = provider.wrap('<p>Hello</p>', CSS_HREF);
+      expect(result).not.toContain('<style>');
+      // The full ~MB stylesheet must not be embedded in each page.
+      expect(result).not.toContain(BULK_EXPORT_CSS);
     });
 
     it('output contains <div class="wiki"> wrapper (Req 2.1: .wiki container)', () => {
-      const result = provider.wrap('<p>Hello</p>');
+      const result = provider.wrap('<p>Hello</p>', CSS_HREF);
       expect(result).toContain('<div class="wiki">');
     });
 
     it('output contains closing </div> for the .wiki wrapper', () => {
-      const result = provider.wrap('<p>Hello</p>');
+      const result = provider.wrap('<p>Hello</p>', CSS_HREF);
       expect(result).toContain('</div>');
-    });
-
-    it('the CSS inside <style> is non-empty (Req 2.2: design-system CSS present)', () => {
-      const result = provider.wrap('<p>Hello</p>');
-      // Extract content between <style> and </style>
-      const match = result.match(/<style>([\s\S]*?)<\/style>/);
-      expect(match).not.toBeNull();
-      const cssContent = match![1];
-      expect(cssContent.trim().length).toBeGreaterThan(0);
-    });
-
-    it('the CSS inside <style> is the BULK_EXPORT_CSS content (Req 2.2)', () => {
-      const result = provider.wrap('<p>Hello</p>');
-      expect(result).toContain(BULK_EXPORT_CSS);
     });
 
     it('preserves the html fragment inside the .wiki div', () => {
       const fragment = '<p>Hello</p>';
-      const result = provider.wrap(fragment);
+      const result = provider.wrap(fragment, CSS_HREF);
       expect(result).toContain(fragment);
     });
 
-    it('the fragment appears inside the .wiki div (after the closing </style>)', () => {
+    it('the fragment appears after the <link> tag', () => {
       const fragment = '<p>content</p>';
-      const result = provider.wrap(fragment);
-      const styleEnd = result.indexOf('</style>');
+      const result = provider.wrap(fragment, CSS_HREF);
+      const linkEnd = result.indexOf('>');
       const fragmentPos = result.indexOf(fragment);
-      expect(styleEnd).toBeGreaterThanOrEqual(0);
-      expect(fragmentPos).toBeGreaterThan(styleEnd);
+      expect(linkEnd).toBeGreaterThanOrEqual(0);
+      expect(fragmentPos).toBeGreaterThan(linkEnd);
     });
 
-    it('format: <style>…</style>\\n<div class="wiki">…</div>', () => {
+    it('format: <link …>\\n<div class="wiki">…</div>', () => {
       const fragment = '<p>test</p>';
-      const result = provider.wrap(fragment);
-      // The style block ends, then a newline, then the wiki div starts
-      expect(result).toContain(`</style>\n<div class="wiki">`);
+      const result = provider.wrap(fragment, CSS_HREF);
+      expect(result).toBe(
+        `<link rel="stylesheet" href="${CSS_HREF}">\n<div class="wiki">${fragment}</div>`,
+      );
     });
 
     it('edge case: wrap("") still produces correct structure', () => {
-      const result = provider.wrap('');
-      expect(result).toContain('<style>');
-      expect(result).toContain('</style>');
+      const result = provider.wrap('', CSS_HREF);
+      expect(result).toContain('<link rel="stylesheet"');
       expect(result).toContain('<div class="wiki">');
       expect(result).toContain('</div>');
     });
 
-    it('does not include theme/layout/chrome styles — only body content CSS (Req 2.3)', () => {
-      // Observable: the CSS comes only from the precompiled asset, no additional chrome injected
-      const result = provider.wrap('<p>test</p>');
-      const match = result.match(/<style>([\s\S]*?)<\/style>/);
-      const cssContent = match![1];
-      // The CSS in the style tag should be exactly BULK_EXPORT_CSS (no extra chrome added)
-      expect(cssContent).toBe(BULK_EXPORT_CSS);
+    it('reflects the href verbatim for differently-nested pages (Req 2.1)', () => {
+      expect(provider.wrap('<p/>', '_bulk-export.css')).toContain(
+        'href="_bulk-export.css"',
+      );
+      expect(provider.wrap('<p/>', '../../_bulk-export.css')).toContain(
+        'href="../../_bulk-export.css"',
+      );
     });
   });
 });

@@ -87,3 +87,21 @@
   - 実際に PDF を生成・描画し、表・引用・見出しが `.wiki` スタイル（枠線色等の `--bs-*` 由来含む）で描画され、数式が KaTeX フォントで崩れず描画されることを目視で確認する（dedup キャッシュは対象外のため、検証時はページ編集等でハッシュを変える）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1_
   - _Depends: 5.1_
+
+## Post-Implementation Revisions (2026-06-11)
+
+> 初回実装のレビューで挙がった保守性・効率の指摘 3 点への改訂。design.md の「実装改訂ノート」と各
+> Boundary/Component 節に反映済み。全テスト green（feature 92 tests / pdf-converter 3 tests）、両アプリ
+> typecheck PASS。
+
+- [x] R1. CSS のページ間重複を排除（per-page inline → per-job 共有ファイル）
+  - `BulkExportStyleProvider.wrap(fragment, cssHref)` は `<style>` インラインをやめ相対 `<link rel="stylesheet">` を出力。`export-pages-to-fs-async` が job ごとに `_bulk-export.css` を 1 回書き出し、各ページの深さに応じた相対 href を算出する
+  - KaTeX フォントは woff2 のみインライン化（woff/ttf 破棄）。生成 CSS ~1.8MB→~757KB、かつ job あたり 1 ファイルのみ（1 ページあたりの HTML は `<link>` 1 行＋本文）
+  - pdf-converter（越境・承認済み）: cluster task を `setContent`→`page.goto(pathToFileURL(...))` に変更し相対 `<link>` を解決。job dir 走査を `*.html` のみに絞り、共有 CSS を変換対象・完了判定から除外
+  - _Requirements: 2.1, 2.2, 5.1_ / _Boundary: BulkExportStyleProvider, export-pages-to-fs-async, pdf-converter(HTML 読み込み機構)_
+- [x] R2. プラグイン宣言の単一出所化（3 ファイル編集 → 1 ファイル編集）
+  - `EsmPluginLoader` は `ADOPTED_PLUGINS`（plugin-set.ts）を走査して `dynamicImport` し順序付きリストを返す。`BulkExportMarkdownRenderer` は読み込み順に `.use()` する。プラグイン追加は plugin-set.ts のみで完結。旧 loader↔plugin-set の逆方向アサーションは削除
+  - _Requirements: 1.6, 5.4_ / _Boundary: plugin-set, EsmPluginLoader, BulkExportMarkdownRenderer_
+- [x] R3. ドリフトテストの堅牢化（正規表現 → AST）
+  - `renderer-parity.spec.ts` を TypeScript コンパイラ API による import 宣言の AST 抽出へ置換。手書きブロックリストを撤廃し、解析不能時は loud に失敗
+  - _Requirements: 6.1, 6.2_ / _Boundary: RendererParityGuard_

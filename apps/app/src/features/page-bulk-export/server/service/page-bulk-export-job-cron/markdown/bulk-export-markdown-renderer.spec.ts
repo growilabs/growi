@@ -3,17 +3,20 @@ import {
   createBulkExportMarkdownRenderer,
 } from './bulk-export-markdown-renderer';
 
+/** A representative shared-stylesheet href passed to renderToHtml in tests. */
+const CSS_HREF = '_bulk-export.css';
+
 describe('BulkExportMarkdownRenderer', () => {
   let renderer: BulkExportMarkdownRenderer;
 
-  beforeAll(async () => {
+  beforeAll(() => {
     renderer = createBulkExportMarkdownRenderer(__dirname);
   });
 
   describe('GFM table rendering (Requirement 1.1)', () => {
     it('renders GFM table as structured <table> with <thead> and <tbody>', async () => {
       const md = `| Name | Age |\n|------|-----|\n| Alice | 30 |\n| Bob | 25 |`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toContain('<table');
       expect(html).toContain('<thead');
       expect(html).toContain('<tbody');
@@ -25,7 +28,7 @@ describe('BulkExportMarkdownRenderer', () => {
   describe('GitHub alert rendering (Requirement 1.2)', () => {
     it('renders GitHub alert as <blockquote>', async () => {
       const md = `> [!NOTE]\n> This is a note.`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toContain('<blockquote');
       expect(html).toContain('This is a note');
     });
@@ -34,13 +37,13 @@ describe('BulkExportMarkdownRenderer', () => {
   describe('Math formula rendering (Requirement 1.3)', () => {
     it('renders inline math $x$ as KaTeX markup', async () => {
       const md = `Inline: $x^2 + y^2 = z^2$`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toMatch(/class="katex/);
     });
 
     it('renders display math $$...$$ as KaTeX markup', async () => {
       const md = `$$\nE = mc^2\n$$`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toMatch(/class="katex/);
     });
   });
@@ -48,7 +51,7 @@ describe('BulkExportMarkdownRenderer', () => {
   describe('Heading ID generation (Requirement 1.4)', () => {
     it('adds unique id attributes to headings', async () => {
       const md = `# Main Title\n## Section One\n### Subsection`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toMatch(/<h1[^>]+id=/);
       expect(html).toMatch(/<h2[^>]+id=/);
       expect(html).toMatch(/<h3[^>]+id=/);
@@ -58,7 +61,7 @@ describe('BulkExportMarkdownRenderer', () => {
   describe('Frontmatter handling (Requirement 1.5)', () => {
     it('does not expose frontmatter in output body', async () => {
       const md = `---\ntitle: My Page\nauthor: Alice\n---\n# Content\nBody text here.`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).not.toContain('title: My Page');
       expect(html).not.toContain('author: Alice');
       expect(html).toContain('Body text here');
@@ -70,7 +73,7 @@ describe('BulkExportMarkdownRenderer', () => {
     // Requirement 4.3: <script> tags must be stripped entirely
     it('removes <script> tags from output', async () => {
       const md = `Hello\n\n<script>alert("xss")</script>\n\nWorld`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).not.toContain('<script');
       expect(html).not.toContain('alert("xss")');
     });
@@ -78,7 +81,7 @@ describe('BulkExportMarkdownRenderer', () => {
     // Requirement 4.3: inline event handlers must be stripped
     it('removes inline event handlers (onclick etc) from output', async () => {
       const md = `<p onclick="evil()">Click me</p>`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).not.toContain('onclick');
       expect(html).toContain('Click me'); // text content preserved, handler stripped
     });
@@ -86,14 +89,14 @@ describe('BulkExportMarkdownRenderer', () => {
     // Requirement 4.2: raw HTML in markdown is sanitized, not passed through verbatim
     it('sanitizes raw HTML embedded in markdown (no unsanitized passthrough)', async () => {
       const md = `Normal text\n\n<script src="evil.js"></script>\n\nMore text`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).not.toContain('<script');
     });
 
     // Requirement 4.1: allowlist passes in-scope GFM table elements
     it('preserves table elements in output (allowlist covers tables)', async () => {
       const md = `| A | B |\n|---|---|\n| 1 | 2 |`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toContain('<table');
       expect(html).toContain('<td');
     });
@@ -103,7 +106,7 @@ describe('BulkExportMarkdownRenderer', () => {
     // so the observable output is id="user-content-<slug>".
     it('preserves id attributes on headings (allowlist covers id attr)', async () => {
       const md = `# Test Heading`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       // id attribute is preserved (with the user-content- prefix added by hast-util-sanitize)
       expect(html).toMatch(/id="user-content-test-heading"/);
     });
@@ -116,20 +119,20 @@ describe('BulkExportMarkdownRenderer', () => {
     it('does not throw for a :::note directive and preserves inner text', async () => {
       const md = `:::note\nThis is a note message.\n:::`;
       // Must resolve (not reject).
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       // The inner content must appear somewhere in readable form.
       expect(html).toContain('This is a note message');
     });
 
     it('does not throw for a :::warning directive and preserves inner text', async () => {
       const md = `:::warning\nDanger ahead.\n:::`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toContain('Danger ahead');
     });
 
     it('does not throw for a :::tip directive with a label and preserves inner text', async () => {
       const md = `:::tip Pro Tip\nUse keyboard shortcuts.\n:::`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toContain('Use keyboard shortcuts');
     });
 
@@ -138,14 +141,14 @@ describe('BulkExportMarkdownRenderer', () => {
     it('does not throw for a drawio fenced code block and outputs a code/pre block', async () => {
       const md =
         '```drawio\n<mxGraph><root><mxCell id="0"/></root></mxGraph>\n```';
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       // Must contain <code> or <pre> — the raw source is rendered as a code block.
       expect(html).toMatch(/<(pre|code)/);
     });
 
     it('does not throw for a plantuml fenced code block and outputs a code/pre block', async () => {
       const md = '```plantuml\n@startuml\nAlice -> Bob: Hello\n@enduml\n```';
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toMatch(/<(pre|code)/);
     });
 
@@ -163,7 +166,7 @@ describe('BulkExportMarkdownRenderer', () => {
         '|-------|-------|',
         '| 1     | 2     |',
       ].join('\n');
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       // Standard elements must be present.
       expect(html).toContain('<table');
       expect(html).toMatch(/<h1[^>]+id=/);
@@ -178,7 +181,7 @@ describe('BulkExportMarkdownRenderer', () => {
     // This confirms the allowlist is effectively applied from the single source of truth
     it('preserves <details>/<summary> elements (present in recommended-whitelist via defaultSchema)', async () => {
       const md = `<details><summary>Expand</summary>Content here</details>`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).toContain('<details');
       expect(html).toContain('<summary');
       expect(html).toContain('Content here');
@@ -187,8 +190,36 @@ describe('BulkExportMarkdownRenderer', () => {
     // Dangerous elements not in the allowlist are stripped regardless
     it('strips <object> tags not in the allowlist', async () => {
       const md = `<object data="malicious.swf" type="application/x-shockwave-flash"></object>`;
-      const html = await renderer.renderToHtml(md);
+      const html = await renderer.renderToHtml(md, CSS_HREF);
       expect(html).not.toContain('<object');
+    });
+  });
+
+  // Requirements 2.1, 2.2: the shared stylesheet is linked (not inlined) so the
+  // CSS is not duplicated into every page. The .wiki container styles the content.
+  describe('shared-stylesheet linking and .wiki wrapping (Requirements 2.1, 2.2)', () => {
+    it('links the shared stylesheet at the given href instead of inlining a <style> block', async () => {
+      const html = await renderer.renderToHtml(
+        '# Hello',
+        '../_bulk-export.css',
+      );
+      expect(html).toContain(
+        '<link rel="stylesheet" href="../_bulk-export.css">',
+      );
+      // No inline <style> — the CSS lives in the shared file, not in each page.
+      expect(html).not.toContain('<style>');
+    });
+
+    it('wraps the rendered content in a .wiki container', async () => {
+      const html = await renderer.renderToHtml('# Hello', CSS_HREF);
+      expect(html).toContain('<div class="wiki">');
+      expect(html).toContain('</div>');
+    });
+
+    it('getCss() returns the shared CSS to be written once per job (non-empty)', () => {
+      const css = renderer.getCss();
+      expect(typeof css).toBe('string');
+      expect(css.length).toBeGreaterThan(0);
     });
   });
 });

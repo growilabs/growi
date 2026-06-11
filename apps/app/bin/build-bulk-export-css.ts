@@ -16,7 +16,7 @@ import {
   unlinkSync,
   writeFileSync,
 } from 'node:fs';
-import { basename, join, resolve } from 'node:path';
+import { join, resolve } from 'node:path';
 import * as sass from 'sass';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
@@ -83,15 +83,29 @@ try {
   }
 }
 
-// ─── Step 2: Process KaTeX CSS with font inlining ────────────────────────────
+// ─── Step 2: Process KaTeX CSS with font inlining (woff2 only) ────────────────
+//
+// KaTeX ships each face in three formats (woff2, woff, ttf). Chromium (the
+// engine pdf-converter drives via Puppeteer) supports woff2, so we keep only
+// woff2 and drop the woff/ttf alternates. Since the fonts are base64-inlined
+// into the CSS, dropping two of three formats removes ~2/3 of the font payload
+// (woff ≈ 395 KB + ttf ≈ 669 KB out of ~1.43 MB).
 
 // biome-ignore lint/suspicious/noConsole: build script — console output is expected
-console.log('Processing KaTeX CSS and inlining fonts...');
+console.log('Processing KaTeX CSS and inlining woff2 fonts...');
 
 let katexCss = readFileSync(KATEX_CSS_PATH, 'utf-8');
 
-// Replace all url(fonts/<fontname>.<ext>) with base64 data URIs.
-// Using woff2 as the primary format but all font files are inlined.
+// 1) Strip the woff/ttf alternates (and their leading comma separator) from each
+//    @font-face `src`, leaving only the woff2 source. KaTeX always lists woff2
+//    first, so the woff/ttf entries always carry the preceding comma.
+katexCss = katexCss.replace(
+  /,\s*url\(fonts\/[^)]+\.(?:woff|ttf)\)\s*format\(['"][^'")]+['"]\)/g,
+  '',
+);
+
+// 2) Inline the remaining woff2 url(fonts/<name>.woff2) as base64 data URIs so
+//    pdf-converter can render standalone HTML without external path resolution.
 katexCss = katexCss.replace(
   /url\(fonts\/([^)]+)\)/g,
   (_match: string, fontFile: string) => {
@@ -103,14 +117,7 @@ katexCss = katexCss.replace(
     }
     const fontData = readFileSync(fontPath);
     const base64 = fontData.toString('base64');
-    const ext = basename(fontFile).split('.').pop()?.toLowerCase() ?? 'woff2';
-    const mimeMap: Record<string, string> = {
-      woff2: 'font/woff2',
-      woff: 'font/woff',
-      ttf: 'font/ttf',
-    };
-    const mime = mimeMap[ext] ?? 'font/woff2';
-    return `url(data:${mime};base64,${base64})`;
+    return `url(data:font/woff2;base64,${base64})`;
   },
 );
 
