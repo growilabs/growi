@@ -1,4 +1,4 @@
-import { LLM_VENDORS } from '~/features/mastra/interfaces/llm-vendor';
+import { LLM_PROVIDERS } from '~/features/mastra/interfaces/llm-provider';
 
 // Each provider creator returns a "provider function" that, when called with a
 // model id, yields a Mastra-compatible model (MastraModelConfig). We mock the
@@ -114,13 +114,13 @@ describe('llm provider factories', () => {
   });
 
   describe('llmModelFactories map', () => {
-    it('exposes exactly one factory per known vendor', () => {
+    it('exposes exactly one factory per known provider', () => {
       expect(Object.keys(llmModelFactories).sort()).toEqual(
-        [...LLM_VENDORS].sort(),
+        [...LLM_PROVIDERS].sort(),
       );
     });
 
-    it('routes each vendor key to its corresponding factory', () => {
+    it('routes each provider key to its corresponding factory', () => {
       llmModelFactories.openai({ apiKey: 'sk-o', model: 'm-o' });
       expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk-o' });
       expect(openaiProviderFn).toHaveBeenCalledWith('m-o');

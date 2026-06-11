@@ -87,7 +87,7 @@ const sentinelModel = { id: 'sentinel-model' } as unknown as MastraModelConfig;
 // was never invoked during construction — if it were, the import would throw.
 resolverMock.fn.mockImplementation(() => {
   throw new Error(
-    'Mastra LLM vendor is not configured (set MASTRA_LLM_VENDOR)',
+    'Mastra LLM provider is not configured (set MASTRA_LLM_PROVIDER)',
   );
 });
 
@@ -132,7 +132,7 @@ describe('growiAgent', () => {
       const modelFn = getModelFn();
 
       // The dynamic function forwards exactly the resolver's model (Req 3.3,
-      // 5.1) — a single vendor's single model, resolved at use time.
+      // 5.1) — a single provider's single model, resolved at use time.
       expect(modelFn()).toBe(sentinelModel);
     });
   });
@@ -143,7 +143,7 @@ describe('growiAgent', () => {
       // `model()` must let it surface (handled by the post-message route's
       // try/catch — Req 4.4), not swallow or replace it.
       const resolverError = new Error(
-        'Mastra LLM API key is not configured for vendor "openai" (set MASTRA_LLM_API_KEY)',
+        'Mastra LLM API key is not configured for provider "openai" (set MASTRA_LLM_API_KEY)',
       );
       resolverMock.fn.mockImplementation(() => {
         throw resolverError;

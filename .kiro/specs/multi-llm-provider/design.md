@@ -27,7 +27,7 @@
 
 ### This Spec Owns
 - mastra の **LLM モデル解決**（ベンダー選択 → API キー/モデル取得 → native provider 生成 → `MastraModelConfig` 返却。不備時は throw）。
-- mastra 用の **単一 LLM 設定キー**（`mastra:llmVendor` / `mastra:llmApiKey` / `mastra:llmModel`）の定義と、ベンダー別**既定モデルのコード内 map**。
+- mastra 用の **単一 LLM 設定キー**（`mastra:llmProvider` / `mastra:llmApiKey` / `mastra:llmModel`）の定義と、ベンダー別**既定モデルのコード内 map**。
 - `growiAgent` の `model` 供給方法（resolver を遅延呼び出しする dynamic function）。
 - **provider options の解決**（`mastra:llmProviderOptions` JSON の parse + fail-soft）と、`post-message` のチャットストリーム呼び出しへの適用。
 
@@ -41,10 +41,10 @@
 ### Allowed Dependencies
 - `~/server/service/config-manager`（`configManager.getConfig`）。
 - `@mastra/core/agent`（`Agent`, `DynamicArgument<MastraModelConfig>`）, `@mastra/core/llm`（`MastraModelConfig` 型）, `@ai-sdk/openai`, `@ai-sdk/anthropic`, `@ai-sdk/google`。
-- 依存方向: `llm-providers(factories)` → `resolve-mastra-model`（`config-definition` と `interfaces` の双方を参照）→ `growi-agent`。`config-definition`（core 層）は `LlmVendor` を **型のみ（`import type`）** 参照する — 実行時に消えるため runtime の core→feature エッジは無く、`llm-vendor` は依存ゼロの leaf なので循環もない。型は DX 用で実行時強制ではないため、不正値検証は resolver の `isLlmVendor`。
+- 依存方向: `llm-providers(factories)` → `resolve-mastra-model`（`config-definition` と `interfaces` の双方を参照）→ `growi-agent`。`config-definition`（core 層）は `LlmProvider` を **型のみ（`import type`）** 参照する — 実行時に消えるため runtime の core→feature エッジは無く、`llm-provider` は依存ゼロの leaf なので循環もない。型は DX 用で実行時強制ではないため、不正値検証は resolver の `isLlmProvider`。
 
 ### Revalidation Triggers
-- `mastra:llmVendor` の有効値集合（`LLM_VENDORS`）の変更。
+- `mastra:llmProvider` の有効値集合（`LLM_PROVIDERS`）の変更。
 - LLM 設定キー名（env 名）の変更。
 - `resolveMastraModel` の戻り値型（`MastraModelConfig`）または throw 契約の変更。
 - `growiAgent` の `model` 供給契約（dynamic function 形式）の変更。
@@ -63,11 +63,11 @@
 ```mermaid
 graph TB
   subgraph config[config-manager]
-    Vendor[mastra llmVendor]
+    Provider[mastra llmProvider]
     Keys[mastra llmApiKey and llmModel]
   end
   subgraph mastra[features mastra server]
-    VendorTypes[interfaces llm-vendor]
+    VendorTypes[interfaces llm-provider]
     Factories[ai-sdk-modules llm-providers]
     Resolver[resolve-mastra-model]
     Agent[growi-agent]
@@ -76,7 +76,7 @@ graph TB
   SDK[ai-sdk native providers]
 
   VendorTypes --> Resolver
-  Vendor --> Resolver
+  Provider --> Resolver
   Keys --> Resolver
   Factories --> Resolver
   Factories --> SDK
@@ -85,7 +85,7 @@ graph TB
 ```
 
 **Architecture Integration**
-- 選択パターン: **データ駆動のベンダー解決**（`LLM_VENDORS` 配列＋ベンダー→factory map＋ベンダー→既定モデル map）。consumer はベンダー名で分岐しない。
+- 選択パターン: **データ駆動のベンダー解決**（`LLM_PROVIDERS` 配列＋ベンダー→factory map＋ベンダー→既定モデル map）。consumer はベンダー名で分岐しない。
 - 既存パターン踏襲: `defineConfig` 設定、`OpenaiClientDelegator` の throw 流儀、純関数 + 薄いアダプタ、barrel 公開。
 - 新規コンポーネント根拠: 「モデル解決」を `growi-agent` から分離した単一責務の純関数に集約し、Req 1–4 を 1 箇所でテスト可能にする。
 - Steering 準拠: 不変更新／named export／server-client 分離／secret は env・非ログ。
@@ -108,7 +108,7 @@ graph TB
 ```
 apps/app/src/features/mastra/
 ├── interfaces/
-│   └── llm-vendor.ts                         # LlmVendor 型, LLM_VENDORS, isLlmVendor ガード
+│   └── llm-provider.ts                         # LlmProvider 型, LLM_PROVIDERS, isLlmProvider ガード
 └── server/services/
     ├── ai-sdk-modules/
     │   ├── llm-providers/
@@ -125,7 +125,7 @@ apps/app/src/features/mastra/
 ```
 
 ### Modified Files
-- `apps/app/src/server/service/config-manager/config-definition.ts` — `CONFIG_KEYS` / `CONFIG_DEFINITIONS` に `mastra:llmVendor`（`LlmVendor` 型・type-only import）/ `mastra:llmApiKey`（secret）/ `mastra:llmModel` を追加し、未使用化した `openai:assistantModel:mastraAgent`（＋ `openai` 型 import）を削除（`ConfigKey`/`ConfigValues` は自動導出。`ENV_ONLY_GROUPS` には追加しない）。
+- `apps/app/src/server/service/config-manager/config-definition.ts` — `CONFIG_KEYS` / `CONFIG_DEFINITIONS` に `mastra:llmProvider`（`LlmProvider` 型・type-only import）/ `mastra:llmApiKey`（secret）/ `mastra:llmModel` を追加し、未使用化した `openai:assistantModel:mastraAgent`（＋ `openai` 型 import）を削除（`ConfigKey`/`ConfigValues` は自動導出。`ENV_ONLY_GROUPS` には追加しない）。
 - `apps/app/src/features/mastra/server/services/mastra-modules/agents/growi-agent.ts` — `getOpenaiProvider()(model)` を `model: () => resolveMastraModel()` の dynamic function へ置換。
 - `apps/app/src/features/mastra/server/routes/post-message.ts` — ハードコードの `providerOptions: { openai: {...} }` を `providerOptions: resolveProviderOptions()` に置換。
 - `apps/app/package.json` — `@ai-sdk/anthropic`・`@ai-sdk/google`（`^3.x`）を `dependencies` に追加。
@@ -166,10 +166,10 @@ sequenceDiagram
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1 | 3 ベンダーを選択可能 | llm-vendor, config | `LLM_VENDORS`, `mastra:llmVendor` | — |
+| 1.1 | 3 ベンダーを選択可能 | llm-provider, config | `LLM_PROVIDERS`, `mastra:llmProvider` | — |
 | 1.2 | 指定ベンダーを使用 | resolver, llm-providers | `resolveMastraModel`, `llmModelFactories` | リクエスト時供給 |
-| 1.3 | 未指定→既定 OpenAI | config | `mastra:llmVendor` default `'openai'` | — |
-| 1.4 | 不正ベンダー名→throw | llm-vendor, resolver | `isLlmVendor`, throws | リクエスト時供給 |
+| 1.3 | 未指定→既定 OpenAI | config | `mastra:llmProvider` default `'openai'` | — |
+| 1.4 | 不正ベンダー名→throw | llm-provider, resolver | `isLlmProvider`, throws | リクエスト時供給 |
 | 2.1 | API キーを env から取得 | config, resolver | `mastra:llmApiKey` | — |
 | 2.2 | モデルを env で設定 | config, resolver | `mastra:llmModel` | — |
 | 2.3 | モデル未指定→単一既定（OpenAI 向け） | config | `mastra:llmModel` default `o4-mini` | — |
@@ -196,13 +196,13 @@ sequenceDiagram
 | LLM Vendor types | interfaces | ベンダー集合と型ガード | 1.1, 1.4, 3 | — | State/型 |
 | Config definitions | config | env↔単一 LLM 設定キー | 1, 2, 3 | configManager (P0) | State |
 | LLM provider factories | services | vendor→native MastraModelConfig | 1.2, 2.1, 2.2 | ai-sdk (P0) | Service |
-| Model resolver | services | 解決/検証（不備時 throw）/既定モデル | 1.2–1.4, 2.1–2.3, 2.5, 3, 4.1 | config, factories, llm-vendor (P0) | Service |
+| Model resolver | services | 解決/検証（不備時 throw）/既定モデル | 1.2–1.4, 2.1–2.3, 2.5, 3, 4.1 | config, factories, llm-provider (P0) | Service |
 | GROWI agent | services | dynamic model 供給（throw 伝播） | 3.3, 4.1, 4.3, 5.1 | resolver (P0), Agent (P0) | Service |
 | Provider options resolver | services | provider options JSON の parse（fail-soft）＋ post-message 適用 | 6.1–6.4 | config (P0) | Service |
 
 ### interfaces
 
-#### LLM Vendor types (`interfaces/llm-vendor.ts`)
+#### LLM Vendor types (`interfaces/llm-provider.ts`)
 
 | Field | Detail |
 |-------|--------|
@@ -212,16 +212,16 @@ sequenceDiagram
 **Contracts**: State [x]
 
 ```typescript
-export const LLM_VENDORS = ['openai', 'anthropic', 'google'] as const;
-export type LlmVendor = (typeof LLM_VENDORS)[number];
+export const LLM_PROVIDERS = ['openai', 'anthropic', 'google'] as const;
+export type LlmProvider = (typeof LLM_PROVIDERS)[number];
 
-export const isLlmVendor = (value: unknown): value is LlmVendor =>
-  typeof value === 'string' && (LLM_VENDORS as readonly string[]).includes(value);
+export const isLlmProvider = (value: unknown): value is LlmProvider =>
+  typeof value === 'string' && (LLM_PROVIDERS as readonly string[]).includes(value);
 ```
 
 **Implementation Notes**
 - Integration: `resolve-mastra-model` が参照。client からは import しない（server-only 利用）。
-- Validation: `mastra:llmVendor`（env 由来の任意文字列）の検証点はここ（Req 1.4）。
+- Validation: `mastra:llmProvider`（env 由来の任意文字列）の検証点はここ（Req 1.4）。
 
 ### config
 
@@ -236,16 +236,16 @@ export const isLlmVendor = (value: unknown): value is LlmVendor =>
 
 | 設定キー | 型 | env 名 | default | isSecret |
 |---|---|---|---|---|
-| `mastra:llmVendor` | `LlmVendor`（共有型・type-only import。実行時は resolver の `isLlmVendor` で再検証） | `MASTRA_LLM_VENDOR` | `'openai'` | no |
+| `mastra:llmProvider` | `LlmProvider`（共有型・type-only import。実行時は resolver の `isLlmProvider` で再検証） | `MASTRA_LLM_PROVIDER` | `'openai'` | no |
 | `mastra:llmApiKey` | `string \| undefined` | `MASTRA_LLM_API_KEY` | `undefined` | yes |
 | `mastra:llmModel` | `string`（単一既定値。既定 vendor=OpenAI 向け） | `MASTRA_LLM_MODEL` | `o4-mini` | no |
 | `mastra:llmProviderOptions` | `string`（生 JSON。resolver で parse + fail-soft） | `MASTRA_LLM_PROVIDER_OPTIONS` | `{"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}}` | no |
 
 **Implementation Notes**
-- Integration: 1 App = 1 Vendor のため**単一キーセット**。ベンダーは `mastra:llmVendor` で選択し、resolver がそれに応じて factory を選ぶ。`openai:apiKey` 等の既存キーは suggest-path 用に不変（mastra は参照しない）。
+- Integration: 1 App = 1 Vendor のため**単一キーセット**。ベンダーは `mastra:llmProvider` で選択し、resolver がそれに応じて factory を選ぶ。`openai:apiKey` 等の既存キーは suggest-path 用に不変（mastra は参照しない）。
 - **env-only の実装方針（確定）**: Req 2.4「env のみ」は **「設定用の管理画面 UI を持たない」** と解釈する。新規キーは既存 `openai:apiKey` と同じ **DB＋env フォールバック**で統一し、**`ENV_ONLY_GROUPS` には登録しない**。UI から書き込まれる経路が存在しないため実運用上は env 駆動。
 - **設定キー追加で編集する箇所**: `config-definition.ts` の `CONFIG_KEYS` 配列＋`CONFIG_DEFINITIONS`。`ConfigKey`/`ConfigValues` は自動導出。
-- Validation: `mastra:llmVendor` は共有 **`LlmVendor`** で型付け（`import type` の type-only＝実行時に消えるため依存逆転の実害なし・`llm-vendor` は leaf で循環なし・単一ソース）。**型は DX/補完のためで実行時強制ではない**（config-manager は env 文字列を宣言型で検証しない）。よって resolver は依然 `isLlmVendor` で実行時検証する（`MASTRA_LLM_VENDOR=azure` 等の untrusted env を弾く。Req 1.4）。default `'openai'` により未指定時は OpenAI（Req 1.3）。
+- Validation: `mastra:llmProvider` は共有 **`LlmProvider`** で型付け（`import type` の type-only＝実行時に消えるため依存逆転の実害なし・`llm-provider` は leaf で循環なし・単一ソース）。**型は DX/補完のためで実行時強制ではない**（config-manager は env 文字列を宣言型で検証しない）。よって resolver は依然 `isLlmProvider` で実行時検証する（`MASTRA_LLM_PROVIDER=azure` 等の untrusted env を弾く。Req 1.4）。default `'openai'` により未指定時は OpenAI（Req 1.3）。
 - Model 既定: `mastra:llmModel` は config の defaultValue（`o4-mini`、既定 vendor=OpenAI 向け）に集約。resolver は per-vendor 既定 map を持たない。非 OpenAI ベンダー利用時は `MASTRA_LLM_MODEL` の明示指定が必要。
 - Secret: `mastra:llmApiKey` は `isSecret: true`。クライアントへ返す apiv3 エンドポイントは存在せず露出経路なし（Req 2.5）。
 
@@ -263,11 +263,11 @@ export const isLlmVendor = (value: unknown): value is LlmVendor =>
 ```typescript
 // llm-providers/index.ts
 import type { MastraModelConfig } from '@mastra/core/llm';
-import type { LlmVendor } from '~/features/mastra/interfaces/llm-vendor';
+import type { LlmProvider } from '~/features/mastra/interfaces/llm-provider';
 
 export type LlmModelFactory = (params: { apiKey: string; model: string }) => MastraModelConfig;
 
-export const llmModelFactories: Record<LlmVendor, LlmModelFactory> = {
+export const llmModelFactories: Record<LlmProvider, LlmModelFactory> = {
   openai:    createOpenAiModel,    // createOpenAI({ apiKey })(model)
   anthropic: createAnthropicModel, // createAnthropic({ apiKey })(model)
   google:    createGoogleModel,    // createGoogleGenerativeAI({ apiKey })(model)
@@ -300,8 +300,8 @@ export const resolveMastraModel: () => MastraModelConfig; // 不備時は throw
 - Invariants: 単一の `mastra:llmApiKey` のみ参照（Req 3.2）。throw メッセージに API キー値を含めない（Req 2.5）。per-vendor 既定モデル map は持たない（既定は config の `mastra:llmModel` defaultValue に集約）。
 
 解決手順:
-1. `mastra:llmVendor` 取得（config default `'openai'`。未指定時は OpenAI。Req 1.3）。
-2. `isLlmVendor` 失敗なら throw（不正 vendor 名を含むメッセージ。untrusted env を弾く。Req 1.4）。
+1. `mastra:llmProvider` 取得（config default `'openai'`。未指定時は OpenAI。Req 1.3）。
+2. `isLlmProvider` 失敗なら throw（不正 vendor 名を含むメッセージ。untrusted env を弾く。Req 1.4）。
 3. `mastra:llmApiKey` 取得 → null なら throw（`MASTRA_LLM_API_KEY` 未設定。Req 4.1）。
 4. `mastra:llmModel` 取得（config default `o4-mini`。Req 2.2, 2.3）。
 5. `llmModelFactories[vendor]({ apiKey, model })` を memoize して返す（Req 3.1）。
@@ -379,15 +379,15 @@ export const resolveProviderOptions: () => MastraProviderOptions;
 ## Testing Strategy
 
 ### Unit Tests
-- **resolver**: vendor 未指定→throw（`MASTRA_LLM_VENDOR`）（1.3/4.1）／不正 vendor→throw（値を含む）（1.4）／apiKey 欠落→throw（`MASTRA_LLM_API_KEY`）（4.1）／3 ベンダー各成功で正しい factory を `{apiKey, model}` で呼ぶ（1.2/2.1/2.2）／model 未指定で per-vendor 既定（2.3）／throw メッセージに apiKey 値を含まない（2.5）／単一キーのみ参照（3.2）／memoize（同一 instance, factory 1 回）と throw は非 memoize。
-- **isLlmVendor**: 3 値を受理・他を拒否（1.1/1.4）。
+- **resolver**: vendor 未指定→throw（`MASTRA_LLM_PROVIDER`）（1.3/4.1）／不正 vendor→throw（値を含む）（1.4）／apiKey 欠落→throw（`MASTRA_LLM_API_KEY`）（4.1）／3 ベンダー各成功で正しい factory を `{apiKey, model}` で呼ぶ（1.2/2.1/2.2）／model 未指定で per-vendor 既定（2.3）／throw メッセージに apiKey 値を含まない（2.5）／単一キーのみ参照（3.2）／memoize（同一 instance, factory 1 回）と throw は非 memoize。
+- **isLlmProvider**: 3 値を受理・他を拒否（1.1/1.4）。
 - **provider factories**: 各 factory が対応 `create*` を `{ apiKey }` で呼び `(model)` を適用（ai-sdk を mock）（1.2/2.1/2.2）。
 
 ### Integration / Component Tests
 - **growi-agent**: import 時 no-throw（resolver が throw する状態でも構築成功・resolver 未呼出）（4.3）／成功時 `model()` が resolver の model を返す（3.3/5.1）／不備時 `model()` が resolver の throw を伝播（swallow しない）（4.1/4.4）。
 
 ### Regression
-- **suggest-path 不変**: `mastra:llmVendor` 設定に関わらず `suggest-path` は `openai:serviceType`/`openai:apiKey` 経路で動作（5.2）。
+- **suggest-path 不変**: `mastra:llmProvider` 設定に関わらず `suggest-path` は `openai:serviceType`/`openai:apiKey` 経路で動作（5.2）。
 
 ## Security Considerations
 - API キーは `isSecret: true` で config-manager がマスク（DB/API 応答）。throw メッセージ・ログは vendor 名／欠落 env 名のみ（Req 2.5）。
@@ -399,4 +399,4 @@ export const resolveProviderOptions: () => MastraProviderOptions;
 - **依存分類（検証済 D-?）**: `@ai-sdk/anthropic`/`@ai-sdk/google` は Express サーバ（`dist/`、`build:server`）経由の server-only パッケージで `.next/node_modules` には externalise されない（既存 `@ai-sdk/openai` と同一）。`dependencies` 配置で正しい。確定的 prod ロード検証は CI Level 2（`server:ci`）。
 - **削除した config キー**: `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）は未使用化したため本仕様で削除（`OpenAI.Chat.ChatModel` 用の `openai` 型 import も除去）。
 - **pre-existing branch 課題（本仕様スコープ外）**: `apiv3/index.js` の `mastraRouteFactory` import 欠落、`post-message.ts:77` TS2769。support/mastra ブランチのマージ未完状態で、別途対応が必要（tasks.md Implementation Notes 参照）。
-- **設定キー命名**: `mastra:llmVendor` / `mastra:llmApiKey` / `mastra:llmModel` は提案。レビューで調整余地あり。
+- **設定キー命名**: `mastra:llmProvider` / `mastra:llmApiKey` / `mastra:llmModel` は提案。レビューで調整余地あり。

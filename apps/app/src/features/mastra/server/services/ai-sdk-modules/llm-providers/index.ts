@@ -1,6 +1,6 @@
 import type { MastraModelConfig } from '@mastra/core/llm';
 
-import type { LlmVendor } from '~/features/mastra/interfaces/llm-vendor';
+import type { LlmProvider } from '~/features/mastra/interfaces/llm-provider';
 
 import { createAnthropicModel } from './anthropic';
 import { createGoogleModel } from './google';
@@ -16,10 +16,10 @@ export type LlmModelFactory = (params: {
   model: string;
 }) => MastraModelConfig;
 
-// Data-driven vendor -> factory map. Consumers select by vendor key and must
-// not branch on the vendor name. Adding a vendor requires only a new entry here
-// plus the corresponding LlmVendor union member.
-export const llmModelFactories: Record<LlmVendor, LlmModelFactory> = {
+// Data-driven provider -> factory map. Consumers select by provider key and must
+// not branch on the provider name. Adding a provider requires only a new entry here
+// plus the corresponding LlmProvider union member.
+export const llmModelFactories: Record<LlmProvider, LlmModelFactory> = {
   openai: createOpenAiModel,
   anthropic: createAnthropicModel,
   google: createGoogleModel,

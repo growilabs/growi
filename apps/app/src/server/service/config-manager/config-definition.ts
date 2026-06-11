@@ -6,7 +6,7 @@ import type {
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
 
-import type { LlmVendor } from '~/features/mastra/interfaces/llm-vendor';
+import type { LlmProvider } from '~/features/mastra/interfaces/llm-provider';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
@@ -284,8 +284,8 @@ export const CONFIG_KEYS = [
   'openai:serviceType',
   'openai:apiKey',
 
-  // Mastra LLM Settings (vendor-agnostic: one vendor per app)
-  'mastra:llmVendor',
+  // Mastra LLM Settings (provider-agnostic: one provider per app)
+  'mastra:llmProvider',
   'mastra:llmApiKey',
   'mastra:llmModel',
   'mastra:llmProviderOptions',
@@ -1259,16 +1259,16 @@ export const CONFIG_DEFINITIONS = {
     isSecret: true,
   }),
 
-  // Mastra LLM Settings (vendor-agnostic: one vendor per app)
-  // Single set of keys regardless of vendor — the resolver reads `mastra:llmVendor`
+  // Mastra LLM Settings (provider-agnostic: one provider per app)
+  // Single set of keys regardless of provider — the resolver reads `mastra:llmProvider`
   // to pick the provider client, then injects `mastra:llmApiKey` / `mastra:llmModel`.
-  // Typed with the shared `LlmVendor` (single source of truth). This is a
+  // Typed with the shared `LlmProvider` (single source of truth). This is a
   // type-only import — erased at runtime, so there is no runtime core->feature
   // edge, and the module is a dependency-free leaf (no cycle). The type aids DX
   // but is NOT enforced at runtime for env-loaded values, so the resolver still
-  // validates with `isLlmVendor` (untrusted env may carry an out-of-union string).
-  'mastra:llmVendor': defineConfig<LlmVendor>({
-    envVarName: 'MASTRA_LLM_VENDOR',
+  // validates with `isLlmProvider` (untrusted env may carry an out-of-union string).
+  'mastra:llmProvider': defineConfig<LlmProvider>({
+    envVarName: 'MASTRA_LLM_PROVIDER',
     defaultValue: 'openai',
   }),
   'mastra:llmApiKey': defineConfig<string | undefined>({
@@ -1276,8 +1276,8 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
     isSecret: true,
   }),
-  // Single default tuned for the default vendor (OpenAI). When a non-OpenAI
-  // vendor is selected, set MASTRA_LLM_MODEL to that vendor's model.
+  // Single default tuned for the default provider (OpenAI). When a non-OpenAI
+  // provider is selected, set MASTRA_LLM_MODEL to that provider's model.
   'mastra:llmModel': defineConfig<string>({
     envVarName: 'MASTRA_LLM_MODEL',
     defaultValue: 'o4-mini',

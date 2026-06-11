@@ -13,12 +13,12 @@
   - co-located unit test: 3 値を受理し、未知文字列・非文字列を拒否する
   - 観測可能: 型ガードのユニットテストが green（未知文字列・非文字列で false を返す）
   - _Requirements: 1.1, 1.4_
-  - _Boundary: llm-vendor interface_
+  - _Boundary: llm-provider interface_
 
 - [x] 1.3 (P) ベンダー設定キーの定義
   - ベンダーセレクタ（`string | undefined`、env 由来、既定なし）と、Anthropic/Google の API キー（secret）・モデル（ベンダー既定値あり）の設定キーを追加する。OpenAI は既存キーを再利用する
   - 設定キー一覧の配列と定義オブジェクトの両方に登録する（キー型・値型は自動導出）。env-only グループには登録せず、既存 API キーと同じ DB+env フォールバックで統一する（管理 UI は追加しない）
-  - 観測可能: 新 env（`MASTRA_LLM_VENDOR` / `ANTHROPIC_API_KEY` / `ANTHROPIC_MASTRA_AGENT_MODEL` / `GOOGLE_API_KEY` / `GOOGLE_MASTRA_AGENT_MODEL`）が設定として解決でき、モデル未指定時はベンダー既定値が返る。API キーは secret 扱いになる
+  - 観測可能: 新 env（`MASTRA_LLM_PROVIDER` / `ANTHROPIC_API_KEY` / `ANTHROPIC_MASTRA_AGENT_MODEL` / `GOOGLE_API_KEY` / `GOOGLE_MASTRA_AGENT_MODEL`）が設定として解決でき、モデル未指定時はベンダー既定値が返る。API キーは secret 扱いになる
   - _Requirements: 1.1, 2.1, 2.2, 2.3, 2.4, 2.5_
   - _Boundary: config-definition_
 
@@ -79,9 +79,9 @@
 - 3.1(follow-up): **解決済み（bc064d6d3a）** — 削除した `get-openai-provider.ts` を指すコメント残骸（`resolve-mastra-model.ts`・`llm-providers/openai.ts`）を除去。`grep get-openai-provider` は src 全体でゼロ。
 - 4.2: `@ai-sdk/anthropic`/`@ai-sdk/google` は **Express サーバ（dist/、`build:server`）** 経由の server-only パッケージで、`next build`（Turbopack）には到達しない → `.next/node_modules` に externalise されない（既存 `@ai-sdk/openai` と同一挙動）。よって design の「`.next/node_modules` で確認」前提は server パッケージには非該当。3つとも `dependencies` 配置で正しい（`pnpm deploy --prod` が devDeps を除去するため runtime require には必須）。確定的な prod ロード検証は CI Level 2（`server:ci` = `node dist/server/app.js`）。
 - 4.2(pre-existing / 本仕様スコープ外・要対応): (a) `src/server/routes/apiv3/index.js:205` が `mastraRouteFactory(crowi)` を mount しているが、**本ブランチに import 文が無い**（import を追加した commit `25d076c6a6` は HEAD の ancestor でない＝分岐ブランチ側）。stale な `dist/`（2026-06-05）が require を残しローカルでは露見しないが、dist 再生成で **boot 時 ReferenceError**／CI Level 2 で顕在化。(b) `post-message.ts(77,48)` TS2769（`build:server`/typecheck の唯一の赤）。いずれも multi-llm-provider 由来でなく、support/mastra ブランチのマージ未完状態。本ブランチで別途 import 追加（または `25d076c6a6` cherry-pick）＋ post-message の型修正が必要。
-- FB 反映（commit f67933bc44, 設計改訂 D-10）: タスク 1.3 / 2.2 / 3.2 の当初実装を上書き — (1) per-vendor 設定キーを単一 `mastra:llmVendor`/`mastra:llmApiKey`/`mastra:llmModel` に統一（既定モデルは resolver の map）、(2) resolver を判別共用体から **throw ベース**へ（不備時 throw、`OpenaiClientDelegator` 流儀）、(3) 3.2 の起動時可用性ゲート（routes/index 変更・503）を **revert**（不備時 throw を post-message 既存 catch が処理）。タスクのチェックボックスは完了のまま（成果は最新コミットに反映済み）。
-- FB 追加反映（D-11）: (1) `mastra:llmVendor` を inline literal union `'openai'|'anthropic'|'google'` に型付け（import 不要・依存逆転回避）、(2) 既定値 `'openai'`（Req 1.3 を「未指定→既定 OpenAI」に反転、vendor-unset throw 撤去）、(3) `mastra:llmModel` 既定 `'o4-mini'`・型は `string`（ベンダー横断モデル id union は SDK 未 export のため不可）、(4) resolver の `defaultModels` map 撤去（既定は config defaultValue に集約）。`isLlmVendor` は実行時検証として残置（型は実行時強制でないため必須）。
-- FB 追加（D-12）: (1) `mastra:llmVendor` を共有 `LlmVendor` 型で定義（`import type`＝実行時に消えるため依存逆転の実害なし・leaf で循環なし・単一ソース）。(2) 未使用化した `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）と、その唯一の利用元だった `openai` 型 import を削除。
+- FB 反映（commit f67933bc44, 設計改訂 D-10）: タスク 1.3 / 2.2 / 3.2 の当初実装を上書き — (1) per-vendor 設定キーを単一 `mastra:llmProvider`/`mastra:llmApiKey`/`mastra:llmModel` に統一（既定モデルは resolver の map）、(2) resolver を判別共用体から **throw ベース**へ（不備時 throw、`OpenaiClientDelegator` 流儀）、(3) 3.2 の起動時可用性ゲート（routes/index 変更・503）を **revert**（不備時 throw を post-message 既存 catch が処理）。タスクのチェックボックスは完了のまま（成果は最新コミットに反映済み）。
+- FB 追加反映（D-11）: (1) `mastra:llmProvider` を inline literal union `'openai'|'anthropic'|'google'` に型付け（import 不要・依存逆転回避）、(2) 既定値 `'openai'`（Req 1.3 を「未指定→既定 OpenAI」に反転、vendor-unset throw 撤去）、(3) `mastra:llmModel` 既定 `'o4-mini'`・型は `string`（ベンダー横断モデル id union は SDK 未 export のため不可）、(4) resolver の `defaultModels` map 撤去（既定は config defaultValue に集約）。`isLlmProvider` は実行時検証として残置（型は実行時強制でないため必須）。
+- FB 追加（D-12）: (1) `mastra:llmProvider` を共有 `LlmProvider` 型で定義（`import type`＝実行時に消えるため依存逆転の実害なし・leaf で循環なし・単一ソース）。(2) 未使用化した `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）と、その唯一の利用元だった `openai` 型 import を削除。
 
 ## Scope Expansion (Req 6 — provider options via env)
 - [x] 6.1 provider options の env 指定と適用

@@ -1,9 +1,9 @@
 import type { MastraModelConfig } from '@mastra/core/llm';
 
 import {
-  isLlmVendor,
-  LLM_VENDORS,
-} from '~/features/mastra/interfaces/llm-vendor';
+  isLlmProvider,
+  LLM_PROVIDERS,
+} from '~/features/mastra/interfaces/llm-provider';
 import { configManager } from '~/server/service/config-manager';
 
 import { llmModelFactories } from './llm-providers';
@@ -21,14 +21,14 @@ export const resolveMastraModel = (): MastraModelConfig => {
     return memoizedModel;
   }
 
-  // `mastra:llmVendor` defaults to 'openai' and is typed as the vendor union,
+  // `mastra:llmProvider` defaults to 'openai' and is typed as the provider union,
   // but env-loaded config is not runtime-validated against that type — an
-  // out-of-union value (e.g. MASTRA_LLM_VENDOR=azure) can still arrive — so we
+  // out-of-union value (e.g. MASTRA_LLM_PROVIDER=azure) can still arrive — so we
   // re-validate here (Req 1.4).
-  const vendor = configManager.getConfig('mastra:llmVendor');
-  if (!isLlmVendor(vendor)) {
+  const provider = configManager.getConfig('mastra:llmProvider');
+  if (!isLlmProvider(provider)) {
     throw new Error(
-      `Unsupported Mastra LLM vendor "${vendor}" (expected one of: ${LLM_VENDORS.join(', ')})`,
+      `Unsupported Mastra LLM provider "${provider}" (expected one of: ${LLM_PROVIDERS.join(', ')})`,
     );
   }
 
@@ -36,13 +36,13 @@ export const resolveMastraModel = (): MastraModelConfig => {
   const apiKey = configManager.getConfig('mastra:llmApiKey');
   if (apiKey == null) {
     throw new Error(
-      `Mastra LLM API key is not configured for vendor "${vendor}" (set MASTRA_LLM_API_KEY)`,
+      `Mastra LLM API key is not configured for provider "${provider}" (set MASTRA_LLM_API_KEY)`,
     );
   }
 
-  // `mastra:llmModel` carries a single default (tuned for the default vendor).
+  // `mastra:llmModel` carries a single default (tuned for the default provider).
   const model = configManager.getConfig('mastra:llmModel');
 
-  memoizedModel = llmModelFactories[vendor]({ apiKey, model });
+  memoizedModel = llmModelFactories[provider]({ apiKey, model });
   return memoizedModel;
 };

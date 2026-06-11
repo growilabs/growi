@@ -21,10 +21,10 @@ export const growiAgent = new Agent({
 
   // Resolve the model lazily (DynamicArgument<MastraModelConfig>): the function
   // runs at use time, not at import time, so constructing the agent never throws
-  // even when the vendor/API key are unconfigured (Req 4.3). On misconfiguration
+  // even when the provider/API key are unconfigured (Req 4.3). On misconfiguration
   // resolveMastraModel() throws; the throw surfaces at request time and is
   // handled by the post-message route's existing try/catch (Req 4.4). Its
-  // message carries only the vendor name / missing-var name — never the API key
+  // message carries only the provider name / missing-var name — never the API key
   // (Req 4.1, 2.5).
   model: () => resolveMastraModel(),
   tools: {
