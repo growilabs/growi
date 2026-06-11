@@ -85,7 +85,7 @@
   - _Requirements: 2.4, 6.2, 6.3_
   - _Depends: 2, 4.3_
 
-- [ ] 4.5 エンジンディスパッチャ
+- [x] 4.5 エンジンディスパッチャ
   - engine id からエンジン実装を解決する static map（oneshot / agentic）を実装し、barrel からは実行関数のみを再エクスポートする（レジストリ等の拡張機構は作らない）
   - engine id 毎に対応する実装が実行されることがユニットテストで green
   - _Requirements: 5.1, 5.2, 5.4_
