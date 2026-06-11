@@ -91,9 +91,11 @@ export type MongoTermsKey = 'match' | 'not_match' | 'prefix' | 'not_prefix';
 export type ESQueryTerms = Pick<QueryTerms, ESTermsKey>;
 export type MongoQueryTerms = Pick<QueryTerms, MongoTermsKey>;
 
+// Holds filter values that require server-side resolution before being turned
+// into delegator query criteria. `editor:` is intentionally absent: it is
+// resolved directly against the dedicated `lastUpdatedUser` search index field
+// (see PR #11061), so it needs no page-id resolution here.
 export type ResolvedFilterData = {
-  editorPageIds: string[];
-  notEditorPageIds: string[];
   groupMemberUsernames: string[];
   notGroupMemberUsernames: string[];
 };

@@ -50,6 +50,22 @@ const filterXssOptions = {
 
 const filterXss = new FilterXSS(filterXssOptions);
 
+const FILTER_PREFIXES = [
+  'prefix:',
+  'tag:',
+  'author:',
+  'editor:',
+  'group:',
+] as const;
+// https://regex101.com/r/pN9XfK/2
+const NEGATIVE_TERM_REGEXP = new RegExp(
+  `^-(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
+// https://regex101.com/r/3qw9FQ/2
+const POSITIVE_TERM_REGEXP = new RegExp(
+  `^(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
+
 const normalizeQueryString = (_queryString: string): string => {
   let queryString = _queryString.trim();
   queryString = removeAiMenthion(queryString).replace(/\s+/g, ' ');
@@ -497,14 +513,8 @@ class SearchService implements SearchQueryParser, SearchResolver {
         return;
       }
 
-      // https://regex101.com/r/pN9XfK/2
-      const matchNegative = word.match(
-        /^-(prefix:|tag:|author:|editor:|group:)?(.+)$/,
-      );
-      // https://regex101.com/r/3qw9FQ/2
-      const matchPositive = word.match(
-        /^(prefix:|tag:|author:|editor:|group:)?(.+)$/,
-      );
+      const matchNegative = word.match(NEGATIVE_TERM_REGEXP);
+      const matchPositive = word.match(POSITIVE_TERM_REGEXP);
 
       if (matchNegative != null) {
         if (matchNegative[1] === 'prefix:') {
