@@ -16,11 +16,28 @@ const mocks = vi.hoisted(() => {
     generateMock: vi.fn(),
     getAgentMock: vi.fn(),
     resolveParentGrantMock: vi.fn(),
+    loggerInfoMock: vi.fn(),
+    loggerDebugMock: vi.fn(),
+    loggerWarnMock: vi.fn(),
+    loggerErrorMock: vi.fn(),
   };
 });
 
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig: mocks.getConfigMock },
+}));
+
+// The engine creates its logger at module scope via the factory default
+// export; mocking the factory lets the tests assert the exploration trace
+// contract (info summary + debug detail) per request (design.md
+// "AgenticEngine > State Management").
+vi.mock('~/utils/logger', () => ({
+  default: vi.fn(() => ({
+    info: mocks.loggerInfoMock,
+    debug: mocks.loggerDebugMock,
+    warn: mocks.loggerWarnMock,
+    error: mocks.loggerErrorMock,
+  })),
 }));
 
 // The real mastra-modules barrel transitively imports `@mastra/core/agent`,
@@ -101,6 +118,57 @@ const armAbortAwareGenerate = (): void => {
   );
 };
 
+// Runtime chunk shapes of steps[].toolCalls / steps[].toolResults as observed
+// on @mastra/core 1.41.0 (research.md "Spike Results" item 4).
+const toolCallChunk = (toolName: string, args: unknown): unknown => ({
+  type: 'tool-call',
+  runId: 'run-1',
+  from: 'AGENT',
+  payload: { toolCallId: 'call-1', toolName, args },
+});
+
+const toolResultChunk = (toolName: string, result: unknown): unknown => ({
+  type: 'tool-result',
+  runId: 'run-1',
+  from: 'AGENT',
+  payload: { toolCallId: 'call-1', toolName, result },
+});
+
+// Primes generate with a runtime-shaped full result (steps / totalUsage) and
+// simulates the agent loop consuming the search budget — the budget is the
+// engine's primary source for searchCount and the executed-query sequence.
+const primeGenerateWithExploration = (exploration: {
+  object: unknown;
+  queries?: readonly string[];
+  steps?: unknown;
+  totalUsage?: unknown;
+}): void => {
+  mocks.generateMock.mockImplementation(
+    (_messages: unknown, options: CapturedGenerateOptions) => {
+      const budget = options.requestContext.get('searchBudget');
+      for (const query of exploration.queries ?? []) {
+        budget.used += 1;
+        budget.queries.push(query);
+      }
+      return Promise.resolve({
+        object: exploration.object,
+        steps: exploration.steps,
+        totalUsage: exploration.totalUsage,
+      });
+    },
+  );
+};
+
+// AI SDK v5 usage shape (research.md "Spike Results" item 4) — the engine
+// must pick inputTokens / outputTokens / totalTokens and ignore the rest.
+const SAMPLE_TOTAL_USAGE = {
+  inputTokens: 1183,
+  outputTokens: 232,
+  totalTokens: 1415,
+  reasoningTokens: 0,
+  cachedInputTokens: 0,
+};
+
 const callEngine = (): ReturnType<typeof agenticEngine> =>
   agenticEngine({
     user: mockUser,
@@ -119,6 +187,10 @@ beforeEach(() => {
   mocks.getAgentMock.mockReturnValue({ generate: mocks.generateMock });
   mocks.resolveParentGrantMock.mockReset();
   mocks.resolveParentGrantMock.mockResolvedValue(1);
+  mocks.loggerInfoMock.mockClear();
+  mocks.loggerDebugMock.mockClear();
+  mocks.loggerWarnMock.mockClear();
+  mocks.loggerErrorMock.mockClear();
 });
 
 afterEach(() => {
@@ -461,6 +533,263 @@ describe('agenticEngine', () => {
       // second request would show the accumulated count (4) instead.
       expect(firstCtx.get('searchBudget').used).toBe(2);
       expect(secondCtx.get('searchBudget').used).toBe(2);
+    });
+  });
+
+  describe('exploration trace logging', () => {
+    const getInfoSummary = (): unknown => {
+      const call = mocks.loggerInfoMock.mock.calls[0];
+      if (call == null) {
+        throw new Error('logger.info was not called');
+      }
+      return call[0];
+    };
+
+    it('emits exactly one info summary containing all 7 contract fields — and nothing else — on success', async () => {
+      primeGenerateWithExploration({
+        object: outputWith([
+          suggestionEntry('/tech/', 1),
+          suggestionEntry('/notes/', 2),
+        ]),
+        queries: ['react hooks', 'react documentation'],
+        steps: [
+          {
+            toolCalls: [
+              toolCallChunk('fullTextSearch', { query: 'react hooks' }),
+              toolCallChunk('fullTextSearch', { query: 'react documentation' }),
+            ],
+            toolResults: [
+              toolResultChunk('fullTextSearch', {
+                result: 'ok',
+                hits: [{ pageId: 'p1', pagePath: '/tech/hit' }],
+                totalCount: 1,
+              }),
+            ],
+          },
+          {
+            toolCalls: [toolCallChunk('getPageContent', { pageId: 'p1' })],
+            toolResults: [
+              toolResultChunk('getPageContent', { body: 'page body text' }),
+            ],
+          },
+        ],
+        totalUsage: SAMPLE_TOTAL_USAGE,
+      });
+
+      await callEngine();
+
+      expect(mocks.loggerInfoMock).toHaveBeenCalledTimes(1);
+      // Exact shape: the summary line is an operational contract (the
+      // #183968 evaluator parses it) — extra fields would also risk
+      // leaking body-derived strings into info.
+      expect(getInfoSummary()).toEqual({
+        durationMs: expect.any(Number),
+        searchCount: 2,
+        pageReadCount: 1,
+        stopReason: 'completed',
+        informationType: 'stock',
+        suggestionCount: 2,
+        tokenUsage: { inputTokens: 1183, outputTokens: 232, totalTokens: 1415 },
+      });
+    });
+
+    it('reports stopReason "budget_exhausted" when the run completes with the budget fully used', async () => {
+      mocks.configValues.set(SEARCH_LIMIT_KEY, 2);
+      primeGenerateWithExploration({
+        object: outputWith([suggestionEntry('/a/', 1)]),
+        queries: ['first', 'second'], // used (2) reaches limit (2)
+        totalUsage: SAMPLE_TOTAL_USAGE,
+      });
+
+      await callEngine();
+
+      expect(getInfoSummary()).toMatchObject({
+        stopReason: 'budget_exhausted',
+        searchCount: 2,
+      });
+    });
+
+    it('emits the summary with stopReason "error" and still rejects when structured output fails validation', async () => {
+      primeGenerate({ informationType: 'neither', suggestions: [] });
+
+      await expect(callEngine()).rejects.toThrow(/validation/);
+
+      expect(mocks.loggerInfoMock).toHaveBeenCalledTimes(1);
+      expect(getInfoSummary()).toMatchObject({
+        stopReason: 'error',
+        informationType: null,
+        suggestionCount: 0,
+        tokenUsage: null,
+      });
+    });
+
+    it('emits the summary with stopReason "error" and still rejects when generate itself rejects', async () => {
+      mocks.generateMock.mockRejectedValue(new Error('provider down'));
+
+      await expect(callEngine()).rejects.toThrow('provider down');
+
+      expect(mocks.loggerInfoMock).toHaveBeenCalledTimes(1);
+      expect(getInfoSummary()).toMatchObject({
+        stopReason: 'error',
+        searchCount: 0,
+        pageReadCount: 0,
+        informationType: null,
+        suggestionCount: 0,
+        tokenUsage: null,
+      });
+    });
+
+    it('emits the summary with the known informationType and rethrows when grant resolution fails', async () => {
+      primeGenerate(outputWith([suggestionEntry('/a/', 1)], 'flow'));
+      mocks.resolveParentGrantMock.mockRejectedValueOnce(
+        new Error('mongo down'),
+      );
+
+      await expect(callEngine()).rejects.toThrow('mongo down');
+
+      expect(mocks.loggerInfoMock).toHaveBeenCalledTimes(1);
+      expect(getInfoSummary()).toMatchObject({
+        stopReason: 'error',
+        informationType: 'flow',
+        suggestionCount: 0,
+      });
+    });
+
+    it('emits the summary with stopReason "timeout" and still rejects when the timeout aborts generate', async () => {
+      vi.useFakeTimers();
+      armAbortAwareGenerate();
+
+      const enginePromise = callEngine();
+      const rejection = expect(enginePromise).rejects.toThrow(
+        'agentic engine timed out after 60000ms',
+      );
+      await vi.advanceTimersByTimeAsync(60_000);
+      await rejection;
+
+      expect(mocks.loggerInfoMock).toHaveBeenCalledTimes(1);
+      expect(getInfoSummary()).toMatchObject({
+        stopReason: 'timeout',
+        informationType: null,
+        suggestionCount: 0,
+      });
+    });
+
+    it('keeps body-derived strings (queries, snippets, document body) out of the info level', async () => {
+      const secretQuery = 'SECRET-BODY-DERIVED-QUERY';
+      const secretSnippet = 'SECRET-PAGE-BODY-SNIPPET';
+      primeGenerateWithExploration({
+        object: outputWith([suggestionEntry('/a/', 1)]),
+        queries: [secretQuery],
+        steps: [
+          {
+            toolCalls: [
+              toolCallChunk('fullTextSearch', { query: secretQuery }),
+            ],
+            toolResults: [
+              toolResultChunk('fullTextSearch', {
+                result: 'ok',
+                hits: [
+                  { pageId: 'p1', pagePath: '/a/page', snippet: secretSnippet },
+                ],
+                totalCount: 1,
+              }),
+            ],
+          },
+        ],
+        totalUsage: SAMPLE_TOTAL_USAGE,
+      });
+
+      await callEngine();
+
+      // Guard against vacuous truth: the privacy assertions below are only
+      // meaningful when a summary line was actually emitted.
+      expect(mocks.loggerInfoMock).toHaveBeenCalledTimes(1);
+      const serializedInfoCalls = JSON.stringify(
+        mocks.loggerInfoMock.mock.calls,
+      );
+      expect(serializedInfoCalls).not.toContain(secretQuery);
+      expect(serializedInfoCalls).not.toContain(secretSnippet);
+      expect(serializedInfoCalls).not.toContain('Some document content');
+    });
+
+    it('emits a debug trace with the executed query sequence, hit summaries, and the tool-call sequence', async () => {
+      primeGenerateWithExploration({
+        object: outputWith([suggestionEntry('/a/', 1)]),
+        queries: ['first query', 'second query'],
+        steps: [
+          {
+            toolCalls: [
+              toolCallChunk('fullTextSearch', { query: 'first query' }),
+              toolCallChunk('fullTextSearch', { query: 'second query' }),
+            ],
+            toolResults: [
+              toolResultChunk('fullTextSearch', {
+                result: 'ok',
+                hits: [
+                  { pageId: 'p1', pagePath: '/a/hit-1', snippet: 'excerpt' },
+                  { pageId: 'p2', pagePath: '/a/hit-2' },
+                ],
+                totalCount: 12,
+              }),
+              toolResultChunk('fullTextSearch', {
+                result: 'error',
+                reason: 'es down',
+              }),
+            ],
+          },
+          {
+            toolCalls: [toolCallChunk('getPageContent', { pageId: 'p1' })],
+            toolResults: [
+              toolResultChunk('getPageContent', { body: 'page body text' }),
+            ],
+          },
+        ],
+        totalUsage: SAMPLE_TOTAL_USAGE,
+      });
+
+      await callEngine();
+
+      expect(mocks.loggerDebugMock).toHaveBeenCalledTimes(1);
+      const [trace] = mocks.loggerDebugMock.mock.calls[0];
+      // Exact shape: hit summaries carry kind/count/paths only (snippets are
+      // page-body excerpts and stay out even at debug), and tool RESULTS are
+      // never logged (getPageContent results contain page bodies).
+      expect(trace).toEqual({
+        queries: ['first query', 'second query'],
+        searchResults: [
+          {
+            resultKind: 'ok',
+            totalCount: 12,
+            hitPaths: ['/a/hit-1', '/a/hit-2'],
+          },
+          { resultKind: 'error', totalCount: null, hitPaths: [] },
+        ],
+        toolCallSequence: [
+          { toolName: 'fullTextSearch', args: { query: 'first query' } },
+          { toolName: 'fullTextSearch', args: { query: 'second query' } },
+          { toolName: 'getPageContent', args: { pageId: 'p1' } },
+        ],
+      });
+    });
+
+    it('never lets malformed steps break the engine: suggestions still returned, counts fall back to zero/empty', async () => {
+      primeGenerateWithExploration({
+        object: outputWith([suggestionEntry('/a/', 1)]),
+        steps: 'not-an-array',
+        totalUsage: 7, // malformed: not an object
+      });
+
+      const result = await callEngine();
+
+      expect(result).toHaveLength(1);
+      expect(getInfoSummary()).toMatchObject({
+        pageReadCount: 0,
+        tokenUsage: null,
+      });
+      expect(mocks.loggerDebugMock.mock.calls[0]?.[0]).toMatchObject({
+        searchResults: [],
+        toolCallSequence: [],
+      });
     });
   });
 });

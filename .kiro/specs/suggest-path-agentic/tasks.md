@@ -76,7 +76,7 @@
   - _Requirements: 1.1, 1.4, 2.3, 3.3, 4.2, 4.4, 4.5, 5.5_
   - _Depends: 3.3, 4.2_
 
-- [ ] 4.4 agentic エンジンの探索過程トレースログ
+- [x] 4.4 agentic エンジンの探索過程トレースログ
   - info サマリログ（リクエスト毎 1 行: 処理時間・検索回数・ページ参照回数・stopReason・informationType・提案件数・トークン使用量）を実装する。stopReason の判定規則（timeout / budget_exhausted / error / completed）を実装し、reject 経路でも catch してサマリを出力してから rethrow する
   - debug 詳細ログ（実行クエリ列と各ヒット概要、steps から再構成した tool 呼び出しシーケンス）を実装する
   - プライバシー制約を守る: 文書本文・本文由来の検索クエリは debug レベル限定、info にはメタ情報（件数・時間・トークン）のみ

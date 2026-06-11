@@ -4,6 +4,7 @@ import { mastra } from '~/features/mastra/server/services/mastra-modules';
 import type { SuggestPathRequestContextShape } from '~/features/mastra/server/services/mastra-modules/agents/suggest-path';
 import { configManager } from '~/server/service/config-manager';
 import type SearchServiceImpl from '~/server/service/search';
+import loggerFactory from '~/utils/logger';
 
 import type { PathSuggestion } from '../../../interfaces/suggest-path-types';
 import { SuggestionType } from '../../../interfaces/suggest-path-types';
@@ -13,9 +14,30 @@ import {
   AGENTIC_OUTPUT_JSON_SCHEMA,
   isAgenticEngineOutput,
 } from './agentic-output-schema';
+import type { StopReason } from './agentic-trace-log';
+import {
+  extractSearchHitSummaries,
+  extractToolCallRecords,
+  GET_PAGE_CONTENT_TOOL_NAME,
+  pickTokenUsage,
+} from './agentic-trace-log';
 import type { SuggestPathEngine } from './engine-types';
 
+const logger = loggerFactory('growi:ai-tools:suggest-path:agentic-engine');
+
 const SUGGESTION_CAP = 3;
+
+/**
+ * Loosely-typed view of the generate result for trace reconstruction: the
+ * steps / totalUsage shapes are runtime-observed (research.md "Spike
+ * Results" item 4) and the trace helpers consume them as `unknown`, so the
+ * engine does not depend on Mastra's generate return generics here.
+ */
+type GenerateResultView = {
+  readonly object?: unknown;
+  readonly steps?: unknown;
+  readonly totalUsage?: unknown;
+};
 
 /**
  * Normalize a proposed path to a "/segment/.../" parent-directory form
@@ -87,8 +109,10 @@ const buildUserPrompt = (body: string): string => {
  *
  * Failure contract (Requirement 4.5): structured-output validation failure,
  * agent/provider exceptions, and timeouts all reject — the orchestrator
- * catches the rejection and falls back to the memo-only response.
- * Exploration trace logging is added separately (task 4.4).
+ * catches the rejection and falls back to the memo-only response. Every
+ * path, including the reject ones, emits one info summary line before
+ * settling (design.md "AgenticEngine > State Management"; Requirements 2.4,
+ * 6.2, 6.3).
  *
  * Requirement 5.5: this engine must not import any of the oneshot-specific
  * services (analyze-content / retrieve-search-candidates /
@@ -98,6 +122,7 @@ export const agenticEngine: SuggestPathEngine = async (
   input,
 ): Promise<PathSuggestion[]> => {
   const { user, body, searchService } = input;
+  const startedAt = Date.now();
 
   // Operational settings are read per request so a config change takes
   // effect without a server restart (Requirement 3.3).
@@ -120,11 +145,14 @@ export const agenticEngine: SuggestPathEngine = async (
     'searchService',
     searchService as unknown as SearchServiceImpl,
   );
-  requestContext.set('searchBudget', {
+  // Kept as a local reference: the budget is the primary source for the
+  // trace (searchCount, executed-query sequence) after the agent loop ran.
+  const searchBudget: SuggestPathRequestContextShape['searchBudget'] = {
     limit: searchLimit,
     used: 0,
     queries: [],
-  });
+  };
+  requestContext.set('searchBudget', searchBudget);
 
   // Registry retrieval (NOT a direct Agent import): keeps platform
   // configuration consistent and mirrors the chat-side handler pattern.
@@ -137,55 +165,121 @@ export const agenticEngine: SuggestPathEngine = async (
     );
   }, timeoutMs);
 
-  // Inline wrapper so the timer is ALWAYS cleared once generate settles
-  // (success or failure), while `result` stays in scope for the mapping
-  // below (and for the trace logging added in task 4.4, which reads
-  // result.steps / usage and the budget object).
-  const result = await (async () => {
+  // Observability state shared between the success and reject paths: the
+  // trace emitter reads whatever is known at emission time, so a reject
+  // after validation still reports the classified informationType while an
+  // earlier reject reports explicit nulls (one consistent line shape — the
+  // summary is an operational contract parsed by the #183968 evaluator).
+  let result: GenerateResultView | undefined;
+  let informationType: AgenticEngineOutput['informationType'] | null = null;
+  let suggestionCount = 0;
+
+  const emitTraceLogs = (stopReason: StopReason): void => {
+    // Logging must never alter engine behavior: any unexpected failure in
+    // trace reconstruction is contained here instead of propagating.
     try {
-      return await agent.generate(buildUserPrompt(body), {
-        structuredOutput: { schema: AGENTIC_OUTPUT_JSON_SCHEMA },
-        // Step ceiling as a secondary defense against loop runaway (the
-        // budget and the timeout are the primary controls): each search can
-        // cost up to 2 steps (tool call + follow-up reasoning), +4 covers
-        // classification and final shaping (design.md call contract).
-        maxSteps: 2 * searchLimit + 4,
-        abortSignal: controller.signal,
-        requestContext,
-      });
-    } finally {
-      clearTimeout(timeoutTimer);
+      const toolCalls = extractToolCallRecords(result?.steps);
+      // info carries meta information only — document body and the
+      // body-derived search queries are restricted to debug level
+      // (design.md privacy constraint).
+      logger.info(
+        {
+          durationMs: Date.now() - startedAt,
+          searchCount: searchBudget.used,
+          pageReadCount: toolCalls.filter(
+            (call) => call.toolName === GET_PAGE_CONTENT_TOOL_NAME,
+          ).length,
+          stopReason,
+          informationType,
+          suggestionCount,
+          tokenUsage: pickTokenUsage(result?.totalUsage),
+        },
+        'suggest-path agentic exploration summary',
+      );
+      logger.debug(
+        {
+          queries: [...searchBudget.queries],
+          searchResults: extractSearchHitSummaries(result?.steps),
+          toolCallSequence: toolCalls,
+        },
+        'suggest-path agentic exploration trace',
+      );
+    } catch (logErr) {
+      logger.warn(
+        'failed to emit suggest-path agentic exploration trace logs',
+        logErr,
+      );
     }
-  })();
+  };
 
-  // Defense in depth (output-mapping rule 1): Mastra's structuring pass
-  // already enforces the JSON Schema, but the engine re-validates before
-  // trusting the shape.
-  const output: unknown = result.object;
-  if (!isAgenticEngineOutput(output)) {
-    throw new Error(
-      'agentic engine returned an output that failed structured-output validation',
+  try {
+    // Inline wrapper so the timer is ALWAYS cleared once generate settles
+    // (success or failure), while `result` stays in scope for the mapping
+    // and the trace emission below.
+    result = await (async () => {
+      try {
+        return await agent.generate(buildUserPrompt(body), {
+          structuredOutput: { schema: AGENTIC_OUTPUT_JSON_SCHEMA },
+          // Step ceiling as a secondary defense against loop runaway (the
+          // budget and the timeout are the primary controls): each search can
+          // cost up to 2 steps (tool call + follow-up reasoning), +4 covers
+          // classification and final shaping (design.md call contract).
+          maxSteps: 2 * searchLimit + 4,
+          abortSignal: controller.signal,
+          requestContext,
+        });
+      } finally {
+        clearTimeout(timeoutTimer);
+      }
+    })();
+
+    // Defense in depth (output-mapping rule 1): Mastra's structuring pass
+    // already enforces the JSON Schema, but the engine re-validates before
+    // trusting the shape.
+    const output: unknown = result.object;
+    if (!isAgenticEngineOutput(output)) {
+      throw new Error(
+        'agentic engine returned an output that failed structured-output validation',
+      );
+    }
+    informationType = output.informationType;
+
+    const normalized = toNormalizedSuggestions(output);
+
+    // Grants are resolved in parallel (output-mapping rule 4). A grant
+    // resolution failure rejects the whole engine via Promise.all — matching
+    // the oneshot evaluate-pipeline semantics, where one grant failure fails
+    // the whole search-suggestion branch; the orchestrator's memo fallback
+    // absorbs the rejection (Requirement 4.5).
+    const suggestions = await Promise.all(
+      normalized.map(async (suggestion): Promise<PathSuggestion> => {
+        const grant = await resolveParentGrant(suggestion.path);
+        return {
+          type: SuggestionType.SEARCH,
+          path: suggestion.path,
+          label: suggestion.label,
+          description: suggestion.description,
+          grant,
+          informationType: output.informationType,
+        };
+      }),
     );
+    suggestionCount = suggestions.length;
+
+    // stopReason rules (design.md): budget_exhausted = normal completion
+    // with the search budget fully used; completed = any other normal run.
+    emitTraceLogs(
+      searchBudget.used >= searchBudget.limit
+        ? 'budget_exhausted'
+        : 'completed',
+    );
+    return suggestions;
+  } catch (err) {
+    // Reject paths emit the summary BEFORE rethrowing (Requirement 4.5
+    // keeps the rejection contract intact). Timeout detection is tied to
+    // the engine's own AbortController state — not to error-message
+    // parsing — so provider-side abort wrapping cannot misclassify it.
+    emitTraceLogs(controller.signal.aborted ? 'timeout' : 'error');
+    throw err;
   }
-
-  const normalized = toNormalizedSuggestions(output);
-
-  // Grants are resolved in parallel (output-mapping rule 4). A grant
-  // resolution failure rejects the whole engine via Promise.all — matching
-  // the oneshot evaluate-pipeline semantics, where one grant failure fails
-  // the whole search-suggestion branch; the orchestrator's memo fallback
-  // absorbs the rejection (Requirement 4.5).
-  return Promise.all(
-    normalized.map(async (suggestion): Promise<PathSuggestion> => {
-      const grant = await resolveParentGrant(suggestion.path);
-      return {
-        type: SuggestionType.SEARCH,
-        path: suggestion.path,
-        label: suggestion.label,
-        description: suggestion.description,
-        grant,
-        informationType: output.informationType,
-      };
-    }),
-  );
 };
