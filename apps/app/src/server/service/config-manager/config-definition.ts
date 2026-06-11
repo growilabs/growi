@@ -293,6 +293,7 @@ export const CONFIG_KEYS = [
   'mastra:llmAzureOpenaiResourceName',
   'mastra:llmAzureOpenaiBaseUrl',
   'mastra:llmAzureOpenaiApiVersion',
+  'mastra:llmAzureOpenaiUseEntraId',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1318,6 +1319,15 @@ export const CONFIG_DEFINITIONS = {
   'mastra:llmAzureOpenaiApiVersion': defineConfig<string | undefined>({
     envVarName: 'MASTRA_LLM_AZURE_OPENAI_API_VERSION',
     defaultValue: undefined,
+  }),
+  // When true, authenticate to Azure OpenAI with Microsoft Entra ID (managed
+  // identity / DefaultAzureCredential) instead of an API key. In this mode
+  // MASTRA_LLM_API_KEY is not required; the credential is resolved from the
+  // ambient Azure environment by @azure/identity. Only meaningful when
+  // mastra:llmProvider='azure-openai'.
+  'mastra:llmAzureOpenaiUseEntraId': defineConfig<boolean>({
+    envVarName: 'MASTRA_LLM_AZURE_OPENAI_USE_ENTRA_ID',
+    defaultValue: false,
   }),
 
   // OpenTelemetry Settings

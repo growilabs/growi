@@ -16,8 +16,10 @@ const {
   googleFactory,
   azureFactory,
 } = vi.hoisted(() => {
+  // Permissive params for the factory spies: apiKey is optional because the
+  // azure-openai/Entra ID path forwards no key.
   type FactoryParams = {
-    apiKey: string;
+    apiKey?: string;
     model: string;
     azureOpenai?: unknown;
   };
@@ -49,17 +51,34 @@ vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig },
 }));
 
-vi.mock('./llm-providers', () => ({
-  llmModelFactories: {
+// The resolver dispatches through buildLlmModel(provider, params); the mock
+// routes to the per-provider factory spies so tests can assert which factory ran
+// and with what params (mirroring the real generic dispatch).
+vi.mock('./llm-providers', () => {
+  const factoriesByProvider: Record<
+    string,
+    (params: {
+      apiKey?: string;
+      model: string;
+      azureOpenai?: unknown;
+    }) => unknown
+  > = {
     openai: openaiFactory,
     anthropic: anthropicFactory,
     google: googleFactory,
     'azure-openai': azureFactory,
-  },
-}));
+  };
+  return {
+    buildLlmModel: (
+      provider: string,
+      params: { apiKey?: string; model: string; azureOpenai?: unknown },
+    ) => factoriesByProvider[provider](params),
+  };
+});
 
-// Single provider-agnostic config surface: provider + apiKey + (optional) model.
-type ConfigFixture = Partial<Record<ConfigKey, string | undefined>>;
+// Single provider-agnostic config surface: provider + apiKey + (optional) model
+// + Azure-only keys (boolean useEntraId included).
+type ConfigFixture = Partial<Record<ConfigKey, string | boolean | undefined>>;
 
 const applyConfig = (fixture: ConfigFixture): void => {
   getConfig.mockImplementation((key: ConfigKey) =>
@@ -210,6 +229,24 @@ describe('resolveMastraModel', () => {
         apiKey: 'az-key',
         model: 'my-deployment',
         azureOpenai: { resourceName: 'my-resource' },
+      });
+    });
+
+    it('allows a missing apiKey and forwards useEntraId when Entra ID auth is enabled (Req 8)', async () => {
+      applyConfig({
+        'mastra:llmProvider': 'azure-openai',
+        // no mastra:llmApiKey — Entra ID is the credential
+        'mastra:llmModel': 'my-deployment',
+        'mastra:llmAzureOpenaiResourceName': 'my-resource',
+        'mastra:llmAzureOpenaiUseEntraId': true,
+      });
+      const { resolveMastraModel } = await loadResolver();
+
+      // The missing API key must NOT throw when Entra ID is configured.
+      expect(() => resolveMastraModel()).not.toThrow();
+      expect(azureFactory).toHaveBeenCalledWith({
+        model: 'my-deployment',
+        azureOpenai: { resourceName: 'my-resource', useEntraId: true },
       });
     });
 

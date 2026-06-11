@@ -114,7 +114,7 @@
 
 - [ ] 7.4 Azure native provider ファクトリ
   - `azure-openai.ts` を新設し、`createAzure` を明示的 API キー注入で生成して `(deploymentName)` を適用する薄いアダプタを実装する。`resourceName`/`baseURL` は排他（baseURL 優先）で渡し、`apiVersion` は設定時のみ付与する
-  - **いずれのエンドポイント設定も無い場合はファクトリ内で throw**（欠落 env 名を名指し・API キー値非含）。`AzureOpenaiProviderConfig` 型を定義し、barrel の `LlmModelFactory` に任意フィールド `azureOpenai?` を追加、`llmModelFactories` に `'azure-openai': createAzureOpenaiModel` を登録する
+  - **いずれのエンドポイント設定も無い場合はファクトリ内で throw**（欠落 env 名を名指し・API キー値非含）。`AzureOpenaiProviderConfig` 型を定義し、barrel の provider 別引数型マップ（`LlmModelFactoryParams`）に azure-openai 用の引数型を加え、`llmModelFactories` に `'azure-openai': createAzureOpenaiModel` を登録する
   - co-located unit test: resourceName 経路／baseURL 経路／両指定→baseURL 優先／apiVersion 任意／いずれも無い→throw（メッセージにキー値非含）（`@ai-sdk/azure` を mock）
   - 観測可能: 各経路で言語モデルが生成され、排他渡し・throw 分岐がテストで green。`Object.keys(llmModelFactories)` が `LLM_PROVIDERS` と一致
   - _Requirements: 1.2, 7.2, 7.3, 7.4, 7.5_
@@ -135,3 +135,28 @@
   - _Requirements: 1.1, 7.x_
   - _Boundary: mastra LLM modules（参照のみ）_
   - _Depends: 7.4, 7.5_
+
+## Scope Expansion (Req 8 — Azure OpenAI Entra ID auth)
+- [ ] 8. Azure OpenAI の Microsoft Entra ID 認証
+- [ ] 8.1 認証方式フラグの config
+  - `mastra:llmAzureOpenaiUseEntraId`（`boolean`・default `false`・env `MASTRA_LLM_AZURE_OPENAI_USE_ENTRA_ID`・非 secret）を追加する。`@azure/identity` は既存依存のため追加不要
+  - 観測可能: フラグが config として解決でき、未指定時 false
+  - _Requirements: 8.1, 8.2_
+  - _Boundary: config-definition_
+
+- [ ] 8.2 認証契約を型で表現（provider 別引数型 + ジェネリックディスパッチ）
+  - factory 引数を provider ごとに型付け（`LlmModelFactoryParams`）: key-based（openai/anthropic/google）は `apiKey: string` **必須**、azure-openai は `apiKey?: string`。key-based のランタイム null ガードは持たない（型で保証）。resolver は `buildLlmModel<P>(provider, params)`（correlated dispatch・キャストなし）経由で呼ぶ
+  - azure-openai factory: `AzureOpenaiProviderConfig` に `useEntraId?` を追加し、真なら `getBearerTokenProvider(new DefaultAzureCredential(), 'https://cognitiveservices.azure.com/.default')` を `tokenProvider` として渡す（apiKey 不使用・`@azure/identity` は static import）。偽なら apiKey（欠落で throw）。エンドポイント検証は両方式共通
+  - co-located unit test: Entra ID 経路（tokenProvider を渡し apiKey 非送出・`@azure/identity` は vi.mock で確定化）／apiKey も Entra ID も無い→throw／key-based factory の apiKey 欠落 throw
+  - 観測可能: 上記分岐が green（確定的・高速）
+  - _Requirements: 8.1, 8.3, 8.4, 8.5_
+  - _Boundary: llm-providers（azure-openai, openai, anthropic, google, index）_
+  - _Depends: 8.1_
+
+- [ ] 8.3 resolver の apiKey 必須チェック緩和
+  - `useEntraId` を読み、`apiKey == null && !useEntraId` のときだけ throw に緩和する（provider 名ではなく config フラグで分岐）。`azureOpenai` には `useEntraId` を**有効時のみ**付与し、非破壊（API キー経路の呼び出し形状を不変に保つ）
+  - co-located unit test: provider=azure-openai + useEntraId + apiKey 無し→throw せず `useEntraId: true` を付与／既存の apiKey 欠落 throw（非 Entra ID）は維持
+  - 観測可能: 上記が green、既存テスト不変
+  - _Requirements: 8.3, 8.4_
+  - _Boundary: resolve-mastra-model_
+  - _Depends: 8.1, 8.2_

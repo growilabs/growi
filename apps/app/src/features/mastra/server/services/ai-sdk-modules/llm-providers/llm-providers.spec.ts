@@ -11,6 +11,9 @@ const {
   createAnthropic,
   createGoogleGenerativeAI,
   createAzure,
+  DefaultAzureCredential,
+  getBearerTokenProvider,
+  tokenProviderSentinel,
   openaiProviderFn,
   anthropicProviderFn,
   googleProviderFn,
@@ -32,26 +35,34 @@ const {
     tag: 'azure-model',
     model,
   }));
+  // Sentinel returned by the mocked getBearerTokenProvider so the Entra ID test
+  // can assert it is forwarded to createAzure as `tokenProvider`.
+  const tokenProviderSentinel = (): Promise<string> =>
+    Promise.resolve('fake-token');
   return {
     openaiProviderFn,
     anthropicProviderFn,
     googleProviderFn,
     azureProviderFn,
+    tokenProviderSentinel,
     createOpenAI: vi.fn((_opts: { apiKey: string }) => openaiProviderFn),
     createAnthropic: vi.fn((_opts: { apiKey: string }) => anthropicProviderFn),
     createGoogleGenerativeAI: vi.fn(
       (_opts: { apiKey: string }) => googleProviderFn,
     ),
-    // Azure accepts resourceName | baseURL (mutually exclusive) and optional
-    // apiVersion alongside the apiKey.
+    // Azure accepts resourceName | baseURL (mutually exclusive), optional
+    // apiVersion, and either an apiKey or a tokenProvider (Entra ID).
     createAzure: vi.fn(
       (_opts: {
-        apiKey: string;
+        apiKey?: string;
+        tokenProvider?: () => Promise<string>;
         resourceName?: string;
         baseURL?: string;
         apiVersion?: string;
       }) => azureProviderFn,
     ),
+    DefaultAzureCredential: vi.fn(),
+    getBearerTokenProvider: vi.fn(() => tokenProviderSentinel),
   };
 });
 
@@ -59,6 +70,12 @@ vi.mock('@ai-sdk/openai', () => ({ createOpenAI }));
 vi.mock('@ai-sdk/anthropic', () => ({ createAnthropic }));
 vi.mock('@ai-sdk/google', () => ({ createGoogleGenerativeAI }));
 vi.mock('@ai-sdk/azure', () => ({ createAzure }));
+// Mock @azure/identity (static import in azure-openai.ts) so the Entra ID path
+// is deterministic and fast — no real credential chain is constructed.
+vi.mock('@azure/identity', () => ({
+  DefaultAzureCredential,
+  getBearerTokenProvider,
+}));
 
 import { createAnthropicModel } from './anthropic';
 import { createAzureOpenaiModel } from './azure-openai';
@@ -191,7 +208,45 @@ describe('llm provider factories', () => {
         expect((e as Error).message).not.toContain(apiKey);
       }
     });
+
+    it('authenticates via Microsoft Entra ID (tokenProvider) instead of an apiKey when useEntraId is set', () => {
+      const result = createAzureOpenaiModel({
+        // no apiKey in Entra ID mode
+        model: 'my-deployment',
+        azureOpenai: { resourceName: 'my-resource', useEntraId: true },
+      });
+
+      // Observable contract: a token provider (Entra ID) — not an apiKey — is
+      // forwarded to the SDK alongside the endpoint.
+      expect(getBearerTokenProvider).toHaveBeenCalledWith(
+        expect.anything(),
+        'https://cognitiveservices.azure.com/.default',
+      );
+      expect(createAzure).toHaveBeenCalledWith({
+        resourceName: 'my-resource',
+        tokenProvider: tokenProviderSentinel,
+      });
+      expect(createAzure).not.toHaveBeenCalledWith(
+        expect.objectContaining({ apiKey: expect.anything() }),
+      );
+      expect(azureProviderFn).toHaveBeenCalledWith('my-deployment');
+      expect(result).toEqual({ tag: 'azure-model', model: 'my-deployment' });
+    });
+
+    it('throws when neither an apiKey nor Entra ID is configured (endpoint present)', () => {
+      expect(() =>
+        createAzureOpenaiModel({
+          model: 'dep',
+          azureOpenai: { resourceName: 'my-resource' },
+        }),
+      ).toThrow(/MASTRA_LLM_API_KEY|MASTRA_LLM_AZURE_OPENAI_USE_ENTRA_ID/);
+      expect(createAzure).not.toHaveBeenCalled();
+    });
   });
+
+  // Note: openai/anthropic/google require `apiKey` at the type level
+  // (LlmModelFactoryParams), so a missing key is a compile error rather than a
+  // runtime guard — there is nothing to assert at runtime for that case.
 
   describe('apiKey is injected explicitly (not from process.env)', () => {
     it('passes the given apiKey through even when an env var is present', () => {

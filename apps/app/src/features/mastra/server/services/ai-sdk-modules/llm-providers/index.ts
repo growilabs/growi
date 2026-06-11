@@ -10,30 +10,50 @@ import {
 import { createGoogleModel } from './google';
 import { createOpenAiModel } from './openai';
 
+// Per-provider factory params. Each provider declares exactly what it needs, so
+// the requirement is expressed in the type — no runtime apiKey guard:
+//   - key-based providers (openai/anthropic/google) REQUIRE `apiKey`.
+//   - azure-openai makes `apiKey` OPTIONAL (it can authenticate via Microsoft
+//     Entra ID instead) and additionally takes endpoint config.
 // Factories return MastraModelConfig (the type @mastra/core's Agent.model
-// accepts), not `ai`'s broad LanguageModel union — the latter also includes a
-// bare model-id string form that is not assignable to MastraModelConfig. The
-// concrete provider objects these factories build ARE valid MastraModelConfig
-// members, so the whole pipeline stays cast-free.
-//
-// `azureOpenai` is an optional, Azure-OpenAI-only field: Azure OpenAI needs a
-// resource-specific endpoint, which { apiKey, model } cannot express. The
-// resolver forwards it only when the operator set MASTRA_LLM_AZURE_OPENAI_* (so
-// other providers keep being called with exactly { apiKey, model }). The
-// narrower { apiKey, model } factories (openai/anthropic/google) remain
-// assignable to this wider type, so they need no change.
-type LlmModelFactory = (params: {
-  apiKey: string;
+// accepts), not `ai`'s broad LanguageModel union; the concrete provider objects
+// they build ARE valid MastraModelConfig members, so the pipeline stays cast-free.
+type ApiKeyFactoryParams = { apiKey: string; model: string };
+type AzureOpenaiFactoryParams = {
+  apiKey?: string;
   model: string;
   azureOpenai?: AzureOpenaiProviderConfig;
-}) => MastraModelConfig;
+};
 
-// Data-driven provider -> factory map. Consumers select by provider key and must
-// not branch on the provider name. Adding a provider requires only a new entry here
-// plus the corresponding LlmProvider union member.
-export const llmModelFactories: Record<LlmProvider, LlmModelFactory> = {
+export type LlmModelFactoryParams = {
+  openai: ApiKeyFactoryParams;
+  anthropic: ApiKeyFactoryParams;
+  google: ApiKeyFactoryParams;
+  'azure-openai': AzureOpenaiFactoryParams;
+};
+
+// Data-driven provider -> factory map, each entry typed with its own params
+// (homomorphic mapped type preserves the per-provider signature). Adding a
+// provider requires a new entry here, its params above, and the LlmProvider
+// union member.
+const llmModelFactories: {
+  [P in LlmProvider]: (params: LlmModelFactoryParams[P]) => MastraModelConfig;
+} = {
   openai: createOpenAiModel,
   anthropic: createAnthropicModel,
   google: createGoogleModel,
   'azure-openai': createAzureOpenaiModel,
 };
+
+// Generic dispatch that keeps the (provider, params) correlation: indexing both
+// the factory map and the params type by the same `P` lets the call type-check
+// without branching on the provider name and without a cast. Consumers (the
+// resolver) call this instead of reaching into the map, so the per-provider
+// param contract is enforced at the boundary.
+export const buildLlmModel = <P extends LlmProvider>(
+  provider: P,
+  params: LlmModelFactoryParams[P],
+): MastraModelConfig => llmModelFactories[provider](params);
+
+// Re-exported for completeness assertions (every provider has a factory).
+export { llmModelFactories };

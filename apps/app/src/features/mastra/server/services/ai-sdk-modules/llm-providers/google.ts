@@ -3,7 +3,8 @@ import type { MastraModelConfig } from '@mastra/core/llm';
 
 // Thin adapter: create the native Google Generative AI provider with an
 // explicitly injected API key (never relying on the provider's process.env
-// auto-detection) and apply the model id.
+// auto-detection) and apply the model id. `apiKey` is required by the type (the
+// resolver guarantees it), so no runtime guard is needed here.
 export const createGoogleModel = (params: {
   apiKey: string;
   model: string;

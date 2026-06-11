@@ -6,7 +6,7 @@ import {
 } from '~/features/mastra/interfaces/llm-provider';
 import { configManager } from '~/server/service/config-manager';
 
-import { llmModelFactories } from './llm-providers';
+import { buildLlmModel } from './llm-providers';
 
 // Memoize the resolved model so the native provider object is built once and
 // reused across calls. On misconfiguration the function throws (and does not
@@ -32,9 +32,18 @@ export const resolveMastraModel = (): MastraModelConfig => {
     );
   }
 
-  // The error message must never include the API key value (only its absence).
+  // Azure OpenAI can authenticate via Microsoft Entra ID (managed identity)
+  // instead of an API key. This flag is the single signal that an alternative
+  // credential is configured; the resolver branches on it (config presence), not
+  // on the provider name. It is meaningless for non-Azure providers (default
+  // false), so their API-key requirement below is unaffected.
+  const useEntraId =
+    configManager.getConfig('mastra:llmAzureOpenaiUseEntraId') === true;
+
+  // An API key is required UNLESS an alternative credential (Entra ID) is in
+  // use. The message must never include the API key value (only its absence).
   const apiKey = configManager.getConfig('mastra:llmApiKey');
-  if (apiKey == null) {
+  if (apiKey == null && !useEntraId) {
     throw new Error(
       `Mastra LLM API key is not configured for provider "${provider}" (set MASTRA_LLM_API_KEY)`,
     );
@@ -63,15 +72,19 @@ export const resolveMastraModel = (): MastraModelConfig => {
   const azureOpenai =
     azureOpenaiResourceName != null ||
     azureOpenaiBaseUrl != null ||
-    azureOpenaiApiVersion != null
+    azureOpenaiApiVersion != null ||
+    useEntraId
       ? {
           resourceName: azureOpenaiResourceName,
           baseURL: azureOpenaiBaseUrl,
           apiVersion: azureOpenaiApiVersion,
+          // Only carry the flag when enabled, so the API-key path's call shape
+          // stays minimal (and existing assertions on it are unaffected).
+          ...(useEntraId ? { useEntraId: true } : {}),
         }
       : undefined;
 
-  memoizedModel = llmModelFactories[provider]({
+  memoizedModel = buildLlmModel(provider, {
     apiKey,
     model,
     ...(azureOpenai != null ? { azureOpenai } : {}),
