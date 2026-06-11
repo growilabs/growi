@@ -83,7 +83,7 @@
   - pdf 形式で `.wiki`＋`<style>` 入り HTML を所定パスへ出力 / md 形式は不変 / 変換 reject 時のジョブエラー化 / resume 挙動維持 を検証する（observable）
   - _Requirements: 5.1, 5.2, 5.3, 3.2_
   - _Depends: 5.1_
-- [ ]* 7.2 実機 bulk export（PDF）の描画検証
+- [x]* 7.2 実機 bulk export（PDF）の描画検証
   - 実際に PDF を生成・描画し、表・引用・見出しが `.wiki` スタイル（枠線色等の `--bs-*` 由来含む）で描画され、数式が KaTeX フォントで崩れず描画されることを目視で確認する（dedup キャッシュは対象外のため、検証時はページ編集等でハッシュを変える）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1_
   - _Depends: 5.1_
