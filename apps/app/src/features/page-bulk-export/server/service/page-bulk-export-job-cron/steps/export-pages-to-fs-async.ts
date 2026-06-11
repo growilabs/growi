@@ -18,7 +18,7 @@ import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bu
 import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
 import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
-import { createBulkExportMarkdownRenderer } from '../markdown/bulk-export-markdown-renderer';
+import { createBulkExportMarkdownRenderer } from '../markdown';
 import { createBulkExportStyleProvider } from '../markdown/styles';
 
 const logger = loggerFactory(

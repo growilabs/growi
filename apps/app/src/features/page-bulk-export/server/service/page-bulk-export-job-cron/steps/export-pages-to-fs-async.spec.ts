@@ -29,7 +29,7 @@ import {
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
-import * as RendererModule from '../markdown/bulk-export-markdown-renderer';
+import * as RendererModule from '../markdown';
 import {
   exportPagesToFsAsync,
   getPageWritable,
