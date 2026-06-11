@@ -121,6 +121,9 @@ export const mappings: Mappings = {
       tag_names: {
         type: 'keyword',
       },
+      last_updated_username: {
+        type: 'keyword',
+      },
     },
   },
 };
