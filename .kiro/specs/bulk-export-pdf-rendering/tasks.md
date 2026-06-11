@@ -54,7 +54,7 @@
   - _Boundary: BulkExportMarkdownRenderer_
 
 - [ ] 4. Core: スタイルプロバイダ
-- [ ] 4.1 (P) `BulkExportStyleProvider`（getCss / wrap）を実装する
+- [x] 4.1 (P) `BulkExportStyleProvider`（getCss / wrap）を実装する
   - プリコンパイル CSS を読み込んで返し、本文を `<style>…</style>\n<div class="wiki">…</div>` でラップする
   - `wrap()` 出力が `.wiki` ラッパと `<style>` を含むことをテストで確認する（observable）
   - _Requirements: 2.1, 2.2, 2.3_
