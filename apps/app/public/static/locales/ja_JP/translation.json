@@ -914,7 +914,7 @@
     "sign_in_failure": "ログインに失敗しました。",
     "aws_sttings_required": "この機能にはAWS設定が必要です。管理者に訪ねて下さい。",
     "application_already_installed": "アプリケーションのインストールが完了しました。",
-    "email_address_could_not_be_used": "このメールアドレスは使用できません。(許可されたメールアドレスを確認してください。)",
+    "email_address_could_not_be_used": "このメールアドレスはこの Wiki では使用できません。管理者にお問い合わせください。",
     "user_id_is_not_available": "このユーザーIDは使用できません。",
     "username_should_not_be_null": "Username が null になっています 管理画面の認証機構設定にて設定の確認をしてください",
     "email_address_is_already_registered": "このメールアドレスは既に登録されています。",

@@ -876,7 +876,7 @@
     "sign_in_failure": "Échec de la connexion.",
     "aws_sttings_required": "La configuration AWS est requise pour utiliser cette fonctionnalité.",
     "application_already_installed": "Application déja installée.",
-    "email_address_could_not_be_used": "Cette adresse courriel n'est pas autorisée",
+    "email_address_could_not_be_used": "Cette adresse e-mail ne peut pas être utilisée sur ce wiki. Veuillez contacter votre administrateur.",
     "user_id_is_not_available": "Cet identifiant utilisateur est indisponible.",
     "username_should_not_be_null": "Le nom d'utilisateur est requis",
     "email_address_is_already_registered": "Cette adresse courriel est indisponible.",
