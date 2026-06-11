@@ -284,6 +284,12 @@ export const CONFIG_KEYS = [
   'openai:serviceType',
   'openai:apiKey',
   'openai:assistantModel:mastraAgent',
+  'openai:assistantModel:suggestPathAgent',
+
+  // AI Tools Settings
+  'aiTools:suggestPathEngine',
+  'aiTools:suggestPathAgenticSearchLimit',
+  'aiTools:suggestPathAgenticTimeoutMs',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1258,6 +1264,26 @@ export const CONFIG_DEFINITIONS = {
   'openai:assistantModel:mastraAgent': defineConfig<OpenAI.Chat.ChatModel>({
     envVarName: 'OPENAI_MASTRA_AGENT_MODEL',
     defaultValue: 'o4-mini',
+  }),
+  'openai:assistantModel:suggestPathAgent': defineConfig<string>({
+    envVarName: 'OPENAI_SUGGEST_PATH_AGENT_MODEL',
+    defaultValue: 'gpt-4.1-mini',
+  }),
+
+  // AI Tools Settings
+  // The default engine stays 'oneshot' until the agentic engine passes
+  // A/B validation (suggest-path-agentic spec, Requirement 5.6).
+  'aiTools:suggestPathEngine': defineConfig<'oneshot' | 'agentic'>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_ENGINE',
+    defaultValue: 'oneshot',
+  }),
+  'aiTools:suggestPathAgenticSearchLimit': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT',
+    defaultValue: 5,
+  }),
+  'aiTools:suggestPathAgenticTimeoutMs': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS',
+    defaultValue: 60_000,
   }),
 
   // OpenTelemetry Settings
