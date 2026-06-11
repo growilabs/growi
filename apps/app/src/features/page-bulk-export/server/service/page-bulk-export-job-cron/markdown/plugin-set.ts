@@ -70,6 +70,10 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
  *    Faithful rendering requires React SSR; out of scope for this spec phase.
  *  - remark-directive: GROWI directive syntax support depends on local .ts plugins
  *    listed above; including the parser alone is not useful.
+ *  - remark-breaks: conditionally used in the web renderer only when
+ *    `config.isEnabledLinebreaks` is true (a per-instance GROWI setting). The
+ *    bulk-export pipeline does not have access to this runtime config in the
+ *    current scope; per-page rendering fidelity for this setting is out of scope.
  */
 export const INTENTIONALLY_EXCLUDED_PLUGINS: ReadonlyArray<string> = [
   'emoji',
@@ -84,6 +88,7 @@ export const INTENTIONALLY_EXCLUDED_PLUGINS: ReadonlyArray<string> = [
   'add-class',
   'add-inline-code',
   'relative-links',
+  'remark-breaks',
 ] as const;
 
 /**

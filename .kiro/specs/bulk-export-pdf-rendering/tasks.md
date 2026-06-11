@@ -62,7 +62,7 @@
   - _Depends: 1.1_
 
 - [ ] 5. Integration: bulk-export エクスポートステップへの統合
-- [ ] 5.1 `export-pages-to-fs-async` の独自変換をレンダラ呼び出しに置換する
+- [x] 5.1 `export-pages-to-fs-async` の独自変換をレンダラ呼び出しに置換する
   - `getBootstrapCssForBulkExport` / `bulkExportAdditionalCss` / `wrapHtmlWithBulkExportStyles` / `convertMdToHtml` と `getPageWritable` 内の独自 unified 構築を削除し、`BulkExportMarkdownRenderer` ＋ `BulkExportStyleProvider` 呼び出しに置き換える
   - md 形式分岐・resume（`lastExportedPagePath`）・ストリーミング・エラー時のジョブ状態更新を維持する
   - 配線が完了し、pdf 形式で `.wiki` ラップ＋`<style>` 入りの HTML が所定パスへ出力される（スモーク確認。md 不変・reject 時エラー化・resume の回帰検証は 7.1 が担う）（observable）
@@ -71,7 +71,7 @@
   - _Depends: 3.2, 4.1_
 
 - [ ] 6. Validation: レンダラ整合（ドリフト）テスト
-- [ ] 6.1 (P) Web プラグイン選定との集合ドリフト検知テストを実装する
+- [x] 6.1 (P) Web プラグイン選定との集合ドリフト検知テストを実装する
   - 参照元は `generateCommonOptions` と `generateSSRViewOptions` の両方（math/katex/slug/sanitize は後者で追加されるため、前者だけでは監視の死角になる）
   - 両参照元の各プラグインが bulk-export 側で included / intentionally-excluded のいずれかに分類済みであること、かつ bulk-export が採用する全プラグイン（math/katex/slug/sanitize 含む）が Web 側のいずれかの選定段に対応づくことを検査し、未分類の新規プラグイン出現で失敗する（observable）
   - _Requirements: 6.1, 6.2_
