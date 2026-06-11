@@ -31,7 +31,7 @@
   - _Depends: 2.1_
 
 - [ ] 3. Core: Markdown→HTML レンダラ（TDD）
-- [ ] 3.1 in-scope レンダリング契約の失敗テストを先に書く（red）
+- [x] 3.1 in-scope レンダリング契約の失敗テストを先に書く（red）
   - GFM 表→`<table>` / `> [!NOTE]`→`<blockquote>` / `$x$`→KaTeX マークアップ / 見出し→`id` 付与 / frontmatter→本文非露出 の各契約テストを用意する
   - 未実装のレンダラに対しテストが失敗する状態を確認する（observable: red）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
