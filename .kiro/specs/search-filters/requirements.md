@@ -6,9 +6,10 @@ GROWI team wiki users currently have no way to narrow search results by page aut
 
 ## Boundary Context
 
-- **In scope**: Three new inline search operators (`author:`, `editor:`, `group:`) and their negation variants (`-author:`, `-editor:`, `-group:`); server-side parsing, name resolution, and filter application; graceful handling of unknown usernames and group names
-- **Out of scope**: New UI components, filter bars, or dedicated filter controls; new URL parameters beyond `?q=`; changes to existing `prefix:`, `tag:`, `-word`, or phrase operators; date-based operators (planned for a future iteration); changes to the Elasticsearch index schema or mappings; mobile-specific search UI changes
+- **In scope**: Three new inline search operators (`author:`, `editor:`, `group:`) and their negation variants (`-author:`, `-editor:`, `-group:`); server-side parsing, name resolution, and filter application; graceful handling of unknown usernames and group names; a new indexed Elasticsearch field for the page's last updater (`last_update_username`), populated by the indexing pipeline so that `editor:` maps directly to an indexed field in the same way `author:` maps to `username`
+- **Out of scope**: New UI components, filter bars, or dedicated filter controls; new URL parameters beyond `?q=`; changes to existing `prefix:`, `tag:`, `-word`, or phrase operators; date-based operators (planned for a future iteration); automatic backfill/migration of the new field onto already-indexed pages (a full index rebuild is the supported path); a MongoDB-based fallback for `editor:`; mobile-specific search UI changes
 - **Adjacent expectations**: The existing `parseQueryString()` and Elasticsearch query pipeline are extended without changing their current behavior; all existing operator semantics remain unchanged
+- **Operational precondition**: The `editor:` filter resolves only against the new indexed `last_update_username` field. Pages indexed before this field was introduced will not match until administrators perform a **full index rebuild**. There is no MongoDB fallback — until a rebuild is run, `editor:` returns no results for un-reindexed pages. This precondition must be communicated to administrators in the release notes.
 
 ## Requirements
 
@@ -35,6 +36,8 @@ GROWI team wiki users currently have no way to narrow search results by page aut
 2. When `editor:<username>` is combined with free-text keywords, the Search Service shall return only pages last edited by that user that also match the remaining keywords.
 3. The Search Service shall treat the `editor:` token as a filter and shall not include it as a keyword in full-text or relevance scoring.
 4. If the `editor:` token has no value, the Search Service shall ignore that token and apply no editor filter.
+5. The Search Service shall resolve the `editor:` filter against the indexed `last_update_username` Elasticsearch field directly (no MongoDB resolution), mirroring how `author:` resolves against `username`.
+6. The indexing pipeline shall populate the `last_update_username` field from the page's last updater (`lastUpdateUser.username`) for every page it indexes.
 
 ---
 

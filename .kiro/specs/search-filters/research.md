@@ -46,12 +46,27 @@ if (parsedKeywords.not_tag.length > 0) {
 | ES field | ES type | Source |
 |---|---|---|
 | `username` | `keyword` | `page.creator.username` — already indexed |
+| `last_update_username` | `keyword` | `page.lastUpdateUser.username` — **NEW field added by this spec** |
 | `tag_names` | `keyword` | PageTagRelation |
 | `path.raw` | `keyword` (subfield) | page.path |
 | `created_at` | `date` | |
 | `updated_at` | `date` | |
 
-**Critical**: No `last_update_username` field exists in ES. `lastUpdateUser` in the Page model is `ObjectId` (ref User) — not projected into the ES index. `editor:` operator requires MongoDB pre-resolution.
+**Decision (revised)**: A new `last_update_username` keyword field is added to the ES index so `editor:` maps directly to it — symmetric with `author:` → `username`. The prior MongoDB pre-resolution approach (D2 below) is **abandoned**. This requires a **full index rebuild**; there is no MongoDB fallback (see D2-revised).
+
+### Indexing pipeline touch points (for the new field)
+
+The `creator.username` field is the exact precedent to mirror for `last_update_username`:
+
+| Site | File | Change |
+|---|---|---|
+| Aggregation `$lookup` + `$unwind` + `$project` | `search-delegator/aggregate-to-index.ts` | Add a `lastUpdateUser` lookup mirroring the `creator` lookup (lines 37–50), project `lastUpdateUser.username` (line 136) |
+| `AggregatedPage` type | `search-delegator/bulk-write.d.ts` | Add `lastUpdateUser?: { username: string }` (mirror `creator?`) |
+| `BulkWriteBody` type | `search-delegator/bulk-write.d.ts` | Add `last_update_username?: string` (mirror `username?`) |
+| Doc body builder | `search-delegator/elasticsearch.ts` `prepareBodyForCreate` (~line 485) | Add `last_update_username: page.lastUpdateUser?.username` (mirror `username: page.creator?.username`) |
+| ES mappings | `mappings/mappings-es7.ts`, `-es8.ts`, `-es9.ts` | Add `last_update_username: { type: 'keyword' }` (all three files; mirror `username`) |
+
+All three mapping files are structurally identical for these fields (`username` and `tag_names` both `keyword`), so the addition is mechanical across es7/es8/es9.
 
 ### Page.lastUpdateUser
 
@@ -59,7 +74,7 @@ if (parsedKeywords.not_tag.length > 0) {
 lastUpdateUser: { type: Schema.Types.ObjectId, ref: 'User' }
 ```
 
-Not in ES index — `editor:` must resolve `username → User._id → Page._id[]` via MongoDB before building ES clause.
+`ObjectId` (ref User). The indexing `$lookup` resolves it to `lastUpdateUser.username`, which is written to the new `last_update_username` ES field. At query time `editor:` no longer touches MongoDB.
 
 ### UserGroup / ExternalUserGroup
 
@@ -84,14 +99,18 @@ Globally unique login identifier. Correct field for `author:` and `editor:` oper
 
 `author:jim` → `term: { username: 'jim' }` in `bool.filter`. No MongoDB resolution needed. Same pattern as `tag:` on `tag_names`. Rationale: `username` is already indexed as `keyword`; exact match is the correct semantic.
 
-### D2: editor: resolved via MongoDB to page IDs
+### D2 (revised): editor: maps directly to the new indexed `last_update_username` field
 
-Since `last_update_username` is not in ES, `editor:alice` requires:
-1. `User.findOne({ username: 'alice' })` → `userId`
-2. `Page.find({ lastUpdateUser: userId }).select('_id').limit(EDITOR_PAGE_ID_LIMIT)` → `pageIds[]`
-3. ES `ids: { values: pageIds }` clause in `bool.filter`
+**Superseding the original D2** (which resolved `editor:` via MongoDB to page IDs because no `last_update_username` field existed). The requirements boundary now permits an ES schema change, so:
 
-`EDITOR_PAGE_ID_LIMIT = 1000` — documented limitation. Adding a new ES field was ruled out (no ES schema changes per requirements boundary).
+`editor:alice` → `term: { last_update_username: 'alice' }` in `bool.filter`. No MongoDB resolution, no page-ID enumeration, no `EDITOR_PAGE_ID_LIMIT` cap. Identical pattern to `author:` on `username`.
+
+Consequences (accepted by the spec owner):
+- **Full index rebuild required**: the field only exists on pages indexed after the mapping change. Until administrators rebuild the index, `editor:` returns no results for un-reindexed pages. Release notes must state this.
+- **No MongoDB fallback**: the abandoned resolution path is not retained as a degraded mode.
+- **No backfill/migration**: a full rebuild is the only supported path to populate the field.
+
+Rationale: removing the 1000-page cap, the `User.findOne` + `Page.find` round-trips, and the `editorPageIds`/`notEditorPageIds` plumbing makes `editor:` strictly simpler and symmetric with `author:`. The cost is a one-time operational rebuild, which the spec owner has explicitly accepted.
 
 ### D3: group: resolved to a group ID, intersected with the user's groups, applied to ES `granted_groups`
 
@@ -106,14 +125,14 @@ No member-user resolution: the page documents are already indexed with a `grante
 
 Rationale for including ExternalUserGroup: external groups also appear in `granted_groups` and in the user's `IGrantedGroup[]`, so both must be resolvable by name.
 
-### D4: ResolvedFilterData separates parsed tokens from resolved values
+### D4 (revised): ResolvedFilterData carries only group IDs
 
-MongoDB-resolved values (`editorPageIds`, `groupIds`, and their `not_` counterparts) cannot live in `QueryTerms` (parsed strings only). A new `ResolvedFilterData` type is added to `SearchableData` and populated by `SearchService` before calling the delegator.
+With `editor:` now ES-direct, the only MongoDB-resolved values are group IDs. `ResolvedFilterData` is therefore `{ groupIds: string[]; notGroupIds: string[] }` — the `editorPageIds` / `notEditorPageIds` fields are removed. It is still added to `SearchableData` and populated by `SearchService` before calling the delegator, because group name → ID resolution + membership intersect (Req 3.5, 7.5) cannot live in the delegator. The resolution method is scoped to groups only (`resolveGroupTerms`).
 
 ### D5: Empty/unknown identifiers return empty results naturally
 
 - Unknown `author:` username → ES term matches nothing → empty result (no special handling)
-- Unknown `editor:` username → `User.findOne()` returns null → `editorPageIds = []` → ES `ids: { values: [] }` → no match
+- Unknown `editor:` username → ES `term: { last_update_username }` matches nothing → empty result (no special handling, identical to `author:`)
 - Unknown `group:` name → both group lookups return null → `groupIds = []` → `granted_groups` clause skipped → no match
 - `group:` name the user is not a member of → resolved ID survives the lookup but is dropped by the intersect → `groupIds = []` → clause skipped → no match (Req 3.5, 7.5)
 - Empty operator value (e.g., `author:` with no value) → parser skips token (regex or explicit guard)
@@ -130,6 +149,7 @@ MongoDB-resolved values (`editorPageIds`, `groupIds`, and their `not_` counterpa
 
 ## Synthesis Outcomes
 
-- **Generalization**: All three operators end up as `bool.filter` clauses, but on different ES fields — `author:` on `username` (direct), `editor:` on `_id` via resolved `ids` values, `group:` on `granted_groups` via resolved-then-intersected group IDs. The `bool.filter` push pattern is uniform even though the target fields differ.
-- **Build vs Adopt**: Pure extension — no new libraries, no new ES fields. `author:` reuses the already-indexed `username` field; `group:` reuses the already-indexed `granted_groups` field.
-- **Simplification**: Three file changes only. No new files. `author:` follows `tag:` verbatim. `group:` needs only a name→ID lookup plus the membership intersect — no member-user resolution. The only new abstraction is `ResolvedFilterData` — required to keep MongoDB resolution out of the delegator.
+- **Generalization**: `author:` and `editor:` are now the **same pattern** — an exact `term` match on a keyword field (`username` / `last_update_username`). `group:` is the only operator needing MongoDB resolution (name → ID, intersected with the user's groups) before its `granted_groups` clause. The `bool.filter` push pattern is uniform across all three.
+- **Build vs Adopt**: Extension plus **one new indexed ES field** (`last_update_username`) wired through the existing indexing pipeline by mirroring the `creator.username` precedent. No new libraries.
+- **Simplification**: Collapsing `editor:` onto `author:`'s pattern removes the entire MongoDB editor-resolution path (the `User.findOne` + `Page.find` round-trips, the 1000-page cap, and the `editorPageIds`/`notEditorPageIds` plumbing). `ResolvedFilterData` shrinks to group IDs only. The cost is the new indexing field (5 mechanical touch points) and a one-time full index rebuild.
+- **Trade-off accepted**: A full index rebuild is required before `editor:` returns results for existing pages; no MongoDB fallback is retained. The spec owner accepted this in exchange for the simpler, cap-free query path.
