@@ -17,7 +17,7 @@
   - _Depends: 1.1_
 
 - [ ] 2. Core: プラグイン選定と ESM ローダ
-- [ ] 2.1 採用プラグイン集合と意図的除外一覧を宣言する
+- [x] 2.1 採用プラグイン集合と意図的除外一覧を宣言する
   - 採用（remark-gfm, remark-frontmatter, remark-math, remark-rehype, rehype-raw, rehype-slug, rehype-sanitize, rehype-katex, rehype-stringify）の名前・順序・オプションを宣言として保持する
   - Web `generateCommonOptions` 由来で本 spec が採用しないプラグインを「意図的除外」として列挙する
   - 宣言モジュールが採用/除外の両集合を機械可読に公開する（observable）

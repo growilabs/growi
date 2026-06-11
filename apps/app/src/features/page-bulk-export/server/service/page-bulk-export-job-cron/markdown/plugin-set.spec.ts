@@ -1,0 +1,184 @@
+/**
+ * Tests for the plugin-set declaration module.
+ *
+ * Observable: "宣言モジュールが採用/除外の両集合を機械可読に公開する"
+ *
+ * Verifies:
+ *  - Adopted and excluded sets are non-empty
+ *  - Adopted set contains all 9 required plugins in pipeline order
+ *  - Excluded set contains all listed intentionally-excluded plugins
+ *  - No plugin appears in both adopted and excluded sets
+ *  - Sets export as machine-readable (iterable/Set)
+ */
+import { describe, expect, it } from 'vitest';
+
+import {
+  ADOPTED_PLUGIN_NAMES,
+  ADOPTED_PLUGINS,
+  EXCLUDED_PLUGIN_NAMES,
+  INTENTIONALLY_EXCLUDED_PLUGINS,
+} from './plugin-set';
+
+describe('plugin-set declaration module', () => {
+  describe('ADOPTED_PLUGINS', () => {
+    it('is a non-empty array', () => {
+      expect(Array.isArray(ADOPTED_PLUGINS)).toBe(true);
+      expect(ADOPTED_PLUGINS.length).toBeGreaterThan(0);
+    });
+
+    it('contains all 9 required plugins', () => {
+      const requiredPlugins = [
+        'remark-gfm',
+        'remark-frontmatter',
+        'remark-math',
+        'remark-rehype',
+        'rehype-raw',
+        'rehype-slug',
+        'rehype-sanitize',
+        'rehype-katex',
+        'rehype-stringify',
+      ];
+      for (const plugin of requiredPlugins) {
+        expect(
+          ADOPTED_PLUGIN_NAMES.has(plugin),
+          `Expected ADOPTED_PLUGINS to contain "${plugin}"`,
+        ).toBe(true);
+      }
+    });
+
+    it('contains remark-gfm before remark-frontmatter (pipeline order)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      const gfmIndex = names.indexOf('remark-gfm');
+      const frontmatterIndex = names.indexOf('remark-frontmatter');
+      expect(gfmIndex).toBeGreaterThanOrEqual(0);
+      expect(frontmatterIndex).toBeGreaterThanOrEqual(0);
+      expect(gfmIndex).toBeLessThan(frontmatterIndex);
+    });
+
+    it('contains remark-math before remark-rehype (pipeline order)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      const mathIndex = names.indexOf('remark-math');
+      const rehypeIndex = names.indexOf('remark-rehype');
+      expect(mathIndex).toBeGreaterThanOrEqual(0);
+      expect(rehypeIndex).toBeGreaterThanOrEqual(0);
+      expect(mathIndex).toBeLessThan(rehypeIndex);
+    });
+
+    it('contains remark-rehype before rehype-raw (pipeline order: mdast→hast then raw)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      const remarkRehypeIndex = names.indexOf('remark-rehype');
+      const rehypeRawIndex = names.indexOf('rehype-raw');
+      expect(remarkRehypeIndex).toBeGreaterThanOrEqual(0);
+      expect(rehypeRawIndex).toBeGreaterThanOrEqual(0);
+      expect(remarkRehypeIndex).toBeLessThan(rehypeRawIndex);
+    });
+
+    it('contains rehype-raw before rehype-sanitize (sanitize must be after raw)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      const rawIndex = names.indexOf('rehype-raw');
+      const sanitizeIndex = names.indexOf('rehype-sanitize');
+      expect(rawIndex).toBeGreaterThanOrEqual(0);
+      expect(sanitizeIndex).toBeGreaterThanOrEqual(0);
+      expect(rawIndex).toBeLessThan(sanitizeIndex);
+    });
+
+    it('contains rehype-sanitize before rehype-katex (katex output is trusted, placed after sanitize)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      const sanitizeIndex = names.indexOf('rehype-sanitize');
+      const katexIndex = names.indexOf('rehype-katex');
+      expect(sanitizeIndex).toBeGreaterThanOrEqual(0);
+      expect(katexIndex).toBeGreaterThanOrEqual(0);
+      expect(sanitizeIndex).toBeLessThan(katexIndex);
+    });
+
+    it('contains rehype-stringify as the last plugin', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      const lastPlugin = names[names.length - 1];
+      expect(lastPlugin).toBe('rehype-stringify');
+    });
+
+    it('remark-rehype declares allowDangerousHtml option', () => {
+      const remarkRehype = ADOPTED_PLUGINS.find(
+        (p) => p.name === 'remark-rehype',
+      );
+      expect(remarkRehype).toBeDefined();
+      expect(remarkRehype?.options).toMatchObject({ allowDangerousHtml: true });
+    });
+
+    it('each entry has a name property (machine-readable structure)', () => {
+      for (const plugin of ADOPTED_PLUGINS) {
+        expect(typeof plugin.name).toBe('string');
+        expect(plugin.name.length).toBeGreaterThan(0);
+      }
+    });
+  });
+
+  describe('INTENTIONALLY_EXCLUDED_PLUGINS', () => {
+    it('is a non-empty readonly array', () => {
+      expect(Array.isArray(INTENTIONALLY_EXCLUDED_PLUGINS)).toBe(true);
+      expect(INTENTIONALLY_EXCLUDED_PLUGINS.length).toBeGreaterThan(0);
+    });
+
+    it('contains all listed intentionally-excluded plugins', () => {
+      const expectedExcluded = [
+        'emoji',
+        'pukiwiki-like-linker',
+        'growi-directive',
+        'remark-directive',
+        'echo-directive',
+        'codeblock',
+        'xsv-to-table',
+        'github-admonitions',
+        'callout',
+        'add-class',
+        'add-inline-code',
+        'relative-links',
+      ];
+      for (const plugin of expectedExcluded) {
+        expect(
+          EXCLUDED_PLUGIN_NAMES.has(plugin),
+          `Expected INTENTIONALLY_EXCLUDED_PLUGINS to contain "${plugin}"`,
+        ).toBe(true);
+      }
+    });
+  });
+
+  describe('ADOPTED_PLUGIN_NAMES', () => {
+    it('is a Set (machine-readable)', () => {
+      expect(ADOPTED_PLUGIN_NAMES).toBeInstanceOf(Set);
+    });
+
+    it('is iterable', () => {
+      expect(() => [...ADOPTED_PLUGIN_NAMES]).not.toThrow();
+    });
+
+    it('has size equal to ADOPTED_PLUGINS length', () => {
+      expect(ADOPTED_PLUGIN_NAMES.size).toBe(ADOPTED_PLUGINS.length);
+    });
+  });
+
+  describe('EXCLUDED_PLUGIN_NAMES', () => {
+    it('is a Set (machine-readable)', () => {
+      expect(EXCLUDED_PLUGIN_NAMES).toBeInstanceOf(Set);
+    });
+
+    it('is iterable', () => {
+      expect(() => [...EXCLUDED_PLUGIN_NAMES]).not.toThrow();
+    });
+
+    it('has size equal to INTENTIONALLY_EXCLUDED_PLUGINS length', () => {
+      expect(EXCLUDED_PLUGIN_NAMES.size).toBe(
+        INTENTIONALLY_EXCLUDED_PLUGINS.length,
+      );
+    });
+  });
+
+  describe('disjointness invariant', () => {
+    it('no plugin name appears in both adopted and excluded sets', () => {
+      const overlap = [...ADOPTED_PLUGIN_NAMES].filter((name) =>
+        EXCLUDED_PLUGIN_NAMES.has(name),
+      );
+      expect(overlap).toHaveLength(0);
+    });
+  });
+});
