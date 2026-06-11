@@ -1,0 +1,26 @@
+import { configManager } from '~/server/service/config-manager';
+
+// Shared config accessors for the per-provider model resolvers. The two keys
+// below are common to every provider, so reading them lives here (symmetrically)
+// rather than in any single provider module. Provider-specific keys (e.g. the
+// Azure endpoint) are read inside that provider's own resolver.
+
+export const getApiKey = (): string | undefined =>
+  configManager.getConfig('mastra:llmApiKey');
+
+// API key is mandatory for the key-based providers. The message never includes
+// the key value (only its absence).
+export const requireApiKey = (): string => {
+  const apiKey = getApiKey();
+  if (apiKey == null) {
+    throw new Error(
+      'Mastra LLM API key is not configured (set MASTRA_LLM_API_KEY)',
+    );
+  }
+  return apiKey;
+};
+
+// `mastra:llmModel` carries the single default (tuned for the default provider,
+// OpenAI). For the azure-openai provider this value is the Azure deployment name.
+export const getModel = (): string =>
+  configManager.getConfig('mastra:llmModel');

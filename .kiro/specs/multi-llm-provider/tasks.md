@@ -82,6 +82,9 @@
 - FB 反映（commit f67933bc44, 設計改訂 D-10）: タスク 1.3 / 2.2 / 3.2 の当初実装を上書き — (1) per-vendor 設定キーを単一 `mastra:llmProvider`/`mastra:llmApiKey`/`mastra:llmModel` に統一（既定モデルは resolver の map）、(2) resolver を判別共用体から **throw ベース**へ（不備時 throw、`OpenaiClientDelegator` 流儀）、(3) 3.2 の起動時可用性ゲート（routes/index 変更・503）を **revert**（不備時 throw を post-message 既存 catch が処理）。タスクのチェックボックスは完了のまま（成果は最新コミットに反映済み）。
 - FB 追加反映（D-11）: (1) `mastra:llmProvider` を inline literal union `'openai'|'anthropic'|'google'` に型付け（import 不要・依存逆転回避）、(2) 既定値 `'openai'`（Req 1.3 を「未指定→既定 OpenAI」に反転、vendor-unset throw 撤去）、(3) `mastra:llmModel` 既定 `'o4-mini'`・型は `string`（ベンダー横断モデル id union は SDK 未 export のため不可）、(4) resolver の `defaultModels` map 撤去（既定は config defaultValue に集約）。`isLlmProvider` は実行時検証として残置（型は実行時強制でないため必須）。
 - FB 追加（D-12）: (1) `mastra:llmProvider` を共有 `LlmProvider` 型で定義（`import type`＝実行時に消えるため依存逆転の実害なし・leaf で循環なし・単一ソース）。(2) 未使用化した `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）と、その唯一の利用元だった `openai` 型 import を削除。
+- FB 追加（D-13・dispatch 最終形）: タスク 2.1/2.2（及び Azure 追加時の中間案）の「provider→ファクトリ map ＋ resolver が config を集約して呼ぶ」構造を、**各 provider が config から自己解決する `() => MastraModelConfig`** へ刷新（base タスク 2.x の記述は履歴）。(1) 共有キー（apiKey/model）の読取を `llm-providers/config.ts`（`requireApiKey`/`getApiKey`/`getModel`）に集約、(2) openai/anthropic/google は `resolve<Provider>Model()` の自己解決関数に、azure-openai は `resolveAzureOpenaiModel()` が endpoint/認証を自己完結、(3) barrel は `modelResolvers: Record<LlmProvider, () => MastraModelConfig>` を組み立てるだけ、(4) `resolve-mastra-model.ts` は provider 検証 + `modelResolvers[provider]()` dispatch + memo のみ。中間案の `LlmModelFactoryParams`/`buildLlmModel<P>`（provider 別引数型 + correlated dispatch）は**廃止**（apiKey の必須/任意・azure の非均一性を共有経路に漏らさないため）。coding-style.md「Data-Driven Control over Hard-Coded Mode Checks」準拠（consumer は provider 追加で不変）。
+- FB 追加（D-14・依存更新）: `@ai-sdk/{openai,anthropic,google,azure}` を最新安定版（3.x 系・`ai`@6 と整合）へ bump。`@azure/identity` は既存依存のため追加なし。
+- Azure 識別子: `mastra:llmProvider` の値は `azure-openai`（既存 `openai:serviceType` の `'azure-openai'` と表記統一）。env は `MASTRA_LLM_AZURE_OPENAI_*`。
 
 ## Scope Expansion (Req 6 — provider options via env)
 - [x] 6.1 provider options の env 指定と適用
@@ -112,22 +115,23 @@
   - _Requirements: 7.1, 7.2, 7.5_
   - _Boundary: config-definition_
 
-- [ ] 7.4 Azure native provider ファクトリ
-  - `azure-openai.ts` を新設し、`createAzure` を明示的 API キー注入で生成して `(deploymentName)` を適用する薄いアダプタを実装する。`resourceName`/`baseURL` は排他（baseURL 優先）で渡し、`apiVersion` は設定時のみ付与する
-  - **いずれのエンドポイント設定も無い場合はファクトリ内で throw**（欠落 env 名を名指し・API キー値非含）。`AzureOpenaiProviderConfig` 型を定義し、barrel の provider 別引数型マップ（`LlmModelFactoryParams`）に azure-openai 用の引数型を加え、`llmModelFactories` に `'azure-openai': createAzureOpenaiModel` を登録する
-  - co-located unit test: resourceName 経路／baseURL 経路／両指定→baseURL 優先／apiVersion 任意／いずれも無い→throw（メッセージにキー値非含）（`@ai-sdk/azure` を mock）
-  - 観測可能: 各経路で言語モデルが生成され、排他渡し・throw 分岐がテストで green。`Object.keys(llmModelFactories)` が `LLM_PROVIDERS` と一致
+- [ ] 7.4 Azure 自己解決 resolver（`resolveAzureOpenaiModel`）
+  - `azure-openai.ts` を新設し、`resolveAzureOpenaiModel(): MastraModelConfig` を実装する。自分の config（resourceName/baseURL/apiVersion/apiKey/model）を読み、`resourceName`/`baseURL` 排他（baseURL 優先）・`apiVersion` は設定時のみ付与で `createAzure(...)(deploymentName)` を構築する。明示的 API キー注入（env 自動検出に依存しない）
+  - **エンドポイント（resourceName/baseURL）が双方無い場合は throw**（欠落 env 名を名指し・API キー値非含）。共有経路に Azure 固有の型は漏らさない（自己完結）。（Entra ID 認証分岐は 8.x で追加）
+  - co-located unit test（`azure-openai.spec.ts`）: resourceName 経路／baseURL 経路／両指定→baseURL 優先／apiVersion 任意／いずれも無い→throw（キー値非含）。configManager + `@ai-sdk/azure` を mock
+  - 観測可能: 各経路で言語モデルが生成され、排他・throw 分岐がテストで green
   - _Requirements: 1.2, 7.2, 7.3, 7.4, 7.5_
-  - _Boundary: llm-providers_
-  - _Depends: 7.1, 7.2_
+  - _Boundary: llm-providers（azure-openai）_
+  - _Depends: 7.1, 7.2, 7.3_
 
-- [ ] 7.5 resolver の Azure config 受け渡し
-  - resolver で Azure 固有 config（resourceName/baseUrl/apiVersion）を読み、**いずれかが非 null のときだけ** `azureOpenai` を factory params に付与する（provider 名で分岐しない／非 Azure の呼び出し形状 `{apiKey, model}` を不変に保つ）
-  - co-located unit test 更新: provider=azure-openai で azure 固有 config を収集し factory に `azure` を渡す／azure config 未指定時は `{apiKey, model}` のみ。**「未対応プロバイダ」の例示値（旧 `'azure'`）を真に未対応の値（例 `'cohere'`）へ差し替え**（`'azure-openai'` が有効化されたため）、mock の `llmModelFactories` に azure を追加
-  - 観測可能: 既存 resolver テストが green を維持し（非 Azure 経路の呼び出し形状不変）、azure 経路の新ケースが green
-  - _Requirements: 1.2, 7.2, 7.6_
-  - _Boundary: resolve-mastra-model_
-  - _Depends: 7.3, 7.4_
+- [ ] 7.5 共有アクセサ + 各 provider 自己解決 + データ駆動 dispatch
+  - `config.ts` に共有アクセサ `requireApiKey()`/`getApiKey()`/`getModel()`（apiKey/model は全 provider 共通）を作る。openai/anthropic/google を `resolve<Provider>Model(): MastraModelConfig`（`create*({apiKey:requireApiKey()})(getModel())`）に整える
+  - `index.ts` で `modelResolvers: Record<LlmProvider, () => MastraModelConfig>` を組み立て、`resolve-mastra-model.ts` は **provider 検証 + `modelResolvers[provider]()` dispatch + memoize** のみにする（consumer は provider 名で分岐しない＝coding-style.md「Data-Driven Control over Hard-Coded Mode Checks」準拠）
+  - co-located unit test: 各 key-based resolver が apiKey+model で `create*` を呼ぶ／`Object.keys(modelResolvers)` が `LLM_PROVIDERS` と一致／resolver の provider 検証・dispatch・memo。「未対応プロバイダ」の例示は `'cohere'`
+  - 観測可能: 上記が green、provider 追加で resolver 本体が不変であることを構造で担保
+  - _Requirements: 1.2, 1.3, 1.4, 2.1, 2.2, 2.3, 3.1, 3.2, 4.1_
+  - _Boundary: llm-providers（config/openai/anthropic/google/index）, resolve-mastra-model_
+  - _Depends: 7.4_
 
 - [ ] 7.6 (P) Azure を含めた回帰・型チェック
   - `pnpm vitest run` で mastra LLM 関連テスト（llm-providers / resolve-mastra-model / llm-provider ガード）が全 green、`pnpm run lint:typecheck` に Azure 由来の新規エラーが無いことを確認する（既存の pre-existing TS2769 は本タスク対象外）
@@ -144,19 +148,18 @@
   - _Requirements: 8.1, 8.2_
   - _Boundary: config-definition_
 
-- [ ] 8.2 認証契約を型で表現（provider 別引数型 + ジェネリックディスパッチ）
-  - factory 引数を provider ごとに型付け（`LlmModelFactoryParams`）: key-based（openai/anthropic/google）は `apiKey: string` **必須**、azure-openai は `apiKey?: string`。key-based のランタイム null ガードは持たない（型で保証）。resolver は `buildLlmModel<P>(provider, params)`（correlated dispatch・キャストなし）経由で呼ぶ
-  - azure-openai factory: `AzureOpenaiProviderConfig` に `useEntraId?` を追加し、真なら `getBearerTokenProvider(new DefaultAzureCredential(), 'https://cognitiveservices.azure.com/.default')` を `tokenProvider` として渡す（apiKey 不使用・`@azure/identity` は static import）。偽なら apiKey（欠落で throw）。エンドポイント検証は両方式共通
-  - co-located unit test: Entra ID 経路（tokenProvider を渡し apiKey 非送出・`@azure/identity` は vi.mock で確定化）／apiKey も Entra ID も無い→throw／key-based factory の apiKey 欠落 throw
-  - 観測可能: 上記分岐が green（確定的・高速）
-  - _Requirements: 8.1, 8.3, 8.4, 8.5_
-  - _Boundary: llm-providers（azure-openai, openai, anthropic, google, index）_
-  - _Depends: 8.1_
+- [ ] 8.2 azure resolver に Entra ID 認証分岐を追加
+  - `resolveAzureOpenaiModel()` 内で `mastra:llmAzureOpenaiUseEntraId` を読み、真なら `getBearerTokenProvider(new DefaultAzureCredential(), 'https://cognitiveservices.azure.com/.default')` を `tokenProvider` として `createAzure` に渡す（API キー不使用）。偽なら `getApiKey()` を使い、欠落で throw（`MASTRA_LLM_API_KEY` / `MASTRA_LLM_AZURE_OPENAI_USE_ENTRA_ID` を案内・キー値非含）。エンドポイント検証は両認証で共通
+  - `@azure/identity` は static import（既存依存・既存 `AzureOpenaiClientDelegator` と同スコープ）。認証ロジックは**すべて azure resolver 内に局在**（共有経路・consumer は変更不要）
+  - co-located unit test（`azure-openai.spec.ts`）: Entra ID 経路（`tokenProvider` を渡し apiKey 非送出。configManager + `@ai-sdk/azure` + `@azure/identity` を vi.mock）／apiKey も Entra ID も無い→throw
+  - 観測可能: 上記分岐が green（確定的・高速）。key-based の apiKey 必須は `requireApiKey()` が引き続き担保
+  - _Requirements: 8.1, 8.2, 8.3, 8.4, 8.5_
+  - _Boundary: llm-providers（azure-openai）_
+  - _Depends: 7.4, 8.1_
 
-- [ ] 8.3 resolver の apiKey 必須チェック緩和
-  - `useEntraId` を読み、`apiKey == null && !useEntraId` のときだけ throw に緩和する（provider 名ではなく config フラグで分岐）。`azureOpenai` には `useEntraId` を**有効時のみ**付与し、非破壊（API キー経路の呼び出し形状を不変に保つ）
-  - co-located unit test: provider=azure-openai + useEntraId + apiKey 無し→throw せず `useEntraId: true` を付与／既存の apiKey 欠落 throw（非 Entra ID）は維持
-  - 観測可能: 上記が green、既存テスト不変
+- [ ] 8.3 (P) consumer 非変更の確認（認証は azure resolver に完結）
+  - 認証方式（API キー / Entra ID）の選択は azure resolver 内で完結し、`resolve-mastra-model.ts`（consumer）と key-based provider は**一切変更不要**であることを確認する（uniform `() => MastraModelConfig` 契約により認証差が共有経路へ漏れない）
+  - 観測可能: `resolve-mastra-model.spec.ts`（dispatch/memo/検証）が Entra ID 追加後も無改修で green
   - _Requirements: 8.3, 8.4_
-  - _Boundary: resolve-mastra-model_
-  - _Depends: 8.1, 8.2_
+  - _Boundary: resolve-mastra-model（参照のみ）_
+  - _Depends: 8.2_
