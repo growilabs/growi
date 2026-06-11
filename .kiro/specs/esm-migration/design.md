@@ -56,7 +56,7 @@
 
 ### Allowed Dependencies
 
-- Node.js ^24 の `require(esm)` (CJS→ESM 推移解決)
+- Node.js ^24 の `require(esm)` (CJS→ESM 推移解決) — **ただし ts-node 10 経由の dev / launch-dev:ci 実行では無効** (vendored 旧ローダーガードが先に throw する。Phase R.8 で実証)。Phase 3.7 のランナー置換までは、dev 経路から require される workspace パッケージは CJS バンドルを併存させる (例: `pdf-converter-client` の dual exports)
 - Turbopack のランタイム外部化 (`.next/node_modules/` symlink)
 - ESM 対応 TS ランナー (候補: `tsx` / `@swc-node/register` / 同等品。Phase 3.7.a の bake-off で実測選定。`ts-node/esm` は `--loader` API が deprecated のため候補外)
 - `jscodeshift` + カスタム transform (コード変換)

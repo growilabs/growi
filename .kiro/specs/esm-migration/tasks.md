@@ -159,6 +159,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 - [x] R.4 Phase 1/2 ゲートをマージ後ツリーで再実行
   - `turbo run build --filter @growi/app` 21/21 成功、`turbo run lint --filter @growi/app` 21/21 成功
   - Phase 1/2 の成果 (全 17 パッケージの type:module、config/*.cjs、src/migrations 隔離、orval.config.cjs) の無傷をgrep 検証済み
+  - dev 起動 smoke: マージ済み migrate スクリプト (migrate-mongo `.cjs` + umzug) end-to-end 成功、`/_api/v3/healthcheck` 200 (R.8 修復後)
   - _Requirements: 6.6_
 
 - [x] R.5 マージ意味的衝突の深層レビュー完了確認
@@ -178,6 +179,12 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - マージ後ツリーで `madge --circular`: **サーバ循環 25 件** (ハブ構造は維持)
   - 構成変化: `search-delegator/elasticsearch-client-delegator` の 1 件は search-types.ts 分離で**解消済み**、`service/file-uploader-switch` が新規 +1、socket-io は `service/socket-io/index.ts` 経由の 2 エントリに再編
   - design.md の循環依存ベースライン節に反映済み
+
+- [x] R.8 dev 起動の修復: `@growi/pdf-converter-client` を dual ESM+CJS 出力化
+  - **task 1.1 以降 `pnpm dev` が ERR_REQUIRE_ESM で破綻していた** (3 つ目の潜在欠陥)。ts-node 10 は vendored した旧 CJS ローダーガードを使うため Node 24 の `require(esm)` が効かず、boot 時の `features/page-bulk-export → @growi/pdf-converter-client` チェーンで即死。素の node / turbo build では再現しないため build ゲートをすり抜けていた (task 2.4 の「pnpm dev 起動」は実検証されていなかったことが確定)
+  - Req 1.3 の原則に従い exports map で dual 出力化: `import` → ESM (従来)、`require` → `dist/cjs/` (CJS 隔離)。require 条件は **Phase 3.7 のランナー置換後に撤去** (package.json にコメント明記)
+  - 検証: ts-node 直接起動で `/_api/v3/healthcheck` 200 + Express listening + YjsService 初期化をログ確認
+  - _Requirements: 1.3, 2.7, 6.6_
 
 ## Phase 3: apps/app サーバ層の ESM 化
 
@@ -510,6 +517,14 @@ same issue.
 - **R.6 ベースラインは「基準ブランチ + 環境」のスナップショット**: pnpm major
   (10→11) や turbo minor でも実行プロファイルが変わるため、ベースライン再取得時は
   ツールチェーンのバージョンを成果物に併記し、比較時に環境差分を除外できるようにする。
+
+- **R.8 ts-node 10 は Node 24 の require(esm) を無効化する**: ts-node は旧 Node の
+  CJS ローダーガードを vendored しており、`"type": "module"` のパッケージを
+  require すると Node 本体が対応していても ERR_REQUIRE_ESM を投げる。つまり
+  「Allowed Dependencies の Node 24 `require(esm)`」は **Phase 3.7 のランナー置換
+  までは dev / launch-dev:ci 経路で前提にできない**。Phase 3 で `"type": "module"`
+  を増やす変更 (apps/app 本体の宣言 = task 3.7.b を含む) は、必ず ts-node 経由の
+  dev 起動 smoke で検証すること。build (素の tsc/node) が通っても dev だけ壊れる。
 
 - **0.3 baseline scope**: The route-middleware snapshot tool exempts the
   terminal route-body slot from the "no anonymous function" guard because
