@@ -197,6 +197,10 @@ describe('config-definition multi-llm-provider keys', () => {
     it('contains mastra:llmModel', () => {
       expect(CONFIG_KEYS).toContain('mastra:llmModel');
     });
+
+    it('contains mastra:llmProviderOptions', () => {
+      expect(CONFIG_KEYS).toContain('mastra:llmProviderOptions');
+    });
   });
 
   describe('CONFIG_DEFINITIONS', () => {
@@ -251,6 +255,29 @@ describe('config-definition multi-llm-provider keys', () => {
 
       it('is not marked as secret', () => {
         expect(CONFIG_DEFINITIONS['mastra:llmModel'].isSecret).toBeFalsy();
+      });
+    });
+
+    describe('mastra:llmProviderOptions', () => {
+      it('has envVarName MASTRA_LLM_PROVIDER_OPTIONS', () => {
+        expect(CONFIG_DEFINITIONS['mastra:llmProviderOptions'].envVarName).toBe(
+          'MASTRA_LLM_PROVIDER_OPTIONS',
+        );
+      });
+
+      it('defaults to the OpenAI reasoning options as a JSON string', () => {
+        const def =
+          CONFIG_DEFINITIONS['mastra:llmProviderOptions'].defaultValue;
+        expect(typeof def).toBe('string');
+        expect(JSON.parse(def as string)).toEqual({
+          openai: { reasoningEffort: 'low', reasoningSummary: 'auto' },
+        });
+      });
+
+      it('is not marked as secret', () => {
+        expect(
+          CONFIG_DEFINITIONS['mastra:llmProviderOptions'].isSecret,
+        ).toBeFalsy();
       });
     });
   });

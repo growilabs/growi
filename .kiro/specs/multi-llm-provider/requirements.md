@@ -27,6 +27,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 - **In scope（本仕様で扱う）**
   - mastra チャットエージェント（`growiAgent`）が使用する LLM ベンダーを OpenAI / Anthropic / Google から選択する仕組み
   - ベンダー名・API キー・モデルの環境変数による接続設定（ベンダー未指定時は既定 OpenAI。モデルは任意指定で、未指定時は単一の既定モデル＝既定ベンダー OpenAI 向け）
+  - LLM provider options（reasoning 等）の環境変数（単一 JSON）による指定と mastra チャット呼び出しへの適用
   - 1 アプリインスタンス = 単一ベンダーの制約
   - ベンダー設定の不備（未指定・対応外ベンダー名・必須設定欠落）時の挙動（mastra チャットエージェント無効化＋ログ出力＋アプリ継続）
 - **Out of scope（本仕様で扱わない）**
@@ -35,7 +36,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
   - ベンダー・API キー・モデルを設定するための管理画面 UI（環境変数のみで構成する）
   - OpenAI / Anthropic / Google 以外のベンダーの追加
   - LLM クライアントの生成方式（ai-sdk 由来プロバイダー vs `@mastra/core/agent`）の選定。これは設計上の論点であり design フェーズで比較・決定する
-  - ベンダー別 reasoning provider options のパリティ（`reasoningEffort` / `reasoningSummary` 相当）。reasoning オプションはモデル世代依存で保守コストが高いため、本仕様では OpenAI 既存挙動を維持し、Anthropic/Google は各モデル既定の reasoning に委ねる（providerOptions 未設定）。reasoning パリティは実モデルで検証できる別仕様へ後追いとする
+  - intent レベルの per-vendor 自動マッピング（"effort=low" を各ベンダー固有の形へ変換する等）。provider options は**生 JSON を運用者が env で指定**する（Requirement 6）方式とし、モデル世代依存のマッピングロジックはコードに持たない
 - **Adjacent expectations（隣接システム・前提）**
   - 既存の AI 有効化ゲート（環境変数 `AI_ENABLED` / `app:aiEnabled`）に依存する。mastra チャットエージェントが動作するには AI が有効であり、かつ有効なベンダー設定が存在する必要がある
   - 接続設定は既存の環境変数ベースの設定読み込み機構を通じて解決される
@@ -85,3 +86,12 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 #### Acceptance Criteria
 1. The system shall 本仕様の LLM ベンダー選択を mastra チャットエージェント（`growiAgent`）の LLM 呼び出しにのみ適用する
 2. While 本仕様のベンダー設定が適用される状態でも, the system shall ページパス提案（`suggest-path`）を含む既存の他 LLM 利用機能を, 現行のプロバイダー設定のまま動作させる
+
+### Requirement 6: provider options の環境変数指定
+**Objective:** As a 運用者, I want LLM の provider options（reasoning 等）を環境変数で渡せる, so that ベンダー/モデルに応じた推論挙動を運用者自身が制御できる
+
+#### Acceptance Criteria
+1. The system shall mastra チャットエージェントの LLM 呼び出しに, 環境変数で指定された provider options を適用する
+2. The system shall provider options を単一の JSON 環境変数（AI SDK 形式＝プロバイダー名前空間を含む `{ "<provider>": { ... } }`）として受け付ける
+3. Where provider options が環境変数で指定されていないとき, the system shall 既定値（OpenAI の reasoning オプション）を適用する
+4. If 指定された provider options の JSON が不正（パース不能・非オブジェクト）であるとき, the system shall チャット要求を失敗させず, provider options を適用せずに処理を継続し, 警告をログに出力する

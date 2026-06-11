@@ -13,13 +13,14 @@
 - ベンダー・API キー・（任意の）モデルを**単一の env キーセット**で設定する（管理画面 UI なし）。
 - ベンダー未指定時は既定で OpenAI を使用する（config の defaultValue）。
 - 設定不備時はモデル解決時に **throw**（既存 `OpenaiClientDelegator` と同流儀）。import 時には解決しないためアプリ起動は継続。
+- LLM provider options（reasoning 等）を単一 JSON 環境変数で指定し、チャット呼び出しに適用する（既定は OpenAI の reasoning オプション）。
 
 ### Non-Goals
 - 同一アプリ内での複数ベンダー同時利用／リクエスト単位の切替（1 App = 1 Vendor）。
 - mastra チャットエージェント以外の LLM 利用機能（`suggest-path` 等）のベンダー切替。
 - ベンダー・モデル設定の管理画面 UI。
 - OpenAI/Anthropic/Google 以外のベンダー追加。
-- ベンダー別 reasoning provider options のパリティ（`reasoningEffort` / `reasoningSummary` 相当）。モデル世代依存で保守コストが高いため、OpenAI は現状維持・Anthropic/Google はモデル既定に委ね、reasoning パリティは別仕様へ後追い（research D-7/D-8 参照）。
+- provider options の **intent レベル per-vendor 自動マッピング**（"effort=low" を各ベンダー固有の形へ変換する等）。生 JSON を運用者が指定する方式（Req 6）とし、モデル世代依存のマッピングロジックはコードに持たない（research D-7/D-8 は参考資料として保持）。
 - 起動時の可用性ゲート／専用 HTTP ステータス（503）。設定不備は使用時 throw を `post-message` の既存 try/catch が処理する（route 変更なし）。
 
 ## Boundary Commitments
@@ -28,12 +29,13 @@
 - mastra の **LLM モデル解決**（ベンダー選択 → API キー/モデル取得 → native provider 生成 → `MastraModelConfig` 返却。不備時は throw）。
 - mastra 用の **単一 LLM 設定キー**（`mastra:llmVendor` / `mastra:llmApiKey` / `mastra:llmModel`）の定義と、ベンダー別**既定モデルのコード内 map**。
 - `growiAgent` の `model` 供給方法（resolver を遅延呼び出しする dynamic function）。
+- **provider options の解決**（`mastra:llmProviderOptions` JSON の parse + fail-soft）と、`post-message` のチャットストリーム呼び出しへの適用。
 
 ### Out of Boundary
 - `features/ai-tools/suggest-path` および `features/openai` の client-delegator 経由の LLM 呼び出し（現行どおり `openai:serviceType` / `openai:apiKey` を使用、不変）。
 - mastra の memory（`@mastra/mongodb`、ベンダー非依存）・tools・thread 機能。
 - `mastra/server/routes/index.ts`（**変更しない**）。設定不備時のエラー応答は `post-message.ts` の既存 try/catch が担う。
-- `post-message.ts` の `providerOptions.openai`（OpenAI 専用。非 OpenAI ベンダーでは無視される。ベンダー別 reasoning パリティは別仕様へ後追い）。
+- provider options の **値の妥当性検証・モデル整合**（生 JSON をそのまま AI SDK へ渡す。アクティブ provider 名前空間内の不正値は provider/request 時の責任）。`post-message.ts` の `providerOptions` 結線は本仕様が owns（ハードコードを `resolveProviderOptions()` に置換）。
 - 管理画面 UI／AI 連携設定ページ（[deprecate-openai-features](../deprecate-openai-features/) で廃止済みの方針に従い env のみ）。
 
 ### Allowed Dependencies
@@ -115,7 +117,9 @@ apps/app/src/features/mastra/
     │   │   ├── anthropic.ts                    # createAnthropic({apiKey})(model)
     │   │   └── google.ts                       # createGoogleGenerativeAI({apiKey})(model)
     │   ├── resolve-mastra-model.ts             # vendor 解決 → MastraModelConfig 返却 or throw（memoize）+ 既定モデル map
-    │   └── resolve-mastra-model.spec.ts        # 解決/throw/secret-safe のユニットテスト
+    │   ├── resolve-mastra-model.spec.ts        # 解決/throw/secret-safe のユニットテスト
+    │   ├── resolve-provider-options.ts         # MASTRA_LLM_PROVIDER_OPTIONS JSON を parse（fail-soft）→ ProviderOptions
+    │   └── resolve-provider-options.spec.ts    # parse/既定/不正 JSON fail-soft のユニットテスト
     └── mastra-modules/agents/
         └── growi-agent.ts                      # [変更] model を resolver 経由の dynamic function に
 ```
@@ -123,6 +127,7 @@ apps/app/src/features/mastra/
 ### Modified Files
 - `apps/app/src/server/service/config-manager/config-definition.ts` — `CONFIG_KEYS` / `CONFIG_DEFINITIONS` に `mastra:llmVendor`（`LlmVendor` 型・type-only import）/ `mastra:llmApiKey`（secret）/ `mastra:llmModel` を追加し、未使用化した `openai:assistantModel:mastraAgent`（＋ `openai` 型 import）を削除（`ConfigKey`/`ConfigValues` は自動導出。`ENV_ONLY_GROUPS` には追加しない）。
 - `apps/app/src/features/mastra/server/services/mastra-modules/agents/growi-agent.ts` — `getOpenaiProvider()(model)` を `model: () => resolveMastraModel()` の dynamic function へ置換。
+- `apps/app/src/features/mastra/server/routes/post-message.ts` — ハードコードの `providerOptions: { openai: {...} }` を `providerOptions: resolveProviderOptions()` に置換。
 - `apps/app/package.json` — `@ai-sdk/anthropic`・`@ai-sdk/google`（`^3.x`）を `dependencies` に追加。
 - `apps/app/src/features/mastra/server/services/mastra-modules/agents/growi-agent.spec.ts` — dynamic model / 使用時 throw 伝播を反映。
 
@@ -179,6 +184,10 @@ sequenceDiagram
 | 4.4 | チャット要求→エラー応答 | post-message | 既存 try/catch | リクエスト時供給 |
 | 5.1 | 適用は growiAgent のみ | growi-agent, resolver | `model` 供給のみ | — |
 | 5.2 | 他 LLM 機能は不変 | （境界） | `suggest-path` は別経路 | — |
+| 6.1 | provider options を適用 | resolve-provider-options, post-message | `resolveProviderOptions()` | リクエスト時供給 |
+| 6.2 | 単一 JSON env で受付 | config, resolve-provider-options | `mastra:llmProviderOptions` | — |
+| 6.3 | 未指定→既定（OpenAI reasoning） | config | defaultValue JSON | — |
+| 6.4 | 不正 JSON→fail-soft＋warn | resolve-provider-options | parse try/catch → `{}` | リクエスト時供給 |
 
 ## Components and Interfaces
 
@@ -189,6 +198,7 @@ sequenceDiagram
 | LLM provider factories | services | vendor→native MastraModelConfig | 1.2, 2.1, 2.2 | ai-sdk (P0) | Service |
 | Model resolver | services | 解決/検証（不備時 throw）/既定モデル | 1.2–1.4, 2.1–2.3, 2.5, 3, 4.1 | config, factories, llm-vendor (P0) | Service |
 | GROWI agent | services | dynamic model 供給（throw 伝播） | 3.3, 4.1, 4.3, 5.1 | resolver (P0), Agent (P0) | Service |
+| Provider options resolver | services | provider options JSON の parse（fail-soft）＋ post-message 適用 | 6.1–6.4 | config (P0) | Service |
 
 ### interfaces
 
@@ -229,6 +239,7 @@ export const isLlmVendor = (value: unknown): value is LlmVendor =>
 | `mastra:llmVendor` | `LlmVendor`（共有型・type-only import。実行時は resolver の `isLlmVendor` で再検証） | `MASTRA_LLM_VENDOR` | `'openai'` | no |
 | `mastra:llmApiKey` | `string \| undefined` | `MASTRA_LLM_API_KEY` | `undefined` | yes |
 | `mastra:llmModel` | `string`（単一既定値。既定 vendor=OpenAI 向け） | `MASTRA_LLM_MODEL` | `o4-mini` | no |
+| `mastra:llmProviderOptions` | `string`（生 JSON。resolver で parse + fail-soft） | `MASTRA_LLM_PROVIDER_OPTIONS` | `{"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}}` | no |
 
 **Implementation Notes**
 - Integration: 1 App = 1 Vendor のため**単一キーセット**。ベンダーは `mastra:llmVendor` で選択し、resolver がそれに応じて factory を選ぶ。`openai:apiKey` 等の既存キーは suggest-path 用に不変（mastra は参照しない）。
@@ -326,6 +337,32 @@ export const growiAgent = new Agent({
 - `mastra-modules/index.ts`（`new Mastra({agents:{growiAgent}})`）は不変。
 - resolver の throw を swallow せず素通し（`post-message` が捕捉）。throw メッセージに API キーは含まれない（resolver 側で保証）。
 
+#### Provider options resolver (`ai-sdk-modules/resolve-provider-options.ts` 新規 + `post-message.ts` 変更)
+
+| Field | Detail |
+|-------|--------|
+| Intent | `mastra:llmProviderOptions` JSON を parse（fail-soft）し、AI SDK 形式の `providerOptions` を返す |
+| Requirements | 6.1, 6.2, 6.3, 6.4 |
+
+**Contracts**: Service [x]
+
+```typescript
+import type { JSONValue } from 'ai';
+
+export type MastraProviderOptions = Record<string, Record<string, JSONValue>>;
+
+// 不正 JSON / 非オブジェクトは {} にフォールバック（warn）。例外は投げない。
+export const resolveProviderOptions: () => MastraProviderOptions;
+```
+- Postconditions: `mastra:llmProviderOptions` を JSON.parse し、provider 名前空間オブジェクトなら返す。未指定/空/不正/非オブジェクトは `{}`（warn）。
+- Invariants: **生 JSON を解釈せずそのまま返す（variant A）** — per-vendor マッピングを持たない。例外を投げない（チャットを壊さない。Req 6.4）。
+- 型: `ProviderOptions` は `ai` から未 export のため、`JSONValue`（`ai` から export 済）を用いた構造型 `Record<string, Record<string, JSONValue>>` で表現。
+
+**Implementation Notes**
+- Integration: `post-message.ts` の `growiAgent.stream(messages, { ..., providerOptions })` を、ハードコード `{ openai: {...} }` から `resolveProviderOptions()` の戻り値へ置換。
+- Validation: 単一 JSON env 文字列で受け、object 型 config（loader の JSON.parse が malformed で起動クラッシュ）を避けるため **`string` 型 config ＋ resolver 側 graceful parse**。未知 provider 名前空間は AI SDK が無視（検証済）。アクティブ provider 名前空間内の不正値は request 時に provider が扱う（post-message の既存 catch）。
+- Test: route handler の結線は post-message.spec（validator のみ test、handler は sandbox 制約で未 test）方針に倣い、resolver を単体で厚くテスト＋結線は型チェックで担保。
+
 ## Error Handling
 
 ### Error Strategy
@@ -358,7 +395,7 @@ export const growiAgent = new Agent({
 
 ## Open Questions / Risks
 - **モデル既定値**: `mastra:llmModel` の単一 default は `o4-mini`（既定 vendor=OpenAI 向け）。per-vendor 既定 map は撤去。非 OpenAI ベンダー利用時は `MASTRA_LLM_MODEL` の明示指定が必要（未指定だと OpenAI 向け既定が非互換ベンダーへ渡る）。
-- **provider options パリティ（Out of scope・別仕様へ後追い）**: `post-message.ts` の `providerOptions.openai` は OpenAI 専用のまま現状維持。非 OpenAI ベンダーでは AI SDK 側で**無視される（検証済）** — `@ai-sdk/provider-utils@4.0.27` の `parseProviderOptions` は当該 provider 名前空間が無ければ `undefined` を返し throw しない。ベンダー別 reasoning パリティの調査は research.md D-7/D-8 に保持。
+- **provider options（本仕様で対応・Req 6）**: `mastra:llmProviderOptions`（単一 JSON env）を `resolveProviderOptions()` が parse し `post-message` の stream 呼び出しへ適用。既定は OpenAI の reasoning オプション、非 OpenAI ベンダーでは AI SDK が無視（検証済：`parseProviderOptions` は当該 provider 名前空間が無ければ throw しない）。intent レベルの per-vendor 自動マッピングは非対応（生 JSON を運用者が指定）。各ベンダーの reasoning オプション一覧は research.md D-7/D-8 を参照。
 - **依存分類（検証済 D-?）**: `@ai-sdk/anthropic`/`@ai-sdk/google` は Express サーバ（`dist/`、`build:server`）経由の server-only パッケージで `.next/node_modules` には externalise されない（既存 `@ai-sdk/openai` と同一）。`dependencies` 配置で正しい。確定的 prod ロード検証は CI Level 2（`server:ci`）。
 - **削除した config キー**: `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）は未使用化したため本仕様で削除（`OpenAI.Chat.ChatModel` 用の `openai` 型 import も除去）。
 - **pre-existing branch 課題（本仕様スコープ外）**: `apiv3/index.js` の `mastraRouteFactory` import 欠落、`post-message.ts:77` TS2769。support/mastra ブランチのマージ未完状態で、別途対応が必要（tasks.md Implementation Notes 参照）。

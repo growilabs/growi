@@ -17,6 +17,7 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import { resolveProviderOptions } from '../services/ai-sdk-modules/resolve-provider-options';
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
 import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context';
@@ -80,25 +81,14 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             thread: thread.id,
             resource: thread.resourceId,
           },
-          // Configure the OpenAI Responses API to emit reasoning summary
-          // chunks. Reasoning is always executed (and billed) for reasoning
-          // models; this option controls only whether the summary text is
-          // surfaced to the UI.
-          //
-          // Important: surfacing reasoning summary requires a verified OpenAI
-          // organization. Without verification, summary parts are emitted as
-          // empty (`reasoning-start` / `reasoning-end` only, no delta), so
-          // the UI shows the trigger but no body.
-          //
-          // `effort: 'low'` bounds reasoning-token volume for cost; raise it
-          // when richer reasoning depth is desired (also tends to produce
-          // fuller summaries when verification is in place).
-          providerOptions: {
-            openai: {
-              reasoningEffort: 'low',
-              reasoningSummary: 'auto',
-            },
-          },
+          // Provider options (reasoning etc.) resolved from the
+          // MASTRA_LLM_PROVIDER_OPTIONS env var (Req 6). Defaults to the OpenAI
+          // reasoning options (reasoningEffort 'low' bounds reasoning-token cost;
+          // reasoningSummary 'auto' surfaces summary chunks to the UI — note this
+          // requires a verified OpenAI org, otherwise summary parts are empty).
+          // Operators of other vendors set their own provider namespace; the AI
+          // SDK reads only the active provider's key.
+          providerOptions: resolveProviderOptions(),
         });
 
         // Use pipeUIMessageStreamToResponse for Express servers

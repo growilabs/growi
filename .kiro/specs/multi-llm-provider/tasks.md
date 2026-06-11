@@ -82,3 +82,12 @@
 - FB 反映（commit f67933bc44, 設計改訂 D-10）: タスク 1.3 / 2.2 / 3.2 の当初実装を上書き — (1) per-vendor 設定キーを単一 `mastra:llmVendor`/`mastra:llmApiKey`/`mastra:llmModel` に統一（既定モデルは resolver の map）、(2) resolver を判別共用体から **throw ベース**へ（不備時 throw、`OpenaiClientDelegator` 流儀）、(3) 3.2 の起動時可用性ゲート（routes/index 変更・503）を **revert**（不備時 throw を post-message 既存 catch が処理）。タスクのチェックボックスは完了のまま（成果は最新コミットに反映済み）。
 - FB 追加反映（D-11）: (1) `mastra:llmVendor` を inline literal union `'openai'|'anthropic'|'google'` に型付け（import 不要・依存逆転回避）、(2) 既定値 `'openai'`（Req 1.3 を「未指定→既定 OpenAI」に反転、vendor-unset throw 撤去）、(3) `mastra:llmModel` 既定 `'o4-mini'`・型は `string`（ベンダー横断モデル id union は SDK 未 export のため不可）、(4) resolver の `defaultModels` map 撤去（既定は config defaultValue に集約）。`isLlmVendor` は実行時検証として残置（型は実行時強制でないため必須）。
 - FB 追加（D-12）: (1) `mastra:llmVendor` を共有 `LlmVendor` 型で定義（`import type`＝実行時に消えるため依存逆転の実害なし・leaf で循環なし・単一ソース）。(2) 未使用化した `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）と、その唯一の利用元だった `openai` 型 import を削除。
+
+## Scope Expansion (Req 6 — provider options via env)
+- [x] 6.1 provider options の env 指定と適用
+  - `mastra:llmProviderOptions`（`string`・生 JSON・env `MASTRA_LLM_PROVIDER_OPTIONS`・default=現行 OpenAI オプション）を config に追加
+  - `resolveProviderOptions()` を新設（parse + 名前空間検証 + 不正時 `{}` fail-soft + warn）。型は `Record<string, Record<string, JSONValue>>`
+  - `post-message.ts` のハードコード providerOptions を `resolveProviderOptions()` に置換（variant A）
+  - 観測可能: env 未指定で OpenAI 既定が適用、有効 JSON はそのまま適用、不正 JSON はチャットを壊さず `{}`＋warn。resolver 単体テスト 8 件 green
+  - _Requirements: 6.1, 6.2, 6.3, 6.4_
+  - _Boundary: resolve-provider-options, post-message, config-definition_

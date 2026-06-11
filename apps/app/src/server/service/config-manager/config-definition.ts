@@ -288,6 +288,7 @@ export const CONFIG_KEYS = [
   'mastra:llmVendor',
   'mastra:llmApiKey',
   'mastra:llmModel',
+  'mastra:llmProviderOptions',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1280,6 +1281,17 @@ export const CONFIG_DEFINITIONS = {
   'mastra:llmModel': defineConfig<string>({
     envVarName: 'MASTRA_LLM_MODEL',
     defaultValue: 'o4-mini',
+  }),
+  // Raw AI SDK `providerOptions` JSON (provider-namespaced), applied to the
+  // chat stream call. Typed as a raw JSON string (not object) so a malformed
+  // override fails soft in the resolver (parse + fallback) rather than crashing
+  // config load. Default preserves the prior hardcoded OpenAI reasoning options;
+  // it is ignored by non-OpenAI providers. Operators of other vendors set their
+  // own provider namespace, e.g. {"anthropic":{"thinking":{"type":"enabled"}}}.
+  'mastra:llmProviderOptions': defineConfig<string>({
+    envVarName: 'MASTRA_LLM_PROVIDER_OPTIONS',
+    defaultValue:
+      '{"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}}',
   }),
 
   // OpenTelemetry Settings
