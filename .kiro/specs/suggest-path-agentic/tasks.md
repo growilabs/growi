@@ -66,7 +66,7 @@
   - _Requirements: 1.4, 2.1, 4.2_
   - _Boundary: AgenticOutputSchema_
 
-- [ ] 4.3 agentic エンジンアダプタ（コア実行パス）
+- [x] 4.3 agentic エンジンアダプタ（コア実行パス）
   - 検索上限・タイムアウトの設定をリクエスト毎に読み出し、per-request のリクエストコンテキスト（user / 検索サービス / 検索 budget）を構築する（module-scope 共有禁止）
   - Mastra レジストリから agent を取得し、structured output スキーマ・maxSteps（2 × 検索上限 + 4）・AbortController によるタイムアウト signal を渡して実行する
   - 出力を型ガードで検証し、path 正規化（先頭・末尾スラッシュ保証、正規化不能エントリ破棄）→ 重複除去 → 最大 3 件制限 → grant 並列解決 → informationType 付与のマッピングを行う（category 提案は生成しない）
