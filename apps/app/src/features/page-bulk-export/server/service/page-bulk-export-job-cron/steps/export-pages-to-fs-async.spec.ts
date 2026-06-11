@@ -1,12 +1,15 @@
 /**
- * Smoke tests for export-pages-to-fs-async (Task 5.1).
+ * Integration tests for export-pages-to-fs-async (Tasks 5.1, 7.1).
  *
  * Observable contract verified here:
  *  - PDF format: output HTML file contains <style> tag with CSS content.
  *  - PDF format: output HTML file contains <div class="wiki"> wrapper.
  *  - MD format: output file is written as-is (no HTML rendering applied).
- *
- * Edge cases (md unchanged, error handling, resume) are covered in task 7.1.
+ *  - Error handling: when renderToHtml rejects, the Writable write callback
+ *    receives the error (job is not silently completed). (Req 3.2)
+ *  - Resume: exportPagesToFsAsync queries only pages after lastExportedPagePath
+ *    when that field is set on the job. (Req 5.3)
+ *  - Resume (no prior export): full scan when lastExportedPagePath is unset.
  *
  * Requirements: 3.2, 5.1, 5.2, 5.3
  */
@@ -14,6 +17,7 @@ import fs from 'node:fs';
 import os from 'node:os';
 import path from 'node:path';
 import type { Writable } from 'node:stream';
+import { Readable } from 'node:stream';
 import type { IRevisionHasId } from '@growi/core';
 import { mock } from 'vitest-mock-extended';
 
@@ -25,15 +29,28 @@ import {
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
-import { getPageWritable } from './export-pages-to-fs-async';
+import * as RendererModule from '../markdown/bulk-export-markdown-renderer';
+import {
+  exportPagesToFsAsync,
+  getPageWritable,
+} from './export-pages-to-fs-async';
+
+// ---------------------------------------------------------------------------
+// Module-level mock for PageBulkExportPageSnapshot (resume tests).
+// The model registers with Mongoose at init time; mocking avoids the need for
+// a live MongoDB connection in unit tests.
+// ---------------------------------------------------------------------------
+vi.mock('../../../models/page-bulk-export-page-snapshot', () => {
+  return { default: { find: vi.fn() } };
+});
 
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
 
 /**
- * Create a minimal IPageBulkExportJobCronService mock that returns tmpDir
- * from getTmpOutputDir().
+ * Create a minimal IPageBulkExportJobCronService mock whose getTmpOutputDir
+ * returns tmpDir.
  */
 function makeService(tmpDir: string): IPageBulkExportJobCronService {
   const svc = mock<IPageBulkExportJobCronService>();
@@ -43,14 +60,17 @@ function makeService(tmpDir: string): IPageBulkExportJobCronService {
 
 /**
  * Build a minimal PageBulkExportJobDocument mock for the given format.
+ * lastExportedPagePath defaults to undefined (no prior export).
  */
-function makeJob(format: PageBulkExportFormat): PageBulkExportJobDocument {
+function makeJob(
+  format: PageBulkExportFormat,
+  lastExportedPagePath?: string,
+): PageBulkExportJobDocument {
   const job = mock<PageBulkExportJobDocument>({
     format,
-    lastExportedPagePath: undefined,
+    lastExportedPagePath,
     status: PageBulkExportJobStatus.exporting,
   });
-  // save() must resolve for the Writable to call callback()
   job.save.mockResolvedValue(job);
   return job;
 }
@@ -64,13 +84,14 @@ function makePageSnapshot(
 ): PageBulkExportPageSnapshotDocument {
   return mock<PageBulkExportPageSnapshotDocument>({
     path: pagePath,
-    // Simulate a populated revision (isPopulated() returns true when it's an object, not an ID).
+    // isPopulated() returns true when revision is an object (not an ObjectId).
     revision: mock<IRevisionHasId>({ body: markdownBody }),
   });
 }
 
 /**
- * Write one page snapshot through a Writable and wait for it to complete.
+ * Write one page snapshot through a Writable and wait for the callback.
+ * Resolves on success; rejects with the error passed to callback on failure.
  */
 function writeOneChunk(
   writable: Writable,
@@ -99,6 +120,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
     fs.rmSync(tmpDir, { recursive: true, force: true });
   });
 
+  // -------------------------------------------------------------------------
   describe('PDF format smoke test (Requirements 5.1, 2.1)', () => {
     it('produces an HTML file with <style> tag and <div class="wiki"> wrapper for pdf format', async () => {
       const job = makeJob(PageBulkExportFormat.pdf);
@@ -108,7 +130,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
         '# Hello\n\nSome **bold** text.',
       );
 
-      const writable = await getPageWritable.call(svc, job);
+      const writable = getPageWritable.call(svc, job);
       await writeOneChunk(writable, snapshot);
 
       // The output file for pdf format has .html extension
@@ -132,6 +154,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
     }, 30_000); // allow time for dynamicImport on first run
   });
 
+  // -------------------------------------------------------------------------
   describe('MD format smoke test (Requirement 5.2)', () => {
     it('writes raw Markdown (no HTML rendering) for md format', async () => {
       const job = makeJob(PageBulkExportFormat.md);
@@ -139,7 +162,7 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
       const markdownBody = '# Hello\n\nSome **bold** text.';
       const snapshot = makePageSnapshot('/test/page', markdownBody);
 
-      const writable = await getPageWritable.call(svc, job);
+      const writable = getPageWritable.call(svc, job);
       await writeOneChunk(writable, snapshot);
 
       // The output file for md format has .md extension
@@ -154,5 +177,138 @@ describe('export-pages-to-fs-async: getPageWritable', () => {
       expect(content).not.toContain('<style>');
       expect(content).not.toContain('<div class="wiki">');
     }, 10_000);
+  });
+
+  // -------------------------------------------------------------------------
+  // Requirement 3.2: when renderToHtml rejects, the Writable write callback
+  // must receive the error so the existing error-handling path can update the
+  // job state. The failure must NOT be silently swallowed.
+  // -------------------------------------------------------------------------
+  describe('error handling: conversion reject → write callback receives error (Requirement 3.2)', () => {
+    it('calls the write callback with the render error when renderToHtml rejects', async () => {
+      const renderError = new Error('render pipeline failed');
+
+      // Intercept createBulkExportMarkdownRenderer so renderToHtml rejects.
+      // vi.spyOn on a named export works because Vitest patches the module's
+      // export binding; the production import statement sees the spy.
+      const spy = vi
+        .spyOn(RendererModule, 'createBulkExportMarkdownRenderer')
+        .mockReturnValue({
+          renderToHtml: vi.fn().mockRejectedValue(renderError),
+        });
+
+      const job = makeJob(PageBulkExportFormat.pdf);
+      const svc = makeService(tmpDir);
+      const snapshot = makePageSnapshot('/error/page', '# Will fail');
+
+      const writable = getPageWritable.call(svc, job);
+
+      // Observable: write callback is called WITH an error (not undefined).
+      await expect(writeOneChunk(writable, snapshot)).rejects.toThrow(
+        'render pipeline failed',
+      );
+
+      // The output file must NOT exist — no partial output committed.
+      const outputPath = path.join(tmpDir, 'error', 'page.html');
+      expect(fs.existsSync(outputPath)).toBe(false);
+
+      spy.mockRestore();
+    });
+  });
+});
+
+// ---------------------------------------------------------------------------
+// Requirement 5.3: exportPagesToFsAsync resume behaviour.
+//
+// The resume contract is implemented at the query level: when
+// lastExportedPagePath is set on the job, the MongoDB find query includes
+// { path: { $gt: lastExportedPagePath } } so that already-exported pages are
+// excluded from the cursor without in-stream filtering.
+// ---------------------------------------------------------------------------
+describe('export-pages-to-fs-async: exportPagesToFsAsync resume (Requirement 5.3)', () => {
+  /**
+   * Build a minimal cursor chain mock that Readable.from() can consume.
+   * find() → { populate, sort, lean, cursor } → async iterable of []
+   */
+  function makeCursorChain(): ReturnType<typeof vi.fn> {
+    const cursor = Readable.from([]);
+    // Each chained method returns an object that ultimately yields cursor
+    const chain = {
+      populate: vi.fn().mockReturnThis(),
+      sort: vi.fn().mockReturnThis(),
+      lean: vi.fn().mockReturnThis(),
+      cursor: vi.fn().mockReturnValue(cursor),
+    };
+    return vi.fn().mockReturnValue(chain);
+  }
+
+  it('queries pages with $gt filter when lastExportedPagePath is set', async () => {
+    // Import the mocked model (vi.mock hoists this to module scope).
+    const { default: PageBulkExportPageSnapshot } = await import(
+      '../../../models/page-bulk-export-page-snapshot'
+    );
+
+    const findSpy = vi
+      .spyOn(PageBulkExportPageSnapshot, 'find')
+      .mockImplementation(makeCursorChain());
+
+    const lastPath = '/already/exported';
+    const job = makeJob(PageBulkExportFormat.pdf, lastPath);
+
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'bulk-export-resume-'),
+    );
+    const svc = mock<IPageBulkExportJobCronService>();
+    svc.getTmpOutputDir.mockReturnValue(tmpDir);
+    // setStreamsInExecution and handleError are called by exportPagesToFsAsync
+    svc.setStreamsInExecution.mockReturnValue(undefined);
+    svc.handleError.mockReturnValue(undefined);
+
+    try {
+      await exportPagesToFsAsync.call(svc, job);
+
+      // Observable: find() was called with a query that includes $gt on path
+      expect(findSpy).toHaveBeenCalledOnce();
+      const [queryArg] = findSpy.mock.calls[0];
+      expect(queryArg).toMatchObject({
+        pageBulkExportJob: job,
+        path: { $gt: lastPath },
+      });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      findSpy.mockRestore();
+    }
+  });
+
+  it('queries all pages (no $gt filter) when lastExportedPagePath is not set', async () => {
+    const { default: PageBulkExportPageSnapshot } = await import(
+      '../../../models/page-bulk-export-page-snapshot'
+    );
+
+    const findSpy = vi
+      .spyOn(PageBulkExportPageSnapshot, 'find')
+      .mockImplementation(makeCursorChain());
+
+    const job = makeJob(PageBulkExportFormat.pdf); // lastExportedPagePath = undefined
+
+    const tmpDir = fs.mkdtempSync(
+      path.join(os.tmpdir(), 'bulk-export-resume-full-'),
+    );
+    const svc = mock<IPageBulkExportJobCronService>();
+    svc.getTmpOutputDir.mockReturnValue(tmpDir);
+    svc.setStreamsInExecution.mockReturnValue(undefined);
+    svc.handleError.mockReturnValue(undefined);
+
+    try {
+      await exportPagesToFsAsync.call(svc, job);
+
+      // Observable: find() was called with only the job filter (no path $gt)
+      expect(findSpy).toHaveBeenCalledOnce();
+      const [queryArg] = findSpy.mock.calls[0];
+      expect(queryArg).toEqual({ pageBulkExportJob: job });
+    } finally {
+      fs.rmSync(tmpDir, { recursive: true, force: true });
+      findSpy.mockRestore();
+    }
   });
 });

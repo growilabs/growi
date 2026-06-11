@@ -79,7 +79,7 @@
   - _Depends: 2.1_
 
 - [ ] 7. Validation: 結合テストと実機検証
-- [ ] 7.1 エクスポートステップの結合テスト
+- [x] 7.1 エクスポートステップの結合テスト
   - pdf 形式で `.wiki`＋`<style>` 入り HTML を所定パスへ出力 / md 形式は不変 / 変換 reject 時のジョブエラー化 / resume 挙動維持 を検証する（observable）
   - _Requirements: 5.1, 5.2, 5.3, 3.2_
   - _Depends: 5.1_
