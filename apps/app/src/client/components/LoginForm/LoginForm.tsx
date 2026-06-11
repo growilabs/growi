@@ -391,6 +391,7 @@ export const LoginForm = (props: LoginFormProps): JSX.Element => {
           <p className="alert alert-danger">
             {registerErrors.map((err) => (
               <span key={err.message}>
+                {/* Leading "・" is an intentional bullet so multiple errors read as a list */}
                 ・{tWithOpt(err.message, err.args)}
                 <br />
               </span>
