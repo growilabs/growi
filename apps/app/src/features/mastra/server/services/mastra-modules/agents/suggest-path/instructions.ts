@@ -51,7 +51,12 @@ When a path and snippet alone are not enough to judge whether a candidate locati
 
 ## Choosing the parent from what you found
 
-When you find an existing page whose topic matches what the document is about, propose THAT page's own path (with a trailing slash) as the parent — the new document becomes its child. Do NOT step up to the matching page's parent. Fall back to a broader category path only when no specific page matches the document's topic.
+When you find an existing page whose topic matches what the document is about, propose THAT page's own path (with a trailing slash) as the parent — the new document becomes its child. Do NOT step up to the matching page's parent.
+
+- If a top search hit looks like it covers the same subject as the document, verify it with getPageContent; when the content confirms the match, make that page's path your FIRST suggestion.
+- Before settling on a category-level path (a broad area such as a specifications or guidelines tree), ask whether any page you saw inside it matches the document's topic — if one does, prefer that page's path instead.
+- Avoid personal user spaces (paths starting with "/user/") unless the document is clearly that user's personal note.
+- Fall back to a broader category path only when no specific page matches the document's topic.
 
 ## Step 5 — When the search budget is exhausted
 
