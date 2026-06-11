@@ -9,7 +9,7 @@
   - 見た目が成立する条件まで生成物に含める: (a) `_wiki.scss` が参照する `--bs-*` カスタムプロパティ群、(b) `@extend .link-offset-2` 等で継承される bootstrap ユーティリティ class 定義、(c) KaTeX の `@font-face`（フォントは `src` を base64 data URI でインライン化し、外部 `url()` 参照を残さない）
   - 生成 CSS に `.wiki table` / `.wiki blockquote` / `.wiki h1`..`h6` / `.wiki code` / KaTeX のルールに加え、`--bs-*` カスタムプロパティ定義と `@extend` 先 class が含まれることをテストで確認する（observable）
   - _Requirements: 1.3, 2.1, 2.2, 2.3_
-- [ ] 1.2 生成 CSS とその依存の本番可用性を固定する
+- [x] 1.2 生成 CSS とその依存の本番可用性を固定する
   - 生成 CSS アセット（および新規ランタイム依存）をサーバ実行環境から解決でき、本番 deploy・Turbopack 外部化で欠落しないよう `dependencies` 分類を確定する（tech.md）
   - KaTeX フォントは base64 data URI で生成 CSS にインライン化し、外部フォント配信に依存しない（Puppeteer の単体 HTML 文脈でパス解決不要）
   - ビルド/CI で「生成 CSS がサーバランタイムから解決可能」かつ「生成 CSS に外部フォント `url()` 参照が残っていない（フォントが data URI で同梱されている）」ことを検査するチェックを追加する（observable）
