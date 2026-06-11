@@ -43,7 +43,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 3.2_
   - _Boundary: SuggestPathAgent (instructions)_
 
-- [ ] 3.3 suggestPathAgent の定義と Mastra インスタンスへの登録
+- [x] 3.3 suggestPathAgent の定義と Mastra インスタンスへの登録
   - instructions・dynamic model（設定からの per-request モデル解決）・tools 構成（wrapper 検索 tool + 既存ページ本文参照 tool）で agent を定義する（memory は接続しない）
   - barrel で agent と専用リクエストコンテキスト型のみを公開する
   - Mastra インスタンスの agents マップに additive に登録する
