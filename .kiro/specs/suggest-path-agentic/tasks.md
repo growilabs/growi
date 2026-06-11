@@ -104,7 +104,7 @@
   - _Requirements: 4.1, 5.2, 6.1_
 
 - [ ] 6. 統合検証
-- [ ] 6.1 route 統合テスト
+- [x] 6.1 route 統合テスト
   - engine: 'agentic' 指定（agent モック）で 200 + 契約準拠レスポンス、engine 不正値で 400、未指定で oneshot 経路となることを統合テストで検証する
   - 上記 3 シナリオが green
   - _Requirements: 4.1, 4.2, 5.2, 6.1_
