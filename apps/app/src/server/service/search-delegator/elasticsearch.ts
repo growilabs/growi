@@ -75,6 +75,10 @@ const AVAILABLE_KEYS = [
   'not_prefix',
   'tag',
   'not_tag',
+  'author',
+  'not_author',
+  'editor',
+  'not_editor',
 ];
 
 type Data = any;
