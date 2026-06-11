@@ -1,6 +1,6 @@
 {
   "name": "@growi/app",
-  "version": "7.5.5-RC.0",
+  "version": "7.5.6-RC.0",
   "license": "MIT",
   "private": true,
   "scripts": {
@@ -280,7 +280,6 @@
     "ts-node": "^10.9.2",
     "tsconfig-paths": "^4.2.0",
     "tslib": "^2.8.0",
-    "uglifycss": "^0.0.29",
     "uid-safe": "^2.1.5",
     "umzug": "^3.8.2",
     "unified": "^11.0.0",

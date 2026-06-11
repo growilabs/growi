@@ -185,6 +185,13 @@ export interface IPageService {
     options: IOptionsForCreate,
     pageOpId: ObjectIdLike,
   ): Promise<void>;
+  updatePageSubOperation(
+    page,
+    user,
+    exPage,
+    options: IOptionsForUpdate,
+    pageOpId: ObjectIdLike,
+  ): Promise<void>;
 
   getCreatorIdForCanDelete(page: PageDocument): Promise<ObjectIdLike | null>;
 

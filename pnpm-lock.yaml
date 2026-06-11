@@ -797,9 +797,6 @@ importers:
       tslib:
         specifier: ^2.8.0
         version: 2.8.1
-      uglifycss:
-        specifier: ^0.0.29
-        version: 0.0.29
       uid-safe:
         specifier: ^2.1.5
         version: 2.1.5
@@ -13521,11 +13518,6 @@ packages:
   uglify-js@3.19.3:
     resolution: {integrity: sha512-v3Xu+yuwBXisp6QYTcH4UbH+xYJXqnq2m/LtQVWKWzYc1iehYnLixoQDN9FH6/j9/oybfd6W9Ghwkl8+UMKTKQ==}
     engines: {node: '>=0.8.0'}
-    hasBin: true
-
-  uglifycss@0.0.29:
-    resolution: {integrity: sha512-J2SQ2QLjiknNGbNdScaNZsXgmMGI0kYNrXaDlr4obnPW9ni1jljb1NeEVWAiTgZ8z+EBWP2ozfT9vpy03rjlMQ==}
-    engines: {node: '>=6.4.0'}
     hasBin: true
 
   uid-safe@2.1.5:
@@ -28815,8 +28807,6 @@ snapshots:
 
   uglify-js@3.19.3:
     optional: true
-
-  uglifycss@0.0.29: {}
 
   uid-safe@2.1.5:
     dependencies:
