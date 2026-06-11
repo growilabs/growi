@@ -59,7 +59,7 @@
   - 移設後のワンショットエンジンの挙動がユニットテストで検証され green。既存 4 サービスのファイルに差分がない
   - _Requirements: 5.3, 5.5_
 
-- [ ] 4.2 (P) structured output 契約（スキーマ・型・型ガード）
+- [x] 4.2 (P) structured output 契約（スキーマ・型・型ガード）
   - agent 出力の JSON Schema 定数（OpenAI strict mode 互換: 全レベル additionalProperties: false・全プロパティ required。informationType は flow | stock、suggestions は path / label / description で最大 3 件）を直接記述する（Zod からの変換はしない）
   - 対応する TS 型と型ガードを定義する
   - 型ガードのユニットテスト（正常系 / informationType 不正 / path 欠落 / 余剰プロパティ拒否）が green で、JSON Schema 定数と TS 型の整合（required・enum 値）が確認されている
