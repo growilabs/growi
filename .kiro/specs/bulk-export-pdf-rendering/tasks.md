@@ -23,7 +23,7 @@
   - 宣言モジュールが採用/除外の両集合を機械可読に公開する（observable）
   - _Requirements: 1.6, 6.1_
   - _Boundary: plugin-set_
-- [ ] 2.2 ESM プラグインローダを dynamicImport ＋キャッシュで実装する
+- [x] 2.2 ESM プラグインローダを dynamicImport ＋キャッシュで実装する
   - 宣言された全プラグインを `dynamicImport` で取得し、初回ロードをキャッシュする
   - ts-node/CJS ランタイムで全プラグインが `ERR_REQUIRE_ESM` なくロードできることをテストで確認する（observable）
   - _Requirements: 5.4, 1.6_
