@@ -886,7 +886,7 @@
     "sign_in_failure": "登录失败。",
     "aws_sttings_required": "使用此功能所需的AWS设置。请询问管理员。",
     "application_already_installed": "应用程序已安装。",
-    "email_address_could_not_be_used": "无法使用此电子邮件地址。（确保允许的电子邮件地址）",
+    "email_address_could_not_be_used": "此电子邮件地址无法在此 Wiki 中使用。请联系管理员。",
     "user_id_is_not_available": "此用户ID不可用。",
     "username_should_not_be_null": "用户名不应为空。请检查管理页面上的身份验证机制设置",
     "email_address_is_already_registered": "此电子邮件地址已注册。",
