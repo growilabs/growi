@@ -988,7 +988,6 @@ class ElasticsearchDelegator
       query.body.query.bool.filter.push({ bool: { must_not: queries } });
     }
 
-    // editor is still not indexed so does not work yet
     if (parsedKeywords.editor.length > 0) {
       const queries = parsedKeywords.editor.map((editor) => {
         return { term: { last_update_username: editor } };

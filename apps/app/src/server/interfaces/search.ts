@@ -70,12 +70,7 @@ export type UnavailableTermsKey<K extends AllTermsKey> = Exclude<
   AllTermsKey,
   K
 >;
-// NOTE: author/editor/group are declared here but are NOT yet runtime-enabled —
-// AVAILABLE_KEYS in elasticsearch.ts (the runtime gate) intentionally still stops
-// at not_tag, so using these filters currently throws SearchError. They are wired
-// in later stories (author/editor → indexed username fields; group → resolved
-// member usernames), which also relaxes the delegator registry typing in
-// search.ts so ESTermsKey can become an honest subset of AllTermsKey.
+
 export type ESTermsKey =
   | 'match'
   | 'not_match'
