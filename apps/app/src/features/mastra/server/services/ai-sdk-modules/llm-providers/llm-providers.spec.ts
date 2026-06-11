@@ -10,9 +10,11 @@ const {
   createOpenAI,
   createAnthropic,
   createGoogleGenerativeAI,
+  createAzure,
   openaiProviderFn,
   anthropicProviderFn,
   googleProviderFn,
+  azureProviderFn,
 } = vi.hoisted(() => {
   const openaiProviderFn = vi.fn((model: string) => ({
     tag: 'openai-model',
@@ -26,14 +28,29 @@ const {
     tag: 'google-model',
     model,
   }));
+  const azureProviderFn = vi.fn((model: string) => ({
+    tag: 'azure-model',
+    model,
+  }));
   return {
     openaiProviderFn,
     anthropicProviderFn,
     googleProviderFn,
+    azureProviderFn,
     createOpenAI: vi.fn((_opts: { apiKey: string }) => openaiProviderFn),
     createAnthropic: vi.fn((_opts: { apiKey: string }) => anthropicProviderFn),
     createGoogleGenerativeAI: vi.fn(
       (_opts: { apiKey: string }) => googleProviderFn,
+    ),
+    // Azure accepts resourceName | baseURL (mutually exclusive) and optional
+    // apiVersion alongside the apiKey.
+    createAzure: vi.fn(
+      (_opts: {
+        apiKey: string;
+        resourceName?: string;
+        baseURL?: string;
+        apiVersion?: string;
+      }) => azureProviderFn,
     ),
   };
 });
@@ -41,8 +58,10 @@ const {
 vi.mock('@ai-sdk/openai', () => ({ createOpenAI }));
 vi.mock('@ai-sdk/anthropic', () => ({ createAnthropic }));
 vi.mock('@ai-sdk/google', () => ({ createGoogleGenerativeAI }));
+vi.mock('@ai-sdk/azure', () => ({ createAzure }));
 
 import { createAnthropicModel } from './anthropic';
+import { createAzureOpenaiModel } from './azure-openai';
 import { createGoogleModel } from './google';
 import { llmModelFactories } from './index';
 import { createOpenAiModel } from './openai';
@@ -95,6 +114,85 @@ describe('llm provider factories', () => {
     });
   });
 
+  describe('createAzureOpenaiModel', () => {
+    it('constructs the Azure provider with resourceName and applies the deployment name', () => {
+      const result = createAzureOpenaiModel({
+        apiKey: 'az-key-1',
+        model: 'my-deployment',
+        azureOpenai: { resourceName: 'my-resource' },
+      });
+
+      expect(createAzure).toHaveBeenCalledWith({
+        apiKey: 'az-key-1',
+        resourceName: 'my-resource',
+      });
+      expect(azureProviderFn).toHaveBeenCalledWith('my-deployment');
+      expect(result).toEqual({ tag: 'azure-model', model: 'my-deployment' });
+    });
+
+    it('constructs the Azure provider with baseURL when given', () => {
+      createAzureOpenaiModel({
+        apiKey: 'az-key-2',
+        model: 'dep',
+        azureOpenai: { baseURL: 'https://gw.example.com/openai/deployments' },
+      });
+
+      expect(createAzure).toHaveBeenCalledWith({
+        apiKey: 'az-key-2',
+        baseURL: 'https://gw.example.com/openai/deployments',
+      });
+    });
+
+    it('prefers baseURL over resourceName when both are set (AI SDK is exclusive)', () => {
+      createAzureOpenaiModel({
+        apiKey: 'az-key-3',
+        model: 'dep',
+        azureOpenai: {
+          resourceName: 'should-be-ignored',
+          baseURL: 'https://gw.example.com',
+        },
+      });
+
+      // resourceName must NOT be forwarded when baseURL wins.
+      expect(createAzure).toHaveBeenCalledWith({
+        apiKey: 'az-key-3',
+        baseURL: 'https://gw.example.com',
+      });
+    });
+
+    it('forwards apiVersion only when set', () => {
+      createAzureOpenaiModel({
+        apiKey: 'az-key-4',
+        model: 'dep',
+        azureOpenai: { resourceName: 'res', apiVersion: '2024-10-01-preview' },
+      });
+
+      expect(createAzure).toHaveBeenCalledWith({
+        apiKey: 'az-key-4',
+        resourceName: 'res',
+        apiVersion: '2024-10-01-preview',
+      });
+    });
+
+    it('throws (naming the env vars, never the key) when neither resourceName nor baseURL is set', () => {
+      const apiKey = 'az-super-secret';
+
+      expect(() =>
+        createAzureOpenaiModel({ apiKey, model: 'dep', azureOpenai: {} }),
+      ).toThrow(
+        /MASTRA_LLM_AZURE_OPENAI_RESOURCE_NAME|MASTRA_LLM_AZURE_OPENAI_BASE_URL/,
+      );
+      // The provider must not be constructed on the throw path.
+      expect(createAzure).not.toHaveBeenCalled();
+
+      try {
+        createAzureOpenaiModel({ apiKey, model: 'dep' });
+      } catch (e) {
+        expect((e as Error).message).not.toContain(apiKey);
+      }
+    });
+  });
+
   describe('apiKey is injected explicitly (not from process.env)', () => {
     it('passes the given apiKey through even when an env var is present', () => {
       const original = process.env.OPENAI_API_KEY;
@@ -132,6 +230,17 @@ describe('llm provider factories', () => {
       llmModelFactories.google({ apiKey: 'sk-g', model: 'm-g' });
       expect(createGoogleGenerativeAI).toHaveBeenCalledWith({ apiKey: 'sk-g' });
       expect(googleProviderFn).toHaveBeenCalledWith('m-g');
+
+      llmModelFactories['azure-openai']({
+        apiKey: 'sk-az',
+        model: 'm-az',
+        azureOpenai: { resourceName: 'res' },
+      });
+      expect(createAzure).toHaveBeenCalledWith({
+        apiKey: 'sk-az',
+        resourceName: 'res',
+      });
+      expect(azureProviderFn).toHaveBeenCalledWith('m-az');
     });
   });
 });

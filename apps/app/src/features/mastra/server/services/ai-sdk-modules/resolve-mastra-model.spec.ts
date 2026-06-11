@@ -9,27 +9,41 @@ import type { ConfigKey } from '~/server/service/config-manager/config-definitio
 //      which factory ran and with what { apiKey, model }.
 //
 // vi.hoisted keeps the spies available inside the hoisted vi.mock factories.
-const { getConfig, openaiFactory, anthropicFactory, googleFactory } =
-  vi.hoisted(() => {
-    return {
-      getConfig: vi.fn(),
-      // Each factory returns a distinct tagged sentinel so tests can assert the
-      // RIGHT provider's factory produced the model, and that the same instance
-      // is reused on memoization.
-      openaiFactory: vi.fn((params: { apiKey: string; model: string }) => ({
-        tag: 'openai-model',
-        ...params,
-      })),
-      anthropicFactory: vi.fn((params: { apiKey: string; model: string }) => ({
-        tag: 'anthropic-model',
-        ...params,
-      })),
-      googleFactory: vi.fn((params: { apiKey: string; model: string }) => ({
-        tag: 'google-model',
-        ...params,
-      })),
-    };
-  });
+const {
+  getConfig,
+  openaiFactory,
+  anthropicFactory,
+  googleFactory,
+  azureFactory,
+} = vi.hoisted(() => {
+  type FactoryParams = {
+    apiKey: string;
+    model: string;
+    azureOpenai?: unknown;
+  };
+  return {
+    getConfig: vi.fn(),
+    // Each factory returns a distinct tagged sentinel so tests can assert the
+    // RIGHT provider's factory produced the model, and that the same instance
+    // is reused on memoization.
+    openaiFactory: vi.fn((params: FactoryParams) => ({
+      tag: 'openai-model',
+      ...params,
+    })),
+    anthropicFactory: vi.fn((params: FactoryParams) => ({
+      tag: 'anthropic-model',
+      ...params,
+    })),
+    googleFactory: vi.fn((params: FactoryParams) => ({
+      tag: 'google-model',
+      ...params,
+    })),
+    azureFactory: vi.fn((params: FactoryParams) => ({
+      tag: 'azure-model',
+      ...params,
+    })),
+  };
+});
 
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig },
@@ -40,6 +54,7 @@ vi.mock('./llm-providers', () => ({
     openai: openaiFactory,
     anthropic: anthropicFactory,
     google: googleFactory,
+    'azure-openai': azureFactory,
   },
 }));
 
@@ -78,13 +93,16 @@ describe('resolveMastraModel', () => {
       expect(openaiFactory).not.toHaveBeenCalled();
       expect(anthropicFactory).not.toHaveBeenCalled();
       expect(googleFactory).not.toHaveBeenCalled();
+      expect(azureFactory).not.toHaveBeenCalled();
     });
 
     it('throws for an unsupported provider, surfacing the raw value (Req 1.4)', async () => {
-      applyConfig({ 'mastra:llmProvider': 'azure' });
+      // 'cohere' is genuinely outside the supported set (openai/anthropic/
+      // google/azure), so it must be rejected here.
+      applyConfig({ 'mastra:llmProvider': 'cohere' });
       const { resolveMastraModel } = await loadResolver();
 
-      expect(() => resolveMastraModel()).toThrow(/azure/);
+      expect(() => resolveMastraModel()).toThrow(/cohere/);
       expect(openaiFactory).not.toHaveBeenCalled();
     });
 
@@ -176,6 +194,68 @@ describe('resolveMastraModel', () => {
     });
   });
 
+  describe('azure connection config forwarding (Req 7.2, 7.6)', () => {
+    it('forwards resourceName to the azure factory (model is the deployment name)', async () => {
+      applyConfig({
+        'mastra:llmProvider': 'azure-openai',
+        'mastra:llmApiKey': 'az-key',
+        'mastra:llmModel': 'my-deployment',
+        'mastra:llmAzureOpenaiResourceName': 'my-resource',
+      });
+      const { resolveMastraModel } = await loadResolver();
+
+      resolveMastraModel();
+
+      expect(azureFactory).toHaveBeenCalledWith({
+        apiKey: 'az-key',
+        model: 'my-deployment',
+        azureOpenai: { resourceName: 'my-resource' },
+      });
+    });
+
+    it('forwards baseURL (and apiVersion) to the azure factory', async () => {
+      applyConfig({
+        'mastra:llmProvider': 'azure-openai',
+        'mastra:llmApiKey': 'az-key',
+        'mastra:llmModel': 'dep',
+        'mastra:llmAzureOpenaiBaseUrl':
+          'https://gw.example.com/openai/deployments',
+        'mastra:llmAzureOpenaiApiVersion': '2024-10-01-preview',
+      });
+      const { resolveMastraModel } = await loadResolver();
+
+      resolveMastraModel();
+
+      expect(azureFactory).toHaveBeenCalledWith({
+        apiKey: 'az-key',
+        model: 'dep',
+        azureOpenai: {
+          baseURL: 'https://gw.example.com/openai/deployments',
+          apiVersion: '2024-10-01-preview',
+        },
+      });
+    });
+
+    it('does NOT add an azure field for non-azure providers (call shape stays { apiKey, model })', async () => {
+      // Even if azure-only env vars are present, a non-azure provider must be
+      // called with exactly { apiKey, model } — the resolver branches on config
+      // presence per provider, never leaking azure config into other factories.
+      applyConfig({
+        'mastra:llmProvider': 'openai',
+        'mastra:llmApiKey': 'sk-key',
+        'mastra:llmModel': 'o4-mini',
+      });
+      const { resolveMastraModel } = await loadResolver();
+
+      resolveMastraModel();
+
+      expect(openaiFactory).toHaveBeenCalledWith({
+        apiKey: 'sk-key',
+        model: 'o4-mini',
+      });
+    });
+  });
+
   describe('single-provider config surface (Req 3.1, 3.2)', () => {
     it('reads only the single mastra LLM keys, never per-provider keys', async () => {
       applyConfig({
@@ -201,7 +281,7 @@ describe('resolveMastraModel', () => {
       // Provider invalid -> throw, while a real key is present in config: the
       // message must surface the cause without ever echoing the secret.
       applyConfig({
-        'mastra:llmProvider': 'azure',
+        'mastra:llmProvider': 'cohere',
         'mastra:llmApiKey': secret,
       });
       const { resolveMastraModel } = await loadResolver();

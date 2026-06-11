@@ -41,8 +41,40 @@ export const resolveMastraModel = (): MastraModelConfig => {
   }
 
   // `mastra:llmModel` carries a single default (tuned for the default provider).
+  // For the 'azure-openai' provider this value is the Azure *deployment name*.
   const model = configManager.getConfig('mastra:llmModel');
 
-  memoizedModel = llmModelFactories[provider]({ apiKey, model });
+  // Azure-OpenAI-only connection config. Forwarded to the factory ONLY when at
+  // least one value is set, so other providers keep receiving exactly
+  // { apiKey, model } (and so this resolver does not branch on the provider
+  // name — it branches on config presence, which is data-driven). The
+  // azure-openai factory validates these and throws if neither resourceName nor
+  // baseURL is set; that throw surfaces here at use time (not memoized) and is
+  // handled by the post-message route's try/catch.
+  const azureOpenaiResourceName = configManager.getConfig(
+    'mastra:llmAzureOpenaiResourceName',
+  );
+  const azureOpenaiBaseUrl = configManager.getConfig(
+    'mastra:llmAzureOpenaiBaseUrl',
+  );
+  const azureOpenaiApiVersion = configManager.getConfig(
+    'mastra:llmAzureOpenaiApiVersion',
+  );
+  const azureOpenai =
+    azureOpenaiResourceName != null ||
+    azureOpenaiBaseUrl != null ||
+    azureOpenaiApiVersion != null
+      ? {
+          resourceName: azureOpenaiResourceName,
+          baseURL: azureOpenaiBaseUrl,
+          apiVersion: azureOpenaiApiVersion,
+        }
+      : undefined;
+
+  memoizedModel = llmModelFactories[provider]({
+    apiKey,
+    model,
+    ...(azureOpenai != null ? { azureOpenai } : {}),
+  });
   return memoizedModel;
 };

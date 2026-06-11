@@ -289,6 +289,10 @@ export const CONFIG_KEYS = [
   'mastra:llmApiKey',
   'mastra:llmModel',
   'mastra:llmProviderOptions',
+  // Azure OpenAI-only connection config (mastra:llmProvider='azure-openai')
+  'mastra:llmAzureOpenaiResourceName',
+  'mastra:llmAzureOpenaiBaseUrl',
+  'mastra:llmAzureOpenaiApiVersion',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1292,6 +1296,28 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'MASTRA_LLM_PROVIDER_OPTIONS',
     defaultValue:
       '{"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}}',
+  }),
+
+  // Azure OpenAI-only connection config (mastra:llmProvider='azure-openai'). Azure is
+  // reached via a resource-specific endpoint, so { apiKey, model } alone is not
+  // enough. Set exactly one of resourceName / baseUrl: resourceName builds the
+  // standard https://<name>.openai.azure.com/... URL; baseUrl is the escape
+  // hatch for Azure Government / sovereign clouds / API Management gateways /
+  // custom domains. apiVersion is optional (the AI SDK defaults it). For Azure,
+  // MASTRA_LLM_MODEL is the *deployment name*, not an OpenAI model id. These
+  // keys are ignored by the other providers. None are secret (a resource name,
+  // URL, or API version is not a credential — only mastra:llmApiKey is).
+  'mastra:llmAzureOpenaiResourceName': defineConfig<string | undefined>({
+    envVarName: 'MASTRA_LLM_AZURE_OPENAI_RESOURCE_NAME',
+    defaultValue: undefined,
+  }),
+  'mastra:llmAzureOpenaiBaseUrl': defineConfig<string | undefined>({
+    envVarName: 'MASTRA_LLM_AZURE_OPENAI_BASE_URL',
+    defaultValue: undefined,
+  }),
+  'mastra:llmAzureOpenaiApiVersion': defineConfig<string | undefined>({
+    envVarName: 'MASTRA_LLM_AZURE_OPENAI_API_VERSION',
+    defaultValue: undefined,
   }),
 
   // OpenTelemetry Settings

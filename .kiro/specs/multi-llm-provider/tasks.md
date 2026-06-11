@@ -91,3 +91,47 @@
   - 観測可能: env 未指定で OpenAI 既定が適用、有効 JSON はそのまま適用、不正 JSON はチャットを壊さず `{}`＋warn。resolver 単体テスト 8 件 green
   - _Requirements: 6.1, 6.2, 6.3, 6.4_
   - _Boundary: resolve-provider-options, post-message, config-definition_
+
+## Scope Expansion (Req 7 — Azure OpenAI provider)
+- [ ] 7. Azure OpenAI を 4 番目のベンダーとして追加
+- [ ] 7.1 `@ai-sdk/azure` 依存の追加
+  - `@ai-sdk/azure` を `^3.x`（既存 `@ai-sdk/*` と同じ provider IF）で `apps/app/package.json` の `dependencies` に追加し、ルートで `turbo run bootstrap` を実行して依存解決・lockfile を更新する
+  - 観測可能: `@ai-sdk/azure` が `dependencies` に存在し `turbo run bootstrap` が完了。`createAzure`（`@ai-sdk/azure`）が型解決する
+  - _Requirements: 1.1, 7.1_
+  - _Boundary: package.json_
+
+- [ ] 7.2 ベンダー集合への `'azure-openai'` 追加
+  - `LLM_PROVIDERS` に `'azure-openai'` を追加する（`LlmProvider` 型・`isLlmProvider` は自動拡張）。識別子は既存の `openai:serviceType` の `'azure-openai'` 値と表記を揃える
+  - 観測可能: `isLlmProvider('azure-openai')` が true を返し、`LLM_PROVIDERS` の長さが 4 になる
+  - _Requirements: 1.1, 1.4_
+  - _Boundary: llm-provider interface_
+
+- [ ] 7.3 Azure 固有の接続設定キー
+  - `mastra:llmAzureOpenaiResourceName` / `mastra:llmAzureOpenaiBaseUrl` / `mastra:llmAzureOpenaiApiVersion`（いずれも `string | undefined`・default `undefined`・非 secret）を `CONFIG_KEYS` と `CONFIG_DEFINITIONS` に追加する。API キー・デプロイ名は既存の `mastra:llmApiKey` / `mastra:llmModel` を流用（追加しない）
+  - 観測可能: 3 つの新 env（`MASTRA_LLM_AZURE_OPENAI_RESOURCE_NAME` / `MASTRA_LLM_AZURE_OPENAI_BASE_URL` / `MASTRA_LLM_AZURE_OPENAI_API_VERSION`）が config として解決でき、いずれも非 secret
+  - _Requirements: 7.1, 7.2, 7.5_
+  - _Boundary: config-definition_
+
+- [ ] 7.4 Azure native provider ファクトリ
+  - `azure-openai.ts` を新設し、`createAzure` を明示的 API キー注入で生成して `(deploymentName)` を適用する薄いアダプタを実装する。`resourceName`/`baseURL` は排他（baseURL 優先）で渡し、`apiVersion` は設定時のみ付与する
+  - **いずれのエンドポイント設定も無い場合はファクトリ内で throw**（欠落 env 名を名指し・API キー値非含）。`AzureOpenaiProviderConfig` 型を定義し、barrel の `LlmModelFactory` に任意フィールド `azureOpenai?` を追加、`llmModelFactories` に `'azure-openai': createAzureOpenaiModel` を登録する
+  - co-located unit test: resourceName 経路／baseURL 経路／両指定→baseURL 優先／apiVersion 任意／いずれも無い→throw（メッセージにキー値非含）（`@ai-sdk/azure` を mock）
+  - 観測可能: 各経路で言語モデルが生成され、排他渡し・throw 分岐がテストで green。`Object.keys(llmModelFactories)` が `LLM_PROVIDERS` と一致
+  - _Requirements: 1.2, 7.2, 7.3, 7.4, 7.5_
+  - _Boundary: llm-providers_
+  - _Depends: 7.1, 7.2_
+
+- [ ] 7.5 resolver の Azure config 受け渡し
+  - resolver で Azure 固有 config（resourceName/baseUrl/apiVersion）を読み、**いずれかが非 null のときだけ** `azureOpenai` を factory params に付与する（provider 名で分岐しない／非 Azure の呼び出し形状 `{apiKey, model}` を不変に保つ）
+  - co-located unit test 更新: provider=azure-openai で azure 固有 config を収集し factory に `azure` を渡す／azure config 未指定時は `{apiKey, model}` のみ。**「未対応プロバイダ」の例示値（旧 `'azure'`）を真に未対応の値（例 `'cohere'`）へ差し替え**（`'azure-openai'` が有効化されたため）、mock の `llmModelFactories` に azure を追加
+  - 観測可能: 既存 resolver テストが green を維持し（非 Azure 経路の呼び出し形状不変）、azure 経路の新ケースが green
+  - _Requirements: 1.2, 7.2, 7.6_
+  - _Boundary: resolve-mastra-model_
+  - _Depends: 7.3, 7.4_
+
+- [ ] 7.6 (P) Azure を含めた回帰・型チェック
+  - `pnpm vitest run` で mastra LLM 関連テスト（llm-providers / resolve-mastra-model / llm-provider ガード）が全 green、`pnpm run lint:typecheck` に Azure 由来の新規エラーが無いことを確認する（既存の pre-existing TS2769 は本タスク対象外）
+  - 観測可能: 上記テストが green、typecheck の差分が pre-existing 既知エラーのみ
+  - _Requirements: 1.1, 7.x_
+  - _Boundary: mastra LLM modules（参照のみ）_
+  - _Depends: 7.4, 7.5_
