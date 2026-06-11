@@ -19,7 +19,6 @@ import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-sn
 import type { IPageBulkExportJobCronService } from '..';
 import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 import { createBulkExportMarkdownRenderer } from '../markdown';
-import { createBulkExportStyleProvider } from '../markdown/styles';
 
 const logger = loggerFactory(
   'growi:features:page-bulk-export:export-pages-to-fs-async',
@@ -49,11 +48,10 @@ export function getPageWritable(
       : pageBulkExportJob.format;
   const outputDir = this.getTmpOutputDir(pageBulkExportJob, isHtmlPath);
 
-  // Build renderer and style provider once — reused for every page in the job.
-  // BulkExportMarkdownRenderer caches the unified pipeline at module level;
-  // BulkExportStyleProvider is stateless.
+  // Build renderer once — reused for every page in the job.
+  // BulkExportMarkdownRenderer caches the unified pipeline at module level and
+  // owns CSS injection + .wiki wrapping internally (design.md postcondition).
   const renderer = createBulkExportMarkdownRenderer(__dirname);
-  const styleProvider = createBulkExportStyleProvider();
 
   return new Writable({
     objectMode: true,
@@ -78,9 +76,9 @@ export function getPageWritable(
             // Render Markdown → sanitized HTML fragment, then wrap with CSS + .wiki container.
             // If renderToHtml rejects, the error propagates to callback(err) below,
             // letting the existing error-handling path update the job state (Req 3.2).
-            let htmlFragment: string;
+            let htmlString: string;
             try {
-              htmlFragment = await renderer.renderToHtml(markdownBody);
+              htmlString = await renderer.renderToHtml(markdownBody);
             } catch (renderErr) {
               logger.warn(
                 'BulkExportMarkdownRenderer failed for page %s: %o',
@@ -89,7 +87,6 @@ export function getPageWritable(
               );
               throw renderErr;
             }
-            const htmlString = styleProvider.wrap(htmlFragment);
             await fs.promises.writeFile(fileOutputPath, htmlString);
           }
           pageBulkExportJob.lastExportedPagePath = page.path;

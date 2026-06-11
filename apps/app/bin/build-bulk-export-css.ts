@@ -1,4 +1,3 @@
-#!/usr/bin/env ts-node
 /**
  * Build script: compile a self-contained CSS asset for bulk-export PDF rendering.
  *

@@ -4,6 +4,7 @@ import type * as HastUtilSanitize from 'hast-util-sanitize';
 import type { Plugin } from 'unified';
 
 import { loadPlugins } from './esm-plugin-loader';
+import { createBulkExportStyleProvider } from './styles';
 
 /**
  * Service contract for bulk-export Markdown → HTML conversion.
@@ -12,7 +13,10 @@ import { loadPlugins } from './esm-plugin-loader';
  * Requirements: 1.1–1.6, 3.1, 4.1–4.3
  */
 export interface BulkExportMarkdownRenderer {
-  /** Convert one page's markdown body into a sanitized HTML string. */
+  /**
+   * Convert one page's markdown body into a sanitized, CSS-injected,
+   * .wiki-wrapped, self-contained HTML string (design.md § BulkExportMarkdownRenderer).
+   */
   renderToHtml(markdownBody: string): Promise<string>;
 }
 
@@ -99,12 +103,14 @@ async function buildProcessor(baseDir: string) {
 export function createBulkExportMarkdownRenderer(
   baseDir: string,
 ): BulkExportMarkdownRenderer {
+  const styleProvider = createBulkExportStyleProvider();
   return {
     async renderToHtml(markdownBody: string): Promise<string> {
       if (cachedProcessor == null) {
         cachedProcessor = await buildProcessor(baseDir);
       }
-      return String(await cachedProcessor.process(markdownBody));
+      const htmlFragment = String(await cachedProcessor.process(markdownBody));
+      return styleProvider.wrap(htmlFragment);
     },
   };
 }

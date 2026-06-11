@@ -11,41 +11,7 @@ import type * as RemarkParse from 'remark-parse';
 import type * as RemarkRehype from 'remark-rehype';
 import type * as Unified from 'unified';
 
-import { ADOPTED_PLUGIN_NAMES } from './plugin-set';
-
-/**
- * Plugin names that this loader imports, in the same order as the dynamicImport calls below.
- * Must be a subset of ADOPTED_PLUGIN_NAMES (from plugin-set.ts, the single source of truth).
- * "unified" is the pipeline entry point and is not a remark/rehype plugin, so it is omitted
- * from ADOPTED_PLUGIN_NAMES but is still loaded here.
- *
- * This constant is used by the runtime assertion below to prevent the loader from silently
- * drifting out of sync with plugin-set.ts.
- */
-const LOADER_PLUGIN_NAMES: ReadonlyArray<string> = [
-  'remark-parse',
-  'remark-gfm',
-  'remark-frontmatter',
-  'remark-math',
-  'remark-rehype',
-  'rehype-raw',
-  'rehype-slug',
-  'rehype-sanitize',
-  'rehype-katex',
-  'rehype-stringify',
-];
-
-// Compile-time-style assertion: every name this loader requests must exist in the
-// canonical ADOPTED_PLUGIN_NAMES set declared by plugin-set.ts.  Violations surface
-// immediately when loadPlugins() is first called rather than at deploy time.
-for (const name of LOADER_PLUGIN_NAMES) {
-  if (!ADOPTED_PLUGIN_NAMES.has(name)) {
-    throw new Error(
-      `[EsmPluginLoader] Plugin "${name}" is not listed in ADOPTED_PLUGIN_NAMES (plugin-set.ts). ` +
-        'Update plugin-set.ts to add it, or remove the import from esm-plugin-loader.ts.',
-    );
-  }
-}
+import { ADOPTED_PLUGINS } from './plugin-set';
 
 /**
  * All unified/remark/rehype plugins required by the bulk-export Markdown→HTML pipeline,
@@ -127,6 +93,25 @@ export async function loadPlugins(baseDir: string): Promise<LoadedPlugins> {
     rehypeKatex: rehypeKatexModule.default,
     rehypeStringify: rehypeStringifyModule.default,
   };
+
+  // Reverse-direction assertion: every plugin declared in ADOPTED_PLUGINS (except
+  // remark-parse, which is the unified base and has no separate dynamicImport) must
+  // have a corresponding camelCase key in cachedPlugins.  This catches the case where
+  // plugin-set.ts gains a new entry that esm-plugin-loader.ts has not yet wired up.
+  const toCamelCase = (name: string): string =>
+    name.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+
+  for (const { name } of ADOPTED_PLUGINS) {
+    if (name === 'remark-parse') continue;
+    const key = toCamelCase(name);
+    if (!(key in cachedPlugins)) {
+      throw new Error(
+        `[EsmPluginLoader] Plugin "${name}" is declared in ADOPTED_PLUGINS (plugin-set.ts) ` +
+          `but key "${key}" is missing from cachedPlugins. ` +
+          'Add a dynamicImport call and wire it into cachedPlugins in esm-plugin-loader.ts.',
+      );
+    }
+  }
 
   return cachedPlugins;
 }
