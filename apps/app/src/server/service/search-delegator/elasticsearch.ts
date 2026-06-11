@@ -975,18 +975,19 @@ class ElasticsearchDelegator
 
     if (parsedKeywords.author.length > 0) {
       const queries = parsedKeywords.author.map((author) => {
-        return { term: { author_names: author } };
+        return { term: { username: author } };
       });
       query.body.query.bool.filter.push({ bool: { must: queries } });
     }
 
     if (parsedKeywords.not_author.length > 0) {
       const queries = parsedKeywords.not_author.map((author) => {
-        return { term: { author_names: author } };
+        return { term: { username: author } };
       });
       query.body.query.bool.filter.push({ bool: { must_not: queries } });
     }
 
+    // editor is still not indexed so does not work yet
     if (parsedKeywords.editor.length > 0) {
       const queries = parsedKeywords.editor.map((editor) => {
         return { term: { editor_names: editor } };
