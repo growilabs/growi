@@ -80,6 +80,11 @@ vi.mock('~/server/service/config-manager', () => ({
           return testState.openaiServiceType;
         case 'security:disableUserPages':
           return testState.disableUserPages;
+        // The orchestrator resolves the default engine id from config; the
+        // real configManager never returns undefined for this key
+        // (defaultValue: 'oneshot' in config-definition).
+        case 'aiTools:suggestPathEngine':
+          return 'oneshot';
         default:
           return undefined;
       }
@@ -151,6 +156,17 @@ vi.mock('../services/resolve-parent-grant', () => ({
   resolveParentGrant: vi.fn().mockImplementation(() => {
     return Promise.resolve(testState.parentGrant);
   }),
+}));
+
+// Mock wiring only for the orchestrator's import graph (task 5.1); every
+// pre-existing mock, test, and assertion in this file is unchanged.
+// The engines dispatcher statically imports the agentic engine, whose
+// transitive imports (mastra-modules) cannot load in the unit-test process
+// (module-scope config reads, ESM/CJS interop). Stubbing it keeps the real
+// orchestrator + dispatcher + oneshot engine in the graph, which these
+// tests exercise.
+vi.mock('../services/engines/agentic-engine', () => ({
+  agenticEngine: vi.fn(),
 }));
 
 describe('POST /suggest-path integration', () => {

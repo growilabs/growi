@@ -44,6 +44,25 @@ vi.mock('./resolve-parent-grant', () => ({
   resolveParentGrant: mocks.resolveParentGrantMock,
 }));
 
+// Mock wiring only for the orchestrator's new import graph (task 5.1);
+// every pre-existing mock, test, and assertion in this file is unchanged.
+//
+// The engines dispatcher statically imports the agentic engine, whose
+// transitive imports (mastra-modules) cannot load in the unit-test process
+// (module-scope config reads, ESM/CJS interop). Stubbing it keeps the real
+// dispatcher + real oneshot engine in the graph, which these tests exercise.
+vi.mock('./engines/agentic-engine', () => ({
+  agenticEngine: vi.fn(),
+}));
+
+// The orchestrator resolves the default engine id from config when the
+// caller does not specify one; the real configManager throws
+// 'Config is not loaded' in unit tests. A plain function (not vi.fn) is
+// used so `vi.resetAllMocks()` in beforeEach cannot wipe the value.
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: { getConfig: () => 'oneshot' },
+}));
+
 vi.mock('~/utils/logger', () => ({
   default: () => ({
     error: mocks.loggerErrorMock,

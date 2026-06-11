@@ -91,7 +91,7 @@
   - _Requirements: 5.1, 5.2, 5.4_
 
 - [ ] 5. オーケストレータと API の統合
-- [ ] 5.1 オーケストレータの再構成
+- [x] 5.1 オーケストレータの再構成
   - memo 提案を常に生成してレスポンス先頭に含め、engine id（リクエスト指定 → なければ設定の既定）でディスパッチする構成に再構成する（公開シグネチャは後方互換: 既存引数列 + optional オプション）。旧パイプラインロジックの除去（ワンショットエンジンへの配線替え）はこのタスクが所有する
   - 非対称フォールバックを実装する: agentic エンジンの reject（例外・タイムアウト）は捕捉して memo のみ返す。oneshot エンジンの例外は現行どおり伝播させる
   - 既存のオーケストレータのテストが無修正で green、agentic reject 時に memo のみ返ることが新規テストで green
@@ -144,3 +144,4 @@
 - 2: スパイク 4 項目すべて成立（research.md「Spike Results」参照）。フォールバック方針は一切不要。usage は AI SDK v5 命名（inputTokens/outputTokens）で `totalUsage` を採用、toolCalls は `steps[].toolCalls[].payload.{toolName,args}`
 - 2: pnpm-workspace.yaml の `@mastra/core>p-map: 4.0.0` override により `@mastra/core/agent` は vitest（ESM）で import 不可（pMapSkip link エラー）。3.3 / 4.x のユニットテストは growi-agent.spec.ts の StubAgent `vi.mock('@mastra/core/agent', ...)` パターンを踏襲すること。`@mastra/core/request-context` / `tools` は影響なし
 - 2: dynamic model 解決関数は 1 generate あたり約 2 回評価される — 副作用なし・軽量に保つこと
+- 5.1: design の「既存テスト無修正 green」は **additive-mock-wiring の意味で充足**（アサーション・既存行は byte-identical、追加は vi.mock 配線のみ 19+/0− と 16+/0−）。engines barrel → agentic-engine → mastra-modules の静的 import チェーンが app-unit vitest でロード不能（p-map ESM）なため、`./engines/agentic-engine` のスタブ mock 追加が必須だった。レビューで HEAD spec の import 時 fail を再現済み = モック方式起因の証明。6.3 はこの解釈を前提に再検証すること（再揉めしない）
