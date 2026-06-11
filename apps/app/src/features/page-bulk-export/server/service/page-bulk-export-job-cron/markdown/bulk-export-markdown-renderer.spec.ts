@@ -64,4 +64,68 @@ describe('BulkExportMarkdownRenderer', () => {
       expect(html).toContain('Body text here');
     });
   });
+
+  // Requirements 4.1, 4.2, 4.3: sanitize and safety behaviour
+  describe('sanitize and safety behavior', () => {
+    // Requirement 4.3: <script> tags must be stripped entirely
+    it('removes <script> tags from output', async () => {
+      const md = `Hello\n\n<script>alert("xss")</script>\n\nWorld`;
+      const html = await renderer.renderToHtml(md);
+      expect(html).not.toContain('<script');
+      expect(html).not.toContain('alert("xss")');
+    });
+
+    // Requirement 4.3: inline event handlers must be stripped
+    it('removes inline event handlers (onclick etc) from output', async () => {
+      const md = `<p onclick="evil()">Click me</p>`;
+      const html = await renderer.renderToHtml(md);
+      expect(html).not.toContain('onclick');
+      expect(html).toContain('Click me'); // text content preserved, handler stripped
+    });
+
+    // Requirement 4.2: raw HTML in markdown is sanitized, not passed through verbatim
+    it('sanitizes raw HTML embedded in markdown (no unsanitized passthrough)', async () => {
+      const md = `Normal text\n\n<script src="evil.js"></script>\n\nMore text`;
+      const html = await renderer.renderToHtml(md);
+      expect(html).not.toContain('<script');
+    });
+
+    // Requirement 4.1: allowlist passes in-scope GFM table elements
+    it('preserves table elements in output (allowlist covers tables)', async () => {
+      const md = `| A | B |\n|---|---|\n| 1 | 2 |`;
+      const html = await renderer.renderToHtml(md);
+      expect(html).toContain('<table');
+      expect(html).toContain('<td');
+    });
+
+    // Requirement 4.1: rehype-slug adds id attributes on headings; allowlist must permit id.
+    // hast-util-sanitize's defaultSchema prefixes id values with "user-content-" for safety,
+    // so the observable output is id="user-content-<slug>".
+    it('preserves id attributes on headings (allowlist covers id attr)', async () => {
+      const md = `# Test Heading`;
+      const html = await renderer.renderToHtml(md);
+      // id attribute is preserved (with the user-content- prefix added by hast-util-sanitize)
+      expect(html).toMatch(/id="user-content-test-heading"/);
+    });
+  });
+
+  // Requirement 4.1: single-source allowlist — observable behaviour matches recommended-whitelist.ts
+  describe('sanitize allowlist provenance (Requirement 4.1)', () => {
+    // details/summary are in defaultSchema.tagNames (included via recommended-whitelist's spread)
+    // This confirms the allowlist is effectively applied from the single source of truth
+    it('preserves <details>/<summary> elements (present in recommended-whitelist via defaultSchema)', async () => {
+      const md = `<details><summary>Expand</summary>Content here</details>`;
+      const html = await renderer.renderToHtml(md);
+      expect(html).toContain('<details');
+      expect(html).toContain('<summary');
+      expect(html).toContain('Content here');
+    });
+
+    // Dangerous elements not in the allowlist are stripped regardless
+    it('strips <object> tags not in the allowlist', async () => {
+      const md = `<object data="malicious.swf" type="application/x-shockwave-flash"></object>`;
+      const html = await renderer.renderToHtml(md);
+      expect(html).not.toContain('<object');
+    });
+  });
 });

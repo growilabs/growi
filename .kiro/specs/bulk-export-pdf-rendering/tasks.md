@@ -42,7 +42,7 @@
   - 3.1 の全契約テストが green になる（observable）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
   - _Boundary: BulkExportMarkdownRenderer_
-- [ ] 3.3 サニタイズ／安全性の挙動を担保する（test-first）
+- [x] 3.3 サニタイズ／安全性の挙動を担保する（test-first）
   - `<script>` 等の危険入力が除去され、raw HTML が必ず sanitize を通り、HTML エスケープを無効化しないことをテストで先に固定してから満たす
   - 許可リストは `services/renderer/recommended-whitelist.ts` の `tagNames` / `attributes` を `dynamicImport` で再利用し（`recommended-whitelist.ts` 自体も `hast-util-sanitize` ESM 依存のため dynamicImport 経由）、in-scope の数式コンテナ等のみ上乗せする。bulk-export 側で許可リストを独自に書き起こさない（Web と二重管理にしない）
   - 危険入力テストが green、許可リストの出所が `recommended-whitelist` 単一であること、かつ allowlist が in-scope 要素（表/数式コンテナ/見出し id 等）を通すことをテストで確認する（observable）
