@@ -39,9 +39,8 @@ const EXCLUSION_LIST = [
  */
 function isExcluded(filePath, specifier) {
   return EXCLUSION_LIST.some(
-    entry =>
-      entry.filePattern.test(filePath) &&
-      entry.requireSpecifier === specifier,
+    (entry) =>
+      entry.filePattern.test(filePath) && entry.requireSpecifier === specifier,
   );
 }
 
@@ -61,11 +60,12 @@ function rewriteConfigSpecifier(specifier) {
 // ─── Helper: derive a camelCase import alias from a module specifier ─────────
 function aliasFromSpecifier(specifier) {
   // Take the last path segment, strip extension, camelCase it
-  const base = specifier
-    .replace(/\.js$|\.ts$|\.cjs$/, '')
-    .split('/')
-    .filter(Boolean)
-    .pop() || 'module';
+  const base =
+    specifier
+      .replace(/\.js$|\.ts$|\.cjs$/, '')
+      .split('/')
+      .filter(Boolean)
+      .pop() || 'module';
 
   // Convert kebab-case / snake_case to camelCase
   return base.replace(/[-_](.)/g, (_, c) => c.toUpperCase());
@@ -104,7 +104,7 @@ module.exports = function transform(fileInfo, api, _options) {
     const entry = pendingImports.get(key);
     if (entry.kind === 'named') {
       // Avoid duplicate members
-      const exists = entry.members.some(m => m.importedName === importedName);
+      const exists = entry.members.some((m) => m.importedName === importedName);
       if (!exists) {
         entry.members.push({ importedName, localName });
       }
@@ -113,7 +113,7 @@ module.exports = function transform(fileInfo, api, _options) {
   }
 
   // ─── Rewrite existing import specifiers for config .cjs ─────────────────
-  root.find(j.ImportDeclaration).forEach(path => {
+  root.find(j.ImportDeclaration).forEach((path) => {
     const spec = path.node.source.value;
     const newSpec = rewriteConfigSpecifier(spec);
     if (newSpec) {
@@ -126,50 +126,53 @@ module.exports = function transform(fileInfo, api, _options) {
   // (We do exclusion per-node below; no whole-file skip needed)
 
   // ─── P5: const { x, y } = require('pkg') → import { x, y } from 'pkg' ───
-  root.find(j.VariableDeclaration).filter(path => {
-    const decl = path.node.declarations;
-    return (
-      decl.length === 1 &&
-      decl[0].id.type === 'ObjectPattern' &&
-      decl[0].init &&
-      decl[0].init.type === 'CallExpression' &&
-      decl[0].init.callee.type === 'Identifier' &&
-      decl[0].init.callee.name === 'require' &&
-      decl[0].init.arguments.length === 1 &&
-      decl[0].init.arguments[0].type === 'StringLiteral'
-    );
-  }).forEach(path => {
-    const decl = path.node.declarations[0];
-    const specifier = decl.init.arguments[0].value;
-
-    // Exclusion check
-    if (isExcluded(filePath, specifier)) return;
-
-    // Config specifier rewrite
-    const finalSpecifier = rewriteConfigSpecifier(specifier) || specifier;
-
-    const properties = decl.id.properties;
-    const specifiers = properties.map(prop => {
-      const importedName =
-        prop.key.type === 'Identifier' ? prop.key.name : prop.key.value;
-      const localName =
-        prop.value.type === 'Identifier' ? prop.value.name : importedName;
-      if (importedName === localName) {
-        return j.importSpecifier(j.identifier(importedName));
-      }
-      return j.importSpecifier(
-        j.identifier(importedName),
-        j.identifier(localName),
+  root
+    .find(j.VariableDeclaration)
+    .filter((path) => {
+      const decl = path.node.declarations;
+      return (
+        decl.length === 1 &&
+        decl[0].id.type === 'ObjectPattern' &&
+        decl[0].init &&
+        decl[0].init.type === 'CallExpression' &&
+        decl[0].init.callee.type === 'Identifier' &&
+        decl[0].init.callee.name === 'require' &&
+        decl[0].init.arguments.length === 1 &&
+        decl[0].init.arguments[0].type === 'StringLiteral'
       );
-    });
+    })
+    .forEach((path) => {
+      const decl = path.node.declarations[0];
+      const specifier = decl.init.arguments[0].value;
 
-    const importDecl = j.importDeclaration(
-      specifiers,
-      j.stringLiteral(finalSpecifier),
-    );
-    j(path).replaceWith(importDecl);
-    changed = true;
-  });
+      // Exclusion check
+      if (isExcluded(filePath, specifier)) return;
+
+      // Config specifier rewrite
+      const finalSpecifier = rewriteConfigSpecifier(specifier) || specifier;
+
+      const properties = decl.id.properties;
+      const specifiers = properties.map((prop) => {
+        const importedName =
+          prop.key.type === 'Identifier' ? prop.key.name : prop.key.value;
+        const localName =
+          prop.value.type === 'Identifier' ? prop.value.name : importedName;
+        if (importedName === localName) {
+          return j.importSpecifier(j.identifier(importedName));
+        }
+        return j.importSpecifier(
+          j.identifier(importedName),
+          j.identifier(localName),
+        );
+      });
+
+      const importDecl = j.importDeclaration(
+        specifiers,
+        j.stringLiteral(finalSpecifier),
+      );
+      j(path).replaceWith(importDecl);
+      changed = true;
+    });
 
   // ─── P6: const x = require('pkg').member ─────────────────────────────────
   // Matches: const localName = require('pkg').memberName;
@@ -178,102 +181,111 @@ module.exports = function transform(fileInfo, api, _options) {
   //
   // Also handles inline call: const x = require('pkg').member(args);
   // In that case: import { member } from 'pkg'; const x = member(args);
-  root.find(j.VariableDeclaration).filter(path => {
-    const decl = path.node.declarations;
-    return (
-      decl.length === 1 &&
-      decl[0].id.type === 'Identifier' &&
-      decl[0].init &&
-      decl[0].init.type === 'MemberExpression' &&
-      decl[0].init.object.type === 'CallExpression' &&
-      decl[0].init.object.callee.type === 'Identifier' &&
-      decl[0].init.object.callee.name === 'require' &&
-      decl[0].init.object.arguments.length === 1 &&
-      decl[0].init.object.arguments[0].type === 'StringLiteral'
-    );
-  }).forEach(path => {
-    const decl = path.node.declarations[0];
-    const requireCall = decl.init.object;
-    const memberExpr = decl.init;
-    const specifier = requireCall.arguments[0].value;
-    const localName = decl.id.name;
+  root
+    .find(j.VariableDeclaration)
+    .filter((path) => {
+      const decl = path.node.declarations;
+      return (
+        decl.length === 1 &&
+        decl[0].id.type === 'Identifier' &&
+        decl[0].init &&
+        decl[0].init.type === 'MemberExpression' &&
+        decl[0].init.object.type === 'CallExpression' &&
+        decl[0].init.object.callee.type === 'Identifier' &&
+        decl[0].init.object.callee.name === 'require' &&
+        decl[0].init.object.arguments.length === 1 &&
+        decl[0].init.object.arguments[0].type === 'StringLiteral'
+      );
+    })
+    .forEach((path) => {
+      const decl = path.node.declarations[0];
+      const requireCall = decl.init.object;
+      const memberExpr = decl.init;
+      const specifier = requireCall.arguments[0].value;
+      const localName = decl.id.name;
 
-    // Exclusion check
-    if (isExcluded(filePath, specifier)) return;
+      // Exclusion check
+      if (isExcluded(filePath, specifier)) return;
 
-    const memberName =
-      memberExpr.property.type === 'Identifier'
-        ? memberExpr.property.name
-        : memberExpr.property.value;
+      const memberName =
+        memberExpr.property.type === 'Identifier'
+          ? memberExpr.property.name
+          : memberExpr.property.value;
 
-    const finalSpecifier = rewriteConfigSpecifier(specifier) || specifier;
+      const finalSpecifier = rewriteConfigSpecifier(specifier) || specifier;
 
-    // import { memberName as localName } from 'pkg';
-    const specifierNode =
-      memberName === localName
-        ? j.importSpecifier(j.identifier(memberName))
-        : j.importSpecifier(j.identifier(memberName), j.identifier(localName));
+      // import { memberName as localName } from 'pkg';
+      const specifierNode =
+        memberName === localName
+          ? j.importSpecifier(j.identifier(memberName))
+          : j.importSpecifier(
+              j.identifier(memberName),
+              j.identifier(localName),
+            );
 
-    const importDecl = j.importDeclaration(
-      [specifierNode],
-      j.stringLiteral(finalSpecifier),
-    );
-    j(path).replaceWith(importDecl);
-    changed = true;
-  });
+      const importDecl = j.importDeclaration(
+        [specifierNode],
+        j.stringLiteral(finalSpecifier),
+      );
+      j(path).replaceWith(importDecl);
+      changed = true;
+    });
 
   // Handle: const x = require('pkg').member(args);  (member call pattern)
-  root.find(j.VariableDeclaration).filter(path => {
-    const decl = path.node.declarations;
-    return (
-      decl.length === 1 &&
-      decl[0].id.type === 'Identifier' &&
-      decl[0].init &&
-      decl[0].init.type === 'CallExpression' &&
-      decl[0].init.callee.type === 'MemberExpression' &&
-      decl[0].init.callee.object.type === 'CallExpression' &&
-      decl[0].init.callee.object.callee.type === 'Identifier' &&
-      decl[0].init.callee.object.callee.name === 'require' &&
-      decl[0].init.callee.object.arguments.length === 1 &&
-      decl[0].init.callee.object.arguments[0].type === 'StringLiteral'
-    );
-  }).forEach(path => {
-    const decl = path.node.declarations[0];
-    const requireCall = decl.init.callee.object;
-    const memberExpr = decl.init.callee;
-    const specifier = requireCall.arguments[0].value;
-    const localName = decl.id.name;
+  root
+    .find(j.VariableDeclaration)
+    .filter((path) => {
+      const decl = path.node.declarations;
+      return (
+        decl.length === 1 &&
+        decl[0].id.type === 'Identifier' &&
+        decl[0].init &&
+        decl[0].init.type === 'CallExpression' &&
+        decl[0].init.callee.type === 'MemberExpression' &&
+        decl[0].init.callee.object.type === 'CallExpression' &&
+        decl[0].init.callee.object.callee.type === 'Identifier' &&
+        decl[0].init.callee.object.callee.name === 'require' &&
+        decl[0].init.callee.object.arguments.length === 1 &&
+        decl[0].init.callee.object.arguments[0].type === 'StringLiteral'
+      );
+    })
+    .forEach((path) => {
+      const decl = path.node.declarations[0];
+      const requireCall = decl.init.callee.object;
+      const memberExpr = decl.init.callee;
+      const specifier = requireCall.arguments[0].value;
+      const localName = decl.id.name;
 
-    // Exclusion check
-    if (isExcluded(filePath, specifier)) return;
+      // Exclusion check
+      if (isExcluded(filePath, specifier)) return;
 
-    const memberName =
-      memberExpr.property.type === 'Identifier'
-        ? memberExpr.property.name
-        : memberExpr.property.value;
+      const memberName =
+        memberExpr.property.type === 'Identifier'
+          ? memberExpr.property.name
+          : memberExpr.property.value;
 
-    const finalSpecifier = rewriteConfigSpecifier(specifier) || specifier;
+      const finalSpecifier = rewriteConfigSpecifier(specifier) || specifier;
 
-    // Build: import { memberName } from 'pkg';
-    const importDecl = j.importDeclaration(
-      [j.importSpecifier(j.identifier(memberName))],
-      j.stringLiteral(finalSpecifier),
-    );
+      // Build: import { memberName } from 'pkg';
+      const importDecl = j.importDeclaration(
+        [j.importSpecifier(j.identifier(memberName))],
+        j.stringLiteral(finalSpecifier),
+      );
 
-    // Build: const localName = memberName(args);
-    const newInit = j.callExpression(
-      j.identifier(memberName),
-      decl.init.arguments,
-    );
-    const newDecl = j.variableDeclaration('const', [
-      j.variableDeclarator(j.identifier(localName), newInit),
-    ]);
+      // Build: const localName = memberName(args);
+      const newInit = j.callExpression(
+        j.identifier(memberName),
+        decl.init.arguments,
+      );
+      const newDecl = j.variableDeclaration('const', [
+        j.variableDeclarator(j.identifier(localName), newInit),
+      ]);
 
-    // Replace the single VariableDeclaration with import + new declaration.
-    // Use path.replace (recast NodePath API) to avoid a blank line between nodes.
-    path.replace(importDecl, newDecl);
-    changed = true;
-  });
+      // Replace the single VariableDeclaration with import + new declaration.
+      // Use path.replace (recast NodePath API) to avoid a blank line between nodes.
+      path.replace(importDecl, newDecl);
+      changed = true;
+    });
 
   // ─── P3 + P4: factory invoke require('./x')(args) ────────────────────────
   // This handles BOTH:
@@ -287,7 +299,7 @@ module.exports = function transform(fileInfo, api, _options) {
   // We need to collect all factory-require call expressions, deduplicate by specifier,
   // and emit imports at the top.
 
-  const factoryRequireCalls = root.find(j.CallExpression).filter(path => {
+  const factoryRequireCalls = root.find(j.CallExpression).filter((path) => {
     const callee = path.node.callee;
     return (
       callee.type === 'CallExpression' &&
@@ -300,7 +312,7 @@ module.exports = function transform(fileInfo, api, _options) {
 
   // Group by specifier to build imports
   const factorySpecifiers = new Set();
-  factoryRequireCalls.forEach(path => {
+  factoryRequireCalls.forEach((path) => {
     const specifier = path.node.callee.arguments[0].value;
     if (!isExcluded(filePath, specifier)) {
       factorySpecifiers.add(specifier);
@@ -308,7 +320,7 @@ module.exports = function transform(fileInfo, api, _options) {
   });
 
   // Replace each factory call: require('./x')(args) → setupX(args)
-  factoryRequireCalls.forEach(path => {
+  factoryRequireCalls.forEach((path) => {
     const specifier = path.node.callee.arguments[0].value;
     if (isExcluded(filePath, specifier)) return;
 
@@ -326,7 +338,7 @@ module.exports = function transform(fileInfo, api, _options) {
   // We need to find which specifiers are used and add their imports
   // We build a map from specifier → setupName
   const factoryImports = new Map();
-  factorySpecifiers.forEach(specifier => {
+  factorySpecifiers.forEach((specifier) => {
     const alias = aliasFromSpecifier(specifier);
     const setupName = `setup${alias.charAt(0).toUpperCase()}${alias.slice(1)}`;
     factoryImports.set(specifier, setupName);
@@ -334,121 +346,132 @@ module.exports = function transform(fileInfo, api, _options) {
 
   // ─── P2: const x = require('./x') (non-destructuring, non-factory) ────────
   // These are the remaining require() calls that are simple default imports
-  root.find(j.VariableDeclaration).filter(path => {
-    const decl = path.node.declarations;
-    return (
-      decl.length === 1 &&
-      decl[0].id.type === 'Identifier' &&
-      decl[0].init &&
-      decl[0].init.type === 'CallExpression' &&
-      decl[0].init.callee.type === 'Identifier' &&
-      decl[0].init.callee.name === 'require' &&
-      decl[0].init.arguments.length === 1 &&
-      decl[0].init.arguments[0].type === 'StringLiteral'
-    );
-  }).forEach(path => {
-    const decl = path.node.declarations[0];
-    const specifier = decl.init.arguments[0].value;
-    const localName = decl.id.name;
+  root
+    .find(j.VariableDeclaration)
+    .filter((path) => {
+      const decl = path.node.declarations;
+      return (
+        decl.length === 1 &&
+        decl[0].id.type === 'Identifier' &&
+        decl[0].init &&
+        decl[0].init.type === 'CallExpression' &&
+        decl[0].init.callee.type === 'Identifier' &&
+        decl[0].init.callee.name === 'require' &&
+        decl[0].init.arguments.length === 1 &&
+        decl[0].init.arguments[0].type === 'StringLiteral'
+      );
+    })
+    .forEach((path) => {
+      const decl = path.node.declarations[0];
+      const specifier = decl.init.arguments[0].value;
+      const localName = decl.id.name;
 
-    // Exclusion check
-    if (isExcluded(filePath, specifier)) return;
+      // Exclusion check
+      if (isExcluded(filePath, specifier)) return;
 
-    const finalSpecifier = rewriteConfigSpecifier(specifier) || specifier;
+      const finalSpecifier = rewriteConfigSpecifier(specifier) || specifier;
 
-    const importDecl = j.importDeclaration(
-      [j.importDefaultSpecifier(j.identifier(localName))],
-      j.stringLiteral(finalSpecifier),
-    );
-    j(path).replaceWith(importDecl);
-    changed = true;
-  });
+      const importDecl = j.importDeclaration(
+        [j.importDefaultSpecifier(j.identifier(localName))],
+        j.stringLiteral(finalSpecifier),
+      );
+      j(path).replaceWith(importDecl);
+      changed = true;
+    });
 
   // ─── P7: require(dynamicExpr)(args) → (await import(dynamicExpr)).default(args) ──
   // Matches CallExpression where callee is a CallExpression with identifier 'require'
   // but argument is NOT a StringLiteral (dynamic).
-  root.find(j.CallExpression).filter(path => {
-    const callee = path.node.callee;
-    return (
-      callee.type === 'CallExpression' &&
-      callee.callee.type === 'Identifier' &&
-      callee.callee.name === 'require' &&
-      callee.arguments.length === 1 &&
-      callee.arguments[0].type !== 'StringLiteral' // dynamic
-    );
-  }).forEach(path => {
-    const dynamicArg = path.node.callee.arguments[0];
-    const callArgs = path.node.arguments;
+  root
+    .find(j.CallExpression)
+    .filter((path) => {
+      const callee = path.node.callee;
+      return (
+        callee.type === 'CallExpression' &&
+        callee.callee.type === 'Identifier' &&
+        callee.callee.name === 'require' &&
+        callee.arguments.length === 1 &&
+        callee.arguments[0].type !== 'StringLiteral' // dynamic
+      );
+    })
+    .forEach((path) => {
+      const dynamicArg = path.node.callee.arguments[0];
+      const callArgs = path.node.arguments;
 
-    // (await import(dynamicArg)).default ?? (await import(dynamicArg))
-    // Then call it with the original args
-    const awaitImport = j.awaitExpression(
-      j.callExpression(j.import(), [dynamicArg]),
-    );
-    const awaitImport2 = j.awaitExpression(
-      j.callExpression(j.import(), [dynamicArg]),
-    );
+      // (await import(dynamicArg)).default ?? (await import(dynamicArg))
+      // Then call it with the original args
+      const awaitImport = j.awaitExpression(
+        j.callExpression(j.import(), [dynamicArg]),
+      );
+      const awaitImport2 = j.awaitExpression(
+        j.callExpression(j.import(), [dynamicArg]),
+      );
 
-    const defaultOrModule = j.logicalExpression(
-      '??',
-      j.memberExpression(awaitImport, j.identifier('default')),
-      awaitImport2,
-    );
+      const defaultOrModule = j.logicalExpression(
+        '??',
+        j.memberExpression(awaitImport, j.identifier('default')),
+        awaitImport2,
+      );
 
-    const newCall = j.callExpression(
-      j.parenthesizedExpression
-        ? j.parenthesizedExpression(defaultOrModule)
-        : defaultOrModule,
-      callArgs,
-    );
+      const newCall = j.callExpression(
+        j.parenthesizedExpression
+          ? j.parenthesizedExpression(defaultOrModule)
+          : defaultOrModule,
+        callArgs,
+      );
 
-    j(path).replaceWith(newCall);
-    changed = true;
-  });
+      j(path).replaceWith(newCall);
+      changed = true;
+    });
 
   // ─── P1: module.exports = ... → export ───────────────────────────────────
-  root.find(j.ExpressionStatement).filter(path => {
-    const expr = path.node.expression;
-    return (
-      expr.type === 'AssignmentExpression' &&
-      expr.left.type === 'MemberExpression' &&
-      expr.left.object.type === 'Identifier' &&
-      expr.left.object.name === 'module' &&
-      expr.left.property.type === 'Identifier' &&
-      expr.left.property.name === 'exports'
-    );
-  }).forEach(path => {
-    const right = path.node.expression.right;
-
-    if (
-      right.type === 'ArrowFunctionExpression' ||
-      right.type === 'FunctionExpression'
-    ) {
-      // module.exports = (crowi, app) => { ... }
-      // → export const setup = (crowi, app) => { ... }
-      const exportDecl = j.exportNamedDeclaration(
-        j.variableDeclaration('const', [
-          j.variableDeclarator(j.identifier('setup'), right),
-        ]),
-        [],
+  root
+    .find(j.ExpressionStatement)
+    .filter((path) => {
+      const expr = path.node.expression;
+      return (
+        expr.type === 'AssignmentExpression' &&
+        expr.left.type === 'MemberExpression' &&
+        expr.left.object.type === 'Identifier' &&
+        expr.left.object.name === 'module' &&
+        expr.left.property.type === 'Identifier' &&
+        expr.left.property.name === 'exports'
       );
-      j(path).replaceWith(exportDecl);
-    } else if (right.type === 'Identifier') {
-      // module.exports = MyClass or module.exports = instance
-      // → export default MyClass / export default instance
-      const exportDefault = j.exportDefaultDeclaration(j.identifier(right.name));
-      j(path).replaceWith(exportDefault);
-    } else if (right.type === 'ClassDeclaration') {
-      // module.exports = class Foo { }
-      j(path).replaceWith(j.exportDefaultDeclaration(right));
-    } else if (right.type === 'ClassExpression') {
-      j(path).replaceWith(j.exportDefaultDeclaration(right));
-    } else {
-      // Fallback: export default <value>
-      j(path).replaceWith(j.exportDefaultDeclaration(right));
-    }
-    changed = true;
-  });
+    })
+    .forEach((path) => {
+      const right = path.node.expression.right;
+
+      if (
+        right.type === 'ArrowFunctionExpression' ||
+        right.type === 'FunctionExpression'
+      ) {
+        // module.exports = (crowi, app) => { ... }
+        // → export const setup = (crowi, app) => { ... }
+        const exportDecl = j.exportNamedDeclaration(
+          j.variableDeclaration('const', [
+            j.variableDeclarator(j.identifier('setup'), right),
+          ]),
+          [],
+        );
+        j(path).replaceWith(exportDecl);
+      } else if (right.type === 'Identifier') {
+        // module.exports = MyClass or module.exports = instance
+        // → export default MyClass / export default instance
+        const exportDefault = j.exportDefaultDeclaration(
+          j.identifier(right.name),
+        );
+        j(path).replaceWith(exportDefault);
+      } else if (right.type === 'ClassDeclaration') {
+        // module.exports = class Foo { }
+        j(path).replaceWith(j.exportDefaultDeclaration(right));
+      } else if (right.type === 'ClassExpression') {
+        j(path).replaceWith(j.exportDefaultDeclaration(right));
+      } else {
+        // Fallback: export default <value>
+        j(path).replaceWith(j.exportDefaultDeclaration(right));
+      }
+      changed = true;
+    });
 
   // ─── Insert factory imports at the top of the file ───────────────────────
   if (factoryImports.size > 0) {
@@ -469,12 +492,7 @@ module.exports = function transform(fileInfo, api, _options) {
     for (const [specifier, setupName] of factoryImports) {
       const finalSpecifier = rewriteConfigSpecifier(specifier) || specifier;
       const importDecl = j.importDeclaration(
-        [
-          j.importSpecifier(
-            j.identifier('setup'),
-            j.identifier(setupName),
-          ),
-        ],
+        [j.importSpecifier(j.identifier('setup'), j.identifier(setupName))],
         j.stringLiteral(finalSpecifier),
       );
       newImports.push(importDecl);
@@ -497,12 +515,15 @@ if (require.main === module) {
 
   const args = process.argv.slice(2);
   if (args.length === 0) {
-    console.error('Usage: node tools/codemod/cjs-to-esm.cjs <path> [<path> ...]');
+    // biome-ignore lint/suspicious/noConsole: CLI usage message.
+    console.error(
+      'Usage: node tools/codemod/cjs-to-esm.cjs <path> [<path> ...]',
+    );
     process.exit(1);
   }
 
   // Resolve all target paths to absolute
-  const targetPaths = args.map(a => path.resolve(a));
+  const targetPaths = args.map((a) => path.resolve(a));
 
   // Resolve to the actual JS entry point, not the shell wrapper in .bin/
   const jscodeshift = require.resolve('jscodeshift/bin/jscodeshift.js');
