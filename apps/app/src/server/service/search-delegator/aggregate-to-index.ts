@@ -33,7 +33,7 @@ export const aggregatePipelineToIndex = (
       },
     },
 
-    // join User
+    // join User (creator)
     {
       $lookup: {
         from: 'users',
@@ -45,6 +45,21 @@ export const aggregatePipelineToIndex = (
     {
       $unwind: {
         path: '$creator',
+        preserveNullAndEmptyArrays: true,
+      },
+    },
+    // join User (lastUpdateUser)
+    {
+      $lookup: {
+        from: 'users',
+        localField: 'lastUpdateUser',
+        foreignField: '_id',
+        as: 'lastUpdateUser',
+      },
+    },
+    {
+      $unwind: {
+        path: '$lastUpdateUser',
         preserveNullAndEmptyArrays: true,
       },
     },
@@ -135,6 +150,7 @@ export const aggregatePipelineToIndex = (
         seenUsersCount: 1,
         'creator.username': 1,
         'creator.email': 1,
+        'lastUpdateUser.username': 1,
       },
     },
   ];
