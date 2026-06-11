@@ -48,7 +48,7 @@
   - 危険入力テストが green、許可リストの出所が `recommended-whitelist` 単一であること、かつ allowlist が in-scope 要素（表/数式コンテナ/見出し id 等）を通すことをテストで確認する（observable）
   - _Requirements: 4.1, 4.2, 4.3, 6.1_
   - _Boundary: BulkExportMarkdownRenderer_
-- [ ] 3.4 未対応記法のグレースフル劣化を担保する（test-first）
+- [x] 3.4 未対応記法のグレースフル劣化を担保する（test-first）
   - `:::note` 等のディレクティブや drawio フェンスが throw せず、可読テキスト/blockquote として出力されることをテストで確認する（observable）
   - _Requirements: 3.1_
   - _Boundary: BulkExportMarkdownRenderer_

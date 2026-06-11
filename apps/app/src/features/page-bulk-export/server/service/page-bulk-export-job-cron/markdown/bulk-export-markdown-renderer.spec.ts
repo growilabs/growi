@@ -109,6 +109,69 @@ describe('BulkExportMarkdownRenderer', () => {
     });
   });
 
+  // Requirement 3.1: graceful degradation of unsupported syntax
+  describe('graceful degradation of unsupported syntax (Requirement 3.1)', () => {
+    // GROWI directives (:::note etc.) are not in the plugin list (no remark-directive loaded).
+    // The renderer must not throw and must expose the directive's inner text in a readable form.
+    it('does not throw for a :::note directive and preserves inner text', async () => {
+      const md = `:::note\nThis is a note message.\n:::`;
+      // Must resolve (not reject).
+      const html = await renderer.renderToHtml(md);
+      // The inner content must appear somewhere in readable form.
+      expect(html).toContain('This is a note message');
+    });
+
+    it('does not throw for a :::warning directive and preserves inner text', async () => {
+      const md = `:::warning\nDanger ahead.\n:::`;
+      const html = await renderer.renderToHtml(md);
+      expect(html).toContain('Danger ahead');
+    });
+
+    it('does not throw for a :::tip directive with a label and preserves inner text', async () => {
+      const md = `:::tip Pro Tip\nUse keyboard shortcuts.\n:::`;
+      const html = await renderer.renderToHtml(md);
+      expect(html).toContain('Use keyboard shortcuts');
+    });
+
+    // drawio fenced code blocks have lang="drawio". Without a drawio plugin the renderer
+    // must not throw and must output a <code> or <pre> block containing the raw drawio source.
+    it('does not throw for a drawio fenced code block and outputs a code/pre block', async () => {
+      const md =
+        '```drawio\n<mxGraph><root><mxCell id="0"/></root></mxGraph>\n```';
+      const html = await renderer.renderToHtml(md);
+      // Must contain <code> or <pre> — the raw source is rendered as a code block.
+      expect(html).toMatch(/<(pre|code)/);
+    });
+
+    it('does not throw for a plantuml fenced code block and outputs a code/pre block', async () => {
+      const md = '```plantuml\n@startuml\nAlice -> Bob: Hello\n@enduml\n```';
+      const html = await renderer.renderToHtml(md);
+      expect(html).toMatch(/<(pre|code)/);
+    });
+
+    // A document mixing unsupported syntax with standard Markdown must not lose the
+    // standard content — both the directive fallback and the table must appear.
+    it('renders standard Markdown alongside unsupported directives without data loss', async () => {
+      const md = [
+        '# My Page',
+        '',
+        ':::note',
+        'Inline note.',
+        ':::',
+        '',
+        '| Col A | Col B |',
+        '|-------|-------|',
+        '| 1     | 2     |',
+      ].join('\n');
+      const html = await renderer.renderToHtml(md);
+      // Standard elements must be present.
+      expect(html).toContain('<table');
+      expect(html).toMatch(/<h1[^>]+id=/);
+      // Inner text of the directive must be preserved.
+      expect(html).toContain('Inline note');
+    });
+  });
+
   // Requirement 4.1: single-source allowlist — observable behaviour matches recommended-whitelist.ts
   describe('sanitize allowlist provenance (Requirement 4.1)', () => {
     // details/summary are in defaultSchema.tagNames (included via recommended-whitelist's spread)
