@@ -109,7 +109,7 @@
   - 上記 3 シナリオが green
   - _Requirements: 4.1, 4.2, 5.2, 6.1_
 
-- [ ] 6.2 agentic 経路の統合テスト
+- [x] 6.2 agentic 経路の統合テスト
   - モック agent が limit_exceeded を経て出力を返すシナリオで、レスポンスに memo 提案 + informationType 付き search 提案が含まれることを検証する
   - シナリオテストが green
   - 6.1 と同一テスト資産を触る可能性があるため並列実行しない
