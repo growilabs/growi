@@ -487,6 +487,7 @@ class ElasticsearchDelegator
       body: page.revision.body,
       body_embedded: page.revisionBodyEmbedded,
       username: page.creator?.username,
+      last_update_username: page.lastUpdateUser?.username,
       comments: page.commentsCount > 0 ? page.comments : undefined,
       comment_count: page.commentsCount,
       bookmark_count: page.bookmarksCount,
@@ -990,14 +991,14 @@ class ElasticsearchDelegator
     // editor is still not indexed so does not work yet
     if (parsedKeywords.editor.length > 0) {
       const queries = parsedKeywords.editor.map((editor) => {
-        return { term: { editor_names: editor } };
+        return { term: { last_update_username: editor } };
       });
       query.body.query.bool.filter.push({ bool: { must: queries } });
     }
 
     if (parsedKeywords.not_editor.length > 0) {
       const queries = parsedKeywords.not_editor.map((editor) => {
-        return { term: { editor_names: editor } };
+        return { term: { last_update_username: editor } };
       });
       query.body.query.bool.filter.push({ bool: { must_not: queries } });
     }
