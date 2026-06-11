@@ -115,7 +115,7 @@
   - 6.1 と同一テスト資産を触る可能性があるため並列実行しない
   - _Requirements: 1.4, 2.3, 3.2, 4.3_
 
-- [ ] 6.3 後方互換の最終確認と全体回帰
+- [x] 6.3 後方互換の最終確認と全体回帰
   - 既存のオーケストレータ・統合・既存 4 サービスの spec 群が一切の変更なしで green であることを確認する（5.3 の受け入れ証拠。万一モック方式起因の修正が避けられない場合もモックパスの機械的変更に限定し、アサーションには手を入れない）
   - lint / test / build が通る（実行環境は devcontainer。ホストには mongo / Elasticsearch / turbo がない）
   - _Requirements: 5.3_
@@ -145,3 +145,4 @@
 - 2: pnpm-workspace.yaml の `@mastra/core>p-map: 4.0.0` override により `@mastra/core/agent` は vitest（ESM）で import 不可（pMapSkip link エラー）。3.3 / 4.x のユニットテストは growi-agent.spec.ts の StubAgent `vi.mock('@mastra/core/agent', ...)` パターンを踏襲すること。`@mastra/core/request-context` / `tools` は影響なし
 - 2: dynamic model 解決関数は 1 generate あたり約 2 回評価される — 副作用なし・軽量に保つこと
 - 5.1: design の「既存テスト無修正 green」は **additive-mock-wiring の意味で充足**（アサーション・既存行は byte-identical、追加は vi.mock 配線のみ 19+/0− と 16+/0−）。engines barrel → agentic-engine → mastra-modules の静的 import チェーンが app-unit vitest でロード不能（p-map ESM）なため、`./engines/agentic-engine` のスタブ mock 追加が必須だった。レビューで HEAD spec の import 時 fail を再現済み = モック方式起因の証明。6.3 はこの解釈を前提に再検証すること（再揉めしない）
+- 6.3: devcontainer（HEAD 526c3d3694）で suggest-path 17 files/297 tests + mastra-modules 7 files/83 tests 全 green。lint/test/build の非ゼロ exit はすべて feature 起因でないことを証明済み: (a) `post-message.ts` TS2769 は baseline byte-identical の pre-existing（support/mastra 系譜・chat 側 = spec 境界外。**リリース前に要修正**）、(b) full-suite の 13 fail 中 12 は負荷起因（分離再実行 green）、(c) `update-activity.spec` は mongod バイナリ SIGSEGV（コンテナ環境問題）。build:client は exit 0。devcontainer の `@growi/core` dist が stale だったため `pnpm exec turbo run build --filter "@growi/app^..."` を実施（環境修復）
