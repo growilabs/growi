@@ -972,6 +972,20 @@ class ElasticsearchDelegator
       });
       query.body.query.bool.filter.push({ bool: { must_not: queries } });
     }
+
+    if (parsedKeywords.author.length > 0) {
+      const queries = parsedKeywords.author.map((author) => {
+        return { term: { author_names: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { must: queries } });
+    }
+
+    if (parsedKeywords.not_author.length > 0) {
+      const queries = parsedKeywords.not_author.map((author) => {
+        return { term: { author_names: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { must_not: queries } });
+    }
   }
 
   filterPagesByViewer(query: SearchQuery, user, userGroups): void {
