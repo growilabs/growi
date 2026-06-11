@@ -25,7 +25,7 @@
   - _Boundary: スパイク（throwaway コード。本実装ファイルには手を入れない）_
 
 - [ ] 3. agentic 探索の実行主体（Mastra agent 層）
-- [ ] 3.1 検索 budget 付きリクエストコンテキストと budget 執行検索 tool
+- [x] 3.1 検索 budget 付きリクエストコンテキストと budget 執行検索 tool
   - 共有リクエストコンテキスト shape を拡張し、検索回数 budget（上限・消費カウンタ・実行クエリ記録）を per-request で伝搬する型を定義する（共有 shape は無改変）
   - 既存全文検索 tool と同一の入力スキーマを持ち、出力 union に limit_exceeded を追加した wrapper 検索 tool を実装する
   - budget 欠落時は context_error、上限到達時は委譲せず limit_exceeded を値で返し、それ以外は消費カウンタを増やしクエリを記録してから既存 tool へ委譲する（いかなる経路でも throw しない。権限フィルタは委譲先に委ねる）
