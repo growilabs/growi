@@ -171,3 +171,56 @@
 - [mastra-ai/mastra#3139](https://github.com/mastra-ai/mastra/issues/3139) — structured output 使用時に tools が外れる報告（対処: スパイク実機確認 + structuring model 分離）
 - `@mastra/core@1.41.0` 型定義（`dist/agent/agent.types.d.ts`, `dist/agent/types.d.ts`）— structuredOutput / maxSteps / stopWhen / abortSignal / requestContext / DynamicArgument の実機確認
 - #183964 / #183967 / #183968 — 評価器・代表ユースケース・ベースライン測定（41/60）
+
+## Spike Results (Task 2, 2026-06-11)
+
+実行環境: devcontainer（`@mastra/core@1.41.0` 実機 + OpenAI API 実呼び出し）。スパイクコードは throwaway（コンテナ内のみに配置し、実行後に削除済み）。実行形態は 2 本:
+
+- **OpenAI 実機スクリプト**（項目 1・3・4 + 委譲のランタイム封筒確認）: `node` 直接実行の CJS スクリプト。budget 付き wrapper tool → 内部 canned 検索 tool（初回 0 件 → 2 回目以降ヒット）を持つ Agent に対し、design の呼び出し契約どおり `agent.generate(prompt, { structuredOutput: { schema: AGENTIC_OUTPUT_JSON_SCHEMA }, maxSteps: 14, requestContext })` を実行（JSON Schema 直接指定・generateVNext 不使用）。モデルは gpt-4.1-mini / nano。2 回連続実行していずれも全アサーション PASS
+- **委譲 integ テスト**（項目 2）: vitest app-integration プロジェクト（実 MongoDB + dummy ES delegator。`full-text-search-tool.integ.ts` と同一規約）で `pnpm vitest run spike-wrapper-delegation` → 3 tests passed
+
+### 項目 1: tool 複数回呼び出し + structured output の両立（mastra#3139 系統） — ✅ 両立する
+
+- 観測: 1 回の `generate` で検索 tool が 2 回呼ばれ（step 0: finishReason `'tool-calls'`）、最終 step（finishReason `'stop'`）の後に `result.object` が JSON Schema 準拠の構造化出力として取得できた（`informationType: 'flow'`、`suggestions` 3 件、全フィールド string、trailing slash 付き親パス）。2 回連続実行で再現
+- `structuredOutput.model` の明示指定（structuring パス分離）は**不要**。`totalUsage` が steps の合計と完全一致しており（452+731=1183 input / 71+161=232 output）、構造化のための追加 LLM 呼び出しの消費は観測されなかった
+- 注意: 2 回の tool call は**同一 step 内で並列発行**された（step 数 ≠ 検索回数の実証）。検索回数を wrapper tool 側の budget でカウントする設計の正しさを裏付ける
+- **採用方針**: design の呼び出し契約（JSON Schema 直接指定 + `maxSteps` + `requestContext`）をそのまま採用。`structuredOutput.model` は指定しない
+
+### 項目 2: wrapper tool → fullTextSearchTool.execute 委譲 — ✅ 成立する
+
+- 観測（integ・実 SearchService 経路）: wrapper の execute から `fullTextSearchTool.execute!(inputData as never, context as never)` へ (inputData, context) を**そのまま転送**するだけで委譲が成立。dummy delegator のヒットが `{ pageId, pagePath, snippet }` にマッピングされ（body 非漏洩も確認）、user は参照同一性のまま `delegator.search` まで到達。budget 消費（`used` インクリメント・`queries` 記録）、上限到達時の `limit_exceeded`（委譲なし・budget 不変）、`searchBudget` 欠落時の `context_error`（委譲なし）も期待どおり
+- 観測（OpenAI 実機・実ランタイム封筒）: Mastra agent ループが wrapper に渡す context 封筒を内部 tool の execute へ転送しても、委譲先から `requestContext`（user / searchBudget）が読めることを確認
+- 補足: zod の default 適用は Mastra ランタイムの入力 validation（= wrapper の inputSchema）で行われるため、wrapper の入力スキーマは元 tool と同一（default 含む）に保つこと（design 記載どおり）
+- **採用方針**: budget 付き wrapper tool（execute 委譲方式）を採用。`SearchService.searchKeyword` 直接呼び出しの代替案は不要
+
+### 項目 3: dynamic model（関数指定）の per-generate 評価 — ✅ 再起動なしで反映される
+
+- 観測: `model: () => openai(currentModel)` の Agent で、1 回目 generate（currentModel='gpt-4.1-nano'）→ `response.modelId: 'gpt-4.1-nano-2025-04-14'`、変数を変更した 2 回目 generate → `'gpt-4.1-mini-2025-04-14'`。プロセス再起動なしで実使用モデルが追従
+- 注意: モデル解決関数は **1 回の generate につき 2 回**評価された（2 generate で計 4 回）。`configManager.getConfig()` のような軽量処理なら問題ないが、副作用・高コスト処理を入れないこと
+- **採用方針**: design どおり `model: () => getOpenaiProvider()(configManager.getConfig('openai:assistantModel:suggestPathAgent'))` を採用（Requirement 3.4 の充足を実機実証）
+
+### 項目 4: steps / usage の実形状とトレースログ整形方針
+
+実測（`agent.generate` 戻り値 = `FullOutput`、@mastra/core 1.41.0）:
+
+- **トップレベルキー**: `text, usage, steps, finishReason, warnings, providerMetadata, request, reasoning, reasoningText, toolCalls, toolResults, sources, files, response, totalUsage, object, error, tripwire, traceId, spanId, runId, suspendPayload, resumeSchema, messages, rememberedMessages`
+- **usage / totalUsage は AI SDK v5 命名**:
+
+  ```json
+  { "inputTokens": 1183, "outputTokens": 232, "totalTokens": 1415, "reasoningTokens": 0, "cachedInputTokens": 0, "raw": { "...": "provider 生値" } }
+  ```
+
+  - v4 命名（`promptTokens` / `completionTokens`）は**存在しない**
+  - 観測上 `usage` と `totalUsage` は同値（いずれも steps 横断の合計。型定義コメントの「usage = 最終 step」とは異なる挙動）。`raw` サブオブジェクトのみ最終 step のプロバイダ生値だった。**ログには意味が一意な `totalUsage` を使う**
+- **steps**: `LLMStepResult[]`。各 step のキー: `stepType, sources, files, toolCalls, toolResults, content, text, tripwire, reasoningText, reasoning, staticToolCalls, dynamicToolCalls, staticToolResults, dynamicToolResults, finishReason, usage, warnings, request, response, providerMetadata`。step ごとの `usage` も同じ v5 形状
+- **tool call / result の位置**: `steps[i].toolCalls[j]` は chunk 形式 `{ type: 'tool-call', runId, from: 'AGENT', payload: { toolCallId, toolName, args, providerMetadata } }`。tool 名は **`payload.toolName`**（Agent の tools レコードのキー名。例: `'fullTextSearch'`）、引数は **`payload.args`**、tool 戻り値は `steps[i].toolResults[j].payload.result`。トップレベル `result.toolCalls` には全 step 分の集約が入る（steps の flatMap と同数）
+- **トレースログ整形方針（採用）**:
+  - 検索回数・クエリ列: requestContext の `searchBudget.used` / `queries` を一次情報とし、`steps[].toolCalls[].payload`（toolName フィルタ）で突合可能
+  - getPageContent 呼び出し回数・tool 呼び出し列の再構成: `steps` を順に走査して `toolCalls[].payload.toolName / .args` を抽出
+  - トークン: info サマリに `totalUsage.inputTokens / outputTokens / totalTokens` を記録
+  - stopReason: トップレベル `finishReason`（`'stop'` 等）を記録
+
+### 副次的発見（実装タスクへの影響）
+
+- **pnpm override `@mastra/core>p-map: 4.0.0`（pnpm-workspace.yaml）の影響**: @mastra/core の **ESM ビルドは import 不可**（p-map@4 に `pMapSkip` named export がなく module link エラー）。CJS ビルド（GROWI サーバが実際にロードする側）は pMapSkip を参照せず正常動作する。vitest（unit / integration いずれのプロジェクトでも）から `@mastra/core/agent` を**実体 import するとこのエラーで落ちる**ため、suggest-path-agent のユニットテストは既存 `growi-agent.spec.ts` と同じく `vi.mock('@mastra/core/agent', ...)`（StubAgent パターン）を踏襲すること。`@mastra/core/request-context` / `@mastra/core/tools` は p-map を参照せず vitest からも import 可能（既存・スパイク両方の integ テストで実証済み）
+- 参考実測値: 検索 2 回 + 構造化出力の 1 generate で約 4.2 秒 / 計 1,415 tokens（gpt-4.1-mini、canned tool + 実 LLM。実 ES 検索や getPageContent を含まない下限値）

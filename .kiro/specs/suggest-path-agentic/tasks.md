@@ -14,7 +14,7 @@
   - _Requirements: 5.1, 5.2_
   - _Boundary: suggest-path interfaces（1.1 の Config Keys とは別レイヤ・別ファイル）_
 
-- [ ] 2. (P) Mastra 実機スパイク: 前提挙動の確認
+- [x] 2. (P) Mastra 実機スパイク: 前提挙動の確認
   - 実行環境は devcontainer（mongo / Elasticsearch / OpenAI API キーが必要。ホスト側では実行不可）
   - @mastra/core 1.41.0 実機で、tool の複数回呼び出しと structured output 取得が両立することを確認する（既知バグ mastra-ai/mastra#3139 系統の再発検知。両立しない場合は structuredOutput.model に同一モデルを明示指定して structuring パスを分離する方針へ切り替え）
   - wrapper tool から既存の全文検索 tool への execute 委譲が成立することを確認する（不成立の場合は wrapper 内で検索サービスを直接呼ぶ代替案を採用）
@@ -141,3 +141,6 @@
 ## Implementation Notes
 
 - 1.1/1.2: ホスト（Windows）でユニットテストを動かすには `packages/core` の事前ビルドが必要（`pnpm run build`）。アプリ全体の `lint:typecheck` は兄弟パッケージの dist 未ビルドで完走しない（devcontainer 専用 = 6.3 の所有）。タスクローカルの型検証は一時 tsconfig（include を変更ファイルに限定）+ `tsgo --noEmit -p` で代替可能
+- 2: スパイク 4 項目すべて成立（research.md「Spike Results」参照）。フォールバック方針は一切不要。usage は AI SDK v5 命名（inputTokens/outputTokens）で `totalUsage` を採用、toolCalls は `steps[].toolCalls[].payload.{toolName,args}`
+- 2: pnpm-workspace.yaml の `@mastra/core>p-map: 4.0.0` override により `@mastra/core/agent` は vitest（ESM）で import 不可（pMapSkip link エラー）。3.3 / 4.x のユニットテストは growi-agent.spec.ts の StubAgent `vi.mock('@mastra/core/agent', ...)` パターンを踏襲すること。`@mastra/core/request-context` / `tools` は影響なし
+- 2: dynamic model 解決関数は 1 generate あたり約 2 回評価される — 副作用なし・軽量に保つこと
