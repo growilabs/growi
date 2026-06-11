@@ -37,7 +37,7 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5_
   - _Boundary: BulkExportMarkdownRenderer_
   - _Depends: 2.2_
-- [ ] 3.2 レンダラパイプラインを実装し契約テストを通す（green）
+- [x] 3.2 レンダラパイプラインを実装し契約テストを通す（green）
   - `parse → gfm/frontmatter/math → remark-rehype(allowDangerousHtml) → rehype-raw → rehype-slug → rehype-sanitize → rehype-katex → rehype-stringify` を組み立て、パイプライン/モジュールを一度だけ構築してページ間で再利用する
   - 3.1 の全契約テストが green になる（observable）
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6_
