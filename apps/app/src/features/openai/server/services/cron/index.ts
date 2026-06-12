@@ -1,6 +1,5 @@
-import loggerFactory from '~/utils/logger/index.js';
-
 import { isAiEnabled } from '~/features/openai/server/services/is-ai-enabled.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:openai:service:cron');
 

@@ -1,4 +1,7 @@
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity.js';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
 import { configManager } from '~/server/service/config-manager/index.js';
 import loggerFactory from '~/utils/logger/index.js';
 

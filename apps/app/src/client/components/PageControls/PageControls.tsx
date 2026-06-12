@@ -21,7 +21,19 @@ import { useRect } from '@growi/ui/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { DropdownItem } from 'reactstrap';
 
-import { toggleLike, toggleSubscribe } from '~/client/services/page-operation.js';
+import {
+  MenuItemType,
+  PageItemControl,
+} from '~/client/components/Common/Dropdown/PageItemControl.js';
+import { BookmarkButtons } from '~/client/components/PageControls/BookmarkButtons.js';
+import LikeButtons from '~/client/components/PageControls/LikeButtons.js';
+import SearchButton from '~/client/components/PageControls/SearchButton.js';
+import SeenUserInfo from '~/client/components/PageControls/SeenUserInfo.js';
+import SubscribeButton from '~/client/components/PageControls/SubscribeButton.js';
+import {
+  toggleLike,
+  toggleSubscribe,
+} from '~/client/services/page-operation.js';
 import { toastError } from '~/client/util/toastr.js';
 import OpenDefaultAiAssistantButton from '~/features/openai/client/components/AiAssistant/OpenDefaultAiAssistantButton.js';
 import {
@@ -35,23 +47,14 @@ import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
 import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate.js';
 import { useTagEditModalActions } from '~/states/ui/modal/tag-edit.js';
 import { useSetPageControlsX } from '~/states/ui/page.js';
-import loggerFactory from '~/utils/logger/index.js';
-
 import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page.js';
 import { useSWRxUsersList } from '~/stores/user.js';
+import loggerFactory from '~/utils/logger/index.js';
+
 import type {
   AdditionalMenuItemsRendererProps,
   ForceHideMenuItems,
 } from '../Common/Dropdown/PageItemControl.js';
-import {
-  MenuItemType,
-  PageItemControl,
-} from '~/client/components/Common/Dropdown/PageItemControl.js';
-import { BookmarkButtons } from '~/client/components/PageControls/BookmarkButtons.js';
-import LikeButtons from '~/client/components/PageControls/LikeButtons.js';
-import SearchButton from '~/client/components/PageControls/SearchButton.js';
-import SeenUserInfo from '~/client/components/PageControls/SeenUserInfo.js';
-import SubscribeButton from '~/client/components/PageControls/SubscribeButton.js';
 
 import styles from './PageControls.module.scss';
 

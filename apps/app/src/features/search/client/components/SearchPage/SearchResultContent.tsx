@@ -14,6 +14,7 @@ import type { RevisionLoaderProps } from '~/client/components/Page/RevisionLoade
 import { exportAsMarkdown } from '~/client/services/page-operation.js';
 import { toastSuccess } from '~/client/util/toastr.js';
 import { PagePathNav } from '~/components/Common/PagePathNav/index.js';
+import { useKeywordRescroll } from '~/features/search/client/components/SearchPage/use-keyword-rescroll.js';
 import type { IPageWithSearchMeta } from '~/interfaces/search.js';
 import type {
   OnDeletedFunction,
@@ -33,8 +34,6 @@ import {
 import { useSearchResultOptions } from '~/stores/renderer.js';
 import { mutateSearching } from '~/stores/search.js';
 
-import { useKeywordRescroll } from '~/features/search/client/components/SearchPage/use-keyword-rescroll.js';
-
 import styles from './SearchResultContent.module.scss';
 
 const moduleClass = styles['search-result-content'];
@@ -42,7 +41,9 @@ const _fluidLayoutClass = styles['fluid-layout'];
 
 const PageControls = dynamic(
   () =>
-    import('~/client/components/PageControls/index.js').then((mod) => mod.PageControls),
+    import('~/client/components/PageControls/index.js').then(
+      (mod) => mod.PageControls,
+    ),
   { ssr: false },
 );
 const RevisionLoader = dynamic<RevisionLoaderProps>(

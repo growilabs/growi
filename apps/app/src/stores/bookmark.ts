@@ -5,9 +5,9 @@ import useSWR from 'swr';
 import useSWRImmutable from 'swr/immutable';
 import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
+import { apiv3Get } from '~/client/util/apiv3-client.js';
 import { useCurrentUser } from '~/states/global/index.js';
 
-import { apiv3Get } from '~/client/util/apiv3-client.js';
 import type { IBookmarkInfo } from '../interfaces/bookmark-info.js';
 
 export const useSWRxBookmarkedUsers = (

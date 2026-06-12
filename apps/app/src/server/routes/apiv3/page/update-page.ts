@@ -16,7 +16,10 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
 import { isAiEnabled } from '~/features/openai/server/services/index.js';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity.js';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
 import {
   type IApiv3PageUpdateParams,
   PageUpdateErrorCode,

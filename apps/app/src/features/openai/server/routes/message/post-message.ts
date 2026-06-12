@@ -8,25 +8,24 @@ import type { AssistantStream } from 'openai/lib/AssistantStream';
 import type { MessageDelta } from 'openai/resources/beta/threads/messages.mjs';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
-import { getOrCreateChatAssistant } from '~/features/openai/server/services/assistant/index.js';
-import type Crowi from '~/server/crowi/index.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
-import loggerFactory from '~/utils/logger/index.js';
-
 import {
   MessageErrorCode,
   type StreamErrorCode,
 } from '~/features/openai/interfaces/message-error.js';
 import AiAssistantModel from '~/features/openai/server/models/ai-assistant.js';
 import ThreadRelationModel from '~/features/openai/server/models/thread-relation.js';
+import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
+import { getOrCreateChatAssistant } from '~/features/openai/server/services/assistant/index.js';
 import { openaiClient } from '~/features/openai/server/services/client.js';
 import { getStreamErrorCode } from '~/features/openai/server/services/getStreamErrorCode.js';
 import { getOpenaiService } from '~/features/openai/server/services/openai.js';
 import { replaceAnnotationWithPageLink } from '~/features/openai/server/services/replace-annotation-with-page-link.js';
-import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:message');
 

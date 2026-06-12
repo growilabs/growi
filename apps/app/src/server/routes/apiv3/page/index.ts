@@ -27,7 +27,10 @@ import mongoose from 'mongoose';
 import path from 'pathe';
 import sanitize from 'sanitize-filename';
 
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity.js';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
 import type { IPageGrantData } from '~/interfaces/page.js';
 import type { IRecordApplicableGrant } from '~/interfaces/page-grant.js';
 import type Crowi from '~/server/crowi/index.js';

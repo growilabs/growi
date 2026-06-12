@@ -10,22 +10,22 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Input, ModalBody, ModalFooter } from 'reactstrap';
 
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
+import { ShareScopeWarningModal } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/ShareScopeWarningModal.js';
+import {
+  AiAssistantManagementModalPageMode,
+  useAiAssistantManagementModalActions,
+} from '~/features/openai/client/states/modal/ai-assistant-management.js';
 import {
   AiAssistantAccessScope,
   AiAssistantShareScope,
 } from '~/features/openai/interfaces/ai-assistant.js';
+import { determineShareScope } from '~/features/openai/utils/determine-share-scope.js';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
 import { useCurrentUser } from '~/states/global/index.js';
 import { limitLearnablePageCountPerAssistantAtom } from '~/states/server-configurations/index.js';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
-import { determineShareScope } from '~/features/openai/utils/determine-share-scope.js';
-import {
-  AiAssistantManagementModalPageMode,
-  useAiAssistantManagementModalActions,
-} from '~/features/openai/client/states/modal/ai-assistant-management.js';
-import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
-import { ShareScopeWarningModal } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/ShareScopeWarningModal.js';
 
 type Props = {
   isActivePane: boolean;

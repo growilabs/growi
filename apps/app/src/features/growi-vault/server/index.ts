@@ -1,9 +1,6 @@
 import type { IPage } from '@growi/core';
 import type { Router } from 'express';
 
-import { configManager } from '~/server/service/config-manager/index.js';
-import loggerFactory from '~/utils/logger/index.js';
-
 import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction.js';
 import { VaultReconcileLog } from '~/features/growi-vault/server/models/vault-reconcile-log.js';
 import { VaultSyncState } from '~/features/growi-vault/server/models/vault-sync-state.js';
@@ -19,6 +16,8 @@ import { createVaultBootstrapper } from '~/features/growi-vault/server/services/
 import { createVaultDispatcher } from '~/features/growi-vault/server/services/vault-dispatcher.js';
 import { vaultNamespaceMapper } from '~/features/growi-vault/server/services/vault-namespace-mapper.js';
 import { vaultSettingsService } from '~/features/growi-vault/server/services/vault-settings-service.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 export { createVaultAdminRouter } from '~/features/growi-vault/server/routes/vault-admin.js';
 export { createVaultGatewayRouter } from '~/features/growi-vault/server/routes/vault-gateway.js';
@@ -612,13 +611,17 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
       '~/features/growi-vault/server/services/reconcile/reconcile-target-resolver.js'
     ),
     aclEvaluator: (
-      await import('~/features/growi-vault/server/services/reconcile/reconcile-acl-evaluator.js')
+      await import(
+        '~/features/growi-vault/server/services/reconcile/reconcile-acl-evaluator.js'
+      )
     ).createAclEvaluator({
       pageModel: pageModel as never,
       pageGrantService: crowi.pageGrantService,
     }),
     concurrencyController: (
-      await import('~/features/growi-vault/server/services/reconcile/reconcile-concurrency-controller.js')
+      await import(
+        '~/features/growi-vault/server/services/reconcile/reconcile-concurrency-controller.js'
+      )
     ).createConcurrencyController({
       maxConcurrentPerUser: configManager.getConfig(
         'app:vaultReconcileMaxConcurrentPerUser',
@@ -632,7 +635,9 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
     }),
     historyStore,
     orchestrator: (
-      await import('~/features/growi-vault/server/services/reconcile/reconcile-orchestrator.js')
+      await import(
+        '~/features/growi-vault/server/services/reconcile/reconcile-orchestrator.js'
+      )
     ).createReconcileOrchestrator({
       pageModel: pageModel as never,
       vaultInstruction: VaultInstruction,

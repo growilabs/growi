@@ -13,17 +13,17 @@ import { useTranslation } from 'react-i18next';
 import { ModalBody } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
-import { useSWRxSearch } from '~/stores/search.js';
-
-import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
+import { SelectablePageList } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectablePageList.js';
 import { useSelectedPages } from '~/features/openai/client/services/use-selected-pages.js';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
   useAiAssistantManagementModalStatus,
 } from '~/features/openai/client/states/modal/ai-assistant-management.js';
-import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
-import { SelectablePageList } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectablePageList.js';
+import { useSWRxSearch } from '~/stores/search.js';
+
+import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
 
 import styles from './AiAssistantManagementKeywordSearch.module.scss';
 

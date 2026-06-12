@@ -14,8 +14,8 @@ import {
   useIsReadOnlyUser,
   useIsSharedUser,
 } from '~/states/context.js';
-import { useCurrentPagePath } from '~/states/page/index.js';
 import { useShareLinkId } from '~/states/page/hooks.js';
+import { useCurrentPagePath } from '~/states/page/index.js';
 import type { ReservedNextCaretLineEventDetail } from '~/states/ui/editor/reserved-next-caret-line.js';
 import loggerFactory from '~/utils/logger/index.js';
 

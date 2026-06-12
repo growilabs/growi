@@ -17,8 +17,6 @@ import { NextLink } from '~/components/ReactMarkdownComponents/NextLink.js';
 import type { RendererOptions } from '~/interfaces/renderer-options.js';
 import { RehypeSanitizeType } from '~/interfaces/services/rehype-sanitize.js';
 import type { RendererConfig } from '~/interfaces/services/renderer.js';
-import loggerFactory from '~/utils/logger/index.js';
-
 import {
   attributes as recommendedAttributes,
   tagNames as recommendedTagNames,
@@ -32,6 +30,7 @@ import * as echoDirective from '~/services/renderer/remark-plugins/echo-directiv
 import * as emoji from '~/services/renderer/remark-plugins/emoji.js';
 import { pukiwikiLikeLinker } from '~/services/renderer/remark-plugins/pukiwiki-like-linker.js';
 import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 // import EasyGrid from './PreProcessor/EasyGrid';
 

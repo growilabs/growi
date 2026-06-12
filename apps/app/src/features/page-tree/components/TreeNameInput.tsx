@@ -8,8 +8,8 @@ import {
   useInputValidator,
   ValidationTarget,
 } from '~/client/util/use-input-validator.js';
-
 import { CREATING_PAGE_VIRTUAL_ID } from '~/features/page-tree/constants/_inner.js';
+
 import type { TreeItemToolProps } from '../interfaces/index.js';
 
 type TreeNameInputProps = {

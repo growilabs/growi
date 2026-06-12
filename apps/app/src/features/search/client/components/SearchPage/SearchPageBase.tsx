@@ -15,6 +15,9 @@ import { useTranslation } from 'next-i18next';
 import type { ForceHideMenuItems } from '~/client/components/Common/Dropdown/PageItemControl.js';
 import type { ISelectableAll } from '~/client/interfaces/selectable-all.js';
 import { toastSuccess } from '~/client/util/toastr.js';
+// Do not import with next/dynamic
+// see: https://github.com/growilabs/growi/pull/7923
+import { SearchResultList } from '~/features/search/client/components/SearchPage/SearchResultList.js';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
@@ -27,11 +30,10 @@ import {
   isSearchServiceReachableAtom,
 } from '~/states/server-configurations/index.js';
 import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete.js';
-import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing.js';
-
-// Do not import with next/dynamic
-// see: https://github.com/growilabs/growi/pull/7923
-import { SearchResultList } from '~/features/search/client/components/SearchPage/SearchResultList.js';
+import {
+  mutatePageTree,
+  mutateRecentlyUpdated,
+} from '~/stores/page-listing.js';
 
 import styles from './SearchPageBase.module.scss';
 
@@ -60,7 +62,10 @@ type Props = {
 };
 
 const SearchResultContent = dynamic(
-  () => import('~/features/search/client/components/SearchPage/SearchResultContent.js').then((mod) => mod.SearchResultContent),
+  () =>
+    import(
+      '~/features/search/client/components/SearchPage/SearchResultContent.js'
+    ).then((mod) => mod.SearchResultContent),
   {
     ssr: false,
     loading: () => <></>,

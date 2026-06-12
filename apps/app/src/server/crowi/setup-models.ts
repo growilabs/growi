@@ -58,7 +58,9 @@ export const setupIndependentModels = async (): Promise<void> => {
     import(
       '~/features/external-user-group/server/models/external-user-group-relation.js'
     ),
-    import('~/features/external-user-group/server/models/external-user-group.js'),
+    import(
+      '~/features/external-user-group/server/models/external-user-group.js'
+    ),
     import('~/features/growi-plugin/server/models/index.js'),
     import('../models/activity.js'),
     import('../models/attachment.js'),

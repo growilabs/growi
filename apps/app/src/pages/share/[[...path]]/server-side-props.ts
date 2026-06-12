@@ -5,7 +5,6 @@ import {
   type SupportedActionType,
 } from '~/interfaces/activity.js';
 import type { IShareLinkHasId } from '~/interfaces/share-link.js';
-
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
@@ -16,9 +15,10 @@ import {
   getServerSideShareLinkRendererConfigProps,
   isValidGeneralPageInitialProps,
 } from '~/pages/general-page/index.js';
+import { getPageDataForInitial } from '~/pages/share/[[...path]]/page-data-props.js';
 import { addActivity } from '~/pages/utils/activity.js';
 import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props.js';
-import { getPageDataForInitial } from '~/pages/share/[[...path]]/page-data-props.js';
+
 import type { Stage2InitialProps } from './types.js';
 
 const basisProps = {

@@ -6,7 +6,10 @@ import type {
   IPageOperationProcessData,
   IPageOperationProcessInfo,
 } from '~/interfaces/page-operation.js';
-import { PageActionStage, PageActionType } from '~/interfaces/page-operation.js';
+import {
+  PageActionStage,
+  PageActionType,
+} from '~/interfaces/page-operation.js';
 import type { PageOperationDocument } from '~/server/models/page-operation.js';
 import PageOperation from '~/server/models/page-operation.js';
 import loggerFactory from '~/utils/logger/index.js';

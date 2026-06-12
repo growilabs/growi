@@ -9,11 +9,11 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
 } from '~/features/openai/client/states/modal/ai-assistant-management.js';
-import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
 
 type Props = {
   instruction: string;

@@ -13,16 +13,8 @@ import { Collapse } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
 import { toastError } from '~/client/util/toastr.js';
-import { useGrowiCloudUri } from '~/states/global/index.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant.js';
-import type { MessageLog } from '../../../../interfaces/message.js';
-import {
-  MessageErrorCode,
-  StreamErrorCode,
-} from '~/features/openai/interfaces/message-error.js';
-import type { IThreadRelationHasId } from '../../../../interfaces/thread-relation.js';
+import { MessageCard } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/MessageCard/MessageCard.js';
+import { ResizableTextarea } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/ResizableTextArea.js';
 import {
   type FormData as FormDataForEditorAssistant,
   isEditorAssistantFormData,
@@ -39,8 +31,16 @@ import {
   useUnifiedMergeViewActions,
 } from '~/features/openai/client/states/index.js';
 import { useSWRxThreads } from '~/features/openai/client/stores/thread.js';
-import { MessageCard } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/MessageCard/MessageCard.js';
-import { ResizableTextarea } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/ResizableTextArea.js';
+import {
+  MessageErrorCode,
+  StreamErrorCode,
+} from '~/features/openai/interfaces/message-error.js';
+import { useGrowiCloudUri } from '~/states/global/index.js';
+import loggerFactory from '~/utils/logger/index.js';
+
+import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant.js';
+import type { MessageLog } from '../../../../interfaces/message.js';
+import type { IThreadRelationHasId } from '../../../../interfaces/thread-relation.js';
 
 import styles from './AiAssistantSidebar.module.scss';
 

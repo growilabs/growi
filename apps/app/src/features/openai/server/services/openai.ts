@@ -20,6 +20,17 @@ import { toFile } from 'openai';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
+import { OpenaiServiceTypes } from '~/features/openai/interfaces/ai.js';
+import {
+  type AccessibleAiAssistants,
+  type AiAssistant,
+  AiAssistantAccessScope,
+  AiAssistantShareScope,
+} from '~/features/openai/interfaces/ai-assistant.js';
+import { ThreadType } from '~/features/openai/interfaces/thread-relation.js';
+import AiAssistantModel, {
+  type AiAssistantDocument,
+} from '~/features/openai/server/models/ai-assistant.js';
 import ThreadRelationModel, {
   type ThreadRelationDocument,
 } from '~/features/openai/server/models/thread-relation.js';
@@ -30,6 +41,16 @@ import VectorStoreFileRelationModel, {
   prepareVectorStoreFileRelations,
   type VectorStoreFileRelation,
 } from '~/features/openai/server/models/vector-store-file-relation.js';
+import {
+  getClient,
+  isStreamResponse,
+} from '~/features/openai/server/services/client-delegator/index.js';
+import { openaiApiErrorHandler } from '~/features/openai/server/services/openai-api-error-handler.js';
+import { replaceAnnotationWithPageLink } from '~/features/openai/server/services/replace-annotation-with-page-link.js';
+import { convertMarkdownToHtml } from '~/features/openai/server/utils/convert-markdown-to-html.js';
+import { generateGlobPatterns } from '~/features/openai/server/utils/generate-glob-patterns.js';
+import { isVectorStoreCompatible } from '~/features/openai/server/utils/is-vector-store-compatible.js';
+import { removeGlobPath } from '~/features/openai/utils/remove-glob-path.js';
 import type Crowi from '~/server/crowi/index.js';
 import type {
   IAttachmentDocument,
@@ -41,27 +62,9 @@ import { configManager } from '~/server/service/config-manager/index.js';
 import { createBatchStream } from '~/server/util/batch-stream.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { OpenaiServiceTypes } from '~/features/openai/interfaces/ai.js';
 import type { UpsertAiAssistantData } from '../../interfaces/ai-assistant.js';
-import {
-  type AccessibleAiAssistants,
-  type AiAssistant,
-  AiAssistantAccessScope,
-  AiAssistantShareScope,
-} from '~/features/openai/interfaces/ai-assistant.js';
 import type { MessageListParams } from '../../interfaces/message.js';
-import { ThreadType } from '~/features/openai/interfaces/thread-relation.js';
 import type { IVectorStore } from '../../interfaces/vector-store.js';
-import { removeGlobPath } from '~/features/openai/utils/remove-glob-path.js';
-import AiAssistantModel, {
-  type AiAssistantDocument,
-} from '~/features/openai/server/models/ai-assistant.js';
-import { convertMarkdownToHtml } from '~/features/openai/server/utils/convert-markdown-to-html.js';
-import { generateGlobPatterns } from '~/features/openai/server/utils/generate-glob-patterns.js';
-import { isVectorStoreCompatible } from '~/features/openai/server/utils/is-vector-store-compatible.js';
-import { getClient, isStreamResponse } from '~/features/openai/server/services/client-delegator/index.js';
-import { openaiApiErrorHandler } from '~/features/openai/server/services/openai-api-error-handler.js';
-import { replaceAnnotationWithPageLink } from '~/features/openai/server/services/replace-annotation-with-page-link.js';
 
 const { isDeepEquals } = deepEquals;
 

@@ -10,15 +10,18 @@
 
 import type { VaultInstructionModel } from '~/features/growi-vault/server/models/vault-instruction.js';
 import type { VaultSyncStateModel } from '~/features/growi-vault/server/models/vault-sync-state.js';
+import { createBootstrapHeartbeat } from '~/features/growi-vault/server/services/resilience/bootstrap-heartbeat.js';
+import { transition } from '~/features/growi-vault/server/services/resilience/bootstrap-state-machine.js';
+import { resolveAction } from '~/features/growi-vault/server/services/resilience/bootstrap-trigger-resolver.js';
+import { decideRetry } from '~/features/growi-vault/server/services/resilience/retry-policy.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { createBootstrapHeartbeat } from '~/features/growi-vault/server/services/resilience/bootstrap-heartbeat.js';
-import type { BootstrapState, TriggerSource } from './bootstrap-state-machine.js';
-import { transition } from '~/features/growi-vault/server/services/resilience/bootstrap-state-machine.js';
+import type {
+  BootstrapState,
+  TriggerSource,
+} from './bootstrap-state-machine.js';
 import type { BootstrapEnvValue } from './bootstrap-trigger-resolver.js';
-import { resolveAction } from '~/features/growi-vault/server/services/resilience/bootstrap-trigger-resolver.js';
 import type { RetryConfig } from './retry-policy.js';
-import { decideRetry } from '~/features/growi-vault/server/services/resilience/retry-policy.js';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:service:resilience:bootstrap-runner',

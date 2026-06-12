@@ -1,13 +1,12 @@
 import { Suspense, useCallback, useState } from 'react';
 
 import ItemsTreeContentSkeleton from '~/client/components/ItemsTree/ItemsTreeContentSkeleton.js';
-import { ItemsTree } from '~/features/page-tree/components/index.js';
-import type { IPageForTreeItem } from '~/interfaces/page.js';
-
 import {
   TreeItemWithCheckbox,
   treeItemWithCheckboxSize,
 } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/TreeItemWithCheckbox.js';
+import { ItemsTree } from '~/features/page-tree/components/index.js';
+import type { IPageForTreeItem } from '~/interfaces/page.js';
 
 type Props = {
   isEnableActions: boolean;

@@ -2,18 +2,18 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ModalBody } from 'reactstrap';
 
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
-
-import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
+import { usePageTreeSelection } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/hooks/use-page-tree-selection.js';
+import { PageTreeSelectionTree } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/PageTreeSelectionTree.js';
+import { SelectedPagesPanel } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectedPagesPanel.js';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
   useAiAssistantManagementModalStatus,
 } from '~/features/openai/client/states/modal/ai-assistant-management.js';
-import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
-import { usePageTreeSelection } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/hooks/use-page-tree-selection.js';
-import { PageTreeSelectionTree } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/PageTreeSelectionTree.js';
-import { SelectedPagesPanel } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectedPagesPanel.js';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
+
+import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
 
 import styles from './AiAssistantManagementPageTreeSelection.module.scss';
 

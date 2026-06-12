@@ -11,9 +11,19 @@ import { useTranslation } from 'react-i18next';
 import type { Text as YText } from 'yjs';
 
 import { apiv3Post } from '~/client/util/apiv3-client.js';
-import { useCurrentPageId } from '~/states/page/index.js';
-
-import type { AiAssistantHasId } from '../../../interfaces/ai-assistant.js';
+import { AiAssistantDropdown } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown.js';
+import { QuickMenuList } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/QuickMenuList.js';
+import {
+  shouldUseClientProcessing,
+  useClientEngineIntegration,
+} from '~/features/openai/client/services/client-engine-integration.js';
+import { getPageBodyForContext } from '~/features/openai/client/services/editor-assistant/get-page-body-for-context.js';
+import { performSearchReplace } from '~/features/openai/client/services/editor-assistant/search-replace-engine.js';
+import {
+  useAiAssistantSidebarStatus,
+  useIsEnableUnifiedMergeView,
+  useUnifiedMergeViewActions,
+} from '~/features/openai/client/states/index.js';
 import {
   type EditRequestBody,
   type SseDetectedDiff,
@@ -23,23 +33,13 @@ import {
   type SseMessage,
   SseMessageSchema,
 } from '~/features/openai/interfaces/editor-assistant/sse-schemas.js';
-import type { MessageLog } from '../../../interfaces/message.js';
-import type { IThreadRelationHasId } from '../../../interfaces/thread-relation.js';
 import { ThreadType } from '~/features/openai/interfaces/thread-relation.js';
 import { handleIfSuccessfullyParsed } from '~/features/openai/utils/handle-if-successfully-parsed.js';
-import { AiAssistantDropdown } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown.js';
-import { QuickMenuList } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/QuickMenuList.js';
-import {
-  useAiAssistantSidebarStatus,
-  useIsEnableUnifiedMergeView,
-  useUnifiedMergeViewActions,
-} from '~/features/openai/client/states/index.js';
-import {
-  shouldUseClientProcessing,
-  useClientEngineIntegration,
-} from '~/features/openai/client/services/client-engine-integration.js';
-import { getPageBodyForContext } from '~/features/openai/client/services/editor-assistant/get-page-body-for-context.js';
-import { performSearchReplace } from '~/features/openai/client/services/editor-assistant/search-replace-engine.js';
+import { useCurrentPageId } from '~/states/page/index.js';
+
+import type { AiAssistantHasId } from '../../../interfaces/ai-assistant.js';
+import type { MessageLog } from '../../../interfaces/message.js';
+import type { IThreadRelationHasId } from '../../../interfaces/thread-relation.js';
 
 type CreateThread = () => Promise<IThreadRelationHasId>;
 

@@ -93,7 +93,9 @@ class CrowiDev {
     const next = nextFactory(this.crowi);
     app.use(
       '/analyze',
-      express.static(path.resolve(import.meta.dirname, '../../../.next/analyze')),
+      express.static(
+        path.resolve(import.meta.dirname, '../../../.next/analyze'),
+      ),
     );
   }
 

@@ -673,9 +673,7 @@ class ElasticsearchDelegator
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
 
-  deletePages(
-    pages,
-  ): ReturnType<ElasticsearchClientDelegator['bulk']> {
+  deletePages(pages): ReturnType<ElasticsearchClientDelegator['bulk']> {
     const body = [];
     pages.forEach((page) => {
       this.prepareBodyForDelete(body, page);
@@ -1184,7 +1182,9 @@ class ElasticsearchDelegator
   async syncDescendantsPagesDeleted(
     pages,
     user,
-  ): Promise<Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined> {
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
+  > {
     for (let i = 0; i < pages.length; i++) {
       logger.debug('SearchClient.syncDescendantsPagesDeleted', pages[i].path);
     }
@@ -1199,7 +1199,9 @@ class ElasticsearchDelegator
   async syncPageDeleted(
     page,
     user,
-  ): Promise<Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined> {
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
+  > {
     logger.debug('SearchClient.syncPageDeleted', page.path);
 
     try {

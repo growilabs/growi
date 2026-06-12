@@ -6,7 +6,6 @@ import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
 import { apiv3Delete } from '~/client/util/apiv3-client.js';
 import { toastError, toastSuccess } from '~/client/util/toastr.js';
-
 import {
   usePluginDeleteModalActions,
   usePluginDeleteModalStatus,

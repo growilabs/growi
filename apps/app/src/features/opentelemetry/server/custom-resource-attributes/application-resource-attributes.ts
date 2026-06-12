@@ -15,7 +15,9 @@ export async function getApplicationResourceAttributes(): Promise<Attributes> {
 
   try {
     // Dynamic import to avoid circular dependencies
-    const { growiInfoService } = await import('~/server/service/growi-info/index.js');
+    const { growiInfoService } = await import(
+      '~/server/service/growi-info/index.js'
+    );
 
     const growiInfo = await growiInfoService.getGrowiInfo({});
 

@@ -3,7 +3,10 @@ import type { NextFunction, Request, Response, Router } from 'express';
 import express from 'express';
 import mongoose from 'mongoose';
 
-import type { CrowiProperties, CrowiRequest } from '~/interfaces/crowi-request.js';
+import type {
+  CrowiProperties,
+  CrowiRequest,
+} from '~/interfaces/crowi-request.js';
 import {
   type ExpressHttpHeader,
   type RespondOptions,

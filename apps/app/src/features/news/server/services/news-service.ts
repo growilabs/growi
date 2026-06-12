@@ -1,5 +1,7 @@
 import type { Types } from 'mongoose';
 
+import { NewsItem } from '~/features/news/server/models/news-item.js';
+import { NewsReadStatus } from '~/features/news/server/models/news-read-status.js';
 import type { PaginateResult } from '~/interfaces/in-app-notification.js';
 import loggerFactory from '~/utils/logger/index.js';
 
@@ -7,8 +9,6 @@ import type {
   INewsItemInput,
   INewsItemWithReadStatus,
 } from '../../interfaces/news-item.js';
-import { NewsItem } from '~/features/news/server/models/news-item.js';
-import { NewsReadStatus } from '~/features/news/server/models/news-read-status.js';
 
 const logger = loggerFactory('growi:feature:news:service');
 

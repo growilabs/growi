@@ -15,7 +15,10 @@ import {
 import express from 'express';
 import { body, query } from 'express-validator';
 
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity.js';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification.js';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
 import adminRequiredFactory from '~/server/middlewares/admin-required.js';

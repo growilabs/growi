@@ -4,7 +4,10 @@ import type {
 } from '@growi/core/dist/interfaces';
 
 import type { IShareLinkHasId } from '~/interfaces/share-link.js';
-import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props/index.js';
+import type {
+  CommonEachProps,
+  CommonInitialProps,
+} from '~/pages/common-props/index.js';
 import type {
   GeneralPageInitialProps,
   IPageToShowRevisionWithMeta,

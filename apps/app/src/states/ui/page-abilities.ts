@@ -43,11 +43,12 @@ const isAbleToShowTagLabelAtom = atom((get) => {
   // "/trash" page does not exist on page collection and unable to add tags
   return (
     // biome-ignore lint/style/noNonNullAssertion: currentPagePath should be defined here
-    (!isUsersTopPage(currentPagePath!) &&
+    !isUsersTopPage(currentPagePath!) &&
     // biome-ignore lint/style/noNonNullAssertion: currentPagePath should be defined here
     !isTrashTopPage(currentPagePath!) &&
     shareLinkId == null &&
-    !isIdenticalPath && !(isViewMode && isNotFound))
+    !isIdenticalPath &&
+    !(isViewMode && isNotFound)
   );
 });
 

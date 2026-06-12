@@ -14,7 +14,11 @@ interface AuthorizedRequest extends Request {
 export const generateAddActivityMiddleware = () =>
   // Named function so the route-middleware snapshot tool can identify this
   // handler in the apiv3 auth chain.
-  (async function addActivity(req: AuthorizedRequest, res: Response, next: NextFunction): Promise<void> {
+  async function addActivity(
+    req: AuthorizedRequest,
+    res: Response,
+    next: NextFunction,
+  ): Promise<void> {
     if (req.method === 'GET') {
       logger.warn('This middleware is not available for GET requests');
       return next();
@@ -38,4 +42,4 @@ export const generateAddActivityMiddleware = () =>
     }
 
     return next();
-  });
+  };

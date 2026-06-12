@@ -6,7 +6,6 @@ import {
 } from '@growi/core/dist/utils/page-path-utils';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-
 import { getServerSideBasicLayoutProps } from '~/pages/basic-layout-page/index.js';
 import {
   getServerSideCommonEachProps,
@@ -15,6 +14,7 @@ import {
 } from '~/pages/common-props/index.js';
 import { getServerSideRendererConfigProps } from '~/pages/general-page/index.js';
 import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props.js';
+
 import type { ServerConfigurationProps } from '../types.js';
 
 const getServerSideConfigurationProps: GetServerSideProps<

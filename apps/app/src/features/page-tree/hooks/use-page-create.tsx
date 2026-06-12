@@ -9,18 +9,25 @@ import { join } from 'pathe';
 import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
 import { NotAvailableForReadOnlyUser } from '~/client/components/NotAvailableForReadOnlyUser.js';
 import { useCreatePage } from '~/client/services/create-page/index.js';
-import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr.js';
-import type { IPageForItem } from '~/interfaces/page.js';
-import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing.js';
-import { shouldCreateWipPage } from '~/utils/should-create-wip-page.js';
-
+import {
+  toastError,
+  toastSuccess,
+  toastWarning,
+} from '~/client/util/toastr.js';
 import { CREATING_PAGE_VIRTUAL_ID } from '~/features/page-tree/constants/_inner.js';
-import type { TreeItemToolProps } from '../interfaces/index.js';
 import {
   useCreatingParentId,
   usePageTreeCreateActions,
 } from '~/features/page-tree/states/_inner/index.js';
 import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update.js';
+import type { IPageForItem } from '~/interfaces/page.js';
+import {
+  mutatePageTree,
+  mutateRecentlyUpdated,
+} from '~/stores/page-listing.js';
+import { shouldCreateWipPage } from '~/utils/should-create-wip-page.js';
+
+import type { TreeItemToolProps } from '../interfaces/index.js';
 
 // Inner component for CreateButton to properly use hooks
 type CreateButtonInnerProps = {

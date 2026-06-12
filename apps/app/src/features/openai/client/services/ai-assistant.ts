@@ -1,4 +1,8 @@
-import { apiv3Delete, apiv3Post, apiv3Put } from '~/client/util/apiv3-client.js';
+import {
+  apiv3Delete,
+  apiv3Post,
+  apiv3Put,
+} from '~/client/util/apiv3-client.js';
 
 import type {
   AiAssistantHasId,

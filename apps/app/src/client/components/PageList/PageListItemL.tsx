@@ -23,10 +23,19 @@ import { useTranslation } from 'next-i18next';
 import Clamp from 'react-multiline-clamp';
 import { Input } from 'reactstrap';
 
+import { PageItemControl } from '~/client/components/Common/Dropdown/PageItemControl.js';
 import type { ISelectable } from '~/client/interfaces/selectable-all.js';
-import { bookmark, unbookmark, unlink } from '~/client/services/page-operation.js';
+import {
+  bookmark,
+  unbookmark,
+  unlink,
+} from '~/client/services/page-operation.js';
 import { toastError } from '~/client/util/toastr.js';
-import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search.js';
+import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink/index.js';
+import type {
+  IPageSearchMeta,
+  IPageWithSearchMeta,
+} from '~/interfaces/search.js';
 import { isIPageSearchMeta } from '~/interfaces/search.js';
 import type {
   OnDeletedFunction,
@@ -41,11 +50,9 @@ import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate.j
 import { usePageRenameModalActions } from '~/states/ui/modal/page-rename.js';
 import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page.js';
 import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark.js';
-
-import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink/index.js';
 import { useSWRMUTxPageInfo, useSWRxPageInfo } from '~/stores/page.js';
+
 import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl.js';
-import { PageItemControl } from '~/client/components/Common/Dropdown/PageItemControl.js';
 
 type Props = {
   page:

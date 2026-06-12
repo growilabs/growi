@@ -11,7 +11,10 @@ import type {
 import type { HydratedDocument, Types } from 'mongoose';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group.js';
-import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page.js';
+import type {
+  IOptionsForCreate,
+  IOptionsForUpdate,
+} from '~/interfaces/page.js';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group.js';
 import type { CurrentPageYjsData } from '~/interfaces/yjs.js';

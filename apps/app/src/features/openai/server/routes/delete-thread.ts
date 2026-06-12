@@ -6,6 +6,9 @@ import type { Request, RequestHandler } from 'express';
 import { param } from 'express-validator';
 import { isHttpError } from 'http-errors';
 
+import ThreadRelationModel from '~/features/openai/server/models/thread-relation.js';
+import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
+import { getOpenaiService } from '~/features/openai/server/services/openai.js';
 import type Crowi from '~/server/crowi/index.js';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
@@ -14,9 +17,6 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger/index.js';
 
 import type { IApiv3DeleteThreadParams } from '../../interfaces/thread-relation.js';
-import ThreadRelationModel from '~/features/openai/server/models/thread-relation.js';
-import { getOpenaiService } from '~/features/openai/server/services/openai.js';
-import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:delete-thread');
 

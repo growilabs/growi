@@ -19,7 +19,10 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
 import { isAiEnabled } from '~/features/openai/server/services/index.js';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity.js';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3/index.js';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification.js';
 import type { IOptionsForCreate } from '~/interfaces/page.js';

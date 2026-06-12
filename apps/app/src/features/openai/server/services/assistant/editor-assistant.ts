@@ -1,7 +1,5 @@
 import type OpenAI from 'openai';
 
-import { configManager } from '~/server/service/config-manager/index.js';
-
 import { AssistantType } from '~/features/openai/server/services/assistant/assistant-types.js';
 import { getOrCreateAssistant } from '~/features/openai/server/services/assistant/create-assistant.js';
 import {
@@ -9,6 +7,7 @@ import {
   instructionsForInjectionCountermeasures,
   instructionsForSystem,
 } from '~/features/openai/server/services/assistant/instructions/commons.js';
+import { configManager } from '~/server/service/config-manager/index.js';
 
 const instructionsForUserIntentDetection = `# USER INTENT DETECTION:
   First, analyze the user's message to determine their intent:

@@ -18,7 +18,10 @@ import type {
   ISelectableAll,
 } from '~/client/interfaces/selectable-all.js';
 import { toastSuccess } from '~/client/util/toastr.js';
-import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search.js';
+import type {
+  IPageSearchMeta,
+  IPageWithSearchMeta,
+} from '~/interfaces/search.js';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
 import {
   mutatePageTree,

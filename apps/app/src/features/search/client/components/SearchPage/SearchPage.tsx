@@ -9,8 +9,17 @@ import type {
   ISelectableAll,
   ISelectableAndIndeterminatable,
 } from '~/client/interfaces/selectable-all.js';
+import { OperateAllControl } from '~/features/search/client/components/SearchPage/OperateAllControl.js';
+import SearchControl from '~/features/search/client/components/SearchPage/SearchControl.js';
+import {
+  SearchPageBase,
+  usePageDeleteModalForBulkDeletion,
+} from '~/features/search/client/components/SearchPage/SearchPageBase.js';
 import type { IFormattedSearchResult } from '~/interfaces/search.js';
-import { useSearchKeyword, useSetSearchKeyword } from '~/states/search/index.js';
+import {
+  useSearchKeyword,
+  useSetSearchKeyword,
+} from '~/states/search/index.js';
 import {
   disableUserPagesAtom,
   showPageLimitationLAtom,
@@ -21,13 +30,7 @@ import {
   useSWRxSearch,
 } from '~/stores/search.js';
 
-import { OperateAllControl } from '~/features/search/client/components/SearchPage/OperateAllControl.js';
-import SearchControl from '~/features/search/client/components/SearchPage/SearchControl.js';
 import type { IReturnSelectedPageIds } from './SearchPageBase.js';
-import {
-  SearchPageBase,
-  usePageDeleteModalForBulkDeletion,
-} from '~/features/search/client/components/SearchPage/SearchPageBase.js';
 
 import styles from './SearchPage.module.scss';
 
@@ -70,12 +73,13 @@ const SearchResultListHead = React.memo(
           </span>
           {took != null && (
             // blackout 70px rectangle in VRT
-            (<span
+            <span
               data-vrt-blackout
               className="ms-3 text-muted d-inline-block"
               style={{ minWidth: '70px' }}
-            >({took}ms)
-                          </span>)
+            >
+              ({took}ms)
+            </span>
           )}
         </div>
         {/* TODO: infinite scroll for search result */}

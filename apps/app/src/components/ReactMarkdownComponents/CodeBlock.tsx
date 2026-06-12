@@ -12,9 +12,9 @@ let prismModulePromise: Promise<ComponentType<PrismHighlighterProps>> | null =
   null;
 function loadPrismHighlighter(): Promise<ComponentType<PrismHighlighterProps>> {
   if (prismModulePromise == null) {
-    prismModulePromise = import('~/components/ReactMarkdownComponents/PrismHighlighter.js').then(
-      (mod) => mod.PrismHighlighter,
-    );
+    prismModulePromise = import(
+      '~/components/ReactMarkdownComponents/PrismHighlighter.js'
+    ).then((mod) => mod.PrismHighlighter);
   }
   return prismModulePromise;
 }

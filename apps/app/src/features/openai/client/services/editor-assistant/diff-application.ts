@@ -4,14 +4,15 @@
  * Optimized for real-time application with undo/redo support
  */
 
+import { ClientErrorHandler } from '~/features/openai/client/services/editor-assistant/error-handling.js';
+import { ClientFuzzyMatcher } from '~/features/openai/client/services/editor-assistant/fuzzy-matching.js';
+
 import type { LlmEditorAssistantDiff } from '../../../interfaces/editor-assistant/llm-response-schemas.js';
 import type {
   ProcessorConfig,
   SearchContext,
   SingleDiffResult,
 } from '../../interfaces/types.js';
-import { ClientErrorHandler } from '~/features/openai/client/services/editor-assistant/error-handling.js';
-import { ClientFuzzyMatcher } from '~/features/openai/client/services/editor-assistant/fuzzy-matching.js';
 
 // -----------------------------------------------------------------------------
 // Client Diff Application Engine

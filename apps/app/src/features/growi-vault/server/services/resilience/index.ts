@@ -14,13 +14,13 @@
 
 import type { VaultInstructionModel } from '~/features/growi-vault/server/models/vault-instruction.js';
 import type { VaultSyncStateModel } from '~/features/growi-vault/server/models/vault-sync-state.js';
+import { createBootstrapRunner } from '~/features/growi-vault/server/services/resilience/bootstrap-runner.js';
+import { createDriftDetector } from '~/features/growi-vault/server/services/resilience/drift-detector.js';
 
 import type {
   BootstrapRunnerDeps,
   VaultResilienceLayer,
 } from './bootstrap-runner.js';
-import { createBootstrapRunner } from '~/features/growi-vault/server/services/resilience/bootstrap-runner.js';
-import { createDriftDetector } from '~/features/growi-vault/server/services/resilience/drift-detector.js';
 import type { RetryConfig } from './retry-policy.js';
 
 // ---------------------------------------------------------------------------

@@ -9,10 +9,9 @@ import type {
 import { basename, join } from 'pathe';
 
 import { apiv3Put } from '~/client/util/apiv3-client.js';
+import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update.js';
 import type { IPageForTreeItem } from '~/interfaces/page.js';
 import { mutatePageTree } from '~/stores/page-listing.js';
-
-import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update.js';
 
 import styles from './use-page-dnd.module.scss';
 

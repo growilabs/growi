@@ -5,9 +5,16 @@ import { getIdStringForRef, isPopulated } from '@growi/core';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
+import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser.js';
+import { Comment } from '~/client/components/PageComment/Comment.js';
+import { CommentEditor } from '~/client/components/PageComment/CommentEditor.js';
+import { DeleteCommentModalLazyLoaded } from '~/client/components/PageComment/DeleteCommentModal/index.js';
+import { ReplyComments } from '~/client/components/PageComment/ReplyComments.js';
 import { apiPost } from '~/client/util/apiv1-client.js';
 import { toastError } from '~/client/util/toastr.js';
 import type { RendererOptions } from '~/interfaces/renderer-options.js';
+import { useSWRxPageComment } from '~/stores/comment.js';
 import { useSWRMUTxPageInfo } from '~/stores/page.js';
 import { useCommentForCurrentPageOptions } from '~/stores/renderer.js';
 
@@ -15,13 +22,6 @@ import type {
   ICommentHasId,
   ICommentHasIdList,
 } from '../../interfaces/comment.js';
-import { useSWRxPageComment } from '~/stores/comment.js';
-import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
-import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser.js';
-import { Comment } from '~/client/components/PageComment/Comment.js';
-import { CommentEditor } from '~/client/components/PageComment/CommentEditor.js';
-import { DeleteCommentModalLazyLoaded } from '~/client/components/PageComment/DeleteCommentModal/index.js';
-import { ReplyComments } from '~/client/components/PageComment/ReplyComments.js';
 
 import styles from './PageComment.module.scss';
 

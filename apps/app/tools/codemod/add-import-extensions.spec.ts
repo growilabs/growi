@@ -166,7 +166,9 @@ describe('alias specifiers (~/ -> src/, ^/ -> app root) — task 3.6 NodeNext pa
   });
 
   it('leaves an unresolvable ~/ alias untouched', () => {
-    expect(applyTransform(`import { x } from '~/does/not/exist';`)).toBeUndefined();
+    expect(
+      applyTransform(`import { x } from '~/does/not/exist';`),
+    ).toBeUndefined();
   });
 });
 

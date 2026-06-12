@@ -27,8 +27,8 @@ import type {
   IResCurrentGrantData,
 } from '~/interfaces/page-grant.js';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
-import { useCurrentPageData, usePageNotFound } from '~/states/page/index.js';
 import { useRevisionIdFromUrl, useShareLinkId } from '~/states/page/hooks.js';
+import { useCurrentPageData, usePageNotFound } from '~/states/page/index.js';
 
 import type { IPageTagsInfo } from '../interfaces/tag.js';
 

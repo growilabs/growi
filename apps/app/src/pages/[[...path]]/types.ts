@@ -1,5 +1,8 @@
 import type { BasicLayoutConfigurationProps } from '../basic-layout-page/index.js';
-import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
+import type {
+  CommonEachProps,
+  CommonInitialProps,
+} from '../common-props/index.js';
 import type {
   GeneralPageEachProps,
   GeneralPageInitialProps,

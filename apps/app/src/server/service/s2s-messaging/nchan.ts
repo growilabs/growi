@@ -9,6 +9,7 @@ import ReconnectingWebSocketPkg from 'reconnecting-websocket';
 const ReconnectingWebSocket =
   ReconnectingWebSocketPkg as unknown as typeof import('reconnecting-websocket').default;
 type ReconnectingWebSocket = import('reconnecting-websocket').default;
+
 import WebSocket from 'ws';
 
 import type Crowi from '~/server/crowi/index.js';

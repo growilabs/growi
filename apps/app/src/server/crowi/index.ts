@@ -525,7 +525,9 @@ class Crowi {
   async setupMailer(): Promise<void> {
     // intentionally lazy: service/mail participates in a require cycle with
     // this hub module; loading it at import time would surface the cycle
-    const { default: MailService } = await import('~/server/service/mail/index.js');
+    const { default: MailService } = await import(
+      '~/server/service/mail/index.js'
+    );
     this.mailService = new MailService(this);
 
     // add as a message handler

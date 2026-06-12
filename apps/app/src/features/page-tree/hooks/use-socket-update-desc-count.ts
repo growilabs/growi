@@ -1,13 +1,12 @@
 import { useEffect } from 'react';
 
+import { usePageTreeDescCountMapAction } from '~/features/page-tree/states/page-tree-desc-count-map.js';
 import type {
   UpdateDescCountData,
   UpdateDescCountRawData,
 } from '~/interfaces/websocket.js';
 import { SocketEventName } from '~/interfaces/websocket.js';
 import { useGlobalSocket } from '~/states/socket-io/index.js';
-
-import { usePageTreeDescCountMapAction } from '~/features/page-tree/states/page-tree-desc-count-map.js';
 
 /**
  * Hook to listen for Socket.io UpdateDescCount events and update descendant count badges
