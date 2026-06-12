@@ -28,7 +28,7 @@
   - _Boundary: mastra interfaces_
 
 - [ ] 2. サーバーコア: モデルキャッシュ無効化・利用可否判定・伝播・ゲート
-- [ ] 2.1 (P) Mastra モデルのキャッシュ破棄関数を追加
+- [x] 2.1 (P) Mastra モデルのキャッシュ破棄関数を追加
   - メモ化されたモデルを破棄する関数を `resolve-mastra-model` に追加・export(メモ自体は維持)
   - 破棄後の次回解決で最新 config から再構築されることを単体テストで確認
   - _Requirements: 2.4_

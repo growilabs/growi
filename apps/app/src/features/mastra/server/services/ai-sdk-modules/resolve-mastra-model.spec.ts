@@ -113,4 +113,49 @@ describe('resolveMastraModel', () => {
       expect(resolveMastraModel()).toMatchObject({ tag: 'openai-model' });
     });
   });
+
+  describe('clearResolvedMastraModelCache (Req 2.4)', () => {
+    it('rebuilds the model from the latest config on the next call (restart-free reflection)', async () => {
+      setProvider('openai');
+      const { resolveMastraModel, clearResolvedMastraModelCache } =
+        await loadResolver();
+
+      // Initial resolve memoizes; a second call stays cached (resolver runs once).
+      const first = resolveMastraModel();
+      expect(resolveMastraModel()).toBe(first);
+      expect(openaiResolver).toHaveBeenCalledTimes(1);
+
+      // Operator saves a new provider. Without invalidation the stale memo would
+      // be returned until restart; clearing forces re-resolution.
+      clearResolvedMastraModelCache();
+      setProvider('anthropic');
+
+      const rebuilt = resolveMastraModel();
+
+      expect(rebuilt).toMatchObject({ tag: 'anthropic-model' });
+      expect(anthropicResolver).toHaveBeenCalledTimes(1);
+      // The previous provider's resolver is not re-run on rebuild.
+      expect(openaiResolver).toHaveBeenCalledTimes(1);
+    });
+
+    it('re-runs the resolver after clearing even when the provider is unchanged', async () => {
+      setProvider('openai');
+      const { resolveMastraModel, clearResolvedMastraModelCache } =
+        await loadResolver();
+
+      resolveMastraModel();
+      clearResolvedMastraModelCache();
+      resolveMastraModel();
+
+      // Same provider, but the cleared cache forces a fresh build each time
+      // (e.g. provider-internal options changed).
+      expect(openaiResolver).toHaveBeenCalledTimes(2);
+    });
+
+    it('is a no-op when nothing is cached (safe to call before first resolve)', async () => {
+      const { clearResolvedMastraModelCache } = await loadResolver();
+
+      expect(() => clearResolvedMastraModelCache()).not.toThrow();
+    });
+  });
 });
