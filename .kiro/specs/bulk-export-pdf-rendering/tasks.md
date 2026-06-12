@@ -105,3 +105,10 @@
 - [x] R3. ドリフトテストの堅牢化（正規表現 → AST）
   - `renderer-parity.spec.ts` を TypeScript コンパイラ API による import 宣言の AST 抽出へ置換。手書きブロックリストを撤廃し、解析不能時は loud に失敗
   - _Requirements: 6.1, 6.2_ / _Boundary: RendererParityGuard_
+- [x] R4. 表の枠線が出ない不具合の修正（実機 PDF 検証で発覚）
+  - 原因: research.md I-table の前提が誤り。`.wiki table` は枠線を持たず、GROWI の表枠線は `add-class` が付ける `table table-bordered`（Bootstrap クラス）由来。手書き表 CSS を削除した本 spec 実装では実機で表が無装飾になっていた
+  - 修正: Web の `add-class` プラグインを**再利用**(`add-class.ts` の実行時依存は `hast-util-select` ESM のみ＝`recommended-whitelist.ts` と同じパターン)。**`plugin-set.ts` の `ADOPTED_PLUGINS` に正規エントリとして宣言**(`specifier`=相対パス, `exportName`='rehypePlugin', `options`=`{ table: 'table table-bordered' }`、sanitize 後・stringify 前に配置)し、loader/renderer が汎用処理。ローカル再実装も位置の特殊分岐も手書き CSS も持たず、生成済み Bootstrap 表 CSS を再利用。research.md I-table・design.md・plugin-set.ts の関連記述を訂正
+- [x] R5. 責務分離: loader は「ロードする」責務に純化
+  - `EsmPluginLoader` から `ADOPTED_PLUGINS` への依存を除去し、`loadPlugins(baseDir, declarations)` と宣言注入に変更(何をロードするかは呼び出し元=renderer が渡す)。冗長なモジュールキャッシュも撤廃(build-once は renderer の `cachedProcessor` が担保)。`PluginDeclaration` に `specifier`/`exportName` を追加し npm/ローカル両方を同一宣言で表現
+  - _責務: EsmPluginLoader = 純粋なロード / plugin-set = 何をロードするか / renderer = 合成_
+  - _Requirements: 1.1, 2.1_ / _Boundary: BulkExportMarkdownRenderer_

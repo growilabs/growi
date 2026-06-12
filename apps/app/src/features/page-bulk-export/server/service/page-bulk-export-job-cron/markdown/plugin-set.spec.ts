@@ -97,6 +97,22 @@ describe('plugin-set declaration module', () => {
       expect(lastPlugin).toBe('rehype-stringify');
     });
 
+    it('contains add-class after rehype-sanitize and before rehype-stringify (table classes)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      const sanitizeIndex = names.indexOf('rehype-sanitize');
+      const addClassIndex = names.indexOf('add-class');
+      const stringifyIndex = names.indexOf('rehype-stringify');
+      expect(addClassIndex).toBeGreaterThan(sanitizeIndex);
+      expect(addClassIndex).toBeLessThan(stringifyIndex);
+    });
+
+    it('add-class declares a relative specifier, named export, and table additions', () => {
+      const addClass = ADOPTED_PLUGINS.find((p) => p.name === 'add-class');
+      expect(addClass?.specifier).toMatch(/add-class\.ts$/);
+      expect(addClass?.exportName).toBe('rehypePlugin');
+      expect(addClass?.options).toEqual({ table: 'table table-bordered' });
+    });
+
     it('remark-rehype declares allowDangerousHtml option', () => {
       const remarkRehype = ADOPTED_PLUGINS.find(
         (p) => p.name === 'remark-rehype',
@@ -130,7 +146,6 @@ describe('plugin-set declaration module', () => {
         'xsv-to-table',
         'github-admonitions',
         'callout',
-        'add-class',
         'add-inline-code',
         'relative-links',
       ];

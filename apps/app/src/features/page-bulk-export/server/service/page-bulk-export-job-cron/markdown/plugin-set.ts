@@ -11,16 +11,32 @@
  *   remark-parse (implicit base)
  *   → remark plugins (gfm, frontmatter, math)
  *   → remark-rehype (bridge, allowDangerousHtml)
- *   → rehype plugins (raw, slug, sanitize, katex, stringify)
+ *   → rehype plugins (raw, slug, sanitize, katex, add-class, stringify)
+ *
+ * Entries are loaded by EsmPluginLoader generically: npm plugins by bare
+ * specifier, reused local plugins (add-class) by relative path + named export.
  */
 
-/** A declared plugin entry: npm package name, pipeline position options. */
+/** A declared plugin entry: how to load it, its pipeline options, and its
+ *  canonical name (for the web-renderer parity test). */
 export interface PluginDeclaration {
-  /** Exact npm package name (e.g. "remark-gfm"). */
+  /**
+   * Canonical name — the npm package name for npm plugins (also used as the
+   * import specifier), or the short name the web renderer / parity test use for
+   * a reused local plugin (e.g. "add-class").
+   */
   readonly name: string;
   /**
-   * Options to pass when calling the plugin.
-   * `undefined` means no options (default behaviour).
+   * Module to import when it differs from `name` — e.g. a relative path (from
+   * the markdown/ dir) to a reused local GROWI plugin. Defaults to `name`,
+   * treated as a bare npm specifier.
+   */
+  readonly specifier?: string;
+  /** Named export to use as the plugin. Defaults to "default". */
+  readonly exportName?: string;
+  /**
+   * Options to pass when calling the plugin. `undefined` means no options.
+   * (rehype-sanitize's schema is computed at runtime and supplied by the renderer.)
    */
   readonly options?: Record<string, unknown>;
 }
@@ -53,6 +69,18 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
   { name: 'rehype-sanitize', options: undefined },
   // rehype-katex renders math nodes; placed after sanitize so its trusted output is not stripped
   { name: 'rehype-katex', options: undefined },
+  // Reused GROWI web plugin: add-class adds `table table-bordered` so the design
+  // system's .table/.table-bordered borders apply (mirrors generateCommonOptions).
+  // Loaded via dynamicImport from a relative path; its only runtime dependency
+  // (hast-util-select) is ESM. Placed after sanitize (trusted, static class
+  // values), before stringify.
+  {
+    name: 'add-class',
+    specifier:
+      '../../../../../../services/renderer/rehype-plugins/add-class.ts',
+    exportName: 'rehypePlugin',
+    options: { table: 'table table-bordered' },
+  },
   // Serialises the hast tree to an HTML string; must be last
   { name: 'rehype-stringify', options: undefined },
 ] as const;
@@ -64,8 +92,10 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
  * generateSSRViewOptions) that this pipeline consciously omits. The exclusion
  * reasons are documented in research.md:
  *  - Local .ts plugins (emoji, pukiwiki-like-linker, growi-directive, echo-directive,
- *    codeblock, xsv-to-table, add-class, add-inline-code, relative-links):
+ *    codeblock, xsv-to-table, add-inline-code, relative-links):
  *    ERR_REQUIRE_ESM or React/DOM dependency; cannot be loaded in CJS server runtime.
+ *    (add-class is the exception: it depends only on hast-util-select (ESM), so it
+ *    IS reused — see its entry in ADOPTED_PLUGINS above, loaded by relative path.)
  *  - React-component-driven features (callout, github-admonitions):
  *    Faithful rendering requires React SSR; out of scope for this spec phase.
  *  - remark-directive: GROWI directive syntax support depends on local .ts plugins
@@ -85,7 +115,6 @@ export const INTENTIONALLY_EXCLUDED_PLUGINS: ReadonlyArray<string> = [
   'xsv-to-table',
   'github-admonitions',
   'callout',
-  'add-class',
   'add-inline-code',
   'relative-links',
   'remark-breaks',

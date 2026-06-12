@@ -61,11 +61,18 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
   シンタックスハイライト配色, drawio/lsx/mermaid/plantuml/attachment-refs。忠実なコールアウト等は
   React SSR ベースの収れんで扱う。
 
-### I-table. テーブルはロジック不要（CSS のみ）
-- **Finding**: [_wiki.scss](../../../apps/app/src/styles/organisms/_wiki.scss#L4) は `.wiki { table {…} blockquote {…} h1..h6 {…} }` と **素の要素**を装飾する。
-  Web 側の `add-class`（`table table-bordered` 付与）が無くても、`.wiki` でラップすれば `.wiki table {}`
-  が当たる。PR #11288 の追加 CSS も素の `table` を装飾できていた（描画確認済み）。
-- **Implication**: テーブルのクラス付与変換は **不要**。`.wiki` ラップ＋CSS で解決し、二重実装は発生しない。
+### I-table. テーブルはロジック不要（CSS のみ）← ⚠️ 誤り（改訂 4 で訂正）
+- **当初の Finding（誤り）**: `.wiki table {}` が素の表を装飾するのでクラス付与は不要、と判断した。
+- **訂正（実機 PDF 検証 2026-06-11）**: [_wiki.scss](../../../apps/app/src/styles/organisms/_wiki.scss#L120) の
+  `.wiki table` は **`font-size: 0.95em` のみ**で枠線を持たない。GROWI の表の枠線・ヘッダ背景・セル余白は
+  Web レンダラの `add-class` が付与する **`table table-bordered`（Bootstrap クラス）由来**。PR #11288 が表を
+  描画できていたのは**手書き表 CSS** があったためで、それを削除した本 spec の実装では実機で表が無装飾になった。
+- **Implication（訂正後）**: 表は **`<table>` への `table table-bordered` クラス付与が必要**。**Web の
+  `add-class` プラグインを再利用**して付与する（`add-class.ts` の実行時依存は `hast-util-select` ESM のみ＝
+  `recommended-whitelist.ts` と同じ再利用パターン。ローカル再実装はしない）。add-class は `plugin-set.ts` の
+  `ADOPTED_PLUGINS` に正規エントリとして宣言し（`specifier`=相対パス, `exportName`='rehypePlugin'）、loader が
+  汎用的にロード・renderer が順序どおり適用する。これで生成済み Bootstrap 表 CSS（`.table`/`.table-bordered`）
+  が当たる。手書き表 CSS は導入しない。表以外（引用/見出し/コード）は素要素＋`.wiki` CSS で従来どおり装飾される。
 
 ## Risks
 
