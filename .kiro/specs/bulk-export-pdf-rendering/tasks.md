@@ -135,3 +135,8 @@
   - `INTENTIONALLY_EXCLUDED_PLUGINS` から emoji / xsv-to-table / remark-directive / echo-directive を除去。`github-admonitions` の除外理由を「callout 不在で劣化悪化」に訂正。`plugin-set.spec.ts` の除外期待リストを更新し、ドリフトテスト（`renderer-parity.spec.ts`）が全 Web プラグインを分類済みに保つことを確認する（observable）
   - _Requirements: 1.6, 6.1, 6.2_
   - _Boundary: plugin-set, RendererParityGuard_
+- [ ] 8.4 インラインコードの枠線を Web と揃える（実機 PDF 検証で発覚）
+  - 症状: PDF のインラインコードが Bootstrap の code 色（赤）だけで、Web のような枠線付きピル表示にならない。原因は枠線を付ける `src/styles/atoms/_code.scss`（`code:not([class^='language-'])`）が bulk-export の生成 CSS に含まれていなかったため（エントリは bootstrap apply + `_wiki.scss` のみ取り込み）
+  - 修正: `bin/build-bulk-export-css.ts` のエントリ SCSS に `@use 'styles/atoms/code'` を追加し Web の単一出所ルールを**再利用**。`@use 'styles/...'` 解決のため loadPaths に `src/` を追加。生成 CSS を再生成。`bulk-export-css.spec.ts` に `code:not([class^=language-])` ルールの存在アサーションを追加（observable）
+  - _Requirements: 2.1, 2.2_
+  - _Boundary: BulkExportStyleProvider（生成 CSS）_

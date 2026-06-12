@@ -64,6 +64,16 @@ describe('BULK_EXPORT_CSS', () => {
       // code rules are present in the output.
       expect(BULK_EXPORT_CSS).toMatch(/\bcode\s*[,{]/);
     });
+
+    // Inline code (no language-* class) gets a border + padding + radius on the web
+    // via src/styles/atoms/_code.scss. The bulk-export CSS reuses that same file so
+    // inline code in the PDF looks like the bordered pill it does in the browser.
+    it('contains the inline-code border rule reused from atoms/_code.scss', () => {
+      // selector: code:not([class^="language-"])
+      expect(BULK_EXPORT_CSS).toMatch(
+        /code:not\(\[class\^=['"]?language-['"]?\]\)/,
+      );
+    });
   });
 
   describe('Bootstrap CSS custom properties', () => {

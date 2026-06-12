@@ -399,7 +399,11 @@ export interface BulkExportStyleProvider {
   `@font-face`。KaTeX フォントは **`src` を base64 data URI で生成 CSS に同梱**する（外部 `url(fonts/...)`
   参照を残さない）。改訂 1: Chromium は woff2 を解せるため **woff2 のみ**インライン化し、woff/ttf の代替は
   ビルド時に破棄する（フォント payload の約 2/3 削減、生成 CSS ~1.8MB→~757KB）。共有ファイル化と併せ、
-  1 ページあたりの CSS 重複が解消される。
+  1 ページあたりの CSS 重複が解消される。(d) インラインコードの枠線・余白・角丸（改訂 5）: Web の
+  `src/styles/atoms/_code.scss`（`code:not([class^='language-'])` ルール。主アプリも `style-app.scss` から
+  取り込む単一出所）をエントリ SCSS から `@use 'styles/atoms/code'` で**再利用**する。これが無いと Bootstrap の
+  code 色（赤）だけ当たり、Web のような枠線付きピル表示にならない。`@use 'styles/...'` 解決のためビルドの
+  loadPaths に `src/` を追加する。
 - Risk: SCSS→CSS プリコンパイル機構・フォント解決・`dependencies` 分類（tech.md、Turbopack 外部化）は
   タスクで確定。観測は「ルールの文字列存在」ではなく「実際に描画して見た目が出る」ことで担保する（7.2）。
 

@@ -26,6 +26,9 @@ const NODE_MODULES_DIR = resolve(APPS_APP_DIR, 'node_modules');
 const KATEX_CSS_PATH = resolve(NODE_MODULES_DIR, 'katex/dist/katex.css');
 const KATEX_FONTS_DIR = resolve(NODE_MODULES_DIR, 'katex/dist/fonts');
 const APP_STYLES_DIR = resolve(APPS_APP_DIR, 'src/styles');
+// Added to loadPaths so that `@use 'styles/...'` specifiers (used by the app's own
+// SCSS, e.g. atoms/_code.scss → `@use 'styles/variables'`) resolve against src/.
+const APP_SRC_DIR = resolve(APPS_APP_DIR, 'src');
 const OUTPUT_DIR = resolve(
   APPS_APP_DIR,
   'src/features/page-bulk-export/server/service/page-bulk-export-job-cron/markdown/styles',
@@ -55,6 +58,10 @@ const SCSS_ENTRY_CONTENT = `
 
 // 2. .wiki scoped content styles
 @use 'wiki' as wiki-content;
+
+// 3. Inline-code border/padding/radius (reused from the app's own atoms/_code.scss,
+//    the single source for the bordered inline-code "pill" the web renderer shows).
+@use 'styles/atoms/code';
 `;
 
 // biome-ignore lint/suspicious/noConsole: build script — console output is expected
@@ -68,8 +75,10 @@ try {
 
   const sassResult = sass.compile(TEMP_SCSS_PATH, {
     // loadPaths allows Sass to resolve bare module specifiers (@growi/core-styles, bootstrap)
-    // via apps/app/node_modules where @growi/core-styles is symlinked to packages/core-styles
-    loadPaths: [NODE_MODULES_DIR],
+    // via apps/app/node_modules where @growi/core-styles is symlinked to packages/core-styles.
+    // APP_SRC_DIR lets `@use 'styles/...'` specifiers (atoms/code and its `styles/variables`
+    // dependency) resolve against src/.
+    loadPaths: [NODE_MODULES_DIR, APP_SRC_DIR],
     quietDeps: true,
   });
 
