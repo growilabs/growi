@@ -20,7 +20,7 @@
   - _Requirements: 2.3_
   - _Boundary: activity interfaces_
 
-- [ ] 1.4 (P) AI 設定の DTO と編集対象キー一覧を定義
+- [x] 1.4 (P) AI 設定の DTO と編集対象キー一覧を定義
   - 取得/更新の DTO(有効/無効・provider・model・providerOptions・azure 4 項目・`isApiKeySet`・`useOnlyEnvVars`・`isConfigured`、更新は apiKey を含む)を型定義
   - 編集対象キー一覧(`AI_SETTING_KEYS`)を定義し server/client から参照可能にする
   - 型が `tsc` を通り、サーバー・クライアント双方から import 可能
