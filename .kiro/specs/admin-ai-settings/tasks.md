@@ -55,7 +55,7 @@
   - _Boundary: mastra routes (ai-ready-guard, routes factory)_
 
 - [ ] 3. サーバー API: AI 設定の取得/更新エンドポイント
-- [ ] 3.1 (P) 入力検証ルールを実装
+- [x] 3.1 (P) 入力検証ルールを実装
   - provider がサポート対象のみ、`providerOptions` は非空時 JSON として解釈可能、boolean 項目の型検証
   - 単体テスト: 不正 provider と不正 JSON を検出、正常値を通過
   - _Requirements: 6.1, 6.2_
