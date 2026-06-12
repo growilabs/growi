@@ -186,88 +186,77 @@ describe('config-definition resilience keys', () => {
 
 describe('config-definition multi-llm-provider keys', () => {
   describe('CONFIG_KEYS array', () => {
-    it('contains mastra:llmProvider', () => {
-      expect(CONFIG_KEYS).toContain('mastra:llmProvider');
+    it('contains ai:provider', () => {
+      expect(CONFIG_KEYS).toContain('ai:provider');
     });
 
-    it('contains mastra:llmApiKey', () => {
-      expect(CONFIG_KEYS).toContain('mastra:llmApiKey');
+    it('contains ai:apiKey', () => {
+      expect(CONFIG_KEYS).toContain('ai:apiKey');
     });
 
-    it('contains mastra:llmModel', () => {
-      expect(CONFIG_KEYS).toContain('mastra:llmModel');
+    it('contains ai:model', () => {
+      expect(CONFIG_KEYS).toContain('ai:model');
     });
 
-    it('contains mastra:llmProviderOptions', () => {
-      expect(CONFIG_KEYS).toContain('mastra:llmProviderOptions');
+    it('contains ai:providerOptions', () => {
+      expect(CONFIG_KEYS).toContain('ai:providerOptions');
     });
   });
 
   describe('CONFIG_DEFINITIONS', () => {
-    describe('mastra:llmProvider', () => {
-      it('has envVarName MASTRA_LLM_PROVIDER', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmProvider'].envVarName).toBe(
-          'MASTRA_LLM_PROVIDER',
+    describe('ai:provider', () => {
+      it('has envVarName AI_PROVIDER', () => {
+        expect(CONFIG_DEFINITIONS['ai:provider'].envVarName).toBe(
+          'AI_PROVIDER',
         );
       });
 
       it('has default value openai', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmProvider'].defaultValue).toBe(
-          'openai',
-        );
+        expect(CONFIG_DEFINITIONS['ai:provider'].defaultValue).toBe('openai');
       });
 
       it('is not marked as secret', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmProvider'].isSecret).toBeFalsy();
+        expect(CONFIG_DEFINITIONS['ai:provider'].isSecret).toBeFalsy();
       });
     });
 
-    describe('mastra:llmApiKey', () => {
-      it('has envVarName MASTRA_LLM_API_KEY', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmApiKey'].envVarName).toBe(
-          'MASTRA_LLM_API_KEY',
-        );
+    describe('ai:apiKey', () => {
+      it('has envVarName AI_API_KEY', () => {
+        expect(CONFIG_DEFINITIONS['ai:apiKey'].envVarName).toBe('AI_API_KEY');
       });
 
       it('has default value of undefined', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmApiKey'].defaultValue).toBe(
-          undefined,
-        );
+        expect(CONFIG_DEFINITIONS['ai:apiKey'].defaultValue).toBe(undefined);
       });
 
       it('is marked as secret', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmApiKey'].isSecret).toBe(true);
+        expect(CONFIG_DEFINITIONS['ai:apiKey'].isSecret).toBe(true);
       });
     });
 
-    describe('mastra:llmModel', () => {
-      it('has envVarName MASTRA_LLM_MODEL', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmModel'].envVarName).toBe(
-          'MASTRA_LLM_MODEL',
-        );
+    describe('ai:model', () => {
+      it('has envVarName AI_MODEL', () => {
+        expect(CONFIG_DEFINITIONS['ai:model'].envVarName).toBe('AI_MODEL');
       });
 
       it('has default value o4-mini (single default tuned for the default vendor)', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmModel'].defaultValue).toBe(
-          'o4-mini',
-        );
+        expect(CONFIG_DEFINITIONS['ai:model'].defaultValue).toBe('o4-mini');
       });
 
       it('is not marked as secret', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmModel'].isSecret).toBeFalsy();
+        expect(CONFIG_DEFINITIONS['ai:model'].isSecret).toBeFalsy();
       });
     });
 
-    describe('mastra:llmProviderOptions', () => {
-      it('has envVarName MASTRA_LLM_PROVIDER_OPTIONS', () => {
-        expect(CONFIG_DEFINITIONS['mastra:llmProviderOptions'].envVarName).toBe(
-          'MASTRA_LLM_PROVIDER_OPTIONS',
+    describe('ai:providerOptions', () => {
+      it('has envVarName AI_PROVIDER_OPTIONS', () => {
+        expect(CONFIG_DEFINITIONS['ai:providerOptions'].envVarName).toBe(
+          'AI_PROVIDER_OPTIONS',
         );
       });
 
       it('defaults to the OpenAI reasoning options as a JSON string', () => {
-        const def =
-          CONFIG_DEFINITIONS['mastra:llmProviderOptions'].defaultValue;
+        const def = CONFIG_DEFINITIONS['ai:providerOptions'].defaultValue;
         expect(typeof def).toBe('string');
         expect(JSON.parse(def as string)).toEqual({
           openai: { reasoningEffort: 'low', reasoningSummary: 'auto' },
@@ -275,9 +264,7 @@ describe('config-definition multi-llm-provider keys', () => {
       });
 
       it('is not marked as secret', () => {
-        expect(
-          CONFIG_DEFINITIONS['mastra:llmProviderOptions'].isSecret,
-        ).toBeFalsy();
+        expect(CONFIG_DEFINITIONS['ai:providerOptions'].isSecret).toBeFalsy();
       });
     });
   });

@@ -18,16 +18,14 @@ const ENTRA_ID_SCOPE = 'https://cognitiveservices.azure.com/.default';
 // `https://<name>.openai.azure.com/...` URL; baseURL is the escape hatch for
 // sovereign clouds / API Management gateways / custom domains), and it can
 // authenticate via either an API key or Microsoft Entra ID. All of that stays
-// inside this resolver — the shared dispatch never sees it. `mastra:llmModel`
+// inside this resolver — the shared dispatch never sees it. `ai:model`
 // here is the Azure *deployment name*, not an OpenAI model id.
 export const resolveAzureOpenaiModel = (): MastraModelConfig => {
-  const resourceName = configManager.getConfig(
-    'mastra:llmAzureOpenaiResourceName',
-  );
-  const baseURL = configManager.getConfig('mastra:llmAzureOpenaiBaseUrl');
-  const apiVersion = configManager.getConfig('mastra:llmAzureOpenaiApiVersion');
+  const resourceName = configManager.getConfig('ai:azureOpenaiResourceName');
+  const baseURL = configManager.getConfig('ai:azureOpenaiBaseUrl');
+  const apiVersion = configManager.getConfig('ai:azureOpenaiApiVersion');
   const useEntraId =
-    configManager.getConfig('mastra:llmAzureOpenaiUseEntraId') === true;
+    configManager.getConfig('ai:azureOpenaiUseEntraId') === true;
   const model = getModel();
 
   // Endpoint is required regardless of the auth method. resourceName and baseURL
@@ -36,7 +34,7 @@ export const resolveAzureOpenaiModel = (): MastraModelConfig => {
   // applies otherwise. The throw names the missing env vars only — never a key.
   if (resourceName == null && baseURL == null) {
     throw new Error(
-      'Azure OpenAI requires MASTRA_LLM_AZURE_OPENAI_RESOURCE_NAME or MASTRA_LLM_AZURE_OPENAI_BASE_URL to be set',
+      'Azure OpenAI requires AI_AZURE_OPENAI_RESOURCE_NAME or AI_AZURE_OPENAI_BASE_URL to be set',
     );
   }
   const endpoint = baseURL != null ? { baseURL } : { resourceName };
@@ -58,7 +56,7 @@ export const resolveAzureOpenaiModel = (): MastraModelConfig => {
   const apiKey = getApiKey();
   if (apiKey == null) {
     throw new Error(
-      'Azure OpenAI requires MASTRA_LLM_API_KEY, or set MASTRA_LLM_AZURE_OPENAI_USE_ENTRA_ID=true to authenticate with Microsoft Entra ID',
+      'Azure OpenAI requires AI_API_KEY, or set AI_AZURE_OPENAI_USE_ENTRA_ID=true to authenticate with Microsoft Entra ID',
     );
   }
   return createAzure({ apiKey, ...endpoint, ...apiVersionOption })(model);

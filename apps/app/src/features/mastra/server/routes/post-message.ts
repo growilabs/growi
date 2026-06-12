@@ -82,7 +82,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             resource: thread.resourceId,
           },
           // Provider options (reasoning etc.) resolved from the
-          // MASTRA_LLM_PROVIDER_OPTIONS env var (Req 6). Defaults to the OpenAI
+          // AI_PROVIDER_OPTIONS env var (Req 6). Defaults to the OpenAI
           // reasoning options (reasoningEffort 'low' bounds reasoning-token cost;
           // reasoningSummary 'auto' surfaces summary chunks to the UI — note this
           // requires a verified OpenAI org, otherwise summary parts are empty).

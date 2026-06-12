@@ -15,7 +15,7 @@ import { resolveProviderOptions } from './resolve-provider-options';
 
 const setRaw = (value: string | undefined): void => {
   getConfig.mockImplementation((key: string) =>
-    key === 'mastra:llmProviderOptions' ? value : undefined,
+    key === 'ai:providerOptions' ? value : undefined,
   );
 };
 

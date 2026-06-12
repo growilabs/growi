@@ -33,7 +33,7 @@ const isString = (parsed: unknown): parsed is string =>
  *
  * suggest-path resolves its LLM client exclusively through the openai
  * client-delegator, driven by the `openai:serviceType` config. It must remain
- * independent of mastra's provider selection (`mastra:llmProvider`): choosing a
+ * independent of mastra's provider selection (`ai:provider`): choosing a
  * non-OpenAI mastra provider must NOT reroute or alter suggest-path's LLM path.
  * call-llm-for-json is the single chokepoint where that client is selected, so
  * the independence contract is asserted here.
@@ -75,11 +75,11 @@ describe('callLlmForJson client selection', () => {
     });
   });
 
-  it('should ignore mastra:llmProvider when selecting the client (independence from mastra)', async () => {
+  it('should ignore ai:provider when selecting the client (independence from mastra)', async () => {
     // A non-OpenAI mastra provider is configured; suggest-path must not be rerouted.
     mocks.configManagerMock.getConfig.mockImplementation((key: string) => {
       if (key === 'openai:serviceType') return 'openai';
-      if (key === 'mastra:llmProvider') return 'anthropic';
+      if (key === 'ai:provider') return 'anthropic';
       return undefined;
     });
 
@@ -89,9 +89,9 @@ describe('callLlmForJson client selection', () => {
     expect(mocks.getClientMock).toHaveBeenCalledWith({
       openaiServiceType: 'openai',
     });
-    // ... and mastra:llmProvider is never consulted.
+    // ... and ai:provider is never consulted.
     expect(mocks.configManagerMock.getConfig).not.toHaveBeenCalledWith(
-      'mastra:llmProvider',
+      'ai:provider',
     );
   });
 });

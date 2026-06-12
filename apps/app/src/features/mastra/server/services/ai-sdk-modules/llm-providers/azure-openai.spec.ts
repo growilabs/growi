@@ -62,9 +62,9 @@ beforeEach(() => {
 describe('resolveAzureOpenaiModel', () => {
   it('builds with resourceName and applies the deployment name as the model', () => {
     applyConfig({
-      'mastra:llmApiKey': 'az-key',
-      'mastra:llmModel': 'my-deployment',
-      'mastra:llmAzureOpenaiResourceName': 'my-resource',
+      'ai:apiKey': 'az-key',
+      'ai:model': 'my-deployment',
+      'ai:azureOpenaiResourceName': 'my-resource',
     });
 
     const result = resolveAzureOpenaiModel();
@@ -79,10 +79,9 @@ describe('resolveAzureOpenaiModel', () => {
 
   it('builds with baseURL when given', () => {
     applyConfig({
-      'mastra:llmApiKey': 'az-key',
-      'mastra:llmModel': 'dep',
-      'mastra:llmAzureOpenaiBaseUrl':
-        'https://gw.example.com/openai/deployments',
+      'ai:apiKey': 'az-key',
+      'ai:model': 'dep',
+      'ai:azureOpenaiBaseUrl': 'https://gw.example.com/openai/deployments',
     });
 
     resolveAzureOpenaiModel();
@@ -95,10 +94,10 @@ describe('resolveAzureOpenaiModel', () => {
 
   it('prefers baseURL over resourceName when both are set (AI SDK is exclusive)', () => {
     applyConfig({
-      'mastra:llmApiKey': 'az-key',
-      'mastra:llmModel': 'dep',
-      'mastra:llmAzureOpenaiResourceName': 'should-be-ignored',
-      'mastra:llmAzureOpenaiBaseUrl': 'https://gw.example.com',
+      'ai:apiKey': 'az-key',
+      'ai:model': 'dep',
+      'ai:azureOpenaiResourceName': 'should-be-ignored',
+      'ai:azureOpenaiBaseUrl': 'https://gw.example.com',
     });
 
     resolveAzureOpenaiModel();
@@ -112,10 +111,10 @@ describe('resolveAzureOpenaiModel', () => {
 
   it('forwards apiVersion only when set', () => {
     applyConfig({
-      'mastra:llmApiKey': 'az-key',
-      'mastra:llmModel': 'dep',
-      'mastra:llmAzureOpenaiResourceName': 'res',
-      'mastra:llmAzureOpenaiApiVersion': '2024-10-01-preview',
+      'ai:apiKey': 'az-key',
+      'ai:model': 'dep',
+      'ai:azureOpenaiResourceName': 'res',
+      'ai:azureOpenaiApiVersion': '2024-10-01-preview',
     });
 
     resolveAzureOpenaiModel();
@@ -129,10 +128,10 @@ describe('resolveAzureOpenaiModel', () => {
 
   it('authenticates via Microsoft Entra ID (tokenProvider) instead of an apiKey when useEntraId is set', () => {
     applyConfig({
-      // no mastra:llmApiKey in Entra ID mode
-      'mastra:llmModel': 'my-deployment',
-      'mastra:llmAzureOpenaiResourceName': 'my-resource',
-      'mastra:llmAzureOpenaiUseEntraId': true,
+      // no ai:apiKey in Entra ID mode
+      'ai:model': 'my-deployment',
+      'ai:azureOpenaiResourceName': 'my-resource',
+      'ai:azureOpenaiUseEntraId': true,
     });
 
     const result = resolveAzureOpenaiModel();
@@ -154,10 +153,10 @@ describe('resolveAzureOpenaiModel', () => {
 
   it('throws (naming the endpoint env vars, never the key) when neither resourceName nor baseURL is set', () => {
     const secret = 'az-super-secret';
-    applyConfig({ 'mastra:llmApiKey': secret, 'mastra:llmModel': 'dep' });
+    applyConfig({ 'ai:apiKey': secret, 'ai:model': 'dep' });
 
     expect(() => resolveAzureOpenaiModel()).toThrow(
-      /MASTRA_LLM_AZURE_OPENAI_RESOURCE_NAME|MASTRA_LLM_AZURE_OPENAI_BASE_URL/,
+      /AI_AZURE_OPENAI_RESOURCE_NAME|AI_AZURE_OPENAI_BASE_URL/,
     );
     expect(createAzure).not.toHaveBeenCalled();
 
@@ -170,12 +169,12 @@ describe('resolveAzureOpenaiModel', () => {
 
   it('throws when neither an apiKey nor Entra ID is configured (endpoint present)', () => {
     applyConfig({
-      'mastra:llmModel': 'dep',
-      'mastra:llmAzureOpenaiResourceName': 'my-resource',
+      'ai:model': 'dep',
+      'ai:azureOpenaiResourceName': 'my-resource',
     });
 
     expect(() => resolveAzureOpenaiModel()).toThrow(
-      /MASTRA_LLM_API_KEY|MASTRA_LLM_AZURE_OPENAI_USE_ENTRA_ID/,
+      /AI_API_KEY|AI_AZURE_OPENAI_USE_ENTRA_ID/,
     );
     expect(createAzure).not.toHaveBeenCalled();
   });

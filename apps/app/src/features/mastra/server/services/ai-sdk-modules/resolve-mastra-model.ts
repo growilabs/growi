@@ -1,9 +1,9 @@
 import type { MastraModelConfig } from '@mastra/core/llm';
 
 import {
-  isLlmProvider,
-  LLM_PROVIDERS,
-} from '~/features/mastra/interfaces/llm-provider';
+  AI_PROVIDERS,
+  isAiProvider,
+} from '~/features/mastra/interfaces/ai-provider';
 import { configManager } from '~/server/service/config-manager';
 
 import { modelResolvers } from './llm-providers';
@@ -21,12 +21,12 @@ export const resolveMastraModel = (): MastraModelConfig => {
     return memoizedModel;
   }
 
-  // `mastra:llmProvider` defaults to 'openai' but env-loaded config is not
+  // `ai:provider` defaults to 'openai' but env-loaded config is not
   // runtime-validated against the union, so re-validate here (Req 1.4).
-  const provider = configManager.getConfig('mastra:llmProvider');
-  if (!isLlmProvider(provider)) {
+  const provider = configManager.getConfig('ai:provider');
+  if (!isAiProvider(provider)) {
     throw new Error(
-      `Unsupported Mastra LLM provider "${provider}" (expected one of: ${LLM_PROVIDERS.join(', ')})`,
+      `Unsupported Mastra LLM provider "${provider}" (expected one of: ${AI_PROVIDERS.join(', ')})`,
     );
   }
 

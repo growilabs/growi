@@ -110,7 +110,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 3. While リソース名とベース URL の両方が指定されたとき, the system shall ベース URL 方式を優先する（AI SDK の排他契約に従う）
 4. If Azure OpenAI が選択され, かつリソース名・ベース URL のいずれも指定されていないとき, the system shall それを設定不備として扱い（使用時に失敗）, 不備の内容を特定できるエラーをログに出力する（API キー値は含めない）
 5. The system shall Azure の API バージョンを任意の環境変数で指定できるようにし, 未指定時は AI SDK の既定バージョンを使用する
-6. When ベンダーが Azure OpenAI のとき, the system shall モデル設定（`MASTRA_LLM_MODEL`）を Azure の**デプロイ名**として解釈する（OpenAI のモデル ID ではない）
+6. When ベンダーが Azure OpenAI のとき, the system shall モデル設定（`AI_MODEL`）を Azure の**デプロイ名**として解釈する（OpenAI のモデル ID ではない）
 
 ### Requirement 8: Azure OpenAI の認証方式（API キー / Microsoft Entra ID）
 **Objective:** As a Azure OpenAI を利用する運用者, I want API キーの代わりに Microsoft Entra ID（マネージド ID）で認証できる, so that 長期シークレットを保管せずに Azure の推奨方式で安全に接続できる
@@ -118,6 +118,6 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 #### Acceptance Criteria
 1. The system shall Azure OpenAI の認証方式として, API キー方式と Microsoft Entra ID 方式の両方をサポートする
 2. The system shall 認証方式を環境変数フラグで選択できるようにし, 既定は API キー方式とする
-3. When Microsoft Entra ID 方式が有効なとき, the system shall `DefaultAzureCredential` 由来のトークンプロバイダで認証し, API キー（`MASTRA_LLM_API_KEY`）を要求しない
+3. When Microsoft Entra ID 方式が有効なとき, the system shall `DefaultAzureCredential` 由来のトークンプロバイダで認証し, API キー（`AI_API_KEY`）を要求しない
 4. While Microsoft Entra ID 方式が有効でないとき（既定）, the system shall 従来どおり API キーを要求し, 欠落時は設定不備として扱う
 5. The system shall いずれの認証方式でも Azure のエンドポイント設定（リソース名 or ベース URL。Requirement 7）を必須とする

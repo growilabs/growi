@@ -1,9 +1,9 @@
-import { isLlmProvider, LLM_PROVIDERS } from './llm-provider';
+import { AI_PROVIDERS, isAiProvider } from './ai-provider';
 
 describe('llm-provider', () => {
-  describe('LLM_PROVIDERS', () => {
+  describe('AI_PROVIDERS', () => {
     it('enumerates exactly the four supported vendors', () => {
-      expect([...LLM_PROVIDERS]).toStrictEqual([
+      expect([...AI_PROVIDERS]).toStrictEqual([
         'openai',
         'anthropic',
         'google',
@@ -12,14 +12,14 @@ describe('llm-provider', () => {
     });
   });
 
-  describe('isLlmProvider', () => {
+  describe('isAiProvider', () => {
     it.each([
       'openai',
       'anthropic',
       'google',
       'azure-openai',
     ])('returns true for the supported provider "%s"', (provider) => {
-      expect(isLlmProvider(provider)).toBe(true);
+      expect(isAiProvider(provider)).toBe(true);
     });
 
     it.each([
@@ -31,7 +31,7 @@ describe('llm-provider', () => {
       'openai ',
       '',
     ])('returns false for an unsupported string "%s"', (value) => {
-      expect(isLlmProvider(value)).toBe(false);
+      expect(isAiProvider(value)).toBe(false);
     });
 
     it.each([
@@ -42,7 +42,7 @@ describe('llm-provider', () => {
       ['an array', ['openai']],
       ['a boolean', true],
     ])('returns false for non-string input (%s)', (_label, value) => {
-      expect(isLlmProvider(value)).toBe(false);
+      expect(isAiProvider(value)).toBe(false);
     });
   });
 });

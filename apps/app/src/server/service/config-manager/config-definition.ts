@@ -6,7 +6,7 @@ import type {
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
 
-import type { LlmProvider } from '~/features/mastra/interfaces/llm-provider';
+import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
@@ -285,15 +285,15 @@ export const CONFIG_KEYS = [
   'openai:apiKey',
 
   // Mastra LLM Settings (provider-agnostic: one provider per app)
-  'mastra:llmProvider',
-  'mastra:llmApiKey',
-  'mastra:llmModel',
-  'mastra:llmProviderOptions',
-  // Azure OpenAI-only connection config (mastra:llmProvider='azure-openai')
-  'mastra:llmAzureOpenaiResourceName',
-  'mastra:llmAzureOpenaiBaseUrl',
-  'mastra:llmAzureOpenaiApiVersion',
-  'mastra:llmAzureOpenaiUseEntraId',
+  'ai:provider',
+  'ai:apiKey',
+  'ai:model',
+  'ai:providerOptions',
+  // Azure OpenAI-only connection config (ai:provider='azure-openai')
+  'ai:azureOpenaiResourceName',
+  'ai:azureOpenaiBaseUrl',
+  'ai:azureOpenaiApiVersion',
+  'ai:azureOpenaiUseEntraId',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1265,26 +1265,26 @@ export const CONFIG_DEFINITIONS = {
   }),
 
   // Mastra LLM Settings (provider-agnostic: one provider per app)
-  // Single set of keys regardless of provider — the resolver reads `mastra:llmProvider`
-  // to pick the provider client, then injects `mastra:llmApiKey` / `mastra:llmModel`.
-  // Typed with the shared `LlmProvider` (single source of truth). This is a
+  // Single set of keys regardless of provider — the resolver reads `ai:provider`
+  // to pick the provider client, then injects `ai:apiKey` / `ai:model`.
+  // Typed with the shared `AiProvider` (single source of truth). This is a
   // type-only import — erased at runtime, so there is no runtime core->feature
   // edge, and the module is a dependency-free leaf (no cycle). The type aids DX
   // but is NOT enforced at runtime for env-loaded values, so the resolver still
-  // validates with `isLlmProvider` (untrusted env may carry an out-of-union string).
-  'mastra:llmProvider': defineConfig<LlmProvider>({
-    envVarName: 'MASTRA_LLM_PROVIDER',
+  // validates with `isAiProvider` (untrusted env may carry an out-of-union string).
+  'ai:provider': defineConfig<AiProvider>({
+    envVarName: 'AI_PROVIDER',
     defaultValue: 'openai',
   }),
-  'mastra:llmApiKey': defineConfig<string | undefined>({
-    envVarName: 'MASTRA_LLM_API_KEY',
+  'ai:apiKey': defineConfig<string | undefined>({
+    envVarName: 'AI_API_KEY',
     defaultValue: undefined,
     isSecret: true,
   }),
   // Single default tuned for the default provider (OpenAI). When a non-OpenAI
-  // provider is selected, set MASTRA_LLM_MODEL to that provider's model.
-  'mastra:llmModel': defineConfig<string>({
-    envVarName: 'MASTRA_LLM_MODEL',
+  // provider is selected, set AI_MODEL to that provider's model.
+  'ai:model': defineConfig<string>({
+    envVarName: 'AI_MODEL',
     defaultValue: 'o4-mini',
   }),
   // Raw AI SDK `providerOptions` JSON (provider-namespaced), applied to the
@@ -1293,40 +1293,40 @@ export const CONFIG_DEFINITIONS = {
   // config load. Default preserves the prior hardcoded OpenAI reasoning options;
   // it is ignored by non-OpenAI providers. Operators of other vendors set their
   // own provider namespace, e.g. {"anthropic":{"thinking":{"type":"enabled"}}}.
-  'mastra:llmProviderOptions': defineConfig<string>({
-    envVarName: 'MASTRA_LLM_PROVIDER_OPTIONS',
+  'ai:providerOptions': defineConfig<string>({
+    envVarName: 'AI_PROVIDER_OPTIONS',
     defaultValue:
       '{"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}}',
   }),
 
-  // Azure OpenAI-only connection config (mastra:llmProvider='azure-openai'). Azure is
+  // Azure OpenAI-only connection config (ai:provider='azure-openai'). Azure is
   // reached via a resource-specific endpoint, so { apiKey, model } alone is not
   // enough. Set exactly one of resourceName / baseUrl: resourceName builds the
   // standard https://<name>.openai.azure.com/... URL; baseUrl is the escape
   // hatch for Azure Government / sovereign clouds / API Management gateways /
   // custom domains. apiVersion is optional (the AI SDK defaults it). For Azure,
-  // MASTRA_LLM_MODEL is the *deployment name*, not an OpenAI model id. These
+  // AI_MODEL is the *deployment name*, not an OpenAI model id. These
   // keys are ignored by the other providers. None are secret (a resource name,
-  // URL, or API version is not a credential — only mastra:llmApiKey is).
-  'mastra:llmAzureOpenaiResourceName': defineConfig<string | undefined>({
-    envVarName: 'MASTRA_LLM_AZURE_OPENAI_RESOURCE_NAME',
+  // URL, or API version is not a credential — only ai:apiKey is).
+  'ai:azureOpenaiResourceName': defineConfig<string | undefined>({
+    envVarName: 'AI_AZURE_OPENAI_RESOURCE_NAME',
     defaultValue: undefined,
   }),
-  'mastra:llmAzureOpenaiBaseUrl': defineConfig<string | undefined>({
-    envVarName: 'MASTRA_LLM_AZURE_OPENAI_BASE_URL',
+  'ai:azureOpenaiBaseUrl': defineConfig<string | undefined>({
+    envVarName: 'AI_AZURE_OPENAI_BASE_URL',
     defaultValue: undefined,
   }),
-  'mastra:llmAzureOpenaiApiVersion': defineConfig<string | undefined>({
-    envVarName: 'MASTRA_LLM_AZURE_OPENAI_API_VERSION',
+  'ai:azureOpenaiApiVersion': defineConfig<string | undefined>({
+    envVarName: 'AI_AZURE_OPENAI_API_VERSION',
     defaultValue: undefined,
   }),
   // When true, authenticate to Azure OpenAI with Microsoft Entra ID (managed
   // identity / DefaultAzureCredential) instead of an API key. In this mode
-  // MASTRA_LLM_API_KEY is not required; the credential is resolved from the
+  // AI_API_KEY is not required; the credential is resolved from the
   // ambient Azure environment by @azure/identity. Only meaningful when
-  // mastra:llmProvider='azure-openai'.
-  'mastra:llmAzureOpenaiUseEntraId': defineConfig<boolean>({
-    envVarName: 'MASTRA_LLM_AZURE_OPENAI_USE_ENTRA_ID',
+  // ai:provider='azure-openai'.
+  'ai:azureOpenaiUseEntraId': defineConfig<boolean>({
+    envVarName: 'AI_AZURE_OPENAI_USE_ENTRA_ID',
     defaultValue: false,
   }),
 

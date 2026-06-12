@@ -21,13 +21,13 @@ const isProviderOptions = (value: unknown): value is MastraProviderOptions => {
 };
 
 // Resolve the provider options applied to the mastra chat stream call from the
-// single `mastra:llmProviderOptions` JSON env var. Fails soft: a malformed or
+// single `ai:providerOptions` JSON env var. Fails soft: a malformed or
 // non-provider-namespaced value is ignored (returns `{}`) with a warning rather
 // than failing the chat request, since provider options are tuning, not
 // correctness-critical (Req 6.4). Unknown provider namespaces are harmless — the
 // AI SDK reads only the active provider's namespace.
 export const resolveProviderOptions = (): MastraProviderOptions => {
-  const raw = configManager.getConfig('mastra:llmProviderOptions');
+  const raw = configManager.getConfig('ai:providerOptions');
   if (raw == null || raw === '') {
     return {};
   }
@@ -39,7 +39,7 @@ export const resolveProviderOptions = (): MastraProviderOptions => {
     // Include the parse error so operators can locate the broken position in a
     // long JSON value (the value is not a secret).
     logger.warn(
-      'MASTRA_LLM_PROVIDER_OPTIONS is not valid JSON; ignoring provider options',
+      'AI_PROVIDER_OPTIONS is not valid JSON; ignoring provider options',
       err,
     );
     return {};
@@ -47,7 +47,7 @@ export const resolveProviderOptions = (): MastraProviderOptions => {
 
   if (!isProviderOptions(parsed)) {
     logger.warn(
-      'MASTRA_LLM_PROVIDER_OPTIONS must be a provider-namespaced object (e.g. {"openai":{...}}); ignoring',
+      'AI_PROVIDER_OPTIONS must be a provider-namespaced object (e.g. {"openai":{...}}); ignoring',
     );
     return {};
   }

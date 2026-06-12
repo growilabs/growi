@@ -1,4 +1,4 @@
-import { LLM_PROVIDERS } from '~/features/mastra/interfaces/llm-provider';
+import { AI_PROVIDERS } from '~/features/mastra/interfaces/ai-provider';
 
 // Each provider creator returns a "provider function" that, when called with a
 // model id, yields a Mastra-compatible model. We mock the @ai-sdk/* + config
@@ -56,8 +56,8 @@ import { resolveOpenaiModel } from './openai';
 
 const setKeyAndModel = (apiKey: string | undefined, model: string): void => {
   getConfig.mockImplementation((key: string) => {
-    if (key === 'mastra:llmApiKey') return apiKey;
-    if (key === 'mastra:llmModel') return model;
+    if (key === 'ai:apiKey') return apiKey;
+    if (key === 'ai:model') return model;
     return undefined;
   });
 };
@@ -101,10 +101,10 @@ describe('key-based provider resolvers', () => {
     expect(result).toEqual({ tag: 'google-model', model: 'gemini-test' });
   });
 
-  it('throws (naming MASTRA_LLM_API_KEY) when the api key is missing', () => {
+  it('throws (naming AI_API_KEY) when the api key is missing', () => {
     setKeyAndModel(undefined, 'gpt-test');
 
-    expect(() => resolveOpenaiModel()).toThrow(/MASTRA_LLM_API_KEY/);
+    expect(() => resolveOpenaiModel()).toThrow(/AI_API_KEY/);
     expect(createOpenAI).not.toHaveBeenCalled();
   });
 
@@ -129,7 +129,7 @@ describe('key-based provider resolvers', () => {
 describe('modelResolvers', () => {
   it('exposes exactly one resolver per known provider', () => {
     expect(Object.keys(modelResolvers).sort()).toEqual(
-      [...LLM_PROVIDERS].sort(),
+      [...AI_PROVIDERS].sort(),
     );
   });
 

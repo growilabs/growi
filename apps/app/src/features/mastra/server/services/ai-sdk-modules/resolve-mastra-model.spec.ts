@@ -34,7 +34,7 @@ vi.mock('./llm-providers', () => ({
 // Set the configured provider (the only config the resolver itself reads).
 const setProvider = (provider: string | undefined): void => {
   getConfig.mockImplementation((key: string) =>
-    key === 'mastra:llmProvider' ? provider : undefined,
+    key === 'ai:provider' ? provider : undefined,
   );
 };
 

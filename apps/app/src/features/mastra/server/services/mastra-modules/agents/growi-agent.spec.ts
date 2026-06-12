@@ -86,9 +86,7 @@ const sentinelModel = { id: 'sentinel-model' } as unknown as MastraModelConfig;
 // the resolver is in a throwing (misconfigured) state and assert below that it
 // was never invoked during construction — if it were, the import would throw.
 resolverMock.fn.mockImplementation(() => {
-  throw new Error(
-    'Mastra LLM provider is not configured (set MASTRA_LLM_PROVIDER)',
-  );
+  throw new Error('Mastra LLM provider is not configured (set AI_PROVIDER)');
 });
 
 import { growiAgent } from './growi-agent';
@@ -143,7 +141,7 @@ describe('growiAgent', () => {
       // `model()` must let it surface (handled by the post-message route's
       // try/catch — Req 4.4), not swallow or replace it.
       const resolverError = new Error(
-        'Mastra LLM API key is not configured for provider "openai" (set MASTRA_LLM_API_KEY)',
+        'Mastra LLM API key is not configured for provider "openai" (set AI_API_KEY)',
       );
       resolverMock.fn.mockImplementation(() => {
         throw resolverError;
