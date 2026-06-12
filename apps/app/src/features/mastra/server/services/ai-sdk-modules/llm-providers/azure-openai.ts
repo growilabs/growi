@@ -7,7 +7,7 @@ import type { MastraModelConfig } from '@mastra/core/llm';
 
 import { configManager } from '~/server/service/config-manager';
 
-import { getApiKey, getModel } from './config';
+import { getApiKey, requireModel } from './config';
 
 // Microsoft Entra ID token scope for Azure Cognitive Services (matches the
 // existing AzureOpenaiClientDelegator in features/openai).
@@ -26,7 +26,7 @@ export const resolveAzureOpenaiModel = (): MastraModelConfig => {
   const apiVersion = configManager.getConfig('ai:azureOpenaiApiVersion');
   const useEntraId =
     configManager.getConfig('ai:azureOpenaiUseEntraId') === true;
-  const model = getModel();
+  const model = requireModel();
 
   // Endpoint is required regardless of the auth method. resourceName and baseURL
   // are mutually exclusive in the AI SDK (baseURL wins when both are set), so

@@ -1264,39 +1264,40 @@ export const CONFIG_DEFINITIONS = {
     isSecret: true,
   }),
 
-  // Mastra LLM Settings (provider-agnostic: one provider per app)
+  // AI chat (Mastra) Settings — provider-agnostic, one provider per app.
   // Single set of keys regardless of provider — the resolver reads `ai:provider`
   // to pick the provider client, then injects `ai:apiKey` / `ai:model`.
-  // Typed with the shared `AiProvider` (single source of truth). This is a
-  // type-only import — erased at runtime, so there is no runtime core->feature
-  // edge, and the module is a dependency-free leaf (no cycle). The type aids DX
-  // but is NOT enforced at runtime for env-loaded values, so the resolver still
-  // validates with `isAiProvider` (untrusted env may carry an out-of-union string).
-  'ai:provider': defineConfig<AiProvider>({
+  // No defaultValue on purpose: provider / apiKey / model are required, so an
+  // unset value surfaces as a clear error at resolve time rather than silently
+  // defaulting to a particular provider/model. `ai:provider` is typed with the
+  // shared `AiProvider` (type-only import — erased at runtime, dependency-free
+  // leaf, no cycle); the type aids DX but is not runtime-enforced for env-loaded
+  // values, so the resolver still validates with `isAiProvider`.
+  'ai:provider': defineConfig<AiProvider | undefined>({
     envVarName: 'AI_PROVIDER',
-    defaultValue: 'openai',
+    defaultValue: undefined,
   }),
   'ai:apiKey': defineConfig<string | undefined>({
     envVarName: 'AI_API_KEY',
     defaultValue: undefined,
     isSecret: true,
   }),
-  // Single default tuned for the default provider (OpenAI). When a non-OpenAI
-  // provider is selected, set AI_MODEL to that provider's model.
-  'ai:model': defineConfig<string>({
+  // Required (no default). For the azure-openai provider this is the Azure
+  // *deployment name*, not an OpenAI model id.
+  'ai:model': defineConfig<string | undefined>({
     envVarName: 'AI_MODEL',
-    defaultValue: 'o4-mini',
+    defaultValue: undefined,
   }),
   // Raw AI SDK `providerOptions` JSON (provider-namespaced), applied to the
   // chat stream call. Typed as a raw JSON string (not object) so a malformed
   // override fails soft in the resolver (parse + fallback) rather than crashing
-  // config load. Default preserves the prior hardcoded OpenAI reasoning options;
-  // it is ignored by non-OpenAI providers. Operators of other vendors set their
-  // own provider namespace, e.g. {"anthropic":{"thinking":{"type":"enabled"}}}.
-  'ai:providerOptions': defineConfig<string>({
+  // config load. No default: unset means no provider options. Operators set
+  // their own provider namespace, e.g.
+  // {"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}} or
+  // {"anthropic":{"thinking":{"type":"enabled"}}}.
+  'ai:providerOptions': defineConfig<string | undefined>({
     envVarName: 'AI_PROVIDER_OPTIONS',
-    defaultValue:
-      '{"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}}',
+    defaultValue: undefined,
   }),
 
   // Azure OpenAI-only connection config (ai:provider='azure-openai'). Azure is

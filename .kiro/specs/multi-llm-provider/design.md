@@ -10,10 +10,10 @@
 
 ### Goals
 - OpenAI / Anthropic / Google / Azure OpenAI を環境変数で選択し、その native provider で `growiAgent` を駆動する。
-- ベンダー・API キー・（任意の）モデルを**単一の env キーセット**で設定する（管理画面 UI なし）。
-- ベンダー未指定時は既定で OpenAI を使用する（config の defaultValue）。
+- ベンダー・API キー・モデルを**単一の env キーセット**で設定する（管理画面 UI なし）。
+- ベンダー・モデルに既定値は持たず、いずれも**明示指定を必須**とする（config の `defaultValue` は `undefined`）。未指定はモデル解決時に throw。
 - 設定不備時はモデル解決時に **throw**（既存 `OpenaiClientDelegator` と同流儀）。import 時には解決しないためアプリ起動は継続。
-- LLM provider options（reasoning 等）を単一 JSON 環境変数で指定し、チャット呼び出しに適用する（既定は OpenAI の reasoning オプション）。
+- LLM provider options（reasoning 等）を単一 JSON 環境変数で指定し、チャット呼び出しに適用する（既定値は持たず、未指定時は空 `{}`）。
 
 ### Non-Goals
 - 同一アプリ内での複数ベンダー同時利用／リクエスト単位の切替（1 App = 1 Vendor）。
@@ -27,7 +27,7 @@
 
 ### This Spec Owns
 - mastra の **LLM モデル解決**（ベンダー選択 → API キー/モデル取得 → native provider 生成 → `MastraModelConfig` 返却。不備時は throw）。
-- mastra 用の **単一 LLM 設定キー**（`ai:provider` / `ai:apiKey` / `ai:model`）の定義と、ベンダー別**既定モデルのコード内 map**。
+- mastra 用の **単一 LLM 設定キー**（`ai:provider` / `ai:apiKey` / `ai:model`）の定義（いずれも既定値なし＝必須）。ベンダー別の既定モデル map は持たない。
 - `growiAgent` の `model` 供給方法（resolver を遅延呼び出しする dynamic function）。
 - **provider options の解決**（`ai:providerOptions` JSON の parse + fail-soft）と、`post-message` のチャットストリーム呼び出しへの適用。
 
@@ -178,11 +178,11 @@ sequenceDiagram
 |-------------|---------|------------|------------|-------|
 | 1.1 | 3 ベンダーを選択可能 | llm-provider, config | `AI_PROVIDERS`, `ai:provider` | — |
 | 1.2 | 指定ベンダーを使用 | resolver, llm-providers | `resolveMastraModel`, `modelResolvers` | リクエスト時供給 |
-| 1.3 | 未指定→既定 OpenAI | config | `ai:provider` default `'openai'` | — |
+| 1.3 | 未指定→設定不備（throw） | config, resolver | `ai:provider` 既定なし（`undefined`）, `isAiProvider` で弾く | リクエスト時供給 |
 | 1.4 | 不正ベンダー名→throw | llm-provider, resolver | `isAiProvider`, throws | リクエスト時供給 |
 | 2.1 | API キーを env から取得 | config, resolver | `ai:apiKey` | — |
 | 2.2 | モデルを env で設定 | config, resolver | `ai:model` | — |
-| 2.3 | モデル未指定→単一既定（OpenAI 向け） | config | `ai:model` default `o4-mini` | — |
+| 2.3 | モデル未指定→設定不備（throw） | config, resolver | `ai:model` 既定なし（`undefined`）, `requireModel()` | リクエスト時供給 |
 | 2.4 | env のみ・管理 UI なし | config | `envVarName` のみ（UI 追加なし） | — |
 | 2.5 | API キーをログ等に非出力 | config, resolver | `isSecret`, throw メッセージに key 不含 | リクエスト時供給 |
 | 3.1 | 1 App = 1 ベンダー | config, resolver | 単一キーセット | — |
@@ -196,7 +196,7 @@ sequenceDiagram
 | 5.2 | 他 LLM 機能は不変 | （境界） | `suggest-path` は別経路 | — |
 | 6.1 | provider options を適用 | resolve-provider-options, post-message | `resolveProviderOptions()` | リクエスト時供給 |
 | 6.2 | 単一 JSON env で受付 | config, resolve-provider-options | `ai:providerOptions` | — |
-| 6.3 | 未指定→既定（OpenAI reasoning） | config | defaultValue JSON | — |
+| 6.3 | 未指定→空 `{}` | config, resolve-provider-options | `ai:providerOptions` 既定なし（`undefined`）→ `{}` | リクエスト時供給 |
 | 6.4 | 不正 JSON→fail-soft＋warn | resolve-provider-options | parse try/catch → `{}` | リクエスト時供給 |
 
 ## Components and Interfaces
@@ -206,7 +206,7 @@ sequenceDiagram
 | LLM Vendor types | interfaces | ベンダー集合と型ガード | 1.1, 1.4, 3 | — | State/型 |
 | Config definitions | config | env↔単一 LLM 設定キー | 1, 2, 3 | configManager (P0) | State |
 | LLM provider factories | services | vendor→native MastraModelConfig | 1.2, 2.1, 2.2 | ai-sdk (P0) | Service |
-| Model resolver | services | 解決/検証（不備時 throw）/既定モデル | 1.2–1.4, 2.1–2.3, 2.5, 3, 4.1 | config, factories, llm-provider (P0) | Service |
+| Model resolver | services | 解決/検証（不備時 throw） | 1.2–1.4, 2.1–2.3, 2.5, 3, 4.1 | config, factories, llm-provider (P0) | Service |
 | GROWI agent | services | dynamic model 供給（throw 伝播） | 3.3, 4.1, 4.3, 5.1 | resolver (P0), Agent (P0) | Service |
 | Provider options resolver | services | provider options JSON の parse（fail-soft）＋ post-message 適用 | 6.1–6.4 | config (P0) | Service |
 
@@ -246,17 +246,17 @@ export const isAiProvider = (value: unknown): value is AiProvider =>
 
 | 設定キー | 型 | env 名 | default | isSecret |
 |---|---|---|---|---|
-| `ai:provider` | `AiProvider`（共有型・type-only import。実行時は resolver の `isAiProvider` で再検証） | `AI_PROVIDER` | `'openai'` | no |
+| `ai:provider` | `AiProvider \| undefined`（共有型・type-only import。実行時は resolver の `isAiProvider` で再検証） | `AI_PROVIDER` | `undefined` | no |
 | `ai:apiKey` | `string \| undefined` | `AI_API_KEY` | `undefined` | yes |
-| `ai:model` | `string`（単一既定値。既定 vendor=OpenAI 向け） | `AI_MODEL` | `o4-mini` | no |
-| `ai:providerOptions` | `string`（生 JSON。resolver で parse + fail-soft） | `AI_PROVIDER_OPTIONS` | `{"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}}` | no |
+| `ai:model` | `string \| undefined`（既定なし＝必須。Azure では deployment 名） | `AI_MODEL` | `undefined` | no |
+| `ai:providerOptions` | `string \| undefined`（生 JSON。resolver で parse + fail-soft） | `AI_PROVIDER_OPTIONS` | `undefined` | no |
 
 **Implementation Notes**
 - Integration: 1 App = 1 Vendor のため**単一キーセット**。provider は `ai:provider` で選択し、resolver が `modelResolvers[provider]()` を呼ぶ。`openai:apiKey` 等の既存キーは suggest-path 用に不変（mastra は参照しない）。
 - **env-only の実装方針（確定）**: Req 2.4「env のみ」は **「設定用の管理画面 UI を持たない」** と解釈する。新規キーは既存 `openai:apiKey` と同じ **DB＋env フォールバック**で統一し、**`ENV_ONLY_GROUPS` には登録しない**。UI から書き込まれる経路が存在しないため実運用上は env 駆動。
 - **設定キー追加で編集する箇所**: `config-definition.ts` の `CONFIG_KEYS` 配列＋`CONFIG_DEFINITIONS`。`ConfigKey`/`ConfigValues` は自動導出。
-- Validation: `ai:provider` は共有 **`AiProvider`** で型付け（`import type` の type-only＝実行時に消えるため依存逆転の実害なし・`llm-provider` は leaf で循環なし・単一ソース）。**型は DX/補完のためで実行時強制ではない**（config-manager は env 文字列を宣言型で検証しない）。よって resolver は依然 `isAiProvider` で実行時検証する（`AI_PROVIDER=azure` 等の untrusted env を弾く。Req 1.4）。default `'openai'` により未指定時は OpenAI（Req 1.3）。
-- Model 既定: `ai:model` は config の defaultValue（`o4-mini`、既定 vendor=OpenAI 向け）に集約。resolver は per-vendor 既定 map を持たない。非 OpenAI ベンダー利用時は `AI_MODEL` の明示指定が必要。
+- Validation: `ai:provider` は共有 **`AiProvider | undefined`** で型付け（`import type` の type-only＝実行時に消えるため依存逆転の実害なし・`llm-provider` は leaf で循環なし・単一ソース）。**型は DX/補完のためで実行時強制ではない**（config-manager は env 文字列を宣言型で検証しない）。よって resolver は依然 `isAiProvider` で実行時検証する（`AI_PROVIDER=azure` 等の untrusted env、および未指定（`undefined`）を弾く。Req 1.3/1.4）。既定ベンダーは持たないため未指定時は resolver が throw（Req 1.3/4.1）。
+- Model 必須: `ai:model` は既定値を持たない（`undefined`）。全ベンダーで `AI_MODEL` の明示指定が必要で、未指定時は `requireModel()` が throw（Req 2.3/4.1）。resolver は per-vendor 既定 map を持たない。
 - Secret: `ai:apiKey` は `isSecret: true`。クライアントへ返す apiv3 エンドポイントは存在せず露出経路なし（Req 2.5）。
 
 ### services
@@ -308,11 +308,11 @@ export const resolveMastraModel: () => MastraModelConfig; // 不備時は throw
 ```
 - Preconditions: config-manager ロード済み。
 - Postconditions: 成功時 native model（memoize）。不備時は throw（選択 resolver 由来。メッセージは provider 名／欠落 env 名のみ、API キー値を含まない）。
-- Invariants: resolver 自身は provider 値のみ読む（apiKey/model/azure config の読取は各 provider の resolver へ移譲）。throw メッセージに API キー値を含めない（Req 2.5）。per-vendor 既定モデル map は持たない（既定は config の `ai:model` defaultValue に集約）。
+- Invariants: resolver 自身は provider 値のみ読む（apiKey/model/azure config の読取は各 provider の resolver へ移譲）。throw メッセージに API キー値を含めない（Req 2.5）。per-vendor 既定モデル map は持たない（モデルは必須・既定なし）。
 
 解決手順:
 1. memoize 済みなら即返す（Req 3.1）。
-2. `ai:provider` 取得（config default `'openai'`。未指定時は OpenAI。Req 1.3）。
+2. `ai:provider` 取得（既定なし。未指定（`undefined`）は次段の `isAiProvider` で弾く。Req 1.3）。
 3. `isAiProvider` 失敗なら throw（不正 provider 名を含むメッセージ。untrusted env を弾く。Req 1.4）。
 4. `modelResolvers[provider]()` を dispatch（各 provider が自分の config を読みモデルを構築。apiKey 欠落等の不備はその resolver が throw。Req 4.1）。結果を memoize して返す（throw は非 memoize）。
 
@@ -389,7 +389,7 @@ export const resolveProviderOptions: () => MastraProviderOptions;
 ## Testing Strategy
 
 ### Unit Tests
-- **resolver**: vendor 未指定→throw（`AI_PROVIDER`）（1.3/4.1）／不正 vendor→throw（値を含む）（1.4）／apiKey 欠落→throw（`AI_API_KEY`）（4.1）／3 ベンダー各成功で正しい factory を `{apiKey, model}` で呼ぶ（1.2/2.1/2.2）／model 未指定で per-vendor 既定（2.3）／throw メッセージに apiKey 値を含まない（2.5）／単一キーのみ参照（3.2）／memoize（同一 instance, factory 1 回）と throw は非 memoize。
+- **resolver**: vendor 未指定→throw（`AI_PROVIDER`）（1.3/4.1）／不正 vendor→throw（値を含む）（1.4）／apiKey 欠落→throw（`AI_API_KEY`）（4.1）／model 欠落→throw（`AI_MODEL`）（2.3/4.1）／3 ベンダー各成功で正しい factory を `{apiKey, model}` で呼ぶ（1.2/2.1/2.2）／throw メッセージに apiKey 値を含まない（2.5）／単一キーのみ参照（3.2）／memoize（同一 instance, factory 1 回）と throw は非 memoize。
 - **isAiProvider**: 3 値を受理・他を拒否（1.1/1.4）。
 - **provider factories**: 各 factory が対応 `create*` を `{ apiKey }` で呼び `(model)` を適用（ai-sdk を mock）（1.2/2.1/2.2）。
 
@@ -404,12 +404,12 @@ export const resolveProviderOptions: () => MastraProviderOptions;
 - API キーは env からの明示注入のみ（provider の env 自動検出に依存しない）。
 
 ## Open Questions / Risks
-- **モデル既定値**: `ai:model` の単一 default は `o4-mini`（既定 vendor=OpenAI 向け）。per-vendor 既定 map は撤去。非 OpenAI ベンダー利用時は `AI_MODEL` の明示指定が必要（未指定だと OpenAI 向け既定が非互換ベンダーへ渡る）。
-- **provider options（本仕様で対応・Req 6）**: `ai:providerOptions`（単一 JSON env）を `resolveProviderOptions()` が parse し `post-message` の stream 呼び出しへ適用。既定は OpenAI の reasoning オプション、非 OpenAI ベンダーでは AI SDK が無視（検証済：`parseProviderOptions` は当該 provider 名前空間が無ければ throw しない）。intent レベルの per-vendor 自動マッピングは非対応（生 JSON を運用者が指定）。各ベンダーの reasoning オプション一覧は research.md D-7/D-8 を参照。
+- **モデル必須（既定なし）**: `ai:model` は既定値を持たず、全ベンダーで `AI_MODEL` の明示指定が必要（未指定なら `requireModel()` が throw）。per-vendor 既定 map も持たない。PR FB で「default `o4-mini`」案を撤回（将来の SLM 対応・特定モデルへの先入れを避ける）。
+- **provider options（本仕様で対応・Req 6）**: `ai:providerOptions`（単一 JSON env）を `resolveProviderOptions()` が parse し `post-message` の stream 呼び出しへ適用。既定値は持たず、未指定時は空 `{}`（PR FB で OpenAI reasoning 既定を撤回）。指定された名前空間がアクティブ provider と異なる場合は AI SDK が無視（検証済：`parseProviderOptions` は当該 provider 名前空間が無ければ throw しない）。intent レベルの per-vendor 自動マッピングは非対応（生 JSON を運用者が指定）。各ベンダーの reasoning オプション一覧は research.md D-7/D-8 を参照。
 - **依存分類（検証済 D-?）**: `@ai-sdk/anthropic`/`@ai-sdk/google` は Express サーバ（`dist/`、`build:server`）経由の server-only パッケージで `.next/node_modules` には externalise されない（既存 `@ai-sdk/openai` と同一）。`dependencies` 配置で正しい。確定的 prod ロード検証は CI Level 2（`server:ci`）。
 - **削除した config キー**: `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）は未使用化したため本仕様で削除（`OpenAI.Chat.ChatModel` 用の `openai` 型 import も除去）。
 - **pre-existing branch 課題（本仕様スコープ外）**: `apiv3/index.js` の `mastraRouteFactory` import 欠落、`post-message.ts:77` TS2769。support/mastra ブランチのマージ未完状態で、別途対応が必要（tasks.md Implementation Notes 参照）。
-- **設定キー命名**: `ai:provider` / `ai:apiKey` / `ai:model` は提案。レビューで調整余地あり。
+- **設定キー命名（PR FB で確定）**: `mastra:llm*` 案を撤回し、`ai:` 名前空間＋`llm` 語の除去で `ai:provider` / `ai:apiKey` / `ai:model` / `ai:providerOptions` に確定。型族も `AiProvider` にリネーム。将来の SLM 等を見据えキー名に `llm` を持ち込まない。
 
 ## Scope Expansion (Azure OpenAI)
 
@@ -495,12 +495,12 @@ return memoizedModel;
 
 ### Testing（追加分）
 - **azure resolver**（`azure-openai.spec.ts`）: resourceName 経路（`createAzure({apiKey, resourceName})` を呼び `(model)` 適用）／baseURL 経路／両指定→baseURL 優先（resourceName を渡さない）／apiVersion 指定時のみ付与／**いずれも無い→throw（env 名・apiKey 値非含）**（7.2–7.5）／**Entra ID 経路**（`useEntraId` 時に `tokenProvider` を渡し apiKey 非送出）／**apiKey も Entra ID も無い→throw**（8.1–8.5）。configManager + `@ai-sdk/azure` + `@azure/identity` を vi.mock。
-- **key-based resolvers**（`llm-providers.spec.ts`）: `resolveOpenai/Anthropic/Google` が config の apiKey+model で `create*` を呼ぶ／apiKey 欠落で throw（`requireApiKey`）／provider の env 自動検出を使わない。
+- **key-based resolvers**（`llm-providers.spec.ts`）: `resolveOpenai/Anthropic/Google` が config の apiKey+model で `create*` を呼ぶ／apiKey 欠落で throw（`requireApiKey`／`AI_API_KEY`）／model 欠落で throw（`requireModel`／`AI_MODEL`）／provider の env 自動検出を使わない。
 - **modelResolvers map**: `Object.keys` が `AI_PROVIDERS` と一致／各 key が対応 resolver に振り分け。
 - **resolver**（`resolve-mastra-model.spec.ts`）: provider 検証 throw／4 provider を対応 resolver に dispatch／memo（同一 instance・1 回・throw は非 memo）。
 - **isAiProvider**: `'azure-openai'` を受理。**未対応の例示**は別の文字列（例 `'cohere'`、旧 `'azure'`）へ差し替え。
 
 ### Open Questions（Azure 固有）
-- **provider options 名前空間**: `@ai-sdk/azure` は OpenAI 互換のため、reasoning 等の provider options は運用者が `AI_PROVIDER_OPTIONS` で指定する（variant A）。既定値（`{"openai":{...}}`）が Azure デプロイにそのまま効くかはモデル/バージョン依存で、運用者責務。本拡張ではマッピングロジックを追加しない（Req 6 の方針を踏襲）。
+- **provider options 名前空間**: `@ai-sdk/azure` は OpenAI 互換のため、reasoning 等の provider options は運用者が `AI_PROVIDER_OPTIONS` で指定する（variant A）。既定値は持たない（未指定なら空 `{}`）。どの名前空間が Azure デプロイに効くかはモデル/バージョン依存で、運用者責務。本拡張ではマッピングロジックを追加しない（Req 6 の方針を踏襲）。
 - **Entra ID 認証（Req 8 で対応）**: `AI_AZURE_OPENAI_USE_ENTRA_ID=true` で `createAzure({ tokenProvider })`（`DefaultAzureCredential`）認証に切替（API キー不要）。`@azure/identity` は既存依存（legacy `features/openai` の `AzureOpenaiClientDelegator` が使用）で追加不要。`DefaultAzureCredential` は周辺環境（マネージド ID / 環境変数 / az CLI 等）から認証情報を**自動検出**するため、本機能の他経路で貫いている「明示注入のみ」方針の例外となる点に留意（Entra ID の設計上、自動検出が前提）。実質的な恩恵は Azure 上で動く GROWI（マネージド ID）中心。
 - **`@ai-sdk/azure` の依存分類**: 他 `@ai-sdk/*` と同じく Express サーバ（`dist/`）経由の server-only。`.next/node_modules` には externalise されない見込みで `dependencies` 配置が正しい（確定検証は CI Level 2 / `server:ci`）。

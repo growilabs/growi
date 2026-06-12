@@ -55,7 +55,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 #### Acceptance Criteria
 1. The system shall OpenAI / Anthropic / Google / Azure OpenAI を mastra チャットエージェントの選択可能な LLM ベンダーとしてサポートする
 2. When 運用者が環境変数で対応ベンダーのいずれかを指定したとき, the system shall そのベンダーを mastra チャットエージェントの LLM プロバイダーとして使用する
-3. Where ベンダーが環境変数で指定されていないとき, the system shall 既定ベンダー（OpenAI）を使用する
+3. Where ベンダーが環境変数で指定されていないとき, the system shall それを設定不備として扱う（既定ベンダーは持たず、ベンダーの明示指定を必須とする）
 4. If 指定されたベンダー名が対応集合（OpenAI / Anthropic / Google / Azure OpenAI）に含まれないとき, the system shall それを設定不備として扱う
 
 ### Requirement 2: 環境変数による接続設定
@@ -64,7 +64,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 #### Acceptance Criteria
 1. The system shall 選択されたベンダーの API キーを環境変数から取得する
 2. The system shall 選択されたベンダーで使用するモデル名を環境変数で設定できるようにする
-3. Where モデル名が環境変数で指定されていないとき, the system shall 単一の既定モデル（既定ベンダー OpenAI 向け）を使用する（非 OpenAI ベンダー利用時はモデルの明示指定が必要）
+3. Where モデル名が環境変数で指定されていないとき, the system shall それを設定不備として扱う（既定モデルは持たず、全ベンダーでモデルの明示指定を必須とする）
 4. The system shall ベンダー・API キー・モデルの接続設定を環境変数のみから受け付け, これらを設定する管理画面 UI を提供しない
 5. The system shall API キーを機密情報として扱い, ログ出力・エラーメッセージ・API 応答のいずれにも平文で含めない
 
@@ -80,7 +80,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 **Objective:** As a 運用者, I want ベンダー設定に不備があってもアプリ全体は起動・動作を継続し, 原因がログから判別できる, so that 一部の設定ミスで全体が停止せず, 原因究明が容易になる
 
 #### Acceptance Criteria
-1. If 選択ベンダーが未指定・対応外, または選択ベンダーの必須設定（API キー）が欠落しているとき, the system shall mastra チャットエージェントを無効化する
+1. If 選択ベンダーが未指定・対応外, または選択ベンダーの必須設定（API キー・モデル）が欠落しているとき, the system shall mastra チャットエージェントを無効化する
 2. When 上記の設定不備が検出されたとき（モデル解決の実行時）, the system shall 不備の内容（未指定 / 不正なベンダー名 / 欠落している設定項目）を特定できるエラーをログに出力する
 3. While 設定不備により mastra チャットエージェントが無効な状態, the system shall アプリケーション本体および他の AI 機能の起動・動作を継続する
 4. When 利用者が無効状態の mastra チャットエージェントにチャットを要求したとき, the system shall エラー応答を返して処理を成功させない（具体的な原因はサーバログに記録し、クライアントには平文の機密情報を返さない）
@@ -98,7 +98,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 #### Acceptance Criteria
 1. The system shall mastra チャットエージェントの LLM 呼び出しに, 環境変数で指定された provider options を適用する
 2. The system shall provider options を単一の JSON 環境変数（AI SDK 形式＝プロバイダー名前空間を含む `{ "<provider>": { ... } }`）として受け付ける
-3. Where provider options が環境変数で指定されていないとき, the system shall 既定値（OpenAI の reasoning オプション）を適用する
+3. Where provider options が環境変数で指定されていないとき, the system shall provider options を適用しない（既定値は持たず、空として扱う）
 4. If 指定された provider options の JSON が不正（パース不能・非オブジェクト）であるとき, the system shall チャット要求を失敗させず, provider options を適用せずに処理を継続し, 警告をログに出力する
 
 ### Requirement 7: Azure OpenAI 固有の接続設定

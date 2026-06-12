@@ -211,8 +211,8 @@ describe('config-definition multi-llm-provider keys', () => {
         );
       });
 
-      it('has default value openai', () => {
-        expect(CONFIG_DEFINITIONS['ai:provider'].defaultValue).toBe('openai');
+      it('has no default value (provider is required)', () => {
+        expect(CONFIG_DEFINITIONS['ai:provider'].defaultValue).toBe(undefined);
       });
 
       it('is not marked as secret', () => {
@@ -239,8 +239,8 @@ describe('config-definition multi-llm-provider keys', () => {
         expect(CONFIG_DEFINITIONS['ai:model'].envVarName).toBe('AI_MODEL');
       });
 
-      it('has default value o4-mini (single default tuned for the default vendor)', () => {
-        expect(CONFIG_DEFINITIONS['ai:model'].defaultValue).toBe('o4-mini');
+      it('has no default value (model is required)', () => {
+        expect(CONFIG_DEFINITIONS['ai:model'].defaultValue).toBe(undefined);
       });
 
       it('is not marked as secret', () => {
@@ -255,12 +255,10 @@ describe('config-definition multi-llm-provider keys', () => {
         );
       });
 
-      it('defaults to the OpenAI reasoning options as a JSON string', () => {
-        const def = CONFIG_DEFINITIONS['ai:providerOptions'].defaultValue;
-        expect(typeof def).toBe('string');
-        expect(JSON.parse(def as string)).toEqual({
-          openai: { reasoningEffort: 'low', reasoningSummary: 'auto' },
-        });
+      it('has no default value (unset means no provider options)', () => {
+        expect(CONFIG_DEFINITIONS['ai:providerOptions'].defaultValue).toBe(
+          undefined,
+        );
       });
 
       it('is not marked as secret', () => {

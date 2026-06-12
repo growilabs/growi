@@ -18,6 +18,12 @@ export const requireApiKey = (): string => {
   return apiKey;
 };
 
-// `ai:model` carries the single default (tuned for the default provider,
-// OpenAI). For the azure-openai provider this value is the Azure deployment name.
-export const getModel = (): string => configManager.getConfig('ai:model');
+// Model is required (no default). For the azure-openai provider this value is
+// the Azure deployment name. The message never includes a secret.
+export const requireModel = (): string => {
+  const model = configManager.getConfig('ai:model');
+  if (model == null) {
+    throw new Error('Mastra LLM model is not configured (set AI_MODEL)');
+  }
+  return model;
+};

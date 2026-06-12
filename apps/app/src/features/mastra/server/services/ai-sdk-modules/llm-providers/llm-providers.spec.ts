@@ -108,6 +108,15 @@ describe('key-based provider resolvers', () => {
     expect(createOpenAI).not.toHaveBeenCalled();
   });
 
+  it('throws (naming AI_MODEL) when the model is missing', () => {
+    getConfig.mockImplementation((key: string) =>
+      key === 'ai:apiKey' ? 'sk-openai-123' : undefined,
+    );
+
+    expect(() => resolveOpenaiModel()).toThrow(/AI_MODEL/);
+    expect(openaiProviderFn).not.toHaveBeenCalled();
+  });
+
   it('injects the config apiKey explicitly (never the provider env var)', () => {
     const original = process.env.OPENAI_API_KEY;
     process.env.OPENAI_API_KEY = 'env-should-not-be-used';
