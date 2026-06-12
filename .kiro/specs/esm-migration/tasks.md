@@ -270,12 +270,13 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Codemod Transform (routes leaves)_
   - **実績 (2026-06-12)**: 49 ファイル変換 (.ts 含む)。初回適用で codemod が leading comments (@swagger 約 2300 行) を欠落 → codemod 修正 (`207fe517a4`) 後に再適用。declaration:true 起因の TS2742 に対し全 route factory へ明示 `Router` 戻り値型を付与 (.ts 10 / .js JSDoc 22)。express 型付化で顕在化した潜在型債務 3 ファイルを CrowiRequest/ApiV3Response + 到達不能ガードで解消。中央ルーターは member-access 修正のみ + 既存 synthetic default import 2 件 (g2g-transfer / security-settings) を named import 化 (boot クラッシュの実修正)。検証: build 21/21 / tests 75/75 / dev boot smoke (healthcheck 200, security-setting 未認証 403)
 
-- [ ] 3.3.e (step 3.e) `routes/index.js` (中央ルーター 12 箇所) を変換
+- [x] 3.3.e (step 3.e) `routes/index.js` (中央ルーター 12 箇所) を変換
   - factory invoke (`require('./x')(crowi, app)`) を `import { setup as setupX } from './x.js'; const x = setupX(crowi, app);` に変換
   - 変換後に `pnpm dev` を起動し、`/_api/v3/healthcheck` が 200 を返すこと
   - _Requirements: 2.3, 2.6_
   - _Depends: 3.3.d_
   - _Boundary: Codemod Transform (routes/index)_
+  - **実績 (2026-06-12)**: 13 invoke を named import 化。`require('./apiv3')` の 1 行のみ意図的に残置 (apiv3/index.js が module.exports のままのため — 3.3.f で解消、コメント明記)。stranded caller `crowi/index.ts` の `await import('../routes')` を `.default` → `.setup` 化し `as unknown as` 撤去。検証: typecheck 0 / lint 0 / build 21/21 / dev smoke 200×3
 
 - [ ] 3.3.f (step 3.f) `routes/apiv3/index.js` (中央ルーター 44 箇所) を変換
   - 3.3.e と同じ規約で 44 エントリを名前付き factory invoke に変換

@@ -684,10 +684,9 @@ class Crowi {
    */
   async setupRoutesAtLast(): Promise<void> {
     type RoutesSetup = (crowi: Crowi, app: Express) => void;
-    // CommonJS modules are always wrapped in { default } when dynamically imported
-    const { default: setupRoutes } = (await import('../routes')) as unknown as {
-      default: RoutesSetup;
-    };
+    const { setup: setupRoutes }: { setup: RoutesSetup } = await import(
+      '../routes'
+    );
     setupRoutes(this, this.express);
   }
 
