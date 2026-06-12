@@ -639,3 +639,16 @@ same issue.
   pairing strictly required. Do not delete these declaration files, and
   keep them in sync with the `.cjs` implementations when adding / removing
   exported symbols.
+
+- **3.4 prior ts2esm attempt failed (user report, 2026-06-12)**: A previous
+  session attempted to run `ts2esm` to give all imports `.js` extensions and
+  it did not work well (details were not recorded; no trace in git history —
+  the attempt was discarded). Treat `ts2esm` output as untrusted: the task
+  3.4 gate is the mechanical scan (extensionless relative specifiers in
+  `apps/app/src/server/` = 0) plus typecheck/build/lint/test green, NOT the
+  tool exiting successfully. If `ts2esm` cannot deliver (crashes, partial
+  rewrites, corrupted output, alias mangling), pivot to the in-repo
+  jscodeshift infrastructure (`apps/app/tools/codemod/`) for the extension
+  pass instead of fighting the tool — both are sanctioned dependencies of
+  the Codemod Transform component (design.md: jscodeshift P0, ts2esm P1).
+  Record which tool ultimately produced the rewrite.
