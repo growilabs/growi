@@ -76,7 +76,7 @@
   - _Depends: 1.2, 1.3, 1.4, 2.1, 3.1_
   - _Boundary: put-ai-settings handler_
 
-- [ ] 3.4 ルータを組み立て管理者ルートに登録
+- [x] 3.4 ルータを組み立て管理者ルートに登録
   - 取得/更新ハンドラを 1 つのルータに集約し、`admin:ai` スコープ + 管理者認可を適用して管理者用 apiv3 にマウント(AI 無効時も到達可能、`isAiEnabled` ゲートは付けない)
   - 統合テスト: 管理者は GET/PUT 可、非管理者は 403、エンドポイントが管理者ルート配下で応答
   - _Requirements: 1.1, 1.2_
@@ -132,3 +132,7 @@
   - `@growi/app` と `@growi/core` で lint / typecheck / test が緑
   - _Requirements: 4.1, 7.2, 7.3, 7.5_
   - _Depends: 2.4, 3.4, 5.2_
+
+## Implementation Notes
+- 1.1 added `admin:ai` to `@growi/core` source, but `packages/core/dist` is **gitignored** and was stale. Any consumer of `SCOPE.READ/WRITE.ADMIN.AI` (e.g. task 3.4) needs `turbo run build --filter @growi/core` locally before `lint:typecheck` passes. CI handles this via turbo build ordering.
+- crowi/index.ts and config-manager.spec.ts carry pre-existing biome warnings (type aliases `= any`, non-null assertions, default export, async-without-await on legacy test callbacks). These are outside feature boundaries; biome `--diagnostic-level=error` does not fail on them.
