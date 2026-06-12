@@ -1,5 +1,4 @@
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+export const setup = (crowi) => {
   const { appService } = crowi;
 
   // Named function so the route-middleware snapshot tool can identify this

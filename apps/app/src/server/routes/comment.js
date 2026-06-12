@@ -62,7 +62,7 @@ import { preNotifyService } from '../service/pre-notify';
 module.exports = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:comment');
   const { Page } = crowi.models;
-  const ApiResponse = require('../util/apiResponse');
+  const ApiResponse = require('../util/apiResponse').default;
 
   const activityEvent = crowi.events.activity;
 

@@ -86,7 +86,7 @@ module.exports = (crowi, app) => {
 
   // auth
   const applicationInstalled =
-    require('../../middlewares/application-installed')(crowi);
+    require('../../middlewares/application-installed').setup(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
   const login = require('../login')(crowi, app);
   const loginPassport = require('../login-passport')(crowi, app);

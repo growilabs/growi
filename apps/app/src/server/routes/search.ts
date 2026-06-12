@@ -41,8 +41,8 @@ const logger = loggerFactory('growi:routes:search');
  *             $ref: '#/components/schemas/ElasticsearchResultMeta'
  */
 module.exports = (crowi: Crowi, app) => {
-  const ApiResponse = require('../util/apiResponse');
-  const ApiPaginate = require('../util/apiPaginate');
+  const ApiResponse = require('../util/apiResponse').default;
+  const ApiPaginate = require('../util/apiPaginate').default;
 
   const actions: any = {};
   const api: any = {};

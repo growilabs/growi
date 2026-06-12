@@ -47,7 +47,7 @@
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, _app) => {
   const { User } = crowi.models;
-  const ApiResponse = require('../util/apiResponse');
+  const ApiResponse = require('../util/apiResponse').default;
 
   const actions = {};
 

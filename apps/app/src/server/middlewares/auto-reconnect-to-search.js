@@ -1,14 +1,13 @@
 import loggerFactory from '~/utils/logger';
 
-const {
-  ReconnectContext,
+import {
   nextTick,
-} = require('../service/search-reconnect-context/reconnect-context');
+  ReconnectContext,
+} from '../service/search-reconnect-context/reconnect-context';
 
 const logger = loggerFactory('growi:middlewares:auto-reconnect-to-search');
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+export const setup = (crowi) => {
   const { searchService } = crowi;
   const reconnectContext = new ReconnectContext();
 

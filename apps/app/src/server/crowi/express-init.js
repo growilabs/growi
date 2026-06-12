@@ -30,9 +30,9 @@ module.exports = (crowi, app) => {
 
   const registerSafeRedirect = registerSafeRedirectFactory();
   const injectCurrentuserToLocalvars =
-    require('../middlewares/inject-currentuser-to-localvars')();
+    require('../middlewares/inject-currentuser-to-localvars').setup();
   const autoReconnectToS2sMsgServer =
-    require('../middlewares/auto-reconnect-to-s2s-msg-server')(crowi);
+    require('../middlewares/auto-reconnect-to-s2s-msg-server').setup(crowi);
   const avoidSessionRoutes = require('../routes/avoid-session-routes');
 
   const env = crowi.node_env;

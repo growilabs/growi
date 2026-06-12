@@ -254,9 +254,10 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Depends: 3.3.a_
   - _Boundary: Codemod Transform (service)_
 
-- [ ] 3.3.c (step 3.c) `middlewares/`, `util/`, `pageserv/` 等の非ルートを変換
+- [x] 3.3.c (step 3.c) `middlewares/`, `util/`, `pageserv/` 等の非ルートを変換
   - `pnpm codemod:cjs-to-esm -- apps/app/src/server/middlewares apps/app/src/server/util apps/app/src/server/pageserv` ほか
   - 各サブツリーで `tsc --noEmit` をクリーン
+  - **実績 (2026-06-12)**: `pageserv/` は v8 ツリーに存在せず、実スコープは middlewares 6 + util 7 ファイル。stranded CJS caller 9 箇所 (routes 7 / crowi/express-init 1 / integ test mock 1) を同一 step で修正 (3.3.b 先例)。検証: typecheck / biome / `turbo run build` 21/21 / vitest 95/95 / dev boot healthcheck 200
   - _Requirements: 2.2, 2.3_
   - _Depends: 3.3.b_
   - _Boundary: Codemod Transform (middlewares/util)_
@@ -581,6 +582,17 @@ same issue.
   `type:commonjs` subdirectory the same way, migration loading will
   fail at runtime. Record the verification command and output in the
   3.7.b bake-off evidence file.
+
+- **3.3.c default-import interop trap**: `esModuleInterop` + `module: CommonJS`
+  masks missing default exports — `import diff from 'diff'` typechecks AND works
+  at runtime today (`__importDefault` wraps the CJS module), but `diff@5.2.0`'s
+  ESM entry has no default export, so the same line crashes under NodeNext
+  (Phase 3.6 以降). When converting `require('pkg').member(...)` (codemod
+  pattern 6) or any bare `require('pkg')` of a dual/CJS package, prefer
+  **namespace (`import * as`) or named imports** over default imports, and
+  verify with `node -e "import('pkg').then(m => console.log(typeof m.default))"`.
+  Steps 3.3.d–3.3.g must apply the same check to every external-package import
+  the codemod produces.
 
 - **2.2 config .d.cts pairing**: The three CJS config files
   (`migrate-mongo-config.cjs`, `i18next.config.cjs`,

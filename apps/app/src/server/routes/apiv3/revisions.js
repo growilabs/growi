@@ -57,9 +57,8 @@ const router = express.Router();
  */
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi) => {
-  const certifySharedPage = require('../../middlewares/certify-shared-page')(
-    crowi,
-  );
+  const certifySharedPage =
+    require('../../middlewares/certify-shared-page').setup(crowi);
   const loginRequired = loginRequiredFactory(crowi, true);
 
   const { Page, User } = crowi.models;

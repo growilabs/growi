@@ -17,7 +17,7 @@ module.exports = (crowi, app) => {
 
   const activityEvent = crowi.events.activity;
 
-  const ApiResponse = require('../util/apiResponse');
+  const ApiResponse = require('../util/apiResponse').default;
 
   const promisifiedPassportAuthentication = (strategyName, req, res) => {
     return new Promise((resolve, reject) => {

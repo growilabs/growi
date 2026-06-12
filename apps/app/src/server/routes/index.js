@@ -35,10 +35,9 @@ autoReap.options.reapOnError = true; // continue reaping the file even if an err
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, app) => {
   const autoReconnectToSearch =
-    require('../middlewares/auto-reconnect-to-search')(crowi);
-  const applicationInstalled = require('../middlewares/application-installed')(
-    crowi,
-  );
+    require('../middlewares/auto-reconnect-to-search').setup(crowi);
+  const applicationInstalled =
+    require('../middlewares/application-installed').setup(crowi);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const loginRequired = loginRequiredFactory(crowi, true);
   const adminRequired = adminRequiredFactory(crowi);

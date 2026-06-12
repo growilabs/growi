@@ -7,7 +7,7 @@ const logger = loggerFactory('growi:routes:admin');
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, app) => {
-  const ApiResponse = require('../util/apiResponse');
+  const ApiResponse = require('../util/apiResponse').default;
 
   const actions = {};
 

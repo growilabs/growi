@@ -18,7 +18,7 @@ type InvitedFormRequest = Request & { form: any; user: any };
 
 module.exports = (crowi: Crowi): Router => {
   const applicationInstalled =
-    require('../../middlewares/application-installed')(crowi);
+    require('../../middlewares/application-installed').setup(crowi);
   const router = express.Router();
 
   /**

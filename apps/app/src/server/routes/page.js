@@ -25,7 +25,7 @@ module.exports = (crowi, _app) => {
 
   const PageRedirect = mongoose.model('PageRedirect');
 
-  const ApiResponse = require('../util/apiResponse');
+  const ApiResponse = require('../util/apiResponse').default;
 
   const globalNotificationService = crowi.globalNotificationService;
 
