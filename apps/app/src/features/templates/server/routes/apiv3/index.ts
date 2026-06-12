@@ -6,7 +6,7 @@ import {
   getMarkdown,
   scanAllTemplates,
 } from '@growi/pluginkit/dist/v4/server/index.cjs';
-import express from 'express';
+import express, { type Router } from 'express';
 import { param, query } from 'express-validator';
 
 import { PLUGIN_STORING_PATH } from '~/features/growi-plugin/server/consts';
@@ -31,7 +31,7 @@ const validator = {
 // cache object
 let presetTemplateSummaries: TemplateSummary[];
 
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   /**

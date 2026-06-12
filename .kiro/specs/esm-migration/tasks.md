@@ -278,13 +278,14 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Codemod Transform (routes/index)_
   - **実績 (2026-06-12)**: 13 invoke を named import 化。`require('./apiv3')` の 1 行のみ意図的に残置 (apiv3/index.js が module.exports のままのため — 3.3.f で解消、コメント明記)。stranded caller `crowi/index.ts` の `await import('../routes')` を `.default` → `.setup` 化し `as unknown as` 撤去。検証: typecheck 0 / lint 0 / build 21/21 / dev smoke 200×3
 
-- [ ] 3.3.f (step 3.f) `routes/apiv3/index.js` (中央ルーター 44 箇所) を変換
+- [x] 3.3.f (step 3.f) `routes/apiv3/index.js` (中央ルーター 44 箇所) を変換
   - 3.3.e と同じ規約で 44 エントリを名前付き factory invoke に変換
   - supertest もしくは手動で apiv3 代表エンドポイント (例: `/_api/v3/healthcheck`, `/_api/v3/users`, `/_api/v3/page`) がそれぞれ想定ステータスを返すこと
   - 複合パターン (例: `isInstalled ? alreadyInstalledMiddleware : require('./installer')(crowi)` — 三項演算子の片側のみ factory invoke) が正しく変換されていること。該当箇所を事前に grep して codemod の単体テスト (タスク 3.2) に入力フィクスチャとして追加しておく
   - _Requirements: 2.3, 2.6_
   - _Depends: 3.3.e_
   - _Boundary: Codemod Transform (routes/apiv3/index)_
+  - **実績 (2026-06-12)**: 44 invoke を named import 化 (マウント順序は HEAD と完全一致 — 3.8.c snapshot 互換)。installer 三項は member 形のまま 3.3.d で `.setup` 化済みだったため async 化なしで alias 置換のみ (codemod フィクスチャ追加は不要 — 対象パターンが member 形に変化済み)。**スコープ追補**: 3.3.d の src/server glob から漏れていた feature route factory 5 件 (templates / page-bulk-export / external-user-group ×2 / growi-plugin) を同時に `export const setup` 化し、growiPlugin の synthetic default import (実行時 undefined 化リスク) を named 化。routes/index.js の最終 require('./apiv3') を解消し中央ルーター 2 ファイルの require/module.exports は 0。smoke: healthcheck・statistics 200 / users・page・templates・security-setting 未認証 403 / login 200
 
 - [ ] 3.3.h (step 3.h) 変換済みルートモジュールのトップレベル副作用を禁止するガードを追加
   - `routes/**/*.js` および `routes/**/*.ts` に対し、import / type-only 宣言 / 関数宣言 / `export const setup = (crowi, app) => { ... }` 以外のトップレベル文を ESLint カスタムルール (もしくは CI の grep チェック) で禁止

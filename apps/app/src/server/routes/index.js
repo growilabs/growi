@@ -27,6 +27,7 @@ import {
   generateUnavailableWhenMaintenanceModeMiddlewareForApi,
 } from '../middlewares/unavailable-when-maintenance-mode';
 import { setup as setupAdmin } from './admin';
+import { setup as setupApiV3 } from './apiv3';
 import * as attachment from './attachment';
 import { routesFactory as attachmentApiRoutesFactory } from './attachment/api';
 import { setup as setupComment } from './comment';
@@ -69,8 +70,7 @@ export const setup = (crowi, app) => {
   const unavailableWhenMaintenanceModeForApi =
     generateUnavailableWhenMaintenanceModeMiddlewareForApi(crowi);
 
-  // remains require() until ./apiv3 is converted (task 3.3.f)
-  const [apiV3Router, apiV3AdminRouter, apiV3AuthRouter] = require('./apiv3')(
+  const [apiV3Router, apiV3AdminRouter, apiV3AuthRouter] = setupApiV3(
     crowi,
     app,
   );
