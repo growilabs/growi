@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. Foundation: 共有型・スコープ・設定・監査アクションの整備
-- [ ] 1.1 (P) `admin:ai` スコープを @growi/core に追加
+- [x] 1.1 (P) `admin:ai` スコープを @growi/core に追加
   - `SCOPE_SEED_ADMIN` に `ai` を追加し、`ReadAdminScope` / `WriteAdminScope` の型 union に `read:admin:ai` / `write:admin:ai` を追加
   - `SCOPE.READ.ADMIN.AI` / `SCOPE.WRITE.ADMIN.AI` が解決でき、既存スコープのテストが緑のまま
   - _Requirements: 1.2_
