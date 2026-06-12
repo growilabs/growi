@@ -6,6 +6,18 @@ import { Decoration, EditorView, WidgetType } from '@codemirror/view';
 import type { MentionData } from '../types';
 
 /**
+ * Presentation of a committed mention chip (Requirement 3.2): visually
+ * distinct via background, rounded corners and padding, with a pointer cursor
+ * signalling clickability.
+ *
+ * Kept as a named constant so the (otherwise framework-agnostic) decoration
+ * logic below stays free of inline styling concerns, and the chip's look has a
+ * single obvious definition point.
+ */
+const MENTION_CHIP_CLASS =
+  'tw:inline-flex tw:items-center tw:rounded tw:bg-primary/10 tw:px-1 tw:text-primary tw:cursor-pointer';
+
+/**
  * Facet collecting navigation handlers invoked when a mention chip is clicked
  * (Requirement 4.1). Each registered callback receives the chip's MentionData.
  * The decoration layer deliberately knows nothing about routing — navigation is
@@ -51,9 +63,7 @@ class MentionWidget extends WidgetType {
   toDOM(view: EditorView): HTMLElement {
     const chip = document.createElement('span');
     chip.dataset.mention = '';
-    // Visually distinct chip (3.2): background, rounded corners, padding.
-    chip.className =
-      'tw:inline-flex tw:items-center tw:rounded tw:bg-primary/10 tw:px-1 tw:text-primary tw:cursor-pointer';
+    chip.className = MENTION_CHIP_CLASS;
     // Path rendered as text — no HTML injection (4.2 / security).
     chip.textContent = this.data.path;
 
