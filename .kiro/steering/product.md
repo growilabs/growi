@@ -12,6 +12,7 @@ GROWI is a team collaboration wiki platform using Markdown, designed to help tea
 6. **Audit & Compliance**: Activity logging, audit log search (Elasticsearch-backed), and bulk export for compliance needs
 7. **Multi-Service Architecture**: Modular services (PDF export, Slack integration) deployed independently
 8. **Observability**: OpenTelemetry integration for monitoring and tracing
+9. **GROWI Vault**: Git-backed materialization of wiki pages into per-ACL namespace repositories — provides PAT-authenticated read access for external consumers (LLM ingestion, mirroring) without exposing the live MongoDB store. Resilient bootstrap + automatic drift detection ensure the git tree stays trustworthy ([growi-vault-resilience](../specs/growi-vault-resilience/) completed 2026-05-21)
 
 ## Target Use Cases
 
@@ -34,5 +35,5 @@ GROWI is a team collaboration wiki platform using Markdown, designed to help tea
 - **Microservices**: Optional services (pdf-converter, slackbot-proxy) for enhanced functionality
 
 ---
-_Updated: 2026-04-16. Added AI assistant, audit/compliance, and observability capabilities._
+_Updated: 2026-05-21. Added GROWI Vault capability (git-backed materialization with resilient bootstrap + drift detection)._
 _Focus on patterns and purpose, not exhaustive feature lists_

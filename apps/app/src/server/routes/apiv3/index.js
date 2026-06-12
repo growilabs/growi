@@ -1,6 +1,10 @@
 import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
 import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
 import growiPlugin from '~/features/growi-plugin/server/routes/apiv3/admin';
+import {
+  createVaultAdminRouterWithDeps,
+  createVaultPageRouterWithDeps,
+} from '~/features/growi-vault/server';
 import { factory as openaiRouteFactory } from '~/features/openai/server/routes';
 import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed';
 import loggerFactory from '~/utils/logger';
@@ -77,6 +81,9 @@ module.exports = (crowi, app) => {
   routerForAdmin.use('/g2g-transfer', g2gTransfer(crowi));
   routerForAdmin.use('/plugins', growiPlugin(crowi));
 
+  // vault admin API (GET /status, POST /bootstrap, PUT /enabled, POST /reconcile)
+  routerForAdmin.use('/vault', createVaultAdminRouterWithDeps(crowi));
+
   // auth
   const applicationInstalled =
     require('../../middlewares/application-installed')(crowi);
@@ -152,6 +159,9 @@ module.exports = (crowi, app) => {
   router.use('/page', require('./page')(crowi));
   router.use('/pages', require('./pages')(crowi));
   router.use('/revisions', require('./revisions')(crowi));
+
+  // vault user API (POST /page/reconcile) — loginRequired only, no adminRequired
+  router.use('/vault', createVaultPageRouterWithDeps(crowi));
 
   router.use('/page-listing', pageListing(crowi));
 

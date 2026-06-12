@@ -4,6 +4,7 @@ import type {
   IUserHasId,
 } from '@growi/core/dist/interfaces';
 import { getIdForRef, isPopulated } from '@growi/core/dist/interfaces';
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import { hasSlash, isTopPage } from '@growi/core/dist/utils/page-path-utils';
 import {
   addTrailingSlash,
@@ -347,7 +348,7 @@ export class PageQueryBuilder {
     const pathNormalized = normalizePath(path);
     const pathWithTrailingSlash = addTrailingSlash(path);
 
-    const startsPattern = RegExp.escape(pathWithTrailingSlash);
+    const startsPattern = escapeStringForMongoRegex(pathWithTrailingSlash);
 
     this.query = this.query.and({
       $or: [
@@ -372,7 +373,7 @@ export class PageQueryBuilder {
 
     const pathWithTrailingSlash = addTrailingSlash(path);
 
-    const startsPattern = RegExp.escape(pathWithTrailingSlash);
+    const startsPattern = escapeStringForMongoRegex(pathWithTrailingSlash);
 
     this.query = this.query.and({ path: new RegExp(`^${startsPattern}`) });
 
@@ -408,7 +409,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const startsPattern = RegExp.escape(path);
+    const startsPattern = escapeStringForMongoRegex(path);
 
     this.query = this.query.and({ path: new RegExp(`^${startsPattern}`) });
 
@@ -423,7 +424,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const startsPattern = RegExp.escape(str);
+    const startsPattern = escapeStringForMongoRegex(str);
 
     this.query = this.query.and({
       path: new RegExp(`^(?!${startsPattern}).*$`),
@@ -439,7 +440,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const startsPattern = RegExp.escape(path);
+    const startsPattern = escapeStringForMongoRegex(path);
 
     this.query = this.query.and({
       path: { $not: new RegExp(`^${startsPattern}(/|$)`) },
@@ -454,7 +455,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const match = RegExp.escape(str);
+    const match = escapeStringForMongoRegex(str);
 
     this.query = this.query.and({ path: new RegExp(`^(?=.*${match}).*$`) });
 
@@ -467,7 +468,7 @@ export class PageQueryBuilder {
       return this;
     }
 
-    const match = RegExp.escape(str);
+    const match = escapeStringForMongoRegex(str);
 
     this.query = this.query.and({ path: new RegExp(`^(?!.*${match}).*$`) });
 
