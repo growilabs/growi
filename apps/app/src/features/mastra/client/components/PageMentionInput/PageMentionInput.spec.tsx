@@ -220,7 +220,12 @@ describe('PageMentionInput', () => {
       vi.useFakeTimers();
     });
     afterEach(() => {
-      vi.runOnlyPendingTimers();
+      // A debounce timer scheduled by the last interaction may still be
+      // pending; flushing it triggers React state updates, so wrap in act()
+      // to keep the flush inside React's update cycle (no act() warning).
+      act(() => {
+        vi.runOnlyPendingTimers();
+      });
       vi.useRealTimers();
     });
 
