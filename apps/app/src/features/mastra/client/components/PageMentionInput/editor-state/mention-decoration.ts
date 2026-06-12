@@ -74,8 +74,11 @@ class MentionWidget extends WidgetType {
   }
 
   /**
-   * Let the events we handle (mousedown/click) reach our own DOM listeners
-   * instead of being swallowed by the editor.
+   * Returning false tells the editor NOT to ignore events originating in this
+   * widget, i.e. CodeMirror's own handlers run too. That is intentional: the
+   * editor's mousedown handling respects the `preventDefault()` issued by the
+   * chip's listener above, which suppresses caret placement while the chip's
+   * `click` listener still fires for navigation.
    */
   override ignoreEvent(): boolean {
     return false;
