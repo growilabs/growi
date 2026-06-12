@@ -87,7 +87,7 @@
   - _Requirements: 4.1, 4.3, 4.7_
   - _Boundary: use-default-extensions, emojiAutocompletionSettings_
 
-- [ ]* 4.2 Add regression tests proving facility/source decoupling
+- [x]* 4.2 Add regression tests proving facility/source decoupling
   - **Coexistence (AC 4.4)** — in a new spec beside the emoji extension: call the exported emoji source with a `:smi` context and expect a non-null result, and separately call the mention source factory with an `@ab` context and expect a non-null result, proving neither source suppresses the other. The emoji source needs a real `EditorState`-backed `CompletionContext` (it reads `syntaxTree`/`sliceDoc`) but not the markdown language; the mention source is debounced + async, so drive it with `vi.useFakeTimers()` + `mockResolvedValue([...])` + `vi.runAllTimers()` and return at least one user (empty → `null`)
   - **Code-block scoping (AC 4.6)** — in the same new spec: assert the emoji source is excluded from fenced code blocks. The sublanguage MUST be nested **synchronously** — do NOT use `codeLanguages: languages` (async load; will not nest in a sync unit test and the assertion will fail, verified during design validation). Build a synchronous stub sublanguage instead:
     ```typescript
@@ -104,3 +104,7 @@
   - _Requirements: 4.2, 4.4, 4.6_
   - _Depends: 4.1_
   - _Boundary: emojiAutocompletionSettings.spec, mentionAutocompletionSettings.spec_
+
+## Implementation Notes
+
+- **4.2 — dual-version `@codemirror/language` IDE diagnostic (non-blocking):** Both `6.12.2` and `6.12.3` resolve in the pnpm store, so the IDE tsserver flags a `2322` "separate declarations of private property 'loadFunc'" error on the `LanguageDescription` passed to `codeLanguages`. This is a tsserver-vs-`tsgo` resolution divergence only — `turbo run lint --filter @growi/editor` (`tsgo --noEmit`) and `turbo run build --filter @growi/editor` (`vite:dts`) both resolve a single consistent version and pass green. Trust the build/typecheck commands over the IDE diagnostic for editor specs that import CodeMirror language types.
