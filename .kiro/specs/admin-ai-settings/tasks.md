@@ -7,7 +7,7 @@
   - _Requirements: 1.2_
   - _Boundary: core scope_
 
-- [ ] 1.2 (P) 環境変数専用モードの宣言を AI 設定グループに追加
+- [x] 1.2 (P) 環境変数専用モードの宣言を AI 設定グループに追加
   - 制御キー `env:useOnlyEnvVars:ai`(env 変数 `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS`、default false)を `CONFIG_KEYS` + `CONFIG_DEFINITIONS` に追加
   - `ENV_ONLY_GROUPS` に `app:aiEnabled` + `ai:*` 8 キーの計 9 キーを対象とするグループを追加
   - 単体テスト: 制御キー true で 9 キーが env 値のみ、false で `db ?? env`、`ai:*` 以外のキーの解決は不変

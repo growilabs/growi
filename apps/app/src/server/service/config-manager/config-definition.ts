@@ -344,6 +344,7 @@ export const CONFIG_KEYS = [
   'env:useOnlyEnvVars:security:passport-saml',
   'env:useOnlyEnvVars:gcs',
   'env:useOnlyEnvVars:azure',
+  'env:useOnlyEnvVars:ai',
 
   // Page Bulk Export Settings
   'app:bulkExportJobExpirationSeconds',
@@ -1491,6 +1492,10 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'AZURE_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
   }),
+  'env:useOnlyEnvVars:ai': defineConfig<boolean>({
+    envVarName: 'AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    defaultValue: false,
+  }),
   'app:bulkExportJobExpirationSeconds': defineConfig<number>({
     envVarName: 'BULK_EXPORT_JOB_EXPIRATION_SECONDS',
     defaultValue: 86400,
@@ -1583,6 +1588,23 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
       'azure:clientSecret',
       'azure:storageAccountName',
       'azure:storageContainerName',
+    ],
+  },
+  {
+    // AI settings: provider-common (4) + Azure OpenAI-only (4) + the enable
+    // toggle. app:aiEnabled uses the app: prefix but is fixed together with the
+    // ai:* keys as a single AI configuration unit.
+    controlKey: 'env:useOnlyEnvVars:ai',
+    targetKeys: [
+      'app:aiEnabled',
+      'ai:provider',
+      'ai:apiKey',
+      'ai:model',
+      'ai:providerOptions',
+      'ai:azureOpenaiResourceName',
+      'ai:azureOpenaiBaseUrl',
+      'ai:azureOpenaiApiVersion',
+      'ai:azureOpenaiUseEntraId',
     ],
   },
 ];

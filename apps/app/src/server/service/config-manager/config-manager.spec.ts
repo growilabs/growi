@@ -322,5 +322,94 @@ describe('ConfigManager test', () => {
       ); // Should fallback to env when db value is undefined
       expect(configManager.getConfig('app:fileUploadType')).toBe('gridfs'); // Should use db value when valid
     });
+
+    describe('env-only mode for AI settings (env:useOnlyEnvVars:ai)', () => {
+      // The 9 keys fixed by the env:useOnlyEnvVars:ai control key:
+      // app:aiEnabled + the 8 ai:* keys.
+      const aiKeys = [
+        'app:aiEnabled',
+        'ai:provider',
+        'ai:apiKey',
+        'ai:model',
+        'ai:providerOptions',
+        'ai:azureOpenaiResourceName',
+        'ai:azureOpenaiBaseUrl',
+        'ai:azureOpenaiApiVersion',
+        'ai:azureOpenaiUseEntraId',
+      ] as const;
+
+      // Distinct db/env values per key so a resolution that picks the wrong
+      // source is observable. Booleans use opposite values across db/env.
+      const dbValues: Partial<TestConfigData> = {
+        'app:aiEnabled': { value: true },
+        'ai:provider': { value: 'openai' },
+        'ai:apiKey': { value: 'db-api-key' },
+        'ai:model': { value: 'db-model' },
+        'ai:providerOptions': { value: '{"openai":{"db":true}}' },
+        'ai:azureOpenaiResourceName': { value: 'db-resource' },
+        'ai:azureOpenaiBaseUrl': { value: 'https://db.example.com' },
+        'ai:azureOpenaiApiVersion': { value: '2024-db' },
+        'ai:azureOpenaiUseEntraId': { value: true },
+      };
+      const envValues: Partial<TestConfigData> = {
+        'app:aiEnabled': { value: false },
+        'ai:provider': { value: 'anthropic' },
+        'ai:apiKey': { value: 'env-api-key' },
+        'ai:model': { value: 'env-model' },
+        'ai:providerOptions': { value: '{"anthropic":{"env":true}}' },
+        'ai:azureOpenaiResourceName': { value: 'env-resource' },
+        'ai:azureOpenaiBaseUrl': { value: 'https://env.example.com' },
+        'ai:azureOpenaiApiVersion': { value: '2024-env' },
+        'ai:azureOpenaiUseEntraId': { value: false },
+      };
+
+      test('returns env value only (ignoring db) for all 9 AI keys when control key is true', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: true },
+        });
+
+        for (const key of aiKeys) {
+          expect(configManager.getConfig(key)).toEqual(envValues[key]?.value);
+        }
+      });
+
+      test('returns db value (env as fallback default) for all 9 AI keys when control key is false', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: false },
+        });
+
+        for (const key of aiKeys) {
+          expect(configManager.getConfig(key)).toEqual(dbValues[key]?.value);
+        }
+      });
+
+      test('falls back to env value when db value is undefined and control key is false', () => {
+        setTestConfigs(
+          { 'ai:provider': { value: undefined } },
+          {
+            'ai:provider': { value: 'anthropic' },
+            'env:useOnlyEnvVars:ai': { value: false },
+          },
+        );
+
+        expect(configManager.getConfig('ai:provider')).toBe('anthropic');
+      });
+
+      test('does not change resolution of unrelated keys when control key is true', () => {
+        // app:title is not part of the ai env-only group, so it must keep the
+        // default db ?? env resolution regardless of env:useOnlyEnvVars:ai.
+        setTestConfigs(
+          { 'app:title': { value: 'db-title' } },
+          {
+            'app:title': { value: 'env-title' },
+            'env:useOnlyEnvVars:ai': { value: true },
+          },
+        );
+
+        expect(configManager.getConfig('app:title')).toBe('db-title');
+      });
+    });
   });
 });
