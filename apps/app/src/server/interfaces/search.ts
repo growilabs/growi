@@ -93,6 +93,6 @@ export type ESQueryTerms = Pick<QueryTerms, ESTermsKey>;
 export type MongoQueryTerms = Pick<QueryTerms, MongoTermsKey>;
 
 export type ResolvedFilterData = {
-  groupMemberUsernames: string[];
-  notGroupMemberUsernames: string[];
+  groupIds: string[];
+  notGroupIds: string[];
 };

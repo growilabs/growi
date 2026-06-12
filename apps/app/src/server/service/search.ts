@@ -4,6 +4,7 @@ import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import {
   isIncludeAiMenthion,
   removeAiMenthion,
@@ -16,6 +17,7 @@ import type {
   ISearchResult,
 } from '~/interfaces/search';
 import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import UserGroup from '~/server/models/user-group';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
@@ -23,6 +25,7 @@ import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import type {
   ParsedQuery,
   QueryTerms,
+  ResolvedFilterData,
   SearchableData,
   SearchDelegator,
   SearchQueryParser,
@@ -436,7 +439,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     keyword: string,
     nqName: string | null,
     user,
-    userGroups,
+    userGroups: ObjectIdLike[] | null,
     searchOpts,
   ): Promise<[ISearchResult<unknown>, string | null]> {
     let parsedQuery: ParsedQuery;
@@ -462,6 +465,11 @@ class SearchService implements SearchQueryParser, SearchResolver {
       throw err;
     }
 
+    data.resolvedFilterData = await this.resolveFilterData(
+      data.terms,
+      userGroups,
+    );
+
     // throws
     this.validateSearchableData(delegator, data);
 
@@ -469,6 +477,49 @@ class SearchService implements SearchQueryParser, SearchResolver {
       await delegator.search(data, user, userGroups, searchOpts),
       delegator.name ?? null,
     ];
+  }
+
+  async resolveFilterData(
+    terms: Partial<QueryTerms>,
+    userGroups: ObjectIdLike[] | null,
+  ): Promise<ResolvedFilterData> {
+    const groupTerms = terms.group;
+    const notGroupTerms = terms.not_group;
+
+    if (userGroups == null || (groupTerms == null && notGroupTerms == null)) {
+      const emptyFilterData: ResolvedFilterData = {
+        groupIds: [],
+        notGroupIds: [],
+      };
+      return emptyFilterData;
+    }
+
+    const [internal, external] = await Promise.all([
+      UserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+      ExternalUserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+    ]);
+    const myGroups = [...internal, ...external];
+    const namesToIds = new Map<string, string[]>();
+
+    // Save the all the user's group names and their ids
+    for (const group of myGroups) {
+      const id = group.id.toString();
+      namesToIds.set(group.name, [...(namesToIds.get(group.name) ?? []), id]);
+    }
+
+    const resolve = (names: string[] = []) =>
+      names.flatMap((name) => namesToIds.get(name) ?? []);
+
+    const resolvedFilterData: ResolvedFilterData = {
+      groupIds: resolve(groupTerms),
+      notGroupIds: resolve(notGroupTerms),
+    };
+
+    return resolvedFilterData;
   }
 
   parseQueryString(_queryString: string): QueryTerms {
