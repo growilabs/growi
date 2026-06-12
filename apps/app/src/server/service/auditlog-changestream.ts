@@ -54,7 +54,10 @@ export class AuditlogChangeStreamService {
   }
 
   async start(): Promise<void> {
-    this.stopped = false;
+    // close() is terminal: once stopped, the service never restarts.
+    // Resetting the flag here would let an in-flight restart() reopen the stream after shutdown.
+    if (this.stopped) return;
+
     const auditLogEnabled = configManager.getConfig('app:auditLogEnabled');
     if (!auditLogEnabled) {
       logger.debug(
@@ -65,6 +68,8 @@ export class AuditlogChangeStreamService {
 
     const Activity = mongoose.model<ActivityDocument>('Activity');
     const token = await ChangeStreamResumeToken.load(STREAM_KEY);
+    if (this.stopped) return;
+
     const options: ChangeStreamOptions =
       token != null ? { resumeAfter: token } : {};
 
@@ -93,13 +98,15 @@ export class AuditlogChangeStreamService {
             await this.delegator.deleteAuditlog(event.documentKey._id);
           }
           // Per-event upsert doubles MongoDB writes but keeps the replay window minimal on restart.
-          // Throttle if write frequency becomes a concern.
+          // Throttle if write frequency becomes a concern — e.g. the one-time delete burst when
+          // Activity TTL is first enabled on a large backlog.
           await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
           this.consecutiveEventFailures = 0;
           this.lastFailingToken = null;
           this.consecutiveRestarts = 0;
         } catch (err) {
           // ResumeToken is typed as `unknown`; JSON.stringify compares structurally without type assertions.
+          // A false mismatch only resets the counter and delays the poison-pill skip — never causes data loss.
           if (
             JSON.stringify(event._id) !== JSON.stringify(this.lastFailingToken)
           ) {
