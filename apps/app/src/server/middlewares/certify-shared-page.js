@@ -3,6 +3,7 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:middleware:certify-shared-page');
 
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi) => {
   // Named function so the route-middleware snapshot tool can identify this
   // handler in the apiv3 auth chain.

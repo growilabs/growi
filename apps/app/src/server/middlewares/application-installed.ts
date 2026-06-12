@@ -1,3 +1,4 @@
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi) => {
   const { appService } = crowi;
 

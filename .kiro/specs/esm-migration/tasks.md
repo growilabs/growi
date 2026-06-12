@@ -262,12 +262,13 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Depends: 3.3.b_
   - _Boundary: Codemod Transform (middlewares/util)_
 
-- [ ] 3.3.d (step 3.d) `routes/` 配下の非中央ファイル (~40 本) を変換
+- [x] 3.3.d (step 3.d) `routes/` 配下の非中央ファイル (~40 本) を変換
   - `routes/index.js` と `routes/apiv3/index.js` を **除く** `routes/**/*.js` に対して codemod を実行
   - factory DI (`module.exports = (crowi, app) => ...`) を named export に変換
   - _Requirements: 2.2, 2.3, 2.6_
   - _Depends: 3.3.c_
   - _Boundary: Codemod Transform (routes leaves)_
+  - **実績 (2026-06-12)**: 49 ファイル変換 (.ts 含む)。初回適用で codemod が leading comments (@swagger 約 2300 行) を欠落 → codemod 修正 (`207fe517a4`) 後に再適用。declaration:true 起因の TS2742 に対し全 route factory へ明示 `Router` 戻り値型を付与 (.ts 10 / .js JSDoc 22)。express 型付化で顕在化した潜在型債務 3 ファイルを CrowiRequest/ApiV3Response + 到達不能ガードで解消。中央ルーターは member-access 修正のみ + 既存 synthetic default import 2 件 (g2g-transfer / security-settings) を named import 化 (boot クラッシュの実修正)。検証: build 21/21 / tests 75/75 / dev boot smoke (healthcheck 200, security-setting 未認証 403)
 
 - [ ] 3.3.e (step 3.e) `routes/index.js` (中央ルーター 12 箇所) を変換
   - factory invoke (`require('./x')(crowi, app)`) を `import { setup as setupX } from './x.js'; const x = setupX(crowi, app);` に変換
@@ -593,6 +594,35 @@ same issue.
   verify with `node -e "import('pkg').then(m => console.log(typeof m.default))"`.
   Steps 3.3.d–3.3.g must apply the same check to every external-package import
   the codemod produces.
+
+- **3.3.d explicit export types (TS2742)**: `tsconfig.build.server.json` has
+  `declaration: true`, so every exported route factory needs an explicit return
+  type (`: Router` on .ts, `@returns {import('express').Router}` JSDoc on .js) —
+  inferred express types are "not portable" and fail the build (NOT the tsgo
+  typecheck, which doesn't emit declarations). **Steps 3.3.e/f/g must annotate
+  the central routers' new exports the same way.**
+
+- **3.3.d synthetic default-import blind spot**: `import X from './converted-module'`
+  where the module has only named exports passes typecheck (esModuleInterop
+  synthesizes a default) but `X` is **undefined at runtime** → boot crash.
+  Stranded-caller sweeps after each codemod step MUST audit `import` statements
+  too, not just `require()` sites (3.3.d hit this twice: `g2g-transfer`,
+  `security-settings` in apiv3/index.js). Mechanical check: for every converted
+  file, resolve all importers and match member shape against actual exports.
+
+- **3.3.d boot-crash diagnosis pitfalls**: (1) pino's async transport loses
+  `logger.error(err)` written immediately before `process.exit(1)` — a boot
+  crash exits silently; temporarily inject `console.error(err)` into the
+  `main()` catch in `src/server/app.ts` to capture the stack. (2) nodemon keeps
+  running after "app crashed" and auto-restarts on file edits; stale dev servers
+  on :3000 produce false-positive 200s. Before any smoke, verify port 3000 is
+  free and attribute responses to the process you started.
+
+- **3.3.d deferred risk — resource/Contributor.js**: `routes/apiv3/staffs.js`
+  imports `^/resource/Contributor` (CJS `module.exports`, OUTSIDE src/server and
+  outside codemod scope). It compiles/runs today, but when `apps/app` gains
+  `"type": "module"` (task 3.7.b) the file becomes invalid as `.js`. Handle in
+  3.6/3.7.b preflight (rename to `.cjs` + specifier update, or convert).
 
 - **2.2 config .d.cts pairing**: The three CJS config files
   (`migrate-mongo-config.cjs`, `i18next.config.cjs`,

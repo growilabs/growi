@@ -143,7 +143,7 @@ type ActivityPaginationResult = PaginateResult<IActivity>;
  *               example: null
  */
 
-module.exports = (crowi: Crowi): Router => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const router = express.Router();

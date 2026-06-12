@@ -30,7 +30,7 @@ fs.readFile(path.join(projectRoot, DEFAULT_USER_IMAGE_PATH), (err, buffer) => {
   bufferedDefaultUserImageCache = buffer;
 });
 
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi) => {
   const isUserImageAttachment = (userImageUrlCached: string): boolean => {
     return /^\/attachment\/.+/.test(userImageUrlCached);
   };

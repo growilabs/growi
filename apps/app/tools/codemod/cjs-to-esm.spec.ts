@@ -348,7 +348,7 @@ describe('Comment preservation — leading comments must survive transform', () 
       ' *   get:',
       ' *     summary: Foo endpoint',
       ' */',
-      '/** @param {import(\'~/server/crowi\').default} crowi Crowi instance */',
+      "/** @param {import('~/server/crowi').default} crowi Crowi instance */",
       'module.exports = (crowi) => {',
       '  const router = express.Router();',
       '  return router;',
@@ -359,7 +359,9 @@ describe('Comment preservation — leading comments must survive transform', () 
 
     // Both comments must appear before the export declaration
     expect(output).toContain('@swagger');
-    expect(output).toContain('@param {import(\'~/server/crowi\').default} crowi Crowi instance');
+    expect(output).toContain(
+      "@param {import('~/server/crowi').default} crowi Crowi instance",
+    );
     expect(output).toContain('export const setup');
     // Comments must come before the export keyword
     const swaggerIdx = output.indexOf('@swagger');
@@ -425,9 +427,15 @@ describe('Comment preservation — leading comments must survive transform', () 
     const output = applyTransform(input);
 
     expect(output).toContain('/** Utility for creating API routers */');
-    expect(output).toContain("import { createApiRouter } from '~/server/util/createApiRouter'");
-    const commentIdx = output.indexOf('/** Utility for creating API routers */');
-    const importIdx = output.indexOf("import { createApiRouter } from '~/server/util/createApiRouter'");
+    expect(output).toContain(
+      "import { createApiRouter } from '~/server/util/createApiRouter'",
+    );
+    const commentIdx = output.indexOf(
+      '/** Utility for creating API routers */',
+    );
+    const importIdx = output.indexOf(
+      "import { createApiRouter } from '~/server/util/createApiRouter'",
+    );
     expect(commentIdx).toBeLessThan(importIdx);
   });
 });

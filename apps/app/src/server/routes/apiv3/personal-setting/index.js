@@ -21,8 +21,8 @@ import { getAccessTokenHandlerFactory } from './get-access-tokens';
 
 const logger = loggerFactory('growi:routes:apiv3:personal-setting');
 
-const express = require('express');
-const passport = require('passport');
+import express from 'express';
+import passport from 'passport';
 
 const router = express.Router();
 
@@ -72,8 +72,11 @@ const router = express.Router();
  *          accountId:
  *            type: string
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 

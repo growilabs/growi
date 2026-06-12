@@ -38,8 +38,11 @@ router.use((req, _res, next) => {
   next();
 });
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const { slackIntegrationService } = crowi;
 
   // Check if the access token is correct

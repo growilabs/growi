@@ -1,6 +1,7 @@
 import { ConfigSource, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import pathUtils from '@growi/core/dist/utils/path-utils';
+import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
@@ -20,6 +21,7 @@ import loggerFactory from '~/utils/logger';
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { setup as setupFileUploadSetting } from './file-upload-setting';
 
 const logger = loggerFactory('growi:routes:apiv3:app-settings');
 
@@ -318,7 +320,7 @@ const router = express.Router();
  *            type: boolean
  *            description: is enable internal stream system for azure file request
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
@@ -1035,7 +1037,7 @@ module.exports = (crowi: Crowi) => {
     },
   );
 
-  router.use('/file-upload-setting', require('./file-upload-setting')(crowi));
+  router.use('/file-upload-setting', setupFileUploadSetting(crowi));
 
   router.put(
     '/page-bulk-export-settings',

@@ -44,15 +44,15 @@ module.exports = (crowi, app) => {
   const addActivity = generateAddActivityMiddleware(crowi);
 
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });
-  const page = require('./page')(crowi, app);
-  const login = require('./login')(crowi, app);
-  const loginPassport = require('./login-passport')(crowi, app);
-  const admin = require('./admin')(crowi, app);
+  const page = require('./page').setup(crowi, app);
+  const login = require('./login').setup(crowi, app);
+  const loginPassport = require('./login-passport').setup(crowi, app);
+  const admin = require('./admin').setup(crowi, app);
   const attachmentApi = attachmentApiRoutesFactory(crowi).api;
-  const comment = require('./comment')(crowi, app);
-  const tag = require('./tag')(crowi, app);
-  const search = require('./search')(crowi, app);
-  const ogp = require('./ogp')(crowi);
+  const comment = require('./comment').setup(crowi, app);
+  const tag = require('./tag').setup(crowi, app);
+  const search = require('./search').setup(crowi, app);
+  const ogp = require('./ogp').setup(crowi);
   const { createApiRouter } = require('~/server/util/createApiRouter');
 
   const next = nextFactory(crowi);

@@ -13,10 +13,10 @@ import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import injectUserRegistrationOrderByTokenMiddleware from '../../middlewares/inject-user-registration-order-by-token-middleware';
 import * as loginFormValidator from '../../middlewares/login-form-validator';
 import * as registerFormValidator from '../../middlewares/register-form-validator';
-import g2gTransfer from './g2g-transfer';
+import { setup as g2gTransfer } from './g2g-transfer';
 import importRoute from './import';
 import pageListing from './page-listing';
-import securitySettings from './security-settings';
+import { setup as securitySettings } from './security-settings';
 import { factory as userRouteFactory } from './user';
 import * as userActivation from './user-activation';
 
@@ -36,48 +36,51 @@ module.exports = (crowi, app) => {
   );
 
   // add custom functions to express response
-  require('./response')(express, crowi);
+  require('./response').default(express, crowi);
 
-  routerForAdmin.use('/healthcheck', require('./healthcheck')(crowi));
+  routerForAdmin.use('/healthcheck', require('./healthcheck').setup(crowi));
 
   // admin
-  routerForAdmin.use('/admin-home', require('./admin-home')(crowi));
-  routerForAdmin.use('/markdown-setting', require('./markdown-setting')(crowi));
+  routerForAdmin.use('/admin-home', require('./admin-home').setup(crowi));
+  routerForAdmin.use(
+    '/markdown-setting',
+    require('./markdown-setting').setup(crowi),
+  );
   routerForAdmin.use(
     '/content-disposition-settings',
-    require('./content-disposition-settings')(crowi),
+    require('./content-disposition-settings').setup(crowi),
   );
-  routerForAdmin.use('/app-settings', require('./app-settings')(crowi));
+  routerForAdmin.use('/app-settings', require('./app-settings').setup(crowi));
   routerForAdmin.use(
     '/customize-setting',
-    require('./customize-setting')(crowi),
+    require('./customize-setting').setup(crowi),
   );
   routerForAdmin.use(
     '/notification-setting',
-    require('./notification-setting')(crowi),
+    require('./notification-setting').setup(crowi),
   );
-  routerForAdmin.use('/users', require('./users')(crowi));
-  routerForAdmin.use('/user-groups', require('./user-group')(crowi));
+  routerForAdmin.use('/users', require('./users').setup(crowi));
+  routerForAdmin.use('/user-groups', require('./user-group').setup(crowi));
   routerForAdmin.use(
     '/external-user-groups',
     require('~/features/external-user-group/server/routes/apiv3/external-user-group')(
       crowi,
     ),
   );
-  routerForAdmin.use('/export', require('./export')(crowi));
+  routerForAdmin.use('/export', require('./export').setup(crowi));
   routerForAdmin.use('/import', importRoute(crowi));
-  routerForAdmin.use('/search', require('./search')(crowi));
+  routerForAdmin.use('/search', require('./search').setup(crowi));
   routerForAdmin.use('/security-setting', securitySettings(crowi));
-  routerForAdmin.use('/mongo', require('./mongo')(crowi));
+  routerForAdmin.use('/mongo', require('./mongo').setup(crowi));
   routerForAdmin.use(
     '/slack-integration-settings',
-    require('./slack-integration-settings')(crowi),
+    require('./slack-integration-settings').setup(crowi),
   );
   routerForAdmin.use(
     '/slack-integration-legacy-settings',
-    require('./slack-integration-legacy-settings')(crowi),
+    require('./slack-integration-legacy-settings').setup(crowi),
   );
-  routerForAdmin.use('/activity', require('./activity')(crowi));
+  routerForAdmin.use('/activity', require('./activity').setup(crowi));
   routerForAdmin.use('/g2g-transfer', g2gTransfer(crowi));
   routerForAdmin.use('/plugins', growiPlugin(crowi));
 
@@ -88,8 +91,8 @@ module.exports = (crowi, app) => {
   const applicationInstalled =
     require('../../middlewares/application-installed').setup(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
-  const login = require('../login')(crowi, app);
-  const loginPassport = require('../login-passport')(crowi, app);
+  const login = require('../login').setup(crowi, app);
+  const loginPassport = require('../login-passport').setup(crowi, app);
 
   routerForAuth.post(
     '/login',
@@ -105,8 +108,8 @@ module.exports = (crowi, app) => {
     loginPassport.loginFailure,
   );
 
-  routerForAuth.use('/invited', require('./invited')(crowi));
-  routerForAuth.use('/logout', require('./logout')(crowi));
+  routerForAuth.use('/invited', require('./invited').setup(crowi));
+  routerForAuth.use('/logout', require('./logout').setup(crowi));
 
   routerForAuth.post(
     '/register',
@@ -128,23 +131,31 @@ module.exports = (crowi, app) => {
   // installer
   routerForAdmin.use(
     '/installer',
-    isInstalled ? allreadyInstalledMiddleware : require('./installer')(crowi),
+    isInstalled
+      ? allreadyInstalledMiddleware
+      : require('./installer').setup(crowi),
   );
 
   if (!isInstalled) {
     return [router, routerForAdmin, routerForAuth];
   }
 
-  router.use('/in-app-notification', require('./in-app-notification')(crowi));
+  router.use(
+    '/in-app-notification',
+    require('./in-app-notification').setup(crowi),
+  );
   router.use(
     '/news',
     require('~/features/news/server/routes/news').default(crowi),
   );
 
-  router.use('/personal-setting', require('./personal-setting')(crowi));
-  router.use('/user-activities', require('./user-activities')(crowi));
+  router.use('/personal-setting', require('./personal-setting').setup(crowi));
+  router.use('/user-activities', require('./user-activities').setup(crowi));
 
-  router.use('/user-group-relations', require('./user-group-relation')(crowi));
+  router.use(
+    '/user-group-relations',
+    require('./user-group-relation').setup(crowi),
+  );
   router.use(
     '/external-user-group-relations',
     require('~/features/external-user-group/server/routes/apiv3/external-user-group-relation')(
@@ -152,31 +163,31 @@ module.exports = (crowi, app) => {
     ),
   );
 
-  router.use('/statistics', require('./statistics')(crowi));
+  router.use('/statistics', require('./statistics').setup(crowi));
 
-  router.use('/search', require('./search')(crowi));
+  router.use('/search', require('./search').setup(crowi));
 
-  router.use('/page', require('./page')(crowi));
-  router.use('/pages', require('./pages')(crowi));
-  router.use('/revisions', require('./revisions')(crowi));
+  router.use('/page', require('./page').setup(crowi));
+  router.use('/pages', require('./pages').setup(crowi));
+  router.use('/revisions', require('./revisions').setup(crowi));
 
   // vault user API (POST /page/reconcile) — loginRequired only, no adminRequired
   router.use('/vault', createVaultPageRouterWithDeps(crowi));
 
   router.use('/page-listing', pageListing(crowi));
 
-  router.use('/share-links', require('./share-links')(crowi));
+  router.use('/share-links', require('./share-links').setup(crowi));
 
-  router.use('/bookmarks', require('./bookmarks')(crowi));
-  router.use('/attachment', require('./attachment')(crowi));
+  router.use('/bookmarks', require('./bookmarks').setup(crowi));
+  router.use('/attachment', require('./attachment').setup(crowi));
 
-  router.use('/slack-integration', require('./slack-integration')(crowi));
+  router.use('/slack-integration', require('./slack-integration').setup(crowi));
 
-  router.use('/staffs', require('./staffs')(crowi));
+  router.use('/staffs', require('./staffs').setup(crowi));
 
-  router.use('/forgot-password', require('./forgot-password')(crowi));
+  router.use('/forgot-password', require('./forgot-password').setup(crowi));
 
-  const user = require('../user')(crowi, null);
+  const user = require('../user').setup(crowi, null);
   router.get('/check-username', user.api.checkUsername);
 
   router.post(
@@ -188,9 +199,9 @@ module.exports = (crowi, app) => {
     userActivation.completeRegistrationAction(crowi),
   );
 
-  router.use('/user-ui-settings', require('./user-ui-settings')(crowi));
+  router.use('/user-ui-settings', require('./user-ui-settings').setup());
 
-  router.use('/bookmark-folder', require('./bookmark-folder')(crowi));
+  router.use('/bookmark-folder', require('./bookmark-folder').setup(crowi));
   router.use(
     '/templates',
     require('~/features/templates/server/routes/apiv3')(crowi),

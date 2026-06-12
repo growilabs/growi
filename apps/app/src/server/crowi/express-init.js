@@ -33,7 +33,7 @@ module.exports = (crowi, app) => {
     require('../middlewares/inject-currentuser-to-localvars').setup();
   const autoReconnectToS2sMsgServer =
     require('../middlewares/auto-reconnect-to-s2s-msg-server').setup(crowi);
-  const avoidSessionRoutes = require('../routes/avoid-session-routes');
+  const avoidSessionRoutes = require('../routes/avoid-session-routes').default;
 
   const env = crowi.node_env;
 

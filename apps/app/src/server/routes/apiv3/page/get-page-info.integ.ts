@@ -133,13 +133,8 @@ describe('GET /info', () => {
     });
 
     // Mount the page router
-    const pageModule = await import('./index');
-    const factoryCandidate =
-      'default' in pageModule ? pageModule.default : pageModule;
-    if (typeof factoryCandidate !== 'function') {
-      throw new Error('Module does not export a router factory function');
-    }
-    const pageRouter = factoryCandidate(crowi);
+    const { setup: setupPageRouter } = await import('./index');
+    const pageRouter = setupPageRouter(crowi);
     app.use('/', pageRouter);
   });
 

@@ -12,6 +12,9 @@ import {
   getConnectionStatuses,
   sendSuccessMessage,
 } from '@growi/slack/dist/utils/check-communicable';
+import express from 'express';
+import { body, param } from 'express-validator';
+import urljoin from 'url-join';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -22,10 +25,6 @@ import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-
-const express = require('express');
-const { body, param } = require('express-validator');
-const urljoin = require('url-join');
 
 const logger = loggerFactory('growi:routes:apiv3:slack-integration-settings');
 
@@ -49,8 +48,11 @@ const router = express.Router();
  *            type: string
  */
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
