@@ -47,7 +47,7 @@
   - _Depends: 2.1_
   - _Boundary: model-config-sync, crowi S2S setup_
 
-- [ ] 2.4 mastra ルートゲートをリクエスト毎の利用可否判定へ置換
+- [x] 2.4 mastra ルートゲートをリクエスト毎の利用可否判定へ置換
   - 起動時固定ゲート(`isAiEnabled()` の factory 時評価)を撤去し、`isAiReady()` を毎リクエスト評価する guard ミドルウェアを適用(未 ready で 501、無効と設定不備をメッセージで区別)
   - 統合テスト: 有効かつ未設定で 501、両者揃うと通過、設定変更後に再起動なしで判定が切り替わる
   - _Requirements: 7.2, 7.3, 7.5_
