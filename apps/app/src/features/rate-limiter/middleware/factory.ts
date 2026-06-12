@@ -3,14 +3,14 @@ import type { Handler, Request } from 'express';
 import md5 from 'md5';
 import type { RateLimiterRes } from 'rate-limiter-flexible';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   DEFAULT_USERS_PER_IP_PROSPECTION,
   type IApiRateLimitConfig,
-} from '../config';
-import { generateApiRateLimitConfig } from '../utils/config-generator';
-import { consumePoints } from './consume-points';
+} from '../config/index.js';
+import { generateApiRateLimitConfig } from '../utils/config-generator.js';
+import { consumePoints } from './consume-points.js';
 
 const logger = loggerFactory('growi:middleware:api-rate-limit');
 

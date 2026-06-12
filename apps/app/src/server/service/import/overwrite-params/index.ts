@@ -1,5 +1,5 @@
-import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
-import { isImportOptionForPages } from '~/models/admin/import-option-for-pages';
+import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option.js';
+import { isImportOptionForPages } from '~/models/admin/import-option-for-pages.js';
 
 import type { OverwriteParams } from '../import-settings.js';
 import { overwriteParams as overwriteParamsForAttachmentFilesChunks } from './attachmentFiles.chunks.js';

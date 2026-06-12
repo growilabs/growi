@@ -2,13 +2,13 @@ import React, { useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
 
-import Accordion from '../Common/Accordion';
-import CustomBotWithoutProxySecretTokenSection from './CustomBotWithoutProxySecretTokenSection';
-import ManageCommandsProcessWithoutProxy from './ManageCommandsProcessWithoutProxy';
-import MessageBasedOnConnection from './MessageBasedOnConnection';
-import { addLogs } from './slack-integration-util';
+import Accordion from '../Common/Accordion.js';
+import CustomBotWithoutProxySecretTokenSection from './CustomBotWithoutProxySecretTokenSection.js';
+import ManageCommandsProcessWithoutProxy from './ManageCommandsProcessWithoutProxy.js';
+import MessageBasedOnConnection from './MessageBasedOnConnection.js';
+import { addLogs } from './slack-integration-util.js';
 
 export const botInstallationStep = {
   CREATE_BOT: 'create-bot',

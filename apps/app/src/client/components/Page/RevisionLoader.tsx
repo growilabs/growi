@@ -3,11 +3,11 @@ import type { IRevision, IRevisionHasId, Ref } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import type { RendererOptions } from '~/interfaces/renderer-options';
-import { useSWRxPageRevision } from '~/stores/page';
-import loggerFactory from '~/utils/logger';
+import type { RendererOptions } from '~/interfaces/renderer-options.js';
+import { useSWRxPageRevision } from '~/stores/page.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import RevisionRenderer from '../../../components/PageView/RevisionRenderer';
+import RevisionRenderer from '../../../components/PageView/RevisionRenderer.js';
 
 export const ROOT_ELEM_ID = 'revision-loader' as const;
 

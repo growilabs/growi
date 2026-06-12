@@ -3,9 +3,9 @@ import React from 'react';
 import type { HasObjectId } from '@growi/core';
 import { PagePathLabel } from '@growi/ui/dist/components';
 
-import type { IInAppNotification } from '~/interfaces/in-app-notification';
+import type { IInAppNotification } from '~/interfaces/in-app-notification.js';
 
-import FormattedDistanceDate from '../../FormattedDistanceDate';
+import FormattedDistanceDate from '../../FormattedDistanceDate.js';
 
 import styles from './ModelNotification.module.scss';
 

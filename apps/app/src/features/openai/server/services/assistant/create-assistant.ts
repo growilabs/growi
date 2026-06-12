@@ -1,9 +1,9 @@
 import type OpenAI from 'openai';
 
-import { configManager } from '~/server/service/config-manager';
+import { configManager } from '~/server/service/config-manager/index.js';
 
-import { openaiClient } from '../client';
-import type { AssistantType } from './assistant-types';
+import { openaiClient } from '../client.js';
+import type { AssistantType } from './assistant-types.js';
 
 const findAssistantByName = async (
   assistantName: string,

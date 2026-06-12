@@ -1,5 +1,5 @@
 import { Text } from '@codemirror/state';
-import type { UseCodeMirrorEditor } from '@growi/editor/dist/client/services/use-codemirror-editor';
+import type { UseCodeMirrorEditor } from '@growi/editor/dist/client/services/use-codemirror-editor/index.js';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 

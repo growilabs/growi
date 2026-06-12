@@ -6,7 +6,7 @@ import {
   apiv3Get,
   apiv3Post,
   apiv3Put,
-} from '../util/apiv3-client';
+} from '../util/apiv3-client.js';
 
 /**
  * Service container for admin Notification setting page (NotificationSetting.jsx)

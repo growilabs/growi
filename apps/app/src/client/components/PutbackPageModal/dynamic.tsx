@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader';
-import { usePutBackPageModalStatus } from '~/states/ui/modal/put-back-page';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
+import { usePutBackPageModalStatus } from '~/states/ui/modal/put-back-page.js';
 
 type PutBackPageModalProps = Record<string, unknown>;
 
@@ -11,7 +11,7 @@ export const PutBackPageModalLazyLoaded = (): JSX.Element => {
   const PutBackPageModal = useLazyLoader<PutBackPageModalProps>(
     'put-back-page-modal',
     () =>
-      import('./PutbackPageModal').then((mod) => ({
+      import('./PutbackPageModal.js').then((mod) => ({
         default: mod.PutBackPageModal,
       })),
     status?.isOpened ?? false,

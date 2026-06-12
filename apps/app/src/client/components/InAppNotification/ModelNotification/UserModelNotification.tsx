@@ -2,12 +2,12 @@ import React from 'react';
 import { useRouter } from 'next/router';
 import type { HasObjectId, IUser } from '@growi/core';
 
-import { SupportedTargetModel } from '~/interfaces/activity';
-import type { IInAppNotification } from '~/interfaces/in-app-notification';
+import { SupportedTargetModel } from '~/interfaces/activity.js';
+import type { IInAppNotification } from '~/interfaces/in-app-notification.js';
 
-import type { ModelNotificationUtils } from '.';
-import { ModelNotification } from './ModelNotification';
-import { useActionMsgAndIconForModelNotification } from './useActionAndMsg';
+import type { ModelNotificationUtils } from './index.js';
+import { ModelNotification } from './ModelNotification.js';
+import { useActionMsgAndIconForModelNotification } from './useActionAndMsg.js';
 
 export const useUserModelNotification = (
   notification: IInAppNotification & HasObjectId,

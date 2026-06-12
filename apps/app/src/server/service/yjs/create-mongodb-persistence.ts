@@ -3,12 +3,12 @@ import type { Server } from 'socket.io';
 import type { WSSharedDoc, YWebsocketPersistence } from 'y-websocket/bin/utils';
 import * as Y from 'yjs';
 
-import { SocketEventName } from '~/interfaces/websocket';
+import { SocketEventName } from '~/interfaces/websocket.js';
 import {
   getRoomNameWithId,
   RoomPrefix,
-} from '~/server/service/socket-io/helper';
-import loggerFactory from '~/utils/logger';
+} from '~/server/service/socket-io/helper.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { MongodbPersistence } from './extended/mongodb-persistence.js';
 import type { syncYDoc as syncYDocType } from './sync-ydoc.js';

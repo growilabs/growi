@@ -6,8 +6,8 @@ import type { Plugin } from 'unified';
 import { visit } from 'unist-util-visit';
 import urljoin from 'url-join';
 
-import carbonGrayDarkStyles from '../themes/carbon-gray-dark.puml';
-import carbonGrayLightStyles from '../themes/carbon-gray-light.puml';
+import carbonGrayDarkStyles from '../themes/carbon-gray-dark.puml.js';
+import carbonGrayLightStyles from '../themes/carbon-gray-light.puml.js';
 
 type PlantUMLPluginParams = {
   plantumlUri: string;

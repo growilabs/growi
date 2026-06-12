@@ -11,8 +11,8 @@ import type { TypeaheadRef } from 'react-bootstrap-typeahead';
 import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
 
-import type { IClearable } from '~/client/interfaces/clearable';
-import { useSWRxUsernames } from '~/stores/user';
+import type { IClearable } from '~/client/interfaces/clearable.js';
+import { useSWRxUsernames } from '~/stores/user.js';
 
 const Categories = {
   activeUser: 'Active User',

@@ -1,7 +1,7 @@
 import type React from 'react';
 import type { JSX } from 'react';
 
-import type { GetItemProps } from '../interfaces/downshift';
+import type { GetItemProps } from '../interfaces/downshift.js';
 
 import styles from './SearchMenuItem.module.scss';
 

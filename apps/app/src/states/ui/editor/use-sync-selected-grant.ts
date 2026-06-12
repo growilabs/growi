@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 
-import { useCurrentPageId } from '~/states/page';
-import { useSWRxCurrentGrantData } from '~/stores/page';
+import { useCurrentPageId } from '~/states/page/index.js';
+import { useSWRxCurrentGrantData } from '~/stores/page.js';
 
-import { toSelectedGrant, useSelectedGrant } from './selected-grant';
+import { toSelectedGrant, useSelectedGrant } from './selected-grant.js';
 
 /**
  * Sync selectedGrantAtom with the current page's grant.

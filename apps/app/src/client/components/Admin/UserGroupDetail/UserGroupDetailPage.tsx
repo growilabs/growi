@@ -18,22 +18,22 @@ import {
   apiv3Get,
   apiv3Post,
   apiv3Put,
-} from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import type { IExternalUserGroupHasId } from '~/features/external-user-group/interfaces/external-user-group';
+} from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import type { IExternalUserGroupHasId } from '~/features/external-user-group/interfaces/external-user-group.js';
 import type {
   PageActionOnGroupDelete,
   SearchType,
-} from '~/interfaces/user-group';
-import { SearchTypes } from '~/interfaces/user-group';
-import { isAclEnabledAtom } from '~/states/server-configurations';
-import { useUpdateUserGroupConfirmModalActions } from '~/states/ui/modal/update-user-group-confirm';
+} from '~/interfaces/user-group.js';
+import { SearchTypes } from '~/interfaces/user-group.js';
+import { isAclEnabledAtom } from '~/states/server-configurations/index.js';
+import { useUpdateUserGroupConfirmModalActions } from '~/states/ui/modal/update-user-group-confirm.js';
 import {
   useSWRxSelectableChildUserGroups,
   useSWRxSelectableParentUserGroups,
   useSWRxUserGroupPages,
-} from '~/stores/user-group';
-import loggerFactory from '~/utils/logger';
+} from '~/stores/user-group.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   useAncestorUserGroups,
@@ -41,53 +41,53 @@ import {
   useUserGroup,
   useUserGroupRelationList,
   useUserGroupRelations,
-} from './use-user-group-resource';
+} from './use-user-group-resource.js';
 
 import styles from './UserGroupDetailPage.module.scss';
 
 const logger = loggerFactory('growi:services:AdminCustomizeContainer');
 
-const UserGroupPageList = dynamic(() => import('./UserGroupPageList'), {
+const UserGroupPageList = dynamic(() => import('./UserGroupPageList.js'), {
   ssr: false,
 });
 const UserGroupUserTable = dynamic(
-  () => import('./UserGroupUserTable').then((mod) => mod.UserGroupUserTable),
+  () => import('./UserGroupUserTable.js').then((mod) => mod.UserGroupUserTable),
   { ssr: false },
 );
 
-const UserGroupUserModal = dynamic(() => import('./UserGroupUserModal'), {
+const UserGroupUserModal = dynamic(() => import('./UserGroupUserModal.js'), {
   ssr: false,
 });
 
 const UserGroupDeleteModal = dynamic(
   () =>
-    import('../UserGroup/UserGroupDeleteModal').then(
+    import('../UserGroup/UserGroupDeleteModal.js').then(
       (mod) => mod.UserGroupDeleteModal,
     ),
   { ssr: false },
 );
 const UserGroupDropdown = dynamic(
   () =>
-    import('../UserGroup/UserGroupDropdown').then(
+    import('../UserGroup/UserGroupDropdown.js').then(
       (mod) => mod.UserGroupDropdown,
     ),
   { ssr: false },
 );
 const UserGroupForm = dynamic(
-  () => import('../UserGroup/UserGroupForm').then((mod) => mod.UserGroupForm),
+  () => import('../UserGroup/UserGroupForm.js').then((mod) => mod.UserGroupForm),
   { ssr: false },
 );
 const UserGroupModal = dynamic(
-  () => import('../UserGroup/UserGroupModal').then((mod) => mod.UserGroupModal),
+  () => import('../UserGroup/UserGroupModal.js').then((mod) => mod.UserGroupModal),
   { ssr: false },
 );
 const UserGroupTable = dynamic(
-  () => import('../UserGroup/UserGroupTable').then((mod) => mod.UserGroupTable),
+  () => import('../UserGroup/UserGroupTable.js').then((mod) => mod.UserGroupTable),
   { ssr: false },
 );
 const UpdateParentConfirmModal = dynamic(
   () =>
-    import('./UpdateParentConfirmModal').then(
+    import('./UpdateParentConfirmModal.js').then(
       (mod) => mod.UpdateParentConfirmModal,
     ),
   { ssr: false },

@@ -9,22 +9,22 @@ import Head from 'next/head';
 import { USER_STATUS } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import { NoLoginLayout } from '~/components/Layout/NoLoginLayout';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { NoLoginLayout } from '~/components/Layout/NoLoginLayout.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
 
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
-import { useCustomTitle } from '../utils/page-title-customization';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+} from '../common-props/index.js';
+import { useCustomTitle } from '../utils/page-title-customization.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
 
 const InvitedForm = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/InvitedForm').then((mod) => mod.InvitedForm),
+    import('~/client/components/InvitedForm.js').then((mod) => mod.InvitedForm),
   { ssr: false },
 );
 

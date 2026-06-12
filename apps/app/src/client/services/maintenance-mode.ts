@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { useSetAtom } from 'jotai';
 
-import { _atomsForMaintenanceMode } from '../../states/global';
-import { apiv3Post } from '../util/apiv3-client';
+import { _atomsForMaintenanceMode } from '../../states/global/index.js';
+import { apiv3Post } from '../util/apiv3-client.js';
 
 const { isMaintenanceModeAtom } = _atomsForMaintenanceMode;
 

@@ -3,7 +3,7 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import mongoose from 'mongoose';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../../crowi/index.js';
 import { setup as applicationInstalledSetup } from '../../middlewares/application-installed.js';

@@ -3,10 +3,10 @@ import type { IPageInfoForEntity, IPageWithMeta } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import type { OnDeletedFunction, OnPutBackedFunction } from '~/interfaces/ui';
+import type { OnDeletedFunction, OnPutBackedFunction } from '~/interfaces/ui.js';
 
-import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl';
-import { PageListItemL } from './PageListItemL';
+import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl.js';
+import { PageListItemL } from './PageListItemL.js';
 
 import styles from './PageList.module.scss';
 

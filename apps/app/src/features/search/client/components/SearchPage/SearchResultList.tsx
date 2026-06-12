@@ -11,21 +11,21 @@ import {
 } from '@growi/core/dist/interfaces';
 import { useTranslation } from 'next-i18next';
 
-import type { ForceHideMenuItems } from '~/client/components/Common/Dropdown/PageItemControl';
-import { PageListItemL } from '~/client/components/PageList/PageListItemL';
+import type { ForceHideMenuItems } from '~/client/components/Common/Dropdown/PageItemControl.js';
+import { PageListItemL } from '~/client/components/PageList/PageListItemL.js';
 import type {
   ISelectable,
   ISelectableAll,
-} from '~/client/interfaces/selectable-all';
-import { toastSuccess } from '~/client/util/toastr';
-import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+} from '~/client/interfaces/selectable-all.js';
+import { toastSuccess } from '~/client/util/toastr.js';
+import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search.js';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
 import {
   mutatePageTree,
   mutateRecentlyUpdated,
   useSWRxPageInfoForList,
-} from '~/stores/page-listing';
-import { mutateSearching } from '~/stores/search';
+} from '~/stores/page-listing.js';
+import { mutateSearching } from '~/stores/search.js';
 
 type Props = {
   pages: IPageWithSearchMeta[];

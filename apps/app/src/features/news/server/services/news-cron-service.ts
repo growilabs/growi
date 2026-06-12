@@ -1,11 +1,11 @@
-import { configManager } from '~/server/service/config-manager';
-import CronService from '~/server/service/cron';
-import { getGrowiVersion } from '~/utils/growi-version';
-import loggerFactory from '~/utils/logger';
+import { configManager } from '~/server/service/config-manager/index.js';
+import CronService from '~/server/service/cron.js';
+import { getGrowiVersion } from '~/utils/growi-version.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { INewsItemInput } from '../../interfaces/news-item';
-import { type FeedItem, parseFeedJson } from './feed-parser';
-import { NewsService } from './news-service';
+import type { INewsItemInput } from '../../interfaces/news-item.js';
+import { type FeedItem, parseFeedJson } from './feed-parser.js';
+import { NewsService } from './news-service.js';
 
 const logger = loggerFactory('growi:feature:news:cron');
 

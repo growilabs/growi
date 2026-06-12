@@ -1,20 +1,20 @@
 import type { JSX } from 'react';
 import dynamic from 'next/dynamic';
 
-import { useHashChangedEffect } from '~/client/services/side-effects/hash-changed';
-import { useIsEditable, useRevisionIdFromUrl } from '~/states/page';
+import { useHashChangedEffect } from '~/client/services/side-effects/hash-changed.js';
+import { useIsEditable, useRevisionIdFromUrl } from '~/states/page/index.js';
 import {
   EditorMode,
   useEditorMode,
   useReservedNextCaretLine,
-} from '~/states/ui/editor';
+} from '~/states/ui/editor/index.js';
 
-import { LazyRenderer } from '../Common/LazyRenderer';
+import { LazyRenderer } from '../Common/LazyRenderer.js';
 
-const PageEditor = dynamic(() => import('../PageEditor'), { ssr: false });
+const PageEditor = dynamic(() => import('../PageEditor/index.js'), { ssr: false });
 const PageEditorReadOnly = dynamic(
   () =>
-    import('../PageEditor/PageEditorReadOnly').then(
+    import('../PageEditor/PageEditorReadOnly.js').then(
       (mod) => mod.PageEditorReadOnly,
     ),
   { ssr: false },

@@ -1,7 +1,7 @@
 import React, { type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { NotAvailable } from './NotAvailable';
+import { NotAvailable } from './NotAvailable.js';
 
 type NotAvailableForNowProps = {
   children: JSX.Element;

@@ -1,1 +1,1 @@
-export * from './general-xss-filter';
+export * from './general-xss-filter.js';

@@ -2,7 +2,7 @@ import type { IPageHasId } from '@growi/core';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 import useSWRInfinite from 'swr/infinite';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
 
 type PageTimelineResult = {
   pages: IPageHasId[];

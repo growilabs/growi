@@ -2,12 +2,12 @@ import { addDays } from 'date-fns/addDays';
 import { type Document, type PaginateModel, Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
 import {
   type IThreadRelation,
   ThreadType,
-} from '../../interfaces/thread-relation';
+} from '../../interfaces/thread-relation.js';
 
 const DAYS_UNTIL_EXPIRATION = 3;
 

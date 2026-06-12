@@ -3,11 +3,11 @@ import { useEffect } from 'react';
 import type {
   UpdateDescCountData,
   UpdateDescCountRawData,
-} from '~/interfaces/websocket';
-import { SocketEventName } from '~/interfaces/websocket';
-import { useGlobalSocket } from '~/states/socket-io';
+} from '~/interfaces/websocket.js';
+import { SocketEventName } from '~/interfaces/websocket.js';
+import { useGlobalSocket } from '~/states/socket-io/index.js';
 
-import { usePageTreeDescCountMapAction } from '../states/page-tree-desc-count-map';
+import { usePageTreeDescCountMapAction } from '../states/page-tree-desc-count-map.js';
 
 /**
  * Hook to listen for Socket.io UpdateDescCount events and update descendant count badges

@@ -10,8 +10,8 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 import path from 'path';
 
-import { projectRoot } from '~/server/util/project-dir-utils';
-import loggerFactory from '~/utils/logger';
+import { projectRoot } from '~/server/util/project-dir-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 import { Attachment } from '../models/attachment.js';

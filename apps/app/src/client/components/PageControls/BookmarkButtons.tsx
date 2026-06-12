@@ -2,16 +2,18 @@ import type { FC } from 'react';
 import React, { useCallback, useState } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
-import DropdownToggle from 'reactstrap/esm/DropdownToggle';
-import Popover from 'reactstrap/esm/Popover';
-import PopoverBody from 'reactstrap/esm/PopoverBody';
-import UncontrolledTooltip from 'reactstrap/esm/UncontrolledTooltip';
+import {
+  DropdownToggle,
+  Popover,
+  PopoverBody,
+  UncontrolledTooltip,
+} from 'reactstrap';
 
-import { useIsGuestUser } from '~/states/context';
-import { useSWRxBookmarkedUsers } from '~/stores/bookmark';
+import { useIsGuestUser } from '~/states/context.js';
+import { useSWRxBookmarkedUsers } from '~/stores/bookmark.js';
 
-import { BookmarkFolderMenu } from '../Bookmarks/BookmarkFolderMenu';
-import UserPictureList from '../Common/UserPictureList';
+import { BookmarkFolderMenu } from '../Bookmarks/BookmarkFolderMenu.js';
+import UserPictureList from '../Common/UserPictureList.js';
 
 import styles from './BookmarkButtons.module.scss';
 import popoverStyles from './user-list-popover.module.scss';

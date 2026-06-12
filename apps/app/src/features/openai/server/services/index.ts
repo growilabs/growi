@@ -1,1 +1,1 @@
-export * from './is-ai-enabled';
+export * from './is-ai-enabled.js';

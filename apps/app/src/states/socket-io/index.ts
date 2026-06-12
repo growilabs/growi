@@ -1,1 +1,1 @@
-export * from './global-socket';
+export * from './global-socket.js';

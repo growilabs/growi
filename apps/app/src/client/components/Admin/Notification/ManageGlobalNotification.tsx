@@ -13,15 +13,15 @@ import { useTranslation } from 'next-i18next';
 import {
   NotifyType,
   TriggerEventType,
-} from '~/client/interfaces/global-notification';
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError } from '~/client/util/toastr';
-import { isMailerSetupAtom } from '~/states/server-configurations';
-import { useSWRxGlobalNotification } from '~/stores/global-notification';
-import loggerFactory from '~/utils/logger';
+} from '~/client/interfaces/global-notification.js';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
+import { toastError } from '~/client/util/toastr.js';
+import { isMailerSetupAtom } from '~/states/server-configurations/index.js';
+import { useSWRxGlobalNotification } from '~/stores/global-notification.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
-import TriggerEventCheckBox from './TriggerEventCheckBox';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
+import TriggerEventCheckBox from './TriggerEventCheckBox.js';
 
 const logger = loggerFactory('growi:manageGlobalNotification');
 

@@ -1,2 +1,2 @@
-export * from './conflict';
-export * from './use-update-page';
+export * from './conflict.js';
+export * from './use-update-page.js';

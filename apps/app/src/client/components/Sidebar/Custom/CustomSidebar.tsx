@@ -3,14 +3,14 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 
-import { useSWRxPageByPath } from '~/stores/page';
+import { useSWRxPageByPath } from '~/stores/page.js';
 
-import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton';
-import DefaultContentSkeleton from '../Skeleton/DefaultContentSkeleton';
+import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton.js';
+import DefaultContentSkeleton from '../Skeleton/DefaultContentSkeleton.js';
 
 const CustomSidebarContent = dynamic(
   () =>
-    import('./CustomSidebarSubstance').then(
+    import('./CustomSidebarSubstance.js').then(
       (mod) => mod.CustomSidebarSubstance,
     ),
   { ssr: false },

@@ -6,9 +6,9 @@ import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 import path from 'pathe';
 
-import { AttachmentType } from '~/server/interfaces/attachment';
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
-import loggerFactory from '~/utils/logger';
+import { AttachmentType } from '~/server/interfaces/attachment.js';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const _logger = loggerFactory('growi:models:attachment');
 

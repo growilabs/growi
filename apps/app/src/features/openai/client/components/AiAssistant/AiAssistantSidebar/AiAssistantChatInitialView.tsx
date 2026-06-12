@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 
-import { removeGlobPath } from '../../../../utils/remove-glob-path';
-import { ThreadList } from './ThreadList';
+import { removeGlobPath } from '../../../../utils/remove-glob-path.js';
+import { ThreadList } from './ThreadList.js';
 
 type Props = {
   description: string;

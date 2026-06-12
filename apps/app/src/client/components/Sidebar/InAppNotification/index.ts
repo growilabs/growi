@@ -1,1 +1,1 @@
-export * from './InAppNotification';
+export * from './InAppNotification.js';

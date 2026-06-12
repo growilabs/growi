@@ -4,7 +4,7 @@ import { useTranslation } from 'next-i18next';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from '~/features/openai/client/states';
+} from '~/features/openai/client/states/index.js';
 
 export const EditorAssistantToggleButton = (): JSX.Element => {
   const { t } = useTranslation();

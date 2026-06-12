@@ -1,5 +1,5 @@
-import { normalizeExpiredAtForThreadRelations } from '~/features/openai/server/services/normalize-data';
-import loggerFactory from '~/utils/logger';
+import { normalizeExpiredAtForThreadRelations } from '~/features/openai/server/services/normalize-data/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { convertNullToEmptyGrantedArrays } from './convert-null-to-empty-granted-arrays.js';
 import { convertRevisionPageIdToObjectId } from './convert-revision-page-id-to-objectid.js';

@@ -7,13 +7,13 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
-import type { IActivity, ISearchFilter } from '~/interfaces/activity';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import adminRequiredFactory from '~/server/middlewares/admin-required';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
-import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
+import type { IActivity, ISearchFilter } from '~/interfaces/activity.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import adminRequiredFactory from '~/server/middlewares/admin-required.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import Activity from '~/server/models/activity.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../../crowi/index.js';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';

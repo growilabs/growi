@@ -1,10 +1,10 @@
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { SupportedAction } from '~/interfaces/activity';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
+import { SupportedAction } from '~/interfaces/activity.js';
 import type {
   IFormattedSearchResult,
   ISearchResult,
-} from '~/interfaces/search';
-import loggerFactory from '~/utils/logger';
+} from '~/interfaces/search.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 import UserGroupRelation from '../models/user-group-relation.js';

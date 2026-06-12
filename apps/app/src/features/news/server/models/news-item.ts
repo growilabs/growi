@@ -1,9 +1,9 @@
 import type { Document, Model, Types } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
-import type { INewsItem, INewsItemHasId } from '../../interfaces/news-item';
+import type { INewsItem, INewsItemHasId } from '../../interfaces/news-item.js';
 
 // 90 days in seconds
 const TTL_90_DAYS = 60 * 60 * 24 * 90;

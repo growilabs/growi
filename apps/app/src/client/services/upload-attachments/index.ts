@@ -1,1 +1,1 @@
-export * from './upload-attachments';
+export * from './upload-attachments.js';

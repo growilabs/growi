@@ -1,10 +1,10 @@
-import type { EditorTheme, KeyMapMode, PasteMode } from '../../../consts';
-import { InitEditorValueRow } from './controller/InitEditorValueRow';
-import { KeymapControl } from './controller/KeymapControl';
-import { PasteModeControl } from './controller/PasteModeControl';
-import { SetCaretLineRow } from './controller/SetCaretLineRow';
-import { ThemeControl } from './controller/ThemeControl';
-import { UnifiedMergeViewControl } from './controller/UnifiedMergeViewControl';
+import type { EditorTheme, KeyMapMode, PasteMode } from '../../../consts/index.js';
+import { InitEditorValueRow } from './controller/InitEditorValueRow.js';
+import { KeymapControl } from './controller/KeymapControl.js';
+import { PasteModeControl } from './controller/PasteModeControl.js';
+import { SetCaretLineRow } from './controller/SetCaretLineRow.js';
+import { ThemeControl } from './controller/ThemeControl.js';
+import { UnifiedMergeViewControl } from './controller/UnifiedMergeViewControl.js';
 
 type PlaygroundControllerProps = {
   setEditorTheme: (value: EditorTheme) => void;

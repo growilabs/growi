@@ -1,2 +1,2 @@
-export * from './accepted-upload-file-type';
-export * from './server-configurations';
+export * from './accepted-upload-file-type.js';
+export * from './server-configurations.js';

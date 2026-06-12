@@ -6,7 +6,7 @@ import {
   remoteRevisionBodyAtom,
   remoteRevisionLastUpdatedAtAtom,
   remoteRevisionLastUpdateUserAtom,
-} from './internal-atoms';
+} from './internal-atoms.js';
 
 export type RemoteRevisionData = {
   remoteRevisionId: string;

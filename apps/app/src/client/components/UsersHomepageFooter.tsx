@@ -1,16 +1,16 @@
 import { type JSX, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { RecentActivity } from '~/client/components/RecentActivity/RecentActivity';
-import { RecentCreated } from '~/client/components/RecentCreated/RecentCreated';
-import { useCurrentUser } from '~/states/global';
+import { RecentActivity } from '~/client/components/RecentActivity/RecentActivity.js';
+import { RecentCreated } from '~/client/components/RecentCreated/RecentCreated.js';
+import { useCurrentUser } from '~/states/global/index.js';
 
-import { BookmarkFolderTree } from './Bookmarks/BookmarkFolderTree';
+import { BookmarkFolderTree } from './Bookmarks/BookmarkFolderTree.js';
 import {
   BOOKMARKS_LIST_ID,
   RECENT_ACTIVITY_LIST_ID,
   RECENTLY_CREATED_LIST_ID,
-} from './UsersHomepageFooter.consts';
+} from './UsersHomepageFooter.consts.js';
 
 import styles from './UsersHomepageFooter.module.scss';
 

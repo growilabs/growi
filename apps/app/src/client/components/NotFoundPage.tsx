@@ -1,9 +1,9 @@
 import React, { type JSX, useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import CustomNavAndContents from './CustomNavigation/CustomNavAndContents';
-import { DescendantsPageList } from './DescendantsPageList';
-import { PageTimeline } from './PageTimeline';
+import CustomNavAndContents from './CustomNavigation/CustomNavAndContents.js';
+import { DescendantsPageList } from './DescendantsPageList.js';
+import { PageTimeline } from './PageTimeline.js';
 
 type NotFoundPageProps = {
   path: string;

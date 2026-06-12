@@ -1,7 +1,7 @@
 import type { ErrorRequestHandler } from 'express';
 import { isHttpError } from 'http-errors';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:middleware:htto-error-handler');
 

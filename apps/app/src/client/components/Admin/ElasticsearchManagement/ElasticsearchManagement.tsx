@@ -2,16 +2,16 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/features/admin/states/socket-io';
-import { SocketEventName } from '~/interfaces/websocket';
-import { isSearchServiceReachableAtom } from '~/states/server-configurations';
+import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useAdminSocket } from '~/features/admin/states/socket-io.js';
+import { SocketEventName } from '~/interfaces/websocket.js';
+import { isSearchServiceReachableAtom } from '~/states/server-configurations/index.js';
 
-import NormalizeIndicesControls from './NormalizeIndicesControls';
-import RebuildIndexControls from './RebuildIndexControls';
-import ReconnectControls from './ReconnectControls';
-import StatusTable from './StatusTable';
+import NormalizeIndicesControls from './NormalizeIndicesControls.js';
+import RebuildIndexControls from './RebuildIndexControls.js';
+import ReconnectControls from './ReconnectControls.js';
+import StatusTable from './StatusTable.js';
 
 const ElasticsearchManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');

@@ -4,9 +4,9 @@ import { isDeepEquals } from '@growi/core/dist/utils/is-deep-equals';
 import { isUsersHomepage } from '@growi/core/dist/utils/page-path-utils';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
-import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
-import type { RendererConfig } from '~/interfaces/services/renderer';
-import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
+import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle/index.js';
+import type { RendererConfig } from '~/interfaces/services/renderer.js';
+import { useShouldExpandContent } from '~/services/layout/use-should-expand-content.js';
 import {
   useCurrentPageData,
   useCurrentPageId,
@@ -14,71 +14,71 @@ import {
   useIsIdenticalPath,
   useIsNotCreatable,
   usePageNotFound,
-} from '~/states/page';
-import { useViewOptions } from '~/stores/renderer';
+} from '~/states/page/index.js';
+import { useViewOptions } from '~/stores/renderer.js';
 
-import { UserInfo } from '../User/UserInfo';
-import { PageAlerts } from './PageAlerts/PageAlerts';
-import { PageContentFooter } from './PageContentFooter';
-import { PageViewLayout } from './PageViewLayout';
-import { useHashAutoScroll } from './use-hash-auto-scroll';
+import { UserInfo } from '../User/UserInfo.js';
+import { PageAlerts } from './PageAlerts/PageAlerts.js';
+import { PageContentFooter } from './PageContentFooter.js';
+import { PageViewLayout } from './PageViewLayout.js';
+import { useHashAutoScroll } from './use-hash-auto-scroll.js';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 const NotCreatablePage = dynamic(
   () =>
-    import('~/client/components/NotCreatablePage').then(
+    import('~/client/components/NotCreatablePage.js').then(
       (mod) => mod.NotCreatablePage,
     ),
   { ssr: false },
 );
 const ForbiddenPage = dynamic(
-  () => import('~/client/components/ForbiddenPage'),
+  () => import('~/client/components/ForbiddenPage.js'),
   { ssr: false },
 );
-const NotFoundPage = dynamic(() => import('~/client/components/NotFoundPage'), {
+const NotFoundPage = dynamic(() => import('~/client/components/NotFoundPage.js'), {
   ssr: false,
 });
 const PageSideContents = dynamic(
   () =>
-    import('~/client/components/PageSideContents').then(
+    import('~/client/components/PageSideContents/index.js').then(
       (mod) => mod.PageSideContents,
     ),
   { ssr: false },
 );
 const PageContentsUtilities = dynamic(
   () =>
-    import('~/client/components/Page/PageContentsUtilities').then(
+    import('~/client/components/Page/PageContentsUtilities.js').then(
       (mod) => mod.PageContentsUtilities,
     ),
   { ssr: false },
 );
 const Comments = dynamic(
-  () => import('~/client/components/Comments').then((mod) => mod.Comments),
+  () => import('~/client/components/Comments.js').then((mod) => mod.Comments),
   { ssr: false },
 );
 const UsersHomepageFooter = dynamic(
   () =>
-    import('~/client/components/UsersHomepageFooter').then(
+    import('~/client/components/UsersHomepageFooter.js').then(
       (mod) => mod.UsersHomepageFooter,
     ),
   { ssr: false },
 );
 const IdenticalPathPage = dynamic(
   () =>
-    import('~/client/components/IdenticalPathPage').then(
+    import('~/client/components/IdenticalPathPage.js').then(
       (mod) => mod.IdenticalPathPage,
     ),
   { ssr: false },
 );
 const SlideRenderer = dynamic(
   () =>
-    import('~/client/components/Page/SlideRenderer').then(
+    import('~/client/components/Page/SlideRenderer.js').then(
       (mod) => mod.SlideRenderer,
     ),
   { ssr: false },
 );
 const PageContentRenderer = dynamic(
-  () => import('./PageContentRenderer').then((mod) => mod.PageContentRenderer),
+  () => import('./PageContentRenderer.js').then((mod) => mod.PageContentRenderer),
   { ssr: true },
 );
 // biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import

@@ -1,4 +1,4 @@
-import commonStyles from './carbon-gray-common.puml';
+import commonStyles from './carbon-gray-common.puml.js';
 
 const style = `
 ---

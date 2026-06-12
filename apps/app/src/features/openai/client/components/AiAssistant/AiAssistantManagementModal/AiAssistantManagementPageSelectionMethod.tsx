@@ -2,9 +2,9 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import { ModalBody } from 'reactstrap';
 
-import { useAiAssistantManagementModalStatus } from '../../../states/modal/ai-assistant-management';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
-import { PageSelectionMethodButtons } from './PageSelectionMethodButtons';
+import { useAiAssistantManagementModalStatus } from '../../../states/modal/ai-assistant-management.js';
+import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
+import { PageSelectionMethodButtons } from './PageSelectionMethodButtons.js';
 
 export const AiAssistantManagementPageSelectionMethod = (): JSX.Element => {
   const { t } = useTranslation();

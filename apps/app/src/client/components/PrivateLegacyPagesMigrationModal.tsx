@@ -3,17 +3,17 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
 import type {
   ILegacyPrivatePage,
   PrivateLegacyPagesMigrationModalSubmitedHandler,
-} from '~/states/ui/modal/private-legacy-pages-migration';
+} from '~/states/ui/modal/private-legacy-pages-migration.js';
 import {
   usePrivateLegacyPagesMigrationModalActions,
   usePrivateLegacyPagesMigrationModalStatus,
-} from '~/states/ui/modal/private-legacy-pages-migration';
+} from '~/states/ui/modal/private-legacy-pages-migration.js';
 
-import ApiErrorMessageList from './PageManagement/ApiErrorMessageList';
+import ApiErrorMessageList from './PageManagement/ApiErrorMessageList.js';
 
 /**
  * PrivateLegacyPagesMigrationModalSubstance - Presentation component (all logic here)

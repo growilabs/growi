@@ -1,5 +1,5 @@
-import type Crowi from '~/server/crowi';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { S2sMessagingService } from './base.js';
 

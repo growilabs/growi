@@ -3,12 +3,12 @@ import Link from 'next/link';
 import type { IPageHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentPagePath } from '~/states/page';
-import { useSWRINFxPageTimeline } from '~/stores/page-timeline';
-import { useTimelineOptions } from '~/stores/renderer';
+import { useCurrentPagePath } from '~/states/page/index.js';
+import { useSWRINFxPageTimeline } from '~/stores/page-timeline.js';
+import { useTimelineOptions } from '~/stores/renderer.js';
 
-import InfiniteScroll from './InfiniteScroll';
-import { RevisionLoader } from './Page/RevisionLoader';
+import InfiniteScroll from './InfiniteScroll.js';
+import { RevisionLoader } from './Page/RevisionLoader.js';
 
 import styles from './PageTimeline.module.scss';
 

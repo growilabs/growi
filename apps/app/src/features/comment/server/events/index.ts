@@ -1,2 +1,2 @@
-export * from './consts';
-export * from './event-emitter';
+export * from './consts.js';
+export * from './event-emitter.js';

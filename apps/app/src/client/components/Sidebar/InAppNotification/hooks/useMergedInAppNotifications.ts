@@ -4,14 +4,14 @@ import type { SWRInfiniteResponse } from 'swr/infinite';
 import {
   useSWRINFxNews,
   useSWRxNewsUnreadCount,
-} from '~/features/news/client/hooks/use-news';
-import type { INewsItemWithReadStatus } from '~/features/news/interfaces/news-item';
+} from '~/features/news/client/hooks/use-news.js';
+import type { INewsItemWithReadStatus } from '~/features/news/interfaces/news-item.js';
 import type {
   IInAppNotificationHasId,
   PaginateResult,
-} from '~/interfaces/in-app-notification';
-import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
-import { useSWRINFxInAppNotifications } from '~/stores/in-app-notification';
+} from '~/interfaces/in-app-notification.js';
+import { InAppNotificationStatuses } from '~/interfaces/in-app-notification.js';
+import { useSWRINFxInAppNotifications } from '~/stores/in-app-notification.js';
 
 const PER_PAGE = 10;
 

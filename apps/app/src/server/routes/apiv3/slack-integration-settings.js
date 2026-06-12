@@ -16,12 +16,12 @@ import express from 'express';
 import { body, param } from 'express-validator';
 import urljoin from 'url-join';
 
-import { SupportedAction } from '~/interfaces/activity';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import adminRequiredFactory from '~/server/middlewares/admin-required';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import axios from '~/utils/axios';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import adminRequiredFactory from '~/server/middlewares/admin-required.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import axios from '~/utils/axios/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';

@@ -2,13 +2,13 @@ import { type JSX, Suspense, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
-import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
-import { PageTreeHeader } from './PageTreeSubstance';
+import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton.js';
+import { PageTreeHeader } from './PageTreeSubstance.js';
 
 // PageTreeWithDnD uses HTML5Backend which accesses browser APIs on mount;
 // ssr: false prevents it from rendering on the server.
 const PageTreeWithDnD = dynamic(
-  () => import('./PageTreeSubstance').then((mod) => mod.PageTreeWithDnD),
+  () => import('./PageTreeSubstance.js').then((mod) => mod.PageTreeWithDnD),
   { ssr: false, loading: ItemsTreeContentSkeleton },
 );
 

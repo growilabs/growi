@@ -4,16 +4,16 @@ import type { Readable } from 'stream';
 import { pipeline } from 'stream/promises';
 import urljoin from 'url-join';
 
-import type Crowi from '~/server/crowi';
+import type Crowi from '~/server/crowi/index.js';
 import {
   AttachmentType,
   FilePathOnStoragePrefix,
   type RespondOptions,
   ResponseMode,
-} from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
-import axios from '~/utils/axios';
-import loggerFactory from '~/utils/logger';
+} from '~/server/interfaces/attachment.js';
+import type { IAttachmentDocument } from '~/server/models/attachment.js';
+import axios from '~/utils/axios/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { configManager } from '../../config-manager/index.js';
 import {

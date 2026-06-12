@@ -5,19 +5,19 @@ import type { IUserHasId } from '@growi/core/dist/interfaces';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 import deepmerge from 'ts-deepmerge';
 
-import { GlobalCodeMirrorEditorKey } from '../../consts';
-import type { EditingClient } from '../../interfaces';
+import { GlobalCodeMirrorEditorKey } from '../../consts/index.js';
+import type { EditingClient } from '../../interfaces/index.js';
 import {
   CodeMirrorEditor,
   type CodeMirrorEditorProps,
-} from '../components-internal/CodeMirrorEditor';
+} from '../components-internal/CodeMirrorEditor/index.js';
 import {
   codemirrorEditorClassForUnifiedMergeView,
   setDataLine,
   useUnifiedMergeView,
-} from '../services-internal';
-import { useCodeMirrorEditorIsolated } from '../stores/codemirror-editor';
-import { useCollaborativeEditorMode } from '../stores/use-collaborative-editor-mode';
+} from '../services-internal/index.js';
+import { useCodeMirrorEditorIsolated } from '../stores/codemirror-editor.js';
+import { useCollaborativeEditorMode } from '../stores/use-collaborative-editor-mode.js';
 
 const additionalExtensions: Extension[] = [[scrollPastEnd(), setDataLine]];
 

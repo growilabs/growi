@@ -4,11 +4,11 @@ import { body } from 'express-validator';
 
 import { i18n } from '^/config/next-i18next.config.cjs';
 
-import { SupportedAction } from '~/interfaces/activity';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { prisma } from '~/utils/prisma.js';
 
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity.js';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';

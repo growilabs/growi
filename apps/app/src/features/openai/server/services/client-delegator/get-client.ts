@@ -1,7 +1,7 @@
-import { OpenaiServiceType } from '../../../interfaces/ai';
-import { AzureOpenaiClientDelegator } from './azure-openai-client-delegator';
-import type { IOpenaiClientDelegator } from './interfaces';
-import { OpenaiClientDelegator } from './openai-client-delegator';
+import { OpenaiServiceType } from '../../../interfaces/ai.js';
+import { AzureOpenaiClientDelegator } from './azure-openai-client-delegator.js';
+import type { IOpenaiClientDelegator } from './interfaces.js';
+import { OpenaiClientDelegator } from './openai-client-delegator.js';
 
 type GetDelegatorOptions = {
   openaiServiceType: OpenaiServiceType;

@@ -17,14 +17,14 @@ import useSWRImmutable from 'swr/immutable';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 import useSWRInfinite, { unstable_serialize } from 'swr/infinite';
 
-import type { IPagingResult } from '~/interfaces/paging-result';
+import type { IPagingResult } from '~/interfaces/paging-result.js';
 
-import { apiv3Get } from '../client/util/apiv3-client';
+import { apiv3Get } from '../client/util/apiv3-client.js';
 import type {
   ChildrenResult,
   RootPageResult,
   V5MigrationStatus,
-} from '../interfaces/page-listing-results';
+} from '../interfaces/page-listing-results.js';
 
 export const useSWRxPagesByPath = (
   path?: Nullable<string>,

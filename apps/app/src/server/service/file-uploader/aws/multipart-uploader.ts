@@ -7,7 +7,7 @@ import {
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   type IMultipartUploader,

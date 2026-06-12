@@ -1,6 +1,6 @@
 import { addDays } from 'date-fns/addDays';
 
-import ThreadRelation from '../../../models/thread-relation';
+import ThreadRelation from '../../../models/thread-relation.js';
 
 export const MAX_DAYS_UNTIL_EXPIRATION = 3;
 

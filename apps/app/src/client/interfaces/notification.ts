@@ -1,4 +1,4 @@
-import type { NotifyType } from './global-notification';
+import type { NotifyType } from './global-notification.js';
 
 export type INotificationType = {
   __t?: NotifyType;

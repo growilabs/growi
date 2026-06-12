@@ -4,7 +4,7 @@ import {
 } from '@growi/slack/dist/utils/block-kit-builder';
 import { generateLastUpdateMrkdwn } from '@growi/slack/dist/utils/generate-last-update-markdown';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { growiInfoService } from '../growi-info/index.js';
 import BaseSlackCommandHandler from './slack-command-handler.js';

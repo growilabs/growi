@@ -1,11 +1,11 @@
 import type { CSSProperties, JSX } from 'react';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
-import RevisionRenderer from '~/components/PageView/RevisionRenderer';
-import type { RendererOptions } from '~/interfaces/renderer-options';
-import { useRendererConfig } from '~/states/server-configurations';
+import RevisionRenderer from '~/components/PageView/RevisionRenderer.js';
+import type { RendererOptions } from '~/interfaces/renderer-options.js';
+import { useRendererConfig } from '~/states/server-configurations/index.js';
 
-import { SlideRenderer } from '../Page/SlideRenderer';
+import { SlideRenderer } from '../Page/SlideRenderer.js';
 
 import styles from './Preview.module.scss';
 

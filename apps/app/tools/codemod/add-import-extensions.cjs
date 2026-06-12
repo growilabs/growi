@@ -18,9 +18,14 @@
  *   ./x   -> ./x.cjs|.mjs    (x.cts|x.cjs / x.mts|x.mjs on disk)
  *   ./dir -> ./dir/index.js  (dir/index.ts ... on disk)
  *
+ * Alias specifiers (task 3.6 NodeNext pass): `~/` (-> `<appRoot>/src/`) and
+ * `^/` (-> `<appRoot>/`) are resolved against the same candidate table and
+ * rewritten in place (`~/x` -> `~/x.js`, `~/dir` -> `~/dir/index.js`). The
+ * app root defaults to two directories above this file and can be overridden
+ * with the jscodeshift option `aliasRoot` (used by the tests).
+ *
  * Untouched on purpose:
- *   - non-relative specifiers (bare packages, `~/` and `^/` aliases — alias
- *     completion is deferred to the NodeNext switch, task 3.6)
+ *   - bare package specifiers
  *   - specifiers that already end in .js/.cjs/.mjs/.json/.node (the
  *     `^/config/*.cjs` trio stays `.cjs`)
  *   - template-literal / non-literal dynamic imports (runtime-resolved)
@@ -53,6 +58,13 @@ const EXTENSION_CANDIDATES = [
 
 const ALREADY_EXTENDED_RE = /\.(?:js|cjs|mjs|json|node)$/;
 
+// tsconfig paths aliases used across apps/app: prefix in the specifier and
+// the directory (relative to the app root) it maps to.
+const ALIAS_ROOTS = [
+  { prefix: '~/', dir: 'src' },
+  { prefix: '^/', dir: '.' },
+];
+
 /** @param {string} spec */
 function isRelativeSpecifier(spec) {
   return (
@@ -61,6 +73,28 @@ function isRelativeSpecifier(spec) {
     spec.startsWith('./') ||
     spec.startsWith('../')
   );
+}
+
+/** @param {string} spec */
+function isAliasSpecifier(spec) {
+  return ALIAS_ROOTS.some(({ prefix }) => spec.startsWith(prefix));
+}
+
+/**
+ * Probe the candidate table against an absolute base path and return the
+ * specifier suffix to append (`.js`, `/index.js`, ...) or null.
+ *
+ * @param {string} base - absolute path of the specifier without extension
+ */
+function findExtensionSuffix(base) {
+  for (const suffix of ['', '/index']) {
+    for (const { candidate, replacement } of EXTENSION_CANDIDATES) {
+      if (fs.existsSync(base + suffix + candidate)) {
+        return suffix + replacement;
+      }
+    }
+  }
+  return null;
 }
 
 /**
@@ -78,12 +112,29 @@ function resolveSpecifier(importerDir, spec) {
   const cleanSpec = spec.endsWith('/') ? spec.slice(0, -1) : spec;
   const base = path.resolve(importerDir, cleanSpec);
 
-  for (const suffix of ['', '/index']) {
-    for (const { candidate, replacement } of EXTENSION_CANDIDATES) {
-      if (fs.existsSync(base + suffix + candidate)) {
-        return cleanSpec + suffix + replacement;
-      }
-    }
+  const suffix = findExtensionSuffix(base);
+  return suffix == null ? null : cleanSpec + suffix;
+}
+
+/**
+ * Compute the explicit-extension form of a `~/` or `^/` alias specifier.
+ *
+ * @param {string} aliasRoot - absolute app root the aliases are mapped against
+ * @param {string} spec - the specifier as written in the source
+ * @returns {string|null} the rewritten specifier, or null when the specifier
+ *   must be left untouched (not an alias, already extended, or unresolvable)
+ */
+function resolveAliasSpecifier(aliasRoot, spec) {
+  if (ALREADY_EXTENDED_RE.test(spec)) return null;
+
+  for (const { prefix, dir } of ALIAS_ROOTS) {
+    if (!spec.startsWith(prefix)) continue;
+
+    const cleanSpec = spec.endsWith('/') ? spec.slice(0, -1) : spec;
+    const base = path.join(aliasRoot, dir, cleanSpec.slice(prefix.length));
+
+    const suffix = findExtensionSuffix(base);
+    return suffix == null ? null : cleanSpec + suffix;
   }
   return null;
 }
@@ -94,10 +145,12 @@ function resolveSpecifier(importerDir, spec) {
  * @param {import('jscodeshift').FileInfo} fileInfo
  * @param {import('jscodeshift').API} api
  */
-module.exports = function transformer(fileInfo, api) {
+module.exports = function transformer(fileInfo, api, options) {
   const j = api.jscodeshift;
   const root = j(fileInfo.source);
   const importerDir = path.dirname(path.resolve(fileInfo.path));
+  const aliasRoot =
+    (options && options.aliasRoot) || path.resolve(__dirname, '../..');
 
   let changed = false;
   /** @type {string[]} */
@@ -107,9 +160,13 @@ module.exports = function transformer(fileInfo, api) {
   function updateLiteral(node) {
     if (node == null || typeof node.value !== 'string') return;
     const spec = node.value;
-    if (!isRelativeSpecifier(spec) || ALREADY_EXTENDED_RE.test(spec)) return;
+    const isRelative = isRelativeSpecifier(spec);
+    const isAlias = isAliasSpecifier(spec);
+    if ((!isRelative && !isAlias) || ALREADY_EXTENDED_RE.test(spec)) return;
 
-    const next = resolveSpecifier(importerDir, spec);
+    const next = isRelative
+      ? resolveSpecifier(importerDir, spec)
+      : resolveAliasSpecifier(aliasRoot, spec);
     if (next == null) {
       unresolved.push(spec);
       return;
@@ -189,6 +246,7 @@ module.exports = function transformer(fileInfo, api) {
 };
 
 module.exports.resolveSpecifier = resolveSpecifier;
+module.exports.resolveAliasSpecifier = resolveAliasSpecifier;
 module.exports.isRelativeSpecifier = isRelativeSpecifier;
 
 // ─── CLI entry point ─────────────────────────────────────────────────────────

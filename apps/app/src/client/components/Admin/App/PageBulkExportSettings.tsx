@@ -2,12 +2,12 @@ import { type JSX, useCallback, useEffect, useState } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useSWRxAppSettings } from '~/stores/admin/app-settings';
+import { apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useSWRxAppSettings } from '~/stores/admin/app-settings.js';
 
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
-import { ConfirmModal } from './ConfirmModal';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
+import { ConfirmModal } from './ConfirmModal.js';
 
 const PageBulkExportSettings = (): JSX.Element => {
   const { t } = useTranslation(['admin', 'commons']);

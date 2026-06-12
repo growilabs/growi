@@ -7,14 +7,14 @@ import type {
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 
-import { NoLoginLayout } from '~/components/Layout/NoLoginLayout';
-import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
+import { NoLoginLayout } from '~/components/Layout/NoLoginLayout.js';
+import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '~/pages/common-props';
-import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
+} from '~/pages/common-props/index.js';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props.js';
 
 type Props = CommonInitialProps & CommonEachProps;
 const classNames: string[] = ['login-page'];

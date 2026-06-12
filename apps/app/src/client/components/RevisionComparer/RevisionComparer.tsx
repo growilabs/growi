@@ -15,7 +15,7 @@ import {
 // ssr: false skips server-side rendering for performance; the package itself must
 // stay in dependencies because Turbopack still externalises it via static import analysis.
 const RevisionDiff = dynamic(
-  () => import('../PageHistory/RevisionDiff').then((mod) => mod.RevisionDiff),
+  () => import('../PageHistory/RevisionDiff.js').then((mod) => mod.RevisionDiff),
   { ssr: false },
 );
 

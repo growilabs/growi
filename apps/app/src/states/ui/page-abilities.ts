@@ -4,8 +4,8 @@ import { atom, useAtomValue } from 'jotai';
 import {
   _atomsForDerivedAbilities as contextAtoms,
   useIsSharedUser,
-} from '~/states/context';
-import { _atomsForDerivedAbilities as globalAtoms } from '~/states/global';
+} from '~/states/context.js';
+import { _atomsForDerivedAbilities as globalAtoms } from '~/states/global/index.js';
 // Import internal atoms with special naming
 import {
   _atomsForDerivedAbilities as pageAtoms,
@@ -13,11 +13,11 @@ import {
   useCurrentPagePath,
   useIsEditable,
   usePageNotFound,
-} from '~/states/page';
+} from '~/states/page/index.js';
 import {
   EditorMode,
   _atomsForDerivedAbilities as editorAtoms,
-} from '~/states/ui/editor';
+} from '~/states/ui/editor/index.js';
 
 const { isTrashTopPage, isUsersTopPage } = pagePathUtils;
 
@@ -43,12 +43,11 @@ const isAbleToShowTagLabelAtom = atom((get) => {
   // "/trash" page does not exist on page collection and unable to add tags
   return (
     // biome-ignore lint/style/noNonNullAssertion: currentPagePath should be defined here
-    !isUsersTopPage(currentPagePath!) &&
+    (!isUsersTopPage(currentPagePath!) &&
     // biome-ignore lint/style/noNonNullAssertion: currentPagePath should be defined here
     !isTrashTopPage(currentPagePath!) &&
     shareLinkId == null &&
-    !isIdenticalPath &&
-    !(isViewMode && isNotFound)
+    !isIdenticalPath && !(isViewMode && isNotFound))
   );
 });
 

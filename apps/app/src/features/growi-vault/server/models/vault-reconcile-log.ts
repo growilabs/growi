@@ -2,7 +2,7 @@ import type mongoose from 'mongoose';
 import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
 // ---------------------------------------------------------------------------
 // TTL constant

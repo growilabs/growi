@@ -2,7 +2,7 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import { body } from 'express-validator';
 import mongoose from 'mongoose';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { PathAlreadyExistsError } from '../models/errors.js';
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting/index.js';

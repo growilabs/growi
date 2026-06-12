@@ -12,26 +12,26 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import type { ForceHideMenuItems } from '~/client/components/Common/Dropdown/PageItemControl';
-import type { ISelectableAll } from '~/client/interfaces/selectable-all';
-import { toastSuccess } from '~/client/util/toastr';
+import type { ForceHideMenuItems } from '~/client/components/Common/Dropdown/PageItemControl.js';
+import type { ISelectableAll } from '~/client/interfaces/selectable-all.js';
+import { toastSuccess } from '~/client/util/toastr.js';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
-} from '~/interfaces/search';
-import type { OnDeletedFunction } from '~/interfaces/ui';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
-import { useKeywordManager } from '~/states/search';
+} from '~/interfaces/search.js';
+import type { OnDeletedFunction } from '~/interfaces/ui.js';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
+import { useKeywordManager } from '~/states/search/index.js';
 import {
   isSearchServiceConfiguredAtom,
   isSearchServiceReachableAtom,
-} from '~/states/server-configurations';
-import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
-import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
+} from '~/states/server-configurations/index.js';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete.js';
+import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing.js';
 
 // Do not import with next/dynamic
 // see: https://github.com/growilabs/growi/pull/7923
-import { SearchResultList } from './SearchResultList';
+import { SearchResultList } from './SearchResultList.js';
 
 import styles from './SearchPageBase.module.scss';
 
@@ -60,7 +60,7 @@ type Props = {
 };
 
 const SearchResultContent = dynamic(
-  () => import('./SearchResultContent').then((mod) => mod.SearchResultContent),
+  () => import('./SearchResultContent.js').then((mod) => mod.SearchResultContent),
   {
     ssr: false,
     loading: () => <></>,

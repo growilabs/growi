@@ -1,1 +1,1 @@
-export * from './llm-response-stream-processor';
+export * from './llm-response-stream-processor.js';

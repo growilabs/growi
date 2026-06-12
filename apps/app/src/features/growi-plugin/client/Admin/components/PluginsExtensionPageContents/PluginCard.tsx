@@ -2,8 +2,8 @@ import { type JSX, useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import { apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 
 import styles from './PluginCard.module.scss';
 

@@ -4,15 +4,15 @@ import type { IPage } from '@growi/core';
 import { getIdForRef, getIdStringForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
-import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import { SupportedAction } from '~/interfaces/activity';
-import type { PageDocument, PageModel } from '~/server/models/page';
+import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
+import { SupportedAction } from '~/interfaces/activity.js';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
 
-import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
-import PageBulkExportJob from '../../../models/page-bulk-export-job';
-import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
-import type { IPageBulkExportJobCronService } from '..';
-import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
+import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job.js';
+import PageBulkExportJob from '../../../models/page-bulk-export-job.js';
+import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot.js';
+import type { IPageBulkExportJobCronService } from '../index.js';
+import { BulkExportJobStreamDestroyedByCleanupError } from '../errors.js';
 
 async function reuseDuplicateExportIfExists(
   this: IPageBulkExportJobCronService,

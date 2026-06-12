@@ -6,8 +6,8 @@ import mongoose from 'mongoose';
 import passport from 'passport';
 import type { Duplex } from 'stream';
 
-import type { SessionConfig } from '~/interfaces/session-config';
-import loggerFactory from '~/utils/logger';
+import type { SessionConfig } from '~/interfaces/session-config.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { PageModel } from '../../models/page.js';
 

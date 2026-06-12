@@ -1,17 +1,17 @@
 import dynamic from 'next/dynamic';
 
-import type { NextPageWithLayout } from '../_app.page';
-import type { AdminCommonProps } from './_shared';
+import type { NextPageWithLayout } from '../_app.page.js';
+import type { AdminCommonProps } from './_shared/index.js';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared';
+} from './_shared/index.js';
 
 const LegacySlackIntegration = dynamic(
   () =>
     import(
       // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-      '~/client/components/Admin/LegacySlackIntegration/LegacySlackIntegration'
+      '~/client/components/Admin/LegacySlackIntegration/LegacySlackIntegration.js'
     ),
   { ssr: false },
 );
@@ -28,7 +28,7 @@ AdminLegacySlackIntegrationPage.getLayout = createAdminPageLayout<Props>({
     async () => {
       const AdminSlackIntegrationLegacyContainer =
         // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        (await import('~/client/services/AdminSlackIntegrationLegacyContainer'))
+        (await import('~/client/services/AdminSlackIntegrationLegacyContainer.js'))
           .default;
       return new AdminSlackIntegrationLegacyContainer();
     },

@@ -9,14 +9,14 @@ import { useTranslation } from 'next-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 import urljoin from 'url-join';
 
-import type { RendererOptions } from '~/interfaces/renderer-options';
+import type { RendererOptions } from '~/interfaces/renderer-options.js';
 
-import RevisionRenderer from '../../../components/PageView/RevisionRenderer';
-import { Username } from '../../../components/User/Username';
-import type { ICommentHasId } from '../../../interfaces/comment';
-import FormattedDistanceDate from '../FormattedDistanceDate';
-import { CommentControl } from './CommentControl';
-import { CommentEditor } from './CommentEditor';
+import RevisionRenderer from '../../../components/PageView/RevisionRenderer.js';
+import { Username } from '../../../components/User/Username.js';
+import type { ICommentHasId } from '../../../interfaces/comment.js';
+import FormattedDistanceDate from '../FormattedDistanceDate.js';
+import { CommentControl } from './CommentControl.js';
+import { CommentEditor } from './CommentEditor.js';
 
 import styles from './Comment.module.scss';
 

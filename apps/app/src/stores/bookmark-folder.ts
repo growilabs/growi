@@ -1,8 +1,8 @@
 import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
-import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
+import type { BookmarkFolderItems } from '~/interfaces/bookmark-info.js';
 
 export const useSWRxBookmarkFolderAndChild = (
   userId?: string,

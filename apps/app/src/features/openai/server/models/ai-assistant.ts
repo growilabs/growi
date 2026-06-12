@@ -1,13 +1,13 @@
 import { GroupType, type IGrantedGroup } from '@growi/core';
 import { type Document, type Model, Schema } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
 import {
   type AiAssistant,
   AiAssistantAccessScope,
   AiAssistantShareScope,
-} from '../../interfaces/ai-assistant';
+} from '../../interfaces/ai-assistant.js';
 
 export interface AiAssistantDocument extends AiAssistant, Document {}
 

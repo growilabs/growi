@@ -4,16 +4,16 @@ import type { Request } from 'express';
 import { Router } from 'express';
 import { body, validationResult } from 'express-validator';
 
-import type Crowi from '~/server/crowi';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE } from '../../../interfaces/page-bulk-export';
+import { PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE } from '../../../interfaces/page-bulk-export.js';
 import {
   DuplicateBulkExportJobError,
   pageBulkExportService,
-} from '../../service/page-bulk-export';
+} from '../../service/page-bulk-export.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page-bulk-export');
 

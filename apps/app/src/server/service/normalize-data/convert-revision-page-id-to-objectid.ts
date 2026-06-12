@@ -7,8 +7,8 @@ import mongoose from 'mongoose';
 import type {
   IRevisionDocument,
   IRevisionModel,
-} from '~/server/models/revision';
-import loggerFactory from '~/utils/logger';
+} from '~/server/models/revision.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory(
   'growi:service:NormalizeData:convert-revision-page-id-to-string',

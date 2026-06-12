@@ -6,8 +6,8 @@ import {
   markdownHeaderBlock,
 } from '@growi/slack/dist/utils/block-kit-builder';
 
-import { SlackCommandHandlerError } from '~/server/models/vo/slack-command-handler-error';
-import loggerFactory from '~/utils/logger';
+import { SlackCommandHandlerError } from '~/server/models/vo/slack-command-handler-error.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import CreatePageService from './create-page-service.js';
 import BaseSlackCommandHandler from './slack-command-handler.js';

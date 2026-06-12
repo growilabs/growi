@@ -1,19 +1,19 @@
 import { useMemo, useRef } from 'react';
 import type { TreeDataLoader } from '@headless-tree/core';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
-import type { IPageForTreeItem } from '~/interfaces/page';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
+import type { IPageForTreeItem } from '~/interfaces/page.js';
 
 import {
   CREATING_PAGE_VIRTUAL_ID,
   ROOT_PAGE_VIRTUAL_ID,
-} from '../../constants/_inner';
-import { type ChildrenData, fetchAndCacheChildren } from '../../services';
+} from '../../constants/_inner.js';
+import { type ChildrenData, fetchAndCacheChildren } from '../../services/index.js';
 import {
   createPlaceholderPageData,
   useCreatingParentId,
   useCreatingParentPath,
-} from '../../states/_inner';
+} from '../../states/_inner/index.js';
 
 function constructRootPageForVirtualRoot(
   rootPageId: string,

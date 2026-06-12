@@ -3,16 +3,16 @@ import { SlackbotType } from '@growi/slack';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
-import loggerFactory from '~/utils/logger';
+import { apiv3Post, apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import CustomCopyToClipBoard from '../../Common/CustomCopyToClipBoard';
-import Accordion from '../Common/Accordion';
-import ManageCommandsProcess from './ManageCommandsProcess';
-import MessageBasedOnConnection from './MessageBasedOnConnection';
-import { addLogs } from './slack-integration-util';
+import CustomCopyToClipBoard from '../../Common/CustomCopyToClipBoard.js';
+import Accordion from '../Common/Accordion.js';
+import ManageCommandsProcess from './ManageCommandsProcess.js';
+import MessageBasedOnConnection from './MessageBasedOnConnection.js';
+import { addLogs } from './slack-integration-util.js';
 
 const logger = loggerFactory(
   'growi:SlackIntegration:WithProxyAccordionsWrapper',

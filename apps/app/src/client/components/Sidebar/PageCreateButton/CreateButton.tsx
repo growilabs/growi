@@ -1,6 +1,6 @@
 import type { ButtonHTMLAttributes, DetailedHTMLProps, JSX } from 'react';
 
-import { Hexagon } from './Hexagon';
+import { Hexagon } from './Hexagon.js';
 
 import styles from './CreateButton.module.scss';
 

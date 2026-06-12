@@ -3,9 +3,9 @@ import { useEffect } from 'react';
 import {
   useShortcutsModalActions,
   useShortcutsModalStatus,
-} from '~/states/ui/modal/shortcuts';
+} from '~/states/ui/modal/shortcuts.js';
 
-import type { HotkeyBindingDef } from '../HotkeysManager';
+import type { HotkeyBindingDef } from '../HotkeysManager.js';
 
 type Props = {
   onDeleteRender: () => void;

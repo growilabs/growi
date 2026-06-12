@@ -1,10 +1,10 @@
 import type { Router } from 'express';
 import express from 'express';
 
-import { SupportedAction } from '~/interfaces/activity';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction } from '~/interfaces/activity.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../../crowi/index.js';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment/index.js';

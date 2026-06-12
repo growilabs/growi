@@ -9,7 +9,7 @@ import {
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { PageActionOnGroupDelete } from '~/interfaces/user-group';
+import { PageActionOnGroupDelete } from '~/interfaces/user-group.js';
 
 /**
  * Delete User Group Select component

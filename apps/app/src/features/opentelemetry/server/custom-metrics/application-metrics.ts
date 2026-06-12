@@ -1,8 +1,8 @@
 import crypto from 'node:crypto';
 import { diag, metrics } from '@opentelemetry/api';
 
-import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory(
   'growi:opentelemetry:custom-metrics:application-metrics',
@@ -34,7 +34,7 @@ export function addApplicationMetrics(): void {
       try {
         // Dynamic import to avoid circular dependencies
         const { growiInfoService } = await import(
-          '~/server/service/growi-info'
+          '~/server/service/growi-info/index.js'
         );
         const growiInfo = await growiInfoService.getGrowiInfo({
           includeAttachmentInfo: true,

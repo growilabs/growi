@@ -1,4 +1,4 @@
-import * as pathUtils from '../utils/path-utils';
+import * as pathUtils from '../utils/path-utils.js';
 
 // https://regex101.com/r/BahpKX/2
 const PATTERN_INCLUDE_DATE =

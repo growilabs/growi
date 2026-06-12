@@ -1,5 +1,5 @@
-import type { AiAssistantAccessScope } from '../interfaces/ai-assistant';
-import { AiAssistantShareScope } from '../interfaces/ai-assistant';
+import type { AiAssistantAccessScope } from '../interfaces/ai-assistant.js';
+import { AiAssistantShareScope } from '../interfaces/ai-assistant.js';
 
 export const determineShareScope = (
   shareScope: AiAssistantShareScope,

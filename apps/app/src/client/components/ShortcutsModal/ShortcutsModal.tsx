@@ -3,12 +3,12 @@ import { useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import { useGrowiDocumentationUrl } from '~/states/context';
+import { useGrowiDocumentationUrl } from '~/states/context.js';
 import {
   useShortcutsModalActions,
   useShortcutsModalStatus,
-} from '~/states/ui/modal/shortcuts';
-import { getLocale } from '~/utils/locale-utils';
+} from '~/states/ui/modal/shortcuts.js';
+import { getLocale } from '~/utils/locale-utils.js';
 
 import styles from './ShortcutsModal.module.scss';
 

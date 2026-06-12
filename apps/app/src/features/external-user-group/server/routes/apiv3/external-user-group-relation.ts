@@ -4,15 +4,15 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
-import type { IExternalUserGroupRelationHasId } from '~/features/external-user-group/interfaces/external-user-group';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import adminRequiredFactory from '~/server/middlewares/admin-required';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import loggerFactory from '~/utils/logger';
+import type { IExternalUserGroupRelationHasId } from '~/features/external-user-group/interfaces/external-user-group.js';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import adminRequiredFactory from '~/server/middlewares/admin-required.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer.js';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:routes:apiv3:user-group-relation');
 

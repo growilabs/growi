@@ -4,7 +4,7 @@ import { scanAllTemplates } from '@growi/pluginkit/dist/v4/server/index.cjs';
 import type {
   IGrowiPlugin,
   IGrowiTemplatePluginMeta,
-} from '../../../interfaces';
+} from '../../../interfaces/index.js';
 
 export const generateTemplatePluginMeta = async (
   plugin: IGrowiPlugin,

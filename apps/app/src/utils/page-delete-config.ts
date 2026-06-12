@@ -1,8 +1,8 @@
 import type {
   IPageDeleteConfigValue,
   IPageDeleteConfigValueToProcessValidation,
-} from '~/interfaces/page-delete-config';
-import { PageDeleteConfigValue as Value } from '~/interfaces/page-delete-config';
+} from '~/interfaces/page-delete-config.js';
+import { PageDeleteConfigValue as Value } from '~/interfaces/page-delete-config.js';
 
 /**
  * Return true if "configForRecursive" is stronger than "configForSingle"

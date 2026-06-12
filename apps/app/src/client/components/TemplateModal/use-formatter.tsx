@@ -2,8 +2,8 @@ import { format as dateFnsFormat } from 'date-fns/format';
 import mustache from 'mustache';
 import path from 'path';
 
-import { useCurrentPagePath } from '~/states/page';
-import loggerFactory from '~/utils/logger';
+import { useCurrentPagePath } from '~/states/page/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:components:TemplateModal:use-formatter');
 

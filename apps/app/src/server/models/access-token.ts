@@ -5,9 +5,9 @@ import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
-import { extractScopes } from '~/server/util/scope-utils';
-import loggerFactory from '~/utils/logger';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import { extractScopes } from '~/server/util/scope-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:models:access-token');
 

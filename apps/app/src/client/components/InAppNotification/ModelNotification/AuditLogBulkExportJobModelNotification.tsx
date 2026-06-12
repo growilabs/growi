@@ -2,13 +2,13 @@ import React from 'react';
 import { type HasObjectId, isPopulated } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 
-import type { IAuditLogBulkExportJobHasId } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import type { IInAppNotification } from '~/interfaces/in-app-notification';
+import type { IAuditLogBulkExportJobHasId } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity.js';
+import type { IInAppNotification } from '~/interfaces/in-app-notification.js';
 
-import type { ModelNotificationUtils } from '.';
-import { ModelNotification } from './ModelNotification';
-import { useActionMsgAndIconForModelNotification } from './useActionAndMsg';
+import type { ModelNotificationUtils } from './index.js';
+import { ModelNotification } from './ModelNotification.js';
+import { useActionMsgAndIconForModelNotification } from './useActionAndMsg.js';
 
 export const useAuditLogBulkExportJobModelNotification = (
   notification: IInAppNotification & HasObjectId,

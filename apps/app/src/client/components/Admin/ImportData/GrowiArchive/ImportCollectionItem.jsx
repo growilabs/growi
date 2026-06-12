@@ -8,7 +8,7 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option.js';
 
 const MODE_ATTR_MAP = {
   insert: { color: 'info', icon: 'add_circle', label: 'Insert' },

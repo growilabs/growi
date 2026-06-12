@@ -1,9 +1,9 @@
-import type { OpenaiServiceType } from '~/features/openai/interfaces/ai';
+import type { OpenaiServiceType } from '~/features/openai/interfaces/ai.js';
 import {
   getClient,
   isStreamResponse,
-} from '~/features/openai/server/services/client-delegator';
-import { configManager } from '~/server/service/config-manager';
+} from '~/features/openai/server/services/client-delegator/index.js';
+import { configManager } from '~/server/service/config-manager/index.js';
 
 /**
  * Shared utility for making LLM calls that return JSON responses.

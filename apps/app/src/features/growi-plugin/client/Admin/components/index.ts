@@ -1,1 +1,1 @@
-export * from './PluginsExtensionPageContents';
+export * from './PluginsExtensionPageContents/index.js';

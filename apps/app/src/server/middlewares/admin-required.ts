@@ -2,7 +2,7 @@ import type { IUser } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 import type { HydratedDocument } from 'mongoose';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 

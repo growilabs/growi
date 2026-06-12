@@ -1,15 +1,15 @@
 import dynamic from 'next/dynamic';
 
-import type { NextPageWithLayout } from '../../_app.page';
-import type { AdminCommonProps } from '../_shared';
+import type { NextPageWithLayout } from '../../_app.page.js';
+import type { AdminCommonProps } from '../_shared/index.js';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from '../_shared';
+} from '../_shared/index.js';
 
 const ManageExternalAccount = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/Admin/ManageExternalAccount'),
+  () => import('~/client/components/Admin/ManageExternalAccount.js'),
   { ssr: false },
 );
 
@@ -25,7 +25,7 @@ AdminExternalAccountsPage.getLayout = createAdminPageLayout<Props>({
     async () => {
       const AdminExternalAccountsContainer =
         // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        (await import('~/client/services/AdminExternalAccountsContainer'))
+        (await import('~/client/services/AdminExternalAccountsContainer.js'))
           .default;
       return new AdminExternalAccountsContainer();
     },

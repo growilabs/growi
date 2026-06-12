@@ -1,12 +1,12 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import type { IPageHasId } from '@growi/core';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
-import { toastError } from '~/client/util/toastr';
-import loggerFactory from '~/utils/logger';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
+import { toastError } from '~/client/util/toastr.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { PageListItemS } from '../PageList/PageListItemS';
-import PaginationWrapper from '../PaginationWrapper';
+import { PageListItemS } from '../PageList/PageListItemS.js';
+import PaginationWrapper from '../PaginationWrapper.js';
 
 const logger = loggerFactory('growi:RecentCreated');
 

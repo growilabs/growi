@@ -1,1 +1,1 @@
-export { LinkEditModalLazyLoaded } from './dynamic';
+export { LinkEditModalLazyLoaded } from './dynamic.js';

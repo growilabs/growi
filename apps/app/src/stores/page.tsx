@@ -17,20 +17,20 @@ import useSWRImmutable from 'swr/immutable';
 import useSWRInfinite, { type SWRInfiniteResponse } from 'swr/infinite';
 import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
-import type { ErrorV3 } from '^/../../packages/core/dist/models';
+import type { ErrorV3 } from '^/../../packages/core/dist/models/index.js';
 
-import { apiGet } from '~/client/util/apiv1-client';
-import { apiv3Get } from '~/client/util/apiv3-client';
-import type { IPagePathWithDescendantCount } from '~/interfaces/page';
+import { apiGet } from '~/client/util/apiv1-client.js';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
+import type { IPagePathWithDescendantCount } from '~/interfaces/page.js';
 import type {
   IRecordApplicableGrant,
   IResCurrentGrantData,
-} from '~/interfaces/page-grant';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
-import { useCurrentPageData, usePageNotFound } from '~/states/page';
-import { useRevisionIdFromUrl, useShareLinkId } from '~/states/page/hooks';
+} from '~/interfaces/page-grant.js';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
+import { useCurrentPageData, usePageNotFound } from '~/states/page/index.js';
+import { useRevisionIdFromUrl, useShareLinkId } from '~/states/page/hooks.js';
 
-import type { IPageTagsInfo } from '../interfaces/tag';
+import type { IPageTagsInfo } from '../interfaces/tag.js';
 
 const getPageApiErrorHandler = (errs: ErrorV3<IPageNotFoundInfo>[]) => {
   if (!Array.isArray(errs)) {

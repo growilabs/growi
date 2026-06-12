@@ -2,12 +2,12 @@ import type { JSX } from 'react';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { tinykeys } from 'tinykeys';
 
-import * as createPage from './Subscribers/CreatePage';
-import * as editPage from './Subscribers/EditPage';
-import * as focusToGlobalSearch from './Subscribers/FocusToGlobalSearch';
-import * as showShortcutsModal from './Subscribers/ShowShortcutsModal';
-import * as showStaffCredit from './Subscribers/ShowStaffCredit';
-import * as switchToMirrorMode from './Subscribers/SwitchToMirrorMode';
+import * as createPage from './Subscribers/CreatePage.js';
+import * as editPage from './Subscribers/EditPage.js';
+import * as focusToGlobalSearch from './Subscribers/FocusToGlobalSearch.js';
+import * as showShortcutsModal from './Subscribers/ShowShortcutsModal.js';
+import * as showStaffCredit from './Subscribers/ShowStaffCredit.js';
+import * as switchToMirrorMode from './Subscribers/SwitchToMirrorMode.js';
 
 export type HotkeyCategory = 'single' | 'modifier';
 

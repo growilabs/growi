@@ -3,7 +3,7 @@ import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option.js';
 
 // import { toastSuccess, toastError } from '~/client/util/toastr';
 

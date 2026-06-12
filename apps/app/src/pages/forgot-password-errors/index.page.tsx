@@ -7,15 +7,15 @@ import type {
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 
-import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
+import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password.js';
 
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+} from '../common-props/index.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
 
 type Props = CommonInitialProps &
   CommonEachProps & {

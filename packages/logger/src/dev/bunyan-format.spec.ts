@@ -1,7 +1,7 @@
 import { PassThrough, Writable } from 'node:stream';
 import { describe, expect, it } from 'vitest';
 
-import bunyanFormat from './bunyan-format';
+import bunyanFormat from './bunyan-format.js';
 
 function createWithCapture(opts: { singleLine?: boolean } = {}) {
   const dest = new PassThrough();

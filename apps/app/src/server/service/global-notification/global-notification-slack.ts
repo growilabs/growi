@@ -3,13 +3,13 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import type { ChatPostMessageArguments } from '@slack/web-api';
 import urljoin from 'url-join';
 
-import type Crowi from '~/server/crowi';
+import type Crowi from '~/server/crowi/index.js';
 import {
   GlobalNotificationSettingEvent,
   type GlobalNotificationSettingModel,
   GlobalNotificationSettingType,
-} from '~/server/models/GlobalNotificationSetting';
-import loggerFactory from '~/utils/logger';
+} from '~/server/models/GlobalNotificationSetting/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { prepareSlackMessageForGlobalNotification } from '../../util/slack.js';
 import { growiInfoService } from '../growi-info/index.js';

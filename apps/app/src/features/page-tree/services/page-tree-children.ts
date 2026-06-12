@@ -1,5 +1,5 @@
-import { apiv3Get } from '~/client/util/apiv3-client';
-import type { IPageForTreeItem } from '~/interfaces/page';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
+import type { IPageForTreeItem } from '~/interfaces/page.js';
 
 export type ChildrenData = { id: string; data: IPageForTreeItem }[];
 

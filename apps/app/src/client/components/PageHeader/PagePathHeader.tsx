@@ -7,21 +7,21 @@ import { useTranslation } from 'next-i18next';
 import nodePath from 'path';
 import { debounce } from 'throttle-debounce';
 
-import type { InputValidationResult } from '~/client/util/use-input-validator';
+import type { InputValidationResult } from '~/client/util/use-input-validator.js';
 import {
   useInputValidator,
   ValidationTarget,
-} from '~/client/util/use-input-validator';
-import type { IPageForItem } from '~/interfaces/page';
-import { LinkedPagePath } from '~/models/linked-page-path';
-import { usePageSelectModalActions } from '~/states/ui/modal/page-select';
+} from '~/client/util/use-input-validator.js';
+import type { IPageForItem } from '~/interfaces/page.js';
+import { LinkedPagePath } from '~/models/linked-page-path.js';
+import { usePageSelectModalActions } from '~/states/ui/modal/page-select.js';
 
-import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
+import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink/index.js';
 import {
   AutosizeSubmittableInput,
   getAdjustedMaxWidthForAutosizeInput,
-} from '../Common/SubmittableInput';
-import { usePagePathRenameHandler } from '../PageEditor/page-path-rename-utils';
+} from '../Common/SubmittableInput/index.js';
+import { usePagePathRenameHandler } from '../PageEditor/page-path-rename-utils.js';
 
 import styles from './PagePathHeader.module.scss';
 

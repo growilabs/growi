@@ -14,10 +14,10 @@ import assert from 'assert';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import type { BookmarkedPage } from '~/interfaces/bookmark-info';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import Subscription from '~/server/models/subscription';
-import type { IPageGrantService } from '~/server/service/page-grant';
+import type { BookmarkedPage } from '~/interfaces/bookmark-info.js';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
+import Subscription from '~/server/models/subscription.js';
+import type { IPageGrantService } from '~/server/service/page-grant.js';
 
 import type { IPageService } from './page-service.js';
 

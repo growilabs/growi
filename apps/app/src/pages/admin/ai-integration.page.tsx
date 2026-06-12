@@ -2,22 +2,22 @@ import type { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
 import { useHydrateAtoms } from 'jotai/utils';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import { aiEnabledAtom } from '~/states/server-configurations';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import { aiEnabledAtom } from '~/states/server-configurations/index.js';
 
-import type { NextPageWithLayout } from '../_app.page';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
-import type { AdminCommonProps } from './_shared';
+import type { NextPageWithLayout } from '../_app.page.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
+import type { AdminCommonProps } from './_shared/index.js';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared';
+} from './_shared/index.js';
 
 const AiIntegration = dynamic(
   () =>
     import(
       // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-      '~/features/openai/client/components/AiIntegration/AiIntegration'
+      '~/features/openai/client/components/AiIntegration/AiIntegration.js'
     ).then((mod) => mod.AiIntegration),
   { ssr: false },
 );
@@ -25,7 +25,7 @@ const AiIntegrationDisableMode = dynamic(
   () =>
     import(
       // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-      '~/features/openai/client/components/AiIntegration/AiIntegrationDisableMode'
+      '~/features/openai/client/components/AiIntegration/AiIntegrationDisableMode.js'
     ).then((mod) => mod.AiIntegrationDisableMode),
   { ssr: false },
 );

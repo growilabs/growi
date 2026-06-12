@@ -1,11 +1,18 @@
 // biome-ignore lint/style/noRestrictedImports: Direct axios usage for external S2S messaging
 import axios from 'axios';
 import path from 'path';
-import ReconnectingWebSocket from 'reconnecting-websocket';
+import ReconnectingWebSocketPkg from 'reconnecting-websocket';
+
+// reconnecting-websocket is CJS whose runtime self-patches module.exports to
+// the class; its `export default` declaration makes NodeNext type the default
+// import as the module namespace, so narrow it back to the constructor.
+const ReconnectingWebSocket =
+  ReconnectingWebSocketPkg as unknown as typeof import('reconnecting-websocket').default;
+type ReconnectingWebSocket = import('reconnecting-websocket').default;
 import WebSocket from 'ws';
 
-import type Crowi from '~/server/crowi';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import S2sMessage from '../../models/vo/s2s-message.js';
 import { AbstractS2sMessagingService } from './base.js';

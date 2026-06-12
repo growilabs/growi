@@ -3,10 +3,10 @@ import useSWR from 'swr';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 import useSWRInfinite from 'swr/infinite';
 
-import type { PaginateResult } from '~/interfaces/in-app-notification';
+import type { PaginateResult } from '~/interfaces/in-app-notification.js';
 
-import { apiv3Get } from '../../../../client/util/apiv3-client';
-import type { INewsItemWithReadStatus } from '../../interfaces/news-item';
+import { apiv3Get } from '../../../../client/util/apiv3-client.js';
+import type { INewsItemWithReadStatus } from '../../interfaces/news-item.js';
 
 const NEWS_PER_PAGE = 10;
 

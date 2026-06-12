@@ -8,10 +8,10 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import { useGrowiCloudUri, useGrowiVersion } from '~/states/global';
-import { useShortcutsModalActions } from '~/states/ui/modal/shortcuts';
+import { useGrowiCloudUri, useGrowiVersion } from '~/states/global/index.js';
+import { useShortcutsModalActions } from '~/states/ui/modal/shortcuts.js';
 
-import { SkeletonItem } from './SkeletonItem';
+import { SkeletonItem } from './SkeletonItem.js';
 
 import styles from './HelpDropdown.module.scss';
 

@@ -1,10 +1,10 @@
 import type { NextFunction, Request } from 'express';
 
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { OpenaiServiceTypes } from '../../../interfaces/ai';
+import { OpenaiServiceTypes } from '../../../interfaces/ai.js';
 
 const logger = loggerFactory('growi:middlewares:certify-ai-service');
 

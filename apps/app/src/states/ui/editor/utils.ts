@@ -1,6 +1,6 @@
 import { isServer } from '@growi/core/dist/utils';
 
-import { EditorMode, EditorModeHash } from './types';
+import { EditorMode, EditorModeHash } from './types.js';
 
 export const determineEditorModeByHash = (): EditorMode => {
   if (isServer()) {

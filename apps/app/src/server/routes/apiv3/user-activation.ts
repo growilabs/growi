@@ -6,14 +6,14 @@ import { subSeconds } from 'date-fns/subSeconds';
 import { body, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 
-import { SupportedAction } from '~/interfaces/activity';
-import { RegistrationMode } from '~/interfaces/registration-mode';
-import type Crowi from '~/server/crowi';
-import UserRegistrationOrder from '~/server/models/user-registration-order';
-import { configManager } from '~/server/service/config-manager';
-import { growiInfoService } from '~/server/service/growi-info';
-import { getTranslation } from '~/server/service/i18next';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { RegistrationMode } from '~/interfaces/registration-mode.js';
+import type Crowi from '~/server/crowi/index.js';
+import UserRegistrationOrder from '~/server/models/user-registration-order.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { growiInfoService } from '~/server/service/growi-info/index.js';
+import { getTranslation } from '~/server/service/i18next.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { resolveLocalePath } from '../../util/safe-path-utils.js';
 

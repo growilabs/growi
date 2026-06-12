@@ -1,12 +1,12 @@
 import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
 import type {
   ActivityHasTargetPage,
   PopulatedUserActivitiesResult,
-} from '~/interfaces/activity';
-import type { PaginateResult } from '~/interfaces/mongoose-utils';
+} from '~/interfaces/activity.js';
+import type { PaginateResult } from '~/interfaces/mongoose-utils.js';
 
 export const useSWRxRecentActivity = (
   limit?: number,

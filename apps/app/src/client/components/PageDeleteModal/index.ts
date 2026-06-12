@@ -1,1 +1,1 @@
-export { PageDeleteModalLazyLoaded } from './dynamic';
+export { PageDeleteModalLazyLoaded } from './dynamic.js';

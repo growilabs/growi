@@ -5,7 +5,7 @@ import { ModalHeader } from 'reactstrap';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
-} from '../../../states/modal/ai-assistant-management';
+} from '../../../states/modal/ai-assistant-management.js';
 
 type Props = {
   labelTranslationKey: string;

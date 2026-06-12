@@ -5,28 +5,28 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import {
   SupportedAction,
   type SupportedActionType,
-} from '~/interfaces/activity';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
+} from '~/interfaces/activity.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
 
-import { getServerSideBasicLayoutProps } from '../basic-layout-page';
+import { getServerSideBasicLayoutProps } from '../basic-layout-page/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
+} from '../common-props/index.js';
 import {
   getServerSideGeneralPageProps,
   getServerSideRendererConfigProps,
-} from '../general-page';
-import { isValidGeneralPageInitialProps } from '../general-page/type-guards';
-import { addActivity } from '../utils/activity';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
-import { NEXT_JS_ROUTING_PAGE } from './consts';
+} from '../general-page/index.js';
+import { isValidGeneralPageInitialProps } from '../general-page/type-guards.js';
+import { addActivity } from '../utils/activity.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
+import { NEXT_JS_ROUTING_PAGE } from './consts/index.js';
 import {
   getPageDataForInitial,
   getPageDataForSameRoute,
-} from './page-data-props';
-import type { Stage2EachProps, Stage2InitialProps } from './types';
+} from './page-data-props.js';
+import type { Stage2EachProps, Stage2InitialProps } from './types.js';
 
 const nextjsRoutingProps = {
   props: {

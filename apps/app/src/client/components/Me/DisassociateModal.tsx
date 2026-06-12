@@ -4,12 +4,12 @@ import type { HasObjectId, IExternalAccount } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
 import {
   useDisassociateLdapAccount,
   useSWRxPersonalExternalAccounts,
-} from '~/stores/personal-settings';
+} from '~/stores/personal-settings.js';
 
 type Props = {
   isOpen: boolean;

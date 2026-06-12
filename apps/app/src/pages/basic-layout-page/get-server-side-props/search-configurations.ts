@@ -1,8 +1,8 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
 
-import type { SearchConfigurationProps } from '../types';
+import type { SearchConfigurationProps } from '../types.js';
 
 export const getServerSideSearchConfigurationProps: GetServerSideProps<
   SearchConfigurationProps

@@ -1,3 +1,3 @@
-export * from './PagePathNav';
-export * from './PagePathNavLayout';
-export * from './Separator';
+export * from './PagePathNav.js';
+export * from './PagePathNavLayout.js';
+export * from './Separator.js';

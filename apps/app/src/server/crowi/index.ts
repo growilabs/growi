@@ -1,4 +1,4 @@
-import next from 'next';
+import nextPkg from 'next';
 import http from 'node:http';
 import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
@@ -11,22 +11,22 @@ import expressSession from 'express-session';
 import mongoose from 'mongoose';
 import uidSafe from 'uid-safe';
 
-import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
-import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
-import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
-import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
-import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
-import { initializeVaultFeature } from '~/features/growi-vault/server';
-import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
-import { initializeOpenaiService } from '~/features/openai/server/services/openai';
-import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
-import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
-import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
-import type { SessionConfig } from '~/interfaces/session-config';
-import { startCron as startAccessTokenCron } from '~/server/service/access-token';
-import { projectRoot } from '~/server/util/project-dir-utils';
-import { getGrowiVersion } from '~/utils/growi-version';
-import loggerFactory from '~/utils/logger';
+import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron.js';
+import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/index.js';
+import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron.js';
+import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync.js';
+import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync.js';
+import { initializeVaultFeature } from '~/features/growi-vault/server/index.js';
+import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron/index.js';
+import { initializeOpenaiService } from '~/features/openai/server/services/openai.js';
+import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron.js';
+import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron.js';
+import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/index.js';
+import type { SessionConfig } from '~/interfaces/session-config.js';
+import { startCron as startAccessTokenCron } from '~/server/service/access-token/index.js';
+import { projectRoot } from '~/server/util/project-dir-utils.js';
+import { getGrowiVersion } from '~/utils/growi-version.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import ActivityEvent from '../events/activity.js';
 import AdminEvent from '../events/admin.js';
@@ -79,6 +79,12 @@ import type { ModelsMapDependentOnCrowi } from './setup-models.js';
 import { setupModelsDependentOnCrowi } from './setup-models.js';
 
 const logger = loggerFactory('growi:crowi');
+
+// next's CJS entry self-patches `module.exports` to the createServer function,
+// so the runtime default import IS callable; the shipped d.ts (`export default`
+// in a CJS package) makes NodeNext type it as the module namespace instead.
+// Narrow the binding back to the callable declared as its `default`.
+const next = nextPkg as unknown as typeof import('next').default;
 
 const sep = path.sep;
 
@@ -224,7 +230,7 @@ class Crowi {
     this.publicDir = path.join(projectRoot, 'public') + sep;
     this.resourceDir = path.join(projectRoot, 'resource') + sep;
     this.localeDir = path.join(this.resourceDir, 'locales') + sep;
-    this.viewsDir = path.resolve(__dirname, '../views') + sep;
+    this.viewsDir = path.resolve(import.meta.dirname, '../views') + sep;
     this.tmpDir = path.join(projectRoot, 'tmp') + sep;
     this.cacheDir = path.join(this.tmpDir, 'cache');
 
@@ -447,7 +453,7 @@ class Crowi {
     instanciatePageBulkExportJobCleanUpCronService(this);
     // Dynamic import to get the initialized singleton instance
     const { pageBulkExportJobCleanUpCronService } = await import(
-      '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron'
+      '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron.js'
     );
     if (pageBulkExportJobCleanUpCronService == null) {
       throw new Error('pageBulkExportJobCleanUpCronService is not initialized');
@@ -459,7 +465,7 @@ class Crowi {
 
     instantiateAuditLogBulkExportJobCleanUpCronService(this);
     const { auditLogBulkExportJobCleanUpCronService } = await import(
-      '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron'
+      '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron.js'
     );
     if (auditLogBulkExportJobCleanUpCronService == null) {
       throw new Error(
@@ -473,7 +479,7 @@ class Crowi {
 
     // News feed sync cron
     const { NewsCronService } = await import(
-      '~/features/news/server/services/news-cron-service'
+      '~/features/news/server/services/news-cron-service.js'
     );
     new NewsCronService().startCron();
   }
@@ -519,7 +525,7 @@ class Crowi {
   async setupMailer(): Promise<void> {
     // intentionally lazy: service/mail participates in a require cycle with
     // this hub module; loading it at import time would surface the cycle
-    const { default: MailService } = await import('~/server/service/mail');
+    const { default: MailService } = await import('~/server/service/mail/index.js');
     this.mailService = new MailService(this);
 
     // add as a message handler
@@ -834,7 +840,7 @@ class Crowi {
 
   async setupGrowiPluginService(): Promise<void> {
     const growiPluginService = await import(
-      '~/features/growi-plugin/server/services'
+      '~/features/growi-plugin/server/services/index.js'
     ).then((mod) => mod.growiPluginService);
 
     // download plugin repositories, if document exists but there is no repository

@@ -1,1 +1,1 @@
-export { PutBackPageModalLazyLoaded } from './dynamic';
+export { PutBackPageModalLazyLoaded } from './dynamic.js';

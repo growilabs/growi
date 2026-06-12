@@ -15,7 +15,7 @@ import {
   extractSupportedLocales,
   getLocalizedTemplate,
   type TemplateSummary,
-} from '@growi/pluginkit/dist/v4';
+} from '@growi/pluginkit/dist/v4/index.js';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import assert from 'assert';
 import { useTranslation } from 'next-i18next';
@@ -30,13 +30,13 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import { useSWRxTemplate, useSWRxTemplates } from '~/features/templates/stores';
-import { useSWRxPersonalSettings } from '~/stores/personal-settings';
-import { usePreviewOptions } from '~/stores/renderer';
-import loggerFactory from '~/utils/logger';
+import { useSWRxTemplate, useSWRxTemplates } from '~/features/templates/stores/index.js';
+import { useSWRxPersonalSettings } from '~/stores/personal-settings.js';
+import { usePreviewOptions } from '~/stores/renderer.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import Preview from '../PageEditor/Preview';
-import { useFormatter } from './use-formatter';
+import Preview from '../PageEditor/Preview.js';
+import { useFormatter } from './use-formatter.js';
 
 import styles from './TemplateModal.module.scss';
 

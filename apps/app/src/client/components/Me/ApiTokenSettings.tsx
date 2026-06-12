@@ -1,9 +1,9 @@
 import React, { useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useSWRxPersonalSettings } from '~/stores/personal-settings';
+import { apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useSWRxPersonalSettings } from '~/stores/personal-settings.js';
 
 export const ApiTokenSettings = React.memo((): JSX.Element => {
   const { t } = useTranslation();

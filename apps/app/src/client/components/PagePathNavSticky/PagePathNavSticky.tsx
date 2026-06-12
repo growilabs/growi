@@ -3,19 +3,19 @@ import { DevidedPagePath } from '@growi/core/dist/models';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import Sticky from 'react-stickynode';
 
-import { usePrintMode } from '~/client/services/use-print-mode';
-import { LinkedPagePath } from '~/models/linked-page-path';
-import { usePageControlsX } from '~/states/ui/page';
-import { useCurrentProductNavWidth, useSidebarMode } from '~/states/ui/sidebar';
+import { usePrintMode } from '~/client/services/use-print-mode.js';
+import { LinkedPagePath } from '~/models/linked-page-path.js';
+import { usePageControlsX } from '~/states/ui/page.js';
+import { useCurrentProductNavWidth, useSidebarMode } from '~/states/ui/sidebar/index.js';
 
-import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
-import type { PagePathNavLayoutProps } from '../../../components/Common/PagePathNav';
+import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink/index.js';
+import type { PagePathNavLayoutProps } from '../../../components/Common/PagePathNav/index.js';
 import {
   PagePathNav,
   PagePathNavLayout,
   Separator,
-} from '../../../components/Common/PagePathNav';
-import { CollapsedParentsDropdown } from './CollapsedParentsDropdown';
+} from '../../../components/Common/PagePathNav/index.js';
+import { CollapsedParentsDropdown } from './CollapsedParentsDropdown.js';
 
 import styles from './PagePathNavSticky.module.scss';
 

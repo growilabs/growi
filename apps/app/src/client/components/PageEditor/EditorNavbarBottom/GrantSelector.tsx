@@ -12,12 +12,12 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import type { UserRelatedGroupsData } from '~/interfaces/page';
-import { UserGroupPageGrantStatus } from '~/interfaces/page';
-import { useCurrentUser } from '~/states/global';
-import { useCurrentPageId } from '~/states/page';
-import { toSelectedGrant, useSelectedGrant } from '~/states/ui/editor';
-import { useSWRxCurrentGrantData } from '~/stores/page';
+import type { UserRelatedGroupsData } from '~/interfaces/page.js';
+import { UserGroupPageGrantStatus } from '~/interfaces/page.js';
+import { useCurrentUser } from '~/states/global/index.js';
+import { useCurrentPageId } from '~/states/page/index.js';
+import { toSelectedGrant, useSelectedGrant } from '~/states/ui/editor/index.js';
+import { useSWRxCurrentGrantData } from '~/stores/page.js';
 
 const AVAILABLE_GRANTS = [
   {
@@ -221,12 +221,12 @@ export const GrantSelector = (props: Props): JSX.Element => {
           <span className="label">
             {grantedGroupNames.length > 1 ? (
               // substring for group name truncate
-              <span>
+              (<span>
                 {`${grantedGroupNames[0].substring(0, 30)}, ... `}
                 <span className="badge bg-primary">
                   +{grantedGroupNames.length - 1}
                 </span>
-              </span>
+              </span>)
             ) : (
               grantedGroupNames[0].substring(0, 30)
             )}

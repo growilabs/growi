@@ -5,7 +5,7 @@ import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
+import type { IPageTagRelation } from '~/interfaces/page-tag-relation.js';
 
 import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
 import { getOrCreateModel } from '../util/mongoose-utils.js';

@@ -3,9 +3,9 @@ import express from 'express';
 import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
-import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server';
-import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
-import { createApiRouter } from '~/server/util/createApiRouter';
+import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server/index.js';
+import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter/index.js';
+import { createApiRouter } from '~/server/util/createApiRouter.js';
 
 import { accessTokenParser } from '../middlewares/access-token-parser/index.js';
 import { generateAddActivityMiddleware } from '../middlewares/add-activity.js';

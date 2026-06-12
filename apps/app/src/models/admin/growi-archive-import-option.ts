@@ -1,4 +1,4 @@
-import { ImportMode } from './import-mode';
+import { ImportMode } from './import-mode.js';
 
 export class GrowiArchiveImportOption {
   collectionName: string;

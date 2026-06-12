@@ -2,13 +2,13 @@ import type React from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { IThreadRelationHasId } from '~/features/openai/interfaces/thread-relation';
+import type { IThreadRelationHasId } from '~/features/openai/interfaces/thread-relation.js';
 
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from '../../../states';
-import { useSWRxThreads } from '../../../stores/thread';
+} from '../../../states/index.js';
+import { useSWRxThreads } from '../../../stores/thread.js';
 
 import styles from './ThreadList.module.scss';
 

@@ -2,7 +2,7 @@ import React, { type JSX } from 'react';
 import { format } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 
-import ArchiveFilesTableMenu from './ArchiveFilesTableMenu';
+import ArchiveFilesTableMenu from './ArchiveFilesTableMenu.js';
 
 type ArchiveFilesTableProps = {
   zipFileStats: any[];

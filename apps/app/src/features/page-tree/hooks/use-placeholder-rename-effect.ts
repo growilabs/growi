@@ -1,9 +1,9 @@
 import { useEffect, useRef } from 'react';
 import type { ItemInstance } from '@headless-tree/core';
 
-import type { IPageForItem } from '~/interfaces/page';
+import type { IPageForItem } from '~/interfaces/page.js';
 
-import { CREATING_PAGE_VIRTUAL_ID } from '../constants/_inner';
+import { CREATING_PAGE_VIRTUAL_ID } from '../constants/_inner.js';
 
 type UsePlaceholderRenameEffectParams = {
   item: ItemInstance<IPageForItem>;

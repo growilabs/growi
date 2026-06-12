@@ -2,11 +2,11 @@ import { type RefObject, useCallback, useEffect, useState } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 import type { HtmlElementNode } from 'rehype-toc';
 
-import type { generateTocOptions } from '~/client/services/renderer/renderer';
-import type { RendererOptions } from '~/interfaces/renderer-options';
-import { useCurrentPagePath } from '~/states/page';
-import { useRendererConfig } from '~/states/server-configurations';
-import { useNextThemes } from '~/stores-universal/use-next-themes';
+import type { generateTocOptions } from '~/client/services/renderer/renderer.js';
+import type { RendererOptions } from '~/interfaces/renderer-options.js';
+import { useCurrentPagePath } from '~/states/page/index.js';
+import { useRendererConfig } from '~/states/server-configurations/index.js';
+import { useNextThemes } from '~/stores-universal/use-next-themes.js';
 
 // ============================================================================
 // INTERNAL ATOMS (Implementation details, not exported)
@@ -116,7 +116,7 @@ export const useTocOptions = () => {
       try {
         if (!generateTocOptionsCache) {
           const { generateTocOptions } = await import(
-            '~/client/services/renderer/renderer'
+            '~/client/services/renderer/renderer.js'
           );
           generateTocOptionsCache = generateTocOptions;
         }

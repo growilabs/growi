@@ -4,7 +4,7 @@ import type { IncomingHttpHeaders } from 'http';
 import * as i18nextConfig from '^/config/i18next.config.cjs';
 
 // Re-export getLocale from the shared client-safe module
-export { getLocale } from '~/utils/locale-utils';
+export { getLocale } from '~/utils/locale-utils.js';
 
 const ACCEPT_LANG_MAP = {
   en: Lang.en_US,

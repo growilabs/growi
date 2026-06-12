@@ -1,18 +1,36 @@
-import KeycloakAdminClient from '@keycloak/keycloak-admin-client';
-import type GroupRepresentation from '@keycloak/keycloak-admin-client/lib/defs/groupRepresentation';
-import type UserRepresentation from '@keycloak/keycloak-admin-client/lib/defs/userRepresentation';
+import KeycloakAdminClientPkg from '@keycloak/keycloak-admin-client';
 
-import { configManager } from '~/server/service/config-manager';
-import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
-import loggerFactory from '~/utils/logger';
-import { batchProcessPromiseAll } from '~/utils/promise';
+// @keycloak/keycloak-admin-client v18 is transpiled CJS without a
+// module.exports self-patch: under native ESM the default import binding is
+// the exports object, so the constructor must be unwrapped from `.default`.
+// `typeof import(...)` keeps the narrowing valid under both module
+// resolutions: NodeNext (server build) binds the default import to the module
+// namespace, Bundler (tsgo / next build) binds it to the class itself.
+const KeycloakAdminClient = (KeycloakAdminClientPkg as unknown as {
+  default: typeof import('@keycloak/keycloak-admin-client').default;
+}).default;
+type KeycloakAdminClient =
+  import('@keycloak/keycloak-admin-client').default;
+
+// The defs are CJS-format declarations (`export default interface ...`);
+// NodeNext types a default import of them as the module namespace, so pull
+// the interfaces out via type-level import() instead.
+type GroupRepresentation =
+  import('@keycloak/keycloak-admin-client/lib/defs/groupRepresentation.js').default;
+type UserRepresentation =
+  import('@keycloak/keycloak-admin-client/lib/defs/userRepresentation.js').default;
+
+import { configManager } from '~/server/service/config-manager/index.js';
+import type { S2sMessagingService } from '~/server/service/s2s-messaging/base.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { batchProcessPromiseAll } from '~/utils/promise.js';
 
 import type {
   ExternalUserGroupTreeNode,
   ExternalUserInfo,
-} from '../../interfaces/external-user-group';
-import { ExternalGroupProviderType } from '../../interfaces/external-user-group';
-import ExternalUserGroupSyncService from './external-user-group-sync';
+} from '../../interfaces/external-user-group.js';
+import { ExternalGroupProviderType } from '../../interfaces/external-user-group.js';
+import ExternalUserGroupSyncService from './external-user-group-sync.js';
 
 const logger = loggerFactory('growi:service:keycloak-user-group-sync-service');
 

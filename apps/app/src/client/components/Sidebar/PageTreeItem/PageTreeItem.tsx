@@ -7,27 +7,27 @@ import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import path from 'path';
 
-import { toastSuccess } from '~/client/util/toastr';
-import type { TreeItemProps } from '~/features/page-tree';
+import { toastSuccess } from '~/client/util/toastr.js';
+import type { TreeItemProps } from '~/features/page-tree/index.js';
 import {
   usePageCreate,
   usePageRename,
   usePageTreeInformationUpdate,
   usePlaceholderRenameEffect,
-} from '~/features/page-tree';
-import { TreeItemLayout, TreeNameInput } from '~/features/page-tree/components';
-import type { IPageForItem } from '~/interfaces/page';
-import type { OnDeletedFunction, OnDuplicatedFunction } from '~/interfaces/ui';
-import { useCurrentPagePath, useFetchCurrentPage } from '~/states/page';
-import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
-import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
-import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
-import { mutateAllPageInfo } from '~/stores/page';
-import { mutatePageList, mutatePageTree } from '~/stores/page-listing';
-import { mutateSearching } from '~/stores/search';
+} from '~/features/page-tree/index.js';
+import { TreeItemLayout, TreeNameInput } from '~/features/page-tree/components/index.js';
+import type { IPageForItem } from '~/interfaces/page.js';
+import type { OnDeletedFunction, OnDuplicatedFunction } from '~/interfaces/ui.js';
+import { useCurrentPagePath, useFetchCurrentPage } from '~/states/page/index.js';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete.js';
+import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate.js';
+import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate.js';
+import { mutateAllPageInfo } from '~/stores/page.js';
+import { mutatePageList, mutatePageTree } from '~/stores/page-listing.js';
+import { mutateSearching } from '~/stores/search.js';
 
-import { CountBadgeForPageTreeItem } from './CountBadgeForPageTreeItem';
-import { usePageItemControl } from './use-page-item-control';
+import { CountBadgeForPageTreeItem } from './CountBadgeForPageTreeItem.js';
+import { usePageItemControl } from './use-page-item-control.js';
 
 import styles from './PageTreeItem.module.scss';
 

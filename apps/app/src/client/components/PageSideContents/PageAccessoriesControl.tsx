@@ -1,6 +1,6 @@
 import { type JSX, memo, type ReactNode } from 'react';
 
-import CountBadge from '../Common/CountBadge';
+import CountBadge from '../Common/CountBadge.js';
 
 import styles from './PageAccessoriesControl.module.scss';
 

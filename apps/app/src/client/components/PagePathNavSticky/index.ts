@@ -1,1 +1,1 @@
-export * from './PagePathNavSticky';
+export * from './PagePathNavSticky.js';

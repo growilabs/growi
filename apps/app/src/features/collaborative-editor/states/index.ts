@@ -3,4 +3,4 @@ export {
   useCurrentPageYjsData,
   useCurrentPageYjsDataActions,
   useCurrentPageYjsDataLoading,
-} from './current-page-yjs-data';
+} from './current-page-yjs-data.js';

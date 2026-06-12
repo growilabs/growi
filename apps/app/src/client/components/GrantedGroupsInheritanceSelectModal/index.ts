@@ -1,1 +1,1 @@
-export { GrantedGroupsInheritanceSelectModalLazyLoaded } from './dynamic';
+export { GrantedGroupsInheritanceSelectModalLazyLoaded } from './dynamic.js';

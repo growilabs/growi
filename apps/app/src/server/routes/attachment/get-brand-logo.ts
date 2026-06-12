@@ -2,10 +2,10 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import type { Response, Router } from 'express';
 import express from 'express';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import loggerFactory from '~/utils/logger';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../../crowi/index.js';
 import { AttachmentType } from '../../interfaces/attachment.js';

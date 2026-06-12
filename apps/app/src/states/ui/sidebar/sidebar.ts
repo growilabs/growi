@@ -1,12 +1,12 @@
 import { type RefObject, useCallback, useMemo } from 'react';
 import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai';
 
-import { scheduleToPut } from '~/client/services/user-ui-settings';
-import { SidebarContentsType, SidebarMode } from '~/interfaces/ui';
+import { scheduleToPut } from '~/client/services/user-ui-settings.js';
+import { SidebarContentsType, SidebarMode } from '~/interfaces/ui.js';
 
-import { isDeviceLargerThanXlAtom } from '../device';
-import { EditorMode } from '../editor';
-import { editorModeAtom } from '../editor/editor-mode'; // import the atom directly
+import { isDeviceLargerThanXlAtom } from '../device.js';
+import { EditorMode } from '../editor/index.js';
+import { editorModeAtom } from '../editor/editor-mode.js'; // import the atom directly
 
 const isDrawerOpenedAtom = atom(false);
 

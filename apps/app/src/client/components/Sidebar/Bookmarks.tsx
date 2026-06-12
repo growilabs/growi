@@ -1,9 +1,9 @@
 import React, { type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useIsGuestUser } from '~/states/context';
+import { useIsGuestUser } from '~/states/context.js';
 
-import { BookmarkContents } from './Bookmarks/BookmarkContents';
+import { BookmarkContents } from './Bookmarks/BookmarkContents.js';
 
 export const Bookmarks = (): JSX.Element => {
   const { t } = useTranslation();

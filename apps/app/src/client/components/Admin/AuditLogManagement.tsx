@@ -6,24 +6,24 @@ import { format } from 'date-fns/format';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import type { IClearable } from '~/client/interfaces/clearable';
-import { toastError } from '~/client/util/toastr';
-import type { SupportedActionType } from '~/interfaces/activity';
-import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
+import type { IClearable } from '~/client/interfaces/clearable.js';
+import { toastError } from '~/client/util/toastr.js';
+import type { SupportedActionType } from '~/interfaces/activity.js';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global/index.js';
 import {
   auditLogAvailableActionsAtom,
   auditLogEnabledAtom,
-} from '~/states/server-configurations';
-import { useSWRxActivity } from '~/stores/activity';
+} from '~/states/server-configurations/index.js';
+import { useSWRxActivity } from '~/stores/activity.js';
 
-import PaginationWrapper from '../PaginationWrapper';
-import { ActivityTable } from './AuditLog/ActivityTable';
-import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
-import { AuditLogExportModal } from './AuditLog/AuditLogExportModal';
-import { AuditLogSettings } from './AuditLog/AuditLogSettings';
-import { DateRangePicker } from './AuditLog/DateRangePicker';
-import { SearchUsernameTypeahead } from './AuditLog/SearchUsernameTypeahead';
-import { SelectActionDropdown } from './AuditLog/SelectActionDropdown';
+import PaginationWrapper from '../PaginationWrapper.js';
+import { ActivityTable } from './AuditLog/ActivityTable.js';
+import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode.js';
+import { AuditLogExportModal } from './AuditLog/AuditLogExportModal.js';
+import { AuditLogSettings } from './AuditLog/AuditLogSettings.js';
+import { DateRangePicker } from './AuditLog/DateRangePicker.js';
+import { SearchUsernameTypeahead } from './AuditLog/SearchUsernameTypeahead.js';
+import { SelectActionDropdown } from './AuditLog/SelectActionDropdown.js';
 
 const formatDate = (date: Date | null) => {
   if (date == null) {

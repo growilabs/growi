@@ -3,9 +3,9 @@ import React, { useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import loggerFactory from '~/utils/logger';
+import { apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:passwordReset');
 

@@ -6,8 +6,8 @@ import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import urljoin from 'url-join';
 
-import UserDate from '../../../components/User/UserDate';
-import { Username } from '../../../components/User/Username';
+import UserDate from '../../../components/User/UserDate.js';
+import { Username } from '../../../components/User/Username.js';
 
 import styles from './Revision.module.scss';
 

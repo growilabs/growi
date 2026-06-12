@@ -3,7 +3,7 @@ import type { Scope } from '@growi/core/dist/interfaces';
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 
-import { useDeviceLargerThanMd } from '~/states/ui/device';
+import { useDeviceLargerThanMd } from '~/states/ui/device.js';
 
 import styles from './AccessTokenScopeList.module.scss';
 

@@ -6,12 +6,12 @@ import { query } from 'express-validator';
 import type { PaginateResult, PipelineStage } from 'mongoose';
 import { Types } from 'mongoose';
 
-import type { IActivity } from '~/interfaces/activity';
-import { ActivityLogActions } from '~/interfaces/activity';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
-import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
+import type { IActivity } from '~/interfaces/activity.js';
+import { ActivityLogActions } from '~/interfaces/activity.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import Activity from '~/server/models/activity.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../../crowi/index.js';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';

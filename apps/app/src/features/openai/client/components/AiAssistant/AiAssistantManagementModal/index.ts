@@ -1,1 +1,1 @@
-export { AiAssistantManagementModalLazyLoaded } from './dynamic';
+export { AiAssistantManagementModalLazyLoaded } from './dynamic.js';

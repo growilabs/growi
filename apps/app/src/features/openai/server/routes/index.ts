@@ -1,10 +1,10 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
-import type Crowi from '~/server/crowi';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import type Crowi from '~/server/crowi/index.js';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
 
-import { isAiEnabled } from '../services';
+import { isAiEnabled } from '../services/index.js';
 
 const router = express.Router();
 
@@ -17,26 +17,26 @@ export const factory = (crowi: Crowi): express.Router => {
   }
   // enabled
   else {
-    import('./thread').then(({ createThreadHandlersFactory }) => {
+    import('./thread.js').then(({ createThreadHandlersFactory }) => {
       router.post('/thread', createThreadHandlersFactory(crowi));
     });
 
-    import('./get-recent-threads').then(({ getRecentThreadsFactory }) => {
+    import('./get-recent-threads.js').then(({ getRecentThreadsFactory }) => {
       router.get('/threads/recent', getRecentThreadsFactory(crowi));
     });
 
-    import('./get-threads').then(({ getThreadsFactory }) => {
+    import('./get-threads.js').then(({ getThreadsFactory }) => {
       router.get('/threads/:aiAssistantId', getThreadsFactory(crowi));
     });
 
-    import('./delete-thread').then(({ deleteThreadFactory }) => {
+    import('./delete-thread.js').then(({ deleteThreadFactory }) => {
       router.delete(
         '/thread/:aiAssistantId/:threadRelationId',
         deleteThreadFactory(crowi),
       );
     });
 
-    import('./message').then(
+    import('./message/index.js').then(
       ({ getMessagesFactory, postMessageHandlersFactory }) => {
         router.post('/message', postMessageHandlersFactory(crowi));
         router.get(
@@ -46,23 +46,23 @@ export const factory = (crowi: Crowi): express.Router => {
       },
     );
 
-    import('./edit').then(({ postMessageToEditHandlersFactory }) => {
+    import('./edit/index.js').then(({ postMessageToEditHandlersFactory }) => {
       router.post('/edit', postMessageToEditHandlersFactory(crowi));
     });
 
-    import('./ai-assistant').then(({ createAiAssistantFactory }) => {
+    import('./ai-assistant.js').then(({ createAiAssistantFactory }) => {
       router.post('/ai-assistant', createAiAssistantFactory(crowi));
     });
 
-    import('./ai-assistants').then(({ getAiAssistantsFactory }) => {
+    import('./ai-assistants.js').then(({ getAiAssistantsFactory }) => {
       router.get('/ai-assistants', getAiAssistantsFactory(crowi));
     });
 
-    import('./update-ai-assistant').then(({ updateAiAssistantsFactory }) => {
+    import('./update-ai-assistant.js').then(({ updateAiAssistantsFactory }) => {
       router.put('/ai-assistant/:id', updateAiAssistantsFactory(crowi));
     });
 
-    import('./set-default-ai-assistant').then(
+    import('./set-default-ai-assistant.js').then(
       ({ setDefaultAiAssistantFactory }) => {
         router.put(
           '/ai-assistant/:id/set-default',
@@ -71,7 +71,7 @@ export const factory = (crowi: Crowi): express.Router => {
       },
     );
 
-    import('./delete-ai-assistant').then(({ deleteAiAssistantsFactory }) => {
+    import('./delete-ai-assistant.js').then(({ deleteAiAssistantsFactory }) => {
       router.delete('/ai-assistant/:id', deleteAiAssistantsFactory(crowi));
     });
   }

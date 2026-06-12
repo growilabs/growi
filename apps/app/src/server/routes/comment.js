@@ -3,14 +3,14 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { body, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 
-import { CommentEvent, commentEvent } from '~/features/comment/server';
+import { CommentEvent, commentEvent } from '~/features/comment/server/index.js';
 import {
   SupportedAction,
   SupportedEventModel,
   SupportedTargetModel,
-} from '~/interfaces/activity';
-import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
+} from '~/interfaces/activity.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { prisma } from '~/utils/prisma.js';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting/index.js';
 import { preNotifyService } from '../service/pre-notify.js';

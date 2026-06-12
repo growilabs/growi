@@ -4,15 +4,15 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import type { IAuditLogBulkExportRequestFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import type { SupportedActionType } from '~/interfaces/activity';
-import { auditLogAvailableActionsAtom } from '~/states/server-configurations';
+import type { IAuditLogBulkExportRequestFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
+import type { SupportedActionType } from '~/interfaces/activity.js';
+import { auditLogAvailableActionsAtom } from '~/states/server-configurations/index.js';
 
-import { DateRangePicker } from './DateRangePicker';
-import { DuplicateExportConfirmModal } from './DuplicateExportConfirmModal';
-import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
-import { SelectActionDropdown } from './SelectActionDropdown';
-import { useAuditLogExport } from './useAuditLogExport';
+import { DateRangePicker } from './DateRangePicker.js';
+import { DuplicateExportConfirmModal } from './DuplicateExportConfirmModal.js';
+import { SearchUsernameTypeahead } from './SearchUsernameTypeahead.js';
+import { SelectActionDropdown } from './SelectActionDropdown.js';
+import { useAuditLogExport } from './useAuditLogExport.js';
 
 type Props = {
   isOpen: boolean;

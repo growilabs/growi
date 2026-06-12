@@ -4,9 +4,9 @@ import type { Request, Response } from 'express';
 import createError from 'http-errors';
 import { mock } from 'vitest-mock-extended';
 
-import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
-import { addFilterCondition, listPages } from '.';
-import type { PageQuery, PageQueryBuilder } from './generate-base-query';
+import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api.js';
+import { addFilterCondition, listPages } from './index.js';
+import type { PageQuery, PageQueryBuilder } from './generate-base-query.js';
 
 interface IListPagesRequest
   extends Request<undefined, undefined, undefined, LsxApiParams> {

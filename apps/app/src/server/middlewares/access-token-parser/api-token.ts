@@ -5,8 +5,8 @@ import type { Response } from 'express';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { extractAccessToken } from '~/server/middlewares/access-token-parser/extract-access-token';
-import loggerFactory from '~/utils/logger';
+import { extractAccessToken } from '~/server/middlewares/access-token-parser/extract-access-token.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:middleware:access-token-parser:api-token');
 

@@ -1,1 +1,1 @@
-export * from './CopyDropdown';
+export * from './CopyDropdown.js';

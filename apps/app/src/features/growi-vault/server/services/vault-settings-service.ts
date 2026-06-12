@@ -1,6 +1,6 @@
 import { ConfigSource } from '@growi/core/dist/interfaces';
 
-import { configManager } from '~/server/service/config-manager';
+import { configManager } from '~/server/service/config-manager/index.js';
 
 /**
  * Resolved Vault settings consumed by gateway components.

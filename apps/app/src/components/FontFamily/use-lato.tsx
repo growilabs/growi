@@ -1,6 +1,6 @@
 import { Lato } from 'next/font/google';
 
-import type { DefineStyle } from './types';
+import type { DefineStyle } from './types.js';
 
 const lato = Lato({
   weight: ['400', '700'],

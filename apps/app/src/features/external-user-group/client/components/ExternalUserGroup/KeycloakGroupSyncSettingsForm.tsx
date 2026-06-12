@@ -2,10 +2,10 @@ import type { FC } from 'react';
 import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useSWRxKeycloakGroupSyncSettings } from '~/features/external-user-group/client/stores/external-user-group';
-import type { KeycloakGroupSyncSettings } from '~/features/external-user-group/interfaces/external-user-group';
+import { apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useSWRxKeycloakGroupSyncSettings } from '~/features/external-user-group/client/stores/external-user-group.js';
+import type { KeycloakGroupSyncSettings } from '~/features/external-user-group/interfaces/external-user-group.js';
 
 export const KeycloakGroupSyncSettingsForm: FC = () => {
   const { t } = useTranslation('admin');

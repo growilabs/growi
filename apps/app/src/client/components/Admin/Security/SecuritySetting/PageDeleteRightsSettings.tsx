@@ -2,16 +2,16 @@ import type React from 'react';
 import { useCallback } from 'react';
 import { Collapse } from 'reactstrap';
 
-import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
+import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer.js';
 import {
   type IPageDeleteConfigValue,
   type IPageDeleteConfigValueToProcessValidation,
   PageDeleteConfigValue,
-} from '~/interfaces/page-delete-config';
+} from '~/interfaces/page-delete-config.js';
 import {
   prepareDeleteConfigValuesForCalc,
   validateDeleteConfigs,
-} from '~/utils/page-delete-config';
+} from '~/utils/page-delete-config.js';
 
 import {
   DeletionType,
@@ -20,7 +20,7 @@ import {
   getDeletionTypeForT,
   isRecursiveDeletion,
   isTypeDeletion,
-} from './types';
+} from './types.js';
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;

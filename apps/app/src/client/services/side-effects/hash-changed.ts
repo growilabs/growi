@@ -1,8 +1,8 @@
 import { useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 
-import { useIsEditable } from '~/states/page';
-import { determineEditorModeByHash, useEditorMode } from '~/states/ui/editor';
+import { useIsEditable } from '~/states/page/index.js';
+import { determineEditorModeByHash, useEditorMode } from '~/states/ui/editor/index.js';
 
 /**
  * Change editorMode by browser forward/back operation

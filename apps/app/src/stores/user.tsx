@@ -3,10 +3,10 @@ import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
-import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
-import { useIsGuestUser } from '~/states/context';
-import { checkAndUpdateImageUrlCached } from '~/stores/middlewares/user';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
+import { useIsGuestUser } from '~/states/context.js';
+import { checkAndUpdateImageUrlCached } from '~/stores/middlewares/user.js';
 
 export const useSWRxUsersList = (
   userIds: string[],

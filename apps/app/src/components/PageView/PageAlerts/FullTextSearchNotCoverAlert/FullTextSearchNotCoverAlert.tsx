@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { elasticsearchMaxBodyLengthToIndexAtom } from '~/states/server-configurations';
+import { elasticsearchMaxBodyLengthToIndexAtom } from '~/states/server-configurations/index.js';
 
 export type FullTextSearchNotCoverAlertProps = {
   isActive: boolean;

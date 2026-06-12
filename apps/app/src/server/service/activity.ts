@@ -1,7 +1,7 @@
 import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
-import type { IActivity, SupportedActionType } from '~/interfaces/activity';
+import type { IActivity, SupportedActionType } from '~/interfaces/activity.js';
 import {
   ActionGroupSize,
   AllEssentialActions,
@@ -9,9 +9,9 @@ import {
   AllMediumGroupActions,
   AllSmallGroupActions,
   AllSupportedActions,
-} from '~/interfaces/activity';
-import type { ActivityDocument } from '~/server/models/activity';
-import Activity from '~/server/models/activity';
+} from '~/interfaces/activity.js';
+import type { ActivityDocument } from '~/server/models/activity.js';
+import Activity from '~/server/models/activity.js';
 
 import loggerFactory from '../../utils/logger/index.js';
 import type Crowi from '../crowi/index.js';

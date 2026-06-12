@@ -5,9 +5,9 @@ import { finished, pipeline } from 'node:stream/promises';
 import archiver from 'archiver';
 import mongoose from 'mongoose';
 
-import { toArrayIfNot } from '~/utils/array-utils';
-import { getGrowiVersion } from '~/utils/growi-version';
-import loggerFactory from '~/utils/logger';
+import { toArrayIfNot } from '~/utils/array-utils.js';
+import { getGrowiVersion } from '~/utils/growi-version.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type CollectionProgress from '../models/vo/collection-progress.js';
 import CollectionProgressingStatus from '../models/vo/collection-progressing-status.js';

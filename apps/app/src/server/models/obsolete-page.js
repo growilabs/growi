@@ -12,14 +12,14 @@ import { differenceInYears } from 'date-fns/differenceInYears';
 import mongoose from 'mongoose';
 import urljoin from 'url-join';
 
-import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
-import UserGroup from '~/server/models/user-group';
-import UserGroupRelation from '~/server/models/user-group-relation';
-import { configManager as _configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group.js';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts.js';
+import UserGroup from '~/server/models/user-group.js';
+import UserGroupRelation from '~/server/models/user-group-relation.js';
+import { configManager as _configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { prisma } from '~/utils/prisma.js';
 
 /** @returns {import('../service/config-manager').IConfigManagerForApp} */
 function getConfigManager() {

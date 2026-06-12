@@ -3,16 +3,16 @@ import useSWR from 'swr';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 import useSWRInfinite from 'swr/infinite';
 
-import { SupportedTargetModel } from '~/interfaces/activity';
+import { SupportedTargetModel } from '~/interfaces/activity.js';
 import type {
   IInAppNotificationHasId,
   InAppNotificationStatuses,
   PaginateResult,
-} from '~/interfaces/in-app-notification';
-import * as userSerializers from '~/models/serializers/in-app-notification-snapshot/user';
-import loggerFactory from '~/utils/logger';
+} from '~/interfaces/in-app-notification.js';
+import * as userSerializers from '~/models/serializers/in-app-notification-snapshot/user.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { apiv3Get } from '../client/util/apiv3-client';
+import { apiv3Get } from '../client/util/apiv3-client.js';
 
 const logger = loggerFactory('growi:cli:InAppNotification');
 

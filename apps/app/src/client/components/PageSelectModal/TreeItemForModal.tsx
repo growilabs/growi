@@ -1,10 +1,10 @@
 import type { FC } from 'react';
 import { useCallback, useMemo } from 'react';
 
-import type { TreeItemProps } from '~/features/page-tree';
-import { TreeItemLayout } from '~/features/page-tree/components';
-import type { IPageForItem } from '~/interfaces/page';
-import { useSelectPageInModal } from '~/states/ui/modal/page-select';
+import type { TreeItemProps } from '~/features/page-tree/index.js';
+import { TreeItemLayout } from '~/features/page-tree/components/index.js';
+import type { IPageForItem } from '~/interfaces/page.js';
+import { useSelectPageInModal } from '~/states/ui/modal/page-select.js';
 
 import styles from './TreeItemForModal.module.scss';
 

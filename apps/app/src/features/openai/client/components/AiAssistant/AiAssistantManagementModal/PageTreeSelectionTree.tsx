@@ -1,13 +1,13 @@
 import { Suspense, useCallback, useState } from 'react';
 
-import ItemsTreeContentSkeleton from '~/client/components/ItemsTree/ItemsTreeContentSkeleton';
-import { ItemsTree } from '~/features/page-tree/components';
-import type { IPageForTreeItem } from '~/interfaces/page';
+import ItemsTreeContentSkeleton from '~/client/components/ItemsTree/ItemsTreeContentSkeleton.js';
+import { ItemsTree } from '~/features/page-tree/components/index.js';
+import type { IPageForTreeItem } from '~/interfaces/page.js';
 
 import {
   TreeItemWithCheckbox,
   treeItemWithCheckboxSize,
-} from './TreeItemWithCheckbox';
+} from './TreeItemWithCheckbox.js';
 
 type Props = {
   isEnableActions: boolean;

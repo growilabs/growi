@@ -12,9 +12,9 @@ import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import { useAtomValue } from 'jotai';
 import { useAtomCallback } from 'jotai/utils';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
-import { useSWRxPageInfo } from '~/stores/page';
-import loggerFactory from '~/utils/logger';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
+import { useSWRxPageInfo } from '~/stores/page.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   currentPageDataAtom,
@@ -27,7 +27,7 @@ import {
   remoteRevisionBodyAtom,
   revisionIdFromUrlAtom,
   shareLinkIdAtom,
-} from './internal-atoms';
+} from './internal-atoms.js';
 
 const logger = loggerFactory('growi:states:page:useFetchCurrentPage');
 

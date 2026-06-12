@@ -1,1 +1,1 @@
-export * from './ShareLink';
+export * from './ShareLink.js';

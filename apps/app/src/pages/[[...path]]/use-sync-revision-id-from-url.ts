@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useSetAtom } from 'jotai';
 
-import { _atomsForSyncRevisionIdFromUrl } from '~/states/page';
+import { _atomsForSyncRevisionIdFromUrl } from '~/states/page/index.js';
 
 const { revisionIdFromUrlAtom } = _atomsForSyncRevisionIdFromUrl;
 

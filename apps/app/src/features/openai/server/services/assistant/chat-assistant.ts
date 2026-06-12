@@ -1,15 +1,15 @@
 import type OpenAI from 'openai';
 
-import { configManager } from '~/server/service/config-manager';
+import { configManager } from '~/server/service/config-manager/index.js';
 
-import { AssistantType } from './assistant-types';
-import { getOrCreateAssistant } from './create-assistant';
+import { AssistantType } from './assistant-types.js';
+import { getOrCreateAssistant } from './create-assistant.js';
 import {
   instructionsForFileSearch,
   instructionsForInformationTypes,
   instructionsForInjectionCountermeasures,
   instructionsForSystem,
-} from './instructions/commons';
+} from './instructions/commons.js';
 
 const instructionsForResponseModes = `## Response Modes
 

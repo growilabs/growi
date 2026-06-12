@@ -1,6 +1,6 @@
 import type { Model } from 'mongoose';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from './index.js';
 
@@ -54,12 +54,12 @@ export const setupModelsDependentOnCrowi = async (
 
 export const setupIndependentModels = async (): Promise<void> => {
   await Promise.all([
-    import('~/features/comment/server/models'),
+    import('~/features/comment/server/models/index.js'),
     import(
-      '~/features/external-user-group/server/models/external-user-group-relation'
+      '~/features/external-user-group/server/models/external-user-group-relation.js'
     ),
-    import('~/features/external-user-group/server/models/external-user-group'),
-    import('~/features/growi-plugin/server/models'),
+    import('~/features/external-user-group/server/models/external-user-group.js'),
+    import('~/features/growi-plugin/server/models/index.js'),
     import('../models/activity.js'),
     import('../models/attachment.js'),
     import('../models/bookmark-folder.js'),

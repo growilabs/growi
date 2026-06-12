@@ -2,14 +2,14 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { HtmlElementNode } from 'rehype-toc';
 import useSWR, { type SWRConfiguration, type SWRResponse } from 'swr';
 
-import { getGrowiFacade } from '~/features/growi-plugin/client/utils/growi-facade-utils';
-import type { RendererOptions } from '~/interfaces/renderer-options';
-import type { RendererConfigExt } from '~/interfaces/services/renderer';
-import { useCurrentPagePath } from '~/states/page';
-import { useRendererConfig } from '~/states/server-configurations';
-import { useSetTocNode } from '~/states/ui/toc';
-import { useNextThemes } from '~/stores-universal/use-next-themes';
-import loggerFactory from '~/utils/logger';
+import { getGrowiFacade } from '~/features/growi-plugin/client/utils/growi-facade-utils.js';
+import type { RendererOptions } from '~/interfaces/renderer-options.js';
+import type { RendererConfigExt } from '~/interfaces/services/renderer.js';
+import { useCurrentPagePath } from '~/states/page/index.js';
+import { useRendererConfig } from '~/states/server-configurations/index.js';
+import { useSetTocNode } from '~/states/ui/toc.js';
+import { useNextThemes } from '~/stores-universal/use-next-themes.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:cli:services:renderer');
 
@@ -66,7 +66,7 @@ export const useViewOptions = (): SWRResponse<RendererOptions, Error> => {
       }
 
       const { generateViewOptions } = await import(
-        '~/client/services/renderer/renderer'
+        '~/client/services/renderer/renderer.js'
       );
       return generateViewOptions(
         currentPagePath,
@@ -101,7 +101,7 @@ export const usePreviewOptions = (): SWRResponse<RendererOptions, Error> => {
       }
 
       const { generatePreviewOptions } = await import(
-        '~/client/services/renderer/renderer'
+        '~/client/services/renderer/renderer.js'
       );
       return generatePreviewOptions(rendererConfig, pagePath);
     },
@@ -128,7 +128,7 @@ export const useCommentForCurrentPageOptions = (): SWRResponse<
       : null,
     async ([, rendererConfig, currentPagePath]) => {
       const { generateSimpleViewOptions } = await import(
-        '~/client/services/renderer/renderer'
+        '~/client/services/renderer/renderer.js'
       );
       return generateSimpleViewOptions(
         rendererConfig,
@@ -165,7 +165,7 @@ export const useSelectedPagePreviewOptions = (
       : null,
     async ([, rendererConfig, pagePath, highlightKeywords]) => {
       const { generateSimpleViewOptions } = await import(
-        '~/client/services/renderer/renderer'
+        '~/client/services/renderer/renderer.js'
       );
       return generateSimpleViewOptions(
         rendererConfig,
@@ -194,7 +194,7 @@ export const useCustomSidebarOptions = (
     isAllDataValid ? ['customSidebarOptions', rendererConfig] : null,
     async ([, rendererConfig]) => {
       const { generateSimpleViewOptions } = await import(
-        '~/client/services/renderer/renderer'
+        '~/client/services/renderer/renderer.js'
       );
       return generateSimpleViewOptions(rendererConfig, '/');
     },
@@ -228,7 +228,7 @@ export const usePresentationViewOptions = (): SWRResponse<
       : null,
     async ([, currentPagePath, rendererConfig]) => {
       const { generatePresentationViewOptions } = await import(
-        '~/client/services/renderer/renderer'
+        '~/client/services/renderer/renderer.js'
       );
       return generatePresentationViewOptions(rendererConfig, currentPagePath);
     },

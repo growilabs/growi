@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { isPopulated } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 
-import { useCurrentPageData } from '~/states/page';
+import { useCurrentPageData } from '~/states/page/index.js';
 
 export const PageGrantAlert = (): JSX.Element => {
   const { t } = useTranslation();

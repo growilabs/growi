@@ -6,22 +6,22 @@ import {
   isSearchScopeChildrenAsDefaultAtom,
   isSearchServiceConfiguredAtom,
   isSearchServiceReachableAtom,
-} from '~/states/server-configurations';
+} from '~/states/server-configurations/index.js';
 
-import type { NextPageWithLayout } from '../_app.page';
-import type { SearchConfigurationProps } from '../basic-layout-page';
-import { getServerSideSearchConfigurationProps } from '../basic-layout-page/get-server-side-props/search-configurations';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
-import type { AdminCommonProps } from './_shared';
+import type { NextPageWithLayout } from '../_app.page.js';
+import type { SearchConfigurationProps } from '../basic-layout-page/index.js';
+import { getServerSideSearchConfigurationProps } from '../basic-layout-page/get-server-side-props/search-configurations.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
+import type { AdminCommonProps } from './_shared/index.js';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared';
+} from './_shared/index.js';
 
 const FullTextSearchManagement = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Admin/FullTextSearchManagement').then(
+    import('~/client/components/Admin/FullTextSearchManagement.js').then(
       (mod) => mod.FullTextSearchManagement,
     ),
   { ssr: false },

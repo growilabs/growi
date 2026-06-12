@@ -2,8 +2,8 @@ import type { ReactElement } from 'react';
 import type { AutosizeInputProps } from 'react-input-autosize';
 import AutosizeInput from 'react-input-autosize';
 
-import type { SubmittableInputProps } from './types';
-import { useSubmittable } from './use-submittable';
+import type { SubmittableInputProps } from './types.js';
+import { useSubmittable } from './use-submittable.js';
 
 export const getAdjustedMaxWidthForAutosizeInput = (
   parentMaxWidth: number,

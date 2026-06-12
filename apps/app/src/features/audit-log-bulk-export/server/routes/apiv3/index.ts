@@ -1,1 +1,1 @@
-export { factory } from './audit-log-bulk-export';
+export { factory } from './audit-log-bulk-export.js';

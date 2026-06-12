@@ -1,4 +1,4 @@
-import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job';
+import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job.js';
 
 export class BulkExportJobExpiredError extends Error {
   constructor(pageBulkExportJob: PageBulkExportJobDocument) {

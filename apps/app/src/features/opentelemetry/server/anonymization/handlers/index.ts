@@ -1,8 +1,8 @@
-import type { AnonymizationModule } from '../interfaces/anonymization-module';
-import { pageAccessModule } from './page-access-handler';
-import { pageApiModule } from './page-api-handler';
-import { pageListingApiModule } from './page-listing-api-handler';
-import { searchApiModule } from './search-api-handler';
+import type { AnonymizationModule } from '../interfaces/anonymization-module.js';
+import { pageAccessModule } from './page-access-handler.js';
+import { pageApiModule } from './page-api-handler.js';
+import { pageListingApiModule } from './page-listing-api-handler.js';
+import { searchApiModule } from './search-api-handler.js';
 
 /**
  * List of anonymization modules

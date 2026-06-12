@@ -3,17 +3,17 @@ import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
-import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 
-import { withUnstatedContainers } from '../../../UnstatedUtils';
-import { CommentManageRightsSettings } from './CommentManageRightsSettings';
-import { PageAccessRightsSettings } from './PageAccessRightsSettings';
-import { PageDeleteRightsSettings } from './PageDeleteRightsSettings';
-import { PageListDisplaySettings } from './PageListDisplaySettings';
-import { SessionMaxAgeSettings } from './SessionMaxAgeSettings';
-import { UserHomepageDeletionSettings } from './UserHomepageDeletionSettings';
-import { UserPageVisibilitySettings } from './UserPageVisibilitySettings';
+import { withUnstatedContainers } from '../../../UnstatedUtils.js';
+import { CommentManageRightsSettings } from './CommentManageRightsSettings.js';
+import { PageAccessRightsSettings } from './PageAccessRightsSettings.js';
+import { PageDeleteRightsSettings } from './PageDeleteRightsSettings.js';
+import { PageListDisplaySettings } from './PageListDisplaySettings.js';
+import { SessionMaxAgeSettings } from './SessionMaxAgeSettings.js';
+import { UserHomepageDeletionSettings } from './UserHomepageDeletionSettings.js';
+import { UserPageVisibilitySettings } from './UserPageVisibilitySettings.js';
 
 type FormData = {
   sessionMaxAge: string;

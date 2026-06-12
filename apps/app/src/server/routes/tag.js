@@ -1,5 +1,5 @@
-import { SupportedAction } from '~/interfaces/activity';
-import Tag from '~/server/models/tag';
+import { SupportedAction } from '~/interfaces/activity.js';
+import Tag from '~/server/models/tag.js';
 
 import PageTagRelation from '../models/page-tag-relation.js';
 import { Revision } from '../models/revision.js';

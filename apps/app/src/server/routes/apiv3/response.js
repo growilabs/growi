@@ -1,6 +1,6 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 
-import { toArrayIfNot } from '~/utils/array-utils';
+import { toArrayIfNot } from '~/utils/array-utils.js';
 
 const addCustomFunctionToResponse = (express) => {
   express.response.apiv3 = function (obj = {}, status = 200) {

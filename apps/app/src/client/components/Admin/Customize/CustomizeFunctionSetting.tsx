@@ -2,13 +2,13 @@ import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Card, CardBody } from 'reactstrap';
 
-import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
-import CustomizeFunctionOption from './CustomizeFunctionOption';
-import PagingSizeUncontrolledDropdown from './PagingSizeUncontrolledDropdown';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
+import CustomizeFunctionOption from './CustomizeFunctionOption.js';
+import PagingSizeUncontrolledDropdown from './PagingSizeUncontrolledDropdown.js';
 
 type Props = {
   adminCustomizeContainer: AdminCustomizeContainer;

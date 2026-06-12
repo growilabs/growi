@@ -1,12 +1,12 @@
 import React, { memo, useMemo } from 'react';
 
-import type { SidebarContentsType } from '~/interfaces/ui';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import type { SidebarContentsType } from '~/interfaces/ui.js';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
 
-import { NotAvailableForReadOnlyUser } from '../../NotAvailableForReadOnlyUser';
-import { PageCreateButton } from '../PageCreateButton';
-import { PrimaryItems } from './PrimaryItems';
-import { SecondaryItems } from './SecondaryItems';
+import { NotAvailableForReadOnlyUser } from '../../NotAvailableForReadOnlyUser.js';
+import { PageCreateButton } from '../PageCreateButton/index.js';
+import { PrimaryItems } from './PrimaryItems.js';
+import { SecondaryItems } from './SecondaryItems.js';
 
 import styles from './SidebarNav.module.scss';
 

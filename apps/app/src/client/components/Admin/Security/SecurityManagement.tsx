@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect } from 'react';
 
-import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
-import { toastError } from '~/client/util/toastr';
-import { toArrayIfNot } from '~/utils/array-utils';
+import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer.js';
+import { toastError } from '~/client/util/toastr.js';
+import { toArrayIfNot } from '~/utils/array-utils.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import SecurityManagementContents from './SecurityManagementContents';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import SecurityManagementContents from './SecurityManagementContents.js';
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;

@@ -1,13 +1,13 @@
 import type { JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import InAppNotificationElm from '~/client/components/InAppNotification/InAppNotificationElm';
-import InfiniteScroll from '~/client/components/InfiniteScroll';
-import { NewsItem } from '~/features/news/client/components/NewsItem';
-import { useSidebarMode } from '~/states/ui/sidebar';
+import InAppNotificationElm from '~/client/components/InAppNotification/InAppNotificationElm.js';
+import InfiniteScroll from '~/client/components/InfiniteScroll.js';
+import { NewsItem } from '~/features/news/client/components/NewsItem.js';
+import { useSidebarMode } from '~/states/ui/sidebar/index.js';
 
-import { useMergedInAppNotifications } from './hooks/useMergedInAppNotifications';
-import type { FilterType } from './InAppNotification';
+import { useMergedInAppNotifications } from './hooks/useMergedInAppNotifications.js';
+import type { FilterType } from './InAppNotification.js';
 
 type InAppNotificationContentProps = {
   isUnopendNotificationsVisible: boolean;

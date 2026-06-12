@@ -1,12 +1,12 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
 
 import type {
   SearchCandidate,
   SearchResultItem,
   SearchService,
-} from '../../interfaces/suggest-path-types';
+} from '../../interfaces/suggest-path-types.js';
 
 const SCORE_THRESHOLD = 5.0;
 const SEARCH_RESULT_LIMIT = 20;

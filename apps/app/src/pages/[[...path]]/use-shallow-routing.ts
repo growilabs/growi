@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 import { isClient } from '@growi/core/dist/utils';
 
-import type { CommonEachProps } from '../common-props';
+import type { CommonEachProps } from '../common-props/index.js';
 
 /**
  * Custom hook for syncing pathname by Shallow Routing

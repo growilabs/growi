@@ -3,15 +3,15 @@ import dynamic from 'next/dynamic';
 import withLoadingProps from 'next-dynamic-loading-props';
 import { useIsomorphicLayoutEffect } from 'usehooks-ts';
 
-import type { PagePathNavLayoutProps } from '../PagePathNav';
-import { PagePathNav } from '../PagePathNav';
+import type { PagePathNavLayoutProps } from '../PagePathNav/index.js';
+import { PagePathNav } from '../PagePathNav/index.js';
 
 const PagePathNavSticky = withLoadingProps<PagePathNavLayoutProps>(
   (useLoadingProps) =>
     dynamic(
       () =>
         // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        import('~/client/components/PagePathNavSticky').then(
+        import('~/client/components/PagePathNavSticky/index.js').then(
           (mod) => mod.PagePathNavSticky,
         ),
       {

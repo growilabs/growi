@@ -3,8 +3,8 @@ import { markdownSectionBlock } from '@growi/slack/dist/utils/block-kit-builder'
 import { reshapeContentsBody } from '@growi/slack/dist/utils/reshape-contents-body';
 import mongoose from 'mongoose';
 
-import { generalXssFilter } from '~/services/general-xss-filter';
-import loggerFactory from '~/utils/logger';
+import { generalXssFilter } from '~/services/general-xss-filter/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { growiInfoService } from '../growi-info/index.js';
 

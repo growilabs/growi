@@ -15,7 +15,7 @@ import type { ChatPostMessageArguments, WebClient } from '@slack/web-api';
 import type { IncomingWebhookSendArguments } from '@slack/webhook';
 import mongoose from 'mongoose';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 import type { EventActionsPermission } from '../interfaces/slack-integration/events.js';

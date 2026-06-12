@@ -13,18 +13,18 @@ import path from 'path';
 import { pipeline } from 'stream/promises';
 import unzipStream from 'unzip-stream';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type {
   IGrowiPlugin,
   IGrowiPluginMeta,
   IGrowiPluginOrigin,
-} from '../../../interfaces';
-import { PLUGIN_EXPRESS_STATIC_DIR, PLUGIN_STORING_PATH } from '../../consts';
-import { GrowiPlugin } from '../../models';
-import { GitHubUrl } from '../../models/vo/github-url';
-import { generateTemplatePluginMeta } from './generate-template-plugin-meta';
-import { generateThemePluginMeta } from './generate-theme-plugin-meta';
+} from '../../../interfaces/index.js';
+import { PLUGIN_EXPRESS_STATIC_DIR, PLUGIN_STORING_PATH } from '../../consts/index.js';
+import { GrowiPlugin } from '../../models/index.js';
+import { GitHubUrl } from '../../models/vo/github-url.js';
+import { generateTemplatePluginMeta } from './generate-template-plugin-meta.js';
+import { generateThemePluginMeta } from './generate-theme-plugin-meta.js';
 
 const logger = loggerFactory('growi:plugins:plugin-utils');
 

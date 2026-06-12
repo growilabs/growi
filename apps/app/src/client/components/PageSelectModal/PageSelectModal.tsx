@@ -4,17 +4,17 @@ import { useTranslation } from 'next-i18next';
 import { dirname } from 'pathe';
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { ItemsTree } from '~/features/page-tree/components';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
-import { useCurrentPageData } from '~/states/page';
+import { ItemsTree } from '~/features/page-tree/components/index.js';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
+import { useCurrentPageData } from '~/states/page/index.js';
 import {
   usePageSelectModalActions,
   usePageSelectModalStatus,
   useSelectedPageInModal,
-} from '~/states/ui/modal/page-select';
+} from '~/states/ui/modal/page-select.js';
 
-import ItemsTreeContentSkeleton from '../ItemsTree/ItemsTreeContentSkeleton';
-import { TreeItemForModal, treeItemForModalSize } from './TreeItemForModal';
+import ItemsTreeContentSkeleton from '../ItemsTree/ItemsTreeContentSkeleton.js';
+import { TreeItemForModal, treeItemForModalSize } from './TreeItemForModal.js';
 
 const PageSelectModalSubstance: FC = () => {
   const { close: closeModal } = usePageSelectModalActions();

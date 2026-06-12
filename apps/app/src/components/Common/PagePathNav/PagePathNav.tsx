@@ -2,12 +2,12 @@ import { type JSX, useMemo } from 'react';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { pagePathUtils } from '@growi/core/dist/utils';
 
-import { LinkedPagePath } from '~/models/linked-page-path';
+import { LinkedPagePath } from '~/models/linked-page-path.js';
 
-import { PagePathHierarchicalLink } from '../PagePathHierarchicalLink';
-import { Separator } from '.';
-import type { PagePathNavLayoutProps } from './PagePathNavLayout';
-import { PagePathNavLayout } from './PagePathNavLayout';
+import { PagePathHierarchicalLink } from '../PagePathHierarchicalLink/index.js';
+import { Separator } from './index.js';
+import type { PagePathNavLayoutProps } from './PagePathNavLayout.js';
+import { PagePathNavLayout } from './PagePathNavLayout.js';
 
 const { isTrashPage } = pagePathUtils;
 

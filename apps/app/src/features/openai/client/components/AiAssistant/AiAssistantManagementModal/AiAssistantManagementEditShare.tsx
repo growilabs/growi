@@ -5,14 +5,14 @@ import { Input, Label, ModalBody } from 'reactstrap';
 import {
   AiAssistantAccessScope,
   AiAssistantShareScope,
-} from '~/features/openai/interfaces/ai-assistant';
-import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
-import { useSWRxUserRelatedGroups } from '~/stores/user';
+} from '~/features/openai/interfaces/ai-assistant.js';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
+import { useSWRxUserRelatedGroups } from '~/stores/user.js';
 
-import { AccessScopeDropdown } from './AccessScopeDropdown';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
-import { SelectUserGroupModal } from './SelectUserGroupModal';
-import { ShareScopeSwitch } from './ShareScopeSwitch';
+import { AccessScopeDropdown } from './AccessScopeDropdown.js';
+import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
+import { SelectUserGroupModal } from './SelectUserGroupModal.js';
+import { ShareScopeSwitch } from './ShareScopeSwitch.js';
 
 const ScopeType = {
   ACCESS: 'Access',

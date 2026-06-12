@@ -4,12 +4,12 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
-import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
-import AdminLocalSecurityContainer from '~/client/services/AdminLocalSecurityContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { isMailerSetupAtom } from '~/states/server-configurations';
+import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer.js';
+import AdminLocalSecurityContainer from '~/client/services/AdminLocalSecurityContainer.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { isMailerSetupAtom } from '~/states/server-configurations/index.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;

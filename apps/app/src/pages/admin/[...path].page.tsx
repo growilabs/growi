@@ -1,15 +1,15 @@
 import dynamic from 'next/dynamic';
 
-import type { NextPageWithLayout } from '../_app.page';
+import type { NextPageWithLayout } from '../_app.page.js';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared';
+} from './_shared/index.js';
 
 const AdminNotFoundPage = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Admin/NotFoundPage').then(
+    import('~/client/components/Admin/NotFoundPage.js').then(
       (mod) => mod.AdminNotFoundPage,
     ),
   { ssr: false },

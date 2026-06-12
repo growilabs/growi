@@ -1,1 +1,1 @@
-export * from './PagePathHierarchicalLink';
+export * from './PagePathHierarchicalLink.js';

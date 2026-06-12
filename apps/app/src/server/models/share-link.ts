@@ -3,7 +3,7 @@ import mongoose, { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import type { IShareLink } from '~/interfaces/share-link';
+import type { IShareLink } from '~/interfaces/share-link.js';
 
 import { getOrCreateModel } from '../util/mongoose-utils.js';
 

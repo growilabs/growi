@@ -2,7 +2,7 @@ import type { Transporter } from 'nodemailer';
 import nodemailer from 'nodemailer';
 import ses from 'nodemailer-ses-transport';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { IConfigManagerForApp } from '../config-manager/index.js';
 

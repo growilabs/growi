@@ -1,10 +1,10 @@
 import type { Response } from 'express';
 import type { Readable } from 'stream';
 
-import type { ICheckLimitResult } from '~/interfaces/attachment';
-import type Crowi from '~/server/crowi';
-import type { RespondOptions } from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
+import type { ICheckLimitResult } from '~/interfaces/attachment.js';
+import type Crowi from '~/server/crowi/index.js';
+import type { RespondOptions } from '~/server/interfaces/attachment.js';
+import type { IAttachmentDocument } from '~/server/models/attachment.js';
 
 import {
   AbstractFileUploader,

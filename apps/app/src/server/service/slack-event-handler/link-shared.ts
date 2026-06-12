@@ -5,10 +5,10 @@ import type { LinkUnfurls, MessageAttachment, WebClient } from '@slack/web-api';
 import mongoose from 'mongoose';
 import urljoin from 'url-join';
 
-import type Crowi from '~/server/crowi';
-import type { EventActionsPermission } from '~/server/interfaces/slack-integration/events';
-import type { PageModel } from '~/server/models/page';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import type { EventActionsPermission } from '~/server/interfaces/slack-integration/events.js';
+import type { PageModel } from '~/server/models/page.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type {
   DataForUnfurl,

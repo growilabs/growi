@@ -3,7 +3,7 @@ import type { ContainerDirective } from 'mdast-util-directive';
 import type { Plugin } from 'unified';
 import { visit } from 'unist-util-visit';
 
-import { AllCallout } from './consts';
+import { AllCallout } from './consts.js';
 
 export const remarkPlugin: Plugin = () => {
   return (tree) => {

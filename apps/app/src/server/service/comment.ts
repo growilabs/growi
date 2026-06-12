@@ -2,8 +2,8 @@ import type { IPage, IUser } from '@growi/core';
 import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { CommentEvent, commentEvent } from '~/features/comment/server';
-import { prisma } from '~/utils/prisma';
+import { CommentEvent, commentEvent } from '~/features/comment/server/index.js';
+import { prisma } from '~/utils/prisma.js';
 
 import loggerFactory from '../../utils/logger/index.js';
 import type Crowi from '../crowi/index.js';

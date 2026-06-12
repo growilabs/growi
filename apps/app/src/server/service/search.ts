@@ -3,20 +3,20 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
-import { CommentEvent, commentEvent } from '~/features/comment/server';
+import { CommentEvent, commentEvent } from '~/features/comment/server/index.js';
 import {
   isIncludeAiMenthion,
   removeAiMenthion,
-} from '~/features/search/utils/ai';
-import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
-import { SearchDelegatorName } from '~/interfaces/named-query';
+} from '~/features/search/utils/ai.js';
+import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages.js';
+import { SearchDelegatorName } from '~/interfaces/named-query.js';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
   ISearchResult,
-} from '~/interfaces/search';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
-import loggerFactory from '~/utils/logger';
+} from '~/interfaces/search.js';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';

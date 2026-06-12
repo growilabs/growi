@@ -4,12 +4,12 @@ import { useTranslation } from 'next-i18next';
 import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { Tooltip } from 'reactstrap';
 
-import { useSWRxAdminHome } from '~/stores/admin/admin-home';
-import { useSWRxV5MigrationStatus } from '~/stores/page-listing';
-import { generatePrefilledHostInformationMarkdown } from '~/utils/admin-home';
+import { useSWRxAdminHome } from '~/stores/admin/admin-home.js';
+import { useSWRxV5MigrationStatus } from '~/stores/page-listing.js';
+import { generatePrefilledHostInformationMarkdown } from '~/utils/admin-home.js';
 
-import { EnvVarsTable } from './EnvVarsTable';
-import SystemInfomationTable from './SystemInfomationTable';
+import { EnvVarsTable } from './EnvVarsTable.js';
+import SystemInfomationTable from './SystemInfomationTable.js';
 
 const COPY_STATE = {
   DEFAULT: 'default',

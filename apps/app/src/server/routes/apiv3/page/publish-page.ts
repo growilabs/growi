@@ -5,11 +5,11 @@ import type { Request, RequestHandler } from 'express';
 import { param } from 'express-validator';
 import mongoose from 'mongoose';
 
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { PageModel } from '~/server/models/page';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import type { PageModel } from '~/server/models/page.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
 import type { ApiV3Response } from '../interfaces/apiv3-response.js';

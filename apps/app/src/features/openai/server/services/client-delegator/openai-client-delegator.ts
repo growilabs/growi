@@ -2,10 +2,10 @@ import OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
 import type { Uploadable } from 'openai/uploads';
 
-import { configManager } from '~/server/service/config-manager';
+import { configManager } from '~/server/service/config-manager/index.js';
 
-import type { MessageListParams } from '../../../interfaces/message';
-import type { IOpenaiClientDelegator } from './interfaces';
+import type { MessageListParams } from '../../../interfaces/message.js';
+import type { IOpenaiClientDelegator } from './interfaces.js';
 
 export class OpenaiClientDelegator implements IOpenaiClientDelegator {
   private client: OpenAI;

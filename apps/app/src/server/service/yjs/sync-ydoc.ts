@@ -2,7 +2,7 @@ import { Origin, YDocStatus } from '@growi/core';
 import type { Delta } from '@growi/editor';
 import type { WSSharedDoc } from 'y-websocket/bin/utils';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { Revision } from '../../models/revision.js';
 import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-revision-if-broken.js';

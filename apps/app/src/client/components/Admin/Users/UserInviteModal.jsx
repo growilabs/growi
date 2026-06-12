@@ -6,11 +6,11 @@ import { CopyToClipboard } from 'react-copy-to-clipboard';
 // import Button from 'react-bootstrap/es/Button';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
-import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
-import { isMailerSetupAtom } from '~/states/server-configurations';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer.js';
+import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr.js';
+import { isMailerSetupAtom } from '~/states/server-configurations/index.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
 
 class UserInviteModal extends React.Component {
   constructor(props) {

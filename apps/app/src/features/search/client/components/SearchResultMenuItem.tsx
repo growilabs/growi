@@ -2,10 +2,10 @@ import { type JSX, useCallback } from 'react';
 import { PagePathLabel, UserPicture } from '@growi/ui/dist/components';
 import { useDebounce } from 'usehooks-ts';
 
-import { useSWRxSearch } from '~/stores/search';
+import { useSWRxSearch } from '~/stores/search.js';
 
-import type { GetItemProps } from '../interfaces/downshift';
-import { SearchMenuItem } from './SearchMenuItem';
+import type { GetItemProps } from '../interfaces/downshift.js';
+import { SearchMenuItem } from './SearchMenuItem.js';
 
 type Props = {
   activeIndex: number | null;

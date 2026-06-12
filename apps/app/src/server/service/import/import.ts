@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import type { EventEmitter } from 'node:stream';
 import { Transform, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import gc from 'expose-gc/function';
+import gc from 'expose-gc/function.js';
 import type {
   BulkOperationBase,
   BulkWriteResult,
@@ -15,12 +15,12 @@ import mongoose from 'mongoose';
 import path from 'pathe';
 import unzipStream from 'unzip-stream';
 
-import { ImportMode } from '~/models/admin/import-mode';
-import type Crowi from '~/server/crowi';
-import { setupIndependentModels } from '~/server/crowi/setup-models';
-import type CollectionProgress from '~/server/models/vo/collection-progress';
-import { getGrowiVersion } from '~/utils/growi-version';
-import loggerFactory from '~/utils/logger';
+import { ImportMode } from '~/models/admin/import-mode.js';
+import type Crowi from '~/server/crowi/index.js';
+import { setupIndependentModels } from '~/server/crowi/setup-models.js';
+import type CollectionProgress from '~/server/models/vo/collection-progress.js';
+import { getGrowiVersion } from '~/utils/growi-version.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import CollectionProgressingStatus from '../../models/vo/collection-progressing-status.js';
 import { createBatchStream } from '../../util/batch-stream.js';

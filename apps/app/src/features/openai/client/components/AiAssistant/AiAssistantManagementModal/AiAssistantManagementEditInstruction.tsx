@@ -12,8 +12,8 @@ import {
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
-} from '../../../states/modal/ai-assistant-management';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
+} from '../../../states/modal/ai-assistant-management.js';
+import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
 
 type Props = {
   instruction: string;

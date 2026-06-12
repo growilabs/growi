@@ -2,11 +2,11 @@ import React, { type JSX, useCallback } from 'react';
 import type { IUserHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useCurrentUser } from '~/states/global';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useCurrentUser } from '~/states/global/index.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
 
 type RevokeAdminButtonProps = {
   adminUsersContainer: AdminUsersContainer;

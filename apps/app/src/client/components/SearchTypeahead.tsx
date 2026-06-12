@@ -21,10 +21,10 @@ import {
 import type { TypeaheadRef } from 'react-bootstrap-typeahead';
 import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 
-import type { IFocusable } from '~/client/interfaces/focusable';
-import type { TypeaheadProps } from '~/client/interfaces/react-bootstrap-typeahead';
-import type { IPageWithSearchMeta } from '~/interfaces/search';
-import { useSWRxSearch } from '~/stores/search';
+import type { IFocusable } from '~/client/interfaces/focusable.js';
+import type { TypeaheadProps } from '~/client/interfaces/react-bootstrap-typeahead.js';
+import type { IPageWithSearchMeta } from '~/interfaces/search.js';
+import { useSWRxSearch } from '~/stores/search.js';
 
 import styles from './SearchTypeahead.module.scss';
 

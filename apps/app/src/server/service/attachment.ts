@@ -4,7 +4,7 @@ import type { IAttachment, Ref } from '@growi/core/dist/interfaces';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 import { AttachmentType } from '../interfaces/attachment.js';

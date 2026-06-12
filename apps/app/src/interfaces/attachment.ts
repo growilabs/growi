@@ -1,6 +1,6 @@
 import type { IAttachmentHasId } from '@growi/core/dist/interfaces';
 
-import type { PaginateResult } from './mongoose-utils';
+import type { PaginateResult } from './mongoose-utils.js';
 
 export const AttachmentMethodType = {
   aws: 'aws',

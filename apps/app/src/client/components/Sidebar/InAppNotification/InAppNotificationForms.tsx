@@ -1,7 +1,7 @@
 import { type JSX, useId } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import type { FilterType } from './InAppNotification';
+import type { FilterType } from './InAppNotification.js';
 
 type InAppNotificationFormsProps = {
   isUnopendNotificationsVisible: boolean;

@@ -4,7 +4,7 @@ import axios from 'axios';
 import { formatISO } from 'date-fns/formatISO';
 import qs from 'qs';
 
-import { convertStringsToDates } from './convert-strings-to-dates';
+import { convertStringsToDates } from './convert-strings-to-dates.js';
 
 export const createCustomAxios = (config?: AxiosRequestConfig) => {
   const baseTransformers =

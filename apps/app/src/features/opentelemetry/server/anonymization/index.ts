@@ -1,1 +1,1 @@
-export * from './anonymize-http-requests';
+export * from './anonymize-http-requests.js';

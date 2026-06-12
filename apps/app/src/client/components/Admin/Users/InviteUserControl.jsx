@@ -2,10 +2,10 @@ import React, { Fragment } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import UserInviteModal from './UserInviteModal';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import UserInviteModal from './UserInviteModal.js';
 
 class InviteUserControl extends React.Component {
   render() {

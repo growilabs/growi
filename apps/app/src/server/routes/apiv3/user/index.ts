@@ -1,6 +1,6 @@
 import express from 'express';
 
-import type Crowi from '~/server/crowi';
+import type Crowi from '~/server/crowi/index.js';
 
 import { getRelatedGroupsHandlerFactory } from './get-related-groups.js';
 

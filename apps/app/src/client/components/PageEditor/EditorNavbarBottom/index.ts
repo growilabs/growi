@@ -1,1 +1,1 @@
-export * from './EditorNavbarBottom';
+export * from './EditorNavbarBottom.js';

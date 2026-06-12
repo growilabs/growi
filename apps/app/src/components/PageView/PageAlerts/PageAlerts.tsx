@@ -1,13 +1,13 @@
 import type { JSX } from 'react';
 
-import { FixPageGrantAlertLazyLoaded } from './FixPageGrantAlert';
-import { FullTextSearchNotCoverAlertLazyLoaded } from './FullTextSearchNotCoverAlert';
-import { OldRevisionAlert } from './OldRevisionAlert';
-import { PageGrantAlert } from './PageGrantAlert';
-import { PageRedirectedAlertLazyLoaded } from './PageRedirectedAlert';
-import { PageStaleAlert } from './PageStaleAlert';
-import { TrashPageAlertLazyLoaded } from './TrashPageAlert';
-import { WipPageAlert } from './WipPageAlert';
+import { FixPageGrantAlertLazyLoaded } from './FixPageGrantAlert/index.js';
+import { FullTextSearchNotCoverAlertLazyLoaded } from './FullTextSearchNotCoverAlert/index.js';
+import { OldRevisionAlert } from './OldRevisionAlert.js';
+import { PageGrantAlert } from './PageGrantAlert.js';
+import { PageRedirectedAlertLazyLoaded } from './PageRedirectedAlert/index.js';
+import { PageStaleAlert } from './PageStaleAlert.js';
+import { TrashPageAlertLazyLoaded } from './TrashPageAlert/index.js';
+import { WipPageAlert } from './WipPageAlert.js';
 
 export const PageAlerts = (): JSX.Element => {
   return (

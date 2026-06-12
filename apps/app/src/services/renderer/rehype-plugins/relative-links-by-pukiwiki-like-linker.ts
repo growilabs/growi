@@ -7,7 +7,7 @@ import {
   type IUrlResolver,
   type RelativeLinksPluginParams,
   relativeLinks,
-} from './relative-links';
+} from './relative-links.js';
 
 const customAnchorsSelector: IAnchorsSelector = (node) => {
   return selectAll('a[href].pukiwiki-like-linker', node);

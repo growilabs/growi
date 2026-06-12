@@ -2,12 +2,12 @@ import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Collapse } from 'reactstrap';
 
-import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
-import type { ISearchConditions, ISearchConfigurations } from '~/stores/search';
+import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search.js';
+import type { ISearchConditions, ISearchConfigurations } from '~/stores/search.js';
 
-import { SearchModalTriggerinput } from './SearchModalTriggerinput';
-import { SearchOptionModalLazyLoaded } from './SearchOptionModal';
-import SortControl from './SortControl';
+import { SearchModalTriggerinput } from './SearchModalTriggerinput.js';
+import { SearchOptionModalLazyLoaded } from './SearchOptionModal/index.js';
+import SortControl from './SortControl.js';
 
 type Props = {
   isEnableSort: boolean;

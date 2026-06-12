@@ -1,9 +1,9 @@
-import { configManager } from '~/server/service/config-manager';
-import CronService from '~/server/service/cron';
+import { configManager } from '~/server/service/config-manager/index.js';
+import CronService from '~/server/service/cron.js';
 
-import { AuditLogBulkExportJobInProgressJobStatus } from '../../interfaces/audit-log-bulk-export';
-import AuditLogExportJob from '../models/audit-log-bulk-export-job';
-import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron';
+import { AuditLogBulkExportJobInProgressJobStatus } from '../../interfaces/audit-log-bulk-export.js';
+import AuditLogExportJob from '../models/audit-log-bulk-export-job.js';
+import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron/index.js';
 
 /**
  * Manages cronjob which checks if AuditLogExportJob in progress exists.

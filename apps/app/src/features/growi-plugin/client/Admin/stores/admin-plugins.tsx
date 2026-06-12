@@ -1,9 +1,9 @@
 import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
 
-import type { IGrowiPluginHasId } from '../../../interfaces';
+import type { IGrowiPluginHasId } from '../../../interfaces/index.js';
 
 type Plugins = {
   plugins: IGrowiPluginHasId[];

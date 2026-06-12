@@ -1,1 +1,1 @@
-export * from './PageControls';
+export * from './PageControls.js';

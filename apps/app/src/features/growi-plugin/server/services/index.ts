@@ -1,1 +1,1 @@
-export * from './growi-plugin';
+export * from './growi-plugin/index.js';

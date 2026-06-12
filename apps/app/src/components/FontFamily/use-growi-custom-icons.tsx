@@ -1,6 +1,6 @@
 import localFont from 'next/font/local';
 
-import type { DefineStyle } from './types';
+import type { DefineStyle } from './types.js';
 
 const growiCustomIconFont = localFont({
   src: '../../../../../packages/custom-icons/dist/growi-custom-icons.woff2',

@@ -3,13 +3,13 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 
 import {
   type ContentDispositionSettings as ContentDispositionSettingsType,
   useContentDisposition,
-} from '../../../services/admin-content-disposition';
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
+} from '../../../services/admin-content-disposition.js';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
 
 interface MimeTypeListProps {
   title: string;

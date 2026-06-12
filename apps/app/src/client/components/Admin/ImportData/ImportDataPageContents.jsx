@@ -1,5 +1,5 @@
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import GrowiArchiveSection from './GrowiArchiveSection';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import GrowiArchiveSection from './GrowiArchiveSection.js';
 
 const ImportDataPageContents = () => {
   return (

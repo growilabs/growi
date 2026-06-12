@@ -9,32 +9,32 @@ import {
 } from '@growi/core/dist/utils/page-path-utils';
 
 // biome-ignore lint/style/noRestrictedImports: no-problem lazy loaded components
-import { EmptyTrashModalLazyLoaded } from '~/client/components/EmptyTrashModal';
-import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
-import { BasicLayout } from '~/components/Layout/BasicLayout';
-import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { EmptyTrashModalLazyLoaded } from '~/client/components/EmptyTrashModal/index.js';
+import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle/index.js';
+import { BasicLayout } from '~/components/Layout/BasicLayout.js';
+import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
 
-import type { NextPageWithLayout } from '../_app.page';
-import type { BasicLayoutConfigurationProps } from '../basic-layout-page';
-import { getServerSideBasicLayoutProps } from '../basic-layout-page';
-import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate';
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { NextPageWithLayout } from '../_app.page.js';
+import type { BasicLayoutConfigurationProps } from '../basic-layout-page/index.js';
+import { getServerSideBasicLayoutProps } from '../basic-layout-page/index.js';
+import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate.js';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
-import type { RendererConfigProps } from '../general-page';
-import { useCustomTitle } from '../utils/page-title-customization';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
-import type { ServerConfigurationProps } from './types';
-import { useHydrateServerConfigurationAtoms } from './use-hydrate-server-configurations';
+} from '../common-props/index.js';
+import type { RendererConfigProps } from '../general-page/index.js';
+import { useCustomTitle } from '../utils/page-title-customization.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
+import type { ServerConfigurationProps } from './types.js';
+import { useHydrateServerConfigurationAtoms } from './use-hydrate-server-configurations.js';
 
 const TrashPageList = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/TrashPageList').then(
+    import('~/client/components/TrashPageList.js').then(
       (mod) => mod.TrashPageList,
     ),
   { ssr: false },

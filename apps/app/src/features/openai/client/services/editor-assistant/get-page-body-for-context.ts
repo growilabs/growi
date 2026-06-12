@@ -1,4 +1,4 @@
-import type { UseCodeMirrorEditor } from '@growi/editor/dist/client/services/use-codemirror-editor';
+import type { UseCodeMirrorEditor } from '@growi/editor/dist/client/services/use-codemirror-editor/index.js';
 
 export type PageBodyContextResult = {
   content: string;

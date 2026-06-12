@@ -1,1 +1,1 @@
-export * from './PageCreateButton';
+export * from './PageCreateButton.js';

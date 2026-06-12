@@ -13,11 +13,11 @@ import {
   ModalHeader,
 } from 'reactstrap';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
 import type {
   ReconcileRejectReason,
   ReconcileSubmitResult,
-} from '~/features/growi-vault/server/services/reconcile';
+} from '~/features/growi-vault/server/services/reconcile/index.js';
 
 // ============================================================================
 // Types

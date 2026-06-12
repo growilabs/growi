@@ -4,14 +4,14 @@
  * Optimized for real-time application with undo/redo support
  */
 
-import type { LlmEditorAssistantDiff } from '../../../interfaces/editor-assistant/llm-response-schemas';
+import type { LlmEditorAssistantDiff } from '../../../interfaces/editor-assistant/llm-response-schemas.js';
 import type {
   ProcessorConfig,
   SearchContext,
   SingleDiffResult,
-} from '../../interfaces/types';
-import { ClientErrorHandler } from './error-handling';
-import { ClientFuzzyMatcher } from './fuzzy-matching';
+} from '../../interfaces/types.js';
+import { ClientErrorHandler } from './error-handling.js';
+import { ClientFuzzyMatcher } from './fuzzy-matching.js';
 
 // -----------------------------------------------------------------------------
 // Client Diff Application Engine

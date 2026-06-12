@@ -1,21 +1,21 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
-import loggerFactory from '~/utils/logger';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type {
   ContentAnalysis,
   PathSuggestion,
   SearchCandidate,
   SearchService,
-} from '../../interfaces/suggest-path-types';
-import { SuggestionType } from '../../interfaces/suggest-path-types';
-import { analyzeContent } from './analyze-content';
-import { evaluateCandidates } from './evaluate-candidates';
-import { generateCategorySuggestion } from './generate-category-suggestion';
-import { generateMemoSuggestion } from './generate-memo-suggestion';
-import { resolveParentGrant } from './resolve-parent-grant';
-import { retrieveSearchCandidates } from './retrieve-search-candidates';
+} from '../../interfaces/suggest-path-types.js';
+import { SuggestionType } from '../../interfaces/suggest-path-types.js';
+import { analyzeContent } from './analyze-content.js';
+import { evaluateCandidates } from './evaluate-candidates.js';
+import { generateCategorySuggestion } from './generate-category-suggestion.js';
+import { generateMemoSuggestion } from './generate-memo-suggestion.js';
+import { resolveParentGrant } from './resolve-parent-grant.js';
+import { retrieveSearchCandidates } from './retrieve-search-candidates.js';
 
 const logger = loggerFactory(
   'growi:features:suggest-path:generate-suggestions',

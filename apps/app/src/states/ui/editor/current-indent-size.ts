@@ -1,6 +1,6 @@
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import { defaultIndentSizeAtom } from '~/states/server-configurations';
+import { defaultIndentSizeAtom } from '~/states/server-configurations/index.js';
 
 // Current indent size state - can be undefined to use default
 const currentIndentSizeAtom = atom<number | undefined>(undefined);

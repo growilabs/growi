@@ -2,9 +2,9 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegister } from 'react-hook-form';
 
-import AdminAppContainer from '~/client/services/AdminAppContainer';
+import AdminAppContainer from '~/client/services/AdminAppContainer.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
 
 type Props = {
   adminAppContainer?: AdminAppContainer;

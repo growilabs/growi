@@ -3,12 +3,12 @@ import type {
   IPageNotFoundInfo,
 } from '@growi/core/dist/interfaces';
 
-import type { IShareLinkHasId } from '~/interfaces/share-link';
-import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
+import type { IShareLinkHasId } from '~/interfaces/share-link.js';
+import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props/index.js';
 import type {
   GeneralPageInitialProps,
   IPageToShowRevisionWithMeta,
-} from '~/pages/general-page';
+} from '~/pages/general-page/index.js';
 
 export type ShareLinkPageStatesProps = Pick<
   GeneralPageInitialProps,

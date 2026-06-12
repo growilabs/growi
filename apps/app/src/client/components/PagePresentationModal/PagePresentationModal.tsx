@@ -7,23 +7,23 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useFullScreen } from '@growi/ui/dist/utils';
 import { Modal, ModalBody } from 'reactstrap';
 
-import { useCurrentPageData } from '~/states/page';
-import { useRendererConfig } from '~/states/server-configurations';
+import { useCurrentPageData } from '~/states/page/index.js';
+import { useRendererConfig } from '~/states/server-configurations/index.js';
 import {
   usePresentationModalActions,
   usePresentationModalStatus,
-} from '~/states/ui/modal/page-presentation';
-import { usePresentationViewOptions } from '~/stores/renderer';
-import { useNextThemes } from '~/stores-universal/use-next-themes';
+} from '~/states/ui/modal/page-presentation.js';
+import { usePresentationViewOptions } from '~/stores/renderer.js';
+import { useNextThemes } from '~/stores-universal/use-next-themes.js';
 
-import { RendererErrorMessage } from '../Common/RendererErrorMessage';
+import { RendererErrorMessage } from '../Common/RendererErrorMessage.js';
 
 import styles from './PagePresentationModal.module.scss';
 
 const moduleClass = styles['grw-presentation-modal'] ?? '';
 
 const Presentation = dynamic<PresentationProps>(
-  () => import('../Presentation/Presentation').then((mod) => mod.Presentation),
+  () => import('../Presentation/Presentation.js').then((mod) => mod.Presentation),
   {
     ssr: false,
     loading: () => <LoadingSpinner className="text-muted fs-1" />,

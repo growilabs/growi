@@ -6,9 +6,9 @@ import { WebSocketServer } from 'ws';
 import type { WSSharedDoc } from 'y-websocket/bin/utils';
 import { docs, setPersistence, setupWSConnection } from 'y-websocket/bin/utils';
 
-import type { SessionConfig } from '~/interfaces/session-config';
-import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
-import loggerFactory from '~/utils/logger';
+import type { SessionConfig } from '~/interfaces/session-config.js';
+import type { SyncLatestRevisionBody } from '~/interfaces/yjs.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { Revision } from '../../models/revision.js';
 import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-revision-if-broken.js';

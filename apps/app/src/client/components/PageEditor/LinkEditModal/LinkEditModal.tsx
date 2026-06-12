@@ -16,14 +16,14 @@ import {
   PopoverBody,
 } from 'reactstrap';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
-import { isMongoId } from '~/client/util/mongo-id';
-import { useCurrentPagePath } from '~/states/page';
-import { usePreviewOptions } from '~/stores/renderer';
-import loggerFactory from '~/utils/logger';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
+import { isMongoId } from '~/client/util/mongo-id.js';
+import { useCurrentPagePath } from '~/states/page/index.js';
+import { usePreviewOptions } from '~/stores/renderer.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import SearchTypeahead from '../../SearchTypeahead';
-import Preview from '../Preview';
+import SearchTypeahead from '../../SearchTypeahead.js';
+import Preview from '../Preview.js';
 
 import styles from './LinkEditPreview.module.scss';
 

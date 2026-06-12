@@ -9,12 +9,12 @@ import {
   useCurrentPagePath,
   useFetchCurrentPage,
   useIsTrashPage,
-} from '~/states/page';
-import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
-import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
-import { useIsAbleToShowTrashPageManagementButtons } from '~/states/ui/page-abilities';
-import { useSWRxPageInfo } from '~/stores/page';
-import { mutateRecentlyUpdated } from '~/stores/page-listing';
+} from '~/states/page/index.js';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete.js';
+import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page.js';
+import { useIsAbleToShowTrashPageManagementButtons } from '~/states/ui/page-abilities.js';
+import { useSWRxPageInfo } from '~/stores/page.js';
+import { mutateRecentlyUpdated } from '~/stores/page-listing.js';
 
 const onDeletedHandler = (pathOrPathsToDelete) => {
   if (typeof pathOrPathsToDelete !== 'string') {
@@ -60,7 +60,7 @@ const TrashPageAlertSubstance = (props: SubstanceProps): JSX.Element => {
       }
       try {
         // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        const unlink = (await import('~/client/services/page-operation'))
+        const unlink = (await import('~/client/services/page-operation.js'))
           .unlink;
         unlink(currentPagePath);
 
@@ -69,7 +69,7 @@ const TrashPageAlertSubstance = (props: SubstanceProps): JSX.Element => {
         mutateRecentlyUpdated();
       } catch (err) {
         // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        const toastError = (await import('~/client/util/toastr')).toastError;
+        const toastError = (await import('~/client/util/toastr.js')).toastError;
         toastError(err);
       }
     };

@@ -3,10 +3,10 @@ import { createModel } from 'mongoose-gridfs';
 import { Readable } from 'stream';
 import util from 'util';
 
-import type Crowi from '~/server/crowi';
-import type { RespondOptions } from '~/server/interfaces/attachment';
-import type { IAttachmentDocument } from '~/server/models/attachment';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import type { RespondOptions } from '~/server/interfaces/attachment.js';
+import type { IAttachmentDocument } from '~/server/models/attachment.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { configManager } from '../config-manager/index.js';
 import {

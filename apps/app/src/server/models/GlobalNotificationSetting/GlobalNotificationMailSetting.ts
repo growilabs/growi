@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-import type Crowi from '~/server/crowi';
+import type Crowi from '~/server/crowi/index.js';
 
 import { GlobalNotificationSettingType } from './consts.js';
 import {

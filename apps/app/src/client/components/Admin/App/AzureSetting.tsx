@@ -2,8 +2,8 @@ import type { JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegister } from 'react-hook-form';
 
-import type { FileUploadFormValues } from './FileUploadSetting.types';
-import MaskedInput from './MaskedInput';
+import type { FileUploadFormValues } from './FileUploadSetting.types.js';
+import MaskedInput from './MaskedInput.js';
 
 export type AzureSettingMoleculeProps = {
   register: UseFormRegister<FileUploadFormValues>;

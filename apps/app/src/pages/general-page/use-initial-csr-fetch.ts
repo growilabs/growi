@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 import { useRouter } from 'next/router';
 
-import { useFetchCurrentPage } from '~/states/page';
+import { useFetchCurrentPage } from '~/states/page/index.js';
 
-import { NextjsRoutingType } from '../utils/nextjs-routing-utils';
+import { NextjsRoutingType } from '../utils/nextjs-routing-utils.js';
 
 /**
  * Hook for handling initial CSR fetch when SSR data is not available.

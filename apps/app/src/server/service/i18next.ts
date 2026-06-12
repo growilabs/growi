@@ -6,11 +6,11 @@ import path from 'path';
 
 import * as i18nextConfig from '^/config/i18next.config.cjs';
 
-import { configManager } from '~/server/service/config-manager';
-import { resolveFromRoot } from '~/server/util/project-dir-utils';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { resolveFromRoot } from '~/server/util/project-dir-utils.js';
 
 const relativePathToLocalesRoot = path.relative(
-  __dirname,
+  import.meta.dirname,
   resolveFromRoot('public/static/locales'),
 );
 
@@ -19,8 +19,11 @@ const initI18next = async (overwriteOpts: InitOptions) => {
   await i18nInstance
     .use(
       resourcesToBackend((language: string, namespace: string) => {
+        // JSON modules require the import attribute under native ESM.
+        // resourcesToBackend unwraps the module namespace `.default` itself.
         return import(
-          path.join(relativePathToLocalesRoot, language, `${namespace}.json`)
+          path.join(relativePathToLocalesRoot, language, `${namespace}.json`),
+          { with: { type: 'json' } }
         );
       }),
     )

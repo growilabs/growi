@@ -2,10 +2,10 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
 
 class UserRemoveButton extends React.Component {
   constructor(props) {

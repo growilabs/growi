@@ -3,13 +3,13 @@ import React from 'react';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentPathname } from '~/states/global';
+import { useCurrentPathname } from '~/states/global/index.js';
 import {
   useSWRxPageInfoForList,
   useSWRxPagesByPath,
-} from '~/stores/page-listing';
+} from '~/stores/page-listing.js';
 
-import { PageListItemL } from './PageList/PageListItemL';
+import { PageListItemL } from './PageList/PageListItemL.js';
 
 import styles from './IdenticalPathPage.module.scss';
 

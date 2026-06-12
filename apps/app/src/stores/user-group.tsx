@@ -7,7 +7,7 @@ import { type SWRResponseWithUtils, withUtils } from '@growi/core/dist/swr';
 import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client.js';
 import type {
   AncestorUserGroupsResult,
   ChildUserGroupListResult,
@@ -19,7 +19,7 @@ import type {
   UserGroupRelationListResult,
   UserGroupRelationsResult,
   UserGroupResult,
-} from '~/interfaces/user-group-response';
+} from '~/interfaces/user-group-response.js';
 
 export const useSWRxUserGroup = (
   groupId: string | null,

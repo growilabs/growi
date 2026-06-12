@@ -1,7 +1,7 @@
 import { type JSX, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
+import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
 
 const authIcon = {
   [IExternalAuthProviderType.google]: (

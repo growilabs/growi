@@ -23,5 +23,5 @@ export type {
   ReconcileTargetType,
   VaultReconcileService,
   VaultReconcileServiceDeps,
-} from './reconcile-service';
-export { createVaultReconcileService } from './reconcile-service';
+} from './reconcile-service.js';
+export { createVaultReconcileService } from './reconcile-service.js';

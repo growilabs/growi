@@ -5,38 +5,38 @@ import Head from 'next/head';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 
-import { BasicLayout } from '~/components/Layout/BasicLayout';
-import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { BasicLayoutConfigurationProps } from '~/pages/basic-layout-page';
-import { getServerSideBasicLayoutProps } from '~/pages/basic-layout-page';
-import { useHydrateBasicLayoutConfigurationAtoms } from '~/pages/basic-layout-page/hydrate';
-import { useCustomTitle } from '~/pages/utils/page-title-customization';
-import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
-import loggerFactory from '~/utils/logger';
+import { BasicLayout } from '~/components/Layout/BasicLayout.js';
+import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import type { BasicLayoutConfigurationProps } from '~/pages/basic-layout-page/index.js';
+import { getServerSideBasicLayoutProps } from '~/pages/basic-layout-page/index.js';
+import { useHydrateBasicLayoutConfigurationAtoms } from '~/pages/basic-layout-page/hydrate.js';
+import { useCustomTitle } from '~/pages/utils/page-title-customization.js';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { NextPageWithLayout } from '../_app.page';
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { NextPageWithLayout } from '../_app.page.js';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
-import type { ServerConfigurationProps } from './types';
-import { useHydrateServerConfigurationAtoms } from './use-hydrate-server-configurations';
+} from '../common-props/index.js';
+import type { ServerConfigurationProps } from './types.js';
+import { useHydrateServerConfigurationAtoms } from './use-hydrate-server-configurations.js';
 
 const logger = loggerFactory('growi:pages:me');
 
 const PersonalSettings = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/Me/PersonalSettings'),
+  () => import('~/client/components/Me/PersonalSettings.js'),
   { ssr: false },
 );
 // const MyDraftList = dynamic(() => import('~/components/MyDraftList/MyDraftList'), { ssr: false });
 const InAppNotificationPage = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/InAppNotification/InAppNotificationPage').then(
+    import('~/client/components/InAppNotification/InAppNotificationPage.js').then(
       (mod) => mod.InAppNotificationPage,
     ),
   { ssr: false },

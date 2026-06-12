@@ -3,10 +3,10 @@ import { useHydrateAtoms } from 'jotai/utils';
 import {
   registrationWhitelistAtom,
   showPageLimitationXLAtom,
-} from '~/states/server-configurations';
-import { createAtomTuple } from '~/utils/jotai-utils';
+} from '~/states/server-configurations/index.js';
+import { createAtomTuple } from '~/utils/jotai-utils.js';
 
-import type { ServerConfigurationProps } from './types';
+import type { ServerConfigurationProps } from './types.js';
 
 /**
  * Hook for hydrating server configuration atoms with server-side data

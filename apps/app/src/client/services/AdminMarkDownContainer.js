@@ -1,7 +1,7 @@
 import { isServer } from '@growi/core/dist/utils';
 import { Container } from 'unstated';
 
-import { apiv3Get, apiv3Put } from '../util/apiv3-client';
+import { apiv3Get, apiv3Put } from '../util/apiv3-client.js';
 
 /**
  * Service container for admin markdown setting page (MarkDownSetting.jsx)

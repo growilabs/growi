@@ -1,14 +1,14 @@
 import { useEffect } from 'react';
 
-import { useCurrentPageYjsDataActions } from '~/features/collaborative-editor/states';
-import { SocketEventName } from '~/interfaces/websocket';
-import { useIsGuestUser } from '~/states/context';
+import { useCurrentPageYjsDataActions } from '~/features/collaborative-editor/states/index.js';
+import { SocketEventName } from '~/interfaces/websocket.js';
+import { useIsGuestUser } from '~/states/context.js';
 import {
   useCurrentPageData,
   useCurrentPageId,
   usePageNotFound,
-} from '~/states/page';
-import { useGlobalSocket } from '~/states/socket-io';
+} from '~/states/page/index.js';
+import { useGlobalSocket } from '~/states/socket-io/index.js';
 
 export const useCurrentPageYjsDataAutoLoadEffect = (): void => {
   const { fetchCurrentPageYjsData } = useCurrentPageYjsDataActions();

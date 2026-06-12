@@ -4,7 +4,7 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import {
   G2G_PROGRESS_STATUS,
   type G2GProgressStatus,
-} from '~/interfaces/g2g-transfer';
+} from '~/interfaces/g2g-transfer.js';
 
 /**
  * Props for {@link G2GDataTransferStatusIcon}

@@ -1,15 +1,15 @@
 import React, { type JSX, useState } from 'react';
 import { Dropdown } from 'reactstrap';
 
-import { useCreateTemplatePage } from '~/client/services/create-page';
-import { useToastrOnError } from '~/client/services/use-toastr-on-error';
-import { useCurrentPagePath } from '~/states/page';
-import { usePageCreateModalActions } from '~/states/ui/modal/page-create';
+import { useCreateTemplatePage } from '~/client/services/create-page/index.js';
+import { useToastrOnError } from '~/client/services/use-toastr-on-error.js';
+import { useCurrentPagePath } from '~/states/page/index.js';
+import { usePageCreateModalActions } from '~/states/ui/modal/page-create.js';
 
-import { CreateButton } from './CreateButton';
-import { DropendMenu } from './DropendMenu';
-import { DropendToggle } from './DropendToggle';
-import { useCreateNewPage, useCreateTodaysMemo } from './hooks';
+import { CreateButton } from './CreateButton.js';
+import { DropendMenu } from './DropendMenu.js';
+import { DropendToggle } from './DropendToggle.js';
+import { useCreateNewPage, useCreateTodaysMemo } from './hooks/index.js';
 
 export const PageCreateButton = React.memo((): JSX.Element => {
   const [isHovered, setIsHovered] = useState(false);

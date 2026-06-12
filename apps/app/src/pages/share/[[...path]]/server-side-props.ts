@@ -3,23 +3,23 @@ import type { GetServerSidePropsContext, GetServerSidePropsResult } from 'next';
 import {
   SupportedAction,
   type SupportedActionType,
-} from '~/interfaces/activity';
-import type { IShareLinkHasId } from '~/interfaces/share-link';
+} from '~/interfaces/activity.js';
+import type { IShareLinkHasId } from '~/interfaces/share-link.js';
 
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../../common-props';
+} from '../../common-props/index.js';
 import {
   getServerSideGeneralPageProps,
   getServerSideShareLinkRendererConfigProps,
   isValidGeneralPageInitialProps,
-} from '../../general-page';
-import { addActivity } from '../../utils/activity';
-import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
-import { getPageDataForInitial } from './page-data-props';
-import type { Stage2InitialProps } from './types';
+} from '../../general-page/index.js';
+import { addActivity } from '../../utils/activity.js';
+import { mergeGetServerSidePropsResults } from '../../utils/server-side-props.js';
+import { getPageDataForInitial } from './page-data-props.js';
+import type { Stage2InitialProps } from './types.js';
 
 const basisProps = {
   props: {

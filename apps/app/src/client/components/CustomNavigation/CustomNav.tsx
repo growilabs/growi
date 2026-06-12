@@ -9,7 +9,7 @@ import React, {
 import type { Breakpoint } from '@growi/ui/dist/interfaces';
 import { Nav, NavItem, NavLink } from 'reactstrap';
 
-import type { ICustomNavTabMappings } from '~/interfaces/ui';
+import type { ICustomNavTabMappings } from '~/interfaces/ui.js';
 
 import styles from './CustomNav.module.scss';
 

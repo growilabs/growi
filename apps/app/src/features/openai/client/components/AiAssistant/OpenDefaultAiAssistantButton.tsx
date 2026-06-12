@@ -2,13 +2,13 @@ import React, { type JSX, useCallback, useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { NotAvailable } from '~/client/components/NotAvailable';
-import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
-import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
-import { aiEnabledAtom } from '~/states/server-configurations';
+import { NotAvailable } from '~/client/components/NotAvailable.js';
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global/index.js';
+import { aiEnabledAtom } from '~/states/server-configurations/index.js';
 
-import { useAiAssistantSidebarActions } from '../../states';
-import { useSWRxAiAssistants } from '../../stores/ai-assistant';
+import { useAiAssistantSidebarActions } from '../../states/index.js';
+import { useSWRxAiAssistants } from '../../stores/ai-assistant.js';
 
 import styles from './OpenDefaultAiAssistantButton.module.scss';
 

@@ -3,10 +3,10 @@ import dynamic from 'next/dynamic';
 import { useTranslation } from 'next-i18next';
 import { Spinner } from 'reactstrap';
 
-import { usePluginDeleteModalActions } from '../../states/modal/plugin-delete';
-import { useSWRxAdminPlugins } from '../../stores/admin-plugins';
-import { PluginCard } from './PluginCard';
-import { PluginInstallerForm } from './PluginInstallerForm';
+import { usePluginDeleteModalActions } from '../../states/modal/plugin-delete.js';
+import { useSWRxAdminPlugins } from '../../stores/admin-plugins.js';
+import { PluginCard } from './PluginCard.js';
+import { PluginInstallerForm } from './PluginInstallerForm.js';
 
 const Loading = (): JSX.Element => {
   return (
@@ -19,7 +19,7 @@ const Loading = (): JSX.Element => {
 export const PluginsExtensionPageContents = (): JSX.Element => {
   const { t } = useTranslation('admin');
   const PluginDeleteModal = dynamic(
-    () => import('./PluginDeleteModal').then((mod) => mod.PluginDeleteModal),
+    () => import('./PluginDeleteModal.js').then((mod) => mod.PluginDeleteModal),
     { ssr: false },
   );
   const { data, mutate } = useSWRxAdminPlugins();

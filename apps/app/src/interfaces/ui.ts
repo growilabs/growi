@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import type { Nullable } from '@growi/core';
 
-import type { IPageForItem } from '~/interfaces/page';
+import type { IPageForItem } from '~/interfaces/page.js';
 
 export const SidebarMode = {
   DRAWER: 'drawer',

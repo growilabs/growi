@@ -6,7 +6,7 @@ import type {
 import type { Document, Model } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
 const { ObjectId } = mongoose.Schema.Types;
 

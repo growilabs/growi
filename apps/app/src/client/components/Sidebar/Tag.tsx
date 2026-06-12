@@ -3,13 +3,13 @@ import React, { useCallback, useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 
-import type { IDataTagCount } from '~/interfaces/tag';
-import { useSWRxTagsList } from '~/stores/tag';
+import type { IDataTagCount } from '~/interfaces/tag.js';
+import { useSWRxTagsList } from '~/stores/tag.js';
 
-import TagCloudBox from '../TagCloudBox';
-import TagList from '../TagList';
-import { SidebarHeaderReloadButton } from './SidebarHeaderReloadButton';
-import { TagListSkeleton } from './Skeleton/TagContentSkeleton';
+import TagCloudBox from '../TagCloudBox.js';
+import TagList from '../TagList.js';
+import { SidebarHeaderReloadButton } from './SidebarHeaderReloadButton.js';
+import { TagListSkeleton } from './Skeleton/TagContentSkeleton.js';
 
 const PAGING_LIMIT = 10;
 const TAG_CLOUD_LIMIT = 20;

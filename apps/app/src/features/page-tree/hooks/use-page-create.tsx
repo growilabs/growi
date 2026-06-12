@@ -6,21 +6,21 @@ import type { ItemInstance } from '@headless-tree/core';
 import { useTranslation } from 'next-i18next';
 import { join } from 'pathe';
 
-import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
-import { NotAvailableForReadOnlyUser } from '~/client/components/NotAvailableForReadOnlyUser';
-import { useCreatePage } from '~/client/services/create-page';
-import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
-import type { IPageForItem } from '~/interfaces/page';
-import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
-import { shouldCreateWipPage } from '~/utils/should-create-wip-page';
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
+import { NotAvailableForReadOnlyUser } from '~/client/components/NotAvailableForReadOnlyUser.js';
+import { useCreatePage } from '~/client/services/create-page/index.js';
+import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr.js';
+import type { IPageForItem } from '~/interfaces/page.js';
+import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing.js';
+import { shouldCreateWipPage } from '~/utils/should-create-wip-page.js';
 
-import { CREATING_PAGE_VIRTUAL_ID } from '../constants/_inner';
-import type { TreeItemToolProps } from '../interfaces';
+import { CREATING_PAGE_VIRTUAL_ID } from '../constants/_inner.js';
+import type { TreeItemToolProps } from '../interfaces/index.js';
 import {
   useCreatingParentId,
   usePageTreeCreateActions,
-} from '../states/_inner';
-import { usePageTreeInformationUpdate } from '../states/page-tree-update';
+} from '../states/_inner/index.js';
+import { usePageTreeInformationUpdate } from '../states/page-tree-update.js';
 
 // Inner component for CreateButton to properly use hooks
 type CreateButtonInnerProps = {

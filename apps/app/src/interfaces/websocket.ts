@@ -1,4 +1,4 @@
-import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
+import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group.js';
 
 const generateGroupSyncEvents = () => {
   const events = {};

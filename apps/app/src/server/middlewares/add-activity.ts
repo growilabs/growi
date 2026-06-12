@@ -1,9 +1,9 @@
 import type { IUserHasId } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 
-import { SupportedAction } from '~/interfaces/activity';
-import Activity from '~/server/models/activity';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction } from '~/interfaces/activity.js';
+import Activity from '~/server/models/activity.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:middlewares:add-activity');
 
@@ -14,11 +14,7 @@ interface AuthorizedRequest extends Request {
 export const generateAddActivityMiddleware = () =>
   // Named function so the route-middleware snapshot tool can identify this
   // handler in the apiv3 auth chain.
-  async function addActivity(
-    req: AuthorizedRequest,
-    res: Response,
-    next: NextFunction,
-  ): Promise<void> {
+  (async function addActivity(req: AuthorizedRequest, res: Response, next: NextFunction): Promise<void> {
     if (req.method === 'GET') {
       logger.warn('This middleware is not available for GET requests');
       return next();
@@ -42,4 +38,4 @@ export const generateAddActivityMiddleware = () =>
     }
 
     return next();
-  };
+  });

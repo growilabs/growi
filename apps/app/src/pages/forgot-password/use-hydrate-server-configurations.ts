@@ -1,9 +1,9 @@
 import { useHydrateAtoms } from 'jotai/utils';
 
-import { isMailerSetupAtom } from '~/states/server-configurations';
-import { createAtomTuple } from '~/utils/jotai-utils';
+import { isMailerSetupAtom } from '~/states/server-configurations/index.js';
+import { createAtomTuple } from '~/utils/jotai-utils.js';
 
-import type { ServerConfigurationProps } from './types';
+import type { ServerConfigurationProps } from './types.js';
 
 /**
  * Hook for hydrating server configuration atoms with server-side data

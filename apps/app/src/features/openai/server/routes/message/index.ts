@@ -1,2 +1,2 @@
-export * from './get-messages';
-export * from './post-message';
+export * from './get-messages.js';
+export * from './post-message.js';

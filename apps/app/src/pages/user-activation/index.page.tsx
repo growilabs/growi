@@ -7,25 +7,25 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useTranslation } from 'next-i18next';
 
-import { NoLoginLayout } from '~/components/Layout/NoLoginLayout';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { UserActivationErrorCode } from '~/interfaces/errors/user-activation';
-import type { RegistrationMode } from '~/interfaces/registration-mode';
-import type { ReqWithUserRegistrationOrder } from '~/server/middlewares/inject-user-registration-order-by-token-middleware';
+import { NoLoginLayout } from '~/components/Layout/NoLoginLayout.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import type { UserActivationErrorCode } from '~/interfaces/errors/user-activation.js';
+import type { RegistrationMode } from '~/interfaces/registration-mode.js';
+import type { ReqWithUserRegistrationOrder } from '~/server/middlewares/inject-user-registration-order-by-token-middleware.js';
 
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
-import { useCustomTitle } from '../utils/page-title-customization';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+} from '../common-props/index.js';
+import { useCustomTitle } from '../utils/page-title-customization.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
 
 const CompleteUserRegistrationForm = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/CompleteUserRegistrationForm').then(
+    import('~/client/components/CompleteUserRegistrationForm.js').then(
       (mod) => mod.CompleteUserRegistrationForm,
     ),
   { ssr: false },

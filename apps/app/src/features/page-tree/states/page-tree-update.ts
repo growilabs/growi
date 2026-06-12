@@ -2,8 +2,8 @@ import { useCallback, useEffect, useRef } from 'react';
 import type { TreeInstance } from '@headless-tree/core';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import { ROOT_PAGE_VIRTUAL_ID } from '../constants/_inner';
-import { invalidatePageTreeChildren } from '../services';
+import { ROOT_PAGE_VIRTUAL_ID } from '../constants/_inner.js';
+import { invalidatePageTreeChildren } from '../services/index.js';
 
 // Update generation number
 const generationAtom = atom<number>(1);

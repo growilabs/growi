@@ -3,7 +3,7 @@ import isIsoDate from 'is-iso-date';
 import type { Schema } from 'mongoose';
 import { type Document, Types } from 'mongoose';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:service:import:overwrite-function');
 

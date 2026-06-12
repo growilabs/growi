@@ -1,6 +1,6 @@
-import { SocketEventName } from '~/interfaces/websocket';
-import type Crowi from '~/server/crowi';
-import loggerFactory from '~/utils/logger';
+import { SocketEventName } from '~/interfaces/websocket.js';
+import type Crowi from '~/server/crowi/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { S2cMessagePageUpdated } from '../../models/vo/s2c-message.js';
 import S2sMessage from '../../models/vo/s2s-message.js';

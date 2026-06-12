@@ -1,7 +1,7 @@
 import type { ComponentType, JSX, ReactNode } from 'react';
 import { startTransition, useEffect, useState } from 'react';
 
-import { LightweightCodeBlock } from './LightweightCodeBlock';
+import { LightweightCodeBlock } from './LightweightCodeBlock.js';
 
 import styles from './CodeBlock.module.scss';
 
@@ -12,7 +12,7 @@ let prismModulePromise: Promise<ComponentType<PrismHighlighterProps>> | null =
   null;
 function loadPrismHighlighter(): Promise<ComponentType<PrismHighlighterProps>> {
   if (prismModulePromise == null) {
-    prismModulePromise = import('./PrismHighlighter').then(
+    prismModulePromise = import('./PrismHighlighter.js').then(
       (mod) => mod.PrismHighlighter,
     );
   }

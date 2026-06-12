@@ -4,17 +4,17 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import ReactCardFlip from 'react-card-flip';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { useTWithOpt } from '~/client/util/t-with-opt';
-import type { IExternalAccountLoginError } from '~/interfaces/errors/external-account-login-error';
-import { LoginErrorCode } from '~/interfaces/errors/login-error';
-import type { IErrorV3 } from '~/interfaces/errors/v3-error';
-import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
-import { RegistrationMode } from '~/interfaces/registration-mode';
-import { toArrayIfNot } from '~/utils/array-utils';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
+import { useTWithOpt } from '~/client/util/t-with-opt.js';
+import type { IExternalAccountLoginError } from '~/interfaces/errors/external-account-login-error.js';
+import { LoginErrorCode } from '~/interfaces/errors/login-error.js';
+import type { IErrorV3 } from '~/interfaces/errors/v3-error.js';
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
+import { RegistrationMode } from '~/interfaces/registration-mode.js';
+import { toArrayIfNot } from '~/utils/array-utils.js';
 
-import { CompleteUserRegistration } from '../CompleteUserRegistration';
-import { ExternalAuthButton } from './ExternalAuthButton';
+import { CompleteUserRegistration } from '../CompleteUserRegistration.js';
+import { ExternalAuthButton } from './ExternalAuthButton.js';
 
 import styles from './LoginForm.module.scss';
 

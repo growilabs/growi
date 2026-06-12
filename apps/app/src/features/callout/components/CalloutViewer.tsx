@@ -3,7 +3,7 @@
 import type { JSX, ReactNode } from 'react';
 import React from 'react';
 
-import type { Callout } from '../services/consts';
+import type { Callout } from '../services/consts.js';
 
 import styles from './CalloutViewer.module.scss';
 

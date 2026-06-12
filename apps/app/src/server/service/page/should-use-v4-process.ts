@@ -2,8 +2,8 @@ import type { IPage } from '@growi/core';
 import { isTopPage } from '@growi/core/dist/utils/page-path-utils';
 import mongoose from 'mongoose';
 
-import type { PageModel } from '~/server/models/page';
-import { configManager } from '~/server/service/config-manager';
+import type { PageModel } from '~/server/models/page.js';
+import { configManager } from '~/server/service/config-manager/index.js';
 
 export const shouldUseV4Process = (page: IPage): boolean => {
   const Page = mongoose.model<IPage, PageModel>('Page');

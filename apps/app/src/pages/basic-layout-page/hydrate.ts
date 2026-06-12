@@ -4,15 +4,15 @@ import {
   isSearchScopeChildrenAsDefaultAtom,
   isSearchServiceConfiguredAtom,
   isSearchServiceReachableAtom,
-} from '~/states/server-configurations';
-import { useHydrateSidebarAtoms } from '~/states/ui/sidebar/hydrate';
-import { createAtomTuple } from '~/utils/jotai-utils';
+} from '~/states/server-configurations/index.js';
+import { useHydrateSidebarAtoms } from '~/states/ui/sidebar/hydrate.js';
+import { createAtomTuple } from '~/utils/jotai-utils.js';
 
 import type {
   SearchConfigurationProps,
   SidebarConfigurationProps,
   UserUISettingsProps,
-} from './types';
+} from './types.js';
 
 /**
  * Hook for hydrating server configuration atoms with server-side data

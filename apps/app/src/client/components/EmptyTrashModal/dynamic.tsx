@@ -1,8 +1,8 @@
 import type { JSX } from 'react';
 
-import { useEmptyTrashModalStatus } from '~/states/ui/modal/empty-trash';
+import { useEmptyTrashModalStatus } from '~/states/ui/modal/empty-trash.js';
 
-import { useLazyLoader } from '../../../components/utils/use-lazy-loader';
+import { useLazyLoader } from '../../../components/utils/use-lazy-loader.js';
 
 type EmptyTrashModalProps = Record<string, unknown>;
 
@@ -12,7 +12,7 @@ export const EmptyTrashModalLazyLoaded = (): JSX.Element => {
   const EmptyTrashModal = useLazyLoader<EmptyTrashModalProps>(
     'empty-trash-modal',
     () =>
-      import('./EmptyTrashModal').then((mod) => ({
+      import('./EmptyTrashModal.js').then((mod) => ({
         default: mod.EmptyTrashModal,
       })),
     status?.isOpened ?? false,

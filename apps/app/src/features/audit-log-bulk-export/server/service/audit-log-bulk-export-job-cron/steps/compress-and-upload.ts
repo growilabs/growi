@@ -2,18 +2,18 @@ import type { IUser } from '@growi/core';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
 
-import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import { SupportedAction } from '~/interfaces/activity';
-import { AttachmentType } from '~/server/interfaces/attachment';
+import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { AttachmentType } from '~/server/interfaces/attachment.js';
 import {
   Attachment,
   type IAttachmentDocument,
-} from '~/server/models/attachment';
-import type { FileUploader } from '~/server/service/file-uploader';
-import loggerFactory from '~/utils/logger';
+} from '~/server/models/attachment.js';
+import type { FileUploader } from '~/server/service/file-uploader/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job';
-import type { IAuditLogBulkExportJobCronService } from '..';
+import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job.js';
+import type { IAuditLogBulkExportJobCronService } from '../index.js';
 
 const logger = loggerFactory(
   'growi:service:audit-log-export-job-cron:compress-and-upload-async',

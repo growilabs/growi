@@ -2,9 +2,9 @@
 import { isServer } from '@growi/core/dist/utils';
 import { Container } from 'unstated';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { apiv3Get, apiv3Put } from '../util/apiv3-client';
+import { apiv3Get, apiv3Put } from '../util/apiv3-client.js';
 
 const logger = loggerFactory('growi:services:AdminCustomizeContainer');
 

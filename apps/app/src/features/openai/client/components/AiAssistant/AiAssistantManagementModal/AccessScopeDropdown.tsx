@@ -9,9 +9,9 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import { useCurrentUser } from '~/states/global';
+import { useCurrentUser } from '~/states/global/index.js';
 
-import { AiAssistantAccessScope } from '../../../../interfaces/ai-assistant';
+import { AiAssistantAccessScope } from '../../../../interfaces/ai-assistant.js';
 
 type Props = {
   isDisabled: boolean;

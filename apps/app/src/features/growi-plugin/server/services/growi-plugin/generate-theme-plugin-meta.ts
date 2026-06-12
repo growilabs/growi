@@ -1,6 +1,6 @@
 import type { GrowiPluginValidationData } from '@growi/pluginkit';
 
-import type { IGrowiPlugin, IGrowiThemePluginMeta } from '../../../interfaces';
+import type { IGrowiPlugin, IGrowiThemePluginMeta } from '../../../interfaces/index.js';
 
 export const generateThemePluginMeta = async (
   plugin: IGrowiPlugin,

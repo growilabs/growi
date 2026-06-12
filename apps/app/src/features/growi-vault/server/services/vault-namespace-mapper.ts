@@ -1,8 +1,8 @@
 import { type IPage, PageGrant } from '@growi/core';
 import type { Namespace } from '@growi/core/dist/interfaces/vault';
 
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import UserGroupRelation from '~/server/models/user-group-relation';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
+import UserGroupRelation from '~/server/models/user-group-relation.js';
 
 /**
  * Interface for computing GROWI ACL-based namespace mappings for the Vault feature.

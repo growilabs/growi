@@ -1,6 +1,6 @@
 import React, { type JSX, type ReactNode } from 'react';
 
-import { BasicLayout } from './BasicLayout';
+import { BasicLayout } from './BasicLayout.js';
 
 import commonStyles from './SearchResultLayout.module.scss';
 

@@ -4,8 +4,8 @@ import EventEmitter from 'events';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import type { PageDocument, PageModel } from '~/server/models/page';
-import loggerFactory from '~/utils/logger';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 import { deleteCompletelyUserHomeBySystem } from '../service/page/delete-completely-user-home-by-system.js';

@@ -29,43 +29,43 @@ import pathlib from 'path';
 import { Readable, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 
-import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { isAiEnabled } from '~/features/openai/server/services';
-import { SupportedAction } from '~/interfaces/activity';
-import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
-import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
-import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
+import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group.js';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
+import { isAiEnabled } from '~/features/openai/server/services/index.js';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error.js';
+import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page.js';
+import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config.js';
 import {
   PageDeleteConfigValue,
   PageSingleDeleteCompConfigValue,
-} from '~/interfaces/page-delete-config';
-import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
-import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
-import { PageActionOnGroupDelete } from '~/interfaces/user-group';
+} from '~/interfaces/page-delete-config.js';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
+import { PageActionStage, PageActionType } from '~/interfaces/page-operation.js';
+import { PageActionOnGroupDelete } from '~/interfaces/user-group.js';
 import {
   type PageMigrationErrorData,
   SocketEventName,
   type UpdateDescCountRawData,
-} from '~/interfaces/websocket';
-import type { CurrentPageYjsData } from '~/interfaces/yjs';
-import type Crowi from '~/server/crowi';
-import type { CreateMethod } from '~/server/models/page';
+} from '~/interfaces/websocket.js';
+import type { CurrentPageYjsData } from '~/interfaces/yjs.js';
+import type Crowi from '~/server/crowi/index.js';
+import type { CreateMethod } from '~/server/models/page.js';
 import {
   type PageDocument,
   type PageModel,
   PageQueryBuilder,
   pushRevision,
-} from '~/server/models/page';
-import type { PageTagRelationDocument } from '~/server/models/page-tag-relation';
-import PageTagRelation from '~/server/models/page-tag-relation';
-import type { UserGroupDocument } from '~/server/models/user-group';
-import { createBatchStream } from '~/server/util/batch-stream';
-import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths';
-import { generalXssFilter } from '~/services/general-xss-filter';
-import loggerFactory from '~/utils/logger';
-import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
-import { prisma } from '~/utils/prisma';
+} from '~/server/models/page.js';
+import type { PageTagRelationDocument } from '~/server/models/page-tag-relation.js';
+import PageTagRelation from '~/server/models/page-tag-relation.js';
+import type { UserGroupDocument } from '~/server/models/user-group.js';
+import { createBatchStream } from '~/server/util/batch-stream.js';
+import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths.js';
+import { generalXssFilter } from '~/services/general-xss-filter/index.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config.js';
+import { prisma } from '~/utils/prisma.js';
 
 import type { ObjectIdLike } from '../../interfaces/mongoose-utils.js';
 import { Attachment } from '../../models/attachment.js';
@@ -1492,7 +1492,7 @@ class PageService implements IPageService {
 
       if (isAiEnabled()) {
         const { getOpenaiService } = await import(
-          '~/features/openai/server/services/openai'
+          '~/features/openai/server/services/openai.js'
         );
         const openaiService = getOpenaiService();
         // Do not await because communication with OpenAI takes time
@@ -1824,7 +1824,7 @@ class PageService implements IPageService {
 
     if (isAiEnabled()) {
       const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
+        '~/features/openai/server/services/openai.js'
       );
       const openaiService = getOpenaiService();
       // Do not await because communication with OpenAI takes time
@@ -2442,7 +2442,7 @@ class PageService implements IPageService {
 
     if (isAiEnabled()) {
       const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
+        '~/features/openai/server/services/openai.js'
       );
       const openaiService = getOpenaiService();
       await openaiService?.deleteVectorStoreFilesByPageIds(pageIds);

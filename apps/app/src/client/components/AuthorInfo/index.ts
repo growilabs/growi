@@ -1,1 +1,1 @@
-export * from './AuthorInfo';
+export * from './AuthorInfo.js';

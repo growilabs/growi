@@ -2,18 +2,18 @@ import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ModalBody } from 'reactstrap';
 
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
 
-import type { SelectablePage } from '../../../../interfaces/selectable-page';
+import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
   useAiAssistantManagementModalStatus,
-} from '../../../states/modal/ai-assistant-management';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
-import { usePageTreeSelection } from './hooks/use-page-tree-selection';
-import { PageTreeSelectionTree } from './PageTreeSelectionTree';
-import { SelectedPagesPanel } from './SelectedPagesPanel';
+} from '../../../states/modal/ai-assistant-management.js';
+import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
+import { usePageTreeSelection } from './hooks/use-page-tree-selection.js';
+import { PageTreeSelectionTree } from './PageTreeSelectionTree.js';
+import { SelectedPagesPanel } from './SelectedPagesPanel.js';
 
 import styles from './AiAssistantManagementPageTreeSelection.module.scss';
 

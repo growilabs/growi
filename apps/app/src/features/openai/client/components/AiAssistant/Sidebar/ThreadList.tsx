@@ -3,19 +3,19 @@ import { useCallback } from 'react';
 import { getIdStringForRef } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 
-import InfiniteScroll from '~/client/components/InfiniteScroll';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import InfiniteScroll from '~/client/components/InfiniteScroll.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 import {
   useSWRINFxRecentThreads,
   useSWRMUTxThreads,
-} from '~/features/openai/client/stores/thread';
-import loggerFactory from '~/utils/logger';
+} from '~/features/openai/client/stores/thread.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { deleteThread } from '../../../services/thread';
+import { deleteThread } from '../../../services/thread.js';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from '../../../states';
+} from '../../../states/index.js';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
 

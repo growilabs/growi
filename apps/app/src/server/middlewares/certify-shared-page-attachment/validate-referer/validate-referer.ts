@@ -1,6 +1,6 @@
 import { objectIdUtils } from '@growi/core/dist/utils';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { ValidReferer } from '../interfaces.js';
 import { retrieveSiteUrl } from './retrieve-site-url.js';

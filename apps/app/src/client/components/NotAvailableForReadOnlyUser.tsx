@@ -3,10 +3,10 @@ import type { JSX } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { useIsReadOnlyUser } from '~/states/context';
-import { isRomUserAllowedToCommentAtom } from '~/states/server-configurations';
+import { useIsReadOnlyUser } from '~/states/context.js';
+import { isRomUserAllowedToCommentAtom } from '~/states/server-configurations/index.js';
 
-import { NotAvailable } from './NotAvailable';
+import { NotAvailable } from './NotAvailable.js';
 
 export const NotAvailableForReadOnlyUser: React.FC<{
   children: JSX.Element;

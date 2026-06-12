@@ -6,20 +6,20 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { apiPost } from '~/client/util/apiv1-client';
-import { apiv3Post } from '~/client/util/apiv3-client';
+import { apiPost } from '~/client/util/apiv1-client.js';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
 import type {
   IDeleteManyPageApiv3Result,
   IDeleteSinglePageApiv1Result,
-} from '~/interfaces/page';
+} from '~/interfaces/page.js';
 import {
   usePageDeleteModalActions,
   usePageDeleteModalStatus,
-} from '~/states/ui/modal/page-delete';
-import { useSWRxPageInfoForList } from '~/stores/page-listing';
-import loggerFactory from '~/utils/logger';
+} from '~/states/ui/modal/page-delete.js';
+import { useSWRxPageInfoForList } from '~/stores/page-listing.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList';
+import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList.js';
 
 const { isTrashPage } = pagePathUtils;
 

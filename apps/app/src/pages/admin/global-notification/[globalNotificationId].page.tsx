@@ -3,17 +3,17 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/router';
 import { objectIdUtils } from '@growi/core/dist/utils';
 
-import type { NextPageWithLayout } from '../../_app.page';
-import type { AdminCommonProps } from '../_shared';
+import type { NextPageWithLayout } from '../../_app.page.js';
+import type { AdminCommonProps } from '../_shared/index.js';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from '../_shared';
+} from '../_shared/index.js';
 
 const ManageGlobalNotification = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Admin/Notification/ManageGlobalNotification'),
+    import('~/client/components/Admin/Notification/ManageGlobalNotification.js'),
   { ssr: false },
 );
 
@@ -28,7 +28,7 @@ const AdminGlobalNotificationDetailPage: NextPageWithLayout<Props> = () => {
 
   useEffect(() => {
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    const toastErrorPromise = import('~/client/util/toastr').then(
+    const toastErrorPromise = import('~/client/util/toastr.js').then(
       (mod) => mod.toastError,
     );
     if (globalNotificationId == null) {
@@ -59,7 +59,7 @@ AdminGlobalNotificationDetailPage.getLayout = createAdminPageLayout<Props>({
     async () => {
       const AdminNotificationContainer =
         // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        (await import('~/client/services/AdminNotificationContainer')).default;
+        (await import('~/client/services/AdminNotificationContainer.js')).default;
       return new AdminNotificationContainer();
     },
   ],

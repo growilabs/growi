@@ -6,23 +6,23 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { scrollToElement } from '~/client/util/smooth-scroll';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
-import { showPageSideAuthorsAtom } from '~/states/server-configurations';
-import { useDescendantsPageListModalActions } from '~/states/ui/modal/descendants-page-list';
-import { useTagEditModalActions } from '~/states/ui/modal/tag-edit';
-import { useIsAbleToShowTagLabel } from '~/states/ui/page-abilities';
-import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page';
+import { scrollToElement } from '~/client/util/smooth-scroll.js';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
+import { showPageSideAuthorsAtom } from '~/states/server-configurations/index.js';
+import { useDescendantsPageListModalActions } from '~/states/ui/modal/descendants-page-list.js';
+import { useTagEditModalActions } from '~/states/ui/modal/tag-edit.js';
+import { useIsAbleToShowTagLabel } from '~/states/ui/page-abilities.js';
+import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page.js';
 
-import { ContentLinkButtons } from '../ContentLinkButtons';
-import { PageTagsSkeleton } from '../PageTags';
-import TableOfContents from '../TableOfContents';
-import { PageAccessoriesControl } from './PageAccessoriesControl';
+import { ContentLinkButtons } from '../ContentLinkButtons.js';
+import { PageTagsSkeleton } from '../PageTags/index.js';
+import TableOfContents from '../TableOfContents.js';
+import { PageAccessoriesControl } from './PageAccessoriesControl.js';
 
 const { isTopPage, isUsersHomepage, isTrashPage } = pagePathUtils;
 
 const PageTags = dynamic(
-  () => import('../PageTags').then((mod) => mod.PageTags),
+  () => import('../PageTags/index.js').then((mod) => mod.PageTags),
   {
     ssr: false,
     loading: PageTagsSkeleton,
@@ -30,7 +30,7 @@ const PageTags = dynamic(
 );
 
 const AuthorInfo = dynamic(
-  () => import('~/client/components/AuthorInfo').then((mod) => mod.AuthorInfo),
+  () => import('~/client/components/AuthorInfo/index.js').then((mod) => mod.AuthorInfo),
   { ssr: false },
 );
 

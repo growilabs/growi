@@ -3,14 +3,14 @@ import { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import LabeledProgressBar from '~/client/components/Admin/Common/LabeledProgressBar';
-import { apiv3Get } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/features/admin/states/socket-io';
-import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
-import { SocketEventName } from '~/interfaces/websocket';
+import LabeledProgressBar from '~/client/components/Admin/Common/LabeledProgressBar.js';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useAdminSocket } from '~/features/admin/states/socket-io.js';
+import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group.js';
+import { SocketEventName } from '~/interfaces/websocket.js';
 
-import { useSWRxExternalUserGroupList } from '../../stores/external-user-group';
+import { useSWRxExternalUserGroupList } from '../../stores/external-user-group.js';
 
 type SyncExecutionProps = {
   provider: ExternalGroupProviderType;

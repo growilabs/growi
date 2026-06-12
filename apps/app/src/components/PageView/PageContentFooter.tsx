@@ -6,7 +6,7 @@ import styles from './PageContentFooter.module.scss';
 
 const AuthorInfo = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/AuthorInfo').then((mod) => mod.AuthorInfo),
+  () => import('~/client/components/AuthorInfo/index.js').then((mod) => mod.AuthorInfo),
   { ssr: false },
 );
 

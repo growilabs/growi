@@ -1,4 +1,4 @@
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   nextTick,

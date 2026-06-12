@@ -2,10 +2,10 @@ import type { FC } from 'react';
 import React, { useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import type { IDataTagCount } from '~/interfaces/tag';
-import { useSetSearchKeyword } from '~/states/search';
+import type { IDataTagCount } from '~/interfaces/tag.js';
+import { useSetSearchKeyword } from '~/states/search/index.js';
 
-import PaginationWrapper from './PaginationWrapper';
+import PaginationWrapper from './PaginationWrapper.js';
 
 import styles from './TagList.module.scss';
 

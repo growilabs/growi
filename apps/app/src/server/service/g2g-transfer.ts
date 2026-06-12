@@ -8,16 +8,16 @@ import * as FormDataModule from 'form-data';
 import mongoose, { Types as MongooseTypes } from 'mongoose';
 import { basename } from 'pathe';
 
-import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
-import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
-import { ImportMode } from '~/models/admin/import-mode';
-import TransferKeyModel from '~/server/models/transfer-key';
-import { getImportService, type ImportSettings } from '~/server/service/import';
-import { createBatchStream } from '~/server/util/batch-stream';
-import axios from '~/utils/axios';
-import { getGrowiVersion } from '~/utils/growi-version';
-import loggerFactory from '~/utils/logger';
-import { TransferKey } from '~/utils/vo/transfer-key';
+import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer.js';
+import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option.js';
+import { ImportMode } from '~/models/admin/import-mode.js';
+import TransferKeyModel from '~/server/models/transfer-key.js';
+import { getImportService, type ImportSettings } from '~/server/service/import/index.js';
+import { createBatchStream } from '~/server/util/batch-stream.js';
+import axios from '~/utils/axios/index.js';
+import { getGrowiVersion } from '~/utils/growi-version.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { TransferKey } from '~/utils/vo/transfer-key.js';
 
 import type Crowi from '../crowi/index.js';
 import { Attachment } from '../models/attachment.js';

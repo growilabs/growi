@@ -1,7 +1,7 @@
 import React, { type JSX, useCallback, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentPagePath, useRedirectFrom } from '~/states/page';
+import { useCurrentPagePath, useRedirectFrom } from '~/states/page/index.js';
 
 type SubstanceProps = {
   redirectFrom: string;
@@ -21,13 +21,13 @@ const PageRedirectedAlertSubstance = React.memo(
       }
       try {
         // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        const unlink = (await import('~/client/services/page-operation'))
+        const unlink = (await import('~/client/services/page-operation.js'))
           .unlink;
         await unlink(currentPagePath);
         setIsUnlinked(true);
       } catch (err) {
         // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        const toastError = (await import('~/client/util/toastr')).toastError;
+        const toastError = (await import('~/client/util/toastr.js')).toastError;
         toastError(err);
       }
     }, [currentPagePath]);

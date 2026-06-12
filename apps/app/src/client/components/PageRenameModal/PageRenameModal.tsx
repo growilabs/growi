@@ -13,19 +13,19 @@ import {
 } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
-import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError } from '~/client/util/toastr';
-import { useSiteUrl } from '~/states/global';
-import { isSearchServiceReachableAtom } from '~/states/server-configurations';
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError } from '~/client/util/toastr.js';
+import { useSiteUrl } from '~/states/global/index.js';
+import { isSearchServiceReachableAtom } from '~/states/server-configurations/index.js';
 import {
   usePageRenameModalActions,
   usePageRenameModalStatus,
-} from '~/states/ui/modal/page-rename';
-import { useSWRxPageInfo } from '~/stores/page';
+} from '~/states/ui/modal/page-rename.js';
+import { useSWRxPageInfo } from '~/stores/page.js';
 
-import DuplicatedPathsTable from '../DuplicatedPathsTable';
-import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList';
-import PagePathAutoComplete from '../PagePathAutoComplete';
+import DuplicatedPathsTable from '../DuplicatedPathsTable.js';
+import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList.js';
+import PagePathAutoComplete from '../PagePathAutoComplete.js';
 
 const isV5Compatible = (meta: unknown): boolean => {
   return isIPageInfoForEntity(meta) ? meta.isV5Compatible : true;

@@ -1,7 +1,7 @@
 import type { HasObjectId } from '@growi/core';
 
-import { SupportedAction } from '~/interfaces/activity';
-import type { IInAppNotification } from '~/interfaces/in-app-notification';
+import { SupportedAction } from '~/interfaces/activity.js';
+import type { IInAppNotification } from '~/interfaces/in-app-notification.js';
 
 export type ActionMsgAndIconType = {
   actionMsg: string;

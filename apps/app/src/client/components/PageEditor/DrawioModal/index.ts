@@ -1,1 +1,1 @@
-export { DrawioModalLazyLoaded } from './dynamic';
+export { DrawioModalLazyLoaded } from './dynamic.js';

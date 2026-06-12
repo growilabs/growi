@@ -1,22 +1,22 @@
 import React, { memo, useMemo } from 'react';
 import { useAtomValue } from 'jotai';
 
-import { AiAssistant } from '~/features/openai/client/components/AiAssistant/Sidebar/AiAssistant';
-import { SidebarContentsType } from '~/interfaces/ui';
-import { useIsGuestUser } from '~/states/context';
-import { aiEnabledAtom } from '~/states/server-configurations';
+import { AiAssistant } from '~/features/openai/client/components/AiAssistant/Sidebar/AiAssistant.js';
+import { SidebarContentsType } from '~/interfaces/ui.js';
+import { useIsGuestUser } from '~/states/context.js';
+import { aiEnabledAtom } from '~/states/server-configurations/index.js';
 import {
   useCollapsedContentsOpened,
   useCurrentSidebarContents,
   useSidebarMode,
-} from '~/states/ui/sidebar';
+} from '~/states/ui/sidebar/index.js';
 
-import { Bookmarks } from './Bookmarks';
-import { CustomSidebar } from './Custom';
-import { InAppNotification } from './InAppNotification';
-import { PageTree } from './PageTree';
-import { RecentChanges } from './RecentChanges';
-import Tag from './Tag';
+import { Bookmarks } from './Bookmarks.js';
+import { CustomSidebar } from './Custom/index.js';
+import { InAppNotification } from './InAppNotification/index.js';
+import { PageTree } from './PageTree/index.js';
+import { RecentChanges } from './RecentChanges/index.js';
+import Tag from './Tag.js';
 
 import styles from './SidebarContents.module.scss';
 

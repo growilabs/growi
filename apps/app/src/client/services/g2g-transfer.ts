@@ -1,6 +1,6 @@
 import { useCallback, useState } from 'react';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
 
 export const useGenerateTransferKey = (): {
   transferKey: string;

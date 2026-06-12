@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { OnPutBackedFunction } from '../../../interfaces/ui';
+import type { OnPutBackedFunction } from '../../../interfaces/ui.js';
 
 type IPageForPagePutBackModal = {
   pageId: string;

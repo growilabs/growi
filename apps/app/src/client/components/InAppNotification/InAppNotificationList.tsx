@@ -6,9 +6,9 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import type {
   IInAppNotification,
   PaginateResult,
-} from '~/interfaces/in-app-notification';
+} from '~/interfaces/in-app-notification.js';
 
-import InAppNotificationElm from './InAppNotificationElm';
+import InAppNotificationElm from './InAppNotificationElm.js';
 
 type Props = {
   inAppNotificationData?: PaginateResult<IInAppNotification>;

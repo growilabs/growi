@@ -4,17 +4,17 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { UpsertAiAssistantData } from '../../interfaces/ai-assistant';
-import { getOpenaiService } from '../services/openai';
-import { certifyAiService } from './middlewares/certify-ai-service';
-import { upsertAiAssistantValidator } from './middlewares/upsert-ai-assistant-validator';
+import type { UpsertAiAssistantData } from '../../interfaces/ai-assistant.js';
+import { getOpenaiService } from '../services/openai.js';
+import { certifyAiService } from './middlewares/certify-ai-service.js';
+import { upsertAiAssistantValidator } from './middlewares/upsert-ai-assistant-validator.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:create-ai-assistant');
 

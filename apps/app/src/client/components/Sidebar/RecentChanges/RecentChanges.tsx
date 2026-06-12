@@ -2,16 +2,16 @@ import { type JSX, Suspense, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
-import RecentChangesContentSkeleton from './RecentChangesContentSkeleton';
+import RecentChangesContentSkeleton from './RecentChangesContentSkeleton.js';
 
 const RecentChangesHeader = dynamic(
   () =>
-    import('./RecentChangesSubstance').then((mod) => mod.RecentChangesHeader),
+    import('./RecentChangesSubstance.js').then((mod) => mod.RecentChangesHeader),
   { ssr: false },
 );
 const RecentChangesContent = dynamic(
   () =>
-    import('./RecentChangesSubstance').then((mod) => mod.RecentChangesContent),
+    import('./RecentChangesSubstance.js').then((mod) => mod.RecentChangesContent),
   { ssr: false, loading: RecentChangesContentSkeleton },
 );
 

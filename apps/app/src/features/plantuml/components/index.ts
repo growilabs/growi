@@ -1,1 +1,1 @@
-export { PlantUmlViewer } from './PlantUmlViewer';
+export { PlantUmlViewer } from './PlantUmlViewer.js';

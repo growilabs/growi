@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 
-import type S2sMessage from '~/server/models/vo/s2s-message';
-import loggerFactory from '~/utils/logger';
+import type S2sMessage from '~/server/models/vo/s2s-message.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { S2sMessageHandlable } from './handlable.js';
 

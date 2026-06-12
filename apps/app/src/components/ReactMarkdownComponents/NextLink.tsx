@@ -3,8 +3,8 @@ import type { LinkProps } from 'next/link';
 import Link from 'next/link';
 import { pagePathUtils } from '@growi/core/dist/utils';
 
-import { useSiteUrl } from '~/states/global';
-import loggerFactory from '~/utils/logger';
+import { useSiteUrl } from '~/states/global/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:components:NextLink');
 

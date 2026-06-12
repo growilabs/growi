@@ -4,16 +4,16 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { Provider } from 'unstated';
 
-import type { AdminPageFrameProps } from './types';
+import type { AdminPageFrameProps } from './types.js';
 
 // Dynamic imports to avoid SSR issues with admin-only components
-const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout'), {
+const AdminLayout = dynamic(() => import('~/components/Layout/AdminLayout.js'), {
   ssr: false,
 });
 const ForbiddenPage = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Admin/ForbiddenPage').then(
+    import('~/client/components/Admin/ForbiddenPage.js').then(
       (mod) => mod.ForbiddenPage,
     ),
   { ssr: false },

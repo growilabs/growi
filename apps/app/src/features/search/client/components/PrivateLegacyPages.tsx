@@ -20,39 +20,39 @@ import {
   UncontrolledButtonDropdown,
 } from 'reactstrap';
 
-import { MenuItemType } from '~/client/components/Common/Dropdown/PageItemControl';
-import PaginationWrapper from '~/client/components/PaginationWrapper';
-import { PrivateLegacyPagesMigrationModal } from '~/client/components/PrivateLegacyPagesMigrationModal';
+import { MenuItemType } from '~/client/components/Common/Dropdown/PageItemControl.js';
+import PaginationWrapper from '~/client/components/PaginationWrapper.js';
+import { PrivateLegacyPagesMigrationModal } from '~/client/components/PrivateLegacyPagesMigrationModal.js';
 import type {
   ISelectableAll,
   ISelectableAndIndeterminatable,
-} from '~/client/interfaces/selectable-all';
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
-import type { V5MigrationStatus } from '~/interfaces/page-listing-results';
-import type { IFormattedSearchResult } from '~/interfaces/search';
-import type { PageMigrationErrorData } from '~/interfaces/websocket';
-import { SocketEventName } from '~/interfaces/websocket';
-import { useIsAdmin } from '~/states/context';
-import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
-import { disableUserPagesAtom } from '~/states/server-configurations';
-import { useGlobalSocket } from '~/states/socket-io';
-import type { ILegacyPrivatePage } from '~/states/ui/modal/private-legacy-pages-migration';
-import { usePrivateLegacyPagesMigrationModalActions } from '~/states/ui/modal/private-legacy-pages-migration';
+} from '~/client/interfaces/selectable-all.js';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error.js';
+import type { V5MigrationStatus } from '~/interfaces/page-listing-results.js';
+import type { IFormattedSearchResult } from '~/interfaces/search.js';
+import type { PageMigrationErrorData } from '~/interfaces/websocket.js';
+import { SocketEventName } from '~/interfaces/websocket.js';
+import { useIsAdmin } from '~/states/context.js';
+import { useSearchKeyword, useSetSearchKeyword } from '~/states/search/index.js';
+import { disableUserPagesAtom } from '~/states/server-configurations/index.js';
+import { useGlobalSocket } from '~/states/socket-io/index.js';
+import type { ILegacyPrivatePage } from '~/states/ui/modal/private-legacy-pages-migration.js';
+import { usePrivateLegacyPagesMigrationModalActions } from '~/states/ui/modal/private-legacy-pages-migration.js';
 import {
   mutatePageTree,
   useSWRxV5MigrationStatus,
-} from '~/stores/page-listing';
-import { useSWRxSearch } from '~/stores/search';
+} from '~/stores/page-listing.js';
+import { useSWRxSearch } from '~/stores/search.js';
 
-import { OperateAllControl } from './SearchPage/OperateAllControl';
-import SearchControl from './SearchPage/SearchControl';
+import { OperateAllControl } from './SearchPage/OperateAllControl.js';
+import SearchControl from './SearchPage/SearchControl.js';
 import {
   type IReturnSelectedPageIds,
   SearchPageBase,
   usePageDeleteModalForBulkDeletion,
-} from './SearchPage/SearchPageBase';
+} from './SearchPage/SearchPageBase.js';
 
 // TODO: replace with "customize:showPageLimitationS"
 const INITIAL_PAGING_SIZE = 20;
@@ -412,10 +412,10 @@ const PrivateLegacyPages = (): JSX.Element => {
       .filter((pageWithMeta) => selectedPageIds.has(pageWithMeta.data._id))
       .map(
         (pageWithMeta) =>
-          ({
+          (({
             pageId: pageWithMeta.data._id,
-            path: pageWithMeta.data.path,
-          }) as ILegacyPrivatePage,
+            path: pageWithMeta.data.path
+          }) as ILegacyPrivatePage),
       );
 
     openModal(selectedPages, () => {

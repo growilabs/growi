@@ -12,7 +12,7 @@ import methodOverride from 'method-override';
 import passport from 'passport';
 import qs from 'qs';
 
-import { resolveFromRoot } from '~/server/util/project-dir-utils';
+import { resolveFromRoot } from '~/server/util/project-dir-utils.js';
 
 import {
   PLUGIN_EXPRESS_STATIC_DIR,

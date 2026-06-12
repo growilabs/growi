@@ -7,8 +7,8 @@ import {
 } from '@growi/preset-themes';
 import path from 'path';
 
-import { growiPluginService } from '~/features/growi-plugin/server/services';
-import loggerFactory from '~/utils/logger';
+import { growiPluginService } from '~/features/growi-plugin/server/services/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 import S2sMessage from '../models/vo/s2s-message.js';

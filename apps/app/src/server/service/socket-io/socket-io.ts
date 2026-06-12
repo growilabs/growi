@@ -5,8 +5,8 @@ import passport from 'passport';
 import type { Namespace } from 'socket.io';
 import { Server } from 'socket.io';
 
-import { SocketEventName } from '~/interfaces/websocket';
-import loggerFactory from '~/utils/logger';
+import { SocketEventName } from '~/interfaces/websocket.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../../crowi/index.js';
 import adminRequiredFactory from '../../middlewares/admin-required.js';

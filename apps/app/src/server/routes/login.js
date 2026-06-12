@@ -1,6 +1,6 @@
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { UserStatus } from '../models/user/conts.js';
 import { growiInfoService } from '../service/growi-info/index.js';

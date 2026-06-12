@@ -1,20 +1,20 @@
-import { configManager } from '~/server/service/config-manager';
-import type { SearchResultEntry } from '~/server/service/ldap';
-import { ldapService } from '~/server/service/ldap';
-import type PassportService from '~/server/service/passport';
-import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
-import loggerFactory from '~/utils/logger';
-import { batchProcessPromiseAll } from '~/utils/promise';
+import { configManager } from '~/server/service/config-manager/index.js';
+import type { SearchResultEntry } from '~/server/service/ldap.js';
+import { ldapService } from '~/server/service/ldap.js';
+import type PassportService from '~/server/service/passport.js';
+import type { S2sMessagingService } from '~/server/service/s2s-messaging/base.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { batchProcessPromiseAll } from '~/utils/promise.js';
 
 import type {
   ExternalUserGroupTreeNode,
   ExternalUserInfo,
-} from '../../interfaces/external-user-group';
+} from '../../interfaces/external-user-group.js';
 import {
   ExternalGroupProviderType,
   LdapGroupMembershipAttributeType,
-} from '../../interfaces/external-user-group';
-import ExternalUserGroupSyncService from './external-user-group-sync';
+} from '../../interfaces/external-user-group.js';
+import ExternalUserGroupSyncService from './external-user-group-sync.js';
 
 const logger = loggerFactory('growi:service:ldap-user-group-sync-service');
 

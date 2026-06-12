@@ -1,7 +1,7 @@
 import { param, validationResult } from 'express-validator';
 
-import { SupportedAction } from '~/interfaces/activity';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction } from '~/interfaces/activity.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { exportService } from '../service/export.js';
 import ApiResponse from '../util/apiResponse.js';

@@ -3,13 +3,13 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { AccessToken } from '~/server/models/access-token';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
+import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { AccessToken } from '~/server/models/access-token.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 

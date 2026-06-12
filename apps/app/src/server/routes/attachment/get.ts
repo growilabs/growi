@@ -3,20 +3,20 @@ import type { NextFunction, Request, Response, Router } from 'express';
 import express from 'express';
 import mongoose from 'mongoose';
 
-import type { CrowiProperties, CrowiRequest } from '~/interfaces/crowi-request';
+import type { CrowiProperties, CrowiRequest } from '~/interfaces/crowi-request.js';
 import {
   type ExpressHttpHeader,
   type RespondOptions,
   ResponseMode,
-} from '~/server/interfaces/attachment';
-import loginRequiredFactory from '~/server/middlewares/login-required';
+} from '~/server/interfaces/attachment.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
 import {
   applyHeaders,
   createContentHeaders,
   type FileUploader,
   toExpressHttpHeaders,
-} from '~/server/service/file-uploader';
-import loggerFactory from '~/utils/logger';
+} from '~/server/service/file-uploader/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../../crowi/index.js';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment/index.js';

@@ -1,12 +1,12 @@
 import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
-import UserGroupRelation from '~/server/models/user-group-relation';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
+import UserGroupRelation from '~/server/models/user-group-relation.js';
 
-import { getOrCreateModel } from '../../../../server/util/mongoose-utils';
-import type { IExternalUserGroupRelation } from '../../interfaces/external-user-group';
-import type { ExternalUserGroupDocument } from './external-user-group';
+import { getOrCreateModel } from '../../../../server/util/mongoose-utils.js';
+import type { IExternalUserGroupRelation } from '../../interfaces/external-user-group.js';
+import type { ExternalUserGroupDocument } from './external-user-group.js';
 
 export interface ExternalUserGroupRelationDocument
   extends IExternalUserGroupRelation,

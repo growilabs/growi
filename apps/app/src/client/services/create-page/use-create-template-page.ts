@@ -3,10 +3,10 @@ import { Origin } from '@growi/core';
 import { isCreatablePage } from '@growi/core/dist/utils/page-path-utils';
 import { normalizePath } from '@growi/core/dist/utils/path-utils';
 
-import type { LabelType } from '~/interfaces/template';
-import { useCurrentPagePath } from '~/states/page';
+import type { LabelType } from '~/interfaces/template.js';
+import { useCurrentPagePath } from '~/states/page/index.js';
 
-import { useCreatePage } from './use-create-page';
+import { useCreatePage } from './use-create-page.js';
 
 type UseCreateTemplatePage = () => {
   isCreatable: boolean;

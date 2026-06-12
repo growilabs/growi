@@ -1,6 +1,6 @@
 import React, { type FC, memo } from 'react';
 
-import { ToggleCollapseButton } from './ToggleCollapseButton';
+import { ToggleCollapseButton } from './ToggleCollapseButton.js';
 
 import styles from './SidebarHead.module.scss';
 

@@ -6,7 +6,7 @@ import monggoose, { Schema } from 'mongoose';
 import type {
   BookmarkFolderItems,
   IBookmarkFolder,
-} from '~/interfaces/bookmark-info';
+} from '~/interfaces/bookmark-info.js';
 
 import loggerFactory from '../../utils/logger/index.js';
 import { getOrCreateModel } from '../util/mongoose-utils.js';

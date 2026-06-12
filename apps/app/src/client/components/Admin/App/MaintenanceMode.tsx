@@ -2,11 +2,11 @@ import type { FC } from 'react';
 import React, { useCallback, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { useMaintenanceModeActions } from '~/client/services/maintenance-mode';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useIsMaintenanceMode } from '~/states/global';
+import { useMaintenanceModeActions } from '~/client/services/maintenance-mode.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useIsMaintenanceMode } from '~/states/global/index.js';
 
-import { ConfirmModal } from './ConfirmModal';
+import { ConfirmModal } from './ConfirmModal.js';
 
 export const MaintenanceMode: FC = () => {
   const { t } = useTranslation();

@@ -2,13 +2,13 @@ import React, { type JSX, useCallback, useMemo, useState } from 'react';
 import type { IAttachmentHasId } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
-import { useCurrentPageData, useCurrentPageId } from '~/states/page';
-import { useDeleteAttachmentModalActions } from '~/states/ui/modal/delete-attachment';
-import { useSWRxAttachments } from '~/stores/attachment';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
+import { useCurrentPageData, useCurrentPageId } from '~/states/page/index.js';
+import { useDeleteAttachmentModalActions } from '~/states/ui/modal/delete-attachment.js';
+import { useSWRxAttachments } from '~/stores/attachment.js';
 
-import { PageAttachmentList } from '../PageAttachment/PageAttachmentList';
-import PaginationWrapper from '../PaginationWrapper';
+import { PageAttachmentList } from '../PageAttachment/PageAttachmentList.js';
+import PaginationWrapper from '../PaginationWrapper.js';
 
 // Utility
 const checkIfFileInUse = (markdown: string, attachment): boolean => {

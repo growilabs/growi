@@ -1,1 +1,1 @@
-export * from './PageAlerts';
+export * from './PageAlerts.js';

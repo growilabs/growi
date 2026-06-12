@@ -2,12 +2,12 @@ import React, { type JSX, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 
-import AdminExternalAccountsContainer from '~/client/services/AdminExternalAccountsContainer';
-import { toastError } from '~/client/util/toastr';
+import AdminExternalAccountsContainer from '~/client/services/AdminExternalAccountsContainer.js';
+import { toastError } from '~/client/util/toastr.js';
 
-import PaginationWrapper from '../PaginationWrapper';
-import { withUnstatedContainers } from '../UnstatedUtils';
-import ExternalAccountTable from './Users/ExternalAccountTable';
+import PaginationWrapper from '../PaginationWrapper.js';
+import { withUnstatedContainers } from '../UnstatedUtils.js';
+import ExternalAccountTable from './Users/ExternalAccountTable.js';
 
 type ManageExternalAccountProps = {
   adminExternalAccountsContainer: AdminExternalAccountsContainer;

@@ -1,11 +1,11 @@
 import type { IPage, IUser, Lang } from '@growi/core';
 import { addSeconds } from 'date-fns/addSeconds';
-import ExtensibleCustomError from 'extensible-custom-error';
+import { ExtensibleCustomError } from '~/server/util/extensible-custom-error.js';
 import fs from 'graceful-fs';
 import mongoose from 'mongoose';
 import path from 'path';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 import { SUPPORTED_LOCALES } from '../util/safe-path-utils.js';

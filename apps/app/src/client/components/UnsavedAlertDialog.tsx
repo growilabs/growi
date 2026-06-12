@@ -2,7 +2,7 @@ import { type JSX, memo, useCallback, useEffect } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 
-import { useUnsavedWarning } from '~/states/ui/unsaved-warning';
+import { useUnsavedWarning } from '~/states/ui/unsaved-warning.js';
 
 const UnsavedAlertDialog = (): JSX.Element => {
   const { t } = useTranslation();

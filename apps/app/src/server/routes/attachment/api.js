@@ -1,6 +1,6 @@
-import { SupportedAction } from '~/interfaces/activity';
-import { AttachmentType } from '~/server/interfaces/attachment';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { AttachmentType } from '~/server/interfaces/attachment.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { Attachment } from '../../models/attachment.js';
 import { validateImageContentType } from './image-content-type-validator.js';

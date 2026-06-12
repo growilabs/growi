@@ -1,6 +1,6 @@
 import { ConfigSource } from '@growi/core/dist/interfaces';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../crowi/index.js';
 import S2sMessage from '../models/vo/s2s-message.js';

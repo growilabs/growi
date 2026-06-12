@@ -1,6 +1,6 @@
 import urljoin from 'url-join';
 
-import axios from '~/utils/axios';
+import axios from '~/utils/axios/index.js';
 
 const apiv1Root = '/_api';
 

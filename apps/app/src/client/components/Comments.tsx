@@ -5,21 +5,21 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { debounce } from 'throttle-debounce';
 
-import { useCurrentUser } from '~/states/global';
-import { useIsTrashPage } from '~/states/page';
-import { useSWRxPageComment } from '~/stores/comment';
-import { useSWRMUTxPageInfo } from '~/stores/page';
+import { useCurrentUser } from '~/states/global/index.js';
+import { useIsTrashPage } from '~/states/page/index.js';
+import { useSWRxPageComment } from '~/stores/comment.js';
+import { useSWRMUTxPageInfo } from '~/stores/page.js';
 
 const { isTopPage } = pagePathUtils;
 
 const PageComment = dynamic(
   () =>
-    import('~/client/components/PageComment').then((mod) => mod.PageComment),
+    import('~/client/components/PageComment.js').then((mod) => mod.PageComment),
   { ssr: false },
 );
 const CommentEditorPre = dynamic(
   () =>
-    import('./PageComment/CommentEditor').then((mod) => mod.CommentEditorPre),
+    import('./PageComment/CommentEditor.js').then((mod) => mod.CommentEditorPre),
   { ssr: false },
 );
 

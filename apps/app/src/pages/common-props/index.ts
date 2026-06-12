@@ -4,5 +4,5 @@ export {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   isCommonInitialProps,
-} from './commons';
-export { getServerSideI18nProps } from './i18n';
+} from './commons.js';
+export { getServerSideI18nProps } from './i18n.js';

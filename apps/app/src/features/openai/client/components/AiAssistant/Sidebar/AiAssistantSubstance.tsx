@@ -4,12 +4,12 @@ import { useTranslation } from 'react-i18next';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from '../../../states';
-import { useAiAssistantManagementModalActions } from '../../../states/modal/ai-assistant-management';
-import { useSWRxAiAssistants } from '../../../stores/ai-assistant';
-import { useSWRINFxRecentThreads } from '../../../stores/thread';
-import { AiAssistantList } from './AiAssistantList';
-import { ThreadList } from './ThreadList';
+} from '../../../states/index.js';
+import { useAiAssistantManagementModalActions } from '../../../states/modal/ai-assistant-management.js';
+import { useSWRxAiAssistants } from '../../../stores/ai-assistant.js';
+import { useSWRINFxRecentThreads } from '../../../stores/thread.js';
+import { AiAssistantList } from './AiAssistantList.js';
+import { ThreadList } from './ThreadList.js';
 
 import styles from './AiAssistantSubstance.module.scss';
 

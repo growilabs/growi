@@ -8,29 +8,29 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useTranslation } from 'next-i18next';
 
-import { NoLoginLayout } from '~/components/Layout/NoLoginLayout';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { NoLoginLayout } from '~/components/Layout/NoLoginLayout.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
 
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
-import { useCustomTitle } from '../utils/page-title-customization';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+} from '../common-props/index.js';
+import { useCustomTitle } from '../utils/page-title-customization.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 const InstallerForm = dynamic(
-  () => import('~/client/components/InstallerForm'),
+  () => import('~/client/components/InstallerForm.js'),
   { ssr: false },
 );
 const DataTransferForm = dynamic(
-  () => import('~/client/components/DataTransferForm'),
+  () => import('~/client/components/DataTransferForm.js'),
   { ssr: false },
 );
 const CustomNavAndContents = dynamic(
-  () => import('~/client/components/CustomNavigation/CustomNavAndContents'),
+  () => import('~/client/components/CustomNavigation/CustomNavAndContents.js'),
   { ssr: false },
 );
 // biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import

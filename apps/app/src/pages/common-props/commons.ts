@@ -2,14 +2,14 @@ import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import type { ColorScheme, IUserHasId } from '@growi/core';
 import mongoose from 'mongoose';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import { getGrowiVersion } from '~/utils/growi-version';
-import loggerFactory from '~/utils/logger';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import { getGrowiVersion } from '~/utils/growi-version.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   detectNextjsRoutingType,
   type NextjsRoutingType,
-} from '../utils/nextjs-routing-utils';
+} from '../utils/nextjs-routing-utils.js';
 
 const logger = loggerFactory('growi:pages:common-props:commons');
 

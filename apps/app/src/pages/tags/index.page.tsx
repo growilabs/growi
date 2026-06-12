@@ -11,32 +11,32 @@ import {
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import { BasicLayout } from '~/components/Layout/BasicLayout';
-import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { IDataTagCount } from '~/interfaces/tag';
-import { useSWRxTagsList } from '~/stores/tag';
+import { BasicLayout } from '~/components/Layout/BasicLayout.js';
+import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import type { IDataTagCount } from '~/interfaces/tag.js';
+import { useSWRxTagsList } from '~/stores/tag.js';
 
-import type { NextPageWithLayout } from '../_app.page';
-import type { BasicLayoutConfigurationProps } from '../basic-layout-page';
-import { getServerSideBasicLayoutProps } from '../basic-layout-page';
-import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate';
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { NextPageWithLayout } from '../_app.page.js';
+import type { BasicLayoutConfigurationProps } from '../basic-layout-page/index.js';
+import { getServerSideBasicLayoutProps } from '../basic-layout-page/index.js';
+import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate.js';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
-import { useCustomTitle } from '../utils/page-title-customization';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+} from '../common-props/index.js';
+import { useCustomTitle } from '../utils/page-title-customization.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
 
 const PAGING_LIMIT = 10;
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
-const TagList = dynamic(() => import('~/client/components/TagList'), {
+const TagList = dynamic(() => import('~/client/components/TagList.js'), {
   ssr: false,
 });
-const TagCloudBox = dynamic(() => import('~/client/components/TagCloudBox'), {
+const TagCloudBox = dynamic(() => import('~/client/components/TagCloudBox.js'), {
   ssr: false,
 });
 // biome-ignore-end lint/style/noRestrictedImports: no-problem dynamic import

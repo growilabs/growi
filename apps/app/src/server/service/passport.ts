@@ -16,12 +16,12 @@ import type { Profile, VerifiedCallback } from 'passport-saml';
 import { Strategy as SamlStrategy } from 'passport-saml';
 import urljoin from 'url-join';
 
-import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
-import S2sMessage from '~/server/models/vo/s2s-message';
-import { configManager } from '~/server/service/config-manager';
-import { growiInfoService } from '~/server/service/growi-info';
-import axios from '~/utils/axios';
-import loggerFactory from '~/utils/logger';
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
+import S2sMessage from '~/server/models/vo/s2s-message.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { growiInfoService } from '~/server/service/growi-info/index.js';
+import axios from '~/utils/axios/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { ConfigKey } from './config-manager/config-definition.js';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable.js';
@@ -811,7 +811,11 @@ class PassportService implements S2sMessageHandlable {
   async isOidcHostReachable(issuerHost: string): Promise<boolean | undefined> {
     try {
       const metadataUrl = this.getOIDCMetadataURL(issuerHost);
-      axiosRetry(axios, {
+      // axios ships dual-format type declarations (index.d.ts / index.d.cts).
+      // This ESM file sees the import-condition types while axios-retry's CJS
+      // declaration file references the require-condition ones; the two are
+      // structurally identical but nominally distinct, so realign the type.
+      axiosRetry(axios as Parameters<typeof axiosRetry>[0], {
         retries: 3,
       });
       const response = await axios.get(metadataUrl);

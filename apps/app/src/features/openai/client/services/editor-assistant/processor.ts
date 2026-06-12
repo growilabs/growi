@@ -4,15 +4,15 @@
  * Optimized for browser environment with performance monitoring
  */
 
-import type { LlmEditorAssistantDiff } from '../../../interfaces/editor-assistant/llm-response-schemas';
+import type { LlmEditorAssistantDiff } from '../../../interfaces/editor-assistant/llm-response-schemas.js';
 import type {
   DiffApplicationResult,
   DiffError,
   ProcessorConfig,
-} from '../../interfaces/types';
-import { ClientDiffApplicationEngine } from './diff-application';
-import { ClientErrorHandler } from './error-handling';
-import { ClientFuzzyMatcher } from './fuzzy-matching';
+} from '../../interfaces/types.js';
+import { ClientDiffApplicationEngine } from './diff-application.js';
+import { ClientErrorHandler } from './error-handling.js';
+import { ClientFuzzyMatcher } from './fuzzy-matching.js';
 
 // Note: measureNormalization import removed as it's not used in this file
 

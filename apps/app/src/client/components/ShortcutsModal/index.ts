@@ -1,1 +1,1 @@
-export { ShortcutsModalLazyLoaded } from './dynamic';
+export { ShortcutsModalLazyLoaded } from './dynamic.js';

@@ -1,6 +1,6 @@
 import { LoadingSpinner } from '@growi/ui/dist/components';
 
-import { useSWRxAdminHome } from '~/stores/admin/admin-home';
+import { useSWRxAdminHome } from '~/stores/admin/admin-home.js';
 
 const SystemInformationTable = () => {
   const { data: adminHomeData } = useSWRxAdminHome();

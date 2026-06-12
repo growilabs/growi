@@ -1,2 +1,2 @@
-export * from './get-client';
-export * from './is-stream-response';
+export * from './get-client.js';
+export * from './is-stream-response.js';

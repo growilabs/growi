@@ -2,20 +2,20 @@ import type { FC } from 'react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/features/admin/states/socket-io';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useAdminSocket } from '~/features/admin/states/socket-io.js';
 import type {
   PMEndedData,
   PMErrorCountData,
   PMMigratingData,
   PMStartedData,
-} from '~/interfaces/websocket';
-import { SocketEventName } from '~/interfaces/websocket';
+} from '~/interfaces/websocket.js';
+import { SocketEventName } from '~/interfaces/websocket.js';
 
-import AdminAppContainer from '../../../services/AdminAppContainer';
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import LabeledProgressBar from '../Common/LabeledProgressBar';
-import { ConfirmModal } from './ConfirmModal';
+import AdminAppContainer from '../../../services/AdminAppContainer.js';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import LabeledProgressBar from '../Common/LabeledProgressBar.js';
+import { ConfirmModal } from './ConfirmModal.js';
 
 type Props = {
   adminAppContainer: typeof AdminAppContainer & {

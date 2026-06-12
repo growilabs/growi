@@ -1,1 +1,1 @@
-export { SearchOptionModalLazyLoaded } from './dynamic';
+export { SearchOptionModalLazyLoaded } from './dynamic.js';

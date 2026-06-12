@@ -1,6 +1,6 @@
-import type { PasteMode } from '../../../../consts';
-import { AllPasteMode } from '../../../../consts';
-import { OutlineSecondaryButtons } from './OutlineSecondaryButtons';
+import type { PasteMode } from '../../../../consts/index.js';
+import { AllPasteMode } from '../../../../consts/index.js';
+import { OutlineSecondaryButtons } from './OutlineSecondaryButtons.js';
 
 type PasteModeControlProps = {
   setEditorPaste: (value: PasteMode) => void;

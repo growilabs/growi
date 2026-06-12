@@ -1,8 +1,8 @@
 import type { IConfigLoader, RawConfigData } from '@growi/core/dist/interfaces';
 import { toBoolean } from '@growi/core/dist/utils/env-utils';
 
-import { CONFIG_DEFINITIONS } from '~/server/service/config-manager/config-definition';
-import loggerFactory from '~/utils/logger';
+import { CONFIG_DEFINITIONS } from '~/server/service/config-manager/config-definition.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { ConfigKey, ConfigValues } from './config-definition.js';
 
@@ -40,7 +40,7 @@ export class ConfigLoader implements IConfigLoader<ConfigKey, ConfigValues> {
     const dbConfig = {} as RawConfigData<ConfigKey, ConfigValues>;
 
     // Dynamic import to avoid loading database modules too early
-    const { Config } = await import('~/server/models/config');
+    const { Config } = await import('~/server/models/config.js');
     const docs = await Config.find().exec();
 
     for (const doc of docs) {

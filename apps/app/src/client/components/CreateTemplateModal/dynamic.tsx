@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '../../../components/utils/use-lazy-loader';
+import { useLazyLoader } from '../../../components/utils/use-lazy-loader.js';
 
 type CreateTemplateModalProps = {
   path: string;
@@ -14,7 +14,7 @@ export const CreateTemplateModalLazyLoaded = (
   const CreateTemplateModal = useLazyLoader<CreateTemplateModalProps>(
     'create-template-modal',
     () =>
-      import('./CreateTemplateModal').then((mod) => ({
+      import('./CreateTemplateModal.js').then((mod) => ({
         default: mod.CreateTemplateModal,
       })),
     props.isOpen,

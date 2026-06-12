@@ -4,8 +4,8 @@ import { finished } from 'node:stream/promises';
 import path from 'pathe';
 import unzipStream, { type Entry } from 'unzip-stream';
 
-import type Crowi from '~/server/crowi';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils.js';
 import type { ZipFileStat } from '../interfaces/export.js';

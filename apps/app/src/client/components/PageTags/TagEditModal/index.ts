@@ -1,1 +1,1 @@
-export { TagEditModalLazyLoaded } from './dynamic';
+export { TagEditModalLazyLoaded } from './dynamic.js';

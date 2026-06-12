@@ -4,19 +4,19 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useCurrentPagePath } from '~/states/page';
-import { isPdfBulkExportEnabledAtom } from '~/states/server-configurations';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useCurrentPagePath } from '~/states/page/index.js';
+import { isPdfBulkExportEnabledAtom } from '~/states/server-configurations/index.js';
 
 import {
   PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE,
   PageBulkExportFormat,
-} from '../../interfaces/page-bulk-export';
+} from '../../interfaces/page-bulk-export.js';
 import {
   usePageBulkExportSelectModalActions,
   usePageBulkExportSelectModalStatus,
-} from '../states/modal';
+} from '../states/modal.js';
 
 const PageBulkExportSelectModalSubstance = (): JSX.Element => {
   const { t } = useTranslation();

@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import { DropdownToggle } from 'reactstrap';
 
-import { Hexagon } from './Hexagon';
+import { Hexagon } from './Hexagon.js';
 
 import styles from './DropendToggle.module.scss';
 

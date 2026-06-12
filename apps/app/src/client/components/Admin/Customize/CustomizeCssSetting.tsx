@@ -3,11 +3,11 @@ import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 import { Card, CardBody } from 'reactstrap';
 
-import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
 
 type Props = {
   adminCustomizeContainer: AdminCustomizeContainer;

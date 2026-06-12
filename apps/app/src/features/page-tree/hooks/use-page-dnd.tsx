@@ -8,11 +8,11 @@ import type {
 } from '@headless-tree/core';
 import { basename, join } from 'pathe';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
-import type { IPageForTreeItem } from '~/interfaces/page';
-import { mutatePageTree } from '~/stores/page-listing';
+import { apiv3Put } from '~/client/util/apiv3-client.js';
+import type { IPageForTreeItem } from '~/interfaces/page.js';
+import { mutatePageTree } from '~/stores/page-listing.js';
 
-import { usePageTreeInformationUpdate } from '../states/page-tree-update';
+import { usePageTreeInformationUpdate } from '../states/page-tree-update.js';
 
 import styles from './use-page-dnd.module.scss';
 

@@ -1,14 +1,14 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
-import { apiv3Delete } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer.js';
+import { apiv3Delete } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 
-import ShareLinkList from '../../PageAccessoriesModal/ShareLink/ShareLinkList';
-import PaginationWrapper from '../../PaginationWrapper';
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import DeleteAllShareLinksModal from './DeleteAllShareLinksModal';
+import ShareLinkList from '../../PageAccessoriesModal/ShareLink/ShareLinkList.js';
+import PaginationWrapper from '../../PaginationWrapper.js';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import DeleteAllShareLinksModal from './DeleteAllShareLinksModal.js';
 
 type PagerProps = {
   activePage: number;

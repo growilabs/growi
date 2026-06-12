@@ -13,26 +13,26 @@ import {
 } from '@growi/core/dist/utils/page-path-utils';
 import { useTranslation } from 'next-i18next';
 
-import { NoLoginLayout } from '~/components/Layout/NoLoginLayout';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { IExternalAccountLoginError } from '~/interfaces/errors/external-account-login-error';
-import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
-import type { RegistrationMode } from '~/interfaces/registration-mode';
+import { NoLoginLayout } from '~/components/Layout/NoLoginLayout.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import type { IExternalAccountLoginError } from '~/interfaces/errors/external-account-login-error.js';
+import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
+import type { RegistrationMode } from '~/interfaces/registration-mode.js';
 
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
-import { useCustomTitle } from '../utils/page-title-customization';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+} from '../common-props/index.js';
+import { useCustomTitle } from '../utils/page-title-customization.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
 
 import styles from './index.module.scss';
 
 const LoginForm = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/LoginForm').then((mod) => mod.LoginForm),
+  () => import('~/client/components/LoginForm/index.js').then((mod) => mod.LoginForm),
   { ssr: false },
 );
 

@@ -1,1 +1,1 @@
-export * from './use-editor-assistant';
+export * from './use-editor-assistant.js';

@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader';
-import { useGrantedGroupsInheritanceSelectModalStatus } from '~/states/ui/modal/granted-groups-inheritance-select';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
+import { useGrantedGroupsInheritanceSelectModalStatus } from '~/states/ui/modal/granted-groups-inheritance-select.js';
 
 type GrantedGroupsInheritanceSelectModalProps = Record<string, unknown>;
 
@@ -13,7 +13,7 @@ export const GrantedGroupsInheritanceSelectModalLazyLoaded =
       useLazyLoader<GrantedGroupsInheritanceSelectModalProps>(
         'granted-groups-inheritance-select-modal',
         () =>
-          import('./GrantedGroupsInheritanceSelectModal').then((mod) => ({
+          import('./GrantedGroupsInheritanceSelectModal.js').then((mod) => ({
             default: mod.GrantedGroupsInheritanceSelectModal,
           })),
         status?.isOpened ?? false,

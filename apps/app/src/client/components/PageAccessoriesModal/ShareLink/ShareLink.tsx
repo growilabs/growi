@@ -1,13 +1,13 @@
 import React, { type JSX, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiv3Delete } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useCurrentPageId } from '~/states/page';
-import { useSWRxSharelink } from '~/stores/share-link';
+import { apiv3Delete } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useCurrentPageId } from '~/states/page/index.js';
+import { useSWRxSharelink } from '~/stores/share-link.js';
 
-import { ShareLinkForm } from './ShareLinkForm';
-import ShareLinkList from './ShareLinkList';
+import { ShareLinkForm } from './ShareLinkForm.js';
+import ShareLinkList from './ShareLinkList.js';
 
 export const ShareLink = (): JSX.Element => {
   const { t } = useTranslation();

@@ -1,12 +1,12 @@
 import { type JSX, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import type { IResGrantData } from '~/interfaces/page-grant';
-import { useCurrentUser } from '~/states/global';
-import { useCurrentPageData } from '~/states/page';
-import { useSWRxApplicableGrant, useSWRxCurrentGrantData } from '~/stores/page';
+import type { IResGrantData } from '~/interfaces/page-grant.js';
+import { useCurrentUser } from '~/states/global/index.js';
+import { useCurrentPageData } from '~/states/page/index.js';
+import { useSWRxApplicableGrant, useSWRxCurrentGrantData } from '~/stores/page.js';
 
-import { FixPageGrantModal } from './FixPageGrantModal';
+import { FixPageGrantModal } from './FixPageGrantModal.js';
 
 type SubstanceProps = {
   pageId: string;

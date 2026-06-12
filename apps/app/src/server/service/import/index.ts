@@ -1,4 +1,4 @@
-import type Crowi from '~/server/crowi';
+import type Crowi from '~/server/crowi/index.js';
 
 import { ImportService } from './import.js';
 

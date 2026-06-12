@@ -5,13 +5,13 @@ import type {
   AuditLogBulkExportFormat,
   IAuditLogBulkExportFilters,
   IAuditLogBulkExportRequestFilters,
-} from '../../interfaces/audit-log-bulk-export';
+} from '../../interfaces/audit-log-bulk-export.js';
 import {
   AuditLogBulkExportJobInProgressJobStatus,
   AuditLogBulkExportJobStatus,
-} from '../../interfaces/audit-log-bulk-export';
-import type { AuditLogBulkExportJobDocument } from '../models/audit-log-bulk-export-job';
-import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
+} from '../../interfaces/audit-log-bulk-export.js';
+import type { AuditLogBulkExportJobDocument } from '../models/audit-log-bulk-export-job.js';
+import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job.js';
 
 export interface IAuditLogBulkExportService {
   createOrResetExportJob: (

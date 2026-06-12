@@ -7,24 +7,24 @@ import type {
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import { toastSuccess } from '~/client/util/toastr';
-import type { IPagingResult } from '~/interfaces/paging-result';
-import type { OnDeletedFunction, OnPutBackedFunction } from '~/interfaces/ui';
+import { toastSuccess } from '~/client/util/toastr.js';
+import type { IPagingResult } from '~/interfaces/paging-result.js';
+import type { OnDeletedFunction, OnPutBackedFunction } from '~/interfaces/ui.js';
 import {
   useIsGuestUser,
   useIsReadOnlyUser,
   useIsSharedUser,
-} from '~/states/context';
+} from '~/states/context.js';
 import {
   mutatePageTree,
   mutateRecentlyUpdated,
   useSWRxPageInfoForList,
   useSWRxPageList,
-} from '~/stores/page-listing';
+} from '~/stores/page-listing.js';
 
-import type { ForceHideMenuItems } from './Common/Dropdown/PageItemControl';
-import PageList from './PageList/PageList';
-import PaginationWrapper from './PaginationWrapper';
+import type { ForceHideMenuItems } from './Common/Dropdown/PageItemControl.js';
+import PageList from './PageList/PageList.js';
+import PaginationWrapper from './PaginationWrapper.js';
 
 type SubstanceProps = {
   pagingResult: IPagingResult<IPageHasId> | undefined;

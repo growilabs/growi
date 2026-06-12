@@ -1,1 +1,1 @@
-export * from './normalize-thread-relation-expired-at';
+export * from './normalize-thread-relation-expired-at/index.js';

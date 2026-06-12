@@ -1,22 +1,22 @@
 import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
-import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
-import { toastError } from '~/client/util/toastr';
-import { toArrayIfNot } from '~/utils/array-utils';
-import loggerFactory from '~/utils/logger';
+import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer.js';
+import { toastError } from '~/client/util/toastr.js';
+import { toArrayIfNot } from '~/utils/array-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import CustomizeCssSetting from './CustomizeCssSetting';
-import CustomizeFunctionSetting from './CustomizeFunctionSetting';
-import CustomizeLayoutSetting from './CustomizeLayoutSetting';
-import CustomizeLogoSetting from './CustomizeLogoSetting';
-import CustomizeNoscriptSetting from './CustomizeNoscriptSetting';
-import CustomizePresentationSetting from './CustomizePresentationSetting';
-import CustomizeScriptSetting from './CustomizeScriptSetting';
-import CustomizeSidebarSetting from './CustomizeSidebarSetting';
-import CustomizeThemeSetting from './CustomizeThemeSetting';
-import { CustomizeTitle } from './CustomizeTitle';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import CustomizeCssSetting from './CustomizeCssSetting.js';
+import CustomizeFunctionSetting from './CustomizeFunctionSetting.js';
+import CustomizeLayoutSetting from './CustomizeLayoutSetting.js';
+import CustomizeLogoSetting from './CustomizeLogoSetting.js';
+import CustomizeNoscriptSetting from './CustomizeNoscriptSetting.js';
+import CustomizePresentationSetting from './CustomizePresentationSetting.js';
+import CustomizeScriptSetting from './CustomizeScriptSetting.js';
+import CustomizeSidebarSetting from './CustomizeSidebarSetting.js';
+import CustomizeThemeSetting from './CustomizeThemeSetting.js';
+import { CustomizeTitle } from './CustomizeTitle.js';
 
 const logger = loggerFactory('growi:services:AdminCustomizePage');
 

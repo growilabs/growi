@@ -1,1 +1,1 @@
-export * from './dynamic';
+export * from './dynamic.js';

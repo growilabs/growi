@@ -2,42 +2,42 @@ import { type JSX, memo, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
-import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
-import type { RendererConfig } from '~/interfaces/services/renderer';
-import type { IShareLinkHasId } from '~/interfaces/share-link';
-import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
-import { useCurrentPageData, usePageNotFound } from '~/states/page';
-import { useViewOptions } from '~/stores/renderer';
-import loggerFactory from '~/utils/logger';
+import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle/index.js';
+import type { RendererConfig } from '~/interfaces/services/renderer.js';
+import type { IShareLinkHasId } from '~/interfaces/share-link.js';
+import { useShouldExpandContent } from '~/services/layout/use-should-expand-content.js';
+import { useCurrentPageData, usePageNotFound } from '~/states/page/index.js';
+import { useViewOptions } from '~/stores/renderer.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { PageContentFooter } from '../PageView/PageContentFooter';
-import { PageViewLayout } from '../PageView/PageViewLayout';
-import ShareLinkAlert from './ShareLinkAlert';
+import { PageContentFooter } from '../PageView/PageContentFooter.js';
+import { PageViewLayout } from '../PageView/PageViewLayout.js';
+import ShareLinkAlert from './ShareLinkAlert.js';
 
 const logger = loggerFactory('growi:components:ShareLinkPageView');
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 const PageSideContents = dynamic(
   () =>
-    import('~/client/components/PageSideContents').then(
+    import('~/client/components/PageSideContents/index.js').then(
       (mod) => mod.PageSideContents,
     ),
   { ssr: false },
 );
 const ForbiddenPage = dynamic(
-  () => import('~/client/components/ForbiddenPage'),
+  () => import('~/client/components/ForbiddenPage.js'),
   { ssr: false },
 );
 const SlideRenderer = dynamic(
   () =>
-    import('~/client/components/Page/SlideRenderer').then(
+    import('~/client/components/Page/SlideRenderer.js').then(
       (mod) => mod.SlideRenderer,
     ),
   { ssr: false },
 );
 const PageContentRenderer = dynamic(
   () =>
-    import('../PageView/PageContentRenderer').then(
+    import('../PageView/PageContentRenderer.js').then(
       (mod) => mod.PageContentRenderer,
     ),
   { ssr: true },

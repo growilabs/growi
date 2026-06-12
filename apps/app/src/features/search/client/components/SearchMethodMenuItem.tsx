@@ -2,10 +2,10 @@ import type { JSX } from 'react';
 import { DevidedPagePath } from '@growi/core/dist/models';
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentPagePath } from '~/states/page';
+import { useCurrentPagePath } from '~/states/page/index.js';
 
-import type { GetItemProps } from '../interfaces/downshift';
-import { SearchMenuItem } from './SearchMenuItem';
+import type { GetItemProps } from '../interfaces/downshift.js';
+import { SearchMenuItem } from './SearchMenuItem.js';
 
 type Props = {
   activeIndex: number | null;

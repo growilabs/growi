@@ -7,12 +7,12 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import loggerFactory from '~/utils/logger';
+import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
 
 const logger = loggerFactory('growi:importer');
 

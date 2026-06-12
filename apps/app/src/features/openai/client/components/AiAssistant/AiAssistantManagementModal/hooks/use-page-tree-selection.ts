@@ -1,12 +1,12 @@
 import { useCallback, useMemo } from 'react';
 
-import type { IPageForTreeItem } from '~/interfaces/page';
+import type { IPageForTreeItem } from '~/interfaces/page.js';
 
 import {
   isSelectablePage,
   type SelectablePage,
-} from '../../../../../interfaces/selectable-page';
-import { useSelectedPages } from '../../../../services/use-selected-pages';
+} from '../../../../../interfaces/selectable-page.js';
+import { useSelectedPages } from '../../../../services/use-selected-pages.js';
 
 /**
  * Convert a page path to a glob pattern for selecting descendants.

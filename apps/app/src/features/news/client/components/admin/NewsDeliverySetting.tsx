@@ -2,13 +2,13 @@ import type { FC } from 'react';
 import { useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import loggerFactory from '~/utils/logger';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   useSWRxNewsDeliverySetting,
   useUpdateNewsDeliverySetting,
-} from '../../services/news-delivery-setting';
+} from '../../services/news-delivery-setting.js';
 
 const logger = loggerFactory('growi:feature:news:admin:NewsDeliverySetting');
 

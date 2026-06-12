@@ -1,8 +1,8 @@
 import type { JSX, MouseEvent } from 'react';
 import { useCallback, useMemo } from 'react';
 
-import type { TreeItemProps, TreeItemToolProps } from '../interfaces';
-import { SimpleItemContent } from './SimpleItemContent';
+import type { TreeItemProps, TreeItemToolProps } from '../interfaces/index.js';
+import { SimpleItemContent } from './SimpleItemContent.js';
 
 import styles from './TreeItemLayout.module.scss';
 
@@ -140,7 +140,7 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
         {showAlternativeContent && AlternativeComponents != null ? (
           AlternativeComponents.map((AlternativeContent, index) => (
             // biome-ignore lint/suspicious/noArrayIndexKey: static component list
-            <AlternativeContent key={index} {...toolProps} />
+            (<AlternativeContent key={index} {...toolProps} />)
           ))
         ) : (
           <>
@@ -148,13 +148,13 @@ export const TreeItemLayout = (props: TreeItemLayoutProps): JSX.Element => {
             <div className="d-hover-none">
               {EndComponents?.map((EndComponent, index) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: static component list
-                <EndComponent key={index} {...toolProps} />
+                (<EndComponent key={index} {...toolProps} />)
               ))}
             </div>
             <div className="d-none d-hover-flex">
               {HoveredEndComponents?.map((HoveredEndContent, index) => (
                 // biome-ignore lint/suspicious/noArrayIndexKey: static component list
-                <HoveredEndContent key={index} {...toolProps} />
+                (<HoveredEndContent key={index} {...toolProps} />)
               ))}
             </div>
           </>

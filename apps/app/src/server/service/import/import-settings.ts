@@ -1,4 +1,4 @@
-import type { ImportMode } from '~/models/admin/import-mode';
+import type { ImportMode } from '~/models/admin/import-mode.js';
 
 import type { OverwriteFunction } from './overwrite-function.js';
 

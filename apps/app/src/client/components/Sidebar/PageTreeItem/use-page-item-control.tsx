@@ -5,20 +5,20 @@ import { getIdStringForRef } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { DropdownToggle } from 'reactstrap';
 
-import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
 import {
   bookmark,
   resumeRenameOperation,
   unbookmark,
-} from '~/client/services/page-operation';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem';
-import { ReconcileTriggerModal } from '~/features/growi-vault/client/components/ReconcileTriggerModal';
-import type { TreeItemToolProps } from '~/features/page-tree/interfaces';
-import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark';
-import { useSWRMUTxPageInfo } from '~/stores/page';
+} from '~/client/services/page-operation.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem.js';
+import { ReconcileTriggerModal } from '~/features/growi-vault/client/components/ReconcileTriggerModal.js';
+import type { TreeItemToolProps } from '~/features/page-tree/interfaces/index.js';
+import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark.js';
+import { useSWRMUTxPageInfo } from '~/stores/page.js';
 
-import { PageItemControl } from '../../Common/Dropdown/PageItemControl';
+import { PageItemControl } from '../../Common/Dropdown/PageItemControl.js';
 
 type UsePageItemControl = {
   Control: FC<TreeItemToolProps>;

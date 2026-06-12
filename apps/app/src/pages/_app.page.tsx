@@ -11,20 +11,20 @@ import { SWRConfig } from 'swr';
 
 import * as nextI18nConfig from '^/config/next-i18next.config.cjs';
 
-import { GlobalFonts } from '~/components/FontFamily/GlobalFonts';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { GlobalFonts } from '~/components/FontFamily/GlobalFonts.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
 import {
   useHydrateGlobalEachAtoms,
   useHydrateGlobalInitialAtoms,
-} from '~/states/global/hydrate';
-import { swrGlobalConfiguration } from '~/utils/swr-utils';
+} from '~/states/global/hydrate.js';
+import { swrGlobalConfiguration } from '~/utils/swr-utils.js';
 
-import type { CommonEachProps, CommonInitialProps } from './common-props';
-import { isCommonInitialProps } from './common-props';
-import { getLocaleAtServerSide } from './utils/locale';
-import { useNextjsRoutingPageRegister } from './utils/nextjs-routing-utils';
-import { registerTransformerForObjectId } from './utils/objectid-transformer';
-import { deserializeSuperJSONProps } from './utils/superjson-ssr';
+import type { CommonEachProps, CommonInitialProps } from './common-props/index.js';
+import { isCommonInitialProps } from './common-props/index.js';
+import { getLocaleAtServerSide } from './utils/locale.js';
+import { useNextjsRoutingPageRegister } from './utils/nextjs-routing-utils.js';
+import { registerTransformerForObjectId } from './utils/objectid-transformer.js';
+import { deserializeSuperJSONProps } from './utils/superjson-ssr.js';
 
 import '~/styles/prebuilt/vendor.css';
 import '~/styles/style-app.scss';

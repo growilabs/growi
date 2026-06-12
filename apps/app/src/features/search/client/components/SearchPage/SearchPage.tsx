@@ -2,32 +2,32 @@ import React, { type JSX, useCallback, useMemo, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
-import { NotAvailableForReadOnlyUser } from '~/client/components/NotAvailableForReadOnlyUser';
-import PaginationWrapper from '~/client/components/PaginationWrapper';
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
+import { NotAvailableForReadOnlyUser } from '~/client/components/NotAvailableForReadOnlyUser.js';
+import PaginationWrapper from '~/client/components/PaginationWrapper.js';
 import type {
   ISelectableAll,
   ISelectableAndIndeterminatable,
-} from '~/client/interfaces/selectable-all';
-import type { IFormattedSearchResult } from '~/interfaces/search';
-import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
+} from '~/client/interfaces/selectable-all.js';
+import type { IFormattedSearchResult } from '~/interfaces/search.js';
+import { useSearchKeyword, useSetSearchKeyword } from '~/states/search/index.js';
 import {
   disableUserPagesAtom,
   showPageLimitationLAtom,
-} from '~/states/server-configurations';
+} from '~/states/server-configurations/index.js';
 import {
   type ISearchConditions,
   type ISearchConfigurations,
   useSWRxSearch,
-} from '~/stores/search';
+} from '~/stores/search.js';
 
-import { OperateAllControl } from './OperateAllControl';
-import SearchControl from './SearchControl';
-import type { IReturnSelectedPageIds } from './SearchPageBase';
+import { OperateAllControl } from './OperateAllControl.js';
+import SearchControl from './SearchControl.js';
+import type { IReturnSelectedPageIds } from './SearchPageBase.js';
 import {
   SearchPageBase,
   usePageDeleteModalForBulkDeletion,
-} from './SearchPageBase';
+} from './SearchPageBase.js';
 
 import styles from './SearchPage.module.scss';
 
@@ -70,13 +70,12 @@ const SearchResultListHead = React.memo(
           </span>
           {took != null && (
             // blackout 70px rectangle in VRT
-            <span
+            (<span
               data-vrt-blackout
               className="ms-3 text-muted d-inline-block"
               style={{ minWidth: '70px' }}
-            >
-              ({took}ms)
-            </span>
+            >({took}ms)
+                          </span>)
           )}
         </div>
         {/* TODO: infinite scroll for search result */}

@@ -1,13 +1,13 @@
 import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
-import { useRemoteRevisionLastUpdateUser } from '~/states/page';
-import { useEditorMode } from '~/states/ui/editor';
-import { usePageStatusAlertStatus } from '~/states/ui/modal/page-status-alert';
-import { useIsRevisionOutdated } from '~/stores/page';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
+import { useRemoteRevisionLastUpdateUser } from '~/states/page/index.js';
+import { useEditorMode } from '~/states/ui/editor/index.js';
+import { usePageStatusAlertStatus } from '~/states/ui/modal/page-status-alert.js';
+import { useIsRevisionOutdated } from '~/stores/page.js';
 
-import { Username } from '../../components/User/Username';
+import { Username } from '../../components/User/Username.js';
 
 import styles from './PageStatusAlert.module.scss';
 

@@ -1,17 +1,17 @@
 import type { HydratedDocument } from 'mongoose';
 
-import type Crowi from '~/server/crowi';
-import { configManager } from '~/server/service/config-manager';
-import CronService from '~/server/service/cron';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import CronService from '~/server/service/cron.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   AuditLogBulkExportJobInProgressJobStatus,
   AuditLogBulkExportJobStatus,
-} from '../../interfaces/audit-log-bulk-export';
-import type { AuditLogBulkExportJobDocument } from '../models/audit-log-bulk-export-job';
-import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job';
-import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron';
+} from '../../interfaces/audit-log-bulk-export.js';
+import type { AuditLogBulkExportJobDocument } from '../models/audit-log-bulk-export-job.js';
+import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job.js';
+import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron/index.js';
 
 const logger = loggerFactory(
   'growi:service:audit-log-bulk-export-job-clean-up-cron',

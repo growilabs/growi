@@ -1,2 +1,2 @@
-export type { DeleteAiAssistantModalProps } from './DeleteAiAssistantModal';
-export { DeleteAiAssistantModalLazyLoaded } from './dynamic';
+export type { DeleteAiAssistantModalProps } from './DeleteAiAssistantModal.js';
+export { DeleteAiAssistantModalLazyLoaded } from './dynamic.js';

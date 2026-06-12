@@ -1,1 +1,1 @@
-export * from './PageTreeItem';
+export * from './PageTreeItem.js';

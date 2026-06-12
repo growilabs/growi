@@ -3,27 +3,27 @@ import { useCallback, useState } from 'react';
 import type { IPageToDeleteWithMeta } from '@growi/core';
 import { DropdownToggle } from 'reactstrap';
 
-import { FolderIcon } from '~/client/components/Icons/FolderIcon';
+import { FolderIcon } from '~/client/components/Icons/FolderIcon.js';
 import {
   addBookmarkToFolder,
   addNewFolder,
   hasChildren,
   updateBookmarkFolder,
-} from '~/client/util/bookmark-utils';
-import { toastError } from '~/client/util/toastr';
+} from '~/client/util/bookmark-utils.js';
+import { toastError } from '~/client/util/toastr.js';
 import type {
   BookmarkFolderItems,
   DragItemDataType,
   DragItemType,
-} from '~/interfaces/bookmark-info';
-import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info';
-import type { onDeletedBookmarkFolderFunction } from '~/interfaces/ui';
-import { useDeleteBookmarkFolderModalActions } from '~/states/ui/modal/delete-bookmark-folder';
+} from '~/interfaces/bookmark-info.js';
+import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info.js';
+import type { onDeletedBookmarkFolderFunction } from '~/interfaces/ui.js';
+import { useDeleteBookmarkFolderModalActions } from '~/states/ui/modal/delete-bookmark-folder.js';
 
-import { BookmarkFolderItemControl } from './BookmarkFolderItemControl';
-import { BookmarkFolderNameInput } from './BookmarkFolderNameInput';
-import { BookmarkItem } from './BookmarkItem';
-import { DragAndDropWrapper } from './DragAndDropWrapper';
+import { BookmarkFolderItemControl } from './BookmarkFolderItemControl.js';
+import { BookmarkFolderNameInput } from './BookmarkFolderNameInput.js';
+import { BookmarkItem } from './BookmarkItem.js';
+import { DragAndDropWrapper } from './DragAndDropWrapper.js';
 
 type BookmarkFolderItemProps = {
   isReadOnlyUser: boolean;

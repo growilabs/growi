@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
-} from '../../../states/modal/ai-assistant-management';
+} from '../../../states/modal/ai-assistant-management.js';
 
 import styles from './PageSelectionMethodButtons.module.scss';
 

@@ -8,15 +8,15 @@ import {
   apiv3Get,
   apiv3Post,
   apiv3Put,
-} from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+} from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 
-import { BotTypeCard } from './BotTypeCard';
-import ConfirmBotChangeModal from './ConfirmBotChangeModal';
-import CustomBotWithoutProxySettings from './CustomBotWithoutProxySettings';
-import CustomBotWithProxySettings from './CustomBotWithProxySettings';
-import { DeleteSlackBotSettingsModal } from './DeleteSlackBotSettingsModal';
-import OfficialBotSettings from './OfficialBotSettings';
+import { BotTypeCard } from './BotTypeCard.js';
+import ConfirmBotChangeModal from './ConfirmBotChangeModal.js';
+import CustomBotWithoutProxySettings from './CustomBotWithoutProxySettings.js';
+import CustomBotWithProxySettings from './CustomBotWithProxySettings.js';
+import { DeleteSlackBotSettingsModal } from './DeleteSlackBotSettingsModal.js';
+import OfficialBotSettings from './OfficialBotSettings.js';
 
 const botTypes = Object.values(SlackbotType);
 

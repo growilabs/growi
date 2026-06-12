@@ -6,9 +6,9 @@ import {
   useAppTitle,
   useConfidential,
   useIsDefaultLogo,
-} from '~/states/global';
+} from '~/states/global/index.js';
 
-import { SidebarBrandLogo } from '../SidebarBrandLogo';
+import { SidebarBrandLogo } from '../SidebarBrandLogo.js';
 
 import styles from './AppTitle.module.scss';
 

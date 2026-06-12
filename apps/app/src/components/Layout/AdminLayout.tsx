@@ -2,28 +2,28 @@ import type { JSX, ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
-import GrowiLogo from '~/components/Common/GrowiLogo';
-import { useSetupAdminSocket } from '~/features/admin/states/socket-io';
+import GrowiLogo from '~/components/Common/GrowiLogo.js';
+import { useSetupAdminSocket } from '~/features/admin/states/socket-io.js';
 
-import { RawLayout } from './RawLayout';
+import { RawLayout } from './RawLayout.js';
 
 import styles from './Admin.module.scss';
 
 const AdminNavigation = dynamic(
   () =>
-    import('../Admin/Common/AdminNavigation').then(
+    import('../Admin/Common/AdminNavigation.js').then(
       (mod) => mod.AdminNavigation,
     ),
   { ssr: false },
 );
 const PageCreateModal = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/PageCreateModal'),
+  () => import('~/client/components/PageCreateModal.js'),
   { ssr: false },
 );
 const HotkeysManager = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/Hotkeys/HotkeysManager'),
+  () => import('~/client/components/Hotkeys/HotkeysManager.js'),
   { ssr: false },
 );
 

@@ -4,11 +4,11 @@ import type { SWRInfiniteResponse } from 'swr/infinite';
 import useSWRInfinite from 'swr/infinite';
 import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
 import type {
   IThreadRelationHasId,
   IThreadRelationPaginate,
-} from '~/features/openai/interfaces/thread-relation';
+} from '~/features/openai/interfaces/thread-relation.js';
 
 const getKey = (aiAssistantId?: string) =>
   aiAssistantId != null ? [`/openai/threads/${aiAssistantId}`] : null;

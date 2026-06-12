@@ -3,16 +3,16 @@ import { useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useController, useForm } from 'react-hook-form';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { FileUploadType } from '~/interfaces/file-uploader';
-import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { FileUploadType } from '~/interfaces/file-uploader.js';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global/index.js';
 
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
-import { AwsSettingMolecule } from './AwsSetting';
-import { AzureSettingMolecule } from './AzureSetting';
-import type { FileUploadFormValues } from './FileUploadSetting.types';
-import { GcsSettingMolecule } from './GcsSetting';
-import { useFileUploadSettings } from './useFileUploadSettings';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
+import { AwsSettingMolecule } from './AwsSetting.js';
+import { AzureSettingMolecule } from './AzureSetting.js';
+import type { FileUploadFormValues } from './FileUploadSetting.types.js';
+import { GcsSettingMolecule } from './GcsSetting.js';
+import { useFileUploadSettings } from './useFileUploadSettings.js';
 
 const FileUploadSetting = (): JSX.Element => {
   const { t } = useTranslation(['admin', 'commons']);

@@ -1,8 +1,8 @@
 import React, { type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { BasicInfoSettings } from './BasicInfoSettings';
-import ProfileImageSettings from './ProfileImageSettings';
+import { BasicInfoSettings } from './BasicInfoSettings.js';
+import ProfileImageSettings from './ProfileImageSettings.js';
 
 const UserSettings = React.memo((): JSX.Element => {
   const { t } = useTranslation();

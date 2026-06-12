@@ -12,35 +12,35 @@ import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
-import { toastError } from '~/client/util/toastr';
-import { useGrowiCloudUri } from '~/states/global';
-import loggerFactory from '~/utils/logger';
+import { toastError } from '~/client/util/toastr.js';
+import { useGrowiCloudUri } from '~/states/global/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant';
-import type { MessageLog } from '../../../../interfaces/message';
+import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant.js';
+import type { MessageLog } from '../../../../interfaces/message.js';
 import {
   MessageErrorCode,
   StreamErrorCode,
-} from '../../../../interfaces/message-error';
-import type { IThreadRelationHasId } from '../../../../interfaces/thread-relation';
+} from '../../../../interfaces/message-error.js';
+import type { IThreadRelationHasId } from '../../../../interfaces/thread-relation.js';
 import {
   type FormData as FormDataForEditorAssistant,
   isEditorAssistantFormData,
   useEditorAssistant,
-} from '../../../services/editor-assistant';
+} from '../../../services/editor-assistant/index.js';
 import {
   type FormData as FormDataForKnowledgeAssistant,
   useFetchAndSetMessageDataEffect,
   useKnowledgeAssistant,
-} from '../../../services/knowledge-assistant';
+} from '../../../services/knowledge-assistant.js';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
   useUnifiedMergeViewActions,
-} from '../../../states';
-import { useSWRxThreads } from '../../../stores/thread';
-import { MessageCard } from './MessageCard/MessageCard';
-import { ResizableTextarea } from './ResizableTextArea';
+} from '../../../states/index.js';
+import { useSWRxThreads } from '../../../stores/thread.js';
+import { MessageCard } from './MessageCard/MessageCard.js';
+import { ResizableTextarea } from './ResizableTextArea.js';
 
 import styles from './AiAssistantSidebar.module.scss';
 

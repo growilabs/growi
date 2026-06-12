@@ -1,20 +1,20 @@
 import express from 'express';
 
-import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3';
-import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3';
-import { setup as setupExternalUserGroup } from '~/features/external-user-group/server/routes/apiv3/external-user-group';
-import { setup as setupExternalUserGroupRelation } from '~/features/external-user-group/server/routes/apiv3/external-user-group-relation';
-import { setup as growiPlugin } from '~/features/growi-plugin/server/routes/apiv3/admin';
+import { factory as aiToolsRouteFactory } from '~/features/ai-tools/server/routes/apiv3/index.js';
+import { factory as auditLogBulkExportRouteFactory } from '~/features/audit-log-bulk-export/server/routes/apiv3/index.js';
+import { setup as setupExternalUserGroup } from '~/features/external-user-group/server/routes/apiv3/external-user-group.js';
+import { setup as setupExternalUserGroupRelation } from '~/features/external-user-group/server/routes/apiv3/external-user-group-relation.js';
+import { setup as growiPlugin } from '~/features/growi-plugin/server/routes/apiv3/admin/index.js';
 import {
   createVaultAdminRouterWithDeps,
   createVaultPageRouterWithDeps,
-} from '~/features/growi-vault/server';
-import newsRoute from '~/features/news/server/routes/news';
-import { factory as openaiRouteFactory } from '~/features/openai/server/routes';
-import { setup as setupPageBulkExport } from '~/features/page-bulk-export/server/routes/apiv3/page-bulk-export';
-import { setup as setupTemplates } from '~/features/templates/server/routes/apiv3';
-import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed';
-import loggerFactory from '~/utils/logger';
+} from '~/features/growi-vault/server/index.js';
+import newsRoute from '~/features/news/server/routes/news.js';
+import { factory as openaiRouteFactory } from '~/features/openai/server/routes/index.js';
+import { setup as setupPageBulkExport } from '~/features/page-bulk-export/server/routes/apiv3/page-bulk-export.js';
+import { setup as setupTemplates } from '~/features/templates/server/routes/apiv3/index.js';
+import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
 import { setup as setupApplicationInstalled } from '../../middlewares/application-installed.js';

@@ -3,14 +3,14 @@ import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import urljoin from 'url-join';
 
-import AdminNotificationContainer from '~/client/services/AdminNotificationContainer';
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import loggerFactory from '~/utils/logger';
+import AdminNotificationContainer from '~/client/services/AdminNotificationContainer.js';
+import { apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import NotificationDeleteModal from './NotificationDeleteModal';
-import { NotificationTypeIcon } from './NotificationTypeIcon';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import NotificationDeleteModal from './NotificationDeleteModal.js';
+import { NotificationTypeIcon } from './NotificationTypeIcon.js';
 
 const logger = loggerFactory('growi:GolobalNotificationList');
 

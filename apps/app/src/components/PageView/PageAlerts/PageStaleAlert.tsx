@@ -3,9 +3,9 @@ import { isIPageInfoForEntity } from '@growi/core';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentPageData } from '~/states/page';
-import { isEnabledStaleNotificationAtom } from '~/states/server-configurations';
-import { useSWRxPageInfo } from '~/stores/page';
+import { useCurrentPageData } from '~/states/page/index.js';
+import { isEnabledStaleNotificationAtom } from '~/states/server-configurations/index.js';
+import { useSWRxPageInfo } from '~/stores/page.js';
 
 export const PageStaleAlert = (): JSX.Element => {
   const { t } = useTranslation();

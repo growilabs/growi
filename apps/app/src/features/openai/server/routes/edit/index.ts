@@ -10,34 +10,34 @@ import type { MessageDelta } from 'openai/resources/beta/threads/messages.mjs';
 import { z } from 'zod';
 
 // Necessary imports
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   LlmEditorAssistantDiffSchema,
   LlmEditorAssistantMessageSchema,
-} from '../../../interfaces/editor-assistant/llm-response-schemas';
+} from '../../../interfaces/editor-assistant/llm-response-schemas.js';
 import type {
   EditRequestBody,
   SseDetectedDiff,
   SseFinalized,
   SseMessage,
-} from '../../../interfaces/editor-assistant/sse-schemas';
-import { MessageErrorCode } from '../../../interfaces/message-error';
-import AiAssistantModel from '../../models/ai-assistant';
-import ThreadRelationModel from '../../models/thread-relation';
-import { getOrCreateEditorAssistant } from '../../services/assistant';
-import { openaiClient } from '../../services/client';
-import { LlmResponseStreamProcessor } from '../../services/editor-assistant';
-import { getStreamErrorCode } from '../../services/getStreamErrorCode';
-import { getOpenaiService } from '../../services/openai';
-import { replaceAnnotationWithPageLink } from '../../services/replace-annotation-with-page-link';
-import { certifyAiService } from '../middlewares/certify-ai-service';
-import { SseHelper } from '../utils/sse-helper';
+} from '../../../interfaces/editor-assistant/sse-schemas.js';
+import { MessageErrorCode } from '../../../interfaces/message-error.js';
+import AiAssistantModel from '../../models/ai-assistant.js';
+import ThreadRelationModel from '../../models/thread-relation.js';
+import { getOrCreateEditorAssistant } from '../../services/assistant/index.js';
+import { openaiClient } from '../../services/client.js';
+import { LlmResponseStreamProcessor } from '../../services/editor-assistant/index.js';
+import { getStreamErrorCode } from '../../services/getStreamErrorCode.js';
+import { getOpenaiService } from '../../services/openai.js';
+import { replaceAnnotationWithPageLink } from '../../services/replace-annotation-with-page-link.js';
+import { certifyAiService } from '../middlewares/certify-ai-service.js';
+import { SseHelper } from '../utils/sse-helper.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:message');
 

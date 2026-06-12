@@ -4,26 +4,26 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useTranslation } from 'next-i18next';
 
-import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
-import { useSetSearchPage } from '~/states/context';
+import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript/index.js';
+import { useSetSearchPage } from '~/states/context.js';
 
-import { getServerSideSearchPageProps } from '../_search/get-server-side-props';
-import type { ServerConfigurationProps } from '../_search/types';
-import { useHydrateServerConfigurationAtoms } from '../_search/use-hydrate-server-configurations';
-import type { BasicLayoutConfigurationProps } from '../basic-layout-page';
-import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate';
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
-import type { RendererConfigProps } from '../general-page';
-import { useCustomTitle } from '../utils/page-title-customization';
+import { getServerSideSearchPageProps } from '../_search/get-server-side-props/index.js';
+import type { ServerConfigurationProps } from '../_search/types.js';
+import { useHydrateServerConfigurationAtoms } from '../_search/use-hydrate-server-configurations.js';
+import type { BasicLayoutConfigurationProps } from '../basic-layout-page/index.js';
+import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate.js';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
+import type { RendererConfigProps } from '../general-page/index.js';
+import { useCustomTitle } from '../utils/page-title-customization.js';
 
 const SearchResultLayout = dynamic(
-  () => import('~/components/Layout/SearchResultLayout'),
+  () => import('~/components/Layout/SearchResultLayout.js'),
   { ssr: false },
 );
 
 const PrivateLegacyPages = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/features/search/client/components/PrivateLegacyPages'),
+  () => import('~/features/search/client/components/PrivateLegacyPages.js'),
   { ssr: false },
 );
 

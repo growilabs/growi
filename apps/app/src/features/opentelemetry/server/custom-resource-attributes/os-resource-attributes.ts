@@ -1,7 +1,7 @@
 import * as os from 'node:os';
 import type { Attributes } from '@opentelemetry/api';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory(
   'growi:opentelemetry:custom-resource-attributes:os',

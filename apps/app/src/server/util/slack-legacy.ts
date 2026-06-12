@@ -5,7 +5,7 @@ import {
   type IncomingWebhookSendArguments,
 } from '@slack/webhook';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { ConfigManager } from '../service/config-manager/index.js';
 

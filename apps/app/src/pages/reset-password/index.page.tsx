@@ -7,15 +7,15 @@ import type {
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'next-i18next';
 
-import { RawLayout } from '~/components/Layout/RawLayout';
+import { RawLayout } from '~/components/Layout/RawLayout.js';
 
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+} from '../common-props/index.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
 
 type Props = CommonInitialProps &
   CommonEachProps & {
@@ -24,7 +24,7 @@ type Props = CommonInitialProps &
 
 const PasswordResetExecutionForm = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/PasswordResetExecutionForm'),
+  () => import('~/client/components/PasswordResetExecutionForm.js'),
   { ssr: false },
 );
 

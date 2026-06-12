@@ -2,8 +2,8 @@ import { type JSX, useCallback } from 'react';
 import Script from 'next/script';
 import type { IGraphViewerGlobal } from '@growi/remark-drawio';
 
-import { patchStencilRegistryUrls } from './patch-stencil-registry-urls';
-import { generateViewerMinJsUrl } from './use-viewer-min-js-url';
+import { patchStencilRegistryUrls } from './patch-stencil-registry-urls.js';
+import { generateViewerMinJsUrl } from './use-viewer-min-js-url.js';
 
 declare global {
   var GraphViewer: IGraphViewerGlobal;

@@ -1,10 +1,10 @@
 import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import type { INamedQuery } from '~/interfaces/named-query';
-import { SearchDelegatorName } from '~/interfaces/named-query';
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
-import loggerFactory from '~/utils/logger';
+import type { INamedQuery } from '~/interfaces/named-query.js';
+import { SearchDelegatorName } from '~/interfaces/named-query.js';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const _logger = loggerFactory('growi:models:named-query');
 

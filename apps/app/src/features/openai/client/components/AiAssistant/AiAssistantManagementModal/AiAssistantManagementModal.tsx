@@ -11,39 +11,39 @@ import { isGlobPatternPath } from '@growi/core/dist/utils/page-path-utils';
 import { useTranslation } from 'react-i18next';
 import { Modal, TabContent, TabPane } from 'reactstrap';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 import {
   AiAssistantAccessScope,
   AiAssistantShareScope,
-} from '~/features/openai/interfaces/ai-assistant';
-import type { IPagePathWithDescendantCount } from '~/interfaces/page';
-import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
-import { useSWRxPagePathsWithDescendantCount } from '~/stores/page';
-import loggerFactory from '~/utils/logger';
+} from '~/features/openai/interfaces/ai-assistant.js';
+import type { IPagePathWithDescendantCount } from '~/interfaces/page.js';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
+import { useSWRxPagePathsWithDescendantCount } from '~/stores/page.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { SelectablePage } from '../../../../interfaces/selectable-page';
-import { removeGlobPath } from '../../../../utils/remove-glob-path';
+import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
+import { removeGlobPath } from '../../../../utils/remove-glob-path.js';
 import {
   createAiAssistant,
   updateAiAssistant,
-} from '../../../services/ai-assistant';
+} from '../../../services/ai-assistant.js';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from '../../../states';
+} from '../../../states/index.js';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
   useAiAssistantManagementModalStatus,
-} from '../../../states/modal/ai-assistant-management';
-import { useSWRxAiAssistants } from '../../../stores/ai-assistant';
-import { AiAssistantManagementEditInstruction } from './AiAssistantManagementEditInstruction';
-import { AiAssistantManagementEditPages } from './AiAssistantManagementEditPages';
-import { AiAssistantManagementEditShare } from './AiAssistantManagementEditShare';
-import { AiAssistantManagementHome } from './AiAssistantManagementHome';
-import { AiAssistantKeywordSearch } from './AiAssistantManagementKeywordSearch';
-import { AiAssistantManagementPageSelectionMethod } from './AiAssistantManagementPageSelectionMethod';
-import { AiAssistantManagementPageTreeSelection } from './AiAssistantManagementPageTreeSelection';
+} from '../../../states/modal/ai-assistant-management.js';
+import { useSWRxAiAssistants } from '../../../stores/ai-assistant.js';
+import { AiAssistantManagementEditInstruction } from './AiAssistantManagementEditInstruction.js';
+import { AiAssistantManagementEditPages } from './AiAssistantManagementEditPages.js';
+import { AiAssistantManagementEditShare } from './AiAssistantManagementEditShare.js';
+import { AiAssistantManagementHome } from './AiAssistantManagementHome.js';
+import { AiAssistantKeywordSearch } from './AiAssistantManagementKeywordSearch.js';
+import { AiAssistantManagementPageSelectionMethod } from './AiAssistantManagementPageSelectionMethod.js';
+import { AiAssistantManagementPageTreeSelection } from './AiAssistantManagementPageTreeSelection.js';
 
 import styles from './AiAssistantManagementModal.module.scss';
 

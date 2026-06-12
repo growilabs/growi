@@ -2,9 +2,9 @@ import {
   initInstrumentation,
   setupAdditionalResourceAttributes,
   startOpenTelemetry,
-} from '~/features/opentelemetry/server';
-import loggerFactory from '~/utils/logger';
-import { hasProcessFlag } from '~/utils/process-utils';
+} from '~/features/opentelemetry/server/index.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { hasProcessFlag } from '~/utils/process-utils.js';
 
 const logger = loggerFactory('growi');
 

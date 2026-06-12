@@ -9,10 +9,10 @@ import {
   DropdownToggle,
 } from 'reactstrap';
 
-import { usePreviewOptions } from '~/stores/renderer';
+import { usePreviewOptions } from '~/stores/renderer.js';
 
-import type { LayoutGuideItem } from '../components/GuideRow';
-import { GuideRow } from '../components/GuideRow';
+import type { LayoutGuideItem } from '../components/GuideRow.js';
+import { GuideRow } from '../components/GuideRow.js';
 
 import styles from './DecorationTab.module.scss';
 

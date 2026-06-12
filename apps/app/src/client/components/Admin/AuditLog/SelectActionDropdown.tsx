@@ -5,7 +5,7 @@ import { useTranslation } from 'react-i18next';
 import type {
   SupportedActionCategoryType,
   SupportedActionType,
-} from '~/interfaces/activity';
+} from '~/interfaces/activity.js';
 import {
   AdminActions,
   AttachmentActions,
@@ -17,7 +17,7 @@ import {
   SupportedActionCategory,
   TagActions,
   UserActions,
-} from '~/interfaces/activity';
+} from '~/interfaces/activity.js';
 
 type Props = {
   actionMap: Map<SupportedActionType, boolean>;

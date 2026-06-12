@@ -2,26 +2,26 @@ import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import { useHydrateAtoms } from 'jotai/utils';
 
-import type { SupportedActionType } from '~/interfaces/activity';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type { SupportedActionType } from '~/interfaces/activity.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
 import {
   activityExpirationSecondsAtom,
   auditLogAvailableActionsAtom,
   auditLogEnabledAtom,
-} from '~/states/server-configurations';
+} from '~/states/server-configurations/index.js';
 
-import type { NextPageWithLayout } from '../_app.page';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
-import type { AdminCommonProps } from './_shared';
+import type { NextPageWithLayout } from '../_app.page.js';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
+import type { AdminCommonProps } from './_shared/index.js';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared';
+} from './_shared/index.js';
 
 const AuditLogManagement = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Admin/AuditLogManagement').then(
+    import('~/client/components/Admin/AuditLogManagement.js').then(
       (mod) => mod.AuditLogManagement,
     ),
   { ssr: false },

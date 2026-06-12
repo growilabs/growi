@@ -11,8 +11,8 @@ import { Origin } from '@growi/core';
 import type { IPageHasId } from '@growi/core/dist/interfaces';
 import { globalEventTarget, pathUtils } from '@growi/core/dist/utils';
 import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
-import { CodeMirrorEditorMain } from '@growi/editor/dist/client/components/CodeMirrorEditorMain';
-import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
+import { CodeMirrorEditorMain } from '@growi/editor/dist/client/components/CodeMirrorEditorMain.js';
+import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor.js';
 import { useRect } from '@growi/ui/dist/utils';
 import detectIndent from 'detect-indent';
 import { useAtomValue } from 'jotai';
@@ -20,16 +20,16 @@ import { useTranslation } from 'next-i18next';
 import nodePath from 'path';
 import { debounce, throttle } from 'throttle-debounce';
 
-import { useUpdateStateAfterSave } from '~/client/services/page-operation';
+import { useUpdateStateAfterSave } from '~/client/services/page-operation.js';
 import {
   extractRemoteRevisionDataFromErrorObj,
   useUpdatePage,
-} from '~/client/services/update-page';
-import { uploadAttachments } from '~/client/services/upload-attachments';
-import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
-import { useIsEnableUnifiedMergeView } from '~/features/openai/client/states';
-import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
-import { useCurrentPathname, useCurrentUser } from '~/states/global';
+} from '~/client/services/update-page/index.js';
+import { uploadAttachments } from '~/client/services/upload-attachments/index.js';
+import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr.js';
+import { useIsEnableUnifiedMergeView } from '~/features/openai/client/states/index.js';
+import { useShouldExpandContent } from '~/services/layout/use-should-expand-content.js';
+import { useCurrentPathname, useCurrentUser } from '~/states/global/index.js';
 import {
   useCurrentPageData,
   useCurrentPageId,
@@ -37,14 +37,14 @@ import {
   useIsEditable,
   useIsUntitledPage,
   usePageNotFound,
-} from '~/states/page';
-import { useTemplateBody } from '~/states/page/hooks';
+} from '~/states/page/index.js';
+import { useTemplateBody } from '~/states/page/hooks.js';
 import {
   defaultIndentSizeAtom,
   isEnabledAttachTitleHeaderAtom,
   isIndentSizeForcedAtom,
   useAcceptedUploadFileType,
-} from '~/states/server-configurations';
+} from '~/states/server-configurations/index.js';
 import {
   EditorMode,
   toPageUpdateGrantParams,
@@ -56,28 +56,28 @@ import {
   useSelectedGrant,
   useSetReservedNextCaretLine,
   useWaitingSaveProcessingActions,
-} from '~/states/ui/editor';
-import { useSetEditingClients } from '~/states/ui/editor/editing-clients';
-import { useSetScrollToRemoteCursor } from '~/states/ui/editor/scroll-to-remote-cursor';
-import { useEditorSettings } from '~/stores/editor';
-import { useSWRxCurrentGrantData } from '~/stores/page';
-import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
-import { usePreviewOptions } from '~/stores/renderer';
-import { useNextThemes } from '~/stores-universal/use-next-themes';
-import loggerFactory from '~/utils/logger';
+} from '~/states/ui/editor/index.js';
+import { useSetEditingClients } from '~/states/ui/editor/editing-clients.js';
+import { useSetScrollToRemoteCursor } from '~/states/ui/editor/scroll-to-remote-cursor.js';
+import { useEditorSettings } from '~/stores/editor.js';
+import { useSWRxCurrentGrantData } from '~/stores/page.js';
+import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing.js';
+import { usePreviewOptions } from '~/stores/renderer.js';
+import { useNextThemes } from '~/stores-universal/use-next-themes.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import {
   type ConflictHandler,
   useConflictEffect,
   useConflictResolver,
-} from './conflict';
-import { EditorGuideModalLazyLoaded } from './EditorGuideModal/dynamic';
-import { EditorNavbar } from './EditorNavbar';
-import { EditorNavbarBottom } from './EditorNavbarBottom';
-import Preview from './Preview';
-import { useScrollSync } from './ScrollSyncHelper';
+} from './conflict.js';
+import { EditorGuideModalLazyLoaded } from './EditorGuideModal/dynamic.js';
+import { EditorNavbar } from './EditorNavbar/index.js';
+import { EditorNavbarBottom } from './EditorNavbarBottom/index.js';
+import Preview from './Preview.js';
+import { useScrollSync } from './ScrollSyncHelper.js';
 
-import '../GrowiEditor.vendor-styles.prebuilt';
+import '../GrowiEditor.vendor-styles.prebuilt.js';
 
 const logger = loggerFactory('growi:PageEditor');
 

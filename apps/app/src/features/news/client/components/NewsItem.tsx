@@ -4,10 +4,10 @@ import { format } from 'date-fns';
 import { useTranslation } from 'next-i18next';
 
 import unreadDotStyles from '~/client/components/InAppNotification/UnreadDot.module.scss';
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { getLocale } from '~/utils/locale-utils';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
+import { getLocale } from '~/utils/locale-utils.js';
 
-import type { INewsItemWithReadStatus } from '../../interfaces/news-item';
+import type { INewsItemWithReadStatus } from '../../interfaces/news-item.js';
 
 const DEFAULT_EMOJI = '📢';
 

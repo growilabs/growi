@@ -1,6 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import { retrieveValidShareLinkByReferer } from './retrieve-valid-share-link.js';
 import { validateAttachment } from './validate-attachment.js';

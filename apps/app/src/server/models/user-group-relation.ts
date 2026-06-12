@@ -5,9 +5,9 @@ import mongoose, { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import { UserStatus } from '~/server/models/user/conts';
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
-import loggerFactory from '~/utils/logger';
+import { UserStatus } from '~/server/models/user/conts.js';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
 import type { UserGroupDocument } from './user-group.js';

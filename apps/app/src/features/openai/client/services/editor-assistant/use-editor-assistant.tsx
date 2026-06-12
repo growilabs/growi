@@ -3,17 +3,17 @@ import { GlobalCodeMirrorEditorKey } from '@growi/editor';
 import {
   acceptAllChunks,
   useTextSelectionEffect,
-} from '@growi/editor/dist/client/services/unified-merge-view';
-import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
-import { useSecondaryYdocs } from '@growi/editor/dist/client/stores/use-secondary-ydocs';
+} from '@growi/editor/dist/client/services/unified-merge-view/index.js';
+import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor.js';
+import { useSecondaryYdocs } from '@growi/editor/dist/client/stores/use-secondary-ydocs.js';
 import { type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import type { Text as YText } from 'yjs';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { useCurrentPageId } from '~/states/page';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
+import { useCurrentPageId } from '~/states/page/index.js';
 
-import type { AiAssistantHasId } from '../../../interfaces/ai-assistant';
+import type { AiAssistantHasId } from '../../../interfaces/ai-assistant.js';
 import {
   type EditRequestBody,
   type SseDetectedDiff,
@@ -22,24 +22,24 @@ import {
   SseFinalizedSchema,
   type SseMessage,
   SseMessageSchema,
-} from '../../../interfaces/editor-assistant/sse-schemas';
-import type { MessageLog } from '../../../interfaces/message';
-import type { IThreadRelationHasId } from '../../../interfaces/thread-relation';
-import { ThreadType } from '../../../interfaces/thread-relation';
-import { handleIfSuccessfullyParsed } from '../../../utils/handle-if-successfully-parsed';
-import { AiAssistantDropdown } from '../../components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown';
-import { QuickMenuList } from '../../components/AiAssistant/AiAssistantSidebar/QuickMenuList';
+} from '../../../interfaces/editor-assistant/sse-schemas.js';
+import type { MessageLog } from '../../../interfaces/message.js';
+import type { IThreadRelationHasId } from '../../../interfaces/thread-relation.js';
+import { ThreadType } from '../../../interfaces/thread-relation.js';
+import { handleIfSuccessfullyParsed } from '../../../utils/handle-if-successfully-parsed.js';
+import { AiAssistantDropdown } from '../../components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown.js';
+import { QuickMenuList } from '../../components/AiAssistant/AiAssistantSidebar/QuickMenuList.js';
 import {
   useAiAssistantSidebarStatus,
   useIsEnableUnifiedMergeView,
   useUnifiedMergeViewActions,
-} from '../../states';
+} from '../../states/index.js';
 import {
   shouldUseClientProcessing,
   useClientEngineIntegration,
-} from '../client-engine-integration';
-import { getPageBodyForContext } from './get-page-body-for-context';
-import { performSearchReplace } from './search-replace-engine';
+} from '../client-engine-integration.js';
+import { getPageBodyForContext } from './get-page-body-for-context.js';
+import { performSearchReplace } from './search-replace-engine.js';
 
 type CreateThread = () => Promise<IThreadRelationHasId>;
 

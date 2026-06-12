@@ -2,13 +2,13 @@ import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
-import AdminAppContainer from '~/client/services/AdminAppContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import AdminAppContainer from '~/client/services/AdminAppContainer.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import { OAuth2Setting } from './OAuth2Setting';
-import { SesSetting } from './SesSetting';
-import { SmtpSetting } from './SmtpSetting';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import { OAuth2Setting } from './OAuth2Setting.js';
+import { SesSetting } from './SesSetting.js';
+import { SmtpSetting } from './SmtpSetting.js';
 
 type Props = {
   adminAppContainer: AdminAppContainer;

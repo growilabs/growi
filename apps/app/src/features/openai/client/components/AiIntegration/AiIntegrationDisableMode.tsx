@@ -1,7 +1,7 @@
 import type { FC } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useGrowiDocumentationUrl } from '~/states/context';
+import { useGrowiDocumentationUrl } from '~/states/context.js';
 
 export const AiIntegrationDisableMode: FC = () => {
   const { t } = useTranslation('admin');

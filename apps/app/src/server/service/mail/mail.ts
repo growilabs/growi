@@ -1,7 +1,7 @@
 import ejs from 'ejs';
 import { promisify } from 'util';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type Crowi from '../../crowi/index.js';
 import { FailedEmail } from '../../models/failed-email.js';

@@ -3,12 +3,12 @@ import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import AdminNotificationContainer from '~/client/services/AdminNotificationContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import loggerFactory from '~/utils/logger';
+import AdminNotificationContainer from '~/client/services/AdminNotificationContainer.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { withUnstatedContainers } from '../../UnstatedUtils';
-import GlobalNotificationList from './GlobalNotificationList';
+import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import GlobalNotificationList from './GlobalNotificationList.js';
 
 const logger = loggerFactory('growi:GlobalNotification');
 
