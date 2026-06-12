@@ -62,7 +62,7 @@
   - _Depends: 1.4_
   - _Boundary: ai-settings validators_
 
-- [ ] 3.2 取得エンドポイントを実装
+- [x] 3.2 取得エンドポイントを実装
   - 現在有効な設定値を返す。`ai:apiKey` の値は返さず `isApiKeySet` のみ、`useOnlyEnvVars` / `aiEnabled` / `isConfigured` を併せて返す
   - 統合テスト: apiKey 値が応答に含まれず、`isApiKeySet` / `useOnlyEnvVars` / `aiEnabled` / `isConfigured` が状態に応じて正しい
   - _Requirements: 1.4, 4.2, 5.2, 7.1, 7.6_
