@@ -17,6 +17,7 @@ import type {
   ESQueryTerms,
   ESTermsKey,
   QueryTerms,
+  ResolvedFilterData,
   SearchableData,
   SearchDelegator,
   UnavailableTermsKey,
@@ -79,6 +80,8 @@ const AVAILABLE_KEYS = [
   'not_author',
   'editor',
   'not_editor',
+  'group',
+  'not_group',
 ];
 
 type Data = any;
@@ -1003,6 +1006,35 @@ class ElasticsearchDelegator
     }
   }
 
+  appendCriteriaForGroupFilter(
+    query: SearchQuery,
+    resolvedFilterData?: ResolvedFilterData,
+  ): void {
+    if (resolvedFilterData == null) return;
+    const { groupIds, notGroupIds } = resolvedFilterData;
+
+    // biome-ignore lint/style/noParameterAssign: ignore
+    query = this.initializeBoolQuery(query);
+    if (
+      query.body?.query?.bool?.filter == null ||
+      !Array.isArray(query.body.query.bool.filter) ||
+      !Array.isArray(query.body.query.bool.must_not)
+    ) {
+      throw new Error('query.body.query.bool is not initialized');
+    }
+
+    if (groupIds.length > 0) {
+      query.body.query.bool.filter.push({
+        terms: { granted_groups: groupIds },
+      });
+    }
+    if (notGroupIds.length > 0) {
+      query.body.query.bool.must_not.push({
+        terms: { granted_groups: notGroupIds },
+      });
+    }
+  }
+
   filterPagesByViewer(query: SearchQuery, user, userGroups): void {
     const showPagesRestrictedByOwner = !configManager.getConfig(
       'security:list-policy:hideRestrictedByOwner',
@@ -1139,6 +1171,7 @@ class ElasticsearchDelegator
     const query = this.createSearchQuery();
 
     this.appendCriteriaForQueryString(query, terms);
+    this.appendCriteriaForGroupFilter(query, data.resolvedFilterData);
     this.filterPagesByViewer(query, user, userGroups);
     await this.appendFunctionScore(query, queryString);
 
