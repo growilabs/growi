@@ -96,6 +96,21 @@ describe('useMentionController', () => {
       expect(lastSearchKeyword()).toBe('foo');
     });
 
+    it('includes user pages in the search scope', () => {
+      renderHook(() =>
+        useMentionController(null, activeSession({ query: 'foo' })),
+      );
+
+      act(() => {
+        vi.runAllTimers();
+      });
+
+      // /user/... pages (personal memos etc.) are valid mention targets, so
+      // the hook must opt in (the store default is includeUserPages: false).
+      const configurations = useSWRxSearchMock.mock.calls.at(-1)?.[2];
+      expect(configurations).toMatchObject({ includeUserPages: true });
+    });
+
     it('does NOT search (null key) when the query is empty', () => {
       renderHook(() =>
         useMentionController(null, activeSession({ query: '' })),

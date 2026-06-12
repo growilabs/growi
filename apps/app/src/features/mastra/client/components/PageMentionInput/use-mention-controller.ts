@@ -66,6 +66,9 @@ export const useMentionController = (
 
   const { data, isLoading } = useSWRxSearch(searchKeyword, null, {
     limit: SEARCH_LIMIT,
+    // User pages (/user/...) are legitimate mention targets (personal memos,
+    // profile pages), so include them; trash pages stay excluded (default).
+    includeUserPages: true,
   });
 
   // While the live query has outrun the debounced one, the search for the latest
