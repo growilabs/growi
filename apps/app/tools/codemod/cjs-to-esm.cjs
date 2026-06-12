@@ -71,6 +71,26 @@ function aliasFromSpecifier(specifier) {
   return base.replace(/[-_](.)/g, (_, c) => c.toUpperCase());
 }
 
+// ─── Comment transfer helper ─────────────────────────────────────────────────
+
+/**
+ * Copy leading (and trailing) comments from `source` node onto `target` node.
+ * In recast, comments are stored as an array on `node.comments`, each with a
+ * `.leading` / `.trailing` boolean.  When jscodeshift replaces a node,
+ * recast does NOT automatically carry comments over, so we must do it manually.
+ *
+ * @param {object} source - The original AST node whose comments should be preserved.
+ * @param {object} target - The newly created AST node that will receive the comments.
+ */
+function transferComments(source, target) {
+  if (!source.comments || source.comments.length === 0) return;
+  // Only transfer leading comments to avoid duplicating trailing ones that
+  // belong to the previous statement.
+  const leading = source.comments.filter((c) => c.leading);
+  if (leading.length === 0) return;
+  target.comments = [...(target.comments || []), ...leading];
+}
+
 // ─── Main transform ──────────────────────────────────────────────────────────
 
 /**
@@ -170,6 +190,7 @@ module.exports = function transform(fileInfo, api, _options) {
         specifiers,
         j.stringLiteral(finalSpecifier),
       );
+      transferComments(path.node, importDecl);
       j(path).replaceWith(importDecl);
       changed = true;
     });
@@ -227,6 +248,7 @@ module.exports = function transform(fileInfo, api, _options) {
         [specifierNode],
         j.stringLiteral(finalSpecifier),
       );
+      transferComments(path.node, importDecl);
       j(path).replaceWith(importDecl);
       changed = true;
     });
@@ -280,6 +302,9 @@ module.exports = function transform(fileInfo, api, _options) {
       const newDecl = j.variableDeclaration('const', [
         j.variableDeclarator(j.identifier(localName), newInit),
       ]);
+
+      // Transfer leading comments to the first emitted node (the import).
+      transferComments(path.node, importDecl);
 
       // Replace the single VariableDeclaration with import + new declaration.
       // Use path.replace (recast NodePath API) to avoid a blank line between nodes.
@@ -375,6 +400,7 @@ module.exports = function transform(fileInfo, api, _options) {
         [j.importDefaultSpecifier(j.identifier(localName))],
         j.stringLiteral(finalSpecifier),
       );
+      transferComments(path.node, importDecl);
       j(path).replaceWith(importDecl);
       changed = true;
     });
@@ -453,6 +479,7 @@ module.exports = function transform(fileInfo, api, _options) {
           ]),
           [],
         );
+        transferComments(path.node, exportDecl);
         j(path).replaceWith(exportDecl);
       } else if (right.type === 'Identifier') {
         // module.exports = MyClass or module.exports = instance
@@ -460,15 +487,22 @@ module.exports = function transform(fileInfo, api, _options) {
         const exportDefault = j.exportDefaultDeclaration(
           j.identifier(right.name),
         );
+        transferComments(path.node, exportDefault);
         j(path).replaceWith(exportDefault);
       } else if (right.type === 'ClassDeclaration') {
         // module.exports = class Foo { }
-        j(path).replaceWith(j.exportDefaultDeclaration(right));
+        const exportDefault = j.exportDefaultDeclaration(right);
+        transferComments(path.node, exportDefault);
+        j(path).replaceWith(exportDefault);
       } else if (right.type === 'ClassExpression') {
-        j(path).replaceWith(j.exportDefaultDeclaration(right));
+        const exportDefault = j.exportDefaultDeclaration(right);
+        transferComments(path.node, exportDefault);
+        j(path).replaceWith(exportDefault);
       } else {
         // Fallback: export default <value>
-        j(path).replaceWith(j.exportDefaultDeclaration(right));
+        const exportDefault = j.exportDefaultDeclaration(right);
+        transferComments(path.node, exportDefault);
+        j(path).replaceWith(exportDefault);
       }
       changed = true;
     });

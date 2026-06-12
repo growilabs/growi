@@ -336,3 +336,98 @@ describe('Config specifier rewrite (.cjs)', () => {
     expect(output).toBe('');
   });
 });
+
+// ─── Comment preservation ─────────────────────────────────────────────────────
+
+describe('Comment preservation — leading comments must survive transform', () => {
+  it('P1 factory: multi-line @swagger block + one-line @param JSDoc survive on export const setup', () => {
+    const input = [
+      '/**',
+      ' * @swagger',
+      ' * /api/v3/foo:',
+      ' *   get:',
+      ' *     summary: Foo endpoint',
+      ' */',
+      '/** @param {import(\'~/server/crowi\').default} crowi Crowi instance */',
+      'module.exports = (crowi) => {',
+      '  const router = express.Router();',
+      '  return router;',
+      '};',
+    ].join('\n');
+
+    const output = applyTransform(input);
+
+    // Both comments must appear before the export declaration
+    expect(output).toContain('@swagger');
+    expect(output).toContain('@param {import(\'~/server/crowi\').default} crowi Crowi instance');
+    expect(output).toContain('export const setup');
+    // Comments must come before the export keyword
+    const swaggerIdx = output.indexOf('@swagger');
+    const exportIdx = output.indexOf('export const setup');
+    expect(swaggerIdx).toBeLessThan(exportIdx);
+  });
+
+  it('P1 value (default export): leading block comment survives on export default', () => {
+    const input = [
+      '/** A service instance */',
+      'module.exports = service;',
+    ].join('\n');
+
+    const output = applyTransform(input);
+
+    expect(output).toContain('/** A service instance */');
+    expect(output).toContain('export default service');
+    const commentIdx = output.indexOf('/** A service instance */');
+    const exportIdx = output.indexOf('export default service');
+    expect(commentIdx).toBeLessThan(exportIdx);
+  });
+
+  it('P2 require: leading line comment survives on the emitted import', () => {
+    const input = [
+      '// Express framework',
+      "const express = require('express');",
+    ].join('\n');
+
+    const output = applyTransform(input);
+
+    expect(output).toContain('// Express framework');
+    expect(output).toContain("import express from 'express'");
+    const commentIdx = output.indexOf('// Express framework');
+    const importIdx = output.indexOf("import express from 'express'");
+    expect(commentIdx).toBeLessThan(importIdx);
+  });
+
+  it('P2 require: mixed block + line comments all survive in order', () => {
+    const input = [
+      '/** Block comment for multer */',
+      '// line comment for multer',
+      "const multer = require('multer');",
+    ].join('\n');
+
+    const output = applyTransform(input);
+
+    expect(output).toContain('/** Block comment for multer */');
+    expect(output).toContain('// line comment for multer');
+    expect(output).toContain("import multer from 'multer'");
+    const blockIdx = output.indexOf('/** Block comment for multer */');
+    const lineIdx = output.indexOf('// line comment for multer');
+    const importIdx = output.indexOf("import multer from 'multer'");
+    expect(blockIdx).toBeLessThan(lineIdx);
+    expect(lineIdx).toBeLessThan(importIdx);
+  });
+
+  it('P5 destructuring require: leading comment survives on the emitted named import', () => {
+    const input = [
+      '/** Utility for creating API routers */',
+      "const { createApiRouter } = require('~/server/util/createApiRouter');",
+    ].join('\n');
+
+    const output = applyTransform(input);
+
+    expect(output).toContain('/** Utility for creating API routers */');
+    expect(output).toContain("import { createApiRouter } from '~/server/util/createApiRouter'");
+    const commentIdx = output.indexOf('/** Utility for creating API routers */');
+    const importIdx = output.indexOf("import { createApiRouter } from '~/server/util/createApiRouter'");
+    expect(commentIdx).toBeLessThan(importIdx);
+  });
+});
