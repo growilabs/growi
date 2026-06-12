@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { EditorSelection } from '@codemirror/state';
 import type { EditorView } from '@codemirror/view';
-import { useDebounce } from 'usehooks-ts';
+import { useDebounceValue } from 'usehooks-ts';
 
 import { useSWRxSearch } from '~/stores/search';
 
@@ -56,7 +56,10 @@ export const useMentionController = (
   // Debounce the query before it reaches the search key (2.7). When the panel
   // must not search, fall back to an empty string so the debounced value is
   // stable and the key below resolves to null.
-  const debouncedQuery = useDebounce(isOpen ? query : '', SEARCH_DEBOUNCE_MS);
+  const [debouncedQuery] = useDebounceValue(
+    isOpen ? query : '',
+    SEARCH_DEBOUNCE_MS,
+  );
 
   // Search only with a non-empty query while open (1.3 / 1.4). A null key skips
   // the request entirely (SWR conditional fetching). Permission filtering is
