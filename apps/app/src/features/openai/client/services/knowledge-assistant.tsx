@@ -24,14 +24,14 @@ import type {
   MessageWithCustomMetaData,
 } from '../../interfaces/message.js';
 import type { IThreadRelationHasId } from '../../interfaces/thread-relation.js';
-import { ThreadType } from '../../interfaces/thread-relation.js';
-import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView.js';
+import { ThreadType } from '~/features/openai/interfaces/thread-relation.js';
+import { AiAssistantChatInitialView } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView.js';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from '../states/index.js';
-import { useSWRMUTxMessages } from '../stores/message.js';
-import { useSWRINFxRecentThreads, useSWRMUTxThreads } from '../stores/thread.js';
+} from '~/features/openai/client/states/index.js';
+import { useSWRMUTxMessages } from '~/features/openai/client/stores/message.js';
+import { useSWRINFxRecentThreads, useSWRMUTxThreads } from '~/features/openai/client/stores/thread.js';
 
 type CreateThread = (
   aiAssistantId: string,

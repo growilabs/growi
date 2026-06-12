@@ -1,1 +1,1 @@
-export * from './PagePathNavTitle.js';
+export * from './PagePathNavTitle';

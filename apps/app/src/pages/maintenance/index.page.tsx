@@ -5,18 +5,18 @@ import type {
 } from 'next';
 import dynamic from 'next/dynamic';
 
-import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
+import type { CommonEachProps, CommonInitialProps } from '../common-props';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props/index.js';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
+} from '../common-props';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
 
 const Maintenance = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Maintenance/index.js').then((mod) => mod.Maintenance),
+    import('~/client/components/Maintenance').then((mod) => mod.Maintenance),
   { ssr: false },
 );
 

@@ -10,16 +10,16 @@ import loggerFactory from '~/utils/logger/index.js';
 import { prisma } from '~/utils/prisma.js';
 import { batchProcessPromiseAll } from '~/utils/promise.js';
 
-import { configManager } from '../../../../server/service/config-manager/index.js';
-import { externalAccountService } from '../../../../server/service/external-account.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { externalAccountService } from '~/server/service/external-account.js';
 import type {
   ExternalGroupProviderType,
   ExternalUserGroupTreeNode,
   ExternalUserInfo,
   IExternalUserGroupHasId,
 } from '../../interfaces/external-user-group.js';
-import ExternalUserGroup from '../models/external-user-group.js';
-import ExternalUserGroupRelation from '../models/external-user-group-relation.js';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group.js';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
 
 const logger = loggerFactory('growi:service:external-user-group-sync-service');
 

@@ -4,35 +4,35 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useAtomValue } from 'jotai';
 
-import { ShareLinkLayout } from '~/components/Layout/ShareLinkLayout.js';
-import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript/index.js';
-import { ShareLinkPageView } from '~/components/ShareLinkPageView/index.js';
-import type { CommonEachProps } from '~/pages/common-props/index.js';
-import { getServerSideCommonEachProps } from '~/pages/common-props/index.js';
-import { NextjsRoutingType } from '~/pages/utils/nextjs-routing-utils.js';
-import { useCustomTitleForPage } from '~/pages/utils/page-title-customization.js';
-import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props.js';
-import { useCurrentPageData, useCurrentPagePath } from '~/states/page/index.js';
-import { useHydratePageAtoms } from '~/states/page/hydrate.js';
+import { ShareLinkLayout } from '~/components/Layout/ShareLinkLayout';
+import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
+import { ShareLinkPageView } from '~/components/ShareLinkPageView';
+import type { CommonEachProps } from '~/pages/common-props';
+import { getServerSideCommonEachProps } from '~/pages/common-props';
+import { NextjsRoutingType } from '~/pages/utils/nextjs-routing-utils';
+import { useCustomTitleForPage } from '~/pages/utils/page-title-customization';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
+import { useCurrentPageData, useCurrentPagePath } from '~/states/page';
+import { useHydratePageAtoms } from '~/states/page/hydrate';
 import {
   disableLinkSharingAtom,
   useRendererConfig,
-} from '~/states/server-configurations/index.js';
+} from '~/states/server-configurations';
 
-import type { NextPageWithLayout } from '../../_app.page.js';
-import { useInitialCSRFetch } from '../../general-page/index.js';
-import { useHydrateGeneralPageConfigurationAtoms } from '../../general-page/hydrate.js';
-import { registerPageToShowRevisionWithMeta } from '../../general-page/superjson/index.js';
-import { NEXT_JS_ROUTING_PAGE } from './consts/index.js';
-import { getServerSidePropsForInitial } from './server-side-props.js';
-import type { InitialProps } from './types.js';
+import type { NextPageWithLayout } from '../../_app.page';
+import { useInitialCSRFetch } from '../../general-page';
+import { useHydrateGeneralPageConfigurationAtoms } from '../../general-page/hydrate';
+import { registerPageToShowRevisionWithMeta } from '../../general-page/superjson';
+import { NEXT_JS_ROUTING_PAGE } from './consts';
+import { getServerSidePropsForInitial } from './server-side-props';
+import type { InitialProps } from './types';
 
 // call superjson custom register
 registerPageToShowRevisionWithMeta();
 
 const GrowiContextualSubNavigation = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/Navbar/GrowiContextualSubNavigation.js'),
+  () => import('~/client/components/Navbar/GrowiContextualSubNavigation'),
   { ssr: false },
 );
 

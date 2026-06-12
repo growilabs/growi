@@ -1,8 +1,8 @@
 import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 
-import { apiGet } from '~/client/util/apiv1-client.js';
-import type { IResTagsListApiv1, IResTagsSearchApiv1 } from '~/interfaces/tag.js';
+import { apiGet } from '~/client/util/apiv1-client';
+import type { IResTagsListApiv1, IResTagsSearchApiv1 } from '~/interfaces/tag';
 
 export const useSWRxTagsList = (
   limit?: number,

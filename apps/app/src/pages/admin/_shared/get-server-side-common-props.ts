@@ -6,8 +6,8 @@ import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../../common-props/index.js';
-import { mergeGetServerSidePropsResults } from '../../utils/server-side-props.js';
+} from '~/pages/common-props/index.js';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props.js';
 import type { AdminCommonProps } from './types.js';
 
 /**

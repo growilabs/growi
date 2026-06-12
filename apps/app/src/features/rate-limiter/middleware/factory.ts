@@ -8,9 +8,9 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   DEFAULT_USERS_PER_IP_PROSPECTION,
   type IApiRateLimitConfig,
-} from '../config/index.js';
-import { generateApiRateLimitConfig } from '../utils/config-generator.js';
-import { consumePoints } from './consume-points.js';
+} from '~/features/rate-limiter/config/index.js';
+import { generateApiRateLimitConfig } from '~/features/rate-limiter/utils/config-generator.js';
+import { consumePoints } from '~/features/rate-limiter/middleware/consume-points.js';
 
 const logger = loggerFactory('growi:middleware:api-rate-limit');
 

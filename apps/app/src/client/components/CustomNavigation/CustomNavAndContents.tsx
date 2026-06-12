@@ -1,8 +1,8 @@
 import type { ReactNode } from 'react';
 import React, { type JSX, useState } from 'react';
 
-import CustomNav, { CustomNavDropdown, CustomNavTab } from './CustomNav.js';
-import CustomTabContent from './CustomTabContent.js';
+import CustomNav, { CustomNavDropdown, CustomNavTab } from './CustomNav';
+import CustomTabContent from './CustomTabContent';
 
 type CustomNavAndContentsProps = {
   navTabMapping: any;

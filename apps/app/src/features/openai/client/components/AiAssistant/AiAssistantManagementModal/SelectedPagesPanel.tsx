@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next';
 import SimpleBar from 'simplebar-react';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
-import { SelectablePageList } from './SelectablePageList.js';
+import { SelectablePageList } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectablePageList.js';
 
 type Props = {
   pages: SelectablePage[];

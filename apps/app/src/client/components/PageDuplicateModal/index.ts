@@ -1,1 +1,1 @@
-export { PageDuplicateModalLazyLoaded } from './dynamic.js';
+export { PageDuplicateModalLazyLoaded } from './dynamic';

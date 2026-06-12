@@ -2,11 +2,11 @@ import React, { type JSX, Suspense } from 'react';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
-import ItemsTreeContentSkeleton from '~/client/components/ItemsTree/ItemsTreeContentSkeleton.js';
-import { useIsGuestUser } from '~/states/context.js';
+import ItemsTreeContentSkeleton from '~/client/components/ItemsTree/ItemsTreeContentSkeleton';
+import { useIsGuestUser } from '~/states/context';
 
 const AiAssistantContent = dynamic(
-  () => import('./AiAssistantSubstance.js').then((mod) => mod.AiAssistantContent),
+  () => import('./AiAssistantSubstance').then((mod) => mod.AiAssistantContent),
   { ssr: false },
 );
 

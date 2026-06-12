@@ -2,7 +2,7 @@ import React, { type JSX, useMemo } from 'react';
 import { type GrowiThemeMetadata, GrowiThemeSchemeType } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import { ThemeColorBox } from './ThemeColorBox.js';
+import { ThemeColorBox } from './ThemeColorBox';
 
 type Props = {
   availableThemes: GrowiThemeMetadata[];

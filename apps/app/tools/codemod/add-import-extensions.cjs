@@ -270,25 +270,40 @@ if (require.main === module) {
   const jscodeshift = require.resolve('jscodeshift/bin/jscodeshift.js');
   const transformPath = __filename;
 
+  // The babel 'ts' parser cannot parse JSX (fails on spread attributes), so
+  // JSX-capable extensions need a separate pass with the 'tsx' parser.
+  // Explicit file arguments bypass jscodeshift's --extensions filter, so
+  // split them per pass here; directories participate in both passes.
+  const passes = [
+    { extensions: 'js,ts', parser: 'ts', fileRe: /\.(js|ts)$/ },
+    { extensions: 'jsx,tsx', parser: 'tsx', fileRe: /\.(jsx|tsx)$/ },
+  ];
   try {
-    execFileSync(
-      process.execPath,
-      [
-        jscodeshift,
-        '--transform',
-        transformPath,
-        '--extensions',
-        'js,ts,jsx,tsx',
-        '--parser',
-        'ts',
-        '--ignore-pattern',
-        '**/node_modules/**',
-        '--ignore-pattern',
-        '**/src/migrations/**',
-        ...targetPaths,
-      ],
-      { stdio: 'inherit', cwd: path.resolve(__dirname, '../..') },
-    );
+    for (const { extensions, parser, fileRe } of passes) {
+      const passPaths = targetPaths.filter((p) => {
+        if (fs.existsSync(p) && fs.statSync(p).isDirectory()) return true;
+        return fileRe.test(p);
+      });
+      if (passPaths.length === 0) continue;
+      execFileSync(
+        process.execPath,
+        [
+          jscodeshift,
+          '--transform',
+          transformPath,
+          '--extensions',
+          extensions,
+          '--parser',
+          parser,
+          '--ignore-pattern',
+          '**/node_modules/**',
+          '--ignore-pattern',
+          '**/src/migrations/**',
+          ...passPaths,
+        ],
+        { stdio: 'inherit', cwd: path.resolve(__dirname, '../..') },
+      );
+    }
   } catch {
     process.exit(1);
   }

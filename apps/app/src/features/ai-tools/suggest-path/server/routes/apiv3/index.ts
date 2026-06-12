@@ -16,7 +16,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger/index.js';
 
 import type { SearchService } from '../../../interfaces/suggest-path-types.js';
-import { generateSuggestions } from '../../services/generate-suggestions.js';
+import { generateSuggestions } from '~/features/ai-tools/suggest-path/server/services/generate-suggestions.js';
 
 const logger = loggerFactory('growi:features:suggest-path:routes');
 

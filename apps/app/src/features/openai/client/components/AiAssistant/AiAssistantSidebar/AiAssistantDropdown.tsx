@@ -8,8 +8,8 @@ import {
 } from 'reactstrap';
 
 import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant.js';
-import { useSWRxAiAssistants } from '../../../stores/ai-assistant.js';
-import { getShareScopeIcon } from '../../../utils/get-share-scope-Icon.js';
+import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant.js';
+import { getShareScopeIcon } from '~/features/openai/client/utils/get-share-scope-Icon.js';
 
 type Props = {
   selectedAiAssistant?: AiAssistantHasId;

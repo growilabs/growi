@@ -1,1 +1,1 @@
-export { EditorGuideModalLazyLoaded } from './dynamic.js';
+export { EditorGuideModalLazyLoaded } from './dynamic';

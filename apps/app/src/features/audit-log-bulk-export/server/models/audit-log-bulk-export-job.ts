@@ -8,7 +8,7 @@ import type { IAuditLogBulkExportJob } from '../../interfaces/audit-log-bulk-exp
 import {
   AuditLogBulkExportFormat,
   AuditLogBulkExportJobStatus,
-} from '../../interfaces/audit-log-bulk-export.js';
+} from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
 
 export type AuditLogBulkExportJobDocument =
   HydratedDocument<IAuditLogBulkExportJob>;

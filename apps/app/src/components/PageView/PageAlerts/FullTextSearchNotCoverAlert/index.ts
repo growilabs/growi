@@ -1,1 +1,1 @@
-export { FullTextSearchNotCoverAlertLazyLoaded } from './dynamic.js';
+export { FullTextSearchNotCoverAlertLazyLoaded } from './dynamic';

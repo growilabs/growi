@@ -12,11 +12,11 @@ import {
 import { useTranslation } from 'react-i18next';
 import { Card, CardBody, CardHeader, Modal } from 'reactstrap';
 
-import { CustomNavTab } from '../../CustomNavigation/CustomNav.js';
-import CustomTabContent from '../../CustomNavigation/CustomTabContent.js';
-import { DecorationTab } from './contents/DecorationTab.js';
-import { LayoutTab } from './contents/LayoutTab.js';
-import { TextStyleTab } from './contents/TextStyleTab.js';
+import { CustomNavTab } from '../../CustomNavigation/CustomNav';
+import CustomTabContent from '../../CustomNavigation/CustomTabContent';
+import { DecorationTab } from './contents/DecorationTab';
+import { LayoutTab } from './contents/LayoutTab';
+import { TextStyleTab } from './contents/TextStyleTab';
 
 import styles from './EditorGuideModal.module.scss';
 

@@ -5,23 +5,23 @@ import { getIdStringForRef } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
 
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useCurrentUser } from '~/states/global/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useCurrentUser } from '~/states/global';
+import loggerFactory from '~/utils/logger';
 
 import {
   type AiAssistantHasId,
   AiAssistantShareScope,
-} from '../../../../interfaces/ai-assistant.js';
-import { determineShareScope } from '../../../../utils/determine-share-scope.js';
+} from '../../../../interfaces/ai-assistant';
+import { determineShareScope } from '../../../../utils/determine-share-scope';
 import {
   deleteAiAssistant,
   setDefaultAiAssistant,
-} from '../../../services/ai-assistant.js';
-import { useAiAssistantSidebarActions } from '../../../states/index.js';
-import { useAiAssistantManagementModalActions } from '../../../states/modal/ai-assistant-management.js';
-import { getShareScopeIcon } from '../../../utils/get-share-scope-Icon.js';
-import { DeleteAiAssistantModalLazyLoaded } from './DeleteAiAssistantModal/index.js';
+} from '../../../services/ai-assistant';
+import { useAiAssistantSidebarActions } from '../../../states';
+import { useAiAssistantManagementModalActions } from '../../../states/modal/ai-assistant-management';
+import { getShareScopeIcon } from '../../../utils/get-share-scope-Icon';
+import { DeleteAiAssistantModalLazyLoaded } from './DeleteAiAssistantModal';
 
 const logger = loggerFactory('growi:openai:client:components:AiAssistantList');
 

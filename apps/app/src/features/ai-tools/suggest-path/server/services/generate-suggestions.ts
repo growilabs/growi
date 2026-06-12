@@ -9,13 +9,13 @@ import type {
   SearchCandidate,
   SearchService,
 } from '../../interfaces/suggest-path-types.js';
-import { SuggestionType } from '../../interfaces/suggest-path-types.js';
-import { analyzeContent } from './analyze-content.js';
-import { evaluateCandidates } from './evaluate-candidates.js';
-import { generateCategorySuggestion } from './generate-category-suggestion.js';
-import { generateMemoSuggestion } from './generate-memo-suggestion.js';
-import { resolveParentGrant } from './resolve-parent-grant.js';
-import { retrieveSearchCandidates } from './retrieve-search-candidates.js';
+import { SuggestionType } from '~/features/ai-tools/suggest-path/interfaces/suggest-path-types.js';
+import { analyzeContent } from '~/features/ai-tools/suggest-path/server/services/analyze-content.js';
+import { evaluateCandidates } from '~/features/ai-tools/suggest-path/server/services/evaluate-candidates.js';
+import { generateCategorySuggestion } from '~/features/ai-tools/suggest-path/server/services/generate-category-suggestion.js';
+import { generateMemoSuggestion } from '~/features/ai-tools/suggest-path/server/services/generate-memo-suggestion.js';
+import { resolveParentGrant } from '~/features/ai-tools/suggest-path/server/services/resolve-parent-grant.js';
+import { retrieveSearchCandidates } from '~/features/ai-tools/suggest-path/server/services/retrieve-search-candidates.js';
 
 const logger = loggerFactory(
   'growi:features:suggest-path:generate-suggestions',

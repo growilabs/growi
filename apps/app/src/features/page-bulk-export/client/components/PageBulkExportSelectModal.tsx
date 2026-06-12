@@ -12,11 +12,11 @@ import { isPdfBulkExportEnabledAtom } from '~/states/server-configurations/index
 import {
   PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE,
   PageBulkExportFormat,
-} from '../../interfaces/page-bulk-export.js';
+} from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
 import {
   usePageBulkExportSelectModalActions,
   usePageBulkExportSelectModalStatus,
-} from '../states/modal.js';
+} from '~/features/page-bulk-export/client/states/modal.js';
 
 const PageBulkExportSelectModalSubstance = (): JSX.Element => {
   const { t } = useTranslation();

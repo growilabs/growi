@@ -10,9 +10,9 @@ import { useSetEditingMarkdown } from '~/states/ui/editor/index.js';
 import { useSWRxApplicableGrant, useSWRxCurrentGrantData } from '~/stores/page.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { apiPost } from '../util/apiv1-client.js';
-import { apiv3Get, apiv3Post, apiv3Put } from '../util/apiv3-client.js';
-import { toastError } from '../util/toastr.js';
+import { apiPost } from '~/client/util/apiv1-client.js';
+import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client.js';
+import { toastError } from '~/client/util/toastr.js';
 
 const logger = loggerFactory('growi:services:page-operation');
 

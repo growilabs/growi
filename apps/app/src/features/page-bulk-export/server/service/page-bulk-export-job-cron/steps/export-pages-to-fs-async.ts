@@ -19,9 +19,9 @@ import {
 
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job.js';
 import type { PageBulkExportPageSnapshotDocument } from '../../../models/page-bulk-export-page-snapshot.js';
-import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot.js';
+import PageBulkExportPageSnapshot from '~/features/page-bulk-export/server/models/page-bulk-export-page-snapshot.js';
 import type { IPageBulkExportJobCronService } from '../index.js';
-import { BulkExportJobStreamDestroyedByCleanupError } from '../errors.js';
+import { BulkExportJobStreamDestroyedByCleanupError } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/errors.js';
 
 async function convertMdToHtml(
   md: string,

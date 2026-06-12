@@ -4,12 +4,12 @@ import { UserPicture } from '@growi/ui/dist/components';
 import { format as dateFnsFormat } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer.js';
-import { UserStatus } from '~/server/models/user/conts.js';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer';
+import { UserStatus } from '~/server/models/user/conts';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import { SortIcons } from './SortIcons.js';
-import UserMenu from './UserMenu.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import { SortIcons } from './SortIcons';
+import UserMenu from './UserMenu';
 
 type UserTableExternalProps = Record<string, never>;
 

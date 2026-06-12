@@ -3,17 +3,17 @@ import { Origin } from '@growi/core';
 import { globalEventTarget } from '@growi/core/dist/utils';
 import type { DrawioEditByViewerProps } from '@growi/remark-drawio';
 
-import { replaceDrawioInMarkdown } from '~/client/components/Page/markdown-drawio-util-for-view.js';
+import { replaceDrawioInMarkdown } from '~/client/components/Page/markdown-drawio-util-for-view';
 import {
   extractRemoteRevisionDataFromErrorObj,
   useUpdatePage,
-} from '~/client/services/update-page/index.js';
-import type { RemoteRevisionData } from '~/states/page/index.js';
-import { useCurrentPageData, useSetRemoteLatestPageData } from '~/states/page/index.js';
-import { useShareLinkId } from '~/states/page/hooks.js';
-import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff.js';
-import { useDrawioModalActions } from '~/states/ui/modal/drawio.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/client/services/update-page';
+import type { RemoteRevisionData } from '~/states/page';
+import { useCurrentPageData, useSetRemoteLatestPageData } from '~/states/page';
+import { useShareLinkId } from '~/states/page/hooks';
+import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff';
+import { useDrawioModalActions } from '~/states/ui/modal/drawio';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:cli:side-effects:useDrawioModalLauncherForView',

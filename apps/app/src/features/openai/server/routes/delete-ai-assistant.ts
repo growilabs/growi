@@ -13,8 +13,8 @@ import loginRequiredFactory from '~/server/middlewares/login-required.js';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { deleteAiAssistant } from '../services/delete-ai-assistant.js';
-import { certifyAiService } from './middlewares/certify-ai-service.js';
+import { deleteAiAssistant } from '~/features/openai/server/services/delete-ai-assistant.js';
+import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:delete-ai-assistants');
 

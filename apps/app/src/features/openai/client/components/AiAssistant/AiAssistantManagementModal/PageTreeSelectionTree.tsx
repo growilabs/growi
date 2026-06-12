@@ -7,7 +7,7 @@ import type { IPageForTreeItem } from '~/interfaces/page.js';
 import {
   TreeItemWithCheckbox,
   treeItemWithCheckboxSize,
-} from './TreeItemWithCheckbox.js';
+} from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/TreeItemWithCheckbox.js';
 
 type Props = {
   isEnableActions: boolean;

@@ -4,17 +4,17 @@ import { type IUserHasId, USER_STATUS } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { DropdownMenu, DropdownToggle, UncontrolledDropdown } from 'reactstrap';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer.js';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import GrantAdminButton from './GrantAdminButton.js';
-import GrantReadOnlyButton from './GrantReadOnlyButton.js';
-import RevokeAdminMenuItem from './RevokeAdminMenuItem.js';
-import RevokeReadOnlyMenuItem from './RevokeReadOnlyMenuItem.js';
-import SendInvitationEmailButton from './SendInvitationEmailButton.js';
-import StatusActivateButton from './StatusActivateButton.js';
-import StatusSuspendedMenuItem from './StatusSuspendMenuItem.js';
-import UserRemoveButton from './UserRemoveButton.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import GrantAdminButton from './GrantAdminButton';
+import GrantReadOnlyButton from './GrantReadOnlyButton';
+import RevokeAdminMenuItem from './RevokeAdminMenuItem';
+import RevokeReadOnlyMenuItem from './RevokeReadOnlyMenuItem';
+import SendInvitationEmailButton from './SendInvitationEmailButton';
+import StatusActivateButton from './StatusActivateButton';
+import StatusSuspendedMenuItem from './StatusSuspendMenuItem';
+import UserRemoveButton from './UserRemoveButton';
 
 import styles from './UserMenu.module.scss';
 

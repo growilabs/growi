@@ -1,1 +1,1 @@
-export { EmptyTrashModalLazyLoaded } from './dynamic.js';
+export { EmptyTrashModalLazyLoaded } from './dynamic';

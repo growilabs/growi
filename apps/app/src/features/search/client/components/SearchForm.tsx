@@ -6,7 +6,7 @@ import React, {
   useRef,
 } from 'react';
 
-import type { GetInputProps } from '../interfaces/downshift.js';
+import type { GetInputProps } from '../interfaces/downshift';
 
 type Props = {
   searchKeyword: string;

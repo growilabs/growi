@@ -1,10 +1,10 @@
 import React from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentUser } from '~/states/global/index.js';
+import { useCurrentUser } from '~/states/global';
 
-import { AccessTokenSettings } from './AccessTokenSettings.js';
-import { ApiTokenSettings } from './ApiTokenSettings.js';
+import { AccessTokenSettings } from './AccessTokenSettings';
+import { ApiTokenSettings } from './ApiTokenSettings';
 
 const ApiSettings = React.memo((): JSX.Element => {
   const { t } = useTranslation();

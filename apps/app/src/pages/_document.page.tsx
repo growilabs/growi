@@ -5,11 +5,11 @@ import type { DocumentContext, DocumentInitialProps } from 'next/document';
 import Document, { Head, Html, Main, NextScript } from 'next/document';
 import type { Locale } from '@growi/core/dist/interfaces';
 
-import type { GrowiPluginResourceEntries } from '~/features/growi-plugin/server/services/index.js';
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import loggerFactory from '~/utils/logger/index.js';
+import type { GrowiPluginResourceEntries } from '~/features/growi-plugin/server/services';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import loggerFactory from '~/utils/logger';
 
-import { getLocaleAtServerSide } from './utils/locale.js';
+import { getLocaleAtServerSide } from './utils/locale';
 
 const _logger = loggerFactory('growi:page:_document');
 
@@ -69,7 +69,7 @@ class GrowiDocument extends Document<GrowiDocumentInitialProps> {
 
     // retrieve plugin manifests
     const growiPluginService = await import(
-      '~/features/growi-plugin/server/services/index.js'
+      '~/features/growi-plugin/server/services'
     ).then((mod) => mod.growiPluginService);
     const pluginResourceEntries =
       await growiPluginService.retrieveAllPluginResourceEntries();

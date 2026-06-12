@@ -5,18 +5,18 @@ import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
-import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client.js';
-import { toastError } from '~/client/util/toastr.js';
-import { useSiteUrl } from '~/states/global/index.js';
-import { isSearchServiceReachableAtom } from '~/states/server-configurations/index.js';
+import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
+import { toastError } from '~/client/util/toastr';
+import { useSiteUrl } from '~/states/global';
+import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 import {
   usePageDuplicateModalActions,
   usePageDuplicateModalStatus,
-} from '~/states/ui/modal/page-duplicate.js';
+} from '~/states/ui/modal/page-duplicate';
 
-import DuplicatePathsTable from '../DuplicatedPathsTable.js';
-import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList.js';
-import PagePathAutoComplete from '../PagePathAutoComplete.js';
+import DuplicatePathsTable from '../DuplicatedPathsTable';
+import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList';
+import PagePathAutoComplete from '../PagePathAutoComplete';
 
 /**
  * PageDuplicateModalSubstance - Heavy processing component (rendered only when modal is open)

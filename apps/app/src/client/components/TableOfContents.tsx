@@ -2,11 +2,11 @@ import React, { type JSX, useCallback } from 'react';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import ReactMarkdown from 'react-markdown';
 
-import { useCurrentPagePath } from '~/states/page/index.js';
-import { useTocOptions } from '~/states/ui/toc.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { useCurrentPagePath } from '~/states/page';
+import { useTocOptions } from '~/states/ui/toc';
+import loggerFactory from '~/utils/logger';
 
-import { StickyStretchableScroller } from './StickyStretchableScroller.js';
+import { StickyStretchableScroller } from './StickyStretchableScroller';
 
 import styles from './TableOfContents.module.scss';
 

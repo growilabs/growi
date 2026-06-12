@@ -8,10 +8,10 @@ import {
   extractScopes,
   getDisabledScopes,
   parseScopes,
-} from '~/client/util/scope-util.js';
-import { useIsAdmin } from '~/states/context.js';
+} from '~/client/util/scope-util';
+import { useIsAdmin } from '~/states/context';
 
-import { AccessTokenScopeList } from './AccessTokenScopeList.js';
+import { AccessTokenScopeList } from './AccessTokenScopeList';
 
 /**
  * Props for AccessTokenScopeSelect

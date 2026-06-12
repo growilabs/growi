@@ -11,7 +11,7 @@ import type {
 import { isPopulated } from '@growi/core';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import { GlobalCodeMirrorEditorKey } from '@growi/editor';
-import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor.js';
+import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import Sticky from 'react-stickynode';
@@ -21,56 +21,56 @@ import {
   exportAsMarkdown,
   syncLatestRevisionBody,
   updateContentWidth,
-} from '~/client/services/page-operation.js';
-import { usePrintMode } from '~/client/services/use-print-mode.js';
-import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr.js';
-import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar.js';
-import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem.js';
-import { ReconcileTriggerModal } from '~/features/growi-vault/client/components/ReconcileTriggerModal.js';
-import { usePageBulkExportSelectModalActions } from '~/features/page-bulk-export/client/states/modal.js';
+} from '~/client/services/page-operation';
+import { usePrintMode } from '~/client/services/use-print-mode';
+import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
+import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
+import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem';
+import { ReconcileTriggerModal } from '~/features/growi-vault/client/components/ReconcileTriggerModal';
+import { usePageBulkExportSelectModalActions } from '~/features/page-bulk-export/client/states/modal';
 import type {
   OnDeletedFunction,
   OnDuplicatedFunction,
   OnRenamedFunction,
-} from '~/interfaces/ui.js';
-import { useShouldExpandContent } from '~/services/layout/use-should-expand-content.js';
+} from '~/interfaces/ui';
+import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import {
   useIsGuestUser,
   useIsReadOnlyUser,
   useIsSharedUser,
-} from '~/states/context.js';
-import { useCurrentPathname, useCurrentUser } from '~/states/global/index.js';
-import { useCurrentPageId, useFetchCurrentPage } from '~/states/page/index.js';
-import { useShareLinkId } from '~/states/page/hooks.js';
+} from '~/states/context';
+import { useCurrentPathname, useCurrentUser } from '~/states/global';
+import { useCurrentPageId, useFetchCurrentPage } from '~/states/page';
+import { useShareLinkId } from '~/states/page/hooks';
 import {
   disableLinkSharingAtom,
   isBulkExportPagesEnabledAtom,
   isLocalAccountRegistrationEnabledAtom,
   isUploadEnabledAtom,
-} from '~/states/server-configurations/index.js';
-import { useDeviceLargerThanMd } from '~/states/ui/device.js';
-import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
+} from '~/states/server-configurations';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
 import {
   PageAccessoriesModalContents,
   usePageAccessoriesModalActions,
-} from '~/states/ui/modal/page-accessories.js';
-import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete.js';
+} from '~/states/ui/modal/page-accessories';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import {
   type IPageForPageDuplicateModal,
   usePageDuplicateModalActions,
-} from '~/states/ui/modal/page-duplicate.js';
-import { usePresentationModalActions } from '~/states/ui/modal/page-presentation.js';
-import { usePageRenameModalActions } from '~/states/ui/modal/page-rename.js';
+} from '~/states/ui/modal/page-duplicate';
+import { usePresentationModalActions } from '~/states/ui/modal/page-presentation';
+import { usePageRenameModalActions } from '~/states/ui/modal/page-rename';
 import {
   useIsAbleToChangeEditorMode,
   useIsAbleToShowPageManagement,
-} from '~/states/ui/page-abilities.js';
-import { useSWRxPageInfo } from '~/stores/page.js';
-import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing.js';
+} from '~/states/ui/page-abilities';
+import { useSWRxPageInfo } from '~/stores/page';
+import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
 
-import { CreateTemplateModalLazyLoaded } from '../CreateTemplateModal/index.js';
-import { NotAvailable } from '../NotAvailable.js';
-import { Skeleton } from '../Skeleton.js';
+import { CreateTemplateModalLazyLoaded } from '../CreateTemplateModal';
+import { NotAvailable } from '../NotAvailable';
+import { Skeleton } from '../Skeleton';
 
 import styles from './GrowiContextualSubNavigation.module.scss';
 import PageEditorModeManagerStyles from './PageEditorModeManager.module.scss';
@@ -80,7 +80,7 @@ const minHeightSubNavigation = styles['grw-min-height-sub-navigation'];
 
 const PageEditorModeManager = dynamic(
   () =>
-    import('./PageEditorModeManager.js').then((mod) => mod.PageEditorModeManager),
+    import('./PageEditorModeManager').then((mod) => mod.PageEditorModeManager),
   {
     ssr: false,
     loading: () => (
@@ -91,7 +91,7 @@ const PageEditorModeManager = dynamic(
   },
 );
 const PageControls = dynamic(
-  () => import('../PageControls/index.js').then((mod) => mod.PageControls),
+  () => import('../PageControls').then((mod) => mod.PageControls),
   { ssr: false, loading: () => <></> },
 );
 

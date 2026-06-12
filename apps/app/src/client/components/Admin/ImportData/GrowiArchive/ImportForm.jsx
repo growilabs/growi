@@ -2,19 +2,19 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { apiv3Post } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useAdminSocket } from '~/features/admin/states/socket-io.js';
-import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option.js';
-import { ImportOptionForPages } from '~/models/admin/import-option-for-pages.js';
-import { ImportOptionForRevisions } from '~/models/admin/import-option-for-revisions.js';
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
+import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import { ImportOptionForPages } from '~/models/admin/import-option-for-pages';
+import { ImportOptionForRevisions } from '~/models/admin/import-option-for-revisions';
 
-import ErrorViewer from './ErrorViewer.js';
-import ImportCollectionConfigurationModal from './ImportCollectionConfigurationModal.js';
+import ErrorViewer from './ErrorViewer';
+import ImportCollectionConfigurationModal from './ImportCollectionConfigurationModal';
 import ImportCollectionItem, {
   DEFAULT_MODE,
   MODE_RESTRICTED_COLLECTION,
-} from './ImportCollectionItem.js';
+} from './ImportCollectionItem';
 
 const GROUPS_PAGE = ['pages', 'revisions', 'tags', 'pagetagrelations'];
 const GROUPS_USER = [

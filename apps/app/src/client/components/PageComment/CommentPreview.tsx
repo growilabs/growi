@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 
 import { useCommentPreviewOptions } from '~/stores/renderer.js';
 
-import RevisionRenderer from '../../../components/PageView/RevisionRenderer.js';
+import RevisionRenderer from '~/components/PageView/RevisionRenderer.js';
 
 import styles from './CommentPreview.module.scss';
 

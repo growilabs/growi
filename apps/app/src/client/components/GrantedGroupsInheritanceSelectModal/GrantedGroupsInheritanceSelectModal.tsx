@@ -5,7 +5,7 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 import {
   useGrantedGroupsInheritanceSelectModalActions,
   useGrantedGroupsInheritanceSelectModalStatus,
-} from '~/states/ui/modal/granted-groups-inheritance-select.js';
+} from '~/states/ui/modal/granted-groups-inheritance-select';
 
 /**
  * GrantedGroupsInheritanceSelectModalSubstance - Presentation component (heavy logic, rendered only when isOpen)

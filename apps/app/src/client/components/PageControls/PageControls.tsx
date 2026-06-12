@@ -37,8 +37,8 @@ import { useTagEditModalActions } from '~/states/ui/modal/tag-edit.js';
 import { useSetPageControlsX } from '~/states/ui/page.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { useSWRxPageInfo, useSWRxTagsInfo } from '../../../stores/page.js';
-import { useSWRxUsersList } from '../../../stores/user.js';
+import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page.js';
+import { useSWRxUsersList } from '~/stores/user.js';
 import type {
   AdditionalMenuItemsRendererProps,
   ForceHideMenuItems,
@@ -46,12 +46,12 @@ import type {
 import {
   MenuItemType,
   PageItemControl,
-} from '../Common/Dropdown/PageItemControl.js';
-import { BookmarkButtons } from './BookmarkButtons.js';
-import LikeButtons from './LikeButtons.js';
-import SearchButton from './SearchButton.js';
-import SeenUserInfo from './SeenUserInfo.js';
-import SubscribeButton from './SubscribeButton.js';
+} from '~/client/components/Common/Dropdown/PageItemControl.js';
+import { BookmarkButtons } from '~/client/components/PageControls/BookmarkButtons.js';
+import LikeButtons from '~/client/components/PageControls/LikeButtons.js';
+import SearchButton from '~/client/components/PageControls/SearchButton.js';
+import SeenUserInfo from '~/client/components/PageControls/SeenUserInfo.js';
+import SubscribeButton from '~/client/components/PageControls/SubscribeButton.js';
 
 import styles from './PageControls.module.scss';
 

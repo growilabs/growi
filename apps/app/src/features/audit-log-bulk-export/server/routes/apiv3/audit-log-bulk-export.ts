@@ -17,7 +17,7 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   auditLogBulkExportService,
   DuplicateAuditLogBulkExportJobError,
-} from '../../service/audit-log-bulk-export.js';
+} from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export.js';
 
 const logger = loggerFactory('growi:routes:apiv3:audit-log-bulk-export');
 

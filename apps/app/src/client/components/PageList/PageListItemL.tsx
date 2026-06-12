@@ -42,10 +42,10 @@ import { usePageRenameModalActions } from '~/states/ui/modal/page-rename.js';
 import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page.js';
 import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark.js';
 
-import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink/index.js';
-import { useSWRMUTxPageInfo, useSWRxPageInfo } from '../../../stores/page.js';
+import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink/index.js';
+import { useSWRMUTxPageInfo, useSWRxPageInfo } from '~/stores/page.js';
 import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl.js';
-import { PageItemControl } from '../Common/Dropdown/PageItemControl.js';
+import { PageItemControl } from '~/client/components/Common/Dropdown/PageItemControl.js';
 
 type Props = {
   page:

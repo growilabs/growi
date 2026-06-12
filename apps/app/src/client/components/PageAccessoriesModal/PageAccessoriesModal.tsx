@@ -8,30 +8,30 @@ import {
   useIsGuestUser,
   useIsReadOnlyUser,
   useIsSharedUser,
-} from '~/states/context.js';
-import { disableLinkSharingAtom } from '~/states/server-configurations/index.js';
-import { useDeviceLargerThanLg } from '~/states/ui/device.js';
+} from '~/states/context';
+import { disableLinkSharingAtom } from '~/states/server-configurations';
+import { useDeviceLargerThanLg } from '~/states/ui/device';
 import {
   PageAccessoriesModalContents,
   usePageAccessoriesModalActions,
   usePageAccessoriesModalStatus,
-} from '~/states/ui/modal/page-accessories.js';
+} from '~/states/ui/modal/page-accessories';
 
-import { CustomNavDropdown, CustomNavTab } from '../CustomNavigation/CustomNav.js';
-import CustomTabContent from '../CustomNavigation/CustomTabContent.js';
-import ExpandOrContractButton from '../ExpandOrContractButton.js';
+import { CustomNavDropdown, CustomNavTab } from '../CustomNavigation/CustomNav';
+import CustomTabContent from '../CustomNavigation/CustomTabContent';
+import ExpandOrContractButton from '../ExpandOrContractButton';
 
 import styles from './PageAccessoriesModal.module.scss';
 
-const PageAttachment = dynamic(() => import('./PageAttachment.js'), {
+const PageAttachment = dynamic(() => import('./PageAttachment'), {
   ssr: false,
 });
 const PageHistory = dynamic(
-  () => import('./PageHistory.js').then((mod) => mod.PageHistory),
+  () => import('./PageHistory').then((mod) => mod.PageHistory),
   { ssr: false },
 );
 const ShareLink = dynamic(
-  () => import('./ShareLink/index.js').then((mod) => mod.ShareLink),
+  () => import('./ShareLink').then((mod) => mod.ShareLink),
   { ssr: false },
 );
 

@@ -1,1 +1,1 @@
-export { FixPageGrantAlertLazyLoaded } from './dynamic.js';
+export { FixPageGrantAlertLazyLoaded } from './dynamic';

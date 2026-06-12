@@ -5,12 +5,12 @@
  * hiding internal implementation details while exposing only the necessary hooks.
  */
 
-export * from './hooks.js';
+export * from '~/states/page/hooks.js';
 export {
   _atomsForDerivedAbilities,
   _atomsForSyncRevisionIdFromUrl,
-} from './internal-atoms.js';
-export { useCurrentPageLoading } from './use-current-page-loading.js';
+} from '~/states/page/internal-atoms.js';
+export { useCurrentPageLoading } from '~/states/page/use-current-page-loading.js';
 // Data fetching hooks
-export { useFetchCurrentPage } from './use-fetch-current-page.js';
-export * from './use-set-remote-latest-page-data.js';
+export { useFetchCurrentPage } from '~/states/page/use-fetch-current-page.js';
+export * from '~/states/page/use-set-remote-latest-page-data.js';

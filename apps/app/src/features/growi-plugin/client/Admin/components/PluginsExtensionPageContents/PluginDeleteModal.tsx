@@ -10,8 +10,8 @@ import { toastError, toastSuccess } from '~/client/util/toastr.js';
 import {
   usePluginDeleteModalActions,
   usePluginDeleteModalStatus,
-} from '../../states/modal/plugin-delete.js';
-import { useSWRxAdminPlugins } from '../../stores/admin-plugins.js';
+} from '~/features/growi-plugin/client/Admin/states/modal/plugin-delete.js';
+import { useSWRxAdminPlugins } from '~/features/growi-plugin/client/Admin/stores/admin-plugins.js';
 
 /**
  * PluginDeleteModalSubstance - Presentation component (all logic here)

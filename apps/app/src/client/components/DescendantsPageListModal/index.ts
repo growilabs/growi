@@ -1,1 +1,1 @@
-export { DescendantsPageListModalLazyLoaded } from './dynamic.js';
+export { DescendantsPageListModalLazyLoaded } from './dynamic';

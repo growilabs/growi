@@ -1,2 +1,2 @@
-export * from './AutosizeSubmittableInput.js';
-export * from './SubmittableInput.js';
+export * from './AutosizeSubmittableInput';
+export * from './SubmittableInput';

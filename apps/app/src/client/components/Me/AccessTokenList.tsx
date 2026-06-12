@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import type { IResGetAccessToken } from '~/interfaces/access-token.js';
+import type { IResGetAccessToken } from '~/interfaces/access-token';
 
 type AccessTokenListProps = {
   accessTokens: IResGetAccessToken[];

@@ -6,8 +6,8 @@ import {
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useAtomCallback } from 'jotai/utils';
 
-import { useIsGuestUser, useIsReadOnlyUser } from '../context.js';
-import { useCurrentPathname } from '../global/index.js';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
+import { useCurrentPathname } from '~/states/global/index.js';
 import {
   currentPageDataAtom,
   currentPageEmptyIdAtom,
@@ -26,7 +26,7 @@ import {
   shareLinkIdAtom,
   templateBodyAtom,
   templateTagsAtom,
-} from './internal-atoms.js';
+} from '~/states/page/internal-atoms.js';
 
 /**
  * Public hooks for page state management

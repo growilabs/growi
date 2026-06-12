@@ -5,7 +5,7 @@ import type {
   BookmarkFolderItems,
 } from '~/interfaces/bookmark-info.js';
 
-import { apiv3Delete, apiv3Post, apiv3Put } from './apiv3-client.js';
+import { apiv3Delete, apiv3Post, apiv3Put } from '~/client/util/apiv3-client.js';
 
 // Check if bookmark folder item has childFolder or bookmarks
 export const hasChildren = ({

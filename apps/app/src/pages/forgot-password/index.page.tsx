@@ -5,22 +5,22 @@ import type {
 } from 'next';
 import dynamic from 'next/dynamic';
 
-import { RawLayout } from '~/components/Layout/RawLayout.js';
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import { RawLayout } from '~/components/Layout/RawLayout';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
 
-import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
+import type { CommonEachProps, CommonInitialProps } from '../common-props';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../common-props/index.js';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
-import type { ServerConfigurationProps } from './types.js';
-import { useHydrateServerConfigurationAtoms } from './use-hydrate-server-configurations.js';
+} from '../common-props';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+import type { ServerConfigurationProps } from './types';
+import { useHydrateServerConfigurationAtoms } from './use-hydrate-server-configurations';
 
 const PasswordResetRequestForm = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/PasswordResetRequestForm.js'),
+  () => import('~/client/components/PasswordResetRequestForm'),
   { ssr: false },
 );
 

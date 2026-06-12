@@ -4,17 +4,17 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Put } from '~/client/util/apiv3-client.js';
-import { InAppNotificationStatuses } from '~/interfaces/in-app-notification.js';
-import { showPageLimitationXLAtom } from '~/states/server-configurations/index.js';
+import { apiv3Put } from '~/client/util/apiv3-client';
+import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
+import { showPageLimitationXLAtom } from '~/states/server-configurations';
 import {
   useSWRxInAppNotificationStatus,
   useSWRxInAppNotifications,
-} from '~/stores/in-app-notification.js';
+} from '~/stores/in-app-notification';
 
-import CustomNavAndContents from '../CustomNavigation/CustomNavAndContents.js';
-import PaginationWrapper from '../PaginationWrapper.js';
-import InAppNotificationList from './InAppNotificationList.js';
+import CustomNavAndContents from '../CustomNavigation/CustomNavAndContents';
+import PaginationWrapper from '../PaginationWrapper';
+import InAppNotificationList from './InAppNotificationList';
 
 type InAppNotificationCategoryByStatusProps = {
   status?: InAppNotificationStatuses;
@@ -88,11 +88,12 @@ const InAppNotificationCategoryByStatus: FC<
         )}
       {notificationData != null && notificationData.docs.length === 0 ? (
         // no items
-        (t('in_app_notification.no_unread_messages'))
+        t('in_app_notification.no_unread_messages')
       ) : (
         // render list-group
-        (<InAppNotificationList inAppNotificationData={notificationData} />)
+        <InAppNotificationList inAppNotificationData={notificationData} />
       )}
+
       {notificationData.totalDocs > 0 && (
         <div className="mt-4">
           <PaginationWrapper

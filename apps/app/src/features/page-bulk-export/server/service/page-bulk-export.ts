@@ -11,9 +11,9 @@ import type { PageBulkExportFormat } from '../../interfaces/page-bulk-export.js'
 import {
   PageBulkExportJobInProgressStatus,
   PageBulkExportJobStatus,
-} from '../../interfaces/page-bulk-export.js';
+} from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
 import type { PageBulkExportJobDocument } from '../models/page-bulk-export-job.js';
-import PageBulkExportJob from '../models/page-bulk-export-job.js';
+import PageBulkExportJob from '~/features/page-bulk-export/server/models/page-bulk-export-job.js';
 
 const logger = loggerFactory('growi:services:PageBulkExportService');
 

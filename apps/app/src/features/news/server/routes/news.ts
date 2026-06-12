@@ -11,7 +11,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required.js';
 import { configManager } from '~/server/service/config-manager/index.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { NewsService } from '../services/news-service.js';
+import { NewsService } from '~/features/news/server/services/news-service.js';
 
 const logger = loggerFactory('growi:feature:news:routes');
 

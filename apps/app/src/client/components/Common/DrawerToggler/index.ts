@@ -1,1 +1,1 @@
-export * from './DrawerToggler.js';
+export * from './DrawerToggler';

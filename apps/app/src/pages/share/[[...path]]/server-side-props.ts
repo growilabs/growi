@@ -10,15 +10,15 @@ import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../../common-props/index.js';
+} from '~/pages/common-props/index.js';
 import {
   getServerSideGeneralPageProps,
   getServerSideShareLinkRendererConfigProps,
   isValidGeneralPageInitialProps,
-} from '../../general-page/index.js';
-import { addActivity } from '../../utils/activity.js';
-import { mergeGetServerSidePropsResults } from '../../utils/server-side-props.js';
-import { getPageDataForInitial } from './page-data-props.js';
+} from '~/pages/general-page/index.js';
+import { addActivity } from '~/pages/utils/activity.js';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props.js';
+import { getPageDataForInitial } from '~/pages/share/[[...path]]/page-data-props.js';
 import type { Stage2InitialProps } from './types.js';
 
 const basisProps = {

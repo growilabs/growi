@@ -19,14 +19,14 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   MessageErrorCode,
   type StreamErrorCode,
-} from '../../../interfaces/message-error.js';
-import AiAssistantModel from '../../models/ai-assistant.js';
-import ThreadRelationModel from '../../models/thread-relation.js';
-import { openaiClient } from '../../services/client.js';
-import { getStreamErrorCode } from '../../services/getStreamErrorCode.js';
-import { getOpenaiService } from '../../services/openai.js';
-import { replaceAnnotationWithPageLink } from '../../services/replace-annotation-with-page-link.js';
-import { certifyAiService } from '../middlewares/certify-ai-service.js';
+} from '~/features/openai/interfaces/message-error.js';
+import AiAssistantModel from '~/features/openai/server/models/ai-assistant.js';
+import ThreadRelationModel from '~/features/openai/server/models/thread-relation.js';
+import { openaiClient } from '~/features/openai/server/services/client.js';
+import { getStreamErrorCode } from '~/features/openai/server/services/getStreamErrorCode.js';
+import { getOpenaiService } from '~/features/openai/server/services/openai.js';
+import { replaceAnnotationWithPageLink } from '~/features/openai/server/services/replace-annotation-with-page-link.js';
+import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:message');
 

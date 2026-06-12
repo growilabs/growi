@@ -12,7 +12,7 @@ import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark.js';
 import { useSWRxBookmarkFolderAndChild } from '~/stores/bookmark-folder.js';
 import { useSWRMUTxPageInfo } from '~/stores/page.js';
 
-import { BookmarkFolderMenuItem } from './BookmarkFolderMenuItem.js';
+import { BookmarkFolderMenuItem } from '~/client/components/Bookmarks/BookmarkFolderMenuItem.js';
 
 import styles from './BookmarkFolderMenu.module.scss';
 

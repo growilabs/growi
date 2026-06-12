@@ -16,8 +16,8 @@ import {
 import { configManager } from '~/server/service/config-manager/index.js';
 import { getGrowiVersion } from '~/utils/growi-version.js';
 
-import { httpInstrumentationConfig as httpInstrumentationConfigForAnonymize } from './anonymization/index.js';
-import { ATTR_SERVICE_INSTANCE_ID } from './semconv.js';
+import { httpInstrumentationConfig as httpInstrumentationConfigForAnonymize } from '~/features/opentelemetry/server/anonymization/index.js';
+import { ATTR_SERVICE_INSTANCE_ID } from '~/features/opentelemetry/server/semconv.js';
 
 type Option = {
   enableAnonymization?: boolean;
@@ -80,7 +80,7 @@ export const generateAdditionalResourceAttributes = async (
     configManager.getConfig('app:serviceInstanceId');
 
   const { getApplicationResourceAttributes, getOsResourceAttributes } =
-    await import('./custom-resource-attributes/index.js');
+    await import('~/features/opentelemetry/server/custom-resource-attributes/index.js');
 
   return resource.merge(
     resourceFromAttributes({

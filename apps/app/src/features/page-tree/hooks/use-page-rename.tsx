@@ -9,8 +9,8 @@ import { toastError, toastSuccess } from '~/client/util/toastr.js';
 import type { IPageForItem } from '~/interfaces/page.js';
 import { mutatePageTree } from '~/stores/page-listing.js';
 
-import { CREATING_PAGE_VIRTUAL_ID } from '../constants/_inner.js';
-import { usePageTreeInformationUpdate } from '../states/page-tree-update.js';
+import { CREATING_PAGE_VIRTUAL_ID } from '~/features/page-tree/constants/_inner.js';
+import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update.js';
 
 type RenameResult = {
   success: boolean;

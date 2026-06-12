@@ -1,8 +1,8 @@
 import type { JSX } from 'react';
 import { useHandsontableModalForEditorStatus } from '@growi/editor';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
-import { useHandsontableModalStatus } from '~/states/ui/modal/handsontable.js';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
+import { useHandsontableModalStatus } from '~/states/ui/modal/handsontable';
 
 type HandsontableModalProps = Record<string, unknown>;
 
@@ -13,7 +13,7 @@ export const HandsontableModalLazyLoaded = (): JSX.Element => {
   const HandsontableModal = useLazyLoader<HandsontableModalProps>(
     'handsontable-modal',
     () =>
-      import('./HandsontableModal.js').then((mod) => ({
+      import('./HandsontableModal').then((mod) => ({
         default: mod.HandsontableModal,
       })),
     status?.isOpened || statusForEditor?.isOpened || false,

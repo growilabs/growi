@@ -2,15 +2,15 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { apiv3Delete, apiv3Put } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useAppTitle } from '~/states/global/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { apiv3Delete, apiv3Put } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useAppTitle } from '~/states/global';
+import loggerFactory from '~/utils/logger';
 
-import { CustomBotWithProxyConnectionStatus } from './CustomBotWithProxyConnectionStatus.js';
-import { DeleteSlackBotSettingsModal } from './DeleteSlackBotSettingsModal.js';
-import { SlackAppIntegrationControl } from './SlackAppIntegrationControl.js';
-import WithProxyAccordions from './WithProxyAccordions.js';
+import { CustomBotWithProxyConnectionStatus } from './CustomBotWithProxyConnectionStatus';
+import { DeleteSlackBotSettingsModal } from './DeleteSlackBotSettingsModal';
+import { SlackAppIntegrationControl } from './SlackAppIntegrationControl';
+import WithProxyAccordions from './WithProxyAccordions';
 
 const logger = loggerFactory(
   'growi:cli:SlackIntegration:CustomBotWithProxySettings',

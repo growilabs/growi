@@ -3,15 +3,15 @@ import { memo } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
-import { useIsAdmin, useIsGuestUser } from '~/states/context.js';
+import { useIsAdmin, useIsGuestUser } from '~/states/context';
 
-import { HelpDropdown } from './HelpDropdown.js';
-import { SkeletonItem } from './SkeletonItem.js';
+import { HelpDropdown } from './HelpDropdown';
+import { SkeletonItem } from './SkeletonItem';
 
 import styles from './SecondaryItems.module.scss';
 
 const PersonalDropdown = dynamic(
-  () => import('./PersonalDropdown.js').then((mod) => mod.PersonalDropdown),
+  () => import('./PersonalDropdown').then((mod) => mod.PersonalDropdown),
   {
     ssr: false,
     loading: () => <SkeletonItem />,

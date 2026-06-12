@@ -2,7 +2,7 @@ import React, { type JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import { DropdownItem, DropdownMenu } from 'reactstrap';
 
-import type { LabelType } from '~/interfaces/template.js';
+import type { LabelType } from '~/interfaces/template';
 
 type DropendMenuProps = {
   onClickCreateNewPage: () => Promise<void>;

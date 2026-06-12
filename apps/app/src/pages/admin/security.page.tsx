@@ -2,21 +2,21 @@ import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import { useHydrateAtoms } from 'jotai/utils';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import { _atomsForAdminPagesHydration as atoms } from '~/states/global/index.js';
-import { isMailerSetupAtom } from '~/states/server-configurations/index.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { _atomsForAdminPagesHydration as atoms } from '~/states/global';
+import { isMailerSetupAtom } from '~/states/server-configurations';
 
-import type { NextPageWithLayout } from '../_app.page.js';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
-import type { AdminCommonProps } from './_shared/index.js';
+import type { NextPageWithLayout } from '../_app.page';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+import type { AdminCommonProps } from './_shared';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared/index.js';
+} from './_shared';
 
 const SecurityManagement = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/Admin/Security/SecurityManagement.js'),
+  () => import('~/client/components/Admin/Security/SecurityManagement'),
   { ssr: false },
 );
 
@@ -44,43 +44,43 @@ AdminSecuritySettingsPage.getLayout = createAdminPageLayout<Props>({
   containerFactories: [
     async () => {
       const { default: C } = await import(
-        '~/client/services/AdminGeneralSecurityContainer.js'
+        '~/client/services/AdminGeneralSecurityContainer'
       );
       return new C();
     },
     async () => {
       const { default: C } = await import(
-        '~/client/services/AdminLocalSecurityContainer.js'
+        '~/client/services/AdminLocalSecurityContainer'
       );
       return new C();
     },
     async () => {
       const { default: C } = await import(
-        '~/client/services/AdminLdapSecurityContainer.js'
+        '~/client/services/AdminLdapSecurityContainer'
       );
       return new C();
     },
     async () => {
       const { default: C } = await import(
-        '~/client/services/AdminSamlSecurityContainer.js'
+        '~/client/services/AdminSamlSecurityContainer'
       );
       return new C();
     },
     async () => {
       const { default: C } = await import(
-        '~/client/services/AdminOidcSecurityContainer.js'
+        '~/client/services/AdminOidcSecurityContainer'
       );
       return new C();
     },
     async () => {
       const { default: C } = await import(
-        '~/client/services/AdminGoogleSecurityContainer.js'
+        '~/client/services/AdminGoogleSecurityContainer'
       );
       return new C();
     },
     async () => {
       const { default: C } = await import(
-        '~/client/services/AdminGitHubSecurityContainer.js'
+        '~/client/services/AdminGitHubSecurityContainer'
       );
       return new C();
     },

@@ -4,14 +4,14 @@ import {
   useSWRxExternalUserGroup,
   useSWRxExternalUserGroupRelationList,
   useSWRxExternalUserGroupRelations,
-} from '~/features/external-user-group/client/stores/external-user-group.js';
+} from '~/features/external-user-group/client/stores/external-user-group';
 import {
   useSWRxAncestorUserGroups,
   useSWRxChildUserGroupList,
   useSWRxUserGroup,
   useSWRxUserGroupRelationList,
   useSWRxUserGroupRelations,
-} from '~/stores/user-group.js';
+} from '~/stores/user-group';
 
 export const useUserGroup = (userGroupId: string, isExternalGroup: boolean) => {
   const userGroupRes = useSWRxUserGroup(isExternalGroup ? null : userGroupId);

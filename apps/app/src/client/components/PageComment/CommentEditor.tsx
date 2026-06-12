@@ -30,19 +30,19 @@ import { useEditorSettings, useSWRxSlackChannels } from '~/stores/editor.js';
 import { useNextThemes } from '~/stores-universal/use-next-themes.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { NotAvailableForGuest } from '../NotAvailableForGuest.js';
-import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '../NotAvailableForReadOnlyUser.js';
-import { CommentPreview } from './CommentPreview.js';
-import { SwitchingButtonGroup } from './SwitchingButtonGroup.js';
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
+import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser.js';
+import { CommentPreview } from '~/client/components/PageComment/CommentPreview.js';
+import { SwitchingButtonGroup } from '~/client/components/PageComment/SwitchingButtonGroup.js';
 
 import styles from './CommentEditor.module.scss';
 
-import '../GrowiEditor.vendor-styles.prebuilt.js';
+import '~/client/components/GrowiEditor.vendor-styles.prebuilt.js';
 
 const _logger = loggerFactory('growi:components:CommentEditor');
 
 const SlackNotification = dynamic(
-  () => import('../SlackNotification.js').then((mod) => mod.SlackNotification),
+  () => import('~/client/components/SlackNotification.js').then((mod) => mod.SlackNotification),
   { ssr: false },
 );
 

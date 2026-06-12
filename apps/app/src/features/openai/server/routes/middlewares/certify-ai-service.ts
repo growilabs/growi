@@ -4,7 +4,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import { configManager } from '~/server/service/config-manager/index.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { OpenaiServiceTypes } from '../../../interfaces/ai.js';
+import { OpenaiServiceTypes } from '~/features/openai/interfaces/ai.js';
 
 const logger = loggerFactory('growi:middlewares:certify-ai-service');
 

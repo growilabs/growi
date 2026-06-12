@@ -1,1 +1,1 @@
-export * from './RecentChanges.js';
+export * from './RecentChanges';

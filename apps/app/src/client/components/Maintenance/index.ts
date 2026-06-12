@@ -1,1 +1,1 @@
-export * from './Maintenance.js';
+export * from './Maintenance';

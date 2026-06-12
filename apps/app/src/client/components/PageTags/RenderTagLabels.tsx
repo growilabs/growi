@@ -1,7 +1,7 @@
 import React from 'react';
 import SimpleBar from 'simplebar-react';
 
-import { useSetSearchKeyword } from '~/states/search/index.js';
+import { useSetSearchKeyword } from '~/states/search';
 
 type RenderTagLabelsProps = {
   tags: string[];

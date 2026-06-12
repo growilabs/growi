@@ -3,21 +3,21 @@ import dynamic from 'next/dynamic';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { NotAvailable } from '~/client/components/NotAvailable.js';
-import { SidebarContentsType } from '~/interfaces/ui.js';
-import { useIsGuestUser } from '~/states/context.js';
-import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global/index.js';
-import { aiEnabledAtom } from '~/states/server-configurations/index.js';
-import { useSidebarMode } from '~/states/ui/sidebar/index.js';
+import { NotAvailable } from '~/client/components/NotAvailable';
+import { SidebarContentsType } from '~/interfaces/ui';
+import { useIsGuestUser } from '~/states/context';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
+import { aiEnabledAtom } from '~/states/server-configurations';
+import { useSidebarMode } from '~/states/ui/sidebar';
 
-import { PrimaryItem } from './PrimaryItem.js';
+import { PrimaryItem } from './PrimaryItem';
 
 import styles from './PrimaryItems.module.scss';
 
 // Do not SSR Socket.io to make it work
 const PrimaryItemForNotification = dynamic(
   () =>
-    import('../InAppNotification/PrimaryItemForNotification.js').then(
+    import('../InAppNotification/PrimaryItemForNotification').then(
       (mod) => mod.PrimaryItemForNotification,
     ),
   { ssr: false },

@@ -10,7 +10,7 @@ import {
 } from '@growi/core/dist/utils/page-path-utils';
 import { diag } from '@opentelemetry/api';
 
-import { ATTR_HTTP_TARGET } from '../../semconv.js';
+import { ATTR_HTTP_TARGET } from '~/features/opentelemetry/server/semconv.js';
 import type { AnonymizationModule } from '../interfaces/anonymization-module.js';
 
 const logger = diag.createComponentLogger({

@@ -1,1 +1,1 @@
-export { AiAssistantManagementModalLazyLoaded } from './dynamic.js';
+export { AiAssistantManagementModalLazyLoaded } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/dynamic.js';

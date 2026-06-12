@@ -7,9 +7,9 @@ import type {
 
 import type { IPageForTreeItem } from '~/interfaces/page.js';
 
-import { useCreatingParentId } from '../../states/_inner/index.js';
-import { usePageCreate } from '../use-page-create.js';
-import { usePageRename } from '../use-page-rename.js';
+import { useCreatingParentId } from '~/features/page-tree/states/_inner/index.js';
+import { usePageCreate } from '~/features/page-tree/hooks/use-page-create.js';
+import { usePageRename } from '~/features/page-tree/hooks/use-page-rename.js';
 
 type completeRenamingHotkey =
   CustomHotkeysConfig<IPageForTreeItem>['completeRenaming'];

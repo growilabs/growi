@@ -6,20 +6,20 @@ import { useTranslation } from 'next-i18next';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
-import { toastSuccess } from '~/client/util/toastr.js';
-import type { OnDeletedFunction } from '~/interfaces/ui.js';
-import { useIsReadOnlyUser } from '~/states/context.js';
-import { useCurrentPageData } from '~/states/page/index.js';
-import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete.js';
+import { toastSuccess } from '~/client/util/toastr';
+import type { OnDeletedFunction } from '~/interfaces/ui';
+import { useIsReadOnlyUser } from '~/states/context';
+import { useCurrentPageData } from '~/states/page';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
 import {
   useSWRMUTxCurrentUserBookmarks,
   useSWRxUserBookmarks,
-} from '~/stores/bookmark.js';
-import { useSWRxBookmarkFolderAndChild } from '~/stores/bookmark-folder.js';
-import { mutateAllPageInfo, useSWRMUTxPageInfo } from '~/stores/page.js';
+} from '~/stores/bookmark';
+import { useSWRxBookmarkFolderAndChild } from '~/stores/bookmark-folder';
+import { mutateAllPageInfo, useSWRMUTxPageInfo } from '~/stores/page';
 
-import { BookmarkFolderItem } from './BookmarkFolderItem.js';
-import { BookmarkItem } from './BookmarkItem.js';
+import { BookmarkFolderItem } from './BookmarkFolderItem';
+import { BookmarkItem } from './BookmarkItem';
 
 import styles from './BookmarkFolderTree.module.scss';
 

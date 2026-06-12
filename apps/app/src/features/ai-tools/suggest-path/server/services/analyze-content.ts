@@ -4,7 +4,7 @@ import type {
   ContentAnalysis,
   InformationType,
 } from '../../interfaces/suggest-path-types.js';
-import { callLlmForJson } from './call-llm-for-json.js';
+import { callLlmForJson } from '~/features/ai-tools/suggest-path/server/services/call-llm-for-json.js';
 
 const VALID_INFORMATION_TYPES: readonly InformationType[] = ['flow', 'stock'];
 

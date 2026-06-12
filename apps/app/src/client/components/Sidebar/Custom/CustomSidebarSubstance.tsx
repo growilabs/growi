@@ -1,11 +1,11 @@
 import React, { type JSX } from 'react';
 
-import RevisionRenderer from '~/components/PageView/RevisionRenderer.js';
-import { useSWRxPageByPath } from '~/stores/page.js';
-import { useCustomSidebarOptions } from '~/stores/renderer.js';
-import loggerFactory from '~/utils/logger/index.js';
+import RevisionRenderer from '~/components/PageView/RevisionRenderer';
+import { useSWRxPageByPath } from '~/stores/page';
+import { useCustomSidebarOptions } from '~/stores/renderer';
+import loggerFactory from '~/utils/logger';
 
-import { SidebarNotFound } from './CustomSidebarNotFound.js';
+import { SidebarNotFound } from './CustomSidebarNotFound';
 
 import styles from './CustomSidebarSubstance.module.scss';
 

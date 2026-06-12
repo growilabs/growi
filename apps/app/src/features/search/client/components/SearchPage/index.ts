@@ -1,1 +1,1 @@
-export * from './SearchPage.js';
+export * from '~/features/search/client/components/SearchPage/SearchPage.js';

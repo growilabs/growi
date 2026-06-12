@@ -1,1 +1,1 @@
-export { remarkPlugin, sanitizeOption } from './plantuml.js';
+export { remarkPlugin, sanitizeOption } from '~/features/plantuml/services/plantuml.js';

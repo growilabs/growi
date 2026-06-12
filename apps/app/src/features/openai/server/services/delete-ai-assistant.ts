@@ -4,10 +4,10 @@ import createError from 'http-errors';
 import loggerFactory from '~/utils/logger/index.js';
 
 import type { AiAssistantDocument } from '../models/ai-assistant.js';
-import AiAssistantModel from '../models/ai-assistant.js';
-import ThreadRelationModel from '../models/thread-relation.js';
-import { isAiEnabled } from './is-ai-enabled.js';
-import { getOpenaiService } from './openai.js';
+import AiAssistantModel from '~/features/openai/server/models/ai-assistant.js';
+import ThreadRelationModel from '~/features/openai/server/models/thread-relation.js';
+import { isAiEnabled } from '~/features/openai/server/services/is-ai-enabled.js';
+import { getOpenaiService } from '~/features/openai/server/services/openai.js';
 
 const logger = loggerFactory('growi:service:openai:delete-ai-assistant');
 

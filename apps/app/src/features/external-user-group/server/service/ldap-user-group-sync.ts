@@ -13,8 +13,8 @@ import type {
 import {
   ExternalGroupProviderType,
   LdapGroupMembershipAttributeType,
-} from '../../interfaces/external-user-group.js';
-import ExternalUserGroupSyncService from './external-user-group-sync.js';
+} from '~/features/external-user-group/interfaces/external-user-group.js';
+import ExternalUserGroupSyncService from '~/features/external-user-group/server/service/external-user-group-sync.js';
 
 const logger = loggerFactory('growi:service:ldap-user-group-sync-service');
 

@@ -13,16 +13,16 @@ import type {
   IAccessTokenInfo,
   IResGenerateAccessToken,
   IResGetAccessToken,
-} from '~/interfaces/access-token.js';
-import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
-import { useIsGuestUser } from '~/states/context.js';
+} from '~/interfaces/access-token';
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
+import { useIsGuestUser } from '~/states/context';
 
 import {
   apiv3Delete,
   apiv3Get,
   apiv3Post,
   apiv3Put,
-} from '../client/util/apiv3-client.js';
+} from '../client/util/apiv3-client';
 
 export const useSWRxPersonalSettings = (
   config?: SWRConfiguration,

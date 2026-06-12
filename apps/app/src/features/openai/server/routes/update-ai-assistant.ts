@@ -14,9 +14,9 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger/index.js';
 
 import type { UpsertAiAssistantData } from '../../interfaces/ai-assistant.js';
-import { getOpenaiService } from '../services/openai.js';
-import { certifyAiService } from './middlewares/certify-ai-service.js';
-import { upsertAiAssistantValidator } from './middlewares/upsert-ai-assistant-validator.js';
+import { getOpenaiService } from '~/features/openai/server/services/openai.js';
+import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
+import { upsertAiAssistantValidator } from '~/features/openai/server/routes/middlewares/upsert-ai-assistant-validator.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:update-ai-assistants');
 

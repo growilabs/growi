@@ -31,7 +31,7 @@ import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing.js'
 
 // Do not import with next/dynamic
 // see: https://github.com/growilabs/growi/pull/7923
-import { SearchResultList } from './SearchResultList.js';
+import { SearchResultList } from '~/features/search/client/components/SearchPage/SearchResultList.js';
 
 import styles from './SearchPageBase.module.scss';
 
@@ -60,7 +60,7 @@ type Props = {
 };
 
 const SearchResultContent = dynamic(
-  () => import('./SearchResultContent.js').then((mod) => mod.SearchResultContent),
+  () => import('~/features/search/client/components/SearchPage/SearchResultContent.js').then((mod) => mod.SearchResultContent),
   {
     ssr: false,
     loading: () => <></>,

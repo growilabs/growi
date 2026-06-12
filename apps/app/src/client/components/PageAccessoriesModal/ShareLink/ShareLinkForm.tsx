@@ -6,9 +6,9 @@ import { parse } from 'date-fns/parse';
 import { set } from 'date-fns/set';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Post } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useCurrentPageId } from '~/states/page/index.js';
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useCurrentPageId } from '~/states/page';
 
 const ExpirationType = {
   UNLIMITED: 'unlimited',

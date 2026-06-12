@@ -16,14 +16,14 @@ import SimpleBar from 'simplebar-react';
 import { useSWRxSearch } from '~/stores/search.js';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
-import { useSelectedPages } from '../../../services/use-selected-pages.js';
+import { useSelectedPages } from '~/features/openai/client/services/use-selected-pages.js';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
   useAiAssistantManagementModalStatus,
-} from '../../../states/modal/ai-assistant-management.js';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
-import { SelectablePageList } from './SelectablePageList.js';
+} from '~/features/openai/client/states/modal/ai-assistant-management.js';
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
+import { SelectablePageList } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectablePageList.js';
 
 import styles from './AiAssistantManagementKeywordSearch.module.scss';
 

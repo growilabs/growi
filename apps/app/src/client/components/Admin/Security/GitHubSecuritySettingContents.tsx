@@ -4,12 +4,12 @@ import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 import urljoin from 'url-join';
 
-import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer.js';
-import AdminGitHubSecurityContainer from '~/client/services/AdminGitHubSecurityContainer.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useSiteUrlWithEmptyValueWarn } from '~/states/global/index.js';
+import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
+import AdminGitHubSecurityContainer from '~/client/services/AdminGitHubSecurityContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;

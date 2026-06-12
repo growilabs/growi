@@ -1,9 +1,9 @@
 import React, { type JSX } from 'react';
 import { TabContent, TabPane } from 'reactstrap';
 
-import type { ICustomNavTabMappings } from '~/interfaces/ui.js';
+import type { ICustomNavTabMappings } from '~/interfaces/ui';
 
-import { LazyRenderer } from '../Common/LazyRenderer.js';
+import { LazyRenderer } from '../Common/LazyRenderer';
 
 type Props = {
   navTabMapping: ICustomNavTabMappings;

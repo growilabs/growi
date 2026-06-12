@@ -20,24 +20,24 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   LlmEditorAssistantDiffSchema,
   LlmEditorAssistantMessageSchema,
-} from '../../../interfaces/editor-assistant/llm-response-schemas.js';
+} from '~/features/openai/interfaces/editor-assistant/llm-response-schemas.js';
 import type {
   EditRequestBody,
   SseDetectedDiff,
   SseFinalized,
   SseMessage,
 } from '../../../interfaces/editor-assistant/sse-schemas.js';
-import { MessageErrorCode } from '../../../interfaces/message-error.js';
-import AiAssistantModel from '../../models/ai-assistant.js';
-import ThreadRelationModel from '../../models/thread-relation.js';
-import { getOrCreateEditorAssistant } from '../../services/assistant/index.js';
-import { openaiClient } from '../../services/client.js';
-import { LlmResponseStreamProcessor } from '../../services/editor-assistant/index.js';
-import { getStreamErrorCode } from '../../services/getStreamErrorCode.js';
-import { getOpenaiService } from '../../services/openai.js';
-import { replaceAnnotationWithPageLink } from '../../services/replace-annotation-with-page-link.js';
-import { certifyAiService } from '../middlewares/certify-ai-service.js';
-import { SseHelper } from '../utils/sse-helper.js';
+import { MessageErrorCode } from '~/features/openai/interfaces/message-error.js';
+import AiAssistantModel from '~/features/openai/server/models/ai-assistant.js';
+import ThreadRelationModel from '~/features/openai/server/models/thread-relation.js';
+import { getOrCreateEditorAssistant } from '~/features/openai/server/services/assistant/index.js';
+import { openaiClient } from '~/features/openai/server/services/client.js';
+import { LlmResponseStreamProcessor } from '~/features/openai/server/services/editor-assistant/index.js';
+import { getStreamErrorCode } from '~/features/openai/server/services/getStreamErrorCode.js';
+import { getOpenaiService } from '~/features/openai/server/services/openai.js';
+import { replaceAnnotationWithPageLink } from '~/features/openai/server/services/replace-annotation-with-page-link.js';
+import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
+import { SseHelper } from '~/features/openai/server/routes/utils/sse-helper.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:message');
 

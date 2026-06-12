@@ -8,7 +8,7 @@ import { CopyToClipboard } from 'react-copy-to-clipboard';
 import { useTranslation } from 'react-i18next';
 import { Tooltip } from 'reactstrap';
 
-import type { IActivityHasId } from '~/interfaces/activity.js';
+import type { IActivityHasId } from '~/interfaces/activity';
 
 type Props = {
   activityList: IActivityHasId[];

@@ -22,28 +22,28 @@ import { useSWRxPagePathsWithDescendantCount } from '~/stores/page.js';
 import loggerFactory from '~/utils/logger/index.js';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
-import { removeGlobPath } from '../../../../utils/remove-glob-path.js';
+import { removeGlobPath } from '~/features/openai/utils/remove-glob-path.js';
 import {
   createAiAssistant,
   updateAiAssistant,
-} from '../../../services/ai-assistant.js';
+} from '~/features/openai/client/services/ai-assistant.js';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from '../../../states/index.js';
+} from '~/features/openai/client/states/index.js';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
   useAiAssistantManagementModalStatus,
-} from '../../../states/modal/ai-assistant-management.js';
-import { useSWRxAiAssistants } from '../../../stores/ai-assistant.js';
-import { AiAssistantManagementEditInstruction } from './AiAssistantManagementEditInstruction.js';
-import { AiAssistantManagementEditPages } from './AiAssistantManagementEditPages.js';
-import { AiAssistantManagementEditShare } from './AiAssistantManagementEditShare.js';
-import { AiAssistantManagementHome } from './AiAssistantManagementHome.js';
-import { AiAssistantKeywordSearch } from './AiAssistantManagementKeywordSearch.js';
-import { AiAssistantManagementPageSelectionMethod } from './AiAssistantManagementPageSelectionMethod.js';
-import { AiAssistantManagementPageTreeSelection } from './AiAssistantManagementPageTreeSelection.js';
+} from '~/features/openai/client/states/modal/ai-assistant-management.js';
+import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant.js';
+import { AiAssistantManagementEditInstruction } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementEditInstruction.js';
+import { AiAssistantManagementEditPages } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementEditPages.js';
+import { AiAssistantManagementEditShare } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementEditShare.js';
+import { AiAssistantManagementHome } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHome.js';
+import { AiAssistantKeywordSearch } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementKeywordSearch.js';
+import { AiAssistantManagementPageSelectionMethod } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementPageSelectionMethod.js';
+import { AiAssistantManagementPageTreeSelection } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementPageTreeSelection.js';
 
 import styles from './AiAssistantManagementModal.module.scss';
 

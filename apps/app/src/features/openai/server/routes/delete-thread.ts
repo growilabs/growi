@@ -14,9 +14,9 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger/index.js';
 
 import type { IApiv3DeleteThreadParams } from '../../interfaces/thread-relation.js';
-import ThreadRelationModel from '../models/thread-relation.js';
-import { getOpenaiService } from '../services/openai.js';
-import { certifyAiService } from './middlewares/certify-ai-service.js';
+import ThreadRelationModel from '~/features/openai/server/models/thread-relation.js';
+import { getOpenaiService } from '~/features/openai/server/services/openai.js';
+import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:delete-thread');
 

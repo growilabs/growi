@@ -3,12 +3,12 @@ import React from 'react';
 import type { HasObjectId } from '@growi/core';
 import { UserPicture } from '@growi/ui/dist/components';
 
-import { apiv3Post } from '~/client/util/apiv3-client.js';
-import type { IInAppNotification } from '~/interfaces/in-app-notification.js';
-import { InAppNotificationStatuses } from '~/interfaces/in-app-notification.js';
-import { useSWRxInAppNotificationStatus } from '~/stores/in-app-notification.js';
+import { apiv3Post } from '~/client/util/apiv3-client';
+import type { IInAppNotification } from '~/interfaces/in-app-notification';
+import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
+import { useSWRxInAppNotificationStatus } from '~/stores/in-app-notification';
 
-import { useModelNotification } from './ModelNotification/index.js';
+import { useModelNotification } from './ModelNotification';
 
 import unreadDotStyles from './UnreadDot.module.scss';
 

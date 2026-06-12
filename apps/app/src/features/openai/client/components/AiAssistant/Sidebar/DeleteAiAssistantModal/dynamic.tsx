@@ -12,7 +12,7 @@ export const DeleteAiAssistantModalLazyLoaded = (
   const DeleteAiAssistantModal = useLazyLoader<DeleteAiAssistantModalProps>(
     'delete-ai-assistant-modal',
     () =>
-      import('./DeleteAiAssistantModal.js').then((mod) => ({
+      import('~/features/openai/client/components/AiAssistant/Sidebar/DeleteAiAssistantModal/DeleteAiAssistantModal.js').then((mod) => ({
         default: mod.DeleteAiAssistantModal,
       })),
     isShown,

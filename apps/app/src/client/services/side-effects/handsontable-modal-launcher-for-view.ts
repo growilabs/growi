@@ -6,18 +6,18 @@ import type { MarkdownTable } from '@growi/editor';
 import {
   getMarkdownTableFromLine,
   replaceMarkdownTableInMarkdown,
-} from '~/client/components/Page/markdown-table-util-for-view.js';
-import type { LaunchHandsonTableModalEventDetail } from '~/client/interfaces/handsontable-modal.js';
+} from '~/client/components/Page/markdown-table-util-for-view';
+import type { LaunchHandsonTableModalEventDetail } from '~/client/interfaces/handsontable-modal';
 import {
   extractRemoteRevisionDataFromErrorObj,
   useUpdatePage,
-} from '~/client/services/update-page/index.js';
-import type { RemoteRevisionData } from '~/states/page/index.js';
-import { useCurrentPageData, useSetRemoteLatestPageData } from '~/states/page/index.js';
-import { useShareLinkId } from '~/states/page/hooks.js';
-import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff.js';
-import { useHandsontableModalActions } from '~/states/ui/modal/handsontable.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/client/services/update-page';
+import type { RemoteRevisionData } from '~/states/page';
+import { useCurrentPageData, useSetRemoteLatestPageData } from '~/states/page';
+import { useShareLinkId } from '~/states/page/hooks';
+import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff';
+import { useHandsontableModalActions } from '~/states/ui/modal/handsontable';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:cli:side-effects:useHandsontableModalLauncherForView',

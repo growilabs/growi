@@ -7,7 +7,7 @@ import {
   apiv3Get,
   apiv3Post,
   apiv3Put,
-} from '../util/apiv3-client.js';
+} from '../util/apiv3-client';
 
 /**
  * Service container for admin users page (Users.jsx)

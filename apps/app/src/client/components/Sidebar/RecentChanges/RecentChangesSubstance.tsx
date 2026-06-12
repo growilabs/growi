@@ -4,15 +4,15 @@ import { DevidedPagePath } from '@growi/core/dist/models';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'react-i18next';
 
-import FormattedDistanceDate from '~/client/components/FormattedDistanceDate.js';
-import InfiniteScroll from '~/client/components/InfiniteScroll.js';
-import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink/index.js';
-import { LinkedPagePath } from '~/models/linked-page-path.js';
-import { useSetSearchKeyword } from '~/states/search/index.js';
-import { useSWRINFxRecentlyUpdated } from '~/stores/page-listing.js';
-import loggerFactory from '~/utils/logger/index.js';
+import FormattedDistanceDate from '~/client/components/FormattedDistanceDate';
+import InfiniteScroll from '~/client/components/InfiniteScroll';
+import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
+import { LinkedPagePath } from '~/models/linked-page-path';
+import { useSetSearchKeyword } from '~/states/search';
+import { useSWRINFxRecentlyUpdated } from '~/stores/page-listing';
+import loggerFactory from '~/utils/logger';
 
-import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton.js';
+import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton';
 
 import styles from './RecentChangesSubstance.module.scss';
 

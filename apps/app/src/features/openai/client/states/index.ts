@@ -5,8 +5,8 @@ export type {
 export {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from './ai-assistant-sidebar.js';
+} from '~/features/openai/client/states/ai-assistant-sidebar.js';
 export {
   useIsEnableUnifiedMergeView,
   useUnifiedMergeViewActions,
-} from './unified-merge-view.js';
+} from '~/features/openai/client/states/unified-merge-view.js';

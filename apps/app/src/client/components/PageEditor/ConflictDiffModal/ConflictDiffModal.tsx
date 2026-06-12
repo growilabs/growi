@@ -2,25 +2,25 @@ import type React from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import type { IUser } from '@growi/core';
 import { GlobalCodeMirrorEditorKey } from '@growi/editor';
-import { CodeMirrorEditorDiff } from '@growi/editor/dist/client/components/diff/CodeMirrorEditorDiff.js';
-import { MergeViewer } from '@growi/editor/dist/client/components/diff/MergeViewer.js';
-import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor.js';
+import { CodeMirrorEditorDiff } from '@growi/editor/dist/client/components/diff/CodeMirrorEditorDiff';
+import { MergeViewer } from '@growi/editor/dist/client/components/diff/MergeViewer';
+import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { UserPicture } from '@growi/ui/dist/components';
 import { format } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { useCurrentUser } from '~/states/global/index.js';
+import { useCurrentUser } from '~/states/global';
 import {
   useCurrentPageData,
   useRemoteRevisionBody,
   useRemoteRevisionLastUpdatedAt,
   useRemoteRevisionLastUpdateUser,
-} from '~/states/page/index.js';
+} from '~/states/page';
 import {
   useConflictDiffModalActions,
   useConflictDiffModalStatus,
-} from '~/states/ui/modal/conflict-diff.js';
+} from '~/states/ui/modal/conflict-diff';
 
 import styles from './ConflictDiffModal.module.scss';
 

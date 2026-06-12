@@ -12,8 +12,8 @@ import {
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
-} from '../../../states/modal/ai-assistant-management.js';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
+} from '~/features/openai/client/states/modal/ai-assistant-management.js';
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
 
 type Props = {
   instruction: string;

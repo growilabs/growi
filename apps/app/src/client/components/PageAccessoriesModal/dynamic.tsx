@@ -1,9 +1,9 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
-import { usePageAccessoriesModalStatus } from '~/states/ui/modal/page-accessories.js';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
+import { usePageAccessoriesModalStatus } from '~/states/ui/modal/page-accessories';
 
-import { useAutoOpenModalByQueryParam } from './hooks.js';
+import { useAutoOpenModalByQueryParam } from './hooks';
 
 type PageAccessoriesModalProps = Record<string, unknown>;
 
@@ -15,7 +15,7 @@ export const PageAccessoriesModalLazyLoaded = (): JSX.Element => {
   const PageAccessoriesModal = useLazyLoader<PageAccessoriesModalProps>(
     'page-accessories-modal',
     () =>
-      import('./PageAccessoriesModal.js').then((mod) => ({
+      import('./PageAccessoriesModal').then((mod) => ({
         default: mod.PageAccessoriesModal,
       })),
     status?.isOpened ?? false,

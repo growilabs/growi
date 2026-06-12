@@ -1,9 +1,9 @@
 import { type SWRResponseWithUtils, withUtils } from '@growi/core/dist/swr';
 import useSWRImmutable from 'swr/immutable';
 
-import type { IGlobalNotification } from '~/client/interfaces/global-notification.js';
+import type { IGlobalNotification } from '~/client/interfaces/global-notification';
 
-import { apiv3Get, apiv3Put } from '../client/util/apiv3-client.js';
+import { apiv3Get, apiv3Put } from '../client/util/apiv3-client';
 
 type Util = {
   update(updateData: any): Promise<void>;

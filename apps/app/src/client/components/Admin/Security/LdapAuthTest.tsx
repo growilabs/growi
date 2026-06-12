@@ -1,10 +1,10 @@
 import React, { type JSX, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { apiPost } from '~/client/util/apiv1-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import type { IResTestLdap } from '~/interfaces/ldap.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { apiPost } from '~/client/util/apiv1-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import type { IResTestLdap } from '~/interfaces/ldap';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:security:AdminLdapSecurityContainer');
 

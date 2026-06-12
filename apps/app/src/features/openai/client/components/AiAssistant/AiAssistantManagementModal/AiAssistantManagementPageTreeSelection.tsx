@@ -9,11 +9,11 @@ import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
   useAiAssistantManagementModalStatus,
-} from '../../../states/modal/ai-assistant-management.js';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
-import { usePageTreeSelection } from './hooks/use-page-tree-selection.js';
-import { PageTreeSelectionTree } from './PageTreeSelectionTree.js';
-import { SelectedPagesPanel } from './SelectedPagesPanel.js';
+} from '~/features/openai/client/states/modal/ai-assistant-management.js';
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
+import { usePageTreeSelection } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/hooks/use-page-tree-selection.js';
+import { PageTreeSelectionTree } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/PageTreeSelectionTree.js';
+import { SelectedPagesPanel } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectedPagesPanel.js';
 
 import styles from './AiAssistantManagementPageTreeSelection.module.scss';
 

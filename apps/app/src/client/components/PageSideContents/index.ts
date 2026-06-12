@@ -1,1 +1,1 @@
-export * from './PageSideContents.js';
+export * from './PageSideContents';

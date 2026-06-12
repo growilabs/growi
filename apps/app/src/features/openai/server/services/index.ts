@@ -1,1 +1,1 @@
-export * from './is-ai-enabled.js';
+export * from '~/features/openai/server/services/is-ai-enabled.js';

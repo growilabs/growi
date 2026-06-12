@@ -11,14 +11,14 @@ import { ColorSchemeType } from 'diff2html/lib/types';
 import { useTranslation } from 'next-i18next';
 import urljoin from 'url-join';
 
-import { Themes, useNextThemes } from '~/stores-universal/use-next-themes.js';
+import { Themes, useNextThemes } from '~/stores-universal/use-next-themes';
 
-import UserDate from '../../../components/User/UserDate.js';
-import { useSWRxGrowiThemeSetting } from '../../../stores/admin/customize.js';
+import UserDate from '../../../components/User/UserDate';
+import { useSWRxGrowiThemeSetting } from '../../../stores/admin/customize';
 
 import styles from './RevisionDiff.module.scss';
 
-import './RevisionDiff.vendor-styles.prebuilt.js';
+import './RevisionDiff.vendor-styles.prebuilt';
 
 const moduleClass = styles['revision-diff-container'];
 

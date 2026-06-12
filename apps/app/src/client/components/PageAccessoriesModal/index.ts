@@ -1,1 +1,1 @@
-export { PageAccessoriesModalLazyLoaded } from './dynamic.js';
+export { PageAccessoriesModalLazyLoaded } from './dynamic';

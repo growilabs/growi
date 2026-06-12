@@ -1,6 +1,6 @@
 import localFont from 'next/font/local';
 
-import type { DefineStyle } from './types.js';
+import type { DefineStyle } from './types';
 
 const sourceHanCodeJPSubsetMain = localFont({
   src: '../../../resource/fonts/SourceHanCodeJP-Regular-subset-main.woff2',

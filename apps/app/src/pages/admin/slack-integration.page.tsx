@@ -2,19 +2,19 @@ import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import { useHydrateAtoms } from 'jotai/utils';
 
-import { _atomsForAdminPagesHydration as atoms } from '~/states/global/index.js';
+import { _atomsForAdminPagesHydration as atoms } from '~/states/global';
 
-import type { NextPageWithLayout } from '../_app.page.js';
-import type { AdminCommonProps } from './_shared/index.js';
+import type { NextPageWithLayout } from '../_app.page';
+import type { AdminCommonProps } from './_shared';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared/index.js';
+} from './_shared';
 
 const SlackIntegration = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Admin/SlackIntegration/SlackIntegration.js').then(
+    import('~/client/components/Admin/SlackIntegration/SlackIntegration').then(
       (mod) => mod.SlackIntegration,
     ),
   { ssr: false },

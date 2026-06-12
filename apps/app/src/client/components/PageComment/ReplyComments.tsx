@@ -7,7 +7,7 @@ import type { ICommentHasId, ICommentHasIdList } from '~/interfaces/comment.js';
 import type { RendererOptions } from '~/interfaces/renderer-options.js';
 import { isAllReplyShownAtom } from '~/states/server-configurations/index.js';
 
-import { Comment } from './Comment.js';
+import { Comment } from '~/client/components/PageComment/Comment.js';
 
 import styles from './ReplyComments.module.scss';
 

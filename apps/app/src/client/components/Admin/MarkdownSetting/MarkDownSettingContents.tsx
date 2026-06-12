@@ -2,16 +2,16 @@ import React, { type JSX, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Card, CardBody } from 'reactstrap';
 
-import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer.js';
-import { toastError } from '~/client/util/toastr.js';
-import { toArrayIfNot } from '~/utils/array-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer';
+import { toastError } from '~/client/util/toastr';
+import { toArrayIfNot } from '~/utils/array-utils';
+import loggerFactory from '~/utils/logger';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import ContentDispositionSettings from './ContentDispositionSettings.js';
-import IndentForm from './IndentForm.js';
-import LineBreakForm from './LineBreakForm.js';
-import XssForm from './XssForm.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import ContentDispositionSettings from './ContentDispositionSettings';
+import IndentForm from './IndentForm';
+import LineBreakForm from './LineBreakForm';
+import XssForm from './XssForm';
 
 const logger = loggerFactory('growi:MarkDown');
 

@@ -12,7 +12,7 @@ import { useCurrentPagePath, useSetIsUntitledPage } from '~/states/page/index.js
 import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
 import { useGrantedGroupsInheritanceSelectModalActions } from '~/states/ui/modal/granted-groups-inheritance-select.js';
 
-import { createPage } from './create-page.js';
+import { createPage } from '~/client/services/create-page/create-page.js';
 
 /**
  * Invoked when creation and transition has finished

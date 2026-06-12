@@ -1,9 +1,9 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
-import { useCurrentUser } from '~/states/global/index.js';
-import { useCurrentPageData, usePageNotFound } from '~/states/page/index.js';
-import { useSWRxCurrentGrantData } from '~/stores/page.js';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
+import { useCurrentUser } from '~/states/global';
+import { useCurrentPageData, usePageNotFound } from '~/states/page';
+import { useSWRxCurrentGrantData } from '~/stores/page';
 
 export const FixPageGrantAlertLazyLoaded = (): JSX.Element => {
   const isNotFound = usePageNotFound();
@@ -25,7 +25,7 @@ export const FixPageGrantAlertLazyLoaded = (): JSX.Element => {
   const FixPageGrantAlert = useLazyLoader<Record<string, unknown>>(
     'fix-page-grant-alert',
     () =>
-      import('./FixPageGrantAlert.js').then((mod) => ({
+      import('./FixPageGrantAlert').then((mod) => ({
         default: mod.FixPageGrantAlert,
       })),
     isActive,

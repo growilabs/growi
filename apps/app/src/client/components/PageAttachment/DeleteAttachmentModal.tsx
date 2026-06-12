@@ -5,14 +5,14 @@ import { LoadingSpinner, UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import {
   useDeleteAttachmentModalActions,
   useDeleteAttachmentModalStatus,
-} from '~/states/ui/modal/delete-attachment.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/states/ui/modal/delete-attachment';
+import loggerFactory from '~/utils/logger';
 
-import { Username } from '../../../components/User/Username.js';
+import { Username } from '../../../components/User/Username';
 
 import styles from './DeleteAttachmentModal.module.scss';
 

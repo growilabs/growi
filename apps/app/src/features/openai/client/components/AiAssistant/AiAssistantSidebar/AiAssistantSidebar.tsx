@@ -21,26 +21,26 @@ import type { MessageLog } from '../../../../interfaces/message.js';
 import {
   MessageErrorCode,
   StreamErrorCode,
-} from '../../../../interfaces/message-error.js';
+} from '~/features/openai/interfaces/message-error.js';
 import type { IThreadRelationHasId } from '../../../../interfaces/thread-relation.js';
 import {
   type FormData as FormDataForEditorAssistant,
   isEditorAssistantFormData,
   useEditorAssistant,
-} from '../../../services/editor-assistant/index.js';
+} from '~/features/openai/client/services/editor-assistant/index.js';
 import {
   type FormData as FormDataForKnowledgeAssistant,
   useFetchAndSetMessageDataEffect,
   useKnowledgeAssistant,
-} from '../../../services/knowledge-assistant.js';
+} from '~/features/openai/client/services/knowledge-assistant.js';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
   useUnifiedMergeViewActions,
-} from '../../../states/index.js';
-import { useSWRxThreads } from '../../../stores/thread.js';
-import { MessageCard } from './MessageCard/MessageCard.js';
-import { ResizableTextarea } from './ResizableTextArea.js';
+} from '~/features/openai/client/states/index.js';
+import { useSWRxThreads } from '~/features/openai/client/stores/thread.js';
+import { MessageCard } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/MessageCard/MessageCard.js';
+import { ResizableTextarea } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/ResizableTextArea.js';
 
 import styles from './AiAssistantSidebar.module.scss';
 

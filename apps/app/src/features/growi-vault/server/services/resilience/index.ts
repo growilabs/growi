@@ -19,8 +19,8 @@ import type {
   BootstrapRunnerDeps,
   VaultResilienceLayer,
 } from './bootstrap-runner.js';
-import { createBootstrapRunner } from './bootstrap-runner.js';
-import { createDriftDetector } from './drift-detector.js';
+import { createBootstrapRunner } from '~/features/growi-vault/server/services/resilience/bootstrap-runner.js';
+import { createDriftDetector } from '~/features/growi-vault/server/services/resilience/drift-detector.js';
 import type { RetryConfig } from './retry-policy.js';
 
 // ---------------------------------------------------------------------------

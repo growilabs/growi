@@ -3,18 +3,18 @@ import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { useForm } from 'react-hook-form';
 
-import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { RehypeSanitizeType } from '~/interfaces/services/rehype-sanitize.js';
+import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { RehypeSanitizeType } from '~/interfaces/services/rehype-sanitize';
 import {
   attributes as recommendedAttributes,
   tagNames as recommendedTagNames,
-} from '~/services/renderer/recommended-whitelist.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/services/renderer/recommended-whitelist';
+import loggerFactory from '~/utils/logger';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
-import { WhitelistInput } from './WhitelistInput.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
+import { WhitelistInput } from './WhitelistInput';
 
 const logger = loggerFactory('growi:importer');
 

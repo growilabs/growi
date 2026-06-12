@@ -7,20 +7,20 @@ import Downshift, {
 import { useAtomValue } from 'jotai';
 import { Modal, ModalBody } from 'reactstrap';
 
-import { useCurrentPagePath } from '~/states/page/index.js';
-import { useSetSearchKeyword } from '~/states/search/index.js';
-import { isSearchScopeChildrenAsDefaultAtom } from '~/states/server-configurations/index.js';
+import { useCurrentPagePath } from '~/states/page';
+import { useSetSearchKeyword } from '~/states/search';
+import { isSearchScopeChildrenAsDefaultAtom } from '~/states/server-configurations';
 
-import { isIncludeAiMenthion, removeAiMenthion } from '../../utils/ai.js';
-import type { DownshiftItem } from '../interfaces/downshift.js';
+import { isIncludeAiMenthion, removeAiMenthion } from '../../utils/ai';
+import type { DownshiftItem } from '../interfaces/downshift';
 import {
   useSearchModalActions,
   useSearchModalStatus,
-} from '../states/modal/search.js';
-import { SearchForm } from './SearchForm.js';
-import { SearchHelp } from './SearchHelp.js';
-import { SearchMethodMenuItem } from './SearchMethodMenuItem.js';
-import { SearchResultMenuItem } from './SearchResultMenuItem.js';
+} from '../states/modal/search';
+import { SearchForm } from './SearchForm';
+import { SearchHelp } from './SearchHelp';
+import { SearchMethodMenuItem } from './SearchMethodMenuItem';
+import { SearchResultMenuItem } from './SearchResultMenuItem';
 
 type Props = {
   onSearch: (keyword: string) => void;

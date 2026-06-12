@@ -1,1 +1,1 @@
-export * from './CopyDropdown.js';
+export * from '~/client/components/Common/CopyDropdown/CopyDropdown.js';

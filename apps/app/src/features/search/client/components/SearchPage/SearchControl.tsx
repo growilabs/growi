@@ -5,9 +5,9 @@ import { Collapse } from 'reactstrap';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search.js';
 import type { ISearchConditions, ISearchConfigurations } from '~/stores/search.js';
 
-import { SearchModalTriggerinput } from './SearchModalTriggerinput.js';
-import { SearchOptionModalLazyLoaded } from './SearchOptionModal/index.js';
-import SortControl from './SortControl.js';
+import { SearchModalTriggerinput } from '~/features/search/client/components/SearchPage/SearchModalTriggerinput.js';
+import { SearchOptionModalLazyLoaded } from '~/features/search/client/components/SearchPage/SearchOptionModal/index.js';
+import SortControl from '~/features/search/client/components/SearchPage/SortControl.js';
 
 type Props = {
   isEnableSort: boolean;

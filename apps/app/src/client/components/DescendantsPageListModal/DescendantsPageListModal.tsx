@@ -5,27 +5,27 @@ import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import { useIsSharedUser } from '~/states/context.js';
-import { useDeviceLargerThanLg } from '~/states/ui/device.js';
+import { useIsSharedUser } from '~/states/context';
+import { useDeviceLargerThanLg } from '~/states/ui/device';
 import {
   useDescendantsPageListModalActions,
   useDescendantsPageListModalStatus,
-} from '~/states/ui/modal/descendants-page-list.js';
+} from '~/states/ui/modal/descendants-page-list';
 
-import { CustomNavDropdown, CustomNavTab } from '../CustomNavigation/CustomNav.js';
-import CustomTabContent from '../CustomNavigation/CustomTabContent.js';
-import type { DescendantsPageListProps } from '../DescendantsPageList.js';
-import ExpandOrContractButton from '../ExpandOrContractButton.js';
+import { CustomNavDropdown, CustomNavTab } from '../CustomNavigation/CustomNav';
+import CustomTabContent from '../CustomNavigation/CustomTabContent';
+import type { DescendantsPageListProps } from '../DescendantsPageList';
+import ExpandOrContractButton from '../ExpandOrContractButton';
 
 import styles from './DescendantsPageListModal.module.scss';
 
 const DescendantsPageList = dynamic<DescendantsPageListProps>(
-  () => import('../DescendantsPageList.js').then((mod) => mod.DescendantsPageList),
+  () => import('../DescendantsPageList').then((mod) => mod.DescendantsPageList),
   { ssr: false },
 );
 
 const PageTimeline = dynamic(
-  () => import('../PageTimeline.js').then((mod) => mod.PageTimeline),
+  () => import('../PageTimeline').then((mod) => mod.PageTimeline),
   { ssr: false },
 );
 

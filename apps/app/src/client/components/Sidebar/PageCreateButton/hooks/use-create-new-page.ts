@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { Origin } from '@growi/core';
 
-import { useCreatePage } from '~/client/services/create-page/index.js';
-import { useCurrentPagePath } from '~/states/page/index.js';
+import { useCreatePage } from '~/client/services/create-page';
+import { useCurrentPagePath } from '~/states/page';
 
 type UseCreateNewPage = () => {
   isCreating: boolean;

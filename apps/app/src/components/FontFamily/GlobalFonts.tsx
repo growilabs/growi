@@ -1,9 +1,9 @@
 import { type JSX, memo } from 'react';
 
-import { useGrowiCustomIcon } from './use-growi-custom-icons.js';
-import { useLatoFontFamily } from './use-lato.js';
-import { useMaterialSymbolsOutlined } from './use-material-symbols-outlined.js';
-import { useSourceHanCodeJP } from './use-source-han-code-jp.js';
+import { useGrowiCustomIcon } from './use-growi-custom-icons';
+import { useLatoFontFamily } from './use-lato';
+import { useMaterialSymbolsOutlined } from './use-material-symbols-outlined';
+import { useSourceHanCodeJP } from './use-source-han-code-jp';
 
 /**
  * Define prefixed by '--grw-font-family'

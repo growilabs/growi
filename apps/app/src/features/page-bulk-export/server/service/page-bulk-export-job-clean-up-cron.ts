@@ -9,10 +9,10 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   PageBulkExportJobInProgressStatus,
   PageBulkExportJobStatus,
-} from '../../interfaces/page-bulk-export.js';
+} from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
 import type { PageBulkExportJobDocument } from '../models/page-bulk-export-job.js';
-import PageBulkExportJob from '../models/page-bulk-export-job.js';
-import { pageBulkExportJobCronService } from './page-bulk-export-job-cron/index.js';
+import PageBulkExportJob from '~/features/page-bulk-export/server/models/page-bulk-export-job.js';
+import { pageBulkExportJobCronService } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/index.js';
 
 const logger = loggerFactory(
   'growi:service:page-bulk-export-job-clean-up-cron',

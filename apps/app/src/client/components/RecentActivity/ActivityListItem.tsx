@@ -5,9 +5,9 @@ import { useTranslation } from 'next-i18next';
 import type {
   ActivityHasTargetPage,
   SupportedActivityActionType,
-} from '~/interfaces/activity.js';
-import { ActivityLogActions } from '~/interfaces/activity.js';
-import { getLocale } from '~/utils/locale-utils.js';
+} from '~/interfaces/activity';
+import { ActivityLogActions } from '~/interfaces/activity';
+import { getLocale } from '~/utils/locale-utils';
 
 export const ActivityActionTranslationMap: Record<
   SupportedActivityActionType,

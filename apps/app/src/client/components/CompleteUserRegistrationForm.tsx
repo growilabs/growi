@@ -3,12 +3,12 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client.js';
-import { UserActivationErrorCode } from '~/interfaces/errors/user-activation.js';
-import { RegistrationMode } from '~/interfaces/registration-mode.js';
+import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
+import { UserActivationErrorCode } from '~/interfaces/errors/user-activation';
+import { RegistrationMode } from '~/interfaces/registration-mode';
 
-import { toastError } from '../util/toastr.js';
-import { CompleteUserRegistration } from './CompleteUserRegistration.js';
+import { toastError } from '../util/toastr';
+import { CompleteUserRegistration } from './CompleteUserRegistration';
 
 import styles from './CompleteUserRegistrationForm.module.scss';
 

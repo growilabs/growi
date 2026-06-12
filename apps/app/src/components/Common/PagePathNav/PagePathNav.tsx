@@ -4,10 +4,10 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 
 import { LinkedPagePath } from '~/models/linked-page-path.js';
 
-import { PagePathHierarchicalLink } from '../PagePathHierarchicalLink/index.js';
-import { Separator } from './index.js';
+import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink/index.js';
+import { Separator } from '~/components/Common/PagePathNav/index.js';
 import type { PagePathNavLayoutProps } from './PagePathNavLayout.js';
-import { PagePathNavLayout } from './PagePathNavLayout.js';
+import { PagePathNavLayout } from '~/components/Common/PagePathNav/PagePathNavLayout.js';
 
 const { isTrashPage } = pagePathUtils;
 

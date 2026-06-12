@@ -1,1 +1,1 @@
-export { MermaidViewer } from './MermaidViewer.js';
+export { MermaidViewer } from '~/features/mermaid/components/MermaidViewer.js';

@@ -2,18 +2,18 @@ import type { JSX, ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 
 // biome-ignore lint/style/noRestrictedImports: no-problem lazy loaded components
-import { ShortcutsModalLazyLoaded } from '~/client/components/ShortcutsModal/index.js';
+import { ShortcutsModalLazyLoaded } from '~/client/components/ShortcutsModal';
 
-import { RawLayout } from './RawLayout.js';
+import { RawLayout } from './RawLayout';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 const PageCreateModal = dynamic(
-  () => import('~/client/components/PageCreateModal.js'),
+  () => import('~/client/components/PageCreateModal'),
   { ssr: false },
 );
 const GrowiNavbarBottom = dynamic(
   () =>
-    import('~/client/components/Navbar/GrowiNavbarBottom.js').then(
+    import('~/client/components/Navbar/GrowiNavbarBottom').then(
       (mod) => mod.GrowiNavbarBottom,
     ),
   { ssr: false },

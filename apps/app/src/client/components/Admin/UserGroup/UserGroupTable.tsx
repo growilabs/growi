@@ -10,7 +10,7 @@ import type {
 import { format as dateFnsFormat } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 
-import type { IExternalUserGroupHasId } from '~/features/external-user-group/interfaces/external-user-group.js';
+import type { IExternalUserGroupHasId } from '~/features/external-user-group/interfaces/external-user-group';
 
 import styles from './UserGroupTable.module.scss';
 

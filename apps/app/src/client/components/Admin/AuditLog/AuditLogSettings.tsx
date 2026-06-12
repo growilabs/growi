@@ -4,11 +4,11 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
 
-import { AllSupportedActions } from '~/interfaces/activity.js';
+import { AllSupportedActions } from '~/interfaces/activity';
 import {
   activityExpirationSecondsAtom,
   auditLogAvailableActionsAtom,
-} from '~/states/server-configurations/index.js';
+} from '~/states/server-configurations';
 
 export const AuditLogSettings: FC = () => {
   const { t } = useTranslation();

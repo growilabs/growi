@@ -2,10 +2,10 @@ import type { FC, JSX } from 'react';
 import React, { useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { NotAvailableForGuest } from '../NotAvailableForGuest.js';
-import { NotAvailableForReadOnlyUser } from '../NotAvailableForReadOnlyUser.js';
-import { Skeleton } from '../Skeleton.js';
-import RenderTagLabels from './RenderTagLabels.js';
+import { NotAvailableForGuest } from '../NotAvailableForGuest';
+import { NotAvailableForReadOnlyUser } from '../NotAvailableForReadOnlyUser';
+import { Skeleton } from '../Skeleton';
+import RenderTagLabels from './RenderTagLabels';
 
 import styles from './TagLabels.module.scss';
 

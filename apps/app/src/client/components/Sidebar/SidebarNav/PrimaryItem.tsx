@@ -2,13 +2,13 @@ import { type JSX, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
-import type { SidebarContentsType } from '~/interfaces/ui.js';
-import { SidebarMode } from '~/interfaces/ui.js';
-import { useIsMobile } from '~/states/ui/device.js';
+import type { SidebarContentsType } from '~/interfaces/ui';
+import { SidebarMode } from '~/interfaces/ui';
+import { useIsMobile } from '~/states/ui/device';
 import {
   useCollapsedContentsOpened,
   useCurrentSidebarContents,
-} from '~/states/ui/sidebar/index.js';
+} from '~/states/ui/sidebar';
 
 const useIndicator = (
   sidebarMode: SidebarMode,

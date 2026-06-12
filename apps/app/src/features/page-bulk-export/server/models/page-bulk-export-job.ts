@@ -6,7 +6,7 @@ import type { IPageBulkExportJob } from '../../interfaces/page-bulk-export.js';
 import {
   PageBulkExportFormat,
   PageBulkExportJobStatus,
-} from '../../interfaces/page-bulk-export.js';
+} from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
 
 export interface PageBulkExportJobDocument
   extends IPageBulkExportJob,

@@ -19,13 +19,13 @@ import {
   Input,
 } from 'reactstrap';
 
-import { isIndentSizeForcedAtom } from '~/states/server-configurations/index.js';
-import { useDeviceLargerThanMd } from '~/states/ui/device.js';
+import { isIndentSizeForcedAtom } from '~/states/server-configurations';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
 import {
   useCurrentIndentSize,
   useCurrentIndentSizeActions,
-} from '~/states/ui/editor/index.js';
-import { useEditorSettings } from '~/stores/editor.js';
+} from '~/states/ui/editor';
+import { useEditorSettings } from '~/stores/editor';
 
 type RadioListItemProps = {
   onClick: () => void;

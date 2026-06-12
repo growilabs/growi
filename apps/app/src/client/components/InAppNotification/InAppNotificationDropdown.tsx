@@ -8,13 +8,13 @@ import {
   DropdownToggle,
 } from 'reactstrap';
 
-import { useGlobalSocket } from '~/states/socket-io/index.js';
+import { useGlobalSocket } from '~/states/socket-io';
 import {
   useSWRxInAppNotificationStatus,
   useSWRxInAppNotifications,
-} from '~/stores/in-app-notification.js';
+} from '~/stores/in-app-notification';
 
-import InAppNotificationList from './InAppNotificationList.js';
+import InAppNotificationList from './InAppNotificationList';
 
 export const InAppNotificationDropdown = (): JSX.Element => {
   const { t } = useTranslation('commons');
@@ -83,19 +83,20 @@ export const InAppNotificationDropdown = (): JSX.Element => {
       <DropdownToggle className="px-3" color="primary" innerRef={buttonRef}>
         <span className="material-symbols-outlined">notifications</span> {badge}
       </DropdownToggle>
+
       {isOpen && (
         <DropdownMenu end>
           {inAppNotificationData != null &&
           inAppNotificationData.docs.length === 0 ? (
             // no items
-            (<DropdownItem disabled>
+            <DropdownItem disabled>
               {t('in_app_notification.no_unread_messages')}
-            </DropdownItem>)
+            </DropdownItem>
           ) : (
             // render DropdownItem
-            (<InAppNotificationList
+            <InAppNotificationList
               inAppNotificationData={inAppNotificationData}
-            />)
+            />
           )}
           <DropdownItem divider />
           <DropdownItem tag="a" href="/me/all-in-app-notifications">

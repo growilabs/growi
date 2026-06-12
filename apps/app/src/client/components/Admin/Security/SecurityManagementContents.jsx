@@ -3,15 +3,15 @@ import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 import { TabContent, TabPane } from 'reactstrap';
 
-import CustomNav from '../../CustomNavigation/CustomNav.js';
-import GitHubSecuritySetting from './GitHubSecuritySetting.js';
-import GoogleSecuritySetting from './GoogleSecuritySetting.js';
-import LdapSecuritySetting from './LdapSecuritySetting.js';
-import LocalSecuritySetting from './LocalSecuritySetting.js';
-import OidcSecuritySetting from './OidcSecuritySetting.js';
-import SamlSecuritySetting from './SamlSecuritySetting.js';
-import { SecuritySetting } from './SecuritySetting/index.js';
-import ShareLinkSetting from './ShareLinkSetting.js';
+import CustomNav from '../../CustomNavigation/CustomNav';
+import GitHubSecuritySetting from './GitHubSecuritySetting';
+import GoogleSecuritySetting from './GoogleSecuritySetting';
+import LdapSecuritySetting from './LdapSecuritySetting';
+import LocalSecuritySetting from './LocalSecuritySetting';
+import OidcSecuritySetting from './OidcSecuritySetting';
+import SamlSecuritySetting from './SamlSecuritySetting';
+import { SecuritySetting } from './SecuritySetting';
+import ShareLinkSetting from './ShareLinkSetting';
 
 const PassportLocalIcon = () => (
   <span className="material-symbols-outlined">groups</span>

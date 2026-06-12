@@ -6,12 +6,12 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 import {
   type IPageGrantData,
   UserGroupPageGrantStatus,
-} from '~/interfaces/page.js';
+} from '~/interfaces/page';
 import type {
   IRecordApplicableGrant,
   IResGrantData,
   PopulatedGrantedGroup,
-} from '~/interfaces/page-grant.js';
+} from '~/interfaces/page-grant';
 
 type ModalProps = {
   isOpen: boolean;
@@ -80,7 +80,7 @@ export const FixPageGrantModal = (props: ModalProps): JSX.Element => {
 
     try {
       // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-      const apiv3Put = (await import('~/client/util/apiv3-client.js')).apiv3Put;
+      const apiv3Put = (await import('~/client/util/apiv3-client')).apiv3Put;
       await apiv3Put(`/page/${pageId}/grant`, {
         grant: selectedGrant,
         userRelatedGrantedGroups:
@@ -92,11 +92,11 @@ export const FixPageGrantModal = (props: ModalProps): JSX.Element => {
       });
 
       // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-      const toastSuccess = (await import('~/client/util/toastr.js')).toastSuccess;
+      const toastSuccess = (await import('~/client/util/toastr')).toastSuccess;
       toastSuccess(t('Successfully updated'));
     } catch {
       // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-      const toastError = (await import('~/client/util/toastr.js')).toastError;
+      const toastError = (await import('~/client/util/toastr')).toastError;
       toastError(t('Failed to update'));
     }
   };

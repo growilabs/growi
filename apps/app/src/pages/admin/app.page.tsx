@@ -1,16 +1,16 @@
 import type { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
 
-import type { NextPageWithLayout } from '../_app.page.js';
-import type { AdminCommonProps } from './_shared/index.js';
+import type { NextPageWithLayout } from '../_app.page';
+import type { AdminCommonProps } from './_shared';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared/index.js';
+} from './_shared';
 
 const AppSettingsPageContents = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/Admin/App/AppSettingsPageContents.js'),
+  () => import('~/client/components/Admin/App/AppSettingsPageContents'),
   { ssr: false },
 );
 
@@ -26,7 +26,7 @@ AdminAppPage.getLayout = createAdminPageLayout<Props>({
     async () => {
       const AdminAppContainer =
         // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-        (await import('~/client/services/AdminAppContainer.js')).default;
+        (await import('~/client/services/AdminAppContainer')).default;
       return new AdminAppContainer();
     },
   ],

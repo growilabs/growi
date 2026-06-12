@@ -1,12 +1,12 @@
 import type { FC } from 'react';
 import type { HasObjectId } from '@growi/core';
 
-import type { IInAppNotification } from '~/interfaces/in-app-notification.js';
+import type { IInAppNotification } from '~/interfaces/in-app-notification';
 
-import { useAuditLogBulkExportJobModelNotification } from './AuditLogBulkExportJobModelNotification.js';
-import { usePageBulkExportJobModelNotification } from './PageBulkExportJobModelNotification.js';
-import { usePageModelNotification } from './PageModelNotification.js';
-import { useUserModelNotification } from './UserModelNotification.js';
+import { useAuditLogBulkExportJobModelNotification } from './AuditLogBulkExportJobModelNotification';
+import { usePageBulkExportJobModelNotification } from './PageBulkExportJobModelNotification';
+import { usePageModelNotification } from './PageModelNotification';
+import { useUserModelNotification } from './UserModelNotification';
 
 export interface ModelNotificationUtils {
   Notification: FC;

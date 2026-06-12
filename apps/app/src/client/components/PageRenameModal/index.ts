@@ -1,1 +1,1 @@
-export { PageRenameModalLazyLoaded } from './dynamic.js';
+export { PageRenameModalLazyLoaded } from './dynamic';

@@ -1,7 +1,7 @@
 import React, { type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import ElasticsearchManagement from './ElasticsearchManagement/ElasticsearchManagement.js';
+import ElasticsearchManagement from './ElasticsearchManagement/ElasticsearchManagement';
 
 export const FullTextSearchManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');

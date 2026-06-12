@@ -1,9 +1,9 @@
 import type { JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Post } from '~/client/util/apiv3-client.js';
-import { toastError } from '~/client/util/toastr.js';
-import { useCurrentUser } from '~/states/global/index.js';
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { toastError } from '~/client/util/toastr';
+import { useCurrentUser } from '~/states/global';
 
 export const Maintenance = (): JSX.Element => {
   const { t } = useTranslation();

@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import type { FieldNamesMarkedBoolean } from 'react-hook-form';
 
-import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client.js';
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
 
 import type {
   FileUploadFormValues,
   FileUploadSettingsData,
-} from './FileUploadSetting.types.js';
+} from './FileUploadSetting.types';
 
 type UseFileUploadSettingsReturn = {
   data: FileUploadSettingsData | null;

@@ -1,6 +1,6 @@
 import type React from 'react';
 
-import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer.js';
+import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 
 type Props = {
   adminGeneralSecurityContainer: AdminGeneralSecurityContainer;

@@ -1,7 +1,7 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { describe, expect, it } from 'vitest';
 
-import { extractScopes, getDisabledScopes, parseScopes } from './scope-util.js';
+import { extractScopes, getDisabledScopes, parseScopes } from './scope-util';
 
 describe('scope-util', () => {
   const mockScopes = {

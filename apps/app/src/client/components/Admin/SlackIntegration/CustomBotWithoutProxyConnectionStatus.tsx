@@ -2,7 +2,7 @@ import React, { type JSX } from 'react';
 import Image from 'next/image';
 import type { ConnectionStatus } from '@growi/slack';
 
-import { Bridge } from './Bridge.js';
+import { Bridge } from './Bridge';
 
 type CustomBotWithoutProxyConnectionStatusProps = {
   siteName: string;

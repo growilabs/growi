@@ -4,7 +4,7 @@ import { useTranslation } from 'next-i18next';
 import type { TypeaheadRef } from 'react-bootstrap-typeahead';
 import { AsyncTypeahead, Token } from 'react-bootstrap-typeahead';
 
-import { useSWRxTagsSearch } from '~/stores/tag.js';
+import { useSWRxTagsSearch } from '~/stores/tag';
 
 import styles from './TagsInput.module.scss';
 

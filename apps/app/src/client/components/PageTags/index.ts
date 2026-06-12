@@ -1,1 +1,1 @@
-export * from './PageTags.js';
+export * from './PageTags';

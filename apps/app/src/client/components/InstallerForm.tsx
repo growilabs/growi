@@ -7,10 +7,10 @@ import { useTranslation } from 'next-i18next';
 
 import * as nextI18nConfig from '^/config/next-i18next.config.cjs';
 
-import { apiv3Post } from '~/client/util/apiv3-client.js';
-import { useTWithOpt } from '~/client/util/t-with-opt.js';
-import { toastError } from '~/client/util/toastr.js';
-import type { IErrorV3 } from '~/interfaces/errors/v3-error.js';
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { useTWithOpt } from '~/client/util/t-with-opt';
+import { toastError } from '~/client/util/toastr';
+import type { IErrorV3 } from '~/interfaces/errors/v3-error';
 
 import styles from './InstallerForm.module.scss';
 

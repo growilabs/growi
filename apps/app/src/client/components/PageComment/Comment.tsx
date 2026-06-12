@@ -11,12 +11,12 @@ import urljoin from 'url-join';
 
 import type { RendererOptions } from '~/interfaces/renderer-options.js';
 
-import RevisionRenderer from '../../../components/PageView/RevisionRenderer.js';
-import { Username } from '../../../components/User/Username.js';
+import RevisionRenderer from '~/components/PageView/RevisionRenderer.js';
+import { Username } from '~/components/User/Username.js';
 import type { ICommentHasId } from '../../../interfaces/comment.js';
-import FormattedDistanceDate from '../FormattedDistanceDate.js';
-import { CommentControl } from './CommentControl.js';
-import { CommentEditor } from './CommentEditor.js';
+import FormattedDistanceDate from '~/client/components/FormattedDistanceDate.js';
+import { CommentControl } from '~/client/components/PageComment/CommentControl.js';
+import { CommentEditor } from '~/client/components/PageComment/CommentEditor.js';
 
 import styles from './Comment.module.scss';
 

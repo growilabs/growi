@@ -21,12 +21,12 @@ import {
   useCurrentPageData,
   useCurrentPagePath,
   useIsEditable,
-} from '~/states/page/index.js';
+} from '~/states/page';
 import {
   isAclEnabledAtom,
   isSlackConfiguredAtom,
-} from '~/states/server-configurations/index.js';
-import { useDeviceLargerThanMd } from '~/states/ui/device.js';
+} from '~/states/server-configurations';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
 import {
   EditorMode,
   useEditorMode,
@@ -34,14 +34,14 @@ import {
   useSelectedGrant,
   useSyncSelectedGrantWithCurrentPage,
   useWaitingSaveProcessing,
-} from '~/states/ui/editor/index.js';
-import { useSWRxSlackChannels } from '~/stores/editor.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/states/ui/editor';
+import { useSWRxSlackChannels } from '~/stores/editor';
+import loggerFactory from '~/utils/logger';
 
-import { NotAvailable } from '../../NotAvailable.js';
-import { SlackNotification } from '../../SlackNotification.js';
-import type { SaveOptions } from '../PageEditor.js';
-import { GrantSelector } from './GrantSelector.js';
+import { NotAvailable } from '../../NotAvailable';
+import { SlackNotification } from '../../SlackNotification';
+import type { SaveOptions } from '../PageEditor';
+import { GrantSelector } from './GrantSelector';
 
 const logger = loggerFactory('growi:SavePageControls');
 

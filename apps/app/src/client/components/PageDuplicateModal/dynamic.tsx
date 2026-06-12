@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
-import { usePageDuplicateModalStatus } from '~/states/ui/modal/page-duplicate.js';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
+import { usePageDuplicateModalStatus } from '~/states/ui/modal/page-duplicate';
 
 type PageDuplicateModalProps = Record<string, unknown>;
 
@@ -11,7 +11,7 @@ export const PageDuplicateModalLazyLoaded = (): JSX.Element => {
   const PageDuplicateModal = useLazyLoader<PageDuplicateModalProps>(
     'page-duplicate-modal',
     () =>
-      import('./PageDuplicateModal.js').then((mod) => ({
+      import('./PageDuplicateModal').then((mod) => ({
         default: mod.PageDuplicateModal,
       })),
     status?.isOpened ?? false,

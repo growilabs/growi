@@ -1,1 +1,1 @@
-export { TrashPageAlertLazyLoaded } from './dynamic.js';
+export { TrashPageAlertLazyLoaded } from './dynamic';

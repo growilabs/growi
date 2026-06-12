@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { useSiteUrl } from '~/states/global/index.js';
+import { useSiteUrl } from '~/states/global';
 
 const isValidUrl = (str: string): boolean => {
   try {

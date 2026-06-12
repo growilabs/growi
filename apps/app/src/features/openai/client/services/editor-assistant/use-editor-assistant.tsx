@@ -22,24 +22,24 @@ import {
   SseFinalizedSchema,
   type SseMessage,
   SseMessageSchema,
-} from '../../../interfaces/editor-assistant/sse-schemas.js';
+} from '~/features/openai/interfaces/editor-assistant/sse-schemas.js';
 import type { MessageLog } from '../../../interfaces/message.js';
 import type { IThreadRelationHasId } from '../../../interfaces/thread-relation.js';
-import { ThreadType } from '../../../interfaces/thread-relation.js';
-import { handleIfSuccessfullyParsed } from '../../../utils/handle-if-successfully-parsed.js';
-import { AiAssistantDropdown } from '../../components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown.js';
-import { QuickMenuList } from '../../components/AiAssistant/AiAssistantSidebar/QuickMenuList.js';
+import { ThreadType } from '~/features/openai/interfaces/thread-relation.js';
+import { handleIfSuccessfullyParsed } from '~/features/openai/utils/handle-if-successfully-parsed.js';
+import { AiAssistantDropdown } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown.js';
+import { QuickMenuList } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/QuickMenuList.js';
 import {
   useAiAssistantSidebarStatus,
   useIsEnableUnifiedMergeView,
   useUnifiedMergeViewActions,
-} from '../../states/index.js';
+} from '~/features/openai/client/states/index.js';
 import {
   shouldUseClientProcessing,
   useClientEngineIntegration,
-} from '../client-engine-integration.js';
-import { getPageBodyForContext } from './get-page-body-for-context.js';
-import { performSearchReplace } from './search-replace-engine.js';
+} from '~/features/openai/client/services/client-engine-integration.js';
+import { getPageBodyForContext } from '~/features/openai/client/services/editor-assistant/get-page-body-for-context.js';
+import { performSearchReplace } from '~/features/openai/client/services/editor-assistant/search-replace-engine.js';
 
 type CreateThread = () => Promise<IThreadRelationHasId>;
 

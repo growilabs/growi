@@ -11,13 +11,13 @@ import {
   TabPane,
 } from 'reactstrap';
 
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import {
   useAssociateLdapAccount,
   useSWRxPersonalExternalAccounts,
-} from '~/stores/personal-settings.js';
+} from '~/stores/personal-settings';
 
-import { LdapAuthTest } from '../Admin/Security/LdapAuthTest.js';
+import { LdapAuthTest } from '../Admin/Security/LdapAuthTest';
 
 type Props = {
   isOpen: boolean;

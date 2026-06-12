@@ -1,10 +1,10 @@
 import type React from 'react';
 
-import { useCurrentPageId, useCurrentPagePath } from '~/states/page/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { useCurrentPageId, useCurrentPagePath } from '~/states/page';
+import loggerFactory from '~/utils/logger';
 
-import { PageRevisionTable } from '../PageHistory/PageRevisionTable.js';
-import { useAutoComparingRevisionsByQueryParam } from './hooks.js';
+import { PageRevisionTable } from '../PageHistory/PageRevisionTable';
+import { useAutoComparingRevisionsByQueryParam } from './hooks';
 
 const logger = loggerFactory('growi:PageHistory');
 

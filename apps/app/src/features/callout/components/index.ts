@@ -1,1 +1,1 @@
-export { CalloutViewer } from './CalloutViewer.js';
+export { CalloutViewer } from '~/features/callout/components/CalloutViewer.js';

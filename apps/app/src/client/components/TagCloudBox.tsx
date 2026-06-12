@@ -1,8 +1,8 @@
 import type { FC } from 'react';
 import React, { memo } from 'react';
 
-import type { IDataTagCount } from '~/interfaces/tag.js';
-import { useSetSearchKeyword } from '~/states/search/index.js';
+import type { IDataTagCount } from '~/interfaces/tag';
+import { useSetSearchKeyword } from '~/states/search';
 
 type Props = {
   tags: IDataTagCount[];

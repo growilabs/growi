@@ -1,11 +1,11 @@
 import type { JSX } from 'react';
 import { useAtomValue } from 'jotai';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
-import { useCurrentPageData } from '~/states/page/index.js';
-import { elasticsearchMaxBodyLengthToIndexAtom } from '~/states/server-configurations/index.js';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
+import { useCurrentPageData } from '~/states/page';
+import { elasticsearchMaxBodyLengthToIndexAtom } from '~/states/server-configurations';
 
-import type { FullTextSearchNotCoverAlertProps } from './FullTextSearchNotCoverAlert.js';
+import type { FullTextSearchNotCoverAlertProps } from './FullTextSearchNotCoverAlert';
 
 export const FullTextSearchNotCoverAlertLazyLoaded = (): JSX.Element => {
   const pageData = useCurrentPageData();
@@ -26,7 +26,7 @@ export const FullTextSearchNotCoverAlertLazyLoaded = (): JSX.Element => {
     useLazyLoader<FullTextSearchNotCoverAlertProps>(
       'full-text-search-not-cover-alert',
       () =>
-        import('./FullTextSearchNotCoverAlert.js').then((mod) => ({
+        import('./FullTextSearchNotCoverAlert').then((mod) => ({
           default: mod.FullTextSearchNotCoverAlert,
         })),
       shouldShow,

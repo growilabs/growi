@@ -3,15 +3,15 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer.js';
-import { toastError } from '~/client/util/toastr.js';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer';
+import { toastError } from '~/client/util/toastr';
 
-import PaginationWrapper from '../PaginationWrapper.js';
-import { withUnstatedContainers } from '../UnstatedUtils.js';
-import InviteUserControl from './Users/InviteUserControl.js';
-import PasswordResetModal from './Users/PasswordResetModal.js';
-import UserStatisticsTable from './Users/UserStatisticsTable.js';
-import UserTable from './Users/UserTable.js';
+import PaginationWrapper from '../PaginationWrapper';
+import { withUnstatedContainers } from '../UnstatedUtils';
+import InviteUserControl from './Users/InviteUserControl';
+import PasswordResetModal from './Users/PasswordResetModal';
+import UserStatisticsTable from './Users/UserStatisticsTable';
+import UserTable from './Users/UserTable';
 
 import styles from './UserManagement.module.scss';
 

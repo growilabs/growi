@@ -2,13 +2,13 @@ import React, { useCallback } from 'react';
 import { useRouter } from 'next/router';
 import type { HasObjectId, IPage } from '@growi/core';
 
-import { SupportedTargetModel } from '~/interfaces/activity.js';
-import type { IInAppNotification } from '~/interfaces/in-app-notification.js';
-import * as pageSerializers from '~/models/serializers/in-app-notification-snapshot/page.js';
+import { SupportedTargetModel } from '~/interfaces/activity';
+import type { IInAppNotification } from '~/interfaces/in-app-notification';
+import * as pageSerializers from '~/models/serializers/in-app-notification-snapshot/page';
 
-import type { ModelNotificationUtils } from './index.js';
-import { ModelNotification } from './ModelNotification.js';
-import { useActionMsgAndIconForModelNotification } from './useActionAndMsg.js';
+import type { ModelNotificationUtils } from '.';
+import { ModelNotification } from './ModelNotification';
+import { useActionMsgAndIconForModelNotification } from './useActionAndMsg';
 
 export const usePageModelNotification = (
   notification: IInAppNotification & HasObjectId,

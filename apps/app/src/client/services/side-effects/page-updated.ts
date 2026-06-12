@@ -1,16 +1,16 @@
 import { useCallback, useEffect } from 'react';
 
-import { SocketEventName } from '~/interfaces/websocket.js';
-import type { RemoteRevisionData } from '~/states/page/index.js';
+import { SocketEventName } from '~/interfaces/websocket';
+import type { RemoteRevisionData } from '~/states/page';
 import {
   useCurrentPageData,
   useFetchCurrentPage,
   useSetRemoteLatestPageData,
-} from '~/states/page/index.js';
-import { useGlobalSocket } from '~/states/socket-io/index.js';
-import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
-import { usePageStatusAlertActions } from '~/states/ui/modal/page-status-alert.js';
-import { useSWRxPageInfo } from '~/stores/page.js';
+} from '~/states/page';
+import { useGlobalSocket } from '~/states/socket-io';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
+import { usePageStatusAlertActions } from '~/states/ui/modal/page-status-alert';
+import { useSWRxPageInfo } from '~/stores/page';
 
 export const usePageUpdatedEffect = (): void => {
   const setRemoteLatestPageData = useSetRemoteLatestPageData();

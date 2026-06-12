@@ -6,7 +6,7 @@ import { useTranslation } from 'next-i18next';
 import { useIsReadOnlyUser } from '~/states/context.js';
 import { isRomUserAllowedToCommentAtom } from '~/states/server-configurations/index.js';
 
-import { NotAvailable } from './NotAvailable.js';
+import { NotAvailable } from '~/client/components/NotAvailable.js';
 
 export const NotAvailableForReadOnlyUser: React.FC<{
   children: JSX.Element;

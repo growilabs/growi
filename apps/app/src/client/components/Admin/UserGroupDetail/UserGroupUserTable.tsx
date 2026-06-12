@@ -3,7 +3,7 @@ import { UserPicture } from '@growi/ui/dist/components';
 import { format as dateFnsFormat } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 
-import type { IUserGroupRelationHasIdPopulatedUser } from '~/interfaces/user-group-response.js';
+import type { IUserGroupRelationHasIdPopulatedUser } from '~/interfaces/user-group-response';
 
 type Props = {
   userGroupRelations: IUserGroupRelationHasIdPopulatedUser[] | undefined;

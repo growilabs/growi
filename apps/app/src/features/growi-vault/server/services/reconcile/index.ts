@@ -24,4 +24,4 @@ export type {
   VaultReconcileService,
   VaultReconcileServiceDeps,
 } from './reconcile-service.js';
-export { createVaultReconcileService } from './reconcile-service.js';
+export { createVaultReconcileService } from '~/features/growi-vault/server/services/reconcile/reconcile-service.js';

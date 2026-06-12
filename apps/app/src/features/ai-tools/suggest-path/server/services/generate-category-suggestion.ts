@@ -2,8 +2,8 @@ import type {
   PathSuggestion,
   SearchCandidate,
 } from '../../interfaces/suggest-path-types.js';
-import { SuggestionType } from '../../interfaces/suggest-path-types.js';
-import { resolveParentGrant } from './resolve-parent-grant.js';
+import { SuggestionType } from '~/features/ai-tools/suggest-path/interfaces/suggest-path-types.js';
+import { resolveParentGrant } from '~/features/ai-tools/suggest-path/server/services/resolve-parent-grant.js';
 
 const CATEGORY_LABEL = 'Save under category';
 

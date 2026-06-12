@@ -1,10 +1,10 @@
 import type { JSX } from 'react';
 
-import { PageHeader } from '~/client/components/PageHeader/index.js';
-import { useEditingClients } from '~/states/ui/editor/editing-clients.js';
-import { useScrollToRemoteCursor } from '~/states/ui/editor/scroll-to-remote-cursor.js';
+import { PageHeader } from '~/client/components/PageHeader';
+import { useEditingClients } from '~/states/ui/editor/editing-clients';
+import { useScrollToRemoteCursor } from '~/states/ui/editor/scroll-to-remote-cursor';
 
-import { EditingUserList } from './EditingUserList.js';
+import { EditingUserList } from './EditingUserList';
 
 import styles from './EditorNavbar.module.scss';
 

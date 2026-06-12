@@ -1,2 +1,2 @@
-export * from './components/index.js';
-export * from './services/index.js';
+export * from '~/features/callout/components/index.js';
+export * from '~/features/callout/services/index.js';

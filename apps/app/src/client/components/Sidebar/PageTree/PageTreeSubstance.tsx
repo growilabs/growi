@@ -3,21 +3,21 @@ import { useTranslation } from 'next-i18next';
 import { DndProvider } from 'react-dnd';
 import { HTML5Backend } from 'react-dnd-html5-backend';
 
-import { ItemsTree } from '~/features/page-tree/components/index.js';
-import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update.js';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
-import { useCurrentPageId, useCurrentPagePath } from '~/states/page/index.js';
-import { useSidebarScrollerElem } from '~/states/ui/sidebar/index.js';
+import { ItemsTree } from '~/features/page-tree/components';
+import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import { useCurrentPageId, useCurrentPagePath } from '~/states/page';
+import { useSidebarScrollerElem } from '~/states/ui/sidebar';
 import {
   mutatePageTree,
   mutateRecentlyUpdated,
   useSWRxRootPage,
   useSWRxV5MigrationStatus,
-} from '~/stores/page-listing.js';
+} from '~/stores/page-listing';
 
-import { PageTreeItem, pageTreeItemSize } from '../PageTreeItem/index.js';
-import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton.js';
-import { PrivateLegacyPagesLink } from './PrivateLegacyPagesLink.js';
+import { PageTreeItem, pageTreeItemSize } from '../PageTreeItem';
+import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton';
+import { PrivateLegacyPagesLink } from './PrivateLegacyPagesLink';
 
 type HeaderProps = {
   isWipPageShown: boolean;

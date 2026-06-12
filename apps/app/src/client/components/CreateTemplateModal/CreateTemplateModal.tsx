@@ -4,9 +4,9 @@ import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import { useCreateTemplatePage } from '~/client/services/create-page/index.js';
-import { toastError } from '~/client/util/toastr.js';
-import type { LabelType, TargetType } from '~/interfaces/template.js';
+import { useCreateTemplatePage } from '~/client/services/create-page';
+import { toastError } from '~/client/util/toastr';
+import type { LabelType, TargetType } from '~/interfaces/template';
 
 type TemplateCardProps = {
   target: TargetType;

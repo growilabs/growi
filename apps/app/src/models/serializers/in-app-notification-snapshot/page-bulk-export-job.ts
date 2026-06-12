@@ -7,7 +7,7 @@ import type { PageModel } from '~/server/models/page.js';
 
 // Re-export client-safe types and functions
 export type { IPageBulkExportJobSnapshot } from './page-bulk-export-job-client.js';
-export { parseSnapshot } from './page-bulk-export-job-client.js';
+export { parseSnapshot } from '~/models/serializers/in-app-notification-snapshot/page-bulk-export-job-client.js';
 
 export const stringifySnapshot = async (
   exportJob: IPageBulkExportJob,

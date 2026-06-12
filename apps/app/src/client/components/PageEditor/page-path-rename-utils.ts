@@ -2,14 +2,14 @@ import { useCallback } from 'react';
 import type { IPagePopulatedToShowRevision } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Put } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useFetchCurrentPage, useSetIsUntitledPage } from '~/states/page/index.js';
+import { apiv3Put } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useFetchCurrentPage, useSetIsUntitledPage } from '~/states/page';
 import {
   mutatePageList,
   mutatePageTree,
   mutateRecentlyUpdated,
-} from '~/stores/page-listing.js';
+} from '~/stores/page-listing';
 
 type PagePathRenameHandler = (
   newPagePath: string,

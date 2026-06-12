@@ -6,7 +6,7 @@ import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 import {
   useUpdateUserGroupConfirmModalActions,
   useUpdateUserGroupConfirmModalStatus,
-} from '~/states/ui/modal/update-user-group-confirm.js';
+} from '~/states/ui/modal/update-user-group-confirm';
 
 export const UpdateParentConfirmModal: FC = () => {
   const { t } = useTranslation();

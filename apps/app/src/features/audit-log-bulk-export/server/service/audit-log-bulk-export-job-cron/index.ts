@@ -16,13 +16,13 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   AuditLogBulkExportJobInProgressJobStatus,
   AuditLogBulkExportJobStatus,
-} from '../../../interfaces/audit-log-bulk-export.js';
+} from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
 import type { AuditLogBulkExportJobDocument } from '../../models/audit-log-bulk-export-job.js';
-import AuditLogBulkExportJob from '../../models/audit-log-bulk-export-job.js';
+import AuditLogBulkExportJob from '~/features/audit-log-bulk-export/server/models/audit-log-bulk-export-job.js';
 import {
   AuditLogBulkExportJobExpiredError,
   AuditLogBulkExportJobRestartedError,
-} from './errors.js';
+} from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/errors.js';
 
 const logger = loggerFactory('growi:service:audit-log-export-job-cron');
 
@@ -58,8 +58,8 @@ export interface IAuditLogBulkExportJobCronService {
 import type { ActivityDocument } from '~/server/models/activity.js';
 import { preNotifyService } from '~/server/service/pre-notify.js';
 
-import { compressAndUpload } from './steps/compress-and-upload.js';
-import { exportAuditLogsToFsAsync } from './steps/exportAuditLogsToFsAsync.js';
+import { compressAndUpload } from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/steps/compress-and-upload.js';
+import { exportAuditLogsToFsAsync } from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/steps/exportAuditLogsToFsAsync.js';
 
 /**
  * Manages cronjob which proceeds AuditLogBulkExportJobs in progress.

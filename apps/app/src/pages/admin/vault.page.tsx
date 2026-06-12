@@ -1,17 +1,17 @@
 import type { GetServerSideProps } from 'next';
 import dynamic from 'next/dynamic';
 
-import type { NextPageWithLayout } from '../_app.page.js';
-import type { AdminCommonProps } from './_shared/index.js';
+import type { NextPageWithLayout } from '../_app.page';
+import type { AdminCommonProps } from './_shared';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared/index.js';
+} from './_shared';
 
 const VaultAdminSettings = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/features/growi-vault/client/admin/index.js').then(
+    import('~/features/growi-vault/client/admin').then(
       (m) => m.VaultAdminSettings,
     ),
   { ssr: false },

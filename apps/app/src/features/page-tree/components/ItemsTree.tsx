@@ -8,7 +8,7 @@ import { toastError, toastWarning } from '~/client/util/toastr.js';
 import type { IPageForTreeItem } from '~/interfaces/page.js';
 import { useSWRxRootPage } from '~/stores/page-listing.js';
 
-import { ROOT_PAGE_VIRTUAL_ID } from '../constants/_inner.js';
+import { ROOT_PAGE_VIRTUAL_ID } from '~/features/page-tree/constants/_inner.js';
 import {
   useAutoExpandAncestors,
   useDataLoader,
@@ -17,10 +17,10 @@ import {
   useTreeFeatures,
   useTreeItemHandlers,
   useTreeRevalidation,
-} from '../hooks/_inner/index.js';
-import { useSocketUpdateDescCount } from '../hooks/use-socket-update-desc-count.js';
+} from '~/features/page-tree/hooks/_inner/index.js';
+import { useSocketUpdateDescCount } from '~/features/page-tree/hooks/use-socket-update-desc-count.js';
 import type { TreeItemProps } from '../interfaces/index.js';
-import { useTriggerTreeRebuild } from '../states/_inner/index.js';
+import { useTriggerTreeRebuild } from '~/features/page-tree/states/_inner/index.js';
 
 // Stable createLoadingItemData function
 const createLoadingItemData = (): IPageForTreeItem => ({

@@ -7,8 +7,8 @@ import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.j
 import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global/index.js';
 import { aiEnabledAtom } from '~/states/server-configurations/index.js';
 
-import { useAiAssistantSidebarActions } from '../../states/index.js';
-import { useSWRxAiAssistants } from '../../stores/ai-assistant.js';
+import { useAiAssistantSidebarActions } from '~/features/openai/client/states/index.js';
+import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant.js';
 
 import styles from './OpenDefaultAiAssistantButton.module.scss';
 

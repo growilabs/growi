@@ -4,8 +4,8 @@ import { body, type ValidationChain } from 'express-validator';
 import {
   AiAssistantAccessScope,
   AiAssistantShareScope,
-} from '../../../interfaces/ai-assistant.js';
-import { isCreatablePagePathPattern } from '../../../utils/is-creatable-page-path-pattern.js';
+} from '~/features/openai/interfaces/ai-assistant.js';
+import { isCreatablePagePathPattern } from '~/features/openai/utils/is-creatable-page-path-pattern.js';
 
 export const upsertAiAssistantValidator: ValidationChain[] = [
   body('name')

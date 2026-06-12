@@ -21,13 +21,13 @@ import {
   useSWRxSearch,
 } from '~/stores/search.js';
 
-import { OperateAllControl } from './OperateAllControl.js';
-import SearchControl from './SearchControl.js';
+import { OperateAllControl } from '~/features/search/client/components/SearchPage/OperateAllControl.js';
+import SearchControl from '~/features/search/client/components/SearchPage/SearchControl.js';
 import type { IReturnSelectedPageIds } from './SearchPageBase.js';
 import {
   SearchPageBase,
   usePageDeleteModalForBulkDeletion,
-} from './SearchPageBase.js';
+} from '~/features/search/client/components/SearchPage/SearchPageBase.js';
 
 import styles from './SearchPage.module.scss';
 

@@ -2,7 +2,7 @@ import type React from 'react';
 import type { CompositionEvent } from 'react';
 import { useCallback, useState } from 'react';
 
-import type { SubmittableInputProps } from './types.js';
+import type { SubmittableInputProps } from './types';
 
 export const useSubmittable = (
   props: SubmittableInputProps,

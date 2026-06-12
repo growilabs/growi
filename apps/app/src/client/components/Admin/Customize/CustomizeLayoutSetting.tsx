@@ -2,9 +2,9 @@ import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useSWRxLayoutSetting } from '~/stores/admin/customize.js';
-import { useNextThemes } from '~/stores-universal/use-next-themes.js';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useSWRxLayoutSetting } from '~/stores/admin/customize';
+import { useNextThemes } from '~/stores-universal/use-next-themes';
 
 const useIsContainerFluid = () => {
   const { data: layoutSetting, update: updateLayoutSetting } =

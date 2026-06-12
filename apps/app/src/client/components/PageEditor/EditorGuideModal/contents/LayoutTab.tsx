@@ -3,8 +3,8 @@ import { useTranslation } from 'react-i18next';
 import { PrismAsyncLight } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
-import type { LayoutGuideItem } from '../components/GuideRow.js';
-import { GuideRow } from '../components/GuideRow.js';
+import type { LayoutGuideItem } from '../components/GuideRow';
+import { GuideRow } from '../components/GuideRow';
 
 import styles from './LayoutTab.module.scss';
 

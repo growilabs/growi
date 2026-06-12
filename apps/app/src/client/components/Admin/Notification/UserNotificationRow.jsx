@@ -2,10 +2,10 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import AdminNotificationContainer from '~/client/services/AdminNotificationContainer.js';
+import AdminNotificationContainer from '~/client/services/AdminNotificationContainer';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import { NotificationTypeIcon } from './NotificationTypeIcon.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import { NotificationTypeIcon } from './NotificationTypeIcon';
 
 class UserNotificationRow extends React.PureComponent {
   render() {

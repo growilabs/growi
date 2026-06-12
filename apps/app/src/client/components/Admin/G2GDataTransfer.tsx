@@ -1,20 +1,20 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { useGenerateTransferKey } from '~/client/services/g2g-transfer.js';
-import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useAdminSocket } from '~/features/admin/states/socket-io.js';
+import { useGenerateTransferKey } from '~/client/services/g2g-transfer';
+import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 import {
   G2G_PROGRESS_STATUS,
   type G2GProgress,
-} from '~/interfaces/g2g-transfer.js';
-import { useGrowiDocumentationUrl } from '~/states/context.js';
+} from '~/interfaces/g2g-transfer';
+import { useGrowiDocumentationUrl } from '~/states/context';
 
-import CustomCopyToClipBoard from '../Common/CustomCopyToClipBoard.js';
+import CustomCopyToClipBoard from '../Common/CustomCopyToClipBoard';
 // import { FileUploadSettingMolecule } from './App/FileUploadSetting';
-import G2GDataTransferExportForm from './G2GDataTransferExportForm.js';
-import G2GDataTransferStatusIcon from './G2GDataTransferStatusIcon.js';
+import G2GDataTransferExportForm from './G2GDataTransferExportForm';
+import G2GDataTransferStatusIcon from './G2GDataTransferStatusIcon';
 
 const IGNORED_COLLECTION_NAMES = [
   'sessions',

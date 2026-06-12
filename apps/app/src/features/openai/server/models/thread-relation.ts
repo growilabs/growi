@@ -7,7 +7,7 @@ import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 import {
   type IThreadRelation,
   ThreadType,
-} from '../../interfaces/thread-relation.js';
+} from '~/features/openai/interfaces/thread-relation.js';
 
 const DAYS_UNTIL_EXPIRATION = 3;
 

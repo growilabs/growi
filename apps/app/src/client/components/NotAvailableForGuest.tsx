@@ -3,7 +3,7 @@ import { useTranslation } from 'next-i18next';
 
 import { useIsGuestUser } from '~/states/context.js';
 
-import { NotAvailable } from './NotAvailable.js';
+import { NotAvailable } from '~/client/components/NotAvailable.js';
 
 type NotAvailableForGuestProps = {
   children: JSX.Element;

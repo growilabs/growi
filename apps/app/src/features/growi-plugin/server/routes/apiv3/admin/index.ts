@@ -10,8 +10,8 @@ import adminRequiredFactory from '~/server/middlewares/admin-required.js';
 import loginRequiredFactory from '~/server/middlewares/login-required.js';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
 
-import { GrowiPlugin } from '../../../models/index.js';
-import { growiPluginService } from '../../../services/index.js';
+import { GrowiPlugin } from '~/features/growi-plugin/server/models/index.js';
+import { growiPluginService } from '~/features/growi-plugin/server/services/index.js';
 
 const ObjectID = mongoose.Types.ObjectId;
 

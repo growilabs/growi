@@ -2,12 +2,12 @@ import type { FC } from 'react';
 import { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client.js';
-import { toastError } from '~/client/util/toastr.js';
-import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group.js';
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
+import { toastError } from '~/client/util/toastr';
+import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
 
-import { LdapGroupSyncSettingsForm } from './LdapGroupSyncSettingsForm.js';
-import { SyncExecution } from './SyncExecution.js';
+import { LdapGroupSyncSettingsForm } from './LdapGroupSyncSettingsForm';
+import { SyncExecution } from './SyncExecution';
 
 export const LdapGroupManagement: FC = () => {
   const [isUserBind, setIsUserBind] = useState(false);

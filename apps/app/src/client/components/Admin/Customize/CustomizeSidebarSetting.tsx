@@ -3,9 +3,9 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import { Card, CardBody } from 'reactstrap';
 
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useSWRxSidebarConfig } from '~/stores/admin/sidebar-config.js';
-import { useNextThemes } from '~/stores-universal/use-next-themes.js';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useSWRxSidebarConfig } from '~/stores/admin/sidebar-config';
+import { useNextThemes } from '~/stores-universal/use-next-themes';
 
 const CustomizeSidebarsetting = (): JSX.Element => {
   const { t } = useTranslation(['admin', 'commons']);

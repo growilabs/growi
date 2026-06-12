@@ -1,11 +1,11 @@
 import { type JSX, useCallback, useEffect, useRef, useState } from 'react';
 
-import { useCurrentPageData } from '~/states/page/index.js';
-import { useDeviceLargerThanSm } from '~/states/ui/device.js';
-import { usePageControlsX } from '~/states/ui/page.js';
+import { useCurrentPageData } from '~/states/page';
+import { useDeviceLargerThanSm } from '~/states/ui/device';
+import { usePageControlsX } from '~/states/ui/page';
 
-import { PagePathHeader } from './PagePathHeader.js';
-import { PageTitleHeader } from './PageTitleHeader.js';
+import { PagePathHeader } from './PagePathHeader';
+import { PageTitleHeader } from './PageTitleHeader';
 
 import styles from './PageHeader.module.scss';
 

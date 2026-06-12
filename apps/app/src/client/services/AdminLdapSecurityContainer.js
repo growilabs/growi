@@ -1,10 +1,10 @@
 import { isServer } from '@growi/core/dist/utils';
 import { Container } from 'unstated';
 
-import loggerFactory from '~/utils/logger/index.js';
-import { removeNullPropertyFromObject } from '~/utils/object-utils.js';
+import loggerFactory from '~/utils/logger';
+import { removeNullPropertyFromObject } from '~/utils/object-utils';
 
-import { apiv3Get, apiv3Put } from '../util/apiv3-client.js';
+import { apiv3Get, apiv3Put } from '../util/apiv3-client';
 
 const logger = loggerFactory('growi:services:AdminLdapSecurityContainer');
 

@@ -7,7 +7,7 @@ import {
   useCurrentPageData,
   useFetchCurrentPage,
   useRevisionIdFromUrl,
-} from '~/states/page/index.js';
+} from '~/states/page';
 
 export const OldRevisionAlert = (): JSX.Element => {
   const router = useRouter();

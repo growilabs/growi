@@ -10,9 +10,9 @@ import type {
   DiffError,
   ProcessorConfig,
 } from '../../interfaces/types.js';
-import { ClientDiffApplicationEngine } from './diff-application.js';
-import { ClientErrorHandler } from './error-handling.js';
-import { ClientFuzzyMatcher } from './fuzzy-matching.js';
+import { ClientDiffApplicationEngine } from '~/features/openai/client/services/editor-assistant/diff-application.js';
+import { ClientErrorHandler } from '~/features/openai/client/services/editor-assistant/error-handling.js';
+import { ClientFuzzyMatcher } from '~/features/openai/client/services/editor-assistant/fuzzy-matching.js';
 
 // Note: measureNormalization import removed as it's not used in this file
 

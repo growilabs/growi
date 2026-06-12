@@ -2,11 +2,11 @@ import React, { type JSX, useCallback } from 'react';
 import type { IUserHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useCurrentUser } from '~/states/global/index.js';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useCurrentUser } from '~/states/global';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
 
 const RevokeAdminAlert = React.memo((): JSX.Element => {
   const { t } = useTranslation();

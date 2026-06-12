@@ -3,17 +3,17 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { useUpdateStateAfterSave } from '~/client/services/page-operation.js';
-import { apiPost } from '~/client/util/apiv1-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useUpdateStateAfterSave } from '~/client/services/page-operation';
+import { apiPost } from '~/client/util/apiv1-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import {
   type TagEditModalStatus,
   useTagEditModalActions,
   useTagEditModalStatus,
-} from '~/states/ui/modal/tag-edit.js';
-import { useSWRxTagsInfo } from '~/stores/page.js';
+} from '~/states/ui/modal/tag-edit';
+import { useSWRxTagsInfo } from '~/stores/page';
 
-import { TagsInput } from './TagsInput.js';
+import { TagsInput } from './TagsInput';
 
 type TagEditModalSubstanceProps = {
   tagEditModalData: TagEditModalStatus;

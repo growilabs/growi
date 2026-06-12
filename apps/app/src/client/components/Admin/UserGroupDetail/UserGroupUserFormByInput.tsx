@@ -5,8 +5,8 @@ import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import { AsyncTypeahead } from 'react-bootstrap-typeahead';
 
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import type { SearchType } from '~/interfaces/user-group.js';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import type { SearchType } from '~/interfaces/user-group';
 
 type Props = {
   userGroup: IUserGroupHasId;

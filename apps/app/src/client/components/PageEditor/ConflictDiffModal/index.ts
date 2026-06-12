@@ -1,1 +1,1 @@
-export { ConflictDiffModalLazyLoaded } from './dynamic.js';
+export { ConflictDiffModalLazyLoaded } from './dynamic';

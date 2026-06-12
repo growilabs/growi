@@ -5,12 +5,12 @@ import { useForm } from 'react-hook-form';
 
 import { i18n as i18nConfig } from '^/config/next-i18next.config.cjs';
 
-import AdminAppContainer from '~/client/services/AdminAppContainer.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import loggerFactory from '~/utils/logger/index.js';
+import AdminAppContainer from '~/client/services/AdminAppContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import loggerFactory from '~/utils/logger';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 
 const logger = loggerFactory('growi:appSettings');
 

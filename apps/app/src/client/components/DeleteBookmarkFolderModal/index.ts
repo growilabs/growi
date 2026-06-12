@@ -1,1 +1,1 @@
-export { DeleteBookmarkFolderModalLazyLoaded } from './dynamic.js';
+export { DeleteBookmarkFolderModalLazyLoaded } from './dynamic';

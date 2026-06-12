@@ -3,10 +3,10 @@ import { useCallback } from 'react';
 import type {
   IApiv3PageUpdateParams,
   IApiv3PageUpdateResponse,
-} from '~/interfaces/apiv3/index.js';
-import { useSetIsUntitledPage } from '~/states/page/index.js';
+} from '~/interfaces/apiv3';
+import { useSetIsUntitledPage } from '~/states/page';
 
-import { updatePage } from './update-page.js';
+import { updatePage } from './update-page';
 
 type UseUpdatePage = (
   params: IApiv3PageUpdateParams,

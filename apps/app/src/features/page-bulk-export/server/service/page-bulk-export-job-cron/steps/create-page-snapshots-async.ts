@@ -9,10 +9,10 @@ import { SupportedAction } from '~/interfaces/activity.js';
 import type { PageDocument, PageModel } from '~/server/models/page.js';
 
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job.js';
-import PageBulkExportJob from '../../../models/page-bulk-export-job.js';
-import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot.js';
+import PageBulkExportJob from '~/features/page-bulk-export/server/models/page-bulk-export-job.js';
+import PageBulkExportPageSnapshot from '~/features/page-bulk-export/server/models/page-bulk-export-page-snapshot.js';
 import type { IPageBulkExportJobCronService } from '../index.js';
-import { BulkExportJobStreamDestroyedByCleanupError } from '../errors.js';
+import { BulkExportJobStreamDestroyedByCleanupError } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/errors.js';
 
 async function reuseDuplicateExportIfExists(
   this: IPageBulkExportJobCronService,

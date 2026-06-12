@@ -30,7 +30,7 @@ import {
 } from '~/states/ui/modal/page-create.js';
 import { getLocale } from '~/utils/locale-utils.js';
 
-import PagePathAutoComplete from './PagePathAutoComplete.js';
+import PagePathAutoComplete from '~/client/components/PagePathAutoComplete.js';
 
 import styles from './PageCreateModal.module.scss';
 

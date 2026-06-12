@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
-import AdminLocalSecurityContainer from '~/client/services/AdminLocalSecurityContainer.js';
-import { toastError } from '~/client/util/toastr.js';
-import { toArrayIfNot } from '~/utils/array-utils.js';
+import AdminLocalSecurityContainer from '~/client/services/AdminLocalSecurityContainer';
+import { toastError } from '~/client/util/toastr';
+import { toArrayIfNot } from '~/utils/array-utils';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import LocalSecuritySettingContents from './LocalSecuritySettingContents.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import LocalSecuritySettingContents from './LocalSecuritySettingContents';
 
 const LocalSecuritySetting = (props) => {
   const { adminLocalSecurityContainer } = props;

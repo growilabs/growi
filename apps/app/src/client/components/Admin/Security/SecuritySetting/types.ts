@@ -1,7 +1,7 @@
 import {
   type IPageDeleteConfigValue,
   PageDeleteConfigValue,
-} from '~/interfaces/page-delete-config.js';
+} from '~/interfaces/page-delete-config';
 
 export const DeletionTypeForT = Object.freeze({
   Deletion: 'deletion',

@@ -1,1 +1,1 @@
-export * from './AdminHome.js';
+export * from './AdminHome';

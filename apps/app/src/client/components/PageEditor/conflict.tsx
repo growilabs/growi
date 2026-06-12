@@ -1,24 +1,24 @@
 import { useCallback, useEffect } from 'react';
 import { Origin } from '@growi/core';
 import { GlobalCodeMirrorEditorKey } from '@growi/editor';
-import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor.js';
+import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import { useTranslation } from 'react-i18next';
 
-import { SocketEventName } from '~/interfaces/websocket.js';
-import type { RemoteRevisionData } from '~/states/page/index.js';
+import { SocketEventName } from '~/interfaces/websocket';
+import type { RemoteRevisionData } from '~/states/page';
 import {
   useCurrentPageData,
   useCurrentPageId,
   useSetRemoteLatestPageData,
-} from '~/states/page/index.js';
-import { useGlobalSocket } from '~/states/socket-io/index.js';
-import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
-import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff.js';
-import { usePageStatusAlertActions } from '~/states/ui/modal/page-status-alert.js';
+} from '~/states/page';
+import { useGlobalSocket } from '~/states/socket-io';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
+import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff';
+import { usePageStatusAlertActions } from '~/states/ui/modal/page-status-alert';
 
-import { useUpdateStateAfterSave } from '../../services/page-operation.js';
-import { toastSuccess } from '../../util/toastr.js';
-import type { Save, SaveOptions } from './PageEditor.js';
+import { useUpdateStateAfterSave } from '../../services/page-operation';
+import { toastSuccess } from '../../util/toastr';
+import type { Save, SaveOptions } from './PageEditor';
 
 export type ConflictHandler = (
   remoteRevisionData: RemoteRevisionData,

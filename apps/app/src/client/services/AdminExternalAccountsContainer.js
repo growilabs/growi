@@ -1,9 +1,9 @@
 import { isServer } from '@growi/core/dist/utils';
 import { Container } from 'unstated';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import { apiv3Delete, apiv3Get } from '../util/apiv3-client.js';
+import { apiv3Delete, apiv3Get } from '../util/apiv3-client';
 
 const _logger = loggerFactory('growi:services:AdminexternalaccountsContainer');
 

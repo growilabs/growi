@@ -3,7 +3,7 @@ import React, { type JSX, useEffect } from 'react';
 import {
   initializeGrowiFacade,
   registerGrowiFacade,
-} from '../utils/growi-facade-utils.js';
+} from '../utils/growi-facade-utils';
 
 declare global {
   var pluginActivators: {
@@ -19,7 +19,7 @@ async function activateAll(): Promise<void> {
 
   // register renderer options to facade
   const { generateViewOptions, generatePreviewOptions } = await import(
-    '~/client/services/renderer/renderer.js'
+    '~/client/services/renderer/renderer'
   );
   registerGrowiFacade({
     markdownRenderer: {

@@ -1,7 +1,7 @@
 import type { JSX, RefObject } from 'react';
 import { useEditorGuideModalStatus } from '@growi/editor/dist/states/modal/editor-guide';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
 
 type Props = {
   containerRef: RefObject<HTMLDivElement | null>;
@@ -15,7 +15,7 @@ export const EditorGuideModalLazyLoaded = ({
   const EditorGuideModal = useLazyLoader(
     'editor-guide-modal',
     () =>
-      import('./EditorGuideModal.js').then((mod) => ({
+      import('./EditorGuideModal').then((mod) => ({
         default: mod.EditorGuideModal,
       })),
     isOpened,

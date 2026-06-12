@@ -211,6 +211,11 @@ function rewriteFile(file, dryRun) {
       );
       return;
     }
+    // Only code modules under src/ can be expressed as `~/` aliases; assets
+    // (.scss/.json/...) and out-of-src targets already resolve in every
+    // pipeline in their relative form.
+    if (!resolved.startsWith(SRC + path.sep)) return;
+    if (!/\.(ts|tsx|js|jsx)$/.test(resolved)) return;
     const alias = toAliasSpecifier(resolved);
     node.value = alias;
     if (node.extra) node.extra = undefined;
@@ -226,7 +231,25 @@ function rewriteFile(file, dryRun) {
 
 function main() {
   const dryRun = process.argv.includes('--dry');
-  const closure = computeClosure();
+  // `--files <list>`: rewrite exactly the files listed (one path per line,
+  // absolute or relative to the app root) instead of computing the
+  // src/server SSR closure. Used by the task 3.6 NodeNext pass, where the
+  // dual-pipeline file set comes from `tspc --listFiles`.
+  const filesFlagIndex = process.argv.indexOf('--files');
+  let closure;
+  if (filesFlagIndex !== -1) {
+    const listPath = process.argv[filesFlagIndex + 1];
+    closure = new Set(
+      fs
+        .readFileSync(listPath, 'utf8')
+        .split('\n')
+        .map((line) => line.trim())
+        .filter((line) => line.length > 0)
+        .map((line) => path.resolve(APP_ROOT, line)),
+    );
+  } else {
+    closure = computeClosure();
+  }
   // biome-ignore lint/suspicious/noConsole: CLI summary output.
   console.log(
     `[ssr-relative-to-alias] SSR-reachable closure: ${closure.size} files`,

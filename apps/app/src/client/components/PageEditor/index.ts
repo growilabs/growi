@@ -1,3 +1,3 @@
-import { PageEditor } from './PageEditor.js';
+import { PageEditor } from './PageEditor';
 
 export default PageEditor;

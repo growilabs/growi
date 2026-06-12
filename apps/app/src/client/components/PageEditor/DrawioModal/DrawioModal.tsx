@@ -1,6 +1,6 @@
 import React, { type JSX, useCallback, useEffect, useMemo } from 'react';
 import { Lang } from '@growi/core';
-import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor.js';
+import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
 import {
   useDrawioModalForEditorActions,
   useDrawioModalForEditorStatus,
@@ -11,19 +11,19 @@ import { Modal, ModalBody } from 'reactstrap';
 import {
   getMarkdownDrawioMxfile,
   replaceFocusedDrawioWithEditor,
-} from '~/client/components/PageEditor/markdown-drawio-util-for-editor.js';
-import { useRendererConfig } from '~/states/server-configurations/index.js';
+} from '~/client/components/PageEditor/markdown-drawio-util-for-editor';
+import { useRendererConfig } from '~/states/server-configurations';
 import {
   useDrawioModalActions,
   useDrawioModalStatus,
-} from '~/states/ui/modal/drawio.js';
-import { useSWRxPersonalSettings } from '~/stores/personal-settings.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/states/ui/modal/drawio';
+import { useSWRxPersonalSettings } from '~/stores/personal-settings';
+import loggerFactory from '~/utils/logger';
 
 import {
   DrawioCommunicationHelper,
   type DrawioConfig,
-} from './DrawioCommunicationHelper.js';
+} from './DrawioCommunicationHelper';
 
 const logger = loggerFactory('growi:components:DrawioModal');
 

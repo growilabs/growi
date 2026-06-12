@@ -3,7 +3,7 @@ import { useRouter } from 'next/router';
 
 import { useFetchCurrentPage } from '~/states/page/index.js';
 
-import { NextjsRoutingType } from '../utils/nextjs-routing-utils.js';
+import { NextjsRoutingType } from '~/pages/utils/nextjs-routing-utils.js';
 
 /**
  * Hook for handling initial CSR fetch when SSR data is not available.

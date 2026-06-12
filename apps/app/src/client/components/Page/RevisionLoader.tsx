@@ -7,7 +7,7 @@ import type { RendererOptions } from '~/interfaces/renderer-options.js';
 import { useSWRxPageRevision } from '~/stores/page.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import RevisionRenderer from '../../../components/PageView/RevisionRenderer.js';
+import RevisionRenderer from '~/components/PageView/RevisionRenderer.js';
 
 export const ROOT_ELEM_ID = 'revision-loader' as const;
 

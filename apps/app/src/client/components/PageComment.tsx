@@ -15,13 +15,13 @@ import type {
   ICommentHasId,
   ICommentHasIdList,
 } from '../../interfaces/comment.js';
-import { useSWRxPageComment } from '../../stores/comment.js';
-import { NotAvailableForGuest } from './NotAvailableForGuest.js';
-import { NotAvailableIfReadOnlyUserNotAllowedToComment } from './NotAvailableForReadOnlyUser.js';
-import { Comment } from './PageComment/Comment.js';
-import { CommentEditor } from './PageComment/CommentEditor.js';
-import { DeleteCommentModalLazyLoaded } from './PageComment/DeleteCommentModal/index.js';
-import { ReplyComments } from './PageComment/ReplyComments.js';
+import { useSWRxPageComment } from '~/stores/comment.js';
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
+import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser.js';
+import { Comment } from '~/client/components/PageComment/Comment.js';
+import { CommentEditor } from '~/client/components/PageComment/CommentEditor.js';
+import { DeleteCommentModalLazyLoaded } from '~/client/components/PageComment/DeleteCommentModal/index.js';
+import { ReplyComments } from '~/client/components/PageComment/ReplyComments.js';
 
 import styles from './PageComment.module.scss';
 

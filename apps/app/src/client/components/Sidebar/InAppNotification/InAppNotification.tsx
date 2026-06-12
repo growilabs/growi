@@ -2,14 +2,14 @@ import { type JSX, Suspense, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
-import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton.js';
-import { InAppNotificationForms } from './InAppNotificationForms.js';
+import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
+import { InAppNotificationForms } from './InAppNotificationForms';
 
 export type FilterType = 'all' | 'news' | 'notifications';
 
 const InAppNotificationContent = dynamic(
   () =>
-    import('./InAppNotificationContent.js').then(
+    import('./InAppNotificationContent').then(
       (mod) => mod.InAppNotificationContent,
     ),
   { ssr: false },

@@ -4,7 +4,7 @@ import {
   PageAccessoriesModalContents,
   usePageAccessoriesModalActions,
   usePageAccessoriesModalStatus,
-} from '~/states/ui/modal/page-accessories.js';
+} from '~/states/ui/modal/page-accessories';
 
 function getURLQueryParamValue(key: string) {
   // window.location.href is page URL;

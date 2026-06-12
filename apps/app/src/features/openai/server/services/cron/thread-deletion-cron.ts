@@ -4,8 +4,8 @@ import { configManager } from '~/server/service/config-manager/index.js';
 import loggerFactory from '~/utils/logger/index.js';
 import { getRandomIntInRange } from '~/utils/rand.js';
 
-import { isAiEnabled } from '../is-ai-enabled.js';
-import { getOpenaiService, type IOpenaiService } from '../openai.js';
+import { isAiEnabled } from '~/features/openai/server/services/is-ai-enabled.js';
+import { getOpenaiService, type IOpenaiService } from '~/features/openai/server/services/openai.js';
 
 const logger = loggerFactory('growi:service:thread-deletion-cron');
 

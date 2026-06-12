@@ -9,10 +9,10 @@ import {
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
 import { useSWRxUserRelatedGroups } from '~/stores/user.js';
 
-import { AccessScopeDropdown } from './AccessScopeDropdown.js';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
-import { SelectUserGroupModal } from './SelectUserGroupModal.js';
-import { ShareScopeSwitch } from './ShareScopeSwitch.js';
+import { AccessScopeDropdown } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AccessScopeDropdown.js';
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
+import { SelectUserGroupModal } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectUserGroupModal.js';
+import { ShareScopeSwitch } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/ShareScopeSwitch.js';
 
 const ScopeType = {
   ACCESS: 'Access',

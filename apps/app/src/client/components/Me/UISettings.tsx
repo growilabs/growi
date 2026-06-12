@@ -2,13 +2,13 @@ import { type JSX, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
-import { updateUserUISettings } from '~/client/services/user-ui-settings.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { updateUserUISettings } from '~/client/services/user-ui-settings';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import {
   useCollapsedContentsOpened,
   useSetPreferCollapsedMode,
   useSidebarMode,
-} from '~/states/ui/sidebar/index.js';
+} from '~/states/ui/sidebar';
 
 import styles from './UISettings.module.scss';
 

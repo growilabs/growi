@@ -4,7 +4,7 @@ import {
   RateLimiterMongo,
 } from 'rate-limiter-flexible';
 
-import { DEFAULT_DURATION_SEC } from '../config/index.js';
+import { DEFAULT_DURATION_SEC } from '~/features/rate-limiter/config/index.js';
 
 class RateLimiterFactory {
   private rateLimiters: Map<string, RateLimiterMongo> = new Map();

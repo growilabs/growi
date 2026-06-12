@@ -2,10 +2,10 @@ import React, { type JSX, useEffect, useRef, useState } from 'react';
 import type { IRevisionHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import { useSWRxInfinitePageRevisions } from '~/stores/page.js';
+import { useSWRxInfinitePageRevisions } from '~/stores/page';
 
-import { RevisionComparer } from '../RevisionComparer/RevisionComparer.js';
-import { Revision } from './Revision.js';
+import { RevisionComparer } from '../RevisionComparer/RevisionComparer';
+import { Revision } from './Revision';
 
 import styles from './PageRevisionTable.module.scss';
 

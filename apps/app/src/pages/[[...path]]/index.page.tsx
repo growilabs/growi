@@ -6,85 +6,85 @@ import Head from 'next/head';
 import { isIPageInfo } from '@growi/core';
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem lazy loaded components
-import { DescendantsPageListModalLazyLoaded } from '~/client/components/DescendantsPageListModal/index.js';
-import { ConflictDiffModalLazyLoaded } from '~/client/components/PageEditor/ConflictDiffModal/index.js';
-import { DrawioModalLazyLoaded } from '~/client/components/PageEditor/DrawioModal/index.js';
-import { HandsontableModalLazyLoaded } from '~/client/components/PageEditor/HandsontableModal/index.js';
-import { LinkEditModalLazyLoaded } from '~/client/components/PageEditor/LinkEditModal/index.js';
-import { TagEditModalLazyLoaded } from '~/client/components/PageTags/TagEditModal/index.js';
-import { TemplateModalLazyLoaded } from '~/client/components/TemplateModal/index.js';
+import { DescendantsPageListModalLazyLoaded } from '~/client/components/DescendantsPageListModal';
+import { ConflictDiffModalLazyLoaded } from '~/client/components/PageEditor/ConflictDiffModal';
+import { DrawioModalLazyLoaded } from '~/client/components/PageEditor/DrawioModal';
+import { HandsontableModalLazyLoaded } from '~/client/components/PageEditor/HandsontableModal';
+import { LinkEditModalLazyLoaded } from '~/client/components/PageEditor/LinkEditModal';
+import { TagEditModalLazyLoaded } from '~/client/components/PageTags/TagEditModal';
+import { TemplateModalLazyLoaded } from '~/client/components/TemplateModal';
 
 // biome-ignore-end lint/style/noRestrictedImports: no-problem lazy loaded components
 
-import { BasicLayout } from '~/components/Layout/BasicLayout.js';
-import { PageView } from '~/components/PageView/PageView.js';
-import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript/index.js';
-import { useEditorModeClassName } from '~/services/layout/use-editor-mode-class-name.js';
-import { useCurrentPageData, useCurrentPagePath } from '~/states/page/index.js';
-import { useHydratePageAtoms } from '~/states/page/hydrate.js';
-import { useRendererConfig } from '~/states/server-configurations/index.js';
+import { BasicLayout } from '~/components/Layout/BasicLayout';
+import { PageView } from '~/components/PageView/PageView';
+import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
+import { useEditorModeClassName } from '~/services/layout/use-editor-mode-class-name';
+import { useCurrentPageData, useCurrentPagePath } from '~/states/page';
+import { useHydratePageAtoms } from '~/states/page/hydrate';
+import { useRendererConfig } from '~/states/server-configurations';
 import {
   useSetupGlobalSocket,
   useSetupGlobalSocketForPage,
-} from '~/states/socket-io/index.js';
-import { useSetEditingMarkdown } from '~/states/ui/editor/index.js';
-import { useSWRxPageInfo } from '~/stores/page.js';
+} from '~/states/socket-io';
+import { useSetEditingMarkdown } from '~/states/ui/editor';
+import { useSWRxPageInfo } from '~/stores/page';
 
-import type { NextPageWithLayout } from '../_app.page.js';
-import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate.js';
-import { getServerSideCommonEachProps } from '../common-props/index.js';
-import { useInitialCSRFetch } from '../general-page/index.js';
-import { useHydrateGeneralPageConfigurationAtoms } from '../general-page/hydrate.js';
-import { registerPageToShowRevisionWithMeta } from '../general-page/superjson/index.js';
-import { NextjsRoutingType } from '../utils/nextjs-routing-utils.js';
-import { useCustomTitleForPage } from '../utils/page-title-customization.js';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
-import { NEXT_JS_ROUTING_PAGE } from './consts/index.js';
+import type { NextPageWithLayout } from '../_app.page';
+import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate';
+import { getServerSideCommonEachProps } from '../common-props';
+import { useInitialCSRFetch } from '../general-page';
+import { useHydrateGeneralPageConfigurationAtoms } from '../general-page/hydrate';
+import { registerPageToShowRevisionWithMeta } from '../general-page/superjson';
+import { NextjsRoutingType } from '../utils/nextjs-routing-utils';
+import { useCustomTitleForPage } from '../utils/page-title-customization';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+import { NEXT_JS_ROUTING_PAGE } from './consts';
 import {
   getServerSidePropsForInitial,
   getServerSidePropsForSameRoute,
-} from './server-side-props.js';
-import type { EachProps, InitialProps } from './types.js';
-import { useSameRouteNavigation } from './use-same-route-navigation.js';
-import { useShallowRouting } from './use-shallow-routing.js';
-import { useSyncRevisionIdFromUrl } from './use-sync-revision-id-from-url.js';
+} from './server-side-props';
+import type { EachProps, InitialProps } from './types';
+import { useSameRouteNavigation } from './use-same-route-navigation';
+import { useShallowRouting } from './use-shallow-routing';
+import { useSyncRevisionIdFromUrl } from './use-sync-revision-id-from-url';
 
 // call superjson custom register
 registerPageToShowRevisionWithMeta();
 
 // biome-ignore-start lint/style/noRestrictedImports: no-problem dynamic import
 const GrowiContextualSubNavigation = dynamic(
-  () => import('~/client/components/Navbar/GrowiContextualSubNavigation.js'),
+  () => import('~/client/components/Navbar/GrowiContextualSubNavigation'),
   { ssr: false },
 );
 const GrowiPluginsActivator = dynamic(
   () =>
     import(
-      '~/features/growi-plugin/client/components/GrowiPluginsActivator.js'
+      '~/features/growi-plugin/client/components/GrowiPluginsActivator'
     ).then((mod) => mod.GrowiPluginsActivator),
   { ssr: false },
 );
 const DisplaySwitcher = dynamic(
   () =>
-    import('~/client/components/Page/DisplaySwitcher.js').then(
+    import('~/client/components/Page/DisplaySwitcher').then(
       (mod) => mod.DisplaySwitcher,
     ),
   { ssr: false },
 );
 const PageStatusAlert = dynamic(
   () =>
-    import('~/client/components/PageStatusAlert.js').then(
+    import('~/client/components/PageStatusAlert').then(
       (mod) => mod.PageStatusAlert,
     ),
   { ssr: false },
 );
 const UnsavedAlertDialog = dynamic(
-  () => import('~/client/components/UnsavedAlertDialog.js'),
+  () => import('~/client/components/UnsavedAlertDialog'),
   { ssr: false },
 );
 const EditablePageEffects = dynamic(
   () =>
-    import('~/client/components/Page/EditablePageEffects.js').then(
+    import('~/client/components/Page/EditablePageEffects').then(
       (mod) => mod.EditablePageEffects,
     ),
   { ssr: false },

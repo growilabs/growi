@@ -2,11 +2,11 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer.js';
-import { apiv3Put } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer';
+import { apiv3Put } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
 
 const SendInvitationEmailButton = (props) => {
   const { user, isInvitationEmailSended, onSuccessfullySentInvitationEmail } =

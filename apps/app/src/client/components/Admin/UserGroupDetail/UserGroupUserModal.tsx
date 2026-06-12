@@ -3,12 +3,12 @@ import type { IUserGroupHasId, IUserHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import type { SearchType } from '~/interfaces/user-group.js';
-import { SearchTypes } from '~/interfaces/user-group.js';
+import type { SearchType } from '~/interfaces/user-group';
+import { SearchTypes } from '~/interfaces/user-group';
 
-import CheckBoxForSerchUserOption from './CheckBoxForSerchUserOption.js';
-import RadioButtonForSerchUserOption from './RadioButtonForSerchUserOption.js';
-import { UserGroupUserFormByInput } from './UserGroupUserFormByInput.js';
+import CheckBoxForSerchUserOption from './CheckBoxForSerchUserOption';
+import RadioButtonForSerchUserOption from './RadioButtonForSerchUserOption';
+import { UserGroupUserFormByInput } from './UserGroupUserFormByInput';
 
 type Props = {
   isOpen: boolean;

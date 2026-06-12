@@ -7,9 +7,9 @@ import SimpleBar from 'simplebar-react';
 import { limitLearnablePageCountPerAssistantAtom } from '~/states/server-configurations/index.js';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
-import { PageSelectionMethodButtons } from './PageSelectionMethodButtons.js';
-import { SelectablePageList } from './SelectablePageList.js';
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
+import { PageSelectionMethodButtons } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/PageSelectionMethodButtons.js';
+import { SelectablePageList } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectablePageList.js';
 
 type Props = {
   selectedPages: SelectablePage[];

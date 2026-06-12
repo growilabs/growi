@@ -11,7 +11,7 @@ import {
 
 import { useCurrentUser } from '~/states/global/index.js';
 
-import { AiAssistantAccessScope } from '../../../../interfaces/ai-assistant.js';
+import { AiAssistantAccessScope } from '~/features/openai/interfaces/ai-assistant.js';
 
 type Props = {
   isDisabled: boolean;

@@ -1,11 +1,11 @@
 import { memo, useCallback, useEffect } from 'react';
 
-import { useSWRxNewsUnreadCount } from '~/features/news/client/hooks/use-news.js';
-import { SidebarContentsType } from '~/interfaces/ui.js';
-import { useGlobalSocket } from '~/states/socket-io/index.js';
-import { useSWRxInAppNotificationStatus } from '~/stores/in-app-notification.js';
+import { useSWRxNewsUnreadCount } from '~/features/news/client/hooks/use-news';
+import { SidebarContentsType } from '~/interfaces/ui';
+import { useGlobalSocket } from '~/states/socket-io';
+import { useSWRxInAppNotificationStatus } from '~/stores/in-app-notification';
 
-import { PrimaryItem, type PrimaryItemProps } from '../SidebarNav/PrimaryItem.js';
+import { PrimaryItem, type PrimaryItemProps } from '../SidebarNav/PrimaryItem';
 
 type PrimaryItemForNotificationProps = Omit<
   PrimaryItemProps,

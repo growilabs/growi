@@ -12,26 +12,26 @@ import nodePath from 'path';
 import { useTranslation } from 'react-i18next';
 import { DropdownToggle, UncontrolledTooltip } from 'reactstrap';
 
-import { bookmark, unbookmark, unlink } from '~/client/services/page-operation.js';
-import { addBookmarkToFolder, renamePage } from '~/client/util/bookmark-utils.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { bookmark, unbookmark, unlink } from '~/client/services/page-operation';
+import { addBookmarkToFolder, renamePage } from '~/client/util/bookmark-utils';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import type {
   BookmarkFolderItems,
   DragItemDataType,
-} from '~/interfaces/bookmark-info.js';
-import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info.js';
-import { useFetchCurrentPage } from '~/states/page/index.js';
-import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page.js';
-import { mutateAllPageInfo, useSWRxPageInfo } from '~/stores/page.js';
+} from '~/interfaces/bookmark-info';
+import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info';
+import { useFetchCurrentPage } from '~/states/page';
+import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
+import { mutateAllPageInfo, useSWRxPageInfo } from '~/stores/page';
 
 import {
   MenuItemType,
   PageItemControl,
-} from '../Common/Dropdown/PageItemControl.js';
-import { PageListItemS } from '../PageList/PageListItemS.js';
-import { BookmarkItemRenameInput } from './BookmarkItemRenameInput.js';
-import { BookmarkMoveToRootBtn } from './BookmarkMoveToRootBtn.js';
-import { DragAndDropWrapper } from './DragAndDropWrapper.js';
+} from '../Common/Dropdown/PageItemControl';
+import { PageListItemS } from '../PageList/PageListItemS';
+import { BookmarkItemRenameInput } from './BookmarkItemRenameInput';
+import { BookmarkMoveToRootBtn } from './BookmarkMoveToRootBtn';
+import { DragAndDropWrapper } from './DragAndDropWrapper';
 
 type Props = {
   isReadOnlyUser: boolean;

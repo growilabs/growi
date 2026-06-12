@@ -5,17 +5,17 @@ import { useTranslation } from 'next-i18next';
 import type { AutosizeInputProps } from 'react-input-autosize';
 import { debounce } from 'throttle-debounce';
 
-import type { InputValidationResult } from '~/client/util/use-input-validator.js';
+import type { InputValidationResult } from '~/client/util/use-input-validator';
 import {
   useInputValidator,
   ValidationTarget,
-} from '~/client/util/use-input-validator.js';
+} from '~/client/util/use-input-validator';
 
 import {
   AutosizeSubmittableInput,
   getAdjustedMaxWidthForAutosizeInput,
-} from '../Common/SubmittableInput/index.js';
-import type { SubmittableInputProps } from '../Common/SubmittableInput/types.js';
+} from '../Common/SubmittableInput';
+import type { SubmittableInputProps } from '../Common/SubmittableInput/types';
 
 type Props = Pick<
   SubmittableInputProps<AutosizeInputProps>,

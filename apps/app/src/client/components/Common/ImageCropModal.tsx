@@ -5,10 +5,10 @@ import { useTranslation } from 'react-i18next';
 import ReactCrop from 'react-image-crop';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { toastError } from '~/client/util/toastr.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { toastError } from '~/client/util/toastr';
+import loggerFactory from '~/utils/logger';
 
-import './ImageCropModal.vendor-styles.prebuilt.js';
+import './ImageCropModal.vendor-styles.prebuilt';
 
 const logger = loggerFactory('growi:ImageCropModal');
 

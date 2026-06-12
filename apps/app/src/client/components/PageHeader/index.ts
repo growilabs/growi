@@ -1,1 +1,1 @@
-export * from './PageHeader.js';
+export * from './PageHeader';

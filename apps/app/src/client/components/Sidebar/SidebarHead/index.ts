@@ -1,1 +1,1 @@
-export * from './SidebarHead.js';
+export * from './SidebarHead';

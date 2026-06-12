@@ -1,1 +1,1 @@
-export { PageRedirectedAlertLazyLoaded } from './dynamic.js';
+export { PageRedirectedAlertLazyLoaded } from './dynamic';

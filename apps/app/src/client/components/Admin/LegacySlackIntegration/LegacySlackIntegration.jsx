@@ -2,13 +2,13 @@ import React, { useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import AdminSlackIntegrationLegacyContainer from '~/client/services/AdminSlackIntegrationLegacyContainer.js';
-import { toastError } from '~/client/util/toastr.js';
-import { toArrayIfNot } from '~/utils/array-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import AdminSlackIntegrationLegacyContainer from '~/client/services/AdminSlackIntegrationLegacyContainer';
+import { toastError } from '~/client/util/toastr';
+import { toArrayIfNot } from '~/utils/array-utils';
+import loggerFactory from '~/utils/logger';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import SlackConfiguration from './SlackConfiguration.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import SlackConfiguration from './SlackConfiguration';
 
 const logger = loggerFactory('growi:NotificationSetting');
 

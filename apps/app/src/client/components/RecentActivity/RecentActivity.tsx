@@ -1,15 +1,15 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
 
-import { toastError } from '~/client/util/toastr.js';
+import { toastError } from '~/client/util/toastr';
 import type {
   ActivityHasTargetPage,
   IActivityHasId,
-} from '~/interfaces/activity.js';
-import { useSWRxRecentActivity } from '~/stores/recent-activity.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/interfaces/activity';
+import { useSWRxRecentActivity } from '~/stores/recent-activity';
+import loggerFactory from '~/utils/logger';
 
-import PaginationWrapper from '../PaginationWrapper.js';
-import { ActivityListItem } from './ActivityListItem.js';
+import PaginationWrapper from '../PaginationWrapper';
+import { ActivityListItem } from './ActivityListItem';
 
 const logger = loggerFactory('growi:RecentActivity');
 

@@ -2,11 +2,11 @@ import React, { Fragment } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { apiv3Delete, apiv3Get } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { apiv3Delete, apiv3Get } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 
-import ImportForm from './GrowiArchive/ImportForm.js';
-import UploadForm from './GrowiArchive/UploadForm.js';
+import ImportForm from './GrowiArchive/ImportForm';
+import UploadForm from './GrowiArchive/UploadForm';
 
 class GrowiArchiveSection extends React.Component {
   constructor(props) {

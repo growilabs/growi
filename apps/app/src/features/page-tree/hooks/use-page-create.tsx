@@ -14,13 +14,13 @@ import type { IPageForItem } from '~/interfaces/page.js';
 import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing.js';
 import { shouldCreateWipPage } from '~/utils/should-create-wip-page.js';
 
-import { CREATING_PAGE_VIRTUAL_ID } from '../constants/_inner.js';
+import { CREATING_PAGE_VIRTUAL_ID } from '~/features/page-tree/constants/_inner.js';
 import type { TreeItemToolProps } from '../interfaces/index.js';
 import {
   useCreatingParentId,
   usePageTreeCreateActions,
-} from '../states/_inner/index.js';
-import { usePageTreeInformationUpdate } from '../states/page-tree-update.js';
+} from '~/features/page-tree/states/_inner/index.js';
+import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update.js';
 
 // Inner component for CreateButton to properly use hooks
 type CreateButtonInnerProps = {

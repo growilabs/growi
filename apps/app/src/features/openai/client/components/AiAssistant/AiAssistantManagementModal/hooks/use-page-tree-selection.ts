@@ -5,8 +5,8 @@ import type { IPageForTreeItem } from '~/interfaces/page.js';
 import {
   isSelectablePage,
   type SelectablePage,
-} from '../../../../../interfaces/selectable-page.js';
-import { useSelectedPages } from '../../../../services/use-selected-pages.js';
+} from '~/features/openai/interfaces/selectable-page.js';
+import { useSelectedPages } from '~/features/openai/client/services/use-selected-pages.js';
 
 /**
  * Convert a page path to a glob pattern for selecting descendants.

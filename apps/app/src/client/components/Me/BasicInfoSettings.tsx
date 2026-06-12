@@ -5,12 +5,12 @@ import { i18n, useTranslation } from 'next-i18next';
 
 import * as nextI18nConfig from '^/config/next-i18next.config.cjs';
 
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { registrationWhitelistAtom } from '~/states/server-configurations/index.js';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { registrationWhitelistAtom } from '~/states/server-configurations';
 import {
   useSWRxPersonalSettings,
   useUpdateBasicInfo,
-} from '~/stores/personal-settings.js';
+} from '~/stores/personal-settings';
 
 const i18nConfig = nextI18nConfig.i18n;
 

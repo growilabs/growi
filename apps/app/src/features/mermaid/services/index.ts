@@ -1,1 +1,1 @@
-export { remarkPlugin, sanitizeOption } from './mermaid.js';
+export { remarkPlugin, sanitizeOption } from '~/features/mermaid/services/mermaid.js';

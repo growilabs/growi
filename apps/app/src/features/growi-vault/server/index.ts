@@ -4,24 +4,24 @@ import type { Router } from 'express';
 import { configManager } from '~/server/service/config-manager/index.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { VaultInstruction } from './models/vault-instruction.js';
-import { VaultReconcileLog } from './models/vault-reconcile-log.js';
-import { VaultSyncState } from './models/vault-sync-state.js';
-import { createVaultAdminRouter } from './routes/vault-admin.js';
-import { createVaultGatewayRouter } from './routes/vault-gateway.js';
-import { createVaultPageRouter } from './routes/vault-page.js';
+import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction.js';
+import { VaultReconcileLog } from '~/features/growi-vault/server/models/vault-reconcile-log.js';
+import { VaultSyncState } from '~/features/growi-vault/server/models/vault-sync-state.js';
+import { createVaultAdminRouter } from '~/features/growi-vault/server/routes/vault-admin.js';
+import { createVaultGatewayRouter } from '~/features/growi-vault/server/routes/vault-gateway.js';
+import { createVaultPageRouter } from '~/features/growi-vault/server/routes/vault-page.js';
 import {
   createVaultReconcileService,
   type VaultReconcileService,
-} from './services/reconcile/index.js';
-import { createHistoryStore } from './services/reconcile/reconcile-history-store.js';
-import { createVaultBootstrapper } from './services/vault-bootstrapper.js';
-import { createVaultDispatcher } from './services/vault-dispatcher.js';
-import { vaultNamespaceMapper } from './services/vault-namespace-mapper.js';
-import { vaultSettingsService } from './services/vault-settings-service.js';
+} from '~/features/growi-vault/server/services/reconcile/index.js';
+import { createHistoryStore } from '~/features/growi-vault/server/services/reconcile/reconcile-history-store.js';
+import { createVaultBootstrapper } from '~/features/growi-vault/server/services/vault-bootstrapper.js';
+import { createVaultDispatcher } from '~/features/growi-vault/server/services/vault-dispatcher.js';
+import { vaultNamespaceMapper } from '~/features/growi-vault/server/services/vault-namespace-mapper.js';
+import { vaultSettingsService } from '~/features/growi-vault/server/services/vault-settings-service.js';
 
-export { createVaultAdminRouter } from './routes/vault-admin.js';
-export { createVaultGatewayRouter } from './routes/vault-gateway.js';
+export { createVaultAdminRouter } from '~/features/growi-vault/server/routes/vault-admin.js';
+export { createVaultGatewayRouter } from '~/features/growi-vault/server/routes/vault-gateway.js';
 
 // ---------------------------------------------------------------------------
 // Module-level reconcile service singleton (set during initializeVaultFeature)
@@ -609,16 +609,16 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   _reconcileService = createVaultReconcileService({
     pageModel: pageModel as never,
     targetResolver: await import(
-      './services/reconcile/reconcile-target-resolver.js'
+      '~/features/growi-vault/server/services/reconcile/reconcile-target-resolver.js'
     ),
     aclEvaluator: (
-      await import('./services/reconcile/reconcile-acl-evaluator.js')
+      await import('~/features/growi-vault/server/services/reconcile/reconcile-acl-evaluator.js')
     ).createAclEvaluator({
       pageModel: pageModel as never,
       pageGrantService: crowi.pageGrantService,
     }),
     concurrencyController: (
-      await import('./services/reconcile/reconcile-concurrency-controller.js')
+      await import('~/features/growi-vault/server/services/reconcile/reconcile-concurrency-controller.js')
     ).createConcurrencyController({
       maxConcurrentPerUser: configManager.getConfig(
         'app:vaultReconcileMaxConcurrentPerUser',
@@ -632,7 +632,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
     }),
     historyStore,
     orchestrator: (
-      await import('./services/reconcile/reconcile-orchestrator.js')
+      await import('~/features/growi-vault/server/services/reconcile/reconcile-orchestrator.js')
     ).createReconcileOrchestrator({
       pageModel: pageModel as never,
       vaultInstruction: VaultInstruction,

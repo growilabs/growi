@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import { apiv3Get } from '../../../client/util/apiv3-client.js';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
 import type { CurrentPageYjsData } from '../../../interfaces/yjs.js';
-import { useCurrentPageId } from '../../../states/page/index.js';
+import { useCurrentPageId } from '~/states/page/index.js';
 
 // ============================================================================
 // Atoms

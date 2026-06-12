@@ -2,20 +2,20 @@ import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import { useHydrateAtoms } from 'jotai/utils';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import { isCustomizedLogoUploadedAtom } from '~/states/server-configurations/index.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { isCustomizedLogoUploadedAtom } from '~/states/server-configurations';
 
-import type { NextPageWithLayout } from '../_app.page.js';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
-import type { AdminCommonProps } from './_shared/index.js';
+import type { NextPageWithLayout } from '../_app.page';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+import type { AdminCommonProps } from './_shared';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared/index.js';
+} from './_shared';
 
 const CustomizeSettingContents = dynamic(
   // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-  () => import('~/client/components/Admin/Customize/Customize.js'),
+  () => import('~/client/components/Admin/Customize/Customize'),
   { ssr: false },
 );
 
@@ -42,7 +42,7 @@ AdminCustomizeSettingsPage.getLayout = createAdminPageLayout<Props>({
   containerFactories: [
     async () => {
       // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-      const C = (await import('~/client/services/AdminCustomizeContainer.js'))
+      const C = (await import('~/client/services/AdminCustomizeContainer'))
         .default;
       return new C();
     },

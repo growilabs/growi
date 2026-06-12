@@ -1,1 +1,1 @@
-export * from './PluginsExtensionPageContents/index.js';
+export * from '~/features/growi-plugin/client/Admin/components/PluginsExtensionPageContents/index.js';

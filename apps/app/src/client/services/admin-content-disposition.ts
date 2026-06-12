@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import useSWR from 'swr';
 import useSWRMutation from 'swr/mutation';
 
-import { apiv3Get, apiv3Put } from '../util/apiv3-client.js';
+import { apiv3Get, apiv3Put } from '../util/apiv3-client';
 
 export interface ContentDispositionSettings {
   inlineMimeTypes: string[];

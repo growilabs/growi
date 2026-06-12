@@ -2,14 +2,14 @@ import type OpenAI from 'openai';
 
 import { configManager } from '~/server/service/config-manager/index.js';
 
-import { AssistantType } from './assistant-types.js';
-import { getOrCreateAssistant } from './create-assistant.js';
+import { AssistantType } from '~/features/openai/server/services/assistant/assistant-types.js';
+import { getOrCreateAssistant } from '~/features/openai/server/services/assistant/create-assistant.js';
 import {
   instructionsForFileSearch,
   instructionsForInformationTypes,
   instructionsForInjectionCountermeasures,
   instructionsForSystem,
-} from './instructions/commons.js';
+} from '~/features/openai/server/services/assistant/instructions/commons.js';
 
 const instructionsForResponseModes = `## Response Modes
 

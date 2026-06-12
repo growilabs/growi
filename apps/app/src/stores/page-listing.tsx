@@ -19,7 +19,7 @@ import useSWRInfinite, { unstable_serialize } from 'swr/infinite';
 
 import type { IPagingResult } from '~/interfaces/paging-result.js';
 
-import { apiv3Get } from '../client/util/apiv3-client.js';
+import { apiv3Get } from '~/client/util/apiv3-client.js';
 import type {
   ChildrenResult,
   RootPageResult,

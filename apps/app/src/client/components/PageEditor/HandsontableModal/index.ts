@@ -1,1 +1,1 @@
-export { HandsontableModalLazyLoaded } from './dynamic.js';
+export { HandsontableModalLazyLoaded } from './dynamic';

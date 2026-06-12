@@ -3,9 +3,9 @@ import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client.js';
-import type { updateConfigMethodForAdmin } from '~/interfaces/admin.js';
-import type { IResGrowiTheme, IResLayoutSetting } from '~/interfaces/customize.js';
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
+import type { updateConfigMethodForAdmin } from '~/interfaces/admin';
+import type { IResGrowiTheme, IResLayoutSetting } from '~/interfaces/customize';
 
 export const useSWRxLayoutSetting = (): SWRResponse<IResLayoutSetting, Error> &
   updateConfigMethodForAdmin<IResLayoutSetting> => {

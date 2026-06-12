@@ -7,8 +7,8 @@ import type {
   INewsItemInput,
   INewsItemWithReadStatus,
 } from '../../interfaces/news-item.js';
-import { NewsItem } from '../models/news-item.js';
-import { NewsReadStatus } from '../models/news-read-status.js';
+import { NewsItem } from '~/features/news/server/models/news-item.js';
+import { NewsReadStatus } from '~/features/news/server/models/news-read-status.js';
 
 const logger = loggerFactory('growi:feature:news:service');
 

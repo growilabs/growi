@@ -1,14 +1,14 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiDelete } from '~/client/util/apiv1-client.js';
-import { apiv3Get } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useAdminSocket } from '~/features/admin/states/socket-io.js';
+import { apiDelete } from '~/client/util/apiv1-client';
+import { apiv3Get } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
 
-import LabeledProgressBar from './Common/LabeledProgressBar.js';
-import ArchiveFilesTable from './ExportArchiveData/ArchiveFilesTable.js';
-import SelectCollectionsModal from './ExportArchiveData/SelectCollectionsModal.js';
+import LabeledProgressBar from './Common/LabeledProgressBar';
+import ArchiveFilesTable from './ExportArchiveData/ArchiveFilesTable';
+import SelectCollectionsModal from './ExportArchiveData/SelectCollectionsModal';
 
 const IGNORED_COLLECTION_NAMES = [
   'sessions',

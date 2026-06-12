@@ -1,11 +1,11 @@
 import React, { type JSX, useCallback } from 'react';
 
-import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar.js';
-import { useSearchModalActions } from '~/features/search/client/states/modal/search.js';
-import { useIsSearchPage } from '~/states/context.js';
-import { useCurrentPagePath } from '~/states/page/index.js';
-import { usePageCreateModalActions } from '~/states/ui/modal/page-create.js';
-import { useDrawerOpened } from '~/states/ui/sidebar/index.js';
+import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
+import { useSearchModalActions } from '~/features/search/client/states/modal/search';
+import { useIsSearchPage } from '~/states/context';
+import { useCurrentPagePath } from '~/states/page';
+import { usePageCreateModalActions } from '~/states/ui/modal/page-create';
+import { useDrawerOpened } from '~/states/ui/sidebar';
 
 import styles from './GrowiNavbarBottom.module.scss';
 

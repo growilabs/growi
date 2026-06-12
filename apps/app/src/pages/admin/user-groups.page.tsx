@@ -2,21 +2,21 @@ import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 import dynamic from 'next/dynamic';
 import { useHydrateAtoms } from 'jotai/utils';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import { isAclEnabledAtom } from '~/states/server-configurations/index.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { isAclEnabledAtom } from '~/states/server-configurations';
 
-import type { NextPageWithLayout } from '../_app.page.js';
-import { mergeGetServerSidePropsResults } from '../utils/server-side-props.js';
-import type { AdminCommonProps } from './_shared/index.js';
+import type { NextPageWithLayout } from '../_app.page';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
+import type { AdminCommonProps } from './_shared';
 import {
   createAdminPageLayout,
   getServerSideAdminCommonProps,
-} from './_shared/index.js';
+} from './_shared';
 
 const UserGroupPage = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Admin/UserGroup/UserGroupPage.js').then(
+    import('~/client/components/Admin/UserGroup/UserGroupPage').then(
       (mod) => mod.UserGroupPage,
     ),
   { ssr: false },

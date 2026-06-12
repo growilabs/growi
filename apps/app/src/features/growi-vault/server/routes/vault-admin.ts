@@ -11,11 +11,11 @@ import type {
   ResilienceStatus,
   VaultBootstrapper,
 } from '../services/vault-bootstrapper.js';
-import { vaultBootstrapperFactory } from '../services/vault-bootstrapper.js';
+import { vaultBootstrapperFactory } from '~/features/growi-vault/server/services/vault-bootstrapper.js';
 import type { VaultManagerClient } from '../services/vault-manager-client.js';
-import { vaultManagerClient as defaultManagerClient } from '../services/vault-manager-client.js';
-import { vaultNamespaceMapper } from '../services/vault-namespace-mapper.js';
-import { vaultSettingsService } from '../services/vault-settings-service.js';
+import { vaultManagerClient as defaultManagerClient } from '~/features/growi-vault/server/services/vault-manager-client.js';
+import { vaultNamespaceMapper } from '~/features/growi-vault/server/services/vault-namespace-mapper.js';
+import { vaultSettingsService } from '~/features/growi-vault/server/services/vault-settings-service.js';
 
 const logger = loggerFactory('growi:features:growi-vault:routes:vault-admin');
 

@@ -1,1 +1,1 @@
-export * from './DrawioViewerScript.js';
+export * from './DrawioViewerScript';

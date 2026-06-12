@@ -3,27 +3,27 @@ import dynamic from 'next/dynamic';
 import Head from 'next/head';
 import { useTranslation } from 'next-i18next';
 
-import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript/index.js';
-import { useSetSearchPage } from '~/states/context.js';
+import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
+import { useSetSearchPage } from '~/states/context';
 
-import type { NextPageWithLayout } from '../_app.page.js';
-import type { BasicLayoutConfigurationProps } from '../basic-layout-page/index.js';
-import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate.js';
-import type { CommonEachProps, CommonInitialProps } from '../common-props/index.js';
-import type { RendererConfigProps } from '../general-page/index.js';
-import { useCustomTitle } from '../utils/page-title-customization.js';
-import { getServerSideSearchPageProps } from './get-server-side-props/index.js';
-import type { ServerConfigurationProps } from './types.js';
-import { useHydrateServerConfigurationAtoms } from './use-hydrate-server-configurations.js';
+import type { NextPageWithLayout } from '../_app.page';
+import type { BasicLayoutConfigurationProps } from '../basic-layout-page';
+import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate';
+import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { RendererConfigProps } from '../general-page';
+import { useCustomTitle } from '../utils/page-title-customization';
+import { getServerSideSearchPageProps } from './get-server-side-props';
+import type { ServerConfigurationProps } from './types';
+import { useHydrateServerConfigurationAtoms } from './use-hydrate-server-configurations';
 
 const SearchResultLayout = dynamic(
-  () => import('~/components/Layout/SearchResultLayout.js'),
+  () => import('~/components/Layout/SearchResultLayout'),
   { ssr: false },
 );
 const SearchPage = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/features/search/client/components/SearchPage/index.js').then(
+    import('~/features/search/client/components/SearchPage').then(
       (mod) => mod.SearchPage,
     ),
   { ssr: false },

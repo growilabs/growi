@@ -1,1 +1,1 @@
-export * from './page.js';
+export * from '~/interfaces/apiv3/page.js';

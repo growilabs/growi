@@ -25,18 +25,18 @@ import { debounce } from 'throttle-debounce';
 import {
   getMarkdownTable,
   replaceFocusedMarkdownTableWithEditor,
-} from '~/client/components/PageEditor/markdown-table-util-for-editor.js';
+} from '~/client/components/PageEditor/markdown-table-util-for-editor';
 import {
   useHandsontableModalActions,
   useHandsontableModalStatus,
-} from '~/states/ui/modal/handsontable.js';
+} from '~/states/ui/modal/handsontable';
 
-import ExpandOrContractButton from '../../ExpandOrContractButton.js';
-import { MarkdownTableDataImportForm } from '../MarkdownTableDataImportForm.js';
+import ExpandOrContractButton from '../../ExpandOrContractButton';
+import { MarkdownTableDataImportForm } from '../MarkdownTableDataImportForm';
 
 import styles from './HandsontableModal.module.scss';
 
-import './HandsontableModal.vendor-styles.prebuilt.js';
+import './HandsontableModal.vendor-styles.prebuilt';
 
 const DEFAULT_HOT_HEIGHT = 300;
 const MARKDOWNTABLE_TO_HANDSONTABLE_ALIGNMENT_SYMBOL_MAPPING = {

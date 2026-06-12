@@ -1,10 +1,10 @@
 import React, { type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { useGenerateTransferKey } from '~/client/services/g2g-transfer.js';
-import { useGrowiDocumentationUrl } from '~/states/context.js';
+import { useGenerateTransferKey } from '~/client/services/g2g-transfer';
+import { useGrowiDocumentationUrl } from '~/states/context';
 
-import CustomCopyToClipBoard from './Common/CustomCopyToClipBoard.js';
+import CustomCopyToClipBoard from './Common/CustomCopyToClipBoard';
 
 const DataTransferForm = (): JSX.Element => {
   const { t } = useTranslation('commons');

@@ -1,1 +1,1 @@
-export * from './upload-attachments.js';
+export * from '~/client/services/upload-attachments/upload-attachments.js';

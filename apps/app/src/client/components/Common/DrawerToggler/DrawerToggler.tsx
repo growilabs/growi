@@ -1,6 +1,6 @@
 import type { JSX, ReactNode } from 'react';
 
-import { useDrawerOpened } from '~/states/ui/sidebar/index.js';
+import { useDrawerOpened } from '~/states/ui/sidebar';
 
 import styles from './DrawerToggler.module.scss';
 

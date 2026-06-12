@@ -1,7 +1,7 @@
 import type { ReactElement } from 'react';
 
-import type { SubmittableInputProps } from './types.js';
-import { useSubmittable } from './use-submittable.js';
+import type { SubmittableInputProps } from './types';
+import { useSubmittable } from './use-submittable';
 
 export const SubmittableInput = (
   props: SubmittableInputProps,

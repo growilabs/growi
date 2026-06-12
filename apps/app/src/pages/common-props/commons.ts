@@ -9,7 +9,7 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   detectNextjsRoutingType,
   type NextjsRoutingType,
-} from '../utils/nextjs-routing-utils.js';
+} from '~/pages/utils/nextjs-routing-utils.js';
 
 const logger = loggerFactory('growi:pages:common-props:commons');
 

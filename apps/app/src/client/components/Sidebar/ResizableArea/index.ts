@@ -1,1 +1,1 @@
-export * from './ResizableArea.js';
+export * from './ResizableArea';

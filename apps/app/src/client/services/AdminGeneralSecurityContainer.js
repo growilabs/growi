@@ -6,11 +6,11 @@ import {
   PageRecursiveDeleteConfigValue,
   PageSingleDeleteCompConfigValue,
   PageSingleDeleteConfigValue,
-} from '~/interfaces/page-delete-config.js';
-import { removeNullPropertyFromObject } from '~/utils/object-utils.js';
+} from '~/interfaces/page-delete-config';
+import { removeNullPropertyFromObject } from '~/utils/object-utils';
 
-import { apiv3Get, apiv3Put } from '../util/apiv3-client.js';
-import { toastError } from '../util/toastr.js';
+import { apiv3Get, apiv3Put } from '../util/apiv3-client';
+import { toastError } from '../util/toastr';
 
 /**
  * Service container for admin security page (SecuritySetting.jsx)

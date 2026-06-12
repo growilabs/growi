@@ -2,21 +2,21 @@ import type { JSX } from 'react';
 import dynamic from 'next/dynamic';
 import { useAtomValue } from 'jotai';
 
-import { aiEnabledAtom } from '~/states/server-configurations/index.js';
-import { useDrawerOpened } from '~/states/ui/sidebar/index.js';
+import { aiEnabledAtom } from '~/states/server-configurations';
+import { useDrawerOpened } from '~/states/ui/sidebar';
 
-import { EditorAssistantToggleButton } from './EditorAssistantToggleButton.js';
+import { EditorAssistantToggleButton } from './EditorAssistantToggleButton';
 
 import styles from './EditorNavbarBottom.module.scss';
 
 const moduleClass = styles['grw-editor-navbar-bottom'];
 
 const SavePageControls = dynamic(
-  () => import('./SavePageControls.js').then((mod) => mod.SavePageControls),
+  () => import('./SavePageControls').then((mod) => mod.SavePageControls),
   { ssr: false },
 );
 const OptionsSelector = dynamic(
-  () => import('./OptionsSelector.js').then((mod) => mod.OptionsSelector),
+  () => import('./OptionsSelector').then((mod) => mod.OptionsSelector),
   { ssr: false },
 );
 

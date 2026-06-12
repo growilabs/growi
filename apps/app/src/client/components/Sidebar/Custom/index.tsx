@@ -1,1 +1,1 @@
-export * from './CustomSidebar.js';
+export * from './CustomSidebar';

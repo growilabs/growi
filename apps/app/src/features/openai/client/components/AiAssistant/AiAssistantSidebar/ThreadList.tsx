@@ -7,8 +7,8 @@ import type { IThreadRelationHasId } from '~/features/openai/interfaces/thread-r
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from '../../../states/index.js';
-import { useSWRxThreads } from '../../../stores/thread.js';
+} from '~/features/openai/client/states/index.js';
+import { useSWRxThreads } from '~/features/openai/client/stores/thread.js';
 
 import styles from './ThreadList.module.scss';
 

@@ -1,9 +1,9 @@
 import { useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiv3Post } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import type { IAuditLogBulkExportFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import type { IAuditLogBulkExportFilters } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 
 export const useAuditLogExport = (
   buildFilters: () => IAuditLogBulkExportFilters,

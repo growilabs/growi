@@ -5,13 +5,13 @@ import Link from 'next/link';
 import GrowiLogo from '~/components/Common/GrowiLogo.js';
 import { useSetupAdminSocket } from '~/features/admin/states/socket-io.js';
 
-import { RawLayout } from './RawLayout.js';
+import { RawLayout } from '~/components/Layout/RawLayout.js';
 
 import styles from './Admin.module.scss';
 
 const AdminNavigation = dynamic(
   () =>
-    import('../Admin/Common/AdminNavigation.js').then(
+    import('~/components/Admin/Common/AdminNavigation.js').then(
       (mod) => mod.AdminNavigation,
     ),
   { ssr: false },

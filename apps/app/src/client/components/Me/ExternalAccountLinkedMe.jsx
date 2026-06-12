@@ -2,12 +2,12 @@ import React, { Fragment } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { useSWRxPersonalExternalAccounts } from '~/stores/personal-settings.js';
+import { useSWRxPersonalExternalAccounts } from '~/stores/personal-settings';
 
-import { withUnstatedContainers } from '../UnstatedUtils.js';
-import AssociateModal from './AssociateModal.js';
-import DisassociateModal from './DisassociateModal.js';
-import ExternalAccountRow from './ExternalAccountRow.js';
+import { withUnstatedContainers } from '../UnstatedUtils';
+import AssociateModal from './AssociateModal';
+import DisassociateModal from './DisassociateModal';
+import ExternalAccountRow from './ExternalAccountRow';
 
 class ExternalAccountLinkedMe extends React.Component {
   constructor(props) {

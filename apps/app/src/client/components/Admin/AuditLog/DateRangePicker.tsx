@@ -4,7 +4,7 @@ import { addDays } from 'date-fns/addDays';
 import { format } from 'date-fns/format';
 import DatePicker from 'react-datepicker';
 
-import './DateRangePicker.vendor-styles.prebuilt.js';
+import './DateRangePicker.vendor-styles.prebuilt';
 
 type CustomInputProps = {
   value?: string;

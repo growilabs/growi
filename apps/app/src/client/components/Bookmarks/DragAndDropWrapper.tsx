@@ -1,7 +1,7 @@
 import type { JSX, ReactNode } from 'react';
 import { useDrag, useDrop } from 'react-dnd';
 
-import type { DragItemDataType } from '~/interfaces/bookmark-info.js';
+import type { DragItemDataType } from '~/interfaces/bookmark-info';
 
 type DragAndDropWrapperProps = {
   item?: Partial<DragItemDataType>;

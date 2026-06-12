@@ -2,7 +2,7 @@ import type { FC } from 'react';
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global/index.js';
+import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 
 export const AuditLogDisableMode: FC = () => {
   const { t } = useTranslation('admin');

@@ -7,13 +7,13 @@ import type { IPageForTreeItem } from '~/interfaces/page.js';
 import {
   CREATING_PAGE_VIRTUAL_ID,
   ROOT_PAGE_VIRTUAL_ID,
-} from '../../constants/_inner.js';
-import { type ChildrenData, fetchAndCacheChildren } from '../../services/index.js';
+} from '~/features/page-tree/constants/_inner.js';
+import { type ChildrenData, fetchAndCacheChildren } from '~/features/page-tree/services/index.js';
 import {
   createPlaceholderPageData,
   useCreatingParentId,
   useCreatingParentPath,
-} from '../../states/_inner/index.js';
+} from '~/features/page-tree/states/_inner/index.js';
 
 function constructRootPageForVirtualRoot(
   rootPageId: string,

@@ -4,7 +4,7 @@ import {
   WATCH_TIMEOUT_MS,
   watchRenderingAndReScroll,
   // biome-ignore lint/style/noRestrictedImports: client-only hook used in client-only component
-} from '~/client/util/watch-rendering-and-rescroll.js';
+} from '~/client/util/watch-rendering-and-rescroll';
 
 /** Configuration for the hash-based auto-scroll hook */
 export interface UseHashAutoScrollOptions {

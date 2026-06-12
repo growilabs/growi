@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { PrismAsyncLight } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { useGrowiDocumentationUrl } from '~/states/context.js';
-import { getLocale } from '~/utils/locale-utils.js';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useGrowiDocumentationUrl } from '~/states/context';
+import { getLocale } from '~/utils/locale-utils';
 
 import styles from './TextStyleTab.module.scss';
 

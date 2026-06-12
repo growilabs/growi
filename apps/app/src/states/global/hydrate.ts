@@ -5,7 +5,7 @@ import { useHydrateAtoms } from 'jotai/utils';
 import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props/index.js';
 import { createAtomTuple } from '~/utils/jotai-utils.js';
 
-import { _atomsForHydration } from './global.js';
+import { _atomsForHydration } from '~/states/global/global.js';
 
 const {
   appTitleAtom,

@@ -1,1 +1,1 @@
-export * from './ShareLinkPageView.js';
+export * from './ShareLinkPageView';

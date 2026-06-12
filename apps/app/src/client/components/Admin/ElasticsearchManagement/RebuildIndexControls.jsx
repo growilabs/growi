@@ -2,10 +2,10 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { useAdminSocket } from '~/features/admin/states/socket-io.js';
-import { SocketEventName } from '~/interfaces/websocket.js';
+import { useAdminSocket } from '~/features/admin/states/socket-io';
+import { SocketEventName } from '~/interfaces/websocket';
 
-import LabeledProgressBar from '../Common/LabeledProgressBar.js';
+import LabeledProgressBar from '../Common/LabeledProgressBar';
 
 class RebuildIndexControls extends React.Component {
   constructor(props) {

@@ -6,7 +6,7 @@ import { useTranslation } from 'react-i18next';
 import AutosizeInput from 'react-input-autosize';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
-import { isCreatablePagePathPattern } from '../../../../utils/is-creatable-page-path-pattern.js';
+import { isCreatablePagePathPattern } from '~/features/openai/utils/is-creatable-page-path-pattern.js';
 
 import styles from './SelectablePageList.module.scss';
 

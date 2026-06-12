@@ -1,9 +1,9 @@
 import { useCallback, useEffect } from 'react';
 
-import { SocketEventName } from '~/interfaces/websocket.js';
-import { useCurrentPageId } from '~/states/page/index.js';
-import { useGlobalSocket } from '~/states/socket-io/index.js';
-import { useSWRxPageInfo } from '~/stores/page.js';
+import { SocketEventName } from '~/interfaces/websocket';
+import { useCurrentPageId } from '~/states/page';
+import { useGlobalSocket } from '~/states/socket-io';
+import { useSWRxPageInfo } from '~/stores/page';
 
 export const usePageSeenUsersUpdatedEffect = (): void => {
   const socket = useGlobalSocket();

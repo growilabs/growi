@@ -4,8 +4,8 @@ import { atom, useAtom } from 'jotai';
 
 import { useIsEditable, usePageNotFound } from '~/states/page/index.js';
 
-import { EditorMode, EditorModeHash, type UseEditorModeReturn } from './types.js';
-import { determineEditorModeByHash } from './utils.js';
+import { EditorMode, EditorModeHash, type UseEditorModeReturn } from '~/states/ui/editor/types.js';
+import { determineEditorModeByHash } from '~/states/ui/editor/utils.js';
 
 // Base atom for editor mode
 const editorModeBaseAtom = atom<EditorMode | null>(null);

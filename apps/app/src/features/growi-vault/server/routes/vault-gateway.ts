@@ -16,11 +16,11 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   createVaultCredentialAdapter,
   type VaultAuthenticatedReq,
-} from '../middlewares/vault-pat-auth.js';
-import { VaultSyncState } from '../models/vault-sync-state.js';
-import { vaultManagerClient } from '../services/vault-manager-client.js';
-import { vaultNamespaceMapper } from '../services/vault-namespace-mapper.js';
-import { vaultSettingsService } from '../services/vault-settings-service.js';
+} from '~/features/growi-vault/server/middlewares/vault-pat-auth.js';
+import { VaultSyncState } from '~/features/growi-vault/server/models/vault-sync-state.js';
+import { vaultManagerClient } from '~/features/growi-vault/server/services/vault-manager-client.js';
+import { vaultNamespaceMapper } from '~/features/growi-vault/server/services/vault-namespace-mapper.js';
+import { vaultSettingsService } from '~/features/growi-vault/server/services/vault-settings-service.js';
 
 const logger = loggerFactory('growi:features:growi-vault:routes:vault-gateway');
 

@@ -1,1 +1,1 @@
-export { DeleteAttachmentModalLazyLoaded } from './dynamic.js';
+export { DeleteAttachmentModalLazyLoaded } from './dynamic';

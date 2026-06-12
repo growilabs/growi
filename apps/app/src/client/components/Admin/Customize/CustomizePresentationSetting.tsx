@@ -1,12 +1,12 @@
 import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow.js';
-import CustomizePresentationOption from './CustomizeFunctionOption.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
+import CustomizePresentationOption from './CustomizeFunctionOption';
 
 type Props = {
   adminCustomizeContainer: AdminCustomizeContainer;

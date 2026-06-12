@@ -6,7 +6,7 @@ import { useCreatePage } from '~/client/services/create-page/index.js';
 import { usePageNotFound } from '~/states/page/index.js';
 import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
 
-import { shouldCreateWipPage } from '../../utils/should-create-wip-page.js';
+import { shouldCreateWipPage } from '~/utils/should-create-wip-page.js';
 
 export const useStartEditing = (): ((path?: string) => Promise<void>) => {
   const isNotFound = usePageNotFound();

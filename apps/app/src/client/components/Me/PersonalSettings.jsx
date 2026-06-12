@@ -1,14 +1,14 @@
 import React, { useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import CustomNavAndContents from '../CustomNavigation/CustomNavAndContents.js';
-import ApiSettings from './ApiSettings.js';
+import CustomNavAndContents from '../CustomNavigation/CustomNavAndContents';
+import ApiSettings from './ApiSettings';
 // import { EditorSettings } from './EditorSettings';
-import ExternalAccountLinkedMe from './ExternalAccountLinkedMe.js';
-import InAppNotificationSettings from './InAppNotificationSettings.js';
-import OtherSettings from './OtherSettings.js';
-import PasswordSettings from './PasswordSettings.js';
-import UserSettings from './UserSettings.js';
+import ExternalAccountLinkedMe from './ExternalAccountLinkedMe';
+import InAppNotificationSettings from './InAppNotificationSettings';
+import OtherSettings from './OtherSettings';
+import PasswordSettings from './PasswordSettings';
+import UserSettings from './UserSettings';
 
 const UserInformationIcon = () => (
   <span

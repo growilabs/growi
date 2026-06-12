@@ -1,22 +1,22 @@
 import { useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import AdminAppContainer from '~/client/services/AdminAppContainer.js';
-import { toastError } from '~/client/util/toastr.js';
-import { NewsDeliverySetting } from '~/features/news/client/components/admin/NewsDeliverySetting.js';
-import { useIsMaintenanceMode } from '~/states/global/index.js';
-import { useSWRxAppSettings } from '~/stores/admin/app-settings.js';
-import { toArrayIfNot } from '~/utils/array-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import AdminAppContainer from '~/client/services/AdminAppContainer';
+import { toastError } from '~/client/util/toastr';
+import { NewsDeliverySetting } from '~/features/news/client/components/admin/NewsDeliverySetting';
+import { useIsMaintenanceMode } from '~/states/global';
+import { useSWRxAppSettings } from '~/stores/admin/app-settings';
+import { toArrayIfNot } from '~/utils/array-utils';
+import loggerFactory from '~/utils/logger';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import AppSetting from './AppSetting.js';
-import FileUploadSetting from './FileUploadSetting.js';
-import MailSetting from './MailSetting.js';
-import { MaintenanceMode } from './MaintenanceMode.js';
-import PageBulkExportSettings from './PageBulkExportSettings.js';
-import SiteUrlSetting from './SiteUrlSetting.js';
-import V5PageMigration from './V5PageMigration.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import AppSetting from './AppSetting';
+import FileUploadSetting from './FileUploadSetting';
+import MailSetting from './MailSetting';
+import { MaintenanceMode } from './MaintenanceMode';
+import PageBulkExportSettings from './PageBulkExportSettings';
+import SiteUrlSetting from './SiteUrlSetting';
+import V5PageMigration from './V5PageMigration';
 
 const logger = loggerFactory('growi:appSettings');
 

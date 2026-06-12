@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 
-import { ColorModeSettings } from './ColorModeSettings.js';
-import { UISettings } from './UISettings.js';
+import { ColorModeSettings } from './ColorModeSettings';
+import { UISettings } from './UISettings';
 
 const OtherSettings = (): JSX.Element => {
   return (

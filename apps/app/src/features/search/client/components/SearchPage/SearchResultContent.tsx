@@ -33,7 +33,7 @@ import {
 import { useSearchResultOptions } from '~/stores/renderer.js';
 import { mutateSearching } from '~/stores/search.js';
 
-import { useKeywordRescroll } from './use-keyword-rescroll.js';
+import { useKeywordRescroll } from '~/features/search/client/components/SearchPage/use-keyword-rescroll.js';
 
 import styles from './SearchResultContent.module.scss';
 

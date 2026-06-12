@@ -1,8 +1,8 @@
 import type { JSX } from 'react';
 
-import { usePresentationViewOptions } from '~/stores/renderer.js';
+import { usePresentationViewOptions } from '~/stores/renderer';
 
-import { Slides } from '../Presentation/Slides.js';
+import { Slides } from '../Presentation/Slides';
 
 type SlideRendererProps = {
   markdown: string;

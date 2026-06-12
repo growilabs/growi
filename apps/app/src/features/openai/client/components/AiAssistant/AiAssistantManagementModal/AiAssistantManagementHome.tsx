@@ -19,13 +19,13 @@ import { useCurrentUser } from '~/states/global/index.js';
 import { limitLearnablePageCountPerAssistantAtom } from '~/states/server-configurations/index.js';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
-import { determineShareScope } from '../../../../utils/determine-share-scope.js';
+import { determineShareScope } from '~/features/openai/utils/determine-share-scope.js';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
-} from '../../../states/modal/ai-assistant-management.js';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader.js';
-import { ShareScopeWarningModal } from './ShareScopeWarningModal.js';
+} from '~/features/openai/client/states/modal/ai-assistant-management.js';
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
+import { ShareScopeWarningModal } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/ShareScopeWarningModal.js';
 
 type Props = {
   isActivePane: boolean;

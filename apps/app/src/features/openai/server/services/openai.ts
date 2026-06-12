@@ -41,27 +41,27 @@ import { configManager } from '~/server/service/config-manager/index.js';
 import { createBatchStream } from '~/server/util/batch-stream.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { OpenaiServiceTypes } from '../../interfaces/ai.js';
+import { OpenaiServiceTypes } from '~/features/openai/interfaces/ai.js';
 import type { UpsertAiAssistantData } from '../../interfaces/ai-assistant.js';
 import {
   type AccessibleAiAssistants,
   type AiAssistant,
   AiAssistantAccessScope,
   AiAssistantShareScope,
-} from '../../interfaces/ai-assistant.js';
+} from '~/features/openai/interfaces/ai-assistant.js';
 import type { MessageListParams } from '../../interfaces/message.js';
-import { ThreadType } from '../../interfaces/thread-relation.js';
+import { ThreadType } from '~/features/openai/interfaces/thread-relation.js';
 import type { IVectorStore } from '../../interfaces/vector-store.js';
-import { removeGlobPath } from '../../utils/remove-glob-path.js';
+import { removeGlobPath } from '~/features/openai/utils/remove-glob-path.js';
 import AiAssistantModel, {
   type AiAssistantDocument,
-} from '../models/ai-assistant.js';
-import { convertMarkdownToHtml } from '../utils/convert-markdown-to-html.js';
-import { generateGlobPatterns } from '../utils/generate-glob-patterns.js';
-import { isVectorStoreCompatible } from '../utils/is-vector-store-compatible.js';
-import { getClient, isStreamResponse } from './client-delegator/index.js';
-import { openaiApiErrorHandler } from './openai-api-error-handler.js';
-import { replaceAnnotationWithPageLink } from './replace-annotation-with-page-link.js';
+} from '~/features/openai/server/models/ai-assistant.js';
+import { convertMarkdownToHtml } from '~/features/openai/server/utils/convert-markdown-to-html.js';
+import { generateGlobPatterns } from '~/features/openai/server/utils/generate-glob-patterns.js';
+import { isVectorStoreCompatible } from '~/features/openai/server/utils/is-vector-store-compatible.js';
+import { getClient, isStreamResponse } from '~/features/openai/server/services/client-delegator/index.js';
+import { openaiApiErrorHandler } from '~/features/openai/server/services/openai-api-error-handler.js';
+import { replaceAnnotationWithPageLink } from '~/features/openai/server/services/replace-annotation-with-page-link.js';
 
 const { isDeepEquals } = deepEquals;
 

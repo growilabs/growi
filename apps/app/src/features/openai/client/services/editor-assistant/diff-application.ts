@@ -10,8 +10,8 @@ import type {
   SearchContext,
   SingleDiffResult,
 } from '../../interfaces/types.js';
-import { ClientErrorHandler } from './error-handling.js';
-import { ClientFuzzyMatcher } from './fuzzy-matching.js';
+import { ClientErrorHandler } from '~/features/openai/client/services/editor-assistant/error-handling.js';
+import { ClientFuzzyMatcher } from '~/features/openai/client/services/editor-assistant/fuzzy-matching.js';
 
 // -----------------------------------------------------------------------------
 // Client Diff Application Engine

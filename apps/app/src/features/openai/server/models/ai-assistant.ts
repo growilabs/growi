@@ -7,7 +7,7 @@ import {
   type AiAssistant,
   AiAssistantAccessScope,
   AiAssistantShareScope,
-} from '../../interfaces/ai-assistant.js';
+} from '~/features/openai/interfaces/ai-assistant.js';
 
 export interface AiAssistantDocument extends AiAssistant, Document {}
 

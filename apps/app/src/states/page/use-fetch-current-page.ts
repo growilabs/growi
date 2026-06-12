@@ -27,7 +27,7 @@ import {
   remoteRevisionBodyAtom,
   revisionIdFromUrlAtom,
   shareLinkIdAtom,
-} from './internal-atoms.js';
+} from '~/states/page/internal-atoms.js';
 
 const logger = loggerFactory('growi:states:page:useFetchCurrentPage');
 

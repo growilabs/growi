@@ -1,10 +1,10 @@
 import type { JSX } from 'react';
 
-import type { RendererOptions } from '~/interfaces/renderer-options.js';
-import type { RendererConfig } from '~/interfaces/services/renderer.js';
-import { generateSSRViewOptions } from '~/services/renderer/renderer.js';
+import type { RendererOptions } from '~/interfaces/renderer-options';
+import type { RendererConfig } from '~/interfaces/services/renderer';
+import { generateSSRViewOptions } from '~/services/renderer/renderer';
 
-import RevisionRenderer from './RevisionRenderer.js';
+import RevisionRenderer from './RevisionRenderer';
 
 type Props = {
   rendererOptions?: RendererOptions;

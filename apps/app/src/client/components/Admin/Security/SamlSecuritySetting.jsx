@@ -1,12 +1,12 @@
 import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
-import AdminSamlSecurityContainer from '~/client/services/AdminSamlSecurityContainer.js';
-import { toastError } from '~/client/util/toastr.js';
-import { toArrayIfNot } from '~/utils/array-utils.js';
+import AdminSamlSecurityContainer from '~/client/services/AdminSamlSecurityContainer';
+import { toastError } from '~/client/util/toastr';
+import { toArrayIfNot } from '~/utils/array-utils';
 
-import { withUnstatedContainers } from '../../UnstatedUtils.js';
-import SamlSecuritySettingContents from './SamlSecuritySettingContents.js';
+import { withUnstatedContainers } from '../../UnstatedUtils';
+import SamlSecuritySettingContents from './SamlSecuritySettingContents';
 
 const SamlSecurityManagement = (props) => {
   const { adminSamlSecurityContainer } = props;

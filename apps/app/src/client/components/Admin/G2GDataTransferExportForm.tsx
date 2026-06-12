@@ -7,15 +7,15 @@ import React, {
 } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option.js';
-import { ImportOptionForPages } from '~/models/admin/import-option-for-pages.js';
-import { ImportOptionForRevisions } from '~/models/admin/import-option-for-revisions.js';
+import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import { ImportOptionForPages } from '~/models/admin/import-option-for-pages';
+import { ImportOptionForRevisions } from '~/models/admin/import-option-for-revisions';
 
-import ImportCollectionConfigurationModal from './ImportData/GrowiArchive/ImportCollectionConfigurationModal.js';
+import ImportCollectionConfigurationModal from './ImportData/GrowiArchive/ImportCollectionConfigurationModal';
 import ImportCollectionItem, {
   DEFAULT_MODE,
   MODE_RESTRICTED_COLLECTION,
-} from './ImportData/GrowiArchive/ImportCollectionItem.js';
+} from './ImportData/GrowiArchive/ImportCollectionItem';
 
 const GROUPS_PAGE = ['pages', 'revisions', 'tags', 'pagetagrelations'];
 const GROUPS_USER = [

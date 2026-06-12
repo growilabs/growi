@@ -25,7 +25,7 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   createVaultResilienceLayer,
   type ResilienceStatus,
-} from './resilience/index.js';
+} from '~/features/growi-vault/server/services/resilience/index.js';
 import type { VaultNamespaceMapper } from './vault-namespace-mapper.js';
 
 export type { ResilienceStatus };

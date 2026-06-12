@@ -2,13 +2,13 @@ import React, { type JSX } from 'react';
 import { type IUserHasId, USER_STATUS } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import { scrollToElement } from '~/client/util/smooth-scroll.js';
+import { scrollToElement } from '~/client/util/smooth-scroll';
 
 import {
   BOOKMARKS_LIST_ID,
   RECENT_ACTIVITY_LIST_ID,
   RECENTLY_CREATED_LIST_ID,
-} from './UsersHomepageFooter.consts.js';
+} from './UsersHomepageFooter.consts';
 
 const BookMarkLinkButton = React.memo(() => {
   const { t } = useTranslation();

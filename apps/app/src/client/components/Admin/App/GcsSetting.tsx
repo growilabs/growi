@@ -2,7 +2,7 @@ import type { JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegister } from 'react-hook-form';
 
-import type { FileUploadFormValues } from './FileUploadSetting.types.js';
+import type { FileUploadFormValues } from './FileUploadSetting.types';
 
 export type GcsSettingMoleculeProps = {
   register: UseFormRegister<FileUploadFormValues>;

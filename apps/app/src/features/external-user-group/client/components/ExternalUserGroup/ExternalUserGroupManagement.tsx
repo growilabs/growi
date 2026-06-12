@@ -6,24 +6,24 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { TabContent, TabPane } from 'reactstrap';
 
-import { UserGroupDeleteModal } from '~/client/components/Admin/UserGroup/UserGroupDeleteModal.js';
-import { UserGroupModal } from '~/client/components/Admin/UserGroup/UserGroupModal.js';
-import { UserGroupTable } from '~/client/components/Admin/UserGroup/UserGroupTable.js';
-import CustomNav from '~/client/components/CustomNavigation/CustomNav.js';
-import { apiv3Delete, apiv3Put } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import type { IExternalUserGroupHasId } from '~/features/external-user-group/interfaces/external-user-group.js';
-import type { PageActionOnGroupDelete } from '~/interfaces/user-group.js';
-import { isAclEnabledAtom } from '~/states/server-configurations/server-configurations.js';
-import { useSWRxUserGroupList } from '~/stores/user-group.js';
+import { UserGroupDeleteModal } from '~/client/components/Admin/UserGroup/UserGroupDeleteModal';
+import { UserGroupModal } from '~/client/components/Admin/UserGroup/UserGroupModal';
+import { UserGroupTable } from '~/client/components/Admin/UserGroup/UserGroupTable';
+import CustomNav from '~/client/components/CustomNavigation/CustomNav';
+import { apiv3Delete, apiv3Put } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import type { IExternalUserGroupHasId } from '~/features/external-user-group/interfaces/external-user-group';
+import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
+import { isAclEnabledAtom } from '~/states/server-configurations/server-configurations';
+import { useSWRxUserGroupList } from '~/stores/user-group';
 
 import {
   useSWRxChildExternalUserGroupList,
   useSWRxExternalUserGroupList,
   useSWRxExternalUserGroupRelationList,
-} from '../../stores/external-user-group.js';
-import { KeycloakGroupManagement } from './KeycloakGroupManagement.js';
-import { LdapGroupManagement } from './LdapGroupManagement.js';
+} from '../../stores/external-user-group';
+import { KeycloakGroupManagement } from './KeycloakGroupManagement';
+import { LdapGroupManagement } from './LdapGroupManagement';
 
 export const ExternalGroupManagement: FC = () => {
   const { data: externalUserGroupList, mutate: mutateExternalUserGroups } =

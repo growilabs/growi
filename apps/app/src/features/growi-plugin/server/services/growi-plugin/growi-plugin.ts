@@ -20,11 +20,11 @@ import type {
   IGrowiPluginMeta,
   IGrowiPluginOrigin,
 } from '../../../interfaces/index.js';
-import { PLUGIN_EXPRESS_STATIC_DIR, PLUGIN_STORING_PATH } from '../../consts/index.js';
-import { GrowiPlugin } from '../../models/index.js';
-import { GitHubUrl } from '../../models/vo/github-url.js';
-import { generateTemplatePluginMeta } from './generate-template-plugin-meta.js';
-import { generateThemePluginMeta } from './generate-theme-plugin-meta.js';
+import { PLUGIN_EXPRESS_STATIC_DIR, PLUGIN_STORING_PATH } from '~/features/growi-plugin/server/consts/index.js';
+import { GrowiPlugin } from '~/features/growi-plugin/server/models/index.js';
+import { GitHubUrl } from '~/features/growi-plugin/server/models/vo/github-url.js';
+import { generateTemplatePluginMeta } from '~/features/growi-plugin/server/services/growi-plugin/generate-template-plugin-meta.js';
+import { generateThemePluginMeta } from '~/features/growi-plugin/server/services/growi-plugin/generate-theme-plugin-meta.js';
 
 const logger = loggerFactory('growi:plugins:plugin-utils');
 

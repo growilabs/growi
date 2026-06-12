@@ -1,10 +1,10 @@
 import type { JSX, ReactNode } from 'react';
 import Image from 'next/image';
 
-import { useAppTitle } from '~/states/global/index.js';
+import { useAppTitle } from '~/states/global';
 
-import GrowiLogo from '../Common/GrowiLogo.js';
-import { RawLayout } from './RawLayout.js';
+import GrowiLogo from '../Common/GrowiLogo';
+import { RawLayout } from './RawLayout';
 
 import commonStyles from './NoLoginLayout.module.scss';
 

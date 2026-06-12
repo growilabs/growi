@@ -1,7 +1,7 @@
 import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { Themes, useNextThemes } from '~/stores-universal/use-next-themes.js';
+import { Themes, useNextThemes } from '~/stores-universal/use-next-themes';
 
 type ColorModeSettingsButtonProps = {
   isActive: boolean;

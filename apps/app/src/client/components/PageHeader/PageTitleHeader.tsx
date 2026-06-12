@@ -7,20 +7,20 @@ import { isMovablePage } from '@growi/core/dist/utils/page-path-utils';
 import { useTranslation } from 'next-i18next';
 import nodePath from 'path';
 
-import type { InputValidationResult } from '~/client/util/use-input-validator.js';
+import type { InputValidationResult } from '~/client/util/use-input-validator';
 import {
   useInputValidator,
   ValidationTarget,
-} from '~/client/util/use-input-validator.js';
-import { useIsUntitledPage } from '~/states/page/index.js';
-import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
+} from '~/client/util/use-input-validator';
+import { useIsUntitledPage } from '~/states/page';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
 
-import { CopyDropdown } from '../Common/CopyDropdown/index.js';
+import { CopyDropdown } from '../Common/CopyDropdown';
 import {
   AutosizeSubmittableInput,
   getAdjustedMaxWidthForAutosizeInput,
-} from '../Common/SubmittableInput/index.js';
-import { usePagePathRenameHandler } from '../PageEditor/page-path-rename-utils.js';
+} from '../Common/SubmittableInput';
+import { usePagePathRenameHandler } from '../PageEditor/page-path-rename-utils';
 
 import styles from './PageTitleHeader.module.scss';
 

@@ -1,1 +1,1 @@
-export { TemplateModalLazyLoaded } from './dynamic.js';
+export { TemplateModalLazyLoaded } from './dynamic';

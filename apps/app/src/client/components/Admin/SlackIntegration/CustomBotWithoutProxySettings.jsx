@@ -2,12 +2,12 @@ import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { useAppTitle } from '~/states/global/index.js';
+import { useAppTitle } from '~/states/global';
 
-import { CustomBotWithoutProxyConnectionStatus } from './CustomBotWithoutProxyConnectionStatus.js';
+import { CustomBotWithoutProxyConnectionStatus } from './CustomBotWithoutProxyConnectionStatus';
 import CustomBotWithoutProxySettingsAccordion, {
   botInstallationStep,
-} from './CustomBotWithoutProxySettingsAccordion.js';
+} from './CustomBotWithoutProxySettingsAccordion';
 
 const CustomBotWithoutProxySettings = (props) => {
   const { connectionStatuses } = props;

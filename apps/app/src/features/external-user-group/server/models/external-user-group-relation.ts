@@ -4,7 +4,7 @@ import { Schema } from 'mongoose';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
 import UserGroupRelation from '~/server/models/user-group-relation.js';
 
-import { getOrCreateModel } from '../../../../server/util/mongoose-utils.js';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 import type { IExternalUserGroupRelation } from '../../interfaces/external-user-group.js';
 import type { ExternalUserGroupDocument } from './external-user-group.js';
 

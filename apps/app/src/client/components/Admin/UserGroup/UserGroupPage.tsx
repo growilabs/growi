@@ -11,29 +11,29 @@ import {
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { apiv3Delete, apiv3Post, apiv3Put } from '~/client/util/apiv3-client.js';
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { ExternalGroupManagement } from '~/features/external-user-group/client/components/ExternalUserGroup/ExternalUserGroupManagement.js';
-import { useSWRxExternalUserGroupList } from '~/features/external-user-group/client/stores/external-user-group.js';
-import type { PageActionOnGroupDelete } from '~/interfaces/user-group.js';
-import { isAclEnabledAtom } from '~/states/server-configurations/index.js';
+import { apiv3Delete, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import { ExternalGroupManagement } from '~/features/external-user-group/client/components/ExternalUserGroup/ExternalUserGroupManagement';
+import { useSWRxExternalUserGroupList } from '~/features/external-user-group/client/stores/external-user-group';
+import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
+import { isAclEnabledAtom } from '~/states/server-configurations';
 import {
   useSWRxChildUserGroupList,
   useSWRxUserGroupList,
   useSWRxUserGroupRelationList,
-} from '~/stores/user-group.js';
+} from '~/stores/user-group';
 
 const UserGroupDeleteModal = dynamic(
   () =>
-    import('./UserGroupDeleteModal.js').then((mod) => mod.UserGroupDeleteModal),
+    import('./UserGroupDeleteModal').then((mod) => mod.UserGroupDeleteModal),
   { ssr: false },
 );
 const UserGroupModal = dynamic(
-  () => import('./UserGroupModal.js').then((mod) => mod.UserGroupModal),
+  () => import('./UserGroupModal').then((mod) => mod.UserGroupModal),
   { ssr: false },
 );
 const UserGroupTable = dynamic(
-  () => import('./UserGroupTable.js').then((mod) => mod.UserGroupTable),
+  () => import('./UserGroupTable').then((mod) => mod.UserGroupTable),
   { ssr: false },
 );
 

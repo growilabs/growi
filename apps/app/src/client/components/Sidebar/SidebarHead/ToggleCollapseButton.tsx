@@ -5,7 +5,7 @@ import {
   useDrawerOpened,
   useSetPreferCollapsedMode,
   useSidebarMode,
-} from '~/states/ui/sidebar/index.js';
+} from '~/states/ui/sidebar';
 
 import styles from './ToggleCollapseButton.module.scss';
 

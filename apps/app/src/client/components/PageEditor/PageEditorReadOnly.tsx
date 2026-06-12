@@ -1,16 +1,16 @@
 import react, { type JSX, useMemo, useRef } from 'react';
 import { GlobalCodeMirrorEditorKey } from '@growi/editor';
-import { CodeMirrorEditorReadOnly } from '@growi/editor/dist/client/components/CodeMirrorEditorReadOnly.js';
+import { CodeMirrorEditorReadOnly } from '@growi/editor/dist/client/components/CodeMirrorEditorReadOnly';
 import { throttle } from 'throttle-debounce';
 
-import { useShouldExpandContent } from '~/services/layout/use-should-expand-content.js';
-import { useCurrentPageData } from '~/states/page/index.js';
-import { useSWRxIsLatestRevision } from '~/stores/page.js';
-import { usePreviewOptions } from '~/stores/renderer.js';
+import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
+import { useCurrentPageData } from '~/states/page';
+import { useSWRxIsLatestRevision } from '~/stores/page';
+import { usePreviewOptions } from '~/stores/renderer';
 
-import { EditorNavbar } from './EditorNavbar/index.js';
-import Preview from './Preview.js';
-import { useScrollSync } from './ScrollSyncHelper.js';
+import { EditorNavbar } from './EditorNavbar';
+import Preview from './Preview';
+import { useScrollSync } from './ScrollSyncHelper';
 
 type Props = {
   visibility?: boolean;

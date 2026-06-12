@@ -9,11 +9,11 @@ import loginRequiredFactory from '~/server/middlewares/login-required.js';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
 import loggerFactory from '~/utils/logger/index.js';
 
-import { PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE } from '../../../interfaces/page-bulk-export.js';
+import { PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE } from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
 import {
   DuplicateBulkExportJobError,
   pageBulkExportService,
-} from '../../service/page-bulk-export.js';
+} from '~/features/page-bulk-export/server/service/page-bulk-export.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page-bulk-export');
 

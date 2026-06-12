@@ -13,13 +13,13 @@ import withLoadingProps from 'next-dynamic-loading-props';
 import SimpleBar from 'simplebar-react';
 import { useIsomorphicLayoutEffect } from 'usehooks-ts';
 
-import { SidebarMode } from '~/interfaces/ui.js';
-import { useIsSearchPage } from '~/states/context.js';
+import { SidebarMode } from '~/interfaces/ui';
+import { useIsSearchPage } from '~/states/context';
 import {
   useDeviceLargerThanMd,
   useDeviceLargerThanXl,
-} from '~/states/ui/device.js';
-import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
+} from '~/states/ui/device';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
 import {
   useCollapsedContentsOpened,
   useCurrentProductNavWidth,
@@ -27,27 +27,27 @@ import {
   useSetPreferCollapsedMode,
   useSetSidebarScrollerRef,
   useSidebarMode,
-} from '~/states/ui/sidebar/index.js';
+} from '~/states/ui/sidebar';
 
-import { DrawerToggler } from '../Common/DrawerToggler/index.js';
+import { DrawerToggler } from '../Common/DrawerToggler';
 import {
   AppTitleOnEditorSidebarHead,
   AppTitleOnSidebarHead,
   AppTitleOnSubnavigation,
-} from './AppTitle/AppTitle.js';
-import type { ResizableAreaProps } from './ResizableArea/props.js';
-import { ResizableAreaFallback } from './ResizableArea/ResizableAreaFallback.js';
-import { SidebarHead } from './SidebarHead/index.js';
-import { SidebarNav, type SidebarNavProps } from './SidebarNav/index.js';
+} from './AppTitle/AppTitle';
+import type { ResizableAreaProps } from './ResizableArea/props';
+import { ResizableAreaFallback } from './ResizableArea/ResizableAreaFallback';
+import { SidebarHead } from './SidebarHead';
+import { SidebarNav, type SidebarNavProps } from './SidebarNav';
 
 import styles from './Sidebar.module.scss';
 
 const SidebarContents = dynamic(
-  () => import('./SidebarContents.js').then((mod) => mod.SidebarContents),
+  () => import('./SidebarContents').then((mod) => mod.SidebarContents),
   { ssr: false },
 );
 const ResizableArea = withLoadingProps<ResizableAreaProps>((useLoadingProps) =>
-  dynamic(() => import('./ResizableArea/index.js').then((mod) => mod.ResizableArea), {
+  dynamic(() => import('./ResizableArea').then((mod) => mod.ResizableArea), {
     ssr: false,
     loading: () => {
       const { children, ...rest } = useLoadingProps();

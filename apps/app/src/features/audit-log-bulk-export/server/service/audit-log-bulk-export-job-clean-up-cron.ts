@@ -8,10 +8,10 @@ import loggerFactory from '~/utils/logger/index.js';
 import {
   AuditLogBulkExportJobInProgressJobStatus,
   AuditLogBulkExportJobStatus,
-} from '../../interfaces/audit-log-bulk-export.js';
+} from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
 import type { AuditLogBulkExportJobDocument } from '../models/audit-log-bulk-export-job.js';
-import AuditLogBulkExportJob from '../models/audit-log-bulk-export-job.js';
-import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron/index.js';
+import AuditLogBulkExportJob from '~/features/audit-log-bulk-export/server/models/audit-log-bulk-export-job.js';
+import { auditLogBulkExportJobCronService } from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/index.js';
 
 const logger = loggerFactory(
   'growi:service:audit-log-bulk-export-job-clean-up-cron',
