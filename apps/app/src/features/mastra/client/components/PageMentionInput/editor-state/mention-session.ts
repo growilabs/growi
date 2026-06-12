@@ -48,15 +48,19 @@ const computeSession = (state: EditorState): MentionSessionState => {
 
   const caret = sel.head;
   const line = state.doc.lineAt(caret);
+  // Work on the line's text with line-local offsets; one doc read instead of
+  // per-character sliceString calls.
+  const lineText = line.text;
+  const caretOffset = caret - line.from;
 
   // Scan backward from the caret within the current line to find the most
   // recent `@`. A whitespace char terminates the scan: the query may not span
   // whitespace (1.6), so any `@` before a space cannot own the caret.
-  let atPos = -1;
-  for (let pos = caret - 1; pos >= line.from; pos--) {
-    const ch = state.doc.sliceString(pos, pos + 1);
+  let atOffset = -1;
+  for (let offset = caretOffset - 1; offset >= 0; offset--) {
+    const ch = lineText[offset];
     if (ch === MENTION_TRIGGER) {
-      atPos = pos;
+      atOffset = offset;
       break;
     }
     if (/\s/.test(ch)) {
@@ -65,21 +69,20 @@ const computeSession = (state: EditorState): MentionSessionState => {
     }
   }
 
-  if (atPos < 0) {
+  if (atOffset < 0) {
     return INACTIVE_MENTION_SESSION;
   }
 
   // The `@` must sit at a trigger boundary (1.1 / 1.5). The char before `@` is
-  // examined; line start (atPos === line.from) yields empty textBefore.
-  const charBefore =
-    atPos > line.from ? state.doc.sliceString(atPos - 1, atPos) : '';
+  // examined; line start (atOffset === 0) yields empty textBefore.
+  const charBefore = atOffset > 0 ? lineText[atOffset - 1] : '';
   if (!isMentionTriggerBoundary(charBefore)) {
     return INACTIVE_MENTION_SESSION;
   }
 
-  const from = atPos;
+  const from = line.from + atOffset;
   const to = caret;
-  const query = state.doc.sliceString(from + 1, to);
+  const query = lineText.slice(atOffset + 1, caretOffset);
 
   return {
     active: true,
