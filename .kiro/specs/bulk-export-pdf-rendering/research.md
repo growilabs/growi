@@ -16,6 +16,7 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
 - **Finding**: `node -r ts-node/register/transpile-only` 環境で `services/renderer/renderer.tsx` を import → `ERR_REQUIRE_ESM`（`@growi/remark-growi-directive` 等）。React/SCSS を除いたプラグインのみのモジュールでも同様に失敗。ts-node が `import`→`require` 変換するため。
 - **Source**: 実測（2 回）。
 - **Implication**: Web レンダラや GROWI ローカル .ts プラグインを **静的 import で再利用することは不可**。サーバ側は npm ESM を `dynamicImport` で個別に読む方式が必須。
+- **訂正（改訂 5, 2026-06-12）**: 上記の失敗は **`renderer.tsx`（多数の ESM/React/SCSS を静的 import するモジュール）を import した場合**に限る。**個別プラグインファイルを `dynamicImport` する経路では成立しない** — 改訂 4 で `add-class.ts`（ローカル .ts）を相対パス `dynamicImport` で本番 cron に正常ロードできた実例が反証となる。よって「ローカル .ts は読めない」という当初の一般化は**誤り**。実体が **React/DOM 非依存の純粋な AST 変換**であるローカルプラグイン（emoji, xsv-to-table, echo-directive）は add-class と同一パターンで再利用可能。除外すべきは「読めないから」ではなく「React/DOM が必須だから（callout, mermaid 等）」または「本 spec で不要だから」である。
 
 ### I3. リッチなアラート/コールアウトは React コンポーネント駆動
 - **Finding**:
@@ -40,6 +41,25 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
 - **Finding**: 共有基盤は `generateCommonOptions`（[renderer.tsx](../../../apps/app/src/services/renderer/renderer.tsx)）= remark: gfm, emoji, pukiwikiLikeLinker, growiDirective, remarkDirective, echoDirective, remarkFrontmatter, codeBlock / rehype: relativeLinks×2, raw, addClass, addInlineProperty。各 view（`client/.../renderer.tsx`）が math, xsvToTable, admonitions, callout, lsx, drawio 等を追加。
 - **Implication**: bulk-export は npm かつ HTML 文字列化に意味のある部分集合＋インライン等価物を採用。drift テストは「Web 共通集合の各プラグインが、bulk-export 側で included / intentionally-excluded のいずれかに分類済み」を検査し、未分類の新規プラグイン出現で失敗させる。
 
+### I7. directive 劣化の実測（改訂 5, 2026-06-12）
+- **目的**: callout（React）抜きで `remark-directive` + `echo-directive`（+ `remark-github-admonitions-to-directives`）を通したとき、`> [!NOTE]` / `:::note` / text/leaf ディレクティブが実際にどう描画されるかを確定する。
+- **方法**: npm パッケージ（unified, remark-gfm, remark-directive, admonitions, remark-rehype, rehype-raw, rehype-stringify）＋ echo-directive 同等ロジックで実 HTML を出力（apps/app 内で実行）。
+- **Finding**（sanitize 前の素の出力）:
+  | 入力 | admonitions あり | admonitions なし（採用案） |
+  |---|---|---|
+  | `> [!NOTE]\n> 本文` | `<div><p>本文</p></div>`（**NOTE ラベル喪失・匿名 div**） | `<blockquote><p>[!NOTE] 本文</p></blockquote>`（**ラベルがテキストで残る**） |
+  | `:::note\n本文\n:::`（container） | `<div><p>本文</p></div>`（ラベル喪失） | 同左 |
+  | `::youtube[Video]{#id}`（leaf） | `<div id="id"><span>::youtube</span><span>[Video]</span></div>` ✅ 可読 | 同左 ✅ |
+  | `:abbr[HTML]{title="…"}`（text） | `<span title="…"><span>:abbr</span><span>[HTML]</span></span>` ✅ 可読 | 同左 ✅ |
+  - emoji: `:smile:`→😄, `:+1:`→👍, 未知の `:xxx:` は不変（安全）。
+  - xsv: `csv-h`/`tsv-h`→ヘッダ付き `<table>`、`csv`（ヘッダ無し）は空 `<th>`（Web と同一挙動）。
+  - XSS: `:foo{onclick="evil()"}` は echo が onclick 属性を付与するが、後段 sanitize が除去（実パイプラインでは onclick は残らない）。
+- **Implication**:
+  - **echo-directive は text/leaf にのみ効く**（callout.ts が container を担当）。`remark-directive` + `echo-directive` は text/leaf を可読テキスト化でき、属性 `{...}` の生露出も防げる → **採用**。
+  - **admonitions は callout 不在では逆効果**（`> [!NOTE]` がラベルを失い匿名 div に劣化、blockquote のままより悪化）→ **不採用**。GitHub アラートは blockquote のまま残す方が劣化として良い。
+  - container ディレクティブ（`:::note`）は専用処理せず、内部テキストを保持した素ブロックへ自然劣化（callout 化は Phase 2）。
+  - **ユーザー決定（2026-06-12）**: emoji + xsv-to-table + remark-directive + echo-directive を採用、admonitions は不採用、callout/mermaid/drawio/lsx/plantuml は Phase 2 据え置き。
+
 ## Architecture Pattern Evaluation
 
 - **採用**: 既存の dynamicImport ベース単一 unified パイプラインを bulk-export feature 内に閉じて構築（サーバ専用 converter モジュール）。Web レンダラのコードは import しない（CJS/ESM 制約 I2）。
@@ -52,14 +72,16 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
 > （ESM 化では解決しない、I3）。これにより **インライン変換・ローカル再実装が一切不要**になり、
 > 「同一機能が 2 箇所」を完全に回避できる。table-bordered は I-table の通り CSS のみで解決。
 
-- **Adopt（dynamicImport）**: remark-gfm, remark-frontmatter, remark-math, remark-rehype, rehype-raw, rehype-slug, rehype-sanitize, rehype-katex, rehype-stringify。
-- **No inline transforms / no local reimplementation**: テーブル/見出し/引用/コード等は素の HTML を
-  出力し `.wiki` 由来 CSS で装飾（I-table, I5）。directive/admonitions/callout プラグインは採用しない。
-- **Degrade**: GitHub アラート `> [!NOTE]` → blockquote（`.wiki blockquote`）。`:::note` 等 → 可読
-  テキスト。これらは仕様上のグレースフル劣化（Req3）。
-- **Defer（Phase 2 / renderer-convergence）**: 色付きコールアウト, emoji ショートコード, xsv-to-table,
+- **Adopt（dynamicImport）**: remark-gfm, remark-frontmatter, remark-math, remark-rehype, rehype-raw, rehype-slug, rehype-sanitize, rehype-katex, rehype-stringify。**改訂 5 で追加**: emoji, xsv-to-table, remark-directive, echo-directive（いずれも React/DOM 非依存。emoji/xsv/echo はローカル .ts を add-class と同一の相対パス `dynamicImport` で再利用）。
+- **No local reimplementation（再実装はしない／再利用はする）**: テーブル/見出し/引用/コード等は素の HTML を
+  出力し `.wiki` 由来 CSS で装飾（I-table, I5）。emoji/xsv/echo-directive は**コピー再実装ではなく Web と同一実装を
+  `dynamicImport` で再利用**する（改訂 5）。admonitions/callout プラグインは採用しない（I7 / Phase 2）。
+- **Degrade**: GitHub アラート `> [!NOTE]` → blockquote のまま（admonitions 不採用、I7）。text/leaf ディレクティブ
+  → echo で可読テキスト化（属性 `{...}` 非露出）。container `:::note` → 内部テキスト保持の素ブロック。仕様上の
+  グレースフル劣化（Req3, 3.1a）。
+- **Defer（Phase 2 / renderer-convergence）**: 色付きコールアウト, github-admonitions（callout 前提）,
   シンタックスハイライト配色, drawio/lsx/mermaid/plantuml/attachment-refs。忠実なコールアウト等は
-  React SSR ベースの収れんで扱う。
+  React SSR ベースの収れんで扱う。（emoji / xsv-to-table は改訂 5 で Phase 1 へ前倒し採用）
 
 ### I-table. テーブルはロジック不要（CSS のみ）← ⚠️ 誤り（改訂 4 で訂正）
 - **当初の Finding（誤り）**: `.wiki table {}` が素の表を装飾するのでクラス付与は不要、と判断した。

@@ -19,18 +19,22 @@
 - **In scope**:
   - 一括エクスポート PDF（中間 HTML 経由）のサーバ側 Markdown レンダリングのリッチ化
   - GFM テーブル / 数式 / 見出し ID / frontmatter / 引用・コード等 標準 Markdown 要素の扱い
+  - 絵文字ショートコード（`:smile:` 等）→ 絵文字グリフへの変換（改訂 5）
+  - CSV / TSV コードブロック → 表への変換（改訂 5）
+  - ディレクティブ記法（`:foo[...]` / `::bar` 等の text/leaf ディレクティブ）の可読テキスト化（改訂 5）
   - GROWI 共通デザインシステム由来のスタイル適用
   - 出力 HTML のサニタイズ（安全性）
   - スコープ外記法のグレースフルな劣化
   - bulk-export と Web レンダラが対象とする機能集合の整合検知（ドリフト防止）
 - **Out of scope**:
   - リポジトリ全体の ESM 化（`support/esm`）そのもの
-  - GitHub アラート / GROWI ディレクティブ（`:::note` 等）の **装飾コールアウト描画**。
-    色付きコールアウトの見た目は React コンポーネント駆動のため本 spec では再現せず、アラートは
-    blockquote、ディレクティブは可読テキストへ劣化させる（将来フェーズ renderer-convergence）
-  - GROWI ローカルの Markdown 拡張に依存する機能: 絵文字ショートコード変換 / CSV・TSV→表 /
-    コードのシンタックスハイライト配色 / drawio・plantuml・lsx・attachment-refs のライブ描画
-    （いずれも ESM 化後の将来フェーズ）
+  - **装飾（色付き）コールアウト描画**。色付きコールアウトの見た目は React コンポーネント
+    （`CalloutViewer`）駆動のため本 spec では再現しない（将来フェーズ renderer-convergence）。
+    GitHub アラート（`> [!NOTE]` 等）は blockquote のまま描画する。これを `:::note` ディレクティブへ
+    変換する `remark-github-admonitions-to-directives` は **callout 不在ではアラート種別ラベルを失い
+    無名ブロックに劣化する（blockquote のままより視認性が下がる）ため、本 spec では採用しない**（改訂 5）
+  - コードのシンタックスハイライト配色 / drawio・plantuml・lsx・mermaid・attachment-refs のライブ
+    描画（React コンポーネント / ブラウザ DOM 駆動。ESM 化後の将来フェーズ renderer-convergence）
   - GROWI テーマ・レイアウト・画面 chrome（サイドバー・パンくず等）の再現
   - 再生成 dedup キャッシュの無効化（`revisionListHash` のレンダラ版反映）── 運用対応とする
   - pdf-converter 側でのレンダリング（Markdown を渡す契約への変更）
@@ -56,6 +60,8 @@
 4. When ページ本文に見出しが含まれる, the Bulk Export Renderer shall 各見出しに一意な識別子（id）を付与する。
 5. When ページ本文に frontmatter が含まれる, the Bulk Export Renderer shall それを出力本文に露出させない。
 6. The Bulk Export Renderer shall in-scope の Markdown 機能について、GROWI Web レンダラと構造的に整合する HTML を生成する。
+7. When ページ本文に絵文字ショートコード（`:smile:` 等）が含まれる, the Bulk Export Renderer shall それを対応する絵文字グリフに変換する。未知のショートコードは元のテキストのまま残す。（改訂 5）
+8. When ページ本文に CSV/TSV コードブロック（`csv` / `csv-h` / `tsv` / `tsv-h`）が含まれる, the Bulk Export Renderer shall それを行・列を持つ構造化された表として描画する。（改訂 5）
 
 ### Requirement 2: 出力のスタイル適用（Web 表示への接近）
 
@@ -71,7 +77,8 @@
 **Objective:** As a エクスポート利用者, I want 本施策で未対応の記法があっても出力が壊れないこと, so that 一部機能が未対応でも文書全体を取得できる
 
 #### Acceptance Criteria
-1. If ページ本文にスコープ外機能に依存する記法（GROWI ディレクティブ `:::note` 等・絵文字ショートコード・CSV/TSV コードブロック・drawio/plantuml/lsx 等）が含まれる, then the Bulk Export Renderer shall エクスポートを失敗させず、当該箇所を可読なテキストまたはコードブロックとして出力する。
+1. If ページ本文にスコープ外機能に依存する記法（コンテナディレクティブ `:::note` 等・drawio/plantuml/lsx/mermaid フェンス等）が含まれる, then the Bulk Export Renderer shall エクスポートを失敗させず、当該箇所の内部テキストを保持した可読なブロックまたはコードブロックとして出力する。
+1a. When ページ本文に text/leaf ディレクティブ（`:foo[...]` / `::bar` 等）が含まれる, the Bulk Export Renderer shall ディレクティブ記法の属性構文（`{...}`）を生のまま露出させず、可読なテキストとして出力する。（改訂 5）
 2. If Markdown 変換中にエラーが発生する, then the Bulk Export Service shall 既存のエラーハンドリングに従ってジョブ状態を更新し、無効な出力をサイレントに完了扱いしない。
 
 ### Requirement 4: 出力の安全性（サニタイズ）

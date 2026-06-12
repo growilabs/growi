@@ -112,3 +112,26 @@
   - `EsmPluginLoader` から `ADOPTED_PLUGINS` への依存を除去し、`loadPlugins(baseDir, declarations)` と宣言注入に変更(何をロードするかは呼び出し元=renderer が渡す)。冗長なモジュールキャッシュも撤廃(build-once は renderer の `cachedProcessor` が担保)。`PluginDeclaration` に `specifier`/`exportName` を追加し npm/ローカル両方を同一宣言で表現
   - _責務: EsmPluginLoader = 純粋なロード / plugin-set = 何をロードするか / renderer = 合成_
   - _Requirements: 1.1, 2.1_ / _Boundary: BulkExportMarkdownRenderer_
+
+## 改訂 5: React 非依存プラグインの追加採用 (2026-06-12)
+
+> emoji / xsv-to-table / remark-directive / echo-directive を `ADOPTED_PLUGINS` に追加採用する。除外理由の
+> 「ローカル .ts は読めない」を訂正し（add-class の実例で反証）、admonitions は callout 不在で劣化が悪化する
+> ため不採用とする（research.md I2 訂正 / I7）。新規変更は test-first（red→green）。
+
+- [ ] 8. 追加プラグイン採用（emoji / xsv / directive+echo）
+- [ ] 8.1 追加プラグインの描画契約の失敗テストを先に書く（red）
+  - `:smile:`→絵文字グリフ（未知ショートコードは不変）/ `csv-h` フェンス→ヘッダ付き `<table>` / text・leaf ディレクティブ→可読テキスト（属性 `{...}` 非露出）/ ディレクティブ属性の `onclick` 等危険属性が sanitize で除去される、の各契約テストを `bulk-export-markdown-renderer.spec.ts` に追加する
+  - 採用前のレンダラに対しテストが失敗することを確認する（observable: red）
+  - _Requirements: 1.7, 1.8, 3.1a, 4.3_
+  - _Boundary: BulkExportMarkdownRenderer (spec)_
+- [ ] 8.2 4 プラグインを `ADOPTED_PLUGINS` に正規エントリとして宣言する（green）
+  - emoji（remark, ローカル `remarkPlugin`、gfm の後・remark-directive の前）、remark-directive（npm, default）、echo-directive（remark, ローカル `remarkPlugin`、remark-directive の後）、xsv-to-table（remark, ローカル `remarkPlugin`、math の後・remark-rehype の前）を Web の選定順に合わせて宣言する。loader/renderer は不変（宣言追加のみ）
+  - 本番可用性: emoji.ts が値 import する `mdast-util-find-and-replace` を devDependencies→dependencies へ移動する（bulk-export cron は emoji.ts を `.ts` のまま dynamicImport し実行時に解決するため。`pnpm deploy --prod` で除外されると `ERR_MODULE_NOT_FOUND` になる。package-dependencies.md）。echo-directive の `mdast-util-directive` は type-only import なので devDependencies のままで可
+  - 8.1 の全契約テストが green になる（observable）
+  - _Requirements: 1.7, 1.8, 3.1a, 1.6, 5.4_
+  - _Boundary: plugin-set_
+- [ ] 8.3 意図的除外一覧と分類テストを更新する
+  - `INTENTIONALLY_EXCLUDED_PLUGINS` から emoji / xsv-to-table / remark-directive / echo-directive を除去。`github-admonitions` の除外理由を「callout 不在で劣化悪化」に訂正。`plugin-set.spec.ts` の除外期待リストを更新し、ドリフトテスト（`renderer-parity.spec.ts`）が全 Web プラグインを分類済みに保つことを確認する（observable）
+  - _Requirements: 1.6, 6.1, 6.2_
+  - _Boundary: plugin-set, RendererParityGuard_

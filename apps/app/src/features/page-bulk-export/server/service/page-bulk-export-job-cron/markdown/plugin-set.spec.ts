@@ -106,6 +106,52 @@ describe('plugin-set declaration module', () => {
       expect(addClassIndex).toBeLessThan(stringifyIndex);
     });
 
+    // 改訂 5: React/DOM-free plugins adopted by reuse.
+    it('adopts emoji, remark-directive, echo-directive and xsv-to-table (改訂 5)', () => {
+      for (const plugin of [
+        'emoji',
+        'remark-directive',
+        'echo-directive',
+        'xsv-to-table',
+      ]) {
+        expect(
+          ADOPTED_PLUGIN_NAMES.has(plugin),
+          `Expected ADOPTED_PLUGINS to contain "${plugin}"`,
+        ).toBe(true);
+      }
+    });
+
+    it('orders emoji before remark-directive (so :smile: is not parsed as a directive)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      expect(names.indexOf('emoji')).toBeLessThan(
+        names.indexOf('remark-directive'),
+      );
+    });
+
+    it('orders remark-directive before echo-directive (parser must run before the echo transform)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      expect(names.indexOf('remark-directive')).toBeLessThan(
+        names.indexOf('echo-directive'),
+      );
+    });
+
+    it('orders xsv-to-table before remark-rehype (it must transform mdast before the hast bridge)', () => {
+      const names = ADOPTED_PLUGINS.map((p) => p.name);
+      const xsvIndex = names.indexOf('xsv-to-table');
+      expect(xsvIndex).toBeGreaterThanOrEqual(0);
+      expect(xsvIndex).toBeLessThan(names.indexOf('remark-rehype'));
+    });
+
+    it('emoji, echo-directive and xsv-to-table declare relative specifiers and named exports', () => {
+      for (const name of ['emoji', 'echo-directive', 'xsv-to-table']) {
+        const entry = ADOPTED_PLUGINS.find((p) => p.name === name);
+        expect(entry?.specifier, `${name} specifier`).toMatch(
+          /remark-plugins\/.+\.ts$/,
+        );
+        expect(entry?.exportName, `${name} exportName`).toBe('remarkPlugin');
+      }
+    });
+
     it('add-class declares a relative specifier, named export, and table additions', () => {
       const addClass = ADOPTED_PLUGINS.find((p) => p.name === 'add-class');
       expect(addClass?.specifier).toMatch(/add-class\.ts$/);
@@ -137,23 +183,35 @@ describe('plugin-set declaration module', () => {
 
     it('contains all listed intentionally-excluded plugins', () => {
       const expectedExcluded = [
-        'emoji',
         'pukiwiki-like-linker',
         'growi-directive',
-        'remark-directive',
-        'echo-directive',
         'codeblock',
-        'xsv-to-table',
         'github-admonitions',
         'callout',
         'add-inline-code',
         'relative-links',
+        'remark-breaks',
       ];
       for (const plugin of expectedExcluded) {
         expect(
           EXCLUDED_PLUGIN_NAMES.has(plugin),
           `Expected INTENTIONALLY_EXCLUDED_PLUGINS to contain "${plugin}"`,
         ).toBe(true);
+      }
+    });
+
+    // 改訂 5: these were excluded before but are now adopted (React/DOM-free reuse).
+    it('no longer excludes emoji / xsv-to-table / remark-directive / echo-directive', () => {
+      for (const plugin of [
+        'emoji',
+        'xsv-to-table',
+        'remark-directive',
+        'echo-directive',
+      ]) {
+        expect(
+          EXCLUDED_PLUGIN_NAMES.has(plugin),
+          `Expected "${plugin}" to NOT be in INTENTIONALLY_EXCLUDED_PLUGINS (改訂 5)`,
+        ).toBe(false);
       }
     });
   });

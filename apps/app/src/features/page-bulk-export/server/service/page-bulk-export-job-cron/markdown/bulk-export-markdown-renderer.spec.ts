@@ -126,7 +126,8 @@ describe('BulkExportMarkdownRenderer', () => {
 
   // Requirement 3.1: graceful degradation of unsupported syntax
   describe('graceful degradation of unsupported syntax (Requirement 3.1)', () => {
-    // GROWI directives (:::note etc.) are not in the plugin list (no remark-directive loaded).
+    // Container directives (:::note etc.) have no callout in this pipeline, so remark-directive
+    // parses them but they degrade to a plain block that preserves the inner text (改訂 5).
     // The renderer must not throw and must expose the directive's inner text in a readable form.
     it('does not throw for a :::note directive and preserves inner text', async () => {
       const md = `:::note\nThis is a note message.\n:::`;
@@ -184,6 +185,79 @@ describe('BulkExportMarkdownRenderer', () => {
       expect(html).toMatch(/<h1[^>]+id=/);
       // Inner text of the directive must be preserved.
       expect(html).toContain('Inline note');
+    });
+  });
+
+  // 改訂 5: React-free plugin adoption (emoji / xsv-to-table / remark-directive + echo-directive)
+  // Emoji shortcodes are converted to native emoji glyphs (Requirement 1.7).
+  describe('emoji shortcode rendering (Requirement 1.7)', () => {
+    it('converts known emoji shortcodes to native emoji glyphs', async () => {
+      const md = `I am happy :smile: and :+1:`;
+      const html = await renderer.renderToHtml(md, CSS_HREF);
+      expect(html).toContain('😄');
+      expect(html).toContain('👍');
+      // The literal shortcode syntax must not remain.
+      expect(html).not.toContain(':smile:');
+    });
+
+    it('leaves unknown shortcodes untouched (no data loss, no throw)', async () => {
+      const md = `unknown :notarealemoji: here`;
+      const html = await renderer.renderToHtml(md, CSS_HREF);
+      expect(html).toContain(':notarealemoji:');
+    });
+  });
+
+  // CSV/TSV code blocks are converted to structured tables (Requirement 1.8).
+  describe('CSV/TSV code block rendering (Requirement 1.8)', () => {
+    it('renders a csv-h fenced block as a <table> with header and data cells', async () => {
+      const md = '```csv-h\nName,Age\nAlice,30\nBob,25\n```';
+      const html = await renderer.renderToHtml(md, CSS_HREF);
+      expect(html).toContain('<table');
+      // Header row from csv-h.
+      expect(html).toMatch(/<th[^>]*>Name<\/th>/);
+      // Data cells.
+      expect(html).toContain('Alice');
+      expect(html).toContain('25');
+      // The table inherits the Bootstrap classes from add-class.
+      const tableTag = html.match(/<table[^>]*>/)?.[0] ?? '';
+      expect(tableTag).toMatch(/class="[^"]*\btable-bordered\b[^"]*"/);
+    });
+
+    it('renders a tsv-h fenced block as a <table>', async () => {
+      const md = '```tsv-h\nA\tB\n1\t2\n```';
+      const html = await renderer.renderToHtml(md, CSS_HREF);
+      expect(html).toContain('<table');
+      expect(html).toMatch(/<th[^>]*>A<\/th>/);
+    });
+  });
+
+  // text/leaf directives degrade to readable text without leaking the {...} attribute
+  // syntax (Requirement 3.1a). echo-directive handles text/leaf (container is callout's
+  // domain and stays a plain text-preserving block).
+  describe('directive readable-text degradation (Requirement 3.1a)', () => {
+    it('renders a text directive as readable text and does not leak the {attr} syntax', async () => {
+      const md = `see :abbr[HTML]{title="HyperText Markup Language"} now`;
+      const html = await renderer.renderToHtml(md, CSS_HREF);
+      expect(html).toContain('HTML');
+      // The raw attribute syntax must not appear as text.
+      expect(html).not.toContain('{title=');
+      expect(html).not.toContain('{title="');
+    });
+
+    it('renders a leaf directive as readable text and does not leak the {#id} syntax', async () => {
+      const md = `::youtube[My Video]{#vid123}`;
+      const html = await renderer.renderToHtml(md, CSS_HREF);
+      expect(html).toContain('My Video');
+      expect(html).not.toContain('{#vid123');
+    });
+
+    // Requirement 4.3: a dangerous attribute supplied via directive syntax must not
+    // survive as a live HTML attribute (echo-directive transcribes it, sanitize strips it).
+    it('strips dangerous attributes supplied via directive attribute syntax', async () => {
+      const md = `:danger{onclick="evil()"}[text]`;
+      const html = await renderer.renderToHtml(md, CSS_HREF);
+      expect(html).not.toContain('onclick');
+      expect(html).not.toContain('evil()');
     });
   });
 

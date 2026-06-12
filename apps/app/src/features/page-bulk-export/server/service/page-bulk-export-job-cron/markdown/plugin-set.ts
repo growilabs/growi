@@ -7,14 +7,16 @@
  *  - RendererParityGuard (task 6.1) — drift test comparing this set against
  *    generateCommonOptions / generateSSRViewOptions from the web renderer
  *
- * Ordering follows the unified pipeline:
+ * Ordering follows the unified pipeline (mirrors the web renderer's selection order):
  *   remark-parse (implicit base)
- *   → remark plugins (gfm, frontmatter, math)
+ *   → remark plugins (gfm, emoji, remark-directive, echo-directive, frontmatter,
+ *                      math, xsv-to-table)
  *   → remark-rehype (bridge, allowDangerousHtml)
  *   → rehype plugins (raw, slug, sanitize, katex, add-class, stringify)
  *
  * Entries are loaded by EsmPluginLoader generically: npm plugins by bare
- * specifier, reused local plugins (add-class) by relative path + named export.
+ * specifier, reused local plugins (emoji, echo-directive, xsv-to-table, add-class)
+ * by relative path + named export.
  */
 
 /** A declared plugin entry: how to load it, its pipeline options, and its
@@ -56,8 +58,43 @@ export interface PluginDeclaration {
 export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
   { name: 'remark-parse', options: undefined },
   { name: 'remark-gfm', options: undefined },
+  // Reused GROWI web plugin: emoji converts `:smile:` shortcodes to native emoji
+  // glyphs (req 1.7). Placed right after gfm and BEFORE remark-directive so that
+  // `:smile:` is consumed as an emoji, not parsed as a text directive (mirrors the
+  // web renderer order). React/DOM-free mdast transform; loaded by relative path.
+  {
+    name: 'emoji',
+    specifier: '../../../../../../services/renderer/remark-plugins/emoji.ts',
+    exportName: 'remarkPlugin',
+    options: undefined,
+  },
+  // remark-directive parses `:foo[..]{..}` / `::bar` / `:::baz` directive syntax
+  // into directive nodes. Required for echo-directive (next) to find them. npm ESM.
+  { name: 'remark-directive', options: undefined },
+  // Reused GROWI web plugin: echo-directive degrades text/leaf directives to readable
+  // text (`<span>`/`<div>` showing the directive name), without leaking the `{...}`
+  // attribute syntax (req 3.1a). Container directives are callout's domain (not adopted)
+  // and degrade to a plain text-preserving block. React/DOM-free; loaded by relative path.
+  {
+    name: 'echo-directive',
+    specifier:
+      '../../../../../../services/renderer/remark-plugins/echo-directive.ts',
+    exportName: 'remarkPlugin',
+    options: undefined,
+  },
   { name: 'remark-frontmatter', options: undefined },
   { name: 'remark-math', options: undefined },
+  // Reused GROWI web plugin: xsv-to-table converts csv/csv-h/tsv/tsv-h fenced code
+  // blocks to GFM tables (req 1.8). Placed after math (mirrors the web view order
+  // `push(math, xsvToTable)`) and before remark-rehype so the produced <table> later
+  // receives `table table-bordered` from add-class. React/DOM-free; loaded by relative path.
+  {
+    name: 'xsv-to-table',
+    specifier:
+      '../../../../../../services/renderer/remark-plugins/xsv-to-table.ts',
+    exportName: 'remarkPlugin',
+    options: undefined,
+  },
   // Bridge: converts mdast → hast; allowDangerousHtml preserves raw HTML nodes
   // for subsequent rehype-raw processing (which is always followed by rehype-sanitize)
   { name: 'remark-rehype', options: { allowDangerousHtml: true } },
@@ -89,30 +126,33 @@ export const ADOPTED_PLUGINS: ReadonlyArray<PluginDeclaration> = [
  * Plugins intentionally excluded from the bulk-export pipeline.
  *
  * These are plugins present in the GROWI web renderer (generateCommonOptions /
- * generateSSRViewOptions) that this pipeline consciously omits. The exclusion
- * reasons are documented in research.md:
- *  - Local .ts plugins (emoji, pukiwiki-like-linker, growi-directive, echo-directive,
- *    codeblock, xsv-to-table, add-inline-code, relative-links):
- *    ERR_REQUIRE_ESM or React/DOM dependency; cannot be loaded in CJS server runtime.
- *    (add-class is the exception: it depends only on hast-util-select (ESM), so it
- *    IS reused — see its entry in ADOPTED_PLUGINS above, loaded by relative path.)
- *  - React-component-driven features (callout, github-admonitions):
- *    Faithful rendering requires React SSR; out of scope for this spec phase.
- *  - remark-directive: GROWI directive syntax support depends on local .ts plugins
- *    listed above; including the parser alone is not useful.
- *  - remark-breaks: conditionally used in the web renderer only when
- *    `config.isEnabledLinebreaks` is true (a per-instance GROWI setting). The
- *    bulk-export pipeline does not have access to this runtime config in the
- *    current scope; per-page rendering fidelity for this setting is out of scope.
+ * generateSSRViewOptions) that this pipeline consciously omits. NOTE (改訂 5):
+ * exclusion is NOT because "local .ts plugins can't be loaded" — that earlier claim
+ * (research.md I2) was disproven by add-class and corrected; any React/DOM-free AST
+ * transform loads fine via the same relative-path dynamicImport pattern. The real
+ * reasons, by group:
+ *  - Degrades WORSE without callout (research.md I7):
+ *      github-admonitions — converts `> [!NOTE]` to a `:::note` container directive,
+ *      which (with no callout to render it) becomes an anonymous <div> that LOSES the
+ *      alert label. Leaving GitHub alerts as blockquotes (label visible as text) is the
+ *      better degradation, so this plugin is not adopted.
+ *  - React-component / browser-DOM driven; faithful rendering needs React SSR or a
+ *    browser, out of scope for this phase (Phase 2 / renderer-convergence):
+ *      callout (colored callouts via CalloutViewer), and the diagram/highlight features
+ *      (drawio, lsx, mermaid, plantuml, attachment-refs, syntax-highlight colors).
+ *  - Not needed by this spec / deferred for a different reason:
+ *      pukiwiki-like-linker, growi-directive (parser alone is not useful without its
+ *      React consumers), codeblock / add-inline-code (negligible visual effect),
+ *      relative-links (needs a per-page pagePath injected at runtime),
+ *      remark-breaks (gated on the per-instance `isEnabledLinebreaks` config).
+ *
+ * (emoji, xsv-to-table, remark-directive and echo-directive were excluded here before
+ * 改訂 5; they are now ADOPTED — see ADOPTED_PLUGINS above.)
  */
 export const INTENTIONALLY_EXCLUDED_PLUGINS: ReadonlyArray<string> = [
-  'emoji',
   'pukiwiki-like-linker',
   'growi-directive',
-  'remark-directive',
-  'echo-directive',
   'codeblock',
-  'xsv-to-table',
   'github-admonitions',
   'callout',
   'add-inline-code',
