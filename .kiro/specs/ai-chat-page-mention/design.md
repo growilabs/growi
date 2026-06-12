@@ -45,7 +45,7 @@
 - `downshift`（既存依存）— 候補リストの **controlled な描画ヘルパ**（ARIA 配線・マウスホバー同期。状態所有は `MentionController` のまま。キーボード操作は CM キーマップが担当）
 - `simplebar-react`（既存依存）— 候補リストのスクロールコンテナ
 - `@growi/ui` の `UserPicture` — 候補行の作成者アバター表示
-- `usehooks-ts` の `useDebounce` — 検索クエリの debounce
+- `usehooks-ts` の `useDebounceValue` — 検索クエリの debounce（`useDebounce` は deprecated のため後継 API を使用）
 
 ### Revalidation Triggers
 - `PromptInput` の合成 API（children 受け渡し・`onSubmit` 契約・`InputGroup` ラップ）が変更された場合
@@ -103,7 +103,7 @@ graph TB
 | Frontend (keymap) | `@codemirror/commands`（`defaultKeymap`） | mention キーマップ（`Prec.highest`）＋標準カーソル移動の合成 | 矢印/編集キーがドキュメントモデル基準。`@codemirror/autocomplete` は不使用 |
 | Frontend (候補UI) | `downshift`（controlled）+ `simplebar-react` + shadcn/Tailwind 4 (`tw:`) | 候補リストの ARIA/ホバー/クリック・スクロール・スタイル | downshift は状態非所有。Bootstrap 不使用 |
 | Frontend (avatar) | `@growi/ui` `UserPicture` | 候補行の作成者アバター | `noLink`/`noTooltip` |
-| Data | `useSWRxSearch`（`/search`） + `usehooks-ts` `useDebounce` | ページパス検索（権限フィルタ済み）・クエリ debounce | 既存。無改修 |
+| Data | `useSWRxSearch`（`/search`） + `usehooks-ts` `useDebounceValue` | ページパス検索（権限フィルタ済み）・クエリ debounce | 既存。無改修。`includeUserPages: true` を指定（/user 配下もメンション対象） |
 | Navigation | `LinkedPagePath` + `next/router` | チップクリック遷移（SPA 同タブ） | 既存ヘルパ |
 | i18n | `react-i18next` | 新規 UI 文言 | ChatSidebar に新規導入 |
 
@@ -117,7 +117,7 @@ apps/app/src/features/mastra/client/components/PageMentionInput/
 ├── MentionCandidateList.tsx          # shadcn 候補ドロップダウン(loading/該当なし/行レンダリング/ハイライト)
 ├── use-mention-controller.ts         # セッション状態↔候補リストの橋渡しフック(検索・選択中index・commit/close)
 ├── types.ts                          # PagePathCandidate / MentionData / MentionSessionState / 公開Props
-├── mention-aria.ts                   # 共有ARIA id (MENTION_LISTBOX_ID / mentionOptionId) — エディタとlistboxの連携用
+├── mention-aria.ts                   # 共有ARIA id (MENTION_LISTBOX_ID / mentionOptionId) + 共有述語 isListboxRendered — エディタとlistboxの連携用
 └── editor-state/
     ├── index.ts                      # サブバレル: 拡張ファクトリ createPageMentionExtensions() を公開
     ├── mention-decoration.ts         # MentionWidget(WidgetType) + 装飾StateField + addMention効果 + atomicRanges
@@ -174,7 +174,7 @@ sequenceDiagram
 - メンションは **doc 本文にパス文字列そのものを保持**し、その範囲に `Decoration.replace({ widget })` を重ねてチップ表示する。これにより flatten 用テキストは `doc.toString()` で得られ、パス文字列のみが自然に反映される（6.1/6.2）。
 - 送信テキストは **隠し `input[name=message]`** を介して既存フォーム経路に渡す。CodeMirror はネイティブフォーム要素でないため、flatten 結果をこの隠し input に同期させて `formData.get('message')` で読めるようにする（Issue 1 対応）。
 - セッション中の Nav 鍵（↑↓/Enter/Tab/Esc）は高優先度キーマップが横取りして候補リスト操作へ委譲し、非セッション時の Enter は `requestSubmit()` で送信に割り当てる。
-- **ARIA 同期（a11y）**: セッションがアクティブな間、`PageMentionInput` がエディタの `contentDOM` に `aria-controls`（listbox）と `aria-activedescendant`（ハイライト中の option）を `EditorView.contentAttributes` の Compartment で同期する。`controller.isOpen` / `highlightedIndex` 変化のたびに再構成し、セッション終了で除去。これによりキーボードで候補を辿る際に SR がアクティブ候補を読み上げる。
+- **ARIA 同期（a11y）**: **listbox とその option が実際に DOM に存在する間だけ**、`PageMentionInput` がエディタの `contentDOM` に `aria-controls`（listbox）と `aria-activedescendant`（ハイライト中の option）を `EditorView.contentAttributes` の Compartment で同期する。「listbox が描画されている」条件（open + 非空クエリ + 検索完了 + 候補 ≥1）は共有述語 `isListboxRendered`（`mention-aria.ts`）に単一定義し、`MentionCandidateList` の listbox 描画分岐と同じ述語を使うことで、ヒント/検索中/該当なし状態で存在しない id を参照（dangling）しないことを保証する。ハイライト移動のたびに再構成し、条件を外れたら除去。これによりキーボードで候補を辿る際に SR がアクティブ候補を読み上げる。
 
 ## Requirements Traceability
 
@@ -238,7 +238,7 @@ sequenceDiagram
 - `value` が空でエディタが空でない場合に doc をリセット。それ以外は一方向（editor→parent）。
 - 候補リスト（`MentionCandidateList`）を入力欄の真上に配置（CSS アンカー、上記参照）。
 - **標準カーソル移動キーマップ（`@codemirror/commands` の `defaultKeymap`）を mention キーマップ（`Prec.highest`）と併せて組み込む**。これにより非セッション時の矢印/編集キーがドキュメントモデル基準でカーソルを動かす: 空 doc での右矢印が placeholder ウィジェットを跨がず、横移動が `atomicRanges` を参照してメンションチップを 1 単位として扱う（5.x）。
-- **プレースホルダ/フォーカス/キャレット**: `placeholder` 拡張で空時の案内、`EditorView.contentAttributes` で `.cm-content` に `data-slot="input-group-control"` を付与し host `InputGroup` のフォーカスリングを発火、テーマで `min-height`・`caret-color: currentColor`（テーマ追従）を設定。
+- **プレースホルダ/フォーカス/キャレット**: `placeholder` 拡張で空時の案内（**Compartment 経由で装着し、prop 変更時に reconfigure** — i18n リソースの非同期ロードや言語切替に追従するため、生成時固定にしない）、`EditorView.contentAttributes` で `.cm-content` に `data-slot="input-group-control"` を付与し host `InputGroup` のフォーカスリングを発火、テーマで `min-height`・`caret-color: currentColor`（テーマ追従）を設定。
 
 **Dependencies**
 - Inbound: ChatSidebar — value/onChange/placeholder/disabled (P0)
@@ -290,8 +290,8 @@ export interface PageMentionInputProps {
 | Requirements | 1.3, 1.4, 2.2, 2.3, 2.7, 7.1, 7.2 |
 
 **Responsibilities & Constraints**
-- セッション state（query/範囲）を React 側に取り込み、`useSWRxSearch(query)`（debounce・クエリ1文字以上で実行）で候補を取得（1.3/1.4/2.7/7.x）。
-- `highlightedIndex` を保持し `moveUp`/`moveDown` で移動（2.2）、`commit` で選択候補を `addMention` として dispatch（2.3）、`close` でセッションを閉じる（2.4 の一部）。
+- セッション state（query/範囲）を React 側に取り込み、`useSWRxSearch(query)`（debounce・クエリ1文字以上で実行、`includeUserPages: true` で /user 配下も対象）で候補を取得（1.3/1.4/2.7/7.x）。
+- `highlightedIndex` を保持し `moveUp`/`moveDown` で移動（2.2）、`commit` で選択候補を `addMention` として dispatch（2.3）、`close` でセッションを閉じる（2.4 の一部）。**`commit` の置換範囲（from/to）は React ミラーの session ではなく `view.state.field(mentionSessionField)` からライブに読み直す** — 最終レンダ以降にトランザクションが入っていてもズレない。
 - **このフックがブリッジの所有者**であり、CM↔React 間の状態同期と呼び出し方向を一手に引き受ける。keymap・候補リスト・PageMentionInput は本フックの契約のみに依存する。
 
 **Dependencies**
