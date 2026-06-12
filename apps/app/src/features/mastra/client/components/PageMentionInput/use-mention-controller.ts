@@ -6,6 +6,7 @@ import { useDebounceValue } from 'usehooks-ts';
 import { useSWRxSearch } from '~/stores/search';
 
 import { addMention } from './editor-state/mention-decoration';
+import { mentionSessionField } from './editor-state/mention-session';
 import { toPagePathCandidate } from './page-path-candidate';
 import type {
   MentionController,
@@ -123,7 +124,15 @@ export const useMentionController = (
 
   const commit = useCallback(
     (index?: number) => {
-      if (view == null || !session.active) {
+      if (view == null) {
+        return;
+      }
+      // Read the session straight from the editor state rather than the React
+      // mirror: a transaction dispatched after the last render would leave the
+      // mirrored from/to stale, while the field is always in sync with the doc
+      // the change below is applied to.
+      const liveSession = view.state.field(mentionSessionField);
+      if (!liveSession.active) {
         return;
       }
       const candidate = candidates[index ?? highlightedIndex];
@@ -131,7 +140,7 @@ export const useMentionController = (
         return;
       }
 
-      const { from, to } = session;
+      const { from, to } = liveSession;
       const { path, pageId } = candidate;
       const mentionEnd = from + path.length;
 
@@ -153,7 +162,7 @@ export const useMentionController = (
       setHighlightedIndex(0);
       setDismissedKey(null);
     },
-    [view, session, candidates, highlightedIndex],
+    [view, candidates, highlightedIndex],
   );
 
   const close = useCallback(() => {

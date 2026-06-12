@@ -11,6 +11,7 @@ import type {
 } from '~/interfaces/search';
 
 import { addMention } from './editor-state/mention-decoration';
+import { mentionSessionField } from './editor-state/mention-session';
 import type { MentionSessionState } from './types';
 import { useMentionController } from './use-mention-controller';
 
@@ -272,11 +273,14 @@ describe('useMentionController', () => {
         isLoading: false,
       });
 
-      // Real EditorView so the transaction is genuinely applied to a doc.
+      // Real EditorView with the session field installed (as in production):
+      // commit reads the live session from the editor state, not from the
+      // React-mirrored prop.
       const view = new EditorView({
         state: EditorState.create({
           doc: '@foo',
           selection: EditorSelection.cursor(4),
+          extensions: [mentionSessionField],
         }),
       });
       const dispatchSpy = vi.spyOn(view, 'dispatch');
@@ -315,6 +319,37 @@ describe('useMentionController', () => {
       view.destroy();
     });
 
+    it('replaces the span of the LIVE session even when the mirrored prop is stale', () => {
+      setSearchResult({
+        data: buildSearchResult([{ id: 'id-a', path: '/foo/a' }]),
+        isLoading: false,
+      });
+
+      const view = new EditorView({
+        state: EditorState.create({
+          doc: '@foo',
+          selection: EditorSelection.cursor(4),
+          extensions: [mentionSessionField],
+        }),
+      });
+
+      const { result } = renderHook(() =>
+        // The mirrored prop lags behind the doc (e.g. a transaction landed
+        // after the last render): its positions no longer match "@foo".
+        useMentionController(
+          view,
+          activeSession({ from: 1, to: 3, query: 'fo' }),
+        ),
+      );
+
+      act(() => result.current.commit());
+
+      // The whole "@foo" span — per the live session [0, 4] — was replaced,
+      // not the stale [1, 3] span from the prop.
+      expect(view.state.doc.toString()).toBe('/foo/a ');
+      view.destroy();
+    });
+
     it('does nothing (doc/selection unchanged) when there is no candidate', () => {
       setSearchResult({ data: buildSearchResult([]), isLoading: false });
 
@@ -322,6 +357,7 @@ describe('useMentionController', () => {
         state: EditorState.create({
           doc: '@foo',
           selection: EditorSelection.cursor(4),
+          extensions: [mentionSessionField],
         }),
       });
 
