@@ -35,9 +35,12 @@ export const resolveProviderOptions = (): MastraProviderOptions => {
   let parsed: unknown;
   try {
     parsed = JSON.parse(raw);
-  } catch {
+  } catch (err) {
+    // Include the parse error so operators can locate the broken position in a
+    // long JSON value (the value is not a secret).
     logger.warn(
       'MASTRA_LLM_PROVIDER_OPTIONS is not valid JSON; ignoring provider options',
+      err,
     );
     return {};
   }
