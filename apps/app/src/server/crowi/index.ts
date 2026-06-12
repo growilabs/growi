@@ -14,6 +14,7 @@ import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-lo
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
+import { modelConfigSync } from '~/features/mastra/server/services/model-config-sync';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
@@ -409,6 +410,8 @@ class Crowi {
       this.configManager.setS2sMessagingService(s2sMessagingService);
       // add as a message handler
       s2sMessagingService.addMessageHandler(this.configManager);
+      // discard the memoized Mastra model on remote AI settings updates
+      s2sMessagingService.addMessageHandler(modelConfigSync);
 
       this.s2sMessagingService = s2sMessagingService;
     }
