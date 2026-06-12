@@ -21,6 +21,7 @@
 - LLM への接続テスト(疎通確認)機能
 - `ai:` 以外の設定キーの管理、保存時暗号化(encryption-at-rest)
 - 旧 AI 連携画面(`/admin/ai-integration`)の復元
+- E2E(ブラウザ自動化)テスト ― 単体・統合・コンポーネントテストでカバーする
 
 ## Boundary Commitments
 
@@ -402,10 +403,12 @@ export const clearResolvedMastraModelCache = (): void => { /* memoizedModel = un
 - PUT apiKey 未指定: 既存 apiKey が保持される(誤クリアしない)。
 - アクセス制御: 非管理者は GET/PUT で 403(1.2)。
 
-### E2E/UI Tests
-- 管理者が `/admin/ai` で provider/model を保存 → 成功トースト + 再読込で反映(1.1, 1.4, 2.3)。
-- env 専用モード有効環境: 全フィールドが readOnly + モード明示の alert(4.2)。
+### Component Tests (UI / React Testing Library)
+- `AiSettings`: 保存操作で `apiv3Put` 呼出 → 成功時 `toastSuccess`、失敗時 `toastError` + 入力 state 保持(2.3, 6.3)。
+- env 専用モード(`useOnlyEnvVars=true`)で全フィールドが readOnly + モード明示の alert を表示(4.2)。
 - provider=azure-openai 選択時に Azure セクションが有効化、`useEntraId` で apiKey 不使用提示(3.2, 3.3)。
+
+> E2E(ブラウザ自動化)は範囲外(Non-Goals)。上記はコンポーネント単位の RTL テストで検証する。
 
 ## Security Considerations
 - **アクセス制御**: 新スコープ `admin:ai`(read/write)+ `adminRequired`。PAT の最小権限を担保。
