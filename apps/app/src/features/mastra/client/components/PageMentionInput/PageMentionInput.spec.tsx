@@ -145,6 +145,33 @@ describe('PageMentionInput', () => {
     });
   });
 
+  describe('placeholder', () => {
+    const placeholderText = (container: HTMLElement): string | undefined =>
+      container.querySelector<HTMLElement>('.cm-placeholder')?.textContent ??
+      undefined;
+
+    it('renders the given placeholder while the doc is empty', () => {
+      const { container } = render(
+        <PageMentionInput value="" onChange={vi.fn()} placeholder="first" />,
+      );
+
+      expect(placeholderText(container)).toBe('first');
+    });
+
+    it('follows a placeholder prop change after mount (async i18n / locale switch)', () => {
+      const { container, rerender } = render(
+        <PageMentionInput value="" onChange={vi.fn()} placeholder="first" />,
+      );
+      expect(placeholderText(container)).toBe('first');
+
+      rerender(
+        <PageMentionInput value="" onChange={vi.fn()} placeholder="second" />,
+      );
+
+      expect(placeholderText(container)).toBe('second');
+    });
+  });
+
   describe('lifecycle', () => {
     it('mounts and unmounts without throwing, destroying the view', () => {
       const { unmount, container } = render(

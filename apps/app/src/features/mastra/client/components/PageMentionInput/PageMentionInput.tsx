@@ -93,6 +93,11 @@ export const PageMentionInput = ({
   // session opens/closes and the highlight moves (#10).
   const ariaCompartmentRef = useRef(new Compartment());
 
+  // Compartment for the placeholder text. The view is created once, but the
+  // placeholder prop can change after mount (i18n resources load asynchronously,
+  // locale switches), so it must be reconfigurable rather than baked in.
+  const placeholderCompartmentRef = useRef(new Compartment());
+
   // The mounted view, exposed to React so the controller and candidate list can
   // read from it. Set once the view is created in the mount effect.
   const [view, setView] = useState<EditorView | null>(null);
@@ -150,7 +155,9 @@ export const PageMentionInput = ({
           EditorView.lineWrapping,
           editorTheme,
           contentDataSlot,
-          cmPlaceholder(placeholder ?? ''),
+          placeholderCompartmentRef.current.of(
+            cmPlaceholder(placeholder ?? ''),
+          ),
           // Combobox ARIA attributes; reconfigured by the effect below. Closed
           // initially (no listbox to reference).
           ariaCompartmentRef.current.of(EditorView.contentAttributes.of({})),
@@ -211,6 +218,21 @@ export const PageMentionInput = ({
       v.dispatch({ changes: { from: 0, to: v.state.doc.length, insert: '' } });
     }
   }, [value]);
+
+  // placeholder → editor sync. The i18n resource may resolve after mount (or
+  // the locale may switch), so reconfigure the placeholder extension whenever
+  // the prop changes instead of relying on the editor-creation value.
+  useEffect(() => {
+    const v = viewRef.current;
+    if (v == null) {
+      return;
+    }
+    v.dispatch({
+      effects: placeholderCompartmentRef.current.reconfigure(
+        cmPlaceholder(placeholder ?? ''),
+      ),
+    });
+  }, [placeholder]);
 
   // Combobox ARIA bridge (#10): expose `aria-controls` (the listbox) and
   // `aria-activedescendant` (the highlighted option) on the editor's contentDOM
