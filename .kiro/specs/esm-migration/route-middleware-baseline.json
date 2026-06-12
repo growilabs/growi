@@ -1,8 +1,8 @@
 {
-  "capturedAt": "2026-04-21T10:23:24.721Z",
-  "node": "v24.13.1",
-  "git": "531da6e4c86e08676e909a111d682a98776419e5",
-  "entryCount": 260,
+  "capturedAt": "2026-06-12T08:20:44.672Z",
+  "node": "v24.15.0",
+  "git": "447ddd20adb7737a63f9913ed98f40fe24cf080a",
+  "entryCount": 273,
   "entries": [
     {
       "method": "GET",
@@ -1081,6 +1081,46 @@
         "adminRequired",
         "<anonymous>"
       ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/news/admin/delivery-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/news/admin/delivery-setting",
+      "middlewares": [
+        "accessTokenParserMw",
+        "loginRequired",
+        "adminRequired",
+        "<anonymous>"
+      ]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/news/list",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/news/mark-all-read",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/news/mark-read",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/news/unread-count",
+      "middlewares": ["accessTokenParserMw", "loginRequired", "<anonymous>"]
     },
     {
       "method": "GET",
@@ -3101,6 +3141,41 @@
         "apiV3FormValidator",
         "<anonymous>"
       ]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/vault/page/reconcile",
+      "middlewares": ["loginRequired", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/vault/reconcile",
+      "middlewares": ["loginRequired", "adminRequired", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/vault/reconcile-history",
+      "middlewares": ["loginRequired", "adminRequired", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/vault/resilience-status",
+      "middlewares": ["loginRequired", "adminRequired", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/vault/retry/abort",
+      "middlewares": ["loginRequired", "adminRequired", "<anonymous>"]
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/vault/status",
+      "middlewares": ["loginRequired", "adminRequired", "<anonymous>"]
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/vault/wipe",
+      "middlewares": ["loginRequired", "adminRequired", "<anonymous>"]
     }
   ]
 }

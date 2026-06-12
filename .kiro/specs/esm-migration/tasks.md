@@ -173,8 +173,8 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - 再取得時の環境条件 (Node 24.15, pnpm 11.1.1, ホスト条件) を perf-baseline.md に明記し、Phase 3.7.a bake-off と同一条件にする
   - **進捗 (2026-06-11)**: worktree `/workspace/growi-baseline` 構築済み (install + 依存パッケージ 17 build 済み、capture ツール 3 種コピー済み)
   - [x] R.6.1 (0.2) audit-baseline.json — 再取得・置換済み (pnpm 11.1.1 / advisories 203 件 / 旧 pnpm 10 形式から `actions`/`muted` キーが消失している点に注意。axios advisory 20 件は >=1.15.1〜>=1.16.0 要求 — Phase 5.x の override 再評価の入力)
-  - [ ] R.6.2 (0.3) route-middleware-baseline.json — **BLOCKED**: v8 コードに対して snapshot ツールの無名関数ガードが **758 件** 発火。無名参照はチェーン位置 0–2 (旧 baseline で `accessTokenParserMw`/`loginRequired`/`adminRequired` だったスロット) に集中しており、v8 の auth middleware 改編で factory が無名関数を返すようになったことが原因。**対処**: support/esm 上で該当 factory を named function 化するコミットを作成 → 同コミットを baseline worktree に cherry-pick → 両側が同名になった状態で再 capture (ツール側のガード緩和は禁止 — diff の信頼性が崩れる)
-  - [ ] R.6.3 (0.3.1) authz-matrix-baseline.json — R.6.2 解消後に実施 (snapshot 出力を `--in` に取るため)
+  - [x] R.6.2 (0.3) route-middleware-baseline.json — **再取得・置換済み** (273 エントリ / git 447ddd20ad / Node v24.15.0)。当初 758 件発火した無名関数ガードは、task 0.3 で named 化した 10 ファイル (middlewares 9 + routes/forgot-password.ts) が worktree (素の v8) に無いことが原因だった — **support/esm 側はマージで naming が全て生存しており新規コミット不要**。worktree へ同 10 ファイルを naming-only 同期 (`git checkout support/esm -- <files>`) して capture。v8 追加ルートは 13 件 (news 6 + vault 7)、削除 0 件、terminal `<anonymous>` 慣行は旧 baseline と同一で diff 互換あり
+  - [ ] R.6.3 (0.3.1) authz-matrix-baseline.json — R.6.2 解消済みのため実施可能 (snapshot 出力を `--in` に取る)。**worktree の naming-only 同期 10 ファイルを維持したまま実行すること**
   - [ ] R.6.4 (0.3.2) ws-authz-baseline.json — R.6.2 と独立に実施可能
   - [ ] R.6.5 (0.1) test-baseline.md — worktree で `turbo run test --filter @growi/app` を 3 回連続実行 (1 回 10 分超のため独立セッション推奨)
   - [ ] R.6.6 (0.4/0.5) perf-baseline.md — 本番出力 + dev 起動の wall time 各 5 回。並走プロセスなしの静穏条件必須のため独立セッション推奨
