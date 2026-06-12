@@ -24,7 +24,7 @@
   - _Requirements: 3.4_
   - _Boundary: スパイク（throwaway コード。本実装ファイルには手を入れない）_
 
-- [ ] 3. agentic 探索の実行主体（Mastra agent 層）
+- [x] 3. agentic 探索の実行主体（Mastra agent 層）
 - [x] 3.1 検索 budget 付きリクエストコンテキストと budget 執行検索 tool
   - 共有リクエストコンテキスト shape を拡張し、検索回数 budget（上限・消費カウンタ・実行クエリ記録）を per-request で伝搬する型を定義する（共有 shape は無改変）
   - 既存全文検索 tool と同一の入力スキーマを持ち、出力 union に limit_exceeded を追加した wrapper 検索 tool を実装する
@@ -50,7 +50,7 @@
   - ユニットテストで tools 構成・memory 不接続・model が関数（DynamicArgument）であることが検証され green
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 3.4_
 
-- [ ] 4. エンジン抽象と agentic エンジン（ai-tools サービス層）
+- [x] 4. エンジン抽象と agentic エンジン（ai-tools サービス層）
 - [x] 4.1 エンジン契約の定義とワンショットエンジンの移設
   - エンジン入力とエンジン関数型（SuggestPathEngine 契約）を server 専用型として定義する
   - 現行のワンショットパイプライン部分（内容分析 → 検索候補取得 → 並列の候補評価 + grant 解決・category 提案）をロジック変更なしでワンショットエンジンとして実装する
@@ -90,7 +90,7 @@
   - engine id 毎に対応する実装が実行されることがユニットテストで green
   - _Requirements: 5.1, 5.2, 5.4_
 
-- [ ] 5. オーケストレータと API の統合
+- [x] 5. オーケストレータと API の統合
 - [x] 5.1 オーケストレータの再構成
   - memo 提案を常に生成してレスポンス先頭に含め、engine id（リクエスト指定 → なければ設定の既定）でディスパッチする構成に再構成する（公開シグネチャは後方互換: 既存引数列 + optional オプション）。旧パイプラインロジックの除去（ワンショットエンジンへの配線替え）はこのタスクが所有する
   - 非対称フォールバックを実装する: agentic エンジンの reject（例外・タイムアウト）は捕捉して memo のみ返す。oneshot エンジンの例外は現行どおり伝播させる
@@ -103,7 +103,7 @@
   - engine 未指定リクエストが現行と完全互換で動作し、不正値が 400 になる
   - _Requirements: 4.1, 5.2, 6.1_
 
-- [ ] 6. 統合検証
+- [x] 6. 統合検証
 - [x] 6.1 route 統合テスト
   - engine: 'agentic' 指定（agent モック）で 200 + 契約準拠レスポンス、engine 不正値で 400、未指定で oneshot 経路となることを統合テストで検証する
   - 上記 3 シナリオが green
@@ -120,7 +120,7 @@
   - lint / test / build が通る（実行環境は devcontainer。ホストには mongo / Elasticsearch / turbo がない）
   - _Requirements: 5.3_
 
-- [ ] 7. A/B 測定と受け入れ判断
+- [x] 7. A/B 測定と受け入れ判断
 - [x] 7.1 A/B 測定の実施とメトリクス記録
   - 実行環境は devcontainer（#183968 評価環境 = ローカル GROWI + dev wiki データはそこに構築済み）
   - 測定開始前に実機 1 リクエストのスモーク（agentic エンジン指定で実 LLM を通した end-to-end 動作確認）を行い、配線不良を測定中に発覚させない
