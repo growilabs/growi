@@ -2,11 +2,11 @@ import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { toAISdkStream } from '@mastra/ai-sdk';
+import type { AIV6Type } from '@mastra/core/agent/message-list';
 import { RequestContext } from '@mastra/core/request-context';
 import {
   createUIMessageStream,
   pipeUIMessageStreamToResponse,
-  type UIMessage,
   validateUIMessages,
 } from 'ai';
 import type { Request, RequestHandler } from 'express';
@@ -27,7 +27,7 @@ const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
   threadId?: string;
-  messages: UIMessage[];
+  messages: AIV6Type.UIMessage[];
 };
 
 type Req = Request<undefined, Response, ReqBody> & {
@@ -54,14 +54,6 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
     async (req: Req, res: ApiV3Response) => {
       const { threadId, messages } = req.body;
 
-      const requestContext = new RequestContext<MastraRequestContextShape>();
-
-      // The chat endpoint is assistant-independent: no aiAssistantId lookup and
-      // no vectorStore-derived context. AI-enabled gating is enforced at the
-      // router level (see ./index.ts).
-      requestContext.set('user', req.user);
-      requestContext.set('searchService', crowi.searchService);
-
       const growiAgent = mastra.getAgent('growiAgent');
       const memory = await growiAgent.getMemory();
       if (memory == null) {
@@ -73,6 +65,15 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         resourceId: req.user._id.toString(),
         threadId,
       });
+
+      const requestContext = new RequestContext<MastraRequestContextShape>();
+
+      // Request-scoped context the agent's tools read at execute time: the
+      // logged-in user (for viewer-aware page access) and the search service
+      // (for the full-text search tool). AI-enabled gating is handled at the
+      // router level (see ./index.ts).
+      requestContext.set('user', req.user);
+      requestContext.set('searchService', crowi.searchService);
 
       try {
         const stream = await growiAgent.stream(messages, {

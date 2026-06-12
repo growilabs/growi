@@ -4,6 +4,7 @@ import { Fragment, useEffect, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { CopyIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { v7 as uuid } from 'uuid';
 
 import { Action, Actions } from '~/components/ai-elements/actions';
@@ -20,7 +21,6 @@ import {
   PromptInputFooter,
   type PromptInputMessage,
   PromptInputSubmit,
-  PromptInputTextarea,
 } from '~/components/ai-elements/prompt-input';
 import {
   Reasoning,
@@ -34,6 +34,7 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '~/components/ai-elements/sources';
+import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
 
 import {
   useChatSidebarActions,
@@ -51,6 +52,8 @@ import styles from './ChatSidebar.module.scss';
 const moduleClass = styles['grw-chat-sidebar'] ?? '';
 
 export const ChatSidebar = (): JSX.Element => {
+  const { t } = useTranslation();
+
   const [input, setInput] = useState('');
 
   const chatSidebarStatus = useChatSidebarStatus();
@@ -112,10 +115,20 @@ export const ChatSidebar = (): JSX.Element => {
   }, [savedMessages, setMessages]);
 
   const handleSubmit = (message: PromptInputMessage) => {
+    // The input stays editable while the assistant responds so the user can
+    // compose the next message, but starting a new request is suppressed until
+    // the current one settles. This guards both the submit button and the
+    // keymap's Enter→requestSubmit path against double-sending while busy (#5).
+    if (status === 'submitted' || status === 'streaming') {
+      return;
+    }
+    // Nothing to send for an empty (or whitespace-only) message.
+    const text = message.text ?? '';
+    if (text.trim().length === 0) {
+      return;
+    }
     sendMessage(
-      {
-        text: message.text || 'Hello World',
-      },
+      { text },
       {
         body: buildMessageRequestBody(chatThreadId),
       },
@@ -263,9 +276,10 @@ export const ChatSidebar = (): JSX.Element => {
               inputGroupClassName="tw:rounded-xl"
             >
               <PromptInputBody>
-                <PromptInputTextarea
-                  onChange={(e) => setInput(e.target.value)}
+                <PageMentionInput
                   value={input}
+                  onChange={setInput}
+                  placeholder={t('pageMention.placeholder')}
                 />
               </PromptInputBody>
               <PromptInputFooter className="tw:justify-end">

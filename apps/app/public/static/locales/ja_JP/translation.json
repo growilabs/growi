@@ -1078,5 +1078,12 @@
       "docs_color": "カラーの詳細はこちら",
       "docs_alert": "アラートブロックの詳細はこちら"
     }
+  },
+  "pageMention": {
+    "placeholder": "メッセージを入力...（ @ でページを参照）",
+    "hint": "ページ名を入力して検索",
+    "searching": "検索中...",
+    "noResults": "該当するページがありません",
+    "candidatesLabel": "ページ候補"
   }
 }
