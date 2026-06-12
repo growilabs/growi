@@ -1,4 +1,7 @@
+import https from 'node:https';
+import { Logger } from 'eazy-logger';
 import express from 'express';
+import fs from 'graceful-fs';
 import path from 'path';
 
 import loggerFactory from '~/utils/logger';
@@ -47,9 +50,6 @@ class CrowiDev {
 
       serverUrl = `https://localhost:${port}}`;
 
-      const fs = require('graceful-fs');
-      const https = require('https');
-
       const options = {
         key: fs.readFileSync(
           path.join(this.crowi.rootDir, './resource/certs/localhost/key.pem'),
@@ -62,7 +62,7 @@ class CrowiDev {
       server = https.createServer(options, app);
     }
 
-    const eazyLogger = require('eazy-logger').Logger({
+    const eazyLogger = Logger({
       prefix: '[{green:GROWI}] ',
       useLevelPrefixes: false,
     });
@@ -103,4 +103,4 @@ class CrowiDev {
   }
 }
 
-module.exports = CrowiDev;
+export default CrowiDev;

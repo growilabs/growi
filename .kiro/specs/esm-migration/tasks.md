@@ -296,13 +296,14 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Codemod Transform (top-level side-effect guard)_
   - **実績 (2026-06-12)**: ESLint 不在 (Biome) のため jscodeshift AST ベースの `tools/lint/route-top-level-guard.cjs` + vitest spec 10 件 (TDD) + `lint:route-guard` script で実装。良性初期化子 (literals / Router() / loggerFactory 等の allowlist) は許容する shallow-check 仕様 (logger 61 / Router 34 件の mass-churn と 3.8.c マウント順序保全の衝突を回避)。CJS 回帰ガード (require / module.exports / exports.x) も同梱。**実違反 5 件を修正**: slack-integration.js の import 時 `mongoose.model()` (真のハザード) + raw-body router.use、routes/index.js の autoReap 設定、ogp.ts の fs.readFile、share-links.js の `new Date()` — すべて setup 内へ移動。features 側 route dirs もスキャン (openai の zod builder 1 件のみ = 良性、対象外として記録)
 
-- [ ] 3.3.g (step 3.g) `crowi/` を変換し `import/no-commonjs` 0 件を達成
+- [x] 3.3.g (step 3.g) `crowi/` を変換し `import/no-commonjs` 0 件を達成
   - `crowi/index.ts`, `crowi/setup-models.ts`, `crowi/dev.js` に codemod を適用
   - 変換完了後、ESLint `import/no-commonjs` が `apps/app/src/server/` 全域で 0 件検出
   - 変換統計が想定規模と累計で一致。**規模は Phase R 再 survey 値を基準にする** (2026-06-11 マージ後ツリー: module.exports 残 63 ファイル = middlewares 5 / util 6 / routes 50 / crowi 2、`= require(` 残 94 箇所 38 ファイル、factory invoke 残 = routes/index.js 11 + apiv3/index.js 44)
   - _Requirements: 2.2, 2.3, 2.5, 2.6_
   - _Depends: 3.3.h_
   - _Boundary: Codemod Transform (crowi)_
+  - **実績 (2026-06-12)**: crowi 3 ファイル変換 (setup-models.ts は 3.3.a 時点で既 ESM)。条件付き redis スタックと MailService (パターン 8 lazy) は `await import()` で lazy 維持、無条件外部依存はトップ import 化。ts-node 専用 `require.extensions` hack は `typeof require` ガードで ESM ビルド時 inert 化 (完全撤去は 3.7.b)。ESLint 不在のため **`lint:no-cjs`** (guard の `--cjs-only` モード、TDD 13/13) を import/no-commonjs 相当として追加 — **src/server 全域 349 ファイルで CJS 構文 0 件**。統計累計: module.exports 63 (mw 5 + util 6 + routes 50 + crowi 2) + feature routes 5 (3.3.f 追補) = 全件変換済み
 
 - [ ] 3.4 `ts2esm` で `.js` 拡張子を補完
   - `ts2esm` を `apps/app/src/server/` に対して実行

@@ -103,9 +103,11 @@ const lineOf = (node) => (node.loc ? node.loc.start.line : 0);
  *
  * @param {string} source file contents
  * @param {string} filename used in violation records
+ * @param {{ cjsOnly?: boolean }} [options] cjsOnly: apply only the CJS
+ *   regression rules (the import/no-commonjs equivalent for non-route trees)
  * @returns {{ file: string, line: number, rule: string, detail: string }[]}
  */
-const collectViolations = (source, filename) => {
+const collectViolations = (source, filename, options = {}) => {
   const violations = [];
   let root;
   try {
@@ -149,12 +151,16 @@ const collectViolations = (source, filename) => {
         file: filename,
         line: lineOf(p.node),
         rule: 'cjs-module-exports',
-        detail: 'exports.<name> assignment is forbidden in route modules (Req 2.2)',
+        detail:
+          'exports.<name> assignment is forbidden in route modules (Req 2.2)',
       });
     }
   });
 
-  // --- top-level statement shape ---
+  // --- top-level statement shape (route modules only) ---
+  if (options.cjsOnly) {
+    return violations;
+  }
   for (const stmt of root.get().node.program.body) {
     if (ALLOWED_STATEMENT_TYPES.has(stmt.type)) {
       const decl =
@@ -206,10 +212,12 @@ const collectTargetFiles = (dir) => {
 };
 
 const main = () => {
-  const targets = process.argv.slice(2);
+  const args = process.argv.slice(2);
+  const cjsOnly = args.includes('--cjs-only');
+  const targets = args.filter((a) => a !== '--cjs-only');
   if (targets.length === 0) {
     process.stderr.write(
-      'usage: node route-top-level-guard.cjs <dir> [...dirs]\n',
+      'usage: node route-top-level-guard.cjs [--cjs-only] <dir> [...dirs]\n',
     );
     process.exit(2);
   }
@@ -219,7 +227,7 @@ const main = () => {
     for (const file of collectTargetFiles(target)) {
       fileCount += 1;
       violations.push(
-        ...collectViolations(fs.readFileSync(file, 'utf8'), file),
+        ...collectViolations(fs.readFileSync(file, 'utf8'), file, { cjsOnly }),
       );
     }
   }

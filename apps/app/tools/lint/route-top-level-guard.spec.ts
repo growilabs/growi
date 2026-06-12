@@ -125,3 +125,34 @@ export const setup = () => {};
     expect(check(src)).toContain('top-level-call');
   });
 });
+
+describe('route-top-level-guard: cjsOnly mode (import/no-commonjs equivalent)', () => {
+  const checkCjsOnly = (source: string): string[] =>
+    collectViolations(source, 'fixture.ts', { cjsOnly: true }).map(
+      (v: { rule: string }) => v.rule,
+    );
+
+  it('still rejects require / module.exports', () => {
+    expect(checkCjsOnly(`const x = require('y');`)).toContain('cjs-require');
+    expect(checkCjsOnly(`module.exports = {};`)).toContain(
+      'cjs-module-exports',
+    );
+  });
+
+  it('does not apply the top-level shape rule', () => {
+    const src = `
+import mongoose from 'mongoose';
+const Page = mongoose.model('Page');
+new Date();
+`;
+    expect(checkCjsOnly(src)).toEqual([]);
+  });
+
+  it('allows typeof require guards (not a call)', () => {
+    const src = `
+const cjsRequire = typeof require === 'function' ? require : undefined;
+if (cjsRequire) { cjsRequire.extensions['.ts'] = undefined; }
+`;
+    expect(checkCjsOnly(src)).toEqual([]);
+  });
+});
