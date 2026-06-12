@@ -88,55 +88,66 @@
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 2.1_
   - _Depends: 5.1_
 
-## Post-Implementation Revisions (2026-06-11)
+## Implementation Notes
 
-> 初回実装のレビューで挙がった保守性・効率の指摘 3 点への改訂。design.md の「実装改訂ノート」と各
-> Boundary/Component 節に反映済み。全テスト green（feature 92 tests / pdf-converter 3 tests）、両アプリ
-> typecheck PASS。
+> 全タスク実装済み・検証済み（pipeline + feature テスト green / typecheck PASS / 本番ビルド PASS）。
+> 以下は将来のメンテ・リファクタで参照すべき、タスクをまたぐ恒久的な実装知識（事実）。
 
-- [x] R1. CSS のページ間重複を排除（per-page inline → per-job 共有ファイル）
-  - `BulkExportStyleProvider.wrap(fragment, cssHref)` は `<style>` インラインをやめ相対 `<link rel="stylesheet">` を出力。`export-pages-to-fs-async` が job ごとに `_bulk-export.css` を 1 回書き出し、各ページの深さに応じた相対 href を算出する
-  - KaTeX フォントは woff2 のみインライン化（woff/ttf 破棄）。生成 CSS ~1.8MB→~757KB、かつ job あたり 1 ファイルのみ（1 ページあたりの HTML は `<link>` 1 行＋本文）
-  - pdf-converter（越境・承認済み）: cluster task を `setContent`→`page.goto(pathToFileURL(...))` に変更し相対 `<link>` を解決。job dir 走査を `*.html` のみに絞り、共有 CSS を変換対象・完了判定から除外
-  - _Requirements: 2.1, 2.2, 5.1_ / _Boundary: BulkExportStyleProvider, export-pages-to-fs-async, pdf-converter(HTML 読み込み機構)_
-- [x] R2. プラグイン宣言の単一出所化（3 ファイル編集 → 1 ファイル編集）
-  - `EsmPluginLoader` は `ADOPTED_PLUGINS`（plugin-set.ts）を走査して `dynamicImport` し順序付きリストを返す。`BulkExportMarkdownRenderer` は読み込み順に `.use()` する。プラグイン追加は plugin-set.ts のみで完結。旧 loader↔plugin-set の逆方向アサーションは削除
-  - _Requirements: 1.6, 5.4_ / _Boundary: plugin-set, EsmPluginLoader, BulkExportMarkdownRenderer_
-- [x] R3. ドリフトテストの堅牢化（正規表現 → AST）
-  - `renderer-parity.spec.ts` を TypeScript コンパイラ API による import 宣言の AST 抽出へ置換。手書きブロックリストを撤廃し、解析不能時は loud に失敗
-  - _Requirements: 6.1, 6.2_ / _Boundary: RendererParityGuard_
-- [x] R4. 表の枠線が出ない不具合の修正（実機 PDF 検証で発覚）
-  - 原因: research.md I-table の前提が誤り。`.wiki table` は枠線を持たず、GROWI の表枠線は `add-class` が付ける `table table-bordered`（Bootstrap クラス）由来。手書き表 CSS を削除した本 spec 実装では実機で表が無装飾になっていた
-  - 修正: Web の `add-class` プラグインを**再利用**(`add-class.ts` の実行時依存は `hast-util-select` ESM のみ＝`recommended-whitelist.ts` と同じパターン)。**`plugin-set.ts` の `ADOPTED_PLUGINS` に正規エントリとして宣言**(`specifier`=相対パス, `exportName`='rehypePlugin', `options`=`{ table: 'table table-bordered' }`、sanitize 後・stringify 前に配置)し、loader/renderer が汎用処理。ローカル再実装も位置の特殊分岐も手書き CSS も持たず、生成済み Bootstrap 表 CSS を再利用。research.md I-table・design.md・plugin-set.ts の関連記述を訂正
-- [x] R5. 責務分離: loader は「ロードする」責務に純化
-  - `EsmPluginLoader` から `ADOPTED_PLUGINS` への依存を除去し、`loadPlugins(baseDir, declarations)` と宣言注入に変更(何をロードするかは呼び出し元=renderer が渡す)。冗長なモジュールキャッシュも撤廃(build-once は renderer の `cachedProcessor` が担保)。`PluginDeclaration` に `specifier`/`exportName` を追加し npm/ローカル両方を同一宣言で表現
-  - _責務: EsmPluginLoader = 純粋なロード / plugin-set = 何をロードするか / renderer = 合成_
-  - _Requirements: 1.1, 2.1_ / _Boundary: BulkExportMarkdownRenderer_
+### N1. CSS は job ごとの共有スタイルシート（ページ間で重複させない）
+`BulkExportStyleProvider.wrap(fragment, cssHref)` は CSS を `<style>` でインラインせず、相対
+`<link rel="stylesheet">` を出力する。`export-pages-to-fs-async` が job ごとに `_bulk-export.css` を 1 回
+書き出し、各ページは自身の深さに応じた相対 href を算出する。pdf-converter は `setContent` ではなく
+`page.goto(pathToFileURL(...))` でページを読むため相対 `<link>` が解決し、job dir の走査は `*.html` のみに
+絞って共有 CSS を変換対象・完了判定から除外する。KaTeX フォントは Chromium が解せる **woff2 のみ**を
+base64 data URI でインライン化（woff/ttf 代替は破棄、生成 CSS ~757KB）。
+_Boundary: BulkExportStyleProvider, export-pages-to-fs-async, pdf-converter(HTML 読み込み機構)_
 
-## 改訂 5: React 非依存プラグインの追加採用 (2026-06-12)
+### N2. プラグイン宣言は plugin-set.ts が単一出所（追加は 1 ファイル編集）
+採用プラグインは `plugin-set.ts` の `ADOPTED_PLUGINS` に宣言として集約する。`BulkExportMarkdownRenderer`
+が `loadPlugins(baseDir, ADOPTED_PLUGINS)` で宣言を渡し、`EsmPluginLoader` は**与えられた宣言をロードする
+だけ**（何をロードするかは知らない＝責務分離。モジュールキャッシュも持たず、build-once は renderer の
+`cachedProcessor` が担保）。renderer は読み込み順に `.use()` する。よってプラグインの追加・削除・並べ替えは
+**plugin-set.ts の 1 ファイル編集のみ**（loader/renderer は不変）。`PluginDeclaration` は `name`（parity 用の
+正規名）/ `specifier`（npm 名 or 相対パス）/ `exportName`（default 以外）/ `options` を持ち、npm プラグインも
+ローカル再利用プラグインも同一の宣言で表現する。
+_Boundary: plugin-set, EsmPluginLoader, BulkExportMarkdownRenderer_
 
-> emoji / xsv-to-table / remark-directive / echo-directive を `ADOPTED_PLUGINS` に追加採用する。除外理由の
-> 「ローカル .ts は読めない」を訂正し（add-class の実例で反証）、admonitions は callout 不在で劣化が悪化する
-> ため不採用とする（research.md I2 訂正 / I7）。新規変更は test-first（red→green）。
+### N3. ドリフト検知は renderer.tsx の AST import 解析
+`renderer-parity.spec.ts` は TypeScript コンパイラ API で `renderer.tsx`（`generateCommonOptions` /
+`generateSSRViewOptions`）の **import 宣言を AST 抽出**し、各プラグインが bulk-export 側で adopted /
+intentionally-excluded のいずれかに分類済みであることを検査する。手書きブロックリストは持たず、解析不能時は
+loud に失敗する。Web レンダラのプラグイン集合・順序が変わると検知される（Revalidation Trigger）。
+_Boundary: RendererParityGuard_
 
-- [ ] 8. 追加プラグイン採用（emoji / xsv / directive+echo）
-- [ ] 8.1 追加プラグインの描画契約の失敗テストを先に書く（red）
-  - `:smile:`→絵文字グリフ（未知ショートコードは不変）/ `csv-h` フェンス→ヘッダ付き `<table>` / text・leaf ディレクティブ→可読テキスト（属性 `{...}` 非露出）/ ディレクティブ属性の `onclick` 等危険属性が sanitize で除去される、の各契約テストを `bulk-export-markdown-renderer.spec.ts` に追加する
-  - 採用前のレンダラに対しテストが失敗することを確認する（observable: red）
-  - _Requirements: 1.7, 1.8, 3.1a, 4.3_
-  - _Boundary: BulkExportMarkdownRenderer (spec)_
-- [ ] 8.2 4 プラグインを `ADOPTED_PLUGINS` に正規エントリとして宣言する（green）
-  - emoji（remark, ローカル `remarkPlugin`、gfm の後・remark-directive の前）、remark-directive（npm, default）、echo-directive（remark, ローカル `remarkPlugin`、remark-directive の後）、xsv-to-table（remark, ローカル `remarkPlugin`、math の後・remark-rehype の前）を Web の選定順に合わせて宣言する。loader/renderer は不変（宣言追加のみ）
-  - 本番可用性: emoji.ts が値 import する `mdast-util-find-and-replace` を devDependencies→dependencies へ移動する（bulk-export cron は emoji.ts を `.ts` のまま dynamicImport し実行時に解決するため。`pnpm deploy --prod` で除外されると `ERR_MODULE_NOT_FOUND` になる。package-dependencies.md）。echo-directive の `mdast-util-directive` は type-only import なので devDependencies のままで可
-  - 8.1 の全契約テストが green になる（observable）
-  - _Requirements: 1.7, 1.8, 3.1a, 1.6, 5.4_
-  - _Boundary: plugin-set_
-- [ ] 8.3 意図的除外一覧と分類テストを更新する
-  - `INTENTIONALLY_EXCLUDED_PLUGINS` から emoji / xsv-to-table / remark-directive / echo-directive を除去。`github-admonitions` の除外理由を「callout 不在で劣化悪化」に訂正。`plugin-set.spec.ts` の除外期待リストを更新し、ドリフトテスト（`renderer-parity.spec.ts`）が全 Web プラグインを分類済みに保つことを確認する（observable）
-  - _Requirements: 1.6, 6.1, 6.2_
-  - _Boundary: plugin-set, RendererParityGuard_
-- [ ] 8.4 インラインコードの枠線を Web と揃える（実機 PDF 検証で発覚）
-  - 症状: PDF のインラインコードが Bootstrap の code 色（赤）だけで、Web のような枠線付きピル表示にならない。原因は枠線を付ける `src/styles/atoms/_code.scss`（`code:not([class^='language-'])`）が bulk-export の生成 CSS に含まれていなかったため（エントリは bootstrap apply + `_wiki.scss` のみ取り込み）
-  - 修正: `bin/build-bulk-export-css.ts` のエントリ SCSS に `@use 'styles/atoms/code'` を追加し Web の単一出所ルールを**再利用**。`@use 'styles/...'` 解決のため loadPaths に `src/` を追加。生成 CSS を再生成。`bulk-export-css.spec.ts` に `code:not([class^=language-])` ルールの存在アサーションを追加（observable）
-  - _Requirements: 2.1, 2.2_
-  - _Boundary: BulkExportStyleProvider（生成 CSS）_
+### N4. ローカル .ts プラグインは「再実装」ではなく「再利用」
+表の枠線・絵文字・CSV/TSV 表・ディレクティブ劣化は、Web と同一実装のローカル .ts プラグイン
+（add-class / emoji / xsv-to-table / echo-directive）を相対パス `dynamicImport` で再利用して実現する
+（コピー再実装・手書き CSS・位置の特殊分岐は持たない）。`add-class` は `<table>` に `table table-bordered`
+（Bootstrap クラス）を付与し生成済み表 CSS を当てる（`.wiki table` 単体では枠線が出ない）。採用順は Web の
+選定順に合わせる: `gfm → emoji → remark-directive → echo-directive → frontmatter → math → xsv-to-table →
+remark-rehype → … → sanitize → katex → add-class → stringify`。emoji は `:smile:` を直接ディレクティブと
+誤認させないため remark-directive より前、xsv-to-table は produced `<table>` が add-class の枠線を受けるため
+remark-rehype より前に置く。`remark-github-admonitions-to-directives` は不採用（callout 不在では `> [!NOTE]`
+を匿名 `<div>` に変換しアラート種別ラベルを失い、blockquote のままより劣化が悪化。research.md I7）。
+_Boundary: plugin-set_
+
+### N5. ディレクティブ劣化の責務分担（echo は text/leaf のみ）
+`echo-directive` は text/leaf ディレクティブのみを可読テキスト化する（container は callout の領分）。callout を
+持たない本パイプラインでは container ディレクティブ（`:::note` 等）は内部テキストを保持した素ブロックへ自然
+劣化する。echo はディレクティブ属性（`:foo{...}`）を `hProperties` に転写するが、後段の rehype-sanitize
+（単一出所 allowlist）が許可外属性（`onclick` 等）を除去するため、Web と同一のサニタイズ境界が保たれる。
+
+### N6. 本番依存分類（dynamicImport 経路の実行時解決）
+bulk-export cron はローカル .ts プラグインを `.ts` のまま `dynamicImport` し、その**実行時**に依存を
+node_modules から解決する。よって emoji.ts が値 import する `mdast-util-find-and-replace` は
+**`dependencies`** に置く（`pnpm deploy --prod` が devDependencies を除外すると `ERR_MODULE_NOT_FOUND`
+になる。package-dependencies.md）。type-only import（echo-directive の `mdast-util-directive` 等）は型消去
+されるため devDependencies のままで可。
+
+### N7. インラインコードの枠線も Web の単一出所を再利用
+インラインコードの枠線・余白・角丸は Web の `src/styles/atoms/_code.scss`
+（`code:not([class^='language-'])`、主アプリも `style-app.scss` から取り込む単一出所）由来。bulk-export の
+CSS ビルド（`bin/build-bulk-export-css.ts`）のエントリ SCSS が `@use 'styles/atoms/code'` でこれを再利用する
+（`@use 'styles/...'` 解決のため Sass loadPaths に `src/` を追加）。これが無いと Bootstrap の code 色だけが
+当たり、枠線付きピル表示にならない。
+_Boundary: BulkExportStyleProvider（生成 CSS）_

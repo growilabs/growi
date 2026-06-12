@@ -12,11 +12,9 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
 - **Finding**: [export-pages-to-fs-async.ts](../../../apps/app/src/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.ts) が `remark-parse → remark-gfm → remark-html` をアドホックに構築。ESM は `@cspell/dynamic-import` の `dynamicImport` で読み込む。PR #11288 は `remark-gfm` 追加＋Bootstrap 全量＋手書き表 CSS 注入。
 - **Implication**: dynamicImport 方式は実証済みで再利用可能。`remark-html` ステップと CSS 注入を置換する。
 
-### I2. CJS サーバでの ESM 静的 import 不可（実測）
-- **Finding**: `node -r ts-node/register/transpile-only` 環境で `services/renderer/renderer.tsx` を import → `ERR_REQUIRE_ESM`（`@growi/remark-growi-directive` 等）。React/SCSS を除いたプラグインのみのモジュールでも同様に失敗。ts-node が `import`→`require` 変換するため。
-- **Source**: 実測（2 回）。
-- **Implication**: Web レンダラや GROWI ローカル .ts プラグインを **静的 import で再利用することは不可**。サーバ側は npm ESM を `dynamicImport` で個別に読む方式が必須。
-- **訂正（改訂 5, 2026-06-12）**: 上記の失敗は **`renderer.tsx`（多数の ESM/React/SCSS を静的 import するモジュール）を import した場合**に限る。**個別プラグインファイルを `dynamicImport` する経路では成立しない** — 改訂 4 で `add-class.ts`（ローカル .ts）を相対パス `dynamicImport` で本番 cron に正常ロードできた実例が反証となる。よって「ローカル .ts は読めない」という当初の一般化は**誤り**。実体が **React/DOM 非依存の純粋な AST 変換**であるローカルプラグイン（emoji, xsv-to-table, echo-directive）は add-class と同一パターンで再利用可能。除外すべきは「読めないから」ではなく「React/DOM が必須だから（callout, mermaid 等）」または「本 spec で不要だから」である。
+### I2. ESM の読み込み方式（静的 import 不可 / dynamicImport は可）
+- **Finding**: `node -r ts-node/register/transpile-only` 環境で `services/renderer/renderer.tsx` を**静的 import**すると `ERR_REQUIRE_ESM`（多数の ESM/React/SCSS を静的 import しており、ts-node が `import`→`require` 変換するため）。一方、**個別プラグインファイルを `dynamicImport` する経路は成立する**（`add-class.ts` 等のローカル .ts を相対パス `dynamicImport` で本番 cron に正常ロード済み）。
+- **Implication**: Web レンダラ本体（`renderer.tsx`）は静的 import で再利用できない。サーバ側は npm ESM もローカル .ts プラグインも `dynamicImport` で個別に読む。**ローカル .ts が読めないわけではない** — 再利用可否を分けるのは「React/DOM に依存するか」。React/DOM 非依存の純粋な AST 変換（emoji, xsv-to-table, echo-directive, add-class）は再利用でき、React/DOM 必須（callout, mermaid 等）は再利用できない。
 
 ### I3. リッチなアラート/コールアウトは React コンポーネント駆動
 - **Finding**:
@@ -31,7 +29,7 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
 
 ### I4. テーブルのクラス付与もローカルプラグイン
 - **Finding**: Web レンダラは [add-class.ts](../../../apps/app/src/services/renderer/rehype-plugins/add-class.ts)（ローカル、`hast-util-select` 依存）で `<table>` に `table table-bordered` を付与。
-- **Implication**: bulk-export では `<table>` への class 付与を小さなインライン変換で再現（または CSS で素の `table` を直接装飾）。
+- **Implication**: bulk-export は Web の `add-class` プラグインを `dynamicImport` で**再利用**して `<table>` に `table table-bordered` を付与する（I-table 参照。`.wiki table` だけでは枠線が出ない）。
 
 ### I5. CSS の出所
 - **Finding**: `@growi/core-styles` は Bootstrap ベースのデザインシステム（SCSS）。Markdown 本文固有の体裁は app 側 SCSS（`styles/organisms/_wiki.scss` 等）と `CalloutViewer.module.scss` に分散。core-styles 単体にはコールアウト/`.wiki` 体裁は無い。
@@ -41,7 +39,7 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
 - **Finding**: 共有基盤は `generateCommonOptions`（[renderer.tsx](../../../apps/app/src/services/renderer/renderer.tsx)）= remark: gfm, emoji, pukiwikiLikeLinker, growiDirective, remarkDirective, echoDirective, remarkFrontmatter, codeBlock / rehype: relativeLinks×2, raw, addClass, addInlineProperty。各 view（`client/.../renderer.tsx`）が math, xsvToTable, admonitions, callout, lsx, drawio 等を追加。
 - **Implication**: bulk-export は npm かつ HTML 文字列化に意味のある部分集合＋インライン等価物を採用。drift テストは「Web 共通集合の各プラグインが、bulk-export 側で included / intentionally-excluded のいずれかに分類済み」を検査し、未分類の新規プラグイン出現で失敗させる。
 
-### I7. directive 劣化の実測（改訂 5, 2026-06-12）
+### I7. directive 劣化の実測（callout 不在時の挙動）
 - **目的**: callout（React）抜きで `remark-directive` + `echo-directive`（+ `remark-github-admonitions-to-directives`）を通したとき、`> [!NOTE]` / `:::note` / text/leaf ディレクティブが実際にどう描画されるかを確定する。
 - **方法**: npm パッケージ（unified, remark-gfm, remark-directive, admonitions, remark-rehype, rehype-raw, rehype-stringify）＋ echo-directive 同等ロジックで実 HTML を出力（apps/app 内で実行）。
 - **Finding**（sanitize 前の素の出力）:
@@ -58,7 +56,7 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
   - **echo-directive は text/leaf にのみ効く**（callout.ts が container を担当）。`remark-directive` + `echo-directive` は text/leaf を可読テキスト化でき、属性 `{...}` の生露出も防げる → **採用**。
   - **admonitions は callout 不在では逆効果**（`> [!NOTE]` がラベルを失い匿名 div に劣化、blockquote のままより悪化）→ **不採用**。GitHub アラートは blockquote のまま残す方が劣化として良い。
   - container ディレクティブ（`:::note`）は専用処理せず、内部テキストを保持した素ブロックへ自然劣化（callout 化は Phase 2）。
-  - **ユーザー決定（2026-06-12）**: emoji + xsv-to-table + remark-directive + echo-directive を採用、admonitions は不採用、callout/mermaid/drawio/lsx/plantuml は Phase 2 据え置き。
+  - **決定**: emoji + xsv-to-table + remark-directive + echo-directive を採用、admonitions は不採用、callout/mermaid/drawio/lsx/plantuml は Phase 2 据え置き。
 
 ## Architecture Pattern Evaluation
 
@@ -67,34 +65,34 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
 
 ## Design Decisions (build vs adopt / synthesis)
 
-> **Decision（ユーザー確定）**: コールアウト（アラート）は本 spec で行わない。理由: 視覚は React
+> **Decision**: 色付きコールアウト（アラート）の装飾描画は本 spec で行わない。理由: 視覚は React
 > `CalloutViewer`（JSX）駆動で HTML 文字列としての再利用元が存在せず、忠実再現には React SSR が要る
-> （ESM 化では解決しない、I3）。これにより **インライン変換・ローカル再実装が一切不要**になり、
-> 「同一機能が 2 箇所」を完全に回避できる。table-bordered は I-table の通り CSS のみで解決。
+> （ESM 化では解決しない、I3）。ローカルプラグインはコピー再実装せず、再利用できるもの（add-class /
+> emoji / xsv-to-table / echo-directive）は `dynamicImport` で Web と同一実装を共有する。表の枠線は
+> `add-class` の `table table-bordered` 付与で解決（I-table）。
 
-- **Adopt（dynamicImport）**: remark-gfm, remark-frontmatter, remark-math, remark-rehype, rehype-raw, rehype-slug, rehype-sanitize, rehype-katex, rehype-stringify。**改訂 5 で追加**: emoji, xsv-to-table, remark-directive, echo-directive（いずれも React/DOM 非依存。emoji/xsv/echo はローカル .ts を add-class と同一の相対パス `dynamicImport` で再利用）。
+- **Adopt（dynamicImport）**: remark-gfm, emoji, remark-directive, echo-directive, remark-frontmatter, remark-math, xsv-to-table, remark-rehype, rehype-raw, rehype-slug, rehype-sanitize, rehype-katex, add-class, rehype-stringify。emoji/xsv-to-table/echo-directive/add-class はローカル .ts を相対パス `dynamicImport` で再利用、それ以外は npm。
 - **No local reimplementation（再実装はしない／再利用はする）**: テーブル/見出し/引用/コード等は素の HTML を
-  出力し `.wiki` 由来 CSS で装飾（I-table, I5）。emoji/xsv/echo-directive は**コピー再実装ではなく Web と同一実装を
-  `dynamicImport` で再利用**する（改訂 5）。admonitions/callout プラグインは採用しない（I7 / Phase 2）。
+  出力し `.wiki` 由来 CSS で装飾（I-table, I5）。emoji/xsv/echo-directive/add-class は**コピー再実装ではなく Web と
+  同一実装を `dynamicImport` で再利用**する。admonitions/callout プラグインは採用しない（I7 / Phase 2）。
 - **Degrade**: GitHub アラート `> [!NOTE]` → blockquote のまま（admonitions 不採用、I7）。text/leaf ディレクティブ
   → echo で可読テキスト化（属性 `{...}` 非露出）。container `:::note` → 内部テキスト保持の素ブロック。仕様上の
   グレースフル劣化（Req3, 3.1a）。
 - **Defer（Phase 2 / renderer-convergence）**: 色付きコールアウト, github-admonitions（callout 前提）,
   シンタックスハイライト配色, drawio/lsx/mermaid/plantuml/attachment-refs。忠実なコールアウト等は
-  React SSR ベースの収れんで扱う。（emoji / xsv-to-table は改訂 5 で Phase 1 へ前倒し採用）
+  React SSR ベースの収れんで扱う。
 
-### I-table. テーブルはロジック不要（CSS のみ）← ⚠️ 誤り（改訂 4 で訂正）
-- **当初の Finding（誤り）**: `.wiki table {}` が素の表を装飾するのでクラス付与は不要、と判断した。
-- **訂正（実機 PDF 検証 2026-06-11）**: [_wiki.scss](../../../apps/app/src/styles/organisms/_wiki.scss#L120) の
-  `.wiki table` は **`font-size: 0.95em` のみ**で枠線を持たない。GROWI の表の枠線・ヘッダ背景・セル余白は
-  Web レンダラの `add-class` が付与する **`table table-bordered`（Bootstrap クラス）由来**。PR #11288 が表を
-  描画できていたのは**手書き表 CSS** があったためで、それを削除した本 spec の実装では実機で表が無装飾になった。
-- **Implication（訂正後）**: 表は **`<table>` への `table table-bordered` クラス付与が必要**。**Web の
-  `add-class` プラグインを再利用**して付与する（`add-class.ts` の実行時依存は `hast-util-select` ESM のみ＝
+### I-table. テーブルの枠線は add-class（Bootstrap クラス）由来
+- **Finding**: [_wiki.scss](../../../apps/app/src/styles/organisms/_wiki.scss#L120) の `.wiki table` は
+  **`font-size: 0.95em` のみ**で枠線を持たない。GROWI の表の枠線・ヘッダ背景・セル余白は Web レンダラの
+  `add-class` が付与する **`table table-bordered`（Bootstrap クラス）由来**で、素の `<table>` には当たらない。
+- **Implication**: 表は **`<table>` への `table table-bordered` クラス付与が必要**。**Web の `add-class`
+  プラグインを再利用**して付与する（`add-class.ts` の実行時依存は `hast-util-select` ESM のみ＝
   `recommended-whitelist.ts` と同じ再利用パターン。ローカル再実装はしない）。add-class は `plugin-set.ts` の
-  `ADOPTED_PLUGINS` に正規エントリとして宣言し（`specifier`=相対パス, `exportName`='rehypePlugin'）、loader が
-  汎用的にロード・renderer が順序どおり適用する。これで生成済み Bootstrap 表 CSS（`.table`/`.table-bordered`）
-  が当たる。手書き表 CSS は導入しない。表以外（引用/見出し/コード）は素要素＋`.wiki` CSS で従来どおり装飾される。
+  `ADOPTED_PLUGINS` に正規エントリとして宣言し（`specifier`=相対パス, `exportName`='rehypePlugin'、sanitize 後・
+  stringify 前に配置）、loader が汎用的にロード・renderer が順序どおり適用する。これで生成済み Bootstrap 表 CSS
+  （`.table`/`.table-bordered`）が当たる。手書き表 CSS は導入しない。表以外（引用/見出し/コード）は素要素＋
+  `.wiki` CSS で装飾される。
 
 ## Risks
 
@@ -108,7 +106,10 @@ Extension（既存 bulk-export への統合）。対象は bulk-export の **サ
 
 ## Boundary Decisions
 
-- **Owns**: bulk-export サーバ側変換パイプライン・注入 CSS（`.wiki` ラップ）・drift テスト。
-- **Out**: Web レンダラ改修（drift テスト用のプラグイン選定参照を除く）、インライン変換/ローカル再実装、
-  コールアウト描画、ローカル .ts プラグイン本体、ESM 化、dedup キャッシュ無効化、pdf-converter 内部。
-- **Revalidation triggers**: pdf-converter が読む HTML ファイル契約の変更／Web `generateCommonOptions` のプラグイン集合変更（drift テストが検知）／ESM 化完了（Phase 2 着手の合図）。
+- **Owns**: bulk-export サーバ側変換パイプライン・注入 CSS（`.wiki` ラップ、job ごとの共有スタイルシート）・
+  drift テスト・pdf-converter の HTML 読み込み機構（相対 `<link>` 解決のための `goto(file://)` と `*.html` 走査）。
+- **Out**: Web/クライアントレンダラの挙動変更（drift テスト用の参照を除く）、ローカルプラグインの再実装（コピー）や
+  独自インライン変換、色付きコールアウト描画、ESM 化、dedup キャッシュ無効化、pdf-converter のその他内部
+  （Puppeteer 起動・フォント・PDF オプション等）。
+- **Revalidation triggers**: pdf-converter が読む HTML ファイル契約の変更／Web `generateCommonOptions`・
+  `generateSSRViewOptions` のプラグイン集合変更（drift テストが検知）／ESM 化完了（Phase 2 着手の合図）。
