@@ -153,6 +153,7 @@ export class AuditlogChangeStreamService {
   private async restart(): Promise<void> {
     if (this.stopped || this.restarting) return;
     this.restarting = true;
+    let startFailed = false;
     try {
       this.consecutiveRestarts++;
       const delay = Math.min(
@@ -167,8 +168,13 @@ export class AuditlogChangeStreamService {
       await this.start();
     } catch (err) {
       logger.error(err, 'AuditlogChangeStreamService failed to restart.');
+      startFailed = true;
     } finally {
       this.restarting = false;
+    }
+    // restarting is cleared in finally above; placing this inside catch would block on the guard
+    if (!this.stopped && startFailed) {
+      void this.restart();
     }
   }
 
