@@ -167,7 +167,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - 結果: 指摘 9 件中 **確定 1 件** (残 8 件は「計画済み残作業 (task 3.5 の `__dirname`)」「上流自身の既存債務」「クリーン検証報告」として棄却)。網羅検証: tsgo `--noEmit` クリーン、src/server 全 64 `.js` の `node --check` クリーン、両側変更ファイル全件のバイト照合一致
   - **確定指摘 (major) を修正済み**: task 3.3.b が design の旧「memoize 必須」指示に従い `getUploader` に導入した `cachedUploader` が、`setUpFileUpload(isForceUpdate=true)` の再初期化契約 (管理画面でのアップロード設定変更 / S2S 切替伝播 / G2G 移行の 3 経路) を silent failure 化していた。メモ化を撤去し、回帰防止の契約テスト (`file-uploader/index.spec.ts`) を TDD (red→green) で追加。design.md / tasks.md の誤指示も訂正
 
-- [ ] R.6 ベースライン全面再取得 (Phase 0 の v8 基準やり直し / MANDATORY)
+- [x] R.6 ベースライン全面再取得 (Phase 0 の v8 基準やり直し / MANDATORY) — **全 6 ベースライン完了 (2026-06-12)**
   - **理由**: Phase 0 成果物 6 点はすべて 2026-04 時点の master で捕捉されており、v8 マージ後はルート増加 (apiv3 require 行 45→46)、access-token-parser 改編、新規テスト追加、pnpm 11 / turbo 2.9 化により diff 比較が成立しない。再取得なしで Phase 3.8 ゲートを判定してはならない
   - **基準**: `git worktree` で dev/8.0.x HEAD (`447ddd20ad`) を checkout し、support/esm から `tools/` の capture スクリプト群をコピーして実行する (v8 の移行前状態が比較基準)
   - 再取得時の環境条件 (Node 24.15, pnpm 11.1.1, ホスト条件) を perf-baseline.md に明記し、Phase 3.7.a bake-off と同一条件にする
@@ -177,7 +177,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - [x] R.6.3 (0.3.1) authz-matrix-baseline.json — **再取得・置換済み** (264 行 × 4 persona / git 447ddd20ad)。再現性検証として 3 回連続 capture を実施し、揺れは `PUT /_api/v3/bookmark-folder/update-bookmark` の readonly/admin 列のみ (probe の DB 状態依存で 200↔500。authz 列 unauth/guest は 403 で安定)。**baseline は steady-state の run3 値 (500) を採用 — 3.8.c diff ではこの 1 行の readonly/admin 差分を回帰と見なさないこと**。vault reconcile 系の admin=500 は VAULT_MANAGER_ENDPOINT 不通環境での handler エラー — 3.8.c 再実行も同条件 (vault-manager 非稼働) で行うこと。April baseline との共通 245 ルートは authz 列全件不変、readonly/admin の挙動変化 6 件はすべて v8 上流の handler 仕様変更
   - [x] R.6.4 (0.3.2) ws-authz-baseline.json — **再取得・置換済み** (git 447ddd20ad)。yjs 3 ケース (401 / 403 / 101+sync) と socketio 3 ケース (false / false / true) はすべて April baseline と同値 — v8 で WS 認可挙動は不変
   - [x] R.6.5 (0.1) test-baseline.md — **再取得・置換済み** (3 回連続 `--force` 実行 / 219 files / 2669 tests)。真の失敗 0 件、既知 flaky 1 file (`growi-vault/__tests__/clone-e2e.integ.ts` の clone 系 4 テスト — ephemeral git server のタイミング起因で Run3 のみ失敗)。**注意**: mongodb-memory-server のバイナリキャッシュが切り詰められていると全 integ テストが SIGSEGV する (今回、初回実行を中断した際にバイナリ展開が中断され 51 files が即死した。再実行時はキャッシュ完全性を確認すること)
-  - [ ] R.6.6 (0.4/0.5) perf-baseline.md — 本番出力 + dev 起動の wall time 各 5 回。並走プロセスなしの静穏条件必須のため独立セッション推奨
+  - [x] R.6.6 (0.4/0.5) perf-baseline.md — **再取得・置換済み**。dev 起動 median **2808 ms** (旧 2724 ms、+3.1%、nodemon 方式維持 — worktree では ENOSPC 未発生)、本番起動 median **4117 ms** (旧 3220 ms、**+27.9% は v8 で preserver に umzug 段が追加されたため** — 内訳を文書に明記)、first-request 5 ルート p50/p95 取得済み。新 gate: dev ±20% `[2246, 3370]` / prod ±20% `[3294, 4940]` / first-request p95 ±25%。umzug が MONGO_URI 必須のため本番系計測でコード内デフォルト同値を export (注記済み)。計測スクリプト 4 本は `apps/app/tmp/perf-baseline/` に保存
   - _Requirements: 2.9, 6.3, 6.5_
   - _Depends: R.1_
 
