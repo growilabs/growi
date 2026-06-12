@@ -6,11 +6,11 @@
 
 **Users**: GROWI 管理者が AI 機能の構成(プロバイダー選択・認証情報・モデル・プロバイダーオプション・Azure 接続設定)を、環境変数を編集せずに変更するために利用する。
 
-**Impact**: 設定解決の優先順位に変更を加える。`ai:*` キーに限り「対応する環境変数が設定されていれば環境変数の値を常に優先し、DB 値による上書きを禁止する」挙動を導入する(既存の DB 優先の既定とは異なる、宣言的な例外)。さらに、設定更新がサーバー再起動なしに反映されるよう、メモ化された Mastra モデルの無効化機構を追加する。
+**Impact**: 既存の「環境変数専用モード」機構(`ENV_ONLY_GROUPS` + `shouldUseEnvOnly`)を `ai:*` グループに拡張する。制御用環境変数(`env:useOnlyEnvVars:ai`)が有効なとき、AI 設定は環境変数の値で固定され DB 値は無視される。`getConfig` のコアロジックは変更せず、設定定義に制御キーとグループを宣言するのみ。さらに、設定更新がサーバー再起動なしに反映されるよう、メモ化された Mastra モデルの無効化機構を追加する。
 
 ### Goals
 - `ai:*` 8 キーを `/admin/ai` から参照・更新できる(共通設定 + Azure 専用設定)
-- 対応環境変数が設定されているキーは環境変数を優先し、UI 上で編集不可・由来明示、API でも更新を拒否する
+- 環境変数専用モードが有効なときは環境変数で固定し、UI 上で編集不可・モード明示、API でも更新を拒否する
 - 設定更新後、サーバー再起動なしに次回の AI 実行へ反映する
 - API キーを画面・API 応答で露出させない
 
@@ -27,14 +27,15 @@
 ### This Spec Owns
 - `/admin/ai` 管理ページ、AI 設定クライアントコンポーネント群、ナビゲーション項目
 - AI 設定専用の apiv3 ルート(GET/PUT)とその入力検証・監査ログ発火
-- `ai:*` 8 キーに対する **env 優先・上書き禁止** の設定解決ロジック(`getConfig` 内の宣言的拡張)
+- `ai:*` 8 キーに対する**環境変数専用モード**(既存 `ENV_ONLY_GROUPS` への新グループ + 制御キー `env:useOnlyEnvVars:ai` の宣言)
 - 設定更新時の **Mastra モデルメモ無効化**(ローカル + S2S 経由)
 - 新スコープ `admin:ai`(read/write)の定義
 
 ### Out of Boundary
 - `configManager.updateConfigs` / `loadConfigs` / S2S `configUpdated` の発行機構そのもの(既存を利用するのみ)
 - Mastra のモデル構築ロジック(`modelResolvers`、各 provider resolver)の内容 ― メモの**破棄点**のみ追加し、構築の中身は変更しない
-- `ai:*` 以外のキーの解決順序(現行の DB 優先を維持)
+- `getConfig` / `shouldUseEnvOnly` のコアロジック(変更せず、宣言データ `ENV_ONLY_GROUPS`/`CONFIG_DEFINITIONS` の追加のみ)
+- `ai:*` 以外のキーの解決順序
 - `app:aiEnabled` および `isAiEnabled()` ゲートの挙動
 
 ### Allowed Dependencies
@@ -45,15 +46,15 @@
 - 依存方向: **Core(scope/types) → config-manager → mastra server(resolver / route / sync) → apiv3 登録**。client は interfaces にのみ依存。config-manager は mastra に依存しない(`config-definition.ts` の `AiProvider` は型限定 import で既存・許容)
 
 ### Revalidation Triggers
-- `ai:*` キーの追加/削除/リネーム → `ENV_PRIORITIZED_KEYS`・DTO・UI・検証の同期が必要
-- `getConfig` の env 優先ロジック変更 → `resolveMastraModel`/`resolveProviderOptions` を含む全 `ai:*` 消費者の挙動に波及
+- `ai:*` キーの追加/削除/リネーム → `ENV_ONLY_GROUPS` の `ai` グループ・DTO・UI・検証の同期が必要
+- `env:useOnlyEnvVars:ai` 制御キー / グループ対象キーの変更 → 固定対象の AI 設定消費者の挙動に波及
 - `configUpdated` S2S メッセージ契約の変更 → メモ無効化ハンドラの再確認
 - `AiProvider` union(サポートプロバイダー)変更 → provider 検証・UI 選択肢の同期
 
 ## Architecture
 
 ### Existing Architecture Analysis
-- **設定解決**: `ConfigManager.getConfig`(`config-manager.ts` L65-91)は既定で `dbConfig ?? envConfig`(DB 優先)。env 専用化は `ENV_ONLY_GROUPS` の制御キー(`env:useOnlyEnvVars:*`)が env で true の場合のみ。本フィーチャーの「キー自身の env が設定されていれば優先」は別トリガーのため新機構を要する。
+- **設定解決**: `ConfigManager.getConfig`(`config-manager.ts` L65-91)は既定で `dbConfig ?? envConfig`(DB 優先 + env フォールバック)。env 専用化は `ENV_ONLY_GROUPS` の制御キー(`env:useOnlyEnvVars:*`)が env で true の場合のみ作用する opt-in 機構。本フィーチャーは既存 `ENV_ONLY_GROUPS` に `ai` グループ(制御キー `env:useOnlyEnvVars:ai`)を追加して env 専用化を実現する。`getConfig`/`shouldUseEnvOnly` のコアは無変更。
 - **設定書込・伝播**: `updateConfigs` → DB upsert → ローカル `loadConfigs` → S2S `configUpdated` publish。他インスタンスは `configManager.handleS2sMessage` で `loadConfigs` 再実行。
 - **モデルメモ**: `resolve-mastra-model.ts` のモジュールスコープ `memoizedModel` は無効化されない。agent は `model: () => resolveMastraModel()` と遅延評価のため、メモ破棄だけで次回リクエストに反映される(agent 再生成不要)。`resolveProviderOptions` は非メモ化のため対応不要。
 - **管理ページ**: 最新は vault パターン(`dynamic(ssr:false)` + `createAdminPageLayout` + `getServerSideAdminCommonProps`、unstated コンテナ不使用)。
@@ -71,8 +72,8 @@ graph TB
         Route[ai-settings admin router]
     end
     subgraph ConfigCore
-        CM[ConfigManager]
-        Def[config-definition ENV_PRIORITIZED_KEYS]
+        CM[ConfigManager shouldUseEnvOnly]
+        Def[config-definition ENV_ONLY_GROUPS ai]
     end
     subgraph MastraFeature
         Resolver[resolve-mastra-model cache]
@@ -84,7 +85,7 @@ graph TB
     end
 
     Page --> UI --> Hook --> Route
-    Route -->|getConfig getManagedEnvVars| CM
+    Route -->|getConfig| CM
     Route -->|updateConfigs| CM
     Route -->|clear after update| Resolver
     CM --> Def
@@ -96,8 +97,8 @@ graph TB
 ```
 
 **Architecture Integration**:
-- 選択パターン: feature-based(AI 設定一式を `features/mastra` 配下に集約)+ 共有設定基盤の宣言的拡張。
-- 境界分離: 設定解決の例外は `config-manager` に閉じ込め、宣言リストは `config-definition`。UI/route は mastra feature。core 変更は scope のみ。
+- 選択パターン: feature-based(AI 設定一式を `features/mastra` 配下に集約)+ 既存設定基盤の宣言的拡張。
+- 境界分離: env 専用化は既存 `ENV_ONLY_GROUPS` 機構を利用し、宣言(制御キー + グループ)は `config-definition` に集約。`config-manager` のコアは無変更。UI/route は mastra feature。core 変更は scope のみ。
 - 保持する既存パターン: apiv3 admin ルート(scope + adminRequired + addActivity + apiV3FormValidator)、vault 管理ページ雛形、S2S 再初期化(MailService 型)、シークレット `undefined` 返却。
 - Steering 準拠: feature-based、named export、server/client 分離、immutability、type-safe(`any` 不使用)。
 
@@ -107,7 +108,7 @@ graph TB
 |-------|------------------|-----------------|-------|
 | Frontend | Next.js Pages Router, React 18, Jotai + SWR, reactstrap | `/admin/ai` ページと設定 UI、設定の取得/保存 | vault 管理ページ雛形を踏襲 |
 | Backend | Express apiv3, express-validator | AI 設定 GET/PUT、入力検証、監査ログ | 既存 admin ルートパターン |
-| Config | `@growi/core` ConfigManager 基盤 | env 優先解決、env-fixed 検出 | `getConfig` 内部拡張 + 新宣言リスト |
+| Config | ConfigManager `ENV_ONLY_GROUPS` 機構 | 環境変数専用モードによる固定 | 制御キー + グループ宣言の追加のみ(コア無変更) |
 | Messaging | S2S messaging(`configUpdated`) | モデルメモの multi-instance 無効化 | 既存メッセージを購読 |
 | Data | MongoDB `configs` コレクション | `ai:*` 値の永続化(平文、既存方式) | スキーマ変更なし |
 
@@ -120,13 +121,13 @@ packages/core/src/interfaces/
 
 apps/app/src/features/mastra/
 ├── interfaces/
-│   └── ai-settings.ts             # GET/PUT DTO 型、編集対象キー一覧 (AI_SETTING_KEYS), env-fixed 表現
+│   └── ai-settings.ts             # GET/PUT DTO 型、編集対象キー一覧 (AI_SETTING_KEYS)
 ├── server/
 │   ├── routes/
 │   │   └── admin-ai-settings/
 │   │       ├── index.ts           # ルータ factory (GET /, PUT /)
-│   │       ├── get-ai-settings.ts # GET ハンドラ: 有効値 + isApiKeySet + envFixedKeys
-│   │       ├── put-ai-settings.ts # PUT ハンドラ: 検証→env-fixed 拒否→updateConfigs→cache clear→activity
+│   │       ├── get-ai-settings.ts # GET ハンドラ: 有効値 + isApiKeySet + useOnlyEnvVars
+│   │       ├── put-ai-settings.ts # PUT ハンドラ: 検証→env専用モード拒否→updateConfigs→cache clear→activity
 │   │       └── validators.ts      # express-validator チェーン(provider enum / providerOptions JSON / boolean)
 │   └── services/
 │       └── model-config-sync.ts   # S2sMessageHandlable: configUpdated 受信で resolveMastraModel cache を破棄
@@ -136,7 +137,7 @@ apps/app/src/features/mastra/
         ├── AiSettings.tsx         # コンテナ: 取得・保存・トースト・セクション統合
         ├── ProviderCommonSettings.tsx  # ai:provider / apiKey / model / providerOptions
         ├── AzureOpenaiSettings.tsx     # azure 4 キー(provider=azure-openai 時に有効化)
-        ├── EnvFixedField.tsx           # env-fixed 時に readOnly + 由来表示する共通ラッパ
+        ├── EnvOnlyModeNotice.tsx       # 環境変数専用モード有効時の alert(各入力は flag 連動で readOnly)
         └── use-ai-settings.ts          # SWR フック(apiv3Get) + 保存関数(apiv3Put)
 
 apps/app/src/pages/admin/
@@ -144,8 +145,7 @@ apps/app/src/pages/admin/
 ```
 
 ### Modified Files
-- `apps/app/src/server/service/config-manager/config-definition.ts` — `ENV_PRIORITIZED_KEYS: readonly ConfigKey[]`(`ai:*` 8 キー)を追加・export
-- `apps/app/src/server/service/config-manager/config-manager.ts` — `getConfig` 既定解決に env 優先分岐、private `isEnvVarSet(key)` と env-prioritized キー集合を追加
+- `apps/app/src/server/service/config-manager/config-definition.ts` — 制御キー `env:useOnlyEnvVars:ai`(env 変数 `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS`)を `CONFIG_KEYS` + `CONFIG_DEFINITIONS` に追加し、`ENV_ONLY_GROUPS` に `ai:*` 8 キーを対象とするグループを追加(`config-manager.ts` のコアは変更不要)
 - `apps/app/src/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model.ts` — `clearResolvedMastraModelCache()` を追加・export
 - `apps/app/src/server/crowi/index.ts` — `setupS2sMessagingService()` で `model-config-sync` ハンドラを `addMessageHandler` 登録
 - `apps/app/src/server/routes/apiv3/index.js` — `routerForAdmin.use('/ai-settings', ...)` でマウント
@@ -168,10 +168,10 @@ sequenceDiagram
     participant Other as Other instance Sync
 
     Admin->>UI: 値を編集して保存
-    UI->>API: PUT ai-settings (env-fixed 以外)
+    UI->>API: PUT ai-settings
     API->>API: 検証 (provider enum, providerOptions JSON)
-    API->>CM: env-fixed キー含むか確認
-    alt env-fixed キーを含む
+    API->>CM: 環境変数専用モードか確認 (env:useOnlyEnvVars:ai)
+    alt 環境変数専用モードが有効
         API-->>UI: 422 更新拒否
     else 正常
         API->>CM: updateConfigs(ai 値)
@@ -185,7 +185,7 @@ sequenceDiagram
     Note over Cache: 次回 chat 要求で resolveMastraModel が<br/>最新 config から再構築される
 ```
 
-ゲーティング決定: env-fixed キーの拒否は防御的多重化(UI でも disable 済)。ローカルはメモを直接破棄、リモートは `configUpdated` 購読で破棄(`updateConfigs` は自インスタンスへ配信しないため両経路が必要)。
+ゲーティング決定: 環境変数専用モード時の拒否は防御的多重化(UI でも入力 disable 済)。`getConfig` が既にこのモードで env 値を返すため DB へ書けても効果はないが、R4.3 として明示的に拒否する。ローカルはメモを直接破棄、リモートは `configUpdated` 購読で破棄(`updateConfigs` は自インスタンスへ配信しないため両経路が必要)。
 
 ## Requirements Traceability
 
@@ -203,10 +203,10 @@ sequenceDiagram
 | 3.2 | 非 azure 時の非適用提示 | AzureOpenaiSettings | provider 状態 | — |
 | 3.3 | EntraId 時の apiKey 不使用提示 | AzureOpenaiSettings | azureOpenaiUseEntraId | — |
 | 3.4 | deployment 名の案内 | AzureOpenaiSettings | i18n 注記 | — |
-| 4.1 | env 設定時は env 優先 | ConfigManager.getConfig | ENV_PRIORITIZED_KEYS, isEnvVarSet | — |
-| 4.2 | env-fixed を編集不可 + 由来明示 | EnvFixedField, get-ai-settings | envFixedKeys | — |
-| 4.3 | env-fixed への更新を拒否 | put-ai-settings | PUT(422) | 保存反映フロー |
-| 4.4 | env 未設定キーは画面値を採用 | ConfigManager.getConfig, put-ai-settings | updateConfigs | — |
+| 4.1 | env 専用モード時は env 値を使用 | config-definition(ai グループ), ConfigManager.shouldUseEnvOnly | ENV_ONLY_GROUPS | — |
+| 4.2 | env 専用モード時に編集不可 + モード明示 | EnvOnlyModeNotice, get-ai-settings | useOnlyEnvVars フラグ | — |
+| 4.3 | env 専用モード時の更新を拒否 | put-ai-settings | PUT(422) | 保存反映フロー |
+| 4.4 | モード無効時は画面値優先・env を既定値 | ConfigManager.getConfig, put-ai-settings | updateConfigs(db ?? env) | — |
 | 5.1 | apiKey をマスク入力 | ProviderCommonSettings | password input | — |
 | 5.2 | apiKey を平文表示しない | get-ai-settings | isApiKeySet(値非返却) | — |
 | 5.3 | エラーに機密を含めない | put/get ハンドラ | ErrorV3 | — |
@@ -218,55 +218,60 @@ sequenceDiagram
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
-| ConfigManager (env 優先拡張) | Config core | `ai:*` の env 優先解決と env-fixed 検出 | 4.1, 4.4 | config-definition (P0) | Service |
-| admin-ai-settings router | Server apiv3 | GET/PUT、検証、env-fixed 拒否、監査、cache clear | 1.2,1.4,2.2,2.3,4.3,5.2,5.3,6.1,6.2 | configManager (P0), resolver (P0) | API |
+| config-definition (ai env-only グループ) | Config core | `env:useOnlyEnvVars:ai` 制御キー + グループ宣言で env 専用化 | 4.1, 4.4 | ENV_ONLY_GROUPS (P0) | — |
+| admin-ai-settings router | Server apiv3 | GET/PUT、検証、env 専用モード拒否、監査、cache clear | 1.2,1.4,2.2,2.3,4.3,5.2,5.3,6.1,6.2 | configManager (P0), resolver (P0) | API |
 | model-config-sync | Mastra server | `configUpdated` 購読で model cache 破棄 | 2.4 | s2s, resolver (P0) | Event |
 | resolve-mastra-model (cache 拡張) | Mastra server | メモ破棄点の提供 | 2.4 | — | Service |
 | AiSettings | Client | 取得/保存/トースト/セクション統合 | 1.1,2.3,6.3 | useAiSettings (P0) | State |
-| ProviderCommonSettings / AzureOpenaiSettings / EnvFixedField | Client UI | 各設定欄、env-fixed 表示、azure 専用 | 2.1,3.x,4.2,5.1,6.2 | AiSettings (P1) | — |
+| ProviderCommonSettings / AzureOpenaiSettings / EnvOnlyModeNotice | Client UI | 各設定欄、env 専用モード表示、azure 専用 | 2.1,3.x,4.2,5.1,6.2 | AiSettings (P1) | — |
 
 ### Config core
 
-#### ConfigManager (env 優先拡張)
+#### config-definition (ai env-only グループ)
 
 | Field | Detail |
 |-------|--------|
-| Intent | `ai:*` キーで対応 env が設定済みなら env 値を優先し、DB 値で上書きさせない |
+| Intent | 既存 `ENV_ONLY_GROUPS` 機構に `ai` グループを宣言し、制御キーが有効なとき `ai:*` を env 専用化する |
 | Requirements | 4.1, 4.4 |
 
 **Responsibilities & Constraints**
-- `getConfig` 既定経路(`source` 未指定)でのみ作用。`ConfigSource.env`/`db` 明示時は現挙動を維持。
-- 作用対象は `ENV_PRIORITIZED_KEYS` に列挙したキーのみ。他キーの解決順序は不変(回帰防止)。
-- env 設定有無は `process.env[envVarName] !== undefined` で判定(default 格納の影響を受けない)。
-- コア interface(`IConfigManager`)は変更しない。追加は app 側 `ConfigManager` クラスの内部実装のみ。
+- 宣言のみ。`getConfig` / `shouldUseEnvOnly` のコアロジックは**変更しない**(既存の opt-in 機構をそのまま流用)。
+- 制御キー `env:useOnlyEnvVars:ai` が env で `true` のとき、グループ対象の `ai:*` 8 キーは `getConfig` が **env 値のみ**を返す(DB 無視)。`false`/未設定なら既存どおり `db ?? env`(R4.4: env は既定値、UI 値が優先)。
+- グループ対象キーは provider 共通 4 + Azure 4 の計 8。1 制御キーで一括(gcs/azure グループと同型)。
+- `ConfigKey` は `CONFIG_KEYS` 由来のため、制御キーを `CONFIG_KEYS` と `CONFIG_DEFINITIONS` の両方に登録する。
 
 **Dependencies**
-- Outbound: `config-definition.ENV_PRIORITIZED_KEYS` — 対象キー集合 (P0)
+- Outbound: `ENV_ONLY_GROUPS`(既存)、`shouldUseEnvOnly`(既存、無変更で利用)(P0)
 - External: なし
 
-**Contracts**: Service [x]
+**Contracts**: なし(設定定義データの追加のみ)
 
-##### Service Interface
+##### 宣言内容
 ```typescript
-// config-definition.ts
-export const ENV_PRIORITIZED_KEYS: readonly ConfigKey[] = [
-  'ai:provider', 'ai:apiKey', 'ai:model', 'ai:providerOptions',
-  'ai:azureOpenaiResourceName', 'ai:azureOpenaiBaseUrl',
-  'ai:azureOpenaiApiVersion', 'ai:azureOpenaiUseEntraId',
-];
+// config-definition.ts — CONFIG_DEFINITIONS に追加
+'env:useOnlyEnvVars:ai': defineConfig<boolean>({
+  envVarName: 'AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+  defaultValue: false,
+}),
 
-// config-manager.ts (private helpers)
-private isEnvPrioritized(key: ConfigKey): boolean;   // envPrioritizedKeySet.has(key)
-private isEnvVarSet(key: ConfigKey): boolean;        // process.env[definition.envVarName] != null
+// ENV_ONLY_GROUPS に追加
+{
+  controlKey: 'env:useOnlyEnvVars:ai',
+  targetKeys: [
+    'ai:provider', 'ai:apiKey', 'ai:model', 'ai:providerOptions',
+    'ai:azureOpenaiResourceName', 'ai:azureOpenaiBaseUrl',
+    'ai:azureOpenaiApiVersion', 'ai:azureOpenaiUseEntraId',
+  ],
+},
 ```
-- Precondition: `envConfig`/`dbConfig` ロード済み(未ロードは現行どおり throw)。
-- Postcondition: `isEnvPrioritized(key) && isEnvVarSet(key)` のとき `envConfig[key].value` を返す。それ以外は既存の `shouldUseEnvOnly ? env : (db ?? env)`。
-- Invariant: `ENV_PRIORITIZED_KEYS` 外のキーの戻り値は変更前と同一。
+- Precondition: 制御キーが `CONFIG_KEYS`/`CONFIG_DEFINITIONS` に登録済み。
+- Postcondition: `getConfig('env:useOnlyEnvVars:ai') === true` のとき、`shouldUseEnvOnly('ai:*')` が true を返し env 値のみ解決。
+- Invariant: 制御キーが false のとき、既存挙動(`db ?? env`)から変化しない。
 
 **Implementation Notes**
-- Integration: 既存 `shouldUseEnvOnly` 分岐の**前段**に env 優先分岐を追加。
-- Validation: `getConfig('ai:*')` の env-set / db-only / 併存 各ケースを単体テストで固定(回帰の要)。
-- Risks: コア解決ロジック変更のため、対象外キー不変であることを明示的にテスト。
+- Integration: `config-manager.ts` の `initKeyToGroupMap()` が起動時に自動でマッピングを構築するため、追加コードは不要。
+- Validation: 制御キー true/false での `getConfig('ai:provider')` 解決を単体テストで固定。
+- Risks: 既存 `ai:*` 利用者は現状ほぼ全員 `AI_*` env を設定済み。env 専用モードを有効化しない限り挙動は不変(env は従来どおりフォールバック)であることをテストで担保。
 
 ### Server apiv3
 
@@ -274,18 +279,18 @@ private isEnvVarSet(key: ConfigKey): boolean;        // process.env[definition.e
 
 | Field | Detail |
 |-------|--------|
-| Intent | AI 設定の取得/更新 API。検証・env-fixed 拒否・監査・キャッシュ破棄を担う |
+| Intent | AI 設定の取得/更新 API。検証・env 専用モード拒否・監査・キャッシュ破棄を担う |
 | Requirements | 1.2, 1.4, 2.2, 2.3, 4.3, 5.2, 5.3, 6.1, 6.2 |
 
 **Responsibilities & Constraints**
 - 全エンドポイントに `accessTokenParser([SCOPE.READ|WRITE.ADMIN.AI])` + `loginRequiredStrictly` + `adminRequired`。
 - `routerForAdmin` 配下にマウント(`/_api/v3/ai-settings`)。`isAiEnabled()` ゲートは**付けない**(AI 無効時も設定可能=R1)。
-- GET は `ai:apiKey` の値を返さない(`isApiKeySet: boolean` のみ)。env-fixed キー一覧を返す。
-- PUT は env-fixed キーを含む要求を 422 で拒否(`getManagedEnvVars()` または `isEnvVarSet` 同等判定で検出)。`apiKey` が空/未指定なら既存値を保持(クリアしない)。
+- GET は `ai:apiKey` の値を返さない(`isApiKeySet: boolean` のみ)。`useOnlyEnvVars: boolean`(`env:useOnlyEnvVars:ai` の状態)を返し、UI の編集可否を決定させる。
+- PUT は環境変数専用モード有効時(`getConfig('env:useOnlyEnvVars:ai') === true`)に 422 で拒否(SiteUrlSetting の拒否パターン)。`apiKey` が空/未指定なら既存値を保持(クリアしない)。
 - 例外メッセージに機密値を含めない(`ai:apiKey` を出力しない)。
 
 **Dependencies**
-- Outbound: `configManager`(getConfig/getManagedEnvVars/updateConfigs)(P0)、`clearResolvedMastraModelCache`(P0)、`activityEvent`(P1)
+- Outbound: `configManager`(getConfig/updateConfigs)(P0)、`clearResolvedMastraModelCache`(P0)、`activityEvent`(P1)
 - External: express-validator(P1)
 
 **Contracts**: API [x]
@@ -307,7 +312,7 @@ export interface AiSettingsResponse {
   azureOpenaiApiVersion?: string;
   azureOpenaiUseEntraId: boolean;
   isApiKeySet: boolean;                // ai:apiKey の値は返さない (5.2)
-  envFixedKeys: AiSettingKey[];        // env 由来で編集不可なキー (4.2)
+  useOnlyEnvVars: boolean;             // env:useOnlyEnvVars:ai 有効時 全項目編集不可 (4.2)
 }
 
 export interface AiSettingsUpdateRequest {
@@ -327,7 +332,7 @@ export interface AiSettingsUpdateRequest {
 
 **Implementation Notes**
 - Integration: ハンドラを `get-ai-settings.ts` / `put-ai-settings.ts` に分割、検証を `validators.ts` に抽出(pure functions)。
-- Validation: env-fixed 拒否、apiKey 非返却、provider/providerOptions 検証、activity 発火を integ テスト。
+- Validation: env 専用モード拒否、apiKey 非返却、provider/providerOptions 検証、activity 発火を integ テスト。
 - Risks: `apiKey` の「未指定=保持/空=保持」境界を明確化(誤クリア防止)。
 
 #### model-config-sync
@@ -362,10 +367,10 @@ export const clearResolvedMastraModelCache = (): void => { /* memoizedModel = un
 - 取得: `useAiSettings`(SWR, `apiv3Get('/ai-settings')`)。保存: `apiv3Put('/ai-settings', body)` → 成功 `toastSuccess` + SWR `mutate`、失敗 `toastError` かつ入力 state を保持(6.3)。
 - `provider` 状態を子へ渡し、`azure-openai` 選択時のみ `AzureOpenaiSettings` を有効化(3.2)。
 
-#### ProviderCommonSettings / AzureOpenaiSettings / EnvFixedField(Summary-only)
-- `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(JSON、クライアント側 parse 検証=6.2)。
+#### ProviderCommonSettings / AzureOpenaiSettings / EnvOnlyModeNotice(Summary-only)
+- `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(JSON、クライアント側 parse 検証=6.2)。各入力は `useOnlyEnvVars` 連動で `readOnly`/`disabled`。
 - `AzureOpenaiSettings`: azure 4 キー。`useEntraId=true` 時は apiKey 不使用を明示(3.3)、model=deployment 名の注記(3.4)、非 azure 時は非適用提示(3.2)。
-- `EnvFixedField`: `envFixedKeys` に含まれるキーを `readOnly` 化し、env 由来であることを表示(4.2)。SiteUrlSetting の env 表示パターンを踏襲。
+- `EnvOnlyModeNotice`: `useOnlyEnvVars` が true のとき alert を表示し、全項目が環境変数で固定され編集不可である旨を明示(4.2)。SiteUrlSetting の env 専用モード表示パターンを踏襲。
 
 ## Data Models
 
@@ -375,7 +380,7 @@ export const clearResolvedMastraModelCache = (): void => { /* memoizedModel = un
 
 ### Error Strategy
 - **入力検証(400)**: provider が `AI_PROVIDERS` 外(6.1)、`providerOptions` が非空かつ JSON 不正(6.2)、boolean 不正 → `apiV3FormValidator` で 400。クライアントは保存前にも JSON 検証してエラー表示。
-- **env-fixed への更新(422)**: env 設定済みキーを含む PUT は `ErrorV3` で拒否(4.3、SiteUrlSetting 拒否パターン)。
+- **env 専用モード時の更新(422)**: 環境変数専用モードが有効な状態の PUT は `ErrorV3` で拒否(4.3、SiteUrlSetting 拒否パターン)。
 - **保存失敗(5xx)**: `toastError` で通知、入力 state 保持(6.3)。
 - **機密保護**: 例外・ログに `ai:apiKey` を出力しない(5.3)。GET は apiKey 値を返さない(5.2)。
 
@@ -385,25 +390,25 @@ export const clearResolvedMastraModelCache = (): void => { /* memoizedModel = un
 ## Testing Strategy
 
 ### Unit Tests
-- `ConfigManager.getConfig`(`ai:provider`): env-only / db-only / env+db 併存 で **env 優先**を返す(4.1)。
-- `ConfigManager.getConfig`: `ENV_PRIORITIZED_KEYS` 外キー(例 `app:title`)が変更前と同値(回帰=4.1 境界)。
-- `isEnvVarSet`: `ai:azureOpenaiUseEntraId`(default false)で env 未設定=false、`=false` 明示設定=true(default と env 設定の識別)。
+- `ConfigManager.getConfig`(`ai:provider`): `env:useOnlyEnvVars:ai`=true で env 値のみ、=false で `db ?? env`(DB 優先・env 既定)を返す(4.1, 4.4)。
+- `ENV_ONLY_GROUPS`: `ai` グループが 8 キーすべてを対象とし、`initKeyToGroupMap` で制御キーへ正しくマップされる(4.1)。
+- `config-definition`: `env:useOnlyEnvVars:ai` が `CONFIG_KEYS`/`CONFIG_DEFINITIONS` に登録され、既存キーの解決に影響しない(回帰)。
 - `validators`: provider enum、`providerOptions` JSON 妥当性、boolean(6.1, 6.2)。
 
 ### Integration Tests
 - PUT 正常: `updateConfigs` 反映 + `clearResolvedMastraModelCache` 呼出 + `ACTION_ADMIN_AI_SETTING_UPDATE` 発火(2.3, 2.4)。
-- PUT env-fixed: env 設定済みキーを含む要求が 422(4.3)。
-- GET: apiKey 値が応答に含まれず `isApiKeySet` と `envFixedKeys` が正しい(4.2, 5.2)。
+- PUT env 専用モード: `env:useOnlyEnvVars:ai`=true の状態で要求が 422(4.3)。
+- GET: apiKey 値が応答に含まれず `isApiKeySet` と `useOnlyEnvVars` が正しい(4.2, 5.2)。
 - PUT apiKey 未指定: 既存 apiKey が保持される(誤クリアしない)。
 - アクセス制御: 非管理者は GET/PUT で 403(1.2)。
 
 ### E2E/UI Tests
 - 管理者が `/admin/ai` で provider/model を保存 → 成功トースト + 再読込で反映(1.1, 1.4, 2.3)。
-- env 設定済み環境: 該当フィールドが readOnly + 由来表示(4.2)。
+- env 専用モード有効環境: 全フィールドが readOnly + モード明示の alert(4.2)。
 - provider=azure-openai 選択時に Azure セクションが有効化、`useEntraId` で apiKey 不使用提示(3.2, 3.3)。
 
 ## Security Considerations
 - **アクセス制御**: 新スコープ `admin:ai`(read/write)+ `adminRequired`。PAT の最小権限を担保。
 - **機密保護**: `ai:apiKey` は GET 非返却(`isApiKeySet` のみ)、入力は `type=password`、例外/ログに非出力(5.1–5.3)。
-- **改変防止**: env 設定済みキーは API/UI 双方で更新不可(多重防御、4.2/4.3)。
+- **改変防止**: 環境変数専用モード有効時は API/UI 双方で更新不可(多重防御、4.2/4.3)。
 - core scope 追加時は `accesstoken_scopes_desc`(全ロケール)を更新。
