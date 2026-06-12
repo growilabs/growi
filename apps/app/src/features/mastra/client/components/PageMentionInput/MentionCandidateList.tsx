@@ -6,7 +6,11 @@ import SimpleBar from 'simplebar-react';
 
 import { cn } from '~/utils/shadcn-ui';
 
-import { MENTION_LISTBOX_ID, mentionOptionId } from './mention-aria';
+import {
+  isListboxRendered,
+  MENTION_LISTBOX_ID,
+  mentionOptionId,
+} from './mention-aria';
 import type { MentionController, PagePathCandidate } from './types';
 
 interface MentionCandidateListProps {
@@ -127,7 +131,10 @@ export const MentionCandidateList = ({
         </div>
       )}
 
-      {hasQuery && !isLoading && candidates.length > 0 && (
+      {/* The listbox branch shares its predicate with the editor's ARIA
+          attributes (aria-controls / aria-activedescendant) so the referenced
+          ids exist exactly while the options are in the DOM. */}
+      {isListboxRendered(controller) && (
         <Downshift<PagePathCandidate>
           isOpen
           highlightedIndex={highlightedIndex}

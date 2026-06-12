@@ -16,7 +16,11 @@ import {
   mentionSessionField,
 } from './editor-state';
 import { MentionCandidateList } from './MentionCandidateList';
-import { MENTION_LISTBOX_ID, mentionOptionId } from './mention-aria';
+import {
+  isListboxRendered,
+  MENTION_LISTBOX_ID,
+  mentionOptionId,
+} from './mention-aria';
 import type {
   MentionController,
   MentionData,
@@ -238,17 +242,10 @@ export const PageMentionInput = ({
   // `aria-activedescendant` (the highlighted option) on the editor's contentDOM
   // so screen readers announce the active candidate during keyboard navigation.
   //
-  // Emit them ONLY while the listbox and its options are actually in the DOM.
-  // MentionCandidateList renders the listbox under exactly this condition (open
-  // session + non-empty query + settled search + ≥1 candidate); in the hint /
-  // searching / no-results states it shows a status row with no listbox, so
-  // referencing the listbox / option ids there would dangle (#2). Keep this
-  // predicate in sync with MentionCandidateList's option-rendering branch.
-  const listboxVisible =
-    controller.isOpen &&
-    controller.query.length >= 1 &&
-    !controller.isLoading &&
-    controller.candidates.length > 0;
+  // Emit them ONLY while the listbox and its options are actually in the DOM —
+  // `isListboxRendered` is the same predicate MentionCandidateList renders the
+  // listbox under, so the referenced ids can never dangle (#2).
+  const listboxVisible = isListboxRendered(controller);
   useEffect(() => {
     const v = viewRef.current;
     if (v == null) {
