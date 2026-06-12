@@ -44,7 +44,7 @@ type AgenticOutputJsonSchema = {
     };
     readonly suggestions: {
       readonly type: 'array';
-      readonly maxItems: 3;
+      readonly maxItems: 20;
       readonly items: {
         readonly type: 'object';
         readonly additionalProperties: false;
@@ -75,7 +75,7 @@ export const AGENTIC_OUTPUT_JSON_SCHEMA: AgenticOutputJsonSchema = {
     },
     suggestions: {
       type: 'array',
-      maxItems: 3,
+      maxItems: 20,
       items: {
         type: 'object',
         additionalProperties: false,
@@ -132,7 +132,7 @@ const isSuggestionEntry = (value: unknown): boolean => {
  * Engine-side re-validation of the agent's structured output.
  * Strict-mode parity: unknown keys at either level are rejected.
  *
- * Deliberately NOT enforced here: the 3-item cap (`maxItems`) and the
+ * Deliberately NOT enforced here: the 20-item cap (`maxItems`) and the
  * trailing-slash path form — the engine adapter truncates and normalizes
  * those (design: AgenticEngine output mapping rules); the guard validates
  * structure only.

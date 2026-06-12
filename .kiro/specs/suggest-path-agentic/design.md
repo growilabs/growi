@@ -404,7 +404,7 @@ const result = await suggestPathAgent.generate(buildUserPrompt(body), {
 - 出力マッピング規則（4.2）:
   1. `result.object` を型ガード `isAgenticEngineOutput` で検証。不合格は例外（memo フォールバック）
   2. 各 suggestion の `path` を正規化: 先頭 `/` 必須・末尾 `/` を保証。正規化不能なエントリは破棄
-  3. 重複 path を除去し、最大 3 件に制限
+  3. 重複 path を除去し、最大 20 件に制限（当初 3 件。A-6 #185211 で候補集合の質を計測可能にするため 20 件に拡張）
   4. 各 path に `resolveParentGrant` を並列適用して `grant` を付与（4.4）
   5. `type: 'search'`、`informationType` は structured output のトップレベル値を全 search 提案に付与（2.3）
 - **category 提案は生成しない**（設計決定。浅い親が妥当な場合はエージェントが search 提案として出せるため機能的に包含。research.md 参照）
@@ -415,7 +415,7 @@ const result = await suggestPathAgent.generate(buildUserPrompt(body), {
 `SuggestPathEngine` 型に適合（EngineDispatcher 参照）。
 
 - Preconditions: `aiTools:suggestPathAgenticSearchLimit` / `aiTools:suggestPathAgenticTimeoutMs` が定義済み（既定値あり）
-- Postconditions: 成功時は 0〜3 件の `type: 'search'` 提案（grant 解決済み・informationType 付き）。失敗・タイムアウト時は reject
+- Postconditions: 成功時は 0〜20 件の `type: 'search'` 提案（grant 解決済み・informationType 付き）。失敗・タイムアウト時は reject
 - Invariants: 1 リクエスト中の検索 tool 実行回数 ≤ searchLimit（budget による執行）
 
 ##### State Management（観測ログ）
@@ -497,7 +497,7 @@ export const suggestPathAgent = new Agent({
   4. **探索戦略（1.1, 1.2）**: 検索結果を元文書と照らして判断し、不十分なら語彙を変える（同義語・言語の切り替え・抽象度の変更）、`prefix:` / `tag:` / 除外等の演算子で条件を変える
   5. **本文参照（1.3）**: パス・スニペットで判断できないときは getPageContent で候補ページの内容を確認する
   6. **budget 手仕舞い（3.2）**: 検索 tool が `limit_exceeded` を返したら、それ以上検索せず収集済み情報から提案を確定する
-  7. **出力ルール**: 提案は最大 3 件。それぞれ既存ページ木に整合する親ディレクトリパス（新設パスも可）・簡潔な label・提案理由 description。label / description は文書の言語に合わせる
+  7. **出力ルール**: 提案は最大 20 件（確からしい順）。それぞれ既存ページ木に整合する親ディレクトリパス（新設パスも可）・簡潔な label・提案理由 description。label / description は文書の言語に合わせる
 - スキーマ（structured output）は Agent 定義に持たせず、AgenticEngine が generate 呼び出し時に渡す（依存方向: mastra 側が suggest-path の型を知らないため）
 
 **Dependencies**
@@ -634,7 +634,7 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
     },
     "suggestions": {
       "type": "array",
-      "maxItems": 3,
+      "maxItems": 20,
       "items": {
         "type": "object",
         "additionalProperties": false,
@@ -650,7 +650,7 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 }
 ```
 
-- スキーマ検証は二重: Mastra の structuring パス（schema 指定）+ AgenticEngine の型ガード（defense in depth）。`maxItems` がモデル側で無視された場合もアダプタが 3 件に切り詰める
+- スキーマ検証は二重: Mastra の structuring パス（schema 指定）+ AgenticEngine の型ガード（defense in depth）。`maxItems` がモデル側で無視された場合もアダプタが 20 件に切り詰める
 
 **トレースログ（新規・運用契約）**: AgenticEngine の State Management 節に定義（info サマリ + debug 詳細）。#183968 評価器はサマリ行から検索回数・レスポンス時間・トークン消費を収集する（6.2）
 
@@ -686,7 +686,7 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 
 1. **agentic-output-schema**: 型ガードの正常系 / informationType 不正 / path 欠落 / 余剰プロパティ拒否。JSON Schema 定数と TS 型の整合（required・enum 値）
 2. **limited-search-tool**: budget 残あり → 委譲 + used 増加 + query 記録 / ちょうど上限 → `limit_exceeded` / searchBudget 欠落 → `context_error`。いずれも throw しないこと
-3. **agentic-engine**: Agent モック（`mock<T>()`）で (a) 正常出力 → path 正規化・dedupe・3 件制限・grant 付与・informationType 付与、(b) 不正出力 → reject、(c) タイムアウト → reject、(d) searchLimit / timeoutMs が config から per-request に読まれること
+3. **agentic-engine**: Agent モック（`mock<T>()`）で (a) 正常出力 → path 正規化・dedupe・20 件制限・grant 付与・informationType 付与、(b) 不正出力 → reject、(c) タイムアウト → reject、(d) searchLimit / timeoutMs が config から per-request に読まれること
 4. **engine dispatcher / orchestrator**: engine 未指定 → config 既定（'oneshot'）/ リクエスト指定が優先 / agentic reject → memo のみ返却 / memo が常に先頭
 5. **suggest-path-agent**: tools 構成（fullTextSearch = limited wrapper, getPageContent）と memory 不接続、model が関数（DynamicArgument）であること
 

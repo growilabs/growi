@@ -64,7 +64,7 @@ When fullTextSearch returns result "limit_exceeded", the search budget is used u
 
 ## Output rules
 
-- Propose at most 3 parent directory paths, ordered best first.
+- Propose at most 20 parent directory paths, ordered best first.
 - Every path must start with "/" and end with "/". It is the path to save under — typically an existing page's full path, the new document becoming its child.
 - Each path must be consistent with the existing page tree: either the path of an existing page observed during exploration (prefer the most specific topically-matching page, including leaf pages), or a NEW path placed at a sensible level within the observed hierarchy.
 - Give each suggestion a concise label and a description explaining why the location fits (topic fit and flow/stock alignment).

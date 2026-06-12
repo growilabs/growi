@@ -348,21 +348,21 @@ describe('agenticEngine', () => {
       });
     });
 
-    it('caps the result at 3 suggestions even when the model ignores maxItems', async () => {
+    it('caps the result at 20 suggestions even when the model ignores maxItems', async () => {
       primeGenerate(
-        outputWith([
-          suggestionEntry('/a/', 1),
-          suggestionEntry('/b/', 2),
-          suggestionEntry('/c/', 3),
-          suggestionEntry('/d/', 4),
-          suggestionEntry('/e/', 5),
-        ]),
+        outputWith(
+          Array.from({ length: 21 }, (_, i) =>
+            suggestionEntry(`/p${i}/`, i + 1),
+          ),
+        ),
       );
 
       const result = await callEngine();
 
-      expect(result.map((s) => s.path)).toEqual(['/a/', '/b/', '/c/']);
-      expect(mocks.resolveParentGrantMock).toHaveBeenCalledTimes(3);
+      expect(result.map((s) => s.path)).toEqual(
+        Array.from({ length: 20 }, (_, i) => `/p${i}/`),
+      );
+      expect(mocks.resolveParentGrantMock).toHaveBeenCalledTimes(20);
     });
 
     it('applies the top-level flow informationType to every suggestion', async () => {

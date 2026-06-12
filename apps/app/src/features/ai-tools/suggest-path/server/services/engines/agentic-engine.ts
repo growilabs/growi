@@ -25,7 +25,7 @@ import type { SuggestPathEngine } from './engine-types';
 
 const logger = loggerFactory('growi:ai-tools:suggest-path:agentic-engine');
 
-const SUGGESTION_CAP = 3;
+const SUGGESTION_CAP = 20;
 
 /**
  * Loosely-typed view of the generate result for trace reconstruction: the

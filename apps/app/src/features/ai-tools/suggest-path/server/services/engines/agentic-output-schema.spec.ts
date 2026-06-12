@@ -35,18 +35,13 @@ describe('isAgenticEngineOutput', () => {
       expect(isAgenticEngineOutput(value)).toBe(true);
     });
 
-    // The guard validates structure only; the 3-item cap is enforced by the
+    // The guard validates structure only; the 20-item cap is enforced by the
     // schema's maxItems plus adapter-side truncation (design: AgenticEngine
     // mapping rules), so a longer array must still pass the guard.
-    it('accepts more than 3 suggestions', () => {
+    it('accepts more than 20 suggestions', () => {
       const value = {
         ...createValidOutput(),
-        suggestions: [
-          createValidSuggestion(),
-          createValidSuggestion(),
-          createValidSuggestion(),
-          createValidSuggestion(),
-        ],
+        suggestions: Array.from({ length: 21 }, () => createValidSuggestion()),
       };
       expect(isAgenticEngineOutput(value)).toBe(true);
     });
@@ -171,10 +166,10 @@ describe('AGENTIC_OUTPUT_JSON_SCHEMA (schema-type consistency)', () => {
     expect(informationType.enum).toEqual(['flow', 'stock']);
   });
 
-  it('caps suggestions at 3 items', () => {
+  it('caps suggestions at 20 items', () => {
     const suggestions = AGENTIC_OUTPUT_JSON_SCHEMA.properties.suggestions;
     expect(suggestions.type).toBe('array');
-    expect(suggestions.maxItems).toBe(3);
+    expect(suggestions.maxItems).toBe(20);
   });
 
   it('declares the strict-mode object contract for suggestion items', () => {
