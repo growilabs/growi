@@ -1175,5 +1175,93 @@
     "section_users": "Utilisateurs",
     "section_data": "Données",
     "section_external_notifications": "Notifications externes"
+  },
+  "growi-vault": {
+    "admin-settings": {
+      "force-warning": {
+        "label": "Avertissement :",
+        "message_html": "La dernière initialisation a été déclenchée par <code>VAULT_BOOTSTRAP_ON_START=force</code>. Redémarrer le serveur avec cette variable d'environnement toujours définie sur <code>force</code> réinitialisera à nouveau toutes les données du Vault. Veuillez modifier la variable d'environnement en <code>true</code> ou <code>false</code>."
+      },
+      "feature-status": {
+        "heading": "GROWI Vault",
+        "label": "Statut de la fonctionnalité",
+        "enabled": "Activé",
+        "disabled": "Désactivé",
+        "description_html": "Contrôlé par la variable d'environnement <code>VAULT_ENABLED</code>. Pour basculer activé/désactivé, modifiez la variable d'environnement et redémarrez le serveur."
+      },
+      "clone-url": {
+        "label": "URL de clone",
+        "description": "Exécutez cette commande dans votre terminal pour cloner le dépôt du Vault.",
+        "copy-button": "Copier la commande",
+        "copied-tooltip": "Copié !",
+        "copy-failed": "Échec de la copie de la commande de clone.",
+        "no-site-url_html": "L'URL du site n'est pas configurée, la commande ne peut pas être affichée. Définissez-la dans les <a href=\"/admin/app\">Paramètres de l'application</a>."
+      },
+      "kill-switch": {
+        "heading": "Reconstruction",
+        "button": "Reconstruire le Vault",
+        "description_html": "Détruit toutes les données des dépôts Git et reconstruit les données Git à partir de MongoDB. Pendant la reconstruction, toutes les requêtes <code>git clone</code> / <code>fetch</code> sont rejetées avec 503. L'opération est enregistrée dans le journal d'audit comme <code>vault.wipe</code>.",
+        "confirm-title": "Confirmer la reconstruction du Vault",
+        "confirm-message_html": "L'exécution de cette action va <strong>perdre toutes les données des dépôts Git actuels</strong>.",
+        "confirm-question": "Êtes-vous sûr de vouloir continuer ?",
+        "confirm-button": "Confirmer",
+        "cancel-button": "Annuler",
+        "started-toast": "Reconstruction démarrée. Le Vault renverra 503 jusqu'à la fin de la reconstruction des données."
+      },
+      "bootstrap-status": {
+        "state": "Statut",
+        "processed-total": "Traité / Total estimé",
+        "started-at": "Démarré le",
+        "completed-at": "Terminé le",
+        "last-error": "Dernière erreur",
+        "progress-label": "{{processed}} sur {{total}} pages"
+      },
+      "completion-reliability": {
+        "heading": "Statut de fiabilité",
+        "check-result": "Dernier résultat de vérification",
+        "last-completed-at": "Dernière complétion",
+        "processed-estimated": "Traité / Estimé",
+        "trigger-source": "Source du déclencheur",
+        "last-error": "Dernière erreur"
+      },
+      "auto-retry-status": {
+        "heading": "Statut du réessai automatique",
+        "escalated-warning_html": "Le réessai automatique pendant l'initialisation a échoué, et l'état a atteint <strong>escalated</strong>. Une intervention manuelle est requise.",
+        "attempt-no": "N° de tentative",
+        "next-attempt-at": "Prochaine tentative",
+        "last-error": "Dernière erreur",
+        "abort-button": "Annuler le réessai automatique",
+        "aborting": "Annulation…",
+        "aborted-toast": "Réessai automatique annulé."
+      },
+      "drift-activity": {
+        "heading": "Statut de détection des incohérences de données",
+        "last-sweep-at": "Dernier balayage",
+        "last-watermark": "Dernière marque de filigrane",
+        "detected-since-boot": "Détectés depuis le démarrage du serveur",
+        "repairs-emitted-since-boot": "Réparations émises depuis le démarrage du serveur",
+        "last-error": "Dernière erreur détectée",
+        "out-of-scope_html": "<strong>Remarque (hors périmètre) :</strong> Les incohérences de données causées par des changements de chemin (renommage / suppression définitive) et la révocation de droits ne sont pas détectées dans l'implémentation actuelle. Elles nécessiteront un support futur de <code>growi-vault-ha</code>."
+      },
+      "storage-observability": {
+        "fetch-failed": "Échec de récupération des statistiques de stockage. vault-manager peut être injoignable.",
+        "namespace-count": "Nombre de namespaces",
+        "total-commit-count": "Nombre total de commits",
+        "loose-object-count": "Nombre d'objets vrac",
+        "repo-size": "Taille du dépôt",
+        "last-squash": "Dernier squash",
+        "last-gc": "Dernier GC"
+      },
+      "audit-log": {
+        "heading": "Journal d'audit",
+        "button": "Voir les entrées du journal VAULT_*",
+        "description": "Ouvre le journal d'audit administrateur filtré sur les actions liées au Vault (VAULT_*)."
+      },
+      "reconcile-admin": {
+        "heading": "Réconcilier",
+        "trigger-button": "Lancer la réconciliation",
+        "description": "Réconcilie manuellement les incohérences de données entre les pages MongoDB et les arbres git du Vault sans effectuer une initialisation complète."
+      }
+    }
   }
 }

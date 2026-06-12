@@ -62,6 +62,8 @@ model activities {
   action      String
   createdAt   DateTime           @db.Date
   endpoint    String
+  event       String?            @db.ObjectId
+  eventModel  String?
   ip          String
   snapshot    ActivitiesSnapshot
   target      String?            @db.ObjectId
@@ -168,11 +170,14 @@ model editorsettings {
 }
 
 model externalaccounts {
-  id           String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  accountId    Json?
-  /// Field referred in an index, but found no data to define the type.
-  providerType Json?
+  id           String   @id @default(auto()) @map("_id") @db.ObjectId
+  v            Int      @default(0) @map("__v")
+  accountId    String
+  createdAt    DateTime @default(now())
+  providerType String
+  userId       String?  @map("user") @db.ObjectId
+
+  user users? @relation(fields: [userId], references: [id])
 
   @@unique([providerType, accountId], map: "providerType_1_accountId_1")
 }
@@ -213,17 +218,15 @@ model growiplugins {
 }
 
 model inappnotifications {
-  id        String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  action    Json?
-  /// Field referred in an index, but found no data to define the type.
-  createdAt Json?
-  /// Field referred in an index, but found no data to define the type.
-  status    Json?
-  /// Field referred in an index, but found no data to define the type.
-  target    Json?
-  /// Field referred in an index, but found no data to define the type.
-  user      Json?
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  action      String
+  activities  String[]
+  createdAt   DateTime @db.Date
+  snapshot    String
+  status      String
+  target      String   @db.ObjectId
+  targetModel String
+  user        String   @db.ObjectId
 
   @@index([user], map: "user_1")
   @@index([status], map: "status_1")
@@ -250,6 +253,29 @@ model namedqueries {
   name          String @unique(map: "name_1")
 
   @@index([creator], map: "creator_1")
+}
+
+model newsitems {
+  id          String @id @default(auto()) @map("_id") @db.ObjectId
+  /// Field referred in an index, but found no data to define the type.
+  externalId  Json?  @unique(map: "externalId_1")
+  /// Field referred in an index, but found no data to define the type.
+  fetchedAt   Json?
+  /// Field referred in an index, but found no data to define the type.
+  publishedAt Json?
+
+  @@index([publishedAt], map: "publishedAt_1")
+  @@index([fetchedAt], map: "fetchedAt_1")
+}
+
+model newsreadstatuses {
+  id         String @id @default(auto()) @map("_id") @db.ObjectId
+  /// Field referred in an index, but found no data to define the type.
+  newsItemId Json?
+  /// Field referred in an index, but found no data to define the type.
+  userId     Json?
+
+  @@unique([userId, newsItemId], map: "userId_1_newsItemId_1")
 }
 
 model pagebulkexportjobs {
@@ -357,14 +383,15 @@ model passwordresetorders {
 }
 
 model revisions {
-  id        String   @id @default(auto()) @map("_id") @db.ObjectId
-  v         Int      @map("__v")
-  authorId  String   @map("author") @db.ObjectId
-  body      String
-  createdAt DateTime @db.Date
-  format    String
-  origin    String?
-  pageId    String   @db.ObjectId
+  id            String   @id @default(auto()) @map("_id") @db.ObjectId
+  v             Int      @map("__v")
+  authorId      String   @map("author") @db.ObjectId
+  body          String
+  createdAt     DateTime @db.Date
+  hasDiffToPrev Boolean?
+  format        String
+  origin        String?
+  pageId        String   @db.ObjectId
 
   author   users      @relation(fields: [authorId], references: [id])
   page     pages      @relation(fields: [pageId], references: [id])
@@ -505,10 +532,11 @@ model users {
   activities         activities[]
   comments           comments[]
   revisions          revisions[]
-  createdPages       pages[]       @relation("CreatedPages")
-  lastUpdatedPages   pages[]       @relation("LastUpdatedPages")
-  imageAttachment    attachments?  @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
-  createdAttachments attachments[] @relation("CreatedAttachments")
+  createdPages       pages[]            @relation("CreatedPages")
+  lastUpdatedPages   pages[]            @relation("LastUpdatedPages")
+  imageAttachment    attachments?       @relation("UserImageAttachment", fields: [imageAttachmentId], references: [id])
+  createdAttachments attachments[]      @relation("CreatedAttachments")
+  externalaccounts   externalaccounts[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")
@@ -517,9 +545,11 @@ model users {
 }
 
 model useruisettings {
-  id   String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  user Json?  @unique(map: "user_1")
+  id                        String  @id @default(auto()) @map("_id") @db.ObjectId
+  v                         Int     @map("__v")
+  currentSidebarContents    String
+  preferCollapsedModeByUser Boolean
+  user                      String  @unique(map: "user_1") @db.ObjectId
 }
 
 model vectorstorefilerelations {
@@ -548,7 +578,7 @@ model yjs_writings {
   metaKey String?
   /// Field referred in an index, but found no data to define the type.
   part    Json?
-  /// Multiple data types found: Float: 33.3%, Binary: 66.7% out of 3 sampled entries
+  /// Multiple data types found: Float: 33.3%, Binary: 66.7% out of 27 sampled entries
   value   Json
   version String
 

@@ -94,37 +94,47 @@ const findPageListByIds = async (pageIds: ObjectIdLike[], crowi: any) => {
 };
 
 class SearchService implements SearchQueryParser, SearchResolver {
+  protected constructor() {}
+
   crowi: Crowi;
 
   isErrorOccuredOnHealthcheck: boolean | null;
 
   isErrorOccuredOnSearching: boolean | null;
 
-  fullTextSearchDelegator: any & ElasticsearchDelegator;
+  fullTextSearchDelegator: ElasticsearchDelegator;
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
 
-  constructor(crowi: Crowi) {
-    this.crowi = crowi;
+  static async create(crowi: Crowi) {
+    const instance = new SearchService();
 
-    this.isErrorOccuredOnHealthcheck = null;
-    this.isErrorOccuredOnSearching = null;
+    instance.crowi = crowi;
+
+    instance.isErrorOccuredOnHealthcheck = null;
+    instance.isErrorOccuredOnSearching = null;
 
     try {
-      this.fullTextSearchDelegator = this.generateFullTextSearchDelegator();
-      this.nqDelegators = this.generateNQDelegators(
-        this.fullTextSearchDelegator,
+      const tmpFullTextSearchDelegator =
+        instance.generateFullTextSearchDelegator();
+      if (tmpFullTextSearchDelegator == null) {
+        throw new Error('Failed to initialize search delegator');
+      }
+      instance.fullTextSearchDelegator = tmpFullTextSearchDelegator;
+      instance.nqDelegators = instance.generateNQDelegators(
+        instance.fullTextSearchDelegator,
       );
       logger.info('Succeeded to initialize search delegators');
     } catch (err) {
       logger.error(err);
     }
 
-    if (this.isConfigured) {
-      this.fullTextSearchDelegator.init();
-      this.registerUpdateEvent();
-      this.registerAuditlogUpdateEvent();
+    if (instance.isConfigured) {
+      await instance.fullTextSearchDelegator.init();
+      instance.registerUpdateEvent();
+      instance.registerAuditlogUpdateEvent();
     }
+    return instance;
   }
 
   get isConfigured() {
@@ -349,8 +359,8 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.normalizeAuditlogIndices();
   }
 
-  async rebuildIndex() {
-    return this.fullTextSearchDelegator.rebuildIndex();
+  async rebuildIndex(shouldEmitProgress = false) {
+    return this.fullTextSearchDelegator.rebuildIndex({ shouldEmitProgress });
   }
 
   async rebuildAuditlogIndex() {

@@ -177,6 +177,7 @@ export default function route(crowi: Crowi): Router {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /import/status
    *      description: Get properties of stored zip files for import
    *      responses:
@@ -213,6 +214,7 @@ export default function route(crowi: Crowi): Router {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /import
    *      description: import a collection from a zipped json
    *      requestBody:
@@ -375,6 +377,7 @@ export default function route(crowi: Crowi): Router {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /import/upload
    *      description: upload a zip file
    *      requestBody:
@@ -441,6 +444,7 @@ export default function route(crowi: Crowi): Router {
    *      security:
    *        - bearer: []
    *        - accessTokenInQuery: []
+   *        - accessTokenHeaderAuth: []
    *      summary: /import/all
    *      description: Delete all zip files
    *      responses:

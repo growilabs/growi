@@ -28,7 +28,11 @@ import type {
 import type { PageModel } from '../../models/page';
 import { createBatchStream } from '../../util/batch-stream';
 import { configManager } from '../config-manager';
-import type { UpdateOrInsertPagesOpts } from '../interfaces/search';
+import type {
+  AddAllPagesOption,
+  RebuildIndexOption,
+  UpdateOrInsertPagesOpts,
+} from '../interfaces/search';
 import { aggregatePipelineToIndex } from './aggregate-to-index';
 import type {
   AggregatedPage,
@@ -229,7 +233,7 @@ class ElasticsearchDelegator
     }
     if (this.isElasticsearchReindexOnBoot) {
       try {
-        await this.rebuildIndex();
+        await this.rebuildIndex({ shouldEmitProgress: false });
       } catch (err) {
         logger.error('Rebuild index on boot failed', err);
       }
@@ -357,13 +361,22 @@ class ElasticsearchDelegator
   /**
    * rebuild index
    */
-  async rebuildIndex(): Promise<void> {
+  async rebuildIndex(
+    option: RebuildIndexOption = { shouldEmitProgress: false },
+  ): Promise<void> {
     const { client, indexName, aliasName } = this;
+    const { shouldEmitProgress } = option;
 
     const tmpIndexName = `${indexName}-tmp`;
 
     try {
       // reindex to tmp index
+      const isExistsTmpIndex = await client.indices.exists({
+        index: tmpIndexName,
+      });
+      if (isExistsTmpIndex) {
+        await client.indices.delete({ index: tmpIndexName });
+      }
       await this.createIndex(tmpIndexName);
       await client.reindex(indexName, tmpIndexName);
 
@@ -380,13 +393,15 @@ class ElasticsearchDelegator
         index: indexName,
       });
       await this.createIndex(indexName);
-      await this.addAllPages();
+      await this.addAllPages({ shouldEmitProgress });
     } catch (error) {
-      logger.error("An error occured while 'rebuildIndex'.", error);
-      logger.error('error.meta.body', error?.meta?.body);
+      logger.error({ err: error }, "An error occured while 'rebuildIndex'.");
+      logger.error({ body: error?.meta?.body }, 'error.meta.body');
 
-      const socket = this.socketIoService.getAdminSocket();
-      socket.emit(SocketEventName.RebuildingFailed, { error: error.message });
+      if (shouldEmitProgress) {
+        const socket = this.socketIoService.getAdminSocket();
+        socket.emit(SocketEventName.RebuildingFailed, { error: error.message });
+      }
 
       throw error;
     } finally {
@@ -586,11 +601,7 @@ class ElasticsearchDelegator
     }
 
     if (isES9ClientDelegator(this.client)) {
-      const { mappings } =
-        process.env.CI == null
-          ? await import('./mappings/mappings-es9')
-          : await import('./mappings/mappings-es9-for-ci');
-
+      const { mappings } = await import('./mappings/mappings-es9');
       return this.client.indices.create({
         index,
         ...mappings,
@@ -695,10 +706,11 @@ class ElasticsearchDelegator
     body.push(command);
   }
 
-  addAllPages() {
+  addAllPages(option: AddAllPagesOption = { shouldEmitProgress: false }) {
+    const { shouldEmitProgress } = option;
     const Page = this.getPageModel();
     return this.updateOrInsertPages(() => Page.find(), {
-      shouldEmitProgress: true,
+      shouldEmitProgress,
       invokeGarbageCollection: true,
     });
   }
@@ -721,10 +733,12 @@ class ElasticsearchDelegator
    */
   async updateOrInsertPages(
     queryFactory,
-    option: UpdateOrInsertPagesOpts = {},
+    option: UpdateOrInsertPagesOpts = {
+      shouldEmitProgress: false,
+      invokeGarbageCollection: false,
+    },
   ): Promise<void> {
-    const { shouldEmitProgress = false, invokeGarbageCollection = false } =
-      option;
+    const { shouldEmitProgress, invokeGarbageCollection } = option;
 
     const Page = this.getPageModel();
     const { PageQueryBuilder } = Page;
@@ -946,7 +960,7 @@ class ElasticsearchDelegator
       const validateQueryResponse = await (async () => {
         if (isES7ClientDelegator(this.client)) {
           const es7SearchQuery = query as ES7SearchQuery;
-          return this.client.indices.validateQuery({
+          return await this.client.indices.validateQuery({
             explain: true,
             index: es7SearchQuery.index,
             body: {
@@ -957,7 +971,7 @@ class ElasticsearchDelegator
 
         if (isES8ClientDelegator(this.client)) {
           const es8SearchQuery = query as ES8SearchQuery;
-          return this.client.indices.validateQuery({
+          return await this.client.indices.validateQuery({
             explain: true,
             index: es8SearchQuery.index,
             query: es8SearchQuery.body.query,
@@ -966,7 +980,7 @@ class ElasticsearchDelegator
 
         if (isES9ClientDelegator(this.client)) {
           const es9SearchQuery = query as ES9SearchQuery;
-          return this.client.indices.validateQuery({
+          return await this.client.indices.validateQuery({
             explain: true,
             index: es9SearchQuery.index,
             query: es9SearchQuery.body.query,
@@ -982,16 +996,16 @@ class ElasticsearchDelegator
 
     const searchResponse = await (async () => {
       if (isES7ClientDelegator(this.client)) {
-        return this.client.search(query as ES7SearchQuery);
+        return await this.client.search(query as ES7SearchQuery);
       }
 
       if (isES8ClientDelegator(this.client)) {
-        return this.client.search(query as ES8SearchQuery);
+        return await this.client.search(query as ES8SearchQuery);
       }
 
       if (isES9ClientDelegator(this.client)) {
         const { body, ...rest } = query as ES9SearchQuery;
-        return this.client.search({
+        return await this.client.search({
           ...rest,
           // Elimination of the body property since ES9
           // https://raw.githubusercontent.com/elastic/elasticsearch-js/2f6200eb397df0e54d23848d769a93614ee1fb45/docs/release-notes/breaking-changes.md
@@ -1233,11 +1247,7 @@ class ElasticsearchDelegator
     }
   }
 
-  async filterPagesByViewer(
-    query: SearchQuery,
-    user,
-    userGroups,
-  ): Promise<void> {
+  filterPagesByViewer(query: SearchQuery, user, userGroups): void {
     const showPagesRestrictedByOwner = !configManager.getConfig(
       'security:list-policy:hideRestrictedByOwner',
     );
@@ -1373,7 +1383,7 @@ class ElasticsearchDelegator
     const query = this.createSearchQuery();
 
     this.appendCriteriaForQueryString(query, terms);
-    await this.filterPagesByViewer(query, user, userGroups);
+    this.filterPagesByViewer(query, user, userGroups);
     await this.appendFunctionScore(query, queryString);
 
     this.appendResultSize(query, from, size);
@@ -1382,7 +1392,7 @@ class ElasticsearchDelegator
 
     this.appendHighlight(query);
 
-    return this.searchKeyword(query);
+    return await this.searchKeyword(query);
   }
 
   isTermsNormalized(terms: Partial<QueryTerms>): terms is ESQueryTerms {
@@ -1406,7 +1416,7 @@ class ElasticsearchDelegator
 
   async syncPageUpdated(page, user) {
     logger.debug('SearchClient.syncPageUpdated', page.path);
-    return this.updateOrInsertPageById(page._id);
+    return await this.updateOrInsertPageById(page._id);
   }
 
   // remove pages whitch should nod Indexed
@@ -1424,7 +1434,7 @@ class ElasticsearchDelegator
   }
 
   async syncDescendantsPagesUpdated(parentPage, user) {
-    return this.updateOrInsertDescendantsPagesById(parentPage, user);
+    return await this.updateOrInsertDescendantsPagesById(parentPage, user);
   }
 
   async syncDescendantsPagesDeleted(pages, user) {
@@ -1452,19 +1462,19 @@ class ElasticsearchDelegator
   async syncBookmarkChanged(pageId) {
     logger.debug('SearchClient.syncBookmarkChanged', pageId);
 
-    return this.updateOrInsertPageById(pageId);
+    return await this.updateOrInsertPageById(pageId);
   }
 
   async syncCommentChanged(comment) {
     logger.debug('SearchClient.syncCommentChanged', comment);
 
-    return this.updateOrInsertPageById(comment.pageId);
+    return await this.updateOrInsertPageById(comment.pageId);
   }
 
   async syncTagChanged(page) {
     logger.debug('SearchClient.syncTagChanged', page.path);
 
-    return this.updateOrInsertPageById(page._id);
+    return await this.updateOrInsertPageById(page._id);
   }
 }
 

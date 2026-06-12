@@ -22,6 +22,11 @@ vi.mock('~/server/service/config-manager/config-manager', () => ({
 }));
 
 class TestSearchService extends SearchService {
+  // biome-ignore lint/complexity/noUselessConstructor: widens the protected base ctor (factory pattern) to public so the test can instantiate and wire mocks
+  public constructor() {
+    super();
+  }
+
   override generateFullTextSearchDelegator(): ElasticsearchDelegator {
     return mock<ElasticsearchDelegator>();
   }
@@ -74,7 +79,13 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     vi.clearAllMocks();
     mockCrowi = mock<Crowi>();
     mockCrowi.configManager = configManager;
-    searchService = new TestSearchService(mockCrowi);
+    // SearchService now uses a protected ctor + async create() factory (dev/8.0.x).
+    // create() hardcodes `new SearchService()`, ignoring our subclass override, so wire
+    // the mocked delegator manually here (isConfigured=false skips the real init block).
+    searchService = new TestSearchService();
+    searchService.crowi = mockCrowi;
+    searchService.fullTextSearchDelegator =
+      searchService.generateFullTextSearchDelegator();
     mockUserModel = mock<Model<IUser>>();
   });
 

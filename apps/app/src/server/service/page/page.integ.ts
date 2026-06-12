@@ -636,7 +636,10 @@ describe('PageService', () => {
 
         expect(generalXssFilterProcessSpy).toHaveBeenCalled();
 
-        expect(pageEventSpy).toHaveBeenCalledWith('rename');
+        expect(pageEventSpy).toHaveBeenCalledWith(
+          'rename',
+          expect.objectContaining({ newPath: '/renamed1', user: testUser2 }),
+        );
 
         assert(resultPage != null);
         expect(resultPage.path).toBe('/renamed1');
@@ -656,7 +659,10 @@ describe('PageService', () => {
 
         expect(generalXssFilterProcessSpy).toHaveBeenCalled();
 
-        expect(pageEventSpy).toHaveBeenCalledWith('rename');
+        expect(pageEventSpy).toHaveBeenCalledWith(
+          'rename',
+          expect.objectContaining({ newPath: '/renamed2', user: testUser2 }),
+        );
 
         assert(resultPage != null);
         expect(resultPage.path).toBe('/renamed2');
@@ -675,7 +681,10 @@ describe('PageService', () => {
         );
 
         expect(generalXssFilterProcessSpy).toHaveBeenCalled();
-        expect(pageEventSpy).toHaveBeenCalledWith('rename');
+        expect(pageEventSpy).toHaveBeenCalledWith(
+          'rename',
+          expect.objectContaining({ newPath: '/renamed3', user: testUser2 }),
+        );
 
         assert(resultPage != null);
         expect(resultPage.path).toBe('/renamed3');
@@ -695,7 +704,10 @@ describe('PageService', () => {
 
         expect(generalXssFilterProcessSpy).toHaveBeenCalled();
         expect(renameDescendantsWithStreamSpy).toHaveBeenCalled();
-        expect(pageEventSpy).toHaveBeenCalledWith('rename');
+        expect(pageEventSpy).toHaveBeenCalledWith(
+          'rename',
+          expect.objectContaining({ newPath: '/renamed4', user: testUser2 }),
+        );
 
         assert(resultPage != null);
         expect(resultPage.path).toBe('/renamed4');
@@ -744,6 +756,7 @@ describe('PageService', () => {
         'updateMany',
         [childForRename1],
         testUser2,
+        { oldPagePathPrefix, newPagePathPrefix },
       );
 
       expect(resultPage?.path).toBe('/renamed1/child');
@@ -770,6 +783,7 @@ describe('PageService', () => {
         'updateMany',
         [childForRename2],
         testUser2,
+        { oldPagePathPrefix, newPagePathPrefix },
       );
 
       expect(resultPage?.path).toBe('/renamed2/child');
@@ -796,6 +810,7 @@ describe('PageService', () => {
         'updateMany',
         [childForRename3],
         testUser2,
+        { oldPagePathPrefix, newPagePathPrefix },
       );
 
       expect(resultPage?.path).toBe('/renamed3/child');

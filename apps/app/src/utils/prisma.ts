@@ -1,8 +1,12 @@
 import { extension as CommentExtension } from '~/features/comment/server';
 import { PrismaClient as OriginalPrismaClient } from '~/generated/prisma/client';
+import { extension as ExternalAccountExtension } from '~/server/models/external-account';
+import { extension as UserExtension } from '~/server/models/user/index.prisma';
 
-export const createPrisma = () =>
-  new OriginalPrismaClient()
+export const createPrisma = (datasourceUrl?: string) =>
+  new OriginalPrismaClient(
+    datasourceUrl != null ? { datasourceUrl } : undefined,
+  )
     .$extends({
       result: {
         $allModels: {
@@ -49,7 +53,9 @@ export const createPrisma = () =>
         },
       },
     })
-    .$extends(CommentExtension);
+    .$extends(CommentExtension)
+    .$extends(ExternalAccountExtension)
+    .$extends(UserExtension);
 
 export const prisma = createPrisma();
 
