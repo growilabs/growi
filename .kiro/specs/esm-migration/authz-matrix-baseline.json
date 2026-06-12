@@ -1,9 +1,9 @@
 {
-  "capturedAt": "2026-04-21T10:40:52.182Z",
-  "node": "v24.13.1",
-  "git": "1236c58dce71f8ac508633d48cd83c9ef233ee0a",
+  "capturedAt": "2026-06-12T08:33:10.137Z",
+  "node": "v24.15.0",
+  "git": "447ddd20adb7737a63f9913ed98f40fe24cf080a",
   "personaHeader": "x-authz-matrix-persona",
-  "entryCount": 251,
+  "entryCount": 264,
   "matrix": [
     {
       "method": "GET",
@@ -178,8 +178,8 @@
       "path": "/_api/v3/bookmark-folder/:id",
       "unauthenticated": 403,
       "guest": 403,
-      "readonly": 200,
-      "admin": 200
+      "readonly": 404,
+      "admin": 404
     },
     {
       "method": "POST",
@@ -523,7 +523,7 @@
       "unauthenticated": 403,
       "guest": 403,
       "readonly": 302,
-      "admin": 500
+      "admin": 422
     },
     {
       "method": "GET",
@@ -751,6 +751,54 @@
     },
     {
       "method": "GET",
+      "path": "/_api/v3/news/admin/delivery-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/news/admin/delivery-setting",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/news/list",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/news/mark-all-read",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/news/mark-read",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 400,
+      "admin": 400
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/news/unread-count",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 200,
+      "admin": 200
+    },
+    {
+      "method": "GET",
       "path": "/_api/v3/notification-setting/",
       "unauthenticated": 403,
       "guest": 403,
@@ -914,8 +962,8 @@
       "path": "/_api/v3/page/:pageId/publish",
       "unauthenticated": 403,
       "guest": 403,
-      "readonly": 404,
-      "admin": 404
+      "readonly": 400,
+      "admin": 400
     },
     {
       "method": "PUT",
@@ -930,8 +978,8 @@
       "path": "/_api/v3/page/:pageId/unpublish",
       "unauthenticated": 403,
       "guest": 403,
-      "readonly": 404,
-      "admin": 404
+      "readonly": 400,
+      "admin": 400
     },
     {
       "method": "GET",
@@ -1955,7 +2003,7 @@
       "unauthenticated": 403,
       "guest": 403,
       "readonly": 302,
-      "admin": 200
+      "admin": 400
     },
     {
       "method": "POST",
@@ -2012,6 +2060,62 @@
       "guest": 400,
       "readonly": 400,
       "admin": 400
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/vault/page/reconcile",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 500,
+      "admin": 500
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/vault/reconcile",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 500
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/vault/reconcile-history",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/vault/resilience-status",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/vault/retry/abort",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 409
+    },
+    {
+      "method": "GET",
+      "path": "/_api/v3/vault/status",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 200
+    },
+    {
+      "method": "POST",
+      "path": "/_api/v3/vault/wipe",
+      "unauthenticated": 403,
+      "guest": 403,
+      "readonly": 302,
+      "admin": 202
     }
   ]
 }

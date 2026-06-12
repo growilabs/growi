@@ -1,7 +1,7 @@
 {
-  "capturedAt": "2026-04-21T11:02:44.187Z",
-  "node": "v24.13.1",
-  "git": "66379d2b5aeb2f1ca337d6f892b7502abd719380",
+  "capturedAt": "2026-06-12T08:33:28.356Z",
+  "node": "v24.15.0",
+  "git": "447ddd20adb7737a63f9913ed98f40fe24cf080a",
   "yjs": {
     "no-session": {
       "status": 401,
