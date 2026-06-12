@@ -6,10 +6,12 @@
 
 **Users**: GROWI 管理者が AI 機能の構成(プロバイダー選択・認証情報・モデル・プロバイダーオプション・Azure 接続設定)を、環境変数を編集せずに変更するために利用する。
 
-**Impact**: 既存の「環境変数専用モード」機構(`ENV_ONLY_GROUPS` + `shouldUseEnvOnly`)を `ai:*` グループに拡張する。制御用環境変数(`env:useOnlyEnvVars:ai`)が有効なとき、AI 設定は環境変数の値で固定され DB 値は無視される。`getConfig` のコアロジックは変更せず、設定定義に制御キーとグループを宣言するのみ。さらに、設定更新がサーバー再起動なしに反映されるよう、メモ化された Mastra モデルの無効化機構を追加する。
+**Impact**: 既存の「環境変数専用モード」機構(`ENV_ONLY_GROUPS` + `shouldUseEnvOnly`)を AI 設定グループ(`ai:*` 8 キー + `app:aiEnabled`)に拡張する。制御用環境変数(`env:useOnlyEnvVars:ai`)が有効なとき、AI 設定は環境変数の値で固定され DB 値は無視される。`getConfig` のコアロジックは変更しない。さらに、(1) 設定更新がサーバー再起動なしに反映されるようメモ化された Mastra モデルの無効化機構を追加し、(2) AI 関連 API のゲートを起動時固定から**リクエスト毎の判定**(`有効 かつ 設定済み`)へ変更して、トグルや設定の変更が再起動なしに利用可否へ反映されるようにする。
 
 ### Goals
 - `ai:*` 8 キーを `/admin/ai` から参照・更新できる(共通設定 + Azure 専用設定)
+- AI 機能の有効/無効(`app:aiEnabled`)を管理画面から切り替えられる
+- AI 関連 API の利用可否を「有効 かつ 設定済み」に整合させ、設定不備時は API を拒否し・クライアント導線も非表示にする(再起動なしで反映)
 - 環境変数専用モードが有効なときは環境変数で固定し、UI 上で編集不可・モード明示、API でも更新を拒否する
 - 設定更新後、サーバー再起動なしに次回の AI 実行へ反映する
 - API キーを画面・API 応答で露出させない
@@ -17,7 +19,6 @@
 ### Non-Goals
 - AI 機能(チャット・エディタ支援)自体の挙動変更
 - 新しい LLM プロバイダーの追加
-- `app:aiEnabled`(AI 機能の有効/無効トグル)の管理 ― 本画面では扱わない
 - LLM への接続テスト(疎通確認)機能
 - `ai:` 以外の設定キーの管理、保存時暗号化(encryption-at-rest)
 - 旧 AI 連携画面(`/admin/ai-integration`)の復元
@@ -28,7 +29,9 @@
 ### This Spec Owns
 - `/admin/ai` 管理ページ、AI 設定クライアントコンポーネント群、ナビゲーション項目
 - AI 設定専用の apiv3 ルート(GET/PUT)とその入力検証・監査ログ発火
-- `ai:*` 8 キーに対する**環境変数専用モード**(既存 `ENV_ONLY_GROUPS` への新グループ + 制御キー `env:useOnlyEnvVars:ai` の宣言)
+- AI 機能の有効/無効(`app:aiEnabled`)の管理画面からの切り替え
+- **AI 利用可否の判定**(`isAiConfigured()` の追加と `有効 かつ 設定済み` の合成)、および mastra ルートゲートをリクエスト毎判定へ変更、クライアント導線(サイドバー)への反映
+- `ai:*` 8 キー + `app:aiEnabled` に対する**環境変数専用モード**(既存 `ENV_ONLY_GROUPS` への新グループ + 制御キー `env:useOnlyEnvVars:ai` の宣言)
 - 設定更新時の **Mastra モデルメモ無効化**(ローカル + S2S 経由)
 - 新スコープ `admin:ai`(read/write)の定義
 
@@ -36,8 +39,9 @@
 - `configManager.updateConfigs` / `loadConfigs` / S2S `configUpdated` の発行機構そのもの(既存を利用するのみ)
 - Mastra のモデル構築ロジック(`modelResolvers`、各 provider resolver)の内容 ― メモの**破棄点**のみ追加し、構築の中身は変更しない
 - `getConfig` / `shouldUseEnvOnly` のコアロジック(変更せず、宣言データ `ENV_ONLY_GROUPS`/`CONFIG_DEFINITIONS` の追加のみ)
-- `ai:*` 以外のキーの解決順序
-- `app:aiEnabled` および `isAiEnabled()` ゲートの挙動
+- `ai:*` / `app:aiEnabled` 以外のキーの解決順序
+- `isAiEnabled()` 自体の実装、および旧 openai 機能の `certify-ai-service` ミドルウェア(変更しない。本フィーチャーは mastra ルートゲートとサイドバー導線の利用可否整合のみを担う)
+- AI 機能(チャット等)の実行ロジック
 
 ### Allowed Dependencies
 - `@growi/core`(`SCOPE`, `ConfigSource`, 型)― scope 追加のためのみ編集
@@ -47,10 +51,11 @@
 - 依存方向: **Core(scope/types) → config-manager → mastra server(resolver / route / sync) → apiv3 登録**。client は interfaces にのみ依存。config-manager は mastra に依存しない(`config-definition.ts` の `AiProvider` は型限定 import で既存・許容)
 
 ### Revalidation Triggers
-- `ai:*` キーの追加/削除/リネーム → `ENV_ONLY_GROUPS` の `ai` グループ・DTO・UI・検証の同期が必要
+- `ai:*` キーの追加/削除/リネーム → `ENV_ONLY_GROUPS` の `ai` グループ・DTO・UI・検証・`isAiConfigured()` の同期が必要
 - `env:useOnlyEnvVars:ai` 制御キー / グループ対象キーの変更 → 固定対象の AI 設定消費者の挙動に波及
+- `isAiConfigured()` の判定基準(provider 別必須項目)の変更 → ゲート・サイドバー導線・`resolveMastraModel` の前提と要整合
 - `configUpdated` S2S メッセージ契約の変更 → メモ無効化ハンドラの再確認
-- `AiProvider` union(サポートプロバイダー)変更 → provider 検証・UI 選択肢の同期
+- `AiProvider` union(サポートプロバイダー)変更 → provider 検証・UI 選択肢・`isAiConfigured()` の同期
 
 ## Architecture
 
@@ -58,6 +63,8 @@
 - **設定解決**: `ConfigManager.getConfig`(`config-manager.ts` L65-91)は既定で `dbConfig ?? envConfig`(DB 優先 + env フォールバック)。env 専用化は `ENV_ONLY_GROUPS` の制御キー(`env:useOnlyEnvVars:*`)が env で true の場合のみ作用する opt-in 機構。本フィーチャーは既存 `ENV_ONLY_GROUPS` に `ai` グループ(制御キー `env:useOnlyEnvVars:ai`)を追加して env 専用化を実現する。`getConfig`/`shouldUseEnvOnly` のコアは無変更。
 - **設定書込・伝播**: `updateConfigs` → DB upsert → ローカル `loadConfigs` → S2S `configUpdated` publish。他インスタンスは `configManager.handleS2sMessage` で `loadConfigs` 再実行。
 - **モデルメモ**: `resolve-mastra-model.ts` のモジュールスコープ `memoizedModel` は無効化されない。agent は `model: () => resolveMastraModel()` と遅延評価のため、メモ破棄だけで次回リクエストに反映される(agent 再生成不要)。`resolveProviderOptions` は非メモ化のため対応不要。
+- **AI ゲート(現状の課題)**: mastra ルート(`features/mastra/server/routes/index.ts`)のゲートは **factory 実行時(起動時)に一度だけ** `isAiEnabled()` を評価し、無効なら catch-all を登録する静的な作り。これでは (a) トグルを再起動なしで反映できず、(b) `app:aiEnabled=true` でも `ai:*` 未設定だとルート到達 → `resolveMastraModel()` が throw する。旧 openai 機能の `certify-ai-service` ミドルウェアは既に**リクエスト毎**に `app:aiEnabled` + `openai:serviceType` 妥当性を検査しており、これが踏襲すべき先例。本フィーチャーは mastra ゲートを**リクエスト毎の `有効 かつ 設定済み` 判定**に置き換える。
+- **AI 有効フラグの消費者**: `app:aiEnabled` は mastra ゲート / openai `certify-ai-service` / general-page の `aiEnabled` 供給(→ `aiEnabledAtom` → サイドバー AI ボタン表示)で参照される。
 - **管理ページ**: 最新は vault パターン(`dynamic(ssr:false)` + `createAdminPageLayout` + `getServerSideAdminCommonProps`、unstated コンテナ不使用)。
 
 ### Architecture Pattern & Boundary Map
@@ -79,6 +86,12 @@ graph TB
     subgraph MastraFeature
         Resolver[resolve-mastra-model cache]
         Sync[model-config-sync handler]
+        Configured[isAiConfigured isAiReady]
+        Gate[mastra route ready guard]
+    end
+    subgraph Consumers
+        Chat[AI chat routes]
+        Sidebar[sidebar via aiEnabled atom]
     end
     subgraph Infra
         DB[(configs collection)]
@@ -95,6 +108,10 @@ graph TB
     S2S -->|configUpdated| Sync
     Sync -->|clear| Resolver
     Sync -->|handlable| S2S
+    Gate -->|per request| Configured
+    Configured -->|getConfig| CM
+    Gate --> Chat
+    Sidebar -->|getConfig ready| Configured
 ```
 
 **Architecture Integration**:
@@ -110,6 +127,7 @@ graph TB
 | Frontend | Next.js Pages Router, React 18, Jotai + SWR, reactstrap | `/admin/ai` ページと設定 UI、設定の取得/保存 | vault 管理ページ雛形を踏襲 |
 | Backend | Express apiv3, express-validator | AI 設定 GET/PUT、入力検証、監査ログ | 既存 admin ルートパターン |
 | Config | ConfigManager `ENV_ONLY_GROUPS` 機構 | 環境変数専用モードによる固定 | 制御キー + グループ宣言の追加のみ(コア無変更) |
+| Gate | per-request Express middleware | AI 利用可否(有効 かつ 設定済み)の判定 | mastra ルートの起動時固定ゲートを置換 |
 | Messaging | S2S messaging(`configUpdated`) | モデルメモの multi-instance 無効化 | 既存メッセージを購読 |
 | Data | MongoDB `configs` コレクション | `ai:*` 値の永続化(平文、既存方式) | スキーマ変更なし |
 
@@ -122,22 +140,25 @@ packages/core/src/interfaces/
 
 apps/app/src/features/mastra/
 ├── interfaces/
-│   └── ai-settings.ts             # GET/PUT DTO 型、編集対象キー一覧 (AI_SETTING_KEYS)
+│   └── ai-settings.ts             # GET/PUT DTO 型、編集対象キー一覧 (AI_SETTING_KEYS), aiEnabled を含む
 ├── server/
 │   ├── routes/
-│   │   └── admin-ai-settings/
-│   │       ├── index.ts           # ルータ factory (GET /, PUT /)
-│   │       ├── get-ai-settings.ts # GET ハンドラ: 有効値 + isApiKeySet + useOnlyEnvVars
-│   │       ├── put-ai-settings.ts # PUT ハンドラ: 検証→env専用モード拒否→updateConfigs→cache clear→activity
-│   │       └── validators.ts      # express-validator チェーン(provider enum / providerOptions JSON / boolean)
+│   │   ├── admin-ai-settings/
+│   │   │   ├── index.ts           # ルータ factory (GET /, PUT /)
+│   │   │   ├── get-ai-settings.ts # GET ハンドラ: 有効値 + isApiKeySet + useOnlyEnvVars + aiEnabled
+│   │   │   ├── put-ai-settings.ts # PUT ハンドラ: 検証→env専用モード拒否→updateConfigs→cache clear→activity
+│   │   │   └── validators.ts      # express-validator チェーン(provider enum / providerOptions JSON / boolean)
+│   │   └── ai-ready-guard.ts      # per-request middleware: isAiReady() でないと 501
 │   └── services/
-│       └── model-config-sync.ts   # S2sMessageHandlable: configUpdated 受信で resolveMastraModel cache を破棄
+│       ├── model-config-sync.ts   # S2sMessageHandlable: configUpdated 受信で resolveMastraModel cache を破棄
+│       └── is-ai-configured.ts    # isAiConfigured()(provider 別必須項目の非throw検査)+ isAiReady()
 └── client/
     └── admin/
         ├── index.ts               # barrel: AiSettings を公開
         ├── AiSettings.tsx         # コンテナ: 取得・保存・トースト・セクション統合
         ├── ProviderCommonSettings.tsx  # ai:provider / apiKey / model / providerOptions
         ├── AzureOpenaiSettings.tsx     # azure 4 キー(provider=azure-openai 時に有効化)
+        ├── AiEnabledToggle.tsx         # app:aiEnabled の有効/無効トグル
         ├── EnvOnlyModeNotice.tsx       # 環境変数専用モード有効時の alert(各入力は flag 連動で readOnly)
         └── use-ai-settings.ts          # SWR フック(apiv3Get) + 保存関数(apiv3Put)
 
@@ -146,8 +167,10 @@ apps/app/src/pages/admin/
 ```
 
 ### Modified Files
-- `apps/app/src/server/service/config-manager/config-definition.ts` — 制御キー `env:useOnlyEnvVars:ai`(env 変数 `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS`)を `CONFIG_KEYS` + `CONFIG_DEFINITIONS` に追加し、`ENV_ONLY_GROUPS` に `ai:*` 8 キーを対象とするグループを追加(`config-manager.ts` のコアは変更不要)
+- `apps/app/src/server/service/config-manager/config-definition.ts` — 制御キー `env:useOnlyEnvVars:ai`(env 変数 `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS`)を `CONFIG_KEYS` + `CONFIG_DEFINITIONS` に追加し、`ENV_ONLY_GROUPS` に **`ai:*` 8 キー + `app:aiEnabled`** を対象とするグループを追加(`config-manager.ts` のコアは変更不要)
+- `apps/app/src/features/mastra/server/routes/index.ts` — 起動時固定ゲート(`if (!isAiEnabled())`)を撤去し、`ai-ready-guard`(per-request)を `router.use` で適用
 - `apps/app/src/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model.ts` — `clearResolvedMastraModelCache()` を追加・export
+- `apps/app/src/pages/general-page/configuration-props.ts` — サイドバー供給値 `aiEnabled` を `isAiReady()`(有効 かつ 設定済み)由来へ変更
 - `apps/app/src/server/crowi/index.ts` — `setupS2sMessagingService()` で `model-config-sync` ハンドラを `addMessageHandler` 登録
 - `apps/app/src/server/routes/apiv3/index.js` — `routerForAdmin.use('/ai-settings', ...)` でマウント
 - `apps/app/src/interfaces/activity.ts` — `ACTION_ADMIN_AI_SETTING_UPDATE` を追加し SupportedAction に登録
@@ -188,6 +211,20 @@ sequenceDiagram
 
 ゲーティング決定: 環境変数専用モード時の拒否は防御的多重化(UI でも入力 disable 済)。`getConfig` が既にこのモードで env 値を返すため DB へ書けても効果はないが、R4.3 として明示的に拒否する。ローカルはメモを直接破棄、リモートは `configUpdated` 購読で破棄(`updateConfigs` は自インスタンスへ配信しないため両経路が必要)。
 
+### AI 利用可否ゲート(リクエスト毎)
+
+```mermaid
+flowchart TD
+    Req[AI 関連 API リクエスト] --> Guard{ai-ready-guard}
+    Guard --> Enabled{app:aiEnabled true?}
+    Enabled -- no --> Reject[501 AI 無効]
+    Enabled -- yes --> Configured{isAiConfigured?}
+    Configured -- no --> Reject2[501 設定不備]
+    Configured -- yes --> Pass[ハンドラへ]
+```
+
+決定: ゲートは **factory 実行時固定をやめ、リクエスト毎**に `isAiReady() = isAiEnabled() && isAiConfigured()` を評価する。これによりトグル・設定変更が再起動なしに利用可否へ反映される(R7.5)。`isAiConfigured()` は provider が `AI_PROVIDERS` に含まれ、provider 別の必須項目(非 Azure: apiKey + model / Azure: endpoint + model +(apiKey or useEntraId))が揃っているかを**非 throw**で検査する。`resolveMastraModel` の検証と同一基準だがモデル構築は行わない。旧 openai の `certify-ai-service`(per-request)と同型。
+
 ## Requirements Traceability
 
 | Requirement | Summary | Components | Interfaces | Flows |
@@ -214,17 +251,25 @@ sequenceDiagram
 | 6.1 | provider 不正を拒否 | validators, put-ai-settings | isAiProvider | — |
 | 6.2 | providerOptions JSON 検証 | ProviderCommonSettings, validators | JSON.parse チェック | — |
 | 6.3 | 保存失敗時に通知 + 入力保持 | AiSettings | toastError, ローカル state | 保存反映フロー |
+| 7.1 | 有効/無効トグルの提供 | AiEnabledToggle, put-ai-settings | aiEnabled(DTO) | — |
+| 7.2 | 無効/未設定時は API 拒否 | ai-ready-guard, is-ai-configured | isAiReady(), 501 | AI ゲートフロー |
+| 7.3 | 有効かつ設定済みで API 利用可 | ai-ready-guard, is-ai-configured | isAiReady() | AI ゲートフロー |
+| 7.4 | 未 ready 時はサイドバー非表示 | configuration-props(general-page) | isAiReady() → aiEnabledAtom | — |
+| 7.5 | トグル/設定変更を再起動なし反映 | ai-ready-guard(per-request) | isAiReady() | AI ゲートフロー |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|--------------|--------|--------------|------------------|-----------|
-| config-definition (ai env-only グループ) | Config core | `env:useOnlyEnvVars:ai` 制御キー + グループ宣言で env 専用化 | 4.1, 4.4 | ENV_ONLY_GROUPS (P0) | — |
-| admin-ai-settings router | Server apiv3 | GET/PUT、検証、env 専用モード拒否、監査、cache clear | 1.2,1.4,2.2,2.3,4.3,5.2,5.3,6.1,6.2 | configManager (P0), resolver (P0) | API |
+| config-definition (ai env-only グループ) | Config core | `env:useOnlyEnvVars:ai` 制御キー + グループ宣言で env 専用化(`ai:*` + `app:aiEnabled`) | 4.1, 4.4 | ENV_ONLY_GROUPS (P0) | — |
+| admin-ai-settings router | Server apiv3 | GET/PUT、検証、env 専用モード拒否、監査、cache clear | 1.2,1.4,2.2,2.3,4.3,5.2,5.3,6.1,6.2,7.1 | configManager (P0), resolver (P0) | API |
+| is-ai-configured | Mastra server | `isAiConfigured()` / `isAiReady()` の判定 | 7.2,7.3,7.4 | configManager (P0) | Service |
+| ai-ready-guard | Mastra server | mastra ルートの per-request 利用可否ゲート | 7.2,7.3,7.5 | is-ai-configured (P0) | — |
 | model-config-sync | Mastra server | `configUpdated` 購読で model cache 破棄 | 2.4 | s2s, resolver (P0) | Event |
 | resolve-mastra-model (cache 拡張) | Mastra server | メモ破棄点の提供 | 2.4 | — | Service |
+| configuration-props (general-page) | Server SSR | サイドバー供給 `aiEnabled` を `isAiReady()` 由来へ | 7.4 | is-ai-configured (P1) | — |
 | AiSettings | Client | 取得/保存/トースト/セクション統合 | 1.1,2.3,6.3 | useAiSettings (P0) | State |
-| ProviderCommonSettings / AzureOpenaiSettings / EnvOnlyModeNotice | Client UI | 各設定欄、env 専用モード表示、azure 専用 | 2.1,3.x,4.2,5.1,6.2 | AiSettings (P1) | — |
+| ProviderCommonSettings / AzureOpenaiSettings / AiEnabledToggle / EnvOnlyModeNotice | Client UI | 各設定欄、有効化トグル、env 専用モード表示、azure 専用 | 2.1,3.x,4.2,5.1,6.2,7.1 | AiSettings (P1) | — |
 
 ### Config core
 
@@ -237,8 +282,8 @@ sequenceDiagram
 
 **Responsibilities & Constraints**
 - 宣言のみ。`getConfig` / `shouldUseEnvOnly` のコアロジックは**変更しない**(既存の opt-in 機構をそのまま流用)。
-- 制御キー `env:useOnlyEnvVars:ai` が env で `true` のとき、グループ対象の `ai:*` 8 キーは `getConfig` が **env 値のみ**を返す(DB 無視)。`false`/未設定なら既存どおり `db ?? env`(R4.4: env は既定値、UI 値が優先)。
-- グループ対象キーは provider 共通 4 + Azure 4 の計 8。1 制御キーで一括(gcs/azure グループと同型)。
+- 制御キー `env:useOnlyEnvVars:ai` が env で `true` のとき、グループ対象キーは `getConfig` が **env 値のみ**を返す(DB 無視)。`false`/未設定なら既存どおり `db ?? env`(R4.4: env は既定値、UI 値が優先)。
+- グループ対象キーは provider 共通 4 + Azure 4 + 有効化トグル `app:aiEnabled` の計 9。1 制御キーで一括(gcs/azure グループと同型)。`app:aiEnabled` は `app:` prefix だが AI 設定の一部として同一グループで固定する。
 - `ConfigKey` は `CONFIG_KEYS` 由来のため、制御キーを `CONFIG_KEYS` と `CONFIG_DEFINITIONS` の両方に登録する。
 
 **Dependencies**
@@ -259,6 +304,7 @@ sequenceDiagram
 {
   controlKey: 'env:useOnlyEnvVars:ai',
   targetKeys: [
+    'app:aiEnabled',
     'ai:provider', 'ai:apiKey', 'ai:model', 'ai:providerOptions',
     'ai:azureOpenaiResourceName', 'ai:azureOpenaiBaseUrl',
     'ai:azureOpenaiApiVersion', 'ai:azureOpenaiUseEntraId',
@@ -281,13 +327,13 @@ sequenceDiagram
 | Field | Detail |
 |-------|--------|
 | Intent | AI 設定の取得/更新 API。検証・env 専用モード拒否・監査・キャッシュ破棄を担う |
-| Requirements | 1.2, 1.4, 2.2, 2.3, 4.3, 5.2, 5.3, 6.1, 6.2 |
+| Requirements | 1.2, 1.4, 2.2, 2.3, 4.3, 5.2, 5.3, 6.1, 6.2, 7.1 |
 
 **Responsibilities & Constraints**
 - 全エンドポイントに `accessTokenParser([SCOPE.READ|WRITE.ADMIN.AI])` + `loginRequiredStrictly` + `adminRequired`。
 - `routerForAdmin` 配下にマウント(`/_api/v3/ai-settings`)。`isAiEnabled()` ゲートは**付けない**(AI 無効時も設定可能=R1)。
-- GET は `ai:apiKey` の値を返さない(`isApiKeySet: boolean` のみ)。`useOnlyEnvVars: boolean`(`env:useOnlyEnvVars:ai` の状態)を返し、UI の編集可否を決定させる。
-- PUT は環境変数専用モード有効時(`getConfig('env:useOnlyEnvVars:ai') === true`)に 422 で拒否(SiteUrlSetting の拒否パターン)。`apiKey` が空/未指定なら既存値を保持(クリアしない)。
+- GET は `ai:apiKey` の値を返さない(`isApiKeySet: boolean` のみ)。`useOnlyEnvVars: boolean`(`env:useOnlyEnvVars:ai` の状態)と `aiEnabled: boolean`(7.1)を返し、UI の編集可否・トグル状態を決定させる。
+- PUT は `aiEnabled` を含む AI 設定を更新。環境変数専用モード有効時(`getConfig('env:useOnlyEnvVars:ai') === true`)は 422 で拒否(SiteUrlSetting の拒否パターン)。`apiKey` が空/未指定なら既存値を保持(クリアしない)。
 - 例外メッセージに機密値を含めない(`ai:apiKey` を出力しない)。
 
 **Dependencies**
@@ -305,6 +351,7 @@ sequenceDiagram
 ```typescript
 // interfaces/ai-settings.ts
 export interface AiSettingsResponse {
+  aiEnabled: boolean;                  // app:aiEnabled の状態 (7.1)
   provider?: AiProvider;
   model?: string;
   providerOptions?: string;            // raw JSON string
@@ -317,6 +364,7 @@ export interface AiSettingsResponse {
 }
 
 export interface AiSettingsUpdateRequest {
+  aiEnabled?: boolean;                 // app:aiEnabled の切り替え (7.1)
   provider?: AiProvider;
   apiKey?: string;                     // 空/未指定なら既存保持 (5.x)
   model?: string;
@@ -362,13 +410,44 @@ export const clearResolvedMastraModelCache = (): void => { /* memoizedModel = un
 ```
 - メモ撤廃ではなく破棄関数の追加(Azure+Entra のトークンキャッシュ維持のため毎回再構築は不可 — 詳細は research.md §7)。
 
+#### is-ai-configured / ai-ready-guard
+
+| Field | Detail |
+|-------|--------|
+| Intent | AI が「設定済み」かを非 throw で判定し、mastra ルートを per-request にゲートする |
+| Requirements | 7.2, 7.3, 7.5 |
+
+**Responsibilities & Constraints**
+- `isAiConfigured()`: `ai:provider` が `AI_PROVIDERS` に含まれ、provider 別の必須項目が揃っているかを判定(非 Azure: `ai:apiKey` + `ai:model` / Azure: endpoint(`ai:azureOpenaiResourceName` か `ai:azureOpenaiBaseUrl`)+ `ai:model` +(`ai:apiKey` か `ai:azureOpenaiUseEntraId`))。`resolveMastraModel` と同一基準・**モデル構築なし・throw しない**。
+- `isAiReady()`: `isAiEnabled() && isAiConfigured()`。mastra ゲートとサイドバー供給の両方が参照する単一の判定。
+- `ai-ready-guard`: per-request Express middleware。`!isAiReady()` のとき 501(無効と設定不備でメッセージを区別)。
+- mastra ルート factory の起動時 `if (!isAiEnabled())` 静的ゲートを撤去し、本 guard を `router.use` で適用(R7.5: 再起動なし反映)。
+
+**Dependencies**
+- Outbound: `configManager.getConfig`(P0)、`isAiEnabled`(既存、openai/server/services)(P0)
+- Inbound: mastra ルート(`routes/index.ts`)、general-page `configuration-props`(P1)
+
+**Contracts**: Service [x]
+```typescript
+export const isAiConfigured = (): boolean => { /* provider + 必須項目の非throw検査 */ };
+export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
+```
+- Postcondition: provider 未設定/必須項目欠落で `isAiConfigured()===false`。
+- Invariant: 判定基準は `resolveMastraModel` の検証と一致(乖離は R5 レベルの不整合)。
+
+**Implementation Notes**
+- Integration: openai の `certify-ai-service`(per-request 検査)を踏襲。openai 側ミドルウェアは変更しない。
+- Risks: `isAiConfigured` と `resolveMastraModel` の検査基準が乖離すると「ready だが resolve で throw」が再発 → 両者を同じ provider 別ルールに揃え、テストで固定。
+
 ### Client UI
 
 #### AiSettings(コンテナ)
 - 取得: `useAiSettings`(SWR, `apiv3Get('/ai-settings')`)。保存: `apiv3Put('/ai-settings', body)` → 成功 `toastSuccess` + SWR `mutate`、失敗 `toastError` かつ入力 state を保持(6.3)。
 - `provider` 状態を子へ渡し、`azure-openai` 選択時のみ `AzureOpenaiSettings` を有効化(3.2)。
+- `aiEnabled` / `useOnlyEnvVars` を子へ渡し、トグルと各入力の状態・編集可否を制御。
 
-#### ProviderCommonSettings / AzureOpenaiSettings / EnvOnlyModeNotice(Summary-only)
+#### ProviderCommonSettings / AzureOpenaiSettings / AiEnabledToggle / EnvOnlyModeNotice(Summary-only)
+- `AiEnabledToggle`: `app:aiEnabled` の有効/無効スイッチ(7.1)。`useOnlyEnvVars` 連動で `disabled`。
 - `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(JSON、クライアント側 parse 検証=6.2)。各入力は `useOnlyEnvVars` 連動で `readOnly`/`disabled`。
 - `AzureOpenaiSettings`: azure 4 キー。`useEntraId=true` 時は apiKey 不使用を明示(3.3)、model=deployment 名の注記(3.4)、非 azure 時は非適用提示(3.2)。
 - `EnvOnlyModeNotice`: `useOnlyEnvVars` が true のとき alert を表示し、全項目が環境変数で固定され編集不可である旨を明示(4.2)。SiteUrlSetting の env 専用モード表示パターンを踏襲。
@@ -392,20 +471,24 @@ export const clearResolvedMastraModelCache = (): void => { /* memoizedModel = un
 
 ### Unit Tests
 - `ConfigManager.getConfig`(`ai:provider`): `env:useOnlyEnvVars:ai`=true で env 値のみ、=false で `db ?? env`(DB 優先・env 既定)を返す(4.1, 4.4)。
-- `ENV_ONLY_GROUPS`: `ai` グループが 8 キーすべてを対象とし、`initKeyToGroupMap` で制御キーへ正しくマップされる(4.1)。
+- `ENV_ONLY_GROUPS`: `ai` グループが 9 キー(`app:aiEnabled` + `ai:*` 8)すべてを対象とし、`initKeyToGroupMap` で制御キーへ正しくマップされる(4.1)。
 - `config-definition`: `env:useOnlyEnvVars:ai` が `CONFIG_KEYS`/`CONFIG_DEFINITIONS` に登録され、既存キーの解決に影響しない(回帰)。
+- `isAiConfigured` / `isAiReady`: provider 未設定/必須項目欠落で false、provider 別に必須が揃うと true。`aiEnabled=false` で `isAiReady=false`(7.2, 7.3)。
+- `isAiConfigured` と `resolveMastraModel`: 同一構成で「configured===解決成功」が一致(乖離回帰)。
 - `validators`: provider enum、`providerOptions` JSON 妥当性、boolean(6.1, 6.2)。
 
 ### Integration Tests
-- PUT 正常: `updateConfigs` 反映 + `clearResolvedMastraModelCache` 呼出 + `ACTION_ADMIN_AI_SETTING_UPDATE` 発火(2.3, 2.4)。
+- PUT 正常: `aiEnabled` + ai 値が `updateConfigs` 反映 + `clearResolvedMastraModelCache` 呼出 + `ACTION_ADMIN_AI_SETTING_UPDATE` 発火(2.3, 2.4, 7.1)。
 - PUT env 専用モード: `env:useOnlyEnvVars:ai`=true の状態で要求が 422(4.3)。
-- GET: apiKey 値が応答に含まれず `isApiKeySet` と `useOnlyEnvVars` が正しい(4.2, 5.2)。
+- GET: apiKey 値が応答に含まれず `isApiKeySet` / `useOnlyEnvVars` / `aiEnabled` が正しい(4.2, 5.2, 7.1)。
 - PUT apiKey 未指定: 既存 apiKey が保持される(誤クリアしない)。
+- `ai-ready-guard`: `aiEnabled=true` かつ未設定で mastra ルートが 501、両者揃うと通過(7.2, 7.3)。設定変更後に再起動なしで判定が変わる(7.5)。
 - アクセス制御: 非管理者は GET/PUT で 403(1.2)。
 
 ### Component Tests (UI / React Testing Library)
 - `AiSettings`: 保存操作で `apiv3Put` 呼出 → 成功時 `toastSuccess`、失敗時 `toastError` + 入力 state 保持(2.3, 6.3)。
-- env 専用モード(`useOnlyEnvVars=true`)で全フィールドが readOnly + モード明示の alert を表示(4.2)。
+- `AiEnabledToggle`: 切り替えが PUT body の `aiEnabled` に反映、`useOnlyEnvVars=true` で disabled(7.1)。
+- env 専用モード(`useOnlyEnvVars=true`)で全フィールド(トグル含む)が readOnly/disabled + モード明示の alert を表示(4.2)。
 - provider=azure-openai 選択時に Azure セクションが有効化、`useEntraId` で apiKey 不使用提示(3.2, 3.3)。
 
 > E2E(ブラウザ自動化)は範囲外(Non-Goals)。上記はコンポーネント単位の RTL テストで検証する。
@@ -414,4 +497,5 @@ export const clearResolvedMastraModelCache = (): void => { /* memoizedModel = un
 - **アクセス制御**: 新スコープ `admin:ai`(read/write)+ `adminRequired`。PAT の最小権限を担保。
 - **機密保護**: `ai:apiKey` は GET 非返却(`isApiKeySet` のみ)、入力は `type=password`、例外/ログに非出力(5.1–5.3)。
 - **改変防止**: 環境変数専用モード有効時は API/UI 双方で更新不可(多重防御、4.2/4.3)。
+- **利用可否ゲート**: AI 関連 API は `有効 かつ 設定済み` のときのみ到達可能(per-request)。設定不備での到達と「動くように見えて動かない」状態を防ぐ(7.2, 7.3)。
 - core scope 追加時は `accesstoken_scopes_desc`(全ロケール)を更新。
