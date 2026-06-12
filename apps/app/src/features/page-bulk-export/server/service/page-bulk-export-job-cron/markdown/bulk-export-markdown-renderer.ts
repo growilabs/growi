@@ -1,9 +1,21 @@
 import path from 'node:path';
 import { dynamicImport } from '@cspell/dynamic-import';
 import type * as HastUtilSanitize from 'hast-util-sanitize';
+import type { Plugin } from 'unified';
 
 import { loadPlugins } from './esm-plugin-loader';
 import { createBulkExportStyleProvider } from './styles';
+
+/**
+ * Bootstrap classes added to `<table>` elements, mirroring the GROWI web
+ * renderer's generateCommonOptions (`addClass.rehypePlugin, { table: 'table table-bordered' }`).
+ * The design system gives bare `<table>` no borders; `.table`/`.table-bordered`
+ * (present in the precompiled CSS) supply them. We reuse the web add-class plugin
+ * (below) rather than re-implementing class addition.
+ */
+const ADD_CLASS_ADDITIONS: Record<string, string> = {
+  table: 'table table-bordered',
+};
 
 /**
  * Service contract for bulk-export Markdown → HTML conversion.
@@ -74,24 +86,56 @@ async function buildSanitizeOptions(
 }
 
 /**
- * Build the unified processor by iterating the plugins declared in
- * plugin-set.ts (single source of truth) in order. No plugin is wired by hand
- * here: adding/removing a plugin is a one-file change in plugin-set.ts.
+ * Load the GROWI web renderer's `add-class` rehype plugin via dynamicImport.
  *
- * The only runtime-resolved option is rehype-sanitize's schema, which is built
- * from the web renderer's whitelist via dynamicImport (see buildSanitizeOptions).
+ * `add-class.ts`'s only runtime dependency is `hast-util-select` (ESM, already a
+ * production dependency); the rest are type-only. This is the same CJS→ESM reuse
+ * pattern as the sanitize whitelist (buildSanitizeOptions), so we reuse the web
+ * plugin rather than re-implementing class addition in bulk-export.
+ *
+ * @param baseDir - Resolution base for dynamicImport (caller's __dirname).
+ */
+async function loadAddClassPlugin(
+  baseDir: string,
+): Promise<Plugin<[unknown?]>> {
+  const addClassPath = path.resolve(
+    baseDir,
+    '../../../../../../services/renderer/rehype-plugins/add-class.ts',
+  );
+  const { rehypePlugin } = await dynamicImport<{
+    rehypePlugin: Plugin<[unknown?]>;
+  }>(addClassPath, baseDir);
+  return rehypePlugin;
+}
+
+/**
+ * Build the unified processor by iterating the plugins declared in
+ * plugin-set.ts (single source of truth) in order. No npm plugin is wired by
+ * hand here: adding/removing one is a one-file change in plugin-set.ts.
+ *
+ * Two integrations are resolved at runtime via dynamicImport — reusing web code
+ * rather than re-implementing it: rehype-sanitize's schema (buildSanitizeOptions)
+ * and the web `add-class` plugin that gives <table> its Bootstrap classes.
  *
  * Design: design.md § System Flows
  */
 async function buildProcessor(baseDir: string) {
   const { unified, plugins } = await loadPlugins(baseDir);
   const sanitizeOptions = await buildSanitizeOptions(baseDir);
+  const addClass = await loadAddClassPlugin(baseDir);
 
   // unified().use() mutates the processor in place and returns `this`, so we
   // call it for its side effect on a single instance. (Reassigning would force
   // the variable's tree-type generics to change at each step.)
   const processor = unified();
   for (const { name, plugin, options } of plugins) {
+    // Reuse the web renderer's add-class to give <table> the Bootstrap classes
+    // (.table/.table-bordered) the design system relies on for borders. Applied
+    // just before the serialiser — after rehype-sanitize, so the static, trusted
+    // class values are not stripped.
+    if (name === 'rehype-stringify') {
+      processor.use(addClass, ADD_CLASS_ADDITIONS);
+    }
     // rehype-sanitize's schema is resolved at runtime (single-source whitelist);
     // all other plugins use the static options declared in plugin-set.ts.
     const resolvedOptions: unknown =

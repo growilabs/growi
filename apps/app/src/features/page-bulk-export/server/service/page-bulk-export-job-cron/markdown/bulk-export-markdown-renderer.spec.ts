@@ -23,6 +23,18 @@ describe('BulkExportMarkdownRenderer', () => {
       expect(html).toContain('<th');
       expect(html).toContain('Alice');
     });
+
+    // Requirements 1.1, 2.1: bare <table> has no borders in the design system;
+    // the Bootstrap `table table-bordered` classes (which the web renderer adds
+    // via its add-class plugin) supply the .table/.table-bordered styling that is
+    // present in the precompiled CSS. Without the classes, tables render unstyled.
+    it('adds Bootstrap "table table-bordered" classes so design-system table styling applies', async () => {
+      const md = `| Name | Age |\n|------|-----|\n| Alice | 30 |`;
+      const html = await renderer.renderToHtml(md, CSS_HREF);
+      const tableTag = html.match(/<table[^>]*>/)?.[0] ?? '';
+      expect(tableTag).toMatch(/class="[^"]*\btable\b[^"]*"/);
+      expect(tableTag).toMatch(/class="[^"]*\btable-bordered\b[^"]*"/);
+    });
   });
 
   describe('GitHub alert rendering (Requirement 1.2)', () => {
