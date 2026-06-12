@@ -5,8 +5,8 @@ import type {
   NonBlankString,
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
-import type OpenAI from 'openai';
 
+import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
@@ -283,7 +283,17 @@ export const CONFIG_KEYS = [
   // OpenAI Settings
   'openai:serviceType',
   'openai:apiKey',
-  'openai:assistantModel:mastraAgent',
+
+  // Mastra LLM Settings (provider-agnostic: one provider per app)
+  'ai:provider',
+  'ai:apiKey',
+  'ai:model',
+  'ai:providerOptions',
+  // Azure OpenAI-only connection config (ai:provider='azure-openai')
+  'ai:azureOpenaiResourceName',
+  'ai:azureOpenaiBaseUrl',
+  'ai:azureOpenaiApiVersion',
+  'ai:azureOpenaiUseEntraId',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1253,11 +1263,72 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
     isSecret: true,
   }),
-  // Reasoning-capable model for the Mastra agent. Emits reasoning summary
-  // chunks consumed by the AI Elements Reasoning UI in the chat sidebar.
-  'openai:assistantModel:mastraAgent': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_MASTRA_AGENT_MODEL',
-    defaultValue: 'o4-mini',
+
+  // AI chat (Mastra) Settings — provider-agnostic, one provider per app.
+  // Single set of keys regardless of provider — the resolver reads `ai:provider`
+  // to pick the provider client, then injects `ai:apiKey` / `ai:model`.
+  // No defaultValue on purpose: provider / apiKey / model are required, so an
+  // unset value surfaces as a clear error at resolve time rather than silently
+  // defaulting to a particular provider/model. `ai:provider` is typed with the
+  // shared `AiProvider` (type-only import — erased at runtime, dependency-free
+  // leaf, no cycle); the type aids DX but is not runtime-enforced for env-loaded
+  // values, so the resolver still validates with `isAiProvider`.
+  'ai:provider': defineConfig<AiProvider | undefined>({
+    envVarName: 'AI_PROVIDER',
+    defaultValue: undefined,
+  }),
+  'ai:apiKey': defineConfig<string | undefined>({
+    envVarName: 'AI_API_KEY',
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  // Required (no default). For the azure-openai provider this is the Azure
+  // *deployment name*, not an OpenAI model id.
+  'ai:model': defineConfig<string | undefined>({
+    envVarName: 'AI_MODEL',
+    defaultValue: undefined,
+  }),
+  // Raw AI SDK `providerOptions` JSON (provider-namespaced), applied to the
+  // chat stream call. Typed as a raw JSON string (not object) so a malformed
+  // override fails soft in the resolver (parse + fallback) rather than crashing
+  // config load. No default: unset means no provider options. Operators set
+  // their own provider namespace, e.g.
+  // {"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}} or
+  // {"anthropic":{"thinking":{"type":"enabled"}}}.
+  'ai:providerOptions': defineConfig<string | undefined>({
+    envVarName: 'AI_PROVIDER_OPTIONS',
+    defaultValue: undefined,
+  }),
+
+  // Azure OpenAI-only connection config (ai:provider='azure-openai'). Azure is
+  // reached via a resource-specific endpoint, so { apiKey, model } alone is not
+  // enough. Set exactly one of resourceName / baseUrl: resourceName builds the
+  // standard https://<name>.openai.azure.com/... URL; baseUrl is the escape
+  // hatch for Azure Government / sovereign clouds / API Management gateways /
+  // custom domains. apiVersion is optional (the AI SDK defaults it). For Azure,
+  // AI_MODEL is the *deployment name*, not an OpenAI model id. These
+  // keys are ignored by the other providers. None are secret (a resource name,
+  // URL, or API version is not a credential — only ai:apiKey is).
+  'ai:azureOpenaiResourceName': defineConfig<string | undefined>({
+    envVarName: 'AI_AZURE_OPENAI_RESOURCE_NAME',
+    defaultValue: undefined,
+  }),
+  'ai:azureOpenaiBaseUrl': defineConfig<string | undefined>({
+    envVarName: 'AI_AZURE_OPENAI_BASE_URL',
+    defaultValue: undefined,
+  }),
+  'ai:azureOpenaiApiVersion': defineConfig<string | undefined>({
+    envVarName: 'AI_AZURE_OPENAI_API_VERSION',
+    defaultValue: undefined,
+  }),
+  // When true, authenticate to Azure OpenAI with Microsoft Entra ID (managed
+  // identity / DefaultAzureCredential) instead of an API key. In this mode
+  // AI_API_KEY is not required; the credential is resolved from the
+  // ambient Azure environment by @azure/identity. Only meaningful when
+  // ai:provider='azure-openai'.
+  'ai:azureOpenaiUseEntraId': defineConfig<boolean>({
+    envVarName: 'AI_AZURE_OPENAI_USE_ENTRA_ID',
+    defaultValue: false,
   }),
 
   // OpenTelemetry Settings
