@@ -58,4 +58,7 @@ export const createPageMentionExtensions = (
 };
 
 export { getMentionFlattenedText } from './flatten';
-export { mentionSessionField } from './mention-session';
+export {
+  INACTIVE_MENTION_SESSION,
+  mentionSessionField,
+} from './mention-session';

@@ -13,6 +13,7 @@ import { LinkedPagePath } from '~/models/linked-page-path';
 import {
   createPageMentionExtensions,
   getMentionFlattenedText,
+  INACTIVE_MENTION_SESSION,
   mentionSessionField,
 } from './editor-state';
 import { MentionCandidateList } from './MentionCandidateList';
@@ -28,13 +29,6 @@ import type {
   PageMentionInputProps,
 } from './types';
 import { useMentionController } from './use-mention-controller';
-
-const INACTIVE_SESSION: MentionSessionState = {
-  active: false,
-  from: -1,
-  to: -1,
-  query: '',
-};
 
 // Theme approximating the prior textarea look (borderless, transparent; the
 // shadcn PromptInput shell owns the surrounding chrome). Min-height raises the
@@ -107,7 +101,9 @@ export const PageMentionInput = ({
   const [view, setView] = useState<EditorView | null>(null);
 
   // React-side mirror of the doc-derived mention session (the CM→React bridge).
-  const [session, setSession] = useState<MentionSessionState>(INACTIVE_SESSION);
+  const [session, setSession] = useState<MentionSessionState>(
+    INACTIVE_MENTION_SESSION,
+  );
 
   // Flattened submit text — the single source for both onChange and the hidden
   // input. Derived from the doc, never round-tripped through the `value` prop,

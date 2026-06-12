@@ -3,7 +3,11 @@ import { StateField } from '@codemirror/state';
 
 import type { MentionSessionState } from '../types';
 
-const INACTIVE: MentionSessionState = {
+/**
+ * The single "no active session" value. Exported so consumers (e.g. the React
+ * adapter's initial state) share this definition instead of re-declaring it.
+ */
+export const INACTIVE_MENTION_SESSION: MentionSessionState = {
   active: false,
   from: -1,
   to: -1,
@@ -39,7 +43,7 @@ const computeSession = (state: EditorState): MentionSessionState => {
   // A session is only meaningful for a collapsed caret; a non-empty selection
   // means the user is selecting/replacing text, not typing a query.
   if (!sel.empty) {
-    return INACTIVE;
+    return INACTIVE_MENTION_SESSION;
   }
 
   const caret = sel.head;
@@ -57,12 +61,12 @@ const computeSession = (state: EditorState): MentionSessionState => {
     }
     if (/\s/.test(ch)) {
       // Whitespace before any `@` → caret is not inside a query span (1.6).
-      return INACTIVE;
+      return INACTIVE_MENTION_SESSION;
     }
   }
 
   if (atPos < 0) {
-    return INACTIVE;
+    return INACTIVE_MENTION_SESSION;
   }
 
   // The `@` must sit at a trigger boundary (1.1 / 1.5). The char before `@` is
@@ -70,7 +74,7 @@ const computeSession = (state: EditorState): MentionSessionState => {
   const charBefore =
     atPos > line.from ? state.doc.sliceString(atPos - 1, atPos) : '';
   if (!isMentionTriggerBoundary(charBefore)) {
-    return INACTIVE;
+    return INACTIVE_MENTION_SESSION;
   }
 
   const from = atPos;
