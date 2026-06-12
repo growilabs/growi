@@ -14,7 +14,7 @@
   - _Requirements: 4.1, 4.4_
   - _Boundary: config-definition_
 
-- [ ] 1.3 (P) AI 設定更新の監査アクションを追加
+- [x] 1.3 (P) AI 設定更新の監査アクションを追加
   - `ACTION_ADMIN_AI_SETTING_UPDATE` を定義し `SupportedAction` に登録(既存 `ACTION_ADMIN_APP_SETTING_UPDATE` と同形)
   - アクション定数が `AllSupportedActions` に含まれることをテストで確認
   - _Requirements: 2.3_
