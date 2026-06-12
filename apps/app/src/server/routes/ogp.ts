@@ -25,12 +25,18 @@ const DEFAULT_USER_IMAGE_URL = '/images/icons/user.svg';
 const DEFAULT_USER_IMAGE_PATH = `public${DEFAULT_USER_IMAGE_URL}`;
 
 let bufferedDefaultUserImageCache: Buffer = Buffer.from('');
-fs.readFile(path.join(projectRoot, DEFAULT_USER_IMAGE_PATH), (err, buffer) => {
-  if (err) throw err;
-  bufferedDefaultUserImageCache = buffer;
-});
 
 export const setup = (crowi: Crowi) => {
+  // populate the default-image cache at setup time, not at import time
+  // (ESM imports are hoisted to boot, before the app environment is ready)
+  fs.readFile(
+    path.join(projectRoot, DEFAULT_USER_IMAGE_PATH),
+    (err, buffer) => {
+      if (err) throw err;
+      bufferedDefaultUserImageCache = buffer;
+    },
+  );
+
   const isUserImageAttachment = (userImageUrlCached: string): boolean => {
     return /^\/attachment\/.+/.test(userImageUrlCached);
   };

@@ -21,8 +21,6 @@ import { body, param, query } from 'express-validator';
 
 const validator = {};
 
-const today = new Date();
-
 /**
  * @swagger
  *
@@ -87,6 +85,7 @@ const today = new Date();
  * @returns {import('express').Router} router
  */
 export const setup = (crowi) => {
+  const today = new Date();
   const loginRequired = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);

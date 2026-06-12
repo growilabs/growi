@@ -41,10 +41,10 @@ import { setup as setupSearch } from './search';
 import { setup as setupTag } from './tag';
 import * as userActivation from './user-activation';
 
-autoReap.options.reapOnError = true; // continue reaping the file even if an error occurs
-
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, app) => {
+  autoReap.options.reapOnError = true; // continue reaping the file even if an error occurs
+
   const autoReconnectToSearch = setupAutoReconnectToSearch(crowi);
   const applicationInstalled = setupApplicationInstalled(crowi);
   const loginRequiredStrictly = loginRequiredFactory(crowi);

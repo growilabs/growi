@@ -287,13 +287,14 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Codemod Transform (routes/apiv3/index)_
   - **実績 (2026-06-12)**: 44 invoke を named import 化 (マウント順序は HEAD と完全一致 — 3.8.c snapshot 互換)。installer 三項は member 形のまま 3.3.d で `.setup` 化済みだったため async 化なしで alias 置換のみ (codemod フィクスチャ追加は不要 — 対象パターンが member 形に変化済み)。**スコープ追補**: 3.3.d の src/server glob から漏れていた feature route factory 5 件 (templates / page-bulk-export / external-user-group ×2 / growi-plugin) を同時に `export const setup` 化し、growiPlugin の synthetic default import (実行時 undefined 化リスク) を named 化。routes/index.js の最終 require('./apiv3') を解消し中央ルーター 2 ファイルの require/module.exports は 0。smoke: healthcheck・statistics 200 / users・page・templates・security-setting 未認証 403 / login 200
 
-- [ ] 3.3.h (step 3.h) 変換済みルートモジュールのトップレベル副作用を禁止するガードを追加
+- [x] 3.3.h (step 3.h) 変換済みルートモジュールのトップレベル副作用を禁止するガードを追加
   - `routes/**/*.js` および `routes/**/*.ts` に対し、import / type-only 宣言 / 関数宣言 / `export const setup = (crowi, app) => { ... }` 以外のトップレベル文を ESLint カスタムルール (もしくは CI の grep チェック) で禁止
   - 現状のファイルで違反がある場合、副作用コードを `setup` 関数内に移す (例: 過去に module-top で `crowi.model('X')` を取得していた箇所を factory 内に移動)
   - ガード追加後に `turbo run lint --filter @growi/app` でエラー 0 件
   - _Requirements: 2.2, 2.3, 2.6_
   - _Depends: 3.3.f_
   - _Boundary: Codemod Transform (top-level side-effect guard)_
+  - **実績 (2026-06-12)**: ESLint 不在 (Biome) のため jscodeshift AST ベースの `tools/lint/route-top-level-guard.cjs` + vitest spec 10 件 (TDD) + `lint:route-guard` script で実装。良性初期化子 (literals / Router() / loggerFactory 等の allowlist) は許容する shallow-check 仕様 (logger 61 / Router 34 件の mass-churn と 3.8.c マウント順序保全の衝突を回避)。CJS 回帰ガード (require / module.exports / exports.x) も同梱。**実違反 5 件を修正**: slack-integration.js の import 時 `mongoose.model()` (真のハザード) + raw-body router.use、routes/index.js の autoReap 設定、ogp.ts の fs.readFile、share-links.js の `new Date()` — すべて setup 内へ移動。features 側 route dirs もスキャン (openai の zod builder 1 件のみ = 良性、対象外として記録)
 
 - [ ] 3.3.g (step 3.g) `crowi/` を変換し `import/no-commonjs` 0 件を達成
   - `crowi/index.ts`, `crowi/setup-models.ts`, `crowi/dev.js` に codemod を適用

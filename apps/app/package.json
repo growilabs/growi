@@ -39,6 +39,7 @@
     "ws-authz-matrix:verify": "cross-env NODE_ENV=development pnpm run ts-node tools/capture-ws-authz.ts -- --out=../../.kiro/specs/esm-migration/ws-authz-baseline.json --verify-determinism",
     "lint:typecheck": "tsgo --noEmit",
     "lint:biome": "biome check --diagnostic-level=error",
+    "lint:route-guard": "node tools/lint/route-top-level-guard.cjs src/server/routes",
     "lint:styles": "stylelint \"src/**/*.scss\"",
     "lint:openapi:apiv3": "node node_modules/swagger2openapi/oas-validate tmp/openapi-spec-apiv3.json",
     "lint:openapi:apiv1": "node node_modules/swagger2openapi/oas-validate tmp/openapi-spec-apiv1.json",
