@@ -1,3 +1,4 @@
+import { autocompletion } from '@codemirror/autocomplete';
 import {
   defaultKeymap,
   deleteCharBackward,
@@ -45,6 +46,9 @@ const defaultExtensions: Extension[] = [
   Prec.lowest(keymap.of(defaultKeymap)),
   syntaxHighlighting(markdownHighlighting),
   Prec.lowest(syntaxHighlighting(defaultHighlightStyle)),
+  // Shared autocomplete facility — feature-agnostic, not owned by emoji or mention.
+  // Each feature contributes only its own completion source; CodeMirror merges configs.
+  autocompletion({ icons: false }),
   emojiAutocompletionSettings,
 ];
 

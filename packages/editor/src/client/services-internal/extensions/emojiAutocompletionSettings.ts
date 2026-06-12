@@ -15,7 +15,7 @@ const emojiOptions: Completion[] = Object.keys(nativeLookup).map((tag) => ({
 const TWO_OR_MORE_WORD_CHARACTERS_REGEX = /:\w{2,}$/;
 
 // EmojiAutocompletion is activated when two characters are entered into the editor.
-const emojiAutocompletion = (context: CompletionContext) => {
+export const emojiCompletionSource = (context: CompletionContext) => {
   const nodeBefore = syntaxTree(context.state).resolveInner(context.pos, -1);
   const textBefore = context.state.sliceDoc(nodeBefore.from, context.pos);
   const emojiBefore = TWO_OR_MORE_WORD_CHARACTERS_REGEX.exec(textBefore);
@@ -44,7 +44,6 @@ export const emojiAutocompletionSettings = [
         position: 20,
       },
     ],
-    icons: false,
   }),
-  markdownLanguage.data.of({ autocomplete: emojiAutocompletion }),
+  markdownLanguage.data.of({ autocomplete: emojiCompletionSource }),
 ];

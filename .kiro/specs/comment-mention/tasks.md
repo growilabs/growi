@@ -79,7 +79,7 @@
 
 ## Editor: Autocomplete Facility / Source Separation (Requirement 4)
 
-- [ ] 4.1 Promote the shared autocomplete facility to a standalone editor default and reduce the emoji extension to emoji-specific config
+- [x] 4.1 Promote the shared autocomplete facility to a standalone editor default and reduce the emoji extension to emoji-specific config
   - Register the generic `autocompletion()` facility once as a standalone shared default extension, independent of any feature, placed before the emoji extension in the defaults
   - Remove the `icons: false` option from the emoji extension's own `autocompletion()` call so that flag is owned solely by the shared base; the emoji extension keeps only its glyph renderer (`addToOptions`) and its `markdownLanguage.data.of` source
   - Export the emoji completion source function (rename the internal `emojiAutocompletion` to `emojiCompletionSource` and export it) so regression tests can exercise it directly — this is the only production export change and belongs with the refactor, keeping the test task free of production edits
