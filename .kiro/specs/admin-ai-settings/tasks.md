@@ -34,7 +34,7 @@
   - _Requirements: 2.4_
   - _Boundary: resolve-mastra-model_
 
-- [ ] 2.2 (P) AI 設定済み判定と利用可否判定を追加
+- [x] 2.2 (P) AI 設定済み判定と利用可否判定を追加
   - `isAiConfigured()` を `resolveMastraModel()` の try/catch ラップで実装(成功=true、throw=false)、`isAiReady() = isAiEnabled() && isAiConfigured()`
   - 単体テスト: provider 未設定/必須項目欠落で false、provider 別に必須が揃うと true、`isAiEnabled=false` で `isAiReady=false`、`resolveMastraModel` 成否との一致
   - _Requirements: 7.2, 7.3_
