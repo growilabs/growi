@@ -1,9 +1,9 @@
 {
   "feature_name": "admin-ai-settings",
   "created_at": "2026-06-12T15:08:03Z",
-  "updated_at": "2026-06-12T17:00:00Z",
+  "updated_at": "2026-06-12T17:20:00Z",
   "language": "ja",
-  "phase": "design-generated",
+  "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -11,10 +11,10 @@
     },
     "design": {
       "generated": true,
-      "approved": false
+      "approved": true
     },
     "tasks": {
-      "generated": false,
+      "generated": true,
       "approved": false
     }
   },

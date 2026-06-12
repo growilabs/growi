@@ -378,6 +378,7 @@ export interface AiSettingsUpdateRequest {
 }
 ```
 - Idempotency: PUT は冪等(同値再送で副作用は cache clear のみ)。
+- 更新セマンティクス: クライアントは全項目を送信する。**boolean**(`aiEnabled` / `azureOpenaiUseEntraId`)は常に値を送る。**文字列項目**(provider / model / providerOptions / azure 3 項目)は空文字を `undefined` に正規化し、`updateConfigs(..., { removeIfUndefined: true })` で DB から削除する(= 環境変数フォールバックへ戻る、R4.4)。**例外は `apiKey` のみ**(空/未指定 = 既存保持、クリアしない)。
 - Validation: `provider ∈ AI_PROVIDERS`(6.1)、`providerOptions` は非空時 `JSON.parse` 可能(6.2)、`azureOpenaiUseEntraId` は boolean。
 - 成功時副作用: `updateConfigs` → `clearResolvedMastraModelCache()` → `activityEvent.emit('update', _id, { action: ACTION_ADMIN_AI_SETTING_UPDATE })`。
 
@@ -420,26 +421,28 @@ export const clearResolvedMastraModelCache = (): void => { /* memoizedModel = un
 | Requirements | 7.2, 7.3, 7.5 |
 
 **Responsibilities & Constraints**
-- `isAiConfigured()`: `ai:provider` が `AI_PROVIDERS` に含まれ、provider 別の必須項目が揃っているかを判定(非 Azure: `ai:apiKey` + `ai:model` / Azure: endpoint(`ai:azureOpenaiResourceName` か `ai:azureOpenaiBaseUrl`)+ `ai:model` +(`ai:apiKey` か `ai:azureOpenaiUseEntraId`))。`resolveMastraModel` と同一基準・**モデル構築なし・throw しない**。
+- `isAiConfigured()`: **`resolveMastraModel()` を try/catch でラップして判定する**(成功=設定済み true、throw=未設定 false)。これにより provider 別必須項目の検証ロジックを二重実装せず、判定基準が `resolveMastraModel` と**構造的に一致**する(基準ドリフト不能)。`resolveMastraModel` は成功時メモ化・throw 時非メモ化のため、per-request コストはほぼゼロ(設定済みならメモ参照、未設定なら検証のみで構築まで到達しない)。`new DefaultAzureCredential()` 構築はトークン取得を伴わない(副作用なし)。
 - `isAiReady()`: `isAiEnabled() && isAiConfigured()`。mastra ゲートとサイドバー供給の両方が参照する単一の判定。
 - `ai-ready-guard`: per-request Express middleware。`!isAiReady()` のとき 501(無効と設定不備でメッセージを区別)。
 - mastra ルート factory の起動時 `if (!isAiEnabled())` 静的ゲートを撤去し、本 guard を `router.use` で適用(R7.5: 再起動なし反映)。
 
 **Dependencies**
-- Outbound: `configManager.getConfig`(P0)、`isAiEnabled`(既存、openai/server/services)(P0)
+- Outbound: `resolveMastraModel`(try/catch でラップ)(P0)、`isAiEnabled`(既存、openai/server/services)(P0)
 - Inbound: mastra ルート(`routes/index.ts`)、general-page `configuration-props`(P1)
 
 **Contracts**: Service [x]
 ```typescript
-export const isAiConfigured = (): boolean => { /* provider + 必須項目の非throw検査 */ };
+export const isAiConfigured = (): boolean => {
+  try { resolveMastraModel(); return true; } catch { return false; }
+};
 export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 ```
-- Postcondition: provider 未設定/必須項目欠落で `isAiConfigured()===false`。
-- Invariant: 判定基準は `resolveMastraModel` の検証と一致(乖離は R5 レベルの不整合)。
+- Postcondition: provider 未設定/必須項目欠落で `isAiConfigured()===false`(`resolveMastraModel` が throw するため)。
+- Invariant: 判定基準は `resolveMastraModel` と**同一実装由来**のため恒久的に一致する。
 
 **Implementation Notes**
 - Integration: openai の `certify-ai-service`(per-request 検査)を踏襲。openai 側ミドルウェアは変更しない。
-- Risks: `isAiConfigured` と `resolveMastraModel` の検査基準が乖離すると「ready だが resolve で throw」が再発 → 両者を同じ provider 別ルールに揃え、テストで固定。
+- Risks: 低。try/catch ラップにより基準ドリフトは構造的に発生しない。`resolveMastraModel` の例外メッセージはログに出さない(機密名のみで apiKey は含まないが、ゲートでは握りつぶして 501 を返す)。
 
 ### Client UI
 
