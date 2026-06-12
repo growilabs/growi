@@ -5,10 +5,10 @@ import { SearchDelegatorName } from '~/interfaces/named-query';
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager/config-manager';
 
-import type { SearchDelegator } from '../interfaces/search';
-import NamedQuery from '../models/named-query';
-import SearchService from './search';
-import type ElasticsearchDelegator from './search-delegator/elasticsearch';
+import type { SearchDelegator } from '../interfaces/search.js';
+import NamedQuery from '../models/named-query.js';
+import SearchService from './search.js';
+import type ElasticsearchDelegator from './search-delegator/elasticsearch.js';
 
 // Mock NamedQuery
 vi.mock('~/server/models/named-query', () => {

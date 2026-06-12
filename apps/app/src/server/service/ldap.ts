@@ -1,8 +1,7 @@
 import ldap, { NoSuchObjectError } from 'ldapjs';
 
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
-
-import { configManager } from './config-manager';
 
 const logger = loggerFactory('growi:service:ldap-service');
 

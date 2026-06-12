@@ -2,7 +2,7 @@ import express from 'express';
 
 import type Crowi from '~/server/crowi';
 
-import { getRelatedGroupsHandlerFactory } from './get-related-groups';
+import { getRelatedGroupsHandlerFactory } from './get-related-groups.js';
 
 const router = express.Router();
 

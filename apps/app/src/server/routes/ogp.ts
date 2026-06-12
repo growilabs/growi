@@ -13,11 +13,11 @@ import path from 'path';
 import { projectRoot } from '~/server/util/project-dir-utils';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import { Attachment } from '../models/attachment';
-import type { PageDocument, PageModel } from '../models/page';
-import { configManager } from '../service/config-manager';
-import { convertStreamToBuffer } from '../util/stream';
+import type Crowi from '../crowi/index.js';
+import { Attachment } from '../models/attachment.js';
+import type { PageDocument, PageModel } from '../models/page.js';
+import { configManager } from '../service/config-manager/index.js';
+import { convertStreamToBuffer } from '../util/stream.js';
 
 const logger = loggerFactory('growi:routes:ogp');
 

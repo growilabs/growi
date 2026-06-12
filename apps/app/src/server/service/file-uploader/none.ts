@@ -10,7 +10,7 @@ import {
   AbstractFileUploader,
   type SaveFileParam,
   type TemporaryUrl,
-} from './file-uploader';
+} from './file-uploader.js';
 
 /**
  * NoneFileUploader is a placeholder uploader when file upload is disabled.

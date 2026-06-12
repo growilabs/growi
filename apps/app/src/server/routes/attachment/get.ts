@@ -18,10 +18,13 @@ import {
 } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
-import { Attachment, type IAttachmentDocument } from '../../models/attachment';
-import ApiResponse from '../../util/apiResponse';
+import type Crowi from '../../crowi/index.js';
+import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment/index.js';
+import {
+  Attachment,
+  type IAttachmentDocument,
+} from '../../models/attachment.js';
+import ApiResponse from '../../util/apiResponse.js';
 
 const logger = loggerFactory('growi:routes:attachment:get');
 

@@ -12,8 +12,8 @@ import { AccessToken } from '~/server/models/access-token';
 import { isValidScope } from '~/server/util/scope-utils';
 import loggerFactory from '~/utils/logger';
 
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:personal-setting:generate-access-tokens',

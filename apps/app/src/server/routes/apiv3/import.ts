@@ -15,8 +15,8 @@ import { generateOverwriteParams } from '~/server/service/import/overwrite-param
 import type { ZipFileStat } from '~/server/service/interfaces/export';
 import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:import');
 

@@ -8,8 +8,7 @@ import {
   AllSupportedTargetModels,
   SupportedTargetModel,
 } from '~/interfaces/activity';
-
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
 export interface SubscriptionDocument extends ISubscription, Document {}
 

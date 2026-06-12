@@ -18,7 +18,7 @@ import type {
   SearchableData,
   SearchDelegator,
   UnavailableTermsKey,
-} from '../../interfaces/search';
+} from '../../interfaces/search.js';
 
 const AVAILABLE_KEYS = ['match', 'not_match', 'prefix', 'not_prefix'];
 

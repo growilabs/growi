@@ -13,8 +13,8 @@ import type { PageModel } from '~/server/models/page';
 import { getYjsService } from '~/server/service/yjs';
 import loggerFactory from '~/utils/logger';
 
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:page:sync-latest-revision-body-to-yjs-draft',

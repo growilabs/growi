@@ -15,7 +15,7 @@ import {
 } from '~/server/models/page';
 import PageOperation from '~/server/models/page-operation';
 
-import type { IPageOperationService } from '../page-operation';
+import type { IPageOperationService } from '../page-operation.js';
 
 const { hasSlash, generateChildrenRegExp } = pagePathUtils;
 
@@ -32,7 +32,7 @@ export interface IPageListingService {
 let pageOperationService: IPageOperationService;
 async function getPageOperationServiceInstance(): Promise<IPageOperationService> {
   if (pageOperationService == null) {
-    pageOperationService = await import('../page-operation').then(
+    pageOperationService = await import('../page-operation.js').then(
       // biome-ignore lint/style/noNonNullAssertion: the module must export pageOperationService
       (mod) => mod.pageOperationService!,
     );

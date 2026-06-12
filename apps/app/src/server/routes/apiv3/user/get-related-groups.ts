@@ -8,7 +8,7 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:user:get-related-groups');
 

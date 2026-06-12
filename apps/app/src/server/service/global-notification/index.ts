@@ -5,9 +5,9 @@ import type Crowi from '~/server/crowi';
 import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
-import { GlobalNotificationMailService } from './global-notification-mail';
-import { GlobalNotificationSlackService } from './global-notification-slack';
-import type { GlobalNotificationEventVars } from './types';
+import { GlobalNotificationMailService } from './global-notification-mail.js';
+import { GlobalNotificationSlackService } from './global-notification-slack.js';
+import type { GlobalNotificationEventVars } from './types.js';
 
 const logger = loggerFactory('growi:service:GlobalNotificationService');
 

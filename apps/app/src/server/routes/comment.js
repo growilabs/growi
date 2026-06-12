@@ -12,9 +12,9 @@ import {
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
-import { preNotifyService } from '../service/pre-notify';
-import ApiResponse from '../util/apiResponse';
+import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting/index.js';
+import { preNotifyService } from '../service/pre-notify.js';
+import ApiResponse from '../util/apiResponse.js';
 
 /**
  * @swagger

@@ -8,10 +8,10 @@ import type { IPage } from '^/../../packages/core/dist';
 import { getPageSchema } from '~/server/models/obsolete-page';
 import { configManager } from '~/server/service/config-manager';
 
-import type { PageModel } from '../../models/page';
-import pageModel from '../../models/page';
-import { deleteCompletelyUserHomeBySystem } from './delete-completely-user-home-by-system';
-import type { IPageService } from './page-service';
+import type { PageModel } from '../../models/page.js';
+import pageModel from '../../models/page.js';
+import { deleteCompletelyUserHomeBySystem } from './delete-completely-user-home-by-system.js';
+import type { IPageService } from './page-service.js';
 
 // TODO: use actual user model after ~/server/models/user.js becomes importable in vitest
 // ref: https://github.com/vitest-dev/vitest/issues/846

@@ -5,12 +5,12 @@ import urljoin from 'url-join';
 
 import loggerFactory from '~/utils/logger';
 
-import { configManager } from '../../config-manager';
+import { configManager } from '../../config-manager/index.js';
 import {
   type IMultipartUploader,
   MultipartUploader,
   UploadStatus,
-} from '../multipart-uploader';
+} from '../multipart-uploader.js';
 
 const logger = loggerFactory(
   'growi:services:fileUploaderGcs:multipartUploader',

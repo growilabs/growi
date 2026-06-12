@@ -4,7 +4,7 @@ import mongoose from 'mongoose';
 
 import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
 
-import Crowi from './crowi';
+import Crowi from './crowi/index.js';
 
 const setupMongoose = async (replServer: REPLServer) => {
   mongoose.Promise = global.Promise;

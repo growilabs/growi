@@ -7,7 +7,7 @@ import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type { PageModel } from '~/server/models/page';
 import type { IPageOperation } from '~/server/models/page-operation';
 
-import { pageListingService } from './page-listing';
+import { pageListingService } from './page-listing.js';
 
 // Mock the page-operation service
 vi.mock('~/server/service/page-operation', () => ({

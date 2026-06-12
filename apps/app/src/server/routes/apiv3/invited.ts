@@ -5,13 +5,13 @@ import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { setup as applicationInstalledSetup } from '../../middlewares/application-installed';
+import type Crowi from '../../crowi/index.js';
+import { setup as applicationInstalledSetup } from '../../middlewares/application-installed.js';
 import {
   invitedRules,
   invitedValidation,
-} from '../../middlewares/invited-form-validator';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+} from '../../middlewares/invited-form-validator.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:login');
 

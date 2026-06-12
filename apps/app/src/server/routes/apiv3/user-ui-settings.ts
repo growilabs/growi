@@ -6,8 +6,8 @@ import { body } from 'express-validator';
 import { AllSidebarContentsType } from '~/interfaces/ui';
 import loggerFactory from '~/utils/logger';
 
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import UserUISettings from '../../models/user-ui-settings';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import UserUISettings from '../../models/user-ui-settings.js';
 
 const logger = loggerFactory('growi:routes:apiv3:user-ui-settings');
 

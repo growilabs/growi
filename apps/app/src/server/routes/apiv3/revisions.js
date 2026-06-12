@@ -13,8 +13,8 @@ import {
 } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import loggerFactory from '~/utils/logger';
 
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import { setup as certifySharedPageSetup } from '../../middlewares/certify-shared-page';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import { setup as certifySharedPageSetup } from '../../middlewares/certify-shared-page.js';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
 

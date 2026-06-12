@@ -12,8 +12,8 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page:get-pages-by-page-paths');
 

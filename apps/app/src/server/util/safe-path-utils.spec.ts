@@ -4,7 +4,7 @@ import {
   assertFileNameSafeForBaseDir,
   isFileNameSafeForBaseDir,
   isPathWithinBase,
-} from './safe-path-utils';
+} from './safe-path-utils.js';
 
 describe('path-utils', () => {
   describe('isPathWithinBase', () => {

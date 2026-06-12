@@ -8,8 +8,8 @@ import {
 } from '~/interfaces/activity';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
-import type { ActivityDocument } from './activity';
+import { getOrCreateModel } from '../util/mongoose-utils.js';
+import type { ActivityDocument } from './activity.js';
 
 const { STATUS_UNOPENED, STATUS_OPENED } = InAppNotificationStatuses;
 

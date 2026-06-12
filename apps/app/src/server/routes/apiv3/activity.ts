@@ -15,9 +15,9 @@ import Activity from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import type Crowi from '../../crowi/index.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 

@@ -4,9 +4,9 @@ import type { WSSharedDoc } from 'y-websocket/bin/utils';
 
 import loggerFactory from '~/utils/logger';
 
-import { Revision } from '../../models/revision';
-import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-revision-if-broken';
-import type { MongodbPersistence } from './extended/mongodb-persistence';
+import { Revision } from '../../models/revision.js';
+import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-revision-if-broken.js';
+import type { MongodbPersistence } from './extended/mongodb-persistence.js';
 
 const logger = loggerFactory('growi:service:yjs:sync-ydoc');
 

@@ -1,4 +1,4 @@
-import CollectionProgress from './collection-progress';
+import CollectionProgress from './collection-progress.js';
 
 class CollectionProgressingStatus {
   totalCount = 0;

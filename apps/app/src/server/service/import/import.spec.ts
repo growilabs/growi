@@ -2,7 +2,7 @@ import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 
-import { ImportService } from './import';
+import { ImportService } from './import.js';
 
 const mocks = vi.hoisted(() => {
   return {

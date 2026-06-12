@@ -14,7 +14,7 @@ import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting:saml');
 

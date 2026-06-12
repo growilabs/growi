@@ -1,7 +1,7 @@
 import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
-import type { IConfigManagerForApp } from '../config-manager';
-import { createOAuth2Client } from './oauth2';
+import type { IConfigManagerForApp } from '../config-manager/index.js';
+import { createOAuth2Client } from './oauth2.js';
 
 describe('createOAuth2Client', () => {
   let mockConfigManager: DeepMockProxy<IConfigManagerForApp>;

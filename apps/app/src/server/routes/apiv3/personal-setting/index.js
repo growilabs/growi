@@ -10,14 +10,14 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import EditorSettings from '../../../models/editor-settings';
-import InAppNotificationSettings from '../../../models/in-app-notification-settings';
-import { deleteAccessTokenHandlersFactory } from './delete-access-token';
-import { deleteAllAccessTokensHandlersFactory } from './delete-all-access-tokens';
-import { generateAccessTokenHandlerFactory } from './generate-access-token';
-import { getAccessTokenHandlerFactory } from './get-access-tokens';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import EditorSettings from '../../../models/editor-settings.js';
+import InAppNotificationSettings from '../../../models/in-app-notification-settings.js';
+import { deleteAccessTokenHandlersFactory } from './delete-access-token.js';
+import { deleteAllAccessTokensHandlersFactory } from './delete-all-access-tokens.js';
+import { generateAccessTokenHandlerFactory } from './generate-access-token.js';
+import { getAccessTokenHandlerFactory } from './get-access-tokens.js';
 
 const logger = loggerFactory('growi:routes:apiv3:personal-setting');
 

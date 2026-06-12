@@ -1,4 +1,4 @@
-import { CONFIG_DEFINITIONS, CONFIG_KEYS } from './config-definition';
+import { CONFIG_DEFINITIONS, CONFIG_KEYS } from './config-definition.js';
 
 describe('config-definition reconcile keys', () => {
   describe('CONFIG_KEYS array', () => {

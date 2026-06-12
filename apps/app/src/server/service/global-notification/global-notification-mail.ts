@@ -11,8 +11,8 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
-import { resolveLocalePath } from '../../util/safe-path-utils';
-import type { GlobalNotificationEventVars } from './types';
+import { resolveLocalePath } from '../../util/safe-path-utils.js';
+import type { GlobalNotificationEventVars } from './types.js';
 
 const _logger = loggerFactory('growi:service:GlobalNotificationMailService');
 

@@ -4,7 +4,7 @@ import type { Request } from 'express-validator/src/base';
 
 import loggerFactory from '~/utils/logger';
 
-import { configManager } from '../service/config-manager';
+import { configManager } from '../service/config-manager/index.js';
 
 const logger = loggerFactory('growi:middleware:exclude-read-only-user');
 

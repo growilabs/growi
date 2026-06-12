@@ -13,7 +13,7 @@ import {
   type IMultipartUploader,
   MultipartUploader,
   UploadStatus,
-} from '../multipart-uploader';
+} from '../multipart-uploader.js';
 
 const logger = loggerFactory(
   'growi:services:fileUploaderAws:multipartUploader',

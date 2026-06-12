@@ -3,15 +3,15 @@ import { promisify } from 'util';
 
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { FailedEmail } from '../../models/failed-email';
-import S2sMessage from '../../models/vo/s2s-message';
-import type { IConfigManagerForApp } from '../config-manager';
-import type { S2sMessageHandlable } from '../s2s-messaging/handlable';
-import { createOAuth2Client } from './oauth2';
-import { createSESClient } from './ses';
-import { createSMTPClient } from './smtp';
-import type { EmailConfig, MailConfig, SendResult } from './types';
+import type Crowi from '../../crowi/index.js';
+import { FailedEmail } from '../../models/failed-email.js';
+import S2sMessage from '../../models/vo/s2s-message.js';
+import type { IConfigManagerForApp } from '../config-manager/index.js';
+import type { S2sMessageHandlable } from '../s2s-messaging/handlable.js';
+import { createOAuth2Client } from './oauth2.js';
+import { createSESClient } from './ses.js';
+import { createSMTPClient } from './smtp.js';
+import type { EmailConfig, MailConfig, SendResult } from './types.js';
 
 const logger = loggerFactory('growi:service:mail');
 

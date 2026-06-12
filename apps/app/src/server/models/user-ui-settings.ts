@@ -4,8 +4,7 @@ import { Schema } from 'mongoose';
 
 import { SidebarContentsType } from '~/interfaces/ui';
 import type { IUserUISettings } from '~/interfaces/user-ui-settings';
-
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
 export interface UserUISettingsDocument extends IUserUISettings, Document {
   user: Ref<IUser>;

@@ -2,7 +2,7 @@ import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 
-import { getUploader } from './index';
+import { getUploader } from './index.js';
 
 const mocks = vi.hoisted(() => ({
   getConfigMock: vi.fn(),

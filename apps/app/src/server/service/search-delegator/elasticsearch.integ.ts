@@ -3,9 +3,9 @@ import { vi } from 'vitest';
 import { configManager } from '~/server/service/config-manager';
 import { SocketIoService } from '~/server/service/socket-io/socket-io';
 
-import { getInstance } from '../../../../test/setup/crowi';
-import type { RebuildIndexOption } from '../interfaces/search';
-import ElasticsearchDelegator from './elasticsearch';
+import { getInstance } from '../../../../test/setup/crowi.js';
+import type { RebuildIndexOption } from '../interfaces/search.js';
+import ElasticsearchDelegator from './elasticsearch.js';
 
 // ELASTICSEARCH_URI is mapped from VITE_ELASTICSEARCH_URI by test/setup/elasticsearch.ts
 const hasElasticsearch = !!process.env.ELASTICSEARCH_URI;

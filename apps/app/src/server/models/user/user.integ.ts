@@ -6,7 +6,7 @@ import type UserEvent from '~/server/events/user';
 import { configManager } from '~/server/service/config-manager';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
 
-import { UserStatus } from './conts';
+import { UserStatus } from './conts.js';
 
 describe('User', () => {
   let User: any;
@@ -31,7 +31,7 @@ describe('User', () => {
     });
 
     // Initialize User model with mocked Crowi using dynamic import
-    const userModule = await import('./index');
+    const userModule = await import('./index.js');
     const userFactory = userModule.default;
     User = userFactory(crowiMock);
 

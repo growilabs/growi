@@ -21,8 +21,8 @@ import {
   validateDeleteConfigs,
 } from '~/utils/page-delete-config';
 
-import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
-import { handleSamlUpdate, samlAuthValidator } from './saml';
+import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin.js';
+import { handleSamlUpdate, samlAuthValidator } from './saml.js';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting');
 

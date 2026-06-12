@@ -4,11 +4,11 @@ import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
-import { PathAlreadyExistsError } from '../models/errors';
-import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
-import PageTagRelation from '../models/page-tag-relation';
-import UpdatePost from '../models/update-post';
-import ApiResponse from '../util/apiResponse';
+import { PathAlreadyExistsError } from '../models/errors.js';
+import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting/index.js';
+import PageTagRelation from '../models/page-tag-relation.js';
+import UpdatePost from '../models/update-post.js';
+import ApiResponse from '../util/apiResponse.js';
 
 /**
  * @swagger

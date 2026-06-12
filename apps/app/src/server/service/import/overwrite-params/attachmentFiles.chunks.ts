@@ -1,7 +1,7 @@
 import { Binary } from 'mongodb';
 import { Types } from 'mongoose';
 
-import type { OverwriteParams } from '../import-settings';
+import type { OverwriteParams } from '../import-settings.js';
 
 const { ObjectId } = Types;
 

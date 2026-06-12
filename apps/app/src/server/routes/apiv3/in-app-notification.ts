@@ -10,8 +10,8 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 
-import type { IInAppNotification } from '../../../interfaces/in-app-notification';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import type { IInAppNotification } from '../../../interfaces/in-app-notification.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const router = express.Router();
 

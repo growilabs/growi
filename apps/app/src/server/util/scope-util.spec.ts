@@ -6,7 +6,7 @@ import {
   extractScopes,
   hasAllScope,
   isValidScope,
-} from './scope-utils';
+} from './scope-utils.js';
 
 describe('scope-utils', () => {
   describe('isValidScope', () => {

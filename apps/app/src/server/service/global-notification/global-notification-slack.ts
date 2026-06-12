@@ -11,9 +11,9 @@ import {
 } from '~/server/models/GlobalNotificationSetting';
 import loggerFactory from '~/utils/logger';
 
-import { prepareSlackMessageForGlobalNotification } from '../../util/slack';
-import { growiInfoService } from '../growi-info';
-import type { GlobalNotificationEventVars } from './types';
+import { prepareSlackMessageForGlobalNotification } from '../../util/slack.js';
+import { growiInfoService } from '../growi-info/index.js';
+import type { GlobalNotificationEventVars } from './types.js';
 
 const _logger = loggerFactory('growi:service:GlobalNotificationSlackService');
 

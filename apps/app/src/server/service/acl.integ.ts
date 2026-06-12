@@ -1,7 +1,7 @@
 import type { MockInstance } from 'vitest';
 
-import { aclService } from './acl';
-import { configManager } from './config-manager';
+import { aclService } from './acl.js';
+import { configManager } from './config-manager/index.js';
 
 describe('AclService', () => {
   test("has consts 'isLabeledStatement'", () => {

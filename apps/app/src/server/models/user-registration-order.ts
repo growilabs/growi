@@ -4,7 +4,7 @@ import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '../util/mongoose-utils.js';
 
 export interface IUserRegistrationOrder {
   token: string;

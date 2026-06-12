@@ -1,4 +1,4 @@
-import PageRedirect from './page-redirect';
+import PageRedirect from './page-redirect.js';
 
 describe('PageRedirect', () => {
   beforeEach(async () => {

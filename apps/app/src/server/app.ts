@@ -24,7 +24,7 @@ async function main() {
     // Initialize OpenTelemetry
     await initInstrumentation();
 
-    const Crowi = (await import('./crowi')).default;
+    const Crowi = (await import('./crowi/index.js')).default;
     const growi = new Crowi();
     const server = await growi.start();
 

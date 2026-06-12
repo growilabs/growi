@@ -4,7 +4,7 @@ import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 
-import { GrowiBridgeService } from './index';
+import { GrowiBridgeService } from './index.js';
 
 vi.mock('fs');
 

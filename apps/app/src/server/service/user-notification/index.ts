@@ -6,8 +6,8 @@ import { toArrayFromCsv } from '~/utils/to-array-from-csv';
 import {
   prepareSlackMessageForComment,
   prepareSlackMessageForPage,
-} from '../../util/slack';
-import { growiInfoService } from '../growi-info';
+} from '../../util/slack.js';
+import { growiInfoService } from '../growi-info/index.js';
 
 /**
  * service class of UserNotification

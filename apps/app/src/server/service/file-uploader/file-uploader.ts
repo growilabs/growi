@@ -15,8 +15,8 @@ import {
 } from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
-import { configManager } from '../config-manager';
-import type { MultipartUploader } from './multipart-uploader';
+import { configManager } from '../config-manager/index.js';
+import type { MultipartUploader } from './multipart-uploader.js';
 
 const logger = loggerFactory('growi:service:fileUploader');
 

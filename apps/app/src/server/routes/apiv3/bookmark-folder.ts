@@ -19,8 +19,8 @@ import {
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
 import loggerFactory from '~/utils/logger';
 
-import BookmarkFolder from '../../models/bookmark-folder';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import BookmarkFolder from '../../models/bookmark-folder.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmark-folder');
 

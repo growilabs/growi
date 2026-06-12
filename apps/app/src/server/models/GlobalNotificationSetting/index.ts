@@ -4,14 +4,14 @@ import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 
-import type { GlobalNotificationSettingType } from './consts';
+import type { GlobalNotificationSettingType } from './consts.js';
 import type {
   GlobalNotificationSettingDocument,
   GlobalNotificationSettingModel,
   IGlobalNotificationMailSetting,
   IGlobalNotificationSetting,
   IGlobalNotificationSlackSetting,
-} from './types';
+} from './types.js';
 
 /**
  * parent schema for GlobalNotificationSetting model
@@ -177,7 +177,7 @@ export default factory;
 export {
   GlobalNotificationSettingEvent,
   GlobalNotificationSettingType,
-} from './consts';
+} from './consts.js';
 export type {
   GlobalNotificationMailSettingModel,
   GlobalNotificationSettingDocument,
@@ -186,7 +186,7 @@ export type {
   IGlobalNotificationMailSetting,
   IGlobalNotificationSetting,
   IGlobalNotificationSlackSetting,
-} from './types';
+} from './types.js';
 
 // Internal use only
 export {

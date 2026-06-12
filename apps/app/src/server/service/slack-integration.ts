@@ -17,15 +17,15 @@ import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import type { EventActionsPermission } from '../interfaces/slack-integration/events';
-import S2sMessage from '../models/vo/s2s-message';
-import { SlackCommandHandlerError } from '../models/vo/slack-command-handler-error';
-import { slackLegacyUtilFactory } from '../util/slack-legacy';
-import { configManager } from './config-manager';
-import type { S2sMessagingService } from './s2s-messaging/base';
-import type { S2sMessageHandlable } from './s2s-messaging/handlable';
-import { LinkSharedEventHandler } from './slack-event-handler/link-shared';
+import type Crowi from '../crowi/index.js';
+import type { EventActionsPermission } from '../interfaces/slack-integration/events.js';
+import S2sMessage from '../models/vo/s2s-message.js';
+import { SlackCommandHandlerError } from '../models/vo/slack-command-handler-error.js';
+import { slackLegacyUtilFactory } from '../util/slack-legacy.js';
+import { configManager } from './config-manager/index.js';
+import type { S2sMessagingService } from './s2s-messaging/base.js';
+import type { S2sMessageHandlable } from './s2s-messaging/handlable.js';
+import { LinkSharedEventHandler } from './slack-event-handler/link-shared.js';
 
 const logger = loggerFactory('growi:service:SlackBotService');
 

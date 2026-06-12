@@ -10,7 +10,7 @@ import {
   __resetCacheForTesting,
   getAppliedAtForRevisionFilter,
   normalizeLatestRevisionIfBroken,
-} from './normalize-latest-revision-if-broken';
+} from './normalize-latest-revision-if-broken.js';
 
 const OLD_MIGRATION_FILE_NAME =
   '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549';

@@ -9,8 +9,8 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
 
 const logger = loggerFactory('growi:routes:apiv3:markdown-setting');
 

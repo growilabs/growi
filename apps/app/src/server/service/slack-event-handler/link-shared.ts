@@ -15,9 +15,9 @@ import type {
   PublicData,
   UnfurlEventLink,
   UnfurlRequestEvent,
-} from '../../interfaces/slack-integration/link-shared-unfurl';
-import { growiInfoService } from '../growi-info';
-import type { SlackEventHandler } from './base-event-handler';
+} from '../../interfaces/slack-integration/link-shared-unfurl.js';
+import { growiInfoService } from '../growi-info/index.js';
+import type { SlackEventHandler } from './base-event-handler.js';
 
 const logger = loggerFactory('growi:service:SlackEventHandler:link-shared');
 

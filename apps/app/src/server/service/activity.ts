@@ -13,9 +13,12 @@ import {
 import type { ActivityDocument } from '~/server/models/activity';
 import Activity from '~/server/models/activity';
 
-import loggerFactory from '../../utils/logger';
-import type Crowi from '../crowi';
-import type { GeneratePreNotify, GetAdditionalTargetUsers } from './pre-notify';
+import loggerFactory from '../../utils/logger/index.js';
+import type Crowi from '../crowi/index.js';
+import type {
+  GeneratePreNotify,
+  GetAdditionalTargetUsers,
+} from './pre-notify.js';
 
 const logger = loggerFactory('growi:service:ActivityService');
 

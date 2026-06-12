@@ -11,7 +11,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:personal-setting:get-access-tokens',

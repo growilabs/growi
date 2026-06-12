@@ -3,7 +3,7 @@ import { validationResult } from 'express-validator';
 
 import loggerFactory from '~/utils/logger';
 
-import ApiResponse from '../util/apiResponse';
+import ApiResponse from '../util/apiResponse.js';
 
 const logger = loggerFactory('growi:middlewares:ApiV1FormValidator');
 

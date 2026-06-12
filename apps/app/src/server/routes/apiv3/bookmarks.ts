@@ -20,8 +20,8 @@ import { configManager } from '~/server/service/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import BookmarkFolder from '../../models/bookmark-folder';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import BookmarkFolder from '../../models/bookmark-folder.js';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmarks');
 

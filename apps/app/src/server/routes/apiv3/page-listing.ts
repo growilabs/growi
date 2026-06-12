@@ -20,10 +20,10 @@ import type { IPageGrantService } from '~/server/service/page-grant';
 import { pageListingService } from '~/server/service/page-listing';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import type { PageDocument, PageModel } from '../../models/page';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import type Crowi from '../../crowi/index.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import type { PageDocument, PageModel } from '../../models/page.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page-tree');
 

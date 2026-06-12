@@ -229,7 +229,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 2.2, 2.3, 2.5, 2.6_
   - _Boundary: Codemod Transform (tooling)_
 
-- [ ] 3.3 段階適用: codemod を依存の内側から外側へディレクトリ単位で適用
+- [x] 3.3 段階適用: codemod を依存の内側から外側へディレクトリ単位で適用
   - 各 step は単一コミット。失敗時は当該 step のみ revert して原因修正後に再実行する (Req 6.6)
   - 各 step 完了後に `tsc --noEmit` を実行し、型エラー 0 件を確認 (NodeNext 切替前のため `.js` 拡張子エラーは許容)
 
@@ -305,13 +305,14 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Codemod Transform (crowi)_
   - **実績 (2026-06-12)**: crowi 3 ファイル変換 (setup-models.ts は 3.3.a 時点で既 ESM)。条件付き redis スタックと MailService (パターン 8 lazy) は `await import()` で lazy 維持、無条件外部依存はトップ import 化。ts-node 専用 `require.extensions` hack は `typeof require` ガードで ESM ビルド時 inert 化 (完全撤去は 3.7.b)。ESLint 不在のため **`lint:no-cjs`** (guard の `--cjs-only` モード、TDD 13/13) を import/no-commonjs 相当として追加 — **src/server 全域 349 ファイルで CJS 構文 0 件**。統計累計: module.exports 63 (mw 5 + util 6 + routes 50 + crowi 2) + feature routes 5 (3.3.f 追補) = 全件変換済み
 
-- [ ] 3.4 `ts2esm` で `.js` 拡張子を補完
+- [x] 3.4 `ts2esm` で `.js` 拡張子を補完
   - `ts2esm` を `apps/app/src/server/` に対して実行
   - すべての relative import が `.js` 拡張子付きとなる
   - `NodeNext` 切替前の段階でも `tsc --noEmit` が拡張子起因のエラーを出さないこと
   - _Requirements: 2.2, 2.3_
   - _Depends: 3.3.g_
   - _Boundary: Codemod Transform (extensions)_
+  - **実績 (2026-06-12)**: 拡張子なし relative specifier **887 → 0** (静的 776 / re-export 28 / 動的 80 / TSImportType 3、288 ファイル変更)。ツール分担: ts2esm 2.2.7 (796 specifier / 281 ファイル、専用 `tools/codemod/tsconfig.ts2esm.json` で対話的 tsconfig 改変・type:module 注入・不正 json attribute の 3 つの癖を封じて実行) + jscodeshift 補完 `add-import-extensions.cjs` (ts2esm 盲点 91 箇所: 動的 import 80 / TSImportType 3 / .d.ts 専用 8、spec 20 件) + `ssr-relative-to-alias.cjs` (SSR 到達 32 ファイルの値 import 60 件を `~/server/...` 化 — 下記 Turbopack 制約) + 手動 1 行。`.cjs` 参照 5 件バイト不変。レビューで 288 ファイル全件の import ターゲット集合前後一致・コメント量不変を機械検証済み。検証: tsgo クリーン / build·lint 21/21 / unit 1944 pass / dev boot は DB 接続まで全グラフロード成功 + require.resolve 823 specifier 全数 0 失敗
 
 - [ ] 3.5 `__dirname` / `__filename` を 3 ファイルで手動置換
   - `apps/app/src/server/crowi/index.ts`, `crowi/dev.js`, `service/i18next.ts` の `__dirname` を `import.meta.dirname` 相当に置換
@@ -652,3 +653,40 @@ same issue.
   pass instead of fighting the tool — both are sanctioned dependencies of
   the Codemod Transform component (design.md: jscodeshift P0, ts2esm P1).
   Record which tool ultimately produced the rewrite.
+
+- **3.4 Turbopack does NOT extension-substitute relative imports** (likely
+  the root cause of the failed prior attempt): `next build` (`build:client`)
+  resolves relative specifiers literally — webpack's `extensionAlias`
+  (`.js`→`.ts`) has no Turbopack equivalent — so any `src/server` file
+  reachable from the SSR import graph MUST NOT use `.js`-suffixed relative
+  imports for VALUE imports. Task 3.4 converted the SSR-reachable closure
+  (60 value imports / 32 files) to `~/server/...` alias form via
+  `tools/codemod/ssr-relative-to-alias.cjs`; type-only relative `.js`
+  imports are safe (SWC erases them before bundler resolution). Re-running
+  `codemod:ts2esm` re-breaks this (and re-adds an invalid
+  `with { type: 'json' }` to the `^/package.json` import in
+  `growi-info.integ.ts`) — ALWAYS re-run `ssr-relative-to-alias.cjs` after
+  any ts2esm re-run. Regression self-detects as a `next build`
+  module-not-found. This is a permanent constraint for tasks 3.6 / 3.8.b /
+  Phase 4; design.md sync pending (fold into 5.5 docs task).
+
+- **3.4 ts-node `experimentalResolver` is a temporary crutch**: ts-node's
+  CJS resolver cannot map `require('./x.js')` → `x.ts`, so dev boot died at
+  the first extensioned import. `apps/app/tsconfig.json` gained
+  `"experimentalResolver": true` inside the ts-node-only section (tsc /
+  tsgo / tspc / vitest / Turbopack all ignore it). REMOVE together with
+  ts-node at task 3.7.b.
+
+- **3.4 leftover for 3.6**: JSDoc-comment type references
+  (`@type {import('../service/...')}` etc.) in `.js` files remain
+  extensionless — comment position, outside the 3.4 gate, tsgo green today.
+  Re-check at the NodeNext switch (3.6).
+
+- **Sandbox environment limits (this remote session)**: no MongoDB (`mongo`
+  host ENOTFOUND) and mongodb-memory-server binary download blocked (HTTP
+  403) → `--project=app-integration` cannot run, 1 unit file
+  (`update-activity.spec.ts`) env-fails in suite setup, and dev-boot smoke
+  can only verify "full module graph loads, stops at DB connection".
+  Tasks 3.5 / 3.7 / 3.8 smoke items that need a live DB must either run in
+  an environment with MongoDB or be reported as MANUAL_VERIFY_REQUIRED —
+  do not claim them green here.

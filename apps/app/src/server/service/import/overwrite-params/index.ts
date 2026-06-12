@@ -1,10 +1,10 @@
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { isImportOptionForPages } from '~/models/admin/import-option-for-pages';
 
-import type { OverwriteParams } from '../import-settings';
-import { overwriteParams as overwriteParamsForAttachmentFilesChunks } from './attachmentFiles.chunks';
-import { generateOverwriteParams as generateForPages } from './pages';
-import { generateOverwriteParams as generateForRevisions } from './revisions';
+import type { OverwriteParams } from '../import-settings.js';
+import { overwriteParams as overwriteParamsForAttachmentFilesChunks } from './attachmentFiles.chunks.js';
+import { generateOverwriteParams as generateForPages } from './pages.js';
+import { generateOverwriteParams as generateForRevisions } from './revisions.js';
 
 /**
  * generate overwrite params with overwrite-params/* modules

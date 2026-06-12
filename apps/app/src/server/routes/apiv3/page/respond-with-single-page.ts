@@ -14,7 +14,7 @@ import type { HydratedDocument } from 'mongoose';
 import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:page:respond-with-single-page',

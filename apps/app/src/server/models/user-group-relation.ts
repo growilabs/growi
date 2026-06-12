@@ -5,12 +5,12 @@ import mongoose, { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
+import { UserStatus } from '~/server/models/user/conts';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
-import { getOrCreateModel } from '../util/mongoose-utils';
-import { UserStatus } from './user/conts';
-import type { UserGroupDocument } from './user-group';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
+import type { UserGroupDocument } from './user-group.js';
 
 const logger = loggerFactory('growi:models:userGroupRelation');
 

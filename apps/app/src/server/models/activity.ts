@@ -15,9 +15,8 @@ import {
   AllSupportedEventModels,
   AllSupportedTargetModels,
 } from '~/interfaces/activity';
-
-import loggerFactory from '../../utils/logger';
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:models:activity');
 

@@ -9,13 +9,13 @@ import { toArrayIfNot } from '~/utils/array-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
-import type CollectionProgress from '../models/vo/collection-progress';
-import CollectionProgressingStatus from '../models/vo/collection-progressing-status';
-import type AppService from './app';
-import { configManager } from './config-manager';
-import type { GrowiBridgeService } from './growi-bridge';
-import { growiInfoService } from './growi-info';
-import type { ZipFileStat } from './interfaces/export';
+import type CollectionProgress from '../models/vo/collection-progress.js';
+import CollectionProgressingStatus from '../models/vo/collection-progressing-status.js';
+import type AppService from './app.js';
+import { configManager } from './config-manager/index.js';
+import type { GrowiBridgeService } from './growi-bridge/index.js';
+import { growiInfoService } from './growi-info/index.js';
+import type { ZipFileStat } from './interfaces/export.js';
 
 const logger = loggerFactory('growi:services:ExportService');
 

@@ -1,7 +1,7 @@
 import EventEmitter from 'node:events';
 import type { ITag } from '@growi/core';
 
-import type Crowi from '../crowi';
+import type Crowi from '../crowi/index.js';
 
 class TagEvent extends EventEmitter {
   crowi: Crowi;

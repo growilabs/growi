@@ -1,1 +1,1 @@
-export * from './headers';
+export * from './headers.js';

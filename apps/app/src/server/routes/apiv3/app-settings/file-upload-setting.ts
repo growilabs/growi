@@ -17,8 +17,8 @@ import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:app-settings:file-upload-setting',

@@ -23,9 +23,9 @@ import { deleteCompletelyUserHomeBySystem } from '~/server/service/page/delete-c
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import { resolveLocalePath } from '../../util/safe-path-utils';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import { resolveLocalePath } from '../../util/safe-path-utils.js';
 
 const logger = loggerFactory('growi:routes:apiv3:users');
 

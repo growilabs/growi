@@ -6,8 +6,8 @@ import nocache from 'nocache';
 import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
-import { Config } from '../../models/config';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import { Config } from '../../models/config.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:healthcheck');
 

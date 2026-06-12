@@ -15,12 +15,12 @@ import {
 } from '~/server/util/compare-objectId';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
+import type Crowi from '../crowi/index.js';
 import type {
   UserGroupRelationDocument,
   UserGroupRelationModel,
-} from '../models/user-group-relation';
-import UserGroupRelation from '../models/user-group-relation';
+} from '../models/user-group-relation.js';
+import UserGroupRelation from '../models/user-group-relation.js';
 
 const logger = loggerFactory('growi:service:UserGroupService');
 

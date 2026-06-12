@@ -6,7 +6,7 @@ import mongoose from 'mongoose';
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
 
-import { growiInfoService } from '../growi-info';
+import { growiInfoService } from '../growi-info/index.js';
 
 const _logger = loggerFactory('growi:service:CreatePageService');
 

@@ -5,7 +5,7 @@ import type {
 import { getModelSafely } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
-import type { ValidReferer } from './interfaces';
+import type { ValidReferer } from './interfaces.js';
 
 const logger = loggerFactory(
   'growi:middleware:certify-shared-page-attachment:retrieve-valid-share-link',

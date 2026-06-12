@@ -20,22 +20,22 @@ import type {
   SearchableData,
   SearchDelegator,
   UnavailableTermsKey,
-} from '../../interfaces/search';
-import type { PageModel } from '../../models/page';
-import { createBatchStream } from '../../util/batch-stream';
-import { configManager } from '../config-manager';
+} from '../../interfaces/search.js';
+import type { PageModel } from '../../models/page.js';
+import { createBatchStream } from '../../util/batch-stream.js';
+import { configManager } from '../config-manager/index.js';
 import type {
   AddAllPagesOption,
   RebuildIndexOption,
   UpdateOrInsertPagesOpts,
-} from '../interfaces/search';
-import { aggregatePipelineToIndex } from './aggregate-to-index';
+} from '../interfaces/search.js';
+import { aggregatePipelineToIndex } from './aggregate-to-index.js';
 import type {
   AggregatedPage,
   BulkWriteBody,
   BulkWriteBodyRestriction,
   BulkWriteCommand,
-} from './bulk-write';
+} from './bulk-write.js';
 import {
   type ElasticsearchClientDelegator,
   type ES7SearchQuery,
@@ -46,7 +46,7 @@ import {
   isES8ClientDelegator,
   isES9ClientDelegator,
   type SearchQuery,
-} from './elasticsearch-client-delegator';
+} from './elasticsearch-client-delegator/index.js';
 
 const logger = loggerFactory('growi:service:search-delegator:elasticsearch');
 
@@ -421,7 +421,7 @@ class ElasticsearchDelegator
   async createIndex(index: string) {
     // TODO: https://redmine.weseek.co.jp/issues/168446
     if (isES7ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es7');
+      const { mappings } = await import('./mappings/mappings-es7.js');
       return this.client.indices.create({
         index,
         body: {
@@ -431,7 +431,7 @@ class ElasticsearchDelegator
     }
 
     if (isES8ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es8');
+      const { mappings } = await import('./mappings/mappings-es8.js');
       return this.client.indices.create({
         index,
         ...mappings,
@@ -439,7 +439,7 @@ class ElasticsearchDelegator
     }
 
     if (isES9ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es9');
+      const { mappings } = await import('./mappings/mappings-es9.js');
       return this.client.indices.create({
         index,
         ...mappings,

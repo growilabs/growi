@@ -15,7 +15,7 @@ import { growiInfoService } from '~/server/service/growi-info';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
-import { resolveLocalePath } from '../../util/safe-path-utils';
+import { resolveLocalePath } from '../../util/safe-path-utils.js';
 
 const logger = loggerFactory('growi:routes:apiv3:user-activation');
 

@@ -10,8 +10,8 @@ import {
 } from '~/server/service/socket-io/helper';
 import loggerFactory from '~/utils/logger';
 
-import type { MongodbPersistence } from './extended/mongodb-persistence';
-import type { syncYDoc as syncYDocType } from './sync-ydoc';
+import type { MongodbPersistence } from './extended/mongodb-persistence.js';
+import type { syncYDoc as syncYDocType } from './sync-ydoc.js';
 
 const logger = loggerFactory('growi:service:yjs:create-mongodb-persistence');
 

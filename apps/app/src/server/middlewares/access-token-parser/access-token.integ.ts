@@ -9,7 +9,7 @@ import type Crowi from '~/server/crowi';
 import type UserEvent from '~/server/events/user';
 import { AccessToken } from '~/server/models/access-token';
 
-import { parserForAccessToken } from './access-token';
+import { parserForAccessToken } from './access-token.js';
 
 vi.mock('@growi/core/dist/models/serializers', { spy: true });
 
@@ -25,7 +25,8 @@ describe('access-token-parser middleware for access token with scopes', () => {
         }),
       },
     });
-    const userModelFactory = (await import('../../models/user')).default;
+    const userModelFactory = (await import('../../models/user/index.js'))
+      .default;
     User = userModelFactory(crowiMock);
   });
 

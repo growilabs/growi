@@ -11,10 +11,10 @@ import type { PageOperationDocument } from '~/server/models/page-operation';
 import PageOperation from '~/server/models/page-operation';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
-import type { PageModel } from '../models/page';
-import { collectAncestorPaths } from '../util/collect-ancestor-paths';
+import type Crowi from '../crowi/index.js';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
+import type { PageModel } from '../models/page.js';
+import { collectAncestorPaths } from '../util/collect-ancestor-paths.js';
 
 const logger = loggerFactory('growi:services:page-operation');
 

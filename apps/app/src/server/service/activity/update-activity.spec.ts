@@ -5,7 +5,7 @@ import { SupportedAction } from '~/interfaces/activity';
 import Activity from '~/server/models/activity';
 import { Revision } from '~/server/models/revision';
 
-import { shouldGenerateUpdate } from './update-activity-logic';
+import { shouldGenerateUpdate } from './update-activity-logic.js';
 
 describe('shouldGenerateUpdate()', () => {
   let mongoServer: MongoMemoryServer;

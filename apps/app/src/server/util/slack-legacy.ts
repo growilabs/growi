@@ -7,7 +7,7 @@ import {
 
 import loggerFactory from '~/utils/logger';
 
-import type { ConfigManager } from '../service/config-manager';
+import type { ConfigManager } from '../service/config-manager/index.js';
 
 const logger = loggerFactory('growi:util:slack-legacy');
 

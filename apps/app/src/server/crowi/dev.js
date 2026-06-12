@@ -6,7 +6,7 @@ import path from 'path';
 
 import loggerFactory from '~/utils/logger';
 
-import nextFactory from '../routes/next';
+import nextFactory from '../routes/next.js';
 
 const logger = loggerFactory('growi:crowi:dev');
 

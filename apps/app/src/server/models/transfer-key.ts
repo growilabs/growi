@@ -3,7 +3,7 @@ import { Schema } from 'mongoose';
 
 import type { ITransferKey } from '~/interfaces/transfer-key';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '../util/mongoose-utils.js';
 
 interface ITransferKeyMethods {
   findOneActiveTransferKey(

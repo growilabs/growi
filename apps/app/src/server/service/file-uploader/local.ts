@@ -17,17 +17,17 @@ import {
 import type { IAttachmentDocument } from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
-import { configManager } from '../config-manager';
+import { configManager } from '../config-manager/index.js';
 import {
   AbstractFileUploader,
   type SaveFileParam,
   type TemporaryUrl,
-} from './file-uploader';
+} from './file-uploader.js';
 import {
   applyHeaders,
   createContentHeaders,
   toExpressHttpHeaders,
-} from './utils';
+} from './utils/index.js';
 
 const logger = loggerFactory('growi:service:fileUploaderLocal');
 

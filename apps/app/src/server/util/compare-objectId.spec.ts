@@ -1,6 +1,6 @@
 import { Types } from 'mongoose';
 
-import { hasIntersection, includesObjectIds } from './compare-objectId';
+import { hasIntersection, includesObjectIds } from './compare-objectId.js';
 
 describe('Objectid comparison utils', () => {
   const id1 = new Types.ObjectId();

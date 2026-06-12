@@ -15,10 +15,10 @@ import InAppNotificationSettings from '~/server/models/in-app-notification-setti
 import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import { generateSnapshot } from './in-app-notification/in-app-notification-utils';
-import { type PreNotify, preNotifyService } from './pre-notify';
-import { getRoomNameWithId, RoomPrefix } from './socket-io/helper';
+import type Crowi from '../crowi/index.js';
+import { generateSnapshot } from './in-app-notification/in-app-notification-utils.js';
+import { type PreNotify, preNotifyService } from './pre-notify.js';
+import { getRoomNameWithId, RoomPrefix } from './socket-io/helper.js';
 
 const { STATUS_UNOPENED, STATUS_OPENED } = InAppNotificationStatuses;
 

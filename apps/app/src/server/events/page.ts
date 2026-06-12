@@ -3,7 +3,7 @@ import type { IPage, IUserHasId } from '@growi/core';
 
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
+import type Crowi from '../crowi/index.js';
 
 const logger = loggerFactory('growi:events:page');
 

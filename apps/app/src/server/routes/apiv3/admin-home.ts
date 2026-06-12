@@ -10,7 +10,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
 
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const router = express.Router();
 

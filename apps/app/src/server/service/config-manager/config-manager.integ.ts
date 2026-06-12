@@ -1,9 +1,9 @@
 import { GrowiDeploymentType, GrowiServiceType } from '@growi/core/dist/consts';
 import { mock } from 'vitest-mock-extended';
 
-import { Config } from '../../models/config';
-import type { S2sMessagingService } from '../s2s-messaging/base';
-import { configManager } from './config-manager';
+import { Config } from '../../models/config.js';
+import type { S2sMessagingService } from '../s2s-messaging/base.js';
+import { configManager } from './config-manager.js';
 
 describe('ConfigManager', () => {
   const s2sMessagingServiceMock = mock<S2sMessagingService>();

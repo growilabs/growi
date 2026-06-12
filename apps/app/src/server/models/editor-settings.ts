@@ -2,7 +2,7 @@ import type { EditorSettings } from '@growi/editor';
 import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '../util/mongoose-utils.js';
 
 export interface EditorSettingsDocument extends EditorSettings, Document {
   userId: Schema.Types.ObjectId;

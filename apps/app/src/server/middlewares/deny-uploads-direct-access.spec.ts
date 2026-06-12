@@ -1,7 +1,7 @@
 import type { Request, Response } from 'express';
 import { mock } from 'vitest-mock-extended';
 
-import { denyUploadsDirectAccess } from './deny-uploads-direct-access';
+import { denyUploadsDirectAccess } from './deny-uploads-direct-access.js';
 
 describe('denyUploadsDirectAccess', () => {
   test('responds with 403 Forbidden', () => {

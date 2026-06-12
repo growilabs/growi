@@ -1,4 +1,4 @@
-import { serializePageSecurely } from './page-serializer';
+import { serializePageSecurely } from './page-serializer.js';
 
 function serializeInsecurePageAttributes(bookmark) {
   if (bookmark.page != null && bookmark.page._id != null) {

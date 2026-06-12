@@ -7,7 +7,7 @@ import { mock } from 'vitest-mock-extended';
 import type Crowi from '~/server/crowi';
 import type UserEvent from '~/server/events/user';
 
-import { parserForApiToken } from './api-token';
+import { parserForApiToken } from './api-token.js';
 
 vi.mock('@growi/core/dist/models/serializers', { spy: true });
 
@@ -23,7 +23,8 @@ describe('access-token-parser middleware', () => {
         }),
       },
     });
-    const userModelFactory = (await import('../../models/user')).default;
+    const userModelFactory = (await import('../../models/user/index.js'))
+      .default;
     User = userModelFactory(crowiMock);
   });
 

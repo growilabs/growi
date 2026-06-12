@@ -33,9 +33,9 @@ import {
   includesObjectIds,
 } from '~/server/util/compare-objectId';
 
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
-import UserGroupRelation from '../models/user-group-relation';
-import { divideByType } from '../util/granted-group';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
+import UserGroupRelation from '../models/user-group-relation.js';
+import { divideByType } from '../util/granted-group.js';
 
 const { addTrailingSlash } = pathUtils;
 const { isTopPage } = pagePathUtils;

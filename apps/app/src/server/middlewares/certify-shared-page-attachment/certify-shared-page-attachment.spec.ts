@@ -6,8 +6,8 @@ import type { ShareLinkDocument } from '~/server/models/share-link';
 import {
   certifySharedPageAttachmentMiddleware,
   type RequestToAllowShareLink,
-} from './certify-shared-page-attachment';
-import type { ValidReferer } from './interfaces';
+} from './certify-shared-page-attachment.js';
+import type { ValidReferer } from './interfaces.js';
 
 const mocks = vi.hoisted(() => {
   return {

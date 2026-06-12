@@ -7,9 +7,9 @@ import unzipStream, { type Entry } from 'unzip-stream';
 import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
-import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils';
-import type { ZipFileStat } from '../interfaces/export';
-import { tapStreamDataByPromise } from './unzip-stream-utils';
+import { assertFileNameSafeForBaseDir } from '../../util/safe-path-utils.js';
+import type { ZipFileStat } from '../interfaces/export.js';
+import { tapStreamDataByPromise } from './unzip-stream-utils.js';
 
 const logger = loggerFactory('growi:services:GrowiBridgeService');
 

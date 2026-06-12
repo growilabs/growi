@@ -6,11 +6,11 @@ import type {
 } from '~/interfaces/search';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import UserGroupRelation from '../models/user-group-relation';
-import { isSearchError } from '../models/vo/search-error';
-import ApiPaginate from '../util/apiPaginate';
-import ApiResponse from '../util/apiResponse';
+import type Crowi from '../crowi/index.js';
+import UserGroupRelation from '../models/user-group-relation.js';
+import { isSearchError } from '../models/vo/search-error.js';
+import ApiPaginate from '../util/apiPaginate.js';
+import ApiResponse from '../util/apiResponse.js';
 
 const logger = loggerFactory('growi:routes:search');
 

@@ -26,11 +26,11 @@ import { configManager } from '~/server/service/config-manager';
 import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
-import { serializePageSecurely } from '../../../models/serializers/page-serializer';
-import { isV5ConversionError } from '../../../models/vo/v5-conversion-error';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user.js';
+import { serializePageSecurely } from '../../../models/serializers/page-serializer.js';
+import { isV5ConversionError } from '../../../models/vo/v5-conversion-error.js';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
 const router = express.Router();

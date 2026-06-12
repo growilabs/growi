@@ -10,8 +10,8 @@ import { configManager } from '~/server/service/config-manager';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response';
-import { respondWithSinglePage } from './respond-with-single-page';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
+import { respondWithSinglePage } from './respond-with-single-page.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page:get-page-by-share-link');
 

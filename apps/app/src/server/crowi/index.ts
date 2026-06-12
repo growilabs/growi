@@ -28,52 +28,55 @@ import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
-import ActivityEvent from '../events/activity';
-import AdminEvent from '../events/admin';
-import BookmarkEvent from '../events/bookmark';
-import PageEvent from '../events/page';
-import TagEvent from '../events/tag';
-import UserEvent from '../events/user';
-import type { AccessTokenParser } from '../middlewares/access-token-parser';
-import { accessTokenParser } from '../middlewares/access-token-parser';
-import httpErrorHandler from '../middlewares/http-error-handler';
-import loginRequiredFactory from '../middlewares/login-required';
-import type { AclService } from '../service/acl';
-import { aclService as aclServiceSingletonInstance } from '../service/acl';
-import ActivityService from '../service/activity';
-import AppService from '../service/app';
-import { AttachmentService } from '../service/attachment';
-import CommentService from '../service/comment';
-import { configManager as configManagerSingletonInstance } from '../service/config-manager';
-import type { ConfigManager } from '../service/config-manager/config-manager';
-import instanciateExportService from '../service/export';
-import instanciateExternalAccountService from '../service/external-account';
-import { type FileUploader, getUploader } from '../service/file-uploader';
+import ActivityEvent from '../events/activity.js';
+import AdminEvent from '../events/admin.js';
+import BookmarkEvent from '../events/bookmark.js';
+import PageEvent from '../events/page.js';
+import TagEvent from '../events/tag.js';
+import UserEvent from '../events/user.js';
+import type { AccessTokenParser } from '../middlewares/access-token-parser/index.js';
+import { accessTokenParser } from '../middlewares/access-token-parser/index.js';
+import httpErrorHandler from '../middlewares/http-error-handler.js';
+import loginRequiredFactory from '../middlewares/login-required.js';
+import type { AclService } from '../service/acl.js';
+import { aclService as aclServiceSingletonInstance } from '../service/acl.js';
+import ActivityService from '../service/activity.js';
+import AppService from '../service/app.js';
+import { AttachmentService } from '../service/attachment.js';
+import CommentService from '../service/comment.js';
+import type { ConfigManager } from '../service/config-manager/config-manager.js';
+import { configManager as configManagerSingletonInstance } from '../service/config-manager/index.js';
+import instanciateExportService from '../service/export.js';
+import instanciateExternalAccountService from '../service/external-account.js';
+import {
+  type FileUploader,
+  getUploader,
+} from '../service/file-uploader/index.js';
 import {
   G2GTransferPusherService,
   G2GTransferReceiverService,
-} from '../service/g2g-transfer';
-import { GrowiBridgeService } from '../service/growi-bridge';
-import { initializeImportService } from '../service/import';
-import { InAppNotificationService } from '../service/in-app-notification';
-import { InstallerService } from '../service/installer';
-import { normalizeData } from '../service/normalize-data';
-import PageService from '../service/page';
-import PageGrantService from '../service/page-grant';
-import type { IPageOperationService } from '../service/page-operation';
-import instanciatePageOperationService from '../service/page-operation';
-import PassportService from '../service/passport';
-import SearchService from '../service/search';
-import { SlackIntegrationService } from '../service/slack-integration';
-import { SocketIoService } from '../service/socket-io';
-import SyncPageStatusService from '../service/system-events/sync-page-status';
-import UserGroupService from '../service/user-group';
-import { UserNotificationService } from '../service/user-notification';
-import { initializeYjsService } from '../service/yjs';
-import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
-import { setup as setupExpressInit } from './express-init';
-import type { ModelsMapDependentOnCrowi } from './setup-models';
-import { setupModelsDependentOnCrowi } from './setup-models';
+} from '../service/g2g-transfer.js';
+import { GrowiBridgeService } from '../service/growi-bridge/index.js';
+import { initializeImportService } from '../service/import/index.js';
+import { InAppNotificationService } from '../service/in-app-notification.js';
+import { InstallerService } from '../service/installer.js';
+import { normalizeData } from '../service/normalize-data/index.js';
+import PageService from '../service/page/index.js';
+import PageGrantService from '../service/page-grant.js';
+import type { IPageOperationService } from '../service/page-operation.js';
+import instanciatePageOperationService from '../service/page-operation.js';
+import PassportService from '../service/passport.js';
+import SearchService from '../service/search.js';
+import { SlackIntegrationService } from '../service/slack-integration.js';
+import { SocketIoService } from '../service/socket-io/index.js';
+import SyncPageStatusService from '../service/system-events/sync-page-status.js';
+import UserGroupService from '../service/user-group.js';
+import { UserNotificationService } from '../service/user-notification/index.js';
+import { initializeYjsService } from '../service/yjs/index.js';
+import { getMongoUri, mongoOptions } from '../util/mongoose-utils.js';
+import { setup as setupExpressInit } from './express-init.js';
+import type { ModelsMapDependentOnCrowi } from './setup-models.js';
+import { setupModelsDependentOnCrowi } from './setup-models.js';
 
 const logger = loggerFactory('growi:crowi');
 
@@ -123,17 +126,17 @@ class Crowi {
 
   fileUploadService!: FileUploader;
 
-  growiInfoService!: import('../service/growi-info').GrowiInfoService;
+  growiInfoService!: import('../service/growi-info/index.js').GrowiInfoService;
 
   growiBridgeService!: GrowiBridgeService;
 
-  pageService!: import('../service/page/page-service').IPageService;
+  pageService!: import('../service/page/page-service.js').IPageService;
 
   pageGrantService!: PageGrantService;
 
   pageOperationService!: IPageOperationService;
 
-  customizeService!: import('../service/customize').CustomizeService;
+  customizeService!: import('../service/customize.js').CustomizeService;
 
   passportService!: PassportService;
 
@@ -420,7 +423,7 @@ class Crowi {
 
   async setupS2sMessagingService(): Promise<void> {
     const { setup: setupS2sMessaging } = await import(
-      '../service/s2s-messaging'
+      '../service/s2s-messaging/index.js'
     );
     const s2sMessagingService = await setupS2sMessaging(this);
     if (s2sMessagingService != null) {
@@ -595,7 +598,7 @@ class Crowi {
 
     // setup CrowiDev (loaded lazily: development runtime only)
     if (dev) {
-      const { default: CrowiDev } = await import('./dev');
+      const { default: CrowiDev } = await import('./dev.js');
       this.crowiDev = new CrowiDev(this);
       this.crowiDev.init();
     }
@@ -695,7 +698,7 @@ class Crowi {
   async setupRoutesAtLast(): Promise<void> {
     type RoutesSetup = (crowi: Crowi, app: Express) => void;
     const { setup: setupRoutes }: { setup: RoutesSetup } = await import(
-      '../routes'
+      '../routes/index.js'
     );
     setupRoutes(this, this.express);
   }
@@ -713,7 +716,7 @@ class Crowi {
    */
   async setUpGlobalNotification(): Promise<void> {
     const { GlobalNotificationService } = await import(
-      '../service/global-notification'
+      '../service/global-notification/index.js'
     );
     if (this.globalNotificationService == null) {
       this.globalNotificationService = new GlobalNotificationService(this);
@@ -740,7 +743,7 @@ class Crowi {
    * setup CustomizeService
    */
   async setUpCustomize(): Promise<void> {
-    const { CustomizeService } = await import('../service/customize');
+    const { CustomizeService } = await import('../service/customize.js');
     if (this.customizeService == null) {
       this.customizeService = new CustomizeService(this);
       this.customizeService.initCustomCss();
@@ -783,7 +786,7 @@ class Crowi {
    */
   async setUpFileUploaderSwitchService(): Promise<void> {
     const { default: FileUploaderSwitchService } = await import(
-      '../service/file-uploader-switch'
+      '../service/file-uploader-switch.js'
     );
     this.fileUploaderSwitchService = new FileUploaderSwitchService(this);
     // add as a message handler
@@ -795,7 +798,7 @@ class Crowi {
   }
 
   async setupGrowiInfoService(): Promise<void> {
-    const { growiInfoService } = await import('../service/growi-info');
+    const { growiInfoService } = await import('../service/growi-info/index.js');
     this.growiInfoService = growiInfoService;
   }
 

@@ -48,18 +48,18 @@ import { preNotifyService } from '~/server/service/pre-notify';
 import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
 import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response';
-import { checkPageExistenceHandlersFactory } from './check-page-existence';
-import { createPageHandlersFactory } from './create-page';
-import { getPageByShareLinkHandlerFactory } from './get-page-by-share-link';
-import { getPageInfoHandlerFactory } from './get-page-info';
-import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count';
-import { getYjsDataHandlerFactory } from './get-yjs-data';
-import { publishPageHandlersFactory } from './publish-page';
-import { respondWithSinglePage } from './respond-with-single-page';
-import { syncLatestRevisionBodyToYjsDraftHandlerFactory } from './sync-latest-revision-body-to-yjs-draft';
-import { unpublishPageHandlersFactory } from './unpublish-page';
-import { updatePageHandlersFactory } from './update-page';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
+import { checkPageExistenceHandlersFactory } from './check-page-existence.js';
+import { createPageHandlersFactory } from './create-page.js';
+import { getPageByShareLinkHandlerFactory } from './get-page-by-share-link.js';
+import { getPageInfoHandlerFactory } from './get-page-info.js';
+import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count.js';
+import { getYjsDataHandlerFactory } from './get-yjs-data.js';
+import { publishPageHandlersFactory } from './publish-page.js';
+import { respondWithSinglePage } from './respond-with-single-page.js';
+import { syncLatestRevisionBodyToYjsDraftHandlerFactory } from './sync-latest-revision-body-to-yjs-draft.js';
+import { unpublishPageHandlersFactory } from './unpublish-page.js';
+import { updatePageHandlersFactory } from './update-page.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page');
 

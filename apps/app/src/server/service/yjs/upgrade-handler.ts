@@ -9,7 +9,7 @@ import type { Duplex } from 'stream';
 import type { SessionConfig } from '~/interfaces/session-config';
 import loggerFactory from '~/utils/logger';
 
-import type { PageModel } from '../../models/page';
+import type { PageModel } from '../../models/page.js';
 
 const logger = loggerFactory('growi:service:yjs:upgrade-handler');
 

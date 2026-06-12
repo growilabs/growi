@@ -1,7 +1,7 @@
 import type { NextFunction, Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
 
-import type Crowi from '../crowi';
+import type Crowi from '../crowi/index.js';
 
 /**
  * Middleware factory to check if the application is already installed

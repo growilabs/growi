@@ -6,8 +6,8 @@ import { generateLastUpdateMrkdwn } from '@growi/slack/dist/utils/generate-last-
 
 import loggerFactory from '~/utils/logger';
 
-import { growiInfoService } from '../growi-info';
-import BaseSlackCommandHandler from './slack-command-handler';
+import { growiInfoService } from '../growi-info/index.js';
+import BaseSlackCommandHandler from './slack-command-handler.js';
 
 const logger = loggerFactory('growi:service:SlackCommandHandler:search');
 

@@ -5,7 +5,7 @@ import uniqueValidator from 'mongoose-unique-validator';
 
 import type { IShareLink } from '~/interfaces/share-link';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '../util/mongoose-utils.js';
 
 export interface ShareLinkDocument extends IShareLink, Document {
   isExpired: () => boolean;

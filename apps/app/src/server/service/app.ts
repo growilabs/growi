@@ -2,11 +2,11 @@ import { ConfigSource } from '@growi/core/dist/interfaces';
 
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import S2sMessage from '../models/vo/s2s-message';
-import { configManager } from './config-manager';
-import type { S2sMessagingService } from './s2s-messaging/base';
-import type { S2sMessageHandlable } from './s2s-messaging/handlable';
+import type Crowi from '../crowi/index.js';
+import S2sMessage from '../models/vo/s2s-message.js';
+import { configManager } from './config-manager/index.js';
+import type { S2sMessagingService } from './s2s-messaging/base.js';
+import type { S2sMessageHandlable } from './s2s-messaging/handlable.js';
 
 const logger = loggerFactory('growi:service:AppService');
 /**

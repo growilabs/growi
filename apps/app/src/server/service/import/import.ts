@@ -22,14 +22,14 @@ import type CollectionProgress from '~/server/models/vo/collection-progress';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
-import CollectionProgressingStatus from '../../models/vo/collection-progressing-status';
-import { createBatchStream } from '../../util/batch-stream';
-import { configManager } from '../config-manager';
-import type { ConvertMap } from './construct-convert-map';
-import { constructConvertMap } from './construct-convert-map';
-import { getModelFromCollectionName } from './get-model-from-collection-name';
-import type { ImportSettings, OverwriteParams } from './import-settings';
-import { keepOriginal } from './overwrite-function';
+import CollectionProgressingStatus from '../../models/vo/collection-progressing-status.js';
+import { createBatchStream } from '../../util/batch-stream.js';
+import { configManager } from '../config-manager/index.js';
+import type { ConvertMap } from './construct-convert-map.js';
+import { constructConvertMap } from './construct-convert-map.js';
+import { getModelFromCollectionName } from './get-model-from-collection-name.js';
+import type { ImportSettings, OverwriteParams } from './import-settings.js';
+import { keepOriginal } from './overwrite-function.js';
 
 import * as JSONStream from 'JSONStream';
 

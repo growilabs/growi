@@ -21,11 +21,11 @@ import { getImportService } from '~/server/service/import';
 import loggerFactory from '~/utils/logger';
 import { TransferKey } from '~/utils/vo/transfer-key';
 
-import type Crowi from '../../crowi';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import { Attachment } from '../../models/attachment';
-import { isPathWithinBase } from '../../util/safe-path-utils';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import type Crowi from '../../crowi/index.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import { Attachment } from '../../models/attachment.js';
+import { isPathWithinBase } from '../../util/safe-path-utils.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 interface AuthorizedRequest extends Request {
   user?: any;

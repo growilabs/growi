@@ -3,7 +3,7 @@ import type { RequestHandler } from 'express';
 
 import { configManager } from '~/server/service/config-manager';
 
-import type { ApiV3Response } from '../routes/apiv3/interfaces/apiv3-response';
+import type { ApiV3Response } from '../routes/apiv3/interfaces/apiv3-response.js';
 
 /**
  * Middleware that rejects requests when link sharing is globally disabled.

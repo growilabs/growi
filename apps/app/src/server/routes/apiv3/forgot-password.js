@@ -12,10 +12,10 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import httpErrorHandler from '../../middlewares/http-error-handler';
-import { resolveLocalePath } from '../../util/safe-path-utils';
-import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import httpErrorHandler from '../../middlewares/http-error-handler.js';
+import { resolveLocalePath } from '../../util/safe-path-utils.js';
+import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password.js';
 
 const logger = loggerFactory('growi:routes:apiv3:forgotPassword');
 

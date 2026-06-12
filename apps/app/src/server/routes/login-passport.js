@@ -8,8 +8,8 @@ import { createRedirectToForUnauthenticated } from '~/server/util/createRedirect
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-import { externalAccountService } from '../service/external-account';
-import ApiResponse from '../util/apiResponse';
+import { externalAccountService } from '../service/external-account.js';
+import ApiResponse from '../util/apiResponse.js';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, app) => {

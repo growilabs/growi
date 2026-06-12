@@ -7,8 +7,8 @@ import WebSocket from 'ws';
 import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
-import S2sMessage from '../../models/vo/s2s-message';
-import { AbstractS2sMessagingService } from './base';
+import S2sMessage from '../../models/vo/s2s-message.js';
+import { AbstractS2sMessagingService } from './base.js';
 
 const logger = loggerFactory('growi:service:s2s-messaging:nchan');
 

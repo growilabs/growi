@@ -1,1 +1,1 @@
-export * from './update-activity-logic';
+export * from './update-activity-logic.js';

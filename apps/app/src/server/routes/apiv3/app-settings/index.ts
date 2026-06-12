@@ -18,10 +18,10 @@ import { getTranslation } from '~/server/service/i18next';
 import { createSMTPClient } from '~/server/service/mail/smtp';
 import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import type { ApiV3Response } from '../interfaces/apiv3-response';
-import { setup as setupFileUploadSetting } from './file-upload-setting';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
+import { setup as setupFileUploadSetting } from './file-upload-setting.js';
 
 const logger = loggerFactory('growi:routes:apiv3:app-settings');
 

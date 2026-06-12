@@ -7,18 +7,18 @@ import { SupportedAction } from '~/interfaces/activity';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import * as applicationNotInstalled from '../../middlewares/application-not-installed';
+import type Crowi from '../../crowi/index.js';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
+import * as applicationNotInstalled from '../../middlewares/application-not-installed.js';
 import {
   registerRules,
   registerValidation,
-} from '../../middlewares/register-form-validator';
+} from '../../middlewares/register-form-validator.js';
 import {
   FailedToCreateAdminUserError,
   InstallerService,
-} from '../../service/installer';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+} from '../../service/installer.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const _logger = loggerFactory('growi:routes:apiv3:installer');
 

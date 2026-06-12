@@ -4,8 +4,8 @@ import createError from 'http-errors';
 import { UserActivationErrorCode } from '~/interfaces/errors/user-activation';
 import loggerFactory from '~/utils/logger';
 
-import type { IUserRegistrationOrder } from '../models/user-registration-order';
-import UserRegistrationOrder from '../models/user-registration-order';
+import type { IUserRegistrationOrder } from '../models/user-registration-order.js';
+import UserRegistrationOrder from '../models/user-registration-order.js';
 
 const logger = loggerFactory('growi:routes:user-activation');
 

@@ -4,7 +4,7 @@ import type { AccessTokenParserReq } from '@growi/core/dist/interfaces/server';
 import {
   extractAccessToken,
   X_GROWI_ACCESS_TOKEN_HEADER_NAME,
-} from './extract-access-token';
+} from './extract-access-token.js';
 
 // Build a minimal request shaped like the real Express request: only explicitly-set
 // properties exist, so unset sources are genuinely `undefined` (unlike a deep auto-mock,

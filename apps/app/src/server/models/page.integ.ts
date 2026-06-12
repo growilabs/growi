@@ -54,19 +54,19 @@ describe('Page', () => {
     await configManager.loadConfigs();
 
     // Initialize models with mocked Crowi using dynamic import
-    const pageModule = await import('./page');
+    const pageModule = await import('./page.js');
     const pageFactory = pageModule.default;
     Page = pageFactory(crowiMock);
     PageQueryBuilder = Page.PageQueryBuilder;
 
-    const userModule = await import('./user/index');
+    const userModule = await import('./user/index.js');
     const userFactory = userModule.default;
     User = userFactory(null);
 
-    const userGroupModule = await import('./user-group');
+    const userGroupModule = await import('./user-group.js');
     UserGroup = userGroupModule.default;
 
-    const userGroupRelationModule = await import('./user-group-relation');
+    const userGroupRelationModule = await import('./user-group-relation.js');
     UserGroupRelation = userGroupRelationModule.default;
 
     await User.insertMany([

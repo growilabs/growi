@@ -16,10 +16,10 @@ import {
 } from '~/server/models/serializers';
 import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
-import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment/index.js';
+import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user.js';
 
 const logger = loggerFactory('growi:routes:apiv3:attachment');
 

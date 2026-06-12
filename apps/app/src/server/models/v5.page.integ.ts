@@ -26,10 +26,10 @@ import type {
 import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 
-import type { IPageService } from '../service/page';
-import type { BookmarkModel } from './bookmark';
-import type { IPageRedirect, PageRedirectModel } from './page-redirect';
-import type { ShareLinkModel } from './share-link';
+import type { IPageService } from '../service/page/index.js';
+import type { BookmarkModel } from './bookmark.js';
+import type { IPageRedirect, PageRedirectModel } from './page-redirect.js';
+import type { ShareLinkModel } from './share-link.js';
 
 describe('Page', () => {
   let crowi: Crowi;

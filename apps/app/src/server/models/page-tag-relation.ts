@@ -7,10 +7,10 @@ import uniqueValidator from 'mongoose-unique-validator';
 
 import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
 
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
-import { getOrCreateModel } from '../util/mongoose-utils';
-import type { IdToNamesMap } from './tag';
-import Tag from './tag';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
+import { getOrCreateModel } from '../util/mongoose-utils.js';
+import type { IdToNamesMap } from './tag.js';
+import Tag from './tag.js';
 
 export interface PageTagRelationDocument extends IPageTagRelation, Document {}
 

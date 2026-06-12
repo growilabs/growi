@@ -6,8 +6,8 @@ import uniqueValidator from 'mongoose-unique-validator';
 import type { IBookmark } from '~/interfaces/bookmark-info';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import { getOrCreateModel } from '../util/mongoose-utils';
+import type Crowi from '../crowi/index.js';
+import { getOrCreateModel } from '../util/mongoose-utils.js';
 
 const logger = loggerFactory('growi:models:bookmark');
 

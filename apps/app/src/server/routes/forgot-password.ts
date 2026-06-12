@@ -4,8 +4,8 @@ import createError from 'http-errors';
 import { forgotPasswordErrorCode } from '~/interfaces/errors/forgot-password';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import type { IPasswordResetOrder } from '../models/password-reset-order';
+import type Crowi from '../crowi/index.js';
+import type { IPasswordResetOrder } from '../models/password-reset-order.js';
 
 const logger = loggerFactory('growi:routes:forgot-password');
 

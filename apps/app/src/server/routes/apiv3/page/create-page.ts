@@ -38,9 +38,9 @@ import { configManager } from '~/server/service/config-manager';
 import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user.js';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page:create-page');
 

@@ -3,8 +3,8 @@ import { param, validationResult } from 'express-validator';
 import { SupportedAction } from '~/interfaces/activity';
 import loggerFactory from '~/utils/logger';
 
-import { exportService } from '../service/export';
-import ApiResponse from '../util/apiResponse';
+import { exportService } from '../service/export.js';
+import ApiResponse from '../util/apiResponse.js';
 
 const logger = loggerFactory('growi:routes:admin');
 

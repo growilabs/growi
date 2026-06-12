@@ -17,8 +17,8 @@ import { configManager } from '~/server/service/config-manager';
 import { growiInfoService } from '~/server/service/growi-info';
 import loggerFactory from '~/utils/logger';
 
-import { handleError } from '../../service/slack-command-handler/error-handler';
-import { checkPermission } from '../../util/slack-integration';
+import { handleError } from '../../service/slack-command-handler/error-handler.js';
+import { checkPermission } from '../../util/slack-integration.js';
 
 const logger = loggerFactory('growi:routes:apiv3:slack-integration');
 const router = express.Router();

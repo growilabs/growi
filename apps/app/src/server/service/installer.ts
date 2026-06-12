@@ -7,9 +7,9 @@ import path from 'path';
 
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi';
-import { SUPPORTED_LOCALES } from '../util/safe-path-utils';
-import { configManager } from './config-manager';
+import type Crowi from '../crowi/index.js';
+import { SUPPORTED_LOCALES } from '../util/safe-path-utils.js';
+import { configManager } from './config-manager/index.js';
 
 const logger = loggerFactory('growi:service:installer');
 

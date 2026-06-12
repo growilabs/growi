@@ -1,9 +1,9 @@
 import { SupportedAction } from '~/interfaces/activity';
 import Tag from '~/server/models/tag';
 
-import PageTagRelation from '../models/page-tag-relation';
-import { Revision } from '../models/revision';
-import ApiResponse from '../util/apiResponse';
+import PageTagRelation from '../models/page-tag-relation.js';
+import { Revision } from '../models/revision.js';
+import ApiResponse from '../util/apiResponse.js';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, _app) => {
