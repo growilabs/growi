@@ -540,8 +540,9 @@
     "selected_editable_revision": "Selected Page Body (Editable)"
   },
   "ai_unavailable": {
-    "open_cloud_settings_to_enable": "Please check the GROWI.cloud management screen to enable AI integration",
-    "to_cloud_settings": "Open GROWI.cloud Settings"
+    "open_admin_settings_to_enable": "Configure AI settings on the admin page to enable AI integration",
+    "to_admin_ai_settings": "Open AI Settings",
+    "contact_admin_to_enable": "AI integration is not enabled. Please contact your administrator."
   },
   "ai_sidebar": {
     "new_chat": "New Chat",

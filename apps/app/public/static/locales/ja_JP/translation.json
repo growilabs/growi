@@ -574,8 +574,9 @@
     "selected_editable_revision": "保存するページ本文(編集可能)"
   },
   "ai_unavailable": {
-    "open_cloud_settings_to_enable": "AI 連携を有効にするには GROWI.cloud の管理画面をご確認ください",
-    "to_cloud_settings": "GROWI.cloud の管理画面へ"
+    "open_admin_settings_to_enable": "AI 連携を有効にするには管理画面で設定してください",
+    "to_admin_ai_settings": "AI 設定の管理画面へ",
+    "contact_admin_to_enable": "AI 連携が有効になっていません。管理者にお問い合わせください"
   },
   "ai_sidebar": {
     "new_chat": "新規チャット",

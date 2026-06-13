@@ -532,8 +532,9 @@
     "selected_editable_revision": "选定的可编辑页面正文"
   },
   "ai_unavailable": {
-    "open_cloud_settings_to_enable": "请查看 GROWI.cloud 管理界面以启用 AI 集成",
-    "to_cloud_settings": "前往 GROWI.cloud 管理界面"
+    "open_admin_settings_to_enable": "请在管理界面中配置 AI 设置以启用 AI 集成",
+    "to_admin_ai_settings": "前往 AI 设置管理界面",
+    "contact_admin_to_enable": "AI 集成尚未启用。请联系您的管理员。"
   },
   "ai_sidebar": {
     "new_chat": "新建对话",

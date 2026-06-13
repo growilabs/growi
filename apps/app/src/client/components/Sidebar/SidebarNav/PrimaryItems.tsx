@@ -1,12 +1,12 @@
 import { memo } from 'react';
 import dynamic from 'next/dynamic';
+import Link from 'next/link';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
 import { NotAvailable } from '~/client/components/NotAvailable';
 import { SidebarContentsType } from '~/interfaces/ui';
-import { useIsGuestUser } from '~/states/context';
-import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
+import { useIsAdmin, useIsGuestUser } from '~/states/context';
 import { aiEnabledAtom } from '~/states/server-configurations';
 import { useSidebarMode } from '~/states/ui/sidebar';
 
@@ -34,29 +34,32 @@ export const PrimaryItems = memo((props: Props) => {
   const { sidebarMode } = useSidebarMode();
   const isAiEnabled = useAtomValue(aiEnabledAtom);
   const isGuestUser = useIsGuestUser();
-  const growiCloudUri = useGrowiCloudUri();
-  const growiAppIdForGrowiCloud = useGrowiAppIdForGrowiCloud();
-  const isCloud = growiCloudUri != null && growiAppIdForGrowiCloud != null;
+  const isAdminUser = useIsAdmin();
 
   if (sidebarMode == null) {
     return <></>;
   }
 
-  const aiUnavailableTitle = (
+  // When AI is not ready, the AI Chat icon is always shown but disabled. The
+  // tooltip prompts configuration on the admin screen: admins get a link to
+  // /admin/ai, while non-admins (who would 403 there) are asked to contact one.
+  const aiUnavailableTitle = isAdminUser ? (
     <>
       <p className="mb-2">
-        {t('ai_unavailable.open_cloud_settings_to_enable')}
+        {t('ai_unavailable.open_admin_settings_to_enable')}
       </p>
-      <a href={`${growiCloudUri}/my/apps/${growiAppIdForGrowiCloud}`}>
+      <Link href="/admin/ai">
         <span
           className="material-symbols-outlined me-1"
           style={{ fontSize: '1rem', verticalAlign: 'middle' }}
         >
-          share
+          settings
         </span>
-        {t('ai_unavailable.to_cloud_settings')}
-      </a>
+        {t('ai_unavailable.to_admin_ai_settings')}
+      </Link>
     </>
+  ) : (
+    t('ai_unavailable.contact_admin_to_enable')
   );
 
   return (
@@ -102,7 +105,11 @@ export const PrimaryItems = memo((props: Props) => {
           onHover={onItemHover}
         />
       )}
-      {isAiEnabled ? (
+      <NotAvailable
+        isDisabled={!isAiEnabled}
+        title={aiUnavailableTitle}
+        placement="right"
+      >
         <PrimaryItem
           sidebarMode={sidebarMode}
           contents={SidebarContentsType.AI}
@@ -111,19 +118,7 @@ export const PrimaryItems = memo((props: Props) => {
           isCustomIcon
           onHover={onItemHover}
         />
-      ) : (
-        isCloud && (
-          <NotAvailable isDisabled title={aiUnavailableTitle} placement="right">
-            <PrimaryItem
-              sidebarMode={sidebarMode}
-              contents={SidebarContentsType.AI}
-              label="AI Chat"
-              iconName="growi_ai"
-              isCustomIcon
-            />
-          </NotAvailable>
-        )
-      )}
+      </NotAvailable>
     </div>
   );
 });
