@@ -1,7 +1,9 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
+import { body, type ValidationChain } from 'express-validator';
 
+import { isAiProvider } from '~/features/mastra/interfaces/ai-provider';
 import { clearResolvedMastraModelCache } from '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model';
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
@@ -16,11 +18,36 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type { AiSettingsUpdateRequest } from '../../../interfaces/ai-settings';
-import { updateAiSettingsValidators } from './validators';
+import { isValidProviderOptionsJson } from '../../../utils/provider-options-validation';
 
 const logger = loggerFactory(
   'growi:features:mastra:routes:admin-ai-settings:put-ai-settings',
 );
+
+/**
+ * express-validator chain for PUT /_api/v3/ai-settings (formal validation, Req 6.1/6.2).
+ * All fields optional (partial update). provider must be a supported AI provider;
+ * providerOptions must be valid JSON when present (empty = cleared, skipped);
+ * the boolean toggles must be real booleans. Semantic option validity is the
+ * provider integration's responsibility.
+ */
+export const updateAiSettingsValidators: ValidationChain[] = [
+  body('provider')
+    .optional()
+    .custom((value) => isAiProvider(value))
+    .withMessage('provider must be one of the supported AI providers'),
+  body('providerOptions')
+    // Shared FE/BE predicate (Req 6.2): the single source of truth for what
+    // counts as a valid providerOptions string. Plain `.optional()` is enough
+    // because the predicate already treats '' / whitespace as valid ("no
+    // options", normalized to undefined server-side), so client and server
+    // accept/reject exactly the same input.
+    .optional()
+    .custom((value: string) => isValidProviderOptionsJson(value))
+    .withMessage('providerOptions must be a valid JSON string'),
+  body('aiEnabled').optional().isBoolean(),
+  body('azureOpenaiUseEntraId').optional().isBoolean(),
+];
 
 // The exact updates shape accepted by configManager.updateConfigs, derived from
 // the public instance so the internal ConfigKey/ConfigValues types stay behind

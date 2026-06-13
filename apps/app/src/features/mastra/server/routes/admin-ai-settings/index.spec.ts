@@ -8,7 +8,8 @@
 //   - loginRequiredFactory(crowi): login gate                — REAL (depends only on req.user)
 //   - adminRequiredFactory(crowi): admin gate                — REAL (depends only on req.user)
 //   - getAiSettings / putAiSettings terminal handlers        — REAL (deep leaves mocked below)
-//   - updateAiSettingsValidators / apiV3FormValidator        — mocked (body validation covered elsewhere)
+//   - updateAiSettingsValidators                             — REAL (inline in put-ai-settings; covered in put-ai-settings.spec.ts)
+//   - apiV3FormValidator                                     — mocked → passthrough so validation runs but never blocks
 //   - generateAddActivityMiddleware()                        — mocked → sets res.locals.activity (PUT)
 //
 // The observable contract we assert (Req 1.1, 1.2):
@@ -35,9 +36,10 @@ vi.mock('~/server/middlewares/access-token-parser', () => ({
   },
 }));
 
-// Keep validation a no-op so PUT reaches the handler when authorized; body
-// validation is covered by validators.spec.ts.
-vi.mock('./validators', () => ({ updateAiSettingsValidators: [] }));
+// updateAiSettingsValidators now lives inline in put-ai-settings.ts and is mounted
+// for real by the factory; body validation is covered in put-ai-settings.spec.ts.
+// apiV3FormValidator stays a passthrough so validation runs but never blocks → the
+// PUT handler is still reached for the valid body this test sends.
 vi.mock('~/server/middlewares/apiv3-form-validator', () => ({
   apiV3FormValidator: (_req: Request, _res: Response, next: NextFunction) =>
     next(),

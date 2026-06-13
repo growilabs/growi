@@ -5,8 +5,8 @@ import { useFormContext } from 'react-hook-form';
 import { FormFeedback, FormGroup, FormText, Input, Label } from 'reactstrap';
 
 import { AI_PROVIDERS } from '../../interfaces/ai-provider';
+import { isValidProviderOptionsJson } from '../../utils/provider-options-validation';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
-import { isValidProviderOptionsJson } from './provider-options-validation';
 import { registerToInputProps } from './register-to-input-props';
 
 // Vercel AI SDK docs describing the provider-namespaced `providerOptions` shape.

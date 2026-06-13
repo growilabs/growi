@@ -142,13 +142,15 @@ packages/core/src/interfaces/
 apps/app/src/features/mastra/
 ├── interfaces/
 │   └── ai-settings.ts             # GET/PUT DTO 型、編集対象キー一覧 (AI_SETTING_KEYS), aiEnabled を含む
+├── utils/
+│   └── provider-options-validation.ts  # FE/BE 共通の providerOptions JSON 検証述語 isValidProviderOptionsJson(純粋関数)
 ├── server/
 │   ├── routes/
 │   │   ├── admin-ai-settings/
 │   │   │   ├── index.ts           # ルータ factory: GET/PUT に各ハンドラ factory(RequestHandler[])を mount するのみ
 │   │   │   ├── get-ai-settings.ts # getAiSettingsFactory(crowi): [scope+login+admin, getAiSettings ハンドラ]
 │   │   │   ├── put-ai-settings.ts # putAiSettingsFactory(crowi): [scope+login+admin+addActivity+validators+formValidator, ハンドラ(検証→env専用拒否→updateConfigs→cache clear→activity)]
-│   │   │   └── validators.ts      # express-validator チェーン(provider enum / providerOptions JSON / boolean)
+│   │   │   (検証チェーン updateAiSettingsValidators は put-ai-settings.ts に inline 定義 — provider enum / providerOptions は共有述語 / boolean)
 │   │   └── ai-ready-guard.ts      # per-request middleware: isAiReady() でないと 501
 │   └── services/
 │       ├── model-config-sync.ts   # S2sMessageHandlable: configUpdated 受信で resolveMastraModel cache を破棄
@@ -252,7 +254,7 @@ flowchart TD
 | 5.2 | apiKey を平文表示しない | get-ai-settings | isApiKeySet(値非返却) | — |
 | 5.3 | エラーに機密を含めない | put/get ハンドラ | ErrorV3 | — |
 | 6.1 | provider 不正を拒否 | validators, put-ai-settings | isAiProvider | — |
-| 6.2 | providerOptions JSON 検証 | ProviderCommonSettings, validators | JSON.parse チェック | — |
+| 6.2 | providerOptions JSON 検証 | ProviderCommonSettings(client), put-ai-settings(updateAiSettingsValidators) | 共通述語 `isValidProviderOptionsJson`(utils/、FE/BE 共有) | — |
 | 6.3 | 保存失敗時に通知 + 入力保持 | AiSettings | toastError, ローカル state | 保存反映フロー |
 | 7.1 | 有効/無効トグルの提供 | AiEnabledToggle, put-ai-settings | aiEnabled(DTO) | — |
 | 7.2 | 無効/未設定時は API 拒否 | ai-ready-guard, is-ai-configured | isAiReady(), 501 | AI ゲートフロー |
@@ -383,11 +385,11 @@ export interface AiSettingsUpdateRequest {
 ```
 - Idempotency: PUT は冪等(同値再送で副作用は cache clear のみ)。
 - 更新セマンティクス: クライアントは全項目を送信する。**boolean**(`aiEnabled` / `azureOpenaiUseEntraId`)は常に値を送る。**文字列項目**(provider / model / providerOptions / azure 3 項目)は空文字を `undefined` に正規化し、`updateConfigs(..., { removeIfUndefined: true })` で DB から削除する(= 環境変数フォールバックへ戻る、R4.4)。**例外は `apiKey` のみ**(空/未指定 = 既存保持、クリアしない)。
-- Validation: `provider ∈ AI_PROVIDERS`(6.1)、`providerOptions` は非空時 `JSON.parse` 可能(6.2)、`azureOpenaiUseEntraId` は boolean。
+- Validation(`put-ai-settings.ts` に inline 定義の `updateAiSettingsValidators`): `provider ∈ AI_PROVIDERS`(6.1)、`providerOptions` は **FE/BE 共通述語 `isValidProviderOptionsJson`**(`utils/provider-options-validation.ts`、JSON.parse ベース・空=有効)を `.custom()` で適用(6.2)、`azureOpenaiUseEntraId` は boolean。クライアント(`ProviderCommonSettings` の register validate)も同じ述語を使い、判定が完全一致。
 - 成功時副作用: `updateConfigs` → `clearResolvedMastraModelCache()` → `activityEvent.emit('update', _id, { action: ACTION_ADMIN_AI_SETTING_UPDATE })`。
 
 **Implementation Notes**
-- Integration: ハンドラを `get-ai-settings.ts` / `put-ai-settings.ts` に分割、検証を `validators.ts` に抽出(pure functions)。
+- Integration: ハンドラを `get-ai-settings.ts` / `put-ai-settings.ts` に分割。検証チェーンは利用元の `put-ai-settings.ts` に inline 定義(`updateAiSettingsValidators`)。
 - Validation: env 専用モード拒否、apiKey 非返却、provider/providerOptions 検証、activity 発火を integ テスト。
 - Risks: `apiKey` の「未指定=保持/空=保持」境界を明確化(誤クリア防止)。
 
@@ -487,7 +489,8 @@ export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 - `config-definition`: `env:useOnlyEnvVars:ai` が `CONFIG_KEYS`/`CONFIG_DEFINITIONS` に登録され、既存キーの解決に影響しない(回帰)。
 - `isAiConfigured` / `isAiReady`: provider 未設定/必須項目欠落で false、provider 別に必須が揃うと true。`aiEnabled=false` で `isAiReady=false`(7.2, 7.3)。
 - `isAiConfigured` と `resolveMastraModel`: 同一構成で「configured===解決成功」が一致(乖離回帰)。
-- `validators`: provider enum、`providerOptions` JSON 妥当性、boolean(6.1, 6.2)。
+- `updateAiSettingsValidators`(put-ai-settings.spec): provider enum、`providerOptions` 妥当性、boolean(6.1, 6.2)。
+- `isValidProviderOptionsJson`(utils/provider-options-validation.spec): 空=有効 / オブジェクト・配列・プリミティブ OK / 不正 NG(FE/BE 共通述語の単体テスト)。
 
 ### Integration Tests
 - PUT 正常: `aiEnabled` + ai 値が `updateConfigs` 反映 + `clearResolvedMastraModelCache` 呼出 + `ACTION_ADMIN_AI_SETTING_UPDATE` 発火(2.3, 2.4, 7.1)。
