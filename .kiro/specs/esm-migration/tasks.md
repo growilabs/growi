@@ -339,7 +339,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
     - **検証**: tspc/tsgo typecheck クリーン、Biome クリーン、unit 1951 passed/8 skipped (135/136 ファイル、1 ファイルは既知の mongodb-memory-server 403 env 起因)、lint:no-cjs / route-guard 通過、本番起動プローブ (`NODE_ENV=production node -r dotenv-flow/config dist/server/app.js`) が **MongoDB 接続 ECONNREFUSED のみで停止** = ESM 全モジュールグラフのリンク/実行成功 (サンドボックスに DB 無しのため healthcheck 200 は 3.8 ゲートで検証)
     - **既知の影響 (計画どおり/承認済み)**: ts-node 依存スクリプト (`pnpm dev` / `dev:migrate*` / `migrate:umzug` / `repl`) は 3.7.b のランナー置換まで起動不能。`next.config.prod.cjs` → `.mjs` 化、bin/openapi definition の `.cjs` 化、`resource/Contributor.js` ESM 化等の type:module 追随を含む
 
-- [ ] 3.7.a dev runner bake-off で ESM 対応ランナーを実測選定
+- [x] 3.7.a dev runner bake-off で ESM 対応ランナーを実測選定
   - **Precondition (hard)**: タスク 3.6 (NodeNext 切替) 完了後に限り実施。サーバソースが ESM として本番ビルド可能な状態でのみ bake-off 結果が実運用プロファイルを反映する
   - 候補ランナーごとに `apps/app/package.json` の `scripts.dev` を一時的に切替え、cold start wall time (`pnpm dev` 起動 → `/_api/v3/healthcheck` 200 までの壁時計時間) を Phase 0.5 と **同一条件** で 5 回計測し中央値を記録
   - 最低限の候補:
@@ -356,8 +356,9 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 2.7, 6.5_
   - _Depends: 3.6, 0.5_
   - _Boundary: Dev Runner Adapter (selection)_
+  - **実績 (2026-06-13)**: **tsx 4.22.4 を採用** (`node --import tsx`)。`@swc-node/register` 1.10.9 は `^/*` エイリアス (`"^/*": ["./*"]`) を bare package `'^'` と誤解釈して解決不能 → 必須条件 (paths 解決成立) 未達で**失格**。選定は機能要件で確定。`tsconfig.paths` は `~/*`・`^/*`・suffix パターン `~/*.js` すべて tsx で runtime 解決成立 (グラフ全体ロード成功で実証)。**計測 deviation**: 本サンドボックスは MongoDB 不在のため healthcheck 200 計測が実施不能 → モジュールグラフ全ロード時間で代理計測 (tsx 中央値 4029ms / 5 回)。Phase 0.5 ベースライン (devcontainer, Node 24, i7-12650H) との ±20% gate 正式判定は **3.8.e に委譲** (別ハードのため絶対値直接比較は不可)。詳細・生データは `dev-runner-bench.md`
 
-- [ ] 3.7.b 開発/本番起動スクリプトを選定ランナー / --import に切替
+- [x] 3.7.b 開発/本番起動スクリプトを選定ランナー / --import に切替
   - **Note**: `apps/app` の `"type": "module"` 宣言は task 3.6 で前倒し済み (本タスクでの追加は不要)。3.6 以降 ts-node 系スクリプトは起動不能のため、本タスクが dev 復旧の完了点となる
   - `apps/app/package.json` の `scripts.ts-node` を廃止し、`dev` / `launch-dev:ci` / `repl` / `dev:migrate-mongo` を **3.7.a で選定したランナー** ベースに書き換え
   - **(Phase R 追加)** v8 で導入された umzug 系スクリプト (`migrate:umzug`, `dev:umzug` — `pnpm run ts-node prisma/migrate.ts` 経由で TS マイグレーションを実行) も同時に選定ランナーへ移行し、`pnpm run dev:migrate` end-to-end (migrate-mongo + umzug 両系統) を実 DB で再検証する
@@ -367,6 +368,11 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 2.7_
   - _Depends: 3.7.a_
   - _Boundary: Dev Runner Adapter (adoption)_
+  - **実績 (2026-06-13)**: `scripts.ts-node` 削除。全スクリプトを `node --import tsx --import dotenv-flow/config.js` 形式へ移行 (dev / dev:migrate-mongo / dev:umzug / migrate:umzug / launch-dev:ci / repl / snapshot-routes / authz-matrix / ws-authz)。本番 `server` は `node --import dotenv-flow/config.js dist/server/app.js`。tsconfig.json の `ts-node` ブロック削除。**`ts-node` / `tsconfig-paths` / 試用した `@swc-node/register` `@swc/core` を削除**し、**`tsx` は `dependencies`** に配置 (本番 `migrate:umzug` が `preserver` 経路で TS を実行するため devDependencies 不可)。
+    - **発見・修正した実バグ 2 件**: (1) `--import dotenv-flow/config` は ESM 解決で `.js` を自動補完せず `ERR_MODULE_NOT_FOUND` → 全箇所 `--import dotenv-flow/config.js` に明示 (`-r` は CJS 解決が補完していた)。(2) `dev:migrate-mongo` は `migrate-mongo-config.cjs` が dev 分岐で `src/server/util/mongoose-utils.ts` (TS) を require するため tsx 必須 → `--import tsx` を追加 (本番分岐は `dist/.../mongoose-utils.js` なので plain node のまま正しい)
+    - **引数互換**: snapshot/authz 系ツールの `pnpm run ts-node ... -- --out=` の `--` 区切りを除去。3 ツールとも `argv` 全体から `--out=` を `.find/.includes` する実装で `--` 非依存と確認済み
+    - **サンドボックス検証** (MongoDB 不在のため接続到達/グラフロードで代理確認): `server` (本番 ESM) → ECONNREFUSED 到達、`dev:migrate-mongo status` (tsx+CJS bin) → ECONNREFUSED 到達、`dev:umzug pending` (tsx+TS) → ServerSelectionError 到達、`app.ts --ci` (launch-dev:ci 中核) → mongo 接続失敗で exit (catch に一時 console.error を挿し ECONNREFUSED が原因と断定、グラフは完全ロード)。Yjs 二重 import 警告は本番 dist boot にも出る既存事象で tsx 固有でないと確認。typecheck/biome/no-cjs/route-guard green、unit 1951 passed (既知の mongodb-memory-server 403 で `update-activity.spec.ts` 1 ファイルのみ env-fail)
+    - **実 DB での end-to-end (`dev:migrate` 両系統 / healthcheck 200) は push 後 CI** (`ci-app-launch-dev`・`ci-app-test-integration`、mongo サービスコンテナ付き) で検証する
 
 - [ ] 3.8 Phase 3 統合ゲート (MANDATORY — 迂回禁止)
 

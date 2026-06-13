@@ -2,7 +2,8 @@
  * umzug cli
  *
  * Usage:
- *   pnpm ts-node prisma/migrate.ts
+ *   node --import tsx --import dotenv-flow/config prisma/migrate.ts
+ *   (or via the dev:umzug / migrate:umzug scripts)
  */
 import { resolve } from 'node:path';
 import { MongoClient } from 'mongodb';
