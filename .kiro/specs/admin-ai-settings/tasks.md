@@ -98,7 +98,7 @@
   - _Depends: 1.4_
   - _Boundary: client section components_
 
-- [ ] 4.3 設定画面コンテナを実装
+- [x] 4.3 設定画面コンテナを実装
   - セクションを統合し、フォーム一括保存(トグル含む)・成功/失敗トースト・保存失敗時の入力保持・provider に応じた Azure セクション表示・「有効だが未設定」警告(`aiEnabled && !isConfigured`)を制御
   - コンポーネントテスト: 保存でトースト表示+失敗時に入力保持、env 専用モードで全項目 disabled+通知、未設定警告の表示/非表示、azure 選択での Azure セクション表示
   - _Requirements: 1.1, 2.3, 6.2, 6.3, 7.6_
