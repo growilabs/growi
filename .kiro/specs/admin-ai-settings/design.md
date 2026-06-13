@@ -65,6 +65,7 @@
 - **モデルメモ**: `resolve-mastra-model.ts` のモジュールスコープ `memoizedModel` は無効化されない。agent は `model: () => resolveMastraModel()` と遅延評価のため、メモ破棄だけで次回リクエストに反映される(agent 再生成不要)。`resolveProviderOptions` は非メモ化のため対応不要。
 - **AI ゲート(現状の課題)**: mastra ルート(`features/mastra/server/routes/index.ts`)のゲートは **factory 実行時(起動時)に一度だけ** `isAiEnabled()` を評価し、無効なら catch-all を登録する静的な作り。これでは (a) トグルを再起動なしで反映できず、(b) `app:aiEnabled=true` でも `ai:*` 未設定だとルート到達 → `resolveMastraModel()` が throw する。旧 openai 機能の `certify-ai-service` ミドルウェアは既に**リクエスト毎**に `app:aiEnabled` + `openai:serviceType` 妥当性を検査しており、これが踏襲すべき先例。本フィーチャーは mastra ゲートを**リクエスト毎の `有効 かつ 設定済み` 判定**に置き換える。
 - **AI 有効フラグの消費者**: `app:aiEnabled` は mastra ゲート / openai `certify-ai-service` / general-page の `aiEnabled` 供給(→ `aiEnabledAtom` → サイドバー AI ボタン表示)で参照される。
+- **SSR realm 制約(重要)**: `configManager` はモジュールレベルのシングルトンで、Express ブート時に `loadConfigs()` される。getServerSideProps は Next/Turbopack の **別 realm(SSR chunks)** で実行され、その realm にバンドルされた `configManager` は**未ロードの別インスタンス**。したがって getServerSideProps からサーバー状態を読むときは、サーバー専用シングルトンを直接 import せず **Express realm の loaded な `crowi` インスタンス経由**(`crowi.configManager` / `crowi.isAiReady()` 等)で取得する。直接 import は (1) "Config is not loaded"、(2) クライアント import 可能なバレル経由でクライアントバンドルに mongoose 等が混入、の 2 問題を起こす(research.md §11)。
 - **管理ページ**: 最新は vault パターン(`dynamic(ssr:false)` + `createAdminPageLayout` + `getServerSideAdminCommonProps`、unstated コンテナ不使用)。
 
 ### Architecture Pattern & Boundary Map
@@ -170,8 +171,8 @@ apps/app/src/pages/admin/
 - `apps/app/src/server/service/config-manager/config-definition.ts` — 制御キー `env:useOnlyEnvVars:ai`(env 変数 `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS`)を `CONFIG_KEYS` + `CONFIG_DEFINITIONS` に追加し、`ENV_ONLY_GROUPS` に **`ai:*` 8 キー + `app:aiEnabled`** を対象とするグループを追加(`config-manager.ts` のコアは変更不要)
 - `apps/app/src/features/mastra/server/routes/index.ts` — 起動時固定ゲート(`if (!isAiEnabled())`)を撤去し、`ai-ready-guard`(per-request)を `router.use` で適用
 - `apps/app/src/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model.ts` — `clearResolvedMastraModelCache()` を追加・export
-- `apps/app/src/pages/general-page/configuration-props.ts` — サイドバー供給値 `aiEnabled` を `isAiReady()`(有効 かつ 設定済み)由来へ変更
-- `apps/app/src/server/crowi/index.ts` — `setupS2sMessagingService()` で `model-config-sync` ハンドラを `addMessageHandler` 登録
+- `apps/app/src/pages/general-page/configuration-props.ts` — サイドバー供給値 `aiEnabled` を **`crowi.isAiReady()`**(有効 かつ 設定済み)由来へ変更。**`isAiReady` を直接 import しない**(SSR realm 問題 + クライアントバンドル混入を回避 — research.md §11)。import は型(`GetServerSideProps`/`CrowiRequest`)と client-safe enum のみに保つ
+- `apps/app/src/server/crowi/index.ts` — (1) `setupS2sMessagingService()` で `model-config-sync` ハンドラを `addMessageHandler` 登録、(2) 薄いメソッド `isAiReady(): boolean { return resolveIsAiReady(); }` を追加(`isAiReady` を `resolveIsAiReady` として import)。getServerSideProps は Express realm の loaded な `crowi` インスタンス経由でこれを呼ぶ(`crowi.isPageId()` / `crowi.aclService` と同じ確立済みパターン)
 - `apps/app/src/server/routes/apiv3/index.js` — `routerForAdmin.use('/ai-settings', ...)` でマウント
 - `apps/app/src/interfaces/activity.ts` — `ACTION_ADMIN_AI_SETTING_UPDATE` を追加し SupportedAction に登録
 - `apps/app/src/components/Admin/Common/AdminNavigation.tsx` — `'ai'` メニュー(MenuLabel case + MenuLink + モバイル MenuLabel)
@@ -268,7 +269,7 @@ flowchart TD
 | ai-ready-guard | Mastra server | mastra ルートの per-request 利用可否ゲート | 7.2,7.3,7.5 | is-ai-configured (P0) | — |
 | model-config-sync | Mastra server | `configUpdated` 購読で model cache 破棄 | 2.4 | s2s, resolver (P0) | Event |
 | resolve-mastra-model (cache 拡張) | Mastra server | メモ破棄点の提供 | 2.4 | — | Service |
-| configuration-props (general-page) | Server SSR | サイドバー供給 `aiEnabled` を `isAiReady()` 由来へ | 7.4 | is-ai-configured (P1) | — |
+| configuration-props (general-page) | Server SSR | サイドバー供給 `aiEnabled` を `crowi.isAiReady()` 由来へ | 7.4 | crowi.isAiReady (P1) | — |
 | AiSettings | Client | 取得/保存/トースト/セクション統合 | 1.1,2.3,6.3 | useAiSettings (P0) | State |
 | ProviderCommonSettings / AzureOpenaiSettings / AiEnabledToggle / EnvOnlyModeNotice | Client UI | 各設定欄、有効化トグル、env 専用モード表示、azure 専用 | 2.1,3.x,4.2,5.1,6.2,7.1 | AiSettings (P1) | — |
 
@@ -428,7 +429,7 @@ export const clearResolvedMastraModelCache = (): void => { /* memoizedModel = un
 
 **Dependencies**
 - Outbound: `resolveMastraModel`(try/catch でラップ)(P0)、`isAiEnabled`(既存、openai/server/services)(P0)
-- Inbound: mastra ルート(`routes/index.ts`)、general-page `configuration-props`(P1)
+- Inbound: mastra ルート(`routes/index.ts`)は free function を直接利用(その realm では config が loaded)。general-page `configuration-props` は **`crowi.isAiReady()` 経由**で利用(getServerSideProps は SSR realm で実行されるため直接 import 不可 — research.md §11)。crowi に薄いメソッド `isAiReady()` を追加 (P1)
 
 **Contracts**: Service [x]
 ```typescript
