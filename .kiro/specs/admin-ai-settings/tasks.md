@@ -127,7 +127,7 @@
   - _Boundary: locales (admin.json, accesstoken_scopes_desc)_
 
 - [ ] 6. 検証: 横断結合と回帰・品質ゲート
-- [ ] 6.1 横断結合テストと回帰確認、品質ゲートを実行
+- [x] 6.1 横断結合テストと回帰確認、品質ゲートを実行
   - 環境変数専用モードの end-to-end(制御フラグ有効 → 取得で `useOnlyEnvVars` true → 更新が 422)、再起動なし反映(provider 更新 → 次の AI 要求でゲート判定が 501→通過へ遷移)、回帰(`ai:*` 以外の env-only キーが影響を受けない、`isAiConfigured` と `resolveMastraModel` の判定一致)を確認
   - `@growi/app` と `@growi/core` で lint / typecheck / test が緑
   - _Requirements: 4.1, 7.2, 7.3, 7.5_
