@@ -197,7 +197,7 @@ export const putAiSettingsFactory = (crowi: Crowi): RequestHandler[] => {
   };
 
   return [
-    accessTokenParser([SCOPE.WRITE.ADMIN.AI]),
+    accessTokenParser([SCOPE.WRITE.ADMIN.AI], { acceptLegacy: true }),
     loginRequiredStrictly,
     adminRequired,
     addActivity,
