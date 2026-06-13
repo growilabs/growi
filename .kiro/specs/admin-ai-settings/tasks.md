@@ -91,7 +91,7 @@
   - _Depends: 1.4, 3.4_
   - _Boundary: use-ai-settings_
 
-- [ ] 4.2 (P) 設定セクションコンポーネント群を実装
+- [x] 4.2 (P) 設定セクションコンポーネント群を実装
   - 有効化トグル / プロバイダー共通設定(provider 選択肢は対象のみ・apiKey はマスク入力・model・providerOptions の JSON クライアント検証)/ Azure 専用設定(`azure-openai` 選択時のみ表示、Entra ID 時は apiKey 不使用を明示、model はデプロイメント名と案内)/ 環境変数専用モードの通知アラート
   - 各コンポーネントが `useOnlyEnvVars` 連動で readOnly/disabled になり、Azure セクションは非 azure 時に非表示、apiKey 欄がマスク表示される
   - _Requirements: 2.1, 2.2, 3.1, 3.2, 3.3, 3.4, 4.2, 5.1, 6.2, 7.1_
@@ -136,3 +136,4 @@
 ## Implementation Notes
 - 1.1 added `admin:ai` to `@growi/core` source, but `packages/core/dist` is **gitignored** and was stale. Any consumer of `SCOPE.READ/WRITE.ADMIN.AI` (e.g. task 3.4) needs `turbo run build --filter @growi/core` locally before `lint:typecheck` passes. CI handles this via turbo build ordering.
 - crowi/index.ts and config-manager.spec.ts carry pre-existing biome warnings (type aliases `= any`, non-null assertions, default export, async-without-await on legacy test callbacks). These are outside feature boundaries; biome `--diagnostic-level=error` does not fail on them.
+- 4.2 referenced i18n keys (namespace `admin`, prefix `ai_settings.`) that task 5.3 must define in all 5 locales: `ai_enabled_label`, `api_key_label`, `api_key_help`, `api_key_set_placeholder`, `model_label`, `provider_label`, `provider_placeholder`, `provider_options_label`, `provider_options_invalid_json`, `env_only_mode_notice`, `azure_resource_name_label`, `azure_base_url_label`, `azure_api_version_label`, `azure_use_entra_id_label`, `azure_entra_id_api_key_note`, `azure_model_deployment_note`. Task 4.3 (container) and 5.1 (nav) will add more (e.g. save button, page/nav label, unconfigured warning) — 5.3 should sweep all referenced keys.
