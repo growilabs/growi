@@ -14,6 +14,7 @@ import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-lo
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
+import { isAiReady as resolveIsAiReady } from '~/features/mastra/server/services/is-ai-configured';
 import { modelConfigSync } from '~/features/mastra/server/services/model-config-sync';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
@@ -322,6 +323,18 @@ class Crowi {
     }
 
     return false;
+  }
+
+  // AI usability verdict (enabled && configured) for callers that cannot reach
+  // the module-level config singleton safely — notably getServerSideProps, which
+  // runs in the Next/Turbopack SSR realm where a directly-imported configManager
+  // is a separate, never-loaded instance ("Config is not loaded"). Exposing the
+  // verdict here makes it execute in this (Express) realm, where the singleton is
+  // bootstrapped and loaded, so SSR code only needs the crowi reference it already
+  // has. Mirrors the verdict the mastra route guard uses, keeping UI and API
+  // aligned (Req 7.4).
+  isAiReady(): boolean {
+    return resolveIsAiReady();
   }
 
   setConfig(config: Record<string, unknown>): void {
