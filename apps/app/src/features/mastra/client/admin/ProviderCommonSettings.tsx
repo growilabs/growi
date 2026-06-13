@@ -10,6 +10,15 @@ import { isValidProviderOptionsJson } from './provider-options-validation';
 const PROVIDER_OPTIONS_DOC_URL =
   'https://ai-sdk.dev/docs/foundations/provider-options';
 
+// Shown as the textarea placeholder to illustrate the provider-namespaced JSON
+// shape. Language-neutral (a code example), so it is not an i18n string.
+const PROVIDER_OPTIONS_PLACEHOLDER = `{
+    "openai": {
+        "reasoningEffort": "low",
+        "reasoningSummary": "auto"
+    },
+}`;
+
 export interface ProviderCommonSettingsProps {
   /** Current `ai:provider` value (undefined when not yet configured). */
   readonly provider?: AiProvider;
@@ -123,7 +132,8 @@ export const ProviderCommonSettings = (
         <Input
           id={providerOptionsId}
           type="textarea"
-          rows={5}
+          rows={6}
+          placeholder={PROVIDER_OPTIONS_PLACEHOLDER}
           value={providerOptions}
           readOnly={disabled}
           invalid={isProviderOptionsInvalid}
