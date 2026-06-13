@@ -79,7 +79,7 @@ export const AzureOpenaiSettings = (
           id={resourceNameId}
           type="text"
           value={resourceName}
-          readOnly={disabled}
+          disabled={disabled}
           onChange={(e) => onChangeResourceName(e.target.value)}
         />
       </FormGroup>
@@ -90,7 +90,7 @@ export const AzureOpenaiSettings = (
           id={baseUrlId}
           type="text"
           value={baseUrl}
-          readOnly={disabled}
+          disabled={disabled}
           onChange={(e) => onChangeBaseUrl(e.target.value)}
         />
       </FormGroup>
@@ -103,7 +103,7 @@ export const AzureOpenaiSettings = (
           id={apiVersionId}
           type="text"
           value={apiVersion}
-          readOnly={disabled}
+          disabled={disabled}
           onChange={(e) => onChangeApiVersion(e.target.value)}
         />
       </FormGroup>

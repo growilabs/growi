@@ -30,7 +30,11 @@ export interface ProviderCommonSettingsProps {
   readonly providerOptions: string;
   /** Whether an apiKey is already stored on the server (5.2). */
   readonly isApiKeySet: boolean;
-  /** Disable/read-only the inputs when env-only mode is active (4.2). */
+  /**
+   * Disable the inputs when env-only mode is active (4.2). `disabled` (not
+   * `readOnly`) is used so the locked fields are also removed from the tab order
+   * and cannot receive focus, matching the always-`disabled` provider select.
+   */
   readonly disabled: boolean;
   readonly onChangeProvider: (next: AiProvider) => void;
   readonly onChangeApiKey: (next: string) => void;
@@ -45,7 +49,7 @@ export interface ProviderCommonSettingsProps {
  * The provider select offers only the supported providers (2.2). The apiKey
  * field is password-masked (5.1) and write-only. `providerOptions` is checked
  * for JSON validity locally and surfaces an inline error (6.2). Every input is
- * disabled/read-only when `disabled` (driven by `useOnlyEnvVars`) is true.
+ * disabled (not focusable) when `disabled` (driven by `useOnlyEnvVars`) is true.
  */
 export const ProviderCommonSettings = (
   props: ProviderCommonSettingsProps,
@@ -104,7 +108,7 @@ export const ProviderCommonSettings = (
           id={apiKeyId}
           type="password"
           value={apiKey}
-          readOnly={disabled}
+          disabled={disabled}
           autoComplete="new-password"
           placeholder={
             isApiKeySet ? t('ai_settings.api_key_set_placeholder') : ''
@@ -120,7 +124,7 @@ export const ProviderCommonSettings = (
           id={modelId}
           type="text"
           value={model}
-          readOnly={disabled}
+          disabled={disabled}
           onChange={(e) => onChangeModel(e.target.value)}
         />
       </FormGroup>
@@ -135,7 +139,7 @@ export const ProviderCommonSettings = (
           rows={6}
           placeholder={PROVIDER_OPTIONS_PLACEHOLDER}
           value={providerOptions}
-          readOnly={disabled}
+          disabled={disabled}
           invalid={isProviderOptionsInvalid}
           onChange={(e) => onChangeProviderOptions(e.target.value)}
         />

@@ -160,7 +160,7 @@ apps/app/src/features/mastra/
         ├── ProviderCommonSettings.tsx  # ai:provider / apiKey / model / providerOptions
         ├── AzureOpenaiSettings.tsx     # azure 4 キー(provider=azure-openai 時に有効化)
         ├── AiEnabledToggle.tsx         # app:aiEnabled の有効/無効トグル
-        ├── EnvOnlyModeNotice.tsx       # 環境変数専用モード有効時の alert(各入力は flag 連動で readOnly)
+        ├── EnvOnlyModeNotice.tsx       # 環境変数専用モード有効時の alert(各入力は flag 連動で disabled=フォーカス不可)
         └── use-ai-settings.ts          # SWR フック(apiv3Get) + 保存関数(apiv3Put)
 
 apps/app/src/pages/admin/
@@ -455,7 +455,7 @@ export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 
 #### ProviderCommonSettings / AzureOpenaiSettings / AiEnabledToggle / EnvOnlyModeNotice(Summary-only)
 - `AiEnabledToggle`: `app:aiEnabled` の有効/無効スイッチ(7.1)。フォーム state を更新し保存ボタンで PUT body の `aiEnabled` に反映。`useOnlyEnvVars` 連動で `disabled`。
-- `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(JSON、クライアント側 parse 検証=6.2)。各入力は `useOnlyEnvVars` 連動で `readOnly`/`disabled`。
+- `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(JSON、クライアント側 parse 検証=6.2)。各入力は `useOnlyEnvVars` 連動で **`disabled`**(`readOnly` ではなく — タブ順から除外しフォーカス不可にするため。env 専用時は完全ロック扱い)。
 - `AzureOpenaiSettings`: azure 4 キー。`provider !== 'azure-openai'` のときは**非表示**(3.2)。`useEntraId=true` 時は apiKey 不使用を明示(3.3)、model=deployment 名の注記(3.4)。
 - `EnvOnlyModeNotice`: `useOnlyEnvVars` が true のとき alert を表示し、全項目が環境変数で固定され編集不可である旨を明示(4.2)。SiteUrlSetting の env 専用モード表示パターンを踏襲。
 
@@ -495,7 +495,7 @@ export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 ### Component Tests (UI / React Testing Library)
 - `AiSettings`: 保存操作で `apiv3Put` 呼出 → 成功時 `toastSuccess`、失敗時 `toastError` + 入力 state 保持(2.3, 6.3)。
 - `AiEnabledToggle`: 切り替えが PUT body の `aiEnabled` に反映、`useOnlyEnvVars=true` で disabled(7.1)。
-- env 専用モード(`useOnlyEnvVars=true`)で全フィールド(トグル含む)が readOnly/disabled + モード明示の alert を表示(4.2)。
+- env 専用モード(`useOnlyEnvVars=true`)で全フィールド(トグル含む)が disabled(フォーカス不可)+ モード明示の alert を表示(4.2)。
 - `aiEnabled=true && isConfigured=false` で「有効だが未設定」警告 alert を表示し、両者が揃うと非表示(7.6)。
 - provider=azure-openai 選択時のみ Azure セクションを表示、`useEntraId` で apiKey 不使用提示(3.2, 3.3)。
 

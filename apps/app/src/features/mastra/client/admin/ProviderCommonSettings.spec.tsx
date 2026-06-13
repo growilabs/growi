@@ -107,18 +107,18 @@ describe('ProviderCommonSettings', () => {
   });
 
   describe('env-only mode', () => {
-    it('disables the provider select and makes text inputs read-only', () => {
+    it('disables every input so the locked fields cannot be focused', () => {
       // Act
       renderComponent({ disabled: true });
 
-      // Assert
+      // Assert: disabled (not readOnly) so the fields are removed from the tab
+      // order and cannot receive focus.
       expect(screen.getByRole('combobox')).toBeDisabled();
+      expect(screen.getByLabelText('ai_settings.api_key_label')).toBeDisabled();
+      expect(screen.getByLabelText('ai_settings.model_label')).toBeDisabled();
       expect(
-        screen.getByLabelText('ai_settings.api_key_label'),
-      ).toHaveAttribute('readonly');
-      expect(screen.getByLabelText('ai_settings.model_label')).toHaveAttribute(
-        'readonly',
-      );
+        screen.getByLabelText('ai_settings.provider_options_label'),
+      ).toBeDisabled();
     });
   });
 

@@ -207,14 +207,12 @@ describe('AiSettings', () => {
       expect(
         screen.getByText('ai_settings.env_only_mode_notice'),
       ).toBeInTheDocument();
-      // ...the toggle/inputs are disabled/read-only...
+      // ...the toggle/inputs are disabled (not focusable)...
       expect(
         screen.getByLabelText('ai_settings.ai_enabled_label'),
       ).toBeDisabled();
       expect(screen.getByRole('combobox')).toBeDisabled();
-      expect(screen.getByLabelText('ai_settings.model_label')).toHaveAttribute(
-        'readonly',
-      );
+      expect(screen.getByLabelText('ai_settings.model_label')).toBeDisabled();
       // ...and saving is not possible.
       expect(getSaveButton()).toBeDisabled();
     });

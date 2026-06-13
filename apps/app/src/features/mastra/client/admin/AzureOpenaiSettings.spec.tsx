@@ -84,14 +84,20 @@ describe('AzureOpenaiSettings', () => {
     expect(onChangeUseEntraId).toHaveBeenCalledWith(true);
   });
 
-  it('makes inputs read-only and the switch disabled in env-only mode', () => {
+  it('disables every input (not focusable) in env-only mode', () => {
     // Act
     renderComponent({ disabled: true });
 
-    // Assert
+    // Assert: disabled (not readOnly) so the locked fields cannot be focused.
     expect(
       screen.getByLabelText('ai_settings.azure_resource_name_label'),
-    ).toHaveAttribute('readonly');
+    ).toBeDisabled();
+    expect(
+      screen.getByLabelText('ai_settings.azure_base_url_label'),
+    ).toBeDisabled();
+    expect(
+      screen.getByLabelText('ai_settings.azure_api_version_label'),
+    ).toBeDisabled();
     expect(screen.getByRole('switch')).toBeDisabled();
   });
 });
