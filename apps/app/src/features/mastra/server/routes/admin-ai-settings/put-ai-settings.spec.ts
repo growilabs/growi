@@ -118,7 +118,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         { useOnlyEnvVars: true },
       );
 
-      const apiv3Err = res.apiv3Err as unknown as ReturnType<typeof vi.fn>;
+      const apiv3Err = vi.mocked(res.apiv3Err);
       expect(apiv3Err).toHaveBeenCalledTimes(1);
       expect(apiv3Err.mock.calls[0][1]).toBe(422);
       expect(updateConfigs).not.toHaveBeenCalled();
@@ -231,7 +231,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
 
       const { res } = await invoke({ apiKey: 'sk-leak-me-not' });
 
-      const apiv3Err = res.apiv3Err as unknown as ReturnType<typeof vi.fn>;
+      const apiv3Err = vi.mocked(res.apiv3Err);
       expect(apiv3Err).toHaveBeenCalledTimes(1);
       expect(res.apiv3).not.toHaveBeenCalled();
       const errArg = apiv3Err.mock.calls[0][0];

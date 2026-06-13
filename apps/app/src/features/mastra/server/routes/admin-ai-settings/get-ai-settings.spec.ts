@@ -66,7 +66,7 @@ const invoke = () => {
 
 // Pull the single object the handler handed to res.apiv3().
 const responseBody = (res: ApiV3Response): Record<string, unknown> => {
-  const apiv3 = res.apiv3 as unknown as ReturnType<typeof vi.fn>;
+  const apiv3 = vi.mocked(res.apiv3);
   expect(apiv3).toHaveBeenCalledTimes(1);
   return apiv3.mock.calls[0][0] as Record<string, unknown>;
 };
@@ -171,7 +171,7 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
 
     const { res } = invoke();
 
-    const apiv3Err = res.apiv3Err as unknown as ReturnType<typeof vi.fn>;
+    const apiv3Err = vi.mocked(res.apiv3Err);
     expect(apiv3Err).toHaveBeenCalledTimes(1);
     expect(res.apiv3).not.toHaveBeenCalled();
     const errArg = apiv3Err.mock.calls[0][0];

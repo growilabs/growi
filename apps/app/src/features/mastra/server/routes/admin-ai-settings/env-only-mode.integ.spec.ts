@@ -92,7 +92,7 @@ const invokeGet = (): AiSettingsResponse => {
   const req = mock<Request>();
   const res = mock<ApiV3Response>();
   getAiSettings(req, res);
-  const apiv3 = res.apiv3 as unknown as ReturnType<typeof vi.fn>;
+  const apiv3 = vi.mocked(res.apiv3);
   expect(res.apiv3Err).not.toHaveBeenCalled();
   expect(apiv3).toHaveBeenCalledTimes(1);
   return apiv3.mock.calls[0][0] as AiSettingsResponse;
@@ -160,7 +160,7 @@ describe('admin-ai-settings env-only mode end-to-end (Req 4.1, 4.2, 4.3)', () =>
         model: 'should-not-be-saved',
       });
 
-      const apiv3Err = res.apiv3Err as unknown as ReturnType<typeof vi.fn>;
+      const apiv3Err = vi.mocked(res.apiv3Err);
       expect(apiv3Err).toHaveBeenCalledTimes(1);
       expect(apiv3Err.mock.calls[0][1]).toBe(422);
       expect(res.apiv3).not.toHaveBeenCalled();
