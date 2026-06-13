@@ -39,12 +39,14 @@ const clearableConfigString = (field: string): ValidationChain =>
 
 /**
  * express-validator chain for PUT /_api/v3/ai-settings (formal validation, Req 6.1/6.2).
- * All fields optional (partial update). provider must be a supported AI provider;
- * the string fields are type-guarded with .isString(); the clearable ones are
- * sanitized ('' -> undefined) so removeIfUndefined deletes them (Req 4.4);
- * providerOptions must be valid JSON when present; the boolean toggles must be
- * real booleans. Semantic option validity is the provider integration's
- * responsibility.
+ * Every field is optional at the validation layer, but the request is a FULL-STATE
+ * REPLACE rather than a PATCH — see the `AiSettingsUpdateRequest` contract for the
+ * omit semantics (omitted clearable strings are reset; apiKey/booleans are merge
+ * exceptions). provider must be a supported AI provider; the string fields are
+ * type-guarded with .isString(); the clearable ones are sanitized ('' -> undefined)
+ * so removeIfUndefined deletes them (Req 4.4); providerOptions must be valid JSON
+ * when present; the boolean toggles must be real booleans. Semantic option validity
+ * is the provider integration's responsibility.
  */
 export const updateAiSettingsValidators: ValidationChain[] = [
   body('aiEnabled')
@@ -88,11 +90,14 @@ type AiConfigUpdates = Parameters<typeof configManager.updateConfigs>[0];
 /**
  * Build the config updates from a validated request body.
  *
- * Update semantics (design "API Contract"):
+ * Update semantics (design "API Contract"): FULL-STATE REPLACE, not PATCH.
  *   - the clearable string fields are already normalized ('' -> undefined) by the
  *     validator's customSanitizer (middleware that runs before this handler), so
  *     they are mapped directly and ALWAYS placed in the object — `removeIfUndefined`
- *     then removes the cleared ones from the DB (Req 4.4).
+ *     then removes the cleared ones from the DB (Req 4.4). Consequently a field the
+ *     request OMITTED is `undefined` here too and is likewise removed: an omitted
+ *     clearable string is reset to its env default, not preserved. Callers must
+ *     send the complete set (the admin form always does); see AiSettingsUpdateRequest.
  *   - boolean fields are always saved when provided (toggle / Entra ID)
  *   - `ai:apiKey` is the exception: it has NO sanitizer, so it is included only
  *     when a non-empty string is sent; an empty/omitted apiKey preserves the

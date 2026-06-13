@@ -25,19 +25,33 @@ export interface AiSettingsResponse {
 /**
  * PUT /_api/v3/ai-settings request.
  *
- * All fields are optional. `apiKey` is special: an empty/omitted value keeps the
- * existing stored key (it is never cleared by this request).
+ * Semantics are FULL-STATE REPLACE, not PATCH: the admin form always submits the
+ * complete set of values, so an omitted *clearable string* field is treated as
+ * "cleared" — it is removed from the DB and the effective value falls back to its
+ * env var (Req 4.4). A partial request that omits these will therefore RESET them;
+ * an API client must send the complete set, not just the fields it wants changed.
+ *
+ * Two groups are EXCEPTIONS and behave as merge (omit = keep the current value):
+ *   - `apiKey`: an empty or omitted value keeps the existing stored key; it is
+ *     never cleared by this request. A new key is applied only when a non-empty
+ *     string is sent (Req 5.x).
+ *   - the booleans (`aiEnabled`, `azureOpenaiUseEntraId`): applied only when
+ *     explicitly provided; omitting one leaves the stored value untouched.
+ *
+ * Every field is typed optional so the exceptions above can be omitted — this is
+ * NOT an invitation to send a partial set of the clearable strings expecting the
+ * rest to survive (they will be reset to their env defaults).
  */
 export interface AiSettingsUpdateRequest {
-  aiEnabled?: boolean; // toggle for app:aiEnabled (7.1)
-  provider?: AiProvider;
-  apiKey?: string; // empty/omitted keeps the existing value (5.x)
-  model?: string;
-  providerOptions?: string;
-  azureOpenaiResourceName?: string;
-  azureOpenaiBaseUrl?: string;
-  azureOpenaiApiVersion?: string;
-  azureOpenaiUseEntraId?: boolean;
+  aiEnabled?: boolean; // merge: applied only when provided; omit = keep (7.1)
+  provider?: AiProvider; // clearable: omit = reset to env default (4.4)
+  apiKey?: string; // merge: empty/omitted keeps the existing value (5.x)
+  model?: string; // clearable: omit = reset to env default (4.4)
+  providerOptions?: string; // clearable: omit = reset to env default (4.4)
+  azureOpenaiResourceName?: string; // clearable: omit = reset to env default (4.4)
+  azureOpenaiBaseUrl?: string; // clearable: omit = reset to env default (4.4)
+  azureOpenaiApiVersion?: string; // clearable: omit = reset to env default (4.4)
+  azureOpenaiUseEntraId?: boolean; // merge: applied only when provided; omit = keep
 }
 
 /**
