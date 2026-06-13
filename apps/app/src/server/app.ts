@@ -39,10 +39,13 @@ async function main() {
       });
     }
   } catch (err) {
-    // Print synchronously to stderr first: pino's async transport can drop the
+    // Write synchronously to stderr first: pino's async transport can drop the
     // final log line when the process exits immediately afterwards, which would
-    // otherwise make a fatal startup error vanish without a trace.
-    console.error('Failed to start the server:', err);
+    // otherwise make a fatal startup error vanish without a trace. Use the raw
+    // stream rather than console.* to satisfy the no-console lint rule.
+    process.stderr.write(
+      `Failed to start the server: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
+    );
     logger.error('An error occurred, unable to start the server');
     logger.error(err);
     process.exit(1);
