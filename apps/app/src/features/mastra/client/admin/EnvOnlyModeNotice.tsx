@@ -32,7 +32,7 @@ export const EnvOnlyModeNotice = (
   }
 
   return (
-    <Alert color="info" className="mb-3">
+    <Alert color="warning" className="mb-3">
       <p className={isCloud ? 'mb-2' : 'mb-0'}>
         {t('ai_settings.env_only_mode_notice')}
       </p>
