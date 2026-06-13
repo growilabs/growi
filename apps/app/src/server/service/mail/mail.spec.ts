@@ -1,9 +1,9 @@
 import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
-import type Crowi from '../../crowi';
-import type { IConfigManagerForApp } from '../config-manager';
-import MailService from './mail';
-import { createOAuth2Client } from './oauth2';
+import type Crowi from '../../crowi/index.js';
+import type { IConfigManagerForApp } from '../config-manager/index.js';
+import MailService from './mail.js';
+import { createOAuth2Client } from './oauth2.js';
 
 // Mock the FailedEmail model
 vi.mock('../../models/failed-email', () => ({
@@ -236,13 +236,13 @@ describe('MailService', () => {
 
   describe('storeFailedEmail', () => {
     beforeEach(async () => {
-      const { FailedEmail } = await import('../../models/failed-email');
+      const { FailedEmail } = await import('../../models/failed-email.js');
       vi.mocked(FailedEmail.create).mockClear();
       vi.mocked(FailedEmail.create).mockResolvedValue({} as never);
     });
 
     it('should store failed email with all required fields', async () => {
-      const { FailedEmail } = await import('../../models/failed-email');
+      const { FailedEmail } = await import('../../models/failed-email.js');
 
       const config = {
         to: 'recipient@example.com',
@@ -274,7 +274,7 @@ describe('MailService', () => {
     });
 
     it('should store OAuth 2.0 error code if present', async () => {
-      const { FailedEmail } = await import('../../models/failed-email');
+      const { FailedEmail } = await import('../../models/failed-email.js');
 
       const config = {
         to: 'recipient@example.com',
@@ -300,7 +300,7 @@ describe('MailService', () => {
     });
 
     it('should handle model creation errors gracefully', async () => {
-      const { FailedEmail } = await import('../../models/failed-email');
+      const { FailedEmail } = await import('../../models/failed-email.js');
 
       const config = {
         to: 'recipient@example.com',

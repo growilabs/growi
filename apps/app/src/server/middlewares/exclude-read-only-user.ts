@@ -1,10 +1,10 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Response } from 'express';
-import type { Request } from 'express-validator/src/base';
+import type { Request } from 'express-validator/src/base.js';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { configManager } from '../service/config-manager';
+import { configManager } from '../service/config-manager/index.js';
 
 const logger = loggerFactory('growi:middleware:exclude-read-only-user');
 

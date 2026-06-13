@@ -2,9 +2,9 @@ import type { Extension } from '@codemirror/state';
 import { ViewPlugin } from '@codemirror/view';
 import type { WebsocketProvider } from 'y-websocket';
 
-import { richCursorsTheme } from './dom';
-import type { ScrollCallbackRef } from './plugin';
-import { YRichCursorsPluginValue } from './plugin';
+import { richCursorsTheme } from './dom/index.js';
+import type { ScrollCallbackRef } from './plugin.js';
+import { YRichCursorsPluginValue } from './plugin.js';
 
 type Awareness = WebsocketProvider['awareness'];
 

@@ -12,19 +12,19 @@ import methodOverride from 'method-override';
 import passport from 'passport';
 import qs from 'qs';
 
-import { resolveFromRoot } from '~/server/util/project-dir-utils';
+import { resolveFromRoot } from '~/server/util/project-dir-utils.js';
 
 import {
   PLUGIN_EXPRESS_STATIC_DIR,
   PLUGIN_STORING_PATH,
-} from '../../features/growi-plugin/server/consts';
-import loggerFactory from '../../utils/logger';
-import { setup as setupAutoReconnectToS2sMsgServer } from '../middlewares/auto-reconnect-to-s2s-msg-server';
-import CertifyOrigin from '../middlewares/certify-origin';
-import { denyUploadsDirectAccess } from '../middlewares/deny-uploads-direct-access';
-import { setup as setupInjectCurrentuserToLocalvars } from '../middlewares/inject-currentuser-to-localvars';
-import registerSafeRedirectFactory from '../middlewares/safe-redirect';
-import avoidSessionRoutes from '../routes/avoid-session-routes';
+} from '../../features/growi-plugin/server/consts/index.js';
+import loggerFactory from '../../utils/logger/index.js';
+import { setup as setupAutoReconnectToS2sMsgServer } from '../middlewares/auto-reconnect-to-s2s-msg-server.js';
+import CertifyOrigin from '../middlewares/certify-origin.js';
+import { denyUploadsDirectAccess } from '../middlewares/deny-uploads-direct-access.js';
+import { setup as setupInjectCurrentuserToLocalvars } from '../middlewares/inject-currentuser-to-localvars.js';
+import registerSafeRedirectFactory from '../middlewares/safe-redirect.js';
+import avoidSessionRoutes from '../routes/avoid-session-routes.js';
 
 const logger = loggerFactory('growi:crowi:express-init');
 

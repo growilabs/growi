@@ -3,7 +3,7 @@ import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
 export interface UserGroupDocument extends IUserGroup, Document {}
 

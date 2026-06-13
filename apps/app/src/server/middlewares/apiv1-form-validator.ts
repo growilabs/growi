@@ -1,9 +1,9 @@
 import type { NextFunction, Request, Response } from 'express';
 import { validationResult } from 'express-validator';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
-import ApiResponse from '../util/apiResponse';
+import ApiResponse from '../util/apiResponse.js';
 
 const logger = loggerFactory('growi:middlewares:ApiV1FormValidator');
 

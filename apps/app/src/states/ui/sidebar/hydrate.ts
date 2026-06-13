@@ -1,13 +1,14 @@
 import { useHydrateAtoms } from 'jotai/utils';
 
-import type { ISidebarConfig } from '../../../interfaces/sidebar-config';
-import { SidebarContentsType } from '../../../interfaces/ui';
-import type { IUserUISettings } from '../../../interfaces/user-ui-settings';
+import { SidebarContentsType } from '~/interfaces/ui.js';
 import {
   currentProductNavWidthAtom,
   currentSidebarContentsAtom,
   preferCollapsedModeAtom,
-} from './sidebar';
+} from '~/states/ui/sidebar/sidebar.js';
+
+import type { ISidebarConfig } from '../../../interfaces/sidebar-config.js';
+import type { IUserUISettings } from '../../../interfaces/user-ui-settings.js';
 
 /**
  * Hook for hydrating sidebar-related UI state atoms with server-side data

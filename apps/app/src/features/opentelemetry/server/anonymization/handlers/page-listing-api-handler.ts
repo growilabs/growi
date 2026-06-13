@@ -1,9 +1,10 @@
 import type { IncomingMessage } from 'node:http';
 import { diag } from '@opentelemetry/api';
 
-import { ATTR_HTTP_TARGET } from '../../semconv';
-import type { AnonymizationModule } from '../interfaces/anonymization-module';
-import { anonymizeQueryParams } from '../utils/anonymize-query-params';
+import { anonymizeQueryParams } from '~/features/opentelemetry/server/anonymization/utils/anonymize-query-params.js';
+import { ATTR_HTTP_TARGET } from '~/features/opentelemetry/server/semconv.js';
+
+import type { AnonymizationModule } from '../interfaces/anonymization-module.js';
 
 const logger = diag.createComponentLogger({
   namespace: 'growi:anonymization:page-listing-handler',

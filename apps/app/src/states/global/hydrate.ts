@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 import { useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 
-import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
-import { createAtomTuple } from '~/utils/jotai-utils';
-
-import { _atomsForHydration } from './global';
+import type {
+  CommonEachProps,
+  CommonInitialProps,
+} from '~/pages/common-props/index.js';
+import { _atomsForHydration } from '~/states/global/global.js';
+import { createAtomTuple } from '~/utils/jotai-utils.js';
 
 const {
   appTitleAtom,

@@ -6,9 +6,10 @@
 import { useCallback, useMemo, useRef } from 'react';
 import type { Text as YText } from 'yjs';
 
-import type { SseDetectedDiff } from '../../interfaces/editor-assistant/sse-schemas';
-import type { ProcessingResult } from '../interfaces/types';
-import { ClientSearchReplaceProcessor } from './editor-assistant/processor';
+import { ClientSearchReplaceProcessor } from '~/features/openai/client/services/editor-assistant/processor.js';
+
+import type { SseDetectedDiff } from '../../interfaces/editor-assistant/sse-schemas.js';
+import type { ProcessingResult } from '../interfaces/types.js';
 
 // -----------------------------------------------------------------------------
 // Integration Configuration

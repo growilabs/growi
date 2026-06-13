@@ -22,9 +22,9 @@
  * | 'true'   | 'verifying'               | ANY          | ANY            | skip               |
  */
 
-import type { BootstrapState } from './bootstrap-state-machine';
+import type { BootstrapState } from './bootstrap-state-machine.js';
 
-export type { TriggerSource } from './bootstrap-state-machine';
+export type { TriggerSource } from './bootstrap-state-machine.js';
 
 export type BootstrapEnvValue = 'true' | 'false' | 'force' | 'unknown';
 

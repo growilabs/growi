@@ -1,5 +1,9 @@
-import type { IApiRateLimitEndpointMap } from '../config';
-import { defaultConfig, defaultConfigWithRegExp } from '../config';
+import {
+  defaultConfig,
+  defaultConfigWithRegExp,
+} from '~/features/rate-limiter/config/index.js';
+
+import type { IApiRateLimitEndpointMap } from '../config/index.js';
 
 const envVar = process.env;
 

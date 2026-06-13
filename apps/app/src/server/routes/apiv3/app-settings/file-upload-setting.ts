@@ -8,17 +8,17 @@ import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
-import { SupportedAction } from '~/interfaces/activity';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import adminRequiredFactory from '~/server/middlewares/admin-required';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { configManager } from '~/server/service/config-manager';
-import { getTranslation } from '~/server/service/i18next';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction } from '~/interfaces/activity.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import adminRequiredFactory from '~/server/middlewares/admin-required.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { getTranslation } from '~/server/service/i18next.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:app-settings:file-upload-setting',

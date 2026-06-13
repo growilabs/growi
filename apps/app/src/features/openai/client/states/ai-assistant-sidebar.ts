@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { AiAssistantHasId } from '../../interfaces/ai-assistant';
-import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
+import type { AiAssistantHasId } from '../../interfaces/ai-assistant.js';
+import type { IThreadRelationHasId } from '../../interfaces/thread-relation.js';
 
 /**
  * Type definition for AI Assistant Sidebar status

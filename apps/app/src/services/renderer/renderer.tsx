@@ -12,26 +12,25 @@ import math from 'remark-math';
 import deepmerge from 'ts-deepmerge';
 import type { Pluggable, PluginTuple } from 'unified';
 
-import { CodeBlock } from '~/components/ReactMarkdownComponents/CodeBlock';
-import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
-import type { RendererOptions } from '~/interfaces/renderer-options';
-import { RehypeSanitizeType } from '~/interfaces/services/rehype-sanitize';
-import type { RendererConfig } from '~/interfaces/services/renderer';
-import loggerFactory from '~/utils/logger';
-
+import { CodeBlock } from '~/components/ReactMarkdownComponents/CodeBlock.js';
+import { NextLink } from '~/components/ReactMarkdownComponents/NextLink.js';
+import type { RendererOptions } from '~/interfaces/renderer-options.js';
+import { RehypeSanitizeType } from '~/interfaces/services/rehype-sanitize.js';
+import type { RendererConfig } from '~/interfaces/services/renderer.js';
 import {
   attributes as recommendedAttributes,
   tagNames as recommendedTagNames,
-} from './recommended-whitelist';
-import * as addClass from './rehype-plugins/add-class';
-import * as addInlineProperty from './rehype-plugins/add-inline-code-property';
-import { relativeLinks } from './rehype-plugins/relative-links';
-import { relativeLinksByPukiwikiLikeLinker } from './rehype-plugins/relative-links-by-pukiwiki-like-linker';
-import * as codeBlock from './remark-plugins/codeblock';
-import * as echoDirective from './remark-plugins/echo-directive';
-import * as emoji from './remark-plugins/emoji';
-import { pukiwikiLikeLinker } from './remark-plugins/pukiwiki-like-linker';
-import * as xsvToTable from './remark-plugins/xsv-to-table';
+} from '~/services/renderer/recommended-whitelist.js';
+import * as addClass from '~/services/renderer/rehype-plugins/add-class.js';
+import * as addInlineProperty from '~/services/renderer/rehype-plugins/add-inline-code-property.js';
+import { relativeLinks } from '~/services/renderer/rehype-plugins/relative-links.js';
+import { relativeLinksByPukiwikiLikeLinker } from '~/services/renderer/rehype-plugins/relative-links-by-pukiwiki-like-linker.js';
+import * as codeBlock from '~/services/renderer/remark-plugins/codeblock.js';
+import * as echoDirective from '~/services/renderer/remark-plugins/echo-directive.js';
+import * as emoji from '~/services/renderer/remark-plugins/emoji.js';
+import { pukiwikiLikeLinker } from '~/services/renderer/remark-plugins/pukiwiki-like-linker.js';
+import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 // import EasyGrid from './PreProcessor/EasyGrid';
 

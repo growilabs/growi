@@ -19,8 +19,8 @@ import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
 
-import type { BookmarkModel } from '../../models/bookmark';
-import type { ShareLinkModel } from '../../models/share-link';
+import type { BookmarkModel } from '../../models/bookmark.js';
+import type { ShareLinkModel } from '../../models/share-link.js';
 
 let rootPage: PageDocument;
 let dummyUser1: HydratedDocument<IUser>;

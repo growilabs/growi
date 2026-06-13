@@ -4,14 +4,13 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import loggerFactory from '~/utils/logger';
-
-import { getOpenaiService } from '../services/openai';
-import { certifyAiService } from './middlewares/certify-ai-service';
+import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
+import { getOpenaiService } from '~/features/openai/server/services/openai.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:get-ai-assistants');
 

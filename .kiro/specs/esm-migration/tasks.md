@@ -124,7 +124,8 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 - [x] 2.3 ワークスペースルートと `apps/app` に `"type": "module"` を宣言
   - ルート `package.json` に `"type": "module"` を追加 (Req 5.1)
-  - **`apps/app/package.json` への宣言は Phase 3.7.b に延期** — ts-node v10 は `"type":"module"` 宣言済みパッケージ内の `.ts` ファイルを `require()` できず、`dev:migrate` (turbo で `dev` の必須依存) が破綻するため。Phase 3.7.b で dev runner を tsx/swc-node に切り替える際に同時追加する (Req 5.2 は Phase 3 で充足)
+  - **`apps/app` への宣言は Phase 3.7.b に延期** — ts-node v10 は `"type":"module"` 宣言済みパッケージ内の `.ts` ファイルを `require()` できず、`dev:migrate` (turbo で `dev` の必須依存) が破綻するため。Phase 3.7.b で dev runner を tsx/swc-node に切り替える際に同時追加する (Req 5.2 は Phase 3 で充足)
+  - **(更新 2026-06-12)** 上記延期分は **task 3.6 で前倒し宣言済み** — NodeNext + `import.meta` が type:module 無しでは成立しない (TS1470) ため。代償として ts-node 系スクリプトは 3.7.b まで起動不能 (ユーザー承認済み、3.6 実績参照)
   - `pnpm install` が成功し、root の type:module 宣言が既存パッケージ解決に影響しないことを確認
   - _Requirements: 5.1_
   - _Depends: 2.1, 2.2_
@@ -229,7 +230,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 2.2, 2.3, 2.5, 2.6_
   - _Boundary: Codemod Transform (tooling)_
 
-- [ ] 3.3 段階適用: codemod を依存の内側から外側へディレクトリ単位で適用
+- [x] 3.3 段階適用: codemod を依存の内側から外側へディレクトリ単位で適用
   - 各 step は単一コミット。失敗時は当該 step のみ revert して原因修正後に再実行する (Req 6.6)
   - 各 step 完了後に `tsc --noEmit` を実行し、型エラー 0 件を確認 (NodeNext 切替前のため `.js` 拡張子エラーは許容)
 
@@ -305,27 +306,38 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Codemod Transform (crowi)_
   - **実績 (2026-06-12)**: crowi 3 ファイル変換 (setup-models.ts は 3.3.a 時点で既 ESM)。条件付き redis スタックと MailService (パターン 8 lazy) は `await import()` で lazy 維持、無条件外部依存はトップ import 化。ts-node 専用 `require.extensions` hack は `typeof require` ガードで ESM ビルド時 inert 化 (完全撤去は 3.7.b)。ESLint 不在のため **`lint:no-cjs`** (guard の `--cjs-only` モード、TDD 13/13) を import/no-commonjs 相当として追加 — **src/server 全域 349 ファイルで CJS 構文 0 件**。統計累計: module.exports 63 (mw 5 + util 6 + routes 50 + crowi 2) + feature routes 5 (3.3.f 追補) = 全件変換済み
 
-- [ ] 3.4 `ts2esm` で `.js` 拡張子を補完
+- [x] 3.4 `ts2esm` で `.js` 拡張子を補完
   - `ts2esm` を `apps/app/src/server/` に対して実行
   - すべての relative import が `.js` 拡張子付きとなる
   - `NodeNext` 切替前の段階でも `tsc --noEmit` が拡張子起因のエラーを出さないこと
   - _Requirements: 2.2, 2.3_
   - _Depends: 3.3.g_
   - _Boundary: Codemod Transform (extensions)_
+  - **実績 (2026-06-12)**: 拡張子なし relative specifier **887 → 0** (静的 776 / re-export 28 / 動的 80 / TSImportType 3、288 ファイル変更)。ツール分担: ts2esm 2.2.7 (796 specifier / 281 ファイル、専用 `tools/codemod/tsconfig.ts2esm.json` で対話的 tsconfig 改変・type:module 注入・不正 json attribute の 3 つの癖を封じて実行) + jscodeshift 補完 `add-import-extensions.cjs` (ts2esm 盲点 91 箇所: 動的 import 80 / TSImportType 3 / .d.ts 専用 8、spec 20 件) + `ssr-relative-to-alias.cjs` (SSR 到達 32 ファイルの値 import 60 件を `~/server/...` 化 — 下記 Turbopack 制約) + 手動 1 行。`.cjs` 参照 5 件バイト不変。レビューで 288 ファイル全件の import ターゲット集合前後一致・コメント量不変を機械検証済み。検証: tsgo クリーン / build·lint 21/21 / unit 1944 pass / dev boot は DB 接続まで全グラフロード成功 + require.resolve 823 specifier 全数 0 失敗
 
-- [ ] 3.5 `__dirname` / `__filename` を 3 ファイルで手動置換
+- [x] 3.5 `__dirname` / `__filename` を 3 ファイルで手動置換
   - `apps/app/src/server/crowi/index.ts`, `crowi/dev.js`, `service/i18next.ts` の `__dirname` を `import.meta.dirname` 相当に置換
   - 置換後も i18next リソース読込とアプリ起動が同じファイルパスに解決されることを smoke で確認
   - _Requirements: 2.4_
   - _Boundary: Codemod Transform (dirname)_
+  - **実績 (2026-06-12)**: 3 ファイル置換完了 (`__dirname`/`__filename` 残存 0 件)。i18next の locale 動的 import に ESM 必須の `with { type: 'json' }` 属性を追加 (resourcesToBackend が `.default` を unwrap するため互換)。**3.6 と同一コミットで実施** — `import.meta` は CJS 形式ファイルではコンパイルエラー (TS1470)、`__dirname` は ESM 出力で ReferenceError となる相互依存のため、個別実施では必ず壊れた中間状態が生じることを実証確認しユーザー承認のうえ統合。smoke: 本番 ESM 出力の起動プローブで 3 箇所すべて実行通過 (下記 3.6 実績参照)
 
-- [ ] 3.6 `tsconfig.build.server.json` を NodeNext に切替
+- [x] 3.6 `tsconfig.build.server.json` を NodeNext に切替
   - **Precondition (hard)**: タスク 2.1 で `exclude` に `src/migrations/**` が追加済みであること。未完了なら本タスクを着手してはならない
   - `"module": "CommonJS"` → `"module": "NodeNext"`、`"moduleResolution": "Node"` → `"moduleResolution": "NodeNext"` に変更
   - `turbo run build --filter @growi/app` が成功し、`transpiled/` 配下に ESM 出力が生成される
   - _Requirements: 2.1_
   - _Depends: 2.1, 3.3, 3.4, 3.5_
   - _Boundary: Server Build Config_
+  - **実績 (2026-06-12)**: NodeNext 切替完了。`turbo run build --filter @growi/app` 21/21 成功、`dist/server/` に ESM 出力 (import/export 構文 + 拡張子付き相対 specifier) を確認。主要な付随変更:
+    - **`apps/app/package.json` に `"type": "module"` を前倒し追加** (2.3 で 3.7.b に延期していたもの)。NodeNext はファイル形式を package.json の type で判定するため、これ無しでは `import.meta` が TS1470 になることを実験で確認 — 3.5+3.6+type:module は不可分の 3 点セット
+    - **dual-pipeline ファイル戦略**: サーバプログラム (`tspc --listFiles` = src 配下 1095 ファイル、うち src/server 外 745) と Turbopack グラフの共有ファイルは「相対 import 禁止 → alias+`.js`」(671 specifier 変換)。tsconfig.json に suffix パターン `"~/*.js": ["./src/*"]` を追加し、tspc (NodeNext: paths 先で .js→.ts 置換) / Turbopack / tsgo / vitest 全系統で解決可能に。サーバプログラム外の client 専用 526 ファイルは拡張子付与を巻き戻し (3.4 と同じ理由: Turbopack は相対 .js→.ts 置換不可)
+    - **NodeNext 型解決シム**: `types/server-build-shims/` (next/link 等 13 マッピング、tsconfig.build.server.json paths)。client 値 import の emit はサーバビルドでは dead code
+    - **CJS interop 実バグ修正 (起動プローブで発見)**: ldapjs named import → default+分割代入 / `@growi/remark-attachment-refs` exports map の import 条件が実在しない index.js を指すゴースト → 実在の index.cjs に修正+types 条件追加 / `@growi/preset-themes` に exports map 追加 (ESM ビルド実在も main が UMD cjs のみ指し named import がリンク不能だった)
+    - **Prisma generator**: `moduleFormat = "cjs"` → `"esm"` + `importFileExtension = "js"` (生成コードの拡張子なし相対 import が ESM ランタイムで不能のため)
+    - **codemod 修正**: `add-import-extensions.cjs` CLI が `.tsx` に `--parser ts` を強制し JSX spread でパース失敗→静かに処理漏れするバグを拡張子別 2 パス化で修正。`ssr-relative-to-alias.cjs` に `--files` モード (明示リスト処理) + src 外/非コードターゲットのガードを追加
+    - **検証**: tspc/tsgo typecheck クリーン、Biome クリーン、unit 1951 passed/8 skipped (135/136 ファイル、1 ファイルは既知の mongodb-memory-server 403 env 起因)、lint:no-cjs / route-guard 通過、本番起動プローブ (`NODE_ENV=production node -r dotenv-flow/config dist/server/app.js`) が **MongoDB 接続 ECONNREFUSED のみで停止** = ESM 全モジュールグラフのリンク/実行成功 (サンドボックスに DB 無しのため healthcheck 200 は 3.8 ゲートで検証)
+    - **既知の影響 (計画どおり/承認済み)**: ts-node 依存スクリプト (`pnpm dev` / `dev:migrate*` / `migrate:umzug` / `repl`) は 3.7.b のランナー置換まで起動不能。`next.config.prod.cjs` → `.mjs` 化、bin/openapi definition の `.cjs` 化、`resource/Contributor.js` ESM 化等の type:module 追随を含む
 
 - [ ] 3.7.a dev runner bake-off で ESM 対応ランナーを実測選定
   - **Precondition (hard)**: タスク 3.6 (NodeNext 切替) 完了後に限り実施。サーバソースが ESM として本番ビルド可能な状態でのみ bake-off 結果が実運用プロファイルを反映する
@@ -346,6 +358,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Dev Runner Adapter (selection)_
 
 - [ ] 3.7.b 開発/本番起動スクリプトを選定ランナー / --import に切替
+  - **Note**: `apps/app` の `"type": "module"` 宣言は task 3.6 で前倒し済み (本タスクでの追加は不要)。3.6 以降 ts-node 系スクリプトは起動不能のため、本タスクが dev 復旧の完了点となる
   - `apps/app/package.json` の `scripts.ts-node` を廃止し、`dev` / `launch-dev:ci` / `repl` / `dev:migrate-mongo` を **3.7.a で選定したランナー** ベースに書き換え
   - **(Phase R 追加)** v8 で導入された umzug 系スクリプト (`migrate:umzug`, `dev:umzug` — `pnpm run ts-node prisma/migrate.ts` 経由で TS マイグレーションを実行) も同時に選定ランナーへ移行し、`pnpm run dev:migrate` end-to-end (migrate-mongo + umzug 両系統) を実 DB で再検証する
   - 本番起動スクリプトを `node --import dotenv-flow/config dist/server/app.js` に変更 (選定ランナーに依存しない共通部)
@@ -639,3 +652,53 @@ same issue.
   pairing strictly required. Do not delete these declaration files, and
   keep them in sync with the `.cjs` implementations when adding / removing
   exported symbols.
+
+- **3.4 prior ts2esm attempt failed (user report, 2026-06-12)**: A previous
+  session attempted to run `ts2esm` to give all imports `.js` extensions and
+  it did not work well (details were not recorded; no trace in git history —
+  the attempt was discarded). Treat `ts2esm` output as untrusted: the task
+  3.4 gate is the mechanical scan (extensionless relative specifiers in
+  `apps/app/src/server/` = 0) plus typecheck/build/lint/test green, NOT the
+  tool exiting successfully. If `ts2esm` cannot deliver (crashes, partial
+  rewrites, corrupted output, alias mangling), pivot to the in-repo
+  jscodeshift infrastructure (`apps/app/tools/codemod/`) for the extension
+  pass instead of fighting the tool — both are sanctioned dependencies of
+  the Codemod Transform component (design.md: jscodeshift P0, ts2esm P1).
+  Record which tool ultimately produced the rewrite.
+
+- **3.4 Turbopack does NOT extension-substitute relative imports** (likely
+  the root cause of the failed prior attempt): `next build` (`build:client`)
+  resolves relative specifiers literally — webpack's `extensionAlias`
+  (`.js`→`.ts`) has no Turbopack equivalent — so any `src/server` file
+  reachable from the SSR import graph MUST NOT use `.js`-suffixed relative
+  imports for VALUE imports. Task 3.4 converted the SSR-reachable closure
+  (60 value imports / 32 files) to `~/server/...` alias form via
+  `tools/codemod/ssr-relative-to-alias.cjs`; type-only relative `.js`
+  imports are safe (SWC erases them before bundler resolution). Re-running
+  `codemod:ts2esm` re-breaks this (and re-adds an invalid
+  `with { type: 'json' }` to the `^/package.json` import in
+  `growi-info.integ.ts`) — ALWAYS re-run `ssr-relative-to-alias.cjs` after
+  any ts2esm re-run. Regression self-detects as a `next build`
+  module-not-found. This is a permanent constraint for tasks 3.6 / 3.8.b /
+  Phase 4; design.md sync pending (fold into 5.5 docs task).
+
+- **3.4 ts-node `experimentalResolver` is a temporary crutch**: ts-node's
+  CJS resolver cannot map `require('./x.js')` → `x.ts`, so dev boot died at
+  the first extensioned import. `apps/app/tsconfig.json` gained
+  `"experimentalResolver": true` inside the ts-node-only section (tsc /
+  tsgo / tspc / vitest / Turbopack all ignore it). REMOVE together with
+  ts-node at task 3.7.b.
+
+- **3.4 leftover for 3.6**: JSDoc-comment type references
+  (`@type {import('../service/...')}` etc.) in `.js` files remain
+  extensionless — comment position, outside the 3.4 gate, tsgo green today.
+  Re-check at the NodeNext switch (3.6).
+
+- **Sandbox environment limits (this remote session)**: no MongoDB (`mongo`
+  host ENOTFOUND) and mongodb-memory-server binary download blocked (HTTP
+  403) → `--project=app-integration` cannot run, 1 unit file
+  (`update-activity.spec.ts`) env-fails in suite setup, and dev-boot smoke
+  can only verify "full module graph loads, stops at DB connection".
+  Tasks 3.5 / 3.7 / 3.8 smoke items that need a live DB must either run in
+  an environment with MongoDB or be reported as MANUAL_VERIFY_REQUIRED —
+  do not claim them green here.

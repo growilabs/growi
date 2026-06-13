@@ -1,4 +1,4 @@
-import type { IPageForTreeItem } from './page';
+import type { IPageForTreeItem } from './page.js';
 
 export interface RootPageResult {
   rootPage: IPageForTreeItem;

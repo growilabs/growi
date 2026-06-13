@@ -15,7 +15,7 @@
  * Requirements: 6.6, 6.7, 7.6
  */
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:service:reconcile:concurrency-controller',

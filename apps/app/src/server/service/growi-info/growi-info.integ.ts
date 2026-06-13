@@ -8,10 +8,10 @@ import type UserEvent from '~/server/events/user';
 import { Config } from '~/server/models/config';
 import { configManager } from '~/server/service/config-manager';
 
-import type Crowi from '../../crowi';
-import type { PageModel } from '../../models/page';
-import pageModel from '../../models/page';
-import { growiInfoService } from './growi-info';
+import type Crowi from '../../crowi/index.js';
+import type { PageModel } from '../../models/page.js';
+import pageModel from '../../models/page.js';
+import { growiInfoService } from './growi-info.js';
 
 describe('GrowiInfoService', () => {
   const appVersion = pkg.version;

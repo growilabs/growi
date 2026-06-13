@@ -1,14 +1,14 @@
 import type { HydratedDocument } from 'mongoose';
 import { type Model, Schema } from 'mongoose';
 
-import { AllSupportedActions } from '~/interfaces/activity';
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
-
-import type { IAuditLogBulkExportJob } from '../../interfaces/audit-log-bulk-export';
 import {
   AuditLogBulkExportFormat,
   AuditLogBulkExportJobStatus,
-} from '../../interfaces/audit-log-bulk-export';
+} from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
+import { AllSupportedActions } from '~/interfaces/activity.js';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+
+import type { IAuditLogBulkExportJob } from '../../interfaces/audit-log-bulk-export.js';
 
 export type AuditLogBulkExportJobDocument =
   HydratedDocument<IAuditLogBulkExportJob>;

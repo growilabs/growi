@@ -1,11 +1,11 @@
-import { EnvToModuleMappings } from '~/interfaces/file-uploader';
-import type Crowi from '~/server/crowi';
-import loggerFactory from '~/utils/logger';
+import { EnvToModuleMappings } from '~/interfaces/file-uploader.js';
+import type Crowi from '~/server/crowi/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { configManager } from '../config-manager';
-import type { FileUploader } from './file-uploader';
+import { configManager } from '../config-manager/index.js';
+import type { FileUploader } from './file-uploader.js';
 
-export type { FileUploader } from './file-uploader';
+export type { FileUploader } from './file-uploader.js';
 
 const logger = loggerFactory('growi:service:FileUploaderServise');
 
@@ -28,4 +28,4 @@ export const getUploader = async (crowi: Crowi): Promise<FileUploader> => {
   return uploader;
 };
 
-export * from './utils';
+export * from './utils/index.js';

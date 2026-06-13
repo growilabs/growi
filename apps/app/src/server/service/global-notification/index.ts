@@ -1,13 +1,13 @@
 import { PageGrant } from '@growi/core';
 import type { IUser } from '@growi/core/dist/interfaces';
 
-import type Crowi from '~/server/crowi';
-import type { PageDocument } from '~/server/models/page';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import type { PageDocument } from '~/server/models/page.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { GlobalNotificationMailService } from './global-notification-mail';
-import { GlobalNotificationSlackService } from './global-notification-slack';
-import type { GlobalNotificationEventVars } from './types';
+import { GlobalNotificationMailService } from './global-notification-mail.js';
+import { GlobalNotificationSlackService } from './global-notification-slack.js';
+import type { GlobalNotificationEventVars } from './types.js';
 
 const logger = loggerFactory('growi:service:GlobalNotificationService');
 

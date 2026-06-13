@@ -1,4 +1,5 @@
-export { getServerSideAdminCommonProps } from './get-server-side-common-props';
-export { createAdminPageLayout } from './layout';
-export type * from './types';
-export { useUnstatedContainers } from './use-unstated-container';
+export { getServerSideAdminCommonProps } from '~/pages/admin/_shared/get-server-side-common-props.js';
+export { createAdminPageLayout } from '~/pages/admin/_shared/layout.js';
+export { useUnstatedContainers } from '~/pages/admin/_shared/use-unstated-container.js';
+
+export type * from './types.js';

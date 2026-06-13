@@ -4,7 +4,7 @@ import { respond } from '@growi/slack/dist/utils/response-url';
 import { type ChatPostEphemeralResponse, WebClient } from '@slack/web-api';
 import assert from 'assert';
 
-import { SlackCommandHandlerError } from '../../models/vo/slack-command-handler-error';
+import { SlackCommandHandlerError } from '../../models/vo/slack-command-handler-error.js';
 
 function generateRespondBodyForInternalServerError(
   message,

@@ -2,14 +2,14 @@ import { addHours } from 'date-fns/addHours';
 import { isAfter } from 'date-fns/isAfter';
 import { Router } from 'express';
 
-import axios from '~/utils/axios';
-import loggerFactory from '~/utils/logger';
+import axios from '~/utils/axios/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:routes:apiv3:staffs');
 
 const router = Router();
 
-import contributors from '^/resource/Contributor';
+import contributors from '^/resource/Contributor.js';
 
 let expiredAt;
 const contributorsCache = contributors;

@@ -18,29 +18,32 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { isAiEnabled } from '~/features/openai/server/services';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
-import { subscribeRuleNames } from '~/interfaces/in-app-notification';
-import type { IOptionsForCreate } from '~/interfaces/page';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import PageTagRelation from '~/server/models/page-tag-relation';
+import { isAiEnabled } from '~/features/openai/server/services/index.js';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
+import type { IApiv3PageCreateParams } from '~/interfaces/apiv3/index.js';
+import { subscribeRuleNames } from '~/interfaces/in-app-notification.js';
+import type { IOptionsForCreate } from '~/interfaces/page.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/index.js';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
+import PageTagRelation from '~/server/models/page-tag-relation.js';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
-} from '~/server/models/serializers';
-import { configManager } from '~/server/service/config-manager';
-import { getTranslation } from '~/server/service/i18next';
-import loggerFactory from '~/utils/logger';
+} from '~/server/models/serializers/index.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { getTranslation } from '~/server/service/i18next.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user.js';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page:create-page');
 
@@ -272,7 +275,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     // Rebuild vector store file
     if (isAiEnabled()) {
       const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
+        '~/features/openai/server/services/openai.js'
       );
       try {
         const openaiService = getOpenaiService();

@@ -1,11 +1,11 @@
 import { type JSX, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import { apiv3Post } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { useSWRxAdminPlugins } from '~/features/growi-plugin/client/Admin/stores/admin-plugins.js';
 
-import type { IGrowiPluginOrigin } from '../../../../interfaces';
-import { useSWRxAdminPlugins } from '../../stores/admin-plugins';
+import type { IGrowiPluginOrigin } from '../../../../interfaces/index.js';
 
 export const PluginInstallerForm = (): JSX.Element => {
   const { mutate } = useSWRxAdminPlugins();

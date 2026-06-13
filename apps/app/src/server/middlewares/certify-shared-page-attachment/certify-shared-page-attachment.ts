@@ -1,10 +1,10 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { retrieveValidShareLinkByReferer } from './retrieve-valid-share-link';
-import { validateAttachment } from './validate-attachment';
-import { validateReferer } from './validate-referer';
+import { retrieveValidShareLinkByReferer } from './retrieve-valid-share-link.js';
+import { validateAttachment } from './validate-attachment.js';
+import { validateReferer } from './validate-referer/index.js';
 
 const logger = loggerFactory('growi:middleware:certify-shared-page-attachment');
 

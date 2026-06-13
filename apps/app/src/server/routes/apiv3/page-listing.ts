@@ -12,18 +12,18 @@ import { oneOf, query } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import type { IPageForTreeItem } from '~/interfaces/page';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { configManager } from '~/server/service/config-manager';
-import type { IPageGrantService } from '~/server/service/page-grant';
-import { pageListingService } from '~/server/service/page-listing';
-import loggerFactory from '~/utils/logger';
+import type { IPageForTreeItem } from '~/interfaces/page.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import type { IPageGrantService } from '~/server/service/page-grant.js';
+import { pageListingService } from '~/server/service/page-listing/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type Crowi from '../../crowi';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import type { PageDocument, PageModel } from '../../models/page';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import type Crowi from '../../crowi/index.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import type { PageDocument, PageModel } from '../../models/page.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page-tree');
 

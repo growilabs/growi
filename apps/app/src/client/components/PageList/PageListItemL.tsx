@@ -23,29 +23,36 @@ import { useTranslation } from 'next-i18next';
 import Clamp from 'react-multiline-clamp';
 import { Input } from 'reactstrap';
 
-import type { ISelectable } from '~/client/interfaces/selectable-all';
-import { bookmark, unbookmark, unlink } from '~/client/services/page-operation';
-import { toastError } from '~/client/util/toastr';
-import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search';
-import { isIPageSearchMeta } from '~/interfaces/search';
+import { PageItemControl } from '~/client/components/Common/Dropdown/PageItemControl.js';
+import type { ISelectable } from '~/client/interfaces/selectable-all.js';
+import {
+  bookmark,
+  unbookmark,
+  unlink,
+} from '~/client/services/page-operation.js';
+import { toastError } from '~/client/util/toastr.js';
+import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink/index.js';
+import type {
+  IPageSearchMeta,
+  IPageWithSearchMeta,
+} from '~/interfaces/search.js';
+import { isIPageSearchMeta } from '~/interfaces/search.js';
 import type {
   OnDeletedFunction,
   OnDuplicatedFunction,
   OnPutBackedFunction,
   OnRenamedFunction,
-} from '~/interfaces/ui';
-import { LinkedPagePath } from '~/models/linked-page-path';
-import { useDeviceLargerThanLg } from '~/states/ui/device';
-import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
-import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
-import { usePageRenameModalActions } from '~/states/ui/modal/page-rename';
-import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
-import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark';
+} from '~/interfaces/ui.js';
+import { LinkedPagePath } from '~/models/linked-page-path.js';
+import { useDeviceLargerThanLg } from '~/states/ui/device.js';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete.js';
+import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate.js';
+import { usePageRenameModalActions } from '~/states/ui/modal/page-rename.js';
+import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page.js';
+import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark.js';
+import { useSWRMUTxPageInfo, useSWRxPageInfo } from '~/stores/page.js';
 
-import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
-import { useSWRMUTxPageInfo, useSWRxPageInfo } from '../../../stores/page';
-import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl';
-import { PageItemControl } from '../Common/Dropdown/PageItemControl';
+import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl.js';
 
 type Props = {
   page:

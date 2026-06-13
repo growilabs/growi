@@ -1,7 +1,7 @@
 import { atom, useAtomValue } from 'jotai';
 
-import type { SupportedActionType } from '~/interfaces/activity';
-import type { RendererConfig } from '~/interfaces/services/renderer';
+import type { SupportedActionType } from '~/interfaces/activity.js';
+import type { RendererConfig } from '~/interfaces/services/renderer.js';
 
 /**
  * Atom for AI feature enabled status

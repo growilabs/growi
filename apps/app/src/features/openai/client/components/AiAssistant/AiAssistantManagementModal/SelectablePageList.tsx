@@ -5,8 +5,9 @@ import { useRect } from '@growi/ui/dist/utils';
 import { useTranslation } from 'react-i18next';
 import AutosizeInput from 'react-input-autosize';
 
-import type { SelectablePage } from '../../../../interfaces/selectable-page';
-import { isCreatablePagePathPattern } from '../../../../utils/is-creatable-page-path-pattern';
+import { isCreatablePagePathPattern } from '~/features/openai/utils/is-creatable-page-path-pattern.js';
+
+import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
 
 import styles from './SelectablePageList.module.scss';
 

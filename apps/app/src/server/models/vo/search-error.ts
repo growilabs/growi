@@ -1,6 +1,5 @@
-import ExtensibleCustomError from 'extensible-custom-error';
-
-import type { AllTermsKey } from '~/server/interfaces/search';
+import type { AllTermsKey } from '~/server/interfaces/search.js';
+import { ExtensibleCustomError } from '~/server/util/extensible-custom-error.js';
 
 export class SearchError extends ExtensibleCustomError {
   readonly id = 'SearchError';

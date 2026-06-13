@@ -1,7 +1,7 @@
 import type { JSX, ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 
-import { usePageNotFound } from '~/states/page';
+import { usePageNotFound } from '~/states/page/index.js';
 
 import styles from './PagePathNavLayout.module.scss';
 
@@ -26,7 +26,7 @@ type Props = PagePathNavLayoutProps & {
 const CopyDropdown = dynamic(
   () =>
     // biome-ignore lint/style/noRestrictedImports: no-problem dynamic import
-    import('~/client/components/Common/CopyDropdown').then(
+    import('~/client/components/Common/CopyDropdown/index.js').then(
       (mod) => mod.CopyDropdown,
     ),
   { ssr: false },

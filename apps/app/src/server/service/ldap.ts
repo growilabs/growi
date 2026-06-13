@@ -1,8 +1,11 @@
-import ldap, { NoSuchObjectError } from 'ldapjs';
+import ldap from 'ldapjs';
 
-import loggerFactory from '~/utils/logger';
+// ldapjs is CJS and cjs-module-lexer cannot detect its named exports, so a
+// named import of NoSuchObjectError fails at runtime under native ESM.
+const { NoSuchObjectError } = ldap;
 
-import { configManager } from './config-manager';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:service:ldap-service');
 

@@ -16,17 +16,17 @@
 
 import mongoose from 'mongoose';
 
-import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction';
-import { VaultSyncState } from '~/features/growi-vault/server/models/vault-sync-state';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
-
+import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction.js';
+import { VaultSyncState } from '~/features/growi-vault/server/models/vault-sync-state.js';
 import {
   createVaultResilienceLayer,
   type ResilienceStatus,
-} from './resilience/index';
-import type { VaultNamespaceMapper } from './vault-namespace-mapper';
+} from '~/features/growi-vault/server/services/resilience/index.js';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
+
+import type { VaultNamespaceMapper } from './vault-namespace-mapper.js';
 
 export type { ResilienceStatus };
 

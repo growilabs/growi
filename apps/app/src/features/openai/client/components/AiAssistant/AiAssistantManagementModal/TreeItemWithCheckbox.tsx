@@ -1,10 +1,10 @@
 import type { FC } from 'react';
 
+import { TreeItemLayout } from '~/features/page-tree/components/index.js';
 import type {
   TreeItemProps,
   TreeItemWithCheckboxToolProps,
-} from '~/features/page-tree';
-import { TreeItemLayout } from '~/features/page-tree/components';
+} from '~/features/page-tree/index.js';
 
 import styles from './TreeItemWithCheckbox.module.scss';
 

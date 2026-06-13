@@ -1,3 +1,3 @@
-export * from './hooks';
-export * from './interfaces';
-export * from './states';
+export * from '~/features/page-tree/hooks/index.js';
+export * from '~/features/page-tree/interfaces/index.js';
+export * from '~/features/page-tree/states/index.js';

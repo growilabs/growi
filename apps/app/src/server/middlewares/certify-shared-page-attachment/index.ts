@@ -1,1 +1,1 @@
-export * from './certify-shared-page-attachment';
+export * from './certify-shared-page-attachment.js';

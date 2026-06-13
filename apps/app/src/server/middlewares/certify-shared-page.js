@@ -1,5 +1,5 @@
-import ShareLink from '~/server/models/share-link';
-import loggerFactory from '~/utils/logger';
+import ShareLink from '~/server/models/share-link.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:middleware:certify-shared-page');
 

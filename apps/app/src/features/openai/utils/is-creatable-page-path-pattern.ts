@@ -1,6 +1,6 @@
 import { pagePathUtils } from '@growi/core/dist/utils';
 
-import { removeGlobPath } from './remove-glob-path';
+import { removeGlobPath } from '~/features/openai/utils/remove-glob-path.js';
 
 export const isCreatablePagePathPattern = (pagePath: string): boolean => {
   const isGlobPattern = pagePathUtils.isGlobPatternPath(pagePath);

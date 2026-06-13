@@ -13,13 +13,12 @@ import {
 } from 'reactstrap';
 import useSWR from 'swr';
 
-import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import type { ReconcileLogEntry } from '~/features/growi-vault/server/services/reconcile';
-import { useSiteUrl } from '~/states/global';
-
-import { ReconcileHistoryTable } from '../components/ReconcileHistoryTable';
-import { ReconcileTriggerModal } from '../components/ReconcileTriggerModal';
+import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
+import { ReconcileHistoryTable } from '~/features/growi-vault/client/components/ReconcileHistoryTable.js';
+import { ReconcileTriggerModal } from '~/features/growi-vault/client/components/ReconcileTriggerModal.js';
+import type { ReconcileLogEntry } from '~/features/growi-vault/server/services/reconcile/index.js';
+import { useSiteUrl } from '~/states/global/index.js';
 
 // ============================================================================
 // Types

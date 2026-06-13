@@ -1,10 +1,9 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
-import type Crowi from '~/server/crowi';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-
-import { isAiEnabled } from '../services';
+import { isAiEnabled } from '~/features/openai/server/services/index.js';
+import type Crowi from '~/server/crowi/index.js';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
 
 const router = express.Router();
 
@@ -17,26 +16,34 @@ export const factory = (crowi: Crowi): express.Router => {
   }
   // enabled
   else {
-    import('./thread').then(({ createThreadHandlersFactory }) => {
-      router.post('/thread', createThreadHandlersFactory(crowi));
-    });
+    import('~/features/openai/server/routes/thread.js').then(
+      ({ createThreadHandlersFactory }) => {
+        router.post('/thread', createThreadHandlersFactory(crowi));
+      },
+    );
 
-    import('./get-recent-threads').then(({ getRecentThreadsFactory }) => {
-      router.get('/threads/recent', getRecentThreadsFactory(crowi));
-    });
+    import('~/features/openai/server/routes/get-recent-threads.js').then(
+      ({ getRecentThreadsFactory }) => {
+        router.get('/threads/recent', getRecentThreadsFactory(crowi));
+      },
+    );
 
-    import('./get-threads').then(({ getThreadsFactory }) => {
-      router.get('/threads/:aiAssistantId', getThreadsFactory(crowi));
-    });
+    import('~/features/openai/server/routes/get-threads.js').then(
+      ({ getThreadsFactory }) => {
+        router.get('/threads/:aiAssistantId', getThreadsFactory(crowi));
+      },
+    );
 
-    import('./delete-thread').then(({ deleteThreadFactory }) => {
-      router.delete(
-        '/thread/:aiAssistantId/:threadRelationId',
-        deleteThreadFactory(crowi),
-      );
-    });
+    import('~/features/openai/server/routes/delete-thread.js').then(
+      ({ deleteThreadFactory }) => {
+        router.delete(
+          '/thread/:aiAssistantId/:threadRelationId',
+          deleteThreadFactory(crowi),
+        );
+      },
+    );
 
-    import('./message').then(
+    import('~/features/openai/server/routes/message/index.js').then(
       ({ getMessagesFactory, postMessageHandlersFactory }) => {
         router.post('/message', postMessageHandlersFactory(crowi));
         router.get(
@@ -46,23 +53,31 @@ export const factory = (crowi: Crowi): express.Router => {
       },
     );
 
-    import('./edit').then(({ postMessageToEditHandlersFactory }) => {
-      router.post('/edit', postMessageToEditHandlersFactory(crowi));
-    });
+    import('~/features/openai/server/routes/edit/index.js').then(
+      ({ postMessageToEditHandlersFactory }) => {
+        router.post('/edit', postMessageToEditHandlersFactory(crowi));
+      },
+    );
 
-    import('./ai-assistant').then(({ createAiAssistantFactory }) => {
-      router.post('/ai-assistant', createAiAssistantFactory(crowi));
-    });
+    import('~/features/openai/server/routes/ai-assistant.js').then(
+      ({ createAiAssistantFactory }) => {
+        router.post('/ai-assistant', createAiAssistantFactory(crowi));
+      },
+    );
 
-    import('./ai-assistants').then(({ getAiAssistantsFactory }) => {
-      router.get('/ai-assistants', getAiAssistantsFactory(crowi));
-    });
+    import('~/features/openai/server/routes/ai-assistants.js').then(
+      ({ getAiAssistantsFactory }) => {
+        router.get('/ai-assistants', getAiAssistantsFactory(crowi));
+      },
+    );
 
-    import('./update-ai-assistant').then(({ updateAiAssistantsFactory }) => {
-      router.put('/ai-assistant/:id', updateAiAssistantsFactory(crowi));
-    });
+    import('~/features/openai/server/routes/update-ai-assistant.js').then(
+      ({ updateAiAssistantsFactory }) => {
+        router.put('/ai-assistant/:id', updateAiAssistantsFactory(crowi));
+      },
+    );
 
-    import('./set-default-ai-assistant').then(
+    import('~/features/openai/server/routes/set-default-ai-assistant.js').then(
       ({ setDefaultAiAssistantFactory }) => {
         router.put(
           '/ai-assistant/:id/set-default',
@@ -71,9 +86,11 @@ export const factory = (crowi: Crowi): express.Router => {
       },
     );
 
-    import('./delete-ai-assistant').then(({ deleteAiAssistantsFactory }) => {
-      router.delete('/ai-assistant/:id', deleteAiAssistantsFactory(crowi));
-    });
+    import('~/features/openai/server/routes/delete-ai-assistant.js').then(
+      ({ deleteAiAssistantsFactory }) => {
+        router.delete('/ai-assistant/:id', deleteAiAssistantsFactory(crowi));
+      },
+    );
   }
 
   return router;

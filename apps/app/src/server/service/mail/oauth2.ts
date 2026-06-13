@@ -1,12 +1,12 @@
 import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
 import type { Transporter } from 'nodemailer';
 import nodemailer from 'nodemailer';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { IConfigManagerForApp } from '../config-manager';
-import type { StrictOAuth2Options } from './types';
+import type { IConfigManagerForApp } from '../config-manager/index.js';
+import type { StrictOAuth2Options } from './types.js';
 
 const logger = loggerFactory('growi:service:mail');
 

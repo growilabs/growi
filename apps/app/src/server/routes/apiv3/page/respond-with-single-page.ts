@@ -11,10 +11,10 @@ import {
 } from '@growi/core/dist/utils/page-path-utils';
 import type { HydratedDocument } from 'mongoose';
 
-import type { PageDocument } from '~/server/models/page';
-import loggerFactory from '~/utils/logger';
+import type { PageDocument } from '~/server/models/page.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:page:respond-with-single-page',

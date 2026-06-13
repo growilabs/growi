@@ -1,7 +1,7 @@
 import type { Document, Model, Types } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '../util/mongoose-utils.js';
 
 export interface IUpdatePost {
   pathPattern: string;

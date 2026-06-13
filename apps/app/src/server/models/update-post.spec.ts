@@ -1,4 +1,4 @@
-import UpdatePost from './update-post';
+import UpdatePost from './update-post.js';
 
 describe('UpdatePost', () => {
   describe('.createPrefixesByPathPattern', () => {

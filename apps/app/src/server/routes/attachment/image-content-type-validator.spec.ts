@@ -3,7 +3,7 @@ import { describe, expect, test } from 'vitest';
 import {
   type SupportedImageMimeType,
   validateImageContentType,
-} from './image-content-type-validator';
+} from './image-content-type-validator.js';
 
 describe('validateImageContentType', () => {
   describe('valid cases', () => {

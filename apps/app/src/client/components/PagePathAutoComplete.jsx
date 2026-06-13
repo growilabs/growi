@@ -2,7 +2,7 @@ import React from 'react';
 import { pathUtils } from '@growi/core/dist/utils';
 import PropTypes from 'prop-types';
 
-import SearchTypeahead from './SearchTypeahead';
+import SearchTypeahead from '~/client/components/SearchTypeahead.js';
 
 const PagePathAutoComplete = (props) => {
   const { addTrailingSlash, initializedPath } = props;

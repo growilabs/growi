@@ -4,18 +4,18 @@ import { format } from 'date-fns/format';
 import { subSeconds } from 'date-fns/subSeconds';
 import { join } from 'pathe';
 
-import { SupportedAction } from '~/interfaces/activity';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import injectResetOrderByTokenMiddleware from '~/server/middlewares/inject-reset-order-by-token-middleware';
-import PasswordResetOrder from '~/server/models/password-reset-order';
-import { configManager } from '~/server/service/config-manager';
-import { growiInfoService } from '~/server/service/growi-info';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
+import injectResetOrderByTokenMiddleware from '~/server/middlewares/inject-reset-order-by-token-middleware.js';
+import PasswordResetOrder from '~/server/models/password-reset-order.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { growiInfoService } from '~/server/service/growi-info/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import httpErrorHandler from '../../middlewares/http-error-handler';
-import { resolveLocalePath } from '../../util/safe-path-utils';
-import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import httpErrorHandler from '../../middlewares/http-error-handler.js';
+import { resolveLocalePath } from '../../util/safe-path-utils.js';
+import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password.js';
 
 const logger = loggerFactory('growi:routes:apiv3:forgotPassword');
 

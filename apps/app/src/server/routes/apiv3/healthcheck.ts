@@ -3,11 +3,11 @@ import type { Router } from 'express';
 import express from 'express';
 import nocache from 'nocache';
 
-import type Crowi from '~/server/crowi';
-import loggerFactory from '~/utils/logger';
+import type Crowi from '~/server/crowi/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { Config } from '../../models/config';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import { Config } from '../../models/config.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:healthcheck');
 

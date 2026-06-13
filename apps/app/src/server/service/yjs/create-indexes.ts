@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:service:yjs:create-indexes');
 

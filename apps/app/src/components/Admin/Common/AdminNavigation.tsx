@@ -4,7 +4,10 @@ import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import urljoin from 'url-join';
 
-import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
+import {
+  useGrowiAppIdForGrowiCloud,
+  useGrowiCloudUri,
+} from '~/states/global/index.js';
 
 import styles from './AdminNavigation.module.scss';
 

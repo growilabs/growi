@@ -1,1 +1,1 @@
-export * from './validate-referer';
+export * from './validate-referer.js';

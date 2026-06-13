@@ -1,17 +1,17 @@
 import { getIdStringForRef, type IPage } from '@growi/core';
-import gc from 'expose-gc/function';
+import gc from 'expose-gc/function.js';
 import mongoose from 'mongoose';
 import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
-import { SearchDelegatorName } from '~/interfaces/named-query';
-import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
-import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
-import { SocketEventName } from '~/interfaces/websocket';
-import PageTagRelation from '~/server/models/page-tag-relation';
-import type { SocketIoService } from '~/server/service/socket-io';
-import loggerFactory from '~/utils/logger';
+import { SearchDelegatorName } from '~/interfaces/named-query.js';
+import type { ISearchResult, ISearchResultData } from '~/interfaces/search.js';
+import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search.js';
+import { SocketEventName } from '~/interfaces/websocket.js';
+import PageTagRelation from '~/server/models/page-tag-relation.js';
+import type { SocketIoService } from '~/server/service/socket-io/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import type {
   ESQueryTerms,
@@ -20,22 +20,22 @@ import type {
   SearchableData,
   SearchDelegator,
   UnavailableTermsKey,
-} from '../../interfaces/search';
-import type { PageModel } from '../../models/page';
-import { createBatchStream } from '../../util/batch-stream';
-import { configManager } from '../config-manager';
+} from '../../interfaces/search.js';
+import type { PageModel } from '../../models/page.js';
+import { createBatchStream } from '../../util/batch-stream.js';
+import { configManager } from '../config-manager/index.js';
 import type {
   AddAllPagesOption,
   RebuildIndexOption,
   UpdateOrInsertPagesOpts,
-} from '../interfaces/search';
-import { aggregatePipelineToIndex } from './aggregate-to-index';
+} from '../interfaces/search.js';
+import { aggregatePipelineToIndex } from './aggregate-to-index.js';
 import type {
   AggregatedPage,
   BulkWriteBody,
   BulkWriteBodyRestriction,
   BulkWriteCommand,
-} from './bulk-write';
+} from './bulk-write.js';
 import {
   type ElasticsearchClientDelegator,
   type ES7SearchQuery,
@@ -46,7 +46,7 @@ import {
   isES8ClientDelegator,
   isES9ClientDelegator,
   type SearchQuery,
-} from './elasticsearch-client-delegator';
+} from './elasticsearch-client-delegator/index.js';
 
 const logger = loggerFactory('growi:service:search-delegator:elasticsearch');
 
@@ -267,7 +267,11 @@ class ElasticsearchDelegator
    *
    * @see https://www.elastic.co/guide/en/elasticsearch/reference/6.6/cluster-health.html
    */
-  async getInfoForHealth() {
+  async getInfoForHealth(): Promise<{
+    esClusterHealth: Awaited<
+      ReturnType<ElasticsearchClientDelegator['cluster']['health']>
+    >;
+  }> {
     const esClusterHealth = await this.client.cluster.health();
     return { esClusterHealth };
   }
@@ -275,7 +279,17 @@ class ElasticsearchDelegator
   /**
    * Return information for Admin Full Text Search Management page
    */
-  async getInfoForAdmin() {
+  async getInfoForAdmin(): Promise<{
+    indices:
+      | Awaited<
+          ReturnType<ElasticsearchClientDelegator['indices']['stats']>
+        >['indices']
+      | never[];
+    aliases:
+      | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['getAlias']>>
+      | never[];
+    isNormalized: boolean;
+  }> {
     const { client, indexName, aliasName } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
@@ -418,10 +432,15 @@ class ElasticsearchDelegator
     }
   }
 
-  async createIndex(index: string) {
+  async createIndex(
+    index: string,
+  ): Promise<
+    | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
+    | undefined
+  > {
     // TODO: https://redmine.weseek.co.jp/issues/168446
     if (isES7ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es7');
+      const { mappings } = await import('./mappings/mappings-es7.js');
       return this.client.indices.create({
         index,
         body: {
@@ -431,7 +450,7 @@ class ElasticsearchDelegator
     }
 
     if (isES8ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es8');
+      const { mappings } = await import('./mappings/mappings-es8.js');
       return this.client.indices.create({
         index,
         ...mappings,
@@ -439,7 +458,7 @@ class ElasticsearchDelegator
     }
 
     if (isES9ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es9');
+      const { mappings } = await import('./mappings/mappings-es9.js');
       return this.client.indices.create({
         index,
         ...mappings,
@@ -654,7 +673,7 @@ class ElasticsearchDelegator
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
 
-  deletePages(pages) {
+  deletePages(pages): ReturnType<ElasticsearchClientDelegator['bulk']> {
     const body = [];
     pages.forEach((page) => {
       this.prepareBodyForDelete(body, page);
@@ -1160,7 +1179,12 @@ class ElasticsearchDelegator
     return await this.updateOrInsertDescendantsPagesById(parentPage, user);
   }
 
-  async syncDescendantsPagesDeleted(pages, user) {
+  async syncDescendantsPagesDeleted(
+    pages,
+    user,
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
+  > {
     for (let i = 0; i < pages.length; i++) {
       logger.debug('SearchClient.syncDescendantsPagesDeleted', pages[i].path);
     }
@@ -1172,7 +1196,12 @@ class ElasticsearchDelegator
     }
   }
 
-  async syncPageDeleted(page, user) {
+  async syncPageDeleted(
+    page,
+    user,
+  ): Promise<
+    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
+  > {
     logger.debug('SearchClient.syncPageDeleted', page.path);
 
     try {

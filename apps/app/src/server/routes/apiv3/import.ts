@@ -2,21 +2,21 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Router } from 'express';
 
-import { SupportedAction } from '~/interfaces/activity';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import adminRequiredFactory from '~/server/middlewares/admin-required';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { ImportSettings } from '~/server/service/import';
-import { getImportService } from '~/server/service/import';
-import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
-import type { ZipFileStat } from '~/server/service/interfaces/export';
-import loggerFactory from '~/utils/logger';
+import { SupportedAction } from '~/interfaces/activity.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import adminRequiredFactory from '~/server/middlewares/admin-required.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import type { ImportSettings } from '~/server/service/import/index.js';
+import { getImportService } from '~/server/service/import/index.js';
+import { generateOverwriteParams } from '~/server/service/import/overwrite-params/index.js';
+import type { ZipFileStat } from '~/server/service/interfaces/export.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:import');
 

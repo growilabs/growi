@@ -8,41 +8,43 @@ import {
 } from 'react';
 import dynamic from 'next/dynamic';
 import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
-import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment';
-import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
+import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment.js';
+import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor.js';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { TabContent, TabPane } from 'reactstrap';
 
-import { uploadAttachments } from '~/client/services/upload-attachments';
-import { toastError } from '~/client/util/toastr';
-import { useCurrentUser } from '~/states/global';
-import { useCurrentPagePath } from '~/states/page';
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
+import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser.js';
+import { CommentPreview } from '~/client/components/PageComment/CommentPreview.js';
+import { SwitchingButtonGroup } from '~/client/components/PageComment/SwitchingButtonGroup.js';
+import { uploadAttachments } from '~/client/services/upload-attachments/index.js';
+import { toastError } from '~/client/util/toastr.js';
+import { useCurrentUser } from '~/states/global/index.js';
+import { useCurrentPagePath } from '~/states/page/index.js';
 import {
   isSlackConfiguredAtom,
   useAcceptedUploadFileType,
-} from '~/states/server-configurations';
-import { useIsSlackEnabled } from '~/states/ui/editor';
-import { useCommentEditorsDirtyMap } from '~/states/ui/unsaved-warning';
-import { useSWRxPageComment } from '~/stores/comment';
-import { useEditorSettings, useSWRxSlackChannels } from '~/stores/editor';
-import { useNextThemes } from '~/stores-universal/use-next-themes';
-import loggerFactory from '~/utils/logger';
-
-import { NotAvailableForGuest } from '../NotAvailableForGuest';
-import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '../NotAvailableForReadOnlyUser';
-import { CommentPreview } from './CommentPreview';
-import { SwitchingButtonGroup } from './SwitchingButtonGroup';
+} from '~/states/server-configurations/index.js';
+import { useIsSlackEnabled } from '~/states/ui/editor/index.js';
+import { useCommentEditorsDirtyMap } from '~/states/ui/unsaved-warning.js';
+import { useSWRxPageComment } from '~/stores/comment.js';
+import { useEditorSettings, useSWRxSlackChannels } from '~/stores/editor.js';
+import { useNextThemes } from '~/stores-universal/use-next-themes.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 import styles from './CommentEditor.module.scss';
 
-import '../GrowiEditor.vendor-styles.prebuilt';
+import '~/client/components/GrowiEditor.vendor-styles.prebuilt.js';
 
 const _logger = loggerFactory('growi:components:CommentEditor');
 
 const SlackNotification = dynamic(
-  () => import('../SlackNotification').then((mod) => mod.SlackNotification),
+  () =>
+    import('~/client/components/SlackNotification.js').then(
+      (mod) => mod.SlackNotification,
+    ),
   { ssr: false },
 );
 

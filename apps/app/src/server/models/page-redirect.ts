@@ -1,9 +1,8 @@
 import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import loggerFactory from '~/utils/logger';
-
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:models:page-redirects');
 

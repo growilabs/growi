@@ -9,7 +9,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type { PageDocument } from '~/server/models/page';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 // Mock logger to avoid path resolution issues in tests
 vi.mock('~/utils/logger', () => ({
@@ -21,7 +21,7 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-import { respondWithSinglePage } from './respond-with-single-page';
+import { respondWithSinglePage } from './respond-with-single-page.js';
 
 // ApiV3Response extends Express Response which requires 50+ properties (status, json, send, …).
 // Only apiv3/apiv3Err are exercised in these tests, so a full implementation is impractical.

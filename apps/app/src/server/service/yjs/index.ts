@@ -1,1 +1,1 @@
-export * from './yjs';
+export * from './yjs.js';

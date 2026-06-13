@@ -1,13 +1,13 @@
 import type { IRevisionHasId } from '@growi/core';
 
-import type Crowi from '~/server/crowi';
-import { toArrayFromCsv } from '~/utils/to-array-from-csv';
+import type Crowi from '~/server/crowi/index.js';
+import { toArrayFromCsv } from '~/utils/to-array-from-csv.js';
 
 import {
   prepareSlackMessageForComment,
   prepareSlackMessageForPage,
-} from '../../util/slack';
-import { growiInfoService } from '../growi-info';
+} from '../../util/slack.js';
+import { growiInfoService } from '../growi-info/index.js';
 
 /**
  * service class of UserNotification

@@ -3,7 +3,7 @@ import { isClient } from '@growi/core/dist/utils/browser-utils';
 import * as presentation from '@growi/presentation/dist/client/services/sanitize-option';
 import * as refsGrowiDirective from '@growi/remark-attachment-refs/dist/client';
 import * as drawio from '@growi/remark-drawio';
-import * as lsxGrowiDirective from '@growi/remark-lsx/dist/client';
+import * as lsxGrowiDirective from '@growi/remark-lsx/dist/client/index.js';
 import assert from 'assert';
 import katex from 'rehype-katex';
 import sanitize from 'rehype-sanitize';
@@ -15,35 +15,35 @@ import math from 'remark-math';
 import deepmerge from 'ts-deepmerge';
 import type { Pluggable } from 'unified';
 
-import { DrawioViewerWithEditButton } from '~/client/components/ReactMarkdownComponents/DrawioViewerWithEditButton';
-import { Header } from '~/client/components/ReactMarkdownComponents/Header';
-import { LightBox } from '~/client/components/ReactMarkdownComponents/LightBox';
-import { RichAttachment } from '~/client/components/ReactMarkdownComponents/RichAttachment';
-import { TableWithEditButton } from '~/client/components/ReactMarkdownComponents/TableWithEditButton';
-import * as callout from '~/features/callout';
+import { DrawioViewerWithEditButton } from '~/client/components/ReactMarkdownComponents/DrawioViewerWithEditButton.js';
+import { Header } from '~/client/components/ReactMarkdownComponents/Header.js';
+import { LightBox } from '~/client/components/ReactMarkdownComponents/LightBox.js';
+import { RichAttachment } from '~/client/components/ReactMarkdownComponents/RichAttachment.js';
+import { TableWithEditButton } from '~/client/components/ReactMarkdownComponents/TableWithEditButton.js';
+import * as callout from '~/features/callout/index.js';
 import {
   remarkPlugin as mermaidRemarkPlugin,
   sanitizeOption as mermaidSanitizeOption,
-} from '~/features/mermaid/services';
-import * as plantuml from '~/features/plantuml';
-import type { RendererOptions } from '~/interfaces/renderer-options';
-import type { RendererConfigExt } from '~/interfaces/services/renderer';
-import * as addLineNumberAttribute from '~/services/renderer/rehype-plugins/add-line-number-attribute';
-import * as keywordHighlighter from '~/services/renderer/rehype-plugins/keyword-highlighter';
-import * as relocateToc from '~/services/renderer/rehype-plugins/relocate-toc';
-import * as attachment from '~/services/renderer/remark-plugins/attachment';
-import * as codeBlock from '~/services/renderer/remark-plugins/codeblock';
-import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table';
+} from '~/features/mermaid/services/index.js';
+import * as plantuml from '~/features/plantuml/index.js';
+import type { RendererOptions } from '~/interfaces/renderer-options.js';
+import type { RendererConfigExt } from '~/interfaces/services/renderer.js';
+import * as addLineNumberAttribute from '~/services/renderer/rehype-plugins/add-line-number-attribute.js';
+import * as keywordHighlighter from '~/services/renderer/rehype-plugins/keyword-highlighter.js';
+import * as relocateToc from '~/services/renderer/rehype-plugins/relocate-toc.js';
+import * as attachment from '~/services/renderer/remark-plugins/attachment.js';
+import * as codeBlock from '~/services/renderer/remark-plugins/codeblock.js';
+import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table.js';
 import {
   generateCommonOptions,
   getCommonSanitizeOption,
   verifySanitizePlugin,
-} from '~/services/renderer/renderer';
-import loggerFactory from '~/utils/logger';
+} from '~/services/renderer/renderer.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 // import EasyGrid from './PreProcessor/EasyGrid';
 
-import './Renderer.vendor-styles.prebuilt';
+import '~/client/services/renderer/Renderer.vendor-styles.prebuilt.js';
 
 const logger = loggerFactory('growi:cli:services:renderer');
 
@@ -51,7 +51,7 @@ assert(isClient(), 'This module must be loaded only from client modules.');
 
 const MermaidViewer = dynamic(
   () =>
-    import('~/features/mermaid/components/MermaidViewer').then(
+    import('~/features/mermaid/components/MermaidViewer.js').then(
       (mod) => mod.MermaidViewer,
     ),
   { ssr: false },

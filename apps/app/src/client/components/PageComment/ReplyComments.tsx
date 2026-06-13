@@ -3,11 +3,10 @@ import type { IUser } from '@growi/core';
 import { useAtomValue } from 'jotai';
 import { Collapse } from 'reactstrap';
 
-import type { ICommentHasId, ICommentHasIdList } from '~/interfaces/comment';
-import type { RendererOptions } from '~/interfaces/renderer-options';
-import { isAllReplyShownAtom } from '~/states/server-configurations';
-
-import { Comment } from './Comment';
+import { Comment } from '~/client/components/PageComment/Comment.js';
+import type { ICommentHasId, ICommentHasIdList } from '~/interfaces/comment.js';
+import type { RendererOptions } from '~/interfaces/renderer-options.js';
+import { isAllReplyShownAtom } from '~/states/server-configurations/index.js';
 
 import styles from './ReplyComments.module.scss';
 

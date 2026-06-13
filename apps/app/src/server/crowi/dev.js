@@ -4,9 +4,9 @@ import express from 'express';
 import fs from 'graceful-fs';
 import path from 'path';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
-import nextFactory from '../routes/next';
+import nextFactory from '../routes/next.js';
 
 const logger = loggerFactory('growi:crowi:dev');
 
@@ -93,7 +93,9 @@ class CrowiDev {
     const next = nextFactory(this.crowi);
     app.use(
       '/analyze',
-      express.static(path.resolve(__dirname, '../../../.next/analyze')),
+      express.static(
+        path.resolve(import.meta.dirname, '../../../.next/analyze'),
+      ),
     );
   }
 

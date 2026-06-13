@@ -7,21 +7,27 @@ import {
 } from '@growi/core/dist/utils/page-path-utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import type { IBookmarkInfo } from '~/interfaces/bookmark-info';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
-import { configManager } from '~/server/service/config-manager';
-import { preNotifyService } from '~/server/service/pre-notify';
-import loggerFactory from '~/utils/logger';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
+import type { IBookmarkInfo } from '~/interfaces/bookmark-info.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import type {
+  BookmarkDocument,
+  BookmarkModel,
+} from '~/server/models/bookmark.js';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
+import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { preNotifyService } from '~/server/service/pre-notify.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import BookmarkFolder from '../../models/bookmark-folder';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import BookmarkFolder from '../../models/bookmark-folder.js';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmarks');
 

@@ -3,8 +3,8 @@ import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import mermaid from 'mermaid';
 import { v7 as uuidV7 } from 'uuid';
 
-import { useNextThemes } from '~/stores-universal/use-next-themes';
-import loggerFactory from '~/utils/logger';
+import { useNextThemes } from '~/stores-universal/use-next-themes.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:features:mermaid:MermaidViewer');
 

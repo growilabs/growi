@@ -2,12 +2,12 @@ import type { IPage, IUser } from '@growi/core';
 import type { Types } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { CommentEvent, commentEvent } from '~/features/comment/server';
-import { prisma } from '~/utils/prisma';
+import { CommentEvent, commentEvent } from '~/features/comment/server/index.js';
+import { prisma } from '~/utils/prisma.js';
 
-import loggerFactory from '../../utils/logger';
-import type Crowi from '../crowi';
-import type { PageModel } from '../models/page';
+import loggerFactory from '../../utils/logger/index.js';
+import type Crowi from '../crowi/index.js';
+import type { PageModel } from '../models/page.js';
 
 // https://regex101.com/r/Ztxj2j/1
 const USERNAME_PATTERN = new RegExp(/\B@[\w@.-]+/g);

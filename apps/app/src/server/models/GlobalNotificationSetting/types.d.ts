@@ -1,8 +1,8 @@
 import type { HydratedDocument, Model } from 'mongoose';
 
-import type Crowi from '~/server/crowi';
+import type Crowi from '~/server/crowi/index.js';
 
-import type { GlobalNotificationSettingType } from './consts';
+import type { GlobalNotificationSettingType } from './consts.js';
 
 export interface IGlobalNotificationSetting {
   isEnabled: boolean;

@@ -4,14 +4,13 @@ import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { apiv3Delete } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-
+import { apiv3Delete } from '~/client/util/apiv3-client.js';
+import { toastError, toastSuccess } from '~/client/util/toastr.js';
 import {
   usePluginDeleteModalActions,
   usePluginDeleteModalStatus,
-} from '../../states/modal/plugin-delete';
-import { useSWRxAdminPlugins } from '../../stores/admin-plugins';
+} from '~/features/growi-plugin/client/Admin/states/modal/plugin-delete.js';
+import { useSWRxAdminPlugins } from '~/features/growi-plugin/client/Admin/stores/admin-plugins.js';
 
 /**
  * PluginDeleteModalSubstance - Presentation component (all logic here)

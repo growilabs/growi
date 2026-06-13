@@ -8,9 +8,9 @@ import {
   useIsGuestUser,
   useIsReadOnlyUser,
   useIsSharedUser,
-} from '~/states/context';
-import { useDeleteAttachmentModalActions } from '~/states/ui/modal/delete-attachment';
-import { useSWRxAttachment } from '~/stores/attachment';
+} from '~/states/context.js';
+import { useDeleteAttachmentModalActions } from '~/states/ui/modal/delete-attachment.js';
+import { useSWRxAttachment } from '~/stores/attachment.js';
 
 import styles from './RichAttachment.module.scss';
 

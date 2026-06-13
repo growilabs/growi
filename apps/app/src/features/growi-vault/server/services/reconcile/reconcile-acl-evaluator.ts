@@ -17,9 +17,9 @@
 
 import type { IUserHasId } from '@growi/core';
 
-import type { IPageGrantService } from '~/server/service/page-grant';
+import type { IPageGrantService } from '~/server/service/page-grant.js';
 
-import type { PageQueryFilter } from './reconcile-target-resolver';
+import type { PageQueryFilter } from './reconcile-target-resolver.js';
 
 // ---------------------------------------------------------------------------
 // Public interfaces

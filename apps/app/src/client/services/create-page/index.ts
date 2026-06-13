@@ -1,2 +1,2 @@
-export * from './use-create-page';
-export * from './use-create-template-page';
+export * from '~/client/services/create-page/use-create-page.js';
+export * from '~/client/services/create-page/use-create-template-page.js';

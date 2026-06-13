@@ -2,8 +2,8 @@ import type { ChangeEvent, ForwardRefRenderFunction, JSX } from 'react';
 import React, { forwardRef, useImperativeHandle, useRef } from 'react';
 import { Input } from 'reactstrap';
 
-import type { ISelectableAndIndeterminatable } from '~/client/interfaces/selectable-all';
-import type { IndeterminateInputElement } from '~/interfaces/indeterminate-input-elm';
+import type { ISelectableAndIndeterminatable } from '~/client/interfaces/selectable-all.js';
+import type { IndeterminateInputElement } from '~/interfaces/indeterminate-input-elm.js';
 
 type Props = {
   inputId?: string;

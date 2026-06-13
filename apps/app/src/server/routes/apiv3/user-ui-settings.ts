@@ -3,11 +3,11 @@ import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
-import { AllSidebarContentsType } from '~/interfaces/ui';
-import loggerFactory from '~/utils/logger';
+import { AllSidebarContentsType } from '~/interfaces/ui.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import UserUISettings from '../../models/user-ui-settings';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import UserUISettings from '../../models/user-ui-settings.js';
 
 const logger = loggerFactory('growi:routes:apiv3:user-ui-settings');
 

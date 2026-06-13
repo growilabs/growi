@@ -1,4 +1,4 @@
-import next from 'next';
+import nextPkg from 'next';
 import http from 'node:http';
 import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
@@ -11,71 +11,80 @@ import expressSession from 'express-session';
 import mongoose from 'mongoose';
 import uidSafe from 'uid-safe';
 
-import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
-import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
-import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
-import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
-import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
-import { initializeVaultFeature } from '~/features/growi-vault/server';
-import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
-import { initializeOpenaiService } from '~/features/openai/server/services/openai';
-import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
-import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
-import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
-import type { SessionConfig } from '~/interfaces/session-config';
-import { startCron as startAccessTokenCron } from '~/server/service/access-token';
-import { projectRoot } from '~/server/util/project-dir-utils';
-import { getGrowiVersion } from '~/utils/growi-version';
-import loggerFactory from '~/utils/logger';
+import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron.js';
+import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/index.js';
+import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron.js';
+import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync.js';
+import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync.js';
+import { initializeVaultFeature } from '~/features/growi-vault/server/index.js';
+import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron/index.js';
+import { initializeOpenaiService } from '~/features/openai/server/services/openai.js';
+import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron.js';
+import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron.js';
+import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/index.js';
+import type { SessionConfig } from '~/interfaces/session-config.js';
+import { startCron as startAccessTokenCron } from '~/server/service/access-token/index.js';
+import { projectRoot } from '~/server/util/project-dir-utils.js';
+import { getGrowiVersion } from '~/utils/growi-version.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import ActivityEvent from '../events/activity';
-import AdminEvent from '../events/admin';
-import BookmarkEvent from '../events/bookmark';
-import PageEvent from '../events/page';
-import TagEvent from '../events/tag';
-import UserEvent from '../events/user';
-import type { AccessTokenParser } from '../middlewares/access-token-parser';
-import { accessTokenParser } from '../middlewares/access-token-parser';
-import httpErrorHandler from '../middlewares/http-error-handler';
-import loginRequiredFactory from '../middlewares/login-required';
-import type { AclService } from '../service/acl';
-import { aclService as aclServiceSingletonInstance } from '../service/acl';
-import ActivityService from '../service/activity';
-import AppService from '../service/app';
-import { AttachmentService } from '../service/attachment';
-import CommentService from '../service/comment';
-import { configManager as configManagerSingletonInstance } from '../service/config-manager';
-import type { ConfigManager } from '../service/config-manager/config-manager';
-import instanciateExportService from '../service/export';
-import instanciateExternalAccountService from '../service/external-account';
-import { type FileUploader, getUploader } from '../service/file-uploader';
+import ActivityEvent from '../events/activity.js';
+import AdminEvent from '../events/admin.js';
+import BookmarkEvent from '../events/bookmark.js';
+import PageEvent from '../events/page.js';
+import TagEvent from '../events/tag.js';
+import UserEvent from '../events/user.js';
+import type { AccessTokenParser } from '../middlewares/access-token-parser/index.js';
+import { accessTokenParser } from '../middlewares/access-token-parser/index.js';
+import httpErrorHandler from '../middlewares/http-error-handler.js';
+import loginRequiredFactory from '../middlewares/login-required.js';
+import type { AclService } from '../service/acl.js';
+import { aclService as aclServiceSingletonInstance } from '../service/acl.js';
+import ActivityService from '../service/activity.js';
+import AppService from '../service/app.js';
+import { AttachmentService } from '../service/attachment.js';
+import CommentService from '../service/comment.js';
+import type { ConfigManager } from '../service/config-manager/config-manager.js';
+import { configManager as configManagerSingletonInstance } from '../service/config-manager/index.js';
+import instanciateExportService from '../service/export.js';
+import instanciateExternalAccountService from '../service/external-account.js';
+import {
+  type FileUploader,
+  getUploader,
+} from '../service/file-uploader/index.js';
 import {
   G2GTransferPusherService,
   G2GTransferReceiverService,
-} from '../service/g2g-transfer';
-import { GrowiBridgeService } from '../service/growi-bridge';
-import { initializeImportService } from '../service/import';
-import { InAppNotificationService } from '../service/in-app-notification';
-import { InstallerService } from '../service/installer';
-import { normalizeData } from '../service/normalize-data';
-import PageService from '../service/page';
-import PageGrantService from '../service/page-grant';
-import type { IPageOperationService } from '../service/page-operation';
-import instanciatePageOperationService from '../service/page-operation';
-import PassportService from '../service/passport';
-import SearchService from '../service/search';
-import { SlackIntegrationService } from '../service/slack-integration';
-import { SocketIoService } from '../service/socket-io';
-import SyncPageStatusService from '../service/system-events/sync-page-status';
-import UserGroupService from '../service/user-group';
-import { UserNotificationService } from '../service/user-notification';
-import { initializeYjsService } from '../service/yjs';
-import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
-import { setup as setupExpressInit } from './express-init';
-import type { ModelsMapDependentOnCrowi } from './setup-models';
-import { setupModelsDependentOnCrowi } from './setup-models';
+} from '../service/g2g-transfer.js';
+import { GrowiBridgeService } from '../service/growi-bridge/index.js';
+import { initializeImportService } from '../service/import/index.js';
+import { InAppNotificationService } from '../service/in-app-notification.js';
+import { InstallerService } from '../service/installer.js';
+import { normalizeData } from '../service/normalize-data/index.js';
+import PageService from '../service/page/index.js';
+import PageGrantService from '../service/page-grant.js';
+import type { IPageOperationService } from '../service/page-operation.js';
+import instanciatePageOperationService from '../service/page-operation.js';
+import PassportService from '../service/passport.js';
+import SearchService from '../service/search.js';
+import { SlackIntegrationService } from '../service/slack-integration.js';
+import { SocketIoService } from '../service/socket-io/index.js';
+import SyncPageStatusService from '../service/system-events/sync-page-status.js';
+import UserGroupService from '../service/user-group.js';
+import { UserNotificationService } from '../service/user-notification/index.js';
+import { initializeYjsService } from '../service/yjs/index.js';
+import { getMongoUri, mongoOptions } from '../util/mongoose-utils.js';
+import { setup as setupExpressInit } from './express-init.js';
+import type { ModelsMapDependentOnCrowi } from './setup-models.js';
+import { setupModelsDependentOnCrowi } from './setup-models.js';
 
 const logger = loggerFactory('growi:crowi');
+
+// next's CJS entry self-patches `module.exports` to the createServer function,
+// so the runtime default import IS callable; the shipped d.ts (`export default`
+// in a CJS package) makes NodeNext type it as the module namespace instead.
+// Narrow the binding back to the callable declared as its `default`.
+const next = nextPkg as unknown as typeof import('next').default;
 
 const sep = path.sep;
 
@@ -123,17 +132,17 @@ class Crowi {
 
   fileUploadService!: FileUploader;
 
-  growiInfoService!: import('../service/growi-info').GrowiInfoService;
+  growiInfoService!: import('../service/growi-info/index.js').GrowiInfoService;
 
   growiBridgeService!: GrowiBridgeService;
 
-  pageService!: import('../service/page/page-service').IPageService;
+  pageService!: import('../service/page/page-service.js').IPageService;
 
   pageGrantService!: PageGrantService;
 
   pageOperationService!: IPageOperationService;
 
-  customizeService!: import('../service/customize').CustomizeService;
+  customizeService!: import('../service/customize.js').CustomizeService;
 
   passportService!: PassportService;
 
@@ -221,7 +230,7 @@ class Crowi {
     this.publicDir = path.join(projectRoot, 'public') + sep;
     this.resourceDir = path.join(projectRoot, 'resource') + sep;
     this.localeDir = path.join(this.resourceDir, 'locales') + sep;
-    this.viewsDir = path.resolve(__dirname, '../views') + sep;
+    this.viewsDir = path.resolve(import.meta.dirname, '../views') + sep;
     this.tmpDir = path.join(projectRoot, 'tmp') + sep;
     this.cacheDir = path.join(this.tmpDir, 'cache');
 
@@ -420,7 +429,7 @@ class Crowi {
 
   async setupS2sMessagingService(): Promise<void> {
     const { setup: setupS2sMessaging } = await import(
-      '../service/s2s-messaging'
+      '../service/s2s-messaging/index.js'
     );
     const s2sMessagingService = await setupS2sMessaging(this);
     if (s2sMessagingService != null) {
@@ -444,7 +453,7 @@ class Crowi {
     instanciatePageBulkExportJobCleanUpCronService(this);
     // Dynamic import to get the initialized singleton instance
     const { pageBulkExportJobCleanUpCronService } = await import(
-      '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron'
+      '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron.js'
     );
     if (pageBulkExportJobCleanUpCronService == null) {
       throw new Error('pageBulkExportJobCleanUpCronService is not initialized');
@@ -456,7 +465,7 @@ class Crowi {
 
     instantiateAuditLogBulkExportJobCleanUpCronService(this);
     const { auditLogBulkExportJobCleanUpCronService } = await import(
-      '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron'
+      '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron.js'
     );
     if (auditLogBulkExportJobCleanUpCronService == null) {
       throw new Error(
@@ -470,7 +479,7 @@ class Crowi {
 
     // News feed sync cron
     const { NewsCronService } = await import(
-      '~/features/news/server/services/news-cron-service'
+      '~/features/news/server/services/news-cron-service.js'
     );
     new NewsCronService().startCron();
   }
@@ -516,7 +525,9 @@ class Crowi {
   async setupMailer(): Promise<void> {
     // intentionally lazy: service/mail participates in a require cycle with
     // this hub module; loading it at import time would surface the cycle
-    const { default: MailService } = await import('~/server/service/mail');
+    const { default: MailService } = await import(
+      '~/server/service/mail/index.js'
+    );
     this.mailService = new MailService(this);
 
     // add as a message handler
@@ -595,7 +606,7 @@ class Crowi {
 
     // setup CrowiDev (loaded lazily: development runtime only)
     if (dev) {
-      const { default: CrowiDev } = await import('./dev');
+      const { default: CrowiDev } = await import('./dev.js');
       this.crowiDev = new CrowiDev(this);
       this.crowiDev.init();
     }
@@ -695,7 +706,7 @@ class Crowi {
   async setupRoutesAtLast(): Promise<void> {
     type RoutesSetup = (crowi: Crowi, app: Express) => void;
     const { setup: setupRoutes }: { setup: RoutesSetup } = await import(
-      '../routes'
+      '../routes/index.js'
     );
     setupRoutes(this, this.express);
   }
@@ -713,7 +724,7 @@ class Crowi {
    */
   async setUpGlobalNotification(): Promise<void> {
     const { GlobalNotificationService } = await import(
-      '../service/global-notification'
+      '../service/global-notification/index.js'
     );
     if (this.globalNotificationService == null) {
       this.globalNotificationService = new GlobalNotificationService(this);
@@ -740,7 +751,7 @@ class Crowi {
    * setup CustomizeService
    */
   async setUpCustomize(): Promise<void> {
-    const { CustomizeService } = await import('../service/customize');
+    const { CustomizeService } = await import('../service/customize.js');
     if (this.customizeService == null) {
       this.customizeService = new CustomizeService(this);
       this.customizeService.initCustomCss();
@@ -783,7 +794,7 @@ class Crowi {
    */
   async setUpFileUploaderSwitchService(): Promise<void> {
     const { default: FileUploaderSwitchService } = await import(
-      '../service/file-uploader-switch'
+      '../service/file-uploader-switch.js'
     );
     this.fileUploaderSwitchService = new FileUploaderSwitchService(this);
     // add as a message handler
@@ -795,7 +806,7 @@ class Crowi {
   }
 
   async setupGrowiInfoService(): Promise<void> {
-    const { growiInfoService } = await import('../service/growi-info');
+    const { growiInfoService } = await import('../service/growi-info/index.js');
     this.growiInfoService = growiInfoService;
   }
 
@@ -831,7 +842,7 @@ class Crowi {
 
   async setupGrowiPluginService(): Promise<void> {
     const growiPluginService = await import(
-      '~/features/growi-plugin/server/services'
+      '~/features/growi-plugin/server/services/index.js'
     ).then((mod) => mod.growiPluginService);
 
     // download plugin repositories, if document exists but there is no repository

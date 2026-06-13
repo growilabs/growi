@@ -1,15 +1,15 @@
 import type { IPage, IUser, Lang } from '@growi/core';
 import { addSeconds } from 'date-fns/addSeconds';
-import ExtensibleCustomError from 'extensible-custom-error';
 import fs from 'graceful-fs';
 import mongoose from 'mongoose';
 import path from 'path';
 
-import loggerFactory from '~/utils/logger';
+import { ExtensibleCustomError } from '~/server/util/extensible-custom-error.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type Crowi from '../crowi';
-import { SUPPORTED_LOCALES } from '../util/safe-path-utils';
-import { configManager } from './config-manager';
+import type Crowi from '../crowi/index.js';
+import { SUPPORTED_LOCALES } from '../util/safe-path-utils.js';
+import { configManager } from './config-manager/index.js';
 
 const logger = loggerFactory('growi:service:installer');
 

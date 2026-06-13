@@ -13,29 +13,29 @@ import {
 } from '@growi/core/dist/utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
-import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
-import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import type { UserRelatedGroupsData } from '~/interfaces/page';
+import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group.js';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group.js';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
+import type { UserRelatedGroupsData } from '~/interfaces/page.js';
 import {
   type GroupGrantData,
   UserGroupPageGrantStatus,
-} from '~/interfaces/page';
+} from '~/interfaces/page.js';
 import type {
   IRecordApplicableGrant,
   PopulatedGrantedGroup,
-} from '~/interfaces/page-grant';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import UserGroup from '~/server/models/user-group';
+} from '~/interfaces/page-grant.js';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
+import UserGroup from '~/server/models/user-group.js';
 import {
   excludeTestIdsFromTargetIds,
   hasIntersection,
   includesObjectIds,
-} from '~/server/util/compare-objectId';
+} from '~/server/util/compare-objectId.js';
 
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
-import UserGroupRelation from '../models/user-group-relation';
-import { divideByType } from '../util/granted-group';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
+import UserGroupRelation from '../models/user-group-relation.js';
+import { divideByType } from '../util/granted-group.js';
 
 const { addTrailingSlash } = pathUtils;
 const { isTopPage } = pagePathUtils;

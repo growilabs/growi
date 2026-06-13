@@ -5,18 +5,18 @@ import express from 'express';
 import { body } from 'express-validator';
 import multer from 'multer';
 
-import { GrowiPlugin } from '~/features/growi-plugin/server/models';
-import { SupportedAction } from '~/interfaces/activity';
-import { AttachmentType } from '~/server/interfaces/attachment';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import adminRequiredFactory from '~/server/middlewares/admin-required';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Attachment } from '~/server/models/attachment';
-import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
+import { GrowiPlugin } from '~/features/growi-plugin/server/models/index.js';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { AttachmentType } from '~/server/interfaces/attachment.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import adminRequiredFactory from '~/server/middlewares/admin-required.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { Attachment } from '~/server/models/attachment.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
 
 const logger = loggerFactory('growi:routes:apiv3:customize-setting');
 

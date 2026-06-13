@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { useStartEditing } from '~/client/services/use-start-editing';
-import { toastError } from '~/client/util/toastr';
-import { useCurrentPathname } from '~/states/global';
-import { useCurrentPagePath, useIsEditable } from '~/states/page';
+import { useStartEditing } from '~/client/services/use-start-editing.js';
+import { toastError } from '~/client/util/toastr.js';
+import { useCurrentPathname } from '~/states/global/index.js';
+import { useCurrentPagePath, useIsEditable } from '~/states/page/index.js';
 
-import type { HotkeyBindingDef } from '../HotkeysManager';
+import type { HotkeyBindingDef } from '../HotkeysManager.js';
 
 type Props = {
   onDeleteRender: () => void;

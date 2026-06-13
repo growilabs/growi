@@ -84,7 +84,7 @@ describe('file-upload-setting route', () => {
 
     // Import and mount the actual router using dynamic import
     const { setup: setupFileUploadSetting } = await import(
-      './file-upload-setting'
+      './file-upload-setting.js'
     );
     const fileUploadSettingRouter = setupFileUploadSetting(crowiMock);
     app.use('/', fileUploadSettingRouter);

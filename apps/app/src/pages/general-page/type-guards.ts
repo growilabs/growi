@@ -1,9 +1,9 @@
 import { isIPageInfo } from '@growi/core/dist/interfaces';
 
-import loggerFactory from '~/utils/logger';
+import { NextjsRoutingType } from '~/pages/utils/nextjs-routing-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { NextjsRoutingType } from '../utils/nextjs-routing-utils';
-import type { GeneralPageInitialProps } from './types';
+import type { GeneralPageInitialProps } from './types.js';
 
 const logger = loggerFactory('growi:pages:general-page:type-guards');
 

@@ -1,6 +1,6 @@
-import type Crowi from '~/server/crowi';
+import type Crowi from '~/server/crowi/index.js';
 
-import { ImportService } from './import';
+import { ImportService } from './import.js';
 
 let instance: ImportService;
 
@@ -17,4 +17,4 @@ export const getImportService = (): ImportService => {
   return instance;
 };
 
-export * from './import-settings';
+export * from './import-settings.js';

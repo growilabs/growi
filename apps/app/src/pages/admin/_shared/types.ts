@@ -1,7 +1,10 @@
 import type { ReactNode } from 'react';
 import type { Container } from 'unstated';
 
-import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
+import type {
+  CommonEachProps,
+  CommonInitialProps,
+} from '~/pages/common-props/index.js';
 
 export type AdminCommonProps = CommonInitialProps &
   CommonEachProps & {

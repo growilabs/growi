@@ -1,1 +1,1 @@
-export { Lsx, LsxImmutable } from './Lsx';
+export { Lsx, LsxImmutable } from './Lsx.js';

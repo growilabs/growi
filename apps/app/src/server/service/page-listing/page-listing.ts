@@ -2,20 +2,20 @@ import type { IUser } from '@growi/core/dist/interfaces';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
-import type { IPageForTreeItem } from '~/interfaces/page';
+import type { IPageForTreeItem } from '~/interfaces/page.js';
 import {
   type IPageOperationProcessData,
   type IPageOperationProcessInfo,
   PageActionType,
-} from '~/interfaces/page-operation';
+} from '~/interfaces/page-operation.js';
 import {
   type PageDocument,
   type PageModel,
   PageQueryBuilder,
-} from '~/server/models/page';
-import PageOperation from '~/server/models/page-operation';
+} from '~/server/models/page.js';
+import PageOperation from '~/server/models/page-operation.js';
 
-import type { IPageOperationService } from '../page-operation';
+import type { IPageOperationService } from '../page-operation.js';
 
 const { hasSlash, generateChildrenRegExp } = pagePathUtils;
 
@@ -32,7 +32,7 @@ export interface IPageListingService {
 let pageOperationService: IPageOperationService;
 async function getPageOperationServiceInstance(): Promise<IPageOperationService> {
   if (pageOperationService == null) {
-    pageOperationService = await import('../page-operation').then(
+    pageOperationService = await import('../page-operation.js').then(
       // biome-ignore lint/style/noNonNullAssertion: the module must export pageOperationService
       (mod) => mod.pageOperationService!,
     );

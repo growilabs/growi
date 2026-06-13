@@ -1,6 +1,6 @@
 import type { Text as YText } from 'yjs';
 
-import { ClientFuzzyMatcher } from './fuzzy-matching';
+import { ClientFuzzyMatcher } from '~/features/openai/client/services/editor-assistant/fuzzy-matching.js';
 
 /**
  * Perform search and replace operation on YText with fuzzy matching

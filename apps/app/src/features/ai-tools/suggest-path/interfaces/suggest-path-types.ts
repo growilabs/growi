@@ -1,6 +1,6 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
 
 export const SuggestionType = {
   MEMO: 'memo',

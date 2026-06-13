@@ -1,12 +1,12 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 
-import { LoginErrorCode } from '~/interfaces/errors/login-error';
-import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
-import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
+import { LoginErrorCode } from '~/interfaces/errors/login-error.js';
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
+import { NullUsernameToBeRegisteredError } from '~/server/models/errors.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { prisma } from '~/utils/prisma.js';
 
-import { NullUsernameToBeRegisteredError } from '../models/errors';
-import type PassportService from './passport';
+import type PassportService from './passport.js';
 
 const logger = loggerFactory('growi:service:external-account-service');
 

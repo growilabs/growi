@@ -2,14 +2,14 @@ import type { IPage } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 
-import { SearchDelegatorName } from '~/interfaces/named-query';
-import type { ISearchResult } from '~/interfaces/search';
+import { SearchDelegatorName } from '~/interfaces/named-query.js';
+import type { ISearchResult } from '~/interfaces/search.js';
 import type {
   PageDocument,
   PageModel,
   PageQueryBuilder,
-} from '~/server/models/page';
-import { serializePageSecurely } from '~/server/models/serializers';
+} from '~/server/models/page.js';
+import { serializePageSecurely } from '~/server/models/serializers/index.js';
 
 import type {
   MongoQueryTerms,
@@ -18,7 +18,7 @@ import type {
   SearchableData,
   SearchDelegator,
   UnavailableTermsKey,
-} from '../../interfaces/search';
+} from '../../interfaces/search.js';
 
 const AVAILABLE_KEYS = ['match', 'not_match', 'prefix', 'not_prefix'];
 

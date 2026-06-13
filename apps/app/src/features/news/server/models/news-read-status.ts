@@ -1,12 +1,12 @@
 import type { Document, Model, Types } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
 import type {
   INewsReadStatus,
   INewsReadStatusHasId,
-} from '../../interfaces/news-read-status';
+} from '../../interfaces/news-read-status.js';
 
 export interface NewsReadStatusDocument extends INewsReadStatus, Document {
   _id: Types.ObjectId;

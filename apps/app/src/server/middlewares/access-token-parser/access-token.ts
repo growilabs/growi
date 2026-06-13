@@ -3,10 +3,9 @@ import type { AccessTokenParserReq } from '@growi/core/dist/interfaces/server';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Response } from 'express';
 
-import { AccessToken } from '~/server/models/access-token';
-import loggerFactory from '~/utils/logger';
-
-import { extractAccessToken } from './extract-access-token';
+import { extractAccessToken } from '~/server/middlewares/access-token-parser/extract-access-token.js';
+import { AccessToken } from '~/server/models/access-token.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory(
   'growi:middleware:access-token-parser:access-token',

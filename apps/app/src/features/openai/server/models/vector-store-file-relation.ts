@@ -2,7 +2,7 @@ import type mongoose from 'mongoose';
 import type { Types } from 'mongoose';
 import { type Document, type Model, Schema } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
 export interface VectorStoreFileRelation {
   vectorStoreRelationId: mongoose.Types.ObjectId;

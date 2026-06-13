@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { OnDuplicatedFunction } from '../../../interfaces/ui';
+import type { OnDuplicatedFunction } from '../../../interfaces/ui.js';
 
 // Type definitions to match the original implementation
 export type IPageForPageDuplicateModal = {

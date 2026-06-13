@@ -1,7 +1,8 @@
 import type { JSX } from 'react';
 
-import StaffCredit from '../../StaffCredit/StaffCredit';
-import type { HotkeyBindingDef } from '../HotkeysManager';
+import StaffCredit from '~/client/components/StaffCredit/StaffCredit.js';
+
+import type { HotkeyBindingDef } from '../HotkeysManager.js';
 
 type Props = {
   onDeleteRender: () => void;

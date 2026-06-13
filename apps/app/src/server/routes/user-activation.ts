@@ -1,7 +1,7 @@
 import type { NextFunction, Response } from 'express';
 
-import type { UserActivationErrorCode } from '~/interfaces/errors/user-activation';
-import type { ReqWithUserRegistrationOrder } from '~/server/middlewares/inject-user-registration-order-by-token-middleware';
+import type { UserActivationErrorCode } from '~/interfaces/errors/user-activation.js';
+import type { ReqWithUserRegistrationOrder } from '~/server/middlewares/inject-user-registration-order-by-token-middleware.js';
 
 type Crowi = {
   nextApp: any;

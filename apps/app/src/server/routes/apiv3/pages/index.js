@@ -15,22 +15,25 @@ import {
 import express from 'express';
 import { body, query } from 'express-validator';
 
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import { subscribeRuleNames } from '~/interfaces/in-app-notification';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import adminRequiredFactory from '~/server/middlewares/admin-required';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
-import PageTagRelation from '~/server/models/page-tag-relation';
-import { configManager } from '~/server/service/config-manager';
-import { preNotifyService } from '~/server/service/pre-notify';
-import loggerFactory from '~/utils/logger';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
+import { subscribeRuleNames } from '~/interfaces/in-app-notification.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import adminRequiredFactory from '~/server/middlewares/admin-required.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/index.js';
+import PageTagRelation from '~/server/models/page-tag-relation.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { preNotifyService } from '~/server/service/pre-notify.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
-import { serializePageSecurely } from '../../../models/serializers/page-serializer';
-import { isV5ConversionError } from '../../../models/vo/v5-conversion-error';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user.js';
+import { serializePageSecurely } from '../../../models/serializers/page-serializer.js';
+import { isV5ConversionError } from '../../../models/vo/v5-conversion-error.js';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
 const router = express.Router();

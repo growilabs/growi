@@ -5,22 +5,22 @@ import express from 'express';
 import { body } from 'express-validator';
 import type { Types } from 'mongoose';
 
-import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
-import loginRequiredFactory from '~/server/middlewares/login-required';
+import type { BookmarkFolderItems } from '~/interfaces/bookmark-info.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
 import {
   BookmarkFolderForbiddenError,
   BookmarkFolderNotFoundError,
   InvalidParentBookmarkFolderError,
-} from '~/server/models/errors';
-import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
-import loggerFactory from '~/utils/logger';
+} from '~/server/models/errors.js';
+import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import BookmarkFolder from '../../models/bookmark-folder';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import BookmarkFolder from '../../models/bookmark-folder.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmark-folder');
 

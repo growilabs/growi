@@ -2,11 +2,11 @@ import type { IUser } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 import type { HydratedDocument } from 'mongoose';
 
-import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated';
-import loggerFactory from '~/utils/logger';
+import { UserStatus } from '~/server/models/user/conts.js';
+import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type Crowi from '../crowi';
-import { UserStatus } from '../models/user/conts';
+import type Crowi from '../crowi/index.js';
 
 const logger = loggerFactory('growi:middleware:login-required');
 

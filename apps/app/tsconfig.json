@@ -6,7 +6,16 @@
     "resolveJsonModule": true,
     "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
 
+    // Suffix patterns (esm-migration task 3.6): Turbopack does not apply
+    // TypeScript's `.js` -> `.ts` extension substitution, so the
+    // `.js`-suffixed alias specifiers required by the NodeNext server build
+    // are mapped back to their extensionless form, which every pipeline
+    // (Turbopack, tsgo, vite-tsconfig-paths) resolves with normal extension
+    // searching. Keep the targets extensionless: typescript-go panics on
+    // suffix patterns with extensioned targets.
     "paths": {
+      "~/*.js": ["./src/*"],
+      "^/*.js": ["./*"],
       "~/*": ["./src/*"],
       "^/*": ["./*"]
     },
@@ -31,6 +40,11 @@
   "ts-node": {
     "transpileOnly": true,
     "swc": true,
+    // Map the explicit `.js` specifiers introduced by the ESM migration
+    // (task 3.4) back to their `.ts` sources under the CJS dev runner.
+    // Without this, `require('./x.js')` fails with MODULE_NOT_FOUND because
+    // only `x.ts` exists. Remove together with ts-node in task 3.7.b.
+    "experimentalResolver": true,
     "compilerOptions": {
       "module": "CommonJS",
       "moduleResolution": "Node"

@@ -1,11 +1,10 @@
 import { ConfigSource } from '@growi/core/dist/interfaces';
 import type { NodeSDK } from '@opentelemetry/sdk-node';
 
-import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
-
-import { setupCustomMetrics } from './custom-metrics';
-import { setResource } from './node-sdk-resource';
+import { setupCustomMetrics } from '~/features/opentelemetry/server/custom-metrics/index.js';
+import { setResource } from '~/features/opentelemetry/server/node-sdk-resource.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:opentelemetry:server');
 
@@ -72,14 +71,16 @@ For more information, see https://docs.growi.org/en/admin-guide/admin-cookbook/t
     // initialize global logger for development
     const isDev = process.env.NODE_ENV === 'development';
     if (isDev) {
-      const { initLogger } = await import('./logger');
+      const { initLogger } = await import(
+        '~/features/opentelemetry/server/logger.js'
+      );
       initLogger();
     }
 
     // instanciate NodeSDK
     const { NodeSDK } = await import('@opentelemetry/sdk-node');
     const { generateNodeSDKConfiguration } = await import(
-      './node-sdk-configuration'
+      '~/features/opentelemetry/server/node-sdk-configuration.js'
     );
     // get resource from configuration
     const enableAnonymization = configManager.getConfig(
@@ -105,7 +106,7 @@ export const setupAdditionalResourceAttributes = async (): Promise<void> => {
     }
 
     const { generateAdditionalResourceAttributes } = await import(
-      './node-sdk-configuration'
+      '~/features/opentelemetry/server/node-sdk-configuration.js'
     );
     // get resource from configuration
     const enableAnonymization = configManager.getConfig(

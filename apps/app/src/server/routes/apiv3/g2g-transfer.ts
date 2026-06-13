@@ -7,25 +7,25 @@ import { body } from 'express-validator';
 import multer from 'multer';
 import path from 'pathe';
 
-import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import adminRequiredFactory from '~/server/middlewares/admin-required';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { isG2GTransferError } from '~/server/models/vo/g2g-transfer-error';
-import { configManager } from '~/server/service/config-manager';
-import { exportService } from '~/server/service/export';
-import type { IDataGROWIInfo } from '~/server/service/g2g-transfer';
-import { X_GROWI_TRANSFER_KEY_HEADER_NAME } from '~/server/service/g2g-transfer';
-import type { ImportSettings } from '~/server/service/import';
-import { getImportService } from '~/server/service/import';
-import loggerFactory from '~/utils/logger';
-import { TransferKey } from '~/utils/vo/transfer-key';
+import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import adminRequiredFactory from '~/server/middlewares/admin-required.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { isG2GTransferError } from '~/server/models/vo/g2g-transfer-error.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { exportService } from '~/server/service/export.js';
+import type { IDataGROWIInfo } from '~/server/service/g2g-transfer.js';
+import { X_GROWI_TRANSFER_KEY_HEADER_NAME } from '~/server/service/g2g-transfer.js';
+import type { ImportSettings } from '~/server/service/import/index.js';
+import { getImportService } from '~/server/service/import/index.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { TransferKey } from '~/utils/vo/transfer-key.js';
 
-import type Crowi from '../../crowi';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import { Attachment } from '../../models/attachment';
-import { isPathWithinBase } from '../../util/safe-path-utils';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import type Crowi from '../../crowi/index.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import { Attachment } from '../../models/attachment.js';
+import { isPathWithinBase } from '../../util/safe-path-utils.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 interface AuthorizedRequest extends Request {
   user?: any;

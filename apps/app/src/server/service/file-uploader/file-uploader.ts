@@ -3,20 +3,20 @@ import type { HydratedDocument } from 'mongoose';
 import type { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
 
-import type { ICheckLimitResult } from '~/interfaces/attachment';
-import type Crowi from '~/server/crowi';
+import type { ICheckLimitResult } from '~/interfaces/attachment.js';
+import type Crowi from '~/server/crowi/index.js';
 import {
   type RespondOptions,
   ResponseMode,
-} from '~/server/interfaces/attachment';
+} from '~/server/interfaces/attachment.js';
 import {
   Attachment,
   type IAttachmentDocument,
-} from '~/server/models/attachment';
-import loggerFactory from '~/utils/logger';
+} from '~/server/models/attachment.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { configManager } from '../config-manager';
-import type { MultipartUploader } from './multipart-uploader';
+import { configManager } from '../config-manager/index.js';
+import type { MultipartUploader } from './multipart-uploader.js';
 
 const logger = loggerFactory('growi:service:fileUploader');
 

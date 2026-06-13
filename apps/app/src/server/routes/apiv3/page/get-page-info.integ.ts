@@ -133,7 +133,7 @@ describe('GET /info', () => {
     });
 
     // Mount the page router
-    const { setup: setupPageRouter } = await import('./index');
+    const { setup: setupPageRouter } = await import('./index.js');
     const pageRouter = setupPageRouter(crowi);
     app.use('/', pageRouter);
   });

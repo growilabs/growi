@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { EditorMode } from '../editor';
+import type { EditorMode } from '../editor/index.js';
 
 /*
  * PageStatusAlert

@@ -1,6 +1,6 @@
 import { useHydrateAtoms } from 'jotai/utils';
 
-import type { RendererConfig } from '~/interfaces/services/renderer';
+import type { RendererConfig } from '~/interfaces/services/renderer.js';
 import {
   aiEnabledAtom,
   defaultIndentSizeAtom,
@@ -25,10 +25,10 @@ import {
   limitLearnablePageCountPerAssistantAtom,
   rendererConfigAtom,
   showPageSideAuthorsAtom,
-} from '~/states/server-configurations';
-import { createAtomTuple } from '~/utils/jotai-utils';
+} from '~/states/server-configurations/index.js';
+import { createAtomTuple } from '~/utils/jotai-utils.js';
 
-import type { ServerConfigurationProps } from './types';
+import type { ServerConfigurationProps } from './types.js';
 
 /**
  * Hook for hydrating server configuration atoms with server-side data

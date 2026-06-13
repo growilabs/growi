@@ -1,10 +1,9 @@
-import { configManager } from '~/server/service/config-manager';
-import CronService from '~/server/service/cron';
-import loggerFactory from '~/utils/logger';
-
-import { PageBulkExportJobInProgressStatus } from '../../interfaces/page-bulk-export';
-import PageBulkExportJob from '../models/page-bulk-export-job';
-import { pageBulkExportJobCronService } from './page-bulk-export-job-cron';
+import { PageBulkExportJobInProgressStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
+import PageBulkExportJob from '~/features/page-bulk-export/server/models/page-bulk-export-job.js';
+import { pageBulkExportJobCronService } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/index.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import CronService from '~/server/service/cron.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory(
   'growi:service:check-page-bulk-export-job-in-progress-cron',

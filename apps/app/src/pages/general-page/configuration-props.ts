@@ -1,9 +1,9 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import { RegistrationMode } from '~/interfaces/registration-mode';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import { RegistrationMode } from '~/interfaces/registration-mode.js';
 
-import type { RendererConfigProps, ServerConfigurationProps } from './types';
+import type { RendererConfigProps, ServerConfigurationProps } from './types.js';
 
 export const getServerSideRendererConfigProps: GetServerSideProps<
   RendererConfigProps

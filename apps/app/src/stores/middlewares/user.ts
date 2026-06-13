@@ -1,7 +1,7 @@
 import type { IUserHasId } from '@growi/core';
 import type { Middleware, SWRHook } from 'swr';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
+import { apiv3Put } from '~/client/util/apiv3-client.js';
 
 export const checkAndUpdateImageUrlCached: Middleware = (
   useSWRNext: SWRHook,

@@ -1,8 +1,8 @@
 import { type Document, type Model, Schema } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
-import type { IPageBulkExportPageSnapshot } from '../../interfaces/page-bulk-export';
+import type { IPageBulkExportPageSnapshot } from '../../interfaces/page-bulk-export.js';
 
 export interface PageBulkExportPageSnapshotDocument
   extends IPageBulkExportPageSnapshot,

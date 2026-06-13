@@ -1,9 +1,9 @@
 import { useEffect } from 'react';
 
-import { useCurrentPagePath } from '~/states/page';
-import { usePageCreateModalActions } from '~/states/ui/modal/page-create';
+import { useCurrentPagePath } from '~/states/page/index.js';
+import { usePageCreateModalActions } from '~/states/ui/modal/page-create.js';
 
-import type { HotkeyBindingDef } from '../HotkeysManager';
+import type { HotkeyBindingDef } from '../HotkeysManager.js';
 
 type Props = {
   onDeleteRender: () => void;

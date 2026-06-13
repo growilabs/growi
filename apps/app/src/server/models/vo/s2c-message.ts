@@ -2,7 +2,7 @@ import assert from 'node:assert';
 import type { IPage, IUser } from '@growi/core/dist/interfaces';
 import { isPopulated } from '@growi/core/dist/interfaces';
 
-import { serializePageSecurely } from '../serializers/page-serializer';
+import { serializePageSecurely } from '../serializers/page-serializer.js';
 
 /**
  * Server-to-client message VO

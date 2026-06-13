@@ -10,15 +10,18 @@ import type {
 } from '@growi/core/dist/interfaces';
 import type { HydratedDocument, Types } from 'mongoose';
 
-import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
-import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
-import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
-import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
-import type { CurrentPageYjsData } from '~/interfaces/yjs';
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
-import type { PageDocument } from '~/server/models/page';
-import type { PageOperationDocument } from '~/server/models/page-operation';
-import type { UserGroupDocument } from '~/server/models/user-group';
+import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group.js';
+import type {
+  IOptionsForCreate,
+  IOptionsForUpdate,
+} from '~/interfaces/page.js';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
+import type { PageActionOnGroupDelete } from '~/interfaces/user-group.js';
+import type { CurrentPageYjsData } from '~/interfaces/yjs.js';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
+import type { PageDocument } from '~/server/models/page.js';
+import type { PageOperationDocument } from '~/server/models/page-operation.js';
+import type { UserGroupDocument } from '~/server/models/user-group.js';
 
 export interface IPageService {
   // Page event emitter

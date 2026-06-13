@@ -1,1 +1,1 @@
-export * from './global';
+export * from '~/states/global/global.js';

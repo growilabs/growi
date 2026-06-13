@@ -7,13 +7,13 @@ import {
 } from '@growi/core/dist/utils/page-path-utils';
 import type { model } from 'mongoose';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { IShareLink } from '~/interfaces/share-link';
-import type { PageModel } from '~/server/models/page';
-import type { ShareLinkModel } from '~/server/models/share-link';
-import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import type { IShareLink } from '~/interfaces/share-link.js';
+import type { PageModel } from '~/server/models/page.js';
+import type { ShareLinkModel } from '~/server/models/share-link.js';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer.js';
 
-import type { ShareLinkPageStatesProps } from './types';
+import type { ShareLinkPageStatesProps } from './types.js';
 
 let mongooseModel: typeof model;
 let Page: PageModel;

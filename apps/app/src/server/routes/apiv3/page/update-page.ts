@@ -15,34 +15,37 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { isAiEnabled } from '~/features/openai/server/services';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import { isAiEnabled } from '~/features/openai/server/services/index.js';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
 import {
   type IApiv3PageUpdateParams,
   PageUpdateErrorCode,
-} from '~/interfaces/apiv3';
-import type { IOptionsForUpdate } from '~/interfaces/page';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
-import type { PageDocument, PageModel } from '~/server/models/page';
+} from '~/interfaces/apiv3/index.js';
+import type { IOptionsForUpdate } from '~/interfaces/page.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/index.js';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
-} from '~/server/models/serializers';
-import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
-import { configManager } from '~/server/service/config-manager/config-manager';
-import { preNotifyService } from '~/server/service/pre-notify';
-import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
-import { getYjsService } from '~/server/service/yjs';
-import { generalXssFilter } from '~/services/general-xss-filter';
-import loggerFactory from '~/utils/logger';
+} from '~/server/models/serializers/index.js';
+import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic.js';
+import { configManager } from '~/server/service/config-manager/config-manager.js';
+import { preNotifyService } from '~/server/service/pre-notify.js';
+import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken.js';
+import { getYjsService } from '~/server/service/yjs/index.js';
+import { generalXssFilter } from '~/services/general-xss-filter/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user.js';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page:update-page');
 
@@ -203,7 +206,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     // Rebuild vector store file
     if (isAiEnabled()) {
       const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
+        '~/features/openai/server/services/openai.js'
       );
       try {
         const openaiService = getOpenaiService();

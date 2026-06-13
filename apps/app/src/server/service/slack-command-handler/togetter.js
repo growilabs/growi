@@ -9,11 +9,11 @@ import { deleteOriginal, respond } from '@growi/slack/dist/utils/response-url';
 import { format, formatDate } from 'date-fns/format';
 import { parse } from 'date-fns/parse';
 
-import { SlackCommandHandlerError } from '~/server/models/vo/slack-command-handler-error';
-import loggerFactory from '~/utils/logger';
+import { SlackCommandHandlerError } from '~/server/models/vo/slack-command-handler-error.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import CreatePageService from './create-page-service';
-import BaseSlackCommandHandler from './slack-command-handler';
+import CreatePageService from './create-page-service.js';
+import BaseSlackCommandHandler from './slack-command-handler.js';
 
 const _logger = loggerFactory('growi:service:SlackBotService:togetter');
 

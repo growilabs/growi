@@ -1,6 +1,6 @@
 import { DevidedPagePath } from '@growi/core/dist/models';
 
-import { useAppTitle, useCustomTitleTemplate } from '~/states/global';
+import { useAppTitle, useCustomTitleTemplate } from '~/states/global/index.js';
 
 /**
  * Generate whole title string for the specified title

@@ -3,15 +3,15 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Router } from 'express';
 import express from 'express';
 
-import { SupportedAction } from '~/interfaces/activity';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import loginRequiredFactory from '~/server/middlewares/login-required';
+import { SupportedAction } from '~/interfaces/activity.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
 
-import type { IInAppNotification } from '../../../interfaces/in-app-notification';
-import type { ApiV3Response } from './interfaces/apiv3-response';
+import type { IInAppNotification } from '../../../interfaces/in-app-notification.js';
+import type { ApiV3Response } from './interfaces/apiv3-response.js';
 
 const router = express.Router();
 

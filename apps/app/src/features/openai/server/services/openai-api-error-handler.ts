@@ -1,6 +1,6 @@
 import OpenAI from 'openai';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:service:openai');
 

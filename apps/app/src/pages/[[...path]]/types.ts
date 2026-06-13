@@ -1,9 +1,12 @@
-import type { BasicLayoutConfigurationProps } from '../basic-layout-page';
-import type { CommonEachProps, CommonInitialProps } from '../common-props';
+import type { BasicLayoutConfigurationProps } from '../basic-layout-page/index.js';
+import type {
+  CommonEachProps,
+  CommonInitialProps,
+} from '../common-props/index.js';
 import type {
   GeneralPageEachProps,
   GeneralPageInitialProps,
-} from '../general-page';
+} from '../general-page/index.js';
 
 type PageEachProps = {
   redirectFrom?: string;

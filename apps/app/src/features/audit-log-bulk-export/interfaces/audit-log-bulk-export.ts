@@ -1,6 +1,6 @@
 import type { HasObjectId, IAttachment, IUser, Ref } from '@growi/core';
 
-import type { SupportedActionType } from '~/interfaces/activity';
+import type { SupportedActionType } from '~/interfaces/activity.js';
 
 export const AuditLogBulkExportFormat = {
   json: 'json',

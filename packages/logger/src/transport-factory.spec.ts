@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { createNodeTransportOptions } from './transport-factory';
+import { createNodeTransportOptions } from './transport-factory.js';
 
 describe('createNodeTransportOptions', () => {
   const originalEnv = process.env;

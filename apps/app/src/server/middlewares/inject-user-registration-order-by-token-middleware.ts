@@ -1,11 +1,11 @@
 import type { NextFunction, Request, Response } from 'express';
 import createError from 'http-errors';
 
-import { UserActivationErrorCode } from '~/interfaces/errors/user-activation';
-import loggerFactory from '~/utils/logger';
+import { UserActivationErrorCode } from '~/interfaces/errors/user-activation.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { IUserRegistrationOrder } from '../models/user-registration-order';
-import UserRegistrationOrder from '../models/user-registration-order';
+import type { IUserRegistrationOrder } from '../models/user-registration-order.js';
+import UserRegistrationOrder from '../models/user-registration-order.js';
 
 const logger = loggerFactory('growi:routes:user-activation');
 

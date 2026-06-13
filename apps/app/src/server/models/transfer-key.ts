@@ -1,9 +1,9 @@
 import type { HydratedDocument, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import type { ITransferKey } from '~/interfaces/transfer-key';
+import type { ITransferKey } from '~/interfaces/transfer-key.js';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '../util/mongoose-utils.js';
 
 interface ITransferKeyMethods {
   findOneActiveTransferKey(

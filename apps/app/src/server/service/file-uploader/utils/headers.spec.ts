@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { configManager } from '../../config-manager';
-import { determineDisposition } from './headers';
+import { configManager } from '../../config-manager/index.js';
+import { determineDisposition } from './headers.js';
 
 vi.mock('../../config-manager', () => ({
   configManager: {

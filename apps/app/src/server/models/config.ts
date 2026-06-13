@@ -2,7 +2,7 @@ import type { Types } from 'mongoose';
 import { Schema } from 'mongoose';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import { getOrCreateModel } from '../util/mongoose-utils';
+import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
 
 export interface IConfig {
   _id: Types.ObjectId;

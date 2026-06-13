@@ -1,1 +1,1 @@
-export * from './growi-info';
+export * from '~/server/service/growi-info/growi-info.js';

@@ -5,18 +5,18 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
 
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import UserGroupRelation from '~/server/models/user-group-relation';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
-import loggerFactory from '~/utils/logger';
+import { generateSuggestions } from '~/features/ai-tools/suggest-path/server/services/generate-suggestions.js';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
+import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import UserGroupRelation from '~/server/models/user-group-relation.js';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { SearchService } from '../../../interfaces/suggest-path-types';
-import { generateSuggestions } from '../../services/generate-suggestions';
+import type { SearchService } from '../../../interfaces/suggest-path-types.js';
 
 const logger = loggerFactory('growi:features:suggest-path:routes');
 

@@ -27,39 +27,42 @@ import mongoose from 'mongoose';
 import path from 'pathe';
 import sanitize from 'sanitize-filename';
 
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import type { IPageGrantData } from '~/interfaces/page';
-import type { IRecordApplicableGrant } from '~/interfaces/page-grant';
-import type Crowi from '~/server/crowi';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
-import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
-import Subscription from '~/server/models/subscription';
-import { configManager } from '~/server/service/config-manager';
-import { exportService } from '~/server/service/export';
-import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
-import type { IPageGrantService } from '~/server/service/page-grant';
-import { preNotifyService } from '~/server/service/pre-notify';
-import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
-import loggerFactory from '~/utils/logger';
+import {
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity.js';
+import type { IPageGrantData } from '~/interfaces/page.js';
+import type { IRecordApplicableGrant } from '~/interfaces/page-grant.js';
+import type Crowi from '~/server/crowi/index.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
+import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/index.js';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
+import { Revision } from '~/server/models/revision.js';
+import Subscription from '~/server/models/subscription.js';
+import { configManager } from '~/server/service/config-manager/index.js';
+import { exportService } from '~/server/service/export.js';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer.js';
+import type { IPageGrantService } from '~/server/service/page-grant.js';
+import { preNotifyService } from '~/server/service/pre-notify.js';
+import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response';
-import { checkPageExistenceHandlersFactory } from './check-page-existence';
-import { createPageHandlersFactory } from './create-page';
-import { getPageByShareLinkHandlerFactory } from './get-page-by-share-link';
-import { getPageInfoHandlerFactory } from './get-page-info';
-import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count';
-import { getYjsDataHandlerFactory } from './get-yjs-data';
-import { publishPageHandlersFactory } from './publish-page';
-import { respondWithSinglePage } from './respond-with-single-page';
-import { syncLatestRevisionBodyToYjsDraftHandlerFactory } from './sync-latest-revision-body-to-yjs-draft';
-import { unpublishPageHandlersFactory } from './unpublish-page';
-import { updatePageHandlersFactory } from './update-page';
+import type { ApiV3Response } from '../interfaces/apiv3-response.js';
+import { checkPageExistenceHandlersFactory } from './check-page-existence.js';
+import { createPageHandlersFactory } from './create-page.js';
+import { getPageByShareLinkHandlerFactory } from './get-page-by-share-link.js';
+import { getPageInfoHandlerFactory } from './get-page-info.js';
+import { getPagePathsWithDescendantCountFactory } from './get-page-paths-with-descendant-count.js';
+import { getYjsDataHandlerFactory } from './get-yjs-data.js';
+import { publishPageHandlersFactory } from './publish-page.js';
+import { respondWithSinglePage } from './respond-with-single-page.js';
+import { syncLatestRevisionBodyToYjsDraftHandlerFactory } from './sync-latest-revision-body-to-yjs-draft.js';
+import { unpublishPageHandlersFactory } from './unpublish-page.js';
+import { updatePageHandlersFactory } from './update-page.js';
 
 const logger = loggerFactory('growi:routes:apiv3:page');
 

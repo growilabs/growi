@@ -1,8 +1,9 @@
 import type { JSX, MouseEvent } from 'react';
 import { useCallback, useMemo } from 'react';
 
-import type { TreeItemProps, TreeItemToolProps } from '../interfaces';
-import { SimpleItemContent } from './SimpleItemContent';
+import { SimpleItemContent } from '~/features/page-tree/components/SimpleItemContent.js';
+
+import type { TreeItemProps, TreeItemToolProps } from '../interfaces/index.js';
 
 import styles from './TreeItemLayout.module.scss';
 

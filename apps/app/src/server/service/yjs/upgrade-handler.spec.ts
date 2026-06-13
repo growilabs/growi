@@ -3,7 +3,7 @@ import type { Duplex } from 'node:stream';
 import type { IUserHasId } from '@growi/core';
 import { mock } from 'vitest-mock-extended';
 
-import { createUpgradeHandler } from './upgrade-handler';
+import { createUpgradeHandler } from './upgrade-handler.js';
 
 type AuthenticatedIncomingMessage = IncomingMessage & { user?: IUserHasId };
 

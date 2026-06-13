@@ -1,9 +1,8 @@
 import { useEffect, useRef } from 'react';
 import type { TreeInstance } from '@headless-tree/core';
 
-import type { IPageForTreeItem } from '~/interfaces/page';
-
-import { invalidatePageTreeChildren } from '../../services';
+import { invalidatePageTreeChildren } from '~/features/page-tree/services/index.js';
+import type { IPageForTreeItem } from '~/interfaces/page.js';
 
 type UseExpandParentOnCreateParams = {
   tree: TreeInstance<IPageForTreeItem>;

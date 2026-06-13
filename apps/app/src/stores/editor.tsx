@@ -4,11 +4,11 @@ import type { EditorSettings } from '@growi/editor';
 import useSWR, { type SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiGet } from '~/client/util/apiv1-client';
-import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
-import type { SlackChannels } from '~/interfaces/user-trigger-notification';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
-import { useCurrentUser } from '~/states/global';
+import { apiGet } from '~/client/util/apiv1-client.js';
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client.js';
+import type { SlackChannels } from '~/interfaces/user-trigger-notification.js';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
+import { useCurrentUser } from '~/states/global/index.js';
 
 type EditorSettingsOperation = {
   update: (updateData: Partial<EditorSettings>) => Promise<void>;

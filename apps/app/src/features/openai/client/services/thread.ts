@@ -1,6 +1,6 @@
-import { apiv3Delete } from '~/client/util/apiv3-client';
+import { apiv3Delete } from '~/client/util/apiv3-client.js';
 
-import type { IApiv3DeleteThreadParams } from '../../interfaces/thread-relation';
+import type { IApiv3DeleteThreadParams } from '../../interfaces/thread-relation.js';
 
 export const deleteThread = async (
   params: IApiv3DeleteThreadParams,

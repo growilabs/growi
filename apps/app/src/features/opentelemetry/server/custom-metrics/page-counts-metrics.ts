@@ -1,6 +1,6 @@
 import { diag, metrics } from '@opentelemetry/api';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:opentelemetry:custom-metrics:page-counts');
 const loggerDiag = diag.createComponentLogger({
@@ -21,7 +21,7 @@ export function addPageCountsMetrics(): void {
     async (result) => {
       try {
         const { growiInfoService } = await import(
-          '~/server/service/growi-info'
+          '~/server/service/growi-info/index.js'
         );
 
         const growiInfo = await growiInfoService.getGrowiInfo({

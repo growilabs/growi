@@ -1,1 +1,1 @@
-export * from './page-tree-children';
+export * from '~/features/page-tree/services/page-tree-children.js';

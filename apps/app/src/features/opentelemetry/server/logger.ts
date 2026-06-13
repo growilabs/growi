@@ -1,6 +1,6 @@
 import { type DiagLogger, diag } from '@opentelemetry/api';
 
-import loggerFactory from '~/utils/logger';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:opentelemetry:diag');
 

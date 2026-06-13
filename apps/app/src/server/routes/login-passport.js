@@ -1,15 +1,15 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import passport from 'passport';
 
-import { SupportedAction } from '~/interfaces/activity';
-import { ExternalAccountLoginError } from '~/models/vo/external-account-login-error';
-import { getTranslation } from '~/server/service/i18next';
-import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated';
-import loggerFactory from '~/utils/logger';
-import { prisma } from '~/utils/prisma';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { ExternalAccountLoginError } from '~/models/vo/external-account-login-error.js';
+import { getTranslation } from '~/server/service/i18next.js';
+import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated.js';
+import loggerFactory from '~/utils/logger/index.js';
+import { prisma } from '~/utils/prisma.js';
 
-import { externalAccountService } from '../service/external-account';
-import ApiResponse from '../util/apiResponse';
+import { externalAccountService } from '../service/external-account.js';
+import ApiResponse from '../util/apiResponse.js';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, app) => {

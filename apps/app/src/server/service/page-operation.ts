@@ -5,16 +5,19 @@ import mongoose from 'mongoose';
 import type {
   IPageOperationProcessData,
   IPageOperationProcessInfo,
-} from '~/interfaces/page-operation';
-import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
-import type { PageOperationDocument } from '~/server/models/page-operation';
-import PageOperation from '~/server/models/page-operation';
-import loggerFactory from '~/utils/logger';
+} from '~/interfaces/page-operation.js';
+import {
+  PageActionStage,
+  PageActionType,
+} from '~/interfaces/page-operation.js';
+import type { PageOperationDocument } from '~/server/models/page-operation.js';
+import PageOperation from '~/server/models/page-operation.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type Crowi from '../crowi';
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
-import type { PageModel } from '../models/page';
-import { collectAncestorPaths } from '../util/collect-ancestor-paths';
+import type Crowi from '../crowi/index.js';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
+import type { PageModel } from '../models/page.js';
+import { collectAncestorPaths } from '../util/collect-ancestor-paths.js';
 
 const logger = loggerFactory('growi:services:page-operation');
 

@@ -3,23 +3,23 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
-import { CommentEvent, commentEvent } from '~/features/comment/server';
+import { CommentEvent, commentEvent } from '~/features/comment/server/index.js';
 import {
   isIncludeAiMenthion,
   removeAiMenthion,
-} from '~/features/search/utils/ai';
-import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
-import { SearchDelegatorName } from '~/interfaces/named-query';
+} from '~/features/search/utils/ai.js';
+import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages.js';
+import { SearchDelegatorName } from '~/interfaces/named-query.js';
 import type {
   IFormattedSearchResult,
   IPageWithSearchMeta,
   ISearchResult,
-} from '~/interfaces/search';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
-import loggerFactory from '~/utils/logger';
+} from '~/interfaces/search.js';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type Crowi from '../crowi';
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
+import type Crowi from '../crowi/index.js';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
 import type {
   ParsedQuery,
   QueryTerms,
@@ -27,14 +27,14 @@ import type {
   SearchDelegator,
   SearchQueryParser,
   SearchResolver,
-} from '../interfaces/search';
-import NamedQuery from '../models/named-query';
-import type { PageModel } from '../models/page';
-import { SearchError } from '../models/vo/search-error';
-import { hasIntersection } from '../util/compare-objectId';
-import { configManager } from './config-manager';
-import ElasticsearchDelegator from './search-delegator/elasticsearch';
-import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
+} from '../interfaces/search.js';
+import NamedQuery from '../models/named-query.js';
+import type { PageModel } from '../models/page.js';
+import { SearchError } from '../models/vo/search-error.js';
+import { hasIntersection } from '../util/compare-objectId.js';
+import { configManager } from './config-manager/index.js';
+import ElasticsearchDelegator from './search-delegator/elasticsearch.js';
+import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages.js';
 
 const logger = loggerFactory('growi:service:search');
 

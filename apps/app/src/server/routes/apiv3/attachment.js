@@ -5,21 +5,21 @@ import express from 'express';
 import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
-import { SupportedAction } from '~/interfaces/activity';
-import { AttachmentType } from '~/server/interfaces/attachment';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser';
-import loginRequiredFactory from '~/server/middlewares/login-required';
-import { Attachment } from '~/server/models/attachment';
+import { SupportedAction } from '~/interfaces/activity.js';
+import { AttachmentType } from '~/server/interfaces/attachment.js';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
+import loginRequiredFactory from '~/server/middlewares/login-required.js';
+import { Attachment } from '~/server/models/attachment.js';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
-} from '~/server/models/serializers';
-import loggerFactory from '~/utils/logger';
+} from '~/server/models/serializers/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
-import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment/index.js';
+import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user.js';
 
 const logger = loggerFactory('growi:routes:apiv3:attachment');
 

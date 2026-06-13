@@ -1,10 +1,10 @@
-import { isValidObjectId } from '../objectid-utils';
-import { addTrailingSlash } from '../path-utils';
-import { isTopPage as _isTopPage } from './is-top-page';
+import { isValidObjectId } from '../objectid-utils.js';
+import { addTrailingSlash } from '../path-utils.js';
+import { isTopPage as _isTopPage } from './is-top-page.js';
 
 export const isTopPage = _isTopPage;
 
-export * from './generate-children-regexp';
+export * from './generate-children-regexp.js';
 
 /**
  * Whether path is the top page of users
@@ -311,4 +311,4 @@ export const isGlobPatternPath = (path: string): boolean => {
   return globPattern.test(path);
 };
 
-export * from './is-top-page';
+export * from './is-top-page.js';

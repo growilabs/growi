@@ -1,8 +1,8 @@
-import AiAssistantModel from '~/features/openai/server/models/ai-assistant';
-import VectorStoreRelationModel from '~/features/openai/server/models/vector-store';
-import { isAiEnabled } from '~/features/openai/server/services/is-ai-enabled';
-import { getOpenaiService } from '~/features/openai/server/services/openai';
-import loggerFactory from '~/utils/logger';
+import AiAssistantModel from '~/features/openai/server/models/ai-assistant.js';
+import VectorStoreRelationModel from '~/features/openai/server/models/vector-store.js';
+import { isAiEnabled } from '~/features/openai/server/services/is-ai-enabled.js';
+import { getOpenaiService } from '~/features/openai/server/services/openai.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory(
   'growi:service:normalize-data:delete-vector-stores-orphaned-from-ai-assistant',

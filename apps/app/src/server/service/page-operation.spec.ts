@@ -88,7 +88,7 @@ describe('PageOperationService.autoUpdateExpiryDate', () => {
     mockLogger.error.mockClear?.();
 
     // Import service dynamically to ensure mocks are applied
-    const module = await import('./page-operation');
+    const module = await import('./page-operation.js');
     instanciate = module.default as typeof instanciate;
 
     const mockCrowi = {

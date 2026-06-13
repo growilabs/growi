@@ -1,6 +1,6 @@
 import { objectIdUtils } from '@growi/core/dist/utils';
 
-import { validateReferer } from './validate-referer';
+import { validateReferer } from './validate-referer.js';
 
 const mocks = vi.hoisted(() => {
   return {

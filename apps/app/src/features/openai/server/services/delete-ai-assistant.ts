@@ -1,13 +1,13 @@
 import { getIdStringForRef, type IUserHasId } from '@growi/core';
 import createError from 'http-errors';
 
-import loggerFactory from '~/utils/logger';
+import AiAssistantModel from '~/features/openai/server/models/ai-assistant.js';
+import ThreadRelationModel from '~/features/openai/server/models/thread-relation.js';
+import { isAiEnabled } from '~/features/openai/server/services/is-ai-enabled.js';
+import { getOpenaiService } from '~/features/openai/server/services/openai.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type { AiAssistantDocument } from '../models/ai-assistant';
-import AiAssistantModel from '../models/ai-assistant';
-import ThreadRelationModel from '../models/thread-relation';
-import { isAiEnabled } from './is-ai-enabled';
-import { getOpenaiService } from './openai';
+import type { AiAssistantDocument } from '../models/ai-assistant.js';
 
 const logger = loggerFactory('growi:service:openai:delete-ai-assistant');
 

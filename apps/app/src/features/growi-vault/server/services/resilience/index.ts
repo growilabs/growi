@@ -12,16 +12,16 @@
  *   - ResilienceStatus / BootstrapStatus / RetryStatus / DriftStatus  (status types)
  */
 
-import type { VaultInstructionModel } from '~/features/growi-vault/server/models/vault-instruction';
-import type { VaultSyncStateModel } from '~/features/growi-vault/server/models/vault-sync-state';
+import type { VaultInstructionModel } from '~/features/growi-vault/server/models/vault-instruction.js';
+import type { VaultSyncStateModel } from '~/features/growi-vault/server/models/vault-sync-state.js';
+import { createBootstrapRunner } from '~/features/growi-vault/server/services/resilience/bootstrap-runner.js';
+import { createDriftDetector } from '~/features/growi-vault/server/services/resilience/drift-detector.js';
 
 import type {
   BootstrapRunnerDeps,
   VaultResilienceLayer,
-} from './bootstrap-runner';
-import { createBootstrapRunner } from './bootstrap-runner';
-import { createDriftDetector } from './drift-detector';
-import type { RetryConfig } from './retry-policy';
+} from './bootstrap-runner.js';
+import type { RetryConfig } from './retry-policy.js';
 
 // ---------------------------------------------------------------------------
 // Re-export status types and the VaultResilienceLayer interface.
@@ -34,7 +34,7 @@ export type {
   ResilienceStatus,
   RetryStatus,
   VaultResilienceLayer,
-} from './bootstrap-runner';
+} from './bootstrap-runner.js';
 
 // ---------------------------------------------------------------------------
 // Factory dependency interface

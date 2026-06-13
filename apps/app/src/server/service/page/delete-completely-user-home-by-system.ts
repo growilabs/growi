@@ -6,13 +6,13 @@ import mongoose from 'mongoose';
 import { Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 
-import type { PageDocument, PageModel } from '~/server/models/page';
-import { createBatchStream } from '~/server/util/batch-stream';
-import loggerFactory from '~/utils/logger';
+import type { PageDocument, PageModel } from '~/server/models/page.js';
+import { createBatchStream } from '~/server/util/batch-stream.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import { BULK_REINDEX_SIZE } from './consts';
-import type { IPageService } from './page-service';
-import { shouldUseV4Process } from './should-use-v4-process';
+import { BULK_REINDEX_SIZE } from './consts.js';
+import type { IPageService } from './page-service.js';
+import { shouldUseV4Process } from './should-use-v4-process.js';
 
 const logger = loggerFactory('growi:services:page');
 

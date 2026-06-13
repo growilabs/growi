@@ -1,6 +1,5 @@
-import loggerFactory from '~/utils/logger';
-
-import { configManager } from './config-manager';
+import { configManager } from '~/server/service/config-manager/index.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const _logger = loggerFactory('growi:service:AclService');
 

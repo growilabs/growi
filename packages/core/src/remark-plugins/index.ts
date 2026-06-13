@@ -1,2 +1,2 @@
-export * from './interfaces/option-parser';
-export * from './util/option-parser';
+export * from './interfaces/option-parser.js';
+export * from './util/option-parser.js';

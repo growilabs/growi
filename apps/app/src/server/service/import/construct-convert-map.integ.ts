@@ -8,7 +8,7 @@ import {
 } from '~/server/crowi/setup-models';
 import type UserEvent from '~/server/events/user';
 
-import { constructConvertMap } from './construct-convert-map';
+import { constructConvertMap } from './construct-convert-map.js';
 
 describe('constructConvertMap', () => {
   beforeAll(async () => {

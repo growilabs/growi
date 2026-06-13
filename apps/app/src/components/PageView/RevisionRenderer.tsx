@@ -3,8 +3,8 @@ import type { FallbackProps } from 'react-error-boundary';
 import { ErrorBoundary } from 'react-error-boundary';
 import ReactMarkdown from 'react-markdown';
 
-import type { RendererOptions } from '~/interfaces/renderer-options';
-import loggerFactory from '~/utils/logger';
+import type { RendererOptions } from '~/interfaces/renderer-options.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('components:Page:RevisionRenderer');
 

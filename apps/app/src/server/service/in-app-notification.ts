@@ -3,22 +3,22 @@ import { SubscriptionStatusType } from '@growi/core';
 import { subDays } from 'date-fns/subDays';
 import type { FilterQuery, Types, UpdateQuery } from 'mongoose';
 
-import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import { AllEssentialActions } from '~/interfaces/activity';
-import type { PaginateResult } from '~/interfaces/in-app-notification';
-import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
-import type { ActivityDocument } from '~/server/models/activity';
-import type { InAppNotificationDocument } from '~/server/models/in-app-notification';
-import { InAppNotification } from '~/server/models/in-app-notification';
-import InAppNotificationSettings from '~/server/models/in-app-notification-settings';
-import Subscription from '~/server/models/subscription';
-import loggerFactory from '~/utils/logger';
+import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
+import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
+import { AllEssentialActions } from '~/interfaces/activity.js';
+import type { PaginateResult } from '~/interfaces/in-app-notification.js';
+import { InAppNotificationStatuses } from '~/interfaces/in-app-notification.js';
+import type { ActivityDocument } from '~/server/models/activity.js';
+import type { InAppNotificationDocument } from '~/server/models/in-app-notification.js';
+import { InAppNotification } from '~/server/models/in-app-notification.js';
+import InAppNotificationSettings from '~/server/models/in-app-notification-settings.js';
+import Subscription from '~/server/models/subscription.js';
+import loggerFactory from '~/utils/logger/index.js';
 
-import type Crowi from '../crowi';
-import { generateSnapshot } from './in-app-notification/in-app-notification-utils';
-import { type PreNotify, preNotifyService } from './pre-notify';
-import { getRoomNameWithId, RoomPrefix } from './socket-io/helper';
+import type Crowi from '../crowi/index.js';
+import { generateSnapshot } from './in-app-notification/in-app-notification-utils.js';
+import { type PreNotify, preNotifyService } from './pre-notify.js';
+import { getRoomNameWithId, RoomPrefix } from './socket-io/helper.js';
 
 const { STATUS_UNOPENED, STATUS_OPENED } = InAppNotificationStatuses;
 

@@ -6,7 +6,7 @@ import type {
   Ref,
 } from '@growi/core';
 
-import type { PaginateResult } from './mongoose-utils';
+import type { PaginateResult } from './mongoose-utils.js';
 
 // Model
 const MODEL_PAGE = 'Page';

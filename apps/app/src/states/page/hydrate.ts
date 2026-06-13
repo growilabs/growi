@@ -19,7 +19,7 @@ import {
   shareLinkIdAtom,
   templateBodyAtom,
   templateTagsAtom,
-} from './internal-atoms';
+} from '~/states/page/internal-atoms.js';
 
 /**
  * Hook for hydrating page-related atoms with server-side data
