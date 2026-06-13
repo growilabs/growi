@@ -34,6 +34,7 @@ const clearableConfigString = (field: string): ValidationChain =>
   body(field)
     .optional()
     .isString()
+    .withMessage(`${field} must be a string`)
     .customSanitizer((value) => (value === '' ? undefined : value));
 
 /**
@@ -46,13 +47,17 @@ const clearableConfigString = (field: string): ValidationChain =>
  * responsibility.
  */
 export const updateAiSettingsValidators: ValidationChain[] = [
+  body('aiEnabled')
+    .optional()
+    .isBoolean()
+    .withMessage('aiEnabled must be a boolean'),
   body('provider')
     .optional()
     .custom((value) => isAiProvider(value))
     .withMessage('provider must be one of the supported AI providers'),
   // apiKey is NOT cleared-when-empty (empty = keep existing, handled in buildUpdates),
   // so it only gets a type guard — NO ''->undefined sanitizer.
-  body('apiKey').optional().isString(),
+  body('apiKey').optional().isString().withMessage('apiKey must be a string'),
   clearableConfigString('model'),
   // providerOptions: validate the RAW value with the shared FE/BE predicate
   // (Req 6.2) BEFORE the sanitizer (the predicate treats '' as valid; sanitizing
@@ -60,14 +65,19 @@ export const updateAiSettingsValidators: ValidationChain[] = [
   body('providerOptions')
     .optional()
     .isString()
+    .withMessage('providerOptions must be a string')
     .custom((value: string) => isValidProviderOptionsJson(value))
     .withMessage('providerOptions must be a valid JSON string')
     .customSanitizer((value) => (value === '' ? undefined : value)),
+
+  // The Azure OpenAI fields
   clearableConfigString('azureOpenaiResourceName'),
   clearableConfigString('azureOpenaiBaseUrl'),
   clearableConfigString('azureOpenaiApiVersion'),
-  body('aiEnabled').optional().isBoolean(),
-  body('azureOpenaiUseEntraId').optional().isBoolean(),
+  body('azureOpenaiUseEntraId')
+    .optional()
+    .isBoolean()
+    .withMessage('azureOpenaiUseEntraId must be a boolean'),
 ];
 
 // The exact updates shape accepted by configManager.updateConfigs, derived from
