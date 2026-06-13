@@ -179,15 +179,20 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
     });
   });
 
-  describe('string field normalization with removeIfUndefined (Req 4.4)', () => {
-    it('normalizes empty string fields to undefined and removes them from the DB', async () => {
+  // The handler receives ALREADY-sanitized input: the validator's customSanitizer
+  // (middleware) has turned cleared strings into `undefined` before the handler
+  // runs. These tests invoke the handler directly (bypassing the middleware), so
+  // they feed `undefined` to represent a post-sanitizer cleared field. The
+  // sanitizer's own '' -> undefined behavior is covered in the validators block.
+  describe('cleared string fields with removeIfUndefined (Req 4.4)', () => {
+    it('keeps cleared (undefined) string keys present so removeIfUndefined deletes them from the DB', async () => {
       await invoke({
         provider: 'openai',
-        model: '',
-        providerOptions: '',
-        azureOpenaiResourceName: '',
-        azureOpenaiBaseUrl: '',
-        azureOpenaiApiVersion: '',
+        model: undefined,
+        providerOptions: undefined,
+        azureOpenaiResourceName: undefined,
+        azureOpenaiBaseUrl: undefined,
+        azureOpenaiApiVersion: undefined,
       });
 
       const [updates, options] = updateCall();
@@ -202,6 +207,13 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
       // The keys are still present in the updates object so removeIfUndefined deletes them.
       expect(updates).toHaveProperty('ai:model');
       expect(updates).toHaveProperty('ai:azureOpenaiResourceName');
+    });
+
+    it('keeps a non-empty string field value', async () => {
+      await invoke({ provider: 'openai', model: 'gpt-4o' });
+
+      const [updates] = updateCall();
+      expect(updates['ai:model']).toBe('gpt-4o');
     });
 
     it('always includes boolean fields even when false', async () => {
@@ -254,16 +266,24 @@ const buildRequest = (body: Record<string, unknown>): Request =>
   }) as unknown as Request;
 
 // Run the full chain against a request body and report whether the engine
-// accumulated errors, plus which fields failed.
+// accumulated errors, plus which fields failed. Also returns the (possibly
+// sanitizer-mutated) req.body so tests can assert the customSanitizer's
+// write-back ('' -> undefined) that the production middleware applies before
+// the handler runs.
 const runValidators = async (
   body: Record<string, unknown>,
-): Promise<{ hasErrors: boolean; failedFields: string[] }> => {
+): Promise<{
+  hasErrors: boolean;
+  failedFields: string[];
+  body: Record<string, unknown>;
+}> => {
   const req = buildRequest(body);
   await Promise.all(updateAiSettingsValidators.map((chain) => chain.run(req)));
   const result = validationResult(req);
   return {
     hasErrors: !result.isEmpty(),
     failedFields: result.array().map((e) => e.param),
+    body: req.body,
   };
 };
 
@@ -334,6 +354,64 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
     it('accepts a request that omits providerOptions', async () => {
       const { hasErrors } = await runValidators({});
       expect(hasErrors).toBe(false);
+    });
+  });
+
+  // The string fields are type-guarded with .isString(): a non-string value is
+  // rejected, a string passes. (apiKey and providerOptions share this guard.)
+  describe('string type validation (.isString())', () => {
+    it.each([
+      'apiKey',
+      'model',
+      'providerOptions',
+      'azureOpenaiResourceName',
+      'azureOpenaiBaseUrl',
+      'azureOpenaiApiVersion',
+    ])('rejects a non-string value for "%s"', async (field) => {
+      const { hasErrors, failedFields } = await runValidators({ [field]: 123 });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain(field);
+    });
+
+    it.each([
+      'apiKey',
+      'model',
+      'azureOpenaiResourceName',
+      'azureOpenaiBaseUrl',
+      'azureOpenaiApiVersion',
+    ])('accepts a string value for "%s"', async (field) => {
+      const { hasErrors } = await runValidators({ [field]: 'some-value' });
+      expect(hasErrors).toBe(false);
+    });
+  });
+
+  // The clearable string fields carry a customSanitizer that the production
+  // middleware applies before the handler runs: '' -> undefined so that
+  // removeIfUndefined deletes them and the value falls back to the env var
+  // (Req 4.4). This is the only place that behavior is exercised — the handler
+  // tests bypass the middleware, so they no longer see the normalization.
+  describe('customSanitizer clears empty strings ("" -> undefined) (Req 4.4)', () => {
+    it.each([
+      'model',
+      'providerOptions',
+      'azureOpenaiResourceName',
+      'azureOpenaiBaseUrl',
+      'azureOpenaiApiVersion',
+    ])('sanitizes an empty "%s" to undefined', async (field) => {
+      const { hasErrors, body } = await runValidators({ [field]: '' });
+      expect(hasErrors).toBe(false);
+      expect(body[field]).toBeUndefined();
+    });
+
+    it('leaves a non-empty clearable string untouched', async () => {
+      const { body } = await runValidators({ model: 'gpt-4o' });
+      expect(body.model).toBe('gpt-4o');
+    });
+
+    it('does NOT sanitize an empty apiKey to undefined (handled by the handler instead)', async () => {
+      const { hasErrors, body } = await runValidators({ apiKey: '' });
+      expect(hasErrors).toBe(false);
+      expect(body.apiKey).toBe('');
     });
   });
 

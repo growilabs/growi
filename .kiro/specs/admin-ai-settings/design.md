@@ -384,8 +384,8 @@ export interface AiSettingsUpdateRequest {
 }
 ```
 - Idempotency: PUT は冪等(同値再送で副作用は cache clear のみ)。
-- 更新セマンティクス: クライアントは全項目を送信する。**boolean**(`aiEnabled` / `azureOpenaiUseEntraId`)は常に値を送る。**文字列項目**(provider / model / providerOptions / azure 3 項目)は空文字を `undefined` に正規化し、`updateConfigs(..., { removeIfUndefined: true })` で DB から削除する(= 環境変数フォールバックへ戻る、R4.4)。**例外は `apiKey` のみ**(空/未指定 = 既存保持、クリアしない)。
-- Validation(`put-ai-settings.ts` に inline 定義の `updateAiSettingsValidators`): `provider ∈ AI_PROVIDERS`(6.1)、`providerOptions` は **FE/BE 共通述語 `isValidProviderOptionsJson`**(`utils/provider-options-validation.ts`、JSON.parse ベース・空=有効)を `.custom()` で適用(6.2)、`azureOpenaiUseEntraId` は boolean。クライアント(`ProviderCommonSettings` の register validate)も同じ述語を使い、判定が完全一致。
+- 更新セマンティクス: クライアントは全項目を送信する。**boolean**(`aiEnabled` / `azureOpenaiUseEntraId`)は常に値を送る。**clearable 文字列項目**(model / providerOptions / azure 3 項目)は空文字を `undefined` に正規化(validator の `.customSanitizer()` で実施)し、`updateConfigs(..., { removeIfUndefined: true })` で DB から削除する(= 環境変数フォールバックへ戻る、R4.4)。**例外は `apiKey` のみ**(空/未指定 = 既存保持、クリアしない — sanitizer 非適用)。
+- Validation(`put-ai-settings.ts` に inline 定義の `updateAiSettingsValidators`): `provider ∈ AI_PROVIDERS`(6.1)、文字列項目(apiKey / model / azure 3)は `.isString()` 型ガード、`providerOptions` は `.isString()` + **FE/BE 共通述語 `isValidProviderOptionsJson`**(`utils/provider-options-validation.ts`、JSON.parse ベース・空=有効)を `.custom()` で適用(6.2)、`azureOpenaiUseEntraId` は boolean。clearable 文字列は `.customSanitizer('' → undefined)` で正規化(旧 `normalizeStringField` を置換)。クライアント(`ProviderCommonSettings` の register validate)も同じ JSON 述語を使い判定一致。
 - 成功時副作用: `updateConfigs` → `clearResolvedMastraModelCache()` → `activityEvent.emit('update', _id, { action: ACTION_ADMIN_AI_SETTING_UPDATE })`。
 
 **Implementation Notes**

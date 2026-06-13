@@ -25,26 +25,47 @@ const logger = loggerFactory(
 );
 
 /**
+ * Optional config string that is cleared when empty: '' (or omitted) -> undefined
+ * so updateConfigs({ removeIfUndefined }) deletes it and the value falls back to
+ * the env var (Req 4.4). The customSanitizer (middleware) does the clearing, so the
+ * handler no longer normalizes these fields itself.
+ */
+const clearableConfigString = (field: string): ValidationChain =>
+  body(field)
+    .optional()
+    .isString()
+    .customSanitizer((value) => (value === '' ? undefined : value));
+
+/**
  * express-validator chain for PUT /_api/v3/ai-settings (formal validation, Req 6.1/6.2).
  * All fields optional (partial update). provider must be a supported AI provider;
- * providerOptions must be valid JSON when present (empty = cleared, skipped);
- * the boolean toggles must be real booleans. Semantic option validity is the
- * provider integration's responsibility.
+ * the string fields are type-guarded with .isString(); the clearable ones are
+ * sanitized ('' -> undefined) so removeIfUndefined deletes them (Req 4.4);
+ * providerOptions must be valid JSON when present; the boolean toggles must be
+ * real booleans. Semantic option validity is the provider integration's
+ * responsibility.
  */
 export const updateAiSettingsValidators: ValidationChain[] = [
   body('provider')
     .optional()
     .custom((value) => isAiProvider(value))
     .withMessage('provider must be one of the supported AI providers'),
+  // apiKey is NOT cleared-when-empty (empty = keep existing, handled in buildUpdates),
+  // so it only gets a type guard — NO ''->undefined sanitizer.
+  body('apiKey').optional().isString(),
+  clearableConfigString('model'),
+  // providerOptions: validate the RAW value with the shared FE/BE predicate
+  // (Req 6.2) BEFORE the sanitizer (the predicate treats '' as valid; sanitizing
+  // first would feed it undefined). The sanitizer then clears '' -> undefined.
   body('providerOptions')
-    // Shared FE/BE predicate (Req 6.2): the single source of truth for what
-    // counts as a valid providerOptions string. Plain `.optional()` is enough
-    // because the predicate already treats '' / whitespace as valid ("no
-    // options", normalized to undefined server-side), so client and server
-    // accept/reject exactly the same input.
     .optional()
+    .isString()
     .custom((value: string) => isValidProviderOptionsJson(value))
-    .withMessage('providerOptions must be a valid JSON string'),
+    .withMessage('providerOptions must be a valid JSON string')
+    .customSanitizer((value) => (value === '' ? undefined : value)),
+  clearableConfigString('azureOpenaiResourceName'),
+  clearableConfigString('azureOpenaiBaseUrl'),
+  clearableConfigString('azureOpenaiApiVersion'),
   body('aiEnabled').optional().isBoolean(),
   body('azureOpenaiUseEntraId').optional().isBoolean(),
 ];
@@ -55,40 +76,27 @@ export const updateAiSettingsValidators: ValidationChain[] = [
 type AiConfigUpdates = Parameters<typeof configManager.updateConfigs>[0];
 
 /**
- * Normalize an optional string field for persistence: an empty string means
- * "cleared", which becomes `undefined` so that `updateConfigs({ removeIfUndefined })`
- * deletes the DB value and the effective value falls back to the env var (Req 4.4).
- * The generic preserves the field's narrowed type (e.g. AiProvider) instead of
- * widening it to `string`.
- */
-const normalizeStringField = <T extends string>(
-  value: T | undefined,
-): T | undefined => (value === '' ? undefined : value);
-
-/**
  * Build the config updates from a validated request body.
  *
  * Update semantics (design "API Contract"):
- *   - string fields are normalized ('' -> undefined) and ALWAYS placed in the
- *     object so `removeIfUndefined` removes the cleared ones (Req 4.4)
+ *   - the clearable string fields are already normalized ('' -> undefined) by the
+ *     validator's customSanitizer (middleware that runs before this handler), so
+ *     they are mapped directly and ALWAYS placed in the object — `removeIfUndefined`
+ *     then removes the cleared ones from the DB (Req 4.4).
  *   - boolean fields are always saved when provided (toggle / Entra ID)
- *   - `ai:apiKey` is the exception: included only when a non-empty string is
- *     sent, so an empty/omitted apiKey preserves the existing stored key (Req 5.x).
- *     Because the key is simply absent from the updates object in that case,
- *     `removeIfUndefined` never touches it.
+ *   - `ai:apiKey` is the exception: it has NO sanitizer, so it is included only
+ *     when a non-empty string is sent; an empty/omitted apiKey preserves the
+ *     existing stored key (Req 5.x). Because the key is simply absent from the
+ *     updates object in that case, `removeIfUndefined` never touches it.
  */
 const buildUpdates = (body: AiSettingsUpdateRequest): AiConfigUpdates => {
   const updates: AiConfigUpdates = {
-    'ai:provider': normalizeStringField(body.provider),
-    'ai:model': normalizeStringField(body.model),
-    'ai:providerOptions': normalizeStringField(body.providerOptions),
-    'ai:azureOpenaiResourceName': normalizeStringField(
-      body.azureOpenaiResourceName,
-    ),
-    'ai:azureOpenaiBaseUrl': normalizeStringField(body.azureOpenaiBaseUrl),
-    'ai:azureOpenaiApiVersion': normalizeStringField(
-      body.azureOpenaiApiVersion,
-    ),
+    'ai:provider': body.provider,
+    'ai:model': body.model,
+    'ai:providerOptions': body.providerOptions,
+    'ai:azureOpenaiResourceName': body.azureOpenaiResourceName,
+    'ai:azureOpenaiBaseUrl': body.azureOpenaiBaseUrl,
+    'ai:azureOpenaiApiVersion': body.azureOpenaiApiVersion,
   };
 
   if (body.aiEnabled != null) {
