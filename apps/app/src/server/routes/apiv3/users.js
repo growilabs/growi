@@ -5,7 +5,11 @@ import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
 import express from 'express';
 import { body, query } from 'express-validator';
-import { isEmail } from 'validator';
+// `validator`'s named exports are not statically detectable by cjs-module-lexer
+// (its module.exports is a built object), so a named ESM import fails. Import
+// the per-function module's default export instead (also avoids colliding with
+// the local `validator` middleware map below).
+import isEmail from 'validator/lib/isEmail.js';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
 import { deleteUserAiAssistant } from '~/features/openai/server/services/delete-ai-assistant.js';
