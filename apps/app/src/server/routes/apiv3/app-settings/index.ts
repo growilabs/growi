@@ -5,7 +5,10 @@ import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
-import * as nextI18nConfig from '^/config/next-i18next.config.cjs';
+// Default import (= whole module.exports). A namespace import leaves `.i18n`
+// undefined under native ESM because next-i18next.config.cjs spreads a runtime
+// require() into module.exports and cjs-module-lexer cannot see the keys.
+import nextI18nConfig from '^/config/next-i18next.config.cjs';
 
 import { SupportedAction } from '~/interfaces/activity.js';
 import type { CrowiRequest } from '~/interfaces/crowi-request.js';

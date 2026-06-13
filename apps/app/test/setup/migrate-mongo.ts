@@ -8,7 +8,7 @@ let migrationsRun = false;
 
 /**
  * Run database migrations using external process.
- * This uses the existing dev:migrate:up script which has ts-node and tsconfig-paths configured.
+ * This uses the existing dev:migrate:up script (migrate-mongo via plain node + umzug via tsx).
  */
 function runMigrations(mongoUri: string): void {
   // Run migrations using the existing script with custom MONGO_URI

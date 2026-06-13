@@ -590,16 +590,17 @@ class Crowi {
     await this.buildServer();
 
     // setup Next.js
-    // Save ts-node's .ts extension hook before Next.js prepare() destroys it.
+    // Save the dev TS runner's .ts extension hook (tsx registers one for CJS
+    // interop) before Next.js prepare() destroys it.
     // Next.js's next.config.ts transpiler registers/deregisters its own require hooks,
     // and deregisterHook() deletes require.extensions['.ts'] instead of restoring the previous hook.
     // `typeof require` guards the CJS-only API: under the ESM build `require` is
-    // undefined and ts-node's hook does not exist, so there is nothing to restore.
+    // undefined and no .ts hook exists, so there is nothing to restore.
     const cjsRequire = typeof require === 'function' ? require : undefined;
     const savedTsHook = cjsRequire?.extensions['.ts'];
     this.nextApp = next({ dev });
     await this.nextApp.prepare();
-    // Restore ts-node's .ts hook if Next.js removed it
+    // Restore the runner's .ts hook if Next.js removed it
     if (cjsRequire && savedTsHook && !cjsRequire.extensions['.ts']) {
       cjsRequire.extensions['.ts'] = savedTsHook;
     }

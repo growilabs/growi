@@ -5,7 +5,10 @@ import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import { i18n } from '^/config/next-i18next.config.cjs';
+// next-i18next.config.cjs spreads a runtime require() into module.exports, so
+// cjs-module-lexer cannot see `i18n` as a named export; a default import (= the
+// whole module.exports) is the only form that resolves under native ESM.
+import nextI18nextConfig from '^/config/next-i18next.config.cjs';
 
 import { aclService as _aclService } from '~/server/service/acl.js';
 // Getter wrappers for service singletons: callers use getConfigManager() /
@@ -75,7 +78,7 @@ const factory = (crowi) => {
       apiToken: { type: String, index: true },
       lang: {
         type: String,
-        enum: i18n.locales,
+        enum: nextI18nextConfig.i18n.locales,
         default: 'en_US',
       },
       status: {
