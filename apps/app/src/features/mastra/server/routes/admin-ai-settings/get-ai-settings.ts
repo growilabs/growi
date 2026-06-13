@@ -18,6 +18,74 @@ const logger = loggerFactory(
 );
 
 /**
+ * @swagger
+ *
+ * components:
+ *   schemas:
+ *     AiSettingsResponse:
+ *       description: >-
+ *         The currently effective AI configuration for the admin UI. The
+ *         ai:apiKey value is never returned — only isApiKeySet exposes its presence.
+ *       type: object
+ *       required: [aiEnabled, azureOpenaiUseEntraId, isApiKeySet, useOnlyEnvVars, isConfigured]
+ *       properties:
+ *         aiEnabled:
+ *           type: boolean
+ *           description: State of app:aiEnabled (the AI enable toggle).
+ *         provider:
+ *           type: string
+ *           enum: [openai, anthropic, google, azure-openai]
+ *           description: The selected LLM provider (ai:provider).
+ *         model:
+ *           type: string
+ *           description: The model id (or, for Azure OpenAI, the deployment name).
+ *         providerOptions:
+ *           type: string
+ *           description: Provider-namespaced options as a raw JSON string.
+ *         azureOpenaiResourceName:
+ *           type: string
+ *         azureOpenaiBaseUrl:
+ *           type: string
+ *         azureOpenaiApiVersion:
+ *           type: string
+ *         azureOpenaiUseEntraId:
+ *           type: boolean
+ *           description: Whether Azure OpenAI authenticates via Microsoft Entra ID instead of an API key.
+ *         isApiKeySet:
+ *           type: boolean
+ *           description: Whether an ai:apiKey is stored. The key value itself is never returned.
+ *         useOnlyEnvVars:
+ *           type: boolean
+ *           description: When true (env:useOnlyEnvVars:ai), every field is fixed by env vars and is read-only.
+ *         isConfigured:
+ *           type: boolean
+ *           description: Whether the provider and its required fields resolve to a usable model.
+ */
+
+/**
+ * @swagger
+ *
+ *    /ai-settings:
+ *      get:
+ *        tags: [AiSettings]
+ *        security:
+ *          - bearer: []
+ *          - accessTokenInQuery: []
+ *          - accessTokenHeaderAuth: []
+ *        summary: /ai-settings
+ *        description: Get the currently effective AI settings. The ai:apiKey value is never returned (only isApiKeySet).
+ *        responses:
+ *          200:
+ *            description: The effective AI settings.
+ *            content:
+ *              application/json:
+ *                schema:
+ *                  $ref: '#/components/schemas/AiSettingsResponse'
+ *          500:
+ *            description: Failed to get AI settings.
+ */
+
+/**
  * GET /_api/v3/ai-settings handler.
  *
  * Returns the currently effective AI configuration for the admin UI. Each value

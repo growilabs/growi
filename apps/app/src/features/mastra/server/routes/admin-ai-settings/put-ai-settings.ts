@@ -25,6 +25,48 @@ const logger = loggerFactory(
 );
 
 /**
+ * @swagger
+ *
+ * components:
+ *   schemas:
+ *     AiSettingsUpdateRequest:
+ *       description: >-
+ *         Full-state replace (NOT a PATCH): an omitted clearable string field is
+ *         reset to its env default. apiKey (empty/omitted keeps the existing key)
+ *         and the booleans (applied only when provided) are the merge exceptions.
+ *       type: object
+ *       properties:
+ *         aiEnabled:
+ *           type: boolean
+ *           description: Toggle for app:aiEnabled. Applied only when provided; omit keeps the current value.
+ *         provider:
+ *           type: string
+ *           enum: [openai, anthropic, google, azure-openai]
+ *           description: Clearable — omit resets to the env default.
+ *         apiKey:
+ *           type: string
+ *           description: Write-only. Empty or omitted keeps the existing stored key; it is never returned by GET.
+ *         model:
+ *           type: string
+ *           description: Clearable — omit resets to the env default.
+ *         providerOptions:
+ *           type: string
+ *           description: Provider-namespaced options as a raw JSON string. Clearable — omit resets to the env default.
+ *         azureOpenaiResourceName:
+ *           type: string
+ *           description: Clearable — omit resets to the env default.
+ *         azureOpenaiBaseUrl:
+ *           type: string
+ *           description: Clearable — omit resets to the env default.
+ *         azureOpenaiApiVersion:
+ *           type: string
+ *           description: Clearable — omit resets to the env default.
+ *         azureOpenaiUseEntraId:
+ *           type: boolean
+ *           description: Applied only when provided; omit keeps the current value.
+ */
+
+/**
  * Optional config string that is cleared when empty: '' (or omitted) -> undefined
  * so updateConfigs({ removeIfUndefined }) deletes it and the value falls back to
  * the env var (Req 4.4). The customSanitizer (middleware) does the clearing, so the
@@ -129,6 +171,37 @@ const buildUpdates = (body: AiSettingsUpdateRequest): AiConfigUpdates => {
 
   return updates;
 };
+
+/**
+ * @swagger
+ *
+ *    /ai-settings:
+ *      put:
+ *        tags: [AiSettings]
+ *        security:
+ *          - bearer: []
+ *          - accessTokenInQuery: []
+ *          - accessTokenHeaderAuth: []
+ *        summary: /ai-settings
+ *        description: >-
+ *          Update the AI settings (full-state replace). Rejected with 422 when
+ *          env-only mode (env:useOnlyEnvVars:ai) is active.
+ *        requestBody:
+ *          required: true
+ *          content:
+ *            application/json:
+ *              schema:
+ *                $ref: '#/components/schemas/AiSettingsUpdateRequest'
+ *        responses:
+ *          200:
+ *            description: AI settings updated.
+ *          400:
+ *            description: Validation failed (an invalid field value was sent).
+ *          422:
+ *            description: Updating AI settings is prohibited because env-only mode is active.
+ *          500:
+ *            description: Failed to update AI settings.
+ */
 
 /**
  * PUT /_api/v3/ai-settings handler factory.

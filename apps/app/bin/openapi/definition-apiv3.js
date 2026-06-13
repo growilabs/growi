@@ -98,6 +98,7 @@ module.exports = {
         'Activity',
         'AdminHome',
         'AppSettings',
+        'AiSettings',
         'ExternalUserGroups',
         'SecuritySetting',
         'MarkDownSetting',
