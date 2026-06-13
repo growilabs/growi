@@ -440,6 +440,28 @@
     "note_for_the_only_env_option": "Les paramètres sont définis par des variables d'environnement.<br>Pour modifier ce paramètre, supprimer la variable d'environnement <code>{{env}}</code> .",
     "note_for_the_only_env_option_cloud": "Les paramètres GCS peuvent être modifiés depuis le panneau d'administration GROWI.cloud."
   },
+  "ai_settings": {
+    "ai_settings": "Paramètres IA",
+    "ai_enabled_label": "Activer les fonctionnalités IA",
+    "provider_label": "Fournisseur",
+    "provider_placeholder": "Sélectionnez un fournisseur",
+    "api_key_label": "Clé API",
+    "api_key_help": "La clé API utilisée pour s'authentifier auprès du fournisseur d'IA.",
+    "api_key_set_placeholder": "(configurée)",
+    "model_label": "Modèle",
+    "provider_options_label": "Options du fournisseur (JSON)",
+    "provider_options_invalid_json": "JSON non valide",
+    "env_only_mode_notice": "Les paramètres IA sont fixés par des variables d'environnement et ne peuvent pas être modifiés ici.",
+    "unconfigured_warning": "L'IA est activée mais n'est pas entièrement configurée ; elle ne fonctionnera pas tant que les paramètres ne seront pas complétés.",
+    "save": "Mettre à jour",
+    "save_success": "Paramètres IA mis à jour avec succès.",
+    "azure_resource_name_label": "Nom de la ressource Azure",
+    "azure_base_url_label": "URL de base Azure",
+    "azure_api_version_label": "Version de l'API Azure",
+    "azure_use_entra_id_label": "Utiliser Microsoft Entra ID",
+    "azure_entra_id_api_key_note": "Lorsque Microsoft Entra ID est activé, la clé API n'est pas utilisée.",
+    "azure_model_deployment_note": "Pour Azure OpenAI, saisissez le nom du déploiement dans le champ Modèle."
+  },
   "markdown_settings": {
     "markdown_settings": "Markdown",
     "lineBreak_header": "Saut de ligne",

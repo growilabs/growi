@@ -449,6 +449,28 @@
     "note_for_the_only_env_option": "The GCS settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
     "note_for_the_only_env_option_cloud": "GCS 设置可以从 GROWI.cloud 管理页面进行更改。"
   },
+  "ai_settings": {
+    "ai_settings": "AI 设置",
+    "ai_enabled_label": "启用 AI 功能",
+    "provider_label": "提供商",
+    "provider_placeholder": "请选择提供商",
+    "api_key_label": "API 密钥",
+    "api_key_help": "用于向 AI 提供商进行身份验证的 API 密钥。",
+    "api_key_set_placeholder": "(已配置)",
+    "model_label": "模型",
+    "provider_options_label": "提供商选项 (JSON)",
+    "provider_options_invalid_json": "无效的 JSON",
+    "env_only_mode_notice": "AI 设置由环境变量固定，无法在此处编辑。",
+    "unconfigured_warning": "AI 已启用但尚未完成配置，在完成设置之前将无法使用。",
+    "save": "更新",
+    "save_success": "AI 设置已成功更新。",
+    "azure_resource_name_label": "Azure 资源名称",
+    "azure_base_url_label": "Azure 基础 URL",
+    "azure_api_version_label": "Azure API 版本",
+    "azure_use_entra_id_label": "使用 Microsoft Entra ID",
+    "azure_entra_id_api_key_note": "启用 Microsoft Entra ID 后，将不使用 API 密钥。",
+    "azure_model_deployment_note": "对于 Azure OpenAI，请在模型字段中输入部署名称。"
+  },
   "markdown_settings": {
     "markdown_settings": "Markdown设置",
     "lineBreak_header": "换行设置",

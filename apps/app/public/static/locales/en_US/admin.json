@@ -440,6 +440,28 @@
     "note_for_the_only_env_option": "The GCS Settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
     "note_for_the_only_env_option_cloud": "GCS settings can be changed from the GROWI.cloud admin panel."
   },
+  "ai_settings": {
+    "ai_settings": "AI Settings",
+    "ai_enabled_label": "Enable AI features",
+    "provider_label": "Provider",
+    "provider_placeholder": "Select a provider",
+    "api_key_label": "API Key",
+    "api_key_help": "The API key used to authenticate with the AI provider.",
+    "api_key_set_placeholder": "(configured)",
+    "model_label": "Model",
+    "provider_options_label": "Provider Options (JSON)",
+    "provider_options_invalid_json": "Invalid JSON",
+    "env_only_mode_notice": "AI settings are fixed by environment variables and cannot be edited here.",
+    "unconfigured_warning": "AI is enabled but not fully configured, so it will not work until you complete the settings.",
+    "save": "Update",
+    "save_success": "AI settings updated successfully.",
+    "azure_resource_name_label": "Azure resource name",
+    "azure_base_url_label": "Azure base URL",
+    "azure_api_version_label": "Azure API version",
+    "azure_use_entra_id_label": "Use Microsoft Entra ID",
+    "azure_entra_id_api_key_note": "When Microsoft Entra ID is enabled, the API key is not used.",
+    "azure_model_deployment_note": "For Azure OpenAI, enter the deployment name in the Model field."
+  },
   "markdown_settings": {
     "markdown_settings": "Markdown Settings",
     "lineBreak_header": "Line break setting",
