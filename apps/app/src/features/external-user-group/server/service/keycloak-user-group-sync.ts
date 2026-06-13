@@ -1,16 +1,21 @@
 import KeycloakAdminClientPkg from '@keycloak/keycloak-admin-client';
 
-// @keycloak/keycloak-admin-client v18 is transpiled CJS without a
-// module.exports self-patch: under native ESM the default import binding is
-// the exports object, so the constructor must be unwrapped from `.default`.
-// `typeof import(...)` keeps the narrowing valid under both module
-// resolutions: NodeNext (server build) binds the default import to the module
-// namespace, Bundler (tsgo / next build) binds it to the class itself.
-const KeycloakAdminClient = (
-  KeycloakAdminClientPkg as unknown as {
-    default: typeof import('@keycloak/keycloak-admin-client').default;
-  }
-).default;
+type KeycloakAdminClientCtor =
+  typeof import('@keycloak/keycloak-admin-client').default;
+
+// @keycloak/keycloak-admin-client v18 is transpiled CJS (`exports.__esModule`
+// + `exports.default = KcAdminClient`). The default-import binding differs by
+// resolution mode AND must hold at runtime under both: NodeNext (server build
+// / tsx) binds the module namespace (class lives under `.default`), while the
+// bundler interop (vitest's esbuild, next build) honours `__esModule` and
+// binds the class itself. Unwrapping unconditionally with `.default` breaks
+// the bundler path (`undefined` -> "not a constructor"), so disambiguate at
+// runtime: if the binding is already callable it IS the constructor.
+const pkg = KeycloakAdminClientPkg as unknown as
+  | KeycloakAdminClientCtor
+  | { default: KeycloakAdminClientCtor };
+const KeycloakAdminClient: KeycloakAdminClientCtor =
+  typeof pkg === 'function' ? pkg : pkg.default;
 type KeycloakAdminClient = import('@keycloak/keycloak-admin-client').default;
 
 // The defs are CJS-format declarations (`export default interface ...`);
