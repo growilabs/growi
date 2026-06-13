@@ -125,7 +125,7 @@ graph TB
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Frontend | Next.js Pages Router, React 18, Jotai + SWR, reactstrap | `/admin/ai` ページと設定 UI、設定の取得/保存 | vault 管理ページ雛形を踏襲 |
+| Frontend | Next.js Pages Router, React 18, SWR, react-hook-form, reactstrap | `/admin/ai` ページとフォーム、設定の取得/保存 | フォームは register ベース RHF(GROWI admin フォーム慣習)。vault 管理ページ雛形を踏襲 |
 | Backend | Express apiv3, express-validator | AI 設定 GET/PUT、入力検証、監査ログ | 既存 admin ルートパターン |
 | Config | ConfigManager `ENV_ONLY_GROUPS` 機構 | 環境変数専用モードによる固定 | 制御キー + グループ宣言の追加のみ(コア無変更) |
 | Gate | per-request Express middleware | AI 利用可否(有効 かつ 設定済み)の判定 | mastra ルートの起動時固定ゲートを置換 |
@@ -156,10 +156,12 @@ apps/app/src/features/mastra/
 └── client/
     └── admin/
         ├── index.ts               # barrel: AiSettings を公開
-        ├── AiSettings.tsx         # コンテナ: 取得・保存・トースト・セクション統合
-        ├── ProviderCommonSettings.tsx  # ai:provider / apiKey / model / providerOptions
-        ├── AzureOpenaiSettings.tsx     # azure 4 キー(provider=azure-openai 時に有効化)
-        ├── AiEnabledToggle.tsx         # app:aiEnabled の有効/無効トグル
+        ├── AiSettings.tsx         # コンテナ: useForm + FormProvider、取得・保存(handleSubmit)・トースト・セクション統合
+        ├── ai-settings-form-values.ts  # RHF フォーム値型 + toFormValues / buildUpdateRequest(純粋関数)
+        ├── register-to-input-props.ts  # register() の ref を reactstrap Input の innerRef に remap する純粋ヘルパー
+        ├── ProviderCommonSettings.tsx  # register ベース: ai:provider / apiKey / model / providerOptions(useFormContext)
+        ├── AzureOpenaiSettings.tsx     # azure 4 キー(watch('provider')==='azure-openai' 時のみ表示)
+        ├── AiEnabledToggle.tsx         # app:aiEnabled の有効/無効トグル(register)
         ├── EnvOnlyModeNotice.tsx       # 環境変数専用モード有効時の alert(各入力は flag 連動で disabled=フォーカス不可)
         └── use-ai-settings.ts          # SWR フック(apiv3Get) + 保存関数(apiv3Put)
 
@@ -449,14 +451,16 @@ export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 ### Client UI
 
 #### AiSettings(コンテナ)
-- 取得: `useAiSettings`(SWR, `apiv3Get('/ai-settings')`)。**フォーム一括保存**: 全項目(トグル含む)を 1 つの保存ボタンで `apiv3Put('/ai-settings', body)` → 成功 `toastSuccess` + SWR `mutate`、失敗 `toastError` かつ入力 state を保持(6.3)。
-- `provider` 状態を子へ渡し、`azure-openai` 選択時のみ `AzureOpenaiSettings` を表示(3.2)。
-- `aiEnabled` / `useOnlyEnvVars` を子へ渡し、トグルと各入力の状態・編集可否を制御。
-- `aiEnabled === true && isConfigured === false` のとき、警告 alert(「AI は有効だが設定が未完成のため動作しない」)を表示(7.6)。
+- `useForm`(`mode: 'onChange'`)+ `FormProvider` でフォームを所有(GROWI admin フォーム慣習の register ベース)。取得値 `data`(`useAiSettings`)を `toFormValues` で `defaultValues` に seed し、`reset` で revalidate 時に再 seed(apiKey は常に空にクリア — R5.2)。
+- **フォーム一括保存**: `handleSubmit(onSubmit)` → `buildUpdateRequest`(booleans 常時 / 文字列そのまま / provider '' → undefined / apiKey は非空時のみ)→ `save`(`apiv3Put` + revalidate)→ 成功 `toastSuccess`、失敗 `toastError` かつ RHF は値を保持(6.3)。保存ボタンは `disabled={useOnlyEnvVars || formState.isSubmitting}`。
+- `watch('provider') === 'azure-openai'` のときのみ `AzureOpenaiSettings` を表示(3.2)。
+- `aiEnabled === true && isConfigured === false`(サーバー `data` 由来、フォーム状態ではない)のとき警告 alert を表示(7.6)。
+- **reactstrap + RHF**: `<Input>` は DOM を `innerRef` で配線するため、`registerToInputProps()` で `register()` の `ref` を `innerRef` に remap して全 Input に適用。
 
 #### ProviderCommonSettings / AzureOpenaiSettings / AiEnabledToggle / EnvOnlyModeNotice(Summary-only)
-- `AiEnabledToggle`: `app:aiEnabled` の有効/無効スイッチ(7.1)。フォーム state を更新し保存ボタンで PUT body の `aiEnabled` に反映。`useOnlyEnvVars` 連動で `disabled`。
-- `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(JSON、クライアント側 parse 検証=6.2)。各入力は `useOnlyEnvVars` 連動で **`disabled`**(`readOnly` ではなく — タブ順から除外しフォーカス不可にするため。env 専用時は完全ロック扱い)。
+- 各セクションは `useFormContext` で `register` / `watch` / `errors` を取得(prop drilling なし)。非フォーム props は `disabled`(env-only)と `ProviderCommonSettings` の `isApiKeySet` のみ。
+- `AiEnabledToggle`: `app:aiEnabled` の有効/無効スイッチ(`register('aiEnabled')`、7.1)。`useOnlyEnvVars` 連動で `disabled`。
+- `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(`register` の `validate` で JSON 検証 → `FormFeedback`=6.2)。各入力は `useOnlyEnvVars` 連動で **`disabled`**(`readOnly` ではなく — タブ順から除外しフォーカス不可。env 専用時は完全ロック)。
 - `AzureOpenaiSettings`: azure 4 キー。`provider !== 'azure-openai'` のときは**非表示**(3.2)。`useEntraId=true` 時は apiKey 不使用を明示(3.3)、model=deployment 名の注記(3.4)。
 - `EnvOnlyModeNotice`: `useOnlyEnvVars` が true のとき alert を表示し、全項目が環境変数で固定され編集不可である旨を明示(4.2)。SiteUrlSetting の env 専用モード表示パターンを踏襲。
 

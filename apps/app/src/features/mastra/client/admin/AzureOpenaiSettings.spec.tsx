@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
+import type { JSX, ReactNode } from 'react';
 import { fireEvent, render, screen } from '@testing-library/react';
+import { FormProvider, useForm } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-i18next', () => ({
@@ -10,30 +12,53 @@ vi.mock('next-i18next', () => ({
   }),
 }));
 
-import type { AzureOpenaiSettingsProps } from './AzureOpenaiSettings';
 import { AzureOpenaiSettings } from './AzureOpenaiSettings';
+import type { AiSettingsFormValues } from './ai-settings-form-values';
 
-const renderComponent = (overrides: Partial<AzureOpenaiSettingsProps> = {}) => {
-  const props: AzureOpenaiSettingsProps = {
-    provider: 'azure-openai',
-    resourceName: '',
-    baseUrl: '',
-    apiVersion: '',
-    useEntraId: false,
-    disabled: false,
-    onChangeResourceName: vi.fn(),
-    onChangeBaseUrl: vi.fn(),
-    onChangeApiVersion: vi.fn(),
-    onChangeUseEntraId: vi.fn(),
-    ...overrides,
-  };
-  return { props, ...render(<AzureOpenaiSettings {...props} />) };
+const defaultFormValues: AiSettingsFormValues = {
+  aiEnabled: true,
+  provider: 'azure-openai',
+  apiKey: '',
+  model: '',
+  providerOptions: '',
+  azureOpenaiResourceName: '',
+  azureOpenaiBaseUrl: '',
+  azureOpenaiApiVersion: '',
+  azureOpenaiUseEntraId: false,
 };
+
+const FormHarness = ({
+  defaultValues,
+  children,
+}: {
+  defaultValues?: Partial<AiSettingsFormValues>;
+  children: ReactNode;
+}): JSX.Element => {
+  const methods = useForm<AiSettingsFormValues>({
+    defaultValues: { ...defaultFormValues, ...defaultValues },
+  });
+  return <FormProvider {...methods}>{children}</FormProvider>;
+};
+
+const renderComponent = ({
+  disabled = false,
+  defaultValues,
+}: {
+  disabled?: boolean;
+  defaultValues?: Partial<AiSettingsFormValues>;
+} = {}) =>
+  render(
+    <FormHarness defaultValues={defaultValues}>
+      <AzureOpenaiSettings disabled={disabled} />
+    </FormHarness>,
+  );
 
 describe('AzureOpenaiSettings', () => {
   it('renders nothing when the provider is not azure-openai', () => {
     // Act
-    const { container } = renderComponent({ provider: 'openai' });
+    const { container } = renderComponent({
+      defaultValues: { provider: 'openai' },
+    });
 
     // Assert
     expect(container).toBeEmptyDOMElement();
@@ -58,30 +83,18 @@ describe('AzureOpenaiSettings', () => {
 
   it('shows the Entra ID api-key note only when useEntraId is true', () => {
     // Arrange: note hidden by default
-    const { rerender, props } = renderComponent({ useEntraId: false });
+    renderComponent({ defaultValues: { azureOpenaiUseEntraId: false } });
     expect(
       screen.queryByText('ai_settings.azure_entra_id_api_key_note'),
     ).not.toBeInTheDocument();
 
-    // Act
-    rerender(<AzureOpenaiSettings {...props} useEntraId />);
+    // Act: toggle the Entra ID switch on
+    fireEvent.click(screen.getByRole('switch'));
 
     // Assert
     expect(
       screen.getByText('ai_settings.azure_entra_id_api_key_note'),
     ).toBeInTheDocument();
-  });
-
-  it('calls onChangeUseEntraId with the toggled value', () => {
-    // Arrange
-    const onChangeUseEntraId = vi.fn();
-    renderComponent({ onChangeUseEntraId });
-
-    // Act
-    fireEvent.click(screen.getByRole('switch'));
-
-    // Assert
-    expect(onChangeUseEntraId).toHaveBeenCalledWith(true);
   });
 
   it('disables every input (not focusable) in env-only mode', () => {

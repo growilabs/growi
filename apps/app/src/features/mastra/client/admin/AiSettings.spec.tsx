@@ -1,12 +1,6 @@
 // @vitest-environment happy-dom
 
-import {
-  act,
-  fireEvent,
-  render,
-  screen,
-  waitFor,
-} from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -70,14 +64,10 @@ const setData = (overrides: Partial<AiSettingsResponse> = {}): void => {
 const getSaveButton = (): HTMLElement =>
   screen.getByRole('button', { name: 'ai_settings.save' });
 
-// Clicking save kicks off the async save handler (which flips an internal
-// saving flag), so the click must be flushed under act() to settle that update.
-const clickSave = async (): Promise<void> => {
-  await act(async () => {
-    fireEvent.click(getSaveButton());
-    // Let the save promise (and the resulting state update) settle within act().
-    await Promise.resolve();
-  });
+// Submitting the form kicks off react-hook-form's async handler (validation +
+// the awaited save). Wait until `save` is observed to ensure it has settled.
+const submitForm = (): void => {
+  fireEvent.click(getSaveButton());
 };
 
 describe('AiSettings', () => {
@@ -98,10 +88,12 @@ describe('AiSettings', () => {
 
       // Act
       render(<AiSettings />);
-      await clickSave();
+      submitForm();
 
       // Assert: booleans are always sent; string fields are sent as-is.
-      expect(save).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(save).toHaveBeenCalledTimes(1);
+      });
       const body = save.mock.calls[0][0];
       expect(body).toMatchObject({
         aiEnabled: true,
@@ -117,10 +109,12 @@ describe('AiSettings', () => {
 
       // Act
       render(<AiSettings />);
-      await clickSave();
+      submitForm();
 
       // Assert: a blank apiKey keeps the existing stored key (it is omitted).
-      expect(save).toHaveBeenCalledTimes(1);
+      await waitFor(() => {
+        expect(save).toHaveBeenCalledTimes(1);
+      });
       expect(save.mock.calls[0][0]).not.toHaveProperty('apiKey');
     });
 
@@ -133,10 +127,28 @@ describe('AiSettings', () => {
       fireEvent.change(screen.getByLabelText('ai_settings.api_key_label'), {
         target: { value: 'sk-new-key' },
       });
-      await clickSave();
+      submitForm();
 
       // Assert
+      await waitFor(() => {
+        expect(save).toHaveBeenCalledTimes(1);
+      });
       expect(save.mock.calls[0][0]).toMatchObject({ apiKey: 'sk-new-key' });
+    });
+
+    it('sends provider as undefined when none is selected', async () => {
+      // Arrange: no provider selected (the '' sentinel)
+      setData({ provider: undefined });
+
+      // Act
+      render(<AiSettings />);
+      submitForm();
+
+      // Assert: the '' sentinel is converted to undefined for the DTO.
+      await waitFor(() => {
+        expect(save).toHaveBeenCalledTimes(1);
+      });
+      expect(save.mock.calls[0][0].provider).toBeUndefined();
     });
 
     it('reflects edited fields in the persisted request body', async () => {
@@ -148,9 +160,12 @@ describe('AiSettings', () => {
       fireEvent.change(screen.getByLabelText('ai_settings.model_label'), {
         target: { value: 'gpt-4o-mini' },
       });
-      await clickSave();
+      submitForm();
 
       // Assert
+      await waitFor(() => {
+        expect(save).toHaveBeenCalledTimes(1);
+      });
       expect(save.mock.calls[0][0]).toMatchObject({ model: 'gpt-4o-mini' });
     });
 
@@ -161,7 +176,7 @@ describe('AiSettings', () => {
 
       // Act
       render(<AiSettings />);
-      await clickSave();
+      submitForm();
 
       // Assert
       await waitFor(() => {
@@ -181,14 +196,15 @@ describe('AiSettings', () => {
       render(<AiSettings />);
       const modelInput = screen.getByLabelText('ai_settings.model_label');
       fireEvent.change(modelInput, { target: { value: 'edited-model' } });
-      await clickSave();
+      submitForm();
 
       // Assert: failure surfaces a toast...
       await waitFor(() => {
         expect(toastError).toHaveBeenCalledTimes(1);
       });
       expect(toastSuccess).not.toHaveBeenCalled();
-      // ...and the user's edit is NOT reset back to the server value.
+      // ...and the user's edit is NOT reset back to the server value (the
+      // failure path does not revalidate, so no `reset` is triggered).
       expect(screen.getByLabelText('ai_settings.model_label')).toHaveValue(
         'edited-model',
       );

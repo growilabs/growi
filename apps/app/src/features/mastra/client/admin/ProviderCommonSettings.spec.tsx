@@ -1,6 +1,8 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, render, screen } from '@testing-library/react';
+import type { JSX, ReactNode } from 'react';
+import { act, fireEvent, render, screen } from '@testing-library/react';
+import { FormProvider, useForm } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
 
 import { AI_PROVIDERS } from '../../interfaces/ai-provider';
@@ -12,27 +14,51 @@ vi.mock('next-i18next', () => ({
   }),
 }));
 
-import type { ProviderCommonSettingsProps } from './ProviderCommonSettings';
+import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { ProviderCommonSettings } from './ProviderCommonSettings';
 
-const renderComponent = (
-  overrides: Partial<ProviderCommonSettingsProps> = {},
-) => {
-  const props: ProviderCommonSettingsProps = {
-    provider: 'openai',
-    apiKey: '',
-    model: 'gpt-4o',
-    providerOptions: '',
-    isApiKeySet: false,
-    disabled: false,
-    onChangeProvider: vi.fn(),
-    onChangeApiKey: vi.fn(),
-    onChangeModel: vi.fn(),
-    onChangeProviderOptions: vi.fn(),
-    ...overrides,
-  };
-  return { props, ...render(<ProviderCommonSettings {...props} />) };
+const defaultFormValues: AiSettingsFormValues = {
+  aiEnabled: true,
+  provider: 'openai',
+  apiKey: '',
+  model: 'gpt-4o',
+  providerOptions: '',
+  azureOpenaiResourceName: '',
+  azureOpenaiBaseUrl: '',
+  azureOpenaiApiVersion: '',
+  azureOpenaiUseEntraId: false,
 };
+
+const FormHarness = ({
+  defaultValues,
+  children,
+}: {
+  defaultValues?: Partial<AiSettingsFormValues>;
+  children: ReactNode;
+}): JSX.Element => {
+  // Mirror the container's `onChange` validation mode so the providerOptions
+  // JSON error surfaces as the field changes (matching production behavior).
+  const methods = useForm<AiSettingsFormValues>({
+    mode: 'onChange',
+    defaultValues: { ...defaultFormValues, ...defaultValues },
+  });
+  return <FormProvider {...methods}>{children}</FormProvider>;
+};
+
+const renderComponent = ({
+  isApiKeySet = false,
+  disabled = false,
+  defaultValues,
+}: {
+  isApiKeySet?: boolean;
+  disabled?: boolean;
+  defaultValues?: Partial<AiSettingsFormValues>;
+} = {}) =>
+  render(
+    <FormHarness defaultValues={defaultValues}>
+      <ProviderCommonSettings isApiKeySet={isApiKeySet} disabled={disabled} />
+    </FormHarness>,
+  );
 
 describe('ProviderCommonSettings', () => {
   describe('provider select', () => {
@@ -46,20 +72,6 @@ describe('ProviderCommonSettings', () => {
         .map((opt) => (opt as HTMLOptionElement).value)
         .filter((v) => v !== '');
       expect(options).toEqual([...AI_PROVIDERS]);
-    });
-
-    it('calls onChangeProvider when a provider is selected', () => {
-      // Arrange
-      const onChangeProvider = vi.fn();
-      renderComponent({ onChangeProvider });
-
-      // Act
-      fireEvent.change(screen.getByRole('combobox'), {
-        target: { value: 'anthropic' },
-      });
-
-      // Assert
-      expect(onChangeProvider).toHaveBeenCalledWith('anthropic');
     });
   });
 
@@ -75,19 +87,39 @@ describe('ProviderCommonSettings', () => {
   });
 
   describe('providerOptions JSON validation', () => {
-    it('shows an inline validation message for invalid, non-empty JSON', () => {
+    it('shows an inline validation message after entering invalid, non-empty JSON', async () => {
       // Arrange
-      renderComponent({ providerOptions: '{ invalid json' });
+      renderComponent();
+      const textarea = screen.getByLabelText(
+        'ai_settings.provider_options_label',
+      );
+
+      // Act: enter malformed JSON (onChange validation runs synchronously).
+      await act(async () => {
+        fireEvent.change(textarea, { target: { value: '{ invalid json' } });
+        await Promise.resolve();
+      });
 
       // Assert: an inline error is surfaced for malformed JSON.
       expect(
-        screen.getByText('ai_settings.provider_options_invalid_json'),
+        await screen.findByText('ai_settings.provider_options_invalid_json'),
       ).toBeInTheDocument();
     });
 
-    it('does not show a validation message for valid JSON', () => {
+    it('does not show a validation message for valid JSON', async () => {
       // Arrange
-      renderComponent({ providerOptions: '{"temperature":0.7}' });
+      renderComponent();
+      const textarea = screen.getByLabelText(
+        'ai_settings.provider_options_label',
+      );
+
+      // Act
+      await act(async () => {
+        fireEvent.change(textarea, {
+          target: { value: '{"temperature":0.7}' },
+        });
+        await Promise.resolve();
+      });
 
       // Assert
       expect(
@@ -97,7 +129,7 @@ describe('ProviderCommonSettings', () => {
 
     it('does not show a validation message when empty', () => {
       // Arrange
-      renderComponent({ providerOptions: '' });
+      renderComponent({ defaultValues: { providerOptions: '' } });
 
       // Assert
       expect(
