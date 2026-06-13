@@ -1,5 +1,6 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
+import { isAiReady } from '~/features/mastra/server/services/is-ai-configured';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import { RegistrationMode } from '~/interfaces/registration-mode';
 
@@ -69,7 +70,12 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
   return {
     props: {
       serverConfig: {
-        aiEnabled: configManager.getConfig('app:aiEnabled'),
+        // The sidebar AI affordance must reflect AI *usability*, not just the
+        // on/off toggle: an enabled-but-unconfigured provider would otherwise
+        // surface a dead entry point. isAiReady() = enabled && configured is the
+        // same verdict the mastra route guard uses, keeping UI and API aligned
+        // (Req 7.4). This hydrates aiEnabledAtom (whose meaning is now "AI ready").
+        aiEnabled: isAiReady(),
         isUsersHomepageDeletionEnabled: configManager.getConfig(
           'security:user-homepage-deletion:isEnabled',
         ),
