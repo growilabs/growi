@@ -8,7 +8,11 @@ import {
   keymap,
 } from '@codemirror/view';
 
-import type { EditorSettings, EditorTheme, KeyMapMode } from '../../consts/index.js';
+import type {
+  EditorSettings,
+  EditorTheme,
+  KeyMapMode,
+} from '../../consts/index.js';
 import type { UseCodeMirrorEditor } from '../services/index.js';
 import {
   getEditorTheme,

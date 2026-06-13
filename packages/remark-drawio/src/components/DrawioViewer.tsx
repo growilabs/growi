@@ -207,7 +207,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
       )}
       {error == null && (
         // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
-        (<div dangerouslySetInnerHTML={{ __html: mxgraphHtml }} />)
+        <div dangerouslySetInnerHTML={{ __html: mxgraphHtml }} />
       )}
     </div>
   );

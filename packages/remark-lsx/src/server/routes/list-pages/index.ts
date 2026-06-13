@@ -5,7 +5,10 @@ import { loggerFactory } from '@growi/logger';
 import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
 
-import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api.js';
+import type {
+  LsxApiParams,
+  LsxApiResponseData,
+} from '../../../interfaces/api.js';
 import { addDepthCondition } from './add-depth-condition.js';
 import { addNumCondition } from './add-num-condition.js';
 import { addSortCondition } from './add-sort-condition.js';

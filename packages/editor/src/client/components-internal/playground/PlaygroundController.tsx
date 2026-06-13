@@ -1,4 +1,8 @@
-import type { EditorTheme, KeyMapMode, PasteMode } from '../../../consts/index.js';
+import type {
+  EditorTheme,
+  KeyMapMode,
+  PasteMode,
+} from '../../../consts/index.js';
 import { InitEditorValueRow } from './controller/InitEditorValueRow.js';
 import { KeymapControl } from './controller/KeymapControl.js';
 import { PasteModeControl } from './controller/PasteModeControl.js';

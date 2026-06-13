@@ -3,7 +3,10 @@ import Head from 'next/head';
 import ReactMarkdown from 'react-markdown';
 import type { PluggableList } from 'unified';
 
-import { MARP_CONTAINER_CLASS_NAME, type PresentationOptions } from '../consts/index.js';
+import {
+  MARP_CONTAINER_CLASS_NAME,
+  type PresentationOptions,
+} from '../consts/index.js';
 import {
   PRESENTATION_MARPIT_CSS,
   SLIDE_MARPIT_CSS,
