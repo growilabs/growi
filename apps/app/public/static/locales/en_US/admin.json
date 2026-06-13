@@ -451,6 +451,7 @@
     "model_label": "Model",
     "provider_options_label": "Provider Options (JSON)",
     "provider_options_invalid_json": "Invalid JSON",
+    "provider_options_help": "Specify provider-namespaced options as JSON.<br>See the AI SDK documentation:",
     "env_only_mode_notice": "AI settings are fixed by environment variables and cannot be edited here.",
     "unconfigured_warning": "AI is enabled but not fully configured, so it will not work until you complete the settings.",
     "save": "Update",

@@ -6,6 +6,10 @@ import { FormFeedback, FormGroup, FormText, Input, Label } from 'reactstrap';
 import { AI_PROVIDERS, type AiProvider } from '../../interfaces/ai-provider';
 import { isValidProviderOptionsJson } from './provider-options-validation';
 
+// Vercel AI SDK docs describing the provider-namespaced `providerOptions` shape.
+const PROVIDER_OPTIONS_DOC_URL =
+  'https://ai-sdk.dev/docs/foundations/provider-options';
+
 export interface ProviderCommonSettingsProps {
   /** Current `ai:provider` value (undefined when not yet configured). */
   readonly provider?: AiProvider;
@@ -130,6 +134,21 @@ export const ProviderCommonSettings = (
             {t('ai_settings.provider_options_invalid_json')}
           </FormFeedback>
         )}
+        <FormText>
+          <span
+            // biome-ignore lint/security/noDangerouslySetInnerHtml: includes <br> markup from i18n strings
+            dangerouslySetInnerHTML={{
+              __html: t('ai_settings.provider_options_help'),
+            }}
+          />{' '}
+          <a
+            href={PROVIDER_OPTIONS_DOC_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+          >
+            {PROVIDER_OPTIONS_DOC_URL}
+          </a>
+        </FormText>
       </FormGroup>
     </>
   );

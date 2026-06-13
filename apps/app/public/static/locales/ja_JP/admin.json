@@ -460,6 +460,7 @@
     "model_label": "モデル",
     "provider_options_label": "プロバイダーオプション (JSON)",
     "provider_options_invalid_json": "JSON の形式が正しくありません",
+    "provider_options_help": "プロバイダー名前空間付きのオプションを JSON で指定します。<br>詳細は AI SDK のドキュメントを参照してください:",
     "env_only_mode_notice": "AI 設定は環境変数で固定されているため、この画面からは編集できません。",
     "unconfigured_warning": "AI は有効になっていますが設定が完了していないため、設定を完了するまで動作しません。",
     "save": "更新",

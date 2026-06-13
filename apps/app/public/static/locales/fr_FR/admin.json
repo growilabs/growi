@@ -451,6 +451,7 @@
     "model_label": "Modèle",
     "provider_options_label": "Options du fournisseur (JSON)",
     "provider_options_invalid_json": "JSON non valide",
+    "provider_options_help": "Spécifiez les options par espace de noms de fournisseur au format JSON.<br>Consultez la documentation du AI SDK :",
     "env_only_mode_notice": "Les paramètres IA sont fixés par des variables d'environnement et ne peuvent pas être modifiés ici.",
     "unconfigured_warning": "L'IA est activée mais n'est pas entièrement configurée ; elle ne fonctionnera pas tant que les paramètres ne seront pas complétés.",
     "save": "Mettre à jour",

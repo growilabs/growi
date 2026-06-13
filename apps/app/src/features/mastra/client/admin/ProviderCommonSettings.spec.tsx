@@ -121,4 +121,22 @@ describe('ProviderCommonSettings', () => {
       );
     });
   });
+
+  describe('provider options help', () => {
+    it('links to the AI SDK provider-options documentation', () => {
+      // Act
+      renderComponent();
+
+      // Assert
+      const link = screen.getByRole('link', {
+        name: 'https://ai-sdk.dev/docs/foundations/provider-options',
+      });
+      expect(link).toHaveAttribute(
+        'href',
+        'https://ai-sdk.dev/docs/foundations/provider-options',
+      );
+      expect(link).toHaveAttribute('target', '_blank');
+      expect(link).toHaveAttribute('rel', 'noopener noreferrer');
+    });
+  });
 });

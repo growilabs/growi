@@ -460,6 +460,7 @@
     "model_label": "模型",
     "provider_options_label": "提供商选项 (JSON)",
     "provider_options_invalid_json": "无效的 JSON",
+    "provider_options_help": "以 JSON 格式指定按提供商命名空间组织的选项。<br>详见 AI SDK 文档：",
     "env_only_mode_notice": "AI 设置由环境变量固定，无法在此处编辑。",
     "unconfigured_warning": "AI 已启用但尚未完成配置，在完成设置之前将无法使用。",
     "save": "更新",
