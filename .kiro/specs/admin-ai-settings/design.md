@@ -145,9 +145,9 @@ apps/app/src/features/mastra/
 ├── server/
 │   ├── routes/
 │   │   ├── admin-ai-settings/
-│   │   │   ├── index.ts           # ルータ factory (GET /, PUT /)
-│   │   │   ├── get-ai-settings.ts # GET ハンドラ: 有効値 + isApiKeySet + useOnlyEnvVars + aiEnabled + isConfigured
-│   │   │   ├── put-ai-settings.ts # PUT ハンドラ: 検証→env専用モード拒否→updateConfigs→cache clear→activity
+│   │   │   ├── index.ts           # ルータ factory: GET/PUT に各ハンドラ factory(RequestHandler[])を mount するのみ
+│   │   │   ├── get-ai-settings.ts # getAiSettingsFactory(crowi): [scope+login+admin, getAiSettings ハンドラ]
+│   │   │   ├── put-ai-settings.ts # putAiSettingsFactory(crowi): [scope+login+admin+addActivity+validators+formValidator, ハンドラ(検証→env専用拒否→updateConfigs→cache clear→activity)]
 │   │   │   └── validators.ts      # express-validator チェーン(provider enum / providerOptions JSON / boolean)
 │   │   └── ai-ready-guard.ts      # per-request middleware: isAiReady() でないと 501
 │   └── services/
@@ -332,7 +332,8 @@ flowchart TD
 | Requirements | 1.2, 1.4, 2.2, 2.3, 4.3, 5.2, 5.3, 6.1, 6.2, 7.1, 7.6 |
 
 **Responsibilities & Constraints**
-- 全エンドポイントに `accessTokenParser([SCOPE.READ|WRITE.ADMIN.AI])` + `loginRequiredStrictly` + `adminRequired`。
+- **ミドルウェアチェーンは各ハンドラ factory が所有**(GROWI mastra 慣習: `getThreadsFactory`/`postMessageHandlersFactory` と同様、`(crowi) => RequestHandler[]` を返す)。`index.ts` のルータ factory は `router.get('/', getAiSettingsFactory(crowi))` / `router.put('/', putAiSettingsFactory(crowi))` で mount するだけ。
+- 全エンドポイントに `accessTokenParser([SCOPE.READ|WRITE.ADMIN.AI])` + `loginRequiredStrictly` + `adminRequired`(各 factory 内で構築)。PUT はさらに `addActivity` + `updateAiSettingsValidators` + `apiV3FormValidator`。
 - `routerForAdmin` 配下にマウント(`/_api/v3/ai-settings`)。`isAiEnabled()` ゲートは**付けない**(AI 無効時も設定可能=R1)。
 - GET は `ai:apiKey` の値を返さない(`isApiKeySet: boolean` のみ)。`useOnlyEnvVars: boolean`(`env:useOnlyEnvVars:ai` の状態)、`aiEnabled: boolean`(7.1)、`isConfigured: boolean`(`isAiConfigured()` の結果、7.6)を返し、UI の編集可否・トグル状態・警告表示を決定させる。
 - PUT は `aiEnabled` を含む AI 設定を更新。環境変数専用モード有効時(`getConfig('env:useOnlyEnvVars:ai') === true`)は 422 で拒否(SiteUrlSetting の拒否パターン)。`apiKey` が空/未指定なら既存値を保持(クリアしない)。

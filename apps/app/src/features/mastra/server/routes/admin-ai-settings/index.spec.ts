@@ -1,27 +1,30 @@
 // --- Mock boundary ---------------------------------------------------------
 //
-// The router factory wires four collaborators onto two routes (GET / and PUT /):
-//   - accessTokenParser([SCOPE]) : PAT/scope gate (passes the request through here)
+// Each route's middleware now lives in its handler factory (get-ai-settings /
+// put-ai-settings); this router just mounts the returned RequestHandler[]. So
+// this integration test mounts the REAL get/put factories and drives the REAL
+// access control under test:
+//   - accessTokenParser([SCOPE]) : PAT/scope gate (mocked → records scope, passes through)
 //   - loginRequiredFactory(crowi): login gate                — REAL (depends only on req.user)
 //   - adminRequiredFactory(crowi): admin gate                — REAL (depends only on req.user)
-//   - getAiSettings / putAiSettingsFactory(crowi)            : terminal handlers
-//   - updateAiSettingsValidators / apiV3FormValidator        : PUT body validation
-//   - generateAddActivityMiddleware()                        : creates res.locals.activity (PUT)
+//   - getAiSettings / putAiSettings terminal handlers        — REAL (deep leaves mocked below)
+//   - updateAiSettingsValidators / apiV3FormValidator        — mocked (body validation covered elsewhere)
+//   - generateAddActivityMiddleware()                        — mocked → sets res.locals.activity (PUT)
 //
 // The observable contract we assert (Req 1.1, 1.2):
-//   - an admin reaches the GET handler and the PUT handler (admins can GET/PUT)
-//   - a logged-in non-admin is REJECTED before the handler runs (non-admin -> 403)
+//   - an admin reaches the GET handler and the PUT handler (success → status 200)
+//   - a logged-in non-admin is REJECTED before the handler runs (non-admin → not 200)
+//   - an unauthenticated request to the API path is rejected with 403
 //   - the AI admin scope is requested on both routes (the parser receives it)
-//   - NO ai-ready / isAiEnabled guard exists — the request reaches the handler even
+//   - NO ai-ready / isAiEnabled guard exists — an admin reaches the handler even
 //     though no AI config is set, so admins can configure AI while it is disabled (Req 1)
 //
-// accessTokenParser and the terminal handlers are mocked so the test exercises this
-// router's wiring (scope + admin authorization + handler dispatch), not their internals.
-// loginRequired/adminRequired are NOT mocked: they are the very access control under test.
-const { accessTokenParser, getAiSettings, putAiSettings } = vi.hoisted(() => ({
+// login/admin are NOT mocked: they are the very access control under test. The
+// terminal handlers' deep collaborators (configManager, isAiConfigured, the
+// resolved-model cache) ARE mocked so the handlers run without touching a real
+// DB/model — we only care that an authorized request reaches a 200 success shape.
+const { accessTokenParser } = vi.hoisted(() => ({
   accessTokenParser: vi.fn(),
-  getAiSettings: vi.fn(),
-  putAiSettings: vi.fn(),
 }));
 
 vi.mock('~/server/middlewares/access-token-parser', () => ({
@@ -29,20 +32,6 @@ vi.mock('~/server/middlewares/access-token-parser', () => ({
   accessTokenParser: (...args: unknown[]) => {
     accessTokenParser(...args);
     return (_req: Request, _res: Response, next: NextFunction) => next();
-  },
-}));
-
-vi.mock('./get-ai-settings', () => ({
-  getAiSettings: (_req: Request, res: Response) => {
-    getAiSettings();
-    res.status(200).json({ handler: 'get' });
-  },
-}));
-
-vi.mock('./put-ai-settings', () => ({
-  putAiSettingsFactory: () => (_req: Request, res: Response) => {
-    putAiSettings();
-    res.status(200).json({ handler: 'put' });
   },
 }));
 
@@ -60,6 +49,24 @@ vi.mock('~/server/middlewares/add-activity', () => ({
       next();
     },
 }));
+
+// Terminal-handler leaves: stub so the REAL handlers run end-to-end without a
+// real DB/model. env-only mode is OFF so PUT is not rejected with 422.
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: {
+    getConfig: vi.fn((k: string) =>
+      k === 'env:useOnlyEnvVars:ai' ? false : undefined,
+    ),
+    updateConfigs: vi.fn().mockResolvedValue(undefined),
+  },
+}));
+vi.mock('~/features/mastra/server/services/is-ai-configured', () => ({
+  isAiConfigured: vi.fn(() => false),
+}));
+vi.mock(
+  '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model',
+  () => ({ clearResolvedMastraModelCache: vi.fn() }),
+);
 
 import { SCOPE } from '@growi/core/dist/interfaces';
 import express, {
@@ -82,7 +89,13 @@ const ACTIVE = 2; // UserStatus.STATUS_ACTIVE
 // factory under a `/_api/v3`-style base so login-required treats it as an API path
 // (responds 403 rather than redirecting when unauthenticated).
 const buildApp = (user?: TestUser) => {
-  const crowi = mock<Crowi>();
+  // The real PUT handler emits an audit event via crowi.events.activity.emit, so
+  // provide it (a bare mock<Crowi>() leaves events.activity undefined).
+  const crowi = mock<Crowi>({
+    events: {
+      activity: { emit: vi.fn() } as unknown as Crowi['events']['activity'],
+    },
+  });
   const app = express();
   app.use(express.json());
   app.use((req: Request, _res: Response, next: NextFunction) => {
@@ -90,6 +103,16 @@ const buildApp = (user?: TestUser) => {
       // biome-ignore lint/suspicious/noExplicitAny: test seam to attach req.user
       (req as any).user = user;
     }
+    next();
+  });
+  // The REAL terminal handlers call res.apiv3 / res.apiv3Err, which a bare express
+  // `res` lacks — stub them so an authorized request yields an observable status.
+  app.use((_req: Request, res: Response, next: NextFunction) => {
+    // biome-ignore lint/suspicious/noExplicitAny: test seam to add apiv3 helpers to res
+    (res as any).apiv3 = (data: unknown) => res.status(200).json(data ?? {});
+    // biome-ignore lint/suspicious/noExplicitAny: test seam to add apiv3 helpers to res
+    (res as any).apiv3Err = (_err: unknown, code = 500) =>
+      res.status(code).json({ err: true });
     next();
   });
   app.use('/_api/v3/ai-settings', factory(crowi));
@@ -119,20 +142,21 @@ describe('admin-ai-settings router factory', () => {
   describe('admin user (Req 1.1)', () => {
     const admin: TestUser = { _id: 'u1', status: ACTIVE, admin: true };
 
-    it('reaches the GET handler', async () => {
+    it('reaches the GET handler (success response)', async () => {
       const res = await request(buildApp(admin)).get('/_api/v3/ai-settings/');
+      // Real getAiSettings → res.apiv3(response); admins reach the handler.
+      // Status 200 is the access-control signal; the response carries the
+      // settings shape (isApiKeySet is always a boolean, so it survives JSON).
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ handler: 'get' });
-      expect(getAiSettings).toHaveBeenCalledTimes(1);
+      expect(res.body).toHaveProperty('isApiKeySet');
     });
 
-    it('reaches the PUT handler', async () => {
+    it('reaches the PUT handler (success response)', async () => {
       const res = await request(buildApp(admin))
         .put('/_api/v3/ai-settings/')
         .send({ aiEnabled: true });
+      // Real put handler → res.apiv3({}); env-only mode is off so no 422.
       expect(res.status).toBe(200);
-      expect(res.body).toEqual({ handler: 'put' });
-      expect(putAiSettings).toHaveBeenCalledTimes(1);
     });
   });
 
@@ -141,9 +165,9 @@ describe('admin-ai-settings router factory', () => {
 
     it('is rejected on GET before the handler runs', async () => {
       const res = await request(buildApp(member)).get('/_api/v3/ai-settings/');
-      // adminRequired redirects ('/') a logged-in non-admin; never 200, handler not reached
+      // adminRequired blocks a logged-in non-admin: never the success shape.
       expect(res.status).not.toBe(200);
-      expect(getAiSettings).not.toHaveBeenCalled();
+      expect(res.body).not.toHaveProperty('isApiKeySet');
     });
 
     it('is rejected on PUT before the handler runs', async () => {
@@ -151,7 +175,6 @@ describe('admin-ai-settings router factory', () => {
         .put('/_api/v3/ai-settings/')
         .send({ aiEnabled: true });
       expect(res.status).not.toBe(200);
-      expect(putAiSettings).not.toHaveBeenCalled();
     });
   });
 
@@ -159,13 +182,13 @@ describe('admin-ai-settings router factory', () => {
     it('is rejected with 403 on GET (API path), handler not reached', async () => {
       const res = await request(buildApp()).get('/_api/v3/ai-settings/');
       expect(res.status).toBe(403);
-      expect(getAiSettings).not.toHaveBeenCalled();
+      expect(res.body).not.toHaveProperty('isApiKeySet');
     });
   });
 
   it('reaches the handler even when no AI config is set (no ai-ready guard) (Req 1)', async () => {
-    // No isAiEnabled / ai-ready mock is involved: the admin router must not gate on
-    // AI availability, so an admin reaches the handler regardless of AI state.
+    // isAiConfigured() is mocked to false: the admin router must not gate on AI
+    // availability, so an admin still reaches the handler (200) regardless of AI state.
     const admin: TestUser = { _id: 'u1', status: ACTIVE, admin: true };
     const res = await request(buildApp(admin)).get('/_api/v3/ai-settings/');
     expect(res.status).toBe(200);

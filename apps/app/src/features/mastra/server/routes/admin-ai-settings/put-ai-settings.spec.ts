@@ -77,7 +77,13 @@ const invoke = async (
   const res = mock<ApiV3Response>();
   res.locals = { activity: { _id: ACTIVITY_ID } } as ApiV3Response['locals'];
 
-  const handler = putAiSettingsFactory(buildCrowi());
+  // putAiSettingsFactory now returns the full middleware chain; the terminal
+  // handler (whose mapping/side-effects we assert) is the LAST element.
+  const chain = putAiSettingsFactory(buildCrowi());
+  const handler = chain[chain.length - 1] as (
+    req: CrowiRequest,
+    res: ApiV3Response,
+  ) => Promise<void>;
   await handler(req, res);
   return { res };
 };

@@ -1,7 +1,12 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { Request } from 'express';
+import type { Request, RequestHandler } from 'express';
 
 import { isAiConfigured } from '~/features/mastra/server/services/is-ai-configured';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
@@ -24,8 +29,8 @@ const logger = loggerFactory(
  * state (`aiEnabled`, Req 7.1), and whether to show the "enabled but not
  * configured" warning (`isConfigured`, Req 7.6).
  *
- * Middleware (scope + adminRequired) is attached by the router (task 3.4), so this
- * is a plain handler that reads config and shapes the response.
+ * Middleware (scope + login + adminRequired) is composed in `getAiSettingsFactory`
+ * below, so this is a plain terminal handler that reads config and shapes the response.
  */
 export const getAiSettings = (_req: Request, res: ApiV3Response): void => {
   try {
@@ -59,4 +64,24 @@ export const getAiSettings = (_req: Request, res: ApiV3Response): void => {
     logger.error('Failed to get AI settings', err);
     res.apiv3Err(new ErrorV3('Failed to get AI settings'), 500);
   }
+};
+
+/**
+ * GET /_api/v3/ai-settings handler factory.
+ *
+ * Returns the full middleware chain (scope gate + login + admin authorization +
+ * the handler), matching the mastra route convention where each handler factory
+ * owns its middleware and the router just mounts the array. NO ai-ready guard is
+ * attached: admins must reach this even while AI is disabled/unconfigured (Req 1).
+ */
+export const getAiSettingsFactory = (crowi: Crowi): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
+
+  return [
+    accessTokenParser([SCOPE.READ.ADMIN.AI], { acceptLegacy: true }),
+    loginRequiredStrictly,
+    adminRequired,
+    getAiSettings,
+  ];
 };

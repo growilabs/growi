@@ -1,14 +1,22 @@
+import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { RequestHandler } from 'express';
 
 import { clearResolvedMastraModelCache } from '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model';
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type { AiSettingsUpdateRequest } from '../../../interfaces/ai-settings';
+import { updateAiSettingsValidators } from './validators';
 
 const logger = loggerFactory(
   'growi:features:mastra:routes:admin-ai-settings:put-ai-settings',
@@ -75,23 +83,30 @@ const buildUpdates = (body: AiSettingsUpdateRequest): AiConfigUpdates => {
 /**
  * PUT /_api/v3/ai-settings handler factory.
  *
- * Persists the submitted AI configuration after validation. Middleware (scope +
- * adminRequired + addActivity + the validator chain + apiV3FormValidator) is
- * attached by the router (task 3.4); this factory only needs `crowi` to obtain
- * the activity event emitter, so it is exported as a factory to match how the
- * router wires its dependencies.
+ * Returns the full middleware chain (scope gate + login + admin authorization +
+ * addActivity + the validator chain + apiV3FormValidator + the terminal handler),
+ * matching the mastra route convention where each handler factory owns its
+ * middleware and the router just mounts the array. NO ai-ready guard is attached:
+ * admins must reach this even while AI is disabled/unconfigured (Req 1).
  *
- * Behavior:
+ * Terminal handler behavior:
  *   - When env-only mode is active (`env:useOnlyEnvVars:ai` === true), the update
  *     is rejected with 422 and nothing is persisted (Req 4.3).
  *   - On success the config is written, the resolved-model cache is invalidated
  *     for restart-free reflection (Req 2.4), and an audit event is emitted (Req 2.3).
  *   - Errors never carry the apiKey to the message, the log, or the client (Req 5.3).
  */
-export const putAiSettingsFactory = (crowi: Crowi) => {
+export const putAiSettingsFactory = (crowi: Crowi): RequestHandler[] => {
   const activityEvent = crowi.events.activity;
 
-  return async (req: CrowiRequest, res: ApiV3Response): Promise<void> => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
+  const adminRequired = adminRequiredFactory(crowi);
+  const addActivity = generateAddActivityMiddleware();
+
+  const handler = async (
+    req: CrowiRequest,
+    res: ApiV3Response,
+  ): Promise<void> => {
     // Defense-in-depth: env-only mode fixes AI settings to env values, so reject
     // the update explicitly even though getConfig would ignore the DB value (Req 4.3).
     if (configManager.getConfig('env:useOnlyEnvVars:ai') === true) {
@@ -130,4 +145,14 @@ export const putAiSettingsFactory = (crowi: Crowi) => {
       res.apiv3Err(new ErrorV3('Failed to update AI settings'), 500);
     }
   };
+
+  return [
+    accessTokenParser([SCOPE.WRITE.ADMIN.AI]),
+    loginRequiredStrictly,
+    adminRequired,
+    addActivity,
+    ...updateAiSettingsValidators,
+    apiV3FormValidator,
+    handler,
+  ];
 };
