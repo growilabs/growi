@@ -39,15 +39,18 @@ async function main() {
       });
     }
   } catch (err) {
-    // Write synchronously to stderr first: pino's async transport can drop the
-    // final log line when the process exits immediately afterwards, which would
-    // otherwise make a fatal startup error vanish without a trace. Use the raw
-    // stream rather than console.* to satisfy the no-console lint rule.
-    process.stderr.write(
-      `Failed to start the server: ${err instanceof Error ? (err.stack ?? err.message) : String(err)}\n`,
-    );
-    logger.error('An error occurred, unable to start the server');
-    logger.error(err);
+    // The shared logger writes through a pino Worker-thread transport, which is
+    // asynchronous. The forced process.exit(1) below terminates the process
+    // before that worker can flush, so a fatal startup error logged only via the
+    // logger is silently lost (exactly how the cause of a failed boot vanished).
+    // A synchronous console write is the one reliable channel for a last-gasp
+    // message before a hard exit — this is a genuine exception to "log via pino",
+    // not a way to dodge the rule.
+    // biome-ignore lint/suspicious/noConsole: synchronous last-gasp before process.exit; the pino worker transport cannot flush in time
+    console.error('Failed to start the server:', err);
+    // Also log through pino for sinks that do capture it (e.g. production
+    // raw-JSON mode, which has no worker transport and flushes synchronously).
+    logger.error(err, 'An error occurred, unable to start the server');
     process.exit(1);
   }
 }
