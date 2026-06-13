@@ -2,7 +2,10 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 
-import { i18n } from '^/config/next-i18next.config.cjs';
+// Default import (= whole module.exports): next-i18next.config.cjs spreads a
+// runtime require() so `i18n` is not a statically-detectable named export and
+// `import { i18n }` fails under native ESM.
+import nextI18nextConfig from '^/config/next-i18next.config.cjs';
 
 import { SupportedAction } from '~/interfaces/activity.js';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
@@ -98,7 +101,7 @@ export const setup = (crowi) => {
             throw new Error('email is not included in whitelist');
           return true;
         }),
-      body('lang').isString().isIn(i18n.locales),
+      body('lang').isString().isIn(nextI18nextConfig.i18n.locales),
       body('isEmailPublished').isBoolean(),
       body('slackMemberId').optional().isString(),
     ],
