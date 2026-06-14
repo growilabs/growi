@@ -75,6 +75,27 @@ describe('ProviderCommonSettings', () => {
     });
   });
 
+  describe('model field', () => {
+    it('renders the generic model field for non-Azure providers', () => {
+      renderComponent({ defaultValues: { provider: 'openai' } });
+
+      expect(
+        screen.getByLabelText('ai_settings.model_label'),
+      ).toBeInTheDocument();
+    });
+
+    it('does not render the model field for Azure OpenAI (it lives in the Azure section)', () => {
+      renderComponent({ defaultValues: { provider: 'azure-openai' } });
+
+      expect(
+        screen.queryByLabelText('ai_settings.model_label'),
+      ).not.toBeInTheDocument();
+      expect(
+        screen.queryByLabelText('ai_settings.azure_model_deployment_label'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe('apiKey input', () => {
     it('is a password-masked input', () => {
       // Act

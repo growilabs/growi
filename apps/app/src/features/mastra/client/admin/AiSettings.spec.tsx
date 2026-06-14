@@ -228,7 +228,11 @@ describe('AiSettings', () => {
         screen.getByLabelText('ai_settings.ai_enabled_label'),
       ).toBeDisabled();
       expect(screen.getByRole('combobox')).toBeDisabled();
-      expect(screen.getByLabelText('ai_settings.model_label')).toBeDisabled();
+      // provider is azure-openai here, so the model field is labelled as the
+      // Azure deployment name.
+      expect(
+        screen.getByLabelText('ai_settings.azure_model_deployment_label'),
+      ).toBeDisabled();
       // ...and saving is not possible.
       expect(getSaveButton()).toBeDisabled();
     });

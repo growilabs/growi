@@ -470,7 +470,7 @@
     "azure_resource_name_help": "Builds the standard endpoint https://<resource-name>.openai.azure.com. Use this for the global Azure cloud. If the base URL is also set, the base URL takes precedence.",
     "azure_base_url_help": "Use instead of the resource name for sovereign clouds (e.g. Azure Government), API Management gateways, or proxies. Takes precedence over the resource name when both are set.",
     "azure_api_version_help": "Optional. Leave empty to use the default. Set only when a specific deployment requires a particular API version.",
-    "azure_model_deployment_note": "For Azure OpenAI, enter the deployment name in the Model field."
+    "azure_model_deployment_label": "Deployment name"
   },
   "markdown_settings": {
     "markdown_settings": "Markdown Settings",

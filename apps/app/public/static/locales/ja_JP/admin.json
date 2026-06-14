@@ -479,7 +479,7 @@
     "azure_resource_name_help": "標準エンドポイント https://<リソース名>.openai.azure.com を組み立てます。通常（グローバル）の Azure クラウドではこちらを使用します。ベース URL も設定した場合はベース URL が優先されます。",
     "azure_base_url_help": "ソブリンクラウド（例: Azure Government）、API Management ゲートウェイ、プロキシ経由の場合に、リソース名の代わりに使用します。両方設定した場合はこちらが優先されます。",
     "azure_api_version_help": "任意。空欄の場合はデフォルトが使用されます。特定のデプロイメントが特定の API バージョンを要求する場合のみ設定してください。",
-    "azure_model_deployment_note": "Azure OpenAI では、モデル欄にデプロイメント名を入力してください。"
+    "azure_model_deployment_label": "デプロイメント名"
   },
   "markdown_settings": {
     "markdown_settings": "マークダウン設定",

@@ -64,6 +64,17 @@ describe('AzureOpenaiSettings', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
+  it('renders the model field labelled as the Azure deployment name', () => {
+    // Act
+    renderComponent();
+
+    // Assert: the shared `ai:model` field lives in the Azure section for this
+    // provider, labelled as the deployment name.
+    expect(
+      screen.getByLabelText('ai_settings.azure_model_deployment_label'),
+    ).toBeInTheDocument();
+  });
+
   it('renders the four azure fields when the provider is azure-openai', () => {
     // Act
     renderComponent();

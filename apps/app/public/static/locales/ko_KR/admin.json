@@ -470,7 +470,7 @@
     "azure_resource_name_help": "표준 엔드포인트 https://<리소스-이름>.openai.azure.com 를 구성합니다. 일반(글로벌) Azure 클라우드에서는 이 값을 사용하세요. 기본 URL도 함께 설정하면 기본 URL이 우선합니다.",
     "azure_base_url_help": "소버린 클라우드(예: Azure Government), API Management 게이트웨이 또는 프록시를 사용할 때 리소스 이름 대신 사용합니다. 둘 다 설정하면 이 값이 우선합니다.",
     "azure_api_version_help": "선택 사항입니다. 비워 두면 기본값이 사용됩니다. 특정 배포가 특정 API 버전을 요구하는 경우에만 설정하세요.",
-    "azure_model_deployment_note": "Azure OpenAI의 경우 모델 필드에 배포 이름을 입력하세요."
+    "azure_model_deployment_label": "배포 이름"
   },
   "markdown_settings": {
     "markdown_settings": "마크다운 설정",

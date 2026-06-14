@@ -7,6 +7,7 @@ import { FormFeedback, FormGroup, FormText, Input, Label } from 'reactstrap';
 import { AI_PROVIDERS } from '../../interfaces/ai-provider';
 import { isValidProviderOptionsJson } from '../../utils/provider-options-validation';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
+import { ModelField } from './ModelField';
 import { registerToInputProps } from './register-to-input-props';
 
 // Vercel AI SDK docs describing the provider-namespaced `providerOptions` shape.
@@ -58,7 +59,6 @@ export const ProviderCommonSettings = (
 
   const providerId = useId();
   const apiKeyId = useId();
-  const modelId = useId();
   const providerOptionsId = useId();
 
   // SECURITY (mirrors the server-side guard in put-ai-settings): `ai:apiKey` is a
@@ -132,15 +132,12 @@ export const ProviderCommonSettings = (
         )}
       </FormGroup>
 
-      <FormGroup className="mb-3">
-        <Label for={modelId}>{t('ai_settings.model_label')}</Label>
-        <Input
-          id={modelId}
-          type="text"
-          disabled={disabled}
-          {...registerToInputProps(register('model'))}
-        />
-      </FormGroup>
+      {/* For Azure OpenAI the `ai:model` value is the deployment name, so that
+          field lives in the Azure-specific section instead — keeping this
+          provider-agnostic component free of a provider-specific label branch. */}
+      {provider !== 'azure-openai' && (
+        <ModelField labelKey="ai_settings.model_label" disabled={disabled} />
+      )}
 
       <FormGroup className="mb-3">
         <Label for={providerOptionsId}>

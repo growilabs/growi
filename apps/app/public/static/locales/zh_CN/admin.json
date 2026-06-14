@@ -479,7 +479,7 @@
     "azure_resource_name_help": "用于构建标准终结点 https://<资源名称>.openai.azure.com。在标准（全球）Azure 云中请使用此项。如果同时设置了基础 URL，则以基础 URL 优先。",
     "azure_base_url_help": "在主权云（例如 Azure Government）、API 管理网关或代理的情况下，使用此项代替资源名称。两者都设置时以此项优先。",
     "azure_api_version_help": "可选。留空则使用默认值。仅当特定部署需要特定 API 版本时才设置。",
-    "azure_model_deployment_note": "对于 Azure OpenAI，请在模型字段中输入部署名称。"
+    "azure_model_deployment_label": "部署名称"
   },
   "markdown_settings": {
     "markdown_settings": "Markdown设置",

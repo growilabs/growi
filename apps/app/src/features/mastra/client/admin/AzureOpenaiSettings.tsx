@@ -5,6 +5,7 @@ import { useFormContext } from 'react-hook-form';
 import { Alert, FormGroup, FormText, Input, Label } from 'reactstrap';
 
 import type { AiSettingsFormValues } from './ai-settings-form-values';
+import { ModelField } from './ModelField';
 import { registerToInputProps } from './register-to-input-props';
 
 export interface AzureOpenaiSettingsProps {
@@ -18,8 +19,8 @@ export interface AzureOpenaiSettingsProps {
  * Reads/writes the shared react-hook-form context owned by `AiSettings`. Renders
  * nothing unless the watched `provider === 'azure-openai'` (3.2). When
  * `azureOpenaiUseEntraId` is on, surfaces a note that the apiKey is not used
- * (3.3) — the apiKey field itself lives in `ProviderCommonSettings`. Also notes
- * that the model field is a deployment name rather than a model id (3.4).
+ * (3.3) — the apiKey field itself lives in `ProviderCommonSettings`, which also
+ * labels the model field as the Azure deployment name for this provider (3.4).
  *
  * Azure is the most configuration-heavy provider (resource name vs. base URL,
  * optional API version, two auth methods), so each field carries inline help and
@@ -50,9 +51,13 @@ export const AzureOpenaiSettings = (
         {t('ai_settings.azure_section_title')}
       </h2>
 
-      <FormText tag="p" className="mb-3">
-        {t('ai_settings.azure_model_deployment_note')}
-      </FormText>
+      {/* `ai:model` carries the Azure *deployment name* for this provider, so the
+          shared model field is rendered here (labelled accordingly) rather than in
+          the provider-agnostic common settings. */}
+      <ModelField
+        labelKey="ai_settings.azure_model_deployment_label"
+        disabled={disabled}
+      />
 
       <FormGroup className="mb-3">
         <Label for={resourceNameId}>

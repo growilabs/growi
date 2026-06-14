@@ -470,7 +470,7 @@
     "azure_resource_name_help": "Construit le point de terminaison standard https://<nom-de-ressource>.openai.azure.com. À utiliser pour le cloud Azure standard (global). Si l'URL de base est également définie, elle est prioritaire.",
     "azure_base_url_help": "À utiliser à la place du nom de ressource pour les clouds souverains (par ex. Azure Government), les passerelles API Management ou les proxys. Prioritaire sur le nom de ressource si les deux sont définis.",
     "azure_api_version_help": "Facultatif. Laissez vide pour utiliser la valeur par défaut. À définir uniquement si un déploiement spécifique nécessite une version d'API particulière.",
-    "azure_model_deployment_note": "Pour Azure OpenAI, saisissez le nom du déploiement dans le champ Modèle."
+    "azure_model_deployment_label": "Nom du déploiement"
   },
   "markdown_settings": {
     "markdown_settings": "Markdown",
