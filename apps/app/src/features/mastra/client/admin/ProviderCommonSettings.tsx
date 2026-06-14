@@ -61,6 +61,10 @@ export const ProviderCommonSettings = (
 
   return (
     <>
+      <h2 className="border-bottom my-4 admin-setting-header">
+        {t('ai_settings.common_settings_title')}
+      </h2>
+
       <FormGroup className="mb-3">
         <Label for={providerId}>{t('ai_settings.provider_label')}</Label>
         <Input

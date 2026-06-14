@@ -92,19 +92,21 @@ describe('resolveAzureOpenaiModel', () => {
     });
   });
 
-  it('prefers baseURL over resourceName when both are set (AI SDK is exclusive)', () => {
+  it('forwards both resourceName and baseURL when both are set (AI SDK ignores resourceName)', () => {
     applyConfig({
       'ai:apiKey': 'az-key',
       'ai:model': 'dep',
-      'ai:azureOpenaiResourceName': 'should-be-ignored',
+      'ai:azureOpenaiResourceName': 'res-ignored-by-sdk',
       'ai:azureOpenaiBaseUrl': 'https://gw.example.com',
     });
 
     resolveAzureOpenaiModel();
 
-    // resourceName must NOT be forwarded when baseURL wins.
+    // Both are passed straight through; the AI SDK is responsible for ignoring
+    // resourceName when baseURL is present, so the resolver no longer pre-selects.
     expect(createAzure).toHaveBeenCalledWith({
       apiKey: 'az-key',
+      resourceName: 'res-ignored-by-sdk',
       baseURL: 'https://gw.example.com',
     });
   });

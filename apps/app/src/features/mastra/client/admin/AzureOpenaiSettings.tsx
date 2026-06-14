@@ -20,6 +20,11 @@ export interface AzureOpenaiSettingsProps {
  * `azureOpenaiUseEntraId` is on, surfaces a note that the apiKey is not used
  * (3.3) — the apiKey field itself lives in `ProviderCommonSettings`. Also notes
  * that the model field is a deployment name rather than a model id (3.4).
+ *
+ * Azure is the most configuration-heavy provider (resource name vs. base URL,
+ * optional API version, two auth methods), so each field carries inline help and
+ * the Entra ID note spells out how credentials are resolved — managed/workload
+ * identity when GROWI runs on Azure, environment variables otherwise.
  */
 export const AzureOpenaiSettings = (
   props: AzureOpenaiSettingsProps,
@@ -41,6 +46,10 @@ export const AzureOpenaiSettings = (
 
   return (
     <div>
+      <h2 className="border-bottom my-4 admin-setting-header">
+        {t('ai_settings.azure_section_title')}
+      </h2>
+
       <FormText tag="p" className="mb-3">
         {t('ai_settings.azure_model_deployment_note')}
       </FormText>
@@ -55,6 +64,7 @@ export const AzureOpenaiSettings = (
           disabled={disabled}
           {...registerToInputProps(register('azureOpenaiResourceName'))}
         />
+        <FormText>{t('ai_settings.azure_resource_name_help')}</FormText>
       </FormGroup>
 
       <FormGroup className="mb-3">
@@ -65,6 +75,7 @@ export const AzureOpenaiSettings = (
           disabled={disabled}
           {...registerToInputProps(register('azureOpenaiBaseUrl'))}
         />
+        <FormText>{t('ai_settings.azure_base_url_help')}</FormText>
       </FormGroup>
 
       <FormGroup className="mb-3">
@@ -77,6 +88,7 @@ export const AzureOpenaiSettings = (
           disabled={disabled}
           {...registerToInputProps(register('azureOpenaiApiVersion'))}
         />
+        <FormText>{t('ai_settings.azure_api_version_help')}</FormText>
       </FormGroup>
 
       <FormGroup switch className="mb-3">
@@ -94,7 +106,20 @@ export const AzureOpenaiSettings = (
 
       {useEntraId && (
         <Alert color="info" className="mb-3">
-          {t('ai_settings.azure_entra_id_api_key_note')}
+          <p className="mb-2">{t('ai_settings.azure_entra_id_api_key_note')}</p>
+          <p className="mb-2">
+            {t('ai_settings.azure_entra_id_credential_note')}
+          </p>
+          <ul className="mb-0 ps-3">
+            <li>{t('ai_settings.azure_entra_id_managed_identity_note')}</li>
+            <li>
+              {t('ai_settings.azure_entra_id_env_note')}
+              <span className="d-block mt-1">
+                <code>AZURE_TENANT_ID</code> / <code>AZURE_CLIENT_ID</code> /{' '}
+                <code>AZURE_CLIENT_SECRET</code>
+              </span>
+            </li>
+          </ul>
         </Alert>
       )}
     </div>
