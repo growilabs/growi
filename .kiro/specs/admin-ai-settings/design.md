@@ -11,7 +11,7 @@
 ### Goals
 - `ai:*` 8 キーを `/admin/ai` から参照・更新できる(共通設定 + Azure 専用設定)
 - AI 機能の有効/無効(`app:aiEnabled`)を管理画面から切り替えられる
-- AI 関連 API の利用可否を「有効 かつ 設定済み」に整合させ、設定不備時は API を拒否し・クライアント導線も非表示にする(再起動なしで反映)
+- AI 関連 API の利用可否を「有効 かつ 設定済み」に整合させ、設定不備時は API を拒否し・クライアント導線(サイドバー)を無効化して設定画面へ案内する(再起動なしで反映)
 - 環境変数専用モードが有効なときは環境変数で固定し、UI 上で編集不可・モード明示、API でも更新を拒否する
 - 設定更新後、サーバー再起動なしに次回の AI 実行へ反映する
 - API キーを画面・API 応答で露出させない
@@ -164,7 +164,7 @@ apps/app/src/features/mastra/
         ├── ProviderCommonSettings.tsx  # register ベース: ai:provider / apiKey / model / providerOptions(useFormContext)
         ├── AzureOpenaiSettings.tsx     # azure 4 キー(watch('provider')==='azure-openai' 時のみ表示)
         ├── AiEnabledToggle.tsx         # app:aiEnabled の有効/無効トグル(register)
-        ├── EnvOnlyModeNotice.tsx       # 環境変数専用モード有効時の alert(各入力は flag 連動で disabled=フォーカス不可)
+        ├── EnvOnlyModeNotice.tsx       # 環境変数専用モード有効時の warning alert。GROWI.cloud 環境ではクラウドコンソールへのリンクを併記
         └── use-ai-settings.ts          # SWR フック(apiv3Get) + 保存関数(apiv3Put)
 
 apps/app/src/pages/admin/
@@ -259,7 +259,7 @@ flowchart TD
 | 7.1 | 有効/無効トグルの提供 | AiEnabledToggle, put-ai-settings | aiEnabled(DTO) | — |
 | 7.2 | 無効/未設定時は API 拒否 | ai-ready-guard, is-ai-configured | isAiReady(), 501 | AI ゲートフロー |
 | 7.3 | 有効かつ設定済みで API 利用可 | ai-ready-guard, is-ai-configured | isAiReady() | AI ゲートフロー |
-| 7.4 | 未 ready 時はサイドバー非表示 | configuration-props(general-page) | isAiReady() → aiEnabledAtom | — |
+| 7.4 | 未 ready 時はサイドバー導線を無効化し設定へ案内 | configuration-props(general-page), PrimaryItems(NotAvailable) | isAiReady() → aiEnabledAtom; admin→/admin/ai リンク, 非 admin→案内文 | — |
 | 7.5 | トグル/設定変更を再起動なし反映 | ai-ready-guard(per-request) | isAiReady() | AI ゲートフロー |
 | 7.6 | 有効だが未設定の警告表示 | AiSettings, get-ai-settings | isConfigured(GET) | — |
 
@@ -337,7 +337,7 @@ flowchart TD
 
 **Responsibilities & Constraints**
 - **ミドルウェアチェーンは各ハンドラ factory が所有**(GROWI mastra 慣習: `getThreadsFactory`/`postMessageHandlersFactory` と同様、`(crowi) => RequestHandler[]` を返す)。`index.ts` のルータ factory は `router.get('/', getAiSettingsFactory(crowi))` / `router.put('/', putAiSettingsFactory(crowi))` で mount するだけ。
-- 全エンドポイントに `accessTokenParser([SCOPE.READ|WRITE.ADMIN.AI])` + `loginRequiredStrictly` + `adminRequired`(各 factory 内で構築)。PUT はさらに `addActivity` + `updateAiSettingsValidators` + `apiV3FormValidator`。
+- 全エンドポイントに `accessTokenParser([SCOPE.READ|WRITE.ADMIN.AI], { acceptLegacy: true })`(レガシー非スコープ管理トークンも許可。他 mastra ルートと整合)+ `loginRequiredStrictly` + `adminRequired`(各 factory 内で構築)。PUT はさらに `addActivity` + `updateAiSettingsValidators` + `apiV3FormValidator`。
 - `routerForAdmin` 配下にマウント(`/_api/v3/ai-settings`)。`isAiEnabled()` ゲートは**付けない**(AI 無効時も設定可能=R1)。
 - GET は `ai:apiKey` の値を返さない(`isApiKeySet: boolean` のみ)。`useOnlyEnvVars: boolean`(`env:useOnlyEnvVars:ai` の状態)、`aiEnabled: boolean`(7.1)、`isConfigured: boolean`(`isAiConfigured()` の結果、7.6)を返し、UI の編集可否・トグル状態・警告表示を決定させる。
 - PUT は `aiEnabled` を含む AI 設定を更新。環境変数専用モード有効時(`getConfig('env:useOnlyEnvVars:ai') === true`)は 422 で拒否(SiteUrlSetting の拒否パターン)。`apiKey` が空/未指定なら既存値を保持(クリアしない)。
@@ -354,6 +354,8 @@ flowchart TD
 |--------|----------|---------|----------|--------|
 | GET | /_api/v3/ai-settings | — | `AiSettingsResponse` | 401, 403, 500 |
 | PUT | /_api/v3/ai-settings | `AiSettingsUpdateRequest` | `AiSettingsResponse` | 400, 403, 422, 500 |
+
+> 両ルートは `@swagger`(OpenAPI)注釈付きで、`AiSettingsResponse` / `AiSettingsUpdateRequest` スキーマを定義する。
 
 ```typescript
 // interfaces/ai-settings.ts
@@ -464,7 +466,7 @@ export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 - `AiEnabledToggle`: `app:aiEnabled` の有効/無効スイッチ(`register('aiEnabled')`、7.1)。`useOnlyEnvVars` 連動で `disabled`。
 - `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(`register` の `validate` で JSON 検証 → `FormFeedback`=6.2)。各入力は `useOnlyEnvVars` 連動で **`disabled`**(`readOnly` ではなく — タブ順から除外しフォーカス不可。env 専用時は完全ロック)。
 - `AzureOpenaiSettings`: azure 4 キー。`provider !== 'azure-openai'` のときは**非表示**(3.2)。`useEntraId=true` 時は apiKey 不使用を明示(3.3)、model=deployment 名の注記(3.4)。
-- `EnvOnlyModeNotice`: `useOnlyEnvVars` が true のとき alert を表示し、全項目が環境変数で固定され編集不可である旨を明示(4.2)。SiteUrlSetting の env 専用モード表示パターンを踏襲。
+- `EnvOnlyModeNotice`: `useOnlyEnvVars` が true のとき **warning** alert を表示し、全項目が環境変数で固定され編集不可である旨を明示(4.2)。GROWI.cloud 環境(`useGrowiCloudUri` + `useGrowiAppIdForGrowiCloud` が揃う)ではクラウドコンソール(`${growiCloudUri}/my/apps/${appId}`)へのリンクを併記(既存 `cloud_setting_management.*` i18n を再利用)。SiteUrlSetting の env 専用モード表示パターンを踏襲。
 
 ## Data Models
 
@@ -498,7 +500,7 @@ export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 - GET: apiKey 値が応答に含まれず `isApiKeySet` / `useOnlyEnvVars` / `aiEnabled` / `isConfigured` が正しい(4.2, 5.2, 7.1, 7.6)。
 - PUT apiKey 未指定: 既存 apiKey が保持される(誤クリアしない)。
 - `ai-ready-guard`: `aiEnabled=true` かつ未設定で mastra ルートが 501、両者揃うと通過(7.2, 7.3)。設定変更後に再起動なしで判定が変わる(7.5)。
-- アクセス制御: 非管理者は GET/PUT で 403(1.2)。
+- アクセス制御: 非管理者は GET/PUT で 403(1.2)。GET/PUT とも `accessTokenParser` に AI 管理スコープ + `{ acceptLegacy: true }` を要求。
 
 ### Component Tests (UI / React Testing Library)
 - `AiSettings`: 保存操作で `apiv3Put` 呼出 → 成功時 `toastSuccess`、失敗時 `toastError` + 入力 state 保持(2.3, 6.3)。
@@ -506,6 +508,7 @@ export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 - env 専用モード(`useOnlyEnvVars=true`)で全フィールド(トグル含む)が disabled(フォーカス不可)+ モード明示の alert を表示(4.2)。
 - `aiEnabled=true && isConfigured=false` で「有効だが未設定」警告 alert を表示し、両者が揃うと非表示(7.6)。
 - provider=azure-openai 選択時のみ Azure セクションを表示、`useEntraId` で apiKey 不使用提示(3.2, 3.3)。
+- `EnvOnlyModeNotice`: GROWI.cloud 環境ではクラウドコンソールへのリンクを表示、非クラウドでは非表示(4.2)。
 
 > E2E(ブラウザ自動化)は範囲外(Non-Goals)。上記はコンポーネント単位の RTL テストで検証する。
 

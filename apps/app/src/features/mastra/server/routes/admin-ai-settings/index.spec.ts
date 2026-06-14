@@ -133,12 +133,18 @@ describe('admin-ai-settings router factory', () => {
     expect(router.stack).toBeDefined();
   });
 
-  it('requests the AI admin read scope on GET and write scope on PUT', () => {
+  it('requests the AI admin scope and accepts legacy tokens on GET (read) and PUT (write)', () => {
     factory(mock<Crowi>());
 
-    const requestedScopes = accessTokenParser.mock.calls.map((call) => call[0]);
-    expect(requestedScopes).toContainEqual([SCOPE.READ.ADMIN.AI]);
-    expect(requestedScopes).toContainEqual([SCOPE.WRITE.ADMIN.AI]);
+    // Each route gates on its AI admin scope AND passes { acceptLegacy: true } so
+    // legacy non-scoped admin tokens still authenticate (consistent with the other
+    // mastra routes). Assert scope (call[0]) and the option (call[1]) together.
+    expect(accessTokenParser).toHaveBeenCalledWith([SCOPE.READ.ADMIN.AI], {
+      acceptLegacy: true,
+    });
+    expect(accessTokenParser).toHaveBeenCalledWith([SCOPE.WRITE.ADMIN.AI], {
+      acceptLegacy: true,
+    });
   });
 
   describe('admin user (Req 1.1)', () => {
