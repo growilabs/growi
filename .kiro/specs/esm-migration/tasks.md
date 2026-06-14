@@ -376,6 +376,15 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 - [ ] 3.8 Phase 3 統合ゲート (MANDATORY — 迂回禁止)
 
+  > **サンドボックス実行状況 (2026-06-14, gate 未完)**: 本ゲートは全サブが本番出力 ×
+  > 実 MongoDB (3.8.d は Chromium、3.8.e は Phase 0.4/0.5 と同一ホスト) を要求するが、
+  > Claude Code クラウドサンドボックスには mongo/ES/Chromium が無いため **3.8.b〜3.8.e は
+  > 実行不可 = 未完**。env 非依存で実証できた範囲 (3.8.a の build/lint/no-cjs/unit green、
+  > および 3.8.c/3.8.d capture スクリプトが tsx で ESM ロード成立し mongo 接続地点まで到達
+  > = devcontainer 実行準備完了) と、devcontainer 向けの ready-to-run 手順を
+  > `.kiro/specs/esm-migration/phase3-gate-evidence/SANDBOX-STATUS.md` に記録。
+  > 残りは devcontainer / 本番 CI (`test-prod-node24` / reusable-app-prod) で実行すること。
+
   本ゲートは ESM 化の成否を決定する最重要検証であり、以下の項目すべてを **本番コンパイル出力** (`node --import dotenv-flow/config dist/server/app.js` ないし `pnpm run server:ci`) に対して実行する。`pnpm dev` (選定 TS ランナー経由) と Vitest と Node NodeNext は ESM 実装が異なるため、dev / test での pass は本ゲートの代替にはならない。
 
   **迂回禁止条項**: 下記 3.8.c (auth middleware snapshot diff) のいずれかの手順 — 特に `app._router.stack` の walk — が実装上の理由で失敗した場合、代替検証で代用したり「実害がなさそうだから」とスキップすることは **禁止** する。スクリプトが動作しないなら修正するまで Phase 4 には進まない。担当者はユーザーに対して明確に「ゲート 3.8.c を通過できないため Phase 4 に進めない」と報告し、対処方針の指示を仰ぐこと。これは他の 3.8.a / 3.8.b / 3.8.d / 3.8.e にも同様に適用される (Req 6.6 を厳格運用)。

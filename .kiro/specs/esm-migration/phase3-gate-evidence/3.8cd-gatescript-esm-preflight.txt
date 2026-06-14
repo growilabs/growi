@@ -1,0 +1,15 @@
+# 3.8.c/3.8.d gate-script ESM pre-flight (tsx) — sandbox
+captured: 2026-06-14T03:51:23Z / commit: 04033e13
+
+Goal: confirm the capture scripts (re-wired to tsx in task 3.7.b) LOAD under tsx and
+fail only at the mongo-connect point (no real ESM bug), so they are ready to run in
+the devcontainer where MongoDB exists.
+
+snapshot-routes        -> MongooseServerSelectionError (ReplicaSetNoPrimary, mongo:27017) = ESM-load OK, mongo absent
+authz-matrix:capture   -> MongooseServerSelectionError                                   = ESM-load OK, mongo absent
+ws-authz-matrix:capture-> ServerSelectionError                                            = ESM-load OK, mongo absent
+
+Note: a transient ERR_MODULE_NOT_FOUND can surface from the mongodb driver during
+connection-failure teardown in a no-mongo env; the deterministic terminal error is the
+mongoose ServerSelectionError. No script-level ESM defect. Same Crowi.setupDatabase path
+boots cleanly on real mongo (ci-app-launch-dev green on the merged commit).
