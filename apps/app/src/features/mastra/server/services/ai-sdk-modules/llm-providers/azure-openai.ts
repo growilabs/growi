@@ -29,16 +29,16 @@ export const resolveAzureOpenaiModel = (): MastraModelConfig => {
   const model = requireModel();
 
   // Endpoint is required regardless of the auth method. resourceName and baseURL
-  // are mutually exclusive in the AI SDK (baseURL wins when both are set), so
-  // pass only one; apiVersion is forwarded only when set so the SDK default
-  // applies otherwise. The throw names the missing env vars only — never a key.
+  // are mutually exclusive in the AI SDK — when both are set the SDK ignores
+  // resourceName and uses baseURL — so passing both straight through is safe; we
+  // only guard that at least one is present. apiVersion is likewise forwarded
+  // as-is (undefined falls back to the SDK default). The throw names the missing
+  // env vars only — never a key.
   if (resourceName == null && baseURL == null) {
     throw new Error(
       'Azure OpenAI requires AI_AZURE_OPENAI_RESOURCE_NAME or AI_AZURE_OPENAI_BASE_URL to be set',
     );
   }
-  const endpoint = baseURL != null ? { baseURL } : { resourceName };
-  const apiVersionOption = apiVersion != null ? { apiVersion } : {};
 
   if (useEntraId) {
     // Microsoft Entra ID (managed identity): resolve a bearer token from the
@@ -47,7 +47,7 @@ export const resolveAzureOpenaiModel = (): MastraModelConfig => {
       new DefaultAzureCredential(),
       ENTRA_ID_SCOPE,
     );
-    return createAzure({ tokenProvider, ...endpoint, ...apiVersionOption })(
+    return createAzure({ tokenProvider, resourceName, baseURL, apiVersion })(
       model,
     );
   }
@@ -59,5 +59,5 @@ export const resolveAzureOpenaiModel = (): MastraModelConfig => {
       'Azure OpenAI requires AI_API_KEY, or set AI_AZURE_OPENAI_USE_ENTRA_ID=true to authenticate with Microsoft Entra ID',
     );
   }
-  return createAzure({ apiKey, ...endpoint, ...apiVersionOption })(model);
+  return createAzure({ apiKey, resourceName, baseURL, apiVersion })(model);
 };
