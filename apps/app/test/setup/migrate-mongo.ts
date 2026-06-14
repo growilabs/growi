@@ -22,6 +22,12 @@ function runMigrations(mongoUri: string): void {
   });
 }
 
+// 120s timeout: this hook spawns `dev:migrate:up`, which runs every migration
+// through tsx (cold-transpiling the 48 migrations + their `~/server/**` import
+// graph) once per Vitest worker. Under the parallel integration run (many
+// workers transpiling at once against one Mongo) this routinely exceeds the
+// default 10s hook timeout — bumped so a slow-but-successful migration pass
+// does not flake the suite.
 beforeAll(() => {
   // Skip if already run (setupFiles run per test file, but we only need to migrate once per worker)
   if (migrationsRun) {
@@ -40,4 +46,4 @@ beforeAll(() => {
 
   runMigrations(mongoUri);
   migrationsRun = true;
-});
+}, 120_000);
