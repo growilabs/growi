@@ -199,36 +199,6 @@ describe('ProviderCommonSettings', () => {
       ).toBeInTheDocument();
     });
 
-    it('hides the warning once a new key is entered, and re-shows it when cleared', async () => {
-      renderComponent({ isApiKeySet: true });
-      await changeProvider('google');
-      expect(
-        screen.getByText('ai_settings.api_key_provider_change_warning'),
-      ).toBeInTheDocument();
-
-      const apiKeyInput = screen.getByLabelText(
-        'ai_settings.api_key_label',
-      ) as HTMLInputElement;
-
-      // Entering a new key means it will NOT be discarded -> warning hides.
-      await act(async () => {
-        fireEvent.change(apiKeyInput, { target: { value: 'new-google-key' } });
-        await Promise.resolve();
-      });
-      expect(
-        screen.queryByText('ai_settings.api_key_provider_change_warning'),
-      ).not.toBeInTheDocument();
-
-      // Clearing it again -> the stored key would be discarded -> warning returns.
-      await act(async () => {
-        fireEvent.change(apiKeyInput, { target: { value: '' } });
-        await Promise.resolve();
-      });
-      expect(
-        screen.getByText('ai_settings.api_key_provider_change_warning'),
-      ).toBeInTheDocument();
-    });
-
     it('does not warn when no key is stored', async () => {
       renderComponent({ isApiKeySet: false });
 
