@@ -576,8 +576,6 @@ if (require.main === module) {
         'ts',
         '--ignore-pattern',
         '**/node_modules/**',
-        '--ignore-pattern',
-        '**/src/migrations/**',
         ...targetPaths,
       ],
       { stdio: 'inherit', cwd: path.resolve(__dirname, '../..') },
