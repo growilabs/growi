@@ -245,7 +245,7 @@ flowchart TD
 | 3.1 | Azure 専用設定欄 | AzureOpenaiSettings | AiSettingsDto(azure 群) | — |
 | 3.2 | 非 azure 時の非適用提示 | AzureOpenaiSettings | provider 状態 | — |
 | 3.3 | EntraId 時の apiKey 不使用提示 | AzureOpenaiSettings | azureOpenaiUseEntraId | — |
-| 3.4 | deployment 名の案内 | AzureOpenaiSettings | i18n 注記 | — |
+| 3.4 | deployment 名の案内 | AzureOpenaiSettings | model フィールドのラベル(`azure_model_deployment_label`) | — |
 | 4.1 | env 専用モード時は env 値を使用 | config-definition(ai グループ), ConfigManager.shouldUseEnvOnly | ENV_ONLY_GROUPS | — |
 | 4.2 | env 専用モード時に編集不可 + モード明示 | EnvOnlyModeNotice, get-ai-settings | useOnlyEnvVars フラグ | — |
 | 4.3 | env 専用モード時の更新を拒否 | put-ai-settings | PUT(422) | 保存反映フロー |
@@ -340,7 +340,7 @@ flowchart TD
 - 全エンドポイントに `accessTokenParser([SCOPE.READ|WRITE.ADMIN.AI], { acceptLegacy: true })`(レガシー非スコープ管理トークンも許可。他 mastra ルートと整合)+ `loginRequiredStrictly` + `adminRequired`(各 factory 内で構築)。PUT はさらに `addActivity` + `updateAiSettingsValidators` + `apiV3FormValidator`。
 - `routerForAdmin` 配下にマウント(`/_api/v3/ai-settings`)。`isAiEnabled()` ゲートは**付けない**(AI 無効時も設定可能=R1)。
 - GET は `ai:apiKey` の値を返さない(`isApiKeySet: boolean` のみ)。`useOnlyEnvVars: boolean`(`env:useOnlyEnvVars:ai` の状態)、`aiEnabled: boolean`(7.1)、`isConfigured: boolean`(`isAiConfigured()` の結果、7.6)を返し、UI の編集可否・トグル状態・警告表示を決定させる。
-- PUT は `aiEnabled` を含む AI 設定を更新。環境変数専用モード有効時(`getConfig('env:useOnlyEnvVars:ai') === true`)は 422 で拒否(SiteUrlSetting の拒否パターン)。`apiKey` が空/未指定なら既存値を保持(クリアしない)。
+- PUT は `aiEnabled` を含む AI 設定を更新。環境変数専用モード有効時(`getConfig('env:useOnlyEnvVars:ai') === true`)は 422 で拒否(SiteUrlSetting の拒否パターン)。`apiKey` が空/未指定なら既存値を保持(クリアしない)。**ただし `provider` が現在値から変わった場合は例外**: `ai:apiKey` は provider 横断で共有される単一キーのため、新キー未指定のまま保持すると前 provider のシークレットが新 provider の API に送信されてしまう(confused-deputy 漏洩)。これを防ぐため、**provider 変更 + 新キー未指定時は保存済みキーを失効**(`undefined` → `removeIfUndefined` で削除)させる(同一 provider のままなら従来どおり保持)。
 - 例外メッセージに機密値を含めない(`ai:apiKey` を出力しない)。
 
 **Dependencies**
@@ -376,7 +376,7 @@ export interface AiSettingsResponse {
 export interface AiSettingsUpdateRequest {
   aiEnabled?: boolean;                 // app:aiEnabled の切り替え (7.1)
   provider?: AiProvider;
-  apiKey?: string;                     // 空/未指定なら既存保持 (5.x)
+  apiKey?: string;                     // 空/未指定なら既存保持 (5.x)。ただし provider 変更時は失効(下記セキュリティ参照)
   model?: string;
   providerOptions?: string;
   azureOpenaiResourceName?: string;
@@ -386,14 +386,14 @@ export interface AiSettingsUpdateRequest {
 }
 ```
 - Idempotency: PUT は冪等(同値再送で副作用は cache clear のみ)。
-- 更新セマンティクス: クライアントは全項目を送信する。**boolean**(`aiEnabled` / `azureOpenaiUseEntraId`)は常に値を送る。**clearable 文字列項目**(model / providerOptions / azure 3 項目)は空文字を `undefined` に正規化(validator の `.customSanitizer()` で実施)し、`updateConfigs(..., { removeIfUndefined: true })` で DB から削除する(= 環境変数フォールバックへ戻る、R4.4)。**例外は `apiKey` のみ**(空/未指定 = 既存保持、クリアしない — sanitizer 非適用)。
+- 更新セマンティクス: クライアントは全項目を送信する。**boolean**(`aiEnabled` / `azureOpenaiUseEntraId`)は常に値を送る。**clearable 文字列項目**(model / providerOptions / azure 3 項目)は空文字を `undefined` に正規化(validator の `.customSanitizer()` で実施)し、`updateConfigs(..., { removeIfUndefined: true })` で DB から削除する(= 環境変数フォールバックへ戻る、R4.4)。**例外は `apiKey` のみ**(空/未指定 = 既存保持、クリアしない — sanitizer 非適用)。**ただしセキュリティ上、`provider` が現在の保存値から変化し、かつ新キー未指定の場合は保持せず失効させる**(`buildUpdates` が `configManager.getConfig('ai:provider')` と比較し、変化時は `ai:apiKey = undefined` を更新へ含める)。これにより前 provider のキーが新 provider に再利用・送信されることを防ぐ。クライアント側でも provider 変更時に apiKey 入力をクリアし、保存済みキーがある状態では警告(`api_key_provider_change_warning`)を表示する。
 - Validation(`put-ai-settings.ts` に inline 定義の `updateAiSettingsValidators`): `provider ∈ AI_PROVIDERS`(6.1)、文字列項目(apiKey / model / azure 3)は `.isString()` 型ガード、`providerOptions` は `.isString()` + **FE/BE 共通述語 `isValidProviderOptionsJson`**(`utils/provider-options-validation.ts`、JSON.parse ベース・空=有効)を `.custom()` で適用(6.2)、`azureOpenaiUseEntraId` は boolean。clearable 文字列は `.customSanitizer('' → undefined)` で正規化(旧 `normalizeStringField` を置換)。クライアント(`ProviderCommonSettings` の register validate)も同じ JSON 述語を使い判定一致。
 - 成功時副作用: `updateConfigs` → `clearResolvedMastraModelCache()` → `activityEvent.emit('update', _id, { action: ACTION_ADMIN_AI_SETTING_UPDATE })`。
 
 **Implementation Notes**
 - Integration: ハンドラを `get-ai-settings.ts` / `put-ai-settings.ts` に分割。検証チェーンは利用元の `put-ai-settings.ts` に inline 定義(`updateAiSettingsValidators`)。
 - Validation: env 専用モード拒否、apiKey 非返却、provider/providerOptions 検証、activity 発火を integ テスト。
-- Risks: `apiKey` の「未指定=保持/空=保持」境界を明確化(誤クリア防止)。
+- Risks: `apiKey` の「未指定=保持/空=保持」境界を明確化(誤クリア防止)。加えて provider 変更時の失効(漏洩防止)を `buildUpdates` の単体テストで担保(変更+新キー無→失効 / 変更+新キー有→新キー保存 / 同一 provider→保持)。
 
 #### model-config-sync
 
@@ -464,8 +464,8 @@ export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 #### ProviderCommonSettings / AzureOpenaiSettings / AiEnabledToggle / EnvOnlyModeNotice(Summary-only)
 - 各セクションは `useFormContext` で `register` / `watch` / `errors` を取得(prop drilling なし)。非フォーム props は `disabled`(env-only)と `ProviderCommonSettings` の `isApiKeySet` のみ。
 - `AiEnabledToggle`: `app:aiEnabled` の有効/無効スイッチ(`register('aiEnabled')`、7.1)。`useOnlyEnvVars` 連動で `disabled`。
-- `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(`register` の `validate` で JSON 検証 → `FormFeedback`=6.2)。各入力は `useOnlyEnvVars` 連動で **`disabled`**(`readOnly` ではなく — タブ順から除外しフォーカス不可。env 専用時は完全ロック)。
-- `AzureOpenaiSettings`: azure 4 キー。`provider !== 'azure-openai'` のときは**非表示**(3.2)。`useEntraId=true` 時は apiKey 不使用を明示(3.3)、model=deployment 名の注記(3.4)。
+- `ProviderCommonSettings`: provider(select、`AI_PROVIDERS` のみ=2.2)/ apiKey(`type=password`=5.1)/ model / providerOptions(`register` の `validate` で JSON 検証 → `FormFeedback`=6.2)。model は共有 `ModelField`(`ai:model` の Label+Input をラベル可変で切り出したサブコンポーネント)で描画し、**Azure OpenAI 選択時はここでは出さず Azure セクション側に移す**(`ai:model` は Azure ではデプロイメント名を意味するため。provider 固有のラベル分岐を汎用コンポーネントに持ち込まない)。各入力は `useOnlyEnvVars` 連動で **`disabled`**(`readOnly` ではなく — タブ順から除外しフォーカス不可。env 専用時は完全ロック)。
+- `AzureOpenaiSettings`: Azure 固有のデプロイメント名(`ModelField` を `azure_model_deployment_label` ラベルで描画)+ azure 4 キー。`provider !== 'azure-openai'` のときは**非表示**(3.2)。`useEntraId=true` 時は apiKey 不使用と資格情報の解決方法(マネージド/ワークロード ID or 環境変数)を明示(3.3)。デプロイメント名はフィールドラベル自体で案内する(3.4 — 旧 i18n 注記は廃止)。各フィールドにはインラインヘルプ(resourceName/baseURL/apiVersion の用途)を付す。
 - `EnvOnlyModeNotice`: `useOnlyEnvVars` が true のとき **warning** alert を表示し、全項目が環境変数で固定され編集不可である旨を明示(4.2)。GROWI.cloud 環境(`useGrowiCloudUri` + `useGrowiAppIdForGrowiCloud` が揃う)ではクラウドコンソール(`${growiCloudUri}/my/apps/${appId}`)へのリンクを併記(既存 `cloud_setting_management.*` i18n を再利用)。SiteUrlSetting の env 専用モード表示パターンを踏襲。
 
 ## Data Models
