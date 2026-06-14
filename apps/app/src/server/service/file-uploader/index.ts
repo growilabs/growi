@@ -16,7 +16,10 @@ const logger = loggerFactory('growi:service:FileUploaderServise');
 export const getUploader = async (crowi: Crowi): Promise<FileUploader> => {
   const method =
     EnvToModuleMappings[configManager.getConfig('app:fileUploadType')];
-  const modulePath = `./${method}`;
+  // Explicit `.js`: this is a template-literal dynamic import, so the static
+  // extension codemod cannot add it, and NodeNext's runtime ESM resolver
+  // requires the extension (extensionless -> ERR_MODULE_NOT_FOUND in prod).
+  const modulePath = `./${method}.js`;
   const mod = await import(modulePath);
   const factory = mod.default ?? mod.setup ?? mod;
   const uploader = factory(crowi);
