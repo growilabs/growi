@@ -3,6 +3,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
 import { body, type ValidationChain } from 'express-validator';
 
+import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
 import { isAiProvider } from '~/features/mastra/interfaces/ai-provider';
 import { clearResolvedMastraModelCache } from '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model';
 import { SupportedAction } from '~/interfaces/activity';
@@ -45,7 +46,11 @@ const logger = loggerFactory(
  *           description: Clearable — omit resets to the env default.
  *         apiKey:
  *           type: string
- *           description: Write-only. Empty or omitted keeps the existing stored key; it is never returned by GET.
+ *           description: >-
+ *             Write-only; never returned by GET. Empty or omitted keeps the
+ *             existing stored key ONLY when the provider is unchanged. If the
+ *             provider changes and no new key is supplied, the stored key is
+ *             cleared so it is not reused against (and sent to) the new provider.
  *         model:
  *           type: string
  *           description: Clearable — omit resets to the env default.
@@ -142,11 +147,25 @@ type AiConfigUpdates = Parameters<typeof configManager.updateConfigs>[0];
  *     send the complete set (the admin form always does); see AiSettingsUpdateRequest.
  *   - boolean fields are always saved when provided (toggle / Entra ID)
  *   - `ai:apiKey` is the exception: it has NO sanitizer, so it is included only
- *     when a non-empty string is sent; an empty/omitted apiKey preserves the
- *     existing stored key (Req 5.x). Because the key is simply absent from the
+ *     when a non-empty string is sent; an empty/omitted apiKey normally preserves
+ *     the existing stored key (Req 5.x). Because the key is simply absent from the
  *     updates object in that case, `removeIfUndefined` never touches it.
+ *
+ * SECURITY — apiKey must NOT survive a provider change. `ai:apiKey` is a single
+ * key shared by every provider, so if the admin switches provider without
+ * supplying a new key, the merge ("keep existing") would carry the previous
+ * provider's secret over to the new one — and the next chat request would
+ * transmit it to a different vendor's endpoint (e.g. an OpenAI key sent to
+ * Google). To prevent this confused-deputy leak, when `provider` changes and no
+ * new key is provided we clear the stored key (set it to undefined so
+ * removeIfUndefined drops it); the admin must enter the new provider's key. The
+ * convenience merge still applies for SAME-provider saves (e.g. changing only the
+ * model). `currentProvider` is the value currently stored, read by the handler.
  */
-const buildUpdates = (body: AiSettingsUpdateRequest): AiConfigUpdates => {
+const buildUpdates = (
+  body: AiSettingsUpdateRequest,
+  currentProvider: AiProvider | undefined,
+): AiConfigUpdates => {
   const updates: AiConfigUpdates = {
     'ai:provider': body.provider,
     'ai:model': body.model,
@@ -163,10 +182,17 @@ const buildUpdates = (body: AiSettingsUpdateRequest): AiConfigUpdates => {
     updates['ai:azureOpenaiUseEntraId'] = body.azureOpenaiUseEntraId;
   }
 
-  // Only persist the apiKey when a non-empty value is provided; otherwise omit
-  // it entirely so the existing stored key is preserved (never cleared).
-  if (typeof body.apiKey === 'string' && body.apiKey !== '') {
+  // apiKey resolution (see the SECURITY note above):
+  //   - a non-empty key is always persisted
+  //   - no new key + provider CHANGED -> clear the stored key (undefined ->
+  //     removeIfUndefined deletes it) so the previous provider's secret is never
+  //     reused against, and transmitted to, the new provider
+  //   - no new key + SAME provider -> omit entirely so the stored key is preserved
+  const hasNewApiKey = body.apiKey != null && body.apiKey !== '';
+  if (hasNewApiKey) {
     updates['ai:apiKey'] = body.apiKey;
+  } else if (body.provider !== currentProvider) {
+    updates['ai:apiKey'] = undefined;
   }
 
   return updates;
@@ -244,7 +270,10 @@ export const putAiSettingsFactory = (crowi: Crowi): RequestHandler[] => {
     }
 
     const body: AiSettingsUpdateRequest = req.body;
-    const updates = buildUpdates(body);
+    // Read the currently stored provider so buildUpdates can decide whether a
+    // provider change must invalidate the shared apiKey (see its SECURITY note).
+    const currentProvider = configManager.getConfig('ai:provider');
+    const updates = buildUpdates(body, currentProvider);
 
     try {
       // removeIfUndefined deletes cleared string fields from the DB so they fall

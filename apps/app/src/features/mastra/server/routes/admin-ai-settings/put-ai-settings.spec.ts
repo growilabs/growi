@@ -11,7 +11,10 @@
 //         effective value falls back to the env var (Req 4.4)
 //       * boolean fields (app:aiEnabled, ai:azureOpenaiUseEntraId) are always saved
 //       * ai:apiKey is the exception: present only when a non-empty value is sent,
-//         omitted otherwise so the stored key is preserved (never cleared) (Req 5.x)
+//         omitted otherwise so the stored key is preserved (Req 5.x) — UNLESS the
+//         provider changes without a new key, in which case it is cleared
+//         (undefined) so the previous provider's secret is not reused against the
+//         new provider (security)
 //   - clearResolvedMastraModelCache(): invalidated on success so the next request
 //     rebuilds the model from the new config without a restart (Req 2.4).
 //   - activityEvent.emit('update', activity._id, { action }): audit log (Req 2.3).
@@ -47,6 +50,7 @@ import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
+import type { AiProvider } from '../../../interfaces/ai-provider';
 import type { AiSettingsUpdateRequest } from '../../../interfaces/ai-settings';
 import {
   putAiSettingsFactory,
@@ -68,11 +72,17 @@ const buildCrowi = (): Crowi =>
 
 const invoke = async (
   body: AiSettingsUpdateRequest,
-  { useOnlyEnvVars = false }: { useOnlyEnvVars?: boolean } = {},
+  {
+    useOnlyEnvVars = false,
+    currentProvider,
+  }: { useOnlyEnvVars?: boolean; currentProvider?: AiProvider } = {},
 ) => {
-  getConfig.mockImplementation((key: string) =>
-    key === 'env:useOnlyEnvVars:ai' ? useOnlyEnvVars : undefined,
-  );
+  getConfig.mockImplementation((key: string) => {
+    if (key === 'env:useOnlyEnvVars:ai') return useOnlyEnvVars;
+    // Currently stored provider — drives the apiKey provider-change invalidation.
+    if (key === 'ai:provider') return currentProvider;
+    return undefined;
+  });
 
   const req = mock<CrowiRequest>();
   // express-validator + apiV3FormValidator run as middleware before this handler,
@@ -158,14 +168,21 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
 
   describe('apiKey preservation (Req 5.x)', () => {
     it('omits ai:apiKey from updates when apiKey is undefined (existing key preserved)', async () => {
-      await invoke({ provider: 'openai', model: 'gpt-4o' });
+      // Same provider as stored: the merge ("keep existing") applies.
+      await invoke(
+        { provider: 'openai', model: 'gpt-4o' },
+        { currentProvider: 'openai' },
+      );
 
       const [updates] = updateCall();
       expect(updates).not.toHaveProperty('ai:apiKey');
     });
 
     it('omits ai:apiKey from updates when apiKey is an empty string (existing key preserved)', async () => {
-      await invoke({ provider: 'openai', model: 'gpt-4o', apiKey: '' });
+      await invoke(
+        { provider: 'openai', model: 'gpt-4o', apiKey: '' },
+        { currentProvider: 'openai' },
+      );
 
       const [updates] = updateCall();
       expect(updates).not.toHaveProperty('ai:apiKey');
@@ -176,6 +193,50 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
 
       const [updates] = updateCall();
       expect(updates['ai:apiKey']).toBe('sk-set-me');
+    });
+  });
+
+  // SECURITY: ai:apiKey is a single key shared by every provider. If the admin
+  // switches provider without entering a new key, the merge would carry the
+  // previous provider's secret over — and the next chat request would transmit it
+  // to a different vendor's endpoint (e.g. an OpenAI key sent to Google). The
+  // handler must clear the stored key on a provider change unless a new one is set.
+  describe('apiKey invalidation on provider change (security)', () => {
+    it('clears ai:apiKey (present-but-undefined for removeIfUndefined) when the provider changes and no new key is sent', async () => {
+      await invoke(
+        { provider: 'google', model: 'gemini-2.5-flash' },
+        { currentProvider: 'openai' },
+      );
+
+      const [updates, options] = updateCall();
+      expect(updates).toHaveProperty('ai:apiKey');
+      expect(updates['ai:apiKey']).toBeUndefined();
+      // removeIfUndefined then deletes the stored key from the DB.
+      expect(options).toMatchObject({ removeIfUndefined: true });
+    });
+
+    it('persists the new key (does NOT clear) when the provider changes and a new key is sent', async () => {
+      await invoke(
+        {
+          provider: 'google',
+          apiKey: 'new-google-key',
+          model: 'gemini-2.5-flash',
+        },
+        { currentProvider: 'openai' },
+      );
+
+      const [updates] = updateCall();
+      expect(updates['ai:apiKey']).toBe('new-google-key');
+    });
+
+    it('preserves the stored key (omits ai:apiKey) when the provider is unchanged', async () => {
+      await invoke(
+        { provider: 'openai', model: 'gpt-4o' },
+        { currentProvider: 'openai' },
+      );
+
+      const [updates] = updateCall();
+      expect(updates).not.toHaveProperty('ai:apiKey');
     });
   });
 

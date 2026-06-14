@@ -447,6 +447,7 @@
     "provider_placeholder": "Select a provider",
     "api_key_label": "API Key",
     "api_key_help": "The API key used to authenticate with the AI provider.",
+    "api_key_provider_change_warning": "You changed the provider. If you save without entering a new API key, the previously saved API key will be discarded.",
     "api_key_set_placeholder": "(configured)",
     "model_label": "Model",
     "provider_options_label": "Provider Options (JSON)",

@@ -456,6 +456,7 @@
     "provider_placeholder": "请选择提供商",
     "api_key_label": "API 密钥",
     "api_key_help": "用于向 AI 提供商进行身份验证的 API 密钥。",
+    "api_key_provider_change_warning": "您更改了提供商。如果未输入新的 API 密钥就保存，先前保存的 API 密钥将被丢弃。",
     "api_key_set_placeholder": "(已配置)",
     "model_label": "模型",
     "provider_options_label": "提供商选项 (JSON)",

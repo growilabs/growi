@@ -1,5 +1,5 @@
 import type { JSX } from 'react';
-import { useId } from 'react';
+import { useEffect, useId, useRef } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useFormContext } from 'react-hook-form';
 import { FormFeedback, FormGroup, FormText, Input, Label } from 'reactstrap';
@@ -51,13 +51,39 @@ export const ProviderCommonSettings = (
   const { t } = useTranslation('admin');
   const {
     register,
-    formState: { errors },
+    watch,
+    setValue,
+    formState: { errors, dirtyFields },
   } = useFormContext<AiSettingsFormValues>();
 
   const providerId = useId();
   const apiKeyId = useId();
   const modelId = useId();
   const providerOptionsId = useId();
+
+  // SECURITY (mirrors the server-side guard in put-ai-settings): `ai:apiKey` is a
+  // single key shared by every provider, so switching provider would otherwise
+  // reuse the previous provider's stored secret against the new one. On a genuine
+  // provider switch, drop any key typed for the old provider so it is not
+  // submitted; the server clears the stored key too unless a new one is entered.
+  const provider = watch('provider');
+  const prevProviderRef = useRef(provider);
+  useEffect(() => {
+    // Only react to a real change away from a previously-defined provider — not
+    // the initial seed (undefined -> loaded value) nor the post-save re-seed.
+    if (
+      prevProviderRef.current != null &&
+      prevProviderRef.current !== provider
+    ) {
+      setValue('apiKey', '', { shouldDirty: true });
+    }
+    prevProviderRef.current = provider;
+  }, [provider, setValue]);
+
+  // Warn only when a stored key actually exists and the admin has changed the
+  // provider from the loaded value (dirtyFields is reset on (re)load/save).
+  const showApiKeyProviderChangeWarning =
+    isApiKeySet && dirtyFields.provider === true;
 
   return (
     <>
@@ -95,6 +121,15 @@ export const ProviderCommonSettings = (
           {...registerToInputProps(register('apiKey'))}
         />
         <FormText>{t('ai_settings.api_key_help')}</FormText>
+        {showApiKeyProviderChangeWarning && (
+          <FormText
+            color="warning"
+            className="d-flex align-items-center text-warning mt-1"
+          >
+            <span className="material-symbols-outlined fs-6 me-1">warning</span>
+            {t('ai_settings.api_key_provider_change_warning')}
+          </FormText>
+        )}
       </FormGroup>
 
       <FormGroup className="mb-3">

@@ -154,6 +154,91 @@ describe('ProviderCommonSettings', () => {
     });
   });
 
+  // SECURITY: ai:apiKey is shared across providers. Switching provider must warn
+  // the admin (a stored key will be discarded) and clear any key typed for the
+  // previous provider, so the old provider's secret is never submitted/reused.
+  describe('apiKey provider-change handling (security)', () => {
+    const changeProvider = async (value: string) => {
+      await act(async () => {
+        fireEvent.change(screen.getByRole('combobox'), { target: { value } });
+        await Promise.resolve();
+      });
+    };
+
+    it('warns that the saved key will be discarded when the provider changes and a key is stored', async () => {
+      renderComponent({ isApiKeySet: true });
+      expect(
+        screen.queryByText('ai_settings.api_key_provider_change_warning'),
+      ).not.toBeInTheDocument();
+
+      await changeProvider('google');
+
+      expect(
+        screen.getByText('ai_settings.api_key_provider_change_warning'),
+      ).toBeInTheDocument();
+    });
+
+    it('hides the warning once a new key is entered, and re-shows it when cleared', async () => {
+      renderComponent({ isApiKeySet: true });
+      await changeProvider('google');
+      expect(
+        screen.getByText('ai_settings.api_key_provider_change_warning'),
+      ).toBeInTheDocument();
+
+      const apiKeyInput = screen.getByLabelText(
+        'ai_settings.api_key_label',
+      ) as HTMLInputElement;
+
+      // Entering a new key means it will NOT be discarded -> warning hides.
+      await act(async () => {
+        fireEvent.change(apiKeyInput, { target: { value: 'new-google-key' } });
+        await Promise.resolve();
+      });
+      expect(
+        screen.queryByText('ai_settings.api_key_provider_change_warning'),
+      ).not.toBeInTheDocument();
+
+      // Clearing it again -> the stored key would be discarded -> warning returns.
+      await act(async () => {
+        fireEvent.change(apiKeyInput, { target: { value: '' } });
+        await Promise.resolve();
+      });
+      expect(
+        screen.getByText('ai_settings.api_key_provider_change_warning'),
+      ).toBeInTheDocument();
+    });
+
+    it('does not warn when no key is stored', async () => {
+      renderComponent({ isApiKeySet: false });
+
+      await changeProvider('google');
+
+      expect(
+        screen.queryByText('ai_settings.api_key_provider_change_warning'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('clears a key typed for the previous provider when the provider changes', async () => {
+      renderComponent({ isApiKeySet: false });
+      const apiKeyInput = screen.getByLabelText(
+        'ai_settings.api_key_label',
+      ) as HTMLInputElement;
+
+      await act(async () => {
+        fireEvent.change(apiKeyInput, {
+          target: { value: 'sk-typed-for-openai' },
+        });
+        await Promise.resolve();
+      });
+      expect(apiKeyInput.value).toBe('sk-typed-for-openai');
+
+      await changeProvider('google');
+
+      // The typed key is dropped so it is never submitted for the new provider.
+      expect(apiKeyInput.value).toBe('');
+    });
+  });
+
   describe('provider options help', () => {
     it('links to the AI SDK provider-options documentation', () => {
       // Act

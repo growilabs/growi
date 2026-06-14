@@ -456,6 +456,7 @@
     "provider_placeholder": "プロバイダーを選択してください",
     "api_key_label": "API キー",
     "api_key_help": "AI プロバイダーの認証に使用する API キーです。",
+    "api_key_provider_change_warning": "プロバイダーを変更しました。新しい API キーを入力せずに保存すると、以前の API キーは破棄されます。",
     "api_key_set_placeholder": "(設定済み)",
     "model_label": "モデル",
     "provider_options_label": "プロバイダーオプション (JSON)",

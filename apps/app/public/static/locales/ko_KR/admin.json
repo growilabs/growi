@@ -447,6 +447,7 @@
     "provider_placeholder": "공급자를 선택하세요",
     "api_key_label": "API 키",
     "api_key_help": "AI 공급자 인증에 사용되는 API 키입니다.",
+    "api_key_provider_change_warning": "공급자를 변경했습니다. 새 API 키를 입력하지 않고 저장하면 이전에 저장된 API 키는 폐기됩니다.",
     "api_key_set_placeholder": "(설정됨)",
     "model_label": "모델",
     "provider_options_label": "공급자 옵션 (JSON)",
