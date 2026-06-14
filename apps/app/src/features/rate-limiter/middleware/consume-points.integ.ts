@@ -50,7 +50,10 @@ describe('consume-points.ts', async () => {
     const maxRequests = 500;
 
     await testRateLimitErrorWhenExceedingMaxRequests(method, key, maxRequests);
-  });
+    // 60s: this test issues `maxRequests + 1` (=501) sequential consumePoints
+    // round-trips to Mongo; the 5s default is inherently too tight and flakes
+    // under CI load (e.g. CPU contention while other workers run migrations).
+  }, 60_000);
 
   it('Should trigger a rate limit error when maxRequest is exceeded (maxRequest: {random integer between 1 and 1000})', async () => {
     // setup
@@ -59,5 +62,7 @@ describe('consume-points.ts', async () => {
     const maxRequests = faker.number.int({ min: 1, max: 1000 });
 
     await testRateLimitErrorWhenExceedingMaxRequests(method, key, maxRequests);
-  });
+    // 60s: up to 1001 sequential consumePoints round-trips to Mongo — see the
+    // maxRequest:500 case above.
+  }, 60_000);
 });
