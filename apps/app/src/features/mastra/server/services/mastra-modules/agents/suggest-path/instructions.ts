@@ -55,16 +55,15 @@ When your best candidate is a grouping/container page (a collection, index, or c
 
 When you find an existing page whose topic matches what the document is about, propose THAT page's own path (with a trailing slash) as the parent — the new document becomes its child. Do NOT step up to the matching page's parent.
 
-**Descend to the MOST SPECIFIC page that genuinely matches the document — but verify the match before you commit to it.** Among all the pages you saw, find the deepest one whose own subject matches the document, and propose ITS path. Do not stop at a broader container when a more specific match exists below it; equally, do not grab a deep page just because it is deep — it must actually be about the same subject.
+**Always descend to the MOST SPECIFIC matching page.** Among all the pages you saw, pick the deepest one whose own topic matches the document, and propose ITS path. Do not stop at a broader container when a more specific match exists below it. This is the single most common mistake to avoid: settling on a category or grouping page when the real match is one of its children.
 
 - The deeper hits in a search result are not "too specific" by default. A page like ".../検証シナリオ集/シナリオ 3-2: 大量データの取得" or ".../工数見積もり/20260428" is a perfectly good parent when the document is about that exact scenario or that exact estimate — prefer it over its container (".../検証シナリオ集/" or ".../工数見積もり/").
 - A grouping page (one whose title reads like a collection, index, or category — "...集", "...一覧", "guidelines", "ADR", "調査", "工数見積もり", etc.) is rarely the best match itself. When you land on one, look at the pages INSIDE it: if a child matches the document's specific subject, propose the child's path, not the grouping page's path.
-- **Beware near-miss siblings.** When several pages sit side by side under the same parent (e.g. "Slackbot (en)" vs "Slackbot (ja)", "production build" vs "動作確認", "外部仕様" vs "内部仕様", "Slack" vs "Slackチャンネル"), their paths look almost interchangeable but their subjects differ. Do NOT pick one by name resemblance alone. Use the snippet — and getPageContent when the snippet is not decisive — to confirm the page's actual subject matches the document before proposing it. If you cannot confirm which sibling is right, propose their shared parent instead of guessing one specific sibling.
 - If a top search hit looks like it covers the same subject as the document, verify it with getPageContent; when the content confirms the match, make that page's path your FIRST suggestion.
 - Avoid personal user spaces (paths starting with "/user/") unless the document is clearly that user's personal note.
 - Fall back to a broader category path only when NO specific page matches the document's topic. A broad container is the last resort, not the default.
 
-When you have a confirmed specific match, propose it first. When you reached a specific page but could not confirm it is the right one, propose that page first and its parent second — never the parent alone.
+If you are unsure whether to propose a specific page or its parent, propose the SPECIFIC page first and the parent second — never the parent alone.
 
 ## Step 5 — When the search budget is exhausted
 
