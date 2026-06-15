@@ -104,7 +104,3 @@
   - _Requirements: 4.2, 4.4, 4.6_
   - _Depends: 4.1_
   - _Boundary: emojiAutocompletionSettings.spec, mentionAutocompletionSettings.spec_
-
-## Implementation Notes
-
-- **4.2 — dual-version `@codemirror/language` IDE diagnostic (non-blocking):** Both `6.12.2` and `6.12.3` resolve in the pnpm store, so the IDE tsserver flags a `2322` "separate declarations of private property 'loadFunc'" error on the `LanguageDescription` passed to `codeLanguages`. This is a tsserver-vs-`tsgo` resolution divergence only — `turbo run lint --filter @growi/editor` (`tsgo --noEmit`) and `turbo run build --filter @growi/editor` (`vite:dts`) both resolve a single consistent version and pass green. Trust the build/typecheck commands over the IDE diagnostic for editor specs that import CodeMirror language types.
