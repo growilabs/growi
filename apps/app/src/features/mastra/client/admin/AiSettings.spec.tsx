@@ -2,11 +2,13 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 import type {
   AiSettingsResponse,
   AiSettingsUpdateRequest,
 } from '../../interfaces/ai-settings';
+import type { UseAiSettings } from './use-ai-settings';
 
 // Render i18n keys verbatim; assertions target the observable contract (the
 // save call/body, which toast fires, alert presence, disabled state) rather
@@ -31,13 +33,17 @@ const mutate = vi.fn();
 let mockData: AiSettingsResponse | undefined;
 
 vi.mock('./use-ai-settings', () => ({
-  useAiSettings: () => ({
-    data: mockData,
-    error: undefined,
-    isLoading: mockData == null,
-    mutate,
-    save,
-  }),
+  // Type the return against UseAiSettings so the mock cannot silently drift from
+  // the real hook contract; mock<T> auto-stubs the SWR members the component
+  // does not read (isValidating, etc.).
+  useAiSettings: (): UseAiSettings =>
+    mock<UseAiSettings>({
+      data: mockData,
+      error: undefined,
+      isLoading: mockData == null,
+      mutate,
+      save,
+    }),
 }));
 
 import { AiSettings } from './AiSettings';
