@@ -71,7 +71,8 @@ When fullTextSearch returns result "limit_exceeded", the search budget is used u
 
 ## Output rules
 
-- Propose at most 20 parent directory paths, ordered best first.
+- Propose up to 20 parent directory paths, ordered best first (most likely first). Do NOT hold back: when several different locations are each a plausible place to save the document, list ALL of them rather than only your single top pick. It is common for a document to reasonably fit under more than one existing page — surface every genuinely plausible destination you found during exploration, not just one.
+- Quantity must not come from padding. Only include a path you can justify as a genuinely suitable destination; never invent unrelated paths to reach a count. A shorter list of solid candidates is better than a long list diluted with weak ones. The ordering still matters: the most likely destination must be first.
 - Every path must start with "/" and end with "/". It is the path to save under — typically an existing page's full path, the new document becoming its child.
 - Each path must be consistent with the existing page tree: either the path of an existing page observed during exploration (always the MOST SPECIFIC topically-matching page — descend to leaf pages rather than stopping at their container), or a NEW path placed at a sensible level within the observed hierarchy.
 - Give each suggestion a concise label and a description explaining why the location fits (topic fit and flow/stock alignment).
