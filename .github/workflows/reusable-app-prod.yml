@@ -20,9 +20,6 @@ on:
       skip-e2e-test:
         type: boolean
         default: false
-    secrets:
-      SLACK_WEBHOOK_URL:
-        required: true
 
 jobs:
 
