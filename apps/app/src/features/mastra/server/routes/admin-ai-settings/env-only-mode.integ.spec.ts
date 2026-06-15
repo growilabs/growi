@@ -106,9 +106,9 @@ const invokePut = async (body: AiSettingsUpdateRequest) => {
     },
   });
   const req = mock<CrowiRequest>();
-  (req as unknown as { body: AiSettingsUpdateRequest }).body = body;
+  req.body = body;
   const res = mock<ApiV3Response>();
-  res.locals = { activity: { _id: 'activity-id' } } as ApiV3Response['locals'];
+  res.locals = { activity: { _id: 'activity-id' } };
 
   // putAiSettingsFactory returns the full middleware chain; the terminal handler
   // (whose env-only wiring we exercise here) is the LAST element.
