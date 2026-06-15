@@ -2,7 +2,6 @@
 
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { mock } from 'vitest-mock-extended';
 
 import type {
   AiSettingsResponse,
@@ -33,17 +32,20 @@ const mutate = vi.fn();
 let mockData: AiSettingsResponse | undefined;
 
 vi.mock('./use-ai-settings', () => ({
-  // Type the return against UseAiSettings so the mock cannot silently drift from
-  // the real hook contract; mock<T> auto-stubs the SWR members the component
-  // does not read (isValidating, etc.).
-  useAiSettings: (): UseAiSettings =>
-    mock<UseAiSettings>({
-      data: mockData,
-      error: undefined,
-      isLoading: mockData == null,
-      mutate,
-      save,
-    }),
+  // Annotated as UseAiSettings so the mock cannot silently drift from the real
+  // hook contract (a missing/renamed field is a compile error). Kept as a plain
+  // object literal — NOT mock<T>() — because this factory runs on every render,
+  // and allocating a fresh vitest-mock-extended proxy (each holding several
+  // vi.fn()s tracked by the global mock registry) per render leaks memory and
+  // degrades the whole component suite (heap growth + clearMocks slowdown).
+  useAiSettings: (): UseAiSettings => ({
+    data: mockData,
+    error: undefined,
+    isLoading: mockData == null,
+    isValidating: false,
+    mutate,
+    save,
+  }),
 }));
 
 import { AiSettings } from './AiSettings';

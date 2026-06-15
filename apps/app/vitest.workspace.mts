@@ -132,18 +132,6 @@ export default defineWorkspace([
       environment: 'happy-dom',
       include: ['**/*.spec.{tsx,jsx}'],
       setupFiles: ['./test/setup/jest-dom.ts'],
-      // happy-dom + React accumulate heap across the many component spec files a
-      // reused worker handles; the default ~4GB ceiling is reached and the
-      // worker OOMs. Raise the per-fork heap limit to give headroom, and cap the
-      // fork count so total memory (maxForks * heap) stays within the CI runner
-      // RAM regardless of its core count.
-      pool: 'forks',
-      poolOptions: {
-        forks: {
-          execArgv: ['--max-old-space-size=6144'],
-          maxForks: 2,
-        },
-      },
     },
   }),
 ]);
