@@ -16,7 +16,7 @@ This is a single-spec project. The operators reuse the existing inline-operator 
   - **MongoDB resolution for `editor:`** (the prior inline-operator design): resolve `username → User._id → Page._id[]` and filter on `ids`. Rejected because it caps results at 1000 pages and adds query-time MongoDB load; the indexed-field approach is simpler and cap-free.
 
 ## Scope
-- **In**: `author:` / `editor:` / `group:` inline operators and their negation variants; server-side parsing extension; group name→ID resolution scoped to the requesting user's groups; new `last_update_username` indexed ES field (mappings + indexing pipeline) so `editor:` filters directly; new ES filter clauses in the delegator; unit and integration tests.
+- **In**: `author:` / `editor:` / `group:` inline operators and their negation variants; server-side parsing extension; `group:` name resolution scoped to the requesting user's own groups (membership enforced by the id-scoped lookup, not a separate intersect); new `last_update_username` indexed ES field (mappings + indexing pipeline) so `editor:` filters directly; new ES filter clauses in the delegator; unit and integration tests.
 - **Out**:
   - New UI components, filter bars, or dedicated filter controls
   - New URL parameters beyond `?q=`

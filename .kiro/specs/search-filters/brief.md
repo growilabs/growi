@@ -15,7 +15,7 @@ GROWI's search page currently supports only keyword-based search with minimal co
 - Three new inline search operators — `author:username`, `editor:username`, `group:groupname` — and their negation variants (`-author:`, `-editor:`, `-group:`) work inside the existing search box alongside free-text keywords and existing operators
 - `author:username` returns only pages whose creator has that username
 - `editor:username` returns only pages whose most recent editor has that username
-- `group:groupname` returns only pages granted to the named user group (internal and external), scoped to groups the requesting user actually belongs to — specifying a group the user is not a member of yields no results for that group (e.g. a user in A,B who types `group:A,C` gets results for A only)
+- `group:groupname` returns only pages granted to the named user group (internal and external), scoped to groups the requesting user actually belongs to — specifying a group the user is not a member of yields no results for that group (e.g. a user in groups A and B who types `group:A group:C` gets results for A only)
 - Unknown usernames and group names return an empty result set rather than an error
 - Zero regression on existing operators (`prefix:`, `tag:`, quoted phrases, negated keywords) and existing search behavior
 - No new UI components, no new URL parameters
@@ -26,7 +26,7 @@ GROWI's search page currently supports only keyword-based search with minimal co
 
 0. **Index**: add a `last_update_username` keyword field to the ES mappings (es7/es8/es9), join `lastUpdateUser` in `aggregatePipelineToIndex()`, and write `last_update_username` in `prepareBodyForCreate()`. Both the full rebuild and every incremental edit share this path, so the field stays fresh after the initial rebuild
 1. **Parse**: extend the regex and branching in `parseQueryString()` to recognise the three new operator prefixes and populate six new `QueryTerms` fields (`author`, `not_author`, `editor`, `not_editor`, `group`, `not_group`)
-2. **Resolve**: add a `resolveGroupTerms()` private method in `SearchService` that converts `group` names to group IDs, then intersects them with the requesting user's own groups (so a user can only filter by groups they belong to), via read-only MongoDB queries, before the delegator is called. `author` and `editor` need **no** resolution — both map directly to indexed keyword fields (`username` / `last_update_username`)
+2. **Resolve**: add a `resolveFilterData()` private method in `SearchService` that resolves `group` names against the requesting user's **own** groups — fetched by `_id ∈ userGroups`, then matched by name (so a name the user has no group for resolves to nothing; membership is implicit, not a separate intersect) — via read-only MongoDB queries, before the delegator is called. `author` and `editor` need **no** resolution — both map directly to indexed keyword fields (`username` / `last_update_username`)
 3. **Delegate**: extend `appendCriteriaForQueryString()` to push the corresponding ES clauses into `bool.filter[]` — `term` for `author`/`editor`, `terms` on `granted_groups` for `group` — using the parsed and resolved data
 
 All changes are additive. No existing file's public surface is broken.
@@ -36,7 +36,7 @@ All changes are additive. No existing file's public surface is broken.
   - New `last_update_username` keyword field across all ES mappings (es7/es8/es9), the indexing aggregation (`aggregate-to-index.ts`), the doc body builder (`prepareBodyForCreate`), and the `AggregatedPage` / `BulkWriteBody` types (`bulk-write.d.ts`)
   - Six new fields in `QueryTerms` and `ESTermsKey`; new `ResolvedFilterData` type (group IDs only); extended `SearchableData`
   - Regex and branching extension in `parseQueryString()`
-  - `resolveGroupTerms()` private method in `SearchService` + wiring into `searchKeyword()`
+  - `resolveFilterData()` private method in `SearchService` + wiring into `searchKeyword()`
   - Six new ES clause builders in `appendCriteriaForQueryString()` + updated `AVAILABLE_KEYS`
   - Unit tests for parser, group resolution, indexing field, and ES clause builder; integration tests for the full `searchKeyword()` pipeline, including an incremental-edit test confirming `editor:` tracks `lastUpdateUser`
 - **Out**:
@@ -52,8 +52,8 @@ All changes are additive. No existing file's public surface is broken.
 - **Types layer** (`interfaces/search.ts`): `QueryTerms` extension, `ResolvedFilterData` (group IDs only), `SearchableData` extension, `ESTermsKey` extension — pure type definitions, no runtime logic
 - **Indexing field** (`mappings/mappings-es7|8|9.ts`, `aggregate-to-index.ts`, `bulk-write.d.ts`, `elasticsearch.ts` — `prepareBodyForCreate`): add and populate `last_update_username`, mirroring the existing `creator.username` precedent; shared by full rebuild and incremental writes
 - **Parser** (`service/search.ts` — `parseQueryString`): regex and branching; postcondition is that new tokens never appear in `match[]`
-- **Resolution step** (`service/search.ts` — `resolveGroupTerms` + `searchKeyword` wiring): MongoDB read-only queries for groups only; early-exit when no `group`/`not_group` terms are present (`author`/`editor` are not resolved here)
-- **ES clause builder** (`service/search-delegator/elasticsearch.ts` — `appendCriteriaForQueryString` + `AVAILABLE_KEYS`): `term` for `author`/`editor`; no-op for `group` when resolved arrays are absent or empty
+- **Resolution step** (`service/search.ts` — `resolveFilterData` + `searchKeyword` wiring): MongoDB read-only queries for groups only (the user's own groups, by `_id ∈ userGroups`); early-exit when both `group`/`not_group` arrays are empty or the user is a guest (`author`/`editor` are not resolved here)
+- **ES clause builder** (`service/search-delegator/elasticsearch.ts` — `appendCriteriaForQueryString` + `AVAILABLE_KEYS`): `term` for `author`/`editor`; for a typed positive `group:` push `terms: { granted_groups: groupIds }` even when `groupIds` is empty (empty `terms` matches nothing → 0 results); negation `-group:` and the "no `group:` typed" case are no-ops
 
 ## Out of Boundary
 - Modifying the existing `?q=` keyword parameter format or any existing operator regex branch
@@ -77,6 +77,6 @@ All changes are additive. No existing file's public surface is broken.
 - Elasticsearch query extensions must use the existing `ElasticsearchDelegator` interface; no new ES client instances
 - The new `last_update_username` field must mirror the existing `creator.username` indexing precedent exactly (same `$lookup`/`$unwind`/project shape, same `keyword` mapping type) across all three ES major versions
 - `editor:` requires a full index rebuild to take effect on existing pages; no MongoDB fallback, no incremental backfill — administrators must be informed via release notes
-- `ExternalUserGroup` lookup uses `name` only (not the compound `{name, provider}` index) — a `group:` token may match the first external group with that name; acceptable approximation for V1
+- `ExternalUserGroup` is resolved by fetching the user's own external groups by `_id` (`{ _id: { $in: userGroups } }`), not by a global `name` lookup — so the compound `{name, provider}` non-uniqueness is moot: only the user's own groups are considered, and same-name groups all resolve
 - `group:` filter values are raw strings in `?q=`; the server resolves them to MongoDB ObjectIds and ES field values. `author`/`editor` values are passed straight through as exact `term` matches
 - New `QueryTerms` fields must be registered in `AVAILABLE_KEYS` so existing `isTermsNormalized()` and `validateTerms()` calls continue to work without modification

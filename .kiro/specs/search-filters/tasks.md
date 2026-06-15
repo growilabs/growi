@@ -44,13 +44,13 @@
 ---
 
 - [ ] 4. Group resolution
-- [ ] 4.1 Implement group name → ID resolution in `SearchService`
-  - Add a private async method that resolves `group` and `not_group` names to group IDs and returns `ResolvedFilterData`
-  - Early-return with empty arrays when no `group`/`not_group` terms are present — issue no MongoDB queries in that case
-  - For each group name, look up the internal and external user groups by name in parallel; collect non-null IDs; if none found, contribute no IDs (unknown group)
-  - Intersect the resolved IDs with the requesting user's own groups; if the intersection is empty, contribute no IDs (user is not a member)
+- [ ] 4.1 Implement group-name resolution against the user's own groups in `SearchService`
+  - Add a private async method `resolveFilterData(terms, userGroups)` that resolves `group`/`not_group` names to the user's own group IDs and returns `ResolvedFilterData`. `userGroups` is `ObjectIdLike[] | null` (an ObjectId list, **not** `IGrantedGroup[]`)
+  - Early-return with empty arrays — and issue **zero** MongoDB queries — when the user is a guest (`userGroups == null`) OR both `terms.group` and `terms.not_group` are empty. Guard on array emptiness, **not** on `groupTerms == null` (the parser initializes these to `[]`, so a `== null` guard never fires and would query on every search). Since `terms` is `Partial<QueryTerms>`, write it null-safely: `(terms.group?.length ?? 0) === 0 && (terms.not_group?.length ?? 0) === 0`
+  - Fetch only the user's **own** groups in parallel: `UserGroup.find({ _id: { $in: userGroups } }).select('_id name')` + the `ExternalUserGroup` equivalent. `userGroups` is used directly as the `$in` operand — no element-shape handling (`id.toString()` / `g._id`) needed
+  - Build a `name → [groupId]` map (read `group.id`; same-name groups accumulate all their IDs), then resolve each typed name against it (`names.flatMap(n => map.get(n) ?? [])`). A name the user has no group for resolves to `[]` — membership is enforced implicitly by the `_id ∈ userGroups` scope, so there is **no** separate intersect step
   - This method must NOT query `User` or `Page` — editor terms are not resolved here
-  - Done when: the method returns correct `groupIds` for a known group the user belongs to, empty `groupIds` for an unknown group, and empty `groupIds` when the user is not a member; for `group:A group:C` where the user belongs only to A, `groupIds` contains only A's ID
+  - Done when: the method returns correct `groupIds` for a known group the user belongs to, `[]` for an unknown group, `[]` when the user is not a member, and `[]` for a guest (`userGroups` null) — all without throwing; for `group:A group:C` where the user belongs only to A, `groupIds` contains only A's ID; and it issues zero MongoDB queries when no group operator is typed
   - _Requirements: 3.1, 3.5, 4.3, 6.3, 6.4, 7.5_
   - _Depends: 1.1_
 
@@ -69,10 +69,12 @@
   - Push clauses into the existing `bool.filter[]` array, following the existing `tag:`/`prefix:` pattern:
     - `author` → `term` on `username` (must); `not_author` → `term` on `username` (must_not)
     - `editor` → `term` on `last_update_username` (must); `not_editor` → `term` on `last_update_username` (must_not) — direct match, identical shape to author, no resolution
-    - `group` IDs non-empty → `terms` on `granted_groups` (must); `not_group` IDs non-empty → `terms` on `granted_groups` (must_not)
-  - Skip the group clause when the resolved data is absent or its array is empty; never widen access — all clauses are AND-ed into the same `bool.filter[]` so they cannot override the existing permission filter
+    - `group` (positive) → push `terms` on `granted_groups` (must) whenever the user typed `group:` (`terms.group.length > 0`), using the resolved `groupIds`. An empty `groupIds` becomes `terms: { granted_groups: [] }`, which matches **nothing** — so an unknown group (Req 6.3) or a group the user is not a member of (Req 3.5, 7.5) returns 0 results, NOT every remaining match. Do **not** gate this on `groupIds.length > 0`.
+    - `not_group` (negation) → push `terms` on `granted_groups` (must_not) only when `notGroupIds` is non-empty. An unknown/non-member negated group must exclude nobody, so skipping on empty is correct here (Req 4.3) — this is the deliberate positive/negative asymmetry.
+  - The group clause is omitted entirely **only** when neither `group` nor `not_group` was typed (both `terms` arrays empty) — that is regression safety (Req 5.4), distinct from "typed but resolved to empty". (`resolvedFilterData` is always present with possibly-empty arrays; gate on the typed `terms`, not on its presence.) `author:`/`editor:` always push their `term` (ES returns 0 for a non-matching value). Never widen access — all clauses are AND-ed into the same `bool.filter[]` so they cannot override the existing permission filter
+  - NOTE: whether the group clauses live inside `appendCriteriaForQueryString` or a dedicated helper, the builder **must** receive `terms` (not just the resolved data) — gating the positive clause requires knowing whether `group:` was typed. A helper that takes only `resolvedFilterData` cannot tell "not typed" from "typed but resolved empty" and will incorrectly skip, returning everything
   - Register all six new `QueryTerms` keys in `AVAILABLE_KEYS` so `isTermsNormalized()` and `validateTerms()` accept them
-  - Done when: an `author:['jim']` term adds a `term: { username: 'jim' }` clause; an `editor:['alice']` term adds a `term: { last_update_username: 'alice' }` clause; calling with no resolved group data leaves the existing filter array byte-for-byte unchanged
+  - Done when: an `author:['jim']` term adds a `term: { username: 'jim' }` clause; an `editor:['alice']` term adds a `term: { last_update_username: 'alice' }` clause; a typed `group:` whose resolved `groupIds` is empty adds a match-nothing `terms: { granted_groups: [] }` clause (NOT skipped); calling with no group terms typed at all leaves the existing filter array byte-for-byte unchanged
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 2.5, 3.1, 3.2, 3.3, 4.1, 4.2, 4.3, 4.4, 5.1, 5.2, 5.4, 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3, 7.4_
   - _Depends: 1.1_
 
@@ -87,14 +89,14 @@
 - [ ] 6. Tests
 - [ ] 6.1 (P) Unit tests for the parser and group resolution
   - Parser: `author:jim report` → correct arrays with `match` free of the operator token; `author:` → empty author array (empty-value guard); `-author:jim` → `not_author:['jim']`; `-editor:alice` → `not_editor:['alice']`; `author:jim editor:alice group:dev tag:wiki prefix:/team` → all operators separated, `match` empty; `regular keyword` → unchanged (regression)
-  - Group resolution (mock the group-model lookups): known group + member → correct `groupIds`; known group + non-member → empty `groupIds`; `group:A group:C` with membership in A only → only A's ID; unknown group → empty; no group terms → early return, no model calls; assert `User`/`Page` are never queried
+  - Group resolution (mock the group-model lookups): known group + member → correct `groupIds`; known group + non-member → empty `groupIds`; `group:A group:C` with membership in A only → only A's ID; unknown group → empty; guest (`userGroups` is `null`) → empty `groupIds`, no throw; no group terms → early return with **zero** `UserGroup`/`ExternalUserGroup` calls (guard on emptiness, not `== null`); assert `User`/`Page` are never queried; assert the lookup is `find({ _id: { $in: userGroups } })` (scoped to the user's own groups) and reads `group.id`
   - Done when: `pnpm vitest run search.spec` passes all cases
   - _Requirements: 1.1, 1.3, 1.4, 2.3, 2.4, 3.1, 3.4, 3.5, 4.1, 4.2, 4.3, 5.3, 5.4, 6.3, 6.4, 7.5_
   - _Boundary: search.spec.ts_
   - _Depends: 3.1, 4.2_
 
 - [ ] 6.2 (P) Unit tests for the clause builder and document body
-  - Clause builder: `author:['jim']` → `term: { username: 'jim' }`; `not_author:['jim']` → `must_not` `term` on `username`; `editor:['alice']` → `term: { last_update_username: 'alice' }`; `not_editor:['alice']` → `must_not` `term` on `last_update_username`; non-empty group IDs → `terms: { granted_groups: [...] }`; empty group IDs → no group clause; no resolved data → filter array unchanged (regression)
+  - Clause builder: `author:['jim']` → `term: { username: 'jim' }`; `not_author:['jim']` → `must_not` `term` on `username`; `editor:['alice']` → `term: { last_update_username: 'alice' }`; `not_editor:['alice']` → `must_not` `term` on `last_update_username`; non-empty group IDs → `terms: { granted_groups: [...] }`; typed `group:` with empty group IDs → match-nothing `terms: { granted_groups: [] }` clause (NOT skipped); no group term typed → filter array unchanged (regression)
   - Document body: building the body for a page with a last updater sets `last_update_username`; building it for a page without one leaves the field undefined and does not throw
   - Done when: `pnpm vitest run elasticsearch.spec` passes all cases
   - _Requirements: 1.1, 2.1, 2.5, 2.6, 3.1, 4.1, 4.2, 5.4, 6.1, 6.2, 6.3_
@@ -111,7 +113,7 @@
 - [ ] 6.4 Full pipeline and indexing integration tests
   - `searchKeyword('author:jim report')` → `bool.filter` has `term: { username: 'jim' }` and `bool.must` has `multi_match` on `report`
   - `searchKeyword('editor:alice report')` → `bool.filter` has `term: { last_update_username: 'alice' }`; confirm no MongoDB resolution fired for the editor term
-  - `searchKeyword('group:dev')` where the user is a member → `terms: { granted_groups: [groupId] }` present; where the user is NOT a member → empty result, no group clause; `group:A group:C` (member of A only) → clause contains only A's ID
+  - `searchKeyword('group:dev')` where the user is a member → `terms: { granted_groups: [groupId] }` present; where the user is NOT a member → empty result via a match-nothing `terms: { granted_groups: [] }` clause (clause present, not skipped); `group:A group:C` (member of A only) → clause contains only A's ID
   - `searchKeyword('author:jim editor:alice tag:wiki prefix:/team')` → all clauses present, existing operators unaffected
   - `author:nonexistent`, `editor:nonexistent`, `group:nonexistent` → empty result, not a server error; `regular keyword` → identical to pre-change behavior
   - Incremental refresh: index a page (last updater = alice), edit it so the last updater becomes bob, re-index via the incremental path → `editor:bob` returns the page and `editor:alice` no longer does

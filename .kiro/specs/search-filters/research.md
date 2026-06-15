@@ -80,8 +80,8 @@ lastUpdateUser: { type: Schema.Types.ObjectId, ref: 'User' }
 
 - `UserGroup.name` — required, globally unique string — the identifier users type in `group:groupname`
 - `ExternalUserGroup.name` — unique per `{name, provider}` compound index (not globally unique)
-- Only the group **name → group ID** lookup is needed (`UserGroup.findOne({ name })` / `ExternalUserGroup.findOne({ name })`). The resolved group ID is used directly against the ES `granted_groups` field — there is **no** member-user resolution step, so `UserGroupRelation` / `ExternalUserGroupRelation` are not queried by this feature.
-- `IGrantedGroup[]` (the requesting user's groups, already passed into `searchKeyword()`) supplies the membership set the resolved group IDs are intersected against — no relation query is needed to obtain it.
+- Only the user's **own** groups are fetched, scoped by id: `UserGroup.find({ _id: { $in: userGroups } })` + `ExternalUserGroup.find({ _id: { $in: userGroups } })` (selecting `_id name`). A `name → [groupId]` map built from that set lets a typed `group:` name resolve straight to the user's group ID(s), used directly against the ES `granted_groups` field. There is **no** member-user resolution (`UserGroupRelation` / `ExternalUserGroupRelation` are not queried) and **no** global `findOne({ name })` lookup.
+- Because the lookup is scoped by `_id ∈ userGroups`, **membership is enforced implicitly**: a typed group the user does not belong to is simply absent from the map and resolves to nothing — no separate intersect pass. The `userGroups` argument (an `ObjectIdLike[]`, `null` for guests) is passed straight into the `$in`; no `IGrantedGroup`/`_id` element-shape handling is required, and group IDs are read off the fetched docs via `group.id`.
 
 ### User.username
 
@@ -112,34 +112,37 @@ Consequences (accepted by the spec owner):
 
 Rationale: removing the 1000-page cap, the `User.findOne` + `Page.find` round-trips, and the `editorPageIds`/`notEditorPageIds` plumbing makes `editor:` strictly simpler and symmetric with `author:`. The cost is a one-time operational rebuild, which the spec owner has explicitly accepted.
 
-### D3: group: resolved to a group ID, intersected with the user's groups, applied to ES `granted_groups`
+### D3: group: resolved against the user's own groups, applied to ES `granted_groups`
 
-`group:dev-team` requires:
-1. `UserGroup.findOne({ name: 'dev-team' })` + `ExternalUserGroup.findOne({ name: 'dev-team' })` → resolved groupId(s)
-2. **Intersect** the resolved IDs with the requesting user's own groups (`IGrantedGroup[]` already passed into `searchKeyword()`). Only IDs the user belongs to survive.
-3. ES `terms: { granted_groups: [validGroupIds] }` clause in `bool.filter`
+`group:dev-team` is resolved by looking up **only the requesting user's own groups** and matching the typed name against them:
+1. `UserGroup.find({ _id: { $in: userGroups } })` + `ExternalUserGroup.find({ _id: { $in: userGroups } })` (select `_id name`) → the user's groups (internal + external)
+2. Build a `name → [groupId]` map from that set (read `group.id`), then resolve each typed name: `names.flatMap(name => map.get(name) ?? [])`
+3. ES `terms: { granted_groups: [groupIds] }` clause in `bool.filter`
 
 No member-user resolution: the page documents are already indexed with a `granted_groups` field, so a group ID matches pages directly. There is no `User.find` / `memberUsernames` step.
 
-**Intersection is a hard requirement, not an optimization (Req 3.5, 7.5).** A user who belongs to groups A and B but types `group:A,C` must get results scoped to **A only** — C is silently dropped because the user is not a member. Without the intersect, `group:C` would let a non-member enumerate pages granted to C, widening access. The resolved-then-intersected set can therefore only ever be a subset of the user's existing group access, so the clause can never broaden the permission filter that already lives in the same `bool.filter[]`.
+**Membership enforcement is implicit and is a hard requirement (Req 3.5, 7.5).** Because the lookup is scoped by `_id ∈ userGroups`, a typed group the user does not belong to is never in the map and resolves to nothing — there is no separate "intersect" step that could be omitted, and no way for a non-member to enumerate pages granted to a group they are not in. A user who belongs to A and B but types `group:A group:C` gets results scoped to **A only**; C resolves to `[]`. The resolved set is by construction a subset of the user's own group access, so the clause can never broaden the permission filter that already lives in the same `bool.filter[]`.
 
-Rationale for including ExternalUserGroup: external groups also appear in `granted_groups` and in the user's `IGrantedGroup[]`, so both must be resolvable by name.
+**Why this supersedes the earlier "global `findOne({ name })` then intersect" design:** one id-scoped query (not two lookups per name), it reads `group.id` off fetched documents (sidestepping the `userGroups` element-type / `_id` pitfalls entirely), and it makes the membership guarantee structural rather than a step that can be forgotten. It also dissolves the ExternalUserGroup `{name, provider}` name-uniqueness approximation: only the user's own groups are ever considered, and if the user belongs to two groups sharing a name the map holds both IDs (more complete than a first-match `findOne`).
+
+Rationale for including ExternalUserGroup: external groups also appear in `granted_groups` and in the user's `userGroups` ID list (the route concatenates internal + external group IDs), so both must be in the map.
 
 ### D4 (revised): ResolvedFilterData carries only group IDs
 
-With `editor:` now ES-direct, the only MongoDB-resolved values are group IDs. `ResolvedFilterData` is therefore `{ groupIds: string[]; notGroupIds: string[] }` — the `editorPageIds` / `notEditorPageIds` fields are removed. It is still added to `SearchableData` and populated by `SearchService` before calling the delegator, because group name → ID resolution + membership intersect (Req 3.5, 7.5) cannot live in the delegator. The resolution method is scoped to groups only (`resolveGroupTerms`).
+With `editor:` now ES-direct, the only MongoDB-resolved values are group IDs. `ResolvedFilterData` is therefore `{ groupIds: string[]; notGroupIds: string[] }` — the `editorPageIds` / `notEditorPageIds` fields are removed. It is still added to `SearchableData` and populated by `SearchService` before calling the delegator, because resolving group names against the user's own groups (Req 3.5, 7.5) needs MongoDB and cannot live in the delegator. The resolution method is `resolveFilterData`.
 
-### D5: Empty/unknown identifiers return empty results naturally
+### D5: Empty/unknown identifiers return empty results
 
 - Unknown `author:` username → ES term matches nothing → empty result (no special handling)
 - Unknown `editor:` username → ES `term: { last_update_username }` matches nothing → empty result (no special handling, identical to `author:`)
-- Unknown `group:` name → both group lookups return null → `groupIds = []` → `granted_groups` clause skipped → no match
-- `group:` name the user is not a member of → resolved ID survives the lookup but is dropped by the intersect → `groupIds = []` → clause skipped → no match (Req 3.5, 7.5)
+- Unknown `group:` name → name absent from the user's-own-groups map → `groupIds = []` → **still push** `terms: { granted_groups: [] }` (an empty ES `terms` array matches nothing) → no match. The positive clause must be pushed, **not skipped**: skipping a positive filter removes it and returns every remaining match instead of none. (This is the same correct behavior the pre-`granted_groups` design had with `ids: { values: [] }`; it was lost in a rewrite and is restored here.)
+- `group:` name the user is not a member of → name absent from the user's-own-groups map (the lookup is scoped to `_id ∈ userGroups`) → `groupIds = []` → same match-nothing `terms: { granted_groups: [] }` clause → no match (Req 3.5, 7.5)
+- Asymmetry: negation (`-group:`) does the opposite — an unknown/non-member negated group should exclude nobody, so its `must_not` clause is **skipped** when `notGroupIds` is empty (Req 4.3). Positive operators push match-nothing on empty resolution; negative operators skip.
 - Empty operator value (e.g., `author:` with no value) → parser skips token (regex or explicit guard)
 
 ### D6: Negation mirrors positive with must_not
 
-`-author:jim` → `must_not: { term: { username: 'jim' } }`. `-editor:alice` and `-group:dev-team` follow same resolution path, clause pushed to `must_not`. Consistent with existing `-prefix:` / `-tag:` behavior.
+`-author:jim` → `must_not: { term: { username: 'jim' } }`. `-editor:alice` and `-group:dev-team` use the same field/resolution as their positive forms (editor direct, group via the user's-own-groups map), with the clause pushed to `must_not` instead of `must`. Consistent with existing `-prefix:` / `-tag:` behavior. (Empty-resolution behavior still differs by polarity — see D5.)
 
 ### D7: AVAILABLE_KEYS and ESTermsKey must include new fields
 
@@ -149,7 +152,7 @@ With `editor:` now ES-direct, the only MongoDB-resolved values are group IDs. `R
 
 ## Synthesis Outcomes
 
-- **Generalization**: `author:` and `editor:` are now the **same pattern** — an exact `term` match on a keyword field (`username` / `last_update_username`). `group:` is the only operator needing MongoDB resolution (name → ID, intersected with the user's groups) before its `granted_groups` clause. The `bool.filter` push pattern is uniform across all three.
+- **Generalization**: `author:` and `editor:` are now the **same pattern** — an exact `term` match on a keyword field (`username` / `last_update_username`). `group:` is the only operator needing MongoDB resolution (typed names matched against the user's own groups) before its `granted_groups` clause. The `bool.filter` push pattern is uniform across all three.
 - **Build vs Adopt**: Extension plus **one new indexed ES field** (`last_update_username`) wired through the existing indexing pipeline by mirroring the `creator.username` precedent. No new libraries.
 - **Simplification**: Collapsing `editor:` onto `author:`'s pattern removes the entire MongoDB editor-resolution path (the `User.findOne` + `Page.find` round-trips, the 1000-page cap, and the `editorPageIds`/`notEditorPageIds` plumbing). `ResolvedFilterData` shrinks to group IDs only. The cost is the new indexing field (5 mechanical touch points) and a one-time full index rebuild.
 - **Trade-off accepted**: A full index rebuild is required before `editor:` returns results for existing pages; no MongoDB fallback is retained. The spec owner accepted this in exchange for the simpler, cap-free query path.
