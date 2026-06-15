@@ -14,7 +14,7 @@
 // from crowi.isAiReady() guards against regressing to either the raw toggle or a
 // direct (realm-unsafe) import.
 import type { GetServerSidePropsContext } from 'next';
-import { mockDeep } from 'vitest-mock-extended';
+import { mock, mockDeep } from 'vitest-mock-extended';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 
@@ -24,18 +24,33 @@ import { getServerSideGeneralPageProps } from './configuration-props';
 // (crowi.configManager.getConfig, crowi.aclService.isAclEnabled, the upload /
 // slack / passport services, and crowi.isAiReady). Only crowi.isAiReady drives
 // the assertion here; the remaining props are irrelevant to this test.
-const buildContext = (isAiReady: boolean): GetServerSidePropsContext => {
+const buildContext = (
+  isAiReady: boolean,
+  // Optional value for the raw app:aiEnabled toggle. Used to prove the prop
+  // sources from isAiReady() and NOT this key (see the discriminating test).
+  rawAiEnabledToggle?: boolean,
+): GetServerSidePropsContext => {
   const req = mockDeep<CrowiRequest>();
   req.crowi.isAiReady.mockReturnValue(isAiReady);
-  const context = mockDeep<GetServerSidePropsContext>();
+  if (rawAiEnabledToggle != null) {
+    req.crowi.configManager.getConfig.mockImplementation((key) =>
+      key === 'app:aiEnabled' ? rawAiEnabledToggle : undefined,
+    );
+  }
   // The builder narrows context.req to CrowiRequest internally (configuration-props.ts:59);
   // localize the cast to the single req field rather than the whole context object.
-  context.req = req as unknown as GetServerSidePropsContext['req'];
-  return context;
+  return mock<GetServerSidePropsContext>({
+    req: req as unknown as GetServerSidePropsContext['req'],
+  });
 };
 
-const getAiEnabledProp = async (isAiReady: boolean): Promise<boolean> => {
-  const result = await getServerSideGeneralPageProps(buildContext(isAiReady));
+const getAiEnabledProp = async (
+  isAiReady: boolean,
+  rawAiEnabledToggle?: boolean,
+): Promise<boolean> => {
+  const result = await getServerSideGeneralPageProps(
+    buildContext(isAiReady, rawAiEnabledToggle),
+  );
   if (!('props' in result)) {
     throw new Error('expected a props result');
   }
@@ -50,5 +65,11 @@ describe('getServerSideGeneralPageProps - aiEnabled supply (Req 7.4)', () => {
 
   it('supplies aiEnabled=false when AI is not ready (e.g. enabled but unconfigured)', async () => {
     expect(await getAiEnabledProp(false)).toBe(false);
+  });
+
+  it('mirrors isAiReady(), not the raw app:aiEnabled toggle (toggle on but not ready)', async () => {
+    // The raw app:aiEnabled key is true, but isAiReady() (= enabled && configured)
+    // is false. The prop must follow isAiReady(), proving it never reads the toggle.
+    expect(await getAiEnabledProp(false, true)).toBe(false);
   });
 });
