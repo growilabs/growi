@@ -104,6 +104,21 @@ describe('SearchService test', () => {
       expect(terms.editor).toStrictEqual([]);
       expect(terms.match).toStrictEqual(['author:', 'editor:']);
     });
+
+    it('should not capture a bare word that starts with a filter name', async () => {
+      // The ':' delimiter is required: a word that merely starts with a filter
+      // name (e.g. 'authorname') must be treated as a plain match word, not as a
+      // filter that captures the remainder (e.g. author: ['name']).
+      const terms = await searchService.parseQueryString(
+        'authorname editorx grouped -notauthorname',
+      );
+
+      expect(terms.author).toStrictEqual([]);
+      expect(terms.editor).toStrictEqual([]);
+      expect(terms.group).toStrictEqual([]);
+      expect(terms.match).toStrictEqual(['authorname', 'editorx', 'grouped']);
+      expect(terms.not_match).toStrictEqual(['notauthorname']);
+    });
   });
 
   describe('parseSearchQuery()', () => {
