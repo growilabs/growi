@@ -374,6 +374,16 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
     - **サンドボックス検証** (MongoDB 不在のため接続到達/グラフロードで代理確認): `server` (本番 ESM) → ECONNREFUSED 到達、`dev:migrate-mongo status` (tsx+CJS bin) → ECONNREFUSED 到達、`dev:umzug pending` (tsx+TS) → ServerSelectionError 到達、`app.ts --ci` (launch-dev:ci 中核) → mongo 接続失敗で exit (catch に一時 console.error を挿し ECONNREFUSED が原因と断定、グラフは完全ロード)。Yjs 二重 import 警告は本番 dist boot にも出る既存事象で tsx 固有でないと確認。typecheck/biome/no-cjs/route-guard green、unit 1951 passed (既知の mongodb-memory-server 403 で `update-activity.spec.ts` 1 ファイルのみ env-fail)
     - **実 DB での end-to-end (`dev:migrate` 両系統 / healthcheck 200) は push 後 CI** (`ci-app-launch-dev`・`ci-app-test-integration`、mongo サービスコンテナ付き) で検証する
 
+- [x] 3.7.c 全面 native 化 — tsx を撤去し Node v24 ネイティブ TS 実行 (transform + resolve-only hook) に置換
+  - **動機**: 3.7.a/3.7.b で暫定採用した tsx が ESM loader hook 経由の resolve/load で dev 起動を劣化させていた (research.md「bake-off で実測選定」「ネイティブ transform 一本化」決定参照)。Node v24 では型ストリップが既定、`--experimental-transform-types` で enum / parameter property も実行可能。
+  - **実装**: `apps/app/bin/dev-esm-resolver.mjs` を新規追加 — `module.registerHooks` による *resolve 専用* 同期 in-thread フック (`~/`→src, `^/`→app root, 相対/拡張子無し `.js`→`.ts`, `index.*`)。全 TS ランナー呼び出し (dev / dev:migrate-mongo / dev:umzug / 本番 migrate:umzug / launch-dev:ci / repl / snapshot-routes / authz-matrix:capture/verify / ws-authz-matrix:capture/verify / openapi apiv3 cli) を `node --experimental-transform-types --import ./bin/dev-esm-resolver.mjs ...` に統一。`tsx` を dependencies から削除し lockfile 再生成。`apps/app` engines に `node: ^24` を明示。
+  - **enum / parameter property**: server-reachable な enum 5 件・parameter property 3 箇所は transform mode が変換するためソース無変更 (共有 interfaces の enum を const-object 化する型カスケードを回避)。decorator は `apps/app/src/**` で不使用を確認 — strip-types を当初「候補外」とした 3 制約をすべて解消。
+  - **追補 (2026-06-15, フラグ全廃)**: 上記「ソース無変更で transform 吸収」を変更し、enum 6 件 (server 5 + client 1) を const-object+union、parameter property 3 件を明示フィールド代入に erasable 化。`--experimental-transform-types` を `tsrun` 定義から削除して全廃し、Node 24 デフォルト strip-only (フラグ無し) で実行。`tsconfig.json` に `erasableSyntaxOnly: true` を常設し回帰防止 (CI lint で検出)。型カスケードは `SearchDelegatorName` の型位置参照 2 箇所のみ (`typeof` 追加)。検証: tsgo --noEmit (erasableSyntaxOnly 込み) exit0 / フラグ無し strip-only で crowi cold-load 3.40s / biome green。
+  - **実測 (Node v24.16.0, crowi グラフ cold-load, warm disk, 各 3 回)**: native transform = 2.42–2.79s / tsx = 5.82–6.38s → **約 2.3× 高速** (native は transform キャッシュ無しでも tsx 上回り = ボトルネックは tsx の loader-hook 往復)。
+  - **サンドボックス検証**: crowi グラフ cold-load OK (resolver で全エイリアス/拡張子解決成立) / typecheck (tsgo --noEmit) green / biome green / openapi apiv3 spec 生成成功 (native cli.ts)。
+  - **実 DB / 本番 boot は push 後 CI** (`ci-app.yml` launch-dev/test/test-es, `ci-app-prod.yml` build-prod/launch-prod — 本番 `migrate:umzug` の native 経路もここで検証) で確認する。
+  - _Supersedes: 3.7.a/3.7.b の tsx 採用_
+
 - [ ] 3.8 Phase 3 統合ゲート (MANDATORY — 迂回禁止)
 
   > **サンドボックス実行状況 (2026-06-14, gate 未完)**: 本ゲートは全サブが本番出力 ×

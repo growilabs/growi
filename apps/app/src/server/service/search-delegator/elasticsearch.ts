@@ -82,7 +82,7 @@ type Data = any;
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
 {
-  name!: SearchDelegatorName.DEFAULT;
+  name!: typeof SearchDelegatorName.DEFAULT;
 
   private socketIoService!: SocketIoService;
 
