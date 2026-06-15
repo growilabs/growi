@@ -6,15 +6,30 @@ a human uses to find weak wiki domains. It deliberately derives every number FRO
 RANKINGS — it never reads an absolute "N out of 10" score, because absolute scores drift
 between runs while relative rank does not.
 
+Verdict vocabulary (matches SKILL.md step 4):
+
+  has-sibling world (a home already exists in the tree)
+    "hit"            correct save location is among the proposals; needs "rank"
+    "near-miss"      a proposal is an ancestor/descendant of the correct location —
+                     right neighborhood, wrong depth (the dominant real failure:
+                     stopping at the category instead of the topic page)
+    "miss"           no proposal is the location or an ancestor/descendant of it
+
+  no-sibling world (a brand-new path is the correct behavior)
+    "hit-new"        proposed a sensible new path matching the intended new home
+    "near-miss-new"  proposed a new path but at an off level/neighborhood
+    "miss-misfiled"  forced the document into an existing location instead of a new one
+
 Input: a JSON file (or stdin) shaped as a list of per-document verdicts:
 
     [
       {
-        "label": "auto-scroll spec",     # free-form, for your own reference
-        "domain": "dev-wiki",            # the grouping axis (wiki area, doc type, ...)
-        "verdict": "hit",                # "hit" | "miss-reachable" | "miss-total"
-        "rank": 1                        # 1-based position of the correct path; required
-                                         #   when verdict == "hit", omit/None otherwise
+        "label": "presentation algorithm spec",  # free-form, for your own reference
+        "domain": "dev-wiki",                     # the grouping axis (wiki area, doc type)
+        "verdict": "hit",                         # one of the seven above
+        "rank": 1                                 # 1-based position of the correct save
+                                                  #   location; REQUIRED for "hit",
+                                                  #   omit/None for every other verdict
       },
       ...
     ]
@@ -33,9 +48,15 @@ import sys
 from collections import defaultdict
 
 HIT = "hit"
-MISS_REACHABLE = "miss-reachable"
-MISS_TOTAL = "miss-total"
-VALID_VERDICTS = {HIT, MISS_REACHABLE, MISS_TOTAL}
+NEAR_MISS = "near-miss"
+MISS = "miss"
+HIT_NEW = "hit-new"
+NEAR_MISS_NEW = "near-miss-new"
+MISS_MISFILED = "miss-misfiled"
+
+# Verdicts that carry a numeric rank (only the has-sibling exact hit does).
+RANKED_VERDICTS = {HIT}
+VALID_VERDICTS = {HIT, NEAR_MISS, MISS, HIT_NEW, NEAR_MISS_NEW, MISS_MISFILED}
 
 
 def load_verdicts(path):
@@ -53,23 +74,27 @@ def validate(entry, index):
             f"entry {index}: verdict must be one of {sorted(VALID_VERDICTS)}, "
             f"got {verdict!r}"
         )
-    if verdict == HIT:
+    if verdict in RANKED_VERDICTS:
         rank = entry.get("rank")
         if not isinstance(rank, int) or rank < 1:
             raise ValueError(
-                f"entry {index}: a 'hit' needs a 1-based integer 'rank', got {rank!r}"
+                f"entry {index}: a {verdict!r} needs a 1-based integer 'rank', "
+                f"got {rank!r}"
             )
 
 
 def summarize(entries, top_n):
     """Return a stats dict for one group of verdicts."""
     total = len(entries)
-    hits = [e for e in entries if e["verdict"] == HIT]
-    top1 = sum(1 for e in hits if e["rank"] == 1)
-    topn = sum(1 for e in hits if e["rank"] <= top_n)
-    miss_reachable = sum(1 for e in entries if e["verdict"] == MISS_REACHABLE)
-    miss_total = sum(1 for e in entries if e["verdict"] == MISS_TOTAL)
-    mean_rank = sum(e["rank"] for e in hits) / len(hits) if hits else None
+    ranked_hits = [e for e in entries if e["verdict"] in RANKED_VERDICTS]
+    top1 = sum(1 for e in ranked_hits if e["rank"] == 1)
+    topn = sum(1 for e in ranked_hits if e["rank"] <= top_n)
+    mean_rank = (
+        sum(e["rank"] for e in ranked_hits) / len(ranked_hits) if ranked_hits else None
+    )
+
+    def count(verdict):
+        return sum(1 for e in entries if e["verdict"] == verdict)
 
     def rate(n):
         return n / total if total else 0.0
@@ -78,15 +103,18 @@ def summarize(entries, top_n):
         "documents": total,
         "top1_rate": rate(top1),
         f"top{top_n}_rate": rate(topn),
+        "hit_new": count(HIT_NEW),
         "mean_rank_when_hit": mean_rank,
-        "miss_reachable": miss_reachable,  # selection problem (parent/sibling proposed)
-        "miss_total": miss_total,          # retrieval problem (correct page never reached)
+        "near_miss": count(NEAR_MISS) + count(NEAR_MISS_NEW),
+        "miss": count(MISS),
+        "misfiled": count(MISS_MISFILED),
     }
 
 
 def fmt(value):
     if value is None:
-        return "—"
+        # ASCII placeholder: a Windows cp932 console cannot encode an em-dash.
+        return "-"
     if isinstance(value, float):
         return f"{value:.0%}" if value <= 1.0 else f"{value:.2f}"
     return str(value)
@@ -113,9 +141,11 @@ def main():
         ("documents", "docs"),
         ("top1_rate", "top1"),
         (topn_key, f"top{top_n}"),
+        ("hit_new", "hit-new"),
         ("mean_rank_when_hit", "mean-rank"),
-        ("miss_reachable", "miss-reach"),
-        ("miss_total", "miss-total"),
+        ("near_miss", "near-miss"),
+        ("miss", "miss"),
+        ("misfiled", "misfiled"),
     ]
 
     rows = []
