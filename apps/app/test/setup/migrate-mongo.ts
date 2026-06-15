@@ -8,7 +8,9 @@ let migrationsRun = false;
 
 /**
  * Run database migrations using external process.
- * This uses the existing dev:migrate:up script (migrate-mongo via plain node + umzug via tsx).
+ * This uses the existing dev:migrate:up script (migrate-mongo via plain node +
+ * umzug via Node's native TS runner — `--experimental-transform-types` + the
+ * resolve-only hook in bin/dev-esm-resolver.mjs, no tsx).
  */
 function runMigrations(mongoUri: string): void {
   // Run migrations using the existing script with custom MONGO_URI
@@ -24,11 +26,12 @@ function runMigrations(mongoUri: string): void {
 
 // 20s timeout (2x the 10s default): this hook spawns `dev:migrate:up`, which
 // runs every migration through the dev TS runner once per Vitest worker. The
-// default 10s is borderline under the parallel integration run; 20s gives a
-// modest margin without normalizing a runaway threshold. NOTE: if this keeps
-// flaking, the real cause is the dev runner's per-file resolve/load cost over
-// the migration import fan-out (see esm-migration research.md §"dev runner
-// bake-off") — fix the runner perf (Phase 3.8.e ±20% gate), not this number.
+// dev runner is now Node-native (transform mode + a synchronous resolve-only
+// hook), ~2x faster to load the graph than the former tsx, so per-file
+// resolve/load is no longer the bottleneck — the residual time is mostly DB
+// I/O under the parallel integration run. 20s is a modest margin over that;
+// any further reduction should follow a measured baseline (Phase 3.8.e ±20%
+// gate on the devcontainer), not a guess.
 beforeAll(() => {
   // Skip if already run (setupFiles run per test file, but we only need to migrate once per worker)
   if (migrationsRun) {

@@ -278,6 +278,21 @@ module.exports = (crowi, app) => {
 - **Rationale**: 「ts-node のままは不可」(`"type": "module"` と非互換) と「ESM 化後の最適ランナーは GROWI のプロファイル依存」(fan-out 量 + 型チェック off + Node 24) の両方を踏まえ、単一ツールの事前選定ではなく測定駆動で決める。bake-off の生データを `dev-runner-bench.md` として保存し、将来の再評価時に比較基準として再利用可能にする。
 - **Superseded notes**: 当初の「tsx 一本化」判断は、研究段階で実ワークロード未計測だったことに起因する。design.md の Dev Runner Adapter および tasks.md の 3.7.a / 3.7.b が最新の権威ソース。
 
+### Decision: 開発/CI/本番マイグレーションの TS ランナーを Node v24 ネイティブ (transform) に一本化 (2026-06-15 改訂)
+
+- **Context**: 3.7.a で暫定採用した `tsx` は ESM loader hook (worker round-trip) 経由の resolve/load が GROWI の大量 import fan-out に定数コストを上乗せし、dev 起動を劣化させていた (上記 bake-off 参照)。Node.js 24 では型ストリップがデフォルト有効で、`--experimental-transform-types` を併用すれば enum / parameter property も含めてネイティブに実行できる。当初 strip-types を「候補外」とした 3 つの理由 (path alias 未対応 / enum 制約 / decorator 制約) を個別に再評価し、いずれも解消できることを確認した。
+- **解消した制約**:
+  - **path alias / `.js`→`.ts` 解決**: `module.registerHooks` (Node 24, 同期 in-thread フック) で *resolve のみ* を担う `apps/app/bin/dev-esm-resolver.mjs` を実装。`~/`→`src/`、`^/`→app root、相対/拡張子無し `.js`→`.ts`、`index.*` を解決。transform はフックせず Node 本体に委ねるため、tsx のような per-module loader-hook 往復コストが無い。
+  - **enum**: `--experimental-transform-types` が enum を変換 (strip-only は `ERR_UNSUPPORTED_TYPESCRIPT_SYNTAX` で拒否)。server-reachable な enum は 5 件 (`interfaces/in-app-notification.ts` ×3, `interfaces/named-query.ts`, `service/file-uploader/multipart-uploader.ts`)。共有 interfaces の enum を const-object へ書き換えると union 型カスケードのリスクがあるため、ソースは変更せず transform mode で吸収する方針。
+  - **parameter property**: 同じく transform mode が対応 (`s2s-messaging/nchan.ts`, `openai/.../sse-helper.ts`, `openai/.../llm-response-stream-processor.ts` の 3 箇所)。
+  - **decorator**: `apps/app/src/**` に decorator 使用なし (調査済み) — 制約に該当せず。
+- **実測 (本サンドボックス, Node v24.16.0, crowi グラフ cold-load, warm disk, 各 3 回)**: native transform = 2.42–2.79s / tsx = 5.82–6.38s。**native が約 2.3× 高速**。native は transform キャッシュを持たず毎回変換するにもかかわらず tsx を上回る → 「ボトルネックは transform 速度ではなく tsx の loader-hook resolve/load 往復」という bake-off の推定を裏付けた。
+- **Selected Approach**: 全 TS ランナー呼び出し (dev / dev:migrate-mongo / dev:umzug / launch-dev:ci / repl / snapshot-routes / authz-matrix:capture/verify / ws-authz-matrix:capture/verify / 本番 migrate:umzug / openapi apiv3 cli) を `node --experimental-transform-types --import ./bin/dev-esm-resolver.mjs ...` に統一。`tsx` を dependencies から削除。`apps/app` の engines に `node: ^24` を明示。
+- **本番への影響**: `migrate:umzug` (preserver 経由で本番起動前に実行) も native 化。本番 CI は Node 24.x (`ci-app-prod.yml`)、`pnpm deploy --prod` は `bin/` と `prisma/` を同梱するため resolver と `prisma/migrate.ts` は tarball に含まれる。`prisma/migrations/` は現状空 (`.keep` のみ) のため umzug は migrate.ts のブートのみ。
+- **Trade-offs**: `--experimental-transform-types` は experimental フラグで、起動時に ExperimentalWarning を stderr に出す (機能自体は安定 / Amaro=swc ベース)。strip-only + erasable-syntax (enum・parameter property をソース側で全廃) にすればフラグ無しで動くが、共有 interfaces の enum を union 化する型カスケードを避けるため今回は見送り。将来 TypeScript の `erasableSyntaxOnly` 導入時の選択肢として残す。
+- **検証**: グラフ cold-load OK / typecheck (tsgo --noEmit) OK / biome OK / openapi apiv3 生成 OK。dev boot・integration・prod boot は実 DB を要するため CI (`ci-app.yml` の launch-dev/test/test-es, `ci-app-prod.yml`) で確認する。
+- **Supersedes**: 上記「bake-off で実測選定」(2026-04-20) が最低候補を `tsx`/`@swc-node/register` としていた点。最終選定は **Node v24 ネイティブ transform + resolve-only hook** であり、tsx は撤去する。
+
 ### Decision: CJS のまま残す設定は .cjs リネーム
 
 - **Context**: CLI (migrate-mongo, nodemon, i18next) が消費する設定は `require()` 構文。
