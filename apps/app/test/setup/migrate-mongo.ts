@@ -22,6 +22,13 @@ function runMigrations(mongoUri: string): void {
   });
 }
 
+// 20s timeout (2x the 10s default): this hook spawns `dev:migrate:up`, which
+// runs every migration through the dev TS runner once per Vitest worker. The
+// default 10s is borderline under the parallel integration run; 20s gives a
+// modest margin without normalizing a runaway threshold. NOTE: if this keeps
+// flaking, the real cause is the dev runner's per-file resolve/load cost over
+// the migration import fan-out (see esm-migration research.md §"dev runner
+// bake-off") — fix the runner perf (Phase 3.8.e ±20% gate), not this number.
 beforeAll(() => {
   // Skip if already run (setupFiles run per test file, but we only need to migrate once per worker)
   if (migrationsRun) {
@@ -40,4 +47,4 @@ beforeAll(() => {
 
   runMigrations(mongoUri);
   migrationsRun = true;
-});
+}, 20_000);

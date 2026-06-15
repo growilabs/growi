@@ -297,8 +297,6 @@ if (require.main === module) {
           parser,
           '--ignore-pattern',
           '**/node_modules/**',
-          '--ignore-pattern',
-          '**/src/migrations/**',
           ...passPaths,
         ],
         { stdio: 'inherit', cwd: path.resolve(__dirname, '../..') },

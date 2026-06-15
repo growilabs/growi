@@ -1,12 +1,12 @@
 import mongoose from 'mongoose';
 
-import getPageModel from '~/server/models/page';
+import getPageModel from '~/server/models/page.js';
 import {
   getModelSafely,
   getMongoUri,
   mongoOptions,
-} from '~/server/util/mongoose-utils';
-import loggerFactory from '~/utils/logger';
+} from '~/server/util/mongoose-utils.js';
+import loggerFactory from '~/utils/logger/index.js';
 
 const logger = loggerFactory('growi:migrate:add-column-is-trashed');
 
@@ -24,50 +24,48 @@ const updateIsPageTrashed = async (db, updateIdList) => {
     );
 };
 
-module.exports = {
-  async up(db) {
-    logger.info('Apply migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
-    const Page = getModelSafely('Page') || getPageModel();
+export async function up(db) {
+  logger.info('Apply migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
+  const Page = getModelSafely('Page') || getPageModel();
 
-    let updateDeletedPageIds = [];
+  let updateDeletedPageIds = [];
 
-    // set isPageTrashed as false temporarily
+  // set isPageTrashed as false temporarily
+  await db
+    .collection('pagetagrelations')
+    .updateMany({}, { $set: { isPageTrashed: false } });
+
+  for await (const deletedPage of Page.find({ status: Page.STATUS_DELETED })
+    .select('_id')
+    .cursor()) {
+    updateDeletedPageIds.push(deletedPage._id);
+    // excute updateMany by one thousand ids
+    if (updateDeletedPageIds.length === LIMIT) {
+      await updateIsPageTrashed(db, updateDeletedPageIds);
+      updateDeletedPageIds = [];
+    }
+  }
+
+  // use ids that have not been updated
+  if (updateDeletedPageIds.length > 0) {
+    await updateIsPageTrashed(db, updateDeletedPageIds);
+  }
+
+  logger.info('Migration has successfully applied');
+}
+
+export async function down(db) {
+  logger.info('Rollback migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
+
+  try {
     await db
       .collection('pagetagrelations')
-      .updateMany({}, { $set: { isPageTrashed: false } });
-
-    for await (const deletedPage of Page.find({ status: Page.STATUS_DELETED })
-      .select('_id')
-      .cursor()) {
-      updateDeletedPageIds.push(deletedPage._id);
-      // excute updateMany by one thousand ids
-      if (updateDeletedPageIds.length === LIMIT) {
-        await updateIsPageTrashed(db, updateDeletedPageIds);
-        updateDeletedPageIds = [];
-      }
-    }
-
-    // use ids that have not been updated
-    if (updateDeletedPageIds.length > 0) {
-      await updateIsPageTrashed(db, updateDeletedPageIds);
-    }
-
-    logger.info('Migration has successfully applied');
-  },
-
-  async down(db) {
-    logger.info('Rollback migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
-
-    try {
-      await db
-        .collection('pagetagrelations')
-        .updateMany({}, { $unset: { isPageTrashed: '' } });
-      logger.info('Migration has been successfully rollbacked');
-    } catch (err) {
-      logger.error(err);
-      logger.info('Migration has failed');
-    }
-  },
-};
+      .updateMany({}, { $unset: { isPageTrashed: '' } });
+    logger.info('Migration has been successfully rollbacked');
+  } catch (err) {
+    logger.error(err);
+    logger.info('Migration has failed');
+  }
+}

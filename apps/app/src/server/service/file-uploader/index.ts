@@ -9,6 +9,22 @@ export type { FileUploader } from './file-uploader.js';
 
 const logger = loggerFactory('growi:service:FileUploaderServise');
 
+// Static loader map keyed by resolved module name. Each entry uses an explicit,
+// statically analyzable specifier with the correct path: `aws`/`gcs` are
+// directories (`/index.js`); the rest are sibling files (`.js`). A computed
+// `import(\`./${method}\`)` cannot express the file-vs-directory distinction —
+// it broke NodeNext's runtime resolver in production (task 3.8.b): a bare
+// `./aws` only worked under tsx's lenient dev resolution, and `./aws.js`
+// (file) does not match the `aws/` directory.
+const uploaderModuleLoaders = {
+  aws: () => import('./aws/index.js'),
+  gcs: () => import('./gcs/index.js'),
+  azure: () => import('./azure.js'),
+  gridfs: () => import('./gridfs.js'),
+  local: () => import('./local.js'),
+  none: () => import('./none.js'),
+};
+
 // Do NOT memoize the uploader instance here: Crowi.setUpFileUpload(isForceUpdate=true)
 // relies on every call re-reading app:fileUploadType and producing a fresh uploader
 // (admin settings change, S2S switch propagation, G2G transfer). The ESM loader
@@ -16,10 +32,16 @@ const logger = loggerFactory('growi:service:FileUploaderServise');
 export const getUploader = async (crowi: Crowi): Promise<FileUploader> => {
   const method =
     EnvToModuleMappings[configManager.getConfig('app:fileUploadType')];
-  const modulePath = `./${method}`;
-  const mod = await import(modulePath);
-  const factory = mod.default ?? mod.setup ?? mod;
-  const uploader = factory(crowi);
+  const loadUploaderModule =
+    uploaderModuleLoaders[method as keyof typeof uploaderModuleLoaders];
+  if (loadUploaderModule == null) {
+    throw new Error(`Unknown file upload method: '${method}'`);
+  }
+  const { setup } = await loadUploaderModule();
+  // The per-uploader `setup` returns its concrete subtype; the union is not
+  // structurally assignable to the `FileUploader` supertype, so narrow it back
+  // here (the previous computed `import()` returned `any` and skipped this).
+  const uploader = setup(crowi) as FileUploader;
 
   if (uploader == null) {
     logger.warn('Failed to initialize uploader.');

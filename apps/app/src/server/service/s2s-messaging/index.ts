@@ -56,7 +56,9 @@ class S2sMessagingServiceFactory {
 
     const moduleFileName = envToModuleMappings[type];
 
-    const modulePath = `./${moduleFileName}`;
+    // Explicit `.js`: template-literal dynamic import — NodeNext's runtime ESM
+    // resolver needs the extension (extensionless -> ERR_MODULE_NOT_FOUND).
+    const modulePath = `./${moduleFileName}.js`;
     const mod = await import(modulePath);
     const factory = mod.default ?? mod.setup ?? mod;
     this.delegator = factory(crowi);
