@@ -27,6 +27,12 @@
     "noImplicitAny": false,
     "noImplicitOverride": true,
 
+    // Enforce erasable-only TS (no enum / parameter properties / namespaces) so
+    // the server runs under Node's native type stripping with no
+    // --experimental-transform-types (esm-migration task 3.7.c). tsgo --noEmit
+    // (CI lint) fails if a non-erasable construct is reintroduced.
+    "erasableSyntaxOnly": true,
+
     // Note: To transform paths for both the output .js and .d.ts files, you need both of the below entries
     "plugins": [
       // Transform paths in output .js files

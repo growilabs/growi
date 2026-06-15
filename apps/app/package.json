@@ -9,7 +9,7 @@
   },
   "scripts": {
     "//// shared (native ts runner: Node 24 transform + path-alias resolve hook)": "",
-    "tsrun": "node --experimental-transform-types --import ./bin/dev-esm-resolver.mjs --import dotenv-flow/config.js",
+    "tsrun": "node --import ./bin/dev-esm-resolver.mjs --import dotenv-flow/config.js",
     "//// for production": "",
     "postinstall": "prisma generate",
     "build": "run-p build:*",

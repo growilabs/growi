@@ -1,9 +1,9 @@
 /**
  * Dev/CI ESM resolver hook for running GROWI's TypeScript server from source
- * under Node's native TypeScript support (Node >= 24). The scripts that load
- * this run Node with `--experimental-transform-types`, so Node compiles `.ts`
- * in-process *including* enum / parameter-property syntax that strip-only mode
- * rejects — no external transform tool (tsx / ts-node) is involved.
+ * under Node's native type stripping (Node >= 24, enabled by default — no
+ * `--experimental-*` flag). The project keeps its source erasable (no TS enum
+ * or parameter properties), so Node strips types in-process with no external
+ * transform tool (tsx / ts-node) involved.
  *
  * This hook only does *resolution* — it teaches Node's loader the project's
  * path aliases and the `.js`->`.ts` source mapping — so there is no per-module
@@ -13,7 +13,7 @@
  *
  * Registered synchronously via `module.registerHooks` (no worker-thread round
  * trip). Used by the dev / migrate / repl scripts:
- *   node --experimental-transform-types --import ./bin/dev-esm-resolver.mjs <entry>.ts
+ *   node --import ./bin/dev-esm-resolver.mjs <entry>.ts
  *
  * Resolution rules (mirrors tsconfig.json `paths` + NodeNext `.js` specifiers):
  *   ~/x        -> <app>/src/x      (.ts/.tsx/.js/index.ts/...)

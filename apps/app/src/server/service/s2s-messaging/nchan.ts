@@ -28,13 +28,17 @@ class NchanDelegator extends AbstractS2sMessagingService {
 
   socket: any = null;
 
-  constructor(
-    uri,
-    private publishPath: string,
-    private subscribePath: string,
-    private channelId: any,
-  ) {
+  private publishPath: string;
+
+  private subscribePath: string;
+
+  private channelId: any;
+
+  constructor(uri, publishPath: string, subscribePath: string, channelId: any) {
     super(uri);
+    this.publishPath = publishPath;
+    this.subscribePath = subscribePath;
+    this.channelId = channelId;
   }
 
   /**
