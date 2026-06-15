@@ -84,6 +84,26 @@ describe('SearchService test', () => {
 
       expect(terms).toStrictEqual(expected);
     });
+
+    it('should accumulate multiple values for the same filter', async () => {
+      const queryString =
+        'author:a1 author:a2 -author:a3 editor:e1 editor:e2 group:g1 -group:g2 -group:g3';
+      const terms = await searchService.parseQueryString(queryString);
+
+      expect(terms.author).toStrictEqual(['a1', 'a2']);
+      expect(terms.not_author).toStrictEqual(['a3']);
+      expect(terms.editor).toStrictEqual(['e1', 'e2']);
+      expect(terms.group).toStrictEqual(['g1']);
+      expect(terms.not_group).toStrictEqual(['g2', 'g3']);
+    });
+
+    it('should treat a filter prefix with no value as a match word', async () => {
+      const terms = await searchService.parseQueryString('author: editor:');
+
+      expect(terms.author).toStrictEqual([]);
+      expect(terms.editor).toStrictEqual([]);
+      expect(terms.match).toStrictEqual(['author:', 'editor:']);
+    });
   });
 
   describe('parseSearchQuery()', () => {
