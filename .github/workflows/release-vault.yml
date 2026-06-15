@@ -5,16 +5,12 @@ name: Release Docker Image for @growi/vault-manager
 # Trigger: a pull request into a `release/vault-manager/**` branch being MERGED
 # (closed with merge). The version comes from apps/growi-vault-manager/package.json.
 #
-# Required secrets (must be provisioned in the repository/organization):
-#   - DHI_REGISTRY_USERNAME / DHI_REGISTRY_PASSWORD
-#       Credentials for the Docker Hardened Images registry (dhi.io). The release
-#       stage of the Dockerfile pulls `dhi.io/node:24-debian13-dev`, so the runner
-#       must authenticate to dhi.io at build time. (apps/app builds on AWS
-#       CodeBuild where this auth already exists; GitHub Actions has no dhi.io
-#       secret yet — add these before the first release.)
+# Secrets (already available in GitHub Actions):
 #   - DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE
-#       Docker Hub push credentials for the `growimoogle` account (same secret
-#       used by release-pdf-converter.yml).
+#       Password/token for the `growimoogle` Docker Hub account. Used both to
+#       pull the DHI base image from dhi.io (the release stage pulls
+#       `dhi.io/node:24-debian13-dev`) and to push the built image to docker.io.
+#       Same secret used by release-pdf-converter.yml.
 #
 # Assumptions to confirm in review:
 #   - Docker Hub repository name: growilabs/vault-manager
@@ -54,13 +50,14 @@ jobs:
           type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}
           type=semver,value=${{ steps.package-json.outputs.packageVersion }},pattern={{major}}.{{minor}}.{{patch}}
 
-    # Authenticate to dhi.io so the release stage can pull the DHI dev base image.
+    # Authenticate to dhi.io so the release stage can pull the DHI dev base image
+    # (uses the same growimoogle Docker Hub credentials as the docker.io push).
     - name: Login to dhi.io registry (DHI base image pull)
       uses: docker/login-action@v3
       with:
         registry: dhi.io
-        username: ${{ secrets.DHI_REGISTRY_USERNAME }}
-        password: ${{ secrets.DHI_REGISTRY_PASSWORD }}
+        username: growimoogle
+        password: ${{ secrets.DOCKER_REGISTRY_PASSWORD_GROWIMOOGLE }}
 
     - name: Login to docker.io registry (push target)
       uses: docker/login-action@v3
