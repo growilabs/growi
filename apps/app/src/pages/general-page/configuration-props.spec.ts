@@ -27,7 +27,11 @@ import { getServerSideGeneralPageProps } from './configuration-props';
 const buildContext = (isAiReady: boolean): GetServerSidePropsContext => {
   const req = mockDeep<CrowiRequest>();
   req.crowi.isAiReady.mockReturnValue(isAiReady);
-  return { req } as unknown as GetServerSidePropsContext;
+  const context = mockDeep<GetServerSidePropsContext>();
+  // The builder narrows context.req to CrowiRequest internally (configuration-props.ts:59);
+  // localize the cast to the single req field rather than the whole context object.
+  context.req = req as unknown as GetServerSidePropsContext['req'];
+  return context;
 };
 
 const getAiEnabledProp = async (isAiReady: boolean): Promise<boolean> => {
