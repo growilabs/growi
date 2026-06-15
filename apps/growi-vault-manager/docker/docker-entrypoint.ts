@@ -3,7 +3,7 @@
  *
  * Run directly by Node.js 24 native type stripping (no build step): the image
  * COPYs this file to /docker-entrypoint.ts and runs `node /docker-entrypoint.ts`
- * (see apps/growi-vault-manager/Dockerfile). Uses only erasable TypeScript syntax
+ * (see apps/growi-vault-manager/docker/Dockerfile). Uses only erasable TypeScript syntax
  * (no enums / namespaces) so it is kept out of the compiled `dist/` artifact.
  *
  * Why an entrypoint instead of `CMD ["node", "dist/index.js"]`:

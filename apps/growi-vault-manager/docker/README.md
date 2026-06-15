@@ -8,7 +8,7 @@ GROWI Vault Manager Official docker image
 Dockerfile link
 ------------------------------------------------
 
-https://github.com/growilabs/growi/blob/master/apps/growi-vault-manager/Dockerfile
+https://github.com/growilabs/growi/blob/master/apps/growi-vault-manager/docker/Dockerfile
 
 
 What is GROWI Vault Manager used for?

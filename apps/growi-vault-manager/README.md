@@ -79,7 +79,7 @@ The following items are **not supported** in the current MVP:
 
 ## Docker image (DHI multi-stage build)
 
-The `apps/growi-vault-manager/Dockerfile` has been refactored to align with `apps/app/docker/Dockerfile`. The new build is a **5-stage multi-stage build** (`base` → `pruner` → `deps` → `builder` → `release`). The build stages run on the official `node:24-bookworm` image, and only the `release` stage runs on a [Docker Hardened Image](https://hub.docker.com/u/dhi) (`dhi.io/node:24-debian13-dev`). Because `vault-manager` spawns `git upload-pack` at runtime (see Requirement 10.3), the runtime stage uses the DHI **dev** variant so it retains a `git` binary (v2.30+). (Build stages stay on the official image because `corepack`'s global `pnpm` shim is not executable on the DHI dev image.)
+The `apps/growi-vault-manager/docker/Dockerfile` has been refactored to align with `apps/app/docker/Dockerfile`. The new build is a **5-stage multi-stage build** (`base` → `pruner` → `deps` → `builder` → `release`). The build stages run on the official `node:24-bookworm` image, and only the `release` stage runs on a [Docker Hardened Image](https://hub.docker.com/u/dhi) (`dhi.io/node:24-debian13-dev`). Because `vault-manager` spawns `git upload-pack` at runtime (see Requirement 10.3), the runtime stage uses the DHI **dev** variant so it retains a `git` binary (v2.30+). (Build stages stay on the official image because `corepack`'s global `pnpm` shim is not executable on the DHI dev image.)
 
 Highlights of the refactor:
 
@@ -111,7 +111,7 @@ Until `docker build` is wired into CI, the DHI-based image is verified manually.
 1. **Build the image** from the repository root:
 
    ```bash
-   docker build -f apps/growi-vault-manager/Dockerfile -t growi-vault-manager:local .
+   docker build -f apps/growi-vault-manager/docker/Dockerfile -t growi-vault-manager:local .
    ```
 
 2. **Confirm the runtime has `git` v2.30+**:
