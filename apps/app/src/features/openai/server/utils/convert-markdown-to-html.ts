@@ -40,12 +40,18 @@ const initializeModules = async (): Promise<void> => {
     { default: rehypeMeta },
     { default: rehypeStringify },
   ] = await Promise.all([
-    dynamicImport<typeof Unified>('unified', __dirname),
-    dynamicImport<typeof UnistUtilVisit>('unist-util-visit', __dirname),
-    dynamicImport<typeof RemarkParse>('remark-parse', __dirname),
-    dynamicImport<typeof RemarkRehype>('remark-rehype', __dirname),
-    dynamicImport<typeof RehypeMeta>('rehype-meta', __dirname),
-    dynamicImport<typeof RehypeStringify>('rehype-stringify', __dirname),
+    dynamicImport<typeof Unified>('unified', import.meta.dirname),
+    dynamicImport<typeof UnistUtilVisit>(
+      'unist-util-visit',
+      import.meta.dirname,
+    ),
+    dynamicImport<typeof RemarkParse>('remark-parse', import.meta.dirname),
+    dynamicImport<typeof RemarkRehype>('remark-rehype', import.meta.dirname),
+    dynamicImport<typeof RehypeMeta>('rehype-meta', import.meta.dirname),
+    dynamicImport<typeof RehypeStringify>(
+      'rehype-stringify',
+      import.meta.dirname,
+    ),
   ]);
 
   moduleCache = {

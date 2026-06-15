@@ -39,13 +39,14 @@ async function getPageWritable(
   this: IPageBulkExportJobCronService,
   pageBulkExportJob: PageBulkExportJobDocument,
 ): Promise<Writable> {
-  const unified = (await dynamicImport<typeof Unified>('unified', __dirname))
-    .unified;
+  const unified = (
+    await dynamicImport<typeof Unified>('unified', import.meta.dirname)
+  ).unified;
   const remarkParse = (
-    await dynamicImport<typeof RemarkParse>('remark-parse', __dirname)
+    await dynamicImport<typeof RemarkParse>('remark-parse', import.meta.dirname)
   ).default;
   const remarkHtml = (
-    await dynamicImport<typeof RemarkHtml>('remark-html', __dirname)
+    await dynamicImport<typeof RemarkHtml>('remark-html', import.meta.dirname)
   ).default;
 
   const isHtmlPath = pageBulkExportJob.format === PageBulkExportFormat.pdf;
