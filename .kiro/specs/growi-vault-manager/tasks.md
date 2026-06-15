@@ -13,7 +13,7 @@
 
 - [x] 1.2 Dockerfile と docker-compose 統合 (P)
   - _Requirements: 10.2, 10.3_
-  - _Boundary: apps/growi-vault-manager/Dockerfile, docker-compose.yml_
+  - _Boundary: apps/growi-vault-manager/docker/Dockerfile, docker-compose.yml_
 
 - [x] 1.3 Turborepo タスク設定と pnpm workspace 登録 (P)
   - _Requirements: 10.4_
@@ -288,20 +288,20 @@
 - [x] 18.1 release stage の git binary 取得戦略を確定（前提調査）
   - DHI distroless は shell も binary も持たないため、git v2.30+ を runtime に持ち込む方針を確定し記録する。採用方針: design.md「Dockerfile 構成戦略」参照。
   - _Requirements: 10.2, 10.3_
-  - _Boundary: apps/growi-vault-manager/Dockerfile（または .kiro/specs/growi-vault-manager/design.md の補足記述）_
+  - _Boundary: apps/growi-vault-manager/docker/Dockerfile（または .kiro/specs/growi-vault-manager/design.md の補足記述）_
 
 - [x] 18.2 multi-stage 構成へリファクタ（DHI base + turbo prune）
   - `base` / `pruner` / `deps` / `builder` / `release` の 5 stage 構成に書き換える。
   - _Requirements: 10.2, 10.3_
-  - _Boundary: apps/growi-vault-manager/Dockerfile_
+  - _Boundary: apps/growi-vault-manager/docker/Dockerfile_
 
 - [x] 18.3 専用 Dockerfile.dockerignore の追加
   - _Requirements: 10.2_
-  - _Boundary: apps/growi-vault-manager/Dockerfile.dockerignore_
+  - _Boundary: apps/growi-vault-manager/docker/Dockerfile.dockerignore_
 
 - [x] 18.4 OCI 標準 label の付与
   - _Requirements: 10.2_
-  - _Boundary: apps/growi-vault-manager/Dockerfile_
+  - _Boundary: apps/growi-vault-manager/docker/Dockerfile_
 
 - [x] 18.5 既存ワークフロー / CI 互換性確認
   - 別リポジトリ growi-docker-compose からの参照は越境のため別 PR で告知。
