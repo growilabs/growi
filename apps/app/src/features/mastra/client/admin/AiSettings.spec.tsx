@@ -1,6 +1,7 @@
 // @vitest-environment happy-dom
 
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type {
@@ -74,8 +75,8 @@ const getSaveButton = (): HTMLElement =>
 
 // Submitting the form kicks off react-hook-form's async handler (validation +
 // the awaited save). Wait until `save` is observed to ensure it has settled.
-const submitForm = (): void => {
-  fireEvent.click(getSaveButton());
+const submitForm = async (): Promise<void> => {
+  await userEvent.setup().click(getSaveButton());
 };
 
 describe('AiSettings', () => {
@@ -96,7 +97,7 @@ describe('AiSettings', () => {
 
       // Act
       render(<AiSettings />);
-      submitForm();
+      await submitForm();
 
       // Assert: booleans are always sent; string fields are sent as-is.
       await waitFor(() => {
@@ -117,7 +118,7 @@ describe('AiSettings', () => {
 
       // Act
       render(<AiSettings />);
-      submitForm();
+      await submitForm();
 
       // Assert: a blank apiKey keeps the existing stored key (it is omitted).
       await waitFor(() => {
@@ -131,11 +132,13 @@ describe('AiSettings', () => {
       setData();
 
       // Act
+      const user = userEvent.setup();
       render(<AiSettings />);
-      fireEvent.change(screen.getByLabelText('ai_settings.api_key_label'), {
-        target: { value: 'sk-new-key' },
-      });
-      submitForm();
+      await user.type(
+        screen.getByLabelText('ai_settings.api_key_label'),
+        'sk-new-key',
+      );
+      await submitForm();
 
       // Assert
       await waitFor(() => {
@@ -150,7 +153,7 @@ describe('AiSettings', () => {
 
       // Act
       render(<AiSettings />);
-      submitForm();
+      await submitForm();
 
       // Assert: the '' sentinel is converted to undefined for the DTO.
       await waitFor(() => {
@@ -164,11 +167,12 @@ describe('AiSettings', () => {
       setData({ provider: 'openai', model: 'gpt-4o' });
 
       // Act
+      const user = userEvent.setup();
       render(<AiSettings />);
-      fireEvent.change(screen.getByLabelText('ai_settings.model_label'), {
-        target: { value: 'gpt-4o-mini' },
-      });
-      submitForm();
+      const modelInput = screen.getByLabelText('ai_settings.model_label');
+      await user.clear(modelInput);
+      await user.type(modelInput, 'gpt-4o-mini');
+      await submitForm();
 
       // Assert
       await waitFor(() => {
@@ -184,7 +188,7 @@ describe('AiSettings', () => {
 
       // Act
       render(<AiSettings />);
-      submitForm();
+      await submitForm();
 
       // Assert
       await waitFor(() => {
@@ -201,10 +205,12 @@ describe('AiSettings', () => {
       save.mockRejectedValue(new Error('update failed'));
 
       // Act
+      const user = userEvent.setup();
       render(<AiSettings />);
       const modelInput = screen.getByLabelText('ai_settings.model_label');
-      fireEvent.change(modelInput, { target: { value: 'edited-model' } });
-      submitForm();
+      await user.clear(modelInput);
+      await user.type(modelInput, 'edited-model');
+      await submitForm();
 
       // Assert: failure surfaces a toast...
       await waitFor(() => {

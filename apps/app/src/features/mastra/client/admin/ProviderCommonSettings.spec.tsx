@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 import type { JSX, ReactNode } from 'react';
-import { act, fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -115,11 +116,9 @@ describe('ProviderCommonSettings', () => {
         'ai_settings.provider_options_label',
       );
 
-      // Act: enter malformed JSON (onChange validation runs synchronously).
-      await act(async () => {
-        fireEvent.change(textarea, { target: { value: '{ invalid json' } });
-        await Promise.resolve();
-      });
+      // Act: enter malformed JSON (the leading `{` is escaped as `{{` for
+      // userEvent's keyboard syntax; the field ends up containing `{ invalid json`).
+      await userEvent.setup().type(textarea, '{{ invalid json');
 
       // Assert: an inline error is surfaced for malformed JSON.
       expect(
@@ -134,13 +133,8 @@ describe('ProviderCommonSettings', () => {
         'ai_settings.provider_options_label',
       );
 
-      // Act
-      await act(async () => {
-        fireEvent.change(textarea, {
-          target: { value: '{"temperature":0.7}' },
-        });
-        await Promise.resolve();
-      });
+      // Act: the leading `{` is escaped as `{{` for userEvent's keyboard syntax.
+      await userEvent.setup().type(textarea, '{{"temperature":0.7}');
 
       // Assert
       expect(
@@ -180,10 +174,9 @@ describe('ProviderCommonSettings', () => {
   // previous provider, so the old provider's secret is never submitted/reused.
   describe('apiKey provider-change handling (security)', () => {
     const changeProvider = async (value: string) => {
-      await act(async () => {
-        fireEvent.change(screen.getByRole('combobox'), { target: { value } });
-        await Promise.resolve();
-      });
+      await userEvent
+        .setup()
+        .selectOptions(screen.getByRole('combobox'), value);
     };
 
     it('warns that the saved key will be discarded when the provider changes and a key is stored', async () => {
@@ -215,12 +208,7 @@ describe('ProviderCommonSettings', () => {
         'ai_settings.api_key_label',
       ) as HTMLInputElement;
 
-      await act(async () => {
-        fireEvent.change(apiKeyInput, {
-          target: { value: 'sk-typed-for-openai' },
-        });
-        await Promise.resolve();
-      });
+      await userEvent.setup().type(apiKeyInput, 'sk-typed-for-openai');
       expect(apiKeyInput.value).toBe('sk-typed-for-openai');
 
       await changeProvider('google');

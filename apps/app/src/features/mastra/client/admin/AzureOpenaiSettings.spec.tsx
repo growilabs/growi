@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 import type { JSX, ReactNode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -92,15 +93,16 @@ describe('AzureOpenaiSettings', () => {
     expect(screen.getByRole('switch')).toBeInTheDocument();
   });
 
-  it('shows the Entra ID api-key note only when useEntraId is true', () => {
+  it('shows the Entra ID api-key note only when useEntraId is true', async () => {
     // Arrange: note hidden by default
+    const user = userEvent.setup();
     renderComponent({ defaultValues: { azureOpenaiUseEntraId: false } });
     expect(
       screen.queryByText('ai_settings.azure_entra_id_api_key_note'),
     ).not.toBeInTheDocument();
 
     // Act: toggle the Entra ID switch on
-    fireEvent.click(screen.getByRole('switch'));
+    await user.click(screen.getByRole('switch'));
 
     // Assert
     expect(

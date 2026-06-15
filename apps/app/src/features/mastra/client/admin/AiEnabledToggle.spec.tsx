@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 import type { JSX, ReactNode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -55,14 +56,15 @@ describe('AiEnabledToggle', () => {
     expect(toggle).toBeChecked();
   });
 
-  it('toggles the checked state when clicked', () => {
+  it('toggles the checked state when clicked', async () => {
     // Arrange
+    const user = userEvent.setup();
     renderToggle({ defaultValues: { aiEnabled: false } });
     const toggle = screen.getByRole('switch');
     expect(toggle).not.toBeChecked();
 
     // Act
-    fireEvent.click(toggle);
+    await user.click(toggle);
 
     // Assert
     expect(toggle).toBeChecked();

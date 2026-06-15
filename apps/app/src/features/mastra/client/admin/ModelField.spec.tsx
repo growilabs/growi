@@ -1,7 +1,8 @@
 // @vitest-environment happy-dom
 
 import type { JSX, ReactNode } from 'react';
-import { fireEvent, render, screen } from '@testing-library/react';
+import { render, screen } from '@testing-library/react';
+import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
 import { describe, expect, it, vi } from 'vitest';
 
@@ -68,8 +69,9 @@ describe('ModelField', () => {
     expect(input).toHaveAttribute('type', 'text');
   });
 
-  it('binds the input to the form `model` value', () => {
+  it('binds the input to the form `model` value', async () => {
     // Arrange
+    const user = userEvent.setup();
     renderComponent({ defaultValues: { model: 'gpt-4o' } });
 
     // Assert: seeded value is shown...
@@ -79,7 +81,8 @@ describe('ModelField', () => {
     expect(input.value).toBe('gpt-4o');
 
     // ...and edits flow back into the field.
-    fireEvent.change(input, { target: { value: 'my-deployment' } });
+    await user.clear(input);
+    await user.type(input, 'my-deployment');
     expect(input.value).toBe('my-deployment');
   });
 
