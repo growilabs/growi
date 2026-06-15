@@ -37,7 +37,9 @@ Modernize and optimize the GROWI official Docker image's Dockerfile (`apps/app/d
 
 **Objective:** As an infrastructure administrator, I want the Dockerfile's base image and syntax to comply with the latest best practices, so that security patch application, performance improvements, and maintainability enhancements are achieved
 
-**Summary**: DHI base images adopted (`dhi.io/node:24-debian13-dev` for build, `dhi.io/node:24-debian13` for release) with up to 95% CVE reduction. Syntax directive updated to auto-follow latest stable. pnpm installed via wget standalone script (corepack not adopted due to planned removal in Node.js 25+). Fixed `---frozen-lockfile` typo and eliminated hardcoded pnpm version.
+**Summary**: DHI base images adopted (`dhi.io/node:24-debian13-dev` for build, `dhi.io/node:24-debian13` for release) with up to 95% CVE reduction. Syntax directive updated to auto-follow latest stable. pnpm activated via `corepack enable` (version pinned by the workspace `packageManager` field). Fixed `---frozen-lockfile` typo and eliminated hardcoded pnpm version.
+
+> **Decision update (2026-06):** The first implementation installed pnpm via the `wget https://get.pnpm.io/install.sh | sh` standalone script to avoid corepack (which is announced for removal in Node.js 25+). In practice that approach caused recurring build problems, so the Dockerfiles (`apps/app`, then `apps/growi-vault-manager`) switched to `corepack enable`. corepack's removal timeline is not certain — it may well survive — and if it is dropped we expect a more robust pnpm bootstrap than the wget script to be established by then. **Treat `corepack enable` as the current standard; do not revert to the wget script based on older wording elsewhere in this spec.**
 
 ### Requirement 2: Memory Management Optimization
 
