@@ -1008,6 +1008,7 @@ class ElasticsearchDelegator
 
   appendCriteriaForGroupFilter(
     query: SearchQuery,
+    parsedKeywords: ESQueryTerms,
     resolvedFilterData?: ResolvedFilterData,
   ): void {
     if (resolvedFilterData == null) return;
@@ -1023,11 +1024,13 @@ class ElasticsearchDelegator
       throw new Error('query.body.query.bool is not initialized');
     }
 
-    if (groupIds.length > 0) {
+    // Gate on whether the user typed group:, NOT on whether resolution produced ids.
+    if (parsedKeywords.group.length > 0) {
       query.body.query.bool.filter.push({
         terms: { granted_groups: groupIds },
       });
     }
+
     if (notGroupIds.length > 0) {
       query.body.query.bool.must_not.push({
         terms: { granted_groups: notGroupIds },
@@ -1171,7 +1174,7 @@ class ElasticsearchDelegator
     const query = this.createSearchQuery();
 
     this.appendCriteriaForQueryString(query, terms);
-    this.appendCriteriaForGroupFilter(query, data.resolvedFilterData);
+    this.appendCriteriaForGroupFilter(query, terms, data.resolvedFilterData);
     this.filterPagesByViewer(query, user, userGroups);
     await this.appendFunctionScore(query, queryString);
 

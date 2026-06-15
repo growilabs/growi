@@ -483,10 +483,14 @@ class SearchService implements SearchQueryParser, SearchResolver {
     terms: Partial<QueryTerms>,
     userGroups: ObjectIdLike[] | null,
   ): Promise<ResolvedFilterData> {
-    const groupTerms = terms.group;
-    const notGroupTerms = terms.not_group;
+    const groupTerms = terms.group ?? [];
+    const notGroupTerms = terms.not_group ?? [];
 
-    if (userGroups == null || (groupTerms == null && notGroupTerms == null)) {
+    // Early-return (no MongoDB query) for guests or when no group operator was typed.
+    if (
+      userGroups == null ||
+      (groupTerms.length === 0 && notGroupTerms.length === 0)
+    ) {
       const emptyFilterData: ResolvedFilterData = {
         groupIds: [],
         notGroupIds: [],
