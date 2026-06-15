@@ -49,14 +49,21 @@ If the results are insufficient or off-target, search again from a different ang
 
 When a path and snippet alone are not enough to judge whether a candidate location is appropriate, fetch the candidate page's body with getPageContent and check what actually accumulates there. Reserve this for the one or two most promising candidates — do not read every hit.
 
+When your best candidate is a grouping/container page (a collection, index, or category), also scan the more specific hits sitting under that same path in your search results. The right answer is often one of those children, not the container — use the children's paths and snippets to decide whether to descend before you finalize.
+
 ## Choosing the parent from what you found
 
 When you find an existing page whose topic matches what the document is about, propose THAT page's own path (with a trailing slash) as the parent — the new document becomes its child. Do NOT step up to the matching page's parent.
 
+**Always descend to the MOST SPECIFIC matching page.** Among all the pages you saw, pick the deepest one whose own topic matches the document, and propose ITS path. Do not stop at a broader container when a more specific match exists below it. This is the single most common mistake to avoid: settling on a category or grouping page when the real match is one of its children.
+
+- The deeper hits in a search result are not "too specific" by default. A page like ".../検証シナリオ集/シナリオ 3-2: 大量データの取得" or ".../工数見積もり/20260428" is a perfectly good parent when the document is about that exact scenario or that exact estimate — prefer it over its container (".../検証シナリオ集/" or ".../工数見積もり/").
+- A grouping page (one whose title reads like a collection, index, or category — "...集", "...一覧", "guidelines", "ADR", "調査", "工数見積もり", etc.) is rarely the best match itself. When you land on one, look at the pages INSIDE it: if a child matches the document's specific subject, propose the child's path, not the grouping page's path.
 - If a top search hit looks like it covers the same subject as the document, verify it with getPageContent; when the content confirms the match, make that page's path your FIRST suggestion.
-- Before settling on a category-level path (a broad area such as a specifications or guidelines tree), ask whether any page you saw inside it matches the document's topic — if one does, prefer that page's path instead.
 - Avoid personal user spaces (paths starting with "/user/") unless the document is clearly that user's personal note.
-- Fall back to a broader category path only when no specific page matches the document's topic.
+- Fall back to a broader category path only when NO specific page matches the document's topic. A broad container is the last resort, not the default.
+
+If you are unsure whether to propose a specific page or its parent, propose the SPECIFIC page first and the parent second — never the parent alone.
 
 ## Step 5 — When the search budget is exhausted
 
@@ -66,7 +73,7 @@ When fullTextSearch returns result "limit_exceeded", the search budget is used u
 
 - Propose at most 20 parent directory paths, ordered best first.
 - Every path must start with "/" and end with "/". It is the path to save under — typically an existing page's full path, the new document becoming its child.
-- Each path must be consistent with the existing page tree: either the path of an existing page observed during exploration (prefer the most specific topically-matching page, including leaf pages), or a NEW path placed at a sensible level within the observed hierarchy.
+- Each path must be consistent with the existing page tree: either the path of an existing page observed during exploration (always the MOST SPECIFIC topically-matching page — descend to leaf pages rather than stopping at their container), or a NEW path placed at a sensible level within the observed hierarchy.
 - Give each suggestion a concise label and a description explaining why the location fits (topic fit and flow/stock alignment).
 - Write the label and description in the language of the DOCUMENT, not necessarily in English.
 - Include your flow/stock classification of the document in the final answer.`;
