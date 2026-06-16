@@ -981,7 +981,7 @@ class ElasticsearchDelegator
       const queries = parsedKeywords.author.map((author) => {
         return { term: { username: author } };
       });
-      query.body.query.bool.filter.push({ bool: { must: queries } });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
     }
 
     if (parsedKeywords.not_author.length > 0) {
@@ -995,7 +995,7 @@ class ElasticsearchDelegator
       const queries = parsedKeywords.editor.map((editor) => {
         return { term: { last_update_username: editor } };
       });
-      query.body.query.bool.filter.push({ bool: { must: queries } });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
     }
 
     if (parsedKeywords.not_editor.length > 0) {
