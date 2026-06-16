@@ -1,12 +1,12 @@
 import type { ChangeStream, ChangeStreamOptions } from 'mongodb';
 import mongoose from 'mongoose';
 
+import type { ActivityDocument } from '~/server/models/activity';
+import { configManager } from '~/server/service/config-manager';
+import type ElasticsearchDelegator from '~/server/service/search-delegator/elasticsearch';
 import loggerFactory from '~/utils/logger';
 
-import type { ActivityDocument } from '../models/activity';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
-import { configManager } from './config-manager';
-import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
 const logger = loggerFactory('growi:service:auditlog-changestream');
 
@@ -87,6 +87,7 @@ export class AuditlogChangeStreamService {
     try {
       for await (const event of this.changeStream) {
         try {
+          // 'update' skipped: Activity updates change only `action`, which is not indexed in ES.
           if (
             event.operationType === 'insert' &&
             'fullDocument' in event &&

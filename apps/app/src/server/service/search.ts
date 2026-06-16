@@ -3,6 +3,7 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
+import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server/service/auditlog-changestream';
 import { CommentEvent, commentEvent } from '~/features/comment/server';
 import {
   isIncludeAiMenthion,
@@ -39,7 +40,6 @@ import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
 import { hasIntersection } from '../util/compare-objectId';
-import { AuditlogChangeStreamService } from './auditlog-changestream';
 import { configManager } from './config-manager';
 import ElasticsearchDelegator from './search-delegator/elasticsearch';
 import PrivateLegacyPagesDelegator from './search-delegator/private-legacy-pages';
@@ -139,8 +139,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
       instance.auditlogChangeStreamService = new AuditlogChangeStreamService(
         instance.fullTextSearchDelegator,
       );
-      instance.auditlogChangeStreamService.start().catch((err) => {
+      instance.auditlogChangeStreamService.start().catch(async (err) => {
         logger.error(err, 'AuditlogChangeStreamService failed to start.');
+        await configManager.updateConfig('app:auditlogEsUnsynced', true);
       });
     }
     return instance;
