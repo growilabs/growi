@@ -13,6 +13,53 @@ export const isValidWhitelistEntry = (entry: string): boolean => {
   return EMAIL_PATTERN.test(entry);
 };
 
+/**
+ * Normalize a legacy whitelist entry into the current strict format.
+ *
+ * Returns an array because a legacy bare-domain entry must expand into TWO
+ * entries to preserve the old matching behavior. Before the strict `@`-prefixed
+ * format was introduced, the admin UI only suggested (but did not enforce) the
+ * leading `@`, so bare-domain entries such as `growi.org` could be persisted.
+ * The old `isEmailValid` used an unanchored `new RegExp(entry)` test, so a bare
+ * domain matched BOTH the root domain (`user@growi.org`) AND its subdomains
+ * (`user@sub.growi.org`). The current matcher separates these into `@growi.org`
+ * (exact) and `@*.growi.org` (subdomain), so we emit both to avoid silently
+ * narrowing access for environments that relied on the old behavior.
+ *
+ * Valid `@`-prefixed and email-form entries are returned unchanged (as a
+ * single-element array). Anything that does not become a valid domain entry by
+ * prepending `@` is returned unchanged for validation to handle elsewhere.
+ */
+export const normalizeWhitelistEntry = (entry: string): string[] => {
+  const trimmed = entry.trim();
+
+  if (trimmed.startsWith('@') || isValidWhitelistEntry(trimmed)) {
+    return [trimmed];
+  }
+
+  const domainEntry = `@${trimmed}`;
+  if (isValidWhitelistEntry(domainEntry)) {
+    const subdomainEntry = `@*.${trimmed}`;
+    return isValidWhitelistEntry(subdomainEntry)
+      ? [domainEntry, subdomainEntry]
+      : [domainEntry];
+  }
+
+  return [trimmed];
+};
+
+/**
+ * Normalize a list of legacy whitelist entries.
+ *
+ * Applies {@link normalizeWhitelistEntry} to each entry, then flattens (bare
+ * domains expand into multiple entries) and de-duplicates so the list stays
+ * clean when a bare domain and its already-normalized form coexist (e.g.
+ * `['@growi.org', 'growi.org']`). Order of first occurrence is preserved.
+ */
+export const normalizeWhitelistEntries = (entries: string[]): string[] => {
+  return [...new Set(entries.flatMap(normalizeWhitelistEntry))];
+};
+
 export const isEmailMatchedByEntry = (
   email: string,
   entry: string,

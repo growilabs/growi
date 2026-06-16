@@ -80,15 +80,7 @@ const validator = {
       .isArray()
       .customSanitizer((value) =>
         value.map((entry) => entry.trim()).filter((entry) => entry !== ''),
-      )
-      .custom((entries) => {
-        if (!entries.every(isValidWhitelistEntry)) {
-          throw new Error(
-            'Each entry must be a valid email address or a domain starting with @',
-          );
-        }
-        return true;
-      }),
+      ),
   ],
   ldapAuth: [
     body('serverUrl')
@@ -1304,6 +1296,16 @@ module.exports = (crowi) => {
           req.body.registrationWhitelist.map((line) =>
             xss(line, { stripIgnoreTag: true }),
           );
+
+        if (!sanitizedRegistrationWhitelist.every(isValidWhitelistEntry)) {
+          return res.apiv3Err(
+            new ErrorV3(
+              'Each entry must be a valid email address or a domain starting with @',
+              'invalid-registration-whitelist-format',
+            ),
+            400,
+          );
+        }
 
         const requestParams = {
           'security:registrationMode': req.body.registrationMode,
