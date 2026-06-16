@@ -301,6 +301,14 @@
     "rebuild_description_1": "Click the button to rebuild index and add all page datas.",
     "rebuild_description_2": "This may take a while."
   },
+  "audit_log_index_management": {
+    "audit_log_index_management": "Audit Log Index Management",
+    "normalize": "Normalize",
+    "normalize_button": "Normalize audit log index",
+    "rebuild": "Rebuild",
+    "rebuild_button": "Rebuild audit log index",
+    "unsynced_events_warning": "Some audit log events failed to sync to Elasticsearch. Rebuild to restore consistency."
+  },
   "mailer_setup_required": "<a href='/admin/app'>Email settings</a> are required to send.",
   "admin_top": {
     "management_wiki": "Management Wiki",

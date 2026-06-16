@@ -310,6 +310,14 @@
     "rebuild_description_1": "全てのページのインデックスを削除し、作り直します。",
     "rebuild_description_2": "この作業には数秒かかります。"
   },
+  "audit_log_index_management": {
+    "audit_log_index_management": "監査ログインデックス管理",
+    "normalize": "正規化",
+    "normalize_button": "監査ログインデックスの正規化",
+    "rebuild": "リビルド",
+    "rebuild_button": "監査ログインデックスのリビルド",
+    "unsynced_events_warning": "Elasticsearch に同期できなかった監査ログがあります。リビルドして整合性を回復してください。"
+  },
   "mailer_setup_required": "送信するには <a href='/admin/app'>メールの設定</a> が必要です。",
   "admin_top": {
     "management_wiki": "Wiki管理",

@@ -348,6 +348,54 @@ class ElasticsearchDelegator
     };
   }
 
+  async getAuditlogInfoForAdmin() {
+    const {
+      client,
+      auditlogIndexName: indexName,
+      auditlogAliasName: aliasName,
+    } = this;
+
+    const tmpIndexName = `${indexName}-tmp`;
+
+    const isExistsMainIndex = await client.indices.exists({ index: indexName });
+    const isExistsTmpIndex = await client.indices.exists({
+      index: tmpIndexName,
+    });
+
+    const existingIndices: string[] = [];
+    if (isExistsMainIndex) existingIndices.push(indexName);
+    if (isExistsTmpIndex) existingIndices.push(tmpIndexName);
+
+    if (existingIndices.length === 0) {
+      return { indices: [], aliases: [], isNormalized: false };
+    }
+
+    const indicesStats = await client.indices.stats({
+      index: existingIndices,
+      metric: ['docs', 'store', 'indexing'],
+    });
+    const { indices } = indicesStats;
+
+    const aliases = await client.indices.getAlias({ index: existingIndices });
+
+    const isMainIndexHasAlias =
+      isExistsMainIndex &&
+      aliases[indexName].aliases != null &&
+      aliases[indexName].aliases[aliasName] != null;
+    const isTmpIndexHasAlias =
+      isExistsTmpIndex &&
+      aliases[tmpIndexName].aliases != null &&
+      aliases[tmpIndexName].aliases[aliasName] != null;
+
+    const isNormalized =
+      isExistsMainIndex &&
+      isMainIndexHasAlias &&
+      !isExistsTmpIndex &&
+      !isTmpIndexHasAlias;
+
+    return { indices, aliases, isNormalized };
+  }
+
   /**
    * rebuild index
    */

@@ -313,6 +313,60 @@ module.exports = (crowi) => {
     },
   );
 
+  /**
+   * @swagger
+   *
+   *  /search/auditlog-indices:
+   *    get:
+   *      tags: [FullTextSearch Management]
+   *      summary: Get auditlog indices status
+   *      responses:
+   *        200:
+   *          description: Status of auditlog indices
+   *          content:
+   *            application/json:
+   *              schema:
+   *                properties:
+   *                  info:
+   *                    type: object
+   *                    description: Status of auditlog indices
+   *                  auditlogHasUnsyncedEvents:
+   *                    type: boolean
+   *                    description: Whether auditlog events failed to sync to Elasticsearch (rebuild needed)
+   */
+  router.get(
+    '/auditlog-indices',
+    noCache(),
+    accessTokenParser([SCOPE.READ.ADMIN.FULL_TEXT_SEARCH], {
+      acceptLegacy: true,
+    }),
+    loginRequired,
+    adminRequired,
+    async (req, res) => {
+      const { searchService } = crowi;
+
+      if (!searchService.isConfigured) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not configured',
+            'search-service-unconfigured',
+          ),
+          503,
+        );
+      }
+
+      try {
+        const info = await searchService.getAuditlogInfoForAdmin();
+        const auditlogHasUnsyncedEvents =
+          await AuditlogEsSyncStatus.isUnsynced();
+        return res.status(200).send({ info, auditlogHasUnsyncedEvents });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(err, 503);
+      }
+    },
+  );
+
   const validatorForPutAuditlogIndices = [
     body('operation').isString().isIn(['rebuild', 'normalize']),
   ];

@@ -1,149 +1,105 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
 import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/features/admin/states/socket-io';
-import { SocketEventName } from '~/interfaces/websocket';
-import { isSearchServiceReachableAtom } from '~/states/server-configurations';
+import {
+  auditLogEnabledAtom,
+  isSearchServiceReachableAtom,
+} from '~/states/server-configurations';
 
-import NormalizeIndicesControls from './NormalizeIndicesControls';
-import RebuildIndexControls from './RebuildIndexControls';
-import ReconnectControls from './ReconnectControls';
-import StatusTable from './StatusTable';
+import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
+import ReconnectControls from './ElasticsearchManagement/ReconnectControls';
+import StatusTable from './ElasticsearchManagement/StatusTable';
 
-const ElasticsearchManagement = (): JSX.Element => {
+export const AuditLogIndexManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');
-  // Get search service reachable flag from atom
   const isSearchServiceReachable = useAtomValue(isSearchServiceReachableAtom);
-  const socket = useAdminSocket();
+  const auditLogEnabled = useAtomValue(auditLogEnabledAtom);
 
   const [isInitialized, setIsInitialized] = useState(false);
-
   const [isConnected, setIsConnected] = useState(false);
   const [isConfigured, setIsConfigured] = useState(false);
   const [isReconnectingProcessing, setIsReconnectingProcessing] =
     useState(false);
+  const [isNormalizingProcessing, setIsNormalizingProcessing] = useState(false);
   const [isRebuildingProcessing, setIsRebuildingProcessing] = useState(false);
-  const [isRebuildingCompleted, setIsRebuildingCompleted] = useState(false);
 
   const [isNormalized, setIsNormalized] = useState(false);
   const [indicesData, setIndicesData] = useState(null);
   const [aliasesData, setAliasesData] = useState(null);
+  const [hasUnsyncedEvents, setHasUnsyncedEvents] = useState(false);
 
-  const retrieveIndicesStatus = useCallback(async () => {
+  const retrieveStatus = useCallback(async () => {
     try {
-      const { data } = await apiv3Get('/search/indices');
+      const { data } = await apiv3Get('/search/auditlog-indices');
       const { info } = data;
 
       setIsConnected(true);
       setIsConfigured(true);
-
+      setIsNormalized(info.isNormalized);
       setIndicesData(info.indices);
       setAliasesData(info.aliases);
-      setIsNormalized(info.isNormalized);
-
-      return info.isNormalized;
+      setHasUnsyncedEvents(data.auditlogHasUnsyncedEvents ?? false);
     } catch (errors: unknown) {
       setIsConnected(false);
-
-      // evaluate whether configured or not
       if (Array.isArray(errors)) {
         for (const error of errors) {
           if (error.code === 'search-service-unconfigured') {
             setIsConfigured(false);
           }
         }
-        toastError(errors as Error[]);
-      } else {
-        toastError(errors as Error);
       }
-
-      return false;
     } finally {
       setIsInitialized(true);
     }
   }, []);
 
   useEffect(() => {
-    retrieveIndicesStatus();
-  }, [retrieveIndicesStatus]);
+    retrieveStatus();
+  }, [retrieveStatus]);
 
-  useEffect(() => {
-    if (socket == null) {
-      return;
-    }
-    socket.on(SocketEventName.AddPageProgress, () => {
-      setIsRebuildingProcessing(true);
-    });
-
-    socket.on(SocketEventName.FinishAddPage, async (data) => {
-      let retryCount = 0;
-      const maxRetries = 5;
-      const retryDelay = 500;
-
-      const retrieveIndicesStatusWithRetry = async () => {
-        const isNormalizedResult = await retrieveIndicesStatus();
-        if (!isNormalizedResult && retryCount < maxRetries) {
-          retryCount++;
-          setTimeout(retrieveIndicesStatusWithRetry, retryDelay);
-        }
-      };
-
-      await retrieveIndicesStatusWithRetry();
-      setIsRebuildingProcessing(false);
-      setIsRebuildingCompleted(true);
-    });
-
-    socket.on(SocketEventName.RebuildingFailed, (data) => {
-      toastError(new Error(data.error));
-    });
-
-    return () => {
-      socket.off(SocketEventName.AddPageProgress);
-      socket.off(SocketEventName.FinishAddPage);
-      socket.off(SocketEventName.RebuildingFailed);
-    };
-  }, [retrieveIndicesStatus, socket]);
+  if (!auditLogEnabled) {
+    return <AuditLogDisableMode />;
+  }
 
   const reconnect = async () => {
     setIsReconnectingProcessing(true);
-
     try {
       await apiv3Post('/search/connection');
     } catch (e) {
       toastError(e);
+      setIsReconnectingProcessing(false);
       return;
     }
-
-    // reload
     window.location.reload();
   };
 
   const normalizeIndices = async () => {
+    setIsNormalizingProcessing(true);
     try {
-      await apiv3Put('/search/indices', { operation: 'normalize' });
+      await apiv3Put('/search/auditlog-indices', { operation: 'normalize' });
+      toastSuccess(t('audit_log_index_management.normalize_button'));
     } catch (e) {
       toastError(e);
+    } finally {
+      setIsNormalizingProcessing(false);
+      await retrieveStatus();
     }
-
-    await retrieveIndicesStatus();
-
-    toastSuccess('Normalizing has succeeded');
   };
 
   const rebuildIndices = async () => {
     setIsRebuildingProcessing(true);
-
     try {
-      await apiv3Put('/search/indices', { operation: 'rebuild' });
-      toastSuccess('Rebuilding is requested');
+      await apiv3Put('/search/auditlog-indices', { operation: 'rebuild' });
+      toastSuccess(t('audit_log_index_management.rebuild_button'));
     } catch (e) {
       toastError(e);
+    } finally {
+      setIsRebuildingProcessing(false);
+      await retrieveStatus();
     }
-
-    await retrieveIndicesStatus();
   };
 
   const isErrorOccuredOnSearchService = !isSearchServiceReachable;
@@ -152,8 +108,19 @@ const ElasticsearchManagement = (): JSX.Element => {
     !isReconnectingProcessing &&
     (!isInitialized || !isConnected || isErrorOccuredOnSearchService);
 
+  const isNormalizeEnabled =
+    !isNormalized &&
+    !isNormalizingProcessing &&
+    !isRebuildingProcessing &&
+    isConnected;
+  const isRebuildEnabled =
+    isNormalized &&
+    !isRebuildingProcessing &&
+    !isNormalizingProcessing &&
+    isConnected;
+
   return (
-    <>
+    <div data-testid="admin-audit-log-index">
       <div className="row">
         <div className="col-md-12">
           <StatusTable
@@ -170,7 +137,6 @@ const ElasticsearchManagement = (): JSX.Element => {
 
       <hr />
 
-      {/* Controls */}
       <div className="row">
         <div className="col-md-3 col-form-label text-start text-md-end">
           {t('full_text_search_management.reconnect')}
@@ -188,14 +154,24 @@ const ElasticsearchManagement = (): JSX.Element => {
 
       <div className="row">
         <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('full_text_search_management.normalize')}
+          {t('audit_log_index_management.normalize')}
         </div>
         <div className="col-md-6">
-          <NormalizeIndicesControls
-            isRebuildingProcessing={isRebuildingProcessing}
-            isNormalized={isNormalized}
-            onNormalizingRequested={normalizeIndices}
-          />
+          <button
+            type="button"
+            className={`btn ${isNormalizeEnabled ? 'btn-outline-info' : 'btn-outline-secondary'}`}
+            disabled={!isNormalizeEnabled}
+            onClick={normalizeIndices}
+          >
+            {isNormalizingProcessing && (
+              <span
+                className="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+              />
+            )}
+            {t('audit_log_index_management.normalize_button')}
+          </button>
         </div>
       </div>
 
@@ -203,21 +179,31 @@ const ElasticsearchManagement = (): JSX.Element => {
 
       <div className="row">
         <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('full_text_search_management.rebuild')}
+          {t('audit_log_index_management.rebuild')}
         </div>
         <div className="col-md-6">
-          <RebuildIndexControls
-            isRebuildingProcessing={isRebuildingProcessing}
-            isRebuildingCompleted={isRebuildingCompleted}
-            isNormalized={isNormalized}
-            onRebuildingRequested={rebuildIndices}
-          />
+          <button
+            type="button"
+            className="btn btn-primary"
+            disabled={!isRebuildEnabled}
+            onClick={rebuildIndices}
+          >
+            {isRebuildingProcessing && (
+              <span
+                className="spinner-border spinner-border-sm me-2"
+                role="status"
+                aria-hidden="true"
+              />
+            )}
+            {t('audit_log_index_management.rebuild_button')}
+          </button>
+          {hasUnsyncedEvents && (
+            <p className="form-text text-warning mt-2 mb-0">
+              {t('audit_log_index_management.unsynced_events_warning')}
+            </p>
+          )}
         </div>
       </div>
-    </>
+    </div>
   );
 };
-
-ElasticsearchManagement.propTypes = {};
-
-export default ElasticsearchManagement;
