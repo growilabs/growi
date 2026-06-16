@@ -316,10 +316,14 @@ function transform(file, api, options = {}) {
 // CLI entry point
 // ──────────────────────────────────────────────────────────────────────────────
 
+// `generated` (e.g. the gitignored Prisma client) is regenerated with its own
+// `.js`-suffixed specifiers and is not hand-written source — never transform it.
+const EXCLUDED_DIRS = new Set(['node_modules', 'generated']);
+
 function walk(dir, acc) {
   for (const entry of fs.readdirSync(dir, { withFileTypes: true })) {
     const p = path.join(dir, entry.name);
-    if (entry.isDirectory() && entry.name !== 'node_modules') {
+    if (entry.isDirectory() && !EXCLUDED_DIRS.has(entry.name)) {
       walk(p, acc);
     } else if (entry.isFile() && SOURCE_FILE_RE.test(entry.name)) {
       acc.push(p);

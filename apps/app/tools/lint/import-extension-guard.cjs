@@ -134,11 +134,17 @@ function collectViolations(source, filename) {
 
 const SOURCE_FILE_RE = /\.(ts|tsx|js|jsx)$/;
 
+// Directories excluded from the convention: dependencies and generated code.
+// `src/generated/**` is gitignored output (e.g. the Prisma client, regenerated
+// with its own `.js`-suffixed specifiers by `prisma generate`) and is not
+// hand-written source, so the no-extension rule does not apply to it.
+const EXCLUDED_DIRS = new Set(['node_modules', 'generated']);
+
 function walkFiles(target, acc = []) {
   const stat = fs.statSync(target);
   if (stat.isDirectory()) {
     for (const entry of fs.readdirSync(target, { withFileTypes: true })) {
-      if (entry.isDirectory() && entry.name !== 'node_modules') {
+      if (entry.isDirectory() && !EXCLUDED_DIRS.has(entry.name)) {
         walkFiles(path.join(target, entry.name), acc);
       } else if (entry.isFile() && SOURCE_FILE_RE.test(entry.name)) {
         acc.push(path.join(target, entry.name));
