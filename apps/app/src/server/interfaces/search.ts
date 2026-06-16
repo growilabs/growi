@@ -70,7 +70,6 @@ export type UnavailableTermsKey<K extends AllTermsKey> = Exclude<
   AllTermsKey,
   K
 >;
-
 export type ESTermsKey =
   | 'match'
   | 'not_match'
