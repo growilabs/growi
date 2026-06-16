@@ -1,6 +1,12 @@
 import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
+import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
+import {
+  ensureUserHasMigrated,
+  resolveContributor,
+} from '~/features/contribution-graph/server/services/contribution-migration-service';
+import { addContribution } from '~/features/contribution-graph/server/services/contribution-service';
 import type { IActivity, SupportedActionType } from '~/interfaces/activity';
 import {
   ActionGroupSize,
@@ -56,13 +62,44 @@ class ActivityService {
         getAdditionalTargetUsers?: GetAdditionalTargetUsers,
       ) => {
         let activity: ActivityDocument;
+        const { contributor, ...activityParameters } = parameters;
         const shoudUpdate = this.shoudUpdateActivity(parameters.action);
+        const shouldGenerateContribution = this.shouldGenerateContribution(
+          parameters.action,
+        );
+
+        // Contribution handling MUST run before updateByParameters: the Activity is
+        // still ACTION_UNSETTLED at this point, so the migration aggregation does not count it.
+        // addContribution's $inc accounts for this event; settling the action afterward avoids
+        // a double count on a user's first contribution.
+        if (shouldGenerateContribution) {
+          try {
+            const contributorUser = await resolveContributor(
+              activityId,
+              contributor,
+            );
+
+            if (contributorUser != null) {
+              await ensureUserHasMigrated(contributorUser);
+              await addContribution(contributorUser._id.toString());
+            } else {
+              logger.warn(
+                'Could not find a valid user for contribution snapshot.',
+              );
+            }
+          } catch (error) {
+            logger.error(
+              'Failed to process contribution migration sequence:',
+              error,
+            );
+          }
+        }
 
         if (shoudUpdate) {
           try {
             activity = await Activity.updateByParameters(
               activityId,
-              parameters,
+              activityParameters,
             );
           } catch (err) {
             logger.error('Update activity failed', err);
@@ -150,6 +187,13 @@ class ActivityService {
 
   shoudUpdateActivity = function (action: SupportedActionType): boolean {
     return this.getAvailableActions().includes(action);
+  };
+
+  shouldGenerateContribution = (action: SupportedActionType): boolean => {
+    const contributionActions: readonly SupportedActionType[] = Object.values(
+      ContributionGraphActions,
+    );
+    return contributionActions.includes(action);
   };
 
   // for GET request
