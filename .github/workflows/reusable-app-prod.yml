@@ -57,7 +57,7 @@ jobs:
     - name: Verify dist import resolution (C5)
       working-directory: ./apps/app
       run: |
-        node bin/verify-dist-resolution.mjs dist
+        node bin/verify-dist-resolution.ts dist
 
     - name: Check import convention lint
       working-directory: ./apps/app

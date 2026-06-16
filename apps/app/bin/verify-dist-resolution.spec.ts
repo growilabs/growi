@@ -14,19 +14,12 @@
  *   - lazy/dynamic imports are also checked
  */
 
-import {
-  mkdirSync,
-  mkdtempSync,
-  readFileSync,
-  rmSync,
-  writeFileSync,
-} from 'node:fs';
+import { mkdirSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// TDD red phase: file does not exist yet
-const { verifyDistResolution } = await import('./verify-dist-resolution.mjs');
+const { verifyDistResolution } = await import('./verify-dist-resolution');
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers

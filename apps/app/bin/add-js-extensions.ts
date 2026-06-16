@@ -14,7 +14,9 @@
  *   External (no leading ./ or ../) → unchanged
  *   Unresolvable → unchanged + warning (reported in unresolved[])
  *
- * @returns {{ rewritten: number, unresolved: string[] }}
+ * Authored in TypeScript and executed directly by Node's native type stripping
+ * (Node >= 22.18, on by default). It imports only node: builtins, so it needs
+ * no path-alias resolver hook and stays a zero-dependency build tool.
  */
 
 import {
@@ -26,9 +28,10 @@ import {
 } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 
-/**
- * @typedef {{ rewritten: number; unresolved: string[] }} AddJsExtensionsResult
- */
+export type AddJsExtensionsResult = {
+  rewritten: number;
+  unresolved: string[];
+};
 
 /**
  * Regex to match import/export from '...' and import('...') expressions.
@@ -43,7 +46,8 @@ import { dirname, join, resolve } from 'node:path';
  * Applied only to non-comment lines — see processLine() below.
  */
 // Matches relative specifiers: ./X, ../X, and also bare '.' or '..' (current/parent dir).
-const IMPORT_SPEC_RE = /(\bfrom\s*['"]|\bimport\(\s*['"]|\bimport\s*['"])(\.\.?(?:\/[^'"]*)?)((?:'\s*(?:with\s*\{[^}]*\})?)|(?:"\s*(?:with\s*\{[^}]*\})?))/g;
+const IMPORT_SPEC_RE =
+  /(\bfrom\s*['"]|\bimport\(\s*['"]|\bimport\s*['"])(\.\.?(?:\/[^'"]*)?)((?:'\s*(?:with\s*\{[^}]*\})?)|(?:"\s*(?:with\s*\{[^}]*\})?))/g;
 
 /**
  * Regex to detect whether a line is purely a comment line (should be skipped).
@@ -57,27 +61,28 @@ const COMMENT_LINE_RE = /^\s*(\/\/|\*)/;
 /**
  * Returns true if the specifier already has a file extension that should not
  * be further modified.
- *
- * @param {string} spec
- * @returns {boolean}
  */
-function hasExtension(spec) {
+function hasExtension(spec: string): boolean {
   // Strip query string and fragment if any
   const bare = spec.split('?')[0].split('#')[0];
   // Remove trailing slash — ./dir/ is treated as a directory import
   const stripped = bare.endsWith('/') ? bare.slice(0, -1) : bare;
-  return /\.[mc]?[jt]sx?$/.test(stripped) || /\.json$/.test(stripped) || /\.cjs$/.test(stripped) || /\.mjs$/.test(stripped);
+  return (
+    /\.[mc]?[jt]sx?$/.test(stripped) ||
+    /\.json$/.test(stripped) ||
+    /\.cjs$/.test(stripped) ||
+    /\.mjs$/.test(stripped)
+  );
 }
 
 /**
  * Resolve an extensionless specifier relative to `importerDir` in the dist
  * tree. Returns the rewritten specifier string or null if unresolvable.
  *
- * @param {string} importerDir  absolute path of the directory containing the importer
- * @param {string} spec         the raw specifier value (e.g. './foo' or '../bar')
- * @returns {string | null}  rewritten specifier or null
+ * @param importerDir  absolute path of the directory containing the importer
+ * @param spec         the raw specifier value (e.g. './foo' or '../bar')
  */
-function resolveSpec(importerDir, spec) {
+function resolveSpec(importerDir: string, spec: string): string | null {
   // Strip trailing slash to normalise directory imports
   const normalised = spec.endsWith('/') ? spec.slice(0, -1) : spec;
   const abs = resolve(importerDir, normalised);
@@ -94,7 +99,7 @@ function resolveSpec(importerDir, spec) {
     for (const idx of ['index.js', 'index.jsx']) {
       const candidate = join(abs, idx);
       if (existsSync(candidate)) {
-        return normalised + '/' + idx;
+        return `${normalised}/${idx}`;
       }
     }
   }
@@ -104,12 +109,8 @@ function resolveSpec(importerDir, spec) {
 
 /**
  * Walk `dir` recursively and collect all .js file paths.
- *
- * @param {string} dir
- * @param {string[]} [acc]
- * @returns {string[]}
  */
-function walkJs(dir, acc = []) {
+function walkJs(dir: string, acc: string[] = []): string[] {
   for (const entry of readdirSync(dir, { withFileTypes: true })) {
     const p = join(dir, entry.name);
     if (entry.isDirectory()) {
@@ -125,13 +126,11 @@ function walkJs(dir, acc = []) {
  * Main entry point. Processes all .js files under `distRoot`, rewriting
  * extensionless relative import specifiers to the resolved form.
  *
- * @param {string} distRoot  absolute path to the dist directory
- * @returns {AddJsExtensionsResult}
+ * @param distRoot  absolute path to the dist directory
  */
-export function addJsExtensions(distRoot) {
+export function addJsExtensions(distRoot: string): AddJsExtensionsResult {
   let rewritten = 0;
-  /** @type {string[]} */
-  const unresolved = [];
+  const unresolved: string[] = [];
 
   for (const file of walkJs(distRoot)) {
     const importerDir = dirname(file);
@@ -149,7 +148,7 @@ export function addJsExtensions(distRoot) {
 
       return line.replace(
         IMPORT_SPEC_RE,
-        (match, prefix, spec, suffix) => {
+        (match: string, prefix: string, spec: string, suffix: string) => {
           // Already extensioned — leave untouched
           if (hasExtension(spec)) {
             return match;
@@ -183,12 +182,12 @@ export function addJsExtensions(distRoot) {
   return { rewritten, unresolved };
 }
 
-// Allow direct CLI invocation: node add-js-extensions.mjs <distRoot>
+// Allow direct CLI invocation: node add-js-extensions.ts <distRoot>
 if (process.argv[1] === new URL(import.meta.url).pathname) {
   const distRoot = process.argv[2];
   if (!distRoot) {
     // biome-ignore lint/suspicious/noConsole: build script diagnostic
-    console.error('Usage: node add-js-extensions.mjs <distRoot>');
+    console.error('Usage: node add-js-extensions.ts <distRoot>');
     process.exit(1);
   }
   const result = addJsExtensions(distRoot);

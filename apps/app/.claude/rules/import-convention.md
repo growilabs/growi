@@ -55,15 +55,15 @@ needed `~/...js` aliases to satisfy both — and which form to use depended on t
 Instead, **`.js` lives only in the build output, not in source**:
 - The server build uses `module: Preserve` / `moduleResolution: Bundler`, so it
   type-checks extensionless source.
-- Post-build `bin/add-js-extensions.mjs` resolves each relative specifier against the
+- Post-build `bin/add-js-extensions.ts` resolves each relative specifier against the
   real `dist/` filesystem and appends the correct form (`.js`, `/index.js`, `.jsx`).
-- CI runs `bin/verify-dist-resolution.mjs` to confirm every relative import in `dist/`
+- CI runs `bin/verify-dist-resolution.ts` to confirm every relative import in `dist/`
   points to an existing file (replaces the NodeNext compile-time guarantee with an
   exhaustive artifact check — stronger, since it also covers lazy/conditional imports).
 - Turbopack (client), `tsgo --noEmit` (Bundler), vitest, and the dev resolver
   (`bin/dev-esm-resolver.mjs`) all resolve extensionless source natively — no change.
 
-> Server-side native-ESM resolution is proven by `bin/verify-dist-resolution.mjs` over
+> Server-side native-ESM resolution is proven by `bin/verify-dist-resolution.ts` over
 > the emitted `dist/` (exhaustive, decision-free), **not** by source type-checking: the
 > server build (`tspc`, Bundler) and `tsgo` both accept extensionless source and neither
 > proves the emitted `.js` graph resolves.

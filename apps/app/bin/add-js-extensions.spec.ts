@@ -12,20 +12,15 @@
 import {
   mkdirSync,
   mkdtempSync,
-  readdirSync,
   readFileSync,
   rmSync,
   writeFileSync,
 } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-// Import the function under test. This import is intentionally broken (file
-// does not exist yet) — this is the TDD red phase.
-import type { AddJsExtensionsResult } from './add-js-extensions.mjs';
-
-const { addJsExtensions } = await import('./add-js-extensions.mjs');
+const { addJsExtensions } = await import('./add-js-extensions');
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Helpers

@@ -29,7 +29,7 @@
  * esm-import-convention codemod (which collapses `./index.js` -> `.`). Node's
  * native ESM loader rejects directory imports (ERR_UNSUPPORTED_DIR_IMPORT), so
  * this hook must resolve them to the directory's index source — mirroring the
- * production-side `bin/add-js-extensions.mjs`, which appends `/index.js` to the
+ * production-side `bin/add-js-extensions.ts`, which appends `/index.js` to the
  * same specifiers in the build output.
  */
 import { statSync } from 'node:fs';

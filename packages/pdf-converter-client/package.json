@@ -19,8 +19,8 @@
   "scripts": {
     "lint": "biome check",
     "gen:client-code": "orval --config orval.config.cjs",
-    "dev": "pnpm gen:client-code && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/write-cjs-type.mjs",
-    "build": "pnpm gen:client-code && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/write-cjs-type.mjs"
+    "dev": "pnpm gen:client-code && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/write-cjs-type.ts",
+    "build": "pnpm gen:client-code && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/write-cjs-type.ts"
   },
   "dependencies": {
     "axios": "^1.16.0",

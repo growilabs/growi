@@ -48,7 +48,9 @@ rmSync(TRANSPILED_DIR, { recursive: true, force: true });
 // ESM requires explicit extensions. add-js-extensions resolves each specifier
 // against the real dist filesystem and rewrites it in place.
 {
-  const { addJsExtensions } = await import('./add-js-extensions.mjs');
+  // Explicit .ts specifier: postbuild-server.ts runs via `node bin/postbuild-server.ts`
+  // (native type stripping), whose ESM resolution performs no extension search.
+  const { addJsExtensions } = await import('./add-js-extensions.ts');
   const { resolve } = await import('node:path');
   const distRoot = resolve(DIST_DIR);
   // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.

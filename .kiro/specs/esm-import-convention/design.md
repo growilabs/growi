@@ -94,7 +94,7 @@ flowchart TD
 
 ### C1. add-js-extensions（emit 後 `.js` 付与）
 - **責務**: dist 出力中の拡張子なし相対 specifier に、dist 実ファイル照合で Node 解決可能な拡張子を付与。
-- **配置**: `apps/app/bin/add-js-extensions.mjs`（`postbuild:server` から呼出、`postbuild-server.ts` の rename 後）。
+- **配置**: `apps/app/bin/add-js-extensions.ts`（`postbuild:server` から呼出、`postbuild-server.ts` から `import('./add-js-extensions.ts')`）。Node のネイティブ型ストリッピングで直接実行され、`node:` ビルトインのみ依存の無依存ツール。
 - **解決規則**（importer ディレクトリ基準、既に拡張子/`.json` のものは不変＝冪等）:
   - `./X` → `./X.js`（`X.js` 存在時）
   - `./X` → `./X.jsx`（`X.jsx` 存在時 = dead client emit）
@@ -123,7 +123,7 @@ flowchart TD
 - **責務**: 失う「ビルド時の解決保証」を、成果物に対する**網羅的かつ決定論的な静的検証**で回収する（design review Critical Issue 1）。
 - **方式**: dist 内の全 `.js` ファイルの全 `from '...'` / `import('...')` 相対 specifier について、**指す先の実ファイルが存在するか**だけを検査する（`add-js-extensions` の逆操作）。`.js` / `/index.js` / `.jsx` / `.json` / `.cjs` を解決対象に含める。
 - **NodeNext `--noEmit` を dist に当てる方式は不採用**: dead な `.tsx`→`.jsx` emit を型エラーとして誤検出するため。対して本方式は「ファイルが在るか」だけを見るので **dead emit でも誤検出せず**、かつ boot 到達に依存しないので **lazy/conditional import（必要時にだけ読む import）も漏れなく**拾える。
-- **配置**: `apps/app/bin/verify-dist-resolution.mjs`。`reusable-app-prod.yml` の `build-prod` で `add-js-extensions` の後に実行。1 件でも解決不能があれば CI を失敗させる。
+- **配置**: `apps/app/bin/verify-dist-resolution.ts`。`reusable-app-prod.yml` の `build-prod` で `node bin/verify-dist-resolution.ts dist` として `add-js-extensions` の後に実行（ネイティブ型ストリッピング）。1 件でも解決不能があれば CI を失敗させる。
 - **契約**（型）:
   ```typescript
   type VerifyDistResolution = (distRoot: string) => { checked: number; unresolved: string[] };
@@ -134,7 +134,7 @@ flowchart TD
 
 | ファイル | 区分 | 責務 |
 |---|---|---|
-| `apps/app/bin/add-js-extensions.mjs` | 新規 | emit 後 `.js`/`/index.js`/`.jsx` 付与（C1） |
+| `apps/app/bin/add-js-extensions.ts` | 新規 | emit 後 `.js`/`/index.js`/`.jsx` 付与（C1） |
 | `apps/app/bin/postbuild-server.ts` | 変更 | rename 後に C1 を呼出 |
 | `apps/app/tsconfig.build.server.json` | 変更 | moduleResolution を Bundler/Preserve 化（C4） |
 | `apps/app/tools/codemod/normalize-import-convention.cjs` | 新規 | 一括移行（C2） |

@@ -15,7 +15,7 @@ Node 24's `require(esm)` lets residual CommonJS consumers (e.g. third-party `@ly
 
 ### apps/app Import Convention (esm-import-convention, 2026-06)
 
-`apps/app/src` uses a **single no-extension import convention** (local → relative `./X` / `../X`, cross-module → `~/X`; never `.js`/`.jsx` in source). The `.js` is added only at server-build emit by `bin/add-js-extensions.mjs` and verified by `bin/verify-dist-resolution.mjs` — this replaced the former dual-notation (`~/X.js` for NodeNext-program files vs extensionless relative) from esm-migration. The full developer rule lives in **`apps/app/.claude/rules/import-convention.md`** (app-scoped); this note records only the build/runtime decision behind it.
+`apps/app/src` uses a **single no-extension import convention** (local → relative `./X` / `../X`, cross-module → `~/X`; never `.js`/`.jsx` in source). The `.js` is added only at server-build emit by `bin/add-js-extensions.ts` and verified by `bin/verify-dist-resolution.ts` (both run directly via Node native type stripping) — this replaced the former dual-notation (`~/X.js` for NodeNext-program files vs extensionless relative) from esm-migration. The full developer rule lives in **`apps/app/.claude/rules/import-convention.md`** (app-scoped); this note records only the build/runtime decision behind it.
 
 ### Bundler Strategy (Project-Wide Decision)
 

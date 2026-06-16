@@ -17,7 +17,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
  * `./index.js` -> bare `.` (and `../x/index.js` -> `..`), which Node's native
  * ESM loader rejects with ERR_UNSUPPORTED_DIR_IMPORT. The resolver must map
  * those bare directory specifiers to the directory's index source, mirroring
- * the production-side `bin/add-js-extensions.mjs`.
+ * the production-side `bin/add-js-extensions.ts`.
  */
 const RESOLVER = resolve(__dirname, 'dev-esm-resolver.mjs');
 
