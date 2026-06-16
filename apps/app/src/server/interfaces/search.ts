@@ -102,6 +102,6 @@ export type MongoQueryTerms = Pick<QueryTerms, MongoTermsKey>;
 // resolved directly against the dedicated `lastUpdatedUser` search index field
 // (see PR #11061), so it needs no page-id resolution here.
 export type ResolvedFilterData = {
-  groupMemberUsernames: string[];
-  notGroupMemberUsernames: string[];
+  groupIds: string[];
+  notGroupIds: string[];
 };
