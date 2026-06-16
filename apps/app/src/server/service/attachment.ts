@@ -147,10 +147,24 @@ export class AttachmentService implements IAttachmentService {
     const { fileUploadService } = this.crowi;
     const attachment = await Attachment.findById(attachmentId);
 
+    // No-op when the metadata doc is already gone. The bulk-export cleanup cron
+    // relies on this to self-heal: a job whose attachment was already removed by
+    // a previous tick (or by a concurrent remover that won an unsynchronized
+    // cross-process race) resolves cleanly here and gets deleted instead of
+    // lingering as a zombie record. Throwing would re-surface it every tick.
     if (attachment == null) {
-      throw new Error(`Attachment not found: ${attachmentId}`);
+      logger.debug(
+        `removeAttachment: attachment already gone, skipping: ${attachmentId}`,
+      );
+      return;
     }
 
+    // Intentionally NOT swallowing deleteFile errors. A genuine file-store
+    // failure (S3/GridFS outage, permission error) must propagate so callers
+    // such as the attachment delete API surface it instead of dropping the
+    // metadata doc and stranding an unreferenceable orphan blob. "File already
+    // gone" is not an error path here: the underlying stores already no-op it
+    // (see gridfs deleteFile, which warns and returns when the file is missing).
     await fileUploadService.deleteFile(attachment);
     await attachment.remove();
 

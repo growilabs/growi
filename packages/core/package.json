@@ -1,6 +1,6 @@
 {
   "name": "@growi/core",
-  "version": "2.3.0",
+  "version": "2.3.1",
   "description": "GROWI Core Libraries",
   "license": "MIT",
   "repository": {
@@ -33,6 +33,11 @@
     "./dist/interfaces/server": {
       "import": "./dist/interfaces/server/index.js",
       "require": "./dist/interfaces/server/index.cjs"
+    },
+    "./dist/interfaces/vault": {
+      "types": "./dist/interfaces/vault/index.d.ts",
+      "import": "./dist/interfaces/vault/index.js",
+      "require": "./dist/interfaces/vault/index.cjs"
     },
     "./dist/models": {
       "import": "./dist/models/index.js",

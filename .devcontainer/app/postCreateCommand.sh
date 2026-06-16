@@ -26,7 +26,7 @@ mkdir -p "$PNPM_HOME"
 # (overlay FS) and the workspace (bind mount) are on different filesystems.
 pnpm config set store-dir /workspace/.pnpm-store
 
-pnpm install --global turbo typescript-language-server typescript
+pnpm install --global turbo
 
 # Install dependencies
 turbo run bootstrap

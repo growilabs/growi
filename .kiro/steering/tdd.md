@@ -1,6 +1,13 @@
 # Test-Driven Development
 
-See: `.claude/commands/tdd.md`, `.claude/skills/learned/essential-test-patterns/SKILL.md` and `.claude/skills/learned/essential-test-design/SKILL.md`
+The RED → GREEN → REFACTOR enforcement workflow lives in the `kiro-impl` skill
+(`.claude/skills/kiro-impl/SKILL.md`), which gates every task on a captured
+failing-test (`RED_PHASE_OUTPUT`) before implementation.
+
+For how to *write* the tests well, see `.claude/skills/essential-test-design/SKILL.md`
+(test the contract, not the mechanism) and `.claude/skills/essential-test-patterns/SKILL.md`
+(Vitest / RTL / type-safe mocking). The `testing` rule (`.claude/rules/testing.md`)
+is always loaded and points to both.
 
 ## cc-sdd Specific Notes
 

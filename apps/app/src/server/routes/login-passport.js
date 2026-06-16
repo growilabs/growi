@@ -5,6 +5,7 @@ import { ExternalAccountLoginError } from '~/models/vo/external-account-login-er
 import { getTranslation } from '~/server/service/i18next';
 import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { externalAccountService } from '../service/external-account';
 
@@ -243,7 +244,16 @@ module.exports = (crowi, app) => {
       return next(new ErrorV3('message.external_account_not_exist'));
     }
 
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
 
     // login
     await req.logIn(user, (err) => {
@@ -449,7 +459,16 @@ module.exports = (crowi, app) => {
       return next(new ExternalAccountLoginError('message.sign_in_failure'));
     }
 
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
 
     // login
     req.logIn(user, async (err) => {
@@ -510,7 +529,16 @@ module.exports = (crowi, app) => {
       return next(new ExternalAccountLoginError('message.sign_in_failure'));
     }
 
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
 
     // login
     req.logIn(user, async (err) => {
@@ -594,7 +622,17 @@ module.exports = (crowi, app) => {
     }
 
     // login
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
+
     req.logIn(user, async (err) => {
       if (err) {
         logger.debug(err.message);
@@ -686,7 +724,16 @@ module.exports = (crowi, app) => {
       return next(new ExternalAccountLoginError('message.sign_in_failure'));
     }
 
-    const user = (await externalAccount.populate('user')).user;
+    const user = await prisma.externalaccounts
+      .findUnique({
+        select: {
+          user: true,
+        },
+        where: {
+          id: externalAccount.id,
+        },
+      })
+      .then((result) => result?.user ?? null);
 
     // login
     req.logIn(user, (err) => {

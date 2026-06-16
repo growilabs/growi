@@ -13,6 +13,11 @@ overrides:
   # CVE-2025-XXXXX: CRLF Injection + Prototype Pollution combo leads to HTTP Request Smuggling (CVSS 10.0).
   # All versions < 1.15.0 are vulnerable.
   axios: ^1.15.0
+  # Dedupe @codemirror/commands to a single version. <= 6.10.2 has a bug where
+  # Shift+Arrow selection gets stuck on soft-wrapped lines (growilabs/growi#11093);
+  # fixed in 6.10.3. Without this, transitive consumers (@uiw/*, codemirror) keep
+  # pulling 6.8.0 alongside our direct 6.10.3.
+  '@codemirror/commands': ^6.10.3
 
 packageExtensions:
   # @orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime,
