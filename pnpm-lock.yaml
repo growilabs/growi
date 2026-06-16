@@ -5,7 +5,6 @@ settings:
   excludeLinksFromLockfile: false
 
 overrides:
-  '@lykmapipo/common>flat': 5.0.2
   '@lykmapipo/common>mime': 3.0.0
   '@lykmapipo/common>parse-json': 5.2.0
   axios: ^1.15.0
@@ -9040,8 +9039,9 @@ packages:
     resolution: {integrity: sha512-f7ccFPK3SXFHpx15UIGyRJ/FJQctuKZ0zVuN3frBo4HnK3cay9VEW0R6yPYFHC0AgqhukPzKjq22t5DmAyqGyw==}
     engines: {node: '>=16'}
 
-  flat@5.0.2:
-    resolution: {integrity: sha512-b6suED+5/3rTpUBdG1gupIl8MPFCAMA0QXwmljLhvCUKcUvdE4gWky9zpuGCcXHOsz4J9wPGNWq6OKpmIzz3hQ==}
+  flat@6.0.1:
+    resolution: {integrity: sha512-/3FfIa8mbrg3xE7+wAhWeV+bd7L2Mof+xtZb5dRDKZ+wDvYJK4WDYeIOuOhre5Yv5aQObZrlbRmk3RTSiuQBtw==}
+    engines: {node: '>=18'}
     hasBin: true
 
   flatbuffers@24.12.23:
@@ -17881,7 +17881,7 @@ snapshots:
     dependencies:
       auto-parse: 1.8.0
       browser-or-node: 3.0.0
-      flat: 5.0.2
+      flat: 6.0.1
       inflection: 3.0.2
       lodash: 4.17.23
       mime: 3.0.0
@@ -23899,7 +23899,7 @@ snapshots:
       flatted: 3.4.2
       keyv: 4.5.4
 
-  flat@5.0.2: {}
+  flat@6.0.1: {}
 
   flatbuffers@24.12.23: {}
 

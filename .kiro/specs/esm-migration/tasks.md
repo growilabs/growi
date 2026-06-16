@@ -500,7 +500,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 ## Phase 5: pnpm.overrides 削除とドキュメント整合
 
 - [ ] 5. CJS 起因の override を除去し、文書を新状態に同期
-- [ ] 5.1 `@lykmapipo/common>flat` override を削除評価
+- [x] 5.1 `@lykmapipo/common>flat` override を削除評価
   - **(Phase R 変更)** overrides は pnpm 11 化に伴い ルート `package.json` から **`pnpm-workspace.yaml`** に移転済み。本タスク以降の編集対象はすべて `pnpm-workspace.yaml` の `overrides:` セクション
   - `pnpm-workspace.yaml` の overrides から `flat` ピンを削除
   - `pnpm install` 成功後 `turbo run build` を実行し、`pnpm why flat` で最新 ESM バージョンが解決されることを確認
@@ -509,6 +509,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - 失敗時は override を戻しインラインコメントで原因記録
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _Boundary: Overrides Reducer (flat)_
+  - **実績 (2026-06-16, 削除可)**: flat の CJS ピン override を**削除**し flat **6.0.1 (ESM-only)** を採用。`@lykmapipo/common` (CJS) は `flat$1.flatten`/`flat$1.unflatten` という named プロパティ経由で flat を使うため、Node 24 `require(esm)` が返す名前空間オブジェクトに同名関数が存在し動作する (bare 関数呼び出しではないのが鍵)。**resolution の sticky 性**: override 単純削除では lockfile の 5.0.2 が `>=5.0.2` を満たし維持されるため、一時 override `^6.0.0` で 6.0.1 を強制解決→smoke→override 完全削除 (sticky で 6.0.1 維持) の順で確定。検証: `pnpm why flat`=6.0.1 / smoke (`apps/app/tmp/phase5-smoke/smoke.cjs`: @lykmapipo/common contract + mongoose-gridfs round-trip 実 mongo) **OVERALL PASS** / `turbo run build` 21/21 / audit は flat 関連 advisory 0・lockfile 変更は flat 5.0.2→6.0.1 のみ (新規 high/critical は DB ドリフト由来で無関係)。証跡: `phase5-gate-evidence/README.md`
 
 - [ ] 5.2 `@lykmapipo/common>mime` override を削除評価
   - overrides から `mime` ピンを削除し、5.1 と同じプロトコル (install → build → file-upload smoke) で検証

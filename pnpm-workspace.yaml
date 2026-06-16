@@ -4,8 +4,6 @@ packages:
   - 'bin'
 
 overrides:
-  # flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
-  '@lykmapipo/common>flat': 5.0.2
   # mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version
   '@lykmapipo/common>mime': 3.0.0
   # parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
