@@ -13,7 +13,6 @@ import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import { SocketEventName } from '~/interfaces/websocket';
 import type { ActivityDocument } from '~/server/models/activity';
-import { AuditlogEsSyncStatus } from '~/server/models/auditlog-es-sync-status';
 import PageTagRelation from '~/server/models/page-tag-relation';
 import type { SocketIoService } from '~/server/service/socket-io';
 import loggerFactory from '~/utils/logger';
@@ -445,7 +444,7 @@ class ElasticsearchDelegator
       });
 
       // alias now points to the freshly populated index — ES is in sync with MongoDB
-      await AuditlogEsSyncStatus.setUnsynced(false);
+      await configManager.updateConfig('app:auditlogEsUnsynced', false);
 
       await client.indices.delete({ index: tmpIndexName });
     } catch (error) {

@@ -63,6 +63,7 @@ export const CONFIG_KEYS = [
   'app:elasticsearchReindexBulkSize',
   'app:elasticsearchReindexOnBoot',
   'app:elasticsearchAuditlogReindexOnBoot',
+  'app:auditlogEsUnsynced',
   'app:growiCloudUri',
   'app:growiAppIdForCloud',
   'app:ogpUri',
@@ -490,6 +491,9 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:elasticsearchAuditlogReindexOnBoot': defineConfig<boolean>({
     envVarName: 'ELASTICSEARCH_AUDITLOG_REINDEX_ON_BOOT',
+    defaultValue: false,
+  }),
+  'app:auditlogEsUnsynced': defineConfig<boolean>({
     defaultValue: false,
   }),
   'app:growiCloudUri': defineConfig<string | undefined>({

@@ -4,7 +4,6 @@ import mongoose from 'mongoose';
 import loggerFactory from '~/utils/logger';
 
 import type { ActivityDocument } from '../models/activity';
-import { AuditlogEsSyncStatus } from '../models/auditlog-es-sync-status';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 import { configManager } from './config-manager';
 import type ElasticsearchDelegator from './search-delegator/elasticsearch';
@@ -122,7 +121,7 @@ export class AuditlogChangeStreamService {
               { token: event._id, operationType: event.operationType, err },
               'Skipping poison pill event after consecutive failures.',
             );
-            await AuditlogEsSyncStatus.setUnsynced(true);
+            await configManager.updateConfig('app:auditlogEsUnsynced', true);
             await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
             this.consecutiveEventFailures = 0;
             this.lastFailingToken = null;
@@ -146,7 +145,7 @@ export class AuditlogChangeStreamService {
             ' Documents written during the gap are not in Elasticsearch; run reindex to restore consistency.',
         );
         await ChangeStreamResumeToken.clear(STREAM_KEY);
-        await AuditlogEsSyncStatus.setUnsynced(true);
+        await configManager.updateConfig('app:auditlogEsUnsynced', true);
       } else {
         logger.error(err, 'AuditlogChangeStreamService change stream error.');
       }
