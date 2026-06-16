@@ -470,29 +470,32 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 ## Phase 4: transpilePackages の削減
 
-- [ ] 4. `next.config.ts` から CJS 起因エントリを除去
-- [ ] 4.1 prefix グループを 1 つずつ削除評価
+- [x] 4. `next.config.ts` から CJS 起因エントリを除去
+- [x] 4.1 prefix グループを 1 つずつ削除評価
   - `remark-` / `rehype-` / `hast-` / `mdast-` / `micromark-` / `unist-` を順に `listPrefixedPackages` から除外
   - 各削除後に `turbo run build --filter @growi/app` + `.next/node_modules/` 目視確認 + `pnpm start` で SSR smoke を実行
   - 失敗した prefix は `next.config.ts` に戻し、インラインコメントで残存理由を記録
   - 最終的に prefix 配列が最小化されている (削除できたものはすべて削除済み)
   - _Requirements: 3.1, 3.2, 3.3_
   - _Boundary: transpilePackages Reducer (prefix groups)_
+  - **実績 (2026-06-16)**: prefix 6 グループを `listPrefixedPackages` 呼び出しごと削除。`turbo run build` 21/21 + 本番起動 smoke で ESM module error 0。ESM 化により Turbopack が transpile 無しで自然解決するため**全 prefix を削除可能** = 残存 0 (削除理由は `next.config.ts` に英語コメントで記録)。最終確認は 4.3 CI E2E (実ブラウザで markdown レンダリング green)
 
-- [ ] 4.2 hardcoded エントリを評価・削除
+- [x] 4.2 hardcoded エントリを評価・削除
   - 42 件のハードコードエントリをエコシステム単位でグルーピングし、グループごとに削除 → build → smoke を実施
   - 失敗したエントリは戻してインラインコメントで理由を記録
   - 残存エントリすべてが CJS 以外の理由を示すインラインコメントを持つ
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 7.2_
   - _Depends: 4.1_
   - _Boundary: transpilePackages Reducer (hardcoded)_
+  - **実績 (2026-06-16)**: hardcoded 40 エントリ (v8 再計測値。本文の「42 件」は旧値) を全削除し `transpilePackages` を空に。`getTranspilePackages` 関数・`listPrefixedPackages` import・未使用化した `src/utils/next.config.utils.ts` も削除。CJS 起因の残存エントリ 0 (削除理由を `next.config.ts` に英語コメントで記録)。**副作用対応 (commit `be50a1bf87`)**: transpilePackages 削除で Turbopack に externalize されるようになった `remark-github-admonitions-to-directives` と `rehype-rewrite` を devDeps→deps へ移動 (renderer で静的 import のため `ALLOWED_BROKEN` ではなく deps が正解 — package-dependencies.md)。ローカル `assemble-prod.sh` + `check-next-symlinks.sh` で broken 0 確認
 
-- [ ] 4.3 Phase 4 検証: CI `reusable-app-prod.yml` で本番相当確認
+- [x] 4.3 Phase 4 検証: CI `reusable-app-prod.yml` で本番相当確認
   - GitHub Actions の `reusable-app-prod.yml` を `workflow_dispatch` でトリガ
   - `build-prod` と `launch-prod` の両ジョブが成功
   - `check-next-symlinks.sh` が `fslightbox-react` 以外の broken symlink を検出しない
   - _Requirements: 3.5, 6.4, 6.6_
   - _Depends: 4.2_
+  - **実績 (2026-06-16)**: `reusable-app-prod.yml` run #27602173121 (sha `be50a1bf87`) を `workflow_dispatch` で実行し **全 17 job success**。build-prod (`turbo build` + `assemble-prod.sh` + `check-next-symlinks.sh` = broken 0) / launch-prod (mongo 6.0/8.0 とも `server:ci` exit 0) / run-playwright 全 12 (chromium/firefox/webkit × 2 shard × mongo 6.0/8.0) green = **transpilePackages 削除後も markdown 全拡張が実ブラウザで正常レンダリング** (curl SSR では未認証 /login のため確認不可だった分をここで担保)。初回 run #27601481774 は broken symlink で build-prod fail → 2 パッケージ deps 移動 (4.2 副作用対応) で解消
 
 ## Phase 5: pnpm.overrides 削除とドキュメント整合
 
