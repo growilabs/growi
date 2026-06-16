@@ -42,7 +42,8 @@ import { dirname, join, resolve } from 'node:path';
  *
  * Applied only to non-comment lines — see processLine() below.
  */
-const IMPORT_SPEC_RE = /(\bfrom\s*['"]|\bimport\(\s*['"]|\bimport\s*['"])(\.\.?\/[^'"]+)(['"]\s*(?:with\s*\{[^}]*\})?)/g;
+// Matches relative specifiers: ./X, ../X, and also bare '.' or '..' (current/parent dir).
+const IMPORT_SPEC_RE = /(\bfrom\s*['"]|\bimport\(\s*['"]|\bimport\s*['"])(\.\.?(?:\/[^'"]*)?)((?:'\s*(?:with\s*\{[^}]*\})?)|(?:"\s*(?:with\s*\{[^}]*\})?))/g;
 
 /**
  * Regex to detect whether a line is purely a comment line (should be skipped).

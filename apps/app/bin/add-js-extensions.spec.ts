@@ -128,6 +128,16 @@ describe('add-js-extensions: directory → /index.js', () => {
     // Trailing slash form resolves to sub/index.js
     expect(readFile('a.js')).toContain(`./sub/index.js`);
   });
+
+  it("rewrites bare '.' to './index.js' when index.js exists in same dir", () => {
+    // import { foo } from '.' — self-barrel (e.g. discriminator sub-models)
+    writeFile('sub/a.js', `import { foo } from '.';`);
+    writeFile('sub/index.js', `export const foo = 1;`);
+
+    addJsExtensions(tmpDir);
+
+    expect(readFile('sub/a.js')).toContain(`from './index.js'`);
+  });
 });
 
 describe('add-js-extensions: .jsx target from .tsx client emit', () => {
