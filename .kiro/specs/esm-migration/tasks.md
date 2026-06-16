@@ -547,14 +547,15 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 ## Phase 6: 本番アセンブリ end-to-end 検証
 
-- [ ] 6. 本番アーティファクトで全要件を最終確認
-- [ ] 6.1 `assemble-prod.sh` をローカル実行し本番相当アーティファクトを生成
+- [x] 6. 本番アーティファクトで全要件を最終確認
+- [x] 6.1 `assemble-prod.sh` をローカル実行し本番相当アーティファクトを生成
   - `assemble-prod.sh` が成功し、既定出力ディレクトリに成果物が生成される
   - `check-next-symlinks.sh` が `fslightbox-react` 以外の broken symlink を検出しない
   - _Requirements: 6.4_
   - _Depends: 5.5_
+  - **実績 (2026-06-16, CI に統合)**: ユーザー選択により破壊的なローカル `assemble-prod.sh` (`rm -rf node_modules`、共有 devcontainer への一時影響) は回避し、CI `reusable-app-prod.yml` の `build-prod` ジョブ (= `turbo build` + `assemble-prod.sh` + `check-next-symlinks.sh`) に統合してクリーン隔離環境で権威的に検証。run 27609048544 の `build-prod` **success** = assemble-prod 成功 + broken symlink (ALLOWED_BROKEN 以外) 0 を充足。証跡: `phase6-gate-evidence/README.md`
 
-- [ ] 6.2 本番アーティファクトを起動して機能 smoke (Phase 3.8 の最終確認)
+- [x] 6.2 本番アーティファクトを起動して機能 smoke (Phase 3.8 の最終確認)
   - 本タスクは Phase 3.8.b / 3.8.d / 3.8.e で既に前倒し実施済みだが、Phase 4 / 5 の変更 (transpilePackages 削減 / overrides 削除) 後に **回帰していないことの最終確認** として再実行する位置付けに変更する
   - `node --import dotenv-flow/config dist/server/app.js` でサーバを起動
   - **API / SSR / WebSocket / Yjs**: 3.8.b と 3.8.d の検証項目を再度パスすること
@@ -563,19 +564,22 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - ブラックボックス認可マトリクス (0.3.1) と WS 認可マトリクス (0.3.2) も再実行して baseline と完全一致することを確認 (Phase 4 / 5 の変更で認可チェーンが壊れていないことの最終保証)
   - _Requirements: 6.5_
   - _Depends: 6.1, 3.8_
+  - **実績 (2026-06-16, devcontainer で充足)**: Phase 5 HEAD (567df72b6b) の本番 dist を起動し 3.8.c/d/e を Phase 4/5 後に再実行。**機能**: healthcheck 200 / apiv3 認可ゲート (users・page 403, statistics 302) / socket.io upgrade 400 (4xx) / SSR は未認証 302→login (markdown レンダリングは 6.3 CI E2E が担保) / attach-before-listen (YjsService init が listen callback の 214ms 前)。**auth middleware snapshot diff**: 273 endpoints 構造不変 (差分は `@growi/slack` minify 名 `S→$` の 3 件のみ・3.8.c 同一)。**認可マトリクス diff**: 認可ゲート列 (unauth/guest/readonly) 264 行全件 diff 0、admin は `import/upload` 599→400 の 1 件 (handler 改善)。**WS 認可 diff**: EXACT match (diff 0)。**perf**: 本番起動 median 3938ms ∈[3294,4940] / dev 3239ms ∈[2246,3370] / first-request 4/5 ルート gate 内・`/` のみ cold first-render +1〜2% (warm ~20ms・起因は Phase 4 transpilePackages 削除の ESM cold-init、ユーザー受容)。capture は committed baseline 上書きハザード回避のためツール直接呼び `--out=/tmp/...` 単一指定で実行 (baseline 無傷を git で確認)。証跡: `phase6-gate-evidence/README.md`
 
-- [ ] 6.2.1 (任意) Yjs 同期 Playwright スペックを追加
+- [x] 6.2.1 (任意) Yjs 同期 Playwright スペックを追加
   - `apps/app/playwright/23-editor/yjs-sync.spec.ts` (仮) を追加し 6.2 の Yjs 手順を自動化
   - `reusable-app-prod.yml` の `launch-prod` で自動実行されるよう組み込む
   - 本タスクは CI 自動化を目的とする延命措置で、6.2 の手動 smoke 成功が Req 6.5 の充足条件である
   - _Requirements: 6.5_
   - _Depends: 6.2_
+  - **実績 (2026-06-16, SKIP)**: 任意項目。Yjs 同期は (a) 6.2 の ws-authz `session-viewable`=`101+syncReceived:true`、(b) 3.8.d の Chromium 2 クライアント同期実証、(c) 6.3 CI E2E (実ブラウザ chromium/firefox/webkit) で担保済みのため新規 spec は **SKIP**。Req 6.5 は 6.2 の smoke 成功で充足。将来 CI 自動化が必要になれば別 issue で追加可。
 
-- [ ] 6.3 CI 最終通過
+- [x] 6.3 CI 最終通過
   - `reusable-app-prod.yml` を `workflow_dispatch` で実行し、`build-prod` と `launch-prod` の両ジョブが成功
   - 全 Phase の変更を含むブランチが `server:ci` でエラーなく起動・終了する
   - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
   - _Depends: 6.2_
+  - **実績 (2026-06-16, 充足)**: run **27609048544** @ `567df72b6b` (Phase 5 完了 HEAD) を `workflow_dispatch` (node-version=24.x) で実行し **全 job success**。`build-prod` ✅ / `launch-prod` (mongo 6.0・8.0 とも `server:ci` exit 0) ✅ / `run-playwright` 全 16 shard (chromium/firefox/webkit × 2 shard × mongo 6.0/8.0) ✅ / `report-playwright` ✅。初回 run の 1 shard failure は既知 flaky (`comments.spec.ts` test-isolation, ESM 無関係, Implementation Notes 記載済) で `gh run rerun --failed` で green。FEATURE_GO 検証 (kiro-verify-completion): full test suite `turbo run test --filter @growi/app --force` = **224 files / 2742 tests 全 pass・新規失敗 0** (567df72b6b fresh)。証跡: `phase6-gate-evidence/README.md`
 
 ## Implementation Notes
 
