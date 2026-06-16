@@ -529,12 +529,13 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Overrides Reducer (parse-json)_
   - **実績 (2026-06-16, 削除可・dead override)**: `@lykmapipo/common@0.44.5` の dependencies に **parse-json は存在しない** (smoke でも `not resolvable from @lykmapipo/common` を確認)。pnpm の `parent>child` override は parent の直接依存エッジにのみ適用されるため、本 override は適用先のない **no-op (dead)**。削除して `pnpm install` → `pnpm why parse-json` = **5.2.0 + 8.3.0 で削除前と完全不変**、`git diff pnpm-lock.yaml` は override 行削除のみ (resolved version 変化ゼロ)、`axios: ^1.15.0` override は不変 (Req 4.5 確認)。累積最終 smoke OVERALL PASS。証跡: `phase5-gate-evidence/README.md`
 
-- [ ] 5.4 dependency コメントとインライン理由を整理
+- [x] 5.4 dependency コメントとインライン理由を整理
   - `package.json` の `// comments for dependencies` から解消済みの CJS/ESM ピン記述を削除
   - 残存する `transpilePackages` / `pnpm-workspace.yaml` overrides のすべてのエントリに理由コメント (YAML コメント) が存在することを確認
   - ~~`axios` override の CVE ID プレースホルダ置換~~ → **Phase R.1 で完了済み** (pnpm-workspace.yaml に CVE-2026-40175 / GHSA-fvcv-3m26-pcqx を記載済み)。残作業はコメントの現状維持確認のみ
   - _Requirements: 7.1, 7.2, 7.3_
   - _Depends: 4.2, 5.3_
+  - **実績 (2026-06-16, 検証完了・ソース変更なし)**: (1) 削除対象の解消済み CJS/ESM ピン記述は **0 件** — flat/mime/parse-json ピンは元々 `package.json` でなく `pnpm-workspace.yaml` overrides にあり 5.1–5.3 で処理済み。`apps/app/package.json` の `// comments for dependencies` は `@keycloak/keycloak-admin-client` (19+ ESM-only/API 破壊で別マイグレーション要) のみで、これは現役 pin `^18.0.0` の有効な理由 (GROWI の ESM 化と独立) のため削除せず・スコープ外。(2) `transpilePackages` は Phase 4 で空配列化し `next.config.ts:45-49` に理由コメント既設、overrides 3 件 (mime/axios/@codemirror-commands) すべてに理由コメントあり。(3) axios CVE コメント (CVE-2026-40175 / GHSA-fvcv-3m26-pcqx) は `pnpm-workspace.yaml:15-19` に無傷。証跡: `phase5-gate-evidence/README.md`
 
 - [ ] 5.5 ステアリング文書と auto-loaded skill を同期更新
   - `.kiro/steering/tech.md` の Production Assembly / Turbopack 外部化の記述を ESM 前提に書き換え

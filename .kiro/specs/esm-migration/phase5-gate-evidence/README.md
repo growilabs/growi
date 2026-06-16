@@ -163,3 +163,31 @@ harness は実際にインストールされたバージョンに対して以下
 | `@codemirror/commands` (対象外) | 変更なし | `^6.10.3` 維持 (#11093 / CJS 無関係) |
 
 最終 smoke: `@lykmapipo/common contract: PASS / mongoose-gridfs round-trip: PASS / OVERALL: PASS`
+
+## 5.4 dependency コメント・インライン理由整理 — 検証完了 (ソース変更なし)
+
+**(1) `package.json` の `// comments for dependencies` から解消済み CJS/ESM ピン記述を削除**:
+削除対象は **0 件**だった。理由:
+- flat / mime / parse-json のピンは元々 `package.json` ではなく `pnpm-workspace.yaml` の
+  overrides にあり、5.1–5.3 で処理済み (`package.json` には存在しなかった)。
+- `apps/app/package.json` の `// comments for dependencies` には
+  `@keycloak/keycloak-admin-client` (= "19.0.0+ は ESM-only / API 破壊で別マイグレーション要")
+  のみ。これは **現役の pin** (`@keycloak/keycloak-admin-client: ^18.0.0`) の理由説明であり、
+  19 系へ上げない残存理由 (API 破壊) は GROWI の ESM 化とは独立に有効。「解消済み CJS/ESM ピン」
+  ではないため**削除しない** (keycloak 19 系移行は本 spec のスコープ外)。
+- `apps/slackbot-proxy/package.json` の `read-pkg-up` コメントも別アプリの現役 pin (スコープ外)。
+
+**(2) 残存 `transpilePackages` / overrides のすべてのエントリに理由コメントが存在することを確認**:
+- `transpilePackages`: Phase 4 で**空配列化**。`apps/app/next.config.ts:45-49` に「全エントリは
+  ESM 化で不要になり削除、CJS/ESM 非互換起因の残存 0」を説明する英語コメントが既設 (Req 3.1-3.4/7.2)。
+- `pnpm-workspace.yaml` の overrides (3 件) すべてに理由コメントあり:
+  - `@lykmapipo/common>mime: 3.0.0` — 5.2 で精緻化した詳細コメント
+  - `axios: ^1.15.0` — CVE-2026-40175 / GHSA-fvcv-3m26-pcqx
+  - `@codemirror/commands: ^6.10.3` — growilabs/growi#11093 (CJS/ESM 無関係・対象外)
+  - (参考) packageExtensions / patchedDependencies / allowBuilds も各々コメントあり。
+
+**(3) `axios` CVE コメント**: Phase R.1 で実 advisory を記載済み。現状 `pnpm-workspace.yaml:15-19`
+に CVE-2026-40175 / GHSA-fvcv-3m26-pcqx + GHSA URL が**無傷**で存在することを確認。
+
+**結論**: 5.4 は検証タスクとして完了。削除すべき stale な CJS/ESM ピン記述は無く、残存する
+すべての override / transpilePackages 状態に正当化コメントが揃っている。ソース変更は不要。
