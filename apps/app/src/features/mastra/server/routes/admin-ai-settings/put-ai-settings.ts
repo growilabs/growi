@@ -58,18 +58,22 @@ const logger = loggerFactory(
  *         providerOptions:
  *           type: string
  *           description: Provider-namespaced options as a raw JSON string. Clearable — omit resets to the env default.
- *         azureOpenaiResourceName:
- *           type: string
- *           description: Clearable — omit resets to the env default.
- *         azureOpenaiBaseUrl:
- *           type: string
- *           description: Clearable — omit resets to the env default.
- *         azureOpenaiApiVersion:
- *           type: string
- *           description: Clearable — omit resets to the env default.
- *         azureOpenaiUseEntraId:
- *           type: boolean
- *           description: Applied only when provided; omit keeps the current value.
+ *         azureOpenaiSettings:
+ *           type: object
+ *           description: >-
+ *             Azure OpenAI connection settings, replaced as a whole (full-state).
+ *             Each inner string is clearable (empty/omit = reset that field), and
+ *             clearing every field resets the whole object to the env default.
+ *           properties:
+ *             resourceName:
+ *               type: string
+ *             baseURL:
+ *               type: string
+ *             apiVersion:
+ *               type: string
+ *             useEntraId:
+ *               type: boolean
+ *               description: Part of the object (full-state replace), not an independent merge field.
  */
 
 /**
@@ -120,14 +124,20 @@ export const updateAiSettingsValidators: ValidationChain[] = [
     .withMessage('providerOptions must be a valid JSON string')
     .customSanitizer((value) => (value === '' ? undefined : value)),
 
-  // The Azure OpenAI fields
-  clearableConfigString('azureOpenaiResourceName'),
-  clearableConfigString('azureOpenaiBaseUrl'),
-  clearableConfigString('azureOpenaiApiVersion'),
-  body('azureOpenaiUseEntraId')
+  // The Azure OpenAI connection settings are one nested object. Validate the
+  // container, then each inner field by dot-path (the clearable strings reuse the
+  // same '' -> undefined sanitizer so an emptied field is dropped from the object).
+  body('azureOpenaiSettings')
+    .optional()
+    .isObject()
+    .withMessage('azureOpenaiSettings must be an object'),
+  clearableConfigString('azureOpenaiSettings.resourceName'),
+  clearableConfigString('azureOpenaiSettings.baseURL'),
+  clearableConfigString('azureOpenaiSettings.apiVersion'),
+  body('azureOpenaiSettings.useEntraId')
     .optional()
     .isBoolean()
-    .withMessage('azureOpenaiUseEntraId must be a boolean'),
+    .withMessage('azureOpenaiSettings.useEntraId must be a boolean'),
 ];
 
 // The exact updates shape accepted by configManager.updateConfigs, derived from
@@ -147,8 +157,8 @@ type AiConfigUpdates = Parameters<typeof configManager.updateConfigs>[0];
  *     `undefined` here too and is likewise removed: an omitted clearable string is
  *     reset to its env default, not preserved. Callers must send the complete set
  *     (the admin form always does); see AiSettingsUpdateRequest.
- *   - the four Azure OpenAI fields are consolidated into one `ai:azureOpenaiSettings`
- *     JSON object by buildAzureOpenaiConfig (see its note for the object-level
+ *   - the `azureOpenaiSettings` object is re-assembled into the `ai:azureOpenaiSettings`
+ *     config value by buildAzureOpenaiConfig (see its note for the object-level
  *     full-state-replace + env-fallback semantics).
  *   - `app:aiEnabled` is saved only when provided (merge: omit keeps the toggle).
  *   - `ai:apiKey` is the exception: it has NO sanitizer, so it is included only
@@ -167,33 +177,30 @@ type AiConfigUpdates = Parameters<typeof configManager.updateConfigs>[0];
  * convenience merge still applies for SAME-provider saves (e.g. changing only the
  * model). `currentProvider` is the value currently stored, read by the handler.
  *
- * AZURE OPENAI — the request still carries four flat fields (the admin UI is
- * unchanged), but they are persisted as ONE JSON object under `ai:azureOpenaiSettings`.
- * The object is assembled here as full-state replace: a cleared string field is
- * already '' -> undefined (validator sanitizer) and is therefore omitted, and
- * `useEntraId` is included only when explicitly true (its default-false carries no
- * information). When the assembled object has no keys at all — i.e. the admin
- * cleared every field and did not enable Entra ID — it collapses to `undefined`
- * so removeIfUndefined deletes the key and the value falls back to the
- * AI_AZURE_OPENAI_SETTINGS env default (Req 4.4, applied at the object level). Because the
- * whole object is replaced (not deep-merged with env), unchecking Entra ID or
- * clearing a single field is honored exactly as submitted.
+ * AZURE OPENAI — the request carries `azureOpenaiSettings` as the same nested
+ * AzureOpenaiConfig object used for storage. It is re-assembled here as full-state
+ * replace: a cleared string field is already '' -> undefined (validator sanitizer)
+ * and is therefore omitted, and `useEntraId` is included only when explicitly true
+ * (its default-false carries no information). When the assembled object has no keys
+ * at all — i.e. the admin cleared every field and did not enable Entra ID — it
+ * collapses to `undefined` so removeIfUndefined deletes the key and the value falls
+ * back to the AI_AZURE_OPENAI_SETTINGS env default (Req 4.4, applied at the object
+ * level). Because the whole object is replaced (not deep-merged with env),
+ * unchecking Entra ID or clearing a single field is honored exactly as submitted.
  */
 const buildAzureOpenaiConfig = (
   body: AiSettingsUpdateRequest,
 ): AzureOpenaiConfig | undefined => {
+  const settings = body.azureOpenaiSettings;
   const azureOpenaiSettings: AzureOpenaiConfig = {
-    ...(body.azureOpenaiResourceName != null
-      ? { resourceName: body.azureOpenaiResourceName }
+    ...(settings?.resourceName != null
+      ? { resourceName: settings.resourceName }
       : {}),
-    // API field azureOpenaiBaseUrl maps to the object's `baseURL` (AI SDK naming).
-    ...(body.azureOpenaiBaseUrl != null
-      ? { baseURL: body.azureOpenaiBaseUrl }
+    ...(settings?.baseURL != null ? { baseURL: settings.baseURL } : {}),
+    ...(settings?.apiVersion != null
+      ? { apiVersion: settings.apiVersion }
       : {}),
-    ...(body.azureOpenaiApiVersion != null
-      ? { apiVersion: body.azureOpenaiApiVersion }
-      : {}),
-    ...(body.azureOpenaiUseEntraId === true ? { useEntraId: true } : {}),
+    ...(settings?.useEntraId === true ? { useEntraId: true } : {}),
   };
 
   return Object.keys(azureOpenaiSettings).length > 0

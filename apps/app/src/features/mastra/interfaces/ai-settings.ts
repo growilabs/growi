@@ -1,4 +1,5 @@
 import type { AiProvider } from './ai-provider';
+import type { AzureOpenaiConfig } from './azure-openai-config';
 
 /**
  * GET /_api/v3/ai-settings response.
@@ -7,16 +8,17 @@ import type { AiProvider } from './ai-provider';
  * `ai:apiKey` value is never returned (only `isApiKeySet`), and the boolean
  * flags (`useOnlyEnvVars`, `isConfigured`) let the UI decide editability and
  * whether to surface the "enabled but not configured" warning.
+ *
+ * The Azure OpenAI connection settings are exposed as the same `AzureOpenaiConfig`
+ * object used for storage (one canonical type end-to-end). It is always present
+ * (an empty object when unset); `useEntraId` is optional (absent = false).
  */
 export interface AiSettingsResponse {
   aiEnabled: boolean; // state of app:aiEnabled (7.1)
   provider?: AiProvider;
   model?: string;
   providerOptions?: string; // raw JSON string
-  azureOpenaiResourceName?: string;
-  azureOpenaiBaseUrl?: string;
-  azureOpenaiApiVersion?: string;
-  azureOpenaiUseEntraId: boolean;
+  azureOpenaiSettings: AzureOpenaiConfig;
   isApiKeySet: boolean; // the ai:apiKey value is never returned (5.2)
   useOnlyEnvVars: boolean; // when env:useOnlyEnvVars:ai is on, all fields are read-only (4.2)
   isConfigured: boolean; // result of isAiConfigured(), used for the 7.6 warning
@@ -35,16 +37,15 @@ export interface AiSettingsResponse {
  * omitted value keeps the existing stored key; it is never cleared by this
  * request. A new key is applied only when a non-empty string is sent (Req 5.x).
  *
- * The four Azure OpenAI fields are persisted internally as ONE JSON object
- * (`ai:azureOpenaiSettings`); the request keeps them flat so the admin UI is unchanged.
- * They behave as a single FULL-STATE-REPLACE unit: the strings are clearable
- * (omit/empty = reset that field), and `azureOpenaiUseEntraId` is part of the same
- * object rather than an independent merge field — the whole object is replaced, so
- * unchecking Entra ID or clearing one field is honored exactly as submitted, and
- * clearing every field resets the entire object to its env default.
+ * `azureOpenaiSettings` is the same `AzureOpenaiConfig` object used for storage.
+ * It is a single FULL-STATE-REPLACE unit: each inner string is clearable
+ * (empty/omit = reset that field) and `useEntraId` is part of the same object
+ * (not an independent merge field) — the whole object is replaced, so unchecking
+ * Entra ID or clearing one field is honored exactly as submitted, and clearing
+ * every field resets the entire object to its env default.
  *
  * Every field is typed optional so the exceptions above can be omitted — this is
- * NOT an invitation to send a partial set of the clearable strings expecting the
+ * NOT an invitation to send a partial set of the clearable fields expecting the
  * rest to survive (they will be reset to their env defaults).
  */
 export interface AiSettingsUpdateRequest {
@@ -53,12 +54,7 @@ export interface AiSettingsUpdateRequest {
   apiKey?: string; // merge: empty/omitted keeps the existing value (5.x)
   model?: string; // clearable: omit = reset to env default (4.4)
   providerOptions?: string; // clearable: omit = reset to env default (4.4)
-  // The four flat fields below are consolidated into the ai:azureOpenaiSettings JSON
-  // object as a single full-state-replace unit (see the contract note above).
-  azureOpenaiResourceName?: string; // clearable: omit = reset to env default (4.4)
-  azureOpenaiBaseUrl?: string; // clearable: omit = reset to env default (4.4)
-  azureOpenaiApiVersion?: string; // clearable: omit = reset to env default (4.4)
-  azureOpenaiUseEntraId?: boolean; // part of the ai:azureOpenaiSettings object (full-state replace)
+  azureOpenaiSettings?: AzureOpenaiConfig; // full-state-replace object (see note above)
 }
 
 /**

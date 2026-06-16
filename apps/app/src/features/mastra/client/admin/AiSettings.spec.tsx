@@ -56,10 +56,7 @@ const baseSettings: AiSettingsResponse = {
   provider: 'openai',
   model: 'gpt-4o',
   providerOptions: undefined,
-  azureOpenaiResourceName: undefined,
-  azureOpenaiBaseUrl: undefined,
-  azureOpenaiApiVersion: undefined,
-  azureOpenaiUseEntraId: false,
+  azureOpenaiSettings: {},
   isApiKeySet: true,
   useOnlyEnvVars: false,
   isConfigured: true,
@@ -92,14 +89,14 @@ describe('AiSettings', () => {
       setData({
         provider: 'openai',
         model: 'gpt-4o',
-        azureOpenaiUseEntraId: false,
       });
 
       // Act
       render(<AiSettings />);
       await submitForm();
 
-      // Assert: booleans are always sent; string fields are sent as-is.
+      // Assert: aiEnabled is always sent; the azure object is forwarded as-is
+      // (seeded to empty strings / false from the unset response).
       await waitFor(() => {
         expect(save).toHaveBeenCalledTimes(1);
       });
@@ -108,7 +105,12 @@ describe('AiSettings', () => {
         aiEnabled: true,
         provider: 'openai',
         model: 'gpt-4o',
-        azureOpenaiUseEntraId: false,
+        azureOpenaiSettings: {
+          resourceName: '',
+          baseURL: '',
+          apiVersion: '',
+          useEntraId: false,
+        },
       });
     });
 

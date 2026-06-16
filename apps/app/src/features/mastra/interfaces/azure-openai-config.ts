@@ -10,9 +10,9 @@
  * (managed identity) auth instead of an API key; absent / `false` means API-key
  * auth. None of these are secrets — only `ai:apiKey` is.
  *
- * `baseURL` (capital URL) matches the AI SDK's createAzure option name so the
- * resolver passes it straight through. The admin API/form field is the lowercase
- * `azureOpenaiBaseUrl`; the get/put-ai-settings routes map between the two.
+ * `baseURL` (capital URL) matches the AI SDK's createAzure option name, and the
+ * admin API and form reuse this same object, so `baseURL` is uniform end-to-end
+ * (storage / API / form / SDK).
  *
  * Storage/loading: the DB value is the serialized object, and the
  * `AI_AZURE_OPENAI_SETTINGS` env var is a JSON string parsed by the config loader. The

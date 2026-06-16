@@ -149,7 +149,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         apiKey: 'sk-new-key',
         model: 'gpt-4o',
         providerOptions: '{"temperature":0.2}',
-        azureOpenaiUseEntraId: true,
+        azureOpenaiSettings: { useEntraId: true },
       });
 
       const [updates] = updateCall();
@@ -159,7 +159,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         'ai:apiKey': 'sk-new-key',
         'ai:model': 'gpt-4o',
         'ai:providerOptions': '{"temperature":0.2}',
-        // The flat Azure fields are consolidated into one JSON object.
+        // The azureOpenaiSettings object is re-assembled into the config value.
         'ai:azureOpenaiSettings': { useEntraId: true },
       });
 
@@ -256,9 +256,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         provider: 'openai',
         model: undefined,
         providerOptions: undefined,
-        azureOpenaiResourceName: undefined,
-        azureOpenaiBaseUrl: undefined,
-        azureOpenaiApiVersion: undefined,
+        azureOpenaiSettings: {},
       });
 
       const [updates, options] = updateCall();
@@ -283,24 +281,26 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
     });
 
     it('saves app:aiEnabled even when false', async () => {
-      await invoke({ aiEnabled: false, azureOpenaiUseEntraId: false });
+      await invoke({ aiEnabled: false });
 
       const [updates] = updateCall();
       expect(updates['app:aiEnabled']).toBe(false);
     });
   });
 
-  // The four flat Azure fields are persisted as ONE ai:azureOpenaiSettings JSON object
-  // (the admin UI is unchanged). The object is full-state replace: useEntraId is
-  // stored only when true, and an object with no meaningful content collapses to
-  // undefined so removeIfUndefined deletes the key and the value falls back to the
+  // The azureOpenaiSettings object is re-assembled into the ai:azureOpenaiSettings
+  // config value. It is full-state replace: useEntraId is stored only when true,
+  // and an object with no meaningful content collapses to undefined so
+  // removeIfUndefined deletes the key and the value falls back to the
   // AI_AZURE_OPENAI_SETTINGS env default (Req 4.4, at the object level).
   describe('Azure OpenAI object consolidation (Req 4.4)', () => {
-    it('builds the ai:azureOpenaiSettings object from the flat fields', async () => {
+    it('builds the ai:azureOpenaiSettings config from the request object', async () => {
       await invoke({
-        azureOpenaiResourceName: 'my-resource',
-        azureOpenaiApiVersion: '2024-02-01',
-        azureOpenaiUseEntraId: true,
+        azureOpenaiSettings: {
+          resourceName: 'my-resource',
+          apiVersion: '2024-02-01',
+          useEntraId: true,
+        },
       });
 
       const [updates] = updateCall();
@@ -313,8 +313,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
 
     it('omits useEntraId from the object when it is false (default carries no info)', async () => {
       await invoke({
-        azureOpenaiResourceName: 'my-resource',
-        azureOpenaiUseEntraId: false,
+        azureOpenaiSettings: { resourceName: 'my-resource', useEntraId: false },
       });
 
       const [updates] = updateCall();
@@ -325,10 +324,12 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
 
     it('collapses to undefined (key present for removeIfUndefined) when every field is cleared', async () => {
       await invoke({
-        azureOpenaiResourceName: undefined,
-        azureOpenaiBaseUrl: undefined,
-        azureOpenaiApiVersion: undefined,
-        azureOpenaiUseEntraId: false,
+        azureOpenaiSettings: {
+          resourceName: undefined,
+          baseURL: undefined,
+          apiVersion: undefined,
+          useEntraId: false,
+        },
       });
 
       const [updates, options] = updateCall();
@@ -471,17 +472,17 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
   });
 
   // The string fields are type-guarded with .isString(): a non-string value is
-  // rejected, a string passes. (apiKey and providerOptions share this guard.)
+  // rejected, a string passes. The Azure connection strings live under the nested
+  // azureOpenaiSettings object (validated by dot-path).
   describe('string type validation (.isString())', () => {
     it.each([
       'apiKey',
       'model',
       'providerOptions',
-      'azureOpenaiResourceName',
-      'azureOpenaiBaseUrl',
-      'azureOpenaiApiVersion',
     ])('rejects a non-string value for "%s"', async (field) => {
-      const { hasErrors, failedFields } = await runValidators({ [field]: 123 });
+      const { hasErrors, failedFields } = await runValidators({
+        [field]: 123,
+      });
       expect(hasErrors).toBe(true);
       expect(failedFields).toContain(field);
     });
@@ -489,12 +490,40 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
     it.each([
       'apiKey',
       'model',
-      'azureOpenaiResourceName',
-      'azureOpenaiBaseUrl',
-      'azureOpenaiApiVersion',
     ])('accepts a string value for "%s"', async (field) => {
       const { hasErrors } = await runValidators({ [field]: 'some-value' });
       expect(hasErrors).toBe(false);
+    });
+
+    it.each([
+      'resourceName',
+      'baseURL',
+      'apiVersion',
+    ])('rejects a non-string value for azureOpenaiSettings.%s', async (field) => {
+      const { hasErrors, failedFields } = await runValidators({
+        azureOpenaiSettings: { [field]: 123 },
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain(`azureOpenaiSettings.${field}`);
+    });
+
+    it.each([
+      'resourceName',
+      'baseURL',
+      'apiVersion',
+    ])('accepts a string value for azureOpenaiSettings.%s', async (field) => {
+      const { hasErrors } = await runValidators({
+        azureOpenaiSettings: { [field]: 'some-value' },
+      });
+      expect(hasErrors).toBe(false);
+    });
+
+    it('rejects a non-object azureOpenaiSettings', async () => {
+      const { hasErrors, failedFields } = await runValidators({
+        azureOpenaiSettings: 'not-an-object',
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('azureOpenaiSettings');
     });
   });
 
@@ -507,13 +536,23 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
     it.each([
       'model',
       'providerOptions',
-      'azureOpenaiResourceName',
-      'azureOpenaiBaseUrl',
-      'azureOpenaiApiVersion',
     ])('sanitizes an empty "%s" to undefined', async (field) => {
       const { hasErrors, body } = await runValidators({ [field]: '' });
       expect(hasErrors).toBe(false);
       expect(body[field]).toBeUndefined();
+    });
+
+    it.each([
+      'resourceName',
+      'baseURL',
+      'apiVersion',
+    ])('sanitizes an empty azureOpenaiSettings.%s to undefined', async (field) => {
+      const { hasErrors, body } = await runValidators({
+        azureOpenaiSettings: { [field]: '' },
+      });
+      expect(hasErrors).toBe(false);
+      const azure = body.azureOpenaiSettings as Record<string, unknown>;
+      expect(azure[field]).toBeUndefined();
     });
 
     it('leaves a non-empty clearable string untouched', async () => {
@@ -529,26 +568,36 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
   });
 
   describe('boolean fields', () => {
-    it.each([
-      'aiEnabled',
-      'azureOpenaiUseEntraId',
-    ])('accepts a boolean value for "%s"', async (field) => {
-      const accepted = await runValidators({ [field]: true });
-      expect(accepted.hasErrors).toBe(false);
-
-      const acceptedFalse = await runValidators({ [field]: false });
-      expect(acceptedFalse.hasErrors).toBe(false);
+    it('accepts a boolean value for aiEnabled', async () => {
+      expect((await runValidators({ aiEnabled: true })).hasErrors).toBe(false);
+      expect((await runValidators({ aiEnabled: false })).hasErrors).toBe(false);
     });
 
-    it.each([
-      'aiEnabled',
-      'azureOpenaiUseEntraId',
-    ])('rejects a non-boolean value for "%s"', async (field) => {
+    it('rejects a non-boolean value for aiEnabled', async () => {
       const { hasErrors, failedFields } = await runValidators({
-        [field]: 'yes',
+        aiEnabled: 'yes',
       });
       expect(hasErrors).toBe(true);
-      expect(failedFields).toContain(field);
+      expect(failedFields).toContain('aiEnabled');
+    });
+
+    it('accepts a boolean value for azureOpenaiSettings.useEntraId', async () => {
+      expect(
+        (await runValidators({ azureOpenaiSettings: { useEntraId: true } }))
+          .hasErrors,
+      ).toBe(false);
+      expect(
+        (await runValidators({ azureOpenaiSettings: { useEntraId: false } }))
+          .hasErrors,
+      ).toBe(false);
+    });
+
+    it('rejects a non-boolean value for azureOpenaiSettings.useEntraId', async () => {
+      const { hasErrors, failedFields } = await runValidators({
+        azureOpenaiSettings: { useEntraId: 'yes' },
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('azureOpenaiSettings.useEntraId');
     });
   });
 
@@ -559,10 +608,12 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
       apiKey: 'secret-key',
       model: 'gpt-4o',
       providerOptions: '{"temperature":0.2}',
-      azureOpenaiResourceName: 'my-resource',
-      azureOpenaiBaseUrl: 'https://example.openai.azure.com',
-      azureOpenaiApiVersion: '2024-02-01',
-      azureOpenaiUseEntraId: false,
+      azureOpenaiSettings: {
+        resourceName: 'my-resource',
+        baseURL: 'https://example.openai.azure.com',
+        apiVersion: '2024-02-01',
+        useEntraId: false,
+      },
     });
     expect(hasErrors).toBe(false);
   });

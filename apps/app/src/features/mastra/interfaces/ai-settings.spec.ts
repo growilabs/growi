@@ -35,10 +35,12 @@ describe('ai-settings interfaces', () => {
         provider,
         model: 'gpt-4o',
         providerOptions: '{"temperature":0.2}',
-        azureOpenaiResourceName: 'my-resource',
-        azureOpenaiBaseUrl: 'https://example.openai.azure.com',
-        azureOpenaiApiVersion: '2024-02-01',
-        azureOpenaiUseEntraId: false,
+        azureOpenaiSettings: {
+          resourceName: 'my-resource',
+          baseURL: 'https://example.openai.azure.com',
+          apiVersion: '2024-02-01',
+          useEntraId: false,
+        },
         isApiKeySet: true,
         useOnlyEnvVars: false,
         isConfigured: true,
@@ -50,16 +52,19 @@ describe('ai-settings interfaces', () => {
         apiKey: 'secret',
         model: 'gpt-4o',
         providerOptions: '{}',
-        azureOpenaiResourceName: 'my-resource',
-        azureOpenaiBaseUrl: 'https://example.openai.azure.com',
-        azureOpenaiApiVersion: '2024-02-01',
-        azureOpenaiUseEntraId: true,
+        azureOpenaiSettings: {
+          resourceName: 'my-resource',
+          baseURL: 'https://example.openai.azure.com',
+          apiVersion: '2024-02-01',
+          useEntraId: true,
+        },
       };
 
-      // The minimal-required shape: only the non-optional response fields.
+      // The minimal-required shape: only the non-optional response fields
+      // (azureOpenaiSettings is always present — an empty object is valid).
       const minimalResponse: AiSettingsResponse = {
         aiEnabled: false,
-        azureOpenaiUseEntraId: false,
+        azureOpenaiSettings: {},
         isApiKeySet: false,
         useOnlyEnvVars: false,
         isConfigured: false,

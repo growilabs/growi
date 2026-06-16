@@ -12,10 +12,12 @@ const baseResponse: AiSettingsResponse = {
   provider: 'openai',
   model: 'gpt-4o',
   providerOptions: '{"openai":{}}',
-  azureOpenaiResourceName: 'res',
-  azureOpenaiBaseUrl: 'https://example.com',
-  azureOpenaiApiVersion: '2024-02-01',
-  azureOpenaiUseEntraId: false,
+  azureOpenaiSettings: {
+    resourceName: 'res',
+    baseURL: 'https://example.com',
+    apiVersion: '2024-02-01',
+    useEntraId: false,
+  },
   isApiKeySet: true,
   useOnlyEnvVars: false,
   isConfigured: true,
@@ -27,10 +29,12 @@ const baseValues: AiSettingsFormValues = {
   apiKey: '',
   model: 'gpt-4o',
   providerOptions: '',
-  azureOpenaiResourceName: '',
-  azureOpenaiBaseUrl: '',
-  azureOpenaiApiVersion: '',
-  azureOpenaiUseEntraId: false,
+  azureOpenaiSettings: {
+    resourceName: '',
+    baseURL: '',
+    apiVersion: '',
+    useEntraId: false,
+  },
 };
 
 describe('toFormValues', () => {
@@ -45,50 +49,62 @@ describe('toFormValues', () => {
       apiKey: '', // write-only: never seeded from the server (R5.2)
       model: 'gpt-4o',
       providerOptions: '{"openai":{}}',
-      azureOpenaiResourceName: 'res',
-      azureOpenaiBaseUrl: 'https://example.com',
-      azureOpenaiApiVersion: '2024-02-01',
-      azureOpenaiUseEntraId: false,
+      azureOpenaiSettings: {
+        resourceName: 'res',
+        baseURL: 'https://example.com',
+        apiVersion: '2024-02-01',
+        useEntraId: false,
+      },
     });
   });
 
   it('falls back to the unselected sentinel and empty strings for absent values', () => {
-    // Act
+    // Act: an empty azureOpenaiSettings object means every inner field is absent
     const values = toFormValues({
       ...baseResponse,
       provider: undefined,
       model: undefined,
       providerOptions: undefined,
-      azureOpenaiResourceName: undefined,
-      azureOpenaiBaseUrl: undefined,
-      azureOpenaiApiVersion: undefined,
+      azureOpenaiSettings: {},
     });
 
     // Assert
     expect(values.provider).toBe('');
     expect(values.model).toBe('');
     expect(values.providerOptions).toBe('');
-    expect(values.azureOpenaiResourceName).toBe('');
-    expect(values.azureOpenaiBaseUrl).toBe('');
-    expect(values.azureOpenaiApiVersion).toBe('');
+    expect(values.azureOpenaiSettings).toEqual({
+      resourceName: '',
+      baseURL: '',
+      apiVersion: '',
+      useEntraId: false,
+    });
   });
 });
 
 describe('buildUpdateRequest', () => {
-  it('always includes booleans and sends string fields as-is', () => {
+  it('always includes aiEnabled and sends the azure object as-is', () => {
     // Act
     const body = buildUpdateRequest({
       ...baseValues,
       aiEnabled: false,
-      azureOpenaiUseEntraId: true,
+      azureOpenaiSettings: {
+        ...baseValues.azureOpenaiSettings,
+        useEntraId: true,
+      },
       model: '',
     });
 
     // Assert
     expect(body).toMatchObject({
       aiEnabled: false,
-      azureOpenaiUseEntraId: true,
       model: '', // empty strings are sent as-is (server normalizes, R4.4)
+    });
+    // The azure object is forwarded verbatim (the server drops empty fields).
+    expect(body.azureOpenaiSettings).toEqual({
+      resourceName: '',
+      baseURL: '',
+      apiVersion: '',
+      useEntraId: true,
     });
   });
 

@@ -21,9 +21,8 @@ const ENTRA_ID_SCOPE = 'https://cognitiveservices.azure.com/.default';
 // inside this resolver — the shared dispatch never sees it. `ai:model`
 // here is the Azure *deployment name*, not an OpenAI model id.
 //
-// Naming: the config object field is `baseURL`, matching the AI SDK's createAzure
-// option, so it passes straight through here. (The admin API/form field is the
-// lowercase azureOpenaiBaseUrl; the get/put-ai-settings routes map between the two.)
+// The object field is `baseURL`, matching the AI SDK's createAzure option (and
+// the API/form use the same name end-to-end), so it passes straight through here.
 export const resolveAzureOpenaiModel = (): MastraModelConfig => {
   // Connection config is a single JSON object (ai:azureOpenaiSettings). `?? {}` guards a
   // malformed AI_AZURE_OPENAI_SETTINGS env var, which the loader fails soft to null.

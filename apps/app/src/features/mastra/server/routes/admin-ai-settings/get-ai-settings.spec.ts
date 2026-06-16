@@ -47,8 +47,8 @@ const setConfig = (overrides: ConfigStub = {}): void => {
     'ai:apiKey': undefined,
     'ai:model': undefined,
     'ai:providerOptions': undefined,
-    // Azure connection config is one JSON object internally; the response keeps
-    // the four flat fields (UI unchanged).
+    // Azure connection config is one JSON object, exposed as-is under
+    // azureOpenaiSettings in the response.
     'ai:azureOpenaiSettings': {},
     'env:useOnlyEnvVars:ai': false,
     ...overrides,
@@ -153,27 +153,31 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
 
     const { res } = invoke();
 
-    // The stored ai:azureOpenaiSettings object is unpacked into the four flat response
-    // fields the admin UI consumes (Req 1.4).
+    // The stored ai:azureOpenaiSettings object is exposed as-is under
+    // azureOpenaiSettings (one canonical type end-to-end, Req 1.4).
     expect(responseBody(res)).toMatchObject({
       provider: 'azure-openai',
       model: 'gpt-4o',
       providerOptions: '{"temperature":0.2}',
-      azureOpenaiResourceName: 'my-resource',
-      azureOpenaiBaseUrl: 'https://example.openai.azure.com',
-      azureOpenaiApiVersion: '2024-02-01',
-      azureOpenaiUseEntraId: true,
+      azureOpenaiSettings: {
+        resourceName: 'my-resource',
+        baseURL: 'https://example.openai.azure.com',
+        apiVersion: '2024-02-01',
+        useEntraId: true,
+      },
     });
   });
 
-  it('defaults azureOpenaiUseEntraId to false when the stored object omits it', () => {
+  it('passes the azureOpenaiSettings object through verbatim (no normalization)', () => {
     setConfig({ 'ai:azureOpenaiSettings': { resourceName: 'my-resource' } });
 
     const { res } = invoke();
 
-    const body = responseBody(res);
-    expect(body.azureOpenaiUseEntraId).toBe(false);
-    expect(body.azureOpenaiResourceName).toBe('my-resource');
+    // The handler does not fill defaults; useEntraId is simply absent here (the
+    // form applies the `?? false` default when seeding its inputs).
+    expect(responseBody(res).azureOpenaiSettings).toEqual({
+      resourceName: 'my-resource',
+    });
   });
 
   it('responds with apiv3Err and does not leak the apiKey when a collaborator throws (Req 5.3)', () => {

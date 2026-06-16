@@ -22,10 +22,12 @@ const defaultFormValues: AiSettingsFormValues = {
   apiKey: '',
   model: '',
   providerOptions: '',
-  azureOpenaiResourceName: '',
-  azureOpenaiBaseUrl: '',
-  azureOpenaiApiVersion: '',
-  azureOpenaiUseEntraId: false,
+  azureOpenaiSettings: {
+    resourceName: '',
+    baseURL: '',
+    apiVersion: '',
+    useEntraId: false,
+  },
 };
 
 const FormHarness = ({
@@ -96,7 +98,16 @@ describe('AzureOpenaiSettings', () => {
   it('shows the Entra ID api-key note only when useEntraId is true', async () => {
     // Arrange: note hidden by default
     const user = userEvent.setup();
-    renderComponent({ defaultValues: { azureOpenaiUseEntraId: false } });
+    renderComponent({
+      defaultValues: {
+        azureOpenaiSettings: {
+          resourceName: '',
+          baseURL: '',
+          apiVersion: '',
+          useEntraId: false,
+        },
+      },
+    });
     expect(
       screen.queryByText('ai_settings.azure_entra_id_api_key_note'),
     ).not.toBeInTheDocument();

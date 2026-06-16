@@ -18,7 +18,7 @@ export interface AzureOpenaiSettingsProps {
  *
  * Reads/writes the shared react-hook-form context owned by `AiSettings`. Renders
  * nothing unless the watched `provider === 'azure-openai'` (3.2). When
- * `azureOpenaiUseEntraId` is on, surfaces a note that the apiKey is not used
+ * `azureOpenaiSettings.useEntraId` is on, surfaces a note that the apiKey is not used
  * (3.3) — the apiKey field itself lives in `ProviderCommonSettings`, which also
  * labels the model field as the Azure deployment name for this provider (3.4).
  *
@@ -43,7 +43,7 @@ export const AzureOpenaiSettings = (
     return null;
   }
 
-  const useEntraId = watch('azureOpenaiUseEntraId');
+  const useEntraId = watch('azureOpenaiSettings.useEntraId');
 
   return (
     <div>
@@ -67,7 +67,9 @@ export const AzureOpenaiSettings = (
           id={resourceNameId}
           type="text"
           disabled={disabled}
-          {...registerToInputProps(register('azureOpenaiResourceName'))}
+          {...registerToInputProps(
+            register('azureOpenaiSettings.resourceName'),
+          )}
         />
         <FormText>{t('ai_settings.azure_resource_name_help')}</FormText>
       </FormGroup>
@@ -78,7 +80,7 @@ export const AzureOpenaiSettings = (
           id={baseUrlId}
           type="text"
           disabled={disabled}
-          {...registerToInputProps(register('azureOpenaiBaseUrl'))}
+          {...registerToInputProps(register('azureOpenaiSettings.baseURL'))}
         />
         <FormText>{t('ai_settings.azure_base_url_help')}</FormText>
       </FormGroup>
@@ -91,7 +93,7 @@ export const AzureOpenaiSettings = (
           id={apiVersionId}
           type="text"
           disabled={disabled}
-          {...registerToInputProps(register('azureOpenaiApiVersion'))}
+          {...registerToInputProps(register('azureOpenaiSettings.apiVersion'))}
         />
         <FormText>{t('ai_settings.azure_api_version_help')}</FormText>
       </FormGroup>
@@ -102,7 +104,7 @@ export const AzureOpenaiSettings = (
           type="switch"
           role="switch"
           disabled={disabled}
-          {...registerToInputProps(register('azureOpenaiUseEntraId'))}
+          {...registerToInputProps(register('azureOpenaiSettings.useEntraId'))}
         />
         <Label htmlFor={useEntraIdId} className="ms-2">
           {t('ai_settings.azure_use_entra_id_label')}

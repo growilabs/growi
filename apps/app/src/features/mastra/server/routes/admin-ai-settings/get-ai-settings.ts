@@ -27,7 +27,7 @@ const logger = loggerFactory(
  *         The currently effective AI configuration for the admin UI. The
  *         ai:apiKey value is never returned — only isApiKeySet exposes its presence.
  *       type: object
- *       required: [aiEnabled, azureOpenaiUseEntraId, isApiKeySet, useOnlyEnvVars, isConfigured]
+ *       required: [aiEnabled, azureOpenaiSettings, isApiKeySet, useOnlyEnvVars, isConfigured]
  *       properties:
  *         aiEnabled:
  *           type: boolean
@@ -42,15 +42,21 @@ const logger = loggerFactory(
  *         providerOptions:
  *           type: string
  *           description: Provider-namespaced options as a raw JSON string.
- *         azureOpenaiResourceName:
- *           type: string
- *         azureOpenaiBaseUrl:
- *           type: string
- *         azureOpenaiApiVersion:
- *           type: string
- *         azureOpenaiUseEntraId:
- *           type: boolean
- *           description: Whether Azure OpenAI authenticates via Microsoft Entra ID instead of an API key.
+ *         azureOpenaiSettings:
+ *           type: object
+ *           description: >-
+ *             Azure OpenAI connection settings (the ai:azureOpenaiSettings object).
+ *             Always present; an empty object when unset.
+ *           properties:
+ *             resourceName:
+ *               type: string
+ *             baseURL:
+ *               type: string
+ *             apiVersion:
+ *               type: string
+ *             useEntraId:
+ *               type: boolean
+ *               description: Whether Azure OpenAI authenticates via Microsoft Entra ID instead of an API key (absent = false).
  *         isApiKeySet:
  *           type: boolean
  *           description: Whether an ai:apiKey is stored. The key value itself is never returned.
@@ -105,9 +111,10 @@ export const getAiSettings = (_req: Request, res: ApiV3Response): void => {
     // Never read into a returned field — only its presence is exposed (Req 5.2).
     const apiKey = configManager.getConfig('ai:apiKey');
 
-    // Azure connection config is one JSON object internally (ai:azureOpenaiSettings);
-    // the response keeps the four flat fields so the admin UI is unchanged.
-    // `?? {}` guards a malformed AI_AZURE_OPENAI_SETTINGS env var (loader fails soft to null).
+    // Azure connection config is one JSON object (ai:azureOpenaiSettings) shared
+    // end-to-end (storage / API / form). `?? {}` guards a malformed
+    // AI_AZURE_OPENAI_SETTINGS env var (loader fails soft to null) and the unset
+    // case, so the response always carries an object.
     const azureOpenaiSettings =
       configManager.getConfig('ai:azureOpenaiSettings') ?? {};
 
@@ -116,10 +123,7 @@ export const getAiSettings = (_req: Request, res: ApiV3Response): void => {
       provider: configManager.getConfig('ai:provider'),
       model: configManager.getConfig('ai:model'),
       providerOptions: configManager.getConfig('ai:providerOptions'),
-      azureOpenaiResourceName: azureOpenaiSettings.resourceName,
-      azureOpenaiBaseUrl: azureOpenaiSettings.baseURL,
-      azureOpenaiApiVersion: azureOpenaiSettings.apiVersion,
-      azureOpenaiUseEntraId: azureOpenaiSettings.useEntraId ?? false,
+      azureOpenaiSettings,
       isApiKeySet: apiKey != null && apiKey !== '',
       useOnlyEnvVars: configManager.getConfig('env:useOnlyEnvVars:ai') === true,
       isConfigured: isAiConfigured(),

@@ -22,10 +22,12 @@ const defaultFormValues: AiSettingsFormValues = {
   apiKey: '',
   model: '',
   providerOptions: '',
-  azureOpenaiResourceName: '',
-  azureOpenaiBaseUrl: '',
-  azureOpenaiApiVersion: '',
-  azureOpenaiUseEntraId: false,
+  azureOpenaiSettings: {
+    resourceName: '',
+    baseURL: '',
+    apiVersion: '',
+    useEntraId: false,
+  },
 };
 
 const FormHarness = ({

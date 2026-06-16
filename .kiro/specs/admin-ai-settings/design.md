@@ -244,7 +244,7 @@ flowchart TD
 | 2.4 | 再起動なし反映 | resolve-mastra-model, model-config-sync | clearResolvedMastraModelCache | 保存反映フロー |
 | 3.1 | Azure 専用設定欄 | AzureOpenaiSettings | AiSettingsDto(azure 群) | — |
 | 3.2 | 非 azure 時の非適用提示 | AzureOpenaiSettings | provider 状態 | — |
-| 3.3 | EntraId 時の apiKey 不使用提示 | AzureOpenaiSettings | azureOpenaiUseEntraId | — |
+| 3.3 | EntraId 時の apiKey 不使用提示 | AzureOpenaiSettings | azureOpenaiSettings.useEntraId | — |
 | 3.4 | deployment 名の案内 | AzureOpenaiSettings | model フィールドのラベル(`azure_model_deployment_label`) | — |
 | 4.1 | env 専用モード時は env 値を使用 | config-definition(ai グループ), ConfigManager.shouldUseEnvOnly | ENV_ONLY_GROUPS | — |
 | 4.2 | env 専用モード時に編集不可 + モード明示 | EnvOnlyModeNotice, get-ai-settings | useOnlyEnvVars フラグ | — |
@@ -363,13 +363,10 @@ export interface AiSettingsResponse {
   provider?: AiProvider;
   model?: string;
   providerOptions?: string;            // raw JSON string
-  // 以下 4 フィールドは API 契約として平坦のまま維持。内部の単一キー `ai:azureOpenaiSettings`
-  // (AzureOpenaiConfig オブジェクト)を GET ハンドラがアンパックして返す
-  // (object が useEntraId を持たない場合 azureOpenaiUseEntraId は false)
-  azureOpenaiResourceName?: string;
-  azureOpenaiBaseUrl?: string;
-  azureOpenaiApiVersion?: string;
-  azureOpenaiUseEntraId: boolean;
+  // Azure 接続設定は storage と同じ AzureOpenaiConfig オブジェクトをそのまま公開
+  // (storage / API / フォームで単一の正準型)。常に存在し、未設定時は空オブジェクト {}。
+  // useEntraId は optional(未設定 = false 扱い)。
+  azureOpenaiSettings: AzureOpenaiConfig;
   isApiKeySet: boolean;                // ai:apiKey の値は返さない (5.2)
   useOnlyEnvVars: boolean;             // env:useOnlyEnvVars:ai 有効時 全項目編集不可 (4.2)
   isConfigured: boolean;              // isAiConfigured() の結果 (7.6 の警告判定に使用)
@@ -381,18 +378,15 @@ export interface AiSettingsUpdateRequest {
   apiKey?: string;                     // 空/未指定なら既存保持 (5.x)。ただし provider 変更時は失効(下記セキュリティ参照)
   model?: string;
   providerOptions?: string;
-  // 以下 4 フィールドは API 契約として平坦のまま維持。PUT ハンドラがこれらを束ねて
-  // 単一キー `ai:azureOpenaiSettings`(AzureOpenaiConfig オブジェクト)へ組み立てて永続化する
-  azureOpenaiResourceName?: string;
-  azureOpenaiBaseUrl?: string;
-  azureOpenaiApiVersion?: string;
-  azureOpenaiUseEntraId?: boolean;
+  // storage と同じ AzureOpenaiConfig オブジェクト。full-state replace 単位
+  // (各内部文字列は clearable、useEntraId は object の一部)。
+  azureOpenaiSettings?: AzureOpenaiConfig;
 }
 ```
 - Idempotency: PUT は冪等(同値再送で副作用は cache clear のみ)。
 - 更新セマンティクス: クライアントは全項目を送信する。**merge boolean は `aiEnabled` のみ**(常に値を送る)。**clearable 文字列項目**(model / providerOptions)は空文字を `undefined` に正規化(validator の `.customSanitizer()` で実施)し、`updateConfigs(..., { removeIfUndefined: true })` で DB から削除する(= 環境変数フォールバックへ戻る、R4.4)。**例外は `apiKey` のみ**(空/未指定 = 既存保持、クリアしない — sanitizer 非適用)。**ただしセキュリティ上、`provider` が現在の保存値から変化し、かつ新キー未指定の場合は保持せず失効させる**(`buildUpdates` が `configManager.getConfig('ai:provider')` と比較し、変化時は `ai:apiKey = undefined` を更新へ含める)。これにより前 provider のキーが新 provider に再利用・送信されることを防ぐ。クライアント側でも provider 変更時に apiKey 入力をクリアし、保存済みキーがある状態では警告(`api_key_provider_change_warning`)を表示する。
-- **Azure 接続設定の更新セマンティクス(full-state replace)**: 平坦な Azure 4 項目(`azureOpenaiResourceName` / `azureOpenaiBaseUrl` / `azureOpenaiApiVersion` / `azureOpenaiUseEntraId`)は、PUT ハンドラ(`buildAzureOpenaiConfig`)が単一の `ai:azureOpenaiSettings` オブジェクト(`AzureOpenaiConfig`)へ組み立てて**全体置換(deep-merge せず submit 内容をそのまま反映)**で永続化する。したがって Entra ID のチェック解除や 1 項目のクリアは submit どおりに正確に反映される。`azureOpenaiUseEntraId` は**もはや独立した boolean-merge 項目ではない**(default `false` は情報を持たないため、`useEntraId` は `true` のときのみ object に格納する)。3 つの文字列が全てクリア/未指定で、かつ `useEntraId` が true でない場合、組み立て結果のオブジェクトはキーを 1 つも持たず `undefined` に潰れる → `updateConfigs(..., { removeIfUndefined: true })` がキーを削除し、有効値は `AI_AZURE_OPENAI_SETTINGS` env の既定値へフォールバックする(R4.4 を per-field ではなく**オブジェクト単位**で適用したもの)。
-- Validation(`put-ai-settings.ts` に inline 定義の `updateAiSettingsValidators`): リクエスト検証層は**無変更**で、引き続き平坦な 4 項目を検証する。`provider ∈ AI_PROVIDERS`(6.1)、文字列項目(apiKey / model / azure 3:`azureOpenaiResourceName` / `azureOpenaiBaseUrl` / `azureOpenaiApiVersion`)は `.isString()` 型ガード、`providerOptions` は `.isString()` + **FE/BE 共通述語 `isValidProviderOptionsJson`**(`utils/provider-options-validation.ts`、JSON.parse ベース・空=有効)を `.custom()` で適用(6.2)、`azureOpenaiUseEntraId` は boolean。clearable 文字列は `.customSanitizer('' → undefined)` で正規化(旧 `normalizeStringField` を置換)。クライアント(`ProviderCommonSettings` の register validate)も同じ JSON 述語を使い判定一致。なお検証は平坦なフィールド単位で行うが、**永続化段階で `buildUpdates` / `buildAzureOpenaiConfig` が Azure 4 項目を単一の `ai:azureOpenaiSettings` オブジェクトへ集約する**(項目ごとに別 Config として保存はしない)。
+- **Azure 接続設定の更新セマンティクス(full-state replace)**: リクエストは storage と同じ `azureOpenaiSettings`(`AzureOpenaiConfig`)オブジェクトを運ぶ。PUT ハンドラ(`buildAzureOpenaiConfig`)が `body.azureOpenaiSettings` から `ai:azureOpenaiSettings` の config 値を**再組み立て(deep-merge せず submit 内容をそのまま反映する全体置換)**する。したがって Entra ID のチェック解除や 1 項目のクリアは submit どおりに正確に反映される。`useEntraId` は default `false` が情報を持たないため **`true` のときのみ object に格納**する。3 つの文字列が全てクリア(sanitizer で '' → undefined)/未指定で、かつ `useEntraId` が true でない場合、組み立て結果のオブジェクトはキーを 1 つも持たず `undefined` に潰れる → `updateConfigs(..., { removeIfUndefined: true })` がキーを削除し、有効値は `AI_AZURE_OPENAI_SETTINGS` env の既定値へフォールバックする(R4.4 を per-field ではなく**オブジェクト単位**で適用したもの)。
+- Validation(`put-ai-settings.ts` に inline 定義の `updateAiSettingsValidators`): `provider ∈ AI_PROVIDERS`(6.1)、トップレベル文字列項目(apiKey / model)は `.isString()` 型ガード、`providerOptions` は `.isString()` + **FE/BE 共通述語 `isValidProviderOptionsJson`**(`utils/provider-options-validation.ts`、JSON.parse ベース・空=有効)を `.custom()` で適用(6.2)。Azure 接続設定は **ネストした dot-path で検証**する: `azureOpenaiSettings` 自体は `.isObject()`、`azureOpenaiSettings.resourceName` / `.baseURL` / `.apiVersion` は clearable 文字列(`.isString()` + `.customSanitizer('' → undefined)`)、`azureOpenaiSettings.useEntraId` は boolean。クライアント(`ProviderCommonSettings` の register validate)も同じ JSON 述語を使い判定一致。
 - 成功時副作用: `updateConfigs` → `clearResolvedMastraModelCache()` → `activityEvent.emit('update', _id, { action: ACTION_ADMIN_AI_SETTING_UPDATE })`。
 
 **Implementation Notes**

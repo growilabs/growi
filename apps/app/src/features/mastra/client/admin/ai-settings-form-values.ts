@@ -3,6 +3,7 @@ import type {
   AiSettingsResponse,
   AiSettingsUpdateRequest,
 } from '../../interfaces/ai-settings';
+import type { AzureOpenaiConfig } from '../../interfaces/azure-openai-config';
 
 /**
  * The react-hook-form working copy for the AI settings admin form.
@@ -12,6 +13,9 @@ import type {
  * admin types a new value. `provider` uses `''` for the unselected state so the
  * `<select>` is never bound to `undefined`. String fields default to '' so the
  * registered inputs are never `undefined`.
+ *
+ * `azureOpenaiSettings` reuses the storage/API `AzureOpenaiConfig`, wrapped in
+ * `Required<>` so every input is a controlled value (strings '', not undefined).
  */
 export interface AiSettingsFormValues {
   aiEnabled: boolean;
@@ -19,17 +23,15 @@ export interface AiSettingsFormValues {
   apiKey: string;
   model: string;
   providerOptions: string;
-  azureOpenaiResourceName: string;
-  azureOpenaiBaseUrl: string;
-  azureOpenaiApiVersion: string;
-  azureOpenaiUseEntraId: boolean;
+  azureOpenaiSettings: Required<AzureOpenaiConfig>;
 }
 
 /**
  * Seed the form values from the server response.
  *
  * `apiKey` is always '' (write-only, never seeded). `provider` falls back to ''
- * (unselected) and optional strings to ''. Booleans pass through as-is.
+ * (unselected) and optional strings to ''. The azure object's optional fields are
+ * filled with '' / false so the inputs stay controlled.
  */
 export const toFormValues = (
   data: AiSettingsResponse,
@@ -39,21 +41,23 @@ export const toFormValues = (
   apiKey: '',
   model: data.model ?? '',
   providerOptions: data.providerOptions ?? '',
-  azureOpenaiResourceName: data.azureOpenaiResourceName ?? '',
-  azureOpenaiBaseUrl: data.azureOpenaiBaseUrl ?? '',
-  azureOpenaiApiVersion: data.azureOpenaiApiVersion ?? '',
-  azureOpenaiUseEntraId: data.azureOpenaiUseEntraId,
+  azureOpenaiSettings: {
+    resourceName: data.azureOpenaiSettings.resourceName ?? '',
+    baseURL: data.azureOpenaiSettings.baseURL ?? '',
+    apiVersion: data.azureOpenaiSettings.apiVersion ?? '',
+    useEntraId: data.azureOpenaiSettings.useEntraId ?? false,
+  },
 });
 
 /**
  * Map the form values to the PUT request body.
  *
- * Booleans (`aiEnabled` / `azureOpenaiUseEntraId`) are always included. String
- * fields are sent as-is (including ''), which the server normalizes to remove
- * the DB value and fall back to the env default (R4.4). `provider` '' (the
- * unselected sentinel) is sent as `undefined`. `apiKey` is the only exception:
- * it is included only when the admin typed a value, so a blank field keeps the
- * existing stored key (R5.x).
+ * `aiEnabled` is always included. The `azureOpenaiSettings` object is sent as-is
+ * (including '' strings), which the server normalizes — emptied fields are dropped
+ * and an all-empty object falls back to the env default (R4.4). `provider` ''
+ * (the unselected sentinel) is sent as `undefined`. `apiKey` is the only
+ * exception: it is included only when the admin typed a value, so a blank field
+ * keeps the existing stored key (R5.x).
  */
 export const buildUpdateRequest = (
   values: AiSettingsFormValues,
@@ -63,10 +67,7 @@ export const buildUpdateRequest = (
     provider: values.provider === '' ? undefined : values.provider,
     model: values.model,
     providerOptions: values.providerOptions,
-    azureOpenaiResourceName: values.azureOpenaiResourceName,
-    azureOpenaiBaseUrl: values.azureOpenaiBaseUrl,
-    azureOpenaiApiVersion: values.azureOpenaiApiVersion,
-    azureOpenaiUseEntraId: values.azureOpenaiUseEntraId,
+    azureOpenaiSettings: values.azureOpenaiSettings,
   };
   if (values.apiKey !== '') {
     body.apiKey = values.apiKey;
