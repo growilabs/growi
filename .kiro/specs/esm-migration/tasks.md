@@ -537,12 +537,13 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Depends: 4.2, 5.3_
   - **実績 (2026-06-16, 検証完了・ソース変更なし)**: (1) 削除対象の解消済み CJS/ESM ピン記述は **0 件** — flat/mime/parse-json ピンは元々 `package.json` でなく `pnpm-workspace.yaml` overrides にあり 5.1–5.3 で処理済み。`apps/app/package.json` の `// comments for dependencies` は `@keycloak/keycloak-admin-client` (19+ ESM-only/API 破壊で別マイグレーション要) のみで、これは現役 pin `^18.0.0` の有効な理由 (GROWI の ESM 化と独立) のため削除せず・スコープ外。(2) `transpilePackages` は Phase 4 で空配列化し `next.config.ts:45-49` に理由コメント既設、overrides 3 件 (mime/axios/@codemirror-commands) すべてに理由コメントあり。(3) axios CVE コメント (CVE-2026-40175 / GHSA-fvcv-3m26-pcqx) は `pnpm-workspace.yaml:15-19` に無傷。証跡: `phase5-gate-evidence/README.md`
 
-- [ ] 5.5 ステアリング文書と auto-loaded skill を同期更新
+- [x] 5.5 ステアリング文書と auto-loaded skill を同期更新
   - `.kiro/steering/tech.md` の Production Assembly / Turbopack 外部化の記述を ESM 前提に書き換え
   - `.claude/skills/tech-stack/SKILL.md` と `.claude/skills/monorepo-overview/SKILL.md` の CJS/ESM 関連節を最新化
   - 更新後の文書に含まれるコードブロックや件数がリポジトリ実態と一致する
   - _Requirements: 7.4_
   - _Depends: 5.4_
+  - **実績 (2026-06-16)**: 名指しの `.claude/skills/{tech-stack,monorepo-overview}/SKILL.md` は**現存しない** (過去コミットで steering/rules/AGENTS.md に統合・廃止)。実在の auto-loaded 文書を更新: (1) `tech.md` に「Module System (native ESM)」節新設 (root+apps/app+packages/* 17 共有が type:module、NodeNext ESM 出力、runtime に ts-node/tsx 無し、require(esm) は名前空間返却=named member 可/default member は CJS ピン要 → mime 維持・flat/parse-json 撤去の根拠)、Bundler Strategy に transpilePackages 空 (40+6 を Phase 4 全削除) を追記、broken skill 参照を AGENTS.md へ修正、staleness 修正 (v7.5→v8 / pnpm v10→v11)。(2) `structure.md` の存在しない monorepo-overview 参照 2 箇所を `.claude/rules/project-structure.md` へ repoint。(3) `build-optimization/SKILL.md` は webpack 撤去済みで ESM 整合・変更不要。件数検証: packages/* type:module=17 / Next ^16.2.6 / pnpm 11.1.1 / 本番起動・tsrun コマンドをスクリプト実体で確認。証跡: `phase5-gate-evidence/README.md`
 
 ## Phase 6: 本番アセンブリ end-to-end 検証
 

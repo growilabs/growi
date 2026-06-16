@@ -191,3 +191,40 @@ harness は実際にインストールされたバージョンに対して以下
 
 **結論**: 5.4 は検証タスクとして完了。削除すべき stale な CJS/ESM ピン記述は無く、残存する
 すべての override / transpilePackages 状態に正当化コメントが揃っている。ソース変更は不要。
+
+## 5.5 ステアリング文書・auto-loaded skill 同期更新 — 完了
+
+**スコープの実態補正**: task が名指しする `.claude/skills/tech-stack/SKILL.md` と
+`.claude/skills/monorepo-overview/SKILL.md` は**リポジトリに存在しない** (過去の "reorganize
+skills and rules" / "relocate skills" コミットで steering + rules + AGENTS.md に統合・廃止済み)。
+それらへの dangling `See:` 参照が `.kiro/steering/tech.md`・`structure.md` に残っていた。
+Req 7.4 (文書がリポジトリ実態と一致) に従い、実在の auto-loaded 文書を更新し broken 参照を修正した。
+
+**更新内容**:
+
+1. **`.kiro/steering/tech.md`** (ESM 前提化):
+   - broken 参照 `See: .claude/skills/tech-stack/SKILL.md` → `AGENTS.md` / `apps/app/AGENTS.md` に修正
+   - **「Module System (native ESM)」節を新設**: root + apps/app + `packages/*` の 17 共有
+     `@growi/*` が `"type": "module"`、apps/app server は NodeNext で `dist/server/` に ESM 出力、
+     runtime に ts-node/tsx 無し (本番 `node --import dotenv-flow/config.js dist/server/app.js` /
+     dev は `dev-esm-resolver.mjs` resolve-only hook + Node 24 native TS strip)。`require(esm)` が
+     名前空間を返すため named member は動くが default member 参照には CJS ピンが要る (= mime 維持・
+     flat/parse-json 撤去の根拠) を明記
+   - **Bundler Strategy**: `transpilePackages` が空であること (40 hardcoded + 6 prefix を Phase 4 で
+     全削除、ESM 化で Turbopack が native 解決) を追記
+   - staleness 修正: SSR deps リストの「as of v7.5」→「v8」、Production Assembly の「(pnpm v10)」→
+     「(pnpm v11)」(`assemble-prod.sh` の `pnpm deploy --prod --legacy` は現行と一致を確認)
+2. **`.kiro/steering/structure.md`**: 存在しない `monorepo-overview/SKILL.md` への参照 2 箇所を
+   実在の `.claude/rules/project-structure.md` (always loaded、monorepo layout / @growi/core hub を
+   保持) に repoint。
+3. **`apps/app/.claude/skills/build-optimization/SKILL.md`**: webpack 完全撤去済みの記述で既に
+   ESM 整合・transpilePackages 言及なし → **変更不要**を確認。
+
+**件数・コマンドの実態一致検証** (Req 7.4):
+- `packages/*` の `"type": "module"` = **17** (= 共有 @growi パッケージ数)
+- Next.js = **^16.2.6** (tech.md「Next.js 16」は正)、pnpm = **11.1.1**
+- 本番起動 = `node --import dotenv-flow/config.js dist/server/app.js`、`tsrun` =
+  `node --import ./bin/dev-esm-resolver.mjs --import dotenv-flow/config.js` をスクリプト実体で確認
+
+> 補足: `apps/app/AGENTS.md` の「Next.js 14」表記は実態 (16) と不一致だが、CJS/ESM とは無関係かつ
+> 本 spec のスコープ外 (override/ESM 文書同期) のため本タスクでは変更しない。別途修正対象として記録。
