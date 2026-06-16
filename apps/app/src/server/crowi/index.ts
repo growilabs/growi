@@ -11,6 +11,7 @@ import mongoose from 'mongoose';
 import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
+import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server/service/auditlog-changestream';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
@@ -134,6 +135,8 @@ class Crowi {
   passportService!: PassportService;
 
   searchService!: SearchService;
+
+  auditlogChangeStreamService: AuditlogChangeStreamService | null = null;
 
   slackIntegrationService!: SlackIntegrationService;
 
@@ -503,6 +506,19 @@ class Crowi {
 
   async setupSearcher(): Promise<void> {
     this.searchService = await SearchService.create(this);
+
+    if (this.searchService.isConfigured) {
+      this.auditlogChangeStreamService = new AuditlogChangeStreamService(
+        this.searchService.fullTextSearchDelegator,
+      );
+      this.auditlogChangeStreamService.start().catch(async (err) => {
+        logger.error(err, 'AuditlogChangeStreamService failed to start.');
+        await configManagerSingletonInstance.updateConfig(
+          'app:auditlogEsUnsynced',
+          true,
+        );
+      });
+    }
   }
 
   setupMailer(): void {
@@ -660,7 +676,7 @@ class Crowi {
       onSignal: async () => {
         logger.info('Server is starting cleanup');
 
-        await this.searchService?.close();
+        await this.auditlogChangeStreamService?.close();
         await mongoose.disconnect();
         return;
       },

@@ -3,7 +3,6 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
-import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server/service/auditlog-changestream';
 import { CommentEvent, commentEvent } from '~/features/comment/server';
 import {
   isIncludeAiMenthion,
@@ -107,9 +106,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
 
   nqDelegators: { [key in SearchDelegatorName]: SearchDelegator };
 
-  private auditlogChangeStreamService: AuditlogChangeStreamService | null =
-    null;
-
   static async create(crowi: Crowi) {
     const instance = new SearchService();
 
@@ -136,13 +132,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
     if (instance.isConfigured) {
       await instance.fullTextSearchDelegator.init();
       instance.registerUpdateEvent();
-      instance.auditlogChangeStreamService = new AuditlogChangeStreamService(
-        instance.fullTextSearchDelegator,
-      );
-      instance.auditlogChangeStreamService.start().catch(async (err) => {
-        logger.error(err, 'AuditlogChangeStreamService failed to start.');
-        await configManager.updateConfig('app:auditlogEsUnsynced', true);
-      });
     }
     return instance;
   }
@@ -301,10 +290,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
   resetErrorStatus() {
     this.isErrorOccuredOnHealthcheck = false;
     this.isErrorOccuredOnSearching = false;
-  }
-
-  async close(): Promise<void> {
-    await this.auditlogChangeStreamService?.close();
   }
 
   async reconnectClient() {
