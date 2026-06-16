@@ -2,9 +2,6 @@ import type { Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
-import loggerFactory from '~/utils/logger';
-
-const logger = loggerFactory('growi:models:changestream-resume-token');
 
 export interface IChangeStreamResumeToken {
   key: string;
@@ -34,36 +31,19 @@ const resumeTokenSchema = new Schema<
 resumeTokenSchema.statics.load = async function (
   key: string,
 ): Promise<unknown> {
-  try {
-    const doc = await this.findOne({ key });
-    return doc?.token ?? null;
-  } catch (err) {
-    logger.error('ChangeStreamResumeToken.load failed.', err);
-    return null;
-  }
+  const doc = await this.findOne({ key });
+  return doc?.token ?? null;
 };
 
 resumeTokenSchema.statics.upsert = async function (
   key: string,
   token: unknown,
 ): Promise<void> {
-  try {
-    await this.findOneAndUpdate(
-      { key },
-      { token },
-      { upsert: true, new: true },
-    );
-  } catch (err) {
-    logger.error('ChangeStreamResumeToken.upsert failed.', err);
-  }
+  await this.findOneAndUpdate({ key }, { token }, { upsert: true, new: true });
 };
 
 resumeTokenSchema.statics.clear = async function (key: string): Promise<void> {
-  try {
-    await this.deleteOne({ key });
-  } catch (err) {
-    logger.error('ChangeStreamResumeToken.clear failed.', err);
-  }
+  await this.deleteOne({ key });
 };
 
 export const ChangeStreamResumeToken = getOrCreateModel<

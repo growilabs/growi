@@ -86,6 +86,7 @@ export class AuditlogChangeStreamService {
 
     try {
       for await (const event of this.changeStream) {
+        // Phase 1: ES operation — failures here feed poison-pill detection.
         try {
           // 'update' skipped: Activity updates change only `action`, which is not indexed in ES.
           if (
@@ -97,10 +98,6 @@ export class AuditlogChangeStreamService {
           } else if (event.operationType === 'delete') {
             await this.delegator.deleteAuditlog(event.documentKey._id);
           }
-          // Per-event upsert doubles MongoDB writes but keeps the replay window minimal on restart.
-          // Throttle if write frequency becomes a concern — e.g. the one-time delete burst when
-          // Activity TTL is first enabled on a large backlog.
-          await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
           this.consecutiveEventFailures = 0;
           this.lastFailingToken = null;
           this.consecutiveRestarts = 0;
@@ -123,7 +120,15 @@ export class AuditlogChangeStreamService {
               'Skipping poison pill event after consecutive failures.',
             );
             await configManager.updateConfig('app:auditlogEsUnsynced', true);
-            await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
+            // Advance token past the poison pill; failure here means it will be retried on restart.
+            try {
+              await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
+            } catch (tokenErr) {
+              logger.error(
+                tokenErr,
+                'Failed to advance token past poison pill; will retry on restart.',
+              );
+            }
             this.consecutiveEventFailures = 0;
             this.lastFailingToken = null;
             this.consecutiveRestarts = 0;
@@ -138,6 +143,20 @@ export class AuditlogChangeStreamService {
           );
           break;
         }
+
+        // Phase 2: persist token — separate from ES failures so token errors do not
+        // affect consecutiveEventFailures or trigger poison-pill detection.
+        // Per-event upsert doubles MongoDB writes but keeps the replay window minimal on restart.
+        // Throttle if write frequency becomes a concern — e.g. the one-time delete burst when
+        // Activity TTL is first enabled on a large backlog.
+        try {
+          await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
+        } catch (tokenErr) {
+          logger.error(
+            tokenErr,
+            'Failed to persist resume token; events will be reprocessed on restart.',
+          );
+        }
       }
     } catch (err) {
       if (isChangeStreamHistoryLost(err)) {
@@ -145,7 +164,17 @@ export class AuditlogChangeStreamService {
           'Change stream history lost (oplog truncated). Clearing resume token and restarting from current position.' +
             ' Documents written during the gap are not in Elasticsearch; run reindex to restore consistency.',
         );
-        await ChangeStreamResumeToken.clear(STREAM_KEY);
+        try {
+          await ChangeStreamResumeToken.clear(STREAM_KEY);
+        } catch (clearErr) {
+          // If clear fails, restart would re-read the stale token and immediately hit HistoryLost again.
+          // Stop the service instead; admin must resolve the MongoDB issue and restart the process.
+          logger.error(
+            clearErr,
+            'Failed to clear resume token after history loss. Stopping service to prevent restart loop.',
+          );
+          this.stopped = true;
+        }
         await configManager.updateConfig('app:auditlogEsUnsynced', true);
       } else {
         logger.error(err, 'AuditlogChangeStreamService change stream error.');
