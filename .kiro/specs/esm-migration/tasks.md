@@ -806,3 +806,25 @@ same issue.
   実機実行して充足した (`phase3-gate-evidence/3.8cde-devcontainer-gate.md`)。perf 計測スクリプト
   (`apps/app/tmp/perf-baseline/`, gitignore) は type:module 下で動かすため `dev-once.js`→`.cjs`
   リネームが必要 (ロジック不変)。
+
+- **client ファイルの `~/...js` alias は過剰適用ではなく NodeNext プログラム所属に対する必須形 — 相対化の可否は tsgo でなく tspc で検証する (2026-06-16, /kiro-validate-impl で確認)**:
+  「`src/client` 配下の barrel/import が `export * from '~/client/components/AuthorInfo/AuthorInfo.js'`
+  のように alias 化されているのは不自然で、`./AuthorInfo` に戻せるのでは」という疑義を検証した結果、
+  **alias は正当かつ必要**と確定した。理由: `tsconfig.build.server.json` (NodeNext, `build:server` = `tspc`)
+  の `exclude` (`src/client` / `src/**/*.tsx` 等) は **root 集合から外すだけ**で、import グラフ経由で到達する
+  ファイルはプログラムに含まれ型チェック + emit (jsx:preserve で `.tsx`→`.jsx` の dead code) される。
+  実測: NodeNext プログラムは **apps/app/src 1142 ファイル**を含み、`~/...js` alias 化された **740 ファイルは
+  全てプログラム所属 (非所属 = stale alias は 0 件)**。NodeNext は相対 import に拡張子必須 (TS2835) かつ
+  Turbopack は相対 `.js`→`.ts/.tsx` の読替え不可なので、両立解は「非相対 alias + tsconfig suffix paths
+  (`~/*.js → ./src/*`)」のみ。alias / 相対 の振り分けは `tspc --listFiles` (= プログラム所属) で決まり、
+  所属ファイル (例 AuthorInfo・PageControls・PageItemControl) → alias、非所属ファイル (例 PageSideContents)
+  → 相対 `./X`。両者の差はディレクトリではなく**プログラム所属の有無**で説明され、task 3.6 の実装は正しい。
+  - **落とし穴 (今回の誤判定の原因)**: `lint:typecheck` の **tsgo は `tsconfig.json` (`moduleResolution: Bundler`)**
+    を使い拡張子なし相対を許容するため、`AuthorInfo/index.ts` を `./AuthorInfo` に戻しても **tsgo は exit 0** で通る。
+    しかし `build:server` の **tspc (NodeNext)** では同じ変更が TS2835 で落ちる。**tsgo の pass は server ビルドの
+    保証にならない**。相対化や import 解決の検証は必ず `pnpm exec tspc -p tsconfig.build.server.json --noEmit`
+    (= build:server と同一 resolution) で行うこと。`dist/` も `.tsx`→`.jsx` emit かつ stale になり得るため
+    プログラム所属判定の oracle にしてはならない (必ず fresh な `tspc --listFiles` を使う)。
+  - **alias を完全排除できる将来条件** (現状はいずれも不成立のため alias 維持が正): (a) Turbopack が
+    webpack 相当の extensionAlias (`.js`→`.ts/.tsx`) に対応する (Next 16.2 は未対応・実機 `Module not found`
+    で確認済み)、または (b) server ビルドの program 境界を client 木を含まないよう再設計する (大規模・別 spec 相当)。

@@ -80,7 +80,7 @@
 GROWI モノレポのモジュールシステムは層状になっている:
 
 1. **共有パッケージ** (`packages/*`): 17 個中 12 個は ESM 化済み。残 5 個は JS ソースがない (設定だけ変更) ものが中心。
-2. **Next.js フロントエンド** (`apps/app` クライアント): Turbopack 経由で ESM 互換。ソース変更不要。
+2. **Next.js フロントエンド** (`apps/app` クライアント): Turbopack 経由で ESM 互換。**ただし当初の「ソース変更不要」想定は誤りで、NodeNext server ビルド (`tspc -p tsconfig.build.server.json`) のプログラムには import グラフ経由で client `.tsx`/`.ts` が多数含まれる (実測 1142 src ファイル)**。これらは NodeNext 型チェック上 `.js` 拡張子必須かつ Turbopack が相対 `.js`→`.ts/.tsx` を読替え不可のため、`tspc --listFiles` でプログラム所属となる value import を **非相対 alias + suffix paths (`~/*.js → ./src/*`)** へ変換する (task 3.6 / `ssr-relative-to-alias.cjs`)。非所属の純 client ファイルのみ相対 `./X` のまま。検証手順 (相対化可否は tsgo でなく tspc で判定) は tasks.md Implementation Notes「client ファイルの `~/...js` alias は…」を参照。
 3. **Express サーバ** (`apps/app` サーバ): 完全 CJS。最も重い改修対象。特に `routes/apiv3/index.js` 単体で 44 件の factory DI 呼び出しが集中。
 4. **設定ファイル**: migrate-mongo / i18next / nodemon が消費する 3 ファイルは CJS のまま残す必要がある。
 5. **本番アセンブリ**: `assemble-prod.sh` がフラット `node_modules/` を生成。ESM 互換だが未検証。
