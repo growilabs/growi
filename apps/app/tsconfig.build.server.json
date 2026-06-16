@@ -2,8 +2,13 @@
   "$schema": "http://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "NodeNext",
-    "moduleResolution": "NodeNext",
+    // Use Preserve/Bundler resolution so that extensionless relative specifiers
+    // are accepted during type-checking. The server build emits real Node ESM
+    // by running add-js-extensions (C1) in postbuild after tspc finishes.
+    // NodeNext shims (server-build-shims/) are no longer needed because Bundler
+    // resolution uses esModuleInterop-style default imports natively.
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
     "outDir": "transpiled",
     "declaration": true,
     "noResolve": false,
@@ -13,39 +18,7 @@
     "baseUrl": ".",
     "paths": {
       "~/*": ["./src/*"],
-      "^/*": ["./*"],
-      // Type-resolution mappings for NodeNext (task 3.6).
-      // These packages expose extensionless root/deep shims that NodeNext
-      // cannot resolve, but their specifiers MUST stay untouched in source:
-      // Next.js compiler transforms key on the exact literals ('next/dynamic',
-      // 'next/font/local', ...), so appending '.js' in client sources would
-      // silently disable them. All value imports of these specifiers live in
-      // client files whose server-build emit is dead code; type-only imports
-      // are erased, so the emit rewrite by typescript-transform-paths is
-      // harmless here. Resolution for the live client bundle is unchanged
-      // (Turbopack resolves the extensionless forms natively).
-      // CJS packages whose runtime default is the declared component/class
-      // (self-patched module.exports) are mapped to `export =` shims under
-      // types/server-build-shims/ — see the README there.
-      "next/link": ["./types/server-build-shims/next-link.d.cts"],
-      "next/dynamic": ["./types/server-build-shims/next-dynamic.d.cts"],
-      "next/router": ["./node_modules/next/router.d.ts"],
-      "next/head": ["./types/server-build-shims/next-head.d.cts"],
-      "next/image": ["./types/server-build-shims/next-image.d.cts"],
-      "next/error": ["./types/server-build-shims/next-error.d.cts"],
-      "next/font/local": ["./types/server-build-shims/next-font-local.d.cts"],
-      "next/dist/server/next": ["./node_modules/next/dist/server/next.d.ts"],
-      "next-i18next/serverSideTranslations": [
-        "./node_modules/next-i18next/serverSideTranslations.d.ts"
-      ],
-      "react-input-autosize": [
-        "./types/server-build-shims/react-input-autosize.d.cts"
-      ],
-      "rehype-toc": ["./types/server-build-shims/rehype-toc.d.cts"],
-      "csv-to-markdown-table": [
-        "./types/server-build-shims/csv-to-markdown-table.d.cts"
-      ],
-      "bson-objectid": ["./types/server-build-shims/bson-objectid.d.cts"]
+      "^/*": ["./*"]
     }
   },
   "exclude": [
