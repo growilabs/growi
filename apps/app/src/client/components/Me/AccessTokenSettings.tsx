@@ -2,10 +2,10 @@ import React, { useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 import CopyToClipboard from 'react-copy-to-clipboard';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { IAccessTokenInfo } from '~/interfaces/access-token';
 import { useSWRxAccessToken } from '~/stores/personal-settings';
 
+import { toastError, toastSuccess } from '../../util/toastr';
 import { AccessTokenForm } from './AccessTokenForm';
 import { AccessTokenList } from './AccessTokenList';
 

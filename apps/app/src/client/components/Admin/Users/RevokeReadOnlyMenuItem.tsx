@@ -2,9 +2,8 @@ import React, { type JSX, useCallback } from 'react';
 import type { IUserHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-
+import AdminUsersContainer from '../../../services/AdminUsersContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
 const RevokeReadOnlyMenuItem: React.FC<{

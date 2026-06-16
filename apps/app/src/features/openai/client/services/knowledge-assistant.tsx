@@ -10,31 +10,28 @@ import {
   UncontrolledTooltip,
 } from 'reactstrap';
 
-import { apiv3Post } from '~/client/util/apiv3-client.js';
-import { AiAssistantChatInitialView } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView.js';
-import {
-  useAiAssistantSidebarActions,
-  useAiAssistantSidebarStatus,
-} from '~/features/openai/client/states/index.js';
-import { useSWRMUTxMessages } from '~/features/openai/client/stores/message.js';
-import {
-  useSWRINFxRecentThreads,
-  useSWRMUTxThreads,
-} from '~/features/openai/client/stores/thread.js';
+import { apiv3Post } from '~/client/util/apiv3-client';
+
 import {
   type SseMessage,
   SseMessageSchema,
   type SsePreMessage,
   SsePreMessageSchema,
-} from '~/features/openai/interfaces/knowledge-assistant/sse-schemas.js';
-import { ThreadType } from '~/features/openai/interfaces/thread-relation.js';
-import { handleIfSuccessfullyParsed } from '~/features/openai/utils/handle-if-successfully-parsed.js';
-
+} from '../../interfaces/knowledge-assistant/sse-schemas';
 import type {
   MessageLog,
   MessageWithCustomMetaData,
-} from '../../interfaces/message.js';
-import type { IThreadRelationHasId } from '../../interfaces/thread-relation.js';
+} from '../../interfaces/message';
+import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
+import { ThreadType } from '../../interfaces/thread-relation';
+import { handleIfSuccessfullyParsed } from '../../utils/handle-if-successfully-parsed';
+import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
+import {
+  useAiAssistantSidebarActions,
+  useAiAssistantSidebarStatus,
+} from '../states';
+import { useSWRMUTxMessages } from '../stores/message';
+import { useSWRINFxRecentThreads, useSWRMUTxThreads } from '../stores/thread';
 
 type CreateThread = (
   aiAssistantId: string,

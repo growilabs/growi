@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
-import slackAppIntegrationFactory from '~/server/models/slack-app-integration.js';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import slackAppIntegrationFactory from '~/server/models/slack-app-integration';
+import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:migrate:slack-app-integration-set-default-value',

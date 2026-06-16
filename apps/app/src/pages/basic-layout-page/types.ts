@@ -1,5 +1,5 @@
-import type { ISidebarConfig } from '~/interfaces/sidebar-config.js';
-import type { IUserUISettings } from '~/interfaces/user-ui-settings.js';
+import type { ISidebarConfig } from '~/interfaces/sidebar-config';
+import type { IUserUISettings } from '~/interfaces/user-ui-settings';
 
 export type UserUISettingsProps = {
   userUISettings?: IUserUISettings;

@@ -2,9 +2,9 @@ import {
   initInstrumentation,
   setupAdditionalResourceAttributes,
   startOpenTelemetry,
-} from '~/features/opentelemetry/server/index.js';
-import loggerFactory from '~/utils/logger/index.js';
-import { hasProcessFlag } from '~/utils/process-utils.js';
+} from '~/features/opentelemetry/server';
+import loggerFactory from '~/utils/logger';
+import { hasProcessFlag } from '~/utils/process-utils';
 
 const logger = loggerFactory('growi');
 
@@ -24,7 +24,7 @@ async function main() {
     // Initialize OpenTelemetry
     await initInstrumentation();
 
-    const Crowi = (await import('./crowi/index.js')).default;
+    const Crowi = (await import('./crowi')).default;
     const growi = new Crowi();
     const server = await growi.start();
 

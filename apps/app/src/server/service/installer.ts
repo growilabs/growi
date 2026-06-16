@@ -4,12 +4,12 @@ import fs from 'graceful-fs';
 import mongoose from 'mongoose';
 import path from 'path';
 
-import { ExtensibleCustomError } from '~/server/util/extensible-custom-error.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi/index.js';
-import { SUPPORTED_LOCALES } from '../util/safe-path-utils.js';
-import { configManager } from './config-manager/index.js';
+import type Crowi from '../crowi';
+import { ExtensibleCustomError } from '../util/extensible-custom-error';
+import { SUPPORTED_LOCALES } from '../util/safe-path-utils';
+import { configManager } from './config-manager';
 
 const logger = loggerFactory('growi:service:installer');
 

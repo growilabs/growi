@@ -11,39 +11,39 @@ import { isGlobPatternPath } from '@growi/core/dist/utils/page-path-utils';
 import { useTranslation } from 'react-i18next';
 import { Modal, TabContent, TabPane } from 'reactstrap';
 
-import { toastError, toastSuccess } from '~/client/util/toastr.js';
-import { AiAssistantManagementEditInstruction } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementEditInstruction.js';
-import { AiAssistantManagementEditPages } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementEditPages.js';
-import { AiAssistantManagementEditShare } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementEditShare.js';
-import { AiAssistantManagementHome } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHome.js';
-import { AiAssistantKeywordSearch } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementKeywordSearch.js';
-import { AiAssistantManagementPageSelectionMethod } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementPageSelectionMethod.js';
-import { AiAssistantManagementPageTreeSelection } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementPageTreeSelection.js';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+import type { IPagePathWithDescendantCount } from '~/interfaces/page';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
+import { useSWRxPagePathsWithDescendantCount } from '~/stores/page';
+import loggerFactory from '~/utils/logger';
+
+import {
+  AiAssistantAccessScope,
+  AiAssistantShareScope,
+} from '../../../../interfaces/ai-assistant';
+import type { SelectablePage } from '../../../../interfaces/selectable-page';
+import { removeGlobPath } from '../../../../utils/remove-glob-path';
 import {
   createAiAssistant,
   updateAiAssistant,
-} from '~/features/openai/client/services/ai-assistant.js';
+} from '../../../services/ai-assistant';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
-} from '~/features/openai/client/states/index.js';
+} from '../../../states';
 import {
   AiAssistantManagementModalPageMode,
   useAiAssistantManagementModalActions,
   useAiAssistantManagementModalStatus,
-} from '~/features/openai/client/states/modal/ai-assistant-management.js';
-import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant.js';
-import {
-  AiAssistantAccessScope,
-  AiAssistantShareScope,
-} from '~/features/openai/interfaces/ai-assistant.js';
-import { removeGlobPath } from '~/features/openai/utils/remove-glob-path.js';
-import type { IPagePathWithDescendantCount } from '~/interfaces/page.js';
-import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
-import { useSWRxPagePathsWithDescendantCount } from '~/stores/page.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
+} from '../../../states/modal/ai-assistant-management';
+import { useSWRxAiAssistants } from '../../../stores/ai-assistant';
+import { AiAssistantManagementEditInstruction } from './AiAssistantManagementEditInstruction';
+import { AiAssistantManagementEditPages } from './AiAssistantManagementEditPages';
+import { AiAssistantManagementEditShare } from './AiAssistantManagementEditShare';
+import { AiAssistantManagementHome } from './AiAssistantManagementHome';
+import { AiAssistantKeywordSearch } from './AiAssistantManagementKeywordSearch';
+import { AiAssistantManagementPageSelectionMethod } from './AiAssistantManagementPageSelectionMethod';
+import { AiAssistantManagementPageTreeSelection } from './AiAssistantManagementPageTreeSelection';
 
 import styles from './AiAssistantManagementModal.module.scss';
 

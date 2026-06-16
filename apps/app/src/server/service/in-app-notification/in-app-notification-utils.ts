@@ -1,10 +1,10 @@
 import type { IPage, IUser } from '@growi/core';
 
-import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
-import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
-import { SupportedTargetModel } from '~/interfaces/activity.js';
-import * as pageSerializers from '~/models/serializers/in-app-notification-snapshot/page.js';
-import * as pageBulkExportJobSerializers from '~/models/serializers/in-app-notification-snapshot/page-bulk-export-job.js';
+import type { IAuditLogBulkExportJob } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
+import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+import { SupportedTargetModel } from '~/interfaces/activity';
+import * as pageSerializers from '~/models/serializers/in-app-notification-snapshot/page';
+import * as pageBulkExportJobSerializers from '~/models/serializers/in-app-notification-snapshot/page-bulk-export-job';
 
 const isIPage = (
   targetModel: string,

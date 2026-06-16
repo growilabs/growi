@@ -1,1 +1,1 @@
-export * from '~/features/templates/stores/template.js';
+export * from './template';

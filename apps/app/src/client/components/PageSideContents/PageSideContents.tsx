@@ -6,7 +6,6 @@ import { pagePathUtils } from '@growi/core/dist/utils';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { scrollToElement } from '~/client/util/smooth-scroll';
 import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
 import { showPageSideAuthorsAtom } from '~/states/server-configurations';
 import { useDescendantsPageListModalActions } from '~/states/ui/modal/descendants-page-list';
@@ -14,6 +13,7 @@ import { useTagEditModalActions } from '~/states/ui/modal/tag-edit';
 import { useIsAbleToShowTagLabel } from '~/states/ui/page-abilities';
 import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page';
 
+import { scrollToElement } from '../../util/smooth-scroll';
 import { ContentLinkButtons } from '../ContentLinkButtons';
 import { PageTagsSkeleton } from '../PageTags';
 import TableOfContents from '../TableOfContents';
@@ -30,7 +30,7 @@ const PageTags = dynamic(
 );
 
 const AuthorInfo = dynamic(
-  () => import('~/client/components/AuthorInfo').then((mod) => mod.AuthorInfo),
+  () => import('../AuthorInfo').then((mod) => mod.AuthorInfo),
   { ssr: false },
 );
 

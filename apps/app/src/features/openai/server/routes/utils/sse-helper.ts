@@ -1,6 +1,6 @@
 import type { Response } from 'express';
 
-import type { StreamErrorCode } from '../../../interfaces/message-error.js';
+import type { StreamErrorCode } from '../../../interfaces/message-error';
 
 /**
  * Interface to simplify SSE communication

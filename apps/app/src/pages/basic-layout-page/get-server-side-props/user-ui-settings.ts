@@ -1,11 +1,11 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import type { IUserUISettings } from '~/interfaces/user-ui-settings.js';
-import type { UserUISettingsDocument } from '~/server/models/user-ui-settings.js';
-import { getModelSafely } from '~/server/util/mongoose-utils.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type { IUserUISettings } from '~/interfaces/user-ui-settings';
+import type { UserUISettingsDocument } from '~/server/models/user-ui-settings';
+import { getModelSafely } from '~/server/util/mongoose-utils';
 
-import type { UserUISettingsProps } from '../types.js';
+import type { UserUISettingsProps } from '../types';
 
 export const getServerSideUserUISettingsProps: GetServerSideProps<
   UserUISettingsProps

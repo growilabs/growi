@@ -5,9 +5,8 @@ import PrismAsyncLight from 'react-syntax-highlighter/dist/esm/prism-async-light
 import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark';
 import { Card, CardBody } from 'reactstrap';
 
-import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-
+import AdminCustomizeContainer from '../../../services/AdminCustomizeContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 

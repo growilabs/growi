@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:feature:news:feed-parser');
 

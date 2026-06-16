@@ -1,6 +1,6 @@
-import type { ImportMode } from '~/models/admin/import-mode.js';
+import type { ImportMode } from '~/models/admin/import-mode';
 
-import type { OverwriteFunction } from './overwrite-function.js';
+import type { OverwriteFunction } from './overwrite-function';
 
 export type OverwriteParams = {
   [propertyName: string]: OverwriteFunction | unknown;

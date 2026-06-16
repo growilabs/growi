@@ -1,6 +1,6 @@
 import EventEmitter from 'node:events';
 
-import type Crowi from '../crowi/index.js';
+import type Crowi from '../crowi';
 
 class AdminEvent extends EventEmitter {
   crowi: Crowi;

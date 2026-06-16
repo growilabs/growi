@@ -1,18 +1,18 @@
 import type { IUser } from '@growi/core/dist/interfaces';
 
-import type Crowi from '~/server/crowi/index.js';
+import loggerFactory from '~/utils/logger';
+
+import type Crowi from '../../crowi';
 import {
   GlobalNotificationSettingEvent,
   type GlobalNotificationSettingModel,
   GlobalNotificationSettingType,
-} from '~/server/models/GlobalNotificationSetting/index.js';
-import type { PageDocument } from '~/server/models/page.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { growiInfoService } from '~/server/service/growi-info/index.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import { resolveLocalePath } from '../../util/safe-path-utils.js';
-import type { GlobalNotificationEventVars } from './types.js';
+} from '../../models/GlobalNotificationSetting';
+import type { PageDocument } from '../../models/page';
+import { resolveLocalePath } from '../../util/safe-path-utils';
+import { configManager } from '../config-manager';
+import { growiInfoService } from '../growi-info';
+import type { GlobalNotificationEventVars } from './types';
 
 const _logger = loggerFactory('growi:service:GlobalNotificationMailService');
 

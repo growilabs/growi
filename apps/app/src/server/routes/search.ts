@@ -1,16 +1,16 @@
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
-import { SupportedAction } from '~/interfaces/activity.js';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import { SupportedAction } from '~/interfaces/activity';
 import type {
   IFormattedSearchResult,
   ISearchResult,
-} from '~/interfaces/search.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/interfaces/search';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi/index.js';
-import UserGroupRelation from '../models/user-group-relation.js';
-import { isSearchError } from '../models/vo/search-error.js';
-import ApiPaginate from '../util/apiPaginate.js';
-import ApiResponse from '../util/apiResponse.js';
+import type Crowi from '../crowi';
+import UserGroupRelation from '../models/user-group-relation';
+import { isSearchError } from '../models/vo/search-error';
+import ApiPaginate from '../util/apiPaginate';
+import ApiResponse from '../util/apiResponse';
 
 const logger = loggerFactory('growi:routes:search');
 

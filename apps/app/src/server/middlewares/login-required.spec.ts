@@ -1,5 +1,5 @@
-import type Crowi from '../crowi/index.js';
-import { UserStatus } from '../models/user/conts.js';
+import type Crowi from '../crowi';
+import { UserStatus } from '../models/user/conts';
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type LoginRequiredMiddleware = (req: any, res: any, next: any) => any;
@@ -24,7 +24,7 @@ describe('loginRequired', () => {
     fallbackMock = vi.fn().mockReturnValue('fallback');
 
     // Use dynamic import to load the middleware factory
-    const loginRequiredFactory = (await import('./login-required.js')).default;
+    const loginRequiredFactory = (await import('./login-required')).default;
 
     loginRequiredStrictly = loginRequiredFactory(crowiMock);
     loginRequired = loginRequiredFactory(crowiMock, true);

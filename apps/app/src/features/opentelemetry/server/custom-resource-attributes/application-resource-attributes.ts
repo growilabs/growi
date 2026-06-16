@@ -1,6 +1,6 @@
 import type { Attributes } from '@opentelemetry/api';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:opentelemetry:custom-resource-attributes:application',
@@ -15,9 +15,7 @@ export async function getApplicationResourceAttributes(): Promise<Attributes> {
 
   try {
     // Dynamic import to avoid circular dependencies
-    const { growiInfoService } = await import(
-      '~/server/service/growi-info/index.js'
-    );
+    const { growiInfoService } = await import('~/server/service/growi-info');
 
     const growiInfo = await growiInfoService.getGrowiInfo({});
 

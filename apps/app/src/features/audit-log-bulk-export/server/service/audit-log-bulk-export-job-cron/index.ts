@@ -6,26 +6,23 @@ import { getIdForRef, isPopulated } from '@growi/core';
 import type archiver from 'archiver';
 import mongoose from 'mongoose';
 
+import type { SupportedActionType } from '~/interfaces/activity';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import type Crowi from '~/server/crowi';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import CronService from '~/server/service/cron';
+import loggerFactory from '~/utils/logger';
+
 import {
   AuditLogBulkExportJobInProgressJobStatus,
   AuditLogBulkExportJobStatus,
-} from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
-import AuditLogBulkExportJob from '~/features/audit-log-bulk-export/server/models/audit-log-bulk-export-job.js';
+} from '../../../interfaces/audit-log-bulk-export';
+import type { AuditLogBulkExportJobDocument } from '../../models/audit-log-bulk-export-job';
+import AuditLogBulkExportJob from '../../models/audit-log-bulk-export-job';
 import {
   AuditLogBulkExportJobExpiredError,
   AuditLogBulkExportJobRestartedError,
-} from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/errors.js';
-import type { SupportedActionType } from '~/interfaces/activity.js';
-import {
-  SupportedAction,
-  SupportedTargetModel,
-} from '~/interfaces/activity.js';
-import type Crowi from '~/server/crowi/index.js';
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
-import CronService from '~/server/service/cron.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import type { AuditLogBulkExportJobDocument } from '../../models/audit-log-bulk-export-job.js';
+} from './errors';
 
 const logger = loggerFactory('growi:service:audit-log-export-job-cron');
 
@@ -58,10 +55,11 @@ export interface IAuditLogBulkExportJobCronService {
   ): Promise<void>;
 }
 
-import { compressAndUpload } from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/steps/compress-and-upload.js';
-import { exportAuditLogsToFsAsync } from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron/steps/exportAuditLogsToFsAsync.js';
-import type { ActivityDocument } from '~/server/models/activity.js';
-import { preNotifyService } from '~/server/service/pre-notify.js';
+import type { ActivityDocument } from '~/server/models/activity';
+import { preNotifyService } from '~/server/service/pre-notify';
+
+import { compressAndUpload } from './steps/compress-and-upload';
+import { exportAuditLogsToFsAsync } from './steps/exportAuditLogsToFsAsync';
 
 /**
  * Manages cronjob which proceeds AuditLogBulkExportJobs in progress.

@@ -13,8 +13,7 @@ import { useSWRMUTxPageInfo } from '~/stores/page';
 const { isTopPage } = pagePathUtils;
 
 const PageComment = dynamic(
-  () =>
-    import('~/client/components/PageComment').then((mod) => mod.PageComment),
+  () => import('./PageComment').then((mod) => mod.PageComment),
   { ssr: false },
 );
 const CommentEditorPre = dynamic(

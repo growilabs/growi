@@ -2,8 +2,8 @@ import { addHours } from 'date-fns/addHours';
 import { isAfter } from 'date-fns/isAfter';
 import { Router } from 'express';
 
-import axios from '~/utils/axios/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import axios from '~/utils/axios';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:routes:apiv3:staffs');
 

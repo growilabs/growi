@@ -1,7 +1,7 @@
 import type { ScheduledTask } from 'node-cron';
 import nodeCron from 'node-cron';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:service:cron');
 

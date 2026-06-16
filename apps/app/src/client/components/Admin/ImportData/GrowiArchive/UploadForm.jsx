@@ -2,8 +2,8 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { apiv3PostForm } from '~/client/util/apiv3-client';
-import { toastError } from '~/client/util/toastr';
+import { apiv3PostForm } from '../../../../util/apiv3-client';
+import { toastError } from '../../../../util/toastr';
 
 class UploadForm extends React.Component {
   constructor(props) {
@@ -43,9 +43,11 @@ class UploadForm extends React.Component {
 
   validateForm() {
     return (
+      // validate extension
+      // null check
       this.inputRef.current && // null check
-      this.inputRef.current.files[0] && // null check
-      /\.zip$/.test(this.inputRef.current.files[0].name) // validate extension
+      this.inputRef.current.files[0] &&
+      /\.zip$/.test(this.inputRef.current.files[0].name)
     );
   }
 

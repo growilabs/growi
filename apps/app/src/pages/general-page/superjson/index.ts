@@ -1,1 +1,1 @@
-export { registerPageToShowRevisionWithMeta } from '~/pages/general-page/superjson/page-to-show-revision-with-meta.js';
+export { registerPageToShowRevisionWithMeta } from './page-to-show-revision-with-meta';

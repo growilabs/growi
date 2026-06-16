@@ -3,12 +3,12 @@ import type { IUserSerializedSecurely } from '@growi/core/dist/models/serializer
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { NextFunction, Request, Response } from 'express';
 
-import { SupportedAction } from '~/interfaces/activity.js';
+import { SupportedAction } from '~/interfaces/activity';
 // extractAccessToken / X_GROWI_ACCESS_TOKEN_HEADER_NAME are NOT re-exported by the
 // access-token-parser barrel — import them directly from the file (PR #11244).
-import { extractAccessToken } from '~/server/middlewares/access-token-parser/extract-access-token.js';
-import { AccessToken } from '~/server/models/access-token.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { extractAccessToken } from '~/server/middlewares/access-token-parser/extract-access-token';
+import { AccessToken } from '~/server/models/access-token';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:middleware:vault-pat-auth',

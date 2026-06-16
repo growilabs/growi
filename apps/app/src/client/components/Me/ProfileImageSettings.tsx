@@ -2,12 +2,13 @@ import React, { type JSX, useCallback, useState } from 'react';
 import { isPopulated } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import ImageCropModal from '~/client/components/Common/ImageCropModal';
-import { apiPost, apiPostForm } from '~/client/util/apiv1-client';
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
 import { GRAVATAR_DEFAULT, generateGravatarSrc } from '~/utils/gravatar';
+
+import { apiPost, apiPostForm } from '../../util/apiv1-client';
+import { apiv3Put } from '../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../util/toastr';
+import ImageCropModal from '../Common/ImageCropModal';
 
 const DEFAULT_IMAGE = '/images/icons/user.svg';
 

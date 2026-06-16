@@ -23,17 +23,17 @@
 
 import crypto from 'node:crypto';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type { AclEvaluator } from './reconcile-acl-evaluator.js';
-import type { ConcurrencyController } from './reconcile-concurrency-controller.js';
+import type { AclEvaluator } from './reconcile-acl-evaluator';
+import type { ConcurrencyController } from './reconcile-concurrency-controller';
 import type {
   HistoryStore,
   ReconcileLogEntry,
   ReconcileRejectReason,
   ReconcileTargetType,
-} from './reconcile-history-store.js';
-import type { ReconcileOrchestrator } from './reconcile-orchestrator.js';
+} from './reconcile-history-store';
+import type { ReconcileOrchestrator } from './reconcile-orchestrator';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:service:reconcile:service',

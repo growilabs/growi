@@ -15,21 +15,19 @@ import ExternalUserGroup from '~/features/external-user-group/server/models/exte
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { PageActionType } from '~/interfaces/page-operation';
 import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
-import type Crowi from '~/server/crowi';
-import type { PageDocument, PageModel } from '~/server/models/page';
+import { generalXssFilter } from '~/services/general-xss-filter';
+
+import type Crowi from '../../crowi';
+import type { PageDocument, PageModel } from '../../models/page';
 import type {
   IPageOperation,
   PageOperationModel,
-} from '~/server/models/page-operation';
-import PageTagRelation from '~/server/models/page-tag-relation';
-import type {
-  IRevisionDocument,
-  IRevisionModel,
-} from '~/server/models/revision';
-import Tag from '~/server/models/tag';
-import UserGroup from '~/server/models/user-group';
-import UserGroupRelation from '~/server/models/user-group-relation';
-import { generalXssFilter } from '~/services/general-xss-filter';
+} from '../../models/page-operation';
+import PageTagRelation from '../../models/page-tag-relation';
+import type { IRevisionDocument, IRevisionModel } from '../../models/revision';
+import Tag from '../../models/tag';
+import UserGroup from '../../models/user-group';
+import UserGroupRelation from '../../models/user-group-relation';
 
 describe('PageService page operations with non-public pages', () => {
   // biome-ignore lint/suspicious/noImplicitAnyLet: ignore

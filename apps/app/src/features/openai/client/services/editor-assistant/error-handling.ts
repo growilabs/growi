@@ -4,7 +4,7 @@
  * Provides detailed error information and user-friendly suggestions
  */
 
-import type { DiffError, MatchResult } from '../../interfaces/types.js';
+import type { DiffError, MatchResult } from '../../interfaces/types';
 
 // -----------------------------------------------------------------------------
 // Client Error Types and Constants

@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 
-import type { AnyUnstatedContainer } from './types.js';
+import type { AnyUnstatedContainer } from './types';
 
 /**
  * Helper hook to dynamically load and instantiate unstated containers for admin pages.

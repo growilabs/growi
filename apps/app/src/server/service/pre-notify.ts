@@ -1,10 +1,9 @@
 import { getIdForRef, type IPage, type IUser, type Ref } from '@growi/core';
 import mongoose from 'mongoose';
 
-import Subscription from '~/server/models/subscription.js';
-import { UserStatus } from '~/server/models/user/conts.js';
-
-import type { ActivityDocument } from '../models/activity.js';
+import type { ActivityDocument } from '../models/activity';
+import Subscription from '../models/subscription';
+import { UserStatus } from '../models/user/conts';
 
 export type PreNotifyProps = {
   notificationTargetUsers?: Ref<IUser>[];

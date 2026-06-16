@@ -5,8 +5,8 @@
 
 import { markdownSectionBlock } from '@growi/slack/dist/utils/block-kit-builder';
 
-import { growiInfoService } from '../growi-info/index.js';
-import BaseSlackCommandHandler from './slack-command-handler.js';
+import { growiInfoService } from '../growi-info';
+import BaseSlackCommandHandler from './slack-command-handler';
 
 export const setup = (crowi) => {
   const handler = new BaseSlackCommandHandler();

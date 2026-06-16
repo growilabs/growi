@@ -1,7 +1,7 @@
-import type Crowi from '~/server/crowi/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type { S2sMessagingService } from './base.js';
+import type Crowi from '../../crowi';
+import type { S2sMessagingService } from './base';
 
 const logger = loggerFactory(
   'growi:service:s2s-messaging:S2sMessagingServiceFactory',

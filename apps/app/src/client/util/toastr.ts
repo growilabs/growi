@@ -1,7 +1,7 @@
 import type { ToastContent, ToastOptions } from 'react-toastify';
 import { toast } from 'react-toastify';
 
-import { toArrayIfNot } from '~/utils/array-utils.js';
+import { toArrayIfNot } from '~/utils/array-utils';
 
 export const toastErrorOption: ToastOptions = {
   autoClose: false,

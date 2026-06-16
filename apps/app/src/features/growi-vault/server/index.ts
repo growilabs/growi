@@ -1,26 +1,27 @@
 import type { IPage } from '@growi/core';
 import type { Router } from 'express';
 
-import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction.js';
-import { VaultReconcileLog } from '~/features/growi-vault/server/models/vault-reconcile-log.js';
-import { VaultSyncState } from '~/features/growi-vault/server/models/vault-sync-state.js';
-import { createVaultAdminRouter } from '~/features/growi-vault/server/routes/vault-admin.js';
-import { createVaultGatewayRouter } from '~/features/growi-vault/server/routes/vault-gateway.js';
-import { createVaultPageRouter } from '~/features/growi-vault/server/routes/vault-page.js';
+import { configManager } from '~/server/service/config-manager';
+import loggerFactory from '~/utils/logger';
+
+import { VaultInstruction } from './models/vault-instruction';
+import { VaultReconcileLog } from './models/vault-reconcile-log';
+import { VaultSyncState } from './models/vault-sync-state';
+import { createVaultAdminRouter } from './routes/vault-admin';
+import { createVaultGatewayRouter } from './routes/vault-gateway';
+import { createVaultPageRouter } from './routes/vault-page';
 import {
   createVaultReconcileService,
   type VaultReconcileService,
-} from '~/features/growi-vault/server/services/reconcile/index.js';
-import { createHistoryStore } from '~/features/growi-vault/server/services/reconcile/reconcile-history-store.js';
-import { createVaultBootstrapper } from '~/features/growi-vault/server/services/vault-bootstrapper.js';
-import { createVaultDispatcher } from '~/features/growi-vault/server/services/vault-dispatcher.js';
-import { vaultNamespaceMapper } from '~/features/growi-vault/server/services/vault-namespace-mapper.js';
-import { vaultSettingsService } from '~/features/growi-vault/server/services/vault-settings-service.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from './services/reconcile';
+import { createHistoryStore } from './services/reconcile/reconcile-history-store';
+import { createVaultBootstrapper } from './services/vault-bootstrapper';
+import { createVaultDispatcher } from './services/vault-dispatcher';
+import { vaultNamespaceMapper } from './services/vault-namespace-mapper';
+import { vaultSettingsService } from './services/vault-settings-service';
 
-export { createVaultAdminRouter } from '~/features/growi-vault/server/routes/vault-admin.js';
-export { createVaultGatewayRouter } from '~/features/growi-vault/server/routes/vault-gateway.js';
+export { createVaultAdminRouter } from './routes/vault-admin';
+export { createVaultGatewayRouter } from './routes/vault-gateway';
 
 // ---------------------------------------------------------------------------
 // Module-level reconcile service singleton (set during initializeVaultFeature)
@@ -595,7 +596,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   // Resolve the Page Mongoose model via its factory; passing `crowi` so the
   // model picks up the crowi-bound schema augmentations defined in
   // ~/server/models/page.
-  const pageModelFactory = (await import('~/server/models/page.js')).default;
+  const pageModelFactory = (await import('~/server/models/page')).default;
   const pageModel = pageModelFactory(crowi);
 
   // Adapter exposing the bootstrapper as the minimal ReconcileResilienceLayer
@@ -608,20 +609,16 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
   _reconcileService = createVaultReconcileService({
     pageModel: pageModel as never,
     targetResolver: await import(
-      '~/features/growi-vault/server/services/reconcile/reconcile-target-resolver.js'
+      './services/reconcile/reconcile-target-resolver'
     ),
     aclEvaluator: (
-      await import(
-        '~/features/growi-vault/server/services/reconcile/reconcile-acl-evaluator.js'
-      )
+      await import('./services/reconcile/reconcile-acl-evaluator')
     ).createAclEvaluator({
       pageModel: pageModel as never,
       pageGrantService: crowi.pageGrantService,
     }),
     concurrencyController: (
-      await import(
-        '~/features/growi-vault/server/services/reconcile/reconcile-concurrency-controller.js'
-      )
+      await import('./services/reconcile/reconcile-concurrency-controller')
     ).createConcurrencyController({
       maxConcurrentPerUser: configManager.getConfig(
         'app:vaultReconcileMaxConcurrentPerUser',
@@ -635,9 +632,7 @@ export const initializeVaultFeature = async (crowi: any): Promise<void> => {
     }),
     historyStore,
     orchestrator: (
-      await import(
-        '~/features/growi-vault/server/services/reconcile/reconcile-orchestrator.js'
-      )
+      await import('./services/reconcile/reconcile-orchestrator')
     ).createReconcileOrchestrator({
       pageModel: pageModel as never,
       vaultInstruction: VaultInstruction,

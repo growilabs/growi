@@ -1,10 +1,10 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import type { IPageHasId } from '@growi/core';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
-import { toastError } from '~/client/util/toastr';
 import loggerFactory from '~/utils/logger';
 
+import { apiv3Get } from '../../util/apiv3-client';
+import { toastError } from '../../util/toastr';
 import { PageListItemS } from '../PageList/PageListItemS';
 import PaginationWrapper from '../PaginationWrapper';
 

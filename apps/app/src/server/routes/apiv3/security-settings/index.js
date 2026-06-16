@@ -6,23 +6,23 @@ import {
 import { ErrorV3 } from '@growi/core/dist/models';
 import xss from 'xss';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import { PageDeleteConfigValue } from '~/interfaces/page-delete-config.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import ShareLink from '~/server/models/share-link.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import { PageDeleteConfigValue } from '~/interfaces/page-delete-config';
+import loggerFactory from '~/utils/logger';
 import {
   prepareDeleteConfigValuesForCalc,
   validateDeleteConfigs,
-} from '~/utils/page-delete-config.js';
+} from '~/utils/page-delete-config';
 
-import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin.js';
-import { handleSamlUpdate, samlAuthValidator } from './saml.js';
+import { accessTokenParser } from '../../../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
+import adminRequiredFactory from '../../../middlewares/admin-required';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import loginRequiredFactory from '../../../middlewares/login-required';
+import ShareLink from '../../../models/share-link';
+import { configManager } from '../../../service/config-manager';
+import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
+import { handleSamlUpdate, samlAuthValidator } from './saml';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting');
 

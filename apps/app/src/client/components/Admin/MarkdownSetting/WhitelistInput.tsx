@@ -2,11 +2,12 @@ import { type JSX, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 import type { UseFormRegister, UseFormSetValue } from 'react-hook-form';
 
-import type AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer';
 import {
   attributes as recommendedAttributes,
   tagNames as recommendedTagNames,
 } from '~/services/renderer/recommended-whitelist';
+
+import type AdminMarkDownContainer from '../../../services/AdminMarkDownContainer';
 
 type FormValues = {
   tagWhitelist: string;

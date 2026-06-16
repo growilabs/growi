@@ -1,12 +1,13 @@
 import type { IAttachment } from '@growi/core';
 
-import { apiv3Get, apiv3PostForm } from '~/client/util/apiv3-client.js';
 import type {
   IApiv3GetAttachmentLimitParams,
   IApiv3GetAttachmentLimitResponse,
   IApiv3PostAttachmentResponse,
-} from '~/interfaces/apiv3/attachment.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/interfaces/apiv3/attachment';
+import loggerFactory from '~/utils/logger';
+
+import { apiv3Get, apiv3PostForm } from '../../util/apiv3-client';
 
 const logger = loggerFactory('growi:client:services:upload-attachment');
 

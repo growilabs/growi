@@ -4,9 +4,9 @@ import { UserPicture } from '@growi/ui/dist/components';
 import { format as dateFnsFormat } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
 import { UserStatus } from '~/server/models/user/conts';
 
+import AdminUsersContainer from '../../../services/AdminUsersContainer';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import { SortIcons } from './SortIcons';
 import UserMenu from './UserMenu';

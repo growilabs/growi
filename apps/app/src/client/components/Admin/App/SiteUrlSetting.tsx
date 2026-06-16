@@ -2,10 +2,10 @@ import React, { useCallback, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
-import AdminAppContainer from '~/client/services/AdminAppContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import loggerFactory from '~/utils/logger';
 
+import AdminAppContainer from '../../../services/AdminAppContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 

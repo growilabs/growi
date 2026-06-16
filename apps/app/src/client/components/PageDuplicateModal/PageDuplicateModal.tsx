@@ -5,8 +5,6 @@ import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
-import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
-import { toastError } from '~/client/util/toastr';
 import { useSiteUrl } from '~/states/global';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 import {
@@ -14,6 +12,8 @@ import {
   usePageDuplicateModalStatus,
 } from '~/states/ui/modal/page-duplicate';
 
+import { apiv3Get, apiv3Post } from '../../util/apiv3-client';
+import { toastError } from '../../util/toastr';
 import DuplicatePathsTable from '../DuplicatedPathsTable';
 import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList';
 import PagePathAutoComplete from '../PagePathAutoComplete';

@@ -2,16 +2,16 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
 
-import type Crowi from '~/server/crowi/index.js';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
-import { setup as certifySharedPageFactory } from '~/server/middlewares/certify-shared-page.js';
-import { rejectLinkSharingDisabled } from '~/server/middlewares/reject-link-sharing-disabled.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response.js';
-import { respondWithSinglePage } from './respond-with-single-page.js';
+import type Crowi from '../../../crowi';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { setup as certifySharedPageFactory } from '../../../middlewares/certify-shared-page';
+import { rejectLinkSharingDisabled } from '../../../middlewares/reject-link-sharing-disabled';
+import { configManager } from '../../../service/config-manager';
+import { findPageAndMetaDataByViewer } from '../../../service/page/find-page-and-meta-data-by-viewer';
+import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { respondWithSinglePage } from './respond-with-single-page';
 
 const logger = loggerFactory('growi:routes:apiv3:page:get-page-by-share-link');
 

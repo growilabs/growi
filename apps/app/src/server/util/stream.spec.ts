@@ -1,7 +1,7 @@
 import { pipeline, Readable, Writable } from 'stream';
 import { promisify } from 'util';
 
-import { getBufferToFixedSizeTransform } from './stream.js';
+import { getBufferToFixedSizeTransform } from './stream';
 
 const pipelinePromise = promisify(pipeline);
 

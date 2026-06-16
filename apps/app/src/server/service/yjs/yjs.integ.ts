@@ -4,10 +4,10 @@ import { Types } from 'mongoose';
 import type { Server } from 'socket.io';
 import { mock } from 'vitest-mock-extended';
 
-import { Revision } from '../../models/revision.js';
-import type { MongodbPersistence } from './extended/mongodb-persistence.js';
-import type { IYjsService } from './yjs.js';
-import { getYjsService, initializeYjsService } from './yjs.js';
+import { Revision } from '../../models/revision';
+import type { MongodbPersistence } from './extended/mongodb-persistence';
+import type { IYjsService } from './yjs';
+import { getYjsService, initializeYjsService } from './yjs';
 
 vi.mock('y-websocket/bin/utils', () => {
   const docs = new Map();

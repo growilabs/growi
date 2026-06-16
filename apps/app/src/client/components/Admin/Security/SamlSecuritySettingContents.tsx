@@ -5,11 +5,11 @@ import { useForm } from 'react-hook-form';
 import { Collapse } from 'reactstrap';
 import urljoin from 'url-join';
 
-import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
-import AdminSamlSecurityContainer from '~/client/services/AdminSamlSecurityContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
+import AdminGeneralSecurityContainer from '../../../services/AdminGeneralSecurityContainer';
+import AdminSamlSecurityContainer from '../../../services/AdminSamlSecurityContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
 type Props = {

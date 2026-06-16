@@ -7,20 +7,20 @@ import { body } from 'express-validator';
 // `import { i18n }` fails under native ESM.
 import nextI18nextConfig from '^/config/next-i18next.config.cjs';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import loggerFactory from '~/utils/logger/index.js';
-import { prisma } from '~/utils/prisma.js';
+import { SupportedAction } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity.js';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
-import EditorSettings from '../../../models/editor-settings.js';
-import InAppNotificationSettings from '../../../models/in-app-notification-settings.js';
-import { deleteAccessTokenHandlersFactory } from './delete-access-token.js';
-import { deleteAllAccessTokensHandlersFactory } from './delete-all-access-tokens.js';
-import { generateAccessTokenHandlerFactory } from './generate-access-token.js';
-import { getAccessTokenHandlerFactory } from './get-access-tokens.js';
+import { accessTokenParser } from '../../../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import loginRequiredFactory from '../../../middlewares/login-required';
+import EditorSettings from '../../../models/editor-settings';
+import InAppNotificationSettings from '../../../models/in-app-notification-settings';
+import { deleteAccessTokenHandlersFactory } from './delete-access-token';
+import { deleteAllAccessTokensHandlersFactory } from './delete-all-access-tokens';
+import { generateAccessTokenHandlerFactory } from './generate-access-token';
+import { getAccessTokenHandlerFactory } from './get-access-tokens';
 
 const logger = loggerFactory('growi:routes:apiv3:personal-setting');
 

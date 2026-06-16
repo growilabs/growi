@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import useSWR, { type SWRResponse } from 'swr';
 
-import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client.js';
+import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
 
 const ENDPOINT = '/news/admin/delivery-setting';
 

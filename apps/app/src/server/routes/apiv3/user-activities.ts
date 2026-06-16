@@ -6,16 +6,16 @@ import { query } from 'express-validator';
 import type { PaginateResult, PipelineStage } from 'mongoose';
 import { Types } from 'mongoose';
 
-import type { IActivity } from '~/interfaces/activity.js';
-import { ActivityLogActions } from '~/interfaces/activity.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import Activity from '~/server/models/activity.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import type { IActivity } from '~/interfaces/activity';
+import { ActivityLogActions } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi/index.js';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
-import type { ApiV3Response } from './interfaces/apiv3-response.js';
+import type Crowi from '../../crowi';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import loginRequiredFactory from '../../middlewares/login-required';
+import Activity from '../../models/activity';
+import { configManager } from '../../service/config-manager';
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');
 

@@ -1,6 +1,6 @@
 import type { IPageHasId, IRevisionHasId, ITag, Origin } from '@growi/core';
 
-import type { IOptionsForCreate, IOptionsForUpdate } from '../page.js';
+import type { IOptionsForCreate, IOptionsForUpdate } from '../page';
 
 export type IApiv3PageCreateParams = IOptionsForCreate & {
   path?: string;

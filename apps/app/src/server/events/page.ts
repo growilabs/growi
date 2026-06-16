@@ -1,9 +1,9 @@
 import EventEmitter from 'node:events';
 import type { IPage, IUserHasId } from '@growi/core';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi/index.js';
+import type Crowi from '../crowi';
 
 const logger = loggerFactory('growi:events:page');
 

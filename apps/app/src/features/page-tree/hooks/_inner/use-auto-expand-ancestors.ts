@@ -2,7 +2,7 @@ import { useEffect, useRef } from 'react';
 import { addTrailingSlash } from '@growi/core/dist/utils/path-utils';
 import type { ItemInstance } from '@headless-tree/core';
 
-import type { IPageForTreeItem } from '~/interfaces/page.js';
+import type { IPageForTreeItem } from '~/interfaces/page';
 
 type UseAutoExpandAncestorsProps = {
   items: ItemInstance<IPageForTreeItem>[];

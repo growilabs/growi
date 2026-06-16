@@ -1,4 +1,4 @@
-import type { SidebarContentsType } from './ui.js';
+import type { SidebarContentsType } from './ui';
 
 export interface IUserUISettings {
   currentSidebarContents: SidebarContentsType;

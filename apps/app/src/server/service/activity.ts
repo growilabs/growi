@@ -1,7 +1,7 @@
 import type { IPage } from '@growi/core';
 import mongoose from 'mongoose';
 
-import type { IActivity, SupportedActionType } from '~/interfaces/activity.js';
+import type { IActivity, SupportedActionType } from '~/interfaces/activity';
 import {
   ActionGroupSize,
   AllEssentialActions,
@@ -9,16 +9,13 @@ import {
   AllMediumGroupActions,
   AllSmallGroupActions,
   AllSupportedActions,
-} from '~/interfaces/activity.js';
-import type { ActivityDocument } from '~/server/models/activity.js';
-import Activity from '~/server/models/activity.js';
+} from '~/interfaces/activity';
 
-import loggerFactory from '../../utils/logger/index.js';
-import type Crowi from '../crowi/index.js';
-import type {
-  GeneratePreNotify,
-  GetAdditionalTargetUsers,
-} from './pre-notify.js';
+import loggerFactory from '../../utils/logger';
+import type Crowi from '../crowi';
+import type { ActivityDocument } from '../models/activity';
+import Activity from '../models/activity';
+import type { GeneratePreNotify, GetAdditionalTargetUsers } from './pre-notify';
 
 const logger = loggerFactory('growi:service:ActivityService');
 

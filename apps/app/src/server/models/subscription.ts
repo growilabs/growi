@@ -2,13 +2,14 @@ import type { IPage, ISubscription, IUser, Ref } from '@growi/core';
 import { AllSubscriptionStatusType, SubscriptionStatusType } from '@growi/core';
 import { type Document, type Model, Schema, type Types } from 'mongoose';
 
-import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
-import type { SupportedTargetModelType } from '~/interfaces/activity.js';
+import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+import type { SupportedTargetModelType } from '~/interfaces/activity';
 import {
   AllSupportedTargetModels,
   SupportedTargetModel,
-} from '~/interfaces/activity.js';
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+} from '~/interfaces/activity';
+
+import { getOrCreateModel } from '../util/mongoose-utils';
 
 export interface SubscriptionDocument extends ISubscription, Document {}
 

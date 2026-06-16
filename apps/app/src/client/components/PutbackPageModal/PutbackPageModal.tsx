@@ -3,7 +3,6 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { apiPost } from '~/client/util/apiv1-client';
 import type { PutBackPageModalStatus } from '~/states/ui/modal/put-back-page';
 import {
   usePutBackPageModalActions,
@@ -11,6 +10,7 @@ import {
 } from '~/states/ui/modal/put-back-page';
 import { mutateAllPageInfo } from '~/stores/page';
 
+import { apiPost } from '../../util/apiv1-client';
 import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList';
 
 type ApiError = {

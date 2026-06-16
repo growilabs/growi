@@ -2,11 +2,12 @@ import type { IUser, IUserHasId } from '@growi/core/dist/interfaces';
 import type { HydratedDocument, Model } from 'mongoose';
 import mongoose, { model, Schema } from 'mongoose';
 
-import { Prisma } from '~/generated/prisma/client.js';
-import { NullUsernameToBeRegisteredError } from '~/server/models/errors.js';
-import { UserStatus } from '~/server/models/user/conts.js';
-import loggerFactory from '~/utils/logger/index.js';
-import type { prisma } from '~/utils/prisma.js';
+import { Prisma } from '~/generated/prisma/client';
+import loggerFactory from '~/utils/logger';
+import type { prisma } from '~/utils/prisma';
+
+import { NullUsernameToBeRegisteredError } from './errors';
+import { UserStatus } from './user/conts';
 
 const logger = loggerFactory('growi:models:external-account');
 

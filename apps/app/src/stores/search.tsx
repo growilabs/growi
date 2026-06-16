@@ -1,9 +1,9 @@
 import type { SWRResponse } from 'swr';
 import useSWR, { mutate } from 'swr';
 
-import { apiGet } from '~/client/util/apiv1-client.js';
-import type { IFormattedSearchResult } from '~/interfaces/search.js';
-import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search.js';
+import { apiGet } from '~/client/util/apiv1-client';
+import type { IFormattedSearchResult } from '~/interfaces/search';
+import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 
 export type ISearchConfigurations = {
   limit: number;

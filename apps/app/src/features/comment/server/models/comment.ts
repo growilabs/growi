@@ -1,7 +1,7 @@
 import { model, Schema } from 'mongoose';
 
-import { Prisma } from '~/generated/prisma/client.js';
-import type { prisma } from '~/utils/prisma.js';
+import { Prisma } from '~/generated/prisma/client';
+import type { prisma } from '~/utils/prisma';
 
 // TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
 // Until then, use mongoose to automatically create collections and indexes when connected.

@@ -1,1 +1,1 @@
-export * from '~/features/openai/client/services/editor-assistant/use-editor-assistant.js';
+export * from './use-editor-assistant';

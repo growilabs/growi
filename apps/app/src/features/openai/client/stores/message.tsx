@@ -1,8 +1,8 @@
 import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
-import { apiv3Get } from '~/client/util/apiv3-client.js';
+import { apiv3Get } from '~/client/util/apiv3-client';
 
-import type { MessageWithCustomMetaData } from '../../interfaces/message.js';
+import type { MessageWithCustomMetaData } from '../../interfaces/message';
 
 export const useSWRMUTxMessages = (
   aiAssistantId?: string,

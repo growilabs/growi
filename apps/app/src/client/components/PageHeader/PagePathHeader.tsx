@@ -7,16 +7,16 @@ import { useTranslation } from 'next-i18next';
 import nodePath from 'path';
 import { debounce } from 'throttle-debounce';
 
-import type { InputValidationResult } from '~/client/util/use-input-validator';
-import {
-  useInputValidator,
-  ValidationTarget,
-} from '~/client/util/use-input-validator';
 import type { IPageForItem } from '~/interfaces/page';
 import { LinkedPagePath } from '~/models/linked-page-path';
 import { usePageSelectModalActions } from '~/states/ui/modal/page-select';
 
 import { PagePathHierarchicalLink } from '../../../components/Common/PagePathHierarchicalLink';
+import type { InputValidationResult } from '../../util/use-input-validator';
+import {
+  useInputValidator,
+  ValidationTarget,
+} from '../../util/use-input-validator';
 import {
   AutosizeSubmittableInput,
   getAdjustedMaxWidthForAutosizeInput,

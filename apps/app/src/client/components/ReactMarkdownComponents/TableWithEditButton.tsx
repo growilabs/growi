@@ -2,15 +2,16 @@ import React, { type JSX, useCallback } from 'react';
 import { globalEventTarget } from '@growi/core/dist/utils';
 import type { Element } from 'hast';
 
-import type { LaunchHandsonTableModalEventDetail } from '~/client/interfaces/handsontable-modal.js';
-import { useCurrentPageYjsData } from '~/features/collaborative-editor/states/index.js';
+import { useCurrentPageYjsData } from '~/features/collaborative-editor/states';
 import {
   useIsGuestUser,
   useIsReadOnlyUser,
   useIsSharedUser,
-} from '~/states/context.js';
-import { useShareLinkId } from '~/states/page/hooks.js';
-import { useIsRevisionOutdated } from '~/stores/page.js';
+} from '~/states/context';
+import { useShareLinkId } from '~/states/page/hooks';
+import { useIsRevisionOutdated } from '~/stores/page';
+
+import type { LaunchHandsonTableModalEventDetail } from '../../interfaces/handsontable-modal';
 
 import styles from './TableWithEditButton.module.scss';
 

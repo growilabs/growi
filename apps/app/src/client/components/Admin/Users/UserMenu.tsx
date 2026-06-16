@@ -4,8 +4,7 @@ import { type IUserHasId, USER_STATUS } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { DropdownMenu, DropdownToggle, UncontrolledDropdown } from 'reactstrap';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
-
+import AdminUsersContainer from '../../../services/AdminUsersContainer';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import GrantAdminButton from './GrantAdminButton';
 import GrantReadOnlyButton from './GrantReadOnlyButton';

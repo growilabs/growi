@@ -1,9 +1,9 @@
 import { objectIdUtils } from '@growi/core/dist/utils';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type { ValidReferer } from '../interfaces.js';
-import { retrieveSiteUrl } from './retrieve-site-url.js';
+import type { ValidReferer } from '../interfaces';
+import { retrieveSiteUrl } from './retrieve-site-url';
 
 const logger = loggerFactory(
   'growi:middlewares:certify-shared-page-attachment:validate-referer',

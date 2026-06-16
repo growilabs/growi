@@ -1,13 +1,13 @@
 import mongoose from 'mongoose';
 
-import PageRedirectModel from '~/server/models/page-redirect.js';
-import { createBatchStream } from '~/server/util/batch-stream.js';
+import PageRedirectModel from '~/server/models/page-redirect';
+import { createBatchStream } from '~/server/util/batch-stream';
 import {
   getModelSafely,
   getMongoUri,
   mongoOptions,
-} from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:migrate:convert-redirect-to-pages-to-page-redirect-documents',

@@ -3,21 +3,16 @@ import type { IPageHasId } from '@growi/core';
 import { SubscriptionStatusType } from '@growi/core';
 import urljoin from 'url-join';
 
-import { apiPost } from '~/client/util/apiv1-client.js';
-import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client.js';
-import { toastError } from '~/client/util/toastr.js';
-import type { SyncLatestRevisionBody } from '~/interfaces/yjs.js';
-import { useIsGuestUser } from '~/states/context.js';
-import {
-  useFetchCurrentPage,
-  useSetRemoteLatestPageData,
-} from '~/states/page/index.js';
-import { useSetEditingMarkdown } from '~/states/ui/editor/index.js';
-import {
-  useSWRxApplicableGrant,
-  useSWRxCurrentGrantData,
-} from '~/stores/page.js';
-import loggerFactory from '~/utils/logger/index.js';
+import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
+import { useIsGuestUser } from '~/states/context';
+import { useFetchCurrentPage, useSetRemoteLatestPageData } from '~/states/page';
+import { useSetEditingMarkdown } from '~/states/ui/editor';
+import { useSWRxApplicableGrant, useSWRxCurrentGrantData } from '~/stores/page';
+import loggerFactory from '~/utils/logger';
+
+import { apiPost } from '../util/apiv1-client';
+import { apiv3Get, apiv3Post, apiv3Put } from '../util/apiv3-client';
+import { toastError } from '../util/toastr';
 
 const logger = loggerFactory('growi:services:page-operation');
 

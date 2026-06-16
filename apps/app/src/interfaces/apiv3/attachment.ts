@@ -1,6 +1,6 @@
 import type { IAttachment, IPage, IRevision } from '@growi/core';
 
-import type { ICheckLimitResult } from '../attachment.js';
+import type { ICheckLimitResult } from '../attachment';
 
 export type IApiv3GetAttachmentLimitParams = {
   fileSize: number;

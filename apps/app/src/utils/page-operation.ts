@@ -1,4 +1,4 @@
-import type { IPageOperationProcessData } from '~/interfaces/page-operation.js';
+import type { IPageOperationProcessData } from '~/interfaces/page-operation';
 
 export const shouldRecoverPagePaths = (
   processData: IPageOperationProcessData,

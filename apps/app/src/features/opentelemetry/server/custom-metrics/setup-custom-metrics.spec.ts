@@ -61,7 +61,7 @@ describe('setupCustomMetrics', () => {
   });
 
   it('should call getMeter for every registering metric module (Req 4.2)', async () => {
-    const { setupCustomMetrics } = await import('./index');
+    const { setupCustomMetrics } = await import('.');
     await setupCustomMetrics();
 
     // setupCustomMetrics() wires 7 modules, but addMongooseConnectionPoolMetrics()
@@ -70,7 +70,7 @@ describe('setupCustomMetrics', () => {
   });
 
   it('should register growi.yjs.docs.count gauge (Req 4.1)', async () => {
-    const { setupCustomMetrics } = await import('./index');
+    const { setupCustomMetrics } = await import('.');
     await setupCustomMetrics();
 
     const allGaugeNames = mockMeter.createObservableGauge.mock.calls.map(
@@ -80,7 +80,7 @@ describe('setupCustomMetrics', () => {
   });
 
   it('should register growi.configs gauge from application-metrics (Req 4.5)', async () => {
-    const { setupCustomMetrics } = await import('./index');
+    const { setupCustomMetrics } = await import('.');
     await setupCustomMetrics();
 
     const allGaugeNames = mockMeter.createObservableGauge.mock.calls.map(
@@ -90,7 +90,7 @@ describe('setupCustomMetrics', () => {
   });
 
   it('should register system.memory.limit gauge from system-metrics (Req 4.5)', async () => {
-    const { setupCustomMetrics } = await import('./index');
+    const { setupCustomMetrics } = await import('.');
     await setupCustomMetrics();
 
     const allGaugeNames = mockMeter.createObservableGauge.mock.calls.map(
@@ -105,7 +105,7 @@ describe('setupCustomMetrics', () => {
   });
 
   it('should call getMeter with growi-yjs-metrics meter name (Req 4.2)', async () => {
-    const { setupCustomMetrics } = await import('./index');
+    const { setupCustomMetrics } = await import('.');
     await setupCustomMetrics();
 
     expect(metrics.getMeter).toHaveBeenCalledWith('growi-yjs-metrics', '1.0.0');

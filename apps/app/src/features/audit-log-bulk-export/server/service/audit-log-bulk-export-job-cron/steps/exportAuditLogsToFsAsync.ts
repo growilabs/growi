@@ -4,12 +4,12 @@ import type { Readable } from 'node:stream';
 import { pipeline, Writable } from 'node:stream';
 import type { FilterQuery } from 'mongoose';
 
-import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export.js';
-import { SupportedAction } from '~/interfaces/activity.js';
-import Activity, { type ActivityDocument } from '~/server/models/activity.js';
+import { SupportedAction } from '~/interfaces/activity';
+import Activity, { type ActivityDocument } from '~/server/models/activity';
 
-import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job.js';
-import type { IAuditLogBulkExportJobCronService } from '../index.js';
+import { AuditLogBulkExportJobStatus } from '../../../../interfaces/audit-log-bulk-export';
+import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job';
+import type { IAuditLogBulkExportJobCronService } from '..';
 
 /**
  * Get a Writable that writes audit logs to JSON files

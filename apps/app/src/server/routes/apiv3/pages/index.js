@@ -15,25 +15,22 @@ import {
 import express from 'express';
 import { body, query } from 'express-validator';
 
-import {
-  SupportedAction,
-  SupportedTargetModel,
-} from '~/interfaces/activity.js';
-import { subscribeRuleNames } from '~/interfaces/in-app-notification.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/index.js';
-import PageTagRelation from '~/server/models/page-tag-relation.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { preNotifyService } from '~/server/service/pre-notify.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import { subscribeRuleNames } from '~/interfaces/in-app-notification';
+import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity.js';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user.js';
-import { serializePageSecurely } from '../../../models/serializers/page-serializer.js';
-import { isV5ConversionError } from '../../../models/vo/v5-conversion-error.js';
+import { accessTokenParser } from '../../../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
+import adminRequiredFactory from '../../../middlewares/admin-required';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
+import loginRequiredFactory from '../../../middlewares/login-required';
+import { GlobalNotificationSettingEvent } from '../../../models/GlobalNotificationSetting';
+import PageTagRelation from '../../../models/page-tag-relation';
+import { serializePageSecurely } from '../../../models/serializers/page-serializer';
+import { isV5ConversionError } from '../../../models/vo/v5-conversion-error';
+import { configManager } from '../../../service/config-manager';
+import { preNotifyService } from '../../../service/pre-notify';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
 const router = express.Router();

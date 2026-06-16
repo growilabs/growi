@@ -1,1 +1,1 @@
-export * from './socket-io.js';
+export * from './socket-io';

@@ -1,13 +1,12 @@
-export {
-  useAiAssistantSidebarActions,
-  useAiAssistantSidebarStatus,
-} from '~/features/openai/client/states/ai-assistant-sidebar.js';
-export {
-  useIsEnableUnifiedMergeView,
-  useUnifiedMergeViewActions,
-} from '~/features/openai/client/states/unified-merge-view.js';
-
 export type {
   AiAssistantSidebarActions,
   AiAssistantSidebarStatus,
-} from './ai-assistant-sidebar.js';
+} from './ai-assistant-sidebar';
+export {
+  useAiAssistantSidebarActions,
+  useAiAssistantSidebarStatus,
+} from './ai-assistant-sidebar';
+export {
+  useIsEnableUnifiedMergeView,
+  useUnifiedMergeViewActions,
+} from './unified-merge-view';

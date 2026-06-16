@@ -7,13 +7,13 @@ import {
   UploadPartCommand,
 } from '@aws-sdk/client-s3';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 import {
   type IMultipartUploader,
   MultipartUploader,
   UploadStatus,
-} from '../multipart-uploader.js';
+} from '../multipart-uploader';
 
 const logger = loggerFactory(
   'growi:services:fileUploaderAws:multipartUploader',

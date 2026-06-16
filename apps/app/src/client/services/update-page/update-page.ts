@@ -1,8 +1,9 @@
-import { apiv3Put } from '~/client/util/apiv3-client';
 import type {
   IApiv3PageUpdateParams,
   IApiv3PageUpdateResponse,
 } from '~/interfaces/apiv3';
+
+import { apiv3Put } from '../../util/apiv3-client';
 
 export const updatePage = async (
   params: IApiv3PageUpdateParams,

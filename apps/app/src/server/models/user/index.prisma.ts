@@ -3,7 +3,7 @@
 // Defining a prisma extension in js file loosen typings of the prisma client, so we define the extension in ts file and merge it into the js file later.
 // When migrating users model to Prisma, this file should be removed and merged into `apps/app/src/server/models/user/index.js`.
 
-import { Prisma, type users } from '~/generated/prisma/client.js';
+import { Prisma, type users } from '~/generated/prisma/client';
 
 // TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
 // Until then, use mongoose to automatically create collections and indexes when connected.

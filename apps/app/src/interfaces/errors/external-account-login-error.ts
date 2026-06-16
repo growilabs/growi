@@ -1,4 +1,4 @@
-import type { ExternalAccountLoginError } from '~/models/vo/external-account-login-error.js';
+import type { ExternalAccountLoginError } from '~/models/vo/external-account-login-error';
 
 export type IExternalAccountLoginError = ExternalAccountLoginError;
 

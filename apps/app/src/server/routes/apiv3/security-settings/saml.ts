@@ -7,14 +7,14 @@ import {
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import type Crowi from '~/server/crowi/index.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { getTranslation } from '~/server/service/i18next.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response.js';
+import type Crowi from '../../../crowi';
+import { configManager } from '../../../service/config-manager';
+import { getTranslation } from '../../../service/i18next';
+import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting:saml');
 

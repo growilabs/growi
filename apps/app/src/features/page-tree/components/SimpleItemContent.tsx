@@ -5,8 +5,8 @@ import { useTranslation } from 'next-i18next';
 import path from 'pathe';
 import { UncontrolledTooltip } from 'reactstrap';
 
-import type { IPageForItem } from '~/interfaces/page.js';
-import { shouldRecoverPagePaths } from '~/utils/page-operation.js';
+import type { IPageForItem } from '~/interfaces/page';
+import { shouldRecoverPagePaths } from '~/utils/page-operation';
 
 import styles from './SimpleItemContent.module.scss';
 

@@ -12,35 +12,35 @@ import { useTranslation } from 'react-i18next';
 import { Collapse } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
-import { toastError } from '~/client/util/toastr.js';
-import { MessageCard } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/MessageCard/MessageCard.js';
-import { ResizableTextarea } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/ResizableTextArea.js';
+import { toastError } from '~/client/util/toastr';
+import { useGrowiCloudUri } from '~/states/global';
+import loggerFactory from '~/utils/logger';
+
+import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant';
+import type { MessageLog } from '../../../../interfaces/message';
+import {
+  MessageErrorCode,
+  StreamErrorCode,
+} from '../../../../interfaces/message-error';
+import type { IThreadRelationHasId } from '../../../../interfaces/thread-relation';
 import {
   type FormData as FormDataForEditorAssistant,
   isEditorAssistantFormData,
   useEditorAssistant,
-} from '~/features/openai/client/services/editor-assistant/index.js';
+} from '../../../services/editor-assistant';
 import {
   type FormData as FormDataForKnowledgeAssistant,
   useFetchAndSetMessageDataEffect,
   useKnowledgeAssistant,
-} from '~/features/openai/client/services/knowledge-assistant.js';
+} from '../../../services/knowledge-assistant';
 import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
   useUnifiedMergeViewActions,
-} from '~/features/openai/client/states/index.js';
-import { useSWRxThreads } from '~/features/openai/client/stores/thread.js';
-import {
-  MessageErrorCode,
-  StreamErrorCode,
-} from '~/features/openai/interfaces/message-error.js';
-import { useGrowiCloudUri } from '~/states/global/index.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant.js';
-import type { MessageLog } from '../../../../interfaces/message.js';
-import type { IThreadRelationHasId } from '../../../../interfaces/thread-relation.js';
+} from '../../../states';
+import { useSWRxThreads } from '../../../stores/thread';
+import { MessageCard } from './MessageCard/MessageCard';
+import { ResizableTextarea } from './ResizableTextArea';
 
 import styles from './AiAssistantSidebar.module.scss';
 

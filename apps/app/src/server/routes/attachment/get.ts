@@ -3,31 +3,25 @@ import type { NextFunction, Request, Response, Router } from 'express';
 import express from 'express';
 import mongoose from 'mongoose';
 
-import type {
-  CrowiProperties,
-  CrowiRequest,
-} from '~/interfaces/crowi-request.js';
+import type { CrowiProperties, CrowiRequest } from '~/interfaces/crowi-request';
+import loggerFactory from '~/utils/logger';
+
+import type Crowi from '../../crowi';
 import {
   type ExpressHttpHeader,
   type RespondOptions,
   ResponseMode,
-} from '~/server/interfaces/attachment.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
+} from '../../interfaces/attachment';
+import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
+import loginRequiredFactory from '../../middlewares/login-required';
+import { Attachment, type IAttachmentDocument } from '../../models/attachment';
 import {
   applyHeaders,
   createContentHeaders,
   type FileUploader,
   toExpressHttpHeaders,
-} from '~/server/service/file-uploader/index.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import type Crowi from '../../crowi/index.js';
-import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment/index.js';
-import {
-  Attachment,
-  type IAttachmentDocument,
-} from '../../models/attachment.js';
-import ApiResponse from '../../util/apiResponse.js';
+} from '../../service/file-uploader';
+import ApiResponse from '../../util/apiResponse';
 
 const logger = loggerFactory('growi:routes:attachment:get');
 

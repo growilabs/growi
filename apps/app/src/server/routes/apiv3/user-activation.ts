@@ -6,16 +6,16 @@ import { subSeconds } from 'date-fns/subSeconds';
 import { body, validationResult } from 'express-validator';
 import mongoose from 'mongoose';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import { RegistrationMode } from '~/interfaces/registration-mode.js';
-import type Crowi from '~/server/crowi/index.js';
-import UserRegistrationOrder from '~/server/models/user-registration-order.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { growiInfoService } from '~/server/service/growi-info/index.js';
-import { getTranslation } from '~/server/service/i18next.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import { RegistrationMode } from '~/interfaces/registration-mode';
+import loggerFactory from '~/utils/logger';
 
-import { resolveLocalePath } from '../../util/safe-path-utils.js';
+import type Crowi from '../../crowi';
+import UserRegistrationOrder from '../../models/user-registration-order';
+import { configManager } from '../../service/config-manager';
+import { growiInfoService } from '../../service/growi-info';
+import { getTranslation } from '../../service/i18next';
+import { resolveLocalePath } from '../../util/safe-path-utils';
 
 const logger = loggerFactory('growi:routes:apiv3:user-activation');
 

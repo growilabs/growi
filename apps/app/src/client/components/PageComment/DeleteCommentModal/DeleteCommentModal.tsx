@@ -6,8 +6,8 @@ import { format } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { Username } from '~/components/User/Username.js';
-import type { ICommentHasId } from '~/interfaces/comment.js';
+import { Username } from '~/components/User/Username';
+import type { ICommentHasId } from '~/interfaces/comment';
 
 import styles from './DeleteCommentModal.module.scss';
 

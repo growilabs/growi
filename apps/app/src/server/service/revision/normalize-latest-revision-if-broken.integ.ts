@@ -2,15 +2,14 @@ import { getIdStringForRef } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
 import mongoose, { connection, Types } from 'mongoose';
 
-import type { PageDocument, PageModel } from '~/server/models/page';
-import PageModelFactory from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
-
+import type { PageDocument, PageModel } from '../../models/page';
+import PageModelFactory from '../../models/page';
+import { Revision } from '../../models/revision';
 import {
   __resetCacheForTesting,
   getAppliedAtForRevisionFilter,
   normalizeLatestRevisionIfBroken,
-} from './normalize-latest-revision-if-broken.js';
+} from './normalize-latest-revision-if-broken';
 
 const OLD_MIGRATION_FILE_NAME =
   '20211227060705-revision-path-to-page-id-schema-migration--fixed-7549';

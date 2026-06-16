@@ -6,18 +6,18 @@ import { WebSocketServer } from 'ws';
 import type { WSSharedDoc } from 'y-websocket/bin/utils';
 import { docs, setPersistence, setupWSConnection } from 'y-websocket/bin/utils';
 
-import type { SessionConfig } from '~/interfaces/session-config.js';
-import type { SyncLatestRevisionBody } from '~/interfaces/yjs.js';
-import loggerFactory from '~/utils/logger/index.js';
+import type { SessionConfig } from '~/interfaces/session-config';
+import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
+import loggerFactory from '~/utils/logger';
 
-import { Revision } from '../../models/revision.js';
-import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-revision-if-broken.js';
-import { createIndexes } from './create-indexes.js';
-import { createMongoDBPersistence } from './create-mongodb-persistence.js';
-import { MongodbPersistence } from './extended/mongodb-persistence.js';
-import { guardSocket } from './guard-socket.js';
-import { syncYDoc } from './sync-ydoc.js';
-import { createUpgradeHandler } from './upgrade-handler.js';
+import { Revision } from '../../models/revision';
+import { normalizeLatestRevisionIfBroken } from '../revision/normalize-latest-revision-if-broken';
+import { createIndexes } from './create-indexes';
+import { createMongoDBPersistence } from './create-mongodb-persistence';
+import { MongodbPersistence } from './extended/mongodb-persistence';
+import { guardSocket } from './guard-socket';
+import { syncYDoc } from './sync-ydoc';
+import { createUpgradeHandler } from './upgrade-handler';
 
 const MONGODB_PERSISTENCE_COLLECTION_NAME = 'yjs-writings';
 const MONGODB_PERSISTENCE_FLUSH_SIZE = 100;

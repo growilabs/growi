@@ -4,14 +4,13 @@ import { mock } from 'vitest-mock-extended';
 
 import pkg from '^/package.json';
 
-import type UserEvent from '~/server/events/user';
-import { Config } from '~/server/models/config';
-import { configManager } from '~/server/service/config-manager';
-
-import type Crowi from '../../crowi/index.js';
-import type { PageModel } from '../../models/page.js';
-import pageModel from '../../models/page.js';
-import { growiInfoService } from './growi-info.js';
+import type Crowi from '../../crowi';
+import type UserEvent from '../../events/user';
+import { Config } from '../../models/config';
+import type { PageModel } from '../../models/page';
+import pageModel from '../../models/page';
+import { configManager } from '../config-manager';
+import { growiInfoService } from './growi-info';
 
 describe('GrowiInfoService', () => {
   const appVersion = pkg.version;
@@ -53,7 +52,7 @@ describe('GrowiInfoService', () => {
       },
     });
 
-    const userModelFactory = (await import('~/server/models/user')).default;
+    const userModelFactory = (await import('../../models/user')).default;
     // biome-ignore lint/suspicious/noTsIgnore: Suppress auto fix by lefthook
     // @ts-ignore
     User = userModelFactory(crowiMock);

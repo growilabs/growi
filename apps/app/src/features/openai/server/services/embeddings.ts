@@ -1,7 +1,7 @@
 import crypto from 'crypto';
 import type { OpenAI } from 'openai';
 
-import { openaiClient } from '~/features/openai/server/services/client.js';
+import { openaiClient } from './client';
 
 export const embed = async (
   input: string,

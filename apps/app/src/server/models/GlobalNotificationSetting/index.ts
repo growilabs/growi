@@ -2,16 +2,15 @@ import nodePath from 'node:path';
 import { pathUtils } from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 
-import type Crowi from '~/server/crowi/index.js';
-
-import type { GlobalNotificationSettingType } from './consts.js';
+import type Crowi from '../../crowi';
+import type { GlobalNotificationSettingType } from './consts';
 import type {
   GlobalNotificationSettingDocument,
   GlobalNotificationSettingModel,
   IGlobalNotificationMailSetting,
   IGlobalNotificationSetting,
   IGlobalNotificationSlackSetting,
-} from './types.js';
+} from './types';
 
 /**
  * parent schema for GlobalNotificationSetting model
@@ -177,7 +176,7 @@ export default factory;
 export {
   GlobalNotificationSettingEvent,
   GlobalNotificationSettingType,
-} from './consts.js';
+} from './consts';
 export type {
   GlobalNotificationMailSettingModel,
   GlobalNotificationSettingDocument,
@@ -186,7 +185,7 @@ export type {
   IGlobalNotificationMailSetting,
   IGlobalNotificationSetting,
   IGlobalNotificationSlackSetting,
-} from './types.js';
+} from './types';
 
 // Internal use only
 export {

@@ -2,13 +2,9 @@ import { useCallback } from 'react';
 import { isServer } from '@growi/core/dist/utils';
 import { atom, useAtom } from 'jotai';
 
-import { useIsEditable, usePageNotFound } from '~/states/page/index.js';
-import {
-  EditorMode,
-  EditorModeHash,
-  type UseEditorModeReturn,
-} from '~/states/ui/editor/types.js';
-import { determineEditorModeByHash } from '~/states/ui/editor/utils.js';
+import { useIsEditable, usePageNotFound } from '../../page';
+import { EditorMode, EditorModeHash, type UseEditorModeReturn } from './types';
+import { determineEditorModeByHash } from './utils';
 
 // Base atom for editor mode
 const editorModeBaseAtom = atom<EditorMode | null>(null);

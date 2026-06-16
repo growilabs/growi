@@ -1,4 +1,4 @@
-import type { QueryTerms } from '~/server/interfaces/search.js';
+import type { QueryTerms } from '~/server/interfaces/search';
 
 export function excludeUserPagesFromQuery(terms: QueryTerms): void {
   const userRegex: RegExp = /^\/user($|\/(?!\/))/;

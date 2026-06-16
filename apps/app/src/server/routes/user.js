@@ -1,4 +1,4 @@
-import ApiResponse from '../util/apiResponse.js';
+import ApiResponse from '../util/apiResponse';
 
 /**
  * @swagger

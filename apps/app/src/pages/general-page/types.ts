@@ -5,8 +5,8 @@ import type {
   IPagePopulatedToShowRevision,
 } from '@growi/core';
 
-import type { RendererConfig } from '~/interfaces/services/renderer.js';
-import type { PageDocument } from '~/server/models/page.js';
+import type { RendererConfig } from '~/interfaces/services/renderer';
+import type { PageDocument } from '~/server/models/page';
 
 export type IPageToShowRevisionWithMeta = IDataWithRequiredMeta<
   IPagePopulatedToShowRevision & PageDocument,

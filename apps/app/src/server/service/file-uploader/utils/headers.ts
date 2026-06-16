@@ -1,10 +1,9 @@
 import type { Response } from 'express';
 
-import type { ExpressHttpHeader } from '~/server/interfaces/attachment.js';
-import type { IAttachmentDocument } from '~/server/models/attachment.js';
-
-import { configManager } from '../../config-manager/index.js';
-import { defaultContentDispositionSettings } from './security.js';
+import type { ExpressHttpHeader } from '../../../interfaces/attachment';
+import type { IAttachmentDocument } from '../../../models/attachment';
+import { configManager } from '../../config-manager';
+import { defaultContentDispositionSettings } from './security';
 
 type ContentHeaderField =
   | 'Content-Type'

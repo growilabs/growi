@@ -1,6 +1,6 @@
 import crypto from 'crypto';
 
-import { AccessToken } from './access-token.js';
+import { AccessToken } from './access-token';
 
 /**
  * Integration tests for AccessToken.findUserIdByToken.

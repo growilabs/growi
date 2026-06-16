@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 
-import pageModelFactory from '~/server/models/page.js';
-import userGroupModelFactory from '~/server/models/user-group.js';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import pageModelFactory from '~/server/models/page';
+import userGroupModelFactory from '~/server/models/user-group';
+import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:abolish-page-group-relation');
 

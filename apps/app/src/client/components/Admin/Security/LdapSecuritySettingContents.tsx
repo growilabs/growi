@@ -2,10 +2,9 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
-import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
-import AdminLdapSecurityContainer from '~/client/services/AdminLdapSecurityContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-
+import AdminGeneralSecurityContainer from '../../../services/AdminGeneralSecurityContainer';
+import AdminLdapSecurityContainer from '../../../services/AdminLdapSecurityContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import LdapAuthTestModal from './LdapAuthTestModal';
 

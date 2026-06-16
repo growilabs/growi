@@ -4,8 +4,9 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
 import { useCurrentUser } from '~/states/global';
+
+import { apiv3Post } from '../util/apiv3-client';
 
 type InvitedFormProps = {
   invitedFormUsername: string;

@@ -1,7 +1,6 @@
-import { AiAssistantShareScope } from '~/features/openai/interfaces/ai-assistant.js';
-import { determineShareScope } from '~/features/openai/utils/determine-share-scope.js';
-
-import type { AiAssistantAccessScope } from '../../interfaces/ai-assistant.js';
+import type { AiAssistantAccessScope } from '../../interfaces/ai-assistant';
+import { AiAssistantShareScope } from '../../interfaces/ai-assistant';
+import { determineShareScope } from '../../utils/determine-share-scope';
 
 export const getShareScopeIcon = (
   shareScope: AiAssistantShareScope,

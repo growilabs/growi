@@ -1,10 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
-import { apiv3Delete } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-
+import AdminGeneralSecurityContainer from '../../../services/AdminGeneralSecurityContainer';
+import { apiv3Delete } from '../../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import ShareLinkList from '../../PageAccessoriesModal/ShareLink/ShareLinkList';
 import PaginationWrapper from '../../PaginationWrapper';
 import { withUnstatedContainers } from '../../UnstatedUtils';

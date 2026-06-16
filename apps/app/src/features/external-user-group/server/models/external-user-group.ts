@@ -2,9 +2,10 @@ import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
-import type { IExternalUserGroup } from '~/features/external-user-group/interfaces/external-user-group.js';
-import UserGroup from '~/server/models/user-group.js';
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import UserGroup from '~/server/models/user-group';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
+
+import type { IExternalUserGroup } from '../../interfaces/external-user-group';
 
 export interface ExternalUserGroupDocument
   extends IExternalUserGroup,

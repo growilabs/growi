@@ -1,9 +1,10 @@
 import type { HydratedDocument, Types } from 'mongoose';
 import mongoose from 'mongoose';
 
-import type { PageDocument, PageModel } from '~/server/models/page.js';
-import { Revision } from '~/server/models/revision.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
+
+import type { PageDocument, PageModel } from '../../models/page';
+import { Revision } from '../../models/revision';
 
 const logger = loggerFactory(
   'growi:service:revision:normalize-latest-revision',

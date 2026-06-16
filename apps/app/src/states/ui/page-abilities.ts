@@ -4,8 +4,8 @@ import { atom, useAtomValue } from 'jotai';
 import {
   _atomsForDerivedAbilities as contextAtoms,
   useIsSharedUser,
-} from '~/states/context.js';
-import { _atomsForDerivedAbilities as globalAtoms } from '~/states/global/index.js';
+} from '../context';
+import { _atomsForDerivedAbilities as globalAtoms } from '../global';
 // Import internal atoms with special naming
 import {
   _atomsForDerivedAbilities as pageAtoms,
@@ -13,11 +13,8 @@ import {
   useCurrentPagePath,
   useIsEditable,
   usePageNotFound,
-} from '~/states/page/index.js';
-import {
-  EditorMode,
-  _atomsForDerivedAbilities as editorAtoms,
-} from '~/states/ui/editor/index.js';
+} from '../page';
+import { EditorMode, _atomsForDerivedAbilities as editorAtoms } from './editor';
 
 const { isTrashTopPage, isUsersTopPage } = pagePathUtils;
 

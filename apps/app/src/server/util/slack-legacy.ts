@@ -5,9 +5,9 @@ import {
   type IncomingWebhookSendArguments,
 } from '@slack/webhook';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type { ConfigManager } from '../service/config-manager/index.js';
+import type { ConfigManager } from '../service/config-manager';
 
 const logger = loggerFactory('growi:util:slack-legacy');
 

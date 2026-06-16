@@ -5,14 +5,14 @@ import passport from 'passport';
 import type { Namespace } from 'socket.io';
 import { Server } from 'socket.io';
 
-import { SocketEventName } from '~/interfaces/websocket.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SocketEventName } from '~/interfaces/websocket';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi/index.js';
-import adminRequiredFactory from '../../middlewares/admin-required.js';
-import loginRequiredFactory from '../../middlewares/login-required.js';
-import { configManager } from '../config-manager/index.js';
-import { getRoomNameWithId, RoomPrefix } from './helper.js';
+import type Crowi from '../../crowi';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import loginRequiredFactory from '../../middlewares/login-required';
+import { configManager } from '../config-manager';
+import { getRoomNameWithId, RoomPrefix } from './helper';
 
 const logger = loggerFactory('growi:service:socket-io');
 

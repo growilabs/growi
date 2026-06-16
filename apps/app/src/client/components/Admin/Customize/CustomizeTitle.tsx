@@ -4,10 +4,10 @@ import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 import { Card, CardBody } from 'reactstrap';
 
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useCustomTitleTemplate } from '~/states/global';
 
+import { apiv3Put } from '../../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 
 export const CustomizeTitle: FC = () => {

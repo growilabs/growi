@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 
-import { SearchDelegatorName } from '~/interfaces/named-query.js';
-import NamedQuery from '~/server/models/named-query.js';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SearchDelegatorName } from '~/interfaces/named-query';
+import NamedQuery from '~/server/models/named-query';
+import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:migrate:initialize-private-legacy-pages-named-query',

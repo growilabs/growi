@@ -1,13 +1,13 @@
-import { SupportedAction } from '~/interfaces/activity.js';
-import { AttachmentType } from '~/server/interfaces/attachment.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
 
-import { Attachment } from '../../models/attachment.js';
-import { validateImageContentType } from './image-content-type-validator.js';
+import { AttachmentType } from '../../interfaces/attachment';
+import { Attachment } from '../../models/attachment';
+import { validateImageContentType } from './image-content-type-validator';
 
 const logger = loggerFactory('growi:routes:attachment');
 
-import ApiResponse from '../../util/apiResponse.js';
+import ApiResponse from '../../util/apiResponse';
 
 /**
  * @swagger

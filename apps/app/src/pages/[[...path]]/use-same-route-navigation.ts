@@ -1,11 +1,8 @@
 import { useEffect, useRef } from 'react';
 import { useRouter } from 'next/router';
 
-import {
-  useFetchCurrentPage,
-  useIsIdenticalPath,
-} from '~/states/page/index.js';
-import { useSetEditingMarkdown } from '~/states/ui/editor/index.js';
+import { useFetchCurrentPage, useIsIdenticalPath } from '~/states/page';
+import { useSetEditingMarkdown } from '~/states/ui/editor';
 
 /**
  * Hook for handling SAME_ROUTE client-side navigation within [[...path]] route.

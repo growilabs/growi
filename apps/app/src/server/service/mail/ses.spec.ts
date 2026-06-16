@@ -1,7 +1,7 @@
 import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
-import type { IConfigManagerForApp } from '../config-manager/index.js';
-import { createSESClient } from './ses.js';
+import type { IConfigManagerForApp } from '../config-manager';
+import { createSESClient } from './ses';
 
 describe('createSESClient', () => {
   let mockConfigManager: DeepMockProxy<IConfigManagerForApp>;

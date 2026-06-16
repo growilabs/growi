@@ -1,7 +1,7 @@
-import { extension as CommentExtension } from '~/features/comment/server/index.js';
-import { PrismaClient as OriginalPrismaClient } from '~/generated/prisma/client.js';
-import { extension as ExternalAccountExtension } from '~/server/models/external-account.js';
-import { extension as UserExtension } from '~/server/models/user/index.prisma.js';
+import { extension as CommentExtension } from '~/features/comment/server';
+import { PrismaClient as OriginalPrismaClient } from '~/generated/prisma/client';
+import { extension as ExternalAccountExtension } from '~/server/models/external-account';
+import { extension as UserExtension } from '~/server/models/user/index.prisma';
 
 export const createPrisma = (datasourceUrl?: string) =>
   new OriginalPrismaClient(

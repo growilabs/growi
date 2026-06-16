@@ -4,17 +4,18 @@ import mongoose, { type HydratedDocument, type Model } from 'mongoose';
 import { getInstance } from '^/test/setup/crowi';
 
 import { PageActionType } from '~/interfaces/page-operation';
-import type Crowi from '~/server/crowi';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import type { PageOperationModel } from '~/server/models/page-operation';
+
+import type Crowi from '../../crowi';
+import type { PageDocument, PageModel } from '../../models/page';
+import type { PageOperationModel } from '../../models/page-operation';
 import type {
   UserGroupDocument,
   UserGroupModel,
-} from '~/server/models/user-group';
+} from '../../models/user-group';
 import type {
   UserGroupRelationDocument,
   UserGroupRelationModel,
-} from '~/server/models/user-group-relation';
+} from '../../models/user-group-relation';
 
 describe('V5 page migration', () => {
   let crowi: Crowi;

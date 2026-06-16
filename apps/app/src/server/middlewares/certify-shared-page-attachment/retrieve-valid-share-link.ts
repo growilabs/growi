@@ -1,11 +1,11 @@
+import loggerFactory from '~/utils/logger';
+
 import type {
   ShareLinkDocument,
   ShareLinkModel,
-} from '~/server/models/share-link.js';
-import { getModelSafely } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import type { ValidReferer } from './interfaces.js';
+} from '../../models/share-link';
+import { getModelSafely } from '../../util/mongoose-utils';
+import type { ValidReferer } from './interfaces';
 
 const logger = loggerFactory(
   'growi:middleware:certify-shared-page-attachment:retrieve-valid-share-link',

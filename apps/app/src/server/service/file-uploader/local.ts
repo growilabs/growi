@@ -8,26 +8,26 @@ import type { Response } from 'express';
 import mkdir from 'mkdirp';
 import urljoin from 'url-join';
 
-import type Crowi from '~/server/crowi/index.js';
+import loggerFactory from '~/utils/logger';
+
+import type Crowi from '../../crowi';
 import {
   FilePathOnStoragePrefix,
   type RespondOptions,
   ResponseMode,
-} from '~/server/interfaces/attachment.js';
-import type { IAttachmentDocument } from '~/server/models/attachment.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import { configManager } from '../config-manager/index.js';
+} from '../../interfaces/attachment';
+import type { IAttachmentDocument } from '../../models/attachment';
+import { configManager } from '../config-manager';
 import {
   AbstractFileUploader,
   type SaveFileParam,
   type TemporaryUrl,
-} from './file-uploader.js';
+} from './file-uploader';
 import {
   applyHeaders,
   createContentHeaders,
   toExpressHttpHeaders,
-} from './utils/index.js';
+} from './utils';
 
 const logger = loggerFactory('growi:service:fileUploaderLocal');
 

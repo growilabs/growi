@@ -3,11 +3,11 @@ import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import type { IBookmark } from '~/interfaces/bookmark-info.js';
-import loggerFactory from '~/utils/logger/index.js';
+import type { IBookmark } from '~/interfaces/bookmark-info';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi/index.js';
-import { getOrCreateModel } from '../util/mongoose-utils.js';
+import type Crowi from '../crowi';
+import { getOrCreateModel } from '../util/mongoose-utils';
 
 const logger = loggerFactory('growi:models:bookmark');
 

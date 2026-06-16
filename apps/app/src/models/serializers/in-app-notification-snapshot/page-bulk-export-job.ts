@@ -2,13 +2,12 @@ import type { IPage } from '@growi/core';
 import { isPopulated } from '@growi/core';
 import mongoose from 'mongoose';
 
-import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
-import type { PageModel } from '~/server/models/page.js';
-
-export { parseSnapshot } from '~/models/serializers/in-app-notification-snapshot/page-bulk-export-job-client.js';
+import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/page-bulk-export';
+import type { PageModel } from '~/server/models/page';
 
 // Re-export client-safe types and functions
-export type { IPageBulkExportJobSnapshot } from './page-bulk-export-job-client.js';
+export type { IPageBulkExportJobSnapshot } from './page-bulk-export-job-client';
+export { parseSnapshot } from './page-bulk-export-job-client';
 
 export const stringifySnapshot = async (
   exportJob: IPageBulkExportJob,

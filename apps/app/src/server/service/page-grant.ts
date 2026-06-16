@@ -13,29 +13,29 @@ import {
 } from '@growi/core/dist/utils';
 import mongoose, { type HydratedDocument } from 'mongoose';
 
-import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group.js';
-import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group.js';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
-import type { UserRelatedGroupsData } from '~/interfaces/page.js';
+import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import type { UserRelatedGroupsData } from '~/interfaces/page';
 import {
   type GroupGrantData,
   UserGroupPageGrantStatus,
-} from '~/interfaces/page.js';
+} from '~/interfaces/page';
 import type {
   IRecordApplicableGrant,
   PopulatedGrantedGroup,
-} from '~/interfaces/page-grant.js';
-import type { PageDocument, PageModel } from '~/server/models/page.js';
-import UserGroup from '~/server/models/user-group.js';
+} from '~/interfaces/page-grant';
+
+import type { ObjectIdLike } from '../interfaces/mongoose-utils';
+import type { PageDocument, PageModel } from '../models/page';
+import UserGroup from '../models/user-group';
+import UserGroupRelation from '../models/user-group-relation';
 import {
   excludeTestIdsFromTargetIds,
   hasIntersection,
   includesObjectIds,
-} from '~/server/util/compare-objectId.js';
-
-import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
-import UserGroupRelation from '../models/user-group-relation.js';
-import { divideByType } from '../util/granted-group.js';
+} from '../util/compare-objectId';
+import { divideByType } from '../util/granted-group';
 
 const { addTrailingSlash } = pathUtils;
 const { isTopPage } = pagePathUtils;

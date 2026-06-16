@@ -10,14 +10,14 @@ import uniqueValidator from 'mongoose-unique-validator';
 // whole module.exports) is the only form that resolves under native ESM.
 import nextI18nextConfig from '^/config/next-i18next.config.cjs';
 
-import { aclService as _aclService } from '~/server/service/acl.js';
+import { aclService as _aclService } from '../../service/acl';
 // Getter wrappers for service singletons: callers use getConfigManager() /
 // getAclService() so that this module's import of service singletons can be
 // intercepted by tests (vi.mock) without changing the call-site API.
 // The singletons are module-level bindings (ESM live-binding); accesses happen
 // only inside functions, never at module-top, so circular-dep evaluation order
 // is safe.
-import { configManager as _configManager } from '~/server/service/config-manager/index.js';
+import { configManager as _configManager } from '../../service/config-manager';
 
 /** @returns {import('../../service/config-manager').IConfigManagerForApp} */
 export function getConfigManager() {
@@ -29,11 +29,12 @@ export function getAclService() {
   return _aclService;
 }
 
-import { Attachment } from '~/server/models/attachment.js';
-import { UserStatus } from '~/server/models/user/conts.js';
-import { getModelSafely } from '~/server/util/mongoose-utils.js';
-import { generateGravatarSrc } from '~/utils/gravatar.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { generateGravatarSrc } from '~/utils/gravatar';
+import loggerFactory from '~/utils/logger';
+
+import { getModelSafely } from '../../util/mongoose-utils';
+import { Attachment } from '../attachment';
+import { UserStatus } from './conts';
 
 const logger = loggerFactory('growi:models:user');
 

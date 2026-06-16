@@ -6,8 +6,8 @@ import path from 'path';
 
 import * as i18nextConfig from '^/config/i18next.config.cjs';
 
-import { configManager } from '~/server/service/config-manager/index.js';
-import { resolveFromRoot } from '~/server/util/project-dir-utils.js';
+import { resolveFromRoot } from '../util/project-dir-utils';
+import { configManager } from './config-manager';
 
 const relativePathToLocalesRoot = path.relative(
   import.meta.dirname,

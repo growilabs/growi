@@ -1,6 +1,6 @@
 import mongoose from 'mongoose';
 
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 
 type IObjectId = mongoose.Types.ObjectId;
 const ObjectId = mongoose.Types.ObjectId;

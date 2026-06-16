@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { IPageToDeleteWithMeta } from '@growi/core';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { OnDeletedFunction } from '../../../interfaces/ui.js';
+import type { OnDeletedFunction } from '../../../interfaces/ui';
 
 // Type definitions
 export type IDeleteModalOption = {

@@ -1,9 +1,10 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader';
 import { useCurrentUser } from '~/states/global';
 import { useCurrentPageData, usePageNotFound } from '~/states/page';
 import { useSWRxCurrentGrantData } from '~/stores/page';
+
+import { useLazyLoader } from '../../../utils/use-lazy-loader';
 
 export const FixPageGrantAlertLazyLoaded = (): JSX.Element => {
   const isNotFound = usePageNotFound();

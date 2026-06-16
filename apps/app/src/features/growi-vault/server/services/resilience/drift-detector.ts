@@ -1,6 +1,7 @@
-import type { VaultInstructionModel } from '~/features/growi-vault/server/models/vault-instruction.js';
-import type { VaultSyncStateModel } from '~/features/growi-vault/server/models/vault-sync-state.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
+
+import type { VaultInstructionModel } from '../../models/vault-instruction';
+import type { VaultSyncStateModel } from '../../models/vault-sync-state';
 
 const logger = loggerFactory('growi:vault:drift-detector');
 

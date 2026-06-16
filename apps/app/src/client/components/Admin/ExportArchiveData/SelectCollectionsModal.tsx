@@ -2,8 +2,8 @@ import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { apiPost } from '~/client/util/apiv1-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
+import { apiPost } from '../../../util/apiv1-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
 
 const GROUPS_PAGE = [
   'pages',

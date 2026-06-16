@@ -15,36 +15,34 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { TabContent, TabPane } from 'reactstrap';
 
-import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
-import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser.js';
-import { CommentPreview } from '~/client/components/PageComment/CommentPreview.js';
-import { SwitchingButtonGroup } from '~/client/components/PageComment/SwitchingButtonGroup.js';
-import { uploadAttachments } from '~/client/services/upload-attachments/index.js';
-import { toastError } from '~/client/util/toastr.js';
-import { useCurrentUser } from '~/states/global/index.js';
-import { useCurrentPagePath } from '~/states/page/index.js';
+import { useCurrentUser } from '~/states/global';
+import { useCurrentPagePath } from '~/states/page';
 import {
   isSlackConfiguredAtom,
   useAcceptedUploadFileType,
-} from '~/states/server-configurations/index.js';
-import { useIsSlackEnabled } from '~/states/ui/editor/index.js';
-import { useCommentEditorsDirtyMap } from '~/states/ui/unsaved-warning.js';
-import { useSWRxPageComment } from '~/stores/comment.js';
-import { useEditorSettings, useSWRxSlackChannels } from '~/stores/editor.js';
-import { useNextThemes } from '~/stores-universal/use-next-themes.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/states/server-configurations';
+import { useIsSlackEnabled } from '~/states/ui/editor';
+import { useCommentEditorsDirtyMap } from '~/states/ui/unsaved-warning';
+import { useSWRxPageComment } from '~/stores/comment';
+import { useEditorSettings, useSWRxSlackChannels } from '~/stores/editor';
+import { useNextThemes } from '~/stores-universal/use-next-themes';
+import loggerFactory from '~/utils/logger';
+
+import { uploadAttachments } from '../../services/upload-attachments';
+import { toastError } from '../../util/toastr';
+import { NotAvailableForGuest } from '../NotAvailableForGuest';
+import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '../NotAvailableForReadOnlyUser';
+import { CommentPreview } from './CommentPreview';
+import { SwitchingButtonGroup } from './SwitchingButtonGroup';
 
 import styles from './CommentEditor.module.scss';
 
-import '~/client/components/GrowiEditor.vendor-styles.prebuilt.js';
+import '../GrowiEditor.vendor-styles.prebuilt';
 
 const _logger = loggerFactory('growi:components:CommentEditor');
 
 const SlackNotification = dynamic(
-  () =>
-    import('~/client/components/SlackNotification.js').then(
-      (mod) => mod.SlackNotification,
-    ),
+  () => import('../SlackNotification').then((mod) => mod.SlackNotification),
   { ssr: false },
 );
 

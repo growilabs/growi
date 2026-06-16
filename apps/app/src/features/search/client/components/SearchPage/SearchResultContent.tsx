@@ -9,30 +9,31 @@ import { DropdownItem } from 'reactstrap';
 import type {
   AdditionalMenuItemsRendererProps,
   ForceHideMenuItems,
-} from '~/client/components/Common/Dropdown/PageItemControl.js';
-import type { RevisionLoaderProps } from '~/client/components/Page/RevisionLoader.js';
-import { exportAsMarkdown } from '~/client/services/page-operation.js';
-import { toastSuccess } from '~/client/util/toastr.js';
-import { PagePathNav } from '~/components/Common/PagePathNav/index.js';
-import { useKeywordRescroll } from '~/features/search/client/components/SearchPage/use-keyword-rescroll.js';
-import type { IPageWithSearchMeta } from '~/interfaces/search.js';
+} from '~/client/components/Common/Dropdown/PageItemControl';
+import type { RevisionLoaderProps } from '~/client/components/Page/RevisionLoader';
+import { exportAsMarkdown } from '~/client/services/page-operation';
+import { toastSuccess } from '~/client/util/toastr';
+import { PagePathNav } from '~/components/Common/PagePathNav';
+import type { IPageWithSearchMeta } from '~/interfaces/search';
 import type {
   OnDeletedFunction,
   OnDuplicatedFunction,
   OnRenamedFunction,
-} from '~/interfaces/ui.js';
-import { useShouldExpandContent } from '~/services/layout/use-should-expand-content.js';
-import { useCurrentUser } from '~/states/global/index.js';
-import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete.js';
-import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate.js';
-import { usePageRenameModalActions } from '~/states/ui/modal/page-rename.js';
+} from '~/interfaces/ui';
+import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
+import { useCurrentUser } from '~/states/global';
+import { usePageDeleteModalActions } from '~/states/ui/modal/page-delete';
+import { usePageDuplicateModalActions } from '~/states/ui/modal/page-duplicate';
+import { usePageRenameModalActions } from '~/states/ui/modal/page-rename';
 import {
   mutatePageList,
   mutatePageTree,
   mutateRecentlyUpdated,
-} from '~/stores/page-listing.js';
-import { useSearchResultOptions } from '~/stores/renderer.js';
-import { mutateSearching } from '~/stores/search.js';
+} from '~/stores/page-listing';
+import { useSearchResultOptions } from '~/stores/renderer';
+import { mutateSearching } from '~/stores/search';
+
+import { useKeywordRescroll } from './use-keyword-rescroll';
 
 import styles from './SearchResultContent.module.scss';
 
@@ -41,26 +42,24 @@ const _fluidLayoutClass = styles['fluid-layout'];
 
 const PageControls = dynamic(
   () =>
-    import('~/client/components/PageControls/index.js').then(
-      (mod) => mod.PageControls,
-    ),
+    import('~/client/components/PageControls').then((mod) => mod.PageControls),
   { ssr: false },
 );
 const RevisionLoader = dynamic<RevisionLoaderProps>(
   () =>
-    import('~/client/components/Page/RevisionLoader.js').then(
+    import('~/client/components/Page/RevisionLoader').then(
       (mod) => mod.RevisionLoader,
     ),
   { ssr: false },
 );
 const PageComment = dynamic(
   () =>
-    import('~/client/components/PageComment.js').then((mod) => mod.PageComment),
+    import('~/client/components/PageComment').then((mod) => mod.PageComment),
   { ssr: false },
 );
 const PageContentFooter = dynamic(
   () =>
-    import('~/components/PageView/PageContentFooter.js').then(
+    import('~/components/PageView/PageContentFooter').then(
       (mod) => mod.PageContentFooter,
     ),
   { ssr: false },

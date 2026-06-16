@@ -1,6 +1,6 @@
 import { memo } from 'react';
 
-import { Skeleton } from '~/client/components/Skeleton';
+import { Skeleton } from '../../Skeleton';
 
 import styles from './SkeletonItem.module.scss';
 

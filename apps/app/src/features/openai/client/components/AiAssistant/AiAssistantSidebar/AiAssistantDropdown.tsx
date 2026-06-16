@@ -7,10 +7,9 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant.js';
-import { getShareScopeIcon } from '~/features/openai/client/utils/get-share-scope-Icon.js';
-
-import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant.js';
+import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant';
+import { useSWRxAiAssistants } from '../../../stores/ai-assistant';
+import { getShareScopeIcon } from '../../../utils/get-share-scope-Icon';
 
 type Props = {
   selectedAiAssistant?: AiAssistantHasId;

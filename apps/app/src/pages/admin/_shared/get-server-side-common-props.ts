@@ -1,14 +1,13 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
-import type { GetServerSideI18nPropsOption } from '~/pages/common-props/i18n.js';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '~/pages/common-props/index.js';
-import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props.js';
-
-import type { AdminCommonProps } from './types.js';
+} from '../../common-props';
+import type { GetServerSideI18nPropsOption } from '../../common-props/i18n';
+import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
+import type { AdminCommonProps } from './types';
 
 /**
  * Build common admin SSR props (merges common initial/each/i18n and computes admin flag).

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { AiAssistantHasId } from '../../../interfaces/ai-assistant.js';
+import type { AiAssistantHasId } from '../../../interfaces/ai-assistant';
 
 export const AiAssistantManagementModalPageMode = {
   HOME: 'home',

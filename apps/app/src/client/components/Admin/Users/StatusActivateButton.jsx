@@ -2,9 +2,8 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-
+import AdminUsersContainer from '../../../services/AdminUsersContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
 class StatusActivateButton extends React.Component {

@@ -1,10 +1,10 @@
 import type { Document, Model, Types } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import type { IInAppNotificationSettings } from '~/interfaces/in-app-notification.js';
-import { subscribeRuleNames } from '~/interfaces/in-app-notification.js';
+import type { IInAppNotificationSettings } from '~/interfaces/in-app-notification';
+import { subscribeRuleNames } from '~/interfaces/in-app-notification';
 
-import { getOrCreateModel } from '../util/mongoose-utils.js';
+import { getOrCreateModel } from '../util/mongoose-utils';
 
 export interface InAppNotificationSettingsDocument
   extends IInAppNotificationSettings<Types.ObjectId>,

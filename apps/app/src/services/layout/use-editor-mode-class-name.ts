@@ -1,4 +1,4 @@
-import { useEditorMode } from '~/states/ui/editor/index.js';
+import { useEditorMode } from '~/states/ui/editor';
 
 export const useEditorModeClassName = (): string => {
   const { getClassNamesByEditorMode } = useEditorMode();

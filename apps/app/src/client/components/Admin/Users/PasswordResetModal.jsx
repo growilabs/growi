@@ -12,10 +12,11 @@ import {
   Tooltip,
 } from 'reactstrap';
 
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
-import { apiv3Put } from '~/client/util/apiv3-client';
-import { toastError } from '~/client/util/toastr';
 import { isMailerSetupAtom } from '~/states/server-configurations';
+
+import AdminUsersContainer from '../../../services/AdminUsersContainer';
+import { apiv3Put } from '../../../util/apiv3-client';
+import { toastError } from '../../../util/toastr';
 
 class PasswordResetModal extends React.Component {
   constructor(props) {

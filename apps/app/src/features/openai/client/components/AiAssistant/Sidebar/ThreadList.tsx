@@ -5,10 +5,6 @@ import { useTranslation } from 'react-i18next';
 
 import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import {
-  useSWRINFxRecentThreads,
-  useSWRMUTxThreads,
-} from '~/features/openai/client/stores/thread';
 import loggerFactory from '~/utils/logger';
 
 import { deleteThread } from '../../../services/thread';
@@ -16,6 +12,10 @@ import {
   useAiAssistantSidebarActions,
   useAiAssistantSidebarStatus,
 } from '../../../states';
+import {
+  useSWRINFxRecentThreads,
+  useSWRMUTxThreads,
+} from '../../../stores/thread';
 
 const logger = loggerFactory('growi:openai:client:components:ThreadList');
 

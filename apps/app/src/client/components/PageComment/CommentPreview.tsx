@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 
-import RevisionRenderer from '~/components/PageView/RevisionRenderer.js';
-import { useCommentPreviewOptions } from '~/stores/renderer.js';
+import RevisionRenderer from '~/components/PageView/RevisionRenderer';
+import { useCommentPreviewOptions } from '~/stores/renderer';
 
 import styles from './CommentPreview.module.scss';
 

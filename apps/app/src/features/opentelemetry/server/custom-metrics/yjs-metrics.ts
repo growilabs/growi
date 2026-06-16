@@ -1,7 +1,7 @@
 import { diag, metrics } from '@opentelemetry/api';
 import { docs } from 'y-websocket/bin/utils';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:opentelemetry:custom-metrics:yjs');
 const loggerDiag = diag.createComponentLogger({

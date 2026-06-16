@@ -11,8 +11,6 @@ import {
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { apiv3Delete, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { ExternalGroupManagement } from '~/features/external-user-group/client/components/ExternalUserGroup/ExternalUserGroupManagement';
 import { useSWRxExternalUserGroupList } from '~/features/external-user-group/client/stores/external-user-group';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
@@ -22,6 +20,9 @@ import {
   useSWRxUserGroupList,
   useSWRxUserGroupRelationList,
 } from '~/stores/user-group';
+
+import { apiv3Delete, apiv3Post, apiv3Put } from '../../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
 
 const UserGroupDeleteModal = dynamic(
   () =>

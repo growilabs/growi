@@ -4,15 +4,15 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from './interfaces/apiv3-response.js';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import loginRequiredFactory from '../../middlewares/login-required';
+import { configManager } from '../../service/config-manager';
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:content-disposition-settings');
 

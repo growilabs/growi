@@ -1,18 +1,17 @@
 import mongoose from 'mongoose';
 
-import type Crowi from '~/server/crowi/index.js';
-
-import { GlobalNotificationSettingType } from './consts.js';
+import type Crowi from '../../crowi';
 import {
   class as GlobalNotificationSettingClass,
   schema as GlobalNotificationSettingSchema,
-} from './index.js';
+} from '.';
+import { GlobalNotificationSettingType } from './consts';
 import type {
   GlobalNotificationSettingModel,
   GlobalNotificationSlackSettingModel,
   IGlobalNotificationSetting,
   IGlobalNotificationSlackSetting,
-} from './types.js';
+} from './types';
 
 const factory = (crowi: Crowi): GlobalNotificationSlackSettingModel => {
   GlobalNotificationSettingClass.crowi = crowi;

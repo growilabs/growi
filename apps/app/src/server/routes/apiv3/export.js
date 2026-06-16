@@ -5,15 +5,15 @@ import { body, param } from 'express-validator';
 import mongoose from 'mongoose';
 import sanitize from 'sanitize-filename';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import { exportService } from '~/server/service/export.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+import { accessTokenParser } from '../../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import loginRequiredFactory from '../../middlewares/login-required';
+import { exportService } from '../../service/export';
 
 const logger = loggerFactory('growi:routes:apiv3:export');
 const router = express.Router();

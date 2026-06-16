@@ -2,7 +2,7 @@ import type OpenAI from 'openai';
 import type { Stream } from 'openai/streaming';
 import type { Uploadable } from 'openai/uploads';
 
-import type { MessageListParams } from '../../../interfaces/message.js';
+import type { MessageListParams } from '../../../interfaces/message';
 
 export interface IOpenaiClientDelegator {
   createThread(vectorStoreId?: string): Promise<OpenAI.Beta.Threads.Thread>;

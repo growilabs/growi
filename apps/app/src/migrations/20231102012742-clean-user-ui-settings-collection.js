@@ -1,6 +1,6 @@
-import UserUISettings from '~/server/models/user-ui-settings.js';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import UserUISettings from '~/server/models/user-ui-settings';
+import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:clean-user-ui-settings-collection');
 

@@ -1,7 +1,7 @@
-import { Config } from '~/server/models/config.js';
-import userModelFactory from '~/server/models/user/index.js';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { Config } from '~/server/models/config';
+import userModelFactory from '~/server/models/user';
+import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:add-installed-date-to-config');
 

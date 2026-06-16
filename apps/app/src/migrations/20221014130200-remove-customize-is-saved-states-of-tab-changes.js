@@ -1,6 +1,6 @@
-import { Config } from '~/server/models/config.js';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { Config } from '~/server/models/config';
+import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:remove-isSavedStatesOfTabChanges');
 

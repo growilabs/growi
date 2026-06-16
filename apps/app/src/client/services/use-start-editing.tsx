@@ -2,10 +2,11 @@ import { useCallback } from 'react';
 import { Origin } from '@growi/core';
 import { getParentPath } from '@growi/core/dist/utils/path-utils';
 
-import { useCreatePage } from '~/client/services/create-page/index.js';
-import { usePageNotFound } from '~/states/page/index.js';
-import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
-import { shouldCreateWipPage } from '~/utils/should-create-wip-page.js';
+import { usePageNotFound } from '~/states/page';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
+import { shouldCreateWipPage } from '~/utils/should-create-wip-page';
+
+import { useCreatePage } from './create-page';
 
 export const useStartEditing = (): ((path?: string) => Promise<void>) => {
   const isNotFound = usePageNotFound();

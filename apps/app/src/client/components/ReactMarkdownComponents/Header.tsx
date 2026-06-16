@@ -3,21 +3,22 @@ import { useRouter } from 'next/router';
 import { globalEventTarget } from '@growi/core/dist/utils';
 import type { Element } from 'hast';
 
-import { useStartEditing } from '~/client/services/use-start-editing.js';
-import { NextLink } from '~/components/ReactMarkdownComponents/NextLink.js';
+import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
 import {
   useCurrentPageYjsData,
   useCurrentPageYjsDataLoading,
-} from '~/features/collaborative-editor/states/index.js';
+} from '~/features/collaborative-editor/states';
 import {
   useIsGuestUser,
   useIsReadOnlyUser,
   useIsSharedUser,
-} from '~/states/context.js';
-import { useShareLinkId } from '~/states/page/hooks.js';
-import { useCurrentPagePath } from '~/states/page/index.js';
-import type { ReservedNextCaretLineEventDetail } from '~/states/ui/editor/reserved-next-caret-line.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/states/context';
+import { useCurrentPagePath } from '~/states/page';
+import { useShareLinkId } from '~/states/page/hooks';
+import type { ReservedNextCaretLineEventDetail } from '~/states/ui/editor/reserved-next-caret-line';
+import loggerFactory from '~/utils/logger';
+
+import { useStartEditing } from '../../services/use-start-editing';
 
 import styles from './Header.module.scss';
 

@@ -5,35 +5,32 @@ import type { IUser } from '@growi/core';
 import { getIdForRef, isPopulated } from '@growi/core';
 import mongoose from 'mongoose';
 
+import type { SupportedActionType } from '~/interfaces/activity';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import type Crowi from '~/server/crowi';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import type { ActivityDocument } from '~/server/models/activity';
+import { configManager } from '~/server/service/config-manager';
+import CronService from '~/server/service/cron';
+import { preNotifyService } from '~/server/service/pre-notify';
+import loggerFactory from '~/utils/logger';
+
 import {
   PageBulkExportFormat,
   PageBulkExportJobInProgressStatus,
   PageBulkExportJobStatus,
-} from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
-import PageBulkExportJob from '~/features/page-bulk-export/server/models/page-bulk-export-job.js';
-import PageBulkExportPageSnapshot from '~/features/page-bulk-export/server/models/page-bulk-export-page-snapshot.js';
+} from '../../../interfaces/page-bulk-export';
+import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job';
+import PageBulkExportJob from '../../models/page-bulk-export-job';
+import PageBulkExportPageSnapshot from '../../models/page-bulk-export-page-snapshot';
 import {
   BulkExportJobExpiredError,
   BulkExportJobStreamDestroyedByCleanupError,
-} from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/errors.js';
-import { requestPdfConverter } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/request-pdf-converter.js';
-import { compressAndUpload } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/compress-and-upload.js';
-import { createPageSnapshotsAsync } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/create-page-snapshots-async.js';
-import { exportPagesToFsAsync } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/steps/export-pages-to-fs-async.js';
-import type { SupportedActionType } from '~/interfaces/activity.js';
-import {
-  SupportedAction,
-  SupportedTargetModel,
-} from '~/interfaces/activity.js';
-import type Crowi from '~/server/crowi/index.js';
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
-import type { ActivityDocument } from '~/server/models/activity.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import CronService from '~/server/service/cron.js';
-import { preNotifyService } from '~/server/service/pre-notify.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job.js';
+} from './errors';
+import { requestPdfConverter } from './request-pdf-converter';
+import { compressAndUpload } from './steps/compress-and-upload';
+import { createPageSnapshotsAsync } from './steps/create-page-snapshots-async';
+import { exportPagesToFsAsync } from './steps/export-pages-to-fs-async';
 
 const logger = loggerFactory('growi:service:page-bulk-export-job-cron');
 

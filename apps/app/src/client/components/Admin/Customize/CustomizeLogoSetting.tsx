@@ -2,16 +2,16 @@ import React, { type JSX, useCallback, useRef, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import ImageCropModal from '~/client/components/Common/ImageCropModal';
+import { useIsDefaultLogo } from '~/states/global';
+import { isCustomizedLogoUploadedAtom } from '~/states/server-configurations';
+
 import {
   apiv3Delete,
   apiv3PostForm,
   apiv3Put,
-} from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useIsDefaultLogo } from '~/states/global';
-import { isCustomizedLogoUploadedAtom } from '~/states/server-configurations';
-
+} from '../../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
+import ImageCropModal from '../../Common/ImageCropModal';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 
 const DEFAULT_LOGO = '/images/logo.svg';

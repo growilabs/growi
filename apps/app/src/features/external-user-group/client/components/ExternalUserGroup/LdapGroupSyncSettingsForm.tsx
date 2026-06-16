@@ -4,9 +4,10 @@ import { useTranslation } from 'react-i18next';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useSWRxLdapGroupSyncSettings } from '~/features/external-user-group/client/stores/external-user-group';
-import type { LdapGroupSyncSettings } from '~/features/external-user-group/interfaces/external-user-group';
-import { LdapGroupMembershipAttributeType } from '~/features/external-user-group/interfaces/external-user-group';
+
+import type { LdapGroupSyncSettings } from '../../../interfaces/external-user-group';
+import { LdapGroupMembershipAttributeType } from '../../../interfaces/external-user-group';
+import { useSWRxLdapGroupSyncSettings } from '../../stores/external-user-group';
 
 export const LdapGroupSyncSettingsForm: FC = () => {
   const { t } = useTranslation('admin');

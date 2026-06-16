@@ -2,8 +2,8 @@ import type { JSX } from 'react';
 import { useTranslation } from 'react-i18next';
 import ReactMarkdown from 'react-markdown';
 
-import { Header } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/MessageCard/ReactMarkdownComponents/Header.js';
-import { NextLinkWrapper } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/MessageCard/ReactMarkdownComponents/NextLinkWrapper.js';
+import { Header } from './ReactMarkdownComponents/Header';
+import { NextLinkWrapper } from './ReactMarkdownComponents/NextLinkWrapper';
 
 import styles from './MessageCard.module.scss';
 

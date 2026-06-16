@@ -4,18 +4,12 @@ import { addSeconds } from 'date-fns/addSeconds';
 import type { Document, FilterQuery, Model, QueryOptions } from 'mongoose';
 import mongoose, { Schema } from 'mongoose';
 
-import type {
-  IOptionsForCreate,
-  IOptionsForUpdate,
-} from '~/interfaces/page.js';
-import {
-  PageActionStage,
-  PageActionType,
-} from '~/interfaces/page-operation.js';
+import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
+import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 
-import loggerFactory from '../../utils/logger/index.js';
-import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
-import { getOrCreateModel } from '../util/mongoose-utils.js';
+import loggerFactory from '../../utils/logger';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils';
+import { getOrCreateModel } from '../util/mongoose-utils';
 
 const TIME_TO_ADD_SEC = 10;
 

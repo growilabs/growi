@@ -12,7 +12,7 @@
  */
 import { diag, metrics } from '@opentelemetry/api';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:opentelemetry:custom-metrics:installed-at-metrics',
@@ -56,7 +56,7 @@ export function addInstalledAtMetrics(): void {
       try {
         // Dynamic import to avoid circular dependencies
         const { growiInfoService } = await import(
-          '~/server/service/growi-info/index.js'
+          '~/server/service/growi-info'
         );
         const growiInfo = await growiInfoService.getGrowiInfo({
           includeInstalledInfo: true,

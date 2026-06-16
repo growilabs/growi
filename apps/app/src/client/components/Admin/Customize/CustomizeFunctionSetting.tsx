@@ -2,9 +2,8 @@ import React, { type JSX, useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Card, CardBody } from 'reactstrap';
 
-import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-
+import AdminCustomizeContainer from '../../../services/AdminCustomizeContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 import CustomizeFunctionOption from './CustomizeFunctionOption';

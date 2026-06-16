@@ -7,14 +7,14 @@ import type {
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
 import type OpenAI from 'openai';
 
-import { ActionGroupSize } from '~/interfaces/activity.js';
-import { AttachmentMethodType } from '~/interfaces/attachment.js';
+import { ActionGroupSize } from '~/interfaces/activity';
+import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
   IPageDeleteConfigValue,
   IPageDeleteConfigValueToProcessValidation,
-} from '~/interfaces/page-delete-config.js';
-import type { RegistrationMode } from '~/interfaces/registration-mode.js';
-import { RehypeSanitizeType } from '~/interfaces/services/rehype-sanitize.js';
+} from '~/interfaces/page-delete-config';
+import type { RegistrationMode } from '~/interfaces/registration-mode';
+import { RehypeSanitizeType } from '~/interfaces/services/rehype-sanitize';
 
 /*
  * Sort order for top level keys:

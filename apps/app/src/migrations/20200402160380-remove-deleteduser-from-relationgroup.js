@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 
-import userModelFactory from '~/server/models/user/index.js';
-import UserGroupRelation from '~/server/models/user-group-relation.js';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import userModelFactory from '~/server/models/user';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:migrate:remove-deleteduser-from-relationgroup',

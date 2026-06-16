@@ -2,7 +2,7 @@ import * as os from 'node:os';
 import * as v8 from 'node:v8';
 import { diag, metrics } from '@opentelemetry/api';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:opentelemetry:custom-metrics:system');
 const loggerDiag = diag.createComponentLogger({

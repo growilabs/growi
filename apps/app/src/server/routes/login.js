@@ -1,13 +1,10 @@
-import {
-  SupportedAction,
-  SupportedTargetModel,
-} from '~/interfaces/activity.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
 
-import { UserStatus } from '../models/user/conts.js';
-import { growiInfoService } from '../service/growi-info/index.js';
-import { resolveLocalePath } from '../util/safe-path-utils.js';
+import { UserStatus } from '../models/user/conts';
+import { configManager } from '../service/config-manager';
+import { growiInfoService } from '../service/growi-info';
+import { resolveLocalePath } from '../util/safe-path-utils';
 
 // disable all of linting
 // because this file is a deprecated legacy of Crowi

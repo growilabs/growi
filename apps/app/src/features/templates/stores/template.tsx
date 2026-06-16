@@ -5,7 +5,7 @@ import {
 import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiv3Get } from '~/client/util/apiv3-client.js';
+import { apiv3Get } from '~/client/util/apiv3-client';
 
 export const useSWRxTemplates = (): SWRResponse<TemplateSummary[], Error> => {
   return useSWRImmutable('/templates', (endpoint) =>

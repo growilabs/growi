@@ -1,5 +1,6 @@
-import { PageDeleteConfigValue } from '~/interfaces/page-delete-config.js';
-import { validateDeleteConfigs } from '~/utils/page-delete-config.js';
+import { PageDeleteConfigValue } from '~/interfaces/page-delete-config';
+
+import { validateDeleteConfigs } from './page-delete-config';
 
 describe('validateDeleteConfigs utility function', () => {
   test('Should validate delete configs', () => {

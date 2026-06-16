@@ -2,7 +2,7 @@ import http from 'node:http';
 import WebSocket, { WebSocketServer } from 'ws';
 import { docs, setPersistence, setupWSConnection } from 'y-websocket/bin/utils';
 
-import { guardSocket } from './guard-socket.js';
+import { guardSocket } from './guard-socket';
 
 /**
  * Creates a test server where:

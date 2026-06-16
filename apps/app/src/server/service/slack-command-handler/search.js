@@ -4,10 +4,10 @@ import {
 } from '@growi/slack/dist/utils/block-kit-builder';
 import { generateLastUpdateMrkdwn } from '@growi/slack/dist/utils/generate-last-update-markdown';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import { growiInfoService } from '../growi-info/index.js';
-import BaseSlackCommandHandler from './slack-command-handler.js';
+import { growiInfoService } from '../growi-info';
+import BaseSlackCommandHandler from './slack-command-handler';
 
 const logger = loggerFactory('growi:service:SlackCommandHandler:search');
 

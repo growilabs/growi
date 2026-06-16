@@ -11,25 +11,25 @@ import { body, query } from 'express-validator';
 // the local `validator` middleware map below).
 import isEmail from 'validator/lib/isEmail.js';
 
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
-import { deleteUserAiAssistant } from '~/features/openai/server/services/delete-ai-assistant.js';
-import { SupportedAction } from '~/interfaces/activity.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import Activity from '~/server/models/activity.js';
-import { serializePageSecurely } from '~/server/models/serializers/index.js';
-import { UserStatus } from '~/server/models/user/conts.js';
-import UserGroupRelation from '~/server/models/user-group-relation.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { growiInfoService } from '~/server/service/growi-info/index.js';
-import { deleteCompletelyUserHomeBySystem } from '~/server/service/page/delete-completely-user-home-by-system.js';
-import loggerFactory from '~/utils/logger/index.js';
-import { prisma } from '~/utils/prisma.js';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import { deleteUserAiAssistant } from '~/features/openai/server/services/delete-ai-assistant';
+import { SupportedAction } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
-import { resolveLocalePath } from '../../util/safe-path-utils.js';
+import { accessTokenParser } from '../../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import loginRequiredFactory from '../../middlewares/login-required';
+import Activity from '../../models/activity';
+import { serializePageSecurely } from '../../models/serializers';
+import { UserStatus } from '../../models/user/conts';
+import UserGroupRelation from '../../models/user-group-relation';
+import { configManager } from '../../service/config-manager';
+import { growiInfoService } from '../../service/growi-info';
+import { deleteCompletelyUserHomeBySystem } from '../../service/page/delete-completely-user-home-by-system';
+import { resolveLocalePath } from '../../util/safe-path-utils';
 
 const logger = loggerFactory('growi:routes:apiv3:users');
 

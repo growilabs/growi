@@ -1,6 +1,5 @@
-import { AiAssistantShareScope } from '~/features/openai/interfaces/ai-assistant.js';
-
-import type { AiAssistantAccessScope } from '../interfaces/ai-assistant.js';
+import type { AiAssistantAccessScope } from '../interfaces/ai-assistant';
+import { AiAssistantShareScope } from '../interfaces/ai-assistant';
 
 export const determineShareScope = (
   shareScope: AiAssistantShareScope,

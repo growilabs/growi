@@ -1,7 +1,7 @@
 import events from 'node:events';
 import util from 'node:util';
 
-import type Crowi from '../crowi/index.js';
+import type Crowi from '../crowi';
 
 function ActivityEvent(crowi: Crowi) {
   this.crowi = crowi;

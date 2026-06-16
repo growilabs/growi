@@ -12,11 +12,11 @@ type ReconnectingWebSocket = import('reconnecting-websocket').default;
 
 import WebSocket from 'ws';
 
-import type Crowi from '~/server/crowi/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import S2sMessage from '../../models/vo/s2s-message.js';
-import { AbstractS2sMessagingService } from './base.js';
+import type Crowi from '../../crowi';
+import S2sMessage from '../../models/vo/s2s-message';
+import { AbstractS2sMessagingService } from './base';
 
 const logger = loggerFactory('growi:service:s2s-messaging:nchan');
 

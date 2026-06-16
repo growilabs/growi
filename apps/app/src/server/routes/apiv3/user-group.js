@@ -5,23 +5,23 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
 import { body, param, query, sanitizeQuery } from 'express-validator';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer.js';
-import UserGroup from '~/server/models/user-group.js';
-import UserGroupRelation from '~/server/models/user-group-relation.js';
-import { excludeTestIdsFromTargetIds } from '~/server/util/compare-objectId.js';
+import { SupportedAction } from '~/interfaces/activity';
+import { generalXssFilter } from '~/services/general-xss-filter';
+import loggerFactory from '~/utils/logger';
+
+import { accessTokenParser } from '../../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import loginRequiredFactory from '../../middlewares/login-required';
+import { serializeUserGroupRelationSecurely } from '../../models/serializers/user-group-relation-serializer';
+import UserGroup from '../../models/user-group';
+import UserGroupRelation from '../../models/user-group-relation';
+import { excludeTestIdsFromTargetIds } from '../../util/compare-objectId';
 import {
   toPagingLimit,
   toPagingOffset,
-} from '~/server/util/express-validator/sanitizer.js';
-import { generalXssFilter } from '~/services/general-xss-filter/index.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
+} from '../../util/express-validator/sanitizer';
 
 const logger = loggerFactory('growi:routes:apiv3:user-group');
 

@@ -1,6 +1,6 @@
 import { z } from 'zod';
 
-import { LlmEditorAssistantDiffSchema } from '~/features/openai/interfaces/editor-assistant/llm-response-schemas.js';
+import { LlmEditorAssistantDiffSchema } from './llm-response-schemas';
 
 // -----------------------------------------------------------------------------
 // SSE Schemas for Streaming Editor Assistant

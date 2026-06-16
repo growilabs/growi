@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
-import AdminOidcSecurityContainer from '~/client/services/AdminOidcSecurityContainer';
-import { toastError } from '~/client/util/toastr';
 import { toArrayIfNot } from '~/utils/array-utils';
 
+import AdminOidcSecurityContainer from '../../../services/AdminOidcSecurityContainer';
+import { toastError } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import OidcSecurityManagementContents from './OidcSecuritySettingContents';
 

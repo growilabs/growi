@@ -2,16 +2,17 @@ import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Input, Label, ModalBody } from 'reactstrap';
 
-import { AccessScopeDropdown } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AccessScopeDropdown.js';
-import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader.js';
-import { SelectUserGroupModal } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectUserGroupModal.js';
-import { ShareScopeSwitch } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/ShareScopeSwitch.js';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
+import { useSWRxUserRelatedGroups } from '~/stores/user';
+
 import {
   AiAssistantAccessScope,
   AiAssistantShareScope,
-} from '~/features/openai/interfaces/ai-assistant.js';
-import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
-import { useSWRxUserRelatedGroups } from '~/stores/user.js';
+} from '../../../../interfaces/ai-assistant';
+import { AccessScopeDropdown } from './AccessScopeDropdown';
+import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
+import { SelectUserGroupModal } from './SelectUserGroupModal';
+import { ShareScopeSwitch } from './ShareScopeSwitch';
 
 const ScopeType = {
   ACCESS: 'Access',

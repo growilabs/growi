@@ -2,9 +2,9 @@
 import type { AxiosResponse } from 'axios';
 import urljoin from 'url-join';
 
-import { toArrayIfNot } from '~/utils/array-utils.js';
-import axios from '~/utils/axios/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { toArrayIfNot } from '~/utils/array-utils';
+import axios from '~/utils/axios';
+import loggerFactory from '~/utils/logger';
 
 const apiv3Root = '/_api/v3';
 

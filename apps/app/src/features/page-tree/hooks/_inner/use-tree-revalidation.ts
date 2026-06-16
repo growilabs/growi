@@ -3,7 +3,7 @@ import { useEffect, useRef, useState } from 'react';
 import {
   usePageTreeInformationGeneration,
   usePageTreeRevalidationEffect,
-} from '~/features/page-tree/states/page-tree-update.js';
+} from '../../states/page-tree-update';
 
 type TreeInstance = {
   getItems: () => unknown[];

@@ -1,9 +1,10 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
+
+import { accessTokenParser } from '../../middlewares/access-token-parser';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import loginRequiredFactory from '../../middlewares/login-required';
 
 const _logger = loggerFactory('growi:routes:apiv3:mongo');
 

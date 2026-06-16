@@ -1,7 +1,7 @@
 import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
-import type { IConfigManagerForApp } from '../config-manager/index.js';
-import { createSMTPClient } from './smtp.js';
+import type { IConfigManagerForApp } from '../config-manager';
+import { createSMTPClient } from './smtp';
 
 describe('createSMTPClient', () => {
   let mockConfigManager: DeepMockProxy<IConfigManagerForApp>;

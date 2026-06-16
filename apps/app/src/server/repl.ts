@@ -2,9 +2,8 @@ import type { REPLServer } from 'node:repl';
 import repl from 'node:repl';
 import mongoose from 'mongoose';
 
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-
-import Crowi from './crowi/index.js';
+import Crowi from './crowi';
+import { getMongoUri, mongoOptions } from './util/mongoose-utils';
 
 const setupMongoose = async (replServer: REPLServer) => {
   mongoose.Promise = global.Promise;

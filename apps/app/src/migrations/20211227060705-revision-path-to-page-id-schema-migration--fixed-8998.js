@@ -2,15 +2,15 @@ import { Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
 import mongoose from 'mongoose';
 
-import getPageModel from '~/server/models/page.js';
-import { Revision } from '~/server/models/revision.js';
-import { createBatchStream } from '~/server/util/batch-stream.js';
+import getPageModel from '~/server/models/page';
+import { Revision } from '~/server/models/revision';
+import { createBatchStream } from '~/server/util/batch-stream';
 import {
   getModelSafely,
   getMongoUri,
   mongoOptions,
-} from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:migrate:revision-path-to-page-id-schema-migration--fixed-8998',

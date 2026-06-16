@@ -8,7 +8,7 @@
  * Requirements: 1.4, 1.5
  */
 
-import type { ReconcileTargetType } from '~/features/growi-vault/server/models/vault-reconcile-log.js';
+import type { ReconcileTargetType } from '../../models/vault-reconcile-log';
 
 // ---------------------------------------------------------------------------
 // Public types

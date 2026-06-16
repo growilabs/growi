@@ -3,17 +3,17 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import type Crowi from '~/server/crowi/index.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
-import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import { AccessToken } from '~/server/models/access-token.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
 
-import type { ApiV3Response } from '../interfaces/apiv3-response.js';
+import type Crowi from '../../../crowi';
+import { accessTokenParser } from '../../../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
+import loginRequiredFactory from '../../../middlewares/login-required';
+import { AccessToken } from '../../../models/access-token';
+import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:personal-setting:generate-access-tokens',

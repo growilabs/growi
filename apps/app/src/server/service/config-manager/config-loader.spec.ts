@@ -1,7 +1,7 @@
 import type { RawConfigData } from '@growi/core/dist/interfaces';
 
-import type { ConfigKey, ConfigValues } from './config-definition.js';
-import { ConfigLoader } from './config-loader.js';
+import type { ConfigKey, ConfigValues } from './config-definition';
+import { ConfigLoader } from './config-loader';
 
 const mockExec = vi.fn();
 const mockFind = vi.fn().mockReturnValue({ exec: mockExec });

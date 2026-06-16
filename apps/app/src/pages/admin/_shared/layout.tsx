@@ -4,11 +4,10 @@ import { useMemo } from 'react';
 import type { TFunction } from 'i18next';
 import { useTranslation } from 'next-i18next';
 
-import { AdminPageFrame } from '~/pages/admin/_shared/AdminPageFrame.js';
-import { useUnstatedContainers } from '~/pages/admin/_shared/use-unstated-container.js';
-import { useCustomTitle } from '~/pages/utils/page-title-customization.js';
-
-import type { AdminCommonProps, AnyUnstatedContainer } from './types.js';
+import { useCustomTitle } from '../../utils/page-title-customization';
+import { AdminPageFrame } from './AdminPageFrame';
+import type { AdminCommonProps, AnyUnstatedContainer } from './types';
+import { useUnstatedContainers } from './use-unstated-container';
 
 export interface AdminLayoutOptions<P extends AdminCommonProps> {
   title: string | ((props: P, t: TFunction) => string);

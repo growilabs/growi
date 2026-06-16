@@ -180,7 +180,7 @@ import {
   createVaultPageRouterWithDeps,
   initializeVaultFeature,
   runVaultSyncStateMigration,
-} from './index';
+} from '.';
 import { VaultSyncState } from './models/vault-sync-state';
 import { createVaultAdminRouter } from './routes/vault-admin';
 import { createVaultPageRouter } from './routes/vault-page';

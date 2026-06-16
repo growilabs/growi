@@ -1,7 +1,7 @@
 import * as diff from 'diff';
 import urljoin from 'url-join';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:util:slack');
 

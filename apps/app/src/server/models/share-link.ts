@@ -3,9 +3,9 @@ import mongoose, { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import type { IShareLink } from '~/interfaces/share-link.js';
+import type { IShareLink } from '~/interfaces/share-link';
 
-import { getOrCreateModel } from '../util/mongoose-utils.js';
+import { getOrCreateModel } from '../util/mongoose-utils';
 
 export interface ShareLinkDocument extends IShareLink, Document {
   isExpired: () => boolean;

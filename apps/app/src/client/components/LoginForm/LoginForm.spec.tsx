@@ -2,9 +2,9 @@ import React from 'react';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 
+import { apiv3Post } from '../../util/apiv3-client';
 import { LoginForm } from './LoginForm';
 
 vi.mock('next-i18next', () => ({

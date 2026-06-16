@@ -2,9 +2,10 @@ import type { IUser, Ref } from '@growi/core';
 import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import { SidebarContentsType } from '~/interfaces/ui.js';
-import type { IUserUISettings } from '~/interfaces/user-ui-settings.js';
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import { SidebarContentsType } from '~/interfaces/ui';
+import type { IUserUISettings } from '~/interfaces/user-ui-settings';
+
+import { getOrCreateModel } from '../util/mongoose-utils';
 
 export interface UserUISettingsDocument extends IUserUISettings, Document {
   user: Ref<IUser>;

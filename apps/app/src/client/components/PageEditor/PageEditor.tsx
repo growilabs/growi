@@ -20,13 +20,6 @@ import { useTranslation } from 'next-i18next';
 import nodePath from 'path';
 import { debounce, throttle } from 'throttle-debounce';
 
-import { useUpdateStateAfterSave } from '~/client/services/page-operation';
-import {
-  extractRemoteRevisionDataFromErrorObj,
-  useUpdatePage,
-} from '~/client/services/update-page';
-import { uploadAttachments } from '~/client/services/upload-attachments';
-import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
 import { useIsEnableUnifiedMergeView } from '~/features/openai/client/states';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
 import { useCurrentPathname, useCurrentUser } from '~/states/global';
@@ -66,6 +59,13 @@ import { usePreviewOptions } from '~/stores/renderer';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
 import loggerFactory from '~/utils/logger';
 
+import { useUpdateStateAfterSave } from '../../services/page-operation';
+import {
+  extractRemoteRevisionDataFromErrorObj,
+  useUpdatePage,
+} from '../../services/update-page';
+import { uploadAttachments } from '../../services/upload-attachments';
+import { toastError, toastSuccess, toastWarning } from '../../util/toastr';
 import {
   type ConflictHandler,
   useConflictEffect,

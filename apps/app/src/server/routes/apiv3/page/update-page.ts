@@ -15,37 +15,34 @@ import { body } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { isAiEnabled } from '~/features/openai/server/services/index.js';
-import {
-  SupportedAction,
-  SupportedTargetModel,
-} from '~/interfaces/activity.js';
+import { isAiEnabled } from '~/features/openai/server/services';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import {
   type IApiv3PageUpdateParams,
   PageUpdateErrorCode,
-} from '~/interfaces/apiv3/index.js';
-import type { IOptionsForUpdate } from '~/interfaces/page.js';
-import type Crowi from '~/server/crowi/index.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting/index.js';
-import type { PageDocument, PageModel } from '~/server/models/page.js';
+} from '~/interfaces/apiv3';
+import type { IOptionsForUpdate } from '~/interfaces/page';
+import { generalXssFilter } from '~/services/general-xss-filter';
+import loggerFactory from '~/utils/logger';
+
+import type Crowi from '../../../crowi';
+import { accessTokenParser } from '../../../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
+import loginRequiredFactory from '../../../middlewares/login-required';
+import { GlobalNotificationSettingEvent } from '../../../models/GlobalNotificationSetting';
+import type { PageDocument, PageModel } from '../../../models/page';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
-} from '~/server/models/serializers/index.js';
-import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic.js';
-import { configManager } from '~/server/service/config-manager/config-manager.js';
-import { preNotifyService } from '~/server/service/pre-notify.js';
-import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken.js';
-import { getYjsService } from '~/server/service/yjs/index.js';
-import { generalXssFilter } from '~/services/general-xss-filter/index.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user.js';
-import type { ApiV3Response } from '../interfaces/apiv3-response.js';
+} from '../../../models/serializers';
+import { shouldGenerateUpdate } from '../../../service/activity/update-activity-logic';
+import { configManager } from '../../../service/config-manager/config-manager';
+import { preNotifyService } from '../../../service/pre-notify';
+import { normalizeLatestRevisionIfBroken } from '../../../service/revision/normalize-latest-revision-if-broken';
+import { getYjsService } from '../../../service/yjs';
+import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:page:update-page');
 
@@ -206,7 +203,7 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     // Rebuild vector store file
     if (isAiEnabled()) {
       const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai.js'
+        '~/features/openai/server/services/openai'
       );
       try {
         const openaiService = getOpenaiService();

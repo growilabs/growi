@@ -13,7 +13,7 @@ import {
 import PageBulkExportJob from '../../models/page-bulk-export-job';
 import instanciatePageBulkExportJobCronService, {
   pageBulkExportJobCronService,
-} from './index';
+} from '.';
 
 /**
  * Every completion path must set `completedAt`. The duplicate-reuse path

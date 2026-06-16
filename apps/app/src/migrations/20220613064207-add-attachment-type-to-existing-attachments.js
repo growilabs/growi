@@ -1,9 +1,9 @@
 import mongoose from 'mongoose';
 
-import { AttachmentType } from '~/server/interfaces/attachment.js';
-import { Attachment } from '~/server/models/attachment.js';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { AttachmentType } from '~/server/interfaces/attachment';
+import { Attachment } from '~/server/models/attachment';
+import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:migrate:add-attachment-type-to-existing-attachments',

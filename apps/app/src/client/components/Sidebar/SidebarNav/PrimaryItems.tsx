@@ -3,13 +3,13 @@ import dynamic from 'next/dynamic';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
-import { NotAvailable } from '~/client/components/NotAvailable';
 import { SidebarContentsType } from '~/interfaces/ui';
 import { useIsGuestUser } from '~/states/context';
 import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 import { aiEnabledAtom } from '~/states/server-configurations';
 import { useSidebarMode } from '~/states/ui/sidebar';
 
+import { NotAvailable } from '../../NotAvailable';
 import { PrimaryItem } from './PrimaryItem';
 
 import styles from './PrimaryItems.module.scss';

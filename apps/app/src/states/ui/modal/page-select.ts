@@ -1,9 +1,9 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { IPageForItem } from '~/interfaces/page.js';
+import type { IPageForItem } from '~/interfaces/page';
 
-import type { OnSelectedFunction } from '../../../interfaces/ui.js';
+import type { OnSelectedFunction } from '../../../interfaces/ui';
 
 type IPageSelectModalOption = {
   isHierarchicalSelectionMode?: boolean;

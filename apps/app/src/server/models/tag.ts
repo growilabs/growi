@@ -3,8 +3,8 @@ import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
-import { getOrCreateModel } from '../util/mongoose-utils.js';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils';
+import { getOrCreateModel } from '../util/mongoose-utils';
 
 export interface TagDocument {
   _id: Types.ObjectId;

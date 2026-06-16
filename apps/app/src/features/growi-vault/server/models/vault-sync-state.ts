@@ -2,7 +2,7 @@ import type mongoose from 'mongoose';
 import type { Document, Model } from 'mongoose';
 import { Schema } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
 /**
  * Bootstrap lifecycle states managed by apps/app (VaultBootstrapper).

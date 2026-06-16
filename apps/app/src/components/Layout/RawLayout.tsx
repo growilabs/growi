@@ -8,8 +8,8 @@ import { useIsomorphicLayoutEffect } from 'usehooks-ts';
 import {
   NextThemesProvider,
   useNextThemes,
-} from '~/stores-universal/use-next-themes.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/stores-universal/use-next-themes';
+import loggerFactory from '~/utils/logger';
 
 import styles from './RawLayout.module.scss';
 

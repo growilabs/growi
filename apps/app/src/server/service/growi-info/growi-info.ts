@@ -10,12 +10,13 @@ import { pathUtils } from '@growi/core/dist/utils';
 import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 
-import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
-import { Config } from '~/server/models/config.js';
-import type { PageDocument, PageModel } from '~/server/models/page.js';
-import { aclService } from '~/server/service/acl.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { getGrowiVersion } from '~/utils/growi-version.js';
+import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
+import { getGrowiVersion } from '~/utils/growi-version';
+
+import { Config } from '../../models/config';
+import type { PageDocument, PageModel } from '../../models/page';
+import { aclService } from '../acl';
+import { configManager } from '../config-manager';
 
 // Local preset for full additional info
 const FULL_ADDITIONAL_INFO_OPTIONS = {

@@ -11,12 +11,12 @@ import {
   TabPane,
 } from 'reactstrap';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import {
   useAssociateLdapAccount,
   useSWRxPersonalExternalAccounts,
 } from '~/stores/personal-settings';
 
+import { toastError, toastSuccess } from '../../util/toastr';
 import { LdapAuthTest } from '../Admin/Security/LdapAuthTest';
 
 type Props = {

@@ -1,13 +1,9 @@
-import {
-  apiv3Delete,
-  apiv3Post,
-  apiv3Put,
-} from '~/client/util/apiv3-client.js';
+import { apiv3Delete, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
 
 import type {
   AiAssistantHasId,
   UpsertAiAssistantData,
-} from '../../interfaces/ai-assistant.js';
+} from '../../interfaces/ai-assistant';
 
 export const createAiAssistant = async (
   body: UpsertAiAssistantData,

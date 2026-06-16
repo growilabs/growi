@@ -53,8 +53,9 @@ vi.mock('mongoose', () => ({
   },
 }));
 
-import PageOperation from '~/server/models/page-operation';
 import loggerFactory from '~/utils/logger';
+
+import PageOperation from '../models/page-operation';
 
 // We need to import the factory function - the default export is an instanciate() function
 // But PageOperationService is not exported directly, so we construct via instanciate
@@ -88,7 +89,7 @@ describe('PageOperationService.autoUpdateExpiryDate', () => {
     mockLogger.error.mockClear?.();
 
     // Import service dynamically to ensure mocks are applied
-    const module = await import('./page-operation.js');
+    const module = await import('./page-operation');
     instanciate = module.default as typeof instanciate;
 
     const mockCrowi = {

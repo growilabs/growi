@@ -1,9 +1,9 @@
 import type { GroupType, PageGrant } from '@growi/core';
 
-import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group.js';
-import type { UserGroupDocument } from '~/server/models/user-group.js';
+import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
+import type { UserGroupDocument } from '~/server/models/user-group';
 
-import type { IPageGrantData } from './page.js';
+import type { IPageGrantData } from './page';
 
 type UserGroupType = typeof GroupType.userGroup;
 type ExternalUserGroupType = typeof GroupType.externalUserGroup;

@@ -16,15 +16,15 @@ import type { Profile, VerifiedCallback } from 'passport-saml';
 import { Strategy as SamlStrategy } from 'passport-saml';
 import urljoin from 'url-join';
 
-import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
-import S2sMessage from '~/server/models/vo/s2s-message.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { growiInfoService } from '~/server/service/growi-info/index.js';
-import axios from '~/utils/axios/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
+import axios from '~/utils/axios';
+import loggerFactory from '~/utils/logger';
 
-import type { ConfigKey } from './config-manager/config-definition.js';
-import type { S2sMessageHandlable } from './s2s-messaging/handlable.js';
+import S2sMessage from '../models/vo/s2s-message';
+import { configManager } from './config-manager';
+import type { ConfigKey } from './config-manager/config-definition';
+import { growiInfoService } from './growi-info';
+import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
 const logger = loggerFactory('growi:service:PassportService');
 

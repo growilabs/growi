@@ -4,8 +4,11 @@ import { useTree } from '@headless-tree/react';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { useTranslation } from 'next-i18next';
 
-import { toastError, toastWarning } from '~/client/util/toastr.js';
-import { ROOT_PAGE_VIRTUAL_ID } from '~/features/page-tree/constants/_inner.js';
+import { toastError, toastWarning } from '~/client/util/toastr';
+import type { IPageForTreeItem } from '~/interfaces/page';
+import { useSWRxRootPage } from '~/stores/page-listing';
+
+import { ROOT_PAGE_VIRTUAL_ID } from '../constants/_inner';
 import {
   useAutoExpandAncestors,
   useDataLoader,
@@ -14,13 +17,10 @@ import {
   useTreeFeatures,
   useTreeItemHandlers,
   useTreeRevalidation,
-} from '~/features/page-tree/hooks/_inner/index.js';
-import { useSocketUpdateDescCount } from '~/features/page-tree/hooks/use-socket-update-desc-count.js';
-import { useTriggerTreeRebuild } from '~/features/page-tree/states/_inner/index.js';
-import type { IPageForTreeItem } from '~/interfaces/page.js';
-import { useSWRxRootPage } from '~/stores/page-listing.js';
-
-import type { TreeItemProps } from '../interfaces/index.js';
+} from '../hooks/_inner';
+import { useSocketUpdateDescCount } from '../hooks/use-socket-update-desc-count';
+import type { TreeItemProps } from '../interfaces';
+import { useTriggerTreeRebuild } from '../states/_inner';
 
 // Stable createLoadingItemData function
 const createLoadingItemData = (): IPageForTreeItem => ({

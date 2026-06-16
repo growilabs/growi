@@ -1,2 +1,2 @@
-export * from '~/features/comment/server/events/index.js';
-export * from '~/features/comment/server/models/index.js';
+export * from './events';
+export * from './models';

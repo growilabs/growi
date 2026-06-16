@@ -2,7 +2,7 @@ import { useEffect } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 import type { Socket } from 'socket.io-client';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:cli:states:socket');
 

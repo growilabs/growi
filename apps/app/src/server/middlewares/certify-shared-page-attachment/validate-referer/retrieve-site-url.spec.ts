@@ -1,4 +1,4 @@
-import { retrieveSiteUrl } from './retrieve-site-url.js';
+import { retrieveSiteUrl } from './retrieve-site-url';
 
 const mocks = vi.hoisted(() => {
   return {

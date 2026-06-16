@@ -1,3 +1,3 @@
-export * from './download.js';
-export * from './get.js';
-export * from './get-brand-logo.js';
+export * from './download';
+export * from './get';
+export * from './get-brand-logo';

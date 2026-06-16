@@ -2,19 +2,14 @@ import { useCallback, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
 
-import { createPage } from '~/client/services/create-page/create-page.js';
-import {
-  exist,
-  getIsNonUserRelatedGroupsGranted,
-} from '~/client/services/page-operation.js';
-import { toastWarning } from '~/client/util/toastr.js';
-import type { IApiv3PageCreateParams } from '~/interfaces/apiv3/index.js';
-import {
-  useCurrentPagePath,
-  useSetIsUntitledPage,
-} from '~/states/page/index.js';
-import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
-import { useGrantedGroupsInheritanceSelectModalActions } from '~/states/ui/modal/granted-groups-inheritance-select.js';
+import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
+import { useCurrentPagePath, useSetIsUntitledPage } from '~/states/page';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
+import { useGrantedGroupsInheritanceSelectModalActions } from '~/states/ui/modal/granted-groups-inheritance-select';
+
+import { toastWarning } from '../../util/toastr';
+import { exist, getIsNonUserRelatedGroupsGranted } from '../page-operation';
+import { createPage } from './create-page';
 
 /**
  * Invoked when creation and transition has finished

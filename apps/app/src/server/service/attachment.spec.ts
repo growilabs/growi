@@ -1,9 +1,9 @@
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '../crowi/index.js';
-import type { IAttachmentDocument } from '../models/attachment.js';
-import { Attachment } from '../models/attachment.js';
-import { AttachmentService } from './attachment.js';
+import type Crowi from '../crowi';
+import type { IAttachmentDocument } from '../models/attachment';
+import { Attachment } from '../models/attachment';
+import { AttachmentService } from './attachment';
 
 // Locks down two contracts of removeAttachment:
 // 1. Missing metadata doc is a no-op (the bulk-export cleanup cron relies on

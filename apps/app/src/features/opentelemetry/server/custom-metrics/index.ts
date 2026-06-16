@@ -1,32 +1,20 @@
-export { addApplicationMetrics } from '~/features/opentelemetry/server/custom-metrics/application-metrics.js';
-export { addInstalledAtMetrics } from '~/features/opentelemetry/server/custom-metrics/installed-at-metrics.js';
-export { addMongooseConnectionPoolMetrics } from '~/features/opentelemetry/server/custom-metrics/mongoose-connection-pool-metrics.js';
-export { addPageCountsMetrics } from '~/features/opentelemetry/server/custom-metrics/page-counts-metrics.js';
-export { addSystemMetrics } from '~/features/opentelemetry/server/custom-metrics/system-metrics.js';
-export { addUserCountsMetrics } from '~/features/opentelemetry/server/custom-metrics/user-counts-metrics.js';
-export { addYjsMetrics } from '~/features/opentelemetry/server/custom-metrics/yjs-metrics.js';
+export { addApplicationMetrics } from './application-metrics';
+export { addInstalledAtMetrics } from './installed-at-metrics';
+export { addMongooseConnectionPoolMetrics } from './mongoose-connection-pool-metrics';
+export { addPageCountsMetrics } from './page-counts-metrics';
+export { addSystemMetrics } from './system-metrics';
+export { addUserCountsMetrics } from './user-counts-metrics';
+export { addYjsMetrics } from './yjs-metrics';
 
 export const setupCustomMetrics = async (): Promise<void> => {
-  const { addApplicationMetrics } = await import(
-    '~/features/opentelemetry/server/custom-metrics/application-metrics.js'
-  );
-  const { addInstalledAtMetrics } = await import(
-    '~/features/opentelemetry/server/custom-metrics/installed-at-metrics.js'
-  );
-  const { addUserCountsMetrics } = await import(
-    '~/features/opentelemetry/server/custom-metrics/user-counts-metrics.js'
-  );
-  const { addPageCountsMetrics } = await import(
-    '~/features/opentelemetry/server/custom-metrics/page-counts-metrics.js'
-  );
-  const { addSystemMetrics } = await import(
-    '~/features/opentelemetry/server/custom-metrics/system-metrics.js'
-  );
-  const { addYjsMetrics } = await import(
-    '~/features/opentelemetry/server/custom-metrics/yjs-metrics.js'
-  );
+  const { addApplicationMetrics } = await import('./application-metrics');
+  const { addInstalledAtMetrics } = await import('./installed-at-metrics');
+  const { addUserCountsMetrics } = await import('./user-counts-metrics');
+  const { addPageCountsMetrics } = await import('./page-counts-metrics');
+  const { addSystemMetrics } = await import('./system-metrics');
+  const { addYjsMetrics } = await import('./yjs-metrics');
   const { addMongooseConnectionPoolMetrics } = await import(
-    '~/features/opentelemetry/server/custom-metrics/mongoose-connection-pool-metrics.js'
+    './mongoose-connection-pool-metrics'
   );
 
   // Add custom metrics

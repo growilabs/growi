@@ -4,11 +4,11 @@ import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { TabContent, TabPane } from 'reactstrap';
 
-import AdminNotificationContainer from '~/client/services/AdminNotificationContainer';
-import { toastError } from '~/client/util/toastr';
 import { toArrayIfNot } from '~/utils/array-utils';
 import loggerFactory from '~/utils/logger';
 
+import AdminNotificationContainer from '../../../services/AdminNotificationContainer';
+import { toastError } from '../../../util/toastr';
 import CustomNav from '../../CustomNavigation/CustomNav';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import GlobalNotification from './GlobalNotification';

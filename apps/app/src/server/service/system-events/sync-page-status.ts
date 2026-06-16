@@ -1,12 +1,12 @@
-import { SocketEventName } from '~/interfaces/websocket.js';
-import type Crowi from '~/server/crowi/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SocketEventName } from '~/interfaces/websocket';
+import loggerFactory from '~/utils/logger';
 
-import { S2cMessagePageUpdated } from '../../models/vo/s2c-message.js';
-import S2sMessage from '../../models/vo/s2s-message.js';
-import type { S2sMessagingService } from '../s2s-messaging/base.js';
-import type { S2sMessageHandlable } from '../s2s-messaging/handlable.js';
-import { getRoomNameWithId, RoomPrefix } from '../socket-io/helper.js';
+import type Crowi from '../../crowi';
+import { S2cMessagePageUpdated } from '../../models/vo/s2c-message';
+import S2sMessage from '../../models/vo/s2s-message';
+import type { S2sMessagingService } from '../s2s-messaging/base';
+import type { S2sMessageHandlable } from '../s2s-messaging/handlable';
+import { getRoomNameWithId, RoomPrefix } from '../socket-io/helper';
 
 const logger = loggerFactory(
   'growi:service:system-events:SyncPageStatusService',

@@ -3,14 +3,14 @@ import type { Bucket, File } from '@google-cloud/storage';
 import axios from 'axios';
 import urljoin from 'url-join';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import { configManager } from '../../config-manager/index.js';
+import { configManager } from '../../config-manager';
 import {
   type IMultipartUploader,
   MultipartUploader,
   UploadStatus,
-} from '../multipart-uploader.js';
+} from '../multipart-uploader';
 
 const logger = loggerFactory(
   'growi:services:fileUploaderGcs:multipartUploader',

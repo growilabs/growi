@@ -1,1 +1,1 @@
-export * from '~/features/rate-limiter/middleware/factory.js';
+export * from './factory';

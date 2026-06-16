@@ -10,16 +10,16 @@ import { useRouter } from 'next/router';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import {
-  NotifyType,
-  TriggerEventType,
-} from '~/client/interfaces/global-notification';
-import { apiv3Post } from '~/client/util/apiv3-client';
-import { toastError } from '~/client/util/toastr';
 import { isMailerSetupAtom } from '~/states/server-configurations';
 import { useSWRxGlobalNotification } from '~/stores/global-notification';
 import loggerFactory from '~/utils/logger';
 
+import {
+  NotifyType,
+  TriggerEventType,
+} from '../../../interfaces/global-notification';
+import { apiv3Post } from '../../../util/apiv3-client';
+import { toastError } from '../../../util/toastr';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 import TriggerEventCheckBox from './TriggerEventCheckBox';
 

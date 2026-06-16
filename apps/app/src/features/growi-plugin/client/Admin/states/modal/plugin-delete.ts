@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { IGrowiPluginHasId } from '../../../../interfaces/index.js';
+import type { IGrowiPluginHasId } from '../../../../interfaces';
 
 export type PluginDeleteModalStatus = {
   isOpened: boolean;

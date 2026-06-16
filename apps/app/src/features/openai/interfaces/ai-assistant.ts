@@ -1,6 +1,6 @@
 import type { HasObjectId, IGrantedGroup, IUserHasId, Ref } from '@growi/core';
 
-import type { IVectorStore } from './vector-store.js';
+import type { IVectorStore } from './vector-store';
 
 /*
  *  Objects

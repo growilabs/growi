@@ -1,7 +1,7 @@
 import mongoose from 'mongoose';
 
-import type { OverwriteFunction } from './overwrite-function.js';
-import { keepOriginal } from './overwrite-function.js';
+import type { OverwriteFunction } from './overwrite-function';
+import { keepOriginal } from './overwrite-function';
 
 export type ConvertMap = {
   [collectionName: string]: {

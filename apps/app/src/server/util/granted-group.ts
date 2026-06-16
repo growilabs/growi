@@ -1,6 +1,6 @@
 import { GroupType, type IGrantedGroup } from '@growi/core';
 
-import type { ObjectIdLike } from '../interfaces/mongoose-utils.js';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 
 export const divideByType = (
   grantedGroups: IGrantedGroup[] | null,

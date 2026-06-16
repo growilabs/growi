@@ -8,30 +8,27 @@ import * as FormDataModule from 'form-data';
 import mongoose, { Types as MongooseTypes } from 'mongoose';
 import { basename } from 'pathe';
 
-import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer.js';
-import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option.js';
-import { ImportMode } from '~/models/admin/import-mode.js';
-import TransferKeyModel from '~/server/models/transfer-key.js';
-import {
-  getImportService,
-  type ImportSettings,
-} from '~/server/service/import/index.js';
-import { createBatchStream } from '~/server/util/batch-stream.js';
-import axios from '~/utils/axios/index.js';
-import { getGrowiVersion } from '~/utils/growi-version.js';
-import loggerFactory from '~/utils/logger/index.js';
-import { TransferKey } from '~/utils/vo/transfer-key.js';
+import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
+import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import { ImportMode } from '~/models/admin/import-mode';
+import axios from '~/utils/axios';
+import { getGrowiVersion } from '~/utils/growi-version';
+import loggerFactory from '~/utils/logger';
+import { TransferKey } from '~/utils/vo/transfer-key';
 
-import type Crowi from '../crowi/index.js';
-import { Attachment } from '../models/attachment.js';
+import type Crowi from '../crowi';
+import { Attachment } from '../models/attachment';
+import TransferKeyModel from '../models/transfer-key';
 import {
   G2GTransferError,
   G2GTransferErrorCode,
-} from '../models/vo/g2g-transfer-error.js';
-import type { ConfigKey } from './config-manager/config-definition.js';
-import { configManager } from './config-manager/index.js';
-import { exportService } from './export.js';
-import { generateOverwriteParams } from './import/overwrite-params/index.js';
+} from '../models/vo/g2g-transfer-error';
+import { createBatchStream } from '../util/batch-stream';
+import { configManager } from './config-manager';
+import type { ConfigKey } from './config-manager/config-definition';
+import { exportService } from './export';
+import { getImportService, type ImportSettings } from './import';
+import { generateOverwriteParams } from './import/overwrite-params';
 
 const logger = loggerFactory('growi:service:g2g-transfer');
 

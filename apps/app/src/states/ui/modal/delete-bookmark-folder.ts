@@ -1,8 +1,8 @@
 import { useCallback } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { BookmarkFolderItems } from '../../../interfaces/bookmark-info.js';
-import type { onDeletedBookmarkFolderFunction } from '../../../interfaces/ui.js';
+import type { BookmarkFolderItems } from '../../../interfaces/bookmark-info';
+import type { onDeletedBookmarkFolderFunction } from '../../../interfaces/ui';
 
 type IDeleteBookmarkFolderModalOption = {
   onDeleted?: onDeletedBookmarkFolderFunction;

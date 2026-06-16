@@ -4,9 +4,9 @@ import express from 'express';
 import fs from 'graceful-fs';
 import path from 'path';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import nextFactory from '../routes/next.js';
+import nextFactory from '../routes/next';
 
 const logger = loggerFactory('growi:crowi:dev');
 

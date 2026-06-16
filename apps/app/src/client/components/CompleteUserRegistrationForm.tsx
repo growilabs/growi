@@ -3,10 +3,10 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
 import { UserActivationErrorCode } from '~/interfaces/errors/user-activation';
 import { RegistrationMode } from '~/interfaces/registration-mode';
 
+import { apiv3Get, apiv3Post } from '../util/apiv3-client';
 import { toastError } from '../util/toastr';
 import { CompleteUserRegistration } from './CompleteUserRegistration';
 

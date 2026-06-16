@@ -3,15 +3,12 @@ import type { Server } from 'socket.io';
 import type { WSSharedDoc, YWebsocketPersistence } from 'y-websocket/bin/utils';
 import * as Y from 'yjs';
 
-import { SocketEventName } from '~/interfaces/websocket.js';
-import {
-  getRoomNameWithId,
-  RoomPrefix,
-} from '~/server/service/socket-io/helper.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SocketEventName } from '~/interfaces/websocket';
+import loggerFactory from '~/utils/logger';
 
-import type { MongodbPersistence } from './extended/mongodb-persistence.js';
-import type { syncYDoc as syncYDocType } from './sync-ydoc.js';
+import { getRoomNameWithId, RoomPrefix } from '../socket-io/helper';
+import type { MongodbPersistence } from './extended/mongodb-persistence';
+import type { syncYDoc as syncYDocType } from './sync-ydoc';
 
 const logger = loggerFactory('growi:service:yjs:create-mongodb-persistence');
 

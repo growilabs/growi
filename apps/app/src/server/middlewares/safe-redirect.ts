@@ -6,7 +6,7 @@
 
 import type { NextFunction, Request, Response } from 'express';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:middleware:safe-redirect');
 

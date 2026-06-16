@@ -1,6 +1,6 @@
 import type { Request } from 'express';
 
-import type { AccessTokenParserReq } from '~/server/middlewares/access-token-parser/index.js';
+import type { AccessTokenParserReq } from '../middlewares/access-token-parser';
 
 const allowedMethods = ['GET', 'HEAD', 'POST'] as const;
 type AllowedMethod = (typeof allowedMethods)[number];

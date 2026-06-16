@@ -5,13 +5,11 @@ import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
-import { SearchDelegatorName } from '~/interfaces/named-query.js';
-import type { ISearchResult, ISearchResultData } from '~/interfaces/search.js';
-import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search.js';
-import { SocketEventName } from '~/interfaces/websocket.js';
-import PageTagRelation from '~/server/models/page-tag-relation.js';
-import type { SocketIoService } from '~/server/service/socket-io/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SearchDelegatorName } from '~/interfaces/named-query';
+import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
+import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
+import { SocketEventName } from '~/interfaces/websocket';
+import loggerFactory from '~/utils/logger';
 
 import type {
   ESQueryTerms,
@@ -20,22 +18,24 @@ import type {
   SearchableData,
   SearchDelegator,
   UnavailableTermsKey,
-} from '../../interfaces/search.js';
-import type { PageModel } from '../../models/page.js';
-import { createBatchStream } from '../../util/batch-stream.js';
-import { configManager } from '../config-manager/index.js';
+} from '../../interfaces/search';
+import type { PageModel } from '../../models/page';
+import PageTagRelation from '../../models/page-tag-relation';
+import { createBatchStream } from '../../util/batch-stream';
+import { configManager } from '../config-manager';
 import type {
   AddAllPagesOption,
   RebuildIndexOption,
   UpdateOrInsertPagesOpts,
-} from '../interfaces/search.js';
-import { aggregatePipelineToIndex } from './aggregate-to-index.js';
+} from '../interfaces/search';
+import type { SocketIoService } from '../socket-io';
+import { aggregatePipelineToIndex } from './aggregate-to-index';
 import type {
   AggregatedPage,
   BulkWriteBody,
   BulkWriteBodyRestriction,
   BulkWriteCommand,
-} from './bulk-write.js';
+} from './bulk-write';
 import {
   type ElasticsearchClientDelegator,
   type ES7SearchQuery,
@@ -46,7 +46,7 @@ import {
   isES8ClientDelegator,
   isES9ClientDelegator,
   type SearchQuery,
-} from './elasticsearch-client-delegator/index.js';
+} from './elasticsearch-client-delegator';
 
 const logger = loggerFactory('growi:service:search-delegator:elasticsearch');
 
@@ -440,7 +440,7 @@ class ElasticsearchDelegator
   > {
     // TODO: https://redmine.weseek.co.jp/issues/168446
     if (isES7ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es7.js');
+      const { mappings } = await import('./mappings/mappings-es7');
       return this.client.indices.create({
         index,
         body: {
@@ -450,7 +450,7 @@ class ElasticsearchDelegator
     }
 
     if (isES8ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es8.js');
+      const { mappings } = await import('./mappings/mappings-es8');
       return this.client.indices.create({
         index,
         ...mappings,
@@ -458,7 +458,7 @@ class ElasticsearchDelegator
     }
 
     if (isES9ClientDelegator(this.client)) {
-      const { mappings } = await import('./mappings/mappings-es9.js');
+      const { mappings } = await import('./mappings/mappings-es9');
       return this.client.indices.create({
         index,
         ...mappings,

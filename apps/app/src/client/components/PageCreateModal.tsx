@@ -18,18 +18,19 @@ import {
 } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
-import PagePathAutoComplete from '~/client/components/PagePathAutoComplete.js';
-import { useCreateTemplatePage } from '~/client/services/create-page/index.js';
-import { useCreatePage } from '~/client/services/create-page/use-create-page.js';
-import { useToastrOnError } from '~/client/services/use-toastr-on-error.js';
-import { useGrowiDocumentationUrl } from '~/states/context.js';
-import { useCurrentUser } from '~/states/global/index.js';
-import { isSearchServiceReachableAtom } from '~/states/server-configurations/index.js';
+import { useGrowiDocumentationUrl } from '~/states/context';
+import { useCurrentUser } from '~/states/global';
+import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 import {
   usePageCreateModalActions,
   usePageCreateModalStatus,
-} from '~/states/ui/modal/page-create.js';
-import { getLocale } from '~/utils/locale-utils.js';
+} from '~/states/ui/modal/page-create';
+import { getLocale } from '~/utils/locale-utils';
+
+import { useCreateTemplatePage } from '../services/create-page';
+import { useCreatePage } from '../services/create-page/use-create-page';
+import { useToastrOnError } from '../services/use-toastr-on-error';
+import PagePathAutoComplete from './PagePathAutoComplete';
 
 import styles from './PageCreateModal.module.scss';
 

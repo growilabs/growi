@@ -1,10 +1,10 @@
 import type { IPage } from '@growi/core';
 import type { Namespace } from '@growi/core/dist/interfaces/vault';
 
-import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type { VaultNamespaceMapper } from './vault-namespace-mapper.js';
+import { VaultInstruction } from '../models/vault-instruction';
+import type { VaultNamespaceMapper } from './vault-namespace-mapper';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:service:vault-dispatcher',

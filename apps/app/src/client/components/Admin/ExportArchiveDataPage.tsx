@@ -1,11 +1,11 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiDelete } from '~/client/util/apiv1-client';
-import { apiv3Get } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useAdminSocket } from '~/features/admin/states/socket-io';
 
+import { apiDelete } from '../../util/apiv1-client';
+import { apiv3Get } from '../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../util/toastr';
 import LabeledProgressBar from './Common/LabeledProgressBar';
 import ArchiveFilesTable from './ExportArchiveData/ArchiveFilesTable';
 import SelectCollectionsModal from './ExportArchiveData/SelectCollectionsModal';

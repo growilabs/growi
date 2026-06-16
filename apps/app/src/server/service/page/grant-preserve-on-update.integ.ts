@@ -5,8 +5,8 @@ import { vi } from 'vitest';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type Crowi from '~/server/crowi';
-import type { PageDocument, PageModel } from '~/server/models/page';
+import type Crowi from '../../crowi';
+import type { PageDocument, PageModel } from '../../models/page';
 
 /**
  * Characterization test for the server premise that the pre-load race fix relies

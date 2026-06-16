@@ -1,11 +1,11 @@
-import { EnvToModuleMappings } from '~/interfaces/file-uploader.js';
-import type Crowi from '~/server/crowi/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { EnvToModuleMappings } from '~/interfaces/file-uploader';
+import loggerFactory from '~/utils/logger';
 
-import { configManager } from '../config-manager/index.js';
-import type { FileUploader } from './file-uploader.js';
+import type Crowi from '../../crowi';
+import { configManager } from '../config-manager';
+import type { FileUploader } from './file-uploader';
 
-export type { FileUploader } from './file-uploader.js';
+export type { FileUploader } from './file-uploader';
 
 const logger = loggerFactory('growi:service:FileUploaderServise');
 
@@ -17,12 +17,12 @@ const logger = loggerFactory('growi:service:FileUploaderServise');
 // `./aws` only worked under tsx's lenient dev resolution, and `./aws.js`
 // (file) does not match the `aws/` directory.
 const uploaderModuleLoaders = {
-  aws: () => import('./aws/index.js'),
-  gcs: () => import('./gcs/index.js'),
-  azure: () => import('./azure.js'),
-  gridfs: () => import('./gridfs.js'),
-  local: () => import('./local.js'),
-  none: () => import('./none.js'),
+  aws: () => import('./aws'),
+  gcs: () => import('./gcs'),
+  azure: () => import('./azure'),
+  gridfs: () => import('./gridfs'),
+  local: () => import('./local'),
+  none: () => import('./none'),
 };
 
 // Do NOT memoize the uploader instance here: Crowi.setUpFileUpload(isForceUpdate=true)
@@ -50,4 +50,4 @@ export const getUploader = async (crowi: Crowi): Promise<FileUploader> => {
   return uploader;
 };
 
-export * from './utils/index.js';
+export * from './utils';

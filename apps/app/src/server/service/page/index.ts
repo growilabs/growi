@@ -29,74 +29,68 @@ import pathlib from 'path';
 import { Readable, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 
-import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group.js';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
-import { isAiEnabled } from '~/features/openai/server/services/index.js';
-import { SupportedAction } from '~/interfaces/activity.js';
-import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error.js';
-import type {
-  IOptionsForCreate,
-  IOptionsForUpdate,
-} from '~/interfaces/page.js';
-import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config.js';
+import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import { isAiEnabled } from '~/features/openai/server/services';
+import { SupportedAction } from '~/interfaces/activity';
+import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
+import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
+import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
 import {
   PageDeleteConfigValue,
   PageSingleDeleteCompConfigValue,
-} from '~/interfaces/page-delete-config.js';
-import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
-import {
-  PageActionStage,
-  PageActionType,
-} from '~/interfaces/page-operation.js';
-import { PageActionOnGroupDelete } from '~/interfaces/user-group.js';
+} from '~/interfaces/page-delete-config';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
+import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
+import { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import {
   type PageMigrationErrorData,
   SocketEventName,
   type UpdateDescCountRawData,
-} from '~/interfaces/websocket.js';
-import type { CurrentPageYjsData } from '~/interfaces/yjs.js';
-import type Crowi from '~/server/crowi/index.js';
-import type { CreateMethod } from '~/server/models/page.js';
+} from '~/interfaces/websocket';
+import type { CurrentPageYjsData } from '~/interfaces/yjs';
+import { generalXssFilter } from '~/services/general-xss-filter';
+import loggerFactory from '~/utils/logger';
+import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config';
+import { prisma } from '~/utils/prisma';
+
+import type Crowi from '../../crowi';
+import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
+import { Attachment } from '../../models/attachment';
+import { PathAlreadyExistsError } from '../../models/errors';
+import type { CreateMethod } from '../../models/page';
 import {
   type PageDocument,
   type PageModel,
   PageQueryBuilder,
   pushRevision,
-} from '~/server/models/page.js';
-import type { PageTagRelationDocument } from '~/server/models/page-tag-relation.js';
-import PageTagRelation from '~/server/models/page-tag-relation.js';
-import type { UserGroupDocument } from '~/server/models/user-group.js';
-import { createBatchStream } from '~/server/util/batch-stream.js';
-import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths.js';
-import { generalXssFilter } from '~/services/general-xss-filter/index.js';
-import loggerFactory from '~/utils/logger/index.js';
-import { prepareDeleteConfigValuesForCalc } from '~/utils/page-delete-config.js';
-import { prisma } from '~/utils/prisma.js';
+} from '../../models/page';
+import type { PageOperationDocument } from '../../models/page-operation';
+import PageOperation from '../../models/page-operation';
+import PageRedirect from '../../models/page-redirect';
+import type { PageTagRelationDocument } from '../../models/page-tag-relation';
+import PageTagRelation from '../../models/page-tag-relation';
+import type { IRevisionDocument } from '../../models/revision';
+import { Revision } from '../../models/revision';
+import { serializePageSecurely } from '../../models/serializers/page-serializer';
+import ShareLink from '../../models/share-link';
+import Subscription from '../../models/subscription';
+import type { UserGroupDocument } from '../../models/user-group';
+import UserGroupRelation from '../../models/user-group-relation';
+import { V5ConversionError } from '../../models/vo/v5-conversion-error';
+import { createBatchStream } from '../../util/batch-stream';
+import { collectAncestorPaths } from '../../util/collect-ancestor-paths';
+import { divideByType } from '../../util/granted-group';
+import { configManager } from '../config-manager';
+import type { IPageGrantService } from '../page-grant';
+import { preNotifyService } from '../pre-notify';
+import { getYjsService } from '../yjs';
+import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
+import { onSeen } from './events/seen';
+import type { IPageService } from './page-service';
+import { shouldUseV4Process } from './should-use-v4-process';
 
-import type { ObjectIdLike } from '../../interfaces/mongoose-utils.js';
-import { Attachment } from '../../models/attachment.js';
-import { PathAlreadyExistsError } from '../../models/errors.js';
-import type { PageOperationDocument } from '../../models/page-operation.js';
-import PageOperation from '../../models/page-operation.js';
-import PageRedirect from '../../models/page-redirect.js';
-import type { IRevisionDocument } from '../../models/revision.js';
-import { Revision } from '../../models/revision.js';
-import { serializePageSecurely } from '../../models/serializers/page-serializer.js';
-import ShareLink from '../../models/share-link.js';
-import Subscription from '../../models/subscription.js';
-import UserGroupRelation from '../../models/user-group-relation.js';
-import { V5ConversionError } from '../../models/vo/v5-conversion-error.js';
-import { divideByType } from '../../util/granted-group.js';
-import { configManager } from '../config-manager/index.js';
-import type { IPageGrantService } from '../page-grant.js';
-import { preNotifyService } from '../pre-notify.js';
-import { getYjsService } from '../yjs/index.js';
-import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts.js';
-import { onSeen } from './events/seen.js';
-import type { IPageService } from './page-service.js';
-import { shouldUseV4Process } from './should-use-v4-process.js';
-
-export * from './page-service.js';
+export * from './page-service';
 
 const logger = loggerFactory('growi:services:page');
 const {
@@ -1498,7 +1492,7 @@ class PageService implements IPageService {
 
       if (isAiEnabled()) {
         const { getOpenaiService } = await import(
-          '~/features/openai/server/services/openai.js'
+          '~/features/openai/server/services/openai'
         );
         const openaiService = getOpenaiService();
         // Do not await because communication with OpenAI takes time
@@ -1830,7 +1824,7 @@ class PageService implements IPageService {
 
     if (isAiEnabled()) {
       const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai.js'
+        '~/features/openai/server/services/openai'
       );
       const openaiService = getOpenaiService();
       // Do not await because communication with OpenAI takes time
@@ -2448,7 +2442,7 @@ class PageService implements IPageService {
 
     if (isAiEnabled()) {
       const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai.js'
+        '~/features/openai/server/services/openai'
       );
       const openaiService = getOpenaiService();
       await openaiService?.deleteVectorStoreFilesByPageIds(pageIds);

@@ -10,8 +10,8 @@ import type { AnimationPlaybackControls } from 'motion';
 import { animate } from 'motion';
 import { Modal, ModalBody } from 'reactstrap';
 
-import { useSWRxStaffs } from '~/stores/staff.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { useSWRxStaffs } from '~/stores/staff';
+import loggerFactory from '~/utils/logger';
 
 import styles from './StaffCredit.module.scss';
 

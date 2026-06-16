@@ -1,1 +1,1 @@
-export { startCron } from './access-token-deletion-cron.js';
+export { startCron } from './access-token-deletion-cron';

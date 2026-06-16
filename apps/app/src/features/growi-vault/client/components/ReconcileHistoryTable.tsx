@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import { Badge } from 'reactstrap';
 
-import type { ReconcileLogEntry } from '~/features/growi-vault/server/services/reconcile/index.js';
+import type { ReconcileLogEntry } from '../../server/services/reconcile';
 
 // ============================================================================
 // Types

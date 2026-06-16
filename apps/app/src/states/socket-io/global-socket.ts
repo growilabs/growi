@@ -2,10 +2,11 @@ import { useCallback, useEffect } from 'react';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 import type { Socket } from 'socket.io-client';
 
-import { SocketEventName } from '~/interfaces/websocket.js';
-import { useIsGuestUser } from '~/states/context.js';
-import { useCurrentPageId } from '~/states/page/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SocketEventName } from '~/interfaces/websocket';
+import loggerFactory from '~/utils/logger';
+
+import { useIsGuestUser } from '../context';
+import { useCurrentPageId } from '../page';
 
 const logger = loggerFactory('growi:states:websocket');
 

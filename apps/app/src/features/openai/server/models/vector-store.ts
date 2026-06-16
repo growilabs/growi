@@ -1,8 +1,8 @@
 import { type Document, type Model, Schema } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
-import type { IVectorStore } from '../../interfaces/vector-store.js';
+import type { IVectorStore } from '../../interfaces/vector-store';
 
 export interface VectorStoreDocument extends IVectorStore, Document {
   markAsDeleted(): Promise<void>;

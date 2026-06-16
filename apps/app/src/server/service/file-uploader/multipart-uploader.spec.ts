@@ -1,4 +1,4 @@
-import { MultipartUploader, UploadStatus } from './multipart-uploader.js';
+import { MultipartUploader, UploadStatus } from './multipart-uploader';
 
 class MockMultipartUploader extends MultipartUploader {
   async initUpload(): Promise<void> {

@@ -3,8 +3,7 @@ import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import BootstrapGrid from '~/client/models/BootstrapGrid';
-
+import BootstrapGrid from '../../models/BootstrapGrid';
 import geu from './GridEditorUtil';
 
 import styles from './GridEditModal.module.scss';

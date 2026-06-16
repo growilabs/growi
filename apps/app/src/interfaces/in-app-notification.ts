@@ -1,9 +1,6 @@
 import type { HasObjectId, IUser } from '@growi/core';
 
-import type {
-  SupportedActionType,
-  SupportedTargetModelType,
-} from './activity.js';
+import type { SupportedActionType, SupportedTargetModelType } from './activity';
 
 export const InAppNotificationStatuses = {
   STATUS_UNOPENED: 'UNOPENED',

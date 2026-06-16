@@ -5,10 +5,10 @@ import { useForm } from 'react-hook-form';
 
 import { i18n as i18nConfig } from '^/config/next-i18next.config.cjs';
 
-import AdminAppContainer from '~/client/services/AdminAppContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import loggerFactory from '~/utils/logger';
 
+import AdminAppContainer from '../../../services/AdminAppContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 

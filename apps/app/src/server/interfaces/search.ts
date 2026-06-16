@@ -1,5 +1,5 @@
-import type { SearchDelegatorName } from '~/interfaces/named-query.js';
-import type { ISearchResult } from '~/interfaces/search.js';
+import type { SearchDelegatorName } from '~/interfaces/named-query';
+import type { ISearchResult } from '~/interfaces/search';
 
 export type QueryTerms = {
   match: string[];

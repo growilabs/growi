@@ -1,7 +1,7 @@
 import { diag, metrics } from '@opentelemetry/api';
 import mongoose from 'mongoose';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory(
   'growi:opentelemetry:custom-metrics:mongoose-connection-pool',

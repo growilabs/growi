@@ -33,13 +33,13 @@ import {
 import AuditLogBulkExportJob, {
   type AuditLogBulkExportJobDocument,
 } from '../../models/audit-log-bulk-export-job';
+import instanciateAuditLogBulkExportJobCronService, {
+  auditLogBulkExportJobCronService,
+} from '.';
 import {
   AuditLogBulkExportJobExpiredError,
   AuditLogBulkExportJobRestartedError,
 } from './errors';
-import instanciateAuditLogBulkExportJobCronService, {
-  auditLogBulkExportJobCronService,
-} from './index';
 
 type ExportedActivityData = Pick<
   ActivityDocument,

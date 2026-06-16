@@ -5,17 +5,17 @@ import {
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import { getServerSideBasicLayoutProps } from '~/pages/basic-layout-page/index.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+
+import { getServerSideBasicLayoutProps } from '../../basic-layout-page';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '~/pages/common-props/index.js';
-import { getServerSideRendererConfigProps } from '~/pages/general-page/index.js';
-import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props.js';
-
-import type { ServerConfigurationProps } from '../types.js';
+} from '../../common-props';
+import { getServerSideRendererConfigProps } from '../../general-page';
+import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
+import type { ServerConfigurationProps } from '../types';
 
 const getServerSideConfigurationProps: GetServerSideProps<
   ServerConfigurationProps

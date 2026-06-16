@@ -2,7 +2,7 @@ import type React from 'react';
 import { useTranslation } from 'react-i18next';
 import { FormGroup, Input, Label } from 'reactstrap';
 
-import { AiAssistantShareScope } from '~/features/openai/interfaces/ai-assistant.js';
+import { AiAssistantShareScope } from '../../../../interfaces/ai-assistant';
 
 type Props = {
   isDisabled: boolean;

@@ -3,12 +3,12 @@ import type { Nullable } from '@growi/core';
 import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 
-import { apiGet, apiPost } from '~/client/util/apiv1-client.js';
+import { apiGet, apiPost } from '~/client/util/apiv1-client';
 
 import type {
   ICommentHasIdList,
   ICommentPostArgs,
-} from '../interfaces/comment.js';
+} from '../interfaces/comment';
 
 type IResponseComment = {
   comments: ICommentHasIdList;

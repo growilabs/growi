@@ -3,7 +3,7 @@ import { useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Button, Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import type { AiAssistantHasId } from '../../../../../interfaces/ai-assistant.js';
+import type { AiAssistantHasId } from '../../../../../interfaces/ai-assistant';
 
 export type DeleteAiAssistantModalProps = {
   isShown: boolean;

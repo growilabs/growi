@@ -1,1 +1,1 @@
-export * from './page-listing.js';
+export * from './page-listing';

@@ -1,12 +1,11 @@
 import type mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '~/server/crowi';
-import type UserEvent from '~/server/events/user';
-import { configManager } from '~/server/service/config-manager';
-import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
-
-import { UserStatus } from './conts.js';
+import type Crowi from '../../crowi';
+import type UserEvent from '../../events/user';
+import { configManager } from '../../service/config-manager';
+import type { S2sMessagingService } from '../../service/s2s-messaging/base';
+import { UserStatus } from './conts';
 
 describe('User', () => {
   let User: any;
@@ -31,7 +30,7 @@ describe('User', () => {
     });
 
     // Initialize User model with mocked Crowi using dynamic import
-    const userModule = await import('./index.js');
+    const userModule = await import('.');
     const userFactory = userModule.default;
     User = userFactory(crowiMock);
 

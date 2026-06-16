@@ -3,43 +3,43 @@ import express from 'express';
 import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
-import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server/index.js';
-import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter/index.js';
-import { createApiRouter } from '~/server/util/createApiRouter.js';
+import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server';
+import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
 
-import { accessTokenParser } from '../middlewares/access-token-parser/index.js';
-import { generateAddActivityMiddleware } from '../middlewares/add-activity.js';
-import adminRequiredFactory from '../middlewares/admin-required.js';
-import apiV1FormValidator from '../middlewares/apiv1-form-validator.js';
-import { setup as setupApplicationInstalled } from '../middlewares/application-installed.js';
-import * as applicationNotInstalled from '../middlewares/application-not-installed.js';
-import { setup as setupAutoReconnectToSearch } from '../middlewares/auto-reconnect-to-search.js';
+import { accessTokenParser } from '../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../middlewares/add-activity';
+import adminRequiredFactory from '../middlewares/admin-required';
+import apiV1FormValidator from '../middlewares/apiv1-form-validator';
+import { setup as setupApplicationInstalled } from '../middlewares/application-installed';
+import * as applicationNotInstalled from '../middlewares/application-not-installed';
+import { setup as setupAutoReconnectToSearch } from '../middlewares/auto-reconnect-to-search';
 import {
   excludeReadOnlyUser,
   excludeReadOnlyUserIfCommentNotAllowed,
-} from '../middlewares/exclude-read-only-user.js';
-import injectResetOrderByTokenMiddleware from '../middlewares/inject-reset-order-by-token-middleware.js';
-import injectUserRegistrationOrderByTokenMiddleware from '../middlewares/inject-user-registration-order-by-token-middleware.js';
-import * as loginFormValidator from '../middlewares/login-form-validator.js';
-import loginRequiredFactory from '../middlewares/login-required.js';
+} from '../middlewares/exclude-read-only-user';
+import injectResetOrderByTokenMiddleware from '../middlewares/inject-reset-order-by-token-middleware';
+import injectUserRegistrationOrderByTokenMiddleware from '../middlewares/inject-user-registration-order-by-token-middleware';
+import * as loginFormValidator from '../middlewares/login-form-validator';
+import loginRequiredFactory from '../middlewares/login-required';
 import {
   generateUnavailableWhenMaintenanceModeMiddleware,
   generateUnavailableWhenMaintenanceModeMiddlewareForApi,
-} from '../middlewares/unavailable-when-maintenance-mode.js';
-import { setup as setupAdmin } from './admin.js';
-import { setup as setupApiV3 } from './apiv3/index.js';
-import { routesFactory as attachmentApiRoutesFactory } from './attachment/api.js';
-import * as attachment from './attachment/index.js';
-import { setup as setupComment } from './comment.js';
-import * as forgotPassword from './forgot-password.js';
-import { setup as setupLogin } from './login.js';
-import { setup as setupLoginPassport } from './login-passport.js';
-import nextFactory from './next.js';
-import { setup as setupOgp } from './ogp.js';
-import { setup as setupPage } from './page.js';
-import { setup as setupSearch } from './search.js';
-import { setup as setupTag } from './tag.js';
-import * as userActivation from './user-activation.js';
+} from '../middlewares/unavailable-when-maintenance-mode';
+import { createApiRouter } from '../util/createApiRouter';
+import { setup as setupAdmin } from './admin';
+import { setup as setupApiV3 } from './apiv3';
+import * as attachment from './attachment';
+import { routesFactory as attachmentApiRoutesFactory } from './attachment/api';
+import { setup as setupComment } from './comment';
+import * as forgotPassword from './forgot-password';
+import { setup as setupLogin } from './login';
+import { setup as setupLoginPassport } from './login-passport';
+import nextFactory from './next';
+import { setup as setupOgp } from './ogp';
+import { setup as setupPage } from './page';
+import { setup as setupSearch } from './search';
+import { setup as setupTag } from './tag';
+import * as userActivation from './user-activation';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, app) => {

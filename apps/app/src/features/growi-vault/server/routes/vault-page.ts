@@ -1,10 +1,10 @@
 import type { Router } from 'express';
 import express from 'express';
 
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import loggerFactory from '~/utils/logger';
 
-import type { VaultReconcileService } from '../services/reconcile/index.js';
+import type { VaultReconcileService } from '../services/reconcile';
 
 const logger = loggerFactory('growi:features:growi-vault:routes:vault-page');
 

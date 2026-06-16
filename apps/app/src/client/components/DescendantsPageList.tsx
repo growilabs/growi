@@ -7,7 +7,6 @@ import type {
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import { toastSuccess } from '~/client/util/toastr';
 import type { IPagingResult } from '~/interfaces/paging-result';
 import type { OnDeletedFunction, OnPutBackedFunction } from '~/interfaces/ui';
 import {
@@ -22,6 +21,7 @@ import {
   useSWRxPageList,
 } from '~/stores/page-listing';
 
+import { toastSuccess } from '../util/toastr';
 import type { ForceHideMenuItems } from './Common/Dropdown/PageItemControl';
 import PageList from './PageList/PageList';
 import PaginationWrapper from './PaginationWrapper';

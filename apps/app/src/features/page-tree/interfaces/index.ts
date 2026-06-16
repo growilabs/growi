@@ -1,8 +1,8 @@
 import type { IPageToDeleteWithMeta } from '@growi/core';
 import type { CheckboxesFeatureDef, ItemInstance } from '@headless-tree/core';
 
-import type { IPageForTreeItem } from '~/interfaces/page.js';
-import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate.js';
+import type { IPageForTreeItem } from '~/interfaces/page';
+import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
 
 type TreeItemBaseProps<
   TI = IPageForTreeItem,

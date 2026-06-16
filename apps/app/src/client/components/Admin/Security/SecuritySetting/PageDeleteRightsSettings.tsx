@@ -2,7 +2,6 @@ import type React from 'react';
 import { useCallback } from 'react';
 import { Collapse } from 'reactstrap';
 
-import type AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
 import {
   type IPageDeleteConfigValue,
   type IPageDeleteConfigValueToProcessValidation,
@@ -13,6 +12,7 @@ import {
   validateDeleteConfigs,
 } from '~/utils/page-delete-config';
 
+import type AdminGeneralSecurityContainer from '../../../../services/AdminGeneralSecurityContainer';
 import {
   DeletionType,
   type DeletionTypeValue,

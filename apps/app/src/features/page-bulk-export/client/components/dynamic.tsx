@@ -1,7 +1,8 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
-import { usePageBulkExportSelectModalStatus } from '~/features/page-bulk-export/client/states/modal.js';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
+
+import { usePageBulkExportSelectModalStatus } from '../states/modal';
 
 type PageBulkExportSelectModalProps = Record<string, unknown>;
 
@@ -12,9 +13,7 @@ export const PageBulkExportSelectModalLazyLoaded = (): JSX.Element => {
     useLazyLoader<PageBulkExportSelectModalProps>(
       'page-bulk-export-select-modal',
       () =>
-        import(
-          '~/features/page-bulk-export/client/components/PageBulkExportSelectModal.js'
-        ).then((mod) => ({
+        import('./PageBulkExportSelectModal').then((mod) => ({
           default: mod.PageBulkExportSelectModal,
         })),
       status?.isOpened ?? false,

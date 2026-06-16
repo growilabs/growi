@@ -1,4 +1,4 @@
-import type { RehypeSanitizeConfiguration } from './rehype-sanitize.js';
+import type { RehypeSanitizeConfiguration } from './rehype-sanitize';
 
 export type RendererConfig = {
   isSharedPage?: boolean;

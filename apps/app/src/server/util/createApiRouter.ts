@@ -1,6 +1,6 @@
 import express, { type Router } from 'express';
 
-import CertifyOrigin from '~/server/middlewares/certify-origin.js';
+import CertifyOrigin from '../middlewares/certify-origin';
 
 function createApiRouter(): Router {
   const router = express.Router();

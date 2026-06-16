@@ -5,21 +5,22 @@ import type { Request } from 'express';
 import { Router } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 
-import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group.js';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
-import { SupportedAction } from '~/interfaces/activity.js';
-import type { PageActionOnGroupDelete } from '~/interfaces/user-group.js';
-import type Crowi from '~/server/crowi/index.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer.js';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import type UserGroupService from '~/server/service/user-group.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { configManager } from '~/server/service/config-manager';
+import type UserGroupService from '~/server/service/user-group';
+import loggerFactory from '~/utils/logger';
+
+import ExternalUserGroup from '../../models/external-user-group';
+import ExternalUserGroupRelation from '../../models/external-user-group-relation';
 
 const logger = loggerFactory('growi:routes:apiv3:external-user-group');
 

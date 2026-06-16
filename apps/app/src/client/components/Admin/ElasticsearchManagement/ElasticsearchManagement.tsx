@@ -2,12 +2,12 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { SocketEventName } from '~/interfaces/websocket';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 
+import { apiv3Get, apiv3Post, apiv3Put } from '../../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import NormalizeIndicesControls from './NormalizeIndicesControls';
 import RebuildIndexControls from './RebuildIndexControls';
 import ReconnectControls from './ReconnectControls';

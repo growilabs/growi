@@ -1,8 +1,9 @@
 import type { FC } from 'react';
 import { memo } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
-import { useAiAssistantSidebarStatus } from '~/features/openai/client/states/index.js';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
+
+import { useAiAssistantSidebarStatus } from '../../../states';
 
 export const AiAssistantSidebarLazyLoaded: FC = memo(() => {
   const aiAssistantSidebarData = useAiAssistantSidebarStatus();
@@ -11,9 +12,7 @@ export const AiAssistantSidebarLazyLoaded: FC = memo(() => {
   const ComponentToRender = useLazyLoader(
     'ai-assistant-sidebar',
     () =>
-      import(
-        '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/AiAssistantSidebar.js'
-      ).then((mod) => ({
+      import('./AiAssistantSidebar').then((mod) => ({
         default: mod.AiAssistantSidebar,
       })),
     isOpened,

@@ -1,4 +1,4 @@
-import { CONFIG_DEFINITIONS, CONFIG_KEYS } from './config-definition.js';
+import { CONFIG_DEFINITIONS, CONFIG_KEYS } from './config-definition';
 
 describe('config-definition resilience keys', () => {
   describe('CONFIG_KEYS array', () => {

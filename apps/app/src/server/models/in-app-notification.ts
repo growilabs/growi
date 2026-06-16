@@ -5,11 +5,11 @@ import mongoosePaginate from 'mongoose-paginate-v2';
 import {
   AllSupportedActions,
   AllSupportedTargetModels,
-} from '~/interfaces/activity.js';
-import { InAppNotificationStatuses } from '~/interfaces/in-app-notification.js';
+} from '~/interfaces/activity';
+import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 
-import { getOrCreateModel } from '../util/mongoose-utils.js';
-import type { ActivityDocument } from './activity.js';
+import { getOrCreateModel } from '../util/mongoose-utils';
+import type { ActivityDocument } from './activity';
 
 const { STATUS_UNOPENED, STATUS_OPENED } = InAppNotificationStatuses;
 

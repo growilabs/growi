@@ -1,7 +1,7 @@
 import type { HasObjectId, IUser, Ref } from '@growi/core';
 import type { PaginateResult } from 'mongoose';
 
-import type { AiAssistant, AiAssistantHasId } from './ai-assistant.js';
+import type { AiAssistant, AiAssistantHasId } from './ai-assistant';
 
 export const ThreadType = {
   KNOWLEDGE: 'knowledge',

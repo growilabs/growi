@@ -1,7 +1,7 @@
 import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 
-import { apiv3Get } from '~/client/util/apiv3-client.js';
+import { apiv3Get } from '~/client/util/apiv3-client';
 
 export const useSWRxStaffs = (): SWRResponse<any, Error> => {
   return useSWR('/staffs', (endpoint) =>

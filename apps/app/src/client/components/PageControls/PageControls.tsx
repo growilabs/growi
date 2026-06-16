@@ -21,40 +21,37 @@ import { useRect } from '@growi/ui/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { DropdownItem } from 'reactstrap';
 
-import {
-  MenuItemType,
-  PageItemControl,
-} from '~/client/components/Common/Dropdown/PageItemControl.js';
-import { BookmarkButtons } from '~/client/components/PageControls/BookmarkButtons.js';
-import LikeButtons from '~/client/components/PageControls/LikeButtons.js';
-import SearchButton from '~/client/components/PageControls/SearchButton.js';
-import SeenUserInfo from '~/client/components/PageControls/SeenUserInfo.js';
-import SubscribeButton from '~/client/components/PageControls/SubscribeButton.js';
-import {
-  toggleLike,
-  toggleSubscribe,
-} from '~/client/services/page-operation.js';
-import { toastError } from '~/client/util/toastr.js';
-import OpenDefaultAiAssistantButton from '~/features/openai/client/components/AiAssistant/OpenDefaultAiAssistantButton.js';
+import OpenDefaultAiAssistantButton from '~/features/openai/client/components/AiAssistant/OpenDefaultAiAssistantButton';
 import {
   useIsGuestUser,
   useIsReadOnlyUser,
   useIsSearchPage,
-} from '~/states/context.js';
-import { useCurrentPagePath } from '~/states/page/index.js';
-import { useDeviceLargerThanMd } from '~/states/ui/device.js';
-import { EditorMode, useEditorMode } from '~/states/ui/editor/index.js';
-import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate.js';
-import { useTagEditModalActions } from '~/states/ui/modal/tag-edit.js';
-import { useSetPageControlsX } from '~/states/ui/page.js';
-import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page.js';
-import { useSWRxUsersList } from '~/stores/user.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/states/context';
+import { useCurrentPagePath } from '~/states/page';
+import { useDeviceLargerThanMd } from '~/states/ui/device';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
+import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
+import { useTagEditModalActions } from '~/states/ui/modal/tag-edit';
+import { useSetPageControlsX } from '~/states/ui/page';
+import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page';
+import { useSWRxUsersList } from '~/stores/user';
+import loggerFactory from '~/utils/logger';
 
+import { toggleLike, toggleSubscribe } from '../../services/page-operation';
+import { toastError } from '../../util/toastr';
 import type {
   AdditionalMenuItemsRendererProps,
   ForceHideMenuItems,
-} from '../Common/Dropdown/PageItemControl.js';
+} from '../Common/Dropdown/PageItemControl';
+import {
+  MenuItemType,
+  PageItemControl,
+} from '../Common/Dropdown/PageItemControl';
+import { BookmarkButtons } from './BookmarkButtons';
+import LikeButtons from './LikeButtons';
+import SearchButton from './SearchButton';
+import SeenUserInfo from './SeenUserInfo';
+import SubscribeButton from './SubscribeButton';
 
 import styles from './PageControls.module.scss';
 

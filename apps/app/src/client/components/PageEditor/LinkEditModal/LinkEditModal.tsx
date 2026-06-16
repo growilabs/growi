@@ -16,12 +16,12 @@ import {
   PopoverBody,
 } from 'reactstrap';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
-import { isMongoId } from '~/client/util/mongo-id';
 import { useCurrentPagePath } from '~/states/page';
 import { usePreviewOptions } from '~/stores/renderer';
 import loggerFactory from '~/utils/logger';
 
+import { apiv3Get } from '../../../util/apiv3-client';
+import { isMongoId } from '../../../util/mongo-id';
 import SearchTypeahead from '../../SearchTypeahead';
 import Preview from '../Preview';
 

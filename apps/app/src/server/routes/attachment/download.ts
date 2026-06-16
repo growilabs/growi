@@ -1,15 +1,15 @@
 import type { Router } from 'express';
 import express from 'express';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi/index.js';
-import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment/index.js';
-import type { GetRequest, GetResponse } from './get.js';
-import { getActionFactory, retrieveAttachmentFromIdParam } from './get.js';
+import type Crowi from '../../crowi';
+import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
+import loginRequiredFactory from '../../middlewares/login-required';
+import type { GetRequest, GetResponse } from './get';
+import { getActionFactory, retrieveAttachmentFromIdParam } from './get';
 
 const logger = loggerFactory('growi:routes:attachment:download');
 

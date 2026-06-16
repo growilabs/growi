@@ -4,8 +4,9 @@ import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
 import { format } from 'date-fns/format';
 import { useTranslation } from 'react-i18next';
 
-import { useCreatePage } from '~/client/services/create-page';
 import { useCurrentUser } from '~/states/global';
+
+import { useCreatePage } from '../../../../services/create-page';
 
 type UseCreateTodaysMemo = () => {
   isCreating: boolean;

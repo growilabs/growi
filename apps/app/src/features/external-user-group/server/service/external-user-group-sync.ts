@@ -1,25 +1,25 @@
 import type { IUserHasId } from '@growi/core';
 
-import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group.js';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
-import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider.js';
-import { SocketEventName } from '~/interfaces/websocket.js';
-import S2sMessage from '~/server/models/vo/s2s-message.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { externalAccountService } from '~/server/service/external-account.js';
-import type { S2sMessagingService } from '~/server/service/s2s-messaging/base.js';
-import type { S2sMessageHandlable } from '~/server/service/s2s-messaging/handlable.js';
-import { excludeTestIdsFromTargetIds } from '~/server/util/compare-objectId.js';
-import loggerFactory from '~/utils/logger/index.js';
-import { prisma } from '~/utils/prisma.js';
-import { batchProcessPromiseAll } from '~/utils/promise.js';
+import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
+import { SocketEventName } from '~/interfaces/websocket';
+import S2sMessage from '~/server/models/vo/s2s-message';
+import { configManager } from '~/server/service/config-manager';
+import { externalAccountService } from '~/server/service/external-account';
+import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
+import type { S2sMessageHandlable } from '~/server/service/s2s-messaging/handlable';
+import { excludeTestIdsFromTargetIds } from '~/server/util/compare-objectId';
+import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
+import { batchProcessPromiseAll } from '~/utils/promise';
 
 import type {
   ExternalGroupProviderType,
   ExternalUserGroupTreeNode,
   ExternalUserInfo,
   IExternalUserGroupHasId,
-} from '../../interfaces/external-user-group.js';
+} from '../../interfaces/external-user-group';
+import ExternalUserGroup from '../models/external-user-group';
+import ExternalUserGroupRelation from '../models/external-user-group-relation';
 
 const logger = loggerFactory('growi:service:external-user-group-sync-service');
 

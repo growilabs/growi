@@ -1,9 +1,8 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { RequestHandler } from 'express';
 
-import { configManager } from '~/server/service/config-manager/index.js';
-
-import type { ApiV3Response } from '../routes/apiv3/interfaces/apiv3-response.js';
+import type { ApiV3Response } from '../routes/apiv3/interfaces/apiv3-response';
+import { configManager } from '../service/config-manager';
 
 /**
  * Middleware that rejects requests when link sharing is globally disabled.

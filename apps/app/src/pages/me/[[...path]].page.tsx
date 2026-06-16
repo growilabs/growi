@@ -8,20 +8,20 @@ import { useTranslation } from 'next-i18next';
 import { BasicLayout } from '~/components/Layout/BasicLayout';
 import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-import type { BasicLayoutConfigurationProps } from '~/pages/basic-layout-page';
-import { getServerSideBasicLayoutProps } from '~/pages/basic-layout-page';
-import { useHydrateBasicLayoutConfigurationAtoms } from '~/pages/basic-layout-page/hydrate';
-import { useCustomTitle } from '~/pages/utils/page-title-customization';
-import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
 import loggerFactory from '~/utils/logger';
 
 import type { NextPageWithLayout } from '../_app.page';
+import type { BasicLayoutConfigurationProps } from '../basic-layout-page';
+import { getServerSideBasicLayoutProps } from '../basic-layout-page';
+import { useHydrateBasicLayoutConfigurationAtoms } from '../basic-layout-page/hydrate';
 import type { CommonEachProps, CommonInitialProps } from '../common-props';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
 } from '../common-props';
+import { useCustomTitle } from '../utils/page-title-customization';
+import { mergeGetServerSidePropsResults } from '../utils/server-side-props';
 import type { ServerConfigurationProps } from './types';
 import { useHydrateServerConfigurationAtoms } from './use-hydrate-server-configurations';
 

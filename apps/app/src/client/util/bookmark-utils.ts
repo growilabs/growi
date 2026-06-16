@@ -1,14 +1,11 @@
 import type { IRevision, Ref } from '@growi/core';
 
-import {
-  apiv3Delete,
-  apiv3Post,
-  apiv3Put,
-} from '~/client/util/apiv3-client.js';
 import type {
   BookmarkedPage,
   BookmarkFolderItems,
-} from '~/interfaces/bookmark-info.js';
+} from '~/interfaces/bookmark-info';
+
+import { apiv3Delete, apiv3Post, apiv3Put } from './apiv3-client';
 
 // Check if bookmark folder item has childFolder or bookmarks
 export const hasChildren = ({

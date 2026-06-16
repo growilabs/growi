@@ -4,16 +4,15 @@
  * Optimized for browser environment with performance monitoring
  */
 
-import { ClientDiffApplicationEngine } from '~/features/openai/client/services/editor-assistant/diff-application.js';
-import { ClientErrorHandler } from '~/features/openai/client/services/editor-assistant/error-handling.js';
-import { ClientFuzzyMatcher } from '~/features/openai/client/services/editor-assistant/fuzzy-matching.js';
-
-import type { LlmEditorAssistantDiff } from '../../../interfaces/editor-assistant/llm-response-schemas.js';
+import type { LlmEditorAssistantDiff } from '../../../interfaces/editor-assistant/llm-response-schemas';
 import type {
   DiffApplicationResult,
   DiffError,
   ProcessorConfig,
-} from '../../interfaces/types.js';
+} from '../../interfaces/types';
+import { ClientDiffApplicationEngine } from './diff-application';
+import { ClientErrorHandler } from './error-handling';
+import { ClientFuzzyMatcher } from './fuzzy-matching';
 
 // Note: measureNormalization import removed as it's not used in this file
 

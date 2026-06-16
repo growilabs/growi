@@ -1,7 +1,7 @@
 import type { IDataWithRequiredMeta } from '@growi/core';
 import superjson from 'superjson';
 
-import type { IPageToShowRevisionWithMeta } from '../types.js';
+import type { IPageToShowRevisionWithMeta } from '../types';
 
 type IPageToShowRevisionWithMetaSerialized = IDataWithRequiredMeta<
   string,

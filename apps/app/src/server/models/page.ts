@@ -24,26 +24,26 @@ import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 import nodePath from 'path';
 
-import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group.js';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation.js';
+import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import type {
   IOptionsForCreate,
   IPagePathWithDescendantCount,
-} from '~/interfaces/page.js';
-import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils.js';
+} from '~/interfaces/page';
+import loggerFactory from '~/utils/logger';
+
+import type Crowi from '../crowi';
+import type { ObjectIdLike } from '../interfaces/mongoose-utils';
+import { collectAncestorPaths } from '../util/collect-ancestor-paths';
+import { getOrCreateModel } from '../util/mongoose-utils';
 import {
   extractToAncestorsPaths,
   getPageSchema,
   populateDataToShowRevision,
-} from '~/server/models/obsolete-page.js';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts.js';
-import UserGroupRelation from '~/server/models/user-group-relation.js';
-import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths.js';
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import type Crowi from '../crowi/index.js';
-import type { UserGroupDocument } from './user-group.js';
+} from './obsolete-page';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
+import type { UserGroupDocument } from './user-group';
+import UserGroupRelation from './user-group-relation';
 
 type ObjectId = mongoose.Types.ObjectId;
 

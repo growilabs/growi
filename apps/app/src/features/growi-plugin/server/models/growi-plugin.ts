@@ -1,7 +1,7 @@
 import { GrowiPluginType } from '@growi/core';
 import { type Document, type Model, Schema, type Types } from 'mongoose';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
 import type {
   IGrowiPlugin,
@@ -10,7 +10,7 @@ import type {
   IGrowiPluginOrigin,
   IGrowiTemplatePluginMeta,
   IGrowiThemePluginMeta,
-} from '../../interfaces/index.js';
+} from '../../interfaces';
 
 export interface IGrowiPluginDocument<
   M extends IGrowiPluginMeta = IGrowiPluginMeta,

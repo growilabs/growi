@@ -1,6 +1,6 @@
 import { useEffect } from 'react';
 
-import type { HotkeyBindingDef } from '../HotkeysManager.js';
+import type { HotkeyBindingDef } from '../HotkeysManager';
 
 type Props = {
   onDeleteRender: () => void;

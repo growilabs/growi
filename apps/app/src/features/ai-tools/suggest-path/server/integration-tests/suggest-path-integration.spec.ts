@@ -2,9 +2,10 @@ import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
 import request from 'supertest';
 
-import type { ContentAnalysis } from '~/features/ai-tools/suggest-path/interfaces/suggest-path-types';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+
+import type { ContentAnalysis } from '../../interfaces/suggest-path-types';
 
 // Mutable test state — controls mock behavior per test
 const testState = vi.hoisted(() => ({

@@ -2,7 +2,6 @@ import type { FC } from 'react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useAdminSocket } from '~/features/admin/states/socket-io';
 import type {
   PMEndedData,
@@ -13,6 +12,7 @@ import type {
 import { SocketEventName } from '~/interfaces/websocket';
 
 import AdminAppContainer from '../../../services/AdminAppContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import LabeledProgressBar from '../Common/LabeledProgressBar';
 import { ConfirmModal } from './ConfirmModal';

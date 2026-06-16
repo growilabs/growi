@@ -1,6 +1,6 @@
 import type { Request, Response } from 'express';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:middleware:deny-uploads-direct-access');
 

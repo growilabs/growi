@@ -2,10 +2,11 @@ import React, { type JSX, useCallback } from 'react';
 import type { IUserHasId } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import { withUnstatedContainers } from '~/client/components/UnstatedUtils';
-import AdminUsersContainer from '~/client/services/AdminUsersContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
+
+import AdminUsersContainer from '../../../services/AdminUsersContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
+import { withUnstatedContainers } from '../../UnstatedUtils';
 
 const SuspendAlert = React.memo((): JSX.Element => {
   const { t } = useTranslation();

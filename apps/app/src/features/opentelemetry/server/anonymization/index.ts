@@ -1,1 +1,1 @@
-export * from '~/features/opentelemetry/server/anonymization/anonymize-http-requests.js';
+export * from './anonymize-http-requests';

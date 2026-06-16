@@ -13,13 +13,6 @@ import { objectIdUtils } from '@growi/core/dist/utils';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import {
-  apiv3Delete,
-  apiv3Get,
-  apiv3Post,
-  apiv3Put,
-} from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { IExternalUserGroupHasId } from '~/features/external-user-group/interfaces/external-user-group';
 import type {
   PageActionOnGroupDelete,
@@ -35,6 +28,13 @@ import {
 } from '~/stores/user-group';
 import loggerFactory from '~/utils/logger';
 
+import {
+  apiv3Delete,
+  apiv3Get,
+  apiv3Post,
+  apiv3Put,
+} from '../../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import {
   useAncestorUserGroups,
   useChildUserGroupList,

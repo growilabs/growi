@@ -2,8 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { apiv3Post } from '~/client/util/apiv3-client';
-
+import { apiv3Post } from '../../../util/apiv3-client';
 import Accordion from '../Common/Accordion';
 import CustomBotWithoutProxySecretTokenSection from './CustomBotWithoutProxySecretTokenSection';
 import ManageCommandsProcessWithoutProxy from './ManageCommandsProcessWithoutProxy';

@@ -1,15 +1,15 @@
 import { useHydrateAtoms } from 'jotai/utils';
 
-import type { RendererConfig } from '~/interfaces/services/renderer.js';
+import type { RendererConfig } from '~/interfaces/services/renderer';
 import {
   disableUserPagesAtom,
   isContainerFluidAtom,
   rendererConfigAtom,
   showPageLimitationLAtom,
-} from '~/states/server-configurations/index.js';
-import { createAtomTuple } from '~/utils/jotai-utils.js';
+} from '~/states/server-configurations';
+import { createAtomTuple } from '~/utils/jotai-utils';
 
-import type { ServerConfigurationProps } from './types.js';
+import type { ServerConfigurationProps } from './types';
 
 /**
  * Hook for hydrating server configuration atoms with server-side data

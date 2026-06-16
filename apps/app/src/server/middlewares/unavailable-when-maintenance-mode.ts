@@ -1,8 +1,8 @@
 import type { NextFunction, Request, Response } from 'express';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../crowi/index.js';
+import type Crowi from '../crowi';
 
 const logger = loggerFactory(
   'growi:middlewares:unavailable-when-maintenance-mode',

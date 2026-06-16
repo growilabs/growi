@@ -1,8 +1,8 @@
 import type { Model } from 'mongoose';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from './index.js';
+import type Crowi from '.';
 
 const logger = loggerFactory('growi:crowi:setup-models');
 
@@ -16,23 +16,23 @@ export const setupModelsDependentOnCrowi = async (
   const modelsMap: ModelsMapDependentOnCrowi = {};
 
   const modelsDependsOnCrowi = {
-    Page: (await import('../models/page.js')).default,
-    User: (await import('../models/user/index.js')).default,
-    Bookmark: (await import('../models/bookmark.js')).default,
+    Page: (await import('../models/page')).default,
+    User: (await import('../models/user')).default,
+    Bookmark: (await import('../models/bookmark')).default,
     GlobalNotificationSetting: (
-      await import('../models/GlobalNotificationSetting/index.js')
+      await import('../models/GlobalNotificationSetting')
     ).default,
     GlobalNotificationMailSetting: (
       await import(
-        '../models/GlobalNotificationSetting/GlobalNotificationMailSetting.js'
+        '../models/GlobalNotificationSetting/GlobalNotificationMailSetting'
       )
     ).default,
     GlobalNotificationSlackSetting: (
       await import(
-        '../models/GlobalNotificationSetting/GlobalNotificationSlackSetting.js'
+        '../models/GlobalNotificationSetting/GlobalNotificationSlackSetting'
       )
     ).default,
-    SlackAppIntegration: (await import('../models/slack-app-integration.js'))
+    SlackAppIntegration: (await import('../models/slack-app-integration'))
       .default,
   };
 
@@ -54,37 +54,35 @@ export const setupModelsDependentOnCrowi = async (
 
 export const setupIndependentModels = async (): Promise<void> => {
   await Promise.all([
-    import('~/features/comment/server/models/index.js'),
+    import('~/features/comment/server/models'),
     import(
-      '~/features/external-user-group/server/models/external-user-group-relation.js'
+      '~/features/external-user-group/server/models/external-user-group-relation'
     ),
-    import(
-      '~/features/external-user-group/server/models/external-user-group.js'
-    ),
-    import('~/features/growi-plugin/server/models/index.js'),
-    import('../models/activity.js'),
-    import('../models/attachment.js'),
-    import('../models/bookmark-folder.js'),
-    import('../models/config.js'),
-    import('../models/editor-settings.js'),
-    import('../models/external-account.js'),
-    import('../models/in-app-notification-settings.js'),
-    import('../models/in-app-notification.js'),
-    import('../models/named-query.js'),
-    import('../models/page-operation.js'),
-    import('../models/page-redirect.js'),
-    import('../models/page-tag-relation.js'),
-    import('../models/password-reset-order.js'),
-    import('../models/revision.js'),
-    import('../models/share-link.js'),
-    import('../models/subscription.js'),
-    import('../models/tag.js'),
-    import('../models/transfer-key.js'),
-    import('../models/update-post.js'),
-    import('../models/user-group-relation.js'),
-    import('../models/user-group.js'),
-    import('../models/user-registration-order.js'),
-    import('../models/user-ui-settings.js'),
-    import('../models/access-token.js'),
+    import('~/features/external-user-group/server/models/external-user-group'),
+    import('~/features/growi-plugin/server/models'),
+    import('../models/activity'),
+    import('../models/attachment'),
+    import('../models/bookmark-folder'),
+    import('../models/config'),
+    import('../models/editor-settings'),
+    import('../models/external-account'),
+    import('../models/in-app-notification-settings'),
+    import('../models/in-app-notification'),
+    import('../models/named-query'),
+    import('../models/page-operation'),
+    import('../models/page-redirect'),
+    import('../models/page-tag-relation'),
+    import('../models/password-reset-order'),
+    import('../models/revision'),
+    import('../models/share-link'),
+    import('../models/subscription'),
+    import('../models/tag'),
+    import('../models/transfer-key'),
+    import('../models/update-post'),
+    import('../models/user-group-relation'),
+    import('../models/user-group'),
+    import('../models/user-registration-order'),
+    import('../models/user-ui-settings'),
+    import('../models/access-token'),
   ]);
 };

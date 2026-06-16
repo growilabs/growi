@@ -2,35 +2,32 @@ import React, { type JSX, useCallback, useMemo, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest.js';
-import { NotAvailableForReadOnlyUser } from '~/client/components/NotAvailableForReadOnlyUser.js';
-import PaginationWrapper from '~/client/components/PaginationWrapper.js';
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
+import { NotAvailableForReadOnlyUser } from '~/client/components/NotAvailableForReadOnlyUser';
+import PaginationWrapper from '~/client/components/PaginationWrapper';
 import type {
   ISelectableAll,
   ISelectableAndIndeterminatable,
-} from '~/client/interfaces/selectable-all.js';
-import { OperateAllControl } from '~/features/search/client/components/SearchPage/OperateAllControl.js';
-import SearchControl from '~/features/search/client/components/SearchPage/SearchControl.js';
-import {
-  SearchPageBase,
-  usePageDeleteModalForBulkDeletion,
-} from '~/features/search/client/components/SearchPage/SearchPageBase.js';
-import type { IFormattedSearchResult } from '~/interfaces/search.js';
-import {
-  useSearchKeyword,
-  useSetSearchKeyword,
-} from '~/states/search/index.js';
+} from '~/client/interfaces/selectable-all';
+import type { IFormattedSearchResult } from '~/interfaces/search';
+import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
 import {
   disableUserPagesAtom,
   showPageLimitationLAtom,
-} from '~/states/server-configurations/index.js';
+} from '~/states/server-configurations';
 import {
   type ISearchConditions,
   type ISearchConfigurations,
   useSWRxSearch,
-} from '~/stores/search.js';
+} from '~/stores/search';
 
-import type { IReturnSelectedPageIds } from './SearchPageBase.js';
+import { OperateAllControl } from './OperateAllControl';
+import SearchControl from './SearchControl';
+import type { IReturnSelectedPageIds } from './SearchPageBase';
+import {
+  SearchPageBase,
+  usePageDeleteModalForBulkDeletion,
+} from './SearchPageBase';
 
 import styles from './SearchPage.module.scss';
 

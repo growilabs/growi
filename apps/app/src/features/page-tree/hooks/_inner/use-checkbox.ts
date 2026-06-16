@@ -1,6 +1,6 @@
 import { useCallback, useMemo, useState } from 'react';
 
-import type { IPageForTreeItem } from '~/interfaces/page.js';
+import type { IPageForTreeItem } from '~/interfaces/page';
 
 type TreeInstance = {
   getItemInstance: (

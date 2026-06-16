@@ -1,8 +1,8 @@
 import { Types } from 'mongoose';
 
-import type { ImportOptionForPages } from '~/models/admin/import-option-for-pages.js';
+import type { ImportOptionForPages } from '~/models/admin/import-option-for-pages';
 
-import type { OverwriteParams } from '../import-settings.js';
+import type { OverwriteParams } from '../import-settings';
 
 const { ObjectId } = Types;
 

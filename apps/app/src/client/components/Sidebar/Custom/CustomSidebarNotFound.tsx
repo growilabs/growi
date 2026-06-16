@@ -2,7 +2,7 @@ import { type JSX, useCallback } from 'react';
 import { Origin } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 
-import { useCreatePage } from '~/client/services/create-page';
+import { useCreatePage } from '../../../services/create-page';
 
 export const SidebarNotFound = (): JSX.Element => {
   const { t } = useTranslation();

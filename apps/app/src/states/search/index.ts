@@ -1,1 +1,1 @@
-export * from '~/states/search/keyword-manager.js';
+export * from './keyword-manager';

@@ -3,18 +3,19 @@ import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
-import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client.js';
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
+import type {
+  ChildUserGroupListResult,
+  IUserGroupRelationHasIdPopulatedUser,
+  UserGroupRelationListResult,
+} from '~/interfaces/user-group-response';
+
 import type {
   IExternalUserGroupHasId,
   IExternalUserGroupRelationHasId,
   KeycloakGroupSyncSettings,
   LdapGroupSyncSettings,
-} from '~/features/external-user-group/interfaces/external-user-group.js';
-import type {
-  ChildUserGroupListResult,
-  IUserGroupRelationHasIdPopulatedUser,
-  UserGroupRelationListResult,
-} from '~/interfaces/user-group-response.js';
+} from '../../interfaces/external-user-group';
 
 export const useSWRxLdapGroupSyncSettings = (): SWRResponse<
   LdapGroupSyncSettings,

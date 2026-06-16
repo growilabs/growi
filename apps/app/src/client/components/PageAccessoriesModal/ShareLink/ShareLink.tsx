@@ -1,11 +1,11 @@
 import React, { type JSX, useCallback, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { apiv3Delete } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useCurrentPageId } from '~/states/page';
 import { useSWRxSharelink } from '~/stores/share-link';
 
+import { apiv3Delete } from '../../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { ShareLinkForm } from './ShareLinkForm';
 import ShareLinkList from './ShareLinkList';
 

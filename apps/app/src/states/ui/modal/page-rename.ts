@@ -2,7 +2,7 @@ import { useCallback } from 'react';
 import type { IPageToRenameWithMeta } from '@growi/core';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import type { OnRenamedFunction } from '../../../interfaces/ui.js';
+import type { OnRenamedFunction } from '../../../interfaces/ui';
 
 // Type definitions to match the original implementation
 export type IRenameModalOption = {

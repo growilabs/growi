@@ -1,1 +1,1 @@
-export { VaultAdminSettings } from '~/features/growi-vault/client/admin/VaultAdminSettings.js';
+export { VaultAdminSettings } from './VaultAdminSettings';

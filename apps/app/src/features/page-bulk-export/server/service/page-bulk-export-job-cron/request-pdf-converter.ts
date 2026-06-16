@@ -4,12 +4,12 @@ import {
   pdfCtrlSyncJobStatus,
 } from '@growi/pdf-converter-client';
 
-import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
-import PageBulkExportPageSnapshot from '~/features/page-bulk-export/server/models/page-bulk-export-page-snapshot.js';
-import { BulkExportJobExpiredError } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/errors.js';
-import { configManager } from '~/server/service/config-manager/index.js';
+import { configManager } from '~/server/service/config-manager';
 
-import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job.js';
+import { PageBulkExportJobStatus } from '../../../interfaces/page-bulk-export';
+import type { PageBulkExportJobDocument } from '../../models/page-bulk-export-job';
+import PageBulkExportPageSnapshot from '../../models/page-bulk-export-page-snapshot';
+import { BulkExportJobExpiredError } from './errors';
 
 /**
  * Request PDF converter and start pdf convert for the pageBulkExportJob,

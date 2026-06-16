@@ -1,6 +1,6 @@
 import type { HttpInstrumentationConfig } from '@opentelemetry/instrumentation-http';
 
-import { anonymizationModules } from '~/features/opentelemetry/server/anonymization/handlers/index.js';
+import { anonymizationModules } from './handlers';
 
 export const httpInstrumentationConfig: HttpInstrumentationConfig = {
   startIncomingSpanHook: (request) => {

@@ -1,8 +1,8 @@
 import type { Locale } from '@growi/core';
 import { Lang } from '@growi/core';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import { detectLocaleFromBrowserAcceptLanguage } from '~/server/util/locale-utils.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { detectLocaleFromBrowserAcceptLanguage } from '~/server/util/locale-utils';
 
 export type LangMap = {
   readonly [key in Lang]: Locale;

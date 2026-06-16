@@ -1,6 +1,6 @@
 import type { IPageHasId } from '@growi/core';
 
-import type { IPageForItem } from '~/interfaces/page.js';
+import type { IPageForItem } from '~/interfaces/page';
 
 export type SelectablePage = Partial<IPageHasId> & { path: string };
 

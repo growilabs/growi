@@ -2,16 +2,16 @@ import { PassThrough } from 'node:stream';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
 
-import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
-import { SupportedAction } from '~/interfaces/activity.js';
-import { AttachmentType } from '~/server/interfaces/attachment.js';
-import type { IAttachmentDocument } from '~/server/models/attachment.js';
-import { Attachment } from '~/server/models/attachment.js';
-import type { FileUploader } from '~/server/service/file-uploader/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import { AttachmentType } from '~/server/interfaces/attachment';
+import type { IAttachmentDocument } from '~/server/models/attachment';
+import { Attachment } from '~/server/models/attachment';
+import type { FileUploader } from '~/server/service/file-uploader';
+import loggerFactory from '~/utils/logger';
 
-import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job.js';
-import type { IPageBulkExportJobCronService } from '../index.js';
+import { PageBulkExportJobStatus } from '../../../../interfaces/page-bulk-export';
+import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
+import type { IPageBulkExportJobCronService } from '..';
 
 const logger = loggerFactory(
   'growi:service:page-bulk-export-job-cron:compress-and-upload-async',

@@ -19,18 +19,18 @@ import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
 import type { ErrorV3 } from '^/../../packages/core/dist/models/index.js';
 
-import { apiGet } from '~/client/util/apiv1-client.js';
-import { apiv3Get } from '~/client/util/apiv3-client.js';
-import type { IPagePathWithDescendantCount } from '~/interfaces/page.js';
+import { apiGet } from '~/client/util/apiv1-client';
+import { apiv3Get } from '~/client/util/apiv3-client';
+import type { IPagePathWithDescendantCount } from '~/interfaces/page';
 import type {
   IRecordApplicableGrant,
   IResCurrentGrantData,
-} from '~/interfaces/page-grant.js';
-import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context.js';
-import { useRevisionIdFromUrl, useShareLinkId } from '~/states/page/hooks.js';
-import { useCurrentPageData, usePageNotFound } from '~/states/page/index.js';
+} from '~/interfaces/page-grant';
+import { useIsGuestUser, useIsReadOnlyUser } from '~/states/context';
+import { useCurrentPageData, usePageNotFound } from '~/states/page';
+import { useRevisionIdFromUrl, useShareLinkId } from '~/states/page/hooks';
 
-import type { IPageTagsInfo } from '../interfaces/tag.js';
+import type { IPageTagsInfo } from '../interfaces/tag';
 
 const getPageApiErrorHandler = (errs: ErrorV3<IPageNotFoundInfo>[]) => {
   if (!Array.isArray(errs)) {

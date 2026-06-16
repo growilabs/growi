@@ -6,10 +6,10 @@ import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 import LabeledProgressBar from '~/client/components/Admin/Common/LabeledProgressBar';
 import { apiv3Get } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/features/admin/states/socket-io';
-import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
 import { SocketEventName } from '~/interfaces/websocket';
 
+import { useAdminSocket } from '../../../../admin/states/socket-io';
+import type { ExternalGroupProviderType } from '../../../interfaces/external-user-group';
 import { useSWRxExternalUserGroupList } from '../../stores/external-user-group';
 
 type SyncExecutionProps = {

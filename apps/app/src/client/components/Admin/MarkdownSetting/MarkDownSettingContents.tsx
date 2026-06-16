@@ -2,11 +2,11 @@ import React, { type JSX, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Card, CardBody } from 'reactstrap';
 
-import AdminMarkDownContainer from '~/client/services/AdminMarkDownContainer';
-import { toastError } from '~/client/util/toastr';
 import { toArrayIfNot } from '~/utils/array-utils';
 import loggerFactory from '~/utils/logger';
 
+import AdminMarkDownContainer from '../../../services/AdminMarkDownContainer';
+import { toastError } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import ContentDispositionSettings from './ContentDispositionSettings';
 import IndentForm from './IndentForm';

@@ -2,10 +2,10 @@ import type { ClientOptions as ES7ClientOptions } from '@elastic/elasticsearch7'
 import type { ClientOptions as ES8ClientOptions } from '@elastic/elasticsearch8';
 import type { ClientOptions as ES9ClientOptions } from '@elastic/elasticsearch9';
 
-import type { ES7ClientDelegator } from './es7-client-delegator.js';
-import type { ES8ClientDelegator } from './es8-client-delegator.js';
-import type { ES9ClientDelegator } from './es9-client-delegator.js';
-import type { ElasticsearchClientDelegator } from './interfaces.js';
+import type { ES7ClientDelegator } from './es7-client-delegator';
+import type { ES8ClientDelegator } from './es8-client-delegator';
+import type { ES9ClientDelegator } from './es9-client-delegator';
+import type { ElasticsearchClientDelegator } from './interfaces';
 
 type GetDelegatorOptions =
   | {
@@ -42,37 +42,31 @@ export const getClient = async <Opts extends GetDelegatorOptions>(
 ): Promise<Delegator<Opts>> => {
   if (instance == null) {
     if (opts.version === 7) {
-      await import('./es7-client-delegator.js').then(
-        ({ ES7ClientDelegator }) => {
-          instance = new ES7ClientDelegator(
-            opts.options,
-            opts.rejectUnauthorized,
-          );
-          return instance;
-        },
-      );
+      await import('./es7-client-delegator').then(({ ES7ClientDelegator }) => {
+        instance = new ES7ClientDelegator(
+          opts.options,
+          opts.rejectUnauthorized,
+        );
+        return instance;
+      });
     }
     if (opts.version === 8) {
-      await import('./es8-client-delegator.js').then(
-        ({ ES8ClientDelegator }) => {
-          instance = new ES8ClientDelegator(
-            opts.options,
-            opts.rejectUnauthorized,
-          );
-          return instance;
-        },
-      );
+      await import('./es8-client-delegator').then(({ ES8ClientDelegator }) => {
+        instance = new ES8ClientDelegator(
+          opts.options,
+          opts.rejectUnauthorized,
+        );
+        return instance;
+      });
     }
     if (opts.version === 9) {
-      await import('./es9-client-delegator.js').then(
-        ({ ES9ClientDelegator }) => {
-          instance = new ES9ClientDelegator(
-            opts.options,
-            opts.rejectUnauthorized,
-          );
-          return instance;
-        },
-      );
+      await import('./es9-client-delegator').then(({ ES9ClientDelegator }) => {
+        instance = new ES9ClientDelegator(
+          opts.options,
+          opts.rejectUnauthorized,
+        );
+        return instance;
+      });
     }
   }
 

@@ -2,11 +2,12 @@ import { addDays } from 'date-fns/addDays';
 import { type Document, type PaginateModel, Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
+
 import {
   type IThreadRelation,
   ThreadType,
-} from '~/features/openai/interfaces/thread-relation.js';
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
+} from '../../interfaces/thread-relation';
 
 const DAYS_UNTIL_EXPIRATION = 3;
 

@@ -2,8 +2,9 @@ import type { IRevisionHasId } from '@growi/core';
 import { getIdStringForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import Activity from '~/server/models/activity.js';
+import { SupportedAction } from '~/interfaces/activity';
+
+import Activity from '../../models/activity';
 
 type GenerateUpdatePayload = {
   currentUserId: string | undefined;

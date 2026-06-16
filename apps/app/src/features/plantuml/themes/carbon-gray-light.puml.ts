@@ -1,4 +1,4 @@
-import commonStyles from '~/features/plantuml/themes/carbon-gray-common.puml.js';
+import commonStyles from './carbon-gray-common.puml';
 
 const style = `
 ---

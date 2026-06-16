@@ -12,9 +12,6 @@ import nodePath from 'path';
 import { useTranslation } from 'react-i18next';
 import { DropdownToggle, UncontrolledTooltip } from 'reactstrap';
 
-import { bookmark, unbookmark, unlink } from '~/client/services/page-operation';
-import { addBookmarkToFolder, renamePage } from '~/client/util/bookmark-utils';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import type {
   BookmarkFolderItems,
   DragItemDataType,
@@ -24,6 +21,9 @@ import { useFetchCurrentPage } from '~/states/page';
 import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
 import { mutateAllPageInfo, useSWRxPageInfo } from '~/stores/page';
 
+import { bookmark, unbookmark, unlink } from '../../services/page-operation';
+import { addBookmarkToFolder, renamePage } from '../../util/bookmark-utils';
+import { toastError, toastSuccess } from '../../util/toastr';
 import {
   MenuItemType,
   PageItemControl,

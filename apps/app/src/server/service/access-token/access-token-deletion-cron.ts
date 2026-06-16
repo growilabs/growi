@@ -1,8 +1,9 @@
 import nodeCron from 'node-cron';
 
-import { AccessToken } from '~/server/models/access-token.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
+
+import { AccessToken } from '../../models/access-token';
+import { configManager } from '../config-manager';
 
 const logger = loggerFactory('growi:service:access-token-deletion-cron');
 

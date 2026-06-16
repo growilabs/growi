@@ -4,17 +4,17 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
 import { param, query } from 'express-validator';
 
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import { Revision } from '~/server/models/revision.js';
+import loggerFactory from '~/utils/logger';
+
+import { accessTokenParser } from '../../middlewares/access-token-parser';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { setup as certifySharedPageSetup } from '../../middlewares/certify-shared-page';
+import loginRequiredFactory from '../../middlewares/login-required';
+import { Revision } from '../../models/revision';
 import {
   getAppliedAtForRevisionFilter,
   normalizeLatestRevisionIfBroken,
-} from '~/server/service/revision/normalize-latest-revision-if-broken.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator.js';
-import { setup as certifySharedPageSetup } from '../../middlewares/certify-shared-page.js';
+} from '../../service/revision/normalize-latest-revision-if-broken';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
 

@@ -1,6 +1,6 @@
 import type { AccessTokenParserReq } from '@growi/core/dist/interfaces/server';
 
-import { extractBearerToken } from '~/server/middlewares/access-token-parser/extract-bearer-token.js';
+import { extractBearerToken } from './extract-bearer-token';
 
 // Canonical header name for passing an access token outside the Authorization header.
 // Express lowercases incoming header keys, so indexing by this lowercase constant

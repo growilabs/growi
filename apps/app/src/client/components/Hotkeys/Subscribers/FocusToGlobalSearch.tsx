@@ -3,10 +3,10 @@ import { useEffect } from 'react';
 import {
   useSearchModalActions,
   useSearchModalStatus,
-} from '~/features/search/client/states/modal/search.js';
-import { useIsEditable } from '~/states/page/index.js';
+} from '~/features/search/client/states/modal/search';
+import { useIsEditable } from '~/states/page';
 
-import type { HotkeyBindingDef } from '../HotkeysManager.js';
+import type { HotkeyBindingDef } from '../HotkeysManager';
 
 type Props = {
   onDeleteRender: () => void;

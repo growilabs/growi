@@ -6,11 +6,12 @@ import { beforeAll, describe, expect, it } from 'vitest';
 import { getInstance } from '^/test/setup/crowi';
 
 import { PageActionOnGroupDelete } from '~/interfaces/user-group';
-import type Crowi from '~/server/crowi';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import UserGroup from '~/server/models/user-group';
-import UserGroupRelation from '~/server/models/user-group-relation';
-import type { IUserGroupService } from '~/server/service/user-group';
+
+import type Crowi from '../crowi';
+import type { PageDocument, PageModel } from '../models/page';
+import UserGroup from '../models/user-group';
+import UserGroupRelation from '../models/user-group-relation';
+import type { IUserGroupService } from './user-group';
 
 describe('UserGroupService', () => {
   let crowi: Crowi;

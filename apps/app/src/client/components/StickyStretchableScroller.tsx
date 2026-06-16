@@ -10,8 +10,9 @@ import {
 import SimpleBar from 'simplebar-react';
 import { debounce } from 'throttle-debounce';
 
-import { useSticky } from '~/client/services/side-effects/use-sticky';
 import loggerFactory from '~/utils/logger';
+
+import { useSticky } from '../services/side-effects/use-sticky';
 
 const logger = loggerFactory('growi:cli:StickyStretchableScroller');
 

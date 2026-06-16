@@ -2,15 +2,15 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import type { Router } from 'express';
 import express from 'express';
 
-import type { IResAdminHome } from '~/interfaces/res/admin/admin-home.js';
-import type Crowi from '~/server/crowi/index.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { getGrowiVersion } from '~/utils/growi-version.js';
+import type { IResAdminHome } from '~/interfaces/res/admin/admin-home';
+import { getGrowiVersion } from '~/utils/growi-version';
 
-import type { ApiV3Response } from './interfaces/apiv3-response.js';
+import type Crowi from '../../crowi';
+import { accessTokenParser } from '../../middlewares/access-token-parser';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import loginRequiredFactory from '../../middlewares/login-required';
+import { configManager } from '../../service/config-manager';
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const router = express.Router();
 
@@ -96,7 +96,7 @@ export const setup = (crowi: Crowi): Router => {
     adminRequired,
     async (_req, res: ApiV3Response) => {
       const { getRuntimeVersions } = await import(
-        '~/server/util/runtime-versions.js'
+        '../../util/runtime-versions'
       );
       const runtimeVersions = getRuntimeVersions();
 

@@ -1,7 +1,7 @@
 import { useEffect, useRef } from 'react';
 import type { Virtualizer } from '@tanstack/react-virtual';
 
-import type { IPageForTreeItem } from '~/interfaces/page.js';
+import type { IPageForTreeItem } from '~/interfaces/page';
 
 type UseScrollToSelectedItemParams = {
   targetPathOrId?: string;

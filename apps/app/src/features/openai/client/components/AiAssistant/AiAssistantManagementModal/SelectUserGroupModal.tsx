@@ -4,7 +4,7 @@ import { GroupType } from '@growi/core';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
-import type { PopulatedGrantedGroup } from '~/interfaces/page-grant.js';
+import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 
 type Props = {
   isOpen: boolean;

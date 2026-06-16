@@ -6,8 +6,9 @@ import type {
   MessageContentDelta,
 } from 'openai/resources/beta/threads/messages.mjs';
 
-import VectorStoreFileRelationModel from '~/features/openai/server/models/vector-store-file-relation.js';
-import { getTranslation } from '~/server/service/i18next.js';
+import { getTranslation } from '~/server/service/i18next';
+
+import VectorStoreFileRelationModel from '../models/vector-store-file-relation';
 
 export const replaceAnnotationWithPageLink = async (
   messageContent: MessageContentDelta | MessageContent,

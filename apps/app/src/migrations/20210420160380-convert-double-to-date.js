@@ -1,12 +1,12 @@
 import mongoose from 'mongoose';
 
-import getPageModel from '~/server/models/page.js';
+import getPageModel from '~/server/models/page';
 import {
   getModelSafely,
   getMongoUri,
   mongoOptions,
-} from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:remove-crowi-lauout');
 

@@ -1,7 +1,7 @@
 import type React from 'react';
 import type { LinkProps } from 'next/link';
 
-import { NextLink } from '~/components/ReactMarkdownComponents/NextLink.js';
+import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
 
 export const NextLinkWrapper = (
   props: LinkProps & { children: React.ReactNode; href: string },

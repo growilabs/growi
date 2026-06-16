@@ -12,13 +12,13 @@ import { body } from 'express-validator';
 import createError from 'http-errors';
 import mongoose from 'mongoose';
 
-import { SlackCommandHandlerError } from '~/server/models/vo/slack-command-handler-error.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import { growiInfoService } from '~/server/service/growi-info/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import { handleError } from '../../service/slack-command-handler/error-handler.js';
-import { checkPermission } from '../../util/slack-integration.js';
+import { SlackCommandHandlerError } from '../../models/vo/slack-command-handler-error';
+import { configManager } from '../../service/config-manager';
+import { growiInfoService } from '../../service/growi-info';
+import { handleError } from '../../service/slack-command-handler/error-handler';
+import { checkPermission } from '../../util/slack-integration';
 
 const logger = loggerFactory('growi:routes:apiv3:slack-integration');
 const router = express.Router();

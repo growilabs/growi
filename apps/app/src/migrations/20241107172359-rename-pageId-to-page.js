@@ -1,8 +1,8 @@
 import mongoose from 'mongoose';
 
-import VectorStoreFileRelationModel from '~/features/openai/server/models/vector-store-file-relation.js';
-import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+import VectorStoreFileRelationModel from '~/features/openai/server/models/vector-store-file-relation';
+import { getMongoUri, mongoOptions } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:rename-pageId-to-page');
 

@@ -1,9 +1,9 @@
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 import {
   nextTick,
   ReconnectContext,
-} from '../service/search-reconnect-context/reconnect-context.js';
+} from '../service/search-reconnect-context/reconnect-context';
 
 const logger = loggerFactory('growi:middlewares:auto-reconnect-to-search');
 

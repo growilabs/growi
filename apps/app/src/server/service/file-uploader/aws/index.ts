@@ -20,24 +20,24 @@ import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
 import type { Readable } from 'stream';
 import urljoin from 'url-join';
 
-import type Crowi from '~/server/crowi/index.js';
+import loggerFactory from '~/utils/logger';
+
+import type Crowi from '../../../crowi';
 import {
   AttachmentType,
   FilePathOnStoragePrefix,
   type RespondOptions,
   ResponseMode,
-} from '~/server/interfaces/attachment.js';
-import type { IAttachmentDocument } from '~/server/models/attachment.js';
-import loggerFactory from '~/utils/logger/index.js';
-
-import { configManager } from '../../config-manager/index.js';
+} from '../../../interfaces/attachment';
+import type { IAttachmentDocument } from '../../../models/attachment';
+import { configManager } from '../../config-manager';
 import {
   AbstractFileUploader,
   type SaveFileParam,
   type TemporaryUrl,
-} from '../file-uploader.js';
-import { createContentHeaders, getContentHeaderValue } from '../utils/index.js';
-import { AwsMultipartUploader } from './multipart-uploader.js';
+} from '../file-uploader';
+import { createContentHeaders, getContentHeaderValue } from '../utils';
+import { AwsMultipartUploader } from './multipart-uploader';
 
 const logger = loggerFactory('growi:service:fileUploaderAws');
 

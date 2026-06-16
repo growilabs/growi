@@ -3,9 +3,6 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import { useUpdateStateAfterSave } from '~/client/services/page-operation';
-import { apiPost } from '~/client/util/apiv1-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import {
   type TagEditModalStatus,
   useTagEditModalActions,
@@ -13,6 +10,9 @@ import {
 } from '~/states/ui/modal/tag-edit';
 import { useSWRxTagsInfo } from '~/stores/page';
 
+import { useUpdateStateAfterSave } from '../../../services/page-operation';
+import { apiPost } from '../../../util/apiv1-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { TagsInput } from './TagsInput';
 
 type TagEditModalSubstanceProps = {

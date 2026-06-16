@@ -23,16 +23,16 @@ import {
 import { debounce } from 'throttle-debounce';
 
 import {
-  getMarkdownTable,
-  replaceFocusedMarkdownTableWithEditor,
-} from '~/client/components/PageEditor/markdown-table-util-for-editor';
-import {
   useHandsontableModalActions,
   useHandsontableModalStatus,
 } from '~/states/ui/modal/handsontable';
 
 import ExpandOrContractButton from '../../ExpandOrContractButton';
 import { MarkdownTableDataImportForm } from '../MarkdownTableDataImportForm';
+import {
+  getMarkdownTable,
+  replaceFocusedMarkdownTableWithEditor,
+} from '../markdown-table-util-for-editor';
 
 import styles from './HandsontableModal.module.scss';
 

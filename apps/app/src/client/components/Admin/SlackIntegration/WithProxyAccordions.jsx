@@ -3,11 +3,11 @@ import { SlackbotType } from '@growi/slack';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import { apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
+import { apiv3Post, apiv3Put } from '../../../util/apiv3-client';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import CustomCopyToClipBoard from '../../Common/CustomCopyToClipBoard';
 import Accordion from '../Common/Accordion';
 import ManageCommandsProcess from './ManageCommandsProcess';

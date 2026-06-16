@@ -9,14 +9,15 @@ import type {
   SupportedActionType,
   SupportedEventModelType,
   SupportedTargetModelType,
-} from '~/interfaces/activity.js';
+} from '~/interfaces/activity';
 import {
   AllSupportedActions,
   AllSupportedEventModels,
   AllSupportedTargetModels,
-} from '~/interfaces/activity.js';
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
-import loggerFactory from '~/utils/logger/index.js';
+} from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
+
+import { getOrCreateModel } from '../util/mongoose-utils';
 
 const logger = loggerFactory('growi:models:activity');
 

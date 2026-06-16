@@ -6,14 +6,14 @@ import type { ValidationChain } from 'express-validator';
 import { query } from 'express-validator';
 import mongoose from 'mongoose';
 
-import type Crowi from '~/server/crowi/index.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import type { PageModel } from '~/server/models/page.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator.js';
-import type { ApiV3Response } from '../interfaces/apiv3-response.js';
+import type Crowi from '../../../crowi';
+import { accessTokenParser } from '../../../middlewares/access-token-parser';
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import loginRequiredFactory from '../../../middlewares/login-required';
+import type { PageModel } from '../../../models/page';
+import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:page:get-pages-by-page-paths');
 

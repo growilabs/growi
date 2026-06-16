@@ -4,11 +4,11 @@ import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 import urljoin from 'url-join';
 
-import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
-import AdminGoogleSecurityContainer from '~/client/services/AdminGoogleSecurityContainer';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useSiteUrlWithEmptyValueWarn } from '~/states/global';
 
+import AdminGeneralSecurityContainer from '../../../services/AdminGeneralSecurityContainer';
+import AdminGoogleSecurityContainer from '../../../services/AdminGoogleSecurityContainer';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
 type Props = {

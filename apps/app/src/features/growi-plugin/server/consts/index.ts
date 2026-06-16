@@ -1,4 +1,4 @@
-import { resolveFromRoot } from '~/server/util/project-dir-utils.js';
+import { resolveFromRoot } from '~/server/util/project-dir-utils';
 
 export const PLUGIN_STORING_PATH = resolveFromRoot('tmp/plugins');
 

@@ -1,8 +1,8 @@
 import { type RefObject, useEffect } from 'react';
 import { debounce } from 'throttle-debounce';
 
-import { scrollWithinContainer } from '~/client/util/smooth-scroll.js';
-import { watchRenderingAndReScroll } from '~/client/util/watch-rendering-and-rescroll.js';
+import { scrollWithinContainer } from '~/client/util/smooth-scroll';
+import { watchRenderingAndReScroll } from '~/client/util/watch-rendering-and-rescroll';
 
 const SCROLL_OFFSET_TOP = 30;
 const MUTATION_OBSERVER_CONFIG = { childList: true, subtree: true };

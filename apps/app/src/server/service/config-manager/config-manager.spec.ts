@@ -1,9 +1,9 @@
 import type { RawConfigData } from '@growi/core/dist/interfaces';
 import { mock } from 'vitest-mock-extended';
 
-import type { S2sMessagingService } from '../s2s-messaging/base.js';
-import type { ConfigKey, ConfigValues } from './config-definition.js';
-import { configManager } from './config-manager.js';
+import type { S2sMessagingService } from '../s2s-messaging/base';
+import type { ConfigKey, ConfigValues } from './config-definition';
+import { configManager } from './config-manager';
 
 // Test helper type for setting configs
 type TestConfigData = RawConfigData<ConfigKey, ConfigValues>;

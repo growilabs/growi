@@ -7,9 +7,9 @@ import type {
   PageGrant,
 } from '@growi/core';
 
-import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group.js';
+import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
 
-import type { IPageOperationProcessData } from './page-operation.js';
+import type { IPageOperationProcessData } from './page-operation';
 
 export {
   isIPageInfoForEntity,

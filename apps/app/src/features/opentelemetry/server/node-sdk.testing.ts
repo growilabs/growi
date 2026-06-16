@@ -5,7 +5,7 @@
 
 import type { NodeSDK } from '@opentelemetry/sdk-node';
 
-import { __testing__ } from '~/features/opentelemetry/server/node-sdk.js';
+import { __testing__ } from './node-sdk';
 
 /**
  * Get the current SDK instance

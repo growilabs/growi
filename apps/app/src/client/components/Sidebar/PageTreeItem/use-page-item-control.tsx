@@ -5,20 +5,20 @@ import { getIdStringForRef } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { DropdownToggle } from 'reactstrap';
 
-import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
-import {
-  bookmark,
-  resumeRenameOperation,
-  unbookmark,
-} from '~/client/services/page-operation';
-import { toastError, toastSuccess } from '~/client/util/toastr';
 import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem';
 import { ReconcileTriggerModal } from '~/features/growi-vault/client/components/ReconcileTriggerModal';
 import type { TreeItemToolProps } from '~/features/page-tree/interfaces';
 import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark';
 import { useSWRMUTxPageInfo } from '~/stores/page';
 
+import {
+  bookmark,
+  resumeRenameOperation,
+  unbookmark,
+} from '../../../services/page-operation';
+import { toastError, toastSuccess } from '../../../util/toastr';
 import { PageItemControl } from '../../Common/Dropdown/PageItemControl';
+import { NotAvailableForGuest } from '../../NotAvailableForGuest';
 
 type UsePageItemControl = {
   Control: FC<TreeItemToolProps>;

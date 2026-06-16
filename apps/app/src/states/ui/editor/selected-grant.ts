@@ -4,8 +4,8 @@ import type {
   IOptionsForUpdate,
   IPageGrantData,
   IPageSelectedGrant,
-} from '~/interfaces/page.js';
-import { UserGroupPageGrantStatus } from '~/interfaces/page.js';
+} from '~/interfaces/page';
+import { UserGroupPageGrantStatus } from '~/interfaces/page';
 
 /**
  * Atom for selected grant in page editor

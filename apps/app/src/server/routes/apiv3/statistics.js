@@ -1,4 +1,4 @@
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
 const _logger = loggerFactory('growi:routes:apiv3:healthcheck');
 

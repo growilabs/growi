@@ -1,4 +1,4 @@
-import { configManager } from '~/server/service/config-manager/index.js';
+import { configManager } from '~/server/service/config-manager';
 
 export const isAiEnabled = (): boolean =>
   configManager.getConfig('app:aiEnabled');

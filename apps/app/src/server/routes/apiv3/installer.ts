@@ -3,22 +3,22 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, Router } from 'express';
 import express from 'express';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import { configManager } from '~/server/service/config-manager/index.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi/index.js';
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity.js';
-import * as applicationNotInstalled from '../../middlewares/application-not-installed.js';
+import type Crowi from '../../crowi';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import * as applicationNotInstalled from '../../middlewares/application-not-installed';
 import {
   registerRules,
   registerValidation,
-} from '../../middlewares/register-form-validator.js';
+} from '../../middlewares/register-form-validator';
+import { configManager } from '../../service/config-manager';
 import {
   FailedToCreateAdminUserError,
   InstallerService,
-} from '../../service/installer.js';
-import type { ApiV3Response } from './interfaces/apiv3-response.js';
+} from '../../service/installer';
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const _logger = loggerFactory('growi:routes:apiv3:installer');
 

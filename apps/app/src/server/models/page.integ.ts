@@ -1,9 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '~/server/crowi';
-import { configManager } from '~/server/service/config-manager';
-import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
+import type Crowi from '../crowi';
+import { configManager } from '../service/config-manager';
+import type { S2sMessagingService } from '../service/s2s-messaging/base';
 
 // Minimal mock for PageEvent that extends EventEmitter
 class MockPageEvent extends EventEmitter {
@@ -54,19 +54,19 @@ describe('Page', () => {
     await configManager.loadConfigs();
 
     // Initialize models with mocked Crowi using dynamic import
-    const pageModule = await import('./page.js');
+    const pageModule = await import('./page');
     const pageFactory = pageModule.default;
     Page = pageFactory(crowiMock);
     PageQueryBuilder = Page.PageQueryBuilder;
 
-    const userModule = await import('./user/index.js');
+    const userModule = await import('./user');
     const userFactory = userModule.default;
     User = userFactory(null);
 
-    const userGroupModule = await import('./user-group.js');
+    const userGroupModule = await import('./user-group');
     UserGroup = userGroupModule.default;
 
-    const userGroupRelationModule = await import('./user-group-relation.js');
+    const userGroupRelationModule = await import('./user-group-relation');
     UserGroupRelation = userGroupRelationModule.default;
 
     await User.insertMany([

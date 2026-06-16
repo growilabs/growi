@@ -9,7 +9,7 @@ describe('migrate-slack-app-integration-schema', () => {
   beforeAll(async () => {
     // The migration module exposes named `up` / `down` ESM exports.
     const migrateModule = await import(
-      './20210913153942-migrate-slack-app-integration-schema.js'
+      './20210913153942-migrate-slack-app-integration-schema'
     );
     migrate = migrateModule;
     collection = mongoose.connection.collection('slackappintegrations');

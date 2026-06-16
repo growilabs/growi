@@ -1,2 +1,2 @@
-export * from '~/states/server-configurations/accepted-upload-file-type.js';
-export * from '~/states/server-configurations/server-configurations.js';
+export * from './accepted-upload-file-type';
+export * from './server-configurations';

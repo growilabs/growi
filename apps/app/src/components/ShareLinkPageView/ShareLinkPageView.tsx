@@ -2,7 +2,6 @@ import { type JSX, memo, useCallback, useMemo } from 'react';
 import dynamic from 'next/dynamic';
 import { useSlidesByFrontmatter } from '@growi/presentation/dist/services';
 
-import { PagePathNavTitle } from '~/components/Common/PagePathNavTitle';
 import type { RendererConfig } from '~/interfaces/services/renderer';
 import type { IShareLinkHasId } from '~/interfaces/share-link';
 import { useShouldExpandContent } from '~/services/layout/use-should-expand-content';
@@ -10,6 +9,7 @@ import { useCurrentPageData, usePageNotFound } from '~/states/page';
 import { useViewOptions } from '~/stores/renderer';
 import loggerFactory from '~/utils/logger';
 
+import { PagePathNavTitle } from '../Common/PagePathNavTitle';
 import { PageContentFooter } from '../PageView/PageContentFooter';
 import { PageViewLayout } from '../PageView/PageViewLayout';
 import ShareLinkAlert from './ShareLinkAlert';

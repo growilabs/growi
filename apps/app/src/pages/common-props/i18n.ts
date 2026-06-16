@@ -5,8 +5,9 @@ import { serverSideTranslations } from 'next-i18next/serverSideTranslations';
 
 import nextI18NextConfig from '^/config/next-i18next.config.cjs';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import { getLangAtServerSide } from '~/pages/utils/locale.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+
+import { getLangAtServerSide } from '../utils/locale';
 
 // Shared helper function to create i18n config with proper configuration
 async function createNextI18NextConfig(

@@ -3,15 +3,16 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
-import { SupportedAction } from '~/interfaces/activity.js';
-import { accessTokenParser } from '~/server/middlewares/access-token-parser/index.js';
-import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity.js';
-import adminRequiredFactory from '~/server/middlewares/admin-required.js';
-import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator.js';
-import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user.js';
-import loginRequiredFactory from '~/server/middlewares/login-required.js';
-import ShareLink from '~/server/models/share-link.js';
-import loggerFactory from '~/utils/logger/index.js';
+import { SupportedAction } from '~/interfaces/activity';
+import loggerFactory from '~/utils/logger';
+
+import { accessTokenParser } from '../../middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import adminRequiredFactory from '../../middlewares/admin-required';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
+import loginRequiredFactory from '../../middlewares/login-required';
+import ShareLink from '../../models/share-link';
 
 const logger = loggerFactory('growi:routes:apiv3:share-links');
 

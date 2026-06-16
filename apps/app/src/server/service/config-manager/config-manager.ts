@@ -6,14 +6,14 @@ import type {
 import { ConfigSource } from '@growi/core/dist/interfaces';
 import { parseISO } from 'date-fns/parseISO';
 
-import { ENV_ONLY_GROUPS } from '~/server/service/config-manager/config-definition.js';
-import { ConfigLoader } from '~/server/service/config-manager/config-loader.js';
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type S2sMessage from '../../models/vo/s2s-message.js';
-import type { S2sMessagingService } from '../s2s-messaging/base.js';
-import type { S2sMessageHandlable } from '../s2s-messaging/handlable.js';
-import type { ConfigKey, ConfigValues } from './config-definition.js';
+import type S2sMessage from '../../models/vo/s2s-message';
+import type { S2sMessagingService } from '../s2s-messaging/base';
+import type { S2sMessageHandlable } from '../s2s-messaging/handlable';
+import type { ConfigKey, ConfigValues } from './config-definition';
+import { ENV_ONLY_GROUPS } from './config-definition';
+import { ConfigLoader } from './config-loader';
 
 const logger = loggerFactory('growi:service:ConfigManager');
 
@@ -116,7 +116,7 @@ export class ConfigManager
     options?: UpdateConfigOptions,
   ): Promise<void> {
     // Dynamic import to avoid loading database modules too early
-    const { Config } = await import('~/server/models/config.js');
+    const { Config } = await import('../../models/config');
 
     if (options?.removeIfUndefined && value === undefined) {
       // remove the config if the value is undefined and removeIfUndefined is true
@@ -141,7 +141,7 @@ export class ConfigManager
     options?: UpdateConfigOptions,
   ): Promise<void> {
     // Dynamic import to avoid loading database modules too early
-    const { Config } = await import('~/server/models/config.js');
+    const { Config } = await import('../../models/config');
 
     const operations = Object.entries(updates).map(([key, value]) => {
       return options?.removeIfUndefined && value === undefined
@@ -170,7 +170,7 @@ export class ConfigManager
     options?: UpdateConfigOptions,
   ): Promise<void> {
     // Dynamic import to avoid loading database modules too early
-    const { Config } = await import('~/server/models/config.js');
+    const { Config } = await import('../../models/config');
 
     const operations = keys.map((key) => ({
       deleteOne: {
@@ -224,9 +224,7 @@ export class ConfigManager
   }
 
   async publishUpdateMessage(): Promise<void> {
-    const { default: S2sMessage } = await import(
-      '~/server/models/vo/s2s-message.js'
-    );
+    const { default: S2sMessage } = await import('../../models/vo/s2s-message');
 
     const s2sMessage = new S2sMessage('configUpdated', {
       updatedAt: new Date(),

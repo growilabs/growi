@@ -17,20 +17,20 @@ import { removeHeadingSlash } from '@growi/core/dist/utils/path-utils';
 import assert from 'assert';
 import type { HydratedDocument, model } from 'mongoose';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
-import type { PageDocument, PageModel } from '~/server/models/page.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageRedirect,
   PageRedirectModel,
-} from '~/server/models/page-redirect.js';
-import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer.js';
+} from '~/server/models/page-redirect';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 
-import type { CommonEachProps } from '../common-props/index.js';
+import type { CommonEachProps } from '../common-props';
 import type {
   GeneralPageInitialProps,
   IPageToShowRevisionWithMeta,
-} from '../general-page/index.js';
-import type { EachProps } from './types.js';
+} from '../general-page';
+import type { EachProps } from './types';
 
 // Utility to resolve path, redirect, and identical path page check
 type PathResolutionResult = {

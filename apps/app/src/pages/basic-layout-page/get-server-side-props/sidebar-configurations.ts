@@ -1,8 +1,8 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
-import type { CrowiRequest } from '~/interfaces/crowi-request.js';
+import type { CrowiRequest } from '~/interfaces/crowi-request';
 
-import type { SidebarConfigurationProps } from '../types.js';
+import type { SidebarConfigurationProps } from '../types';
 
 export const getServerSideSidebarConfigProps: GetServerSideProps<
   SidebarConfigurationProps

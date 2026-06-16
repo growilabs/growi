@@ -1,12 +1,12 @@
 import { type Document, type Model, Schema } from 'mongoose';
 
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
+
+import type { IPageBulkExportJob } from '../../interfaces/page-bulk-export';
 import {
   PageBulkExportFormat,
   PageBulkExportJobStatus,
-} from '~/features/page-bulk-export/interfaces/page-bulk-export.js';
-import { getOrCreateModel } from '~/server/util/mongoose-utils.js';
-
-import type { IPageBulkExportJob } from '../../interfaces/page-bulk-export.js';
+} from '../../interfaces/page-bulk-export';
 
 export interface PageBulkExportJobDocument
   extends IPageBulkExportJob,

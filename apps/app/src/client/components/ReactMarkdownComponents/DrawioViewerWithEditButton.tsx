@@ -7,18 +7,18 @@ import {
 } from '@growi/remark-drawio';
 import { useTranslation } from 'next-i18next';
 
-import { useCurrentPageYjsData } from '~/features/collaborative-editor/states/index.js';
+import { useCurrentPageYjsData } from '~/features/collaborative-editor/states';
 import {
   useIsGuestUser,
   useIsReadOnlyUser,
   useIsSharedUser,
-} from '~/states/context.js';
-import { useShareLinkId } from '~/states/page/hooks.js';
-import { useIsRevisionOutdated } from '~/stores/page.js';
+} from '~/states/context';
+import { useShareLinkId } from '~/states/page/hooks';
+import { useIsRevisionOutdated } from '~/stores/page';
 
 import styles from './DrawioViewerWithEditButton.module.scss';
 
-import '~/client/components/ReactMarkdownComponents/DrawioViewerWithEditButton.vendor-styles.prebuilt.js';
+import './DrawioViewerWithEditButton.vendor-styles.prebuilt';
 
 export const DrawioViewerWithEditButton = React.memo(
   (props: DrawioViewerProps): JSX.Element => {

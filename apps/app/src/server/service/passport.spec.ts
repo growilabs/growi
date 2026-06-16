@@ -1,11 +1,10 @@
 import type { MockInstance } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '~/server/crowi';
-import type UserEvent from '~/server/events/user';
-
-import { configManager } from './config-manager/index.js';
-import PassportService from './passport.js';
+import type Crowi from '../crowi';
+import type UserEvent from '../events/user';
+import { configManager } from './config-manager';
+import PassportService from './passport';
 
 describe('PassportService test', () => {
   let crowiMock: Crowi;

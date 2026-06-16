@@ -3,15 +3,15 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import mongoose from 'mongoose';
 
-import loggerFactory from '~/utils/logger/index.js';
+import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi/index.js';
-import { setup as applicationInstalledSetup } from '../../middlewares/application-installed.js';
+import type Crowi from '../../crowi';
+import { setup as applicationInstalledSetup } from '../../middlewares/application-installed';
 import {
   invitedRules,
   invitedValidation,
-} from '../../middlewares/invited-form-validator.js';
-import type { ApiV3Response } from './interfaces/apiv3-response.js';
+} from '../../middlewares/invited-form-validator';
+import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:login');
 

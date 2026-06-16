@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader.js';
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
 
 type SearchOptionModalProps = {
   isOpen: boolean;
@@ -20,9 +20,7 @@ export const SearchOptionModalLazyLoaded = (
   const SearchOptionModal = useLazyLoader<SearchOptionModalProps>(
     'search-option-modal',
     () =>
-      import(
-        '~/features/search/client/components/SearchPage/SearchOptionModal/SearchOptionModal.js'
-      ).then((mod) => ({
+      import('./SearchOptionModal').then((mod) => ({
         default: mod.SearchOptionModal,
       })),
     isOpen,

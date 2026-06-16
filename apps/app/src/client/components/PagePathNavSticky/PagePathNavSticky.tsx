@@ -3,7 +3,6 @@ import { DevidedPagePath } from '@growi/core/dist/models';
 import { pagePathUtils } from '@growi/core/dist/utils';
 import Sticky from 'react-stickynode';
 
-import { usePrintMode } from '~/client/services/use-print-mode';
 import { LinkedPagePath } from '~/models/linked-page-path';
 import { usePageControlsX } from '~/states/ui/page';
 import { useCurrentProductNavWidth, useSidebarMode } from '~/states/ui/sidebar';
@@ -15,6 +14,7 @@ import {
   PagePathNavLayout,
   Separator,
 } from '../../../components/Common/PagePathNav';
+import { usePrintMode } from '../../services/use-print-mode';
 import { CollapsedParentsDropdown } from './CollapsedParentsDropdown';
 
 import styles from './PagePathNavSticky.module.scss';

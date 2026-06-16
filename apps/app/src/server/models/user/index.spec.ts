@@ -61,7 +61,7 @@ vi.mock('../../service/acl', () => ({
 describe('models/user lazy singleton getters', () => {
   describe('getConfigManager', () => {
     it('should be a synchronous function (not return a Promise)', async () => {
-      const { getConfigManager } = await import('./index.js');
+      const { getConfigManager } = await import('.');
       const result = getConfigManager();
       // Must not be a Promise
       expect(result).not.toBeInstanceOf(Promise);
@@ -69,7 +69,7 @@ describe('models/user lazy singleton getters', () => {
     });
 
     it('should return the same singleton reference on multiple calls (cache is singleton)', async () => {
-      const { getConfigManager } = await import('./index.js');
+      const { getConfigManager } = await import('.');
       const first = getConfigManager();
       const second = getConfigManager();
       // Must be strictly the same object (cached reference)
@@ -79,7 +79,7 @@ describe('models/user lazy singleton getters', () => {
 
   describe('getAclService', () => {
     it('should be a synchronous function (not return a Promise)', async () => {
-      const { getAclService } = await import('./index.js');
+      const { getAclService } = await import('.');
       const result = getAclService();
       // Must not be a Promise
       expect(result).not.toBeInstanceOf(Promise);
@@ -87,7 +87,7 @@ describe('models/user lazy singleton getters', () => {
     });
 
     it('should return the same singleton reference on multiple calls (cache is singleton)', async () => {
-      const { getAclService } = await import('./index.js');
+      const { getAclService } = await import('.');
       const first = getAclService();
       const second = getAclService();
       // Must be strictly the same object (cached reference)

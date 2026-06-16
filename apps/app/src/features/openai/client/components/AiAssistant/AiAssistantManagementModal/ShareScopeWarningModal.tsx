@@ -3,7 +3,7 @@ import { useCallback, useMemo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
-import type { SelectablePage } from '../../../../interfaces/selectable-page.js';
+import type { SelectablePage } from '../../../../interfaces/selectable-page';
 
 /**
  * ShareScopeWarningModalSubstance - Presentation component (all logic here)
