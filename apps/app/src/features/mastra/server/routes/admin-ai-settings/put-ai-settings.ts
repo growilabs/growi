@@ -96,9 +96,10 @@ const clearableConfigString = (field: string): ValidationChain =>
  * omit semantics (omitted clearable strings are reset; apiKey/booleans are merge
  * exceptions). provider must be a supported AI provider; the string fields are
  * type-guarded with .isString(); the clearable ones are sanitized ('' -> undefined)
- * so removeIfUndefined deletes them (Req 4.4); providerOptions must be valid JSON
- * when present; the boolean toggles must be real booleans. Semantic option validity
- * is the provider integration's responsibility.
+ * so removeIfUndefined deletes them (Req 4.4); providerOptions must be a
+ * provider-namespaced JSON object when present (the shape the runtime applies);
+ * the boolean toggles must be real booleans. Semantic option validity is the
+ * provider integration's responsibility.
  */
 export const updateAiSettingsValidators: ValidationChain[] = [
   body('aiEnabled')
@@ -115,13 +116,18 @@ export const updateAiSettingsValidators: ValidationChain[] = [
   clearableConfigString('model'),
   // providerOptions: validate the RAW value with the shared FE/BE predicate
   // (Req 6.2) BEFORE the sanitizer (the predicate treats '' as valid; sanitizing
-  // first would feed it undefined). The sanitizer then clears '' -> undefined.
+  // first would feed it undefined). The predicate requires a provider-namespaced
+  // JSON object (the shape the runtime actually applies), so a wrong-shape value
+  // is rejected here instead of being saved and then silently ignored at chat
+  // time. The sanitizer then clears '' -> undefined.
   body('providerOptions')
     .optional()
     .isString()
     .withMessage('providerOptions must be a string')
     .custom((value: string) => isValidProviderOptionsJson(value))
-    .withMessage('providerOptions must be a valid JSON string')
+    .withMessage(
+      'providerOptions must be a provider-namespaced JSON object (e.g. {"openai":{...}})',
+    )
     .customSanitizer((value) => (value === '' ? undefined : value)),
 
   // The Azure OpenAI connection settings are one nested object. Validate the

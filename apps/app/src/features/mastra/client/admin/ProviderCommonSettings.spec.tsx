@@ -128,20 +128,42 @@ describe('ProviderCommonSettings', () => {
       ).toBeInTheDocument();
     });
 
-    it('does not show a validation message for valid JSON', async () => {
+    it('does not show a validation message for a valid provider-namespaced object', async () => {
       // Arrange
       renderComponent();
       const textarea = screen.getByLabelText(
         'ai_settings.provider_options_label',
       );
 
-      // Act: the leading `{` is escaped as `{{` for userEvent's keyboard syntax.
-      await userEvent.setup().type(textarea, '{{"temperature":0.7}');
+      // Act: a provider-namespaced object — the shape the runtime applies. Each
+      // literal `{` is escaped as `{{` for userEvent's keyboard syntax, so this
+      // types `{"openai":{"temperature":0.7}}`.
+      await userEvent
+        .setup()
+        .type(textarea, '{{"openai":{{"temperature":0.7}}');
 
       // Assert
       expect(
         screen.queryByText('ai_settings.provider_options_invalid_json'),
       ).not.toBeInTheDocument();
+    });
+
+    it('shows an inline validation message for valid JSON of the wrong shape', async () => {
+      // Arrange
+      renderComponent();
+      const textarea = screen.getByLabelText(
+        'ai_settings.provider_options_label',
+      );
+
+      // Act: parsable JSON but NOT provider-namespaced (a flat object whose value
+      // is a primitive). The runtime would ignore it, so the form rejects it up
+      // front. Types `{"temperature":0.7}`.
+      await userEvent.setup().type(textarea, '{{"temperature":0.7}');
+
+      // Assert
+      expect(
+        await screen.findByText('ai_settings.provider_options_invalid_json'),
+      ).toBeInTheDocument();
     });
 
     it('does not show a validation message when empty', () => {

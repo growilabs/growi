@@ -34,7 +34,7 @@ describe('ai-settings interfaces', () => {
         aiEnabled: true,
         provider,
         model: 'gpt-4o',
-        providerOptions: '{"temperature":0.2}',
+        providerOptions: '{"openai":{"temperature":0.2}}',
         azureOpenaiSettings: {
           resourceName: 'my-resource',
           baseURL: 'https://example.openai.azure.com',

@@ -142,7 +142,7 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
     setConfig({
       'ai:provider': 'azure-openai',
       'ai:model': 'gpt-4o',
-      'ai:providerOptions': '{"temperature":0.2}',
+      'ai:providerOptions': '{"openai":{"temperature":0.2}}',
       'ai:azureOpenaiSettings': {
         resourceName: 'my-resource',
         baseURL: 'https://example.openai.azure.com',
@@ -158,7 +158,7 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
     expect(responseBody(res)).toMatchObject({
       provider: 'azure-openai',
       model: 'gpt-4o',
-      providerOptions: '{"temperature":0.2}',
+      providerOptions: '{"openai":{"temperature":0.2}}',
       azureOpenaiSettings: {
         resourceName: 'my-resource',
         baseURL: 'https://example.openai.azure.com',

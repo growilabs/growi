@@ -148,7 +148,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         provider: 'openai',
         apiKey: 'sk-new-key',
         model: 'gpt-4o',
-        providerOptions: '{"temperature":0.2}',
+        providerOptions: '{"openai":{"temperature":0.2}}',
         azureOpenaiSettings: { useEntraId: true },
       });
 
@@ -158,7 +158,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         'ai:provider': 'openai',
         'ai:apiKey': 'sk-new-key',
         'ai:model': 'gpt-4o',
-        'ai:providerOptions': '{"temperature":0.2}',
+        'ai:providerOptions': '{"openai":{"temperature":0.2}}',
         // The azureOpenaiSettings object is re-assembled into the config value.
         'ai:azureOpenaiSettings': { useEntraId: true },
       });
@@ -427,19 +427,21 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
     });
   });
 
-  // providerOptions now uses the shared FE/BE predicate (isValidProviderOptionsJson,
-  // JSON.parse based), so client and server accept/reject exactly the same input.
-  describe('providerOptions (shared JSON.parse predicate)', () => {
-    it('accepts a parsable JSON object string', async () => {
+  // providerOptions uses the shared FE/BE predicate (isValidProviderOptionsJson),
+  // which requires a provider-namespaced JSON object — the shape the runtime
+  // applies — so client and server accept/reject exactly the same input and a
+  // wrong-shape value is rejected here instead of saved-then-silently-ignored.
+  describe('providerOptions (shared provider-namespaced predicate)', () => {
+    it('accepts a provider-namespaced JSON object string', async () => {
       const { hasErrors } = await runValidators({
         providerOptions: '{"openai":{"temperature":0.7}}',
       });
       expect(hasErrors).toBe(false);
     });
 
-    // JSON.parse accepts objects, arrays, the literal primitives true/false/null,
-    // AND bare numbers / quoted strings, so the shared predicate accepts them all.
-    // This is the parity point with the client form.
+    // Parsable JSON of the wrong shape (arrays, bare primitives, or an object
+    // whose value is not itself an option object) is rejected up front — the
+    // runtime would ignore it, so accepting it on save would be a silent no-op.
     it.each([
       '[1,2,3]',
       'true',
@@ -447,9 +449,14 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
       'null',
       '42',
       '"x"',
-    ])('accepts the parsable JSON value "%s"', async (providerOptions) => {
-      const { hasErrors } = await runValidators({ providerOptions });
-      expect(hasErrors).toBe(false);
+      '{"temperature":0.2}',
+      '{"openai":[1,2]}',
+    ])('rejects the wrong-shape JSON value "%s"', async (providerOptions) => {
+      const { hasErrors, failedFields } = await runValidators({
+        providerOptions,
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('providerOptions');
     });
 
     it('rejects a malformed JSON string', async () => {
@@ -607,7 +614,7 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
       provider: 'azure-openai',
       apiKey: 'secret-key',
       model: 'gpt-4o',
-      providerOptions: '{"temperature":0.2}',
+      providerOptions: '{"openai":{"temperature":0.2}}',
       azureOpenaiSettings: {
         resourceName: 'my-resource',
         baseURL: 'https://example.openai.azure.com',

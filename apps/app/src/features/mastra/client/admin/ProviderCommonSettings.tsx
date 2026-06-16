@@ -20,7 +20,7 @@ const PROVIDER_OPTIONS_PLACEHOLDER = `{
     "openai": {
         "reasoningEffort": "low",
         "reasoningSummary": "auto"
-    },
+    }
 }`;
 
 export interface ProviderCommonSettingsProps {
