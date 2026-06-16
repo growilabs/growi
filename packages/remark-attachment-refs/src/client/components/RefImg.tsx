@@ -2,6 +2,7 @@ import React, { type JSX, useMemo } from 'react';
 
 import { useSWRxRef } from '../stores/refs';
 import { AttachmentList } from './AttachmentList';
+import { AttachmentRefsDisabled } from './AttachmentRefsDisabled';
 import { RefsContext } from './util/refs-context';
 
 type Props = {
@@ -14,6 +15,7 @@ type Props = {
   alt?: string;
 
   isImmutable?: boolean;
+  isSharedPage?: boolean;
 };
 
 const RefImgSubstance = React.memo(
@@ -58,12 +60,15 @@ const RefImgSubstance = React.memo(
 );
 
 export const RefImg = React.memo((props: Props): JSX.Element => {
+  if (props.isSharedPage) {
+    return <AttachmentRefsDisabled name="refimg" />;
+  }
   return <RefImgSubstance {...props} />;
 });
 
 export const RefImgImmutable = React.memo(
   (props: Omit<Props, 'isImmutable'>): JSX.Element => {
-    return <RefImgSubstance {...props} isImmutable />;
+    return <RefImg {...props} isImmutable />;
   },
 );
 

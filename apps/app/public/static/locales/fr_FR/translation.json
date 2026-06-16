@@ -1007,6 +1007,8 @@
   },
   "user_home_page": {
     "bookmarks": "Favoris",
+    "contribution_graph": "Graphe de contribution",
+    "contribution_migration_in_progress": "Préparation de vos données de contribution. Actualisez dans un instant pour les voir.",
     "recently_created": "Pages récentes",
     "recent_activity": "Modifications récentes",
     "unknown_action": "a effectué une modification non spécifiée",
