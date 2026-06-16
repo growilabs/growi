@@ -20,7 +20,17 @@
  *   ~/x.js     -> <app>/src/x.ts   (.js suffix -> .ts source)
  *   ^/x        -> <app>/x
  *   ./x.js     -> ./x.ts           (relative .js -> .ts source)
- * Bare specifiers and anything already resolvable fall through to the default.
+ *   ./dir      -> ./dir/index.ts   (directory -> index source)
+ *   . / ..     -> ./index.ts / ../index.ts  (bare current/parent dir)
+ * Other bare specifiers (packages) and anything already resolvable fall
+ * through to the default.
+ *
+ * The bare `.` / `..` (and `./dir`) directory forms are produced by the
+ * esm-import-convention codemod (which collapses `./index.js` -> `.`). Node's
+ * native ESM loader rejects directory imports (ERR_UNSUPPORTED_DIR_IMPORT), so
+ * this hook must resolve them to the directory's index source — mirroring the
+ * production-side `bin/add-js-extensions.mjs`, which appends `/index.js` to the
+ * same specifiers in the build output.
  */
 import { statSync } from 'node:fs';
 import { registerHooks } from 'node:module';
@@ -80,7 +90,10 @@ registerHooks({
     } else if (specifier.startsWith('^/')) {
       target = resolvePath(APP_ROOT, specifier.slice(2));
     } else if (
-      (specifier.startsWith('./') || specifier.startsWith('../')) &&
+      (specifier === '.' ||
+        specifier === '..' ||
+        specifier.startsWith('./') ||
+        specifier.startsWith('../')) &&
       context.parentURL?.startsWith('file:')
     ) {
       target = resolvePath(
