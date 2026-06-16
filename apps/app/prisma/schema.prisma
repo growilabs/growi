@@ -133,6 +133,13 @@ model bookmarks {
   @@index([user], map: "user_1")
 }
 
+model changestream_resume_tokens {
+  id    String @id @default(auto()) @map("_id") @db.ObjectId
+  v     Int    @default(0) @map("__v")
+  key   String @unique
+  token Json
+}
+
 model comments {
   id              String   @id @default(auto()) @map("_id") @db.ObjectId
   v               Int      @default(0) @map("__v")
