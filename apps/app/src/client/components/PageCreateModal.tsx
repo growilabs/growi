@@ -18,7 +18,6 @@ import {
 } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
-import PagePathAutoComplete from '~/client/components/PagePathAutoComplete';
 import { useCreateTemplatePage } from '~/client/services/create-page';
 import { useCreatePage } from '~/client/services/create-page/use-create-page';
 import { useToastrOnError } from '~/client/services/use-toastr-on-error';
@@ -30,6 +29,8 @@ import {
   usePageCreateModalStatus,
 } from '~/states/ui/modal/page-create';
 import { getLocale } from '~/utils/locale-utils';
+
+import PagePathAutoComplete from './PagePathAutoComplete';
 
 import styles from './PageCreateModal.module.scss';
 

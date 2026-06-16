@@ -1,2 +1,2 @@
-export * from '~/features/comment/server/events/consts';
-export * from '~/features/comment/server/events/event-emitter';
+export * from './consts';
+export * from './event-emitter';

@@ -59,7 +59,7 @@ describe('Page', () => {
     Page = pageFactory(crowiMock);
     PageQueryBuilder = Page.PageQueryBuilder;
 
-    const userModule = await import('./user');
+    const userModule = await import('./user/index');
     const userFactory = userModule.default;
     User = userFactory(null);
 

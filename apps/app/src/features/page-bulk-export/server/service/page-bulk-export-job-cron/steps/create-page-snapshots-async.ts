@@ -5,14 +5,14 @@ import { getIdForRef, getIdStringForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import PageBulkExportJob from '~/features/page-bulk-export/server/models/page-bulk-export-job';
-import PageBulkExportPageSnapshot from '~/features/page-bulk-export/server/models/page-bulk-export-page-snapshot';
-import { BulkExportJobStreamDestroyedByCleanupError } from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron/errors';
 import { SupportedAction } from '~/interfaces/activity';
 import type { PageDocument, PageModel } from '~/server/models/page';
 
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
+import PageBulkExportJob from '../../../models/page-bulk-export-job';
+import PageBulkExportPageSnapshot from '../../../models/page-bulk-export-page-snapshot';
 import type { IPageBulkExportJobCronService } from '..';
+import { BulkExportJobStreamDestroyedByCleanupError } from '../errors';
 
 async function reuseDuplicateExportIfExists(
   this: IPageBulkExportJobCronService,

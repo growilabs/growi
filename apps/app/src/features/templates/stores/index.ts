@@ -1,1 +1,1 @@
-export * from '~/features/templates/stores/template';
+export * from './template';

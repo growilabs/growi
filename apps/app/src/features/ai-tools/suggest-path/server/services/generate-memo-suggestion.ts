@@ -1,11 +1,11 @@
 import { PageGrant } from '@growi/core';
 import { userHomepagePath } from '@growi/core/dist/utils/page-path-utils';
 
-import { SuggestionType } from '~/features/ai-tools/suggest-path/interfaces/suggest-path-types';
-import { resolveParentGrant } from '~/features/ai-tools/suggest-path/server/services/resolve-parent-grant';
 import { configManager } from '~/server/service/config-manager';
 
 import type { PathSuggestion } from '../../interfaces/suggest-path-types';
+import { SuggestionType } from '../../interfaces/suggest-path-types';
+import { resolveParentGrant } from './resolve-parent-grant';
 
 const MEMO_LABEL = 'Save as memo';
 const MEMO_DESCRIPTION = 'Save to your personal memo area';

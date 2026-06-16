@@ -10,22 +10,22 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Input, ModalBody, ModalFooter } from 'reactstrap';
 
-import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader';
-import { ShareScopeWarningModal } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/ShareScopeWarningModal';
-import {
-  AiAssistantManagementModalPageMode,
-  useAiAssistantManagementModalActions,
-} from '~/features/openai/client/states/modal/ai-assistant-management';
 import {
   AiAssistantAccessScope,
   AiAssistantShareScope,
 } from '~/features/openai/interfaces/ai-assistant';
-import { determineShareScope } from '~/features/openai/utils/determine-share-scope';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import { useCurrentUser } from '~/states/global';
 import { limitLearnablePageCountPerAssistantAtom } from '~/states/server-configurations';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page';
+import { determineShareScope } from '../../../../utils/determine-share-scope';
+import {
+  AiAssistantManagementModalPageMode,
+  useAiAssistantManagementModalActions,
+} from '../../../states/modal/ai-assistant-management';
+import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
+import { ShareScopeWarningModal } from './ShareScopeWarningModal';
 
 type Props = {
   isActivePane: boolean;

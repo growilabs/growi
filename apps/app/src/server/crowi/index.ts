@@ -129,17 +129,17 @@ class Crowi {
 
   fileUploadService!: FileUploader;
 
-  growiInfoService!: import('../service/growi-info/index.js').GrowiInfoService;
+  growiInfoService!: import('../service/growi-info').GrowiInfoService;
 
   growiBridgeService!: GrowiBridgeService;
 
-  pageService!: import('../service/page/page-service.js').IPageService;
+  pageService!: import('../service/page/page-service').IPageService;
 
   pageGrantService!: PageGrantService;
 
   pageOperationService!: IPageOperationService;
 
-  customizeService!: import('../service/customize.js').CustomizeService;
+  customizeService!: import('../service/customize').CustomizeService;
 
   passportService!: PassportService;
 

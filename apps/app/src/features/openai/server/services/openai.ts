@@ -20,17 +20,6 @@ import { toFile } from 'openai';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { OpenaiServiceTypes } from '~/features/openai/interfaces/ai';
-import {
-  type AccessibleAiAssistants,
-  type AiAssistant,
-  AiAssistantAccessScope,
-  AiAssistantShareScope,
-} from '~/features/openai/interfaces/ai-assistant';
-import { ThreadType } from '~/features/openai/interfaces/thread-relation';
-import AiAssistantModel, {
-  type AiAssistantDocument,
-} from '~/features/openai/server/models/ai-assistant';
 import ThreadRelationModel, {
   type ThreadRelationDocument,
 } from '~/features/openai/server/models/thread-relation';
@@ -41,16 +30,6 @@ import VectorStoreFileRelationModel, {
   prepareVectorStoreFileRelations,
   type VectorStoreFileRelation,
 } from '~/features/openai/server/models/vector-store-file-relation';
-import {
-  getClient,
-  isStreamResponse,
-} from '~/features/openai/server/services/client-delegator';
-import { openaiApiErrorHandler } from '~/features/openai/server/services/openai-api-error-handler';
-import { replaceAnnotationWithPageLink } from '~/features/openai/server/services/replace-annotation-with-page-link';
-import { convertMarkdownToHtml } from '~/features/openai/server/utils/convert-markdown-to-html';
-import { generateGlobPatterns } from '~/features/openai/server/utils/generate-glob-patterns';
-import { isVectorStoreCompatible } from '~/features/openai/server/utils/is-vector-store-compatible';
-import { removeGlobPath } from '~/features/openai/utils/remove-glob-path';
 import type Crowi from '~/server/crowi';
 import type {
   IAttachmentDocument,
@@ -62,9 +41,27 @@ import { configManager } from '~/server/service/config-manager';
 import { createBatchStream } from '~/server/util/batch-stream';
 import loggerFactory from '~/utils/logger';
 
+import { OpenaiServiceTypes } from '../../interfaces/ai';
 import type { UpsertAiAssistantData } from '../../interfaces/ai-assistant';
+import {
+  type AccessibleAiAssistants,
+  type AiAssistant,
+  AiAssistantAccessScope,
+  AiAssistantShareScope,
+} from '../../interfaces/ai-assistant';
 import type { MessageListParams } from '../../interfaces/message';
+import { ThreadType } from '../../interfaces/thread-relation';
 import type { IVectorStore } from '../../interfaces/vector-store';
+import { removeGlobPath } from '../../utils/remove-glob-path';
+import AiAssistantModel, {
+  type AiAssistantDocument,
+} from '../models/ai-assistant';
+import { convertMarkdownToHtml } from '../utils/convert-markdown-to-html';
+import { generateGlobPatterns } from '../utils/generate-glob-patterns';
+import { isVectorStoreCompatible } from '../utils/is-vector-store-compatible';
+import { getClient, isStreamResponse } from './client-delegator';
+import { openaiApiErrorHandler } from './openai-api-error-handler';
+import { replaceAnnotationWithPageLink } from './replace-annotation-with-page-link';
 
 const { isDeepEquals } = deepEquals;
 

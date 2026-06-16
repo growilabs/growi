@@ -1,8 +1,3 @@
-import {
-  ExternalGroupProviderType,
-  LdapGroupMembershipAttributeType,
-} from '~/features/external-user-group/interfaces/external-user-group';
-import ExternalUserGroupSyncService from '~/features/external-user-group/server/service/external-user-group-sync';
 import { configManager } from '~/server/service/config-manager';
 import type { SearchResultEntry } from '~/server/service/ldap';
 import { ldapService } from '~/server/service/ldap';
@@ -15,6 +10,11 @@ import type {
   ExternalUserGroupTreeNode,
   ExternalUserInfo,
 } from '../../interfaces/external-user-group';
+import {
+  ExternalGroupProviderType,
+  LdapGroupMembershipAttributeType,
+} from '../../interfaces/external-user-group';
+import ExternalUserGroupSyncService from './external-user-group-sync';
 
 const logger = loggerFactory('growi:service:ldap-user-group-sync-service');
 

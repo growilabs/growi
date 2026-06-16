@@ -6,16 +6,17 @@ import { Modal, ModalBody, ModalHeader } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import {
-  usePageBulkExportSelectModalActions,
-  usePageBulkExportSelectModalStatus,
-} from '~/features/page-bulk-export/client/states/modal';
+import { useCurrentPagePath } from '~/states/page';
+import { isPdfBulkExportEnabledAtom } from '~/states/server-configurations';
+
 import {
   PAGE_BULK_EXPORT_DUPLICATE_JOB_ERROR_CODE,
   PageBulkExportFormat,
-} from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import { useCurrentPagePath } from '~/states/page';
-import { isPdfBulkExportEnabledAtom } from '~/states/server-configurations';
+} from '../../interfaces/page-bulk-export';
+import {
+  usePageBulkExportSelectModalActions,
+  usePageBulkExportSelectModalStatus,
+} from '../states/modal';
 
 const PageBulkExportSelectModalSubstance = (): JSX.Element => {
   const { t } = useTranslation();

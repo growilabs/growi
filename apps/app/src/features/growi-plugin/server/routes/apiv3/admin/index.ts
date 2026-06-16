@@ -4,13 +4,14 @@ import express from 'express';
 import { body, query } from 'express-validator';
 import mongoose from 'mongoose';
 
-import { GrowiPlugin } from '~/features/growi-plugin/server/models';
-import { growiPluginService } from '~/features/growi-plugin/server/services';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+
+import { GrowiPlugin } from '../../../models';
+import { growiPluginService } from '../../../services';
 
 const ObjectID = mongoose.Types.ObjectId;
 

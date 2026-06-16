@@ -1,8 +1,9 @@
-import { AuditLogBulkExportJobInProgressJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import AuditLogExportJob from '~/features/audit-log-bulk-export/server/models/audit-log-bulk-export-job';
-import { auditLogBulkExportJobCronService } from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
+
+import { AuditLogBulkExportJobInProgressJobStatus } from '../../interfaces/audit-log-bulk-export';
+import AuditLogExportJob from '../models/audit-log-bulk-export-job';
+import { auditLogBulkExportJobCronService } from './audit-log-bulk-export-job-cron';
 
 /**
  * Manages cronjob which checks if AuditLogExportJob in progress exists.

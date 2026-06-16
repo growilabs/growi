@@ -12,10 +12,10 @@
 import mongoose from 'mongoose';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 
-import { runVaultSyncStateMigration } from '~/features/growi-vault/server';
+import { runVaultSyncStateMigration } from '~/features/growi-vault/server/index';
 import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction';
 import { VaultSyncState } from '~/features/growi-vault/server/models/vault-sync-state';
-import { createVaultResilienceLayer } from '~/features/growi-vault/server/services/resilience';
+import { createVaultResilienceLayer } from '~/features/growi-vault/server/services/resilience/index';
 
 // ---------------------------------------------------------------------------
 // Constants — 14 resilience fields added by migration Step 2

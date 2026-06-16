@@ -31,7 +31,7 @@ describe('User', () => {
     });
 
     // Initialize User model with mocked Crowi using dynamic import
-    const userModule = await import('.');
+    const userModule = await import('./index');
     const userFactory = userModule.default;
     User = userFactory(crowiMock);
 

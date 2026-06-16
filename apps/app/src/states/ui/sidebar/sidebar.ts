@@ -3,9 +3,10 @@ import { atom, useAtom, useAtomValue, useSetAtom } from 'jotai';
 
 import { scheduleToPut } from '~/client/services/user-ui-settings';
 import { SidebarContentsType, SidebarMode } from '~/interfaces/ui';
-import { isDeviceLargerThanXlAtom } from '~/states/ui/device';
-import { EditorMode } from '~/states/ui/editor';
-import { editorModeAtom } from '~/states/ui/editor/editor-mode'; // import the atom directly
+
+import { isDeviceLargerThanXlAtom } from '../device';
+import { EditorMode } from '../editor';
+import { editorModeAtom } from '../editor/editor-mode'; // import the atom directly
 
 const isDrawerOpenedAtom = atom(false);
 

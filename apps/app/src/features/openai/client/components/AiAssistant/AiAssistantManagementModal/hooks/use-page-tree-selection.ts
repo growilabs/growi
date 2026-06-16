@@ -1,11 +1,12 @@
 import { useCallback, useMemo } from 'react';
 
-import { useSelectedPages } from '~/features/openai/client/services/use-selected-pages';
+import type { IPageForTreeItem } from '~/interfaces/page';
+
 import {
   isSelectablePage,
   type SelectablePage,
-} from '~/features/openai/interfaces/selectable-page';
-import type { IPageForTreeItem } from '~/interfaces/page';
+} from '../../../../../interfaces/selectable-page';
+import { useSelectedPages } from '../../../../services/use-selected-pages';
 
 /**
  * Convert a page path to a glob pattern for selecting descendants.

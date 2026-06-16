@@ -8,24 +8,25 @@ import type { AssistantStream } from 'openai/lib/AssistantStream';
 import type { MessageDelta } from 'openai/resources/beta/threads/messages.mjs';
 import type { ChatCompletionChunk } from 'openai/resources/chat/completions';
 
-import {
-  MessageErrorCode,
-  type StreamErrorCode,
-} from '~/features/openai/interfaces/message-error';
-import AiAssistantModel from '~/features/openai/server/models/ai-assistant';
-import ThreadRelationModel from '~/features/openai/server/models/thread-relation';
-import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service';
 import { getOrCreateChatAssistant } from '~/features/openai/server/services/assistant';
-import { openaiClient } from '~/features/openai/server/services/client';
-import { getStreamErrorCode } from '~/features/openai/server/services/getStreamErrorCode';
-import { getOpenaiService } from '~/features/openai/server/services/openai';
-import { replaceAnnotationWithPageLink } from '~/features/openai/server/services/replace-annotation-with-page-link';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
+
+import {
+  MessageErrorCode,
+  type StreamErrorCode,
+} from '../../../interfaces/message-error';
+import AiAssistantModel from '../../models/ai-assistant';
+import ThreadRelationModel from '../../models/thread-relation';
+import { openaiClient } from '../../services/client';
+import { getStreamErrorCode } from '../../services/getStreamErrorCode';
+import { getOpenaiService } from '../../services/openai';
+import { replaceAnnotationWithPageLink } from '../../services/replace-annotation-with-page-link';
+import { certifyAiService } from '../middlewares/certify-ai-service';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:message');
 

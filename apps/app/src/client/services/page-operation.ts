@@ -3,15 +3,16 @@ import type { IPageHasId } from '@growi/core';
 import { SubscriptionStatusType } from '@growi/core';
 import urljoin from 'url-join';
 
-import { apiPost } from '~/client/util/apiv1-client';
-import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError } from '~/client/util/toastr';
 import type { SyncLatestRevisionBody } from '~/interfaces/yjs';
 import { useIsGuestUser } from '~/states/context';
 import { useFetchCurrentPage, useSetRemoteLatestPageData } from '~/states/page';
 import { useSetEditingMarkdown } from '~/states/ui/editor';
 import { useSWRxApplicableGrant, useSWRxCurrentGrantData } from '~/stores/page';
 import loggerFactory from '~/utils/logger';
+
+import { apiPost } from '../util/apiv1-client';
+import { apiv3Get, apiv3Post, apiv3Put } from '../util/apiv3-client';
+import { toastError } from '../util/toastr';
 
 const logger = loggerFactory('growi:services:page-operation');
 

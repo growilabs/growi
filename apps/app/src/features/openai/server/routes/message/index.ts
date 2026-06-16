@@ -1,2 +1,2 @@
-export * from '~/features/openai/server/routes/message/get-messages';
-export * from '~/features/openai/server/routes/message/post-message';
+export * from './get-messages';
+export * from './post-message';

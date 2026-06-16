@@ -4,9 +4,6 @@ import type { Request, RequestHandler } from 'express';
 import { body, param } from 'express-validator';
 import { isHttpError } from 'http-errors';
 
-import AiAssistantModel from '~/features/openai/server/models/ai-assistant';
-import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service';
-import { getOpenaiService } from '~/features/openai/server/services/openai';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
@@ -14,6 +11,10 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
+
+import AiAssistantModel from '../models/ai-assistant';
+import { getOpenaiService } from '../services/openai';
+import { certifyAiService } from './middlewares/certify-ai-service';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:openai:set-default-ai-assistants',

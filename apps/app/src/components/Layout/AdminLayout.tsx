@@ -3,14 +3,15 @@ import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
 import GrowiLogo from '~/components/Common/GrowiLogo';
-import { RawLayout } from '~/components/Layout/RawLayout';
 import { useSetupAdminSocket } from '~/features/admin/states/socket-io';
+
+import { RawLayout } from './RawLayout';
 
 import styles from './Admin.module.scss';
 
 const AdminNavigation = dynamic(
   () =>
-    import('~/components/Admin/Common/AdminNavigation').then(
+    import('../Admin/Common/AdminNavigation').then(
       (mod) => mod.AdminNavigation,
     ),
   { ssr: false },

@@ -16,9 +16,9 @@ import mongoose from 'mongoose';
 
 import type { BookmarkedPage } from '~/interfaces/bookmark-info';
 import type { PageDocument, PageModel } from '~/server/models/page';
-import Subscription from '~/server/models/subscription';
 import type { IPageGrantService } from '~/server/service/page-grant';
 
+import Subscription from '../../models/subscription';
 import type { IPageService } from './page-service';
 
 // ============================================================

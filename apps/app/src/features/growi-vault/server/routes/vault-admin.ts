@@ -2,10 +2,6 @@ import type { StorageStatsResponse } from '@growi/core/dist/interfaces/vault';
 import type { Router } from 'express';
 import express from 'express';
 
-import { vaultBootstrapperFactory } from '~/features/growi-vault/server/services/vault-bootstrapper';
-import { vaultManagerClient as defaultManagerClient } from '~/features/growi-vault/server/services/vault-manager-client';
-import { vaultNamespaceMapper } from '~/features/growi-vault/server/services/vault-namespace-mapper';
-import { vaultSettingsService } from '~/features/growi-vault/server/services/vault-settings-service';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
@@ -15,7 +11,11 @@ import type {
   ResilienceStatus,
   VaultBootstrapper,
 } from '../services/vault-bootstrapper';
+import { vaultBootstrapperFactory } from '../services/vault-bootstrapper';
 import type { VaultManagerClient } from '../services/vault-manager-client';
+import { vaultManagerClient as defaultManagerClient } from '../services/vault-manager-client';
+import { vaultNamespaceMapper } from '../services/vault-namespace-mapper';
+import { vaultSettingsService } from '../services/vault-settings-service';
 
 const logger = loggerFactory('growi:features:growi-vault:routes:vault-admin');
 

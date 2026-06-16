@@ -5,16 +5,9 @@ import { getIdStringForRef, isPopulated } from '@growi/core';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 
-import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
-import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser';
-import { Comment } from '~/client/components/PageComment/Comment';
-import { CommentEditor } from '~/client/components/PageComment/CommentEditor';
-import { DeleteCommentModalLazyLoaded } from '~/client/components/PageComment/DeleteCommentModal';
-import { ReplyComments } from '~/client/components/PageComment/ReplyComments';
 import { apiPost } from '~/client/util/apiv1-client';
 import { toastError } from '~/client/util/toastr';
 import type { RendererOptions } from '~/interfaces/renderer-options';
-import { useSWRxPageComment } from '~/stores/comment';
 import { useSWRMUTxPageInfo } from '~/stores/page';
 import { useCommentForCurrentPageOptions } from '~/stores/renderer';
 
@@ -22,6 +15,13 @@ import type {
   ICommentHasId,
   ICommentHasIdList,
 } from '../../interfaces/comment';
+import { useSWRxPageComment } from '../../stores/comment';
+import { NotAvailableForGuest } from './NotAvailableForGuest';
+import { NotAvailableIfReadOnlyUserNotAllowedToComment } from './NotAvailableForReadOnlyUser';
+import { Comment } from './PageComment/Comment';
+import { CommentEditor } from './PageComment/CommentEditor';
+import { DeleteCommentModalLazyLoaded } from './PageComment/DeleteCommentModal';
+import { ReplyComments } from './PageComment/ReplyComments';
 
 import styles from './PageComment.module.scss';
 

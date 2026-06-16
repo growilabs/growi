@@ -1,13 +1,13 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
+import type { GetServerSideI18nPropsOption } from '~/pages/common-props/i18n';
+
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '~/pages/common-props';
-import type { GetServerSideI18nPropsOption } from '~/pages/common-props/i18n';
-import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
-
+} from '../../common-props';
+import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
 import type { AdminCommonProps } from './types';
 
 /**

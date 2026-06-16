@@ -1,12 +1,8 @@
 import type { IUserHasId } from '@growi/core';
 
-import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
-import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 import { SocketEventName } from '~/interfaces/websocket';
 import S2sMessage from '~/server/models/vo/s2s-message';
-import { configManager } from '~/server/service/config-manager';
-import { externalAccountService } from '~/server/service/external-account';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
 import type { S2sMessageHandlable } from '~/server/service/s2s-messaging/handlable';
 import { excludeTestIdsFromTargetIds } from '~/server/util/compare-objectId';
@@ -14,12 +10,16 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 import { batchProcessPromiseAll } from '~/utils/promise';
 
+import { configManager } from '../../../../server/service/config-manager';
+import { externalAccountService } from '../../../../server/service/external-account';
 import type {
   ExternalGroupProviderType,
   ExternalUserGroupTreeNode,
   ExternalUserInfo,
   IExternalUserGroupHasId,
 } from '../../interfaces/external-user-group';
+import ExternalUserGroup from '../models/external-user-group';
+import ExternalUserGroupRelation from '../models/external-user-group-relation';
 
 const logger = loggerFactory('growi:service:external-user-group-sync-service');
 

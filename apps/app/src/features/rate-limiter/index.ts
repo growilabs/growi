@@ -1,1 +1,1 @@
-export * from '~/features/rate-limiter/middleware';
+export * from './middleware';

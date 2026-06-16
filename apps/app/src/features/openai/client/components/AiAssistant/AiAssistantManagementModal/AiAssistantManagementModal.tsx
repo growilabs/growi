@@ -12,38 +12,38 @@ import { useTranslation } from 'react-i18next';
 import { Modal, TabContent, TabPane } from 'reactstrap';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
-import { AiAssistantManagementEditInstruction } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementEditInstruction';
-import { AiAssistantManagementEditPages } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementEditPages';
-import { AiAssistantManagementEditShare } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementEditShare';
-import { AiAssistantManagementHome } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHome';
-import { AiAssistantKeywordSearch } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementKeywordSearch';
-import { AiAssistantManagementPageSelectionMethod } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementPageSelectionMethod';
-import { AiAssistantManagementPageTreeSelection } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementPageTreeSelection';
-import {
-  createAiAssistant,
-  updateAiAssistant,
-} from '~/features/openai/client/services/ai-assistant';
-import {
-  useAiAssistantSidebarActions,
-  useAiAssistantSidebarStatus,
-} from '~/features/openai/client/states';
-import {
-  AiAssistantManagementModalPageMode,
-  useAiAssistantManagementModalActions,
-  useAiAssistantManagementModalStatus,
-} from '~/features/openai/client/states/modal/ai-assistant-management';
-import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant';
 import {
   AiAssistantAccessScope,
   AiAssistantShareScope,
 } from '~/features/openai/interfaces/ai-assistant';
-import { removeGlobPath } from '~/features/openai/utils/remove-glob-path';
 import type { IPagePathWithDescendantCount } from '~/interfaces/page';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import { useSWRxPagePathsWithDescendantCount } from '~/stores/page';
 import loggerFactory from '~/utils/logger';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page';
+import { removeGlobPath } from '../../../../utils/remove-glob-path';
+import {
+  createAiAssistant,
+  updateAiAssistant,
+} from '../../../services/ai-assistant';
+import {
+  useAiAssistantSidebarActions,
+  useAiAssistantSidebarStatus,
+} from '../../../states';
+import {
+  AiAssistantManagementModalPageMode,
+  useAiAssistantManagementModalActions,
+  useAiAssistantManagementModalStatus,
+} from '../../../states/modal/ai-assistant-management';
+import { useSWRxAiAssistants } from '../../../stores/ai-assistant';
+import { AiAssistantManagementEditInstruction } from './AiAssistantManagementEditInstruction';
+import { AiAssistantManagementEditPages } from './AiAssistantManagementEditPages';
+import { AiAssistantManagementEditShare } from './AiAssistantManagementEditShare';
+import { AiAssistantManagementHome } from './AiAssistantManagementHome';
+import { AiAssistantKeywordSearch } from './AiAssistantManagementKeywordSearch';
+import { AiAssistantManagementPageSelectionMethod } from './AiAssistantManagementPageSelectionMethod';
+import { AiAssistantManagementPageTreeSelection } from './AiAssistantManagementPageTreeSelection';
 
 import styles from './AiAssistantManagementModal.module.scss';
 

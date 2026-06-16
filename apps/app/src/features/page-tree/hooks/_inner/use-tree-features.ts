@@ -9,11 +9,10 @@ import {
   selectionFeature,
 } from '@headless-tree/core';
 
-import { useCheckbox } from '~/features/page-tree/hooks/_inner/use-checkbox';
-import { usePageDnd } from '~/features/page-tree/hooks/use-page-dnd';
-
 import type { UsePageDndProperties } from '../use-page-dnd';
+import { usePageDnd } from '../use-page-dnd';
 import type { UseCheckboxProperties } from './use-checkbox';
+import { useCheckbox } from './use-checkbox';
 
 export type UseTreeFeaturesOptions = {
   enableRenaming?: boolean;

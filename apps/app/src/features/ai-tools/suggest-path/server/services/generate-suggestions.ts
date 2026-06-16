@@ -1,12 +1,5 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
 
-import { SuggestionType } from '~/features/ai-tools/suggest-path/interfaces/suggest-path-types';
-import { analyzeContent } from '~/features/ai-tools/suggest-path/server/services/analyze-content';
-import { evaluateCandidates } from '~/features/ai-tools/suggest-path/server/services/evaluate-candidates';
-import { generateCategorySuggestion } from '~/features/ai-tools/suggest-path/server/services/generate-category-suggestion';
-import { generateMemoSuggestion } from '~/features/ai-tools/suggest-path/server/services/generate-memo-suggestion';
-import { resolveParentGrant } from '~/features/ai-tools/suggest-path/server/services/resolve-parent-grant';
-import { retrieveSearchCandidates } from '~/features/ai-tools/suggest-path/server/services/retrieve-search-candidates';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
@@ -16,6 +9,13 @@ import type {
   SearchCandidate,
   SearchService,
 } from '../../interfaces/suggest-path-types';
+import { SuggestionType } from '../../interfaces/suggest-path-types';
+import { analyzeContent } from './analyze-content';
+import { evaluateCandidates } from './evaluate-candidates';
+import { generateCategorySuggestion } from './generate-category-suggestion';
+import { generateMemoSuggestion } from './generate-memo-suggestion';
+import { resolveParentGrant } from './resolve-parent-grant';
+import { retrieveSearchCandidates } from './retrieve-search-candidates';
 
 const logger = loggerFactory(
   'growi:features:suggest-path:generate-suggestions',

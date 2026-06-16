@@ -8,9 +8,9 @@ import type { Types } from 'mongoose';
 import { type Document, type Model, Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
 
+import { getOrCreateModel } from '../util/mongoose-utils';
 import type { PageDocument } from './page';
 
 const logger = loggerFactory('growi:models:revision');

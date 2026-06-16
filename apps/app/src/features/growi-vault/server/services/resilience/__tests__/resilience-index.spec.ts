@@ -19,7 +19,7 @@ import {
   type RetryStatus,
   type VaultResilienceLayer,
   type VaultResilienceLayerDeps,
-} from '..';
+} from '../index';
 
 // ---------------------------------------------------------------------------
 // Minimal mock helpers

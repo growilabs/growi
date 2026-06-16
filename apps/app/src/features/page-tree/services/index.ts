@@ -1,1 +1,1 @@
-export * from '~/features/page-tree/services/page-tree-children';
+export * from './page-tree-children';

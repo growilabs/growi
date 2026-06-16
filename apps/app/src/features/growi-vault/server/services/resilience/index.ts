@@ -14,13 +14,13 @@
 
 import type { VaultInstructionModel } from '~/features/growi-vault/server/models/vault-instruction';
 import type { VaultSyncStateModel } from '~/features/growi-vault/server/models/vault-sync-state';
-import { createBootstrapRunner } from '~/features/growi-vault/server/services/resilience/bootstrap-runner';
-import { createDriftDetector } from '~/features/growi-vault/server/services/resilience/drift-detector';
 
 import type {
   BootstrapRunnerDeps,
   VaultResilienceLayer,
 } from './bootstrap-runner';
+import { createBootstrapRunner } from './bootstrap-runner';
+import { createDriftDetector } from './drift-detector';
 import type { RetryConfig } from './retry-policy';
 
 // ---------------------------------------------------------------------------

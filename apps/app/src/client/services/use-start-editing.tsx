@@ -5,7 +5,8 @@ import { getParentPath } from '@growi/core/dist/utils/path-utils';
 import { useCreatePage } from '~/client/services/create-page';
 import { usePageNotFound } from '~/states/page';
 import { EditorMode, useEditorMode } from '~/states/ui/editor';
-import { shouldCreateWipPage } from '~/utils/should-create-wip-page';
+
+import { shouldCreateWipPage } from '../../utils/should-create-wip-page';
 
 export const useStartEditing = (): ((path?: string) => Promise<void>) => {
   const isNotFound = usePageNotFound();

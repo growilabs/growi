@@ -1,1 +1,1 @@
-export { CalloutViewer } from '~/features/callout/components/CalloutViewer';
+export { CalloutViewer } from './CalloutViewer';

@@ -1,1 +1,1 @@
-export * from '~/client/components/Common/CopyDropdown/CopyDropdown';
+export * from './CopyDropdown';

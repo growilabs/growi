@@ -2,7 +2,7 @@
 import axios from 'axios';
 import { describe, expect, it } from 'vitest';
 
-import customAxios from '.';
+import customAxios from './index';
 
 describe('Custom Axios Static', () => {
   describe('Custom instance properties preservation', () => {

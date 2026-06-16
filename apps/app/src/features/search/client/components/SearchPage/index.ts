@@ -1,1 +1,1 @@
-export * from '~/features/search/client/components/SearchPage/SearchPage';
+export * from './SearchPage';

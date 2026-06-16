@@ -1,1 +1,1 @@
-export { PlantUmlViewer } from '~/features/plantuml/components/PlantUmlViewer';
+export { PlantUmlViewer } from './PlantUmlViewer';

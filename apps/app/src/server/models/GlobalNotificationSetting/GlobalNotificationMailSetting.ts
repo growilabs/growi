@@ -2,11 +2,11 @@ import mongoose from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 
+import { GlobalNotificationSettingType } from './consts';
 import {
   class as GlobalNotificationSettingClass,
   schema as GlobalNotificationSettingSchema,
-} from '.';
-import { GlobalNotificationSettingType } from './consts';
+} from './index';
 import type {
   GlobalNotificationMailSettingModel,
   GlobalNotificationSettingModel,

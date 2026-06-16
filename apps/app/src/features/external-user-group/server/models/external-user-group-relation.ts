@@ -3,8 +3,8 @@ import { Schema } from 'mongoose';
 
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import UserGroupRelation from '~/server/models/user-group-relation';
-import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
+import { getOrCreateModel } from '../../../../server/util/mongoose-utils';
 import type { IExternalUserGroupRelation } from '../../interfaces/external-user-group';
 import type { ExternalUserGroupDocument } from './external-user-group';
 

@@ -6,10 +6,10 @@
 
 import { distance } from 'fastest-levenshtein';
 
-import { normalizeForBrowserFuzzyMatch } from '~/features/openai/client/services/editor-assistant/text-normalization';
 import loggerFactory from '~/utils/logger';
 
 import type { MatchResult, SearchContext } from '../../interfaces/types';
+import { normalizeForBrowserFuzzyMatch } from './text-normalization';
 
 const logger = loggerFactory(
   'growi:features:openai:client:services:editor-assistant:fuzzy-matching',

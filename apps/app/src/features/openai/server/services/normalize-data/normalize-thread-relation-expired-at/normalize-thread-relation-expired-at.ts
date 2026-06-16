@@ -1,6 +1,6 @@
 import { addDays } from 'date-fns/addDays';
 
-import ThreadRelation from '~/features/openai/server/models/thread-relation';
+import ThreadRelation from '../../../models/thread-relation';
 
 export const MAX_DAYS_UNTIL_EXPIRATION = 3;
 

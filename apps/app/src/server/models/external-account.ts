@@ -4,9 +4,10 @@ import mongoose, { model, Schema } from 'mongoose';
 
 import { Prisma } from '~/generated/prisma/client';
 import { NullUsernameToBeRegisteredError } from '~/server/models/errors';
-import { UserStatus } from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
 import type { prisma } from '~/utils/prisma';
+
+import { UserStatus } from './user/conts';
 
 const logger = loggerFactory('growi:models:external-account');
 

@@ -1,1 +1,1 @@
-export { DeleteCommentModalLazyLoaded } from '~/client/components/PageComment/DeleteCommentModal/dynamic';
+export { DeleteCommentModalLazyLoaded } from './dynamic';

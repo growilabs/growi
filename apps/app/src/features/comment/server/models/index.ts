@@ -1,1 +1,1 @@
-export * from '~/features/comment/server/models/comment';
+export * from './comment';

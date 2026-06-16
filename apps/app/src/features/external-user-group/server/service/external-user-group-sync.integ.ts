@@ -257,7 +257,7 @@ describe('ExternalUserGroupSyncService.syncExternalUserGroups', () => {
     const pageModule = await import('~/server/models/page');
     Page = pageModule.default(crowi);
 
-    const userModule = await import('~/server/models/user');
+    const userModule = await import('~/server/models/user/index');
     userModule.default(crowi);
 
     // Initialize services with mocked PassportService

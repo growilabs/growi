@@ -5,7 +5,6 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
 
-import { generateSuggestions } from '~/features/ai-tools/suggest-path/server/services/generate-suggestions';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service';
 import type Crowi from '~/server/crowi';
@@ -17,6 +16,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { SearchService } from '../../../interfaces/suggest-path-types';
+import { generateSuggestions } from '../../services/generate-suggestions';
 
 const logger = loggerFactory('growi:features:suggest-path:routes');
 

@@ -2,18 +2,18 @@ import { type IPage, SubscriptionStatusType } from '@growi/core';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
-import {
-  PageBulkExportJobInProgressStatus,
-  PageBulkExportJobStatus,
-} from '~/features/page-bulk-export/interfaces/page-bulk-export';
-import PageBulkExportJob from '~/features/page-bulk-export/server/models/page-bulk-export-job';
 import { SupportedTargetModel } from '~/interfaces/activity';
 import type { PageModel } from '~/server/models/page';
 import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
 
 import type { PageBulkExportFormat } from '../../interfaces/page-bulk-export';
+import {
+  PageBulkExportJobInProgressStatus,
+  PageBulkExportJobStatus,
+} from '../../interfaces/page-bulk-export';
 import type { PageBulkExportJobDocument } from '../models/page-bulk-export-job';
+import PageBulkExportJob from '../models/page-bulk-export-job';
 
 const logger = loggerFactory('growi:services:PageBulkExportService');
 

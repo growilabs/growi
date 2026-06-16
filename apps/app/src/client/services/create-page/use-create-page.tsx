@@ -2,7 +2,6 @@ import { useCallback, useState } from 'react';
 import { useRouter } from 'next/router';
 import { useTranslation } from 'react-i18next';
 
-import { createPage } from '~/client/services/create-page/create-page';
 import {
   exist,
   getIsNonUserRelatedGroupsGranted,
@@ -12,6 +11,8 @@ import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
 import { useCurrentPagePath, useSetIsUntitledPage } from '~/states/page';
 import { EditorMode, useEditorMode } from '~/states/ui/editor';
 import { useGrantedGroupsInheritanceSelectModalActions } from '~/states/ui/modal/granted-groups-inheritance-select';
+
+import { createPage } from './create-page';
 
 /**
  * Invoked when creation and transition has finished

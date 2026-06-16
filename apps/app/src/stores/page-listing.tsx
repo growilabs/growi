@@ -17,9 +17,9 @@ import useSWRImmutable from 'swr/immutable';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 import useSWRInfinite, { unstable_serialize } from 'swr/infinite';
 
-import { apiv3Get } from '~/client/util/apiv3-client';
 import type { IPagingResult } from '~/interfaces/paging-result';
 
+import { apiv3Get } from '../client/util/apiv3-client';
 import type {
   ChildrenResult,
   RootPageResult,

@@ -9,21 +9,6 @@ import { zodResponseFormat } from 'openai/helpers/zod';
 import type { MessageDelta } from 'openai/resources/beta/threads/messages.mjs';
 import { z } from 'zod';
 
-import {
-  LlmEditorAssistantDiffSchema,
-  LlmEditorAssistantMessageSchema,
-} from '~/features/openai/interfaces/editor-assistant/llm-response-schemas';
-import { MessageErrorCode } from '~/features/openai/interfaces/message-error';
-import AiAssistantModel from '~/features/openai/server/models/ai-assistant';
-import ThreadRelationModel from '~/features/openai/server/models/thread-relation';
-import { certifyAiService } from '~/features/openai/server/routes/middlewares/certify-ai-service';
-import { SseHelper } from '~/features/openai/server/routes/utils/sse-helper';
-import { getOrCreateEditorAssistant } from '~/features/openai/server/services/assistant';
-import { openaiClient } from '~/features/openai/server/services/client';
-import { LlmResponseStreamProcessor } from '~/features/openai/server/services/editor-assistant';
-import { getStreamErrorCode } from '~/features/openai/server/services/getStreamErrorCode';
-import { getOpenaiService } from '~/features/openai/server/services/openai';
-import { replaceAnnotationWithPageLink } from '~/features/openai/server/services/replace-annotation-with-page-link';
 // Necessary imports
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -32,12 +17,27 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import {
+  LlmEditorAssistantDiffSchema,
+  LlmEditorAssistantMessageSchema,
+} from '../../../interfaces/editor-assistant/llm-response-schemas';
 import type {
   EditRequestBody,
   SseDetectedDiff,
   SseFinalized,
   SseMessage,
 } from '../../../interfaces/editor-assistant/sse-schemas';
+import { MessageErrorCode } from '../../../interfaces/message-error';
+import AiAssistantModel from '../../models/ai-assistant';
+import ThreadRelationModel from '../../models/thread-relation';
+import { getOrCreateEditorAssistant } from '../../services/assistant';
+import { openaiClient } from '../../services/client';
+import { LlmResponseStreamProcessor } from '../../services/editor-assistant';
+import { getStreamErrorCode } from '../../services/getStreamErrorCode';
+import { getOpenaiService } from '../../services/openai';
+import { replaceAnnotationWithPageLink } from '../../services/replace-annotation-with-page-link';
+import { certifyAiService } from '../middlewares/certify-ai-service';
+import { SseHelper } from '../utils/sse-helper';
 
 const logger = loggerFactory('growi:routes:apiv3:openai:message');
 

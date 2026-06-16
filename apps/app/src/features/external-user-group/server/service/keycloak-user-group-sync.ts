@@ -26,8 +26,6 @@ type GroupRepresentation =
 type UserRepresentation =
   import('@keycloak/keycloak-admin-client/lib/defs/userRepresentation.js').default;
 
-import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
-import ExternalUserGroupSyncService from '~/features/external-user-group/server/service/external-user-group-sync';
 import { configManager } from '~/server/service/config-manager';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
 import loggerFactory from '~/utils/logger';
@@ -37,6 +35,8 @@ import type {
   ExternalUserGroupTreeNode,
   ExternalUserInfo,
 } from '../../interfaces/external-user-group';
+import { ExternalGroupProviderType } from '../../interfaces/external-user-group';
+import ExternalUserGroupSyncService from './external-user-group-sync';
 
 const logger = loggerFactory('growi:service:keycloak-user-group-sync-service');
 

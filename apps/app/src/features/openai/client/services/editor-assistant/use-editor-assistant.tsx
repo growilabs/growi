@@ -11,19 +11,9 @@ import { useTranslation } from 'react-i18next';
 import type { Text as YText } from 'yjs';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-import { AiAssistantDropdown } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown';
-import { QuickMenuList } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/QuickMenuList';
-import {
-  shouldUseClientProcessing,
-  useClientEngineIntegration,
-} from '~/features/openai/client/services/client-engine-integration';
-import { getPageBodyForContext } from '~/features/openai/client/services/editor-assistant/get-page-body-for-context';
-import { performSearchReplace } from '~/features/openai/client/services/editor-assistant/search-replace-engine';
-import {
-  useAiAssistantSidebarStatus,
-  useIsEnableUnifiedMergeView,
-  useUnifiedMergeViewActions,
-} from '~/features/openai/client/states';
+import { useCurrentPageId } from '~/states/page';
+
+import type { AiAssistantHasId } from '../../../interfaces/ai-assistant';
 import {
   type EditRequestBody,
   type SseDetectedDiff,
@@ -32,14 +22,24 @@ import {
   SseFinalizedSchema,
   type SseMessage,
   SseMessageSchema,
-} from '~/features/openai/interfaces/editor-assistant/sse-schemas';
-import { ThreadType } from '~/features/openai/interfaces/thread-relation';
-import { handleIfSuccessfullyParsed } from '~/features/openai/utils/handle-if-successfully-parsed';
-import { useCurrentPageId } from '~/states/page';
-
-import type { AiAssistantHasId } from '../../../interfaces/ai-assistant';
+} from '../../../interfaces/editor-assistant/sse-schemas';
 import type { MessageLog } from '../../../interfaces/message';
 import type { IThreadRelationHasId } from '../../../interfaces/thread-relation';
+import { ThreadType } from '../../../interfaces/thread-relation';
+import { handleIfSuccessfullyParsed } from '../../../utils/handle-if-successfully-parsed';
+import { AiAssistantDropdown } from '../../components/AiAssistant/AiAssistantSidebar/AiAssistantDropdown';
+import { QuickMenuList } from '../../components/AiAssistant/AiAssistantSidebar/QuickMenuList';
+import {
+  useAiAssistantSidebarStatus,
+  useIsEnableUnifiedMergeView,
+  useUnifiedMergeViewActions,
+} from '../../states';
+import {
+  shouldUseClientProcessing,
+  useClientEngineIntegration,
+} from '../client-engine-integration';
+import { getPageBodyForContext } from './get-page-body-for-context';
+import { performSearchReplace } from './search-replace-engine';
 
 type CreateThread = () => Promise<IThreadRelationHasId>;
 

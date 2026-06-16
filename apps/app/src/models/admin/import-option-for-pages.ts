@@ -1,5 +1,6 @@
-import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportMode } from '~/models/admin/import-mode';
+
+import { GrowiArchiveImportOption } from './growi-archive-import-option';
 
 const DEFAULT_PROPS = {
   isOverwriteAuthorWithCurrentUser: false,

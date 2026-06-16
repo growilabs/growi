@@ -21,15 +21,6 @@ import { useRect } from '@growi/ui/dist/utils';
 import { useTranslation } from 'next-i18next';
 import { DropdownItem } from 'reactstrap';
 
-import {
-  MenuItemType,
-  PageItemControl,
-} from '~/client/components/Common/Dropdown/PageItemControl';
-import { BookmarkButtons } from '~/client/components/PageControls/BookmarkButtons';
-import LikeButtons from '~/client/components/PageControls/LikeButtons';
-import SearchButton from '~/client/components/PageControls/SearchButton';
-import SeenUserInfo from '~/client/components/PageControls/SeenUserInfo';
-import SubscribeButton from '~/client/components/PageControls/SubscribeButton';
 import { toggleLike, toggleSubscribe } from '~/client/services/page-operation';
 import { toastError } from '~/client/util/toastr';
 import OpenDefaultAiAssistantButton from '~/features/openai/client/components/AiAssistant/OpenDefaultAiAssistantButton';
@@ -44,14 +35,23 @@ import { EditorMode, useEditorMode } from '~/states/ui/editor';
 import type { IPageForPageDuplicateModal } from '~/states/ui/modal/page-duplicate';
 import { useTagEditModalActions } from '~/states/ui/modal/tag-edit';
 import { useSetPageControlsX } from '~/states/ui/page';
-import { useSWRxPageInfo, useSWRxTagsInfo } from '~/stores/page';
-import { useSWRxUsersList } from '~/stores/user';
 import loggerFactory from '~/utils/logger';
 
+import { useSWRxPageInfo, useSWRxTagsInfo } from '../../../stores/page';
+import { useSWRxUsersList } from '../../../stores/user';
 import type {
   AdditionalMenuItemsRendererProps,
   ForceHideMenuItems,
 } from '../Common/Dropdown/PageItemControl';
+import {
+  MenuItemType,
+  PageItemControl,
+} from '../Common/Dropdown/PageItemControl';
+import { BookmarkButtons } from './BookmarkButtons';
+import LikeButtons from './LikeButtons';
+import SearchButton from './SearchButton';
+import SeenUserInfo from './SeenUserInfo';
+import SubscribeButton from './SubscribeButton';
 
 import styles from './PageControls.module.scss';
 

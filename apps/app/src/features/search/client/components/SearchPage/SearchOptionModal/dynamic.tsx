@@ -20,9 +20,7 @@ export const SearchOptionModalLazyLoaded = (
   const SearchOptionModal = useLazyLoader<SearchOptionModalProps>(
     'search-option-modal',
     () =>
-      import(
-        '~/features/search/client/components/SearchPage/SearchOptionModal/SearchOptionModal'
-      ).then((mod) => ({
+      import('./SearchOptionModal').then((mod) => ({
         default: mod.SearchOptionModal,
       })),
     isOpen,

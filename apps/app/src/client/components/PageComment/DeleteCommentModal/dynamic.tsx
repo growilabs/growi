@@ -1,7 +1,6 @@
 import type { JSX } from 'react';
 
-import { useLazyLoader } from '~/components/utils/use-lazy-loader';
-
+import { useLazyLoader } from '../../../../components/utils/use-lazy-loader';
 import type { DeleteCommentModalProps } from './DeleteCommentModal';
 
 export const DeleteCommentModalLazyLoaded = (
@@ -10,9 +9,7 @@ export const DeleteCommentModalLazyLoaded = (
   const DeleteCommentModal = useLazyLoader<DeleteCommentModalProps>(
     'delete-comment-modal',
     () =>
-      import(
-        '~/client/components/PageComment/DeleteCommentModal/DeleteCommentModal'
-      ).then((mod) => ({
+      import('./DeleteCommentModal').then((mod) => ({
         default: mod.DeleteCommentModal,
       })),
     props.isShown,

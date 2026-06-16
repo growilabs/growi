@@ -18,7 +18,7 @@ import { useIsRevisionOutdated } from '~/stores/page';
 
 import styles from './DrawioViewerWithEditButton.module.scss';
 
-import '~/client/components/ReactMarkdownComponents/DrawioViewerWithEditButton.vendor-styles.prebuilt';
+import './DrawioViewerWithEditButton.vendor-styles.prebuilt';
 
 export const DrawioViewerWithEditButton = React.memo(
   (props: DrawioViewerProps): JSX.Element => {

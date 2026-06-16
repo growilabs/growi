@@ -1,2 +1,2 @@
-export * from '~/features/mermaid/components';
-export * from '~/features/mermaid/services';
+export * from './components';
+export * from './services';

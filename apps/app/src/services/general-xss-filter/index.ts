@@ -1,1 +1,1 @@
-export * from '~/services/general-xss-filter/general-xss-filter';
+export * from './general-xss-filter';

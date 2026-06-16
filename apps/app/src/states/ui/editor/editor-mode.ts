@@ -3,12 +3,9 @@ import { isServer } from '@growi/core/dist/utils';
 import { atom, useAtom } from 'jotai';
 
 import { useIsEditable, usePageNotFound } from '~/states/page';
-import {
-  EditorMode,
-  EditorModeHash,
-  type UseEditorModeReturn,
-} from '~/states/ui/editor/types';
-import { determineEditorModeByHash } from '~/states/ui/editor/utils';
+
+import { EditorMode, EditorModeHash, type UseEditorModeReturn } from './types';
+import { determineEditorModeByHash } from './utils';
 
 // Base atom for editor mode
 const editorModeBaseAtom = atom<EditorMode | null>(null);

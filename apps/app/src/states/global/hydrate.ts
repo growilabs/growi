@@ -3,8 +3,9 @@ import { useSetAtom } from 'jotai';
 import { useHydrateAtoms } from 'jotai/utils';
 
 import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
-import { _atomsForHydration } from '~/states/global/global';
 import { createAtomTuple } from '~/utils/jotai-utils';
+
+import { _atomsForHydration } from './global';
 
 const {
   appTitleAtom,

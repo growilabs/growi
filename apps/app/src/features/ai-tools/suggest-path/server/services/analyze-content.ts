@@ -1,10 +1,10 @@
-import { callLlmForJson } from '~/features/ai-tools/suggest-path/server/services/call-llm-for-json';
 import { instructionsForInformationTypes } from '~/features/openai/server/services/assistant/instructions/commons';
 
 import type {
   ContentAnalysis,
   InformationType,
 } from '../../interfaces/suggest-path-types';
+import { callLlmForJson } from './call-llm-for-json';
 
 const VALID_INFORMATION_TYPES: readonly InformationType[] = ['flow', 'stock'];
 

@@ -14,7 +14,6 @@ import type { RevisionLoaderProps } from '~/client/components/Page/RevisionLoade
 import { exportAsMarkdown } from '~/client/services/page-operation';
 import { toastSuccess } from '~/client/util/toastr';
 import { PagePathNav } from '~/components/Common/PagePathNav';
-import { useKeywordRescroll } from '~/features/search/client/components/SearchPage/use-keyword-rescroll';
 import type { IPageWithSearchMeta } from '~/interfaces/search';
 import type {
   OnDeletedFunction,
@@ -33,6 +32,8 @@ import {
 } from '~/stores/page-listing';
 import { useSearchResultOptions } from '~/stores/renderer';
 import { mutateSearching } from '~/stores/search';
+
+import { useKeywordRescroll } from './use-keyword-rescroll';
 
 import styles from './SearchResultContent.module.scss';
 

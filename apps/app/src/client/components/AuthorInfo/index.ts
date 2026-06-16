@@ -1,1 +1,1 @@
-export * from '~/client/components/AuthorInfo/AuthorInfo';
+export * from './AuthorInfo';

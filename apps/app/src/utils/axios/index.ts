@@ -3,7 +3,7 @@
 import type { AxiosStatic } from 'axios';
 import axios from 'axios';
 
-import { createCustomAxios } from '~/utils/axios/create-custom-axios';
+import { createCustomAxios } from './create-custom-axios';
 
 // Create a new object based on axios, but with custom create method
 // This avoids mutating the original axios object and prevents infinite recursion

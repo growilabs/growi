@@ -2,8 +2,7 @@ export {
   getServerSideGeneralPageProps,
   getServerSideRendererConfigProps,
   getServerSideShareLinkRendererConfigProps,
-} from '~/pages/general-page/configuration-props';
-export { isValidGeneralPageInitialProps } from '~/pages/general-page/type-guards';
-export { useInitialCSRFetch } from '~/pages/general-page/use-initial-csr-fetch';
-
+} from './configuration-props';
+export { isValidGeneralPageInitialProps } from './type-guards';
 export type * from './types';
+export { useInitialCSRFetch } from './use-initial-csr-fetch';

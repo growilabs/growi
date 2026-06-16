@@ -9,8 +9,9 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
-import { AiAssistantAccessScope } from '~/features/openai/interfaces/ai-assistant';
 import { useCurrentUser } from '~/states/global';
+
+import { AiAssistantAccessScope } from '../../../../interfaces/ai-assistant';
 
 type Props = {
   isDisabled: boolean;

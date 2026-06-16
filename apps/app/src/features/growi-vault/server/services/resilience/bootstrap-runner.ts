@@ -10,15 +10,15 @@
 
 import type { VaultInstructionModel } from '~/features/growi-vault/server/models/vault-instruction';
 import type { VaultSyncStateModel } from '~/features/growi-vault/server/models/vault-sync-state';
-import { createBootstrapHeartbeat } from '~/features/growi-vault/server/services/resilience/bootstrap-heartbeat';
-import { transition } from '~/features/growi-vault/server/services/resilience/bootstrap-state-machine';
-import { resolveAction } from '~/features/growi-vault/server/services/resilience/bootstrap-trigger-resolver';
-import { decideRetry } from '~/features/growi-vault/server/services/resilience/retry-policy';
 import loggerFactory from '~/utils/logger';
 
+import { createBootstrapHeartbeat } from './bootstrap-heartbeat';
 import type { BootstrapState, TriggerSource } from './bootstrap-state-machine';
+import { transition } from './bootstrap-state-machine';
 import type { BootstrapEnvValue } from './bootstrap-trigger-resolver';
+import { resolveAction } from './bootstrap-trigger-resolver';
 import type { RetryConfig } from './retry-policy';
+import { decideRetry } from './retry-policy';
 
 const logger = loggerFactory(
   'growi:features:growi-vault:service:resilience:bootstrap-runner',

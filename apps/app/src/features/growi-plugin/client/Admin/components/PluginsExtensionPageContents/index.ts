@@ -1,1 +1,1 @@
-export * from '~/features/growi-plugin/client/Admin/components/PluginsExtensionPageContents/PluginsExtensionPageContents';
+export * from './PluginsExtensionPageContents';

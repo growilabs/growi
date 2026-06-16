@@ -1,2 +1,2 @@
-export * from '~/features/openai/server/services/assistant/chat-assistant';
-export * from '~/features/openai/server/services/assistant/editor-assistant';
+export * from './chat-assistant';
+export * from './editor-assistant';

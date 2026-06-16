@@ -1,11 +1,12 @@
 import { jsonrepair } from 'jsonrepair';
 
+import loggerFactory from '~/utils/logger';
+
 import {
   type LlmEditorAssistantDiff,
   LlmEditorAssistantDiffSchema,
   type LlmEditorAssistantMessage,
-} from '~/features/openai/interfaces/editor-assistant/llm-response-schemas';
-import loggerFactory from '~/utils/logger';
+} from '../../../interfaces/editor-assistant/llm-response-schemas';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:openai:edit:editor-stream-processor',

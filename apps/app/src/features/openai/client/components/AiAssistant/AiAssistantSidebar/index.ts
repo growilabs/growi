@@ -1,1 +1,1 @@
-export * from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/dynamic';
+export * from './dynamic';

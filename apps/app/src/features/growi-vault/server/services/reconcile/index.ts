@@ -15,8 +15,6 @@
  *   - ReconcileLogEntry                                          (history entry type)
  */
 
-export { createVaultReconcileService } from '~/features/growi-vault/server/services/reconcile/reconcile-service';
-
 export type {
   ReconcileLogEntry,
   ReconcileRejectReason,
@@ -26,3 +24,4 @@ export type {
   VaultReconcileService,
   VaultReconcileServiceDeps,
 } from './reconcile-service';
+export { createVaultReconcileService } from './reconcile-service';

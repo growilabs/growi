@@ -6,10 +6,6 @@ import { Router } from 'express';
 import { body } from 'express-validator';
 
 import { AuditLogBulkExportFormat } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
-import {
-  auditLogBulkExportService,
-  DuplicateAuditLogBulkExportJobError,
-} from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { AllSupportedActions } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
@@ -17,6 +13,11 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
+
+import {
+  auditLogBulkExportService,
+  DuplicateAuditLogBulkExportJobError,
+} from '../../service/audit-log-bulk-export';
 
 const logger = loggerFactory('growi:routes:apiv3:audit-log-bulk-export');
 
