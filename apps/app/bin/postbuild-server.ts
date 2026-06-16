@@ -43,6 +43,33 @@ if (existsSync(CONFIG_SUBDIR)) {
 // Remove leftover transpiled directory
 rmSync(TRANSPILED_DIR, { recursive: true, force: true });
 
+// Add .js extensions to extensionless relative specifiers in dist.
+// tspc (Bundler resolution) emits extensionless relative imports; Node native
+// ESM requires explicit extensions. add-js-extensions resolves each specifier
+// against the real dist filesystem and rewrites it in place.
+{
+  const { addJsExtensions } = await import('./add-js-extensions.mjs');
+  const { resolve } = await import('node:path');
+  const distRoot = resolve(DIST_DIR);
+  // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
+  console.log(`[postbuild] Running add-js-extensions on ${distRoot}...`);
+  const result = addJsExtensions(distRoot);
+  // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
+  console.log(
+    `[postbuild] add-js-extensions: rewrote ${result.rewritten} specifier(s), unresolved: ${result.unresolved.length}`,
+  );
+  if (result.unresolved.length > 0) {
+    // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
+    console.error(
+      '[postbuild] add-js-extensions: unresolved specifiers found (CI will fail at verify-dist-resolution):',
+    );
+    for (const u of result.unresolved) {
+      // biome-ignore lint/suspicious/noConsole: This is a build script, console output is expected.
+      console.error(`  ${u}`);
+    }
+  }
+}
+
 // Copy Prisma native engine binaries from src to dist.
 // tspc only compiles TypeScript files, so .so.node engine files must be copied manually.
 if (existsSync(PRISMA_SRC_DIR)) {
