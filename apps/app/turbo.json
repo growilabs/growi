@@ -23,13 +23,25 @@
       ],
       "outputLogs": "new-only"
     },
+    "pre:styles-bulk-export": {
+      "outputs": [
+        "src/features/page-bulk-export/server/service/page-bulk-export-job-cron/markdown/styles/bulk-export.generated.ts"
+      ],
+      "inputs": [
+        "bin/build-bulk-export-css.ts",
+        "src/styles/**/*.scss",
+        "../../packages/core-styles/scss/**",
+        "package.json"
+      ],
+      "outputLogs": "new-only"
+    },
     "prisma:generate": {
       "outputs": ["src/generated/prisma/**"],
       "inputs": ["prisma/schema.prisma"],
       "outputLogs": "new-only"
     },
     "build": {
-      "dependsOn": ["^build", "pre:styles-commons", "pre:styles-components", "prisma:generate"],
+      "dependsOn": ["^build", "pre:styles-commons", "pre:styles-components", "pre:styles-bulk-export", "prisma:generate"],
       "outputs": [".next/**", "!.next/cache/**", "dist/**"],
       "inputs": [
         "next.config.ts",
@@ -71,34 +83,34 @@
       "outputLogs": "new-only"
     },
     "dev": {
-      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles-commons", "dev:pre:styles-components"],
+      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles-commons", "dev:pre:styles-components", "pre:styles-bulk-export"],
       "cache": false,
       "persistent": true
     },
 
     "launch-dev:ci": {
-      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles-commons", "dev:pre:styles-components"],
+      "dependsOn": ["^dev", "dev:migrate", "dev:pre:styles-commons", "dev:pre:styles-components", "pre:styles-bulk-export"],
       "cache": false
     },
 
     "lint": {
-      "dependsOn": ["^dev", "dev:pre:styles-commons", "dev:pre:styles-components"]
+      "dependsOn": ["^dev", "dev:pre:styles-commons", "dev:pre:styles-components", "pre:styles-bulk-export"]
     },
 
     "test": {
-      "dependsOn": ["^dev"],
+      "dependsOn": ["^dev", "pre:styles-bulk-export"],
       "outputLogs": "new-only"
     },
     "test:unit": {
-      "dependsOn": ["^dev"],
+      "dependsOn": ["^dev", "pre:styles-bulk-export"],
       "outputLogs": "new-only"
     },
     "test:integ": {
-      "dependsOn": ["^dev"],
+      "dependsOn": ["^dev", "pre:styles-bulk-export"],
       "outputLogs": "new-only"
     },
     "test:components": {
-      "dependsOn": ["^dev"],
+      "dependsOn": ["^dev", "pre:styles-bulk-export"],
       "outputLogs": "new-only"
     },
 
