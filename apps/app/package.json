@@ -47,6 +47,7 @@
     "lint:biome": "biome check --diagnostic-level=error",
     "lint:route-guard": "node tools/lint/route-top-level-guard.cjs src/server/routes",
     "lint:no-cjs": "node tools/lint/route-top-level-guard.cjs --cjs-only src/server",
+    "lint:import-convention": "node tools/lint/import-extension-guard.cjs src",
     "lint:styles": "stylelint \"src/**/*.scss\"",
     "lint:openapi:apiv3": "node node_modules/swagger2openapi/oas-validate tmp/openapi-spec-apiv3.json",
     "lint:openapi:apiv1": "node node_modules/swagger2openapi/oas-validate tmp/openapi-spec-apiv1.json",
