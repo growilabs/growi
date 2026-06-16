@@ -7,7 +7,6 @@ const logger = loggerFactory(
 
 const KEY = 'auditlogs';
 
-// Failures are swallowed so a status write/read never disrupts the caller's main flow.
 export const AuditlogEsSyncStatus = {
   async setUnsynced(value: boolean): Promise<void> {
     try {

@@ -11,7 +11,6 @@ import mongoose from 'mongoose';
 import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
 import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-log-bulk-export/server/service/check-audit-log-bulk-export-job-in-progress-cron';
-import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server/models/auditlog-es-sync-status';
 import { AuditlogChangeStreamService } from '~/features/auditlog-es-sync/server/service/auditlog-changestream';
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
@@ -512,10 +511,7 @@ class Crowi {
       this.auditlogChangeStreamService = new AuditlogChangeStreamService(
         this.searchService.fullTextSearchDelegator,
       );
-      this.auditlogChangeStreamService.start().catch(async (err) => {
-        logger.error(err, 'AuditlogChangeStreamService failed to start.');
-        await AuditlogEsSyncStatus.setUnsynced(true);
-      });
+      void this.auditlogChangeStreamService.startWithRetry();
     }
   }
 

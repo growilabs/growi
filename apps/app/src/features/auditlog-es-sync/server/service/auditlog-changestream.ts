@@ -82,6 +82,19 @@ export class AuditlogChangeStreamService {
     logger.info('AuditlogChangeStreamService started.');
   }
 
+  // Retry the initial start like a runtime error, so a transient failure doesn't leave sync dead.
+  async startWithRetry(): Promise<void> {
+    try {
+      await this.start();
+    } catch (err) {
+      logger.error(
+        err,
+        'AuditlogChangeStreamService failed initial start; scheduling restart.',
+      );
+      void this.restart();
+    }
+  }
+
   private async processChangeStream(): Promise<void> {
     if (this.changeStream == null) return;
 
