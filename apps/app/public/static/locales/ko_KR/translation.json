@@ -972,6 +972,8 @@
   },
   "user_home_page": {
     "bookmarks": "북마크",
+    "contribution_graph": "기여 그래프",
+    "contribution_migration_in_progress": "기여 데이터를 준비하고 있습니다. 잠시 후 새로고침하면 표시됩니다.",
     "recently_created": "최근 생성됨",
     "recent_activity": "최근 활동",
     "unknown_action": "지정되지 않은 변경 사항을 적용했습니다",

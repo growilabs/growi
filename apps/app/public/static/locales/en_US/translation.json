@@ -1012,6 +1012,8 @@
   },
   "user_home_page": {
     "bookmarks": "Bookmarks",
+    "contribution_graph": "Contribution Graph",
+    "contribution_migration_in_progress": "Preparing your contribution data. Refresh in a moment to see it.",
     "recently_created": "Recently Created",
     "recent_activity": "Recent Activity",
     "unknown_action": "made an unspecified change",
