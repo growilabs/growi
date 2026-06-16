@@ -9,11 +9,11 @@ import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type Crowi from '~/server/crowi';
+import { configManager } from '~/server/service/config-manager';
+import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../../crowi';
-import { configManager } from '../../../service/config-manager';
-import { getTranslation } from '../../../service/i18next';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting:saml');

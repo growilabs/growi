@@ -3,10 +3,10 @@ import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { useForm } from 'react-hook-form';
 
+import AdminSlackIntegrationLegacyContainer from '~/client/services/AdminSlackIntegrationLegacyContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import loggerFactory from '~/utils/logger';
 
-import AdminSlackIntegrationLegacyContainer from '../../../services/AdminSlackIntegrationLegacyContainer';
-import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 

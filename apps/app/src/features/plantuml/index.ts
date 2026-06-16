@@ -1,2 +1,2 @@
-export * from './components';
-export * from './services';
+export * from '~/features/plantuml/components';
+export * from '~/features/plantuml/services';

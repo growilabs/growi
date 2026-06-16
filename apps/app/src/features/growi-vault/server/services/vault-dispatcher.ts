@@ -1,9 +1,9 @@
 import type { IPage } from '@growi/core';
 import type { Namespace } from '@growi/core/dist/interfaces/vault';
 
+import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction';
 import loggerFactory from '~/utils/logger';
 
-import { VaultInstruction } from '../models/vault-instruction';
 import type { VaultNamespaceMapper } from './vault-namespace-mapper';
 
 const logger = loggerFactory(

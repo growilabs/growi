@@ -4,10 +4,10 @@ import express from 'express';
 import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '../../../crowi';
-import { configManager } from '../../../service/config-manager';
-import type { S2sMessagingService } from '../../../service/s2s-messaging/base';
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import type Crowi from '~/server/crowi';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { configManager } from '~/server/service/config-manager';
+import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
 
 const mockActivityId = '507f1f77bcf86cd799439011';
 

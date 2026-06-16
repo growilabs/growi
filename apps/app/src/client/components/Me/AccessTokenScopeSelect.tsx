@@ -4,13 +4,13 @@ import type { Scope } from '@growi/core/dist/interfaces';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import type { UseFormRegisterReturn } from 'react-hook-form';
 
-import { useIsAdmin } from '~/states/context';
-
 import {
   extractScopes,
   getDisabledScopes,
   parseScopes,
-} from '../../util/scope-util';
+} from '~/client/util/scope-util';
+import { useIsAdmin } from '~/states/context';
+
 import { AccessTokenScopeList } from './AccessTokenScopeList';
 
 /**

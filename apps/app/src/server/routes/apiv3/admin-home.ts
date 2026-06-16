@@ -3,13 +3,13 @@ import type { Router } from 'express';
 import express from 'express';
 
 import type { IResAdminHome } from '~/interfaces/res/admin/admin-home';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
 
-import type Crowi from '../../crowi';
-import { accessTokenParser } from '../../middlewares/access-token-parser';
-import adminRequiredFactory from '../../middlewares/admin-required';
-import loginRequiredFactory from '../../middlewares/login-required';
-import { configManager } from '../../service/config-manager';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const router = express.Router();
@@ -96,7 +96,7 @@ export const setup = (crowi: Crowi): Router => {
     adminRequired,
     async (_req, res: ApiV3Response) => {
       const { getRuntimeVersions } = await import(
-        '../../util/runtime-versions'
+        '~/server/util/runtime-versions'
       );
       const runtimeVersions = getRuntimeVersions();
 

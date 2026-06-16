@@ -1,9 +1,9 @@
 import React, { useCallback, useEffect } from 'react';
 
+import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
+import { toastError } from '~/client/util/toastr';
 import { toArrayIfNot } from '~/utils/array-utils';
 
-import AdminGeneralSecurityContainer from '../../../services/AdminGeneralSecurityContainer';
-import { toastError } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import SecurityManagementContents from './SecurityManagementContents';
 

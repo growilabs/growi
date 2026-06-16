@@ -22,26 +22,26 @@ import {
   PageUpdateErrorCode,
 } from '~/interfaces/apiv3';
 import type { IOptionsForUpdate } from '~/interfaces/page';
-import { generalXssFilter } from '~/services/general-xss-filter';
-import loggerFactory from '~/utils/logger';
-
-import type Crowi from '../../../crowi';
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
-import loginRequiredFactory from '../../../middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '../../../models/GlobalNotificationSetting';
-import type { PageDocument, PageModel } from '../../../models/page';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
-} from '../../../models/serializers';
-import { shouldGenerateUpdate } from '../../../service/activity/update-activity-logic';
-import { configManager } from '../../../service/config-manager/config-manager';
-import { preNotifyService } from '../../../service/pre-notify';
-import { normalizeLatestRevisionIfBroken } from '../../../service/revision/normalize-latest-revision-if-broken';
-import { getYjsService } from '../../../service/yjs';
+} from '~/server/models/serializers';
+import { shouldGenerateUpdate } from '~/server/service/activity/update-activity-logic';
+import { configManager } from '~/server/service/config-manager/config-manager';
+import { preNotifyService } from '~/server/service/pre-notify';
+import { normalizeLatestRevisionIfBroken } from '~/server/service/revision/normalize-latest-revision-if-broken';
+import { getYjsService } from '~/server/service/yjs';
+import { generalXssFilter } from '~/services/general-xss-filter';
+import loggerFactory from '~/utils/logger';
+
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:page:update-page');

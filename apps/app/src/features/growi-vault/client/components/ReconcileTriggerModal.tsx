@@ -14,11 +14,10 @@ import {
 } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-
 import type {
   ReconcileRejectReason,
   ReconcileSubmitResult,
-} from '../../server/services/reconcile';
+} from '~/features/growi-vault/server/services/reconcile';
 
 // ============================================================================
 // Types

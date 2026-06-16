@@ -5,12 +5,12 @@ import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 
 import type { IInAppNotification } from '../../../interfaces/in-app-notification';
-import type Crowi from '../../crowi';
-import { accessTokenParser } from '../../middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import loginRequiredFactory from '../../middlewares/login-required';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const router = express.Router();

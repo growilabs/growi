@@ -4,12 +4,11 @@ import type {
 } from '@growi/core/dist/interfaces';
 
 import type { IShareLinkHasId } from '~/interfaces/share-link';
-
-import type { CommonEachProps, CommonInitialProps } from '../../common-props';
+import type { CommonEachProps, CommonInitialProps } from '~/pages/common-props';
 import type {
   GeneralPageInitialProps,
   IPageToShowRevisionWithMeta,
-} from '../../general-page';
+} from '~/pages/general-page';
 
 export type ShareLinkPageStatesProps = Pick<
   GeneralPageInitialProps,

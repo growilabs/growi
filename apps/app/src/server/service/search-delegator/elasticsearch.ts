@@ -9,6 +9,8 @@ import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
 import { SORT_AXIS, SORT_ORDER } from '~/interfaces/search';
 import { SocketEventName } from '~/interfaces/websocket';
+import PageTagRelation from '~/server/models/page-tag-relation';
+import type { SocketIoService } from '~/server/service/socket-io';
 import loggerFactory from '~/utils/logger';
 
 import type {
@@ -20,7 +22,6 @@ import type {
   UnavailableTermsKey,
 } from '../../interfaces/search';
 import type { PageModel } from '../../models/page';
-import PageTagRelation from '../../models/page-tag-relation';
 import { createBatchStream } from '../../util/batch-stream';
 import { configManager } from '../config-manager';
 import type {
@@ -28,7 +29,6 @@ import type {
   RebuildIndexOption,
   UpdateOrInsertPagesOpts,
 } from '../interfaces/search';
-import type { SocketIoService } from '../socket-io';
 import { aggregatePipelineToIndex } from './aggregate-to-index';
 import type {
   AggregatedPage,

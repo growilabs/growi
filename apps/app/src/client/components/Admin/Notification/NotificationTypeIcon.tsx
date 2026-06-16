@@ -1,7 +1,7 @@
 import React, { type JSX } from 'react';
 import { UncontrolledTooltip } from 'reactstrap';
 
-import type { INotificationType } from '../../../interfaces/notification';
+import type { INotificationType } from '~/client/interfaces/notification';
 
 type NotificationTypeIconProps = {
   // supports 2 types:

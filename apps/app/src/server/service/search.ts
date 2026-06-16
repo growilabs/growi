@@ -15,6 +15,7 @@ import type {
   IPageWithSearchMeta,
   ISearchResult,
 } from '~/interfaces/search';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
@@ -29,7 +30,6 @@ import type {
 } from '../interfaces/search';
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '../models/user/conts';
 import { SearchError } from '../models/vo/search-error';
 import { hasIntersection } from '../util/compare-objectId';
 import { configManager } from './config-manager';

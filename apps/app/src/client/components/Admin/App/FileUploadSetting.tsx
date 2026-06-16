@@ -3,10 +3,10 @@ import { useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useController, useForm } from 'react-hook-form';
 
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import { FileUploadType } from '~/interfaces/file-uploader';
 import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 
-import { toastError, toastSuccess } from '../../../util/toastr';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 import { AwsSettingMolecule } from './AwsSetting';
 import { AzureSettingMolecule } from './AzureSetting';

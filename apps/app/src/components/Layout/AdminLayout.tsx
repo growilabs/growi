@@ -2,16 +2,15 @@ import type { JSX, ReactNode } from 'react';
 import dynamic from 'next/dynamic';
 import Link from 'next/link';
 
+import GrowiLogo from '~/components/Common/GrowiLogo';
+import { RawLayout } from '~/components/Layout/RawLayout';
 import { useSetupAdminSocket } from '~/features/admin/states/socket-io';
-
-import GrowiLogo from '../Common/GrowiLogo';
-import { RawLayout } from './RawLayout';
 
 import styles from './Admin.module.scss';
 
 const AdminNavigation = dynamic(
   () =>
-    import('../Admin/Common/AdminNavigation').then(
+    import('~/components/Admin/Common/AdminNavigation').then(
       (mod) => mod.AdminNavigation,
     ),
   { ssr: false },

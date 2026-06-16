@@ -3,10 +3,9 @@ import { atom, useAtomValue, useSetAtom } from 'jotai';
 import type { Socket } from 'socket.io-client';
 
 import { SocketEventName } from '~/interfaces/websocket';
+import { useIsGuestUser } from '~/states/context';
+import { useCurrentPageId } from '~/states/page';
 import loggerFactory from '~/utils/logger';
-
-import { useIsGuestUser } from '../context';
-import { useCurrentPageId } from '../page';
 
 const logger = loggerFactory('growi:states:websocket');
 

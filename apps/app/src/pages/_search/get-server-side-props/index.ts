@@ -6,15 +6,15 @@ import {
 } from '@growi/core/dist/utils/page-path-utils';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
-
-import { getServerSideBasicLayoutProps } from '../../basic-layout-page';
+import { getServerSideBasicLayoutProps } from '~/pages/basic-layout-page';
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../../common-props';
-import { getServerSideRendererConfigProps } from '../../general-page';
-import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
+} from '~/pages/common-props';
+import { getServerSideRendererConfigProps } from '~/pages/general-page';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
+
 import type { ServerConfigurationProps } from '../types';
 
 const getServerSideConfigurationProps: GetServerSideProps<

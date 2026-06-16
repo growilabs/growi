@@ -4,9 +4,9 @@ import type { HydratedDocument, Model } from 'mongoose';
 import mongoose from 'mongoose';
 
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
+import type { PageModel } from '~/server/models/page';
+import type { IPageOperation } from '~/server/models/page-operation';
 
-import type { PageModel } from '../../models/page';
-import type { IPageOperation } from '../../models/page-operation';
 import { pageListingService } from './page-listing';
 
 // Mock the page-operation service
@@ -56,15 +56,15 @@ describe('page-listing store integration tests', () => {
 
   beforeAll(async () => {
     // setup models
-    const setupPage = (await import('../../models/page')).default;
+    const setupPage = (await import('~/server/models/page')).default;
     setupPage(null);
-    const setupUser = (await import('../../models/user')).default;
+    const setupUser = (await import('~/server/models/user')).default;
     setupUser(null);
 
     // get models
     Page = mongoose.model<IPage, PageModel>('Page');
     User = mongoose.model<IUser>('User');
-    PageOperation = (await import('../../models/page-operation')).default;
+    PageOperation = (await import('~/server/models/page-operation')).default;
   });
 
   beforeEach(async () => {

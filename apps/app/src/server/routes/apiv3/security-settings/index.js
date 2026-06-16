@@ -8,19 +8,19 @@ import xss from 'xss';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { PageDeleteConfigValue } from '~/interfaces/page-delete-config';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import ShareLink from '~/server/models/share-link';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import {
   prepareDeleteConfigValuesForCalc,
   validateDeleteConfigs,
 } from '~/utils/page-delete-config';
 
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import adminRequiredFactory from '../../../middlewares/admin-required';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../../middlewares/login-required';
-import ShareLink from '../../../models/share-link';
-import { configManager } from '../../../service/config-manager';
 import { checkSetupStrategiesHasAdmin } from './checkSetupStrategiesHasAdmin';
 import { handleSamlUpdate, samlAuthValidator } from './saml';
 

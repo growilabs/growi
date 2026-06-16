@@ -15,6 +15,11 @@ import math from 'remark-math';
 import deepmerge from 'ts-deepmerge';
 import type { Pluggable } from 'unified';
 
+import { DrawioViewerWithEditButton } from '~/client/components/ReactMarkdownComponents/DrawioViewerWithEditButton';
+import { Header } from '~/client/components/ReactMarkdownComponents/Header';
+import { LightBox } from '~/client/components/ReactMarkdownComponents/LightBox';
+import { RichAttachment } from '~/client/components/ReactMarkdownComponents/RichAttachment';
+import { TableWithEditButton } from '~/client/components/ReactMarkdownComponents/TableWithEditButton';
 import * as callout from '~/features/callout';
 import {
   remarkPlugin as mermaidRemarkPlugin,
@@ -36,15 +41,9 @@ import {
 } from '~/services/renderer/renderer';
 import loggerFactory from '~/utils/logger';
 
-import { DrawioViewerWithEditButton } from '../../components/ReactMarkdownComponents/DrawioViewerWithEditButton';
-import { Header } from '../../components/ReactMarkdownComponents/Header';
-import { LightBox } from '../../components/ReactMarkdownComponents/LightBox';
-import { RichAttachment } from '../../components/ReactMarkdownComponents/RichAttachment';
-import { TableWithEditButton } from '../../components/ReactMarkdownComponents/TableWithEditButton';
-
 // import EasyGrid from './PreProcessor/EasyGrid';
 
-import './Renderer.vendor-styles.prebuilt';
+import '~/client/services/renderer/Renderer.vendor-styles.prebuilt';
 
 const logger = loggerFactory('growi:cli:services:renderer');
 

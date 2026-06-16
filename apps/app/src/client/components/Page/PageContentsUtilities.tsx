@@ -1,12 +1,11 @@
 import { useTranslation } from 'next-i18next';
 
+import { useUpdateStateAfterSave } from '~/client/services/page-operation';
+import { useDrawioModalLauncherForView } from '~/client/services/side-effects/drawio-modal-launcher-for-view';
+import { useHandsontableModalLauncherForView } from '~/client/services/side-effects/handsontable-modal-launcher-for-view';
+import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
 import { PageUpdateErrorCode } from '~/interfaces/apiv3';
 import { useCurrentPageId } from '~/states/page';
-
-import { useUpdateStateAfterSave } from '../../services/page-operation';
-import { useDrawioModalLauncherForView } from '../../services/side-effects/drawio-modal-launcher-for-view';
-import { useHandsontableModalLauncherForView } from '../../services/side-effects/handsontable-modal-launcher-for-view';
-import { toastError, toastSuccess, toastWarning } from '../../util/toastr';
 
 export const PageContentsUtilities = (): null => {
   const { t } = useTranslation();

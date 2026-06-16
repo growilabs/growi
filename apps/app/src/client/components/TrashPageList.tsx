@@ -4,13 +4,13 @@ import type { IPageHasId } from '@growi/core';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
+import { toastSuccess } from '~/client/util/toastr';
 import type { IPagingResult } from '~/interfaces/paging-result';
 import { useIsReadOnlyUser } from '~/states/context';
 import { showPageLimitationXLAtom } from '~/states/server-configurations';
 import { useEmptyTrashModalActions } from '~/states/ui/modal/empty-trash';
 import { useSWRxPageInfoForList, useSWRxPageList } from '~/stores/page-listing';
 
-import { toastSuccess } from '../util/toastr';
 import { MenuItemType } from './Common/Dropdown/PageItemControl';
 import CustomNavAndContents from './CustomNavigation/CustomNavAndContents';
 import type { DescendantsPageListProps } from './DescendantsPageList';

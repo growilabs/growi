@@ -1,11 +1,11 @@
 import type { JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
+import InAppNotificationElm from '~/client/components/InAppNotification/InAppNotificationElm';
+import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { NewsItem } from '~/features/news/client/components/NewsItem';
 import { useSidebarMode } from '~/states/ui/sidebar';
 
-import InAppNotificationElm from '../../InAppNotification/InAppNotificationElm';
-import InfiniteScroll from '../../InfiniteScroll';
 import { useMergedInAppNotifications } from './hooks/useMergedInAppNotifications';
 import type { FilterType } from './InAppNotification';
 

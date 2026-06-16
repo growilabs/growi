@@ -3,8 +3,9 @@ import { useCallback, useEffect } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 
-import AdminGeneralSecurityContainer from '../../../../services/AdminGeneralSecurityContainer';
-import { toastError, toastSuccess } from '../../../../util/toastr';
+import AdminGeneralSecurityContainer from '~/client/services/AdminGeneralSecurityContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+
 import { withUnstatedContainers } from '../../../UnstatedUtils';
 import { CommentManageRightsSettings } from './CommentManageRightsSettings';
 import { PageAccessRightsSettings } from './PageAccessRightsSettings';

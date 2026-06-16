@@ -2,6 +2,7 @@ import { PassThrough } from 'node:stream';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
 
+import { PageBulkExportJobStatus } from '~/features/page-bulk-export/interfaces/page-bulk-export';
 import { SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import type { IAttachmentDocument } from '~/server/models/attachment';
@@ -9,7 +10,6 @@ import { Attachment } from '~/server/models/attachment';
 import type { FileUploader } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
 
-import { PageBulkExportJobStatus } from '../../../../interfaces/page-bulk-export';
 import type { PageBulkExportJobDocument } from '../../../models/page-bulk-export-job';
 import type { IPageBulkExportJobCronService } from '..';
 

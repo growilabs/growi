@@ -3,6 +3,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
+import { apiv3Post } from '~/client/util/apiv3-client';
 import type {
   ILegacyPrivatePage,
   PrivateLegacyPagesMigrationModalSubmitedHandler,
@@ -12,7 +13,6 @@ import {
   usePrivateLegacyPagesMigrationModalStatus,
 } from '~/states/ui/modal/private-legacy-pages-migration';
 
-import { apiv3Post } from '../util/apiv3-client';
 import ApiErrorMessageList from './PageManagement/ApiErrorMessageList';
 
 /**

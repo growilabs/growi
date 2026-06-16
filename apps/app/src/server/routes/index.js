@@ -5,6 +5,7 @@ import autoReap from 'multer-autoreap';
 
 import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server';
 import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
+import { createApiRouter } from '~/server/util/createApiRouter';
 
 import { accessTokenParser } from '../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../middlewares/add-activity';
@@ -25,7 +26,6 @@ import {
   generateUnavailableWhenMaintenanceModeMiddleware,
   generateUnavailableWhenMaintenanceModeMiddlewareForApi,
 } from '../middlewares/unavailable-when-maintenance-mode';
-import { createApiRouter } from '../util/createApiRouter';
 import { setup as setupAdmin } from './admin';
 import { setup as setupApiV3 } from './apiv3';
 import * as attachment from './attachment';

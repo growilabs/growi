@@ -1,2 +1,2 @@
-export * from './events';
-export * from './models';
+export * from '~/features/comment/server/events';
+export * from '~/features/comment/server/models';

@@ -7,9 +7,9 @@ import {
 import { format } from 'date-fns/format';
 import { parse } from 'date-fns/parse';
 
+import { SlackCommandHandlerError } from '~/server/models/vo/slack-command-handler-error';
 import loggerFactory from '~/utils/logger';
 
-import { SlackCommandHandlerError } from '../../models/vo/slack-command-handler-error';
 import CreatePageService from './create-page-service';
 import BaseSlackCommandHandler from './slack-command-handler';
 

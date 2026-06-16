@@ -2,13 +2,12 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { serializeUserGroupRelationSecurely } from '~/server/models/serializers';
+import UserGroupRelation from '~/server/models/user-group-relation';
 import loggerFactory from '~/utils/logger';
-
-import { accessTokenParser } from '../../middlewares/access-token-parser';
-import adminRequiredFactory from '../../middlewares/admin-required';
-import loginRequiredFactory from '../../middlewares/login-required';
-import { serializeUserGroupRelationSecurely } from '../../models/serializers';
-import UserGroupRelation from '../../models/user-group-relation';
 
 const logger = loggerFactory('growi:routes:apiv3:user-group-relation');
 

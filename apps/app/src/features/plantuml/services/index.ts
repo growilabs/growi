@@ -1,4 +1,4 @@
 export {
   remarkPlugin,
   sanitizeOption,
-} from './plantuml';
+} from '~/features/plantuml/services/plantuml';

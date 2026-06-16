@@ -1,8 +1,7 @@
 import type { JSX } from 'react';
 
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
 import { useRedirectFrom } from '~/states/page';
-
-import { useLazyLoader } from '../../../utils/use-lazy-loader';
 
 export const PageRedirectedAlertLazyLoaded = (): JSX.Element => {
   const redirectFrom = useRedirectFrom();

@@ -1,9 +1,8 @@
 import type { JSX } from 'react';
 
+import CountBadge from '~/client/components/Common/CountBadge';
 import type { TreeItemToolProps } from '~/features/page-tree/interfaces';
 import { usePageTreeDescCountMap } from '~/features/page-tree/states';
-
-import CountBadge from '../../Common/CountBadge';
 
 export const CountBadgeForPageTreeItem = (
   props: TreeItemToolProps,

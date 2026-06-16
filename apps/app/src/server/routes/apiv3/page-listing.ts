@@ -13,16 +13,16 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type { IPageForTreeItem } from '~/interfaces/page';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { configManager } from '~/server/service/config-manager';
+import type { IPageGrantService } from '~/server/service/page-grant';
+import { pageListingService } from '~/server/service/page-listing';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
-import { accessTokenParser } from '../../middlewares/access-token-parser';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../middlewares/login-required';
 import type { PageDocument, PageModel } from '../../models/page';
-import { configManager } from '../../service/config-manager';
-import type { IPageGrantService } from '../../service/page-grant';
-import { pageListingService } from '../../service/page-listing';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:page-tree');

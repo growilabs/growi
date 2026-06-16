@@ -1,1 +1,1 @@
-export * from './upload-attachments';
+export * from '~/client/services/upload-attachments/upload-attachments';

@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 
-import { toastError } from '../util/toastr';
+import { toastError } from '~/client/util/toastr';
 
 export const useToastrOnError = <P, R>(
   method?: (param?: P) => Promise<R | undefined>,

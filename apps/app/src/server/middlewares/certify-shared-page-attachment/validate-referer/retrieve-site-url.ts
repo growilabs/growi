@@ -1,6 +1,5 @@
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
-
-import { configManager } from '../../../service/config-manager';
 
 const logger = loggerFactory(
   'growi:middlewares:certify-shared-page-attachment:validate-referer:retrieve-site-url',

@@ -3,11 +3,11 @@ import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
-import loginRequiredFactory from '../../middlewares/login-required';
 import type { GetRequest, GetResponse } from './get';
 import { getActionFactory, retrieveAttachmentFromIdParam } from './get';
 

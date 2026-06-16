@@ -11,6 +11,9 @@ import { basename } from 'pathe';
 import { G2G_PROGRESS_STATUS } from '~/interfaces/g2g-transfer';
 import { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
 import { ImportMode } from '~/models/admin/import-mode';
+import TransferKeyModel from '~/server/models/transfer-key';
+import { getImportService, type ImportSettings } from '~/server/service/import';
+import { createBatchStream } from '~/server/util/batch-stream';
 import axios from '~/utils/axios';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
@@ -18,16 +21,13 @@ import { TransferKey } from '~/utils/vo/transfer-key';
 
 import type Crowi from '../crowi';
 import { Attachment } from '../models/attachment';
-import TransferKeyModel from '../models/transfer-key';
 import {
   G2GTransferError,
   G2GTransferErrorCode,
 } from '../models/vo/g2g-transfer-error';
-import { createBatchStream } from '../util/batch-stream';
 import { configManager } from './config-manager';
 import type { ConfigKey } from './config-manager/config-definition';
 import { exportService } from './export';
-import { getImportService, type ImportSettings } from './import';
 import { generateOverwriteParams } from './import/overwrite-params';
 
 const logger = loggerFactory('growi:service:g2g-transfer');

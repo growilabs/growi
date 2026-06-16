@@ -1,1 +1,1 @@
-export * from './node-sdk';
+export * from '~/features/opentelemetry/server/node-sdk';

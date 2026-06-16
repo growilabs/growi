@@ -3,9 +3,9 @@ import { useTranslation } from 'next-i18next';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { useSWRxAdminPlugins } from '~/features/growi-plugin/client/Admin/stores/admin-plugins';
 
 import type { IGrowiPluginOrigin } from '../../../../interfaces';
-import { useSWRxAdminPlugins } from '../../stores/admin-plugins';
 
 export const PluginInstallerForm = (): JSX.Element => {
   const { mutate } = useSWRxAdminPlugins();

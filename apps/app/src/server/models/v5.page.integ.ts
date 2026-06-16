@@ -17,16 +17,19 @@ import ExternalUserGroupRelation from '~/features/external-user-group/server/mod
 import type { IBookmark } from '~/interfaces/bookmark-info';
 import { PageActionType } from '~/interfaces/page-operation';
 import type { IShareLink } from '~/interfaces/share-link';
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import type {
+  IPageOperation,
+  PageOperationModel,
+} from '~/server/models/page-operation';
+import UserGroup from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
 
-import type Crowi from '../crowi';
 import type { IPageService } from '../service/page';
 import type { BookmarkModel } from './bookmark';
-import type { PageDocument, PageModel } from './page';
-import type { IPageOperation, PageOperationModel } from './page-operation';
 import type { IPageRedirect, PageRedirectModel } from './page-redirect';
 import type { ShareLinkModel } from './share-link';
-import UserGroup from './user-group';
-import UserGroupRelation from './user-group-relation';
 
 describe('Page', () => {
   let crowi: Crowi;

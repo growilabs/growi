@@ -1,8 +1,8 @@
 import crypto from 'crypto';
 
+import type S2sMessage from '~/server/models/vo/s2s-message';
 import loggerFactory from '~/utils/logger';
 
-import type S2sMessage from '../../models/vo/s2s-message';
 import type { S2sMessageHandlable } from './handlable';
 
 const _logger = loggerFactory('growi:service:s2s-messaging:base');

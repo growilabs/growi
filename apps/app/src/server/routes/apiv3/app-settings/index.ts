@@ -12,17 +12,17 @@ import nextI18nConfig from '^/config/next-i18next.config.cjs';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { configManager } from '~/server/service/config-manager';
+import { getTranslation } from '~/server/service/i18next';
+import { createSMTPClient } from '~/server/service/mail/smtp';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../../crowi';
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import adminRequiredFactory from '../../../middlewares/admin-required';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../../middlewares/login-required';
-import { configManager } from '../../../service/config-manager';
-import { getTranslation } from '../../../service/i18next';
-import { createSMTPClient } from '../../../service/mail/smtp';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 import { setup as setupFileUploadSetting } from './file-upload-setting';
 

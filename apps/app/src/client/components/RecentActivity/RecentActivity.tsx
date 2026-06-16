@@ -1,5 +1,6 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
 
+import { toastError } from '~/client/util/toastr';
 import type {
   ActivityHasTargetPage,
   IActivityHasId,
@@ -7,7 +8,6 @@ import type {
 import { useSWRxRecentActivity } from '~/stores/recent-activity';
 import loggerFactory from '~/utils/logger';
 
-import { toastError } from '../../util/toastr';
 import PaginationWrapper from '../PaginationWrapper';
 import { ActivityListItem } from './ActivityListItem';
 

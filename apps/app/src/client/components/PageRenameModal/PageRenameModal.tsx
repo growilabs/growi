@@ -13,6 +13,8 @@ import {
 } from 'reactstrap';
 import { debounce } from 'throttle-debounce';
 
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
+import { toastError } from '~/client/util/toastr';
 import { useSiteUrl } from '~/states/global';
 import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 import {
@@ -21,8 +23,6 @@ import {
 } from '~/states/ui/modal/page-rename';
 import { useSWRxPageInfo } from '~/stores/page';
 
-import { apiv3Get, apiv3Put } from '../../util/apiv3-client';
-import { toastError } from '../../util/toastr';
 import DuplicatedPathsTable from '../DuplicatedPathsTable';
 import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList';
 import PagePathAutoComplete from '../PagePathAutoComplete';

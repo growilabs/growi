@@ -1,11 +1,14 @@
+import {
+  type FeedItem,
+  parseFeedJson,
+} from '~/features/news/server/services/feed-parser';
+import { NewsService } from '~/features/news/server/services/news-service';
 import { configManager } from '~/server/service/config-manager';
 import CronService from '~/server/service/cron';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
 import type { INewsItemInput } from '../../interfaces/news-item';
-import { type FeedItem, parseFeedJson } from './feed-parser';
-import { NewsService } from './news-service';
 
 const logger = loggerFactory('growi:feature:news:cron');
 

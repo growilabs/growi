@@ -8,6 +8,10 @@ import {
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { Modal, ModalBody } from 'reactstrap';
 
+import {
+  getMarkdownDrawioMxfile,
+  replaceFocusedDrawioWithEditor,
+} from '~/client/components/PageEditor/markdown-drawio-util-for-editor';
 import { useRendererConfig } from '~/states/server-configurations';
 import {
   useDrawioModalActions,
@@ -16,10 +20,6 @@ import {
 import { useSWRxPersonalSettings } from '~/stores/personal-settings';
 import loggerFactory from '~/utils/logger';
 
-import {
-  getMarkdownDrawioMxfile,
-  replaceFocusedDrawioWithEditor,
-} from '../markdown-drawio-util-for-editor';
 import {
   DrawioCommunicationHelper,
   type DrawioConfig,

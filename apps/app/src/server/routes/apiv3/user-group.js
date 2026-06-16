@@ -6,22 +6,22 @@ import express from 'express';
 import { body, param, query, sanitizeQuery } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
-import { generalXssFilter } from '~/services/general-xss-filter';
-import loggerFactory from '~/utils/logger';
-
-import { accessTokenParser } from '../../middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import adminRequiredFactory from '../../middlewares/admin-required';
-import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../middlewares/login-required';
-import { serializeUserGroupRelationSecurely } from '../../models/serializers/user-group-relation-serializer';
-import UserGroup from '../../models/user-group';
-import UserGroupRelation from '../../models/user-group-relation';
-import { excludeTestIdsFromTargetIds } from '../../util/compare-objectId';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer';
+import UserGroup from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import { excludeTestIdsFromTargetIds } from '~/server/util/compare-objectId';
 import {
   toPagingLimit,
   toPagingOffset,
-} from '../../util/express-validator/sanitizer';
+} from '~/server/util/express-validator/sanitizer';
+import { generalXssFilter } from '~/services/general-xss-filter';
+import loggerFactory from '~/utils/logger';
+
+import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
+import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:user-group');
 

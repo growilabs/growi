@@ -4,9 +4,12 @@ import type { WSSharedDoc, YWebsocketPersistence } from 'y-websocket/bin/utils';
 import * as Y from 'yjs';
 
 import { SocketEventName } from '~/interfaces/websocket';
+import {
+  getRoomNameWithId,
+  RoomPrefix,
+} from '~/server/service/socket-io/helper';
 import loggerFactory from '~/utils/logger';
 
-import { getRoomNameWithId, RoomPrefix } from '../socket-io/helper';
 import type { MongodbPersistence } from './extended/mongodb-persistence';
 import type { syncYDoc as syncYDocType } from './sync-ydoc';
 

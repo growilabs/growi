@@ -17,13 +17,13 @@ import { Strategy as SamlStrategy } from 'passport-saml';
 import urljoin from 'url-join';
 
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
+import S2sMessage from '~/server/models/vo/s2s-message';
+import { configManager } from '~/server/service/config-manager';
+import { growiInfoService } from '~/server/service/growi-info';
 import axios from '~/utils/axios';
 import loggerFactory from '~/utils/logger';
 
-import S2sMessage from '../models/vo/s2s-message';
-import { configManager } from './config-manager';
 import type { ConfigKey } from './config-manager/config-definition';
-import { growiInfoService } from './growi-info';
 import type { S2sMessageHandlable } from './s2s-messaging/handlable';
 
 const logger = loggerFactory('growi:service:PassportService');

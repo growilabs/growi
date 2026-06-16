@@ -4,14 +4,14 @@ import { DevidedPagePath } from '@growi/core/dist/models';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useTranslation } from 'react-i18next';
 
+import FormattedDistanceDate from '~/client/components/FormattedDistanceDate';
+import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
 import { LinkedPagePath } from '~/models/linked-page-path';
 import { useSetSearchKeyword } from '~/states/search';
 import { useSWRINFxRecentlyUpdated } from '~/stores/page-listing';
 import loggerFactory from '~/utils/logger';
 
-import FormattedDistanceDate from '../../FormattedDistanceDate';
-import InfiniteScroll from '../../InfiniteScroll';
 import { SidebarHeaderReloadButton } from '../SidebarHeaderReloadButton';
 
 import styles from './RecentChangesSubstance.module.scss';

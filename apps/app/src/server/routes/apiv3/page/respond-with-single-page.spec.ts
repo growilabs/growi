@@ -7,7 +7,8 @@ import type {
 import type { HydratedDocument } from 'mongoose';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
-import type { PageDocument } from '../../../models/page';
+import type { PageDocument } from '~/server/models/page';
+
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 // Mock logger to avoid path resolution issues in tests

@@ -3,8 +3,8 @@ import type { FC } from 'react';
 import type {
   TreeItemProps,
   TreeItemWithCheckboxToolProps,
-} from '../../../../../page-tree';
-import { TreeItemLayout } from '../../../../../page-tree/components';
+} from '~/features/page-tree';
+import { TreeItemLayout } from '~/features/page-tree/components';
 
 import styles from './TreeItemWithCheckbox.module.scss';
 

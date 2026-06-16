@@ -4,11 +4,10 @@ import { useTranslation } from 'react-i18next';
 
 import { NotAvailable } from '~/client/components/NotAvailable';
 import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
+import { useAiAssistantSidebarActions } from '~/features/openai/client/states';
+import { useSWRxAiAssistants } from '~/features/openai/client/stores/ai-assistant';
 import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 import { aiEnabledAtom } from '~/states/server-configurations';
-
-import { useAiAssistantSidebarActions } from '../../states';
-import { useSWRxAiAssistants } from '../../stores/ai-assistant';
 
 import styles from './OpenDefaultAiAssistantButton.module.scss';
 

@@ -3,8 +3,9 @@ import { useTranslation } from 'next-i18next';
 import { useForm } from 'react-hook-form';
 import { Card, CardBody } from 'reactstrap';
 
-import AdminCustomizeContainer from '../../../services/AdminCustomizeContainer';
-import { toastError, toastSuccess } from '../../../util/toastr';
+import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 

@@ -1,9 +1,8 @@
 import React, { type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
+import { NotAvailable } from '~/client/components/NotAvailable';
 import { useIsGuestUser } from '~/states/context';
-
-import { NotAvailable } from './NotAvailable';
 
 type NotAvailableForGuestProps = {
   children: JSX.Element;

@@ -2,7 +2,8 @@ import fs from 'node:fs';
 import path from 'pathe';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '../../crowi';
+import type Crowi from '~/server/crowi';
+
 import { GrowiBridgeService } from '.';
 
 vi.mock('fs');

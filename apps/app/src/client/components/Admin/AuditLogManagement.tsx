@@ -6,6 +6,8 @@ import { format } from 'date-fns/format';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
 
+import type { IClearable } from '~/client/interfaces/clearable';
+import { toastError } from '~/client/util/toastr';
 import type { SupportedActionType } from '~/interfaces/activity';
 import { useGrowiAppIdForGrowiCloud, useGrowiCloudUri } from '~/states/global';
 import {
@@ -14,8 +16,6 @@ import {
 } from '~/states/server-configurations';
 import { useSWRxActivity } from '~/stores/activity';
 
-import type { IClearable } from '../../interfaces/clearable';
-import { toastError } from '../../util/toastr';
 import PaginationWrapper from '../PaginationWrapper';
 import { ActivityTable } from './AuditLog/ActivityTable';
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';

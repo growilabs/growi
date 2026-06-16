@@ -6,10 +6,10 @@ import { mockDeep } from 'vitest-mock-extended';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type Crowi from '../../../crowi';
-import type { PageDocument } from '../../../models/page';
-import * as findPageModule from '../../../service/page/find-page-and-meta-data-by-viewer';
-import type { ApiV3Response } from '../interfaces/apiv3-response';
+import type Crowi from '~/server/crowi';
+import type { PageDocument } from '~/server/models/page';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import * as findPageModule from '~/server/service/page/find-page-and-meta-data-by-viewer';
 
 // Extend Request type for test
 interface TestRequest extends Request {

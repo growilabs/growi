@@ -9,19 +9,19 @@ import mongoose, { type HydratedDocument } from 'mongoose';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IBookmarkInfo } from '~/interfaces/bookmark-info';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
+import { configManager } from '~/server/service/config-manager';
+import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { accessTokenParser } from '../../middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../middlewares/login-required';
-import type { BookmarkDocument, BookmarkModel } from '../../models/bookmark';
 import BookmarkFolder from '../../models/bookmark-folder';
-import type { PageDocument, PageModel } from '../../models/page';
-import { serializeBookmarkSecurely } from '../../models/serializers/bookmark-serializer';
-import { configManager } from '../../service/config-manager';
-import { preNotifyService } from '../../service/pre-notify';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmarks');
 

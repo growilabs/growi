@@ -4,11 +4,17 @@ import type { Readable } from 'stream';
 import { v4 as uuidv4 } from 'uuid';
 
 import type { ICheckLimitResult } from '~/interfaces/attachment';
+import type Crowi from '~/server/crowi';
+import {
+  type RespondOptions,
+  ResponseMode,
+} from '~/server/interfaces/attachment';
+import {
+  Attachment,
+  type IAttachmentDocument,
+} from '~/server/models/attachment';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { type RespondOptions, ResponseMode } from '../../interfaces/attachment';
-import { Attachment, type IAttachmentDocument } from '../../models/attachment';
 import { configManager } from '../config-manager';
 import type { MultipartUploader } from './multipart-uploader';
 

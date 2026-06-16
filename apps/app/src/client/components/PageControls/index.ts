@@ -1,1 +1,1 @@
-export * from './PageControls';
+export * from '~/client/components/PageControls/PageControls';

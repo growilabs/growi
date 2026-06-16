@@ -2,13 +2,12 @@ import type { FC } from 'react';
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import {
   SubscribeRuleDescriptions,
   subscribeRuleNames,
 } from '~/interfaces/in-app-notification';
-
-import { apiv3Get, apiv3Put } from '../../util/apiv3-client';
-import { toastError, toastSuccess } from '../../util/toastr';
 
 type SubscribeRule = {
   name: string;

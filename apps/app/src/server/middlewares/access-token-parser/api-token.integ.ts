@@ -4,8 +4,9 @@ import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import type { Response } from 'express';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '../../crowi';
-import type UserEvent from '../../events/user';
+import type Crowi from '~/server/crowi';
+import type UserEvent from '~/server/events/user';
+
 import { parserForApiToken } from './api-token';
 
 vi.mock('@growi/core/dist/models/serializers', { spy: true });

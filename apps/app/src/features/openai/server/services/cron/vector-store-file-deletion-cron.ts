@@ -1,11 +1,13 @@
 import nodeCron from 'node-cron';
 
+import { isAiEnabled } from '~/features/openai/server/services/is-ai-enabled';
+import {
+  getOpenaiService,
+  type IOpenaiService,
+} from '~/features/openai/server/services/openai';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { getRandomIntInRange } from '~/utils/rand';
-
-import { isAiEnabled } from '../is-ai-enabled';
-import { getOpenaiService, type IOpenaiService } from '../openai';
 
 const logger = loggerFactory('growi:service:vector-store-file-deletion-cron');
 

@@ -25,16 +25,16 @@ import type {
   IRecordApplicableGrant,
   PopulatedGrantedGroup,
 } from '~/interfaces/page-grant';
-
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
-import type { PageDocument, PageModel } from '../models/page';
-import UserGroup from '../models/user-group';
-import UserGroupRelation from '../models/user-group-relation';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import UserGroup from '~/server/models/user-group';
 import {
   excludeTestIdsFromTargetIds,
   hasIntersection,
   includesObjectIds,
-} from '../util/compare-objectId';
+} from '~/server/util/compare-objectId';
+
+import type { ObjectIdLike } from '../interfaces/mongoose-utils';
+import UserGroupRelation from '../models/user-group-relation';
 import { divideByType } from '../util/granted-group';
 
 const { addTrailingSlash } = pathUtils;

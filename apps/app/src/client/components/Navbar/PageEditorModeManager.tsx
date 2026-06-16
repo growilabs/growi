@@ -1,13 +1,12 @@
 import React, { type JSX, type ReactNode, useCallback, useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 
+import { useCreatePage } from '~/client/services/create-page';
+import { useStartEditing } from '~/client/services/use-start-editing';
+import { toastError } from '~/client/util/toastr';
 import { useCurrentPageYjsData } from '~/features/collaborative-editor/states';
 import { useDeviceLargerThanMd } from '~/states/ui/device';
 import { EditorMode, useEditorMode } from '~/states/ui/editor';
-
-import { useCreatePage } from '../../services/create-page';
-import { useStartEditing } from '../../services/use-start-editing';
-import { toastError } from '../../util/toastr';
 
 import styles from './PageEditorModeManager.module.scss';
 

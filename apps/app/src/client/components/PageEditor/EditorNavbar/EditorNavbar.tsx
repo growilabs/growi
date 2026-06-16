@@ -1,9 +1,9 @@
 import type { JSX } from 'react';
 
+import { PageHeader } from '~/client/components/PageHeader';
 import { useEditingClients } from '~/states/ui/editor/editing-clients';
 import { useScrollToRemoteCursor } from '~/states/ui/editor/scroll-to-remote-cursor';
 
-import { PageHeader } from '../../PageHeader';
 import { EditingUserList } from './EditingUserList';
 
 import styles from './EditorNavbar.module.scss';

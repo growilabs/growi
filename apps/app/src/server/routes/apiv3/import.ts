@@ -5,17 +5,17 @@ import type { Router } from 'express';
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type { GrowiArchiveImportOption } from '~/models/admin/growi-archive-import-option';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import type { ImportSettings } from '~/server/service/import';
+import { getImportService } from '~/server/service/import';
+import { generateOverwriteParams } from '~/server/service/import/overwrite-params';
+import type { ZipFileStat } from '~/server/service/interfaces/export';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { accessTokenParser } from '../../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import adminRequiredFactory from '../../middlewares/admin-required';
-import loginRequiredFactory from '../../middlewares/login-required';
-import type { ImportSettings } from '../../service/import';
-import { getImportService } from '../../service/import';
-import { generateOverwriteParams } from '../../service/import/overwrite-params';
-import type { ZipFileStat } from '../../service/interfaces/export';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:import');

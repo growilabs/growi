@@ -9,16 +9,16 @@ import express from 'express';
 import { body } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { configManager } from '~/server/service/config-manager';
+import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../../crowi';
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import adminRequiredFactory from '../../../middlewares/admin-required';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../../middlewares/login-required';
-import { configManager } from '../../../service/config-manager';
-import { getTranslation } from '../../../service/i18next';
 
 const logger = loggerFactory(
   'growi:routes:apiv3:app-settings:file-upload-setting',

@@ -1,4 +1,4 @@
 export {
   remarkPlugin,
   sanitizeOption,
-} from './callout';
+} from '~/features/callout/services/callout';

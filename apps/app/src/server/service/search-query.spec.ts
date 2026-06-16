@@ -2,11 +2,11 @@ import { vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
 import { SearchDelegatorName } from '~/interfaces/named-query';
+import type Crowi from '~/server/crowi';
+import { configManager } from '~/server/service/config-manager/config-manager';
 
-import type Crowi from '../crowi';
 import type { SearchDelegator } from '../interfaces/search';
 import NamedQuery from '../models/named-query';
-import { configManager } from './config-manager/config-manager';
 import SearchService from './search';
 import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 

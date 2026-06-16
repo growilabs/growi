@@ -1,6 +1,6 @@
 import React, { type JSX } from 'react';
 
-import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '../NotAvailableForReadOnlyUser';
+import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser';
 
 type CommentControlProps = {
   onClickEditBtn: () => void;

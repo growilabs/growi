@@ -19,15 +19,15 @@ import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
 import type { Readable } from 'stream';
 import urljoin from 'url-join';
 
-import loggerFactory from '~/utils/logger';
-
-import type Crowi from '../../crowi';
+import type Crowi from '~/server/crowi';
 import {
   FilePathOnStoragePrefix,
   type RespondOptions,
   ResponseMode,
-} from '../../interfaces/attachment';
-import type { IAttachmentDocument } from '../../models/attachment';
+} from '~/server/interfaces/attachment';
+import type { IAttachmentDocument } from '~/server/models/attachment';
+import loggerFactory from '~/utils/logger';
+
 import { configManager } from '../config-manager';
 import {
   AbstractFileUploader,

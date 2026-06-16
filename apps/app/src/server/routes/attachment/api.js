@@ -1,7 +1,7 @@
 import { SupportedAction } from '~/interfaces/activity';
+import { AttachmentType } from '~/server/interfaces/attachment';
 import loggerFactory from '~/utils/logger';
 
-import { AttachmentType } from '../../interfaces/attachment';
 import { Attachment } from '../../models/attachment';
 import { validateImageContentType } from './image-content-type-validator';
 

@@ -3,6 +3,14 @@ import { useCallback, useState } from 'react';
 import type { IPageToDeleteWithMeta } from '@growi/core';
 import { DropdownToggle } from 'reactstrap';
 
+import { FolderIcon } from '~/client/components/Icons/FolderIcon';
+import {
+  addBookmarkToFolder,
+  addNewFolder,
+  hasChildren,
+  updateBookmarkFolder,
+} from '~/client/util/bookmark-utils';
+import { toastError } from '~/client/util/toastr';
 import type {
   BookmarkFolderItems,
   DragItemDataType,
@@ -12,14 +20,6 @@ import { DRAG_ITEM_TYPE } from '~/interfaces/bookmark-info';
 import type { onDeletedBookmarkFolderFunction } from '~/interfaces/ui';
 import { useDeleteBookmarkFolderModalActions } from '~/states/ui/modal/delete-bookmark-folder';
 
-import {
-  addBookmarkToFolder,
-  addNewFolder,
-  hasChildren,
-  updateBookmarkFolder,
-} from '../../util/bookmark-utils';
-import { toastError } from '../../util/toastr';
-import { FolderIcon } from '../Icons/FolderIcon';
 import { BookmarkFolderItemControl } from './BookmarkFolderItemControl';
 import { BookmarkFolderNameInput } from './BookmarkFolderNameInput';
 import { BookmarkItem } from './BookmarkItem';

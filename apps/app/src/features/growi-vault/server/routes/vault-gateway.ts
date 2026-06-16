@@ -8,19 +8,18 @@ import type {
 } from 'express';
 import express from 'express';
 
+import {
+  createVaultCredentialAdapter,
+  type VaultAuthenticatedReq,
+} from '~/features/growi-vault/server/middlewares/vault-pat-auth';
+import { VaultSyncState } from '~/features/growi-vault/server/models/vault-sync-state';
+import { vaultManagerClient } from '~/features/growi-vault/server/services/vault-manager-client';
+import { vaultNamespaceMapper } from '~/features/growi-vault/server/services/vault-namespace-mapper';
+import { vaultSettingsService } from '~/features/growi-vault/server/services/vault-settings-service';
 import { SupportedAction } from '~/interfaces/activity';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { generateUnavailableWhenMaintenanceModeMiddlewareForApi } from '~/server/middlewares/unavailable-when-maintenance-mode';
 import loggerFactory from '~/utils/logger';
-
-import {
-  createVaultCredentialAdapter,
-  type VaultAuthenticatedReq,
-} from '../middlewares/vault-pat-auth';
-import { VaultSyncState } from '../models/vault-sync-state';
-import { vaultManagerClient } from '../services/vault-manager-client';
-import { vaultNamespaceMapper } from '../services/vault-namespace-mapper';
-import { vaultSettingsService } from '../services/vault-settings-service';
 
 const logger = loggerFactory('growi:features:growi-vault:routes:vault-gateway');
 

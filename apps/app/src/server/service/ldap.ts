@@ -4,9 +4,8 @@ import ldap from 'ldapjs';
 // named import of NoSuchObjectError fails at runtime under native ESM.
 const { NoSuchObjectError } = ldap;
 
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
-
-import { configManager } from './config-manager';
 
 const logger = loggerFactory('growi:service:ldap-service');
 

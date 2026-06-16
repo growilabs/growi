@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
+import AdminGitHubSecurityContainer from '~/client/services/AdminGitHubSecurityContainer';
+import { toastError } from '~/client/util/toastr';
 import { toArrayIfNot } from '~/utils/array-utils';
 
-import AdminGitHubSecurityContainer from '../../../services/AdminGitHubSecurityContainer';
-import { toastError } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import GitHubSecuritySettingContents from './GitHubSecuritySettingContents';
 

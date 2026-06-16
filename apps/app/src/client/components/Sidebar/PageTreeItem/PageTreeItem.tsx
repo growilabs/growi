@@ -7,6 +7,7 @@ import { pathUtils } from '@growi/core/dist/utils';
 import { useTranslation } from 'next-i18next';
 import path from 'path';
 
+import { toastSuccess } from '~/client/util/toastr';
 import type { TreeItemProps } from '~/features/page-tree';
 import {
   usePageCreate,
@@ -25,7 +26,6 @@ import { mutateAllPageInfo } from '~/stores/page';
 import { mutatePageList, mutatePageTree } from '~/stores/page-listing';
 import { mutateSearching } from '~/stores/search';
 
-import { toastSuccess } from '../../../util/toastr';
 import { CountBadgeForPageTreeItem } from './CountBadgeForPageTreeItem';
 import { usePageItemControl } from './use-page-item-control';
 

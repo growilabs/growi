@@ -1,6 +1,9 @@
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
-import { currentUserAtomGetter, growiCloudUriAtomGetter } from './global';
+import {
+  currentUserAtomGetter,
+  growiCloudUriAtomGetter,
+} from '~/states/global';
 
 /**
  * Computed atom for checking if current user is a guest user

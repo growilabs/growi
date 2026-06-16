@@ -8,8 +8,9 @@ import {
   apiv3Get,
   apiv3Post,
   apiv3Put,
-} from '../../../util/apiv3-client';
-import { toastError, toastSuccess } from '../../../util/toastr';
+} from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+
 import { BotTypeCard } from './BotTypeCard';
 import ConfirmBotChangeModal from './ConfirmBotChangeModal';
 import CustomBotWithoutProxySettings from './CustomBotWithoutProxySettings';

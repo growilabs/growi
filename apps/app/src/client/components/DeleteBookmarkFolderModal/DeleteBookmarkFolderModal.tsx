@@ -3,15 +3,14 @@ import { useCallback } from 'react';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
+import { FolderIcon } from '~/client/components/Icons/FolderIcon';
+import { deleteBookmarkFolder } from '~/client/util/bookmark-utils';
+import { toastError } from '~/client/util/toastr';
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
 import {
   useDeleteBookmarkFolderModalActions,
   useDeleteBookmarkFolderModalStatus,
 } from '~/states/ui/modal/delete-bookmark-folder';
-
-import { deleteBookmarkFolder } from '../../util/bookmark-utils';
-import { toastError } from '../../util/toastr';
-import { FolderIcon } from '../Icons/FolderIcon';
 
 /**
  * DeleteBookmarkFolderModalSubstance - Presentation component (all logic here)

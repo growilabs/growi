@@ -1,9 +1,10 @@
 import { vi } from 'vitest';
 
+import { configManager } from '~/server/service/config-manager';
+import { SocketIoService } from '~/server/service/socket-io/socket-io';
+
 import { getInstance } from '../../../../test/setup/crowi';
-import { configManager } from '../config-manager';
 import type { RebuildIndexOption } from '../interfaces/search';
-import { SocketIoService } from '../socket-io/socket-io';
 import ElasticsearchDelegator from './elasticsearch';
 
 // ELASTICSEARCH_URI is mapped from VITE_ELASTICSEARCH_URI by test/setup/elasticsearch.ts

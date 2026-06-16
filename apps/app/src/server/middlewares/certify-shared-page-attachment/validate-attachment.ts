@@ -1,9 +1,8 @@
 import { getIdForRef, type IAttachment } from '@growi/core';
 
+import type { ShareLinkDocument } from '~/server/models/share-link';
+import { getModelSafely } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
-
-import type { ShareLinkDocument } from '../../models/share-link';
-import { getModelSafely } from '../../util/mongoose-utils';
 
 const logger = loggerFactory(
   'growi:middleware:certify-shared-page-attachment:validate-attachment',

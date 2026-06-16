@@ -11,7 +11,7 @@ import {
   vi,
 } from 'vitest';
 
-import type { VaultSyncStateDocument } from '../models/vault-sync-state';
+import type { VaultSyncStateDocument } from '~/features/growi-vault/server/models/vault-sync-state';
 
 // ---------------------------------------------------------------------------
 // Mocks — declared before any module imports so that vi.mock() hoisting works.
@@ -79,10 +79,12 @@ vi.mock('~/server/service/config-manager', () => ({
 // ---------------------------------------------------------------------------
 
 const getVaultInstruction = async () =>
-  (await import('../models/vault-instruction')).VaultInstruction;
+  (await import('~/features/growi-vault/server/models/vault-instruction'))
+    .VaultInstruction;
 
 const getVaultSyncState = async () =>
-  (await import('../models/vault-sync-state')).VaultSyncState;
+  (await import('~/features/growi-vault/server/models/vault-sync-state'))
+    .VaultSyncState;
 
 const getMongoose = async () => (await import('mongoose')).default;
 

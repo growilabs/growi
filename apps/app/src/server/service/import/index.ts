@@ -1,4 +1,5 @@
-import type Crowi from '../../crowi';
+import type Crowi from '~/server/crowi';
+
 import { ImportService } from './import';
 
 let instance: ImportService;

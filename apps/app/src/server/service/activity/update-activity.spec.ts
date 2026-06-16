@@ -2,9 +2,9 @@ import { MongoMemoryServer } from 'mongodb-memory-server-core';
 import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
+import Activity from '~/server/models/activity';
+import { Revision } from '~/server/models/revision';
 
-import Activity from '../../models/activity';
-import { Revision } from '../../models/revision';
 import { shouldGenerateUpdate } from './update-activity-logic';
 
 describe('shouldGenerateUpdate()', () => {

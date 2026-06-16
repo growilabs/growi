@@ -7,14 +7,14 @@ import { isMovablePage } from '@growi/core/dist/utils/page-path-utils';
 import { useTranslation } from 'next-i18next';
 import nodePath from 'path';
 
-import { useIsUntitledPage } from '~/states/page';
-import { EditorMode, useEditorMode } from '~/states/ui/editor';
-
-import type { InputValidationResult } from '../../util/use-input-validator';
+import type { InputValidationResult } from '~/client/util/use-input-validator';
 import {
   useInputValidator,
   ValidationTarget,
-} from '../../util/use-input-validator';
+} from '~/client/util/use-input-validator';
+import { useIsUntitledPage } from '~/states/page';
+import { EditorMode, useEditorMode } from '~/states/ui/editor';
+
 import { CopyDropdown } from '../Common/CopyDropdown';
 import {
   AutosizeSubmittableInput,

@@ -6,10 +6,10 @@ import mongoose from 'mongoose';
 import { Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 
+import type { PageDocument, PageModel } from '~/server/models/page';
+import { createBatchStream } from '~/server/util/batch-stream';
 import loggerFactory from '~/utils/logger';
 
-import type { PageDocument, PageModel } from '../../models/page';
-import { createBatchStream } from '../../util/batch-stream';
 import { BULK_REINDEX_SIZE } from './consts';
 import type { IPageService } from './page-service';
 import { shouldUseV4Process } from './should-use-v4-process';

@@ -1,7 +1,7 @@
 import type { IPageHasId } from '@growi/core';
 import mongoose from 'mongoose';
 
-import type { PageModel } from '../../models/page';
+import type { PageModel } from '~/server/models/page';
 
 export const convertNullToEmptyGrantedArrays = async (): Promise<void> => {
   const Page = mongoose.model<IPageHasId, PageModel>('Page');

@@ -5,10 +5,11 @@ import { mock } from 'vitest-mock-extended';
 
 import type { IPage } from '^/../../packages/core/dist';
 
-import { getPageSchema } from '../../models/obsolete-page';
+import { getPageSchema } from '~/server/models/obsolete-page';
+import { configManager } from '~/server/service/config-manager';
+
 import type { PageModel } from '../../models/page';
 import pageModel from '../../models/page';
-import { configManager } from '../config-manager';
 import { deleteCompletelyUserHomeBySystem } from './delete-completely-user-home-by-system';
 import type { IPageService } from './page-service';
 

@@ -2,14 +2,16 @@ import React, { type JSX, useCallback, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 import { DropdownItem, DropdownMenu, UncontrolledDropdown } from 'reactstrap';
 
+import { BookmarkFolderMenuItem } from '~/client/components/Bookmarks/BookmarkFolderMenuItem';
+import {
+  addBookmarkToFolder,
+  toggleBookmark,
+} from '~/client/util/bookmark-utils';
+import { toastError } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
 import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark';
 import { useSWRxBookmarkFolderAndChild } from '~/stores/bookmark-folder';
 import { useSWRMUTxPageInfo } from '~/stores/page';
-
-import { addBookmarkToFolder, toggleBookmark } from '../../util/bookmark-utils';
-import { toastError } from '../../util/toastr';
-import { BookmarkFolderMenuItem } from './BookmarkFolderMenuItem';
 
 import styles from './BookmarkFolderMenu.module.scss';
 

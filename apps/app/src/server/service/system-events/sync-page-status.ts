@@ -1,7 +1,7 @@
 import { SocketEventName } from '~/interfaces/websocket';
+import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
 import { S2cMessagePageUpdated } from '../../models/vo/s2c-message';
 import S2sMessage from '../../models/vo/s2s-message';
 import type { S2sMessagingService } from '../s2s-messaging/base';

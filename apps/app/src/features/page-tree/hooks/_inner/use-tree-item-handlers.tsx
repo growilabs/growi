@@ -5,11 +5,10 @@ import type {
   TreeConfig,
 } from '@headless-tree/core';
 
+import { usePageCreate } from '~/features/page-tree/hooks/use-page-create';
+import { usePageRename } from '~/features/page-tree/hooks/use-page-rename';
+import { useCreatingParentId } from '~/features/page-tree/states/_inner';
 import type { IPageForTreeItem } from '~/interfaces/page';
-
-import { useCreatingParentId } from '../../states/_inner';
-import { usePageCreate } from '../use-page-create';
-import { usePageRename } from '../use-page-rename';
 
 type completeRenamingHotkey =
   CustomHotkeysConfig<IPageForTreeItem>['completeRenaming'];

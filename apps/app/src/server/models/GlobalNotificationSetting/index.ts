@@ -2,7 +2,8 @@ import nodePath from 'node:path';
 import { pathUtils } from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 
-import type Crowi from '../../crowi';
+import type Crowi from '~/server/crowi';
+
 import type { GlobalNotificationSettingType } from './consts';
 import type {
   GlobalNotificationSettingDocument,

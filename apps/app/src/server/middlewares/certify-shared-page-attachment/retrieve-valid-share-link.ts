@@ -1,10 +1,10 @@
-import loggerFactory from '~/utils/logger';
-
 import type {
   ShareLinkDocument,
   ShareLinkModel,
-} from '../../models/share-link';
-import { getModelSafely } from '../../util/mongoose-utils';
+} from '~/server/models/share-link';
+import { getModelSafely } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
+
 import type { ValidReferer } from './interfaces';
 
 const logger = loggerFactory(

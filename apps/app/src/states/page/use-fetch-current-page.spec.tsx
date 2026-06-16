@@ -16,9 +16,7 @@ import { vi } from 'vitest';
 import { mockDeep } from 'vitest-mock-extended';
 
 import * as apiv3Client from '~/client/util/apiv3-client';
-import { useSWRxPageInfo } from '~/stores/page';
-
-import { useFetchCurrentPage } from './index';
+import { useFetchCurrentPage } from '~/states/page';
 import {
   currentPageDataAtom,
   currentPageEmptyIdAtom,
@@ -29,7 +27,8 @@ import {
   pageNotFoundAtom,
   remoteRevisionBodyAtom,
   shareLinkIdAtom,
-} from './internal-atoms';
+} from '~/states/page/internal-atoms';
+import { useSWRxPageInfo } from '~/stores/page';
 
 // Mock Next.js router
 const mockRouter = mockDeep<NextRouter>();

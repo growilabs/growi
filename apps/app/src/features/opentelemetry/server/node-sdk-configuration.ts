@@ -13,11 +13,10 @@ import {
   ATTR_SERVICE_VERSION,
 } from '@opentelemetry/semantic-conventions';
 
+import { httpInstrumentationConfig as httpInstrumentationConfigForAnonymize } from '~/features/opentelemetry/server/anonymization';
+import { ATTR_SERVICE_INSTANCE_ID } from '~/features/opentelemetry/server/semconv';
 import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
-
-import { httpInstrumentationConfig as httpInstrumentationConfigForAnonymize } from './anonymization';
-import { ATTR_SERVICE_INSTANCE_ID } from './semconv';
 
 type Option = {
   enableAnonymization?: boolean;
@@ -80,7 +79,7 @@ export const generateAdditionalResourceAttributes = async (
     configManager.getConfig('app:serviceInstanceId');
 
   const { getApplicationResourceAttributes, getOsResourceAttributes } =
-    await import('./custom-resource-attributes');
+    await import('~/features/opentelemetry/server/custom-resource-attributes');
 
   return resource.merge(
     resourceFromAttributes({

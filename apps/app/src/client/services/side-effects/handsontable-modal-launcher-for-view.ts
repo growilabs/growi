@@ -3,22 +3,21 @@ import { Origin } from '@growi/core';
 import { globalEventTarget } from '@growi/core/dist/utils';
 import type { MarkdownTable } from '@growi/editor';
 
+import {
+  getMarkdownTableFromLine,
+  replaceMarkdownTableInMarkdown,
+} from '~/client/components/Page/markdown-table-util-for-view';
+import type { LaunchHandsonTableModalEventDetail } from '~/client/interfaces/handsontable-modal';
+import {
+  extractRemoteRevisionDataFromErrorObj,
+  useUpdatePage,
+} from '~/client/services/update-page';
 import type { RemoteRevisionData } from '~/states/page';
 import { useCurrentPageData, useSetRemoteLatestPageData } from '~/states/page';
 import { useShareLinkId } from '~/states/page/hooks';
 import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff';
 import { useHandsontableModalActions } from '~/states/ui/modal/handsontable';
 import loggerFactory from '~/utils/logger';
-
-import {
-  getMarkdownTableFromLine,
-  replaceMarkdownTableInMarkdown,
-} from '../../components/Page/markdown-table-util-for-view';
-import type { LaunchHandsonTableModalEventDetail } from '../../interfaces/handsontable-modal';
-import {
-  extractRemoteRevisionDataFromErrorObj,
-  useUpdatePage,
-} from '../update-page';
 
 const logger = loggerFactory(
   'growi:cli:side-effects:useHandsontableModalLauncherForView',

@@ -13,10 +13,10 @@
  * Design: Components and Interfaces > ReconcileOrchestrator
  */
 
+import type { VaultInstructionModel } from '~/features/growi-vault/server/models/vault-instruction';
+import type { VaultReconcileLogModel } from '~/features/growi-vault/server/models/vault-reconcile-log';
 import loggerFactory from '~/utils/logger';
 
-import type { VaultInstructionModel } from '../../models/vault-instruction';
-import type { VaultReconcileLogModel } from '../../models/vault-reconcile-log';
 import type { ReconcileTargetType } from './reconcile-history-store';
 
 const logger = loggerFactory(

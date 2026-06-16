@@ -17,20 +17,20 @@ import { body, query } from 'express-validator';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
+import PageTagRelation from '~/server/models/page-tag-relation';
+import { configManager } from '~/server/service/config-manager';
+import { preNotifyService } from '~/server/service/pre-notify';
 import loggerFactory from '~/utils/logger';
 
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import adminRequiredFactory from '../../../middlewares/admin-required';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
-import loginRequiredFactory from '../../../middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '../../../models/GlobalNotificationSetting';
-import PageTagRelation from '../../../models/page-tag-relation';
 import { serializePageSecurely } from '../../../models/serializers/page-serializer';
 import { isV5ConversionError } from '../../../models/vo/v5-conversion-error';
-import { configManager } from '../../../service/config-manager';
-import { preNotifyService } from '../../../service/pre-notify';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
 const router = express.Router();

@@ -1,9 +1,9 @@
 import { EventEmitter } from 'node:events';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '../crowi';
-import { configManager } from '../service/config-manager';
-import type { S2sMessagingService } from '../service/s2s-messaging/base';
+import type Crowi from '~/server/crowi';
+import { configManager } from '~/server/service/config-manager';
+import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
 
 // Minimal mock for PageEvent that extends EventEmitter
 class MockPageEvent extends EventEmitter {

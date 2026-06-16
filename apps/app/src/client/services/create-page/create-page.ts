@@ -1,9 +1,8 @@
+import { apiv3Post } from '~/client/util/apiv3-client';
 import type {
   IApiv3PageCreateParams,
   IApiv3PageCreateResponse,
 } from '~/interfaces/apiv3';
-
-import { apiv3Post } from '../../util/apiv3-client';
 
 export const createPage = async (
   params: IApiv3PageCreateParams,

@@ -2,8 +2,8 @@ import type { FC } from 'react';
 import { useCallback } from 'react';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
+import { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
 
-import { ExternalGroupProviderType } from '../../../interfaces/external-user-group';
 import { KeycloakGroupSyncSettingsForm } from './KeycloakGroupSyncSettingsForm';
 import { SyncExecution } from './SyncExecution';
 

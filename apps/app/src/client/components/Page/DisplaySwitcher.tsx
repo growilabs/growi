@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 import dynamic from 'next/dynamic';
 
+import { useHashChangedEffect } from '~/client/services/side-effects/hash-changed';
 import { useIsEditable, useRevisionIdFromUrl } from '~/states/page';
 import {
   EditorMode,
@@ -8,7 +9,6 @@ import {
   useReservedNextCaretLine,
 } from '~/states/ui/editor';
 
-import { useHashChangedEffect } from '../../services/side-effects/hash-changed';
 import { LazyRenderer } from '../Common/LazyRenderer';
 
 const PageEditor = dynamic(() => import('../PageEditor'), { ssr: false });

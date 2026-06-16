@@ -3,10 +3,10 @@ import { useRouter } from 'next/router';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
+import AdminNotificationContainer from '~/client/services/AdminNotificationContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import loggerFactory from '~/utils/logger';
 
-import AdminNotificationContainer from '../../../services/AdminNotificationContainer';
-import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import GlobalNotificationList from './GlobalNotificationList';
 

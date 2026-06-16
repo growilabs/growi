@@ -13,24 +13,26 @@ import { getInstance } from '^/test/setup/crowi';
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
 import type { IShareLink } from '~/interfaces/share-link';
-import { generalXssFilter } from '~/services/general-xss-filter';
-import { prisma } from '~/utils/prisma';
-
-import type Crowi from '../../crowi';
-import type { BookmarkDocument, BookmarkModel } from '../../models/bookmark';
-import type { PageDocument, PageModel } from '../../models/page';
+import type Crowi from '~/server/crowi';
+import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
   PageOperationModel,
-} from '../../models/page-operation';
+} from '~/server/models/page-operation';
 import type {
   IPageRedirect,
   PageRedirectModel,
-} from '../../models/page-redirect';
-import PageTagRelation from '../../models/page-tag-relation';
-import type { IRevisionDocument, IRevisionModel } from '../../models/revision';
-import type { ShareLinkModel } from '../../models/share-link';
-import Tag from '../../models/tag';
+} from '~/server/models/page-redirect';
+import PageTagRelation from '~/server/models/page-tag-relation';
+import type {
+  IRevisionDocument,
+  IRevisionModel,
+} from '~/server/models/revision';
+import type { ShareLinkModel } from '~/server/models/share-link';
+import Tag from '~/server/models/tag';
+import { generalXssFilter } from '~/services/general-xss-filter';
+import { prisma } from '~/utils/prisma';
 
 describe('PageService page operations with only public pages', () => {
   // biome-ignore lint/suspicious/noImplicitAnyLet: ignore

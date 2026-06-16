@@ -8,13 +8,13 @@ import { body } from 'express-validator';
 import nextI18nextConfig from '^/config/next-i18next.config.cjs';
 
 import { SupportedAction } from '~/interfaces/activity';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../../middlewares/login-required';
 import EditorSettings from '../../../models/editor-settings';
 import InAppNotificationSettings from '../../../models/in-app-notification-settings';
 import { deleteAccessTokenHandlersFactory } from './delete-access-token';

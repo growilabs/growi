@@ -1,10 +1,10 @@
 import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
+import AdminSamlSecurityContainer from '~/client/services/AdminSamlSecurityContainer';
+import { toastError } from '~/client/util/toastr';
 import { toArrayIfNot } from '~/utils/array-utils';
 
-import AdminSamlSecurityContainer from '../../../services/AdminSamlSecurityContainer';
-import { toastError } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import SamlSecuritySettingContents from './SamlSecuritySettingContents';
 

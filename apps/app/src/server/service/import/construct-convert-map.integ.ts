@@ -1,12 +1,13 @@
 import type { EventEmitter } from 'events';
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '../../crowi';
+import type Crowi from '~/server/crowi';
 import {
   setupIndependentModels,
   setupModelsDependentOnCrowi,
-} from '../../crowi/setup-models';
-import type UserEvent from '../../events/user';
+} from '~/server/crowi/setup-models';
+import type UserEvent from '~/server/events/user';
+
 import { constructConvertMap } from './construct-convert-map';
 
 describe('constructConvertMap', () => {

@@ -1,11 +1,11 @@
 import { useCallback, useEffect, useRef } from 'react';
 import { useTranslation } from 'next-i18next';
 
+import { useStartEditing } from '~/client/services/use-start-editing';
+import { toastError } from '~/client/util/toastr';
 import { useCurrentPathname } from '~/states/global';
 import { useCurrentPagePath, useIsEditable } from '~/states/page';
 
-import { useStartEditing } from '../../../services/use-start-editing';
-import { toastError } from '../../../util/toastr';
 import type { HotkeyBindingDef } from '../HotkeysManager';
 
 type Props = {

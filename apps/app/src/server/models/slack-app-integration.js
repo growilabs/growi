@@ -2,8 +2,8 @@ import { defaultSupportedSlackEventActions } from '@growi/slack';
 import crypto from 'crypto';
 import mongoose from 'mongoose';
 
-import { configManager as _configManager } from '../service/config-manager';
-import { getModelSafely } from '../util/mongoose-utils';
+import { configManager as _configManager } from '~/server/service/config-manager';
+import { getModelSafely } from '~/server/util/mongoose-utils';
 
 /** @returns {import('../service/config-manager').IConfigManagerForApp} */
 function getConfigManager() {

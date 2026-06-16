@@ -3,11 +3,11 @@ import mongoose, { type Model } from 'mongoose';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type Crowi from '../../crowi';
-import type { QueryTerms, SearchDelegator } from '../../interfaces/search';
-import NamedQuery from '../../models/named-query';
-import type { PageDocument, PageModel } from '../../models/page';
-import SearchService from '../search';
+import type Crowi from '~/server/crowi';
+import type { QueryTerms, SearchDelegator } from '~/server/interfaces/search';
+import NamedQuery from '~/server/models/named-query';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import SearchService from '~/server/service/search';
 
 describe('SearchService test', () => {
   let crowi: Crowi;

@@ -17,14 +17,14 @@ import { body, param } from 'express-validator';
 import urljoin from 'url-join';
 
 import { SupportedAction } from '~/interfaces/activity';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import axios from '~/utils/axios';
 import loggerFactory from '~/utils/logger';
 
-import { accessTokenParser } from '../../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
-import adminRequiredFactory from '../../middlewares/admin-required';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../middlewares/login-required';
 
 const logger = loggerFactory('growi:routes:apiv3:slack-integration-settings');
 

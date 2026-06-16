@@ -1,11 +1,11 @@
 import React, { type JSX, useState } from 'react';
 import { Dropdown } from 'reactstrap';
 
+import { useCreateTemplatePage } from '~/client/services/create-page';
+import { useToastrOnError } from '~/client/services/use-toastr-on-error';
 import { useCurrentPagePath } from '~/states/page';
 import { usePageCreateModalActions } from '~/states/ui/modal/page-create';
 
-import { useCreateTemplatePage } from '../../../services/create-page';
-import { useToastrOnError } from '../../../services/use-toastr-on-error';
 import { CreateButton } from './CreateButton';
 import { DropendMenu } from './DropendMenu';
 import { DropendToggle } from './DropendToggle';

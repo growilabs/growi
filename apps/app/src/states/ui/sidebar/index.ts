@@ -1,1 +1,1 @@
-export * from './sidebar';
+export * from '~/states/ui/sidebar/sidebar';

@@ -4,10 +4,9 @@ import type { HtmlElementNode } from 'rehype-toc';
 
 import type { generateTocOptions } from '~/client/services/renderer/renderer';
 import type { RendererOptions } from '~/interfaces/renderer-options';
+import { useCurrentPagePath } from '~/states/page';
+import { useRendererConfig } from '~/states/server-configurations';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
-
-import { useCurrentPagePath } from '../page';
-import { useRendererConfig } from '../server-configurations';
 
 // ============================================================================
 // INTERNAL ATOMS (Implementation details, not exported)

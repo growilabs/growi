@@ -53,9 +53,8 @@ vi.mock('mongoose', () => ({
   },
 }));
 
+import PageOperation from '~/server/models/page-operation';
 import loggerFactory from '~/utils/logger';
-
-import PageOperation from '../models/page-operation';
 
 // We need to import the factory function - the default export is an instanciate() function
 // But PageOperationService is not exported directly, so we construct via instanciate

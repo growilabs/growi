@@ -5,7 +5,7 @@ import type {
   StorageStatsResponse,
 } from '@growi/core/dist/interfaces/vault';
 
-import { vaultSettingsService } from './vault-settings-service';
+import { vaultSettingsService } from '~/features/growi-vault/server/services/vault-settings-service';
 
 // Timeout for all vault-manager requests: 10 minutes in milliseconds.
 const REQUEST_TIMEOUT_MS = 600_000;

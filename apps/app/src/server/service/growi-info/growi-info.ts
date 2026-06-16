@@ -11,12 +11,11 @@ import type { Model } from 'mongoose';
 import mongoose from 'mongoose';
 
 import { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
+import { Config } from '~/server/models/config';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import { aclService } from '~/server/service/acl';
+import { configManager } from '~/server/service/config-manager';
 import { getGrowiVersion } from '~/utils/growi-version';
-
-import { Config } from '../../models/config';
-import type { PageDocument, PageModel } from '../../models/page';
-import { aclService } from '../acl';
-import { configManager } from '../config-manager';
 
 // Local preset for full additional info
 const FULL_ADDITIONAL_INFO_OPTIONS = {

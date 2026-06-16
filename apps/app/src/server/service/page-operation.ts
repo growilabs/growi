@@ -7,13 +7,13 @@ import type {
   IPageOperationProcessInfo,
 } from '~/interfaces/page-operation';
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
+import type { PageOperationDocument } from '~/server/models/page-operation';
+import PageOperation from '~/server/models/page-operation';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
 import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import type { PageModel } from '../models/page';
-import type { PageOperationDocument } from '../models/page-operation';
-import PageOperation from '../models/page-operation';
 import { collectAncestorPaths } from '../util/collect-ancestor-paths';
 
 const logger = loggerFactory('growi:services:page-operation');

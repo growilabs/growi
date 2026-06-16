@@ -3,4 +3,4 @@ export {
   useCurrentPageYjsData,
   useCurrentPageYjsDataActions,
   useCurrentPageYjsDataLoading,
-} from './current-page-yjs-data';
+} from '~/features/collaborative-editor/states/current-page-yjs-data';

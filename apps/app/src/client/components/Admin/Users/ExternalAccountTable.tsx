@@ -3,10 +3,10 @@ import type { IAdminExternalAccount } from '@growi/core';
 import { format as dateFnsFormat } from 'date-fns/format';
 import { useTranslation } from 'next-i18next';
 
+import AdminExternalAccountsContainer from '~/client/services/AdminExternalAccountsContainer';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
 
-import AdminExternalAccountsContainer from '../../../services/AdminExternalAccountsContainer';
-import { toastError, toastSuccess } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 
 import styles from './ExternalAccountTable.module.scss';

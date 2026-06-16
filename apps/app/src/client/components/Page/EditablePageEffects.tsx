@@ -1,13 +1,12 @@
 import type { JSX } from 'react';
 
+import { usePageSeenUsersUpdatedEffect } from '~/client/services/side-effects/page-seen-users-updated';
+import { usePageUpdatedEffect } from '~/client/services/side-effects/page-updated';
 import {
   useAwarenessSyncingEffect,
   useCurrentPageYjsDataAutoLoadEffect,
   useNewlyYjsDataSyncingEffect,
 } from '~/features/collaborative-editor/side-effects';
-
-import { usePageSeenUsersUpdatedEffect } from '../../services/side-effects/page-seen-users-updated';
-import { usePageUpdatedEffect } from '../../services/side-effects/page-updated';
 
 export const EditablePageEffects = (): JSX.Element => {
   usePageUpdatedEffect();

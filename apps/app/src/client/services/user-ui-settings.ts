@@ -2,9 +2,8 @@
 import type { AxiosResponse } from 'axios';
 import { debounce } from 'throttle-debounce';
 
+import { apiv3Put } from '~/client/util/apiv3-client';
 import type { IUserUISettings } from '~/interfaces/user-ui-settings';
-
-import { apiv3Put } from '../util/apiv3-client';
 
 let settingsForBulk: Partial<IUserUISettings> = {};
 const _putUserUISettingsInBulk = (): Promise<

@@ -4,6 +4,7 @@ import type { Request, Router } from 'express';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
@@ -13,7 +14,6 @@ import {
   registerRules,
   registerValidation,
 } from '../../middlewares/register-form-validator';
-import { configManager } from '../../service/config-manager';
 import {
   FailedToCreateAdminUserError,
   InstallerService,

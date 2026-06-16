@@ -1,6 +1,7 @@
 import { mock } from 'vitest-mock-extended';
 
-import type Crowi from '../../crowi';
+import type Crowi from '~/server/crowi';
+
 import { getUploader } from '.';
 
 const mocks = vi.hoisted(() => ({

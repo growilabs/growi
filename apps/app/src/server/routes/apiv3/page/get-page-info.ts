@@ -5,14 +5,14 @@ import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
 import type { HydratedDocument } from 'mongoose';
 
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../../crowi';
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import { setup as certifySharedPageFactory } from '../../../middlewares/certify-shared-page';
-import loginRequiredFactory from '../../../middlewares/login-required';
-import { findPageAndMetaDataByViewer } from '../../../service/page/find-page-and-meta-data-by-viewer';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:page:get-page-info');

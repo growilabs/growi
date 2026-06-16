@@ -3,21 +3,24 @@ import type { DeleteResult } from 'mongodb';
 import mongoose, { type Model } from 'mongoose';
 
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import type {
+  UserGroupDocument,
+  UserGroupModel,
+} from '~/server/models/user-group';
+import UserGroup from '~/server/models/user-group';
+import {
+  excludeTestIdsFromTargetIds,
+  includesObjectIds,
+} from '~/server/util/compare-objectId';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
-import type { UserGroupDocument, UserGroupModel } from '../models/user-group';
-import UserGroup from '../models/user-group';
 import type {
   UserGroupRelationDocument,
   UserGroupRelationModel,
 } from '../models/user-group-relation';
 import UserGroupRelation from '../models/user-group-relation';
-import {
-  excludeTestIdsFromTargetIds,
-  includesObjectIds,
-} from '../util/compare-objectId';
 
 const logger = loggerFactory('growi:service:UserGroupService');
 

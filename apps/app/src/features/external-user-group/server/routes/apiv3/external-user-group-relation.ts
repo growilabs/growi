@@ -4,6 +4,8 @@ import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
 
+import type { IExternalUserGroupRelationHasId } from '~/features/external-user-group/interfaces/external-user-group';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
@@ -11,9 +13,6 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import { serializeUserGroupRelationSecurely } from '~/server/models/serializers/user-group-relation-serializer';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
-
-import type { IExternalUserGroupRelationHasId } from '../../../interfaces/external-user-group';
-import ExternalUserGroupRelation from '../../models/external-user-group-relation';
 
 const logger = loggerFactory('growi:routes:apiv3:user-group-relation');
 

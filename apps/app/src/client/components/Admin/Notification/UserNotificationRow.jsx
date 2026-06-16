@@ -2,7 +2,8 @@ import React from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import AdminNotificationContainer from '../../../services/AdminNotificationContainer';
+import AdminNotificationContainer from '~/client/services/AdminNotificationContainer';
+
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import { NotificationTypeIcon } from './NotificationTypeIcon';
 

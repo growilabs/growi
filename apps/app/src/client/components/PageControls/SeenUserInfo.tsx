@@ -4,7 +4,7 @@ import type { IUser } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { Popover, PopoverBody, UncontrolledTooltip } from 'reactstrap';
 
-import UserPictureList from '../Common/UserPictureList';
+import UserPictureList from '~/client/components/Common/UserPictureList';
 
 import styles from './SeenUserInfo.module.scss';
 import popoverStyles from './user-list-popover.module.scss';

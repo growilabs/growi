@@ -11,27 +11,30 @@ import {
 } from 'reactstrap';
 
 import { apiv3Post } from '~/client/util/apiv3-client';
-
+import { AiAssistantChatInitialView } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
+import {
+  useAiAssistantSidebarActions,
+  useAiAssistantSidebarStatus,
+} from '~/features/openai/client/states';
+import { useSWRMUTxMessages } from '~/features/openai/client/stores/message';
+import {
+  useSWRINFxRecentThreads,
+  useSWRMUTxThreads,
+} from '~/features/openai/client/stores/thread';
 import {
   type SseMessage,
   SseMessageSchema,
   type SsePreMessage,
   SsePreMessageSchema,
-} from '../../interfaces/knowledge-assistant/sse-schemas';
+} from '~/features/openai/interfaces/knowledge-assistant/sse-schemas';
+import { ThreadType } from '~/features/openai/interfaces/thread-relation';
+import { handleIfSuccessfullyParsed } from '~/features/openai/utils/handle-if-successfully-parsed';
+
 import type {
   MessageLog,
   MessageWithCustomMetaData,
 } from '../../interfaces/message';
 import type { IThreadRelationHasId } from '../../interfaces/thread-relation';
-import { ThreadType } from '../../interfaces/thread-relation';
-import { handleIfSuccessfullyParsed } from '../../utils/handle-if-successfully-parsed';
-import { AiAssistantChatInitialView } from '../components/AiAssistant/AiAssistantSidebar/AiAssistantChatInitialView';
-import {
-  useAiAssistantSidebarActions,
-  useAiAssistantSidebarStatus,
-} from '../states';
-import { useSWRMUTxMessages } from '../stores/message';
-import { useSWRINFxRecentThreads, useSWRMUTxThreads } from '../stores/thread';
 
 type CreateThread = (
   aiAssistantId: string,

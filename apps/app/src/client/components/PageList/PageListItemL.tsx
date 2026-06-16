@@ -23,6 +23,10 @@ import { useTranslation } from 'next-i18next';
 import Clamp from 'react-multiline-clamp';
 import { Input } from 'reactstrap';
 
+import { PageItemControl } from '~/client/components/Common/Dropdown/PageItemControl';
+import type { ISelectable } from '~/client/interfaces/selectable-all';
+import { bookmark, unbookmark, unlink } from '~/client/services/page-operation';
+import { toastError } from '~/client/util/toastr';
 import { PagePathHierarchicalLink } from '~/components/Common/PagePathHierarchicalLink';
 import type { IPageSearchMeta, IPageWithSearchMeta } from '~/interfaces/search';
 import { isIPageSearchMeta } from '~/interfaces/search';
@@ -41,11 +45,7 @@ import { usePutBackPageModalActions } from '~/states/ui/modal/put-back-page';
 import { useSWRMUTxCurrentUserBookmarks } from '~/stores/bookmark';
 import { useSWRMUTxPageInfo, useSWRxPageInfo } from '~/stores/page';
 
-import type { ISelectable } from '../../interfaces/selectable-all';
-import { bookmark, unbookmark, unlink } from '../../services/page-operation';
-import { toastError } from '../../util/toastr';
 import type { ForceHideMenuItems } from '../Common/Dropdown/PageItemControl';
-import { PageItemControl } from '../Common/Dropdown/PageItemControl';
 
 type Props = {
   page:

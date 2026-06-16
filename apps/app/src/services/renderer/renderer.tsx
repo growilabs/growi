@@ -17,21 +17,20 @@ import { NextLink } from '~/components/ReactMarkdownComponents/NextLink';
 import type { RendererOptions } from '~/interfaces/renderer-options';
 import { RehypeSanitizeType } from '~/interfaces/services/rehype-sanitize';
 import type { RendererConfig } from '~/interfaces/services/renderer';
-import loggerFactory from '~/utils/logger';
-
 import {
   attributes as recommendedAttributes,
   tagNames as recommendedTagNames,
-} from './recommended-whitelist';
-import * as addClass from './rehype-plugins/add-class';
-import * as addInlineProperty from './rehype-plugins/add-inline-code-property';
-import { relativeLinks } from './rehype-plugins/relative-links';
-import { relativeLinksByPukiwikiLikeLinker } from './rehype-plugins/relative-links-by-pukiwiki-like-linker';
-import * as codeBlock from './remark-plugins/codeblock';
-import * as echoDirective from './remark-plugins/echo-directive';
-import * as emoji from './remark-plugins/emoji';
-import { pukiwikiLikeLinker } from './remark-plugins/pukiwiki-like-linker';
-import * as xsvToTable from './remark-plugins/xsv-to-table';
+} from '~/services/renderer/recommended-whitelist';
+import * as addClass from '~/services/renderer/rehype-plugins/add-class';
+import * as addInlineProperty from '~/services/renderer/rehype-plugins/add-inline-code-property';
+import { relativeLinks } from '~/services/renderer/rehype-plugins/relative-links';
+import { relativeLinksByPukiwikiLikeLinker } from '~/services/renderer/rehype-plugins/relative-links-by-pukiwiki-like-linker';
+import * as codeBlock from '~/services/renderer/remark-plugins/codeblock';
+import * as echoDirective from '~/services/renderer/remark-plugins/echo-directive';
+import * as emoji from '~/services/renderer/remark-plugins/emoji';
+import { pukiwikiLikeLinker } from '~/services/renderer/remark-plugins/pukiwiki-like-linker';
+import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table';
+import loggerFactory from '~/utils/logger';
 
 // import EasyGrid from './PreProcessor/EasyGrid';
 

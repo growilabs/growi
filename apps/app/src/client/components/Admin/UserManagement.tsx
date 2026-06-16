@@ -3,8 +3,9 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 
-import AdminUsersContainer from '../../services/AdminUsersContainer';
-import { toastError } from '../../util/toastr';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer';
+import { toastError } from '~/client/util/toastr';
+
 import PaginationWrapper from '../PaginationWrapper';
 import { withUnstatedContainers } from '../UnstatedUtils';
 import InviteUserControl from './Users/InviteUserControl';

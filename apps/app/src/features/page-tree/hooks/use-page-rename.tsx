@@ -6,11 +6,10 @@ import { basename, dirname, resolve } from 'pathe';
 
 import { apiv3Put } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
+import { CREATING_PAGE_VIRTUAL_ID } from '~/features/page-tree/constants/_inner';
+import { usePageTreeInformationUpdate } from '~/features/page-tree/states/page-tree-update';
 import type { IPageForItem } from '~/interfaces/page';
 import { mutatePageTree } from '~/stores/page-listing';
-
-import { CREATING_PAGE_VIRTUAL_ID } from '../constants/_inner';
-import { usePageTreeInformationUpdate } from '../states/page-tree-update';
 
 type RenameResult = {
   success: boolean;

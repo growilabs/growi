@@ -1,10 +1,11 @@
-import { instructionsForInformationTypes } from '../../../../openai/server/services/assistant/instructions/commons';
+import { callLlmForJson } from '~/features/ai-tools/suggest-path/server/services/call-llm-for-json';
+import { instructionsForInformationTypes } from '~/features/openai/server/services/assistant/instructions/commons';
+
 import type {
   ContentAnalysis,
   EvaluatedSuggestion,
   SearchCandidate,
 } from '../../interfaces/suggest-path-types';
-import { callLlmForJson } from './call-llm-for-json';
 
 const SYSTEM_PROMPT = [
   'You are a page save location evaluator for a wiki system. ',

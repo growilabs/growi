@@ -1,7 +1,6 @@
 import { SupportedAction } from '~/interfaces/activity';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
 import loggerFactory from '~/utils/logger';
-
-import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 
 const _logger = loggerFactory('growi:routes:apiv3:logout');
 

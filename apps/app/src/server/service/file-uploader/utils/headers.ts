@@ -1,7 +1,8 @@
 import type { Response } from 'express';
 
-import type { ExpressHttpHeader } from '../../../interfaces/attachment';
-import type { IAttachmentDocument } from '../../../models/attachment';
+import type { ExpressHttpHeader } from '~/server/interfaces/attachment';
+import type { IAttachmentDocument } from '~/server/models/attachment';
+
 import { configManager } from '../../config-manager';
 import { defaultContentDispositionSettings } from './security';
 

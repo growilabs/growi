@@ -1,5 +1,6 @@
 import { useEffect } from 'react';
 
+import { useCurrentPageYjsDataActions } from '~/features/collaborative-editor/states';
 import { SocketEventName } from '~/interfaces/websocket';
 import { useIsGuestUser } from '~/states/context';
 import {
@@ -8,8 +9,6 @@ import {
   usePageNotFound,
 } from '~/states/page';
 import { useGlobalSocket } from '~/states/socket-io';
-
-import { useCurrentPageYjsDataActions } from '../states';
 
 export const useCurrentPageYjsDataAutoLoadEffect = (): void => {
   const { fetchCurrentPageYjsData } = useCurrentPageYjsDataActions();

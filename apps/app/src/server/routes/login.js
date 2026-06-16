@@ -1,8 +1,8 @@
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { UserStatus } from '../models/user/conts';
-import { configManager } from '../service/config-manager';
 import { growiInfoService } from '../service/growi-info';
 import { resolveLocalePath } from '../util/safe-path-utils';
 

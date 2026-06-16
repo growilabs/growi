@@ -12,7 +12,7 @@
 import type {
   ReconcileTargetType,
   VaultReconcileLogModel,
-} from '../../models/vault-reconcile-log';
+} from '~/features/growi-vault/server/models/vault-reconcile-log';
 
 // ---------------------------------------------------------------------------
 // Re-exports needed by other modules in the reconcile module group

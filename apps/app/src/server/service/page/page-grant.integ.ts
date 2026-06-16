@@ -11,12 +11,11 @@ import ExternalUserGroup, {
 } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { UserGroupPageGrantStatus } from '~/interfaces/page';
-
-import type Crowi from '../../crowi';
-import type { PageDocument, PageModel } from '../../models/page';
-import UserGroup, { type UserGroupDocument } from '../../models/user-group';
-import UserGroupRelation from '../../models/user-group-relation';
-import type { IPageGrantService } from '../page-grant';
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import UserGroup, { type UserGroupDocument } from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import type { IPageGrantService } from '~/server/service/page-grant';
 
 /*
  * There are 3 grant types to test.

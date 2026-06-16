@@ -10,13 +10,13 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 import path from 'path';
 
+import { projectRoot } from '~/server/util/project-dir-utils';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
 import { Attachment } from '../models/attachment';
 import type { PageDocument, PageModel } from '../models/page';
 import { configManager } from '../service/config-manager';
-import { projectRoot } from '../util/project-dir-utils';
 import { convertStreamToBuffer } from '../util/stream';
 
 const logger = loggerFactory('growi:routes:ogp');

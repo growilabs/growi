@@ -6,13 +6,13 @@ import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
 import mongoose from 'mongoose';
 
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import type { PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../../crowi';
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../../middlewares/login-required';
-import type { PageModel } from '../../../models/page';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:page:check-page-existence');

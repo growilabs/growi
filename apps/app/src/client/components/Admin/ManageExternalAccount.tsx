@@ -2,8 +2,9 @@ import React, { type JSX, useCallback, useEffect } from 'react';
 import Link from 'next/link';
 import { useTranslation } from 'next-i18next';
 
-import AdminExternalAccountsContainer from '../../services/AdminExternalAccountsContainer';
-import { toastError } from '../../util/toastr';
+import AdminExternalAccountsContainer from '~/client/services/AdminExternalAccountsContainer';
+import { toastError } from '~/client/util/toastr';
+
 import PaginationWrapper from '../PaginationWrapper';
 import { withUnstatedContainers } from '../UnstatedUtils';
 import ExternalAccountTable from './Users/ExternalAccountTable';

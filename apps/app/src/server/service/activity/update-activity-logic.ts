@@ -3,8 +3,7 @@ import { getIdStringForRef } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
-
-import Activity from '../../models/activity';
+import Activity from '~/server/models/activity';
 
 type GenerateUpdatePayload = {
   currentUserId: string | undefined;

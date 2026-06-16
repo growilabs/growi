@@ -9,11 +9,10 @@ import {
   UncontrolledTooltip,
 } from 'reactstrap';
 
+import { BookmarkFolderMenu } from '~/client/components/Bookmarks/BookmarkFolderMenu';
+import UserPictureList from '~/client/components/Common/UserPictureList';
 import { useIsGuestUser } from '~/states/context';
 import { useSWRxBookmarkedUsers } from '~/stores/bookmark';
-
-import { BookmarkFolderMenu } from '../Bookmarks/BookmarkFolderMenu';
-import UserPictureList from '../Common/UserPictureList';
 
 import styles from './BookmarkButtons.module.scss';
 import popoverStyles from './user-list-popover.module.scss';

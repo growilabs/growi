@@ -49,7 +49,7 @@ const getUserGroupRelation = async () =>
 const getExternalUserGroupRelation = async () =>
   (
     await import(
-      '../../../external-user-group/server/models/external-user-group-relation'
+      '~/features/external-user-group/server/models/external-user-group-relation'
     )
   ).default;
 

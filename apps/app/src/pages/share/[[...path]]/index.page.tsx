@@ -7,6 +7,11 @@ import { useAtomValue } from 'jotai';
 import { ShareLinkLayout } from '~/components/Layout/ShareLinkLayout';
 import { DrawioViewerScript } from '~/components/Script/DrawioViewerScript';
 import { ShareLinkPageView } from '~/components/ShareLinkPageView';
+import type { CommonEachProps } from '~/pages/common-props';
+import { getServerSideCommonEachProps } from '~/pages/common-props';
+import { NextjsRoutingType } from '~/pages/utils/nextjs-routing-utils';
+import { useCustomTitleForPage } from '~/pages/utils/page-title-customization';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
 import { useCurrentPageData, useCurrentPagePath } from '~/states/page';
 import { useHydratePageAtoms } from '~/states/page/hydrate';
 import {
@@ -15,14 +20,9 @@ import {
 } from '~/states/server-configurations';
 
 import type { NextPageWithLayout } from '../../_app.page';
-import type { CommonEachProps } from '../../common-props';
-import { getServerSideCommonEachProps } from '../../common-props';
 import { useInitialCSRFetch } from '../../general-page';
 import { useHydrateGeneralPageConfigurationAtoms } from '../../general-page/hydrate';
 import { registerPageToShowRevisionWithMeta } from '../../general-page/superjson';
-import { NextjsRoutingType } from '../../utils/nextjs-routing-utils';
-import { useCustomTitleForPage } from '../../utils/page-title-customization';
-import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
 import { NEXT_JS_ROUTING_PAGE } from './consts';
 import { getServerSidePropsForInitial } from './server-side-props';
 import type { InitialProps } from './types';

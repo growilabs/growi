@@ -2,9 +2,8 @@ import type { IUserHasId } from '@growi/core/dist/interfaces';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import type { PageDocument, PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
-
-import type { PageDocument, PageModel } from '../../../models/page';
 
 const logger = loggerFactory('growi:events:page:seen');
 

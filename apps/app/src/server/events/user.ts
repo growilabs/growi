@@ -4,10 +4,10 @@ import EventEmitter from 'events';
 import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
+import type { PageDocument, PageModel } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
-import type { PageDocument, PageModel } from '../models/page';
 import { deleteCompletelyUserHomeBySystem } from '../service/page/delete-completely-user-home-by-system';
 
 const logger = loggerFactory('growi:events:user');

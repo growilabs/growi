@@ -3,13 +3,13 @@ import passport from 'passport';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { ExternalAccountLoginError } from '~/models/vo/external-account-login-error';
+import { getTranslation } from '~/server/service/i18next';
+import { createRedirectToForUnauthenticated } from '~/server/util/createRedirectToForUnauthenticated';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { externalAccountService } from '../service/external-account';
-import { getTranslation } from '../service/i18next';
 import ApiResponse from '../util/apiResponse';
-import { createRedirectToForUnauthenticated } from '../util/createRedirectToForUnauthenticated';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 export const setup = (crowi, app) => {

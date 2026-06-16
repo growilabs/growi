@@ -13,34 +13,34 @@ import { Collapse } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
 import { toastError } from '~/client/util/toastr';
+import { MessageCard } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/MessageCard/MessageCard';
+import { ResizableTextarea } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/ResizableTextArea';
+import {
+  type FormData as FormDataForEditorAssistant,
+  isEditorAssistantFormData,
+  useEditorAssistant,
+} from '~/features/openai/client/services/editor-assistant';
+import {
+  type FormData as FormDataForKnowledgeAssistant,
+  useFetchAndSetMessageDataEffect,
+  useKnowledgeAssistant,
+} from '~/features/openai/client/services/knowledge-assistant';
+import {
+  useAiAssistantSidebarActions,
+  useAiAssistantSidebarStatus,
+  useUnifiedMergeViewActions,
+} from '~/features/openai/client/states';
+import { useSWRxThreads } from '~/features/openai/client/stores/thread';
+import {
+  MessageErrorCode,
+  StreamErrorCode,
+} from '~/features/openai/interfaces/message-error';
 import { useGrowiCloudUri } from '~/states/global';
 import loggerFactory from '~/utils/logger';
 
 import type { AiAssistantHasId } from '../../../../interfaces/ai-assistant';
 import type { MessageLog } from '../../../../interfaces/message';
-import {
-  MessageErrorCode,
-  StreamErrorCode,
-} from '../../../../interfaces/message-error';
 import type { IThreadRelationHasId } from '../../../../interfaces/thread-relation';
-import {
-  type FormData as FormDataForEditorAssistant,
-  isEditorAssistantFormData,
-  useEditorAssistant,
-} from '../../../services/editor-assistant';
-import {
-  type FormData as FormDataForKnowledgeAssistant,
-  useFetchAndSetMessageDataEffect,
-  useKnowledgeAssistant,
-} from '../../../services/knowledge-assistant';
-import {
-  useAiAssistantSidebarActions,
-  useAiAssistantSidebarStatus,
-  useUnifiedMergeViewActions,
-} from '../../../states';
-import { useSWRxThreads } from '../../../stores/thread';
-import { MessageCard } from './MessageCard/MessageCard';
-import { ResizableTextarea } from './ResizableTextArea';
 
 import styles from './AiAssistantSidebar.module.scss';
 

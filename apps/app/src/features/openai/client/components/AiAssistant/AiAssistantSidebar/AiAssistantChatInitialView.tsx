@@ -1,8 +1,8 @@
 import Link from 'next/link';
 import { useTranslation } from 'react-i18next';
 
-import { removeGlobPath } from '../../../../utils/remove-glob-path';
-import { ThreadList } from './ThreadList';
+import { ThreadList } from '~/features/openai/client/components/AiAssistant/AiAssistantSidebar/ThreadList';
+import { removeGlobPath } from '~/features/openai/utils/remove-glob-path';
 
 type Props = {
   description: string;

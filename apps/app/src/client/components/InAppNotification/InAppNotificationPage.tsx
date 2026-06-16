@@ -4,6 +4,7 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
+import { apiv3Put } from '~/client/util/apiv3-client';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
 import { showPageLimitationXLAtom } from '~/states/server-configurations';
 import {
@@ -11,7 +12,6 @@ import {
   useSWRxInAppNotifications,
 } from '~/stores/in-app-notification';
 
-import { apiv3Put } from '../../util/apiv3-client';
 import CustomNavAndContents from '../CustomNavigation/CustomNavAndContents';
 import PaginationWrapper from '../PaginationWrapper';
 import InAppNotificationList from './InAppNotificationList';
@@ -93,6 +93,7 @@ const InAppNotificationCategoryByStatus: FC<
         // render list-group
         <InAppNotificationList inAppNotificationData={notificationData} />
       )}
+
       {notificationData.totalDocs > 0 && (
         <div className="mt-4">
           <PaginationWrapper

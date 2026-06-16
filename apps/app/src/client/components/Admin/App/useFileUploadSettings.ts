@@ -1,7 +1,8 @@
 import { useEffect, useState } from 'react';
 import type { FieldNamesMarkedBoolean } from 'react-hook-form';
 
-import { apiv3Get, apiv3Put } from '../../../util/apiv3-client';
+import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
+
 import type {
   FileUploadFormValues,
   FileUploadSettingsData,

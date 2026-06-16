@@ -21,17 +21,16 @@ import mongoose from 'mongoose';
 import { afterEach, beforeAll, describe, expect, it } from 'vitest';
 import { mock } from 'vitest-mock-extended';
 
+import { VaultInstruction } from '~/features/growi-vault/server/models/vault-instruction';
+import { VaultReconcileLog } from '~/features/growi-vault/server/models/vault-reconcile-log';
+import { createConcurrencyController } from '~/features/growi-vault/server/services/reconcile/reconcile-concurrency-controller';
+import { createHistoryStore } from '~/features/growi-vault/server/services/reconcile/reconcile-history-store';
+import { createReconcileOrchestrator } from '~/features/growi-vault/server/services/reconcile/reconcile-orchestrator';
+import { createVaultReconcileService } from '~/features/growi-vault/server/services/reconcile/reconcile-service';
+import { resolveTarget } from '~/features/growi-vault/server/services/reconcile/reconcile-target-resolver';
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
 import type { S2sMessagingService } from '~/server/service/s2s-messaging/base';
-
-import { VaultInstruction } from '../../../models/vault-instruction';
-import { VaultReconcileLog } from '../../../models/vault-reconcile-log';
-import { createConcurrencyController } from '../reconcile-concurrency-controller';
-import { createHistoryStore } from '../reconcile-history-store';
-import { createReconcileOrchestrator } from '../reconcile-orchestrator';
-import { createVaultReconcileService } from '../reconcile-service';
-import { resolveTarget } from '../reconcile-target-resolver';
 
 // ---------------------------------------------------------------------------
 // Minimal PageEvent EventEmitter (matches what page.ts binds on .on())

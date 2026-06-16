@@ -15,10 +15,10 @@ import type { HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
 
 import type { BookmarkedPage } from '~/interfaces/bookmark-info';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import Subscription from '~/server/models/subscription';
+import type { IPageGrantService } from '~/server/service/page-grant';
 
-import type { PageDocument, PageModel } from '../../models/page';
-import Subscription from '../../models/subscription';
-import type { IPageGrantService } from '../page-grant';
 import type { IPageService } from './page-service';
 
 // ============================================================

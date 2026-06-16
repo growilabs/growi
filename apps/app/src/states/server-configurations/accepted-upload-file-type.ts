@@ -4,7 +4,7 @@ import { atom, useAtomValue } from 'jotai';
 import {
   isUploadAllFileAllowedAtom,
   isUploadEnabledAtom,
-} from './server-configurations';
+} from '~/states/server-configurations/server-configurations';
 
 // Derived atom for accepted upload file type calculation
 const acceptedUploadFileTypeAtom = atom((get) => {

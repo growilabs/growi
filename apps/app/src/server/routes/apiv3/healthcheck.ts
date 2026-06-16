@@ -3,9 +3,9 @@ import type { Router } from 'express';
 import express from 'express';
 import nocache from 'nocache';
 
+import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
 import { Config } from '../../models/config';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 

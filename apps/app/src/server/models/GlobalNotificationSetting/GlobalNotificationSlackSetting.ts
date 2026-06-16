@@ -1,6 +1,7 @@
 import mongoose from 'mongoose';
 
-import type Crowi from '../../crowi';
+import type Crowi from '~/server/crowi';
+
 import {
   class as GlobalNotificationSettingClass,
   schema as GlobalNotificationSettingSchema,

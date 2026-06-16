@@ -3,6 +3,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import express from 'express';
 import mongoose from 'mongoose';
 
+import { NewsService } from '~/features/news/server/services/news-service';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -10,8 +11,6 @@ import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
-
-import { NewsService } from '../services/news-service';
 
 const logger = loggerFactory('growi:feature:news:routes');
 

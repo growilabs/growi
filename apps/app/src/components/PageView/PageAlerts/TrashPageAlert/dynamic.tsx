@@ -1,8 +1,7 @@
 import type { JSX } from 'react';
 
+import { useLazyLoader } from '~/components/utils/use-lazy-loader';
 import { useIsTrashPage } from '~/states/page';
-
-import { useLazyLoader } from '../../../utils/use-lazy-loader';
 
 export const TrashPageAlertLazyLoaded = (): JSX.Element => {
   const isTrashPage = useIsTrashPage();

@@ -13,11 +13,11 @@ import newsRoute from '~/features/news/server/routes/news';
 import { factory as openaiRouteFactory } from '~/features/openai/server/routes';
 import { setup as setupPageBulkExport } from '~/features/page-bulk-export/server/routes/apiv3/page-bulk-export';
 import { setup as setupTemplates } from '~/features/templates/server/routes/apiv3';
+import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { setup as setupApplicationInstalled } from '../../middlewares/application-installed';
-import { allreadyInstalledMiddleware } from '../../middlewares/application-not-installed';
 import injectUserRegistrationOrderByTokenMiddleware from '../../middlewares/inject-user-registration-order-by-token-middleware';
 import * as loginFormValidator from '../../middlewares/login-form-validator';
 import * as registerFormValidator from '../../middlewares/register-form-validator';

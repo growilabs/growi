@@ -4,6 +4,8 @@ import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import ReactCardFlip from 'react-card-flip';
 
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { useTWithOpt } from '~/client/util/t-with-opt';
 import type { IExternalAccountLoginError } from '~/interfaces/errors/external-account-login-error';
 import { LoginErrorCode } from '~/interfaces/errors/login-error';
 import type { IErrorV3 } from '~/interfaces/errors/v3-error';
@@ -11,8 +13,6 @@ import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provi
 import { RegistrationMode } from '~/interfaces/registration-mode';
 import { toArrayIfNot } from '~/utils/array-utils';
 
-import { apiv3Post } from '../../util/apiv3-client';
-import { useTWithOpt } from '../../util/t-with-opt';
 import { CompleteUserRegistration } from '../CompleteUserRegistration';
 import { ExternalAuthButton } from './ExternalAuthButton';
 

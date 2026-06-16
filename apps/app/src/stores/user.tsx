@@ -6,8 +6,7 @@ import useSWRImmutable from 'swr/immutable';
 import { apiv3Get } from '~/client/util/apiv3-client';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import { useIsGuestUser } from '~/states/context';
-
-import { checkAndUpdateImageUrlCached } from './middlewares/user';
+import { checkAndUpdateImageUrlCached } from '~/stores/middlewares/user';
 
 export const useSWRxUsersList = (
   userIds: string[],

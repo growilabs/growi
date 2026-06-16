@@ -9,6 +9,8 @@ import {
 import express, { type Router } from 'express';
 import { param, query } from 'express-validator';
 
+import { PLUGIN_STORING_PATH } from '~/features/growi-plugin/server/consts';
+import { GrowiPlugin } from '~/features/growi-plugin/server/models';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -16,9 +18,6 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import { resolveFromRoot } from '~/server/util/project-dir-utils';
 import loggerFactory from '~/utils/logger';
-
-import { PLUGIN_STORING_PATH } from '../../../../growi-plugin/server/consts';
-import { GrowiPlugin } from '../../../../growi-plugin/server/models';
 
 const logger = loggerFactory('growi:routes:apiv3:templates');
 

@@ -3,10 +3,9 @@ import type {
   AccessTokenParserReq,
 } from '@growi/core/dist/interfaces/server';
 
+import { parserForAccessToken } from '~/server/middlewares/access-token-parser/access-token';
+import { parserForApiToken } from '~/server/middlewares/access-token-parser/api-token';
 import loggerFactory from '~/utils/logger';
-
-import { parserForAccessToken } from './access-token';
-import { parserForApiToken } from './api-token';
 
 const logger = loggerFactory('growi:middleware:access-token-parser');
 

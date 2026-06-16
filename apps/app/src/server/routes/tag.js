@@ -1,8 +1,8 @@
 import { SupportedAction } from '~/interfaces/activity';
+import Tag from '~/server/models/tag';
 
 import PageTagRelation from '../models/page-tag-relation';
 import { Revision } from '../models/revision';
-import Tag from '../models/tag';
 import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */

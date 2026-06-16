@@ -4,12 +4,12 @@ import { useTranslation } from 'react-i18next';
 import { ModalBody } from 'reactstrap';
 import SimpleBar from 'simplebar-react';
 
+import { AiAssistantManagementHeader } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/AiAssistantManagementHeader';
+import { PageSelectionMethodButtons } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/PageSelectionMethodButtons';
+import { SelectablePageList } from '~/features/openai/client/components/AiAssistant/AiAssistantManagementModal/SelectablePageList';
 import { limitLearnablePageCountPerAssistantAtom } from '~/states/server-configurations';
 
 import type { SelectablePage } from '../../../../interfaces/selectable-page';
-import { AiAssistantManagementHeader } from './AiAssistantManagementHeader';
-import { PageSelectionMethodButtons } from './PageSelectionMethodButtons';
-import { SelectablePageList } from './SelectablePageList';
 
 type Props = {
   selectedPages: SelectablePage[];

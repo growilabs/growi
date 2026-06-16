@@ -1,10 +1,11 @@
 import type { GetServerSideProps, GetServerSidePropsContext } from 'next';
 
-import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
+import { getServerSideSearchConfigurationProps } from '~/pages/basic-layout-page/get-server-side-props/search-configurations';
+import { getServerSideSidebarConfigProps } from '~/pages/basic-layout-page/get-server-side-props/sidebar-configurations';
+import { getServerSideUserUISettingsProps } from '~/pages/basic-layout-page/get-server-side-props/user-ui-settings';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
+
 import type { BasicLayoutConfigurationProps } from '../types';
-import { getServerSideSearchConfigurationProps } from './search-configurations';
-import { getServerSideSidebarConfigProps } from './sidebar-configurations';
-import { getServerSideUserUISettingsProps } from './user-ui-settings';
 
 export const getServerSideBasicLayoutProps: GetServerSideProps<
   BasicLayoutConfigurationProps

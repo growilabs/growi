@@ -1,8 +1,8 @@
 import type { IRevisionHasId } from '@growi/core';
 
+import type Crowi from '~/server/crowi';
 import { toArrayFromCsv } from '~/utils/to-array-from-csv';
 
-import type Crowi from '../../crowi';
 import {
   prepareSlackMessageForComment,
   prepareSlackMessageForPage,

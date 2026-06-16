@@ -1,1 +1,1 @@
-export * from './global-socket';
+export * from '~/states/socket-io/global-socket';

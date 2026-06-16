@@ -1,1 +1,1 @@
-export { PageBulkExportSelectModalLazyLoaded } from './dynamic';
+export { PageBulkExportSelectModalLazyLoaded } from '~/features/page-bulk-export/client/components/dynamic';

@@ -4,10 +4,10 @@ import type { Readable } from 'node:stream';
 import { pipeline, Writable } from 'node:stream';
 import type { FilterQuery } from 'mongoose';
 
+import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import { SupportedAction } from '~/interfaces/activity';
 import Activity, { type ActivityDocument } from '~/server/models/activity';
 
-import { AuditLogBulkExportJobStatus } from '../../../../interfaces/audit-log-bulk-export';
 import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job';
 import type { IAuditLogBulkExportJobCronService } from '..';
 

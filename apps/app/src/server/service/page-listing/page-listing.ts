@@ -8,13 +8,13 @@ import {
   type IPageOperationProcessInfo,
   PageActionType,
 } from '~/interfaces/page-operation';
-
 import {
   type PageDocument,
   type PageModel,
   PageQueryBuilder,
-} from '../../models/page';
-import PageOperation from '../../models/page-operation';
+} from '~/server/models/page';
+import PageOperation from '~/server/models/page-operation';
+
 import type { IPageOperationService } from '../page-operation';
 
 const { hasSlash, generateChildrenRegExp } = pagePathUtils;

@@ -2,9 +2,8 @@ import type { IUserHasId } from '@growi/core';
 import type { NextFunction, Request, Response } from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
+import Activity from '~/server/models/activity';
 import loggerFactory from '~/utils/logger';
-
-import Activity from '../models/activity';
 
 const logger = loggerFactory('growi:middlewares:add-activity');
 

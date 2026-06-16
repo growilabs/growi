@@ -11,16 +11,16 @@ import { getInstance } from '^/test/setup/crowi';
 
 import type { IBookmark } from '~/interfaces/bookmark-info';
 import type { IShareLink } from '~/interfaces/share-link';
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import PageTagRelation from '~/server/models/page-tag-relation';
+import Tag from '~/server/models/tag';
+import UserGroup from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
 
-import type Crowi from '../../crowi';
 import type { BookmarkModel } from '../../models/bookmark';
-import type { PageDocument, PageModel } from '../../models/page';
-import PageTagRelation from '../../models/page-tag-relation';
 import type { ShareLinkModel } from '../../models/share-link';
-import Tag from '../../models/tag';
-import UserGroup from '../../models/user-group';
-import UserGroupRelation from '../../models/user-group-relation';
 
 let rootPage: PageDocument;
 let dummyUser1: HydratedDocument<IUser>;

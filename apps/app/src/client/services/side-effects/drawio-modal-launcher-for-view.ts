@@ -3,18 +3,17 @@ import { Origin } from '@growi/core';
 import { globalEventTarget } from '@growi/core/dist/utils';
 import type { DrawioEditByViewerProps } from '@growi/remark-drawio';
 
+import { replaceDrawioInMarkdown } from '~/client/components/Page/markdown-drawio-util-for-view';
+import {
+  extractRemoteRevisionDataFromErrorObj,
+  useUpdatePage,
+} from '~/client/services/update-page';
 import type { RemoteRevisionData } from '~/states/page';
 import { useCurrentPageData, useSetRemoteLatestPageData } from '~/states/page';
 import { useShareLinkId } from '~/states/page/hooks';
 import { useConflictDiffModalActions } from '~/states/ui/modal/conflict-diff';
 import { useDrawioModalActions } from '~/states/ui/modal/drawio';
 import loggerFactory from '~/utils/logger';
-
-import { replaceDrawioInMarkdown } from '../../components/Page/markdown-drawio-util-for-view';
-import {
-  extractRemoteRevisionDataFromErrorObj,
-  useUpdatePage,
-} from '../update-page';
 
 const logger = loggerFactory(
   'growi:cli:side-effects:useDrawioModalLauncherForView',

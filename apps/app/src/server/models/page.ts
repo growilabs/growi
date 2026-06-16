@@ -30,20 +30,20 @@ import type {
   IOptionsForCreate,
   IPagePathWithDescendantCount,
 } from '~/interfaces/page';
-import loggerFactory from '~/utils/logger';
-
-import type Crowi from '../crowi';
-import type { ObjectIdLike } from '../interfaces/mongoose-utils';
-import { collectAncestorPaths } from '../util/collect-ancestor-paths';
-import { getOrCreateModel } from '../util/mongoose-utils';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import {
   extractToAncestorsPaths,
   getPageSchema,
   populateDataToShowRevision,
-} from './obsolete-page';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
+} from '~/server/models/obsolete-page';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import { collectAncestorPaths } from '~/server/util/collect-ancestor-paths';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
+import loggerFactory from '~/utils/logger';
+
+import type Crowi from '../crowi';
 import type { UserGroupDocument } from './user-group';
-import UserGroupRelation from './user-group-relation';
 
 type ObjectId = mongoose.Types.ObjectId;
 

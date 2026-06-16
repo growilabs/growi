@@ -14,13 +14,12 @@ import urljoin from 'url-join';
 
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
+import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import UserGroup from '~/server/models/user-group';
+import UserGroupRelation from '~/server/models/user-group-relation';
+import { configManager as _configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
-
-import { configManager as _configManager } from '../service/config-manager';
-import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from './user/conts';
-import UserGroup from './user-group';
-import UserGroupRelation from './user-group-relation';
 
 /** @returns {import('../service/config-manager').IConfigManagerForApp} */
 function getConfigManager() {

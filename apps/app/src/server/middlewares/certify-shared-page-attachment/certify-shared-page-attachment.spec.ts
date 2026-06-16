@@ -1,7 +1,8 @@
 import type { Response } from 'express';
 import { mock } from 'vitest-mock-extended';
 
-import type { ShareLinkDocument } from '../../models/share-link';
+import type { ShareLinkDocument } from '~/server/models/share-link';
+
 import {
   certifySharedPageAttachmentMiddleware,
   type RequestToAllowShareLink,

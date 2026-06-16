@@ -10,11 +10,11 @@ import {
   AllSmallGroupActions,
   AllSupportedActions,
 } from '~/interfaces/activity';
+import type { ActivityDocument } from '~/server/models/activity';
+import Activity from '~/server/models/activity';
 
 import loggerFactory from '../../utils/logger';
 import type Crowi from '../crowi';
-import type { ActivityDocument } from '../models/activity';
-import Activity from '../models/activity';
 import type { GeneratePreNotify, GetAdditionalTargetUsers } from './pre-notify';
 
 const logger = loggerFactory('growi:service:ActivityService');

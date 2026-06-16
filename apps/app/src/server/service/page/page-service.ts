@@ -15,11 +15,10 @@ import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
-
-import type { ObjectIdLike } from '../../interfaces/mongoose-utils';
-import type { PageDocument } from '../../models/page';
-import type { PageOperationDocument } from '../../models/page-operation';
-import type { UserGroupDocument } from '../../models/user-group';
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import type { PageDocument } from '~/server/models/page';
+import type { PageOperationDocument } from '~/server/models/page-operation';
+import type { UserGroupDocument } from '~/server/models/user-group';
 
 export interface IPageService {
   // Page event emitter

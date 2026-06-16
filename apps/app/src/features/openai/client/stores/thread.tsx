@@ -5,11 +5,10 @@ import useSWRInfinite from 'swr/infinite';
 import useSWRMutation, { type SWRMutationResponse } from 'swr/mutation';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-
 import type {
   IThreadRelationHasId,
   IThreadRelationPaginate,
-} from '../../interfaces/thread-relation';
+} from '~/features/openai/interfaces/thread-relation';
 
 const getKey = (aiAssistantId?: string) =>
   aiAssistantId != null ? [`/openai/threads/${aiAssistantId}`] : null;

@@ -11,11 +11,11 @@ import {
   UncontrolledDropdown,
 } from 'reactstrap';
 
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { toastError } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
 import { disableUserPagesAtom } from '~/states/server-configurations';
 
-import { apiv3Post } from '../../../util/apiv3-client';
-import { toastError } from '../../../util/toastr';
 import { SkeletonItem } from './SkeletonItem';
 
 import styles from './PersonalDropdown.module.scss';

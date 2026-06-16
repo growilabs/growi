@@ -5,17 +5,16 @@ import useSWRImmutable from 'swr/immutable';
 
 import { apiv3Get, apiv3Put } from '~/client/util/apiv3-client';
 import type {
-  ChildUserGroupListResult,
-  IUserGroupRelationHasIdPopulatedUser,
-  UserGroupRelationListResult,
-} from '~/interfaces/user-group-response';
-
-import type {
   IExternalUserGroupHasId,
   IExternalUserGroupRelationHasId,
   KeycloakGroupSyncSettings,
   LdapGroupSyncSettings,
-} from '../../interfaces/external-user-group';
+} from '~/features/external-user-group/interfaces/external-user-group';
+import type {
+  ChildUserGroupListResult,
+  IUserGroupRelationHasIdPopulatedUser,
+  UserGroupRelationListResult,
+} from '~/interfaces/user-group-response';
 
 export const useSWRxLdapGroupSyncSettings = (): SWRResponse<
   LdapGroupSyncSettings,

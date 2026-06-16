@@ -1,1 +1,1 @@
-export * from './config-manager';
+export * from '~/server/service/config-manager/config-manager';

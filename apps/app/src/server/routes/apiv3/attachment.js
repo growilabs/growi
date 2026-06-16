@@ -6,20 +6,20 @@ import multer from 'multer';
 import autoReap from 'multer-autoreap';
 
 import { SupportedAction } from '~/interfaces/activity';
+import { AttachmentType } from '~/server/interfaces/attachment';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { Attachment } from '~/server/models/attachment';
+import {
+  serializePageSecurely,
+  serializeRevisionSecurely,
+} from '~/server/models/serializers';
 import loggerFactory from '~/utils/logger';
 
-import { AttachmentType } from '../../interfaces/attachment';
-import { accessTokenParser } from '../../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 import { certifySharedPageAttachmentMiddleware } from '../../middlewares/certify-shared-page-attachment';
 import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
-import loginRequiredFactory from '../../middlewares/login-required';
-import { Attachment } from '../../models/attachment';
-import {
-  serializePageSecurely,
-  serializeRevisionSecurely,
-} from '../../models/serializers';
 
 const logger = loggerFactory('growi:routes:apiv3:attachment');
 

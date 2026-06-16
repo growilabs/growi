@@ -2,6 +2,7 @@ import type { IUser } from '@growi/core';
 import type { Archiver } from 'archiver';
 import archiver from 'archiver';
 
+import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import { SupportedAction } from '~/interfaces/activity';
 import { AttachmentType } from '~/server/interfaces/attachment';
 import {
@@ -11,7 +12,6 @@ import {
 import type { FileUploader } from '~/server/service/file-uploader';
 import loggerFactory from '~/utils/logger';
 
-import { AuditLogBulkExportJobStatus } from '../../../../interfaces/audit-log-bulk-export';
 import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job';
 import type { IAuditLogBulkExportJobCronService } from '..';
 

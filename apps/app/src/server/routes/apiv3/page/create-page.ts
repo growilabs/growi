@@ -23,23 +23,23 @@ import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IApiv3PageCreateParams } from '~/interfaces/apiv3';
 import { subscribeRuleNames } from '~/interfaces/in-app-notification';
 import type { IOptionsForCreate } from '~/interfaces/page';
-import loggerFactory from '~/utils/logger';
-
-import type Crowi from '../../../crowi';
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
-import loginRequiredFactory from '../../../middlewares/login-required';
-import { GlobalNotificationSettingEvent } from '../../../models/GlobalNotificationSetting';
-import type { PageDocument, PageModel } from '../../../models/page';
-import PageTagRelation from '../../../models/page-tag-relation';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { GlobalNotificationSettingEvent } from '~/server/models/GlobalNotificationSetting';
+import type { PageDocument, PageModel } from '~/server/models/page';
+import PageTagRelation from '~/server/models/page-tag-relation';
 import {
   serializePageSecurely,
   serializeRevisionSecurely,
-} from '../../../models/serializers';
-import { configManager } from '../../../service/config-manager';
-import { getTranslation } from '../../../service/i18next';
+} from '~/server/models/serializers';
+import { configManager } from '~/server/service/config-manager';
+import { getTranslation } from '~/server/service/i18next';
+import loggerFactory from '~/utils/logger';
+
+import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:page:create-page');

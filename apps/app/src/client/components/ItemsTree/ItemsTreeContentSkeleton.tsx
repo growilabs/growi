@@ -1,6 +1,6 @@
 import type { JSX } from 'react';
 
-import { Skeleton } from '../Skeleton';
+import { Skeleton } from '~/client/components/Skeleton';
 
 import styles from './ItemsTreeContentSkeleton.module.scss';
 

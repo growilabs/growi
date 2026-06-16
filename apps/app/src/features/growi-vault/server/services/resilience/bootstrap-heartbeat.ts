@@ -1,4 +1,4 @@
-import type { VaultSyncStateModel } from '../../models/vault-sync-state';
+import type { VaultSyncStateModel } from '~/features/growi-vault/server/models/vault-sync-state';
 
 /**
  * BootstrapHeartbeat manages the instance identity and liveness signal for a

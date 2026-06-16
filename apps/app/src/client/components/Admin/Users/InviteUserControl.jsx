@@ -2,7 +2,8 @@ import React, { Fragment } from 'react';
 import { useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 
-import AdminUsersContainer from '../../../services/AdminUsersContainer';
+import AdminUsersContainer from '~/client/services/AdminUsersContainer';
+
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import UserInviteModal from './UserInviteModal';
 

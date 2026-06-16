@@ -36,7 +36,8 @@ vi.mock('~/utils/logger', () => ({
 // ---------------------------------------------------------------------------
 
 const getVaultInstruction = async () =>
-  (await import('../models/vault-instruction')).VaultInstruction;
+  (await import('~/features/growi-vault/server/models/vault-instruction'))
+    .VaultInstruction;
 
 // ---------------------------------------------------------------------------
 // Helpers

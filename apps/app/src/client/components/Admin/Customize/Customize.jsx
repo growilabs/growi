@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect } from 'react';
 import PropTypes from 'prop-types';
 
+import AdminCustomizeContainer from '~/client/services/AdminCustomizeContainer';
+import { toastError } from '~/client/util/toastr';
 import { toArrayIfNot } from '~/utils/array-utils';
 import loggerFactory from '~/utils/logger';
 
-import AdminCustomizeContainer from '../../../services/AdminCustomizeContainer';
-import { toastError } from '../../../util/toastr';
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import CustomizeCssSetting from './CustomizeCssSetting';
 import CustomizeFunctionSetting from './CustomizeFunctionSetting';

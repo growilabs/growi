@@ -23,6 +23,8 @@ import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bul
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
 import type { SessionConfig } from '~/interfaces/session-config';
+import { startCron as startAccessTokenCron } from '~/server/service/access-token';
+import { projectRoot } from '~/server/util/project-dir-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
@@ -36,7 +38,6 @@ import type { AccessTokenParser } from '../middlewares/access-token-parser';
 import { accessTokenParser } from '../middlewares/access-token-parser';
 import httpErrorHandler from '../middlewares/http-error-handler';
 import loginRequiredFactory from '../middlewares/login-required';
-import { startCron as startAccessTokenCron } from '../service/access-token';
 import type { AclService } from '../service/acl';
 import { aclService as aclServiceSingletonInstance } from '../service/acl';
 import ActivityService from '../service/activity';
@@ -70,7 +71,6 @@ import UserGroupService from '../service/user-group';
 import { UserNotificationService } from '../service/user-notification';
 import { initializeYjsService } from '../service/yjs';
 import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
-import { projectRoot } from '../util/project-dir-utils';
 import { setup as setupExpressInit } from './express-init';
 import type { ModelsMapDependentOnCrowi } from './setup-models';
 import { setupModelsDependentOnCrowi } from './setup-models';
@@ -522,7 +522,7 @@ class Crowi {
   async setupMailer(): Promise<void> {
     // intentionally lazy: service/mail participates in a require cycle with
     // this hub module; loading it at import time would surface the cycle
-    const { default: MailService } = await import('../service/mail');
+    const { default: MailService } = await import('~/server/service/mail');
     this.mailService = new MailService(this);
 
     // add as a message handler

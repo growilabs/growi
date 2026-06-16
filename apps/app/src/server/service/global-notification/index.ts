@@ -1,10 +1,10 @@
 import { PageGrant } from '@growi/core';
 import type { IUser } from '@growi/core/dist/interfaces';
 
+import type Crowi from '~/server/crowi';
+import type { PageDocument } from '~/server/models/page';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import type { PageDocument } from '../../models/page';
 import { GlobalNotificationMailService } from './global-notification-mail';
 import { GlobalNotificationSlackService } from './global-notification-slack';
 import type { GlobalNotificationEventVars } from './types';

@@ -1,4 +1,4 @@
 export {
   remarkPlugin,
   sanitizeOption,
-} from './mermaid';
+} from '~/features/mermaid/services/mermaid';

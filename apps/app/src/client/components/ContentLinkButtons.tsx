@@ -2,7 +2,8 @@ import React, { type JSX } from 'react';
 import { type IUserHasId, USER_STATUS } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 
-import { scrollToElement } from '../util/smooth-scroll';
+import { scrollToElement } from '~/client/util/smooth-scroll';
+
 import {
   BOOKMARKS_LIST_ID,
   RECENT_ACTIVITY_LIST_ID,

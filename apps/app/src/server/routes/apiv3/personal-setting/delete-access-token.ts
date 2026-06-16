@@ -4,15 +4,15 @@ import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
 
 import { SupportedAction } from '~/interfaces/activity';
+import type Crowi from '~/server/crowi';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import { generateAddActivityMiddleware } from '~/server/middlewares/add-activity';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import { excludeReadOnlyUser } from '~/server/middlewares/exclude-read-only-user';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import { AccessToken } from '~/server/models/access-token';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../../crowi';
-import { accessTokenParser } from '../../../middlewares/access-token-parser';
-import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
-import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
-import { excludeReadOnlyUser } from '../../../middlewares/exclude-read-only-user';
-import loginRequiredFactory from '../../../middlewares/login-required';
-import { AccessToken } from '../../../models/access-token';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
 
 const logger = loggerFactory(

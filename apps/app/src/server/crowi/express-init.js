@@ -12,6 +12,8 @@ import methodOverride from 'method-override';
 import passport from 'passport';
 import qs from 'qs';
 
+import { resolveFromRoot } from '~/server/util/project-dir-utils';
+
 import {
   PLUGIN_EXPRESS_STATIC_DIR,
   PLUGIN_STORING_PATH,
@@ -23,7 +25,6 @@ import { denyUploadsDirectAccess } from '../middlewares/deny-uploads-direct-acce
 import { setup as setupInjectCurrentuserToLocalvars } from '../middlewares/inject-currentuser-to-localvars';
 import registerSafeRedirectFactory from '../middlewares/safe-redirect';
 import avoidSessionRoutes from '../routes/avoid-session-routes';
-import { resolveFromRoot } from '../util/project-dir-utils';
 
 const logger = loggerFactory('growi:crowi:express-init');
 

@@ -4,7 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { PrismAsyncLight } from 'react-syntax-highlighter';
 import { oneDark } from 'react-syntax-highlighter/dist/cjs/styles/prism';
 
-import { toastError, toastSuccess } from '../../../../util/toastr';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 
 import styles from './GuideRow.module.scss';
 

@@ -2,9 +2,9 @@ import { PageGrant } from '@growi/core';
 import { act, renderHook } from '@testing-library/react';
 import { createStore, Provider } from 'jotai';
 
+import { useCurrentPageId } from '~/states/page';
 import { useSWRxCurrentGrantData } from '~/stores/page';
 
-import { useCurrentPageId } from '../../page';
 import { useSelectedGrant } from './selected-grant';
 import { useSyncSelectedGrantWithCurrentPage } from './use-sync-selected-grant';
 
@@ -29,7 +29,6 @@ const grantDataResponse = (currentPageGrant?: {
             isGrantNormalized: true,
             grantData: { isForbidden: false, currentPageGrant },
           },
-
     error: undefined,
     isLoading: false,
     isValidating: false,

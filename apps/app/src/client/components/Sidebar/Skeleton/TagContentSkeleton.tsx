@@ -1,7 +1,7 @@
 import React, { type JSX } from 'react';
 import { useTranslation } from 'next-i18next';
 
-import { Skeleton } from '../../Skeleton';
+import { Skeleton } from '~/client/components/Skeleton';
 
 import styles from '../Tag.module.scss';
 

@@ -8,14 +8,14 @@ import type { IPageBulkExportJob } from '~/features/page-bulk-export/interfaces/
 import { AllEssentialActions } from '~/interfaces/activity';
 import type { PaginateResult } from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
+import type { ActivityDocument } from '~/server/models/activity';
+import type { InAppNotificationDocument } from '~/server/models/in-app-notification';
+import { InAppNotification } from '~/server/models/in-app-notification';
+import InAppNotificationSettings from '~/server/models/in-app-notification-settings';
+import Subscription from '~/server/models/subscription';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
-import type { ActivityDocument } from '../models/activity';
-import type { InAppNotificationDocument } from '../models/in-app-notification';
-import { InAppNotification } from '../models/in-app-notification';
-import InAppNotificationSettings from '../models/in-app-notification-settings';
-import Subscription from '../models/subscription';
 import { generateSnapshot } from './in-app-notification/in-app-notification-utils';
 import { type PreNotify, preNotifyService } from './pre-notify';
 import { getRoomNameWithId, RoomPrefix } from './socket-io/helper';

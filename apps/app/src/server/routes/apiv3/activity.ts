@@ -8,15 +8,15 @@ import express from 'express';
 import { query } from 'express-validator';
 
 import type { IActivity, ISearchFilter } from '~/interfaces/activity';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import adminRequiredFactory from '~/server/middlewares/admin-required';
+import loginRequiredFactory from '~/server/middlewares/login-required';
+import Activity from '~/server/models/activity';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
-import { accessTokenParser } from '../../middlewares/access-token-parser';
-import adminRequiredFactory from '../../middlewares/admin-required';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import loginRequiredFactory from '../../middlewares/login-required';
-import Activity from '../../models/activity';
-import { configManager } from '../../service/config-manager';
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:activity');

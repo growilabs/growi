@@ -9,6 +9,12 @@ import type {
   ISelectableAll,
   ISelectableAndIndeterminatable,
 } from '~/client/interfaces/selectable-all';
+import { OperateAllControl } from '~/features/search/client/components/SearchPage/OperateAllControl';
+import SearchControl from '~/features/search/client/components/SearchPage/SearchControl';
+import {
+  SearchPageBase,
+  usePageDeleteModalForBulkDeletion,
+} from '~/features/search/client/components/SearchPage/SearchPageBase';
 import type { IFormattedSearchResult } from '~/interfaces/search';
 import { useSearchKeyword, useSetSearchKeyword } from '~/states/search';
 import {
@@ -21,13 +27,7 @@ import {
   useSWRxSearch,
 } from '~/stores/search';
 
-import { OperateAllControl } from './OperateAllControl';
-import SearchControl from './SearchControl';
 import type { IReturnSelectedPageIds } from './SearchPageBase';
-import {
-  SearchPageBase,
-  usePageDeleteModalForBulkDeletion,
-} from './SearchPageBase';
 
 import styles from './SearchPage.module.scss';
 

@@ -5,6 +5,8 @@ import type { Request } from 'express';
 import { Router } from 'express';
 import { body, param, query, validationResult } from 'express-validator';
 
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
+import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { SupportedAction } from '~/interfaces/activity';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type Crowi from '~/server/crowi';
@@ -18,9 +20,6 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import { configManager } from '~/server/service/config-manager';
 import type UserGroupService from '~/server/service/user-group';
 import loggerFactory from '~/utils/logger';
-
-import ExternalUserGroup from '../../models/external-user-group';
-import ExternalUserGroupRelation from '../../models/external-user-group-relation';
 
 const logger = loggerFactory('growi:routes:apiv3:external-user-group');
 

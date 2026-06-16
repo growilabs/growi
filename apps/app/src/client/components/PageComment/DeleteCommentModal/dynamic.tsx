@@ -10,7 +10,9 @@ export const DeleteCommentModalLazyLoaded = (
   const DeleteCommentModal = useLazyLoader<DeleteCommentModalProps>(
     'delete-comment-modal',
     () =>
-      import('./DeleteCommentModal').then((mod) => ({
+      import(
+        '~/client/components/PageComment/DeleteCommentModal/DeleteCommentModal'
+      ).then((mod) => ({
         default: mod.DeleteCommentModal,
       })),
     props.isShown,

@@ -1,8 +1,7 @@
 import mongoose from 'mongoose';
 
 import type { IExternalAuthProviderType } from '~/interfaces/external-auth-provider';
-
-import { UserStatus } from '../../../models/user/conts';
+import { UserStatus } from '~/server/models/user/conts';
 
 interface AggregateResult {
   count: number;

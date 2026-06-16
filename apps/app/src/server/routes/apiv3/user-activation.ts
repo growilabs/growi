@@ -8,13 +8,13 @@ import mongoose from 'mongoose';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { RegistrationMode } from '~/interfaces/registration-mode';
+import type Crowi from '~/server/crowi';
+import UserRegistrationOrder from '~/server/models/user-registration-order';
+import { configManager } from '~/server/service/config-manager';
+import { growiInfoService } from '~/server/service/growi-info';
+import { getTranslation } from '~/server/service/i18next';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import UserRegistrationOrder from '../../models/user-registration-order';
-import { configManager } from '../../service/config-manager';
-import { growiInfoService } from '../../service/growi-info';
-import { getTranslation } from '../../service/i18next';
 import { resolveLocalePath } from '../../util/safe-path-utils';
 
 const logger = loggerFactory('growi:routes:apiv3:user-activation');

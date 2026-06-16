@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { useAiAssistantManagementModalStatus } from '~/features/openai/client/states/modal/ai-assistant-management';
+
 import type { SelectablePage } from '../../interfaces/selectable-page';
-import { useAiAssistantManagementModalStatus } from '../states/modal/ai-assistant-management';
 
 type UseSelectedPages = {
   selectedPages: Map<string, SelectablePage>;

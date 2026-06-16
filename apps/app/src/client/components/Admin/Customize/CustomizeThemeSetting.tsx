@@ -2,9 +2,9 @@ import { useCallback, useEffect, useState } from 'react';
 import { PresetThemes, PresetThemesMetadatas } from '@growi/preset-themes';
 import { useTranslation } from 'next-i18next';
 
+import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
 import { useSWRxGrowiThemeSetting } from '~/stores/admin/customize';
 
-import { toastError, toastSuccess, toastWarning } from '../../../util/toastr';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
 import CustomizeThemeOptions from './CustomizeThemeOptions';
 

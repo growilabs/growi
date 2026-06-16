@@ -1,2 +1,2 @@
-export * from './components';
-export * from './services';
+export * from '~/features/callout/components';
+export * from '~/features/callout/services';

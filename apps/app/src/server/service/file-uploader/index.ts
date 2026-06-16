@@ -1,7 +1,7 @@
 import { EnvToModuleMappings } from '~/interfaces/file-uploader';
+import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
 import { configManager } from '../config-manager';
 import type { FileUploader } from './file-uploader';
 

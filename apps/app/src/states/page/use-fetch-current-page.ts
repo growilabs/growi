@@ -13,9 +13,6 @@ import { useAtomValue } from 'jotai';
 import { useAtomCallback } from 'jotai/utils';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-import { useSWRxPageInfo } from '~/stores/page';
-import loggerFactory from '~/utils/logger';
-
 import {
   currentPageDataAtom,
   currentPageEmptyIdAtom,
@@ -27,7 +24,9 @@ import {
   remoteRevisionBodyAtom,
   revisionIdFromUrlAtom,
   shareLinkIdAtom,
-} from './internal-atoms';
+} from '~/states/page/internal-atoms';
+import { useSWRxPageInfo } from '~/stores/page';
+import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:states:page:useFetchCurrentPage');
 

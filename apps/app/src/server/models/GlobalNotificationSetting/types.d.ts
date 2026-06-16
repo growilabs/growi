@@ -1,6 +1,6 @@
 import type { HydratedDocument, Model } from 'mongoose';
 
-import type Crowi from '../../crowi';
+import type Crowi from '~/server/crowi';
 
 import type { GlobalNotificationSettingType } from './consts';
 

@@ -3,13 +3,13 @@ import type { Response, Router } from 'express';
 import express from 'express';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
+import { accessTokenParser } from '~/server/middlewares/access-token-parser';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
 import { AttachmentType } from '../../interfaces/attachment';
-import { accessTokenParser } from '../../middlewares/access-token-parser';
 import { generateCertifyBrandLogoMiddleware } from '../../middlewares/certify-brand-logo';
-import loginRequiredFactory from '../../middlewares/login-required';
 import { Attachment } from '../../models/attachment';
 import ApiResponse from '../../util/apiResponse';
 import { getActionFactory } from './get';

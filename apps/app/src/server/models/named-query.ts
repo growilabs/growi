@@ -3,9 +3,8 @@ import { Schema } from 'mongoose';
 
 import type { INamedQuery } from '~/interfaces/named-query';
 import { SearchDelegatorName } from '~/interfaces/named-query';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 import loggerFactory from '~/utils/logger';
-
-import { getOrCreateModel } from '../util/mongoose-utils';
 
 const _logger = loggerFactory('growi:models:named-query');
 

@@ -1,6 +1,6 @@
+import type Crowi from '~/server/crowi';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
 import type { S2sMessagingService } from './base';
 
 const logger = loggerFactory(

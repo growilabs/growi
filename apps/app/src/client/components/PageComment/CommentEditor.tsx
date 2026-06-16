@@ -15,6 +15,12 @@ import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 import { TabContent, TabPane } from 'reactstrap';
 
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
+import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '~/client/components/NotAvailableForReadOnlyUser';
+import { CommentPreview } from '~/client/components/PageComment/CommentPreview';
+import { SwitchingButtonGroup } from '~/client/components/PageComment/SwitchingButtonGroup';
+import { uploadAttachments } from '~/client/services/upload-attachments';
+import { toastError } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
 import { useCurrentPagePath } from '~/states/page';
 import {
@@ -28,21 +34,17 @@ import { useEditorSettings, useSWRxSlackChannels } from '~/stores/editor';
 import { useNextThemes } from '~/stores-universal/use-next-themes';
 import loggerFactory from '~/utils/logger';
 
-import { uploadAttachments } from '../../services/upload-attachments';
-import { toastError } from '../../util/toastr';
-import { NotAvailableForGuest } from '../NotAvailableForGuest';
-import { NotAvailableIfReadOnlyUserNotAllowedToComment } from '../NotAvailableForReadOnlyUser';
-import { CommentPreview } from './CommentPreview';
-import { SwitchingButtonGroup } from './SwitchingButtonGroup';
-
 import styles from './CommentEditor.module.scss';
 
-import '../GrowiEditor.vendor-styles.prebuilt';
+import '~/client/components/GrowiEditor.vendor-styles.prebuilt';
 
 const _logger = loggerFactory('growi:components:CommentEditor');
 
 const SlackNotification = dynamic(
-  () => import('../SlackNotification').then((mod) => mod.SlackNotification),
+  () =>
+    import('~/client/components/SlackNotification').then(
+      (mod) => mod.SlackNotification,
+    ),
   { ssr: false },
 );
 

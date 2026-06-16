@@ -16,12 +16,12 @@ import path from 'pathe';
 import unzipStream from 'unzip-stream';
 
 import { ImportMode } from '~/models/admin/import-mode';
+import type Crowi from '~/server/crowi';
+import { setupIndependentModels } from '~/server/crowi/setup-models';
+import type CollectionProgress from '~/server/models/vo/collection-progress';
 import { getGrowiVersion } from '~/utils/growi-version';
 import loggerFactory from '~/utils/logger';
 
-import type Crowi from '../../crowi';
-import { setupIndependentModels } from '../../crowi/setup-models';
-import type CollectionProgress from '../../models/vo/collection-progress';
 import CollectionProgressingStatus from '../../models/vo/collection-progressing-status';
 import { createBatchStream } from '../../util/batch-stream';
 import { configManager } from '../config-manager';

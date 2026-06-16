@@ -5,12 +5,12 @@ import type { IPageToDeleteWithMeta } from '@growi/core';
 import { useTranslation } from 'next-i18next';
 import { Modal, ModalBody, ModalFooter, ModalHeader } from 'reactstrap';
 
+import { apiv3Delete } from '~/client/util/apiv3-client';
 import {
   useEmptyTrashModalActions,
   useEmptyTrashModalStatus,
 } from '~/states/ui/modal/empty-trash';
 
-import { apiv3Delete } from '../../util/apiv3-client';
 import ApiErrorMessageList from '../PageManagement/ApiErrorMessageList';
 
 /**

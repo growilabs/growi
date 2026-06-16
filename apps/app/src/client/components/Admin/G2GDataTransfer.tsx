@@ -1,6 +1,9 @@
 import React, { type JSX, useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
+import { useGenerateTransferKey } from '~/client/services/g2g-transfer';
+import { apiv3Get, apiv3Post } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
 import { useAdminSocket } from '~/features/admin/states/socket-io';
 import {
   G2G_PROGRESS_STATUS,
@@ -8,9 +11,6 @@ import {
 } from '~/interfaces/g2g-transfer';
 import { useGrowiDocumentationUrl } from '~/states/context';
 
-import { useGenerateTransferKey } from '../../services/g2g-transfer';
-import { apiv3Get, apiv3Post } from '../../util/apiv3-client';
-import { toastError, toastSuccess } from '../../util/toastr';
 import CustomCopyToClipBoard from '../Common/CustomCopyToClipBoard';
 // import { FileUploadSettingMolecule } from './App/FileUploadSetting';
 import G2GDataTransferExportForm from './G2GDataTransferExportForm';

@@ -1,7 +1,7 @@
 import type { IPage } from '@growi/core';
 import type { PipelineStage, Query } from 'mongoose';
 
-import type { PageModel } from '../../models/page';
+import type { PageModel } from '~/server/models/page';
 
 export const aggregatePipelineToIndex = (
   maxBodyLengthToIndex: number,

@@ -13,12 +13,11 @@ import {
   DropdownToggle,
 } from 'reactstrap';
 
+import { NotAvailableForGuest } from '~/client/components/NotAvailableForGuest';
 import type { IPageOperationProcessData } from '~/interfaces/page-operation';
 import { useSWRxPageInfo } from '~/stores/page';
 import loggerFactory from '~/utils/logger';
 import { shouldRecoverPagePaths } from '~/utils/page-operation';
-
-import { NotAvailableForGuest } from '../../NotAvailableForGuest';
 
 const logger = loggerFactory('growi:cli:PageItemControl');
 

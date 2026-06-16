@@ -1,13 +1,12 @@
 import React, { type JSX, useCallback, useState } from 'react';
 import { useTranslation } from 'next-i18next';
 
+import { BookmarkFolderNameInput } from '~/client/components/Bookmarks/BookmarkFolderNameInput';
+import { BookmarkFolderTree } from '~/client/components/Bookmarks/BookmarkFolderTree';
+import { addNewFolder } from '~/client/util/bookmark-utils';
+import { toastError } from '~/client/util/toastr';
 import { useCurrentUser } from '~/states/global';
 import { useSWRxBookmarkFolderAndChild } from '~/stores/bookmark-folder';
-
-import { addNewFolder } from '../../../util/bookmark-utils';
-import { toastError } from '../../../util/toastr';
-import { BookmarkFolderNameInput } from '../../Bookmarks/BookmarkFolderNameInput';
-import { BookmarkFolderTree } from '../../Bookmarks/BookmarkFolderTree';
 
 export const BookmarkContents = (): JSX.Element => {
   const { t } = useTranslation();

@@ -3,10 +3,10 @@ import dynamic from 'next/dynamic';
 import { useTranslation } from 'next-i18next';
 import { Spinner } from 'reactstrap';
 
-import { usePluginDeleteModalActions } from '../../states/modal/plugin-delete';
-import { useSWRxAdminPlugins } from '../../stores/admin-plugins';
-import { PluginCard } from './PluginCard';
-import { PluginInstallerForm } from './PluginInstallerForm';
+import { PluginCard } from '~/features/growi-plugin/client/Admin/components/PluginsExtensionPageContents/PluginCard';
+import { PluginInstallerForm } from '~/features/growi-plugin/client/Admin/components/PluginsExtensionPageContents/PluginInstallerForm';
+import { usePluginDeleteModalActions } from '~/features/growi-plugin/client/Admin/states/modal/plugin-delete';
+import { useSWRxAdminPlugins } from '~/features/growi-plugin/client/Admin/stores/admin-plugins';
 
 const Loading = (): JSX.Element => {
   return (
@@ -19,7 +19,10 @@ const Loading = (): JSX.Element => {
 export const PluginsExtensionPageContents = (): JSX.Element => {
   const { t } = useTranslation('admin');
   const PluginDeleteModal = dynamic(
-    () => import('./PluginDeleteModal').then((mod) => mod.PluginDeleteModal),
+    () =>
+      import(
+        '~/features/growi-plugin/client/Admin/components/PluginsExtensionPageContents/PluginDeleteModal'
+      ).then((mod) => mod.PluginDeleteModal),
     { ssr: false },
   );
   const { data, mutate } = useSWRxAdminPlugins();

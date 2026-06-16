@@ -6,13 +6,12 @@ import { beforeAll, describe, expect, it, vi } from 'vitest';
 import { getInstance } from '^/test/setup/crowi';
 
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
-
-import type Crowi from '../../crowi';
-import type { PageDocument, PageModel } from '../../models/page';
+import type Crowi from '~/server/crowi';
+import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
   PageOperationModel,
-} from '../../models/page-operation';
+} from '~/server/models/page-operation';
 
 describe('Test page service methods', () => {
   let crowi: Crowi;

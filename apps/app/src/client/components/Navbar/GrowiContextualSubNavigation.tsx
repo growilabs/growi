@@ -17,6 +17,13 @@ import { useTranslation } from 'next-i18next';
 import Sticky from 'react-stickynode';
 import { DropdownItem, Tooltip, UncontrolledTooltip } from 'reactstrap';
 
+import {
+  exportAsMarkdown,
+  syncLatestRevisionBody,
+  updateContentWidth,
+} from '~/client/services/page-operation';
+import { usePrintMode } from '~/client/services/use-print-mode';
+import { toastError, toastSuccess, toastWarning } from '~/client/util/toastr';
 import { GroundGlassBar } from '~/components/Navbar/GroundGlassBar';
 import { PageReconcileMenuItem } from '~/features/growi-vault/client/components/PageReconcileMenuItem';
 import { ReconcileTriggerModal } from '~/features/growi-vault/client/components/ReconcileTriggerModal';
@@ -61,13 +68,6 @@ import {
 import { useSWRxPageInfo } from '~/stores/page';
 import { mutatePageTree, mutateRecentlyUpdated } from '~/stores/page-listing';
 
-import {
-  exportAsMarkdown,
-  syncLatestRevisionBody,
-  updateContentWidth,
-} from '../../services/page-operation';
-import { usePrintMode } from '../../services/use-print-mode';
-import { toastError, toastSuccess, toastWarning } from '../../util/toastr';
 import { CreateTemplateModalLazyLoaded } from '../CreateTemplateModal';
 import { NotAvailable } from '../NotAvailable';
 import { Skeleton } from '../Skeleton';

@@ -5,20 +5,20 @@ import {
   type SupportedActionType,
 } from '~/interfaces/activity';
 import type { IShareLinkHasId } from '~/interfaces/share-link';
-
 import {
   getServerSideCommonEachProps,
   getServerSideCommonInitialProps,
   getServerSideI18nProps,
-} from '../../common-props';
+} from '~/pages/common-props';
 import {
   getServerSideGeneralPageProps,
   getServerSideShareLinkRendererConfigProps,
   isValidGeneralPageInitialProps,
-} from '../../general-page';
-import { addActivity } from '../../utils/activity';
-import { mergeGetServerSidePropsResults } from '../../utils/server-side-props';
-import { getPageDataForInitial } from './page-data-props';
+} from '~/pages/general-page';
+import { getPageDataForInitial } from '~/pages/share/[[...path]]/page-data-props';
+import { addActivity } from '~/pages/utils/activity';
+import { mergeGetServerSidePropsResults } from '~/pages/utils/server-side-props';
+
 import type { Stage2InitialProps } from './types';
 
 const basisProps = {

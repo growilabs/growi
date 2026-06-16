@@ -1,6 +1,7 @@
 import type { JSX } from 'react';
 
-import StaffCredit from '../../StaffCredit/StaffCredit';
+import StaffCredit from '~/client/components/StaffCredit/StaffCredit';
+
 import type { HotkeyBindingDef } from '../HotkeysManager';
 
 type Props = {

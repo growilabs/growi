@@ -3,10 +3,9 @@ import type { JSX } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
+import { NotAvailable } from '~/client/components/NotAvailable';
 import { useIsReadOnlyUser } from '~/states/context';
 import { isRomUserAllowedToCommentAtom } from '~/states/server-configurations';
-
-import { NotAvailable } from './NotAvailable';
 
 export const NotAvailableForReadOnlyUser: React.FC<{
   children: JSX.Element;
