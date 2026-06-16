@@ -11,6 +11,7 @@ const SCOPE_SEED_ADMIN = {
   admin: {
     top: {},
     app: {},
+    ai: {},
     security: {},
     markdown: {},
     customize: {},
@@ -87,6 +88,7 @@ const SCOPE_SEED_WITH_ACTION = Object.values(ACTION).reduce(
 type ReadAdminScope =
   | 'read:admin:top'
   | 'read:admin:app'
+  | 'read:admin:ai'
   | 'read:admin:security'
   | 'read:admin:markdown'
   | 'read:admin:customize'
@@ -130,6 +132,7 @@ type ReadFeaturesScope =
 type WriteAdminScope =
   | 'write:admin:top'
   | 'write:admin:app'
+  | 'write:admin:ai'
   | 'write:admin:security'
   | 'write:admin:markdown'
   | 'write:admin:customize'

@@ -1,5 +1,6 @@
 import type { JSONValue } from 'ai';
 
+import { isProviderNamespacedObject } from '~/features/mastra/utils/provider-options-validation';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -10,15 +11,12 @@ const logger = loggerFactory('growi:features:mastra:resolve-provider-options');
 // feature carries no per-vendor mapping logic.
 export type MastraProviderOptions = Record<string, Record<string, JSONValue>>;
 
-const isProviderOptions = (value: unknown): value is MastraProviderOptions => {
-  if (typeof value !== 'object' || value == null || Array.isArray(value)) {
-    return false;
-  }
-  // Each top-level entry must itself be a (non-array) option object.
-  return Object.values(value).every(
-    (v) => typeof v === 'object' && v != null && !Array.isArray(v),
-  );
-};
+// Typed guard over the shared shape predicate — single source of truth with the
+// FE/BE form validator (isValidProviderOptionsJson), narrowing to the AI SDK's
+// MastraProviderOptions. The form rejects this shape up front; this stays as
+// defense-in-depth for a value set directly via the env var (which bypasses the form).
+const isProviderOptions = (value: unknown): value is MastraProviderOptions =>
+  isProviderNamespacedObject(value);
 
 // Resolve the provider options applied to the mastra chat stream call from the
 // single `ai:providerOptions` JSON env var. Fails soft: a malformed or

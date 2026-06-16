@@ -21,8 +21,8 @@ export const resolveMastraModel = (): MastraModelConfig => {
     return memoizedModel;
   }
 
-  // `ai:provider` defaults to 'openai' but env-loaded config is not
-  // runtime-validated against the union, so re-validate here (Req 1.4).
+  // `ai:provider` has no default (undefined when unset), and env-loaded config is
+  // not runtime-validated against the union, so re-validate here (Req 1.4).
   const provider = configManager.getConfig('ai:provider');
   if (!isAiProvider(provider)) {
     throw new Error(
@@ -35,4 +35,14 @@ export const resolveMastraModel = (): MastraModelConfig => {
   // config fix takes effect on the next call.
   memoizedModel = modelResolvers[provider]();
   return memoizedModel;
+};
+
+// Discard the memoized model so the next resolveMastraModel() rebuilds it from
+// the current config. Called when AI settings are saved (locally) or a
+// `configUpdated` s2s message arrives (other instances), giving restart-free
+// reflection of updated settings (Req 2.4). Memoization itself is preserved —
+// rebuilding on every request is undesirable because the Azure+Entra resolver
+// holds a per-instance token cache (see research.md §7).
+export const clearResolvedMastraModelCache = (): void => {
+  memoizedModel = undefined;
 };

@@ -69,7 +69,19 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
   return {
     props: {
       serverConfig: {
-        aiEnabled: configManager.getConfig('app:aiEnabled'),
+        // The sidebar AI affordance must reflect AI *usability*, not just the
+        // on/off toggle: an enabled-but-unconfigured provider would otherwise
+        // surface a dead entry point. crowi.isAiReady() = enabled && configured is
+        // the same verdict the mastra route guard uses, keeping UI and API aligned
+        // (Req 7.4). This hydrates aiEnabledAtom (whose meaning is now "AI ready").
+        //
+        // Routed through crowi (not a direct isAiReady import) on purpose: this
+        // runs in the Next SSR realm, where a directly-imported configManager is a
+        // separate, never-loaded instance. crowi.isAiReady() executes in the
+        // Express realm against the loaded config, and importing the server-only
+        // verdict module here would also leak the mongoose Config model into the
+        // client bundle.
+        aiEnabled: crowi.isAiReady(),
         isUsersHomepageDeletionEnabled: configManager.getConfig(
           'security:user-homepage-deletion:isEnabled',
         ),

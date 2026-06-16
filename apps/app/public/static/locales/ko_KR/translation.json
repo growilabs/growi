@@ -511,8 +511,9 @@
     "selected_editable_revision": "선택된 편집 가능한 페이지 본문"
   },
   "ai_unavailable": {
-    "open_cloud_settings_to_enable": "AI 통합을 활성화하려면 GROWI.cloud 관리 화면을 확인하십시오",
-    "to_cloud_settings": "GROWI.cloud 관리 화면 열기"
+    "open_admin_settings_to_enable": "AI 통합을 활성화하려면 관리 화면에서 설정하십시오",
+    "to_admin_ai_settings": "AI 설정 관리 화면 열기",
+    "contact_admin_to_enable": "AI 통합이 활성화되지 않았습니다. 관리자에게 문의하십시오."
   },
   "ai_sidebar": {
     "new_chat": "새 채팅",

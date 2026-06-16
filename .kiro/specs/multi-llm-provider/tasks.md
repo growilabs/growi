@@ -85,7 +85,7 @@
 - FB 追加（D-13・dispatch 最終形）: タスク 2.1/2.2（及び Azure 追加時の中間案）の「provider→ファクトリ map ＋ resolver が config を集約して呼ぶ」構造を、**各 provider が config から自己解決する `() => MastraModelConfig`** へ刷新（base タスク 2.x の記述は履歴）。(1) 共有キー（apiKey/model）の読取を `llm-providers/config.ts`（`requireApiKey`/`getApiKey`/`getModel`）に集約、(2) openai/anthropic/google は `resolve<Provider>Model()` の自己解決関数に、azure-openai は `resolveAzureOpenaiModel()` が endpoint/認証を自己完結、(3) barrel は `modelResolvers: Record<AiProvider, () => MastraModelConfig>` を組み立てるだけ、(4) `resolve-mastra-model.ts` は provider 検証 + `modelResolvers[provider]()` dispatch + memo のみ。中間案の `LlmModelFactoryParams`/`buildLlmModel<P>`（provider 別引数型 + correlated dispatch）は**廃止**（apiKey の必須/任意・azure の非均一性を共有経路に漏らさないため）。coding-style.md「Data-Driven Control over Hard-Coded Mode Checks」準拠（consumer は provider 追加で不変）。
 - FB 追加（D-14・依存更新）: `@ai-sdk/{openai,anthropic,google,azure}` を最新安定版（3.x 系・`ai`@6 と整合）へ bump。`@azure/identity` は既存依存のため追加なし。
 - PR FB 反映（D-15・PR #11297）: (1) **キー名改名** — `mastra:llm*` → `ai:`（`llm` 語を除去）で `ai:provider`/`ai:apiKey`/`ai:model`/`ai:providerOptions`、env は `AI_*`。型族も `AiProvider`（`interfaces/ai-provider.ts`）にリネーム。(2) **既定値の全廃** — provider/model/providerOptions の `defaultValue` を全て `undefined` に。`getModel()` → `requireModel()`（未指定で `AI_MODEL` を案内し throw）。D-11 の「既定 openai」「default o4-mini」と D-13 の「OpenAI reasoning 既定」を撤回。**上記の override により、下記 Scope Expansion (Req 6) タスク本文の「default=現行 OpenAI オプション」「env 未指定で OpenAI 既定が適用」は無効**（未指定時は空 `{}`）。テストに model 欠落 throw を追加。
-- Azure 識別子: `ai:provider` の値は `azure-openai`（既存 `openai:serviceType` の `'azure-openai'` と表記統一）。env は `AI_AZURE_OPENAI_*`。
+- Azure 識別子: `ai:provider` の値は `azure-openai`（既存 `openai:serviceType` の `'azure-openai'` と表記統一）。Azure 固有の接続設定は単一の `AI_AZURE_OPENAI_SETTINGS`（JSON 文字列）に集約する。
 
 ## Scope Expansion (Req 6 — provider options via env)
 - [x] 6.1 provider options の env 指定と適用
@@ -111,8 +111,8 @@
   - _Boundary: llm-provider interface_
 
 - [ ] 7.3 Azure 固有の接続設定キー
-  - `ai:azureOpenaiResourceName` / `ai:azureOpenaiBaseUrl` / `ai:azureOpenaiApiVersion`（いずれも `string | undefined`・default `undefined`・非 secret）を `CONFIG_KEYS` と `CONFIG_DEFINITIONS` に追加する。API キー・デプロイ名は既存の `ai:apiKey` / `ai:model` を流用（追加しない）
-  - 観測可能: 3 つの新 env（`AI_AZURE_OPENAI_RESOURCE_NAME` / `AI_AZURE_OPENAI_BASE_URL` / `AI_AZURE_OPENAI_API_VERSION`）が config として解決でき、いずれも非 secret
+  - 単一のオブジェクトキー `ai:azureOpenaiSettings`（型 `AzureOpenaiConfig` = `{ resourceName?, baseURL?, apiVersion?, useEntraId? }`・default `{}`・env `AI_AZURE_OPENAI_SETTINGS`・JSON 文字列・非 secret）を `CONFIG_KEYS` と `CONFIG_DEFINITIONS` に追加する。値の型は `apps/app/src/features/mastra/interfaces/azure-openai-config.ts` に定義する。API キー・デプロイ名は既存の `ai:apiKey` / `ai:model` を流用（追加しない）
+  - 観測可能: 単一の env（`AI_AZURE_OPENAI_SETTINGS`）が parse 済みのオブジェクト config として解決でき、非 secret
   - _Requirements: 7.1, 7.2, 7.5_
   - _Boundary: config-definition_
 
@@ -144,13 +144,13 @@
 ## Scope Expansion (Req 8 — Azure OpenAI Entra ID auth)
 - [ ] 8. Azure OpenAI の Microsoft Entra ID 認証
 - [ ] 8.1 認証方式フラグの config
-  - `ai:azureOpenaiUseEntraId`（`boolean`・default `false`・env `AI_AZURE_OPENAI_USE_ENTRA_ID`・非 secret）を追加する。`@azure/identity` は既存依存のため追加不要
-  - 観測可能: フラグが config として解決でき、未指定時 false
+  - 認証方式フラグは `ai:azureOpenaiSettings`（7.3 で追加済み）の `useEntraId` フィールド（`boolean`・既定 false）として表現する（独立キーは追加しない）。`@azure/identity` は既存依存のため追加不要
+  - 観測可能: `ai:azureOpenaiSettings` の `useEntraId` が読め、未指定時 false 相当として扱える
   - _Requirements: 8.1, 8.2_
   - _Boundary: config-definition_
 
 - [ ] 8.2 azure resolver に Entra ID 認証分岐を追加
-  - `resolveAzureOpenaiModel()` 内で `ai:azureOpenaiUseEntraId` を読み、真なら `getBearerTokenProvider(new DefaultAzureCredential(), 'https://cognitiveservices.azure.com/.default')` を `tokenProvider` として `createAzure` に渡す（API キー不使用）。偽なら `getApiKey()` を使い、欠落で throw（`AI_API_KEY` / `AI_AZURE_OPENAI_USE_ENTRA_ID` を案内・キー値非含）。エンドポイント検証は両認証で共通
+  - `resolveAzureOpenaiModel()` 内で `ai:azureOpenaiSettings` の `useEntraId` を読み、真なら `getBearerTokenProvider(new DefaultAzureCredential(), 'https://cognitiveservices.azure.com/.default')` を `tokenProvider` として `createAzure` に渡す（API キー不使用）。偽なら `getApiKey()` を使い、欠落で throw（`AI_API_KEY`、または `AI_AZURE_OPENAI_SETTINGS` の `"useEntraId": true` を案内・キー値非含）。エンドポイント検証は両認証で共通
   - `@azure/identity` は static import（既存依存・既存 `AzureOpenaiClientDelegator` と同スコープ）。認証ロジックは**すべて azure resolver 内に局在**（共有経路・consumer は変更不要）
   - co-located unit test（`azure-openai.spec.ts`）: Entra ID 経路（`tokenProvider` を渡し apiKey 非送出。configManager + `@ai-sdk/azure` + `@azure/identity` を vi.mock）／apiKey も Entra ID も無い→throw
   - 観測可能: 上記分岐が green（確定的・高速）。key-based の apiKey 必須は `requireApiKey()` が引き続き担保

@@ -86,6 +86,20 @@ vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
 }));
 
+// PageMentionInput's controller debounces the mention query via usehooks-ts
+// useDebounceValue (lodash.debounce, 200ms). The debounce *timing* is covered in
+// use-mention-controller.spec; here it is irrelevant (search results are mocked),
+// so make it synchronous (identity). This also prevents a trailing-edge timer
+// from firing after happy-dom is torn down in the full parallel suite
+// (ReferenceError: window is not defined).
+vi.mock('usehooks-ts', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('usehooks-ts')>();
+  return {
+    ...actual,
+    useDebounceValue: (value: unknown) => [value, vi.fn()],
+  };
+});
+
 // next/router: PageMentionInput uses useRouter for chip-click SPA navigation.
 vi.mock('next/router', () => ({
   useRouter: () => ({ push: vi.fn() }),
