@@ -141,9 +141,9 @@ export const ChatSidebar = (): JSX.Element => {
     <div
       className={`tw-root position-fixed top-0 end-0 h-100 border-start bg-body shadow-sm overflow-hidden ${moduleClass}`}
     >
-      <div className="tw:max-w-4xl tw:mx-auto tw:p-6 tw:relative tw:size-full twh-screen">
+      <div className="tw:max-w-4xl tw:mx-auto tw:py-6 tw:relative tw:size-full twh-screen">
         <div className="tw:flex tw:flex-col tw:h-full">
-          <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:pb-2 tw:border-b tw:border-border">
+          <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:px-6 tw:pb-2 tw:border-b tw:border-border">
             <span className="growi-custom-icons fs-4">ai_chat</span>
             <span className="tw:flex-1 tw:font-semibold tw:truncate">
               {headerLabel}
@@ -271,7 +271,7 @@ export const ChatSidebar = (): JSX.Element => {
             <ConversationScrollButton />
           </Conversation>
 
-          <div className="tw:shrink-0 tw:pt-4">
+          <div className="tw:shrink-0 tw:px-6 tw:pt-4">
             <PromptInput
               onSubmit={handleSubmit}
               inputGroupClassName="tw:rounded-xl"
