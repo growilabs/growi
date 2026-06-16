@@ -94,3 +94,36 @@ harness は実際にインストールされたバージョンに対して以下
 > override 撤去後に flat 6.0.1 が別の .pnpm パスへ hoist され probe の commonDir 起点 resolve が
 > 外したため (表示上の制限)。実 `require('flat')` は動作している (contract PASS が証左)。
 > バージョンは `pnpm why flat` = 6.0.1 が authoritative。
+
+## 5.2 `@lykmapipo/common>mime` — 削除不可 ❌ (override 維持・3.0.0)
+
+**評価手順と結果**:
+
+1. **最新 ESM 版の強制検証**: override を一時的に `^4.0.0` にして `pnpm install` → `pnpm why
+   mime` に **4.1.0** が出現 (@lykmapipo/common 経由)。smoke = **OVERALL FAIL**:
+   - `common.mimeTypeOf("photo.png")` => `THREW: common.mimeTypeOf is not a function`
+   - `common.mimeExtensionOf("image/png")` => `THREW: common.mimeExtensionOf is not a function`
+   - flat/unflat は PASS、mongoose-gridfs round-trip も **PASS**
+2. **根本原因**: `@lykmapipo/common` は `mimeTypeOf`/`mimeExtensionOf` を
+   `Object.defineProperty(exports, 'mimeTypeOf', { get: () => mime.getType })` で公開する
+   (lib/index.js:1606-1613)。mime v4 は ESM-only (`require` export 無し) なので Node 24
+   `require(esm)` は名前空間オブジェクトを返し、`getType`/`getExtension` は `.default` 側に
+   存在する → 名前空間 top-level の `mime.getType` は **undefined** → getter が undefined を
+   返し、呼び出すと "is not a function"。mime v3 は `module.exports` が Mime インスタンス
+   そのものなので `mime.getType` が直接引ける。
+3. **smoke カバレッジの重要点**: GROWI・mongoose-gridfs・@lykmapipo チェーンは
+   `mimeTypeOf`/`mimeExtensionOf` を**どこからも呼ばない** (grep 0 件)。そのため
+   build・gridfs round-trip だけの検証では mime 4 の破壊を **false-pass** する。
+   @lykmapipo/common の mime API を直接 exercise する harness のみが検出できた。
+4. **最終状態**: override を `3.0.0` に**復元** + コメントを実発見に基づき精緻化。
+   `pnpm install` 後 `pnpm why mime` は baseline の 4 バージョン (1.4.1/1.6.0/2.6.0/3.0.0) に
+   戻り、`git diff pnpm-lock.yaml` は**空** (= 5.1 コミット状態と完全一致)。復元後 smoke =
+   **OVERALL PASS**。
+5. **build / audit**: 最終状態の依存グラフは 5.1 コミット時と同一 (lockfile diff 空) のため
+   5.1 で取得した `turbo run build` 21/21 がそのまま有効。mime の破壊は runtime getter の
+   問題で型/ビルドには出ない (mime は transitive・型検査対象外) ため、build はこの override の
+   ゲートとして無意味。
+
+**結論**: mime の CJS ピン (3.0.0) override は **依然必要**。これは GROWI 自身の CJS/ESM 状態
+とは無関係で、第三者 CJS パッケージ `@lykmapipo/common` が mime を CJS default-export 形状で
+読む実装に依存するため。Req 4.4 に従い override を維持しコメントで正当化。

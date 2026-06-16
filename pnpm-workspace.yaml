@@ -4,7 +4,13 @@ packages:
   - 'bin'
 
 overrides:
-  # mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version
+  # KEEP: mime v4 is ESM-only (no `require` export). @lykmapipo/common is CommonJS and reads
+  # `mime.getType` / `mime.getExtension` off the require() result (exposed as mimeTypeOf /
+  # mimeExtensionOf). Under Node 24 require(esm), mime v4 resolves to a module *namespace*
+  # whose getType/getExtension live on `.default`, so those top-level accesses are undefined
+  # and mimeTypeOf/mimeExtensionOf throw "is not a function". mime v3's module.exports IS the
+  # Mime instance, so the accesses work. Pin retained until @lykmapipo/common is dropped or
+  # ships ESM-aware mime access. (esm-migration Phase 5.2 — verified by phase5-smoke harness)
   '@lykmapipo/common>mime': 3.0.0
   # parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
   '@lykmapipo/common>parse-json': 5.2.0

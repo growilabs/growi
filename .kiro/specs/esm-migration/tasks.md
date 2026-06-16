@@ -511,13 +511,14 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Overrides Reducer (flat)_
   - **実績 (2026-06-16, 削除可)**: flat の CJS ピン override を**削除**し flat **6.0.1 (ESM-only)** を採用。`@lykmapipo/common` (CJS) は `flat$1.flatten`/`flat$1.unflatten` という named プロパティ経由で flat を使うため、Node 24 `require(esm)` が返す名前空間オブジェクトに同名関数が存在し動作する (bare 関数呼び出しではないのが鍵)。**resolution の sticky 性**: override 単純削除では lockfile の 5.0.2 が `>=5.0.2` を満たし維持されるため、一時 override `^6.0.0` で 6.0.1 を強制解決→smoke→override 完全削除 (sticky で 6.0.1 維持) の順で確定。検証: `pnpm why flat`=6.0.1 / smoke (`apps/app/tmp/phase5-smoke/smoke.cjs`: @lykmapipo/common contract + mongoose-gridfs round-trip 実 mongo) **OVERALL PASS** / `turbo run build` 21/21 / audit は flat 関連 advisory 0・lockfile 変更は flat 5.0.2→6.0.1 のみ (新規 high/critical は DB ドリフト由来で無関係)。証跡: `phase5-gate-evidence/README.md`
 
-- [ ] 5.2 `@lykmapipo/common>mime` override を削除評価
+- [x] 5.2 `@lykmapipo/common>mime` override を削除評価
   - overrides から `mime` ピンを削除し、5.1 と同じプロトコル (install → build → file-upload smoke) で検証
   - `pnpm why mime` で最新 ESM バージョンが解決される
   - 失敗時は戻してインラインコメントで原因記録
   - _Requirements: 4.1, 4.2, 4.3, 4.4_
   - _Depends: 5.1_
   - _Boundary: Overrides Reducer (mime)_
+  - **実績 (2026-06-16, 削除不可・override 維持)**: 一時 override `^4.0.0` で mime 4.1.0 を強制解決して smoke した結果、`common.mimeTypeOf`/`common.mimeExtensionOf` が **"is not a function" で THREW** (OVERALL FAIL)。原因: `@lykmapipo/common` は両 API を `get: () => mime.getType`/`mime.getExtension` で公開するが (lib/index.js:1606-1613)、mime v4 は ESM-only で Node 24 `require(esm)` が名前空間を返し `getType`/`getExtension` は `.default` 側のため top-level 参照が undefined になる。mime v3 は `module.exports` が Mime インスタンスそのものなので動く。GROWI/mongoose-gridfs/@lykmapipo チェーンは両 API を呼ばない (grep 0) ため build・gridfs round-trip は **false-pass** し、@lykmapipo/common contract を直接叩く harness のみが破壊を検出。→ override を **3.0.0 に復元**しコメントを実発見に基づき精緻化 (Req 4.4)。復元後 `git diff pnpm-lock.yaml` 空 (5.1 状態と一致)・smoke OVERALL PASS。証跡: `phase5-gate-evidence/README.md`
 
 - [ ] 5.3 `@lykmapipo/common>parse-json` override を削除評価
   - overrides から `parse-json` ピンを削除し、5.1 と同じプロトコルで検証
