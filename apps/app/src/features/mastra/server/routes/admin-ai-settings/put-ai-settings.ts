@@ -146,6 +146,41 @@ export const updateAiSettingsValidators: ValidationChain[] = [
 type AiConfigUpdates = Parameters<typeof configManager.updateConfigs>[0];
 
 /**
+ * Re-assemble the `ai:azureOpenaiSettings` config value from a validated request.
+ *
+ * The request carries `azureOpenaiSettings` as the same nested AzureOpenaiConfig
+ * object used for storage, and it is rebuilt here as FULL-STATE REPLACE (not
+ * deep-merged with the env default): a cleared string field is already
+ * '' -> undefined (validator sanitizer) and is therefore omitted, and `useEntraId`
+ * is included only when explicitly true (its default-false carries no information).
+ * When the assembled object has no keys at all — i.e. the admin cleared every field
+ * and did not enable Entra ID — it collapses to `undefined` so removeIfUndefined
+ * deletes the key and the value falls back to the AI_AZURE_OPENAI_SETTINGS env
+ * default (Req 4.4, applied at the object level). Because the whole object is
+ * replaced, unchecking Entra ID or clearing a single field is honored exactly as
+ * submitted.
+ */
+const buildAzureOpenaiConfig = (
+  body: AiSettingsUpdateRequest,
+): AzureOpenaiConfig | undefined => {
+  const settings = body.azureOpenaiSettings;
+  const azureOpenaiSettings: AzureOpenaiConfig = {
+    ...(settings?.resourceName != null
+      ? { resourceName: settings.resourceName }
+      : {}),
+    ...(settings?.baseURL != null ? { baseURL: settings.baseURL } : {}),
+    ...(settings?.apiVersion != null
+      ? { apiVersion: settings.apiVersion }
+      : {}),
+    ...(settings?.useEntraId === true ? { useEntraId: true } : {}),
+  };
+
+  return Object.keys(azureOpenaiSettings).length > 0
+    ? azureOpenaiSettings
+    : undefined;
+};
+
+/**
  * Build the config updates from a validated request body.
  *
  * Update semantics (design "API Contract"): FULL-STATE REPLACE, not PATCH.
@@ -176,38 +211,7 @@ type AiConfigUpdates = Parameters<typeof configManager.updateConfigs>[0];
  * removeIfUndefined drops it); the admin must enter the new provider's key. The
  * convenience merge still applies for SAME-provider saves (e.g. changing only the
  * model). `currentProvider` is the value currently stored, read by the handler.
- *
- * AZURE OPENAI — the request carries `azureOpenaiSettings` as the same nested
- * AzureOpenaiConfig object used for storage. It is re-assembled here as full-state
- * replace: a cleared string field is already '' -> undefined (validator sanitizer)
- * and is therefore omitted, and `useEntraId` is included only when explicitly true
- * (its default-false carries no information). When the assembled object has no keys
- * at all — i.e. the admin cleared every field and did not enable Entra ID — it
- * collapses to `undefined` so removeIfUndefined deletes the key and the value falls
- * back to the AI_AZURE_OPENAI_SETTINGS env default (Req 4.4, applied at the object
- * level). Because the whole object is replaced (not deep-merged with env),
- * unchecking Entra ID or clearing a single field is honored exactly as submitted.
  */
-const buildAzureOpenaiConfig = (
-  body: AiSettingsUpdateRequest,
-): AzureOpenaiConfig | undefined => {
-  const settings = body.azureOpenaiSettings;
-  const azureOpenaiSettings: AzureOpenaiConfig = {
-    ...(settings?.resourceName != null
-      ? { resourceName: settings.resourceName }
-      : {}),
-    ...(settings?.baseURL != null ? { baseURL: settings.baseURL } : {}),
-    ...(settings?.apiVersion != null
-      ? { apiVersion: settings.apiVersion }
-      : {}),
-    ...(settings?.useEntraId === true ? { useEntraId: true } : {}),
-  };
-
-  return Object.keys(azureOpenaiSettings).length > 0
-    ? azureOpenaiSettings
-    : undefined;
-};
-
 const buildUpdates = (
   body: AiSettingsUpdateRequest,
   currentProvider: AiProvider | undefined,
