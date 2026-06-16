@@ -39,8 +39,19 @@ import { dirname, join, resolve } from 'node:path';
  *
  * Handles both single and double quotes. Does not handle template literals
  * (dynamic imports with template literals are rare in TS/JS output).
+ *
+ * Applied only to non-comment lines — see processLine() below.
  */
 const IMPORT_SPEC_RE = /(\bfrom\s*['"]|\bimport\(\s*['"]|\bimport\s*['"])(\.\.?\/[^'"]+)(['"]\s*(?:with\s*\{[^}]*\})?)/g;
+
+/**
+ * Regex to detect whether a line is purely a comment line (should be skipped).
+ * Matches lines like:
+ *   // comment
+ *    * JSDoc line
+ *    * @example import('./foo')
+ */
+const COMMENT_LINE_RE = /^\s*(\/\/|\*)/;
 
 /**
  * Returns true if the specifier already has a file extension that should not
@@ -125,32 +136,44 @@ export function addJsExtensions(distRoot) {
     const importerDir = dirname(file);
     const original = readFileSync(file, 'utf8');
 
-    const rewrittenContent = original.replace(
-      IMPORT_SPEC_RE,
-      (match, prefix, spec, suffix) => {
-        // Already extensioned — leave untouched
-        if (hasExtension(spec)) {
-          return match;
-        }
+    // Process line by line so that comment lines (// ... and * JSDoc lines)
+    // are skipped and their content is never modified.
+    const lines = original.split('\n');
+    const processedLines = lines.map((line) => {
+      // Skip pure comment lines (// and * JSDoc lines) — they may contain
+      // example code like import('./MyModal') that should not be resolved.
+      if (COMMENT_LINE_RE.test(line)) {
+        return line;
+      }
 
-        const resolved = resolveSpec(importerDir, spec);
-        if (resolved == null) {
-          const location = `${file}: '${spec}'`;
-          unresolved.push(location);
-          // biome-ignore lint/suspicious/noConsole: build script diagnostic
-          console.warn(`[add-js-extensions] unresolvable: ${location}`);
-          return match;
-        }
+      return line.replace(
+        IMPORT_SPEC_RE,
+        (match, prefix, spec, suffix) => {
+          // Already extensioned — leave untouched
+          if (hasExtension(spec)) {
+            return match;
+          }
 
-        if (resolved === spec) {
-          return match;
-        }
+          const resolved = resolveSpec(importerDir, spec);
+          if (resolved == null) {
+            const location = `${file}: '${spec}'`;
+            unresolved.push(location);
+            // biome-ignore lint/suspicious/noConsole: build script diagnostic
+            console.warn(`[add-js-extensions] unresolvable: ${location}`);
+            return match;
+          }
 
-        rewritten += 1;
-        return prefix + resolved + suffix;
-      },
-    );
+          if (resolved === spec) {
+            return match;
+          }
 
+          rewritten += 1;
+          return prefix + resolved + suffix;
+        },
+      );
+    });
+
+    const rewrittenContent = processedLines.join('\n');
     if (rewrittenContent !== original) {
       writeFileSync(file, rewrittenContent, 'utf8');
     }

@@ -32,6 +32,15 @@ import { dirname, join, resolve } from 'node:path';
 const RELATIVE_IMPORT_RE = /\b(?:from|import)\s*\(\s*['"](\.[^'"]+)['"]\s*(?:with\s*\{[^}]*\})?\s*\)|\bfrom\s*['"](\.[^'"]+)['"]\s*(?:with\s*\{[^}]*\})?/g;
 
 /**
+ * Regex to detect whether a line is purely a comment line (should be skipped).
+ * Matches lines like:
+ *   // comment
+ *    * JSDoc line
+ *    * @example import('./foo')
+ */
+const COMMENT_LINE_RE = /^\s*(\/\/|\*)/;
+
+/**
  * Walk `dir` recursively, collecting all .js files.
  *
  * @param {string} dir
@@ -66,25 +75,32 @@ export function verifyDistResolution(distRoot) {
     const importerDir = dirname(file);
     const content = readFileSync(file, 'utf8');
 
-    // Reset regex state for each file
-    RELATIVE_IMPORT_RE.lastIndex = 0;
+    // Process line by line to skip comment lines (// and * JSDoc lines).
+    // This avoids false positives from JSDoc @example code like import('./Foo').
+    for (const line of content.split('\n')) {
+      // Skip pure comment lines
+      if (COMMENT_LINE_RE.test(line)) continue;
 
-    let match;
-    while ((match = RELATIVE_IMPORT_RE.exec(content)) !== null) {
-      // group 1 = dynamic import('...') specifier, group 2 = from '...' specifier
-      const spec = match[1] ?? match[2];
-      if (!spec) continue;
+      // Reset regex state for each line
+      RELATIVE_IMPORT_RE.lastIndex = 0;
 
-      checked += 1;
+      let match;
+      while ((match = RELATIVE_IMPORT_RE.exec(line)) !== null) {
+        // group 1 = dynamic import('...') specifier, group 2 = from '...' specifier
+        const spec = match[1] ?? match[2];
+        if (!spec) continue;
 
-      // Resolve the specifier to an absolute path
-      const target = resolve(importerDir, spec);
+        checked += 1;
 
-      if (!existsSync(target)) {
-        const location = `${file}: '${spec}'`;
-        unresolved.push(location);
-        // biome-ignore lint/suspicious/noConsole: build script diagnostic
-        console.warn(`[verify-dist-resolution] unresolved: ${location}`);
+        // Resolve the specifier to an absolute path
+        const target = resolve(importerDir, spec);
+
+        if (!existsSync(target)) {
+          const location = `${file}: '${spec}'`;
+          unresolved.push(location);
+          // biome-ignore lint/suspicious/noConsole: build script diagnostic
+          console.warn(`[verify-dist-resolution] unresolved: ${location}`);
+        }
       }
     }
   }
