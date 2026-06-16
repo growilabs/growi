@@ -97,18 +97,20 @@ describe('SearchService test', () => {
       expect(terms.not_group).toStrictEqual(['g2', 'g3']);
     });
 
-    it('should treat a filter prefix with no value as a match word', async () => {
-      const terms = await searchService.parseQueryString('author: editor:');
+    it('should ignore a new-filter operator that has no value', async () => {
+      const terms = await searchService.parseQueryString(
+        'author: editor: group: -group:',
+      );
 
       expect(terms.author).toStrictEqual([]);
       expect(terms.editor).toStrictEqual([]);
-      expect(terms.match).toStrictEqual(['author:', 'editor:']);
+      expect(terms.group).toStrictEqual([]);
+      expect(terms.not_group).toStrictEqual([]);
+      expect(terms.match).toStrictEqual([]);
+      expect(terms.not_match).toStrictEqual([]);
     });
 
     it('should not capture a bare word that starts with a filter name', async () => {
-      // The ':' delimiter is required: a word that merely starts with a filter
-      // name (e.g. 'authorname') must be treated as a plain match word, not as a
-      // filter that captures the remainder (e.g. author: ['name']).
       const terms = await searchService.parseQueryString(
         'authorname editorx grouped -notauthorname',
       );

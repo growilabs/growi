@@ -57,6 +57,16 @@ const FILTER_PREFIXES = [
   'editor:',
   'group:',
 ] as const;
+
+// New-filter operators (author/editor/group) typed with no value (e.g. `author:`,
+// `-group:`) are ignored. They must not be captured as
+// full-text match terms. prefix:/tag: keep their existing behavior.
+const VALUELESS_IGNORED_PREFIXES: readonly string[] = [
+  'author:',
+  'editor:',
+  'group:',
+];
+
 // https://regex101.com/r/pN9XfK/2
 const NEGATIVE_TERM_REGEXP = new RegExp(
   `^-(${FILTER_PREFIXES.join('|')})?(.+)$`,
@@ -510,6 +520,13 @@ class SearchService implements SearchQueryParser, SearchResolver {
     // Second: Parse other keywords (include minus keywords)
     queryString.split(' ').forEach((word) => {
       if (word === '') {
+        return;
+      }
+
+      // Ignore a bare new-filter operator with no value (positive or negated) so it
+      // does not leak into full-text match terms
+      const wordWithoutNegation = word.startsWith('-') ? word.slice(1) : word;
+      if (VALUELESS_IGNORED_PREFIXES.includes(wordWithoutNegation)) {
         return;
       }
 

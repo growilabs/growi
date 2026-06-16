@@ -73,9 +73,10 @@ export type UnavailableTermsKey<K extends AllTermsKey> = Exclude<
 // NOTE: author/editor/group are declared here but are NOT yet runtime-enabled —
 // AVAILABLE_KEYS in elasticsearch.ts (the runtime gate) intentionally still stops
 // at not_tag, so using these filters currently throws SearchError. They are wired
-// in later stories (author/editor → indexed username fields; group → resolved
-// member usernames), which also relaxes the delegator registry typing in
-// search.ts so ESTermsKey can become an honest subset of AllTermsKey.
+// in later stories (author/editor → indexed username fields; group → resolved to the
+// requesting user's own group IDs, matched against the `granted_groups` index field),
+// which also relaxes the delegator registry typing in search.ts so ESTermsKey can
+// become an honest subset of AllTermsKey.
 export type ESTermsKey =
   | 'match'
   | 'not_match'
@@ -99,7 +100,7 @@ export type MongoQueryTerms = Pick<QueryTerms, MongoTermsKey>;
 
 // Holds filter values that require server-side resolution before being turned
 // into delegator query criteria. `editor:` is intentionally absent: it is
-// resolved directly against the dedicated `lastUpdatedUser` search index field
+// resolved directly against the dedicated `last_update_username` search index field
 // (see PR #11061), so it needs no page-id resolution here.
 export type ResolvedFilterData = {
   groupIds: string[];
