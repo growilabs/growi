@@ -6,7 +6,6 @@ settings:
 
 overrides:
   '@lykmapipo/common>mime': 3.0.0
-  '@lykmapipo/common>parse-json': 5.2.0
   axios: ^1.15.0
   '@codemirror/commands': ^6.10.3
 

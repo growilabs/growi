@@ -520,13 +520,14 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Boundary: Overrides Reducer (mime)_
   - **実績 (2026-06-16, 削除不可・override 維持)**: 一時 override `^4.0.0` で mime 4.1.0 を強制解決して smoke した結果、`common.mimeTypeOf`/`common.mimeExtensionOf` が **"is not a function" で THREW** (OVERALL FAIL)。原因: `@lykmapipo/common` は両 API を `get: () => mime.getType`/`mime.getExtension` で公開するが (lib/index.js:1606-1613)、mime v4 は ESM-only で Node 24 `require(esm)` が名前空間を返し `getType`/`getExtension` は `.default` 側のため top-level 参照が undefined になる。mime v3 は `module.exports` が Mime インスタンスそのものなので動く。GROWI/mongoose-gridfs/@lykmapipo チェーンは両 API を呼ばない (grep 0) ため build・gridfs round-trip は **false-pass** し、@lykmapipo/common contract を直接叩く harness のみが破壊を検出。→ override を **3.0.0 に復元**しコメントを実発見に基づき精緻化 (Req 4.4)。復元後 `git diff pnpm-lock.yaml` 空 (5.1 状態と一致)・smoke OVERALL PASS。証跡: `phase5-gate-evidence/README.md`
 
-- [ ] 5.3 `@lykmapipo/common>parse-json` override を削除評価
+- [x] 5.3 `@lykmapipo/common>parse-json` override を削除評価
   - overrides から `parse-json` ピンを削除し、5.1 と同じプロトコルで検証
   - `axios` override は変更しないことを確認
   - 失敗時は戻してインラインコメントで原因記録
   - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
   - _Depends: 5.2_
   - _Boundary: Overrides Reducer (parse-json)_
+  - **実績 (2026-06-16, 削除可・dead override)**: `@lykmapipo/common@0.44.5` の dependencies に **parse-json は存在しない** (smoke でも `not resolvable from @lykmapipo/common` を確認)。pnpm の `parent>child` override は parent の直接依存エッジにのみ適用されるため、本 override は適用先のない **no-op (dead)**。削除して `pnpm install` → `pnpm why parse-json` = **5.2.0 + 8.3.0 で削除前と完全不変**、`git diff pnpm-lock.yaml` は override 行削除のみ (resolved version 変化ゼロ)、`axios: ^1.15.0` override は不変 (Req 4.5 確認)。累積最終 smoke OVERALL PASS。証跡: `phase5-gate-evidence/README.md`
 
 - [ ] 5.4 dependency コメントとインライン理由を整理
   - `package.json` の `// comments for dependencies` から解消済みの CJS/ESM ピン記述を削除

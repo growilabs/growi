@@ -12,8 +12,6 @@ overrides:
   # Mime instance, so the accesses work. Pin retained until @lykmapipo/common is dropped or
   # ships ESM-aware mime access. (esm-migration Phase 5.2 — verified by phase5-smoke harness)
   '@lykmapipo/common>mime': 3.0.0
-  # parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
-  '@lykmapipo/common>parse-json': 5.2.0
   # CVE-2026-40175 / GHSA-fvcv-3m26-pcqx: Unrestricted Cloud Metadata Exfiltration via CRLF
   # header-injection chain that combines Prototype Pollution from other deps with Axios'
   # unsanitised header merge, enabling HTTP Request Smuggling and AWS IMDSv2 bypass

@@ -127,3 +127,39 @@ harness は実際にインストールされたバージョンに対して以下
 **結論**: mime の CJS ピン (3.0.0) override は **依然必要**。これは GROWI 自身の CJS/ESM 状態
 とは無関係で、第三者 CJS パッケージ `@lykmapipo/common` が mime を CJS default-export 形状で
 読む実装に依存するため。Req 4.4 に従い override を維持しコメントで正当化。
+
+## 5.3 `@lykmapipo/common>parse-json` — 削除可 ✅ (dead no-op override)
+
+**評価手順と結果**:
+
+1. **前提の確定**: `@lykmapipo/common@0.44.5` の `dependencies` に **parse-json は存在しない**
+   (auto-parse / browser-or-node / flat / inflection / lodash / mime / moment / object-hash /
+   randomcolor / statuses / string-template / striptags / uuid)。baseline smoke でも
+   `parse-json: (not resolvable from @lykmapipo/common)` を確認済み。pnpm の `parent>child`
+   override は `parent` の**直接**依存エッジにのみ適用されるため、`@lykmapipo/common>parse-json`
+   は適用先が存在しない **no-op (dead) override**。
+2. **削除と検証**: override を削除して `pnpm install`。
+   - `pnpm why parse-json` = **5.2.0 + 8.3.0 (2 versions) で削除前と完全に不変**
+   - `git diff pnpm-lock.yaml` = **override 行 `'@lykmapipo/common>parse-json': 5.2.0` の削除のみ**。
+     パッケージの resolution / version 行は**一切変化なし**。
+   - `axios: ^1.15.0` override は**不変** (Req 4.5 — 対象外を確認)
+   - 累積最終状態 (flat 6.0.1 / mime 3.0.0 / parse-json override 削除) の smoke = **OVERALL PASS**
+3. **audit / build**: resolved version が一切変わらないため security/build への影響なし
+   (5.1 の build 21/21 が有効、audit も不変)。
+
+**結論**: `@lykmapipo/common>parse-json` は適用先のない dead override だったため**削除**。
+解決グラフに一切影響しない (cleanup)。
+
+---
+
+## Phase 5.1–5.3 最終状態サマリ
+
+| override | 判定 | 最終状態 |
+|----------|------|----------|
+| `@lykmapipo/common>flat` | 削除可 ✅ | **削除** (flat 6.0.1 ESM 採用、require(esm) で named export 動作) |
+| `@lykmapipo/common>mime` | 削除不可 ❌ | **維持 (3.0.0)** + コメント精緻化 (mime v4 で mimeTypeOf/mimeExtensionOf 破綻) |
+| `@lykmapipo/common>parse-json` | 削除可 ✅ | **削除** (dead no-op override、@lykmapipo/common は parse-json 非依存) |
+| `axios` (対象外) | 変更なし | `^1.15.0` 維持 (Req 4.5) |
+| `@codemirror/commands` (対象外) | 変更なし | `^6.10.3` 維持 (#11093 / CJS 無関係) |
+
+最終 smoke: `@lykmapipo/common contract: PASS / mongoose-gridfs round-trip: PASS / OVERALL: PASS`
