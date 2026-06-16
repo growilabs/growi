@@ -31,13 +31,17 @@ import { ctx } from '~/states/context';
 | Relative (`./`, `../`) and `~/` alias | Extensionless (`./foo`, `~/states/context`); a directory/barrel import is `.` / `./sub`, never `./sub/index.js` |
 | External packages, `^/`, `.json`, `.cjs`, `.scss` | Unchanged |
 
-**Alias vs. relative is the author's choice — it is not normalized.** Extensionless
-`~/` aliases and extensionless relative paths resolve identically in every pipeline
-(server build, Turbopack, `tsgo`, vitest, dev resolver), so there is no mechanical need
-to prefer one. The migration codemod therefore preserves whichever form a file already
-uses and never mass-rewrites alias↔relative. As a light style preference, a `~/` alias
-reads better for a distant cross-module reference and a relative path for a nearby one —
-but the lint does **not** enforce this, and existing code is left as written.
+**Only the no-extension rule is enforced.** Extensionless `~/` aliases and extensionless
+relative paths resolve identically in every pipeline (server build, Turbopack, `tsgo`,
+vitest, dev resolver), so the alias-vs-relative choice is a readability matter, not a
+correctness one, and the lint does **not** police it.
+
+The codebase follows the **natural convention**: a nearby reference (same area of `src/`)
+uses a relative path (`./Sibling`, `../Near`), and a distant / cross-area reference uses
+a `~/` alias (`~/states/context`). The esm-import-convention migration restored this form
+to match the base branch — esm-migration had temporarily rewritten many nearby relatives
+to `~/…js` aliases to satisfy NodeNext, and removing `.js` from source makes that
+workaround unnecessary. New code should follow the same natural convention by hand.
 
 ## Why no `.js` in source
 
