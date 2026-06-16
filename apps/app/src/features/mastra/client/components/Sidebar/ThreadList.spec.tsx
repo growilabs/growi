@@ -85,4 +85,15 @@ describe('ThreadList', () => {
 
     expect(deleteThreadMock).toHaveBeenCalledWith({ threadId: 'thread-1' });
   });
+
+  it.each([
+    ['undefined', undefined],
+    ['empty', ''],
+  ])('shows the new-chat label for a thread whose title is %s', async (_label, title) => {
+    recentThreadsData = [makeThreadData([{ id: 'thread-1', title }])];
+    const { ThreadList } = await import('./ThreadList');
+    render(<ThreadList />);
+
+    expect(screen.getByText('ai_sidebar.new_chat')).toBeInTheDocument();
+  });
 });

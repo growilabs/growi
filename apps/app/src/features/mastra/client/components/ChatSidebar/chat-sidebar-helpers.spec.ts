@@ -3,9 +3,10 @@ import { mock } from 'vitest-mock-extended';
 
 import {
   buildMessageRequestBody,
-  GENERIC_CHAT_HEADER_LABEL,
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
+
+const FALLBACK = 'New Chat';
 
 const makeThread = (id: string, title?: string): StorageThreadType =>
   mock<StorageThreadType>({
@@ -37,30 +38,30 @@ describe('resolveChatHeaderLabel', () => {
       makeThread('thread-2', 'Second chat'),
     ];
 
-    expect(resolveChatHeaderLabel('thread-2', threads)).toBe('Second chat');
+    expect(resolveChatHeaderLabel('thread-2', threads, FALLBACK)).toBe(
+      'Second chat',
+    );
   });
 
-  it('falls back to the generic label when the thread is not found', () => {
+  it('falls back to the given label when the thread is not found', () => {
     const threads = [makeThread('thread-1', 'First chat')];
 
-    expect(resolveChatHeaderLabel('unknown', threads)).toBe(
-      GENERIC_CHAT_HEADER_LABEL,
-    );
+    expect(resolveChatHeaderLabel('unknown', threads, FALLBACK)).toBe(FALLBACK);
   });
 
-  it('falls back to the generic label when the thread has no title', () => {
+  it('falls back to the given label when the thread has no title', () => {
     const threads = [makeThread('thread-1', undefined)];
 
-    expect(resolveChatHeaderLabel('thread-1', threads)).toBe(
-      GENERIC_CHAT_HEADER_LABEL,
+    expect(resolveChatHeaderLabel('thread-1', threads, FALLBACK)).toBe(
+      FALLBACK,
     );
   });
 
-  it('falls back to the generic label for an empty title', () => {
+  it('falls back to the given label for an empty title', () => {
     const threads = [makeThread('thread-1', '')];
 
-    expect(resolveChatHeaderLabel('thread-1', threads)).toBe(
-      GENERIC_CHAT_HEADER_LABEL,
+    expect(resolveChatHeaderLabel('thread-1', threads, FALLBACK)).toBe(
+      FALLBACK,
     );
   });
 });

@@ -23,22 +23,19 @@ export const buildMessageRequestBody = (
 };
 
 /**
- * Generic fallback label shown in the chat header when no thread title is
- * available (e.g. a brand-new chat whose title has not been generated yet).
- */
-export const GENERIC_CHAT_HEADER_LABEL = 'AI Chat';
-
-/**
  * Resolve the chat header label.
  *
  * Prefers the title of the current thread (looked up in the recent-threads
- * list by id); falls back to a generic label when the thread or its title is
- * not yet available. The header never depends on assistant data.
+ * list by id); falls back to the given label when the thread or its title is
+ * not yet available (e.g. a brand-new chat whose title has not been generated
+ * yet). The caller passes a localized fallback so this stays a pure function.
+ * The header never depends on assistant data.
  */
 export const resolveChatHeaderLabel = (
   threadId: string,
   threads: readonly StorageThreadType[],
+  fallbackLabel: string,
 ): string => {
   const title = threads.find((thread) => thread.id === threadId)?.title;
-  return title != null && title !== '' ? title : GENERIC_CHAT_HEADER_LABEL;
+  return title != null && title !== '' ? title : fallbackLabel;
 };

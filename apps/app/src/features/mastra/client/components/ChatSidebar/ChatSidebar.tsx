@@ -73,6 +73,7 @@ export const ChatSidebar = (): JSX.Element => {
   const headerLabel = resolveChatHeaderLabel(
     chatThreadId,
     threadPages?.flatMap((page) => page.threads) ?? [],
+    t('ai_sidebar.new_chat'),
   );
 
   const { messages, sendMessage, status, regenerate, setMessages } = useChat({

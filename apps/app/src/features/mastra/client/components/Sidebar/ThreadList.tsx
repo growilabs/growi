@@ -90,7 +90,7 @@ export const ThreadList: React.FC = () => {
 
                 <div className="grw-item-title ps-1">
                   <p className="text-truncate m-auto">
-                    {thread.title ?? 'Untitled thread'}
+                    {thread.title || t('ai_sidebar.new_chat')}
                   </p>
                 </div>
 
