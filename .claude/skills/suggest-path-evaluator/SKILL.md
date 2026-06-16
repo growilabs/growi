@@ -149,6 +149,25 @@ equally-good sibling sets (e.g. two different `会議室` trees). Capture all of
 If the document has **no siblings anywhere** — it's genuinely new to this wiki — that is
 a real and expected outcome; handle it as the "no-sibling world" below.
 
+#### Self-consistency gate: prove you judged the right body
+
+Before you commit to a save location, prove you reasoned about **this** document and not
+a neighbouring one. While forming the answer, also write a one-line **body digest** for
+the document: its subject plus 3–5 proper nouns / feature names taken verbatim from the
+body (`{ "subject": "...", "key_terms": ["...", ...] }`).
+
+Then verify the digest against the body itself: **every key term must actually appear in
+the body you read.** If a term you "remember" isn't in the text, you summarised a
+different document — discard the answer, re-read this document's body from scratch, and
+redo step 3.
+
+This catches the single most damaging batch error: **filing the right reasoning under the
+wrong document.** When several documents are judged in one pass (especially across
+parallel sub-agents), it is easy to carry the previous document's content into the next
+one's verdict; the digest-vs-body check exposes that mechanically. Crucially it needs
+**only the body** — no human answer key — so it works on any wiki and never leaks ground
+truth into the blind judgment.
+
 ### 4. Rank suggest-path's proposals, and compare against your answer
 
 Order suggest-path's proposals from most to least plausible **as a save location for
@@ -214,6 +233,7 @@ Use this structure per document:
 
 ```
 ## <document label>
+- Body digest: <subject> | key terms: <term, term, ...>   (self-consistency check; all terms must be in the body)
 - suggest-path proposals (ranked best->worst):
   1. <path>   — <why this rank; hit / near-miss(too shallow|too deep) / off-subtree>
   2. <path>   — ...
@@ -229,6 +249,24 @@ A single document is the core unit. For a batch, run steps 1–5 for each docume
 aggregate. The point of aggregating is to find **which wiki domains suggest-path is weak
 in** — e.g. it does well on the dev wiki but misses everything under a management/HR
 tree, which is the kind of blind spot a human can't see from one run.
+
+**Batches are where bodies get swapped — gate every document.** A batch is usually fanned
+out across parallel sub-agents, each handling a slice of documents; that is exactly the
+setup where one document's content bleeds into another's verdict (the failure step 3's
+self-consistency gate exists to catch). So in batch mode the gate is **not optional**:
+
+1. Each document carries its **body digest** (step 3) through to the report.
+2. Before aggregating, reconcile every digest against its own body file: each digest's
+   key terms must appear in the body it claims to describe.
+3. Any document that fails reconciliation is a **suspected body swap** — do not score it.
+   Send it back through step 3 (re-read that document's body in isolation, redo the
+   judgment), then re-reconcile. Only documents that pass the gate enter the aggregate.
+
+This is a closed self-repair loop: it uses only the bodies, so it corrects swaps without
+ever consulting a human answer key. Reconciliation is a cheap mechanical string check —
+keep it as a deterministic pass (e.g. a small script), not another LLM judgment, so it
+can't drift the same way the original mistake did. If any documents were quarantined and
+re-judged, say how many in the report — a silent re-judge hides how shaky the first pass was.
 
 Derive the per-domain numbers **by aggregation from the rankings**, never by asking for
 absolute points (same drift reason as step 4):
