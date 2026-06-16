@@ -7,6 +7,7 @@ import type {
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
 
 import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
+import type { AzureOpenaiConfig } from '~/features/mastra/interfaces/azure-openai-config';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
@@ -289,11 +290,9 @@ export const CONFIG_KEYS = [
   'ai:apiKey',
   'ai:model',
   'ai:providerOptions',
-  // Azure OpenAI-only connection config (ai:provider='azure-openai')
-  'ai:azureOpenaiResourceName',
-  'ai:azureOpenaiBaseUrl',
-  'ai:azureOpenaiApiVersion',
-  'ai:azureOpenaiUseEntraId',
+  // Azure OpenAI-only connection config (ai:provider='azure-openai'), stored as
+  // a single JSON object (consolidated from the former four ai:azureOpenaiSettings* keys)
+  'ai:azureOpenaiSettings',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1301,35 +1300,32 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
   }),
 
-  // Azure OpenAI-only connection config (ai:provider='azure-openai'). Azure is
-  // reached via a resource-specific endpoint, so { apiKey, model } alone is not
-  // enough. Set exactly one of resourceName / baseUrl: resourceName builds the
-  // standard https://<name>.openai.azure.com/... URL; baseUrl is the escape
-  // hatch for Azure Government / sovereign clouds / API Management gateways /
-  // custom domains. apiVersion is optional (the AI SDK defaults it). For Azure,
-  // AI_MODEL is the *deployment name*, not an OpenAI model id. These
-  // keys are ignored by the other providers. None are secret (a resource name,
-  // URL, or API version is not a credential — only ai:apiKey is).
-  'ai:azureOpenaiResourceName': defineConfig<string | undefined>({
-    envVarName: 'AI_AZURE_OPENAI_RESOURCE_NAME',
-    defaultValue: undefined,
-  }),
-  'ai:azureOpenaiBaseUrl': defineConfig<string | undefined>({
-    envVarName: 'AI_AZURE_OPENAI_BASE_URL',
-    defaultValue: undefined,
-  }),
-  'ai:azureOpenaiApiVersion': defineConfig<string | undefined>({
-    envVarName: 'AI_AZURE_OPENAI_API_VERSION',
-    defaultValue: undefined,
-  }),
-  // When true, authenticate to Azure OpenAI with Microsoft Entra ID (managed
-  // identity / DefaultAzureCredential) instead of an API key. In this mode
-  // AI_API_KEY is not required; the credential is resolved from the
-  // ambient Azure environment by @azure/identity. Only meaningful when
-  // ai:provider='azure-openai'.
-  'ai:azureOpenaiUseEntraId': defineConfig<boolean>({
-    envVarName: 'AI_AZURE_OPENAI_USE_ENTRA_ID',
-    defaultValue: false,
+  // Azure OpenAI-only connection config (ai:provider='azure-openai'),
+  // consolidated into a SINGLE JSON object key (was four flat keys:
+  // ai:azureOpenai{ResourceName,BaseUrl,ApiVersion,UseEntraId}). Azure is reached
+  // via a resource-specific endpoint, so { apiKey, model } alone is not enough.
+  // Set exactly one of resourceName / baseURL: resourceName builds the standard
+  // https://<name>.openai.azure.com/... URL; baseURL is the
+  // escape hatch for Azure Government / sovereign clouds / API Management
+  // gateways / custom domains. apiVersion is optional (the AI SDK defaults it).
+  // useEntraId selects Microsoft Entra ID (managed identity / DefaultAzureCredential)
+  // auth instead of an API key (then AI_API_KEY is not required). For Azure,
+  // AI_MODEL is the *deployment name*, not an OpenAI model id. This key is ignored
+  // by the other providers and is not secret (only ai:apiKey is). See
+  // AzureOpenaiConfig for field semantics.
+  //
+  // Stored/loaded as JSON: the DB value is the serialized object, and the
+  // AI_AZURE_OPENAI_SETTINGS env var is a JSON string. defaultValue is an object ({}) so
+  // the loader parses the env var as JSON (a malformed env var fails soft to null;
+  // consumers read it defensively with `?? {}`).
+  // The type includes `| undefined` because this is a CLEARABLE key like ai:model /
+  // ai:providerOptions: the admin PUT handler sets it to undefined when the admin
+  // clears every field, so updateConfigs({ removeIfUndefined }) deletes it and the
+  // value falls back to the env default. The runtime default stays `{}` (not
+  // undefined) so the env JSON-parse branch is selected.
+  'ai:azureOpenaiSettings': defineConfig<AzureOpenaiConfig | undefined>({
+    envVarName: 'AI_AZURE_OPENAI_SETTINGS',
+    defaultValue: {},
   }),
 
   // OpenTelemetry Settings
@@ -1591,9 +1587,9 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
     ],
   },
   {
-    // AI settings: provider-common (4) + Azure OpenAI-only (4) + the enable
-    // toggle. app:aiEnabled uses the app: prefix but is fixed together with the
-    // ai:* keys as a single AI configuration unit.
+    // AI settings: provider-common (4) + the Azure OpenAI-only object key + the
+    // enable toggle. app:aiEnabled uses the app: prefix but is fixed together
+    // with the ai:* keys as a single AI configuration unit.
     controlKey: 'env:useOnlyEnvVars:ai',
     targetKeys: [
       'app:aiEnabled',
@@ -1601,10 +1597,7 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
       'ai:apiKey',
       'ai:model',
       'ai:providerOptions',
-      'ai:azureOpenaiResourceName',
-      'ai:azureOpenaiBaseUrl',
-      'ai:azureOpenaiApiVersion',
-      'ai:azureOpenaiUseEntraId',
+      'ai:azureOpenaiSettings',
     ],
   },
 ];

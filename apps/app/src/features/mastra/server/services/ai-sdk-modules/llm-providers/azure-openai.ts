@@ -20,12 +20,20 @@ const ENTRA_ID_SCOPE = 'https://cognitiveservices.azure.com/.default';
 // authenticate via either an API key or Microsoft Entra ID. All of that stays
 // inside this resolver — the shared dispatch never sees it. `ai:model`
 // here is the Azure *deployment name*, not an OpenAI model id.
+//
+// Naming: the config object field is `baseURL`, matching the AI SDK's createAzure
+// option, so it passes straight through here. (The admin API/form field is the
+// lowercase azureOpenaiBaseUrl; the get/put-ai-settings routes map between the two.)
 export const resolveAzureOpenaiModel = (): MastraModelConfig => {
-  const resourceName = configManager.getConfig('ai:azureOpenaiResourceName');
-  const baseURL = configManager.getConfig('ai:azureOpenaiBaseUrl');
-  const apiVersion = configManager.getConfig('ai:azureOpenaiApiVersion');
-  const useEntraId =
-    configManager.getConfig('ai:azureOpenaiUseEntraId') === true;
+  // Connection config is a single JSON object (ai:azureOpenaiSettings). `?? {}` guards a
+  // malformed AI_AZURE_OPENAI_SETTINGS env var, which the loader fails soft to null.
+  const {
+    resourceName,
+    baseURL,
+    apiVersion,
+    useEntraId: useEntraIdRaw,
+  } = configManager.getConfig('ai:azureOpenaiSettings') ?? {};
+  const useEntraId = useEntraIdRaw === true;
   const model = requireModel();
 
   // Endpoint is required regardless of the auth method. resourceName and baseURL
@@ -33,10 +41,10 @@ export const resolveAzureOpenaiModel = (): MastraModelConfig => {
   // resourceName and uses baseURL — so passing both straight through is safe; we
   // only guard that at least one is present. apiVersion is likewise forwarded
   // as-is (undefined falls back to the SDK default). The throw names the missing
-  // env vars only — never a key.
+  // JSON fields only — never an apiKey value.
   if (resourceName == null && baseURL == null) {
     throw new Error(
-      'Azure OpenAI requires AI_AZURE_OPENAI_RESOURCE_NAME or AI_AZURE_OPENAI_BASE_URL to be set',
+      'Azure OpenAI requires resourceName or baseURL to be set in AI_AZURE_OPENAI_SETTINGS',
     );
   }
 
@@ -56,7 +64,7 @@ export const resolveAzureOpenaiModel = (): MastraModelConfig => {
   const apiKey = getApiKey();
   if (apiKey == null) {
     throw new Error(
-      'Azure OpenAI requires AI_API_KEY, or set AI_AZURE_OPENAI_USE_ENTRA_ID=true to authenticate with Microsoft Entra ID',
+      'Azure OpenAI requires AI_API_KEY, or set "useEntraId": true in AI_AZURE_OPENAI_SETTINGS to authenticate with Microsoft Entra ID',
     );
   }
   return createAzure({ apiKey, resourceName, baseURL, apiVersion })(model);

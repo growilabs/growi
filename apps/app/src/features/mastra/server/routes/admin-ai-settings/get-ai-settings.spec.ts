@@ -47,10 +47,9 @@ const setConfig = (overrides: ConfigStub = {}): void => {
     'ai:apiKey': undefined,
     'ai:model': undefined,
     'ai:providerOptions': undefined,
-    'ai:azureOpenaiResourceName': undefined,
-    'ai:azureOpenaiBaseUrl': undefined,
-    'ai:azureOpenaiApiVersion': undefined,
-    'ai:azureOpenaiUseEntraId': false,
+    // Azure connection config is one JSON object internally; the response keeps
+    // the four flat fields (UI unchanged).
+    'ai:azureOpenaiSettings': {},
     'env:useOnlyEnvVars:ai': false,
     ...overrides,
   };
@@ -144,14 +143,18 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
       'ai:provider': 'azure-openai',
       'ai:model': 'gpt-4o',
       'ai:providerOptions': '{"temperature":0.2}',
-      'ai:azureOpenaiResourceName': 'my-resource',
-      'ai:azureOpenaiBaseUrl': 'https://example.openai.azure.com',
-      'ai:azureOpenaiApiVersion': '2024-02-01',
-      'ai:azureOpenaiUseEntraId': true,
+      'ai:azureOpenaiSettings': {
+        resourceName: 'my-resource',
+        baseURL: 'https://example.openai.azure.com',
+        apiVersion: '2024-02-01',
+        useEntraId: true,
+      },
     });
 
     const { res } = invoke();
 
+    // The stored ai:azureOpenaiSettings object is unpacked into the four flat response
+    // fields the admin UI consumes (Req 1.4).
     expect(responseBody(res)).toMatchObject({
       provider: 'azure-openai',
       model: 'gpt-4o',
@@ -161,6 +164,16 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
       azureOpenaiApiVersion: '2024-02-01',
       azureOpenaiUseEntraId: true,
     });
+  });
+
+  it('defaults azureOpenaiUseEntraId to false when the stored object omits it', () => {
+    setConfig({ 'ai:azureOpenaiSettings': { resourceName: 'my-resource' } });
+
+    const { res } = invoke();
+
+    const body = responseBody(res);
+    expect(body.azureOpenaiUseEntraId).toBe(false);
+    expect(body.azureOpenaiResourceName).toBe('my-resource');
   });
 
   it('responds with apiv3Err and does not leak the apiKey when a collaborator throws (Req 5.3)', () => {

@@ -105,21 +105,21 @@ export const getAiSettings = (_req: Request, res: ApiV3Response): void => {
     // Never read into a returned field — only its presence is exposed (Req 5.2).
     const apiKey = configManager.getConfig('ai:apiKey');
 
+    // Azure connection config is one JSON object internally (ai:azureOpenaiSettings);
+    // the response keeps the four flat fields so the admin UI is unchanged.
+    // `?? {}` guards a malformed AI_AZURE_OPENAI_SETTINGS env var (loader fails soft to null).
+    const azureOpenaiSettings =
+      configManager.getConfig('ai:azureOpenaiSettings') ?? {};
+
     const response: AiSettingsResponse = {
       aiEnabled: configManager.getConfig('app:aiEnabled'),
       provider: configManager.getConfig('ai:provider'),
       model: configManager.getConfig('ai:model'),
       providerOptions: configManager.getConfig('ai:providerOptions'),
-      azureOpenaiResourceName: configManager.getConfig(
-        'ai:azureOpenaiResourceName',
-      ),
-      azureOpenaiBaseUrl: configManager.getConfig('ai:azureOpenaiBaseUrl'),
-      azureOpenaiApiVersion: configManager.getConfig(
-        'ai:azureOpenaiApiVersion',
-      ),
-      azureOpenaiUseEntraId: configManager.getConfig(
-        'ai:azureOpenaiUseEntraId',
-      ),
+      azureOpenaiResourceName: azureOpenaiSettings.resourceName,
+      azureOpenaiBaseUrl: azureOpenaiSettings.baseURL,
+      azureOpenaiApiVersion: azureOpenaiSettings.apiVersion,
+      azureOpenaiUseEntraId: azureOpenaiSettings.useEntraId ?? false,
       isApiKeySet: apiKey != null && apiKey !== '',
       useOnlyEnvVars: configManager.getConfig('env:useOnlyEnvVars:ai') === true,
       isConfigured: isAiConfigured(),

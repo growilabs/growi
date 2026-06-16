@@ -1,3 +1,4 @@
+import type { AzureOpenaiConfig } from '~/features/mastra/interfaces/azure-openai-config';
 import type { ConfigKey } from '~/server/service/config-manager/config-definition';
 
 // Mock the @ai-sdk/azure + @azure/identity boundaries and config-manager so the
@@ -47,7 +48,11 @@ vi.mock('~/server/service/config-manager', () => ({
 
 import { resolveAzureOpenaiModel } from './azure-openai';
 
-type ConfigFixture = Partial<Record<ConfigKey, string | boolean | undefined>>;
+// Azure connection config is one JSON object under ai:azureOpenaiSettings; ai:apiKey and
+// ai:model remain flat keys.
+type ConfigFixture = Partial<
+  Record<ConfigKey, string | boolean | AzureOpenaiConfig | undefined>
+>;
 
 const applyConfig = (fixture: ConfigFixture): void => {
   getConfig.mockImplementation((key: ConfigKey) =>
@@ -64,7 +69,7 @@ describe('resolveAzureOpenaiModel', () => {
     applyConfig({
       'ai:apiKey': 'az-key',
       'ai:model': 'my-deployment',
-      'ai:azureOpenaiResourceName': 'my-resource',
+      'ai:azureOpenaiSettings': { resourceName: 'my-resource' },
     });
 
     const result = resolveAzureOpenaiModel();
@@ -81,7 +86,9 @@ describe('resolveAzureOpenaiModel', () => {
     applyConfig({
       'ai:apiKey': 'az-key',
       'ai:model': 'dep',
-      'ai:azureOpenaiBaseUrl': 'https://gw.example.com/openai/deployments',
+      'ai:azureOpenaiSettings': {
+        baseURL: 'https://gw.example.com/openai/deployments',
+      },
     });
 
     resolveAzureOpenaiModel();
@@ -96,8 +103,10 @@ describe('resolveAzureOpenaiModel', () => {
     applyConfig({
       'ai:apiKey': 'az-key',
       'ai:model': 'dep',
-      'ai:azureOpenaiResourceName': 'res-ignored-by-sdk',
-      'ai:azureOpenaiBaseUrl': 'https://gw.example.com',
+      'ai:azureOpenaiSettings': {
+        resourceName: 'res-ignored-by-sdk',
+        baseURL: 'https://gw.example.com',
+      },
     });
 
     resolveAzureOpenaiModel();
@@ -115,8 +124,10 @@ describe('resolveAzureOpenaiModel', () => {
     applyConfig({
       'ai:apiKey': 'az-key',
       'ai:model': 'dep',
-      'ai:azureOpenaiResourceName': 'res',
-      'ai:azureOpenaiApiVersion': '2024-10-01-preview',
+      'ai:azureOpenaiSettings': {
+        resourceName: 'res',
+        apiVersion: '2024-10-01-preview',
+      },
     });
 
     resolveAzureOpenaiModel();
@@ -132,8 +143,10 @@ describe('resolveAzureOpenaiModel', () => {
     applyConfig({
       // no ai:apiKey in Entra ID mode
       'ai:model': 'my-deployment',
-      'ai:azureOpenaiResourceName': 'my-resource',
-      'ai:azureOpenaiUseEntraId': true,
+      'ai:azureOpenaiSettings': {
+        resourceName: 'my-resource',
+        useEntraId: true,
+      },
     });
 
     const result = resolveAzureOpenaiModel();
@@ -153,12 +166,12 @@ describe('resolveAzureOpenaiModel', () => {
     expect(result).toEqual({ tag: 'azure-model', model: 'my-deployment' });
   });
 
-  it('throws (naming the endpoint env vars, never the key) when neither resourceName nor baseURL is set', () => {
+  it('throws (naming the missing endpoint fields, never the key) when neither resourceName nor baseURL is set', () => {
     const secret = 'az-super-secret';
     applyConfig({ 'ai:apiKey': secret, 'ai:model': 'dep' });
 
     expect(() => resolveAzureOpenaiModel()).toThrow(
-      /AI_AZURE_OPENAI_RESOURCE_NAME|AI_AZURE_OPENAI_BASE_URL/,
+      /resourceName|baseURL|AI_AZURE_OPENAI_SETTINGS/,
     );
     expect(createAzure).not.toHaveBeenCalled();
 
@@ -172,12 +185,10 @@ describe('resolveAzureOpenaiModel', () => {
   it('throws when neither an apiKey nor Entra ID is configured (endpoint present)', () => {
     applyConfig({
       'ai:model': 'dep',
-      'ai:azureOpenaiResourceName': 'my-resource',
+      'ai:azureOpenaiSettings': { resourceName: 'my-resource' },
     });
 
-    expect(() => resolveAzureOpenaiModel()).toThrow(
-      /AI_API_KEY|AI_AZURE_OPENAI_USE_ENTRA_ID/,
-    );
+    expect(() => resolveAzureOpenaiModel()).toThrow(/AI_API_KEY|useEntraId/);
     expect(createAzure).not.toHaveBeenCalled();
   });
 });

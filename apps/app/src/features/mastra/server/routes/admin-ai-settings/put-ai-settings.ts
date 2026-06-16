@@ -19,6 +19,7 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type { AiSettingsUpdateRequest } from '../../../interfaces/ai-settings';
+import type { AzureOpenaiConfig } from '../../../interfaces/azure-openai-config';
 import { isValidProviderOptionsJson } from '../../../utils/provider-options-validation';
 
 const logger = loggerFactory(
@@ -138,14 +139,18 @@ type AiConfigUpdates = Parameters<typeof configManager.updateConfigs>[0];
  * Build the config updates from a validated request body.
  *
  * Update semantics (design "API Contract"): FULL-STATE REPLACE, not PATCH.
- *   - the clearable string fields are already normalized ('' -> undefined) by the
- *     validator's customSanitizer (middleware that runs before this handler), so
- *     they are mapped directly and ALWAYS placed in the object — `removeIfUndefined`
- *     then removes the cleared ones from the DB (Req 4.4). Consequently a field the
- *     request OMITTED is `undefined` here too and is likewise removed: an omitted
- *     clearable string is reset to its env default, not preserved. Callers must
- *     send the complete set (the admin form always does); see AiSettingsUpdateRequest.
- *   - boolean fields are always saved when provided (toggle / Entra ID)
+ *   - the clearable string fields (provider-common: model, providerOptions) are
+ *     already normalized ('' -> undefined) by the validator's customSanitizer
+ *     (middleware that runs before this handler), so they are mapped directly and
+ *     ALWAYS placed in the object — `removeIfUndefined` then removes the cleared
+ *     ones from the DB (Req 4.4). Consequently a field the request OMITTED is
+ *     `undefined` here too and is likewise removed: an omitted clearable string is
+ *     reset to its env default, not preserved. Callers must send the complete set
+ *     (the admin form always does); see AiSettingsUpdateRequest.
+ *   - the four Azure OpenAI fields are consolidated into one `ai:azureOpenaiSettings`
+ *     JSON object by buildAzureOpenaiConfig (see its note for the object-level
+ *     full-state-replace + env-fallback semantics).
+ *   - `app:aiEnabled` is saved only when provided (merge: omit keeps the toggle).
  *   - `ai:apiKey` is the exception: it has NO sanitizer, so it is included only
  *     when a non-empty string is sent; an empty/omitted apiKey normally preserves
  *     the existing stored key (Req 5.x). Because the key is simply absent from the
@@ -161,7 +166,41 @@ type AiConfigUpdates = Parameters<typeof configManager.updateConfigs>[0];
  * removeIfUndefined drops it); the admin must enter the new provider's key. The
  * convenience merge still applies for SAME-provider saves (e.g. changing only the
  * model). `currentProvider` is the value currently stored, read by the handler.
+ *
+ * AZURE OPENAI — the request still carries four flat fields (the admin UI is
+ * unchanged), but they are persisted as ONE JSON object under `ai:azureOpenaiSettings`.
+ * The object is assembled here as full-state replace: a cleared string field is
+ * already '' -> undefined (validator sanitizer) and is therefore omitted, and
+ * `useEntraId` is included only when explicitly true (its default-false carries no
+ * information). When the assembled object has no keys at all — i.e. the admin
+ * cleared every field and did not enable Entra ID — it collapses to `undefined`
+ * so removeIfUndefined deletes the key and the value falls back to the
+ * AI_AZURE_OPENAI_SETTINGS env default (Req 4.4, applied at the object level). Because the
+ * whole object is replaced (not deep-merged with env), unchecking Entra ID or
+ * clearing a single field is honored exactly as submitted.
  */
+const buildAzureOpenaiConfig = (
+  body: AiSettingsUpdateRequest,
+): AzureOpenaiConfig | undefined => {
+  const azureOpenaiSettings: AzureOpenaiConfig = {
+    ...(body.azureOpenaiResourceName != null
+      ? { resourceName: body.azureOpenaiResourceName }
+      : {}),
+    // API field azureOpenaiBaseUrl maps to the object's `baseURL` (AI SDK naming).
+    ...(body.azureOpenaiBaseUrl != null
+      ? { baseURL: body.azureOpenaiBaseUrl }
+      : {}),
+    ...(body.azureOpenaiApiVersion != null
+      ? { apiVersion: body.azureOpenaiApiVersion }
+      : {}),
+    ...(body.azureOpenaiUseEntraId === true ? { useEntraId: true } : {}),
+  };
+
+  return Object.keys(azureOpenaiSettings).length > 0
+    ? azureOpenaiSettings
+    : undefined;
+};
+
 const buildUpdates = (
   body: AiSettingsUpdateRequest,
   currentProvider: AiProvider | undefined,
@@ -170,16 +209,11 @@ const buildUpdates = (
     'ai:provider': body.provider,
     'ai:model': body.model,
     'ai:providerOptions': body.providerOptions,
-    'ai:azureOpenaiResourceName': body.azureOpenaiResourceName,
-    'ai:azureOpenaiBaseUrl': body.azureOpenaiBaseUrl,
-    'ai:azureOpenaiApiVersion': body.azureOpenaiApiVersion,
+    'ai:azureOpenaiSettings': buildAzureOpenaiConfig(body),
   };
 
   if (body.aiEnabled != null) {
     updates['app:aiEnabled'] = body.aiEnabled;
-  }
-  if (body.azureOpenaiUseEntraId != null) {
-    updates['ai:azureOpenaiUseEntraId'] = body.azureOpenaiUseEntraId;
   }
 
   // apiKey resolution (see the SECURITY note above):

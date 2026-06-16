@@ -8,19 +8,16 @@ import {
 describe('ai-settings interfaces', () => {
   describe('AI_SETTING_KEYS', () => {
     // Contract: this list is the single source of truth for the config keys this
-    // feature manages (server handlers iterate it to build GET / apply PUT, and the
-    // env-only group mirrors it). It must contain exactly these 9 keys.
-    it('enumerates exactly the 9 editable config keys (app:aiEnabled + 8 ai:* keys)', () => {
+    // feature manages (the env-only group mirrors it). It must contain exactly
+    // these 6 keys — the Azure connection config is one ai:azureOpenaiSettings JSON object.
+    it('enumerates exactly the 6 editable config keys (app:aiEnabled + 5 ai:* keys)', () => {
       expect([...AI_SETTING_KEYS]).toStrictEqual([
         'app:aiEnabled',
         'ai:provider',
         'ai:apiKey',
         'ai:model',
         'ai:providerOptions',
-        'ai:azureOpenaiResourceName',
-        'ai:azureOpenaiBaseUrl',
-        'ai:azureOpenaiApiVersion',
-        'ai:azureOpenaiUseEntraId',
+        'ai:azureOpenaiSettings',
       ]);
     });
 

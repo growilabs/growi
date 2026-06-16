@@ -9,7 +9,11 @@
 //     the `removeIfUndefined` option:
 //       * string fields normalize '' -> undefined and are removed from DB so the
 //         effective value falls back to the env var (Req 4.4)
-//       * boolean fields (app:aiEnabled, ai:azureOpenaiUseEntraId) are always saved
+//       * the four Azure OpenAI fields are consolidated into one ai:azureOpenaiSettings
+//         JSON object (full-state replace); useEntraId is stored only when true,
+//         and an all-cleared object collapses to undefined so removeIfUndefined
+//         deletes the key and the value falls back to the env var (Req 4.4)
+//       * app:aiEnabled is saved only when provided
 //       * ai:apiKey is the exception: present only when a non-empty value is sent,
 //         omitted otherwise so the stored key is preserved (Req 5.x) — UNLESS the
 //         provider changes without a new key, in which case it is cleared
@@ -155,7 +159,8 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         'ai:apiKey': 'sk-new-key',
         'ai:model': 'gpt-4o',
         'ai:providerOptions': '{"temperature":0.2}',
-        'ai:azureOpenaiUseEntraId': true,
+        // The flat Azure fields are consolidated into one JSON object.
+        'ai:azureOpenaiSettings': { useEntraId: true },
       });
 
       expect(clearResolvedMastraModelCache).toHaveBeenCalledTimes(1);
@@ -260,14 +265,14 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
       expect(options).toMatchObject({ removeIfUndefined: true });
       expect(updates['ai:model']).toBeUndefined();
       expect(updates['ai:providerOptions']).toBeUndefined();
-      expect(updates['ai:azureOpenaiResourceName']).toBeUndefined();
-      expect(updates['ai:azureOpenaiBaseUrl']).toBeUndefined();
-      expect(updates['ai:azureOpenaiApiVersion']).toBeUndefined();
+      // All Azure fields cleared (and useEntraId not provided) -> the object
+      // collapses to undefined so removeIfUndefined deletes the consolidated key.
+      expect(updates['ai:azureOpenaiSettings']).toBeUndefined();
       // Non-empty string keeps its value.
       expect(updates['ai:provider']).toBe('openai');
       // The keys are still present in the updates object so removeIfUndefined deletes them.
       expect(updates).toHaveProperty('ai:model');
-      expect(updates).toHaveProperty('ai:azureOpenaiResourceName');
+      expect(updates).toHaveProperty('ai:azureOpenaiSettings');
     });
 
     it('keeps a non-empty string field value', async () => {
@@ -277,12 +282,59 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
       expect(updates['ai:model']).toBe('gpt-4o');
     });
 
-    it('always includes boolean fields even when false', async () => {
+    it('saves app:aiEnabled even when false', async () => {
       await invoke({ aiEnabled: false, azureOpenaiUseEntraId: false });
 
       const [updates] = updateCall();
       expect(updates['app:aiEnabled']).toBe(false);
-      expect(updates['ai:azureOpenaiUseEntraId']).toBe(false);
+    });
+  });
+
+  // The four flat Azure fields are persisted as ONE ai:azureOpenaiSettings JSON object
+  // (the admin UI is unchanged). The object is full-state replace: useEntraId is
+  // stored only when true, and an object with no meaningful content collapses to
+  // undefined so removeIfUndefined deletes the key and the value falls back to the
+  // AI_AZURE_OPENAI_SETTINGS env default (Req 4.4, at the object level).
+  describe('Azure OpenAI object consolidation (Req 4.4)', () => {
+    it('builds the ai:azureOpenaiSettings object from the flat fields', async () => {
+      await invoke({
+        azureOpenaiResourceName: 'my-resource',
+        azureOpenaiApiVersion: '2024-02-01',
+        azureOpenaiUseEntraId: true,
+      });
+
+      const [updates] = updateCall();
+      expect(updates['ai:azureOpenaiSettings']).toEqual({
+        resourceName: 'my-resource',
+        apiVersion: '2024-02-01',
+        useEntraId: true,
+      });
+    });
+
+    it('omits useEntraId from the object when it is false (default carries no info)', async () => {
+      await invoke({
+        azureOpenaiResourceName: 'my-resource',
+        azureOpenaiUseEntraId: false,
+      });
+
+      const [updates] = updateCall();
+      expect(updates['ai:azureOpenaiSettings']).toEqual({
+        resourceName: 'my-resource',
+      });
+    });
+
+    it('collapses to undefined (key present for removeIfUndefined) when every field is cleared', async () => {
+      await invoke({
+        azureOpenaiResourceName: undefined,
+        azureOpenaiBaseUrl: undefined,
+        azureOpenaiApiVersion: undefined,
+        azureOpenaiUseEntraId: false,
+      });
+
+      const [updates, options] = updateCall();
+      expect(updates).toHaveProperty('ai:azureOpenaiSettings');
+      expect(updates['ai:azureOpenaiSettings']).toBeUndefined();
+      expect(options).toMatchObject({ removeIfUndefined: true });
     });
   });
 
