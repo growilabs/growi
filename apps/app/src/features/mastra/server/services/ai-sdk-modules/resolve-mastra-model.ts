@@ -21,8 +21,8 @@ export const resolveMastraModel = (): MastraModelConfig => {
     return memoizedModel;
   }
 
-  // `ai:provider` defaults to 'openai' but env-loaded config is not
-  // runtime-validated against the union, so re-validate here (Req 1.4).
+  // `ai:provider` has no default (undefined when unset), and env-loaded config is
+  // not runtime-validated against the union, so re-validate here (Req 1.4).
   const provider = configManager.getConfig('ai:provider');
   if (!isAiProvider(provider)) {
     throw new Error(
