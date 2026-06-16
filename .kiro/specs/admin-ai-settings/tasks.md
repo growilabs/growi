@@ -9,8 +9,8 @@
 
 - [x] 1.2 (P) 環境変数専用モードの宣言を AI 設定グループに追加
   - 制御キー `env:useOnlyEnvVars:ai`(env 変数 `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS`、default false)を `CONFIG_KEYS` + `CONFIG_DEFINITIONS` に追加
-  - `ENV_ONLY_GROUPS` に `app:aiEnabled` + `ai:*` 8 キーの計 9 キーを対象とするグループを追加
-  - 単体テスト: 制御キー true で 9 キーが env 値のみ、false で `db ?? env`、`ai:*` 以外のキーの解決は不変
+  - `ENV_ONLY_GROUPS` に `app:aiEnabled` + `ai:*` 5 キーの計 6 キーを対象とするグループを追加
+  - 単体テスト: 制御キー true で 6 キーが env 値のみ、false で `db ?? env`、`ai:*` 以外のキーの解決は不変
   - _Requirements: 4.1, 4.4_
   - _Boundary: config-definition_
 
@@ -136,4 +136,4 @@
 ## Implementation Notes
 - 1.1 added `admin:ai` to `@growi/core` source, but `packages/core/dist` is **gitignored** and was stale. Any consumer of `SCOPE.READ/WRITE.ADMIN.AI` (e.g. task 3.4) needs `turbo run build --filter @growi/core` locally before `lint:typecheck` passes. CI handles this via turbo build ordering.
 - crowi/index.ts and config-manager.spec.ts carry pre-existing biome warnings (type aliases `= any`, non-null assertions, default export, async-without-await on legacy test callbacks). These are outside feature boundaries; biome `--diagnostic-level=error` does not fail on them.
-- 4.2 referenced i18n keys (namespace `admin`, prefix `ai_settings.`) that task 5.3 must define in all 5 locales: `ai_enabled_label`, `api_key_label`, `api_key_help`, `api_key_set_placeholder`, `model_label`, `provider_label`, `provider_placeholder`, `provider_options_label`, `provider_options_invalid_json`, `env_only_mode_notice`, `azure_resource_name_label`, `azure_base_url_label`, `azure_api_version_label`, `azure_use_entra_id_label`, `azure_entra_id_api_key_note`, `azure_model_deployment_note`. Task 4.3 (container) and 5.1 (nav) will add more (e.g. save button, page/nav label, unconfigured warning) — 5.3 should sweep all referenced keys.
+- 4.2 referenced i18n keys (namespace `admin`, prefix `ai_settings.`) that task 5.3 must define in all 5 locales: `ai_enabled_label`, `api_key_label`, `api_key_help`, `api_key_set_placeholder`, `model_label`, `provider_label`, `provider_placeholder`, `provider_options_label`, `provider_options_invalid_json`, `env_only_mode_notice`, `azure_resource_name_label`, `azure_base_url_label`, `azure_api_version_label`, `azure_use_entra_id_label`, `azure_entra_id_api_key_note`, `azure_model_deployment_label`. Task 4.3 (container) and 5.1 (nav) will add more (e.g. save button, page/nav label, unconfigured warning) — 5.3 should sweep all referenced keys.

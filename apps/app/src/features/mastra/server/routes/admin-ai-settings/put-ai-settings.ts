@@ -227,12 +227,10 @@ const buildUpdates = (
     updates['app:aiEnabled'] = body.aiEnabled;
   }
 
-  // apiKey resolution (see the SECURITY note above):
-  //   - a non-empty key is always persisted
-  //   - no new key + provider CHANGED -> clear the stored key (undefined ->
-  //     removeIfUndefined deletes it) so the previous provider's secret is never
-  //     reused against, and transmitted to, the new provider
-  //   - no new key + SAME provider -> omit entirely so the stored key is preserved
+  // apiKey resolution — maps to the SECURITY note in the JSDoc above:
+  //   - non-empty key             -> persist it
+  //   - no new key + provider CHANGED -> clear the stored key (undefined; removeIfUndefined drops it)
+  //   - no new key + SAME provider    -> omit, preserving the stored key
   const hasNewApiKey = body.apiKey != null && body.apiKey !== '';
   if (hasNewApiKey) {
     updates['ai:apiKey'] = body.apiKey;

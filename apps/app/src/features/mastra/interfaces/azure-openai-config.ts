@@ -1,7 +1,8 @@
 /**
  * Azure OpenAI connection settings, persisted as a SINGLE JSON object under the
  * `ai:azureOpenaiSettings` config key (consolidated from the former four flat
- * `ai:azureOpenaiSettings*` keys). Only meaningful when `ai:provider` is 'azure-openai'.
+ * `ai:azureOpenai{ResourceName,BaseUrl,ApiVersion,UseEntraId}` keys). Only
+ * meaningful when `ai:provider` is 'azure-openai'.
  *
  * All fields are optional: Azure is reached via a resource-specific endpoint, so
  * exactly one of `resourceName` / `baseURL` is expected at resolve time (the AI

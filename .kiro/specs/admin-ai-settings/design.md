@@ -2,14 +2,14 @@
 
 ## Overview
 
-**Purpose**: 本フィーチャーは、GROWI 管理者が `/admin/ai` の管理画面から AI(Mastra LLM プロバイダー)連携の `ai:*` 設定値を参照・更新できるようにする。これまで環境変数でのみ構成可能だった 8 つの設定キーを UI から管理可能にし、Azure OpenAI 固有の接続設定は同画面内の専用セクションで扱う。
+**Purpose**: 本フィーチャーは、GROWI 管理者が `/admin/ai` の管理画面から AI(Mastra LLM プロバイダー)連携の `ai:*` 設定値を参照・更新できるようにする。これまで環境変数でのみ構成可能だった `ai:*` 5 キーを UI から管理可能にし、Azure OpenAI 固有の接続設定は同画面内の専用セクションで扱う。
 
 **Users**: GROWI 管理者が AI 機能の構成(プロバイダー選択・認証情報・モデル・プロバイダーオプション・Azure 接続設定)を、環境変数を編集せずに変更するために利用する。
 
-**Impact**: 既存の「環境変数専用モード」機構(`ENV_ONLY_GROUPS` + `shouldUseEnvOnly`)を AI 設定グループ(`ai:*` 8 キー + `app:aiEnabled`)に拡張する。制御用環境変数(`env:useOnlyEnvVars:ai`)が有効なとき、AI 設定は環境変数の値で固定され DB 値は無視される。`getConfig` のコアロジックは変更しない。さらに、(1) 設定更新がサーバー再起動なしに反映されるようメモ化された Mastra モデルの無効化機構を追加し、(2) AI 関連 API のゲートを起動時固定から**リクエスト毎の判定**(`有効 かつ 設定済み`)へ変更して、トグルや設定の変更が再起動なしに利用可否へ反映されるようにする。
+**Impact**: 既存の「環境変数専用モード」機構(`ENV_ONLY_GROUPS` + `shouldUseEnvOnly`)を AI 設定グループ(`ai:*` 5 キー + `app:aiEnabled`)に拡張する。制御用環境変数(`env:useOnlyEnvVars:ai`)が有効なとき、AI 設定は環境変数の値で固定され DB 値は無視される。`getConfig` のコアロジックは変更しない。さらに、(1) 設定更新がサーバー再起動なしに反映されるようメモ化された Mastra モデルの無効化機構を追加し、(2) AI 関連 API のゲートを起動時固定から**リクエスト毎の判定**(`有効 かつ 設定済み`)へ変更して、トグルや設定の変更が再起動なしに利用可否へ反映されるようにする。
 
 ### Goals
-- `ai:*` 8 キーを `/admin/ai` から参照・更新できる(共通設定 + Azure 専用設定)
+- `ai:*` 5 キーを `/admin/ai` から参照・更新できる(共通設定 + Azure 専用設定)
 - AI 機能の有効/無効(`app:aiEnabled`)を管理画面から切り替えられる
 - AI 関連 API の利用可否を「有効 かつ 設定済み」に整合させ、設定不備時は API を拒否し・クライアント導線(サイドバー)を無効化して設定画面へ案内する(再起動なしで反映)
 - 環境変数専用モードが有効なときは環境変数で固定し、UI 上で編集不可・モード明示、API でも更新を拒否する
@@ -31,7 +31,7 @@
 - AI 設定専用の apiv3 ルート(GET/PUT)とその入力検証・監査ログ発火
 - AI 機能の有効/無効(`app:aiEnabled`)の管理画面からの切り替え
 - **AI 利用可否の判定**(`isAiConfigured()` の追加と `有効 かつ 設定済み` の合成)、および mastra ルートゲートをリクエスト毎判定へ変更、クライアント導線(サイドバー)への反映
-- `ai:*` 8 キー + `app:aiEnabled` に対する**環境変数専用モード**(既存 `ENV_ONLY_GROUPS` への新グループ + 制御キー `env:useOnlyEnvVars:ai` の宣言)
+- `ai:*` 5 キー + `app:aiEnabled` に対する**環境変数専用モード**(既存 `ENV_ONLY_GROUPS` への新グループ + 制御キー `env:useOnlyEnvVars:ai` の宣言)
 - 設定更新時の **Mastra モデルメモ無効化**(ローカル + S2S 経由)
 - 新スコープ `admin:ai`(read/write)の定義
 
@@ -172,7 +172,7 @@ apps/app/src/pages/admin/
 ```
 
 ### Modified Files
-- `apps/app/src/server/service/config-manager/config-definition.ts` — 制御キー `env:useOnlyEnvVars:ai`(env 変数 `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS`)を `CONFIG_KEYS` + `CONFIG_DEFINITIONS` に追加し、`ENV_ONLY_GROUPS` に **`ai:*` 8 キー + `app:aiEnabled`** を対象とするグループを追加(`config-manager.ts` のコアは変更不要)
+- `apps/app/src/server/service/config-manager/config-definition.ts` — 制御キー `env:useOnlyEnvVars:ai`(env 変数 `AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS`)を `CONFIG_KEYS` + `CONFIG_DEFINITIONS` に追加し、`ENV_ONLY_GROUPS` に **`ai:*` 5 キー + `app:aiEnabled`** を対象とするグループを追加(`config-manager.ts` のコアは変更不要)
 - `apps/app/src/features/mastra/server/routes/index.ts` — 起動時固定ゲート(`if (!isAiEnabled())`)を撤去し、`ai-ready-guard`(per-request)を `router.use` で適用
 - `apps/app/src/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model.ts` — `clearResolvedMastraModelCache()` を追加・export
 - `apps/app/src/pages/general-page/configuration-props.ts` — サイドバー供給値 `aiEnabled` を **`crowi.isAiReady()`**(有効 かつ 設定済み)由来へ変更。**`isAiReady` を直接 import しない**(SSR realm 問題 + クライアントバンドル混入を回避 — research.md §11)。import は型(`GetServerSideProps`/`CrowiRequest`)と client-safe enum のみに保つ
@@ -486,7 +486,7 @@ export const isAiReady = (): boolean => isAiEnabled() && isAiConfigured();
 
 ### Unit Tests
 - `ConfigManager.getConfig`(`ai:provider`): `env:useOnlyEnvVars:ai`=true で env 値のみ、=false で `db ?? env`(DB 優先・env 既定)を返す(4.1, 4.4)。
-- `ENV_ONLY_GROUPS`: `ai` グループが 9 キー(`app:aiEnabled` + `ai:*` 8)すべてを対象とし、`initKeyToGroupMap` で制御キーへ正しくマップされる(4.1)。
+- `ENV_ONLY_GROUPS`: `ai` グループが 6 キー(`app:aiEnabled` + `ai:*` 5)すべてを対象とし、`initKeyToGroupMap` で制御キーへ正しくマップされる(4.1)。
 - `config-definition`: `env:useOnlyEnvVars:ai` が `CONFIG_KEYS`/`CONFIG_DEFINITIONS` に登録され、既存キーの解決に影響しない(回帰)。
 - `isAiConfigured` / `isAiReady`: provider 未設定/必須項目欠落で false、provider 別に必須が揃うと true。`aiEnabled=false` で `isAiReady=false`(7.2, 7.3)。
 - `isAiConfigured` と `resolveMastraModel`: 同一構成で「configured===解決成功」が一致(乖離回帰)。
