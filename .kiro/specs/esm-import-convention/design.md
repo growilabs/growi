@@ -151,7 +151,7 @@ flowchart TD
 | `apps/app/package.json` | 変更 | `lint:import-convention` script 追加・`lint` 集約へ |
 | `apps/app/src/**/*.ts(x)` | 変更（codemod 一括） | `.js` 除去 + local alias→相対（~740 ファイル） |
 | `.github/workflows/reusable-app-prod.yml` | 変更 | emit 後解決可能性チェック追加（C5） |
-| `apps/app/biome.json` 近辺 / steering | 変更 | 規約を `coding-style.md` / steering に明文化 |
+| `apps/app/.claude/rules/import-convention.md` | 新規 | apps/app 限定の規約を app-scoped で明文化（正典）。root `coding-style.md` はポインタのみ、steering `tech.md` は build/runtime 決定の記録＋ポインタ。`apps/app/AGENTS.md` のルール表へ追加 |
 
 ## Trade-off Analysis（レビューの中核）
 

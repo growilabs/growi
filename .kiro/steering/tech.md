@@ -8,27 +8,14 @@ The tech-stack overview lives in `AGENTS.md` / `apps/app/AGENTS.md` (auto-loaded
 
 Since the ESM migration (2026-06), the workspace root, `apps/app`, and the 17 shared `@growi/*` packages under `packages/*` all declare `"type": "module"`. `apps/app`'s Express server emits native ESM under `dist/`, and **the runtime path contains no `ts-node` / `tsx`** — TypeScript runs via Node v24's built-in type stripping:
 
-### apps/app Import Convention (esm-import-convention, 2026-06)
-
-Source files in `apps/app/src` follow a **single, no-extension import convention**:
-
-| Reference | Form | Example |
-|---|---|---|
-| Same-dir / descendant / ancestor / sibling-dir (local) | Extensionless relative | `./AuthorInfo`, `../FormattedDistanceDate` |
-| Cross-module (different `src/` first-level dir) | Extensionless `~/` alias | `~/states/context`, `~/stores/bookmark` |
-| External packages / `.json` / `.cjs` / `.scss` | Unchanged | `mongoose`, `^/config/i18next.config.cjs` |
-
-**`.js` / `.jsx` extensions are NEVER written in source.** The server production build (`tspc -p tsconfig.build.server.json`, `module: Preserve`/`moduleResolution: Bundler`) emits extensionless JS and the post-build step `bin/add-js-extensions.mjs` resolves each relative specifier against the real `dist/` filesystem and adds the correct extension (`.js`, `./index.js`, `.jsx`). CI then runs `bin/verify-dist-resolution.mjs` to confirm every relative import in `dist/` resolves to an existing file.
-
-Migration: `tools/codemod/normalize-import-convention.cjs` (full-src batch transform)  
-Enforcement: `tools/lint/import-extension-guard.cjs` (CI + `pnpm run lint:import-convention`)
-
-This replaces the former dual-notation scheme (`~/X.js` alias for NodeNext-program files, extensionless relative for client-only files) introduced during esm-migration.
-
 - **Production**: `node --import dotenv-flow/config.js dist/server/app.js` (`server:ci` adds `--ci` for load-only smoke)
 - **Dev**: `nodemon` → Node v24 native TS + an in-thread resolve-only hook (`apps/app/bin/dev-esm-resolver.mjs`) that maps `~/`/`^/` aliases and `.js`→`.ts`
 
 Node 24's `require(esm)` lets residual CommonJS consumers (e.g. third-party `@lykmapipo/common`) load ESM-only transitive deps, **but it returns a module *namespace* object, not the CJS default export**. Packages that read members off the default (e.g. `mime.getType`) still need a CJS pin; packages that use named members (e.g. `flat.flatten`) work natively. This is why `pnpm-workspace.yaml` keeps the `@lykmapipo/common>mime` pin but no longer needs the `flat` / `parse-json` pins (esm-migration Phase 5).
+
+### apps/app Import Convention (esm-import-convention, 2026-06)
+
+`apps/app/src` uses a **single no-extension import convention** (local → relative `./X` / `../X`, cross-module → `~/X`; never `.js`/`.jsx` in source). The `.js` is added only at server-build emit by `bin/add-js-extensions.mjs` and verified by `bin/verify-dist-resolution.mjs` — this replaced the former dual-notation (`~/X.js` for NodeNext-program files vs extensionless relative) from esm-migration. The full developer rule lives in **`apps/app/.claude/rules/import-convention.md`** (app-scoped); this note records only the build/runtime decision behind it.
 
 ### Bundler Strategy (Project-Wide Decision)
 

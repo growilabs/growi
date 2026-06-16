@@ -83,7 +83,7 @@
   - _Depends: 7, 8_
 
 - [x] 10. 単一規約をドキュメント/steering に明文化する
-  - 採用した単一規約（local=拡張子なし相対 / cross-module=拡張子なし `~/`、`.js` はソースに書かない）と「出力時 `.js` 付与 + 出力物網羅検証で安全を担保する」仕組みを `coding-style.md` / steering（tech.md）へ記載。esm-migration 側の関連記述（`.js` 必須前提）も整合更新
-  - **観測可能な完了条件**: コーディング規約と steering に新規約と検証方式が明記され、移行前の `.js` 前提記述が解消されている
+  - 採用した単一規約（local=拡張子なし相対 / cross-module=拡張子なし `~/`、`.js` はソースに書かない）と「出力時 `.js` 付与 + 出力物網羅検証で安全を担保する」仕組みを明文化。**apps/app 限定の規約は `apps/app/.claude/rules/import-convention.md` を正典**とし（`apps/app/AGENTS.md` のルール表へ登録）、root `.claude/rules/coding-style.md` はポインタのみ、steering `tech.md` は build/runtime 決定の記録＋ポインタに留める。esm-migration 側の関連記述（`.js` 必須前提）も整合更新
+  - **観測可能な完了条件**: `apps/app/.claude/rules/import-convention.md` に新規約と検証方式が明記され、root/steering からはポインタで辿れる。移行前の `.js` 前提記述が解消されている
   - _Requirements: 1.1, 1.2, 1.3_
   - _Depends: 5_
