@@ -394,6 +394,15 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   > = devcontainer 実行準備完了) と、devcontainer 向けの ready-to-run 手順を
   > `.kiro/specs/esm-migration/phase3-gate-evidence/SANDBOX-STATUS.md` に記録。
   > 残りは devcontainer / 本番 CI (`test-prod-node24` / reusable-app-prod) で実行すること。
+  >
+  > **更新 (2026-06-15, 本番 CI で 3.8.b 充足)**: `reusable-app-prod.yml` を workflow_dispatch
+  > で実行 (run #27552484985 @ `ea3b744307`)。実 mongo 6.0/8.0 + ES + 実ブラウザで **全 17 ジョブ
+  > green**。→ **3.8.b 充足** (`server:ci` exit 0 × 両 mongo + native `migrate:umzug` + 実ブラウザ
+  > E2E 緑)。3.8.a は build を CI で・lint/unit をローカルで green (integration test は本 HEAD 未実行)、
+  > 3.8.d は E2E 挙動が緑 (`ws-authz` baseline diff + attach-before-listen は未)。本 run で type:module
+  > 化以降 ESM 非対応のまま残っていた `__dirname` 2 系統 (Playwright `f427a6f836` / server feature
+  > `ea3b744307`) を顕在化・修正済み。詳細: `phase3-gate-evidence/3.8b-prod-ci-run-27552484985.md`。
+  > **残: 3.8.c / 3.8.d(厳密版) / 3.8.e は devcontainer で実行**。
 
   本ゲートは ESM 化の成否を決定する最重要検証であり、以下の項目すべてを **本番コンパイル出力** (`node --import dotenv-flow/config dist/server/app.js` ないし `pnpm run server:ci`) に対して実行する。`pnpm dev` (選定 TS ランナー経由) と Vitest と Node NodeNext は ESM 実装が異なるため、dev / test での pass は本ゲートの代替にはならない。
 
@@ -410,8 +419,9 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
     - `turbo run build lint test --filter @growi/app` がすべて成功
     - `test` の結果は `.kiro/specs/esm-migration/test-baseline.md` (Phase 0.1) と比較し、新規失敗 0 件 (既知 flaky のブレは除外)
     - `import/no-commonjs` が `apps/app/src/server/` で 0 件検出
+    - **進捗 (2026-06-15, 一部充足)**: build = CI `build-prod` green (run #27552484985)。lint (biome/typecheck/lint:no-cjs 350 files/route-guard) + unit (1951 passed) = 同 HEAD `ea3b744307` でローカル green。**integration test (`turbo run test`, 要 mongo+ES) は本 HEAD で未実行** (本番 workflow は test を回さない) → `ci-app.yml` dispatch か devcontainer で要実行。test-baseline との diff も同時に残すこと
 
-  - [ ] 3.8.b 本番出力起動 smoke (production-mode)
+  - [x] 3.8.b 本番出力起動 smoke (production-mode)
     - `turbo run build --filter @growi/app` + `assemble-prod.sh` 相当で本番相当成果物を生成
     - `pnpm run server:ci` (= `node dist/server/app.js --ci`) がエラー終了せず exit 0 で完走 (全モジュールロード到達の確認)
     - 続いて `node --import dotenv-flow/config dist/server/app.js` で通常起動し、以下を確認:
@@ -419,6 +429,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
       - 代表 apiv3 エンドポイント 2 種が想定ステータス
       - markdown 全拡張 (drawio / LSX / footnote / math / mermaid / attachment-refs) を含むサンプルページの SSR 200 応答で、各拡張のレンダリング結果を含む HTML が返る
     - **NG 時対応**: 本番モードでのみ再現する ESM ローダ起因の初期化エラー (TDZ, ERR_MODULE_NOT_FOUND, ERR_REQUIRE_ESM 等) は dev/test では捕捉不能。原因特定まで Phase 4 に進んではならない
+    - **実績 (2026-06-15, 本番 CI で充足)**: `reusable-app-prod.yml` run #27552484985 @ `ea3b744307`。`build-prod` (ESM 本番ビルド + `assemble-prod.sh` + `check-next-symlinks.sh`) green、`launch-prod` が **mongo 6.0 / 8.0 の両方で `server:ci` exit 0** (= 全 ESM モジュールグラフのロード到達) + native `migrate:umzug` 動作。本番起動 (`pnpm run server`) 上で実ブラウザ E2E (chromium/firefox/webkit × installer/main/guest-mode) が緑 = healthcheck / SSR / apiv3 / 認証フローが本番出力で機能。markdown 拡張個別の SSR アサーションは E2E が暗黙にカバー (専用 assert は 3.8.b の dedicated check として devcontainer で補完可)。証跡: `phase3-gate-evidence/3.8b-prod-ci-run-27552484985.md`
 
   - [ ] 3.8.c auth middleware チェーン snapshot diff + ブラックボックス認可マトリクス diff (MANDATORY)
     - (1) Phase 0.3 で作成した `tools/snapshot-route-middleware.ts` を ESM 化後の本番出力に対して実行し、`route-middleware-baseline.json` と diff。**すべての apiv3 エンドポイントで middleware 名列が一致** + **無名関数 0 件** を確認
@@ -433,6 +444,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
       - Yjs: Chromium 2 クライアントで同一ページを開き、クライアント A の編集が 2 秒以内にクライアント B に反映される。DevTools Network で `ws://.../y-websocket` が 101 で確立
     - **WS 認可マトリクス diff (MANDATORY)**: Phase 0.3.2 で baseline 化した 3 ケース (`/yjs/<pageId>` セッション無し / 閲覧不可 / 許可) + socket.io 3 ケースを再実行し、`ws-authz-baseline.json` と完全一致することを確認。差分があれば Phase 4 に進まず、迂回禁止条項 (3.8.c と同等) を適用
     - 起動ログに socket.io attach / yjs upgrade-handler attach / `server.listen()` callback のタイムスタンプを出力し、**attach が listen callback 前に完了している** ことを assert (ログに「socketio attached」「yjs attached」が「server listening」より先に現れる)
+    - **進捗 (2026-06-15, 一部充足)**: 本番 CI (run #27552484985) の実ブラウザ E2E が socket.io / Yjs 協調編集の挙動を緑で通過 (本番出力 × 実 mongo × chromium/firefox/webkit)。**未実施**: `ws-authz-matrix:verify` の `ws-authz-baseline.json` diff (3 ケース × yjs/socketio) と attach-before-listen ログ順序 assert → devcontainer で要実行
     - _Requirements: 6.5_
 
   - [ ] 3.8.e 起動性能・first-request レイテンシ比較 (本番 + dev)
@@ -727,3 +739,28 @@ same issue.
   Tasks 3.5 / 3.7 / 3.8 smoke items that need a live DB must either run in
   an environment with MongoDB or be reported as MANUAL_VERIFY_REQUIRED —
   do not claim them green here.
+
+- **3.5/3.6 `__dirname` スイープは src/server 外も対象 (2026-06-15, 3.8.b CI で顕在化)**:
+  apps/app の `"type": "module"` 化以降、ESM では `__dirname`/`__filename` が未定義になるが、
+  task 3.5 のスイープは `src/server` のみが対象で 2 系統を取りこぼしていた。本番 CI
+  (run #27552484985) の実ブラウザ E2E で初めて露見した。(1) **Playwright ドメイン**:
+  `playwright.config.ts` は Node 24 がネイティブ ESM としてロードするため config 読込で即
+  `ReferenceError: __dirname is not defined in ES module scope` → 全 E2E が test 実行前に
+  一様 fail (`f427a6f836` で `import.meta.dirname` 化、`playwright/utils/Login.ts` +
+  `playwright/23-editor/with-navigation.spec.ts` も同時)。(2) **server feature**:
+  `src/features/{openai,page-bulk-export}/server/.../*.ts` の `dynamicImport(pkg, __dirname)`
+  (`ea3b744307`)。これらが `server:ci` で落ちなかったのは Prisma 生成クライアントが
+  `globalThis['__dirname']` をシムしていた (`src/generated/prisma/client.ts`) ため = 偶然
+  動いていただけの脆い状態。教訓: **type:module 配下の `__dirname` は src/server だけでなく
+  `src/features/*/server`・config (playwright/vite)・test まで全域を grep し、Next/Vitest が
+  shim する文脈 (next.config・*.spec) と native ESM ロードされる文脈を区別して扱う**。
+  build/server:ci green は `__dirname` 健全性を保証しない (関数本体内参照 + prisma global shim
+  で load 時は通る) — 実ブラウザ/実 feature 実行が唯一の検出手段。
+
+- **comments E2E は test-isolation flaky (ESM 無関係, 別件)**: run #27552484985 で
+  `run-playwright (firefox, 1/2, 6.0)` のみ初回 fail → `gh run rerun --failed` で green。
+  `playwright/20-basic-features/comments.spec.ts` の
+  `strict mode violation: locator('.page-comment-body') resolved to 2 elements`。
+  同テストは chromium/webkit/firefox-8.0 では緑で、Playwright の retry が同一 mongo コンテナに
+  コメントを重複追加し strict-mode 違反が累積する test-quality 問題。ESM 移行とは無関係なので
+  別 issue として切り出すこと (本 spec のスコープ外)。
