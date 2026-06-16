@@ -1,11 +1,11 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 
+import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server/models/auditlog-es-sync-status';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import { generateAddActivityMiddleware } from '../../middlewares/add-activity';
@@ -155,9 +155,8 @@ module.exports = (crowi) => {
 
       try {
         const info = await searchService.getInfoForAdmin();
-        const auditlogHasUnsyncedEvents = configManager.getConfig(
-          'app:auditlogEsUnsynced',
-        );
+        const auditlogHasUnsyncedEvents =
+          await AuditlogEsSyncStatus.isUnsynced();
         return res.status(200).send({ info, auditlogHasUnsyncedEvents });
       } catch (err) {
         logger.error(err);

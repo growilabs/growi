@@ -7,6 +7,7 @@ import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
+import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server/models/auditlog-es-sync-status';
 import type { AuditlogSuggestionField } from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
@@ -444,7 +445,7 @@ class ElasticsearchDelegator
       });
 
       // alias now points to the freshly populated index — ES is in sync with MongoDB
-      await configManager.updateConfig('app:auditlogEsUnsynced', false);
+      await AuditlogEsSyncStatus.setUnsynced(false);
 
       await client.indices.delete({ index: tmpIndexName });
     } catch (error) {

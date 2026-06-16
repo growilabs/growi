@@ -6,6 +6,7 @@ import { configManager } from '~/server/service/config-manager';
 import type ElasticsearchDelegator from '~/server/service/search-delegator/elasticsearch';
 import loggerFactory from '~/utils/logger';
 
+import { AuditlogEsSyncStatus } from '../models/auditlog-es-sync-status';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 
 const logger = loggerFactory('growi:service:auditlog-changestream');
@@ -119,7 +120,7 @@ export class AuditlogChangeStreamService {
               { token: event._id, operationType: event.operationType, err },
               'Skipping poison pill event after consecutive failures.',
             );
-            await configManager.updateConfig('app:auditlogEsUnsynced', true);
+            await AuditlogEsSyncStatus.setUnsynced(true);
             // Advance token past the poison pill; failure here means it will be retried on restart.
             try {
               await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
@@ -175,7 +176,7 @@ export class AuditlogChangeStreamService {
           );
           this.stopped = true;
         }
-        await configManager.updateConfig('app:auditlogEsUnsynced', true);
+        await AuditlogEsSyncStatus.setUnsynced(true);
       } else {
         logger.error(err, 'AuditlogChangeStreamService change stream error.');
       }
