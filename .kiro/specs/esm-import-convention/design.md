@@ -77,15 +77,17 @@ flowchart TD
 
 ## 単一 import 規約（正準仕様）
 
-| 参照先の位置 | 記法 | 例 |
+唯一の hard rule は「相対（`./` `../`）/ `~/` alias の specifier に `.js`/`.jsx` 拡張子を**書かない**」こと。alias と相対のどちらを使うかは**正規化しない（書き手の選択を保持する）**——拡張子なしなら両形式とも全パイプライン（server build / Turbopack / tsgo / vitest / dev resolver）で等価に解決されるため、機械的に一方へ寄せる必要がなく、寄せると移行差分が無用に膨らむ。
+
+| specifier 種別 | 記法 | 例 |
 |---|---|---|
-| 同一ディレクトリ / 子孫 / 祖先 / 兄弟ディレクトリ（local） | 拡張子なし相対 | `./AuthorInfo`, `../FormattedDistanceDate`, `./PageComment/Comment` |
-| ディレクトリ区分跨ぎ（cross-module） | 拡張子なし `~/` alias | `~/states/context`, `~/stores/bookmark` |
+| 相対（`./` `../`）/ `~/` alias | 拡張子なし。barrel/ディレクトリ参照は `.` / `./sub`（`./sub/index.js` ではない） | `./AuthorInfo`, `../FormattedDistanceDate`, `~/states/context` |
 | app ルート相対の特殊参照 | `^/` alias（現状維持） | `^/package.json`（import 属性付き） |
 | 外部パッケージ / `.json` / `.cjs` / `.scss` 等 | 現状維持（変更しない） | `mongoose`, `^/config/i18next.config.cjs` |
 
 - value / type-only を問わず同一規約（type-only も拡張子なし）。
 - `.js`/`.jsx` 拡張子はソースに**書かない**。
+- alias↔相対の collapse は行わない。軽い指針として遠い cross-module は `~/`、近い参照は相対が読みやすいが、lint では強制しない。
 
 ## Components & Interfaces
 
@@ -104,21 +106,13 @@ flowchart TD
 - value/type を区別せず emit 後 JS の全 `from '...'` / `import('...')` を対象（emit 後は型は消えている）。
 
 ### C2. 一括移行 codemod
-- **責務**: 既存ソースを新規約へ機械的変換。`tools/codemod/ssr-relative-to-alias.cjs` の AST/helper を再利用。
+- **責務**: 既存ソースから拡張子のみを機械的に除去する。**純粋に字句的**（ファイルシステム解決をしない）で、alias↔相対の collapse は**行わず**書き手の形式を保持するため、移行差分は「拡張子除去のみ」に最小化される。
 - **配置**: `apps/app/tools/codemod/normalize-import-convention.cjs`。
 - **変換**:
   1. 相対/`~/` value+type specifier の `.js`/`.jsx` を除去。
-  2. local 関係（same-dir/descendant/ancestor/sibling-dir）に解決される `~/...` alias を拡張子なし相対へ collapse。
-  3. cross-module の `~/...` は拡張子なし alias のまま維持。
-- **不変条件**: 解決先ファイルを変えない（振る舞い保存）。外部/`.json`/`.cjs`/`.scss` は不変。解決不能は不変＋警告。
-- **契約**（型）:
-  ```typescript
-  type NormalizeResult = {
-    files: number;
-    rewritten: { stripExt: number; aliasToRelative: number };
-    unresolved: string[];
-  };
-  ```
+  2. `/index` barrel を正規化（`./sub/index.js` → `./sub`、`./index.js` → `.`）。
+  3. alias は alias のまま、相対は相対のまま（形式不変）。
+- **不変条件**: alias↔相対を変換しない。外部/`^/`/`.json`/`.cjs`/`.scss` は不変。字句変換のみなので解決先を変えず（振る舞い保存）、誤分類も起こさない。
 
 ### C3. import-extension-guard（規約強制 lint）
 - **責務**: 相対/`~/` specifier の `.js`/`.jsx` 終端を違反検出。

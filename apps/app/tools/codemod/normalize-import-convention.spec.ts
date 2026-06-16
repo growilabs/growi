@@ -1,14 +1,15 @@
 /**
  * Tests for normalize-import-convention codemod (C2, esm-import-convention task 4.1).
  *
- * Transforms apps/app/src import specifiers to the canonical "no-extension" convention:
+ * Transforms apps/app/src import specifiers to the canonical "no-extension" convention.
+ * The transform removes extensions ONLY — it preserves each specifier's authored
+ * alias/relative form (no alias↔relative collapse), to keep the migration diff minimal:
  *   1. Remove .js/.jsx from relative specifiers (./foo.js → ./foo)
  *   2. Remove .js/.jsx from ~/alias specifiers (~/states/context.js → ~/states/context)
- *   3. Collapse local ~/... alias to extensionless relative (when target is in same
- *      src/ first-level subtree as the importer)
- *   4. Remove /index suffix from barrel imports (~/utils/logger/index.js → ~/utils/logger)
+ *   3. Normalize /index barrel suffix (./sub/index.js → ./sub, ./index.js → .)
+ *   4. Preserve the authored form — a ~/alias stays ~/alias, a relative stays relative
  *   5. Leave external/non-TS specifiers unchanged (.json/.cjs/.scss/npm packages)
- *   6. If unresolvable, leave unchanged + warn (no crash)
+ *   6. Idempotent
  *
  * Test strategy (essential-test-design): test observable contract — the output source
  * string — not AST internals. Master-calibration samples are verified inline.
@@ -151,32 +152,33 @@ describe('normalize-import-convention: alias .js removal (cross-module stays ali
 });
 
 // ──────────────────────────────────────────────────────────────────────────────
-// 3. Collapse local alias → relative (same src/ first-level subtree)
+// 3. Authored form preserved — NO alias↔relative collapse (extension removal only)
 // ──────────────────────────────────────────────────────────────────────────────
 
-describe('normalize-import-convention: local alias collapse to relative', () => {
+describe('normalize-import-convention: authored form preserved (no collapse)', () => {
   const IMPORTER = path.join(
     FIXTURES,
     'src/client/components/PageControls/fixture.ts',
   );
 
-  it('collapses ~/client/... alias to relative when in same src/client/ subtree', () => {
-    // BookmarkButtons master calibration: ~/client/components/Bookmarks/... → ../Bookmarks/...
+  it('keeps a same-subtree ~/client/... alias as alias (only strips .js)', () => {
     const src = `import { BookmarkFolderMenu } from '~/client/components/Bookmarks/BookmarkFolderMenu.js';`;
-    // After: ../Bookmarks/BookmarkFolderMenu (relative, .js removed)
-    const result = applyTransform(src, IMPORTER);
-    expect(result).toBe(
-      `import { BookmarkFolderMenu } from '../Bookmarks/BookmarkFolderMenu';`,
+    expect(applyTransform(src, IMPORTER)).toBe(
+      `import { BookmarkFolderMenu } from '~/client/components/Bookmarks/BookmarkFolderMenu';`,
     );
   });
 
-  it('collapses ~/client/... alias to relative for default import', () => {
+  it('keeps a same-subtree ~/client/... alias for a default import', () => {
     const src = `import FormattedDistanceDate from '~/client/components/FormattedDistanceDate.js';`;
-    const result = applyTransform(src, IMPORTER);
-    // FormattedDistanceDate.tsx is at src/client/components/FormattedDistanceDate.tsx
-    // relative from PageControls/ is ../FormattedDistanceDate
-    expect(result).toBe(
-      `import FormattedDistanceDate from '../FormattedDistanceDate';`,
+    expect(applyTransform(src, IMPORTER)).toBe(
+      `import FormattedDistanceDate from '~/client/components/FormattedDistanceDate';`,
+    );
+  });
+
+  it('keeps an authored relative specifier relative (no promotion to alias)', () => {
+    const src = `import { apiPost } from '../../util/apiv1-client.js';`;
+    expect(applyTransform(src, IMPORTER)).toBe(
+      `import { apiPost } from '../../util/apiv1-client';`,
     );
   });
 });
@@ -305,7 +307,7 @@ describe('normalize-import-convention: master calibration', () => {
     expect(result).not.toContain('.js');
   });
 
-  it('BookmarkButtons.tsx: local alias collapsed to relative', () => {
+  it('BookmarkButtons.tsx: local alias preserved (no collapse), .js removed', () => {
     const IMPORTER = path.join(
       FIXTURES,
       'src/client/components/PageControls/BookmarkButtons.tsx',
@@ -315,7 +317,9 @@ describe('normalize-import-convention: master calibration', () => {
     ].join('\n');
 
     const result = applyTransformTsx(src, IMPORTER);
-    expect(result).toContain(`from '../Bookmarks/BookmarkFolderMenu'`);
-    expect(result).not.toContain('~/client');
+    expect(result).toContain(
+      `from '~/client/components/Bookmarks/BookmarkFolderMenu'`,
+    );
+    expect(result).not.toContain('.js');
   });
 });
