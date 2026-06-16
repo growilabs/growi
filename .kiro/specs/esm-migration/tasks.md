@@ -499,7 +499,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
 
 ## Phase 5: pnpm.overrides 削除とドキュメント整合
 
-- [ ] 5. CJS 起因の override を除去し、文書を新状態に同期
+- [x] 5. CJS 起因の override を除去し、文書を新状態に同期
 - [x] 5.1 `@lykmapipo/common>flat` override を削除評価
   - **(Phase R 変更)** overrides は pnpm 11 化に伴い ルート `package.json` から **`pnpm-workspace.yaml`** に移転済み。本タスク以降の編集対象はすべて `pnpm-workspace.yaml` の `overrides:` セクション
   - `pnpm-workspace.yaml` の overrides から `flat` ピンを削除
