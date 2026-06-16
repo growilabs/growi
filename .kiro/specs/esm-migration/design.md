@@ -13,7 +13,7 @@
 ### Goals
 
 - `apps/app` サーバソースから `module.exports` / `require()` / `__dirname` / `__filename` を排除する
-- `apps/app` サーバビルドを `"module": "NodeNext"` で ESM 出力する
+- `apps/app` サーバビルドを `"module": "NodeNext"` で ESM 出力する *(achieved; subsequently superseded by esm-import-convention: now `module: Preserve` / `moduleResolution: Bundler` — see `.kiro/specs/esm-import-convention/`)*
 - `transpilePackages` に CJS/ESM 非互換性を理由とするエントリが残らない状態にする
 - `pnpm.overrides` から CJS ピンを削除可能な範囲で削除する
 - 開発・本番起動・ビルド・テスト・本番アセンブリのすべてで移行前と同等のふるまいを保つ

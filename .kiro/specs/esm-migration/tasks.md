@@ -329,6 +329,7 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Requirements: 2.1_
   - _Depends: 2.1, 3.3, 3.4, 3.5_
   - _Boundary: Server Build Config_
+  - > **Note (esm-import-convention, 2026-06)**: This NodeNext config was subsequently replaced by `module: Preserve` / `moduleResolution: Bundler` as part of the esm-import-convention spec (task 1). Source files no longer carry `.js` extensions; they are added at build emit time by `bin/add-js-extensions.mjs`. See `.kiro/specs/esm-import-convention/`.
   - **実績 (2026-06-12)**: NodeNext 切替完了。`turbo run build --filter @growi/app` 21/21 成功、`dist/server/` に ESM 出力 (import/export 構文 + 拡張子付き相対 specifier) を確認。主要な付随変更:
     - **`apps/app/package.json` に `"type": "module"` を前倒し追加** (2.3 で 3.7.b に延期していたもの)。NodeNext はファイル形式を package.json の type で判定するため、これ無しでは `import.meta` が TS1470 になることを実験で確認 — 3.5+3.6+type:module は不可分の 3 点セット
     - **dual-pipeline ファイル戦略**: サーバプログラム (`tspc --listFiles` = src 配下 1095 ファイル、うち src/server 外 745) と Turbopack グラフの共有ファイルは「相対 import 禁止 → alias+`.js`」(671 specifier 変換)。tsconfig.json に suffix パターン `"~/*.js": ["./src/*"]` を追加し、tspc (NodeNext: paths 先で .js→.ts 置換) / Turbopack / tsgo / vitest 全系統で解決可能に。サーバプログラム外の client 専用 526 ファイルは拡張子付与を巻き戻し (3.4 と同じ理由: Turbopack は相対 .js→.ts 置換不可)

@@ -6,7 +6,24 @@ The tech-stack overview lives in `AGENTS.md` / `apps/app/AGENTS.md` (auto-loaded
 
 ### Module System (native ESM)
 
-Since the ESM migration (2026-06), the workspace root, `apps/app`, and the 17 shared `@growi/*` packages under `packages/*` all declare `"type": "module"`. `apps/app`'s Express server is built with `module: NodeNext` to native ESM under `dist/server/`, and **the runtime path contains no `ts-node` / `tsx`** — TypeScript runs via Node v24's built-in type stripping:
+Since the ESM migration (2026-06), the workspace root, `apps/app`, and the 17 shared `@growi/*` packages under `packages/*` all declare `"type": "module"`. `apps/app`'s Express server emits native ESM under `dist/`, and **the runtime path contains no `ts-node` / `tsx`** — TypeScript runs via Node v24's built-in type stripping:
+
+### apps/app Import Convention (esm-import-convention, 2026-06)
+
+Source files in `apps/app/src` follow a **single, no-extension import convention**:
+
+| Reference | Form | Example |
+|---|---|---|
+| Same-dir / descendant / ancestor / sibling-dir (local) | Extensionless relative | `./AuthorInfo`, `../FormattedDistanceDate` |
+| Cross-module (different `src/` first-level dir) | Extensionless `~/` alias | `~/states/context`, `~/stores/bookmark` |
+| External packages / `.json` / `.cjs` / `.scss` | Unchanged | `mongoose`, `^/config/i18next.config.cjs` |
+
+**`.js` / `.jsx` extensions are NEVER written in source.** The server production build (`tspc -p tsconfig.build.server.json`, `module: Preserve`/`moduleResolution: Bundler`) emits extensionless JS and the post-build step `bin/add-js-extensions.mjs` resolves each relative specifier against the real `dist/` filesystem and adds the correct extension (`.js`, `./index.js`, `.jsx`). CI then runs `bin/verify-dist-resolution.mjs` to confirm every relative import in `dist/` resolves to an existing file.
+
+Migration: `tools/codemod/normalize-import-convention.cjs` (full-src batch transform)  
+Enforcement: `tools/lint/import-extension-guard.cjs` (CI + `pnpm run lint:import-convention`)
+
+This replaces the former dual-notation scheme (`~/X.js` alias for NodeNext-program files, extensionless relative for client-only files) introduced during esm-migration.
 
 - **Production**: `node --import dotenv-flow/config.js dist/server/app.js` (`server:ci` adds `--ci` for load-only smoke)
 - **Dev**: `nodemon` → Node v24 native TS + an in-thread resolve-only hook (`apps/app/bin/dev-esm-resolver.mjs`) that maps `~/`/`^/` aliases and `.js`→`.ts`
