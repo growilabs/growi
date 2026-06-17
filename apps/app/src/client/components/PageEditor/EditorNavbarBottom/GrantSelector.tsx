@@ -18,6 +18,7 @@ import { useCurrentUser } from '~/states/global';
 import { useCurrentPageId } from '~/states/page';
 import { toSelectedGrant, useSelectedGrant } from '~/states/ui/editor';
 import { useSWRxCurrentGrantData } from '~/stores/page';
+import { useSWRxRelatedGroupsMembers } from '~/stores/user';
 
 const AVAILABLE_GRANTS = [
   {
@@ -66,6 +67,7 @@ export const GrantSelector = (props: Props): JSX.Element => {
   const currentUser = useCurrentUser();
 
   const shouldFetch = isSelectGroupModalShown;
+  const { data: membersByGroupId } = useSWRxRelatedGroupsMembers(shouldFetch);
   const [selectedGrant, setSelectedGrant] = useSelectedGrant();
   const currentPageId = useCurrentPageId();
   const { data: grantData } = useSWRxCurrentGrantData(currentPageId);
@@ -335,7 +337,25 @@ export const GrantSelector = (props: Props): JSX.Element => {
                   {group.provider}
                 </span>
               )}
-              {/* TODO: Replace <div className="small">(TBD) List group members</div> */}
+              {(() => {
+                const members = membersByGroupId?.[group.id] ?? [];
+                if (members.length === 0) return null;
+                const onlySelf = members.every(
+                  (m) => m.username === currentUser?.username,
+                );
+                if (onlySelf) {
+                  return (
+                    <small className="ms-2 text-muted">
+                      {t('user_group.only_yourself')}
+                    </small>
+                  );
+                }
+                return (
+                  <small className="ms-2 text-muted">
+                    {members.map((m) => m.name).join(', ')}
+                  </small>
+                );
+              })()}
             </button>
           );
         })}
@@ -354,7 +374,6 @@ export const GrantSelector = (props: Props): JSX.Element => {
                   {group.provider}
                 </span>
               )}
-              {/* TODO: Replace <div className="small">(TBD) List group members</div> */}
             </button>
           );
         })}
@@ -369,7 +388,9 @@ export const GrantSelector = (props: Props): JSX.Element => {
     );
   }, [
     currentUser?.admin,
+    currentUser?.username,
     groupListItemClickHandler,
+    membersByGroupId,
     shouldFetch,
     t,
     groupGrantData,

@@ -5,6 +5,10 @@ import useSWRImmutable from 'swr/immutable';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
+import type {
+  IResRelatedGroupsMembers,
+  RelatedGroupsMembers,
+} from '~/interfaces/user-group-member';
 import { useIsGuestUser } from '~/states/context';
 import { checkAndUpdateImageUrlCached } from '~/stores/middlewares/user';
 
@@ -81,5 +85,18 @@ export const useSWRxUserRelatedGroups = (): SWRResponse<
   return useSWRImmutable<RelatedGroupsResponse>(
     ['/user/related-groups'],
     ([endpoint]) => apiv3Get(endpoint).then((response) => response.data),
+  );
+};
+
+export const useSWRxRelatedGroupsMembers = (
+  shouldFetch: boolean,
+): SWRResponse<RelatedGroupsMembers, Error> => {
+  return useSWRImmutable<RelatedGroupsMembers>(
+    shouldFetch ? ['/user/related-groups/members'] : null,
+    ([endpoint]) =>
+      apiv3Get(endpoint).then(
+        (response) =>
+          (response.data as IResRelatedGroupsMembers).membersByGroupId,
+      ),
   );
 };
