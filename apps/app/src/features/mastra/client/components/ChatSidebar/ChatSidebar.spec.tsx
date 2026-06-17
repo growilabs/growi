@@ -301,32 +301,40 @@ describe('ChatSidebar — send suppression while busy (#5)', () => {
 });
 
 describe('ChatSidebar — server error display', () => {
+  // The server forwards an AISDKError's provider message (already sanitized).
+  const PROVIDER_MESSAGE =
+    'model: claude-x_ was not found. Did you mean claude-x?';
+
   it('renders no error alert when there is no error', () => {
     render(<ChatSidebar />);
 
     expect(screen.queryByRole('alert')).toBeNull();
   });
 
-  it('shows the heading plus the server-sanitized provider message, and wires retry / dismiss', () => {
-    // The server forwards an AISDKError's provider message (already sanitized).
-    chatState.error = new Error(
-      'model: claude-x_ was not found. Did you mean claude-x?',
-    );
+  it('shows the heading plus the server-sanitized provider message', () => {
+    chatState.error = new Error(PROVIDER_MESSAGE);
     render(<ChatSidebar />);
 
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByText('ai_sidebar.error.title')).toBeInTheDocument();
-    expect(
-      screen.getByText(
-        'model: claude-x_ was not found. Did you mean claude-x?',
-      ),
-    ).toBeInTheDocument();
+    expect(screen.getByText(PROVIDER_MESSAGE)).toBeInTheDocument();
+  });
 
-    // Retry re-requests via regenerate(); dismiss clears via clearError().
+  it('retry re-requests via regenerate()', () => {
+    chatState.error = new Error(PROVIDER_MESSAGE);
+    render(<ChatSidebar />);
+
     fireEvent.click(screen.getByText('ai_sidebar.error.retry'));
+
     expect(regenerate).toHaveBeenCalledTimes(1);
+  });
+
+  it('dismiss clears the error via clearError()', () => {
+    chatState.error = new Error(PROVIDER_MESSAGE);
+    render(<ChatSidebar />);
 
     fireEvent.click(screen.getByLabelText('ai_sidebar.error.dismiss'));
+
     expect(clearError).toHaveBeenCalledTimes(1);
   });
 
