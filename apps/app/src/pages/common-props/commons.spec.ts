@@ -1,11 +1,11 @@
 // --- Mock boundary ---------------------------------------------------------
 //
-// getServerSideGeneralPageProps builds the SSR props that hydrate the client's
-// aiEnabledAtom, which gates the sidebar AI affordance. The contract under test
-// is the SOURCE of serverConfig.aiEnabled: it must mirror crowi.isAiReady()
-// (= enabled && configured), NOT the raw app:aiEnabled toggle. We stub
-// crowi.isAiReady() on the request-scoped crowi and assert the prop tracks its
-// return value, independent of any config key.
+// getServerSideCommonInitialProps builds the SSR props that hydrate global
+// atoms on every page; aiEnabled among them gates the sidebar AI affordance.
+// The contract under test is the SOURCE of aiEnabled: it must mirror
+// crowi.isAiReady() (= enabled && configured), NOT the raw app:aiEnabled toggle.
+// We stub crowi.isAiReady() on the request-scoped crowi and assert the prop
+// tracks its return value, independent of any config key.
 //
 // Sourcing via crowi (rather than a direct isAiReady import) is itself part of
 // the contract: this builder runs in the Next SSR realm, where a directly
@@ -18,12 +18,12 @@ import { mock, mockDeep } from 'vitest-mock-extended';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 
-import { getServerSideGeneralPageProps } from './configuration-props';
+import { getServerSideCommonInitialProps } from './commons';
 
 // mockDeep recursively stubs the nested crowi graph the builder walks
-// (crowi.configManager.getConfig, crowi.aclService.isAclEnabled, the upload /
-// slack / passport services, and crowi.isAiReady). Only crowi.isAiReady drives
-// the assertion here; the remaining props are irrelevant to this test.
+// (appService, configManager, attachmentService, customizeService,
+// growiInfoService and crowi.isAiReady). Only crowi.isAiReady drives the
+// assertion here; the remaining props are irrelevant to this test.
 const buildContext = (
   isAiReady: boolean,
   // Optional value for the raw app:aiEnabled toggle. Used to prove the prop
@@ -37,8 +37,8 @@ const buildContext = (
       key === 'app:aiEnabled' ? rawAiEnabledToggle : undefined,
     );
   }
-  // The builder narrows context.req to CrowiRequest internally (configuration-props.ts:59);
-  // localize the cast to the single req field rather than the whole context object.
+  // The builder narrows context.req to CrowiRequest internally; localize the
+  // cast to the single req field rather than the whole context object.
   return mock<GetServerSidePropsContext>({
     req: req as unknown as GetServerSidePropsContext['req'],
   });
@@ -48,17 +48,17 @@ const getAiEnabledProp = async (
   isAiReady: boolean,
   rawAiEnabledToggle?: boolean,
 ): Promise<boolean> => {
-  const result = await getServerSideGeneralPageProps(
+  const result = await getServerSideCommonInitialProps(
     buildContext(isAiReady, rawAiEnabledToggle),
   );
   if (!('props' in result)) {
     throw new Error('expected a props result');
   }
   const props = await result.props;
-  return props.serverConfig.aiEnabled;
+  return props.aiEnabled;
 };
 
-describe('getServerSideGeneralPageProps - aiEnabled supply (Req 7.4)', () => {
+describe('getServerSideCommonInitialProps - aiEnabled supply', () => {
   it('supplies aiEnabled=true when AI is ready (enabled && configured)', async () => {
     expect(await getAiEnabledProp(true)).toBe(true);
   });

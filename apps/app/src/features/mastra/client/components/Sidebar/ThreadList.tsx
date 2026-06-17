@@ -22,6 +22,12 @@ export const ThreadList: React.FC = () => {
   const { openChat, close: closeChatSidebar } = useChatSidebarActions();
   const chatSidebarStatus = useChatSidebarStatus();
 
+  // The thread currently open in the right chat sidebar (only while it is open).
+  // A brand-new chat carries no threadId, so nothing in the list matches it.
+  const activeThreadId = chatSidebarStatus?.isOpened
+    ? chatSidebarStatus.threadId
+    : undefined;
+
   const isEmpty = data?.[0]?.total === 0;
   const isReachingEnd =
     isEmpty || (data != null && data[data.length - 1]?.hasMore === false);
@@ -71,46 +77,53 @@ export const ThreadList: React.FC = () => {
       >
         {data
           ?.flatMap((threadData) => threadData.threads)
-          .map((thread) => (
-            <li key={thread.id} className="list-group-item border-0 p-0">
-              <button
-                type="button"
-                className="btn btn-link list-group-item-action border-0 d-flex align-items-center rounded-1"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  handleOpenChat(thread.id);
-                }}
-                onMouseDown={(e) => {
-                  e.preventDefault();
-                }}
+          .map((thread) => {
+            const isActive = thread.id === activeThreadId;
+            return (
+              <li
+                key={thread.id}
+                className={`list-group-item border-0 p-0${isActive ? ' active' : ''}`}
               >
-                <div>
-                  <span className="material-symbols-outlined fs-5">chat</span>
-                </div>
+                <button
+                  type="button"
+                  aria-current={isActive || undefined}
+                  className="btn btn-link list-group-item-action border-0 d-flex align-items-center rounded-1"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleOpenChat(thread.id);
+                  }}
+                  onMouseDown={(e) => {
+                    e.preventDefault();
+                  }}
+                >
+                  <div>
+                    <span className="material-symbols-outlined fs-5">chat</span>
+                  </div>
 
-                <div className="grw-item-title ps-1">
-                  <p className="text-truncate m-auto">
-                    {thread.title ?? 'Untitled thread'}
-                  </p>
-                </div>
+                  <div className="grw-item-title ps-1">
+                    <p className="text-truncate m-auto">
+                      {thread.title || t('ai_sidebar.new_chat')}
+                    </p>
+                  </div>
 
-                <div className="grw-btn-actions opacity-0 d-flex justify-content-center">
-                  <button
-                    type="button"
-                    className="btn btn-link text-secondary p-0"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      deleteThreadHandler(thread.id);
-                    }}
-                  >
-                    <span className="material-symbols-outlined fs-5">
-                      delete
-                    </span>
-                  </button>
-                </div>
-              </button>
-            </li>
-          ))}
+                  <div className="grw-btn-actions opacity-0 d-flex justify-content-center">
+                    <button
+                      type="button"
+                      className="btn btn-link text-secondary p-0"
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        deleteThreadHandler(thread.id);
+                      }}
+                    >
+                      <span className="material-symbols-outlined fs-5">
+                        delete
+                      </span>
+                    </button>
+                  </div>
+                </button>
+              </li>
+            );
+          })}
       </InfiniteScroll>
     </ul>
   );

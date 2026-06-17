@@ -113,7 +113,7 @@ export const PrimaryItems = memo((props: Props) => {
         <PrimaryItem
           sidebarMode={sidebarMode}
           contents={SidebarContentsType.AI}
-          label="AI Chat"
+          label="GROWI AI"
           iconName="growi_ai"
           isCustomIcon
           onHover={onItemHover}

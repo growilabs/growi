@@ -151,7 +151,7 @@
   "Page Tree": "페이지 트리",
   "Bookmarks": "북마크",
   "In-App Notification": "알림",
-  "AI Chat": "AI 채팅",
+  "GROWI AI": "GROWI AI",
   "original_path": "원본 경로",
   "new_path": "새 경로",
   "duplicated_path": "중복된 경로",
@@ -518,6 +518,11 @@
   "ai_sidebar": {
     "new_chat": "새 채팅",
     "recent_threads": "최근 항목",
+    "error": {
+      "title": "오류가 발생했습니다",
+      "retry": "다시 시도",
+      "dismiss": "닫기"
+    },
     "toaster": {
       "thread_deleted_success": "스레드 삭제됨",
       "thread_deleted_failed": "스레드 삭제 실패"

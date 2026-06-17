@@ -2,7 +2,6 @@ import { useHydrateAtoms } from 'jotai/utils';
 
 import type { RendererConfig } from '~/interfaces/services/renderer';
 import {
-  aiEnabledAtom,
   defaultIndentSizeAtom,
   disableLinkSharingAtom,
   disableUserPagesAtom,
@@ -41,7 +40,6 @@ export const useHydrateGeneralPageConfigurationAtoms = (
     serverConfig == null || rendererConfigs == null
       ? []
       : [
-          createAtomTuple(aiEnabledAtom, serverConfig.aiEnabled),
           createAtomTuple(
             isUsersHomepageDeletionEnabledAtom,
             serverConfig.isUsersHomepageDeletionEnabled,

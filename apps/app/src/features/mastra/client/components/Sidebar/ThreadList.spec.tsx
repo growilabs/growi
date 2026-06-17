@@ -85,4 +85,39 @@ describe('ThreadList', () => {
 
     expect(deleteThreadMock).toHaveBeenCalledWith({ threadId: 'thread-1' });
   });
+
+  it.each([
+    ['undefined', undefined],
+    ['empty', ''],
+  ])('shows the new-chat label for a thread whose title is %s', async (_label, title) => {
+    recentThreadsData = [makeThreadData([{ id: 'thread-1', title }])];
+    const { ThreadList } = await import('./ThreadList');
+    render(<ThreadList />);
+
+    expect(screen.getByText('ai_sidebar.new_chat')).toBeInTheDocument();
+  });
+
+  it('marks the thread open in the chat sidebar as the current item', async () => {
+    chatSidebarStatus = { isOpened: true, threadId: 'thread-2' };
+    const { ThreadList } = await import('./ThreadList');
+    render(<ThreadList />);
+
+    expect(screen.getByText('Second chat').closest('button')).toHaveAttribute(
+      'aria-current',
+      'true',
+    );
+    expect(
+      screen.getByText('First chat').closest('button'),
+    ).not.toHaveAttribute('aria-current');
+  });
+
+  it('marks nothing current while the chat sidebar is closed', async () => {
+    chatSidebarStatus = { isOpened: false, threadId: 'thread-2' };
+    const { ThreadList } = await import('./ThreadList');
+    render(<ThreadList />);
+
+    expect(
+      screen.getByText('Second chat').closest('button'),
+    ).not.toHaveAttribute('aria-current');
+  });
 });

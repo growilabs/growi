@@ -153,7 +153,7 @@
   "Page Tree": "ページツリー",
   "Bookmarks": "ブックマーク",
   "In-App Notification": "通知",
-  "AI Chat": "AI チャット",
+  "GROWI AI": "GROWI AI",
   "original_path": "元のパス",
   "new_path": "新しいパス",
   "duplicated_path": "重複したパス",
@@ -581,6 +581,11 @@
   "ai_sidebar": {
     "new_chat": "新規チャット",
     "recent_threads": "最近の項目",
+    "error": {
+      "title": "エラーが発生しました",
+      "retry": "再試行",
+      "dismiss": "閉じる"
+    },
     "toaster": {
       "thread_deleted_success": "スレッドを削除しました",
       "thread_deleted_failed": "スレッドの削除に失敗しました"
