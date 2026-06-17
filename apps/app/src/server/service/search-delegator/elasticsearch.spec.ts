@@ -46,8 +46,8 @@ beforeEach(() => {
 });
 
 describe('appendCriteriaForGroupFilter()', () => {
-  it('should push the correct group terms into the filter query', () => {
-    const terms = createMockESQueryTerms({ group: ['bob'] });
+  it('should push the correct group filter ids into the filter query', () => {
+    const terms = createMockESQueryTerms({ group: ['dev-1'] });
     const query = delegator.createSearchQuery();
 
     const resolvedFilterData = {
@@ -59,6 +59,118 @@ describe('appendCriteriaForGroupFilter()', () => {
 
     expect(query.body?.query.bool?.filter).toContainEqual({
       terms: { granted_groups: ['id1'] },
+    });
+  });
+});
+
+describe('appendCriteriaForQueryString()', () => {
+  it('filters by author via a should (OR) clause', () => {
+    const terms = createMockESQueryTerms({ author: ['dennis'] });
+    const query = delegator.createSearchQuery();
+
+    delegator.appendCriteriaForQueryString(query, terms);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: { should: [{ term: { username: 'dennis' } }] },
+    });
+  });
+
+  it('excludes the author via a must_not clause', () => {
+    const terms = createMockESQueryTerms({ not_author: ['dennis'] });
+    const query = delegator.createSearchQuery();
+
+    delegator.appendCriteriaForQueryString(query, terms);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: { must_not: [{ term: { username: 'dennis' } }] },
+    });
+  });
+
+  it('filters by editor via a should (OR) clause', () => {
+    const terms = createMockESQueryTerms({ editor: ['dennis'] });
+    const query = delegator.createSearchQuery();
+
+    delegator.appendCriteriaForQueryString(query, terms);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: { should: [{ term: { last_update_username: 'dennis' } }] },
+    });
+  });
+
+  it('excludes the editor via a must_not clause', () => {
+    const terms = createMockESQueryTerms({ not_editor: ['alice'] });
+    const query = delegator.createSearchQuery();
+
+    delegator.appendCriteriaForQueryString(query, terms);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: { must_not: [{ term: { last_update_username: 'alice' } }] },
+    });
+  });
+
+  it('combines author and editor as separate AND-ed filter clauses', () => {
+    const terms = createMockESQueryTerms({
+      editor: ['dennis'],
+      author: ['alice'],
+    });
+    const query = delegator.createSearchQuery();
+
+    delegator.appendCriteriaForQueryString(query, terms);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: { should: [{ term: { last_update_username: 'dennis' } }] },
+    });
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: { should: [{ term: { username: 'alice' } }] },
+    });
+  });
+
+  it('combines two authors into a single OR (should) clause', () => {
+    const terms = createMockESQueryTerms({ author: ['dennis', 'alice'] });
+    const query = delegator.createSearchQuery();
+
+    delegator.appendCriteriaForQueryString(query, terms);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: {
+        should: [
+          { term: { username: 'dennis' } },
+          { term: { username: 'alice' } },
+        ],
+      },
+    });
+  });
+
+  it('combines two editors into a single OR (should) clause', () => {
+    const terms = createMockESQueryTerms({ editor: ['dennis', 'alice'] });
+    const query = delegator.createSearchQuery();
+
+    delegator.appendCriteriaForQueryString(query, terms);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: {
+        should: [
+          { term: { last_update_username: 'dennis' } },
+          { term: { last_update_username: 'alice' } },
+        ],
+      },
+    });
+  });
+
+  it('combines not author and not editor as separate AND-ed filter clauses', () => {
+    const terms = createMockESQueryTerms({
+      not_author: ['dennis'],
+      not_editor: ['alice'],
+    });
+    const query = delegator.createSearchQuery();
+
+    delegator.appendCriteriaForQueryString(query, terms);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: { must_not: [{ term: { last_update_username: 'alice' } }] },
+    });
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      bool: { must_not: [{ term: { username: 'dennis' } }] },
     });
   });
 });
