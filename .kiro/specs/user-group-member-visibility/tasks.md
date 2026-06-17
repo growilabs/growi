@@ -44,9 +44,9 @@
   - _Boundary: Frontend/UI, i18n_
   - _Depends: 2.2_
 
-- [ ]* 4.1 GrantSelector でのメンバー表示を手動 E2E 検証する(任意)
+- [x]* 4.1 GrantSelector でのメンバー表示を手動 E2E 検証する(任意)
   - 開発サーバーを起動し、グループ限定ページのエディタで GrantSelector モーダルを開く
-  - 所属グループ下にメンバー(氏名・ユーザー名)が表示されること
+  - 所属グループ下にメンバー(name)が表示されること
   - 自分のみのグループで「自分のみ」表示になること
   - `nonUserRelatedGrantedGroups` のグループにメンバーが表示されないこと
   - _Requirements: 1.1, 1.2, 1.4, 3.1, 3.2_
