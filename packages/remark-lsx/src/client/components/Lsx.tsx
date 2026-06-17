@@ -57,9 +57,9 @@ const LsxSubstance = React.memo(
     const hasError = error != null;
     const errorMessage = error?.message;
 
-    const ErrorMessage = useCallback((): JSX.Element => {
+    const ErrorMessage = useCallback((): JSX.Element | null => {
       if (!hasError) {
-        return;
+        return null;
       }
 
       return (
@@ -75,12 +75,12 @@ const LsxSubstance = React.memo(
       );
     }, [errorMessage, hasError, lsxContext]);
 
-    const Loading = useCallback((): JSX.Element => {
+    const Loading = useCallback((): JSX.Element | null => {
       if (hasError) {
-        return;
+        return null;
       }
       if (!isLoading) {
-        return;
+        return null;
       }
 
       return (
