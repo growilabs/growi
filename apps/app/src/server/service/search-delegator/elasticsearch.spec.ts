@@ -46,7 +46,7 @@ beforeEach(() => {
 });
 
 describe('appendCriteriaForGroupFilter()', () => {
-  it('should push the correct group filter ids into the filter query', () => {
+  it('filters by group via a should (OR) clause', () => {
     const terms = createMockESQueryTerms({ group: ['dev-1'] });
     const query = delegator.createSearchQuery();
 
@@ -60,6 +60,80 @@ describe('appendCriteriaForGroupFilter()', () => {
     expect(query.body?.query.bool?.filter).toContainEqual({
       terms: { granted_groups: ['id1'] },
     });
+  });
+
+  it('excludes the group via a must_not clause', () => {
+    const terms = createMockESQueryTerms({ not_group: ['dev-1'] });
+    const query = delegator.createSearchQuery();
+
+    const resolvedFilterData = {
+      groupIds: [],
+      notGroupIds: ['id1'],
+    };
+
+    delegator.appendCriteriaForGroupFilter(query, terms, resolvedFilterData);
+
+    expect(query.body?.query.bool?.must_not).toContainEqual({
+      terms: { granted_groups: ['id1'] },
+    });
+  });
+
+  it('combines two groups into a single OR clause', () => {
+    const terms = createMockESQueryTerms({ group: ['dev-1', 'dev-2'] });
+    const query = delegator.createSearchQuery();
+
+    const resolvedFilterData = {
+      groupIds: ['id1', 'id2'],
+      notGroupIds: [],
+    };
+
+    delegator.appendCriteriaForGroupFilter(query, terms, resolvedFilterData);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      terms: { granted_groups: ['id1', 'id2'] },
+    });
+  });
+
+  it('keeps the positive group clause even when no group ids resolve (matching nothing)', () => {
+    const terms = createMockESQueryTerms({ group: ['nonexistent'] });
+    const query = delegator.createSearchQuery();
+
+    const resolvedFilterData = {
+      groupIds: [],
+      notGroupIds: [],
+    };
+
+    delegator.appendCriteriaForGroupFilter(query, terms, resolvedFilterData);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      terms: { granted_groups: [] },
+    });
+  });
+
+  it('does nothing when resolvedFilterData is undefined', () => {
+    const terms = createMockESQueryTerms({ group: ['dev-1'] });
+    const query = delegator.createSearchQuery();
+
+    const resolvedFilterData = undefined;
+
+    delegator.appendCriteriaForGroupFilter(query, terms, resolvedFilterData);
+
+    expect(query.body?.query.bool?.filter).toBeUndefined();
+    expect(query.body?.query.bool?.must_not).toBeUndefined();
+  });
+
+  it('skip the negative group claude when no not-group ids resolve', () => {
+    const terms = createMockESQueryTerms({ group: ['nonexistent'] });
+    const query = delegator.createSearchQuery();
+
+    const resolvedFilterData = {
+      groupIds: [],
+      notGroupIds: [],
+    };
+
+    delegator.appendCriteriaForGroupFilter(query, terms, resolvedFilterData);
+
+    expect(query.body?.query.bool?.must_not).toEqual([]);
   });
 });
 
