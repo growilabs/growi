@@ -69,9 +69,12 @@
   },
   "devDependencies": {
     "@popperjs/core": "^2.11.8",
+    "@swc/core": "^1.5.25",
     "@tsed/core": "=6.43.0",
     "@tsed/exceptions": "=6.43.0",
     "@tsed/json-mapper": "=6.43.0",
-    "bootstrap": "^5.3.8"
+    "bootstrap": "^5.3.8",
+    "ts-node": "^10.9.2",
+    "tsconfig-paths": "^4.2.0"
   }
 }
