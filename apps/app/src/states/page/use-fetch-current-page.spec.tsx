@@ -7,6 +7,7 @@ import type {
   Lang,
   PageGrant,
   PageStatus,
+  PageWriteGrant,
 } from '@growi/core/dist/interfaces';
 import { act, renderHook, waitFor } from '@testing-library/react';
 // biome-ignore lint/style/noRestrictedImports: import only types
@@ -94,6 +95,10 @@ const createPageDataMock = (
     grant: 1 as PageGrant,
     grantedUsers: [],
     grantedGroups: [],
+    writeGrant: 1 as PageWriteGrant,
+    writeGrantedUsers: [],
+    writeGrantedGroups: [],
+    readOnlyUserIds: [],
     parent: null,
     descendantCount: 0,
     isEmpty: false,

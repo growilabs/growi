@@ -53,6 +53,7 @@ function createPageInfo(overrides: Partial<IPageInfo> = {}): IPageInfo {
     isDeletable: true,
     isAbleToDeleteCompletely: true,
     isRevertible: false,
+    isEditable: true,
     bookmarkCount: 0,
     ...overrides,
   };

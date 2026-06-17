@@ -109,6 +109,7 @@ describe('GET /info', () => {
         isDeletable: false,
         isAbleToDeleteCompletely: false,
         isRevertible: false,
+        isEditable: false,
         bookmarkCount: 0,
       } satisfies PageInfoExt,
     });

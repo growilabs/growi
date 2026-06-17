@@ -68,6 +68,7 @@ describe('PageItemControl.tsx', () => {
         isDeletable: true,
         isAbleToDeleteCompletely: false,
         isRevertible: false,
+        isEditable: true,
         bookmarkCount: 0,
         isBookmarked: false,
       };
@@ -107,6 +108,43 @@ describe('PageItemControl.tsx', () => {
       expect(onClickRenameMenuItemMock).toHaveBeenCalledWith(
         'dummy-page-id',
         pageInfo,
+      );
+    });
+  });
+
+  describe('Should trigger onClickPermissionMenuItem() when clicking the permission button', () => {
+    it('should open permission modal on click', async () => {
+      const pageInfo = mock<IPageInfoForOperation>();
+      const onClickPermissionMenuItemMock = vi.fn();
+
+      mocks.isIPageInfoForOperationMock.mockImplementation((arg) => {
+        if (arg === pageInfo) {
+          return true;
+        }
+      });
+      mocks.isIPageInfoForEmptyMock.mockReturnValue(false);
+
+      const props = {
+        pageId: 'dummy-page-id',
+        isEnableActions: true,
+        pageInfo,
+        onClickPermissionMenuItem: onClickPermissionMenuItemMock,
+      };
+
+      render(<PageItemControl {...props} />);
+
+      const button = within(
+        screen.getByTestId('open-page-item-control-btn'),
+      ).getByText(/more_vert/);
+      fireEvent.click(button);
+      const permissionMenuItem = await screen.findByTestId(
+        'open-page-permission-modal-btn',
+      );
+      fireEvent.click(permissionMenuItem);
+
+      expect(onClickPermissionMenuItemMock).toHaveBeenCalled();
+      expect(onClickPermissionMenuItemMock).toHaveBeenCalledWith(
+        'dummy-page-id',
       );
     });
   });
