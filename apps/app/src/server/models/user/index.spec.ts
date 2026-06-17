@@ -31,7 +31,7 @@ vi.mock('@growi/core/dist/models/serializers', () => ({
 vi.mock('@growi/core/dist/utils', () => ({
   pagePathUtils: { getUsernameByPath: vi.fn() },
 }));
-vi.mock('^/config/next-i18next.config.cjs', () => ({
+vi.mock('^/config/next-i18next.config.mjs', () => ({
   default: { i18n: { locales: ['en_US', 'ja_JP'] } },
 }));
 vi.mock('~/utils/gravatar', () => ({ generateGravatarSrc: vi.fn() }));

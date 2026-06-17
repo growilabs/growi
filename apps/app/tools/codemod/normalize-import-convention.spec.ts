@@ -200,10 +200,10 @@ describe('normalize-import-convention: invariants — unchanged specifiers', () 
     );
   });
 
-  it('does not modify .json imports (import attribute)', () => {
-    const src = `import config from '^/config/i18next.config.cjs';`;
+  it('does not modify .cjs imports', () => {
+    const src = `import config from '^/config/migrate-mongo-config.cjs';`;
     expect(applyTransform(src, IMPORTER)).toBe(
-      `import config from '^/config/i18next.config.cjs';`,
+      `import config from '^/config/migrate-mongo-config.cjs';`,
     );
   });
 

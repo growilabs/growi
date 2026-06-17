@@ -3,7 +3,7 @@ import { i18n, useTranslation } from 'next-i18next';
 import PropTypes from 'prop-types';
 import { useForm } from 'react-hook-form';
 
-import { i18n as i18nConfig } from '^/config/next-i18next.config.cjs';
+import nextI18nConfig from '^/config/next-i18next.config.mjs';
 
 import AdminAppContainer from '~/client/services/AdminAppContainer';
 import { toastError, toastSuccess } from '~/client/util/toastr';
@@ -11,6 +11,8 @@ import loggerFactory from '~/utils/logger';
 
 import { withUnstatedContainers } from '../../UnstatedUtils';
 import AdminUpdateButtonRow from '../Common/AdminUpdateButtonRow';
+
+const i18nConfig = nextI18nConfig.i18n;
 
 const logger = loggerFactory('growi:appSettings');
 

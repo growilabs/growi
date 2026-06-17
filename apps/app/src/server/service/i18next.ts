@@ -4,7 +4,7 @@ import { createInstance } from 'i18next';
 import resourcesToBackend from 'i18next-resources-to-backend';
 import path from 'path';
 
-import * as i18nextConfig from '^/config/i18next.config.cjs';
+import { defaultLang, initOptions } from '^/config/i18next.config.mjs';
 
 import { resolveFromRoot } from '~/server/util/project-dir-utils';
 
@@ -29,7 +29,7 @@ const initI18next = async (overwriteOpts: InitOptions) => {
       }),
     )
     .init({
-      ...i18nextConfig.initOptions,
+      ...initOptions,
       ...overwriteOpts,
     });
   return i18nInstance;
@@ -50,7 +50,7 @@ export async function getTranslation(opts?: Opts): Promise<Translation> {
   const fixedLang = opts?.lang ?? globalLang;
 
   const initOptions: InitOptions = {
-    fallbackLng: [fixedLang, i18nextConfig.defaultLang],
+    fallbackLng: [fixedLang, defaultLang],
   };
 
   // set ns if not null

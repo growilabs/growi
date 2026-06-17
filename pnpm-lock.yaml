@@ -477,6 +477,9 @@ importers:
       i18next:
         specifier: ^23.16.5
         version: 23.16.5
+      i18next-chained-backend:
+        specifier: ^4.6.2
+        version: 4.6.2
       i18next-http-backend:
         specifier: ^2.6.2
         version: 2.6.2(encoding@0.1.13)
@@ -958,9 +961,6 @@ importers:
       happy-dom:
         specifier: ^15.7.4
         version: 15.7.4
-      i18next-chained-backend:
-        specifier: ^4.6.2
-        version: 4.6.2
       jotai-devtools:
         specifier: ^0.11.0
         version: 0.11.0(@types/react@18.3.3)(react-dom@18.2.0(react@18.2.0))(react@18.2.0)(redux@4.2.1)

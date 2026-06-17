@@ -2,10 +2,9 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 
-// Default import (= whole module.exports): next-i18next.config.cjs spreads a
-// runtime require() so `i18n` is not a statically-detectable named export and
-// `import { i18n }` fails under native ESM.
-import nextI18nextConfig from '^/config/next-i18next.config.cjs';
+// next-i18next.config.mjs has a single `export default` config object; `i18n` is
+// a property of it, not a named export. Use a default import and read `.i18n`.
+import nextI18nextConfig from '^/config/next-i18next.config.mjs';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';

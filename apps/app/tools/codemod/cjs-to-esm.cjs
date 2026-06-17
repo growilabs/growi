@@ -11,8 +11,8 @@
  *   P7: require(dynamicVar)(ctx) → (await import(dynamicVar)).default(ctx)
  *   P8: exclusion list — intentional lazy requires must not be transformed
  *
- * Also rewrites /config/{migrate-mongo,next-i18next,i18next}-config specifiers
- * to add .cjs extension.
+ * Also rewrites /config/* specifiers to add their fixed extension:
+ * migrate-mongo-config → .cjs; next-i18next.config / i18next.config → .mjs.
  *
  * CLI wrapper: called by `pnpm codemod:cjs-to-esm -- <path>`
  */
@@ -45,16 +45,23 @@ function isExcluded(filePath, specifier) {
 }
 
 // ─── Config specifier patterns ───────────────────────────────────────────────
-const CONFIG_SPECIFIER_RE =
-  /^(~\/config\/(?:migrate-mongo-config|next-i18next\.config|i18next\.config))$/;
+// Each config under ~/config/ is emitted with a fixed extension. The i18next
+// configs are native ESM (.mjs); migrate-mongo-config remains CommonJS (.cjs).
+const CONFIG_SPECIFIER_EXT = {
+  '~/config/migrate-mongo-config': '.cjs',
+  '~/config/next-i18next.config': '.mjs',
+  '~/config/i18next.config': '.mjs',
+};
 
 /**
- * Rewrite a config specifier to add .cjs if it matches and doesn't already have it.
+ * Rewrite a config specifier to add its fixed extension if it matches and doesn't
+ * already have one.
  */
 function rewriteConfigSpecifier(specifier) {
-  if (!CONFIG_SPECIFIER_RE.test(specifier)) return null;
-  if (specifier.endsWith('.cjs')) return null;
-  return specifier + '.cjs';
+  const ext = CONFIG_SPECIFIER_EXT[specifier];
+  if (ext == null) return null;
+  if (specifier.endsWith('.cjs') || specifier.endsWith('.mjs')) return null;
+  return specifier + ext;
 }
 
 // ─── Helper: derive a camelCase import alias from a module specifier ─────────

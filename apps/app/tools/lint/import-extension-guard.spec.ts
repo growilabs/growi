@@ -114,7 +114,7 @@ describe('import-extension-guard: allowed — canonical (no extension)', () => {
 describe('import-extension-guard: allowed — invariant specifiers', () => {
   it('does not flag .cjs imports', () => {
     expect(
-      check(`import cfg from '^/config/i18next.config.cjs';`),
+      check(`import cfg from '^/config/migrate-mongo-config.cjs';`),
     ).not.toContain('import-extension');
   });
 

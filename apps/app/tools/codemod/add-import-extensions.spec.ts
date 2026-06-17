@@ -176,7 +176,10 @@ describe('specifiers that must stay untouched', () => {
   it.each([
     ['bare package', `import express from 'express';`],
     ['unresolvable ~/ alias', `import { x } from '~/server/util/x';`],
-    ['^/ alias with .cjs', `import config from '^/config/i18next.config.cjs';`],
+    [
+      '^/ alias with .cjs',
+      `import config from '^/config/migrate-mongo-config.cjs';`,
+    ],
     ['already-extended .js', `import { bar } from './bar.js';`],
     ['already-extended .json', `import data from './data.json';`],
     ['unresolvable relative path', `import { gone } from './missing';`],

@@ -5,10 +5,10 @@ import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-// next-i18next.config.cjs spreads a runtime require() into module.exports, so
-// cjs-module-lexer cannot see `i18n` as a named export; a default import (= the
-// whole module.exports) is the only form that resolves under native ESM.
-import nextI18nextConfig from '^/config/next-i18next.config.cjs';
+// next-i18next.config.mjs has a single `export default` whose value is the config
+// object; `i18n` is a property of that object, not a named export. Use a default
+// import and read `.i18n` from it.
+import nextI18nextConfig from '^/config/next-i18next.config.mjs';
 
 import { aclService as _aclService } from '../../service/acl';
 // Getter wrappers for service singletons: callers use getConfigManager() /

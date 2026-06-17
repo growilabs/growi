@@ -1,7 +1,7 @@
 import { Lang } from '@growi/core/dist/interfaces';
 import type { IncomingHttpHeaders } from 'http';
 
-import * as i18nextConfig from '^/config/i18next.config.cjs';
+import { defaultLang } from '^/config/i18next.config.mjs';
 
 // Re-export getLocale from the shared client-safe module
 export { getLocale } from '~/utils/locale-utils';
@@ -25,7 +25,7 @@ const getPreferredLanguage = (sortedAcceptLanguagesArray: string[]): Lang => {
     );
     if (matchingLang) return ACCEPT_LANG_MAP[matchingLang];
   }
-  return i18nextConfig.defaultLang;
+  return defaultLang;
 };
 
 /**
@@ -40,7 +40,7 @@ export const detectLocaleFromBrowserAcceptLanguage = (
   const acceptLanguages = headers['accept-language'];
 
   if (acceptLanguages == null) {
-    return i18nextConfig.defaultLang;
+    return defaultLang;
   }
 
   // 1. trim blank spaces.

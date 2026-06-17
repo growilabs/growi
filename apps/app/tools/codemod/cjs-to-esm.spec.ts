@@ -311,20 +311,20 @@ describe('Config specifier rewrite (.cjs)', () => {
     );
   });
 
-  it('rewrites import from ~/config/next-i18next.config to .cjs', () => {
+  it('rewrites import from ~/config/next-i18next.config to .mjs', () => {
     const input = `import config from '~/config/next-i18next.config';`;
     const output = applyTransform(input);
     expect(output).toMatchInlineSnapshot(
-      `"import config from '~/config/next-i18next.config.cjs';"`,
+      `"import config from '~/config/next-i18next.config.mjs';"`,
     );
   });
 
-  it('rewrites import from ~/config/i18next.config to .cjs', () => {
+  it('rewrites import from ~/config/i18next.config to .mjs', () => {
     const input = `const i18n = require('~/config/i18next.config');`;
     const output = applyTransform(input);
-    // The require becomes an import with .cjs specifier
+    // The require becomes an import with .mjs specifier (native-ESM config)
     expect(output).toMatchInlineSnapshot(
-      `"import i18n from '~/config/i18next.config.cjs';"`,
+      `"import i18n from '~/config/i18next.config.mjs';"`,
     );
   });
 
@@ -332,6 +332,13 @@ describe('Config specifier rewrite (.cjs)', () => {
     // The specifier already ends in .cjs, so no change is made.
     // jscodeshift returns undefined for no-op → applyTransform returns ''.
     const input = `import config from '~/config/migrate-mongo-config.cjs';`;
+    const output = applyTransform(input);
+    expect(output).toBe('');
+  });
+
+  it('does not rewrite specifiers that already have .mjs extension', () => {
+    // The i18next config specifier already ends in .mjs, so no change is made.
+    const input = `import config from '~/config/next-i18next.config.mjs';`;
     const output = applyTransform(input);
     expect(output).toBe('');
   });
