@@ -254,6 +254,20 @@ export const updatePageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         );
       }
 
+      const userRelatedGroups =
+        await crowi.pageGrantService.getUserRelatedGroups(req.user);
+      if (
+        !crowi.pageService.canEdit(currentPage, req.user, userRelatedGroups)
+      ) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'You do not have permission to edit this page.',
+            'forbidden',
+          ),
+          403,
+        );
+      }
+
       const disableUserPages = configManager.getConfig(
         'security:disableUserPages',
       );

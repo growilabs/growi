@@ -28,7 +28,7 @@ import path from 'pathe';
 import sanitize from 'sanitize-filename';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
-import type { IPageGrantData } from '~/interfaces/page';
+import type { IPageGrantData, IPageWriteGrantData } from '~/interfaces/page';
 import type { IRecordApplicableGrant } from '~/interfaces/page-grant';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -125,6 +125,20 @@ module.exports = (crowi: Crowi) => {
       body('grantedGroups.*.item')
         .isMongoId()
         .withMessage('grantedGroups item is required'),
+    ],
+    updateWriteGrant: [
+      param('pageId').isMongoId().withMessage('pageId is required'),
+      body('writeGrant').isInt().withMessage('writeGrant is required'),
+      body('writeGrantUserGroupIds')
+        .optional()
+        .isArray()
+        .withMessage('writeGrantUserGroupIds must be an array'),
+      body('writeGrantUserGroupIds.*.type')
+        .isString()
+        .withMessage('writeGrantUserGroupIds type is required'),
+      body('writeGrantUserGroupIds.*.item')
+        .isMongoId()
+        .withMessage('writeGrantUserGroupIds item is required'),
     ],
     export: [
       query('format').isString().isIn(['md', 'pdf']),
@@ -575,12 +589,16 @@ module.exports = (crowi: Crowi) => {
         grant: page.grant,
         groupGrantData: currentPageGroupGrantData,
       };
+      const currentPageWriteGrant: IPageWriteGrantData = {
+        writeGrant: page.writeGrant,
+      };
 
       // page doesn't have parent page
       if (page.parent == null) {
         const grantData = {
           isForbidden: false,
           currentPageGrant,
+          currentPageWriteGrant,
           parentPageGrant: null,
         };
         return res.apiv3({ isGrantNormalized, grantData });
@@ -598,6 +616,7 @@ module.exports = (crowi: Crowi) => {
         const grantData = {
           isForbidden: true,
           currentPageGrant,
+          currentPageWriteGrant,
           parentPageGrant: null,
         };
         return res.apiv3({ isGrantNormalized, grantData });
@@ -613,6 +632,7 @@ module.exports = (crowi: Crowi) => {
       const grantData = {
         isForbidden: false,
         currentPageGrant,
+        currentPageWriteGrant,
         parentPageGrant,
       };
 
@@ -853,6 +873,18 @@ module.exports = (crowi: Crowi) => {
         );
       }
 
+      const userRelatedGroups =
+        await crowi.pageGrantService.getUserRelatedGroups(req.user);
+      if (!crowi.pageService.canEdit(page, req.user, userRelatedGroups)) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'You do not have permission to edit this page.',
+            'forbidden',
+          ),
+          403,
+        );
+      }
+
       let data: PageDocument;
       try {
         const grantData = { grant, userRelatedGrantedGroups };
@@ -862,6 +894,60 @@ module.exports = (crowi: Crowi) => {
           'Error occurred while processing calcApplicableGrantData.',
           err,
         );
+        return res.apiv3Err(err, 500);
+      }
+
+      return res.apiv3(data);
+    },
+  );
+
+  router.put(
+    '/:pageId/write-grant',
+    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE]),
+    loginRequiredStrictly,
+    excludeReadOnlyUser,
+    validator.updateWriteGrant,
+    apiV3FormValidator,
+    async (req, res) => {
+      const { pageId } = req.params;
+      const { writeGrant, writeGrantUserGroupIds } = req.body;
+
+      const Page = mongoose.model<IPage, PageModel>('Page');
+
+      const page = await Page.findByIdAndViewer(pageId, req.user, null, false);
+
+      if (page == null) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Page is unreachable or empty.',
+            'page_unreachable_or_empty',
+          ),
+          400,
+        );
+      }
+
+      const userRelatedGroups =
+        await crowi.pageGrantService.getUserRelatedGroups(req.user);
+      if (!crowi.pageService.canEdit(page, req.user, userRelatedGroups)) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'You do not have permission to edit this page.',
+            'forbidden',
+          ),
+          403,
+        );
+      }
+
+      let data: PageDocument;
+      try {
+        const writeGrantData = { writeGrant, writeGrantUserGroupIds };
+        data = await crowi.pageService.updateWriteGrant(
+          page,
+          req.user,
+          writeGrantData,
+        );
+      } catch (err) {
+        logger.error('Error occurred while updating write grant.', err);
         return res.apiv3Err(err, 500);
       }
 
@@ -1001,6 +1087,58 @@ module.exports = (crowi: Crowi) => {
       await crowi.activityService.createActivity(parameters);
 
       await pipeline(stream, res);
+    },
+  );
+
+  router.put(
+    '/:pageId/read-only-users',
+    accessTokenParser([SCOPE.WRITE.FEATURES.PAGE]),
+    loginRequiredStrictly,
+    excludeReadOnlyUser,
+    apiV3FormValidator,
+    async (req, res) => {
+      const { pageId } = req.params;
+      const { readOnlyUserIds } = req.body;
+
+      const Page = mongoose.model<IPage, PageModel>('Page');
+
+      const page = await Page.findByIdAndViewer(pageId, req.user, null, false);
+
+      if (page == null) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'Page is unreachable or empty.',
+            'page_unreachable_or_empty',
+          ),
+          400,
+        );
+      }
+
+      const userRelatedGroups =
+        await crowi.pageGrantService.getUserRelatedGroups(req.user);
+      if (!crowi.pageService.canEdit(page, req.user, userRelatedGroups)) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'You do not have permission to edit this page.',
+            'forbidden',
+          ),
+          403,
+        );
+      }
+
+      let data: PageDocument;
+      try {
+        data = await crowi.pageService.updateReadOnlyUsers(
+          page,
+          req.user,
+          readOnlyUserIds ?? [],
+        );
+      } catch (err) {
+        logger.error('Error occurred while updating read-only users.', err);
+        return res.apiv3Err(err, 500);
+      }
+
+      return res.apiv3(data);
     },
   );
 
