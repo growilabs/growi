@@ -39,6 +39,16 @@ describe('resolveChatErrorMessage', () => {
     expect(resolved).toBe('boom at file.js:1:1 at other.js:2:2');
   });
 
+  it('returns "unknown" for an AISDKError whose message is blank (nothing useful to show)', () => {
+    const error = new APICallError({
+      message: '   \n  ',
+      url: 'https://api.example.com',
+      requestBodyValues: {},
+    });
+
+    expect(resolveChatErrorMessage(error)).toBe('unknown');
+  });
+
   it('returns "unknown" for a non-AISDK error or non-error value (never leaks a GROWI-internal message)', () => {
     expect(
       resolveChatErrorMessage(new Error('Mongo connect mongodb://secret@host')),
