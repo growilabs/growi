@@ -284,6 +284,7 @@ flowchart TB
 - **Verify3 (Phase 3 ゲート、最重要)**: dev/test だけでは不十分。本番コンパイル出力 (`node --import dotenv-flow/config dist/server/app.js` / `pnpm run server:ci`) を起動し、(a) markdown 全拡張を含む SSR smoke、(b) auth middleware snapshot を Phase 0 ベースラインと diff (差分 = 認可バイパス相当で fail)、(c) WebSocket / Yjs 2-client sync、(d) 起動時間と first-request p95 を Phase 0 perf baseline と比較、を全件通過。**いずれかのスクリプトが動作しない場合、代替検証で迂回してはならず、ユーザーに「ゲート通過不可」を報告して指示を仰ぐ**。
 - **Verify4**: `transpilePackages` エントリ 1 つずつ削除 → ビルド + ランタイム検証 → 失敗時はそのエントリを戻して理由を comment。markdown 全拡張を含むサンプルページで SSR を試し、特定ページだけで起こる `ERR_MODULE_NOT_FOUND` を捕捉する。
 - **Verify5**: 最終段で `assemble-prod.sh` + `check-next-symlinks.sh` を起動する end-to-end 検証。Phase 3.8.c の route-middleware snapshot と Phase 3.8.d の WebSocket smoke を **再実行** し、Phase 4/5 の変更で回帰していないことを確認。
+- **Verify6 (外部プラグイン導入 smoke、Req 6.7/6.8)**: build/boot では実行されない `features/growi-plugin/server` の経路 (ルートファクトリ・ルーター登録・`_document` の動的 import・Vite マニフェスト読込・`/static/plugins` 配信) を、公式リリース済みプラグインを各種別 1 つずつ実際にインストールして通す。本番出力を起動 → 管理 API (`POST /_api/v3/plugins`) で **script (`growilabs/growi-plugin-datatables`、Vite4 マニフェスト) / theme (`growilabs/growi-plugin-theme-vivid-internet`、Vite5 マニフェスト) / template (`growilabs/growi-plugin-templates-for-marketing`)** を導入し、(a) `growiplugins` ドキュメントが種別どおり生成、(b) script は `retrieveAllPluginResourceEntries()` が `<script type="module">` / `<link>` エントリを返し SSR HTML に注入され、当該資産が `/static/plugins/...` で HTTP 200 配信、(c) theme は CSS が配信、(d) template はサーバ側で `templateSummaries` が走査生成、を確認。**プラグイン側コードはロード・ビルドしない** (GROWI は prebuilt `dist/` を再処理せず配信/走査するだけ)。失敗時は GROWI 側経路の退行か、プラグイン側の不備 (dist 欠落・ディレクティブ不備) かを切り分ける。証跡: `phase6-gate-evidence/plugin-install-smoke.md`。
 
 ### Route Factory Conversion Sequence
 
@@ -337,6 +338,8 @@ sequenceDiagram
 | 6.4 | `assemble-prod.sh` 成功 | Verification Harness | end-to-end build | Verify5 |
 | 6.5 | 本番アーティファクトの機能維持 | Verification Harness | smoke (API/SSR/WebSocket) | Verify5 |
 | 6.6 | 失敗時の停止と是正 | Phase Gate | フロー分岐 | 各 Verify |
+| 6.7 | 外部プラグイン導入経路の機能維持 | Verification Harness | plugin-install smoke (script/theme/template 各1) | Verify6 |
+| 6.8 | smoke 失敗時の GROWI 側退行 vs プラグイン側不備の切り分け | Phase Gate | フロー分岐 | Verify6 |
 | 7.1 | dependencies コメント整理 | Documentation | `package.json` コメント | Phase 5 |
 | 7.2 | 残存 `transpilePackages` の正当化 | Documentation | インラインコメント | Phase 4 |
 | 7.3 | 残存 `overrides` の正当化 | Documentation | インラインコメント | Phase 5 |

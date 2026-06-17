@@ -74,5 +74,40 @@ For apps/app-specific build optimization details (webpack config, null-loader ru
 
 The monorepo uses **pino** (via `@growi/logger`) as the standard logging library. Legacy bunyan usage has been migrated.
 
+### External Plugin Distribution Contract (orthogonal to the internal module system)
+
+Third-party plugins published at **https://growi.org/plugins** reach a running GROWI by a
+path that is deliberately decoupled from how `apps/app`'s own source is authored or built.
+This decoupling is a **system-wide invariant to protect and verify, not an assumption to
+lean on** — it is easy to silently break from inside an unrelated refactor (such as the ESM
+migration).
+
+How an installed plugin actually flows (`features/growi-plugin/server`):
+
+- **Install** downloads the plugin repo as a GitHub archive zip, unzips it, validates the
+  `growiPlugin` directive in its `package.json` (`schemaVersion >= 4`), and saves metadata.
+  GROWI **never builds, bundles, `require()`s, or `import()`s the plugin's own code.** It
+  relies on the plugin shipping a **prebuilt `dist/` with a Vite manifest**
+  (`dist/.vite/manifest.json`, or the Vite 4 `dist/manifest.json` — both are read).
+- **script / theme** plugins are served as **static files** (`express.static` at
+  `/static/plugins`) and loaded by the **browser as native ESM** —
+  `<script type="module">` / `<link rel="stylesheet">` injected by `_document.page.tsx`.
+  These assets are served raw; they do **not** pass through Turbopack or the server build.
+- **template** plugins are read server-side as markdown (scanned via `@growi/pluginkit`).
+- The only server-side use of plugin packaging is reading the manifest + `package.json`
+  directive, done through GROWI's own **`@growi/pluginkit` `.cjs`** build (published dual
+  CJS/ESM).
+
+**Consequence:** GROWI's internal CJS→ESM module-system choice is structurally orthogonal
+to the external plugin contract — existing prebuilt plugins keep working because their code
+is never re-processed by GROWI's build. **But the surfaces that carry this contract can
+still regress** — the plugin install route factory, the `/static/plugins` serving, the
+`_document` script/stylesheet injection, the Vite-manifest reader, and the published
+`@growi/pluginkit` format. Any change touching those (the ESM migration touched several)
+must re-run the **plugin-install smoke** — install one officially-released *script*, one
+*theme*, and one *template* plugin and confirm each is served/loaded — because build/boot
+checks do not exercise this path. (See `.kiro/specs/esm-migration/` Requirement 6 /
+`phase6-gate-evidence/`.)
+
 ---
-_Updated: 2026-06-16. Added Module System (native ESM) section + transpilePackages-empty note; refreshed broken skill reference, pnpm v11 / v8 annotations (esm-migration Phase 5.5)._
+_Updated: 2026-06-17. Added "External Plugin Distribution Contract" as a system-wide invariant (external plugins are prebuilt assets loaded as browser ESM / scanned server-side; orthogonal to the internal module system but must be smoke-verified on changes). Prior: 2026-06-16 Module System (native ESM) + transpilePackages-empty (esm-migration Phase 5.5)._

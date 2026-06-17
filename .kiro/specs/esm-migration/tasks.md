@@ -582,6 +582,15 @@ Phase 1 以降の検証に必要な比較基準と構造ガードを、移行前
   - _Depends: 6.2_
   - **実績 (2026-06-16, 充足)**: run **27609048544** @ `567df72b6b` (Phase 5 完了 HEAD) を `workflow_dispatch` (node-version=24.x) で実行し **全 job success**。`build-prod` ✅ / `launch-prod` (mongo 6.0・8.0 とも `server:ci` exit 0) ✅ / `run-playwright` 全 16 shard (chromium/firefox/webkit × 2 shard × mongo 6.0/8.0) ✅ / `report-playwright` ✅。初回 run の 1 shard failure は既知 flaky (`comments.spec.ts` test-isolation, ESM 無関係, Implementation Notes 記載済) で `gh run rerun --failed` で green。FEATURE_GO 検証 (kiro-verify-completion): full test suite `turbo run test --filter @growi/app --force` = **224 files / 2742 tests 全 pass・新規失敗 0** (567df72b6b fresh)。証跡: `phase6-gate-evidence/README.md`
 
+- [x] 6.4 外部プラグイン導入 smoke (script / theme / template 各1)
+  - 本番出力 (`NODE_ENV=production node dist/server/app.js`) を起動し、管理 API 経由で公式リリース済みプラグインを各種別 1 つずつインストールして導入経路全体を通す
+  - script (`growilabs/growi-plugin-datatables`) / theme (`growilabs/growi-plugin-theme-vivid-internet`) / template (`growilabs/growi-plugin-templates-for-marketing`) を `POST /_api/v3/plugins` で導入し、(a) `growiplugins` ドキュメントが種別どおり生成、(b) script は SSR HTML に `<script type="module">`/`<link>` が注入され当該資産が `/static/plugins/...` で HTTP 200 配信、(c) theme は CSS 配信、(d) template はサーバ側で `templateSummaries` 走査生成、を確認
+  - プラグイン側コードはロード・ビルドしない (GROWI は prebuilt `dist/` を再処理せず配信/走査するだけ)
+  - _Requirements: 6.7, 6.8_
+  - _Depends: 6.2_
+  - _Boundary: External Plugin Install Path (features/growi-plugin/server) — 検証のみ・プラグイン側コード不変_
+  - **実績 (2026-06-17, 充足)**: Phase 6 HEAD の本番 dist を起動し、`write:admin:plugin`/`read:admin:plugin` スコープのトークンで 3 プラグインを導入。認可 (Bearer 200 / 無トークン 403)、POST install 3/3 = 200、`growiplugins` 3 件が `["script"]`/`["theme"]`/`["template"]` で `isEnabled:true`、theme は `themes` メタ・template は `templateSummaries` (`article-seo-strategy-plan`, en_US, isValid) をサーバ側走査生成。`retrieveAllPluginResourceEntries()` が script の `<script type=module>`+`<link>` を返し、SSR `/login` (200) HTML に実注入を確認。静的配信は script JS (200/application/javascript/511KB)・script CSS (200/text/css)・theme CSS (200/text/css)。script は Vite4 `dist/manifest.json`、theme は Vite5 `dist/.vite/manifest.json` で `retrievePluginManifest` 両分岐をカバー。証跡: `phase6-gate-evidence/plugin-install-smoke.md`
+
 ## Implementation Notes
 
 Learnings captured during Phase 0 baseline capture (kiro-impl). Each entry is
