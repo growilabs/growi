@@ -552,6 +552,13 @@
       "retry": "Retry",
       "dismiss": "Dismiss"
     },
+    "incomplete": {
+      "length": "The response stopped because it reached the maximum length.",
+      "tool_calls": "The response stopped after reaching the processing-step limit.",
+      "content_filter": "The response was stopped by the content policy.",
+      "error": "The response stopped because an error occurred.",
+      "unknown": "The response stopped before completing."
+    },
     "toaster": {
       "thread_deleted_success": "Thread deleted",
       "thread_deleted_failed": "Failed to delete thread"

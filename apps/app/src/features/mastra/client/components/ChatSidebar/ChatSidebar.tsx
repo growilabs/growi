@@ -48,6 +48,7 @@ import {
   resolveChatErrorDetail,
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
+import { IncompleteResponseNotice } from './IncompleteResponseNotice';
 
 import styles from './ChatSidebar.module.scss';
 
@@ -265,6 +266,11 @@ export const ChatSidebar = (): JSX.Element => {
                         return null;
                     }
                   })}
+                  {message.role === 'assistant' && (
+                    <IncompleteResponseNotice
+                      finishReason={message.metadata?.finishReason}
+                    />
+                  )}
                 </div>
               ))}
               {(() => {

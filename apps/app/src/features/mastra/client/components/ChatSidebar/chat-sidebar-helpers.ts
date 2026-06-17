@@ -87,3 +87,47 @@ export const resolveChatErrorDetail = (
   }
   return detail;
 };
+
+/**
+ * i18n key suffix under `ai_sidebar.incomplete.*` for an abnormally-finished
+ * assistant message. Mirrors the finish reasons we give distinct copy to; every
+ * other / unrecognized reason collapses to `unknown`.
+ */
+type IncompleteReasonKey =
+  | 'length'
+  | 'tool_calls'
+  | 'content_filter'
+  | 'error'
+  | 'unknown';
+
+/**
+ * Map a message's `finishReason` to the notice key, or `null` when no notice
+ * should show (normal `stop`, or an absent reason — still streaming / a legacy
+ * message that predates metadata).
+ *
+ * The reason arrives as a plain string: Mastra widens `stream.finishReason` to
+ * `string | undefined` (the precise `MastraFinishReason` union is not carried on
+ * that accessor), so this narrows it at runtime. Reasons beyond the standard
+ * provider set — e.g. Mastra's `tripwire` / `retry`, or a future `unknown` —
+ * fall through to the generic message.
+ */
+export const resolveIncompleteReasonKey = (
+  finishReason: string | undefined,
+): IncompleteReasonKey | null => {
+  switch (finishReason) {
+    case undefined:
+    case '':
+    case 'stop':
+      return null;
+    case 'length':
+      return 'length';
+    case 'tool-calls':
+      return 'tool_calls';
+    case 'content-filter':
+      return 'content_filter';
+    case 'error':
+      return 'error';
+    default:
+      return 'unknown';
+  }
+};

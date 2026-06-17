@@ -523,6 +523,13 @@
       "retry": "다시 시도",
       "dismiss": "닫기"
     },
+    "incomplete": {
+      "length": "응답이 최대 길이에 도달하여 도중에 중단되었습니다.",
+      "tool_calls": "처리 단계 한도에 도달하여 도중에 중단되었습니다.",
+      "content_filter": "콘텐츠 정책에 의해 응답이 중단되었습니다.",
+      "error": "오류가 발생하여 응답이 도중에 중단되었습니다.",
+      "unknown": "응답이 완료되기 전에 중단되었습니다."
+    },
     "toaster": {
       "thread_deleted_success": "스레드 삭제됨",
       "thread_deleted_failed": "스레드 삭제 실패"

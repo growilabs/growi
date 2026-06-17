@@ -80,7 +80,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       try {
         const stream = await growiAgent.stream(messages, {
           requestContext,
-          maxSteps: 20,
+          maxSteps: 10,
           memory: {
             thread: thread.id,
             resource: thread.resourceId,
