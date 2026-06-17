@@ -17,14 +17,6 @@ export type SearchConfigurationProps = {
   };
 };
 
-export type AiConfigurationProps = {
-  // AI *usability* (enabled && configured), not the raw on/off toggle. Gates the
-  // sidebar AI affordance, so it must be supplied on every page that renders the
-  // sidebar — hence it lives in the basic-layout props shared by all of them.
-  aiEnabled: boolean;
-};
-
 export type BasicLayoutConfigurationProps = UserUISettingsProps &
   SidebarConfigurationProps &
-  SearchConfigurationProps &
-  AiConfigurationProps;
+  SearchConfigurationProps;

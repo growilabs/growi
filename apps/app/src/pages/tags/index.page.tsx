@@ -109,7 +109,6 @@ const Layout = ({ children, ...props }: LayoutProps): JSX.Element => {
     props.searchConfig,
     props.sidebarConfig,
     props.userUISettings,
-    props.aiEnabled,
   );
 
   return <BasicLayout>{children}</BasicLayout>;

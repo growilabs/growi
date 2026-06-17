@@ -1,11 +1,11 @@
 // --- Mock boundary ---------------------------------------------------------
 //
-// getServerSideAiConfigProps builds the SSR prop that hydrates the client's
-// aiEnabledAtom, which gates the sidebar AI affordance on every page that
-// renders the sidebar. The contract under test is the SOURCE of aiEnabled: it
-// must mirror crowi.isAiReady() (= enabled && configured), NOT the raw
-// app:aiEnabled toggle. We stub crowi.isAiReady() on the request-scoped crowi
-// and assert the prop tracks its return value, independent of any config key.
+// getServerSideCommonInitialProps builds the SSR props that hydrate global
+// atoms on every page; aiEnabled among them gates the sidebar AI affordance.
+// The contract under test is the SOURCE of aiEnabled: it must mirror
+// crowi.isAiReady() (= enabled && configured), NOT the raw app:aiEnabled toggle.
+// We stub crowi.isAiReady() on the request-scoped crowi and assert the prop
+// tracks its return value, independent of any config key.
 //
 // Sourcing via crowi (rather than a direct isAiReady import) is itself part of
 // the contract: this builder runs in the Next SSR realm, where a directly
@@ -18,11 +18,12 @@ import { mock, mockDeep } from 'vitest-mock-extended';
 
 import type { CrowiRequest } from '~/interfaces/crowi-request';
 
-import { getServerSideAiConfigProps } from './ai-configurations';
+import { getServerSideCommonInitialProps } from './commons';
 
-// mockDeep recursively stubs the nested crowi graph (crowi.isAiReady and, for
-// the discriminating test, crowi.configManager.getConfig). Only crowi.isAiReady
-// drives the assertion.
+// mockDeep recursively stubs the nested crowi graph the builder walks
+// (appService, configManager, attachmentService, customizeService,
+// growiInfoService and crowi.isAiReady). Only crowi.isAiReady drives the
+// assertion here; the remaining props are irrelevant to this test.
 const buildContext = (
   isAiReady: boolean,
   // Optional value for the raw app:aiEnabled toggle. Used to prove the prop
@@ -47,7 +48,7 @@ const getAiEnabledProp = async (
   isAiReady: boolean,
   rawAiEnabledToggle?: boolean,
 ): Promise<boolean> => {
-  const result = await getServerSideAiConfigProps(
+  const result = await getServerSideCommonInitialProps(
     buildContext(isAiReady, rawAiEnabledToggle),
   );
   if (!('props' in result)) {
@@ -57,7 +58,7 @@ const getAiEnabledProp = async (
   return props.aiEnabled;
 };
 
-describe('getServerSideAiConfigProps - aiEnabled supply', () => {
+describe('getServerSideCommonInitialProps - aiEnabled supply', () => {
   it('supplies aiEnabled=true when AI is ready (enabled && configured)', async () => {
     expect(await getAiEnabledProp(true)).toBe(true);
   });

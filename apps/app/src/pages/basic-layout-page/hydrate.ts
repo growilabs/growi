@@ -1,7 +1,6 @@
 import { useHydrateAtoms } from 'jotai/utils';
 
 import {
-  aiEnabledAtom,
   isSearchScopeChildrenAsDefaultAtom,
   isSearchServiceConfiguredAtom,
   isSearchServiceReachableAtom,
@@ -10,7 +9,6 @@ import { useHydrateSidebarAtoms } from '~/states/ui/sidebar/hydrate';
 import { createAtomTuple } from '~/utils/jotai-utils';
 
 import type {
-  AiConfigurationProps,
   SearchConfigurationProps,
   SidebarConfigurationProps,
   UserUISettingsProps,
@@ -24,10 +22,9 @@ export const useHydrateBasicLayoutConfigurationAtoms = (
   searchConfig: SearchConfigurationProps['searchConfig'] | undefined,
   sidebarConfig: SidebarConfigurationProps['sidebarConfig'] | undefined,
   userUISettings: UserUISettingsProps['userUISettings'] | undefined,
-  aiEnabled: AiConfigurationProps['aiEnabled'] | undefined,
 ): void => {
-  const tuples = [
-    ...(searchConfig == null
+  const tuples =
+    searchConfig == null
       ? []
       : [
           createAtomTuple(
@@ -42,9 +39,7 @@ export const useHydrateBasicLayoutConfigurationAtoms = (
             isSearchScopeChildrenAsDefaultAtom,
             searchConfig.isSearchScopeChildrenAsDefault,
           ),
-        ]),
-    ...(aiEnabled == null ? [] : [createAtomTuple(aiEnabledAtom, aiEnabled)]),
-  ];
+        ];
 
   useHydrateAtoms(tuples);
 
