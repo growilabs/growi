@@ -7,6 +7,7 @@ import type {
   IUser,
   IUserHasId,
   PageGrant,
+  PageWriteGrant,
 } from '@growi/core/dist/interfaces';
 import type { HydratedDocument, Types } from 'mongoose';
 
@@ -52,6 +53,24 @@ export interface IPageService {
     user: IUserHasId,
     grantData: { grant: PageGrant; userRelatedGrantedGroups: IGrantedGroup[] },
   ): Promise<PageDocument>;
+  updateReadOnlyUsers(
+    page: HydratedDocument<PageDocument>,
+    user: IUserHasId,
+    readOnlyUserIds: string[],
+  ): Promise<PageDocument>;
+  updateWriteGrant(
+    page: HydratedDocument<PageDocument>,
+    user: IUserHasId,
+    writeGrantData: {
+      writeGrant: PageWriteGrant;
+      writeGrantUserGroupIds?: IGrantedGroup[];
+    },
+  ): Promise<PageDocument>;
+  canEdit(
+    page: PageDocument,
+    user: { _id: ObjectIdLike; admin?: boolean; readOnly?: boolean } | null,
+    userRelatedGroups?: PopulatedGrantedGroup[],
+  ): boolean;
   deleteCompletelyOperation: (
     pageIds: ObjectIdLike[],
     pagePaths: string[],

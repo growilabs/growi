@@ -148,6 +148,7 @@ export async function findPageAndMetaDataByViewer(
       data: page,
       meta: {
         ...pageInfo,
+        isEditable: false,
         isDeletable: false,
         isAbleToDeleteCompletely: false,
       } satisfies IPageInfo,
@@ -170,6 +171,8 @@ export async function findPageAndMetaDataByViewer(
 
     return await pageService.isUsersHomepageOwnerAbsent(page.path);
   })();
+
+  const isEditable = pageService.canEdit(page, user, userRelatedGroups);
 
   const isDeletable =
     canDeleteUserHomepage &&
@@ -194,6 +197,7 @@ export async function findPageAndMetaDataByViewer(
       data: page,
       meta: {
         ...pageInfo,
+        isEditable,
         isDeletable,
         isAbleToDeleteCompletely,
         isBookmarked,
@@ -215,6 +219,7 @@ export async function findPageAndMetaDataByViewer(
     data: page,
     meta: {
       ...pageInfo,
+      isEditable,
       isDeletable,
       isAbleToDeleteCompletely,
       isBookmarked,

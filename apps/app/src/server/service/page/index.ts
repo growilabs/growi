@@ -16,7 +16,7 @@ import type {
   IUserHasId,
   Ref,
 } from '@growi/core/dist/interfaces';
-import { PageGrant } from '@growi/core/dist/interfaces';
+import { PageGrant, PageWriteGrant } from '@growi/core/dist/interfaces';
 import {
   escapeStringForMongoRegex,
   pagePathUtils,
@@ -85,6 +85,7 @@ import { configManager } from '../config-manager';
 import type { IPageGrantService } from '../page-grant';
 import { preNotifyService } from '../pre-notify';
 import { getYjsService } from '../yjs';
+import { canEditPage } from './can-edit';
 import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { onSeen } from './events/seen';
 import type { IPageService } from './page-service';
@@ -376,6 +377,14 @@ class PageService implements IPageService {
       singleAuthority,
       recursiveAuthority,
     );
+  }
+
+  canEdit(
+    page: PageDocument,
+    user: { _id: ObjectIdLike; admin?: boolean; readOnly?: boolean } | null,
+    userRelatedGroups?: PopulatedGrantedGroup[],
+  ): boolean {
+    return canEditPage({ user, page, userRelatedGroups });
   }
 
   canDeleteUserHomepageByConfig(): boolean {
@@ -3295,6 +3304,7 @@ class PageService implements IPageService {
         isEmpty: true,
         isMovable,
         isRevertible: false,
+        isEditable: false,
       } satisfies IPageInfoBasicForEmpty;
     }
 
@@ -3316,6 +3326,7 @@ class PageService implements IPageService {
       commentCount: page.commentCount,
       // biome-ignore lint/style/noNonNullAssertion: the page must have a revision if it is not empty
       latestRevisionId: getIdStringForRef(page.revision!),
+      isEditable: false,
     } satisfies IPageInfoBasicForEntity;
 
     return infoForEntity;
@@ -5126,6 +5137,49 @@ class PageService implements IPageService {
     return this.updatePage(page, null, null, user, options);
   }
 
+  async updateWriteGrant(
+    page: HydratedDocument<PageDocument>,
+    user: IUserHasId,
+    writeGrantData: {
+      writeGrant: PageWriteGrant;
+      writeGrantUserGroupIds?: IGrantedGroup[];
+    },
+  ): Promise<PageDocument> {
+    const { writeGrant, writeGrantUserGroupIds } = writeGrantData;
+
+    page.writeGrant = writeGrant;
+    page.lastUpdateUser = user;
+
+    switch (writeGrant) {
+      case PageWriteGrant.WRITE_GRANT_PUBLIC:
+        page.writeGrantedUsers = [];
+        page.writeGrantedGroups = [];
+        break;
+      case PageWriteGrant.WRITE_GRANT_OWNER:
+        page.writeGrantedUsers = [user._id];
+        page.writeGrantedGroups = [];
+        break;
+      case PageWriteGrant.WRITE_GRANT_USER_GROUP:
+        page.writeGrantedUsers = [];
+        page.writeGrantedGroups = writeGrantUserGroupIds ?? [];
+        break;
+      default:
+        throw new Error(`Invalid writeGrant: ${writeGrant}`);
+    }
+
+    return page.save();
+  }
+
+  async updateReadOnlyUsers(
+    page: HydratedDocument<PageDocument>,
+    user: IUserHasId,
+    readOnlyUserIds: string[],
+  ): Promise<PageDocument> {
+    page.readOnlyUserIds = readOnlyUserIds;
+    page.lastUpdateUser = user;
+    return page.save();
+  }
+
   async updatePageSubOperation(
     page,
     user,
@@ -5348,16 +5402,19 @@ class PageService implements IPageService {
       }
     } else {
       if (wasOnTree && isChildrenExist) {
-        // Update children's parent with new parent
-        const newParentForChildren = await Page.createEmptyPage(
-          clonedPageData.path,
-          clonedPageData.parent,
-          clonedPageData.descendantCount,
-        );
-        await Page.updateMany(
-          { parent: clonedPageData._id },
-          { parent: newParentForChildren._id },
-        );
+        if (clonedPageData.parent != null) {
+          // Update children's parent with new parent
+          const newParentForChildren = await Page.createEmptyPage(
+            clonedPageData.path,
+            clonedPageData.parent,
+            clonedPageData.descendantCount,
+          );
+          await Page.updateMany(
+            { parent: clonedPageData._id },
+            { parent: newParentForChildren._id },
+          );
+        }
+        // When parent is null (root page), children stay as direct children of root
       }
 
       newPageData.parent = null;
@@ -5383,6 +5440,9 @@ class PageService implements IPageService {
       );
       savedPage = await pushRevision(savedPage, newRevision, user);
       await savedPage.populateDataToShowRevision();
+    } else {
+      // populate revision for the event handler which requires populated revision
+      await savedPage.populate('revision');
     }
 
     this.pageEvent.emit('update', savedPage, user);
@@ -5482,6 +5542,8 @@ class PageService implements IPageService {
       );
       savedPage = await pushRevision(savedPage, newRevision, user);
       await savedPage.populateDataToShowRevision();
+    } else {
+      await savedPage.populate('revision');
     }
 
     // update scopes for descendants
