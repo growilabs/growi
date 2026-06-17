@@ -3,6 +3,7 @@ import { mock } from 'vitest-mock-extended';
 
 import {
   buildMessageRequestBody,
+  resolveChatErrorDetail,
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
 
@@ -63,5 +64,32 @@ describe('resolveChatHeaderLabel', () => {
     expect(resolveChatHeaderLabel('thread-1', threads, FALLBACK)).toBe(
       FALLBACK,
     );
+  });
+});
+
+describe('resolveChatErrorDetail', () => {
+  it('returns a (server-sanitized) provider message for display', () => {
+    expect(
+      resolveChatErrorDetail(
+        new Error('model: claude-x_ was not found. Did you mean claude-x?'),
+      ),
+    ).toBe('model: claude-x_ was not found. Did you mean claude-x?');
+  });
+
+  it('trims surrounding whitespace (server already collapsed the message)', () => {
+    expect(resolveChatErrorDetail(new Error('  hi  '))).toBe('hi');
+  });
+
+  it.each([
+    ['the unknown sentinel', 'unknown'],
+    ['an empty message', ''],
+    ['a structured JSON body', '{"errors":[{"message":"nope"}]}'],
+    ['an HTML body', '<!DOCTYPE html><html>...'],
+  ])('returns undefined for %s (heading only)', (_label, msg) => {
+    expect(resolveChatErrorDetail(new Error(msg))).toBeUndefined();
+  });
+
+  it('returns undefined when there is no error', () => {
+    expect(resolveChatErrorDetail(undefined)).toBeUndefined();
   });
 });

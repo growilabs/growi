@@ -518,6 +518,11 @@
   "ai_sidebar": {
     "new_chat": "새 채팅",
     "recent_threads": "최근 항목",
+    "error": {
+      "title": "오류가 발생했습니다",
+      "retry": "다시 시도",
+      "dismiss": "닫기"
+    },
     "toaster": {
       "thread_deleted_success": "스레드 삭제됨",
       "thread_deleted_failed": "스레드 삭제 실패"

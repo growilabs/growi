@@ -1,5 +1,7 @@
 import type { StorageThreadType } from '@mastra/core/memory';
 
+import { UNKNOWN_CHAT_ERROR } from '~/features/mastra/interfaces/chat-error';
+
 /**
  * Body sent with each message POST to `/_api/v3/mastra/message`.
  *
@@ -38,4 +40,29 @@ export const resolveChatHeaderLabel = (
 ): string => {
   const title = threads.find((thread) => thread.id === threadId)?.title;
   return title != null && title !== '' ? title : fallbackLabel;
+};
+
+/**
+ * The chat error detail to display, or undefined (→ show just the heading).
+ *
+ * The server already resolved a safe message (an AISDKError's provider message,
+ * one line — or the "unknown" sentinel) and it arrives as the client error's
+ * `.message`, so no re-sanitizing is needed here. We only decide whether to show
+ * it: hide the sentinel, the empty string, and any structured body (JSON/HTML)
+ * — which only the rare pre-stream HTTP-error path (raw transport text) can
+ * produce — so a non-human-readable string is never rendered.
+ */
+export const resolveChatErrorDetail = (
+  error: Error | undefined,
+): string | undefined => {
+  const detail = error?.message?.trim();
+  if (
+    detail == null ||
+    detail === '' ||
+    detail === UNKNOWN_CHAT_ERROR ||
+    /^[{[<]/.test(detail)
+  ) {
+    return undefined;
+  }
+  return detail;
 };

@@ -34,6 +34,7 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '~/components/ai-elements/sources';
+import { Button } from '~/components/ui/button';
 import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
 
 import {
@@ -44,6 +45,7 @@ import { useSWRxMessages } from '../../stores/message';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 import {
   buildMessageRequestBody,
+  resolveChatErrorDetail,
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
 
@@ -76,9 +78,24 @@ export const ChatSidebar = (): JSX.Element => {
     t('ai_sidebar.new_chat'),
   );
 
-  const { messages, sendMessage, status, regenerate, setMessages } = useChat({
+  const {
+    messages,
+    sendMessage,
+    status,
+    regenerate,
+    setMessages,
+    error,
+    clearError,
+  } = useChat({
     id: chatThreadId,
-    transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
+    // Pin the thread id on the transport so EVERY request carries it — not just
+    // sendMessage. regenerate() (the error/message retry) sends no per-call body,
+    // so without this the server would receive no threadId and mint a brand-new
+    // thread on each retry.
+    transport: new DefaultChatTransport({
+      api: '/_api/v3/mastra/message',
+      body: buildMessageRequestBody(chatThreadId),
+    }),
     // Refresh the thread list after the assistant finishes streaming.
     //
     // The thread itself is persisted by the time the stream closes, but
@@ -128,12 +145,9 @@ export const ChatSidebar = (): JSX.Element => {
     if (text.trim().length === 0) {
       return;
     }
-    sendMessage(
-      { text },
-      {
-        body: buildMessageRequestBody(chatThreadId),
-      },
-    );
+    // The threadId rides on the transport body (see useChat above), so no
+    // per-call body is needed here.
+    sendMessage({ text });
     setInput('');
   };
 
@@ -267,6 +281,44 @@ export const ChatSidebar = (): JSX.Element => {
                   last?.role !== 'assistant' || (last.parts?.length ?? 0) === 0;
                 return awaitingFirstPart ? <Loader /> : null;
               })()}
+              {error != null && (
+                <div
+                  role="alert"
+                  className="tw:my-2 tw:flex tw:flex-col tw:gap-2 tw:rounded-lg tw:border tw:border-destructive/40 tw:bg-destructive/10 tw:p-3 tw:text-sm"
+                >
+                  <div className="tw:flex tw:items-start tw:justify-between tw:gap-2">
+                    <p className="tw:font-medium tw:text-destructive">
+                      {t('ai_sidebar.error.title')}
+                    </p>
+                    <button
+                      type="button"
+                      className="btn btn-ghost tw:shrink-0 tw:p-0.5"
+                      aria-label={t('ai_sidebar.error.dismiss')}
+                      onClick={() => clearError()}
+                    >
+                      <XIcon size={14} />
+                    </button>
+                  </div>
+                  {(() => {
+                    const detail = resolveChatErrorDetail(error);
+                    return detail == null ? null : (
+                      <p className="tw:break-words tw:text-muted-foreground">
+                        {detail}
+                      </p>
+                    );
+                  })()}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="tw:self-end"
+                    onClick={() => regenerate()}
+                  >
+                    <RefreshCcwIcon className="tw:mr-1 tw:size-3" />
+                    {t('ai_sidebar.error.retry')}
+                  </Button>
+                </div>
+              )}
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>

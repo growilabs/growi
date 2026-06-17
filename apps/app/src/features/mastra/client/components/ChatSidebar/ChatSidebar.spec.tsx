@@ -16,10 +16,15 @@ import { ChatSidebar } from './ChatSidebar';
 // --- sendMessage spy (the send-flow boundary we assert against) ------------
 const sendMessage = vi.fn();
 
-// Controllable chat status so a test can put the assistant in a busy state.
-const { chatState } = vi.hoisted(() => {
-  const chatState: { status: ChatStatus | undefined } = { status: undefined };
-  return { chatState };
+// Controllable chat status / error so a test can put the assistant in a busy
+// state or simulate a server error. regenerate/clearError are shared spies so
+// the error-recovery wiring can be asserted.
+const { chatState, regenerate, clearError } = vi.hoisted(() => {
+  const chatState: {
+    status: ChatStatus | undefined;
+    error: Error | undefined;
+  } = { status: undefined, error: undefined };
+  return { chatState, regenerate: vi.fn(), clearError: vi.fn() };
 });
 
 // @ai-sdk/react useChat: a controllable object exposing the sendMessage spy.
@@ -28,8 +33,10 @@ vi.mock('@ai-sdk/react', () => ({
     messages: [],
     sendMessage,
     status: chatState.status,
-    regenerate: vi.fn(),
+    regenerate,
     setMessages: vi.fn(),
+    error: chatState.error,
+    clearError,
   }),
 }));
 
@@ -156,8 +163,11 @@ const submitViaEvent = async (container: HTMLElement): Promise<void> => {
 
 beforeEach(() => {
   sendMessage.mockClear();
+  regenerate.mockClear();
+  clearError.mockClear();
   searchState.current = { data: undefined, isLoading: false };
   chatState.status = undefined;
+  chatState.error = undefined;
 
   // happy-dom 15.7.4's HTMLFormElement.reset() throws ("hasAttribute" on an
   // undefined ref) when a CodeMirror editor is mounted inside the form.
@@ -200,7 +210,6 @@ describe('ChatSidebar — PageMentionInput integration (6.1)', () => {
 
     expect(sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('/docs/foo') }),
-      expect.anything(),
     );
   });
 
@@ -234,7 +243,6 @@ describe('ChatSidebar — PageMentionInput integration (6.1)', () => {
 
     expect(sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ text: expect.stringContaining('/docs/foo') }),
-      expect.anything(),
     );
   });
 
@@ -250,7 +258,6 @@ describe('ChatSidebar — PageMentionInput integration (6.1)', () => {
 
     expect(sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ text: 'hello world' }),
-      expect.anything(),
     );
   });
 });
@@ -289,8 +296,47 @@ describe('ChatSidebar — send suppression while busy (#5)', () => {
 
     expect(sendMessage).toHaveBeenCalledWith(
       expect.objectContaining({ text: 'go' }),
-      expect.anything(),
     );
+  });
+});
+
+describe('ChatSidebar — server error display', () => {
+  it('renders no error alert when there is no error', () => {
+    render(<ChatSidebar />);
+
+    expect(screen.queryByRole('alert')).toBeNull();
+  });
+
+  it('shows the heading plus the server-sanitized provider message, and wires retry / dismiss', () => {
+    // The server forwards an AISDKError's provider message (already sanitized).
+    chatState.error = new Error(
+      'model: claude-x_ was not found. Did you mean claude-x?',
+    );
+    render(<ChatSidebar />);
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText('ai_sidebar.error.title')).toBeInTheDocument();
+    expect(
+      screen.getByText(
+        'model: claude-x_ was not found. Did you mean claude-x?',
+      ),
+    ).toBeInTheDocument();
+
+    // Retry re-requests via regenerate(); dismiss clears via clearError().
+    fireEvent.click(screen.getByText('ai_sidebar.error.retry'));
+    expect(regenerate).toHaveBeenCalledTimes(1);
+
+    fireEvent.click(screen.getByLabelText('ai_sidebar.error.dismiss'));
+    expect(clearError).toHaveBeenCalledTimes(1);
+  });
+
+  it('shows only the generic heading for the unknown sentinel (non-AISDK errors carry no detail)', () => {
+    chatState.error = new Error('unknown');
+    render(<ChatSidebar />);
+
+    expect(screen.getByRole('alert')).toBeInTheDocument();
+    expect(screen.getByText('ai_sidebar.error.title')).toBeInTheDocument();
+    expect(screen.queryByText('unknown')).toBeNull();
   });
 });
 

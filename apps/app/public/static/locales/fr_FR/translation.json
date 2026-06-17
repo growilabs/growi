@@ -543,6 +543,11 @@
   "ai_sidebar": {
     "new_chat": "Nouvelle discussion",
     "recent_threads": "Éléments récents",
+    "error": {
+      "title": "Une erreur s'est produite",
+      "retry": "Réessayer",
+      "dismiss": "Fermer"
+    },
     "toaster": {
       "thread_deleted_success": "Discussion supprimée",
       "thread_deleted_failed": "Échec de la suppression de la discussion"

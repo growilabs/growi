@@ -547,6 +547,11 @@
   "ai_sidebar": {
     "new_chat": "New Chat",
     "recent_threads": "Recent Items",
+    "error": {
+      "title": "An error occurred",
+      "retry": "Retry",
+      "dismiss": "Dismiss"
+    },
     "toaster": {
       "thread_deleted_success": "Thread deleted",
       "thread_deleted_failed": "Failed to delete thread"

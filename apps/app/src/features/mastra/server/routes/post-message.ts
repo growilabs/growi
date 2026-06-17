@@ -21,6 +21,7 @@ import { resolveProviderOptions } from '../services/ai-sdk-modules/resolve-provi
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
 import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context';
+import { resolveChatErrorMessage } from './chat-error-message';
 import { buildPostMessageValidator } from './post-message-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
@@ -96,8 +97,27 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         // Express requires piping to ServerResponse object, not returning Web API Response
         // See: https://ai-sdk.dev/cookbook/api-servers/express#ui-message-stream
         // Example: https://github.com/vercel/ai/blob/c5e2a7c22eb8d9392705d1e87458b1d4af9c6ec9/examples/express/src/server.ts
+        // A streaming failure (e.g. a misconfigured / unsupported model) arrives
+        // as an error *chunk* from toAISdkStream — NOT a thrown exception — so it
+        // never reaches createUIMessageStream's onError. The chunk converter calls
+        // toAISdkStream's own onError to build the chunk text, so that is the
+        // primary sanitize point. createUIMessageStream's onError covers the rare
+        // execute-level throw (e.g. `stream.usage` rejecting): it must stay,
+        // because that hook's DEFAULT (getErrorMessage) forwards the RAW message
+        // — dropping it would leak detail on that path.
+        //
+        // Forward only a safe message: an AISDKError's provider-authored text
+        // (one line), never the stack / responseBody / url, and never a
+        // non-AISDK (possibly GROWI-internal) error's message (OWASP
+        // LLM02/LLM09). The full error is logged server-side.
+        const onChatError = (error: unknown): string => {
+          logger.error(error);
+          return resolveChatErrorMessage(error);
+        };
+
         const uiMessageStream = createUIMessageStream({
           originalMessages: messages,
+          onError: onChatError,
           execute: async ({ writer }) => {
             // Workaround for https://github.com/mastra-ai/mastra/issues/11884#issuecomment-3799153269
             // toAISdkStream() returns a ReadableStream that lacks [Symbol.asyncIterator]
@@ -106,6 +126,9 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
               from: 'agent',
               version: 'v6',
               sendReasoning: true,
+              // Primary sanitize point: the agent→UI chunk converter calls this
+              // with the original error to build the error chunk's text.
+              onError: onChatError,
             }).getReader();
 
             while (true) {
