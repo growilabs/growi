@@ -1,9 +1,9 @@
-import type { GroupType, PageGrant } from '@growi/core';
+import type { GroupType, PageGrant, PageWriteGrant } from '@growi/core';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import type { UserGroupDocument } from '~/server/models/user-group';
 
-import type { IPageGrantData } from './page';
+import type { IPageGrantData, IPageWriteGrantData } from './page';
 
 type UserGroupType = typeof GroupType.userGroup;
 type ExternalUserGroupType = typeof GroupType.externalUserGroup;
@@ -24,6 +24,7 @@ export type IResApplicableGrant = {
 export type IResGrantData = {
   isForbidden: boolean;
   currentPageGrant: IPageGrantData;
+  currentPageWriteGrant: IPageWriteGrantData;
   parentPageGrant?: IPageGrantData;
 };
 export type IResCurrentGrantData = {

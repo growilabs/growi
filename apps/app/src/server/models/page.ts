@@ -251,6 +251,37 @@ const schema = new Schema<PageDocument, PageModel>(
       default: [],
       required: true,
     },
+    writeGrant: { type: Number, default: 1, index: true },
+    writeGrantedUsers: [{ type: Schema.Types.ObjectId, ref: 'User' }],
+    writeGrantedGroups: {
+      type: [
+        {
+          type: {
+            type: String,
+            enum: Object.values(GroupType),
+            required: true,
+            default: 'UserGroup',
+          },
+          item: {
+            type: Schema.Types.ObjectId,
+            refPath: 'writeGrantedGroups.type',
+            required: true,
+            index: true,
+          },
+        },
+      ],
+      validate: [
+        (arr) => {
+          if (arr == null) return true;
+          const uniqueItemValues = new Set(arr.map((e) => e.item));
+          return arr.length === uniqueItemValues.size;
+        },
+        'writeGrantedGroups contains non unique item',
+      ],
+      default: [],
+      required: true,
+    },
+    readOnlyUserIds: [{ type: Schema.Types.ObjectId, ref: 'User' }],
     creator: { type: Schema.Types.ObjectId, ref: 'User', index: true },
     lastUpdateUser: { type: Schema.Types.ObjectId, ref: 'User' },
     liker: [{ type: Schema.Types.ObjectId, ref: 'User' }],

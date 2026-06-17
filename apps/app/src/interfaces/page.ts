@@ -5,6 +5,7 @@ import type {
   Nullable,
   Origin,
   PageGrant,
+  PageWriteGrant,
 } from '@growi/core';
 
 import type { ExternalGroupProviderType } from '~/features/external-user-group/interfaces/external-user-group';
@@ -63,6 +64,11 @@ export type IPageGrantData = {
   grant: PageGrant;
   groupGrantData?: GroupGrantData;
 };
+// current write grant data of page
+export type IPageWriteGrantData = {
+  writeGrant: PageWriteGrant;
+  groupGrantData?: GroupGrantData;
+};
 // grant selected by user which is not yet applied
 export type IPageSelectedGrant = {
   grant: PageGrant;
@@ -89,6 +95,8 @@ export type IOptionsForUpdate = {
   userRelatedGrantUserGroupIds?: IGrantedGroup[];
   // isSyncRevisionToHackmd?: boolean,
   overwriteScopesOfDescendants?: boolean;
+
+  readOnlyUserIds?: string[];
 };
 
 export type IOptionsForCreate = {
@@ -99,6 +107,8 @@ export type IOptionsForCreate = {
 
   origin?: Origin;
   wip?: boolean;
+
+  readOnlyUserIds?: string[];
 };
 
 export type IPagePathWithDescendantCount = {
