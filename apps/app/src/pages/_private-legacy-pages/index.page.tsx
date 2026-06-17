@@ -41,6 +41,7 @@ const PrivateLegacyPage: NextPage<Props> = (props: Props) => {
     props.searchConfig,
     props.sidebarConfig,
     props.userUISettings,
+    props.aiEnabled,
   );
   useHydrateServerConfigurationAtoms(props.serverConfig, props.rendererConfig);
 

@@ -198,6 +198,7 @@ const Layout = ({ children, ...props }: LayoutProps): JSX.Element => {
     initialProps?.searchConfig,
     initialProps?.sidebarConfig,
     initialProps?.userUISettings,
+    initialProps?.aiEnabled,
   );
   useHydrateGeneralPageConfigurationAtoms(
     initialProps?.serverConfig,
