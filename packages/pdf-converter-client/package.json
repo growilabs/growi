@@ -18,7 +18,7 @@
   "private": true,
   "scripts": {
     "lint": "biome check",
-    "gen:client-code": "orval --config orval.config.cjs",
+    "gen:client-code": "orval --config orval.config.ts",
     "dev": "pnpm gen:client-code && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/write-cjs-type.ts",
     "build": "pnpm gen:client-code && tsc -p tsconfig.json && tsc -p tsconfig.cjs.json && node scripts/write-cjs-type.ts"
   },
