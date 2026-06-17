@@ -2,31 +2,31 @@
 
 ARG NODE_VERSION=24
 ARG OPT_DIR="/opt"
-ARG PNPM_HOME="/root/.local/share/pnpm"
 
 ##
-## base — DHI dev image with pnpm + turbo
+## base — official Node.js image with pnpm + turbo
 ##
-FROM dhi.io/node:24-debian13-dev AS base
+## Build stages run on the official image (not DHI) because corepack's global
+## pnpm shim is not executable on the DHI dev image. Only the release stage uses
+## DHI — the build artifacts (dist + prod node_modules) are pure JS, so running
+## them on the DHI runtime carries no native-ABI risk. Mirrors apps/app.
+##
+FROM node:24-bookworm AS base
 
 ARG OPT_DIR
-ARG PNPM_HOME
 
 WORKDIR $OPT_DIR
 
-# Install build dependencies
-RUN --mount=type=cache,target=/var/lib/apt,sharing=locked \
-    --mount=type=cache,target=/var/cache/apt,sharing=locked \
-  apt-get update && apt-get install -y --no-install-recommends ca-certificates wget
-
-# Install pnpm (standalone script, no version hardcoding)
-RUN wget -qO- https://get.pnpm.io/install.sh | ENV="$HOME/.shrc" SHELL=/bin/sh sh -
-ENV PNPM_HOME=$PNPM_HOME
-ENV PATH="$PNPM_HOME:$PATH"
+# Activate corepack so the pnpm version pinned in the workspace package.json
+# "packageManager" field is used (avoids drift between Dockerfile and local/CI).
+RUN corepack enable
+ENV PNPM_HOME="/pnpm"
+ENV PATH="$PNPM_HOME/bin:$PATH"
 
 # Install turbo globally
-RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
-  pnpm add turbo --global
+# Note: no cache mount here — pnpm global install links binaries into the store,
+# and the BuildKit cache mount would be unmounted after RUN, breaking those links.
+RUN pnpm add turbo --global
 
 
 ##
@@ -49,18 +49,14 @@ RUN turbo prune @growi/vault-manager --docker
 FROM base AS deps
 
 ARG OPT_DIR
-ARG PNPM_HOME
-
-ENV PNPM_HOME=$PNPM_HOME
-ENV PATH="$PNPM_HOME:$PATH"
 
 WORKDIR $OPT_DIR
 
 # Copy only package manifests and lockfile for dependency caching
 COPY --from=pruner $OPT_DIR/out/json/ .
 
-# Install dependencies
-RUN --mount=type=cache,target=$PNPM_HOME/store,sharing=locked \
+# Install dependencies (PNPM_HOME / PATH inherited from base)
+RUN --mount=type=cache,id=pnpm,target=/pnpm/store \
   pnpm install --frozen-lockfile
 
 
@@ -111,6 +107,13 @@ ENV appDir="$OPT_DIR/vault-manager"
 WORKDIR ${appDir}
 COPY --from=builder --chown=node:node /tmp/release/ ${appDir}/
 
+# Copy the entrypoint, run directly via Node 24 type stripping. It lives outside
+# src/ so it never enters the compiled dist/ artifact.
+COPY --chown=node:node apps/growi-vault-manager/docker/docker-entrypoint.ts /docker-entrypoint.ts
+
+# Stay root for the entrypoint: it creates/chowns the bare repo on the shared
+# /data volume, then drops to the node user (uid/gid 1000) before exec'ing the
+# app — so vault-manager and apps/app share the volume under one uid.
 USER root
 WORKDIR ${appDir}/apps/growi-vault-manager
 
@@ -123,4 +126,4 @@ LABEL org.opencontainers.image.authors="Yuki Takei <yuki@weseek.co.jp>"
 
 EXPOSE 3001
 
-CMD ["node", "dist/index.js"]
+ENTRYPOINT ["node", "/docker-entrypoint.ts"]

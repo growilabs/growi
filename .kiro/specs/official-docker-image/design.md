@@ -90,7 +90,7 @@ graph TB
 | Entrypoint | Node.js (TypeScript) | Initialization, heap calculation, privilege drop, process startup | Node.js 24 native type stripping, no busybox/bash needed |
 | Privilege Drop | `process.setuid/setgid` (Node.js) | root → node user switch | No external binaries needed |
 | Build Tool | `turbo prune --docker` | Monorepo minimization | Official Turborepo recommendation |
-| Package Manager | pnpm (wget standalone) | Dependency management | corepack not adopted (scheduled for removal in Node.js 25+) |
+| Package Manager | pnpm via `corepack enable` | Dependency management | Version pinned by workspace `packageManager`. A wget standalone install was tried first but caused recurring build issues — see Requirement 1 decision update |
 
 > For the rationale behind adopting the TypeScript entrypoint and comparison with busybox-static/setpriv, see `research.md`.
 
@@ -176,7 +176,7 @@ flowchart LR
 - **No shell or additional binary copying in runtime** (everything is handled by the Node.js entrypoint)
 
 **Stage Definitions:**
-- **base**: DHI dev image + pnpm (wget) + turbo + apt packages (`ca-certificates`, `wget`)
+- **base**: DHI dev image + `corepack enable` (pnpm, version-pinned) + turbo (no extra apt packages needed for the package manager)
 - **pruner**: `COPY . .` + `turbo prune @growi/app --docker`
 - **deps**: COPY json/lockfile from pruner + `pnpm install --frozen-lockfile` + node-gyp
 - **builder**: COPY full source from pruner + `turbo run build` + `pnpm deploy` + artifact packaging
