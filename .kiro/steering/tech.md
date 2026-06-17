@@ -74,6 +74,11 @@ For apps/app-specific build optimization details (webpack config, null-loader ru
 
 The monorepo uses **pino** (via `@growi/logger`) as the standard logging library. Legacy bunyan usage has been migrated.
 
+`@growi/logger` is a **universal** package (server + browser). Two constraints follow from that, both learned the hard way (esm-migration):
+
+- **No static `import … from 'node:*'` that a browser code path can reach.** Builtins like `node:module` have no browser polyfill and break the Turbopack client build. Acquire them at runtime inside a server-only branch via `process.getBuiltinModule('node:module')` (not an import statement → never enters the browser graph).
+- **pino transport targets must be ABSOLUTE PATHS, not bare specifiers,** because pino loads transports in a worker thread that resolves a bare specifier relative to the caller — and when the logger is **bundled** (Next.js SSR via Turbopack) that resolution fails with `unable to determine transport target for "pino-pretty"`, 500-ing every SSR page when `FORMAT_NODE_LOG` is truthy. `transport-factory.ts` resolves both the dev (`bunyan-format`) and prod (`pino-pretty`) targets to absolute paths for this reason.
+
 ### External Plugin Distribution Contract (orthogonal to the internal module system)
 
 Third-party plugins published at **https://growi.org/plugins** reach a running GROWI by a

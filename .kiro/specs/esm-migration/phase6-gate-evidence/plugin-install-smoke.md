@@ -98,6 +98,19 @@ GET .../does-not-exist.js → 存在しない資産はフォールスルー (静
 SSR 注入 (script) → 静的配信 → ブラウザ取得、の全経路が本番 ESM 出力で機能する。
 ESM 移行は外部プラグインの導入経路を退行させていない。
 
+## 付随して発見・修正した別件 (ESM/Turbopack 由来 / プラグインとは無関係)
+
+- 当初、本番出力を `FORMAT_NODE_LOG=true` (pretty ログ) で起動すると Next SSR ワーカーが
+  `Error: unable to determine transport target for "pino-pretty"` で全ページ 500 になった。
+  原因は `@growi/logger` が Turbopack に**バンドル**されると、pino のワーカースレッドが
+  トランスポート target の**裸指定子 `'pino-pretty'`** を呼び出し元 (バンドルチャンク) 基準で
+  解決できないこと。**修正済み** (`packages/logger/src/transport-factory.ts`): dev 用と同じく
+  pino-pretty を**絶対パス**に解決する (`process.getBuiltinModule('node:module')` で `createRequire`
+  を取得 → `.resolve('pino-pretty')`。`node:module` の静的 import はブラウザビルドを壊すため避ける)。
+  修正後、`FORMAT_NODE_LOG=true` でも `/login`・`/installer`・`/trash` が **HTTP 200**、
+  pino-pretty トランスポートエラー 0 件・整形ログ正常。`turbo run build --filter @growi/app` 22/22、
+  `@growi/logger` test 54 pass。`@growi/logger` は internal package のため changeset 不要。
+
 ## 後片付け
 
 - smoke 用アクセストークン (`description:"esm-plugin-smoke"`) は削除済み。
