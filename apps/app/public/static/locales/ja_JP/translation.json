@@ -22,7 +22,10 @@
   "unlink_redirection": "リダイレクト削除",
   "Done": "完了",
   "Cancel": "キャンセル",
+  "Save": "保存",
   "Create": "作成",
+  "Successfully updated": "更新しました",
+  "Failed to update": "更新に失敗しました",
   "Description": "説明",
   "Admin": "管理",
   "administrator": "管理者",
@@ -1210,6 +1213,24 @@
       "docs_badge": "バッジの詳細はこちら",
       "docs_color": "カラーの詳細はこちら",
       "docs_alert": "アラートブロックの詳細はこちら"
+    }
+  },
+  "page_permission": {
+    "title": "ページ権限設定",
+    "menu_label": "権限設定",
+    "read_permission_section": "閲覧権限 (このページを閲覧できるユーザー)",
+    "write_permission_section": "編集権限 (このページを編集できるユーザー)",
+    "current_summary": "現在の設定: 閲覧: {{readGrant}} | 編集: {{writeGrant}}",
+    "read_grant": {
+      "public": "公開",
+      "restricted": "リンクを知っている人のみ",
+      "owner": "自分のみ",
+      "user_group": "特定グループのみ"
+    },
+    "write_grant": {
+      "public": "誰でも編集可",
+      "owner": "自分のみ編集可",
+      "user_group": "特定グループのみ編集可"
     }
   }
 }

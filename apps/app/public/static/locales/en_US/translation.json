@@ -22,8 +22,11 @@
   "unlink_redirection": "Unlink redirection",
   "Done": "Done",
   "Cancel": "Cancel",
+  "Save": "Save",
   "Create": "Create",
   "Description": "Description",
+  "Successfully updated": "Successfully updated",
+  "Failed to update": "Failed to update",
   "Admin": "Admin",
   "administrator": "Admin",
   "Tag": "Tag",
@@ -1176,6 +1179,24 @@
       "docs_badge": "Learn more about Badges",
       "docs_color": "Learn more about Colors",
       "docs_alert": "Learn more about Alert Blocks"
+    }
+  },
+  "page_permission": {
+    "title": "Page Permissions",
+    "menu_label": "Permissions",
+    "read_permission_section": "Read Permission (Who can view this page)",
+    "write_permission_section": "Write Permission (Who can edit this page)",
+    "current_summary": "Current: Read: {{readGrant}} | Write: {{writeGrant}}",
+    "read_grant": {
+      "public": "Public",
+      "restricted": "Anyone with the link",
+      "owner": "Only me",
+      "user_group": "Only inside the group"
+    },
+    "write_grant": {
+      "public": "Anyone can edit",
+      "owner": "Only me can edit",
+      "user_group": "Only inside the group can edit"
     }
   }
 }
