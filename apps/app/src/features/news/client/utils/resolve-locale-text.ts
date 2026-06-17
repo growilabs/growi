@@ -2,8 +2,9 @@
  * Resolve a localized text from a locale-keyed map with fallback chain:
  * requested locale → ja_JP → en_US → first available key → ''.
  *
- * Shared by NewsItem (title) and NewsItemModal (title / body) so the
- * fallback behaviour stays identical across the list row and the detail modal.
+ * Shared by NewsItem (title in the sidebar panel) and NewsFeed
+ * (title / body on the full-page feed) so the fallback behaviour stays
+ * identical across both surfaces.
  */
 export const resolveLocaleText = (
   map: Record<string, string>,
