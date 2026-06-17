@@ -99,11 +99,18 @@ model attachments {
 }
 
 model bookmarkfolders {
-  id    String @id @default(auto()) @map("_id") @db.ObjectId
-  /// Field referred in an index, but found no data to define the type.
-  owner Json?
+  id          String   @id @default(auto()) @map("_id") @db.ObjectId
+  v           Int      @default(0) @map("__v")
+  name        String?
+  ownerId     String?  @map("owner") @db.ObjectId
+  parentId    String?  @map("parent") @db.ObjectId
+  bookmarkIds String[] @map("bookmarks") @db.ObjectId
 
-  @@index([owner], map: "owner_1")
+  owner    users?            @relation(fields: [ownerId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  parent   bookmarkfolders?  @relation("BookmarkFolderParentChild", fields: [parentId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  children bookmarkfolders[] @relation("BookmarkFolderParentChild")
+
+  @@index([ownerId], map: "owner_1")
 }
 
 model bookmarks {
@@ -545,6 +552,7 @@ model users {
   createdAttachments attachments[]      @relation("CreatedAttachments")
   externalaccounts   externalaccounts[]
   bookmarks          bookmarks[]
+  bookmarkfolders    bookmarkfolders[]
 
   @@index([name], map: "name_1")
   @@index([status], map: "status_1")
