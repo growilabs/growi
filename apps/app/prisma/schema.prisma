@@ -135,14 +135,12 @@ model bookmarks {
 
 model auditlog_es_sync_status {
   id                String  @id @default(auto()) @map("_id") @db.ObjectId
-  v                 Int     @default(0) @map("__v")
   key               String  @unique
   hasUnsyncedEvents Boolean @default(false)
 }
 
 model changestream_resume_tokens {
   id    String @id @default(auto()) @map("_id") @db.ObjectId
-  v     Int    @default(0) @map("__v")
   key   String @unique
   token Json
 }
