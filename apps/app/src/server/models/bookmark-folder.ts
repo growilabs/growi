@@ -1,14 +1,14 @@
 import { objectIdUtils } from '@growi/core/dist/utils';
-import type { Document, Model, Types } from 'mongoose';
+import type { Types } from 'mongoose';
 import { Schema } from 'mongoose';
 
+import { Prisma } from '~/generated/prisma/client';
 import type {
   BookmarkFolderItems,
   IBookmarkFolder,
 } from '~/interfaces/bookmark-info';
 import { prisma } from '~/utils/prisma';
 
-import loggerFactory from '../../utils/logger';
 import { getOrCreateModel } from '../util/mongoose-utils';
 import {
   BookmarkFolderForbiddenError,
@@ -16,268 +16,281 @@ import {
   InvalidParentBookmarkFolderError,
 } from './errors';
 
-const logger = loggerFactory('growi:models:bookmark-folder');
-
-export interface BookmarkFolderDocument extends Document {
-  _id: Types.ObjectId;
-  name: string;
-  owner: Types.ObjectId;
-  parent?: Types.ObjectId | undefined;
-  bookmarks?: Types.ObjectId[];
-  childFolder?: BookmarkFolderDocument[];
-}
-
-export interface BookmarkFolderModel extends Model<BookmarkFolderDocument> {
-  createByParameters(params: IBookmarkFolder): Promise<BookmarkFolderDocument>;
-  deleteFolderAndChildren(
-    bookmarkFolderId: Types.ObjectId | string,
-    ownerId?: Types.ObjectId | string,
-  ): Promise<{ deletedCount: number }>;
-  updateBookmarkFolder(
-    bookmarkFolderId: string,
-    name: string,
-    parent: string | null,
-    childFolder: BookmarkFolderItems[],
-  ): Promise<BookmarkFolderDocument>;
-  insertOrUpdateBookmarkedPage(
-    pageId: Types.ObjectId | string,
-    userId: Types.ObjectId | string,
-    folderId: string | null,
-  ): Promise<BookmarkFolderDocument | null>;
-  updateBookmark(
-    pageId: Types.ObjectId | string,
-    status: boolean,
-    userId: Types.ObjectId | string,
-  ): Promise<BookmarkFolderDocument | null>;
-}
-
-const bookmarkFolderSchema = new Schema<
-  BookmarkFolderDocument,
-  BookmarkFolderModel
->(
-  {
-    name: { type: String },
-    owner: { type: Schema.Types.ObjectId, ref: 'User', index: true },
-    parent: {
-      type: Schema.Types.ObjectId,
-      ref: 'BookmarkFolder',
-      required: false,
-    },
-    bookmarks: {
-      type: [
-        {
-          type: Schema.Types.ObjectId,
-          ref: 'Bookmark',
-          required: false,
-        },
-      ],
-      required: false,
-      default: [],
-    },
+// TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
+// Until then, use mongoose to automatically create collections and indexes when connected.
+const bookmarkFolderSchema = new Schema({
+  name: { type: String },
+  owner: { type: Schema.Types.ObjectId, ref: 'User', index: true },
+  parent: {
+    type: Schema.Types.ObjectId,
+    ref: 'BookmarkFolder',
+    required: false,
   },
-  {
-    toObject: { virtuals: true },
+  bookmarks: {
+    type: [
+      {
+        type: Schema.Types.ObjectId,
+        ref: 'Bookmark',
+        required: false,
+      },
+    ],
+    required: false,
+    default: [],
   },
-);
-
-bookmarkFolderSchema.virtual('childFolder', {
-  ref: 'BookmarkFolder',
-  localField: '_id',
-  foreignField: 'parent',
 });
 
-bookmarkFolderSchema.statics.createByParameters = async function (
-  params: IBookmarkFolder,
-): Promise<BookmarkFolderDocument> {
-  const { name, owner, parent } = params;
-  let bookmarkFolder: BookmarkFolderDocument;
+getOrCreateModel('BookmarkFolder', bookmarkFolderSchema);
 
-  if (parent == null) {
-    bookmarkFolder = await this.create({ name, owner });
-  } else {
-    // Check if parent folder id is valid and parent folder exists
-    const isParentFolderIdValid = objectIdUtils.isValidObjectId(
-      parent as string,
-    );
+export const extension = Prisma.defineExtension((client) => {
+  return client.$extends({
+    model: {
+      bookmarkfolders: {
+        async createByParameters(params: IBookmarkFolder) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarkfolders>(this);
+          const { name, owner, parent } = params;
+          const ownerId = owner.toString();
 
-    if (!isParentFolderIdValid) {
-      throw new InvalidParentBookmarkFolderError('Parent folder id is invalid');
-    }
-    const parentFolder = await this.findById(parent);
-    if (parentFolder == null) {
-      throw new InvalidParentBookmarkFolderError('Parent folder not found');
-    }
-    bookmarkFolder = await this.create({
-      name,
-      owner,
-      parent: parentFolder._id,
-    });
-  }
+          if (parent == null) {
+            return context.create({
+              data: { name, ownerId },
+            });
+          }
 
-  return bookmarkFolder;
-};
-
-bookmarkFolderSchema.statics.deleteFolderAndChildren = async function (
-  bookmarkFolderId: Types.ObjectId | string,
-  ownerId?: Types.ObjectId | string,
-): Promise<{ deletedCount: number }> {
-  const bookmarkFolder = await this.findById(bookmarkFolderId);
-  if (ownerId != null) {
-    if (bookmarkFolder == null) {
-      throw new BookmarkFolderNotFoundError('Bookmark folder not found');
-    }
-    if (bookmarkFolder.owner.toString() !== ownerId.toString()) {
-      throw new BookmarkFolderForbiddenError('Forbidden');
-    }
-  }
-  // Delete parent and all children folder
-  let deletedCount = 0;
-  if (bookmarkFolder != null) {
-    // Delete Bookmarks
-    const bookmarks = bookmarkFolder?.bookmarks;
-    if (bookmarks && bookmarks.length > 0) {
-      await prisma.bookmarks.deleteMany({
-        where: {
-          id: {
-            in: bookmarks.map((bookmarkId) => bookmarkId.toString()),
-          },
+          const isParentFolderIdValid = objectIdUtils.isValidObjectId(
+            parent as string,
+          );
+          if (!isParentFolderIdValid) {
+            throw new InvalidParentBookmarkFolderError(
+              'Parent folder id is invalid',
+            );
+          }
+          const parentFolder = await context.findUnique({
+            where: { id: parent.toString() },
+          });
+          if (parentFolder == null) {
+            throw new InvalidParentBookmarkFolderError(
+              'Parent folder not found',
+            );
+          }
+          return context.create({
+            data: {
+              name,
+              ownerId,
+              parentId: parentFolder.id,
+            },
+          });
         },
-      });
-    }
-    // Delete all child recursively and update deleted count
-    const childFolders = await this.find({ parent: bookmarkFolder._id });
-    await Promise.all(
-      childFolders.map(async (child) => {
-        const deletedChildFolder = await this.deleteFolderAndChildren(
-          child._id,
-        );
-        deletedCount += deletedChildFolder.deletedCount;
-      }),
-    );
-    const deletedChild = await this.deleteMany({ parent: bookmarkFolder._id });
-    deletedCount += deletedChild.deletedCount + 1;
-    bookmarkFolder.delete();
-  }
-  return { deletedCount };
-};
 
-bookmarkFolderSchema.statics.updateBookmarkFolder = async function (
-  bookmarkFolderId: string,
-  name: string,
-  parentId: string | null,
-  childFolder: BookmarkFolderItems[],
-): Promise<BookmarkFolderDocument> {
-  const updateFields: { name: string; parent: Types.ObjectId | null } = {
-    name: '',
-    parent: null,
-  };
+        async deleteFolderAndChildren(
+          bookmarkFolderId: Types.ObjectId | string,
+          ownerId?: Types.ObjectId | string,
+        ): Promise<{ deletedCount: number }> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarkfolders>(this);
+          const bookmarkFolder = await context.findUnique({
+            where: { id: bookmarkFolderId.toString() },
+          });
 
-  updateFields.name = name;
-  const parentFolder = parentId ? await this.findById(parentId) : null;
-  updateFields.parent = parentFolder?._id ?? null;
+          if (ownerId != null) {
+            if (bookmarkFolder == null) {
+              throw new BookmarkFolderNotFoundError(
+                'Bookmark folder not found',
+              );
+            }
+            if (bookmarkFolder.ownerId !== ownerId.toString()) {
+              throw new BookmarkFolderForbiddenError('Forbidden');
+            }
+          }
 
-  // Maximum folder hierarchy of 2 levels
-  // If the destination folder (parentFolder) has a parent, the source folder cannot be moved because the destination folder hierarchy is already 2.
-  // If the drop source folder has child folders, the drop source folder cannot be moved because the drop source folder hierarchy is already 2.
-  if (parentId != null) {
-    if (parentFolder?.parent != null) {
-      throw new Error('Update bookmark folder failed');
-    }
-    if (childFolder.length !== 0) {
-      throw new Error('Update bookmark folder failed');
-    }
-  }
+          let deletedCount = 0;
+          if (bookmarkFolder != null) {
+            if (bookmarkFolder.bookmarkIds.length > 0) {
+              await prisma.bookmarks.deleteMany({
+                where: { id: { in: bookmarkFolder.bookmarkIds } },
+              });
+            }
 
-  const bookmarkFolder = await this.findByIdAndUpdate(
-    bookmarkFolderId,
-    { $set: updateFields },
-    { new: true },
-  );
-  if (bookmarkFolder == null) {
-    throw new Error('Update bookmark folder failed');
-  }
-  return bookmarkFolder;
-};
+            const childFolders = await context.findMany({
+              where: { parentId: bookmarkFolder.id },
+            });
+            await Promise.all(
+              childFolders.map(async (child) => {
+                const deletedChildFolder =
+                  await context.deleteFolderAndChildren(child.id);
+                deletedCount += deletedChildFolder.deletedCount;
+              }),
+            );
 
-bookmarkFolderSchema.statics.insertOrUpdateBookmarkedPage = async function (
-  pageId: Types.ObjectId | string,
-  userId: Types.ObjectId | string,
-  folderId: string | null,
-): Promise<BookmarkFolderDocument | null> {
-  // Find bookmark
-  const bookmarkedPage = await prisma.bookmarks.findUnique({
-    where: {
-      pageId_userId: {
-        pageId: pageId.toString(),
-        userId: userId.toString(),
+            const deletedChildren = await context.deleteMany({
+              where: { parentId: bookmarkFolder.id },
+            });
+            deletedCount += deletedChildren.count + 1;
+            await context.delete({ where: { id: bookmarkFolder.id } });
+          }
+          return { deletedCount };
+        },
+
+        async updateBookmarkFolder(
+          bookmarkFolderId: string,
+          name: string,
+          parentId: string | null,
+          childFolder: BookmarkFolderItems[],
+        ) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarkfolders>(this);
+          const parentFolder = parentId
+            ? await context.findUnique({ where: { id: parentId } })
+            : null;
+
+          // Maximum folder hierarchy of 2 levels
+          // If the destination folder (parentFolder) has a parent, the source folder cannot be moved because the destination folder hierarchy is already 2.
+          // If the drop source folder has child folders, the drop source folder cannot be moved because the drop source folder hierarchy is already 2.
+          if (parentId != null) {
+            if (parentFolder?.parentId != null) {
+              throw new Error('Update bookmark folder failed');
+            }
+            if (childFolder.length !== 0) {
+              throw new Error('Update bookmark folder failed');
+            }
+          }
+
+          const updated = await context.update({
+            where: { id: bookmarkFolderId },
+            data: { name, parentId: parentFolder?.id ?? null },
+          });
+          if (updated == null) {
+            throw new Error('Update bookmark folder failed');
+          }
+          return updated;
+        },
+
+        async insertOrUpdateBookmarkedPage(
+          pageId: string,
+          userId: string,
+          folderId: string | null,
+        ) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.bookmarkfolders>(this);
+          // Find bookmark
+          const bookmarkedPage = await prisma.bookmarks.findUnique({
+            where: {
+              pageId_userId: {
+                pageId,
+                userId,
+              },
+            },
+          });
+
+          if (bookmarkedPage == null) {
+            return null;
+          }
+
+          // Remove existing bookmark in bookmark folder
+          await client.$runCommandRaw({
+            update: 'bookmarkfolders',
+            updates: [
+              {
+                q: { owner: { $oid: userId } },
+                u: {
+                  $pull: {
+                    bookmarks: { $oid: bookmarkedPage._id },
+                  },
+                },
+                multi: true,
+              },
+            ],
+          });
+
+          if (folderId == null) {
+            return null;
+          }
+
+          // Insert bookmark into bookmark folder
+          await client.$runCommandRaw({
+            update: 'bookmarkfolders',
+            updates: [
+              {
+                q: {
+                  _id: { $oid: folderId },
+                  owner: { $oid: userId },
+                },
+                u: {
+                  $addToSet: {
+                    bookmarks: { $oid: bookmarkedPage._id },
+                  },
+                },
+                multi: false,
+                upsert: true,
+              },
+            ],
+          });
+
+          return context.findUnique({
+            where: { id: folderId },
+          });
+        },
+
+        async updateBookmark(pageId: string, status: boolean, userId: string) {
+          // If isBookmarked
+          if (status) {
+            const context =
+              Prisma.getExtensionContext<typeof prisma.bookmarkfolders>(this);
+            const bookmarkedPage = await prisma.bookmarks.findUnique({
+              where: {
+                pageId_userId: {
+                  pageId,
+                  userId,
+                },
+              },
+            });
+            const bookmarkFolder = await context.findFirst({
+              where: {
+                ownerId: userId,
+                bookmarkIds: {
+                  hasSome: bookmarkedPage ? [bookmarkedPage._id] : [],
+                },
+              },
+            });
+            if (bookmarkFolder != null && bookmarkedPage != null) {
+              await client.$runCommandRaw({
+                update: 'bookmarkfolders',
+                updates: [
+                  {
+                    q: {
+                      _id: { $oid: bookmarkFolder.id },
+                      owner: { $oid: userId },
+                    },
+                    u: {
+                      $pull: {
+                        bookmarks: { $oid: bookmarkedPage._id },
+                      },
+                    },
+                    multi: false,
+                  },
+                ],
+              });
+            }
+
+            if (bookmarkedPage) {
+              await prisma.bookmarks.delete({
+                where: {
+                  id: bookmarkedPage.id,
+                },
+              });
+            }
+            return bookmarkFolder;
+          }
+          // else , Add bookmark
+          await prisma.bookmarks.create({
+            data: {
+              pageId,
+              userId,
+            },
+          });
+          return null;
+        },
       },
     },
   });
-
-  // Remove existing bookmark in bookmark folder
-  await this.updateMany(
-    { owner: userId },
-    { $pull: { bookmarks: bookmarkedPage?._id } },
-  );
-  if (folderId == null) {
-    return null;
-  }
-
-  // Insert bookmark into bookmark folder
-  const bookmarkFolder = await this.findByIdAndUpdate(
-    { _id: folderId, owner: userId },
-    { $addToSet: { bookmarks: bookmarkedPage } },
-    { new: true, upsert: true },
-  );
-
-  return bookmarkFolder;
-};
-
-bookmarkFolderSchema.statics.updateBookmark = async function (
-  pageId: Types.ObjectId | string,
-  status: boolean,
-  userId: Types.ObjectId | string,
-): Promise<BookmarkFolderDocument | null> {
-  // If isBookmarked
-  if (status) {
-    const bookmarkedPage = await prisma.bookmarks.findUnique({
-      where: {
-        pageId_userId: {
-          pageId: pageId.toString(),
-          userId: userId.toString(),
-        },
-      },
-    });
-    const bookmarkFolder = await this.findOne({
-      owner: userId,
-      bookmarks: { $in: [bookmarkedPage?._id] },
-    });
-    if (bookmarkFolder != null) {
-      await this.updateOne(
-        { owner: userId, _id: bookmarkFolder._id },
-        { $pull: { bookmarks: bookmarkedPage?._id } },
-      );
-    }
-
-    if (bookmarkedPage) {
-      await prisma.bookmarks.delete({
-        where: {
-          id: bookmarkedPage.id,
-        },
-      });
-    }
-    return bookmarkFolder;
-  }
-  // else , Add bookmark
-  await prisma.bookmarks.create({
-    data: {
-      pageId: pageId.toString(),
-      userId: userId.toString(),
-    },
-  });
-  return null;
-};
-export default getOrCreateModel<BookmarkFolderDocument, BookmarkFolderModel>(
-  'BookmarkFolder',
-  bookmarkFolderSchema,
-);
+});
