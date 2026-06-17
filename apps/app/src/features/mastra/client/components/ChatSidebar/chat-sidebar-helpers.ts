@@ -1,4 +1,5 @@
 import type { StorageThreadType } from '@mastra/core/memory';
+import { DefaultChatTransport, type UIMessage } from 'ai';
 
 import { UNKNOWN_CHAT_ERROR } from '~/features/mastra/interfaces/chat-error';
 
@@ -23,6 +24,25 @@ export const buildMessageRequestBody = (
 ): MastraMessageRequestBody => {
   return { threadId };
 };
+
+/** API endpoint that backs the chat transport. */
+const MASTRA_MESSAGE_API = '/_api/v3/mastra/message';
+
+/**
+ * Build the chat transport for a session.
+ *
+ * The threadId is pinned on the transport `body` so EVERY request carries it —
+ * not just sendMessage. regenerate() (the error / message retry) sends no
+ * per-call body, so without this the server would receive no threadId and mint
+ * a brand-new thread on each retry.
+ */
+export const createMastraChatTransport = (
+  threadId: string,
+): DefaultChatTransport<UIMessage> =>
+  new DefaultChatTransport({
+    api: MASTRA_MESSAGE_API,
+    body: buildMessageRequestBody(threadId),
+  });
 
 /**
  * Resolve the chat header label.

@@ -3,6 +3,7 @@ import { mock } from 'vitest-mock-extended';
 
 import {
   buildMessageRequestBody,
+  createMastraChatTransport,
   resolveChatErrorDetail,
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
@@ -91,5 +92,48 @@ describe('resolveChatErrorDetail', () => {
 
   it('returns undefined when there is no error', () => {
     expect(resolveChatErrorDetail(undefined)).toBeUndefined();
+  });
+});
+
+describe('createMastraChatTransport', () => {
+  afterEach(() => {
+    vi.unstubAllGlobals();
+  });
+
+  // Guards the thread-duplication regression (#185056): the threadId must ride
+  // on the transport body, NOT a per-call sendMessage body, because regenerate()
+  // (the retry on error) sends no per-call body. We exercise the REAL transport
+  // with the regenerate trigger and a mocked fetch (the request boundary), and
+  // assert the outgoing POST body carries the threadId.
+  it('sends the threadId in the POST body for the regenerate trigger (which has no per-call body)', async () => {
+    const fetchMock = vi.fn().mockResolvedValue(
+      // sendMessages only requires response.ok + a non-null body stream; it does
+      // not consume the stream, so an immediately-closed one is enough.
+      new Response(
+        new ReadableStream({
+          start(controller) {
+            controller.close();
+          },
+        }),
+        { status: 200 },
+      ),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+
+    await createMastraChatTransport('thread-xyz').sendMessages({
+      trigger: 'regenerate-message',
+      chatId: 'thread-xyz',
+      messageId: undefined,
+      messages: [],
+      abortSignal: undefined,
+    });
+
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+    const [url, init] = fetchMock.mock.calls[0];
+    expect(url).toBe('/_api/v3/mastra/message');
+    expect(JSON.parse(init.body)).toMatchObject({
+      threadId: 'thread-xyz',
+      trigger: 'regenerate-message',
+    });
   });
 });

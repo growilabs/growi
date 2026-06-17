@@ -2,7 +2,6 @@
 
 import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
 import { CopyIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { v7 as uuid } from 'uuid';
@@ -44,7 +43,7 @@ import {
 import { useSWRxMessages } from '../../stores/message';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 import {
-  buildMessageRequestBody,
+  createMastraChatTransport,
   resolveChatErrorDetail,
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
@@ -78,12 +77,12 @@ export const ChatSidebar = (): JSX.Element => {
     t('ai_sidebar.new_chat'),
   );
 
+  // Memoized so a stable transport instance survives re-renders (chatThreadId is
+  // fixed for this session), instead of allocating a new one on every render.
+  // The factory pins the threadId on the transport body so EVERY request — incl.
+  // regenerate(), which sends no per-call body — carries it (see the factory).
   const transport = useMemo(
-    () =>
-      new DefaultChatTransport({
-        api: '/_api/v3/mastra/message',
-        body: buildMessageRequestBody(chatThreadId),
-      }),
+    () => createMastraChatTransport(chatThreadId),
     [chatThreadId],
   );
 
