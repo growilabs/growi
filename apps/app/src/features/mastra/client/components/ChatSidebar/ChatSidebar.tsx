@@ -286,18 +286,20 @@ export const ChatSidebar = (): JSX.Element => {
                   role="alert"
                   className="tw:my-2 tw:flex tw:flex-col tw:gap-2 tw:rounded-lg tw:border tw:border-destructive/40 tw:bg-destructive/10 tw:p-3 tw:text-sm"
                 >
-                  <div className="tw:flex tw:items-start tw:justify-between tw:gap-2">
+                  <div className="tw:flex tw:items-center tw:justify-between tw:gap-2">
                     <p className="tw:font-medium tw:text-destructive">
                       {t('ai_sidebar.error.title')}
                     </p>
-                    <button
+                    <Button
                       type="button"
-                      className="btn btn-ghost tw:shrink-0 tw:p-0.5"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="tw:-my-1"
                       aria-label={t('ai_sidebar.error.dismiss')}
                       onClick={() => clearError()}
                     >
-                      <XIcon size={14} />
-                    </button>
+                      <XIcon className="tw:size-3.5" />
+                    </Button>
                   </div>
                   {(() => {
                     const detail = resolveChatErrorDetail(error);
