@@ -1031,7 +1031,7 @@ class ElasticsearchDelegator
       });
     }
 
-    if (notGroupIds.length > 0) {
+    if (parsedKeywords.not_group.length > 0) {
       query.body.query.bool.must_not.push({
         terms: { granted_groups: notGroupIds },
       });
