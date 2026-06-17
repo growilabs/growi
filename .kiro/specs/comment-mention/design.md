@@ -501,7 +501,7 @@ it('scopes emoji source to markdown language — not active inside fenced code b
 
 #### `mentionAutocompletionSettings.spec.ts` (modified)
 
-**AC 4.2 test** (new case): Create `createMentionCompletionSource(mockFetch)` and invoke it with `@ab` from an `EditorState` that contains no `emojiAutocompletionSettings` extension. Expect a non-null result. This documents and regression-locks the independence contract — the source already passes today (every existing case in this spec already runs from an emoji-free `EditorState.create({ doc })`), so the test makes the existing guarantee **explicit** rather than adding new coverage. The mention source is debounced + async, so reuse the existing spec's `invoke` helper pattern (`vi.useFakeTimers()` + `mockResolvedValue([...])` + `vi.runAllTimers()`); the mock must return at least one user, as an empty result resolves to `null`.
+**AC 4.2 test** (new case): Create `createMentionCompletionSource(mockFetch)` and invoke it with `@ab` from an `EditorState` that contains no `emojiAutocompletionSettings` extension. Expect a non-null result. This **documents / makes explicit** the existing source-level independence contract — the source already passes today (every existing case in this spec already runs from an emoji-free `EditorState.create({ doc })`). It does NOT lock the facility-level wiring (the test does not import `use-default-extensions`), so it adds no new behavioral coverage; it makes the existing guarantee explicit. The mention source is debounced + async, so reuse the existing spec's `invoke` helper pattern (`vi.useFakeTimers()` + `mockResolvedValue([...])` + `vi.runAllTimers()`); the mock must return at least one user, as an empty result resolves to `null`.
 
 ---
 

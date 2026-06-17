@@ -53,6 +53,9 @@ describe('emoji / mention source decoupling (Requirement 4)', () => {
     });
 
     it('emoji source returns options for ":smi" and mention source returns a result for "@ab" — neither suppresses the other', async () => {
+      // NOTE: this calls the two sources INDEPENDENTLY (each in its own context),
+      // not on a single merged autocompletion() facility. It proves each source
+      // returns a result in isolation — not coexistence on the shared facility.
       // Emoji source: synchronous, driven directly. explicit:true guarantees a
       // non-null result independent of syntax-tree resolution details.
       const emojiResult = emojiCompletionSource(createContext(':smi', 4, true));
