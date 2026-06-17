@@ -30,7 +30,8 @@ const jscodeshift = require('jscodeshift');
 const VIOLATION_EXT_RE = /\.(js|jsx)$/;
 
 /** Non-TS asset extensions that are allowed as-is (should NOT be modified). */
-const INVARIANT_ASSET_RE = /\.(json|cjs|mjs|scss|css|svg|png|jpg|jpeg|gif|woff|woff2|d\.ts)$/;
+const INVARIANT_ASSET_RE =
+  /\.(json|cjs|mjs|scss|css|svg|png|jpg|jpeg|gif|woff|woff2|d\.ts)$/;
 
 // ──────────────────────────────────────────────────────────────────────────────
 // Core: collectViolations
@@ -44,7 +45,8 @@ const INVARIANT_ASSET_RE = /\.(json|cjs|mjs|scss|css|svg|png|jpg|jpeg|gif|woff|w
  * @returns {{ file: string; line: number; rule: string; detail: string }[]}
  */
 function collectViolations(source, filename) {
-  const parser = filename.endsWith('.tsx') || filename.endsWith('.jsx') ? 'tsx' : 'ts';
+  const parser =
+    filename.endsWith('.tsx') || filename.endsWith('.jsx') ? 'tsx' : 'ts';
   const j = jscodeshift.withParser(parser);
 
   let root;
@@ -52,7 +54,10 @@ function collectViolations(source, filename) {
     root = j(source);
   } catch (err) {
     // biome-ignore lint/suspicious/noConsole: lint diagnostic
-    console.error(`[import-extension-guard] parse failed: ${filename}`, err.message);
+    console.error(
+      `[import-extension-guard] parse failed: ${filename}`,
+      err.message,
+    );
     return [];
   }
 
@@ -161,9 +166,10 @@ if (require.main === module) {
   const args = process.argv.slice(2).filter((a) => !a.startsWith('--'));
 
   const appRoot = path.resolve(__dirname, '../..');
-  const targets = args.length > 0
-    ? args.flatMap((a) => walkFiles(path.resolve(a)))
-    : walkFiles(path.join(appRoot, 'src'));
+  const targets =
+    args.length > 0
+      ? args.flatMap((a) => walkFiles(path.resolve(a)))
+      : walkFiles(path.join(appRoot, 'src'));
 
   /** @type {{ file: string; line: number; rule: string; detail: string }[]} */
   let allViolations = [];
