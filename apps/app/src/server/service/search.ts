@@ -465,13 +465,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
       throw err;
     }
 
+    this.validateSearchableData(delegator, data);
+
     data.resolvedFilterData = await this.resolveFilterData(
       data.terms,
       userGroups,
     );
-
-    // throws
-    this.validateSearchableData(delegator, data);
 
     return [
       await delegator.search(data, user, userGroups, searchOpts),
@@ -509,9 +508,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const myGroups = [...internal, ...external];
     const namesToIds = new Map<string, string[]>();
 
-    // Save the all the user's group names and their ids
+    // Save all the user's group names and their ids
     for (const group of myGroups) {
-      const id = group.id.toString();
+      const id = group.id;
       namesToIds.set(group.name, [...(namesToIds.get(group.name) ?? []), id]);
     }
 
