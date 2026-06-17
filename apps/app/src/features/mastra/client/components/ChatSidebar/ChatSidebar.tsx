@@ -35,6 +35,7 @@ import {
 } from '~/components/ai-elements/sources';
 import { Button } from '~/components/ui/button';
 import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
+import type { MastraUIMessage } from '~/features/mastra/interfaces/chat-message';
 
 import {
   useChatSidebarActions,
@@ -94,7 +95,7 @@ export const ChatSidebar = (): JSX.Element => {
     setMessages,
     error,
     clearError,
-  } = useChat({
+  } = useChat<MastraUIMessage>({
     id: chatThreadId,
     transport,
     // Refresh the thread list after the assistant finishes streaming.

@@ -17,6 +17,7 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import type { MastraMessageMetadata } from '../../interfaces/chat-message';
 import { resolveProviderOptions } from '../services/ai-sdk-modules/resolve-provider-options';
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
@@ -79,6 +80,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       try {
         const stream = await growiAgent.stream(messages, {
           requestContext,
+          maxSteps: 20,
           memory: {
             thread: thread.id,
             resource: thread.resourceId,
@@ -138,15 +140,31 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
               writer.write(value);
             }
 
-            const usage = await stream.usage;
+            const [usage, finishReason, steps] = await Promise.all([
+              stream.usage,
+              stream.finishReason,
+              stream.steps,
+            ]);
+
+            // Typed against the shared MastraMessageMetadata so the written
+            // shape stays in sync with what the client reads as
+            // `message.metadata` (see ../../interfaces/chat-message). The
+            // relayed mastra chunks carry `unknown` metadata, so the stream
+            // itself is left ungenerified; this annotation is the write-side
+            // contract.
+            const messageMetadata: MastraMessageMetadata = { finishReason };
+            writer.write({ type: 'message-metadata', messageMetadata });
+
             logger.info(
               {
+                finishReason,
+                stepCount: steps.length,
                 inputTokens: usage.inputTokens,
                 outputTokens: usage.outputTokens,
                 totalTokens: usage.totalTokens,
                 reasoningTokens: usage.reasoningTokens,
               },
-              'Token usage',
+              'Stream finished',
             );
           },
         });
