@@ -1,6 +1,6 @@
 // ref: https://elements.ai-sdk.dev/examples/chatbot
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
 import { DefaultChatTransport } from 'ai';
 import { CopyIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
@@ -78,6 +78,15 @@ export const ChatSidebar = (): JSX.Element => {
     t('ai_sidebar.new_chat'),
   );
 
+  const transport = useMemo(
+    () =>
+      new DefaultChatTransport({
+        api: '/_api/v3/mastra/message',
+        body: buildMessageRequestBody(chatThreadId),
+      }),
+    [chatThreadId],
+  );
+
   const {
     messages,
     sendMessage,
@@ -88,14 +97,7 @@ export const ChatSidebar = (): JSX.Element => {
     clearError,
   } = useChat({
     id: chatThreadId,
-    // Pin the thread id on the transport so EVERY request carries it — not just
-    // sendMessage. regenerate() (the error/message retry) sends no per-call body,
-    // so without this the server would receive no threadId and mint a brand-new
-    // thread on each retry.
-    transport: new DefaultChatTransport({
-      api: '/_api/v3/mastra/message',
-      body: buildMessageRequestBody(chatThreadId),
-    }),
+    transport,
     // Refresh the thread list after the assistant finishes streaming.
     //
     // The thread itself is persisted by the time the stream closes, but
