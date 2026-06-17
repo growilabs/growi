@@ -29,6 +29,7 @@ export const MenuItemType = {
   REVERT: 'revert',
   PATH_RECOVERY: 'pathRecovery',
   SWITCH_CONTENT_WIDTH: 'switch_content_width',
+  PERMISSION: 'permission',
 } as const;
 export type MenuItemType = (typeof MenuItemType)[keyof typeof MenuItemType];
 
@@ -57,6 +58,7 @@ type CommonProps = {
   ) => Promise<void> | void;
   onClickRevertMenuItem?: (pageId: string) => Promise<void> | void;
   onClickPathRecoveryMenuItem?: (pageId: string) => Promise<void> | void;
+  onClickPermissionMenuItem?: (pageId: string) => void;
 
   additionalMenuItemOnTopRenderer?: React.FunctionComponent<AdditionalMenuItemsRendererProps>;
   additionalMenuItemRenderer?: React.FunctionComponent<AdditionalMenuItemsRendererProps>;
@@ -90,6 +92,7 @@ const PageItemControlDropdownMenu = React.memo(
       onClickDeleteMenuItem,
       onClickRevertMenuItem,
       onClickPathRecoveryMenuItem,
+      onClickPermissionMenuItem,
       additionalMenuItemOnTopRenderer: AdditionalMenuItemsOnTop,
       additionalMenuItemRenderer: AdditionalMenuItems,
       isInstantRename,
@@ -156,6 +159,11 @@ const PageItemControlDropdownMenu = React.memo(
       }
       await onClickPathRecoveryMenuItem(pageId);
     }, [onClickPathRecoveryMenuItem, pageId]);
+
+    const permissionItemClickedHandler = useCallback(() => {
+      if (onClickPermissionMenuItem == null) return;
+      onClickPermissionMenuItem(pageId);
+    }, [onClickPermissionMenuItem, pageId]);
 
     let contents = <></>;
 
@@ -256,6 +264,22 @@ const PageItemControlDropdownMenu = React.memo(
                   file_copy
                 </span>
                 {t('Duplicate')}
+              </DropdownItem>
+            )}
+
+          {/* Permission Settings */}
+          {!forceHideMenuItems?.includes(MenuItemType.PERMISSION) &&
+            isEnableActions &&
+            !isReadOnlyUser && (
+              <DropdownItem
+                onClick={permissionItemClickedHandler}
+                data-testid="open-page-permission-modal-btn"
+                className="grw-page-control-dropdown-item"
+              >
+                <span className="material-symbols-outlined me-1 grw-page-control-dropdown-icon">
+                  manage_accounts
+                </span>
+                {t('page_permission.menu_label')}
               </DropdownItem>
             )}
 
@@ -363,6 +387,7 @@ export const PageItemControlSubstance = (
     onClickRenameMenuItem,
     onClickDuplicateMenuItem,
     onClickDeleteMenuItem,
+    onClickPermissionMenuItem,
     onClickPathRecoveryMenuItem,
   } = props;
 
@@ -461,6 +486,7 @@ export const PageItemControlSubstance = (
             onClickDuplicateMenuItem={duplicateMenuItemClickHandler}
             onClickDeleteMenuItem={deleteMenuItemClickHandler}
             onClickPathRecoveryMenuItem={pathRecoveryMenuItemClickHandler}
+            onClickPermissionMenuItem={onClickPermissionMenuItem}
           />
         )}
       </Dropdown>

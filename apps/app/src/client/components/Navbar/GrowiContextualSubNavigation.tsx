@@ -40,6 +40,7 @@ import {
 import { useCurrentPathname, useCurrentUser } from '~/states/global';
 import { useCurrentPageId, useFetchCurrentPage } from '~/states/page';
 import { useShareLinkId } from '~/states/page/hooks';
+import { PagePermissionModal } from '../PageControls/PagePermissionModal';
 import {
   disableLinkSharingAtom,
   isBulkExportPagesEnabledAtom,
@@ -351,6 +352,7 @@ const GrowiContextualSubNavigation = (
 
   const [isPageTemplateModalShown, setIsPageTempleteModalShown] =
     useState(false);
+  const [isPermissionModalShown, setIsPermissionModalShown] = useState(false);
 
   const duplicateItemClickedHandler = useCallback(
     async (page: IPageForPageDuplicateModal) => {
@@ -421,6 +423,13 @@ const GrowiContextualSubNavigation = (
       }
     },
     [isSharedPage, fetchCurrentPage],
+  );
+
+  const permissionMenuItemClickHandler = useCallback(
+    (_pageId: string) => {
+      setIsPermissionModalShown(true);
+    },
+    [],
   );
 
   const additionalMenuItemsRenderer = useCallback(() => {
@@ -498,6 +507,7 @@ const GrowiContextualSubNavigation = (
             onClickRenameMenuItem={renameItemClickedHandler}
             onClickDeleteMenuItem={deleteItemClickedHandler}
             onClickSwitchContentWidth={switchContentWidthHandler}
+            onClickPermissionMenuItem={permissionMenuItemClickHandler}
           />
 
           {isAbleToChangeEditorMode && (
@@ -556,6 +566,14 @@ const GrowiContextualSubNavigation = (
           path={path}
           isOpen={isPageTemplateModalShown}
           onClose={() => setIsPageTempleteModalShown(false)}
+        />
+      )}
+
+      {pageId != null && (
+        <PagePermissionModal
+          isOpen={isPermissionModalShown}
+          pageId={pageId}
+          onClose={() => setIsPermissionModalShown(false)}
         />
       )}
     </>

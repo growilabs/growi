@@ -129,6 +129,7 @@ type CommonProps = {
   onClickRenameMenuItem?: (pageToRename: IPageToRenameWithMeta) => void;
   onClickDeleteMenuItem?: (pageToDelete: IPageToDeleteWithMeta) => void;
   onClickSwitchContentWidth?: (pageId: string, value: boolean) => void;
+  onClickPermissionMenuItem?: (pageId: string) => void;
 };
 
 type PageControlsSubstanceProps = CommonProps & {
@@ -419,6 +420,7 @@ const PageControlsSubstance = (
           onClickRenameMenuItem={renameMenuItemClickHandler}
           onClickDuplicateMenuItem={duplicateMenuItemClickHandler}
           onClickDeleteMenuItem={deleteMenuItemClickHandler}
+          onClickPermissionMenuItem={props.onClickPermissionMenuItem}
         />
       )}
     </div>
