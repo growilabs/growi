@@ -94,6 +94,28 @@ describe('appendCriteriaForGroupFilter()', () => {
     });
   });
 
+  it('combines group and not-group into a single AND clause', () => {
+    const terms = createMockESQueryTerms({
+      group: ['dev-1'],
+      not_group: ['dev-2'],
+    });
+    const query = delegator.createSearchQuery();
+
+    const resolvedFilterData = {
+      groupIds: ['id1'],
+      notGroupIds: ['id2'],
+    };
+
+    delegator.appendCriteriaForGroupFilter(query, terms, resolvedFilterData);
+
+    expect(query.body?.query.bool?.filter).toContainEqual({
+      terms: { granted_groups: ['id1'] },
+    });
+    expect(query.body?.query.bool?.must_not).toContainEqual({
+      terms: { granted_groups: ['id2'] },
+    });
+  });
+
   it('keeps the positive group clause even when no group ids resolve (matching nothing)', () => {
     const terms = createMockESQueryTerms({ group: ['nonexistent'] });
     const query = delegator.createSearchQuery();
@@ -122,8 +144,8 @@ describe('appendCriteriaForGroupFilter()', () => {
     expect(query.body?.query.bool?.must_not).toBeUndefined();
   });
 
-  it('skip the negative group claude when no not-group ids resolve', () => {
-    const terms = createMockESQueryTerms({ group: ['nonexistent'] });
+  it('skips the negative group clause when no not-group ids resolve', () => {
+    const terms = createMockESQueryTerms({ not_group: ['nonexistent'] });
     const query = delegator.createSearchQuery();
 
     const resolvedFilterData = {

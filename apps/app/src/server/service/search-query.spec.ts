@@ -183,6 +183,127 @@ describe('searchParseQuery()', () => {
   });
 });
 
+describe('parseQueryString()', () => {
+  let searchService: TestSearchService;
+  let mockCrowi: MockProxy<Crowi>;
+
+  const emptyTerms = (overrides: Partial<QueryTerms> = {}): QueryTerms => ({
+    match: [],
+    not_match: [],
+    phrase: [],
+    not_phrase: [],
+    prefix: [],
+    not_prefix: [],
+    tag: [],
+    not_tag: [],
+    author: [],
+    not_author: [],
+    editor: [],
+    not_editor: [],
+    group: [],
+    not_group: [],
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+
+    mockCrowi = mock<Crowi>();
+    mockCrowi.configManager = configManager;
+    searchService = new TestSearchService(mockCrowi);
+  });
+
+  it('extracts author into the author bucket and nothing else', () => {
+    const queryString = 'author:alice';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { author: ['alice'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts editor into the editor bucket and nothing else', () => {
+    const queryString = 'editor:john';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { editor: ['john'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts group into the group bucket and nothing else', () => {
+    const queryString = 'group:dev-1';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { group: ['dev-1'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts a negated author into the not_author bucket and nothing else', () => {
+    const queryString = '-author:alice';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { not_author: ['alice'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts a negated editor into the not_editor bucket and nothing else', () => {
+    const queryString = '-editor:john';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { not_editor: ['john'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts a negated group into the not_group bucket and nothing else', () => {
+    const queryString = '-group:dev-1';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { not_group: ['dev-1'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('collects repeated authors into the author bucket in order', () => {
+    const queryString = 'author:alice author:bob';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { author: ['alice', 'bob'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('routes each token to its own bucket in a mixed query', () => {
+    const queryString =
+      'hello author:alice -editor:bob group:dev-1 -group:dev-2';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = {
+      match: ['hello'],
+      author: ['alice'],
+      not_editor: ['bob'],
+      group: ['dev-1'],
+      not_group: ['dev-2'],
+    };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+});
+
+type MockGroupDoc = { id: string; name: string };
+
+// Builds the find().select().exec() chain for both group models.
+// The single `as unknown as` cast is confined here instead of scattered across every test.
+const mockGroupFinds = (
+  internal: MockGroupDoc[],
+  external: MockGroupDoc[],
+): void => {
+  vi.mocked(UserGroup.find).mockReturnValue({
+    select: vi.fn().mockReturnThis(),
+    exec: vi.fn().mockResolvedValue(internal),
+  } as unknown as ReturnType<typeof UserGroup.find>);
+
+  vi.mocked(ExternalUserGroup.find).mockReturnValue({
+    select: vi.fn().mockReturnThis(),
+    exec: vi.fn().mockResolvedValue(external),
+  } as unknown as ReturnType<typeof ExternalUserGroup.find>);
+};
+
 describe('resolveFilterData()', () => {
   let searchService: TestSearchService;
   let mockCrowi: MockProxy<Crowi>;
@@ -196,15 +317,10 @@ describe('resolveFilterData()', () => {
   });
 
   it('resolves the id for an existing group', async () => {
-    vi.mocked(UserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id1', name: 'dev-1' }]),
-    } as any);
-
-    vi.mocked(ExternalUserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id2', name: 'admin-only' }]),
-    } as any);
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'admin-only' }],
+    );
 
     const mockTerms: Partial<QueryTerms> = { group: ['dev-1'] };
     const userGroups = ['id1', 'id2'];
@@ -223,15 +339,10 @@ describe('resolveFilterData()', () => {
   });
 
   it('resolves the ids for several existing groups', async () => {
-    vi.mocked(UserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id1', name: 'dev-1' }]),
-    } as any);
-
-    vi.mocked(ExternalUserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id2', name: 'admin-only' }]),
-    } as any);
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'admin-only' }],
+    );
 
     const mockTerms: Partial<QueryTerms> = { group: ['dev-1', 'admin-only'] };
     const userGroups = ['id1', 'id2'];
@@ -250,15 +361,7 @@ describe('resolveFilterData()', () => {
   });
 
   it('resolves to empty when the group is not among the users groups', async () => {
-    vi.mocked(UserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([]),
-    } as any);
-
-    vi.mocked(ExternalUserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([]),
-    } as any);
+    mockGroupFinds([], []);
 
     const mockTerms: Partial<QueryTerms> = { group: ['dev-1'] };
     const userGroups = [];
@@ -279,18 +382,8 @@ describe('resolveFilterData()', () => {
   });
 
   it('does not resolve any ids on empty group terms', async () => {
-    vi.mocked(UserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([]),
-    } as any);
-
-    vi.mocked(ExternalUserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([]),
-    } as any);
-
     const mockTerms: Partial<QueryTerms> = { group: [] };
-    const userGroups = [];
+    const userGroups = ['id1', 'id2'];
 
     const resolvedIds = await searchService.resolveFilterData(
       mockTerms,
@@ -303,18 +396,15 @@ describe('resolveFilterData()', () => {
     };
 
     expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+    expect(UserGroup.find).not.toHaveBeenCalled();
+    expect(ExternalUserGroup.find).not.toHaveBeenCalled();
   });
 
   it('resolves the ids for not-groups', async () => {
-    vi.mocked(UserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id1', name: 'dev-1' }]),
-    } as any);
-
-    vi.mocked(ExternalUserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id2', name: 'admin-only' }]),
-    } as any);
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'admin-only' }],
+    );
 
     const mockTerms: Partial<QueryTerms> = {
       not_group: ['dev-1', 'admin-only'],
@@ -335,15 +425,10 @@ describe('resolveFilterData()', () => {
   });
 
   it('resolves the ids for not-group combined with group', async () => {
-    vi.mocked(UserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id1', name: 'dev-1' }]),
-    } as any);
-
-    vi.mocked(ExternalUserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id2', name: 'admin-only' }]),
-    } as any);
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'admin-only' }],
+    );
 
     const mockTerms: Partial<QueryTerms> = {
       group: ['admin-only'],
@@ -403,15 +488,10 @@ describe('resolveFilterData()', () => {
   });
 
   it('resolves to correct ids when group names are identical', async () => {
-    vi.mocked(UserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id1', name: 'dev-1' }]),
-    } as any);
-
-    vi.mocked(ExternalUserGroup.find).mockReturnValue({
-      select: vi.fn().mockReturnThis(),
-      exec: vi.fn().mockResolvedValue([{ id: 'id2', name: 'dev-1' }]),
-    } as any);
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'dev-1' }],
+    );
 
     const mockTerms: Partial<QueryTerms> = {
       group: ['dev-1'],
