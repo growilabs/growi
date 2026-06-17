@@ -27,11 +27,12 @@ type CommentsProps = {
   pageId: string;
   pagePath: string;
   revision: IRevisionHasId;
+  isReadOnly?: boolean;
   onLoaded?: () => void;
 };
 
 export const Comments = (props: CommentsProps): JSX.Element => {
-  const { pageId, pagePath, revision, onLoaded } = props;
+  const { pageId, pagePath, revision, isReadOnly = false, onLoaded } = props;
 
   const { t } = useTranslation('');
 
@@ -86,10 +87,10 @@ export const Comments = (props: CommentsProps): JSX.Element => {
           pagePath={pagePath}
           revision={revision}
           currentUser={currentUser}
-          isReadOnly={false}
+          isReadOnly={isReadOnly}
         />
       </div>
-      {!isDeleted && (
+      {!isDeleted && !isReadOnly && (
         <div id="page-comment-write">
           <CommentEditorPre
             pageId={pageId}
