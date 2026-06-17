@@ -1091,9 +1091,6 @@ importers:
       '@types/node':
         specifier: ^20.18.3
         version: 20.19.17
-      unplugin-swc:
-        specifier: ^1.5.3
-        version: 1.5.5(@swc/core@1.10.7(@swc/helpers@0.5.18))(rollup@4.39.0)
       vitest:
         specifier: ^2.0.0
         version: 2.1.9(@types/node@20.19.17)(@vitest/ui@3.2.4(vitest@3.2.4))(happy-dom@15.7.4)(jsdom@26.1.0)(sass@1.77.6)
