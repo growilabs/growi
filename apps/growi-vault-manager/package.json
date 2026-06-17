@@ -7,8 +7,8 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:vault-manager": "cross-env NODE_ENV=development SWCRC=true node --import @swc-node/register/esm-register src/index.ts",
-    "dev:vault-manager:ci": "cross-env NODE_ENV=development SWCRC=true node --import @swc-node/register/esm-register src/index.ts --ci",
+    "dev:vault-manager": "cross-env NODE_ENV=development node --import @swc-node/register/esm-register src/index.ts",
+    "dev:vault-manager:ci": "cross-env NODE_ENV=development node --import @swc-node/register/esm-register src/index.ts --ci",
     "start:prod": "cross-env NODE_ENV=production node dist/index.js",
     "start:prod:ci": "cross-env NODE_ENV=production pnpm start:prod --ci",
     "lint:biome": "biome check",
