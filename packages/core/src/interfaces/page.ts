@@ -46,6 +46,14 @@ export type IPage = {
   expandContentWidth?: boolean;
   wip?: boolean;
   ttlTimestamp?: Date;
+
+  // write permission
+  writeGrant: PageWriteGrant;
+  writeGrantedUsers: Ref<IUser>[];
+  writeGrantedGroups: IGrantedGroup[];
+
+  // readOnly permission per page
+  readOnlyUserIds: Ref<IUser>[];
 };
 
 export type IPagePopulatedToShowRevision = Omit<
@@ -75,6 +83,14 @@ export const PageGrant = {
 type UnionPageGrantKeys = keyof typeof PageGrant;
 export type PageGrant = (typeof PageGrant)[UnionPageGrantKeys];
 
+export const PageWriteGrant = {
+  WRITE_GRANT_PUBLIC: 1,
+  WRITE_GRANT_OWNER: 2,
+  WRITE_GRANT_USER_GROUP: 4,
+} as const;
+type UnionPageWriteGrantKeys = keyof typeof PageWriteGrant;
+export type PageWriteGrant = (typeof PageWriteGrant)[UnionPageWriteGrantKeys];
+
 export const PageStatus = {
   STATUS_PUBLISHED: 'published',
   STATUS_DELETED: 'deleted',
@@ -97,6 +113,7 @@ export type IPageInfo = {
   isDeletable: boolean;
   isAbleToDeleteCompletely: boolean;
   isRevertible: boolean;
+  isEditable: boolean;
   bookmarkCount: number;
 };
 
