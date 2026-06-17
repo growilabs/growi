@@ -21,6 +21,7 @@ export type IUser = {
   slackMemberId?: string;
   createdAt: Date;
   lastLoginAt?: Date;
+  contributionsMigratedAt?: Date;
   introduction: string;
   status: IUserStatus;
 };

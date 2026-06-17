@@ -851,6 +851,7 @@ export const setup = (crowi) => {
         targetModel: SupportedTargetModel.MODEL_PAGE,
         target: page,
         action: SupportedAction.ACTION_PAGE_DUPLICATE,
+        contributor: req.user,
       };
 
       activityEvent.emit(

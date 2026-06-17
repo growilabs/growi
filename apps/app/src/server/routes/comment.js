@@ -307,6 +307,7 @@ export const setup = (crowi, _app) => {
       eventModel: SupportedEventModel.MODEL_COMMENT,
       event: createdComment.id,
       action: SupportedAction.ACTION_COMMENT_CREATE,
+      contributor: req.user,
     };
 
     /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */

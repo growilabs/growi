@@ -89,6 +89,7 @@ const factory = (crowi) => {
         index: true,
       },
       lastLoginAt: { type: Date, index: true },
+      contributionsMigratedAt: { type: Date },
       admin: { type: Boolean, default: 0, index: true },
       readOnly: { type: Boolean, default: 0 },
       isInvitationEmailSended: { type: Boolean, default: false },
