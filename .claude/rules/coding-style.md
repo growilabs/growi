@@ -75,6 +75,50 @@ const activeBindings = allGroups
   .flatMap(group => group.bindings);
 ```
 
+### Executors Take Their Work-Set as Input (Don't Own It)
+
+Keep **"how to do X"** separate from **"what to do X to"**. A module whose job is to
+*perform* an operation over a set of items — a loader, runner, batch processor,
+dispatcher, pipeline assembler — should receive that set as a **parameter**, not
+`import` the specific dataset itself. Declare the set once in a dedicated module;
+every consumer (the executor **and** any validator/drift test) reads that single
+source.
+
+Why: the executor keeps one responsibility (the mechanism), stays reusable with
+any input, and is unit-testable with a small fixture list. The declaration stays
+the single source of truth, so adding/removing an item is a one-file change that
+never touches the executor.
+
+```typescript
+// ❌ WRONG: the loader owns *what* to load — coupled to one dataset, hard to test
+// esm-plugin-loader.ts
+import { ADOPTED_PLUGINS } from './plugin-set';
+export async function loadPlugins(baseDir: string) {
+  return Promise.all(ADOPTED_PLUGINS.map(d => dynamicImport(d.specifier ?? d.name, baseDir)));
+}
+
+// ✅ CORRECT: the caller passes what to load; the loader only loads
+// esm-plugin-loader.ts — pure, reusable, testable with any declaration list
+export async function loadPlugins(
+  baseDir: string,
+  declarations: readonly PluginDeclaration[],
+) {
+  return Promise.all(declarations.map(d => dynamicImport(d.specifier ?? d.name, baseDir)));
+}
+// caller composes:  loadPlugins(__dirname, ADOPTED_PLUGINS)
+// plugin-set.ts stays the single source the loader AND the drift test both read
+```
+
+**Corollary — declare items in the set, don't special-case them in the executor.**
+If an item belongs to the set, add it to the declaration (encode order/options/
+variant as data) rather than branching for it inside the loop. A positional
+`if (item === 'the-last-one') doSpecialThing()` is a sign the declaration is
+incomplete. Reserve executor-side branches for genuinely **runtime-computed**
+inputs (e.g. a value built from another async load), not static configuration.
+
+**Applies to**: plugin/middleware registries, job runners, migration/seed runners,
+codegen over a manifest, route tables, any "iterate a list and act on each" module.
+
 ### Factory Pattern with Encapsulated Metadata
 
 When a module produces a value that needs consumer-side configuration (precedence, feature flags, etc.), **bundle the metadata alongside the value** in a structured return type. This keeps decision-making inside the module that has the knowledge.
@@ -247,6 +291,7 @@ Before marking work complete:
 - [ ] Co-located tests
 - [ ] Non-trivial logic extracted as pure functions from framework wrappers
 - [ ] No hard-coded mode/variant checks in consumers (use declared metadata)
+- [ ] **Executors/loaders/runners receive their work-set as input** (don't `import` the dataset); items are declared in a single source, not special-cased in the consumer
 - [ ] Modules with multiple responsibilities split by domain
 - [ ] **Module public surface is minimal** — `index.ts` re-exports only what external callers need; internals stay unexported
 - [ ] **Cohesive internals are grouped in subdirectories** with their own barrel, not flattened into the parent
