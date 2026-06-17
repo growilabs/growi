@@ -7,7 +7,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import { useAtomCallback } from 'jotai/utils';
 
 import { useIsGuestUser, useIsReadOnlyUser } from '../context';
-import { useCurrentPathname } from '../global';
+import { useCurrentPathname, useCurrentUser } from '../global';
 import {
   currentPageDataAtom,
   currentPageEmptyIdAtom,
@@ -117,9 +117,27 @@ export const useIsNotCreatable = (): boolean => {
 /**
  * Computed hook for checking if current page is editable
  */
+export const useCurrentPageReadOnlyUserIds = (): string[] => {
+  const currentPageData = useAtomValue(currentPageDataAtom);
+  return useMemo(() => {
+    return (currentPageData as any)?.readOnlyUserIds ?? [];
+  }, [currentPageData]);
+};
+
+export const useIsReadOnlyUserForPage = (): boolean => {
+  const currentUser = useCurrentUser();
+  const readOnlyUserIds = useCurrentPageReadOnlyUserIds();
+
+  return useMemo(() => {
+    if (currentUser == null) return false;
+    return readOnlyUserIds.some((userId) => userId === currentUser._id);
+  }, [currentUser, readOnlyUserIds]);
+};
+
 export const useIsEditable = () => {
   const isGuestUser = useIsGuestUser();
   const isReadOnlyUser = useIsReadOnlyUser();
+  const isReadOnlyUserForPage = useIsReadOnlyUserForPage();
   const isNotCreatable = useIsNotCreatable();
   const isForbidden = useAtomValue(isForbiddenAtom);
   const isIdenticalPath = useAtomValue(isIdenticalPathAtom);
@@ -128,6 +146,7 @@ export const useIsEditable = () => {
     return (
       !isGuestUser &&
       !isReadOnlyUser &&
+      !isReadOnlyUserForPage &&
       !isNotCreatable &&
       !isForbidden &&
       !isIdenticalPath
@@ -135,6 +154,7 @@ export const useIsEditable = () => {
   }, [
     isGuestUser,
     isReadOnlyUser,
+    isReadOnlyUserForPage,
     isNotCreatable,
     isForbidden,
     isIdenticalPath,
