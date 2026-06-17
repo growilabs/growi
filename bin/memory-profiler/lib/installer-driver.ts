@@ -10,7 +10,7 @@
  * route (apps/app/src/server/routes/apiv3/installer.ts).
  */
 
-import type { HttpClient } from './http-client';
+import type { HttpClient } from './http-client.ts';
 
 // ---------------------------------------------------------------------------
 // Types
