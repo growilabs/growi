@@ -11,6 +11,7 @@ import type {
 import type { HydratedDocument, Types } from 'mongoose';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
+import type { SupportedActionType } from '~/interfaces/activity';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
@@ -111,6 +112,7 @@ export interface IPageService {
     options,
     pageOpId: ObjectIdLike,
     activity?,
+    resolvedAction?: SupportedActionType,
   ): Promise<void>;
   revertDeletedPage(
     page,
