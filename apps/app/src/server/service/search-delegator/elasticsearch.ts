@@ -410,6 +410,12 @@ class ElasticsearchDelegator
 
     try {
       // reindex to tmp index
+      const isExistsTmpIndex = await client.indices.exists({
+        index: tmpIndexName,
+      });
+      if (isExistsTmpIndex) {
+        await client.indices.delete({ index: tmpIndexName });
+      }
       await this.createAuditlogIndex(tmpIndexName);
       await client.reindex(indexName, tmpIndexName);
 
@@ -425,22 +431,15 @@ class ElasticsearchDelegator
       await client.indices.delete({ index: indexName });
       await this.createAuditlogIndex(indexName);
       await this.addAllAuditlogs();
-
-      await client.indices.updateAliases({
-        actions: [
-          { add: { alias: aliasName, index: indexName } },
-          { remove: { alias: aliasName, index: tmpIndexName } },
-        ],
-      });
-
-      await client.indices.delete({ index: tmpIndexName });
     } catch (error) {
-      try {
-        await this.normalizeAuditlogIndices();
-      } catch (normalizeErr) {
-        logger.error('Failed to restore auditlog indices', normalizeErr);
-      }
+      logger.error(
+        { err: error },
+        "An error occured while 'rebuildAuditlogIndex'.",
+      );
+      logger.error({ body: error?.meta?.body }, 'error.meta.body');
       throw error;
+    } finally {
+      await this.normalizeAuditlogIndices();
     }
   }
 
@@ -674,7 +673,7 @@ class ElasticsearchDelegator
     if (username == null || username === '') return [];
     return [
       {
-        index: { _index: this.auditlogAliasName, _id: activity._id.toString() },
+        index: { _index: this.auditlogIndexName, _id: activity._id.toString() },
       },
       { username },
     ];
