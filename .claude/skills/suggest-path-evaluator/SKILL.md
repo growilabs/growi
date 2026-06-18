@@ -17,24 +17,6 @@ description: >-
 
 # suggest-path Evaluator (plausibility-domain, wiki-aware, drilldown-backed)
 
-> **★ STATUS (2026-06-18): rebuilt around the human's actual judging procedure.** An earlier
-> generation of this skill fixed **one** "correct" save location and scored proposals
-> hit/near-miss/miss against it — which over-punished any proposal that differed from that one
-> pick (the "answer-key mismatch" problem). A later draft swung the other way: it judged each
-> candidate from the path string alone (no wiki content) as a 2-value o/x, which systematically
-> over-marked o (it could never say "x" with confidence because it never knew where the
-> document *should* go), and was calibrated wiki-blind against wiki-blind human labels — the
-> wrong target entirely. **This version is the synthesis:** it reads page **content**, drills
-> down to build the document's ideal home (Phase B), but still scores each candidate on its own
-> merits as **○/△/×** (Phase A). Calibration is now **eyeball-led** (a human spot-checks a few
-> outputs; weighted κ is a reference number, not a pass/fail gate). The old κ≥0.6 ∧
-> x-recall≥0.7 gate is **retired** (it was for the 2-value, wiki-blind setup). The Phase-B
-> "drill before you rule out" flow is the central change; its premise (that judging without
-> exploration drifts o because it can never name a better place) is a **hypothesis to confirm
-> by spot-check after the skill runs**. See `tmp/calib-pilot/CALIBRATION-PROTOCOL.md` and the
-> `suggest-path-evaluator-calibration` memory's "2026-06-18 セッション" section (the canonical
-> design source).
-
 ## What this is
 
 GROWI's `suggest-path` takes a document body and proposes parent paths to save it under.
@@ -60,29 +42,25 @@ enough to know when a candidate is beaten, without collapsing the answer to one 
 
 ## ★★ The non-negotiable constraint: wiki-agnostic
 
-This skill is used on **an unknown wiki** (wiki-agnostic). It is calibrated on the GROWI dev
-wiki today, but **must not be optimized to the dev wiki** (= overfitting).
+This skill is used on **an unknown wiki** (wiki-agnostic). It **must not be optimized to any
+one wiki** (= overfitting).
 
-The same "spec document" may correctly live at `/資料/仕様/`, or root-level `/仕様/`, or
-`/project/hoge/仕様/`, depending on the wiki. **All are correct — only the filing convention
-differs.** The job is: *given THIS wiki's own organization, is placing this document at this
-candidate path reasonable, and is there a clearly better home?* — never *does it match a
-specific canonical tree?*
+The same kind of document may correctly live in very different places depending on the wiki —
+a spec might sit at `/docs/spec/`, or root-level `/spec/`, or `/project/<name>/spec/`. **All
+are correct — only the filing convention differs.** The job is: *given THIS wiki's own
+organization, is placing this document at this candidate path reasonable, and is there a
+clearly better home?* — never *does it match a specific canonical tree?*
 
 Hard rules that follow:
 
-- **Never encode dev-wiki-specific path strings or directory names** (`/資料/内部仕様/` etc.)
-  into the judgement. Reason from structure, not from memorized paths. The moment a concrete
-  dev-wiki path becomes a criterion, this becomes a dev-wiki-only tool.
-- **Infer the wiki's classification system from the tree itself** (the candidate tree and
-  what you see while drilling down), then judge whether the document's character fits it.
-  Example: if this wiki separates internal-spec from external-spec trees, respect that
-  separation; but the *criterion* is "respect the separation THIS wiki makes", not "the words
-  内部仕様/外部仕様 are canonical".
-- The human-facing calibration rubric (`tmp/calib-pilot/RUBRIC.md`) contains dev-wiki examples
-  on purpose (it is a tool for a human to label the dev-wiki sheet). **That rubric is raw
-  material, not this skill's prompt.** Only the *distilled, wiki-agnostic principles* below
-  come from it; the concrete examples do not transfer here.
+- **Never encode specific path strings or directory names** into the judgement. Reason from
+  structure, not from memorized paths. The moment a concrete path becomes a fixed criterion,
+  this becomes a single-wiki tool.
+- **Infer the wiki's classification system from the tree itself** (the candidate tree and what
+  you see while drilling down), then judge whether the document's character fits it. Example:
+  if this wiki keeps separate trees for different document kinds (specs vs manuals vs minutes),
+  respect that separation — but the *criterion* is "respect the separation THIS wiki makes",
+  not any particular directory name being canonical.
 
 ## The judgement stance
 
@@ -99,26 +77,23 @@ Aim to **draw the boundary of plausibility**, not to hit one narrow correct answ
   an API spec was discussed" may belong under minutes *or* under a spec-discussion area — allow
   both ○.) But "put an API definition into the meeting-minutes tree" → ×.
 
-## The judgement principles (wiki-agnostic; pinned 2026-06-18 against intra-rater data)
+## The judgement principles (wiki-agnostic)
 
-These are the wiki-agnostic principles distilled from the calibration rubric, then tuned by
-what the human could **reproduce** across two passes. Transferable reasoning, **no dev-wiki
-path strings**. The ordering matters: the **firm axes** are where the human never wavered —
-apply them decisively. The **soft axis (depth)** is where the human's own labels swung on a
-re-pass — so do not be rigid there; lean ○/△, not ×.
+Transferable reasoning, **no fixed path strings**. The ordering matters: the **firm axes** are
+applied decisively; the **soft axis (depth)** must not be applied rigidly — there, lean ○/△,
+not ×.
 
-### Firm axes — apply decisively (the human reproduced these)
+### Firm axes — apply decisively
 
 1. **Clear mis-placement is × — this is the core job.** A candidate whose subject or
    document-kind plainly does not belong (meeting-notes proposed under a UI-design tree; an API
-   definition under a minutes tree) is × with confidence. In the calibration these "obvious no"
-   verdicts were the most stable signal (159/187 ×-labels held across a re-pass). Spend your
-   confidence here.
+   definition under a minutes tree) is × with confidence. The "obvious no" is the most reliable
+   verdict this skill makes — spend your confidence here.
 2. **"Usable" = you would actually file it here**, not merely "same broad genre". Genre match
    alone is not enough; it must be a place a careful person would actually choose.
 3. **Personal/private areas are × for shared content** (a candidate under someone's personal
    user space, for content that should be a shared wiki asset). It won't become a shared asset
-   there. (In the calibration this axis had **zero** re-pass disagreements — treat it as firm.)
+   there.
 4. **Classification-axis mismatch is × even if the topic matches.** If the document's *kind*
    (spec / manual / minutes / decision-record / …) conflicts with the candidate's
    classification — even when the subject name matches perfectly — it is ×. Read this
@@ -129,12 +104,11 @@ re-pass — so do not be rigid there; lean ○/△, not ×.
    kind-mismatch that the path name alone hides — and avoid a false × when the path name looks
    wrong but the content fits.)
 
-### Soft axis — do NOT be rigid (the human could not reproduce strictness here)
+### Soft axis — do NOT be rigid
 
 5. **Depth is a soft call — when a candidate is right in subject/kind but arguably one level
-   off, lean ○/△, never ×.** This is the single most important correction from the calibration:
-   every intra-rater disagreement (38/38) was a depth call, and the human systematically
-   *relaxed* toward ○ on the re-pass. So:
+   off, lean ○/△, never ×.** Depth is genuinely ambiguous: a careful person filing the same
+   document twice may not even nest it the same way. So:
    - **Too shallow → ○ (or △).** A parent broader than ideal still leaves room to nest later;
      not fatal as long as subject/kind direction is right. Decide ○ vs △ by THIS wiki's habit
      (Phase A step on shallow candidates, below): if siblings under the candidate are organized
@@ -145,8 +119,7 @@ re-pass — so do not be rigid there; lean ○/△, not ×.
    - **Too deep → usually ○, not ×.** A slightly-narrower box is a *soft* miss. Mark
      deep-but-on-topic candidates × **only** when the box is *clearly* narrower than the
      document's whole scope (a doc about a feature in general, proposed under one sub-detail of
-     that feature). When it's a judgement call, lean ○/△. Do not manufacture strictness the
-     human herself doesn't hold.
+     that feature). When it's a judgement call, lean ○/△. Do not manufacture strictness.
 
 ### Tie-breakers
 
@@ -154,8 +127,7 @@ re-pass — so do not be rigid there; lean ○/△, not ×.
    force a single best.
 7. **"When in doubt, ×" applies to KIND/subject doubt, not depth doubt.** If you're unsure
    because the subject or document-kind might not fit (axes 1–4), lean ×. If you're unsure only
-   about *how deep* an otherwise-fitting candidate sits (axis 5), lean ○/△. This split is
-   exactly where the human's reproducible judgement and her wavering judgement divide.
+   about *how deep* an otherwise-fitting candidate sits (axis 5), lean ○/△.
 
 ## Inputs
 
@@ -186,10 +158,9 @@ justification — do not let it sway you; judge body × path on your own.** If s
 zero proposals, record that as a result (nothing to mark usable), do not silently skip.
 
 > **Note on the wiki source.** Both phases read the wiki tree **and page content** through a
-> **Vault interface** — see `references/tree-source.md` for how to source it today (devcontainer
-> GROWI via MongoDB direct-read) and the Vault boundary to preserve. Judge **content fit**, not
-> path-string similarity: a path can string-match a surface word yet be the wrong home (exactly
-> suggest-path's own failure mode).
+> **Vault interface** — see `references/tree-source.md` for how to source it today and the
+> Vault boundary to preserve. Judge **content fit**, not path-string similarity: a path can
+> string-match a surface word yet be the wrong home (exactly suggest-path's own failure mode).
 
 ### Phase A — judge each candidate ○ / △ / ×
 
@@ -202,9 +173,9 @@ For **each** proposed parent path:
    - **Box page** (`$lsx()`-only / empty / non-existent intermediate — a grouping page) → its
      body says nothing; **look at its children (titles + snippets) to learn what the box is
      for.** In GROWI, parent directories tend to be `$lsx()`-only; the box's identity is told by
-     its contents, not its own body. (Measured on the dev wiki: ~44% of candidate levels are
-     boxes — so this is the common case, not the exception.) Without reading children you cannot
-     judge a box; do not guess from its path name.
+     its contents, not its own body. A large share of candidate levels are such boxes, so this
+     is the common case, not the exception. Without reading children you cannot judge a box; do
+     not guess from its path name.
    - A path/title can look wrong while the content fits (or vice versa) — reading the snippet is
      what catches kind-mismatches (axis 4) and prevents false ×.
 3. **Score the candidate on its own merits** (do not overturn it just because Phase B found
@@ -243,9 +214,9 @@ From the root, at each level:
   descend into. Don't commit to one child on a single glance — that prunes a better branch too
   early.
 - **d.** Stop when **no child fits the document better than the current node** — the current
-  node is the recommended save location. Depth cap **5 levels** as a backstop (also a cycle
-  guard); the real stop is "no better child", not the cap. (Dev-wiki candidate paths average
-  ~2.5 deep; max observed 7. 5 is plenty for the common case — note it if you hit the cap.)
+  node is the recommended save location. Depth cap **5 levels** as a backstop and cycle guard;
+  the real stop is "no better child", not the cap. Most save locations are far shallower than
+  5, so the cap rarely bites — note it if you hit it.
 - If nothing along the descent fits, conclude **"new path"** and state where it would hang.
 
 "Better fit" is a **judgement call you make** (LLM judgement) — do **not** reduce it to a
@@ -255,11 +226,10 @@ Phase A and Phase B **share work**: in both you read a node's children to unders
 granularity habit. Do it once and reuse it — the box-identity reads in Phase A step 2 and the
 child-listing in Phase B are the same kind of access.
 
-> **Cost caveat (unverified).** Reading up to 3 full bodies per level can add up on deep trees.
-> The snippet cost is measured and light (~505 chars/case average); **full-body reads in Phase B
-> are not yet measured.** Run the defaults above (beam ≤3, full-reads ≤3, depth ≤5) on a few
-> cases first, measure the real cost, and retune the beam/depth if needed. Don't assume it's
-> free.
+> **Cost caveat.** Reading up to 3 full bodies per level can add up on deep trees. Listing
+> children with short snippets is cheap; the full-body reads are the cost to watch. Run the
+> defaults above (beam ≤3, full-reads ≤3, depth ≤5) on a few cases first, measure the real
+> cost, and retune the beam/depth if needed. Don't assume it's free.
 
 ### Step 4. Report
 
@@ -312,37 +282,26 @@ Group by whatever "domain" fits the batch (wiki area, document type). If you bou
 (sampled docs, capped the proposal list, hit the depth cap), **say so** — a silent cap reads as
 "measured everything".
 
-## Calibration: how this skill's verdicts are checked (eyeball-led)
+## On the verdict unit (why ○/△/× and not hit/miss)
 
-The ○/△/× verdict is the same unit a human labels in calibration. Calibration asks whether
-*this skill's* verdicts agree with a human's — but the check is now **eyeball-led, not a numeric
-gate**:
+The ○/△/× verdict is deliberately a **plausibility** judgement, not an answer-key match. A
+human reviewing the same proposals marks candidates the same way — so this skill's output can
+be sanity-checked by a human reading a handful of cases. Two things to keep in mind when doing
+that:
 
-- **The pass/fail is a human spot-check**: a human reads a handful of this skill's outputs and
-  decides whether the verdicts and the drilldown homes are sane; then repeats on a small sample
-  from **another** wiki to confirm it transfers. That judgement is the gate.
-- **Weighted κ is a reference number, not a gate.** Compute it against human ○/△/× labels as one
-  diagnostic among others; do not pass/fail on it. Use a **linear** weight matrix: ○↔△ = 0.5
-  (light), △↔× = 0.5 (medium), ○↔× = 1.0 (full) — adjacent classes are half-penalised, the two
-  extremes are full-penalised. (`tmp/calib-pilot/intra-kappa.js` is the 2-value version; a
-  weighted-κ variant must be written for ○/△/×.)
-- The **old gate is retired**: κ≥0.6 ∧ x-recall≥0.7 was for the 2-value, wiki-blind setup whose
-  premises the 2026-06-18 session overturned. Do not reinstate it.
-- Human labels are the gold standard but **not absolute truth**: a human marks candidates, while
-  this skill, seeing the whole tree via Phase B, may know a better home the human overlooked. So
-  **human-○ / skill-△ (and vice versa) is expected, not a bug** — don't chase κ=1.0; the ceiling
-  is the human's own test-retest agreement.
-- When tuning this skill after a spot-check, fix disagreements **only** by sharpening
-  wiki-agnostic principles — **never** by adding concrete dev-wiki paths to raise agreement (that
-  raises the number but breaks on other wikis).
-- Human labels for calibration must be re-taken **wiki-aware and in ○/△/×** to match this flow;
-  the older wiki-blind, 2-value labels are not a valid target for this skill.
+- The human's marks are a useful reference but **not absolute truth**: a human marks candidates
+  one by one, while this skill, seeing the whole tree via Phase B, may know a better home the
+  human overlooked. So **human-○ / skill-△ (and vice versa) is expected, not a bug** — the two
+  will not agree perfectly, and shouldn't be forced to.
+- If the skill ever needs tuning, fix disagreements **only** by sharpening the wiki-agnostic
+  principles above — **never** by adding concrete paths to make one wiki's numbers look better
+  (that helps one wiki and breaks every other).
 
 ## References
 
-- `references/tree-source.md` — how to source the wiki tree **and page content** today (Vault
-  adapter: devcontainer GROWI via MongoDB direct-read) and the Vault-interface boundary to
-  preserve. Phase A (box-identity reads) and Phase B (beam descent) both go through it.
+- `references/tree-source.md` — how to source the wiki tree **and page content** today (the
+  current adapter and the Vault-interface boundary to preserve). Phase A (box-identity reads)
+  and Phase B (beam descent) both go through it.
 - `scripts/reconcile-digests.py` — deterministic self-consistency gate for batch mode (every
   key term in a document's digest must appear in that document's body; exits non-zero on a
   suspected body-swap).

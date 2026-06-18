@@ -138,8 +138,8 @@ Reuse pattern 1's `children` read at each level — Phase A and Phase B share th
   the document yet be the wrong home — exactly suggest-path's own failure mode. Read enough
   bodies (snippets for breadth, full bodies for the few you descend into) to avoid repeating that
   mistake as the evaluator.
-- **Boxes are common (~44% of candidate levels on the dev wiki).** Don't judge a box from its
-  path name; read its children.
+- **Boxes are common** — a large share of candidate levels are `$lsx()`-only / empty grouping
+  pages. Don't judge a box from its path name; read its children.
 - **Server-running is not required.** This adapter reads Mongo directly, so it works whether or
   not the dev web server is up. (suggest-path itself, in Step 0, does need a reachable endpoint —
   MCP or the HTTP route; if the server is down, get the proposals via MCP.)
