@@ -1,10 +1,10 @@
 import { vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
-import ExternalUserGroup, {} from '~/features/external-user-group/server/models/external-user-group';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type Crowi from '~/server/crowi';
-import UserGroup, {} from '~/server/models/user-group';
+import UserGroup from '~/server/models/user-group';
 import { configManager } from '~/server/service/config-manager/config-manager';
 
 import type { QueryTerms, SearchDelegator } from '../interfaces/search';
@@ -258,10 +258,10 @@ describe('resolveFilterData()', () => {
   });
 
   it('resolves to empty when the group is not among the users groups', async () => {
-    mockGroupFinds([], []);
+    mockGroupFinds([{ id: 'id1', name: 'other-group' }], []);
 
     const mockTerms: Partial<QueryTerms> = { group: ['dev-1'] };
-    const userGroups = [];
+    const userGroups = ['id1'];
 
     const resolvedIds = await searchService.resolveFilterData(
       mockTerms,
@@ -276,6 +276,25 @@ describe('resolveFilterData()', () => {
     expect(resolvedIds).toStrictEqual(expectedResolvedIds);
     expect(UserGroup.find).toHaveBeenCalled();
     expect(ExternalUserGroup.find).toHaveBeenCalled();
+  });
+
+  it('returns early without querying when the user belongs to no groups', async () => {
+    const mockTerms: Partial<QueryTerms> = { group: ['dev-1'] };
+    const userGroups = [];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: [],
+      notGroupIds: [],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+    expect(UserGroup.find).not.toHaveBeenCalled();
+    expect(ExternalUserGroup.find).not.toHaveBeenCalled();
   });
 
   it('does not resolve any ids on empty group terms', async () => {

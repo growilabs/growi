@@ -498,6 +498,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     // Early-return (no MongoDB query) for guests or when no group operator was typed.
     if (
       userGroups == null ||
+      userGroups.length < 1 ||
       (groupTerms.length === 0 && notGroupTerms.length === 0)
     ) {
       const emptyFilterData: ResolvedFilterData = {
