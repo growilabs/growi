@@ -3,6 +3,8 @@ import { describe, expect, it } from 'vitest';
 import {
   isEmailMatchedByEntry,
   isValidWhitelistEntry,
+  normalizeWhitelistEntries,
+  normalizeWhitelistEntry,
 } from './email-whitelist';
 
 describe('isValidWhitelistEntry', () => {
@@ -139,5 +141,100 @@ describe('isEmailMatchedByEntry', () => {
         false,
       );
     });
+  });
+});
+
+describe('normalizeWhitelistEntry', () => {
+  it.each([
+    ['growi.org', ['@growi.org', '@*.growi.org']],
+    ['sub.example.com', ['@sub.example.com', '@*.sub.example.com']],
+    ['a.b.c', ['@a.b.c', '@*.a.b.c']],
+  ])('expands legacy bare-domain entry to exact + wildcard: %s -> %j', (input, expected) => {
+    expect(normalizeWhitelistEntry(input)).toEqual(expected);
+  });
+
+  it('expands a bare wildcard domain to a single valid wildcard entry (no double wildcard)', () => {
+    // `@*.*.example.com` is not a valid entry, so only the wildcard form is kept
+    expect(normalizeWhitelistEntry('*.example.com')).toEqual([
+      '@*.example.com',
+    ]);
+  });
+
+  it.each([
+    '@growi.org',
+    '@*.example.com',
+  ])('leaves valid domain entry untouched: %s', (entry) => {
+    expect(normalizeWhitelistEntry(entry)).toEqual([entry]);
+  });
+
+  it.each([
+    'user@growi.org',
+    'User@GROWI.ORG',
+  ])('leaves valid email entry untouched: %s', (entry) => {
+    expect(normalizeWhitelistEntry(entry)).toEqual([entry]);
+  });
+
+  it('trims surrounding whitespace before normalizing', () => {
+    expect(normalizeWhitelistEntry('  growi.org  ')).toEqual([
+      '@growi.org',
+      '@*.growi.org',
+    ]);
+  });
+
+  it.each([
+    ['example', 'single-label (no dot)'],
+    ['not a domain', 'space in entry'],
+    ['', 'empty string'],
+  ])('returns unchanged when prepending @ does not form a valid entry: %s (%s)', (input) => {
+    expect(normalizeWhitelistEntry(input)).toEqual([input.trim()]);
+  });
+
+  // Regression: a legacy bare-domain entry must match its users again after normalization.
+  // Before the strict @-prefixed format, `growi.org` matched BOTH `user@growi.org` and
+  // `user@sub.growi.org` (unanchored regex). The new matcher requires the leading @ and
+  // separates exact vs subdomain, so the entry must expand to @growi.org + @*.growi.org
+  // to fully reproduce the old behavior.
+  describe('regression: normalized legacy bare domain matches its users', () => {
+    const normalized = normalizeWhitelistEntry('growi.org');
+
+    it('matches the root domain (growi.org -> user@growi.org)', () => {
+      expect(
+        normalized.some((entry) =>
+          isEmailMatchedByEntry('user@growi.org', entry),
+        ),
+      ).toBe(true);
+    });
+
+    it('matches a subdomain (growi.org -> user@sub.growi.org)', () => {
+      expect(
+        normalized.some((entry) =>
+          isEmailMatchedByEntry('user@sub.growi.org', entry),
+        ),
+      ).toBe(true);
+    });
+  });
+});
+
+describe('normalizeWhitelistEntries', () => {
+  it('expands and de-duplicates a list of mixed entries', () => {
+    expect(
+      normalizeWhitelistEntries(['growi.org', 'user@example.com', '@foo.com']),
+    ).toEqual(['@growi.org', '@*.growi.org', 'user@example.com', '@foo.com']);
+  });
+
+  it('de-duplicates when a bare domain and its normalized form coexist', () => {
+    expect(normalizeWhitelistEntries(['@growi.org', 'growi.org'])).toEqual([
+      '@growi.org',
+      '@*.growi.org',
+    ]);
+  });
+
+  it('returns an empty array unchanged', () => {
+    expect(normalizeWhitelistEntries([])).toEqual([]);
+  });
+
+  it('leaves an already-normalized list unchanged', () => {
+    const entries = ['@growi.org', '@*.growi.org', 'user@example.com'];
+    expect(normalizeWhitelistEntries(entries)).toEqual(entries);
   });
 });

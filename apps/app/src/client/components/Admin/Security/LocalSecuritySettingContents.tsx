@@ -57,8 +57,13 @@ const LocalSecuritySettingContents = (props: Props): JSX.Element => {
         });
         await adminGeneralSecurityContainer.retrieveSetupStratedies();
         toastSuccess(t('security_settings.updated_general_security_setting'));
-      } catch (err) {
-        toastError(err);
+      } catch (errs) {
+        const err = Array.isArray(errs) ? errs[0] : errs;
+        if (err?.code === 'invalid-registration-whitelist-format') {
+          toastError(t('security_settings.whitelist_invalid_format'));
+        } else {
+          toastError(errs);
+        }
       }
     },
     [t, adminGeneralSecurityContainer, adminLocalSecurityContainer],
