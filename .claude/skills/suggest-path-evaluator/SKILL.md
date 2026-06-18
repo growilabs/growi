@@ -1,304 +1,352 @@
 ---
 name: suggest-path-evaluator
 description: >-
-  Evaluate the quality of GROWI's suggest-path output by having Claude act as an
-  answer-key checker. Use this whenever you want to measure how good suggest-path's
-  proposed save paths are — e.g. "evaluate suggest-path on this document", "score
-  the path suggestions for this content", "how accurate is suggest-path for this
-  wiki", "run a hit-rate check on suggest-path", or when dogfooding suggest-path
-  and needing an objective rank of its proposals instead of eyeballing them. Given
-  a document body and a GROWI wiki, the skill self-drives: it calls suggest-path,
-  reads the wiki tree, constructs its OWN correct save location as a measuring stick,
-  and ranks the proposals by plausibility so hit-rate ("is the right place in the
-  top N") can be aggregated. Trigger it even when the user only says
-  "check"/"score"/"rank" suggest-path results without saying "evaluator".
+  Evaluate the quality of GROWI's suggest-path output by judging each proposed save-path as
+  o (usable) / △ (usable but improvable) / x (not usable) for a document, with a
+  wiki-agnostic plausibility rubric — NOT by matching one "correct" path. For each document
+  it reads the wiki content (page bodies, not just path strings), judges each candidate
+  against THIS wiki's own organization, AND drills down the tree to build the document's own
+  ideal home so a candidate is only ruled x once a better place is known (multiple candidates
+  may be usable — the correct place is not unique). Use it to score suggest-path's proposals
+  as a reviewer would — e.g. "evaluate suggest-path on this document", "score / check /
+  review these path suggestions", "are these save paths usable", "how good is suggest-path
+  for this wiki", or when dogfooding suggest-path and you want a per-candidate verdict instead
+  of eyeballing it. Trigger it even when the user only says "check"/"score"/"review"
+  suggest-path results without the word "evaluator".
 ---
 
-# suggest-path Evaluator
+# suggest-path Evaluator (plausibility-domain, wiki-aware, drilldown-backed)
+
+> **★ STATUS (2026-06-18): rebuilt around the human's actual judging procedure.** An earlier
+> generation of this skill fixed **one** "correct" save location and scored proposals
+> hit/near-miss/miss against it — which over-punished any proposal that differed from that one
+> pick (the "answer-key mismatch" problem). A later draft swung the other way: it judged each
+> candidate from the path string alone (no wiki content) as a 2-value o/x, which systematically
+> over-marked o (it could never say "x" with confidence because it never knew where the
+> document *should* go), and was calibrated wiki-blind against wiki-blind human labels — the
+> wrong target entirely. **This version is the synthesis:** it reads page **content**, drills
+> down to build the document's ideal home (Phase B), but still scores each candidate on its own
+> merits as **○/△/×** (Phase A). Calibration is now **eyeball-led** (a human spot-checks a few
+> outputs; weighted κ is a reference number, not a pass/fail gate). The old κ≥0.6 ∧
+> x-recall≥0.7 gate is **retired** (it was for the 2-value, wiki-blind setup). The Phase-B
+> "drill before you rule out" flow is the central change; its premise (that judging without
+> exploration drifts o because it can never name a better place) is a **hypothesis to confirm
+> by spot-check after the skill runs**. See `tmp/calib-pilot/CALIBRATION-PROTOCOL.md` and the
+> `suggest-path-evaluator-calibration` memory's "2026-06-18 セッション" section (the canonical
+> design source).
 
 ## What this is
 
-GROWI's `suggest-path` feature takes a document body and proposes where in the wiki
-to save it. The proposals are only ever *plausible*, never provably *correct* — the
-wiki tree is the ground truth, and "the right place" is a judgment call a human makes
-by analogy ("last week's meeting notes live here, so this week's go here too").
+GROWI's `suggest-path` takes a document body and proposes parent paths to save it under.
+This skill **reviews each proposal** and marks it **○ (usable)** / **△ (usable but a better
+place exists)** / **× (not usable)**, and — because a candidate can only be ruled out once
+you know where the document *should* live — it also **drills down the wiki to build the
+document's own ideal home** and reports it (including "this is a new path" when nothing fits).
+It is a measurement/tuning tool for suggest-path, not part of the production feature; it does
+not modify suggest-path or GROWI.
 
-This skill measures how good those proposals are **without a human scoring each one by
-hand**. It does that by making Claude the **answer-key checker**: Claude looks at the
-wiki and the document, decides where *it* would file the document, and then checks
-whether suggest-path's proposals agree.
+## The evaluation paradigm: plausibility domain, not answer-key
 
-This is for **dogfooding and tuning** suggest-path. It is a measurement tool, not part
-of the production feature — it does not modify suggest-path or GROWI.
+The correct save location is **not unique**. A meeting-note could reasonably live under a
+minutes tree OR a dev-log tree OR a "discussion" area under an API-spec — all are legitimate.
+So this skill does **not** pick one canonical answer and grade against it. Instead it asks of
+*each* candidate: **"is placing this document here reasonable, and is there a clearly better
+home?"** Multiple ○'s are expected and correct.
 
-## What "a save location" means here (read this before anything else)
+The drilldown (Phase B) builds a *recommended* home, but that home is a **reference**, not a
+single must-match key: it tells you when a candidate is *beaten* (→ △ with the better place
+named), never that a candidate must *equal* it. This is the deliberate middle ground — explore
+enough to know when a candidate is beaten, without collapsing the answer to one point.
 
-suggest-path does **not** name the new page. It returns the **parent path to save
-UNDER** — always a directory-style path with a trailing slash (e.g. `/資料/内部仕様/`).
-The new document becomes a *child* of that path. In GROWI there is no separate notion
-of "folder" vs "page": every page can have children, so a parent path is usually the
-full path of an **existing page** that the document belongs under.
+## ★★ The non-negotiable constraint: wiki-agnostic
 
-The evaluator must speak the **same units**. When Claude builds its own answer, it also
-produces a **parent path to save under**, not the full path of a hypothetical new page.
-Comparing suggest-path's parent path against Claude's parent path is the whole game —
-they must be at the same granularity or every comparison is off by one level.
+This skill is used on **an unknown wiki** (wiki-agnostic). It is calibrated on the GROWI dev
+wiki today, but **must not be optimized to the dev wiki** (= overfitting).
 
-> Wrong (granularity mismatch): Claude's answer = `/資料/内部仕様/プレゼンテーション/アルゴリズム`
-> (a full path for the new page). suggest-path's answer = `/資料/内部仕様/プレゼンテーション/`.
-> These describe the *same intent* but look one level apart — a false miss.
->
-> Right: Claude's answer = `/資料/内部仕様/プレゼンテーション/` (the parent to save under).
-> Now it lines up with suggest-path's units and the comparison is meaningful.
+The same "spec document" may correctly live at `/資料/仕様/`, or root-level `/仕様/`, or
+`/project/hoge/仕様/`, depending on the wiki. **All are correct — only the filing convention
+differs.** The job is: *given THIS wiki's own organization, is placing this document at this
+candidate path reasonable, and is there a clearly better home?* — never *does it match a
+specific canonical tree?*
 
-## The one rule that defines this skill
+Hard rules that follow:
 
-**Claude builds its own correct save location FIRST, then judges suggest-path against it.**
+- **Never encode dev-wiki-specific path strings or directory names** (`/資料/内部仕様/` etc.)
+  into the judgement. Reason from structure, not from memorized paths. The moment a concrete
+  dev-wiki path becomes a criterion, this becomes a dev-wiki-only tool.
+- **Infer the wiki's classification system from the tree itself** (the candidate tree and
+  what you see while drilling down), then judge whether the document's character fits it.
+  Example: if this wiki separates internal-spec from external-spec trees, respect that
+  separation; but the *criterion* is "respect the separation THIS wiki makes", not "the words
+  内部仕様/外部仕様 are canonical".
+- The human-facing calibration rubric (`tmp/calib-pilot/RUBRIC.md`) contains dev-wiki examples
+  on purpose (it is a tool for a human to label the dev-wiki sheet). **That rubric is raw
+  material, not this skill's prompt.** Only the *distilled, wiki-agnostic principles* below
+  come from it; the concrete examples do not transfer here.
 
-This is the difference between a useful evaluator and a useless one. If Claude only
-looked at suggest-path's list and ranked *within* it, it could never detect the case
-that matters most: **suggest-path missed entirely** — none of its proposals are right.
-By forming an independent answer first, Claude can say "all of these are wrong, the
-document actually belongs under X", which is exactly the signal needed to find wiki
-domains where suggest-path is weak.
+## The judgement stance
 
-Claude's own answer is a **measuring stick, not a deliverable.** The skill does not exist
-to propose new paths to the user. Surface Claude's answer only as the *rationale* for the
-verdict, so a human can look at it and tune the evaluator ("you marked that a miss, but
-this page already exists — why didn't you see it?").
+Aim to **draw the boundary of plausibility**, not to hit one narrow correct answer.
+
+- **Clear mis-placement → ×.** (meeting-notes vs a UI-design tree = obviously different.)
+- **Reasonably plausible → ○**, and **be generous: multiple candidates can be ○.**
+  (meeting-notes could sit under a minutes tree OR a dev-log tree OR a "discussion" area under
+  an API-spec — all ○.)
+- **Right direction but a clearly better home exists → △** (usable, but improvable). △ is not
+  a hedge — it means "you *could* file it here, but the drilldown found a place that fits
+  better; here it is." Always pair a △ with that better place.
+- **Genuinely ambiguous content gets a wider ○**, not a forced single pick. ("a meeting where
+  an API spec was discussed" may belong under minutes *or* under a spec-discussion area — allow
+  both ○.) But "put an API definition into the meeting-minutes tree" → ×.
+
+## The judgement principles (wiki-agnostic; pinned 2026-06-18 against intra-rater data)
+
+These are the wiki-agnostic principles distilled from the calibration rubric, then tuned by
+what the human could **reproduce** across two passes. Transferable reasoning, **no dev-wiki
+path strings**. The ordering matters: the **firm axes** are where the human never wavered —
+apply them decisively. The **soft axis (depth)** is where the human's own labels swung on a
+re-pass — so do not be rigid there; lean ○/△, not ×.
+
+### Firm axes — apply decisively (the human reproduced these)
+
+1. **Clear mis-placement is × — this is the core job.** A candidate whose subject or
+   document-kind plainly does not belong (meeting-notes proposed under a UI-design tree; an API
+   definition under a minutes tree) is × with confidence. In the calibration these "obvious no"
+   verdicts were the most stable signal (159/187 ×-labels held across a re-pass). Spend your
+   confidence here.
+2. **"Usable" = you would actually file it here**, not merely "same broad genre". Genre match
+   alone is not enough; it must be a place a careful person would actually choose.
+3. **Personal/private areas are × for shared content** (a candidate under someone's personal
+   user space, for content that should be a shared wiki asset). It won't become a shared asset
+   there. (In the calibration this axis had **zero** re-pass disagreements — treat it as firm.)
+4. **Classification-axis mismatch is × even if the topic matches.** If the document's *kind*
+   (spec / manual / minutes / decision-record / …) conflicts with the candidate's
+   classification — even when the subject name matches perfectly — it is ×. Read this
+   **abstractly**: "if THIS wiki separates document kinds, a candidate in the wrong kind is ×",
+   NOT "a specific pair of directory names is canonical". First determine what kind of document
+   this is, then check the candidate's place is consistent with that kind, as THIS wiki
+   expresses kinds. (Reading page **content**, per Phase A, is what lets you catch a
+   kind-mismatch that the path name alone hides — and avoid a false × when the path name looks
+   wrong but the content fits.)
+
+### Soft axis — do NOT be rigid (the human could not reproduce strictness here)
+
+5. **Depth is a soft call — when a candidate is right in subject/kind but arguably one level
+   off, lean ○/△, never ×.** This is the single most important correction from the calibration:
+   every intra-rater disagreement (38/38) was a depth call, and the human systematically
+   *relaxed* toward ○ on the re-pass. So:
+   - **Too shallow → ○ (or △).** A parent broader than ideal still leaves room to nest later;
+     not fatal as long as subject/kind direction is right. Decide ○ vs △ by THIS wiki's habit
+     (Phase A step on shallow candidates, below): if siblings under the candidate are organized
+     into per-topic subdirectories, a too-shallow candidate is △ (a new subdir is the better
+     home — name it in the △ note); if the area is run flat, it is ○. (Only a catch-all
+     top-level bucket that *anything* falls into is too vague → ×, and that's really axis 1/2,
+     not depth.)
+   - **Too deep → usually ○, not ×.** A slightly-narrower box is a *soft* miss. Mark
+     deep-but-on-topic candidates × **only** when the box is *clearly* narrower than the
+     document's whole scope (a doc about a feature in general, proposed under one sub-detail of
+     that feature). When it's a judgement call, lean ○/△. Do not manufacture strictness the
+     human herself doesn't hold.
+
+### Tie-breakers
+
+6. **Multiple ○'s are expected.** If several parents are reasonable, mark them all ○; do not
+   force a single best.
+7. **"When in doubt, ×" applies to KIND/subject doubt, not depth doubt.** If you're unsure
+   because the subject or document-kind might not fit (axes 1–4), lean ×. If you're unsure only
+   about *how deep* an otherwise-fitting candidate sits (axis 5), lean ○/△. This split is
+   exactly where the human's reproducible judgement and her wavering judgement divide.
 
 ## Inputs
 
-You need two things from the user:
+1. **The document body** (required) — one document, or several for a batch.
+2. **The wiki to evaluate against** — which GROWI instance is the tree/ground truth (the same
+   instance suggest-path is called against). Default: the local GROWI in the devcontainer.
 
-1. **The document body** (required) — the content suggest-path will be asked to file.
-   One document, or several for a batch run.
-2. **The wiki to evaluate against** — which GROWI instance is the ground truth. This is
-   the same instance suggest-path will be called against, so the tree and the proposals
-   stay consistent. Default: the local GROWI running in the devcontainer.
+The user does not pre-run suggest-path; this skill calls it.
 
-The user does **not** pre-run suggest-path. This skill calls it for them — they hand
-over the document, the skill does the rest.
+## The flow
 
-## The flow (self-driving)
+For a single document, run Phase A and Phase B against the same wiki, then report. Phase B
+runs **for every document** — it is what lets Phase A say × with confidence (you only rule a
+candidate out once you know a better place exists).
 
-For a single document:
-
-### 1. Get suggest-path's proposals
+### Step 0. Get suggest-path's proposals
 
 Call suggest-path with the document body. Prefer the MCP tool; fall back to HTTP.
 
-- **MCP (preferred):** call `mcp__growi__suggestPath` with `{ body: <document> }`. It
-  returns the proposal list directly. Simplest when the GROWI MCP server is connected.
-- **HTTP (fallback):** `POST /_api/v3/ai-tools/suggest-path` with JSON `{ "body": "<document>" }`.
-  Auth via `?access_token=<token>` (or a bearer header). Against the devcontainer GROWI
-  this is `http://localhost:3000/_api/v3/ai-tools/suggest-path`. Response shape:
-  `{ "suggestions": [ { "type", "path", "label", "description", "grant", "informationType?" }, ... ] }`.
+- **MCP (preferred):** `mcp__growi__suggestPath` with `{ body: <document> }`.
+- **HTTP (fallback):** `POST /_api/v3/ai-tools/suggest-path` with `{ "body": "<document>" }`,
+  auth via `?access_token=<token>`. Devcontainer: `http://localhost:3000/...`. Response:
+  `{ "suggestions": [ { "type", "path", "label", "description", ... }, ... ] }`.
 
-Keep every proposal — including the obviously-wrong ones. suggest-path is allowed to
-emit junk (e.g. a path it latched onto from a surface word); the evaluator's job is to
-rank, not to pre-filter. The `path` field is what you rank; `informationType` (flow vs
-stock) is useful context for your own judgment.
+Keep every proposal, including obviously-wrong ones — the job is to mark each, not to
+pre-filter. The `path` field is what you judge. **The `description` is suggest-path's own
+justification — do not let it sway you; judge body × path on your own.** If suggest-path returns
+zero proposals, record that as a result (nothing to mark usable), do not silently skip.
 
-If suggest-path returns zero proposals (everything got cut), that is itself a result —
-record it as a total miss, do not silently skip the document.
+> **Note on the wiki source.** Both phases read the wiki tree **and page content** through a
+> **Vault interface** — see `references/tree-source.md` for how to source it today (devcontainer
+> GROWI via MongoDB direct-read) and the Vault boundary to preserve. Judge **content fit**, not
+> path-string similarity: a path can string-match a surface word yet be the wrong home (exactly
+> suggest-path's own failure mode).
 
-### 2. Read the wiki tree
+### Phase A — judge each candidate ○ / △ / ×
 
-Load enough of the wiki to form a real judgment: the tree structure (paths) **and** the
-content of the candidate-relevant pages, so you can judge content-to-location fit, not
-just path-string similarity.
+For **each** proposed parent path:
 
-Treat the tree as coming through a **Vault interface**: a set of local files mirroring
-the wiki's page hierarchy. GROWI Vault (the feature that exposes the wiki as a local git
-clone) is not implemented yet, so for now read the tree through an adapter — see
-`references/tree-source.md` for how to source it (currently: the devcontainer GROWI's
-search/page API). Write your reasoning against "the wiki tree", not against a specific
-API, so the day Vault lands the only thing that changes is the adapter.
-
-### 3. Build your own correct save location — the sibling test
-
-Before looking hard at suggest-path's ranking, decide where **you** would save this
-document. Use one general question that covers every case:
-
-> **If I dropped this document into the existing tree, which existing pages would it sit
-> NEXT TO as a sibling? The parent of those siblings is the save location.**
-
-This single test handles the situations that look different but aren't:
-
-- **A topic page already exists.** A document about "presentation algorithms" and an
-  existing page `/資料/内部仕様/プレゼンテーション/アーキテクチャ` are both *about
-  presentation internals* — they're siblings under `/資料/内部仕様/プレゼンテーション/`.
-  So the save location is `/資料/内部仕様/プレゼンテーション/`. It is **not**
-  `…/プレゼンテーション/アーキテクチャ/` (the document isn't *about* the architecture
-  page's sub-topic — don't nest it under a sibling) and it is **not** `/資料/内部仕様/`
-  (that's the grandparent — don't step up past the real topic page).
-- **Only same-kind records exist.** A `20260615_定例` meeting-note and an existing
-  `会議/議事録/20260608_定例` are siblings: both are dated 定例 records. They sit side by
-  side under `会議/議事録/`. Do **not** nest the new note *under* `20260608_定例` just
-  because the two are similar — similar ≠ contained. The parent `会議/議事録/` is the answer.
-
-Both bullets are the same move: find the siblings, return their parent. The recurring
-mistakes are the two directions of getting the depth wrong — **nesting under a sibling**
-(one level too deep) or **stepping up to a grandparent** (one level too shallow). Aim for
-the exact parent of the sibling set.
-
-A document can legitimately have **more than one** save location when the wiki has two
-equally-good sibling sets (e.g. two different `会議室` trees). Capture all of them.
-
-If the document has **no siblings anywhere** — it's genuinely new to this wiki — that is
-a real and expected outcome; handle it as the "no-sibling world" below.
+1. **Understand the document's meaning** (subject + kind) from the body.
+2. **Decompose the candidate path into its hierarchy, and look at each level's page:**
+   - **Page has a body** → use that level's content (a snippet is enough) to tell *what kind of
+     page it is*.
+   - **Box page** (`$lsx()`-only / empty / non-existent intermediate — a grouping page) → its
+     body says nothing; **look at its children (titles + snippets) to learn what the box is
+     for.** In GROWI, parent directories tend to be `$lsx()`-only; the box's identity is told by
+     its contents, not its own body. (Measured on the dev wiki: ~44% of candidate levels are
+     boxes — so this is the common case, not the exception.) Without reading children you cannot
+     judge a box; do not guess from its path name.
+   - A path/title can look wrong while the content fits (or vice versa) — reading the snippet is
+     what catches kind-mismatches (axis 4) and prevents false ×.
+3. **Score the candidate on its own merits** (do not overturn it just because Phase B found
+   somewhere else — Phase B informs ○-vs-△, not the candidate's intrinsic fit):
+   - whole path fits in subject **and** kind → **○**
+   - part of the path is off but it's still a usable home → **△**, and name the better place
+   - **shallow candidate** (right direction, but the wiki would normally nest one level
+     deeper): look at the candidate's children to read THIS wiki's habit — per-topic
+     subdirectories ⇒ **△** (a new subdir is the better home); flat area ⇒ **○**. Not a blanket
+     rule; depends on how organized this part of the wiki is.
+   - subject/kind clearly wrong (any depth) → **×**
+4. **Self-consistency gate** (below) so you prove you judged THIS document.
 
 #### Self-consistency gate: prove you judged the right body
 
-Before you commit to a save location, prove you reasoned about **this** document and not
-a neighbouring one. While forming the answer, also write a one-line **body digest** for
-the document: its subject plus 3–5 proper nouns / feature names taken verbatim from the
-body (`{ "subject": "...", "key_terms": ["...", ...] }`).
+Write a one-line **body digest**: subject + 3–5 proper nouns / feature names taken verbatim
+from the body (`{ "subject": "...", "key_terms": ["...", ...] }`). Then verify every key term
+actually appears in the body you read. If a term you "remember" isn't in the text, you
+summarised a different document — discard, re-read this body, redo Phase A. This catches the
+most damaging batch error: **filing the right reasoning under the wrong document**. It needs
+only the body (no answer key), so it works on any wiki and leaks no ground truth.
+`scripts/reconcile-digests.py` runs this check mechanically over a batch (see Batch mode).
 
-Then verify the digest against the body itself: **every key term must actually appear in
-the body you read.** If a term you "remember" isn't in the text, you summarised a
-different document — discard the answer, re-read this document's body from scratch, and
-redo step 3.
+### Phase B — drilldown to the document's ideal home (always run)
 
-This catches the single most damaging batch error: **filing the right reasoning under the
-wrong document.** When several documents are judged in one pass (especially across
-parallel sub-agents), it is easy to carry the previous document's content into the next
-one's verdict; the digest-vs-body check exposes that mechanically. Crucially it needs
-**only the body** — no human answer key — so it works on any wiki and never leaks ground
-truth into the blind judgment.
+Build, from the wiki, where this document *should* go. This is the reference that lets Phase A
+distinguish ○ from △ (and rule × with confidence). It is a **beam descent** from the root:
 
-### 4. Rank suggest-path's proposals, and compare against your answer
+From the root, at each level:
 
-Order suggest-path's proposals from most to least plausible **as a save location for
-this document**. This is a **relative ranking, not an absolute score.** Do not emit
-"7 out of 10" numbers — absolute points drift every run because the scale has no fixed
-anchor, whereas a relative order stays stable because you are only ever comparing
-proposals to each other. (Per-domain numeric scores come later, by aggregation — see
-below — not by asking for points here.)
+- **a.** List the level's children (titles + snippets).
+- **b.** Pick the candidates worth descending into — **the "plausible" children, up to 3**
+  (keep a child whose snippet fits even if its title looks marginal; don't drop on title alone
+  — that's how a good-but-oddly-named home gets missed).
+- **c.** Read the **full body of those kept children (up to 3)** and choose the best fit to
+  descend into. Don't commit to one child on a single glance — that prunes a better branch too
+  early.
+- **d.** Stop when **no child fits the document better than the current node** — the current
+  node is the recommended save location. Depth cap **5 levels** as a backstop (also a cycle
+  guard); the real stop is "no better child", not the cap. (Dev-wiki candidate paths average
+  ~2.5 deep; max observed 7. 5 is plenty for the common case — note it if you hit the cap.)
+- If nothing along the descent fits, conclude **"new path"** and state where it would hang.
 
-Then compare each proposal's path against your own correct save location. Because both
-are parent paths (step 0 / step 3), the comparison is path-vs-path at the same level.
-Classify the document's outcome:
+"Better fit" is a **judgement call you make** (LLM judgement) — do **not** reduce it to a
+numeric threshold; thresholds invite the arbitrariness this skill exists to avoid.
 
-**When the document HAS siblings (a home exists in the tree):**
+Phase A and Phase B **share work**: in both you read a node's children to understand the wiki's
+granularity habit. Do it once and reuse it — the box-identity reads in Phase A step 2 and the
+child-listing in Phase B are the same kind of access.
 
-- **hit@N** — a proposal's path equals your correct save location (the sibling-set
-  parent), sitting at rank N. Exact same parent = hit.
-- **near-miss** — a proposal is on the right line but at the wrong depth: it is an
-  **ancestor or descendant** of your correct save location (e.g. you said
-  `/資料/内部仕様/プレゼンテーション/`, the proposal said `/資料/内部仕様/` — the parent,
-  one level too shallow; or it dived one level too deep). The neighborhood is right, the
-  level is off. This is the dominant real-world failure (stopping at the category instead
-  of the topic page), so it gets its own bucket rather than being lumped into miss.
-- **miss** — no proposal is your save location or an ancestor/descendant of it. The
-  correct home exists but suggest-path pointed at a different subtree (or only at
-  coincidental string matches).
+> **Cost caveat (unverified).** Reading up to 3 full bodies per level can add up on deep trees.
+> The snippet cost is measured and light (~505 chars/case average); **full-body reads in Phase B
+> are not yet measured.** Run the defaults above (beam ≤3, full-reads ≤3, depth ≤5) on a few
+> cases first, measure the real cost, and retune the beam/depth if needed. Don't assume it's
+> free.
 
-**When the document has NO siblings (a new path is the right answer):**
+### Step 4. Report
 
-Here a brand-new path is the *correct* behavior — suggest-path is explicitly allowed to
-propose new directories, and so are you. String equality is the wrong test (two sensible
-new paths rarely match character-for-character), so judge intent instead:
-
-- **hit (new)** — suggest-path proposed a genuinely new path at a sensible level of the
-  taxonomy, matching the *intent* of the new home you'd create (same neighborhood, same
-  altitude), even if the exact wording differs.
-- **near-miss (new)** — it proposed a new path but at an off level or slightly wrong
-  neighborhood.
-- **miss (mis-filed)** — it forced the document into an existing location that doesn't
-  fit, instead of recognizing it needed a new home. (This is the inverse failure of the
-  has-siblings case and just as important to surface.)
-
-Deciding *whether* siblings exist is the evaluator's hardest and most error-prone step:
-a real sibling you failed to find looks identical to "no siblings exist". Search the tree
-honestly before concluding a document is new — a lazy search produces a false "new"
-verdict, which then mis-blames suggest-path for mis-filing. When you do conclude "new",
-say what you searched, so the human can challenge it.
-
-"Match" everywhere means same intended save location, not a coincidental string prefix.
-When a call is genuinely ambiguous, explain it in the rationale rather than forcing it.
-
-### 5. Report
-
-For each document, output:
-
-- the ranked proposal list (most → least plausible),
-- **your own correct save location(s)**, shown as the rationale for the verdict,
-- the **verdict** (see step 4),
-- a one- or two-line explanation of *why* — especially when you disagreed with
-  suggest-path, so the evaluator itself can be tuned.
-
-Use this structure per document:
+Per document:
 
 ```
 ## <document label>
 - Body digest: <subject> | key terms: <term, term, ...>   (self-consistency check; all terms must be in the body)
-- suggest-path proposals (ranked best->worst):
-  1. <path>   — <why this rank; hit / near-miss(too shallow|too deep) / off-subtree>
-  2. <path>   — ...
-- Claude's correct save location: <parent path(s)>   (measuring stick, not a new proposal)
-- Sibling basis: <which existing pages it would sit next to>  |  new (no siblings; searched: ...)
-- Verdict: hit@N | near-miss | miss | hit(new) | near-miss(new) | miss(mis-filed)
-- Note: <where suggest-path went wrong / why this was hard>
+- This wiki's inferred organization: <one line: how it separates kinds / nests topics>
+- suggest-path proposals, each judged:
+  1. <path>   — ○ | △ | ×  — <one-line why: which principle; for △, the better place>
+  2. <path>   — ○ | △ | ×  — ...
+- Recommended home (Phase B drilldown): <path, or "new path under <parent>">
+- Usable count: <#○+#△> / <#candidates>   (○: <#○>, △: <#△>, ×: <#×>)
+- Note: <where suggest-path went wrong, or why a call was hard / genuinely ambiguous>
 ```
 
-## Batch mode and per-domain scores
+- **△ always carries its better place** — either a sibling/child path the drilldown found, or
+  the Phase B recommended home.
+- The Phase B **recommended home** appears once per document (not per candidate); a candidate
+  may equal it (→ that candidate is ○), be beaten by it (→ △), or be unrelated (judge on its own
+  axes).
+- Do not emit absolute point scores (they drift run-to-run). The ○/△/× marks are the output;
+  aggregate them across documents (below) for rates.
 
-A single document is the core unit. For a batch, run steps 1–5 for each document, then
-aggregate. The point of aggregating is to find **which wiki domains suggest-path is weak
-in** — e.g. it does well on the dev wiki but misses everything under a management/HR
-tree, which is the kind of blind spot a human can't see from one run.
+## Batch mode and per-domain rates
 
-**Batches are where bodies get swapped — gate every document.** A batch is usually fanned
-out across parallel sub-agents, each handling a slice of documents; that is exactly the
-setup where one document's content bleeds into another's verdict (the failure step 3's
-self-consistency gate exists to catch). So in batch mode the gate is **not optional**:
+A single document is the core unit. For a batch, run the flow per document, then aggregate.
+**Batches are where bodies get swapped — gate every document** (Phase A's self-consistency gate
+is mandatory in batch mode; a body that fails reconciliation is a suspected swap: re-judge it in
+isolation before it enters the aggregate; reconciliation is a deterministic string check, not
+another LLM pass). `scripts/reconcile-digests.py` runs this gate over a directory of bodies and
+exits non-zero on a suspected swap, so it can block aggregation.
 
-1. Each document carries its **body digest** (step 3) through to the report.
-2. Before aggregating, reconcile every digest against its own body file: each digest's
-   key terms must appear in the body it claims to describe.
-3. Any document that fails reconciliation is a **suspected body swap** — do not score it.
-   Send it back through step 3 (re-read that document's body in isolation, redo the
-   judgment), then re-reconcile. Only documents that pass the gate enter the aggregate.
+Aggregate from the ○/△/× marks (`scripts/aggregate.py` turns per-document verdicts into the
+per-domain table):
 
-This is a closed self-repair loop: it uses only the bodies, so it corrects swaps without
-ever consulting a human answer key. Reconciliation is a cheap mechanical string check —
-keep it as a deterministic pass (e.g. a small script), not another LLM judgment, so it
-can't drift the same way the original mistake did. If any documents were quarantined and
-re-judged, say how many in the report — a silent re-judge hides how shaky the first pass was.
+- **usable-rate (case-level)** — fraction of documents with ≥1 usable (○ or △) candidate. This
+  is a **precision-side** number: "did suggest-path put at least one reasonable place in its
+  list". It cannot measure recall (whether a good place existed that suggest-path never
+  proposed) — but Phase B's recommended home gives a recall signal: **count cases where the
+  recommended home matched no proposed candidate** (= suggest-path missed a better place it
+  should have offered). Report both, and label the usable-rate as precision-side.
+- **per-candidate ○/△/× rates** — fraction of all candidates in each class.
+- **×-concentration by reason** — group ×'s by which principle triggered them (clear
+  mis-placement / axis-mismatch / personal-area / vague-catch-all). Different reasons point at
+  different suggest-path fixes. Depth is, by design, rarely a × here.
 
-Derive the per-domain numbers **by aggregation from the rankings**, never by asking for
-absolute points (same drift reason as step 4):
+Group by whatever "domain" fits the batch (wiki area, document type). If you bound coverage
+(sampled docs, capped the proposal list, hit the depth cap), **say so** — a silent cap reads as
+"measured everything".
 
-- **top-1 rate** — fraction of documents whose correct save location is the #1 proposal.
-- **top-N rate** — fraction where it lands within the top N (N is a cutoff you choose, e.g. 3).
-- **mean rank** — average position of the correct save location when it's a hit.
-- **outcome breakdown** — counts of hit / near-miss / miss (and the new-path variants).
-  near-miss concentration means a depth-selection problem (right neighborhood, wrong
-  level); miss concentration means a retrieval problem (wrong subtree entirely);
-  mis-filed concentration means suggest-path won't create new paths when it should.
-  These point at different fixes.
+## Calibration: how this skill's verdicts are checked (eyeball-led)
 
-Group these by whatever "domain" makes sense for the batch (wiki area, document type).
-`scripts/aggregate.py` takes the per-document verdicts as JSON and produces this summary;
-see its header for the input shape and how near-miss is counted. If you bound coverage in
-any way (sampled documents, capped the proposal list), say so in the report — a silent cap
-reads as "measured everything" when it didn't.
+The ○/△/× verdict is the same unit a human labels in calibration. Calibration asks whether
+*this skill's* verdicts agree with a human's — but the check is now **eyeball-led, not a numeric
+gate**:
 
-## Tuning the evaluator itself
-
-This evaluator is **expected to be wrong sometimes**, and that's part of the loop. The
-human's sense of "the right place" is the final authority; Claude's judgment is an
-approximation of it. When the human says "you marked that a miss but it's actually fine —
-that page does exist," that's a signal to refine *this skill's* judgment criteria, not to
-discard the result. This is why step 3's save location and sibling basis are always
-surfaced: without seeing Claude's reasoning, the human can't correct it. A run where the
-evaluator's verdicts and the human's gut start agreeing — including agreeing that a change
-*lowered* quality — is the evaluator working, not failing.
+- **The pass/fail is a human spot-check**: a human reads a handful of this skill's outputs and
+  decides whether the verdicts and the drilldown homes are sane; then repeats on a small sample
+  from **another** wiki to confirm it transfers. That judgement is the gate.
+- **Weighted κ is a reference number, not a gate.** Compute it against human ○/△/× labels as one
+  diagnostic among others; do not pass/fail on it. Use a **linear** weight matrix: ○↔△ = 0.5
+  (light), △↔× = 0.5 (medium), ○↔× = 1.0 (full) — adjacent classes are half-penalised, the two
+  extremes are full-penalised. (`tmp/calib-pilot/intra-kappa.js` is the 2-value version; a
+  weighted-κ variant must be written for ○/△/×.)
+- The **old gate is retired**: κ≥0.6 ∧ x-recall≥0.7 was for the 2-value, wiki-blind setup whose
+  premises the 2026-06-18 session overturned. Do not reinstate it.
+- Human labels are the gold standard but **not absolute truth**: a human marks candidates, while
+  this skill, seeing the whole tree via Phase B, may know a better home the human overlooked. So
+  **human-○ / skill-△ (and vice versa) is expected, not a bug** — don't chase κ=1.0; the ceiling
+  is the human's own test-retest agreement.
+- When tuning this skill after a spot-check, fix disagreements **only** by sharpening
+  wiki-agnostic principles — **never** by adding concrete dev-wiki paths to raise agreement (that
+  raises the number but breaks on other wikis).
+- Human labels for calibration must be re-taken **wiki-aware and in ○/△/×** to match this flow;
+  the older wiki-blind, 2-value labels are not a valid target for this skill.
 
 ## References
 
-- `references/tree-source.md` — how to source the wiki tree today (Vault adapter:
-  devcontainer GROWI search/page API) and the Vault-interface boundary to preserve.
-- `scripts/aggregate.py` — turn per-document verdicts into per-domain hit-rate / rank stats.
+- `references/tree-source.md` — how to source the wiki tree **and page content** today (Vault
+  adapter: devcontainer GROWI via MongoDB direct-read) and the Vault-interface boundary to
+  preserve. Phase A (box-identity reads) and Phase B (beam descent) both go through it.
+- `scripts/reconcile-digests.py` — deterministic self-consistency gate for batch mode (every
+  key term in a document's digest must appear in that document's body; exits non-zero on a
+  suspected body-swap).
+- `scripts/aggregate.py` — aggregates per-document ○/△/× verdicts into the per-domain table
+  (usable-rate, per-candidate ○/△/× rates, recall-miss rate from Phase B, and an ×-by-reason
+  breakdown). Input is a JSON list of per-document records (`candidates` + an optional
+  `recommended_home_in_candidates` recall flag); see the script's header for the shape.
