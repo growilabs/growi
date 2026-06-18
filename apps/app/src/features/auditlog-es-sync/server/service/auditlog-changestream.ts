@@ -154,6 +154,8 @@ export class AuditlogChangeStreamService {
           this.stopped = true;
         }
         await AuditlogEsSyncStatus.setUnsynced(true);
+      } else if (this.stopped) {
+        logger.debug('AuditlogChangeStreamService change stream closed.');
       } else {
         logger.error(err, 'AuditlogChangeStreamService change stream error.');
       }

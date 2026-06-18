@@ -905,7 +905,7 @@ class ElasticsearchDelegator
     const body = [
       ...upserts.flatMap((activity) => this.prepareBodyForAuditlog(activity)),
       ...deleteIds.map((id) => ({
-        delete: { _index: this.auditlogAliasName, _id: id.toString() },
+        delete: { _index: this.auditlogIndexName, _id: id.toString() },
       })),
     ];
     if (body.length === 0) return;
@@ -916,7 +916,7 @@ class ElasticsearchDelegator
         (i) => i.index?.error || i.delete?.error,
       );
       throw new Error(
-        `bulkSyncAuditlogs had errors: ${JSON.stringify(failedItems)}`,
+        `bulkSyncAuditlogs had ${failedItems.length} errors: ${JSON.stringify(failedItems.slice(0, 3))}`,
       );
     }
   }
