@@ -837,24 +837,6 @@ class ElasticsearchDelegator
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
 
-  async updateOrInsertAuditlog(
-    activity: ActivityDocument | null,
-  ): Promise<void> {
-    if (activity == null) return;
-    const body = this.prepareBodyForAuditlog(activity);
-    if (body.length === 0) return;
-
-    const bulkResponse = await this.client.bulk({ body });
-    if (bulkResponse.errors) {
-      const failedItems = (bulkResponse.items ?? []).filter(
-        (i) => i.index?.error,
-      );
-      throw new Error(
-        `updateOrInsertAuditlog bulk indexing had errors: ${JSON.stringify(failedItems)}`,
-      );
-    }
-  }
-
   async searchAuditlogByFuzzyWildcard(
     field: AuditlogSuggestionField,
     q: string,
@@ -916,17 +898,25 @@ class ElasticsearchDelegator
     return [];
   }
 
-  async deleteAuditlog(id: mongoose.Types.ObjectId): Promise<void> {
+  async bulkSyncAuditlogs(
+    upserts: ActivityDocument[],
+    deleteIds: mongoose.Types.ObjectId[],
+  ): Promise<void> {
     const body = [
-      { delete: { _index: this.auditlogAliasName, _id: id.toString() } },
+      ...upserts.flatMap((activity) => this.prepareBodyForAuditlog(activity)),
+      ...deleteIds.map((id) => ({
+        delete: { _index: this.auditlogAliasName, _id: id.toString() },
+      })),
     ];
+    if (body.length === 0) return;
+
     const bulkResponse = await this.client.bulk({ body });
     if (bulkResponse.errors) {
       const failedItems = (bulkResponse.items ?? []).filter(
-        (i) => i.delete?.error,
+        (i) => i.index?.error || i.delete?.error,
       );
       throw new Error(
-        `deleteAuditlog bulk deletion had errors: ${JSON.stringify(failedItems)}`,
+        `bulkSyncAuditlogs had errors: ${JSON.stringify(failedItems)}`,
       );
     }
   }

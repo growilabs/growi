@@ -1,5 +1,4 @@
 import type {
-  Document as BsonDocument,
   ChangeStream,
   ChangeStreamDocument,
   ChangeStreamOptions,
@@ -32,28 +31,20 @@ const isChangeStreamHistoryLost = (err: unknown): boolean => {
   return false;
 };
 
-// mongoose 6's ChangeStream wrapper lacks Symbol.asyncIterator (fixed in v7), so
-// `for await` throws; drive next() manually until then.
-async function* iterateChangeStream<T extends BsonDocument>(
-  changeStream: ChangeStream<T>,
-): AsyncGenerator<ChangeStreamDocument<T>> {
-  while (!changeStream.closed) {
-    // biome-ignore lint/performance/noAwaitInLoops: change streams are inherently sequential.
-    const event = await changeStream.next();
-    if (event == null) return;
-    yield event;
-  }
-}
-
 export class AuditlogChangeStreamService {
-  // Backoff: 1,2,4,8,16,30,30s. Skip a repeatedly failing event on its 8th failure (~91s total).
+  // Backoff: 1,2,4,8,16,30,30s. Skip a repeatedly failing batch on its 8th failure (~91s total).
   private static readonly MAX_CONSECUTIVE_EVENT_FAILURES = 8;
   private static readonly RESTART_BASE_DELAY_MS = 1000;
   private static readonly RESTART_MAX_DELAY_MS = 30000;
+  // Flush a batch once it reaches this size or after this idle gap, whichever comes first.
+  private static readonly BATCH_SIZE = 100;
+  private static readonly FLUSH_IDLE_MS = 200;
 
   private readonly esWriter: AuditlogEsWriter;
 
   private changeStream: ChangeStream<ActivityDocument> | null = null;
+
+  private buffer: ChangeStreamDocument<ActivityDocument>[] = [];
 
   private stopped = false;
 
@@ -114,82 +105,37 @@ export class AuditlogChangeStreamService {
   }
 
   private async processChangeStream(): Promise<void> {
-    if (this.changeStream == null) return;
+    const changeStream = this.changeStream;
+    if (changeStream == null) return;
 
     try {
-      for await (const event of iterateChangeStream(this.changeStream)) {
-        // Phase 1: ES operation — failures here feed poison-pill detection.
-        try {
-          // 'update' skipped: Activity updates change only `action`, which is not indexed in ES.
-          if (
-            event.operationType === 'insert' &&
-            'fullDocument' in event &&
-            event.fullDocument != null
-          ) {
-            await this.esWriter.updateOrInsertAuditlog(event.fullDocument);
-          } else if (event.operationType === 'delete') {
-            await this.esWriter.deleteAuditlog(event.documentKey._id);
-          }
-          this.consecutiveEventFailures = 0;
-          this.lastFailingToken = null;
-          this.consecutiveRestarts = 0;
-        } catch (err) {
-          // ResumeToken is typed as `unknown`; JSON.stringify compares structurally without type assertions.
-          // A false mismatch only resets the counter and delays the poison-pill skip — never causes data loss.
-          if (
-            JSON.stringify(event._id) !== JSON.stringify(this.lastFailingToken)
-          ) {
-            this.consecutiveEventFailures = 0;
-          }
-          this.consecutiveEventFailures++;
+      // Keep exactly one in-flight next() in `pending`. flushBuffer() is awaited inline so the
+      // loop applies natural backpressure and never runs concurrently with a flush.
+      let pending = changeStream.next();
 
-          if (
-            this.consecutiveEventFailures >=
-            AuditlogChangeStreamService.MAX_CONSECUTIVE_EVENT_FAILURES
-          ) {
-            logger.error(
-              { token: event._id, operationType: event.operationType, err },
-              'Skipping poison pill event after consecutive failures.',
-            );
-            await AuditlogEsSyncStatus.setUnsynced(true);
-            // Advance token past the poison pill; failure here means it will be retried on restart.
-            try {
-              await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
-            } catch (tokenErr) {
-              logger.error(
-                tokenErr,
-                'Failed to advance token past poison pill; will retry on restart.',
-              );
-            }
-            this.consecutiveEventFailures = 0;
-            this.lastFailingToken = null;
-            this.consecutiveRestarts = 0;
-            continue;
-          }
+      while (!changeStream.closed) {
+        // biome-ignore lint/performance/noAwaitInLoops: change-stream consumption is inherently sequential (backpressure).
+        const { idle, event } = await this.nextOrIdle(pending);
 
-          // Token not advanced on failure; event will be retried on restart.
-          this.lastFailingToken = event._id;
-          logger.error(
-            { err },
-            'AuditlogChangeStreamService change event handling failed.',
-          );
+        if (idle) {
+          if (!(await this.flushBuffer())) break;
+          continue;
+        }
+        if (event == null) break; // stream ended
+
+        pending = changeStream.next();
+        this.buffer.push(event);
+        if (
+          this.buffer.length >= AuditlogChangeStreamService.BATCH_SIZE &&
+          !(await this.flushBuffer())
+        ) {
           break;
         }
-
-        // Phase 2: persist token — separate from ES failures so token errors do not
-        // affect consecutiveEventFailures or trigger poison-pill detection.
-        // Per-event upsert doubles MongoDB writes but keeps the replay window minimal on restart.
-        // Throttle if write frequency becomes a concern — e.g. the one-time delete burst when
-        // Activity TTL is first enabled on a large backlog.
-        try {
-          await ChangeStreamResumeToken.upsert(STREAM_KEY, event._id);
-        } catch (tokenErr) {
-          logger.error(
-            tokenErr,
-            'Failed to persist resume token; events will be reprocessed on restart.',
-          );
-        }
       }
+
+      // Drain events buffered when the stream ended before a size/idle flush.
+      // A no-op after an in-loop flush failure, which already emptied the buffer.
+      await this.flushBuffer();
     } catch (err) {
       if (isChangeStreamHistoryLost(err)) {
         logger.warn(
@@ -216,6 +162,121 @@ export class AuditlogChangeStreamService {
     if (!this.stopped) {
       await this.restart();
     }
+  }
+
+  // Resolve with the next event, or { idle: true } if no event arrives within FLUSH_IDLE_MS
+  // while the buffer is non-empty. `pending` is never abandoned, so racing it here is lossless.
+  private async nextOrIdle(
+    pending: Promise<ChangeStreamDocument<ActivityDocument> | null>,
+  ): Promise<{
+    idle: boolean;
+    event: ChangeStreamDocument<ActivityDocument> | null;
+  }> {
+    if (this.buffer.length === 0) {
+      return { idle: false, event: await pending };
+    }
+    let timer: NodeJS.Timeout | undefined;
+    const idle = new Promise<'idle'>((resolve) => {
+      timer = setTimeout(
+        () => resolve('idle'),
+        AuditlogChangeStreamService.FLUSH_IDLE_MS,
+      );
+    });
+    try {
+      const result = await Promise.race([pending, idle]);
+      return result === 'idle'
+        ? { idle: true, event: null }
+        : { idle: false, event: result };
+    } finally {
+      if (timer != null) clearTimeout(timer);
+    }
+  }
+
+  // Send the buffered events as one ES bulk and persist the resume token at the batch
+  // boundary. Returns false when the batch failed (token not advanced) and the stream must
+  // restart to replay it; true when synced, poison-pill-skipped, or empty.
+  private async flushBuffer(): Promise<boolean> {
+    if (this.buffer.length === 0) return true;
+    const batch = this.buffer;
+    this.buffer = [];
+
+    const upserts: ActivityDocument[] = [];
+    const deleteIds: mongoose.Types.ObjectId[] = [];
+    for (const event of batch) {
+      // 'update' is intentionally ignored: it changes only `action`, which is not in ES.
+      if (
+        event.operationType === 'insert' &&
+        'fullDocument' in event &&
+        event.fullDocument != null
+      ) {
+        upserts.push(event.fullDocument);
+      } else if (event.operationType === 'delete') {
+        deleteIds.push(event.documentKey._id);
+      }
+    }
+    // Counter keys on the head token: stable across restarts, unlike the drifting tail.
+    const firstToken = batch[0]._id;
+    const lastToken = batch[batch.length - 1]._id;
+
+    try {
+      await this.esWriter.bulkSyncAuditlogs(upserts, deleteIds);
+      this.consecutiveEventFailures = 0;
+      this.lastFailingToken = null;
+      this.consecutiveRestarts = 0;
+    } catch (err) {
+      // ResumeToken is `unknown`; JSON.stringify compares structurally without assertions.
+      // A false mismatch only resets the counter and delays the poison-pill skip.
+      if (
+        JSON.stringify(firstToken) !== JSON.stringify(this.lastFailingToken)
+      ) {
+        this.consecutiveEventFailures = 0;
+      }
+      this.consecutiveEventFailures++;
+
+      if (
+        this.consecutiveEventFailures >=
+        AuditlogChangeStreamService.MAX_CONSECUTIVE_EVENT_FAILURES
+      ) {
+        logger.error(
+          { token: lastToken, batchSize: batch.length, err },
+          'Skipping poison pill batch after consecutive failures.',
+        );
+        await AuditlogEsSyncStatus.setUnsynced(true);
+        // Advance token past the poisoned batch; failure here means it is retried on restart.
+        try {
+          await ChangeStreamResumeToken.upsert(STREAM_KEY, lastToken);
+        } catch (tokenErr) {
+          logger.error(
+            tokenErr,
+            'Failed to advance token past poison pill batch; will retry on restart.',
+          );
+        }
+        this.consecutiveEventFailures = 0;
+        this.lastFailingToken = null;
+        this.consecutiveRestarts = 0;
+        return true;
+      }
+
+      this.lastFailingToken = firstToken;
+      logger.error(
+        { err },
+        'AuditlogChangeStreamService batch handling failed.',
+      );
+      return false;
+    }
+
+    // Persist token at the batch boundary (not per event). Replay window: a crash before
+    // this persists replays the batch on restart; ES index/delete are idempotent, so
+    // reprocessing is safe (at-least-once).
+    try {
+      await ChangeStreamResumeToken.upsert(STREAM_KEY, lastToken);
+    } catch (tokenErr) {
+      logger.error(
+        tokenErr,
+        'Failed to persist resume token; batch will be reprocessed on restart.',
+      );
+    }
+    return true;
   }
 
   private async restart(): Promise<void> {
