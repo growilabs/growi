@@ -2,7 +2,7 @@ import type { StorageThreadType } from '@mastra/core/memory';
 import { DefaultChatTransport } from 'ai';
 
 import { UNKNOWN_CHAT_ERROR } from '~/features/mastra/interfaces/chat-error';
-import type { MastraUIMessage } from '~/features/mastra/interfaces/chat-message';
+import type { CustomUIMessage } from '~/features/mastra/interfaces/chat-message';
 
 /**
  * Body sent with each message POST to `/_api/v3/mastra/message`.
@@ -39,7 +39,7 @@ const MASTRA_MESSAGE_API = '/_api/v3/mastra/message';
  */
 export const createMastraChatTransport = (
   threadId: string,
-): DefaultChatTransport<MastraUIMessage> =>
+): DefaultChatTransport<CustomUIMessage> =>
   new DefaultChatTransport({
     api: MASTRA_MESSAGE_API,
     body: buildMessageRequestBody(threadId),

@@ -8,7 +8,7 @@ import type { UIMessage } from 'ai';
  * `finishReason` mirrors the resolved `stream.finishReason`, which the agent
  * stream types as `string | undefined`.
  */
-export type MastraMessageMetadata = {
+export type CustomUIMessageMetadata = {
   finishReason?: string;
 };
 
@@ -18,4 +18,4 @@ export type MastraMessageMetadata = {
  * and the client (`useChat` / transport / saved-message store) so message
  * metadata stays type-safe end to end.
  */
-export type MastraUIMessage = UIMessage<MastraMessageMetadata>;
+export type CustomUIMessage = UIMessage<CustomUIMessageMetadata>;

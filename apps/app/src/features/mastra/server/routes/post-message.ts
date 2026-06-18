@@ -17,7 +17,7 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import type { MastraMessageMetadata } from '../../interfaces/chat-message';
+import type { CustomUIMessageMetadata } from '../../interfaces/chat-message';
 import { resolveProviderOptions } from '../services/ai-sdk-modules/resolve-provider-options';
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
@@ -146,13 +146,13 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
               stream.steps,
             ]);
 
-            // Typed against the shared MastraMessageMetadata so the written
+            // Typed against the shared CustomUIMessageMetadata so the written
             // shape stays in sync with what the client reads as
             // `message.metadata` (see ../../interfaces/chat-message). The
             // relayed mastra chunks carry `unknown` metadata, so the stream
             // itself is left ungenerified; this annotation is the write-side
             // contract.
-            const messageMetadata: MastraMessageMetadata = { finishReason };
+            const messageMetadata: CustomUIMessageMetadata = { finishReason };
             writer.write({ type: 'message-metadata', messageMetadata });
 
             logger.info(
