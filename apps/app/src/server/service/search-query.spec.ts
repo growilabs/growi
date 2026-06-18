@@ -1,10 +1,8 @@
 import { vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
-import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type Crowi from '~/server/crowi';
-import UserGroup from '~/server/models/user-group';
 import { configManager } from '~/server/service/config-manager/config-manager';
 
 import type { QueryTerms, SearchDelegator } from '../interfaces/search';
