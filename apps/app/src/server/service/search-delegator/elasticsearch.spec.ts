@@ -198,7 +198,7 @@ describe('appendCriteriaForGroupFilter()', () => {
     });
   });
 
-  it('combines group and not-group into a single AND clause', () => {
+  it('applies group as a filter clause and not-group as a must_not clause', () => {
     const terms = createMockESQueryTerms({
       group: ['dev-1'],
       not_group: ['dev-2'],
