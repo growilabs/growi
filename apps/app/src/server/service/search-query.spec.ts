@@ -10,33 +10,6 @@ import NamedQuery from '../models/named-query';
 import SearchService from './search';
 import type ElasticsearchDelegator from './search-delegator/elasticsearch';
 
-// Mock UserGroup
-vi.mock('~/server/models/user-group', () => {
-  const mockModel = {
-    find: vi.fn(),
-    findOne: vi.fn(),
-  };
-
-  return {
-    default: mockModel,
-    UserGroup: mockModel,
-  };
-});
-vi.mock(
-  '~/features/external-user-group/server/models/external-user-group',
-  () => {
-    const mockModel = {
-      find: vi.fn(),
-      findOne: vi.fn(),
-    };
-
-    return {
-      default: mockModel,
-      ExternalUserGroup: mockModel,
-    };
-  },
-);
-
 // Mock NamedQuery
 vi.mock('~/server/models/named-query', () => {
   const mockModel = {
