@@ -60,14 +60,19 @@ export const fetchActiveMembersByGroup = async (
     return initialResult;
   }
 
-  const User = mongoose.model('User');
-  const activeUsers = (await User.find({
+  type ActiveUserFields = {
+    _id: Types.ObjectId;
+    name: string;
+    username: string;
+  };
+  const User = mongoose.model<ActiveUserFields>('User');
+  const activeUsers = await User.find({
     _id: { $in: Object.keys(userIdToGroupIds) },
     status: UserStatus.STATUS_ACTIVE,
   })
     .select('name username')
     .lean()
-    .exec()) as Array<{ _id: Types.ObjectId; name: string; username: string }>;
+    .exec();
 
   const result = { ...initialResult };
   for (const user of activeUsers) {
