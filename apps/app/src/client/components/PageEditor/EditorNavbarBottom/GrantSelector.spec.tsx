@@ -6,10 +6,13 @@ import { createStore, Provider } from 'jotai';
 import type { IPageSelectedGrant } from '~/interfaces/page';
 import { useSelectedGrant } from '~/states/ui/editor';
 
-import { GrantSelector } from './GrantSelector';
+import { GrantSelector, GroupMembersLabel } from './GrantSelector';
 
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),
+}));
+vi.mock('~/stores/user', () => ({
+  useSWRxRelatedGroupsMembers: vi.fn(() => ({ data: undefined })),
 }));
 vi.mock('~/states/global', () => ({ useCurrentUser: vi.fn(() => undefined) }));
 vi.mock('~/states/page', () => ({ useCurrentPageId: vi.fn(() => 'page1') }));
@@ -32,6 +35,45 @@ const renderGrantSelector = (
 
   return render(<GrantSelector />, { wrapper });
 };
+
+describe('GroupMembersLabel', () => {
+  it('renders nothing when members list is empty', () => {
+    const { container } = render(
+      <GroupMembersLabel members={[]} currentUsername="alice" />,
+    );
+    expect(container.firstChild).toBeNull();
+  });
+
+  it('shows "only_yourself" key when all members are the current user', () => {
+    const members = [{ username: 'alice', name: 'Alice' }];
+    const { getByText } = render(
+      <GroupMembersLabel members={members} currentUsername="alice" />,
+    );
+    expect(getByText('user_group.only_yourself')).not.toBeNull();
+  });
+
+  it('shows names joined by comma when other members exist', () => {
+    const members = [
+      { username: 'alice', name: 'Alice' },
+      { username: 'bob', name: 'Bob' },
+    ];
+    const { getByText } = render(
+      <GroupMembersLabel members={members} currentUsername="alice" />,
+    );
+    expect(getByText('Alice, Bob')).not.toBeNull();
+  });
+
+  it('falls back to username when name is empty', () => {
+    const members = [
+      { username: 'alice', name: '' },
+      { username: 'bob', name: 'Bob' },
+    ];
+    const { getByText } = render(
+      <GroupMembersLabel members={members} currentUsername="carol" />,
+    );
+    expect(getByText('alice, Bob')).not.toBeNull();
+  });
+});
 
 describe('GrantSelector', () => {
   // Before the current page's grant is loaded, selectedGrant is null. Showing the

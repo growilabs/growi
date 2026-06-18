@@ -14,6 +14,7 @@ import {
 
 import type { UserRelatedGroupsData } from '~/interfaces/page';
 import { UserGroupPageGrantStatus } from '~/interfaces/page';
+import type { IUserGroupMember } from '~/interfaces/user-group-member';
 import { useCurrentUser } from '~/states/global';
 import { useCurrentPageId } from '~/states/page';
 import { toSelectedGrant, useSelectedGrant } from '~/states/ui/editor';
@@ -48,6 +49,32 @@ const AVAILABLE_GRANTS = [
     reselectLabel: 'Reselect the group',
   },
 ];
+
+type GroupMembersLabelProps = {
+  members: IUserGroupMember[];
+  currentUsername: string | undefined;
+};
+
+export const GroupMembersLabel = ({
+  members,
+  currentUsername,
+}: GroupMembersLabelProps): JSX.Element | null => {
+  const { t } = useTranslation();
+
+  if (members.length === 0) return null;
+
+  const onlySelf = members.every((m) => m.username === currentUsername);
+  if (onlySelf) {
+    return (
+      <small className="ms-2 text-muted">{t('user_group.only_yourself')}</small>
+    );
+  }
+  return (
+    <small className="ms-2 text-muted">
+      {members.map((m) => m.name || m.username).join(', ')}
+    </small>
+  );
+};
 
 type Props = {
   disabled?: boolean;
@@ -337,25 +364,10 @@ export const GrantSelector = (props: Props): JSX.Element => {
                   {group.provider}
                 </span>
               )}
-              {(() => {
-                const members = membersByGroupId?.[group.id] ?? [];
-                if (members.length === 0) return null;
-                const onlySelf = members.every(
-                  (m) => m.username === currentUser?.username,
-                );
-                if (onlySelf) {
-                  return (
-                    <small className="ms-2 text-muted">
-                      {t('user_group.only_yourself')}
-                    </small>
-                  );
-                }
-                return (
-                  <small className="ms-2 text-muted">
-                    {members.map((m) => m.name).join(', ')}
-                  </small>
-                );
-              })()}
+              <GroupMembersLabel
+                members={membersByGroupId?.[group.id] ?? []}
+                currentUsername={currentUser?.username}
+              />
             </button>
           );
         })}
