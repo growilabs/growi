@@ -433,10 +433,9 @@ class ElasticsearchDelegator
       await this.addAllAuditlogs();
     } catch (error) {
       logger.error(
-        { err: error },
-        "An error occured while 'rebuildAuditlogIndex'.",
+        { err: error, body: error?.meta?.body },
+        "An error occurred while 'rebuildAuditlogIndex'.",
       );
-      logger.error({ body: error?.meta?.body }, 'error.meta.body');
       throw error;
     } finally {
       await this.normalizeAuditlogIndices();
