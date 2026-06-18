@@ -27,14 +27,14 @@
   - 兄弟エンドポイント(`get-related-groups.ts`)と同じ factory パターン・同じ認可(`accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true })` + `loginRequiredStrictly`)で `apps/app/src/server/routes/apiv3/user/get-related-groups-members.ts` を作成する
   - サーバ側でセッションからグループ集合を導出し(`getUserRelatedGroups(req.user)`)、サービスを呼び出して `res.apiv3({ membersByGroupId })` を返す
   - `apps/app/src/server/routes/apiv3/user/index.ts` に `/related-groups/members` ルートを登録する
-  - インテグレーションテスト: 未ログインで 401、ログイン済み一般ユーザーで 200 かつ自分の所属グループのみが写像に含まれること
+  - ハンドラーユニットテスト（supertest + モック）: 未ログインで 401、ログイン済み一般ユーザーで 200 かつ自分の所属グループのみが写像に含まれること
   - _Requirements: 1.1, 2.1, 3.1, 3.2, 3.3, 3.5_
   - _Boundary: Backend/API_
   - _Depends: 2.1_
 
 - [x] 3.2 (P) GrantSelector にグループ別メンバー一覧表示と i18n ラベルを実装する
   - `apps/app/src/client/components/PageEditor/EditorNavbarBottom/GrantSelector.tsx` の L338 TODO を置き換え、モーダルの開閉状態(`isSelectGroupModalShown`)をフックの有効化条件として使用する
-  - 自分が所属するグループ(`userRelatedGroups`)それぞれに、groupId に対応するメンバーの氏名・ユーザー名リストを描画する
+  - 自分が所属するグループ(`userRelatedGroups`)それぞれに、groupId に対応するメンバーの氏名リストを描画する（`name` が空の場合は `username` にフォールバック）
   - `<button>` 要素内ではインライン/インラインブロック要素(`<span>`, `<small>` 等)のみを使用し、ブロック要素・インタラクティブ要素は追加しない
   - メンバーが現在ユーザー(`username` 一致)のみの場合は「自分のみ」を示す i18n テキストを表示する
   - 未所属グループ(`nonUserRelatedGrantedGroups`)セクションには何も追加しない

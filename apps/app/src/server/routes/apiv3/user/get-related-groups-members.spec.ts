@@ -111,7 +111,7 @@ describe('getRelatedGroupsMembersHandlerFactory', () => {
   describe('authenticated request', () => {
     const mockUser = mock<IUserHasId>({ _id: 'user-id-1', username: 'alice' });
 
-    it('should return 200 and membersByGroupId map for the authenticated user (req 1.1, 2.1, 3.3, 3.5)', async () => {
+    it('should return 200 and membersByGroupId map for the authenticated user (req 1.1, 2.1)', async () => {
       const mockGroups = [
         { item: { _id: 'group-1' }, type: 'userGroup' },
         { item: { _id: 'group-2' }, type: 'userGroup' },
