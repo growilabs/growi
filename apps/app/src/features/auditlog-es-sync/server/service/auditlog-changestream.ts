@@ -8,9 +8,9 @@ import mongoose from 'mongoose';
 
 import type { ActivityDocument } from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager';
-import type ElasticsearchDelegator from '~/server/service/search-delegator/elasticsearch';
 import loggerFactory from '~/utils/logger';
 
+import type { AuditlogEsWriter } from '../interfaces/auditlog-es-writer';
 import { AuditlogEsSyncStatus } from '../models/auditlog-es-sync-status';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 
@@ -51,7 +51,7 @@ export class AuditlogChangeStreamService {
   private static readonly RESTART_BASE_DELAY_MS = 1000;
   private static readonly RESTART_MAX_DELAY_MS = 30000;
 
-  private readonly delegator: ElasticsearchDelegator;
+  private readonly esWriter: AuditlogEsWriter;
 
   private changeStream: ChangeStream<ActivityDocument> | null = null;
 
@@ -67,8 +67,8 @@ export class AuditlogChangeStreamService {
 
   private lastFailingToken: unknown = null;
 
-  constructor(delegator: ElasticsearchDelegator) {
-    this.delegator = delegator;
+  constructor(esWriter: AuditlogEsWriter) {
+    this.esWriter = esWriter;
   }
 
   async start(): Promise<void> {
@@ -126,9 +126,9 @@ export class AuditlogChangeStreamService {
             'fullDocument' in event &&
             event.fullDocument != null
           ) {
-            await this.delegator.updateOrInsertAuditlog(event.fullDocument);
+            await this.esWriter.updateOrInsertAuditlog(event.fullDocument);
           } else if (event.operationType === 'delete') {
-            await this.delegator.deleteAuditlog(event.documentKey._id);
+            await this.esWriter.deleteAuditlog(event.documentKey._id);
           }
           this.consecutiveEventFailures = 0;
           this.lastFailingToken = null;

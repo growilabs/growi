@@ -7,7 +7,6 @@ import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
-import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server/models/auditlog-es-sync-status';
 import type { AuditlogSuggestionField } from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
@@ -96,8 +95,6 @@ class ElasticsearchDelegator
 
   private isElasticsearchReindexOnBoot: boolean;
 
-  private isElasticsearchAuditlogReindexOnBoot: boolean;
-
   private elasticsearchVersion: 7 | 8 | 9;
 
   private client: ElasticsearchClientDelegator;
@@ -135,10 +132,6 @@ class ElasticsearchDelegator
 
     this.isElasticsearchReindexOnBoot = configManager.getConfig(
       'app:elasticsearchReindexOnBoot',
-    );
-
-    this.isElasticsearchAuditlogReindexOnBoot = configManager.getConfig(
-      'app:elasticsearchAuditlogReindexOnBoot',
     );
   }
 
@@ -239,13 +232,9 @@ class ElasticsearchDelegator
         logger.error('Rebuild index on boot failed', err);
       }
     }
-    if (this.isElasticsearchAuditlogReindexOnBoot) {
-      try {
-        await this.rebuildAuditlogIndex();
-      } catch (err) {
-        logger.error('Rebuild auditlog index on boot failed', err);
-      }
-    }
+    // Auditlog rebuild-on-boot is orchestrated by Crowi (setupSearcher): it must also
+    // clear the ES sync-status flag afterwards, which is a feature concern the delegator
+    // must not reach into.
     return normalizeIndices;
   }
 
@@ -443,9 +432,6 @@ class ElasticsearchDelegator
           { remove: { alias: aliasName, index: tmpIndexName } },
         ],
       });
-
-      // alias now points to the freshly populated index — ES is in sync with MongoDB
-      await AuditlogEsSyncStatus.setUnsynced(false);
 
       await client.indices.delete({ index: tmpIndexName });
     } catch (error) {
