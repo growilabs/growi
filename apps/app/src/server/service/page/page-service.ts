@@ -111,8 +111,8 @@ export interface IPageService {
     user,
     options,
     pageOpId: ObjectIdLike,
+    resolvedAction: SupportedActionType,
     activity?,
-    resolvedAction?: SupportedActionType,
   ): Promise<void>;
   revertDeletedPage(
     page,

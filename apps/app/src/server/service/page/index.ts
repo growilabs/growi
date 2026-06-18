@@ -33,7 +33,7 @@ import { Comment } from '~/features/comment/server';
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { isAiEnabled } from '~/features/openai/server/services';
-import { SupportedAction } from '~/interfaces/activity';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
 import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
@@ -2812,13 +2812,20 @@ class PageService implements IPageService {
         ? SupportedAction.ACTION_PAGE_RECURSIVELY_REVERT
         : SupportedAction.ACTION_PAGE_REVERT;
 
+    const activityUpdateParameters = {
+      action: resolvedAction,
+      target: page,
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+      contributor: user,
+    };
+
     const parameters = {
       ip: activityParameters.ip,
       endpoint: activityParameters.endpoint,
       action: SupportedAction.ACTION_UNSETTLED,
       user,
       target: page,
-      targetModel: 'Page',
+      targetModel: SupportedTargetModel.MODEL_PAGE,
       snapshot: {
         username: user.username,
       },
@@ -2829,13 +2836,14 @@ class PageService implements IPageService {
     // 1. Separate v4 & v5 process
     const shouldUseV4Process = this.shouldUseV4ProcessForRevert(page);
     if (shouldUseV4Process) {
-      this.activityEvent.emit('update', activity._id, {
-        action: resolvedAction,
-        target: page,
-        targetModel: 'Page',
-        contributor: user,
-      });
-      return this.revertDeletedPageV4(page, user, options, isRecursively);
+      const reverted = await this.revertDeletedPageV4(
+        page,
+        user,
+        options,
+        isRecursively,
+      );
+      this.activityEvent.emit('update', activity._id, activityUpdateParameters);
+      return reverted;
     }
 
     const newPath = Page.getRevertDeletedPageName(page.path);
@@ -2896,12 +2904,7 @@ class PageService implements IPageService {
       this.activityEvent.emit(
         'update',
         activity._id,
-        {
-          action: resolvedAction,
-          target: page,
-          targetModel: 'Page',
-          contributor: user,
-        },
+        activityUpdateParameters,
         page,
         preNotifyService.generatePreNotify,
       );
@@ -2931,8 +2934,8 @@ class PageService implements IPageService {
             user,
             options,
             pageOp._id,
-            activity,
             resolvedAction,
+            activity,
           );
           this.pageEvent.emit('syncDescendantsUpdate', updatedPage, user);
         } catch (err) {
@@ -2957,8 +2960,8 @@ class PageService implements IPageService {
     user,
     options,
     pageOpId: ObjectIdLike,
+    resolvedAction,
     activity?,
-    resolvedAction?,
   ): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
@@ -2980,7 +2983,7 @@ class PageService implements IPageService {
       {
         action: resolvedAction,
         target: page,
-        targetModel: 'Page',
+        targetModel: SupportedTargetModel.MODEL_PAGE,
         contributor: user,
       },
       page,
