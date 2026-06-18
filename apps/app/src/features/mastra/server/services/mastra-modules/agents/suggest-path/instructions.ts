@@ -44,16 +44,23 @@ This classification is part of your final answer and must steer the whole explor
 
 ## Step 3 — Search the wiki with fullTextSearch
 
-Start from distinctive terms in the document — proper nouns, technical terms, and topic words — written in the document's own language. After each search, compare the hits against the document:
+Full-text search matches the literal words that pages and their paths actually contain — it does not reason about meaning. So your job here is to GUESS the words the target shelf and its pages most likely contain, the way you would when grepping an unfamiliar codebase, and probe for them. Work in three moves:
 
-- Does the hit's path look like a place where documents of this kind (and this flow/stock type) accumulate?
-- Does the snippet indicate a genuinely related topic?
+1. **Read for intent, not surface.** First understand what this document IS: what it is about (its topic) AND what kind of document it is (its type — the flow/stock category you assigned, the activity or record it represents, the genre of work it belongs to). Both matter, and the kind is the half that is easy to forget.
+2. **Imagine the target, then name it.** Picture where a document like this would already live in a well-kept wiki, and what an existing neighbour page there would be titled or pathed. Turn that picture into query words you'd expect to FIND there — including words for the KIND of document, not only its topic. Pages that share a save location are usually grouped by kind, so a kind word often lands on the right shelf when topic words alone scatter across unrelated areas. Combine a kind word with a topic word in one query.
+   - **A page's PATH is often spelled differently from its prose.** Page-path segments (slugs) are frequently short identifiers — and may be in a DIFFERENT language than the body, most often an English/ASCII slug even when the document is written in Japanese (e.g. a document whose body says "ページレイアウト" or "監査ログ" may live at a path segment like "page_layout" or "audit-log"). Search lands hardest on the path, so when a document centres on a named feature, setting, screen, or term, also query the literal slug you'd expect that thing to have in a path: the English name, the identifier, the file/setting key — not only the prose phrase. A slug guess that matches the path beats any number of topic-word rephrasings.
+3. **Probe, read the hits, adjust.** After each search compare the hits against the document:
+   - Does the hit's path look like a place where documents of this kind (and this flow/stock type) accumulate?
+   - Does the snippet indicate a genuinely related topic?
 
-If the results are insufficient or off-target, search again from a different angle. Each search consumes one unit of a limited budget, so change something meaningful every time:
+If the results are insufficient or off-target, search again from a DIFFERENT angle — each search consumes one unit of a limited budget, so make every retry change something meaningful rather than rephrasing the same topic word:
 
-- Use synonyms or alternative phrasings of the same concept; page titles may use different words than the document does.
+- Switch axis: if topic words scattered the hits, lead with a kind/type word (or a path-segment word you'd expect the shelf to use); if a kind word was too generic, pin it down with a topic word.
+- **Follow the terrain your hits reveal.** Even an imperfect search usually returns a few hits that sit near the right area. Read their PATHS and look for a shared segment or parent — that is the shelf taking shape. Don't just rephrase the topic; spend your next search drilling into that shelf with prefix:/that/shared/path/ to see what actually accumulates there and whether your document belongs among it. Each hit's path is a clue to the next query, not just a candidate to score.
+- Try a literal path-slug you haven't tried yet: the English/ASCII identifier of the feature or term, an alternate spelling, or a word you'd expect to appear in the path rather than the prose.
+- Use synonyms or alternative phrasings; page titles may use different words than the document does.
 - Switch language: wikis are often mostly monolingual. If searching in English finds little, retry the same concept in Japanese (and vice versa).
-- Change the abstraction level: try a broader topic word when specific terms miss; try a more specific term when generic words return noise.
+- Change the abstraction level: try a broader word when specific terms miss; try a more specific term when generic words return noise.
 - Use search operators to change the conditions: "phrase" for exact phrase match, -word to exclude noise, prefix:/path to search inside a promising subtree, -prefix:/path to exclude an irrelevant subtree, tag:name to restrict to tagged pages.
 
 ## Step 4 — Identify the CATEGORY the related pages live in
@@ -62,6 +69,7 @@ The goal of exploration is to locate the right shelf for the document, not to fi
 
 - Read the paths of the related hits. If several related pages share a common parent path (e.g. they all sit directly under "/資料/内部仕様/"), that shared parent is the category the document belongs in too — propose it, so the document becomes a sibling of those pages.
 - Use getPageContent only to confirm a candidate is genuinely about a related topic when path and snippet are not enough. Reserve it for the one or two most promising candidates — do not read every hit.
+- Verify before you trust a shelf whose fit is uncertain. When a candidate's topic is close but its KIND looks off, or its path reads like a broad grouping/container rather than a place where documents of this kind actually sit, take one targeted look before committing — getPageContent on the page, or a prefix:/that/path/ search to see what kind of documents accumulate under it. A topic-adjacent shelf that collects a DIFFERENT kind of document is the wrong shelf however related the subject; this is exactly the trap that topic-only searching falls into, so confirm the kind matches before you propose it.
 - When you land on a related page, your default move is to step to ITS PARENT (the category that page sits in) and propose that parent — because the document is a peer of that page, not a part of it. Do NOT propose the related page's own path unless the document is truly a sub-detail of that specific page (see the core question above).
 
 ## Choosing the path from what you found
