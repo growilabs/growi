@@ -529,4 +529,24 @@ describe('parseQueryString()', () => {
     };
     expect(terms).toStrictEqual(emptyTerms(expectedTerm));
   });
+
+  it('ignores a valueless new-filter operator, capturing nothing', () => {
+    const terms = searchService.parseQueryString('author: editor: group:');
+
+    // A bare operator must not leak into match (or any bucket).
+    expect(terms).toStrictEqual(emptyTerms());
+  });
+
+  it('ignores a valueless negated new-filter operator, capturing nothing', () => {
+    const terms = searchService.parseQueryString('-author: -editor: -group:');
+
+    expect(terms).toStrictEqual(emptyTerms());
+  });
+
+  it('drops only the valueless operator while parsing the rest of the query', () => {
+    const terms = searchService.parseQueryString('author: hello group:dev-1');
+
+    const expectedTerm = { match: ['hello'], group: ['dev-1'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
 });
