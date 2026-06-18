@@ -7,15 +7,15 @@ type Props = {
   finishReason: string | undefined;
 };
 
-// /**
-//  * Inline warning shown beneath an assistant message whose stream ended
-//  * abnormally (any `finishReason` other than `stop`) — so the reader sees why the
-//  * answer is cut short. Informational only (no action). Renders nothing for a
-//  * normal or not-yet-finished message.
-//  *
-//  * The notice is reason-aware: each finish reason maps to its own localized
-//  * message under `ai_sidebar.incomplete.*`.
-//  */
+/**
+ * Inline warning shown beneath an assistant message whose stream ended
+ * abnormally (any `finishReason` other than `stop`) — so the reader sees why the
+ * answer is cut short. Informational only (no action). Renders nothing for a
+ * normal or not-yet-finished message.
+ *
+ * The notice is reason-aware: each finish reason maps to its own localized
+ * message under `ai_sidebar.incomplete.*`.
+ */
 export const IncompleteResponseNotice = ({
   finishReason,
 }: Props): JSX.Element | null => {
