@@ -60,6 +60,16 @@ const FILTER_PREFIXES = [
   'editor:',
   'group:',
 ] as const;
+
+// New-filter operators (author/editor/group) typed with no value (e.g. `author:`,
+// `-group:`) are ignored. They must not be captured as
+// full-text match terms. prefix:/tag: keep their existing behavior.
+const VALUELESS_IGNORED_PREFIXES: readonly string[] = [
+  'author:',
+  'editor:',
+  'group:',
+];
+
 // https://regex101.com/r/pN9XfK/2
 const NEGATIVE_TERM_REGEXP = new RegExp(
   `^-(${FILTER_PREFIXES.join('|')})?(.+)$`,
@@ -465,13 +475,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
       throw err;
     }
 
+    this.validateSearchableData(delegator, data);
+
     data.resolvedFilterData = await this.resolveFilterData(
       data.terms,
       userGroups,
     );
-
-    // throws
-    this.validateSearchableData(delegator, data);
 
     return [
       await delegator.search(data, user, userGroups, searchOpts),
@@ -489,6 +498,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     // Early-return (no MongoDB query) for guests or when no group operator was typed.
     if (
       userGroups == null ||
+      userGroups.length < 1 ||
       (groupTerms.length === 0 && notGroupTerms.length === 0)
     ) {
       const emptyFilterData: ResolvedFilterData = {
@@ -509,9 +519,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const myGroups = [...internal, ...external];
     const namesToIds = new Map<string, string[]>();
 
-    // Save the all the user's group names and their ids
+    // Save all the user's group names and their ids
     for (const group of myGroups) {
-      const id = group.id.toString();
+      const id = group.id;
       namesToIds.set(group.name, [...(namesToIds.get(group.name) ?? []), id]);
     }
 
@@ -565,6 +575,13 @@ class SearchService implements SearchQueryParser, SearchResolver {
     // Second: Parse other keywords (include minus keywords)
     queryString.split(' ').forEach((word) => {
       if (word === '') {
+        return;
+      }
+
+      // Ignore a bare new-filter operator with no value (positive or negated) so it
+      // does not leak into full-text match terms
+      const wordWithoutNegation = word.startsWith('-') ? word.slice(1) : word;
+      if (VALUELESS_IGNORED_PREFIXES.includes(wordWithoutNegation)) {
         return;
       }
 

@@ -171,4 +171,29 @@ describe('excludeUserPagesFromQuery()', () => {
     expect(query.not_prefix).toContain('/user');
     expect(query.not_prefix).toHaveLength(1);
   });
+
+  it('should leave author/editor/group filters untouched', () => {
+    const query: QueryTerms = {
+      match: [],
+      not_match: [],
+      phrase: [],
+      not_phrase: [],
+      prefix: [],
+      not_prefix: [],
+      tag: [],
+      not_tag: [],
+      author: ['alice'],
+      editor: ['bob'],
+      group: ['team'],
+      not_author: [],
+      not_editor: [],
+      not_group: [],
+    };
+
+    excludeUserPagesFromQuery(query);
+
+    expect(query.author).toStrictEqual(['alice']);
+    expect(query.editor).toStrictEqual(['bob']);
+    expect(query.group).toStrictEqual(['team']);
+  });
 });

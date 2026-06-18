@@ -84,6 +84,43 @@ describe('SearchService test', () => {
 
       expect(terms).toStrictEqual(expected);
     });
+
+    it('should accumulate multiple values for the same filter', async () => {
+      const queryString =
+        'author:a1 author:a2 -author:a3 editor:e1 editor:e2 group:g1 -group:g2 -group:g3';
+      const terms = await searchService.parseQueryString(queryString);
+
+      expect(terms.author).toStrictEqual(['a1', 'a2']);
+      expect(terms.not_author).toStrictEqual(['a3']);
+      expect(terms.editor).toStrictEqual(['e1', 'e2']);
+      expect(terms.group).toStrictEqual(['g1']);
+      expect(terms.not_group).toStrictEqual(['g2', 'g3']);
+    });
+
+    it('should ignore a new-filter operator that has no value', async () => {
+      const terms = await searchService.parseQueryString(
+        'author: editor: group: -group:',
+      );
+
+      expect(terms.author).toStrictEqual([]);
+      expect(terms.editor).toStrictEqual([]);
+      expect(terms.group).toStrictEqual([]);
+      expect(terms.not_group).toStrictEqual([]);
+      expect(terms.match).toStrictEqual([]);
+      expect(terms.not_match).toStrictEqual([]);
+    });
+
+    it('should not capture a bare word that starts with a filter name', async () => {
+      const terms = await searchService.parseQueryString(
+        'authorname editorx grouped -notauthorname',
+      );
+
+      expect(terms.author).toStrictEqual([]);
+      expect(terms.editor).toStrictEqual([]);
+      expect(terms.group).toStrictEqual([]);
+      expect(terms.match).toStrictEqual(['authorname', 'editorx', 'grouped']);
+      expect(terms.not_match).toStrictEqual(['notauthorname']);
+    });
   });
 
   describe('parseSearchQuery()', () => {
