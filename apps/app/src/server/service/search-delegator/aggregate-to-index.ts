@@ -39,6 +39,8 @@ export const aggregatePipelineToIndex = (
         from: 'users',
         localField: 'creator',
         foreignField: '_id',
+        // Only the fields consumed downstream — avoid hydrating full user docs.
+        pipeline: [{ $project: { username: 1, email: 1 } }],
         as: 'creator',
       },
     },
@@ -54,6 +56,7 @@ export const aggregatePipelineToIndex = (
         from: 'users',
         localField: 'lastUpdateUser',
         foreignField: '_id',
+        pipeline: [{ $project: { username: 1 } }],
         as: 'lastUpdateUser',
       },
     },
