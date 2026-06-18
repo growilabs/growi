@@ -1,4 +1,9 @@
-import type { ChangeStream, ChangeStreamOptions } from 'mongodb';
+import type {
+  Document as BsonDocument,
+  ChangeStream,
+  ChangeStreamDocument,
+  ChangeStreamOptions,
+} from 'mongodb';
 import mongoose from 'mongoose';
 
 import type { ActivityDocument } from '~/server/models/activity';
@@ -26,6 +31,19 @@ const isChangeStreamHistoryLost = (err: unknown): boolean => {
     return true;
   return false;
 };
+
+// mongoose 6's ChangeStream wrapper lacks Symbol.asyncIterator (fixed in v7), so
+// `for await` throws; drive next() manually until then.
+async function* iterateChangeStream<T extends BsonDocument>(
+  changeStream: ChangeStream<T>,
+): AsyncGenerator<ChangeStreamDocument<T>> {
+  while (!changeStream.closed) {
+    // biome-ignore lint/performance/noAwaitInLoops: change streams are inherently sequential.
+    const event = await changeStream.next();
+    if (event == null) return;
+    yield event;
+  }
+}
 
 export class AuditlogChangeStreamService {
   // Backoff: 1,2,4,8,16,30,30s. Skip a repeatedly failing event on its 8th failure (~91s total).
@@ -99,7 +117,7 @@ export class AuditlogChangeStreamService {
     if (this.changeStream == null) return;
 
     try {
-      for await (const event of this.changeStream) {
+      for await (const event of iterateChangeStream(this.changeStream)) {
         // Phase 1: ES operation — failures here feed poison-pill detection.
         try {
           // 'update' skipped: Activity updates change only `action`, which is not indexed in ES.
