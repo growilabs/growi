@@ -27,12 +27,6 @@ import {
   ReasoningTrigger,
 } from '~/components/ai-elements/reasoning';
 import { Response } from '~/components/ai-elements/response';
-import {
-  Source,
-  Sources,
-  SourcesContent,
-  SourcesTrigger,
-} from '~/components/ai-elements/sources';
 import { Button } from '~/components/ui/button';
 import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
 import type { CustomUIMessage } from '~/features/mastra/interfaces/chat-message';
@@ -49,6 +43,8 @@ import {
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
 import { IncompleteResponseNotice } from './IncompleteResponseNotice';
+import { PageSources } from './PageSources';
+import { extractPageSources } from './page-sources';
 
 import styles from './ChatSidebar.module.scss';
 
@@ -178,32 +174,9 @@ export const ChatSidebar = (): JSX.Element => {
             <ConversationContent>
               {messages.map((message) => (
                 <div key={message.id}>
-                  {message.role === 'assistant' &&
-                    message.parts.filter((part) => part.type === 'source-url')
-                      .length > 0 && (
-                      <Sources>
-                        <SourcesTrigger
-                          count={
-                            message.parts.filter(
-                              (part) => part.type === 'source-url',
-                            ).length
-                          }
-                        />
-                        {message.parts
-                          .filter((part) => part.type === 'source-url')
-                          .map((_part, i) => (
-                            // biome-ignore lint/suspicious/noArrayIndexKey: the source parts have no stable ID, but the index is sufficient for this static list
-                            <SourcesContent key={`${message.id}-${i}`}>
-                              <Source
-                                // biome-ignore lint/suspicious/noArrayIndexKey: the source parts have no stable ID, but the index is sufficient for this static list
-                                key={`${message.id}-${i}`}
-                                // href={part.url}
-                                // title={part.url}
-                              />
-                            </SourcesContent>
-                          ))}
-                      </Sources>
-                    )}
+                  {message.role === 'assistant' && (
+                    <PageSources sources={extractPageSources(message.parts)} />
+                  )}
                   {message.parts.map((part, i) => {
                     switch (part.type) {
                       case 'text':
