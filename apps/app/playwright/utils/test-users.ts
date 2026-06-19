@@ -41,3 +41,10 @@ export const FILTER_TEST_USERS: readonly TestUser[] = [
   FILTER_TEST_USER_A,
   FILTER_TEST_USER_B,
 ];
+
+/**
+ * User group used by the `group:` filter test. The `group:` qualifier resolves
+ * this name against the *searcher's* own memberships, so the search must run as
+ * a member (FILTER_TEST_USER_A is added to it in the spec setup).
+ */
+export const FILTER_GROUP_NAME = 'e2e-filter-group';

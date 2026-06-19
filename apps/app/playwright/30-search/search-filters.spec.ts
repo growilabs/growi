@@ -4,10 +4,16 @@ import {
   type CreatedPage,
   createPage,
   deletePagesCompletely,
+  Grant,
   updatePage,
 } from '../utils/CreatePage';
+import { addUserToGroup, ensureUserGroup } from '../utils/CreateUserGroup';
 import { rebuildSearchIndex } from '../utils/SearchIndex';
-import { FILTER_TEST_USER_A, FILTER_TEST_USER_B } from '../utils/test-users';
+import {
+  FILTER_GROUP_NAME,
+  FILTER_TEST_USER_A,
+  FILTER_TEST_USER_B,
+} from '../utils/test-users';
 
 test.describe
   .serial('tag filter relevance', () => {
@@ -192,5 +198,89 @@ test.describe
       await expect(
         list.getByRole('link', { name: `${stamp}-only-a` }),
       ).toHaveCount(0);
+    });
+  });
+
+test.describe
+  .serial('group filter relevance', () => {
+    // `group:<name>` matches pages granted to that user group.
+    const stamp = 'e2e-groupfilter-2b8e6d';
+    const inGroupPath = `/Sandbox/${stamp}-in-group`;
+    const publicControlPath = `/Sandbox/${stamp}-public`;
+    let created: CreatedPage[] = [];
+
+    // Delete as user A (creator + group member).
+    test.afterAll(async ({ browser }) => {
+      const contextA = await browser.newContext({
+        storageState: FILTER_TEST_USER_A.authFile,
+      });
+      try {
+        await deletePagesCompletely(contextA.request, created);
+      } finally {
+        await contextA.close();
+      }
+    });
+
+    test('setup: a group page (A is a member) and a public control', async ({
+      request,
+      browser,
+    }) => {
+      // Admin creates the group and adds user A as a member.
+      const groupId = await ensureUserGroup(request, FILTER_GROUP_NAME);
+      await addUserToGroup(request, groupId, FILTER_TEST_USER_A.username);
+
+      // Login as user A.
+      const contextA = await browser.newContext({
+        storageState: FILTER_TEST_USER_A.authFile,
+      });
+      try {
+        // Page restricted to the group -> only group members can find it.
+        const inGroup = await createPage(contextA.request, {
+          path: inGroupPath,
+          body: `group filter ${stamp}`,
+          grant: Grant.USER_GROUP,
+          grantUserGroupIds: [{ type: 'UserGroup', item: groupId }],
+        });
+        // Public page.
+        const publicControl = await createPage(contextA.request, {
+          path: publicControlPath,
+          body: `group filter ${stamp}`,
+        });
+        created = [inGroup, publicControl];
+      } finally {
+        await contextA.close();
+      }
+    });
+
+    test('group filter returns only pages granted to that group', async ({
+      request,
+      browser,
+    }) => {
+      await rebuildSearchIndex(request);
+
+      // Search as user A (a group member).
+      const contextA = await browser.newContext({
+        storageState: FILTER_TEST_USER_A.authFile,
+      });
+      try {
+        const pageA = await contextA.newPage();
+        const list = pageA.getByTestId('search-result-list');
+
+        // POSITIVE: the group-restricted page appears for `group:<name>`.
+        await expect(async () => {
+          await pageA.goto(`/_search?q=group:${FILTER_GROUP_NAME}`);
+          await expect(pageA.getByTestId('search-result-base')).toBeVisible();
+          await expect(
+            list.getByRole('link', { name: `${stamp}-in-group` }),
+          ).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 20_000 });
+
+        // NEGATIVE: the public (non-group) page does not appear.
+        await expect(
+          list.getByRole('link', { name: `${stamp}-public` }),
+        ).toHaveCount(0);
+      } finally {
+        await contextA.close();
+      }
     });
   });
