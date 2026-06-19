@@ -309,3 +309,119 @@ test.describe
       }
     });
   });
+
+test.describe
+  .serial('prefix filter relevance', () => {
+    // `prefix:<path>` matches pages whose path starts with <path>.
+    const stamp = 'e2e-prefixfilter-4d7c1a';
+    const targetPath = `/Sandbox/${stamp}-inc-target`;
+    const controlPath = `/Sandbox/${stamp}-exc-control`;
+    let created: CreatedPage[] = [];
+
+    test.afterAll(async ({ request }) => {
+      await deletePagesCompletely(request, created);
+    });
+
+    test('setup: create an in-prefix page and an out-of-prefix control page', async ({
+      request,
+    }) => {
+      const target = await createPage(request, {
+        path: targetPath,
+        body: `prefix filter ${stamp}`,
+      });
+      const control = await createPage(request, {
+        path: controlPath,
+        body: `prefix filter ${stamp}`,
+      });
+      created = [target, control];
+    });
+
+    test('prefix filter returns only pages under that path', async ({
+      page,
+      request,
+    }) => {
+      await rebuildSearchIndex(request);
+
+      const list = page.getByTestId('search-result-list');
+
+      // POSITIVE: the page under the prefix appears for `prefix:<path>`.
+      await expect(async () => {
+        await page.goto(`/_search?q=prefix:/Sandbox/${stamp}-inc`);
+        await expect(page.getByTestId('search-result-base')).toBeVisible();
+        await expect(
+          list.getByRole('link', { name: `${stamp}-inc-target` }),
+        ).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 20_000 });
+
+      // NEGATIVE: the page outside the prefix does not appear.
+      await expect(
+        list.getByRole('link', { name: `${stamp}-exc-control` }),
+      ).toHaveCount(0);
+    });
+  });
+
+test.describe
+  .serial('negated author filter relevance', () => {
+    // Representative end-to-end check for negation (`-author:`). A bare `-author:`
+    // matches every page except one, so scope it with a unique
+    // `prefix:` to keep the result set deterministic.
+    const stamp = 'e2e-notauthorfilter-8e2f0b';
+    const prefix = `/Sandbox/${stamp}`;
+    const byUserAPath = `${prefix}-by-a`;
+    const byUserBPath = `${prefix}-by-b`;
+    let created: CreatedPage[] = [];
+
+    test.afterAll(async ({ request }) => {
+      await deletePagesCompletely(request, created);
+    });
+
+    test('setup: create pages under one prefix authored by different users', async ({
+      browser,
+    }) => {
+      const contextA = await browser.newContext({
+        storageState: FILTER_TEST_USER_A.authFile,
+      });
+      const contextB = await browser.newContext({
+        storageState: FILTER_TEST_USER_B.authFile,
+      });
+      try {
+        const byA = await createPage(contextA.request, {
+          path: byUserAPath,
+          body: `not-author filter ${stamp}`,
+        });
+        const byB = await createPage(contextB.request, {
+          path: byUserBPath,
+          body: `not-author filter ${stamp}`,
+        });
+        created = [byA, byB];
+      } finally {
+        await contextA.close();
+        await contextB.close();
+      }
+    });
+
+    test('negated author filter excludes that author within the scope', async ({
+      page,
+      request,
+    }) => {
+      await rebuildSearchIndex(request);
+
+      const list = page.getByTestId('search-result-list');
+
+      // POSITIVE: within the prefix scope, A's page is found.
+      await expect(async () => {
+        await page.goto(
+          `/_search?q=prefix:${prefix} -author:${FILTER_TEST_USER_B.username}`,
+        );
+        await expect(page.getByTestId('search-result-base')).toBeVisible();
+        await expect(
+          list.getByRole('link', { name: `${stamp}-by-a` }),
+        ).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 20_000 });
+
+      // NEGATIVE: B's page is excluded by -author:<B>.
+      await expect(
+        list.getByRole('link', { name: `${stamp}-by-b` }),
+      ).toHaveCount(0);
+    });
+  });
