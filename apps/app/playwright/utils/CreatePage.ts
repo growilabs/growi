@@ -65,6 +65,33 @@ export const createPage = async (
 };
 
 /**
+ * Update a page via PUT /_api/v3/page. The authenticated user becomes the page's
+ * last editor — used to set up the `editor:` filter target. Returns the page
+ * with its new revision id so the caller can refresh its teardown record.
+ */
+export const updatePage = async (
+  request: APIRequestContext,
+  page: CreatedPage,
+  body: string,
+): Promise<CreatedPage> => {
+  const res = await request.put('/_api/v3/page', {
+    data: { pageId: page.pageId, revisionId: page.revisionId, body },
+  });
+
+  expect(
+    res.ok(),
+    `updatePage failed: ${res.status()} ${await res.text()}`,
+  ).toBe(true);
+
+  const json = await res.json();
+  return {
+    pageId: page.pageId,
+    path: json.page.path,
+    revisionId: json.page.revision?._id ?? json.revision?._id,
+  };
+};
+
+/**
  * Delete pages completely via POST /_api/v3/pages/delete. Best-effort teardown
  * for tests — pass the pages returned by createPage(). The endpoint takes a
  * map of pageId -> revisionId.

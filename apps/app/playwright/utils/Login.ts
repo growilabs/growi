@@ -1,26 +1,56 @@
 import path from 'node:path';
-import { expect, type Page } from '@playwright/test';
+import type { Page } from '@playwright/test';
 
-const authFile = path.resolve(__dirname, '../.auth/admin.json');
+const adminAuthFile = path.resolve(__dirname, '../.auth/admin.json');
 
-export const login = async (page: Page): Promise<void> => {
-  // Perform authentication steps. Replace these actions with your own.
-  await page.goto('/admin');
+interface LoginOptions {
+  usernameOrEmail?: string;
+  password?: string;
+  /** where to persist the authenticated storageState; defaults to admin.json */
+  authFile?: string;
+}
 
-  const loginForm = await page.getByTestId('login-form');
+/**
+ * Fill and submit the login form, then wait until the app navigates away from
+ * the login page. Does NOT persist storageState.
+ *
+ * Exposed separately from {@link login} so callers that must keep acting on the
+ * resulting session without writing an auth file (e.g. logging in as a freshly
+ * invited user to complete their registration) can drive the form directly.
+ */
+export const fillLoginForm = async (
+  page: Page,
+  usernameOrEmail: string,
+  password: string,
+): Promise<void> => {
+  await page.goto('/login');
 
-  if (loginForm != null) {
-    await loginForm.getByPlaceholder('Username or E-mail').fill('admin');
-    await loginForm.getByPlaceholder('Password').fill('adminadmin');
-    await loginForm
-      .locator('[type=submit]')
-      .filter({ hasText: 'Login' })
-      .click();
-  }
+  const loginForm = page.getByTestId('login-form');
+  await loginForm.getByPlaceholder('Username or E-mail').fill(usernameOrEmail);
+  await loginForm.getByPlaceholder('Password').fill(password);
+  await loginForm.locator('[type=submit]').filter({ hasText: 'Login' }).click();
 
-  await page.waitForURL('/admin');
-  await expect(page).toHaveTitle(/Wiki Management Homepage/);
+  // A successful login redirects away from the login page; wrong credentials
+  // keep us on /login, so this also fails fast on a bad login.
+  await page.waitForURL((url) => !url.pathname.startsWith('/login'));
+};
 
-  // End of authentication steps.
+/**
+ * Authenticate and persist the session to a storageState file so other browser
+ * contexts can reuse it via `browser.newContext({ storageState })`.
+ * Defaults to the admin account / admin.json.
+ */
+export const login = async (
+  page: Page,
+  options: LoginOptions = {},
+): Promise<void> => {
+  const {
+    usernameOrEmail = 'admin',
+    password = 'adminadmin',
+    authFile = adminAuthFile,
+  } = options;
+
+  await fillLoginForm(page, usernameOrEmail, password);
+
   await page.context().storageState({ path: authFile });
 };
