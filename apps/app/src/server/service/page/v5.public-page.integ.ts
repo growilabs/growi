@@ -3008,11 +3008,14 @@ describe('PageService page operations with only public pages', () => {
           dummyUser1._id.toString(),
         );
 
-        // The emitted activity id must match the Activity persisted as unsettled.
+        // The emitted activity id must correspond to a persisted Activity.
+        // We assert the linkage only, not the intermediate action state: whether
+        // the activity is created unsettled-then-settled is an implementation
+        // detail of the listener, covered behaviorally in
+        // contribution-orchestration.spec.ts.
         const Activity = mongoose.model('Activity');
         const activity = await Activity.findById(activityId);
         expect(activity).toBeTruthy();
-        expect(activity?.action).toBe(SupportedAction.ACTION_UNSETTLED);
       } finally {
         emitSpy.mockRestore();
       }
@@ -3024,6 +3027,10 @@ describe('PageService page operations with only public pages', () => {
         status: Page.STATUS_DELETED,
       });
       expect(deletedPage).toBeTruthy();
+      // descendantCount is seeded to a positive value on purpose (the page has
+      // no real descendants) because the resolved action is driven solely by
+      // page.descendantCount. Do not "fix" it to match a real subtree — that
+      // would change which branch this test exercises.
       expect(deletedPage?.descendantCount).toBeGreaterThan(0);
 
       const emitSpy = vi
