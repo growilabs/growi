@@ -10,7 +10,10 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type { AuditlogEsWriter } from '../interfaces/auditlog-es-writer';
-import { AuditlogEsSyncStatus } from '../models/auditlog-es-sync-status';
+import {
+  markUnsyncedAndAdvanceToken,
+  markUnsyncedAndClearToken,
+} from '../models/auditlog-es-sync-tx';
 import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 
 const logger = loggerFactory('growi:service:auditlog-changestream');
@@ -36,7 +39,6 @@ export class AuditlogChangeStreamService {
   private static readonly MAX_CONSECUTIVE_EVENT_FAILURES = 8;
   private static readonly RESTART_BASE_DELAY_MS = 1000;
   private static readonly RESTART_MAX_DELAY_MS = 30000;
-  // Flush a batch once it reaches this size or after this idle gap, whichever comes first.
   private static readonly BATCH_SIZE = 100;
   private static readonly FLUSH_IDLE_MS = 200;
 
@@ -104,6 +106,15 @@ export class AuditlogChangeStreamService {
     }
   }
 
+  private startNext(
+    changeStream: ChangeStream<ActivityDocument>,
+  ): Promise<ChangeStreamDocument<ActivityDocument> | null> {
+    const pending = changeStream.next();
+    // Guard against unhandled rejection when the loop breaks and abandons this next().
+    pending.catch(() => {});
+    return pending;
+  }
+
   private async processChangeStream(): Promise<void> {
     const changeStream = this.changeStream;
     if (changeStream == null) return;
@@ -111,7 +122,7 @@ export class AuditlogChangeStreamService {
     try {
       // Keep exactly one in-flight next() in `pending`. flushBuffer() is awaited inline so the
       // loop applies natural backpressure and never runs concurrently with a flush.
-      let pending = changeStream.next();
+      let pending = this.startNext(changeStream);
 
       while (!changeStream.closed) {
         // biome-ignore lint/performance/noAwaitInLoops: change-stream consumption is inherently sequential (backpressure).
@@ -123,7 +134,7 @@ export class AuditlogChangeStreamService {
         }
         if (event == null) break; // stream ended
 
-        pending = changeStream.next();
+        pending = this.startNext(changeStream);
         this.buffer.push(event);
         if (
           this.buffer.length >= AuditlogChangeStreamService.BATCH_SIZE &&
@@ -143,17 +154,16 @@ export class AuditlogChangeStreamService {
             ' Documents written during the gap are not in Elasticsearch; run reindex to restore consistency.',
         );
         try {
-          await ChangeStreamResumeToken.clear(STREAM_KEY);
-        } catch (clearErr) {
-          // If clear fails, restart would re-read the stale token and immediately hit HistoryLost again.
-          // Stop the service instead; admin must resolve the MongoDB issue and restart the process.
+          await markUnsyncedAndClearToken(STREAM_KEY);
+        } catch (txErr) {
+          // If this fails the stale token remains and restart would immediately hit HistoryLost
+          // again. Stop the service instead; admin must resolve the MongoDB issue and restart.
           logger.error(
-            clearErr,
-            'Failed to clear resume token after history loss. Stopping service to prevent restart loop.',
+            txErr,
+            'Failed to clear resume token + mark unsynced after history loss. Stopping service to prevent restart loop.',
           );
           this.stopped = true;
         }
-        await AuditlogEsSyncStatus.setUnsynced(true);
       } else if (this.stopped) {
         logger.debug('AuditlogChangeStreamService change stream closed.');
       } else {
@@ -244,15 +254,16 @@ export class AuditlogChangeStreamService {
           { token: lastToken, batchSize: batch.length, err },
           'Skipping poison pill batch after consecutive failures.',
         );
-        await AuditlogEsSyncStatus.setUnsynced(true);
-        // Advance token past the poisoned batch; failure here means it is retried on restart.
+        // On failure, return false instead of skipping: the batch replays on restart, so a
+        // gap is never left with the flag unset.
         try {
-          await ChangeStreamResumeToken.upsert(STREAM_KEY, lastToken);
-        } catch (tokenErr) {
+          await markUnsyncedAndAdvanceToken(STREAM_KEY, lastToken);
+        } catch (txErr) {
           logger.error(
-            tokenErr,
-            'Failed to advance token past poison pill batch; will retry on restart.',
+            txErr,
+            'Failed to mark unsynced + advance token past poison pill batch; will retry on restart.',
           );
+          return false;
         }
         this.consecutiveEventFailures = 0;
         this.lastFailingToken = null;

@@ -5,15 +5,15 @@ const logger = loggerFactory(
   'growi:features:auditlog-es-sync:models:auditlog-es-sync-status',
 );
 
-const KEY = 'auditlogs';
+export const AUDITLOG_SYNC_STATUS_KEY = 'auditlogs';
 
 export const AuditlogEsSyncStatus = {
   async setUnsynced(value: boolean): Promise<void> {
     try {
       await prisma.auditlog_es_sync_status.upsert({
-        where: { key: KEY },
+        where: { key: AUDITLOG_SYNC_STATUS_KEY },
         update: { hasUnsyncedEvents: value },
-        create: { key: KEY, hasUnsyncedEvents: value },
+        create: { key: AUDITLOG_SYNC_STATUS_KEY, hasUnsyncedEvents: value },
       });
     } catch (err) {
       logger.error('AuditlogEsSyncStatus.setUnsynced failed.', err);
@@ -23,7 +23,7 @@ export const AuditlogEsSyncStatus = {
   async isUnsynced(): Promise<boolean> {
     try {
       const doc = await prisma.auditlog_es_sync_status.findUnique({
-        where: { key: KEY },
+        where: { key: AUDITLOG_SYNC_STATUS_KEY },
       });
       return doc?.hasUnsyncedEvents ?? false;
     } catch (err) {
