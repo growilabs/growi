@@ -1,7 +1,10 @@
-import type { Prisma } from '~/generated/prisma/client';
 import { prisma } from '~/utils/prisma';
 
 import { AUDITLOG_SYNC_STATUS_KEY } from './auditlog-es-sync-status';
+import {
+  buildResumeTokenDeleteArgs,
+  buildResumeTokenUpsertArgs,
+} from './changestream-resume-token';
 
 const setUnsyncedTrueArgs = {
   where: { key: AUDITLOG_SYNC_STATUS_KEY },
@@ -15,14 +18,11 @@ export const markUnsyncedAndAdvanceToken = async (
   streamKey: string,
   token: unknown,
 ): Promise<void> => {
-  const value = token as Prisma.InputJsonValue;
   await prisma.$transaction(async (tx) => {
     await tx.auditlog_es_sync_status.upsert(setUnsyncedTrueArgs);
-    await tx.changestream_resume_tokens.upsert({
-      where: { key: streamKey },
-      update: { token: value },
-      create: { key: streamKey, token: value },
-    });
+    await tx.changestream_resume_tokens.upsert(
+      buildResumeTokenUpsertArgs(streamKey, token),
+    );
   });
 };
 
@@ -33,8 +33,8 @@ export const markUnsyncedAndClearToken = async (
 ): Promise<void> => {
   await prisma.$transaction(async (tx) => {
     await tx.auditlog_es_sync_status.upsert(setUnsyncedTrueArgs);
-    await tx.changestream_resume_tokens.deleteMany({
-      where: { key: streamKey },
-    });
+    await tx.changestream_resume_tokens.deleteMany(
+      buildResumeTokenDeleteArgs(streamKey),
+    );
   });
 };

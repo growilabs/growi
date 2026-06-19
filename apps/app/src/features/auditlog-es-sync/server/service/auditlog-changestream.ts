@@ -18,8 +18,7 @@ import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 
 const logger = loggerFactory('growi:service:auditlog-changestream');
 
-// Shared across all instances. Since the token is only saved after a successful ES write,
-// token N in the store guarantees event N is already in ES — conflicts cause extra reprocessing but not data loss.
+// Fixed key shared by every instance: all GROWI processes use the one resume-token doc.
 const STREAM_KEY = 'auditlogs';
 
 const CHANGE_STREAM_HISTORY_LOST_CODE = 286;
@@ -215,7 +214,8 @@ export class AuditlogChangeStreamService {
     const upserts: ActivityDocument[] = [];
     const deleteIds: mongoose.Types.ObjectId[] = [];
     for (const event of batch) {
-      // 'update' is intentionally ignored: it changes only `action`, which is not in ES.
+      // 'update' is ignored: ES holds only snapshot.username, fixed at creation.
+      // Index a mutable field in the auditlog mapping and 'update' must be handled too.
       if (
         event.operationType === 'insert' &&
         'fullDocument' in event &&
