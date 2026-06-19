@@ -26,9 +26,10 @@ interface CreatePageOptions {
 /**
  * Create a page via the REST API (POST /_api/v3/page).
  *
- * Uses Playwright's `request` fixture, which reuses the stored admin session
- * cookies — so the call is authenticated without any token or CSRF header
- * (POST is in the CSRF ignore list).
+ * Authenticates via the cookies carried by the given `request` context — pass a
+ * `browser.newContext({ storageState })` request to author the page as a
+ * specific user. No token or CSRF header is needed (POST is in the CSRF ignore
+ * list).
  *
  * Returns the created page's id so the test can clean it up afterwards.
  */
@@ -92,9 +93,14 @@ export const updatePage = async (
 };
 
 /**
- * Delete pages completely via POST /_api/v3/pages/delete. Best-effort teardown
- * for tests — pass the pages returned by createPage(). The endpoint takes a
- * map of pageId -> revisionId.
+ * Delete pages completely via POST /_api/v3/pages/delete — teardown for tests.
+ * Pass the pages returned by createPage(); the endpoint takes a map of
+ * pageId -> revisionId.
+ *
+ * Asserts the request succeeded: a silent teardown failure leaks pages, which
+ * resurfaces as a confusing duplicate-path error on the next run. Note the
+ * caller must be allowed to delete every page — a group-restricted page can only
+ * be completely deleted by a group member, not by a non-member admin.
  */
 export const deletePagesCompletely = async (
   request: APIRequestContext,
@@ -105,7 +111,11 @@ export const deletePagesCompletely = async (
   const pageIdToRevisionIdMap = Object.fromEntries(
     pages.map((p) => [p.pageId, p.revisionId]),
   );
-  await request.post('/_api/v3/pages/delete', {
+  const res = await request.post('/_api/v3/pages/delete', {
     data: { pageIdToRevisionIdMap, isCompletely: true, isRecursively: true },
   });
+  expect(
+    res.ok(),
+    `deletePagesCompletely failed: ${res.status()} ${await res.text()}`,
+  ).toBe(true);
 };

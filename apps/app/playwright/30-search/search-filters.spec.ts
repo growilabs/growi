@@ -15,6 +15,11 @@ import {
   FILTER_TEST_USER_B,
 } from '../utils/test-users';
 
+// Each describe below triggers a full Elasticsearch reindex and then polls with
+// `toPass`. CI runs Playwright with `workers: 1` (see playwright.config.ts), so
+// they execute serially there. Run locally with `--workers=1` to avoid
+// concurrent rebuilds interfering across describes.
+
 test.describe
   .serial('tag filter relevance', () => {
     // Unique keyword so the matching set is deterministic and survives seed data.
@@ -138,13 +143,14 @@ test.describe
     const stamp = 'e2e-editorfilter-9c4d1e';
     const editedByBPath = `/Sandbox/${stamp}-edited-by-b`;
     const onlyByAPath = `/Sandbox/${stamp}-only-a`;
+    const authoredByBPath = `/Sandbox/${stamp}-authored-by-b`;
     let created: CreatedPage[] = [];
 
     test.afterAll(async ({ request }) => {
       await deletePagesCompletely(request, created);
     });
 
-    test('setup: page last edited by B, control edited only by A', async ({
+    test('setup: page last edited by B, plus author/contributor controls', async ({
       browser,
     }) => {
       const contextA = await browser.newContext({
@@ -154,7 +160,7 @@ test.describe
         storageState: FILTER_TEST_USER_B.authFile,
       });
       try {
-        // Created by A, then last-edited by B -> last editor is B.
+        // Created by A, then last-edited by B -> last editor is B (target).
         const createdByA = await createPage(contextA.request, {
           path: editedByBPath,
           body: `editor filter ${stamp}`,
@@ -170,7 +176,20 @@ test.describe
           path: onlyByAPath,
           body: `editor filter ${stamp}`,
         });
-        created = [editedByB, onlyA];
+
+        // Authored by B but last-edited by A -> last editor is A.
+        // Proves the filter keys on the LAST editor.
+        const createdByB = await createPage(contextB.request, {
+          path: authoredByBPath,
+          body: `editor filter ${stamp}`,
+        });
+        const editedByA = await updatePage(
+          contextA.request,
+          createdByB,
+          `editor filter ${stamp} edited by a`,
+        );
+
+        created = [editedByB, onlyA, editedByA];
       } finally {
         await contextA.close();
         await contextB.close();
@@ -194,9 +213,15 @@ test.describe
         ).toBeVisible({ timeout: 3000 });
       }).toPass({ timeout: 20_000 });
 
-      // NEGATIVE: the page only A ever edited does not appear.
+      // NEGATIVE: a page only A ever edited does not appear.
       await expect(
         list.getByRole('link', { name: `${stamp}-only-a` }),
+      ).toHaveCount(0);
+
+      // NEGATIVE: a page authored & contributed to by B, but last-edited by A,
+      // does not appear -> proves `editor:` is the LAST editor, not the author.
+      await expect(
+        list.getByRole('link', { name: `${stamp}-authored-by-b` }),
       ).toHaveCount(0);
     });
   });

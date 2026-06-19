@@ -17,9 +17,9 @@ const authDir = path.resolve(__dirname, '../.auth');
 const password = 'e2e-filter-password';
 
 /**
- * Users provisioned by `users.setup.ts` for the author/editor search-filter
- * tests. Declared here as the single source of truth so the setup that creates
- * them and the specs that act as them read the same list.
+ * Users provisioned by `users.setup.ts` for the search-filter tests (author,
+ * editor and group). Declared here as the single source of truth so the setup
+ * that creates them and the specs that act as them read the same list.
  */
 export const FILTER_TEST_USER_A: TestUser = {
   email: 'e2e-filter-author-a@example.com',
