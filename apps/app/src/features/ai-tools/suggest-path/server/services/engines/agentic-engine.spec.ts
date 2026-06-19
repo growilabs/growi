@@ -57,6 +57,7 @@ vi.mock('../resolve-parent-grant', () => ({
 import { agenticEngine } from './agentic-engine';
 
 const SEARCH_LIMIT_KEY = 'aiTools:suggestPathAgenticSearchLimit';
+const CHILD_LISTING_LIMIT_KEY = 'aiTools:suggestPathAgenticChildListingLimit';
 const TIMEOUT_KEY = 'aiTools:suggestPathAgenticTimeoutMs';
 
 const mockUser = mock<IUserHasId>({ username: 'alice' });
@@ -180,6 +181,7 @@ const callEngine = (): ReturnType<typeof agenticEngine> =>
 beforeEach(() => {
   mocks.configValues.clear();
   mocks.configValues.set(SEARCH_LIMIT_KEY, 5);
+  mocks.configValues.set(CHILD_LISTING_LIMIT_KEY, 5);
   mocks.configValues.set(TIMEOUT_KEY, 60_000);
   mocks.getConfigMock.mockClear();
   mocks.generateMock.mockReset();
@@ -214,7 +216,8 @@ describe('agenticEngine', () => {
 
       const { options } = getGenerateCall();
       expect(options.structuredOutput.schema).toBe(AGENTIC_OUTPUT_JSON_SCHEMA);
-      expect(options.maxSteps).toBe(14); // 2 * searchLimit(5) + 4
+      // 2 * searchLimit(5) + 2 * childListingLimit(5) + 4
+      expect(options.maxSteps).toBe(24);
       expect(options.abortSignal).toBeInstanceOf(AbortSignal);
     });
 
@@ -463,7 +466,7 @@ describe('agenticEngine', () => {
 
       await callEngine();
       const first = getGenerateCall(0);
-      expect(first.options.maxSteps).toBe(14); // 2 * 5 + 4
+      expect(first.options.maxSteps).toBe(24); // 2 * 5 + 2 * 5 + 4
       expect(first.options.requestContext.get('searchBudget')).toEqual({
         limit: 5,
         used: 0,
@@ -474,7 +477,7 @@ describe('agenticEngine', () => {
 
       await callEngine();
       const second = getGenerateCall(1);
-      expect(second.options.maxSteps).toBe(10); // 2 * 3 + 4
+      expect(second.options.maxSteps).toBe(20); // 2 * 3 + 2 * 5 + 4
       expect(second.options.requestContext.get('searchBudget')).toEqual({
         limit: 3,
         used: 0,
@@ -510,11 +513,14 @@ describe('agenticEngine', () => {
     it('builds a fresh request context with a zeroed budget for every request (no module-scope sharing)', async () => {
       mocks.generateMock.mockImplementation(
         (_messages: unknown, options: CapturedGenerateOptions) => {
-          // Simulate the agent loop consuming budget during the request —
-          // the NEXT request must not observe this consumption.
+          // Simulate the agent loop consuming both budgets during the request
+          // — the NEXT request must not observe this consumption.
           const budget = options.requestContext.get('searchBudget');
           budget.used += 2;
           budget.queries.push('consumed query');
+          const childBudget = options.requestContext.get('childListingBudget');
+          childBudget.used += 1;
+          childBudget.paths.push('/consumed/path/');
           return Promise.resolve({ object: outputWith([]) });
         },
       );
@@ -529,10 +535,15 @@ describe('agenticEngine', () => {
       expect(secondCtx.get('searchBudget')).not.toBe(
         firstCtx.get('searchBudget'),
       );
-      // Each request started from used=0: had the budget been shared, the
-      // second request would show the accumulated count (4) instead.
+      expect(secondCtx.get('childListingBudget')).not.toBe(
+        firstCtx.get('childListingBudget'),
+      );
+      // Each request started from used=0: had a budget been shared, the second
+      // request would show the accumulated count instead.
       expect(firstCtx.get('searchBudget').used).toBe(2);
       expect(secondCtx.get('searchBudget').used).toBe(2);
+      expect(firstCtx.get('childListingBudget').used).toBe(1);
+      expect(secondCtx.get('childListingBudget').used).toBe(1);
     });
   });
 
@@ -545,7 +556,7 @@ describe('agenticEngine', () => {
       return call[0];
     };
 
-    it('emits exactly one info summary containing all 7 contract fields — and nothing else — on success', async () => {
+    it('emits exactly one info summary containing all 8 contract fields — and nothing else — on success', async () => {
       primeGenerateWithExploration({
         object: outputWith([
           suggestionEntry('/tech/', 1),
@@ -585,6 +596,7 @@ describe('agenticEngine', () => {
       expect(getInfoSummary()).toEqual({
         durationMs: expect.any(Number),
         searchCount: 2,
+        listChildrenCount: 0,
         pageReadCount: 1,
         stopReason: 'completed',
         informationType: 'stock',
@@ -756,6 +768,7 @@ describe('agenticEngine', () => {
       // never logged (getPageContent results contain page bodies).
       expect(trace).toEqual({
         queries: ['first query', 'second query'],
+        listedPaths: [],
         searchResults: [
           {
             resultKind: 'ok',

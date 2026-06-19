@@ -102,6 +102,7 @@ vi.mock('../../memory', () => ({
 }));
 
 import { getPageContentTool } from '../../tools/get-page-content-tool';
+import { listChildrenTool } from '../../tools/list-children-tool';
 import { SUGGEST_PATH_INSTRUCTIONS } from './instructions';
 import { limitedSearchTool } from './limited-search-tool';
 import { suggestPathAgent } from './suggest-path-agent';
@@ -163,12 +164,19 @@ describe('suggestPathAgent', () => {
       expect(config.tools?.getPageContent).toBe(getPageContentTool);
     });
 
-    it('exposes exactly the two exploration tools', () => {
+    it('wires listChildren to the shared listChildrenTool by reference', () => {
+      const config = getCapturedConfig();
+
+      expect(config.tools?.listChildren).toBe(listChildrenTool);
+    });
+
+    it('exposes exactly the three exploration tools', () => {
       const config = getCapturedConfig();
 
       expect(Object.keys(config.tools ?? {}).sort()).toEqual([
         'fullTextSearch',
         'getPageContent',
+        'listChildren',
       ]);
     });
   });
