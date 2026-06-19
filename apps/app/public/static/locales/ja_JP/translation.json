@@ -581,6 +581,7 @@
   "ai_sidebar": {
     "new_chat": "新規チャット",
     "recent_threads": "最近の項目",
+    "sources": "参照したページ {{count}} 件",
     "error": {
       "title": "エラーが発生しました",
       "retry": "再試行",

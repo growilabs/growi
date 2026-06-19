@@ -539,6 +539,7 @@
   "ai_sidebar": {
     "new_chat": "新建对话",
     "recent_threads": "最近的项目",
+    "sources": "已参考 {{count}} 个页面",
     "error": {
       "title": "发生错误",
       "retry": "重试",
