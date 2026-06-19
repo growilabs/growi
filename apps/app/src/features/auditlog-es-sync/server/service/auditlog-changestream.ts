@@ -216,7 +216,8 @@ export class AuditlogChangeStreamService {
         deleteIds.push(event.documentKey._id);
       }
     }
-    // Counter keys on the head token: stable across restarts, unlike the drifting tail.
+    // Counter keys on the head token, not the tail: a restart resumes just after the last
+    // committed event, so the head is stable across restarts while the tail drifts with batch size.
     const firstToken = batch[0]._id;
     const lastToken = batch[batch.length - 1]._id;
 

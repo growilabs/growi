@@ -396,9 +396,12 @@ module.exports = (crowi) => {
               .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
             // NOT wait the processing is terminated
-            searchService.rebuildAuditlogIndex().catch((err) => {
-              logger.error('Rebuild auditlog index failed', err);
-            });
+            searchService
+              .rebuildAuditlogIndex()
+              .then(() => AuditlogEsSyncStatus.setUnsynced(false))
+              .catch((err) => {
+                logger.error('Rebuild auditlog index failed', err);
+              });
 
             activityEvent.emit('update', res.locals.activity._id, {
               action:
