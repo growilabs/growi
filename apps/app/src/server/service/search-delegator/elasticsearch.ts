@@ -75,6 +75,10 @@ const AVAILABLE_KEYS = [
   'not_prefix',
   'tag',
   'not_tag',
+  'author',
+  'not_author',
+  'editor',
+  'not_editor',
 ];
 
 type Data = any;
@@ -483,6 +487,7 @@ class ElasticsearchDelegator
       body: page.revision.body,
       body_embedded: page.revisionBodyEmbedded,
       username: page.creator?.username,
+      last_update_username: page.lastUpdateUser?.username,
       comments: page.commentsCount > 0 ? page.comments : undefined,
       comment_count: page.commentsCount,
       bookmark_count: page.bookmarksCount,
@@ -965,6 +970,34 @@ class ElasticsearchDelegator
     if (parsedKeywords.not_tag.length > 0) {
       const queries = parsedKeywords.not_tag.map((tag) => {
         return { term: { tag_names: tag } };
+      });
+      query.body.query.bool.filter.push({ bool: { must_not: queries } });
+    }
+
+    if (parsedKeywords.author.length > 0) {
+      const queries = parsedKeywords.author.map((author) => {
+        return { term: { username: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
+    }
+
+    if (parsedKeywords.not_author.length > 0) {
+      const queries = parsedKeywords.not_author.map((author) => {
+        return { term: { username: author } };
+      });
+      query.body.query.bool.filter.push({ bool: { must_not: queries } });
+    }
+
+    if (parsedKeywords.editor.length > 0) {
+      const queries = parsedKeywords.editor.map((editor) => {
+        return { term: { last_update_username: editor } };
+      });
+      query.body.query.bool.filter.push({ bool: { should: queries } });
+    }
+
+    if (parsedKeywords.not_editor.length > 0) {
+      const queries = parsedKeywords.not_editor.map((editor) => {
+        return { term: { last_update_username: editor } };
       });
       query.body.query.bool.filter.push({ bool: { must_not: queries } });
     }
