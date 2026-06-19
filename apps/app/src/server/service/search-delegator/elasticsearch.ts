@@ -95,8 +95,6 @@ class ElasticsearchDelegator
 
   private isElasticsearchReindexOnBoot: boolean;
 
-  private isElasticsearchAuditlogReindexOnBoot: boolean;
-
   private elasticsearchVersion: 7 | 8 | 9;
 
   private client: ElasticsearchClientDelegator;
@@ -134,10 +132,6 @@ class ElasticsearchDelegator
 
     this.isElasticsearchReindexOnBoot = configManager.getConfig(
       'app:elasticsearchReindexOnBoot',
-    );
-
-    this.isElasticsearchAuditlogReindexOnBoot = configManager.getConfig(
-      'app:elasticsearchAuditlogReindexOnBoot',
     );
   }
 
@@ -238,13 +232,9 @@ class ElasticsearchDelegator
         logger.error('Rebuild index on boot failed', err);
       }
     }
-    if (this.isElasticsearchAuditlogReindexOnBoot) {
-      try {
-        await this.rebuildAuditlogIndex();
-      } catch (err) {
-        logger.error('Rebuild auditlog index on boot failed', err);
-      }
-    }
+    // Auditlog rebuild-on-boot is orchestrated by Crowi (setupSearcher): it must also
+    // clear the ES sync-status flag afterwards, which is a feature concern the delegator
+    // must not reach into.
     return normalizeIndices;
   }
 
@@ -847,29 +837,6 @@ class ElasticsearchDelegator
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
 
-  async updateOrInsertAuditlog(
-    activity: ActivityDocument | null,
-  ): Promise<void> {
-    if (activity == null) return;
-    const body = this.prepareBodyForAuditlog(activity);
-    if (body.length === 0) return;
-
-    try {
-      const bulkResponse = await this.client.bulk({ body });
-      if (bulkResponse.errors) {
-        const failedItems = (bulkResponse.items ?? []).filter(
-          (i) => i.index?.error,
-        );
-        logger.error(
-          { failedItems },
-          'updateOrInsertAuditlog bulk indexing had errors',
-        );
-      }
-    } catch (err) {
-      logger.error('updateOrInsertAuditlog failed.', err);
-    }
-  }
-
   async searchAuditlogByFuzzyWildcard(
     field: AuditlogSuggestionField,
     q: string,
@@ -929,6 +896,36 @@ class ElasticsearchDelegator
     }
 
     return [];
+  }
+
+  async bulkSyncAuditlogs(
+    upserts: ActivityDocument[],
+    deleteIds: mongoose.Types.ObjectId[],
+  ): Promise<void> {
+    const body = [
+      ...upserts.flatMap((activity) => this.prepareBodyForAuditlog(activity)),
+      ...deleteIds.map((id) => ({
+        delete: { _index: this.auditlogIndexName, _id: id.toString() },
+      })),
+    ];
+    if (body.length === 0) return;
+
+    const bulkResponse = await this.client.bulk({ body });
+    if (bulkResponse.errors) {
+      const failedItems = (bulkResponse.items ?? []).filter(
+        (i) => i.index?.error || i.delete?.error,
+      );
+      // errors flag is set but no per-item error matched our filter — surface the raw
+      // items so the anomaly is debuggable instead of throwing an empty "0 failed items".
+      const summary =
+        failedItems.length > 0
+          ? `${failedItems.length} failed items`
+          : 'errors flag set but no per-item error';
+      const detail = failedItems.length > 0 ? failedItems : bulkResponse.items;
+      throw new Error(
+        `bulkSyncAuditlogs: ${summary}: ${JSON.stringify(detail?.slice(0, 3))}`,
+      );
+    }
   }
 
   deletePages(pages) {

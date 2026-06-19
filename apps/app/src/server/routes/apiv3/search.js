@@ -1,6 +1,7 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 
+import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
@@ -127,6 +128,9 @@ module.exports = (crowi) => {
    *                    type: object
    *                    description: Status of indices
    *                    $ref: '#/components/schemas/Indices'
+   *                  auditlogHasUnsyncedEvents:
+   *                    type: boolean
+   *                    description: Whether auditlog events failed to sync to Elasticsearch (rebuild needed)
    */
   router.get(
     '/indices',
@@ -151,7 +155,9 @@ module.exports = (crowi) => {
 
       try {
         const info = await searchService.getInfoForAdmin();
-        return res.status(200).send({ info });
+        const auditlogHasUnsyncedEvents =
+          await AuditlogEsSyncStatus.isUnsynced();
+        return res.status(200).send({ info, auditlogHasUnsyncedEvents });
       } catch (err) {
         logger.error(err);
         return res.apiv3Err(err, 503);
@@ -390,9 +396,12 @@ module.exports = (crowi) => {
               .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
             // NOT wait the processing is terminated
-            searchService.rebuildAuditlogIndex().catch((err) => {
-              logger.error('Rebuild auditlog index failed', err);
-            });
+            searchService
+              .rebuildAuditlogIndex()
+              .then(() => AuditlogEsSyncStatus.setUnsynced(false))
+              .catch((err) => {
+                logger.error('Rebuild auditlog index failed', err);
+              });
 
             activityEvent.emit('update', res.locals.activity._id, {
               action:
