@@ -1,4 +1,6 @@
-import type { UIMessage } from 'ai';
+import type { UIDataTypes, UIMessage } from 'ai';
+
+import type { GrowiChatTools } from './chat-tools';
 
 /**
  * Metadata the server attaches to an assistant message when its stream finishes.
@@ -14,8 +16,14 @@ export type CustomUIMessageMetadata = {
 
 /**
  * GROWI's chat message shape: the AI SDK `UIMessage` specialized with GROWI's
- * message metadata. Shared by the server stream writer (`createUIMessageStream`)
- * and the client (`useChat` / transport / saved-message store) so message
- * metadata stays type-safe end to end.
+ * message metadata AND tool set. Shared by the server stream writer
+ * (`createUIMessageStream`) and the client (`useChat` / transport / saved-message
+ * store) so both message metadata and tool-result parts stay type-safe end to
+ * end — a `tool-getPageContentTool` part's `output` is statically typed, no
+ * runtime shape-narrowing needed (see client/.../page-sources.ts).
  */
-export type CustomUIMessage = UIMessage<CustomUIMessageMetadata>;
+export type CustomUIMessage = UIMessage<
+  CustomUIMessageMetadata,
+  UIDataTypes,
+  GrowiChatTools
+>;

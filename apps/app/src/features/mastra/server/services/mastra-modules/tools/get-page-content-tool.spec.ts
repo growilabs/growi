@@ -65,6 +65,7 @@ const buildMockUser = (): IUserHasId =>
 // `updatedAt` is optional so we can simulate legacy pages predating the
 // timestamps schema (PR #11204 review FB: tool must not crash when null).
 type MockPage = {
+  _id: string;
   path: string;
   updatedAt?: Date;
   revision: unknown;
@@ -72,6 +73,7 @@ type MockPage = {
 };
 
 const buildMockPage = (overrides: Partial<MockPage> = {}): MockPage => ({
+  _id: 'page-1-id',
   path: '/p1',
   updatedAt: new Date('2026-01-15T10:00:00Z'),
   revision: 'revision-id-placeholder',
@@ -114,6 +116,7 @@ type OutlineEntry = {
 type GetPageContentOkResult = {
   result: 'ok';
   page: {
+    pageId: string;
     path: string;
     // Optional: legacy pages with `updatedAt == null` cause the tool to omit
     // the field entirely (PR #11204 review FB).
@@ -305,6 +308,8 @@ describe('getPageContentTool', () => {
       expect(result.result).toBe('ok');
       if (result.result !== 'ok') return;
       expect(result.page.path).toBe('/p1');
+      // pageId is surfaced for the client "sources" permalink (/{pageId}).
+      expect(result.page.pageId).toBe('page-1-id');
       // Byte-for-byte equality — the tool MUST NOT transform / re-escape the
       // Markdown body (requirement 2.5).
       expect(result.page.content).toBe(body);
@@ -336,6 +341,7 @@ describe('getPageContentTool', () => {
       expect(result.result).toBe('ok');
       if (result.result !== 'ok') return;
       expect(result.page.path).toBe('/p1');
+      expect(result.page.pageId).toBe('page-1-id');
       expect(result.page.content).toBe(body);
       expect(result.page.updatedAt).toBe('2026-01-15T10:00:00.000Z');
       expect(result.page.totalLines).toBe(2);

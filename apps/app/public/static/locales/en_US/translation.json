@@ -547,6 +547,9 @@
   "ai_sidebar": {
     "new_chat": "New Chat",
     "recent_threads": "Recent Items",
+    "sources": "{{count}} pages referenced",
+    "sources_one": "{{count}} page referenced",
+    "sources_other": "{{count}} pages referenced",
     "error": {
       "title": "An error occurred",
       "retry": "Retry",

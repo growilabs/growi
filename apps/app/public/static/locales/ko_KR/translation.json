@@ -518,6 +518,7 @@
   "ai_sidebar": {
     "new_chat": "새 채팅",
     "recent_threads": "최근 항목",
+    "sources": "참고한 페이지 {{count}}건",
     "error": {
       "title": "오류가 발생했습니다",
       "retry": "다시 시도",
