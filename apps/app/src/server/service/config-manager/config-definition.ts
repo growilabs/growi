@@ -289,6 +289,7 @@ export const CONFIG_KEYS = [
   // AI Tools Settings
   'aiTools:suggestPathEngine',
   'aiTools:suggestPathAgenticSearchLimit',
+  'aiTools:suggestPathAgenticChildListingLimit',
   'aiTools:suggestPathAgenticTimeoutMs',
 
   // OpenTelemetry Settings
@@ -1279,6 +1280,10 @@ export const CONFIG_DEFINITIONS = {
   }),
   'aiTools:suggestPathAgenticSearchLimit': defineConfig<number>({
     envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT',
+    defaultValue: 5,
+  }),
+  'aiTools:suggestPathAgenticChildListingLimit': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_CHILD_LISTING_LIMIT',
     defaultValue: 5,
   }),
   'aiTools:suggestPathAgenticTimeoutMs': defineConfig<number>({

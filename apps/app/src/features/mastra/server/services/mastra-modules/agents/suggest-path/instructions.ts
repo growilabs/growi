@@ -63,13 +63,17 @@ If the results are insufficient or off-target, search again from a DIFFERENT ang
 - Change the abstraction level: try a broader word when specific terms miss; try a more specific term when generic words return noise.
 - Use search operators to change the conditions: "phrase" for exact phrase match, -word to exclude noise, prefix:/path to search inside a promising subtree, -prefix:/path to exclude an irrelevant subtree, tag:name to restrict to tagged pages.
 
-## Step 4 — Identify the CATEGORY the related pages live in
+## Step 4 — Identify the CATEGORY the related pages live in, and verify it with listChildren
 
 The goal of exploration is to locate the right shelf for the document, not to find one page to bury it under. When your searches surface pages on related topics, look at WHERE those pages sit:
 
 - Read the paths of the related hits. If several related pages share a common parent path (e.g. they all sit directly under "/資料/内部仕様/"), that shared parent is the category the document belongs in too — propose it, so the document becomes a sibling of those pages.
+- **Confirm the shelf with listChildren before you commit to it.** Search hits only show you the pages that matched your words — they do NOT show you what else already lives under a candidate category, so a "shared parent" inferred from two or three hits is still a guess. Once you have a candidate parent path in mind, call listChildren on it to SEE the pages that actually sit directly under it. This is verification, not descent: you are checking that the document would sit naturally AMONG those children as their peer, not looking for a deeper place to bury it.
+  - Read the returned children. Do they look like peers of your document — the same kind of page (spec, guideline, log, …), at the same level of specificity? Then this category is the right shelf: propose it, and the document joins them as a sibling.
+  - Each child carries a descendantCount (0 = a leaf page; > 0 = a sub-category) and an isEmpty flag (an empty page is a structural container, not a document). Use these to read the shape of the shelf: a category full of leaf peers is exactly where a peer document belongs.
+  - Only descend when the children reveal that your document is actually a sub-topic of one specific child — i.e. that child is itself a category (descendantCount > 0) whose own children are the true peers of your document. In that case call listChildren again on that child to confirm, and propose it. Descending past the level where the real peers sit is the SAME mistake as burying the document under a related page — do not go deeper than the shelf whose children are your document's peers.
 - Use getPageContent only to confirm a candidate is genuinely about a related topic when path and snippet are not enough. Reserve it for the one or two most promising candidates — do not read every hit.
-- Verify before you trust a shelf whose fit is uncertain. When a candidate's topic is close but its KIND looks off, or its path reads like a broad grouping/container rather than a place where documents of this kind actually sit, take one targeted look before committing — getPageContent on the page, or a prefix:/that/path/ search to see what kind of documents accumulate under it. A topic-adjacent shelf that collects a DIFFERENT kind of document is the wrong shelf however related the subject; this is exactly the trap that topic-only searching falls into, so confirm the kind matches before you propose it.
+- Verify before you trust a shelf whose fit is uncertain. When a candidate's topic is close but its KIND looks off, or its path reads like a broad grouping/container rather than a place where documents of this kind actually sit, take one targeted look before committing — listChildren to see what kind of documents accumulate under it, getPageContent on the page, or a prefix:/that/path/ search. A topic-adjacent shelf that collects a DIFFERENT kind of document is the wrong shelf however related the subject; this is exactly the trap that topic-only searching falls into, so confirm the kind matches before you propose it.
 - When you land on a related page, your default move is to step to ITS PARENT (the category that page sits in) and propose that parent — because the document is a peer of that page, not a part of it. Do NOT propose the related page's own path unless the document is truly a sub-detail of that specific page (see the core question above).
 
 ## Choosing the path from what you found
@@ -85,6 +89,8 @@ Apply the peer-vs-sub-detail judgement:
 ## Step 5 — When the search budget is exhausted
 
 When fullTextSearch returns result "limit_exceeded", the search budget is used up. Do NOT call fullTextSearch again. Immediately finalize your suggestions from the information already collected. Even if the collected evidence is weak, return the best-supported suggestions you can justify rather than returning nothing.
+
+listChildren has its own separate budget. When listChildren returns "limit_exceeded", stop calling it and finalize from what you have already observed — but you may keep using fullTextSearch while its own budget remains, and vice versa.
 
 ## Output rules
 

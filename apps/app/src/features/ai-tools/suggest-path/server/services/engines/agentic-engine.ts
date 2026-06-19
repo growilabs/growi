@@ -129,6 +129,12 @@ export const agenticEngine: SuggestPathEngine = async (
   const searchLimit = configManager.getConfig(
     'aiTools:suggestPathAgenticSearchLimit',
   );
+  // Tracked separately from the search budget on purpose: listChildren runs a
+  // light Mongo path query (no Elasticsearch), so it must not deplete the ES
+  // search budget the agent needs to locate candidate shelves.
+  const childListingLimit = configManager.getConfig(
+    'aiTools:suggestPathAgenticChildListingLimit',
+  );
   const timeoutMs = configManager.getConfig(
     'aiTools:suggestPathAgenticTimeoutMs',
   );
@@ -153,6 +159,16 @@ export const agenticEngine: SuggestPathEngine = async (
     queries: [],
   };
   requestContext.set('searchBudget', searchBudget);
+  // The listChildren budget is independent of the search budget (see the
+  // childListingLimit comment above): peer-verification drill-ins draw from
+  // this pool, not from the ES search pool.
+  const childListingBudget: SuggestPathRequestContextShape['childListingBudget'] =
+    {
+      limit: childListingLimit,
+      used: 0,
+      paths: [],
+    };
+  requestContext.set('childListingBudget', childListingBudget);
 
   // Registry retrieval (NOT a direct Agent import): keeps platform
   // configuration consistent and mirrors the chat-side handler pattern.
@@ -186,6 +202,10 @@ export const agenticEngine: SuggestPathEngine = async (
         {
           durationMs: Date.now() - startedAt,
           searchCount: searchBudget.used,
+          // Tracked next to searchCount so a measurement run can tell, from
+          // the summary alone, whether peer-verification drill-ins actually
+          // fired (parallels searchCount for the #183968 evaluator).
+          listChildrenCount: childListingBudget.used,
           pageReadCount: toolCalls.filter(
             (call) => call.toolName === GET_PAGE_CONTENT_TOOL_NAME,
           ).length,
@@ -199,6 +219,7 @@ export const agenticEngine: SuggestPathEngine = async (
       logger.debug(
         {
           queries: [...searchBudget.queries],
+          listedPaths: [...childListingBudget.paths],
           searchResults: extractSearchHitSummaries(result?.steps),
           toolCallSequence: toolCalls,
         },
@@ -221,10 +242,11 @@ export const agenticEngine: SuggestPathEngine = async (
         return await agent.generate(buildUserPrompt(body), {
           structuredOutput: { schema: AGENTIC_OUTPUT_JSON_SCHEMA },
           // Step ceiling as a secondary defense against loop runaway (the
-          // budget and the timeout are the primary controls): each search can
-          // cost up to 2 steps (tool call + follow-up reasoning), +4 covers
-          // classification and final shaping (design.md call contract).
-          maxSteps: 2 * searchLimit + 4,
+          // budgets and the timeout are the primary controls): each search and
+          // each listChildren call can cost up to 2 steps (tool call +
+          // follow-up reasoning), +4 covers classification and final shaping
+          // (design.md call contract).
+          maxSteps: 2 * searchLimit + 2 * childListingLimit + 4,
           abortSignal: controller.signal,
           requestContext,
         });
