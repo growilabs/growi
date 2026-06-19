@@ -10,7 +10,7 @@
  *   2 — CDP connection failure
  *
  * Usage:
- *   tsx bin/memory-profiler/run-scenario.ts \
+ *   node bin/memory-profiler/run-scenario.ts \
  *     --baseUrl http://localhost:3000 \
  *     --inspector http://127.0.0.1:9229 \
  *     [--outputDir tmp/memory-profiler/] \
@@ -19,10 +19,10 @@
 
 import * as path from 'node:path';
 
-import { createCdpSnapshotClient } from './cdp-snapshot-client';
-import { createLoadDriver } from './load-driver';
-import { createRssTimeSeriesLogger } from './rss-time-series-logger';
-import { runBaseline, runDrain, runLoad } from './scenarios';
+import { createCdpSnapshotClient } from './cdp-snapshot-client.ts';
+import { createLoadDriver } from './load-driver.ts';
+import { createRssTimeSeriesLogger } from './rss-time-series-logger.ts';
+import { runBaseline, runDrain, runLoad } from './scenarios/index.ts';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -302,7 +302,7 @@ function parseArgs(): ScenarioRunnerOptions {
 }
 
 /**
- * CLI main: called when run directly via tsx / ts-node.
+ * CLI main: called when run directly via node (see usage header).
  */
 async function main(): Promise<void> {
   const opts = parseArgs();

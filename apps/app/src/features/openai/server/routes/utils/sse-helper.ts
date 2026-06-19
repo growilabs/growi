@@ -27,7 +27,9 @@ export interface ISseHelper {
  * Provides functionality to write data to response object in SSE format
  */
 export class SseHelper implements ISseHelper {
-  constructor(private res: Response) {
+  private res: Response;
+
+  constructor(res: Response) {
     this.res = res;
   }
 

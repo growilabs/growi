@@ -1,4 +1,4 @@
-import type { Namespace } from './vault-instruction';
+import type { Namespace } from './vault-instruction.js';
 
 /** Request body for the POST /internal/compose-view RPC call to vault-manager. */
 export interface ComposeViewRequest {

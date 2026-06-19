@@ -2,11 +2,11 @@ import { Document } from 'mongoose';
 
 import type { IAttachment, IUser } from '~/interfaces';
 
-import { isPopulated, isRef, type Ref } from '../../interfaces/common';
+import { isPopulated, isRef, type Ref } from '../../interfaces/common.js';
 import {
   type IUserSerializedSecurely,
   serializeUserSecurely,
-} from './user-serializer';
+} from './user-serializer.js';
 
 export type IAttachmentSerializedSecurely<A extends IAttachment> = Omit<
   A,

@@ -1,4 +1,4 @@
-import { rehypePlugin } from './refs';
+import { rehypePlugin } from './refs.js';
 
 type RefTagName = 'ref' | 'refimg' | 'refs' | 'refsimg' | 'gallery';
 

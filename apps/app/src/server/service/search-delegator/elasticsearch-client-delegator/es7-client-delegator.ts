@@ -7,7 +7,7 @@ import {
   type RequestParams,
 } from '@elastic/elasticsearch7';
 
-import type { ES7SearchQuery } from './interfaces';
+import type { ES7SearchQuery } from './search-types';
 
 export class ES7ClientDelegator {
   private client: Client;

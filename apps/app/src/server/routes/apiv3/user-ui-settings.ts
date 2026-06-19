@@ -1,4 +1,5 @@
 import { ErrorV3 } from '@growi/core/dist/models';
+import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
@@ -12,7 +13,7 @@ const logger = loggerFactory('growi:routes:apiv3:user-ui-settings');
 
 const router = express.Router();
 
-module.exports = () => {
+export const setup = (): Router => {
   const validatorForPut = [
     body('settings')
       .exists()

@@ -1,7 +1,7 @@
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
-import { GrowiSlides } from './GrowiSlides';
+import { GrowiSlides } from './GrowiSlides.js';
 
 vi.mock('next/head', () => ({
   default: ({ children }: { children: React.ReactNode }) => <>{children}</>,

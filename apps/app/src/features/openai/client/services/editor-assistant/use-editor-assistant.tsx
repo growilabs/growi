@@ -3,9 +3,9 @@ import { GlobalCodeMirrorEditorKey } from '@growi/editor';
 import {
   acceptAllChunks,
   useTextSelectionEffect,
-} from '@growi/editor/dist/client/services/unified-merge-view';
-import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
-import { useSecondaryYdocs } from '@growi/editor/dist/client/stores/use-secondary-ydocs';
+} from '@growi/editor/dist/client/services/unified-merge-view/index.js';
+import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor.js';
+import { useSecondaryYdocs } from '@growi/editor/dist/client/stores/use-secondary-ydocs.js';
 import { type UseFormReturn, useForm } from 'react-hook-form';
 import { useTranslation } from 'react-i18next';
 import type { Text as YText } from 'yjs';

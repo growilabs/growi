@@ -3,7 +3,7 @@ import type { IUser } from '@growi/core/dist/interfaces';
 import { useAtomValue } from 'jotai';
 import { i18n, useTranslation } from 'next-i18next';
 
-import * as nextI18nConfig from '^/config/next-i18next.config';
+import nextI18nConfig from '^/config/next-i18next.config.mjs';
 
 import { toastError, toastSuccess } from '~/client/util/toastr';
 import { registrationWhitelistAtom } from '~/states/server-configurations';

@@ -66,7 +66,9 @@ export class LlmResponseStreamProcessor {
   // Last processed content length - to optimize processing
   private lastProcessedContentLength = 0;
 
-  constructor(private options?: Options) {
+  private options?: Options;
+
+  constructor(options?: Options) {
     this.options = options;
   }
 
