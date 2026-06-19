@@ -29,7 +29,9 @@ async function dedupeByKey(collection) {
     .toArray();
 
   const idsToRemove = groups.flatMap((group) => {
-    const ids = group.ids.sort((a, b) => (a > b ? 1 : a < b ? -1 : 0));
+    // Byte-wise compare of the 12-byte ObjectId; its leading 4-byte timestamp makes this
+    // creation order, so the last element is the newest doc to keep.
+    const ids = [...group.ids].sort((a, b) => Buffer.compare(a.id, b.id));
     const removable = ids.slice(0, -1);
     logger.warn(
       `Removing ${removable.length} duplicate doc(s) for key="${group._id}" before building the unique index`,

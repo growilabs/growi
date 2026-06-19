@@ -10,6 +10,7 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type { AuditlogEsWriter } from '../interfaces/auditlog-es-writer';
+import { AuditlogEsSyncStatus } from '../models/auditlog-es-sync-status';
 import {
   markUnsyncedAndAdvanceToken,
   markUnsyncedAndClearToken,
@@ -19,6 +20,9 @@ import { ChangeStreamResumeToken } from '../models/changestream-resume-token';
 const logger = loggerFactory('growi:service:auditlog-changestream');
 
 // Fixed key shared by every instance: all GROWI processes use the one resume-token doc.
+// Each process also runs its own consumer against this key, so events are written to ES
+// redundantly across instances; ES index/delete are idempotent (keyed on activity _id) and
+// the token store is last-writer-wins, so the duplication wastes work but never corrupts state.
 const STREAM_KEY = 'auditlogs';
 
 const CHANGE_STREAM_HISTORY_LOST_CODE = 286;
@@ -59,8 +63,15 @@ export class AuditlogChangeStreamService {
 
   private lastFailingToken: unknown = null;
 
-  constructor(esWriter: AuditlogEsWriter) {
+  // True when a full auditlog reindex succeeded on this boot, so ES is complete as of startup.
+  private readonly didRebuildOnBoot: boolean;
+
+  // Guards the one-time sync-state reconciliation in start() so restarts don't repeat it.
+  private initialStartHandled = false;
+
+  constructor(esWriter: AuditlogEsWriter, didRebuildOnBoot = false) {
     this.esWriter = esWriter;
+    this.didRebuildOnBoot = didRebuildOnBoot;
   }
 
   async start(): Promise<void> {
@@ -77,6 +88,13 @@ export class AuditlogChangeStreamService {
     }
 
     const Activity = mongoose.model<ActivityDocument>('Activity');
+
+    if (!this.initialStartHandled) {
+      await this.reconcileInitialSyncState(Activity);
+      if (this.stopped) return;
+      this.initialStartHandled = true;
+    }
+
     const token = await ChangeStreamResumeToken.load(STREAM_KEY);
     if (this.stopped) return;
 
@@ -102,6 +120,31 @@ export class AuditlogChangeStreamService {
         'AuditlogChangeStreamService failed initial start; scheduling restart.',
       );
       void this.restart();
+    }
+  }
+
+  // Run once on the first start to settle the sync-status flag against the stream's start position.
+  private async reconcileInitialSyncState(
+    Activity: mongoose.Model<ActivityDocument>,
+  ): Promise<void> {
+    // A boot rebuild already wrote every existing activity to ES. Drop any stale resume token so
+    // the stream resumes from the current position instead of replaying from a token that may sit
+    // past a truncated oplog — replaying would raise HistoryLost and re-flag unsynced right after a
+    // clean rebuild. ES is complete as of now, so clear the flag.
+    if (this.didRebuildOnBoot) {
+      // Accepted gap: activities inserted between the rebuild snapshot and watch() below miss ES
+      // until the next reindex-on-boot; harmless since Mongo keeps the source of truth.
+      await ChangeStreamResumeToken.clear(STREAM_KEY);
+      await AuditlogEsSyncStatus.setUnsynced(false);
+      return;
+    }
+
+    // No rebuild and no resume token: the stream starts from "now", so any auditlog written before
+    // this point is absent from ES. Flag a rebuild when such a backlog exists (skip a fresh install
+    // with no activities, which needs no signal).
+    const token = await ChangeStreamResumeToken.load(STREAM_KEY);
+    if (token == null && (await Activity.exists({})) != null) {
+      await AuditlogEsSyncStatus.setUnsynced(true);
     }
   }
 
