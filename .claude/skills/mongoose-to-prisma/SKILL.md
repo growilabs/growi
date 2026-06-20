@@ -208,7 +208,7 @@ Once ported here, the original `schema.virtual(...)` block is deleted in Step 6 
 - ObjectId strings: Prisma uses `String` for ObjectId fields; use `.toString()` when comparing with `Types.ObjectId` values from callers
 
 **Plugin replacements:**
-- `mongoose-paginate-v2` → `context.findMany({ skip: offset, take: limit })` + `context.count({ where })`. Check what fields callers use from the paginate result (typically `docs`, `totalDocs`, `limit`, `offset`, `page`, `totalPages`) and return a compatible object shape.
+- `mongoose-paginate-v2` → use the `paginate` model method already defined on `$allModels` in `apps/app/src/utils/prisma.ts` — do not hand-roll `findMany`/`count`. Call it as `context.paginate({ where, orderBy, include, select, page, limit })`; it returns a `mongoose-paginate-v2`-compatible shape (`docs`, `totalDocs`, `limit`, `page`, `pagingCounter`, `totalPages`, `hasNextPage`, `hasPrevPage`, `nextPage`, `prevPage`), so callers that destructure those fields from the old `Model.paginate(...)` result need no further changes.
 - `mongoose-unique-validator` → already handled by `@unique` in `schema.prisma`; the developer should catch Prisma error code `P2002` where unique constraint errors are currently caught.
 
 **Hook migration:**
