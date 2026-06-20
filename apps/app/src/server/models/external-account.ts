@@ -187,32 +187,16 @@ export const extension = Prisma.defineExtension((client) => {
         }) {
           const context =
             Prisma.getExtensionContext<typeof prisma.externalaccounts>(this);
-          const [externalAccounts, count] = await client.$transaction([
-            context.findMany({
-              take: limit,
-              skip: (page - 1) * limit,
-              orderBy: sort,
-              include: {
-                user: true,
-              },
-            }),
-            context.count(),
-          ]);
-          const totalPages = Math.ceil(count / limit);
-          const hasPrevPage = page > 1;
-          const hasNextPage = page < totalPages;
-          return {
-            docs: externalAccounts,
-            totalDocs: count,
-            limit,
-            totalPages,
+          const result = await context.paginate({
             page,
-            pagingCounter: (page - 1) * limit + 1,
-            hasPrevPage,
-            hasNextPage,
-            prevPage: hasPrevPage ? page - 1 : null,
-            nextPage: hasNextPage ? page + 1 : null,
-          };
+            limit,
+            orderBy: sort,
+            include: {
+              user: true,
+            },
+          });
+
+          return result;
         },
       },
     },
