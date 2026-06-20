@@ -146,6 +146,8 @@
 - **`ai:providerOptions` の扱い（決定）**: 廃止予定（deprecated）。**読取専用の legacy キーとして config 定義は残す**（env `AI_PROVIDER_OPTIONS` を読み込めるように）。`AI_SETTING_KEYS`（管理書込み集合）と管理 UI / PUT からは除去し、グローバル一律適用も廃止。読取時フォールバックの単一エントリ合成時のみ参照。
 - **チャットへの許可リスト供給（決定）= 新規 chat-scoped エンドポイント B1**: `GET /_api/v3/mastra/models` が `{ models: {id,name}[], defaultModelId }` を返す（providerOptions はクライアントへ送らない）。管理用 available-models は新設しない（要件どおりベンダー API も叩かない）。
 - **Map キャッシュキー（決定）**: `${provider}:${effectiveModel}`。provider 単一前提だが将来の provider 変更に頑健。`clearResolvedMastraModelCache()` は Map 全消去（PUT / `model-config-sync` の既存呼出と整合）。Azure+Entra のトークンキャッシュはキャッシュされたモデルオブジェクト内に保持されるため維持される。
+- **既定モデルの保持（決定・更新）**: 別キー `ai:model` ではなく `ai:allowedModels` 各エントリの `isDefault` フラグ（リスト内 1 つ）で既定を表す。「既定 ∈ 許可集合」の相互検証が不要（既定は本質的にリストの一員）。`ai:model` は `ai:providerOptions` と同様 **legacy 読取専用の移行ソース**へ降格（管理 UI/PUT/`AI_SETTING_KEYS` から除去、env `AI_MODEL` は移行時のみ読取）。既定解決 = `find(isDefault) ?? 先頭`。`isAiConfigured()` を `provider + apiKey + 非空 allowedModels` に更新（先のレビュー Critical Issue 2 を解消）。
+- **regenerate のモデル保持（決定）**: `modelId` は per-call ではなく **transport body に固定**し、`modelId` 変更時に transport を再生成する。`sendMessage` / `regenerate()` の双方で現在の選択モデルが送られる（per-call body だと `regenerate()` が modelId を落とす問題への対応＝レビュー Critical Issue 1）。
 
 ### 持ち越す既知挙動
 - ツール呼び出し/結果パートはスレッド再読込後も復元（`convertMessages`→output-available）。チャット UI 派生はこれ前提。
