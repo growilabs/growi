@@ -16,8 +16,8 @@ Mastra AI チャットの複数モデル対応 (1 App = 複数 LLM モデル)。
 
 1. **同一プロバイダ内の複数モデルに限定。** config の単一 `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` は据え置き。異プロバイダ混在はスコープ外。
 2. **モデル一覧取得 API は新設しない。** 理由: Vercel AI SDK (`ai`/`@ai-sdk/*`) は provider が factory のみでモデル列挙不可。唯一 `@ai-sdk/gateway.getAvailableModels()` はあるが Vercel Gateway 認証 (`AI_GATEWAY_API_KEY`/OIDC) 必須で、provider+apiKey を直接設定する GROWI に不適合。→ 管理者がモデル ID を自由入力で並べる。
-3. **config (同梱案):** 新キー `ai:allowedModels: Array<{ model: string; providerOptions?: Record<string, Record<string, JSONValue>> }>` — モデルとその provider オプションを 1 エントリに同梱。スタンドアロンの `ai:providerOptions` は廃止し、移行時に既定モデルのエントリへ移す。グローバル既定オプションは設けない。`ai:model` はデフォルトモデルとして残す。env-only グループ `env:useOnlyEnvVars:ai` の `targetKeys` にも `ai:allowedModels` を追加。providerOptions 検証は既存 `isProviderNamespacedObject` / `isValidProviderOptionsJson` を各エントリに再利用。
-4. **会話ごとの選択モデル:** per-message の request body フィールド `modelId` (サーバ永続化なし)。`sendMessage(..., { body: { modelId } })` で per-call 送信。
+3. **config:** 新キー `ai:allowedModels: Array<{ model: string; providerOptions?: Record<string, Record<string, JSONValue>>; isDefault?: boolean }>` — モデル + provider オプション + 既定フラグを 1 エントリに同梱（既定は別キーではなくリスト内 `isDefault`、1 つ）。**`ai:model` と `ai:providerOptions` は完全廃止**（config キー・env `AI_MODEL` / `AI_PROVIDER_OPTIONS` ともに削除。自動移行なし）。グローバル既定オプションは設けない。env-only グループ `env:useOnlyEnvVars:ai` の `targetKeys` に `ai:allowedModels` を追加（旧 2 キーは除去）。providerOptions 検証は既存 `isProviderNamespacedObject` / `isValidProviderOptionsJson` を各エントリに再利用。`isAiConfigured()` は `provider + apiKey + 非空 allowedModels` に更新。
+4. **会話ごとの選択モデル:** `modelId`（サーバ永続化なし）。`modelId` は transport body に固定し変更時に transport を再生成する（`sendMessage` も `regenerate()` も現在の選択モデルを送る）。
 5. **サーバ側検証必須 (セキュリティ):** クライアントが送る `modelId` は信用せず、`resolveEffectiveModel(modelId?)` で `ai:allowedModels` に対し検証。
 6. **リクエスト単位のモデル切替:** Mastra@1.41 の動的モデル関数を使う。`growi-agent.ts` を `model: ({ requestContext }) => resolveMastraModel(requestContext.get('modelId'))` に。`resolveMastraModel` を `(modelId?)` 対応 + Map 化。`resolveProviderOptions(modelId)` 化。各 provider resolver は model 文字列を引数受け取りに変更。
 7. **管理 UI:** 「許可するモデル」リストエディタを**共通設定 (ProviderCommonSettings) に単一配置**する (従来 Azure 専用セクションに置いていたモデル=デプロイ名欄を共通側へ統合。デプロイ名は `ai:azureOpenaiSettings` ではなく共有の `ai:model`/`ai:allowedModels` に格納されるため、データモデルとも整合)。各行 = モデル ID + 既定ラジオ + 折りたたみ providerOptions JSON + 削除、追加ボタン、env-only 時 disabled。ラベルは `provider` を watch して切替 (Azure OpenAI のときのみ「デプロイ名」、他は「モデル」)。共通設定の単一 providerOptions テキストエリアは廃止し各行へ移す。Azure 専用セクションは接続設定 (resourceName/baseURL/apiVersion/useEntraId) のみに縮小。
@@ -46,13 +46,13 @@ Mastra AI チャットの複数モデル対応 (1 App = 複数 LLM モデル)。
   - 許可モデルごとの provider オプション設定。
   - チャット画面でのメッセージ単位のモデル選択 (エンドユーザー)。
   - 選択モデルのサーバ側検証と、実際に使用するモデルへの provider オプションの一致適用。
-  - 既存の単一モデル設定からの無改変な移行 (後方互換)。
   - 本機能が変更する既存仕様 (`admin-ai-settings`, `multi-llm-provider`) のドキュメント整合更新 (本 spec のタスクとして後続実施。実装タスク完了後に doc を同期し、現時点では他 spec のファイルは変更しない)。これは user-observable な要件ではなく spec 保守タスクのため、EARS 要件ではなくスコープ項目として扱う。
 - **Out of scope (本機能は担わない)**:
   - 異なるプロバイダのモデルを 1 つの許可リストに混在させること (モデルごとに別プロバイダ/別 API キーを持つこと)。
   - プロバイダやレジストリの API からモデル一覧を自動取得・補完すること (許可モデルは管理者が手入力する)。
   - 会話 (スレッド) ごとの選択モデルをサーバに永続化すること (選択はメッセージ単位で、スレッドに保存しない)。
   - プロバイダ/API キーの設定方式そのものの変更。
+  - 旧 `ai:model` / `ai:providerOptions`（および env `AI_MODEL` / `AI_PROVIDER_OPTIONS`）からの自動移行。これらは完全廃止し、運用者は `ai:allowedModels`（env `AI_ALLOWED_MODELS`）で再設定する（本機能はプレリリースのため後方互換移行を提供しない）。
 - **Adjacent expectations (隣接前提・本機能は変更しない)**:
   - 既存の AI 有効性ゲーティング (AI 無効/未設定時にチャットを提供しない判定) を前提とし、そのまま維持する。
   - 既存のスレッド永続化・ストリーミング配信・チャットエラーのサニタイズ表示を前提とし、そのまま維持する。
@@ -100,13 +100,13 @@ Mastra AI チャットの複数モデル対応 (1 App = 複数 LLM モデル)。
 4. The チャットサーバ shall 応答生成に用いる provider オプションを、実際に使用するモデルに設定されたものと一致させる。
 5. If 選択されたモデルがプロバイダ側で利用できずエラーになる, then the チャット機能 shall 機密情報を含まない安全なエラーメッセージを表示する。
 
-### Requirement 5: 後方互換と移行
-**Objective:** 運用者として、既存の単一モデル設定が無改変で動き続けてほしい。そうすればアップグレード時に再設定の手間や障害が生じない。
+### Requirement 5: 既存チャット資産の維持
+**Objective:** 運用者として、本機能導入後も既存スレッドが従来どおり使えてほしい。
 
 #### Acceptance Criteria
-1. Where 許可モデルが未設定で、かつ従来の単一モデルが設定済み, the AI 設定機能 shall その単一モデルをデフォルトモデル兼許可モデル 1 件として扱う。
-2. When 従来のグローバル provider オプションが設定された状態で移行される, the AI 設定機能 shall それをデフォルトモデルの provider オプションとして引き継ぐ。
-3. The チャット機能 shall 既存スレッドの読み込み・継続・ストリーミング表示を本機能導入後も従来どおり維持する。
+1. The チャット機能 shall 既存スレッドの読み込み・継続・ストリーミング表示を本機能導入後も従来どおり維持する。
+
+> 注: 旧 `ai:model` / `ai:providerOptions`（env `AI_MODEL` / `AI_PROVIDER_OPTIONS`）からの自動移行は提供しない（本機能はプレリリースのため完全廃止し、運用者は `ai:allowedModels` で再設定する）。Boundary Context の Out of scope を参照。
 
 ### Requirement 6: AI 有効性ゲーティングの維持
 **Objective:** 運用者として、AI が無効または未設定のときの挙動を変えたくない。
