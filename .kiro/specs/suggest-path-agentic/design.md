@@ -251,6 +251,8 @@ sequenceDiagram
 | 3.2 | 上限到達時は収集済み情報で提案 | LimitedSearchTool（limit_exceeded）, SuggestPathAgent（instructions） | tool 出力 union | System Flows |
 | 3.3 | 上限の設定変更反映 | Config Keys, AgenticEngine（per-request 読み出し） | `aiTools:suggestPathAgenticSearchLimit` | — |
 | 3.4 | モデルの設定変更反映 | Config Keys, SuggestPathAgent（dynamic model） | `openai:assistantModel:suggestPathAgent` | — |
+| 3.5 | 推論強度の設定変更反映 | Config Keys, AgenticEngine（per-request 読み出し → providerOptions） | `openai:reasoningEffort:suggestPathAgent`, `generate` の `providerOptions.openai.reasoningEffort` | — |
+| 3.6 | 推論強度未指定時は既定挙動 | AgenticEngine（空文字列なら providerOptions に渡さない） | `generate` 呼び出し契約（条件付き providerOptions） | — |
 | 4.1 | エンドポイント・リクエスト形式・認証の維持 | Route（validator は additive のみ） | API Contract | — |
 | 4.2 | レスポンス形状と trailing-slash 親パス | AgenticEngine（正規化・検証）, AgenticOutputSchema | `PathSuggestion` | — |
 | 4.3 | memo 提案を常に含める | SuggestPathOrchestrator | `generateSuggestions` | System Flows |
@@ -383,23 +385,32 @@ declare function runEngine(
 | Field | Detail |
 |-------|--------|
 | Intent | suggestPathAgent の呼び出し・タイムアウト制御・structured output の検証とマッピング・grant 解決・観測ログ |
-| Requirements | 1.1, 1.4, 2.3, 3.3, 4.2, 4.4, 4.5, 6.2, 6.3 |
+| Requirements | 1.1, 1.4, 2.3, 3.3, 3.5, 3.6, 4.2, 4.4, 4.5, 6.2, 6.3 |
 
 **Responsibilities & Constraints**
 
-- config（searchLimit / timeoutMs）を**リクエスト毎に** `configManager.getConfig()` で読む（3.3）
+- config（searchLimit / timeoutMs / reasoningEffort）を**リクエスト毎に** `configManager.getConfig()` で読む（3.3, 3.5）。`reasoningEffort` は空文字列なら未指定として扱う（3.6）
 - per-request の `RequestContext<SuggestPathRequestContextShape>` を構築（user / searchService / searchBudget）。module-scope 共有は禁止（並行リクエストの user 漏れ防止）
 - `AbortController` + `setTimeout(timeoutMs)` で `abortSignal` を渡し、中断時は例外として reject（オーケストレータの memo フォールバックへ）
 - agent 呼び出し契約:
 
 ```typescript
+const reasoningEffort = configManager.getConfig('openai:reasoningEffort:suggestPathAgent');
 const result = await suggestPathAgent.generate(buildUserPrompt(body), {
   structuredOutput: { schema: AGENTIC_OUTPUT_JSON_SCHEMA },
   maxSteps: 2 * searchLimit + 4,
   abortSignal: controller.signal,
   requestContext,
+  // Pass reasoning effort only when configured; an empty value leaves the
+  // model's default behavior unchanged (3.6). Shape follows the existing
+  // chat-side precedent (features/mastra/.../post-message.ts).
+  ...(reasoningEffort !== ''
+    ? { providerOptions: { openai: { reasoningEffort } } }
+    : {}),
 });
 ```
+
+- `reasoningEffort` の値検証はエンジン層では行わない（3.5）。空判定のみ行い、非空ならプロバイダにそのまま透過する。未対応モデル × 非対応値の組み合わせはプロバイダ側のエラーとして表面化し、既存のエンジン失敗フォールバック（4.5）が memo 提案で受け止める
 
 - 出力マッピング規則（4.2）:
   1. `result.object` を型ガード `isAgenticEngineOutput` で検証。不合格は例外（memo フォールバック）
@@ -599,8 +610,8 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 
 | Field | Detail |
 |-------|--------|
-| Intent | エンジン・上限・タイムアウト・モデルの運用設定化 |
-| Requirements | 3.3, 3.4, 5.2, 5.6 |
+| Intent | エンジン・上限・タイムアウト・モデル・推論強度の運用設定化 |
+| Requirements | 3.3, 3.4, 3.5, 3.6, 5.2, 5.6 |
 
 | Key | Type | Default | Env Var | 用途 |
 |-----|------|---------|---------|------|
@@ -608,8 +619,10 @@ export type SuggestPathRequestContextShape = MastraRequestContextShape & {
 | `aiTools:suggestPathAgenticSearchLimit` | `number` | `5` | `AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT` | 1 リクエストの検索回数上限（3.1, 3.3。合意レンジ 3〜5 の上限を初期値とし、A/B 実測で確定） |
 | `aiTools:suggestPathAgenticTimeoutMs` | `number` | `60000` | `AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS` | agentic エンジンの総時間セーフティネット（4.5。暫定値。A/B 実測とレスポンス時間上限の別途合意を経て確定） |
 | `openai:assistantModel:suggestPathAgent` | `string` | `'gpt-4.1-mini'` | `OPENAI_SUGGEST_PATH_AGENT_MODEL` | agentic エンジンのモデル（3.4。既存 `openai:assistantModel:mastraAgent` の命名規約に整合） |
+| `openai:reasoningEffort:suggestPathAgent` | `string` | `''`（空＝未指定） | `OPENAI_SUGGEST_PATH_AGENT_REASONING_EFFORT` | agentic エンジンの推論強度（3.5, 3.6）。空文字列は「未指定」を表し、`providerOptions` に reasoning effort を渡さない（モデル既定挙動）。非空時のみ後述の `providerOptions.openai.reasoningEffort` に渡す。値の妥当性（対応モデル・許容値 `minimal`/`low`/`medium`/`high`）はモデル側が判定し、本キーは文字列をそのまま透過する |
 
-- すべて利用箇所で per-request に `configManager.getConfig()` を呼ぶことで、再起動なしの変更反映（3.3, 3.4）を保証する
+- すべて利用箇所で per-request に `configManager.getConfig()` を呼ぶことで、再起動なしの変更反映（3.3, 3.4, 3.5）を保証する
+- `openai:reasoningEffort:suggestPathAgent` は空文字列を既定とすることで、設定しない限り現行挙動（reasoning effort 未指定）を変えない（3.6）。型は `string`（enum 化しない）— GPT-5 系のみ `minimal` を許容する等のモデル別制約を config 層に固定化せず、対応値の解釈はモデル／プロバイダ側に委ねる
 
 ## Data Models
 

@@ -138,6 +138,21 @@
   - _Requirements: 6.3, 6.4_
   - _2026-06-12 ユーザー指示（改善継続）により実施完了。debug トレースで誘導反映を確認（Req 6.3: 全件 stock 判定 → 仕様系語彙で蓄積系を探索。6 ケース中 5 ケースで正解ページに到達済みと判明）。原因 = instructions の「PARENT DIRECTORY」表現がリーフページ配下の提案を妨げていた。チューニング 2 ラウンド（302d974819, 066d1776de）で 4/60 → 39/60 → **52/60（ベースライン 41/60 比 +11、oneshot 再測定 40/60 比 +12）**。残 8 件は過適合リスクのため R3 見送り、ユースケース拡充（#184975 系統）での汎化検証を後続とする。受け入れ判断: agentic エンジンの有効性を確認（記録: 検証ページ 6a2ad59e173f969dbd278f91 に追記済み）_
 
+- [x] 8. 推論強度（reasoning effort）の設定化
+- [x] 8.1 reasoning effort 設定キーの追加
+  - `openai:reasoningEffort:suggestPathAgent`（型 `string`・既定値 `''`・環境変数 `OPENAI_SUGGEST_PATH_AGENT_REASONING_EFFORT`）を設定定義に追加する。既存の `openai:assistantModel:suggestPathAgent`（1.1 で追加）と同型・同レイヤで宣言する
+  - 当該キーが configManager から既定値 `''` で読み出せ、環境変数で上書きできる
+  - _Requirements: 3.5, 3.6_
+  - _Depends: 1.1_
+  - _Boundary: Config Keys（config-definition.ts）_
+- [x] 8.2 AgenticEngine への reasoning effort 配線
+  - AgenticEngine で `openai:reasoningEffort:suggestPathAgent` をリクエスト毎に `configManager.getConfig()` で読み、値が非空のときのみ `agent.generate` の `providerOptions.openai.reasoningEffort` に透過する。空文字列のときは `providerOptions` を渡さず現行挙動を維持する
+  - 値の妥当性検証はエンジン層で行わず、プロバイダ側に委ねる（未対応の組み合わせは既存のエンジン失敗フォールバック 4.5 が受ける）
+  - config が非空なら providerOptions に effort が乗り、空なら providerOptions が渡らないことがユニットテストで検証されている（既存 agentic-engine.spec の config 駆動ケースに追従）
+  - _Requirements: 3.5, 3.6_
+  - _Depends: 8.1_
+  - _Boundary: AgenticEngine（agentic-engine.ts）_
+
 ## Implementation Notes
 
 - 1.1/1.2: ホスト（Windows）でユニットテストを動かすには `packages/core` の事前ビルドが必要（`pnpm run build`）。アプリ全体の `lint:typecheck` は兄弟パッケージの dist 未ビルドで完走しない（devcontainer 専用 = 6.3 の所有）。タスクローカルの型検証は一時 tsconfig（include を変更ファイルに限定）+ `tsgo --noEmit -p` で代替可能
