@@ -138,6 +138,12 @@ export const agenticEngine: SuggestPathEngine = async (
   const timeoutMs = configManager.getConfig(
     'aiTools:suggestPathAgenticTimeoutMs',
   );
+  // Read per request so a config change is reflected without restart, mirroring
+  // the model/limit/timeout reads above. Empty means "unset": no reasoning
+  // effort is forwarded and the model's default behavior is left unchanged.
+  const reasoningEffort = configManager.getConfig(
+    'openai:reasoningEffort:suggestPathAgent',
+  );
 
   // The request context MUST be built per request — a module-scope instance
   // would leak `user` (and the search budget) across concurrent requests.
@@ -249,6 +255,15 @@ export const agenticEngine: SuggestPathEngine = async (
           maxSteps: 2 * searchLimit + 2 * childListingLimit + 4,
           abortSignal: controller.signal,
           requestContext,
+          // Pass reasoning effort only when configured; an empty value leaves
+          // the model's default behavior unchanged. Shape follows the existing
+          // chat-side precedent (features/mastra/.../post-message.ts). Value
+          // validity per model is the provider's concern, not enforced here —
+          // an unsupported combination surfaces as a provider error and is
+          // absorbed by the memo fallback (design.md AgenticEngine, 3.5/3.6).
+          ...(reasoningEffort !== ''
+            ? { providerOptions: { openai: { reasoningEffort } } }
+            : {}),
         });
       } finally {
         clearTimeout(timeoutTimer);

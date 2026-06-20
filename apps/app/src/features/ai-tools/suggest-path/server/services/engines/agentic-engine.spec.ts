@@ -59,6 +59,7 @@ import { agenticEngine } from './agentic-engine';
 const SEARCH_LIMIT_KEY = 'aiTools:suggestPathAgenticSearchLimit';
 const CHILD_LISTING_LIMIT_KEY = 'aiTools:suggestPathAgenticChildListingLimit';
 const TIMEOUT_KEY = 'aiTools:suggestPathAgenticTimeoutMs';
+const REASONING_EFFORT_KEY = 'openai:reasoningEffort:suggestPathAgent';
 
 const mockUser = mock<IUserHasId>({ username: 'alice' });
 const mockUserGroups: ObjectIdLike[] = ['group1'];
@@ -71,6 +72,9 @@ type CapturedGenerateOptions = {
   maxSteps: number;
   abortSignal: AbortSignal;
   requestContext: RequestContext<SuggestPathRequestContextShape>;
+  // Present only when a non-empty reasoning effort is configured; absent
+  // otherwise so the model's default behavior is left unchanged.
+  providerOptions?: { openai: { reasoningEffort: string } };
 };
 
 const getGenerateCall = (
@@ -183,6 +187,8 @@ beforeEach(() => {
   mocks.configValues.set(SEARCH_LIMIT_KEY, 5);
   mocks.configValues.set(CHILD_LISTING_LIMIT_KEY, 5);
   mocks.configValues.set(TIMEOUT_KEY, 60_000);
+  // Default to unset reasoning effort; the dedicated tests override this.
+  mocks.configValues.set(REASONING_EFFORT_KEY, '');
   mocks.getConfigMock.mockClear();
   mocks.generateMock.mockReset();
   mocks.getAgentMock.mockReset();
@@ -508,6 +514,41 @@ describe('agenticEngine', () => {
       await vi.advanceTimersByTimeAsync(4000);
       expect(getGenerateCall(1).options.abortSignal.aborted).toBe(true);
       await secondRejection;
+    });
+
+    it('forwards a configured reasoning effort to the provider via providerOptions', async () => {
+      primeGenerate(outputWith([]));
+      mocks.configValues.set(REASONING_EFFORT_KEY, 'minimal');
+
+      await callEngine();
+
+      expect(getGenerateCall(0).options.providerOptions).toEqual({
+        openai: { reasoningEffort: 'minimal' },
+      });
+    });
+
+    it('omits providerOptions when the reasoning effort is unset (empty), leaving the model default unchanged', async () => {
+      primeGenerate(outputWith([]));
+      // beforeEach already sets the key to '' (unset); assert the engine
+      // passes no providerOptions so the provider applies its own default.
+
+      await callEngine();
+
+      expect(getGenerateCall(0).options.providerOptions).toBeUndefined();
+    });
+
+    it('re-reads the reasoning effort per request: a config change is reflected without restart', async () => {
+      primeGenerate(outputWith([]));
+
+      await callEngine();
+      expect(getGenerateCall(0).options.providerOptions).toBeUndefined();
+
+      mocks.configValues.set(REASONING_EFFORT_KEY, 'low');
+
+      await callEngine();
+      expect(getGenerateCall(1).options.providerOptions).toEqual({
+        openai: { reasoningEffort: 'low' },
+      });
     });
 
     it('builds a fresh request context with a zeroed budget for every request (no module-scope sharing)', async () => {

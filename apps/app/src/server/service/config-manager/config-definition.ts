@@ -285,6 +285,7 @@ export const CONFIG_KEYS = [
   'openai:apiKey',
   'openai:assistantModel:mastraAgent',
   'openai:assistantModel:suggestPathAgent',
+  'openai:reasoningEffort:suggestPathAgent',
 
   // AI Tools Settings
   'aiTools:suggestPathEngine',
@@ -1269,6 +1270,14 @@ export const CONFIG_DEFINITIONS = {
   'openai:assistantModel:suggestPathAgent': defineConfig<string>({
     envVarName: 'OPENAI_SUGGEST_PATH_AGENT_MODEL',
     defaultValue: 'gpt-4.1-mini',
+  }),
+  // Empty string means "unset": the engine passes no reasoning effort to the
+  // provider, leaving the model's default behavior unchanged. A non-empty
+  // value (e.g. 'minimal' | 'low' | 'medium' | 'high') is forwarded verbatim;
+  // value validity per model is left to the provider, not pinned here.
+  'openai:reasoningEffort:suggestPathAgent': defineConfig<string>({
+    envVarName: 'OPENAI_SUGGEST_PATH_AGENT_REASONING_EFFORT',
+    defaultValue: '',
   }),
 
   // AI Tools Settings
