@@ -48,6 +48,7 @@ Target: <path>
 Collection: <collection name (lowercase plural from schema or inferred)>
 Schema fields: <field list>
 Statics: <method names>
+Virtuals: <virtual names, or none>
 TypeScript interfaces: <interfaces found>
 Plugins: <mongoose plugins used>
 Hooks: <pre/post hooks if any, else none>
@@ -71,12 +72,13 @@ Read the target Mongoose model file in full and extract:
 2. **`_id` / `__v` presence** — check the Schema options argument for `{ _id: false }` and/or `{ versionKey: false }`. Both default to enabled in Mongoose when unset, but either can be individually disabled — note which of `_id`/`__v` actually exist on this model (could be both, either one, or neither)
 3. **Statics** — each method name and TypeScript signature
 4. **Instance methods** — each method name and signature (if any)
-5. **Plugins** — `mongoose-paginate-v2`, `mongoose-unique-validator`, others
-6. **Relations** — fields with `ref: 'Model'`, their names
-7. **Factory pattern** — does the file export `const factory = (crowi: Crowi) => { ... }` or similar?
-8. **Hooks** — any `schema.pre()`/`schema.post()` calls?
-9. **Already partially migrated?** — is a `Prisma.defineExtension` already present?
-10. **Callers** — run all four (alias path AND relative path, both extensions):
+5. **Virtuals** — each `schema.virtual('name').get(fn)` (and `.set(fn)` if present): the virtual's name, the getter's return type, and every schema field it reads inside the getter body (these become the `needs` for its Prisma `result` compute alias in Step 3)
+6. **Plugins** — `mongoose-paginate-v2`, `mongoose-unique-validator`, others
+7. **Relations** — fields with `ref: 'Model'`, their names
+8. **Factory pattern** — does the file export `const factory = (crowi: Crowi) => { ... }` or similar?
+9. **Hooks** — any `schema.pre()`/`schema.post()` calls?
+10. **Already partially migrated?** — is a `Prisma.defineExtension` already present?
+11. **Callers** — run all four (alias path AND relative path, both extensions):
    ```bash
    grep -r "from '~/server/models/<model-name>'" apps/app/src --include="*.ts" -l
    grep -r "from '~/server/models/<model-name>'" apps/app/src --include="*.js" -l
@@ -169,6 +171,34 @@ export const extension = Prisma.defineExtension((client) => {
 Declare `result.<collection>._id` and/or `result.<collection>.__v` in the per-model extension **only for the field(s) Step 1 confirmed exist on this model** — not blindly for both. Most models have both (Mongoose enables `_id` and `versionKey` by default), but a model declared with `{ _id: false }` or `{ versionKey: false }` has only one or neither; do not declare an alias for a field the model never had. Omit the whole `result: { <collection>: { ... } }` block if neither applies.
 
 This declaration is needed in the per-model extension, not only the global `$allModels` fallback in `apps/app/src/utils/prisma.ts`: the global fallback uses `// @ts-ignore` because `$allModels` cannot know any specific model's shape, so the computed `_id`/`__v` it produces are typed `any` for every model. Declaring the same field(s) again here — scoped to `<collection>` — gives them their real type (`string`/`number`) because the result extension knows the concrete model shape, and this model-specific declaration takes precedence over the `$allModels` one once `.$extends(<thisModel>Extension)` is chained after it in `utils/prisma.ts`. Skipping this for a field the model actually has leaves it typed `any` for every caller of this collection.
+
+**Virtual fields → `result` compute aliases:**
+
+For each virtual found in Step 1, port the getter's logic into a `result.<collection>.<virtualName>` field in the same extension, alongside `_id`/`__v`. `needs` must list every schema field the getter body reads; `compute` runs the same logic against the Prisma model shape:
+
+```typescript
+// Before (Mongoose)
+schema.virtual('isDeleted').get(function(this: FooDocument) {
+  return this.deletedAt != null;
+});
+
+// After (Prisma) — inside the same result.<collection> block as _id/__v
+result: {
+  <collection>: {
+    // ...,
+    isDeleted: {
+      needs: { deletedAt: true },
+      compute(model) {
+        return model.deletedAt != null;
+      },
+    },
+  },
+},
+```
+
+If the getter calls other instance methods or reads fields through populated relations, resolve those dependencies first — `needs` can only reference scalar fields on the same model, not populated relation documents. If a virtual cannot be expressed as a pure function of the model's own scalar fields (e.g. it queries another collection), flag it and discuss an alternative (a Prisma extension `model` method instead of a `result` field) with the developer rather than forcing it into `compute`.
+
+Once ported here, the original `schema.virtual(...)` block is deleted in Step 6 — see the cleanup table.
 
 **Converting Mongoose statics to Prisma:**
 - `Model.find({ ... })` → `context.findMany({ where: { ... } })`
@@ -327,7 +357,7 @@ Read the file and apply the following rules to every section:
 | `interface FooModel extends Model<FooDocument> { ... }` | **Remove** — Mongoose-specific type, no longer needed |
 | Mongoose schema block (`new Schema(...)`) | **Keep** but simplify: strip type arguments (`new Schema<FooDocument, FooModel>(...)` → `new Schema(...)`) and remove the options argument (`{ toObject, timestamps, strict, ... }`) — Mongoose is only used for schema registration, not serialization |
 | TODO comment above schema | **Keep** (add if missing) |
-| `schema.virtual(...)` blocks | **Remove** — virtuals are a Mongoose serialization feature, not needed for collection management |
+| `schema.virtual(...)` blocks | **Remove**, but only after its logic has been ported to a `result.<collection>.<virtualName>` compute alias in the Prisma extension (Step 3) — verify the alias exists before deleting |
 | Mongoose statics (`schema.statics.X = ...`) | **Remove** — replaced by Prisma extension |
 | `getOrCreateModel(...)` call | **Keep** the call (needed to register the schema), but **remove** the `export default` — callers now use Prisma and no longer import this model |
 | `Prisma.defineExtension(...)` block | **Keep** — target state |
