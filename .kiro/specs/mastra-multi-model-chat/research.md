@@ -124,6 +124,20 @@
 5. **i18n キー**: モデル/デプロイ名ラベル、追加/削除/既定、providerOptions ヘルプ等の新規キー（`admin` namespace）。
 6. **PUT の FULL-STATE-REPLACE と配列**: 空配列 `[]` の意味（=許可なし）と「未指定=env デフォルト復帰」の区別、`removeIfUndefined` との整合。
 
+### 関連既存 spec の整合更新（本 spec のスコープ・タスク化）
+本機能は以下 2 spec が記述する領域を変更するため、これらの spec ドキュメントの整合更新を **mastra-multi-model-chat のタスクとして** 行う（実装タスク完了後に doc を同期）。**今すぐ他 spec のファイルは変更しない。** tasks フェーズで明示タスク化する。
+
+- **admin-ai-settings**（`tasks-generated` / `ready_for_implementation: true`＝実装済み）: 以下の記述を更新。
+  - `ai:model`（単一自由入力）→ デフォルトモデルとして維持しつつ `ai:allowedModels` を追加。
+  - `ai:providerOptions`（単一 textarea）→ 廃止し per-model（各許可モデルに同梱）へ。
+  - `ai:*` キー一覧・`AI_SETTING_KEYS`・env-only `targetKeys`（`ai:allowedModels` 追加 / `ai:providerOptions` 除去）。
+  - GET/PUT 契約（`AiSettingsResponse`/`AiSettingsUpdateRequest`）。
+  - 管理 UI（`ModelField` → 許可モデルリストエディタ、Azure モデル欄を共通設定へ統合）。
+- **multi-llm-provider**（`tasks-generated` / `ready_for_implementation: false`＝未実装）: 以下の記述を更新。
+  - 単一モデル解決（`resolveMastraModel` 単一メモ・`requireModel`）→ model パラメータ化 + Map キャッシュ + `resolveEffectiveModel`。
+  - provider options の単一 env JSON → per-model 解決（`resolveProviderOptions(modelId)`）。
+  - Boundary の「per-request 切替は Out of scope（ユーザー/リクエスト単位の切り替えを含む）」記述に、「**モデル単位（同一ベンダー内）の per-request 選択は mastra-multi-model-chat で扱う**（ベンダー単位の切替は引き続き対象外）」旨を追記し、両 spec の境界整合を明示。
+
 ### 持ち越す既知挙動
 - ツール呼び出し/結果パートはスレッド再読込後も復元（`convertMessages`→output-available）。チャット UI 派生はこれ前提。
 - ストリーミング/エラーサニタイズ（`resolveChatErrorMessage`、`pipeUIMessageStreamToResponse`）は無改変で維持。
