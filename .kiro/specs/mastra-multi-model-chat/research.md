@@ -138,6 +138,15 @@
   - provider options の単一 env JSON → per-model 解決（`resolveProviderOptions(modelId)`）。
   - Boundary の「per-request 切替は Out of scope（ユーザー/リクエスト単位の切り替えを含む）」記述に、「**モデル単位（同一ベンダー内）の per-request 選択は mastra-multi-model-chat で扱う**（ベンダー単位の切替は引き続き対象外）」旨を追記し、両 spec の境界整合を明示。
 
+### 設計シンセシス / 確定事項（design フェーズで決定）
+- **Generalization**: 6 要件は「あるチャットリクエストの実効モデルとその providerOptions を、許可リスト + デフォルトから解決し、サーバ側で検証する」という単一能力の variation。中核を `resolveEffectiveModel(modelId?)` + `resolveProviderOptions(modelId?)`（同一の `ai:allowedModels`/`ai:model` を読む）に集約する。
+- **Build vs Adopt（全て Adopt）**: 動的モデル関数（Mastra@1.41）、ベンダリング済み `PromptInputModelSelect*`、既存 `isProviderNamespacedObject`/`isValidProviderOptionsJson`、config-loader のオブジェクト配列対応、react-hook-form `useFieldArray`。新規ビルドは「許可リスト型・リストエディタ UI・チャット用モデル一覧エンドポイント」のみ。
+- **Simplification**: グローバル providerOptions 廃止（per-model 化）。会話固定の永続化なし（per-message）。
+- **移行方式（決定）= 読取時フォールバック**（マイグレーションスクリプト不採用）。理由: env-only 構成（`AI_MODEL`/`AI_PROVIDER_OPTIONS` で env 設定）は DB を持たないため DB マイグレーションでは移行できない。読取時フォールバックは DB / env 両方を同一ロジックで吸収でき非破壊。`getAllowedModels()` が `ai:allowedModels` 空かつ `ai:model` 有のとき `[{ model: ai:model, providerOptions: <legacy ai:providerOptions をパース> }]` を合成する。
+- **`ai:providerOptions` の扱い（決定）**: 廃止予定（deprecated）。**読取専用の legacy キーとして config 定義は残す**（env `AI_PROVIDER_OPTIONS` を読み込めるように）。`AI_SETTING_KEYS`（管理書込み集合）と管理 UI / PUT からは除去し、グローバル一律適用も廃止。読取時フォールバックの単一エントリ合成時のみ参照。
+- **チャットへの許可リスト供給（決定）= 新規 chat-scoped エンドポイント B1**: `GET /_api/v3/mastra/models` が `{ models: {id,name}[], defaultModelId }` を返す（providerOptions はクライアントへ送らない）。管理用 available-models は新設しない（要件どおりベンダー API も叩かない）。
+- **Map キャッシュキー（決定）**: `${provider}:${effectiveModel}`。provider 単一前提だが将来の provider 変更に頑健。`clearResolvedMastraModelCache()` は Map 全消去（PUT / `model-config-sync` の既存呼出と整合）。Azure+Entra のトークンキャッシュはキャッシュされたモデルオブジェクト内に保持されるため維持される。
+
 ### 持ち越す既知挙動
 - ツール呼び出し/結果パートはスレッド再読込後も復元（`convertMessages`→output-available）。チャット UI 派生はこれ前提。
 - ストリーミング/エラーサニタイズ（`resolveChatErrorMessage`、`pipeUIMessageStreamToResponse`）は無改変で維持。
