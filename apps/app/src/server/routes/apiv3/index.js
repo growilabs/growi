@@ -6,6 +6,7 @@ import {
   createVaultPageRouterWithDeps,
 } from '~/features/growi-vault/server';
 import { factory as mastraRouteFactory } from '~/features/mastra/server/routes';
+import { factory as adminAiSettingsRouteFactory } from '~/features/mastra/server/routes/admin-ai-settings';
 import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed';
 import loggerFactory from '~/utils/logger';
 
@@ -48,6 +49,7 @@ module.exports = (crowi, app) => {
     require('./content-disposition-settings')(crowi),
   );
   routerForAdmin.use('/app-settings', require('./app-settings')(crowi));
+  routerForAdmin.use('/ai-settings', adminAiSettingsRouteFactory(crowi));
   routerForAdmin.use(
     '/customize-setting',
     require('./customize-setting')(crowi),

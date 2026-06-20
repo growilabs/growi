@@ -86,4 +86,50 @@ describe('ConfigLoader', () => {
       });
     });
   });
+
+  // ai:azureOpenaiSettings is an object-typed config (defaultValue: {}) that also
+  // has an env var, so the loader must JSON.parse its env string into an object.
+  // This is the contract for "setting an object via an environment variable".
+  describe('loadFromEnv (object-typed key from a JSON env var)', () => {
+    const ENV = 'AI_AZURE_OPENAI_SETTINGS';
+    const original = process.env[ENV];
+
+    afterEach(() => {
+      if (original === undefined) {
+        delete process.env[ENV];
+      } else {
+        process.env[ENV] = original;
+      }
+    });
+
+    it('parses a JSON object string into an object', async () => {
+      process.env[ENV] = '{"resourceName":"my-res","useEntraId":true}';
+
+      const config: RawConfigData<ConfigKey, ConfigValues> =
+        await configLoader.loadFromEnv();
+
+      expect(config['ai:azureOpenaiSettings'].value).toEqual({
+        resourceName: 'my-res',
+        useEntraId: true,
+      });
+    });
+
+    it('falls back to null on malformed JSON (fail-soft, no boot crash)', async () => {
+      process.env[ENV] = '{not valid json';
+
+      const config: RawConfigData<ConfigKey, ConfigValues> =
+        await configLoader.loadFromEnv();
+
+      expect(config['ai:azureOpenaiSettings'].value).toBeNull();
+    });
+
+    it('uses the empty-object default when the env var is unset', async () => {
+      delete process.env[ENV];
+
+      const config: RawConfigData<ConfigKey, ConfigValues> =
+        await configLoader.loadFromEnv();
+
+      expect(config['ai:azureOpenaiSettings'].value).toEqual({});
+    });
+  });
 });

@@ -2,11 +2,11 @@ import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { toAISdkStream } from '@mastra/ai-sdk';
+import type { AIV6Type } from '@mastra/core/agent/message-list';
 import { RequestContext } from '@mastra/core/request-context';
 import {
   createUIMessageStream,
   pipeUIMessageStreamToResponse,
-  type UIMessage,
   validateUIMessages,
 } from 'ai';
 import type { Request, RequestHandler } from 'express';
@@ -17,16 +17,18 @@ import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import { resolveProviderOptions } from '../services/ai-sdk-modules/resolve-provider-options';
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
 import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context';
+import { resolveChatErrorMessage } from './chat-error-message';
 import { buildPostMessageValidator } from './post-message-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
   threadId?: string;
-  messages: UIMessage[];
+  messages: AIV6Type.UIMessage[];
 };
 
 type Req = Request<undefined, Response, ReqBody> & {
@@ -53,14 +55,6 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
     async (req: Req, res: ApiV3Response) => {
       const { threadId, messages } = req.body;
 
-      const requestContext = new RequestContext<MastraRequestContextShape>();
-
-      // The chat endpoint is assistant-independent: no aiAssistantId lookup and
-      // no vectorStore-derived context. AI-enabled gating is enforced at the
-      // router level (see ./index.ts).
-      requestContext.set('user', req.user);
-      requestContext.set('searchService', crowi.searchService);
-
       const growiAgent = mastra.getAgent('growiAgent');
       const memory = await growiAgent.getMemory();
       if (memory == null) {
@@ -73,6 +67,15 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         threadId,
       });
 
+      const requestContext = new RequestContext<MastraRequestContextShape>();
+
+      // Request-scoped context the agent's tools read at execute time: the
+      // logged-in user (for viewer-aware page access) and the search service
+      // (for the full-text search tool). AI-enabled gating is handled at the
+      // router level (see ./index.ts).
+      requestContext.set('user', req.user);
+      requestContext.set('searchService', crowi.searchService);
+
       try {
         const stream = await growiAgent.stream(messages, {
           requestContext,
@@ -80,33 +83,41 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             thread: thread.id,
             resource: thread.resourceId,
           },
-          // Configure the OpenAI Responses API to emit reasoning summary
-          // chunks. Reasoning is always executed (and billed) for reasoning
-          // models; this option controls only whether the summary text is
-          // surfaced to the UI.
-          //
-          // Important: surfacing reasoning summary requires a verified OpenAI
-          // organization. Without verification, summary parts are emitted as
-          // empty (`reasoning-start` / `reasoning-end` only, no delta), so
-          // the UI shows the trigger but no body.
-          //
-          // `effort: 'low'` bounds reasoning-token volume for cost; raise it
-          // when richer reasoning depth is desired (also tends to produce
-          // fuller summaries when verification is in place).
-          providerOptions: {
-            openai: {
-              reasoningEffort: 'low',
-              reasoningSummary: 'auto',
-            },
-          },
+          // Provider options (reasoning etc.) resolved from the
+          // AI_PROVIDER_OPTIONS env var (Req 6). Defaults to the OpenAI
+          // reasoning options (reasoningEffort 'low' bounds reasoning-token cost;
+          // reasoningSummary 'auto' surfaces summary chunks to the UI — note this
+          // requires a verified OpenAI org, otherwise summary parts are empty).
+          // Operators of other vendors set their own provider namespace; the AI
+          // SDK reads only the active provider's key.
+          providerOptions: resolveProviderOptions(),
         });
 
         // Use pipeUIMessageStreamToResponse for Express servers
         // Express requires piping to ServerResponse object, not returning Web API Response
         // See: https://ai-sdk.dev/cookbook/api-servers/express#ui-message-stream
         // Example: https://github.com/vercel/ai/blob/c5e2a7c22eb8d9392705d1e87458b1d4af9c6ec9/examples/express/src/server.ts
+        // A streaming failure (e.g. a misconfigured / unsupported model) arrives
+        // as an error *chunk* from toAISdkStream — NOT a thrown exception — so it
+        // never reaches createUIMessageStream's onError. The chunk converter calls
+        // toAISdkStream's own onError to build the chunk text, so that is the
+        // primary sanitize point. createUIMessageStream's onError covers the rare
+        // execute-level throw (e.g. `stream.usage` rejecting): it must stay,
+        // because that hook's DEFAULT (getErrorMessage) forwards the RAW message
+        // — dropping it would leak detail on that path.
+        //
+        // Forward only a safe message: an AISDKError's provider-authored text
+        // (one line), never the stack / responseBody / url, and never a
+        // non-AISDK (possibly GROWI-internal) error's message (OWASP
+        // LLM02/LLM09). The full error is logged server-side.
+        const onChatError = (error: unknown): string => {
+          logger.error(error);
+          return resolveChatErrorMessage(error);
+        };
+
         const uiMessageStream = createUIMessageStream({
           originalMessages: messages,
+          onError: onChatError,
           execute: async ({ writer }) => {
             // Workaround for https://github.com/mastra-ai/mastra/issues/11884#issuecomment-3799153269
             // toAISdkStream() returns a ReadableStream that lacks [Symbol.asyncIterator]
@@ -115,6 +126,9 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
               from: 'agent',
               version: 'v6',
               sendReasoning: true,
+              // Primary sanitize point: the agent→UI chunk converter calls this
+              // with the original error to build the error chunk's text.
+              onError: onChatError,
             }).getReader();
 
             while (true) {

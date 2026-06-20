@@ -42,6 +42,13 @@ const MenuLabel = ({ menu }: { menu: string }) => {
           {t('customize_settings.customize_settings')}
         </>
       );
+    case 'ai':
+      return (
+        <>
+          <span className="material-symbols-outlined me-1">smart_toy</span>
+          {t('ai_settings.ai_settings')}
+        </>
+      );
     case 'importer':
       return (
         <>
@@ -245,6 +252,11 @@ export const AdminNavigation = (): JSX.Element => {
             isListGroupItems={isListGroupItems}
             isActive={isActiveMenu('/plugins')}
           />
+          <MenuLink
+            menu="ai"
+            isListGroupItems={isListGroupItems}
+            isActive={isActiveMenu('/ai')}
+          />
 
           <hr />
 
@@ -348,6 +360,7 @@ export const AdminNavigation = (): JSX.Element => {
             {isActiveMenu('/security') && <MenuLabel menu="security" />}
             {isActiveMenu('/markdown') && <MenuLabel menu="markdown" />}
             {isActiveMenu('/customize') && <MenuLabel menu="customize" />}
+            {isActiveMenu('/ai') && <MenuLabel menu="ai" />}
             {isActiveMenu('/importer') && <MenuLabel menu="importer" />}
             {isActiveMenu('/export') && <MenuLabel menu="export" />}
             {isActiveMenu(['/notification', '/global-notification']) && (

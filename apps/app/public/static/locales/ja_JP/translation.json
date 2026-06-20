@@ -153,7 +153,7 @@
   "Page Tree": "ページツリー",
   "Bookmarks": "ブックマーク",
   "In-App Notification": "通知",
-  "AI Chat": "AI チャット",
+  "GROWI AI": "GROWI AI",
   "original_path": "元のパス",
   "new_path": "新しいパス",
   "duplicated_path": "重複したパス",
@@ -574,12 +574,18 @@
     "selected_editable_revision": "保存するページ本文(編集可能)"
   },
   "ai_unavailable": {
-    "open_cloud_settings_to_enable": "AI 連携を有効にするには GROWI.cloud の管理画面をご確認ください",
-    "to_cloud_settings": "GROWI.cloud の管理画面へ"
+    "open_admin_settings_to_enable": "AI 連携を有効にするには管理画面で設定してください",
+    "to_admin_ai_settings": "AI 設定の管理画面へ",
+    "contact_admin_to_enable": "AI 連携が有効になっていません。管理者にお問い合わせください"
   },
   "ai_sidebar": {
     "new_chat": "新規チャット",
     "recent_threads": "最近の項目",
+    "error": {
+      "title": "エラーが発生しました",
+      "retry": "再試行",
+      "dismiss": "閉じる"
+    },
     "toaster": {
       "thread_deleted_success": "スレッドを削除しました",
       "thread_deleted_failed": "スレッドの削除に失敗しました"
@@ -913,6 +919,8 @@
   },
   "user_home_page": {
     "bookmarks": "ブックマーク",
+    "contribution_graph": "コントリビューショングラフ",
+    "contribution_migration_in_progress": "コントリビューションデータを準備しています。少し待ってから再読み込みしてください。",
     "recently_created": "最近作成したページ",
     "recent_activity": "最近のアクティビティ",
     "unknown_action": "未指定の変更を加えました",
@@ -1078,5 +1086,12 @@
       "docs_color": "カラーの詳細はこちら",
       "docs_alert": "アラートブロックの詳細はこちら"
     }
+  },
+  "pageMention": {
+    "placeholder": "メッセージを入力...（ @ でページを参照）",
+    "hint": "ページ名を入力して検索",
+    "searching": "検索中...",
+    "noResults": "該当するページがありません",
+    "candidatesLabel": "ページ候補"
   }
 }

@@ -1,9 +1,9 @@
 // ref: https://elements.ai-sdk.dev/examples/chatbot
 
-import { Fragment, useEffect, useState } from 'react';
+import { Fragment, useEffect, useMemo, useState } from 'react';
 import { useChat } from '@ai-sdk/react';
-import { DefaultChatTransport } from 'ai';
 import { CopyIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
+import { useTranslation } from 'react-i18next';
 import { v7 as uuid } from 'uuid';
 
 import { Action, Actions } from '~/components/ai-elements/actions';
@@ -20,7 +20,6 @@ import {
   PromptInputFooter,
   type PromptInputMessage,
   PromptInputSubmit,
-  PromptInputTextarea,
 } from '~/components/ai-elements/prompt-input';
 import {
   Reasoning,
@@ -34,6 +33,8 @@ import {
   SourcesContent,
   SourcesTrigger,
 } from '~/components/ai-elements/sources';
+import { Button } from '~/components/ui/button';
+import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
 
 import {
   useChatSidebarActions,
@@ -42,7 +43,8 @@ import {
 import { useSWRxMessages } from '../../stores/message';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 import {
-  buildMessageRequestBody,
+  createMastraChatTransport,
+  resolveChatErrorDetail,
   resolveChatHeaderLabel,
 } from './chat-sidebar-helpers';
 
@@ -51,6 +53,8 @@ import styles from './ChatSidebar.module.scss';
 const moduleClass = styles['grw-chat-sidebar'] ?? '';
 
 export const ChatSidebar = (): JSX.Element => {
+  const { t } = useTranslation();
+
   const [input, setInput] = useState('');
 
   const chatSidebarStatus = useChatSidebarStatus();
@@ -70,11 +74,29 @@ export const ChatSidebar = (): JSX.Element => {
   const headerLabel = resolveChatHeaderLabel(
     chatThreadId,
     threadPages?.flatMap((page) => page.threads) ?? [],
+    t('ai_sidebar.new_chat'),
   );
 
-  const { messages, sendMessage, status, regenerate, setMessages } = useChat({
+  // Memoized so a stable transport instance survives re-renders (chatThreadId is
+  // fixed for this session), instead of allocating a new one on every render.
+  // The factory pins the threadId on the transport body so EVERY request — incl.
+  // regenerate(), which sends no per-call body — carries it (see the factory).
+  const transport = useMemo(
+    () => createMastraChatTransport(chatThreadId),
+    [chatThreadId],
+  );
+
+  const {
+    messages,
+    sendMessage,
+    status,
+    regenerate,
+    setMessages,
+    error,
+    clearError,
+  } = useChat({
     id: chatThreadId,
-    transport: new DefaultChatTransport({ api: '/_api/v3/mastra/message' }),
+    transport,
     // Refresh the thread list after the assistant finishes streaming.
     //
     // The thread itself is persisted by the time the stream closes, but
@@ -112,14 +134,21 @@ export const ChatSidebar = (): JSX.Element => {
   }, [savedMessages, setMessages]);
 
   const handleSubmit = (message: PromptInputMessage) => {
-    sendMessage(
-      {
-        text: message.text || 'Hello World',
-      },
-      {
-        body: buildMessageRequestBody(chatThreadId),
-      },
-    );
+    // The input stays editable while the assistant responds so the user can
+    // compose the next message, but starting a new request is suppressed until
+    // the current one settles. This guards both the submit button and the
+    // keymap's Enter→requestSubmit path against double-sending while busy (#5).
+    if (status === 'submitted' || status === 'streaming') {
+      return;
+    }
+    // Nothing to send for an empty (or whitespace-only) message.
+    const text = message.text ?? '';
+    if (text.trim().length === 0) {
+      return;
+    }
+    // The threadId rides on the transport body (see useChat above), so no
+    // per-call body is needed here.
+    sendMessage({ text });
     setInput('');
   };
 
@@ -127,9 +156,9 @@ export const ChatSidebar = (): JSX.Element => {
     <div
       className={`tw-root position-fixed top-0 end-0 h-100 border-start bg-body shadow-sm overflow-hidden ${moduleClass}`}
     >
-      <div className="tw:max-w-4xl tw:mx-auto tw:p-6 tw:relative tw:size-full twh-screen">
+      <div className="tw:max-w-4xl tw:mx-auto tw:py-6 tw:relative tw:size-full twh-screen">
         <div className="tw:flex tw:flex-col tw:h-full">
-          <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:pb-2 tw:border-b tw:border-border">
+          <div className="tw:flex tw:items-center tw:gap-2 tw:shrink-0 tw:px-6 tw:pb-2 tw:border-b tw:border-border">
             <span className="growi-custom-icons fs-4">ai_chat</span>
             <span className="tw:flex-1 tw:font-semibold tw:truncate">
               {headerLabel}
@@ -253,19 +282,60 @@ export const ChatSidebar = (): JSX.Element => {
                   last?.role !== 'assistant' || (last.parts?.length ?? 0) === 0;
                 return awaitingFirstPart ? <Loader /> : null;
               })()}
+              {error != null && (
+                <div
+                  role="alert"
+                  className="tw:my-2 tw:flex tw:flex-col tw:gap-2 tw:rounded-lg tw:border tw:border-destructive/40 tw:bg-destructive/10 tw:p-3 tw:text-sm"
+                >
+                  <div className="tw:flex tw:items-center tw:justify-between tw:gap-2">
+                    <p className="tw:font-medium tw:text-destructive">
+                      {t('ai_sidebar.error.title')}
+                    </p>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="icon-sm"
+                      className="tw:-my-1"
+                      aria-label={t('ai_sidebar.error.dismiss')}
+                      onClick={() => clearError()}
+                    >
+                      <XIcon className="tw:size-3.5" />
+                    </Button>
+                  </div>
+                  {(() => {
+                    const detail = resolveChatErrorDetail(error);
+                    return detail == null ? null : (
+                      <p className="tw:break-words tw:text-muted-foreground">
+                        {detail}
+                      </p>
+                    );
+                  })()}
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="tw:self-end"
+                    onClick={() => regenerate()}
+                  >
+                    <RefreshCcwIcon className="tw:mr-1 tw:size-3" />
+                    {t('ai_sidebar.error.retry')}
+                  </Button>
+                </div>
+              )}
             </ConversationContent>
             <ConversationScrollButton />
           </Conversation>
 
-          <div className="tw:shrink-0 tw:pt-4">
+          <div className="tw:shrink-0 tw:px-6 tw:pt-4">
             <PromptInput
               onSubmit={handleSubmit}
               inputGroupClassName="tw:rounded-xl"
             >
               <PromptInputBody>
-                <PromptInputTextarea
-                  onChange={(e) => setInput(e.target.value)}
+                <PageMentionInput
                   value={input}
+                  onChange={setInput}
+                  placeholder={t('pageMention.placeholder')}
                 />
               </PromptInputBody>
               <PromptInputFooter className="tw:justify-end">

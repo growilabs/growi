@@ -5,8 +5,9 @@ import type {
   NonBlankString,
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
-import type OpenAI from 'openai';
 
+import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
+import type { AzureOpenaiConfig } from '~/features/mastra/interfaces/azure-openai-config';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
@@ -293,6 +294,15 @@ export const CONFIG_KEYS = [
   'aiTools:suggestPathAgenticChildListingLimit',
   'aiTools:suggestPathAgenticTimeoutMs',
 
+  // Mastra LLM Settings (provider-agnostic: one provider per app)
+  'ai:provider',
+  'ai:apiKey',
+  'ai:model',
+  'ai:providerOptions',
+  // Azure OpenAI-only connection config (ai:provider='azure-openai'), stored as
+  // a single JSON object (consolidated from the former four ai:azureOpenaiSettings* keys)
+  'ai:azureOpenaiSettings',
+
   // OpenTelemetry Settings
   'otel:enabled',
   'otel:isAppSiteUrlHashed',
@@ -342,6 +352,7 @@ export const CONFIG_KEYS = [
   'env:useOnlyEnvVars:security:passport-saml',
   'env:useOnlyEnvVars:gcs',
   'env:useOnlyEnvVars:azure',
+  'env:useOnlyEnvVars:ai',
 
   // Page Bulk Export Settings
   'app:bulkExportJobExpirationSeconds',
@@ -1261,11 +1272,69 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
     isSecret: true,
   }),
-  // Reasoning-capable model for the Mastra agent. Emits reasoning summary
-  // chunks consumed by the AI Elements Reasoning UI in the chat sidebar.
-  'openai:assistantModel:mastraAgent': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_MASTRA_AGENT_MODEL',
-    defaultValue: 'o4-mini',
+
+  // AI chat (Mastra) Settings — provider-agnostic, one provider per app.
+  // Single set of keys regardless of provider — the resolver reads `ai:provider`
+  // to pick the provider client, then injects `ai:apiKey` / `ai:model`.
+  // No defaultValue on purpose: provider / apiKey / model are required, so an
+  // unset value surfaces as a clear error at resolve time rather than silently
+  // defaulting to a particular provider/model. `ai:provider` is typed with the
+  // shared `AiProvider` (type-only import — erased at runtime, dependency-free
+  // leaf, no cycle); the type aids DX but is not runtime-enforced for env-loaded
+  // values, so the resolver still validates with `isAiProvider`.
+  'ai:provider': defineConfig<AiProvider | undefined>({
+    envVarName: 'AI_PROVIDER',
+    defaultValue: undefined,
+  }),
+  'ai:apiKey': defineConfig<string | undefined>({
+    envVarName: 'AI_API_KEY',
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  // Required (no default). For the azure-openai provider this is the Azure
+  // *deployment name*, not an OpenAI model id.
+  'ai:model': defineConfig<string | undefined>({
+    envVarName: 'AI_MODEL',
+    defaultValue: undefined,
+  }),
+  // Raw AI SDK `providerOptions` JSON (provider-namespaced), applied to the
+  // chat stream call. Typed as a raw JSON string (not object) so a malformed
+  // override fails soft in the resolver (parse + fallback) rather than crashing
+  // config load. No default: unset means no provider options. Operators set
+  // their own provider namespace, e.g.
+  // {"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}} or
+  // {"anthropic":{"thinking":{"type":"enabled"}}}.
+  'ai:providerOptions': defineConfig<string | undefined>({
+    envVarName: 'AI_PROVIDER_OPTIONS',
+    defaultValue: undefined,
+  }),
+
+  // Azure OpenAI-only connection config (ai:provider='azure-openai'),
+  // consolidated into a SINGLE JSON object key (was four flat keys:
+  // ai:azureOpenai{ResourceName,BaseUrl,ApiVersion,UseEntraId}). Azure is reached
+  // via a resource-specific endpoint, so { apiKey, model } alone is not enough.
+  // Set exactly one of resourceName / baseURL: resourceName builds the standard
+  // https://<name>.openai.azure.com/... URL; baseURL is the
+  // escape hatch for Azure Government / sovereign clouds / API Management
+  // gateways / custom domains. apiVersion is optional (the AI SDK defaults it).
+  // useEntraId selects Microsoft Entra ID (managed identity / DefaultAzureCredential)
+  // auth instead of an API key (then AI_API_KEY is not required). For Azure,
+  // AI_MODEL is the *deployment name*, not an OpenAI model id. This key is ignored
+  // by the other providers and is not secret (only ai:apiKey is). See
+  // AzureOpenaiConfig for field semantics.
+  //
+  // Stored/loaded as JSON: the DB value is the serialized object, and the
+  // AI_AZURE_OPENAI_SETTINGS env var is a JSON string. defaultValue is an object ({}) so
+  // the loader parses the env var as JSON (a malformed env var fails soft to null;
+  // consumers read it defensively with `?? {}`).
+  // The type includes `| undefined` because this is a CLEARABLE key like ai:model /
+  // ai:providerOptions: the admin PUT handler sets it to undefined when the admin
+  // clears every field, so updateConfigs({ removeIfUndefined }) deletes it and the
+  // value falls back to the env default. The runtime default stays `{}` (not
+  // undefined) so the env JSON-parse branch is selected.
+  'ai:azureOpenaiSettings': defineConfig<AzureOpenaiConfig | undefined>({
+    envVarName: 'AI_AZURE_OPENAI_SETTINGS',
+    defaultValue: {},
   }),
   'openai:assistantModel:suggestPathAgent': defineConfig<string>({
     envVarName: 'OPENAI_SUGGEST_PATH_AGENT_MODEL',
@@ -1460,6 +1529,10 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'AZURE_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
   }),
+  'env:useOnlyEnvVars:ai': defineConfig<boolean>({
+    envVarName: 'AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    defaultValue: false,
+  }),
   'app:bulkExportJobExpirationSeconds': defineConfig<number>({
     envVarName: 'BULK_EXPORT_JOB_EXPIRATION_SECONDS',
     defaultValue: 86400,
@@ -1552,6 +1625,20 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
       'azure:clientSecret',
       'azure:storageAccountName',
       'azure:storageContainerName',
+    ],
+  },
+  {
+    // AI settings: provider-common (4) + the Azure OpenAI-only object key + the
+    // enable toggle. app:aiEnabled uses the app: prefix but is fixed together
+    // with the ai:* keys as a single AI configuration unit.
+    controlKey: 'env:useOnlyEnvVars:ai',
+    targetKeys: [
+      'app:aiEnabled',
+      'ai:provider',
+      'ai:apiKey',
+      'ai:model',
+      'ai:providerOptions',
+      'ai:azureOpenaiSettings',
     ],
   },
 ];
