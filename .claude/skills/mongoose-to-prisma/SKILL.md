@@ -227,22 +227,13 @@ query: {
 ```
 
 **Factory pattern:**
-If the model uses `const factory = (crowi: Crowi) => { ... }`, the extension needs access to `crowi` for events (e.g. `crowi.events.bookmark`). Pass `crowi` as a closure parameter:
-```typescript
-export const createExtension = (crowi: Crowi) =>
-  Prisma.defineExtension((client) => {
-    return client.$extends({
-      model: {
-        <collection>: {
-          async <method>() {
-            crowi.events.<event>.emit(...);
-          },
-        },
-      },
-    });
-  });
-```
-> ⚠️ **Requires architectural discussion**: `createPrisma()` in `apps/app/src/utils/prisma.ts` currently takes no arguments, so there is no established pattern for injecting `crowi` into the Prisma client chain. Before generating code, discuss with the developer how `crowi` will be passed to the extension (options: singleton accessor, dependency injection into `createPrisma`, or restructuring the factory). Do not produce a half-working implementation — pause here and get a decision first.
+If the model uses `const factory = (crowi: Crowi) => { ... }`, the goal is to avoid passing `crowi` as a closure parameter into `Prisma.defineExtension` — `createPrisma()` in `apps/app/src/utils/prisma.ts` currently takes no arguments, so there is no established pattern for injecting `crowi` itself into the Prisma client chain.
+
+Before generating code, investigate what the factory actually uses `crowi` for (typically `crowi.events.<event>.emit(...)`, but verify per model — it may be something else):
+1. Open the dependency behind `crowi.<path>` (e.g. the event class behind `crowi.events.<event>`) and read its implementation, not just its usage site in the model file.
+2. Check whether that dependency reads `this.crowi`/needs live access to the `Crowi` instance anywhere in its own methods, or whether the reference is unused dead weight.
+3. Based on what you find, work out the smallest change that removes the closure parameter while preserving behavior — this varies per model and per dependency, so don't reach for a fixed template. Consider, as starting points, whatever fits the actual finding: hoisting the dependency to a module-level singleton (clean, but only safe if it never needs live `crowi` state), a lazily-read accessor for the `Crowi` instance (keeps the dependency untouched but still needs `crowi` available somewhere at call time), or some other shape entirely if the investigation turns up something different.
+4. Present the specific approach you worked out — grounded in what step 1–2 found for this model — to the developer, with the reasoning, and wait for their decision before writing any code. Do not pick silently and do not produce a half-working implementation.
 
 Show the full generated extension before writing. Wait for approval.
 
