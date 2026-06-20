@@ -1,4 +1,7 @@
 import type { IUserHasId } from '@growi/core/dist/interfaces';
+import { mock } from 'vitest-mock-extended';
+
+import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 
 import type {
   ContentAnalysis,
@@ -6,11 +9,10 @@ import type {
   PathSuggestion,
   SearchCandidate,
   SearchService,
-} from '../../interfaces/suggest-path-types';
+} from '../../../interfaces/suggest-path-types';
 
 const mocks = vi.hoisted(() => {
   return {
-    generateMemoSuggestionMock: vi.fn(),
     analyzeContentMock: vi.fn(),
     retrieveSearchCandidatesMock: vi.fn(),
     evaluateCandidatesMock: vi.fn(),
@@ -20,47 +22,24 @@ const mocks = vi.hoisted(() => {
   };
 });
 
-vi.mock('./generate-memo-suggestion', () => ({
-  generateMemoSuggestion: mocks.generateMemoSuggestionMock,
-}));
-
-vi.mock('./analyze-content', () => ({
+vi.mock('../analyze-content', () => ({
   analyzeContent: mocks.analyzeContentMock,
 }));
 
-vi.mock('./retrieve-search-candidates', () => ({
+vi.mock('../retrieve-search-candidates', () => ({
   retrieveSearchCandidates: mocks.retrieveSearchCandidatesMock,
 }));
 
-vi.mock('./evaluate-candidates', () => ({
+vi.mock('../evaluate-candidates', () => ({
   evaluateCandidates: mocks.evaluateCandidatesMock,
 }));
 
-vi.mock('./generate-category-suggestion', () => ({
+vi.mock('../generate-category-suggestion', () => ({
   generateCategorySuggestion: mocks.generateCategorySuggestionMock,
 }));
 
-vi.mock('./resolve-parent-grant', () => ({
+vi.mock('../resolve-parent-grant', () => ({
   resolveParentGrant: mocks.resolveParentGrantMock,
-}));
-
-// Mock wiring only for the orchestrator's new import graph (task 5.1);
-// every pre-existing mock, test, and assertion in this file is unchanged.
-//
-// The engines dispatcher statically imports the agentic engine, whose
-// transitive imports (mastra-modules) cannot load in the unit-test process
-// (module-scope config reads, ESM/CJS interop). Stubbing it keeps the real
-// dispatcher + real oneshot engine in the graph, which these tests exercise.
-vi.mock('./engines/agentic-engine', () => ({
-  agenticEngine: vi.fn(),
-}));
-
-// The orchestrator resolves the default engine id from config when the
-// caller does not specify one; the real configManager throws
-// 'Config is not loaded' in unit tests. A plain function (not vi.fn) is
-// used so `vi.resetAllMocks()` in beforeEach cannot wipe the value.
-vi.mock('~/server/service/config-manager', () => ({
-  configManager: { getConfig: () => 'oneshot' },
 }));
 
 vi.mock('~/utils/logger', () => ({
@@ -69,27 +48,11 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-const mockUser = {
-  _id: 'user123',
-  username: 'alice',
-} as unknown as IUserHasId;
+const mockUser = mock<IUserHasId>({ username: 'alice' });
 
-const mockUserGroups = [
-  'group1',
-  'group2',
-] as unknown as import('~/server/interfaces/mongoose-utils').ObjectIdLike[];
+const mockUserGroups: ObjectIdLike[] = ['group1', 'group2'];
 
-const mockSearchService = {
-  searchKeyword: vi.fn(),
-} as unknown as SearchService;
-
-const memoSuggestion: PathSuggestion = {
-  type: 'memo',
-  path: '/user/alice/memo/',
-  label: 'Save as memo',
-  description: 'Save to your personal memo area',
-  grant: 4,
-};
+const mockSearchService = mock<SearchService>();
 
 const mockAnalysis: ContentAnalysis = {
   keywords: ['React', 'hooks'],
@@ -127,20 +90,19 @@ const categorySuggestion: PathSuggestion = {
   grant: 1,
 };
 
-describe('generateSuggestions', () => {
+describe('oneshotEngine', () => {
   beforeEach(() => {
     vi.resetAllMocks();
-    mocks.generateMemoSuggestionMock.mockResolvedValue(memoSuggestion);
   });
 
-  const callGenerateSuggestions = async () => {
-    const { generateSuggestions } = await import('./generate-suggestions');
-    return generateSuggestions(
-      mockUser,
-      'Some page content',
-      mockUserGroups,
-      mockSearchService,
-    );
+  const callOneshotEngine = async () => {
+    const { oneshotEngine } = await import('./oneshot-engine');
+    return oneshotEngine({
+      user: mockUser,
+      body: 'Some page content',
+      userGroups: mockUserGroups,
+      searchService: mockSearchService,
+    });
   };
 
   describe('successful full pipeline', () => {
@@ -154,39 +116,41 @@ describe('generateSuggestions', () => {
       mocks.resolveParentGrantMock.mockResolvedValue(1);
     });
 
-    it('should return memo + search + category suggestions when all succeed', async () => {
-      const result = await callGenerateSuggestions();
+    it('should return search + category suggestions when all succeed', async () => {
+      const result = await callOneshotEngine();
 
-      expect(result).toHaveLength(4); // memo + 2 search + 1 category
-      expect(result[0]).toEqual(memoSuggestion);
-      expect(result[1]).toMatchObject({ type: 'search', path: '/tech/React/' });
-      expect(result[2]).toMatchObject({
+      expect(result).toHaveLength(3); // 2 search + 1 category
+      expect(result[0]).toMatchObject({ type: 'search', path: '/tech/React/' });
+      expect(result[1]).toMatchObject({
         type: 'search',
         path: '/tech/React/performance/',
       });
-      expect(result[3]).toEqual(categorySuggestion);
+      expect(result[2]).toEqual(categorySuggestion);
     });
 
-    it('should always include memo as the first suggestion', async () => {
-      const result = await callGenerateSuggestions();
+    it('should never include a memo-type suggestion (memo is the orchestrator responsibility)', async () => {
+      const result = await callOneshotEngine();
 
-      expect(result[0]).toEqual(memoSuggestion);
+      expect(
+        result.every((s) => s.type === 'search' || s.type === 'category'),
+      ).toBe(true);
     });
 
     it('should map informationType from content analysis to search-type suggestions', async () => {
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
       const searchSuggestions = result.filter((s) => s.type === 'search');
+      expect(searchSuggestions).toHaveLength(2);
       for (const s of searchSuggestions) {
         expect(s.informationType).toBe('stock');
       }
     });
 
-    it('should not include informationType on memo or category suggestions', async () => {
-      const result = await callGenerateSuggestions();
+    it('should not include informationType on category suggestion', async () => {
+      const result = await callOneshotEngine();
 
-      expect(result[0].informationType).toBeUndefined(); // memo
-      expect(result[3].informationType).toBeUndefined(); // category
+      const category = result.find((s) => s.type === 'category');
+      expect(category?.informationType).toBeUndefined();
     });
 
     it('should resolve grant for each evaluated suggestion path', async () => {
@@ -194,19 +158,19 @@ describe('generateSuggestions', () => {
         .mockResolvedValueOnce(1)
         .mockResolvedValueOnce(4);
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
       expect(mocks.resolveParentGrantMock).toHaveBeenCalledTimes(2);
       expect(mocks.resolveParentGrantMock).toHaveBeenCalledWith('/tech/React/');
       expect(mocks.resolveParentGrantMock).toHaveBeenCalledWith(
         '/tech/React/performance/',
       );
-      expect(result[1].grant).toBe(1);
-      expect(result[2].grant).toBe(4);
+      expect(result[0].grant).toBe(1);
+      expect(result[1].grant).toBe(4);
     });
 
-    it('should pass correct arguments to analyzeContent', async () => {
-      await callGenerateSuggestions();
+    it('should pass body to analyzeContent', async () => {
+      await callOneshotEngine();
 
       expect(mocks.analyzeContentMock).toHaveBeenCalledWith(
         'Some page content',
@@ -214,7 +178,7 @@ describe('generateSuggestions', () => {
     });
 
     it('should pass keywords, user, userGroups, and searchService to retrieveSearchCandidates', async () => {
-      await callGenerateSuggestions();
+      await callOneshotEngine();
 
       expect(mocks.retrieveSearchCandidatesMock).toHaveBeenCalledWith(
         ['React', 'hooks'],
@@ -225,7 +189,7 @@ describe('generateSuggestions', () => {
     });
 
     it('should pass body, analysis, and candidates to evaluateCandidates', async () => {
-      await callGenerateSuggestions();
+      await callOneshotEngine();
 
       expect(mocks.evaluateCandidatesMock).toHaveBeenCalledWith(
         'Some page content',
@@ -235,7 +199,7 @@ describe('generateSuggestions', () => {
     });
 
     it('should pass candidates to generateCategorySuggestion', async () => {
-      await callGenerateSuggestions();
+      await callOneshotEngine();
 
       expect(mocks.generateCategorySuggestionMock).toHaveBeenCalledWith(
         mockCandidates,
@@ -244,14 +208,14 @@ describe('generateSuggestions', () => {
   });
 
   describe('graceful degradation', () => {
-    it('should fall back to memo only when content analysis fails', async () => {
+    it('should return an empty array when content analysis fails', async () => {
       mocks.analyzeContentMock.mockRejectedValue(
         new Error('AI service unavailable'),
       );
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
-      expect(result).toEqual([memoSuggestion]);
+      expect(result).toEqual([]);
       expect(mocks.retrieveSearchCandidatesMock).not.toHaveBeenCalled();
       expect(mocks.evaluateCandidatesMock).not.toHaveBeenCalled();
       expect(mocks.generateCategorySuggestionMock).not.toHaveBeenCalled();
@@ -262,24 +226,26 @@ describe('generateSuggestions', () => {
         new Error('AI service unavailable'),
       );
 
-      await callGenerateSuggestions();
+      await callOneshotEngine();
 
       expect(mocks.loggerErrorMock).toHaveBeenCalled();
     });
 
-    it('should fall back to memo only when search candidate retrieval fails', async () => {
+    it('should return an empty array when search candidate retrieval fails', async () => {
       mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
       mocks.retrieveSearchCandidatesMock.mockRejectedValue(
         new Error('Search service down'),
       );
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
-      expect(result).toEqual([memoSuggestion]);
+      expect(result).toEqual([]);
+      expect(mocks.evaluateCandidatesMock).not.toHaveBeenCalled();
+      expect(mocks.generateCategorySuggestionMock).not.toHaveBeenCalled();
       expect(mocks.loggerErrorMock).toHaveBeenCalled();
     });
 
-    it('should return memo + category when candidate evaluation fails', async () => {
+    it('should return category only when candidate evaluation fails', async () => {
       mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
       mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
       mocks.evaluateCandidatesMock.mockRejectedValue(
@@ -289,13 +255,13 @@ describe('generateSuggestions', () => {
         categorySuggestion,
       );
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
-      expect(result).toEqual([memoSuggestion, categorySuggestion]);
+      expect(result).toEqual([categorySuggestion]);
       expect(mocks.loggerErrorMock).toHaveBeenCalled();
     });
 
-    it('should return memo + search when category generation fails', async () => {
+    it('should return search suggestions only when category generation fails', async () => {
       mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
       mocks.retrieveSearchCandidatesMock.mockResolvedValue(mockCandidates);
       mocks.evaluateCandidatesMock.mockResolvedValue(mockEvaluated);
@@ -304,35 +270,25 @@ describe('generateSuggestions', () => {
         new Error('Category failed'),
       );
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
-      expect(result).toHaveLength(3); // memo + 2 search (no category)
-      expect(result[0]).toEqual(memoSuggestion);
+      expect(result).toHaveLength(2); // 2 search (no category)
+      expect(result[0]).toMatchObject({ type: 'search' });
       expect(result[1]).toMatchObject({ type: 'search' });
-      expect(result[2]).toMatchObject({ type: 'search' });
       expect(mocks.loggerErrorMock).toHaveBeenCalled();
     });
 
-    it('should return memo only when both search pipeline and category fail', async () => {
-      mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
-      mocks.retrieveSearchCandidatesMock.mockRejectedValue(
-        new Error('Search down'),
-      );
-
-      const result = await callGenerateSuggestions();
-
-      expect(result).toEqual([memoSuggestion]);
-    });
-
-    it('should skip search suggestions when no candidates pass threshold (empty array)', async () => {
+    it('should skip candidate evaluation when no candidates pass threshold (empty array)', async () => {
       mocks.analyzeContentMock.mockResolvedValue(mockAnalysis);
       mocks.retrieveSearchCandidatesMock.mockResolvedValue([]);
       mocks.generateCategorySuggestionMock.mockResolvedValue(null);
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
-      expect(result).toEqual([memoSuggestion]);
+      expect(result).toEqual([]);
       expect(mocks.evaluateCandidatesMock).not.toHaveBeenCalled();
+      // Category generation still receives the (empty) candidates, as in the original pipeline
+      expect(mocks.generateCategorySuggestionMock).toHaveBeenCalledWith([]);
     });
 
     it('should omit category when generateCategorySuggestion returns null', async () => {
@@ -342,9 +298,9 @@ describe('generateSuggestions', () => {
       mocks.resolveParentGrantMock.mockResolvedValue(1);
       mocks.generateCategorySuggestionMock.mockResolvedValue(null);
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
-      expect(result).toHaveLength(3); // memo + 2 search, no category
+      expect(result).toHaveLength(2); // 2 search, no category
       expect(result.every((s) => s.type !== 'category')).toBe(true);
     });
   });
@@ -361,7 +317,7 @@ describe('generateSuggestions', () => {
       mocks.resolveParentGrantMock.mockResolvedValue(1);
       mocks.generateCategorySuggestionMock.mockResolvedValue(null);
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
       const searchSuggestion = result.find((s) => s.type === 'search');
       expect(searchSuggestion?.informationType).toBe('flow');
@@ -379,9 +335,9 @@ describe('generateSuggestions', () => {
         categorySuggestion,
       );
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
-      expect(result).toEqual([memoSuggestion, categorySuggestion]);
+      expect(result).toEqual([categorySuggestion]);
     });
 
     it('should return search suggestions even when category fails', async () => {
@@ -393,7 +349,7 @@ describe('generateSuggestions', () => {
         new Error('Category failed'),
       );
 
-      const result = await callGenerateSuggestions();
+      const result = await callOneshotEngine();
 
       const searchSuggestions = result.filter((s) => s.type === 'search');
       expect(searchSuggestions).toHaveLength(2);

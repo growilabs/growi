@@ -11,6 +11,14 @@ export const SuggestionType = {
 export type SuggestionType =
   (typeof SuggestionType)[keyof typeof SuggestionType];
 
+export const SuggestPathEngineId = {
+  ONESHOT: 'oneshot',
+  AGENTIC: 'agentic',
+} as const;
+
+export type SuggestPathEngineId =
+  (typeof SuggestPathEngineId)[keyof typeof SuggestPathEngineId];
+
 export type PathSuggestion = {
   type: SuggestionType;
   path: string;

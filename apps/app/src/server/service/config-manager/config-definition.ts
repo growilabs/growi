@@ -284,6 +284,15 @@ export const CONFIG_KEYS = [
   // OpenAI Settings
   'openai:serviceType',
   'openai:apiKey',
+  'openai:assistantModel:mastraAgent',
+  'openai:assistantModel:suggestPathAgent',
+  'openai:reasoningEffort:suggestPathAgent',
+
+  // AI Tools Settings
+  'aiTools:suggestPathEngine',
+  'aiTools:suggestPathAgenticSearchLimit',
+  'aiTools:suggestPathAgenticChildListingLimit',
+  'aiTools:suggestPathAgenticTimeoutMs',
 
   // Mastra LLM Settings (provider-agnostic: one provider per app)
   'ai:provider',
@@ -1326,6 +1335,38 @@ export const CONFIG_DEFINITIONS = {
   'ai:azureOpenaiSettings': defineConfig<AzureOpenaiConfig | undefined>({
     envVarName: 'AI_AZURE_OPENAI_SETTINGS',
     defaultValue: {},
+  }),
+  'openai:assistantModel:suggestPathAgent': defineConfig<string>({
+    envVarName: 'OPENAI_SUGGEST_PATH_AGENT_MODEL',
+    defaultValue: 'gpt-4.1-mini',
+  }),
+  // Empty string means "unset": the engine passes no reasoning effort to the
+  // provider, leaving the model's default behavior unchanged. A non-empty
+  // value (e.g. 'minimal' | 'low' | 'medium' | 'high') is forwarded verbatim;
+  // value validity per model is left to the provider, not pinned here.
+  'openai:reasoningEffort:suggestPathAgent': defineConfig<string>({
+    envVarName: 'OPENAI_SUGGEST_PATH_AGENT_REASONING_EFFORT',
+    defaultValue: '',
+  }),
+
+  // AI Tools Settings
+  // The default engine stays 'oneshot' until the agentic engine passes
+  // A/B validation (suggest-path-agentic spec, Requirement 5.6).
+  'aiTools:suggestPathEngine': defineConfig<'oneshot' | 'agentic'>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_ENGINE',
+    defaultValue: 'oneshot',
+  }),
+  'aiTools:suggestPathAgenticSearchLimit': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT',
+    defaultValue: 5,
+  }),
+  'aiTools:suggestPathAgenticChildListingLimit': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_CHILD_LISTING_LIMIT',
+    defaultValue: 5,
+  }),
+  'aiTools:suggestPathAgenticTimeoutMs': defineConfig<number>({
+    envVarName: 'AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS',
+    defaultValue: 60_000,
   }),
 
   // OpenTelemetry Settings

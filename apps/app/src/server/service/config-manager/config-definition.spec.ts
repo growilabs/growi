@@ -184,6 +184,89 @@ describe('config-definition resilience keys', () => {
   });
 });
 
+describe('config-definition suggest-path agentic keys', () => {
+  describe('CONFIG_KEYS array', () => {
+    it('contains aiTools:suggestPathEngine', () => {
+      expect(CONFIG_KEYS).toContain('aiTools:suggestPathEngine');
+    });
+
+    it('contains aiTools:suggestPathAgenticSearchLimit', () => {
+      expect(CONFIG_KEYS).toContain('aiTools:suggestPathAgenticSearchLimit');
+    });
+
+    it('contains aiTools:suggestPathAgenticTimeoutMs', () => {
+      expect(CONFIG_KEYS).toContain('aiTools:suggestPathAgenticTimeoutMs');
+    });
+
+    it('contains openai:assistantModel:suggestPathAgent', () => {
+      expect(CONFIG_KEYS).toContain('openai:assistantModel:suggestPathAgent');
+    });
+  });
+
+  describe('CONFIG_DEFINITIONS defaults', () => {
+    describe('aiTools:suggestPathEngine', () => {
+      it("has default value of 'oneshot'", () => {
+        expect(
+          CONFIG_DEFINITIONS['aiTools:suggestPathEngine'].defaultValue,
+        ).toBe('oneshot');
+      });
+
+      it('has envVarName AI_TOOLS_SUGGEST_PATH_ENGINE', () => {
+        expect(CONFIG_DEFINITIONS['aiTools:suggestPathEngine'].envVarName).toBe(
+          'AI_TOOLS_SUGGEST_PATH_ENGINE',
+        );
+      });
+    });
+
+    describe('aiTools:suggestPathAgenticSearchLimit', () => {
+      it('has default value of 5', () => {
+        expect(
+          CONFIG_DEFINITIONS['aiTools:suggestPathAgenticSearchLimit']
+            .defaultValue,
+        ).toBe(5);
+      });
+
+      it('has envVarName AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT', () => {
+        expect(
+          CONFIG_DEFINITIONS['aiTools:suggestPathAgenticSearchLimit']
+            .envVarName,
+        ).toBe('AI_TOOLS_SUGGEST_PATH_AGENTIC_SEARCH_LIMIT');
+      });
+    });
+
+    describe('aiTools:suggestPathAgenticTimeoutMs', () => {
+      it('has default value of 60000', () => {
+        expect(
+          CONFIG_DEFINITIONS['aiTools:suggestPathAgenticTimeoutMs']
+            .defaultValue,
+        ).toBe(60_000);
+      });
+
+      it('has envVarName AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS', () => {
+        expect(
+          CONFIG_DEFINITIONS['aiTools:suggestPathAgenticTimeoutMs'].envVarName,
+        ).toBe('AI_TOOLS_SUGGEST_PATH_AGENTIC_TIMEOUT_MS');
+      });
+    });
+
+    describe('openai:assistantModel:suggestPathAgent', () => {
+      it("has default value of 'gpt-4.1-mini'", () => {
+        expect(
+          CONFIG_DEFINITIONS['openai:assistantModel:suggestPathAgent']
+            .defaultValue,
+        ).toBe('gpt-4.1-mini');
+      });
+
+      it('has envVarName OPENAI_SUGGEST_PATH_AGENT_MODEL', () => {
+        expect(
+          CONFIG_DEFINITIONS['openai:assistantModel:suggestPathAgent']
+            .envVarName,
+        ).toBe('OPENAI_SUGGEST_PATH_AGENT_MODEL');
+      });
+    });
+  });
+});
+
 describe('config-definition multi-llm-provider keys', () => {
   describe('CONFIG_KEYS array', () => {
     it('contains ai:provider', () => {

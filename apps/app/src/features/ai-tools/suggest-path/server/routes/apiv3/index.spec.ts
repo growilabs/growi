@@ -1,4 +1,5 @@
 import type { Request, RequestHandler } from 'express';
+import { type ValidationChain, validationResult } from 'express-validator';
 import type { Mock } from 'vitest';
 
 import type Crowi from '~/server/crowi';
@@ -77,6 +78,51 @@ describe('suggestPathHandlersFactory', () => {
       const { suggestPathHandlersFactory } = await import('.');
       const handlers = suggestPathHandlersFactory(mockCrowi);
       expect(handlers).toContain(mocks.certifyAiServiceMock);
+    });
+  });
+
+  describe('engine parameter validation', () => {
+    // Runs the real express-validator chains contained in the middleware
+    // chain against a bare request body and returns the validation result
+    // (which apiV3FormValidator maps to a 400 response in the real pipeline)
+    const runValidation = async (reqBody: Record<string, unknown>) => {
+      const { suggestPathHandlersFactory } = await import('.');
+      const handlers = suggestPathHandlersFactory(mockCrowi);
+      const chains = handlers.filter(
+        (handler): handler is ValidationChain => 'run' in handler,
+      );
+      const req = { body: reqBody };
+      await Promise.all(chains.map((chain) => chain.run(req)));
+      return validationResult(req);
+    };
+
+    it('should produce a validation error for an invalid engine value', async () => {
+      const result = await runValidation({
+        body: 'Some page content',
+        engine: 'invalid-engine',
+      });
+
+      expect(result.isEmpty()).toBe(false);
+      // express-validator v6 error shape: the offending field is in `param`
+      expect(result.array().some((err) => err.param === 'engine')).toBe(true);
+    });
+
+    it('should accept a request without engine (backward compatibility)', async () => {
+      const result = await runValidation({ body: 'Some page content' });
+
+      expect(result.isEmpty()).toBe(true);
+    });
+
+    it.each([
+      'oneshot',
+      'agentic',
+    ])('should accept engine=%s', async (engine) => {
+      const result = await runValidation({
+        body: 'Some page content',
+        engine,
+      });
+
+      expect(result.isEmpty()).toBe(true);
     });
   });
 
@@ -177,6 +223,43 @@ describe('suggestPathHandlersFactory', () => {
 
       const call = mocks.generateSuggestionsMock.mock.calls[0];
       expect(call[2]).toEqual(['g1', 'g2', 'eg1']);
+    });
+
+    it.each([
+      'oneshot',
+      'agentic',
+    ])('should forward engine=%s to generateSuggestions options', async (engine) => {
+      mocks.generateSuggestionsMock.mockResolvedValue([]);
+
+      const { suggestPathHandlersFactory } = await import('.');
+      const handlers = suggestPathHandlersFactory(mockCrowi);
+      const handler = handlers[handlers.length - 1] as RequestHandler;
+
+      const { req, res } = createMockReqRes();
+      req.body.engine = engine;
+      await handler(req, res, vi.fn());
+
+      expect(mocks.generateSuggestionsMock).toHaveBeenCalledWith(
+        { _id: 'user123', username: 'alice' },
+        'Some page content',
+        ['group1', 'extGroup1'],
+        mockSearchService,
+        { engine },
+      );
+    });
+
+    it('should not pass an engine option when engine is omitted', async () => {
+      mocks.generateSuggestionsMock.mockResolvedValue([]);
+
+      const { suggestPathHandlersFactory } = await import('.');
+      const handlers = suggestPathHandlersFactory(mockCrowi);
+      const handler = handlers[handlers.length - 1] as RequestHandler;
+
+      const { req, res } = createMockReqRes();
+      await handler(req, res, vi.fn());
+
+      const options = mocks.generateSuggestionsMock.mock.calls[0][4];
+      expect(options?.engine).toBeUndefined();
     });
   });
 });
