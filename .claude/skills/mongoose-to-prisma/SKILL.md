@@ -104,11 +104,9 @@ Read `apps/app/prisma/schema.prisma` and check for the collection entry (use low
 4. **Relations**: verify each relation field uses `onDelete: NoAction, onUpdate: NoAction`.
    Mongoose has no referential integrity enforcement; this is the Mongoose-compatible default.
 5. **Sparse index check**: if the Mongoose schema declares `{ sparse: true }` on any index, flag it:
-   > ⚠️ Prisma does not support sparse indexes. Choose one:
-   > a. Keep this index managed by Mongoose only (add a comment in `schema.prisma`, do not declare the index there)
-   > b. Remove the sparse constraint and add application-level null-filtering to the queries that use this index
+   > ⚠️ Prisma does not support sparse indexes. Create the index directly via a `migrate-mongo` migration using the native MongoDB driver (`collection.createIndex({ ... }, { sparse: true })`), following the precedent in `apps/app/src/migrations/20220411114257-set-sparse-option-to-slack-member-id.js`. A sparse index is a database-level property, independent of Mongoose/Prisma — once created this way it keeps applying to every write (Mongoose or Prisma) and survives the eventual full removal of Mongoose. Add a comment in `schema.prisma` noting the index is sparse and managed by a migration, not by Prisma, so a future `prisma db push` doesn't attempt to recreate it without the sparse flag.
 
-   Wait for the developer to choose before proceeding.
+   Show the proposed migration file before writing. Wait for approval before proceeding.
 
 If `schema.prisma` needs changes, show a diff of the proposed additions and wait for approval before writing.
 
@@ -393,7 +391,7 @@ Remaining TODOs:
   - Run pnpm prisma generate to regenerate types (if schema.prisma was changed)
   - Add .$extends(extension) to apps/app/src/utils/prisma.ts to activate the new extension
   - <source file> Mongoose schema block to be removed after all models have been migrated
-  - [sparse index alternative handling (if applicable)]
+  - [run the sparse-index migration created in Step 2 (if applicable)]
 ```
 
 ---
