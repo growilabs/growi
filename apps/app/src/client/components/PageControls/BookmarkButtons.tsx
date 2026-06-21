@@ -2,12 +2,10 @@ import type { FC } from 'react';
 import React, { useCallback, useState } from 'react';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
-import {
-  DropdownToggle,
-  Popover,
-  PopoverBody,
-  UncontrolledTooltip,
-} from 'reactstrap';
+import DropdownToggle from 'reactstrap/esm/DropdownToggle';
+import Popover from 'reactstrap/esm/Popover';
+import PopoverBody from 'reactstrap/esm/PopoverBody';
+import UncontrolledTooltip from 'reactstrap/esm/UncontrolledTooltip';
 
 import { useIsGuestUser } from '~/states/context';
 import { useSWRxBookmarkedUsers } from '~/stores/bookmark';

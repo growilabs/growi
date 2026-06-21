@@ -38,7 +38,7 @@ vi.mock('next/router', () => ({
 // Component under test (imported AFTER mocks are in place)
 // ---------------------------------------------------------------------------
 
-import { UserPicture } from './UserPicture.js';
+import { UserPicture } from './UserPicture';
 
 // ---------------------------------------------------------------------------
 // Helpers

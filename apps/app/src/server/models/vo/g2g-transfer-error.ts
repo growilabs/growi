@@ -1,4 +1,4 @@
-import { ExtensibleCustomError } from '~/server/util/extensible-custom-error';
+import ExtensibleCustomError from 'extensible-custom-error';
 
 export const G2GTransferErrorCode = {
   INVALID_TRANSFER_KEY_STRING: 'INVALID_TRANSFER_KEY_STRING',

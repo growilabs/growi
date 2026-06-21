@@ -19,11 +19,7 @@ export default defineConfig({
   ],
   build: {
     outDir: 'dist',
-    // No source maps: @growi/logger is a small, private utility whose stack
-    // frames are noise relative to the caller's. Emitting external .map files
-    // also tripped @swc-node's ESM loader (spurious "failed to read input
-    // source map" errors in consumers run via @swc-node/register).
-    sourcemap: false,
+    sourcemap: true,
     lib: {
       entry: glob.sync(path.resolve(__dirname, 'src/**/*.ts'), {
         ignore: '**/*.spec.ts',

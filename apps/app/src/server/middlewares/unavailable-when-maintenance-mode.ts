@@ -21,9 +21,7 @@ type IMiddleware = (
 export const generateUnavailableWhenMaintenanceModeMiddleware = (
   crowi: Crowi,
 ): IMiddleware => {
-  // Named function so the route-middleware snapshot tool can identify this
-  // handler in the apiv3 auth chain.
-  return async function unavailableWhenMaintenanceMode(req, res, next) {
+  return async (req, res, next) => {
     const isMaintenanceMode = crowi.appService.isMaintenanceMode();
 
     if (!isMaintenanceMode) {
@@ -40,9 +38,7 @@ export const generateUnavailableWhenMaintenanceModeMiddleware = (
 export const generateUnavailableWhenMaintenanceModeMiddlewareForApi = (
   crowi: Crowi,
 ): IMiddleware => {
-  // Named function so the route-middleware snapshot tool can identify this
-  // handler in the apiv3 auth chain.
-  return async function unavailableWhenMaintenanceModeForApi(req, res, next) {
+  return async (req, res, next) => {
     const isMaintenanceMode = crowi.appService.isMaintenanceMode();
 
     if (!isMaintenanceMode) {

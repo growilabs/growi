@@ -41,4 +41,4 @@ ApiPaginate.parseOptions = (params) => {
   return { limit, offset };
 };
 
-export default ApiPaginate;
+module.exports = ApiPaginate;

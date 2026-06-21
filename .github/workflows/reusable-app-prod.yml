@@ -20,6 +20,9 @@ on:
       skip-e2e-test:
         type: boolean
         default: false
+    secrets:
+      SLACK_WEBHOOK_URL:
+        required: true
 
 jobs:
 
@@ -54,16 +57,6 @@ jobs:
       env:
         ANALYZE: 1
 
-    - name: Verify dist import resolution (C5)
-      working-directory: ./apps/app
-      run: |
-        node bin/verify-dist-resolution.ts dist
-
-    - name: Check import convention lint
-      working-directory: ./apps/app
-      run: |
-        node tools/lint/import-extension-guard.cjs src
-
     - name: Assemble production artifacts
       run: bash apps/app/bin/assemble-prod.sh
 
@@ -73,11 +66,6 @@ jobs:
     - name: Archive production files
       id: archive-prod-files
       run: |
-        # apps/app/bin/dev-esm-resolver.mjs is the native TS runner's resolve hook.
-        # It is required at runtime because `migrate:umzug` (run via preserver ->
-        # migrate before the prod server starts) executes prisma/migrate.ts with
-        # `node --import ./bin/dev-esm-resolver.mjs`. Only this single self-contained
-        # file from bin/ is needed (the rest of bin/ is build-time only).
         tar -zcf production.tar.gz --exclude ./apps/app/.next/cache \
           package.json \
           node_modules \
@@ -86,7 +74,6 @@ jobs:
           apps/app/config \
           apps/app/dist \
           apps/app/prisma \
-          apps/app/bin/dev-esm-resolver.mjs \
           apps/app/public \
           apps/app/resource \
           apps/app/tmp \

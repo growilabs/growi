@@ -1,8 +1,4 @@
-import ldap from 'ldapjs';
-
-// ldapjs is CJS and cjs-module-lexer cannot detect its named exports, so a
-// named import of NoSuchObjectError fails at runtime under native ESM.
-const { NoSuchObjectError } = ldap;
+import ldap, { NoSuchObjectError } from 'ldapjs';
 
 import loggerFactory from '~/utils/logger';
 

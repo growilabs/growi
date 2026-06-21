@@ -13,13 +13,7 @@ export const checkForgotPasswordEnabledMiddlewareFactory = (
   crowi: Crowi,
   forApi = false,
 ) => {
-  // Named function so the route-middleware snapshot tool can identify this
-  // handler in the apiv3 auth chain.
-  return function checkForgotPasswordEnabled(
-    req: Request,
-    res: Response,
-    next: NextFunction,
-  ): void {
+  return (req: Request, res: Response, next: NextFunction): void => {
     const isPasswordResetEnabled = crowi.configManager.getConfig(
       'security:passport-local:isPasswordResetEnabled',
     );

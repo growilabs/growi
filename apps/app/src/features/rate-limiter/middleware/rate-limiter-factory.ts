@@ -1,7 +1,4 @@
-// `connection` is a getter on the mongoose instance, not a static export, so
-// cjs-module-lexer cannot expose it as a named ESM export. Import the default
-// (the mongoose instance) and read `.connection` off it instead.
-import mongoose from 'mongoose';
+import { connection } from 'mongoose';
 import {
   type IRateLimiterMongoOptions,
   RateLimiterMongo,
@@ -19,7 +16,7 @@ class RateLimiterFactory {
     }
 
     const opts: IRateLimiterMongoOptions = {
-      storeClient: mongoose.connection,
+      storeClient: connection,
       duration: DEFAULT_DURATION_SEC,
       points: maxRequests,
     };

@@ -2,22 +2,24 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:non-null-granted-groups');
 
-export async function up(db, client) {
-  logger.info('Apply migration');
+module.exports = {
+  async up(db, client) {
+    logger.info('Apply migration');
 
-  const pageCollection = await db.collection('pages');
+    const pageCollection = await db.collection('pages');
 
-  await pageCollection.updateMany({ grantedGroups: { $eq: null } }, [
-    {
-      $set: {
-        grantedGroups: [],
+    await pageCollection.updateMany({ grantedGroups: { $eq: null } }, [
+      {
+        $set: {
+          grantedGroups: [],
+        },
       },
-    },
-  ]);
+    ]);
 
-  logger.info('Migration has successfully applied');
-}
+    logger.info('Migration has successfully applied');
+  },
 
-export async function down(db, client) {
-  // No rollback
-}
+  async down(db, client) {
+    // No rollback
+  },
+};

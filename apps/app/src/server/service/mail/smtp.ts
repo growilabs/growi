@@ -1,6 +1,6 @@
 import type { Transporter } from 'nodemailer';
 import nodemailer from 'nodemailer';
-import type SMTPTransport from 'nodemailer/lib/smtp-transport/index.js';
+import type SMTPTransport from 'nodemailer/lib/smtp-transport';
 
 import loggerFactory from '~/utils/logger';
 

@@ -1,2 +1,2 @@
-export { insertLinePrefix } from './insert-line-prefix.js';
-export { toggleMarkdownSymbol } from './toggle-markdown-symbol.js';
+export { insertLinePrefix } from './insert-line-prefix';
+export { toggleMarkdownSymbol } from './toggle-markdown-symbol';

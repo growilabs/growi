@@ -1,14 +1,14 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import type { GrowiTemplatePluginValidationData } from '../../../../model/index.js';
+import type { GrowiTemplatePluginValidationData } from '../../../../model';
 import {
   isTemplateStatusValid,
   type TemplateStatus,
   type TemplateSummary,
-} from '../../../interfaces/index.js';
-import { getStatus } from './get-status.js';
-import { validateTemplatePluginGrowiDirective } from './validate-growi-plugin-directive.js';
+} from '../../../interfaces';
+import { getStatus } from './get-status';
+import { validateTemplatePluginGrowiDirective } from './validate-growi-plugin-directive';
 
 export const scanTemplate = async (
   projectDirRoot: string,

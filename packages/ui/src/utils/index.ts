@@ -1,3 +1,3 @@
-export * from './browser-utils.js';
-export * from './use-fullscreen.js';
-export * from './use-rect.js';
+export * from './browser-utils';
+export * from './use-fullscreen';
+export * from './use-rect';

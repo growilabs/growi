@@ -19,8 +19,8 @@ import { checkForgotPasswordEnabledMiddlewareFactory } from '../forgot-password'
 
 const logger = loggerFactory('growi:routes:apiv3:forgotPassword');
 
-import express from 'express';
-import { body } from 'express-validator';
+const express = require('express');
+const { body } = require('express-validator');
 
 /**
  * @swagger
@@ -44,11 +44,8 @@ import { body } from 'express-validator';
 
 const router = express.Router();
 
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
   const { appService, mailService } = crowi;
   const { User } = crowi.models;
 

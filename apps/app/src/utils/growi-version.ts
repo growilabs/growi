@@ -1,4 +1,4 @@
-import pkg from '^/package.json' with { type: 'json' };
+import pkg from '^/package.json';
 
 export const getGrowiVersion = (): string => {
   return pkg.version;

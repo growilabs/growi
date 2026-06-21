@@ -1,12 +1,9 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { Router } from 'express';
-import express from 'express';
 import { body } from 'express-validator';
 import type { Types } from 'mongoose';
 
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
-import type { CrowiRequest } from '~/interfaces/crowi-request';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
@@ -20,9 +17,9 @@ import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-
 import loggerFactory from '~/utils/logger';
 
 import BookmarkFolder from '../../models/bookmark-folder';
-import type { ApiV3Response } from './interfaces/apiv3-response';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmark-folder');
+const express = require('express');
 
 const router = express.Router();
 
@@ -141,7 +138,7 @@ const validator = {
   ],
 };
 
-export const setup = (crowi: Crowi): Router => {
+module.exports = (crowi: Crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   /**
@@ -185,17 +182,8 @@ export const setup = (crowi: Crowi): Router => {
     loginRequiredStrictly,
     validator.bookmarkFolder,
     apiV3FormValidator,
-    async (req: CrowiRequest, res: ApiV3Response) => {
-      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
-      if (req.user == null) {
-        return res.apiv3Err(
-          new ErrorV3(
-            'param "user" must be set.',
-            'failed_to_create_bookmark_folder',
-          ),
-        );
-      }
-      const owner = req.user._id;
+    async (req, res) => {
+      const owner = req.user?._id;
       const { name, parent } = req.body;
       const params = {
         name,
@@ -255,7 +243,7 @@ export const setup = (crowi: Crowi): Router => {
     '/list/:userId',
     accessTokenParser([SCOPE.READ.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
-    async (req: CrowiRequest, res: ApiV3Response) => {
+    async (req, res) => {
       const { userId } = req.params;
 
       const getBookmarkFolders = async (
@@ -356,15 +344,8 @@ export const setup = (crowi: Crowi): Router => {
     '/:id',
     accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
-    async (req: CrowiRequest, res: ApiV3Response) => {
+    async (req, res) => {
       const { id } = req.params;
-      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
-      if (req.user == null) {
-        return res.apiv3Err(
-          new ErrorV3('param "user" must be set.', 'forbidden'),
-          403,
-        );
-      }
       try {
         const result = await BookmarkFolder.deleteFolderAndChildren(
           id,
@@ -434,7 +415,7 @@ export const setup = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
     validator.bookmarkFolder,
-    async (req: CrowiRequest, res: ApiV3Response) => {
+    async (req, res) => {
       const { bookmarkFolderId, name, parent, childFolder } = req.body;
       try {
         const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(
@@ -493,15 +474,8 @@ export const setup = (crowi: Crowi): Router => {
     loginRequiredStrictly,
     validator.bookmarkPage,
     apiV3FormValidator,
-    async (req: CrowiRequest, res: ApiV3Response) => {
-      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
-      if (req.user == null) {
-        return res.apiv3Err(
-          new ErrorV3('param "user" must be set.', 'forbidden'),
-          403,
-        );
-      }
-      const userId = req.user._id;
+    async (req, res) => {
+      const userId = req.user?._id;
       const { pageId, folderId } = req.body;
 
       try {
@@ -560,16 +534,9 @@ export const setup = (crowi: Crowi): Router => {
     accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
     validator.bookmark,
-    async (req: CrowiRequest, res: ApiV3Response) => {
+    async (req, res) => {
       const { pageId, status } = req.body;
-      // loginRequiredStrictly guarantees req.user at runtime; guard narrows the type
-      if (req.user == null) {
-        return res.apiv3Err(
-          new ErrorV3('param "user" must be set.', 'forbidden'),
-          403,
-        );
-      }
-      const userId = req.user._id;
+      const userId = req.user?._id;
       try {
         const bookmarkFolder = await BookmarkFolder.updateBookmark(
           pageId,

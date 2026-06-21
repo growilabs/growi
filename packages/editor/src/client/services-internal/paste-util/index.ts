@@ -1,1 +1,1 @@
-export * from './paste-markdown-util.js';
+export * from './paste-markdown-util';

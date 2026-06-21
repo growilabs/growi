@@ -4,7 +4,6 @@ import { query } from 'express-validator';
 
 import type Crowi from '~/server/crowi';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
-import { setup as certifySharedPageFactory } from '~/server/middlewares/certify-shared-page';
 import { rejectLinkSharingDisabled } from '~/server/middlewares/reject-link-sharing-disabled';
 import { configManager } from '~/server/service/config-manager';
 import { findPageAndMetaDataByViewer } from '~/server/service/page/find-page-and-meta-data-by-viewer';
@@ -68,7 +67,9 @@ export const getPageByShareLinkHandlerFactory = (
   crowi: Crowi,
 ): RequestHandler[] => {
   const { pageService, pageGrantService } = crowi;
-  const certifySharedPage = certifySharedPageFactory(crowi);
+  const certifySharedPage = require('../../../middlewares/certify-shared-page')(
+    crowi,
+  );
 
   const validator = [
     query('shareLinkId').isMongoId().withMessage('shareLinkId is required'),

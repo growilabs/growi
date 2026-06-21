@@ -1,6 +1,6 @@
 import path from 'node:path';
 
-import { importPackageJson } from './import-package-json.js';
+import { importPackageJson } from './import-package-json';
 
 it('importPackageJson() returns an object', async () => {
   // when

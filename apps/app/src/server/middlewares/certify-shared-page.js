@@ -4,10 +4,8 @@ import loggerFactory from '~/utils/logger';
 const logger = loggerFactory('growi:middleware:certify-shared-page');
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-export const setup = (crowi) => {
-  // Named function so the route-middleware snapshot tool can identify this
-  // handler in the apiv3 auth chain.
-  return async function certifySharedPage(req, res, next) {
+module.exports = (crowi) => {
+  return async (req, res, next) => {
     const pageId = req.query.pageId || req.body.pageId || null;
     const shareLinkId = req.query.shareLinkId || req.body.shareLinkId || null;
     if (pageId == null || shareLinkId == null) {

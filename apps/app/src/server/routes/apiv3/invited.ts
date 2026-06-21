@@ -6,7 +6,6 @@ import mongoose from 'mongoose';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../../crowi';
-import { setup as applicationInstalledSetup } from '../../middlewares/application-installed';
 import {
   invitedRules,
   invitedValidation,
@@ -17,8 +16,9 @@ const logger = loggerFactory('growi:routes:login');
 
 type InvitedFormRequest = Request & { form: any; user: any };
 
-export const setup = (crowi: Crowi): Router => {
-  const applicationInstalled = applicationInstalledSetup(crowi);
+module.exports = (crowi: Crowi): Router => {
+  const applicationInstalled =
+    require('../../middlewares/application-installed')(crowi);
   const router = express.Router();
 
   /**

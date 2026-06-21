@@ -1,4 +1,4 @@
-import { SCOPE, type Scope } from './scope.js';
+import { SCOPE, type Scope } from './scope';
 
 /**
  * Helper to extract all scope strings from the SCOPE constant

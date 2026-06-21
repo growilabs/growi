@@ -1,5 +1,5 @@
 import styles from './use-unified-merge-view.module.scss';
 
-export * from './use-unified-merge-view.js';
+export * from './use-unified-merge-view';
 export const codemirrorEditorClassForUnifiedMergeView =
   styles['codemirror-editor'];

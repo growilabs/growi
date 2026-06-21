@@ -7,16 +7,13 @@ import loggerFactory from '~/utils/logger';
 
 const _logger = loggerFactory('growi:routes:apiv3:mongo');
 
-import express from 'express';
-import mongoose from 'mongoose';
+const express = require('express');
+const mongoose = require('mongoose');
 
 const router = express.Router();
 
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
 

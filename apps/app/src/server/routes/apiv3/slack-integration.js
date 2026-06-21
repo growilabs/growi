@@ -22,31 +22,25 @@ import { checkPermission } from '../../util/slack-integration';
 
 const logger = loggerFactory('growi:routes:apiv3:slack-integration');
 const router = express.Router();
+const SlackAppIntegration = mongoose.model('SlackAppIntegration');
 
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
+// Capture the raw request body string so that verifySlackRequest can recompute
+// the Slack signature for Events API payloads (which include `event`).
+// Scoped to this router only — globally injecting `req.rawBody` would put every
+// request stream into flowing mode and disturb streaming endpoints elsewhere.
+router.use((req, _res, next) => {
+  if (!req.is('multipart/form-data')) {
+    req.rawBody = '';
+    req.on('data', (chunk) => {
+      req.rawBody += chunk;
+    });
+  }
+  next();
+});
+
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
   const { slackIntegrationService } = crowi;
-
-  // Resolved inside setup: model lookup at import time would run before
-  // crowi registers the mongoose models (ESM imports are hoisted to boot).
-  const SlackAppIntegration = mongoose.model('SlackAppIntegration');
-
-  // Capture the raw request body string so that verifySlackRequest can recompute
-  // the Slack signature for Events API payloads (which include `event`).
-  // Scoped to this router only — globally injecting `req.rawBody` would put every
-  // request stream into flowing mode and disturb streaming endpoints elsewhere.
-  router.use((req, _res, next) => {
-    if (!req.is('multipart/form-data')) {
-      req.rawBody = '';
-      req.on('data', (chunk) => {
-        req.rawBody += chunk;
-      });
-    }
-    next();
-  });
 
   // Check if the access token is correct
   async function verifyAccessTokenFromProxy(req, res, next) {

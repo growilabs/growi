@@ -18,92 +18,99 @@ const logger = loggerFactory(
 
 const LIMIT = 300;
 
-export async function up(db, client) {
-  await mongoose.connect(getMongoUri(), mongoOptions);
-  const Page = getModelSafely('Page') || getPageModel();
+/**
+ * @see https://dev.growi.org/69301054963f68dfcf2b7111
+ */
+module.exports = {
+  // path => pageId
+  async up(db, client) {
+    await mongoose.connect(getMongoUri(), mongoOptions);
+    const Page = getModelSafely('Page') || getPageModel();
 
-  const pagesStream = await Page.find(
-    { revision: { $ne: null } },
-    { _id: 1, path: 1 },
-  ).cursor({ batch_size: LIMIT });
-  const batchStrem = createBatchStream(LIMIT);
+    const pagesStream = await Page.find(
+      { revision: { $ne: null } },
+      { _id: 1, path: 1 },
+    ).cursor({ batch_size: LIMIT });
+    const batchStrem = createBatchStream(LIMIT);
 
-  const migratePagesStream = new Writable({
-    objectMode: true,
-    async write(pages, _encoding, callback) {
-      const updateManyOperations = pages.map((page) => {
-        return {
-          updateMany: {
-            filter: {
-              $and: [{ path: page.path }, { pageId: { $exists: false } }],
+    const migratePagesStream = new Writable({
+      objectMode: true,
+      async write(pages, _encoding, callback) {
+        const updateManyOperations = pages.map((page) => {
+          return {
+            updateMany: {
+              filter: {
+                $and: [{ path: page.path }, { pageId: { $exists: false } }],
+              },
+              update: [
+                {
+                  $unset: ['path'],
+                },
+                {
+                  $set: { pageId: page._id },
+                },
+              ],
             },
-            update: [
-              {
-                $unset: ['path'],
+          };
+        });
+
+        await Revision.bulkWrite(updateManyOperations, { strict: false });
+
+        callback();
+      },
+      final(callback) {
+        callback();
+      },
+    });
+
+    await pipeline(pagesStream, batchStrem, migratePagesStream);
+
+    logger.info('Migration has successfully applied');
+  },
+
+  // pageId => path
+  async down(db, client) {
+    await mongoose.connect(getMongoUri(), mongoOptions);
+    const Page = getModelSafely('Page') || getPageModel();
+
+    const pagesStream = await Page.find(
+      { revision: { $ne: null } },
+      { _id: 1, path: 1 },
+    ).cursor({ batch_size: LIMIT });
+    const batchStrem = createBatchStream(LIMIT);
+
+    const migratePagesStream = new Writable({
+      objectMode: true,
+      async write(pages, _encoding, callback) {
+        const updateManyOperations = pages.map((page) => {
+          return {
+            updateMany: {
+              filter: {
+                $and: [{ pageId: page._id }, { path: { $exists: false } }],
               },
-              {
-                $set: { pageId: page._id },
-              },
-            ],
-          },
-        };
-      });
-
-      await Revision.bulkWrite(updateManyOperations, { strict: false });
-
-      callback();
-    },
-    final(callback) {
-      callback();
-    },
-  });
-
-  await pipeline(pagesStream, batchStrem, migratePagesStream);
-
-  logger.info('Migration has successfully applied');
-}
-
-export async function down(db, client) {
-  await mongoose.connect(getMongoUri(), mongoOptions);
-  const Page = getModelSafely('Page') || getPageModel();
-
-  const pagesStream = await Page.find(
-    { revision: { $ne: null } },
-    { _id: 1, path: 1 },
-  ).cursor({ batch_size: LIMIT });
-  const batchStrem = createBatchStream(LIMIT);
-
-  const migratePagesStream = new Writable({
-    objectMode: true,
-    async write(pages, _encoding, callback) {
-      const updateManyOperations = pages.map((page) => {
-        return {
-          updateMany: {
-            filter: {
-              $and: [{ pageId: page._id }, { path: { $exists: false } }],
+              update: [
+                {
+                  $unset: ['pageId'],
+                },
+                {
+                  $set: { path: page.path },
+                },
+              ],
             },
-            update: [
-              {
-                $unset: ['pageId'],
-              },
-              {
-                $set: { path: page.path },
-              },
-            ],
-          },
-        };
-      });
+          };
+        });
 
-      await Revision.bulkWrite(updateManyOperations, { strict: false });
+        await Revision.bulkWrite(updateManyOperations, { strict: false });
 
-      callback();
-    },
-    final(callback) {
-      callback();
-    },
-  });
+        callback();
+      },
+      final(callback) {
+        callback();
+      },
+    });
 
-  await pipeline(pagesStream, batchStrem, migratePagesStream);
+    await pipeline(pagesStream, batchStrem, migratePagesStream);
 
-  logger.info('Migration down has successfully applied');
-}
+    logger.info('Migration down has successfully applied');
+  },
+};

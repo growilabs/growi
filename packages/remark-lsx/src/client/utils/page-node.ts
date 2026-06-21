@@ -5,8 +5,8 @@ import {
   removeTrailingSlash,
 } from '@growi/core/dist/utils/path-utils';
 
-import type { PageNode } from '../../interfaces/page-node.js';
-import { getDepthOfPath } from '../../utils/depth-utils.js';
+import type { PageNode } from '../../interfaces/page-node';
+import { getDepthOfPath } from '../../utils/depth-utils';
 
 function getParentPath(path: string) {
   return removeTrailingSlash(decodeURIComponent(getParentPathCore(path)));

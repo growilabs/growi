@@ -1,6 +1,6 @@
 import { OptionParser } from '@growi/core/dist/remark-plugins';
 
-import { parseNumOption } from './parse-num-option.js';
+import { parseNumOption } from './parse-num-option';
 
 describe('addNumCondition()', () => {
   it('set limit with the specified number', () => {

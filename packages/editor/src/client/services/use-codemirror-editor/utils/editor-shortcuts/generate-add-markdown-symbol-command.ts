@@ -1,7 +1,7 @@
 import type { Command } from '@codemirror/view';
 
-import type { InsertMarkdownElements } from '../insert-markdown-elements.js';
-import type { InsertPrefix } from '../insert-prefix.js';
+import type { InsertMarkdownElements } from '../insert-markdown-elements';
+import type { InsertPrefix } from '../insert-prefix';
 
 export const generateAddMarkdownSymbolCommand = (
   insertMarkdown: InsertMarkdownElements | InsertPrefix,

@@ -4,9 +4,9 @@ import { GrowiPluginType, isGrowiThemeMetadata } from '@growi/core';
 import type {
   GrowiPluginValidationData,
   GrowiThemePluginValidationData,
-} from '../../../../model/index.js';
-import { GrowiPluginValidationError } from '../../../../model/index.js';
-import { validateGrowiDirective } from '../common/index.js';
+} from '../../../../model';
+import { GrowiPluginValidationError } from '../../../../model';
+import { validateGrowiDirective } from '../common';
 
 /**
  * An utility for theme plugin which wrap 'validateGrowiDirective' of './common' module

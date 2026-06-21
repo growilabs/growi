@@ -1,4 +1,3 @@
-import * as diff from 'diff';
 import urljoin from 'url-join';
 
 import loggerFactory from '~/utils/logger';
@@ -36,6 +35,7 @@ const prepareAttachmentTextForUpdate = (page, siteUrl, previousRevision) => {
     return;
   }
 
+  const diff = require('diff');
   let diffText = '';
 
   diff.diffLines(previousRevision.body, page.revision.body).forEach((line) => {

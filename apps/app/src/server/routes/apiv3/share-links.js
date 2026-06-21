@@ -17,9 +17,11 @@ const logger = loggerFactory('growi:routes:apiv3:share-links');
 
 const router = express.Router();
 
-import { body, param, query } from 'express-validator';
+const { body, query, param } = require('express-validator');
 
 const validator = {};
+
+const today = new Date();
 
 /**
  * @swagger
@@ -80,12 +82,8 @@ const validator = {};
  *           description: The unique identifier of the share link
  */
 
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
-  const today = new Date();
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
   const loginRequired = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);

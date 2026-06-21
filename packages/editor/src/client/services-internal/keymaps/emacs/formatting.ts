@@ -1,6 +1,6 @@
 import type { EditorView } from '@codemirror/view';
 
-import { toggleMarkdownSymbol } from '../../markdown-utils/index.js';
+import { toggleMarkdownSymbol } from '../../markdown-utils';
 
 /**
  * Register Emacs markdown-mode formatting commands and keybindings.

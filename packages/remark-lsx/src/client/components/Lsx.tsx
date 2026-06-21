@@ -2,10 +2,10 @@ import React, { type JSX, useCallback, useMemo } from 'react';
 import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 
-import { useSWRxLsx } from '../stores/lsx/index.js';
-import { generatePageNodeTree } from '../utils/page-node.js';
-import { LsxListView } from './LsxPageList/LsxListView.js';
-import { LsxContext } from './lsx-context.js';
+import { useSWRxLsx } from '../stores/lsx';
+import { generatePageNodeTree } from '../utils/page-node';
+import { LsxListView } from './LsxPageList/LsxListView';
+import { LsxContext } from './lsx-context';
 
 import styles from './Lsx.module.scss';
 

@@ -9,47 +9,49 @@ const logger = loggerFactory(
   'growi:migrate:initialize-private-legacy-pages-named-query',
 );
 
-export async function up(db, next) {
-  await mongoose.connect(getMongoUri(), mongoOptions);
+module.exports = {
+  async up(db, next) {
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  try {
-    await NamedQuery.updateOne(
-      { name: SearchDelegatorName.PRIVATE_LEGACY_PAGES },
-      { delegatorName: SearchDelegatorName.PRIVATE_LEGACY_PAGES },
-      { upsert: true },
+    try {
+      await NamedQuery.updateOne(
+        { name: SearchDelegatorName.PRIVATE_LEGACY_PAGES },
+        { delegatorName: SearchDelegatorName.PRIVATE_LEGACY_PAGES },
+        { upsert: true },
+      );
+    } catch (err) {
+      logger.error(
+        'Failed to migrate named query for private legacy pages search delagator.',
+        err,
+      );
+      throw err;
+    }
+
+    next();
+    logger.info(
+      'Successfully migrated named query for private legacy pages search delagator.',
     );
-  } catch (err) {
-    logger.error(
-      'Failed to migrate named query for private legacy pages search delagator.',
-      err,
+  },
+
+  async down(db, next) {
+    await mongoose.connect(getMongoUri(), mongoOptions);
+
+    try {
+      await NamedQuery.findOneAndDelete({
+        name: SearchDelegatorName.PRIVATE_LEGACY_PAGES,
+        delegatorName: SearchDelegatorName.PRIVATE_LEGACY_PAGES,
+      });
+    } catch (err) {
+      logger.error(
+        'Failed to delete named query for private legacy pages search delagator.',
+        err,
+      );
+      throw err;
+    }
+
+    next();
+    logger.info(
+      'Successfully deleted named query for private legacy pages search delagator.',
     );
-    throw err;
-  }
-
-  next();
-  logger.info(
-    'Successfully migrated named query for private legacy pages search delagator.',
-  );
-}
-
-export async function down(db, next) {
-  await mongoose.connect(getMongoUri(), mongoOptions);
-
-  try {
-    await NamedQuery.findOneAndDelete({
-      name: SearchDelegatorName.PRIVATE_LEGACY_PAGES,
-      delegatorName: SearchDelegatorName.PRIVATE_LEGACY_PAGES,
-    });
-  } catch (err) {
-    logger.error(
-      'Failed to delete named query for private legacy pages search delagator.',
-      err,
-    );
-    throw err;
-  }
-
-  next();
-  logger.info(
-    'Successfully deleted named query for private legacy pages search delagator.',
-  );
-}
+  },
+};

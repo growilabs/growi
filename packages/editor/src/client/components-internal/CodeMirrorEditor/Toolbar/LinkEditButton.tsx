@@ -1,13 +1,13 @@
 import { type JSX, useCallback } from 'react';
 import { DropdownItem } from 'reactstrap';
 
-import type { GlobalCodeMirrorEditorKey } from '../../../../consts/index.js';
-import { useLinkEditModalActions } from '../../../../states/modal/link-edit.js';
+import type { GlobalCodeMirrorEditorKey } from '../../../../consts';
+import { useLinkEditModalActions } from '../../../../states/modal/link-edit';
 import {
   getMarkdownLink,
   replaceFocusedMarkdownLinkWithEditor,
-} from '../../../services-internal/index.js';
-import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor.js';
+} from '../../../services-internal';
+import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
 
 type Props = {
   editorKey: string | GlobalCodeMirrorEditorKey;

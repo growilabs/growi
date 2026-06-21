@@ -1,6 +1,6 @@
 import type { ChangeSpec } from '@codemirror/state';
 
-import type { Delta } from '../interfaces/index.js';
+import type { Delta } from '../interfaces';
 
 export const deltaToChangeSpecs = (delta: Delta): ChangeSpec[] => {
   const changes: ChangeSpec[] = [];

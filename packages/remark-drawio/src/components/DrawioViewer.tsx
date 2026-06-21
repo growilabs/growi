@@ -11,9 +11,9 @@ import {
 import { GROWI_IS_CONTENT_RENDERING_ATTR } from '@growi/core/dist/consts';
 import { debounce } from 'throttle-debounce';
 
-import type { IGraphViewerGlobal } from '../index.js';
-import { generateMxgraphData } from '../utils/embed.js';
-import { isGraphViewerGlobal } from '../utils/global.js';
+import type { IGraphViewerGlobal } from '..';
+import { generateMxgraphData } from '../utils/embed';
+import { isGraphViewerGlobal } from '../utils/global';
 
 import styles from './DrawioViewer.module.scss';
 
@@ -205,6 +205,7 @@ export const DrawioViewer = memo((props: DrawioViewerProps): JSX.Element => {
           {error.message}
         </span>
       )}
+
       {error == null && (
         // biome-ignore lint/security/noDangerouslySetInnerHtml: ignore
         <div dangerouslySetInnerHTML={{ __html: mxgraphHtml }} />

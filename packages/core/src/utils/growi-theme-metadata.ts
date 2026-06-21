@@ -1,5 +1,5 @@
-import type { ColorScheme } from '../interfaces/color-scheme.js';
-import { GrowiThemeSchemeType } from '../interfaces/growi-theme-metadata.js';
+import type { ColorScheme } from '../interfaces/color-scheme';
+import { GrowiThemeSchemeType } from '../interfaces/growi-theme-metadata';
 
 export const getForcedColorScheme = (
   growiThemeSchemeType?: GrowiThemeSchemeType,

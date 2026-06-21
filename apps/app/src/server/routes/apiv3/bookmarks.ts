@@ -25,9 +25,8 @@ import BookmarkFolder from '../../models/bookmark-folder';
 
 const logger = loggerFactory('growi:routes:apiv3:bookmarks');
 
-import type { Router } from 'express';
-import express from 'express';
-import { body, param, query } from 'express-validator';
+const express = require('express');
+const { body, query, param } = require('express-validator');
 
 const router = express.Router();
 
@@ -95,7 +94,7 @@ const router = express.Router();
  *            items:
  *              $ref: '#/components/schemas/User'
  */
-export const setup = (crowi: Crowi): Router => {
+module.exports = (crowi: Crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const loginRequired = loginRequiredFactory(crowi, true);
   const addActivity = generateAddActivityMiddleware();

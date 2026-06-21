@@ -34,28 +34,28 @@ describe('createHttpLoggerMiddleware', () => {
   });
 
   it('returns an Express-compatible middleware function', async () => {
-    const { createHttpLoggerMiddleware } = await import('./http-logger.js');
+    const { createHttpLoggerMiddleware } = await import('./http-logger');
     const middleware = await createHttpLoggerMiddleware();
     expect(typeof middleware).toBe('function');
   });
 
   it('uses "express" as the default namespace', async () => {
-    const { loggerFactory } = await import('./logger-factory.js');
-    const { createHttpLoggerMiddleware } = await import('./http-logger.js');
+    const { loggerFactory } = await import('./logger-factory');
+    const { createHttpLoggerMiddleware } = await import('./http-logger');
     await createHttpLoggerMiddleware();
     expect(loggerFactory).toHaveBeenCalledWith('express');
   });
 
   it('accepts a custom namespace', async () => {
-    const { loggerFactory } = await import('./logger-factory.js');
-    const { createHttpLoggerMiddleware } = await import('./http-logger.js');
+    const { loggerFactory } = await import('./logger-factory');
+    const { createHttpLoggerMiddleware } = await import('./http-logger');
     await createHttpLoggerMiddleware({ namespace: 'custom-http' });
     expect(loggerFactory).toHaveBeenCalledWith('custom-http');
   });
 
   it('passes autoLogging options to pino-http', async () => {
     const pinoHttp = (await import('pino-http')).default;
-    const { createHttpLoggerMiddleware } = await import('./http-logger.js');
+    const { createHttpLoggerMiddleware } = await import('./http-logger');
 
     const ignoreFn = (req: { url?: string }) =>
       req.url?.startsWith('/_next/') ?? false;
@@ -71,7 +71,7 @@ describe('createHttpLoggerMiddleware', () => {
   it('applies morganLikeFormatOptions in development mode', async () => {
     process.env.NODE_ENV = 'development';
     const pinoHttp = (await import('pino-http')).default;
-    const { createHttpLoggerMiddleware } = await import('./http-logger.js');
+    const { createHttpLoggerMiddleware } = await import('./http-logger');
     await createHttpLoggerMiddleware();
 
     expect(pinoHttp).toHaveBeenCalledWith(
@@ -86,7 +86,7 @@ describe('createHttpLoggerMiddleware', () => {
   it('does not apply morganLikeFormatOptions in production mode', async () => {
     process.env.NODE_ENV = 'production';
     const pinoHttp = (await import('pino-http')).default;
-    const { createHttpLoggerMiddleware } = await import('./http-logger.js');
+    const { createHttpLoggerMiddleware } = await import('./http-logger');
     await createHttpLoggerMiddleware();
 
     const callArgs = (pinoHttp as ReturnType<typeof vi.fn>).mock

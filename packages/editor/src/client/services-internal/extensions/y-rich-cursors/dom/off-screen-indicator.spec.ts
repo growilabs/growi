@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { createOffScreenIndicator } from './off-screen-indicator.js';
+import { createOffScreenIndicator } from './off-screen-indicator';
 
 /**
  * Unit tests for off-screen indicators.

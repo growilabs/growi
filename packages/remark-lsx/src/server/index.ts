@@ -4,8 +4,8 @@ import type { NextFunction, Request, Response } from 'express';
 import { query, validationResult } from 'express-validator';
 import { FilterXSS } from 'xss';
 
-import type { LsxApiOptions } from '../interfaces/api.js';
-import { listPages } from './routes/list-pages/index.js';
+import type { LsxApiOptions } from '../interfaces/api';
+import { listPages } from './routes/list-pages';
 
 const loginRequiredFallback = (_req: Request, res: Response) => {
   return res.status(403).send('login required');

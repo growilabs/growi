@@ -1,7 +1,5 @@
-import { pathUtils } from '@growi/core/dist/utils';
 import { markdownSectionBlock } from '@growi/slack/dist/utils/block-kit-builder';
 import { reshapeContentsBody } from '@growi/slack/dist/utils/reshape-contents-body';
-import mongoose from 'mongoose';
 
 import { generalXssFilter } from '~/services/general-xss-filter';
 import loggerFactory from '~/utils/logger';
@@ -9,6 +7,9 @@ import loggerFactory from '~/utils/logger';
 import { growiInfoService } from '../growi-info';
 
 const _logger = loggerFactory('growi:service:CreatePageService');
+
+const { pathUtils } = require('@growi/core/dist/utils');
+const mongoose = require('mongoose');
 
 class CreatePageService {
   /** @type {import('~/server/crowi').default} Crowi instance */
@@ -56,4 +57,4 @@ class CreatePageService {
   }
 }
 
-export default CreatePageService;
+module.exports = CreatePageService;

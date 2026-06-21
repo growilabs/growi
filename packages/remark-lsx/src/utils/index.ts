@@ -1,1 +1,1 @@
-export * from './depth-utils.js';
+export * from './depth-utils';

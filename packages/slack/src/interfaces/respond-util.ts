@@ -1,4 +1,4 @@
-import type { RespondBodyForResponseUrl } from './response-url.js';
+import type { RespondBodyForResponseUrl } from './response-url';
 
 export interface IRespondUtil {
   respond(body: RespondBodyForResponseUrl): Promise<void>;

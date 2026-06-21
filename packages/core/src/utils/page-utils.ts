@@ -1,5 +1,5 @@
-import type { IPage } from '../index.js';
-import { isTopPage } from './page-path-utils/is-top-page.js';
+import type { IPage } from '..';
+import { isTopPage } from './page-path-utils/is-top-page';
 
 // const GRANT_PUBLIC = 1;
 const GRANT_RESTRICTED = 2;

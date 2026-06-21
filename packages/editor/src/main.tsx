@@ -2,7 +2,7 @@ import React from 'react';
 import ReactDOM from 'react-dom/client';
 import { ToastContainer } from 'react-toastify';
 
-import { Playground } from './client/components-internal/playground/index.js';
+import { Playground } from './client/components-internal/playground';
 
 import './main.scss';
 

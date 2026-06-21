@@ -1,9 +1,7 @@
-import fs from 'node:fs';
-import path from 'node:path';
-import { Readable, Transform } from 'node:stream';
-import { finished, pipeline } from 'node:stream/promises';
 import archiver from 'archiver';
-import mongoose from 'mongoose';
+import fs from 'fs';
+import path from 'path';
+import { Readable, Transform } from 'stream';
 
 import { toArrayIfNot } from '~/utils/array-utils';
 import { getGrowiVersion } from '~/utils/growi-version';
@@ -18,6 +16,9 @@ import { growiInfoService } from './growi-info';
 import type { ZipFileStat } from './interfaces/export';
 
 const logger = loggerFactory('growi:services:ExportService');
+const { pipeline, finished } = require('stream/promises');
+
+const mongoose = require('mongoose');
 
 class ExportProgressingStatus extends CollectionProgressingStatus {
   async init() {
@@ -209,10 +210,7 @@ class ExportService {
     const collection = mongoose.connection.collection(collectionName);
 
     const nativeCursor = collection.find();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const readStream = nativeCursor.stream({
-      transform: JSON.stringify as any,
-    });
+    const readStream = nativeCursor.stream({ transform: JSON.stringify });
 
     // get TransformStream
     const transformStream = this.generateTransformStream();

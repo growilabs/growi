@@ -5,8 +5,8 @@ import { renderHook, waitFor } from '@testing-library/react';
 import axios from 'axios';
 import express from 'express';
 
-import lsxMiddleware from '../../../server/index.js';
-import { useSWRxLsx } from './lsx.js';
+import lsxMiddleware from '../../../server';
+import { useSWRxLsx } from './lsx';
 
 // Mock the generateBaseQuery function
 vi.mock('../../../server/routes/list-pages/generate-base-query', () => ({

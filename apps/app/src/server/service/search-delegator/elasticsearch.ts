@@ -1,5 +1,5 @@
 import { getIdStringForRef, type IPage } from '@growi/core';
-import gc from 'expose-gc/function.js';
+import gc from 'expose-gc/function';
 import mongoose from 'mongoose';
 import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
@@ -82,7 +82,7 @@ type Data = any;
 class ElasticsearchDelegator
   implements SearchDelegator<Data, ESTermsKey, ESQueryTerms>
 {
-  name!: typeof SearchDelegatorName.DEFAULT;
+  name!: SearchDelegatorName.DEFAULT;
 
   private socketIoService!: SocketIoService;
 
@@ -267,11 +267,7 @@ class ElasticsearchDelegator
    *
    * @see https://www.elastic.co/guide/en/elasticsearch/reference/6.6/cluster-health.html
    */
-  async getInfoForHealth(): Promise<{
-    esClusterHealth: Awaited<
-      ReturnType<ElasticsearchClientDelegator['cluster']['health']>
-    >;
-  }> {
+  async getInfoForHealth() {
     const esClusterHealth = await this.client.cluster.health();
     return { esClusterHealth };
   }
@@ -279,17 +275,7 @@ class ElasticsearchDelegator
   /**
    * Return information for Admin Full Text Search Management page
    */
-  async getInfoForAdmin(): Promise<{
-    indices:
-      | Awaited<
-          ReturnType<ElasticsearchClientDelegator['indices']['stats']>
-        >['indices']
-      | never[];
-    aliases:
-      | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['getAlias']>>
-      | never[];
-    isNormalized: boolean;
-  }> {
+  async getInfoForAdmin() {
     const { client, indexName, aliasName } = this;
 
     const tmpIndexName = `${indexName}-tmp`;
@@ -432,12 +418,7 @@ class ElasticsearchDelegator
     }
   }
 
-  async createIndex(
-    index: string,
-  ): Promise<
-    | Awaited<ReturnType<ElasticsearchClientDelegator['indices']['create']>>
-    | undefined
-  > {
+  async createIndex(index: string) {
     // TODO: https://redmine.weseek.co.jp/issues/168446
     if (isES7ClientDelegator(this.client)) {
       const { mappings } = await import('./mappings/mappings-es7');
@@ -673,7 +654,7 @@ class ElasticsearchDelegator
     return pipeline(readStream, batchStream, appendTagNamesStream, writeStream);
   }
 
-  deletePages(pages): ReturnType<ElasticsearchClientDelegator['bulk']> {
+  deletePages(pages) {
     const body = [];
     pages.forEach((page) => {
       this.prepareBodyForDelete(body, page);
@@ -1179,12 +1160,7 @@ class ElasticsearchDelegator
     return await this.updateOrInsertDescendantsPagesById(parentPage, user);
   }
 
-  async syncDescendantsPagesDeleted(
-    pages,
-    user,
-  ): Promise<
-    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
-  > {
+  async syncDescendantsPagesDeleted(pages, user) {
     for (let i = 0; i < pages.length; i++) {
       logger.debug('SearchClient.syncDescendantsPagesDeleted', pages[i].path);
     }
@@ -1196,12 +1172,7 @@ class ElasticsearchDelegator
     }
   }
 
-  async syncPageDeleted(
-    page,
-    user,
-  ): Promise<
-    Awaited<ReturnType<ElasticsearchClientDelegator['bulk']>> | undefined
-  > {
+  async syncPageDeleted(page, user) {
     logger.debug('SearchClient.syncPageDeleted', page.path);
 
     try {

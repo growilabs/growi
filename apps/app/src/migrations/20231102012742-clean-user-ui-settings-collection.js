@@ -4,27 +4,29 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:clean-user-ui-settings-collection');
 
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
-export async function up() {
-  logger.info('Apply migration');
-  await mongoose.connect(getMongoUri(), mongoOptions);
+module.exports = {
+  async up() {
+    logger.info('Apply migration');
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  await UserUISettings.updateMany(
-    {},
-    {
-      $unset: {
-        isSidebarCollapsed: '',
-        preferDrawerModeByUser: '',
-        preferDrawerModeOnEditByUser: '',
+    await UserUISettings.updateMany(
+      {},
+      {
+        $unset: {
+          isSidebarCollapsed: '',
+          preferDrawerModeByUser: '',
+          preferDrawerModeOnEditByUser: '',
+        },
       },
-    },
-    { strict: false },
-  );
+      { strict: false },
+    );
 
-  logger.info('Migration has successfully applied');
-}
+    logger.info('Migration has successfully applied');
+  },
 
-export async function down() {
-  // No rollback
-}
+  async down() {
+    // No rollback
+  },
+};

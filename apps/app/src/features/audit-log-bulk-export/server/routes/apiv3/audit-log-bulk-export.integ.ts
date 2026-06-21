@@ -19,9 +19,8 @@ vi.mock('~/server/middlewares/login-required', () => ({
   },
 }));
 
-vi.mock('~/server/middlewares/apiv3-form-validator', async () => {
-  // mock factories are hoisted above imports, so the dependency is loaded inline
-  const { validationResult } = await import('express-validator');
+vi.mock('~/server/middlewares/apiv3-form-validator', () => {
+  const { validationResult } = require('express-validator');
   return {
     apiV3FormValidator: (req: Request, res: Response, next: NextFunction) => {
       const errors = validationResult(req);

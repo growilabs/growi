@@ -1,4 +1,3 @@
-import { pagePathUtils } from '@growi/core/dist/utils';
 import { body } from 'express-validator';
 import mongoose from 'mongoose';
 
@@ -8,7 +7,6 @@ import { PathAlreadyExistsError } from '../models/errors';
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
 import PageTagRelation from '../models/page-tag-relation';
 import UpdatePost from '../models/update-post';
-import ApiResponse from '../util/apiResponse';
 
 /**
  * @swagger
@@ -17,13 +15,17 @@ import ApiResponse from '../util/apiResponse';
  */
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-export const setup = (crowi, _app) => {
+module.exports = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:page');
+
+  const { pagePathUtils } = require('@growi/core/dist/utils');
 
   /** @type {import('../models/page').PageModel} */
   const { Page } = crowi.models;
 
   const PageRedirect = mongoose.model('PageRedirect');
+
+  const ApiResponse = require('../util/apiResponse');
 
   const globalNotificationService = crowi.globalNotificationService;
 
@@ -81,8 +83,7 @@ export const setup = (crowi, _app) => {
   const validator = {};
 
   actions.api = api;
-  actions.validator = validator;
-  /**
+  actions.validator = validator; /**
    * @swagger
    *
    * components:

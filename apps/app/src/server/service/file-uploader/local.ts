@@ -1,12 +1,7 @@
-import fs from 'node:fs';
-import fsPromises from 'node:fs/promises';
-import path from 'node:path';
-import type { Writable } from 'node:stream';
-import { Readable } from 'node:stream';
-import { pipeline } from 'node:stream/promises';
 import type { Response } from 'express';
-import mkdir from 'mkdirp';
-import urljoin from 'url-join';
+import type { Writable } from 'stream';
+import { Readable } from 'stream';
+import { pipeline } from 'stream/promises';
 
 import type Crowi from '~/server/crowi';
 import {
@@ -30,6 +25,13 @@ import {
 } from './utils';
 
 const logger = loggerFactory('growi:service:fileUploaderLocal');
+
+const fs = require('fs');
+const fsPromises = require('fs/promises');
+const path = require('path');
+
+const mkdir = require('mkdirp');
+const urljoin = require('url-join');
 
 // TODO: rewrite this module to be a type-safe implementation
 class LocalFileUploader extends AbstractFileUploader {
@@ -145,7 +147,7 @@ class LocalFileUploader extends AbstractFileUploader {
   }
 }
 
-export const setup = (crowi: Crowi) => {
+module.exports = (crowi: Crowi) => {
   const lib = new LocalFileUploader(crowi);
 
   const basePath = path.posix.join(crowi.publicDir, 'uploads');

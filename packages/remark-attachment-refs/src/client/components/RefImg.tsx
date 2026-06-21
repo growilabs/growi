@@ -1,9 +1,9 @@
 import React, { type JSX, useMemo } from 'react';
 
-import { useSWRxRef } from '../stores/refs.js';
-import { AttachmentList } from './AttachmentList.js';
-import { AttachmentRefsDisabled } from './AttachmentRefsDisabled.js';
-import { RefsContext } from './util/refs-context.js';
+import { useSWRxRef } from '../stores/refs';
+import { AttachmentList } from './AttachmentList';
+import { AttachmentRefsDisabled } from './AttachmentRefsDisabled';
+import { RefsContext } from './util/refs-context';
 
 type Props = {
   fileNameOrId: string;

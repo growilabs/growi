@@ -5,14 +5,14 @@ import { ySyncFacet } from 'y-codemirror.next';
 import type { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 
-import type { EditingClient } from '../../../../interfaces/index.js';
-import { ActivityTracker } from './activity-tracker.js';
-import { createOffScreenIndicator, RichCaretWidget } from './dom/index.js';
-import { broadcastLocalCursor } from './local-cursor.js';
+import type { EditingClient } from '../../../../interfaces';
+import { ActivityTracker } from './activity-tracker';
+import { createOffScreenIndicator, RichCaretWidget } from './dom';
+import { broadcastLocalCursor } from './local-cursor';
 import {
   classifyCursorPosition,
   createViewportContext,
-} from './viewport-classification.js';
+} from './viewport-classification';
 
 type Awareness = WebsocketProvider['awareness'];
 

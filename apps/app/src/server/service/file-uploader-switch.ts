@@ -64,4 +64,4 @@ class FileUploaderSwitch implements S2sMessageHandlable {
   }
 }
 
-export default FileUploaderSwitch;
+module.exports = FileUploaderSwitch;

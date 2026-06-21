@@ -167,4 +167,3 @@ The following rules in `.claude/rules/` are always applied when working in this 
 | Rule | Description |
 |------|-------------|
 | **package-dependencies** | Turbopack dependency classification — when to use `dependencies` vs `devDependencies`, verification procedure |
-| **import-convention** | Single no-extension import convention for `apps/app/src` (local → relative, cross-module → `~/`; `.js` added only at build emit) |

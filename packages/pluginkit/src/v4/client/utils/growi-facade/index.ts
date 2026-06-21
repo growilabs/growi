@@ -1,1 +1,1 @@
-export * from './growi-react.js';
+export * from './growi-react';

@@ -23,7 +23,7 @@ interface AuthorizedRequest extends Request {
   user?: any;
 }
 
-export const setup = (crowi: Crowi): Router => {
+module.exports = (crowi: Crowi): Router => {
   const accessTokenParser = crowi.accessTokenParser;
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 

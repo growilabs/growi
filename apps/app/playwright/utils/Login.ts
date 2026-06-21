@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { expect, type Page } from '@playwright/test';
 
-const authFile = path.resolve(import.meta.dirname, '../.auth/admin.json');
+const authFile = path.resolve(__dirname, '../.auth/admin.json');
 
 export const login = async (page: Page): Promise<void> => {
   // Perform authentication steps. Replace these actions with your own.

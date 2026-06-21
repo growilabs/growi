@@ -1,8 +1,8 @@
 import createError from 'http-errors';
 import { mock } from 'vitest-mock-extended';
 
-import { addNumCondition } from './add-num-condition.js';
-import type { PageQuery } from './generate-base-query.js';
+import { addNumCondition } from './add-num-condition';
+import type { PageQuery } from './generate-base-query';
 
 describe('addNumCondition() throws 400 http-errors instance', () => {
   it("when the param 'offset' is a negative value", () => {

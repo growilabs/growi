@@ -75,8 +75,7 @@ async function nextTick(context, reconnectHandler) {
   }
 }
 
-export { nextTick, ReconnectContext };
-export default {
+module.exports = {
   ReconnectContext,
   nextTick,
 };

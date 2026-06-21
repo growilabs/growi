@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { Linker } from './linker.js';
+import { Linker } from './linker';
 
 describe('Linker.fromMarkdownString', () => {
   describe('pukiwiki link with label', () => {

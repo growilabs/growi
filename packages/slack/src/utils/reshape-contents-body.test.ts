@@ -1,4 +1,4 @@
-import { reshapeContentsBody } from './reshape-contents-body.js';
+import { reshapeContentsBody } from './reshape-contents-body';
 
 describe('reshapeContentsBody', () => {
   describe('Markdown only', () => {

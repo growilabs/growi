@@ -1,7 +1,7 @@
 import fs from 'node:fs';
 import path from 'node:path';
 
-import { getStatus } from './get-status.js';
+import { getStatus } from './get-status';
 
 export const getMarkdown = async (
   projectDirRoot: string,

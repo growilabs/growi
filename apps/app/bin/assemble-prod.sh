@@ -24,7 +24,7 @@ echo "[3/4] Done."
 # next.config.js takes precedence over next.config.ts in Next.js, so the .ts file
 # is left in place but effectively ignored at runtime.
 echo "[4/4] Installing runtime next.config.js..."
-cp apps/app/next.config.prod.mjs apps/app/next.config.js
+cp apps/app/next.config.prod.cjs apps/app/next.config.js
 echo "[4/4] Done."
 
 echo "Assembly complete."

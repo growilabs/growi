@@ -28,4 +28,4 @@ class BaseSlackCommandHandler {
   }
 }
 
-export default BaseSlackCommandHandler;
+module.exports = BaseSlackCommandHandler;

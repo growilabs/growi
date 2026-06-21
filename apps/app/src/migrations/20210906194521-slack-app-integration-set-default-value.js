@@ -8,27 +8,29 @@ const logger = loggerFactory(
   'growi:migrate:slack-app-integration-set-default-value',
 );
 
-export async function up(db) {
-  logger.info('Apply migration');
-  await mongoose.connect(getMongoUri(), mongoOptions);
+module.exports = {
+  async up(db) {
+    logger.info('Apply migration');
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  const SlackAppIntegration = slackAppIntegrationFactory();
+    const SlackAppIntegration = slackAppIntegrationFactory();
 
-  // Add togetter command if supportedCommandsForBroadcastUse already exists
-  const slackAppIntegrations = await SlackAppIntegration.find();
-  slackAppIntegrations.forEach(async (doc) => {
-    if (
-      doc.supportedCommandsForSingleUse != null &&
-      !doc.supportedCommandsForSingleUse.includes('togetter')
-    ) {
-      doc.supportedCommandsForSingleUse.push('togetter');
-    }
-    await doc.save();
-  });
+    // Add togetter command if supportedCommandsForBroadcastUse already exists
+    const slackAppIntegrations = await SlackAppIntegration.find();
+    slackAppIntegrations.forEach(async (doc) => {
+      if (
+        doc.supportedCommandsForSingleUse != null &&
+        !doc.supportedCommandsForSingleUse.includes('togetter')
+      ) {
+        doc.supportedCommandsForSingleUse.push('togetter');
+      }
+      await doc.save();
+    });
 
-  logger.info('Migration has successfully applied');
-}
+    logger.info('Migration has successfully applied');
+  },
 
-export async function down() {
-  // no rollback
-}
+  async down() {
+    // no rollback
+  },
+};

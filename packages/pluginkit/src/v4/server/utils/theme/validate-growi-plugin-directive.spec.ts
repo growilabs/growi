@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { isGrowiThemeMetadata } from '@growi/core';
 
-import { validateThemePluginGrowiDirective } from './validate-growi-plugin-directive.js';
+import { validateThemePluginGrowiDirective } from './validate-growi-plugin-directive';
 
 describe('validateThemePluginGrowiDirective()', () => {
   it('returns a data object', async () => {

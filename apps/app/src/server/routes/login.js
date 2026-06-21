@@ -10,7 +10,7 @@ import { resolveLocalePath } from '../util/safe-path-utils';
 // because this file is a deprecated legacy of Crowi
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-export const setup = (crowi, app) => {
+module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:login');
   const { User } = crowi.models;
   const { appService, aclService, mailService, activityService } = crowi;

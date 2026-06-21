@@ -7,7 +7,7 @@ import {
   toNonBlankStringOrUndefined,
   toNonEmptyString,
   toNonEmptyStringOrUndefined,
-} from './string.js';
+} from './string';
 
 describe('isNonEmptyString', () => {
   it.each`

@@ -4,14 +4,14 @@ import { createInstance } from 'i18next';
 import resourcesToBackend from 'i18next-resources-to-backend';
 import path from 'path';
 
-import { defaultLang, initOptions } from '^/config/i18next.config.mjs';
+import * as i18nextConfig from '^/config/i18next.config';
 
 import { resolveFromRoot } from '~/server/util/project-dir-utils';
 
 import { configManager } from './config-manager';
 
 const relativePathToLocalesRoot = path.relative(
-  import.meta.dirname,
+  __dirname,
   resolveFromRoot('public/static/locales'),
 );
 
@@ -20,16 +20,13 @@ const initI18next = async (overwriteOpts: InitOptions) => {
   await i18nInstance
     .use(
       resourcesToBackend((language: string, namespace: string) => {
-        // JSON modules require the import attribute under native ESM.
-        // resourcesToBackend unwraps the module namespace `.default` itself.
         return import(
-          path.join(relativePathToLocalesRoot, language, `${namespace}.json`),
-          { with: { type: 'json' } }
+          path.join(relativePathToLocalesRoot, language, `${namespace}.json`)
         );
       }),
     )
     .init({
-      ...initOptions,
+      ...i18nextConfig.initOptions,
       ...overwriteOpts,
     });
   return i18nInstance;
@@ -50,7 +47,7 @@ export async function getTranslation(opts?: Opts): Promise<Translation> {
   const fixedLang = opts?.lang ?? globalLang;
 
   const initOptions: InitOptions = {
-    fallbackLng: [fixedLang, defaultLang],
+    fallbackLng: [fixedLang, i18nextConfig.defaultLang],
   };
 
   // set ns if not null

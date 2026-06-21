@@ -2,8 +2,8 @@ import type { IPageHasId } from '@growi/core';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
 import { mock } from 'vitest-mock-extended';
 
-import type { PageNode } from '../../interfaces/page-node.js';
-import { generatePageNodeTree } from './page-node.js';
+import type { PageNode } from '../../interfaces/page-node';
+import { generatePageNodeTree } from './page-node';
 
 function omitPageData(pageNode: PageNode): Omit<PageNode, 'page'> {
   // Destructure to omit 'page', and recursively process children

@@ -1,7 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
-import { initializeLoggerFactory, loggerFactory } from './logger-factory.js';
-import type { LoggerConfig } from './types.js';
+import { initializeLoggerFactory, loggerFactory } from './logger-factory';
+import type { LoggerConfig } from './types';
 
 // ---------------------------------------------------------------------------
 // Shared-transport test: pino.transport() must be called exactly once,
@@ -50,7 +50,7 @@ describe('shared transport — single Worker thread (Req 11)', () => {
     vi.doMock('pino', () => ({ default: pinoSpy }));
 
     const { initializeLoggerFactory: init, loggerFactory: factory } =
-      await import('./logger-factory.js');
+      await import('./logger-factory');
 
     init({ config: { default: 'info', 'growi:debug:*': 'debug' } });
 
@@ -107,7 +107,7 @@ describe('shared transport — single Worker thread (Req 11)', () => {
     vi.doMock('pino', () => ({ default: pinoSpy }));
 
     const { initializeLoggerFactory: init, loggerFactory: factory } =
-      await import('./logger-factory.js');
+      await import('./logger-factory');
 
     init({ config: { default: 'info' } });
     factory('growi:ns1');

@@ -4,15 +4,12 @@ import loggerFactory from '~/utils/logger';
 
 const _logger = loggerFactory('growi:routes:apiv3:logout');
 
-import express from 'express';
+const express = require('express');
 
 const router = express.Router();
 
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
   const activityEvent = crowi.events.activity;
   const addActivity = generateAddActivityMiddleware(crowi);
 

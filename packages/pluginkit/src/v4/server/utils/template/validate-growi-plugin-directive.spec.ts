@@ -1,7 +1,7 @@
 import path from 'node:path';
 import { GrowiPluginType } from '@growi/core';
 
-import { validateTemplatePluginGrowiDirective } from './validate-growi-plugin-directive.js';
+import { validateTemplatePluginGrowiDirective } from './validate-growi-plugin-directive';
 
 describe('validateTemplatePluginGrowiDirective()', () => {
   it('returns a data object', async () => {

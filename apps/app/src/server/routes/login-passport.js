@@ -1,5 +1,4 @@
 import { ErrorV3 } from '@growi/core/dist/models';
-import passport from 'passport';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { ExternalAccountLoginError } from '~/models/vo/external-account-login-error';
@@ -9,14 +8,16 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import { externalAccountService } from '../service/external-account';
-import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-export const setup = (crowi, app) => {
+module.exports = (crowi, app) => {
   const logger = loggerFactory('growi:routes:login-passport');
+  const passport = require('passport');
   const passportService = crowi.passportService;
 
   const activityEvent = crowi.events.activity;
+
+  const ApiResponse = require('../util/apiResponse');
 
   const promisifiedPassportAuthentication = (strategyName, req, res) => {
     return new Promise((resolve, reject) => {

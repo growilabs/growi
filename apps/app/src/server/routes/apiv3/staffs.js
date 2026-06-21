@@ -9,7 +9,7 @@ const logger = loggerFactory('growi:routes:apiv3:staffs');
 
 const router = Router();
 
-import contributors from '^/resource/Contributor.js';
+const contributors = require('^/resource/Contributor');
 
 let expiredAt;
 const contributorsCache = contributors;
@@ -18,11 +18,8 @@ let gcContributors;
 // Sorting contributors by this method
 const compareFunction = (a, b) => a.order - b.order;
 
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
   router.get('/', async (req, res) => {
     const now = new Date();
     const growiCloudUri =

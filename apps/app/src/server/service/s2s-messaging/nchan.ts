@@ -1,15 +1,7 @@
 // biome-ignore lint/style/noRestrictedImports: Direct axios usage for external S2S messaging
 import axios from 'axios';
 import path from 'path';
-import ReconnectingWebSocketPkg from 'reconnecting-websocket';
-
-// reconnecting-websocket is CJS whose runtime self-patches module.exports to
-// the class; its `export default` declaration makes NodeNext type the default
-// import as the module namespace, so narrow it back to the constructor.
-const ReconnectingWebSocket =
-  ReconnectingWebSocketPkg as unknown as typeof import('reconnecting-websocket').default;
-type ReconnectingWebSocket = import('reconnecting-websocket').default;
-
+import ReconnectingWebSocket from 'reconnecting-websocket';
 import WebSocket from 'ws';
 
 import type Crowi from '~/server/crowi';
@@ -28,17 +20,13 @@ class NchanDelegator extends AbstractS2sMessagingService {
 
   socket: any = null;
 
-  private publishPath: string;
-
-  private subscribePath: string;
-
-  private channelId: any;
-
-  constructor(uri, publishPath: string, subscribePath: string, channelId: any) {
+  constructor(
+    uri,
+    private publishPath: string,
+    private subscribePath: string,
+    private channelId: any,
+  ) {
     super(uri);
-    this.publishPath = publishPath;
-    this.subscribePath = subscribePath;
-    this.channelId = channelId;
   }
 
   /**
@@ -197,7 +185,7 @@ class NchanDelegator extends AbstractS2sMessagingService {
   }
 }
 
-export const setup = (crowi: Crowi) => {
+module.exports = (crowi: Crowi) => {
   const { configManager } = crowi;
 
   const uri = configManager.getConfig('app:nchanUri');

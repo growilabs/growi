@@ -1,3 +1,3 @@
-export * from './common/index.js';
-export * from './template/index.js';
-export * from './theme/index.js';
+export * from './common';
+export * from './template';
+export * from './theme';

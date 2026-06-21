@@ -2,7 +2,7 @@ import mockRequire from 'mock-require';
 
 const { reRequire } = mockRequire;
 
-describe('config/migrate-mongo-config.cjs', () => {
+describe('config/migrate-mongo-config.js', () => {
   test.concurrent('throws an error when MIGRATIONS_DIR is not set', () => {
     const getMongoUriMock = vi.fn();
     const mongoOptionsMock = vi.fn();
@@ -14,7 +14,7 @@ describe('config/migrate-mongo-config.cjs', () => {
     });
 
     // use reRequire to avoid using module cache
-    const caller = () => reRequire('./migrate-mongo-config.cjs');
+    const caller = () => reRequire('./migrate-mongo-config');
 
     expect(caller).toThrow('An env var MIGRATIONS_DIR must be set.');
 
@@ -45,7 +45,7 @@ describe('config/migrate-mongo-config.cjs', () => {
 
       // use reRequire to avoid using module cache
       const { mongodb, migrationsDir, changelogCollectionName } = reRequire(
-        './migrate-mongo-config.cjs',
+        './migrate-mongo-config',
       );
 
       mockRequire.stop('../src/server/util/mongoose-utils');

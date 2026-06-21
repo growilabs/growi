@@ -25,7 +25,7 @@ const AVAILABLE_KEYS = ['match', 'not_match', 'prefix', 'not_prefix'];
 class PrivateLegacyPagesDelegator
   implements SearchDelegator<IPage, MongoTermsKey, MongoQueryTerms>
 {
-  name!: typeof SearchDelegatorName.PRIVATE_LEGACY_PAGES;
+  name!: SearchDelegatorName.PRIVATE_LEGACY_PAGES;
 
   constructor() {
     this.name = SearchDelegatorName.PRIVATE_LEGACY_PAGES;

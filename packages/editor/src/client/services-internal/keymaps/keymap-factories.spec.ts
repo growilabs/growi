@@ -2,7 +2,7 @@
 import { Prec } from '@codemirror/state';
 import { describe, expect, it, vi } from 'vitest';
 
-import { getKeymap } from './index.js';
+import { getKeymap } from './index';
 
 describe('getKeymap', () => {
   it('should return low precedence and no overrides for default mode', async () => {

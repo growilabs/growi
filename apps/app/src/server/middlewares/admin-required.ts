@@ -20,13 +20,7 @@ const adminRequiredFactory = (
   _crowi: Crowi,
   fallback: FallbackFunction | null = null,
 ) => {
-  // Named function so the route-middleware snapshot tool can identify this
-  // handler in the apiv3 auth chain.
-  return function adminRequired(
-    req: RequestWithUser,
-    res: Response,
-    next: NextFunction,
-  ) {
+  return (req: RequestWithUser, res: Response, next: NextFunction) => {
     if (req.user != null && req.user instanceof Object && '_id' in req.user) {
       if (req.user.admin) {
         return next();

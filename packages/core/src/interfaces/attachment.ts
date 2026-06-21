@@ -1,7 +1,7 @@
-import type { Ref } from './common.js';
-import type { HasObjectId } from './has-object-id.js';
-import type { IPage } from './page.js';
-import type { IUser } from './user.js';
+import type { Ref } from './common';
+import type { HasObjectId } from './has-object-id';
+import type { IPage } from './page';
+import type { IUser } from './user';
 
 export type IAttachment = {
   page?: Ref<IPage>;

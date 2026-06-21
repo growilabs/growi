@@ -1,3 +1,3 @@
-export * from './vault-compose-view.js';
-export * from './vault-instruction.js';
-export * from './vault-storage-stats.js';
+export * from './vault-compose-view';
+export * from './vault-instruction';
+export * from './vault-storage-stats';

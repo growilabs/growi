@@ -23,4 +23,4 @@ ApiResponse.success = (data) => {
   return result;
 };
 
-export default ApiResponse;
+module.exports = ApiResponse;

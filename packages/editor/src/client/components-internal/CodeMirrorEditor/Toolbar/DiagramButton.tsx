@@ -2,7 +2,7 @@ import { type JSX, useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
-import { useDrawioModalForEditorActions } from '../../../../states/modal/drawio-for-editor.js';
+import { useDrawioModalForEditorActions } from '../../../../states/modal/drawio-for-editor';
 
 type Props = {
   editorKey: string;

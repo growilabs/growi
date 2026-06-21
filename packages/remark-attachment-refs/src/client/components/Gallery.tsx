@@ -1,8 +1,8 @@
 import React, { type JSX } from 'react';
 
-import { AttachmentRefsDisabled } from './AttachmentRefsDisabled.js';
-import type { Props } from './RefsImg.js';
-import { RefsImgSubstance } from './RefsImg.js';
+import { AttachmentRefsDisabled } from './AttachmentRefsDisabled';
+import type { Props } from './RefsImg';
+import { RefsImgSubstance } from './RefsImg';
 
 const gridDefault = 'col-4';
 const gridGapDefault = '1px';

@@ -1,1 +1,1 @@
-export { sanitizeOption } from './renderer/extract-sections.js';
+export { sanitizeOption } from './renderer/extract-sections';

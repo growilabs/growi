@@ -6,11 +6,11 @@ import { yCollab, yUndoManagerKeymap } from 'y-codemirror.next';
 import { WebsocketProvider } from 'y-websocket';
 import * as Y from 'yjs';
 
-import { userColor } from '../../consts/index.js';
-import type { EditingClient } from '../../interfaces/index.js';
-import type { UseCodeMirrorEditor } from '../services/index.js';
-import { yRichCursors } from '../services-internal/extensions/y-rich-cursors/index.js';
-import { useSecondaryYdocs } from './use-secondary-ydocs.js';
+import { userColor } from '../../consts';
+import type { EditingClient } from '../../interfaces';
+import type { UseCodeMirrorEditor } from '../services';
+import { yRichCursors } from '../services-internal/extensions/y-rich-cursors';
+import { useSecondaryYdocs } from './use-secondary-ydocs';
 
 type Awareness = WebsocketProvider['awareness'];
 

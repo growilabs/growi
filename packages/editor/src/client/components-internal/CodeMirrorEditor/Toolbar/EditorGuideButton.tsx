@@ -2,7 +2,7 @@ import { type JSX, useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
-import { useEditorGuideModalActions } from '../../../../states/modal/editor-guide.js';
+import { useEditorGuideModalActions } from '../../../../states/modal/editor-guide';
 
 export const EditorGuideButton = (): JSX.Element => {
   const { open: openEditorGuideModal } = useEditorGuideModalActions();

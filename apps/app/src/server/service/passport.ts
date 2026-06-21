@@ -811,11 +811,7 @@ class PassportService implements S2sMessageHandlable {
   async isOidcHostReachable(issuerHost: string): Promise<boolean | undefined> {
     try {
       const metadataUrl = this.getOIDCMetadataURL(issuerHost);
-      // axios ships dual-format type declarations (index.d.ts / index.d.cts).
-      // This ESM file sees the import-condition types while axios-retry's CJS
-      // declaration file references the require-condition ones; the two are
-      // structurally identical but nominally distinct, so realign the type.
-      axiosRetry(axios as Parameters<typeof axiosRetry>[0], {
+      axiosRetry(axios, {
         retries: 3,
       });
       const response = await axios.get(metadataUrl);

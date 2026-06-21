@@ -38,4 +38,4 @@ const addCustomFunctionToResponse = (express) => {
   };
 };
 
-export default addCustomFunctionToResponse;
+module.exports = addCustomFunctionToResponse;

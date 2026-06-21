@@ -1,4 +1,4 @@
-import type { IChannelOptionalId } from '../interfaces/channel.js';
+import type { IChannelOptionalId } from '../interfaces/channel';
 
 export const permissionParser = (
   permissionForCommand: boolean | string[],

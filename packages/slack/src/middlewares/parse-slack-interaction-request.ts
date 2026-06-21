@@ -1,7 +1,7 @@
 import type { NextFunction, Response } from 'express';
 
-import type { RequestFromSlack } from '../interfaces/request-from-slack.js';
-import { InteractionPayloadAccessor } from '../utils/interaction-payload-accessor.js';
+import type { RequestFromSlack } from '../interfaces/request-from-slack';
+import { InteractionPayloadAccessor } from '../utils/interaction-payload-accessor';
 
 export const parseSlackInteractionRequest = (
   req: RequestFromSlack,

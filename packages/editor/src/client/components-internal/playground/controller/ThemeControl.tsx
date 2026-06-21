@@ -1,6 +1,6 @@
-import type { EditorTheme } from '../../../../consts/index.js';
-import { AllEditorTheme } from '../../../../consts/index.js';
-import { OutlineSecondaryButtons } from './OutlineSecondaryButtons.js';
+import type { EditorTheme } from '../../../../consts';
+import { AllEditorTheme } from '../../../../consts';
+import { OutlineSecondaryButtons } from './OutlineSecondaryButtons';
 
 type ThemeControlProps = {
   setEditorTheme: (value: EditorTheme) => void;

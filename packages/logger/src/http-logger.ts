@@ -1,7 +1,7 @@
 import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { HttpLogger, Options as PinoHttpOptions } from 'pino-http';
 
-import { loggerFactory } from './logger-factory.js';
+import { loggerFactory } from './logger-factory';
 
 interface HttpLoggerOptions {
   /** Logger namespace, defaults to 'express' */
@@ -37,7 +37,7 @@ export async function createHttpLoggerMiddleware(
   // In development, dynamically import morgan-like format options
   if (process.env.NODE_ENV !== 'production') {
     const { morganLikeFormatOptions } = await import(
-      './dev/morgan-like-format-options.js'
+      './dev/morgan-like-format-options'
     );
     Object.assign(httpOptions, morganLikeFormatOptions);
   }

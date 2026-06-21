@@ -10,13 +10,13 @@ import { parse } from 'date-fns/parse';
 import { SlackCommandHandlerError } from '~/server/models/vo/slack-command-handler-error';
 import loggerFactory from '~/utils/logger';
 
-import CreatePageService from './create-page-service';
-import BaseSlackCommandHandler from './slack-command-handler';
+const logger = loggerFactory('growi:service:SlackBotService:keep');
 
-const _logger = loggerFactory('growi:service:SlackBotService:keep');
-
-export const setup = (crowi) => {
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
+  const CreatePageService = require('./create-page-service');
   const createPageService = new CreatePageService(crowi);
+  const BaseSlackCommandHandler = require('./slack-command-handler');
   const handler = new BaseSlackCommandHandler();
   const { User } = crowi.models;
 

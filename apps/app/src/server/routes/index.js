@@ -1,19 +1,14 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import express from 'express';
-import multer from 'multer';
-import autoReap from 'multer-autoreap';
 
 import { createVaultGatewayRouterWithDeps } from '~/features/growi-vault/server';
 import { middlewareFactory as rateLimiterFactory } from '~/features/rate-limiter';
-import { createApiRouter } from '~/server/util/createApiRouter';
 
 import { accessTokenParser } from '../middlewares/access-token-parser';
 import { generateAddActivityMiddleware } from '../middlewares/add-activity';
 import adminRequiredFactory from '../middlewares/admin-required';
 import apiV1FormValidator from '../middlewares/apiv1-form-validator';
-import { setup as setupApplicationInstalled } from '../middlewares/application-installed';
 import * as applicationNotInstalled from '../middlewares/application-not-installed';
-import { setup as setupAutoReconnectToSearch } from '../middlewares/auto-reconnect-to-search';
 import {
   excludeReadOnlyUser,
   excludeReadOnlyUserIfCommentNotAllowed,
@@ -26,42 +21,40 @@ import {
   generateUnavailableWhenMaintenanceModeMiddleware,
   generateUnavailableWhenMaintenanceModeMiddlewareForApi,
 } from '../middlewares/unavailable-when-maintenance-mode';
-import { setup as setupAdmin } from './admin';
-import { setup as setupApiV3 } from './apiv3';
 import * as attachment from './attachment';
 import { routesFactory as attachmentApiRoutesFactory } from './attachment/api';
-import { setup as setupComment } from './comment';
 import * as forgotPassword from './forgot-password';
-import { setup as setupLogin } from './login';
-import { setup as setupLoginPassport } from './login-passport';
 import nextFactory from './next';
-import { setup as setupOgp } from './ogp';
-import { setup as setupPage } from './page';
-import { setup as setupSearch } from './search';
-import { setup as setupTag } from './tag';
 import * as userActivation from './user-activation';
 
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-export const setup = (crowi, app) => {
-  autoReap.options.reapOnError = true; // continue reaping the file even if an error occurs
+const multer = require('multer');
+const autoReap = require('multer-autoreap');
 
-  const autoReconnectToSearch = setupAutoReconnectToSearch(crowi);
-  const applicationInstalled = setupApplicationInstalled(crowi);
+autoReap.options.reapOnError = true; // continue reaping the file even if an error occurs
+
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi, app) => {
+  const autoReconnectToSearch =
+    require('../middlewares/auto-reconnect-to-search')(crowi);
+  const applicationInstalled = require('../middlewares/application-installed')(
+    crowi,
+  );
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const loginRequired = loginRequiredFactory(crowi, true);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
   const uploads = multer({ dest: `${crowi.tmpDir}uploads` });
-  const page = setupPage(crowi, app);
-  const login = setupLogin(crowi, app);
-  const loginPassport = setupLoginPassport(crowi, app);
-  const admin = setupAdmin(crowi, app);
+  const page = require('./page')(crowi, app);
+  const login = require('./login')(crowi, app);
+  const loginPassport = require('./login-passport')(crowi, app);
+  const admin = require('./admin')(crowi, app);
   const attachmentApi = attachmentApiRoutesFactory(crowi).api;
-  const comment = setupComment(crowi, app);
-  const tag = setupTag(crowi, app);
-  const search = setupSearch(crowi, app);
-  const ogp = setupOgp(crowi);
+  const comment = require('./comment')(crowi, app);
+  const tag = require('./tag')(crowi, app);
+  const search = require('./search')(crowi, app);
+  const ogp = require('./ogp')(crowi);
+  const { createApiRouter } = require('~/server/util/createApiRouter');
 
   const next = nextFactory(crowi);
 
@@ -70,7 +63,7 @@ export const setup = (crowi, app) => {
   const unavailableWhenMaintenanceModeForApi =
     generateUnavailableWhenMaintenanceModeMiddlewareForApi(crowi);
 
-  const [apiV3Router, apiV3AdminRouter, apiV3AuthRouter] = setupApiV3(
+  const [apiV3Router, apiV3AdminRouter, apiV3AuthRouter] = require('./apiv3')(
     crowi,
     app,
   );

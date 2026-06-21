@@ -63,9 +63,8 @@ import { updatePageHandlersFactory } from './update-page';
 
 const logger = loggerFactory('growi:routes:apiv3:page');
 
-import type { Router } from 'express';
-import express from 'express';
-import { body, param, query } from 'express-validator';
+const express = require('express');
+const { body, query, param } = require('express-validator');
 
 const router = express.Router();
 
@@ -87,7 +86,7 @@ const router = express.Router();
  *            description: boolean for like status
  *
  */
-export const setup = (crowi: Crowi): Router => {
+module.exports = (crowi: Crowi) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();

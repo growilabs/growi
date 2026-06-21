@@ -8,21 +8,17 @@ import {
   keymap,
 } from '@codemirror/view';
 
-import type {
-  EditorSettings,
-  EditorTheme,
-  KeyMapMode,
-} from '../../consts/index.js';
-import type { UseCodeMirrorEditor } from '../services/index.js';
+import type { EditorSettings, EditorTheme, KeyMapMode } from '../../consts';
+import type { UseCodeMirrorEditor } from '../services';
 import {
   getEditorTheme,
   getKeymap,
   insertNewlineContinueMarkup,
   insertNewRowToMarkdownTable,
   isInTable,
-} from '../services-internal/index.js';
-import type { KeymapResult } from '../services-internal/keymaps/index.js';
-import { useEditorShortcuts } from './use-editor-shortcuts.js';
+} from '../services-internal';
+import type { KeymapResult } from '../services-internal/keymaps';
+import { useEditorShortcuts } from './use-editor-shortcuts';
 
 const useStyleActiveLine = (
   codeMirrorEditor?: UseCodeMirrorEditor,

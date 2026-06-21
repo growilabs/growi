@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { EditorView } from '@codemirror/view';
 
-import { toggleMarkdownSymbol } from '../../../services-internal/markdown-utils/index.js';
+import { toggleMarkdownSymbol } from '../../../services-internal/markdown-utils';
 
 export type InsertMarkdownElements = (prefix: string, suffix: string) => void;
 

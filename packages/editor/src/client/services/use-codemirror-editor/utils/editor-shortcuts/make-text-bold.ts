@@ -1,8 +1,8 @@
 import type { EditorView, KeyBinding } from '@codemirror/view';
 
-import type { KeyMapMode } from '../../../../../consts/index.js';
-import { useInsertMarkdownElements } from '../insert-markdown-elements.js';
-import { generateAddMarkdownSymbolCommand } from './generate-add-markdown-symbol-command.js';
+import type { KeyMapMode } from '../../../../../consts';
+import { useInsertMarkdownElements } from '../insert-markdown-elements';
+import { generateAddMarkdownSymbolCommand } from './generate-add-markdown-symbol-command';
 
 export const useMakeTextBoldKeyBinding = (
   view?: EditorView,

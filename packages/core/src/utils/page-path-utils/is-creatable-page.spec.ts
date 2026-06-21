@@ -1,4 +1,4 @@
-import { isCreatablePage } from './index.js';
+import { isCreatablePage } from './index';
 
 describe('isCreatablePage', () => {
   describe('should return true for valid page paths', () => {

@@ -1,6 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 
-import { parseEnvLevels } from './env-var-parser.js';
+import { parseEnvLevels } from './env-var-parser';
 
 describe('parseEnvLevels', () => {
   const originalEnv = process.env;

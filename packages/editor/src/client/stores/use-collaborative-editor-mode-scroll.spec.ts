@@ -1,7 +1,7 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import * as Y from 'yjs';
 
-import type { EditingClient } from '../../interfaces/index.js';
+import type { EditingClient } from '../../interfaces';
 
 /**
  * Integration tests for the scroll-to-remote-cursor logic extracted from
@@ -33,7 +33,7 @@ type FakeEditorView = {
 // Import the pure function after it is implemented.
 // Using a dynamic import wrapper so this test file can compile before
 // the implementation exists (RED phase). We test the extracted pure function.
-import { createScrollToRemoteCursorFn } from './use-collaborative-editor-mode.js';
+import { createScrollToRemoteCursorFn } from './use-collaborative-editor-mode';
 
 // ---------------------------------------------------------------------------
 // Tests

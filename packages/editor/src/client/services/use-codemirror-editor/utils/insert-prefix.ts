@@ -1,7 +1,7 @@
 import { useCallback } from 'react';
 import type { EditorView } from '@codemirror/view';
 
-import { insertLinePrefix } from '../../../services-internal/markdown-utils/index.js';
+import { insertLinePrefix } from '../../../services-internal/markdown-utils';
 
 export type InsertPrefix = (
   prefix: string,

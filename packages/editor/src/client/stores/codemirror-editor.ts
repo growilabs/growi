@@ -8,10 +8,7 @@ import { atom, useAtom } from 'jotai';
 import { atomFamily } from 'jotai/utils';
 import deepmerge from 'ts-deepmerge';
 
-import {
-  type UseCodeMirrorEditor,
-  useCodeMirrorEditor,
-} from '../services/index.js';
+import { type UseCodeMirrorEditor, useCodeMirrorEditor } from '../services';
 
 const { isDeepEquals } = deepEquals;
 

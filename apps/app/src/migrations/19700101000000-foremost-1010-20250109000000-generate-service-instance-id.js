@@ -7,17 +7,19 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:generate-service-instance-id');
 
-export async function up(db) {
-  logger.info('Generate serviceInstanceId for the system');
-  await mongoose.connect(getMongoUri(), mongoOptions);
+module.exports = {
+  async up(db) {
+    logger.info('Generate serviceInstanceId for the system');
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  await configManager.loadConfigs();
+    await configManager.loadConfigs();
 
-  await configManager.updateConfig('app:serviceInstanceId', uuidv4(), {
-    skipPubsub: true,
-  });
-}
+    await configManager.updateConfig('app:serviceInstanceId', uuidv4(), {
+      skipPubsub: true,
+    });
+  },
 
-export async function down() {
-  // No rollback
-}
+  async down() {
+    // No rollback
+  },
+};

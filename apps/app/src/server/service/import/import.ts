@@ -2,7 +2,7 @@ import fs from 'node:fs';
 import type { EventEmitter } from 'node:stream';
 import { Transform, Writable } from 'node:stream';
 import { pipeline } from 'node:stream/promises';
-import gc from 'expose-gc/function.js';
+import gc from 'expose-gc/function';
 import type {
   BulkOperationBase,
   BulkWriteResult,

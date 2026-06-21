@@ -1,8 +1,8 @@
 import { type JSX, useEffect, useRef } from 'react';
 import Reveal from 'reveal.js';
 
-import type { PresentationOptions } from '../consts/index.js';
-import { Slides } from './Slides.js';
+import type { PresentationOptions } from '../consts';
+import { Slides } from './Slides';
 
 import 'reveal.js/dist/reveal.css';
 

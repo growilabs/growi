@@ -437,7 +437,7 @@ class AwsFileUploader extends AbstractFileUploader {
   }
 }
 
-export const setup = (crowi: Crowi) => {
+module.exports = (crowi: Crowi) => {
   const lib = new AwsFileUploader(crowi);
 
   lib.isValidUploadSettings = () =>

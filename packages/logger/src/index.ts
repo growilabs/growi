@@ -1,9 +1,9 @@
-export { parseEnvLevels } from './env-var-parser.js';
-export { createHttpLoggerMiddleware } from './http-logger.js';
-export { resolveLevel } from './level-resolver.js';
-export { initializeLoggerFactory, loggerFactory } from './logger-factory.js';
+export { parseEnvLevels } from './env-var-parser';
+export { createHttpLoggerMiddleware } from './http-logger';
+export { resolveLevel } from './level-resolver';
+export { initializeLoggerFactory, loggerFactory } from './logger-factory';
 export {
   createBrowserOptions,
   createNodeTransportOptions,
-} from './transport-factory.js';
-export type { Logger, LoggerConfig, LoggerFactoryOptions } from './types.js';
+} from './transport-factory';
+export type { Logger, LoggerConfig, LoggerFactoryOptions } from './types';

@@ -1,7 +1,7 @@
 import { useForm } from 'react-hook-form';
 
-import { GlobalCodeMirrorEditorKey } from '../../../../consts/index.js';
-import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor.js';
+import { GlobalCodeMirrorEditorKey } from '../../../../consts';
+import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
 
 type SetCaretLineRowFormData = {
   lineNumber: number | string;

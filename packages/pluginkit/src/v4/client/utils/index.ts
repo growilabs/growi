@@ -1,1 +1,1 @@
-export * from './growi-facade/index.js';
+export * from './growi-facade';

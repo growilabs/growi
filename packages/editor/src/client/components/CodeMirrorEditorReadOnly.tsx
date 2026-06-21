@@ -2,10 +2,10 @@ import { type JSX, useEffect } from 'react';
 import { EditorState, type Extension, Prec } from '@codemirror/state';
 import { EditorView, keymap } from '@codemirror/view';
 
-import { GlobalCodeMirrorEditorKey } from '../../consts/index.js';
-import { CodeMirrorEditor } from '../components-internal/CodeMirrorEditor/index.js';
-import { setDataLine } from '../services-internal/index.js';
-import { useCodeMirrorEditorIsolated } from '../stores/codemirror-editor.js';
+import { GlobalCodeMirrorEditorKey } from '../../consts';
+import { CodeMirrorEditor } from '../components-internal/CodeMirrorEditor';
+import { setDataLine } from '../services-internal';
+import { useCodeMirrorEditorIsolated } from '../stores/codemirror-editor';
 
 const additionalExtensions: Extension[] = [
   [setDataLine, EditorState.readOnly.of(true), EditorView.editable.of(false)],

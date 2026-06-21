@@ -1,6 +1,6 @@
 import createError from 'http-errors';
 
-import type { PageQuery } from './generate-base-query.js';
+import type { PageQuery } from './generate-base-query';
 
 /**
  * add sort condition(sort key & sort order)

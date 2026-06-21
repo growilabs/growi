@@ -18,13 +18,12 @@ type SyncExecutionProps = {
   AdditionalForm?: FC;
 };
 
-const SyncStatus = {
-  beforeSync: 0,
-  syncExecuting: 1,
-  syncCompleted: 2,
-  syncFailed: 3,
-} as const;
-type SyncStatus = (typeof SyncStatus)[keyof typeof SyncStatus];
+enum SyncStatus {
+  beforeSync,
+  syncExecuting,
+  syncCompleted,
+  syncFailed,
+}
 
 export const SyncExecution = ({
   provider,

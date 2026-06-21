@@ -9,18 +9,18 @@ import {
   type EditorSettings,
   type GlobalCodeMirrorEditorKey,
   PasteMode,
-} from '../../../consts/index.js';
+} from '../../../consts';
 import {
   adjustPasteData,
   FileDropzoneOverlay,
   getStrFromBol,
   useFileDropzone,
   useShowTableIcon,
-} from '../../services-internal/index.js';
-import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor.js';
-import { useDefaultExtensions } from '../../stores/use-default-extensions.js';
-import { useEditorSettings } from '../../stores/use-editor-settings.js';
-import { Toolbar } from './Toolbar/index.js';
+} from '../../services-internal';
+import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor';
+import { useDefaultExtensions } from '../../stores/use-default-extensions';
+import { useEditorSettings } from '../../stores/use-editor-settings';
+import { Toolbar } from './Toolbar';
 
 import style from './CodeMirrorEditor.module.scss';
 

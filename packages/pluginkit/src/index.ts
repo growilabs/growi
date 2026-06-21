@@ -1,2 +1,2 @@
-export * from './model/index.js';
-export * from './v4/client/index.js';
+export * from './model';
+export * from './v4/client';

@@ -1,8 +1,8 @@
 import type { Request, RequestHandler } from 'express';
 
-import type { IUserSerializedSecurely } from '../../models/serializers/index.js';
-import type { Scope } from '../scope.js';
-import type { IUserHasId } from '../user.js';
+import type { IUserSerializedSecurely } from '../../models/serializers';
+import type { Scope } from '../scope';
+import type { IUserHasId } from '../user';
 
 export interface AccessTokenParserReq extends Request {
   user?: IUserSerializedSecurely<IUserHasId>;

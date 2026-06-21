@@ -1,7 +1,7 @@
 import type { WebAPICallResult } from '@slack/web-api';
 
-import { markdownSectionBlock } from './block-kit-builder.js';
-import { respond } from './response-url.js';
+import { markdownSectionBlock } from './block-kit-builder';
+import { respond } from './response-url';
 
 export const respondRejectedErrors = async (
   rejectedResults: PromiseRejectedResult[],

@@ -10,32 +10,34 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:remove-crowi-lauout');
 
-export async function up(db) {
-  logger.info('Apply migration');
-  await mongoose.connect(getMongoUri(), mongoOptions);
+module.exports = {
+  async up(db) {
+    logger.info('Apply migration');
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  const Page = getModelSafely('Page') || getPageModel();
+    const Page = getModelSafely('Page') || getPageModel();
 
-  const pages = await Page.find({ updatedAt: { $type: 'double' } });
+    const pages = await Page.find({ updatedAt: { $type: 'double' } });
 
-  if (pages.length === 0) {
-    return logger.info('The target page did not exist.');
-  }
+    if (pages.length === 0) {
+      return logger.info('The target page did not exist.');
+    }
 
-  const operations = pages.map((page) => {
-    return {
-      updateMany: {
-        filter: { _id: page._id },
-        update: { updatedAt: new Date(page.updatedAt) },
-      },
-    };
-  });
+    const operations = pages.map((page) => {
+      return {
+        updateMany: {
+          filter: { _id: page._id },
+          update: { updatedAt: new Date(page.updatedAt) },
+        },
+      };
+    });
 
-  await Page.bulkWrite(operations);
+    await Page.bulkWrite(operations);
 
-  logger.info('Migration has successfully applied');
-}
+    logger.info('Migration has successfully applied');
+  },
 
-export function down(db) {
-  // do not rollback
-}
+  down(db) {
+    // do not rollback
+  },
+};

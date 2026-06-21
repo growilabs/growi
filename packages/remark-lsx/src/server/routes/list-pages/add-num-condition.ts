@@ -1,6 +1,6 @@
 import createError from 'http-errors';
 
-import type { PageQuery } from './generate-base-query.js';
+import type { PageQuery } from './generate-base-query';
 
 const DEFAULT_PAGES_NUM = 50;
 

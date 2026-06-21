@@ -1,4 +1,4 @@
-import type { Linker } from '@growi/editor/dist/models/index.js';
+import type { Linker } from '@growi/editor/dist/models';
 import { atom, useAtomValue, useSetAtom } from 'jotai';
 
 type LinkEditModalState = {

@@ -8,10 +8,7 @@ let migrationsRun = false;
 
 /**
  * Run database migrations using external process.
- * This uses the existing dev:migrate:up script (migrate-mongo via plain node +
- * umzug via Node's native TS runner — Node 24 strip-only type stripping (no
- * --experimental-transform-types) + the resolve-only hook in
- * bin/dev-esm-resolver.mjs, no tsx).
+ * This uses the existing dev:migrate:up script which has ts-node and tsconfig-paths configured.
  */
 function runMigrations(mongoUri: string): void {
   // Run migrations using the existing script with custom MONGO_URI
@@ -25,14 +22,6 @@ function runMigrations(mongoUri: string): void {
   });
 }
 
-// 20s timeout (2x the 10s default): this hook spawns `dev:migrate:up`, which
-// runs every migration through the dev TS runner once per Vitest worker. The
-// dev runner is now Node-native (strip-only type stripping + a synchronous
-// resolve-only hook), ~2x faster to load the graph than the former tsx, so per-file
-// resolve/load is no longer the bottleneck — the residual time is mostly DB
-// I/O under the parallel integration run. 20s is a modest margin over that;
-// any further reduction should follow a measured baseline (Phase 3.8.e ±20%
-// gate on the devcontainer), not a guess.
 beforeAll(() => {
   // Skip if already run (setupFiles run per test file, but we only need to migrate once per worker)
   if (migrationsRun) {
@@ -51,4 +40,4 @@ beforeAll(() => {
 
   runMigrations(mongoUri);
   migrationsRun = true;
-}, 20_000);
+});

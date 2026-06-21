@@ -1,5 +1,5 @@
-import type { TemplateSummary } from '../interfaces/index.js';
-import { extractSupportedLocales, getLocalizedTemplate } from './template.js';
+import type { TemplateSummary } from '../interfaces';
+import { extractSupportedLocales, getLocalizedTemplate } from './template';
 
 describe('getLocalizedTemplate', () => {
   it('should return undefined if templateSummary is undefined', () => {

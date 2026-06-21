@@ -3,19 +3,16 @@ import Head from 'next/head';
 import ReactMarkdown from 'react-markdown';
 import type { PluggableList } from 'unified';
 
-import {
-  MARP_CONTAINER_CLASS_NAME,
-  type PresentationOptions,
-} from '../consts/index.js';
+import { MARP_CONTAINER_CLASS_NAME, type PresentationOptions } from '../consts';
 import {
   PRESENTATION_MARPIT_CSS,
   SLIDE_MARPIT_CSS,
-} from '../consts/marpit-base-css.vendor-styles.prebuilt.js';
-import * as extractSections from '../services/renderer/extract-sections.js';
+} from '../consts/marpit-base-css.vendor-styles.prebuilt';
+import * as extractSections from '../services/renderer/extract-sections';
 import {
   PresentationRichSlideSection,
   RichSlideSection,
-} from './RichSlideSection.js';
+} from './RichSlideSection';
 
 type Props = {
   options: PresentationOptions;

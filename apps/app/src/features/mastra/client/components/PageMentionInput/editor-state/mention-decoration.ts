@@ -45,11 +45,8 @@ export const addMention: StateEffectType<{
  * security).
  */
 class MentionWidget extends WidgetType {
-  readonly data: MentionData;
-
-  constructor(data: MentionData) {
+  constructor(readonly data: MentionData) {
     super();
-    this.data = data;
   }
 
   /**

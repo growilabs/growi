@@ -1,5 +1,6 @@
 import type { NextFunction, Request, Response } from 'express';
 import express from 'express';
+import mockRequire from 'mock-require';
 import { Types } from 'mongoose';
 import request from 'supertest';
 import { mockDeep } from 'vitest-mock-extended';
@@ -24,6 +25,20 @@ const passthroughMiddleware = (
   next: NextFunction,
 ) => next();
 
+// Mock certify-shared-page middleware - sets isSharedPage when shareLinkId is present
+const mockCertifySharedPage = (
+  req: TestRequest,
+  _res: Response,
+  next: NextFunction,
+) => {
+  const { shareLinkId, pageId } = req.query;
+  if (shareLinkId && pageId) {
+    // In real implementation, this checks if shareLink exists and is valid
+    req.isSharedPage = true;
+  }
+  next();
+};
+
 // Mock middlewares using vi.mock (hoisted to top)
 vi.mock('~/server/middlewares/access-token-parser', () => ({
   accessTokenParser: () => passthroughMiddleware,
@@ -40,18 +55,6 @@ vi.mock('~/server/middlewares/login-required', () => ({
   },
 }));
 
-// Mock certify-shared-page as a static ESM import.
-// vi.mock factories are hoisted, so they must be self-contained.
-vi.mock('~/server/middlewares/certify-shared-page', () => ({
-  setup: () => (req: TestRequest, _res: Response, next: NextFunction) => {
-    const { shareLinkId, pageId } = req.query;
-    if (shareLinkId && pageId) {
-      req.isSharedPage = true;
-    }
-    next();
-  },
-}));
-
 describe('GET /info', () => {
   let app: express.Application;
   let crowi: Crowi;
@@ -65,6 +68,12 @@ describe('GET /info', () => {
   });
 
   beforeEach(async () => {
+    // Mock certify-shared-page middleware
+    mockRequire(
+      '../../../middlewares/certify-shared-page',
+      () => mockCertifySharedPage,
+    );
+
     // Mock findPageAndMetaDataByViewer with default successful response
     const mockSpy = vi.spyOn(findPageModule, 'findPageAndMetaDataByViewer');
 
@@ -133,12 +142,19 @@ describe('GET /info', () => {
     });
 
     // Mount the page router
-    const { setup: setupPageRouter } = await import('./index');
-    const pageRouter = setupPageRouter(crowi);
+    const pageModule = await import('./index');
+    const factoryCandidate =
+      'default' in pageModule ? pageModule.default : pageModule;
+    if (typeof factoryCandidate !== 'function') {
+      throw new Error('Module does not export a router factory function');
+    }
+    const pageRouter = factoryCandidate(crowi);
     app.use('/', pageRouter);
   });
 
   afterEach(() => {
+    // Clean up mocks
+    mockRequire.stopAll();
     vi.clearAllMocks();
     vi.restoreAllMocks();
   });

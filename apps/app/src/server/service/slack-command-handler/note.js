@@ -9,13 +9,13 @@ import {
 import { SlackCommandHandlerError } from '~/server/models/vo/slack-command-handler-error';
 import loggerFactory from '~/utils/logger';
 
-import CreatePageService from './create-page-service';
-import BaseSlackCommandHandler from './slack-command-handler';
+const logger = loggerFactory('growi:service:SlackCommandHandler:note');
 
-const _logger = loggerFactory('growi:service:SlackCommandHandler:note');
-
-export const setup = (crowi) => {
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
+  const CreatePageService = require('./create-page-service');
   const createPageService = new CreatePageService(crowi);
+  const BaseSlackCommandHandler = require('./slack-command-handler');
   const handler = new BaseSlackCommandHandler();
   const conversationsSelectElement = {
     action_id: 'conversation',

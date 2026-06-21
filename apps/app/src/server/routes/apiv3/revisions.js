@@ -2,7 +2,6 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import express from 'express';
-import { param, query } from 'express-validator';
 
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -14,9 +13,10 @@ import {
 import loggerFactory from '~/utils/logger';
 
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
-import { setup as certifySharedPageSetup } from '../../middlewares/certify-shared-page';
 
 const logger = loggerFactory('growi:routes:apiv3:pages');
+
+const { query, param } = require('express-validator');
 
 const router = express.Router();
 
@@ -55,12 +55,11 @@ const router = express.Router();
  *           type: integer
  *           description: The version key of the revision
  */
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
-  const certifySharedPage = certifySharedPageSetup(crowi);
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
+  const certifySharedPage = require('../../middlewares/certify-shared-page')(
+    crowi,
+  );
   const loginRequired = loginRequiredFactory(crowi, true);
 
   const { Page, User } = crowi.models;

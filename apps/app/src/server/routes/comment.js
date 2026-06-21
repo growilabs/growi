@@ -1,7 +1,5 @@
 import { getIdStringForRef } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import { body, validationResult } from 'express-validator';
-import mongoose from 'mongoose';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
 import {
@@ -14,7 +12,6 @@ import { prisma } from '~/utils/prisma';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
 import { preNotifyService } from '../service/pre-notify';
-import ApiResponse from '../util/apiResponse';
 
 /**
  * @swagger
@@ -62,15 +59,18 @@ import ApiResponse from '../util/apiResponse';
  */
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-export const setup = (crowi, _app) => {
+module.exports = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:comment');
   const { Page } = crowi.models;
+  const ApiResponse = require('../util/apiResponse');
 
   const activityEvent = crowi.events.activity;
 
   const globalNotificationService = crowi.globalNotificationService;
   const userNotificationService = crowi.userNotificationService;
 
+  const { body } = require('express-validator');
+  const mongoose = require('mongoose');
   const ObjectId = mongoose.Types.ObjectId;
 
   const actions = {};
@@ -253,6 +253,7 @@ export const setup = (crowi, _app) => {
    */
   api.add = async (req, res) => {
     const { commentForm, slackNotificationForm } = req.body;
+    const { validationResult } = require('express-validator');
 
     const errors = validationResult(req.body);
     if (!errors.isEmpty()) {

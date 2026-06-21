@@ -1,2 +1,2 @@
-export * from './attachment-serializer.js';
-export * from './user-serializer.js';
+export * from './attachment-serializer';
+export * from './user-serializer';

@@ -11,8 +11,8 @@
  * drain.ts and are consumed only inside those modules.
  */
 
-export { runBaseline } from './baseline.ts';
-export { runDrain } from './drain.ts';
+export { runBaseline } from './baseline';
+export { runDrain } from './drain';
 export {
   LOAD_PAGE_CREATE,
   LOAD_PAGE_EDIT,
@@ -22,4 +22,4 @@ export {
   LOAD_YJS_ABORT,
   LOAD_YJS_CLEAN_CLOSE,
   runLoad,
-} from './load.ts';
+} from './load';

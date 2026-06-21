@@ -1,4 +1,4 @@
-import * as pathUtils from './path-utils.js';
+import * as pathUtils from './path-utils';
 
 describe('page-utils', () => {
   describe('.normalizePath', () => {

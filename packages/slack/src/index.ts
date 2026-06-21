@@ -1,2 +1,2 @@
-export * from './consts/index.js';
-export * from './interfaces/index.js';
+export * from './consts';
+export * from './interfaces';

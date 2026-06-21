@@ -1,5 +1,5 @@
-import { scanAllTemplates } from './scan.js';
-import { validateTemplatePluginGrowiDirective } from './validate-growi-plugin-directive.js';
+import { scanAllTemplates } from './scan';
+import { validateTemplatePluginGrowiDirective } from './validate-growi-plugin-directive';
 
 export const validateAllTemplateLocales = async (
   projectDirRoot: string,

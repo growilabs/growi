@@ -1,6 +1,6 @@
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { NextFunction, Response } from 'express';
-import type { Request } from 'express-validator/src/base.js';
+import type { Request } from 'express-validator/src/base';
 
 import loggerFactory from '~/utils/logger';
 

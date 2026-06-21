@@ -7,8 +7,8 @@
     "declaration": true,
     "rootDir": "src",
     "noEmit": false,
-    "module": "ES2020",
-    "moduleResolution": "Bundler"
+    "module": "CommonJS",
+    "moduleResolution": "Node"
   },
   "include": ["./src/**/*"]
 }

@@ -1,4 +1,4 @@
-import { isTopPage } from './is-top-page.js';
+import { isTopPage } from './is-top-page';
 
 describe('TopPage Path test', () => {
   test.concurrent('Path is only "/"', () => {

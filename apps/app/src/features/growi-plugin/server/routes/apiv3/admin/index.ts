@@ -29,7 +29,7 @@ const validator = {
   ],
 };
 
-export const setup = (crowi: Crowi): Router => {
+module.exports = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
 

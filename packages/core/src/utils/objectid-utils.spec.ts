@@ -1,6 +1,6 @@
 import ObjectId from 'bson-objectid';
 
-import { isValidObjectId } from './objectid-utils.js';
+import { isValidObjectId } from './objectid-utils';
 
 describe('isValidObjectId', () => {
   describe.concurrent.each`

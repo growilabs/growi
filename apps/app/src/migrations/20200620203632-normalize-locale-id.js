@@ -7,33 +7,35 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:normalize-locale-id');
 
-export async function up(db, client) {
-  logger.info('Apply migration');
-  await mongoose.connect(getMongoUri(), mongoOptions);
+module.exports = {
+  async up(db, client) {
+    logger.info('Apply migration');
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  const User = userModelFactory();
+    const User = userModelFactory();
 
-  await Promise.all([
-    // update en-US -> en_US
-    Config.update(
-      { key: 'app:globalLang', value: JSON.stringify('en-US') },
-      { value: JSON.stringify('en_US') },
-    ),
-    // update ja -> ja_JP
-    Config.update(
-      { key: 'app:globalLang', value: JSON.stringify('ja') },
-      { value: JSON.stringify('ja_JP') },
-    ),
+    await Promise.all([
+      // update en-US -> en_US
+      Config.update(
+        { key: 'app:globalLang', value: JSON.stringify('en-US') },
+        { value: JSON.stringify('en_US') },
+      ),
+      // update ja -> ja_JP
+      Config.update(
+        { key: 'app:globalLang', value: JSON.stringify('ja') },
+        { value: JSON.stringify('ja_JP') },
+      ),
 
-    // update en-US -> en_US
-    User.updateMany({ lang: 'en-US' }, { lang: 'en_US' }),
-    // update ja -> ja_JP
-    User.updateMany({ lang: 'ja' }, { lang: 'ja_JP' }),
-  ]);
+      // update en-US -> en_US
+      User.updateMany({ lang: 'en-US' }, { lang: 'en_US' }),
+      // update ja -> ja_JP
+      User.updateMany({ lang: 'ja' }, { lang: 'ja_JP' }),
+    ]);
 
-  logger.info('Migration has successfully applied');
-}
+    logger.info('Migration has successfully applied');
+  },
 
-export async function down(db, client) {
-  // do not rollback
-}
+  async down(db, client) {
+    // do not rollback
+  },
+};

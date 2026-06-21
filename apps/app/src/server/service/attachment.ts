@@ -1,8 +1,6 @@
-import type { ReadStream } from 'node:fs';
-import fs from 'node:fs';
 import type { IAttachment, Ref } from '@growi/core/dist/interfaces';
+import type { ReadStream } from 'fs';
 import type { HydratedDocument } from 'mongoose';
-import mongoose from 'mongoose';
 
 import loggerFactory from '~/utils/logger';
 
@@ -11,12 +9,18 @@ import { AttachmentType } from '../interfaces/attachment';
 import type { IAttachmentDocument } from '../models/attachment';
 import { Attachment } from '../models/attachment';
 
+const fs = require('fs');
+
+const mongoose = require('mongoose');
+
 const logger = loggerFactory('growi:service:AttachmentService');
 
 const createReadStream = (filePath: string): ReadStream => {
   return fs.createReadStream(filePath, {
     flags: 'r',
-    mode: 0o666,
+    encoding: null,
+    fd: null,
+    mode: '0666',
     autoClose: true,
   });
 };

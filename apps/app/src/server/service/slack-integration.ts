@@ -281,15 +281,11 @@ export class SlackIntegrationService implements S2sMessageHandlable {
     respondUtil: RespondUtil,
   ): Promise<void> {
     const { growiCommandType } = growiCommand;
-    // Explicit `.js`: template-literal dynamic import resolved at runtime by
-    // NodeNext, which requires the extension (extensionless -> ERR_MODULE_NOT_FOUND).
-    const modulePath = `./slack-command-handler/${growiCommandType}.js`;
+    const modulePath = `./slack-command-handler/${growiCommandType}`;
 
     let handler: any;
     try {
-      const mod = await import(modulePath);
-      const factory = mod.setup ?? mod.default ?? mod;
-      handler = factory(this.crowi);
+      handler = require(modulePath)(this.crowi);
     } catch (err) {
       const text = `*No command.*\n \`command: ${growiCommand.text}\``;
       logger.error(err);
@@ -320,15 +316,11 @@ export class SlackIntegrationService implements S2sMessageHandlable {
     const commandName = actionId.split(':')[0];
     const handlerMethodName = actionId.split(':')[1];
 
-    // Explicit `.js`: template-literal dynamic import resolved at runtime by
-    // NodeNext, which requires the extension (extensionless -> ERR_MODULE_NOT_FOUND).
-    const modulePath = `./slack-command-handler/${commandName}.js`;
+    const modulePath = `./slack-command-handler/${commandName}`;
 
     let handler: any;
     try {
-      const mod = await import(modulePath);
-      const factory = mod.setup ?? mod.default ?? mod;
-      handler = factory(this.crowi);
+      handler = require(modulePath)(this.crowi);
     } catch (err) {
       throw new SlackCommandHandlerError(
         `No interaction.\n \`actionId: ${actionId}\``,
@@ -356,15 +348,11 @@ export class SlackIntegrationService implements S2sMessageHandlable {
     const commandName = callbackId.split(':')[0];
     const handlerMethodName = callbackId.split(':')[1];
 
-    // Explicit `.js`: template-literal dynamic import resolved at runtime by
-    // NodeNext, which requires the extension (extensionless -> ERR_MODULE_NOT_FOUND).
-    const modulePath = `./slack-command-handler/${commandName}.js`;
+    const modulePath = `./slack-command-handler/${commandName}`;
 
     let handler: any;
     try {
-      const mod = await import(modulePath);
-      const factory = mod.setup ?? mod.default ?? mod;
-      handler = factory(this.crowi);
+      handler = require(modulePath)(this.crowi);
     } catch (err) {
       throw new SlackCommandHandlerError(
         `No interaction.\n \`callbackId: ${callbackId}\``,

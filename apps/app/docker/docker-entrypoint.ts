@@ -178,7 +178,7 @@ function logFlags(heapSize: number | undefined, flags: string[]): void {
 
 /**
  * Run database migration via execFileSync (no shell needed).
- * Equivalent to: node -r dotenv-flow/config node_modules/migrate-mongo/bin/migrate-mongo up -f config/migrate-mongo-config.cjs
+ * Equivalent to: node -r dotenv-flow/config node_modules/migrate-mongo/bin/migrate-mongo up -f config/migrate-mongo-config.js
  */
 function runMigration(): void {
   console.log('[entrypoint] Running migration...');
@@ -190,7 +190,7 @@ function runMigration(): void {
       'node_modules/migrate-mongo/bin/migrate-mongo',
       'up',
       '-f',
-      'config/migrate-mongo-config.cjs',
+      'config/migrate-mongo-config.js',
     ],
     {
       stdio: 'inherit',

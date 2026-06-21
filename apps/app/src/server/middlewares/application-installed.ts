@@ -1,10 +1,8 @@
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-export const setup = (crowi) => {
+module.exports = (crowi) => {
   const { appService } = crowi;
 
-  // Named function so the route-middleware snapshot tool can identify this
-  // handler in the apiv3 auth chain.
-  return async function applicationInstalled(req, res, next) {
+  return async (req, res, next) => {
     const isDBInitialized = await appService.isDBInitialized();
 
     // when already installed

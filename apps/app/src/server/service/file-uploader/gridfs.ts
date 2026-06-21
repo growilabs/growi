@@ -231,7 +231,7 @@ class GridfsFileUploader extends AbstractFileUploader {
   }
 }
 
-export const setup = (crowi: Crowi) => {
+module.exports = (crowi: Crowi) => {
   const lib = new GridfsFileUploader(crowi);
 
   lib.isValidUploadSettings = () => true;

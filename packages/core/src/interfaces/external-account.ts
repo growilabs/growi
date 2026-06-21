@@ -1,5 +1,5 @@
-import type { Ref } from './common.js';
-import type { IUser } from './user.js';
+import type { Ref } from './common';
+import type { IUser } from './user';
 
 export type IExternalAccount<P> = {
   providerType: P;

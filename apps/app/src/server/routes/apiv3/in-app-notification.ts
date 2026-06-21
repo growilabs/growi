@@ -1,6 +1,5 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
-import type { Router } from 'express';
 import express from 'express';
 
 import { SupportedAction } from '~/interfaces/activity';
@@ -87,7 +86,7 @@ const router = express.Router();
  *           items:
  *             $ref: '#/components/schemas/User'
  */
-export const setup = (crowi: Crowi): Router => {
+module.exports = (crowi: Crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
 

@@ -2,13 +2,12 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:services:fileUploader:multipartUploader');
 
-export const UploadStatus = {
-  BEFORE_INIT: 0,
-  IN_PROGRESS: 1,
-  COMPLETED: 2,
-  ABORTED: 3,
-} as const;
-export type UploadStatus = (typeof UploadStatus)[keyof typeof UploadStatus];
+export enum UploadStatus {
+  BEFORE_INIT,
+  IN_PROGRESS,
+  COMPLETED,
+  ABORTED,
+}
 
 export interface IMultipartUploader {
   initUpload(): Promise<void>;

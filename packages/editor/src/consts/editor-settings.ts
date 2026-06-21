@@ -1,6 +1,6 @@
-import type { EditorTheme } from './editor-themes.js';
-import type { KeyMapMode } from './keymaps.js';
-import type { PasteMode } from './paste-mode.js';
+import type { EditorTheme } from './editor-themes';
+import type { KeyMapMode } from './keymaps';
+import type { PasteMode } from './paste-mode';
 
 export interface EditorSettings {
   theme: undefined | EditorTheme;

@@ -1,4 +1,4 @@
-import type { IGraphViewerGlobal } from '../interfaces/graph-viewer.js';
+import type { IGraphViewerGlobal } from '../interfaces/graph-viewer';
 
 export const isGraphViewerGlobal = (
   val: unknown,

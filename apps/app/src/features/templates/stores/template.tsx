@@ -1,7 +1,7 @@
 import {
   getLocalizedTemplate,
   type TemplateSummary,
-} from '@growi/pluginkit/dist/v4/index.js';
+} from '@growi/pluginkit/dist/v4';
 import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 

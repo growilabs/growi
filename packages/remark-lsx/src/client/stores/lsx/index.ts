@@ -1,1 +1,1 @@
-export * from './lsx.js';
+export * from './lsx';

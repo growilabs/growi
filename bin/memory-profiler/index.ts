@@ -3,6 +3,6 @@
 // Internal symbols (factories, scenario `run*` functions, `LOAD_*` constants,
 // lib/* helpers) MUST NOT be re-exported here.
 
-export type { LoadDriver } from './load-driver.ts';
-export type { LoadOpCounts, ScenarioRunnerOptions } from './run-scenario.ts';
-export { runScenario, ScenarioRunnerError } from './run-scenario.ts';
+export type { LoadDriver } from './load-driver';
+export type { LoadOpCounts, ScenarioRunnerOptions } from './run-scenario';
+export { runScenario, ScenarioRunnerError } from './run-scenario';

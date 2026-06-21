@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { escapeStringForMongoRegex } from './escape-string-for-regex.js';
+import { escapeStringForMongoRegex } from './escape-string-for-regex';
 
 describe('escapeStringForMongoRegex', () => {
   test('escapes regex metacharacters', () => {

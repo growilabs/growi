@@ -1,6 +1,6 @@
 import { describe, expect, it, vi } from 'vitest';
 
-import type { EditingClient } from '../../interfaces/index.js';
+import type { EditingClient } from '../../interfaces';
 
 /**
  * Unit tests for awareness state handling logic extracted from

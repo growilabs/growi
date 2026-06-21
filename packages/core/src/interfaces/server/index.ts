@@ -1,1 +1,1 @@
-export * from './access-token-parser.js';
+export * from './access-token-parser';

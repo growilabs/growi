@@ -1,6 +1,6 @@
 import type { IUserHasId } from '@growi/core';
 import { ErrorV3 } from '@growi/core/dist/models';
-import type { Request, Router } from 'express';
+import type { Request } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
@@ -18,7 +18,7 @@ const logger = loggerFactory('growi:routes:apiv3:content-disposition-settings');
 
 const router = express.Router();
 
-export const setup = (crowi): Router => {
+module.exports = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();

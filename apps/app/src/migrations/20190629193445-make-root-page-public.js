@@ -6,24 +6,26 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:make-root-page-public');
 
-export async function up(db) {
-  logger.info('Apply migration');
-  await mongoose.connect(getMongoUri(), mongoOptions);
+module.exports = {
+  async up(db) {
+    logger.info('Apply migration');
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  const Page = getPageModel();
+    const Page = getPageModel();
 
-  await Page.findOneAndUpdate(
-    { path: '/' },
-    {
-      grant: Page.GRANT_PUBLIC,
-      grantedUsers: [],
-      grantedGroup: null,
-    },
-  );
+    await Page.findOneAndUpdate(
+      { path: '/' },
+      {
+        grant: Page.GRANT_PUBLIC,
+        grantedUsers: [],
+        grantedGroup: null,
+      },
+    );
 
-  logger.info('Migration has successfully applied');
-}
+    logger.info('Migration has successfully applied');
+  },
 
-export function down(db) {
-  // do not rollback
-}
+  down(db) {
+    // do not rollback
+  },
+};

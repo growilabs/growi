@@ -1,29 +1,29 @@
 import type { Extension } from '@codemirror/state';
 
-import type { EditorTheme } from '../../../consts/index.js';
+import type { EditorTheme } from '../../../consts';
 
 export const getEditorTheme = async (
   themeName?: EditorTheme,
 ): Promise<Extension> => {
   switch (themeName) {
     case 'eclipse':
-      return (await import('./eclipse.js')).eclipse;
+      return (await import('./eclipse')).eclipse;
     case 'basic':
       return (await import('cm6-theme-basic-light')).basicLight;
     case 'ayu':
-      return (await import('./ayu.js')).ayu;
+      return (await import('./ayu')).ayu;
     case 'rosepine':
-      return (await import('./rose-pine.js')).rosePine;
+      return (await import('./rose-pine')).rosePine;
     case 'defaultdark':
-      return (await import('./original-dark.js')).originalDark;
+      return (await import('./original-dark')).originalDark;
     case 'material':
-      return (await import('./material.js')).materialDark;
+      return (await import('./material')).materialDark;
     case 'nord':
-      return (await import('./nord.js')).nord;
+      return (await import('./nord')).nord;
     case 'cobalt':
-      return (await import('./cobalt.js')).cobalt;
+      return (await import('./cobalt')).cobalt;
     case 'kimbie':
       return (await import('@uiw/codemirror-theme-kimbie')).kimbie;
   }
-  return (await import('./original-light.js')).originalLight;
+  return (await import('./original-light')).originalLight;
 };

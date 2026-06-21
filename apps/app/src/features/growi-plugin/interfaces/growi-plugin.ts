@@ -3,7 +3,7 @@ import type {
   GrowiThemeMetadata,
   HasObjectId,
 } from '@growi/core';
-import type { TemplateSummary } from '@growi/pluginkit/dist/v4/index.js';
+import type { TemplateSummary } from '@growi/pluginkit/dist/v4';
 
 export type IGrowiPluginOrigin = {
   url: string;

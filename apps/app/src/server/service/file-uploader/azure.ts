@@ -17,7 +17,6 @@ import {
 } from '@azure/storage-blob';
 import { toNonBlankStringOrUndefined } from '@growi/core/dist/interfaces';
 import type { Readable } from 'stream';
-import urljoin from 'url-join';
 
 import type Crowi from '~/server/crowi';
 import {
@@ -35,6 +34,8 @@ import {
   type TemporaryUrl,
 } from './file-uploader';
 import { createContentHeaders, getContentHeaderValue } from './utils';
+
+const urljoin = require('url-join');
 
 const logger = loggerFactory('growi:service:fileUploaderAzure');
 
@@ -381,7 +382,7 @@ class AzureFileUploader extends AbstractFileUploader {
   }
 }
 
-export const setup = (crowi: Crowi) => {
+module.exports = (crowi: Crowi) => {
   const lib = new AzureFileUploader(crowi);
 
   lib.isValidUploadSettings = () =>

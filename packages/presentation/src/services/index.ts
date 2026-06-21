@@ -1,1 +1,1 @@
-export * from './use-slides-by-frontmatter.js';
+export * from './use-slides-by-frontmatter';

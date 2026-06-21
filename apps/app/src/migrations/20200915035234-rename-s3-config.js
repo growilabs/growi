@@ -4,7 +4,7 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:migrate:remove-timeline-type');
 
-import mongoose from 'mongoose';
+const mongoose = require('mongoose');
 
 const awsConfigs = [
   {
@@ -29,38 +29,40 @@ const awsConfigs = [
   },
 ];
 
-export async function up(db, client) {
-  logger.info('Apply migration');
-  await mongoose.connect(getMongoUri(), mongoOptions);
+module.exports = {
+  async up(db, client) {
+    logger.info('Apply migration');
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  const request = awsConfigs.map((awsConfig) => {
-    return {
-      updateOne: {
-        filter: { key: awsConfig.oldValue },
-        update: { key: awsConfig.newValue },
-      },
-    };
-  });
+    const request = awsConfigs.map((awsConfig) => {
+      return {
+        updateOne: {
+          filter: { key: awsConfig.oldValue },
+          update: { key: awsConfig.newValue },
+        },
+      };
+    });
 
-  await Config.bulkWrite(request);
+    await Config.bulkWrite(request);
 
-  logger.info('Migration has successfully applied');
-}
+    logger.info('Migration has successfully applied');
+  },
 
-export async function down(db, client) {
-  logger.info('Rollback migration');
+  async down(db, client) {
+    logger.info('Rollback migration');
 
-  await mongoose.connect(getMongoUri(), mongoOptions);
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  const request = awsConfigs.map((awsConfig) => {
-    return {
-      updateOne: {
-        filter: { key: awsConfig.newValue },
-        update: { key: awsConfig.oldValue },
-      },
-    };
-  });
+    const request = awsConfigs.map((awsConfig) => {
+      return {
+        updateOne: {
+          filter: { key: awsConfig.newValue },
+          update: { key: awsConfig.oldValue },
+        },
+      };
+    });
 
-  await Config.bulkWrite(request);
-  logger.info('Migration has been successfully rollbacked');
-}
+    await Config.bulkWrite(request);
+    logger.info('Migration has been successfully rollbacked');
+  },
+};

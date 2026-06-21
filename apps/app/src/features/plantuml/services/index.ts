@@ -1,4 +1,1 @@
-export {
-  remarkPlugin,
-  sanitizeOption,
-} from './plantuml';
+export { remarkPlugin, sanitizeOption } from './plantuml';

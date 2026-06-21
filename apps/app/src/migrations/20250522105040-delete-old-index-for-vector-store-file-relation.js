@@ -22,46 +22,47 @@ async function dropIndexIfExists(db, collectionName, indexName) {
   }
 }
 
-export async function up(db) {
-  logger.info('Apply migration');
+module.exports = {
+  async up(db) {
+    logger.info('Apply migration');
 
-  await mongoose.connect(getMongoUri(), mongoOptions);
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  // Drop old index
-  await dropIndexIfExists(
-    db,
-    'vectorstorefilerelations',
-    'vectorStoreRelationId_1_page_1',
-  );
+    // Drop old index
+    await dropIndexIfExists(
+      db,
+      'vectorstorefilerelations',
+      'vectorStoreRelationId_1_page_1',
+    );
 
-  // Create index
-  const collection = mongoose.connection.collection(
-    'vectorstorefilerelations',
-  );
-  await collection.createIndex(
-    { vectorStoreRelationId: 1, page: 1, attachment: 1 },
-    { unique: true },
-  );
-}
+    // Create index
+    const collection = mongoose.connection.collection(
+      'vectorstorefilerelations',
+    );
+    await collection.createIndex(
+      { vectorStoreRelationId: 1, page: 1, attachment: 1 },
+      { unique: true },
+    );
+  },
+  async down(db) {
+    logger.info('Rollback migration');
 
-export async function down(db) {
-  logger.info('Rollback migration');
+    await mongoose.connect(getMongoUri(), mongoOptions);
 
-  await mongoose.connect(getMongoUri(), mongoOptions);
+    // Drop new index
+    await dropIndexIfExists(
+      db,
+      'vectorstorefilerelations',
+      'vectorStoreRelationId_1_page_1_attachment_1',
+    );
 
-  // Drop new index
-  await dropIndexIfExists(
-    db,
-    'vectorstorefilerelations',
-    'vectorStoreRelationId_1_page_1_attachment_1',
-  );
-
-  // Recreate old index
-  const collection = mongoose.connection.collection(
-    'vectorstorefilerelations',
-  );
-  await collection.createIndex(
-    { vectorStoreRelationId: 1, page: 1 },
-    { unique: true },
-  );
-}
+    // Recreate old index
+    const collection = mongoose.connection.collection(
+      'vectorstorefilerelations',
+    );
+    await collection.createIndex(
+      { vectorStoreRelationId: 1, page: 1 },
+      { unique: true },
+    );
+  },
+};

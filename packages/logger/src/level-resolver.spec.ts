@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
-import { resolveLevel } from './level-resolver.js';
-import type { LoggerConfig } from './types.js';
+import { resolveLevel } from './level-resolver';
+import type { LoggerConfig } from './types';
 
 describe('resolveLevel', () => {
   const baseConfig: LoggerConfig = {

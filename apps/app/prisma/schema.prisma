@@ -1,11 +1,10 @@
 generator client {
-  provider            = "prisma-client"
-  output              = "../src/generated/prisma"
-  // ESM output to match the NodeNext server build (esm-migration task 3.6).
-  // importFileExtension makes the generated relative imports carry explicit
-  // `.js` extensions, which Node's ESM loader requires at runtime.
-  moduleFormat        = "esm"
-  importFileExtension = "js"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  // Force CJS output: the default ESM template emits `import.meta.url`, which Node's
+  // ESM auto-detection then trips on after tspc transpiles the file to CJS — yielding
+  // `ReferenceError: exports is not defined in ES module scope` at server startup.
+  moduleFormat = "cjs"
 }
 
 datasource db {

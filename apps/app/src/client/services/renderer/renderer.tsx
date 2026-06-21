@@ -3,7 +3,7 @@ import { isClient } from '@growi/core/dist/utils/browser-utils';
 import * as presentation from '@growi/presentation/dist/client/services/sanitize-option';
 import * as refsGrowiDirective from '@growi/remark-attachment-refs/dist/client';
 import * as drawio from '@growi/remark-drawio';
-import * as lsxGrowiDirective from '@growi/remark-lsx/dist/client/index.js';
+import * as lsxGrowiDirective from '@growi/remark-lsx/dist/client';
 import assert from 'assert';
 import katex from 'rehype-katex';
 import sanitize from 'rehype-sanitize';

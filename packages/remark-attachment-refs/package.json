@@ -22,9 +22,8 @@
       "import": "./dist/client/*"
     },
     "./dist/server": {
-      "types": "./dist/server/index.d.ts",
       "require": "./dist/server/index.cjs",
-      "import": "./dist/server/index.cjs"
+      "import": "./dist/server/index.js"
     }
   },
   "scripts": {

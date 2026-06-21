@@ -1,3 +1,0 @@
-# 3.8.a lint:no-cjs + unit — sandbox
-no-cjs: route-top-level-guard OK (350 files)
-unit (vitest app-unit): 1951 passed / 8 skipped; 1 file env-fail (update-activity.spec.ts: mongodb-memory-server download 403 — sandbox-only, green in CI)

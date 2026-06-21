@@ -44,7 +44,7 @@ interface AuthorizedRequest extends Request {
  *          count:
  *            type: number
  */
-export const setup = (crowi: Crowi): Router => {
+module.exports = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();

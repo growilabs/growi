@@ -5,33 +5,13 @@ import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
 
-// next-i18next.config.mjs has a single `export default` whose value is the config
-// object; `i18n` is a property of that object, not a named export. Use a default
-// import and read `.i18n` from it.
-import nextI18nextConfig from '^/config/next-i18next.config.mjs';
-
-import { aclService as _aclService } from '../../service/acl';
-// Getter wrappers for service singletons: callers use getConfigManager() /
-// getAclService() so that this module's import of service singletons can be
-// intercepted by tests (vi.mock) without changing the call-site API.
-// The singletons are module-level bindings (ESM live-binding); accesses happen
-// only inside functions, never at module-top, so circular-dep evaluation order
-// is safe.
-import { configManager as _configManager } from '../../service/config-manager';
-
-/** @returns {import('../../service/config-manager').IConfigManagerForApp} */
-export function getConfigManager() {
-  return _configManager;
-}
-
-/** @returns {import('../../service/acl').AclService} */
-export function getAclService() {
-  return _aclService;
-}
+import { i18n } from '^/config/next-i18next.config';
 
 import { generateGravatarSrc } from '~/utils/gravatar';
 import loggerFactory from '~/utils/logger';
 
+import { aclService } from '../../service/acl';
+import { configManager } from '../../service/config-manager';
 import { getModelSafely } from '../../util/mongoose-utils';
 import { Attachment } from '../attachment';
 import { UserStatus } from './conts';
@@ -79,7 +59,7 @@ const factory = (crowi) => {
       apiToken: { type: String, index: true },
       lang: {
         type: String,
-        enum: nextI18nextConfig.i18n.locales,
+        enum: i18n.locales,
         default: 'en_US',
       },
       status: {
@@ -117,20 +97,20 @@ const factory = (crowi) => {
   function decideUserStatusOnRegistration() {
     validateCrowi();
 
-    const isInstalled = getConfigManager().getConfig('app:installed');
+    const isInstalled = configManager.getConfig('app:installed');
     if (!isInstalled) {
       return UserStatus.STATUS_ACTIVE; // is this ok?
     }
 
     // status decided depends on registrationMode
-    const registrationMode = getConfigManager().getConfig(
+    const registrationMode = configManager.getConfig(
       'security:registrationMode',
     );
     switch (registrationMode) {
-      case getAclService().labels.SECURITY_REGISTRATION_MODE_OPEN:
+      case aclService.labels.SECURITY_REGISTRATION_MODE_OPEN:
         return UserStatus.STATUS_ACTIVE;
-      case getAclService().labels.SECURITY_REGISTRATION_MODE_RESTRICTED:
-      case getAclService().labels.SECURITY_REGISTRATION_MODE_CLOSED: // 一応
+      case aclService.labels.SECURITY_REGISTRATION_MODE_RESTRICTED:
+      case aclService.labels.SECURITY_REGISTRATION_MODE_CLOSED: // 一応
         return UserStatus.STATUS_REGISTERED;
       default:
         return UserStatus.STATUS_ACTIVE; // どっちにすんのがいいんだろうな
@@ -299,10 +279,10 @@ const factory = (crowi) => {
     this.name = name;
     this.username = username;
     this.status = UserStatus.STATUS_ACTIVE;
-    this.isEmailPublished = getConfigManager().getConfig(
+    this.isEmailPublished = configManager.getConfig(
       'customize:isEmailPublishedForNewUser',
     );
-    this.readOnly = getConfigManager().getConfig('app:isReadOnlyForNewUser');
+    this.readOnly = configManager.getConfig('app:isReadOnlyForNewUser');
 
     this.save((err, userData) => {
       userEvent.emit('activated', userData);
@@ -398,9 +378,7 @@ const factory = (crowi) => {
   userSchema.statics.isEmailValid = (email, callback) => {
     validateCrowi();
 
-    const whitelist = getConfigManager().getConfig(
-      'security:registrationWhitelist',
-    );
+    const whitelist = configManager.getConfig('security:registrationWhitelist');
 
     if (Array.isArray(whitelist) && whitelist.length > 0) {
       return whitelist.some((allowedEmail) => {
@@ -514,9 +492,7 @@ const factory = (crowi) => {
   };
 
   userSchema.statics.isUserCountExceedsUpperLimit = async function () {
-    const userUpperLimit = getConfigManager().getConfig(
-      'security:userUpperLimit',
-    );
+    const userUpperLimit = configManager.getConfig('security:userUpperLimit');
 
     const activeUsers = await this.countActiveUsers();
     if (userUpperLimit <= activeUsers) {
@@ -616,12 +592,12 @@ const factory = (crowi) => {
     newUser.setPassword(password);
     newUser.status = UserStatus.STATUS_INVITED;
 
-    const globalLang = getConfigManager().getConfig('app:globalLang');
+    const globalLang = configManager.getConfig('app:globalLang');
     if (globalLang != null) {
       newUser.lang = globalLang;
     }
 
-    newUser.readOnly = getConfigManager().getConfig('app:isReadOnlyForNewUser');
+    newUser.readOnly = configManager.getConfig('app:isReadOnlyForNewUser');
 
     try {
       const newUserData = await newUser.save();
@@ -709,13 +685,13 @@ const factory = (crowi) => {
     }
 
     // Default email show/hide is up to the administrator
-    newUser.isEmailPublished = getConfigManager().getConfig(
+    newUser.isEmailPublished = configManager.getConfig(
       'customize:isEmailPublishedForNewUser',
     );
 
-    newUser.readOnly = getConfigManager().getConfig('app:isReadOnlyForNewUser');
+    newUser.readOnly = configManager.getConfig('app:isReadOnlyForNewUser');
 
-    const globalLang = getConfigManager().getConfig('app:globalLang');
+    const globalLang = configManager.getConfig('app:globalLang');
     if (globalLang != null) {
       newUser.lang = globalLang;
     }

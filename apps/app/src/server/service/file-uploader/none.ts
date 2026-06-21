@@ -124,6 +124,6 @@ class NoneFileUploader extends AbstractFileUploader {
   }
 }
 
-export const setup = (crowi: Crowi) => {
+module.exports = (crowi: Crowi) => {
   return new NoneFileUploader(crowi);
 };

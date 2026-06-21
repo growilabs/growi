@@ -1,5 +1,5 @@
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-export const setup = (crowi) => {
+module.exports = (crowi) => {
   const { s2sMessagingService } = crowi;
 
   return (req, res, next) => {

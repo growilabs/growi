@@ -6,7 +6,7 @@ import { Revision } from '../models/revision';
 import ApiResponse from '../util/apiResponse';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-export const setup = (crowi, _app) => {
+module.exports = (crowi, _app) => {
   const actions = {};
   const api = {};
 

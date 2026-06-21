@@ -5,15 +5,12 @@ import { loggerFactory } from '@growi/logger';
 import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
 
-import type {
-  LsxApiParams,
-  LsxApiResponseData,
-} from '../../../interfaces/api.js';
-import { addDepthCondition } from './add-depth-condition.js';
-import { addNumCondition } from './add-num-condition.js';
-import { addSortCondition } from './add-sort-condition.js';
-import { generateBaseQuery, type PageQuery } from './generate-base-query.js';
-import { getToppageViewersCount } from './get-toppage-viewers-count.js';
+import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
+import { addDepthCondition } from './add-depth-condition';
+import { addNumCondition } from './add-num-condition';
+import { addSortCondition } from './add-sort-condition';
+import { generateBaseQuery, type PageQuery } from './generate-base-query';
+import { getToppageViewersCount } from './get-toppage-viewers-count';
 
 const logger = loggerFactory('growi:remark-lsx:routes:list-pages');
 

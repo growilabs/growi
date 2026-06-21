@@ -26,11 +26,11 @@ import { handleSamlUpdate, samlAuthValidator } from './saml';
 
 const logger = loggerFactory('growi:routes:apiv3:security-setting');
 
-import express from 'express';
+const express = require('express');
 
 const router = express.Router();
 
-import { body } from 'express-validator';
+const { body } = require('express-validator');
 
 const validator = {
   generalSetting: [
@@ -418,11 +418,8 @@ const validator = {
  *            type: boolean
  *            description: local account automatically linked the email matched
  */
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);

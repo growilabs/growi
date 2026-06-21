@@ -1,6 +1,6 @@
-import type { Ref } from './common.js';
-import type { IPage } from './page.js';
-import type { IUser } from './user.js';
+import type { Ref } from './common';
+import type { IPage } from './page';
+import type { IUser } from './user';
 
 export const SubscriptionStatusType = {
   SUBSCRIBE: 'SUBSCRIBE',

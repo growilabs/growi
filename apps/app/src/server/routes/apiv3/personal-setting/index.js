@@ -2,9 +2,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
 
-// next-i18next.config.mjs has a single `export default` config object; `i18n` is
-// a property of it, not a named export. Use a default import and read `.i18n`.
-import nextI18nextConfig from '^/config/next-i18next.config.mjs';
+import { i18n } from '^/config/next-i18next.config';
 
 import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
@@ -23,8 +21,8 @@ import { getAccessTokenHandlerFactory } from './get-access-tokens';
 
 const logger = loggerFactory('growi:routes:apiv3:personal-setting');
 
-import express from 'express';
-import passport from 'passport';
+const express = require('express');
+const passport = require('passport');
 
 const router = express.Router();
 
@@ -74,11 +72,8 @@ const router = express.Router();
  *          accountId:
  *            type: string
  */
-/**
- * @param {import('~/server/crowi').default} crowi Crowi instance
- * @returns {import('express').Router} router
- */
-export const setup = (crowi) => {
+/** @param {import('~/server/crowi').default} crowi Crowi instance */
+module.exports = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
 
@@ -100,7 +95,7 @@ export const setup = (crowi) => {
             throw new Error('email is not included in whitelist');
           return true;
         }),
-      body('lang').isString().isIn(nextI18nextConfig.i18n.locales),
+      body('lang').isString().isIn(i18n.locales),
       body('isEmailPublished').isBoolean(),
       body('slackMemberId').optional().isString(),
     ],

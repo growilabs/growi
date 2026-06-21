@@ -1,6 +1,6 @@
 import ExtensibleCustomError from 'extensible-custom-error';
 
-import type { GrowiPluginValidationData } from './growi-plugin-validation-data.js';
+import type { GrowiPluginValidationData } from './growi-plugin-validation-data';
 
 export class GrowiPluginValidationError<
   E extends

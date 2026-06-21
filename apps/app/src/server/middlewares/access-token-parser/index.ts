@@ -13,9 +13,7 @@ const logger = loggerFactory('growi:middleware:access-token-parser');
 export type { AccessTokenParser, AccessTokenParserReq };
 
 export const accessTokenParser: AccessTokenParser = (scopes, opts) => {
-  // Named function so the route-middleware snapshot tool can identify this
-  // handler in the apiv3 auth chain.
-  return async function accessTokenParserMw(req, res, next): Promise<void> {
+  return async (req, res, next): Promise<void> => {
     if (scopes == null || scopes.length === 0) {
       logger.warn('scopes is empty');
       return next();
