@@ -105,6 +105,7 @@
       "includes": [
         "**/vite*.config.ts",
         "vitest*.config.ts",
+        "**/postcss.config.mjs",
         "**/declaration.d.ts"
       ],
       "linter": {
