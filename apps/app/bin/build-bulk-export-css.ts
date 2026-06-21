@@ -21,7 +21,7 @@ import * as sass from 'sass';
 
 // ─── Paths ───────────────────────────────────────────────────────────────────
 
-const APPS_APP_DIR = resolve(__dirname, '..');
+const APPS_APP_DIR = resolve(import.meta.dirname, '..');
 const NODE_MODULES_DIR = resolve(APPS_APP_DIR, 'node_modules');
 const KATEX_CSS_PATH = resolve(NODE_MODULES_DIR, 'katex/dist/katex.css');
 const KATEX_FONTS_DIR = resolve(NODE_MODULES_DIR, 'katex/dist/fonts');

@@ -34,7 +34,13 @@ const loginRequiredFactory = (
   isGuestAllowed = false,
   fallback: FallbackFunction | null = null,
 ) => {
-  return (req: RequestWithUser, res: Response, next: NextFunction) => {
+  // Named function (not an arrow) so the snapshot tool can identify this
+  // middleware by name when walking `app._router.stack`.
+  return function loginRequired(
+    req: RequestWithUser,
+    res: Response,
+    next: NextFunction,
+  ) {
     // check the user logged in
     if (req.user != null && req.user instanceof Object && '_id' in req.user) {
       if (req.user.status === UserStatus.STATUS_ACTIVE) {

@@ -1,2 +1,2 @@
-export * from './components/Presentation';
-export * from './components/Slides';
+export * from './components/Presentation.js';
+export * from './components/Slides.js';

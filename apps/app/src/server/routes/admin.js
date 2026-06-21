@@ -1,17 +1,16 @@
+import { param, validationResult } from 'express-validator';
+
 import { SupportedAction } from '~/interfaces/activity';
 import loggerFactory from '~/utils/logger';
 
 import { exportService } from '../service/export';
+import ApiResponse from '../util/apiResponse';
 
 const logger = loggerFactory('growi:routes:admin');
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, app) => {
-  const ApiResponse = require('../util/apiResponse');
-
+export const setup = (crowi, app) => {
   const actions = {};
-
-  const { param } = require('express-validator');
 
   const api = {};
 
@@ -34,7 +33,6 @@ module.exports = (crowi, app) => {
 
   actions.export.download = (req, res) => {
     const { fileName } = req.params;
-    const { validationResult } = require('express-validator');
     const errors = validationResult(req);
     if (!errors.isEmpty()) {
       return res.status(422).json({

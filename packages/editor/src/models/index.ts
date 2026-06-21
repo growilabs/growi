@@ -1,2 +1,2 @@
-export * from './linker';
-export * from './markdown-table';
+export * from './linker.js';
+export * from './markdown-table.js';

@@ -4,18 +4,18 @@ packages:
   - 'bin'
 
 overrides:
-  # flat v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
-  '@lykmapipo/common>flat': 5.0.2
-  # mime v4 is provided only by ESM, but @lykmapipo/common requires CommonJS version
+  # KEEP: mime v4 is ESM-only (no `require` export). @lykmapipo/common is CommonJS and reads
+  # `mime.getType` / `mime.getExtension` off the require() result (exposed as mimeTypeOf /
+  # mimeExtensionOf). Under Node 24 require(esm), mime v4 resolves to a module *namespace*
+  # whose getType/getExtension live on `.default`, so those top-level accesses are undefined
+  # and mimeTypeOf/mimeExtensionOf throw "is not a function". mime v3's module.exports IS the
+  # Mime instance, so the accesses work. Pin retained until @lykmapipo/common is dropped or
+  # ships ESM-aware mime access. (esm-migration Phase 5.2 — verified by phase5-smoke harness)
   '@lykmapipo/common>mime': 3.0.0
-  # parse-json v6 is provided only by ESM, but @lykmapipo/common requires CommonJS version
-  '@lykmapipo/common>parse-json': 5.2.0
-    # p-map v5+ is provided only by ESM, but @mastra/core requires CommonJS version
-  '@mastra/core>p-map': 4.0.0
-  # uuid v12+ is provided only by ESM, but @mastra/mongodb requires CommonJS version
-  '@mastra/mongodb>uuid': 11.1.0
-  # CVE-2025-XXXXX: CRLF Injection + Prototype Pollution combo leads to HTTP Request Smuggling (CVSS 10.0).
-  # All versions < 1.15.0 are vulnerable.
+  # CVE-2026-40175 / GHSA-fvcv-3m26-pcqx: Unrestricted Cloud Metadata Exfiltration via CRLF
+  # header-injection chain that combines Prototype Pollution from other deps with Axios'
+  # unsanitised header merge, enabling HTTP Request Smuggling and AWS IMDSv2 bypass
+  # (CVSS Critical). Fixed in 1.15.0 - see https://github.com/advisories/GHSA-fvcv-3m26-pcqx
   axios: ^1.15.0
   # Dedupe @codemirror/commands to a single version. <= 6.10.2 has a bug where
   # Shift+Arrow selection gets stuck on soft-wrapped lines (growilabs/growi#11093);
@@ -57,3 +57,11 @@ allowBuilds:
   # (e.g. @img/sharp-linux-x64, @img/sharp-libvips-linux-x64), so its install
   # script (which would build libvips from source as a fallback) is not needed.
   sharp: false
+  # @parcel/watcher (transitive via sass) ships platform-specific prebuilt binaries
+  # via optional dependencies (@parcel/watcher-linux-arm64-glibc, etc.), so its
+  # `install: build-from-source` script is a redundant fallback — same as sharp/esbuild.
+  '@parcel/watcher': false
+  # @scarf/scarf's postinstall only reports install analytics to scarf.sh; skip it.
+  '@scarf/scarf': false
+  # aws-sdk v2's postinstall only prints a maintenance-mode notice (warn-maintenance-mode.js).
+  aws-sdk: false

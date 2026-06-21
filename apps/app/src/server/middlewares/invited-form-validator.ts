@@ -1,7 +1,7 @@
 import type { NextFunction, Response } from 'express';
 import type { ValidationChain } from 'express-validator';
 import { body, validationResult } from 'express-validator';
-import type { Request } from 'express-validator/src/base';
+import type { Request } from 'express-validator/src/base.js';
 
 const MININUM_PASSWORD_LENGTH = 6;
 

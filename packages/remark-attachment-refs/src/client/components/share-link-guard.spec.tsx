@@ -1,11 +1,11 @@
 import { render, screen } from '@testing-library/react';
 
-import { useSWRxRef, useSWRxRefs } from '../stores/refs';
-import { Gallery } from './Gallery';
-import { Ref } from './Ref';
-import { RefImg } from './RefImg';
-import { Refs } from './Refs';
-import { RefsImg } from './RefsImg';
+import { useSWRxRef, useSWRxRefs } from '../stores/refs.js';
+import { Gallery } from './Gallery.js';
+import { Ref } from './Ref.js';
+import { RefImg } from './RefImg.js';
+import { Refs } from './Refs.js';
+import { RefsImg } from './RefsImg.js';
 
 // The contract under test is "no request is issued on a share link page".
 // Mock the data-fetching hooks so we can assert they are never called,

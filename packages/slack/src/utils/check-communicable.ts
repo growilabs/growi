@@ -1,10 +1,10 @@
 import type { WebClient } from '@slack/web-api';
 import axios, { type AxiosError } from 'axios';
 
-import { requiredScopes } from '../consts';
-import type { ConnectionStatus } from '../interfaces/connection-status';
-import { markdownSectionBlock } from './block-kit-builder';
-import { generateWebClient } from './webclient-factory';
+import { requiredScopes } from '../consts/index.js';
+import type { ConnectionStatus } from '../interfaces/connection-status.js';
+import { markdownSectionBlock } from './block-kit-builder.js';
+import { generateWebClient } from './webclient-factory.js';
 
 /**
  * Check whether the HTTP server responds or not.
