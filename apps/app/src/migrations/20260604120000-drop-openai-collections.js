@@ -26,17 +26,15 @@ async function dropCollectionIfExists(db, collectionName) {
   logger.info(`Dropped collection "${collectionName}".`);
 }
 
-module.exports = {
-  async up(db) {
-    logger.info('Apply migration');
+export async function up(db) {
+  logger.info('Apply migration');
 
-    for (const collectionName of COLLECTION_NAMES) {
-      // eslint-disable-next-line no-await-in-loop
-      await dropCollectionIfExists(db, collectionName);
-    }
-  },
+  for (const collectionName of COLLECTION_NAMES) {
+    // eslint-disable-next-line no-await-in-loop
+    await dropCollectionIfExists(db, collectionName);
+  }
+}
 
-  async down() {
-    // No rollback: dropped collections are not re-created.
-  },
-};
+export async function down() {
+  // No rollback: dropped collections are not re-created.
+}
