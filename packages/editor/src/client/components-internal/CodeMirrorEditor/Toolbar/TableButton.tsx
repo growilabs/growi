@@ -2,8 +2,8 @@ import { type JSX, useCallback, useId } from 'react';
 import { useTranslation } from 'react-i18next';
 import { UncontrolledTooltip } from 'reactstrap';
 
-import { useHandsontableModalForEditorActions } from '../../../../states/modal/handsontable';
-import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor';
+import { useHandsontableModalForEditorActions } from '../../../../states/modal/handsontable.js';
+import { useCodeMirrorEditorIsolated } from '../../../stores/codemirror-editor.js';
 
 type Props = {
   editorKey: string;
