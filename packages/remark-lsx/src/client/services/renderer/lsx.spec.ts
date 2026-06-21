@@ -1,7 +1,7 @@
 import type { LeafGrowiPluginDirective } from '@growi/remark-growi-directive';
 import { remarkGrowiDirectivePluginType } from '@growi/remark-growi-directive';
 
-import { remarkPlugin } from './lsx';
+import { remarkPlugin } from './lsx.js';
 
 const createNode = (
   attributes: Record<string, string>,

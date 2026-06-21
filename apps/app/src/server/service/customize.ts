@@ -140,7 +140,8 @@ export class CustomizeService implements S2sMessageHandlable {
     else {
       // import preset-themes manifest
       const presetThemesManifest = await import(
-        path.join('@growi/preset-themes', manifestPath)
+        path.join('@growi/preset-themes', manifestPath),
+        { with: { type: 'json' } }
       ).then((imported) => imported.default);
 
       const themeMetadata = PresetThemesMetadatas.find((p) => p.name === theme);

@@ -1,4 +1,4 @@
-import { routesFactory } from './routes/refs';
+import { routesFactory } from './routes/refs.js';
 
 // biome-ignore lint/suspicious/noExplicitAny: ignore
 const middleware = (crowi: any, app: any): void => {

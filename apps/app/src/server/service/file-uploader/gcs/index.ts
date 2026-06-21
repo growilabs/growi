@@ -307,7 +307,7 @@ class GcsFileUploader extends AbstractFileUploader {
   }
 }
 
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi) => {
   const lib = new GcsFileUploader(crowi);
 
   lib.isValidUploadSettings = () =>

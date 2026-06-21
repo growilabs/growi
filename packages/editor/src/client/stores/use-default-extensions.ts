@@ -15,8 +15,8 @@ import type { KeyBinding } from '@codemirror/view';
 import { EditorView, keymap } from '@codemirror/view';
 import { tags } from '@lezer/highlight';
 
-import type { UseCodeMirrorEditor } from '../services';
-import { emojiAutocompletionSettings } from '../services-internal';
+import type { UseCodeMirrorEditor } from '../services/index.js';
+import { emojiAutocompletionSettings } from '../services-internal/index.js';
 
 // set new markdownKeymap instead of default one
 // https://github.com/codemirror/lang-markdown/blob/main/src/index.ts#L17

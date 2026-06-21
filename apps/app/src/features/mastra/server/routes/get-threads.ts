@@ -1,3 +1,4 @@
+import assert from 'node:assert';
 import type { IUserHasId } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
@@ -7,6 +8,7 @@ import { query, type ValidationChain } from 'express-validator';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -15,15 +17,24 @@ import { mastra } from '../services/mastra-modules';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:get-threads');
 
-type GetThreadsFactory = (crowi: Crowi) => RequestHandler[];
+// Raw query params arrive as strings and are not statically guaranteed present;
+// express-validator validates/sanitizes them at runtime. Typing them as Partial
+// keeps `req` assignable to RequestHandler (whose default query is ParsedQs).
+type ReqQuery = Partial<IApiv3GetThreadsParams>;
 
-type Req = Request<undefined, Response, undefined, IApiv3GetThreadsParams> & {
-  user: IUserHasId;
+// `user` is optional because a RequestHandler slot cannot statically guarantee it;
+// loginRequiredStrictly ensures its presence at runtime (asserted in the handler).
+type Req = Request<
+  Record<string, string>,
+  ApiV3Response,
+  undefined,
+  ReqQuery
+> & {
+  user?: IUserHasId;
 };
 
-export const getThreadsFactory: GetThreadsFactory = (crowi) => {
-  const loginRequiredStrictly =
-    require('~/server/middlewares/login-required').default(crowi);
+export const getThreadsFactory = (crowi: Crowi): RequestHandler[] => {
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const validator: ValidationChain[] = [
     query('page')
@@ -52,9 +63,15 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
+      const { user } = req;
+      assert(
+        user != null,
+        'user is required (ensured by loginRequiredStrictly middleware)',
+      );
+
       try {
         const agent = mastra.getAgent('growiAgent');
         const memory = await agent?.getMemory();
@@ -68,7 +85,7 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
 
         const paginatedThread = await memory.listThreads({
           filter: {
-            resourceId: req.user._id.toString(),
+            resourceId: user._id.toString(),
           },
           page: req.query.page,
           perPage: req.query.perPage,

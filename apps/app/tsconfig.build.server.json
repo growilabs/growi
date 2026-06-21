@@ -2,8 +2,13 @@
   "$schema": "http://json.schemastore.org/tsconfig",
   "extends": "./tsconfig.json",
   "compilerOptions": {
-    "module": "CommonJS",
-    "moduleResolution": "Node",
+    // Use Preserve/Bundler resolution so that extensionless relative specifiers
+    // are accepted during type-checking. The server build emits real Node ESM
+    // by running add-js-extensions (C1) in postbuild after tspc finishes.
+    // NodeNext shims (server-build-shims/) are no longer needed because Bundler
+    // resolution uses esModuleInterop-style default imports natively.
+    "module": "Preserve",
+    "moduleResolution": "Bundler",
     "outDir": "transpiled",
     "declaration": true,
     "noResolve": false,

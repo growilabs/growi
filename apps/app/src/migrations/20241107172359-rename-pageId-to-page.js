@@ -20,36 +20,34 @@ async function dropIndexIfExists(db, collectionName, indexName) {
   }
 }
 
-module.exports = {
-  async up(db) {
-    logger.info('Apply migration');
-    await mongoose.connect(getMongoUri(), mongoOptions);
+export async function up(db) {
+  logger.info('Apply migration');
+  await mongoose.connect(getMongoUri(), mongoOptions);
 
-    // Drop index
-    await dropIndexIfExists(
-      db,
-      'vectorstorefilerelations',
-      'vectorStoreRelationId_1_pageId_1',
-    );
+  // Drop index
+  await dropIndexIfExists(
+    db,
+    'vectorstorefilerelations',
+    'vectorStoreRelationId_1_pageId_1',
+  );
 
-    // Rename field (pageId -> page)
-    // Operate directly on the collection so this migration stays self-contained
-    // and does not depend on the (deprecated) Mongoose model.
-    await db
-      .collection('vectorstorefilerelations')
-      .updateMany({}, [{ $set: { page: '$pageId' } }, { $unset: ['pageId'] }]);
+  // Rename field (pageId -> page)
+  // Operate directly on the collection so this migration stays self-contained
+  // and does not depend on the (deprecated) Mongoose model.
+  await db
+    .collection('vectorstorefilerelations')
+    .updateMany({}, [{ $set: { page: '$pageId' } }, { $unset: ['pageId'] }]);
 
-    // Create index
-    const collection = mongoose.connection.collection(
-      'vectorstorefilerelations',
-    );
-    await collection.createIndex(
-      { vectorStoreRelationId: 1, page: 1 },
-      { unique: true },
-    );
-  },
+  // Create index
+  const collection = mongoose.connection.collection(
+    'vectorstorefilerelations',
+  );
+  await collection.createIndex(
+    { vectorStoreRelationId: 1, page: 1 },
+    { unique: true },
+  );
+}
 
-  async down() {
-    // No rollback
-  },
-};
+export async function down() {
+  // No rollback
+}

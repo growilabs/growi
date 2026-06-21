@@ -1,7 +1,7 @@
 import type { JSX } from 'react';
 import Head from 'next/head';
 
-import { presentationMarpit, slideMarpit } from '../services/growi-marpit';
+import { presentationMarpit, slideMarpit } from '../services/growi-marpit.js';
 
 type Props = {
   children?: string;

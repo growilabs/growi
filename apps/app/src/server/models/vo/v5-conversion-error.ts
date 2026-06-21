@@ -1,6 +1,5 @@
-import ExtensibleCustomError from 'extensible-custom-error';
-
 import type { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
+import { ExtensibleCustomError } from '~/server/util/extensible-custom-error';
 
 export class V5ConversionError extends ExtensibleCustomError {
   readonly id = 'V5ConversionError';
