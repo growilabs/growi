@@ -343,4 +343,89 @@ describe('ElasticsearchDelegator', () => {
       expect(mockES8Client.indices.putAlias).not.toHaveBeenCalled();
     });
   });
+
+  describe('rebuildAuditlogIndex()', () => {
+    let mockES8Client: DeepMockProxy<ES8ClientDelegator>;
+    let addAllAuditlogsSpy: ReturnType<typeof vi.spyOn>;
+    let normalizeAuditlogIndicesSpy: ReturnType<typeof vi.spyOn>;
+
+    beforeEach(() => {
+      mockES8Client = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
+      injectClient(delegator, mockES8Client);
+      // addAllAuditlogs streams from MongoDB and normalizeAuditlogIndices is covered on
+      // its own; stub both so this suite isolates rebuild's orchestration.
+      addAllAuditlogsSpy = vi
+        .spyOn(delegator, 'addAllAuditlogs')
+        .mockResolvedValue(undefined);
+      normalizeAuditlogIndicesSpy = vi
+        .spyOn(delegator, 'normalizeAuditlogIndices')
+        .mockResolvedValue(undefined);
+    });
+
+    it('reindexes into the tmp index before dropping the live index', async () => {
+      await delegator.rebuildAuditlogIndex();
+
+      // Data-safety invariant: the live index must not be dropped until its documents
+      // have been copied into the tmp index.
+      expect(mockES8Client.reindex.mock.invocationCallOrder[0]).toBeLessThan(
+        mockES8Client.indices.delete.mock.invocationCallOrder[0],
+      );
+    });
+
+    it('recreates and repopulates the live index', async () => {
+      await delegator.rebuildAuditlogIndex();
+
+      expect(mockES8Client.indices.create).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 'auditlogs' }),
+      );
+      expect(addAllAuditlogsSpy).toHaveBeenCalled();
+    });
+
+    it('swaps the alias onto the tmp index while the live index is rebuilt', async () => {
+      await delegator.rebuildAuditlogIndex();
+
+      expect(mockES8Client.indices.updateAliases).toHaveBeenCalledWith({
+        actions: [
+          { add: { alias: 'auditlogs-alias', index: 'auditlogs-tmp' } },
+          { remove: { alias: 'auditlogs-alias', index: 'auditlogs' } },
+        ],
+      });
+    });
+
+    it('normalizes the indices after a successful rebuild', async () => {
+      await delegator.rebuildAuditlogIndex();
+
+      expect(normalizeAuditlogIndicesSpy).toHaveBeenCalled();
+    });
+
+    it('deletes a leftover tmp index before reindexing', async () => {
+      mockES8Client.indices.exists.mockResolvedValue(true);
+
+      await delegator.rebuildAuditlogIndex();
+
+      expect(mockES8Client.indices.delete).toHaveBeenCalledWith({
+        index: 'auditlogs-tmp',
+      });
+      expect(
+        mockES8Client.indices.delete.mock.invocationCallOrder[0],
+      ).toBeLessThan(mockES8Client.reindex.mock.invocationCallOrder[0]);
+    });
+
+    it('does not delete a tmp index when none is leftover', async () => {
+      await delegator.rebuildAuditlogIndex();
+
+      expect(mockES8Client.indices.delete).not.toHaveBeenCalledWith({
+        index: 'auditlogs-tmp',
+      });
+    });
+
+    it('normalizes the indices and rethrows when a rebuild step fails', async () => {
+      mockES8Client.reindex.mockRejectedValue(new Error('reindex failed'));
+
+      await expect(delegator.rebuildAuditlogIndex()).rejects.toThrow(
+        'reindex failed',
+      );
+      expect(normalizeAuditlogIndicesSpy).toHaveBeenCalled();
+    });
+  });
 });
