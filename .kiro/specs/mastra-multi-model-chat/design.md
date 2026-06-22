@@ -100,7 +100,7 @@ graph TB
 | Backend | Express apiv3 + `@mastra/core@1.41`（動的モデル関数・RequestContext）+ `@ai-sdk/*@3` | リクエスト単位モデル解決・検証・新 GET エンドポイント | 既存依存のみ |
 | Data | MongoDB config（`config-manager`/`config-loader`） | `ai:allowedModels`（オブジェクト配列）永続化 | env `AI_ALLOWED_MODELS` は JSON 文字列 |
 
-新規依存なし。逸脱: 既定を別キーから `isDefault` フラグへ移行、`ai:model`/`ai:providerOptions` を legacy 化、モデル欄を Azure 専用セクション → 共通設定へ移設。
+新規依存なし。逸脱: 既定を別キーから `isDefault` フラグへ移行、`ai:model`/`ai:providerOptions` を完全廃止、モデル欄を Azure 専用セクション → 共通設定へ移設。
 
 ## File Structure Plan
 
