@@ -8,10 +8,11 @@
   - 完了状態: 型が tsc を通り、`AI_SETTING_KEYS` の spec が新キー集合を期待
   - _Requirements: 1.1, 2.1_
 - [ ] 1.2 config キーと UserUISettings スキーマの定義
-  - `ai:allowedModels` をオブジェクト配列キーとして追加（`envVarName: AI_ALLOWED_MODELS`, `defaultValue: []`）、env-only グループ `targetKeys` に追加
+  - `ai:allowedModels` をオブジェクト配列キーとして追加（`envVarName: AI_ALLOWED_MODELS`, `defaultValue: []`）
+  - env-only グループ `env:useOnlyEnvVars:ai` の `targetKeys` を更新: `ai:allowedModels` を追加し、削除する `ai:model` / `ai:providerOptions` を**除去**（dangling 参照を残さない）
   - `ai:model` / `ai:providerOptions` の config 定義を削除（env も読まれなくなる）
   - `UserUISettings` スキーマに `aiChatSelectedModel` を追加
-  - 完了状態: `configManager.getConfig('ai:allowedModels')` が配列を返し、旧キーは未定義。`UserUISettings` に新フィールドが保存できる
+  - 完了状態: `configManager.getConfig('ai:allowedModels')` が配列を返し、旧キーは未定義。env-only `targetKeys` が削除済みキーを参照せず `ai:allowedModels` を含む。`UserUISettings` に新フィールドが保存できる
   - _Requirements: 1.1, 2.1, 3.6_
 
 - [ ] 2. Core: サーバのモデル解決
