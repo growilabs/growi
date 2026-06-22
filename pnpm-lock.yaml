@@ -591,8 +591,8 @@ importers:
         specifier: ^3.0.2
         version: 3.0.3
       nodemailer:
-        specifier: ^6.9.15
-        version: 6.9.15
+        specifier: ^9.0.1
+        version: 9.0.1
       nodemailer-ses-transport:
         specifier: ~1.5.0
         version: 1.5.1
@@ -10959,8 +10959,8 @@ packages:
   nodemailer-ses-transport@1.5.1:
     resolution: {integrity: sha512-JwL93Lc7KEWbH4a9Ehm6XCJgNhf6QNleSDkIsCvEyViKzqvYsf+8rF2PG8OzI1xDyxvtgsaWAmJWMqABOZmnWg==}
 
-  nodemailer@6.9.15:
-    resolution: {integrity: sha512-AHf04ySLC6CIfuRtRiEYtGEXgRfa6INgWGluDhnxTZhHSKvrBu7lc1VVchQ0d8nPc4cFaZoPq8vkyNoZr0TpGQ==}
+  nodemailer@9.0.1:
+    resolution: {integrity: sha512-Gwv8SQewT616ZM/URn0H54b8PWo/Wum7md3EW2aWy1lO27+WZCX+Xyak3J+NlmHUjDh5ME+uesJUDRbR3Ye8Bw==}
     engines: {node: '>=6.0.0'}
 
   nodemon@3.1.14:
@@ -25747,7 +25747,7 @@ snapshots:
     dependencies:
       aws-sdk: 2.1056.0
 
-  nodemailer@6.9.15: {}
+  nodemailer@9.0.1: {}
 
   nodemon@3.1.14:
     dependencies:
