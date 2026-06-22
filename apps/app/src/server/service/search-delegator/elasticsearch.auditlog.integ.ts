@@ -6,7 +6,7 @@ import { configManager } from '~/server/service/config-manager/config-manager';
 import type { SocketIoService } from '~/server/service/socket-io';
 
 import ElasticsearchDelegator from './elasticsearch';
-import { injectClient } from './elasticsearch.test-helper';
+import { injectClient } from './elasticsearch.testing';
 import type { ES8ClientDelegator } from './elasticsearch-client-delegator/es8-client-delegator';
 
 vi.mock('~/server/service/config-manager/config-manager', () => ({
