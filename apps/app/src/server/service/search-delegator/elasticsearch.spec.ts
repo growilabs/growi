@@ -1,4 +1,9 @@
-import { type MockProxy, mock } from 'vitest-mock-extended';
+import {
+  type DeepMockProxy,
+  type MockProxy,
+  mock,
+  mockDeep,
+} from 'vitest-mock-extended';
 
 import { configManager } from '~/server/service/config-manager/config-manager';
 import type { SocketIoService } from '~/server/service/socket-io';
@@ -232,6 +237,110 @@ describe('ElasticsearchDelegator', () => {
 
         expect(result).toEqual([]);
       });
+    });
+  });
+
+  describe('normalizeAuditlogIndices()', () => {
+    let mockES8Client: DeepMockProxy<ES8ClientDelegator>;
+
+    // Resolve existence per index name so assertions don't depend on probe order.
+    const givenIndexState = (state: {
+      tmpExists: boolean;
+      indexExists: boolean;
+      aliasExists: boolean;
+    }) => {
+      mockES8Client.indices.exists.mockImplementation((params) =>
+        Promise.resolve(
+          params.index === 'auditlogs-tmp'
+            ? state.tmpExists
+            : state.indexExists,
+        ),
+      );
+      mockES8Client.indices.existsAlias.mockResolvedValue(state.aliasExists);
+    };
+
+    beforeEach(() => {
+      mockES8Client = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
+      injectClient(delegator, mockES8Client);
+    });
+
+    it('deletes the leftover tmp index when it exists', async () => {
+      givenIndexState({
+        tmpExists: true,
+        indexExists: true,
+        aliasExists: true,
+      });
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockES8Client.indices.delete).toHaveBeenCalledWith({
+        index: 'auditlogs-tmp',
+      });
+    });
+
+    it('leaves the tmp index alone when it does not exist', async () => {
+      givenIndexState({
+        tmpExists: false,
+        indexExists: true,
+        aliasExists: true,
+      });
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockES8Client.indices.delete).not.toHaveBeenCalled();
+    });
+
+    it('creates the main index when it is missing', async () => {
+      givenIndexState({
+        tmpExists: false,
+        indexExists: false,
+        aliasExists: true,
+      });
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockES8Client.indices.create).toHaveBeenCalledWith(
+        expect.objectContaining({ index: 'auditlogs' }),
+      );
+    });
+
+    it('does not create the main index when it already exists', async () => {
+      givenIndexState({
+        tmpExists: false,
+        indexExists: true,
+        aliasExists: true,
+      });
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockES8Client.indices.create).not.toHaveBeenCalled();
+    });
+
+    it('adds the alias when it is missing', async () => {
+      givenIndexState({
+        tmpExists: false,
+        indexExists: true,
+        aliasExists: false,
+      });
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockES8Client.indices.putAlias).toHaveBeenCalledWith({
+        name: 'auditlogs-alias',
+        index: 'auditlogs',
+      });
+    });
+
+    it('does not touch the alias when it already exists', async () => {
+      givenIndexState({
+        tmpExists: false,
+        indexExists: true,
+        aliasExists: true,
+      });
+
+      await delegator.normalizeAuditlogIndices();
+
+      expect(mockES8Client.indices.putAlias).not.toHaveBeenCalled();
     });
   });
 });
