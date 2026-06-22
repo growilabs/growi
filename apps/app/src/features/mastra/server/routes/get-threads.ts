@@ -7,6 +7,7 @@ import { query, type ValidationChain } from 'express-validator';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
+import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
@@ -17,13 +18,13 @@ const logger = loggerFactory('growi:routes:apiv3:mastra:get-threads');
 
 type GetThreadsFactory = (crowi: Crowi) => RequestHandler[];
 
-type Req = Request<undefined, Response, undefined, IApiv3GetThreadsParams> & {
+interface Req extends Request {
   user: IUserHasId;
-};
+  query: Request['query'] & IApiv3GetThreadsParams;
+}
 
 export const getThreadsFactory: GetThreadsFactory = (crowi) => {
-  const loginRequiredStrictly =
-    require('~/server/middlewares/login-required').default(crowi);
+  const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   const validator: ValidationChain[] = [
     query('page')
@@ -52,7 +53,7 @@ export const getThreadsFactory: GetThreadsFactory = (crowi) => {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,
-    validator,
+    ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
       try {
