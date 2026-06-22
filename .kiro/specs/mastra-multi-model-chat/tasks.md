@@ -21,7 +21,7 @@
   - 完了状態: ユニットテストで 許可内 / 許可外→既定 / 未指定→既定 / 空→throw が通る
   - _Requirements: 4.1, 4.2, 4.3, 1.3_
   - _Boundary: ai-sdk-modules_
-- [ ] 2.2 provider resolver の model 引数化と Map キャッシュ
+- [x] 2.2 provider resolver の model 引数化と Map キャッシュ
   - `modelResolvers` を `(model: string) => MastraModelConfig` に変更、各 provider resolver（openai/anthropic/google/azure-openai）を model 引数受け取りに。`resolveMastraModel(modelId?)` を `${provider}:${effective}` キーの Map キャッシュに、`clearResolvedMastraModelCache()` は Map 全消去
   - 完了状態: 同一 model は 1 回だけ構築（キャッシュ）され、cache clear で再構築。Azure+Entra のトークンプロバイダがモデルごとに保持される
   - _Requirements: 4.1, 1.2_
