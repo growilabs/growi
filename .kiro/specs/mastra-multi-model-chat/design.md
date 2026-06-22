@@ -349,7 +349,8 @@ export interface AiSettingsUpdateRequest {
   azureOpenaiSettings?: AzureOpenaiConfig;
 }
 ```
-- PUT バリデーション: `allowedModels` は配列・各 `model` 非空・重複禁止（1.4）、各 `providerOptions` は `isValidProviderOptionsJson` 相当（2.4）、`isDefault: true` はちょうど 1 つ（0 個なら先頭を既定扱い・複数なら 422）（1.3/1.5）。env-only 422（1.6）。保存後 `clearResolvedMastraModelCache()`（1.2）。
+- PUT バリデーション: `allowedModels` は配列・各 `model` 非空・重複禁止（1.4）、各 `providerOptions` は `isValidProviderOptionsJson` 相当（2.4）、`isDefault: true` は**ちょうど 1 つ**（0 個・複数のいずれも 422 で拒否し、許可集合内から既定を 1 つ選ぶよう促す）（1.3/1.5）。env-only 422（1.6）。保存後 `clearResolvedMastraModelCache()`（1.2）。
+  - 解決層の `getDefaultModel = find(isDefault) ?? 先頭` は、上記検証をすり抜けた不正な保存値（手動 DB 編集・env 直書き等）に対する**防御的フォールバック**であり、PUT 経路では 0 個の状態は保存され得ない。
 - `AI_SETTING_KEYS`: `ai:model`/`ai:providerOptions` を除去し `ai:allowedModels` を追加。
 
 ### client / admin（AllowedModelsField）
@@ -401,7 +402,7 @@ export interface AiSettingsFormValues {
 - 入力検証は早期・フィールド単位（fail fast）。チャットの実行時失敗は安全メッセージで graceful degradation。
 
 ### Error Categories and Responses
-- User(4xx/422): 空/重複モデル ID、`isDefault` 複数、不正 providerOptions JSON → PUT 422 + フィールドエラー（1.4/1.5/2.4）。env-only 中の PUT → 422（1.6）。
+- User(4xx/422): 空/重複モデル ID、`isDefault` が 0 個または複数、不正 providerOptions JSON → PUT 422 + フィールドエラー（1.4/1.5/2.4）。env-only 中の PUT → 422（1.6）。
 - System(5xx): provider 呼出失敗はストリームのエラーチャンク → `resolveChatErrorMessage` で機密を含まない 1 行に（4.5、無改変）。
 - Business(防御): クライアント `modelId` が許可外 → エラーではなく既定に丸め（4.2、監査ログ出力）。
 
