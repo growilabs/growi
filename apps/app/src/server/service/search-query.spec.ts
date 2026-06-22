@@ -429,3 +429,125 @@ describe('resolveFilterData()', () => {
     expect(resolvedIds).toStrictEqual(expectedResolvedIds);
   });
 });
+
+describe('parseQueryString()', () => {
+  let searchService: TestSearchService;
+  let mockCrowi: MockProxy<Crowi>;
+
+  const emptyTerms = (overrides: Partial<QueryTerms> = {}): QueryTerms => ({
+    match: [],
+    not_match: [],
+    phrase: [],
+    not_phrase: [],
+    prefix: [],
+    not_prefix: [],
+    tag: [],
+    not_tag: [],
+    author: [],
+    not_author: [],
+    editor: [],
+    not_editor: [],
+    group: [],
+    not_group: [],
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+
+    mockCrowi = mock<Crowi>();
+    mockCrowi.configManager = configManager;
+    searchService = new TestSearchService(mockCrowi);
+  });
+
+  it('extracts author into the author bucket and nothing else', () => {
+    const queryString = 'author:alice';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { author: ['alice'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts editor into the editor bucket and nothing else', () => {
+    const queryString = 'editor:john';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { editor: ['john'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts group into the group bucket and nothing else', () => {
+    const queryString = 'group:dev-1';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { group: ['dev-1'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts a negated author into the not_author bucket and nothing else', () => {
+    const queryString = '-author:alice';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { not_author: ['alice'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts a negated editor into the not_editor bucket and nothing else', () => {
+    const queryString = '-editor:john';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { not_editor: ['john'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts a negated group into the not_group bucket and nothing else', () => {
+    const queryString = '-group:dev-1';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { not_group: ['dev-1'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('collects repeated authors into the author bucket in order', () => {
+    const queryString = 'author:alice author:bob';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { author: ['alice', 'bob'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('routes each token to its own bucket in a mixed query', () => {
+    const queryString =
+      'hello author:alice -editor:bob group:dev-1 -group:dev-2';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = {
+      match: ['hello'],
+      author: ['alice'],
+      not_editor: ['bob'],
+      group: ['dev-1'],
+      not_group: ['dev-2'],
+    };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('ignores a valueless new-filter operator, capturing nothing', () => {
+    const terms = searchService.parseQueryString('author: editor: group:');
+
+    // A bare operator must not leak into match (or any bucket).
+    expect(terms).toStrictEqual(emptyTerms());
+  });
+
+  it('ignores a valueless negated new-filter operator, capturing nothing', () => {
+    const terms = searchService.parseQueryString('-author: -editor: -group:');
+
+    expect(terms).toStrictEqual(emptyTerms());
+  });
+
+  it('drops only the valueless operator while parsing the rest of the query', () => {
+    const terms = searchService.parseQueryString('author: hello group:dev-1');
+
+    const expectedTerm = { match: ['hello'], group: ['dev-1'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+});
