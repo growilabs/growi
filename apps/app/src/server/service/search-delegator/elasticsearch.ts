@@ -409,7 +409,7 @@ class ElasticsearchDelegator
     const tmpIndexName = `${indexName}-tmp`;
 
     try {
-      // reindex to tmp index
+      // drop any leftover tmp index, then reindex the live index into a fresh tmp
       const isExistsTmpIndex = await client.indices.exists({
         index: tmpIndexName,
       });
