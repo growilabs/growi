@@ -409,7 +409,9 @@ class ElasticsearchDelegator
     const tmpIndexName = `${indexName}-tmp`;
 
     try {
-      // drop any leftover tmp index, then reindex the live index into a fresh tmp
+      // Drop any leftover tmp index, then reindex the live index into a fresh tmp.
+      // reindex is fire-and-forget (wait_for_completion:false), so tmp is a best-effort
+      // copy for read availability; the authoritative repopulation is addAllAuditlogs.
       const isExistsTmpIndex = await client.indices.exists({
         index: tmpIndexName,
       });

@@ -1,3 +1,4 @@
+import mongoose from 'mongoose';
 import {
   type DeepMockProxy,
   type MockProxy,
@@ -5,6 +6,7 @@ import {
   mockDeep,
 } from 'vitest-mock-extended';
 
+import type { ActivityDocument } from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager/config-manager';
 import type { SocketIoService } from '~/server/service/socket-io';
 
@@ -43,7 +45,6 @@ describe('ElasticsearchDelegator', () => {
 
       beforeEach(() => {
         mockES8Client = mock<ES8ClientDelegator>({ delegatorVersion: 8 });
-        // type-assertion (unavoidable): ES search response is a huge union; cast minimal shape.
         mockES8Client.search.mockResolvedValue({
           aggregations: {
             unique_values: { buckets: makeBuckets(['alice', 'bob']) },
@@ -131,7 +132,6 @@ describe('ElasticsearchDelegator', () => {
       });
 
       it('should return [] when rawBuckets is not an array', async () => {
-        // type-assertion (unavoidable): invalid buckets on purpose to hit the non-array guard.
         mockES8Client.search.mockResolvedValue({
           aggregations: { unique_values: { buckets: 'invalid' } },
         } as unknown as Awaited<ReturnType<typeof mockES8Client.search>>);
@@ -151,7 +151,6 @@ describe('ElasticsearchDelegator', () => {
 
       beforeEach(() => {
         mockES7Client = mock<ES7ClientDelegator>({ delegatorVersion: 7 });
-        // type-assertion (unavoidable): see ES8 path — ES response is a large union.
         mockES7Client.search.mockResolvedValue({
           aggregations: {
             unique_values: { buckets: makeBuckets(['alice']) },
@@ -214,7 +213,6 @@ describe('ElasticsearchDelegator', () => {
 
     describe('unknown client type', () => {
       beforeEach(() => {
-        // type-assertion (unavoidable): 0 is outside the 7|8|9 union, to hit the fallback.
         injectClient(delegator, {
           delegatorVersion: 0,
         } as unknown as ElasticsearchClientDelegator);
@@ -354,8 +352,9 @@ describe('ElasticsearchDelegator', () => {
     it('reindexes into the tmp index before dropping the live index', async () => {
       await delegator.rebuildAuditlogIndex();
 
-      // Data-safety invariant: the live index must not be dropped until its documents
-      // have been copied into the tmp index.
+      // The reindex must be issued before the live index is dropped. Ordering only:
+      // reindex is fire-and-forget, so tmp is best-effort; the source of truth on
+      // repopulation is addAllAuditlogs (MongoDB), not this copy.
       expect(mockES8Client.reindex.mock.invocationCallOrder[0]).toBeLessThan(
         mockES8Client.indices.delete.mock.invocationCallOrder[0],
       );
@@ -379,8 +378,9 @@ describe('ElasticsearchDelegator', () => {
           { remove: { alias: 'auditlogs-alias', index: 'auditlogs' } },
         ],
       });
-      // Availability invariant: the alias must move onto tmp before the live index is
-      // dropped, so reads keep resolving throughout the rebuild.
+      // The alias must move onto tmp before the live index is dropped so it stays attached
+      // to an existing index rather than dangling. (tmp may be incomplete; reindex is
+      // best-effort — see the addAllAuditlogs repopulation below.)
       expect(
         mockES8Client.indices.updateAliases.mock.invocationCallOrder[0],
       ).toBeLessThan(mockES8Client.indices.delete.mock.invocationCallOrder[0]);
@@ -450,6 +450,96 @@ describe('ElasticsearchDelegator', () => {
       await expect(delegator.rebuildAuditlogIndex()).rejects.toThrow(
         'reindex failed',
       );
+    });
+  });
+
+  describe('bulkSyncAuditlogs()', () => {
+    let mockES8Client: MockProxy<ES8ClientDelegator>;
+
+    const makeActivity = (username?: string) =>
+      mock<ActivityDocument>({
+        _id: new mongoose.Types.ObjectId(),
+        snapshot: { username },
+      });
+
+    beforeEach(() => {
+      mockES8Client = mock<ES8ClientDelegator>({ delegatorVersion: 8 });
+      mockES8Client.bulk.mockResolvedValue(
+        mock<Awaited<ReturnType<typeof mockES8Client.bulk>>>({
+          errors: false,
+          items: [],
+        }),
+      );
+      injectClient(delegator, mockES8Client);
+    });
+
+    it('indexes upserts into the concrete index, not the alias', async () => {
+      const activity = makeActivity('alice');
+
+      await delegator.bulkSyncAuditlogs([activity], []);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [
+          { index: { _index: 'auditlogs', _id: activity._id.toString() } },
+          { username: 'alice' },
+        ],
+      });
+    });
+
+    it('deletes by id from the concrete index, not the alias', async () => {
+      const id = new mongoose.Types.ObjectId();
+
+      await delegator.bulkSyncAuditlogs([], [id]);
+
+      expect(mockES8Client.bulk).toHaveBeenCalledWith({
+        body: [{ delete: { _index: 'auditlogs', _id: id.toString() } }],
+      });
+    });
+
+    it('skips upserts that have no username', async () => {
+      await delegator.bulkSyncAuditlogs([makeActivity()], []);
+
+      expect(mockES8Client.bulk).not.toHaveBeenCalled();
+    });
+
+    it('does not call bulk when there is nothing to sync', async () => {
+      await delegator.bulkSyncAuditlogs([], []);
+
+      expect(mockES8Client.bulk).not.toHaveBeenCalled();
+    });
+
+    it('throws with the failed item count when the response reports per-item errors', async () => {
+      mockES8Client.bulk.mockResolvedValue({
+        took: 0,
+        errors: true,
+        items: [
+          {
+            index: {
+              _index: 'auditlogs',
+              status: 400,
+              error: { type: 'mapper_exception' },
+            },
+          },
+        ],
+      });
+
+      await expect(
+        delegator.bulkSyncAuditlogs([makeActivity('alice')], []),
+      ).rejects.toThrow('1 failed items');
+    });
+
+    it('throws a debuggable message when the errors flag is set without a matching item error', async () => {
+      mockES8Client.bulk.mockResolvedValue({
+        took: 0,
+        errors: true,
+        items: [
+          { index: { _index: 'auditlogs', status: 200, result: 'created' } },
+        ],
+      });
+
+      await expect(
+        delegator.bulkSyncAuditlogs([makeActivity('alice')], []),
+      ).rejects.toThrow('errors flag set but no per-item error');
     });
   });
 });
