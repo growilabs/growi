@@ -1,5 +1,5 @@
 import { GroupType } from '@growi/core';
-import mongoose from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 import { beforeAll, describe, expect, it } from 'vitest';
 
 import { getInstance } from '^/test/setup/crowi';
@@ -10,16 +10,20 @@ import UserGroupRelation from '~/server/models/user-group-relation';
 
 import { fetchActiveMembersByGroup } from './fetch-active-members-by-group';
 
-describe('fetchActiveMembersByGroup', () => {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  let User: any;
+type UserInsertFields = {
+  _id: Types.ObjectId;
+  name: string;
+  username: string;
+  email: string;
+};
 
+describe('fetchActiveMembersByGroup', () => {
   const groupId = new mongoose.Types.ObjectId();
   const userId = new mongoose.Types.ObjectId();
 
   beforeAll(async () => {
     await getInstance();
-    User = mongoose.model('User');
+    const User = mongoose.model<UserInsertFields>('User');
 
     await User.insertMany([
       {
@@ -40,10 +44,11 @@ describe('fetchActiveMembersByGroup', () => {
   });
 
   it('returns only name and username — email is not present in result (privacy projection)', async () => {
+    const groupDoc = await UserGroup.findById(groupId);
+    if (groupDoc == null) throw new Error('test group not found');
     const group: PopulatedGrantedGroup = {
       type: GroupType.userGroup,
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      item: { _id: groupId } as any,
+      item: groupDoc,
     };
 
     const result = await fetchActiveMembersByGroup([group]);

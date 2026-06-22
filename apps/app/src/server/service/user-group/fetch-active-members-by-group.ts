@@ -31,7 +31,10 @@ export const fetchActiveMembersByGroup = async (
     .map((g) => g.item._id);
 
   const initialResult: RelatedGroupsMembers = Object.fromEntries(
-    groups.map((g) => [g.item._id.toString(), [] as IUserGroupMember[]]),
+    groups.map((g): [string, IUserGroupMember[]] => [
+      g.item._id.toString(),
+      [],
+    ]),
   );
 
   const [internalRelations, externalRelations] = await Promise.all([

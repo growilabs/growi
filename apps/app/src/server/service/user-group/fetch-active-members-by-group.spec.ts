@@ -2,8 +2,10 @@ import { GroupType } from '@growi/core';
 import mongoose from 'mongoose';
 import { mock } from 'vitest-mock-extended';
 
+import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import type { ExternalUserGroupRelationDocument } from '~/features/external-user-group/server/models/external-user-group-relation';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
+import type { UserGroupDocument } from '~/server/models/user-group';
 import type { UserGroupRelationDocument } from '~/server/models/user-group-relation';
 
 import { fetchActiveMembersByGroup } from './fetch-active-members-by-group';
@@ -47,7 +49,7 @@ const makeInternalGroup = (
   name = 'group',
 ): PopulatedGrantedGroup => ({
   type: GroupType.userGroup,
-  item: { _id: new mongoose.Types.ObjectId(id), name } as any,
+  item: mock<UserGroupDocument>({ _id: new mongoose.Types.ObjectId(id), name }),
 });
 
 /** Build a minimal PopulatedGrantedGroup (external) */
@@ -56,22 +58,28 @@ const makeExternalGroup = (
   name = 'ext-group',
 ): PopulatedGrantedGroup => ({
   type: GroupType.externalUserGroup,
-  item: { _id: new mongoose.Types.ObjectId(id), name } as any,
+  item: mock<ExternalUserGroupDocument>({
+    _id: new mongoose.Types.ObjectId(id),
+    name,
+  }),
 });
 
 /** Build a fake relation document */
 const makeRelation = (relatedGroupId: string, relatedUserId: string) =>
   mock<UserGroupRelationDocument | ExternalUserGroupRelationDocument>({
-    relatedGroup: new mongoose.Types.ObjectId(relatedGroupId) as any,
-    relatedUser: new mongoose.Types.ObjectId(relatedUserId) as any,
+    relatedGroup: new mongoose.Types.ObjectId(relatedGroupId),
+    relatedUser: new mongoose.Types.ObjectId(relatedUserId),
   });
 
 // ---- test suite ------------------------------------------------------------
 
+type MockFindModel = { find: ReturnType<typeof vi.fn> };
+type MockMongoose = { model: ReturnType<typeof vi.fn> };
+
 describe('fetchActiveMembersByGroup', () => {
-  let UserGroupRelation: any;
-  let ExternalUserGroupRelation: any;
-  let mongooseMock: any;
+  let UserGroupRelation: MockFindModel;
+  let ExternalUserGroupRelation: MockFindModel;
+  let mongooseMock: MockMongoose;
 
   beforeEach(async () => {
     // Dynamically import mocked modules

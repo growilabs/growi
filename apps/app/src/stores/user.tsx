@@ -94,9 +94,8 @@ export const useSWRxRelatedGroupsMembers = (
   return useSWRImmutable<RelatedGroupsMembers>(
     shouldFetch ? ['/user/related-groups/members'] : null,
     ([endpoint]) =>
-      apiv3Get(endpoint).then(
-        (response) =>
-          (response.data as IResRelatedGroupsMembers).membersByGroupId,
+      apiv3Get<IResRelatedGroupsMembers>(endpoint).then(
+        (response) => response.data.membersByGroupId,
       ),
   );
 };
