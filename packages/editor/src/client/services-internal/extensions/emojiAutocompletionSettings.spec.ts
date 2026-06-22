@@ -38,8 +38,9 @@ const createContext = (
 };
 
 describe('emoji / mention source decoupling (Requirement 4)', () => {
-  // AC 4.4 — the emoji source and the mention source coexist; neither suppresses the other.
-  describe('AC 4.4: coexistence', () => {
+  // AC 4.4 — emoji and mention are independent additive sources. This checks each
+  // returns a result on its own; it does NOT assert coexistence on one shared facility.
+  describe('AC 4.4: each source returns a result independently', () => {
     let mockFetchUsers: ReturnType<typeof vi.fn>;
 
     beforeEach(() => {
@@ -52,13 +53,10 @@ describe('emoji / mention source decoupling (Requirement 4)', () => {
       vi.restoreAllMocks();
     });
 
-    it('emoji source returns options for ":smi" and mention source returns a result for "@ab" — neither suppresses the other', async () => {
-      // NOTE: this calls the two sources INDEPENDENTLY (each in its own context),
-      // not on a single merged autocompletion() facility. It proves each source
-      // returns a result in isolation — not coexistence on the shared facility.
-      // Emoji source: synchronous, driven directly. explicit:true guarantees a
-      // non-null result independent of syntax-tree resolution details.
-      const emojiResult = emojiCompletionSource(createContext(':smi', 4, true));
+    it('emoji source returns options for ":smi" and mention source returns a result for "@ab" (each invoked independently)', async () => {
+      // Emoji source is synchronous. Omitting the explicit flag means the ":smi"
+      // trigger regex is actually exercised (with explicit:true it returns regardless).
+      const emojiResult = emojiCompletionSource(createContext(':smi'));
       expect(emojiResult).not.toBeNull();
       expect(emojiResult?.options.length).toBeGreaterThan(0);
 
