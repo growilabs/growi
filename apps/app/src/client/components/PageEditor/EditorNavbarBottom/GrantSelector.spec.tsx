@@ -6,7 +6,8 @@ import { createStore, Provider } from 'jotai';
 import type { IPageSelectedGrant } from '~/interfaces/page';
 import { useSelectedGrant } from '~/states/ui/editor';
 
-import { GrantSelector, GroupMembersLabel } from './GrantSelector';
+import { GrantSelector } from './GrantSelector';
+import { GroupMembersLabel } from './GroupMembersLabel';
 
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({ t: (key: string) => key }),

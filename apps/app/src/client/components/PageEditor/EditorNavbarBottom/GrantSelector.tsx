@@ -1,32 +1,22 @@
-import React, {
-  type JSX,
-  type ReactNode,
-  useCallback,
-  useRef,
-  useState,
-} from 'react';
-import { GroupType, getIdForRef, PageGrant } from '@growi/core';
+import React, { type JSX, type ReactNode, useCallback, useState } from 'react';
+import { getIdForRef, PageGrant } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
 import {
   DropdownItem,
   DropdownMenu,
   DropdownToggle,
-  Modal,
-  ModalBody,
-  ModalHeader,
   UncontrolledDropdown,
-  UncontrolledTooltip,
 } from 'reactstrap';
 
-import type { UserRelatedGroupsData } from '~/interfaces/page';
-import { UserGroupPageGrantStatus } from '~/interfaces/page';
-import type { IUserGroupMember } from '~/interfaces/user-group-member';
 import { useCurrentUser } from '~/states/global';
 import { useCurrentPageId } from '~/states/page';
 import { toSelectedGrant, useSelectedGrant } from '~/states/ui/editor';
 import { useSWRxCurrentGrantData } from '~/stores/page';
-import { useSWRxRelatedGroupsMembers } from '~/stores/user';
+
+import { SelectGroupModal } from './SelectGroupModal';
+
+export { GroupMembersLabel } from './GroupMembersLabel';
 
 const AVAILABLE_GRANTS = [
   {
@@ -57,41 +47,6 @@ const AVAILABLE_GRANTS = [
   },
 ];
 
-type GroupMembersLabelProps = {
-  members: IUserGroupMember[];
-  currentUsername: string | undefined;
-};
-
-export const GroupMembersLabel = ({
-  members,
-  currentUsername,
-}: GroupMembersLabelProps): JSX.Element | null => {
-  const { t } = useTranslation();
-  const labelRef = useRef<HTMLElement>(null);
-
-  if (members.length === 0) return null;
-
-  const onlySelf = members.every((m) => m.username === currentUsername);
-  if (onlySelf) {
-    return (
-      <small className="ms-2 text-muted">{t('user_group.only_yourself')}</small>
-    );
-  }
-  const label = members.map((m) => m.name || m.username).join(', ');
-  return (
-    <>
-      <small
-        ref={labelRef}
-        className="ms-2 text-muted text-truncate"
-        style={{ minWidth: 0 }}
-      >
-        {label}
-      </small>
-      <UncontrolledTooltip target={labelRef}>{label}</UncontrolledTooltip>
-    </>
-  );
-};
-
 type Props = {
   disabled?: boolean;
   openInModal?: boolean;
@@ -109,8 +64,6 @@ export const GrantSelector = (props: Props): JSX.Element => {
 
   const currentUser = useCurrentUser();
 
-  const shouldFetch = isSelectGroupModalShown;
-  const { data: membersByGroupId } = useSWRxRelatedGroupsMembers(shouldFetch);
   const [selectedGrant, setSelectedGrant] = useSelectedGrant();
   const currentPageId = useCurrentPageId();
   const { data: grantData } = useSWRxCurrentGrantData(currentPageId);
@@ -151,35 +104,6 @@ export const GrantSelector = (props: Props): JSX.Element => {
       applyCurrentPageGrantToSelectedGrant,
       selectedGrant?.grant,
     ],
-  );
-
-  const groupListItemClickHandler = useCallback(
-    (clickedGroup: UserRelatedGroupsData) => {
-      const userRelatedGrantedGroups =
-        selectedGrant?.userRelatedGrantedGroups ?? [];
-
-      let userRelatedGrantedGroupsCopy = [...userRelatedGrantedGroups];
-      if (
-        userRelatedGrantedGroupsCopy.find(
-          (group) => getIdForRef(group.item) === clickedGroup.id,
-        ) == null
-      ) {
-        const grantGroupInfo = {
-          item: clickedGroup.id,
-          type: clickedGroup.type,
-        };
-        userRelatedGrantedGroupsCopy.push(grantGroupInfo);
-      } else {
-        userRelatedGrantedGroupsCopy = userRelatedGrantedGroupsCopy.filter(
-          (group) => getIdForRef(group.item) !== clickedGroup.id,
-        );
-      }
-      setSelectedGrant({
-        grant: 5,
-        userRelatedGrantedGroups: userRelatedGrantedGroupsCopy,
-      });
-    },
-    [setSelectedGrant, selectedGrant?.userRelatedGrantedGroups],
   );
 
   /**
@@ -316,148 +240,19 @@ export const GrantSelector = (props: Props): JSX.Element => {
     openInModal,
   ]);
 
-  /**
-   * Render select grantgroup modal.
-   */
-  const renderSelectGroupModalContent = useCallback(() => {
-    if (!shouldFetch) {
-      return <></>;
-    }
-
-    // show spinner
-    if (groupGrantData == null) {
-      return (
-        <div className="my-3 text-center">
-          <LoadingSpinner className="mx-auto text-muted fs-4" />
-        </div>
-      );
-    }
-
-    const { userRelatedGroups, nonUserRelatedGrantedGroups } = groupGrantData;
-
-    if (userRelatedGroups.length === 0) {
-      return (
-        <div>
-          <h4>{t('user_group.belonging_to_no_group')}</h4>
-          {currentUser?.admin && (
-            <p>
-              <a href="/admin/user-groups">
-                <span className="material-symbols-outlined me-1">login</span>
-                {t('user_group.manage_user_groups')}
-              </a>
-            </p>
-          )}
-        </div>
-      );
-    }
-
-    return (
-      <div className="d-flex flex-column">
-        {userRelatedGroups.map((group) => {
-          const isGroupGranted = selectedGrant?.userRelatedGrantedGroups?.some(
-            (grantedGroup) => getIdForRef(grantedGroup.item) === group.id,
-          );
-          const cannotGrantGroup =
-            group.status === UserGroupPageGrantStatus.cannotGrant;
-          const activeClass = isGroupGranted ? 'active' : '';
-
-          return (
-            <button
-              className={`btn btn-outline-primary d-flex justify-content-start mb-3 mx-4 align-items-center p-3 ${activeClass}`}
-              type="button"
-              key={group.id}
-              onClick={() => groupListItemClickHandler(group)}
-              disabled={cannotGrantGroup}
-            >
-              <input
-                type="checkbox"
-                checked={isGroupGranted}
-                disabled={cannotGrantGroup}
-              />
-              <p className="ms-3 mb-0">{group.name}</p>
-              {group.type === GroupType.externalUserGroup && (
-                <span className="ms-2 badge badge-pill badge-info">
-                  {group.provider}
-                </span>
-              )}
-              <GroupMembersLabel
-                members={membersByGroupId?.[group.id] ?? []}
-                currentUsername={currentUser?.username}
-              />
-            </button>
-          );
-        })}
-        {nonUserRelatedGrantedGroups.map((group) => {
-          return (
-            <button
-              className="btn btn-outline-primary d-flex justify-content-start mb-3 mx-4 align-items-center p-3 active"
-              type="button"
-              key={group.id}
-              disabled
-            >
-              <input type="checkbox" checked disabled />
-              <p className="ms-3 mb-0">{group.name}</p>
-              {group.type === GroupType.externalUserGroup && (
-                <span className="ms-2 badge badge-pill badge-info">
-                  {group.provider}
-                </span>
-              )}
-            </button>
-          );
-        })}
-        <button
-          type="button"
-          className="btn btn-primary mt-2 mx-auto"
-          onClick={() => setIsSelectGroupModalShown(false)}
-        >
-          {t('Done')}
-        </button>
-      </div>
-    );
-  }, [
-    currentUser?.admin,
-    currentUser?.username,
-    groupListItemClickHandler,
-    membersByGroupId,
-    shouldFetch,
-    t,
-    groupGrantData,
-    selectedGrant?.userRelatedGrantedGroups,
-  ]);
-
-  const renderModalCloseButton = useCallback(() => {
-    return (
-      <button
-        type="button"
-        className="btn border-0 text-muted ms-auto"
-        onClick={() => setIsSelectGroupModalShown(false)}
-      >
-        <span className="material-symbols-outlined">close</span>
-      </button>
-    );
-  }, []);
-
   return (
     <>
       {renderGrantSelector()}
 
-      {/* render modal */}
       {!disabled && currentUser != null && (
-        <Modal
+        <SelectGroupModal
           isOpen={isSelectGroupModalShown}
-          toggle={() => setIsSelectGroupModalShown(false)}
-          centered
-        >
-          <ModalHeader
-            tag="p"
-            toggle={() => setIsSelectGroupModalShown(false)}
-            className="fs-5 text-muted fw-bold pb-2"
-            close={renderModalCloseButton()}
-          >
-            {t('user_group.select_group')}
-          </ModalHeader>
-          <ModalBody>{renderSelectGroupModalContent()}</ModalBody>
-        </Modal>
+          onClose={() => setIsSelectGroupModalShown(false)}
+          currentUser={currentUser}
+          selectedGrant={selectedGrant}
+          setSelectedGrant={setSelectedGrant}
+          groupGrantData={groupGrantData}
+        />
       )}
     </>
   );
