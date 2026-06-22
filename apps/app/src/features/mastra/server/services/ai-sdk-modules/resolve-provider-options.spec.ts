@@ -1,6 +1,9 @@
-const { getConfig, warn } = vi.hoisted(() => ({
+import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
+
+// Drive the allow-list through the config boundary; resolveProviderOptions
+// resolves per effective model via getAllowedModels/resolveEffectiveModel.
+const { getConfig } = vi.hoisted(() => ({
   getConfig: vi.fn(),
-  warn: vi.fn(),
 }));
 
 vi.mock('~/server/service/config-manager', () => ({
@@ -8,14 +11,19 @@ vi.mock('~/server/service/config-manager', () => ({
 }));
 
 vi.mock('~/utils/logger', () => ({
-  default: () => ({ warn, error: vi.fn(), debug: vi.fn(), info: vi.fn() }),
+  default: () => ({
+    warn: vi.fn(),
+    error: vi.fn(),
+    info: vi.fn(),
+    debug: vi.fn(),
+  }),
 }));
 
 import { resolveProviderOptions } from './resolve-provider-options';
 
-const setRaw = (value: string | undefined): void => {
+const setAllowedModels = (models: AllowedModel[] | undefined): void => {
   getConfig.mockImplementation((key: string) =>
-    key === 'ai:providerOptions' ? value : undefined,
+    key === 'ai:allowedModels' ? models : undefined,
   );
 };
 
@@ -24,66 +32,66 @@ beforeEach(() => {
 });
 
 describe('resolveProviderOptions', () => {
-  it('parses a provider-namespaced JSON object and returns it as-is (Req 6.1, 6.2)', () => {
-    setRaw('{"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}}');
+  it("returns the selected model's providerOptions when that model has options (Req 2.2)", () => {
+    setAllowedModels([
+      {
+        model: 'gpt-5',
+        isDefault: true,
+        providerOptions: { openai: { reasoningEffort: 'high' } },
+      },
+      {
+        model: 'o3',
+        providerOptions: { openai: { reasoningEffort: 'low' } },
+      },
+    ]);
+
+    expect(resolveProviderOptions('o3')).toEqual({
+      openai: { reasoningEffort: 'low' },
+    });
+  });
+
+  it('returns {} when the effective model entry has no providerOptions (Req 2.2)', () => {
+    setAllowedModels([
+      { model: 'gpt-4o', isDefault: true },
+      { model: 'gpt-4o-mini' },
+    ]);
+
+    expect(resolveProviderOptions('gpt-4o-mini')).toEqual({});
+  });
+
+  it("returns the DEFAULT model's options for an out-of-allowlist modelId (per-effective-model resolution, Req 4.4)", () => {
+    setAllowedModels([
+      {
+        model: 'gpt-5',
+        isDefault: true,
+        providerOptions: { openai: { reasoningEffort: 'high' } },
+      },
+      {
+        model: 'o3',
+        providerOptions: { openai: { reasoningEffort: 'low' } },
+      },
+    ]);
+
+    // resolveEffectiveModel collapses the rejected id to the default, so the
+    // default's options are applied — not the requested model's, not the
+    // (nonexistent) requested entry's.
+    expect(resolveProviderOptions('not-allowed')).toEqual({
+      openai: { reasoningEffort: 'high' },
+    });
+  });
+
+  it("resolves the default model's options when no modelId is given (Req 2.2)", () => {
+    setAllowedModels([
+      {
+        model: 'gpt-5',
+        isDefault: true,
+        providerOptions: { openai: { reasoningEffort: 'high' } },
+      },
+      { model: 'o3' },
+    ]);
 
     expect(resolveProviderOptions()).toEqual({
-      openai: { reasoningEffort: 'low', reasoningSummary: 'auto' },
-    });
-    expect(warn).not.toHaveBeenCalled();
-  });
-
-  it('passes through a non-OpenAI vendor namespace without interpretation (Req 6.2)', () => {
-    setRaw('{"anthropic":{"thinking":{"type":"enabled","budgetTokens":1024}}}');
-
-    expect(resolveProviderOptions()).toEqual({
-      anthropic: { thinking: { type: 'enabled', budgetTokens: 1024 } },
-    });
-  });
-
-  it('resolves the default OpenAI reasoning options when the env carries the default (Req 6.3)', () => {
-    // The config defaultValue is this JSON string; the resolver simply parses it.
-    setRaw('{"openai":{"reasoningEffort":"low","reasoningSummary":"auto"}}');
-
-    expect(resolveProviderOptions()).toEqual({
-      openai: { reasoningEffort: 'low', reasoningSummary: 'auto' },
-    });
-  });
-
-  it('returns an empty object when unset/empty (no options applied)', () => {
-    setRaw(undefined);
-    expect(resolveProviderOptions()).toEqual({});
-
-    setRaw('');
-    expect(resolveProviderOptions()).toEqual({});
-  });
-
-  describe('fail-soft on invalid input (Req 6.4)', () => {
-    it('returns {} and warns on malformed JSON (does not throw)', () => {
-      setRaw('{"openai": {');
-
-      expect(() => resolveProviderOptions()).not.toThrow();
-      expect(resolveProviderOptions()).toEqual({});
-      expect(warn).toHaveBeenCalled();
-    });
-
-    it('returns {} and warns when the JSON is not an object (array)', () => {
-      setRaw('["openai"]');
-      expect(resolveProviderOptions()).toEqual({});
-      expect(warn).toHaveBeenCalled();
-    });
-
-    it('returns {} and warns when the JSON is a primitive', () => {
-      setRaw('"openai"');
-      expect(resolveProviderOptions()).toEqual({});
-      expect(warn).toHaveBeenCalled();
-    });
-
-    it('returns {} and warns when a provider entry is not an option object', () => {
-      // Top-level is an object but the namespace value is a primitive/array.
-      setRaw('{"openai":"reasoningEffort"}');
-      expect(resolveProviderOptions()).toEqual({});
-      expect(warn).toHaveBeenCalled();
+      openai: { reasoningEffort: 'high' },
     });
   });
 });

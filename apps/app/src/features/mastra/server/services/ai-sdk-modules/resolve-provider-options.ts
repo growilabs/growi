@@ -1,54 +1,29 @@
 import type { JSONValue } from 'ai';
 
-import { isProviderNamespacedObject } from '~/features/mastra/utils/provider-options-validation';
-import { configManager } from '~/server/service/config-manager';
-import loggerFactory from '~/utils/logger';
-
-const logger = loggerFactory('growi:features:mastra:resolve-provider-options');
+import {
+  getAllowedModels,
+  resolveEffectiveModel,
+} from './llm-providers/config';
 
 // AI SDK `providerOptions` shape: provider namespace -> option map. Operators
-// supply the full, provider-namespaced object as JSON (variant A), so this
-// feature carries no per-vendor mapping logic.
+// supply the full, provider-namespaced object as JSON per allowed-model entry, so
+// this feature carries no per-vendor mapping logic. Same shape as the cross-layer
+// ModelProviderOptions DTO.
 export type MastraProviderOptions = Record<string, Record<string, JSONValue>>;
 
-// Typed guard over the shared shape predicate — single source of truth with the
-// FE/BE form validator (isValidProviderOptionsJson), narrowing to the AI SDK's
-// MastraProviderOptions. The form rejects this shape up front; this stays as
-// defense-in-depth for a value set directly via the env var (which bypasses the form).
-const isProviderOptions = (value: unknown): value is MastraProviderOptions =>
-  isProviderNamespacedObject(value);
-
-// Resolve the provider options applied to the mastra chat stream call from the
-// single `ai:providerOptions` JSON env var. Fails soft: a malformed or
-// non-provider-namespaced value is ignored (returns `{}`) with a warning rather
-// than failing the chat request, since provider options are tuning, not
-// correctness-critical (Req 6.4). Unknown provider namespaces are harmless — the
-// AI SDK reads only the active provider's namespace.
-export const resolveProviderOptions = (): MastraProviderOptions => {
-  const raw = configManager.getConfig('ai:providerOptions');
-  if (raw == null || raw === '') {
-    return {};
-  }
-
-  let parsed: unknown;
-  try {
-    parsed = JSON.parse(raw);
-  } catch (err) {
-    // Include the parse error so operators can locate the broken position in a
-    // long JSON value (the value is not a secret).
-    logger.warn(
-      'AI_PROVIDER_OPTIONS is not valid JSON; ignoring provider options',
-      err,
-    );
-    return {};
-  }
-
-  if (!isProviderOptions(parsed)) {
-    logger.warn(
-      'AI_PROVIDER_OPTIONS must be a provider-namespaced object (e.g. {"openai":{...}}); ignoring',
-    );
-    return {};
-  }
-
-  return parsed;
+// Resolve the provider options for the mastra chat stream call from the EFFECTIVE
+// model's allow-list entry. There is no global, uniformly-applied options value
+// (Req 2.5): options are always resolved per used model.
+//
+// resolveEffectiveModel collapses an out-of-allowlist / omitted modelId to the
+// default, so a rejected client value yields the DEFAULT model's options — never
+// the requested-but-disallowed model's (Req 4.4). It throws on an empty allow-list
+// (AI unconfigured), which is the established invariant; callers only reach here
+// once AI is configured. Returns {} when the resolved entry has no options.
+export const resolveProviderOptions = (
+  modelId?: string,
+): MastraProviderOptions => {
+  const effective = resolveEffectiveModel(modelId);
+  const entry = getAllowedModels().find((m) => m.model === effective);
+  return entry?.providerOptions ?? {};
 };

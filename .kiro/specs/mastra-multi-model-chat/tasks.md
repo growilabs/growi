@@ -27,7 +27,7 @@
   - _Requirements: 4.1, 1.2_
   - _Boundary: ai-sdk-modules_
   - _Depends: 2.1_
-- [ ] 2.3 provider オプションのモデル単位解決
+- [x] 2.3 provider オプションのモデル単位解決
   - `resolveProviderOptions(modelId?)` を実効モデルのエントリから解決（無ければ `{}`）。グローバル一律適用は廃止
   - 完了状態: ユニットテストで モデル別 options / 未設定→`{}` / 許可外→既定の options が通る
   - _Requirements: 2.2, 2.5, 4.4_
