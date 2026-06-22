@@ -1,0 +1,100 @@
+# Implementation Plan
+
+- [ ] 1. Foundation: 共有型・config・ストレージ定義
+- [ ] 1.1 共有型と AI 設定 DTO の更新
+  - `AllowedModel { model; providerOptions?; isDefault? }` と `ModelProviderOptions` を新規定義（interfaces）
+  - `IUserUISettings` に `aiChatSelectedModel?: string` を追加
+  - `AiSettingsResponse`/`AiSettingsUpdateRequest` から `model`/`providerOptions` を除去し `allowedModels` を追加、`AI_SETTING_KEYS` を `[app:aiEnabled, ai:provider, ai:apiKey, ai:allowedModels, ai:azureOpenaiSettings]` に
+  - 完了状態: 型が tsc を通り、`AI_SETTING_KEYS` の spec が新キー集合を期待
+  - _Requirements: 1.1, 2.1_
+- [ ] 1.2 config キーと UserUISettings スキーマの定義
+  - `ai:allowedModels` をオブジェクト配列キーとして追加（`envVarName: AI_ALLOWED_MODELS`, `defaultValue: []`）、env-only グループ `targetKeys` に追加
+  - `ai:model` / `ai:providerOptions` の config 定義を削除（env も読まれなくなる）
+  - `UserUISettings` スキーマに `aiChatSelectedModel` を追加
+  - 完了状態: `configManager.getConfig('ai:allowedModels')` が配列を返し、旧キーは未定義。`UserUISettings` に新フィールドが保存できる
+  - _Requirements: 1.1, 2.1, 3.6_
+
+- [ ] 2. Core: サーバのモデル解決
+- [ ] 2.1 許可リスト・既定・実効モデルの解決
+  - `getAllowedModels()`（`ai:allowedModels ?? []`、合成なし）、`getDefaultModel()`（`find(isDefault) ?? 先頭`）、`resolveEffectiveModel(modelId?)`（許可内ならそれ・無ければ既定・空なら throw）を実装し `requireModel()` を撤去
+  - 完了状態: ユニットテストで 許可内 / 許可外→既定 / 未指定→既定 / 空→throw が通る
+  - _Requirements: 4.1, 4.2, 4.3, 1.3_
+  - _Boundary: ai-sdk-modules_
+- [ ] 2.2 provider resolver の model 引数化と Map キャッシュ
+  - `modelResolvers` を `(model: string) => MastraModelConfig` に変更、各 provider resolver（openai/anthropic/google/azure-openai）を model 引数受け取りに。`resolveMastraModel(modelId?)` を `${provider}:${effective}` キーの Map キャッシュに、`clearResolvedMastraModelCache()` は Map 全消去
+  - 完了状態: 同一 model は 1 回だけ構築（キャッシュ）され、cache clear で再構築。Azure+Entra のトークンプロバイダがモデルごとに保持される
+  - _Requirements: 4.1, 1.2_
+  - _Boundary: ai-sdk-modules_
+  - _Depends: 2.1_
+- [ ] 2.3 provider オプションのモデル単位解決
+  - `resolveProviderOptions(modelId?)` を実効モデルのエントリから解決（無ければ `{}`）。グローバル一律適用は廃止
+  - 完了状態: ユニットテストで モデル別 options / 未設定→`{}` / 許可外→既定の options が通る
+  - _Requirements: 2.2, 2.5, 4.4_
+  - _Boundary: ai-sdk-modules_
+  - _Depends: 2.1_
+- [ ] 2.4 エージェントのリクエスト単位モデル化
+  - `growiAgent.model` を `({ requestContext }) => resolveMastraModel(requestContext.get('modelId'))` に、`MastraRequestContextShape` に `modelId?: string` を追加
+  - 完了状態: requestContext に modelId を入れて stream すると当該モデルで解決される（ユニット/結合）
+  - _Requirements: 4.1, 4.3_
+  - _Boundary: mastra-modules_
+  - _Depends: 2.1, 2.2_
+- [ ] 2.5 (P) AI 構成済み判定の更新
+  - `isAiConfigured()` を `provider + apiKey + 非空 getAllowedModels()` ベースに更新
+  - 編集対象は `is-ai-configured` のみ（`getAllowedModels` は 2.1 が config 側に追加済み）。2.2/2.3/2.4 とは別ファイルのため並行安全
+  - 完了状態: allowedModels 空→未構成、非空→構成済みのユニットテストが通る
+  - _Requirements: 6.1_
+  - _Boundary: is-ai-configured_
+  - _Depends: 2.1_
+
+- [ ] 3. Core: サーバ API
+- [ ] 3.1 (P) post-message に modelId 経路を追加
+  - validator に `modelId` optional を追加、route で `requestContext.set('modelId', modelId)` と `providerOptions: resolveProviderOptions(modelId)` を設定。許可外/未指定はサービス側で既定に丸め。provider エラーは既存サニタイズを維持
+  - 編集対象は post-message route と validator のみ。`routes/index` は変更しない（新ルート登録は 3.2 が所有）
+  - 完了状態: 許可内 modelId はそのモデルで応答、許可外/未指定は既定で応答（結合テスト）。エラー時は安全メッセージ
+  - _Requirements: 3.3, 4.1, 4.2, 4.3, 4.4, 4.5_
+  - _Boundary: post-message route_
+  - _Depends: 2.3, 2.4_
+- [ ] 3.2 (P) チャット用モデル一覧エンドポイント
+  - `GET /_api/v3/mastra/models` を追加（`routes/index` に登録、`aiReadyGuard` 配下、login + `READ.FEATURES.AI`）。`{ models, defaultModelId, selectedModelId }` を返し、`selectedModelId` は `UserUISettings.aiChatSelectedModel` を許可検証して `saved ∈ allowed ? saved : default`。providerOptions は返さない
+  - 完了状態: 結合テストで 許可モデル + 既定 + 検証済み `selectedModelId` を返す（保存値許可外→既定）
+  - _Requirements: 3.1, 3.2, 3.7_
+  - _Boundary: get-models route, routes/index_
+  - _Depends: 2.1_
+- [ ] 3.3 (P) 管理 AI 設定 API の許可リスト対応
+  - get-ai-settings で `allowedModels` を返却、put-ai-settings で `allowedModels` を read/validate/save（各 model 非空・重複禁止・`isDefault` ちょうど 1・各 providerOptions の JSON/名前空間検証）、env-only 422、保存後 `clearResolvedMastraModelCache`。`model`/`providerOptions` 書込みは除去
+  - 完了状態: PUT→GET ラウンドトリップで `allowedModels`（`isDefault` 含む）が往復、重複/空/`isDefault!=1`/不正 JSON は 422、env-only で 422
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.3, 2.4, 6.2_
+  - _Boundary: admin ai-settings routes_
+  - _Depends: 1.1, 1.2_
+
+- [ ] 4. Core: クライアント UI
+- [ ] 4.1 (P) 管理画面の許可モデルリストエディタ
+  - `AllowedModelsField`（`useFieldArray`、各行 = モデル ID + 既定ラジオ(`isDefault`, 単一) + 折りたたみ providerOptions JSON(既存バリデータ) + 削除、追加ボタン、既定行削除時の再付与）を実装し `ProviderCommonSettings` に単一配置（provider watch でラベル「デプロイ名/モデル」切替）。`AzureOpenaiSettings` から `ModelField` を除去、`ModelField` を削除、`ai-settings-form-values` を `{ model; providerOptionsText; isDefault }[]` 化（parse/stringify 変換）。env-only 時 disabled
+  - 完了状態: 行の追加/削除・既定ラジオ単一性・不正 JSON のインラインエラー・env-only disabled・Azure 時ラベル「デプロイ名」がコンポーネントテストで確認できる
+  - _Requirements: 1.1, 1.3, 1.4, 1.6, 2.1, 2.3, 2.4_
+  - _Boundary: admin client UI_
+  - _Depends: 3.3_
+- [ ] 4.2 (P) チャットのモデルセレクタ配線
+  - `stores/models.tsx`（SWR で `GET /mastra/models`）を追加。ChatSidebar に `PromptInputModelSelect*` を mount、`useState(selectedModelId)`、transport body に `modelId` を固定し `modelId` 変更時に transport 再生成、選択変更時に共有 `scheduleToPut({ aiChatSelectedModel })`。許可モデルが 1 つなら選択状態表示。models 解決までセレクタを disabled
+  - 完了状態: 初期選択 = `selectedModelId`、変更で transport 再生成 + `modelId` 送信 + `scheduleToPut` 呼出、regenerate でも `modelId` 保持（コンポーネントテスト）
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+  - _Boundary: chat client UI_
+  - _Depends: 3.1, 3.2_
+
+- [ ] 5. Integration & Validation
+- [ ] 5.1 結合・回帰テストと品質ゲート
+  - 解決系ユニット（`resolveEffectiveModel`/`getDefaultModel`/`getAllowedModels`/`resolveProviderOptions`/`resolveMastraModel` Map）、put-ai-settings バリデータ、post-message の `modelId` 経路、get-models の `selectedModelId` 検証を整備。既存スレッドの読込・継続・ストリーミングが回帰しないことを確認。lint/typecheck/test を通す
+  - 完了状態: 対象テストと既存スイートがグリーン、lint/typecheck パス
+  - _Requirements: 4.5, 5.1, 6.1, 6.2_
+  - _Depends: 3.1, 3.2, 3.3, 4.1, 4.2_
+- [ ] 5.2 devcontainer 実機スモーク
+  - dev サーバ起動。管理で複数モデル + 既定 + 一部に providerOptions を設定→保存。チャットでセレクタに許可モデルが出る・初期 = 既定/前回選択・別モデル選択で応答・reasoning options が対応モデルにのみ効く・許可外を送ってもデフォルトで応答・env-only で編集不可、を実機確認
+  - 完了状態: 上記フローが実機で観測できる
+  - _Requirements: 1.6, 2.2, 3.1, 3.3, 4.1, 4.2_
+  - _Depends: 5.1_
+
+- [ ] 6. 関連既存 spec のドキュメント整合更新
+  - admin-ai-settings spec（`ai:model` 単一→`allowedModels`、`providerOptions` 廃止、UI、GET/PUT 契約、`AI_SETTING_KEYS`、env-only）と multi-llm-provider spec（単一モデル解決→model パラメータ化、provider options 単一→per-model、「per-request 切替は対象外」へ「モデル単位の per-request 選択は本 spec で扱う／ベンダー切替は対象外」追記）を本実装に整合更新
+  - 完了状態: 両 spec の該当記述が本実装と矛盾しない
+  - _Requirements: 本タスクは spec 保守作業であり EARS 要件 ID を持たない（requirements.md Boundary Context「In scope」のスコープ項目）_
+  - _Depends: 5.1_
