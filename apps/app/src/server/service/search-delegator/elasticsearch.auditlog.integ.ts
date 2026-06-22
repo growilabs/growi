@@ -56,11 +56,12 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     delegator = new ElasticsearchDelegator(mock<SocketIoService>());
 
     mockES8Client = mock<ES8ClientDelegator>({ delegatorVersion: 8 });
-    // bulk's response is a large ES union; only the errors flag is read here.
-    mockES8Client.bulk.mockResolvedValue({
-      errors: false,
-      items: [],
-    } as unknown as Awaited<ReturnType<typeof mockES8Client.bulk>>);
+    mockES8Client.bulk.mockResolvedValue(
+      mock<Awaited<ReturnType<typeof mockES8Client.bulk>>>({
+        errors: false,
+        items: [],
+      }),
+    );
     // No public seam to set the version-specific client.
     (delegator as unknown as { client: ElasticsearchClientDelegator }).client =
       mockES8Client;
@@ -121,10 +122,12 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     await insertActivities([
       { _id: new mongoose.Types.ObjectId(), username: 'alice' },
     ]);
-    mockES8Client.bulk.mockResolvedValue({
-      errors: true,
-      items: [{ index: { error: { type: 'mapper_exception' } } }],
-    } as unknown as Awaited<ReturnType<typeof mockES8Client.bulk>>);
+    mockES8Client.bulk.mockResolvedValue(
+      mock<Awaited<ReturnType<typeof mockES8Client.bulk>>>({
+        errors: true,
+        items: [{ index: { error: { type: 'mapper_exception' } } }],
+      }),
+    );
 
     await expect(delegator.addAllAuditlogs()).rejects.toThrow(
       'addAllAuditlogs bulk indexing had errors',

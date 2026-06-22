@@ -387,17 +387,28 @@ describe('ElasticsearchDelegator', () => {
           { remove: { alias: 'auditlogs-alias', index: 'auditlogs' } },
         ],
       });
+      // Availability invariant: the alias must move onto tmp before the live index is
+      // dropped, so reads keep resolving throughout the rebuild.
+      expect(
+        mockES8Client.indices.updateAliases.mock.invocationCallOrder[0],
+      ).toBeLessThan(mockES8Client.indices.delete.mock.invocationCallOrder[0]);
     });
 
     it('restores the alias onto the live index after a successful rebuild', async () => {
       await delegator.rebuildAuditlogIndex();
 
-      // The mid-rebuild swap leaves the alias on the tmp index; the rebuild must end
-      // with the alias back on the live index.
-      expect(mockES8Client.indices.putAlias).toHaveBeenCalledWith({
-        name: 'auditlogs-alias',
-        index: 'auditlogs',
+      // The mid-rebuild swap leaves the alias on tmp; the rebuild must atomically swap
+      // it back onto the live index so the alias never resolves to nothing.
+      expect(mockES8Client.indices.updateAliases).toHaveBeenCalledWith({
+        actions: [
+          { add: { alias: 'auditlogs-alias', index: 'auditlogs' } },
+          { remove: { alias: 'auditlogs-alias', index: 'auditlogs-tmp' } },
+        ],
       });
+      // The swap-back must happen only after the live index has been repopulated.
+      expect(
+        mockES8Client.indices.updateAliases.mock.invocationCallOrder[1],
+      ).toBeGreaterThan(addAllAuditlogsSpy.mock.invocationCallOrder[0]);
     });
 
     it('deletes a leftover tmp index before reindexing', async () => {
@@ -414,6 +425,8 @@ describe('ElasticsearchDelegator', () => {
     });
 
     it('does not delete a tmp index when none is leftover', async () => {
+      mockES8Client.indices.exists.mockResolvedValue(false);
+
       await delegator.rebuildAuditlogIndex();
 
       expect(mockES8Client.indices.delete).not.toHaveBeenCalledWith({
@@ -432,6 +445,19 @@ describe('ElasticsearchDelegator', () => {
         name: 'auditlogs-alias',
         index: 'auditlogs',
       });
+    });
+
+    it('rethrows the original rebuild error even when normalization fails', async () => {
+      mockES8Client.reindex.mockRejectedValue(new Error('reindex failed'));
+      // putAlias is only reached from normalizeAuditlogIndices (the finally), not the
+      // try block, so failing it isolates a normalization failure during recovery.
+      mockES8Client.indices.putAlias.mockRejectedValue(
+        new Error('normalize failed'),
+      );
+
+      await expect(delegator.rebuildAuditlogIndex()).rejects.toThrow(
+        'reindex failed',
+      );
     });
   });
 });
