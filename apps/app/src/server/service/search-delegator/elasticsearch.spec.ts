@@ -9,6 +9,7 @@ import { configManager } from '~/server/service/config-manager/config-manager';
 import type { SocketIoService } from '~/server/service/socket-io';
 
 import ElasticsearchDelegator from './elasticsearch';
+import { injectClient } from './elasticsearch.test-helper';
 import type { ElasticsearchClientDelegator } from './elasticsearch-client-delegator';
 import type { ES7ClientDelegator } from './elasticsearch-client-delegator/es7-client-delegator';
 import type { ES8ClientDelegator } from './elasticsearch-client-delegator/es8-client-delegator';
@@ -17,15 +18,6 @@ vi.mock('~/server/service/config-manager/config-manager', () => ({
   default: { getConfig: vi.fn() },
   configManager: { getConfig: vi.fn() },
 }));
-
-// type-assertion (unavoidable): no public seam to set the version-specific client.
-const injectClient = (
-  target: ElasticsearchDelegator,
-  client: ElasticsearchClientDelegator,
-) => {
-  (target as unknown as { client: ElasticsearchClientDelegator }).client =
-    client;
-};
 
 describe('ElasticsearchDelegator', () => {
   let delegator: ElasticsearchDelegator;

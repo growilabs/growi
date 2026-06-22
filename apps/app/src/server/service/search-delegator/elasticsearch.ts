@@ -432,8 +432,8 @@ class ElasticsearchDelegator
       await this.createAuditlogIndex(indexName);
       await this.addAllAuditlogs();
 
-      // Atomic swap-back in a single updateAliases call so the alias never resolves to
-      // nothing mid-rebuild; tmp is dropped by normalizeAuditlogIndices in finally.
+      // Swap the alias back atomically so it never resolves to nothing mid-rebuild;
+      // the now-unaliased tmp is dropped by normalizeAuditlogIndices in the finally.
       await client.indices.updateAliases({
         actions: [
           { add: { alias: aliasName, index: indexName } },
@@ -447,9 +447,8 @@ class ElasticsearchDelegator
       );
       throw error;
     } finally {
-      // On success this just drops the now-unaliased tmp index; on failure it restores
-      // the indices and alias. Swallow its failure so it cannot mask the error rethrown
-      // above.
+      // Runs on both paths (cleanup after success, recovery after failure). Swallow its
+      // error so a normalization failure cannot mask the error rethrown above.
       try {
         await this.normalizeAuditlogIndices();
       } catch (normalizeErr) {

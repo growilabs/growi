@@ -6,7 +6,7 @@ import { configManager } from '~/server/service/config-manager/config-manager';
 import type { SocketIoService } from '~/server/service/socket-io';
 
 import ElasticsearchDelegator from './elasticsearch';
-import type { ElasticsearchClientDelegator } from './elasticsearch-client-delegator';
+import { injectClient } from './elasticsearch.test-helper';
 import type { ES8ClientDelegator } from './elasticsearch-client-delegator/es8-client-delegator';
 
 vi.mock('~/server/service/config-manager/config-manager', () => ({
@@ -62,9 +62,7 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
         items: [],
       }),
     );
-    // No public seam to set the version-specific client.
-    (delegator as unknown as { client: ElasticsearchClientDelegator }).client =
-      mockES8Client;
+    injectClient(delegator, mockES8Client);
 
     await Activity.deleteMany({});
   });
@@ -84,6 +82,8 @@ describe('ElasticsearchDelegator.addAllAuditlogs()', () => {
     await delegator.addAllAuditlogs();
 
     expect(mockES8Client.bulk).toHaveBeenCalledOnce();
+    // The body must target the concrete index, not the alias: during a rebuild the
+    // alias points at the tmp index, so indexing via it would write to the wrong index.
     expect(mockES8Client.bulk).toHaveBeenCalledWith({
       body: expect.arrayContaining([
         { index: { _index: 'auditlogs', _id: id1.toString() } },
