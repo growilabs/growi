@@ -1,5 +1,7 @@
 # Implementation Plan
 
+> 後続整合（mastra-multi-model-chat）: 本計画と末尾の各「FB 反映 / D-N」ノートは本 spec 実装時点の履歴である。ここで定義した単一 `ai:model` / グローバル `ai:providerOptions` / `requireModel()` / `getModel()` は、その後 mastra-multi-model-chat で **`ai:allowedModels`（モデル + per-model providerOptions + isDefault）+ `resolveEffectiveModel(modelId?)` / `getDefaultModel()` / `getAllowedModels()` / `resolveProviderOptions(modelId?)`、provider resolver の model 引数化、`${provider}:${effective}` キーの Map キャッシュ**へ統合・置換された（env `AI_MODEL` / `AI_PROVIDER_OPTIONS` は廃止・自動移行なし）。ベンダー（プロバイダ）切替は引き続き本 spec の対象外で、モデル単位の per-request 選択は mastra-multi-model-chat が扱う（同一プロバイダ内）。
+
 - [ ] 1. Foundation: 依存・型・設定
 - [x] 1.1 LLM ベンダー SDK 依存の追加
   - `@ai-sdk/anthropic` と `@ai-sdk/google` を `^3.x`（既存 `@ai-sdk/openai ^3` と同じ provider IF）で `apps/app/package.json` の `dependencies` に追加し、ルートで `turbo run bootstrap` を実行して依存解決・lockfile を更新する

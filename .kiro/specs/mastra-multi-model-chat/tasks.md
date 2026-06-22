@@ -95,7 +95,7 @@
   - _Requirements: 1.6, 2.2, 3.1, 3.3, 4.1, 4.2_
   - _Depends: 5.1_
 
-- [ ] 6. 関連既存 spec のドキュメント整合更新
+- [x] 6. 関連既存 spec のドキュメント整合更新
   - admin-ai-settings spec（`ai:model` 単一→`allowedModels`、`providerOptions` 廃止、UI、GET/PUT 契約、`AI_SETTING_KEYS`、env-only）と multi-llm-provider spec（単一モデル解決→model パラメータ化、provider options 単一→per-model、「per-request 切替は対象外」へ「モデル単位の per-request 選択は本 spec で扱う／ベンダー切替は対象外」追記）を本実装に整合更新
   - 完了状態: 両 spec の該当記述が本実装と矛盾しない
   - _Requirements: 本タスクは spec 保守作業であり EARS 要件 ID を持たない（requirements.md Boundary Context「In scope」のスコープ項目）_
