@@ -100,7 +100,7 @@ graph TB
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
 | Frontend | React 18 + react-hook-form（`useFieldArray`）+ SWR + ベンダリング済み AI Elements `PromptInputModelSelect*` | 許可モデルリストエディタ / チャットのモデルセレクタ | 新規ライブラリ導入なし |
-| Backend | Express apiv3 + `@mastra/core@1.41`（動的モデル関数・RequestContext）+ `@ai-sdk/*@3` | リクエスト単位モデル解決・検証・新 GET エンドポイント | 既存依存のみ |
+| Backend | Express apiv3 + `@mastra/core`（動的モデル関数・RequestContext）+ `@ai-sdk/*@3` | リクエスト単位モデル解決・検証・新 GET エンドポイント | 既存依存のみ。動的モデル関数 `({ requestContext }) => model` を要するため実効最小は 1.41（package.json の floor は `^1.32.1` だが caret で 1.41 系へ解決され、インストール実体は 1.41.0）。floor を巻き戻す場合はこの機能の可用性を再確認 |
 | Data | MongoDB config（`config-manager`/`config-loader`） | `ai:allowedModels`（オブジェクト配列）永続化 | env `AI_ALLOWED_MODELS` は JSON 文字列 |
 
 新規依存なし。逸脱: 既定を別キーから `isDefault` フラグへ移行、`ai:model`/`ai:providerOptions` を完全廃止、モデル欄を Azure 専用セクション → 共通設定へ移設。
@@ -335,7 +335,7 @@ export const clearResolvedMastraModelCache = (): void; // Map 全消去
 export interface AiSettingsResponse {
   aiEnabled: boolean;
   provider?: AiProvider;
-  allowedModels: AllowedModel[];  // isDefault 込み。常に存在（getAllowedModels の合成結果）
+  allowedModels: AllowedModel[];  // isDefault 込み。getAllowedModels() が `?? []` するため常に配列（合成はしない）
   azureOpenaiSettings: AzureOpenaiConfig;
   isApiKeySet: boolean;
   useOnlyEnvVars: boolean;
@@ -442,3 +442,4 @@ export interface AiSettingsFormValues {
 - `ai:allowedModels` 未設定のときチャットは未構成（`isAiConfigured` が false）としてゲートされる（6.1）。
 - DB に残る旧 `ai:model`/`ai:providerOptions` の値は未定義キーとして無視される（実害なし）。
 - ロールバック: 設定方式の変更のみで、データ移行を伴わない。
+- **前提確認（実装着手前）**: 本戦略は「Mastra AI チャットが未リリースで移行対象が存在しない」ことに全面的に依存する。万一すでにリリース済み（旧 `ai:model`/`ai:providerOptions` を本番運用しているユーザーが存在する）であれば、移行欠如が設定消失事故になり得るため、着手前にリリース状態を最終確認すること。
