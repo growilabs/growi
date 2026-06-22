@@ -347,18 +347,15 @@ describe('ElasticsearchDelegator', () => {
   describe('rebuildAuditlogIndex()', () => {
     let mockES8Client: DeepMockProxy<ES8ClientDelegator>;
     let addAllAuditlogsSpy: ReturnType<typeof vi.spyOn>;
-    let normalizeAuditlogIndicesSpy: ReturnType<typeof vi.spyOn>;
 
     beforeEach(() => {
       mockES8Client = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
       injectClient(delegator, mockES8Client);
-      // addAllAuditlogs streams from MongoDB and normalizeAuditlogIndices is covered on
-      // its own; stub both so this suite isolates rebuild's orchestration.
+      // addAllAuditlogs streams from MongoDB, so it cannot run in a unit test — stub it.
+      // normalizeAuditlogIndices runs for real (the ES client is mocked) so the resulting
+      // index state stays observable rather than being asserted through a spy.
       addAllAuditlogsSpy = vi
         .spyOn(delegator, 'addAllAuditlogs')
-        .mockResolvedValue(undefined);
-      normalizeAuditlogIndicesSpy = vi
-        .spyOn(delegator, 'normalizeAuditlogIndices')
         .mockResolvedValue(undefined);
     });
 
@@ -392,10 +389,15 @@ describe('ElasticsearchDelegator', () => {
       });
     });
 
-    it('normalizes the indices after a successful rebuild', async () => {
+    it('restores the alias onto the live index after a successful rebuild', async () => {
       await delegator.rebuildAuditlogIndex();
 
-      expect(normalizeAuditlogIndicesSpy).toHaveBeenCalled();
+      // The mid-rebuild swap leaves the alias on the tmp index; the rebuild must end
+      // with the alias back on the live index.
+      expect(mockES8Client.indices.putAlias).toHaveBeenCalledWith({
+        name: 'auditlogs-alias',
+        index: 'auditlogs',
+      });
     });
 
     it('deletes a leftover tmp index before reindexing', async () => {
@@ -419,13 +421,17 @@ describe('ElasticsearchDelegator', () => {
       });
     });
 
-    it('normalizes the indices and rethrows when a rebuild step fails', async () => {
+    it('restores the indices and rethrows when a rebuild step fails', async () => {
       mockES8Client.reindex.mockRejectedValue(new Error('reindex failed'));
 
       await expect(delegator.rebuildAuditlogIndex()).rejects.toThrow(
         'reindex failed',
       );
-      expect(normalizeAuditlogIndicesSpy).toHaveBeenCalled();
+      // Recovery still runs in `finally`: the alias is restored onto the live index.
+      expect(mockES8Client.indices.putAlias).toHaveBeenCalledWith({
+        name: 'auditlogs-alias',
+        index: 'auditlogs',
+      });
     });
   });
 });
