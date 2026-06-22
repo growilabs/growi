@@ -61,7 +61,7 @@
   - _Requirements: 3.1, 3.2, 3.7_
   - _Boundary: get-models route, routes/index_
   - _Depends: 2.1_
-- [ ] 3.3 (P) 管理 AI 設定 API の許可リスト対応
+- [x] 3.3 (P) 管理 AI 設定 API の許可リスト対応
   - get-ai-settings で `allowedModels` を返却、put-ai-settings で `allowedModels` を read/validate/save。**非空リストのとき**のみ検証（各 model 非空・重複禁止・`isDefault` ちょうど 1・各 providerOptions の JSON/名前空間検証）、env-only 422、保存後 `clearResolvedMastraModelCache`。`model`/`providerOptions` 書込みは除去
   - **空配列/未指定はクリア経路**: `buildUpdates` で `ai:allowedModels` に `undefined` を設定し `updateConfigs({ removeIfUndefined: true })` でキー削除（→ `getConfig` は既定 `[]`）。空配列は 422 にしない（正当な無効化）
   - 完了状態: PUT→GET ラウンドトリップで `allowedModels`（`isDefault` 含む）が往復、重複/非空時の空 model/`isDefault!=1`/不正 JSON は 422、env-only で 422。空配列 PUT はキー削除され GET が `[]` を返す
@@ -103,4 +103,6 @@
 
 ## Implementation Notes
 
+- **3.3 / config-manager.spec.ts の旧キー参照（5.1 で対応）**: `apps/app/src/server/service/config-manager/config-manager.spec.ts` が削除済みの `ai:model` / `ai:providerOptions` を参照しており typecheck が赤い。どのタスクの _Boundary_ にも明示されていない巻き添えのため、**task 5.1（品質ゲート、lint/typecheck/test を通す）で修正**すること。
+- **3.3 / 検証失敗の HTTP コードは 400（env-only のみ 422）**: design.md の本文（管理保存・Error Handling 節）は配列不変条件の検証失敗を「422」と書く箇所があるが、権威ある API Contract 表は `400 (validation), 422 (env-only)` と定義。実装は `apiV3FormValidator → res.apiv3Err` 既定の **400** で検証失敗を返し、env-only のみ明示 422。要件 1.4/1.5/2.4 は HTTP コードを指定せず「保存を拒否」のみなので整合。**task 6 のドキュメント整合更新で design.md 本文の「422」表記を 400 に修正**すること。
 - **2.5 / isAiConfigured と Azure+Entra ID**: design.md は構成済み判定を字面どおり「provider + apiKey + 非空 allowedModels」と記すが、この記述は Azure OpenAI + Entra ID（`ai:azureOpenaiSettings.useEntraId === true`、apiKey 不要のベアラートークン認証）を考慮していない。無条件 apiKey 必須は Entra 専用デプロイを「構成済み→未構成」に退行させ、要件 6.1「従来どおりのゲーティング維持」に反する（実装時にレビューで検出・修正）。`isAiConfigured()` は Entra-aware に実装済み（`requiresApiKey(provider)` ヘルパが `resolveAzureOpenaiModel` の実認証分岐 `useEntraId === true` と完全一致）。**task 6 のドキュメント整合更新時に design.md / 関連 spec の「provider + apiKey」字面へこの Entra 例外を反映すること。**

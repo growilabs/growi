@@ -7,8 +7,13 @@
 //   - configManager.updateConfigs(updates, options): the persistence boundary.
 //     The contract is the SHAPE of `updates` (which keys, with what values) and
 //     the `removeIfUndefined` option:
-//       * string fields normalize '' -> undefined and are removed from DB so the
-//         effective value falls back to the env var (Req 4.4)
+//       * the clearable provider string normalizes '' -> undefined and is removed
+//         from DB so the effective value falls back to the env var (Req 4.4)
+//       * ai:allowedModels is the per-model allow-list (full-state replace): a
+//         non-empty (validated) array is persisted verbatim incl. isDefault and
+//         providerOptions (Req 1.1/1.3); an empty/omitted array collapses to
+//         undefined so removeIfUndefined deletes the key and getConfig falls back
+//         to [] — the legitimate "no allowed models" clear path (Req 1.1)
 //       * the four Azure OpenAI fields are consolidated into one ai:azureOpenaiSettings
 //         JSON object (full-state replace); useEntraId is stored only when true,
 //         and an all-cleared object collapses to undefined so removeIfUndefined
@@ -128,7 +133,10 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
   describe('env-only mode (Req 4.3)', () => {
     it('rejects with 422 and persists nothing when env:useOnlyEnvVars:ai is true', async () => {
       const { res } = await invoke(
-        { provider: 'openai', model: 'gpt-4o' },
+        {
+          provider: 'openai',
+          allowedModels: [{ model: 'gpt-4o', isDefault: true }],
+        },
         { useOnlyEnvVars: true },
       );
 
@@ -141,14 +149,20 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
     });
   });
 
-  describe('successful save (Req 2.3, 2.4, 7.1)', () => {
-    it('maps fields to config keys, clears the cache, and emits the audit action', async () => {
+  describe('successful save (Req 1.1, 1.2, 1.3, 2.3, 7.1)', () => {
+    it('maps fields (incl. the allowedModels allow-list) to config keys, clears the cache, and emits the audit action', async () => {
       const { res } = await invoke({
         aiEnabled: true,
         provider: 'openai',
         apiKey: 'sk-new-key',
-        model: 'gpt-4o',
-        providerOptions: '{"openai":{"temperature":0.2}}',
+        allowedModels: [
+          {
+            model: 'gpt-4o',
+            isDefault: true,
+            providerOptions: { openai: { temperature: 0.2 } },
+          },
+          { model: 'gpt-4o-mini' },
+        ],
         azureOpenaiSettings: { useEntraId: true },
       });
 
@@ -157,12 +171,25 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         'app:aiEnabled': true,
         'ai:provider': 'openai',
         'ai:apiKey': 'sk-new-key',
-        'ai:model': 'gpt-4o',
-        'ai:providerOptions': '{"openai":{"temperature":0.2}}',
+        // The per-model allow-list is persisted verbatim (incl. isDefault and
+        // providerOptions) — Req 1.1, 1.3.
+        'ai:allowedModels': [
+          {
+            model: 'gpt-4o',
+            isDefault: true,
+            providerOptions: { openai: { temperature: 0.2 } },
+          },
+          { model: 'gpt-4o-mini' },
+        ],
         // The azureOpenaiSettings object is re-assembled into the config value.
         'ai:azureOpenaiSettings': { useEntraId: true },
       });
+      // The legacy single-model keys are no longer written.
+      expect(updates).not.toHaveProperty('ai:model');
+      expect(updates).not.toHaveProperty('ai:providerOptions');
 
+      // The resolved-model cache is invalidated AFTER the save so the next request
+      // rebuilds from the new allow-list without a restart (Req 1.2).
       expect(clearResolvedMastraModelCache).toHaveBeenCalledTimes(1);
       expect(emit).toHaveBeenCalledWith('update', ACTIVITY_ID, {
         action: SupportedAction.ACTION_ADMIN_AI_SETTING_UPDATE,
@@ -171,13 +198,54 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
     });
   });
 
+  // The clear path: an empty array OR an omitted allowedModels collapses to
+  // undefined so removeIfUndefined deletes ai:allowedModels and getConfig falls
+  // back to its default []. This is a legitimate "no allowed models" disablement,
+  // NOT a 422 (Req 1.1) — and it must mirror the azureOpenaiSettings collapse.
+  describe('allowedModels clear path (Req 1.1)', () => {
+    it('collapses an empty array to undefined (key present for removeIfUndefined)', async () => {
+      await invoke({ provider: 'openai', allowedModels: [] });
+
+      const [updates, options] = updateCall();
+      expect(updates).toHaveProperty('ai:allowedModels');
+      expect(updates['ai:allowedModels']).toBeUndefined();
+      expect(options).toMatchObject({ removeIfUndefined: true });
+    });
+
+    it('collapses an omitted allowedModels to undefined (key present for removeIfUndefined)', async () => {
+      await invoke({ provider: 'openai' });
+
+      const [updates, options] = updateCall();
+      expect(updates).toHaveProperty('ai:allowedModels');
+      expect(updates['ai:allowedModels']).toBeUndefined();
+      expect(options).toMatchObject({ removeIfUndefined: true });
+    });
+
+    it('still clears the cache and emits the audit action on a clear-path save (Req 1.2)', async () => {
+      const { res } = await invoke({ provider: 'openai', allowedModels: [] });
+
+      expect(clearResolvedMastraModelCache).toHaveBeenCalledTimes(1);
+      expect(emit).toHaveBeenCalledTimes(1);
+      expect(res.apiv3).toHaveBeenCalledTimes(1);
+    });
+
+    it('persists a non-empty allow-list verbatim (no collapse)', async () => {
+      await invoke({
+        provider: 'openai',
+        allowedModels: [{ model: 'gpt-4o', isDefault: true }],
+      });
+
+      const [updates] = updateCall();
+      expect(updates['ai:allowedModels']).toEqual([
+        { model: 'gpt-4o', isDefault: true },
+      ]);
+    });
+  });
+
   describe('apiKey preservation (Req 5.x)', () => {
     it('omits ai:apiKey from updates when apiKey is undefined (existing key preserved)', async () => {
       // Same provider as stored: the merge ("keep existing") applies.
-      await invoke(
-        { provider: 'openai', model: 'gpt-4o' },
-        { currentProvider: 'openai' },
-      );
+      await invoke({ provider: 'openai' }, { currentProvider: 'openai' });
 
       const [updates] = updateCall();
       expect(updates).not.toHaveProperty('ai:apiKey');
@@ -185,7 +253,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
 
     it('omits ai:apiKey from updates when apiKey is an empty string (existing key preserved)', async () => {
       await invoke(
-        { provider: 'openai', model: 'gpt-4o', apiKey: '' },
+        { provider: 'openai', apiKey: '' },
         { currentProvider: 'openai' },
       );
 
@@ -208,10 +276,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
   // handler must clear the stored key on a provider change unless a new one is set.
   describe('apiKey invalidation on provider change (security)', () => {
     it('clears ai:apiKey (present-but-undefined for removeIfUndefined) when the provider changes and no new key is sent', async () => {
-      await invoke(
-        { provider: 'google', model: 'gemini-2.5-flash' },
-        { currentProvider: 'openai' },
-      );
+      await invoke({ provider: 'google' }, { currentProvider: 'openai' });
 
       const [updates, options] = updateCall();
       expect(updates).toHaveProperty('ai:apiKey');
@@ -225,7 +290,6 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         {
           provider: 'google',
           apiKey: 'new-google-key',
-          model: 'gemini-2.5-flash',
         },
         { currentProvider: 'openai' },
       );
@@ -235,10 +299,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
     });
 
     it('preserves the stored key (omits ai:apiKey) when the provider is unchanged', async () => {
-      await invoke(
-        { provider: 'openai', model: 'gpt-4o' },
-        { currentProvider: 'openai' },
-      );
+      await invoke({ provider: 'openai' }, { currentProvider: 'openai' });
 
       const [updates] = updateCall();
       expect(updates).not.toHaveProperty('ai:apiKey');
@@ -250,34 +311,33 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
   // runs. These tests invoke the handler directly (bypassing the middleware), so
   // they feed `undefined` to represent a post-sanitizer cleared field. The
   // sanitizer's own '' -> undefined behavior is covered in the validators block.
-  describe('cleared string fields with removeIfUndefined (Req 4.4)', () => {
-    it('keeps cleared (undefined) string keys present so removeIfUndefined deletes them from the DB', async () => {
+  describe('cleared fields with removeIfUndefined (Req 4.4)', () => {
+    it('keeps cleared (undefined) keys present so removeIfUndefined deletes them from the DB', async () => {
       await invoke({
         provider: 'openai',
-        model: undefined,
-        providerOptions: undefined,
+        allowedModels: undefined,
         azureOpenaiSettings: {},
       });
 
       const [updates, options] = updateCall();
       expect(options).toMatchObject({ removeIfUndefined: true });
-      expect(updates['ai:model']).toBeUndefined();
-      expect(updates['ai:providerOptions']).toBeUndefined();
+      // Omitted allow-list -> collapses to undefined (clear path).
+      expect(updates['ai:allowedModels']).toBeUndefined();
       // All Azure fields cleared (and useEntraId not provided) -> the object
       // collapses to undefined so removeIfUndefined deletes the consolidated key.
       expect(updates['ai:azureOpenaiSettings']).toBeUndefined();
       // Non-empty string keeps its value.
       expect(updates['ai:provider']).toBe('openai');
       // The keys are still present in the updates object so removeIfUndefined deletes them.
-      expect(updates).toHaveProperty('ai:model');
+      expect(updates).toHaveProperty('ai:allowedModels');
       expect(updates).toHaveProperty('ai:azureOpenaiSettings');
     });
 
-    it('keeps a non-empty string field value', async () => {
-      await invoke({ provider: 'openai', model: 'gpt-4o' });
+    it('keeps a non-empty provider value', async () => {
+      await invoke({ provider: 'anthropic' });
 
       const [updates] = updateCall();
-      expect(updates['ai:model']).toBe('gpt-4o');
+      expect(updates['ai:provider']).toBe('anthropic');
     });
 
     it('saves app:aiEnabled even when false', async () => {
@@ -427,53 +487,101 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
     });
   });
 
-  // providerOptions uses the shared FE/BE predicate (isValidProviderOptionsJson),
-  // which requires a provider-namespaced JSON object — the shape the runtime
-  // applies — so client and server accept/reject exactly the same input and a
-  // wrong-shape value is rejected here instead of saved-then-silently-ignored.
-  describe('providerOptions (shared provider-namespaced predicate)', () => {
-    it('accepts a provider-namespaced JSON object string', async () => {
+  // allowedModels is validated as a WHOLE array (the per-entry + cross-field
+  // invariants cannot be expressed by per-field chains). It rejects with the
+  // `allowedModels` field flagged when non-array, a non-empty list breaks a rule,
+  // or the default count != 1. An empty array is ACCEPTED (the clear path).
+  describe('allowedModels (whole-array invariants, Req 1.3/1.4/1.5/2.4)', () => {
+    it('accepts a valid non-empty allow-list (exactly one default, valid options)', async () => {
       const { hasErrors } = await runValidators({
-        providerOptions: '{"openai":{"temperature":0.7}}',
+        allowedModels: [
+          {
+            model: 'gpt-4o',
+            isDefault: true,
+            providerOptions: { openai: { temperature: 0.2 } },
+          },
+          { model: 'gpt-4o-mini' },
+        ],
       });
       expect(hasErrors).toBe(false);
     });
 
-    // Parsable JSON of the wrong shape (arrays, bare primitives, or an object
-    // whose value is not itself an option object) is rejected up front — the
-    // runtime would ignore it, so accepting it on save would be a silent no-op.
-    it.each([
-      '[1,2,3]',
-      'true',
-      'false',
-      'null',
-      '42',
-      '"x"',
-      '{"temperature":0.2}',
-      '{"openai":[1,2]}',
-    ])('rejects the wrong-shape JSON value "%s"', async (providerOptions) => {
-      const { hasErrors, failedFields } = await runValidators({
-        providerOptions,
-      });
-      expect(hasErrors).toBe(true);
-      expect(failedFields).toContain('providerOptions');
-    });
-
-    it('rejects a malformed JSON string', async () => {
-      const { hasErrors, failedFields } = await runValidators({
-        providerOptions: '{ invalid',
-      });
-      expect(hasErrors).toBe(true);
-      expect(failedFields).toContain('providerOptions');
-    });
-
-    it('accepts an empty string (cleared option, valid "no options")', async () => {
-      const { hasErrors } = await runValidators({ providerOptions: '' });
+    it('accepts an empty array (the clear path — must NOT 422, Req 1.1)', async () => {
+      const { hasErrors } = await runValidators({ allowedModels: [] });
       expect(hasErrors).toBe(false);
     });
 
-    it('accepts a request that omits providerOptions', async () => {
+    it('accepts a request that omits allowedModels', async () => {
       const { hasErrors } = await runValidators({});
+      expect(hasErrors).toBe(false);
+    });
+
+    it('rejects a non-array allowedModels', async () => {
+      const { hasErrors, failedFields } = await runValidators({
+        allowedModels: { model: 'gpt-4o' },
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('allowedModels');
+    });
+
+    it('rejects duplicate model ids (Req 1.4)', async () => {
+      const { hasErrors, failedFields } = await runValidators({
+        allowedModels: [
+          { model: 'gpt-4o', isDefault: true },
+          { model: 'gpt-4o' },
+        ],
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('allowedModels');
+    });
+
+    it('rejects a non-empty list with an empty model id (Req 1.4)', async () => {
+      const { hasErrors, failedFields } = await runValidators({
+        allowedModels: [{ model: '', isDefault: true }],
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('allowedModels');
+    });
+
+    it('rejects a list with zero defaults (Req 1.5)', async () => {
+      const { hasErrors, failedFields } = await runValidators({
+        allowedModels: [{ model: 'gpt-4o' }, { model: 'gpt-4o-mini' }],
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('allowedModels');
+    });
+
+    it('rejects a list with two defaults (Req 1.5)', async () => {
+      const { hasErrors, failedFields } = await runValidators({
+        allowedModels: [
+          { model: 'gpt-4o', isDefault: true },
+          { model: 'gpt-4o-mini', isDefault: true },
+        ],
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('allowedModels');
+    });
+
+    it('rejects an entry with invalid (non-namespaced) providerOptions (Req 2.4)', async () => {
+      const { hasErrors, failedFields } = await runValidators({
+        allowedModels: [
+          {
+            model: 'gpt-4o',
+            isDefault: true,
+            providerOptions: { temperature: 0.2 },
+          },
+        ],
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('allowedModels');
+    });
+
+    it('accepts an entry with empty providerOptions ("no options", Req 2.3)', async () => {
+      const { hasErrors } = await runValidators({
+        allowedModels: [
+          { model: 'gpt-4o', isDefault: true, providerOptions: {} },
+        ],
+      });
       expect(hasErrors).toBe(false);
     });
   });
@@ -482,23 +590,14 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
   // rejected, a string passes. The Azure connection strings live under the nested
   // azureOpenaiSettings object (validated by dot-path).
   describe('string type validation (.isString())', () => {
-    it.each([
-      'apiKey',
-      'model',
-      'providerOptions',
-    ])('rejects a non-string value for "%s"', async (field) => {
-      const { hasErrors, failedFields } = await runValidators({
-        [field]: 123,
-      });
+    it('rejects a non-string value for "apiKey"', async () => {
+      const { hasErrors, failedFields } = await runValidators({ apiKey: 123 });
       expect(hasErrors).toBe(true);
-      expect(failedFields).toContain(field);
+      expect(failedFields).toContain('apiKey');
     });
 
-    it.each([
-      'apiKey',
-      'model',
-    ])('accepts a string value for "%s"', async (field) => {
-      const { hasErrors } = await runValidators({ [field]: 'some-value' });
+    it('accepts a string value for "apiKey"', async () => {
+      const { hasErrors } = await runValidators({ apiKey: 'some-value' });
       expect(hasErrors).toBe(false);
     });
 
@@ -534,21 +633,12 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
     });
   });
 
-  // The clearable string fields carry a customSanitizer that the production
-  // middleware applies before the handler runs: '' -> undefined so that
+  // The clearable Azure connection string fields carry a customSanitizer that the
+  // production middleware applies before the handler runs: '' -> undefined so that
   // removeIfUndefined deletes them and the value falls back to the env var
   // (Req 4.4). This is the only place that behavior is exercised — the handler
   // tests bypass the middleware, so they no longer see the normalization.
   describe('customSanitizer clears empty strings ("" -> undefined) (Req 4.4)', () => {
-    it.each([
-      'model',
-      'providerOptions',
-    ])('sanitizes an empty "%s" to undefined', async (field) => {
-      const { hasErrors, body } = await runValidators({ [field]: '' });
-      expect(hasErrors).toBe(false);
-      expect(body[field]).toBeUndefined();
-    });
-
     it.each([
       'resourceName',
       'baseURL',
@@ -562,9 +652,12 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
       expect(azure[field]).toBeUndefined();
     });
 
-    it('leaves a non-empty clearable string untouched', async () => {
-      const { body } = await runValidators({ model: 'gpt-4o' });
-      expect(body.model).toBe('gpt-4o');
+    it('leaves a non-empty clearable Azure string untouched', async () => {
+      const { body } = await runValidators({
+        azureOpenaiSettings: { resourceName: 'my-resource' },
+      });
+      const azure = body.azureOpenaiSettings as Record<string, unknown>;
+      expect(azure.resourceName).toBe('my-resource');
     });
 
     it('does NOT sanitize an empty apiKey to undefined (handled by the handler instead)', async () => {
@@ -613,8 +706,14 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
       aiEnabled: true,
       provider: 'azure-openai',
       apiKey: 'secret-key',
-      model: 'gpt-4o',
-      providerOptions: '{"openai":{"temperature":0.2}}',
+      allowedModels: [
+        {
+          model: 'gpt-4o',
+          isDefault: true,
+          providerOptions: { openai: { temperature: 0.2 } },
+        },
+        { model: 'gpt-4o-mini' },
+      ],
       azureOpenaiSettings: {
         resourceName: 'my-resource',
         baseURL: 'https://example.openai.azure.com',

@@ -10,7 +10,7 @@
 //   - the ai:apiKey VALUE is never present; only isApiKeySet (Req 5.2)
 //   - isApiKeySet reflects whether ai:apiKey is non-empty
 //   - useOnlyEnvVars / aiEnabled / isConfigured reflect their sources (Req 4.2, 7.1, 7.6)
-//   - provider / model / providerOptions / azure fields pass through (Req 1.4)
+//   - provider / allowedModels / azure fields pass through (Req 1.1, 1.3, 1.4)
 //   - on a collaborator failure the handler answers apiv3Err WITHOUT leaking the key (Req 5.3)
 // We mock both collaborators so the test exercises only this handler's mapping,
 // not how a value is resolved or how "configured" is computed.
@@ -45,8 +45,8 @@ const setConfig = (overrides: ConfigStub = {}): void => {
     'app:aiEnabled': false,
     'ai:provider': undefined,
     'ai:apiKey': undefined,
-    'ai:model': undefined,
-    'ai:providerOptions': undefined,
+    // The per-model allow-list. Absent here so the handler's `?? []` is exercised.
+    'ai:allowedModels': undefined,
     // Azure connection config is one JSON object, exposed as-is under
     // azureOpenaiSettings in the response.
     'ai:azureOpenaiSettings': {},
@@ -138,11 +138,19 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
     expect(isAiConfigured).toHaveBeenCalledTimes(1);
   });
 
-  it('passes through the non-secret effective values (Req 1.4)', () => {
+  it('passes through the non-secret effective values incl. the allowedModels allow-list (Req 1.1, 1.3, 1.4)', () => {
     setConfig({
       'ai:provider': 'azure-openai',
-      'ai:model': 'gpt-4o',
-      'ai:providerOptions': '{"openai":{"temperature":0.2}}',
+      // The per-model allow-list is returned verbatim, incl. isDefault and
+      // providerOptions (the admin UI is trusted) — Req 1.1, 1.3.
+      'ai:allowedModels': [
+        {
+          model: 'gpt-4o',
+          isDefault: true,
+          providerOptions: { openai: { temperature: 0.2 } },
+        },
+        { model: 'gpt-4o-mini' },
+      ],
       'ai:azureOpenaiSettings': {
         resourceName: 'my-resource',
         baseURL: 'https://example.openai.azure.com',
@@ -157,8 +165,14 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
     // azureOpenaiSettings (one canonical type end-to-end, Req 1.4).
     expect(responseBody(res)).toMatchObject({
       provider: 'azure-openai',
-      model: 'gpt-4o',
-      providerOptions: '{"openai":{"temperature":0.2}}',
+      allowedModels: [
+        {
+          model: 'gpt-4o',
+          isDefault: true,
+          providerOptions: { openai: { temperature: 0.2 } },
+        },
+        { model: 'gpt-4o-mini' },
+      ],
       azureOpenaiSettings: {
         resourceName: 'my-resource',
         baseURL: 'https://example.openai.azure.com',
@@ -166,6 +180,17 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
         useEntraId: true,
       },
     });
+  });
+
+  it('returns allowedModels as [] when ai:allowedModels is absent (the ?? [] default, Req 1.1)', () => {
+    setConfig({ 'ai:allowedModels': undefined });
+
+    const { res } = invoke();
+
+    expect(responseBody(res).allowedModels).toEqual([]);
+    // The legacy single-model fields are gone from the response.
+    expect(responseBody(res)).not.toHaveProperty('model');
+    expect(responseBody(res)).not.toHaveProperty('providerOptions');
   });
 
   it('passes the azureOpenaiSettings object through verbatim (no normalization)', () => {
