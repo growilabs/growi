@@ -15,7 +15,7 @@
   - 完了状態: `configManager.getConfig('ai:allowedModels')` が配列を返し、旧キーは未定義。env-only `targetKeys` が削除済みキーを参照せず `ai:allowedModels` を含む。`UserUISettings` に新フィールドが保存できる
   - _Requirements: 1.1, 2.1, 3.6_
 
-- [ ] 2. Core: サーバのモデル解決
+- [x] 2. Core: サーバのモデル解決
 - [x] 2.1 許可リスト・既定・実効モデルの解決
   - `getAllowedModels()`（`ai:allowedModels ?? []`、合成なし）、`getDefaultModel()`（`find(isDefault) ?? 先頭`）、`resolveEffectiveModel(modelId?)`（許可内ならそれ・無ければ既定・空なら throw）を実装し `requireModel()` を撤去
   - 完了状態: ユニットテストで 許可内 / 許可外→既定 / 未指定→既定 / 空→throw が通る
@@ -39,7 +39,7 @@
   - _Requirements: 4.1, 4.3_
   - _Boundary: mastra-modules_
   - _Depends: 2.1, 2.2_
-- [ ] 2.5 (P) AI 構成済み判定の更新
+- [x] 2.5 (P) AI 構成済み判定の更新
   - `isAiConfigured()` を `provider + apiKey + 非空 getAllowedModels()` ベースに更新
   - 編集対象は `is-ai-configured` のみ（`getAllowedModels` は 2.1 が config 側に追加済み）。2.2/2.3/2.4 とは別ファイルのため並行安全
   - 完了状態: allowedModels 空→未構成、非空→構成済みのユニットテストが通る
@@ -100,3 +100,7 @@
   - 完了状態: 両 spec の該当記述が本実装と矛盾しない
   - _Requirements: 本タスクは spec 保守作業であり EARS 要件 ID を持たない（requirements.md Boundary Context「In scope」のスコープ項目）_
   - _Depends: 5.1_
+
+## Implementation Notes
+
+- **2.5 / isAiConfigured と Azure+Entra ID**: design.md は構成済み判定を字面どおり「provider + apiKey + 非空 allowedModels」と記すが、この記述は Azure OpenAI + Entra ID（`ai:azureOpenaiSettings.useEntraId === true`、apiKey 不要のベアラートークン認証）を考慮していない。無条件 apiKey 必須は Entra 専用デプロイを「構成済み→未構成」に退行させ、要件 6.1「従来どおりのゲーティング維持」に反する（実装時にレビューで検出・修正）。`isAiConfigured()` は Entra-aware に実装済み（`requiresApiKey(provider)` ヘルパが `resolveAzureOpenaiModel` の実認証分岐 `useEntraId === true` と完全一致）。**task 6 のドキュメント整合更新時に design.md / 関連 spec の「provider + apiKey」字面へこの Entra 例外を反映すること。**
