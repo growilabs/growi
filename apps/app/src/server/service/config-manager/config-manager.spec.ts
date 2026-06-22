@@ -324,27 +324,35 @@ describe('ConfigManager test', () => {
     });
 
     describe('env-only mode for AI settings (env:useOnlyEnvVars:ai)', () => {
-      // The 6 keys fixed by the env:useOnlyEnvVars:ai control key:
-      // app:aiEnabled + the 5 ai:* keys (the Azure connection config is one
-      // ai:azureOpenaiSettings JSON object).
+      // The 5 keys fixed by the env:useOnlyEnvVars:ai control key:
+      // app:aiEnabled + the 4 ai:* keys. The former single ai:model /
+      // ai:providerOptions keys were replaced by the ai:allowedModels array
+      // (the Azure connection config is one ai:azureOpenaiSettings JSON object).
       const aiKeys = [
         'app:aiEnabled',
         'ai:provider',
         'ai:apiKey',
-        'ai:model',
-        'ai:providerOptions',
+        'ai:allowedModels',
         'ai:azureOpenaiSettings',
       ] as const;
 
       // Distinct db/env values per key so a resolution that picks the wrong
       // source is observable. Booleans use opposite values across db/env; the
-      // ai:azureOpenaiSettings object differs by field value across db/env.
+      // ai:allowedModels arrays differ by entry; the ai:azureOpenaiSettings
+      // object differs by field value across db/env.
       const dbValues: Partial<TestConfigData> = {
         'app:aiEnabled': { value: true },
         'ai:provider': { value: 'openai' },
         'ai:apiKey': { value: 'db-api-key' },
-        'ai:model': { value: 'db-model' },
-        'ai:providerOptions': { value: '{"openai":{"db":true}}' },
+        'ai:allowedModels': {
+          value: [
+            {
+              model: 'db-model',
+              providerOptions: { openai: { db: true } },
+              isDefault: true,
+            },
+          ],
+        },
         'ai:azureOpenaiSettings': {
           value: {
             resourceName: 'db-resource',
@@ -358,8 +366,15 @@ describe('ConfigManager test', () => {
         'app:aiEnabled': { value: false },
         'ai:provider': { value: 'anthropic' },
         'ai:apiKey': { value: 'env-api-key' },
-        'ai:model': { value: 'env-model' },
-        'ai:providerOptions': { value: '{"anthropic":{"env":true}}' },
+        'ai:allowedModels': {
+          value: [
+            {
+              model: 'env-model',
+              providerOptions: { anthropic: { env: true } },
+              isDefault: true,
+            },
+          ],
+        },
         'ai:azureOpenaiSettings': {
           value: {
             resourceName: 'env-resource',
@@ -370,7 +385,7 @@ describe('ConfigManager test', () => {
         },
       };
 
-      test('returns env value only (ignoring db) for all 6 AI keys when control key is true', () => {
+      test('returns env value only (ignoring db) for all 5 AI keys when control key is true', () => {
         setTestConfigs(dbValues, {
           ...envValues,
           'env:useOnlyEnvVars:ai': { value: true },
@@ -381,7 +396,7 @@ describe('ConfigManager test', () => {
         }
       });
 
-      test('returns db value (env as fallback default) for all 6 AI keys when control key is false', () => {
+      test('returns db value (env as fallback default) for all 5 AI keys when control key is false', () => {
         setTestConfigs(dbValues, {
           ...envValues,
           'env:useOnlyEnvVars:ai': { value: false },

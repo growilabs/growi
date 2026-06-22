@@ -84,7 +84,7 @@
   - _Depends: 3.1, 3.2_
 
 - [ ] 5. Integration & Validation
-- [ ] 5.1 結合・回帰テストと品質ゲート
+- [x] 5.1 結合・回帰テストと品質ゲート
   - 解決系ユニット（`resolveEffectiveModel`/`getDefaultModel`/`getAllowedModels`/`resolveProviderOptions`/`resolveMastraModel` Map）、put-ai-settings バリデータ、post-message の `modelId` 経路、get-models の `selectedModelId` 検証を整備。既存スレッドの読込・継続・ストリーミングが回帰しないことを確認。lint/typecheck/test を通す
   - 完了状態: 対象テストと既存スイートがグリーン、lint/typecheck パス
   - _Requirements: 4.5, 5.1, 6.1, 6.2_
