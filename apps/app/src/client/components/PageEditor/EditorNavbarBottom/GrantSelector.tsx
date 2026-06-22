@@ -1,4 +1,10 @@
-import React, { type JSX, type ReactNode, useCallback, useState } from 'react';
+import React, {
+  type JSX,
+  type ReactNode,
+  useCallback,
+  useRef,
+  useState,
+} from 'react';
 import { GroupType, getIdForRef, PageGrant } from '@growi/core';
 import { LoadingSpinner } from '@growi/ui/dist/components';
 import { useTranslation } from 'next-i18next';
@@ -10,6 +16,7 @@ import {
   ModalBody,
   ModalHeader,
   UncontrolledDropdown,
+  UncontrolledTooltip,
 } from 'reactstrap';
 
 import type { UserRelatedGroupsData } from '~/interfaces/page';
@@ -60,6 +67,7 @@ export const GroupMembersLabel = ({
   currentUsername,
 }: GroupMembersLabelProps): JSX.Element | null => {
   const { t } = useTranslation();
+  const labelRef = useRef<HTMLElement>(null);
 
   if (members.length === 0) return null;
 
@@ -69,10 +77,18 @@ export const GroupMembersLabel = ({
       <small className="ms-2 text-muted">{t('user_group.only_yourself')}</small>
     );
   }
+  const label = members.map((m) => m.name || m.username).join(', ');
   return (
-    <small className="ms-2 text-muted">
-      {members.map((m) => m.name || m.username).join(', ')}
-    </small>
+    <>
+      <small
+        ref={labelRef}
+        className="ms-2 text-muted text-truncate"
+        style={{ minWidth: 0 }}
+      >
+        {label}
+      </small>
+      <UncontrolledTooltip target={labelRef}>{label}</UncontrolledTooltip>
+    </>
   );
 };
 
