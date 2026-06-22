@@ -74,6 +74,17 @@ describe('buildPostMessageValidator', () => {
     expect(threadIdChain?.calls).toContain('optional');
   });
 
+  it('declares modelId as an optional string field (Req 3.3, 4.x)', () => {
+    buildPostMessageValidator(validateUIMessages);
+
+    const modelIdChain = createdChains.find((c) => c.field === 'modelId');
+    expect(modelIdChain).toBeDefined();
+    // optional so an omitted modelId is valid (server rounds to default);
+    // isString so a non-string modelId is rejected with 400.
+    expect(modelIdChain?.calls).toContain('optional');
+    expect(modelIdChain?.calls).toContain('isString');
+  });
+
   it('delegates messages validation to the injected validateUIMessages', async () => {
     buildPostMessageValidator(validateUIMessages);
 

@@ -29,6 +29,11 @@ const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
   threadId?: string;
+  // Per-request model selection (Req 3.3). Untrusted: the allow-list check is
+  // applied server-side in resolveEffectiveModel (via resolveProviderOptions /
+  // resolveMastraModel), so an out-of-allowlist / omitted value is rounded to
+  // the default model rather than rejected here.
+  modelId?: string;
   messages: AIV6Type.UIMessage[];
 };
 
@@ -53,7 +58,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
     ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
-      const { threadId, messages } = req.body;
+      const { threadId, modelId, messages } = req.body;
 
       const growiAgent = mastra.getAgent('growiAgent');
       const memory = await growiAgent.getMemory();
@@ -75,6 +80,10 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       // router level (see ./index.ts).
       requestContext.set('user', req.user);
       requestContext.set('searchService', crowi.searchService);
+      // Per-request selected model: the agent's dynamic model function reads this
+      // to resolve the effective model. Untrusted — resolveEffectiveModel rounds
+      // an out-of-allowlist / undefined value to the default (Req 4.1/4.2/4.3).
+      requestContext.set('modelId', modelId);
 
       try {
         const stream = await growiAgent.stream(messages, {
@@ -83,14 +92,14 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             thread: thread.id,
             resource: thread.resourceId,
           },
-          // Provider options (reasoning etc.) resolved from the
-          // AI_PROVIDER_OPTIONS env var (Req 6). Defaults to the OpenAI
-          // reasoning options (reasoningEffort 'low' bounds reasoning-token cost;
-          // reasoningSummary 'auto' surfaces summary chunks to the UI — note this
-          // requires a verified OpenAI org, otherwise summary parts are empty).
-          // Operators of other vendors set their own provider namespace; the AI
-          // SDK reads only the active provider's key.
-          providerOptions: resolveProviderOptions(),
+          // Provider options resolved from the EFFECTIVE model's allow-list
+          // entry (Req 4.4/2.2). resolveProviderOptions rounds an
+          // out-of-allowlist / undefined modelId to the default model server-side
+          // and returns that model's options (or {} when it declares none), so
+          // the options always match the model actually used. Each operator sets
+          // their own provider namespace per allowed model; the AI SDK reads only
+          // the active provider's key.
+          providerOptions: resolveProviderOptions(modelId),
         });
 
         // Use pipeUIMessageStreamToResponse for Express servers

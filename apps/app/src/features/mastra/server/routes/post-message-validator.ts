@@ -18,6 +18,12 @@ export const buildPostMessageValidator = (
     .optional()
     .withMessage('threadId must be a valid UUID'),
 
+  // Per-request model selection (Req 3.3). Optional: when omitted the server
+  // rounds to the default model. The value is NOT trusted here — the allow-list
+  // check lives in resolveEffectiveModel (resolveProviderOptions /
+  // resolveMastraModel), so this only rejects a non-string shape.
+  body('modelId').isString().optional().withMessage('modelId must be a string'),
+
   body('messages').custom(async (data) => {
     await validateUIMessages({ messages: data });
   }),

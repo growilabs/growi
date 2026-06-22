@@ -48,7 +48,7 @@
   - _Depends: 2.1_
 
 - [ ] 3. Core: サーバ API
-- [ ] 3.1 (P) post-message に modelId 経路を追加
+- [x] 3.1 (P) post-message に modelId 経路を追加
   - validator に `modelId` optional を追加、route で `requestContext.set('modelId', modelId)` と `providerOptions: resolveProviderOptions(modelId)` を設定。許可外/未指定はサービス側で既定に丸め。provider エラーは既存サニタイズを維持
   - 編集対象は post-message route と validator のみ。`routes/index` は変更しない（新ルート登録は 3.2 が所有）
   - 完了状態: 許可内 modelId はそのモデルで応答、許可外/未指定は既定で応答（結合テスト）。エラー時は安全メッセージ
