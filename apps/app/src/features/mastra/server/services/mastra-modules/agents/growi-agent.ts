@@ -1,9 +1,11 @@
 import { Agent } from '@mastra/core/agent';
+import type { RequestContext } from '@mastra/core/request-context';
 
 import { resolveMastraModel } from '../../ai-sdk-modules/resolve-mastra-model';
 import { memory } from '../memory';
 import { fullTextSearchTool } from '../tools/full-text-search-tool';
 import { getPageContentTool } from '../tools/get-page-content-tool';
+import type { MastraRequestContextShape } from '../types/request-context';
 
 export const growiAgent = new Agent({
   id: 'growiAgent',
@@ -19,14 +21,25 @@ export const growiAgent = new Agent({
   - Keep answers concise and well-structured with headings, lists, and links where helpful.
   `,
 
-  // Resolve the model lazily (DynamicArgument<MastraModelConfig>): the function
-  // runs at use time, not at import time, so constructing the agent never throws
-  // even when the provider/API key are unconfigured (Req 4.3). On misconfiguration
-  // resolveMastraModel() throws; the throw surfaces at request time and is
-  // handled by the post-message route's existing try/catch (Req 4.4). Its
-  // message carries only the provider name / missing-var name — never the API key
-  // (Req 4.1, 2.5).
-  model: () => resolveMastraModel(),
+  // Resolve the model per request (DynamicArgument<MastraModelConfig>): the
+  // function runs at use time, not at import time, so constructing the agent
+  // never throws even when the provider/API key are unconfigured (Req 4.3). The
+  // per-request `modelId` is read from the RequestContext set by post-message;
+  // resolveMastraModel validates it against the allow-list and falls back to the
+  // default when it is absent or disallowed (Req 4.1, 4.3) — the client value is
+  // never trusted here. On misconfiguration resolveMastraModel() throws; the
+  // throw surfaces at request time and is handled by the post-message route's
+  // existing try/catch (Req 4.4). Its message carries only the provider name /
+  // missing-var name — never the API key (Req 4.1, 2.5).
+  //
+  // The parameter is annotated with the shared shape so `get('modelId')` is
+  // typed as `string | undefined` (the agent is constructed without an explicit
+  // TRequestContext, so it would otherwise be `RequestContext<unknown>`).
+  model: ({
+    requestContext,
+  }: {
+    requestContext: RequestContext<MastraRequestContextShape>;
+  }) => resolveMastraModel(requestContext.get('modelId')),
   tools: {
     fullTextSearchTool,
     getPageContentTool,

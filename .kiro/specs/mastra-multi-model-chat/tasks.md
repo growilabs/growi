@@ -33,7 +33,7 @@
   - _Requirements: 2.2, 2.5, 4.4_
   - _Boundary: ai-sdk-modules_
   - _Depends: 2.1_
-- [ ] 2.4 エージェントのリクエスト単位モデル化
+- [x] 2.4 エージェントのリクエスト単位モデル化
   - `growiAgent.model` を `({ requestContext }) => resolveMastraModel(requestContext.get('modelId'))` に、`MastraRequestContextShape` に `modelId?: string` を追加
   - 完了状態: requestContext に modelId を入れて stream すると当該モデルで解決される（ユニット/結合）
   - _Requirements: 4.1, 4.3_
