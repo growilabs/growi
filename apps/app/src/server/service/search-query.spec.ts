@@ -1,5 +1,5 @@
 import { vi } from 'vitest';
-import { type MockProxy, mock } from 'vitest-mock-extended';
+import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import { SearchDelegatorName } from '~/interfaces/named-query';
@@ -184,21 +184,22 @@ describe('searchParseQuery()', () => {
 });
 
 type MockGroupDoc = { id: string; name: string };
+const mockExternalQuery = mockDeep<ReturnType<typeof ExternalUserGroup.find>>();
+const mockInternalQuery = mockDeep<ReturnType<typeof UserGroup.find>>();
 
 // Builds the find().select().exec() chain for both group models.
 const mockGroupFinds = (
   internal: MockGroupDoc[],
   external: MockGroupDoc[],
 ): void => {
-  vi.mocked(UserGroup.find).mockReturnValue({
-    select: vi.fn().mockReturnThis(),
-    exec: vi.fn().mockResolvedValue(internal),
-  } as unknown as ReturnType<typeof UserGroup.find>);
+  mockExternalQuery.select.mockReturnThis();
+  mockExternalQuery.exec.mockResolvedValue(external);
 
-  vi.mocked(ExternalUserGroup.find).mockReturnValue({
-    select: vi.fn().mockReturnThis(),
-    exec: vi.fn().mockResolvedValue(external),
-  } as unknown as ReturnType<typeof ExternalUserGroup.find>);
+  mockInternalQuery.select.mockReturnThis();
+  mockInternalQuery.exec.mockResolvedValue(internal);
+
+  vi.mocked(ExternalUserGroup.find).mockReturnValue(mockExternalQuery);
+  vi.mocked(UserGroup.find).mockReturnValue(mockInternalQuery);
 };
 
 describe('resolveFilterData()', () => {
