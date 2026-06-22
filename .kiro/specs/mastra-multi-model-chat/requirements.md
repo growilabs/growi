@@ -21,7 +21,7 @@ Mastra AI チャットの複数モデル対応 (1 App = 複数 LLM モデル)。
 5. **サーバ側検証必須 (セキュリティ):** クライアントが送る `modelId` は信用せず、`resolveEffectiveModel(modelId?)` で `ai:allowedModels` に対し検証。
 6. **リクエスト単位のモデル切替:** Mastra@1.41 の動的モデル関数を使う。`growi-agent.ts` を `model: ({ requestContext }) => resolveMastraModel(requestContext.get('modelId'))` に。`resolveMastraModel` を `(modelId?)` 対応 + Map 化。`resolveProviderOptions(modelId)` 化。各 provider resolver は model 文字列を引数受け取りに変更。
 7. **管理 UI:** 「許可するモデル」リストエディタを**共通設定 (ProviderCommonSettings) に単一配置**する (従来 Azure 専用セクションに置いていたモデル=デプロイ名欄を共通側へ統合。デプロイ名は `ai:azureOpenaiSettings` ではなく共有の `ai:allowedModels` に格納されるため、データモデルとも整合)。各行 = モデル ID + 既定ラジオ + 折りたたみ providerOptions JSON + 削除、追加ボタン、env-only 時 disabled。ラベルは `provider` を watch して切替 (Azure OpenAI のときのみ「デプロイ名」、他は「モデル」)。共通設定の単一 providerOptions テキストエリアは廃止し各行へ移す。Azure 専用セクションは接続設定 (resourceName/baseURL/apiVersion/useEntraId) のみに縮小。
-8. **チャット UI:** ベンダリング済み `PromptInputModelSelect*` を ChatSidebar に mount。command-palette 型 `ModelSelector` は CSP 問題のため不採用。
+8. **チャット UI:** ベンダリング済み `PromptInputModelSelect*` を ChatSidebar に mount。command-palette 型 `ModelSelector` は CSP 問題のため不採用。ユーザーの選択モデルは `UserUISettings`(DB) の `aiChatSelectedModel` に永続化（既存の `scheduleToPut` デバウンス・バルク PUT + SSR ハイドレートを流用）。初期選択は許可リスト検証のうえ「前回選択 ?? デフォルト」。
 
 ### 主要対象ファイル
 - `apps/app/src/server/service/config-manager/config-definition.ts`
@@ -45,6 +45,7 @@ Mastra AI チャットの複数モデル対応 (1 App = 複数 LLM モデル)。
   - 同一プロバイダ内における複数モデルの許可リスト設定 (管理者)。
   - 許可モデルごとの provider オプション設定。
   - チャット画面でのメッセージ単位のモデル選択 (エンドユーザー)。
+  - ユーザーが選択したモデルの個人設定としての永続化（次回の初期選択に使用。`UserUISettings`）。
   - 選択モデルのサーバ側検証と、実際に使用するモデルへの provider オプションの一致適用。
   - 本機能が変更する既存仕様 (`admin-ai-settings`, `multi-llm-provider`) のドキュメント整合更新 (本 spec のタスクとして後続実施。実装タスク完了後に doc を同期し、現時点では他 spec のファイルは変更しない)。これは user-observable な要件ではなく spec 保守タスクのため、EARS 要件ではなくスコープ項目として扱う。
 - **Out of scope (本機能は担わない)**:
@@ -85,10 +86,12 @@ Mastra AI チャットの複数モデル対応 (1 App = 複数 LLM モデル)。
 
 #### Acceptance Criteria
 1. While チャットが利用可能, the チャット機能 shall 許可モデルの一覧を提示するモデルセレクタを表示する。
-2. The チャット機能 shall モデルセレクタの初期選択をデフォルトモデルにする。
+2. The チャット機能 shall モデルセレクタの初期選択を、ユーザーが前回選択したモデル（許可モデルの集合に含まれる場合）に、無ければデフォルトモデルにする。
 3. When ユーザーがメッセージ送信前にモデルセレクタで別のモデルを選択する, the チャット機能 shall そのメッセージの応答生成に選択したモデルを使用させる。
 4. When ユーザーが同一スレッドの会話途中でモデルを切り替える, the チャット機能 shall 以降のメッセージに切り替え後のモデルを使用させる。
 5. While 許可モデルが 1 つだけ設定されている, the チャット機能 shall そのモデルを選択状態で表示する。
+6. When ユーザーがモデルセレクタでモデルを選択する, the チャット機能 shall その選択をユーザー個人設定として永続化する（次回以降の初期選択に用いる）。
+7. If 永続化されたユーザーの選択モデルが許可モデルの集合に含まれない, then the チャット機能 shall デフォルトモデルにフォールバックする。
 
 ### Requirement 4: 選択モデルの適用とサーバ側検証
 **Objective:** システムとして、選択されたモデルを安全に適用したい。そうすれば許可外のモデルが使用されることを防げる。
