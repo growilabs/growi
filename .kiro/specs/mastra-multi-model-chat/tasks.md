@@ -62,8 +62,9 @@
   - _Boundary: get-models route, routes/index_
   - _Depends: 2.1_
 - [ ] 3.3 (P) 管理 AI 設定 API の許可リスト対応
-  - get-ai-settings で `allowedModels` を返却、put-ai-settings で `allowedModels` を read/validate/save（各 model 非空・重複禁止・`isDefault` ちょうど 1・各 providerOptions の JSON/名前空間検証）、env-only 422、保存後 `clearResolvedMastraModelCache`。`model`/`providerOptions` 書込みは除去
-  - 完了状態: PUT→GET ラウンドトリップで `allowedModels`（`isDefault` 含む）が往復、重複/空/`isDefault!=1`/不正 JSON は 422、env-only で 422
+  - get-ai-settings で `allowedModels` を返却、put-ai-settings で `allowedModels` を read/validate/save。**非空リストのとき**のみ検証（各 model 非空・重複禁止・`isDefault` ちょうど 1・各 providerOptions の JSON/名前空間検証）、env-only 422、保存後 `clearResolvedMastraModelCache`。`model`/`providerOptions` 書込みは除去
+  - **空配列/未指定はクリア経路**: `buildUpdates` で `ai:allowedModels` に `undefined` を設定し `updateConfigs({ removeIfUndefined: true })` でキー削除（→ `getConfig` は既定 `[]`）。空配列は 422 にしない（正当な無効化）
+  - 完了状態: PUT→GET ラウンドトリップで `allowedModels`（`isDefault` 含む）が往復、重複/非空時の空 model/`isDefault!=1`/不正 JSON は 422、env-only で 422。空配列 PUT はキー削除され GET が `[]` を返す
   - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.3, 2.4, 6.2_
   - _Boundary: admin ai-settings routes_
   - _Depends: 1.1, 1.2_

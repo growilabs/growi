@@ -349,8 +349,9 @@ export interface AiSettingsUpdateRequest {
   azureOpenaiSettings?: AzureOpenaiConfig;
 }
 ```
-- PUT バリデーション: `allowedModels` は配列・各 `model` 非空・重複禁止（1.4）、各 `providerOptions` は `isValidProviderOptionsJson` 相当（2.4）、`isDefault: true` は**ちょうど 1 つ**（0 個・複数のいずれも 422 で拒否し、許可集合内から既定を 1 つ選ぶよう促す）（1.3/1.5）。env-only 422（1.6）。保存後 `clearResolvedMastraModelCache()`（1.2）。
-  - 解決層の `getDefaultModel = find(isDefault) ?? 先頭` は、上記検証をすり抜けた不正な保存値（手動 DB 編集・env 直書き等）に対する**防御的フォールバック**であり、PUT 経路では 0 個の状態は保存され得ない。
+- PUT バリデーション（`allowedModels` が**非空**のとき）: 配列・各 `model` 非空・重複禁止（1.4）、各 `providerOptions` は `isValidProviderOptionsJson` 相当（2.4）、`isDefault: true` は**ちょうど 1 つ**（0 個・複数のいずれも 422 で拒否し、許可集合内から既定を 1 つ選ぶよう促す）（1.3/1.5）。env-only 422（1.6）。保存後 `clearResolvedMastraModelCache()`（1.2）。
+  - 解決層の `getDefaultModel = find(isDefault) ?? 先頭` は、上記検証をすり抜けた不正な保存値（手動 DB 編集・env 直書き等）に対する**防御的フォールバック**であり、PUT 経路では非空かつ 0 個 isDefault の状態は保存され得ない。
+- **空配列 `[]` / 未指定の扱い（FULL-STATE-REPLACE のクリア経路）**: `allowedModels` が空配列または未指定のときは「許可モデルなし（＝AI 未構成）」として扱い、`buildUpdates` は `ai:allowedModels` に `undefined` を設定する。`updateConfigs({ removeIfUndefined: true })`（既存呼出）がキーを DB から削除し、`getConfig('ai:allowedModels')` は既定値 `[]`（env `AI_ALLOWED_MODELS` 設定時はその値）を返す。この状態で `isAiConfigured()` は false（6.1）。**空配列は 422 ではなく正当な「無効化」状態**であり、`isDefault` 単一性検証は非空リストのときにのみ適用する（Critical 整合: 0 件の空配列を 0 個 isDefault として 422 にしない）。`azureOpenaiSettings` の「全フィールド未設定→undefined に collapse→キー削除」と同型のパターン。
 - `AI_SETTING_KEYS`: `ai:model`/`ai:providerOptions` を除去し `ai:allowedModels` を追加。
 
 ### client / admin（AllowedModelsField）
@@ -384,6 +385,7 @@ export interface AiSettingsFormValues {
 
 ### config（保存値）
 - `ai:allowedModels: AllowedModel[]`（DB は JSON 配列、env `AI_ALLOWED_MODELS` は JSON 文字列）。`isDefault` を含む。
+- **空 vs 未設定**: DB に非空配列が保存されている場合のみ「許可モデルあり」。PUT のクリア経路（空配列/未指定）ではキーが削除され、`getConfig` は既定 `[]` を返す（env 設定時はそれ）。`[]` は env にフォールバックする一方、DB に明示保存された非空配列は env を上書きする。したがって「許可モデルなし」状態は常に `getConfig() === []`（DB 不在 or 既定）として観測され、`isAiConfigured()` の判定基準（非空 allowedModels）と一致する。
 - 旧 `ai:model` / `ai:providerOptions` は廃止（定義削除・自動移行なし）。
 
 ### ユーザー個人設定（DB）
