@@ -21,7 +21,7 @@ Mastra AI チャットの複数モデル対応 (1 App = 複数 LLM モデル)。
 5. **サーバ側検証必須 (セキュリティ):** クライアントが送る `modelId` は信用せず、`resolveEffectiveModel(modelId?)` で `ai:allowedModels` に対し検証。
 6. **リクエスト単位のモデル切替:** Mastra@1.41 の動的モデル関数を使う。`growi-agent.ts` を `model: ({ requestContext }) => resolveMastraModel(requestContext.get('modelId'))` に。`resolveMastraModel` を `(modelId?)` 対応 + Map 化。`resolveProviderOptions(modelId)` 化。各 provider resolver は model 文字列を引数受け取りに変更。
 7. **管理 UI:** 「許可するモデル」リストエディタを**共通設定 (ProviderCommonSettings) に単一配置**する (従来 Azure 専用セクションに置いていたモデル=デプロイ名欄を共通側へ統合。デプロイ名は `ai:azureOpenaiSettings` ではなく共有の `ai:allowedModels` に格納されるため、データモデルとも整合)。各行 = モデル ID + 既定ラジオ + 折りたたみ providerOptions JSON + 削除、追加ボタン、env-only 時 disabled。ラベルは `provider` を watch して切替 (Azure OpenAI のときのみ「デプロイ名」、他は「モデル」)。共通設定の単一 providerOptions テキストエリアは廃止し各行へ移す。Azure 専用セクションは接続設定 (resourceName/baseURL/apiVersion/useEntraId) のみに縮小。
-8. **チャット UI:** ベンダリング済み `PromptInputModelSelect*` を ChatSidebar に mount。command-palette 型 `ModelSelector` は CSP 問題のため不採用。ユーザーの選択モデルは `UserUISettings`(DB) の `aiChatSelectedModel` に永続化（既存の `scheduleToPut` デバウンス・バルク PUT + SSR ハイドレートを流用）。初期選択は許可リスト検証のうえ「前回選択 ?? デフォルト」。
+8. **チャット UI:** ベンダリング済み `PromptInputModelSelect*` を ChatSidebar に mount。command-palette 型 `ModelSelector` は CSP 問題のため不採用。ユーザーの選択モデルは `UserUISettings`(DB) の `aiChatSelectedModel` に永続化。**読取は `/mastra/models` がサーバ検証して `selectedModelId` を返す、書込は共有 `scheduleToPut`、チャットは feature ローカル useState**（専用 atom・SSR ハイドレートは持たない）。初期選択は「前回選択 ?? デフォルト」をサーバ一元で解決。
 
 ### 主要対象ファイル
 - `apps/app/src/server/service/config-manager/config-definition.ts`
