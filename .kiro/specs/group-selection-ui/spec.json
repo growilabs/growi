@@ -1,8 +1,8 @@
 {
-  "feature_name": "user-group-member-visibility",
+  "feature_name": "group-selection-ui",
   "created_at": "2026-06-16T06:49:03Z",
   "updated_at": "2026-06-16T08:30:00Z",
-  "language": "ja",
+  "language": "en",
   "phase": "tasks-generated",
   "approvals": {
     "requirements": {
