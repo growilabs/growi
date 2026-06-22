@@ -47,7 +47,7 @@
   - _Boundary: is-ai-configured_
   - _Depends: 2.1_
 
-- [ ] 3. Core: サーバ API
+- [x] 3. Core: サーバ API
 - [x] 3.1 (P) post-message に modelId 経路を追加
   - validator に `modelId` optional を追加、route で `requestContext.set('modelId', modelId)` と `providerOptions: resolveProviderOptions(modelId)` を設定。許可外/未指定はサービス側で既定に丸め。provider エラーは既存サニタイズを維持
   - 編集対象は post-message route と validator のみ。`routes/index` は変更しない（新ルート登録は 3.2 が所有）
@@ -70,7 +70,7 @@
   - _Depends: 1.1, 1.2_
 
 - [ ] 4. Core: クライアント UI
-- [ ] 4.1 (P) 管理画面の許可モデルリストエディタ
+- [x] 4.1 (P) 管理画面の許可モデルリストエディタ
   - `AllowedModelsField`（`useFieldArray`、各行 = モデル ID + 既定ラジオ(`isDefault`, 単一) + 折りたたみ providerOptions JSON(既存バリデータ) + 削除、追加ボタン、既定行削除時の再付与）を実装し `ProviderCommonSettings` に単一配置（provider watch でラベル「デプロイ名/モデル」切替）。`AzureOpenaiSettings` から `ModelField` を除去、`ModelField` を削除、`ai-settings-form-values` を `{ model; providerOptionsText; isDefault }[]` 化（parse/stringify 変換）。env-only 時 disabled
   - 完了状態: 行の追加/削除・既定ラジオ単一性・不正 JSON のインラインエラー・env-only disabled・Azure 時ラベル「デプロイ名」がコンポーネントテストで確認できる
   - _Requirements: 1.1, 1.3, 1.4, 1.6, 2.1, 2.3, 2.4_
@@ -103,6 +103,7 @@
 
 ## Implementation Notes
 
+- **4.1 / 新規 i18n キーの翻訳エントリ未追加（5.1 で対応）**: `AllowedModelsField` が参照する `ai_settings.add_model` / `ai_settings.remove_model` / `ai_settings.default_model_label` の 3 キーが全 locale の `apps/app/public/static/locales/{en_US,ja_JP,ko_KR,zh_CN,fr_FR}/admin.json` に未定義。locale ファイルは 4.1 の _Boundary（client/admin/）_ 外のため未編集。**task 5.1 でこの 3 キーを 5 locale に追加**すること（未追加だと UI が生キーを表示。5.2 実機スモークでも要確認）。実装者報告の「task 5.3」は誤りで、そのタスクは存在しない。
 - **3.3 / config-manager.spec.ts の旧キー参照（5.1 で対応）**: `apps/app/src/server/service/config-manager/config-manager.spec.ts` が削除済みの `ai:model` / `ai:providerOptions` を参照しており typecheck が赤い。どのタスクの _Boundary_ にも明示されていない巻き添えのため、**task 5.1（品質ゲート、lint/typecheck/test を通す）で修正**すること。
 - **3.3 / 検証失敗の HTTP コードは 400（env-only のみ 422）**: design.md の本文（管理保存・Error Handling 節）は配列不変条件の検証失敗を「422」と書く箇所があるが、権威ある API Contract 表は `400 (validation), 422 (env-only)` と定義。実装は `apiV3FormValidator → res.apiv3Err` 既定の **400** で検証失敗を返し、env-only のみ明示 422。要件 1.4/1.5/2.4 は HTTP コードを指定せず「保存を拒否」のみなので整合。**task 6 のドキュメント整合更新で design.md 本文の「422」表記を 400 に修正**すること。
 - **2.5 / isAiConfigured と Azure+Entra ID**: design.md は構成済み判定を字面どおり「provider + apiKey + 非空 allowedModels」と記すが、この記述は Azure OpenAI + Entra ID（`ai:azureOpenaiSettings.useEntraId === true`、apiKey 不要のベアラートークン認証）を考慮していない。無条件 apiKey 必須は Entra 専用デプロイを「構成済み→未構成」に退行させ、要件 6.1「従来どおりのゲーティング維持」に反する（実装時にレビューで検出・修正）。`isAiConfigured()` は Entra-aware に実装済み（`requiresApiKey(provider)` ヘルパが `resolveAzureOpenaiModel` の実認証分岐 `useEntraId === true` と完全一致）。**task 6 のドキュメント整合更新時に design.md / 関連 spec の「provider + apiKey」字面へこの Entra 例外を反映すること。**

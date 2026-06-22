@@ -20,8 +20,7 @@ const defaultFormValues: AiSettingsFormValues = {
   aiEnabled: true,
   provider: 'azure-openai',
   apiKey: '',
-  model: '',
-  providerOptions: '',
+  allowedModels: [{ model: '', providerOptionsText: '', isDefault: true }],
   azureOpenaiSettings: {
     resourceName: '',
     baseURL: '',
@@ -67,15 +66,19 @@ describe('AzureOpenaiSettings', () => {
     expect(container).toBeEmptyDOMElement();
   });
 
-  it('renders the model field labelled as the Azure deployment name', () => {
+  it('does not render the model/deployment-name field (it moved to the shared list editor)', () => {
     // Act
     renderComponent();
 
-    // Assert: the shared `ai:model` field lives in the Azure section for this
-    // provider, labelled as the deployment name.
+    // Assert: this section is now connection-only. The deployment-name field is
+    // hosted by the shared `AllowedModelsField` (in ProviderCommonSettings), not
+    // here, so neither model label appears within the Azure section.
     expect(
-      screen.getByLabelText('ai_settings.azure_model_deployment_label'),
-    ).toBeInTheDocument();
+      screen.queryByLabelText('ai_settings.azure_model_deployment_label'),
+    ).not.toBeInTheDocument();
+    expect(
+      screen.queryByLabelText('ai_settings.model_label'),
+    ).not.toBeInTheDocument();
   });
 
   it('renders the four azure fields when the provider is azure-openai', () => {
