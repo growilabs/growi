@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. Foundation: 共有型・config・ストレージ定義
-- [ ] 1.1 共有型と AI 設定 DTO の更新
+- [x] 1.1 共有型と AI 設定 DTO の更新
   - `AllowedModel { model; providerOptions?; isDefault? }` と `ModelProviderOptions` を新規定義（interfaces）
   - `IUserUISettings` に `aiChatSelectedModel?: string` を追加
   - `AiSettingsResponse`/`AiSettingsUpdateRequest` から `model`/`providerOptions` を除去し `allowedModels` を追加、`AI_SETTING_KEYS` を `[app:aiEnabled, ai:provider, ai:apiKey, ai:allowedModels, ai:azureOpenaiSettings]` に

@@ -9,14 +9,14 @@ describe('ai-settings interfaces', () => {
   describe('AI_SETTING_KEYS', () => {
     // Contract: this list is the single source of truth for the config keys this
     // feature manages (the env-only group mirrors it). It must contain exactly
-    // these 6 keys — the Azure connection config is one ai:azureOpenaiSettings JSON object.
-    it('enumerates exactly the 6 editable config keys (app:aiEnabled + 5 ai:* keys)', () => {
+    // these 5 keys — the per-model allow-list is one ai:allowedModels object array,
+    // and the Azure connection config is one ai:azureOpenaiSettings JSON object.
+    it('enumerates exactly the 5 editable config keys (app:aiEnabled + 4 ai:* keys)', () => {
       expect([...AI_SETTING_KEYS]).toStrictEqual([
         'app:aiEnabled',
         'ai:provider',
         'ai:apiKey',
-        'ai:model',
-        'ai:providerOptions',
+        'ai:allowedModels',
         'ai:azureOpenaiSettings',
       ]);
     });
@@ -33,8 +33,14 @@ describe('ai-settings interfaces', () => {
       const response: AiSettingsResponse = {
         aiEnabled: true,
         provider,
-        model: 'gpt-4o',
-        providerOptions: '{"openai":{"temperature":0.2}}',
+        allowedModels: [
+          {
+            model: 'gpt-4o',
+            providerOptions: { openai: { temperature: 0.2 } },
+            isDefault: true,
+          },
+          { model: 'gpt-4o-mini' },
+        ],
         azureOpenaiSettings: {
           resourceName: 'my-resource',
           baseURL: 'https://example.openai.azure.com',
@@ -50,8 +56,7 @@ describe('ai-settings interfaces', () => {
         aiEnabled: true,
         provider,
         apiKey: 'secret',
-        model: 'gpt-4o',
-        providerOptions: '{}',
+        allowedModels: [{ model: 'gpt-4o', isDefault: true }],
         azureOpenaiSettings: {
           resourceName: 'my-resource',
           baseURL: 'https://example.openai.azure.com',
@@ -61,9 +66,11 @@ describe('ai-settings interfaces', () => {
       };
 
       // The minimal-required shape: only the non-optional response fields
-      // (azureOpenaiSettings is always present — an empty object is valid).
+      // (allowedModels is always an array — an empty one is valid; azureOpenaiSettings
+      // is always present — an empty object is valid).
       const minimalResponse: AiSettingsResponse = {
         aiEnabled: false,
+        allowedModels: [],
         azureOpenaiSettings: {},
         isApiKeySet: false,
         useOnlyEnvVars: false,
@@ -74,6 +81,7 @@ describe('ai-settings interfaces', () => {
       const emptyUpdate: AiSettingsUpdateRequest = {};
 
       expect(response.provider).toBe('azure-openai');
+      expect(response.allowedModels[0]?.isDefault).toBe(true);
       expect(updateRequest.apiKey).toBe('secret');
       expect(minimalResponse.aiEnabled).toBe(false);
       expect(emptyUpdate).toStrictEqual({});
