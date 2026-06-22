@@ -17,6 +17,7 @@ import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import type { PageActionOnGroupDelete } from '~/interfaces/user-group';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
 import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
+import type { ActivityDocument } from '~/server/models/activity';
 import type { PageDocument } from '~/server/models/page';
 import type { PageOperationDocument } from '~/server/models/page-operation';
 import type { UserGroupDocument } from '~/server/models/user-group';
@@ -112,7 +113,7 @@ export interface IPageService {
     options,
     pageOpId: ObjectIdLike,
     resolvedAction: SupportedActionType,
-    activity?,
+    activity: ActivityDocument | null,
   ): Promise<void>;
   revertDeletedPage(
     page,

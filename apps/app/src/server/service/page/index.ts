@@ -51,7 +51,7 @@ import {
 } from '~/interfaces/websocket';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
 import type Crowi from '~/server/crowi';
-import Activity from '~/server/models/activity';
+import Activity, { type ActivityDocument } from '~/server/models/activity';
 import type { CreateMethod } from '~/server/models/page';
 import {
   type PageDocument,
@@ -2831,7 +2831,12 @@ class PageService implements IPageService {
       },
     };
 
-    const activity = await Activity.createByParameters(parameters);
+    let activity: ActivityDocument | null = null;
+    try {
+      activity = await Activity.createByParameters(parameters);
+    } catch (err) {
+      logger.error('Create activity failed', err);
+    }
 
     // 1. Separate v4 & v5 process
     const shouldUseV4Process = this.shouldUseV4ProcessForRevert(page);
@@ -2842,7 +2847,13 @@ class PageService implements IPageService {
         options,
         isRecursively,
       );
-      this.activityEvent.emit('update', activity._id, activityUpdateParameters);
+      if (activity != null) {
+        this.activityEvent.emit(
+          'update',
+          activity._id,
+          activityUpdateParameters,
+        );
+      }
       return reverted;
     }
 
@@ -2901,13 +2912,15 @@ class PageService implements IPageService {
 
     if (!isRecursively) {
       await this.updateDescendantCountOfAncestors(parent._id, 1, true);
-      this.activityEvent.emit(
-        'update',
-        activity._id,
-        activityUpdateParameters,
-        page,
-        preNotifyService.generatePreNotify,
-      );
+      if (activity != null) {
+        this.activityEvent.emit(
+          'update',
+          activity._id,
+          activityUpdateParameters,
+          page,
+          preNotifyService.generatePreNotify,
+        );
+      }
     } else {
       let pageOp: PageOperationDocument;
       try {
@@ -2961,7 +2974,7 @@ class PageService implements IPageService {
     options,
     pageOpId: ObjectIdLike,
     resolvedAction,
-    activity?,
+    activity: ActivityDocument | null,
   ): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
@@ -2977,19 +2990,21 @@ class PageService implements IPageService {
       descendantsSubscribedSets,
     ) as Ref<IUser>[];
 
-    this.activityEvent.emit(
-      'update',
-      activity._id,
-      {
-        action: resolvedAction,
-        target: page,
-        targetModel: SupportedTargetModel.MODEL_PAGE,
-        contributor: user,
-      },
-      page,
-      preNotifyService.generatePreNotify,
-      async () => descendantsSubscribedUsers,
-    );
+    if (activity != null) {
+      this.activityEvent.emit(
+        'update',
+        activity._id,
+        {
+          action: resolvedAction,
+          target: page,
+          targetModel: SupportedTargetModel.MODEL_PAGE,
+          contributor: user,
+        },
+        page,
+        preNotifyService.generatePreNotify,
+        async () => descendantsSubscribedUsers,
+      );
+    }
 
     const newPath = Page.getRevertDeletedPageName(page.path);
     // normalize parent of descendant pages
