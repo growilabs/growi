@@ -7,7 +7,7 @@
   - `AiSettingsResponse`/`AiSettingsUpdateRequest` から `model`/`providerOptions` を除去し `allowedModels` を追加、`AI_SETTING_KEYS` を `[app:aiEnabled, ai:provider, ai:apiKey, ai:allowedModels, ai:azureOpenaiSettings]` に
   - 完了状態: 型が tsc を通り、`AI_SETTING_KEYS` の spec が新キー集合を期待
   - _Requirements: 1.1, 2.1_
-- [ ] 1.2 config キーと UserUISettings スキーマの定義
+- [x] 1.2 config キーと UserUISettings スキーマの定義
   - `ai:allowedModels` をオブジェクト配列キーとして追加（`envVarName: AI_ALLOWED_MODELS`, `defaultValue: []`）
   - env-only グループ `env:useOnlyEnvVars:ai` の `targetKeys` を更新: `ai:allowedModels` を追加し、削除する `ai:model` / `ai:providerOptions` を**除去**（dangling 参照を残さない）
   - `ai:model` / `ai:providerOptions` の config 定義を削除（env も読まれなくなる）
