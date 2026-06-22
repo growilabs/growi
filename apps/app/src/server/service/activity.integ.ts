@@ -38,10 +38,10 @@ describe('ActivityService.createActivity()', () => {
     await Activity.deleteMany({});
   });
 
-  it('should emit "created" when activity is created successfully', async () => {
+  it('should emit "created" and return the activity when created successfully', async () => {
     vi.spyOn(activityService, 'shoudUpdateActivity').mockReturnValue(true);
 
-    await activityService.createActivity({
+    const result = await activityService.createActivity({
       action: SupportedAction.ACTION_PAGE_CREATE,
     });
 
@@ -51,25 +51,30 @@ describe('ActivityService.createActivity()', () => {
         action: SupportedAction.ACTION_PAGE_CREATE,
       }),
     );
+    expect(result).toMatchObject({
+      action: SupportedAction.ACTION_PAGE_CREATE,
+    });
   });
 
-  it('should not emit "created" when shoudUpdateActivity returns false', async () => {
+  it('should return null without emitting when shoudUpdateActivity returns false', async () => {
     vi.spyOn(activityService, 'shoudUpdateActivity').mockReturnValue(false);
 
-    await activityService.createActivity({
+    const result = await activityService.createActivity({
       action: SupportedAction.ACTION_PAGE_CREATE,
     });
 
+    expect(result).toBeNull();
     expect(emitSpy).not.toHaveBeenCalledWith('created', expect.anything());
   });
 
-  it('should not emit "created" when Activity creation throws', async () => {
+  it('should return null without emitting when Activity creation throws', async () => {
     vi.spyOn(activityService, 'shoudUpdateActivity').mockReturnValue(true);
 
-    await activityService.createActivity({
+    const result = await activityService.createActivity({
       action: 'INVALID_ACTION' as unknown as SupportedActionType,
     });
 
+    expect(result).toBeNull();
     expect(emitSpy).not.toHaveBeenCalledWith('created', expect.anything());
   });
 });
