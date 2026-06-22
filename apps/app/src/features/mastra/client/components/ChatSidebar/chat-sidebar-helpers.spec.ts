@@ -20,16 +20,22 @@ const makeThread = (id: string, title?: string): StorageThreadType =>
   });
 
 describe('buildMessageRequestBody', () => {
-  it('carries only the threadId', () => {
-    const body = buildMessageRequestBody('thread-abc');
+  it('carries the threadId and the modelId', () => {
+    const body = buildMessageRequestBody('thread-abc', 'gpt-4o');
 
-    expect(body).toEqual({ threadId: 'thread-abc' });
+    expect(body).toEqual({ threadId: 'thread-abc', modelId: 'gpt-4o' });
   });
 
   it('does not include aiAssistantId', () => {
-    const body = buildMessageRequestBody('thread-abc');
+    const body = buildMessageRequestBody('thread-abc', 'gpt-4o');
 
     expect(body).not.toHaveProperty('aiAssistantId');
+  });
+
+  it('omits modelId when no model is given (server rounds to default)', () => {
+    const body = buildMessageRequestBody('thread-abc');
+
+    expect(body).toEqual({ threadId: 'thread-abc' });
   });
 });
 
@@ -105,7 +111,7 @@ describe('createMastraChatTransport', () => {
   // (the retry on error) sends no per-call body. We exercise the REAL transport
   // with the regenerate trigger and a mocked fetch (the request boundary), and
   // assert the outgoing POST body carries the threadId.
-  it('sends the threadId in the POST body for the regenerate trigger (which has no per-call body)', async () => {
+  it('sends both threadId and modelId in the POST body for the regenerate trigger (which has no per-call body)', async () => {
     const fetchMock = vi.fn().mockResolvedValue(
       // sendMessages only requires response.ok + a non-null body stream; it does
       // not consume the stream, so an immediately-closed one is enough.
@@ -120,7 +126,7 @@ describe('createMastraChatTransport', () => {
     );
     vi.stubGlobal('fetch', fetchMock);
 
-    await createMastraChatTransport('thread-xyz').sendMessages({
+    await createMastraChatTransport('thread-xyz', 'gpt-4o').sendMessages({
       trigger: 'regenerate-message',
       chatId: 'thread-xyz',
       messageId: undefined,
@@ -131,8 +137,11 @@ describe('createMastraChatTransport', () => {
     expect(fetchMock).toHaveBeenCalledTimes(1);
     const [url, init] = fetchMock.mock.calls[0];
     expect(url).toBe('/_api/v3/mastra/message');
+    // modelId rides on the transport body, so regenerate() (no per-call body)
+    // still carries the current model — guards Critical Issue 1 (3.3/3.4).
     expect(JSON.parse(init.body)).toMatchObject({
       threadId: 'thread-xyz',
+      modelId: 'gpt-4o',
       trigger: 'regenerate-message',
     });
   });

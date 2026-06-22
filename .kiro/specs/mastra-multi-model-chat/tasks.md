@@ -69,14 +69,14 @@
   - _Boundary: admin ai-settings routes_
   - _Depends: 1.1, 1.2_
 
-- [ ] 4. Core: クライアント UI
+- [x] 4. Core: クライアント UI
 - [x] 4.1 (P) 管理画面の許可モデルリストエディタ
   - `AllowedModelsField`（`useFieldArray`、各行 = モデル ID + 既定ラジオ(`isDefault`, 単一) + 折りたたみ providerOptions JSON(既存バリデータ) + 削除、追加ボタン、既定行削除時の再付与）を実装し `ProviderCommonSettings` に単一配置（provider watch でラベル「デプロイ名/モデル」切替）。`AzureOpenaiSettings` から `ModelField` を除去、`ModelField` を削除、`ai-settings-form-values` を `{ model; providerOptionsText; isDefault }[]` 化（parse/stringify 変換）。env-only 時 disabled
   - 完了状態: 行の追加/削除・既定ラジオ単一性・不正 JSON のインラインエラー・env-only disabled・Azure 時ラベル「デプロイ名」がコンポーネントテストで確認できる
   - _Requirements: 1.1, 1.3, 1.4, 1.6, 2.1, 2.3, 2.4_
   - _Boundary: admin client UI_
   - _Depends: 3.3_
-- [ ] 4.2 (P) チャットのモデルセレクタ配線
+- [x] 4.2 (P) チャットのモデルセレクタ配線
   - `stores/models.tsx`（SWR で `GET /mastra/models`）を追加。ChatSidebar に `PromptInputModelSelect*` を mount、`useState(selectedModelId)`、transport body に `modelId` を固定し `modelId` 変更時に transport 再生成、選択変更時に共有 `scheduleToPut({ aiChatSelectedModel })`。許可モデルが 1 つなら選択状態表示。models 解決までセレクタを disabled
   - 完了状態: 初期選択 = `selectedModelId`、変更で transport 再生成 + `modelId` 送信 + `scheduleToPut` 呼出、regenerate でも `modelId` 保持（コンポーネントテスト）
   - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_

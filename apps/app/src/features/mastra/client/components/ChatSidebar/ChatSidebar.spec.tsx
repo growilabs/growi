@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import type { ReactNode } from 'react';
 import { EditorView } from '@codemirror/view';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ChatStatus } from 'ai';
@@ -57,6 +58,98 @@ vi.mock('../../stores/message', () => ({
 vi.mock('../../stores/thread', () => ({
   useSWRINFxRecentThreads: () => ({ mutate: vi.fn() }),
 }));
+
+// Chat model list / selection: controllable so a test can vary the allowed
+// models, the server-validated initial selection, and the loading state.
+const { modelsState } = vi.hoisted(() => ({
+  modelsState: {
+    current: {
+      data: undefined as
+        | {
+            models: { id: string; name: string }[];
+            defaultModelId?: string;
+            selectedModelId?: string;
+          }
+        | undefined,
+    },
+  },
+}));
+vi.mock('../../stores/models', () => ({
+  useSWRxChatModels: () => modelsState.current,
+}));
+
+// Persisted selection write boundary. The contract is "a model change calls
+// scheduleToPut({ aiChatSelectedModel })"; the debounce + HTTP PUT live in the
+// shared service (reused unchanged), so the spy is the right boundary (3.6).
+const scheduleToPut = vi.fn();
+vi.mock('~/client/services/user-ui-settings', () => ({
+  scheduleToPut: (...args: unknown[]) => scheduleToPut(...args),
+}));
+
+// Spy on the transport factory while keeping the pure label/error helpers real.
+// Re-creation of the transport with the current modelId is the observable proof
+// that BOTH sendMessage and regenerate() carry the model (Critical Issue 1).
+const createMastraChatTransport = vi.fn(
+  (_threadId: string, _modelId?: string) => ({}),
+);
+vi.mock('./chat-sidebar-helpers', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./chat-sidebar-helpers')>();
+  return {
+    ...actual,
+    createMastraChatTransport: (threadId: string, modelId?: string) =>
+      createMastraChatTransport(threadId, modelId),
+  };
+});
+
+// Replace the vendored Radix-based PromptInputModelSelect* with a controllable
+// native <select> test double. We assert the same value/onValueChange contract
+// the real components expose (the Radix portal is not reliably drivable under
+// happy-dom). The vendored file itself is reused unchanged in production.
+vi.mock('~/components/ai-elements/prompt-input', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('~/components/ai-elements/prompt-input')
+    >();
+  type SelectProps = {
+    value?: string;
+    onValueChange?: (v: string) => void;
+    disabled?: boolean;
+    children?: ReactNode;
+  };
+  return {
+    ...actual,
+    PromptInputModelSelect: ({
+      value,
+      onValueChange,
+      disabled,
+      children,
+    }: SelectProps) => (
+      <select
+        aria-label="model-select"
+        value={value ?? ''}
+        disabled={disabled}
+        onChange={(e) => onValueChange?.(e.currentTarget.value)}
+      >
+        {children}
+      </select>
+    ),
+    PromptInputModelSelectTrigger: ({ children }: { children?: ReactNode }) => (
+      <>{children}</>
+    ),
+    PromptInputModelSelectValue: () => null,
+    PromptInputModelSelectContent: ({ children }: { children?: ReactNode }) => (
+      <>{children}</>
+    ),
+    PromptInputModelSelectItem: ({
+      value,
+      children,
+    }: {
+      value: string;
+      children?: ReactNode;
+    }) => <option value={value}>{children}</option>,
+  };
+});
 
 // Search store: PageMentionInput's controller calls useSWRxSearch. Stub it with
 // a controllable return so a test can make candidates appear.
@@ -165,9 +258,22 @@ beforeEach(() => {
   sendMessage.mockClear();
   regenerate.mockClear();
   clearError.mockClear();
+  scheduleToPut.mockClear();
+  createMastraChatTransport.mockClear();
   searchState.current = { data: undefined, isLoading: false };
   chatState.status = undefined;
   chatState.error = undefined;
+  // Default: models resolved with two options, server-validated selection set.
+  modelsState.current = {
+    data: {
+      models: [
+        { id: 'gpt-4o', name: 'gpt-4o' },
+        { id: 'gpt-4o-mini', name: 'gpt-4o-mini' },
+      ],
+      defaultModelId: 'gpt-4o',
+      selectedModelId: 'gpt-4o-mini',
+    },
+  };
 
   // happy-dom 15.7.4's HTMLFormElement.reset() throws ("hasAttribute" on an
   // undefined ref) when a CodeMirror editor is mounted inside the form.
@@ -345,6 +451,76 @@ describe('ChatSidebar — server error display', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByText('ai_sidebar.error.title')).toBeInTheDocument();
     expect(screen.queryByText('unknown')).toBeNull();
+  });
+});
+
+describe('ChatSidebar — model selector wiring (3.2/3.3/3.4/3.5/3.6)', () => {
+  const modelSelect = (): HTMLSelectElement =>
+    screen.getByLabelText<HTMLSelectElement>('model-select');
+
+  it('initialises the selector with the server-validated selectedModelId (3.2)', () => {
+    render(<ChatSidebar />);
+
+    expect(modelSelect().value).toBe('gpt-4o-mini');
+  });
+
+  it('builds the transport with the initial selectedModelId so regenerate carries it (3.3/3.4)', () => {
+    render(<ChatSidebar />);
+
+    // modelId is pinned on the transport body; useChat gets this transport, so
+    // sendMessage AND regenerate() both send the current model.
+    expect(createMastraChatTransport).toHaveBeenLastCalledWith(
+      expect.any(String),
+      'gpt-4o-mini',
+    );
+  });
+
+  it('on selection change: persists via scheduleToPut and rebuilds the transport with the new modelId (3.3/3.6)', () => {
+    render(<ChatSidebar />);
+
+    createMastraChatTransport.mockClear();
+
+    act(() => {
+      fireEvent.change(modelSelect(), { target: { value: 'gpt-4o' } });
+    });
+
+    // Persisted as the user's selection for next visit (3.6).
+    expect(scheduleToPut).toHaveBeenCalledWith({
+      aiChatSelectedModel: 'gpt-4o',
+    });
+    // Transport recreated with the new model (regenerate-safe — 3.3/3.4).
+    expect(createMastraChatTransport).toHaveBeenLastCalledWith(
+      expect.any(String),
+      'gpt-4o',
+    );
+    expect(modelSelect().value).toBe('gpt-4o');
+  });
+
+  it('shows the single allowed model as selected (3.5)', () => {
+    modelsState.current = {
+      data: {
+        models: [{ id: 'only-model', name: 'only-model' }],
+        defaultModelId: 'only-model',
+        selectedModelId: 'only-model',
+      },
+    };
+    render(<ChatSidebar />);
+
+    expect(modelSelect().value).toBe('only-model');
+    expect(modelSelect().options).toHaveLength(1);
+  });
+
+  it('disables the selector until the models resolve', () => {
+    modelsState.current = { data: undefined };
+    render(<ChatSidebar />);
+
+    expect(modelSelect().disabled).toBe(true);
+  });
+
+  it('enables the selector once the models resolve', () => {
+    render(<ChatSidebar />);
+
+    expect(modelSelect().disabled).toBe(false);
   });
 });
 

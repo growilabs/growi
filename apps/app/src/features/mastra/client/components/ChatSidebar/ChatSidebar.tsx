@@ -6,6 +6,7 @@ import { CopyIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import { v7 as uuid } from 'uuid';
 
+import { scheduleToPut } from '~/client/services/user-ui-settings';
 import { Action, Actions } from '~/components/ai-elements/actions';
 import {
   Conversation,
@@ -19,6 +20,11 @@ import {
   PromptInputBody,
   PromptInputFooter,
   type PromptInputMessage,
+  PromptInputModelSelect,
+  PromptInputModelSelectContent,
+  PromptInputModelSelectItem,
+  PromptInputModelSelectTrigger,
+  PromptInputModelSelectValue,
   PromptInputSubmit,
 } from '~/components/ai-elements/prompt-input';
 import {
@@ -41,6 +47,7 @@ import {
   useChatSidebarStatus,
 } from '../../status/chat-sidebar';
 import { useSWRxMessages } from '../../stores/message';
+import { useSWRxChatModels } from '../../stores/models';
 import { useSWRINFxRecentThreads } from '../../stores/thread';
 import {
   createMastraChatTransport,
@@ -71,6 +78,33 @@ export const ChatSidebar = (): JSX.Element => {
   const swrInfiniteThreads = useSWRINFxRecentThreads();
   const { data: threadPages, mutate: mutateRecentThreads } = swrInfiniteThreads;
 
+  // Allowed models + the server-validated initial selection (Req 3.1/3.2/3.7).
+  const { data: chatModels } = useSWRxChatModels();
+  const models = chatModels?.models;
+
+  // Live model selection. Feature-local state only — no dedicated atom, no SSR
+  // hydration (design: read via /mastra/models, write via shared scheduleToPut).
+  // The server already rounds an out-of-allowlist / absent saved value to the
+  // default, so `selectedModelId` is trusted as-is for the initial value.
+  const [model, setModel] = useState<string | undefined>(
+    () => chatModels?.selectedModelId,
+  );
+
+  // `selectedModelId` may arrive after the first render (SWR resolves async).
+  // Seed the local selection once it lands and the user has not picked yet.
+  useEffect(() => {
+    if (model == null && chatModels?.selectedModelId != null) {
+      setModel(chatModels.selectedModelId);
+    }
+  }, [model, chatModels?.selectedModelId]);
+
+  const handleModelChange = (nextModel: string) => {
+    setModel(nextModel);
+    // Persist as the user's selection for next visit (debounced DB write, Req
+    // 3.6). The shared service owns the debounce + PUT; we only schedule it.
+    scheduleToPut({ aiChatSelectedModel: nextModel });
+  };
+
   const headerLabel = resolveChatHeaderLabel(
     chatThreadId,
     threadPages?.flatMap((page) => page.threads) ?? [],
@@ -79,11 +113,14 @@ export const ChatSidebar = (): JSX.Element => {
 
   // Memoized so a stable transport instance survives re-renders (chatThreadId is
   // fixed for this session), instead of allocating a new one on every render.
-  // The factory pins the threadId on the transport body so EVERY request — incl.
-  // regenerate(), which sends no per-call body — carries it (see the factory).
+  // The factory pins the threadId AND modelId on the transport body so EVERY
+  // request — incl. regenerate(), which sends no per-call body — carries them.
+  // `model` is a dependency: re-creating the transport on a model change is what
+  // makes both sendMessage and regenerate() send the current model (Critical
+  // Issue 1, Req 3.3/3.4).
   const transport = useMemo(
-    () => createMastraChatTransport(chatThreadId),
-    [chatThreadId],
+    () => createMastraChatTransport(chatThreadId, model),
+    [chatThreadId, model],
   );
 
   const {
@@ -338,7 +375,23 @@ export const ChatSidebar = (): JSX.Element => {
                   placeholder={t('pageMention.placeholder')}
                 />
               </PromptInputBody>
-              <PromptInputFooter className="tw:justify-end">
+              <PromptInputFooter>
+                <PromptInputModelSelect
+                  value={model ?? ''}
+                  onValueChange={handleModelChange}
+                  disabled={models == null}
+                >
+                  <PromptInputModelSelectTrigger>
+                    <PromptInputModelSelectValue />
+                  </PromptInputModelSelectTrigger>
+                  <PromptInputModelSelectContent>
+                    {models?.map((m) => (
+                      <PromptInputModelSelectItem key={m.id} value={m.id}>
+                        {m.name}
+                      </PromptInputModelSelectItem>
+                    ))}
+                  </PromptInputModelSelectContent>
+                </PromptInputModelSelect>
                 <PromptInputSubmit
                   disabled={!input && !status}
                   status={status}
