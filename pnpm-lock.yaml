@@ -6,9 +6,6 @@ settings:
 
 overrides:
   '@lykmapipo/common>mime': 3.0.0
-  '@lykmapipo/common>parse-json': 5.2.0
-  '@mastra/core>p-map': 4.0.0
-  '@mastra/mongodb>uuid': 11.1.0
   axios: ^1.15.0
   '@codemirror/commands': ^6.10.3
 
@@ -20573,7 +20570,7 @@ snapshots:
       ignore: 7.0.5
       json-schema: 0.4.0
       lru-cache: 11.2.7
-      p-map: 4.0.0
+      p-map: 7.0.4
       p-retry: 7.1.1
       picomatch: 4.0.4
       posthog-node: 5.36.4(rxjs@7.8.1)
