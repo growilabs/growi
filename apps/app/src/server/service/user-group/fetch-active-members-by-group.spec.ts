@@ -73,13 +73,13 @@ const makeRelation = (relatedGroupId: string, relatedUserId: string) =>
 
 // ---- test suite ------------------------------------------------------------
 
-type MockFindModel = { find: ReturnType<typeof vi.fn> };
-type MockMongoose = { model: ReturnType<typeof vi.fn> };
-
 describe('fetchActiveMembersByGroup', () => {
-  let UserGroupRelation: MockFindModel;
-  let ExternalUserGroupRelation: MockFindModel;
-  let mongooseMock: MockMongoose;
+  // biome-ignore lint/suspicious/noExplicitAny: TypeScript sees the declared module type, not the vi.mock replacement
+  let UserGroupRelation: any;
+  // biome-ignore lint/suspicious/noExplicitAny: TypeScript sees the declared module type, not the vi.mock replacement
+  let ExternalUserGroupRelation: any;
+  // biome-ignore lint/suspicious/noExplicitAny: TypeScript sees the declared module type, not the vi.mock replacement
+  let mongooseMock: any;
 
   beforeEach(async () => {
     // Dynamically import mocked modules
