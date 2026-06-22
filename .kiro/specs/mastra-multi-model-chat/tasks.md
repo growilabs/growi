@@ -55,7 +55,7 @@
   - _Requirements: 3.3, 4.1, 4.2, 4.3, 4.4, 4.5_
   - _Boundary: post-message route_
   - _Depends: 2.3, 2.4_
-- [ ] 3.2 (P) チャット用モデル一覧エンドポイント
+- [x] 3.2 (P) チャット用モデル一覧エンドポイント
   - `GET /_api/v3/mastra/models` を追加（`routes/index` に登録、`aiReadyGuard` 配下、login + `READ.FEATURES.AI`）。`{ models, defaultModelId, selectedModelId }` を返し、`selectedModelId` は `UserUISettings.aiChatSelectedModel` を許可検証して `saved ∈ allowed ? saved : default`。providerOptions は返さない
   - 完了状態: 結合テストで 許可モデル + 既定 + 検証済み `selectedModelId` を返す（保存値許可外→既定）
   - _Requirements: 3.1, 3.2, 3.7_

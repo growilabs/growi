@@ -28,5 +28,9 @@ export const factory = (crowi: Crowi): express.Router => {
     router.get('/messages/:threadId', getMessagesHandlersFactory(crowi));
   });
 
+  import('./get-models').then(({ getModelsFactory }) => {
+    router.get('/models', getModelsFactory(crowi));
+  });
+
   return router;
 };
