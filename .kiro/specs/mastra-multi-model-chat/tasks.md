@@ -1,6 +1,6 @@
 # Implementation Plan
 
-- [ ] 1. Foundation: 共有型・config・ストレージ定義
+- [x] 1. Foundation: 共有型・config・ストレージ定義
 - [x] 1.1 共有型と AI 設定 DTO の更新
   - `AllowedModel { model; providerOptions?; isDefault? }` と `ModelProviderOptions` を新規定義（interfaces）
   - `IUserUISettings` に `aiChatSelectedModel?: string` を追加
@@ -16,7 +16,7 @@
   - _Requirements: 1.1, 2.1, 3.6_
 
 - [ ] 2. Core: サーバのモデル解決
-- [ ] 2.1 許可リスト・既定・実効モデルの解決
+- [x] 2.1 許可リスト・既定・実効モデルの解決
   - `getAllowedModels()`（`ai:allowedModels ?? []`、合成なし）、`getDefaultModel()`（`find(isDefault) ?? 先頭`）、`resolveEffectiveModel(modelId?)`（許可内ならそれ・無ければ既定・空なら throw）を実装し `requireModel()` を撤去
   - 完了状態: ユニットテストで 許可内 / 許可外→既定 / 未指定→既定 / 空→throw が通る
   - _Requirements: 4.1, 4.2, 4.3, 1.3_

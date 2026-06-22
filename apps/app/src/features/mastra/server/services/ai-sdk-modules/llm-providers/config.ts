@@ -1,9 +1,13 @@
+import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
 import { configManager } from '~/server/service/config-manager';
+import loggerFactory from '~/utils/logger';
 
-// Shared config accessors for the per-provider model resolvers. The two keys
-// below are common to every provider, so reading them lives here (symmetrically)
-// rather than in any single provider module. Provider-specific keys (e.g. the
-// Azure endpoint) are read inside that provider's own resolver.
+const logger = loggerFactory('growi:features:mastra:llm-providers:config');
+
+// Shared config accessors for the per-provider model resolvers. The api key is
+// common to every provider, so reading it lives here (symmetrically) rather than
+// in any single provider module. Provider-specific keys (e.g. the Azure endpoint)
+// are read inside that provider's own resolver.
 
 export const getApiKey = (): string | undefined =>
   configManager.getConfig('ai:apiKey');
@@ -18,12 +22,49 @@ export const requireApiKey = (): string => {
   return apiKey;
 };
 
-// Model is required (no default). For the azure-openai provider this value is
-// the Azure deployment name. The message never includes a secret.
-export const requireModel = (): string => {
-  const model = configManager.getConfig('ai:model');
-  if (model == null) {
-    throw new Error('Mastra LLM model is not configured (set AI_MODEL)');
+// The allow-list of models the operator permits. Returns it verbatim (falling
+// back to []); never synthesises entries or migrates from the removed single
+// ai:model / ai:providerOptions keys.
+export const getAllowedModels = (): AllowedModel[] =>
+  configManager.getConfig('ai:allowedModels') ?? [];
+
+// The default model id: the entry flagged isDefault, else the first entry, else
+// undefined when the allow-list is empty. The find()?? first fallback is also a
+// defensive guard against a malformed saved value (manual DB edit / direct env)
+// that the PUT validator would otherwise reject.
+export const getDefaultModel = (): string | undefined => {
+  const models = getAllowedModels();
+  return models.find((m) => m.isDefault)?.model ?? models[0]?.model;
+};
+
+// Resolve the effective model id used for a chat request. This is the single
+// server-side security checkpoint that validates the client-supplied modelId
+// against the allow-list (the client value is never trusted):
+//   - modelId in the allow-list  -> use it
+//   - modelId out of allow-list  -> fall back to the default (warn, model id only)
+//   - modelId omitted            -> use the default
+//   - allow-list empty           -> throw (AI is unconfigured)
+export const resolveEffectiveModel = (modelId?: string): string => {
+  const models = getAllowedModels();
+  if (models.length === 0) {
+    throw new Error(
+      'No allowed models are configured (set AI_ALLOWED_MODELS / ai:allowedModels)',
+    );
   }
-  return model;
+
+  if (modelId != null && models.some((m) => m.model === modelId)) {
+    return modelId;
+  }
+
+  // Non-empty allow-list guarantees a default model id here.
+  const defaultModel = getDefaultModel() as string;
+
+  if (modelId != null) {
+    // Audit out-of-allowlist fallback. Log the model id only — no secrets.
+    logger.warn(
+      `Requested model "${modelId}" is not in the allow-list; falling back to the default model`,
+    );
+  }
+
+  return defaultModel;
 };
