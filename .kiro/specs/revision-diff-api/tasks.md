@@ -10,7 +10,7 @@
   - migration(up/down) で `{ author: 1, createdAt: -1 }` を作成し、revision schema にも同インデックスを宣言（コードと DB 定義を一致）
   - 完了状態: migration 適用後に revisions のインデックス一覧へ `{author:1,createdAt:-1}` が現れ、schema 側にも宣言済みであることを確認
   - _Requirements: 9.1_
-- [ ] 1.3 (P) diff-core（unified diff 生成）を TDD で実装
+- [x] 1.3 (P) diff-core（unified diff 生成）を TDD で実装
   - 先に失敗するユニットテストを書く: 通常差分／baseline 空(fromBody='')→全文追加／context 行数指定の反映
   - 既存 `diff`(v5) の createPatch をラップした純粋関数として実装し green にする
   - 完了状態: 3観点のユニットテストが green
