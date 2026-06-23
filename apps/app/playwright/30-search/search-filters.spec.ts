@@ -1,14 +1,15 @@
+import { PageGrant } from '@growi/core';
 import { expect, test } from '@playwright/test';
 
 import {
+  addUserToGroup,
   type CreatedPage,
   createPage,
   deletePagesCompletely,
-  Grant,
+  ensureUserGroup,
+  rebuildSearchIndex,
   updatePage,
-} from '../utils/CreatePage';
-import { addUserToGroup, ensureUserGroup } from '../utils/CreateUserGroup';
-import { rebuildSearchIndex } from '../utils/SearchIndex';
+} from '../utils/api';
 import {
   FILTER_GROUP_NAME,
   FILTER_TEST_USER_A,
@@ -302,7 +303,7 @@ test.describe
               await createPage(contextA.request, {
                 path: inGroupPath,
                 body: `group filter ${stamp}`,
-                grant: Grant.USER_GROUP,
+                grant: PageGrant.GRANT_USER_GROUP,
                 grantUserGroupIds: [{ type: 'UserGroup', item: groupId }],
               }),
             );

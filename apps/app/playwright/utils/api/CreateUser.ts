@@ -1,7 +1,7 @@
 import type { APIRequestContext } from '@playwright/test';
 import { expect } from '@playwright/test';
 
-import type { TestUser } from './test-users';
+import type { TestUser } from '../test-users';
 
 /**
  * Invite a user by e-mail via the admin-only endpoint (POST /_api/v3/users/invite).

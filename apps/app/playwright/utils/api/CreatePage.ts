@@ -1,21 +1,14 @@
+import { PageGrant } from '@growi/core';
 import type { APIRequestContext } from '@playwright/test';
 import { expect } from '@playwright/test';
-
-// GROWI page grant levels (see @growi/core PageGrant)
-export const Grant = {
-  PUBLIC: 1,
-  RESTRICTED: 2,
-  OWNER: 4,
-  USER_GROUP: 5,
-} as const;
 
 interface CreatePageOptions {
   path: string;
   body?: string;
   /** tags to attach — for testing the `tag:` filter */
   pageTags?: string[];
-  /** grant level; defaults to PUBLIC */
-  grant?: number;
+  /** grant level; defaults to GRANT_PUBLIC */
+  grant?: PageGrant;
   /** required when grant === USER_GROUP — for testing the `group:` filter */
   grantUserGroupIds?: {
     type: 'UserGroup' | 'ExternalUserGroup';
@@ -46,7 +39,7 @@ export const createPage = async (
 ): Promise<CreatedPage> => {
   const res = await request.post('/_api/v3/page', {
     data: {
-      grant: Grant.PUBLIC,
+      grant: PageGrant.GRANT_PUBLIC,
       ...options,
     },
   });

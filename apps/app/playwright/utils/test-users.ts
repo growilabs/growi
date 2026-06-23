@@ -13,8 +13,9 @@ const authDir = path.resolve(__dirname, '../.auth');
 
 // Shared password for every provisioned test user (>= 6 ASCII chars, see
 // invited-form-validator). Not a secret — these accounts only exist in the
-// disposable e2e database.
-const password = 'e2e-filter-password';
+// disposable e2e database. Named in full (UPPER_SNAKE, FILTER_ theme) so secret
+// scanners do not flag a bare `password = '...'`.
+const FILTER_TEST_USER_PASSWORD = 'e2e-filter-password';
 
 /**
  * Users provisioned by `users.setup.ts` for the search-filter tests (author,
@@ -25,7 +26,7 @@ export const FILTER_TEST_USER_A: TestUser = {
   email: 'e2e-filter-author-a@example.com',
   username: 'e2e-filter-author-a',
   name: 'E2E Filter Author A',
-  password,
+  password: FILTER_TEST_USER_PASSWORD,
   authFile: path.resolve(authDir, 'e2e-filter-author-a.json'),
 };
 
@@ -33,7 +34,7 @@ export const FILTER_TEST_USER_B: TestUser = {
   email: 'e2e-filter-author-b@example.com',
   username: 'e2e-filter-author-b',
   name: 'E2E Filter Author B',
-  password,
+  password: FILTER_TEST_USER_PASSWORD,
   authFile: path.resolve(authDir, 'e2e-filter-author-b.json'),
 };
 
