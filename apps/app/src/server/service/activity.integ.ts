@@ -1,10 +1,12 @@
 import EventEmitter from 'events';
-import { type MockProxy, mock } from 'vitest-mock-extended';
+import mongoose from 'mongoose';
+import { type DeepMockProxy, mockDeep } from 'vitest-mock-extended';
 
-import { SupportedAction } from '~/interfaces/activity';
+import { ActionGroupSize, SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import Activity from '~/server/models/activity';
 import ActivityService from '~/server/service/activity';
+import type { ConfigValues } from '~/server/service/config-manager/config-definition';
 
 vi.mock('~/utils/logger', () => ({
   default: vi.fn(() => ({
@@ -15,62 +17,243 @@ vi.mock('~/utils/logger', () => ({
   })),
 }));
 
-describe('ActivityService.createActivity()', () => {
-  let mockCrowi: MockProxy<Crowi>;
+describe('ActivityService', () => {
+  let mockCrowi: DeepMockProxy<Crowi>;
   let activityService: ActivityService;
   let activityEvent: EventEmitter;
-  let emitSpy: ReturnType<typeof vi.spyOn>;
+
+  const setConfig = (config: Partial<ConfigValues>) => {
+    mockCrowi.configManager.getConfig.mockImplementation((key) => config[key]);
+  };
 
   beforeEach(() => {
     activityEvent = new EventEmitter();
-    emitSpy = vi.spyOn(activityEvent, 'emit');
-    mockCrowi = mock<Crowi>();
+    mockCrowi = mockDeep<Crowi>();
     mockCrowi.events.activity = activityEvent;
     activityService = new ActivityService(mockCrowi);
     mockCrowi.activityService = activityService;
   });
 
   afterEach(async () => {
+    vi.restoreAllMocks();
     await Activity.deleteMany({});
   });
 
-  it('should emit "created" and return the activity when created successfully', async () => {
-    vi.spyOn(activityService, 'shoudUpdateActivity').mockReturnValue(true);
+  describe('createActivity()', () => {
+    let createdListener: ReturnType<typeof vi.fn>;
 
-    const result = await activityService.createActivity({
-      action: SupportedAction.ACTION_PAGE_CREATE,
+    beforeEach(() => {
+      createdListener = vi.fn();
+      activityEvent.on('created', createdListener);
     });
 
-    expect(emitSpy).toHaveBeenCalledWith(
-      'created',
-      expect.objectContaining({
+    it('should save the activity and notify "created" subscribers', async () => {
+      const result = await activityService.createActivity({
         action: SupportedAction.ACTION_PAGE_CREATE,
-      }),
-    );
-    expect(result).toMatchObject({
-      action: SupportedAction.ACTION_PAGE_CREATE,
+      });
+
+      expect(result).toMatchObject({
+        action: SupportedAction.ACTION_PAGE_CREATE,
+      });
+      const saved = await Activity.findOne({
+        action: SupportedAction.ACTION_PAGE_CREATE,
+      });
+      expect(saved).toMatchObject({
+        action: SupportedAction.ACTION_PAGE_CREATE,
+      });
+      expect(createdListener).toHaveBeenCalledWith(
+        expect.objectContaining({ action: SupportedAction.ACTION_PAGE_CREATE }),
+      );
+    });
+
+    it('should return null without notifying when the action is not available', async () => {
+      const result = await activityService.createActivity({
+        action: SupportedAction.ACTION_PAGE_SUBSCRIBE,
+      });
+
+      expect(result).toBeNull();
+      expect(createdListener).not.toHaveBeenCalled();
+    });
+
+    it('should return null without notifying when Activity creation throws', async () => {
+      vi.spyOn(Activity, 'createByParameters').mockRejectedValue(
+        new Error('DB error'),
+      );
+
+      const result = await activityService.createActivity({
+        action: SupportedAction.ACTION_PAGE_CREATE,
+      });
+
+      expect(result).toBeNull();
+      expect(createdListener).not.toHaveBeenCalled();
+    });
+
+    describe('when audit log is enabled', () => {
+      // Each action is exclusive to its tier (absent from smaller groups) and non-essential,
+      // so saving it proves the configured group size actually expands availability.
+      it.each([
+        {
+          groupSize: ActionGroupSize.Small,
+          action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+        },
+        {
+          groupSize: ActionGroupSize.Medium,
+          action: SupportedAction.ACTION_PAGE_SUBSCRIBE,
+        },
+        {
+          groupSize: ActionGroupSize.Large,
+          action: SupportedAction.ACTION_ADMIN_APP_SETTINGS_UPDATE,
+        },
+      ])('should save a $groupSize-group action that is not essential', async ({
+        groupSize,
+        action,
+      }) => {
+        setConfig({
+          'app:auditLogEnabled': true,
+          'app:auditLogActionGroupSize': groupSize,
+        });
+
+        const result = await activityService.createActivity({ action });
+
+        expect(result).toMatchObject({ action });
+        expect(createdListener).toHaveBeenCalledTimes(1);
+      });
+
+      it('should save an action added via additionalActions even if it is outside the group', async () => {
+        setConfig({
+          'app:auditLogEnabled': true,
+          'app:auditLogActionGroupSize': ActionGroupSize.Small,
+          'app:auditLogAdditionalActions':
+            SupportedAction.ACTION_PAGE_SUBSCRIBE,
+        });
+
+        const result = await activityService.createActivity({
+          action: SupportedAction.ACTION_PAGE_SUBSCRIBE,
+        });
+
+        expect(result).toMatchObject({
+          action: SupportedAction.ACTION_PAGE_SUBSCRIBE,
+        });
+        expect(createdListener).toHaveBeenCalledTimes(1);
+      });
+
+      it('should return null for an action removed via excludeActions', async () => {
+        setConfig({
+          'app:auditLogEnabled': true,
+          'app:auditLogActionGroupSize': ActionGroupSize.Small,
+          'app:auditLogExcludeActions':
+            SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+        });
+
+        const result = await activityService.createActivity({
+          action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+        });
+
+        expect(result).toBeNull();
+        expect(createdListener).not.toHaveBeenCalled();
+      });
     });
   });
 
-  it('should return null without emitting when shoudUpdateActivity returns false', async () => {
-    vi.spyOn(activityService, 'shoudUpdateActivity').mockReturnValue(false);
+  // Activity updates and TTL-driven deletions reach Elasticsearch through the
+  // change stream, so the update path and the TTL index are covered here too.
+  describe("'update' event handling", () => {
+    let updatedListener: ReturnType<typeof vi.fn>;
 
-    const result = await activityService.createActivity({
-      action: SupportedAction.ACTION_PAGE_CREATE,
+    beforeEach(() => {
+      updatedListener = vi.fn();
+      activityEvent.on('updated', updatedListener);
     });
 
-    expect(result).toBeNull();
-    expect(emitSpy).not.toHaveBeenCalled();
+    it('should apply the update and notify "updated" subscribers for an available action', async () => {
+      const activity = await Activity.createByParameters({
+        action: SupportedAction.ACTION_PAGE_CREATE,
+      });
+      const target = new mongoose.Types.ObjectId();
+
+      activityEvent.emit(
+        'update',
+        activity._id.toString(),
+        { action: SupportedAction.ACTION_PAGE_CREATE, endpoint: '/updated' },
+        target,
+      );
+
+      await vi.waitFor(() => expect(updatedListener).toHaveBeenCalled());
+
+      const saved = await Activity.findById(activity._id);
+      expect(saved?.endpoint).toBe('/updated');
+      expect(updatedListener).toHaveBeenCalledWith(
+        expect.objectContaining({ endpoint: '/updated' }),
+        target,
+      );
+    });
+
+    it('should pass the generated preNotify to "updated" subscribers', async () => {
+      const activity = await Activity.createByParameters({
+        action: SupportedAction.ACTION_PAGE_CREATE,
+      });
+      const target = new mongoose.Types.ObjectId();
+      const preNotify = { notified: true };
+      const generatePreNotify = vi.fn().mockReturnValue(preNotify);
+
+      activityEvent.emit(
+        'update',
+        activity._id.toString(),
+        { action: SupportedAction.ACTION_PAGE_CREATE },
+        target,
+        generatePreNotify,
+      );
+
+      await vi.waitFor(() => expect(updatedListener).toHaveBeenCalled());
+
+      expect(updatedListener).toHaveBeenCalledWith(
+        expect.objectContaining({ action: SupportedAction.ACTION_PAGE_CREATE }),
+        target,
+        preNotify,
+      );
+    });
+
+    it('should neither update nor notify when the action is not available', async () => {
+      const activity = await Activity.createByParameters({
+        action: SupportedAction.ACTION_PAGE_CREATE,
+      });
+
+      // shoudUpdateActivity returns false synchronously, so the handler bails before any await.
+      activityEvent.emit('update', activity._id.toString(), {
+        action: SupportedAction.ACTION_PAGE_SUBSCRIBE,
+        endpoint: '/updated',
+      });
+
+      const saved = await Activity.findById(activity._id);
+      expect(saved?.endpoint).toBeUndefined();
+      expect(updatedListener).not.toHaveBeenCalled();
+    });
   });
 
-  it('should return null without emitting when Activity creation throws', async () => {
-    vi.spyOn(activityService, 'shoudUpdateActivity').mockReturnValue(true);
+  describe('createTtlIndex()', () => {
+    const getCreatedAtIndex = async () => {
+      const indexes = await mongoose.connection
+        .collection('activities')
+        .indexes();
+      return indexes.find((i) => i.name === 'createdAt_1');
+    };
 
-    const result = await activityService.createActivity({
-      action: 'INVALID_ACTION',
+    it('should create the TTL index with the configured expiration', async () => {
+      setConfig({ 'app:activityExpirationSeconds': 1000 });
+
+      await activityService.createTtlIndex();
+
+      expect((await getCreatedAtIndex())?.expireAfterSeconds).toBe(1000);
     });
 
-    expect(result).toBeNull();
-    expect(emitSpy).not.toHaveBeenCalled();
+    it('should re-create the TTL index when the configured expiration changes', async () => {
+      setConfig({ 'app:activityExpirationSeconds': 1000 });
+      await activityService.createTtlIndex();
+
+      setConfig({ 'app:activityExpirationSeconds': 2000 });
+      await activityService.createTtlIndex();
+
+      expect((await getCreatedAtIndex())?.expireAfterSeconds).toBe(2000);
+    });
   });
 });
