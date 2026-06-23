@@ -38,7 +38,7 @@
   - 完了状態: ページング系ユニットテストが green
   - _Requirements: 1.3, 1.4, 3.1, 3.2, 3.3, 3.4, 3.5_
   - _Boundary: ChangesIndexService_
-- [ ] 2.3 アクセス可否・削除フラグ判定（bulk 2クエリ）
+- [x] 2.3 アクセス可否・削除フラグ判定（bulk 2クエリ）
   - findByIdsAndViewer（閲覧可集合）＋ 生 Page.find({_id:{$in}},{status,path}) の bulk 2クエリで accessible/forbidden/trashed/不在 を判定。accessible のみ path 付与、閲覧不可・削除は path/内容非開示、不在は索引から除外。deleted は status='deleted' のみ
   - 先に失敗するユニットテストを書く: 各状態の振り分け／閲覧不可・削除時の path 非開示／不在の除外
   - 完了状態: 状態判定ユニットテストが green

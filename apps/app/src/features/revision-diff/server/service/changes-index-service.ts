@@ -7,7 +7,10 @@
 
 import type { Types } from 'mongoose';
 
-import type { ChangesIndexResult } from '../../interfaces/changes-index';
+import type {
+  ChangeIndexEntry,
+  ChangesIndexResult,
+} from '../../interfaces/changes-index';
 import type { CursorKey } from '../cursor';
 
 // ---------------------------------------------------------------------------
@@ -241,4 +244,69 @@ export interface ChangesIndexService {
     userId: string,
     query: NormalizedChangesQuery,
   ): Promise<ChangesIndexResult>;
+}
+
+// ---------------------------------------------------------------------------
+// Access flag resolution (task 2.3)
+// ---------------------------------------------------------------------------
+
+/**
+ * Minimal page info returned by the bulk Page.find query.
+ * Only `status` and `path` are projected; `_id` is always included.
+ */
+export interface PageInfo {
+  _id: Types.ObjectId;
+  status?: string;
+  path?: string;
+}
+
+/**
+ * Apply accessibility flags to a list of runs using the results of two bulk queries.
+ *
+ * State mapping:
+ *   - pageId in `accessiblePageIds`                    → accessible:true,  deleted:false, path included
+ *   - pageId in `pageInfoMap` with status='deleted'    → accessible:false, deleted:true,  path:null
+ *   - pageId in `pageInfoMap` but not accessible and status≠'deleted'
+ *                                                      → accessible:false, deleted:false, path:null
+ *   - pageId NOT in `pageInfoMap`                      → excluded from results (safety-first)
+ *
+ * This is a pure function — no DB calls.
+ *
+ * @param runs             - Completed runs to annotate.
+ * @param accessiblePageIds - Set of page ID strings the viewer can access (from findByIdsAndViewer).
+ * @param pageInfoMap       - Map of page ID string → PageInfo from Page.find({ _id: { $in } }, { status, path }).
+ * @returns ChangeIndexEntry[] — absent pages excluded, accessible/deleted/path set per mapping.
+ */
+export function applyAccessFlags(
+  runs: Run[],
+  accessiblePageIds: Set<string>,
+  pageInfoMap: Map<string, PageInfo>,
+): ChangeIndexEntry[] {
+  const entries: ChangeIndexEntry[] = [];
+
+  for (const run of runs) {
+    const pageKey = run.pageId.toString();
+    const pageInfo = pageInfoMap.get(pageKey);
+
+    // Absent pages (not found in DB) are excluded from results (safety-first).
+    if (pageInfo == null) {
+      continue;
+    }
+
+    const isAccessible = accessiblePageIds.has(pageKey);
+    const isDeleted = pageInfo.status === 'deleted';
+
+    entries.push({
+      pageId: pageKey,
+      path: isAccessible && !isDeleted ? (pageInfo.path ?? null) : null,
+      fromRevisionId: run.fromRevisionId?.toString() ?? null,
+      toRevisionId: run.toRevisionId.toString(),
+      authorId: run.authorId.toString(),
+      latestUpdatedAt: run.latestUpdatedAt.toISOString(),
+      accessible: isAccessible,
+      deleted: isDeleted,
+    });
+  }
+
+  return entries;
 }
