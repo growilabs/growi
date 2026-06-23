@@ -83,7 +83,7 @@ beforeEach(() => {
 });
 
 describe('get-models handler (Req 3.1, 3.2, 3.7)', () => {
-  it('returns models mapped from the allow-list (id=name) and the default model id (Req 3.1)', async () => {
+  it('returns the allow-list model ids and the server-validated selection (Req 3.1, 3.2)', async () => {
     getAllowedModels.mockReturnValue([
       {
         model: 'gpt-4o',
@@ -100,11 +100,27 @@ describe('get-models handler (Req 3.1, 3.2, 3.7)', () => {
 
     expect(res.apiv3).toHaveBeenCalledTimes(1);
     const payload = res.apiv3.mock.calls[0][0];
-    expect(payload.models).toEqual([
-      { id: 'gpt-4o', name: 'gpt-4o' },
-      { id: 'o3', name: 'o3' },
-    ]);
-    expect(payload.defaultModelId).toBe('o3');
+    // Plain model-id array (no id/name objects) and the resolved selection only —
+    // defaultModelId is no longer on the wire (the client never consumed it).
+    expect(payload.models).toEqual(['gpt-4o', 'o3']);
+    expect(payload.selectedModelId).toBe('o3');
+    expect(payload).not.toHaveProperty('defaultModelId');
+  });
+
+  it('responds with an error when no default is resolvable (allow-list emptied after the guard)', async () => {
+    // aiReadyGuard normally guarantees a non-empty allow-list; this is the rare
+    // TOCTOU where it was cleared between the guard and the handler. The handler
+    // must not return a selection-less response — it errors instead.
+    getAllowedModels.mockReturnValue([]);
+    getDefaultModel.mockReturnValue(undefined);
+    mockSavedSelection(undefined);
+
+    const { req, res } = buildReqRes();
+    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
+    await getHandler()(req as any, res as any, vi.fn());
+
+    expect(res.apiv3).not.toHaveBeenCalled();
+    expect(res.apiv3Err).toHaveBeenCalledTimes(1);
   });
 
   it('never leaks providerOptions anywhere in the response (Security)', async () => {

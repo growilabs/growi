@@ -4,6 +4,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 
 import { isModelInAllowList } from '~/features/mastra/interfaces/allowed-model';
+import type { ChatModelsResponse } from '~/features/mastra/interfaces/chat-models-response';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -24,19 +25,6 @@ interface Req extends Request {
   user: IUserHasId;
 }
 
-// The chat model list returned to the client. Only model IDs are exposed —
-// providerOptions are server-only and MUST NOT be sent (Security).
-interface ModelOption {
-  id: string;
-  name: string;
-}
-
-interface GetModelsResponse {
-  models: ModelOption[];
-  defaultModelId?: string;
-  selectedModelId?: string;
-}
-
 export const getModelsFactory: GetModelsFactory = (crowi) => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
@@ -48,12 +36,17 @@ export const getModelsFactory: GetModelsFactory = (crowi) => {
     async (req: Req, res: ApiV3Response) => {
       try {
         const allowedModels = getAllowedModels();
-        // No friendly names exist for free-form model IDs, so name = id.
-        const models: ModelOption[] = allowedModels.map((m) => ({
-          id: m.model,
-          name: m.model,
-        }));
+        // Only the model ids are exposed (no display name: ids have none, and
+        // providerOptions are server-only and MUST NOT be sent — Security).
+        const models = allowedModels.map((m) => m.model);
+
         const defaultModelId = getDefaultModel();
+        if (defaultModelId == null) {
+          // aiReadyGuard guarantees a non-empty allow-list (hence a default); this
+          // only covers the rare case where it was emptied between the guard and
+          // here. Returning an error keeps selectedModelId non-optional below.
+          return res.apiv3Err(new ErrorV3('No models are configured'), 500);
+        }
 
         // The user's persisted selection. Never trusted as-is: an out-of-allowlist
         // (e.g. since-removed) or absent value rounds to the default. Centralising
@@ -62,17 +55,13 @@ export const getModelsFactory: GetModelsFactory = (crowi) => {
           user: req.user._id,
         }).lean();
         const savedModelId = userUISettings?.aiChatSelectedModel;
-        const isSavedAllowed =
+        const selectedModelId =
           savedModelId != null &&
-          isModelInAllowList(savedModelId, allowedModels);
-        const selectedModelId = isSavedAllowed ? savedModelId : defaultModelId;
+          isModelInAllowList(savedModelId, allowedModels)
+            ? savedModelId
+            : defaultModelId;
 
-        // providerOptions deliberately omitted from the response (server-only).
-        const response: GetModelsResponse = {
-          models,
-          defaultModelId,
-          selectedModelId,
-        };
+        const response: ChatModelsResponse = { models, selectedModelId };
         return res.apiv3(response);
       } catch (err) {
         logger.error(err);

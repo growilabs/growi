@@ -66,9 +66,8 @@ const { modelsState } = vi.hoisted(() => ({
     current: {
       data: undefined as
         | {
-            models: { id: string; name: string }[];
-            defaultModelId?: string;
-            selectedModelId?: string;
+            models: string[];
+            selectedModelId: string;
           }
         | undefined,
     },
@@ -269,11 +268,7 @@ beforeEach(() => {
   // Default: models resolved with two options, server-validated selection set.
   modelsState.current = {
     data: {
-      models: [
-        { id: 'gpt-4o', name: 'gpt-4o' },
-        { id: 'gpt-4o-mini', name: 'gpt-4o-mini' },
-      ],
-      defaultModelId: 'gpt-4o',
+      models: ['gpt-4o', 'gpt-4o-mini'],
       selectedModelId: 'gpt-4o-mini',
     },
   };
@@ -511,8 +506,7 @@ describe('ChatSidebar — model selector wiring (3.2/3.3/3.4/3.5/3.6)', () => {
   it('shows the single allowed model as selected (3.5)', () => {
     modelsState.current = {
       data: {
-        models: [{ id: 'only-model', name: 'only-model' }],
-        defaultModelId: 'only-model',
+        models: ['only-model'],
         selectedModelId: 'only-model',
       },
     };

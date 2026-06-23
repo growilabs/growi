@@ -396,9 +396,9 @@ export const ChatSidebar = (): JSX.Element => {
                     `--bs-border-color`, the light gray used elsewhere in GROWI).
                   */}
                   <PromptInputModelSelectContent className="tw:z-[1070] tw:border-border">
-                    {models?.map((m) => (
-                      <PromptInputModelSelectItem key={m.id} value={m.id}>
-                        {m.name}
+                    {models?.map((model) => (
+                      <PromptInputModelSelectItem key={model} value={model}>
+                        {model}
                       </PromptInputModelSelectItem>
                     ))}
                   </PromptInputModelSelectContent>

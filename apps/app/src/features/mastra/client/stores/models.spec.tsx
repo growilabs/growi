@@ -24,13 +24,9 @@ beforeEach(() => {
 });
 
 describe('useSWRxChatModels', () => {
-  it('fetches /mastra/models and returns { models, defaultModelId, selectedModelId }', async () => {
+  it('fetches /mastra/models and returns { models, selectedModelId }', async () => {
     const data = {
-      models: [
-        { id: 'gpt-4o', name: 'gpt-4o' },
-        { id: 'gpt-4o-mini', name: 'gpt-4o-mini' },
-      ],
-      defaultModelId: 'gpt-4o',
+      models: ['gpt-4o', 'gpt-4o-mini'],
       selectedModelId: 'gpt-4o-mini',
     };
     apiv3Get.mockResolvedValue({ data });
@@ -45,8 +41,7 @@ describe('useSWRxChatModels', () => {
 
   it('exposes the single allowed model when only one is configured', async () => {
     const data = {
-      models: [{ id: 'gpt-4o', name: 'gpt-4o' }],
-      defaultModelId: 'gpt-4o',
+      models: ['gpt-4o'],
       selectedModelId: 'gpt-4o',
     };
     apiv3Get.mockResolvedValue({ data });
