@@ -6,7 +6,7 @@
   - server/client 双方から使える interfaces として配置
   - 完了状態: 型がエクスポートされ型チェックを通る
   - _Requirements: 1.2, 5.1, 6.1, 7.4_
-- [ ] 1.2 revisions 複合インデックス追加
+- [x] 1.2 revisions 複合インデックス追加
   - migration(up/down) で `{ author: 1, createdAt: -1 }` を作成し、revision schema にも同インデックスを宣言（コードと DB 定義を一致）
   - 完了状態: migration 適用後に revisions のインデックス一覧へ `{author:1,createdAt:-1}` が現れ、schema 側にも宣言済みであることを確認
   - _Requirements: 9.1_
