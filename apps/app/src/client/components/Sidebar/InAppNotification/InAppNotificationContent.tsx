@@ -6,18 +6,18 @@ import InfiniteScroll from '~/client/components/InfiniteScroll';
 import { NewsItem } from '~/features/news/client/components/NewsItem';
 import { useSidebarMode } from '~/states/ui/sidebar';
 
-import { useMergedInAppNotifications } from './hooks/useMergedInAppNotifications';
-import type { FilterType } from './InAppNotification';
+import type { UseMergedInAppNotificationsResult } from './hooks/useMergedInAppNotifications';
+import type { FilterType } from './types';
 
 type InAppNotificationContentProps = {
-  isUnopendNotificationsVisible: boolean;
   activeFilter: FilterType;
+  merged: UseMergedInAppNotificationsResult;
 };
 
 export const InAppNotificationContent = (
   props: InAppNotificationContentProps,
 ): JSX.Element => {
-  const { isUnopendNotificationsVisible, activeFilter } = props;
+  const { activeFilter, merged } = props;
   const { t } = useTranslation('commons');
   const { isCollapsedMode } = useSidebarMode();
 
@@ -36,9 +36,9 @@ export const InAppNotificationContent = (
     notifExhausted,
     allModeSWRResponse,
     mergedItems,
-    handleReadMutate,
+    handleNewsRead,
     handleNotificationRead,
-  } = useMergedInAppNotifications(isUnopendNotificationsVisible);
+  } = merged;
 
   if (activeFilter === 'news') {
     if (allNewsItems.length === 0 && !newsResponse.isValidating) {
@@ -56,7 +56,7 @@ export const InAppNotificationContent = (
               <NewsItem
                 key={item._id.toString()}
                 item={item}
-                onReadMutate={handleReadMutate}
+                onReadMutate={handleNewsRead}
               />
             ))}
           </div>
@@ -118,7 +118,7 @@ export const InAppNotificationContent = (
                 <NewsItem
                   key={`news-${entry.item._id.toString()}`}
                   item={entry.item}
-                  onReadMutate={handleReadMutate}
+                  onReadMutate={handleNewsRead}
                 />
               );
             }
