@@ -16,17 +16,17 @@ const {
   getConfig,
   resolveAzureOpenaiModel,
 } = vi.hoisted(() => {
-  const openaiProviderFn = vi.fn((model: string) => ({
+  const openaiProviderFn = vi.fn((modelId: string) => ({
     tag: 'openai-model',
-    model,
+    modelId,
   }));
-  const anthropicProviderFn = vi.fn((model: string) => ({
+  const anthropicProviderFn = vi.fn((modelId: string) => ({
     tag: 'anthropic-model',
-    model,
+    modelId,
   }));
-  const googleProviderFn = vi.fn((model: string) => ({
+  const googleProviderFn = vi.fn((modelId: string) => ({
     tag: 'google-model',
-    model,
+    modelId,
   }));
   return {
     openaiProviderFn,
@@ -38,9 +38,9 @@ const {
       (_opts: { apiKey: string }) => googleProviderFn,
     ),
     getConfig: vi.fn(),
-    resolveAzureOpenaiModel: vi.fn((model: string) => ({
+    resolveAzureOpenaiModel: vi.fn((modelId: string) => ({
       tag: 'azure-model',
-      model,
+      modelId,
     })),
   };
 });
@@ -77,7 +77,7 @@ describe('key-based provider resolvers', () => {
 
     expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk-openai-123' });
     expect(openaiProviderFn).toHaveBeenCalledWith('gpt-test');
-    expect(result).toEqual({ tag: 'openai-model', model: 'gpt-test' });
+    expect(result).toEqual({ tag: 'openai-model', modelId: 'gpt-test' });
   });
 
   it('resolveAnthropicModel constructs Anthropic with the config apiKey + the model argument', () => {
@@ -89,7 +89,7 @@ describe('key-based provider resolvers', () => {
       apiKey: 'sk-anthropic-456',
     });
     expect(anthropicProviderFn).toHaveBeenCalledWith('claude-test');
-    expect(result).toEqual({ tag: 'anthropic-model', model: 'claude-test' });
+    expect(result).toEqual({ tag: 'anthropic-model', modelId: 'claude-test' });
   });
 
   it('resolveGoogleModel constructs Google with the config apiKey + the model argument', () => {
@@ -101,7 +101,7 @@ describe('key-based provider resolvers', () => {
       apiKey: 'sk-google-789',
     });
     expect(googleProviderFn).toHaveBeenCalledWith('gemini-test');
-    expect(result).toEqual({ tag: 'google-model', model: 'gemini-test' });
+    expect(result).toEqual({ tag: 'google-model', modelId: 'gemini-test' });
   });
 
   it('throws (naming AI_API_KEY) when the api key is missing', () => {
@@ -140,25 +140,25 @@ describe('modelResolvers', () => {
     setApiKey('sk');
 
     expect(modelResolvers.openai('m-openai')).toMatchObject({
-      model: 'm-openai',
+      modelId: 'm-openai',
     });
     expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk' });
     expect(openaiProviderFn).toHaveBeenCalledWith('m-openai');
 
     expect(modelResolvers.anthropic('m-anthropic')).toMatchObject({
-      model: 'm-anthropic',
+      modelId: 'm-anthropic',
     });
     expect(createAnthropic).toHaveBeenCalledWith({ apiKey: 'sk' });
     expect(anthropicProviderFn).toHaveBeenCalledWith('m-anthropic');
 
     expect(modelResolvers.google('m-google')).toMatchObject({
-      model: 'm-google',
+      modelId: 'm-google',
     });
     expect(createGoogleGenerativeAI).toHaveBeenCalledWith({ apiKey: 'sk' });
     expect(googleProviderFn).toHaveBeenCalledWith('m-google');
 
     const azureResult = modelResolvers['azure-openai']('m-azure');
     expect(resolveAzureOpenaiModel).toHaveBeenCalledWith('m-azure');
-    expect(azureResult).toEqual({ tag: 'azure-model', model: 'm-azure' });
+    expect(azureResult).toEqual({ tag: 'azure-model', modelId: 'm-azure' });
   });
 });

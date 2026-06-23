@@ -347,7 +347,7 @@ describe('ConfigManager test', () => {
         'ai:allowedModels': {
           value: [
             {
-              model: 'db-model',
+              modelId: 'db-model',
               providerOptions: { openai: { db: true } },
               isDefault: true,
             },
@@ -369,7 +369,7 @@ describe('ConfigManager test', () => {
         'ai:allowedModels': {
           value: [
             {
-              model: 'env-model',
+              modelId: 'env-model',
               providerOptions: { anthropic: { env: true } },
               isDefault: true,
             },

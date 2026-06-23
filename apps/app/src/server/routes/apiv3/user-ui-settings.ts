@@ -23,7 +23,7 @@ export const setup = (): Router => {
       .isIn(AllSidebarContentsType),
     body('settings.currentProductNavWidth').optional().isNumeric(),
     body('settings.preferCollapsedModeByUser').optional().isBoolean(),
-    body('settings.aiChatSelectedModel').optional().isString(),
+    body('settings.aiChatSelectedModelId').optional().isString(),
   ];
 
   /**
@@ -52,7 +52,7 @@ export const setup = (): Router => {
    *                     type: number
    *                   preferCollapsedModeByUser:
    *                     type: boolean
-   *                   aiChatSelectedModel:
+   *                   aiChatSelectedModelId:
    *                     type: string
    *     responses:
    *       200:
@@ -72,7 +72,7 @@ export const setup = (): Router => {
    *                   type: string
    *                 preferCollapsedModeByUser:
    *                   type: boolean
-   *                 aiChatSelectedModel:
+   *                 aiChatSelectedModelId:
    *                   type: string
    */
   router.put(
@@ -88,7 +88,7 @@ export const setup = (): Router => {
         currentSidebarContents: settings.currentSidebarContents,
         currentProductNavWidth: settings.currentProductNavWidth,
         preferCollapsedModeByUser: settings.preferCollapsedModeByUser,
-        aiChatSelectedModel: settings.aiChatSelectedModel,
+        aiChatSelectedModelId: settings.aiChatSelectedModelId,
       };
 
       if (user == null) {

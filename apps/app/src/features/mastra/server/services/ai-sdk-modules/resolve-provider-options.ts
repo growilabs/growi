@@ -3,7 +3,7 @@ import type { ModelProviderOptions } from '~/features/mastra/interfaces/allowed-
 import { getAllowedModels } from './llm-providers/config';
 
 // Look up the provider options for an ALREADY-RESOLVED effective model id. The
-// caller resolves the effective model exactly once (resolveEffectiveModel — the
+// caller resolves the effective model exactly once (resolveEffectiveModelId — the
 // single allow-list rounding checkpoint, which collapses an out-of-allowlist /
 // omitted modelId to the default and warns at most once) and threads the result
 // here, so this performs NO resolution / rounding / warning of its own: it is a
@@ -17,5 +17,5 @@ import { getAllowedModels } from './llm-providers/config';
 export const getProviderOptionsForModel = (
   effectiveModelId: string,
 ): ModelProviderOptions =>
-  getAllowedModels().find((m) => m.model === effectiveModelId)
+  getAllowedModels().find((m) => m.modelId === effectiveModelId)
     ?.providerOptions ?? {};

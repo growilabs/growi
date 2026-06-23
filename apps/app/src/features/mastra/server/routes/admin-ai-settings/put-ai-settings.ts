@@ -62,9 +62,9 @@ const logger = loggerFactory(
  *             (resets ai:allowedModels to its env default). Validated as a whole.
  *           items:
  *             type: object
- *             required: [model]
+ *             required: [modelId]
  *             properties:
- *               model:
+ *               modelId:
  *                 type: string
  *                 description: The model id (deployment name for Azure OpenAI).
  *               providerOptions:

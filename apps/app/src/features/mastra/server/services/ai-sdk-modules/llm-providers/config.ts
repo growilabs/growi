@@ -46,9 +46,9 @@ export const getAllowedModels = (): AllowedModel[] => {
 // undefined when the allow-list is empty. The find()?? first fallback is also a
 // defensive guard against a malformed saved value (manual DB edit / direct env)
 // that the PUT validator would otherwise reject.
-export const getDefaultModel = (): string | undefined => {
+export const getDefaultModelId = (): string | undefined => {
   const models = getAllowedModels();
-  return models.find((m) => m.isDefault)?.model ?? models[0]?.model;
+  return models.find((m) => m.isDefault)?.modelId ?? models[0]?.modelId;
 };
 
 // Resolve the effective model id used for a chat request. This is the single
@@ -58,7 +58,7 @@ export const getDefaultModel = (): string | undefined => {
 //   - modelId out of allow-list  -> fall back to the default (warn, model id only)
 //   - modelId omitted            -> use the default
 //   - allow-list empty           -> throw (AI is unconfigured)
-export const resolveEffectiveModel = (modelId?: string): string => {
+export const resolveEffectiveModelId = (modelId?: string): string => {
   const models = getAllowedModels();
   if (models.length === 0) {
     throw new Error(
@@ -71,7 +71,7 @@ export const resolveEffectiveModel = (modelId?: string): string => {
   }
 
   // Non-empty allow-list guarantees a default model id here.
-  const defaultModel = getDefaultModel() as string;
+  const defaultModelId = getDefaultModelId() as string;
 
   if (modelId != null) {
     // Audit out-of-allowlist fallback. Log the model id only — no secrets.
@@ -80,5 +80,5 @@ export const resolveEffectiveModel = (modelId?: string): string => {
     );
   }
 
-  return defaultModel;
+  return defaultModelId;
 };

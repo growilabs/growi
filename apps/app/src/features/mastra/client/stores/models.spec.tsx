@@ -24,9 +24,9 @@ beforeEach(() => {
 });
 
 describe('useSWRxChatModels', () => {
-  it('fetches /mastra/models and returns { models, selectedModelId }', async () => {
+  it('fetches /mastra/models and returns { modelIds, selectedModelId }', async () => {
     const data = {
-      models: ['gpt-4o', 'gpt-4o-mini'],
+      modelIds: ['gpt-4o', 'gpt-4o-mini'],
       selectedModelId: 'gpt-4o-mini',
     };
     apiv3Get.mockResolvedValue({ data });
@@ -41,7 +41,7 @@ describe('useSWRxChatModels', () => {
 
   it('exposes the single allowed model when only one is configured', async () => {
     const data = {
-      models: ['gpt-4o'],
+      modelIds: ['gpt-4o'],
       selectedModelId: 'gpt-4o',
     };
     apiv3Get.mockResolvedValue({ data });
@@ -49,7 +49,7 @@ describe('useSWRxChatModels', () => {
     const { result } = renderHook(() => useSWRxChatModels(), { wrapper });
 
     await waitFor(() => {
-      expect(result.current.data?.models).toHaveLength(1);
+      expect(result.current.data?.modelIds).toHaveLength(1);
     });
     expect(result.current.data?.selectedModelId).toBe('gpt-4o');
   });

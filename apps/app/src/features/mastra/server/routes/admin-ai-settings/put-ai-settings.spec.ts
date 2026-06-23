@@ -135,7 +135,7 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
       const { res } = await invoke(
         {
           provider: 'openai',
-          allowedModels: [{ model: 'gpt-4o', isDefault: true }],
+          allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
         },
         { useOnlyEnvVars: true },
       );
@@ -157,11 +157,11 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         apiKey: 'sk-new-key',
         allowedModels: [
           {
-            model: 'gpt-4o',
+            modelId: 'gpt-4o',
             isDefault: true,
             providerOptions: { openai: { temperature: 0.2 } },
           },
-          { model: 'gpt-4o-mini' },
+          { modelId: 'gpt-4o-mini' },
         ],
         azureOpenaiSettings: { useEntraId: true },
       });
@@ -175,11 +175,11 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
         // providerOptions) — Req 1.1, 1.3.
         'ai:allowedModels': [
           {
-            model: 'gpt-4o',
+            modelId: 'gpt-4o',
             isDefault: true,
             providerOptions: { openai: { temperature: 0.2 } },
           },
-          { model: 'gpt-4o-mini' },
+          { modelId: 'gpt-4o-mini' },
         ],
         // The azureOpenaiSettings object is re-assembled into the config value.
         'ai:azureOpenaiSettings': { useEntraId: true },
@@ -232,12 +232,12 @@ describe('putAiSettings (Req 2.3, 2.4, 4.3, 4.4, 5.3, 7.1)', () => {
     it('persists a non-empty allow-list verbatim (no collapse)', async () => {
       await invoke({
         provider: 'openai',
-        allowedModels: [{ model: 'gpt-4o', isDefault: true }],
+        allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
       });
 
       const [updates] = updateCall();
       expect(updates['ai:allowedModels']).toEqual([
-        { model: 'gpt-4o', isDefault: true },
+        { modelId: 'gpt-4o', isDefault: true },
       ]);
     });
   });
@@ -496,11 +496,11 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
       const { hasErrors } = await runValidators({
         allowedModels: [
           {
-            model: 'gpt-4o',
+            modelId: 'gpt-4o',
             isDefault: true,
             providerOptions: { openai: { temperature: 0.2 } },
           },
-          { model: 'gpt-4o-mini' },
+          { modelId: 'gpt-4o-mini' },
         ],
       });
       expect(hasErrors).toBe(false);
@@ -518,7 +518,7 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
 
     it('rejects a non-array allowedModels', async () => {
       const { hasErrors, failedFields } = await runValidators({
-        allowedModels: { model: 'gpt-4o' },
+        allowedModels: { modelId: 'gpt-4o' },
       });
       expect(hasErrors).toBe(true);
       expect(failedFields).toContain('allowedModels');
@@ -527,8 +527,8 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
     it('rejects duplicate model ids (Req 1.4)', async () => {
       const { hasErrors, failedFields } = await runValidators({
         allowedModels: [
-          { model: 'gpt-4o', isDefault: true },
-          { model: 'gpt-4o' },
+          { modelId: 'gpt-4o', isDefault: true },
+          { modelId: 'gpt-4o' },
         ],
       });
       expect(hasErrors).toBe(true);
@@ -537,7 +537,7 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
 
     it('rejects a non-empty list with an empty model id (Req 1.4)', async () => {
       const { hasErrors, failedFields } = await runValidators({
-        allowedModels: [{ model: '', isDefault: true }],
+        allowedModels: [{ modelId: '', isDefault: true }],
       });
       expect(hasErrors).toBe(true);
       expect(failedFields).toContain('allowedModels');
@@ -545,7 +545,7 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
 
     it('rejects a list with zero defaults (Req 1.5)', async () => {
       const { hasErrors, failedFields } = await runValidators({
-        allowedModels: [{ model: 'gpt-4o' }, { model: 'gpt-4o-mini' }],
+        allowedModels: [{ modelId: 'gpt-4o' }, { modelId: 'gpt-4o-mini' }],
       });
       expect(hasErrors).toBe(true);
       expect(failedFields).toContain('allowedModels');
@@ -554,8 +554,8 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
     it('rejects a list with two defaults (Req 1.5)', async () => {
       const { hasErrors, failedFields } = await runValidators({
         allowedModels: [
-          { model: 'gpt-4o', isDefault: true },
-          { model: 'gpt-4o-mini', isDefault: true },
+          { modelId: 'gpt-4o', isDefault: true },
+          { modelId: 'gpt-4o-mini', isDefault: true },
         ],
       });
       expect(hasErrors).toBe(true);
@@ -566,7 +566,7 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
       const { hasErrors, failedFields } = await runValidators({
         allowedModels: [
           {
-            model: 'gpt-4o',
+            modelId: 'gpt-4o',
             isDefault: true,
             providerOptions: { temperature: 0.2 },
           },
@@ -579,7 +579,7 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
     it('accepts an entry with empty providerOptions ("no options", Req 2.3)', async () => {
       const { hasErrors } = await runValidators({
         allowedModels: [
-          { model: 'gpt-4o', isDefault: true, providerOptions: {} },
+          { modelId: 'gpt-4o', isDefault: true, providerOptions: {} },
         ],
       });
       expect(hasErrors).toBe(false);
@@ -708,11 +708,11 @@ describe('updateAiSettingsValidators (Req 6.1, 6.2)', () => {
       apiKey: 'secret-key',
       allowedModels: [
         {
-          model: 'gpt-4o',
+          modelId: 'gpt-4o',
           isDefault: true,
           providerOptions: { openai: { temperature: 0.2 } },
         },
-        { model: 'gpt-4o-mini' },
+        { modelId: 'gpt-4o-mini' },
       ],
       azureOpenaiSettings: {
         resourceName: 'my-resource',

@@ -85,29 +85,29 @@ export const ChatSidebar = (): JSX.Element => {
 
   // Allowed models + the server-validated initial selection (Req 3.1/3.2/3.7).
   const { data: chatModels } = useSWRxChatModels();
-  const models = chatModels?.models;
+  const modelIds = chatModels?.modelIds;
 
   // Live model selection. Feature-local state only — no dedicated atom, no SSR
   // hydration (design: read via /mastra/models, write via shared scheduleToPut).
   // The server already rounds an out-of-allowlist / absent saved value to the
   // default, so `selectedModelId` is trusted as-is for the initial value.
-  const [model, setModel] = useState<string | undefined>(
+  const [modelId, setModelId] = useState<string | undefined>(
     () => chatModels?.selectedModelId,
   );
 
   // `selectedModelId` may arrive after the first render (SWR resolves async).
   // Seed the local selection once it lands and the user has not picked yet.
   useEffect(() => {
-    if (model == null && chatModels?.selectedModelId != null) {
-      setModel(chatModels.selectedModelId);
+    if (modelId == null && chatModels?.selectedModelId != null) {
+      setModelId(chatModels.selectedModelId);
     }
-  }, [model, chatModels?.selectedModelId]);
+  }, [modelId, chatModels?.selectedModelId]);
 
-  const handleModelChange = (nextModel: string) => {
-    setModel(nextModel);
+  const handleModelChange = (nextModelId: string) => {
+    setModelId(nextModelId);
     // Persist as the user's selection for next visit (debounced DB write, Req
     // 3.6). The shared service owns the debounce + PUT; we only schedule it.
-    scheduleToPut({ aiChatSelectedModel: nextModel });
+    scheduleToPut({ aiChatSelectedModelId: nextModelId });
   };
 
   const headerLabel = resolveChatHeaderLabel(
@@ -121,8 +121,8 @@ export const ChatSidebar = (): JSX.Element => {
   // re-creates that Chat when the chat `id` changes (NOT when the transport
   // instance changes), so re-creating the transport on a model change would have
   // no effect. A ref lets the (stable) transport always see the live selection.
-  const modelRef = useRef(model);
-  modelRef.current = model;
+  const modelRef = useRef(modelId);
+  modelRef.current = modelId;
 
   // Stable getter that reads the live selection from the ref on each request.
   const getModelId = useCallback(() => modelRef.current, []);
@@ -371,9 +371,9 @@ export const ChatSidebar = (): JSX.Element => {
               </PromptInputBody>
               <PromptInputFooter>
                 <PromptInputModelSelect
-                  value={model ?? ''}
+                  value={modelId ?? ''}
                   onValueChange={handleModelChange}
-                  disabled={models == null}
+                  disabled={modelIds == null}
                 >
                   <PromptInputModelSelectTrigger>
                     <PromptInputModelSelectValue />
@@ -396,9 +396,9 @@ export const ChatSidebar = (): JSX.Element => {
                     `--bs-border-color`, the light gray used elsewhere in GROWI).
                   */}
                   <PromptInputModelSelectContent className="tw:z-[1070] tw:border-border">
-                    {models?.map((model) => (
-                      <PromptInputModelSelectItem key={model} value={model}>
-                        {model}
+                    {modelIds?.map((modelId) => (
+                      <PromptInputModelSelectItem key={modelId} value={modelId}>
+                        {modelId}
                       </PromptInputModelSelectItem>
                     ))}
                   </PromptInputModelSelectContent>

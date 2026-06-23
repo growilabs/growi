@@ -18,13 +18,13 @@ const ENTRA_ID_SCOPE = 'https://cognitiveservices.azure.com/.default';
 // `https://<name>.openai.azure.com/...` URL; baseURL is the escape hatch for
 // sovereign clouds / API Management gateways / custom domains), and it can
 // authenticate via either an API key or Microsoft Entra ID. All of that stays
-// inside this resolver — the shared dispatch never sees it. The `model` here is
+// inside this resolver — the shared dispatch never sees it. The `modelId` here is
 // the Azure *deployment name*, not an OpenAI model id, and is passed in by the
 // caller (resolveMastraModel resolves the effective model against the allow-list).
 //
 // The object field is `baseURL`, matching the AI SDK's createAzure option (and
 // the API/form use the same name end-to-end), so it passes straight through here.
-export const resolveAzureOpenaiModel = (model: string): MastraModelConfig => {
+export const resolveAzureOpenaiModel = (modelId: string): MastraModelConfig => {
   // Connection config is a single JSON object (ai:azureOpenaiSettings). `?? {}` guards a
   // malformed AI_AZURE_OPENAI_SETTINGS env var, which the loader fails soft to null.
   const {
@@ -55,7 +55,7 @@ export const resolveAzureOpenaiModel = (model: string): MastraModelConfig => {
       ENTRA_ID_SCOPE,
     );
     return createAzure({ tokenProvider, resourceName, baseURL, apiVersion })(
-      model,
+      modelId,
     );
   }
 
@@ -66,5 +66,5 @@ export const resolveAzureOpenaiModel = (model: string): MastraModelConfig => {
       'Azure OpenAI requires AI_API_KEY, or set "useEntraId": true in AI_AZURE_OPENAI_SETTINGS to authenticate with Microsoft Entra ID',
     );
   }
-  return createAzure({ apiKey, resourceName, baseURL, apiVersion })(model);
+  return createAzure({ apiKey, resourceName, baseURL, apiVersion })(modelId);
 };

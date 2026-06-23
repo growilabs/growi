@@ -7,7 +7,7 @@ import {
 import { configManager } from '~/server/service/config-manager';
 
 import { modelResolvers } from './llm-providers';
-import { resolveEffectiveModel } from './llm-providers/config';
+import { resolveEffectiveModelId } from './llm-providers/config';
 
 // Cache each resolved model so the native provider object is built once per
 // distinct (provider, effective model) and reused across requests. The Map
@@ -23,7 +23,7 @@ export const resolveMastraModel = (modelId?: string): MastraModelConfig => {
   // Resolve (and allow-list validate) the effective model id first. The client
   // value is never trusted: out-of-allowlist / omitted ids fall back to the
   // default; an empty allow-list throws (Req 4.1).
-  const effectiveModel = resolveEffectiveModel(modelId);
+  const effectiveModelId = resolveEffectiveModelId(modelId);
 
   // `ai:provider` has no default (undefined when unset), and env-loaded config is
   // not runtime-validated against the union, so re-validate here (Req 1.4).
@@ -34,7 +34,7 @@ export const resolveMastraModel = (modelId?: string): MastraModelConfig => {
     );
   }
 
-  const cacheKey = `${provider}:${effectiveModel}`;
+  const cacheKey = `${provider}:${effectiveModelId}`;
   const cached = resolvedModelCache.get(cacheKey);
   if (cached != null) {
     return cached;
@@ -44,7 +44,7 @@ export const resolveMastraModel = (modelId?: string): MastraModelConfig => {
   // model id + its own config. The chosen resolver throws on its own
   // misconfiguration — nothing is cached in that case, so a config fix takes
   // effect on the next call.
-  const model = modelResolvers[provider](effectiveModel);
+  const model = modelResolvers[provider](effectiveModelId);
   resolvedModelCache.set(cacheKey, model);
   return model;
 };

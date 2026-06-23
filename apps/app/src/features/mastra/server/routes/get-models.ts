@@ -14,7 +14,7 @@ import loggerFactory from '~/utils/logger';
 
 import {
   getAllowedModels,
-  getDefaultModel,
+  getDefaultModelId,
 } from '../services/ai-sdk-modules/llm-providers/config';
 
 const logger = loggerFactory('growi:routes:apiv3:mastra:get-models');
@@ -38,9 +38,9 @@ export const getModelsFactory: GetModelsFactory = (crowi) => {
         const allowedModels = getAllowedModels();
         // Only the model ids are exposed (no display name: ids have none, and
         // providerOptions are server-only and MUST NOT be sent — Security).
-        const models = allowedModels.map((m) => m.model);
+        const modelIds = allowedModels.map((m) => m.modelId);
 
-        const defaultModelId = getDefaultModel();
+        const defaultModelId = getDefaultModelId();
         if (defaultModelId == null) {
           // aiReadyGuard guarantees a non-empty allow-list (hence a default); this
           // only covers the rare case where it was emptied between the guard and
@@ -54,14 +54,14 @@ export const getModelsFactory: GetModelsFactory = (crowi) => {
         const userUISettings = await UserUISettings.findOne({
           user: req.user._id,
         }).lean();
-        const savedModelId = userUISettings?.aiChatSelectedModel;
+        const savedModelId = userUISettings?.aiChatSelectedModelId;
         const selectedModelId =
           savedModelId != null &&
           isModelInAllowList(savedModelId, allowedModels)
             ? savedModelId
             : defaultModelId;
 
-        const response: ChatModelsResponse = { models, selectedModelId };
+        const response: ChatModelsResponse = { modelIds, selectedModelId };
         return res.apiv3(response);
       } catch (err) {
         logger.error(err);

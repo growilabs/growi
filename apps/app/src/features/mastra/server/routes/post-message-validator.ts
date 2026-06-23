@@ -20,7 +20,7 @@ export const buildPostMessageValidator = (
 
   // Per-request model selection (Req 3.3). Optional: when omitted the server
   // rounds to the default model. The value is NOT trusted here — the allow-list
-  // check lives in resolveEffectiveModel (run once by the post-message handler,
+  // check lives in resolveEffectiveModelId (run once by the post-message handler,
   // then idempotently by resolveMastraModel), so this only rejects a non-string
   // shape.
   body('modelId').isString().optional().withMessage('modelId must be a string'),

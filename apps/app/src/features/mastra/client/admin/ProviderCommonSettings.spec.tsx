@@ -23,7 +23,7 @@ const defaultFormValues: AiSettingsFormValues = {
   provider: 'openai',
   apiKey: '',
   allowedModels: [
-    { model: 'gpt-4o', providerOptionsText: '', isDefault: true },
+    { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
   ],
   azureOpenaiSettings: {
     resourceName: '',

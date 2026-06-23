@@ -12,25 +12,25 @@ import {
 describe('isValidNonEmptyAllowedModels (Req 1.3, 1.4, 1.5, 2.3, 2.4)', () => {
   it('accepts a single-entry list with exactly one default (Req 1.3)', () => {
     expect(
-      isValidNonEmptyAllowedModels([{ model: 'gpt-4o', isDefault: true }]),
+      isValidNonEmptyAllowedModels([{ modelId: 'gpt-4o', isDefault: true }]),
     ).toBe(true);
   });
 
   it('accepts a multi-entry list with exactly one default and valid options', () => {
     const models: AllowedModel[] = [
       {
-        model: 'gpt-4o',
+        modelId: 'gpt-4o',
         isDefault: true,
         providerOptions: { openai: { temperature: 0.2 } },
       },
-      { model: 'gpt-4o-mini' },
+      { modelId: 'gpt-4o-mini' },
     ];
     expect(isValidNonEmptyAllowedModels(models)).toBe(true);
   });
 
   it('accepts an entry without providerOptions ("no options", Req 2.3)', () => {
     expect(
-      isValidNonEmptyAllowedModels([{ model: 'gpt-4o', isDefault: true }]),
+      isValidNonEmptyAllowedModels([{ modelId: 'gpt-4o', isDefault: true }]),
     ).toBe(true);
   });
 
@@ -38,21 +38,21 @@ describe('isValidNonEmptyAllowedModels (Req 1.3, 1.4, 1.5, 2.3, 2.4)', () => {
     it('rejects duplicate model ids', () => {
       expect(
         isValidNonEmptyAllowedModels([
-          { model: 'gpt-4o', isDefault: true },
-          { model: 'gpt-4o' },
+          { modelId: 'gpt-4o', isDefault: true },
+          { modelId: 'gpt-4o' },
         ]),
       ).toBe(false);
     });
 
     it('rejects an empty-string model id', () => {
       expect(
-        isValidNonEmptyAllowedModels([{ model: '', isDefault: true }]),
+        isValidNonEmptyAllowedModels([{ modelId: '', isDefault: true }]),
       ).toBe(false);
     });
 
     it('rejects a whitespace-only model id', () => {
       expect(
-        isValidNonEmptyAllowedModels([{ model: '   ', isDefault: true }]),
+        isValidNonEmptyAllowedModels([{ modelId: '   ', isDefault: true }]),
       ).toBe(false);
     });
   });
@@ -61,8 +61,8 @@ describe('isValidNonEmptyAllowedModels (Req 1.3, 1.4, 1.5, 2.3, 2.4)', () => {
     it('rejects a list with zero defaults', () => {
       expect(
         isValidNonEmptyAllowedModels([
-          { model: 'gpt-4o' },
-          { model: 'gpt-4o-mini' },
+          { modelId: 'gpt-4o' },
+          { modelId: 'gpt-4o-mini' },
         ]),
       ).toBe(false);
     });
@@ -70,8 +70,8 @@ describe('isValidNonEmptyAllowedModels (Req 1.3, 1.4, 1.5, 2.3, 2.4)', () => {
     it('rejects a list with two defaults', () => {
       expect(
         isValidNonEmptyAllowedModels([
-          { model: 'gpt-4o', isDefault: true },
-          { model: 'gpt-4o-mini', isDefault: true },
+          { modelId: 'gpt-4o', isDefault: true },
+          { modelId: 'gpt-4o-mini', isDefault: true },
         ]),
       ).toBe(false);
     });
@@ -82,7 +82,7 @@ describe('isValidNonEmptyAllowedModels (Req 1.3, 1.4, 1.5, 2.3, 2.4)', () => {
       expect(
         isValidNonEmptyAllowedModels([
           {
-            model: 'gpt-4o',
+            modelId: 'gpt-4o',
             isDefault: true,
             // not provider-namespaced: a bare option object
             providerOptions: { temperature: 0.2 } as never,
@@ -94,7 +94,7 @@ describe('isValidNonEmptyAllowedModels (Req 1.3, 1.4, 1.5, 2.3, 2.4)', () => {
     it('accepts an empty providerOptions object ({} is valid, Req 2.3/2.4)', () => {
       expect(
         isValidNonEmptyAllowedModels([
-          { model: 'gpt-4o', isDefault: true, providerOptions: {} },
+          { modelId: 'gpt-4o', isDefault: true, providerOptions: {} },
         ]),
       ).toBe(true);
     });
@@ -114,9 +114,9 @@ describe('isValidAllowedModelsRequest', () => {
 
   it('delegates a non-empty array to the per-entry rules', () => {
     expect(
-      isValidAllowedModelsRequest([{ model: 'gpt-4o', isDefault: true }]),
+      isValidAllowedModelsRequest([{ modelId: 'gpt-4o', isDefault: true }]),
     ).toBe(true);
     // Non-empty but zero defaults -> rejected (the uniqueness rule applies).
-    expect(isValidAllowedModelsRequest([{ model: 'gpt-4o' }])).toBe(false);
+    expect(isValidAllowedModelsRequest([{ modelId: 'gpt-4o' }])).toBe(false);
   });
 });

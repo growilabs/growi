@@ -11,7 +11,7 @@ const baseResponse: AiSettingsResponse = {
   aiEnabled: true,
   provider: 'openai',
   allowedModels: [
-    { model: 'gpt-4o', providerOptions: { openai: {} }, isDefault: true },
+    { modelId: 'gpt-4o', providerOptions: { openai: {} }, isDefault: true },
   ],
   azureOpenaiSettings: {
     resourceName: 'res',
@@ -29,7 +29,7 @@ const baseValues: AiSettingsFormValues = {
   provider: 'openai',
   apiKey: '',
   allowedModels: [
-    { model: 'gpt-4o', providerOptionsText: '', isDefault: true },
+    { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
   ],
   azureOpenaiSettings: {
     resourceName: '',
@@ -46,22 +46,22 @@ describe('toFormValues', () => {
       ...baseResponse,
       allowedModels: [
         {
-          model: 'gpt-4o',
+          modelId: 'gpt-4o',
           providerOptions: { openai: { reasoningEffort: 'low' } },
           isDefault: true,
         },
-        { model: 'gpt-4o-mini', isDefault: false },
+        { modelId: 'gpt-4o-mini', isDefault: false },
       ],
     });
 
     // Assert: the object is serialized to JSON text; isDefault is preserved.
     expect(values.allowedModels).toEqual([
       {
-        model: 'gpt-4o',
+        modelId: 'gpt-4o',
         providerOptionsText: '{"openai":{"reasoningEffort":"low"}}',
         isDefault: true,
       },
-      { model: 'gpt-4o-mini', providerOptionsText: '', isDefault: false },
+      { modelId: 'gpt-4o-mini', providerOptionsText: '', isDefault: false },
     ]);
   });
 
@@ -69,13 +69,13 @@ describe('toFormValues', () => {
     // Act
     const values = toFormValues({
       ...baseResponse,
-      allowedModels: [{ model: 'gpt-4o' }],
+      allowedModels: [{ modelId: 'gpt-4o' }],
     });
 
     // Assert: absent providerOptions => '' (so the textarea binds to a string),
     // and absent isDefault => false.
     expect(values.allowedModels).toEqual([
-      { model: 'gpt-4o', providerOptionsText: '', isDefault: false },
+      { modelId: 'gpt-4o', providerOptionsText: '', isDefault: false },
     ]);
   });
 
@@ -125,22 +125,22 @@ describe('buildUpdateRequest', () => {
       ...baseValues,
       allowedModels: [
         {
-          model: 'gpt-4o',
+          modelId: 'gpt-4o',
           providerOptionsText: '{"openai":{"reasoningEffort":"low"}}',
           isDefault: true,
         },
-        { model: 'gpt-4o-mini', providerOptionsText: '', isDefault: false },
+        { modelId: 'gpt-4o-mini', providerOptionsText: '', isDefault: false },
       ],
     });
 
     // Assert: text is parsed into the object; empty text omits providerOptions.
     expect(body.allowedModels).toEqual([
       {
-        model: 'gpt-4o',
+        modelId: 'gpt-4o',
         providerOptions: { openai: { reasoningEffort: 'low' } },
         isDefault: true,
       },
-      { model: 'gpt-4o-mini', isDefault: false },
+      { modelId: 'gpt-4o-mini', isDefault: false },
     ]);
   });
 
@@ -149,12 +149,14 @@ describe('buildUpdateRequest', () => {
     const body = buildUpdateRequest({
       ...baseValues,
       allowedModels: [
-        { model: 'gpt-4o', providerOptionsText: '   ', isDefault: true },
+        { modelId: 'gpt-4o', providerOptionsText: '   ', isDefault: true },
       ],
     });
 
     // Assert: a whitespace-only text is treated as "no options" (R2.3).
-    expect(body.allowedModels).toEqual([{ model: 'gpt-4o', isDefault: true }]);
+    expect(body.allowedModels).toEqual([
+      { modelId: 'gpt-4o', isDefault: true },
+    ]);
   });
 
   it('always includes aiEnabled and sends the azure object as-is', () => {

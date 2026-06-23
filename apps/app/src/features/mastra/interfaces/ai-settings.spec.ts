@@ -35,11 +35,11 @@ describe('ai-settings interfaces', () => {
         provider,
         allowedModels: [
           {
-            model: 'gpt-4o',
+            modelId: 'gpt-4o',
             providerOptions: { openai: { temperature: 0.2 } },
             isDefault: true,
           },
-          { model: 'gpt-4o-mini' },
+          { modelId: 'gpt-4o-mini' },
         ],
         azureOpenaiSettings: {
           resourceName: 'my-resource',
@@ -56,7 +56,7 @@ describe('ai-settings interfaces', () => {
         aiEnabled: true,
         provider,
         apiKey: 'secret',
-        allowedModels: [{ model: 'gpt-4o', isDefault: true }],
+        allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
         azureOpenaiSettings: {
           resourceName: 'my-resource',
           baseURL: 'https://example.openai.azure.com',

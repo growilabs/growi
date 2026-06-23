@@ -11,9 +11,9 @@ const {
   tokenProviderSentinel,
   getConfig,
 } = vi.hoisted(() => {
-  const azureProviderFn = vi.fn((model: string) => ({
+  const azureProviderFn = vi.fn((modelId: string) => ({
     tag: 'azure-model',
-    model,
+    modelId,
   }));
   // Sentinel returned by the mocked getBearerTokenProvider so the Entra ID test
   // can assert it is forwarded to createAzure as `tokenProvider`.
@@ -79,7 +79,7 @@ describe('resolveAzureOpenaiModel', () => {
       resourceName: 'my-resource',
     });
     expect(azureProviderFn).toHaveBeenCalledWith('my-deployment');
-    expect(result).toEqual({ tag: 'azure-model', model: 'my-deployment' });
+    expect(result).toEqual({ tag: 'azure-model', modelId: 'my-deployment' });
   });
 
   it('builds with baseURL when given', () => {
@@ -159,7 +159,7 @@ describe('resolveAzureOpenaiModel', () => {
     expect(createAzure).not.toHaveBeenCalledWith(
       expect.objectContaining({ apiKey: expect.anything() }),
     );
-    expect(result).toEqual({ tag: 'azure-model', model: 'my-deployment' });
+    expect(result).toEqual({ tag: 'azure-model', modelId: 'my-deployment' });
   });
 
   it('throws (naming the missing endpoint fields, never the key) when neither resourceName nor baseURL is set', () => {

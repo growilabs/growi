@@ -66,7 +66,7 @@ const { modelsState } = vi.hoisted(() => ({
     current: {
       data: undefined as
         | {
-            models: string[];
+            modelIds: string[];
             selectedModelId: string;
           }
         | undefined,
@@ -78,7 +78,7 @@ vi.mock('../../stores/models', () => ({
 }));
 
 // Persisted selection write boundary. The contract is "a model change calls
-// scheduleToPut({ aiChatSelectedModel })"; the debounce + HTTP PUT live in the
+// scheduleToPut({ aiChatSelectedModelId })"; the debounce + HTTP PUT live in the
 // shared service (reused unchanged), so the spy is the right boundary (3.6).
 const scheduleToPut = vi.fn();
 vi.mock('~/client/services/user-ui-settings', () => ({
@@ -268,7 +268,7 @@ beforeEach(() => {
   // Default: models resolved with two options, server-validated selection set.
   modelsState.current = {
     data: {
-      models: ['gpt-4o', 'gpt-4o-mini'],
+      modelIds: ['gpt-4o', 'gpt-4o-mini'],
       selectedModelId: 'gpt-4o-mini',
     },
   };
@@ -493,7 +493,7 @@ describe('ChatSidebar — model selector wiring (3.2/3.3/3.4/3.5/3.6)', () => {
 
     // Persisted as the user's selection for next visit (3.6).
     expect(scheduleToPut).toHaveBeenCalledWith({
-      aiChatSelectedModel: 'gpt-4o',
+      aiChatSelectedModelId: 'gpt-4o',
     });
     // The transport is NOT re-created on a model change (useChat would ignore a
     // new instance anyway); the same live getter now reports the new model, so
@@ -506,7 +506,7 @@ describe('ChatSidebar — model selector wiring (3.2/3.3/3.4/3.5/3.6)', () => {
   it('shows the single allowed model as selected (3.5)', () => {
     modelsState.current = {
       data: {
-        models: ['only-model'],
+        modelIds: ['only-model'],
         selectedModelId: 'only-model',
       },
     };

@@ -6,7 +6,7 @@
 // (resolve-provider-options / resolve-mastra-model own that, tested separately).
 //
 // We mock every module boundary the handler reaches so no real LLM is called:
-//   - config.resolveEffectiveModel: the single allow-list rounding checkpoint —
+//   - config.resolveEffectiveModelId: the single allow-list rounding checkpoint —
 //     assert the route resolves the request's modelId through it EXACTLY once and
 //     threads the resolved id to both requestContext and the options lookup.
 //   - resolve-provider-options.getProviderOptionsForModel: assert the route looks
@@ -24,14 +24,14 @@ import { mock } from 'vitest-mock-extended';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
-const { resolveEffectiveModel, getProviderOptionsForModel } = vi.hoisted(
+const { resolveEffectiveModelId, getProviderOptionsForModel } = vi.hoisted(
   () => ({
-    resolveEffectiveModel: vi.fn(),
+    resolveEffectiveModelId: vi.fn(),
     getProviderOptionsForModel: vi.fn(),
   }),
 );
 vi.mock('../services/ai-sdk-modules/llm-providers/config', () => ({
-  resolveEffectiveModel,
+  resolveEffectiveModelId,
 }));
 vi.mock('../services/ai-sdk-modules/resolve-provider-options', () => ({
   getProviderOptionsForModel,
@@ -148,17 +148,17 @@ beforeEach(() => {
 describe('post-message handler — model selection (Req 3.3, 4.1, 4.3, 4.4)', () => {
   it('resolves an in-allowlist modelId once and threads the resolved id to both requestContext and the options lookup (Req 4.1, 4.4)', async () => {
     const options = { openai: { reasoningEffort: 'low' } };
-    resolveEffectiveModel.mockReturnValue('o3');
+    resolveEffectiveModelId.mockReturnValue('o3');
     getProviderOptionsForModel.mockReturnValue(options);
 
     const { req, res } = buildReqRes('o3');
     // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
     await getHandler()(req as any, res as any, vi.fn());
 
-    // The route rounds the request's modelId through resolveEffectiveModel exactly
+    // The route rounds the request's modelId through resolveEffectiveModelId exactly
     // once (the single checkpoint), then threads the resolved id everywhere.
-    expect(resolveEffectiveModel).toHaveBeenCalledTimes(1);
-    expect(resolveEffectiveModel).toHaveBeenCalledWith('o3');
+    expect(resolveEffectiveModelId).toHaveBeenCalledTimes(1);
+    expect(resolveEffectiveModelId).toHaveBeenCalledWith('o3');
     expect(getProviderOptionsForModel).toHaveBeenCalledWith('o3');
 
     expect(stream).toHaveBeenCalledTimes(1);
@@ -172,15 +172,15 @@ describe('post-message handler — model selection (Req 3.3, 4.1, 4.3, 4.4)', ()
 
   it('rounds an omitted modelId to the default and threads the resolved default id (Req 4.3)', async () => {
     const defaultOptions = { openai: { reasoningEffort: 'high' } };
-    // resolveEffectiveModel collapses an undefined modelId to the default id.
-    resolveEffectiveModel.mockReturnValue('gpt-4o');
+    // resolveEffectiveModelId collapses an undefined modelId to the default id.
+    resolveEffectiveModelId.mockReturnValue('gpt-4o');
     getProviderOptionsForModel.mockReturnValue(defaultOptions);
 
     const { req, res } = buildReqRes(undefined);
     // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
     await getHandler()(req as any, res as any, vi.fn());
 
-    expect(resolveEffectiveModel).toHaveBeenCalledWith(undefined);
+    expect(resolveEffectiveModelId).toHaveBeenCalledWith(undefined);
     // The RESOLVED default id (not undefined) is threaded downstream, so the agent
     // model fn never re-rounds (no second warning).
     expect(getProviderOptionsForModel).toHaveBeenCalledWith('gpt-4o');
@@ -191,7 +191,7 @@ describe('post-message handler — model selection (Req 3.3, 4.1, 4.3, 4.4)', ()
   });
 
   it('keeps the existing error sanitizer wired so provider errors yield a safe message (Req 4.5)', async () => {
-    resolveEffectiveModel.mockReturnValue('o3');
+    resolveEffectiveModelId.mockReturnValue('o3');
     getProviderOptionsForModel.mockReturnValue({});
 
     const { req, res } = buildReqRes('o3');

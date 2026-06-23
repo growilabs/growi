@@ -19,7 +19,7 @@ import type SearchService from '~/server/service/search';
  *
  * Notes on `modelId`:
  * - `modelId` is the per-request model for the chat client's selection. The
- *   post-message handler resolves the client value through `resolveEffectiveModel`
+ *   post-message handler resolves the client value through `resolveEffectiveModelId`
  *   (the single allow-list rounding checkpoint — an out-of-allowlist / omitted
  *   value is collapsed to the default) and sets the ALREADY-RESOLVED id here.
  *   `growiAgent`'s dynamic model function passes it to `resolveMastraModel`, whose

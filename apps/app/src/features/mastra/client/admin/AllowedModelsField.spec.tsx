@@ -21,7 +21,7 @@ const defaultFormValues: AiSettingsFormValues = {
   provider: 'openai',
   apiKey: '',
   allowedModels: [
-    { model: 'gpt-4o', providerOptionsText: '', isDefault: true },
+    { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
   ],
   azureOpenaiSettings: {
     resourceName: '',
@@ -82,7 +82,7 @@ describe('AllowedModelsField', () => {
       renderComponent({
         defaultValues: {
           allowedModels: [
-            { model: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
           ],
         },
       });
@@ -103,8 +103,12 @@ describe('AllowedModelsField', () => {
       renderComponent({
         defaultValues: {
           allowedModels: [
-            { model: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            { model: 'gpt-4o-mini', providerOptionsText: '', isDefault: false },
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            {
+              modelId: 'gpt-4o-mini',
+              providerOptionsText: '',
+              isDefault: false,
+            },
           ],
         },
       });
@@ -130,8 +134,12 @@ describe('AllowedModelsField', () => {
       renderComponent({
         defaultValues: {
           allowedModels: [
-            { model: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            { model: 'gpt-4o-mini', providerOptionsText: '', isDefault: false },
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            {
+              modelId: 'gpt-4o-mini',
+              providerOptionsText: '',
+              isDefault: false,
+            },
           ],
         },
       });
@@ -154,8 +162,12 @@ describe('AllowedModelsField', () => {
       renderComponent({
         defaultValues: {
           allowedModels: [
-            { model: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            { model: 'gpt-4o-mini', providerOptionsText: '', isDefault: false },
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            {
+              modelId: 'gpt-4o-mini',
+              providerOptionsText: '',
+              isDefault: false,
+            },
           ],
         },
       });
@@ -214,7 +226,7 @@ describe('AllowedModelsField', () => {
       renderComponent({
         defaultValues: {
           allowedModels: [
-            { model: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
           ],
         },
       });
@@ -278,8 +290,12 @@ describe('AllowedModelsField', () => {
       renderComponent({
         defaultValues: {
           allowedModels: [
-            { model: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            { model: 'gpt-4o-mini', providerOptionsText: '', isDefault: false },
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            {
+              modelId: 'gpt-4o-mini',
+              providerOptionsText: '',
+              isDefault: false,
+            },
           ],
         },
       });

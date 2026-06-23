@@ -45,9 +45,9 @@ const logger = loggerFactory(
  *             Always an array (an empty array when no models are configured).
  *           items:
  *             type: object
- *             required: [model]
+ *             required: [modelId]
  *             properties:
- *               model:
+ *               modelId:
  *                 type: string
  *                 description: The model id (or, for Azure OpenAI, the deployment name).
  *               providerOptions:

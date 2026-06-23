@@ -52,7 +52,7 @@ const stubConfig = (values: {
   });
 };
 
-const ONE_MODEL: AllowedModel[] = [{ model: 'gpt-4o', isDefault: true }];
+const ONE_MODEL: AllowedModel[] = [{ modelId: 'gpt-4o', isDefault: true }];
 
 beforeEach(() => {
   vi.clearAllMocks();

@@ -3,27 +3,33 @@
 // The resolver does three things: resolve the effective model id (validated
 // against the allow-list), validate the provider, then dispatch to that
 // provider's model resolver (now (model) => model). We mock config-manager
-// (provider value), resolveEffectiveModel (the effective model id), and the
+// (provider value), resolveEffectiveModelId (the effective model id), and the
 // modelResolvers map (so no real @ai-sdk provider is constructed), then observe
 // which resolver ran and with which model.
 const {
   getConfig,
-  resolveEffectiveModel,
+  resolveEffectiveModelId,
   openaiResolver,
   anthropicResolver,
   googleResolver,
   azureResolver,
 } = vi.hoisted(() => ({
   getConfig: vi.fn(),
-  resolveEffectiveModel: vi.fn(),
+  resolveEffectiveModelId: vi.fn(),
   // Each resolver returns a fresh object so cache identity (===) is meaningful.
-  openaiResolver: vi.fn((model: string) => ({ tag: 'openai-model', model })),
-  anthropicResolver: vi.fn((model: string) => ({
-    tag: 'anthropic-model',
-    model,
+  openaiResolver: vi.fn((modelId: string) => ({
+    tag: 'openai-model',
+    modelId,
   })),
-  googleResolver: vi.fn((model: string) => ({ tag: 'google-model', model })),
-  azureResolver: vi.fn((model: string) => ({ tag: 'azure-model', model })),
+  anthropicResolver: vi.fn((modelId: string) => ({
+    tag: 'anthropic-model',
+    modelId,
+  })),
+  googleResolver: vi.fn((modelId: string) => ({
+    tag: 'google-model',
+    modelId,
+  })),
+  azureResolver: vi.fn((modelId: string) => ({ tag: 'azure-model', modelId })),
 }));
 
 vi.mock('~/server/service/config-manager', () => ({
@@ -39,7 +45,7 @@ vi.mock('./llm-providers', () => ({
   },
 }));
 
-vi.mock('./llm-providers/config', () => ({ resolveEffectiveModel }));
+vi.mock('./llm-providers/config', () => ({ resolveEffectiveModelId }));
 
 // Set the configured provider (the only config the resolver itself reads).
 const setProvider = (provider: string | undefined): void => {
@@ -60,7 +66,7 @@ beforeEach(() => {
   vi.clearAllMocks();
   // Default: the effective model is whatever was requested (identity), so a
   // distinct requested modelId yields a distinct effective model.
-  resolveEffectiveModel.mockImplementation(
+  resolveEffectiveModelId.mockImplementation(
     (modelId?: string) => modelId ?? 'default-model',
   );
 });
@@ -95,33 +101,33 @@ describe('resolveMastraModel', () => {
       ['azure-openai', azureResolver, 'azure-model'],
     ] as const)('dispatches %s to its own model resolver with the effective model', async (provider, resolver, tag) => {
       setProvider(provider);
-      resolveEffectiveModel.mockReturnValue('effective-x');
+      resolveEffectiveModelId.mockReturnValue('effective-x');
       const { resolveMastraModel } = await loadResolver();
 
       const result = resolveMastraModel('requested-x');
 
-      // The client-supplied modelId goes through resolveEffectiveModel; the
+      // The client-supplied modelId goes through resolveEffectiveModelId; the
       // provider resolver receives the *effective* model, not the raw request.
-      expect(resolveEffectiveModel).toHaveBeenCalledWith('requested-x');
+      expect(resolveEffectiveModelId).toHaveBeenCalledWith('requested-x');
       expect(resolver).toHaveBeenCalledTimes(1);
       expect(resolver).toHaveBeenCalledWith('effective-x');
-      expect(result).toMatchObject({ tag, model: 'effective-x' });
+      expect(result).toMatchObject({ tag, modelId: 'effective-x' });
     });
 
-    it('passes through an omitted modelId to resolveEffectiveModel', async () => {
+    it('passes through an omitted modelId to resolveEffectiveModelId', async () => {
       setProvider('openai');
       const { resolveMastraModel } = await loadResolver();
 
       resolveMastraModel();
 
-      expect(resolveEffectiveModel).toHaveBeenCalledWith(undefined);
+      expect(resolveEffectiveModelId).toHaveBeenCalledWith(undefined);
     });
   });
 
   describe('Map cache (Req 4.1 — same model built once)', () => {
     it('builds the same (provider, model) only once and returns the cached instance', async () => {
       setProvider('openai');
-      resolveEffectiveModel.mockReturnValue('gpt-4');
+      resolveEffectiveModelId.mockReturnValue('gpt-4');
       const { resolveMastraModel } = await loadResolver();
 
       const first = resolveMastraModel('gpt-4');
@@ -154,7 +160,7 @@ describe('resolveMastraModel', () => {
       setProvider('openai');
       // Both an out-of-allowlist request and an omitted request resolve to the
       // same default → one cached build, not two.
-      resolveEffectiveModel.mockReturnValue('gpt-4');
+      resolveEffectiveModelId.mockReturnValue('gpt-4');
       const { resolveMastraModel } = await loadResolver();
 
       const fromBogus = resolveMastraModel('bogus');
@@ -173,7 +179,7 @@ describe('resolveMastraModel', () => {
       // After the operator fixes config, the next call resolves without a
       // module restart.
       setProvider('openai');
-      resolveEffectiveModel.mockReturnValue('gpt-4');
+      resolveEffectiveModelId.mockReturnValue('gpt-4');
       expect(resolveMastraModel('gpt-4')).toMatchObject({
         tag: 'openai-model',
       });
@@ -183,7 +189,7 @@ describe('resolveMastraModel', () => {
   describe('clearResolvedMastraModelCache (Req 1.2 — restart-free reflection)', () => {
     it('clears the whole Map so the next call rebuilds from the latest config', async () => {
       setProvider('openai');
-      resolveEffectiveModel.mockReturnValue('gpt-4');
+      resolveEffectiveModelId.mockReturnValue('gpt-4');
       const { resolveMastraModel, clearResolvedMastraModelCache } =
         await loadResolver();
 

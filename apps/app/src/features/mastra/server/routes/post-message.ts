@@ -19,7 +19,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { CustomUIMessageMetadata } from '../../interfaces/chat-message';
-import { resolveEffectiveModel } from '../services/ai-sdk-modules/llm-providers/config';
+import { resolveEffectiveModelId } from '../services/ai-sdk-modules/llm-providers/config';
 import { getProviderOptionsForModel } from '../services/ai-sdk-modules/resolve-provider-options';
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
@@ -32,7 +32,7 @@ const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 type ReqBody = {
   threadId?: string;
   // Per-request model selection (Req 3.3). Untrusted: the handler rounds it via
-  // resolveEffectiveModel (the single allow-list checkpoint), so an out-of-allowlist
+  // resolveEffectiveModelId (the single allow-list checkpoint), so an out-of-allowlist
   // / omitted value is collapsed to the default model rather than rejected here.
   modelId?: string;
   messages: AIV6Type.UIMessage[];
@@ -91,7 +91,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
         // re-evaluated / re-warned downstream (Req 4.1/4.2/4.3). resolveMastraModel
         // re-validates the id inside the model fn, but for this already-resolved id
         // that is an idempotent defense-in-depth pass (no second warning).
-        const effectiveModelId = resolveEffectiveModel(modelId);
+        const effectiveModelId = resolveEffectiveModelId(modelId);
         requestContext.set('modelId', effectiveModelId);
 
         const stream = await growiAgent.stream(messages, {

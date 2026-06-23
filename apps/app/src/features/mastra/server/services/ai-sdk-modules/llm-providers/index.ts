@@ -8,7 +8,7 @@ import { resolveGoogleModel } from './google';
 import { resolveOpenaiModel } from './openai';
 
 // Data-driven provider -> self-contained model resolver. Every entry is a
-// uniform (model: string) => MastraModelConfig, so the consumer
+// uniform (modelId: string) => MastraModelConfig, so the consumer
 // (resolveMastraModel) dispatches generically with zero per-provider knowledge —
 // adding a provider is a new module + one entry here + the AiProvider union
 // member, and the consumer never changes (see .claude/rules/coding-style.md
@@ -21,7 +21,7 @@ import { resolveOpenaiModel } from './openai';
 // reads config or throws — app boot is unaffected by misconfiguration.
 export const modelResolvers: Record<
   AiProvider,
-  (model: string) => MastraModelConfig
+  (modelId: string) => MastraModelConfig
 > = {
   openai: resolveOpenaiModel,
   anthropic: resolveAnthropicModel,

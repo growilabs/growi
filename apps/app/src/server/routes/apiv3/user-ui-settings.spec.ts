@@ -66,8 +66,8 @@ beforeEach(() => {
 });
 
 describe('PUT /user-ui-settings handler', () => {
-  it('persists aiChatSelectedModel into the $set (Req 3.6 / 3.2)', async () => {
-    const { req, res } = buildReqRes({ aiChatSelectedModel: 'gpt-4o' });
+  it('persists aiChatSelectedModelId into the $set (Req 3.6 / 3.2)', async () => {
+    const { req, res } = buildReqRes({ aiChatSelectedModelId: 'gpt-4o' });
 
     // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
     await getHandler()(req as any, res as any, vi.fn());
@@ -75,11 +75,11 @@ describe('PUT /user-ui-settings handler', () => {
     expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
     const update = findOneAndUpdate.mock.calls[0][1];
     expect(update.$set).toEqual(
-      expect.objectContaining({ aiChatSelectedModel: 'gpt-4o' }),
+      expect.objectContaining({ aiChatSelectedModelId: 'gpt-4o' }),
     );
   });
 
-  it('does NOT write aiChatSelectedModel when it is omitted (no accidental clear)', async () => {
+  it('does NOT write aiChatSelectedModelId when it is omitted (no accidental clear)', async () => {
     const { req, res } = buildReqRes({ currentSidebarContents: 'recent' });
 
     // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
@@ -87,7 +87,7 @@ describe('PUT /user-ui-settings handler', () => {
 
     expect(findOneAndUpdate).toHaveBeenCalledTimes(1);
     const update = findOneAndUpdate.mock.calls[0][1];
-    expect(update.$set).not.toHaveProperty('aiChatSelectedModel');
+    expect(update.$set).not.toHaveProperty('aiChatSelectedModelId');
   });
 
   it('still forwards the original three fields unchanged', async () => {
@@ -110,8 +110,8 @@ describe('PUT /user-ui-settings handler', () => {
     );
   });
 
-  it('persists aiChatSelectedModel for logged-out users into the session', async () => {
-    const { req, res } = buildReqRes({ aiChatSelectedModel: 'o3' });
+  it('persists aiChatSelectedModelId for logged-out users into the session', async () => {
+    const { req, res } = buildReqRes({ aiChatSelectedModelId: 'o3' });
     // logged-out: no user; the handler writes into req.session.uiSettings instead
     // of the DB.
     // biome-ignore lint/suspicious/noExplicitAny: overriding the mocked req for the logged-out branch
@@ -121,6 +121,6 @@ describe('PUT /user-ui-settings handler', () => {
     await getHandler()(loggedOutReq, res as any, vi.fn());
 
     expect(findOneAndUpdate).not.toHaveBeenCalled();
-    expect(loggedOutReq.session.uiSettings.aiChatSelectedModel).toBe('o3');
+    expect(loggedOutReq.session.uiSettings.aiChatSelectedModelId).toBe('o3');
   });
 });

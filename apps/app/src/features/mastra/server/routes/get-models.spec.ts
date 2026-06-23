@@ -4,7 +4,7 @@
 // contract (task 3.2 / Req 3.1, 3.2, 3.7): the JSON it returns given an
 // allow-list, a default model, and the requesting user's persisted selection.
 // We mock every module boundary the handler reaches:
-//   - the config accessors (getAllowedModels / getDefaultModel): the allow-list
+//   - the config accessors (getAllowedModels / getDefaultModelId): the allow-list
 //     and default are owned by ai-sdk-modules and tested there.
 //   - the UserUISettings model: the per-user persisted selection. We stub
 //     findOne(...).lean() so no DB is touched.
@@ -18,13 +18,13 @@ import { mock } from 'vitest-mock-extended';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
-const { getAllowedModels, getDefaultModel } = vi.hoisted(() => ({
+const { getAllowedModels, getDefaultModelId } = vi.hoisted(() => ({
   getAllowedModels: vi.fn(),
-  getDefaultModel: vi.fn(),
+  getDefaultModelId: vi.fn(),
 }));
 vi.mock('../services/ai-sdk-modules/llm-providers/config', () => ({
   getAllowedModels,
-  getDefaultModel,
+  getDefaultModelId,
 }));
 
 // UserUISettings is a default export; the handler reads the user's persisted
@@ -71,9 +71,9 @@ const buildReqRes = () => {
 };
 
 // Set the per-user persisted selection the handler will read.
-const mockSavedSelection = (aiChatSelectedModel?: string) => {
+const mockSavedSelection = (aiChatSelectedModelId?: string) => {
   lean.mockResolvedValue(
-    aiChatSelectedModel != null ? { aiChatSelectedModel } : null,
+    aiChatSelectedModelId != null ? { aiChatSelectedModelId } : null,
   );
   findOne.mockReturnValue({ lean });
 };
@@ -86,12 +86,12 @@ describe('get-models handler (Req 3.1, 3.2, 3.7)', () => {
   it('returns the allow-list model ids and the server-validated selection (Req 3.1, 3.2)', async () => {
     getAllowedModels.mockReturnValue([
       {
-        model: 'gpt-4o',
+        modelId: 'gpt-4o',
         providerOptions: { openai: { reasoningEffort: 'low' } },
       },
-      { model: 'o3', isDefault: true },
+      { modelId: 'o3', isDefault: true },
     ]);
-    getDefaultModel.mockReturnValue('o3');
+    getDefaultModelId.mockReturnValue('o3');
     mockSavedSelection('o3');
 
     const { req, res } = buildReqRes();
@@ -102,7 +102,7 @@ describe('get-models handler (Req 3.1, 3.2, 3.7)', () => {
     const payload = res.apiv3.mock.calls[0][0];
     // Plain model-id array (no id/name objects) and the resolved selection only —
     // defaultModelId is no longer on the wire (the client never consumed it).
-    expect(payload.models).toEqual(['gpt-4o', 'o3']);
+    expect(payload.modelIds).toEqual(['gpt-4o', 'o3']);
     expect(payload.selectedModelId).toBe('o3');
     expect(payload).not.toHaveProperty('defaultModelId');
   });
@@ -112,7 +112,7 @@ describe('get-models handler (Req 3.1, 3.2, 3.7)', () => {
     // TOCTOU where it was cleared between the guard and the handler. The handler
     // must not return a selection-less response — it errors instead.
     getAllowedModels.mockReturnValue([]);
-    getDefaultModel.mockReturnValue(undefined);
+    getDefaultModelId.mockReturnValue(undefined);
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();
@@ -126,12 +126,12 @@ describe('get-models handler (Req 3.1, 3.2, 3.7)', () => {
   it('never leaks providerOptions anywhere in the response (Security)', async () => {
     getAllowedModels.mockReturnValue([
       {
-        model: 'gpt-4o',
+        modelId: 'gpt-4o',
         providerOptions: { openai: { reasoningEffort: 'low' } },
         isDefault: true,
       },
     ]);
-    getDefaultModel.mockReturnValue('gpt-4o');
+    getDefaultModelId.mockReturnValue('gpt-4o');
     mockSavedSelection('gpt-4o');
 
     const { req, res } = buildReqRes();
@@ -145,10 +145,10 @@ describe('get-models handler (Req 3.1, 3.2, 3.7)', () => {
 
   it('returns the saved selection as selectedModelId when it is in the allow-list (Req 3.2)', async () => {
     getAllowedModels.mockReturnValue([
-      { model: 'gpt-4o', isDefault: true },
-      { model: 'o3' },
+      { modelId: 'gpt-4o', isDefault: true },
+      { modelId: 'o3' },
     ]);
-    getDefaultModel.mockReturnValue('gpt-4o');
+    getDefaultModelId.mockReturnValue('gpt-4o');
     mockSavedSelection('o3');
 
     const { req, res } = buildReqRes();
@@ -161,10 +161,10 @@ describe('get-models handler (Req 3.1, 3.2, 3.7)', () => {
 
   it('falls back to the default when the saved selection is NOT in the allow-list (Req 3.7)', async () => {
     getAllowedModels.mockReturnValue([
-      { model: 'gpt-4o', isDefault: true },
-      { model: 'o3' },
+      { modelId: 'gpt-4o', isDefault: true },
+      { modelId: 'o3' },
     ]);
-    getDefaultModel.mockReturnValue('gpt-4o');
+    getDefaultModelId.mockReturnValue('gpt-4o');
     mockSavedSelection('removed-model');
 
     const { req, res } = buildReqRes();
@@ -177,10 +177,10 @@ describe('get-models handler (Req 3.1, 3.2, 3.7)', () => {
 
   it('falls back to the default when the user has no saved selection (Req 3.7)', async () => {
     getAllowedModels.mockReturnValue([
-      { model: 'gpt-4o', isDefault: true },
-      { model: 'o3' },
+      { modelId: 'gpt-4o', isDefault: true },
+      { modelId: 'o3' },
     ]);
-    getDefaultModel.mockReturnValue('gpt-4o');
+    getDefaultModelId.mockReturnValue('gpt-4o');
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();

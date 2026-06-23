@@ -76,7 +76,7 @@ export const AllowedModelsField = (
   // useId() guarantees uniqueness if multiple instances ever co-exist.
   const radioGroupName = useId();
 
-  // Azure OpenAI stores the *deployment name* in `model`, so the label changes
+  // Azure OpenAI stores the *deployment name* in `modelId`, so the label changes
   // by provider (data-driven on the watched value, no provider-specific branch
   // leaking elsewhere).
   const isAzure = watch('provider') === 'azure-openai';
@@ -145,7 +145,7 @@ export const AllowedModelsField = (
         size="sm"
         disabled={disabled}
         onClick={() =>
-          append({ model: '', providerOptionsText: '', isDefault: false })
+          append({ modelId: '', providerOptionsText: '', isDefault: false })
         }
       >
         {t('ai_settings.add_model')}
@@ -223,7 +223,9 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
             id={modelInputId}
             type="text"
             disabled={disabled}
-            {...registerToInputProps(register(`allowedModels.${index}.model`))}
+            {...registerToInputProps(
+              register(`allowedModels.${index}.modelId`),
+            )}
           />
         </div>
 

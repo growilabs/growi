@@ -15,7 +15,7 @@ import type { AzureOpenaiConfig } from '../../interfaces/azure-openai-config';
  * row's "default" radio; exactly one row is the default across the list.
  */
 export interface AllowedModelFormValue {
-  model: string;
+  modelId: string;
   providerOptionsText: string;
   isDefault: boolean;
 }
@@ -61,7 +61,7 @@ export const toFormValues = (
   provider: data.provider ?? '',
   apiKey: '',
   allowedModels: data.allowedModels.map((m) => ({
-    model: m.model,
+    modelId: m.modelId,
     providerOptionsText:
       m.providerOptions != null ? JSON.stringify(m.providerOptions) : '',
     isDefault: m.isDefault ?? false,
@@ -85,7 +85,7 @@ export const toFormValues = (
  */
 const toAllowedModel = (row: AllowedModelFormValue): AllowedModel => {
   const trimmed = row.providerOptionsText.trim();
-  const base: AllowedModel = { model: row.model, isDefault: row.isDefault };
+  const base: AllowedModel = { modelId: row.modelId, isDefault: row.isDefault };
   if (trimmed === '') {
     return base;
   }

@@ -80,13 +80,13 @@ const DB: Partial<TestConfigData> = {
   'app:aiEnabled': { value: true },
   'ai:provider': { value: 'openai' },
   'ai:apiKey': { value: 'db-secret-key' },
-  'ai:allowedModels': { value: [{ model: 'db-model', isDefault: true }] },
+  'ai:allowedModels': { value: [{ modelId: 'db-model', isDefault: true }] },
 };
 const ENV = (useOnlyEnvVars: boolean): Partial<TestConfigData> => ({
   'app:aiEnabled': { value: false },
   'ai:provider': { value: 'anthropic' },
   'ai:apiKey': { value: 'env-secret-key' },
-  'ai:allowedModels': { value: [{ model: 'env-model', isDefault: true }] },
+  'ai:allowedModels': { value: [{ modelId: 'env-model', isDefault: true }] },
   'env:useOnlyEnvVars:ai': { value: useOnlyEnvVars },
 });
 
@@ -152,7 +152,7 @@ describe('admin-ai-settings env-only mode end-to-end (Req 4.1, 4.2, 4.3)', () =>
       // The allow-list resolves to the env value, not the DB one (Req 4.1, 6.2:
       // GET still works under env-only and reflects the env-fixed allow-list).
       expect(body.allowedModels).toEqual([
-        { model: 'env-model', isDefault: true },
+        { modelId: 'env-model', isDefault: true },
       ]);
       expect(body.aiEnabled).toBe(false); // env, not the DB true
       // apiKey value is never returned; only its presence (env key is set).
@@ -163,7 +163,7 @@ describe('admin-ai-settings env-only mode end-to-end (Req 4.1, 4.2, 4.3)', () =>
     it('PUT rejects with 422 and persists nothing — same flag, other handler (Req 1.6, 4.3)', async () => {
       const { res, emit } = await invokePut({
         provider: 'google',
-        allowedModels: [{ model: 'should-not-be-saved', isDefault: true }],
+        allowedModels: [{ modelId: 'should-not-be-saved', isDefault: true }],
       });
 
       const apiv3Err = vi.mocked(res.apiv3Err);
@@ -190,7 +190,7 @@ describe('admin-ai-settings env-only mode end-to-end (Req 4.1, 4.2, 4.3)', () =>
       expect(body.provider).toBe('openai'); // DB, not env 'anthropic'
       // The allow-list resolves DB-first when the flag is off.
       expect(body.allowedModels).toEqual([
-        { model: 'db-model', isDefault: true },
+        { modelId: 'db-model', isDefault: true },
       ]);
       expect(body.aiEnabled).toBe(true); // DB, not env false
     });
@@ -198,7 +198,7 @@ describe('admin-ai-settings env-only mode end-to-end (Req 4.1, 4.2, 4.3)', () =>
     it('PUT persists the update through the real configManager (no 422) (Req 4.3 inverse)', async () => {
       const { res, emit } = await invokePut({
         provider: 'google',
-        allowedModels: [{ model: 'gpt-via-google', isDefault: true }],
+        allowedModels: [{ modelId: 'gpt-via-google', isDefault: true }],
       });
 
       // No rejection: the same flag being off lets the write through both ends.

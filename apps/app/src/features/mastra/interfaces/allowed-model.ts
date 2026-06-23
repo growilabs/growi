@@ -9,18 +9,18 @@ import type { JSONValue } from 'ai';
 export type ModelProviderOptions = Record<string, Record<string, JSONValue>>;
 
 /**
- * A single allowed model. `model` is the model ID (the deployment name for Azure
+ * A single allowed model. `modelId` is the model ID (the deployment name for Azure
  * OpenAI). `isDefault` marks exactly one entry in the allow-list as the default.
  */
 export interface AllowedModel {
-  readonly model: string;
+  readonly modelId: string;
   readonly providerOptions?: ModelProviderOptions;
   readonly isDefault?: boolean;
 }
 
 /**
  * Whether `modelId` is present in the operator's allow-list. The single membership
- * rule, shared by the request-time resolver (`resolveEffectiveModel`) and the chat
+ * rule, shared by the request-time resolver (`resolveEffectiveModelId`) and the chat
  * selector seed (`get-models` route), so "what counts as an allowed model" cannot
  * drift between those call sites. Pure (no config access): callers pass the list
  * they already hold.
@@ -28,4 +28,4 @@ export interface AllowedModel {
 export const isModelInAllowList = (
   modelId: string,
   allowedModels: readonly AllowedModel[],
-): boolean => allowedModels.some((m) => m.model === modelId);
+): boolean => allowedModels.some((m) => m.modelId === modelId);

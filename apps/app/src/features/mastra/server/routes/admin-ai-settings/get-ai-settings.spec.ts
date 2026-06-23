@@ -145,11 +145,11 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
       // providerOptions (the admin UI is trusted) — Req 1.1, 1.3.
       'ai:allowedModels': [
         {
-          model: 'gpt-4o',
+          modelId: 'gpt-4o',
           isDefault: true,
           providerOptions: { openai: { temperature: 0.2 } },
         },
-        { model: 'gpt-4o-mini' },
+        { modelId: 'gpt-4o-mini' },
       ],
       'ai:azureOpenaiSettings': {
         resourceName: 'my-resource',
@@ -167,11 +167,11 @@ describe('getAiSettings (Req 1.4, 4.2, 5.2, 5.3, 7.1, 7.6)', () => {
       provider: 'azure-openai',
       allowedModels: [
         {
-          model: 'gpt-4o',
+          modelId: 'gpt-4o',
           isDefault: true,
           providerOptions: { openai: { temperature: 0.2 } },
         },
-        { model: 'gpt-4o-mini' },
+        { modelId: 'gpt-4o-mini' },
       ],
       azureOpenaiSettings: {
         resourceName: 'my-resource',

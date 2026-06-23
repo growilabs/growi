@@ -3,8 +3,8 @@ import { isModelInAllowList } from './allowed-model';
 
 describe('isModelInAllowList', () => {
   const allowedModels: AllowedModel[] = [
-    { model: 'gpt-4o', isDefault: true },
-    { model: 'o3' },
+    { modelId: 'gpt-4o', isDefault: true },
+    { modelId: 'o3' },
   ];
 
   it('returns true when the model id matches an allow-list entry', () => {

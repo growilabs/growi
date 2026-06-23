@@ -7,8 +7,8 @@ import { isProviderNamespacedObject } from '../../../utils/provider-options-vali
  * Returns `true` when the list satisfies every rule below, `false` otherwise. It is
  * the single source of truth used by the express-validator `.custom()` chain, so the
  * rules can be unit-tested directly without driving the middleware:
- *   - every entry's `model` is a non-empty string (Req 1.4)
- *   - no two entries share the same `model` id (Req 1.4)
+ *   - every entry's `modelId` is a non-empty string (Req 1.4)
+ *   - no two entries share the same `modelId` (Req 1.4)
  *   - every entry's `providerOptions`, when present, is a provider-namespaced object
  *     (the same shape the runtime applies) (Req 2.4); absent = "no options" (Req 2.3)
  *   - EXACTLY ONE entry has `isDefault === true` — neither 0 nor >1 (Req 1.3 / 1.5)
@@ -26,15 +26,15 @@ export const isValidNonEmptyAllowedModels = (
   let defaultCount = 0;
 
   for (const entry of models) {
-    // model must be a non-empty string.
-    if (typeof entry.model !== 'string' || entry.model.trim() === '') {
+    // modelId must be a non-empty string.
+    if (typeof entry.modelId !== 'string' || entry.modelId.trim() === '') {
       return false;
     }
     // No duplicate model ids.
-    if (ids.has(entry.model)) {
+    if (ids.has(entry.modelId)) {
       return false;
     }
-    ids.add(entry.model);
+    ids.add(entry.modelId);
 
     // providerOptions (when present) must be a provider-namespaced object. Absent
     // is valid ("no options"); the runtime resolves it to {}.

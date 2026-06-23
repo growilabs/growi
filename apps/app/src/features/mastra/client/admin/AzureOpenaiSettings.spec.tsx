@@ -20,7 +20,7 @@ const defaultFormValues: AiSettingsFormValues = {
   aiEnabled: true,
   provider: 'azure-openai',
   apiKey: '',
-  allowedModels: [{ model: '', providerOptionsText: '', isDefault: true }],
+  allowedModels: [{ modelId: '', providerOptionsText: '', isDefault: true }],
   azureOpenaiSettings: {
     resourceName: '',
     baseURL: '',
