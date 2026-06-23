@@ -1,4 +1,7 @@
-import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
+import {
+  type AllowedModel,
+  isModelInAllowList,
+} from '~/features/mastra/interfaces/allowed-model';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -63,7 +66,7 @@ export const resolveEffectiveModel = (modelId?: string): string => {
     );
   }
 
-  if (modelId != null && models.some((m) => m.model === modelId)) {
+  if (modelId != null && isModelInAllowList(modelId, models)) {
     return modelId;
   }
 

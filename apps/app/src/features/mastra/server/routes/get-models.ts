@@ -3,6 +3,7 @@ import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 
+import { isModelInAllowList } from '~/features/mastra/interfaces/allowed-model';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -63,7 +64,7 @@ export const getModelsFactory: GetModelsFactory = (crowi) => {
         const savedModelId = userUISettings?.aiChatSelectedModel;
         const isSavedAllowed =
           savedModelId != null &&
-          allowedModels.some((m) => m.model === savedModelId);
+          isModelInAllowList(savedModelId, allowedModels);
         const selectedModelId = isSavedAllowed ? savedModelId : defaultModelId;
 
         // providerOptions deliberately omitted from the response (server-only).

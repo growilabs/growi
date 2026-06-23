@@ -17,3 +17,15 @@ export interface AllowedModel {
   readonly providerOptions?: ModelProviderOptions;
   readonly isDefault?: boolean;
 }
+
+/**
+ * Whether `modelId` is present in the operator's allow-list. The single membership
+ * rule, shared by the request-time resolver (`resolveEffectiveModel`) and the chat
+ * selector seed (`get-models` route), so "what counts as an allowed model" cannot
+ * drift between those call sites. Pure (no config access): callers pass the list
+ * they already hold.
+ */
+export const isModelInAllowList = (
+  modelId: string,
+  allowedModels: readonly AllowedModel[],
+): boolean => allowedModels.some((m) => m.model === modelId);
