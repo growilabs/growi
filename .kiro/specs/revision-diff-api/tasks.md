@@ -16,7 +16,7 @@
   - 完了状態: 3観点のユニットテストが green
   - _Requirements: 6.2, 6.3, 6.4_
   - _Boundary: diff-core_
-- [ ] 1.4 (P) cursor encode/decode を TDD で実装
+- [x] 1.4 (P) cursor encode/decode を TDD で実装
   - 先に失敗するユニットテストを書く: (createdAt,_id) の往復一致／不正トークンで例外
   - 不透明トークン（内部表現を露出しない）として純粋関数で実装し green にする
   - 完了状態: 往復・異常系のユニットテストが green
