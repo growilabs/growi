@@ -11,6 +11,7 @@ import mongoose from 'mongoose';
 import { getInstance } from '^/test/setup/crowi';
 
 import type { CommentModel } from '~/features/comment/server/models/comment';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IComment } from '~/interfaces/comment';
 import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
@@ -34,6 +35,12 @@ import type {
 import type { ShareLinkModel } from '~/server/models/share-link';
 import Tag from '~/server/models/tag';
 import { generalXssFilter } from '~/services/general-xss-filter';
+
+type EmittedActivityParams = {
+  action: string;
+  targetModel: string;
+  contributor: { _id: { toString(): string } };
+};
 
 describe('PageService page operations with only public pages', () => {
   // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
@@ -1165,6 +1172,57 @@ describe('PageService page operations with only public pages', () => {
         relatedPage: pageIdForRevert1,
         relatedTag: tagIdRevert1,
         isPageTrashed: true,
+      },
+    ]);
+
+    /*
+     * Revert - dedicated pages for activity/contribution assertions.
+     * Kept separate from the pages above so the existing revert tests are not
+     * disturbed by ordering. `descendantCount` drives the resolved action:
+     * 0 -> ACTION_PAGE_REVERT, > 0 -> ACTION_PAGE_RECURSIVELY_REVERT.
+     */
+    const pageIdForRevertActivitySingle = new mongoose.Types.ObjectId();
+    const pageIdForRevertActivityRecursive = new mongoose.Types.ObjectId();
+    const revisionIdForRevertActivitySingle = new mongoose.Types.ObjectId();
+    const revisionIdForRevertActivityRecursive = new mongoose.Types.ObjectId();
+
+    await Page.insertMany([
+      {
+        _id: pageIdForRevertActivitySingle,
+        path: '/trash/v5_revert_activity_single',
+        grant: Page.GRANT_PUBLIC,
+        creator: dummyUser1,
+        lastUpdateUser: dummyUser1._id,
+        revision: revisionIdForRevertActivitySingle,
+        status: Page.STATUS_DELETED,
+        descendantCount: 0,
+      },
+      {
+        _id: pageIdForRevertActivityRecursive,
+        path: '/trash/v5_revert_activity_recursive',
+        grant: Page.GRANT_PUBLIC,
+        creator: dummyUser1,
+        lastUpdateUser: dummyUser1._id,
+        revision: revisionIdForRevertActivityRecursive,
+        status: Page.STATUS_DELETED,
+        descendantCount: 1,
+      },
+    ]);
+
+    await Revision.insertMany([
+      {
+        _id: revisionIdForRevertActivitySingle,
+        pageId: pageIdForRevertActivitySingle,
+        body: 'revert_activity_single',
+        format: 'comment',
+        author: dummyUser1,
+      },
+      {
+        _id: revisionIdForRevertActivityRecursive,
+        pageId: pageIdForRevertActivityRecursive,
+        body: 'revert_activity_recursive',
+        format: 'comment',
+        author: dummyUser1,
       },
     ]);
   });
@@ -2912,6 +2970,95 @@ describe('PageService page operations with only public pages', () => {
       expect(revertedPage1.status).toBe(Page.STATUS_PUBLISHED);
       expect(revertedPage2?.status).toBe(Page.STATUS_PUBLISHED);
       expect(newlyCreatedPage?.status).toBe(Page.STATUS_PUBLISHED);
+    });
+
+    it('emits an update activity event with ACTION_PAGE_REVERT for a single-page revert', async () => {
+      const deletedPage = await Page.findOne({
+        path: '/trash/v5_revert_activity_single',
+        status: Page.STATUS_DELETED,
+      });
+      expect(deletedPage).toBeTruthy();
+
+      // Suppress the async activity listener so the assertion stays deterministic.
+      // Verify that the page service emits the correct event.
+      const emitSpy = vi
+        .spyOn(crowi.events.activity, 'emit')
+        .mockImplementation(() => true);
+
+      try {
+        const revertedPage = await revertDeletedPage(
+          deletedPage,
+          dummyUser1,
+          {},
+          false,
+          { ip: '::ffff:127.0.0.1', endpoint: '/_api/v3/pages/revert' },
+        );
+        expect(revertedPage.status).toBe(Page.STATUS_PUBLISHED);
+
+        const updateCall = emitSpy.mock.calls.find(
+          (call) => call[0] === 'update',
+        );
+        expect(updateCall).toBeDefined();
+
+        const activityId = updateCall?.[1] as mongoose.Types.ObjectId;
+        const parameters = updateCall?.[2] as EmittedActivityParams;
+        expect(parameters.action).toBe(SupportedAction.ACTION_PAGE_REVERT);
+        expect(parameters.targetModel).toBe(SupportedTargetModel.MODEL_PAGE);
+        expect(parameters.contributor._id.toString()).toBe(
+          dummyUser1._id.toString(),
+        );
+
+        // The emitted activity id must correspond to a persisted Activity.
+        // We assert the linkage only, not the intermediate action state: whether
+        // the activity is created unsettled-then-settled is an implementation
+        // detail of the listener, covered behaviorally in
+        // contribution-orchestration.spec.ts.
+        const Activity = mongoose.model('Activity');
+        const activity = await Activity.findById(activityId);
+        expect(activity).toBeTruthy();
+      } finally {
+        emitSpy.mockRestore();
+      }
+    });
+
+    it('emits ACTION_PAGE_RECURSIVELY_REVERT when the reverted page has descendants', async () => {
+      const deletedPage = await Page.findOne({
+        path: '/trash/v5_revert_activity_recursive',
+        status: Page.STATUS_DELETED,
+      });
+      expect(deletedPage).toBeTruthy();
+      // descendantCount is seeded to a positive value on purpose (the page has
+      // no real descendants) because the resolved action is driven solely by
+      // page.descendantCount. Do not "fix" it to match a real subtree — that
+      // would change which branch this test exercises.
+      expect(deletedPage?.descendantCount).toBeGreaterThan(0);
+
+      const emitSpy = vi
+        .spyOn(crowi.events.activity, 'emit')
+        .mockImplementation(() => true);
+
+      try {
+        await revertDeletedPage(deletedPage, dummyUser1, {}, true, {
+          ip: '::ffff:127.0.0.1',
+          endpoint: '/_api/v3/pages/revert',
+        });
+
+        const updateCall = emitSpy.mock.calls.find(
+          (call) => call[0] === 'update',
+        );
+        expect(updateCall).toBeDefined();
+
+        const parameters = updateCall?.[2] as EmittedActivityParams;
+        expect(parameters.action).toBe(
+          SupportedAction.ACTION_PAGE_RECURSIVELY_REVERT,
+        );
+        expect(parameters.targetModel).toBe(SupportedTargetModel.MODEL_PAGE);
+        expect(parameters.contributor._id.toString()).toBe(
+          dummyUser1._id.toString(),
+        );
+      } finally {
+        emitSpy.mockRestore();
+      }
     });
   });
 });
