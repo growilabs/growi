@@ -129,7 +129,6 @@ class FakeChangeStream {
   }
 }
 
-// WHY: ChangeStreamDocument is a discriminated union; a minimal fake object cannot satisfy it without casting.
 const makeInsertEvent = (
   doc: Partial<ActivityDocument>,
   tokenData = 'tok',
@@ -150,7 +149,6 @@ const makeDeleteEvent = (
     documentKey: { _id: id },
   }) as unknown as ChangeStreamDocument<ActivityDocument>;
 
-// Access private members for assertion without triggering noExplicitAny.
 type ServiceInternals = {
   consecutiveEventFailures: number;
   consecutiveRestarts: number;
