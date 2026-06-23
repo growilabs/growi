@@ -1,9 +1,9 @@
 {
   "feature_name": "share-link-comments",
   "created_at": "2026-06-17T07:26:26Z",
-  "updated_at": "2026-06-17T07:55:00Z",
+  "updated_at": "2026-06-23T00:00:00Z",
   "language": "ja",
-  "phase": "tasks-generated",
+  "phase": "active",
   "approvals": {
     "requirements": {
       "generated": true,
@@ -18,5 +18,5 @@
       "approved": true
     }
   },
-  "ready_for_implementation": false
+  "ready_for_implementation": true
 }

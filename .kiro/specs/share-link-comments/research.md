@@ -114,5 +114,30 @@ validator: query('shareLinkId').optional({ checkFalsy: true }).isMongoId()
 
 - **論点B = Option A（query ベース `certify-shared-page.js` 踏襲）を採用。** comments.get ルートに `certifySharedPage` を挿入し、`comment.api.get` を `if (!isSharedPage && !isAccessible) → error` に変更。referer/attachment 方式（Option B/C）は不採用。
 - **論点C** = revisions.js と同じ `!isSharedPage && !isAccessiblePageByViewer` 形に統一。
-- **パラメータ名整合 = クライアントが `pageId` を併送する。** `useSWRxPageComment` から既存 `page_id`（comment.api.get 用）に加え `pageId`（certify-shared-page.js 用）と `shareLinkId`（共有時のみ）を送る。`certify-shared-page.js` 本体は変更しない（最小・最安全）。
+- ~~**パラメータ名整合 = クライアントが `pageId` を併送する。**~~ → **撤回（2026-06-23、下記参照）。**
 - **read-only** = `Comments` に `isReadOnly` を追加 → `PageComment` へ伝播 ＋ `CommentEditorPre` を非描画。共有ページからは read-only で渡す。
+
+## 認可設計の改訂（2026-06-23 — PR #11322 セキュリティレビュー反映）
+
+PR #11322（Task 1）のレビューで、**Task 3 の認可設計に IDOR（認可バイパス）の構造的欠陥**が指摘された。`page_id`（snake_case, 取得対象）と `pageId`（camelCase, 検証対象）という **2 つの page 識別子が併存する設計そのものが脆弱性の温床**であり、当初方針「クライアントが `pageId` を併送して名前の不一致を吸収する」を撤回し、**単一 ID 化（検証対象＝取得対象）** に変更する。
+
+### 欠陥の本質（撤回前の設計だと発生）
+
+ミドルウェア `certify-shared-page.js` は `req.query.pageId` を共有リンクと照合して `req.isSharedPage` を立てるが、ハンドラ `comment.api.get` は別の `req.query.page_id` でコメントを取得する。両方とも攻撃者が制御可能なため、検証と取得が乖離する:
+
+- **CRITICAL-1（page 取り違え / IDOR）**: 有効な共有リンク 1 つ（ページ A）を持つ匿名ユーザーが
+  `GET /_api/comments.get?page_id=<非公開ページB>&pageId=<共有ページA>&shareLinkId=<Aの有効リンク>`
+  を送ると、ミドルウェアは A で検証成功 → `isSharedPage=true`、ハンドラは B のコメントを返す。
+  → **wiki 内の任意ページのコメントが漏洩**。
+- **CRITICAL-2（revision 取り違え）**: `comment.api.get` は `revision_id` があると `findCommentsByRevisionId(revisionId)` で **ページと無関係に**取得する。`isSharedPage=true` のまま別ページの `revision_id` を渡すとそのコメントが返る。page 識別子を単一化しても残るため、別途ガードが必要。
+
+手本の `revisions.js`（検証・バイパス・取得すべて `req.query.pageId`）と `get-page-info.ts`（すべて `pageId`）は **単一 ID 不変条件**を守るため取り違えが起きない。comments.get もこれに揃える。
+
+### 改訂後の確定方針（2026-06-23）
+
+- **単一 ID 化（CRITICAL-1 の根本解決）**: `certify-shared-page.js` を `req.query.pageId || req.query.page_id` も読むよう **additive に一般化**（既存呼び出し元は常に `pageId` を送るため後方互換）。クライアント `useSWRxPageComment` は既存の `page_id` ＋ `shareLinkId`（共有時のみ）だけを送り、**別途 `pageId` は併送しない**。これで「ミドルウェアが検証したページ」と「ハンドラが取得するページ」が同一の単一識別子になる。
+- **revision_id のガード（CRITICAL-2）**: 共有文脈（`isSharedPage === true`）では `revision_id` 分岐を使わず、**検証済み `page_id` でのみ取得する**（共有 read-only 表示はページ単位の一覧で足り、revision 指定は不要）。`revision_id` が併送されても参照しない。
+- **入力バリデーション（HIGH）**: 手本に合わせ `comments.get` に `query('page_id').isMongoId()` / `query('shareLinkId').optional({ checkFalsy: true }).isMongoId()` / `query('revision_id').optional({ checkFalsy: true }).isMongoId()` を追加（NoSQL injection 面の閉塞）。
+- **テスト（MEDIUM）**: 「`shareLinkId` が別ページを指す（不一致）で拒否」「共有文脈で `revision_id` に別ページの revision を渡しても、その revision のコメントは返らない（検証済みページのコメントのみ）」の**負のテストを必須追加**。
+
+> certify-shared-page.js を「無改修」とする当初の境界宣言は撤回し、上記 additive な一般化を許容する（design.md の Boundary Commitments も更新済み）。「2 つの page 識別子の併存」を排し単一ソースへ統一することが最善の防御。
