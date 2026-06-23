@@ -25,8 +25,19 @@ export const requireApiKey = (): string => {
 // The allow-list of models the operator permits. Returns it verbatim (falling
 // back to []); never synthesises entries or migrates from the removed single
 // ai:model / ai:providerOptions keys.
-export const getAllowedModels = (): AllowedModel[] =>
-  configManager.getConfig('ai:allowedModels') ?? [];
+//
+// Array.isArray (not `?? []`) because the AllowedModel[] type is a compile-time
+// annotation only — config-manager does not runtime-validate values (the loader
+// JSON-parses the env var and casts the result unchecked), so getConfig can hand
+// back any JSON value (e.g. an object) that the AllowedModel[] type denies. The
+// guard makes the runtime value honour its declared type. We coerce to [] rather
+// than throw because this accessor feeds isAiConfigured(), which must return a
+// boolean: a malformed value reads as [] = AI unconfigured (fail soft) instead of
+// throwing out of a should-be-pure predicate.
+export const getAllowedModels = (): AllowedModel[] => {
+  const allowedModels = configManager.getConfig('ai:allowedModels');
+  return Array.isArray(allowedModels) ? allowedModels : [];
+};
 
 // The default model id: the entry flagged isDefault, else the first entry, else
 // undefined when the allow-list is empty. The find()?? first fallback is also a

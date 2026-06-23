@@ -52,6 +52,17 @@ describe('getAllowedModels', () => {
 
     expect(getAllowedModels()).toEqual([]);
   });
+
+  it('returns [] for a malformed (non-array) value so downstream .find/.some/.map cannot crash', () => {
+    // A hand-edited AI_ALLOWED_MODELS env var can be valid JSON that is not an
+    // array (e.g. an object); it bypasses the PUT validator. Array.isArray must
+    // coerce it to [] (AI unconfigured) rather than letting it reach the resolvers.
+    getConfig.mockImplementation((key: string) =>
+      key === 'ai:allowedModels' ? { 'gpt-4o': {} } : undefined,
+    );
+
+    expect(getAllowedModels()).toEqual([]);
+  });
 });
 
 describe('getDefaultModel', () => {
