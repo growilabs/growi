@@ -12,6 +12,8 @@ import { newsItemAnchorId } from '../consts';
 import { useSWRINFxNews } from '../hooks/use-news';
 import { resolveLocaleText } from '../utils/resolve-locale-text';
 
+import styles from './NewsFeed.module.scss';
+
 const NEWS_PER_PAGE = 10;
 const DEFAULT_EMOJI = '📢';
 
@@ -132,7 +134,7 @@ export const NewsFeed = (): JSX.Element => {
             <section
               key={id}
               id={newsItemAnchorId(id)}
-              className="list-group-item py-4"
+              className={`${styles['news-item']} list-group-item py-4`}
             >
               <div className="d-flex align-items-center mb-1">
                 <span
