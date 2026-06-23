@@ -15,10 +15,23 @@ import {
   FILTER_TEST_USER_B,
 } from '../utils/test-users';
 
-// Each describe below triggers a full Elasticsearch reindex and then polls with
-// `toPass`. CI runs Playwright with `workers: 1` (see playwright.config.ts), so
-// they execute serially there. Run locally with `--workers=1` to avoid
-// concurrent rebuilds interfering across describes.
+// Why each test rebuilds the index (rather than relying on auto-index + poll):
+//
+// Page indexing is event-driven — `pageEvent`/`tagEvent` auto-index a page after
+// create/update (see search.ts:registerUpdateEvent). But those handlers are
+// fire-and-forget and unordered, so when a fixture produces MORE THAN ONE index
+// event for the same page, the writes race:
+//   - editor: page is created by A (write: editor=A) then updated by B
+//     (write: editor=B). If the create-write lands last, the doc keeps editor=A
+//     and `editor:<B>` never matches, so a per-page poll never converges.
+//   - tag/group: the `create` event indexes the page before tags/grants are
+//     persisted; the follow-up `tagEvent` write can be reordered the same way.
+// Measured: with auto-index + poll only, the `editor:` case failed ~2/10 runs.
+// A full `rebuild` reads the final DB state once and is authoritative, which
+// removes the race. `toPass` still polls because rebuild runs asynchronously.
+//
+// All describes are wrapped in one `test.describe.serial` so the global rebuilds
+// never overlap — CI uses `workers: 1`, but locally `workers` is undefined.
 
 test.describe
   .serial('search filters', () => {
@@ -29,7 +42,7 @@ test.describe
         const tag = `mytag-xyz789${stamp}`;
         const targetPath = `/Sandbox/${stamp}-target`;
         const controlPath = `/Sandbox/${stamp}-control`;
-        let created: CreatedPage[] = [];
+        const created: CreatedPage[] = [];
 
         // Teardown — keep the DB clean so the suite is re-runnable.
         test.afterAll(async ({ request }) => {
@@ -39,16 +52,22 @@ test.describe
         test('setup: create a matching page and a control page', async ({
           request,
         }) => {
-          const target = await createPage(request, {
-            path: targetPath,
-            body: 'matching page',
-            pageTags: [tag], // what `tag:` will match
-          });
-          const control = await createPage(request, {
-            path: controlPath,
-            body: 'control page', // no tag -> must NOT appear
-          });
-          created = [target, control];
+          // Track each page the moment it exists. If a later step throws,
+          // afterAll still tears down the earlier pages — otherwise they leak
+          // and the next run collides on the fixed path.
+          created.push(
+            await createPage(request, {
+              path: targetPath,
+              body: 'matching page',
+              pageTags: [tag], // what `tag:` will match
+            }),
+          );
+          created.push(
+            await createPage(request, {
+              path: controlPath,
+              body: 'control page', // no tag -> must NOT appear
+            }),
+          );
         });
 
         test('tag filter returns only the tagged page', async ({
@@ -83,7 +102,7 @@ test.describe
         const stamp = 'e2e-authorfilter-7f3a2b';
         const byUserAPath = `/Sandbox/${stamp}-by-a`;
         const byUserBPath = `/Sandbox/${stamp}-by-b`;
-        let created: CreatedPage[] = [];
+        const created: CreatedPage[] = [];
 
         test.afterAll(async ({ request }) => {
           await deletePagesCompletely(request, created);
@@ -100,15 +119,20 @@ test.describe
             storageState: FILTER_TEST_USER_B.authFile,
           });
           try {
-            const byA = await createPage(contextA.request, {
-              path: byUserAPath,
-              body: `author filter ${stamp}`,
-            });
-            const byB = await createPage(contextB.request, {
-              path: byUserBPath,
-              body: `author filter ${stamp}`,
-            });
-            created = [byA, byB];
+            // Track each page as it is created (see tag setup) so a mid-setup
+            // failure still leaves the earlier pages tracked for teardown.
+            created.push(
+              await createPage(contextA.request, {
+                path: byUserAPath,
+                body: `author filter ${stamp}`,
+              }),
+            );
+            created.push(
+              await createPage(contextB.request, {
+                path: byUserBPath,
+                body: `author filter ${stamp}`,
+              }),
+            );
           } finally {
             await contextA.close();
             await contextB.close();
@@ -146,7 +170,7 @@ test.describe
         const editedByBPath = `/Sandbox/${stamp}-edited-by-b`;
         const onlyByAPath = `/Sandbox/${stamp}-only-a`;
         const authoredByBPath = `/Sandbox/${stamp}-authored-by-b`;
-        let created: CreatedPage[] = [];
+        const created: CreatedPage[] = [];
 
         test.afterAll(async ({ request }) => {
           await deletePagesCompletely(request, created);
@@ -162,22 +186,32 @@ test.describe
             storageState: FILTER_TEST_USER_B.authFile,
           });
           try {
+            // Track each page as it is created (see tag setup). For updated
+            // pages we push both results: deletePagesCompletely dedups by
+            // pageId keeping the last entry, so the update's newer revisionId
+            // wins — while the create push covers a failure between the two.
+
             // Created by A, then last-edited by B -> last editor is B (target).
             const createdByA = await createPage(contextA.request, {
               path: editedByBPath,
               body: `editor filter ${stamp}`,
             });
-            const editedByB = await updatePage(
-              contextB.request,
-              createdByA,
-              `editor filter ${stamp} edited by b`,
+            created.push(createdByA);
+            created.push(
+              await updatePage(
+                contextB.request,
+                createdByA,
+                `editor filter ${stamp} edited by b`,
+              ),
             );
 
             // Created and edited only by A -> last editor is A (control).
-            const onlyA = await createPage(contextA.request, {
-              path: onlyByAPath,
-              body: `editor filter ${stamp}`,
-            });
+            created.push(
+              await createPage(contextA.request, {
+                path: onlyByAPath,
+                body: `editor filter ${stamp}`,
+              }),
+            );
 
             // Authored by B but last-edited by A -> last editor is A.
             // Proves the filter keys on the LAST editor.
@@ -185,13 +219,14 @@ test.describe
               path: authoredByBPath,
               body: `editor filter ${stamp}`,
             });
-            const editedByA = await updatePage(
-              contextA.request,
-              createdByB,
-              `editor filter ${stamp} edited by a`,
+            created.push(createdByB);
+            created.push(
+              await updatePage(
+                contextA.request,
+                createdByB,
+                `editor filter ${stamp} edited by a`,
+              ),
             );
-
-            created = [editedByB, onlyA, editedByA];
           } finally {
             await contextA.close();
             await contextB.close();
@@ -234,7 +269,7 @@ test.describe
         const stamp = 'e2e-groupfilter-2b8e6d';
         const inGroupPath = `/Sandbox/${stamp}-in-group`;
         const publicControlPath = `/Sandbox/${stamp}-public`;
-        let created: CreatedPage[] = [];
+        const created: CreatedPage[] = [];
 
         // Delete as user A (creator + group member).
         test.afterAll(async ({ browser }) => {
@@ -261,19 +296,23 @@ test.describe
             storageState: FILTER_TEST_USER_A.authFile,
           });
           try {
+            // Track each page as it is created (see tag setup).
             // Page restricted to the group -> only group members can find it.
-            const inGroup = await createPage(contextA.request, {
-              path: inGroupPath,
-              body: `group filter ${stamp}`,
-              grant: Grant.USER_GROUP,
-              grantUserGroupIds: [{ type: 'UserGroup', item: groupId }],
-            });
+            created.push(
+              await createPage(contextA.request, {
+                path: inGroupPath,
+                body: `group filter ${stamp}`,
+                grant: Grant.USER_GROUP,
+                grantUserGroupIds: [{ type: 'UserGroup', item: groupId }],
+              }),
+            );
             // Public page.
-            const publicControl = await createPage(contextA.request, {
-              path: publicControlPath,
-              body: `group filter ${stamp}`,
-            });
-            created = [inGroup, publicControl];
+            created.push(
+              await createPage(contextA.request, {
+                path: publicControlPath,
+                body: `group filter ${stamp}`,
+              }),
+            );
           } finally {
             await contextA.close();
           }
@@ -320,7 +359,7 @@ test.describe
         const stamp = 'e2e-prefixfilter-4d7c1a';
         const targetPath = `/Sandbox/${stamp}-inc-target`;
         const controlPath = `/Sandbox/${stamp}-exc-control`;
-        let created: CreatedPage[] = [];
+        const created: CreatedPage[] = [];
 
         test.afterAll(async ({ request }) => {
           await deletePagesCompletely(request, created);
@@ -329,15 +368,19 @@ test.describe
         test('setup: create an in-prefix page and an out-of-prefix control page', async ({
           request,
         }) => {
-          const target = await createPage(request, {
-            path: targetPath,
-            body: `prefix filter ${stamp}`,
-          });
-          const control = await createPage(request, {
-            path: controlPath,
-            body: `prefix filter ${stamp}`,
-          });
-          created = [target, control];
+          // Track each page as it is created (see tag setup).
+          created.push(
+            await createPage(request, {
+              path: targetPath,
+              body: `prefix filter ${stamp}`,
+            }),
+          );
+          created.push(
+            await createPage(request, {
+              path: controlPath,
+              body: `prefix filter ${stamp}`,
+            }),
+          );
         });
 
         test('prefix filter returns only pages under that path', async ({
@@ -373,7 +416,7 @@ test.describe
         const prefix = `/Sandbox/${stamp}`;
         const byUserAPath = `${prefix}-by-a`;
         const byUserBPath = `${prefix}-by-b`;
-        let created: CreatedPage[] = [];
+        const created: CreatedPage[] = [];
 
         test.afterAll(async ({ request }) => {
           await deletePagesCompletely(request, created);
@@ -389,15 +432,19 @@ test.describe
             storageState: FILTER_TEST_USER_B.authFile,
           });
           try {
-            const byA = await createPage(contextA.request, {
-              path: byUserAPath,
-              body: `not-author filter ${stamp}`,
-            });
-            const byB = await createPage(contextB.request, {
-              path: byUserBPath,
-              body: `not-author filter ${stamp}`,
-            });
-            created = [byA, byB];
+            // Track each page as it is created (see tag setup).
+            created.push(
+              await createPage(contextA.request, {
+                path: byUserAPath,
+                body: `not-author filter ${stamp}`,
+              }),
+            );
+            created.push(
+              await createPage(contextB.request, {
+                path: byUserBPath,
+                body: `not-author filter ${stamp}`,
+              }),
+            );
           } finally {
             await contextA.close();
             await contextB.close();
