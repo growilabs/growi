@@ -1,11 +1,13 @@
 generator client {
-  provider            = "prisma-client"
-  output              = "../src/generated/prisma"
-  // ESM output to match the NodeNext server build (esm-migration task 3.6).
-  // importFileExtension makes the generated relative imports carry explicit
-  // `.js` extensions, which Node's ESM loader requires at runtime.
-  moduleFormat        = "esm"
-  importFileExtension = "js"
+  provider     = "prisma-client"
+  output       = "../src/generated/prisma"
+  // ESM output to match the project's module format. importFileExtension is
+  // intentionally left unset: Prisma then detects moduleResolution "Bundler"
+  // from tsconfig.json and emits extensionless relative imports, matching the
+  // no-extension import convention (see .claude/rules/import-convention.md).
+  // An explicit "js" here breaks Turbopack, which cannot rewrite a relative
+  // `.js` specifier to the actual `.ts` file.
+  moduleFormat = "esm"
 }
 
 datasource db {
