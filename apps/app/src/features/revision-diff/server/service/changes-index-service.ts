@@ -1,17 +1,26 @@
 /**
  * ChangesIndexService — discovers the authenticated user's consecutive-edit runs across pages.
  *
- * Task 2.1 scope: run aggregation logic (buildRuns pure function) and service stub.
- * Pagination (task 2.2) and accessibility flags (task 2.3) are handled in later tasks.
+ * This module owns the full discovery logic: the cross-author aggregation, run grouping,
+ * keyset pagination and accessibility-flag resolution. The route layer is a thin adapter
+ * that validates/normalizes the request and delegates to `listChanges`.
+ *
+ * Pure helpers (`buildRuns`, `paginateRuns`, `applyAccessFlags`) are unit-tested in
+ * isolation; the DB orchestration (`listChanges`) is covered by the route integration tests.
  */
 
-import type { Types } from 'mongoose';
+import type { IUserHasId } from '@growi/core/dist/interfaces';
+import type { HydratedDocument } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
+
+import type { PageDocument, PageModel } from '~/server/models/page';
+import { Revision } from '~/server/models/revision';
 
 import type {
   ChangeIndexEntry,
   ChangesIndexResult,
 } from '../../interfaces/changes-index';
-import type { CursorKey } from '../cursor';
+import { type CursorKey, encodeCursor } from '../cursor';
 
 // ---------------------------------------------------------------------------
 // Internal data shapes used by the run-building algorithm
@@ -239,13 +248,6 @@ export interface NormalizedChangesQuery {
   readonly cursor?: CursorKey;
 }
 
-export interface ChangesIndexService {
-  listChanges(
-    userId: string,
-    query: NormalizedChangesQuery,
-  ): Promise<ChangesIndexResult>;
-}
-
 // ---------------------------------------------------------------------------
 // Access flag resolution (task 2.3)
 // ---------------------------------------------------------------------------
@@ -309,4 +311,146 @@ export function applyAccessFlags(
   }
 
   return entries;
+}
+
+// ---------------------------------------------------------------------------
+// Service entry point — listChanges
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch the authenticated user's edit runs from MongoDB, apply accessibility flags,
+ * and return a paginated ChangesIndexResult.
+ *
+ * This is the concrete ChangesIndexService.listChanges implementation (design.md
+ * "Service Interface"). The route layer is a thin adapter: it authenticates,
+ * validates and normalizes the request, then delegates here.
+ *
+ * The design contract is `listChanges(userId, query)`. We accept the full `user`
+ * document and derive `userId` internally because the page-accessibility bulk check
+ * (`Page.findByIdsAndViewer`) requires the user document, not just the id.
+ *
+ * Pipeline:
+ *   1. $match — restrict to pages where the user has revisions in the window (perf gate)
+ *   2. $setWindowFields — compute prevAuthor / prevRevisionId per page (author-agnostic)
+ *   3. $match — keep only the authenticated user's revisions within the window + cursor
+ *   4. $sort — (createdAt asc, _id asc) for stable ordering
+ *   5. buildRuns() — group revisions into completed runs (pure)
+ *   6. paginateRuns() — take up to `limit` runs with cursor support (pure)
+ *   7. Page bulk queries — resolve accessibility + path for each run's pageId
+ *   8. applyAccessFlags() — annotate entries (pure); encodeCursor() — next-page token
+ */
+export async function listChanges(
+  user: IUserHasId,
+  query: NormalizedChangesQuery,
+): Promise<ChangesIndexResult> {
+  const userId = user._id.toString();
+  const authorObjectId = new Types.ObjectId(userId);
+
+  // Build the post-window $match stage that selects only this user's revisions
+  // within the requested window and cursor position.
+  //
+  // IMPORTANT: The $setWindowFields stage must run before this $match so that
+  // prevAuthor / prevRevisionId are computed over ALL revisions on a page
+  // (regardless of author).  Filtering by author first would cause the window
+  // function to miss other-author revisions, making run-split detection (Req 4.2)
+  // impossible.
+  const postWindowMatch: Record<string, unknown> = {
+    author: authorObjectId,
+  };
+
+  if (query.since != null || query.toDate != null) {
+    const createdAtFilter: Record<string, Date> = {};
+    if (query.since != null) createdAtFilter.$gte = query.since;
+    if (query.toDate != null) createdAtFilter.$lte = query.toDate;
+    postWindowMatch.createdAt = createdAtFilter;
+  }
+
+  // When resuming from a cursor, skip revisions at-or-before the cursor position
+  // using a compound keyset predicate: (createdAt, _id) > (cursor.createdAt, cursor.id).
+  if (query.cursor != null) {
+    const cursorCreatedAt = query.cursor.createdAt;
+    const cursorId = new Types.ObjectId(query.cursor.id);
+    postWindowMatch.$or = [
+      { createdAt: { $gt: cursorCreatedAt } },
+      {
+        createdAt: { $eq: cursorCreatedAt },
+        _id: { $gt: cursorId },
+      },
+    ];
+  }
+
+  // Pre-filter: narrow to pages that have at least one revision by this user
+  // in the requested window to avoid scanning the entire revisions collection.
+  // This keeps the full-collection scan bounded while still allowing $setWindowFields
+  // to see all revisions on those pages (including other-author ones).
+  const authorPageIds: Types.ObjectId[] = await Revision.distinct('pageId', {
+    author: authorObjectId,
+    ...(postWindowMatch.createdAt != null
+      ? { createdAt: postWindowMatch.createdAt }
+      : {}),
+  });
+
+  const rawRevisions: RevisionWithContext[] = await Revision.aggregate([
+    // Step 1: restrict to pages where the user has revisions (performance gate).
+    { $match: { pageId: { $in: authorPageIds } } },
+    // Step 2: enrich each revision with the immediately-preceding revision on the
+    // same page (author-agnostic), so run boundaries can be detected correctly.
+    {
+      $setWindowFields: {
+        partitionBy: '$pageId',
+        sortBy: { createdAt: 1, _id: 1 },
+        output: {
+          prevAuthor: { $shift: { output: '$author', by: -1 } },
+          prevRevisionId: { $shift: { output: '$_id', by: -1 } },
+        },
+      },
+    },
+    // Step 3: keep only the authenticated user's revisions within the window.
+    { $match: postWindowMatch },
+    { $sort: { createdAt: 1, _id: 1 } },
+  ]);
+
+  // Group revisions into completed runs.
+  const runs = buildRuns(rawRevisions, authorObjectId);
+
+  // Apply keyset pagination.
+  const { emittedRuns, nextCursor } = paginateRuns(
+    runs,
+    query.limit,
+    query.cursor,
+  );
+
+  if (emittedRuns.length === 0) {
+    return { changes: [], next: null };
+  }
+
+  // Collect all pageIds from emitted runs for bulk accessibility check.
+  const pageIds = emittedRuns.map((r) => r.pageId);
+
+  // Bulk query 1: determine which pages the authenticated user can access.
+  const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+    'Page',
+  );
+  const accessiblePages: HydratedDocument<PageDocument>[] =
+    await Page.findByIdsAndViewer(pageIds, user, null);
+  const accessiblePageIds = new Set(
+    accessiblePages.map((p) => p._id.toString()),
+  );
+
+  // Bulk query 2: fetch status and path for all pages (to detect deleted pages).
+  const pageInfoDocs: PageInfo[] = await Page.find(
+    { _id: { $in: pageIds } },
+    { status: 1, path: 1 },
+  ).lean();
+  const pageInfoMap = new Map<string, PageInfo>(
+    pageInfoDocs.map((p) => [p._id.toString(), p]),
+  );
+
+  // Annotate runs with accessibility flags.
+  const changes = applyAccessFlags(emittedRuns, accessiblePageIds, pageInfoMap);
+
+  // Encode the next-page cursor.
+  const next = nextCursor != null ? encodeCursor(nextCursor) : null;
+
+  return { changes, next };
 }

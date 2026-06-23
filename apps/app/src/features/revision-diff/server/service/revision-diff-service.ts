@@ -1,11 +1,18 @@
 /**
  * RevisionDiffService — per-pair authorization and unified diff computation.
  *
- * Task 3.1 scope: pure computeDiffForPair function and MAX_PAIRS constant.
- * The full service class (with DB access) is wired in later tasks.
+ * This module owns the full diff logic: the per-batch bulk fetch, per-pair independent
+ * authorization (`computeDiffForPair`, pure) and the `computeDiffs` orchestration that
+ * runs them over a batch. The route layer is a thin adapter that validates the request
+ * and delegates to `computeDiffs`.
  */
 
-import type { Types } from 'mongoose';
+import type { IUserHasId } from '@growi/core/dist/interfaces';
+import type { HydratedDocument } from 'mongoose';
+import mongoose, { Types } from 'mongoose';
+
+import type { PageDocument, PageModel } from '~/server/models/page';
+import { Revision } from '~/server/models/revision';
 
 import type {
   RevisionDiffPairInput,
@@ -115,9 +122,76 @@ export interface NormalizedDiffRequest {
   readonly contextLines: number;
 }
 
-export interface RevisionDiffService {
-  computeDiffs(
-    userId: string,
-    request: NormalizedDiffRequest,
-  ): Promise<readonly RevisionDiffResult[]>;
+// ---------------------------------------------------------------------------
+// Service entry point — computeDiffs
+// ---------------------------------------------------------------------------
+
+/**
+ * Fetch accessible pages and revisions for the given batch, then compute per-pair
+ * diff results.
+ *
+ * This is the concrete RevisionDiffService.computeDiffs implementation (design.md
+ * "Service Interface"). The route layer is a thin adapter: it authenticates, validates
+ * (incl. MAX_PAIRS) and delegates here.
+ *
+ * The design contract is `computeDiffs(userId, request)`. We accept the full `user`
+ * document because the page-accessibility bulk check (`Page.findByIdsAndViewer`)
+ * requires it. Authorization is performed independently per pair regardless of origin
+ * (Req 7.1 / 7.5).
+ *
+ * Pipeline:
+ *   1. Collect unique pageIds and revisionIds from the pairs.
+ *   2. Page.findByIdsAndViewer(pageIds, user) → accessible page-id set.
+ *   3. Revision.find({ _id: { $in } }) → revision map (id → RevisionDoc).
+ *   4. computeDiffForPair() per pair (pure) → results in input order.
+ */
+export async function computeDiffs(
+  user: IUserHasId,
+  request: NormalizedDiffRequest,
+): Promise<readonly RevisionDiffResult[]> {
+  const { pairs, contextLines } = request;
+
+  // Collect unique pageIds and revisionIds for bulk queries.
+  const pageIds: Types.ObjectId[] = [];
+  const revisionIds: Types.ObjectId[] = [];
+
+  for (const pair of pairs) {
+    pageIds.push(new Types.ObjectId(pair.pageId));
+    revisionIds.push(new Types.ObjectId(pair.toRevisionId));
+    if (pair.fromRevisionId != null) {
+      revisionIds.push(new Types.ObjectId(pair.fromRevisionId));
+    }
+  }
+
+  // Deduplicate to avoid redundant queries.
+  const uniquePageIds = [
+    ...new Map(pageIds.map((id) => [id.toString(), id])).values(),
+  ];
+  const uniqueRevisionIds = [
+    ...new Map(revisionIds.map((id) => [id.toString(), id])).values(),
+  ];
+
+  // Bulk query 1: determine which pages the authenticated user can access.
+  const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
+    'Page',
+  );
+  const accessiblePages: HydratedDocument<PageDocument>[] =
+    await Page.findByIdsAndViewer(uniquePageIds, user, null);
+  const accessiblePageIds = new Set(
+    accessiblePages.map((p) => p._id.toString()),
+  );
+
+  // Bulk query 2: fetch revision documents needed for diff computation.
+  const revisionDocs: RevisionDoc[] = await Revision.find(
+    { _id: { $in: uniqueRevisionIds } },
+    { _id: 1, pageId: 1, body: 1 },
+  ).lean();
+  const revisionMap = new Map<string, RevisionDoc>(
+    revisionDocs.map((r) => [r._id.toString(), r]),
+  );
+
+  // Compute per-pair results in order.
+  return pairs.map((pair) =>
+    computeDiffForPair(pair, accessiblePageIds, revisionMap, contextLines),
+  );
 }

@@ -13,27 +13,18 @@ import { type IUserHasId, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { query } from 'express-validator';
-import type { HydratedDocument } from 'mongoose';
-import mongoose, { Types } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
-import type { ChangesIndexResult } from '../../interfaces/changes-index';
-import { decodeCursor, encodeCursor } from '../cursor';
+import { decodeCursor } from '../cursor';
 import {
-  applyAccessFlags,
-  buildRuns,
+  listChanges,
   type NormalizedChangesQuery,
-  type PageInfo,
-  paginateRuns,
-  type RevisionWithContext,
 } from '../service/changes-index-service';
 
 const logger = loggerFactory('growi:routes:apiv3:revision-diff:changes');
@@ -201,8 +192,8 @@ export const changesRouteHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         'user is required (ensured by loginRequired middleware)',
       );
 
-      // userId is always fixed to the authenticated user — never taken from query params (Req 2.1, 2.2).
-      const userId = user._id.toString();
+      // The target user is always fixed to the authenticated `user` — never taken from
+      // query params (Req 2.1, 2.2). The service derives the userId from `user`.
 
       // Decode cursor first; an invalid token results in 400 before further processing.
       let cursorKey: ReturnType<typeof decodeCursor> | undefined;
@@ -257,7 +248,7 @@ export const changesRouteHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       };
 
       try {
-        const result = await listChanges(crowi, user, userId, normalizedQuery);
+        const result = await listChanges(user, normalizedQuery);
         return res.apiv3(result);
       } catch (err) {
         logger.error('Error in GET /revisions/changes', err);
@@ -272,137 +263,3 @@ export const changesRouteHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     },
   ];
 };
-
-/**
- * Fetch the authenticated user's edit runs from MongoDB, apply accessibility flags,
- * and return a paginated ChangesIndexResult.
- *
- * This implements the ChangesIndexService.listChanges contract inline, as a concrete
- * service function scoped to this route factory.
- *
- * Pipeline:
- *   1. $match — filter by author + optional date bounds + keyset cursor
- *   2. $setWindowFields — compute prevAuthor / prevRevisionId per page (partitioned)
- *   3. $sort — (createdAt asc, _id asc) for stable ordering
- *   4. buildRuns() — group revisions into completed runs (pure)
- *   5. paginateRuns() — take up to `limit` runs with cursor support (pure)
- *   6. Page bulk queries — resolve accessibility + path for each run's pageId
- *   7. applyAccessFlags() — annotate entries with accessible/deleted/path (pure)
- *   8. encodeCursor() — produce opaque next-page token when more data exists
- */
-async function listChanges(
-  crowi: Crowi,
-  user: IUserHasId,
-  userId: string,
-  query: NormalizedChangesQuery,
-): Promise<ChangesIndexResult> {
-  const authorObjectId = new Types.ObjectId(userId);
-
-  // Build the post-window $match stage that selects only this user's revisions
-  // within the requested window and cursor position.
-  //
-  // IMPORTANT: The $setWindowFields stage must run before this $match so that
-  // prevAuthor / prevRevisionId are computed over ALL revisions on a page
-  // (regardless of author).  Filtering by author first would cause the window
-  // function to miss other-author revisions, making run-split detection (Req 4.2)
-  // impossible.
-  const postWindowMatch: Record<string, unknown> = {
-    author: authorObjectId,
-  };
-
-  if (query.since != null || query.toDate != null) {
-    const createdAtFilter: Record<string, Date> = {};
-    if (query.since != null) createdAtFilter.$gte = query.since;
-    if (query.toDate != null) createdAtFilter.$lte = query.toDate;
-    postWindowMatch.createdAt = createdAtFilter;
-  }
-
-  // When resuming from a cursor, skip revisions at-or-before the cursor position
-  // using a compound keyset predicate: (createdAt, _id) > (cursor.createdAt, cursor.id).
-  if (query.cursor != null) {
-    const cursorCreatedAt = query.cursor.createdAt;
-    const cursorId = new Types.ObjectId(query.cursor.id);
-    postWindowMatch.$or = [
-      { createdAt: { $gt: cursorCreatedAt } },
-      {
-        createdAt: { $eq: cursorCreatedAt },
-        _id: { $gt: cursorId },
-      },
-    ];
-  }
-
-  // Pre-filter: narrow to pages that have at least one revision by this user
-  // in the requested window to avoid scanning the entire revisions collection.
-  // This keeps the full-collection scan bounded while still allowing $setWindowFields
-  // to see all revisions on those pages (including other-author ones).
-  const authorPageIds: Types.ObjectId[] = await Revision.distinct('pageId', {
-    author: authorObjectId,
-    ...(postWindowMatch.createdAt != null
-      ? { createdAt: postWindowMatch.createdAt }
-      : {}),
-  });
-
-  const rawRevisions: RevisionWithContext[] = await Revision.aggregate([
-    // Step 1: restrict to pages where the user has revisions (performance gate).
-    { $match: { pageId: { $in: authorPageIds } } },
-    // Step 2: enrich each revision with the immediately-preceding revision on the
-    // same page (author-agnostic), so run boundaries can be detected correctly.
-    {
-      $setWindowFields: {
-        partitionBy: '$pageId',
-        sortBy: { createdAt: 1, _id: 1 },
-        output: {
-          prevAuthor: { $shift: { output: '$author', by: -1 } },
-          prevRevisionId: { $shift: { output: '$_id', by: -1 } },
-        },
-      },
-    },
-    // Step 3: keep only the authenticated user's revisions within the window.
-    { $match: postWindowMatch },
-    { $sort: { createdAt: 1, _id: 1 } },
-  ]);
-
-  // Group revisions into completed runs.
-  const runs = buildRuns(rawRevisions, authorObjectId);
-
-  // Apply keyset pagination.
-  const { emittedRuns, nextCursor } = paginateRuns(
-    runs,
-    query.limit,
-    query.cursor,
-  );
-
-  if (emittedRuns.length === 0) {
-    return { changes: [], next: null };
-  }
-
-  // Collect all pageIds from emitted runs for bulk accessibility check.
-  const pageIds = emittedRuns.map((r) => r.pageId);
-
-  // Bulk query 1: determine which pages the authenticated user can access.
-  const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
-    'Page',
-  );
-  const accessiblePages: HydratedDocument<PageDocument>[] =
-    await Page.findByIdsAndViewer(pageIds, user, null);
-  const accessiblePageIds = new Set(
-    accessiblePages.map((p) => p._id.toString()),
-  );
-
-  // Bulk query 2: fetch status and path for all pages (to detect deleted pages).
-  const pageInfoDocs: PageInfo[] = await Page.find(
-    { _id: { $in: pageIds } },
-    { status: 1, path: 1 },
-  ).lean();
-  const pageInfoMap = new Map<string, PageInfo>(
-    pageInfoDocs.map((p) => [p._id.toString(), p]),
-  );
-
-  // Annotate runs with accessibility flags.
-  const changes = applyAccessFlags(emittedRuns, accessiblePageIds, pageInfoMap);
-
-  // Encode the next-page cursor.
-  const next = nextCursor != null ? encodeCursor(nextCursor) : null;
-
-  return { changes, next };
-}

@@ -14,26 +14,22 @@ import { type IUserHasId, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
 import { body } from 'express-validator';
-import type { HydratedDocument } from 'mongoose';
-import mongoose, { Types } from 'mongoose';
 
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import type { PageDocument, PageModel } from '~/server/models/page';
-import { Revision } from '~/server/models/revision';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
 import type {
-  RevisionDiffPairInput,
+  RevisionDiffRequest,
   RevisionDiffResponse,
 } from '../../interfaces/revision-diff';
 import {
-  computeDiffForPair,
+  computeDiffs,
   MAX_PAIRS,
-  type RevisionDoc,
+  type NormalizedDiffRequest,
 } from '../service/revision-diff-service';
 
 const logger = loggerFactory('growi:routes:apiv3:revision-diff:diff');
@@ -41,12 +37,11 @@ const logger = loggerFactory('growi:routes:apiv3:revision-diff:diff');
 /** Default number of context lines in unified diff output. */
 const DEFAULT_CONTEXT_LINES = 3;
 
-type ReqBody = {
-  pairs: RevisionDiffPairInput[];
-  contextLines?: number;
-};
-
-type Req = Request<Record<string, string>, ApiV3Response, ReqBody> & {
+type Req = Request<
+  Record<string, string>,
+  ApiV3Response,
+  RevisionDiffRequest
+> & {
   user?: IUserHasId;
 };
 
@@ -179,9 +174,8 @@ export const diffRouteHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         'user is required (ensured by loginRequired middleware)',
       );
 
-      // userId is always fixed to the authenticated user — never taken from request body.
-      const userId = user._id.toString();
-
+      // The target user is always fixed to the authenticated `user` — never taken from
+      // the request body. The service performs per-pair authorization against `user`.
       const { pairs, contextLines: contextLinesRaw } = req.body;
       const contextLines = contextLinesRaw ?? DEFAULT_CONTEXT_LINES;
 
@@ -199,8 +193,9 @@ export const diffRouteHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       }
 
       try {
-        const results = await computeDiffs(user, userId, pairs, contextLines);
-        const responseBody: RevisionDiffResponse = { results };
+        const request: NormalizedDiffRequest = { pairs, contextLines };
+        const results = await computeDiffs(user, request);
+        const responseBody: RevisionDiffResponse = { results: [...results] };
         return res.apiv3(responseBody);
       } catch (err) {
         logger.error('Error in POST /revisions/diff', err);
@@ -212,65 +207,3 @@ export const diffRouteHandlersFactory = (crowi: Crowi): RequestHandler[] => {
     },
   ];
 };
-
-/**
- * Fetch accessible pages and revisions for the given pairs, then compute
- * per-pair diff results.
- *
- * Pipeline:
- *   1. Collect all unique pageIds and revisionIds from pairs.
- *   2. Page.findByIdsAndViewer(pageIds, user) → accessible page IDs set.
- *   3. Revision.find({ _id: { $in: revisionIds } }) → revision map (id → RevisionDoc).
- *   4. For each pair: computeDiffForPair(pair, accessiblePageIds, revisionMap, contextLines).
- *   5. Return results array in the same order as the input pairs.
- */
-async function computeDiffs(
-  user: IUserHasId,
-  _userId: string,
-  pairs: RevisionDiffPairInput[],
-  contextLines: number,
-) {
-  // Collect unique pageIds and revisionIds for bulk queries.
-  const pageIds: Types.ObjectId[] = [];
-  const revisionIds: Types.ObjectId[] = [];
-
-  for (const pair of pairs) {
-    pageIds.push(new Types.ObjectId(pair.pageId));
-    revisionIds.push(new Types.ObjectId(pair.toRevisionId));
-    if (pair.fromRevisionId != null) {
-      revisionIds.push(new Types.ObjectId(pair.fromRevisionId));
-    }
-  }
-
-  // Deduplicate to avoid redundant queries.
-  const uniquePageIds = [
-    ...new Map(pageIds.map((id) => [id.toString(), id])).values(),
-  ];
-  const uniqueRevisionIds = [
-    ...new Map(revisionIds.map((id) => [id.toString(), id])).values(),
-  ];
-
-  // Bulk query 1: determine which pages the authenticated user can access.
-  const Page = mongoose.model<HydratedDocument<PageDocument>, PageModel>(
-    'Page',
-  );
-  const accessiblePages: HydratedDocument<PageDocument>[] =
-    await Page.findByIdsAndViewer(uniquePageIds, user, null);
-  const accessiblePageIds = new Set(
-    accessiblePages.map((p) => p._id.toString()),
-  );
-
-  // Bulk query 2: fetch revision documents needed for diff computation.
-  const revisionDocs: RevisionDoc[] = await Revision.find(
-    { _id: { $in: uniqueRevisionIds } },
-    { _id: 1, pageId: 1, body: 1 },
-  ).lean();
-  const revisionMap = new Map<string, RevisionDoc>(
-    revisionDocs.map((r) => [r._id.toString(), r]),
-  );
-
-  // Compute per-pair results in order.
-  return pairs.map((pair) =>
-    computeDiffForPair(pair, accessiblePageIds, revisionMap, contextLines),
-  );
-}
