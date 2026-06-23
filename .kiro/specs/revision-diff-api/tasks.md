@@ -47,7 +47,7 @@
   - _Depends: 1.1_
 
 - [ ] 3. Core: Revision Diff サービス（差分計算）
-- [ ] 3.1 (P) ペア単位の独立認可と差分計算
+- [x] 3.1 (P) ペア単位の独立認可と差分計算
   - 各ペアについて: 版が指定 pageId に属するか検証／findByIdsAndViewer で現在閲覧可否を検証。可→diff-core で unified diff(ok)、不可→forbidden（内容非開示）、版-ページ不整合や不在→invalid。baseline 空は全文追加。文脈行数指定を反映。① 由来か否かに依らず毎回独立認可。バッチ全体は失敗させず per-item 結果
   - 先に失敗するユニットテストを書く（TDD）: ok/forbidden/invalid の振り分け／部分成功／全文追加／独立認可（① を経由しない不正ペア）
   - 完了状態: per-pair 判定ユニットテストが green
@@ -92,3 +92,6 @@
   - 完了状態: 上記シナリオの結合テストが green
   - _Requirements: 6.1, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3_
   - _Depends: 4.2_
+
+## Implementation Notes
+- Task 3.1: `computeDiffForPair` currently passes `pageId` to `buildUnifiedDiff` as the `pagePath` argument. `RevisionDiffPairInput` has no path field, so pagePath cannot be provided at the pure function level. When wiring the full service in Task 4.2, the route or service layer should fetch the page path and pass it through, or accept that the diff header shows pageId instead of path.
