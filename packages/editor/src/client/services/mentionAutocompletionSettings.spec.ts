@@ -132,4 +132,19 @@ describe('createMentionCompletionSource', () => {
       expect(result).toBeNull();
     });
   });
+
+  // AC 4.2 — the mention source has no hidden dependency on the emoji extension.
+  describe('independence from emoji extension (AC 4.2)', () => {
+    it('returns completions when invoked from an EditorState with no emoji extension present', async () => {
+      // The invoke helper builds the context from a bare EditorState.create({ doc })
+      // that contains no emojiAutocompletionSettings extension. This DOCUMENTS (makes
+      // explicit) the existing source-level independence guarantee — the mention source
+      // never depended on emoji. It does NOT lock the facility wiring in
+      // use-default-extensions.ts (not imported here); that is out of this test's scope.
+      mockFetchUsers.mockResolvedValue([mockUser('abc', 'Abc')]);
+      const result = await invoke('@ab');
+      expect(result).not.toBeNull();
+      expect(mockFetchUsers).toHaveBeenCalledWith('ab');
+    });
+  });
 });

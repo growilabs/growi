@@ -367,12 +367,14 @@ mentionAutocompletionSettings:
 ```
 packages/editor/src/client/
 ├── stores/
-│   └── use-default-extensions.ts                       # MODIFIED: add autocompletion({ icons:false }) to defaultExtensions
+│   └── use-default-extensions.ts                       # MODIFIED: add standalone autocompletion({ icons:false }); extract & export baseExtensions (defaults minus emoji)
 └── services-internal/extensions/
     ├── emojiAutocompletionSettings.ts                   # MODIFIED: remove icons:false; export emojiCompletionSource
-    └── emojiAutocompletionSettings.spec.ts              # NEW: AC 4.4 and 4.6 regression tests
+    ├── emojiAutocompletionSettings.spec.ts              # NEW: AC 4.4 (source-level) and 4.6 regression tests
+    └── emojiAutocompletionSettings.integ.ts             # NEW: AC 4.4 real coexistence — emoji + mention both surface on one mounted facility
 packages/editor/src/client/services/
-└── mentionAutocompletionSettings.spec.ts                # MODIFIED: add AC 4.2 explicit independence test
+├── mentionAutocompletionSettings.spec.ts                # MODIFIED: add AC 4.2 source-level independence test
+└── mentionAutocompletionSettings.integ.ts               # NEW: AC 4.2 facility-wiring lock — mention surfaces on real baseExtensions (no emoji)
 ```
 
 ---
@@ -501,7 +503,13 @@ it('scopes emoji source to markdown language — not active inside fenced code b
 
 #### `mentionAutocompletionSettings.spec.ts` (modified)
 
-**AC 4.2 test** (new case): Create `createMentionCompletionSource(mockFetch)` and invoke it with `@ab` from an `EditorState` that contains no `emojiAutocompletionSettings` extension. Expect a non-null result. This documents and regression-locks the independence contract — the source already passes today (every existing case in this spec already runs from an emoji-free `EditorState.create({ doc })`), so the test makes the existing guarantee **explicit** rather than adding new coverage. The mention source is debounced + async, so reuse the existing spec's `invoke` helper pattern (`vi.useFakeTimers()` + `mockResolvedValue([...])` + `vi.runAllTimers()`); the mock must return at least one user, as an empty result resolves to `null`.
+**AC 4.2 test** (new case): Create `createMentionCompletionSource(mockFetch)` and invoke it with `@ab` from an `EditorState` that contains no `emojiAutocompletionSettings` extension. Expect a non-null result. This **documents / makes explicit** the existing source-level independence contract — the source already passes today (every existing case in this spec already runs from an emoji-free `EditorState.create({ doc })`). This spec-level test does NOT lock the facility-level wiring (it does not import `use-default-extensions`); that wiring is locked separately by `mentionAutocompletionSettings.integ.ts` (below). Here it adds no new behavioral coverage — it makes the existing source-level guarantee explicit. The mention source is debounced + async, so reuse the existing spec's `invoke` helper pattern (`vi.useFakeTimers()` + `mockResolvedValue([...])` + `vi.runAllTimers()`); the mock must return at least one user, as an empty result resolves to `null`.
+
+#### `mentionAutocompletionSettings.integ.ts` (new — facility-wiring lock)
+
+This is the test that locks the decoupling at the wiring level (the gap the source-level test above intentionally leaves open). To make the real production wiring testable, `use-default-extensions.ts` extracts and exports `baseExtensions` — the defaults **minus** the emoji extension (so it still contains the shared `autocompletion({ icons: false })` facility); `defaultExtensions` becomes `[...baseExtensions, emojiAutocompletionSettings]` (content unchanged).
+
+The integration test mounts a real `EditorView` with `[...baseExtensions, createMentionCompletionExtension(...)]` — i.e. the real production base **with no emoji extension** — and asserts the mention completion surfaces (`currentCompletions` contains `@…`). If the shared facility is ever removed from `baseExtensions`, this test fails, so it locks exactly the regression this requirement targets. A negative control (no facility at all → no completion) keeps the positive assertion failure-sensitive.
 
 ---
 
@@ -509,8 +517,10 @@ it('scopes emoji source to markdown language — not active inside fenced code b
 
 | Test | File | AC | Assertion |
 |------|------|----|-----------|
-| `emojiCompletionSource` returns completions for `:smi` | `emojiAutocompletionSettings.spec.ts` | 4.4 | Source function is callable without emoji setup |
-| `createMentionCompletionSource` returns completions with no emoji in state | `mentionAutocompletionSettings.spec.ts` | 4.2 | Mention source independent of emoji extension |
+| `emojiCompletionSource` returns completions for `:smi` | `emojiAutocompletionSettings.spec.ts` | 4.4 | Source function is callable (source-level, each source checked separately) |
+| Emoji + mention both surface on one mounted facility | `emojiAutocompletionSettings.integ.ts` | 4.4 | Real coexistence — both sources loaded together, each surfaces at its trigger |
+| `createMentionCompletionSource` returns completions with no emoji in state | `mentionAutocompletionSettings.spec.ts` | 4.2 | Mention source independent of emoji extension (source level) |
+| Mention completion surfaces on real `baseExtensions` (no emoji) | `mentionAutocompletionSettings.integ.ts` | 4.2 | Facility-wiring lock — fails if the shared `autocompletion()` is removed from `baseExtensions` |
 | `state.languageDataAt` at code-block pos does NOT contain emoji source | `emojiAutocompletionSettings.spec.ts` | 4.6 | Scoping mechanism prevents emoji in ` ```js ``` ` |
 | `state.languageDataAt` at normal pos DOES contain emoji source | `emojiAutocompletionSettings.spec.ts` | 4.6 | Positive control — source reachable in markdown context |
 
