@@ -24,7 +24,7 @@
   - _Boundary: cursor_
 
 - [ ] 2. Core: Changes Index サービス（本人変更の発見）
-- [ ] 2.1 著者横断クエリと run まとめ・baseline 算出
+- [x] 2.1 著者横断クエリと run まとめ・baseline 算出
   - author=認証ユーザーの版を `(createdAt,_id)` 昇順で取得（1.2 の複合インデックス利用）。対象ユーザーは引数で受けた本人に固定
   - `$setWindowFields`(partition by pageId)で各版の直前版著者を一括取得し、他著者に中断されない連続編集を1 run に集約。baseline=run 開始版の直前版（無ければ空＝新規作成）、to=run 最終版
   - 先に失敗するユニットテストを書く（TDD）: 連続編集の集約／他著者割込みで分割／新規作成 baseline 空
