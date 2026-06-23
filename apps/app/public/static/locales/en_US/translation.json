@@ -547,10 +547,20 @@
   "ai_sidebar": {
     "new_chat": "New Chat",
     "recent_threads": "Recent Items",
+    "sources": "{{count}} pages referenced",
+    "sources_one": "{{count}} page referenced",
+    "sources_other": "{{count}} pages referenced",
     "error": {
       "title": "An error occurred",
       "retry": "Retry",
       "dismiss": "Dismiss"
+    },
+    "incomplete": {
+      "length": "The response stopped because it reached the maximum length.",
+      "tool_calls": "The response stopped after reaching the processing-step limit.",
+      "content_filter": "The response was stopped by the content policy.",
+      "error": "The response stopped because an error occurred.",
+      "unknown": "The response stopped before completing."
     },
     "toaster": {
       "thread_deleted_success": "Thread deleted",
