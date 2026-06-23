@@ -6,6 +6,7 @@ import {
   createMastraChatTransport,
   resolveChatErrorDetail,
   resolveChatHeaderLabel,
+  resolveIncompleteReasonKey,
 } from './chat-sidebar-helpers';
 
 const FALLBACK = 'New Chat';
@@ -92,6 +93,34 @@ describe('resolveChatErrorDetail', () => {
 
   it('returns undefined when there is no error', () => {
     expect(resolveChatErrorDetail(undefined)).toBeUndefined();
+  });
+});
+
+describe('resolveIncompleteReasonKey', () => {
+  it.each([
+    ['a normal completion', 'stop'],
+    ['an absent reason (still streaming / legacy message)', undefined],
+    ['an empty reason', ''],
+  ])('returns null for %s', (_label, finishReason) => {
+    expect(resolveIncompleteReasonKey(finishReason)).toBeNull();
+  });
+
+  it.each([
+    ['length', 'length'],
+    ['tool-calls', 'tool_calls'],
+    ['content-filter', 'content_filter'],
+    ['error', 'error'],
+  ])('maps the %s finish reason to its own notice key', (finishReason, key) => {
+    expect(resolveIncompleteReasonKey(finishReason)).toBe(key);
+  });
+
+  it.each([
+    ['the provider "other" reason', 'other'],
+    ['the provider "unknown" reason', 'unknown'],
+    ["Mastra's tripwire reason", 'tripwire'],
+    ['an unrecognized future reason', 'some-future-reason'],
+  ])('collapses %s to the generic notice key', (_label, finishReason) => {
+    expect(resolveIncompleteReasonKey(finishReason)).toBe('unknown');
   });
 });
 

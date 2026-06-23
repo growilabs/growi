@@ -48,6 +48,7 @@ type OutlineEntry = {
 type GetPageContentOkResult = {
   result: 'ok';
   page: {
+    pageId: string;
     path: string;
     // Optional: legacy pages with `updatedAt == null` cause the tool to omit
     // the field entirely (PR #11204 review FB). All fixtures in this suite
@@ -426,6 +427,9 @@ describe('getPageContentTool (integration)', () => {
 
       assertOk(result);
       expect(result.page.path).toBe(pagePathPublic);
+      // pageId is the page's real hex ObjectId — the client builds the
+      // /{pageId} sources permalink from it, so lock the coercion end-to-end.
+      expect(result.page.pageId).toBe(publicPageId);
       assertShortSeedShape(result, bodyPublic);
       // updatedAt is the page's updatedAt (Date.toISOString() format). The
       // field is now optional in the schema to tolerate legacy pages (PR

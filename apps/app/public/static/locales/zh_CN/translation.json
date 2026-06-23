@@ -539,10 +539,18 @@
   "ai_sidebar": {
     "new_chat": "新建对话",
     "recent_threads": "最近的项目",
+    "sources": "已参考 {{count}} 个页面",
     "error": {
       "title": "发生错误",
       "retry": "重试",
       "dismiss": "关闭"
+    },
+    "incomplete": {
+      "length": "回答因达到最大长度而中途停止。",
+      "tool_calls": "因达到处理步骤上限，回答中途停止。",
+      "content_filter": "回答因内容策略而被停止。",
+      "error": "因发生错误，回答中途停止。",
+      "unknown": "回答在完成前停止。"
     },
     "toaster": {
       "thread_deleted_success": "已删除会话",

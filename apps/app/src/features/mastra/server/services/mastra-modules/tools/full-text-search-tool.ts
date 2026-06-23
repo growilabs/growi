@@ -87,6 +87,10 @@ const outputSchema = z.discriminatedUnion('result', [
   }),
 ]);
 
+// Inferred output type, re-used on the client to type the chat message's tool
+// parts (see interfaces/chat-tools.ts). Type-only export — erased on import.
+export type FullTextSearchToolOutput = z.infer<typeof outputSchema>;
+
 type FullTextSearchHit = {
   pageId: string;
   pagePath: string;

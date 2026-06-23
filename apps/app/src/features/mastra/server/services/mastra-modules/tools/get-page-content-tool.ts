@@ -123,6 +123,10 @@ const outputSchema = z.discriminatedUnion('result', [
   z.object({
     result: z.literal('ok'),
     page: z.object({
+      // Stable page id, surfaced so the client can build an in-app permalink
+      // (/{pageId}) for the "sources" UI instead of relying on the model to
+      // emit a (frequently wrong-origin) URL.
+      pageId: z.string(),
       path: z.string(),
       // Optional: legacy pages predating the timestamps schema can have
       // `updatedAt == null` (the rest of the codebase guards this — see
@@ -158,6 +162,11 @@ const outputSchema = z.discriminatedUnion('result', [
     reason: z.string(),
   }),
 ]);
+
+// Inferred output type, re-used on the client to type the chat message's tool
+// parts (see interfaces/chat-tools.ts). Exported as a type only — `import type`
+// erases it, so this never pulls server runtime code into the client bundle.
+export type GetPageContentToolOutput = z.infer<typeof outputSchema>;
 
 export const getPageContentTool = createTool({
   id: 'get-page-content-tool',
@@ -287,6 +296,7 @@ export const getPageContentTool = createTool({
       return {
         result: 'ok' as const,
         page: {
+          pageId: String(page._id),
           path,
           ...(updatedAt != null ? { updatedAt } : {}),
           totalLines,

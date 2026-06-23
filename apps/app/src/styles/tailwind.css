@@ -165,6 +165,8 @@
   --color-accent: var(--accent);
   --color-accent-foreground: var(--accent-foreground);
   --color-destructive: var(--destructive);
+  --color-warning: var(--warning);
+  --color-warning-foreground: var(--warning-foreground);
   --color-border: var(--border);
   --color-input: var(--input);
   --color-ring: var(--ring);
@@ -204,6 +206,12 @@
   --accent: var(--bs-tertiary-bg);
   --accent-foreground: var(--bs-body-color);
   --destructive: var(--bs-danger);
+  /* Warning accent for subtle inline notices. `warning` carries the hue (used at
+   * low opacity for border/background); `warning-foreground` is the readable
+   * emphasis color for icon/text. Both follow Bootstrap's [data-bs-theme] so they
+   * adapt to dark mode automatically. */
+  --warning: var(--bs-warning);
+  --warning-foreground: var(--bs-warning-text-emphasis);
   --border: var(--bs-border-color);
   --input: var(--bs-border-color);
   --ring: var(--bs-primary);
