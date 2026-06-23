@@ -23,9 +23,9 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type {
-  RevisionDiffRequest,
+  RevisionDiffRequestBody,
   RevisionDiffResponse,
-} from '../../interfaces/revision-diff';
+} from '../../interfaces/dto/revision-diff';
 import {
   computeDiffs,
   MAX_PAIRS,
@@ -40,7 +40,7 @@ const DEFAULT_CONTEXT_LINES = 3;
 type Req = Request<
   Record<string, string>,
   ApiV3Response,
-  RevisionDiffRequest
+  RevisionDiffRequestBody
 > & {
   user?: IUserHasId;
 };

@@ -17,9 +17,9 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
 
 import type {
-  ChangeIndexEntry,
-  ChangesIndexResult,
-} from '../../interfaces/changes-index';
+  ChangesIndexEntry,
+  ChangesIndexResponse,
+} from '../../interfaces/dto/changes-index';
 import { type CursorKey, encodeCursor } from '../cursor';
 
 // ---------------------------------------------------------------------------
@@ -277,14 +277,14 @@ export interface PageInfo {
  * @param runs             - Completed runs to annotate.
  * @param accessiblePageIds - Set of page ID strings the viewer can access (from findByIdsAndViewer).
  * @param pageInfoMap       - Map of page ID string → PageInfo from Page.find({ _id: { $in } }, { status, path }).
- * @returns ChangeIndexEntry[] — absent pages excluded, accessible/deleted/path set per mapping.
+ * @returns ChangesIndexEntry[] — absent pages excluded, accessible/deleted/path set per mapping.
  */
 export function applyAccessFlags(
   runs: Run[],
   accessiblePageIds: Set<string>,
   pageInfoMap: Map<string, PageInfo>,
-): ChangeIndexEntry[] {
-  const entries: ChangeIndexEntry[] = [];
+): ChangesIndexEntry[] {
+  const entries: ChangesIndexEntry[] = [];
 
   for (const run of runs) {
     const pageKey = run.pageId.toString();
@@ -319,7 +319,7 @@ export function applyAccessFlags(
 
 /**
  * Fetch the authenticated user's edit runs from MongoDB, apply accessibility flags,
- * and return a paginated ChangesIndexResult.
+ * and return a paginated ChangesIndexResponse.
  *
  * This is the concrete ChangesIndexService.listChanges implementation (design.md
  * "Service Interface"). The route layer is a thin adapter: it authenticates,
@@ -342,7 +342,7 @@ export function applyAccessFlags(
 export async function listChanges(
   user: IUserHasId,
   query: NormalizedChangesQuery,
-): Promise<ChangesIndexResult> {
+): Promise<ChangesIndexResponse> {
   const userId = user._id.toString();
   const authorObjectId = new Types.ObjectId(userId);
 

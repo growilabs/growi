@@ -15,9 +15,9 @@ import type { PageDocument, PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
 
 import type {
-  RevisionDiffPairInput,
-  RevisionDiffResult,
-} from '../../interfaces/revision-diff';
+  RevisionDiffRequestPair,
+  RevisionDiffResultItem,
+} from '../../interfaces/dto/revision-diff';
 import { buildUnifiedDiff } from '../diff-core';
 
 // ---------------------------------------------------------------------------
@@ -71,14 +71,14 @@ export interface RevisionDoc {
  * @param accessiblePageIds - Set of page ID strings the viewer can currently access.
  * @param revisionMap       - Map of revision ID string → RevisionDoc (pre-fetched for this batch).
  * @param contextLines      - Number of unified diff context lines.
- * @returns RevisionDiffResult discriminated union.
+ * @returns RevisionDiffResultItem discriminated union.
  */
 export function computeDiffForPair(
-  pair: RevisionDiffPairInput,
+  pair: RevisionDiffRequestPair,
   accessiblePageIds: Set<string>,
   revisionMap: Map<string, RevisionDoc>,
   contextLines: number,
-): RevisionDiffResult {
+): RevisionDiffResultItem {
   const { pageId, fromRevisionId, toRevisionId } = pair;
 
   // Step 1: authorization — is the current user allowed to see this page?
@@ -118,7 +118,7 @@ export function computeDiffForPair(
 // ---------------------------------------------------------------------------
 
 export interface NormalizedDiffRequest {
-  readonly pairs: readonly RevisionDiffPairInput[];
+  readonly pairs: readonly RevisionDiffRequestPair[];
   readonly contextLines: number;
 }
 
@@ -148,7 +148,7 @@ export interface NormalizedDiffRequest {
 export async function computeDiffs(
   user: IUserHasId,
   request: NormalizedDiffRequest,
-): Promise<readonly RevisionDiffResult[]> {
+): Promise<readonly RevisionDiffResultItem[]> {
   const { pairs, contextLines } = request;
 
   // Collect unique pageIds and revisionIds for bulk queries.

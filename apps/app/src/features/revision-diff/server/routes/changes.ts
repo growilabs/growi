@@ -21,6 +21,7 @@ import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
 
+import type { ChangesIndexRequestQuery } from '../../interfaces/dto/changes-index';
 import { decodeCursor } from '../cursor';
 import {
   listChanges,
@@ -33,19 +34,11 @@ const logger = loggerFactory('growi:routes:apiv3:revision-diff:changes');
 const DEFAULT_LIMIT = 20;
 const MAX_LIMIT = 100;
 
-type ReqQuery = {
-  since?: string;
-  fromDate?: string;
-  toDate?: string;
-  limit?: string;
-  cursor?: string;
-};
-
 type Req = Request<
   Record<string, string>,
   ApiV3Response,
   undefined,
-  ReqQuery
+  ChangesIndexRequestQuery
 > & {
   user?: IUserHasId;
 };

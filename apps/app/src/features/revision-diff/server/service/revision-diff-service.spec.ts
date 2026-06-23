@@ -1,7 +1,7 @@
 import { Types } from 'mongoose';
 import { describe, expect, it } from 'vitest';
 
-import type { RevisionDiffPairInput } from '../../interfaces/revision-diff';
+import type { RevisionDiffRequestPair } from '../../interfaces/dto/revision-diff';
 import type { RevisionDoc } from './revision-diff-service';
 import { computeDiffForPair, MAX_PAIRS } from './revision-diff-service';
 
@@ -25,7 +25,7 @@ function makePair(
   pageId: Types.ObjectId,
   fromRevisionId: Types.ObjectId | null,
   toRevisionId: Types.ObjectId,
-): RevisionDiffPairInput {
+): RevisionDiffRequestPair {
   return {
     pageId: pageId.toString(),
     fromRevisionId: fromRevisionId?.toString() ?? null,
