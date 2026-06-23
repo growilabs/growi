@@ -21,8 +21,8 @@
   - _Depends: 1.1_
   - _Boundary: ShareLinkPageView_
 
-- [ ] 2. useSWRxPageComment の改善
-- [ ] 2.1 (P) コメント取得フックに共有リンク文脈を伝播する
+- [x] 2. useSWRxPageComment の改善
+- [x] 2.1 (P) コメント取得フックに共有リンク文脈を伝播する
   - 内部で `useShareLinkId()` を取得し、SWR キャッシュキーに `shareLinkId` を含める
   - `shareLinkId` が非null のときのみ取得クエリに `shareLinkId` を付与する（既存 `page_id` は維持。**別 `pageId` は併送しない** — 単一 ID 不変条件）
   - `shareLinkId` が null（通常ページ）のときは従来クエリのまま。`update` / `post` は変更しない

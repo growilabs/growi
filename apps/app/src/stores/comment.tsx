@@ -4,6 +4,7 @@ import type { SWRResponse } from 'swr';
 import useSWR from 'swr';
 
 import { apiGet, apiPost } from '~/client/util/apiv1-client';
+import { useShareLinkId } from '~/states/page/hooks';
 
 import type {
   ICommentHasIdList,
@@ -20,15 +21,44 @@ type CommentOperation = {
   post(args: ICommentPostArgs): Promise<void>;
 };
 
+const hasShareLinkId = (
+  shareLinkId: string | null | undefined,
+): shareLinkId is string => {
+  return shareLinkId != null && shareLinkId.trim().length > 0;
+};
+
+/**
+ * Build query params for /comments.get.
+ * Keep the existing `page_id` as the single page identifier (verification and
+ * fetch use the same id on the server); add `shareLinkId` only in a share-link
+ * context. Never send a separate `pageId` — that would reintroduce the
+ * verify/fetch identifier split.
+ */
+const buildCommentGetParams = (
+  pageId: string,
+  shareLinkId: string | null | undefined,
+): { page_id: string; shareLinkId?: string } => {
+  if (hasShareLinkId(shareLinkId)) {
+    return { page_id: pageId, shareLinkId };
+  }
+  return { page_id: pageId };
+};
+
 export const useSWRxPageComment = (
   pageId: Nullable<string>,
 ): SWRResponse<ICommentHasIdList, Error> & CommentOperation => {
+  const shareLinkId = useShareLinkId();
+
   const shouldFetch: boolean = pageId != null;
 
   const swrResponse = useSWR(
-    shouldFetch ? ['/comments.get', pageId] : null,
-    ([endpoint, pageId]) =>
-      apiGet(endpoint, { page_id: pageId }).then(
+    shouldFetch ? ['/comments.get', pageId, shareLinkId] : null,
+    ([endpoint, pageId, shareLinkId]: [
+      string,
+      string,
+      string | null | undefined,
+    ]) =>
+      apiGet(endpoint, buildCommentGetParams(pageId, shareLinkId)).then(
         (response: IResponseComment) => response.comments,
       ),
   );
