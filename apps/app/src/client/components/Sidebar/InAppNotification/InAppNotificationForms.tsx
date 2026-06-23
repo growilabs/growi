@@ -1,5 +1,6 @@
 import { type JSX, useId } from 'react';
 import { useTranslation } from 'next-i18next';
+import { Button } from 'reactstrap';
 
 import type { FilterType } from './types';
 
@@ -30,27 +31,30 @@ export const InAppNotificationForms = (
     <div className="my-2">
       {/* Filter tabs */}
       <fieldset className="btn-group w-100 mb-2">
-        <button
-          type="button"
-          className={`btn btn-sm ${activeFilter === 'all' ? 'btn-primary' : 'btn-outline-secondary'}`}
+        <Button
+          color={activeFilter === 'all' ? 'primary' : 'secondary'}
+          outline={activeFilter !== 'all'}
+          size="sm"
           onClick={() => onChangeFilter('all')}
         >
           {t('in_app_notification.filter_all')}
-        </button>
-        <button
-          type="button"
-          className={`btn btn-sm ${activeFilter === 'notifications' ? 'btn-primary' : 'btn-outline-secondary'}`}
+        </Button>
+        <Button
+          color={activeFilter === 'notifications' ? 'primary' : 'secondary'}
+          outline={activeFilter !== 'notifications'}
+          size="sm"
           onClick={() => onChangeFilter('notifications')}
         >
           {t('in_app_notification.notifications')}
-        </button>
-        <button
-          type="button"
-          className={`btn btn-sm ${activeFilter === 'news' ? 'btn-primary' : 'btn-outline-secondary'}`}
+        </Button>
+        <Button
+          color={activeFilter === 'news' ? 'primary' : 'secondary'}
+          outline={activeFilter !== 'news'}
+          size="sm"
           onClick={() => onChangeFilter('news')}
         >
           {t('in_app_notification.news')}
-        </button>
+        </Button>
       </fieldset>
 
       {/* Unread-only toggle + mark-all-read button */}
@@ -69,16 +73,15 @@ export const InAppNotificationForms = (
             onChange={onChangeUnopendNotificationsVisible}
           />
         </div>
-        <button
-          type="button"
-          className={`btn btn-sm btn-link text-decoration-none p-0 ${
-            isMarkAllReadDisabled ? 'opacity-25' : ''
-          }`}
+        <Button
+          color="neutral-secondary"
+          outline
+          size="sm"
           onClick={onMarkAllRead}
           disabled={isMarkAllReadDisabled}
         >
           {t('in_app_notification.mark_all_as_read')}
-        </button>
+        </Button>
       </div>
     </div>
   );
