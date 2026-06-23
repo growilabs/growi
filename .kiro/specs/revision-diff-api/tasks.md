@@ -56,7 +56,7 @@
   - _Depends: 1.1, 1.3_
 
 - [ ] 4. Integration: ルート配線と既存ルート制約
-- [ ] 4.1 (P) Changes Index ルート（GET /revisions/changes）
+- [x] 4.1 (P) Changes Index ルート（GET /revisions/changes）
   - accessTokenParser([SCOPE.READ.FEATURES.PAGE]) → loginRequired → express-validator → apiV3FormValidator の順で配線。userId=req.user._id を service に渡す。範囲不正・不正 cursor は 400。swagger(JSDoc) 付与
   - 完了状態: 認証済み PAT で叩くと ChangesIndexService の結果を 200 で返す
   - _Requirements: 1.1, 1.5, 8.1, 8.2, 8.3_
