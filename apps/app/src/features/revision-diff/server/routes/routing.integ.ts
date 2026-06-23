@@ -1,32 +1,44 @@
 /**
  * Routing regression integration tests for the revision-diff feature.
  *
- * Purpose: Verify that `GET /revisions/changes` is NOT swallowed by the legacy
- * `/:id([0-9a-fA-F]{24})` route, and that the 24-hex ObjectId constraint on the
- * legacy route behaves correctly for valid and invalid inputs.
+ * Goal: prove that `GET /revisions/changes` is NOT swallowed by the legacy
+ * `/:id([0-9a-fA-F]{24})` route, exercising the REAL changes route factory (not a stub),
+ * in the same route-registration order as production.
  *
- * Requirements: 1.1, 8.1
- *
- * These tests build a self-contained minimal Express app that mimics the route
- * structure mounted in apps/app/src/server/routes/apiv3/index.js:
- *
- *   revisionsRouter.get('/changes', changesRouteHandlersFactory(crowi));
- *   revisionsRouter.get('/:id([0-9a-fA-F]{24})', <existing handler>);
+ * Production wiring (apps/app/src/server/routes/apiv3/index.js + revisions.js):
+ *   revisionsRouter.get('/:id([0-9a-fA-F]{24})', <legacy handler>);  // registered first (revisions.js)
+ *   revisionsRouter.get('/changes', changesRouteHandlersFactory(crowi)); // appended (index.js)
  *   router.use('/revisions', revisionsRouter);
  *
- * The real handlers (changesRouteHandlersFactory, certifySharedPage, DB queries)
- * are NOT exercised here — the goal is purely routing dispatch correctness.
+ * The legacy `revisions.js` router cannot be imported under vitest (it is a CommonJS module
+ * whose nested `require('~/…')` escapes the alias transform), so the `/:id` slot here is a
+ * lightweight probe that mirrors the production constraint string. To keep that mirror honest,
+ * a drift-guard test reads revisions.js and asserts the exact constraint literal still exists —
+ * so loosening/removing it in revisions.js fails this suite.
+ *
+ * Requirements: 1.1, 8.1
  */
 
-import type { NextFunction, Request, Response } from 'express';
-import express from 'express';
+import { readFileSync } from 'node:fs';
+import path from 'node:path';
+import type { IUserHasId } from '@growi/core/dist/interfaces';
+import express, {
+  type NextFunction,
+  type Request,
+  type Response,
+} from 'express';
+import { Types } from 'mongoose';
 import request from 'supertest';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type Crowi from '~/server/crowi';
+import { Revision } from '~/server/models/revision';
+import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+
+import { changesRouteHandlersFactory } from './changes';
 
 // ---------------------------------------------------------------------------
-// Stub out middleware that the real route handlers pull in at import time.
-// Without these stubs, importing changes.ts would pull Crowi, Mongoose models,
-// and third-party utilities that require a fully-booted server.
+// Bypass auth/validation middleware that the real changes factory pulls in.
 // ---------------------------------------------------------------------------
 
 vi.mock('~/server/middlewares/access-token-parser', () => ({
@@ -48,46 +60,54 @@ vi.mock('~/server/middlewares/apiv3-form-validator', () => ({
 // Helpers
 // ---------------------------------------------------------------------------
 
+const makeId = (): Types.ObjectId => new Types.ObjectId();
+
+/** The production constraint string from revisions.js, mirrored here and drift-guarded below. */
+const LEGACY_ID_ROUTE = '/:id([0-9a-fA-F]{24})';
+
+/** Minimal Crowi — the changes factory only calls loginRequiredFactory(crowi, false). */
+function buildCrowi(): Crowi {
+  return {} as unknown as Crowi;
+}
+
 /**
- * Build a minimal Express app that mirrors the production route structure:
- *
- *   GET /revisions/changes   → handled by a lightweight stub (not the real factory)
- *   GET /revisions/:id(hex)  → handled by a lightweight stub
- *
- * All middleware (auth, validators) is bypassed via the vi.mock() calls above.
- * The stubs just return a recognisable JSON payload so tests can assert which
- * handler was actually reached.
+ * Build an Express app mirroring the production registration order: the constrained
+ * legacy `/:id` route first (as revisions.js registers it), then the REAL changes route
+ * appended afterwards (as index.js does). The legacy slot is a probe; the changes slot is real.
  */
-function buildMinimalRevisionApp() {
+function buildApp(userId: Types.ObjectId): express.Express {
   const app = express();
   app.use(express.json());
 
-  // Attach res.apiv3 / res.apiv3Err helpers (mirror withApiV3Helpers pattern).
+  // apiv3 response helpers.
   app.use((_req: Request, res: Response, next: NextFunction) => {
-    // biome-ignore lint/suspicious/noExplicitAny: apiv3 helper not typed on Response
-    (res as any).apiv3 = (body: unknown, status = 200) =>
+    (res as ApiV3Response).apiv3 = (body: unknown, status = 200) =>
       res.status(status).json(body);
-    // biome-ignore lint/suspicious/noExplicitAny: apiv3Err helper not typed on Response
-    (res as any).apiv3Err = (err: unknown, status = 500) =>
-      res.status(status).json({ error: String(err) });
+    (res as ApiV3Response).apiv3Err = (err: unknown, status = 500) => {
+      const errors = Array.isArray(err) ? err : [err];
+      return res.status(status).json({ errors });
+    };
+    next();
+  });
+
+  // Inject the authenticated user.
+  app.use((req: Request, _res: Response, next: NextFunction) => {
+    (req as Request & { user?: IUserHasId }).user = {
+      _id: userId,
+      admin: false,
+    } as unknown as IUserHasId;
     next();
   });
 
   const revRouter = express.Router();
-
-  // The /changes handler must be registered before /:id so that, without the
-  // regex constraint, the string "changes" would be caught by /:id.  The
-  // production code registers them in this exact order via index.js.
-  revRouter.get('/changes', (_req: Request, res: Response) => {
-    res.status(200).json({ handler: 'changes' });
+  // Registered first, exactly like revisions.js — the constraint must reject "changes".
+  revRouter.get(LEGACY_ID_ROUTE, (req: Request, res: Response) => {
+    res.status(200).json({ handler: 'legacy-id', id: req.params.id });
   });
-
-  // Mimic the production constraint: only 24-hex-char strings match /:id.
-  revRouter.get('/:id([0-9a-fA-F]{24})', (req: Request, res: Response) => {
-    res.status(200).json({ handler: 'existing-id', id: req.params.id });
-  });
-
+  // Appended afterwards, exactly like index.js — uses the REAL changes factory.
+  revRouter.get('/changes', changesRouteHandlersFactory(buildCrowi()));
   app.use('/revisions', revRouter);
+
   return app;
 }
 
@@ -95,99 +115,74 @@ function buildMinimalRevisionApp() {
 // Tests
 // ---------------------------------------------------------------------------
 
-describe('Revision routing — regression tests for /:id([0-9a-fA-F]{24}) constraint', () => {
-  /**
-   * Core regression test (Req 1.1):
-   * The string "changes" is 7 characters and contains non-hex chars ('g').
-   * It must NOT match `/:id([0-9a-fA-F]{24})` and must reach /changes instead.
-   */
-  it('GET /revisions/changes reaches the /changes handler (not swallowed by /:id)', async () => {
-    const app = buildMinimalRevisionApp();
+describe('Revision routing — /:id([0-9a-fA-F]{24}) constraint vs /changes', () => {
+  beforeEach(async () => {
+    await Revision.deleteMany({});
+  });
 
-    const res = await request(app).get('/revisions/changes');
+  afterEach(() => {
+    vi.restoreAllMocks();
+  });
+
+  /**
+   * Core regression (Req 1.1): "changes" contains non-hex chars, so it must NOT match
+   * the legacy /:id route and must reach the REAL changes handler, which returns
+   * { changes, next } (an empty list against an empty DB).
+   */
+  it('GET /revisions/changes reaches the real changes handler (not swallowed by /:id)', async () => {
+    const res = await request(buildApp(makeId())).get('/revisions/changes');
 
     expect(res.status).toBe(200);
-    expect(res.body.handler).toBe('changes');
+    expect(Array.isArray(res.body.changes)).toBe(true);
+    expect(res.body).toHaveProperty('next');
+    // Must NOT have hit the legacy /:id probe.
+    expect(res.body).not.toHaveProperty('handler');
   });
 
-  /**
-   * Positive case for the legacy route (Req 8.1):
-   * A 24-character hex string is a valid ObjectId and must match `/:id([0-9a-fA-F]{24})`.
-   */
-  it('GET /revisions/<valid-24-hex-ObjectId> reaches the existing /:id handler', async () => {
-    const validObjectId = '507f1f77bcf86cd799439011';
-    const app = buildMinimalRevisionApp();
-
-    const res = await request(app).get(`/revisions/${validObjectId}`);
+  /** Positive case (Req 8.1): a 24-hex string matches the legacy /:id route. */
+  it('GET /revisions/<24-hex> matches the legacy /:id route', async () => {
+    const validHex = '507f1f77bcf86cd799439011';
+    const res = await request(buildApp(makeId())).get(`/revisions/${validHex}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.handler).toBe('existing-id');
-    expect(res.body.id).toBe(validObjectId);
+    expect(res.body.handler).toBe('legacy-id');
+    expect(res.body.id).toBe(validHex);
   });
 
-  /**
-   * Non-ObjectId strings shorter than 24 chars must not match `/:id([0-9a-fA-F]{24})`.
-   * This test doubles as a guard for the case where Express falls through to 404.
-   */
-  it('GET /revisions/notvalid (short non-hex string) does NOT match /:id and returns 404', async () => {
-    const app = buildMinimalRevisionApp();
-
-    const res = await request(app).get('/revisions/notvalid');
-
-    // No handler matches → Express default 404
-    expect(res.status).toBe(404);
-  });
-
-  /**
-   * A 24-char string that includes non-hex characters ('g'–'z') must not
-   * match the constraint, guarding against partial hex strings.
-   */
-  it('GET /revisions/<24-char non-hex string> does NOT match /:id and returns 404', async () => {
-    // 24 chars but contains 'g' which is not a valid hex digit
-    const nonHex24 = 'gggggggggggggggggggggggg';
-    const app = buildMinimalRevisionApp();
-
-    const res = await request(app).get(`/revisions/${nonHex24}`);
-
-    expect(res.status).toBe(404);
-  });
-
-  /**
-   * "changes" must not match even when the route order is inverted (defensive check).
-   * Verifies that the regex constraint is what prevents the collision — not just
-   * registration order.
-   */
-  it('"changes" does not match the 24-hex constraint regardless of registration order', () => {
-    // Pure regex test — no HTTP request needed.
-    const objectIdPattern = /^[0-9a-fA-F]{24}$/;
-    expect(objectIdPattern.test('changes')).toBe(false);
-  });
-
-  /**
-   * All lowercase hex characters must match (lower boundary of the hex charset).
-   */
-  it('GET /revisions/<24-char all-lowercase hex> matches /:id handler', async () => {
-    const lowerHex = 'abcdefabcdefabcdefabcdef';
-    const app = buildMinimalRevisionApp();
-
-    const res = await request(app).get(`/revisions/${lowerHex}`);
-
-    expect(res.status).toBe(200);
-    expect(res.body.handler).toBe('existing-id');
-    expect(res.body.id).toBe(lowerHex);
-  });
-
-  /**
-   * All uppercase hex characters must also match (upper boundary of the hex charset).
-   */
-  it('GET /revisions/<24-char all-uppercase hex> matches /:id handler', async () => {
+  /** Upper-case hex is also valid for the constraint. */
+  it('GET /revisions/<24-hex uppercase> matches the legacy /:id route', async () => {
     const upperHex = 'ABCDEFABCDEFABCDEFABCDEF';
-    const app = buildMinimalRevisionApp();
-
-    const res = await request(app).get(`/revisions/${upperHex}`);
+    const res = await request(buildApp(makeId())).get(`/revisions/${upperHex}`);
 
     expect(res.status).toBe(200);
-    expect(res.body.handler).toBe('existing-id');
+    expect(res.body.handler).toBe('legacy-id');
     expect(res.body.id).toBe(upperHex);
+  });
+
+  /** A short non-hex string matches no route → Express default 404. */
+  it('GET /revisions/<non-hex> matches no route and returns 404', async () => {
+    const res = await request(buildApp(makeId())).get('/revisions/notvalid');
+
+    expect(res.status).toBe(404);
+  });
+
+  /** 24 chars but containing non-hex digits must not match the constraint → 404. */
+  it('GET /revisions/<24-char non-hex> does not match /:id and returns 404', async () => {
+    const nonHex24 = 'gggggggggggggggggggggggg';
+    const res = await request(buildApp(makeId())).get(`/revisions/${nonHex24}`);
+
+    expect(res.status).toBe(404);
+  });
+
+  /**
+   * Drift guard: the probe above mirrors the constraint from revisions.js. This asserts the
+   * real source still carries the exact literal, so weakening it there fails this suite.
+   */
+  it('revisions.js still constrains the legacy /:id route to 24 hex chars', () => {
+    const revisionsSrc = readFileSync(
+      path.resolve(process.cwd(), 'src/server/routes/apiv3/revisions.js'),
+      'utf8',
+    );
+    expect(revisionsSrc).toContain(LEGACY_ID_ROUTE);
   });
 });
