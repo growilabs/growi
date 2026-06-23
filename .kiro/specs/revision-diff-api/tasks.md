@@ -76,7 +76,7 @@
   - _Boundary: apiv3 index, revisions.js_
 
 - [ ] 5. Validation: 結合テスト（per-worker 分離で実行）
-- [ ] 5.1 (P) ルーティング回帰の結合テスト
+- [x] 5.1 (P) ルーティング回帰の結合テスト
   - GET /api/v3/revisions/changes が既存 /:id に飲み込まれず 200／既存 GET /revisions/:id が ObjectId で従来どおり 200／非 ObjectId が 404
   - 結合テストは worker ごとに DB/fixtures を分離（per-worker isolation）
   - 完了状態: ルーティング結合テストが green
