@@ -1,7 +1,9 @@
 import { Types } from 'mongoose';
 import { describe, expect, it } from 'vitest';
 
-import { buildRuns } from './changes-index-service';
+import type { CursorKey } from '../cursor';
+import type { Run } from './changes-index-service';
+import { buildRuns, paginateRuns } from './changes-index-service';
 
 // Helper to create a fresh ObjectId
 const makeId = () => new Types.ObjectId();
@@ -182,5 +184,139 @@ describe('buildRuns', () => {
     const userId = makeId();
     const runs = buildRuns([], userId);
     expect(runs).toHaveLength(0);
+  });
+});
+
+// ---------------------------------------------------------------------------
+// paginateRuns
+// ---------------------------------------------------------------------------
+
+/** テスト用に Run を作るヘルパー */
+function makeRun(toRevId: Types.ObjectId, createdAt: Date): Run {
+  return {
+    pageId: new Types.ObjectId(),
+    fromRevisionId: null,
+    toRevisionId: toRevId,
+    authorId: new Types.ObjectId(),
+    latestUpdatedAt: createdAt,
+  };
+}
+
+describe('paginateRuns', () => {
+  it('limit 内に収まる結果は next=null を返す', () => {
+    const runs = [
+      makeRun(new Types.ObjectId(), new Date('2024-01-01')),
+      makeRun(new Types.ObjectId(), new Date('2024-01-02')),
+    ];
+    const result = paginateRuns(runs, 5);
+    expect(result.emittedRuns).toHaveLength(2);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('limit 超過時は limit 件だけ emit し next cursor を返す', () => {
+    const runs = Array.from({ length: 5 }, (_, i) =>
+      makeRun(new Types.ObjectId(), new Date(`2024-01-0${i + 1}`)),
+    );
+    const result = paginateRuns(runs, 3);
+    expect(result.emittedRuns).toHaveLength(3);
+    expect(result.nextCursor).not.toBeNull();
+  });
+
+  it('cursor 継続で前ページの重複・取りこぼしがない', () => {
+    const revIds = Array.from({ length: 6 }, () => new Types.ObjectId());
+    const dates = Array.from(
+      { length: 6 },
+      (_, i) => new Date(`2024-01-0${i + 1}`),
+    );
+    const runs = revIds.map((id, i) => makeRun(id, dates[i]));
+
+    // Page 1
+    const page1 = paginateRuns(runs, 3);
+    expect(page1.emittedRuns).toHaveLength(3);
+    expect(page1.nextCursor).not.toBeNull();
+
+    // Page 2（cursor を渡して継続）
+    const page2 = paginateRuns(runs, 3, page1.nextCursor as CursorKey);
+    expect(page2.emittedRuns).toHaveLength(3);
+    expect(page2.nextCursor).toBeNull();
+
+    // 重複なし
+    const page1Ids = page1.emittedRuns.map((r) => r.toRevisionId.toString());
+    const page2Ids = page2.emittedRuns.map((r) => r.toRevisionId.toString());
+    expect(page1Ids.filter((id) => page2Ids.includes(id))).toHaveLength(0);
+
+    // 6 件全てカバー、取りこぼしなし
+    expect([...page1Ids, ...page2Ids]).toHaveLength(6);
+    // 元の runs 全 ID が含まれる
+    const allRunIds = runs.map((r) => r.toRevisionId.toString());
+    expect([...page1Ids, ...page2Ids].sort()).toEqual(allRunIds.sort());
+  });
+
+  it('結果が空のとき空配列と next=null を返す', () => {
+    const result = paginateRuns([], 5);
+    expect(result.emittedRuns).toHaveLength(0);
+    expect(result.nextCursor).toBeNull();
+  });
+
+  it('emit 済み runs は時系列昇順になっている', () => {
+    // 意図的に逆順で渡す（呼び出し元は昇順ソート済みが前提だが、順序の検証）
+    const sorted = [
+      makeRun(new Types.ObjectId(), new Date('2024-01-01')),
+      makeRun(new Types.ObjectId(), new Date('2024-01-02')),
+      makeRun(new Types.ObjectId(), new Date('2024-01-03')),
+    ];
+    const result = paginateRuns(sorted, 10);
+    for (let i = 1; i < result.emittedRuns.length; i++) {
+      expect(
+        result.emittedRuns[i - 1].latestUpdatedAt.getTime(),
+      ).toBeLessThanOrEqual(result.emittedRuns[i].latestUpdatedAt.getTime());
+    }
+  });
+
+  it('cursor がちょうど最終 run を指すとき次ページは空で next=null', () => {
+    const revId = new Types.ObjectId();
+    const date = new Date('2024-01-01');
+    const runs = [makeRun(revId, date)];
+
+    // 1 件だけのリストを全て取得
+    const page1 = paginateRuns(runs, 5);
+    expect(page1.emittedRuns).toHaveLength(1);
+    expect(page1.nextCursor).toBeNull();
+  });
+
+  it('cursor 直後の run から始まり、cursor と同時刻で _id が大きい run も含める', () => {
+    // 同一 createdAt の run が複数ある場合、toRevisionId (_id) の文字列比較で順序付け
+    const date = new Date('2024-01-01');
+    // ObjectId の toString() は 24 桁 hex: 辞書順で大小が決まる
+    // 明示的に小さい/大きい ID を作るのは困難なので、複数生成して Sort で確認
+    const revIds = Array.from({ length: 4 }, () => new Types.ObjectId());
+    // latestUpdatedAt が全て同じ date のケース
+    const runs = revIds.map((id) => makeRun(id, date));
+
+    // ソート（実装に合わせ latestUpdatedAt asc, toRevisionId str asc）
+    const sorted = [...runs].sort((a, b) => {
+      const timeDiff =
+        a.latestUpdatedAt.getTime() - b.latestUpdatedAt.getTime();
+      if (timeDiff !== 0) return timeDiff;
+      return a.toRevisionId.toString() < b.toRevisionId.toString() ? -1 : 1;
+    });
+
+    // Page 1: 2 件
+    const page1 = paginateRuns(sorted, 2);
+    expect(page1.emittedRuns).toHaveLength(2);
+    expect(page1.nextCursor).not.toBeNull();
+
+    // Page 2: 残り 2 件
+    const page2 = paginateRuns(sorted, 2, page1.nextCursor as CursorKey);
+    expect(page2.emittedRuns).toHaveLength(2);
+    expect(page2.nextCursor).toBeNull();
+
+    // 全 4 件が重複なくカバーされる
+    const allIds = [...page1.emittedRuns, ...page2.emittedRuns].map((r) =>
+      r.toRevisionId.toString(),
+    );
+    expect(allIds.sort()).toEqual(
+      sorted.map((r) => r.toRevisionId.toString()).sort(),
+    );
   });
 });

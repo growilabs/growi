@@ -32,7 +32,7 @@
   - _Requirements: 1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 4.3_
   - _Boundary: ChangesIndexService_
   - _Depends: 1.1, 1.2_
-- [ ] 2.2 ページング（cursor 昇順・完結 run のみ emit・境界の繰り越し）
+- [x] 2.2 ページング（cursor 昇順・完結 run のみ emit・境界の繰り越し）
   - 2.1 の run 集約結果に対してページングを実装（前提）。run 単位で件数上限のページを返し、cursor は emit 済み最終 run の to 版。完結した run のみ emit し、limit 末尾の未完 run は次ページへ繰り越す。時間窓未指定なら全期間をページング対象
   - 先に失敗するユニットテストを書く: 次ページ継続で重複・取りこぼし無し／時系列順／さらに結果ありの cursor／終端で next=null／空結果
   - 完了状態: ページング系ユニットテストが green

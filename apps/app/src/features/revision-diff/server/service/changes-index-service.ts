@@ -162,6 +162,70 @@ export const buildRuns = (
 };
 
 // ---------------------------------------------------------------------------
+// Pagination (task 2.2)
+// ---------------------------------------------------------------------------
+
+/**
+ * Result type for `paginateRuns`.
+ */
+export interface PaginateRunsResult {
+  emittedRuns: Run[];
+  nextCursor: CursorKey | null;
+}
+
+/**
+ * Apply keyset-based pagination to a sorted list of completed runs.
+ *
+ * The input `runs` must already be sorted by (latestUpdatedAt asc, toRevisionId asc) —
+ * i.e. the order produced by `buildRuns`.  The function:
+ *   1. Skips runs that fall at-or-before the given cursor (already returned in a prior page).
+ *   2. Takes up to `limit` runs from the remaining list.
+ *   3. Returns a cursor pointing to the last emitted run when more results exist, or null
+ *      when the caller has reached the end.
+ *
+ * This is a pure function — no DB calls, no side effects.
+ *
+ * @param runs      - Completed runs sorted by (latestUpdatedAt asc, toRevisionId asc).
+ * @param limit     - Maximum number of runs to emit on this page.
+ * @param cursorKey - Exclusive lower bound decoded from the previous page's `next` token.
+ *                    When absent, pagination starts from the beginning.
+ * @returns `emittedRuns` (≤ limit) and `nextCursor` (null when no further pages exist).
+ */
+export const paginateRuns = (
+  runs: Run[],
+  limit: number,
+  cursorKey?: CursorKey,
+): PaginateRunsResult => {
+  // Step 1: filter out runs at-or-before the cursor.
+  // The cursor encodes (createdAt, id) of the last emitted run from the previous page.
+  // We skip any run whose (latestUpdatedAt, toRevisionId) is <= (cursorKey.createdAt, cursorKey.id).
+  const afterCursor: Run[] =
+    cursorKey == null
+      ? runs
+      : runs.filter((r) => {
+          const runTime = r.latestUpdatedAt.getTime();
+          const cursorTime = cursorKey.createdAt.getTime();
+          if (runTime !== cursorTime) return runTime > cursorTime;
+          return r.toRevisionId.toString() > cursorKey.id;
+        });
+
+  // Step 2: take up to `limit` runs; peek one extra to detect whether a next page exists.
+  const emittedRuns = afterCursor.slice(0, limit);
+  const hasMore = afterCursor.length > limit;
+
+  // Step 3: build the cursor for the next page — points to the last emitted run's to-revision.
+  const nextCursor: CursorKey | null =
+    hasMore && emittedRuns.length > 0
+      ? {
+          createdAt: emittedRuns[emittedRuns.length - 1].latestUpdatedAt,
+          id: emittedRuns[emittedRuns.length - 1].toRevisionId.toString(),
+        }
+      : null;
+
+  return { emittedRuns, nextCursor };
+};
+
+// ---------------------------------------------------------------------------
 // Service interface (task 2.2+ will flesh out the implementation)
 // ---------------------------------------------------------------------------
 
