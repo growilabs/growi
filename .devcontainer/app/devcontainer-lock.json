@@ -9,6 +9,11 @@
       "version": "2.0.0",
       "resolved": "ghcr.io/devcontainers/features/node@sha256:fedd4c11f7adfb64283b578dddc7da906728daa25fa293351c9d913231acf12f",
       "integrity": "sha256:fedd4c11f7adfb64283b578dddc7da906728daa25fa293351c9d913231acf12f"
+    },
+    "ghcr.io/rapidsai/devcontainers/features/gitlab-cli:26.6.0": {
+      "version": "26.6.0",
+      "resolved": "ghcr.io/rapidsai/devcontainers/features/gitlab-cli@sha256:5898d9cd83b57082fe833ce39cc3bbf4ebedc4509db8eef8aa45c5a0141da819",
+      "integrity": "sha256:5898d9cd83b57082fe833ce39cc3bbf4ebedc4509db8eef8aa45c5a0141da819"
     }
   }
 }
