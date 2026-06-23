@@ -1,12 +1,6 @@
-import type { JSONValue } from 'ai';
+import type { ModelProviderOptions } from '~/features/mastra/interfaces/allowed-model';
 
 import { getAllowedModels } from './llm-providers/config';
-
-// AI SDK `providerOptions` shape: provider namespace -> option map. Operators
-// supply the full, provider-namespaced object as JSON per allowed-model entry, so
-// this feature carries no per-vendor mapping logic. Same shape as the cross-layer
-// ModelProviderOptions DTO.
-export type MastraProviderOptions = Record<string, Record<string, JSONValue>>;
 
 // Look up the provider options for an ALREADY-RESOLVED effective model id. The
 // caller resolves the effective model exactly once (resolveEffectiveModel — the
@@ -22,6 +16,6 @@ export type MastraProviderOptions = Record<string, Record<string, JSONValue>>;
 // {} when the entry declares no options (or, defensively, is not found).
 export const getProviderOptionsForModel = (
   effectiveModelId: string,
-): MastraProviderOptions =>
+): ModelProviderOptions =>
   getAllowedModels().find((m) => m.model === effectiveModelId)
     ?.providerOptions ?? {};
