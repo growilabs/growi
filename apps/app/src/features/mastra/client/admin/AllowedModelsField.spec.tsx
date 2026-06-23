@@ -67,6 +67,13 @@ const getModelInputs = (): HTMLInputElement[] =>
     .getAllByLabelText('ai_settings.model_label')
     .filter((el): el is HTMLInputElement => el instanceof HTMLInputElement);
 
+// The "default" radios (one per row). Narrow via a type guard — not an `as`
+// cast — so reading `.checked` stays type-safe (same pattern as getModelInputs).
+const getDefaultRadios = (): HTMLInputElement[] =>
+  screen
+    .getAllByRole('radio')
+    .filter((el): el is HTMLInputElement => el instanceof HTMLInputElement);
+
 describe('AllowedModelsField', () => {
   describe('add / remove rows', () => {
     it('adds a new row when the add button is clicked', async () => {
@@ -129,7 +136,7 @@ describe('AllowedModelsField', () => {
         },
       });
 
-      const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+      const radios = getDefaultRadios();
       expect(radios[0].checked).toBe(true);
       expect(radios[1].checked).toBe(false);
 
@@ -160,7 +167,7 @@ describe('AllowedModelsField', () => {
       await user.click(removeButtons[0]);
 
       // Assert: the now-first (formerly second) row becomes the default.
-      const radios = screen.getAllByRole('radio') as HTMLInputElement[];
+      const radios = getDefaultRadios();
       expect(radios).toHaveLength(1);
       expect(radios[0].checked).toBe(true);
       expect(getModelInputs()[0].value).toBe('gpt-4o-mini');
