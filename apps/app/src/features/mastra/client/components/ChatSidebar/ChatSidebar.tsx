@@ -1,6 +1,13 @@
 // ref: https://elements.ai-sdk.dev/examples/chatbot
 
-import { Fragment, useEffect, useMemo, useState } from 'react';
+import {
+  Fragment,
+  useCallback,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useChat } from '@ai-sdk/react';
 import { CopyIcon, RefreshCcwIcon, XIcon } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
@@ -111,16 +118,23 @@ export const ChatSidebar = (): JSX.Element => {
     t('ai_sidebar.new_chat'),
   );
 
-  // Memoized so a stable transport instance survives re-renders (chatThreadId is
-  // fixed for this session), instead of allocating a new one on every render.
-  // The factory pins the threadId AND modelId on the transport body so EVERY
-  // request — incl. regenerate(), which sends no per-call body — carries them.
-  // `model` is a dependency: re-creating the transport on a model change is what
-  // makes both sendMessage and regenerate() send the current model (Critical
-  // Issue 1, Req 3.3/3.4).
+  // The transport reads the current model through this ref at request time.
+  // `useChat` captures the transport when its internal Chat is created and only
+  // re-creates that Chat when the chat `id` changes (NOT when the transport
+  // instance changes), so re-creating the transport on a model change would have
+  // no effect. A ref lets the (stable) transport always see the live selection.
+  const modelRef = useRef(model);
+  modelRef.current = model;
+
+  // Stable getter that reads the live selection from the ref on each request.
+  const getModelId = useCallback(() => modelRef.current, []);
+
+  // Stable for the session (chatThreadId is fixed). The factory attaches the
+  // threadId and the live modelId (via the getter) to EVERY request — incl.
+  // regenerate(), which sends no per-call body (Critical Issue 1, Req 3.3/3.4).
   const transport = useMemo(
-    () => createMastraChatTransport(chatThreadId, model),
-    [chatThreadId, model],
+    () => createMastraChatTransport(chatThreadId, getModelId),
+    [chatThreadId, getModelId],
   );
 
   const {

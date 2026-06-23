@@ -87,18 +87,21 @@ vi.mock('~/client/services/user-ui-settings', () => ({
 }));
 
 // Spy on the transport factory while keeping the pure label/error helpers real.
-// Re-creation of the transport with the current modelId is the observable proof
-// that BOTH sendMessage and regenerate() carry the model (Critical Issue 1).
+// The factory receives a live getModelId() (not a fixed model), so the observable
+// proof of the wiring is that the captured getter reflects the current selection
+// — useChat ignores a re-created transport, so the model must be read live.
 const createMastraChatTransport = vi.fn(
-  (_threadId: string, _modelId?: string) => ({}),
+  (_threadId: string, _getModelId: () => string | undefined) => ({}),
 );
 vi.mock('./chat-sidebar-helpers', async (importOriginal) => {
   const actual =
     await importOriginal<typeof import('./chat-sidebar-helpers')>();
   return {
     ...actual,
-    createMastraChatTransport: (threadId: string, modelId?: string) =>
-      createMastraChatTransport(threadId, modelId),
+    createMastraChatTransport: (
+      threadId: string,
+      getModelId: () => string | undefined,
+    ) => createMastraChatTransport(threadId, getModelId),
   };
 });
 
@@ -464,20 +467,29 @@ describe('ChatSidebar — model selector wiring (3.2/3.3/3.4/3.5/3.6)', () => {
     expect(modelSelect().value).toBe('gpt-4o-mini');
   });
 
-  it('builds the transport with the initial selectedModelId so regenerate carries it (3.3/3.4)', () => {
+  // The getter passed to the transport factory (2nd arg of the last call).
+  const lastModelGetter = (): (() => string | undefined) => {
+    const calls = createMastraChatTransport.mock.calls;
+    return calls[calls.length - 1][1];
+  };
+
+  it('builds the transport with a live getter that reports the initial selectedModelId (3.3/3.4)', () => {
     render(<ChatSidebar />);
 
-    // modelId is pinned on the transport body; useChat gets this transport, so
-    // sendMessage AND regenerate() both send the current model.
+    // The factory gets a getter (not a fixed model); reading it now yields the
+    // server-validated initial selection. The transport reads it live per
+    // request, so sendMessage AND regenerate() both send the current model.
     expect(createMastraChatTransport).toHaveBeenLastCalledWith(
       expect.any(String),
-      'gpt-4o-mini',
+      expect.any(Function),
     );
+    expect(lastModelGetter()()).toBe('gpt-4o-mini');
   });
 
-  it('on selection change: persists via scheduleToPut and rebuilds the transport with the new modelId (3.3/3.6)', () => {
+  it('on selection change: persists via scheduleToPut and the live getter reflects the new model WITHOUT re-creating the transport (3.3/3.6)', () => {
     render(<ChatSidebar />);
 
+    const getModelId = lastModelGetter();
     createMastraChatTransport.mockClear();
 
     act(() => {
@@ -488,11 +500,11 @@ describe('ChatSidebar — model selector wiring (3.2/3.3/3.4/3.5/3.6)', () => {
     expect(scheduleToPut).toHaveBeenCalledWith({
       aiChatSelectedModel: 'gpt-4o',
     });
-    // Transport recreated with the new model (regenerate-safe — 3.3/3.4).
-    expect(createMastraChatTransport).toHaveBeenLastCalledWith(
-      expect.any(String),
-      'gpt-4o',
-    );
+    // The transport is NOT re-created on a model change (useChat would ignore a
+    // new instance anyway); the same live getter now reports the new model, so
+    // the next send/regenerate carries it (Critical Issue 1 — 3.3/3.4).
+    expect(createMastraChatTransport).not.toHaveBeenCalled();
+    expect(getModelId()).toBe('gpt-4o');
     expect(modelSelect().value).toBe('gpt-4o');
   });
 

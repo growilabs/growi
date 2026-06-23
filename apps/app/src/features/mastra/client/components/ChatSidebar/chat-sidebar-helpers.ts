@@ -39,21 +39,49 @@ const MASTRA_MESSAGE_API = '/_api/v3/mastra/message';
 /**
  * Build the chat transport for a session.
  *
- * Both the threadId AND the selected modelId are pinned on the transport `body`
- * so EVERY request carries them — not just sendMessage. regenerate() (the error
- * / message retry) sends no per-call body, so without this the server would
- * receive no threadId (minting a brand-new thread on each retry) and no modelId
- * (dropping the user's model choice on regenerate — Critical Issue 1, Req
- * 3.3/3.4). The caller re-creates the transport when the model changes so the
- * pinned modelId always reflects the current selection.
+ * The threadId AND the selected modelId are attached to EVERY outgoing request —
+ * not just sendMessage. regenerate() (the error / message retry) sends no
+ * per-call body, so without this the server would receive no threadId (minting a
+ * brand-new thread on each retry) and no modelId (dropping the user's model
+ * choice on regenerate — Critical Issue 1, Req 3.3/3.4).
+ *
+ * The model is read LIVE per request via `getModelId()` inside
+ * `prepareSendMessagesRequest`, NOT baked into a static `body`. This is
+ * essential: `@ai-sdk/react`'s `useChat` only re-creates its internal `Chat`
+ * (which captures the transport) when the chat `id` changes — it ignores a
+ * re-created `transport` instance. So a modelId pinned at transport-creation
+ * time would stick for the whole session: it would be absent whenever the
+ * sidebar mounted before `/mastra/models` resolved, and later model-selector
+ * changes would never reach the server. Reading the current selection through a
+ * getter keeps every send/regenerate on the live model regardless of when (or
+ * how often) the model changes.
  */
 export const createMastraChatTransport = (
   threadId: string,
-  modelId?: string,
+  getModelId: () => string | undefined,
 ): DefaultChatTransport<UIMessage> =>
   new DefaultChatTransport({
     api: MASTRA_MESSAGE_API,
-    body: buildMessageRequestBody(threadId, modelId),
+    // `prepareSendMessagesRequest` REPLACES the whole request body, so we must
+    // re-include the SDK's standard fields (id/messages/trigger/messageId — the
+    // same set DefaultChatTransport sends by default) and then add the threadId
+    // and the live modelId on top.
+    prepareSendMessagesRequest: ({
+      body,
+      id,
+      messages,
+      trigger,
+      messageId,
+    }) => ({
+      body: {
+        ...body,
+        id,
+        messages,
+        trigger,
+        messageId,
+        ...buildMessageRequestBody(threadId, getModelId()),
+      },
+    }),
   });
 
 /**
