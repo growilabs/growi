@@ -68,7 +68,7 @@
   - _Requirements: 6.1, 6.5, 8.1, 8.2, 8.3, 9.2_
   - _Boundary: diff route_
   - _Depends: 1.1, 3.1_
-- [ ] 4.3 既存 /:id の24桁hex制約と新ルータのマウント（ルート衝突解消）
+- [x] 4.3 既存 /:id の24桁hex制約と新ルータのマウント（ルート衝突解消）
   - 既存 revisions.js の `/:id` を `/:id([0-9a-fA-F]{24})` に制約し、新ルータ2本を apiv3 index の `/revisions` 配下にマウント。既存 `/:id` ハンドラの共有ページ判定（certifySharedPage / req.isSharedPage）には手を入れず、パスの正規表現制約のみ追加
   - 完了状態: GET /revisions/changes が新ルータに到達して 200、既存 GET /revisions/:id が24桁hex の revision id で従来どおり動作
   - _Requirements: 1.1, 8.1_
