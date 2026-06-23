@@ -350,8 +350,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.rebuildIndex({ shouldEmitProgress });
   }
 
-  async rebuildAuditlogIndex() {
-    return this.fullTextSearchDelegator.rebuildAuditlogIndex();
+  async rebuildAuditlogIndex(shouldEmitProgress = false) {
+    return this.fullTextSearchDelegator.rebuildAuditlogIndex({
+      shouldEmitProgress,
+    });
   }
 
   async searchAuditlogSuggestions(

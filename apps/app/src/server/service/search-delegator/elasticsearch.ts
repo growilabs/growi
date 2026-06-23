@@ -448,12 +448,15 @@ class ElasticsearchDelegator
     }
   }
 
-  async rebuildAuditlogIndex(): Promise<void> {
+  async rebuildAuditlogIndex(
+    option: { shouldEmitProgress: boolean } = { shouldEmitProgress: false },
+  ): Promise<void> {
     const {
       client,
       auditlogIndexName: indexName,
       auditlogAliasName: aliasName,
     } = this;
+    const { shouldEmitProgress } = option;
     const tmpIndexName = `${indexName}-tmp`;
 
     try {
@@ -472,7 +475,7 @@ class ElasticsearchDelegator
       // flush index
       await client.indices.delete({ index: indexName });
       await this.createAuditlogIndex(indexName);
-      await this.addAllAuditlogs();
+      await this.addAllAuditlogs({ shouldEmitProgress });
 
       await client.indices.updateAliases({
         actions: [
@@ -483,6 +486,10 @@ class ElasticsearchDelegator
 
       await client.indices.delete({ index: tmpIndexName });
     } catch (error) {
+      if (shouldEmitProgress) {
+        const socket = this.socketIoService.getAdminSocket();
+        socket.emit(SocketEventName.RebuildingFailed, { error: error.message });
+      }
       try {
         await this.normalizeAuditlogIndices();
       } catch (normalizeErr) {
@@ -559,7 +566,10 @@ class ElasticsearchDelegator
     }
   }
 
-  async addAllAuditlogs(): Promise<void> {
+  async addAllAuditlogs(
+    option: { shouldEmitProgress?: boolean } = {},
+  ): Promise<void> {
+    const { shouldEmitProgress = false } = option;
     const Activity = mongoose.model('Activity');
     const bulkWrite = this.client.bulk.bind(this.client);
     const prepareBodyForAuditlog = this.prepareBodyForAuditlog.bind(this);
@@ -567,6 +577,11 @@ class ElasticsearchDelegator
     const bulkSize: number = configManager.getConfig(
       'app:elasticsearchReindexBulkSize',
     );
+
+    const socket = shouldEmitProgress
+      ? this.socketIoService.getAdminSocket()
+      : undefined;
+    const totalCount = await Activity.countDocuments();
 
     const readStream = Activity.find()
       .select('snapshot.username')
@@ -601,6 +616,13 @@ class ElasticsearchDelegator
           logger.info(
             `Adding auditlogs progressing: (count=${count}, took=${bulkResponse.took}ms)`,
           );
+
+          if (shouldEmitProgress) {
+            socket?.emit(SocketEventName.AddPageProgress, {
+              totalCount,
+              count,
+            });
+          }
         } catch (err) {
           logger.error('Adding auditlogs bulk indexing failed.', err);
           callback(err);
@@ -611,6 +633,9 @@ class ElasticsearchDelegator
       },
       final(callback) {
         logger.info(`Adding auditlogs has completed: (totalCount=${count})`);
+        if (shouldEmitProgress) {
+          socket?.emit(SocketEventName.FinishAddPage, { totalCount, count });
+        }
         callback();
       },
     });

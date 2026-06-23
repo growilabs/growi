@@ -451,7 +451,7 @@ module.exports = (crowi) => {
           case 'rebuild':
             // NOT wait the processing is terminated
             searchService
-              .rebuildAuditlogIndex()
+              .rebuildAuditlogIndex(true)
               .then(() => AuditlogEsSyncStatus.setUnsynced(false))
               .catch((err) => {
                 logger.error('Rebuild auditlog index failed', err);
