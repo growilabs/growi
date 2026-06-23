@@ -384,7 +384,24 @@ export const ChatSidebar = (): JSX.Element => {
                   <PromptInputModelSelectTrigger>
                     <PromptInputModelSelectValue />
                   </PromptInputModelSelectTrigger>
-                  <PromptInputModelSelectContent>
+                  {/*
+                    The Radix Select dropdown is portaled to document.body — a
+                    sibling of this position-fixed sidebar in the root stacking
+                    context. The vendored content defaults to `tw:z-50`, which
+                    sits below the chat sidebar (`.grw-chat-sidebar` =
+                    `$zindex-fixed + 2` = 1032), so the menu opens behind the
+                    opaque panel and looks empty. Lift it to Bootstrap's popover
+                    tier (`$zindex-popover` = 1070) so it paints above the
+                    sidebar. (prefix-aware tailwind-merge makes this override the
+                    baked-in `tw:z-50`.)
+
+                    `tw:border-border`: the vendored SelectContent uses a bare
+                    `tw:border` (width only, no color), so its border falls back to
+                    `currentColor` (the dark popover text color) and looks too
+                    heavy. Pin it to the theme border token (`--border` =
+                    `--bs-border-color`, the light gray used elsewhere in GROWI).
+                  */}
+                  <PromptInputModelSelectContent className="tw:z-[1070] tw:border-border">
                     {models?.map((m) => (
                       <PromptInputModelSelectItem key={m.id} value={m.id}>
                         {m.name}

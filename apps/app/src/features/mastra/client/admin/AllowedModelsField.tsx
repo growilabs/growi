@@ -262,7 +262,7 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
         <Input
           id={providerOptionsId}
           type="textarea"
-          rows={4}
+          rows={6}
           placeholder={PROVIDER_OPTIONS_PLACEHOLDER}
           disabled={disabled}
           invalid={invalidProviderOptions}
