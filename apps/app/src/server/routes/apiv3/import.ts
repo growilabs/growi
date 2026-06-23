@@ -355,7 +355,7 @@ export default function route(crowi: Crowi): Router {
        * import
        */
       try {
-        importService.import(collections, importSettingsMap);
+        await importService.import(collections, importSettingsMap);
 
         const parameters = {
           action: SupportedAction.ACTION_ADMIN_GROWI_DATA_IMPORTED,

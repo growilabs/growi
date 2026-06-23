@@ -355,6 +355,7 @@ class ImportForm extends React.Component {
         toastError(t('admin:importer_management.error.only_upsert_available'));
       }
       toastError(err);
+      this.setState({ isImporting: false });
     }
   }
 
@@ -598,7 +599,7 @@ const ImportFormWrapperFc = (props) => {
   const socket = useAdminSocket();
 
   if (socket == null) {
-    return;
+    return null;
   }
 
   return <ImportForm t={t} socket={socket} {...props} />;
