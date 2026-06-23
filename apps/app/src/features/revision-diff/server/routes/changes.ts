@@ -298,8 +298,15 @@ async function listChanges(
 ): Promise<ChangesIndexResult> {
   const authorObjectId = new Types.ObjectId(userId);
 
-  // Build $match stage: filter to this user's revisions within the requested window.
-  const matchStage: Record<string, unknown> = {
+  // Build the post-window $match stage that selects only this user's revisions
+  // within the requested window and cursor position.
+  //
+  // IMPORTANT: The $setWindowFields stage must run before this $match so that
+  // prevAuthor / prevRevisionId are computed over ALL revisions on a page
+  // (regardless of author).  Filtering by author first would cause the window
+  // function to miss other-author revisions, making run-split detection (Req 4.2)
+  // impossible.
+  const postWindowMatch: Record<string, unknown> = {
     author: authorObjectId,
   };
 
@@ -307,7 +314,7 @@ async function listChanges(
     const createdAtFilter: Record<string, Date> = {};
     if (query.since != null) createdAtFilter.$gte = query.since;
     if (query.toDate != null) createdAtFilter.$lte = query.toDate;
-    matchStage.createdAt = createdAtFilter;
+    postWindowMatch.createdAt = createdAtFilter;
   }
 
   // When resuming from a cursor, skip revisions at-or-before the cursor position
@@ -315,7 +322,7 @@ async function listChanges(
   if (query.cursor != null) {
     const cursorCreatedAt = query.cursor.createdAt;
     const cursorId = new Types.ObjectId(query.cursor.id);
-    matchStage.$or = [
+    postWindowMatch.$or = [
       { createdAt: { $gt: cursorCreatedAt } },
       {
         createdAt: { $eq: cursorCreatedAt },
@@ -324,8 +331,22 @@ async function listChanges(
     ];
   }
 
+  // Pre-filter: narrow to pages that have at least one revision by this user
+  // in the requested window to avoid scanning the entire revisions collection.
+  // This keeps the full-collection scan bounded while still allowing $setWindowFields
+  // to see all revisions on those pages (including other-author ones).
+  const authorPageIds: Types.ObjectId[] = await Revision.distinct('pageId', {
+    author: authorObjectId,
+    ...(postWindowMatch.createdAt != null
+      ? { createdAt: postWindowMatch.createdAt }
+      : {}),
+  });
+
   const rawRevisions: RevisionWithContext[] = await Revision.aggregate([
-    { $match: matchStage },
+    // Step 1: restrict to pages where the user has revisions (performance gate).
+    { $match: { pageId: { $in: authorPageIds } } },
+    // Step 2: enrich each revision with the immediately-preceding revision on the
+    // same page (author-agnostic), so run boundaries can be detected correctly.
     {
       $setWindowFields: {
         partitionBy: '$pageId',
@@ -336,6 +357,8 @@ async function listChanges(
         },
       },
     },
+    // Step 3: keep only the authenticated user's revisions within the window.
+    { $match: postWindowMatch },
     { $sort: { createdAt: 1, _id: 1 } },
   ]);
 
