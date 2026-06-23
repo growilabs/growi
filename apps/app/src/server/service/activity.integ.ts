@@ -1,11 +1,7 @@
 import EventEmitter from 'events';
-import { vi } from 'vitest';
 import { type MockProxy, mock } from 'vitest-mock-extended';
 
-import {
-  SupportedAction,
-  type SupportedActionType,
-} from '~/interfaces/activity';
+import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 import Activity from '~/server/models/activity';
 import ActivityService from '~/server/service/activity';
@@ -64,17 +60,17 @@ describe('ActivityService.createActivity()', () => {
     });
 
     expect(result).toBeNull();
-    expect(emitSpy).not.toHaveBeenCalledWith('created', expect.anything());
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 
   it('should return null without emitting when Activity creation throws', async () => {
     vi.spyOn(activityService, 'shoudUpdateActivity').mockReturnValue(true);
 
     const result = await activityService.createActivity({
-      action: 'INVALID_ACTION' as unknown as SupportedActionType,
+      action: 'INVALID_ACTION',
     });
 
     expect(result).toBeNull();
-    expect(emitSpy).not.toHaveBeenCalledWith('created', expect.anything());
+    expect(emitSpy).not.toHaveBeenCalled();
   });
 });
