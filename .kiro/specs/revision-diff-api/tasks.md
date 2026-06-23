@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. Foundation: 型・インデックス・純粋ユーティリティ
-- [ ] 1.1 DTO 型定義
+- [x] 1.1 DTO 型定義
   - ChangeIndexEntry / ChangesIndexQuery / ChangesIndexResult、RevisionDiffPairInput / RevisionDiffRequest / RevisionDiffResult(discriminated union: ok|forbidden|invalid) / RevisionDiffResponse を定義
   - server/client 双方から使える interfaces として配置
   - 完了状態: 型がエクスポートされ型チェックを通る
