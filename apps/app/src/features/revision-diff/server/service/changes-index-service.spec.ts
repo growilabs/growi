@@ -323,6 +323,30 @@ describe('paginateRuns', () => {
       sorted.map((r) => r.toRevisionId.toString()).sort(),
     );
   });
+
+  it('sorts unsorted input into keyset order so no run is dropped across pages', () => {
+    // Runs supplied in NON-keyset order (as buildRuns may return them, in page-first-touch
+    // order): X has the later latest-edit (05:00) yet appears first; Y is earlier (03:00).
+    const xId = new Types.ObjectId();
+    const yId = new Types.ObjectId();
+    const unsorted = [
+      makeRun(xId, new Date('2024-01-01T05:00:00Z')),
+      makeRun(yId, new Date('2024-01-01T03:00:00Z')),
+    ];
+
+    // Page 1 (limit 1) must emit the EARLIEST run (Y@03:00), not whichever came first in
+    // the array — otherwise the cursor would jump to 05:00 and drop Y on the next page.
+    const page1 = paginateRuns(unsorted, 1);
+    expect(page1.emittedRuns).toHaveLength(1);
+    expect(page1.emittedRuns[0].toRevisionId.toString()).toBe(yId.toString());
+    expect(page1.nextCursor).not.toBeNull();
+
+    // Page 2 continues from the cursor and yields X@05:00 — nothing dropped.
+    const page2 = paginateRuns(unsorted, 1, page1.nextCursor as CursorKey);
+    expect(page2.emittedRuns).toHaveLength(1);
+    expect(page2.emittedRuns[0].toRevisionId.toString()).toBe(xId.toString());
+    expect(page2.nextCursor).toBeNull();
+  });
 });
 
 // ---------------------------------------------------------------------------

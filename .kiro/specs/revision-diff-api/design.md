@@ -155,6 +155,8 @@ sequenceDiagram
 - **ページング単位は run（エントリ）**。本人版を `(createdAt, _id)` 昇順に走査し、**完結した run のみ** emit する（run の全構成版が確定してから1エントリにし、run の途中でページ境界が来ないようにする）。cursor は emit 済み最終 run の `to` 版 `(createdAt, _id)`。
 - **既出 run は不変**: 一度返した run の `from`/`to` は後から変わらない。合間に増えた本人編集は cursor より後の **新しい run** として次ページ以降に現れるだけ（過去 run の境界を書き換えない）。これにより「合間に版が増えても重複・取りこぼし無し」(3.3) と「他著者割込みで分割」(4.2) を両立する。
 - **境界の扱い**: `limit` 末尾で未完の run（まだ後続の本人版が続きうる）は emit せず**次ページへ繰り越す**（cursor は最後に emit した完結 run の `to` 版を指す）。時間窓の右端（`toDate`／現在時刻）では、窓内で見えている範囲を run の完結とみなして emit し、窓より後の編集は次回同期（`since` 前進）で**新 run**として現れる。結合テストの期待値はこの規則に固定する。
+- **cursor の適用位置（実装上の正確性・重要）**: cursor は **DB クエリではなく `paginateRuns` 内の in-memory で適用**する。run の baseline（`fromRevisionId`）は run 開始版の「直前版」で cursor より前の時刻になりうるため、DB 側で cursor より前の版を除外すると、cursor をまたぐ run の baseline が壊れる（直前版を取りこぼし、本人の途中版を誤って baseline にする）。さらに run 単位 keyset の cursor を DB の版単位フィルタに置き換えると、最新版時刻が他ページの run より早い run を丸ごと取りこぼす。よって窓内の run は毎ページ全量を再計算し、cursor は run 単位 keyset で in-memory 適用する。`paginateRuns` は入力を `(latestUpdatedAt, toRevisionId)` 昇順に**自前でソート**してからページングする（`buildRuns` の戻りはページ初出順であり keyset 順ではないため）。
+- **合間編集の扱い（実装の特性）**: ページング途中に既出 run と連続する本人編集が増えた場合、その run は次ページで「`to` 版が前進した別エントリ（baseline は全履歴由来で正確）」として再出現する。同一エントリの重複や取りこぼしは生じない（`to` が異なる新エントリ）。内容範囲は一部重なりうるが、差分の再取得は安全側（取りこぼしより望ましい）。
 
 ## Requirements Traceability
 
@@ -366,3 +368,4 @@ export interface RevisionDiffResponse { results: RevisionDiffResult[]; }
 - **N+1 回避**: baseline / run 検出は `$setWindowFields`（partition by pageId）で一括取得（最小 MongoDB 6.0 確定のため利用可）。
 - **状態判定は索引1ページあたり bulk 2クエリ固定**: `findByIdsAndViewer` ＋ 生 `Page.find({_id:{$in}},{status,path})`。ページ単位ループ（`isAccessiblePageByViewer` を1件ずつ）を避け N+1 にしない。ゴミ箱/不在の区別は (2) の `status`・存在有無を読むだけで追加クエリ無し。
 - **バッチ上限（MAX_PAIRS, 目安 20）**: ② の処理量・応答サイズを予測可能に保つ。正確値は実装定数で確定。
+- **ページング毎の窓内再計算（既知の特性）**: cursor を in-memory 適用する（baseline 正確性のため。System Flows 参照）ので、各ページ要求は時間窓内の対象ページの版を再走査して run を再計算する。応答時間は「ページサイズ」ではなく「窓内対象ページの版数」に比例する。実用上は consumer が `since` を前進させる増分同期で窓を絞ることで抑える。加えて `distinct` の対象ページ集合は下限 `max(since, cursor.createdAt)` で絞り、cursor より前にしか編集の無いページを窓走査から外す（前方ページングの走査量を削減）。窓に含めたページは baseline 正確性のため全履歴を走査する（cursor より前の版も含む）点は不可避。極端に大きな単一窓を一括ページングする用途では、`since` の前進を必須とする運用で緩和する。

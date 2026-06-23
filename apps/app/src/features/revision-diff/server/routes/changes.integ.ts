@@ -165,6 +165,36 @@ function mockPageQueries(
   return mockPage;
 }
 
+type ChangeEntry = {
+  pageId: string;
+  fromRevisionId: string | null;
+  toRevisionId: string;
+};
+
+/**
+ * Page the changes endpoint to exhaustion (following `next` cursors) and return every entry
+ * collected across pages. Hard-capped to avoid an infinite loop if pagination misbehaves.
+ */
+async function paginateAll(
+  app: express.Express,
+  query: Record<string, string>,
+): Promise<ChangeEntry[]> {
+  const collected: ChangeEntry[] = [];
+  let cursor: string | null = null;
+  for (let i = 0; i < 50; i++) {
+    // biome-ignore lint/performance/noAwaitInLoops: pagination is inherently sequential — each page needs the previous page's cursor
+    const res = await request(app)
+      .get('/api/v3/revisions/changes')
+      .query(cursor != null ? { ...query, cursor } : query);
+    expect(res.status).toBe(200);
+    const body = res.body as { changes: ChangeEntry[]; next: string | null };
+    collected.push(...body.changes);
+    cursor = body.next;
+    if (cursor == null) break;
+  }
+  return collected;
+}
+
 // ---------------------------------------------------------------------------
 // Tests
 // ---------------------------------------------------------------------------
@@ -737,5 +767,94 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
     expect(runA!.toRevisionId).toBe(revA2._id.toString());
     expect(runB!.fromRevisionId).toBeNull();
     expect(runB!.toRevisionId).toBe(revB2._id.toString());
+  });
+
+  // -------------------------------------------------------------------------
+  // Req 3.3 — keyset pagination must not drop a run whose latest edit predates an
+  // earlier-touched page's run. (Run-ordering regression: buildRuns returns runs in
+  // page-first-touch order, not sorted by latest-edit time.)
+  // -------------------------------------------------------------------------
+  it('does not drop a run when an earlier-touched page has a later latest-edit time', async () => {
+    const pageX = makeId();
+    const pageY = makeId();
+
+    // Page X: two consecutive own edits → one run, latest edit at 05:00.
+    await createRevision({
+      pageId: pageX,
+      author: userId,
+      createdAt: new Date('2024-07-01T01:00:00Z'),
+    });
+    const xLast = await createRevision({
+      pageId: pageX,
+      author: userId,
+      createdAt: new Date('2024-07-01T05:00:00Z'),
+    });
+    // Page Y: single edit at 03:00 — its run's latest (03:00) precedes page X's (05:00)
+    // although page X was touched first. With unsorted runs + a DB-side cursor, emitting
+    // page X first sets the cursor to 05:00 and silently drops page Y (03:00 < 05:00).
+    const yLast = await createRevision({
+      pageId: pageY,
+      author: userId,
+      createdAt: new Date('2024-07-01T03:00:00Z'),
+    });
+
+    mockPageQueries(
+      [pageX.toString(), pageY.toString()],
+      [
+        { _id: pageX, status: 'published', path: '/x' },
+        { _id: pageY, status: 'published', path: '/y' },
+      ],
+    );
+
+    const all = await paginateAll(buildApp(userId), { limit: '1' });
+
+    const toRevIds = all.map((c) => c.toRevisionId);
+    // Both runs must appear exactly once across all pages — neither dropped nor duplicated.
+    expect(new Set(toRevIds).size).toBe(2);
+    expect(toRevIds).toContain(xLast._id.toString());
+    expect(toRevIds).toContain(yLast._id.toString());
+  });
+
+  // -------------------------------------------------------------------------
+  // Req 4.3 — a run's page-creation baseline (null) must survive even when the run is
+  // emitted on a later page. The cursor must not filter out the run's earlier revisions
+  // at the DB level. Guards against the baseline-shift a sort-only fix would introduce.
+  // -------------------------------------------------------------------------
+  it('preserves a run page-creation baseline (null) across a pagination boundary', async () => {
+    const pageX = makeId();
+    const pageY = makeId();
+
+    // Page X: page-creation edit at 01:00 then a consecutive edit at 05:00 → baseline null.
+    await createRevision({
+      pageId: pageX,
+      author: userId,
+      createdAt: new Date('2024-07-02T01:00:00Z'),
+    });
+    const xLast = await createRevision({
+      pageId: pageX,
+      author: userId,
+      createdAt: new Date('2024-07-02T05:00:00Z'),
+    });
+    // Page Y at 03:00 sorts before page X's run, so page X is emitted on a later page.
+    await createRevision({
+      pageId: pageY,
+      author: userId,
+      createdAt: new Date('2024-07-02T03:00:00Z'),
+    });
+
+    mockPageQueries(
+      [pageX.toString(), pageY.toString()],
+      [
+        { _id: pageX, status: 'published', path: '/x' },
+        { _id: pageY, status: 'published', path: '/y' },
+      ],
+    );
+
+    const all = await paginateAll(buildApp(userId), { limit: '1' });
+
+    const xEntry = all.find((c) => c.toRevisionId === xLast._id.toString());
+    expect(xEntry).toBeDefined();
+    // Baseline must be the page-creation marker (null), NOT the user's own 01:00 revision.
+    expect(xEntry!.fromRevisionId).toBeNull();
   });
 });

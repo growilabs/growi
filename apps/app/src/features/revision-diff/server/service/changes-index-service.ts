@@ -186,18 +186,21 @@ export interface PaginateRunsResult {
 }
 
 /**
- * Apply keyset-based pagination to a sorted list of completed runs.
+ * Apply keyset-based pagination to a list of completed runs.
  *
- * The input `runs` must already be sorted by (latestUpdatedAt asc, toRevisionId asc) —
- * i.e. the order produced by `buildRuns`.  The function:
- *   1. Skips runs that fall at-or-before the given cursor (already returned in a prior page).
- *   2. Takes up to `limit` runs from the remaining list.
- *   3. Returns a cursor pointing to the last emitted run when more results exist, or null
+ * The function sorts `runs` into keyset order (latestUpdatedAt asc, toRevisionId asc)
+ * itself, so callers need NOT pre-sort. This matters because `buildRuns` emits runs in
+ * page-first-touch order, not keyset order — relying on that order here previously dropped
+ * a run whose latest edit predated an earlier-touched page's run. The function:
+ *   1. Sorts runs into keyset order.
+ *   2. Skips runs that fall at-or-before the given cursor (already returned in a prior page).
+ *   3. Takes up to `limit` runs from the remaining list.
+ *   4. Returns a cursor pointing to the last emitted run when more results exist, or null
  *      when the caller has reached the end.
  *
- * This is a pure function — no DB calls, no side effects.
+ * This is a pure function — no DB calls, no mutation of the input array.
  *
- * @param runs      - Completed runs sorted by (latestUpdatedAt asc, toRevisionId asc).
+ * @param runs      - Completed runs in any order (sorted internally).
  * @param limit     - Maximum number of runs to emit on this page.
  * @param cursorKey - Exclusive lower bound decoded from the previous page's `next` token.
  *                    When absent, pagination starts from the beginning.
@@ -208,13 +211,25 @@ export const paginateRuns = (
   limit: number,
   cursorKey?: CursorKey,
 ): PaginateRunsResult => {
-  // Step 1: filter out runs at-or-before the cursor.
+  // Step 1: sort into keyset order. Callers (buildRuns) do not guarantee it, and the cursor
+  // logic below is only correct on a (latestUpdatedAt asc, toRevisionId asc) ordering.
+  const sorted: Run[] = [...runs].sort((a, b) => {
+    const dt = a.latestUpdatedAt.getTime() - b.latestUpdatedAt.getTime();
+    if (dt !== 0) return dt;
+    const ai = a.toRevisionId.toString();
+    const bi = b.toRevisionId.toString();
+    if (ai < bi) return -1;
+    if (ai > bi) return 1;
+    return 0;
+  });
+
+  // Step 2: filter out runs at-or-before the cursor.
   // The cursor encodes (createdAt, id) of the last emitted run from the previous page.
   // We skip any run whose (latestUpdatedAt, toRevisionId) is <= (cursorKey.createdAt, cursorKey.id).
   const afterCursor: Run[] =
     cursorKey == null
-      ? runs
-      : runs.filter((r) => {
+      ? sorted
+      : sorted.filter((r) => {
           const runTime = r.latestUpdatedAt.getTime();
           const cursorTime = cursorKey.createdAt.getTime();
           if (runTime !== cursorTime) return runTime > cursorTime;
@@ -365,28 +380,35 @@ export async function listChanges(
     postWindowMatch.createdAt = createdAtFilter;
   }
 
-  // When resuming from a cursor, skip revisions at-or-before the cursor position
-  // using a compound keyset predicate: (createdAt, _id) > (cursor.createdAt, cursor.id).
-  if (query.cursor != null) {
-    const cursorCreatedAt = query.cursor.createdAt;
-    const cursorId = new Types.ObjectId(query.cursor.id);
-    postWindowMatch.$or = [
-      { createdAt: { $gt: cursorCreatedAt } },
-      {
-        createdAt: { $eq: cursorCreatedAt },
-        _id: { $gt: cursorId },
-      },
-    ];
-  }
+  // NOTE: the cursor is intentionally NOT applied to the DB query. A run's baseline
+  // (fromRevisionId) is the revision immediately before the run's first edit, which can
+  // predate the cursor. Filtering revisions by the cursor in the DB would drop those
+  // earlier revisions and corrupt the baseline of a run that straddles the cursor (and
+  // keyset order is by run, not by revision, so it could also drop whole runs). Runs are
+  // therefore recomputed in full for the window and the cursor is applied in-memory by
+  // paginateRuns. See design.md "run まとめ・ページング".
 
-  // Pre-filter: narrow to pages that have at least one revision by this user
-  // in the requested window to avoid scanning the entire revisions collection.
-  // This keeps the full-collection scan bounded while still allowing $setWindowFields
-  // to see all revisions on those pages (including other-author ones).
+  // Pre-filter: narrow to the pages this user has touched, to avoid scanning the entire
+  // revisions collection. The page-scan lower bound is the later of `since` and the cursor
+  // position: a page whose latest own-edit predates the cursor cannot contribute a run
+  // after the cursor, so it is safely excluded from the (expensive) window scan. A page
+  // that straddles the cursor still qualifies (it has an own-edit at/after cursor.createdAt)
+  // and is then scanned in full — including revisions before the cursor — so its baseline
+  // stays correct.
+  const distinctCreatedAt: Record<string, Date> = {};
+  let pageScanLowerBound = query.since;
+  if (
+    query.cursor != null &&
+    (pageScanLowerBound == null || query.cursor.createdAt > pageScanLowerBound)
+  ) {
+    pageScanLowerBound = query.cursor.createdAt;
+  }
+  if (pageScanLowerBound != null) distinctCreatedAt.$gte = pageScanLowerBound;
+  if (query.toDate != null) distinctCreatedAt.$lte = query.toDate;
   const authorPageIds: Types.ObjectId[] = await Revision.distinct('pageId', {
     author: authorObjectId,
-    ...(postWindowMatch.createdAt != null
-      ? { createdAt: postWindowMatch.createdAt }
+    ...(Object.keys(distinctCreatedAt).length > 0
+      ? { createdAt: distinctCreatedAt }
       : {}),
   });
 
