@@ -6,8 +6,11 @@
 // (resolve-provider-options / resolve-mastra-model own that, tested separately).
 //
 // We mock every module boundary the handler reaches so no real LLM is called:
-//   - resolve-provider-options: assert the route forwards the request's modelId
-//     and passes the resolved options straight through to stream.
+//   - config.resolveEffectiveModel: the single allow-list rounding checkpoint —
+//     assert the route resolves the request's modelId through it EXACTLY once and
+//     threads the resolved id to both requestContext and the options lookup.
+//   - resolve-provider-options.getProviderOptionsForModel: assert the route looks
+//     up options for the RESOLVED id and passes them straight through to stream.
 //   - mastra-modules: a stub growiAgent whose stream() records its options arg.
 //   - get-or-create-thread: a fixed thread (thread plumbing is out of scope here).
 //   - the `ai` package + @mastra/ai-sdk: stubbed so the handler can run to the
@@ -21,11 +24,17 @@ import { mock } from 'vitest-mock-extended';
 import type Crowi from '~/server/crowi';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
-const { resolveProviderOptions } = vi.hoisted(() => ({
-  resolveProviderOptions: vi.fn(),
+const { resolveEffectiveModel, getProviderOptionsForModel } = vi.hoisted(
+  () => ({
+    resolveEffectiveModel: vi.fn(),
+    getProviderOptionsForModel: vi.fn(),
+  }),
+);
+vi.mock('../services/ai-sdk-modules/llm-providers/config', () => ({
+  resolveEffectiveModel,
 }));
 vi.mock('../services/ai-sdk-modules/resolve-provider-options', () => ({
-  resolveProviderOptions,
+  getProviderOptionsForModel,
 }));
 
 const { stream, getMemory, getOrCreateThread } = vi.hoisted(() => ({
@@ -137,44 +146,53 @@ beforeEach(() => {
 });
 
 describe('post-message handler — model selection (Req 3.3, 4.1, 4.3, 4.4)', () => {
-  it('forwards an in-allowlist modelId to the resolver and passes its options to stream, and sets modelId on requestContext (Req 4.1, 4.4)', async () => {
+  it('resolves an in-allowlist modelId once and threads the resolved id to both requestContext and the options lookup (Req 4.1, 4.4)', async () => {
     const options = { openai: { reasoningEffort: 'low' } };
-    resolveProviderOptions.mockReturnValue(options);
+    resolveEffectiveModel.mockReturnValue('o3');
+    getProviderOptionsForModel.mockReturnValue(options);
 
     const { req, res } = buildReqRes('o3');
     // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
     await getHandler()(req as any, res as any, vi.fn());
 
-    // The route forwards the request's modelId to the resolver (server rounds it
-    // to the effective model inside resolveProviderOptions).
-    expect(resolveProviderOptions).toHaveBeenCalledWith('o3');
+    // The route rounds the request's modelId through resolveEffectiveModel exactly
+    // once (the single checkpoint), then threads the resolved id everywhere.
+    expect(resolveEffectiveModel).toHaveBeenCalledTimes(1);
+    expect(resolveEffectiveModel).toHaveBeenCalledWith('o3');
+    expect(getProviderOptionsForModel).toHaveBeenCalledWith('o3');
 
     expect(stream).toHaveBeenCalledTimes(1);
     const streamOptions = stream.mock.calls[0][1];
-    // requestContext carries the per-request modelId for the agent's dynamic model fn.
+    // requestContext carries the RESOLVED model id for the agent's dynamic model fn.
     expect(streamOptions.requestContext).toBeInstanceOf(RequestContext);
     expect(streamOptions.requestContext.get('modelId')).toBe('o3');
-    // providerOptions forwarded verbatim from the resolver (effective model's options).
+    // providerOptions forwarded verbatim from the lookup (effective model's options).
     expect(streamOptions.providerOptions).toBe(options);
   });
 
-  it('forwards an undefined modelId when omitted, so the server rounds to the default (Req 4.3)', async () => {
+  it('rounds an omitted modelId to the default and threads the resolved default id (Req 4.3)', async () => {
     const defaultOptions = { openai: { reasoningEffort: 'high' } };
-    resolveProviderOptions.mockReturnValue(defaultOptions);
+    // resolveEffectiveModel collapses an undefined modelId to the default id.
+    resolveEffectiveModel.mockReturnValue('gpt-4o');
+    getProviderOptionsForModel.mockReturnValue(defaultOptions);
 
     const { req, res } = buildReqRes(undefined);
     // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
     await getHandler()(req as any, res as any, vi.fn());
 
-    expect(resolveProviderOptions).toHaveBeenCalledWith(undefined);
+    expect(resolveEffectiveModel).toHaveBeenCalledWith(undefined);
+    // The RESOLVED default id (not undefined) is threaded downstream, so the agent
+    // model fn never re-rounds (no second warning).
+    expect(getProviderOptionsForModel).toHaveBeenCalledWith('gpt-4o');
 
     const streamOptions = stream.mock.calls[0][1];
-    expect(streamOptions.requestContext.get('modelId')).toBeUndefined();
+    expect(streamOptions.requestContext.get('modelId')).toBe('gpt-4o');
     expect(streamOptions.providerOptions).toBe(defaultOptions);
   });
 
   it('keeps the existing error sanitizer wired so provider errors yield a safe message (Req 4.5)', async () => {
-    resolveProviderOptions.mockReturnValue({});
+    resolveEffectiveModel.mockReturnValue('o3');
+    getProviderOptionsForModel.mockReturnValue({});
 
     const { req, res } = buildReqRes('o3');
     // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res

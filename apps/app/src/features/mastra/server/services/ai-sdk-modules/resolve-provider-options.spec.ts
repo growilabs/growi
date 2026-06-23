@@ -1,7 +1,9 @@
 import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
 
-// Drive the allow-list through the config boundary; resolveProviderOptions
-// resolves per effective model via getAllowedModels/resolveEffectiveModel.
+// getProviderOptionsForModel is a pure allow-list lookup keyed by an ALREADY-
+// RESOLVED effective model id — the caller rounds the client value once via
+// resolveEffectiveModel, so this function performs no resolution / rounding / warn
+// of its own. Drive the allow-list through the config boundary.
 const { getConfig } = vi.hoisted(() => ({
   getConfig: vi.fn(),
 }));
@@ -10,16 +12,7 @@ vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig },
 }));
 
-vi.mock('~/utils/logger', () => ({
-  default: () => ({
-    warn: vi.fn(),
-    error: vi.fn(),
-    info: vi.fn(),
-    debug: vi.fn(),
-  }),
-}));
-
-import { resolveProviderOptions } from './resolve-provider-options';
+import { getProviderOptionsForModel } from './resolve-provider-options';
 
 const setAllowedModels = (models: AllowedModel[] | undefined): void => {
   getConfig.mockImplementation((key: string) =>
@@ -31,8 +24,8 @@ beforeEach(() => {
   vi.clearAllMocks();
 });
 
-describe('resolveProviderOptions', () => {
-  it("returns the selected model's providerOptions when that model has options (Req 2.2)", () => {
+describe('getProviderOptionsForModel', () => {
+  it("returns the model's providerOptions when the resolved entry declares them (Req 2.2)", () => {
     setAllowedModels([
       {
         model: 'gpt-5',
@@ -45,53 +38,33 @@ describe('resolveProviderOptions', () => {
       },
     ]);
 
-    expect(resolveProviderOptions('o3')).toEqual({
+    expect(getProviderOptionsForModel('o3')).toEqual({
       openai: { reasoningEffort: 'low' },
     });
   });
 
-  it('returns {} when the effective model entry has no providerOptions (Req 2.2)', () => {
+  it('returns {} when the resolved entry declares no providerOptions (Req 2.2)', () => {
     setAllowedModels([
       { model: 'gpt-4o', isDefault: true },
       { model: 'gpt-4o-mini' },
     ]);
 
-    expect(resolveProviderOptions('gpt-4o-mini')).toEqual({});
+    expect(getProviderOptionsForModel('gpt-4o-mini')).toEqual({});
   });
 
-  it("returns the DEFAULT model's options for an out-of-allowlist modelId (per-effective-model resolution, Req 4.4)", () => {
+  it('returns {} for an id absent from the allow-list (no rounding here — the caller resolves first)', () => {
+    // This function deliberately does NOT round: collapsing an out-of-allowlist /
+    // omitted id to the default is the caller's job (resolveEffectiveModel, the
+    // single checkpoint). A miss therefore yields {}, not the default's options —
+    // callers must pass an already-effective id.
     setAllowedModels([
       {
         model: 'gpt-5',
         isDefault: true,
         providerOptions: { openai: { reasoningEffort: 'high' } },
       },
-      {
-        model: 'o3',
-        providerOptions: { openai: { reasoningEffort: 'low' } },
-      },
     ]);
 
-    // resolveEffectiveModel collapses the rejected id to the default, so the
-    // default's options are applied — not the requested model's, not the
-    // (nonexistent) requested entry's.
-    expect(resolveProviderOptions('not-allowed')).toEqual({
-      openai: { reasoningEffort: 'high' },
-    });
-  });
-
-  it("resolves the default model's options when no modelId is given (Req 2.2)", () => {
-    setAllowedModels([
-      {
-        model: 'gpt-5',
-        isDefault: true,
-        providerOptions: { openai: { reasoningEffort: 'high' } },
-      },
-      { model: 'o3' },
-    ]);
-
-    expect(resolveProviderOptions()).toEqual({
-      openai: { reasoningEffort: 'high' },
-    });
+    expect(getProviderOptionsForModel('not-in-list')).toEqual({});
   });
 });

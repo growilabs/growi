@@ -18,11 +18,14 @@ import type SearchService from '~/server/service/search';
  *   the fields they need internally.
  *
  * Notes on `modelId`:
- * - `modelId` is the per-request model selected by the chat client. It is
- *   set by the post-message handler and read by `growiAgent`'s dynamic model
- *   function to resolve the effective model. It is optional: when absent the
- *   resolver falls back to the configured default. The value is NOT trusted —
- *   `resolveMastraModel` validates it against the allow-list.
+ * - `modelId` is the per-request model for the chat client's selection. The
+ *   post-message handler resolves the client value through `resolveEffectiveModel`
+ *   (the single allow-list rounding checkpoint — an out-of-allowlist / omitted
+ *   value is collapsed to the default) and sets the ALREADY-RESOLVED id here.
+ *   `growiAgent`'s dynamic model function passes it to `resolveMastraModel`, whose
+ *   own allow-list check is then an idempotent defense-in-depth re-validation
+ *   rather than the first rounding pass. It stays optional only for the type's
+ *   sake; the handler always sets a concrete resolved id when AI is configured.
  */
 export type MastraRequestContextShape = {
   user: IUserHasId;

@@ -19,7 +19,8 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { CustomUIMessageMetadata } from '../../interfaces/chat-message';
-import { resolveProviderOptions } from '../services/ai-sdk-modules/resolve-provider-options';
+import { resolveEffectiveModel } from '../services/ai-sdk-modules/llm-providers/config';
+import { getProviderOptionsForModel } from '../services/ai-sdk-modules/resolve-provider-options';
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
 import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context';
@@ -30,10 +31,9 @@ const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
   threadId?: string;
-  // Per-request model selection (Req 3.3). Untrusted: the allow-list check is
-  // applied server-side in resolveEffectiveModel (via resolveProviderOptions /
-  // resolveMastraModel), so an out-of-allowlist / omitted value is rounded to
-  // the default model rather than rejected here.
+  // Per-request model selection (Req 3.3). Untrusted: the handler rounds it via
+  // resolveEffectiveModel (the single allow-list checkpoint), so an out-of-allowlist
+  // / omitted value is collapsed to the default model rather than rejected here.
   modelId?: string;
   messages: AIV6Type.UIMessage[];
 };
@@ -81,12 +81,19 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       // router level (see ./index.ts).
       requestContext.set('user', req.user);
       requestContext.set('searchService', crowi.searchService);
-      // Per-request selected model: the agent's dynamic model function reads this
-      // to resolve the effective model. Untrusted — resolveEffectiveModel rounds
-      // an out-of-allowlist / undefined value to the default (Req 4.1/4.2/4.3).
-      requestContext.set('modelId', modelId);
 
       try {
+        // Resolve the effective model ONCE per request — the single allow-list
+        // rounding checkpoint: an out-of-allowlist / undefined modelId is collapsed
+        // to the default here (warning at most once). The resolved id is threaded
+        // to BOTH the agent's dynamic model fn (via requestContext) and the
+        // providerOptions lookup, so they can never diverge and the fallback is not
+        // re-evaluated / re-warned downstream (Req 4.1/4.2/4.3). resolveMastraModel
+        // re-validates the id inside the model fn, but for this already-resolved id
+        // that is an idempotent defense-in-depth pass (no second warning).
+        const effectiveModelId = resolveEffectiveModel(modelId);
+        requestContext.set('modelId', effectiveModelId);
+
         const stream = await growiAgent.stream(messages, {
           requestContext,
           maxSteps: 10,
@@ -94,14 +101,12 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             thread: thread.id,
             resource: thread.resourceId,
           },
-          // Provider options resolved from the EFFECTIVE model's allow-list
-          // entry (Req 4.4/2.2). resolveProviderOptions rounds an
-          // out-of-allowlist / undefined modelId to the default model server-side
-          // and returns that model's options (or {} when it declares none), so
-          // the options always match the model actually used. Each operator sets
-          // their own provider namespace per allowed model; the AI SDK reads only
-          // the active provider's key.
-          providerOptions: resolveProviderOptions(modelId),
+          // Provider options for the EFFECTIVE model (Req 4.4/2.2), looked up from
+          // the already-resolved id (no re-resolution), so they always match the
+          // model the agent builds; {} when that model declares none. Each operator
+          // sets their own provider namespace per allowed model; the AI SDK reads
+          // only the active provider's key.
+          providerOptions: getProviderOptionsForModel(effectiveModelId),
         });
 
         // Use pipeUIMessageStreamToResponse for Express servers

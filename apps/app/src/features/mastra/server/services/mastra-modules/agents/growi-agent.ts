@@ -25,13 +25,14 @@ export const growiAgent = new Agent({
   // Resolve the model per request (DynamicArgument<MastraModelConfig>): the
   // function runs at use time, not at import time, so constructing the agent
   // never throws even when the provider/API key are unconfigured (Req 4.3). The
-  // per-request `modelId` is read from the RequestContext set by post-message;
-  // resolveMastraModel validates it against the allow-list and falls back to the
-  // default when it is absent or disallowed (Req 4.1, 4.3) — the client value is
-  // never trusted here. On misconfiguration resolveMastraModel() throws; the
-  // throw surfaces at request time and is handled by the post-message route's
-  // existing try/catch (Req 4.4). Its message carries only the provider name /
-  // missing-var name — never the API key (Req 4.1, 2.5).
+  // per-request `modelId` is read from the RequestContext, where post-message has
+  // already stored the EFFECTIVE (allow-list-resolved) id; resolveMastraModel
+  // re-validates it against the allow-list, which for that already-resolved id is
+  // an idempotent defense-in-depth pass (the client value was rounded upstream, so
+  // it is never trusted here either). On misconfiguration resolveMastraModel()
+  // throws; the throw surfaces at request time and is handled by the post-message
+  // route's existing try/catch (Req 4.4). Its message carries only the provider
+  // name / missing-var name — never the API key (Req 4.1, 2.5).
   //
   // The parameter is annotated with the shared shape so `get('modelId')` is
   // typed as `string | undefined` (the agent is constructed without an explicit
