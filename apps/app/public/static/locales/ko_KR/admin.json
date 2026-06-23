@@ -452,6 +452,7 @@
     "model_label": "모델",
     "default_model_label": "기본",
     "add_model": "+ 모델 추가",
+    "azure_add_deployment": "+ 배포 추가",
     "remove_model": "삭제",
     "provider_options_label": "공급자 옵션 (JSON)",
     "provider_options_invalid_json": "유효하지 않은 JSON입니다",

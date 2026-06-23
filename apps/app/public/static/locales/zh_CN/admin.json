@@ -461,6 +461,7 @@
     "model_label": "模型",
     "default_model_label": "默认",
     "add_model": "+ 添加模型",
+    "azure_add_deployment": "+ 添加部署",
     "remove_model": "删除",
     "provider_options_label": "提供商选项 (JSON)",
     "provider_options_invalid_json": "无效的 JSON",

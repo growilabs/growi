@@ -83,6 +83,11 @@ export const AllowedModelsField = (
   const modelLabelKey = isAzure
     ? 'ai_settings.azure_model_deployment_label'
     : 'ai_settings.model_label';
+  // The add button likewise follows the provider so Azure reads "+ Add deployment"
+  // (the value is a deployment name there, not a model id).
+  const addLabelKey = isAzure
+    ? 'ai_settings.azure_add_deployment'
+    : 'ai_settings.add_model';
 
   // Single-default invariant (1.3): selecting a row's radio sets its isDefault
   // and clears every other row's. Done via setValue (not field replacement) so
@@ -148,7 +153,7 @@ export const AllowedModelsField = (
           append({ modelId: '', providerOptionsText: '', isDefault: false })
         }
       >
-        {t('ai_settings.add_model')}
+        {t(addLabelKey)}
       </Button>
 
       <FormText className="d-block mt-2">

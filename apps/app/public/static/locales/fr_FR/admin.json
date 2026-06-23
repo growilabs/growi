@@ -452,6 +452,7 @@
     "model_label": "Modèle",
     "default_model_label": "Par défaut",
     "add_model": "+ Ajouter un modèle",
+    "azure_add_deployment": "+ Ajouter un déploiement",
     "remove_model": "Supprimer",
     "provider_options_label": "Options du fournisseur (JSON)",
     "provider_options_invalid_json": "JSON non valide",
