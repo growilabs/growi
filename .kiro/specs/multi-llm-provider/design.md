@@ -200,7 +200,7 @@ sequenceDiagram
 | 6.3 | 未指定→空 `{}` | config, resolve-provider-options | `ai:providerOptions` 既定なし（`undefined`）→ `{}` | リクエスト時供給 |
 | 6.4 | 不正 JSON→fail-soft＋warn | resolve-provider-options | parse try/catch → `{}` | リクエスト時供給 |
 
-> 本実装に整合（mastra-multi-model-chat）: Req 2.2/2.3 の `ai:model`（単一）と Req 6.x の `ai:providerOptions`（グローバル単一）は `ai:allowedModels`（モデル + per-model providerOptions + isDefault）へ統合・廃止された。インタフェースは `resolveEffectiveModel(modelId?)` / `getDefaultModel()` / `getAllowedModels()` / `resolveProviderOptions(modelId?)` に置換。本表の `ai:model` / `ai:providerOptions` / `requireModel()` 列はベンダー解決の枠組み（本 spec の対象）を示す歴史的記述として読む。
+> 本実装に整合（mastra-multi-model-chat）: Req 2.2/2.3 の `ai:model`（単一）と Req 6.x の `ai:providerOptions`（グローバル単一）は `ai:allowedModels`（`modelId` + per-model providerOptions + isDefault）へ統合・廃止された。インタフェースは `resolveEffectiveModelId(modelId?)` / `getDefaultModelId()` / `getAllowedModels()` / `getProviderOptionsForModel(effectiveModelId)` に置換。本表の `ai:model` / `ai:providerOptions` / `requireModel()` 列はベンダー解決の枠組み（本 spec の対象）を示す歴史的記述として読む。
 
 ## Components and Interfaces
 
@@ -254,7 +254,7 @@ export const isAiProvider = (value: unknown): value is AiProvider =>
 | `ai:model` | `string \| undefined`（既定なし＝必須。Azure では deployment 名） | `AI_MODEL` | `undefined` | no |
 | `ai:providerOptions` | `string \| undefined`（生 JSON。resolver で parse + fail-soft） | `AI_PROVIDER_OPTIONS` | `undefined` | no |
 
-> 本実装に整合（mastra-multi-model-chat）: 上記 `ai:model`（単一）/ `ai:providerOptions`（グローバル単一）は **`ai:allowedModels`**（`{ model; providerOptions?; isDefault? }[]`、env `AI_ALLOWED_MODELS`、JSON 配列）へ統合・廃止された（env `AI_MODEL` / `AI_PROVIDER_OPTIONS` も廃止、自動移行なし）。モデルは許可リスト内から選び、既定は `isDefault` エントリ、provider オプションはモデルごとに保持する。ベンダー（プロバイダ）自体は引き続き単一（`ai:provider` / `ai:apiKey`）。
+> 本実装に整合（mastra-multi-model-chat）: 上記 `ai:model`（単一）/ `ai:providerOptions`（グローバル単一）は **`ai:allowedModels`**（`{ modelId; providerOptions?; isDefault? }[]`、env `AI_ALLOWED_MODELS`、JSON 配列）へ統合・廃止された（env `AI_MODEL` / `AI_PROVIDER_OPTIONS` も廃止、自動移行なし）。モデルは許可リスト内から選び、既定は `isDefault` エントリ、provider オプションはモデルごとに保持する。ベンダー（プロバイダ）自体は引き続き単一（`ai:provider` / `ai:apiKey`）。
 
 **Implementation Notes**
 - Integration: 1 App = 1 Vendor のため**単一キーセット**。provider は `ai:provider` で選択し、resolver が `modelResolvers[provider]()` を呼ぶ。`openai:apiKey` 等の既存キーは suggest-path 用に不変（mastra は参照しない）。
@@ -262,7 +262,7 @@ export const isAiProvider = (value: unknown): value is AiProvider =>
 - **設定キー追加で編集する箇所**: `config-definition.ts` の `CONFIG_KEYS` 配列＋`CONFIG_DEFINITIONS`。`ConfigKey`/`ConfigValues` は自動導出。
 - Validation: `ai:provider` は共有 **`AiProvider | undefined`** で型付け（`import type` の type-only＝実行時に消えるため依存逆転の実害なし・`llm-provider` は leaf で循環なし・単一ソース）。**型は DX/補完のためで実行時強制ではない**（config-manager は env 文字列を宣言型で検証しない）。よって resolver は依然 `isAiProvider` で実行時検証する（`AI_PROVIDER=azure` 等の untrusted env、および未指定（`undefined`）を弾く。Req 1.3/1.4）。既定ベンダーは持たないため未指定時は resolver が throw（Req 1.3/4.1）。
 - Model 必須: `ai:model` は既定値を持たない（`undefined`）。全ベンダーで `AI_MODEL` の明示指定が必要で、未指定時は `requireModel()` が throw（Req 2.3/4.1）。resolver は per-vendor 既定 map を持たない。
-  - 本実装に整合（mastra-multi-model-chat）: `requireModel()` は撤去され、`getAllowedModels()` / `getDefaultModel()` / `resolveEffectiveModel(modelId?)` が新アクセサ。許可リストが空のときに `resolveEffectiveModel` が throw する（モデル未設定＝未構成）。
+  - 本実装に整合（mastra-multi-model-chat）: `requireModel()` は撤去され、`getAllowedModels()` / `getDefaultModelId()` / `resolveEffectiveModelId(modelId?)` が新アクセサ。許可リストが空のときに `resolveEffectiveModelId` が throw する（モデル未設定＝未構成）。
 - Secret: `ai:apiKey` は `isSecret: true`。クライアントへ返す apiv3 エンドポイントは存在せず露出経路なし（Req 2.5）。
 
 ### services
@@ -281,12 +281,12 @@ export const isAiProvider = (value: unknown): value is AiProvider =>
 export const requireApiKey = (): string => { /* ai:apiKey、欠落で throw */ };
 export const getModel = (): string => configManager.getConfig('ai:model');
 // 本実装に整合（mastra-multi-model-chat）: getModel() は撤去され、
-// getAllowedModels() / getDefaultModel() / resolveEffectiveModel(modelId?) に置換。
+// getAllowedModels() / getDefaultModelId() / resolveEffectiveModelId(modelId?) に置換。
 
 // openai.ts（anthropic / google も同形）
-// 本実装に整合（mastra-multi-model-chat）: resolver は model を引数受け取りに変更:
-//   export const resolveOpenaiModel = (model: string): MastraModelConfig =>
-//     createOpenAI({ apiKey: requireApiKey() })(model);
+// 本実装に整合（mastra-multi-model-chat）: resolver は modelId を引数受け取りに変更:
+//   export const resolveOpenaiModel = (modelId: string): MastraModelConfig =>
+//     createOpenAI({ apiKey: requireApiKey() })(modelId);
 export const resolveOpenaiModel = (): MastraModelConfig =>
   createOpenAI({ apiKey: requireApiKey() })(getModel());
 
@@ -299,7 +299,7 @@ export const modelResolvers: Record<AiProvider, () => MastraModelConfig> = {
 - Postconditions: `Agent.model` に渡せる `MastraModelConfig`。
 - Invariants: API キーは明示注入のみ（`process.env` 自動検出に依存しない）。値は関数（遅延）＝import 時に config を読まない。
 
-> 本実装に整合（mastra-multi-model-chat）: 各 provider resolver は **`model` 引数を受け取る** `(model: string) => MastraModelConfig` に変更され（`createOpenAI({ apiKey })(model)` の `model` を引数化）、`getModel()`（単一 `ai:model` 読取）は撤去された。`modelResolvers` の型も `Record<AiProvider, (model: string) => MastraModelConfig>`。実効モデルは `resolveEffectiveModel(modelId?)` が許可リストに対し検証して決める（同一プロバイダ内のモデル単位の選択。ベンダー切替ではない）。
+> 本実装に整合（mastra-multi-model-chat）: 各 provider resolver は **`modelId` 引数を受け取る** `(modelId: string) => MastraModelConfig` に変更され（`createOpenAI({ apiKey })(modelId)` の `modelId` を引数化）、`getModel()`（単一 `ai:model` 読取）は撤去された。`modelResolvers` の型も `Record<AiProvider, (modelId: string) => MastraModelConfig>`。実効モデルは `resolveEffectiveModelId(modelId?)` が許可リストに対し検証して決める（同一プロバイダ内のモデル単位の選択。ベンダー切替ではない）。
 
 **Implementation Notes**
 - 戻り型は `@mastra/core/llm` の `MastraModelConfig`（`ai` の広い `LanguageModel` union ではない）。native provider オブジェクトは `MastraModelConfig` の正当なメンバーなのでパイプライン全体が cast-free（research D-9）。
@@ -319,7 +319,7 @@ import type { MastraModelConfig } from '@mastra/core/llm';
 
 export const resolveMastraModel: () => MastraModelConfig; // 不備時は throw
 ```
-> 本実装に整合（mastra-multi-model-chat）: シグネチャは **`resolveMastraModel(modelId?: string): MastraModelConfig`** に拡張され、memoize は単一スロットから **`${provider}:${effective}` をキーとする Map** に変更された（`clearResolvedMastraModelCache()` は Map 全消去）。`modelId` は `resolveEffectiveModel` で許可リストに対し検証され（許可外/未指定は既定へ丸め）、その実効モデルで `modelResolvers[provider](effective)` を呼ぶ。
+> 本実装に整合（mastra-multi-model-chat）: シグネチャは **`resolveMastraModel(modelId?: string): MastraModelConfig`** に拡張され、memoize は単一スロットから **`${provider}:${effective}` をキーとする Map** に変更された（`clearResolvedMastraModelCache()` は Map 全消去）。`modelId` は `resolveEffectiveModelId` で許可リストに対し検証され（許可外/未指定は既定へ丸め）、その実効モデルで `modelResolvers[provider](effective)` を呼ぶ。
 - Preconditions: config-manager ロード済み。
 - Postconditions: 成功時 native model（memoize）。不備時は throw（選択 resolver 由来。メッセージは provider 名／欠落 env 名のみ、API キー値を含まない）。
 - Invariants: resolver 自身は provider 値のみ読む（apiKey/model/azure config の読取は各 provider の resolver へ移譲）。throw メッセージに API キー値を含めない（Req 2.5）。per-vendor 既定モデル map は持たない（モデルは必須・既定なし）。
@@ -379,7 +379,7 @@ export type MastraProviderOptions = Record<string, Record<string, JSONValue>>;
 // 不正 JSON / 非オブジェクトは {} にフォールバック（warn）。例外は投げない。
 export const resolveProviderOptions: () => MastraProviderOptions;
 ```
-> 本実装に整合（mastra-multi-model-chat）: シグネチャは **`resolveProviderOptions(modelId?: string): MastraProviderOptions`** に変更され、グローバル単一 `ai:providerOptions` ではなく**実効モデルの `ai:allowedModels` エントリ**の `providerOptions` から解決する（該当なしは `{}`）。全モデル一律のグローバルオプションは廃止（オプションは常に使用モデル単位）。
+> 本実装に整合（mastra-multi-model-chat）: シグネチャは **`getProviderOptionsForModel(effectiveModelId: string): ModelProviderOptions`** に変更され、グローバル単一 `ai:providerOptions` ではなく**実効モデルの `ai:allowedModels` エントリ**の `providerOptions` から解決する（該当なしは `{}`）。さらに**純粋な lookup** に変わり、丸め/検証/警告は一切行わない: `post-message` ハンドラが `resolveEffectiveModelId` で実効モデルを **1 回だけ**解決し、その id を requestContext と `getProviderOptionsForModel` の双方へ渡す（実効モデルがリクエストごとに二重解決されない）。型 `MastraProviderOptions` は撤去され、唯一の providerOptions 型は `interfaces/allowed-model.ts` 宣言の `ModelProviderOptions`（DTO とサーバ resolver の双方が参照）に統一。全モデル一律のグローバルオプションは廃止（オプションは常に使用モデル単位）。
 - Postconditions: 実効モデルのエントリの `providerOptions` を返す。未設定/空/不正/非オブジェクトは `{}`（warn）。
 - Invariants: **生 JSON を解釈せずそのまま返す（variant A）** — per-vendor マッピングを持たない。例外を投げない（チャットを壊さない。Req 6.4）。
 - 型: `ProviderOptions` は `ai` から未 export のため、`JSONValue`（`ai` から export 済）を用いた構造型 `Record<string, Record<string, JSONValue>>` で表現。
@@ -405,7 +405,7 @@ export const resolveProviderOptions: () => MastraProviderOptions;
 ## Testing Strategy
 
 ### Unit Tests
-- **resolver**: vendor 未指定→throw（`AI_PROVIDER`）（1.3/4.1）／不正 vendor→throw（値を含む）（1.4）／apiKey 欠落→throw（`AI_API_KEY`）（4.1）／model 欠落→throw（`AI_MODEL`）（2.3/4.1）／3 ベンダー各成功で正しい factory を `{apiKey, model}` で呼ぶ（1.2/2.1/2.2）／throw メッセージに apiKey 値を含まない（2.5）／単一キーのみ参照（3.2）／memoize（同一 instance, factory 1 回）と throw は非 memoize。本実装に整合（mastra-multi-model-chat）: model 欠落 throw は許可リスト空のときの `resolveEffectiveModel` throw に置換、memoize は `${provider}:${effective}` キーの Map、resolver は `model` 引数を受け取る。
+- **resolver**: vendor 未指定→throw（`AI_PROVIDER`）（1.3/4.1）／不正 vendor→throw（値を含む）（1.4）／apiKey 欠落→throw（`AI_API_KEY`）（4.1）／model 欠落→throw（`AI_MODEL`）（2.3/4.1）／3 ベンダー各成功で正しい factory を `{apiKey, model}` で呼ぶ（1.2/2.1/2.2）／throw メッセージに apiKey 値を含まない（2.5）／単一キーのみ参照（3.2）／memoize（同一 instance, factory 1 回）と throw は非 memoize。本実装に整合（mastra-multi-model-chat）: model 欠落 throw は許可リスト空のときの `resolveEffectiveModelId` throw に置換、memoize は `${provider}:${effective}` キーの Map、resolver は `modelId` 引数を受け取る。
 - **isAiProvider**: 3 値を受理・他を拒否（1.1/1.4）。
 - **provider factories**: 各 factory が対応 `create*` を `{ apiKey }` で呼び `(model)` を適用（ai-sdk を mock）（1.2/2.1/2.2）。
 
@@ -420,8 +420,8 @@ export const resolveProviderOptions: () => MastraProviderOptions;
 - API キーは env からの明示注入のみ（provider の env 自動検出に依存しない）。
 
 ## Open Questions / Risks
-- **モデル必須（既定なし）**: `ai:model` は既定値を持たず、全ベンダーで `AI_MODEL` の明示指定が必要（未指定なら `requireModel()` が throw）。per-vendor 既定 map も持たない。PR FB で「default `o4-mini`」案を撤回（将来の SLM 対応・特定モデルへの先入れを避ける）。本実装に整合（mastra-multi-model-chat）: `ai:model` 単一・`requireModel()` は `ai:allowedModels` + `resolveEffectiveModel(modelId?)` / `getDefaultModel()` へ置換（許可リスト空のとき throw）。
-- **provider options（本仕様で対応・Req 6）**: `ai:providerOptions`（単一 JSON env）を `resolveProviderOptions()` が parse し `post-message` の stream 呼び出しへ適用。既定値は持たず、未指定時は空 `{}`（PR FB で OpenAI reasoning 既定を撤回）。指定された名前空間がアクティブ provider と異なる場合は AI SDK が無視（検証済：`parseProviderOptions` は当該 provider 名前空間が無ければ throw しない）。intent レベルの per-vendor 自動マッピングは非対応（生 JSON を運用者が指定）。各ベンダーの reasoning オプション一覧は research.md D-7/D-8 を参照。本実装に整合（mastra-multi-model-chat）: グローバル単一 `ai:providerOptions` は廃止され、`resolveProviderOptions(modelId?)` が実効モデルの許可リストエントリから per-model に解決する。
+- **モデル必須（既定なし）**: `ai:model` は既定値を持たず、全ベンダーで `AI_MODEL` の明示指定が必要（未指定なら `requireModel()` が throw）。per-vendor 既定 map も持たない。PR FB で「default `o4-mini`」案を撤回（将来の SLM 対応・特定モデルへの先入れを避ける）。本実装に整合（mastra-multi-model-chat）: `ai:model` 単一・`requireModel()` は `ai:allowedModels` + `resolveEffectiveModelId(modelId?)` / `getDefaultModelId()` へ置換（許可リスト空のとき throw）。
+- **provider options（本仕様で対応・Req 6）**: `ai:providerOptions`（単一 JSON env）を `resolveProviderOptions()` が parse し `post-message` の stream 呼び出しへ適用。既定値は持たず、未指定時は空 `{}`（PR FB で OpenAI reasoning 既定を撤回）。指定された名前空間がアクティブ provider と異なる場合は AI SDK が無視（検証済：`parseProviderOptions` は当該 provider 名前空間が無ければ throw しない）。intent レベルの per-vendor 自動マッピングは非対応（生 JSON を運用者が指定）。各ベンダーの reasoning オプション一覧は research.md D-7/D-8 を参照。本実装に整合（mastra-multi-model-chat）: グローバル単一 `ai:providerOptions` は廃止され、`getProviderOptionsForModel(effectiveModelId)` が実効モデルの許可リストエントリから per-model に解決する（純粋な lookup。実効モデルは `resolveEffectiveModelId` で一度だけ解決して渡す）。
 - **依存分類（検証済 D-?）**: `@ai-sdk/anthropic`/`@ai-sdk/google` は Express サーバ（`dist/`、`build:server`）経由の server-only パッケージで `.next/node_modules` には externalise されない（既存 `@ai-sdk/openai` と同一）。`dependencies` 配置で正しい。確定的 prod ロード検証は CI Level 2（`server:ci`）。
 - **削除した config キー**: `openai:assistantModel:mastraAgent`（`OPENAI_MASTRA_AGENT_MODEL`）は未使用化したため本仕様で削除（`OpenAI.Chat.ChatModel` 用の `openai` 型 import も除去）。
 - **pre-existing branch 課題（本仕様スコープ外）**: `apiv3/index.js` の `mastraRouteFactory` import 欠落、`post-message.ts:77` TS2769。support/mastra ブランチのマージ未完状態で、別途対応が必要（tasks.md Implementation Notes 参照）。
@@ -475,7 +475,7 @@ export const modelResolvers: Record<AiProvider, () => MastraModelConfig> = {
   google: resolveGoogleModel,        'azure-openai': resolveAzureOpenaiModel,
 };
 ```
-> 本実装に整合（mastra-multi-model-chat）: 上記 resolver は **`model` 引数を受け取る** `(model: string) => MastraModelConfig` に変更され（`getModel()` は撤去）、`modelResolvers` の型も `Record<AiProvider, (model: string) => MastraModelConfig>`。Azure では渡される `model`（=実効モデル）が `ai:allowedModels` 内のデプロイ名を指す。エンドポイント排他・Entra ID 認証など Azure 固有ロジックは引き続き `resolveAzureOpenaiModel` 内に局在し、`requiresApiKey(provider)` ヘルパが `is-ai-configured` の apiKey 要否判定と認証分岐を共有する。
+> 本実装に整合（mastra-multi-model-chat）: 上記 resolver は **`modelId` 引数を受け取る** `(modelId: string) => MastraModelConfig` に変更され（`getModel()` は撤去）、`modelResolvers` の型も `Record<AiProvider, (modelId: string) => MastraModelConfig>`。Azure では渡される `modelId`（=実効モデル）が `ai:allowedModels` 内のデプロイ名を指す。エンドポイント排他・Entra ID 認証など Azure 固有ロジックは引き続き `resolveAzureOpenaiModel` 内に局在する。
 azure の検証/排他/認証ルール（`resolveAzureOpenaiModel` 内・`configManager.getConfig('ai:azureOpenaiSettings') ?? {}` から `{ resourceName, baseURL, apiVersion, useEntraId }` を分解して読む）:
 - 検証: `resourceName == null && baseURL == null` なら throw（`AI_AZURE_OPENAI_SETTINGS` 内の `resourceName` / `baseURL` を名指し・キー値非含。Req 7.4）。
 - 排他: `baseURL` 設定時は `baseURL` のみ、未設定時は `resourceName` のみを `createAzure` に渡す（AI SDK は両指定不可・baseURL 優先。Req 7.3）。`apiVersion` は設定時のみ付与（未設定→SDK 既定。Req 7.5）。
@@ -492,7 +492,7 @@ return memoizedModel;
 ```
 （apiKey/model/azure 固有 config の読取は各 provider の resolver 内に移動。resolver 本体は provider 検証 + dispatch + memo のみ。）
 
-> 本実装に整合（mastra-multi-model-chat）: 本体は `resolveMastraModel(modelId?)` となり、実効モデルを `resolveEffectiveModel(modelId)`（許可リスト検証・許可外/未指定は既定へ丸め）で決めてから `modelResolvers[provider](effective)` を dispatch する。memo は単一スロットから `${provider}:${effective}` キーの Map に変更（`clearResolvedMastraModelCache()` は Map 全消去）。provider（ベンダー）選択は単一のまま変わらない。
+> 本実装に整合（mastra-multi-model-chat）: 本体は `resolveMastraModel(modelId?)` となり、実効モデルを `resolveEffectiveModelId(modelId)`（許可リスト検証・許可外/未指定は既定へ丸め）で決めてから `modelResolvers[provider](effective)` を dispatch する。memo は単一スロットから `${provider}:${effective}` キーの Map に変更（`clearResolvedMastraModelCache()` は Map 全消去）。provider（ベンダー）選択は単一のまま変わらない。
 
 ### Requirements Traceability（追加分）
 
@@ -512,10 +512,10 @@ return memoizedModel;
 ### Testing（追加分）
 - **azure resolver**（`azure-openai.spec.ts`）: resourceName 経路（`createAzure({apiKey, resourceName})` を呼び `(model)` 適用）／baseURL 経路／両指定→baseURL 優先（resourceName を渡さない）／apiVersion 指定時のみ付与／**いずれも無い→throw（env 名・apiKey 値非含）**（7.2–7.5）／**Entra ID 経路**（`useEntraId` 時に `tokenProvider` を渡し apiKey 非送出）／**apiKey も Entra ID も無い→throw**（8.1–8.5）。configManager + `@ai-sdk/azure` + `@azure/identity` を vi.mock。
 - **key-based resolvers**（`llm-providers.spec.ts`）: `resolveOpenai/Anthropic/Google` が config の apiKey+model で `create*` を呼ぶ／apiKey 欠落で throw（`requireApiKey`／`AI_API_KEY`）／model 欠落で throw（`requireModel`／`AI_MODEL`）／provider の env 自動検出を使わない。
-  - 本実装に整合（mastra-multi-model-chat）: resolver は `model` 引数を受け取り（`getModel()` 撤去）、model 欠落 throw は許可リスト空のときの `resolveEffectiveModel` throw に置換。
+  - 本実装に整合（mastra-multi-model-chat）: resolver は `modelId` 引数を受け取り（`getModel()` 撤去）、model 欠落 throw は許可リスト空のときの `resolveEffectiveModelId` throw に置換。
 - **modelResolvers map**: `Object.keys` が `AI_PROVIDERS` と一致／各 key が対応 resolver に振り分け。
 - **resolver**（`resolve-mastra-model.spec.ts`）: provider 検証 throw／4 provider を対応 resolver に dispatch／memo（同一 instance・1 回・throw は非 memo）。
-  - 本実装に整合（mastra-multi-model-chat）: `resolveMastraModel(modelId?)` の memo は `${provider}:${effective}` キーの Map、実効モデルは `resolveEffectiveModel` で許可検証して決める。
+  - 本実装に整合（mastra-multi-model-chat）: `resolveMastraModel(modelId?)` の memo は `${provider}:${effective}` キーの Map、実効モデルは `resolveEffectiveModelId` で許可検証して決める。
 - **isAiProvider**: `'azure-openai'` を受理。**未対応の例示**は別の文字列（例 `'cohere'`、旧 `'azure'`）へ差し替え。
 
 ### Open Questions（Azure 固有）
