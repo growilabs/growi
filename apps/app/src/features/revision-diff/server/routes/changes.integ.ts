@@ -21,7 +21,7 @@ import request from 'supertest';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import type Crowi from '~/server/crowi';
-import type { PageDocument, PageModel } from '~/server/models/page';
+import type { PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
@@ -161,7 +161,9 @@ function mockPageQueries(
     }),
   } as unknown as PageModel;
 
-  vi.spyOn(mongoose, 'model').mockReturnValue(mockPage as any);
+  vi.spyOn(mongoose, 'model').mockReturnValue(
+    mockPage as unknown as ReturnType<typeof mongoose.model>,
+  );
   return mockPage;
 }
 
@@ -215,7 +217,6 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
   // Req 1.3 — empty result when user has no revisions in range
   // -------------------------------------------------------------------------
   it('returns empty changes array when user has no revisions', async () => {
-    const pageId = makeId();
     mockPageQueries([], []);
 
     const app = buildApp(userId);
@@ -495,7 +496,9 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
         lean: () => Promise.resolve([allPageInfos[0]]),
       }),
     } as unknown as PageModel;
-    vi.spyOn(mongoose, 'model').mockReturnValue(mockPage1 as any);
+    vi.spyOn(mongoose, 'model').mockReturnValue(
+      mockPage1 as unknown as ReturnType<typeof mongoose.model>,
+    );
 
     const app = buildApp(userId);
     const page1 = await request(app)
@@ -511,6 +514,7 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
     expect(changes1[0].pageId).toBe(pageAStr);
     expect(changes1[0].toRevisionId).toBe(rev1._id.toString());
     expect(cursor1).not.toBeNull();
+    if (cursor1 == null) return; // narrow for the typed query below (asserted above)
 
     vi.restoreAllMocks();
 
@@ -521,11 +525,13 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
         lean: () => Promise.resolve([allPageInfos[1]]),
       }),
     } as unknown as PageModel;
-    vi.spyOn(mongoose, 'model').mockReturnValue(mockPage2 as any);
+    vi.spyOn(mongoose, 'model').mockReturnValue(
+      mockPage2 as unknown as ReturnType<typeof mongoose.model>,
+    );
 
     const page2 = await request(app)
       .get('/api/v3/revisions/changes')
-      .query({ limit: '1', cursor: cursor1! });
+      .query({ limit: '1', cursor: cursor1 });
 
     expect(page2.status).toBe(200);
     const { changes: changes2, next: cursor2 } = page2.body as {
@@ -536,6 +542,7 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
     expect(changes2[0].pageId).toBe(pageBStr);
     expect(changes2[0].toRevisionId).toBe(rev2._id.toString());
     expect(cursor2).not.toBeNull();
+    if (cursor2 == null) return; // narrow for the typed query below (asserted above)
 
     vi.restoreAllMocks();
 
@@ -546,11 +553,13 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
         lean: () => Promise.resolve([allPageInfos[2]]),
       }),
     } as unknown as PageModel;
-    vi.spyOn(mongoose, 'model').mockReturnValue(mockPage3 as any);
+    vi.spyOn(mongoose, 'model').mockReturnValue(
+      mockPage3 as unknown as ReturnType<typeof mongoose.model>,
+    );
 
     const page3 = await request(app)
       .get('/api/v3/revisions/changes')
-      .query({ limit: '1', cursor: cursor2! });
+      .query({ limit: '1', cursor: cursor2 });
 
     expect(page3.status).toBe(200);
     const { changes: changes3, next: cursor3 } = page3.body as {
@@ -711,12 +720,12 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
     const pageB = makeId();
 
     // Both pages edited by the same user in interleaved timestamps.
-    const revA1 = await createRevision({
+    await createRevision({
       pageId: pageA,
       author: userId,
       createdAt: new Date('2024-06-01T10:00:00Z'),
     });
-    const revB1 = await createRevision({
+    await createRevision({
       pageId: pageB,
       author: userId,
       createdAt: new Date('2024-06-01T10:30:00Z'),
@@ -763,10 +772,10 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
     expect(runB).toBeDefined();
 
     // Runs span the full edit sequence for each page.
-    expect(runA!.fromRevisionId).toBeNull();
-    expect(runA!.toRevisionId).toBe(revA2._id.toString());
-    expect(runB!.fromRevisionId).toBeNull();
-    expect(runB!.toRevisionId).toBe(revB2._id.toString());
+    expect(runA?.fromRevisionId).toBeNull();
+    expect(runA?.toRevisionId).toBe(revA2._id.toString());
+    expect(runB?.fromRevisionId).toBeNull();
+    expect(runB?.toRevisionId).toBe(revB2._id.toString());
   });
 
   // -------------------------------------------------------------------------
@@ -855,6 +864,6 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
     const xEntry = all.find((c) => c.toRevisionId === xLast._id.toString());
     expect(xEntry).toBeDefined();
     // Baseline must be the page-creation marker (null), NOT the user's own 01:00 revision.
-    expect(xEntry!.fromRevisionId).toBeNull();
+    expect(xEntry?.fromRevisionId).toBeNull();
   });
 });
