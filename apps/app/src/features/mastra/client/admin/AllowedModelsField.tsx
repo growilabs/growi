@@ -118,7 +118,7 @@ export const AllowedModelsField = (
 
   return (
     <FormGroup className="mb-3">
-      <Label>{t(modelLabelKey)}</Label>
+      <Label className="d-block mb-2">{t(modelLabelKey)}</Label>
 
       {fields.map((field, index) => (
         <AllowedModelRow
