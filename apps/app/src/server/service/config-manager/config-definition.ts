@@ -289,7 +289,7 @@ export const CONFIG_KEYS = [
   // Mastra LLM Settings (provider-agnostic: one provider per app)
   'ai:provider',
   'ai:apiKey',
-  // Allow-list of selectable models (model + per-model providerOptions + isDefault
+  // Allow-list of selectable models (modelId + per-model providerOptions + isDefault
   // flag), stored as a single JSON array. Replaces the former single ai:model /
   // ai:providerOptions keys.
   'ai:allowedModels',
@@ -1304,14 +1304,14 @@ export const CONFIG_DEFINITIONS = {
   // Azure OpenAI-only connection config (ai:provider='azure-openai'),
   // consolidated into a SINGLE JSON object key (was four flat keys:
   // ai:azureOpenai{ResourceName,BaseUrl,ApiVersion,UseEntraId}). Azure is reached
-  // via a resource-specific endpoint, so { apiKey, model } alone is not enough.
+  // via a resource-specific endpoint, so { apiKey, modelId } alone is not enough.
   // Set exactly one of resourceName / baseURL: resourceName builds the standard
   // https://<name>.openai.azure.com/... URL; baseURL is the
   // escape hatch for Azure Government / sovereign clouds / API Management
   // gateways / custom domains. apiVersion is optional (the AI SDK defaults it).
   // useEntraId selects Microsoft Entra ID (managed identity / DefaultAzureCredential)
   // auth instead of an API key (then AI_API_KEY is not required). For Azure, an
-  // allowed model's `model` is the *deployment name*, not an OpenAI model id. This
+  // allowed model's `modelId` is the *deployment name*, not an OpenAI model id. This
   // key is ignored by the other providers and is not secret (only ai:apiKey is).
   // See AzureOpenaiConfig for field semantics.
   //
