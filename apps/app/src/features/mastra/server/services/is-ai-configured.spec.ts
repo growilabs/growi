@@ -121,13 +121,36 @@ describe('isAiConfigured (Req 6.1)', () => {
   // Azure OpenAI + Microsoft Entra ID authenticates via a bearer token (no apiKey),
   // mirroring resolveAzureOpenaiModel which skips ai:apiKey when useEntraId === true.
   // Such a deployment must stay configured (Req 6.1: gating unchanged), so the apiKey
-  // prerequisite is relaxed only for this exact provider+useEntraId combination.
-  it('is true for azure-openai with useEntraId even when apiKey is unset (Entra ID auth)', () => {
+  // prerequisite is relaxed only for this exact provider+useEntraId combination. An
+  // endpoint (resourceName here) is still required — see the endpoint cases below.
+  it('is true for azure-openai with useEntraId + an endpoint even when apiKey is unset (Entra ID auth)', () => {
     stubConfig({
       provider: 'azure-openai',
       apiKey: undefined,
       allowedModels: ONE_MODEL,
-      azureOpenaiSettings: { useEntraId: true },
+      azureOpenaiSettings: { useEntraId: true, resourceName: 'my-resource' },
+    });
+
+    expect(isAiConfigured()).toBe(true);
+  });
+
+  it('is true for azure-openai with apiKey + an endpoint (key auth)', () => {
+    stubConfig({
+      provider: 'azure-openai',
+      apiKey: 'sk-test',
+      allowedModels: ONE_MODEL,
+      azureOpenaiSettings: { resourceName: 'my-resource' },
+    });
+
+    expect(isAiConfigured()).toBe(true);
+  });
+
+  it('is true for azure-openai when the endpoint is given as baseURL instead of resourceName', () => {
+    stubConfig({
+      provider: 'azure-openai',
+      apiKey: 'sk-test',
+      allowedModels: ONE_MODEL,
+      azureOpenaiSettings: { baseURL: 'https://example.openai.azure.com' },
     });
 
     expect(isAiConfigured()).toBe(true);
@@ -138,7 +161,7 @@ describe('isAiConfigured (Req 6.1)', () => {
       provider: 'azure-openai',
       apiKey: undefined,
       allowedModels: ONE_MODEL,
-      azureOpenaiSettings: { useEntraId: false },
+      azureOpenaiSettings: { useEntraId: false, resourceName: 'my-resource' },
     });
 
     expect(isAiConfigured()).toBe(false);
@@ -150,7 +173,44 @@ describe('isAiConfigured (Req 6.1)', () => {
       provider: 'azure-openai',
       apiKey: undefined,
       allowedModels: [],
+      azureOpenaiSettings: { useEntraId: true, resourceName: 'my-resource' },
+    });
+
+    expect(isAiConfigured()).toBe(false);
+  });
+
+  // resolveAzureOpenaiModel throws when neither resourceName nor baseURL is set
+  // (endpoint mandatory regardless of auth method). isAiConfigured must mirror that:
+  // an Azure deployment with credentials but no endpoint is NOT ready — reporting it
+  // ready would gate AI on, then fail every chat request at resolve time (Req 6.1).
+  it('is false for azure-openai (key auth) when neither resourceName nor baseURL is set', () => {
+    stubConfig({
+      provider: 'azure-openai',
+      apiKey: 'sk-test',
+      allowedModels: ONE_MODEL,
+      azureOpenaiSettings: { apiVersion: '2024-02-01' },
+    });
+
+    expect(isAiConfigured()).toBe(false);
+  });
+
+  it('is false for azure-openai (Entra ID) when neither resourceName nor baseURL is set', () => {
+    stubConfig({
+      provider: 'azure-openai',
+      apiKey: undefined,
+      allowedModels: ONE_MODEL,
       azureOpenaiSettings: { useEntraId: true },
+    });
+
+    expect(isAiConfigured()).toBe(false);
+  });
+
+  it('is false for azure-openai when ai:azureOpenaiSettings is unset entirely', () => {
+    stubConfig({
+      provider: 'azure-openai',
+      apiKey: 'sk-test',
+      allowedModels: ONE_MODEL,
+      azureOpenaiSettings: undefined,
     });
 
     expect(isAiConfigured()).toBe(false);

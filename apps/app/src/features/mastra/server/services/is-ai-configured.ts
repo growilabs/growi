@@ -10,9 +10,8 @@ import {
 
 // "Is AI configured?" requires all three independent prerequisites to hold:
 //   1. a supported provider is selected (`ai:provider` passes isAiProvider),
-//   2. credentials are present (the shared API key for key-based auth, OR — for
-//      Azure OpenAI with Microsoft Entra ID — an ambient managed identity, which
-//      uses no apiKey),
+//   2. the provider's required connection config is present (see
+//      hasRequiredProviderConfig — credentials, plus the Azure endpoint),
 //   3. the operator's allow-list has at least one model.
 // The allow-list check replaces the former single ai:model presence test:
 // "no allowed models" is always observed as getAllowedModels() === [] (DB-absent
@@ -20,17 +19,31 @@ import {
 // the criteria resolveMastraModel enforces at request time without building a
 // model here — callers (guard, sidebar supplier, admin GET) only need a boolean.
 
-// resolveAzureOpenaiModel skips ai:apiKey when ai:azureOpenaiSettings.useEntraId
-// === true (it authenticates via a bearer token from DefaultAzureCredential).
-// Mirror that exact branch so the configured-verdict agrees with the resolver's
-// real auth path — otherwise an Entra-only Azure deployment (no apiKey by design)
-// would be wrongly reported unconfigured, regressing the AI gating (Req 6.1).
-const requiresApiKey = (provider: AiProvider): boolean => {
-  if (provider === 'azure-openai') {
-    const settings = configManager.getConfig('ai:azureOpenaiSettings');
-    return settings?.useEntraId !== true;
+// Mirror resolveAzureOpenaiModel's two requirements for the configured-verdict so
+// it agrees with the resolver's real success/throw path (Req 6.1), without
+// building a model (which, under Entra ID, would construct a token provider).
+// Non-Azure (key-based) providers only need the shared apiKey.
+const hasRequiredProviderConfig = (provider: AiProvider): boolean => {
+  if (provider !== 'azure-openai') {
+    return getApiKey() != null;
   }
-  return true;
+
+  const azureOpenaiSettings = configManager.getConfig('ai:azureOpenaiSettings');
+  // An endpoint is mandatory regardless of auth: resolveAzureOpenaiModel throws
+  // when both resourceName and baseURL are absent, so a credentials-present-but-
+  // endpoint-missing Azure deployment must read as unconfigured (not "ready then 500").
+  if (
+    azureOpenaiSettings?.resourceName == null &&
+    azureOpenaiSettings?.baseURL == null
+  ) {
+    return false;
+  }
+  // apiKey is waived only under Entra ID (ambient managed identity, no apiKey);
+  // otherwise the shared key is required.
+  if (azureOpenaiSettings.useEntraId === true) {
+    return true;
+  }
+  return getApiKey() != null;
 };
 
 export const isAiConfigured = (): boolean => {
@@ -39,7 +52,7 @@ export const isAiConfigured = (): boolean => {
     return false;
   }
 
-  if (requiresApiKey(provider) && getApiKey() == null) {
+  if (!hasRequiredProviderConfig(provider)) {
     return false;
   }
 
