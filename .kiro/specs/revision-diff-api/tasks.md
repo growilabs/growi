@@ -62,7 +62,7 @@
   - _Requirements: 1.1, 1.5, 8.1, 8.2, 8.3_
   - _Boundary: changes route_
   - _Depends: 1.1, 2.2, 2.3_
-- [ ] 4.2 (P) Revision Diff ルート（POST /revisions/diff）
+- [x] 4.2 (P) Revision Diff ルート（POST /revisions/diff）
   - 同じ認証ミドルウェア順。body の pairs を検証し MAX_PAIRS 超過・型不正は 400。RevisionDiffService に委譲。swagger 付与
   - 完了状態: 認証済み PAT で版ペアを送ると per-item の結果配列を 200 で返し、上限超過は 400
   - _Requirements: 6.1, 6.5, 8.1, 8.2, 8.3, 9.2_
