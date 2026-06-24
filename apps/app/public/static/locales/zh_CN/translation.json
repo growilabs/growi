@@ -384,7 +384,8 @@
     "no_user_found": "未找到用户名",
     "reply": "Reply",
     "delete_comment": "Delete comment?",
-    "comment_management_is_not_allowed": "不允许操作评论。"
+    "comment_management_is_not_allowed": "不允许操作评论。",
+    "no_comments": "暂无评论。"
   },
   "page_api_error": {
     "notfound_or_forbidden": "未找到或禁止原始页。",

@@ -392,7 +392,8 @@
     "no_user_found": "No user found",
     "reply": "Reply",
     "delete_comment": "Delete comment?",
-    "comment_management_is_not_allowed": "Comment management is not allowed."
+    "comment_management_is_not_allowed": "Comment management is not allowed.",
+    "no_comments": "There are no comments yet."
   },
   "page_api_error": {
     "notfound_or_forbidden": "Original page is not found or forbidden.",
