@@ -493,10 +493,10 @@ export const CONFIG_DEFINITIONS = {
   }),
   // Changes Index API: how far back (seconds from now) a request may look. Each cursor
   // page recomputes runs over the window, so this bounds the worst-case scan. Finite by
-  // default (365 days); operators may tune it via the env var.
+  // default (30 days); operators may tune it via the env var.
   'app:revisionDiffMaxLookbackSeconds': defineConfig<number>({
     envVarName: 'REVISION_DIFF_MAX_LOOKBACK_SECONDS',
-    defaultValue: 31536000,
+    defaultValue: 2592000,
   }),
   'app:auditLogActionGroupSize': defineConfig<ActionGroupSize>({
     envVarName: 'AUDIT_LOG_ACTION_GROUP_SIZE',

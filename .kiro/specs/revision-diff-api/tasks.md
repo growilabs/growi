@@ -95,7 +95,7 @@
 
 - [ ] 6. Lookback 上限（遡及範囲のガードレール）
 - [ ] 6.1 config 定義と changes route での適用（reject / 既定窓）
-  - config-definition に `app:revisionDiffMaxLookbackSeconds`（env `REVISION_DIFF_MAX_LOOKBACK_SECONDS`、既定 31536000＝365日）を追加（CONFIG_KEYS ＋ CONFIG_DEFINITIONS）
+  - config-definition に `app:revisionDiffMaxLookbackSeconds`（env `REVISION_DIFF_MAX_LOOKBACK_SECONDS`、既定 2592000＝30日）を追加（CONFIG_KEYS ＋ CONFIG_DEFINITIONS）
   - changes route で `floor = now - maxLookbackSeconds` を求め、実効下限 `max(since, fromDate)` が floor より過去なら 400（`lookback-limit-exceeded`、許容上限を提示）。下限未指定なら floor を実効下限に採用。判定は route（検証・正規化）で行い service には正規化済み `since` のみ渡す
   - 先に失敗する結合テストを書く（TDD）: 明示 since が上限超過で 400／下限未指定で上限窓に絞られる／上限内 since は従来どおり
   - swagger に 400(`lookback-limit-exceeded`) と既定挙動を追記
