@@ -56,6 +56,12 @@ vi.mock('~/server/middlewares/apiv3-form-validator', () => ({
     next(),
 }));
 
+// The real changes factory reads the lookback-limit config; stub it (config is not
+// loaded in this test) so GET /revisions/changes reaches the handler.
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: { getConfig: vi.fn().mockReturnValue(31536000) },
+}));
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------

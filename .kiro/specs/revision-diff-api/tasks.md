@@ -93,5 +93,16 @@
   - _Requirements: 6.1, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3_
   - _Depends: 4.2_
 
+- [ ] 6. Lookback 上限（遡及範囲のガードレール）
+- [ ] 6.1 config 定義と changes route での適用（reject / 既定窓）
+  - config-definition に `app:revisionDiffMaxLookbackSeconds`（env `REVISION_DIFF_MAX_LOOKBACK_SECONDS`、既定 31536000＝365日）を追加（CONFIG_KEYS ＋ CONFIG_DEFINITIONS）
+  - changes route で `floor = now - maxLookbackSeconds` を求め、実効下限 `max(since, fromDate)` が floor より過去なら 400（`lookback-limit-exceeded`、許容上限を提示）。下限未指定なら floor を実効下限に採用。判定は route（検証・正規化）で行い service には正規化済み `since` のみ渡す
+  - 先に失敗する結合テストを書く（TDD）: 明示 since が上限超過で 400／下限未指定で上限窓に絞られる／上限内 since は従来どおり
+  - swagger に 400(`lookback-limit-exceeded`) と既定挙動を追記
+  - 完了状態: 上記結合テストが green、既存テストは大きい lookback を与えて不変
+  - _Requirements: 1.4, 10.1, 10.2, 10.3, 10.4_
+  - _Boundary: changes route, config-definition_
+  - _Depends: 4.1_
+
 ## Implementation Notes
 - Task 3.1: `computeDiffForPair` currently passes `pageId` to `buildUnifiedDiff` as the `pagePath` argument. `RevisionDiffPairInput` has no path field, so pagePath cannot be provided at the pure function level. When wiring the full service in Task 4.2, the route or service layer should fetch the page path and pass it through, or accept that the diff header shows pageId instead of path.

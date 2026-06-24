@@ -19,6 +19,7 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type { ChangesIndexRequestQuery } from '../../interfaces/dto/changes-index';
@@ -156,7 +157,11 @@ const validator = [
  *                      nullable: true
  *                      description: Cursor token for the next page, or null when all results have been returned
  *          400:
- *            description: Invalid query parameters (invalid date range or malformed cursor)
+ *            description: >
+ *              Invalid query parameters: invalid date range, malformed cursor, or a
+ *              `since`/`fromDate` older than the configured lookback limit
+ *              (error code `lookback-limit-exceeded`). When no lower bound is given, the
+ *              lookback limit is applied as the window's lower bound instead of erroring.
  *          401:
  *            description: Not authenticated
  *          403:
@@ -228,13 +233,32 @@ export const changesRouteHandlersFactory = (crowi: Crowi): RequestHandler[] => {
         lowerBound = sinceDate ?? fromDate;
       }
 
+      // Lookback limit (Req 10): cap how far back the request may reach. Each cursor page
+      // recomputes runs over the window, so an unbounded lower bound makes the worst-case
+      // scan unbounded. An explicit lower bound older than the floor is rejected; when no
+      // lower bound is given, the floor itself becomes the window's lower bound.
+      const maxLookbackSeconds = configManager.getConfig(
+        'app:revisionDiffMaxLookbackSeconds',
+      );
+      const lookbackFloor = new Date(Date.now() - maxLookbackSeconds * 1000);
+      if (lowerBound != null && lowerBound < lookbackFloor) {
+        return res.apiv3Err(
+          new ErrorV3(
+            `since/fromDate must not be older than ${maxLookbackSeconds} seconds (lookback limit)`,
+            'lookback-limit-exceeded',
+          ),
+          400,
+        );
+      }
+      const effectiveSince = lowerBound ?? lookbackFloor;
+
       const limit =
         req.query.limit != null
           ? Number.parseInt(req.query.limit, 10)
           : DEFAULT_LIMIT;
 
       const normalizedQuery: NormalizedChangesQuery = {
-        since: lowerBound,
+        since: effectiveSince,
         toDate,
         limit,
         cursor: cursorKey,

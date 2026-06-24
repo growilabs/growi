@@ -24,6 +24,7 @@ import type Crowi from '~/server/crowi';
 import type { PageModel } from '~/server/models/page';
 import { Revision } from '~/server/models/revision';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+import { configManager } from '~/server/service/config-manager';
 
 import { changesRouteHandlersFactory } from './changes';
 
@@ -66,6 +67,10 @@ vi.mock('~/server/middlewares/apiv3-form-validator', () => {
     },
   };
 });
+
+vi.mock('~/server/service/config-manager', () => ({
+  configManager: { getConfig: vi.fn() },
+}));
 
 // ---------------------------------------------------------------------------
 // Helpers
@@ -204,9 +209,14 @@ async function paginateAll(
 describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
   let userId: Types.ObjectId;
 
+  // Existing tests use fixed 2024 dates; give them a very large lookback so the floor
+  // (now - lookback) never excludes their data. Lookback-specific tests override this.
+  const HUGE_LOOKBACK_SECONDS = 100 * 365 * 24 * 60 * 60;
+
   beforeEach(async () => {
     userId = makeId();
     await Revision.deleteMany({});
+    vi.mocked(configManager.getConfig).mockReturnValue(HUGE_LOOKBACK_SECONDS);
   });
 
   afterEach(() => {
@@ -517,6 +527,7 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
     if (cursor1 == null) return; // narrow for the typed query below (asserted above)
 
     vi.restoreAllMocks();
+    vi.mocked(configManager.getConfig).mockReturnValue(HUGE_LOOKBACK_SECONDS);
 
     // Second page: cursor from page 1, limit=1 → should return rev2.
     const mockPage2 = {
@@ -545,6 +556,7 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
     if (cursor2 == null) return; // narrow for the typed query below (asserted above)
 
     vi.restoreAllMocks();
+    vi.mocked(configManager.getConfig).mockReturnValue(HUGE_LOOKBACK_SECONDS);
 
     // Third page: cursor from page 2, limit=1 → should return rev3, next=null.
     const mockPage3 = {
@@ -865,5 +877,91 @@ describe('GET /api/v3/revisions/changes — Changes Index integration', () => {
     expect(xEntry).toBeDefined();
     // Baseline must be the page-creation marker (null), NOT the user's own 01:00 revision.
     expect(xEntry?.fromRevisionId).toBeNull();
+  });
+
+  // -------------------------------------------------------------------------
+  // Req 10.2 — explicit since older than the configured lookback limit → 400
+  // -------------------------------------------------------------------------
+  it('rejects (400) when since is older than the configured lookback limit', async () => {
+    vi.mocked(configManager.getConfig).mockReturnValue(3600); // 1h lookback
+    mockPageQueries([], []);
+
+    const since = new Date(Date.now() - 2 * 60 * 60 * 1000).toISOString(); // 2h ago
+
+    const res = await request(buildApp(userId))
+      .get('/api/v3/revisions/changes')
+      .query({ since });
+
+    expect(res.status).toBe(400);
+    expect(JSON.stringify(res.body)).toContain('lookback-limit-exceeded');
+  });
+
+  // -------------------------------------------------------------------------
+  // Req 10.3 — with no since/fromDate, the lookback limit bounds the window
+  // -------------------------------------------------------------------------
+  it('bounds the window to the lookback limit when no since/fromDate is given', async () => {
+    vi.mocked(configManager.getConfig).mockReturnValue(3600); // 1h lookback
+    const pageOld = makeId();
+    const pageRecent = makeId();
+    // Older than the 1h floor → must be excluded.
+    const old = await createRevision({
+      pageId: pageOld,
+      author: userId,
+      createdAt: new Date(Date.now() - 2 * 60 * 60 * 1000),
+    });
+    // Within the 1h floor → must be included.
+    const recent = await createRevision({
+      pageId: pageRecent,
+      author: userId,
+      createdAt: new Date(Date.now() - 30 * 60 * 1000),
+    });
+
+    mockPageQueries(
+      [pageOld.toString(), pageRecent.toString()],
+      [
+        { _id: pageOld, status: 'published', path: '/old' },
+        { _id: pageRecent, status: 'published', path: '/recent' },
+      ],
+    );
+
+    const res = await request(buildApp(userId)).get(
+      '/api/v3/revisions/changes',
+    );
+
+    expect(res.status).toBe(200);
+    const toRevIds = res.body.changes.map(
+      (c: { toRevisionId: string }) => c.toRevisionId,
+    );
+    expect(toRevIds).toContain(recent._id.toString());
+    expect(toRevIds).not.toContain(old._id.toString());
+    expect(toRevIds).toHaveLength(1);
+  });
+
+  // -------------------------------------------------------------------------
+  // Req 10.2 — since within the lookback limit is accepted (regression guard)
+  // -------------------------------------------------------------------------
+  it('accepts since within the lookback limit', async () => {
+    vi.mocked(configManager.getConfig).mockReturnValue(3600); // 1h lookback
+    const pageId = makeId();
+    const rev = await createRevision({
+      pageId,
+      author: userId,
+      createdAt: new Date(Date.now() - 10 * 60 * 1000),
+    });
+    mockPageQueries(
+      [pageId.toString()],
+      [{ _id: pageId, status: 'published', path: '/p' }],
+    );
+
+    const since = new Date(Date.now() - 30 * 60 * 1000).toISOString(); // 30min ago (within 1h)
+    const res = await request(buildApp(userId))
+      .get('/api/v3/revisions/changes')
+      .query({ since });
+
+    expect(res.status).toBe(200);
+    const toRevIds = res.body.changes.map(
+      (c: { toRevisionId: string }) => c.toRevisionId,
+    );
+    expect(toRevIds).toContain(rev._id.toString());
   });
 });
