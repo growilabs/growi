@@ -394,7 +394,8 @@
     "no_user_found": "Aucun utilisateur trouvé",
     "reply": "Répondre",
     "delete_comment": "Supprimer?",
-    "comment_management_is_not_allowed": "La gestion des commentaires n'est pas autorisée."
+    "comment_management_is_not_allowed": "La gestion des commentaires n'est pas autorisée.",
+    "no_comments": "Il n'y a aucun commentaire."
   },
   "page_api_error": {
     "notfound_or_forbidden": "Page originale introuvable ou accès restreint.",

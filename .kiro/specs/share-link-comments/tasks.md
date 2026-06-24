@@ -6,18 +6,19 @@
 - [x] 1.1 (P) Comments コンポーネントに read-only 対応を追加
   - `isReadOnly` を受け取り `PageComment` に伝播する
   - `isReadOnly` のとき投稿フォーム（`CommentEditorPre`）を描画しない
+  - `isReadOnly` かつコメント0件のとき、空状態案内（`page_comment.no_comments`）を表示する。投稿フォームのある編集可能ビューでは表示しない。`page_comment.no_comments` キーを全ロケール（en_US/ja_JP/fr_FR/ko_KR/zh_CN）に追加
   - 既存の `isTopPage` ガード（トップページではコメント領域を出さない）を維持する
-  - `PageView` からの既存呼び出しは `isReadOnly` 省略で従来動作（投稿フォーム表示）を維持する
-  - 完了: read-only で描画するとコメント一覧のみ表示され投稿フォームが出ない。トップページ・既存通常ページの挙動は不変
-  - _Requirements: 1.3, 2.1, 2.5, 5.1_
+  - `PageView` からの既存呼び出しは `isReadOnly` 省略で従来動作（投稿フォーム表示・空状態案内なし）を維持する
+  - 完了: read-only で描画するとコメント一覧のみ表示され投稿フォームが出ない。0件時は空状態案内を表示。トップページ・既存通常ページの挙動は不変
+  - _Requirements: 1.2, 1.3, 2.1, 2.5, 5.1_
   - _Boundary: Comments_
 
 - [x] 1.2 ShareLinkPageView にコメント領域を描画する
   - `next/dynamic`（`ssr: false`）で `Comments` を読み込む
   - `!isNotFound` かつ `page.revision != null` の分岐内（本文直後・footer 前）に read-only で配置する
-  - `isNotFound` / `disableLinkSharing` / コメント取得失敗のときも本文表示を阻害しない。0件時は見出し付き空表示
-  - 完了: 有効な共有リンクページを開くとコメント領域（既存コメント or 空状態）が表示され、投稿フォームは存在しない
-  - _Requirements: 1.1, 1.2, 1.4, 1.5, 5.1_
+  - `isNotFound` / `disableLinkSharing` / コメント取得失敗のときも本文表示を阻害しない。0件時の空状態案内は Comments 側（1.1）が担う
+  - 完了: 有効な共有リンクページを開くとコメント領域（既存コメント or 空状態案内）が表示され、投稿フォームは存在しない
+  - _Requirements: 1.1, 1.4, 1.5, 5.1_
   - _Depends: 1.1_
   - _Boundary: ShareLinkPageView_
 
@@ -63,7 +64,8 @@
 
 - [ ] 3.4 共有ページコメント表示の E2E 検証
   - 未ログインで有効な共有リンクを開き、既存コメントが表示され投稿フォームが存在しないことを確認する
+  - コメント0件の共有リンクを開き、エラーではなく空状態案内（「コメントはありません」）が表示されることを確認する
   - 共有リンク機能の無効化時にコメントが表示されないことを確認する
   - 完了: 上記 E2E が緑になる
-  - _Requirements: 1.1, 1.5, 2.1_
+  - _Requirements: 1.1, 1.2, 1.5, 2.1_
   - _Depends: 1.2, 2.1, 3.1, 3.2_

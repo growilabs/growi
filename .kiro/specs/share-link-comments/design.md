@@ -184,7 +184,7 @@ sequenceDiagram
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
 | 1.1 | 共有ページでコメント一覧表示 | ShareLinkPageView, Comments | `CommentsProps` | comments.get フロー |
-| 1.2 | コメント0件でも空表示・非エラー（「Comments」見出し＋空リストを表示し、追加実装は不要。`PageComment` が0件で空を返す既存挙動を踏襲） | Comments, PageComment（既存挙動） | — | — |
+| 1.2 | コメント0件でも非エラーで空状態案内を表示（read-only 時は投稿フォームが無く見出しのみだと空に見えるため、`page_comment.no_comments` メッセージを表示） | Comments | `CommentsProps.isReadOnly` | — |
 | 1.3 | トップページは非表示 | Comments（既存 `isTopPage` ガード） | — | — |
 | 1.4 | 取得失敗が本文表示を阻害しない | ShareLinkPageView | SWR error 分離 | — |
 | 1.5 | 共有無効時は非表示 | ShareLinkPageView（既存 `disableLinkSharing`） | — | — |
@@ -217,11 +217,12 @@ sequenceDiagram
 | Field | Detail |
 |-------|--------|
 | Intent | コメント領域を描画し、read-only 時に投稿導線を抑止する |
-| Requirements | 1.1, 2.1 |
+| Requirements | 1.1, 1.2, 2.1 |
 
 **Responsibilities & Constraints**
 - `isReadOnly` を受け取り `PageComment` に伝播する。
 - `isReadOnly === true` のとき `CommentEditorPre`（投稿フォーム）を描画しない。
+- `isReadOnly === true` かつコメント0件のとき、`page_comment.no_comments` メッセージ（空状態案内）を表示する（1.2）。投稿フォームを持つ編集可能ビューでは表示しない（空に見えないため）。
 - 既存の `isTopPage` ガード（1.3）は維持。
 
 **Contracts**: State [x]
@@ -238,8 +239,9 @@ type CommentsProps = {
 
 **Implementation Notes**
 - Integration: `ShareLinkPageView` からは `isReadOnly` を渡す。`PageView` からの既存呼び出しは `isReadOnly` 省略で従来どおり（5.1）。
-- Validation: `PageComment` は既に `isReadOnly` で返信ボタン・返信エディタ・削除モーダルを抑止するため UI 側の追加対応は不要。
-- Risks: 投稿フォーム抑止は `!isDeleted && !isReadOnly` の条件追加のみ。
+- Validation: `PageComment` は既に `isReadOnly` で返信ボタン・返信エディタ・削除モーダルを抑止するため投稿導線の追加対応は不要。
+- Empty state: `useSWRxPageComment` の `data` を参照し、`isReadOnly && data?.length === 0` のとき `page_comment.no_comments` を表示する（`data == null` のロード中は表示しない）。`page_comment.no_comments` キーを全ロケール（en_US/ja_JP/fr_FR/ko_KR/zh_CN）に追加する。
+- Risks: 投稿フォーム抑止は `!isDeleted && !isReadOnly` の条件追加のみ。空状態案内は read-only 限定のため通常ページ（5.1）に影響しない。
 
 #### ShareLinkPageView
 
@@ -322,8 +324,9 @@ const query = (revisionId && !isSharedPage)
 ### Unit Tests
 1. `Comments`：`isReadOnly` 省略時は `CommentEditorPre` を描画、`isReadOnly=true` で非描画（2.1）。
 2. `Comments`：`isReadOnly` を `PageComment` に伝播すること（2.1）。
-3. `useSWRxPageComment`：`shareLinkId` 非null時、クエリに `page_id` と `shareLinkId` を含み（**別 `pageId` は含まない**）、SWR キーが `shareLinkId` で分離される（3.1）。
-4. `useSWRxPageComment`：`shareLinkId` null時は従来クエリ（`page_id` のみ）で `shareLinkId` を送らない（5.2）。
+3. `Comments`：`isReadOnly=true` かつコメント0件時に `page_comment.no_comments` を表示し、コメントありの時・編集可能ビュー（`isReadOnly` 省略）時は表示しないこと（1.2）。
+4. `useSWRxPageComment`：`shareLinkId` 非null時、クエリに `page_id` と `shareLinkId` を含み（**別 `pageId` は含まない**）、SWR キーが `shareLinkId` で分離される（3.1）。
+5. `useSWRxPageComment`：`shareLinkId` null時は従来クエリ（`page_id` のみ）で `shareLinkId` を送らない（5.2）。
 
 ### Integration Tests（`/comments.get`）
 1. 有効な共有リンク（`page_id`+`shareLinkId` 一致）でゲストがコメントを取得できる（3.1, 3.2）。
@@ -337,7 +340,8 @@ const query = (revisionId && !isSharedPage)
 
 ### E2E/UI Tests
 1. 共有リンクページを未ログインで開き、既存コメントが表示され、投稿フォームが存在しない（1.1, 2.1）。
-2. 共有リンク機能無効化時、共有ページにコメントが表示されない（1.5）。
+2. コメント0件の共有リンクページを開くと、エラーではなく空状態案内（「コメントはありません」）が表示される（1.2）。
+3. 共有リンク機能無効化時、共有ページにコメントが表示されない（1.5）。
 
 ## Security Considerations
 

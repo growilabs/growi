@@ -1,13 +1,17 @@
 import type { IRevisionHasId } from '@growi/core';
 import { render, screen } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 
 import { Comments } from './Comments';
 
 const mutate = vi.fn();
 
+const commentStore = vi.hoisted(() => ({
+  data: undefined as unknown[] | undefined,
+}));
+
 vi.mock('~/stores/comment', () => ({
-  useSWRxPageComment: () => ({ mutate }),
+  useSWRxPageComment: () => ({ data: commentStore.data, mutate }),
 }));
 vi.mock('~/stores/page', () => ({
   useSWRMUTxPageInfo: () => ({ trigger: vi.fn() }),
@@ -46,6 +50,10 @@ const renderComments = (isReadOnly?: boolean) =>
   );
 
 describe('Comments.tsx', () => {
+  afterEach(() => {
+    commentStore.data = undefined;
+  });
+
   it('renders the comment posting area when isReadOnly is omitted', () => {
     const { container } = renderComments();
     expect(container.querySelector('#page-comment-write')).toBeInTheDocument();
@@ -68,5 +76,27 @@ describe('Comments.tsx', () => {
     renderComments();
     const pageComment = await screen.findByTestId('page-comment');
     expect(pageComment).toHaveAttribute('data-readonly', 'false');
+  });
+
+  it('shows the empty-state message when read-only and there are no comments', () => {
+    commentStore.data = [];
+    renderComments(true);
+    expect(screen.getByText('page_comment.no_comments')).toBeInTheDocument();
+  });
+
+  it('does not show the empty-state message when there are comments', () => {
+    commentStore.data = [{ _id: 'comment-1' }];
+    renderComments(true);
+    expect(
+      screen.queryByText('page_comment.no_comments'),
+    ).not.toBeInTheDocument();
+  });
+
+  it('does not show the empty-state message on editable views even when empty', () => {
+    commentStore.data = [];
+    renderComments(false);
+    expect(
+      screen.queryByText('page_comment.no_comments'),
+    ).not.toBeInTheDocument();
   });
 });
