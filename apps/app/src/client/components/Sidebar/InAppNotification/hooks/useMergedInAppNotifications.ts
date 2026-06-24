@@ -1,6 +1,7 @@
 import { useCallback, useMemo } from 'react';
 import type { SWRInfiniteResponse } from 'swr/infinite';
 
+import { apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
 import {
   useSWRINFxNews,
   useSWRxNewsUnreadCount,
@@ -11,13 +12,21 @@ import type {
   PaginateResult,
 } from '~/interfaces/in-app-notification';
 import { InAppNotificationStatuses } from '~/interfaces/in-app-notification';
-import { useSWRINFxInAppNotifications } from '~/stores/in-app-notification';
+import {
+  useSWRINFxInAppNotifications,
+  useSWRxInAppNotificationStatus,
+} from '~/stores/in-app-notification';
 
 const PER_PAGE = 10;
 
 export type MergedItem =
   | { type: 'news'; item: INewsItemWithReadStatus; sortKey: Date }
   | { type: 'notification'; item: IInAppNotificationHasId; sortKey: Date };
+
+export type MarkAllReadOptions = {
+  news?: boolean;
+  notifications?: boolean;
+};
 
 export type UseMergedInAppNotificationsResult = {
   newsResponse: SWRInfiniteResponse<
@@ -40,13 +49,18 @@ export type UseMergedInAppNotificationsResult = {
   >;
   mergedItems: MergedItem[];
 
-  handleReadMutate: () => void;
+  newsUnreadCount: number | undefined;
+  notifUnreadCount: number | undefined;
+
+  handleNewsRead: (newsItemId: string) => void;
   handleNotificationRead: (notificationId: string) => void;
+  handleMarkAllRead: (options: MarkAllReadOptions) => Promise<void>;
 };
 
 /**
  * Encapsulates the data layer for the InAppNotification sidebar panel:
  * - Two SWRInfinite streams (news + notifications)
+ * - Unread count badges (per kind)
  * - Pagination exhaustion detection
  * - A synthetic SWRInfiniteResponse for the merged "all" view
  * - Client-side merge + sort by time
@@ -64,13 +78,16 @@ export const useMergedInAppNotifications = (
     { onlyUnread: isUnopendNotificationsVisible },
     { keepPreviousData: true },
   );
-  const { mutate: mutateNewsUnreadCount } = useSWRxNewsUnreadCount();
+  const { data: newsUnreadCount, mutate: mutateNewsUnreadCount } =
+    useSWRxNewsUnreadCount();
 
   const notificationResponse = useSWRINFxInAppNotifications(
     PER_PAGE,
     { status: notificationStatus },
     { keepPreviousData: true },
   );
+  const { data: notifUnreadCount, mutate: mutateNotifUnreadCount } =
+    useSWRxInAppNotificationStatus();
 
   const allNewsItems: INewsItemWithReadStatus[] = useMemo(() => {
     if (!newsResponse.data) return [];
@@ -161,13 +178,29 @@ export const useMergedInAppNotifications = (
   const { mutate: mutateNews } = newsResponse;
   const { mutate: mutateNotifications } = notificationResponse;
 
-  const handleReadMutate = useCallback(() => {
-    mutateNews();
-    mutateNewsUnreadCount();
-  }, [mutateNews, mutateNewsUnreadCount]);
-
   // SWR-idiomatic optimistic update: rewrite the per-page cache in place and
   // suppress revalidation so the dot stays removed across unmount/remount.
+  const handleNewsRead = useCallback(
+    (newsItemId: string) => {
+      mutateNews(
+        (pages) =>
+          pages?.map((page) => ({
+            ...page,
+            docs: page.docs.map((doc) =>
+              doc._id.toString() === newsItemId
+                ? { ...doc, isRead: true }
+                : doc,
+            ),
+          })),
+        { revalidate: false },
+      );
+      mutateNewsUnreadCount((current) => Math.max((current ?? 0) - 1, 0), {
+        revalidate: false,
+      });
+    },
+    [mutateNews, mutateNewsUnreadCount],
+  );
+
   const handleNotificationRead = useCallback(
     (notificationId: string) => {
       mutateNotifications(
@@ -182,8 +215,66 @@ export const useMergedInAppNotifications = (
           })),
         { revalidate: false },
       );
+      mutateNotifUnreadCount((current) => Math.max((current ?? 0) - 1, 0), {
+        revalidate: false,
+      });
     },
-    [mutateNotifications],
+    [mutateNotifications, mutateNotifUnreadCount],
+  );
+
+  const handleMarkAllRead = useCallback(
+    async (options: MarkAllReadOptions): Promise<void> => {
+      const tasks: Promise<unknown>[] = [];
+
+      if (options.news) {
+        mutateNews(
+          (pages) =>
+            pages?.map((page) => ({
+              ...page,
+              docs: page.docs.map((doc) => ({ ...doc, isRead: true })),
+            })),
+          { revalidate: false },
+        );
+        mutateNewsUnreadCount(0, { revalidate: false });
+        tasks.push(apiv3Post('/news/mark-all-read'));
+      }
+
+      if (options.notifications) {
+        mutateNotifications(
+          (pages) =>
+            pages?.map((page) => ({
+              ...page,
+              docs: page.docs.map((doc) => ({
+                ...doc,
+                status: InAppNotificationStatuses.STATUS_OPENED,
+              })),
+            })),
+          { revalidate: false },
+        );
+        mutateNotifUnreadCount(0, { revalidate: false });
+        tasks.push(apiv3Put('/in-app-notification/all-statuses-open'));
+      }
+
+      try {
+        await Promise.all(tasks);
+      } catch {
+        // Re-fetch to reconcile cache with server on failure.
+        if (options.news) {
+          mutateNews();
+          mutateNewsUnreadCount();
+        }
+        if (options.notifications) {
+          mutateNotifications();
+          mutateNotifUnreadCount();
+        }
+      }
+    },
+    [
+      mutateNews,
+      mutateNotifications,
+      mutateNewsUnreadCount,
+      mutateNotifUnreadCount,
+    ],
   );
 
   return {
@@ -195,7 +286,10 @@ export const useMergedInAppNotifications = (
     notifExhausted,
     allModeSWRResponse,
     mergedItems,
-    handleReadMutate,
+    newsUnreadCount,
+    notifUnreadCount,
+    handleNewsRead,
     handleNotificationRead,
+    handleMarkAllRead,
   };
 };

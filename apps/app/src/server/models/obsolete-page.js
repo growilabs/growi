@@ -1,5 +1,6 @@
 import { GroupType, Origin } from '@growi/core';
 import {
+  escapeStringForMongoRegex,
   pagePathUtils,
   pathUtils,
   templateChecker,
@@ -687,7 +688,7 @@ export const getPageSchema = (crowi) => {
     const regexpList = pathList.map((path) => {
       const pathWithTrailingSlash = pathUtils.addTrailingSlash(path);
       return new RegExp(
-        `^${RegExp.escape(pathWithTrailingSlash)}_{1,2}template$`,
+        `^${escapeStringForMongoRegex(pathWithTrailingSlash)}_{1,2}template$`,
       );
     });
 

@@ -1,5 +1,6 @@
 import type { FC } from 'react';
-import { memo } from 'react';
+import { memo, useCallback } from 'react';
+import { useRouter } from 'next/router';
 import { format } from 'date-fns';
 import { useTranslation } from 'next-i18next';
 
@@ -8,33 +9,21 @@ import { apiv3Post } from '~/client/util/apiv3-client';
 import { getLocale } from '~/utils/locale-utils';
 
 import type { INewsItemWithReadStatus } from '../../interfaces/news-item';
+import { NEWS_FEED_PATH, newsItemAnchorId } from '../consts';
+import { resolveLocaleText } from '../utils/resolve-locale-text';
 
 const DEFAULT_EMOJI = '📢';
 
-/**
- * Resolve the title for the given locale with fallback chain:
- * browserLocale → ja_JP → en_US → first available key
- */
-const resolveTitle = (
-  title: Record<string, string>,
-  locale: string,
-): string => {
-  if (title[locale]) return title[locale];
-  if (title.ja_JP) return title.ja_JP;
-  if (title.en_US) return title.en_US;
-  const keys = Object.keys(title);
-  return keys.length > 0 ? title[keys[0]] : '';
-};
-
 type Props = {
   item: INewsItemWithReadStatus;
-  onReadMutate: () => void;
+  onReadMutate: (newsItemId: string) => void;
 };
 
 const NewsItemInner: FC<Props> = ({ item, onReadMutate }) => {
   const { i18n } = useTranslation();
+  const router = useRouter();
   const locale = i18n.language;
-  const title = resolveTitle(item.title, locale);
+  const title = resolveLocaleText(item.title, locale);
   const emoji = item.emoji ?? DEFAULT_EMOJI;
 
   const publishedDate =
@@ -45,18 +34,18 @@ const NewsItemInner: FC<Props> = ({ item, onReadMutate }) => {
     locale: getLocale(locale),
   });
 
-  const handleClick = async () => {
+  // Clicking a news item always navigates to the news feed page, anchored to
+  // the clicked item. Marking it read first keeps the unread badge in sync.
+  const handleClick = useCallback(async () => {
+    const id = item._id.toString();
     try {
-      await apiv3Post('/news/mark-read', { newsItemId: item._id.toString() });
-      onReadMutate();
+      await apiv3Post('/news/mark-read', { newsItemId: id });
+      onReadMutate(id);
     } catch {
       // silently ignore mark-read failures
     }
-
-    if (item.url) {
-      window.open(item.url, '_blank', 'noopener,noreferrer');
-    }
-  };
+    router.push(`${NEWS_FEED_PATH}#${newsItemAnchorId(id)}`);
+  }, [item._id, onReadMutate, router]);
 
   return (
     <button

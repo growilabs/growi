@@ -127,14 +127,6 @@ jobs:
         image: mongo:${{ matrix.mongodb-version }}
         ports:
         - 27017/tcp
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:9.0.1
-        ports:
-        - 9200/tcp
-        env:
-          discovery.type: single-node
-          # ES 9.x enables security (HTTPS + auth) by default; disable for plaintext CI access
-          xpack.security.enabled: false
 
     steps:
     - uses: actions/setup-node@v6
@@ -153,6 +145,25 @@ jobs:
     # Run after extraction so pnpm/action-setup@v6 can read packageManager from package.json
     - uses: pnpm/action-setup@v6
 
+    - name: Start Elasticsearch with plugins
+      uses: elastic/elastic-github-actions/elasticsearch@master
+      with:
+        stack-version: 9.3.3
+        plugins: |
+          analysis-kuromoji
+          analysis-icu
+        security-enabled: false
+
+    - name: Wait for Elasticsearch to be ready
+      run: |
+        curl \
+          --no-progress-meter \
+          -X GET \
+          --retry 60 \
+          --retry-delay 1 \
+          --retry-connrefused \
+          http://localhost:9200/_cluster/health?wait_for_status=green
+
     - name: pnpm run server:ci
       working-directory: ./apps/app
       run: |
@@ -160,7 +171,7 @@ jobs:
         pnpm run server:ci
       env:
         MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi
-        ELASTICSEARCH_URI: http://localhost:${{ job.services.elasticsearch.ports['9200'] }}/growi
+        ELASTICSEARCH_URI: http://localhost:9200/growi
 
     - name: Slack Notification
       uses: weseek/ghaction-slack-notification@master
@@ -173,18 +184,48 @@ jobs:
         url: ${{ secrets.SLACK_WEBHOOK_URL }}
 
 
+  prime-playwright-cache:
+    if: |
+      github.event_name == 'workflow_dispatch' ||
+      (!inputs.skip-e2e-test && startsWith(github.head_ref, 'mergify/merge-queue/'))
+
+    runs-on: ubuntu-latest
+
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: ${{ inputs.node-version }}
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm install --frozen-lockfile
+
+    - name: Cache Playwright browsers
+      id: playwright-cache
+      uses: actions/cache@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+
+    - name: Install Playwright browsers
+      if: steps.playwright-cache.outputs.cache-hit != 'true'
+      run: |
+        pnpm playwright install
+
+
   run-playwright:
-    needs: [build-prod]
+    needs: [build-prod, prime-playwright-cache]
 
     if: |
       github.event_name == 'workflow_dispatch' ||
       (!inputs.skip-e2e-test && startsWith(github.head_ref, 'mergify/merge-queue/'))
 
     runs-on: ubuntu-latest
-    container:
-      # Match the Playwright version
-      # https://github.com/microsoft/playwright/issues/20010
-      image: mcr.microsoft.com/playwright:v1.58.2-jammy
 
     # Playwright spawns `pnpm run server` inside the extracted prod dir via
     # GROWI_WEBSERVER_COMMAND. That dir lacks pnpm-workspace.yaml and packages/*,
@@ -204,14 +245,6 @@ jobs:
         image: mongo:${{ matrix.mongodb-version }}
         ports:
         - 27017/tcp
-      elasticsearch:
-        image: docker.elastic.co/elasticsearch/elasticsearch:9.0.1
-        ports:
-        - 9200/tcp
-        env:
-          discovery.type: single-node
-          # ES 9.x enables security (HTTPS + auth) by default; disable for plaintext CI access
-          xpack.security.enabled: false
 
     steps:
     - uses: actions/checkout@v4
@@ -227,9 +260,40 @@ jobs:
       run: |
         pnpm install --frozen-lockfile
 
-    - name: Install Playwright browsers
+    # Browsers are pre-populated by `prime-playwright-cache`. Always a cache hit;
+    # restore-keys provides a partial fallback if the keyed cache was evicted.
+    - name: Restore Playwright browser cache
+      uses: actions/cache/restore@v4
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-${{ runner.os }}-${{ hashFiles('pnpm-lock.yaml') }}
+        restore-keys: |
+          playwright-${{ runner.os }}-
+
+    # `--with-deps` installs apt system libraries and re-downloads any browser
+    # that wasn't in the restored cache. With a primed cache, this only runs apt.
+    - name: Install Playwright system deps and any missing browsers
       run: |
-        pnpm playwright install --with-deps ${{ matrix.browser }}
+        pnpm playwright install --with-deps
+
+    - name: Start Elasticsearch with plugins
+      uses: elastic/elastic-github-actions/elasticsearch@master
+      with:
+        stack-version: 9.3.3
+        plugins: |
+          analysis-kuromoji
+          analysis-icu
+        security-enabled: false
+
+    - name: Wait for Elasticsearch to be ready
+      run: |
+        curl \
+          --no-progress-meter \
+          -X GET \
+          --retry 60 \
+          --retry-delay 1 \
+          --retry-connrefused \
+          http://localhost:9200/_cluster/health?wait_for_status=green
 
     - name: Download production files artifact
       uses: actions/download-artifact@v4
@@ -245,17 +309,31 @@ jobs:
       run: |
         cat apps/app/config/ci/.env.local.for-ci >> /tmp/growi-prod/apps/app/.env.production.local
 
+    # The installer suite is not sharded, so run it once per mongodb-version
+    # (shard 1/2 only) rather than redundantly in every chromium shard job.
     - name: Playwright Run (--project=chromium/installer)
-      if: ${{ matrix.browser == 'chromium' }}
+      if: ${{ matrix.browser == 'chromium' && matrix.shard == '1/2' }}
       working-directory: ./apps/app
       run: |
         pnpm playwright test --project=chromium/installer
       env:
         DEBUG: pw:api
-        HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://mongodb:27017/growi-playwright-installer
-        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
+        MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright-installer
+        ELASTICSEARCH_URI: http://localhost:9200/growi
+
+    # Each `playwright test` run clears blob-report/ when it writes its report
+    # (the blob reporter empties its output dir), so move this run's blob out to a
+    # staging dir before the next run wipes it. Prefixing the mongodb-version keeps
+    # filenames unique once report-playwright flattens every artifact together.
+    - name: Stash installer blob report
+      if: ${{ always() && matrix.browser == 'chromium' && matrix.shard == '1/2' }}
+      run: |
+        mkdir -p apps/app/all-blobs
+        for f in apps/app/blob-report/*.zip; do
+          [ -e "$f" ] || continue
+          mv "$f" "apps/app/all-blobs/mongo${{ matrix.mongodb-version }}-$(basename "$f")"
+        done
 
     - name: Copy dotenv file for automatic installation
       run: |
@@ -267,10 +345,18 @@ jobs:
         pnpm playwright test --project=${{ matrix.browser }} --shard=${{ matrix.shard }}
       env:
         DEBUG: pw:api
-        HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://mongodb:27017/growi-playwright
-        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
+        MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright
+        ELASTICSEARCH_URI: http://localhost:9200/growi
+
+    - name: Stash main blob report
+      if: always()
+      run: |
+        mkdir -p apps/app/all-blobs
+        for f in apps/app/blob-report/*.zip; do
+          [ -e "$f" ] || continue
+          mv "$f" "apps/app/all-blobs/mongo${{ matrix.mongodb-version }}-$(basename "$f")"
+        done
 
     - name: Copy dotenv file for automatic installation with allowing guest mode
       run: |
@@ -282,10 +368,18 @@ jobs:
         pnpm playwright test --project=${{ matrix.browser }}/guest-mode --shard=${{ matrix.shard }}
       env:
         DEBUG: pw:api
-        HOME: /root # ref: https://github.com/microsoft/playwright/issues/6500
         GROWI_WEBSERVER_COMMAND: 'cd /tmp/growi-prod/apps/app && pnpm run server'
-        MONGO_URI: mongodb://mongodb:27017/growi-playwright-guest-mode
-        ELASTICSEARCH_URI: http://elasticsearch:9200/growi
+        MONGO_URI: mongodb://localhost:${{ job.services.mongodb.ports['27017'] }}/growi-playwright-guest-mode
+        ELASTICSEARCH_URI: http://localhost:9200/growi
+
+    - name: Stash guest-mode blob report
+      if: always()
+      run: |
+        mkdir -p apps/app/all-blobs
+        for f in apps/app/blob-report/*.zip; do
+          [ -e "$f" ] || continue
+          mv "$f" "apps/app/all-blobs/mongo${{ matrix.mongodb-version }}-$(basename "$f")"
+        done
 
     - name: Generate shard ID
       id: shard-id
@@ -299,7 +393,7 @@ jobs:
       if: always()
       with:
         name: blob-report-${{ matrix.browser }}-mongo${{ matrix.mongodb-version }}-${{ steps.shard-id.outputs.shard_id }}
-        path: ./apps/app/blob-report
+        path: ./apps/app/all-blobs
         retention-days: 30
 
     - name: Slack Notification
@@ -356,3 +450,10 @@ jobs:
         name: html-report
         path: playwright-report
         retention-days: 30
+
+    - name: Fail if any playwright shard did not succeed
+      if: needs.run-playwright.result != 'success'
+      run: |
+        echo "run-playwright aggregate result: ${{ needs.run-playwright.result }}"
+        echo "One or more Playwright shards failed or were cancelled. See html-report artifact for details."
+        exit 1

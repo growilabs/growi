@@ -17,7 +17,11 @@ import type {
   Ref,
 } from '@growi/core/dist/interfaces';
 import { PageGrant } from '@growi/core/dist/interfaces';
-import { pagePathUtils, pathUtils } from '@growi/core/dist/utils';
+import {
+  escapeStringForMongoRegex,
+  pagePathUtils,
+  pathUtils,
+} from '@growi/core/dist/utils';
 import type EventEmitter from 'events';
 import type { Cursor, HydratedDocument } from 'mongoose';
 import mongoose from 'mongoose';
@@ -29,7 +33,7 @@ import { Comment } from '~/features/comment/server';
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
 import { isAiEnabled } from '~/features/openai/server/services';
-import { SupportedAction } from '~/interfaces/activity';
+import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
 import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
@@ -47,6 +51,7 @@ import {
 } from '~/interfaces/websocket';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
 import type Crowi from '~/server/crowi';
+import Activity, { type ActivityDocument } from '~/server/models/activity';
 import type { CreateMethod } from '~/server/models/page';
 import {
   type PageDocument,
@@ -2802,28 +2807,54 @@ class PageService implements IPageService {
      */
     const Page = mongoose.model<IPage, PageModel>('Page');
 
+    const resolvedAction =
+      page.descendantCount > 0
+        ? SupportedAction.ACTION_PAGE_RECURSIVELY_REVERT
+        : SupportedAction.ACTION_PAGE_REVERT;
+
+    const activityUpdateParameters = {
+      action: resolvedAction,
+      target: page,
+      targetModel: SupportedTargetModel.MODEL_PAGE,
+      contributor: user,
+    };
+
     const parameters = {
       ip: activityParameters.ip,
       endpoint: activityParameters.endpoint,
-      action:
-        page.descendantCount > 0
-          ? SupportedAction.ACTION_PAGE_RECURSIVELY_REVERT
-          : SupportedAction.ACTION_PAGE_REVERT,
+      action: SupportedAction.ACTION_UNSETTLED,
       user,
       target: page,
-      targetModel: 'Page',
+      targetModel: SupportedTargetModel.MODEL_PAGE,
       snapshot: {
         username: user.username,
       },
     };
 
-    const activity =
-      await this.crowi.activityService.createActivity(parameters);
+    let activity: ActivityDocument | null = null;
+    try {
+      activity = await Activity.createByParameters(parameters);
+    } catch (err) {
+      logger.error('Create activity failed', err);
+    }
 
     // 1. Separate v4 & v5 process
     const shouldUseV4Process = this.shouldUseV4ProcessForRevert(page);
     if (shouldUseV4Process) {
-      return this.revertDeletedPageV4(page, user, options, isRecursively);
+      const reverted = await this.revertDeletedPageV4(
+        page,
+        user,
+        options,
+        isRecursively,
+      );
+      if (activity != null) {
+        this.activityEvent.emit(
+          'update',
+          activity._id,
+          activityUpdateParameters,
+        );
+      }
+      return reverted;
     }
 
     const newPath = Page.getRevertDeletedPageName(page.path);
@@ -2881,10 +2912,15 @@ class PageService implements IPageService {
 
     if (!isRecursively) {
       await this.updateDescendantCountOfAncestors(parent._id, 1, true);
-
-      const preNotify = preNotifyService.generatePreNotify(activity);
-
-      this.activityEvent.emit('updated', activity, page, preNotify);
+      if (activity != null) {
+        this.activityEvent.emit(
+          'update',
+          activity._id,
+          activityUpdateParameters,
+          page,
+          preNotifyService.generatePreNotify,
+        );
+      }
     } else {
       let pageOp: PageOperationDocument;
       try {
@@ -2911,6 +2947,7 @@ class PageService implements IPageService {
             user,
             options,
             pageOp._id,
+            resolvedAction,
             activity,
           );
           this.pageEvent.emit('syncDescendantsUpdate', updatedPage, user);
@@ -2936,7 +2973,8 @@ class PageService implements IPageService {
     user,
     options,
     pageOpId: ObjectIdLike,
-    activity?,
+    resolvedAction,
+    activity: ActivityDocument | null,
   ): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
@@ -2952,11 +2990,21 @@ class PageService implements IPageService {
       descendantsSubscribedSets,
     ) as Ref<IUser>[];
 
-    const preNotify = preNotifyService.generatePreNotify(activity, async () => {
-      return descendantsSubscribedUsers;
-    });
-
-    this.activityEvent.emit('updated', activity, page, preNotify);
+    if (activity != null) {
+      this.activityEvent.emit(
+        'update',
+        activity._id,
+        {
+          action: resolvedAction,
+          target: page,
+          targetModel: SupportedTargetModel.MODEL_PAGE,
+          contributor: user,
+        },
+        page,
+        preNotifyService.generatePreNotify,
+        async () => descendantsSubscribedUsers,
+      );
+    }
 
     const newPath = Page.getRevertDeletedPageName(page.path);
     // normalize parent of descendant pages
@@ -3961,7 +4009,8 @@ class PageService implements IPageService {
     const ancestorPaths = paths.flatMap((p) => collectAncestorPaths(p, []));
     // targets' descendants
     const pathAndRegExpsToNormalize: (RegExp | string)[] = paths.map(
-      (p) => new RegExp(`^${RegExp.escape(addTrailingSlash(p))}`, 'i'),
+      (p) =>
+        new RegExp(`^${escapeStringForMongoRegex(addTrailingSlash(p))}`, 'i'),
     );
     // include targets' path
     pathAndRegExpsToNormalize.push(...paths);
@@ -4172,7 +4221,7 @@ class PageService implements IPageService {
           const parentId = parent._id;
 
           // Build filter
-          const parentPathEscaped = RegExp.escape(
+          const parentPathEscaped = escapeStringForMongoRegex(
             parent.path === '/' ? '' : parent.path,
           ); // adjust the path for RegExp
           const filter: any = {
@@ -5138,7 +5187,9 @@ class PageService implements IPageService {
     const wasOnTree = exPage.parent != null || isTopPage(exPage.path);
     const shouldBeOnTree = currentPage.grant !== PageGrant.GRANT_RESTRICTED;
     const isChildrenExist = await Page.count({
-      path: new RegExp(`^${RegExp.escape(addTrailingSlash(currentPage.path))}`),
+      path: new RegExp(
+        `^${escapeStringForMongoRegex(addTrailingSlash(currentPage.path))}`,
+      ),
       parent: { $ne: null },
     });
 
@@ -5270,7 +5321,7 @@ class PageService implements IPageService {
     const shouldBeOnTree = grant !== PageGrant.GRANT_RESTRICTED;
     const isChildrenExist = await Page.count({
       path: new RegExp(
-        `^${RegExp.escape(addTrailingSlash(clonedPageData.path))}`,
+        `^${escapeStringForMongoRegex(addTrailingSlash(clonedPageData.path))}`,
       ),
       parent: { $ne: null },
     });
