@@ -363,7 +363,8 @@
     "no_user_found": "사용자를 찾을 수 없습니다.",
     "reply": "답글",
     "delete_comment": "댓글 삭제?",
-    "comment_management_is_not_allowed": "댓글 관리가 허용되지 않습니다."
+    "comment_management_is_not_allowed": "댓글 관리가 허용되지 않습니다.",
+    "no_comments": "댓글이 없습니다."
   },
   "page_api_error": {
     "notfound_or_forbidden": "원본 페이지를 찾을 수 없거나 접근이 금지되었습니다.",

@@ -426,7 +426,8 @@
     "no_user_found": "ユーザー名が見つかりません",
     "reply": "返信",
     "delete_comment": "コメントを削除しますか？",
-    "comment_management_is_not_allowed": "コメントの操作が許可されていません。"
+    "comment_management_is_not_allowed": "コメントの操作が許可されていません。",
+    "no_comments": "コメントはありません。"
   },
   "page_api_error": {
     "notfound_or_forbidden": "元のページが見つからないか、アクセス権がありません。",
