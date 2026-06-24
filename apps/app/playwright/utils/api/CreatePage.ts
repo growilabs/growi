@@ -111,4 +111,31 @@ export const deletePagesCompletely = async (
     res.ok(),
     `deletePagesCompletely failed: ${res.status()} ${await res.text()}`,
   ).toBe(true);
+
+  // Delete is async: the endpoint returns before the operation finishes, and
+  // while it runs it locks the path — so a rerun's create at the same fixed path
+  // fails with "Cannot process create". Wait until every page is actually gone.
+  // Poll with the deleting context so group-restricted pages stay viewer-visible.
+  const uniquePaths = [...new Set(pages.map((p) => p.path))];
+  await Promise.all(
+    uniquePaths.map((path) =>
+      expect
+        .poll(
+          async () => {
+            const existRes = await request.get('/_api/v3/page/exist', {
+              params: { path },
+            });
+            // Keep polling through transient errors rather than asserting here.
+            if (!existRes.ok()) return true;
+            const { isExist } = await existRes.json();
+            return isExist;
+          },
+          {
+            message: `page still exists after delete (operation not finished): ${path}`,
+            timeout: 15_000,
+          },
+        )
+        .toBe(false),
+    ),
+  );
 };

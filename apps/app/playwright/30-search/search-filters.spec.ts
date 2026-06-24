@@ -16,465 +16,357 @@ import {
   FILTER_TEST_USER_B,
 } from '../utils/test-users';
 
-// Why each test rebuilds the index (rather than relying on auto-index + poll):
+// Create all fixtures first, rebuild the index ONCE (beforeAll), then each test
+// only re-runs its search.
 //
-// Page indexing is event-driven — `pageEvent`/`tagEvent` auto-index a page after
-// create/update (see search.ts:registerUpdateEvent). But those handlers are
-// fire-and-forget and unordered, so when a fixture produces MORE THAN ONE index
-// event for the same page, the writes race:
-//   - editor: page is created by A (write: editor=A) then updated by B
-//     (write: editor=B). If the create-write lands last, the doc keeps editor=A
-//     and `editor:<B>` never matches, so a per-page poll never converges.
-//   - tag/group: the `create` event indexes the page before tags/grants are
-//     persisted; the follow-up `tagEvent` write can be reordered the same way.
-// Measured: with auto-index + poll only, the `editor:` case failed ~2/10 runs.
-// A full `rebuild` reads the final DB state once and is authoritative, which
-// removes the race. `toPass` still polls because rebuild runs asynchronously.
+// Why rebuild instead of auto-index + poll: auto-indexing is event-driven and
+// unordered (search.ts:registerUpdateEvent), so a page with >1 index event races
+// — e.g. an editor page created by A then edited by B can keep editor=A if the
+// create-write lands last, and a per-page poll never converges (~2/10 failures).
+// A rebuild re-reads the final DB state and is authoritative.
 //
-// All describes are wrapped in one `test.describe.serial` so the global rebuilds
-// never overlap — CI uses `workers: 1`, but locally `workers` is undefined.
+// Why ONE rebuild for all filters: it reindexes the WHOLE collection, and each
+// filter uses a unique stamp, so a single rebuild after every fixture exists
+// covers them all. `toPass` still polls (the rebuild runs async server-side);
+// the suite stays `describe.serial` so two rebuilds can't overlap.
 
 test.describe
   .serial('search filters', () => {
-    test.describe
-      .serial('tag filter relevance', () => {
-        // Unique keyword so the matching set is deterministic and survives seed data.
-        const stamp = 'e2e-tagfilter-0a1b2c';
-        const tag = `mytag-xyz789${stamp}`;
-        const targetPath = `/Sandbox/${stamp}-target`;
-        const controlPath = `/Sandbox/${stamp}-control`;
-        const created: CreatedPage[] = [];
+    // --- tag filter: `tag:` matches a page's tags ---
+    // Unique keyword so the matching set is deterministic and survives seed data.
+    const tagStamp = 'e2e-tagfilter-0a1b2c';
+    const tag = `mytag-xyz789${tagStamp}`;
+    const tagTargetPath = `/Sandbox/${tagStamp}-target`;
+    const tagControlPath = `/Sandbox/${tagStamp}-control`;
+    const createdTag: CreatedPage[] = [];
 
-        // Teardown — keep the DB clean so the suite is re-runnable.
-        test.afterAll(async ({ request }) => {
-          await deletePagesCompletely(request, created);
-        });
+    // --- author filter: `author:<username>` matches the page creator's username ---
+    const authorStamp = 'e2e-authorfilter-7f3a2b';
+    const authorByAPath = `/Sandbox/${authorStamp}-by-a`;
+    const authorByBPath = `/Sandbox/${authorStamp}-by-b`;
+    const createdAuthor: CreatedPage[] = [];
 
-        test('setup: create a matching page and a control page', async ({
-          request,
-        }) => {
-          // Track each page the moment it exists. If a later step throws,
-          // afterAll still tears down the earlier pages — otherwise they leak
-          // and the next run collides on the fixed path.
-          created.push(
-            await createPage(request, {
-              path: targetPath,
-              body: 'matching page',
-              pageTags: [tag], // what `tag:` will match
-            }),
-          );
-          created.push(
-            await createPage(request, {
-              path: controlPath,
-              body: 'control page', // no tag -> must NOT appear
-            }),
-          );
-        });
+    // --- editor filter: `editor:<username>` matches last_update_username ---
+    const editorStamp = 'e2e-editorfilter-9c4d1e';
+    const editorEditedByBPath = `/Sandbox/${editorStamp}-edited-by-b`;
+    const editorOnlyByAPath = `/Sandbox/${editorStamp}-only-a`;
+    const editorAuthoredByBPath = `/Sandbox/${editorStamp}-authored-by-b`;
+    const createdEditor: CreatedPage[] = [];
 
-        test('tag filter returns only the tagged page', async ({
-          page,
-          request,
-        }) => {
-          await rebuildSearchIndex(request);
+    // --- group filter: `group:<name>` matches pages granted to that user group ---
+    const groupStamp = 'e2e-groupfilter-2b8e6d';
+    const groupInGroupPath = `/Sandbox/${groupStamp}-in-group`;
+    const groupPublicControlPath = `/Sandbox/${groupStamp}-public`;
+    const createdGroup: CreatedPage[] = [];
 
-          const list = page.getByTestId('search-result-list');
+    // --- prefix filter: `prefix:<path>` matches pages whose path starts with it ---
+    const prefixStamp = 'e2e-prefixfilter-4d7c1a';
+    const prefixTargetPath = `/Sandbox/${prefixStamp}-inc-target`;
+    const prefixControlPath = `/Sandbox/${prefixStamp}-exc-control`;
+    const createdPrefix: CreatedPage[] = [];
 
-          // rebuild runs asynchronously on the server; re-run the search until the
-          // tagged page shows up (toPass retries the whole block until it passes).
-          // POSITIVE: the tagged page appears.
-          await expect(async () => {
-            await page.goto(`/_search?q=tag:${tag}`);
-            await expect(page.getByTestId('search-result-base')).toBeVisible();
-            await expect(
-              list.getByRole('link', { name: `${stamp}-target` }),
-            ).toBeVisible({ timeout: 3000 });
-          }).toPass({ timeout: 20_000 });
+    // --- negated author filter: `-author:` excludes an author. A bare `-author:`
+    // matches every page except one, so scope it with a unique `prefix:` to keep
+    // the result set deterministic. ---
+    const notAuthorStamp = 'e2e-notauthorfilter-8e2f0b';
+    const notAuthorPrefix = `/Sandbox/${notAuthorStamp}`;
+    const notAuthorByAPath = `${notAuthorPrefix}-by-a`;
+    const notAuthorByBPath = `${notAuthorPrefix}-by-b`;
+    const createdNotAuthor: CreatedPage[] = [];
 
-          // NEGATIVE: the untagged control page does not appear -> proves relevance.
-          await expect(
-            list.getByRole('link', { name: `${stamp}-control` }),
-          ).toHaveCount(0);
-        });
+    // Create EVERY fixture across all filters, then rebuild the index once. The
+    // rebuild must run after the last create/update so addAllPages reads the final
+    // DB state for every page.
+    test.beforeAll(async ({ request, browser }) => {
+      // Author/editor/group/negated-author fixtures need specific users; each
+      // context carries a different user's saved session.
+      const contextA = await browser.newContext({
+        storageState: FILTER_TEST_USER_A.authFile,
       });
-
-    test.describe
-      .serial('author filter relevance', () => {
-        // `author:<username>` matches the page creator's username.
-        const stamp = 'e2e-authorfilter-7f3a2b';
-        const byUserAPath = `/Sandbox/${stamp}-by-a`;
-        const byUserBPath = `/Sandbox/${stamp}-by-b`;
-        const created: CreatedPage[] = [];
-
-        test.afterAll(async ({ request }) => {
-          await deletePagesCompletely(request, created);
-        });
-
-        test('setup: create pages authored by different users', async ({
-          browser,
-        }) => {
-          // Each context carries a different user's saved session.
-          const contextA = await browser.newContext({
-            storageState: FILTER_TEST_USER_A.authFile,
-          });
-          const contextB = await browser.newContext({
-            storageState: FILTER_TEST_USER_B.authFile,
-          });
-          try {
-            // Track each page as it is created (see tag setup) so a mid-setup
-            // failure still leaves the earlier pages tracked for teardown.
-            created.push(
-              await createPage(contextA.request, {
-                path: byUserAPath,
-                body: `author filter ${stamp}`,
-              }),
-            );
-            created.push(
-              await createPage(contextB.request, {
-                path: byUserBPath,
-                body: `author filter ${stamp}`,
-              }),
-            );
-          } finally {
-            await contextA.close();
-            await contextB.close();
-          }
-        });
-
-        test('author filter returns only pages by that author', async ({
-          page,
-          request,
-        }) => {
-          await rebuildSearchIndex(request);
-
-          const list = page.getByTestId('search-result-list');
-
-          // POSITIVE: only user A's page appears for `author:<A>`.
-          await expect(async () => {
-            await page.goto(`/_search?q=author:${FILTER_TEST_USER_A.username}`);
-            await expect(page.getByTestId('search-result-base')).toBeVisible();
-            await expect(
-              list.getByRole('link', { name: `${stamp}-by-a` }),
-            ).toBeVisible({ timeout: 3000 });
-          }).toPass({ timeout: 20_000 });
-
-          // NEGATIVE: user B's page does not appear -> proves the author filter.
-          await expect(
-            list.getByRole('link', { name: `${stamp}-by-b` }),
-          ).toHaveCount(0);
-        });
+      const contextB = await browser.newContext({
+        storageState: FILTER_TEST_USER_B.authFile,
       });
+      try {
+        // tag: one tagged page (matches) and one untagged control.
+        createdTag.push(
+          await createPage(request, {
+            path: tagTargetPath,
+            body: 'matching page',
+            pageTags: [tag],
+          }),
+        );
+        createdTag.push(
+          await createPage(request, {
+            path: tagControlPath,
+            body: 'control page', // no tag -> must NOT appear
+          }),
+        );
 
-    test.describe
-      .serial('editor filter relevance', () => {
-        // `editor:<username>` matches the page's last editor (last_update_username).
-        const stamp = 'e2e-editorfilter-9c4d1e';
-        const editedByBPath = `/Sandbox/${stamp}-edited-by-b`;
-        const onlyByAPath = `/Sandbox/${stamp}-only-a`;
-        const authoredByBPath = `/Sandbox/${stamp}-authored-by-b`;
-        const created: CreatedPage[] = [];
+        // author: one page per user, authored by different creators.
+        createdAuthor.push(
+          await createPage(contextA.request, {
+            path: authorByAPath,
+            body: `author filter ${authorStamp}`,
+          }),
+        );
+        createdAuthor.push(
+          await createPage(contextB.request, {
+            path: authorByBPath,
+            body: `author filter ${authorStamp}`,
+          }),
+        );
 
-        test.afterAll(async ({ request }) => {
-          await deletePagesCompletely(request, created);
+        // editor: for updated pages we push both results — deletePagesCompletely
+        // dedups by pageId keeping the last entry, so the update's newer
+        // revisionId wins, while the create push covers a failure between the two.
+
+        // Created by A, then last-edited by B -> last editor is B (target).
+        const editorCreatedByA = await createPage(contextA.request, {
+          path: editorEditedByBPath,
+          body: `editor filter ${editorStamp}`,
         });
+        createdEditor.push(editorCreatedByA);
+        createdEditor.push(
+          await updatePage(
+            contextB.request,
+            editorCreatedByA,
+            `editor filter ${editorStamp} edited by b`,
+          ),
+        );
 
-        test('setup: page last edited by B, plus author/contributor controls', async ({
-          browser,
-        }) => {
-          const contextA = await browser.newContext({
-            storageState: FILTER_TEST_USER_A.authFile,
-          });
-          const contextB = await browser.newContext({
-            storageState: FILTER_TEST_USER_B.authFile,
-          });
-          try {
-            // Track each page as it is created (see tag setup). For updated
-            // pages we push both results: deletePagesCompletely dedups by
-            // pageId keeping the last entry, so the update's newer revisionId
-            // wins — while the create push covers a failure between the two.
+        // Created and edited only by A -> last editor is A (control).
+        createdEditor.push(
+          await createPage(contextA.request, {
+            path: editorOnlyByAPath,
+            body: `editor filter ${editorStamp}`,
+          }),
+        );
 
-            // Created by A, then last-edited by B -> last editor is B (target).
-            const createdByA = await createPage(contextA.request, {
-              path: editedByBPath,
-              body: `editor filter ${stamp}`,
-            });
-            created.push(createdByA);
-            created.push(
-              await updatePage(
-                contextB.request,
-                createdByA,
-                `editor filter ${stamp} edited by b`,
-              ),
-            );
-
-            // Created and edited only by A -> last editor is A (control).
-            created.push(
-              await createPage(contextA.request, {
-                path: onlyByAPath,
-                body: `editor filter ${stamp}`,
-              }),
-            );
-
-            // Authored by B but last-edited by A -> last editor is A.
-            // Proves the filter keys on the LAST editor.
-            const createdByB = await createPage(contextB.request, {
-              path: authoredByBPath,
-              body: `editor filter ${stamp}`,
-            });
-            created.push(createdByB);
-            created.push(
-              await updatePage(
-                contextA.request,
-                createdByB,
-                `editor filter ${stamp} edited by a`,
-              ),
-            );
-          } finally {
-            await contextA.close();
-            await contextB.close();
-          }
+        // Authored by B but last-edited by A -> last editor is A.
+        // Proves the filter keys on the LAST editor.
+        const editorCreatedByB = await createPage(contextB.request, {
+          path: editorAuthoredByBPath,
+          body: `editor filter ${editorStamp}`,
         });
+        createdEditor.push(editorCreatedByB);
+        createdEditor.push(
+          await updatePage(
+            contextA.request,
+            editorCreatedByB,
+            `editor filter ${editorStamp} edited by a`,
+          ),
+        );
 
-        test('editor filter returns only pages last edited by that user', async ({
-          page,
-          request,
-        }) => {
-          await rebuildSearchIndex(request);
+        // group: admin creates the group and adds user A as a member, then A
+        // creates a group-restricted page and a public control.
+        const groupId = await ensureUserGroup(request, FILTER_GROUP_NAME);
+        await addUserToGroup(request, groupId, FILTER_TEST_USER_A.username);
+        createdGroup.push(
+          await createPage(contextA.request, {
+            path: groupInGroupPath,
+            body: `group filter ${groupStamp}`,
+            grant: PageGrant.GRANT_USER_GROUP,
+            grantUserGroupIds: [{ type: 'UserGroup', item: groupId }],
+          }),
+        );
+        createdGroup.push(
+          await createPage(contextA.request, {
+            path: groupPublicControlPath,
+            body: `group filter ${groupStamp}`,
+          }),
+        );
 
-          const list = page.getByTestId('search-result-list');
+        // prefix: one page under the prefix and one outside it.
+        createdPrefix.push(
+          await createPage(request, {
+            path: prefixTargetPath,
+            body: `prefix filter ${prefixStamp}`,
+          }),
+        );
+        createdPrefix.push(
+          await createPage(request, {
+            path: prefixControlPath,
+            body: `prefix filter ${prefixStamp}`,
+          }),
+        );
 
-          // POSITIVE: only the page last edited by B appears for `editor:<B>`.
-          await expect(async () => {
-            await page.goto(`/_search?q=editor:${FILTER_TEST_USER_B.username}`);
-            await expect(page.getByTestId('search-result-base')).toBeVisible();
-            await expect(
-              list.getByRole('link', { name: `${stamp}-edited-by-b` }),
-            ).toBeVisible({ timeout: 3000 });
-          }).toPass({ timeout: 20_000 });
+        // negated author: two pages under one prefix, authored by different users.
+        createdNotAuthor.push(
+          await createPage(contextA.request, {
+            path: notAuthorByAPath,
+            body: `not-author filter ${notAuthorStamp}`,
+          }),
+        );
+        createdNotAuthor.push(
+          await createPage(contextB.request, {
+            path: notAuthorByBPath,
+            body: `not-author filter ${notAuthorStamp}`,
+          }),
+        );
+      } finally {
+        await contextA.close();
+        await contextB.close();
+      }
 
-          // NEGATIVE: a page only A ever edited does not appear.
-          await expect(
-            list.getByRole('link', { name: `${stamp}-only-a` }),
-          ).toHaveCount(0);
+      await rebuildSearchIndex(request);
+    });
 
-          // NEGATIVE: a page authored & contributed to by B, but last-edited by A,
-          // does not appear -> proves `editor:` is the LAST editor, not the author.
-          await expect(
-            list.getByRole('link', { name: `${stamp}-authored-by-b` }),
-          ).toHaveCount(0);
-        });
+    // Tear everything down once at the very end, so the suite stays re-runnable
+    // (a leaked page collides on the next run's fixed path).
+    test.afterAll(async ({ request, browser }) => {
+      // The group-restricted page can only be completely deleted by a group member
+      // (user A), not by a non-member admin — so delete the group pages as A.
+      const contextA = await browser.newContext({
+        storageState: FILTER_TEST_USER_A.authFile,
       });
+      try {
+        await deletePagesCompletely(contextA.request, createdGroup);
+      } finally {
+        await contextA.close();
+      }
 
-    test.describe
-      .serial('group filter relevance', () => {
-        // `group:<name>` matches pages granted to that user group.
-        const stamp = 'e2e-groupfilter-2b8e6d';
-        const inGroupPath = `/Sandbox/${stamp}-in-group`;
-        const publicControlPath = `/Sandbox/${stamp}-public`;
-        const created: CreatedPage[] = [];
+      // The rest are public pages; admin can delete them regardless of author.
+      await deletePagesCompletely(request, [
+        ...createdTag,
+        ...createdAuthor,
+        ...createdEditor,
+        ...createdPrefix,
+        ...createdNotAuthor,
+      ]);
+    });
 
-        // Delete as user A (creator + group member).
-        test.afterAll(async ({ browser }) => {
-          const contextA = await browser.newContext({
-            storageState: FILTER_TEST_USER_A.authFile,
-          });
-          try {
-            await deletePagesCompletely(contextA.request, created);
-          } finally {
-            await contextA.close();
-          }
-        });
+    test('tag filter returns only the tagged page', async ({ page }) => {
+      const list = page.getByTestId('search-result-list');
 
-        test('setup: a group page (A is a member) and a public control', async ({
-          request,
-          browser,
-        }) => {
-          // Admin creates the group and adds user A as a member.
-          const groupId = await ensureUserGroup(request, FILTER_GROUP_NAME);
-          await addUserToGroup(request, groupId, FILTER_TEST_USER_A.username);
+      // POSITIVE: tagged page appears
+      await expect(async () => {
+        await page.goto(`/_search?q=tag:${tag}`);
+        await expect(page.getByTestId('search-result-base')).toBeVisible();
+        await expect(
+          list.getByRole('link', { name: `${tagStamp}-target` }),
+        ).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 20_000 });
 
-          // Login as user A.
-          const contextA = await browser.newContext({
-            storageState: FILTER_TEST_USER_A.authFile,
-          });
-          try {
-            // Track each page as it is created (see tag setup).
-            // Page restricted to the group -> only group members can find it.
-            created.push(
-              await createPage(contextA.request, {
-                path: inGroupPath,
-                body: `group filter ${stamp}`,
-                grant: PageGrant.GRANT_USER_GROUP,
-                grantUserGroupIds: [{ type: 'UserGroup', item: groupId }],
-              }),
-            );
-            // Public page.
-            created.push(
-              await createPage(contextA.request, {
-                path: publicControlPath,
-                body: `group filter ${stamp}`,
-              }),
-            );
-          } finally {
-            await contextA.close();
-          }
-        });
+      // NEGATIVE: untagged control absent -> proves relevance
+      await expect(
+        list.getByRole('link', { name: `${tagStamp}-control` }),
+      ).toHaveCount(0);
+    });
 
-        test('group filter returns only pages granted to that group', async ({
-          request,
-          browser,
-        }) => {
-          await rebuildSearchIndex(request);
+    test('author filter returns only pages by that author', async ({
+      page,
+    }) => {
+      const list = page.getByTestId('search-result-list');
 
-          // Search as user A (a group member).
-          const contextA = await browser.newContext({
-            storageState: FILTER_TEST_USER_A.authFile,
-          });
-          try {
-            const pageA = await contextA.newPage();
-            const list = pageA.getByTestId('search-result-list');
+      // POSITIVE: only A's page appears
+      await expect(async () => {
+        await page.goto(`/_search?q=author:${FILTER_TEST_USER_A.username}`);
+        await expect(page.getByTestId('search-result-base')).toBeVisible();
+        await expect(
+          list.getByRole('link', { name: `${authorStamp}-by-a` }),
+        ).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 20_000 });
 
-            // POSITIVE: the group-restricted page appears for `group:<name>`.
-            await expect(async () => {
-              await pageA.goto(`/_search?q=group:${FILTER_GROUP_NAME}`);
-              await expect(
-                pageA.getByTestId('search-result-base'),
-              ).toBeVisible();
-              await expect(
-                list.getByRole('link', { name: `${stamp}-in-group` }),
-              ).toBeVisible({ timeout: 3000 });
-            }).toPass({ timeout: 20_000 });
+      // NEGATIVE: B's page absent -> proves the author filter
+      await expect(
+        list.getByRole('link', { name: `${authorStamp}-by-b` }),
+      ).toHaveCount(0);
+    });
 
-            // NEGATIVE: the public (non-group) page does not appear.
-            await expect(
-              list.getByRole('link', { name: `${stamp}-public` }),
-            ).toHaveCount(0);
-          } finally {
-            await contextA.close();
-          }
-        });
+    test('editor filter returns only pages last edited by that user', async ({
+      page,
+    }) => {
+      const list = page.getByTestId('search-result-list');
+
+      // POSITIVE: only the page last edited by B appears
+      await expect(async () => {
+        await page.goto(`/_search?q=editor:${FILTER_TEST_USER_B.username}`);
+        await expect(page.getByTestId('search-result-base')).toBeVisible();
+        await expect(
+          list.getByRole('link', { name: `${editorStamp}-edited-by-b` }),
+        ).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 20_000 });
+
+      // NEGATIVE: page only A edited absent
+      await expect(
+        list.getByRole('link', { name: `${editorStamp}-only-a` }),
+      ).toHaveCount(0);
+
+      // NEGATIVE: B-authored but A-edited absent -> proves editor: is the LAST editor
+      await expect(
+        list.getByRole('link', { name: `${editorStamp}-authored-by-b` }),
+      ).toHaveCount(0);
+    });
+
+    test('group filter returns only pages granted to that group', async ({
+      browser,
+    }) => {
+      // Search as user A (a group member) — `group:` resolves the name against the
+      // searcher's own memberships.
+      const contextA = await browser.newContext({
+        storageState: FILTER_TEST_USER_A.authFile,
       });
+      try {
+        const pageA = await contextA.newPage();
+        const list = pageA.getByTestId('search-result-list');
 
-    test.describe
-      .serial('prefix filter relevance', () => {
-        // `prefix:<path>` matches pages whose path starts with <path>.
-        const stamp = 'e2e-prefixfilter-4d7c1a';
-        const targetPath = `/Sandbox/${stamp}-inc-target`;
-        const controlPath = `/Sandbox/${stamp}-exc-control`;
-        const created: CreatedPage[] = [];
-
-        test.afterAll(async ({ request }) => {
-          await deletePagesCompletely(request, created);
-        });
-
-        test('setup: create an in-prefix page and an out-of-prefix control page', async ({
-          request,
-        }) => {
-          // Track each page as it is created (see tag setup).
-          created.push(
-            await createPage(request, {
-              path: targetPath,
-              body: `prefix filter ${stamp}`,
-            }),
-          );
-          created.push(
-            await createPage(request, {
-              path: controlPath,
-              body: `prefix filter ${stamp}`,
-            }),
-          );
-        });
-
-        test('prefix filter returns only pages under that path', async ({
-          page,
-          request,
-        }) => {
-          await rebuildSearchIndex(request);
-
-          const list = page.getByTestId('search-result-list');
-
-          // POSITIVE: the page under the prefix appears for `prefix:<path>`.
-          await expect(async () => {
-            await page.goto(`/_search?q=prefix:/Sandbox/${stamp}-inc`);
-            await expect(page.getByTestId('search-result-base')).toBeVisible();
-            await expect(
-              list.getByRole('link', { name: `${stamp}-inc-target` }),
-            ).toBeVisible({ timeout: 3000 });
-          }).toPass({ timeout: 20_000 });
-
-          // NEGATIVE: the page outside the prefix does not appear.
+        // POSITIVE: group-restricted page appears
+        await expect(async () => {
+          await pageA.goto(`/_search?q=group:${FILTER_GROUP_NAME}`);
+          await expect(pageA.getByTestId('search-result-base')).toBeVisible();
           await expect(
-            list.getByRole('link', { name: `${stamp}-exc-control` }),
-          ).toHaveCount(0);
-        });
-      });
+            list.getByRole('link', { name: `${groupStamp}-in-group` }),
+          ).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 20_000 });
 
-    test.describe
-      .serial('negated author filter relevance', () => {
-        // Representative end-to-end check for negation (`-author:`). A bare `-author:`
-        // matches every page except one, so scope it with a unique
-        // `prefix:` to keep the result set deterministic.
-        const stamp = 'e2e-notauthorfilter-8e2f0b';
-        const prefix = `/Sandbox/${stamp}`;
-        const byUserAPath = `${prefix}-by-a`;
-        const byUserBPath = `${prefix}-by-b`;
-        const created: CreatedPage[] = [];
+        // NEGATIVE: public (non-group) page absent
+        await expect(
+          list.getByRole('link', { name: `${groupStamp}-public` }),
+        ).toHaveCount(0);
+      } finally {
+        await contextA.close();
+      }
+    });
 
-        test.afterAll(async ({ request }) => {
-          await deletePagesCompletely(request, created);
-        });
+    test('prefix filter returns only pages under that path', async ({
+      page,
+    }) => {
+      const list = page.getByTestId('search-result-list');
 
-        test('setup: create pages under one prefix authored by different users', async ({
-          browser,
-        }) => {
-          const contextA = await browser.newContext({
-            storageState: FILTER_TEST_USER_A.authFile,
-          });
-          const contextB = await browser.newContext({
-            storageState: FILTER_TEST_USER_B.authFile,
-          });
-          try {
-            // Track each page as it is created (see tag setup).
-            created.push(
-              await createPage(contextA.request, {
-                path: byUserAPath,
-                body: `not-author filter ${stamp}`,
-              }),
-            );
-            created.push(
-              await createPage(contextB.request, {
-                path: byUserBPath,
-                body: `not-author filter ${stamp}`,
-              }),
-            );
-          } finally {
-            await contextA.close();
-            await contextB.close();
-          }
-        });
+      // POSITIVE: page under the prefix appears
+      await expect(async () => {
+        await page.goto(`/_search?q=prefix:/Sandbox/${prefixStamp}-inc`);
+        await expect(page.getByTestId('search-result-base')).toBeVisible();
+        await expect(
+          list.getByRole('link', { name: `${prefixStamp}-inc-target` }),
+        ).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 20_000 });
 
-        test('negated author filter excludes that author within the scope', async ({
-          page,
-          request,
-        }) => {
-          await rebuildSearchIndex(request);
+      // NEGATIVE: page outside the prefix absent
+      await expect(
+        list.getByRole('link', { name: `${prefixStamp}-exc-control` }),
+      ).toHaveCount(0);
+    });
 
-          const list = page.getByTestId('search-result-list');
+    test('negated author filter excludes that author within the scope', async ({
+      page,
+    }) => {
+      const list = page.getByTestId('search-result-list');
 
-          // POSITIVE: within the prefix scope, A's page is found.
-          await expect(async () => {
-            await page.goto(
-              `/_search?q=prefix:${prefix} -author:${FILTER_TEST_USER_B.username}`,
-            );
-            await expect(page.getByTestId('search-result-base')).toBeVisible();
-            await expect(
-              list.getByRole('link', { name: `${stamp}-by-a` }),
-            ).toBeVisible({ timeout: 3000 });
-          }).toPass({ timeout: 20_000 });
+      // POSITIVE: A's page found within the prefix scope
+      await expect(async () => {
+        await page.goto(
+          `/_search?q=prefix:${notAuthorPrefix} -author:${FILTER_TEST_USER_B.username}`,
+        );
+        await expect(page.getByTestId('search-result-base')).toBeVisible();
+        await expect(
+          list.getByRole('link', { name: `${notAuthorStamp}-by-a` }),
+        ).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 20_000 });
 
-          // NEGATIVE: B's page is excluded by -author:<B>.
-          await expect(
-            list.getByRole('link', { name: `${stamp}-by-b` }),
-          ).toHaveCount(0);
-        });
-      });
+      // NEGATIVE: B's page excluded by -author:<B>
+      await expect(
+        list.getByRole('link', { name: `${notAuthorStamp}-by-b` }),
+      ).toHaveCount(0);
+    });
   });
