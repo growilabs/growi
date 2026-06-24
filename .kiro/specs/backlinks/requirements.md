@@ -48,13 +48,15 @@ the page grant/permission model (never exposing a page a viewer cannot read), st
 accurate as pages change through GROWI's normal lifecycle (create, update, move,
 soft-delete to trash, restore, and permanent delete), and recognize both link
 forms GROWI supports — standard Markdown links (`[text](/path)`) and wiki-links
-(`[[/path>alias]]`). The requirements below describe the complete feature; the
+(`[[alias>/path]]`, where the link target is the part after `>`). The
+requirements below describe the complete feature; the
 order of delivery is tracked separately in the implementation backlog.
 
 ## Boundary Context
 
 - **In scope**: presenting incoming links (backlinks) per page; recognizing
-  Markdown and wiki-link references; filtering by the viewer's read permission;
+  links from a page's rendered content — Markdown links, wiki-links, and raw HTML
+  anchors — that target internal pages; filtering by the viewer's read permission;
   keeping backlinks current as pages are created, updated, moved/renamed,
   trashed, restored, and permanently deleted; a one-time backfill for
   pre-existing pages; indicating trashed/broken link targets.
@@ -73,11 +75,13 @@ order of delivery is tracked separately in the implementation backlog.
 
 #### Acceptance Criteria
 1. When a user views a page, the Backlinks feature shall display the list of other pages that link to it.
-2. The Backlinks feature shall recognize both standard Markdown links (`[text](/path)`) and wiki-links (`[[/path>alias]]`) as links for the purpose of backlinks.
-3. When a single source page links to the viewed page more than once, the Backlinks feature shall list that source page only once.
-4. The Backlinks feature shall exclude a page's link to itself from that page's backlinks.
-5. When no other page links to the viewed page, the Backlinks feature shall present an explicit empty state.
-6. For each backlink, the Backlinks feature shall show the linking page's title and path.
+2. The Backlinks feature shall treat as a link any anchor in the page's rendered content that targets an internal page, regardless of whether it was authored as a standard Markdown link (`[text](/path)`), a GROWI wiki-link (`[[alias>/path]]`, where the link target is the part after `>`), or raw HTML (`<a href="/path">`).
+3. The Backlinks feature shall not treat external URLs or in-page anchors (`#…`) as links for the purpose of backlinks.
+4. Because links are recognized from rendered content rather than source text, the Backlinks feature shall not treat link-like text inside code spans or code blocks as a link.
+5. When a single source page links to the viewed page more than once, the Backlinks feature shall list that source page only once.
+6. The Backlinks feature shall exclude a page's link to itself from that page's backlinks.
+7. When no other page links to the viewed page, the Backlinks feature shall present an explicit empty state.
+8. For each backlink, the Backlinks feature shall show the linking page's title and path.
 
 ### Requirement 2: Permission-aware backlinks
 **Objective:** As a reader, I want backlinks limited to pages I am allowed to see, so that the feature never reveals restricted content.
