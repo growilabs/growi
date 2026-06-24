@@ -68,7 +68,7 @@ module.exports = (crowi, _app) => {
   const globalNotificationService = crowi.globalNotificationService;
   const userNotificationService = crowi.userNotificationService;
 
-  const { body } = require('express-validator');
+  const { body, query } = require('express-validator');
   const mongoose = require('mongoose');
   const ObjectId = mongoose.Types.ObjectId;
 
@@ -125,30 +125,42 @@ module.exports = (crowi, _app) => {
    * @apiParam {String} revision_id Revision Id.
    */
   api.get = async (req, res) => {
+    // Query ids are validated (MongoId) by `validators.get()` + apiV1FormValidator
+    // in the route chain, so malformed input is already rejected before here.
     const pageId = req.query.page_id;
     const revisionId = req.query.revision_id;
+    const { isSharedPage } = req;
 
-    // check whether accessible
-    const isAccessible = await Page.isAccessiblePageByViewer(pageId, req.user);
+    // In a valid share-link context, certify-shared-page has already verified
+    // that this exact page_id is the share link's related page, so bypass the
+    // viewer access check — but the bypass applies ONLY to that verified
+    // page_id (see the revision_id handling below).
+    const isAccessible =
+      isSharedPage === true ||
+      (await Page.isAccessiblePageByViewer(pageId, req.user));
     if (!isAccessible) {
       return res.json(
         ApiResponse.error('Current user is not accessible to this page.'),
       );
     }
 
-    let query = null;
+    let commentQuery = null;
 
     try {
-      if (revisionId) {
-        query = Comment.findCommentsByRevisionId(revisionId);
+      // revision_id can point to a revision belonging to a different page.
+      // In a share context the access bypass is scoped to the verified
+      // page_id, so we must NOT honor revision_id there; fetch strictly by
+      // page_id. Non-shared (authenticated) access keeps the revision_id path.
+      if (revisionId && !isSharedPage) {
+        commentQuery = Comment.findCommentsByRevisionId(revisionId);
       } else {
-        query = Comment.findCommentsByPageId(pageId);
+        commentQuery = Comment.findCommentsByPageId(pageId);
       }
     } catch (err) {
       return res.json(ApiResponse.error(err));
     }
 
-    const comments = await query.populate('creator');
+    const comments = await commentQuery.populate('creator');
     comments.forEach((comment) => {
       if (comment.creator != null && comment.creator instanceof User) {
         comment.creator = serializeUserSecurely(comment.creator);
@@ -156,6 +168,25 @@ module.exports = (crowi, _app) => {
     });
 
     res.json(ApiResponse.success({ comments }));
+  };
+
+  api.validators.get = () => {
+    // Validate ids as MongoId to close the NoSQL injection surface
+    // (e.g. `?page_id[$gt]=`). page_id is required; shareLinkId / revision_id
+    // are optional. The handler rejects via validationResult when these fail.
+    return [
+      query('page_id')
+        .isMongoId()
+        .withMessage('page_id must be a valid MongoId'),
+      query('shareLinkId')
+        .optional()
+        .isMongoId()
+        .withMessage('shareLinkId must be a valid MongoId'),
+      query('revision_id')
+        .optional()
+        .isMongoId()
+        .withMessage('revision_id must be a valid MongoId'),
+    ];
   };
 
   api.validators.add = () => {

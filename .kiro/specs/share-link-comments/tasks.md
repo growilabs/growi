@@ -34,24 +34,24 @@
 - [ ] 3. isAccessiblePageByViewer 問題の解決（認可 + テスト）
   - **設計改訂（2026-06-23）**: PR #11322 のセキュリティレビューを受け、「単一 ID 化（検証対象＝取得対象）」を採用。詳細は research.md「認可設計の改訂」/ design.md「単一 ID 不変条件」参照。
 
-- [ ] 3.1 (P) certify-shared-page を一般化し comments.get に結線する
-  - `certify-shared-page.js` の検証対象 ID 読み取りを `req.query.pageId || req.query.page_id || req.body.pageId` に **additive 一般化**する（既存呼び出し元は `pageId` 送信のため後方互換）
-  - `comments.get` に MongoId バリデータ `comment.api.validators.get()` を追加（`page_id` 必須 / `shareLinkId`・`revision_id` は optional）し、`accessTokenParser → comment.api.validators.get() → certifySharedPage → loginRequired → comment.api.get` の順に挿入する
+- [x] 3.1 (P) certify-shared-page を一般化し comments.get に結線する
+  - `certify-shared-page.js` を `pageId`（camelCase）と `page_id`（snake_case）の両方を読むよう **additive 一般化**する（既存呼び出し元は `pageId` 送信のため後方互換）。**両 ID が存在し値が異なる ambiguous なリクエストは `isSharedPage` を立てずに通し、verify/fetch split による IDOR を防ぐ**（precedence 片寄せは不可）
+  - `comments.get` に MongoId バリデータ `comment.api.validators.get()` を追加（`page_id` 必須 / `shareLinkId`・`revision_id` は optional）し、既存 `apiV1FormValidator` で短絡したうえで `accessTokenParser → comment.api.validators.get() → apiV1FormValidator → certifySharedPage → loginRequired → comment.api.get` の順に挿入する（バリデータを certify の前段に置き、不正入力が共有リンク DB クエリ・ハンドラに到達しないようにする）
   - 完了: 有効な `page_id` + `shareLinkId`（ページ一致・未期限切れ）のリクエストで `req.isSharedPage` が立つ。既存の `/page/info`・`/revisions/list` の挙動は不変
   - _Requirements: 3.1, 4.2, 4.3_
   - _Boundary: certify-shared-page.js, comments.get route_
 
-- [ ] 3.2 comment.api.get を isSharedPage 尊重 + 単一 ID 化に変更する
+- [x] 3.2 comment.api.get を isSharedPage 尊重 + 単一 ID 化に変更する
   - `!req.isSharedPage && !(await isAccessiblePageByViewer(page_id))` のときのみ拒否する（`revisions.js` と同形）
   - **共有文脈（`isSharedPage`）では `revision_id` 分岐を使わず、検証済み `page_id` でのみ取得する**（CRITICAL-2 の閉塞）。非共有経路の `revision_id` 取得は従来どおり維持
-  - ハンドラ冒頭で `validationResult` を検査（既存 `api.add` と同形）
+  - 入力検証はルート段の `apiV1FormValidator` が担うため、ハンドラ内に重複チェックは置かない（既存 `api.add` の `validationResult(req.body)` は実質 no-op のため踏襲しない）
   - 投稿者情報は既存の `serializeUserSecurely` を維持する
   - 完了: 共有文脈のゲストが検証済みページのコメントを取得でき、共有文脈なしのゲストは従来どおり拒否される。共有文脈で別ページの `revision_id` を渡してもそのコメントは返らない
   - _Requirements: 3.1, 3.2, 3.3, 4.1, 4.2, 5.2_
   - _Depends: 3.1_
   - _Boundary: comment.api.get_
 
-- [ ] 3.3 /comments.get の統合テストを追加する
+- [x] 3.3 /comments.get の統合テストを追加する
   - 正常系: 有効な共有リンクで取得可 / 共有文脈なし未ログインで拒否 / 期限切れで拒否
   - **IDOR 防止（負のテスト・必須）**:
     - `shareLinkId` は A のまま `page_id` を別ページ B にすると拒否される（`relatedPage` 不一致 → `isSharedPage` 立たず、CRITICAL-1）
