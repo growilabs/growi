@@ -84,19 +84,17 @@ export const AuditLogIndexManagement = (): JSX.Element => {
       setRebuildTotal(data.totalCount);
       setRebuildCurrent(data.count);
 
-      let retryCount = 0;
       const maxRetries = 5;
       const retryDelay = 500;
 
-      const retrieveStatusWithRetry = async () => {
-        const isNormalizedResult = await retrieveStatus();
-        if (!isNormalizedResult && retryCount < maxRetries) {
-          retryCount++;
-          setTimeout(retrieveStatusWithRetry, retryDelay);
-        }
-      };
+      for (let i = 0; i < maxRetries; i++) {
+        const isNormalized = await retrieveStatus();
+        if (isNormalized) break;
+        await new Promise<void>((resolve) => {
+          setTimeout(resolve, retryDelay);
+        });
+      }
 
-      await retrieveStatusWithRetry();
       setIsRebuildingProcessing(false);
       setIsRebuildingCompleted(true);
     });
