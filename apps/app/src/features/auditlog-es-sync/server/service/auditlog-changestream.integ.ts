@@ -382,7 +382,7 @@ describe('AuditlogChangeStreamService', () => {
       const doc: Partial<ActivityDocument> = { _id: new Types.ObjectId() };
       fakeStream.push(makeInsertEvent(doc, 'tok1'));
 
-      // Wait for the flush to run and fail, then confirm token was not persisted
+      // confirm flush completed before asserting the negative
       await vi.waitFor(() =>
         expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalled(),
       );
@@ -598,21 +598,26 @@ describe('AuditlogChangeStreamService', () => {
     });
 
     it('does not restart processChangeStream after close()', async () => {
-      const fakeStream = new FakeChangeStream();
-      const watchSpy = vi
-        .spyOn(Activity, 'watch')
-        .mockReturnValue(
-          fakeStream as unknown as ChangeStream<ActivityDocument>,
-        );
-      service = new AuditlogChangeStreamService(esWriter);
+      vi.useFakeTimers();
+      try {
+        const fakeStream = new FakeChangeStream();
+        const watchSpy = vi
+          .spyOn(Activity, 'watch')
+          .mockReturnValue(
+            fakeStream as unknown as ChangeStream<ActivityDocument>,
+          );
+        service = new AuditlogChangeStreamService(esWriter);
 
-      await service.start();
-      await service.close();
+        await service.start();
+        await service.close();
 
-      await new Promise((resolve) => setImmediate(resolve));
+        // Advance past RESTART_BASE_DELAY_MS
+        await vi.runAllTimersAsync();
 
-      // Activity.watch called only once (no restart opened a new stream)
-      expect(watchSpy).toHaveBeenCalledTimes(1);
+        expect(watchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
