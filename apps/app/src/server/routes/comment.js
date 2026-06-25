@@ -10,7 +10,6 @@ import {
 import loggerFactory from '~/utils/logger';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
-import { preNotifyService } from '../service/pre-notify';
 
 /**
  * @swagger
@@ -291,27 +290,32 @@ module.exports = (crowi, _app) => {
       eventModel: SupportedEventModel.MODEL_COMMENT,
       event: createdComment,
       action: SupportedAction.ACTION_COMMENT_CREATE,
+      contributor: req.user,
     };
 
-    /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */
-    const getAdditionalTargetUsers = async (activity) => {
-      const mentionedUsers = await crowi.commentService.getMentionedUsers(
-        activity.event,
+    const { generatePreNotify, notify: notifyMentions } =
+      await crowi.commentService.prepareMentionNotifications(
+        createdComment._id,
+        req.user._id,
+        res.locals.activity._id,
+        page,
       );
-
-      return mentionedUsers;
-    };
 
     activityEvent.emit(
       'update',
       res.locals.activity._id,
       parameters,
       page,
-      preNotifyService.generatePreNotify,
-      getAdditionalTargetUsers,
+      generatePreNotify,
     );
 
     res.json(ApiResponse.success({ comment: createdComment }));
+
+    try {
+      await notifyMentions();
+    } catch (err) {
+      logger.error('Mention notification failed', err);
+    }
 
     // global notification
     try {

@@ -1045,6 +1045,8 @@
   },
   "user_home_page": {
     "bookmarks": "ブックマーク",
+    "contribution_graph": "コントリビューショングラフ",
+    "contribution_migration_in_progress": "コントリビューションデータを準備しています。少し待ってから再読み込みしてください。",
     "recently_created": "最近作成したページ",
     "recent_activity": "最近のアクティビティ",
     "unknown_action": "未指定の変更を加えました",

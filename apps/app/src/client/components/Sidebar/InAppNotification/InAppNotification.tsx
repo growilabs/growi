@@ -1,11 +1,11 @@
-import { type JSX, Suspense, useState } from 'react';
+import { type JSX, Suspense, useCallback, useMemo, useState } from 'react';
 import dynamic from 'next/dynamic';
 import { useTranslation } from 'react-i18next';
 
 import ItemsTreeContentSkeleton from '../../ItemsTree/ItemsTreeContentSkeleton';
+import { useMergedInAppNotifications } from './hooks/useMergedInAppNotifications';
 import { InAppNotificationForms } from './InAppNotificationForms';
-
-export type FilterType = 'all' | 'news' | 'notifications';
+import type { FilterType } from './types';
 
 const InAppNotificationContent = dynamic(
   () =>
@@ -22,6 +22,24 @@ export const InAppNotification = (): JSX.Element => {
     useState(false);
   const [activeFilter, setActiveFilter] = useState<FilterType>('all');
 
+  const merged = useMergedInAppNotifications(isUnopendNotificationsVisible);
+  const { newsUnreadCount, notifUnreadCount, handleMarkAllRead } = merged;
+
+  const isMarkAllReadDisabled = useMemo(() => {
+    const newsHas = (newsUnreadCount ?? 0) > 0;
+    const notifHas = (notifUnreadCount ?? 0) > 0;
+    if (activeFilter === 'news') return !newsHas;
+    if (activeFilter === 'notifications') return !notifHas;
+    return !newsHas && !notifHas;
+  }, [activeFilter, newsUnreadCount, notifUnreadCount]);
+
+  const onMarkAllRead = useCallback(() => {
+    void handleMarkAllRead({
+      news: activeFilter !== 'notifications',
+      notifications: activeFilter !== 'news',
+    });
+  }, [activeFilter, handleMarkAllRead]);
+
   return (
     <div className="px-3">
       <div className="grw-sidebar-content-header py-4 d-flex">
@@ -35,13 +53,12 @@ export const InAppNotification = (): JSX.Element => {
         }}
         activeFilter={activeFilter}
         onChangeFilter={setActiveFilter}
+        onMarkAllRead={onMarkAllRead}
+        isMarkAllReadDisabled={isMarkAllReadDisabled}
       />
 
       <Suspense fallback={<ItemsTreeContentSkeleton />}>
-        <InAppNotificationContent
-          isUnopendNotificationsVisible={isUnopendNotificationsVisible}
-          activeFilter={activeFilter}
-        />
+        <InAppNotificationContent activeFilter={activeFilter} merged={merged} />
       </Suspense>
     </div>
   );
