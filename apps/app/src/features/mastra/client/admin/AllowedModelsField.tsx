@@ -124,7 +124,6 @@ export const AllowedModelsField = (
           labelKey={modelLabelKey}
           radioGroupName={radioGroupName}
           disabled={disabled}
-          isDefault={watch(`allowedModels.${index}.isDefault`) === true}
           docUrl={PROVIDER_OPTIONS_DOC_URL}
           placeholder={buildInitialProviderOptionsText(provider)}
           onSelectDefault={() => selectDefault(index)}
@@ -166,7 +165,6 @@ interface AllowedModelRowProps {
   readonly labelKey: string;
   readonly radioGroupName: string;
   readonly disabled: boolean;
-  readonly isDefault: boolean;
   readonly docUrl: string;
   readonly placeholder: string;
   readonly onSelectDefault: () => void;
@@ -177,7 +175,7 @@ interface AllowedModelRowProps {
  * One allowed-model card: model id (monospace) + "default" badge/radio + remove
  * trash icon + providerOptions JSON with a live valid/invalid indicator, a format
  * button, and a docs link. Extracted so each card owns its own field ids and
- * watches only its own providerOptions value.
+ * watches only its own fields (isDefault + providerOptions value).
  */
 const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
   const {
@@ -185,7 +183,6 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
     labelKey,
     radioGroupName,
     disabled,
-    isDefault,
     docUrl,
     placeholder,
     onSelectDefault,
@@ -198,8 +195,11 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
   const providerOptionsId = useId();
   const radioId = useId();
 
-  // Watch only this card's providerOptions text so the inline status follows
-  // edits without re-rendering sibling cards.
+  // Watch only this card's own fields (isDefault + providerOptions text) so editing
+  // a row or toggling the default re-renders just the affected rows — the parent
+  // subscribes to neither, keeping re-renders row-local.
+  const isDefault =
+    useWatch({ control, name: `allowedModels.${index}.isDefault` }) === true;
   const providerOptionsText =
     useWatch({ control, name: `allowedModels.${index}.providerOptionsText` }) ??
     '';
