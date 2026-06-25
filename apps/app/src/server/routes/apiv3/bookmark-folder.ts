@@ -1,7 +1,7 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import { body } from 'express-validator';
-import type { Types } from 'mongoose';
+import mongoose, { type Types } from 'mongoose';
 
 import type { BookmarkFolderItems } from '~/interfaces/bookmark-info';
 import type Crowi from '~/server/crowi';
@@ -13,6 +13,7 @@ import {
   BookmarkFolderNotFoundError,
   InvalidParentBookmarkFolderError,
 } from '~/server/models/errors';
+import type { PageModel } from '~/server/models/page';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
 import loggerFactory from '~/utils/logger';
 
@@ -245,6 +246,7 @@ module.exports = (crowi: Crowi) => {
     loginRequiredStrictly,
     async (req, res) => {
       const { userId } = req.params;
+      const Page = mongoose.model<InstanceType<PageModel>, PageModel>('Page');
 
       const getBookmarkFolders = async (
         userId: Types.ObjectId | string,
@@ -276,7 +278,22 @@ module.exports = (crowi: Crowi) => {
 
           // !! DO NOT THIS SERIALIZING OUTSIDE OF PROMISES !! -- 05.23.2023 ryoji-s
           // Serializing outside of promises will cause not populated.
-          const bookmarks = folder.bookmarks.map((bookmark) =>
+
+          // Filter bookmarks to only include pages accessible to the requesting user
+          const accessibleBookmarks = (
+            await Promise.all(
+              folder.bookmarks.map(async (bookmark) => {
+                if (bookmark.page == null) return null;
+                const isAccessible = await Page.isAccessiblePageByViewer(
+                  bookmark.page._id,
+                  req.user,
+                );
+                return isAccessible ? bookmark : null;
+              }),
+            )
+          ).filter((b): b is NonNullable<typeof b> => b != null);
+
+          const bookmarks = accessibleBookmarks.map((bookmark) =>
             serializeBookmarkSecurely(bookmark),
           );
 
@@ -418,6 +435,13 @@ module.exports = (crowi: Crowi) => {
     async (req, res) => {
       const { bookmarkFolderId, name, parent, childFolder } = req.body;
       try {
+        const folder = await BookmarkFolder.findById(bookmarkFolderId);
+        if (folder == null) {
+          return res.apiv3Err('bookmark_folder_not_found', 404);
+        }
+        if (folder.owner.toString() !== req.user._id.toString()) {
+          return res.apiv3Err('forbidden', 403);
+        }
         const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(
           bookmarkFolderId,
           name,
@@ -479,6 +503,15 @@ module.exports = (crowi: Crowi) => {
       const { pageId, folderId } = req.body;
 
       try {
+        if (folderId != null) {
+          const folder = await BookmarkFolder.findById(folderId);
+          if (folder == null) {
+            return res.apiv3Err('bookmark_folder_not_found', 404);
+          }
+          if (folder.owner.toString() !== userId.toString()) {
+            return res.apiv3Err('forbidden', 403);
+          }
+        }
         const bookmarkFolder =
           await BookmarkFolder.insertOrUpdateBookmarkedPage(
             pageId,
