@@ -61,7 +61,7 @@ Target requirements: [requirements.md](./requirements.md) / Prior research: [res
 
 #### Existing Architecture Analysis
 - GrantSelector fetches `GroupGrantData` (`userRelatedGroups` / `nonUserRelatedGrantedGroups`) via `useSWRxCurrentGrantData(pageId)` → `GET /api/v3/page/grant-data` → `getPageGroupGrantData`, rendering only group names. A member display TODO exists at [GrantSelector.tsx:338](../../../apps/app/src/client/components/PageEditor/EditorNavbarBottom/GrantSelector.tsx).
-- The existing API `GET /api/v3/user/related-groups` ([get-related-groups.ts](../../../apps/app/src/server/routes/apiv3/user/get-related-groups.ts)) exposes `pageGrantService.getUserRelatedGroups(req.user)` under `loginRequiredStrictly` + `SCOPE.READ.USER_SETTINGS.INFO`. This design adds a **sibling endpoint** with the same pattern and authorization.
+- The existing API `GET /api/v3/user/related-groups` ([get-related-groups.ts](../../../apps/app/src/server/routes/apiv3/user/get-related-groups.ts)) exposes `pageGrantService.getUserRelatedGroups(req.user)` under `loginRequiredStrictly` + `SCOPE.READ.USER_SETTINGS.INFO`. This design adds a **sibling endpoint** with the same `loginRequiredStrictly` + factory pattern, but **diverges on the scope**: the new endpoint uses a newly-introduced `SCOPE.READ.FEATURES.USER_GROUP` instead of inheriting the sibling's `user_settings:info` (see scope rationale under the endpoint design below).
 - `getUserRelatedGroups` joins internal/external `findAllGroupsForUser` on a direct-membership basis (no recursion). Using this as the work-set source structurally satisfies "direct membership only (2.1)" and "no parent-child expansion (2.2)".
 
 #### Architecture Pattern & Boundary Map
@@ -154,7 +154,7 @@ Gating: the hook uses key `null` when the modal is hidden (no request sent). On 
 | 2.3 | Active users only | Service (`status: STATUS_ACTIVE`) | — |
 | 3.1 | Login required | Endpoint (`loginRequiredStrictly`) | — |
 | 3.2 | Hide members of non-belonging groups | Endpoint (group set derived from session), GrantSelector (no render for nonUserRelated) | — |
-| 3.3 | No admin privileges required | Endpoint (`SCOPE.READ.USER_SETTINGS.INFO`) | — |
+| 3.3 | No admin privileges required | Endpoint (`SCOPE.READ.FEATURES.USER_GROUP`) | — |
 | 3.4 | Only name/username exposed | Service (`.select('name username')`) | `IUserGroupMember` |
 | 3.5 | Always enabled (no settings) | Endpoint (unconditionally public, no feature flag) | — |
 
@@ -205,7 +205,9 @@ function fetchActiveMembersByGroup(
 | Requirements | 1.1, 2.1, 3.1, 3.2, 3.3, 3.5 |
 
 **Responsibilities & Constraints**
-- Auth: `accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true })` + `loginRequiredStrictly` (same as sibling `get-related-groups`). No admin required (3.3); unauthenticated requests rejected (3.1).
+- Auth: `accessTokenParser([SCOPE.READ.FEATURES.USER_GROUP], { acceptLegacy: true })` + `loginRequiredStrictly`. No admin required (3.3); unauthenticated requests rejected (3.1).
+  - **Scope rationale**: this endpoint returns *other users'* identity via group membership — a directory read, not "my settings". The pre-existing `user_settings:info` scope used by sibling endpoints semantically means "read the session user's own settings", so reusing it would over-grant any token scoped only to read its own profile. A dedicated `read:features:user_group` scope is therefore newly introduced (`packages/core/src/interfaces/scope.ts`) and used here.
+  - **Deferred (out of this spec's boundary)**: the sibling `GET /api/v3/user/related-groups` and `GET /api/v3/users` carry the same mis-categorization (`user_settings:info`). Re-gating them to `read:features:user_group` / `read:features:user` is a **breaking change for already-issued tokens** and is intentionally NOT done here; it should be tracked as a separate ticket.
 - Group set is **derived server-side** from `crowi.pageGrantService.getUserRelatedGroups(req.user)` (no client-supplied input → 3.2).
 - Returns the result of `fetchActiveMembersByGroup(groups)` as `res.apiv3({ membersByGroupId })`. On failure, returns `apiv3Err(new ErrorV3(...))`.
 - Handler uses factory pattern (same structure as `get-related-groups.ts`); registered in `index.ts` at `/related-groups/members`.
