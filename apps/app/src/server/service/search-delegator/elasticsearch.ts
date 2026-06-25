@@ -460,6 +460,14 @@ class ElasticsearchDelegator
     const tmpIndexName = `${indexName}-tmp`;
 
     try {
+      // remove leftover tmp index from a prior interrupted rebuild
+      const isExistsTmpIndex = await client.indices.exists({
+        index: tmpIndexName,
+      });
+      if (isExistsTmpIndex) {
+        await client.indices.delete({ index: tmpIndexName });
+      }
+
       // reindex to tmp index
       await this.createAuditlogIndex(tmpIndexName);
       await client.reindex(indexName, tmpIndexName);
@@ -475,7 +483,9 @@ class ElasticsearchDelegator
       // flush index
       await client.indices.delete({ index: indexName });
       await this.createAuditlogIndex(indexName);
-      await this.addAllAuditlogs({ shouldEmitProgress });
+      const { totalCount, count } = await this.addAllAuditlogs({
+        shouldEmitProgress,
+      });
 
       await client.indices.updateAliases({
         actions: [
@@ -485,6 +495,11 @@ class ElasticsearchDelegator
       });
 
       await client.indices.delete({ index: tmpIndexName });
+
+      if (shouldEmitProgress) {
+        const socket = this.socketIoService.getAdminSocket();
+        socket.emit(SocketEventName.FinishAddAuditlog, { totalCount, count });
+      }
     } catch (error) {
       if (shouldEmitProgress) {
         const socket = this.socketIoService.getAdminSocket();
@@ -570,7 +585,7 @@ class ElasticsearchDelegator
 
   async addAllAuditlogs(
     option: { shouldEmitProgress?: boolean } = {},
-  ): Promise<void> {
+  ): Promise<{ totalCount: number; count: number }> {
     const { shouldEmitProgress = false } = option;
     const Activity = mongoose.model('Activity');
     const bulkWrite = this.client.bulk.bind(this.client);
@@ -635,17 +650,12 @@ class ElasticsearchDelegator
       },
       final(callback) {
         logger.info(`Adding auditlogs has completed: (totalCount=${count})`);
-        if (shouldEmitProgress) {
-          socket?.emit(SocketEventName.FinishAddAuditlog, {
-            totalCount,
-            count,
-          });
-        }
         callback();
       },
     });
 
     await pipeline(readStream, batchStream, writeStream);
+    return { totalCount, count };
   }
 
   async createIndex(index: string) {

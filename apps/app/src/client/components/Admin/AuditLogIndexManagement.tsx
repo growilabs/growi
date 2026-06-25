@@ -58,6 +58,9 @@ export const AuditLogIndexManagement = (): JSX.Element => {
             setIsConfigured(false);
           }
         }
+        toastError(errors as Error[]);
+      } else {
+        toastError(errors as Error);
       }
       return false;
     } finally {
@@ -101,6 +104,7 @@ export const AuditLogIndexManagement = (): JSX.Element => {
 
     socket.on(SocketEventName.AuditlogRebuildingFailed, (data) => {
       toastError(new Error(data.error));
+      setIsRebuildingProcessing(false);
     });
 
     return () => {
