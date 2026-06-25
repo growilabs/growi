@@ -4,12 +4,17 @@ import mongoose from 'mongoose';
 const mocks = vi.hoisted(() => {
   const apiv3Post = vi.fn().mockResolvedValue({});
   const mutate = vi.fn();
+  const routerPush = vi.fn();
   const i18nLanguage = { current: 'ja_JP' };
-  return { apiv3Post, mutate, i18nLanguage };
+  return { apiv3Post, mutate, routerPush, i18nLanguage };
 });
 
 vi.mock('~/client/util/apiv3-client', () => ({
   apiv3Post: mocks.apiv3Post,
+}));
+
+vi.mock('next/router', () => ({
+  useRouter: () => ({ push: mocks.routerPush }),
 }));
 
 vi.mock('next-i18next', () => ({
@@ -22,10 +27,6 @@ vi.mock('next-i18next', () => ({
     },
   }),
 }));
-
-// Mock window.open
-const mockOpen = vi.fn();
-vi.stubGlobal('open', mockOpen);
 
 import type { INewsItemWithReadStatus } from '../../interfaces/news-item';
 import { NewsItem } from './NewsItem';
@@ -145,46 +146,40 @@ describe('NewsItem', () => {
       });
     });
 
-    test('should open URL in new tab when url is set', async () => {
-      const item = makeNewsItem({
-        url: 'https://github.com/growi',
-        isRead: false,
-      });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
-
-      const element = screen.getByRole('button');
-      fireEvent.click(element);
-
-      await vi.waitFor(() => {
-        expect(mockOpen).toHaveBeenCalledWith(
-          'https://github.com/growi',
-          '_blank',
-          'noopener,noreferrer',
-        );
-      });
-    });
-
-    test('should NOT open URL when url is not set', async () => {
-      const item = makeNewsItem({ url: undefined, isRead: false });
-      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
-
-      const element = screen.getByRole('button');
-      fireEvent.click(element);
-
-      await vi.waitFor(() => {
-        expect(mocks.apiv3Post).toHaveBeenCalled();
-      });
-      expect(mockOpen).not.toHaveBeenCalled();
-    });
-
-    test('should call onReadMutate after marking as read', async () => {
+    test('should navigate to the news feed page anchored to the clicked item', async () => {
       const item = makeNewsItem({ isRead: false });
       render(<NewsItem item={item} onReadMutate={onReadMutate} />);
 
       fireEvent.click(screen.getByRole('button'));
 
       await vi.waitFor(() => {
-        expect(onReadMutate).toHaveBeenCalled();
+        expect(mocks.routerPush).toHaveBeenCalledWith(
+          `/_news#news-${item._id.toString()}`,
+        );
+      });
+    });
+
+    test('should navigate even when url is not set', async () => {
+      const item = makeNewsItem({ url: undefined, isRead: false });
+      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await vi.waitFor(() => {
+        expect(mocks.routerPush).toHaveBeenCalledWith(
+          `/_news#news-${item._id.toString()}`,
+        );
+      });
+    });
+
+    test('should call onReadMutate with the news item id after marking as read', async () => {
+      const item = makeNewsItem({ isRead: false });
+      render(<NewsItem item={item} onReadMutate={onReadMutate} />);
+
+      fireEvent.click(screen.getByRole('button'));
+
+      await vi.waitFor(() => {
+        expect(onReadMutate).toHaveBeenCalledWith(item._id.toString());
       });
     });
   });

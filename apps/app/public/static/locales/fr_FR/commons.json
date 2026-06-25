@@ -63,7 +63,8 @@
     "news": "Actualités",
     "notifications": "Notifications",
     "filter_all": "Tout",
-    "no_news": "Aucune actualité disponible"
+    "no_news": "Aucune actualité disponible",
+    "view_detail": "Voir les détails"
   },
   "personal_dropdown": {
     "home": "Accueil",
