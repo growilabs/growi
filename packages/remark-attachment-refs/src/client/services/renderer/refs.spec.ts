@@ -21,7 +21,7 @@ const runRehype = (
   tree: ReturnType<typeof createTree>,
   options: { pagePath?: string; isSharedPage?: boolean },
 ): void => {
-  // unified's `Plugin` type is not directly callable; narrow it to the
+  // WHY: unified's `Plugin` type is not directly callable; narrow it to the
   // (options) => (tree) => void shape this factory plugin actually has.
   (rehypePlugin as (opts: typeof options) => (tree: unknown) => void)(options)(
     tree,

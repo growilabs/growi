@@ -347,10 +347,9 @@ describe('AuditlogChangeStreamService', () => {
       const doc: Partial<ActivityDocument> = { _id: new Types.ObjectId() };
       fakeStream.push(makeInsertEvent(doc, 'tok1'));
 
-      // Wait for idle flush (FLUSH_IDLE_MS = 200ms + margin)
-      await new Promise((resolve) => setTimeout(resolve, 350));
-
-      expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith([doc], []);
+      await vi.waitFor(() =>
+        expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith([doc], []),
+      );
     });
 
     it('calls bulkSyncAuditlogs with the document key for a delete event', async () => {
@@ -365,9 +364,9 @@ describe('AuditlogChangeStreamService', () => {
       const id = new Types.ObjectId();
       fakeStream.push(makeDeleteEvent(id, 'tok1'));
 
-      await new Promise((resolve) => setTimeout(resolve, 350));
-
-      expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith([], [id]);
+      await vi.waitFor(() =>
+        expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledWith([], [id]),
+      );
     });
 
     it('does not persist resume token when ES sync fails (at-least-once)', async () => {
@@ -383,8 +382,10 @@ describe('AuditlogChangeStreamService', () => {
       const doc: Partial<ActivityDocument> = { _id: new Types.ObjectId() };
       fakeStream.push(makeInsertEvent(doc, 'tok1'));
 
-      await new Promise((resolve) => setTimeout(resolve, 350));
-
+      // Wait for the flush to run and fail, then confirm token was not persisted
+      await vi.waitFor(() =>
+        expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalled(),
+      );
       expect(vi.mocked(ChangeStreamResumeToken.upsert)).not.toHaveBeenCalled();
     });
 
@@ -400,11 +401,11 @@ describe('AuditlogChangeStreamService', () => {
       const doc: Partial<ActivityDocument> = { _id: new Types.ObjectId() };
       fakeStream.push(makeInsertEvent(doc, 'tok1'));
 
-      await new Promise((resolve) => setTimeout(resolve, 350));
-
-      expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalledWith(
-        'auditlogs',
-        { _data: 'tok1' },
+      await vi.waitFor(() =>
+        expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalledWith(
+          'auditlogs',
+          { _data: 'tok1' },
+        ),
       );
     });
 
@@ -421,8 +422,9 @@ describe('AuditlogChangeStreamService', () => {
       fakeStream.push(makeInsertEvent({}, 'tok2'));
       fakeStream.push(makeInsertEvent({}, 'tok3'));
 
-      await new Promise((resolve) => setTimeout(resolve, 350));
-
+      await vi.waitFor(() =>
+        expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalled(),
+      );
       expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalledTimes(
         1,
       );
@@ -529,7 +531,7 @@ describe('AuditlogChangeStreamService', () => {
       internal.buffer = [makeInsertEvent({}, 'tok-b')];
       await internal.flushBuffer.call(service);
 
-      // 7 more failures on tok-b (counter = 8 after reset, so skip fires on the 8th)
+      // 6 more failures on tok-b (1 + 6 = 7 total; skip fires on the 8th)
       for (let i = 0; i < 6; i++) {
         internal.buffer = [makeInsertEvent({}, 'tok-b')];
         await internal.flushBuffer.call(service);
