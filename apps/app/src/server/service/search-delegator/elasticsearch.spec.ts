@@ -341,6 +341,9 @@ describe('ElasticsearchDelegator', () => {
     beforeEach(() => {
       mockES8Client = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
       injectClient(delegator, mockES8Client);
+      // Explicit defaults so tests don't rely on mockDeep returning undefined for unstubbed async calls.
+      mockES8Client.indices.exists.mockResolvedValue(false);
+      mockES8Client.indices.existsAlias.mockResolvedValue(false);
       // addAllAuditlogs streams from MongoDB, so it cannot run in a unit test — stub it.
       // normalizeAuditlogIndices runs for real (the ES client is mocked) so the resulting
       // index state stays observable rather than being asserted through a spy.
