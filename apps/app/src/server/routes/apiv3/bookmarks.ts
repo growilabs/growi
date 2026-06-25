@@ -235,7 +235,7 @@ export const setup = (crowi: Crowi): Router => {
 
         const userRootBookmarks = await prisma.bookmarks.findMany({
           where: {
-            id: { notIn: bookmarkIdsInFolders },
+            id: { notIn: bookmarkIdsInFolders.map((id) => id.toString()) },
             userId,
           },
           include: {
