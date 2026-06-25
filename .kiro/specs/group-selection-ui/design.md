@@ -37,6 +37,7 @@ Target requirements: [requirements.md](./requirements.md) / Prior research: [res
 - **[Feature 1]** Server service function `fetchActiveMembersByGroup` (group set → active members by group)
 - **[Feature 1]** Member DTO types (`IUserGroupMember` / `RelatedGroupsMembers`)
 - **[Feature 1]** Member list rendering in the **userRelatedGroups** section of GrantSelector, and presentation when the user is the only member
+- **[Scope correction]** New access-token scopes `read/write:features:user` and `read/write:features:user_group` in `@growi/core`, and re-gating the mis-categorized sibling routes (`GET /api/v3/user/related-groups`, `GET /api/v3/users{/,/list,/usernames}`) off `user_settings:info` onto the new scopes
 
 #### Out of Boundary
 - FixPageGrantModal member display TODO ([FixPageGrantModal.tsx:328](../../../apps/app/src/components/PageView/PageAlerts/FixPageGrantAlert/FixPageGrantModal.tsx)) — not modified
@@ -61,7 +62,7 @@ Target requirements: [requirements.md](./requirements.md) / Prior research: [res
 
 #### Existing Architecture Analysis
 - GrantSelector fetches `GroupGrantData` (`userRelatedGroups` / `nonUserRelatedGrantedGroups`) via `useSWRxCurrentGrantData(pageId)` → `GET /api/v3/page/grant-data` → `getPageGroupGrantData`, rendering only group names. A member display TODO exists at [GrantSelector.tsx:338](../../../apps/app/src/client/components/PageEditor/EditorNavbarBottom/GrantSelector.tsx).
-- The existing API `GET /api/v3/user/related-groups` ([get-related-groups.ts](../../../apps/app/src/server/routes/apiv3/user/get-related-groups.ts)) exposes `pageGrantService.getUserRelatedGroups(req.user)` under `loginRequiredStrictly` + `SCOPE.READ.USER_SETTINGS.INFO`. This design adds a **sibling endpoint** with the same `loginRequiredStrictly` + factory pattern, but **diverges on the scope**: the new endpoint uses a newly-introduced `SCOPE.READ.FEATURES.USER_GROUP` instead of inheriting the sibling's `user_settings:info` (see scope rationale under the endpoint design below).
+- The existing API `GET /api/v3/user/related-groups` ([get-related-groups.ts](../../../apps/app/src/server/routes/apiv3/user/get-related-groups.ts)) exposes `pageGrantService.getUserRelatedGroups(req.user)` under `loginRequiredStrictly` + `SCOPE.READ.USER_SETTINGS.INFO`. This design adds a **sibling endpoint** with the same `loginRequiredStrictly` + factory pattern, but **corrects the scope**: a misuse of `user_settings:info` (a "read my own settings" scope) was being applied to routes that return *other* users'/groups' data. New `read:features:user` / `read:features:user_group` scopes are introduced and applied to the new endpoint **and** the pre-existing mis-categorized siblings (see scope rationale under the endpoint design below).
 - `getUserRelatedGroups` joins internal/external `findAllGroupsForUser` on a direct-membership basis (no recursion). Using this as the work-set source structurally satisfies "direct membership only (2.1)" and "no parent-child expansion (2.2)".
 
 #### Architecture Pattern & Boundary Map
@@ -109,6 +110,11 @@ apps/app/src/
 ```
 
 #### Modified Files
+- `packages/core/src/interfaces/scope.ts` — add `features.user` / `features.user_group` to `SCOPE_SEED` and the `Read/WriteFeaturesScope` type unions (requires rebuilding `@growi/core`)
+- `apps/app/src/server/routes/apiv3/users.js` — re-gate `/`, `/list`, `/usernames` from `SCOPE.READ.USER_SETTINGS.INFO` to `SCOPE.READ.FEATURES.USER`
+- `apps/app/src/server/routes/apiv3/user/get-related-groups.ts` — re-gate from `SCOPE.READ.USER_SETTINGS.INFO` to `SCOPE.READ.FEATURES.USER_GROUP`
+- `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,zh_CN}/commons.json` — add `accesstoken_scopes_desc.{read,write}.features.{user,user_group}` descriptions
+- `.changeset/*.md` — record the `@growi/core` minor bump for the new scopes
 - `apps/app/src/server/routes/apiv3/user/index.ts` — register `router.get('/related-groups/members', ...)`
 - `apps/app/src/stores/user.tsx` — add `useSWRxRelatedGroupsMembers(shouldFetch)` next to `useSWRxUserRelatedGroups`
 - `apps/app/src/client/components/PageEditor/EditorNavbarBottom/GrantSelector.tsx` — replace L338 TODO with member list rendering, enable hook when modal is open, present "only yourself" case
@@ -206,8 +212,12 @@ function fetchActiveMembersByGroup(
 
 **Responsibilities & Constraints**
 - Auth: `accessTokenParser([SCOPE.READ.FEATURES.USER_GROUP], { acceptLegacy: true })` + `loginRequiredStrictly`. No admin required (3.3); unauthenticated requests rejected (3.1).
-  - **Scope rationale**: this endpoint returns *other users'* identity via group membership — a directory read, not "my settings". The pre-existing `user_settings:info` scope used by sibling endpoints semantically means "read the session user's own settings", so reusing it would over-grant any token scoped only to read its own profile. A dedicated `read:features:user_group` scope is therefore newly introduced (`packages/core/src/interfaces/scope.ts`) and used here.
-  - **Deferred (out of this spec's boundary)**: the sibling `GET /api/v3/user/related-groups` and `GET /api/v3/users` carry the same mis-categorization (`user_settings:info`). Re-gating them to `read:features:user_group` / `read:features:user` is a **breaking change for already-issued tokens** and is intentionally NOT done here; it should be tracked as a separate ticket.
+  - **Scope rationale**: this endpoint returns *other users'* identity via group membership — a directory read, not "my settings". The pre-existing `user_settings:info` scope semantically means "read the session user's own settings", so reusing it would over-grant any token scoped only to read its own profile. Two dedicated scopes are therefore newly introduced in `packages/core/src/interfaces/scope.ts`: `read:features:user` (reading user directory information) and `read:features:user_group` (reading user-group membership). This endpoint uses `read:features:user_group`.
+  - **Existing mis-categorized routes are re-gated in this spec** (not deferred): the same `user_settings:info` misuse exists on sibling routes that also return other users'/groups' data, and they are corrected here for consistency:
+    - `GET /api/v3/user/related-groups` → `read:features:user_group`
+    - `GET /api/v3/users/` , `GET /api/v3/users/list` , `GET /api/v3/users/usernames` → `read:features:user`
+    - `personal-setting/*` is intentionally **left on `user_settings:info`** because it genuinely returns the session user's own settings (incl. email/apiToken).
+  - **Compatibility note**: re-gating is a breaking change for already-issued access tokens scoped only to `user_settings:info`; they must be re-issued with the new scope. `acceptLegacy: true` keeps pre-scope legacy tokens working.
 - Group set is **derived server-side** from `crowi.pageGrantService.getUserRelatedGroups(req.user)` (no client-supplied input → 3.2).
 - Returns the result of `fetchActiveMembersByGroup(groups)` as `res.apiv3({ membersByGroupId })`. On failure, returns `apiv3Err(new ErrorV3(...))`.
 - Handler uses factory pattern (same structure as `get-related-groups.ts`); registered in `index.ts` at `/related-groups/members`.

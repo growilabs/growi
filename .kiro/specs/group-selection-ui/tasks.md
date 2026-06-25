@@ -24,7 +24,8 @@
 
 - [ ] 3. Integration: API route and GrantSelector UI
 - [x] 3.1 (P) Implement the API endpoint to return the session user's group members and write integration tests
-  - Create `apps/app/src/server/routes/apiv3/user/get-related-groups-members.ts` using the same factory pattern and same authorization (`accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true })` + `loginRequiredStrictly`) as the sibling endpoint (`get-related-groups.ts`)
+  - Create `apps/app/src/server/routes/apiv3/user/get-related-groups-members.ts` using the same factory pattern + `loginRequiredStrictly` as the sibling endpoint (`get-related-groups.ts`), but authorize with the newly-introduced `accessTokenParser([SCOPE.READ.FEATURES.USER_GROUP], { acceptLegacy: true })` (NOT `user_settings:info`, which is for the session user's own settings)
+  - Add `features.user` / `features.user_group` scopes to `@growi/core` (`packages/core/src/interfaces/scope.ts`) + scope descriptions to locale `commons.json`, and re-gate the pre-existing mis-categorized routes: `get-related-groups.ts` → `FEATURES.USER_GROUP`; `users.js` `/`,`/list`,`/usernames` → `FEATURES.USER`
   - Derive the group set server-side from the session (`getUserRelatedGroups(req.user)`), call the service, and return `res.apiv3({ membersByGroupId })`
   - Register the `/related-groups/members` route in `apps/app/src/server/routes/apiv3/user/index.ts`
   - Handler integration tests (supertest + mocks): returns 401 when not logged in; returns 200 for a logged-in general user with only the user's own groups in the map

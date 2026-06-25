@@ -49,6 +49,7 @@ const SCOPE_SEED_USER = {
     attachment: {},
     page_bulk_export: {},
     in_app_notification: {},
+    user: {},
     user_group: {},
   },
 } as const;
@@ -127,6 +128,7 @@ type ReadFeaturesScope =
   | 'read:features:attachment'
   | 'read:features:page_bulk_export'
   | 'read:features:in_app_notification'
+  | 'read:features:user'
   | 'read:features:user_group'
   | 'read:features:*';
 
@@ -172,6 +174,7 @@ type WriteFeaturesScope =
   | 'write:features:attachment'
   | 'write:features:page_bulk_export'
   | 'write:features:in_app_notification'
+  | 'write:features:user'
   | 'write:features:user_group'
   | 'write:features:*';
 
