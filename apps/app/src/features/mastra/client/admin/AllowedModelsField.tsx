@@ -1,10 +1,8 @@
 import type { JSX } from 'react';
-import { useCallback, useId, useMemo, useState } from 'react';
+import { useCallback, useId, useMemo } from 'react';
 import { useTranslation } from 'next-i18next';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { Badge, Button, FormGroup, Input, Label } from 'reactstrap';
-
-import { ConfirmModal } from '~/client/components/Admin/App/ConfirmModal';
 
 import { isValidProviderOptionsJson } from '../../utils/provider-options-validation';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
@@ -109,28 +107,6 @@ export const AllowedModelsField = (
     [getValues, remove, setValue],
   );
 
-  // Removal is confirmation-gated (the trash icon only *requests* it). null = no
-  // pending removal / dialog closed.
-  const [pendingRemoveIndex, setPendingRemoveIndex] = useState<number | null>(
-    null,
-  );
-  const cancelRemove = useCallback(() => setPendingRemoveIndex(null), []);
-  // Returns a resolved promise to satisfy ConfirmModal's async onConfirm contract
-  // (the removal itself is synchronous).
-  const confirmRemove = useCallback((): Promise<void> => {
-    if (pendingRemoveIndex != null) {
-      removeRow(pendingRemoveIndex);
-    }
-    setPendingRemoveIndex(null);
-    return Promise.resolve();
-  }, [pendingRemoveIndex, removeRow]);
-
-  // Whether the model awaiting confirmation is the default — drives the extra
-  // "another model will become the default" note in the dialog.
-  const pendingRemoveIsDefault =
-    pendingRemoveIndex != null &&
-    watch(`allowedModels.${pendingRemoveIndex}.isDefault`) === true;
-
   return (
     <FormGroup className="mb-3">
       <h3 className="h5 fw-bold mt-4 mb-1">
@@ -151,7 +127,7 @@ export const AllowedModelsField = (
           docUrl={PROVIDER_OPTIONS_DOC_URL}
           placeholder={buildInitialProviderOptionsText(provider)}
           onSelectDefault={() => selectDefault(index)}
-          onRequestRemove={() => setPendingRemoveIndex(index)}
+          onRemove={() => removeRow(index)}
         />
       ))}
 
@@ -180,19 +156,6 @@ export const AllowedModelsField = (
         </span>
         {t(addLabelKey)}
       </Button>
-
-      <ConfirmModal
-        isModalOpen={pendingRemoveIndex != null}
-        warningMessage={t('ai_settings.remove_model_confirm')}
-        supplymentaryMessage={
-          pendingRemoveIsDefault
-            ? t('ai_settings.remove_default_model_note')
-            : null
-        }
-        confirmButtonTitle={t('ai_settings.remove_model')}
-        onConfirm={confirmRemove}
-        onCancel={cancelRemove}
-      />
     </FormGroup>
   );
 };
@@ -206,7 +169,7 @@ interface AllowedModelRowProps {
   readonly docUrl: string;
   readonly placeholder: string;
   readonly onSelectDefault: () => void;
-  readonly onRequestRemove: () => void;
+  readonly onRemove: () => void;
 }
 
 /**
@@ -225,7 +188,7 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
     docUrl,
     placeholder,
     onSelectDefault,
-    onRequestRemove,
+    onRemove,
   } = props;
   const { t } = useTranslation('admin');
   const { control, register } = useFormContext<AiSettingsFormValues>();
@@ -297,7 +260,7 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
             aria-label={t('ai_settings.remove_model')}
             title={t('ai_settings.remove_model')}
             disabled={disabled}
-            onClick={onRequestRemove}
+            onClick={onRemove}
           >
             <span className="material-symbols-outlined" aria-hidden="true">
               delete

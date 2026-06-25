@@ -457,8 +457,6 @@
     "add_model": "Ajouter un modèle",
     "azure_add_deployment": "Ajouter un déploiement",
     "remove_model": "Supprimer",
-    "remove_model_confirm": "Supprimer ce modèle de la liste ?",
-    "remove_default_model_note": "Il s'agit du modèle par défaut. Le supprimer définira un autre modèle comme modèle par défaut.",
     "provider_options_label": "Options du fournisseur (JSON)",
     "provider_options_doc_link": "Comment écrire",
     "provider_options_invalid_json": "JSON non valide",

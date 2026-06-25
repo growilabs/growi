@@ -81,10 +81,9 @@ const getProviderOptionsTextareas = (): HTMLTextAreaElement[] =>
       (el): el is HTMLTextAreaElement => el instanceof HTMLTextAreaElement,
     );
 
-// Removal is confirmation-gated: click a card's trash icon, then confirm in the
-// dialog. Scoped to the dialog so the confirm button is not confused with the
-// trash icons (both carry the `remove_model` accessible name).
-const confirmRemoveAt = async (
+// Removal is immediate (no confirmation dialog): the change only persists on
+// save, so the trash icon removes the card from the list directly.
+const removeAt = async (
   user: ReturnType<typeof userEvent.setup>,
   index: number,
 ): Promise<void> => {
@@ -92,10 +91,6 @@ const confirmRemoveAt = async (
     name: 'ai_settings.remove_model',
   });
   await user.click(trashButtons[index]);
-  const dialog = await screen.findByRole('dialog');
-  await user.click(
-    within(dialog).getByRole('button', { name: 'ai_settings.remove_model' }),
-  );
 };
 
 describe('AllowedModelsField', () => {
@@ -137,7 +132,7 @@ describe('AllowedModelsField', () => {
       expect(JSON.parse(textareas[1].value)).toEqual({ anthropic: {} });
     });
 
-    it('removes a card only after the removal is confirmed', async () => {
+    it('removes a card when its trash icon is clicked', async () => {
       // Arrange
       const user = userEvent.setup();
       renderComponent({
@@ -154,41 +149,13 @@ describe('AllowedModelsField', () => {
       });
       expect(getModelInputs()).toHaveLength(2);
 
-      // Act: remove the second card via the confirmation dialog.
-      await confirmRemoveAt(user, 1);
+      // Act: remove the second card (no confirmation dialog — persists on save).
+      await removeAt(user, 1);
 
       // Assert
       const inputs = getModelInputs();
       expect(inputs).toHaveLength(1);
       expect(inputs[0].value).toBe('gpt-4o');
-    });
-
-    it('keeps the card when the removal is cancelled', async () => {
-      // Arrange
-      const user = userEvent.setup();
-      renderComponent({
-        defaultValues: {
-          allowedModels: [
-            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
-            {
-              modelId: 'gpt-4o-mini',
-              providerOptionsText: '',
-              isDefault: false,
-            },
-          ],
-        },
-      });
-
-      // Act: open the dialog for the second card, then cancel.
-      const trashButtons = screen.getAllByRole('button', {
-        name: 'ai_settings.remove_model',
-      });
-      await user.click(trashButtons[1]);
-      const dialog = await screen.findByRole('dialog');
-      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
-
-      // Assert: nothing was removed.
-      expect(getModelInputs()).toHaveLength(2);
     });
   });
 
@@ -256,8 +223,8 @@ describe('AllowedModelsField', () => {
         },
       });
 
-      // Act: remove the default (first) card via the confirmation dialog.
-      await confirmRemoveAt(user, 0);
+      // Act: remove the default (first) card.
+      await removeAt(user, 0);
 
       // Assert: the now-first (formerly second) card becomes the default.
       const radios = getDefaultRadios();
