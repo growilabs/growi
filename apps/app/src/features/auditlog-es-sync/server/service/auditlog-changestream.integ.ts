@@ -298,37 +298,32 @@ describe('AuditlogChangeStreamService', () => {
     });
 
     it('does not re-run reconcile on restart (initialStartHandled guard)', async () => {
-      vi.mocked(ChangeStreamResumeToken.load).mockResolvedValue(null);
-      vi.spyOn(Activity, 'exists').mockResolvedValue({
-        _id: new Types.ObjectId(),
-      });
-      const fakeStream = new FakeChangeStream();
-      vi.spyOn(Activity, 'watch').mockReturnValue(
-        fakeStream as unknown as ChangeStream<ActivityDocument>,
-      );
-      service = new AuditlogChangeStreamService(esWriter, false);
+      vi.useFakeTimers();
+      try {
+        vi.mocked(ChangeStreamResumeToken.load).mockResolvedValue(null);
+        vi.spyOn(Activity, 'exists').mockResolvedValue({
+          _id: new Types.ObjectId(),
+        });
+        const fakeStream = new FakeChangeStream();
+        vi.spyOn(Activity, 'watch')
+          .mockImplementationOnce(() => {
+            throw new Error('transient error');
+          })
+          .mockReturnValue(
+            fakeStream as unknown as ChangeStream<ActivityDocument>,
+          );
+        service = new AuditlogChangeStreamService(esWriter, false);
 
-      await service.start();
-      expect(vi.mocked(AuditlogEsSyncStatus.setUnsynced)).toHaveBeenCalledTimes(
-        1,
-      );
-      vi.mocked(AuditlogEsSyncStatus.setUnsynced).mockClear();
+        // restart() calls start() on the same instance — reconcile must not re-run
+        await service.startWithRetry();
+        await vi.runAllTimersAsync();
 
-      // Simulate a restart: set initialStartHandled = true (already done by start()),
-      // then call start() again on a new instance
-      await service.close();
-      const fakeStream2 = new FakeChangeStream();
-      vi.spyOn(Activity, 'watch').mockReturnValue(
-        fakeStream2 as unknown as ChangeStream<ActivityDocument>,
-      );
-      service = new AuditlogChangeStreamService(esWriter, false);
-      (service as unknown as ServiceInternals).initialStartHandled = true;
-
-      await service.start();
-
-      expect(
-        vi.mocked(AuditlogEsSyncStatus.setUnsynced),
-      ).not.toHaveBeenCalled();
+        expect(
+          vi.mocked(AuditlogEsSyncStatus.setUnsynced),
+        ).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
     });
   });
 
@@ -573,10 +568,10 @@ describe('AuditlogChangeStreamService', () => {
       // Reject the pending next() with HistoryLost so the outer catch fires
       fakeStream.pushError(historyLostErr);
 
-      await new Promise((resolve) => setTimeout(resolve, 50));
-
-      expect(vi.mocked(markUnsyncedAndClearToken)).toHaveBeenCalledWith(
-        'auditlogs',
+      await vi.waitFor(() =>
+        expect(vi.mocked(markUnsyncedAndClearToken)).toHaveBeenCalledWith(
+          'auditlogs',
+        ),
       );
     });
   });
