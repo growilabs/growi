@@ -450,7 +450,7 @@
     "api_key_provider_change_warning": "공급자를 변경했습니다. 새 API 키를 입력하지 않고 저장하면 이전에 저장된 API 키는 폐기됩니다.",
     "api_key_set_placeholder": "(설정됨)",
     "models_section_title": "Models",
-    "models_section_desc": "등록한 모델 중 하나를 기본값으로 선택합니다.",
+    "models_section_desc": "등록한 모델 중 하나를 기본값으로 선택합니다. 기본 모델은 채팅에서 사용자에게 처음 선택되어 있는 모델입니다.",
     "model_label": "모델 이름",
     "set_as_default": "기본값으로 설정",
     "default_badge": "기본",

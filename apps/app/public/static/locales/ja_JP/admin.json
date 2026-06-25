@@ -459,7 +459,7 @@
     "api_key_provider_change_warning": "プロバイダーを変更しました。新しい API キーを入力せずに保存すると、以前の API キーは破棄されます。",
     "api_key_set_placeholder": "(設定済み)",
     "models_section_title": "Models",
-    "models_section_desc": "登録したモデルから 1 つを既定として選びます。",
+    "models_section_desc": "登録したモデルから 1 つを既定として選びます。既定は、チャットで最初に選択されているモデルです。",
     "model_label": "モデル名",
     "set_as_default": "既定にする",
     "default_badge": "既定",

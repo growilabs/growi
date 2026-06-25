@@ -450,7 +450,7 @@
     "api_key_provider_change_warning": "You changed the provider. If you save without entering a new API key, the previously saved API key will be discarded.",
     "api_key_set_placeholder": "(configured)",
     "models_section_title": "Models",
-    "models_section_desc": "Choose one of your registered models as the default.",
+    "models_section_desc": "Choose one of your registered models as the default. The default is the model initially selected for users in chat.",
     "model_label": "Model name",
     "set_as_default": "Set as default",
     "default_badge": "Default",

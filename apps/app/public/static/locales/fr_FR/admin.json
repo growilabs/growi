@@ -450,7 +450,7 @@
     "api_key_provider_change_warning": "Vous avez changé de fournisseur. Si vous enregistrez sans saisir de nouvelle clé API, la clé précédemment enregistrée sera supprimée.",
     "api_key_set_placeholder": "(configurée)",
     "models_section_title": "Models",
-    "models_section_desc": "Choisissez l'un de vos modèles enregistrés comme modèle par défaut.",
+    "models_section_desc": "Choisissez l'un de vos modèles enregistrés comme modèle par défaut. Le modèle par défaut est celui sélectionné au départ pour les utilisateurs dans la conversation.",
     "model_label": "Nom du modèle",
     "set_as_default": "Définir par défaut",
     "default_badge": "Par défaut",

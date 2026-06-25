@@ -459,7 +459,7 @@
     "api_key_provider_change_warning": "您更改了提供商。如果未输入新的 API 密钥就保存，先前保存的 API 密钥将被丢弃。",
     "api_key_set_placeholder": "(已配置)",
     "models_section_title": "Models",
-    "models_section_desc": "从已注册的模型中选择一个作为默认模型。",
+    "models_section_desc": "从已注册的模型中选择一个作为默认模型。默认模型是聊天中最初为用户选中的模型。",
     "model_label": "模型名称",
     "set_as_default": "设为默认",
     "default_badge": "默认",
