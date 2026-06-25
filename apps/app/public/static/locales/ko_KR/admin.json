@@ -876,6 +876,20 @@
       "force_update_parents_description": "상위 그룹을 변경한 후 누락된 사용자가 존재하는 경우 상위 그룹에 강제로 추가하려면 이 옵션을 활성화하십시오."
     }
   },
+  "audit_log_index_management": {
+    "audit_log_index_management": "감사 로그 인덱스 관리",
+    "elasticsearch_management": "Elasticsearch 관리 (감사 로그)",
+    "normalize": "정규화",
+    "normalize_button": "감사 로그 인덱스 정규화",
+    "normalize_success": "감사 로그 인덱스가 정규화되었습니다.",
+    "normalize_description": "손상된 감사 로그 인덱스를 복구합니다.",
+    "rebuild": "재구성",
+    "rebuild_button": "감사 로그 인덱스 재구성",
+    "rebuild_requested": "감사 로그 인덱스 재구성 요청이 접수되었습니다.",
+    "rebuild_description_1": "모든 감사 로그 인덱스를 삭제하고 재구성합니다.",
+    "rebuild_description_2": "이 작업은 시간이 걸릴 수 있습니다.",
+    "unsynced_events_warning": "일부 감사 로그 이벤트가 Elasticsearch에 동기화되지 않았습니다. 재구성하여 일관성을 복구하십시오."
+  },
   "audit_log_management": {
     "audit_log": "감사 로그",
     "audit_log_settings": "감사 로그 설정",

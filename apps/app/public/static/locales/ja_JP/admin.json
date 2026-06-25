@@ -315,9 +315,11 @@
     "elasticsearch_management": "Elasticsearch 管理（監査ログ）",
     "normalize": "正規化",
     "normalize_button": "監査のログのインデックスの正規化",
+    "normalize_success": "監査ログのインデックスを正規化しました。",
     "normalize_description": "破損した監査ログのインデックスを修復します。",
     "rebuild": "リビルド",
     "rebuild_button": "監査ログのインデックスのリビルド",
+    "rebuild_requested": "監査ログのインデックスのリビルドをリクエストしました。",
     "rebuild_description_1": "全ての監査ログのインデックスを削除し、作り直します。",
     "rebuild_description_2": "この作業には数秒かかります。",
     "unsynced_events_warning": "Elasticsearch に同期できなかった監査ログがあります。リビルドして整合性を回復してください。"

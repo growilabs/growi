@@ -885,6 +885,20 @@
       "force_update_parents_description": "激活这个选项，如果在父组改变后，在祖先组中有缺失的用户，可以强制添加这些用户"
     }
   },
+  "audit_log_index_management": {
+    "audit_log_index_management": "审计日志索引管理",
+    "elasticsearch_management": "Elasticsearch 管理（审计日志）",
+    "normalize": "规范化",
+    "normalize_button": "规范化审计日志索引",
+    "normalize_success": "审计日志索引规范化成功。",
+    "normalize_description": "修复损坏的审计日志索引。",
+    "rebuild": "重建",
+    "rebuild_button": "重建审计日志索引",
+    "rebuild_requested": "审计日志索引重建请求已接受。",
+    "rebuild_description_1": "删除并重建所有审计日志索引。",
+    "rebuild_description_2": "此操作可能需要一些时间。",
+    "unsynced_events_warning": "部分审计日志事件未能同步到 Elasticsearch。请重建以恢复一致性。"
+  },
   "audit_log_management": {
     "audit_log": "审计日志",
     "audit_log_settings": "审计日志设置",

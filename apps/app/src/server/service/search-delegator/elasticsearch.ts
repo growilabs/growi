@@ -581,7 +581,7 @@ class ElasticsearchDelegator
     const socket = shouldEmitProgress
       ? this.socketIoService.getAdminSocket()
       : undefined;
-    const totalCount = await Activity.countDocuments();
+    const totalCount = shouldEmitProgress ? await Activity.countDocuments() : 0;
 
     const readStream = Activity.find()
       .select('snapshot.username')

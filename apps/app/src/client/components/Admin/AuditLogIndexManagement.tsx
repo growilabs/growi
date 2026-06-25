@@ -132,7 +132,7 @@ export const AuditLogIndexManagement = (): JSX.Element => {
     setIsNormalizingProcessing(true);
     try {
       await apiv3Put('/search/auditlog-indices', { operation: 'normalize' });
-      toastSuccess(t('audit_log_index_management.normalize_button'));
+      toastSuccess(t('audit_log_index_management.normalize_success'));
     } catch (e) {
       toastError(e);
     } finally {
@@ -145,7 +145,7 @@ export const AuditLogIndexManagement = (): JSX.Element => {
     setIsRebuildingProcessing(true);
     try {
       await apiv3Put('/search/auditlog-indices', { operation: 'rebuild' });
-      toastSuccess(t('audit_log_index_management.rebuild_button'));
+      toastSuccess(t('audit_log_index_management.rebuild_requested'));
     } catch (e) {
       toastError(e);
       setIsRebuildingProcessing(false);
