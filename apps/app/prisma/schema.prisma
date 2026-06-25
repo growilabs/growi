@@ -128,11 +128,13 @@ model bookmarks {
   id        String   @id @default(auto()) @map("_id") @db.ObjectId
   v         Int      @default(0) @map("__v")
   createdAt DateTime @default(now())
-  pageId    String   @map("page") @db.ObjectId
+  // optional: pages are left orphaned (not deleted) on page complete-deletion
+  // (see deleteCompletelyOperation), so the referenced page may not exist
+  pageId    String?  @map("page") @db.ObjectId
   userId    String   @map("user") @db.ObjectId
 
-  page pages @relation(fields: [pageId], references: [id])
-  user users @relation(fields: [userId], references: [id])
+  page pages? @relation(fields: [pageId], references: [id])
+  user users  @relation(fields: [userId], references: [id])
 
   @@unique([pageId, userId], map: "page_1_user_1")
   @@index([pageId], map: "page_1")

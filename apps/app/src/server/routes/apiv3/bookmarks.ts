@@ -266,16 +266,21 @@ export const setup = (crowi: Crowi): Router => {
         );
 
         return res.apiv3({
+          // page is null when the bookmarked page has been completely
+          // deleted -- bookmarks are intentionally left orphaned in that case
           userRootBookmarks: serializedUserRootBookmarks.map((bookmark) => ({
             ...bookmark,
             user: bookmark.userId,
-            page: {
-              ...bookmark.page,
-              creator: bookmark.page.creatorId,
-              deleteUser: bookmark.page.deleteUserId,
-              revision: bookmark.page.revisionId,
-              parent: bookmark.page.parentId,
-            },
+            page:
+              bookmark.page == null
+                ? null
+                : {
+                    ...bookmark.page,
+                    creator: bookmark.page.creatorId,
+                    deleteUser: bookmark.page.deleteUserId,
+                    revision: bookmark.page.revisionId,
+                    parent: bookmark.page.parentId,
+                  },
           })),
         });
       } catch (err) {

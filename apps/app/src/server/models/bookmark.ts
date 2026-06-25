@@ -71,8 +71,12 @@ export const extension = Prisma.defineExtension((client) => {
           });
 
           // convert to map
+          // note: result.pageId is typed nullable because the schema allows
+          // orphaned bookmarks, but the `where` filter above only matches
+          // bookmarks whose pageId is one of `pageIds`, so it is never null here
           const idToCountMap: { [key: string]: number } = {};
           results.forEach((result) => {
+            if (result.pageId == null) return;
             idToCountMap[result.pageId] = result._count.pageId;
           });
 
