@@ -409,7 +409,15 @@ class ElasticsearchDelegator
     const tmpIndexName = `${indexName}-tmp`;
 
     try {
-      // reindex to tmp index
+      // Drop any leftover tmp index, then reindex the live index into a fresh tmp.
+      // reindex is fire-and-forget (wait_for_completion:false), so tmp is a best-effort
+      // copy for read availability; the authoritative repopulation is addAllAuditlogs.
+      const isExistsTmpIndex = await client.indices.exists({
+        index: tmpIndexName,
+      });
+      if (isExistsTmpIndex) {
+        await client.indices.delete({ index: tmpIndexName });
+      }
       await this.createAuditlogIndex(tmpIndexName);
       await client.reindex(indexName, tmpIndexName);
 
@@ -426,21 +434,28 @@ class ElasticsearchDelegator
       await this.createAuditlogIndex(indexName);
       await this.addAllAuditlogs();
 
+      // Swap the alias back atomically so it never resolves to nothing mid-rebuild;
+      // the now-unaliased tmp is dropped by normalizeAuditlogIndices in the finally.
       await client.indices.updateAliases({
         actions: [
           { add: { alias: aliasName, index: indexName } },
           { remove: { alias: aliasName, index: tmpIndexName } },
         ],
       });
-
-      await client.indices.delete({ index: tmpIndexName });
     } catch (error) {
+      logger.error(
+        { err: error, body: error?.meta?.body },
+        "An error occurred while 'rebuildAuditlogIndex'.",
+      );
+      throw error;
+    } finally {
+      // Runs on both paths (cleanup after success, recovery after failure). Swallow its
+      // error so a normalization failure cannot mask the error rethrown above.
       try {
         await this.normalizeAuditlogIndices();
       } catch (normalizeErr) {
-        logger.error('Failed to restore auditlog indices', normalizeErr);
+        logger.error('Failed to normalize auditlog indices', normalizeErr);
       }
-      throw error;
     }
   }
 
@@ -501,7 +516,7 @@ class ElasticsearchDelegator
       await this.createAuditlogIndex(indexName);
     }
 
-    // create alias
+    // create alias — re-attaches it if a failed rebuild left the alias detached
     const isExistsAlias = await client.indices.existsAlias({
       index: indexName,
       name: aliasName,
@@ -674,7 +689,7 @@ class ElasticsearchDelegator
     if (username == null || username === '') return [];
     return [
       {
-        index: { _index: this.auditlogAliasName, _id: activity._id.toString() },
+        index: { _index: this.auditlogIndexName, _id: activity._id.toString() },
       },
       { username },
     ];
