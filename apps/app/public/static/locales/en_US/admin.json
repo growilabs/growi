@@ -460,7 +460,6 @@
     "remove_model_confirm": "Remove this model from the list?",
     "remove_default_model_note": "This is the default model. Removing it will make another model the default.",
     "provider_options_label": "Provider Options (JSON)",
-    "provider_options_format": "Format",
     "provider_options_doc_link": "How to write",
     "provider_options_invalid_json": "Invalid JSON",
     "provider_options_error_at_line": "(line {{line}})",

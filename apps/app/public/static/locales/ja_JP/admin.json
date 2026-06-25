@@ -469,7 +469,6 @@
     "remove_model_confirm": "このモデルを一覧から削除しますか？",
     "remove_default_model_note": "これは既定のモデルです。削除すると別のモデルが既定になります。",
     "provider_options_label": "プロバイダーオプション (JSON)",
-    "provider_options_format": "整形",
     "provider_options_doc_link": "書き方",
     "provider_options_invalid_json": "JSON の形式が正しくありません",
     "provider_options_error_at_line": "（{{line}} 行目）",

@@ -319,35 +319,6 @@ describe('AllowedModelsField', () => {
     });
   });
 
-  describe('format button', () => {
-    it('pretty-prints the providerOptions JSON in place', async () => {
-      // Arrange: a compact (but valid) providerOptions value.
-      const user = userEvent.setup();
-      renderComponent({
-        defaultValues: {
-          allowedModels: [
-            {
-              modelId: 'gpt-4o',
-              providerOptionsText: '{"openai":{"a":1}}',
-              isDefault: true,
-            },
-          ],
-        },
-      });
-
-      // Act
-      await user.click(
-        screen.getByRole('button', {
-          name: /ai_settings\.provider_options_format/,
-        }),
-      );
-
-      // Assert: the same data, re-indented over multiple lines.
-      const textarea = getProviderOptionsTextareas()[0];
-      expect(textarea.value).toBe('{\n  "openai": {\n    "a": 1\n  }\n}');
-    });
-  });
-
   describe('env-only mode', () => {
     it('disables every input so the locked fields cannot be focused', () => {
       // Act

@@ -1,9 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import {
-  formatProviderOptionsJson,
-  getProviderOptionsJsonStatus,
-} from './provider-options-json-status';
+import { getProviderOptionsJsonStatus } from './provider-options-json-status';
 
 describe('getProviderOptionsJsonStatus', () => {
   it('reports an empty/whitespace value as empty (no options set)', () => {
@@ -44,17 +41,5 @@ describe('getProviderOptionsJsonStatus', () => {
     if (status.kind === 'syntax-error') {
       expect(status.line).toBe(2);
     }
-  });
-});
-
-describe('formatProviderOptionsJson', () => {
-  it('pretty-prints valid JSON with a 2-space indent', () => {
-    expect(formatProviderOptionsJson('{"openai":{"a":1}}')).toBe(
-      '{\n  "openai": {\n    "a": 1\n  }\n}',
-    );
-  });
-
-  it('returns null for unparseable JSON so the caller leaves it untouched', () => {
-    expect(formatProviderOptionsJson('{ not json')).toBeNull();
   });
 });

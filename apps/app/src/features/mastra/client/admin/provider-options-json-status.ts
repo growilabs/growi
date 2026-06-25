@@ -70,16 +70,3 @@ export const getProviderOptionsJsonStatus = (
     ? { kind: 'valid' }
     : { kind: 'shape-error' };
 };
-
-/**
- * Pretty-print the providerOptions JSON with a 2-space indent. Returns `null`
- * when the value does not parse, so the caller can leave an invalid value
- * untouched (the inline error already tells the admin what to fix).
- */
-export const formatProviderOptionsJson = (value: string): string | null => {
-  try {
-    return JSON.stringify(JSON.parse(value), null, 2);
-  } catch {
-    return null;
-  }
-};

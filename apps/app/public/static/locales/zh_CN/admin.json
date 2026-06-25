@@ -469,7 +469,6 @@
     "remove_model_confirm": "要从列表中删除此模型吗？",
     "remove_default_model_note": "这是默认模型。删除后将由另一个模型成为默认模型。",
     "provider_options_label": "提供商选项 (JSON)",
-    "provider_options_format": "格式化",
     "provider_options_doc_link": "写法",
     "provider_options_invalid_json": "无效的 JSON",
     "provider_options_error_at_line": "（第 {{line}} 行）",

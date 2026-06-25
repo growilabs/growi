@@ -460,7 +460,6 @@
     "remove_model_confirm": "이 모델을 목록에서 삭제하시겠습니까?",
     "remove_default_model_note": "이 모델은 기본 모델입니다. 삭제하면 다른 모델이 기본값이 됩니다.",
     "provider_options_label": "공급자 옵션 (JSON)",
-    "provider_options_format": "정렬",
     "provider_options_doc_link": "작성 방법",
     "provider_options_invalid_json": "유효하지 않은 JSON입니다",
     "provider_options_error_at_line": "({{line}}번째 줄)",

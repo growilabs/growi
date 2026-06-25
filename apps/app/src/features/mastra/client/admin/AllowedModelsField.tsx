@@ -8,10 +8,7 @@ import { ConfirmModal } from '~/client/components/Admin/App/ConfirmModal';
 
 import { isValidProviderOptionsJson } from '../../utils/provider-options-validation';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
-import {
-  formatProviderOptionsJson,
-  getProviderOptionsJsonStatus,
-} from './provider-options-json-status';
+import { getProviderOptionsJsonStatus } from './provider-options-json-status';
 import { buildInitialProviderOptionsText } from './provider-options-namespace';
 import { registerToInputProps } from './register-to-input-props';
 
@@ -231,8 +228,7 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
     onRequestRemove,
   } = props;
   const { t } = useTranslation('admin');
-  const { control, register, setValue } =
-    useFormContext<AiSettingsFormValues>();
+  const { control, register } = useFormContext<AiSettingsFormValues>();
 
   const modelInputId = useId();
   const providerOptionsId = useId();
@@ -249,18 +245,6 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
   );
   const isInvalid =
     status.kind === 'syntax-error' || status.kind === 'shape-error';
-  // Formattable whenever the JSON parses (valid syntax), regardless of shape.
-  const canFormat = status.kind === 'valid' || status.kind === 'shape-error';
-
-  const handleFormat = useCallback(() => {
-    const formatted = formatProviderOptionsJson(providerOptionsText);
-    if (formatted != null) {
-      setValue(`allowedModels.${index}.providerOptionsText`, formatted, {
-        shouldDirty: true,
-        shouldValidate: true,
-      });
-    }
-  }, [providerOptionsText, setValue, index]);
 
   return (
     <FormGroup
@@ -327,38 +311,20 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
           <Label for={providerOptionsId} className="form-label small mb-0">
             {t('ai_settings.provider_options_label')}
           </Label>
-          <div className="ms-auto d-flex align-items-center gap-3">
-            <Button
-              type="button"
-              color="link"
-              size="sm"
-              className="p-0 text-decoration-none d-inline-flex align-items-center"
-              disabled={disabled || !canFormat}
-              onClick={handleFormat}
+          <a
+            href={docUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="ms-auto small d-inline-flex align-items-center"
+          >
+            {t('ai_settings.provider_options_doc_link')}
+            <span
+              className="material-symbols-outlined fs-6 ms-1"
+              aria-hidden="true"
             >
-              <span
-                className="material-symbols-outlined fs-6 me-1"
-                aria-hidden="true"
-              >
-                auto_fix_high
-              </span>
-              {t('ai_settings.provider_options_format')}
-            </Button>
-            <a
-              href={docUrl}
-              target="_blank"
-              rel="noopener noreferrer"
-              className="small d-inline-flex align-items-center"
-            >
-              {t('ai_settings.provider_options_doc_link')}
-              <span
-                className="material-symbols-outlined fs-6 ms-1"
-                aria-hidden="true"
-              >
-                open_in_new
-              </span>
-            </a>
-          </div>
+              open_in_new
+            </span>
+          </a>
         </div>
         {/* Suppress Bootstrap's `.is-invalid` background icon: on a textarea it
             sits at the top-right and gets clipped by the scrollbar once the

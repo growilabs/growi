@@ -460,7 +460,6 @@
     "remove_model_confirm": "Supprimer ce modèle de la liste ?",
     "remove_default_model_note": "Il s'agit du modèle par défaut. Le supprimer définira un autre modèle comme modèle par défaut.",
     "provider_options_label": "Options du fournisseur (JSON)",
-    "provider_options_format": "Formater",
     "provider_options_doc_link": "Comment écrire",
     "provider_options_invalid_json": "JSON non valide",
     "provider_options_error_at_line": "(ligne {{line}})",
