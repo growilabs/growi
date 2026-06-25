@@ -205,14 +205,15 @@ describe('ProviderCommonSettings', () => {
     });
   });
 
-  describe('provider options help', () => {
-    it('links to the AI SDK provider-options documentation', () => {
+  describe('provider options docs link', () => {
+    it('links each model card to the AI SDK provider-options documentation', () => {
       // Act
       renderComponent();
 
-      // Assert
+      // Assert: the link carries the localized "how to write" label (plus the
+      // decorative external-link icon) and points at the AI SDK docs in a new tab.
       const link = screen.getByRole('link', {
-        name: 'https://ai-sdk.dev/docs/foundations/provider-options',
+        name: /ai_settings\.provider_options_doc_link/,
       });
       expect(link).toHaveAttribute(
         'href',

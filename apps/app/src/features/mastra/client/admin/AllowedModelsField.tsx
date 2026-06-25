@@ -1,32 +1,23 @@
 import type { JSX } from 'react';
-import { useCallback, useId } from 'react';
+import { useCallback, useId, useMemo, useState } from 'react';
 import { useTranslation } from 'next-i18next';
-import { useFieldArray, useFormContext } from 'react-hook-form';
-import {
-  Button,
-  FormFeedback,
-  FormGroup,
-  FormText,
-  Input,
-  Label,
-} from 'reactstrap';
+import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
+import { Badge, Button, FormGroup, Input, Label } from 'reactstrap';
+
+import { ConfirmModal } from '~/client/components/Admin/App/ConfirmModal';
 
 import { isValidProviderOptionsJson } from '../../utils/provider-options-validation';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
+import {
+  formatProviderOptionsJson,
+  getProviderOptionsJsonStatus,
+} from './provider-options-json-status';
+import { buildInitialProviderOptionsText } from './provider-options-namespace';
 import { registerToInputProps } from './register-to-input-props';
 
 // Vercel AI SDK docs describing the provider-namespaced `providerOptions` shape.
 const PROVIDER_OPTIONS_DOC_URL =
   'https://ai-sdk.dev/docs/foundations/provider-options';
-
-// Shown as the textarea placeholder to illustrate the provider-namespaced JSON
-// shape. Language-neutral (a code example), so it is not an i18n string.
-const PROVIDER_OPTIONS_PLACEHOLDER = `{
-    "openai": {
-        "reasoningEffort": "low",
-        "reasoningSummary": "auto"
-    }
-}`;
 
 export interface AllowedModelsFieldProps {
   /**
@@ -39,17 +30,21 @@ export interface AllowedModelsFieldProps {
 
 /**
  * The allowed-models list editor (`ai:allowedModels`), registered against the
- * shared react-hook-form context owned by `AiSettings`. Replaces the former
- * single `ai:model` field + single providerOptions textarea.
+ * shared react-hook-form context owned by `AiSettings`.
  *
- * Each row is one allowed model: a model-id text input, a "default" radio
- * (`isDefault`, exactly one across the list — 1.3), a providerOptions JSON
- * textarea validated by the shared `isValidProviderOptionsJson` (2.1/2.3/2.4),
- * and a remove button. An "+ add model" button appends a row. Removing the
- * default row re-assigns the default to the first remaining row so the
- * single-default invariant is preserved.
+ * The section is headed "Models" with a single one-line description; one card per
+ * allowed model. Each card carries the model id (its own identifier — no separate
+ * alias field), a "set as default" radio (`isDefault`, exactly one across the
+ * list — 1.3), and a providerOptions JSON textarea. The card currently chosen as
+ * the default is marked with a "default" badge next to the model label and its
+ * radio checked.
  *
- * The row label follows the watched provider: the Azure *deployment name* for
+ * Removing a card is a low-emphasis trash icon gated by a confirmation dialog;
+ * removing the default card re-assigns the default to the first remaining card so
+ * the single-default invariant holds (1.3/1.5). The "+ add model" button appends
+ * a card pre-seeded with the current provider's empty namespace.
+ *
+ * The model label follows the watched provider: the Azure *deployment name* for
  * Azure OpenAI, otherwise the generic model id (the value is universal but its
  * meaning is provider-specific).
  */
@@ -58,14 +53,8 @@ export const AllowedModelsField = (
 ): JSX.Element => {
   const { disabled } = props;
   const { t } = useTranslation('admin');
-  const {
-    control,
-    register,
-    watch,
-    setValue,
-    getValues,
-    formState: { errors },
-  } = useFormContext<AiSettingsFormValues>();
+  const { control, watch, setValue, getValues } =
+    useFormContext<AiSettingsFormValues>();
 
   const { fields, append, remove } = useFieldArray<
     AiSettingsFormValues,
@@ -76,10 +65,12 @@ export const AllowedModelsField = (
   // useId() guarantees uniqueness if multiple instances ever co-exist.
   const radioGroupName = useId();
 
+  const provider = watch('provider');
+
   // Azure OpenAI stores the *deployment name* in `modelId`, so the label changes
   // by provider (data-driven on the watched value, no provider-specific branch
   // leaking elsewhere).
-  const isAzure = watch('provider') === 'azure-openai';
+  const isAzure = provider === 'azure-openai';
   const modelLabelKey = isAzure
     ? 'ai_settings.azure_model_deployment_label'
     : 'ai_settings.model_label';
@@ -121,9 +112,36 @@ export const AllowedModelsField = (
     [getValues, remove, setValue],
   );
 
+  // Removal is confirmation-gated (the trash icon only *requests* it). null = no
+  // pending removal / dialog closed.
+  const [pendingRemoveIndex, setPendingRemoveIndex] = useState<number | null>(
+    null,
+  );
+  const cancelRemove = useCallback(() => setPendingRemoveIndex(null), []);
+  // Returns a resolved promise to satisfy ConfirmModal's async onConfirm contract
+  // (the removal itself is synchronous).
+  const confirmRemove = useCallback((): Promise<void> => {
+    if (pendingRemoveIndex != null) {
+      removeRow(pendingRemoveIndex);
+    }
+    setPendingRemoveIndex(null);
+    return Promise.resolve();
+  }, [pendingRemoveIndex, removeRow]);
+
+  // Whether the model awaiting confirmation is the default — drives the extra
+  // "another model will become the default" note in the dialog.
+  const pendingRemoveIsDefault =
+    pendingRemoveIndex != null &&
+    watch(`allowedModels.${pendingRemoveIndex}.isDefault`) === true;
+
   return (
     <FormGroup className="mb-3">
-      <Label className="d-block mb-2">{t(modelLabelKey)}</Label>
+      <h3 className="h5 fw-bold mt-4 mb-1">
+        {t('ai_settings.models_section_title')}
+      </h3>
+      <p className="form-text text-muted mt-0 mb-3">
+        {t('ai_settings.models_section_desc')}
+      </p>
 
       {fields.map((field, index) => (
         <AllowedModelRow
@@ -133,13 +151,10 @@ export const AllowedModelsField = (
           radioGroupName={radioGroupName}
           disabled={disabled}
           isDefault={watch(`allowedModels.${index}.isDefault`) === true}
-          invalidProviderOptions={
-            errors.allowedModels?.[index]?.providerOptionsText != null
-          }
-          register={register}
+          docUrl={PROVIDER_OPTIONS_DOC_URL}
+          placeholder={buildInitialProviderOptionsText(provider)}
           onSelectDefault={() => selectDefault(index)}
-          onRemove={() => removeRow(index)}
-          t={t}
+          onRequestRemove={() => setPendingRemoveIndex(index)}
         />
       ))}
 
@@ -147,30 +162,40 @@ export const AllowedModelsField = (
         type="button"
         color="secondary"
         outline
-        size="sm"
+        className="w-100 d-flex align-items-center justify-content-center"
+        style={{ borderStyle: 'dashed' }}
         disabled={disabled}
         onClick={() =>
-          append({ modelId: '', providerOptionsText: '', isDefault: false })
+          append({
+            modelId: '',
+            providerOptionsText: buildInitialProviderOptionsText(provider),
+            // The first model added to an empty list is the default so the
+            // single-default invariant holds from the start.
+            isDefault: fields.length === 0,
+          })
         }
       >
+        <span
+          className="material-symbols-outlined fs-6 me-1"
+          aria-hidden="true"
+        >
+          add
+        </span>
         {t(addLabelKey)}
       </Button>
 
-      <FormText className="d-block mt-2">
-        <span
-          // biome-ignore lint/security/noDangerouslySetInnerHtml: includes <br> markup from i18n strings
-          dangerouslySetInnerHTML={{
-            __html: t('ai_settings.provider_options_help'),
-          }}
-        />{' '}
-        <a
-          href={PROVIDER_OPTIONS_DOC_URL}
-          target="_blank"
-          rel="noopener noreferrer"
-        >
-          {PROVIDER_OPTIONS_DOC_URL}
-        </a>
-      </FormText>
+      <ConfirmModal
+        isModalOpen={pendingRemoveIndex != null}
+        warningMessage={t('ai_settings.remove_model_confirm')}
+        supplymentaryMessage={
+          pendingRemoveIsDefault
+            ? t('ai_settings.remove_default_model_note')
+            : null
+        }
+        confirmButtonTitle={t('ai_settings.remove_model')}
+        onConfirm={confirmRemove}
+        onCancel={cancelRemove}
+      />
     </FormGroup>
   );
 };
@@ -181,19 +206,17 @@ interface AllowedModelRowProps {
   readonly radioGroupName: string;
   readonly disabled: boolean;
   readonly isDefault: boolean;
-  readonly invalidProviderOptions: boolean;
-  readonly register: ReturnType<
-    typeof useFormContext<AiSettingsFormValues>
-  >['register'];
+  readonly docUrl: string;
+  readonly placeholder: string;
   readonly onSelectDefault: () => void;
-  readonly onRemove: () => void;
-  readonly t: (key: string) => string;
+  readonly onRequestRemove: () => void;
 }
 
 /**
- * One allowed-model row: model id + default radio + collapsible providerOptions
- * JSON + remove. Extracted so each row owns its own field ids (label/textarea
- * association) without colliding across rows.
+ * One allowed-model card: model id (monospace) + "default" badge/radio + remove
+ * trash icon + providerOptions JSON with a live valid/invalid indicator, a format
+ * button, and a docs link. Extracted so each card owns its own field ids and
+ * watches only its own providerOptions value.
  */
 const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
   const {
@@ -202,77 +225,154 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
     radioGroupName,
     disabled,
     isDefault,
-    invalidProviderOptions,
-    register,
+    docUrl,
+    placeholder,
     onSelectDefault,
-    onRemove,
-    t,
+    onRequestRemove,
   } = props;
+  const { t } = useTranslation('admin');
+  const { control, register, setValue } =
+    useFormContext<AiSettingsFormValues>();
 
   const modelInputId = useId();
   const providerOptionsId = useId();
   const radioId = useId();
 
+  // Watch only this card's providerOptions text so the inline status follows
+  // edits without re-rendering sibling cards.
+  const providerOptionsText =
+    useWatch({ control, name: `allowedModels.${index}.providerOptionsText` }) ??
+    '';
+  const status = useMemo(
+    () => getProviderOptionsJsonStatus(providerOptionsText),
+    [providerOptionsText],
+  );
+  const isInvalid =
+    status.kind === 'syntax-error' || status.kind === 'shape-error';
+  // Formattable whenever the JSON parses (valid syntax), regardless of shape.
+  const canFormat = status.kind === 'valid' || status.kind === 'shape-error';
+
+  const handleFormat = useCallback(() => {
+    const formatted = formatProviderOptionsJson(providerOptionsText);
+    if (formatted != null) {
+      setValue(`allowedModels.${index}.providerOptionsText`, formatted, {
+        shouldDirty: true,
+        shouldValidate: true,
+      });
+    }
+  }, [providerOptionsText, setValue, index]);
+
   return (
     <FormGroup
       tag="fieldset"
-      className="border rounded p-3 mb-2"
+      className="rounded p-3 mb-2 border"
       data-testid="allowed-model-row"
     >
-      <div className="d-flex align-items-center gap-2 mb-2">
-        <div className="flex-grow-1">
-          <Label for={modelInputId} className="form-label small mb-1">
+      {/* The label/badge sit on their own line; the input, default radio, and
+          remove icon share one center-aligned row below so the controls line up
+          with the input box (not pushed down from the label by magic margins). */}
+      <div className="mb-2">
+        <div className="d-flex align-items-center gap-2 mb-1">
+          <Label for={modelInputId} className="form-label small mb-0">
             {t(labelKey)}
           </Label>
+          {isDefault && (
+            <Badge color="info" pill>
+              {t('ai_settings.default_badge')}
+            </Badge>
+          )}
+        </div>
+        <div className="d-flex align-items-center gap-3">
           <Input
             id={modelInputId}
             type="text"
+            className="font-monospace flex-grow-1"
             disabled={disabled}
             {...registerToInputProps(
               register(`allowedModels.${index}.modelId`),
             )}
           />
-        </div>
-
-        <FormGroup check className="mt-4 mb-0 text-nowrap">
-          <Input
-            id={radioId}
-            type="radio"
-            role="radio"
-            name={radioGroupName}
-            checked={isDefault}
+          <FormGroup check className="mb-0 text-nowrap">
+            <Input
+              id={radioId}
+              type="radio"
+              role="radio"
+              name={radioGroupName}
+              checked={isDefault}
+              disabled={disabled}
+              onChange={onSelectDefault}
+            />
+            <Label check for={radioId} className="ms-1">
+              {t('ai_settings.set_as_default')}
+            </Label>
+          </FormGroup>
+          <Button
+            type="button"
+            color="link"
+            className="text-body-secondary p-1"
+            aria-label={t('ai_settings.remove_model')}
+            title={t('ai_settings.remove_model')}
             disabled={disabled}
-            onChange={onSelectDefault}
-          />
-          <Label check for={radioId} className="ms-1">
-            {t('ai_settings.default_model_label')}
-          </Label>
-        </FormGroup>
-
-        <Button
-          type="button"
-          color="danger"
-          outline
-          size="sm"
-          className="mt-4"
-          disabled={disabled}
-          onClick={onRemove}
-        >
-          {t('ai_settings.remove_model')}
-        </Button>
+            onClick={onRequestRemove}
+          >
+            <span className="material-symbols-outlined" aria-hidden="true">
+              delete
+            </span>
+          </Button>
+        </div>
       </div>
 
       <div>
-        <Label for={providerOptionsId} className="form-label small mb-1">
-          {t('ai_settings.provider_options_label')}
-        </Label>
+        <div className="d-flex align-items-center mb-1">
+          <Label for={providerOptionsId} className="form-label small mb-0">
+            {t('ai_settings.provider_options_label')}
+          </Label>
+          <div className="ms-auto d-flex align-items-center gap-3">
+            <Button
+              type="button"
+              color="link"
+              size="sm"
+              className="p-0 text-decoration-none d-inline-flex align-items-center"
+              disabled={disabled || !canFormat}
+              onClick={handleFormat}
+            >
+              <span
+                className="material-symbols-outlined fs-6 me-1"
+                aria-hidden="true"
+              >
+                auto_fix_high
+              </span>
+              {t('ai_settings.provider_options_format')}
+            </Button>
+            <a
+              href={docUrl}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="small d-inline-flex align-items-center"
+            >
+              {t('ai_settings.provider_options_doc_link')}
+              <span
+                className="material-symbols-outlined fs-6 ms-1"
+                aria-hidden="true"
+              >
+                open_in_new
+              </span>
+            </a>
+          </div>
+        </div>
+        {/* Suppress Bootstrap's `.is-invalid` background icon: on a textarea it
+            sits at the top-right and gets clipped by the scrollbar once the
+            content overflows. The red border + the message below convey the
+            invalid state without it. */}
         <Input
           id={providerOptionsId}
           type="textarea"
           rows={6}
-          placeholder={PROVIDER_OPTIONS_PLACEHOLDER}
+          className="font-monospace"
+          placeholder={placeholder}
           disabled={disabled}
-          invalid={invalidProviderOptions}
+          invalid={isInvalid}
+          style={{ backgroundImage: 'none' }}
           {...registerToInputProps(
             register(`allowedModels.${index}.providerOptionsText`, {
               validate: (v) =>
@@ -281,10 +381,17 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
             }),
           )}
         />
-        {invalidProviderOptions && (
-          <FormFeedback>
+        {isInvalid && (
+          <div className="invalid-feedback d-block">
             {t('ai_settings.provider_options_invalid_json')}
-          </FormFeedback>
+            {status.kind === 'syntax-error' && (
+              <span className="ms-1">
+                {t('ai_settings.provider_options_error_at_line', {
+                  line: status.line,
+                })}
+              </span>
+            )}
+          </div>
         )}
       </div>
     </FormGroup>

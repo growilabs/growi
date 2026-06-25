@@ -62,8 +62,14 @@ export const toFormValues = (
   apiKey: '',
   allowedModels: data.allowedModels.map((m) => ({
     modelId: m.modelId,
+    // Pretty-print (2-space) so the textarea re-seeds as readable, multi-line
+    // JSON after a save. The stored value is the parsed object — the admin's
+    // original whitespace is not persisted — so this canonical formatting is what
+    // keeps a saved value from collapsing to a single minified line on reload.
     providerOptionsText:
-      m.providerOptions != null ? JSON.stringify(m.providerOptions) : '',
+      m.providerOptions != null
+        ? JSON.stringify(m.providerOptions, null, 2)
+        : '',
     isDefault: m.isDefault ?? false,
   })),
   azureOpenaiSettings: {

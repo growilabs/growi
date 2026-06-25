@@ -54,11 +54,13 @@ describe('toFormValues', () => {
       ],
     });
 
-    // Assert: the object is serialized to JSON text; isDefault is preserved.
+    // Assert: the object is serialized to pretty-printed (2-space) JSON text so
+    // it re-seeds as readable multi-line JSON after a save; isDefault is preserved.
     expect(values.allowedModels).toEqual([
       {
         modelId: 'gpt-4o',
-        providerOptionsText: '{"openai":{"reasoningEffort":"low"}}',
+        providerOptionsText:
+          '{\n  "openai": {\n    "reasoningEffort": "low"\n  }\n}',
         isDefault: true,
       },
       { modelId: 'gpt-4o-mini', providerOptionsText: '', isDefault: false },

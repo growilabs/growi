@@ -60,23 +60,47 @@ const renderComponent = ({
     </FormHarness>,
   );
 
-// Each row exposes its model-id text input via the model label; counting them
-// is the observable proxy for "how many rows are rendered".
+// Each card exposes its model-id text input via the model label; counting them
+// is the observable proxy for "how many cards are rendered".
 const getModelInputs = (): HTMLInputElement[] =>
   screen
     .getAllByLabelText('ai_settings.model_label')
     .filter((el): el is HTMLInputElement => el instanceof HTMLInputElement);
 
-// The "default" radios (one per row). Narrow via a type guard — not an `as`
-// cast — so reading `.checked` stays type-safe (same pattern as getModelInputs).
+// The "set as default" radios (one per card). Narrow via a type guard — not an
+// `as` cast — so reading `.checked` stays type-safe.
 const getDefaultRadios = (): HTMLInputElement[] =>
   screen
     .getAllByRole('radio')
     .filter((el): el is HTMLInputElement => el instanceof HTMLInputElement);
 
+const getProviderOptionsTextareas = (): HTMLTextAreaElement[] =>
+  screen
+    .getAllByLabelText('ai_settings.provider_options_label')
+    .filter(
+      (el): el is HTMLTextAreaElement => el instanceof HTMLTextAreaElement,
+    );
+
+// Removal is confirmation-gated: click a card's trash icon, then confirm in the
+// dialog. Scoped to the dialog so the confirm button is not confused with the
+// trash icons (both carry the `remove_model` accessible name).
+const confirmRemoveAt = async (
+  user: ReturnType<typeof userEvent.setup>,
+  index: number,
+): Promise<void> => {
+  const trashButtons = screen.getAllByRole('button', {
+    name: 'ai_settings.remove_model',
+  });
+  await user.click(trashButtons[index]);
+  const dialog = await screen.findByRole('dialog');
+  await user.click(
+    within(dialog).getByRole('button', { name: 'ai_settings.remove_model' }),
+  );
+};
+
 describe('AllowedModelsField', () => {
-  describe('add / remove rows', () => {
-    it('adds a new row when the add button is clicked', async () => {
+  describe('add / remove cards', () => {
+    it('adds a new card when the add button is clicked', async () => {
       // Arrange
       const user = userEvent.setup();
       renderComponent({
@@ -97,7 +121,23 @@ describe('AllowedModelsField', () => {
       expect(getModelInputs()).toHaveLength(2);
     });
 
-    it('removes a row when its remove button is clicked', async () => {
+    it('seeds a newly added card with the current provider namespace', async () => {
+      // Arrange: provider is openai.
+      const user = userEvent.setup();
+      renderComponent({ defaultValues: { provider: 'anthropic' } });
+
+      // Act
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.add_model' }),
+      );
+
+      // Assert: the new card's providerOptions starts from the provider's empty
+      // namespace (anthropic here), not a hard-coded openai example.
+      const textareas = getProviderOptionsTextareas();
+      expect(JSON.parse(textareas[1].value)).toEqual({ anthropic: {} });
+    });
+
+    it('removes a card only after the removal is confirmed', async () => {
       // Arrange
       const user = userEvent.setup();
       renderComponent({
@@ -114,21 +154,46 @@ describe('AllowedModelsField', () => {
       });
       expect(getModelInputs()).toHaveLength(2);
 
-      // Act: remove the second row.
-      const removeButtons = screen.getAllByRole('button', {
-        name: 'ai_settings.remove_model',
-      });
-      await user.click(removeButtons[1]);
+      // Act: remove the second card via the confirmation dialog.
+      await confirmRemoveAt(user, 1);
 
       // Assert
       const inputs = getModelInputs();
       expect(inputs).toHaveLength(1);
       expect(inputs[0].value).toBe('gpt-4o');
     });
+
+    it('keeps the card when the removal is cancelled', async () => {
+      // Arrange
+      const user = userEvent.setup();
+      renderComponent({
+        defaultValues: {
+          allowedModels: [
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            {
+              modelId: 'gpt-4o-mini',
+              providerOptionsText: '',
+              isDefault: false,
+            },
+          ],
+        },
+      });
+
+      // Act: open the dialog for the second card, then cancel.
+      const trashButtons = screen.getAllByRole('button', {
+        name: 'ai_settings.remove_model',
+      });
+      await user.click(trashButtons[1]);
+      const dialog = await screen.findByRole('dialog');
+      await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+
+      // Assert: nothing was removed.
+      expect(getModelInputs()).toHaveLength(2);
+    });
   });
 
-  describe('default radio (single-select)', () => {
-    it('checks exactly one row by default and unchecks the previous when another is selected', async () => {
+  describe('default selection (single-select)', () => {
+    it('checks exactly one card by default and unchecks the previous when another is selected', async () => {
       // Arrange
       const user = userEvent.setup();
       renderComponent({
@@ -148,7 +213,7 @@ describe('AllowedModelsField', () => {
       expect(radios[0].checked).toBe(true);
       expect(radios[1].checked).toBe(false);
 
-      // Act: choose row B as the default.
+      // Act: choose card B as the default.
       await user.click(radios[1]);
 
       // Assert: selecting B unsets A — exactly one default at all times.
@@ -156,8 +221,27 @@ describe('AllowedModelsField', () => {
       expect(radios[1].checked).toBe(true);
     });
 
-    it('re-assigns the default to the first remaining row when the default row is removed', async () => {
-      // Arrange: the default is the first row.
+    it('marks only the default card with the "default" badge', () => {
+      // Arrange / Act
+      renderComponent({
+        defaultValues: {
+          allowedModels: [
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            {
+              modelId: 'gpt-4o-mini',
+              providerOptionsText: '',
+              isDefault: false,
+            },
+          ],
+        },
+      });
+
+      // Assert: exactly one default badge across the two cards.
+      expect(screen.getAllByText('ai_settings.default_badge')).toHaveLength(1);
+    });
+
+    it('re-assigns the default to the first remaining card when the default card is removed', async () => {
+      // Arrange: the default is the first card.
       const user = userEvent.setup();
       renderComponent({
         defaultValues: {
@@ -172,13 +256,10 @@ describe('AllowedModelsField', () => {
         },
       });
 
-      // Act: remove the default (first) row.
-      const removeButtons = screen.getAllByRole('button', {
-        name: 'ai_settings.remove_model',
-      });
-      await user.click(removeButtons[0]);
+      // Act: remove the default (first) card via the confirmation dialog.
+      await confirmRemoveAt(user, 0);
 
-      // Assert: the now-first (formerly second) row becomes the default.
+      // Assert: the now-first (formerly second) card becomes the default.
       const radios = getDefaultRadios();
       expect(radios).toHaveLength(1);
       expect(radios[0].checked).toBe(true);
@@ -204,7 +285,7 @@ describe('AllowedModelsField', () => {
       ).toBeInTheDocument();
     });
 
-    it('does not show an error for a valid provider-namespaced object', async () => {
+    it('shows no error for a provider-namespaced object', async () => {
       // Arrange
       const user = userEvent.setup();
       renderComponent();
@@ -215,13 +296,13 @@ describe('AllowedModelsField', () => {
       // Act: types `{"openai":{"temperature":0.7}}`.
       await user.type(textarea, '{{"openai":{{"temperature":0.7}}');
 
-      // Assert
+      // Assert: a valid value is accepted silently (no error indicator).
       expect(
         screen.queryByText('ai_settings.provider_options_invalid_json'),
       ).not.toBeInTheDocument();
     });
 
-    it('does not show an error when the providerOptions are empty', () => {
+    it('shows no error when the providerOptions are empty', () => {
       // Arrange
       renderComponent({
         defaultValues: {
@@ -235,6 +316,35 @@ describe('AllowedModelsField', () => {
       expect(
         screen.queryByText('ai_settings.provider_options_invalid_json'),
       ).not.toBeInTheDocument();
+    });
+  });
+
+  describe('format button', () => {
+    it('pretty-prints the providerOptions JSON in place', async () => {
+      // Arrange: a compact (but valid) providerOptions value.
+      const user = userEvent.setup();
+      renderComponent({
+        defaultValues: {
+          allowedModels: [
+            {
+              modelId: 'gpt-4o',
+              providerOptionsText: '{"openai":{"a":1}}',
+              isDefault: true,
+            },
+          ],
+        },
+      });
+
+      // Act
+      await user.click(
+        screen.getByRole('button', {
+          name: /ai_settings\.provider_options_format/,
+        }),
+      );
+
+      // Assert: the same data, re-indented over multiple lines.
+      const textarea = getProviderOptionsTextareas()[0];
+      expect(textarea.value).toBe('{\n  "openai": {\n    "a": 1\n  }\n}');
     });
   });
 
@@ -284,8 +394,8 @@ describe('AllowedModelsField', () => {
     });
   });
 
-  describe('row composition', () => {
-    it('renders each row with its own model input and default radio', () => {
+  describe('card composition', () => {
+    it('renders each card with its own model input and default radio', () => {
       // Arrange / Act
       renderComponent({
         defaultValues: {
@@ -302,10 +412,10 @@ describe('AllowedModelsField', () => {
 
       // Assert: each rendered group exposes one model input and one radio.
       const groups = screen.getAllByRole('group');
-      const modelRows = groups.filter(
+      const modelCards = groups.filter(
         (g) => within(g).queryByRole('radio') != null,
       );
-      expect(modelRows).toHaveLength(2);
+      expect(modelCards).toHaveLength(2);
     });
   });
 });
