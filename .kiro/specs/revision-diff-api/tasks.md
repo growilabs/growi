@@ -1,0 +1,108 @@
+# Implementation Plan
+
+- [ ] 1. Foundation: 型・インデックス・純粋ユーティリティ
+- [x] 1.1 DTO 型定義
+  - ChangeIndexEntry / ChangesIndexQuery / ChangesIndexResult、RevisionDiffPairInput / RevisionDiffRequest / RevisionDiffResult(discriminated union: ok|forbidden|invalid) / RevisionDiffResponse を定義
+  - server/client 双方から使える interfaces として配置
+  - 完了状態: 型がエクスポートされ型チェックを通る
+  - _Requirements: 1.2, 5.1, 6.1, 7.4_
+- [x] 1.2 revisions 複合インデックス追加
+  - migration(up/down) で `{ author: 1, createdAt: -1 }` を作成し、revision schema にも同インデックスを宣言（コードと DB 定義を一致）
+  - 完了状態: migration 適用後に revisions のインデックス一覧へ `{author:1,createdAt:-1}` が現れ、schema 側にも宣言済みであることを確認
+  - _Requirements: 9.1_
+- [x] 1.3 (P) diff-core（unified diff 生成）を TDD で実装
+  - 先に失敗するユニットテストを書く: 通常差分／baseline 空(fromBody='')→全文追加／context 行数指定の反映
+  - 既存 `diff`(v5) の createPatch をラップした純粋関数として実装し green にする
+  - 完了状態: 3観点のユニットテストが green
+  - _Requirements: 6.2, 6.3, 6.4_
+  - _Boundary: diff-core_
+- [x] 1.4 (P) cursor encode/decode を TDD で実装
+  - 先に失敗するユニットテストを書く: (createdAt,_id) の往復一致／不正トークンで例外
+  - 不透明トークン（内部表現を露出しない）として純粋関数で実装し green にする
+  - 完了状態: 往復・異常系のユニットテストが green
+  - _Requirements: 3.2_
+  - _Boundary: cursor_
+
+- [ ] 2. Core: Changes Index サービス（本人変更の発見）
+- [x] 2.1 著者横断クエリと run まとめ・baseline 算出
+  - author=認証ユーザーの版を `(createdAt,_id)` 昇順で取得（1.2 の複合インデックス利用）。対象ユーザーは引数で受けた本人に固定
+  - `$setWindowFields`(partition by pageId)で各版の直前版著者を一括取得し、他著者に中断されない連続編集を1 run に集約。baseline=run 開始版の直前版（無ければ空＝新規作成）、to=run 最終版
+  - 先に失敗するユニットテストを書く（TDD）: 連続編集の集約／他著者割込みで分割／新規作成 baseline 空
+  - 完了状態: 上記ユニットテストが green
+  - _Requirements: 1.1, 1.2, 2.1, 2.2, 4.1, 4.2, 4.3_
+  - _Boundary: ChangesIndexService_
+  - _Depends: 1.1, 1.2_
+- [x] 2.2 ページング（cursor 昇順・完結 run のみ emit・境界の繰り越し）
+  - 2.1 の run 集約結果に対してページングを実装（前提）。run 単位で件数上限のページを返し、cursor は emit 済み最終 run の to 版。完結した run のみ emit し、limit 末尾の未完 run は次ページへ繰り越す。時間窓未指定なら全期間をページング対象
+  - 先に失敗するユニットテストを書く: 次ページ継続で重複・取りこぼし無し／時系列順／さらに結果ありの cursor／終端で next=null／空結果
+  - 完了状態: ページング系ユニットテストが green
+  - _Requirements: 1.3, 1.4, 3.1, 3.2, 3.3, 3.4, 3.5_
+  - _Boundary: ChangesIndexService_
+- [x] 2.3 アクセス可否・削除フラグ判定（bulk 2クエリ）
+  - findByIdsAndViewer（閲覧可集合）＋ 生 Page.find({_id:{$in}},{status,path}) の bulk 2クエリで accessible/forbidden/trashed/不在 を判定。accessible のみ path 付与、閲覧不可・削除は path/内容非開示、不在は索引から除外。deleted は status='deleted' のみ
+  - 先に失敗するユニットテストを書く: 各状態の振り分け／閲覧不可・削除時の path 非開示／不在の除外
+  - 完了状態: 状態判定ユニットテストが green
+  - _Requirements: 5.1, 5.2, 5.3, 5.4_
+  - _Boundary: ChangesIndexService_
+  - _Depends: 1.1_
+
+- [ ] 3. Core: Revision Diff サービス（差分計算）
+- [x] 3.1 (P) ペア単位の独立認可と差分計算
+  - 各ペアについて: 版が指定 pageId に属するか検証／findByIdsAndViewer で現在閲覧可否を検証。可→diff-core で unified diff(ok)、不可→forbidden（内容非開示）、版-ページ不整合や不在→invalid。baseline 空は全文追加。文脈行数指定を反映。① 由来か否かに依らず毎回独立認可。バッチ全体は失敗させず per-item 結果
+  - 先に失敗するユニットテストを書く（TDD）: ok/forbidden/invalid の振り分け／部分成功／全文追加／独立認可（① を経由しない不正ペア）
+  - 完了状態: per-pair 判定ユニットテストが green
+  - _Requirements: 6.1, 6.2, 6.3, 6.4, 7.1, 7.2, 7.3, 7.4, 7.5, 9.2_
+  - _Boundary: RevisionDiffService_
+  - _Depends: 1.1, 1.3_
+
+- [ ] 4. Integration: ルート配線と既存ルート制約
+- [x] 4.1 (P) Changes Index ルート（GET /revisions/changes）
+  - accessTokenParser([SCOPE.READ.FEATURES.PAGE]) → loginRequired → express-validator → apiV3FormValidator の順で配線。userId=req.user._id を service に渡す。範囲不正・不正 cursor は 400。swagger(JSDoc) 付与
+  - 完了状態: 認証済み PAT で叩くと ChangesIndexService の結果を 200 で返す
+  - _Requirements: 1.1, 1.5, 8.1, 8.2, 8.3_
+  - _Boundary: changes route_
+  - _Depends: 1.1, 2.2, 2.3_
+- [x] 4.2 (P) Revision Diff ルート（POST /revisions/diff）
+  - 同じ認証ミドルウェア順。body の pairs を検証し MAX_PAIRS 超過・型不正は 400。RevisionDiffService に委譲。swagger 付与
+  - 完了状態: 認証済み PAT で版ペアを送ると per-item の結果配列を 200 で返し、上限超過は 400
+  - _Requirements: 6.1, 6.5, 8.1, 8.2, 8.3, 9.2_
+  - _Boundary: diff route_
+  - _Depends: 1.1, 3.1_
+- [x] 4.3 既存 /:id の24桁hex制約と新ルータのマウント（ルート衝突解消）
+  - 既存 revisions.js の `/:id` を `/:id([0-9a-fA-F]{24})` に制約し、新ルータ2本を apiv3 index の `/revisions` 配下にマウント。既存 `/:id` ハンドラの共有ページ判定（certifySharedPage / req.isSharedPage）には手を入れず、パスの正規表現制約のみ追加
+  - 完了状態: GET /revisions/changes が新ルータに到達して 200、既存 GET /revisions/:id が24桁hex の revision id で従来どおり動作
+  - _Requirements: 1.1, 8.1_
+  - _Depends: 4.1, 4.2_
+  - _Boundary: apiv3 index, revisions.js_
+
+- [ ] 5. Validation: 結合テスト（per-worker 分離で実行）
+- [x] 5.1 (P) ルーティング回帰の結合テスト
+  - GET /api/v3/revisions/changes が既存 /:id に飲み込まれず 200／既存 GET /revisions/:id が ObjectId で従来どおり 200／非 ObjectId が 404
+  - 結合テストは worker ごとに DB/fixtures を分離（per-worker isolation）
+  - 完了状態: ルーティング結合テストが green
+  - _Requirements: 1.1, 8.1_
+  - _Depends: 4.3_
+- [x] 5.2 (P) Changes Index 結合テスト
+  - 期間指定で本人の全ページ横断変更を返す／空結果／範囲不正 400／userId 入力を無視し本人固定／cursor 継続で重複・取りこぼし無し／自分の連続編集の集約・他著者割込み分割・ページ境界をまたいでも分割重複しない／閲覧可 path 付与・閲覧不可/削除は path 非開示・不在は出ない
+  - 完了状態: 上記シナリオの結合テストが green
+  - _Requirements: 1.1, 1.3, 1.5, 2.1, 2.2, 3.3, 3.4, 4.1, 4.2, 5.1, 5.2, 5.3, 5.4_
+  - _Depends: 4.1_
+- [x] 5.3 (P) Revision Diff 結合テスト
+  - 複数ページのペアを unified diff で返す／閲覧不可ペアは forbidden で内容非開示／版-ページ不整合は invalid／一部成功一部失敗の混在／MAX_PAIRS 超過 400／未認証 401・scope 不足 403
+  - 完了状態: 上記シナリオの結合テストが green
+  - _Requirements: 6.1, 6.5, 7.1, 7.2, 7.3, 7.4, 7.5, 8.1, 8.2, 8.3_
+  - _Depends: 4.2_
+
+- [ ] 6. Lookback 上限（遡及範囲のガードレール）
+- [ ] 6.1 config 定義と changes route での適用（reject / 既定窓）
+  - config-definition に `app:revisionDiffMaxLookbackSeconds`（env `REVISION_DIFF_MAX_LOOKBACK_SECONDS`、既定 2592000＝30日）を追加（CONFIG_KEYS ＋ CONFIG_DEFINITIONS）
+  - changes route で `floor = now - maxLookbackSeconds` を求め、実効下限 `max(since, fromDate)` が floor より過去なら 400（`lookback-limit-exceeded`、許容上限を提示）。下限未指定なら floor を実効下限に採用。判定は route（検証・正規化）で行い service には正規化済み `since` のみ渡す
+  - 先に失敗する結合テストを書く（TDD）: 明示 since が上限超過で 400／下限未指定で上限窓に絞られる／上限内 since は従来どおり
+  - swagger に 400(`lookback-limit-exceeded`) と既定挙動を追記
+  - 完了状態: 上記結合テストが green、既存テストは大きい lookback を与えて不変
+  - _Requirements: 1.4, 10.1, 10.2, 10.3, 10.4_
+  - _Boundary: changes route, config-definition_
+  - _Depends: 4.1_
+
+## Implementation Notes
+- Task 3.1: `computeDiffForPair` currently passes `pageId` to `buildUnifiedDiff` as the `pagePath` argument. `RevisionDiffPairInput` has no path field, so pagePath cannot be provided at the pure function level. When wiring the full service in Task 4.2, the route or service layer should fetch the page path and pass it through, or accept that the diff header shows pageId instead of path.

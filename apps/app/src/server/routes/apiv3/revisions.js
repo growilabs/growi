@@ -243,7 +243,7 @@ export const setup = (crowi) => {
    *                      $ref: '#/components/schemas/Revision'
    */
   router.get(
-    '/:id',
+    '/:id([0-9a-fA-F]{24})',
     certifySharedPage,
     accessTokenParser([SCOPE.READ.FEATURES.PAGE], { acceptLegacy: true }),
     loginRequired,

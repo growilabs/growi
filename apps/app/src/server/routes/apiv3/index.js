@@ -12,6 +12,8 @@ import {
 import newsRoute from '~/features/news/server/routes/news';
 import { factory as openaiRouteFactory } from '~/features/openai/server/routes';
 import { setup as setupPageBulkExport } from '~/features/page-bulk-export/server/routes/apiv3/page-bulk-export';
+import { changesRouteHandlersFactory } from '~/features/revision-diff/server/routes/changes';
+import { diffRouteHandlersFactory } from '~/features/revision-diff/server/routes/diff';
 import { setup as setupTemplates } from '~/features/templates/server/routes/apiv3';
 import { allreadyInstalledMiddleware } from '~/server/middlewares/application-not-installed';
 import loggerFactory from '~/utils/logger';
@@ -189,7 +191,12 @@ export const setup = (crowi, app) => {
 
   router.use('/page', setupPage(crowi));
   router.use('/pages', setupPages(crowi));
-  router.use('/revisions', setupRevisions(crowi));
+  {
+    const revisionsRouter = setupRevisions(crowi);
+    revisionsRouter.get('/changes', changesRouteHandlersFactory(crowi));
+    revisionsRouter.post('/diff', diffRouteHandlersFactory(crowi));
+    router.use('/revisions', revisionsRouter);
+  }
 
   // vault user API (POST /page/reconcile) — loginRequired only, no adminRequired
   router.use('/vault', createVaultPageRouterWithDeps(crowi));

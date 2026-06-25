@@ -68,6 +68,7 @@ export const CONFIG_KEYS = [
   'app:minPasswordLength',
   'app:auditLogEnabled',
   'app:activityExpirationSeconds',
+  'app:revisionDiffMaxLookbackSeconds',
   'app:auditLogActionGroupSize',
   'app:auditLogAdditionalActions',
   'app:auditLogExcludeActions',
@@ -509,6 +510,13 @@ export const CONFIG_DEFINITIONS = {
   }),
   'app:activityExpirationSeconds': defineConfig<number>({
     envVarName: 'ACTIVITY_EXPIRATION_SECONDS',
+    defaultValue: 2592000,
+  }),
+  // Changes Index API: how far back (seconds from now) a request may look. Each cursor
+  // page recomputes runs over the window, so this bounds the worst-case scan. Finite by
+  // default (30 days); operators may tune it via the env var.
+  'app:revisionDiffMaxLookbackSeconds': defineConfig<number>({
+    envVarName: 'REVISION_DIFF_MAX_LOOKBACK_SECONDS',
     defaultValue: 2592000,
   }),
   'app:auditLogActionGroupSize': defineConfig<ActionGroupSize>({
