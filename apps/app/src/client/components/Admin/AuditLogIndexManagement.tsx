@@ -102,9 +102,10 @@ export const AuditLogIndexManagement = (): JSX.Element => {
       setIsRebuildingCompleted(true);
     });
 
-    socket.on(SocketEventName.AuditlogRebuildingFailed, (data) => {
+    socket.on(SocketEventName.AuditlogRebuildingFailed, async (data) => {
       toastError(new Error(data.error));
       setIsRebuildingProcessing(false);
+      await retrieveStatus();
     });
 
     return () => {
@@ -145,6 +146,7 @@ export const AuditLogIndexManagement = (): JSX.Element => {
 
   const rebuildIndices = async () => {
     setIsRebuildingProcessing(true);
+    setIsRebuildingCompleted(false);
     try {
       await apiv3Put('/search/auditlog-indices', { operation: 'rebuild' });
       toastSuccess(t('audit_log_index_management.rebuild_requested'));

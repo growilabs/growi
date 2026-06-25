@@ -328,12 +328,12 @@ class ElasticsearchDelegator
 
     const isMainIndexHasAlias =
       isExistsMainIndex &&
-      aliases[indexName].aliases != null &&
-      aliases[indexName].aliases[aliasName] != null;
+      aliases[indexName]?.aliases != null &&
+      aliases[indexName]?.aliases[aliasName] != null;
     const isTmpIndexHasAlias =
       isExistsTmpIndex &&
-      aliases[tmpIndexName].aliases != null &&
-      aliases[tmpIndexName].aliases[aliasName] != null;
+      aliases[tmpIndexName]?.aliases != null &&
+      aliases[tmpIndexName]?.aliases[aliasName] != null;
 
     const isNormalized =
       isExistsMainIndex &&
@@ -380,12 +380,12 @@ class ElasticsearchDelegator
 
     const isMainIndexHasAlias =
       isExistsMainIndex &&
-      aliases[indexName].aliases != null &&
-      aliases[indexName].aliases[aliasName] != null;
+      aliases[indexName]?.aliases != null &&
+      aliases[indexName]?.aliases[aliasName] != null;
     const isTmpIndexHasAlias =
       isExistsTmpIndex &&
-      aliases[tmpIndexName].aliases != null &&
-      aliases[tmpIndexName].aliases[aliasName] != null;
+      aliases[tmpIndexName]?.aliases != null &&
+      aliases[tmpIndexName]?.aliases[aliasName] != null;
 
     const isNormalized =
       isExistsMainIndex &&
