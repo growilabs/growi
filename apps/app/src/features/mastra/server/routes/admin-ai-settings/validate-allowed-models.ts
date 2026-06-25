@@ -59,11 +59,12 @@ export const isValidNonEmptyAllowedModels = (
  * express-validator `.custom()` to accept ALL of:
  *   - an array (the shape requirement)
  *   - an EMPTY array — the clear path (a legitimate "no models" disablement; it must
- *     NOT 422, and the isDefault-uniqueness rule is NOT applied to it)
+ *     NOT be rejected, and the isDefault-uniqueness rule is NOT applied to it)
  *   - a NON-EMPTY array that passes every `isValidNonEmptyAllowedModels` rule
  *
  * A non-array value (or a non-empty array that breaks a rule) returns `false`, which
- * the chain reports as a 422 with the `allowedModels` field flagged.
+ * `apiV3FormValidator` reports as a 400 with the `allowedModels` field flagged (422 is
+ * reserved for env-only mode, handled separately in the PUT handler).
  */
 export const isValidAllowedModelsRequest = (value: unknown): boolean => {
   if (!Array.isArray(value)) {
