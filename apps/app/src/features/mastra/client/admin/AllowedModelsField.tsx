@@ -34,10 +34,11 @@ export interface AllowedModelsFieldProps {
  * the default is marked with a "default" badge next to the model label and its
  * radio checked.
  *
- * Removing a card is a low-emphasis trash icon gated by a confirmation dialog;
- * removing the default card re-assigns the default to the first remaining card so
- * the single-default invariant holds (1.3/1.5). The "+ add model" button appends
- * a card pre-seeded with the current provider's empty namespace.
+ * Removing a card is a low-emphasis trash icon and takes effect immediately (no
+ * confirmation dialog); removing the default card re-assigns the default to the
+ * first remaining card so the single-default invariant holds (1.3/1.5). The
+ * "+ add model" button appends a card pre-seeded with the current provider's empty
+ * namespace.
  *
  * The model label follows the watched provider: the Azure *deployment name* for
  * Azure OpenAI, otherwise the generic model id (the value is universal but its
