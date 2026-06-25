@@ -2,10 +2,10 @@
  * True when `value` is a provider-namespaced options object: a non-null, non-array
  * object whose every top-level value is itself a non-null, non-array object — the
  * exact shape the AI SDK's `providerOptions` consumes (e.g. `{ openai: { ... } }`).
- * An empty object `{}` is valid (vacuously: no namespaces). Reused by the runtime
- * resolver (`resolveProviderOptions`) so the FE/BE form validator and the runtime
- * agree on what "valid" means — a value that passes here is never silently
- * dropped at chat time.
+ * An empty object `{}` is valid (vacuously: no namespaces). Reused by the admin
+ * settings PUT validator (`validate-allowed-models`) so the FE form and server-side
+ * persistence agree on what "valid" means — a value that passes here is stored
+ * as-is and applied verbatim at chat time, never silently dropped.
  */
 export const isProviderNamespacedObject = (value: unknown): boolean => {
   if (typeof value !== 'object' || value == null || Array.isArray(value)) {

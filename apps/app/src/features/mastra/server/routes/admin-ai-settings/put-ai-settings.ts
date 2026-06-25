@@ -19,8 +19,9 @@ import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import type { AiSettingsUpdateRequest } from '../../../interfaces/ai-settings';
+import type { AllowedModel } from '../../../interfaces/allowed-model';
 import type { AzureOpenaiConfig } from '../../../interfaces/azure-openai-config';
-import { isValidProviderOptionsJson } from '../../../utils/provider-options-validation';
+import { isValidAllowedModelsRequest } from './validate-allowed-models';
 
 const logger = loggerFactory(
   'growi:features:mastra:routes:admin-ai-settings:put-ai-settings',
@@ -52,12 +53,26 @@ const logger = loggerFactory(
  *             existing stored key ONLY when the provider is unchanged. If the
  *             provider changes and no new key is supplied, the stored key is
  *             cleared so it is not reused against (and sent to) the new provider.
- *         model:
- *           type: string
- *           description: Clearable — omit resets to the env default.
- *         providerOptions:
- *           type: string
- *           description: Provider-namespaced options as a raw JSON string. Clearable — omit resets to the env default.
+ *         allowedModels:
+ *           type: array
+ *           description: >-
+ *             The per-model allow-list (full-state replace). When non-empty, every
+ *             entry needs a non-empty unique model id and exactly one entry must be
+ *             the default; an empty array (or omitting the field) clears the list
+ *             (resets ai:allowedModels to its env default). Validated as a whole.
+ *           items:
+ *             type: object
+ *             required: [modelId]
+ *             properties:
+ *               modelId:
+ *                 type: string
+ *                 description: The model id (deployment name for Azure OpenAI).
+ *               providerOptions:
+ *                 type: object
+ *                 description: Provider-namespaced options (e.g. {"openai":{...}}); omit for no options.
+ *               isDefault:
+ *                 type: boolean
+ *                 description: Marks the default entry. Exactly one entry must set this true.
  *         azureOpenaiSettings:
  *           type: object
  *           description: >-
@@ -93,13 +108,12 @@ const clearableConfigString = (field: string): ValidationChain =>
  * express-validator chain for PUT /_api/v3/ai-settings (formal validation, Req 6.1/6.2).
  * Every field is optional at the validation layer, but the request is a FULL-STATE
  * REPLACE rather than a PATCH — see the `AiSettingsUpdateRequest` contract for the
- * omit semantics (omitted clearable strings are reset; apiKey/booleans are merge
- * exceptions). provider must be a supported AI provider; the string fields are
- * type-guarded with .isString(); the clearable ones are sanitized ('' -> undefined)
- * so removeIfUndefined deletes them (Req 4.4); providerOptions must be a
- * provider-namespaced JSON object when present (the shape the runtime applies);
- * the boolean toggles must be real booleans. Semantic option validity is the
- * provider integration's responsibility.
+ * omit semantics (omitted clearable fields are reset; apiKey/booleans are merge
+ * exceptions). provider must be a supported AI provider; `allowedModels` (when
+ * non-empty) must satisfy the per-model allow-list invariants (Req 1.3/1.4/1.5/2.4)
+ * while an empty array is accepted as the clear path (Req 1.1); the boolean toggles
+ * must be real booleans. Semantic option validity is the provider integration's
+ * responsibility.
  */
 export const updateAiSettingsValidators: ValidationChain[] = [
   body('aiEnabled')
@@ -113,22 +127,22 @@ export const updateAiSettingsValidators: ValidationChain[] = [
   // apiKey is NOT cleared-when-empty (empty = keep existing, handled in buildUpdates),
   // so it only gets a type guard — NO ''->undefined sanitizer.
   body('apiKey').optional().isString().withMessage('apiKey must be a string'),
-  clearableConfigString('model'),
-  // providerOptions: validate the RAW value with the shared FE/BE predicate
-  // (Req 6.2) BEFORE the sanitizer (the predicate treats '' as valid; sanitizing
-  // first would feed it undefined). The predicate requires a provider-namespaced
-  // JSON object (the shape the runtime actually applies), so a wrong-shape value
-  // is rejected here instead of being saved and then silently ignored at chat
-  // time. The sanitizer then clears '' -> undefined.
-  body('providerOptions')
+  // allowedModels: the per-model allow-list (full-state replace). A SINGLE .custom()
+  // enforces the whole-array contract via the shared pure predicate
+  // (isValidAllowedModelsRequest), so the cross-field rules (no duplicate ids,
+  // exactly one isDefault) and the per-entry rules (non-empty model, valid
+  // provider-namespaced providerOptions) are checked together — express-validator's
+  // per-field chains cannot express those array invariants. An EMPTY array is
+  // ACCEPTED here (the clear path, Req 1.1): the isDefault-uniqueness rule applies
+  // only to a non-empty list, so a legitimate "no models" disablement is never a
+  // 422. A non-array, a non-empty list with an empty/duplicate model id, an invalid
+  // providerOptions value, or an isDefault count != 1 is rejected (Req 1.3/1.4/1.5/2.4).
+  body('allowedModels')
     .optional()
-    .isString()
-    .withMessage('providerOptions must be a string')
-    .custom((value: string) => isValidProviderOptionsJson(value))
+    .custom((value: unknown) => isValidAllowedModelsRequest(value))
     .withMessage(
-      'providerOptions must be a provider-namespaced JSON object (e.g. {"openai":{...}})',
-    )
-    .customSanitizer((value) => (value === '' ? undefined : value)),
+      'allowedModels must be an array; each entry needs a non-empty unique model id, valid provider-namespaced providerOptions, and exactly one entry must be the default',
+    ),
 
   // The Azure OpenAI connection settings are one nested object. Validate the
   // container, then each inner field by dot-path (the clearable strings reuse the
@@ -187,17 +201,39 @@ const buildAzureOpenaiConfig = (
 };
 
 /**
+ * Resolve the `ai:allowedModels` config value from a validated request.
+ *
+ * FULL-STATE REPLACE with a CLEAR path that mirrors `buildAzureOpenaiConfig`: when the
+ * request omits `allowedModels` or sends an EMPTY array, the value collapses to
+ * `undefined` so `updateConfigs({ removeIfUndefined: true })` deletes the key — then
+ * `getConfig('ai:allowedModels')` falls back to its default `[]` (or the
+ * `AI_ALLOWED_MODELS` env value). An empty array is a legitimate "no allowed models"
+ * disablement, NOT a validation error (the validator accepts it; see design "空配列 /
+ * 未指定の扱い（クリア経路）"). A non-empty array — already verified by the validator —
+ * is persisted verbatim (incl. isDefault and providerOptions, Req 1.1/1.3).
+ */
+const buildAllowedModels = (
+  body: AiSettingsUpdateRequest,
+): AllowedModel[] | undefined => {
+  const models = body.allowedModels;
+  return models != null && models.length > 0 ? models : undefined;
+};
+
+/**
  * Build the config updates from a validated request body.
  *
  * Update semantics (design "API Contract"): FULL-STATE REPLACE, not PATCH.
- *   - the clearable string fields (provider-common: model, providerOptions) are
- *     already normalized ('' -> undefined) by the validator's customSanitizer
- *     (middleware that runs before this handler), so they are mapped directly and
- *     ALWAYS placed in the object — `removeIfUndefined` then removes the cleared
- *     ones from the DB (Req 4.4). Consequently a field the request OMITTED is
- *     `undefined` here too and is likewise removed: an omitted clearable string is
- *     reset to its env default, not preserved. Callers must send the complete set
- *     (the admin form always does); see AiSettingsUpdateRequest.
+ *   - `provider` is a clearable string already normalized ('' -> undefined) by the
+ *     validator's customSanitizer (middleware that runs before this handler), so it
+ *     is mapped directly and ALWAYS placed in the object — `removeIfUndefined` then
+ *     removes it when cleared so the value falls back to its env default (Req 4.4).
+ *     A field the request OMITTED is `undefined` here too and is likewise removed.
+ *     Callers must send the complete set (the admin form always does); see
+ *     AiSettingsUpdateRequest.
+ *   - `allowedModels` is the per-model allow-list, resolved by buildAllowedModels:
+ *     a non-empty (validated) array is persisted verbatim; an empty/omitted array
+ *     collapses to `undefined` (the clear path) so removeIfUndefined deletes the key
+ *     and getConfig falls back to `[]` (Req 1.1) — same collapse shape as Azure.
  *   - the `azureOpenaiSettings` object is re-assembled into the `ai:azureOpenaiSettings`
  *     config value by buildAzureOpenaiConfig (see its note for the object-level
  *     full-state-replace + env-fallback semantics).
@@ -224,8 +260,7 @@ const buildUpdates = (
 ): AiConfigUpdates => {
   const updates: AiConfigUpdates = {
     'ai:provider': body.provider,
-    'ai:model': body.model,
-    'ai:providerOptions': body.providerOptions,
+    'ai:allowedModels': buildAllowedModels(body),
     'ai:azureOpenaiSettings': buildAzureOpenaiConfig(body),
   };
 

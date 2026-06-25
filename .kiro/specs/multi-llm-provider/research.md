@@ -2,6 +2,8 @@
 
 _生成日: 2026-06-10 / 対象要件: requirements.md (Requirement 1–5)_
 
+> 後続整合（mastra-multi-model-chat）: 本 research の各 D-セクションは当時の設計判断の履歴である。以降の `ai:model`（単一）/ `ai:providerOptions`（グローバル単一）/ `requireModel()` / `getModel()` への言及は、その後 mastra-multi-model-chat で **`ai:allowedModels`（モデル + per-model providerOptions + isDefault）+ `resolveEffectiveModelId(modelId?)` / `getDefaultModelId()` / `getAllowedModels()` / `getProviderOptionsForModel(effectiveModelId)`** へ統合・置換されたものとして読む（env `AI_MODEL` / `AI_PROVIDER_OPTIONS` は廃止、自動移行なし）。ベンダー（プロバイダ）切替は引き続き本 spec のスコープ外で、モデル単位の per-request 選択は mastra-multi-model-chat が扱う（同一プロバイダ内）。
+
 ## 分析サマリ
 
 - **現状**: mastra チャットエージェント（`growiAgent`）は OpenAI 専用。プロバイダー生成（`createOpenAI`）・モデル選択・API キー取得がモジュール読み込み時（import 時）にハードコードされており、ベンダー切り替えの抽象化が一切ない。

@@ -1,5 +1,6 @@
 // @vitest-environment happy-dom
 
+import type { ReactNode } from 'react';
 import { EditorView } from '@codemirror/view';
 import { act, fireEvent, render, screen } from '@testing-library/react';
 import type { ChatStatus } from 'ai';
@@ -57,6 +58,100 @@ vi.mock('../../stores/message', () => ({
 vi.mock('../../stores/thread', () => ({
   useSWRINFxRecentThreads: () => ({ mutate: vi.fn() }),
 }));
+
+// Chat model list / selection: controllable so a test can vary the allowed
+// models, the server-validated initial selection, and the loading state.
+const { modelsState } = vi.hoisted(() => ({
+  modelsState: {
+    current: {
+      data: undefined as
+        | {
+            modelIds: string[];
+            selectedModelId: string;
+          }
+        | undefined,
+    },
+  },
+}));
+vi.mock('../../stores/models', () => ({
+  useSWRxChatModels: () => modelsState.current,
+}));
+
+// Persisted selection write boundary. The contract is "a model change calls
+// scheduleToPut({ aiChatSelectedModelId })"; the debounce + HTTP PUT live in the
+// shared service (reused unchanged), so the spy is the right boundary (3.6).
+const scheduleToPut = vi.fn();
+vi.mock('~/client/services/user-ui-settings', () => ({
+  scheduleToPut: (...args: unknown[]) => scheduleToPut(...args),
+}));
+
+// Spy on the transport factory while keeping the pure label/error helpers real.
+// The factory receives a live getModelId() (not a fixed model), so the observable
+// proof of the wiring is that the captured getter reflects the current selection
+// — useChat ignores a re-created transport, so the model must be read live.
+const createMastraChatTransport = vi.fn(
+  (_threadId: string, _getModelId: () => string | undefined) => ({}),
+);
+vi.mock('./chat-sidebar-helpers', async (importOriginal) => {
+  const actual =
+    await importOriginal<typeof import('./chat-sidebar-helpers')>();
+  return {
+    ...actual,
+    createMastraChatTransport: (
+      threadId: string,
+      getModelId: () => string | undefined,
+    ) => createMastraChatTransport(threadId, getModelId),
+  };
+});
+
+// Replace the vendored Radix-based PromptInputModelSelect* with a controllable
+// native <select> test double. We assert the same value/onValueChange contract
+// the real components expose (the Radix portal is not reliably drivable under
+// happy-dom). The vendored file itself is reused unchanged in production.
+vi.mock('~/components/ai-elements/prompt-input', async (importOriginal) => {
+  const actual =
+    await importOriginal<
+      typeof import('~/components/ai-elements/prompt-input')
+    >();
+  type SelectProps = {
+    value?: string;
+    onValueChange?: (v: string) => void;
+    disabled?: boolean;
+    children?: ReactNode;
+  };
+  return {
+    ...actual,
+    PromptInputModelSelect: ({
+      value,
+      onValueChange,
+      disabled,
+      children,
+    }: SelectProps) => (
+      <select
+        aria-label="model-select"
+        value={value ?? ''}
+        disabled={disabled}
+        onChange={(e) => onValueChange?.(e.currentTarget.value)}
+      >
+        {children}
+      </select>
+    ),
+    PromptInputModelSelectTrigger: ({ children }: { children?: ReactNode }) => (
+      <>{children}</>
+    ),
+    PromptInputModelSelectValue: () => null,
+    PromptInputModelSelectContent: ({ children }: { children?: ReactNode }) => (
+      <>{children}</>
+    ),
+    PromptInputModelSelectItem: ({
+      value,
+      children,
+    }: {
+      value: string;
+      children?: ReactNode;
+    }) => <option value={value}>{children}</option>,
+  };
+});
 
 // Search store: PageMentionInput's controller calls useSWRxSearch. Stub it with
 // a controllable return so a test can make candidates appear.
@@ -165,9 +260,18 @@ beforeEach(() => {
   sendMessage.mockClear();
   regenerate.mockClear();
   clearError.mockClear();
+  scheduleToPut.mockClear();
+  createMastraChatTransport.mockClear();
   searchState.current = { data: undefined, isLoading: false };
   chatState.status = undefined;
   chatState.error = undefined;
+  // Default: models resolved with two options, server-validated selection set.
+  modelsState.current = {
+    data: {
+      modelIds: ['gpt-4o', 'gpt-4o-mini'],
+      selectedModelId: 'gpt-4o-mini',
+    },
+  };
 
   // happy-dom 15.7.4's HTMLFormElement.reset() throws ("hasAttribute" on an
   // undefined ref) when a CodeMirror editor is mounted inside the form.
@@ -345,6 +449,84 @@ describe('ChatSidebar — server error display', () => {
     expect(screen.getByRole('alert')).toBeInTheDocument();
     expect(screen.getByText('ai_sidebar.error.title')).toBeInTheDocument();
     expect(screen.queryByText('unknown')).toBeNull();
+  });
+});
+
+describe('ChatSidebar — model selector wiring (3.2/3.3/3.4/3.5/3.6)', () => {
+  const modelSelect = (): HTMLSelectElement =>
+    screen.getByLabelText<HTMLSelectElement>('model-select');
+
+  it('initialises the selector with the server-validated selectedModelId (3.2)', () => {
+    render(<ChatSidebar />);
+
+    expect(modelSelect().value).toBe('gpt-4o-mini');
+  });
+
+  // The getter passed to the transport factory (2nd arg of the last call).
+  const lastModelGetter = (): (() => string | undefined) => {
+    const calls = createMastraChatTransport.mock.calls;
+    return calls[calls.length - 1][1];
+  };
+
+  it('builds the transport with a live getter that reports the initial selectedModelId (3.3/3.4)', () => {
+    render(<ChatSidebar />);
+
+    // The factory gets a getter (not a fixed model); reading it now yields the
+    // server-validated initial selection. The transport reads it live per
+    // request, so sendMessage AND regenerate() both send the current model.
+    expect(createMastraChatTransport).toHaveBeenLastCalledWith(
+      expect.any(String),
+      expect.any(Function),
+    );
+    expect(lastModelGetter()()).toBe('gpt-4o-mini');
+  });
+
+  it('on selection change: persists via scheduleToPut and the live getter reflects the new model WITHOUT re-creating the transport (3.3/3.6)', () => {
+    render(<ChatSidebar />);
+
+    const getModelId = lastModelGetter();
+    createMastraChatTransport.mockClear();
+
+    act(() => {
+      fireEvent.change(modelSelect(), { target: { value: 'gpt-4o' } });
+    });
+
+    // Persisted as the user's selection for next visit (3.6).
+    expect(scheduleToPut).toHaveBeenCalledWith({
+      aiChatSelectedModelId: 'gpt-4o',
+    });
+    // The transport is NOT re-created on a model change (useChat would ignore a
+    // new instance anyway); the same live getter now reports the new model, so
+    // the next send/regenerate carries it (Critical Issue 1 — 3.3/3.4).
+    expect(createMastraChatTransport).not.toHaveBeenCalled();
+    expect(getModelId()).toBe('gpt-4o');
+    expect(modelSelect().value).toBe('gpt-4o');
+  });
+
+  it('shows the single allowed model as selected (3.5)', () => {
+    modelsState.current = {
+      data: {
+        modelIds: ['only-model'],
+        selectedModelId: 'only-model',
+      },
+    };
+    render(<ChatSidebar />);
+
+    expect(modelSelect().value).toBe('only-model');
+    expect(modelSelect().options).toHaveLength(1);
+  });
+
+  it('disables the selector until the models resolve', () => {
+    modelsState.current = { data: undefined };
+    render(<ChatSidebar />);
+
+    expect(modelSelect().disabled).toBe(true);
+  });
+
+  it('enables the selector once the models resolve', () => {
+    render(<ChatSidebar />);
+
+    expect(modelSelect().disabled).toBe(false);
   });
 });
 

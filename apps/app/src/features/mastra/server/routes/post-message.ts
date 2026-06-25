@@ -19,7 +19,8 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { CustomUIMessageMetadata } from '../../interfaces/chat-message';
-import { resolveProviderOptions } from '../services/ai-sdk-modules/resolve-provider-options';
+import { resolveEffectiveModelId } from '../services/ai-sdk-modules/llm-providers/config';
+import { getProviderOptionsForModel } from '../services/ai-sdk-modules/resolve-provider-options';
 import { getOrCreateThread } from '../services/get-or-create-thread';
 import { mastra } from '../services/mastra-modules';
 import type { MastraRequestContextShape } from '../services/mastra-modules/types/request-context';
@@ -30,6 +31,10 @@ const logger = loggerFactory('growi:routes:apiv3:mastra:post-message-handler');
 
 type ReqBody = {
   threadId?: string;
+  // Per-request model selection (Req 3.3). Untrusted: the handler rounds it via
+  // resolveEffectiveModelId (the single allow-list checkpoint), so an out-of-allowlist
+  // / omitted value is collapsed to the default model rather than rejected here.
+  modelId?: string;
   messages: AIV6Type.UIMessage[];
 };
 
@@ -54,7 +59,7 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
     ...validator,
     apiV3FormValidator,
     async (req: Req, res: ApiV3Response) => {
-      const { threadId, messages } = req.body;
+      const { threadId, modelId, messages } = req.body;
 
       const growiAgent = mastra.getAgent('growiAgent');
       const memory = await growiAgent.getMemory();
@@ -78,6 +83,17 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
       requestContext.set('searchService', crowi.searchService);
 
       try {
+        // Resolve the effective model ONCE per request — the single allow-list
+        // rounding checkpoint: an out-of-allowlist / undefined modelId is collapsed
+        // to the default here (warning at most once). The resolved id is threaded
+        // to BOTH the agent's dynamic model fn (via requestContext) and the
+        // providerOptions lookup, so they can never diverge and the fallback is not
+        // re-evaluated / re-warned downstream (Req 4.1/4.2/4.3). resolveMastraModel
+        // re-validates the id inside the model fn, but for this already-resolved id
+        // that is an idempotent defense-in-depth pass (no second warning).
+        const effectiveModelId = resolveEffectiveModelId(modelId);
+        requestContext.set('modelId', effectiveModelId);
+
         const stream = await growiAgent.stream(messages, {
           requestContext,
           maxSteps: 10,
@@ -85,14 +101,12 @@ export const postMessageHandlersFactory: PostMessageHandlersFactory = (
             thread: thread.id,
             resource: thread.resourceId,
           },
-          // Provider options (reasoning etc.) resolved from the
-          // AI_PROVIDER_OPTIONS env var (Req 6). Defaults to the OpenAI
-          // reasoning options (reasoningEffort 'low' bounds reasoning-token cost;
-          // reasoningSummary 'auto' surfaces summary chunks to the UI — note this
-          // requires a verified OpenAI org, otherwise summary parts are empty).
-          // Operators of other vendors set their own provider namespace; the AI
-          // SDK reads only the active provider's key.
-          providerOptions: resolveProviderOptions(),
+          // Provider options for the EFFECTIVE model (Req 4.4/2.2), looked up from
+          // the already-resolved id (no re-resolution), so they always match the
+          // model the agent builds; {} when that model declares none. Each operator
+          // sets their own provider namespace per allowed model; the AI SDK reads
+          // only the active provider's key.
+          providerOptions: getProviderOptionsForModel(effectiveModelId),
         });
 
         // Use pipeUIMessageStreamToResponse for Express servers
