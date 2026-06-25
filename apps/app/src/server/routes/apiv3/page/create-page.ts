@@ -223,6 +223,7 @@ export const createPageHandlersFactory = (crowi: Crowi): RequestHandler[] => {
       targetModel: SupportedTargetModel.MODEL_PAGE,
       target: createdPage,
       action: SupportedAction.ACTION_PAGE_CREATE,
+      contributor: req.user,
     };
     const activityEvent = crowi.events.activity;
     activityEvent.emit('update', res.locals.activity._id, parameters);

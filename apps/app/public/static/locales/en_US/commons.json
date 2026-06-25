@@ -62,7 +62,8 @@
     "news": "News",
     "notifications": "Notifications",
     "filter_all": "All",
-    "no_news": "No news available"
+    "no_news": "No news available",
+    "view_detail": "View details"
   },
   "personal_dropdown": {
     "home": "Home",
