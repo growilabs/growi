@@ -102,11 +102,21 @@ export const extension = Prisma.defineExtension((client) => {
         ) {
           const context =
             Prisma.getExtensionContext<typeof prisma.bookmarks>(this);
-          const bookmark = await context.create({
-            data: {
+          // use upsert instead of create: concurrent requests for the same
+          // page/user can race past the existence check in the route handler,
+          // and create() would throw P2002 on the unique (pageId, userId) index
+          const bookmark = await context.upsert({
+            where: {
+              pageId_userId: {
+                pageId: pageId.toString(),
+                userId: userId.toString(),
+              },
+            },
+            create: {
               pageId: pageId.toString(),
               userId: userId.toString(),
             },
+            update: {},
           });
           return bookmark;
         },
