@@ -3,6 +3,7 @@ import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
+import { MAX_MODEL_ID_LENGTH } from '~/features/mastra/interfaces/allowed-model';
 import { AllSidebarContentsType } from '~/interfaces/ui';
 import loggerFactory from '~/utils/logger';
 
@@ -13,19 +14,28 @@ const logger = loggerFactory('growi:routes:apiv3:user-ui-settings');
 
 const router = express.Router();
 
-export const setup = (): Router => {
-  const validatorForPut = [
-    body('settings')
-      .exists()
-      .withMessage("The body param 'settings' is required"),
-    body('settings.currentSidebarContents')
-      .optional()
-      .isIn(AllSidebarContentsType),
-    body('settings.currentProductNavWidth').optional().isNumeric(),
-    body('settings.preferCollapsedModeByUser').optional().isBoolean(),
-    body('settings.aiChatSelectedModelId').optional().isString(),
-  ];
+// Exported at module scope (not inlined in setup) so the formal validation contract
+// can be unit-tested directly via .run(req) + validationResult, mirroring the
+// mastra put-ai-settings convention (updateAiSettingsValidators).
+export const validatorForPutUserUISettings = [
+  body('settings')
+    .exists()
+    .withMessage("The body param 'settings' is required"),
+  body('settings.currentSidebarContents')
+    .optional()
+    .isIn(AllSidebarContentsType),
+  body('settings.currentProductNavWidth').optional().isNumeric(),
+  body('settings.preferCollapsedModeByUser').optional().isBoolean(),
+  // Defensive length cap: the stored selection is never trusted (get-models rounds it
+  // against the allow-list), so the only risk of an unbounded value is document bloat
+  // in UserUISettings. Real model ids are far shorter (MAX_MODEL_ID_LENGTH).
+  body('settings.aiChatSelectedModelId')
+    .optional()
+    .isString()
+    .isLength({ max: MAX_MODEL_ID_LENGTH }),
+];
 
+export const setup = (): Router => {
   /**
    * @swagger
    *
@@ -77,7 +87,7 @@ export const setup = (): Router => {
    */
   router.put(
     '/',
-    validatorForPut,
+    validatorForPutUserUISettings,
     apiV3FormValidator,
     async (req: any, res: any) => {
       const { user } = req;

@@ -11,8 +11,11 @@
 //   - the UserUISettings model (default export): we stub findOneAndUpdate so no DB
 //     is touched and we can assert exactly what reaches the $set.
 import type { IUserHasId } from '@growi/core';
-import type { RequestHandler } from 'express';
+import type { Request, RequestHandler } from 'express';
+import { validationResult } from 'express-validator';
 import { mock } from 'vitest-mock-extended';
+
+import { MAX_MODEL_ID_LENGTH } from '~/features/mastra/interfaces/allowed-model';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
 
@@ -34,7 +37,7 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-import { setup } from './user-ui-settings';
+import { setup, validatorForPutUserUISettings } from './user-ui-settings';
 
 // Read the route handler (last layer of the single PUT route) off the router the
 // factory builds. The validator + apiV3FormValidator layers precede it but are not
@@ -122,5 +125,55 @@ describe('PUT /user-ui-settings handler', () => {
 
     expect(findOneAndUpdate).not.toHaveBeenCalled();
     expect(loggedOutReq.session.uiSettings.aiChatSelectedModelId).toBe('o3');
+  });
+});
+
+// Drive the real express-validator engine over the exported PUT validator chain and
+// inspect validationResult — the same observable-contract approach used in
+// post-message.spec / put-ai-settings.spec. Asserts which `settings` payloads the
+// chain accepts/rejects, not how the chain is built.
+const runPutValidators = async (
+  settings: Record<string, unknown>,
+): Promise<{ hasErrors: boolean; failedFields: string[] }> => {
+  const req = {
+    body: { settings },
+    cookies: {},
+    headers: {},
+    params: {},
+    query: {},
+  } as unknown as Request;
+  await Promise.all(
+    validatorForPutUserUISettings.map((chain) => chain.run(req)),
+  );
+  const result = validationResult(req);
+  return {
+    hasErrors: !result.isEmpty(),
+    failedFields: result.array().map((e) => e.param),
+  };
+};
+
+describe('validatorForPutUserUISettings', () => {
+  describe('aiChatSelectedModelId', () => {
+    it('accepts a string at the maximum length', async () => {
+      const { hasErrors } = await runPutValidators({
+        aiChatSelectedModelId: 'a'.repeat(MAX_MODEL_ID_LENGTH),
+      });
+      expect(hasErrors).toBe(false);
+    });
+
+    it('rejects an over-length value (defensive cap on the persisted selection)', async () => {
+      const { hasErrors, failedFields } = await runPutValidators({
+        aiChatSelectedModelId: 'a'.repeat(MAX_MODEL_ID_LENGTH + 1),
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('settings.aiChatSelectedModelId');
+    });
+
+    it('accepts an omitted aiChatSelectedModelId (optional)', async () => {
+      const { hasErrors } = await runPutValidators({
+        currentSidebarContents: 'recent',
+      });
+      expect(hasErrors).toBe(false);
+    });
   });
 });

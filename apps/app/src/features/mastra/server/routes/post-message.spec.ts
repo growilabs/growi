@@ -1,6 +1,8 @@
 import type { Request } from 'express';
 import { validationResult } from 'express-validator';
 
+import { MAX_MODEL_ID_LENGTH } from '~/features/mastra/interfaces/allowed-model';
+
 import { buildPostMessageValidator } from './post-message-validator';
 
 // Assert the validator's OBSERVABLE contract — which request bodies it accepts and
@@ -85,6 +87,23 @@ describe('buildPostMessageValidator', () => {
     it('rejects a non-string modelId', async () => {
       const { hasErrors, failedFields } = await runValidators({
         modelId: 123,
+        messages: VALID_MESSAGES,
+      });
+      expect(hasErrors).toBe(true);
+      expect(failedFields).toContain('modelId');
+    });
+
+    it('accepts a modelId at the maximum length', async () => {
+      const { hasErrors } = await runValidators({
+        modelId: 'a'.repeat(MAX_MODEL_ID_LENGTH),
+        messages: VALID_MESSAGES,
+      });
+      expect(hasErrors).toBe(false);
+    });
+
+    it('rejects an over-length modelId (defensive cap so an unbounded value is not logged verbatim)', async () => {
+      const { hasErrors, failedFields } = await runValidators({
+        modelId: 'a'.repeat(MAX_MODEL_ID_LENGTH + 1),
         messages: VALID_MESSAGES,
       });
       expect(hasErrors).toBe(true);
