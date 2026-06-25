@@ -6,7 +6,7 @@ import {
 import { extension as ExternalAccountExtension } from '~/server/models/external-account';
 import { extension as UserExtension } from '~/server/models/user/index.prisma';
 
-interface PaginateOptions<TWhere, TOrderBy, TInclude, TSelect> {
+export interface PaginateOptions<TWhere, TOrderBy, TInclude, TSelect> {
   page?: number;
   limit?: number;
   where?: TWhere;
@@ -15,7 +15,7 @@ interface PaginateOptions<TWhere, TOrderBy, TInclude, TSelect> {
   select?: TSelect;
 }
 
-interface PaginateResult<T> {
+export interface PaginateResult<T> {
   docs: T[];
   totalDocs: number;
   limit: number;
