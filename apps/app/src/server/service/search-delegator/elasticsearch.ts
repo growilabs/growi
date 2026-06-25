@@ -488,7 +488,9 @@ class ElasticsearchDelegator
     } catch (error) {
       if (shouldEmitProgress) {
         const socket = this.socketIoService.getAdminSocket();
-        socket.emit(SocketEventName.RebuildingFailed, { error: error.message });
+        socket.emit(SocketEventName.AuditlogRebuildingFailed, {
+          error: error.message,
+        });
       }
       try {
         await this.normalizeAuditlogIndices();
@@ -618,7 +620,7 @@ class ElasticsearchDelegator
           );
 
           if (shouldEmitProgress) {
-            socket?.emit(SocketEventName.AddPageProgress, {
+            socket?.emit(SocketEventName.AddAuditlogProgress, {
               totalCount,
               count,
             });
@@ -634,7 +636,10 @@ class ElasticsearchDelegator
       final(callback) {
         logger.info(`Adding auditlogs has completed: (totalCount=${count})`);
         if (shouldEmitProgress) {
-          socket?.emit(SocketEventName.FinishAddPage, { totalCount, count });
+          socket?.emit(SocketEventName.FinishAddAuditlog, {
+            totalCount,
+            count,
+          });
         }
         callback();
       },

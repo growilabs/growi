@@ -74,13 +74,13 @@ export const AuditLogIndexManagement = (): JSX.Element => {
       return;
     }
 
-    socket.on(SocketEventName.AddPageProgress, (data) => {
+    socket.on(SocketEventName.AddAuditlogProgress, (data) => {
       setIsRebuildingProcessing(true);
       setRebuildTotal(data.totalCount);
       setRebuildCurrent(data.count);
     });
 
-    socket.on(SocketEventName.FinishAddPage, async (data) => {
+    socket.on(SocketEventName.FinishAddAuditlog, async (data) => {
       setRebuildTotal(data.totalCount);
       setRebuildCurrent(data.count);
 
@@ -99,14 +99,14 @@ export const AuditLogIndexManagement = (): JSX.Element => {
       setIsRebuildingCompleted(true);
     });
 
-    socket.on(SocketEventName.RebuildingFailed, (data) => {
+    socket.on(SocketEventName.AuditlogRebuildingFailed, (data) => {
       toastError(new Error(data.error));
     });
 
     return () => {
-      socket.off(SocketEventName.AddPageProgress);
-      socket.off(SocketEventName.FinishAddPage);
-      socket.off(SocketEventName.RebuildingFailed);
+      socket.off(SocketEventName.AddAuditlogProgress);
+      socket.off(SocketEventName.FinishAddAuditlog);
+      socket.off(SocketEventName.AuditlogRebuildingFailed);
     };
   }, [retrieveStatus, socket]);
 
