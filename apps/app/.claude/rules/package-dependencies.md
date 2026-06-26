@@ -35,6 +35,16 @@ It skips HTML rendering for that component but Turbopack still externalises pack
 **`useEffect`-guarded `import()` does NOT guarantee devDependencies.**
 Bootstrap and i18next backends are loaded this way yet still appear in `.next/node_modules/` due to transitive imports.
 
+**A broken symlink for a package that is ALREADY in `dependencies` is NOT a classification bug.**
+The symlink name embeds pnpm's peer-resolution hash. `pnpm deploy --prod` re-resolves the
+production-only graph, so if a package's peer set/versions differ between the full install and
+the prod deploy (commonly an **optional** peer like `next`'s `@babel/core`, present in dev and
+re-resolved to a different patch in prod), it lands in a differently-hashed `.pnpm` dir and the
+build-time symlink dangles — even though the package is in the tarball. Do **not** add such a
+package to `ALLOWED_BROKEN` (it is SSR-dereferenced → `ERR_MODULE_NOT_FOUND` in prod). Instead
+pin the drifting peer in `pnpm-workspace.yaml` → `overrides:`. Full procedure: `fix-broken-next-symlinks`
+skill, Step 3c.
+
 ## Packages Confirmed as devDependencies (Verified)
 
 These were successfully removed from production artifact by eliminating their SSR import path:
