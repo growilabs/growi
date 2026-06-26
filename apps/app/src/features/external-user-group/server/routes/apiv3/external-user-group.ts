@@ -961,7 +961,7 @@ module.exports = (crowi: Crowi): Router => {
 
       try {
         await crowi.ldapUserGroupSyncService?.init(
-          req.user.name,
+          req.user.username,
           req.body.password,
         );
       } catch (_e) {

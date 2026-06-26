@@ -1,8 +1,37 @@
 # Changelog
 
-## [Unreleased](https://github.com/growilabs/compare/v7.5.5...HEAD)
+## [Unreleased](https://github.com/growilabs/compare/v7.5.6...HEAD)
 
 *Please do not manually update this file. We've automated the process.*
+
+## [v7.5.6](https://github.com/growilabs/compare/v7.5.5...v7.5.6) - 2026-06-25
+
+### 💎 Features
+
+* feat: Contribution Graph on the user's profile (#10509) @arvid-e
+* feat(comment): Comment mention and add In-App-notification (#11058) @Ryosei-Fukushima
+* feat: Changes Index and Revision Diff APIs (#11353) @yuki-takei
+* feat: Add button to make all notification as read (#11352) @ryotaro-nagahara
+
+### 🚀 Improvement
+
+* imprv: Expose news body (#11317) @ryotaro-nagahara
+* imprv: Include page revert action in supported contribution actions (#11321) @arvid-e
+* imprv: Page create button interaction (#11313) @hikaru-n-cpu
+
+### 🐛 Bug Fixes
+
+* fix: Suppress modifier shortcuts in editable elements (#11340) @yuki-takei
+* fix: escape </style> breakout in renderCustomCss (#11298) @yuki-takei
+* fix: Use req.user.username in LDAP Execute Sync instead of req.user.name (#11356) @yuki-takei
+* feat(page-bulk-export): Rework bulk PDF/HTML export to render Markdown like the web (tables, math, emoji, directives) (#11288) @yuki-takei
+
+### 🧰 Maintenance
+
+* ci(deps): bump js-yaml from 4.1.1 to 4.2.0 (#11311) @[dependabot[bot]](https://github.com/apps/dependabot)
+* chore(deps): dedupe pnpm-lock.yaml to CI-gate release dependency churn (#11343) @yuki-takei
+* ci(deps-dev): bump vitest from 3.2.4 to 3.2.6 (#11279) @[dependabot[bot]](https://github.com/apps/dependabot)
+* ci(deps): bump form-data from 4.0.5 to 4.0.6 (#11335) @[dependabot[bot]](https://github.com/apps/dependabot)
 
 ## [v7.5.5](https://github.com/growilabs/compare/v7.5.4...v7.5.5) - 2026-06-10
 

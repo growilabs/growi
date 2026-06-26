@@ -5,6 +5,7 @@ import * as refsGrowiDirective from '@growi/remark-attachment-refs/dist/client';
 import * as drawio from '@growi/remark-drawio';
 import * as lsxGrowiDirective from '@growi/remark-lsx/dist/client';
 import assert from 'assert';
+import type { Schema as SanitizeOption } from 'hast-util-sanitize';
 import katex from 'rehype-katex';
 import sanitize from 'rehype-sanitize';
 import slug from 'rehype-slug';
@@ -33,6 +34,7 @@ import * as keywordHighlighter from '~/services/renderer/rehype-plugins/keyword-
 import * as relocateToc from '~/services/renderer/rehype-plugins/relocate-toc';
 import * as attachment from '~/services/renderer/remark-plugins/attachment';
 import * as codeBlock from '~/services/renderer/remark-plugins/codeblock';
+import * as mention from '~/services/renderer/remark-plugins/mention';
 import * as xsvToTable from '~/services/renderer/remark-plugins/xsv-to-table';
 import {
   generateCommonOptions,
@@ -182,6 +184,49 @@ export const generateTocOptions = (
   return options;
 };
 
+const getSanitizePluginForSimpleView = (
+  config: RendererConfigExt,
+  additionalOptions?: SanitizeOption,
+): Pluggable | (() => void) => {
+  return config.isEnabledXssPrevention
+    ? [
+        sanitize,
+        deepmerge(
+          getCommonSanitizeOption(config),
+          presentation.sanitizeOption,
+          drawio.sanitizeOption,
+          mermaidSanitizeOption,
+          plantuml.sanitizeOption,
+          callout.sanitizeOption,
+          attachment.sanitizeOption,
+          lsxGrowiDirective.sanitizeOption,
+          refsGrowiDirective.sanitizeOption,
+          codeBlock.sanitizeOption,
+          additionalOptions ?? {},
+        ),
+      ]
+    : () => {};
+};
+
+const replaceSanitizePlugin = (
+  rehypePlugins: Pluggable[],
+  config: RendererConfigExt,
+  sanitizePlugin: Pluggable | (() => void),
+): void => {
+  if (!config.isEnabledXssPrevention) return;
+
+  const idx = rehypePlugins.findIndex(
+    (p) => Array.isArray(p) && p[0] === sanitize,
+  );
+  if (idx === -1) {
+    logger.warn(
+      'sanitize plugin not found; sanitize options will not be applied',
+    );
+    return;
+  }
+  rehypePlugins[idx] = sanitizePlugin;
+};
+
 export const generateSimpleViewOptions = (
   config: RendererConfigExt,
   pagePath: string,
@@ -216,24 +261,7 @@ export const generateSimpleViewOptions = (
     remarkPlugins.push(breaks);
   }
 
-  const rehypeSanitizePlugin: Pluggable | (() => void) =
-    config.isEnabledXssPrevention
-      ? [
-          sanitize,
-          deepmerge(
-            getCommonSanitizeOption(config),
-            presentation.sanitizeOption,
-            drawio.sanitizeOption,
-            mermaidSanitizeOption,
-            plantuml.sanitizeOption,
-            callout.sanitizeOption,
-            attachment.sanitizeOption,
-            lsxGrowiDirective.sanitizeOption,
-            refsGrowiDirective.sanitizeOption,
-            codeBlock.sanitizeOption,
-          ),
-        ]
-      : () => {};
+  const rehypeSanitizePlugin = getSanitizePluginForSimpleView(config);
 
   // add rehype plugins
   rehypePlugins.push(
@@ -272,6 +300,33 @@ export const generateSimpleViewOptions = (
   return options;
 };
 
+// Mention highlighting applies to comments only. Applying it in search results, timeline,
+// or sidebar would falsely treat @tokens in non-comment content as user mentions.
+// Mention plugin and its sanitize schema are injected via post-processing on top of
+// generateSimpleViewOptions rather than forking the base builder.
+export const generateCommentViewOptions = (
+  config: RendererConfigExt,
+  pagePath: string,
+  overrideIsEnabledLinebreaks?: boolean,
+): RendererOptions => {
+  const options = generateSimpleViewOptions(
+    config,
+    pagePath,
+    undefined,
+    overrideIsEnabledLinebreaks,
+  );
+  const { remarkPlugins, rehypePlugins } = options;
+
+  remarkPlugins.push(mention.remarkPlugin);
+  replaceSanitizePlugin(
+    rehypePlugins,
+    config,
+    getSanitizePluginForSimpleView(config, mention.sanitizeOption),
+  );
+
+  return options;
+};
+
 export const generatePresentationViewOptions = (
   config: RendererConfigExt,
   pagePath: string,
@@ -281,17 +336,18 @@ export const generatePresentationViewOptions = (
 
   const { rehypePlugins } = options;
 
-  const rehypeSanitizePlugin: Pluggable | (() => void) =
-    config.isEnabledXssPrevention
-      ? [sanitize, deepmerge(addLineNumberAttribute.sanitizeOption)]
-      : () => {};
+  // addLineNumberAttribute must run before sanitize so that the data-line attributes
+  // it adds are preserved by the sanitize schema.
+  rehypePlugins.unshift(addLineNumberAttribute.rehypePlugin);
+  replaceSanitizePlugin(
+    rehypePlugins,
+    config,
+    getSanitizePluginForSimpleView(
+      config,
+      addLineNumberAttribute.sanitizeOption,
+    ),
+  );
 
-  // add rehype plugins
-  rehypePlugins.push(addLineNumberAttribute.rehypePlugin, rehypeSanitizePlugin);
-
-  if (config.isEnabledXssPrevention) {
-    verifySanitizePlugin(options, false);
-  }
   return options;
 };
 
