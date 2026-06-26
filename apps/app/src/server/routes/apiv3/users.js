@@ -318,7 +318,7 @@ module.exports = (crowi) => {
 
   router.get(
     '/',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     loginRequired,
     validator.statusList,
     apiV3FormValidator,
@@ -1413,7 +1413,7 @@ module.exports = (crowi) => {
    */
   router.get(
     '/list',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     loginRequired,
     async (req, res) => {
       const userIds = req.query.userIds ?? null;
@@ -1520,7 +1520,7 @@ module.exports = (crowi) => {
    */
   router.get(
     '/usernames',
-    accessTokenParser([SCOPE.READ.USER_SETTINGS.INFO], { acceptLegacy: true }),
+    accessTokenParser([SCOPE.READ.FEATURES.USER], { acceptLegacy: true }),
     loginRequired,
     validator.usernames,
     apiV3FormValidator,
