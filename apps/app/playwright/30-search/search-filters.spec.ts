@@ -328,6 +328,75 @@ test.describe
       }
     });
 
+    test('group filter does not return pages belonging to group the user is not part of', async ({
+      browser,
+    }) => {
+      // Search as user B (not a group member). `group:` resolves the name only
+      // against the searcher's OWN memberships, so for B it resolves to nothing
+      // and the search returns zero results
+      const contextB = await browser.newContext({
+        storageState: FILTER_TEST_USER_B.authFile,
+      });
+      try {
+        const pageB = await contextB.newPage();
+        const list = pageB.getByTestId('search-result-list');
+
+        await expect(async () => {
+          await pageB.goto(`/_search?q=group:${FILTER_GROUP_NAME}`);
+          await expect(pageB.getByText('0 pages', { exact: true })).toBeVisible(
+            {
+              timeout: 3000,
+            },
+          );
+        }).toPass({ timeout: 20_000 });
+
+        // NEGATIVE: the group-restricted page is absent
+        await expect(
+          list.getByRole('link', { name: `${groupStamp}-in-group` }),
+        ).toHaveCount(0);
+        // NEGATIVE: the public (non-group) page is absent too
+        await expect(
+          list.getByRole('link', { name: `${groupStamp}-public` }),
+        ).toHaveCount(0);
+      } finally {
+        await contextB.close();
+      }
+    });
+
+    test('negated group filter excludes pages granted to that group', async ({
+      browser,
+    }) => {
+      // Must search as member A: `-group:` resolves the name against the
+      // searcher's OWN memberships, so a non-member's negation excludes nothing.
+      // Both group fixtures share `groupStamp`, so the keyword would return both;
+      // `-group:` must drop only the group-granted one.
+      const contextA = await browser.newContext({
+        storageState: FILTER_TEST_USER_A.authFile,
+      });
+      try {
+        const pageA = await contextA.newPage();
+        const list = pageA.getByTestId('search-result-list');
+
+        // POSITIVE: the public page survives the negation
+        await expect(async () => {
+          await pageA.goto(
+            `/_search?q=${groupStamp} -group:${FILTER_GROUP_NAME}`,
+          );
+          await expect(pageA.getByTestId('search-result-base')).toBeVisible();
+          await expect(
+            list.getByRole('link', { name: `${groupStamp}-public` }),
+          ).toBeVisible({ timeout: 3000 });
+        }).toPass({ timeout: 20_000 });
+
+        // NEGATIVE: the group-granted page is excluded by -group:
+        await expect(
+          list.getByRole('link', { name: `${groupStamp}-in-group` }),
+        ).toHaveCount(0);
+      } finally {
+        await contextA.close();
+      }
+    });
+
     test('prefix filter returns only pages under that path', async ({
       page,
     }) => {

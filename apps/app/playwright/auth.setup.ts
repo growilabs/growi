@@ -1,6 +1,6 @@
 import { expect, test as setup } from '@playwright/test';
 
-import { login } from './utils/Login';
+import { login } from './utils/login';
 
 // Commonised login process for use elsewhere
 // see: https://github.com/microsoft/playwright/issues/22114

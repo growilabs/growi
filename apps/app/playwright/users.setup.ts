@@ -2,7 +2,7 @@ import type { APIRequestContext, Browser } from '@playwright/test';
 import { test as setup } from '@playwright/test';
 
 import { activateInvitedUser, inviteUser } from './utils/api';
-import { fillLoginForm, login } from './utils/Login';
+import { fillLoginForm, login } from './utils/login';
 import { FILTER_TEST_USERS, type TestUser } from './utils/test-users';
 
 const provisionUser = async (
