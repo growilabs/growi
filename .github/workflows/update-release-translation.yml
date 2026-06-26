@@ -1,0 +1,36 @@
+name: Update Release Translation
+
+# Triggered manually by the release-translation routine to apply
+# Japanese/English summaries to published releases.
+on:
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Release tag to update (e.g. v7.5.6 or @growi/core@2.3.2)'
+        required: true
+        type: string
+      notes_path:
+        description: 'Path to notes markdown file in the repo (relative to root)'
+        required: true
+        type: string
+
+jobs:
+  update-release:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Update release notes
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TAG: ${{ inputs.tag }}
+          NOTES_PATH: ${{ inputs.notes_path }}
+        run: |
+          echo "Updating release: $TAG"
+          echo "Notes file : $NOTES_PATH"
+          gh release edit "$TAG" \
+            --repo growilabs/growi \
+            --notes-file "$NOTES_PATH"
+          echo "Done."
