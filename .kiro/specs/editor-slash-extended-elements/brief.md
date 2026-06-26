@@ -3,7 +3,7 @@
 > アンブレラ `editor-commands` の子スペック。基盤 `editor-slash-command` に依存。
 
 ## Problem
-`editor-slash-command`（MVP）のスラッシュコマンドは基本 Markdown 要素（見出し・リスト・引用・コードブロック・テーブル）のみを対象とする。GROWI 固有の拡張要素（drawio 作図・数式・plantuml・lsx 動的リスト等）は `/` から挿入できず、ユーザーはツールバーや記法の手入力に頼る必要がある。
+`editor-slash-command`（MVP）のスラッシュコマンドは基本 Markdown 要素（見出し・リスト・引用・コードブロック・テーブル）のみを対象とする。GROWI 固有の拡張要素（drawio 作図・plantuml・lsx 動的リスト等）は `/` から挿入できず、ユーザーはツールバーや記法の手入力に頼る必要がある。
 
 ## Current State
 - 基盤 `editor-slash-command` が、補完ソース（トリガー検出・フィルタ・`apply`）、コマンドレジストリ（データ駆動・単一ソース）、挿入ビルダー、i18n 解決を提供する。
@@ -11,7 +11,7 @@
 - ツールバーには drawio 用の DiagramButton があり、挿入記法の参照になる。
 
 ## Desired Outcome
-- `/drawio` `/math` `/plantuml` `/lsx` 等で、対応する GROWI 拡張要素の雛形が `editor-slash-command` と同じ挙動（`/query` 置換 + 単一トランザクション挿入 + カーソル配置）で挿入される。
+- `/drawio` `/plantuml` `/lsx` で、対応する GROWI 拡張要素の雛形が `editor-slash-command` と同じ挙動（`/query` 置換 + 単一トランザクション挿入 + カーソル配置）で挿入される。
 - 各コマンドのラベル/説明が多言語表示される。
 
 ## Approach
@@ -19,7 +19,7 @@
 
 ## Scope
 - **In**:
-  - 拡張要素の挿入コマンド定義（対象: drawio / math（ブロック数式）/ plantuml / lsx。最終セットは requirements で確定）
+  - 拡張要素の挿入コマンド定義（対象: drawio / plantuml / lsx。math / mermaid / callout 等は将来拡張）
   - 各要素の雛形を生成する純粋挿入ビルダー（カーソルは編集を続けやすい位置へ）
   - コマンドのラベル/説明の i18n キー
 - **Out**:

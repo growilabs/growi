@@ -47,7 +47,7 @@
 - **Findings**: パレットは基底 `toggleMarkdownSymbol` + 既存 toolbar i18n + CM tooltip で完結し、slash レジストリを必要としない。
 - **Selected Approach**: パレットは独立モジュールとして実装。基盤 slash の実装を待たずに着手可能。
 - **Trade-offs**: 将来 palette と slash で操作定義を共有したくなった場合、共通コマンド抽象への寄せが別途必要（roadmap "Shared seams to watch" の長期検討事項）。
-- **Follow-up**: roadmap の本スペックの依存を「Dependencies: none（MVP・umbrella 概念上の所属は維持）」に更新することを推奨。
+- **Follow-up（適用済み）**: roadmap の本スペックの依存を「Dependencies: none（MVP・umbrella 所属は維持）」に更新済み（`roadmap.md` の Specs 行・Shared seams に反映）。
 
 ### Decision: 選択駆動 tooltip（StateField → showTooltip）
 - **Selected Approach**: 各トランザクションで選択範囲と dismiss/blur 状態から `Tooltip | null` を算出する `StateField` を持ち、`showTooltip` facet に供給。`create(view)` でパレット DOM を構築。
@@ -91,4 +91,4 @@
 
 ## 状態
 - 本スペックのギャップ・リスクは解消。残ギャップなし。新規依存ゼロ。
-- roadmap 反映推奨（依存 none 化）は design.md「roadmap への反映推奨」のとおり未対応のまま（ユーザー判断待ち）。
+- roadmap の依存 none 化は**反映済み**（`roadmap.md` 更新済み）。

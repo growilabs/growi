@@ -9,14 +9,15 @@
 **Impact**: 既存の絵文字オートコンプリート（`:` トリガー）と同じ `@codemirror/autocomplete` 補完エンジンに、新たなスラッシュコマンド補完ソースを統合する。既存のツールバー・キーバインド・グローバルホットキー（`/` 検索）の挙動は変更しない。
 
 ### Goals
-- `/` 入力で行頭にコマンドメニューを表示し、入力で絞り込み、選択で対応 Markdown 要素を単一トランザクションで挿入する。
+- `/` 入力（行頭または空白直後）でコマンドメニューを表示し、入力で絞り込み、選択で対応 Markdown 要素を単一トランザクションで挿入する。
 - 既存の絵文字補完・キーバインド・グローバル検索と干渉しない。
 - コマンド集合をデータ駆動で宣言し、将来のコマンド追加を定義ファイルへの追記のみで可能にする。
 
 ### Non-Goals
 - GROWI 拡張要素（drawio / math / lsx / テンプレート）のコマンド化（将来拡張）。
 - テーブル挿入時の表ビルダー（行列数指定モーダル）起動（将来拡張）。
-- 行中（mid-line）の空白直後での発火、およびインライン要素の挿入（将来拡張）。
+- 単語の途中（空白以外の文字の直後、例 `foo/`）での発火（誤爆防止のため非対応）。
+- インライン要素の挿入（将来拡張。MVP のコマンドはすべてブロックレベル要素）。
 - コマンドの並び順・表示内容のユーザーカスタマイズ。
 
 ## Boundary Commitments
@@ -129,9 +130,9 @@ sequenceDiagram
     participant S as slash command source
     participant V as EditorView
 
-    U->>CM: 行頭で "/" を入力
+    U->>CM: 行頭または空白直後で "/" を入力
     CM->>S: source(context)
-    S->>S: 行頭トリガー判定 + from=「/」位置
+    S->>S: トリガー判定(行頭/空白直後) + from=「/」位置
     S-->>CM: CompletionResult(options, filter:false)
     CM-->>U: メニュー表示（先頭ハイライト）
     U->>CM: 文字入力で絞り込み
@@ -143,7 +144,7 @@ sequenceDiagram
     V-->>U: 要素挿入・カーソル配置
 ```
 
-- **トリガー判定**: `from`（`/` の位置）の直前が行頭（先頭空白のみ）の場合のみ `CompletionResult` を返す。単語途中・行中の `/` は `null`（Req 1.2）。
+- **トリガー判定**: `from`（`/` の位置）の直前が**行頭（先頭空白のみ）または空白文字**の場合に `CompletionResult` を返す。直前が空白以外の文字（単語の途中、例 `foo/`）の場合は `null`（Req 1.2）。
 - **フィルタ**: `filter: false` とし、source 側で query（`/` 以降の文字列）を label と `keywords` に対して大文字小文字を無視して照合（Req 2.1/2.2）。一致なしは `options: []`→メニューは閉じ、入力テキストは不変（Req 2.4/4.3）。
 - **apply**: コマンドの `buildInsertion` が返す `{ insert, cursorOffset }` から、`/query`（`[from, to]`）を置換する単一 change `{ from, to, insert }` を 1 トランザクションで発行（Req 3.2/3.5）。
 
@@ -151,8 +152,8 @@ sequenceDiagram
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1 | 行頭 `/` でメニュー表示 | slash command source | `createSlashCommandSource` | 起動フロー |
-| 1.2 | 単語途中で非発火 | slash command source | トリガー判定 | 起動フロー |
+| 1.1 | 行頭/空白直後 `/` でメニュー表示 | slash command source | `createSlashCommandSource` | 起動フロー |
+| 1.2 | 単語途中（非空白直後）で非発火 | slash command source | トリガー判定 | 起動フロー |
 | 1.3 | ラベル+説明表示 | resolve-slash-commands, source | `ResolvedSlashCommand` | 起動フロー |
 | 1.4 | 初期ハイライト | autocompletion（標準） | — | 起動フロー |
 | 2.1 | 入力で絞り込み | slash command source | query 照合 | 絞り込み |
@@ -164,6 +165,7 @@ sequenceDiagram
 | 3.3 | 空 Markdown テーブル挿入 | insertion-builders | `tableInsertion` | 選択 |
 | 3.4 | カーソル配置 | insertion-builders | `SlashInsertion.selection` | 選択 |
 | 3.5 | undo で復元 | slash command source | 単一transaction | 選択 |
+| 3.6 | 行中発火時はブロックを改行挿入 | insertion-builders | 行頭判定+改行前置 | 選択 |
 | 4.1 | Escape で閉じ・テキスト保持 | autocompletion（標準） | `closeCompletion` | — |
 | 4.2 | 外側クリック/blur で閉じ | autocompletion（標準） | — | — |
 | 4.3 | 空白入力でテキスト不変 | slash command source | `validFor`（`\w*`） | — |
@@ -184,7 +186,7 @@ sequenceDiagram
 |-----------|--------------|--------|--------------|--------------------------|-----------|
 | slash-command-types | types | コマンド/挿入の型定義 | 5.1 | — | State |
 | slash-command-definitions | data | コマンド集合の単一ソース | 5.1, 5.4 | types (P0) | State |
-| insertion-builders | logic | 挿入内容（純粋）を生成 | 3.3, 3.4, 5.2, 5.3 | types (P0) | Service |
+| insertion-builders | logic | 挿入内容（純粋）を生成 | 3.3, 3.4, 3.6, 5.2, 5.3 | types (P0) | Service |
 | resolve-slash-commands | logic | i18nキー→表示文字列に解決 | 1.3, 7.1, 7.2 | definitions (P0), react-i18next (P1) | Service |
 | slash-command-source | logic | トリガー検出・フィルタ・apply | 1.1, 1.2, 2.1-2.4, 3.2, 3.5, 4.3, 6.3 | builders (P0), `@codemirror/autocomplete` (P0) | Service |
 | use-default-extensions（変更） | integration | emoji と統合し登録 | 6.2, 7.1 | source (P0), emoji source (P0) | Service |
@@ -254,7 +256,7 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
 | Field | Detail |
 |-------|--------|
 | Intent | カーソル位置 `from` を起点に挿入内容（`SlashInsertion`）を返す純粋関数群 |
-| Requirements | 3.3, 3.4, 5.2, 5.3 |
+| Requirements | 3.3, 3.4, 3.6, 5.2, 5.3 |
 
 **Contracts**: Service [x]
 
@@ -271,7 +273,14 @@ export const tableInsertion: SlashCommand['buildInsertion'];
 ```
 - **Preconditions**: `from` は `/` の位置（置換レンジ `[from, to]` の起点）。
 - **Postconditions**: `insert`（置換テキスト全体）と `cursorOffset`（`from` 相対）のみを返す。絶対位置の変更や `view.dispatch` は行わない。`cursorOffset` で続行入力位置を指定（Req 3.4）。
-- **Invariants**: 副作用なし。`view` は行コンテキスト参照のためにのみ使用（位置を直接変更しない）。
+- **行頭/行中の出し分け（Req 3.6）**: `view` と `from` から「`from` が行頭（同じ行に先行する非空白テキストがない）か」を判定し、**先行する非空白テキストがある場合は `insert` の先頭に区切りを付与**して、ブロック要素を新しい行に挿入する（先行テキストを壊さない）。`cursorOffset` も付与分を加味する。
+- **要素種別ごとの区切り（Req 3.3/3.6）**: 必要な区切りは Markdown の描画規則に従って要素ごとに決める。
+  - **テーブル**: GFM のテーブルは直前に**空行**がないと段落の一部と解釈され表として描画されない。先行行が非空のときは**空行（`\n\n`）**を前置する（行頭ケースでも直前行が非空段落なら同様に空行を確保する）。
+  - **見出し / リスト / 番号付き / タスク / 引用**: 段落を中断できるため、先行テキストがある場合は**単一改行（`\n`）**で可。
+  - **コードブロック**: フェンスは新しい行に置く必要があるため、先行行が非空のときは改行（必要に応じて空行）を前置する。
+  - 各要素の必要区切りはテストで固定する。
+- **先行空白の扱い（任意）**: `あいうえお /h1` のように `/` の直前に空白がある場合、`[from, to]` のみ置換すると前行末に空白が残る（`あいうえお \n# `）。気になる場合は `/` 直前の単一空白も置換範囲に含めて吸収してよい（実装時の判断、必須ではない）。
+- **Invariants**: 副作用なし。`view` は行コンテキスト参照（行頭判定）のためにのみ使用（位置を直接変更しない）。
 
 **Implementation Notes**
 - Integration: `lineMarkerInsertion` のプレフィックス文字列はツールバーの行頭挿入と概念的に一致（将来共有ビルダーへ統合余地）。
@@ -303,7 +312,7 @@ export const resolveSlashCommands: (
 
 **Responsibilities & Constraints**
 - 入力（work-set）として `ResolvedSlashCommand[]` を受け取る（executor は集合を所有しない）。
-- トリガー判定: 直前が行頭（先頭空白のみ許容）の `/` のみ。`from` を `/` 位置、`to` を `context.pos` とする。
+- トリガー判定: `/` の直前が行頭（先頭空白のみ許容）**または空白文字**のときに発火。直前が空白以外（単語の途中）のときは発火しない。`from` を `/` 位置、`to` を `context.pos` とする。
 - `filter: false`、`validFor: /\/\w*$/` 相当。query を `label`/`keywords` に対し大文字小文字無視で照合。
 - `apply`: `buildInsertion(view, from)` の結果から、**単一の `view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + cursorOffset } })`** を発行する。削除（`[from, to]`）と挿入が1つの change にまとまるため、change レンジの重なりが発生せず、undo も1回で復元される（Req 3.5）。
 
@@ -326,7 +335,7 @@ export const createSlashCommandSource: (
 
 **Implementation Notes**
 - Integration: 各 `Completion` は `label`（表示）、`detail`/`info`（説明）、`apply`（上記）を持つ。`render` は任意（MVP は標準表示で可）。
-- Validation: トリガー（行頭/単語途中）、query 照合（大小文字/keyword）、apply 後の文書・選択・undo を単体テスト。
+- Validation: トリガー（行頭/空白直後で発火・単語途中で非発火）、query 照合（大小文字/keyword）、apply 後の文書・選択・undo を単体テスト。
 - Risks: 行頭判定の境界（先頭空白・リスト内）に注意。
 
 ### integration
@@ -360,7 +369,7 @@ export const createSlashCommandSource: (
 - **トリガー外**: `source` は `null` を返し副作用なし。
 - **一致なし**: `options: []` でメニューは閉じ、文書は不変（Req 2.4）。
 - **キャンセル**: Escape / blur / 外側クリックは `@codemirror/autocomplete` 標準でメニューを閉じ、文書は不変（Req 4.1/4.2）。
-- **不正な挿入位置**: 行頭トリガーに限定することで行頭プレフィックスの破綻を防止（Req 1.2 / Non-Goals）。
+- **行中での挿入**: `/` が行の途中にある場合、ブロック要素はビルダーが改行を前置して新しい行に挿入し、先行テキストの破綻を防止（Req 3.6）。単語の途中（非空白直後）では発火しない（Req 1.2）。
 
 ### Monitoring
 - 本機能はクライアント内 UI で永続化・サーバ通信なし。専用ログは追加しない（既存エディタの挙動に委譲）。
@@ -368,10 +377,11 @@ export const createSlashCommandSource: (
 ## Testing Strategy
 
 ### Unit Tests
-1. `slash-command-source`: 行頭 `/` で `CompletionResult` を返し、単語途中・行中 `/` では `null`（1.1, 1.2）。
+1. `slash-command-source`: 行頭または空白直後の `/` で `CompletionResult` を返し、空白以外の文字の直後（単語途中、例 `foo/`）では `null`（1.1, 1.2）。
 2. `slash-command-source`: query に対し label/keywords を大文字小文字無視で照合し、一致なしで `options: []`（2.1, 2.2, 2.4）。
 3. `slash-command-source`: `apply` 実行後に `/query` が消え対象要素が挿入され、1 回の undo で元の文書に戻る（3.2, 3.5）。
 4. `insertion-builders`: `lineMarkerInsertion('# ')` / `codeBlockInsertion` / `tableInsertion` が期待する文字列とカーソル位置を返す（3.3, 3.4, 5.2, 5.3）。
+5. `insertion-builders`: `from` が行頭のときは区切りなし、行の途中（先行する非空白テキストあり）のときは要素種別に応じた区切り（テーブル/コードブロックは空行、見出し/リスト/引用は単一改行）を前置してブロックを新しい行に挿入し、`cursorOffset` が付与分を加味する。特に**テーブルは先行段落の直後で空行を確保**し表として描画されることを検証（3.3, 3.6）。
 5. `resolve-slash-commands`: 各コマンドに label/description が解決され、未対応キーで既定言語にフォールバック（1.3, 7.1, 7.2）。
 
 （テストは markdown-utils の既存規約に倣い、`@codemirror/state` の `EditorState`/`EditorSelection` と `@codemirror/view` の `EditorView` を組んで `view.state.doc.toString()` と `view.state.selection` を検証。`// @vitest-environment jsdom`。）

@@ -44,7 +44,7 @@
 - CodeMirror tooltip API（`showTooltip` / `Tooltip`）の変更。
 - 操作集合（`PALETTE_OPERATIONS`）の構造変更。
 
-> **roadmap への反映推奨**: 本設計の結論として、editor-selection-palette は MVP で `editor-slash-command` に依存しない。roadmap の本スペックの依存を「Dependencies: none（umbrella 所属は維持）」に更新することを推奨（research.md「Design Decisions」参照）。
+> **roadmap 反映済み**: 本設計の結論として、editor-selection-palette は MVP で `editor-slash-command` に依存しない。roadmap の本スペックの依存は「Dependencies: none（umbrella 所属は維持）」に更新済み（`roadmap.md` の Specs 行・Shared seams に反映）。
 
 ## Architecture
 

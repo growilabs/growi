@@ -137,7 +137,7 @@ packages/editor/src/client/services-internal/slash-command/extended-elements/
 | 2.3 | undo 1 回で復元 | 基盤 source.apply（単一transaction） | — | 選択 |
 | 3.1 | 同一メニューに表示 | 合流点 | active command set | 起動 |
 | 3.2 | ラベル/キーワードで絞り込み | extended-element-commands（keywords） | 基盤 source の照合 | 絞り込み |
-| 3.3 | 行頭条件に従う | 基盤 source（再利用） | — | 起動 |
+| 3.3 | 起動条件（行頭/空白直後）に従う | 基盤 source（再利用） | — | 起動 |
 | 4.1 | ラベル/説明 i18n | extended-element-commands（i18nキー）+ 基盤 resolve | locale JSON | — |
 | 4.2 | 既定言語フォールバック | react-i18next（標準） | `fallbackLng` | — |
 | 5.1 | 挿入のみ・描画は既存機構 | extended-element-builders | — | — |

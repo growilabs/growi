@@ -27,8 +27,9 @@
 
 ### トリガー条件
 - **Context**: Req 1.1「行頭または空白直後の `/`」、Req 1.2「単語途中では発火しない」。
-- **Findings**: MVP のコマンドは全てブロックレベル要素（見出し・リスト・引用・コードブロック・テーブル）。行中（mid-line）の空白直後で発火させると、行頭プレフィックス挿入が行途中に入り壊れる。
-- **Implications**: MVP では **`/` が行頭（先頭空白のみ許容）にある場合のみ発火**に絞る。これは Req 1.1 の「行頭」ケースに合致し、Req 1.2（単語途中で非発火）も満たす。行中の空白直後ケースはインライン要素導入時の将来拡張とし、本スペックの範囲外とする。
+- **Findings**: MVP のコマンドは全てブロックレベル要素（見出し・リスト・引用・コードブロック・テーブル）。行中（mid-line）の空白直後で発火させても、挿入時にブロック要素を改行して新しい行に置けば行頭プレフィックスは壊れない。
+- **Implications（更新済み）**: **`/` の直前が行頭（先頭空白のみ）または空白文字のときに発火**し、空白以外の文字の直後（単語の途中）では発火しない（Req 1.1/1.2）。行の途中で発火した場合、挿入ビルダーが `from` の行頭判定を行い、**先行する非空白テキストがあればブロック要素の前に改行を付与**して新しい行に挿入する（Req 3.6）。インライン要素の挿入は将来拡張。
+  - ※当初は「行頭のみ」に絞っていたが、ユーザー要望（`あいうえお /command` でもパレットを出したい）により空白直後発火 + 行中は改行挿入に拡張。
 
 ### i18n（多言語ラベル）
 - **Context**: Req 7。コマンドのラベル/説明をユーザー言語で表示。
@@ -62,7 +63,7 @@
 
 ### Decision: 挿入は純粋ビルダー + 単一トランザクション
 - **Context**: undo 粒度（Req 3.5）と挿入の決定性（Req 3.2/3.3/3.4）。
-- **Selected Approach**: 各コマンドが `buildInsertion(view, from) => SlashInsertion`（`{ changes, selection }`）を提供。`apply` が `/query` 削除と挿入を 1 トランザクションに合成。
+- **Selected Approach**: 各コマンドが `buildInsertion(view, from) => SlashInsertion`（`{ insert, cursorOffset }`）を提供。`apply` が `/query` 置換（削除+挿入）を単一の change `{ from, to, insert }` として 1 トランザクションで発行。
 - **Trade-offs**: 既存 toggle 系 pure 関数の直接流用はしない（プレフィックス文字列の知識はツールバーと概念的に共有）。将来、共有ビルダーへ統合する余地あり。
 
 ## Risks & Mitigations
@@ -95,7 +96,7 @@
 
 | Req | 必要技術要素 | 既存資産 | ギャップ |
 |-----|-------------|----------|----------|
-| 1.1, 1.2 | 行頭 `/` トリガー検出 | emoji の CompletionContext パターン | **Missing**: 行頭限定判定（emoji は単語境界ベース） |
+| 1.1, 1.2 | 行頭/空白直後 `/` トリガー検出 | emoji の CompletionContext パターン | **Missing**: 直前が行頭/空白かの判定（単語途中は除外）。行中発火時はブロックを改行挿入（3.6） |
 | 1.3, 7.1, 7.2 | ラベル/説明の i18n 解決 | react-i18next、locale JSON | **Missing**: `slash_command.*` キー、解決関数。**Constraint**: 拡張は非React→フックで解決し注入 |
 | 1.4, 3.1, 4.1, 4.2 | ハイライト/矢印/Escape/blur | `@codemirror/autocomplete` 標準 | なし（標準挙動で充足） |
 | 2.1–2.4 | query フィルタ（label+keyword, 大小無視） | autocomplete の filter | **Constraint**: keyword 照合のため `filter:false`+自前照合 |
