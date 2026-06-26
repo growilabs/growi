@@ -4,7 +4,7 @@
 
 **Purpose**: PAT で認証した利用者が「自分が最近編集した内容」を全ページ横断・増分で取得できる2本の汎用 API を GROWI 本体に追加する。
 **Users**: 最初の利用者は外部取り込み処理（PrimaVista の agent-memory-ingest-growi）。ただし両 API は特定利用者に依存しない汎用部品とし、GROWI 自身や他の consumer も使える。
-**Impact**: 既存 apiv3 / revision モデル / PAT 認証基盤を変更せず拡張する。新規ルート2本・新規サービス・revisions への複合インデックス追加（migration）を加える。
+**Impact**: 既存 apiv3 / revision モデル / PAT 認証基盤を変更せず拡張する。新規ルート2本・新規サービス・revisions への複合インデックス追加（Mongoose の schema 宣言＋autoIndex で構築。専用 migration は設けない）を加える。
 
 ### Goals
 - 本人の変更を全ページ横断・期間指定・安定ページングで「版ペア参照＋メタ」として返す（差分本文は返さない）。
@@ -23,7 +23,7 @@
 - 2つの HTTP 契約: `GET /api/v3/revisions/changes`（Changes Index）と `POST /api/v3/revisions/diff`（Revision Diff）。
 - 「本人の変更の発見ロジック」: 著者横断クエリ、連続編集の run まとめ、baseline 算出、cursor ページング、閲覧可否/削除フラグ付け。
 - 「版ペア→unified diff」のサーバ側計算と、ペア単位の独立認可。
-- revisions への複合インデックス `{ author: 1, createdAt: -1 }` の追加（migration）。
+- revisions への複合インデックス `{ author: 1, createdAt: -1 }` の追加（schema 宣言＋autoIndex で構築。専用 migration は設けない）。
 - 既存 `revisions.js` の `/:id` ルートを24桁hex制約に狭める最小改修（新ルートが衝突しないため）。
 
 ### Out of Boundary
@@ -97,7 +97,7 @@ graph TB
 | Backend / Services | Express apiv3 (既存) | 2ルートの薄いアダプタ | 新規依存なし |
 | Backend / Logic | TypeScript service 層（新規） | 発見・run まとめ・差分・認可 | feature モジュール |
 | Diff | `diff` v5.0.0（既存依存） | `createPatch` で unified diff 生成 | サーバ側で新規利用 |
-| Data / Storage | MongoDB / Mongoose（既存） | revisions 読み取り＋複合インデックス追加 | `$setWindowFields` は 5.0+（GROWI 6.x で可） |
+| Data / Storage | MongoDB / Mongoose（既存） | revisions 読み取り＋複合インデックス追加（autoIndex） | `$setWindowFields` は 5.0+（GROWI 6.x で可） |
 
 ## File Structure Plan
 
@@ -121,8 +121,7 @@ apps/app/src/features/revision-diff/
 ### Modified Files
 - `apps/app/src/server/routes/apiv3/index.*` — 新ルータ2本を `/revisions` 配下にマウント。
 - `apps/app/src/server/routes/apiv3/revisions.js` — 既存 `/:id` を `/:id([0-9a-fA-F]{24})` に制約（1行）。これにより `/revisions/changes` が `/:id` に飲み込まれず新ルータへ届き、ルータ登録順への依存も消える。副作用は「非 ObjectId 1セグメントが 400→404」のみ。
-- `apps/app/src/migrations/<timestamp>-add-revision-author-createdat-index.js` — NEW migration: revisions に `{ author: 1, createdAt: -1 }` を作成。
-- `apps/app/src/server/models/revision.ts` — schema に同複合インデックス宣言を追加（migration と整合、コードと DB 定義の単一ソース化）。
+- `apps/app/src/server/models/revision.ts` — schema に複合インデックス `{ author: 1, createdAt: -1 }` を宣言。Mongoose autoIndex（既定 true）が起動時に構築する。専用 migration は設けない（GROWI は他インデックスも同方式で構築しており、それに揃える）。
 
 > 各ファイルは単一責務。`diff-core.ts`・`cursor.ts` はフレームワーク非依存の pure function（単体テスト容易）。route は薄いアダプタに徹し、ロジックは service に置く。
 
@@ -171,7 +170,7 @@ sequenceDiagram
 | 6.1–6.5 | 複数ページ版ペアの unified diff・文脈行・上限超過拒否 | RevisionDiffService, diff-core, diff route | `POST /revisions/diff`, RevisionDiffResult | ①→② |
 | 7.1–7.5 | ペア単位の独立認可（IDOR）・ページ整合・部分成功 | RevisionDiffService, Page bulk check | RevisionDiffResult(union) | ①→② |
 | 8.1–8.3 | PAT 認証・未認証/権限不足拒否 | changes route, diff route | accessTokenParser+loginRequired | — |
-| 9.1–9.2 | 大規模での実用性・バッチ上限 | revisions index(migration), ChangesIndexService, RevisionDiffService | `{author:1,createdAt:-1}`, MAX_PAIRS | — |
+| 9.1–9.2 | 大規模での実用性・バッチ上限 | revisions index(schema/autoIndex), ChangesIndexService, RevisionDiffService | `{author:1,createdAt:-1}`, MAX_PAIRS | — |
 | 10.1–10.4 | 遡及範囲の上限（窓の広さ＝走査量を運用で制御） | changes route, configManager | `app:revisionDiffMaxLookbackSeconds` | — |
 
 ## Components and Interfaces
@@ -183,7 +182,7 @@ sequenceDiagram
 | diff-core | pure util | createPatch ラップ | 6 | diff lib (P0) | Service |
 | cursor | pure util | keyset cursor encode/decode | 3 | — | Service |
 | changes route / diff route | apiv3 adapter | 認証・検証・service 委譲 | 1,6,8 | accessTokenParser (P0) | API |
-| revisions index migration | data | 著者横断クエリ最適化 | 9 | MongoDB (P0) | Batch |
+| revisions index (schema/autoIndex) | data | 著者横断クエリ最適化 | 9 | MongoDB (P0) | Foundation |
 
 ### service 層
 
@@ -327,7 +326,8 @@ export interface RevisionDiffResponse { results: RevisionDiffResult[]; }
 ### Logical / Physical Data Model（revisions index）
 - 追加インデックス: `{ author: 1, createdAt: -1 }`（複合）。著者横断＋時系列のクエリを支える。
 - 既存スキーマ・フィールドは不変更（読み取りのみ）。
-- 整合: migration で本番に作成し、schema 宣言でコードと一致させる。大規模コレクションでの作成負荷は migration 実行時に考慮（バックグラウンド作成）。
+- 構築方式: revision schema の `.index()` 宣言＋Mongoose autoIndex（既定 true、apps/app では無効化していない）で起動時に構築する。専用 migration は設けない（`pageId` など他のインデックスも同方式で構築しており、それに揃える。コードと DB 定義の単一ソースは schema 宣言）。
+- 大規模・共有 MongoDB 構成での構築負荷: 複数 app が単一 MongoDB を共有する構成（GROWI.cloud）では、アップグレード時に多数の起動時構築が一斉に走ると共有クラスタへ負荷が集中する。これを避けるため、アップグレード前にオペレーションで各テナントへ `db.revisions.createIndex({ author: 1, createdAt: -1 })` を（負荷を見ながら少数ずつ）事前作成する。createIndex は冪等なので、起動時の autoIndex は既存検知で no-op になる。
 
 ## Error Handling
 

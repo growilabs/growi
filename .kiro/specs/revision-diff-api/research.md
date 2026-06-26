@@ -78,7 +78,7 @@
 
 ## Risks & Mitigations
 - **run 検出とページングの相互作用** — ページング単位を run とし、完結 run のみ emit・cursor は to 版 `(createdAt,_id)`・既出 run 不変、と確定（design.md 参照）。他者割込み＋ページ境界フィクスチャの結合テストで担保（Req 4.1/4.2、3.3）。
-- **大規模 wiki での著者横断クエリ** — `{ author: 1, createdAt: -1 }` 複合インデックスを migration で追加。無いと全走査。
+- **大規模 wiki での著者横断クエリ** — `{ author: 1, createdAt: -1 }` 複合インデックスを schema 宣言＋autoIndex で構築（専用 migration は設けない）。無いと全走査。共有 MongoDB 構成（GROWI.cloud）では起動時の一斉構築を避けるためオペレーションで事前作成する。
 - **前版算出 N+1** — `$setWindowFields`（partition by pageId）で一括取得し回避。
 - **MongoDB バージョン** — `$setWindowFields` は 5.0+。GROWI 最小サポートは 6.0 と確認済みのため常に利用可（フォールバック案は不要として設計から除外）。
 - **閲覧不可・ゴミ箱エントリの情報漏れ** — path・現内容を返さず識別子＋フラグのみ（Req 5.2）。

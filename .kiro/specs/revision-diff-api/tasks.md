@@ -7,8 +7,9 @@
   - 完了状態: 型がエクスポートされ型チェックを通る
   - _Requirements: 1.2, 5.1, 6.1, 7.4_
 - [x] 1.2 revisions 複合インデックス追加
-  - migration(up/down) で `{ author: 1, createdAt: -1 }` を作成し、revision schema にも同インデックスを宣言（コードと DB 定義を一致）
-  - 完了状態: migration 適用後に revisions のインデックス一覧へ `{author:1,createdAt:-1}` が現れ、schema 側にも宣言済みであることを確認
+  - revision schema に `{ author: 1, createdAt: -1 }` を宣言し、Mongoose autoIndex（既定 true）で起動時に構築する。専用 migration は設けない（GROWI は `pageId` など他インデックスも autoIndex で構築しており、それに揃える）
+  - GROWI.cloud など複数 app が単一 MongoDB を共有する構成では、起動時の一斉構築を避けるため、アップグレード前にオペレーションで `db.revisions.createIndex({ author: 1, createdAt: -1 })` を事前作成する（createIndex は冪等なので起動時 autoIndex は no-op）
+  - 完了状態: アプリ起動後に revisions のインデックス一覧へ `{author:1,createdAt:-1}` が現れ（autoIndex 構築）、schema 側に宣言済みであることを確認
   - _Requirements: 9.1_
 - [x] 1.3 (P) diff-core（unified diff 生成）を TDD で実装
   - 先に失敗するユニットテストを書く: 通常差分／baseline 空(fromBody='')→全文追加／context 行数指定の反映
