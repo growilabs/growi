@@ -440,6 +440,46 @@
     "note_for_the_only_env_option": "GCS 설정은 환경 변수 값에 의해 제한됩니다.<br>이 설정을 변경하려면 환경 변수 <code>{{env}}</code>의 값을 false로 변경하거나 삭제하십시오.",
     "note_for_the_only_env_option_cloud": "GCS 설정은 GROWI.cloud 관리 화면에서 변경할 수 있습니다."
   },
+  "ai_settings": {
+    "ai_settings": "AI 설정",
+    "ai_enabled_label": "AI 기능 사용",
+    "provider_label": "공급자",
+    "provider_placeholder": "공급자를 선택하세요",
+    "api_key_label": "API 키",
+    "api_key_help": "AI 공급자 인증에 사용되는 API 키입니다.",
+    "api_key_provider_change_warning": "공급자를 변경했습니다. 새 API 키를 입력하지 않고 저장하면 이전에 저장된 API 키는 폐기됩니다.",
+    "api_key_set_placeholder": "(설정됨)",
+    "models_section_title": "Models",
+    "models_section_desc": "등록한 모델 중 하나를 기본값으로 선택합니다. 기본 모델은 채팅에서 사용자에게 처음 선택되어 있는 모델입니다.",
+    "model_label": "모델 이름",
+    "set_as_default": "기본값으로 설정",
+    "default_badge": "기본",
+    "add_model": "모델 추가",
+    "azure_add_deployment": "배포 추가",
+    "remove_model": "삭제",
+    "provider_options_label": "공급자 옵션 (JSON)",
+    "provider_options_doc_link": "작성 방법",
+    "provider_options_invalid_json": "유효하지 않은 JSON입니다",
+    "provider_options_error_at_line": "({{line}}번째 줄)",
+    "env_only_mode_notice": "AI 설정은 환경 변수로 고정되어 있어 여기에서 편집할 수 없습니다.",
+    "unconfigured_warning": "AI가 활성화되었지만 설정이 완료되지 않아 설정을 완료하기 전까지 작동하지 않습니다.",
+    "save": "업데이트",
+    "save_success": "AI 설정이 업데이트되었습니다.",
+    "common_settings_title": "공통 설정",
+    "azure_section_title": "Azure OpenAI 설정",
+    "azure_resource_name_label": "Azure 리소스 이름",
+    "azure_base_url_label": "Azure 기본 URL",
+    "azure_api_version_label": "Azure API 버전",
+    "azure_use_entra_id_label": "Microsoft Entra ID 사용",
+    "azure_entra_id_api_key_note": "Microsoft Entra ID를 사용하면 API 키는 사용되지 않습니다.",
+    "azure_entra_id_credential_note": "자격 증명은 Azure 환경에서 자동으로 확인됩니다:",
+    "azure_entra_id_managed_identity_note": "GROWI를 관리 ID 또는 워크로드 ID가 활성화된 Azure(VM, App Service, Container Apps, AKS)에서 실행하는 경우 여기에서 추가 설정이 필요하지 않습니다.",
+    "azure_entra_id_env_note": "그 외의 환경에서는 GROWI 서버에 다음 환경 변수를 설정하세요:",
+    "azure_resource_name_help": "표준 엔드포인트 https://<리소스-이름>.openai.azure.com 를 구성합니다. 일반(글로벌) Azure 클라우드에서는 이 값을 사용하세요. 기본 URL도 함께 설정하면 기본 URL이 우선합니다.",
+    "azure_base_url_help": "소버린 클라우드(예: Azure Government), API Management 게이트웨이 또는 프록시를 사용할 때 리소스 이름 대신 사용합니다. 둘 다 설정하면 이 값이 우선합니다.",
+    "azure_api_version_help": "선택 사항입니다. 비워 두면 기본값이 사용됩니다. 특정 배포가 특정 API 버전을 요구하는 경우에만 설정하세요.",
+    "azure_model_deployment_label": "배포 이름"
+  },
   "markdown_settings": {
     "markdown_settings": "마크다운 설정",
     "lineBreak_header": "줄 바꿈 설정",
@@ -1166,11 +1206,6 @@
   },
   "forbidden_page": {
     "do_not_have_admin_permission": "관리자 권한이 없는 사용자는 관리 화면에 접근할 수 없습니다."
-  },
-  "ai_integration": {
-    "ai_integration": "AI 통합",
-    "disable_mode_explanation": "현재 AI 통합이 비활성화되어 있습니다. 활성화하려면 <code>AI_ENABLED</code> 환경 변수와 필요한 추가 변수를 구성하십시오.<br><br>자세한 내용은 <a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>문서</a>를 참조하십시오.",
-    "ai_search_management": "AI 검색 관리"
   },
   "admin_navigation": {
     "section_users": "사용자",

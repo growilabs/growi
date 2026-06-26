@@ -17,8 +17,8 @@ import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-lo
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
-import { startCronIfEnabled as startOpenaiCronIfEnabled } from '~/features/openai/server/services/cron';
-import { initializeOpenaiService } from '~/features/openai/server/services/openai';
+import { isAiReady as resolveIsAiReady } from '~/features/mastra/server/services/is-ai-configured';
+import { modelConfigSync } from '~/features/mastra/server/services/model-config-sync';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
@@ -199,10 +199,6 @@ class Crowi {
 
   commentService: CommentServiceType | null;
 
-  openaiThreadDeletionCronService: unknown | null;
-
-  openaiVectorStoreFileDeletionCronService: unknown | null;
-
   tokens: unknown | null;
 
   models: ModelsMapDependentOnCrowi;
@@ -244,8 +240,6 @@ class Crowi {
     this.inAppNotificationService = null;
     this.activityService = null;
     this.commentService = null;
-    this.openaiThreadDeletionCronService = null;
-    this.openaiVectorStoreFileDeletionCronService = null;
 
     this.tokens = null;
 
@@ -311,9 +305,6 @@ class Crowi {
       // depends on passport service
       this.setupExternalAccountService(),
       this.setupExternalUserGroupSyncService(),
-
-      // depends on AttachmentService
-      this.setupOpenaiService(),
       // depends on pageService and activityService
       this.setupVaultFeature(),
     ]);
@@ -342,6 +333,18 @@ class Crowi {
     }
 
     return false;
+  }
+
+  // AI usability verdict (enabled && configured) for callers that cannot reach
+  // the module-level config singleton safely — notably getServerSideProps, which
+  // runs in the Next/Turbopack SSR realm where a directly-imported configManager
+  // is a separate, never-loaded instance ("Config is not loaded"). Exposing the
+  // verdict here makes it execute in this (Express) realm, where the singleton is
+  // bootstrapped and loaded, so SSR code only needs the crowi reference it already
+  // has. Mirrors the verdict the mastra route guard uses, keeping UI and API
+  // aligned (Req 7.4).
+  isAiReady(): boolean {
+    return resolveIsAiReady();
   }
 
   setConfig(config: Record<string, unknown>): void {
@@ -434,6 +437,8 @@ class Crowi {
       this.configManager.setS2sMessagingService(s2sMessagingService);
       // add as a message handler
       s2sMessagingService.addMessageHandler(this.configManager);
+      // discard the memoized Mastra model on remote AI settings updates
+      s2sMessagingService.addMessageHandler(modelConfigSync);
 
       this.s2sMessagingService = s2sMessagingService;
     }
@@ -471,7 +476,6 @@ class Crowi {
     }
     auditLogBulkExportJobCleanUpCronService.startCron();
 
-    startOpenaiCronIfEnabled();
     startAccessTokenCron();
 
     // News feed sync cron
@@ -928,10 +932,6 @@ class Crowi {
       this.s2sMessagingService,
       this.socketIoService,
     );
-  }
-
-  setupOpenaiService(): void {
-    initializeOpenaiService(this);
   }
 
   async setupVaultFeature(): Promise<void> {
