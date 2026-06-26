@@ -1,4 +1,4 @@
-import type { JSX, ReactNode } from 'react';
+import type { JSX } from 'react';
 import PrismAsyncLight from 'react-syntax-highlighter/dist/esm/prism-async-light.js';
 import oneDark from 'react-syntax-highlighter/dist/esm/styles/prism/one-dark.js';
 
@@ -14,7 +14,7 @@ export const PrismHighlighter = ({
   children,
 }: {
   lang: string;
-  children: ReactNode;
+  children: string | string[];
 }): JSX.Element => (
   <PrismAsyncLight PreTag="div" style={oneDark} language={lang}>
     {children}

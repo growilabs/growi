@@ -9,8 +9,9 @@ import {
   createVaultAdminRouterWithDeps,
   createVaultPageRouterWithDeps,
 } from '~/features/growi-vault/server';
+import { factory as mastraRouteFactory } from '~/features/mastra/server/routes';
+import { factory as adminAiSettingsRouteFactory } from '~/features/mastra/server/routes/admin-ai-settings';
 import newsRoute from '~/features/news/server/routes/news';
-import { factory as openaiRouteFactory } from '~/features/openai/server/routes';
 import { setup as setupPageBulkExport } from '~/features/page-bulk-export/server/routes/apiv3/page-bulk-export';
 import { changesRouteHandlersFactory } from '~/features/revision-diff/server/routes/changes';
 import { diffRouteHandlersFactory } from '~/features/revision-diff/server/routes/diff';
@@ -97,6 +98,7 @@ export const setup = (crowi, app) => {
     '/content-disposition-settings',
     setupContentDispositionSettings(crowi),
   );
+  routerForAdmin.use('/ai-settings', adminAiSettingsRouteFactory(crowi));
   routerForAdmin.use('/app-settings', setupAppSettings(crowi));
   routerForAdmin.use('/customize-setting', setupCustomizeSetting(crowi));
   routerForAdmin.use('/notification-setting', setupNotificationSetting(crowi));
@@ -233,7 +235,7 @@ export const setup = (crowi, app) => {
   router.use('/page-bulk-export', setupPageBulkExport(crowi));
   router.use('/audit-log-bulk-export', auditLogBulkExportRouteFactory(crowi));
 
-  router.use('/openai', openaiRouteFactory(crowi));
+  router.use('/mastra', mastraRouteFactory(crowi));
 
   router.use('/ai-tools', aiToolsRouteFactory(crowi));
 

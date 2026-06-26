@@ -28,6 +28,7 @@ import { deserializeSuperJSONProps } from './utils/superjson-ssr';
 
 import '~/styles/prebuilt/vendor.css';
 import '~/styles/style-app.scss';
+import '~/styles/tailwind.css';
 
 // register custom serializer
 registerTransformerForObjectId();

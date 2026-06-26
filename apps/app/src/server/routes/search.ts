@@ -120,7 +120,6 @@ export const setup = (crowi: Crowi, app) => {
       type = null,
       sort = null,
       order = null,
-      vector = null,
     } = req.query;
     let paginateOpts: { limit: number; offset: number };
 
@@ -154,7 +153,6 @@ export const setup = (crowi: Crowi, app) => {
       type,
       sort,
       order,
-      vector,
     };
 
     let searchResult: ISearchResult<unknown>;

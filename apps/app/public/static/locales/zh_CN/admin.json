@@ -449,6 +449,46 @@
     "note_for_the_only_env_option": "The GCS settings is limited by the value of environment variable.<br>To change this setting, please change to false or delete the value of the environment variable <code>{{env}}</code> .",
     "note_for_the_only_env_option_cloud": "GCS 设置可以从 GROWI.cloud 管理页面进行更改。"
   },
+  "ai_settings": {
+    "ai_settings": "AI 设置",
+    "ai_enabled_label": "启用 AI 功能",
+    "provider_label": "提供商",
+    "provider_placeholder": "请选择提供商",
+    "api_key_label": "API 密钥",
+    "api_key_help": "用于向 AI 提供商进行身份验证的 API 密钥。",
+    "api_key_provider_change_warning": "您更改了提供商。如果未输入新的 API 密钥就保存，先前保存的 API 密钥将被丢弃。",
+    "api_key_set_placeholder": "(已配置)",
+    "models_section_title": "Models",
+    "models_section_desc": "从已注册的模型中选择一个作为默认模型。默认模型是聊天中最初为用户选中的模型。",
+    "model_label": "模型名称",
+    "set_as_default": "设为默认",
+    "default_badge": "默认",
+    "add_model": "添加模型",
+    "azure_add_deployment": "添加部署",
+    "remove_model": "删除",
+    "provider_options_label": "提供商选项 (JSON)",
+    "provider_options_doc_link": "写法",
+    "provider_options_invalid_json": "无效的 JSON",
+    "provider_options_error_at_line": "（第 {{line}} 行）",
+    "env_only_mode_notice": "AI 设置由环境变量固定，无法在此处编辑。",
+    "unconfigured_warning": "AI 已启用但尚未完成配置，在完成设置之前将无法使用。",
+    "save": "更新",
+    "save_success": "AI 设置已成功更新。",
+    "common_settings_title": "通用设置",
+    "azure_section_title": "Azure OpenAI 设置",
+    "azure_resource_name_label": "Azure 资源名称",
+    "azure_base_url_label": "Azure 基础 URL",
+    "azure_api_version_label": "Azure API 版本",
+    "azure_use_entra_id_label": "使用 Microsoft Entra ID",
+    "azure_entra_id_api_key_note": "启用 Microsoft Entra ID 后，将不使用 API 密钥。",
+    "azure_entra_id_credential_note": "凭据会从 Azure 环境中自动解析：",
+    "azure_entra_id_managed_identity_note": "如果 GROWI 在启用了托管标识或工作负载标识的 Azure（VM、App Service、Container Apps、AKS）上运行，则此处无需额外配置。",
+    "azure_entra_id_env_note": "否则，请在 GROWI 服务器上设置以下环境变量：",
+    "azure_resource_name_help": "用于构建标准终结点 https://<资源名称>.openai.azure.com。在标准（全球）Azure 云中请使用此项。如果同时设置了基础 URL，则以基础 URL 优先。",
+    "azure_base_url_help": "在主权云（例如 Azure Government）、API 管理网关或代理的情况下，使用此项代替资源名称。两者都设置时以此项优先。",
+    "azure_api_version_help": "可选。留空则使用默认值。仅当特定部署需要特定 API 版本时才设置。",
+    "azure_model_deployment_label": "部署名称"
+  },
   "markdown_settings": {
     "markdown_settings": "Markdown设置",
     "lineBreak_header": "换行设置",
@@ -1175,11 +1215,6 @@
   },
   "forbidden_page": {
     "do_not_have_admin_permission": "没有管理权限的用户无法访问管理屏幕"
-  },
-  "ai_integration": {
-    "ai_integration": "AI 集成",
-    "disable_mode_explanation": "目前，AI 集成已被禁用。若要启用，请配置 <code>AI_ENABLED</code> 环境变量以及其他必要的变量。<br><br>详细信息请参考<a target='blank' rel='noopener noreferrer' href={{documentationUrl}}en/guide/features/ai-knowledge-assistant.html>文档</a>。",
-    "ai_search_management": "AI 搜索管理"
   },
   "admin_navigation": {
     "section_users": "用户",

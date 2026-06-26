@@ -31,7 +31,6 @@ import { pipeline } from 'stream/promises';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { isAiEnabled } from '~/features/openai/server/services';
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
@@ -1490,15 +1489,6 @@ class PageService implements IPageService {
         user,
         options,
       );
-
-      if (isAiEnabled()) {
-        const { getOpenaiService } = await import(
-          '~/features/openai/server/services/openai'
-        );
-        const openaiService = getOpenaiService();
-        // Do not await because communication with OpenAI takes time
-        openaiService?.createVectorStoreFileOnPageCreate([duplicatedTarget]);
-      }
     }
     this.pageEvent.emit('duplicate', page, user);
 
@@ -1809,30 +1799,10 @@ class PageService implements IPageService {
       }
     });
 
-    const duplicatedPages = await Page.insertMany(newPages, { ordered: false });
-    const duplicatedPageIds = duplicatedPages.map(
-      (duplicatedPage) => duplicatedPage._id,
-    );
+    await Page.insertMany(newPages, { ordered: false });
 
     await Revision.insertMany(newRevisions, { ordered: false });
     await this.duplicateTags(pageIdMapping);
-
-    const duplicatedPagesWithPopulatedToShowRevision: HydratedDocument<PageDocument>[] =
-      await Page.find({
-        _id: { $in: duplicatedPageIds },
-        grant: PageGrant.GRANT_PUBLIC,
-      }).populate('revision');
-
-    if (isAiEnabled()) {
-      const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
-      );
-      const openaiService = getOpenaiService();
-      // Do not await because communication with OpenAI takes time
-      openaiService?.createVectorStoreFileOnPageCreate(
-        duplicatedPagesWithPopulatedToShowRevision,
-      );
-    }
   }
 
   private async duplicateDescendantsV4(
@@ -2440,14 +2410,6 @@ class PageService implements IPageService {
 
       // Leave bookmarks without deleting -- 2024.05.17 Yuki Takei
     ]);
-
-    if (isAiEnabled()) {
-      const { getOpenaiService } = await import(
-        '~/features/openai/server/services/openai'
-      );
-      const openaiService = getOpenaiService();
-      await openaiService?.deleteVectorStoreFilesByPageIds(pageIds);
-    }
   }
 
   // delete multiple pages

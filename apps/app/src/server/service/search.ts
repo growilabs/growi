@@ -4,10 +4,6 @@ import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
-import {
-  isIncludeAiMenthion,
-  removeAiMenthion,
-} from '~/features/search/utils/ai';
 import { excludeUserPagesFromQuery } from '~/features/search/utils/disable-user-pages';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type {
@@ -51,8 +47,7 @@ const filterXssOptions = {
 const filterXss = new FilterXSS(filterXssOptions);
 
 const normalizeQueryString = (_queryString: string): string => {
-  let queryString = _queryString.trim();
-  queryString = removeAiMenthion(queryString).replace(/\s+/g, ' ');
+  const queryString = _queryString.trim().replace(/\s+/g, ' ');
 
   return queryString;
 };
@@ -430,10 +425,6 @@ class SearchService implements SearchQueryParser, SearchResolver {
     } catch (err) {
       logger.error('Error occurred while parseSearchQuery', err);
       throw err;
-    }
-
-    if (isIncludeAiMenthion(keyword)) {
-      searchOpts.vector = true;
     }
 
     let delegator: SearchDelegator;
