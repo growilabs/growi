@@ -11,6 +11,20 @@ export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
     result: {
       users: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
         updateLastLoginAt: {
           needs: { id: true },
           compute(user) {

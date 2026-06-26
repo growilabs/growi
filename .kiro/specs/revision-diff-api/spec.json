@@ -1,0 +1,22 @@
+{
+  "feature_name": "revision-diff-api",
+  "created_at": "2026-06-22T14:44:46Z",
+  "updated_at": "2026-06-23T09:11:02Z",
+  "language": "ja",
+  "phase": "tasks-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": true
+    },
+    "tasks": {
+      "generated": true,
+      "approved": true
+    }
+  },
+  "ready_for_implementation": true
+}

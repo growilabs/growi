@@ -65,7 +65,8 @@
     "news": "お知らせ",
     "notifications": "通知",
     "filter_all": "すべて",
-    "no_news": "ニュースはありません"
+    "no_news": "ニュースはありません",
+    "view_detail": "詳細を見る"
   },
   "personal_dropdown": {
     "home": "ホーム",

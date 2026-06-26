@@ -4,13 +4,17 @@ import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:feature:news:feed-parser');
 
+// Allow only http(s) URLs to block javascript:/data:/vbscript: vectors (XSS).
+// Items with disallowed schemes fail per-item validation and are dropped at parse time.
+const HTTP_URL_PATTERN = /^https?:\/\//i;
+
 const FeedItemSchema = z.object({
   id: z.string().min(1),
   type: z.string().optional(),
   emoji: z.string().optional(),
   title: z.record(z.string(), z.string()),
   body: z.record(z.string(), z.string()).optional(),
-  url: z.string().optional(),
+  url: z.string().regex(HTTP_URL_PATTERN).optional(),
   publishedAt: z.string().min(1),
   conditions: z
     .object({

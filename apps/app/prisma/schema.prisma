@@ -125,9 +125,9 @@ model comments {
   createdAt       DateTime @default(now())
   updatedAt       DateTime @updatedAt
 
-  page     pages      @relation(fields: [pageId], references: [id])
-  creator  users?     @relation(fields: [creatorId], references: [id])
-  revision revisions? @relation(fields: [revisionId], references: [id])
+  page     pages      @relation(fields: [pageId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  creator  users?     @relation(fields: [creatorId], references: [id], onDelete: NoAction, onUpdate: NoAction)
+  revision revisions? @relation(fields: [revisionId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   replyTo  comments?  @relation("CommentToReply", fields: [replyToId], references: [id], onDelete: NoAction, onUpdate: NoAction)
   replies  comments[] @relation("CommentToReply")
 
@@ -155,9 +155,9 @@ model externalaccounts {
   accountId    String
   createdAt    DateTime @default(now())
   providerType String
-  userId       String?  @map("user") @db.ObjectId
+  userId       String   @map("user") @db.ObjectId
 
-  user users? @relation(fields: [userId], references: [id])
+  user users @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([providerType, accountId], map: "providerType_1_accountId_1")
 }
