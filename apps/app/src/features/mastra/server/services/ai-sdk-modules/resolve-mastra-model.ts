@@ -7,19 +7,23 @@ import {
 import { configManager } from '~/server/service/config-manager';
 
 import { modelResolvers } from './llm-providers';
+import { resolveEffectiveModelId } from './llm-providers/config';
 
-// Memoize the resolved model so the native provider object is built once and
-// reused across calls. On misconfiguration the function throws (and does not
-// memoize), mirroring the existing OpenaiClientDelegator constructor pattern:
-// a config fix takes effect on the next call. Throwing — rather than returning
-// a sentinel — is safe for app boot because the agent calls this lazily (its
-// `model` is a function), so import-time construction never triggers it.
-let memoizedModel: MastraModelConfig | undefined;
+// Cache each resolved model so the native provider object is built once per
+// distinct (provider, effective model) and reused across requests. The Map
+// replaces the former single-slot memo because one app now serves many models;
+// caching per model preserves the Azure+Entra per-model token cache (the bearer
+// token provider is captured inside each cached MastraModelConfig, so it is not
+// rebuilt while that model stays cached — see research.md §7). On misconfiguration
+// the function throws (and caches nothing), so a config fix takes effect on the
+// next call without a restart.
+const resolvedModelCache = new Map<string, MastraModelConfig>();
 
-export const resolveMastraModel = (): MastraModelConfig => {
-  if (memoizedModel != null) {
-    return memoizedModel;
-  }
+export const resolveMastraModel = (modelId?: string): MastraModelConfig => {
+  // Resolve (and allow-list validate) the effective model id first. The client
+  // value is never trusted: out-of-allowlist / omitted ids fall back to the
+  // default; an empty allow-list throws (Req 4.1).
+  const effectiveModelId = resolveEffectiveModelId(modelId);
 
   // `ai:provider` has no default (undefined when unset), and env-loaded config is
   // not runtime-validated against the union, so re-validate here (Req 1.4).
@@ -30,19 +34,27 @@ export const resolveMastraModel = (): MastraModelConfig => {
     );
   }
 
-  // Generic dispatch: each provider resolves its own model from config. The
-  // chosen resolver throws on its own misconfiguration — not memoized, so a
-  // config fix takes effect on the next call.
-  memoizedModel = modelResolvers[provider]();
-  return memoizedModel;
+  const cacheKey = `${provider}:${effectiveModelId}`;
+  const cached = resolvedModelCache.get(cacheKey);
+  if (cached != null) {
+    return cached;
+  }
+
+  // Generic dispatch: each provider builds its own model from the effective
+  // model id + its own config. The chosen resolver throws on its own
+  // misconfiguration — nothing is cached in that case, so a config fix takes
+  // effect on the next call.
+  const model = modelResolvers[provider](effectiveModelId);
+  resolvedModelCache.set(cacheKey, model);
+  return model;
 };
 
-// Discard the memoized model so the next resolveMastraModel() rebuilds it from
-// the current config. Called when AI settings are saved (locally) or a
+// Discard every cached model so the next resolveMastraModel() rebuilds from the
+// current config. Called when AI settings are saved (locally) or a
 // `configUpdated` s2s message arrives (other instances), giving restart-free
-// reflection of updated settings (Req 2.4). Memoization itself is preserved —
+// reflection of updated settings (Req 1.2). Caching itself is preserved —
 // rebuilding on every request is undesirable because the Azure+Entra resolver
-// holds a per-instance token cache (see research.md §7).
+// holds a per-model token cache inside each cached object (see research.md §7).
 export const clearResolvedMastraModelCache = (): void => {
-  memoizedModel = undefined;
+  resolvedModelCache.clear();
 };

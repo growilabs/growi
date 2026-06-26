@@ -1,4 +1,5 @@
 import type { AiProvider } from './ai-provider';
+import type { AllowedModel } from './allowed-model';
 import type { AzureOpenaiConfig } from './azure-openai-config';
 
 /**
@@ -16,8 +17,7 @@ import type { AzureOpenaiConfig } from './azure-openai-config';
 export interface AiSettingsResponse {
   aiEnabled: boolean; // state of app:aiEnabled (7.1)
   provider?: AiProvider;
-  model?: string;
-  providerOptions?: string; // raw JSON string
+  allowedModels: AllowedModel[]; // per-model allow-list incl. isDefault; always an array (getAllowedModels() does `?? []`)
   azureOpenaiSettings: AzureOpenaiConfig;
   isApiKeySet: boolean; // the ai:apiKey value is never returned (5.2)
   useOnlyEnvVars: boolean; // when env:useOnlyEnvVars:ai is on, all fields are read-only (4.2)
@@ -28,10 +28,11 @@ export interface AiSettingsResponse {
  * PUT /_api/v3/ai-settings request.
  *
  * Semantics are FULL-STATE REPLACE, not PATCH: the admin form always submits the
- * complete set of values, so an omitted *clearable string* field is treated as
- * "cleared" — it is removed from the DB and the effective value falls back to its
- * env var (Req 4.4). A partial request that omits these will therefore RESET them;
- * an API client must send the complete set, not just the fields it wants changed.
+ * complete set of values, so an omitted *clearable* field (`provider`,
+ * `allowedModels`) is treated as "cleared" — it is removed from the DB and the
+ * effective value falls back to its env var (Req 4.4). A partial request that omits
+ * these will therefore RESET them; an API client must send the complete set, not
+ * just the fields it wants changed.
  *
  * `apiKey` is the one merge EXCEPTION (omit = keep the current value): an empty or
  * omitted value keeps the existing stored key; it is never cleared by this
@@ -52,22 +53,21 @@ export interface AiSettingsUpdateRequest {
   aiEnabled?: boolean; // merge: applied only when provided; omit = keep (7.1)
   provider?: AiProvider; // clearable: omit = reset to env default (4.4)
   apiKey?: string; // merge: empty/omitted keeps the existing value (5.x)
-  model?: string; // clearable: omit = reset to env default (4.4)
-  providerOptions?: string; // clearable: omit = reset to env default (4.4)
+  allowedModels?: AllowedModel[]; // full-state-replace; empty/omit = clear (resets ai:allowedModels to its env default)
   azureOpenaiSettings?: AzureOpenaiConfig; // full-state-replace object (see note above)
 }
 
 /**
- * The config keys this feature manages: the AI enablement toggle plus the 5
- * `ai:*` settings (the Azure OpenAI connection config is one `ai:azureOpenaiSettings`
- * JSON object). It mirrors the env-only group declared in config-definition
+ * The config keys this feature manages: the AI enablement toggle plus the 4
+ * `ai:*` settings (the per-model allow-list is one `ai:allowedModels` object array,
+ * and the Azure OpenAI connection config is one `ai:azureOpenaiSettings` JSON object).
+ * It mirrors the env-only group declared in config-definition
  * (`env:useOnlyEnvVars:ai`). Keep this in sync with that group.
  */
 export const AI_SETTING_KEYS = [
   'app:aiEnabled',
   'ai:provider',
   'ai:apiKey',
-  'ai:model',
-  'ai:providerOptions',
+  'ai:allowedModels',
   'ai:azureOpenaiSettings',
 ] as const;

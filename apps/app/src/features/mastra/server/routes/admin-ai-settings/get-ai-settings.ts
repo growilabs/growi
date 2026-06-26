@@ -36,12 +36,26 @@ const logger = loggerFactory(
  *           type: string
  *           enum: [openai, anthropic, google, azure-openai]
  *           description: The selected LLM provider (ai:provider).
- *         model:
- *           type: string
- *           description: The model id (or, for Azure OpenAI, the deployment name).
- *         providerOptions:
- *           type: string
- *           description: Provider-namespaced options as a raw JSON string.
+ *         allowedModels:
+ *           type: array
+ *           description: >-
+ *             The per-model allow-list (ai:allowedModels). Each entry carries its
+ *             model id (deployment name for Azure OpenAI), optional provider-namespaced
+ *             providerOptions, and an isDefault flag (exactly one entry is the default).
+ *             Always an array (an empty array when no models are configured).
+ *           items:
+ *             type: object
+ *             required: [modelId]
+ *             properties:
+ *               modelId:
+ *                 type: string
+ *                 description: The model id (or, for Azure OpenAI, the deployment name).
+ *               providerOptions:
+ *                 type: object
+ *                 description: Provider-namespaced options (e.g. {"openai":{...}}).
+ *               isDefault:
+ *                 type: boolean
+ *                 description: Whether this entry is the default model.
  *         azureOpenaiSettings:
  *           type: object
  *           description: >-
@@ -96,7 +110,9 @@ const logger = loggerFactory(
  *
  * Returns the currently effective AI configuration for the admin UI. Each value
  * comes from `configManager.getConfig`, which already resolves env-only mode, so
- * the response reflects what the runtime actually uses (Req 1.4, 4.4).
+ * the response reflects what the runtime actually uses (Req 1.4, 4.4). The
+ * per-model allow-list is returned as `allowedModels` (replacing the former single
+ * `model`/`providerOptions` fields), always an array (Req 1.1, 1.3).
  *
  * The `ai:apiKey` value is never returned — only `isApiKeySet` (Req 5.2). The
  * boolean flags let the UI decide editability (`useOnlyEnvVars`, Req 4.2), toggle
@@ -121,8 +137,12 @@ export const getAiSettings = (_req: Request, res: ApiV3Response): void => {
     const response: AiSettingsResponse = {
       aiEnabled: configManager.getConfig('app:aiEnabled'),
       provider: configManager.getConfig('ai:provider'),
-      model: configManager.getConfig('ai:model'),
-      providerOptions: configManager.getConfig('ai:providerOptions'),
+      // The per-model allow-list (incl. isDefault and providerOptions). `?? []`
+      // mirrors getAllowedModels(): an absent/cleared key resolves to the default
+      // empty array, so the response always carries an array (Req 1.1, 1.3). The
+      // admin UI is trusted, so providerOptions ARE exposed here (unlike the chat
+      // /models endpoint, which omits them).
+      allowedModels: configManager.getConfig('ai:allowedModels') ?? [],
       azureOpenaiSettings,
       isApiKeySet: apiKey != null && apiKey !== '',
       useOnlyEnvVars: configManager.getConfig('env:useOnlyEnvVars:ai') === true,
