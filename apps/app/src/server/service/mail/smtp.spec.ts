@@ -66,6 +66,21 @@ describe('createSMTPClient', () => {
       });
     });
 
+    it('should set connection and greeting timeouts so unreachable servers fail fast', () => {
+      mockConfigManager.getConfig.mockImplementation((key: string) => {
+        if (key === 'mail:smtpHost') return 'smtp.example.com';
+        if (key === 'mail:smtpPort') return 587;
+        return undefined;
+      });
+
+      const result = createSMTPClient(mockConfigManager);
+
+      expect(result).not.toBeNull();
+      const options = result?.options as Record<string, unknown>;
+      expect(options.connectionTimeout).toBeGreaterThan(0);
+      expect(options.greetingTimeout).toBeGreaterThan(0);
+    });
+
     it('should include auth when user and password are provided', () => {
       mockConfigManager.getConfig.mockImplementation((key: string) => {
         if (key === 'mail:smtpHost') return 'smtp.example.com';

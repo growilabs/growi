@@ -936,7 +936,7 @@
     "new_password": "New Password",
     "confirm_new_password": "Confirm the new password",
     "email_is_required": "Email is required",
-    "success_to_send_email": "Success to send email",
+    "email_sent_if_account_exists": "If an account with that email address exists, a password reset email has been sent.",
     "feature_is_unavailable": "This feature is unavailable.",
     "incorrect_token_or_expired_url": "The token is incorrect or the URL has expired. Please resend a password reset request via the link below.",
     "password_and_confirm_password_does_not_match": "Password and confirm password does not match",
