@@ -564,11 +564,11 @@ importers:
         specifier: ^12.35.0
         version: 12.38.0(react-dom@18.2.0(react@18.2.0))(react@18.2.0)
       multer:
-        specifier: ~1.4.0
-        version: 1.4.4
+        specifier: ~2.2.0
+        version: 2.2.0
       multer-autoreap:
         specifier: ^1.0.3
-        version: 1.0.3(express@4.21.0)(multer@1.4.4)
+        version: 1.0.3(express@4.21.0)(multer@2.2.0)
       mustache:
         specifier: ^4.2.0
         version: 4.2.0
@@ -1046,7 +1046,7 @@ importers:
         version: 7.0.2
       '@tsed/platform-express':
         specifier: '=8.5.0'
-        version: 8.5.0(@tsed/core@8.5.0)(@tsed/di@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/json-mapper@8.5.0(@tsed/core@8.5.0)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/logger@7.0.2)(@tsed/openspec@8.5.0)(@tsed/platform-http@8.5.0(@tsed/engines@8.5.0)(@tsed/logger@7.0.2)(@tsed/openspec@8.5.0))(@tsed/platform-views@8.5.0(@tsed/core@8.5.0)(@tsed/di@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/engines@8.5.0)(@tsed/exceptions@8.5.0(@tsed/core@8.5.0))(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0))(@types/multer@1.4.12)(body-parser@1.20.3)(cross-env@7.0.3)(multer@1.4.4)
+        version: 8.5.0(@tsed/core@8.5.0)(@tsed/di@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/json-mapper@8.5.0(@tsed/core@8.5.0)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/logger@7.0.2)(@tsed/openspec@8.5.0)(@tsed/platform-http@8.5.0(@tsed/engines@8.5.0)(@tsed/logger@7.0.2)(@tsed/openspec@8.5.0))(@tsed/platform-views@8.5.0(@tsed/core@8.5.0)(@tsed/di@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/engines@8.5.0)(@tsed/exceptions@8.5.0(@tsed/core@8.5.0))(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0))(@types/multer@1.4.12)(body-parser@1.20.3)(cross-env@7.0.3)(multer@2.2.0)
       '@tsed/platform-http':
         specifier: '=8.5.0'
         version: 8.5.0(@tsed/engines@8.5.0)(@tsed/logger@7.0.2)(@tsed/openspec@8.5.0)
@@ -6537,6 +6537,9 @@ packages:
   buffer-from@1.1.1:
     resolution: {integrity: sha512-MQcXEUbCKtEo7bhqEs6560Hyd4XaovZlO/k9V3hjVUF/zwW7KBVdSK4gIt/bzwS9MbR5qob+F5jusZsb0YQK2A==}
 
+  buffer-from@1.1.2:
+    resolution: {integrity: sha512-E+XQCRwSbaaiChtv6k6Dwgc+bx+Bs6vuKJHHl5kox/BaKbhiXzqQOwK4cO22yElGp2OCmjwVhT3HmxgyPGnJfQ==}
+
   buffer@4.9.2:
     resolution: {integrity: sha512-xq+q3SRMOxGivLhBNaUdC64hDTQwejJ+H0T/NB1XMtTVEwNTrfFF3gAxiyW0Bu/xWEGhjVKgUcMhCrUy2+uCWg==}
 
@@ -6560,6 +6563,10 @@ packages:
   busboy@0.2.14:
     resolution: {integrity: sha512-InWFDomvlkEj+xWLBfU3AvnbVYqeTWmQopiW0tWWEy5yehYm2YkGEc59sUmw/4ty5Zj/b0WHGs1LgecuBSBGrg==}
     engines: {node: '>=0.8.0'}
+
+  busboy@1.6.0:
+    resolution: {integrity: sha512-8SFQbg/0hQ9xy3UNTB0YEnsNBbWfhf7RtnzpL7TkBiTBRfrQ9Fxcnz7VJsleJpyp6rVLvXiuORqjlHi5q+PYuA==}
+    engines: {node: '>=10.16.0'}
 
   bytes@3.0.0:
     resolution: {integrity: sha512-pMhOfFDPiv9t5jjIXkHosWmkSyQbvsgEVNkz0ERHbuLh2T/7j4Mqqpz523Fe8MVY89KC6Sh/QfS2sM+SjgFDcw==}
@@ -6980,6 +6987,10 @@ packages:
   concat-stream@1.6.2:
     resolution: {integrity: sha512-27HBghJxjiZtIk3Ycvn/4kbJk/1uZuJFfuPEns6LaEvpvG1f0hTea8lilrouyo9mVc2GWdcEZ8OLoGmSADlrCw==}
     engines: {'0': node >= 0.8}
+
+  concat-stream@2.0.0:
+    resolution: {integrity: sha512-MWufYdFw53ccGjCA+Ol7XJYpAlW6/prSMzuPOTRnJGcGzuhLn4Scrz7qf6o8bROZ514ltazcIFJZevcfbo0x7A==}
+    engines: {'0': node >= 6.0}
 
   confbox@0.1.8:
     resolution: {integrity: sha512-RMtmw0iFkeR4YV+fUOSucriAQNb9g8zFR52MWCtl+cCZOFRNL6zeB395vPzFhEjjn4fMxXudmELnl/KF/WrK6w==}
@@ -10806,6 +10817,10 @@ packages:
     engines: {node: '>= 0.10.0'}
     deprecated: Multer 1.x is affected by CVE-2022-24434. This is fixed in v1.4.4-lts.1 which drops support for versions of Node.js before 6. Please upgrade to at least Node.js 6 and version 1.4.4-lts.1 of Multer. If you need support for older versions of Node.js, we are open to accepting patches that would fix the CVE on the main 1.x release line, whilst maintaining compatibility with Node.js 0.10.
 
+  multer@2.2.0:
+    resolution: {integrity: sha512-6rdyFg2kLrMh9Jee7/BMPuV9lEAd7lLW2YUpF9/YxR7njyoUwwQ0ZPh3TaIY50Sw6vlyD2HW3wGOkTS4P79xrQ==}
+    engines: {node: '>= 10.16.0'}
+
   mustache@4.2.0:
     resolution: {integrity: sha512-71ippSywq5Yb7/tVYyGbkBggbU8H3u5Rz56fH60jGFgr8uHwxs+aSKeqmluIVzM0m0kB7xQjKS6qPfd0b2ZoqQ==}
     hasBin: true
@@ -12102,6 +12117,10 @@ packages:
     resolution: {integrity: sha512-BViHy7LKeTz4oNnkcLJ+lVSL6vpiFeX6/d3oSH8zCW7UxP2onchk+vTGB143xuFjHS3deTgkKoXXymXqymiIdA==}
     engines: {node: '>= 6'}
 
+  readable-stream@3.6.2:
+    resolution: {integrity: sha512-9u/sniCrY3D5WdsERHzHE4G2YCXqoG5FTHUiCC4SIbr6XcLZBY05ya9EKjYek9O5xOAwjGq+1JdGBAS7Q9ScoA==}
+    engines: {node: '>= 6'}
+
   readdir-glob@1.1.3:
     resolution: {integrity: sha512-v05I2k7xN8zXvPD9N+z/uhXPaj0sUFCe2rcWZIpBsqxfP7xXFQ0tipAd/wjj1YxWyWtUS5IDJpOG82JKt2EAVA==}
 
@@ -12784,6 +12803,10 @@ packages:
     resolution: {integrity: sha512-jos8u++JKm0ARcSUTAZXOVC0mSox7Bhn6sBgty73P1f3JGf7yG2clTbBNHUdde/kdvP2FESam+vM6l8jBrNxHA==}
     engines: {node: '>=0.8.0'}
 
+  streamsearch@1.1.0:
+    resolution: {integrity: sha512-Mcc5wHehp9aXz1ax6bZUyY5afg9u2rv5cqQI3mRrYkGC8rW2hM02jWuwjtL++LS5qinSyhj2QfLyNsuc+VsExg==}
+    engines: {node: '>=10.0.0'}
+
   streamx@2.20.1:
     resolution: {integrity: sha512-uTa0mU6WUC65iUvzKH4X9hEdvSW7rbPxPtwfWiLMSj3qTdQbAiUboZTxauKfpFuGIGa1C2BYijZ7wgdUXICJhA==}
 
@@ -12829,6 +12852,9 @@ packages:
 
   string_decoder@1.2.0:
     resolution: {integrity: sha512-6YqyX6ZWEYguAxgZzHGL7SsCeGx3V2TtOTqZz1xSTSWnqsbWwbptafNyvf/ACquZUXV3DANr5BDIwNYe1mN42w==}
+
+  string_decoder@1.3.0:
+    resolution: {integrity: sha512-hkRX8U1WjJFd8LsDJ2yQ/wWWxaopEsABU1XfkM8A+j0+85JAGppt16cr1Whg6KIbb4okU6Mql6BOj+uup/wKeA==}
 
   stringify-entities@4.0.4:
     resolution: {integrity: sha512-IwfBptatlO+QCJUo19AqvrPNqlVMpW9YEL2LIVY+Rpv2qsjCGxaDLNRgeGsQWJhfItebuJhsGSLjaBbNSQ+ieg==}
@@ -19497,7 +19523,7 @@ snapshots:
     transitivePeerDependencies:
       - supports-color
 
-  '@tsed/platform-express@8.5.0(@tsed/core@8.5.0)(@tsed/di@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/json-mapper@8.5.0(@tsed/core@8.5.0)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/logger@7.0.2)(@tsed/openspec@8.5.0)(@tsed/platform-http@8.5.0(@tsed/engines@8.5.0)(@tsed/logger@7.0.2)(@tsed/openspec@8.5.0))(@tsed/platform-views@8.5.0(@tsed/core@8.5.0)(@tsed/di@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/engines@8.5.0)(@tsed/exceptions@8.5.0(@tsed/core@8.5.0))(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0))(@types/multer@1.4.12)(body-parser@1.20.3)(cross-env@7.0.3)(multer@1.4.4)':
+  '@tsed/platform-express@8.5.0(@tsed/core@8.5.0)(@tsed/di@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/json-mapper@8.5.0(@tsed/core@8.5.0)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/logger@7.0.2)(@tsed/openspec@8.5.0)(@tsed/platform-http@8.5.0(@tsed/engines@8.5.0)(@tsed/logger@7.0.2)(@tsed/openspec@8.5.0))(@tsed/platform-views@8.5.0(@tsed/core@8.5.0)(@tsed/di@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/engines@8.5.0)(@tsed/exceptions@8.5.0(@tsed/core@8.5.0))(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0))(@types/multer@1.4.12)(body-parser@1.20.3)(cross-env@7.0.3)(multer@2.2.0)':
     dependencies:
       '@tsed/core': 8.5.0
       '@tsed/di': 8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0))
@@ -19510,7 +19536,7 @@ snapshots:
       body-parser: 1.20.3
       cross-env: 7.0.3
       express: 4.21.0
-      multer: 1.4.4
+      multer: 2.2.0
       tslib: 2.7.0
     optionalDependencies:
       '@tsed/platform-views': 8.5.0(@tsed/core@8.5.0)(@tsed/di@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/logger@7.0.2)(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0)))(@tsed/engines@8.5.0)(@tsed/exceptions@8.5.0(@tsed/core@8.5.0))(@tsed/schema@8.5.0(@tsed/core@8.5.0)(@tsed/hooks@8.5.0)(@tsed/openspec@8.5.0))
@@ -20567,7 +20593,7 @@ snapshots:
   are-we-there-yet@3.0.1:
     dependencies:
       delegates: 1.0.0
-      readable-stream: 3.6.0
+      readable-stream: 3.6.2
 
   arg@4.1.3: {}
 
@@ -20964,6 +20990,8 @@ snapshots:
 
   buffer-from@1.1.1: {}
 
+  buffer-from@1.1.2: {}
+
   buffer@4.9.2:
     dependencies:
       base64-js: 1.5.1
@@ -20989,12 +21017,16 @@ snapshots:
 
   bufferstreams@3.0.0:
     dependencies:
-      readable-stream: 3.6.0
+      readable-stream: 3.6.2
 
   busboy@0.2.14:
     dependencies:
       dicer: 0.2.5
       readable-stream: 1.1.14
+
+  busboy@1.6.0:
+    dependencies:
+      streamsearch: 1.1.0
 
   bytes@3.0.0: {}
 
@@ -21474,9 +21506,16 @@ snapshots:
 
   concat-stream@1.6.2:
     dependencies:
-      buffer-from: 1.1.1
+      buffer-from: 1.1.2
       inherits: 2.0.4
       readable-stream: 2.3.8
+      typedarray: 0.0.6
+
+  concat-stream@2.0.0:
+    dependencies:
+      buffer-from: 1.1.2
+      inherits: 2.0.4
+      readable-stream: 3.6.2
       typedarray: 0.0.6
 
   confbox@0.1.8: {}
@@ -21661,7 +21700,7 @@ snapshots:
   crc32-stream@4.0.3:
     dependencies:
       crc-32: 1.2.2
-      readable-stream: 3.6.0
+      readable-stream: 3.6.2
 
   create-frame@1.0.0:
     dependencies:
@@ -24395,7 +24434,7 @@ snapshots:
   level-iterator-stream@4.0.2:
     dependencies:
       inherits: 2.0.4
-      readable-stream: 3.6.0
+      readable-stream: 3.6.2
       xtend: 4.0.2
     optional: true
 
@@ -25546,12 +25585,12 @@ snapshots:
 
   muggle-string@0.4.1: {}
 
-  multer-autoreap@1.0.3(express@4.21.0)(multer@1.4.4):
+  multer-autoreap@1.0.3(express@4.21.0)(multer@2.2.0):
     dependencies:
       debug: 3.2.7
       es6-object-assign: 1.1.0
       express: 4.21.0
-      multer: 1.4.4
+      multer: 2.2.0
       on-finished: 2.4.1
     transitivePeerDependencies:
       - supports-color
@@ -25566,6 +25605,13 @@ snapshots:
       on-finished: 2.4.1
       type-is: 1.6.18
       xtend: 4.0.2
+
+  multer@2.2.0:
+    dependencies:
+      append-field: 1.0.0
+      busboy: 1.6.0
+      concat-stream: 2.0.0
+      type-is: 1.6.18
 
   mustache@4.2.0: {}
 
@@ -27080,6 +27126,12 @@ snapshots:
       string_decoder: 1.2.0
       util-deprecate: 1.0.2
 
+  readable-stream@3.6.2:
+    dependencies:
+      inherits: 2.0.4
+      string_decoder: 1.3.0
+      util-deprecate: 1.0.2
+
   readdir-glob@1.1.3:
     dependencies:
       minimatch: 5.1.6
@@ -27980,6 +28032,8 @@ snapshots:
 
   streamsearch@0.1.2: {}
 
+  streamsearch@1.1.0: {}
+
   streamx@2.20.1:
     dependencies:
       fast-fifo: 1.3.2
@@ -28040,6 +28094,10 @@ snapshots:
   string_decoder@1.2.0:
     dependencies:
       safe-buffer: 5.1.2
+
+  string_decoder@1.3.0:
+    dependencies:
+      safe-buffer: 5.2.1
 
   stringify-entities@4.0.4:
     dependencies:
