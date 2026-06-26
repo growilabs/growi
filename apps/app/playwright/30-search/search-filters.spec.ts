@@ -16,19 +16,15 @@ import {
   FILTER_TEST_USER_B,
 } from '../utils/test-users';
 
-// Create all fixtures first, rebuild the index ONCE (beforeAll), then each test
-// only re-runs its search.
+// Create all fixtures, then rebuild the index ONCE (beforeAll); each test reruns
+// only its search.
 //
-// Why rebuild instead of auto-index + poll: auto-indexing is event-driven and
-// unordered (search.ts:registerUpdateEvent), so a page with >1 index event races
-// — e.g. an editor page created by A then edited by B can keep editor=A if the
-// create-write lands last, and a per-page poll never converges (~2/10 failures).
-// A rebuild re-reads the final DB state and is authoritative.
-//
-// Why ONE rebuild for all filters: it reindexes the WHOLE collection, and each
-// filter uses a unique stamp, so a single rebuild after every fixture exists
-// covers them all. `toPass` still polls (the rebuild runs async server-side);
-// the suite stays `describe.serial` so two rebuilds can't overlap.
+// Rebuild instead of auto-index + poll: auto-indexing is event-driven and unordered
+// (search.ts:registerUpdateEvent), so a page with >1 index event races (an A-created,
+// B-edited page can keep editor=A) and a per-page poll never converges. A rebuild
+// re-reads the final DB state and is authoritative. ONE rebuild covers every filter
+// (whole-collection reindex, unique stamp per filter); `toPass` still polls since the
+// rebuild is async, and `describe.serial` keeps two rebuilds from overlapping.
 
 test.describe
   .serial('search filters', () => {
@@ -74,12 +70,11 @@ test.describe
     const notAuthorByBPath = `${notAuthorPrefix}-by-b`;
     const createdNotAuthor: CreatedPage[] = [];
 
-    // Create EVERY fixture across all filters, then rebuild the index once. The
-    // rebuild must run after the last create/update so addAllPages reads the final
-    // DB state for every page.
+    // Create every fixture, then rebuild once — after the last create/update so
+    // the reindex reads the final DB state for every page.
     test.beforeAll(async ({ request, browser }) => {
       // Author/editor/group/negated-author fixtures need specific users; each
-      // context carries a different user's saved session.
+      // context carries a different user's session.
       const contextA = await browser.newContext({
         storageState: FILTER_TEST_USER_A.authFile,
       });
@@ -116,9 +111,9 @@ test.describe
           }),
         );
 
-        // editor: for updated pages we push both results — deletePagesCompletely
-        // dedups by pageId keeping the last entry, so the update's newer
-        // revisionId wins, while the create push covers a failure between the two.
+        // editor: push both create and update results — deletePagesCompletely
+        // dedups by pageId keeping the last, so the update's newer revisionId wins
+        // for teardown while the create push still covers a failure between the two.
 
         // Created by A, then last-edited by B -> last editor is B (target).
         const editorCreatedByA = await createPage(contextA.request, {
@@ -214,8 +209,8 @@ test.describe
     // Tear everything down once at the very end, so the suite stays re-runnable
     // (a leaked page collides on the next run's fixed path).
     test.afterAll(async ({ request, browser }) => {
-      // The group-restricted page can only be completely deleted by a group member
-      // (user A), not by a non-member admin — so delete the group pages as A.
+      // A group-restricted page can only be completely deleted by a group member,
+      // so delete the group pages as A (admin is a non-member).
       const contextA = await browser.newContext({
         storageState: FILTER_TEST_USER_A.authFile,
       });
@@ -295,6 +290,36 @@ test.describe
       // NEGATIVE: B-authored but A-edited absent -> proves editor: is the LAST editor
       await expect(
         list.getByRole('link', { name: `${editorStamp}-authored-by-b` }),
+      ).toHaveCount(0);
+    });
+
+    test('negated editor filter excludes pages last edited by that user', async ({
+      page,
+    }) => {
+      const list = page.getByTestId('search-result-list');
+
+      // Scope with the `editorStamp` keyword so a bare `-editor:` does not match
+      // the whole corpus; `-editor:<B>` must then drop only the B-edited page.
+      // POSITIVE: a page NOT last edited by B survives the negation
+      await expect(async () => {
+        await page.goto(
+          `/_search?q=${editorStamp} -editor:${FILTER_TEST_USER_B.username}`,
+        );
+        await expect(page.getByTestId('search-result-base')).toBeVisible();
+        await expect(
+          list.getByRole('link', { name: `${editorStamp}-only-a` }),
+        ).toBeVisible({ timeout: 3000 });
+      }).toPass({ timeout: 20_000 });
+
+      // POSITIVE: B-authored but A-edited page survives -> negation keys on the
+      // LAST editor, not the author
+      await expect(
+        list.getByRole('link', { name: `${editorStamp}-authored-by-b` }),
+      ).toBeVisible();
+
+      // NEGATIVE: the B-edited page is excluded by -editor:<B>
+      await expect(
+        list.getByRole('link', { name: `${editorStamp}-edited-by-b` }),
       ).toHaveCount(0);
     });
 
