@@ -5,7 +5,7 @@ import {
   isUserPage,
   isUsersTopPage,
 } from '@growi/core/dist/utils/page-path-utils';
-import mongoose, { type HydratedDocument } from 'mongoose';
+import mongoose, { type HydratedDocument, type Types } from 'mongoose';
 
 import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
 import type { IBookmarkInfo } from '~/interfaces/bookmark-info';
@@ -232,6 +232,10 @@ module.exports = (crowi: Crowi) => {
         HydratedDocument<BookmarkDocument>,
         BookmarkModel
       >('Bookmark');
+      const Page: PageModel = mongoose.model<
+        HydratedDocument<PageDocument>,
+        PageModel
+      >('Page');
 
       try {
         const bookmarkIdsInFolders = await BookmarkFolder.distinct(
@@ -253,18 +257,34 @@ module.exports = (crowi: Crowi) => {
           })
           .exec();
 
+        const bookmarkedPageIds = userRootBookmarks
+          .map((b) => b.page?._id)
+          .filter((id): id is Types.ObjectId => id != null);
+        const viewablePages = await Page.findByIdsAndViewer(
+          bookmarkedPageIds,
+          req.user,
+          null,
+        );
+        const viewableIdSet = new Set(
+          viewablePages.map((p) => p._id.toString()),
+        );
+
         const disabledUserPage = configManager.getConfig(
           'security:disableUserPages',
         );
 
-        const filteredBookmarks = disabledUserPage
-          ? userRootBookmarks.filter(
-              (bookmark) =>
-                bookmark.page != null &&
-                !isUserPage(bookmark.page.path) &&
-                !isUsersTopPage(bookmark.page.path),
-            )
-          : userRootBookmarks;
+        const filteredBookmarks = userRootBookmarks.filter((bookmark) => {
+          if (bookmark.page == null) return false;
+          if (bookmark.page._id == null) return false;
+          if (!viewableIdSet.has(bookmark.page._id.toString())) return false;
+          if (
+            disabledUserPage &&
+            (isUserPage(bookmark.page.path) ||
+              isUsersTopPage(bookmark.page.path))
+          )
+            return false;
+          return true;
+        });
 
         // serialize Bookmark
         const serializedUserRootBookmarks = filteredBookmarks.map((bookmark) =>
