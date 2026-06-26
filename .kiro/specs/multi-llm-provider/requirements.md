@@ -29,14 +29,14 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 
 - **In scope（本仕様で扱う）**
   - mastra チャットエージェント（`growiAgent`）が使用する LLM ベンダーを OpenAI / Anthropic / Google / Azure OpenAI から選択する仕組み
-  - ベンダー名・API キー・モデルの環境変数による接続設定（ベンダー未指定時は既定 OpenAI。モデルは任意指定で、未指定時は単一の既定モデル＝既定ベンダー OpenAI 向け）
+  - ベンダー名・API キー・モデルの環境変数による接続設定（ベンダー未指定時は既定 OpenAI。モデルは任意指定で、未指定時は単一の既定モデル＝既定ベンダー OpenAI 向け）<br>本実装に整合（mastra-multi-model-chat）: 単一 `ai:model` は許可モデル集合 `ai:allowedModels`（既定は `isDefault` エントリ、env `AI_ALLOWED_MODELS`）へ統合・廃止。ベンダー（プロバイダ）/ API キーは引き続き単一。
   - Azure OpenAI 固有の接続設定（リソース名 or ベース URL の両対応、任意の API バージョン）の環境変数による指定（Requirement 7）
   - Azure OpenAI の認証方式の選択（API キー / Microsoft Entra ID）の環境変数による指定（Requirement 8）
-  - LLM provider options（reasoning 等）の環境変数（単一 JSON）による指定と mastra チャット呼び出しへの適用
+  - LLM provider options（reasoning 等）の環境変数（単一 JSON）による指定と mastra チャット呼び出しへの適用<br>本実装に整合（mastra-multi-model-chat）: グローバル単一の provider options は廃止され、許可モデルごと（`ai:allowedModels` の各エントリ）に保持・使用モデル単位で解決される。
   - 1 アプリインスタンス = 単一ベンダーの制約
   - ベンダー設定の不備（未指定・対応外ベンダー名・必須設定欠落）時の挙動（mastra チャットエージェント無効化＋ログ出力＋アプリ継続）
 - **Out of scope（本仕様で扱わない）**
-  - 同一アプリ内での複数ベンダーの同時利用（ユーザー／リクエスト単位の切り替えを含む）
+  - 同一アプリ内での複数**ベンダー**の同時利用、およびベンダー（プロバイダ）単位のユーザー／リクエスト切り替え。<br>本実装に整合（mastra-multi-model-chat）: **モデル単位の per-request 選択は mastra-multi-model-chat spec で扱う（同一プロバイダ内）。ベンダー（プロバイダ）切替は引き続き本 spec の対象外。**
   - mastra チャットエージェント以外の LLM 利用機能（ページパス提案 `suggest-path` など）のベンダー切り替え。これらは現行のプロバイダー設定のまま据え置く
   - ベンダー・API キー・モデルを設定するための管理画面 UI（環境変数のみで構成する）
   - OpenAI / Anthropic / Google / Azure OpenAI 以外のベンダーの追加
@@ -110,7 +110,7 @@ GROWI の mastra チャットエージェント（`growiAgent`）は、現在 Op
 3. While リソース名とベース URL の両方が指定されたとき, the system shall ベース URL 方式を優先する（AI SDK の排他契約に従う）
 4. If Azure OpenAI が選択され, かつリソース名・ベース URL のいずれも指定されていないとき, the system shall それを設定不備として扱い（使用時に失敗）, 不備の内容を特定できるエラーをログに出力する（API キー値は含めない）
 5. The system shall Azure の API バージョンを任意の環境変数で指定できるようにし, 未指定時は AI SDK の既定バージョンを使用する
-6. When ベンダーが Azure OpenAI のとき, the system shall モデル設定（`AI_MODEL`）を Azure の**デプロイ名**として解釈する（OpenAI のモデル ID ではない）
+6. When ベンダーが Azure OpenAI のとき, the system shall モデル設定（`AI_MODEL`）を Azure の**デプロイ名**として解釈する（OpenAI のモデル ID ではない）<br>本実装に整合（mastra-multi-model-chat）: `ai:model` / `AI_MODEL` は `ai:allowedModels`（env `AI_ALLOWED_MODELS`）へ統合・廃止。Azure ではこの許可リストの各エントリの `model` 値がデプロイ名を指す。
 
 ### Requirement 8: Azure OpenAI の認証方式（API キー / Microsoft Entra ID）
 **Objective:** As a Azure OpenAI を利用する運用者, I want API キーの代わりに Microsoft Entra ID（マネージド ID）で認証できる, so that 長期シークレットを保管せずに Azure の推奨方式で安全に接続できる

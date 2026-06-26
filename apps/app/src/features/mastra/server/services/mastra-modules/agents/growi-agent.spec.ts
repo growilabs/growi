@@ -1,5 +1,8 @@
 import type { MastraModelConfig } from '@mastra/core/llm';
+import type { RequestContext } from '@mastra/core/request-context';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+
+import type { MastraRequestContextShape } from '../types/request-context';
 
 // Mock heavy collaborators that the agent module pulls in transitively.
 //
@@ -63,17 +66,19 @@ vi.mock('../memory', () => ({
 
 // The resolver is the single seam this module depends on for model supply.
 // A hoisted mutable holder lets each test choose the resolution that
-// `resolveMastraModel()` returns, while the mock itself stays declared once.
+// `resolveMastraModel(modelId?)` returns, while the mock itself stays declared
+// once. The mock mirrors the real signature (`modelId?: string`) so the spec
+// can assert which model id the agent forwarded.
 // Because growi-agent.ts resolves the model lazily inside its `model()`
 // function (not at import time), changing this return value between tests is
 // enough to vary behavior — no module reset / re-import is required (and
 // re-importing would re-register transitive Mongoose models and throw).
 const resolverMock = vi.hoisted(() => ({
-  fn: vi.fn<() => MastraModelConfig>(),
+  fn: vi.fn<(modelId?: string) => MastraModelConfig>(),
 }));
 
 vi.mock('../../ai-sdk-modules/resolve-mastra-model', () => ({
-  resolveMastraModel: () => resolverMock.fn(),
+  resolveMastraModel: (modelId?: string) => resolverMock.fn(modelId),
 }));
 
 // A sentinel model. The agent must hand back exactly this object from its
@@ -94,8 +99,14 @@ import { growiAgent } from './growi-agent';
 // Snapshot whether the resolver was touched during the import above.
 const resolverCalledDuringImport = resolverMock.fn.mock.calls.length > 0;
 
-// Narrow the captured config's `model` to a callable without an assertion.
-const getModelFn = (): (() => MastraModelConfig) => {
+// The dynamic model function Mastra invokes per request. It receives the
+// request-scoped `{ requestContext }` and returns the resolved model.
+type ModelFnArg = { requestContext: RequestContext<MastraRequestContextShape> };
+type ModelFn = (arg: ModelFnArg) => MastraModelConfig;
+
+// Narrow the captured config's `model` to the dynamic function without an
+// assertion of its return value — only the callable shape is asserted.
+const getModelFn = (): ModelFn => {
   const config =
     'getCapturedConfig' in growiAgent &&
     typeof growiAgent.getCapturedConfig === 'function'
@@ -105,7 +116,18 @@ const getModelFn = (): (() => MastraModelConfig) => {
   if (typeof model !== 'function') {
     throw new Error('Expected the agent model to be a dynamic function');
   }
-  return model as () => MastraModelConfig;
+  return model as ModelFn;
+};
+
+// Build the `{ requestContext }` argument the agent's model function expects,
+// with `requestContext.get('modelId')` returning the supplied value. A typed
+// stub (no `as any`) keeps the fake aligned with RequestContext's surface; only
+// `get` is exercised by the model function.
+const makeModelFnArg = (modelId?: string): ModelFnArg => {
+  const requestContext = {
+    get: (key: string): unknown => (key === 'modelId' ? modelId : undefined),
+  } as unknown as RequestContext<MastraRequestContextShape>;
+  return { requestContext };
 };
 
 describe('growiAgent', () => {
@@ -131,7 +153,33 @@ describe('growiAgent', () => {
 
       // The dynamic function forwards exactly the resolver's model (Req 3.3,
       // 5.1) — a single provider's single model, resolved at use time.
-      expect(modelFn()).toBe(sentinelModel);
+      expect(modelFn(makeModelFnArg())).toBe(sentinelModel);
+    });
+  });
+
+  describe('per-request model selection (requirements 4.1, 4.3)', () => {
+    it('forwards the requestContext modelId to the resolver', () => {
+      resolverMock.fn.mockReturnValue(sentinelModel);
+
+      const modelFn = getModelFn();
+      modelFn(makeModelFnArg('gpt-4o-mini'));
+
+      // The observable contract: the model id selected for this request
+      // (carried on requestContext) is the id the resolver is asked to
+      // resolve — so a per-request selection actually reaches model
+      // resolution (Req 4.1).
+      expect(resolverMock.fn).toHaveBeenCalledWith('gpt-4o-mini');
+    });
+
+    it('passes undefined to the resolver when no modelId is set, so the default is used', () => {
+      resolverMock.fn.mockReturnValue(sentinelModel);
+
+      const modelFn = getModelFn();
+      modelFn(makeModelFnArg());
+
+      // When the request carries no modelId the resolver is invoked with
+      // undefined, which it resolves to the configured default (Req 4.3).
+      expect(resolverMock.fn).toHaveBeenCalledWith(undefined);
     });
   });
 
@@ -152,7 +200,7 @@ describe('growiAgent', () => {
       // Calling the dynamic function in a misconfigured state throws (Req 4.1).
       let thrown: unknown;
       try {
-        modelFn();
+        modelFn(makeModelFnArg());
       } catch (e) {
         thrown = e;
       }

@@ -31,8 +31,7 @@ const buildResponse = <T>(data: T): AxiosResponse<T> => ({
 const baseSettings: AiSettingsResponse = {
   aiEnabled: true,
   provider: 'openai',
-  model: 'gpt-4o',
-  providerOptions: undefined,
+  allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
   azureOpenaiSettings: {},
   isApiKeySet: true,
   useOnlyEnvVars: false,
@@ -80,7 +79,7 @@ describe('useAiSettings', () => {
       const body: AiSettingsUpdateRequest = {
         aiEnabled: true,
         provider: 'anthropic',
-        model: 'claude-3-5-sonnet',
+        allowedModels: [{ modelId: 'claude-3-5-sonnet', isDefault: true }],
       };
 
       // Act
@@ -105,7 +104,7 @@ describe('useAiSettings', () => {
       const updatedSettings: AiSettingsResponse = {
         ...baseSettings,
         provider: 'google',
-        model: 'gemini-1.5-pro',
+        allowedModels: [{ modelId: 'gemini-1.5-pro', isDefault: true }],
       };
       mockedApiv3Get.mockResolvedValue(buildResponse(updatedSettings));
 

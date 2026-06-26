@@ -54,8 +54,7 @@ import { AiSettings } from './AiSettings';
 const baseSettings: AiSettingsResponse = {
   aiEnabled: true,
   provider: 'openai',
-  model: 'gpt-4o',
-  providerOptions: undefined,
+  allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
   azureOpenaiSettings: {},
   isApiKeySet: true,
   useOnlyEnvVars: false,
@@ -88,15 +87,16 @@ describe('AiSettings', () => {
       // Arrange
       setData({
         provider: 'openai',
-        model: 'gpt-4o',
+        allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
       });
 
       // Act
       render(<AiSettings />);
       await submitForm();
 
-      // Assert: aiEnabled is always sent; the azure object is forwarded as-is
-      // (seeded to empty strings / false from the unset response).
+      // Assert: aiEnabled is always sent; the allowed-models list and the azure
+      // object are forwarded (seeded to empty strings / false from the unset
+      // response).
       await waitFor(() => {
         expect(save).toHaveBeenCalledTimes(1);
       });
@@ -104,7 +104,7 @@ describe('AiSettings', () => {
       expect(body).toMatchObject({
         aiEnabled: true,
         provider: 'openai',
-        model: 'gpt-4o',
+        allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
         azureOpenaiSettings: {
           resourceName: '',
           baseURL: '',
@@ -166,9 +166,12 @@ describe('AiSettings', () => {
 
     it('reflects edited fields in the persisted request body', async () => {
       // Arrange
-      setData({ provider: 'openai', model: 'gpt-4o' });
+      setData({
+        provider: 'openai',
+        allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
+      });
 
-      // Act
+      // Act: edit the (single) allowed-model row's model id.
       const user = userEvent.setup();
       render(<AiSettings />);
       const modelInput = screen.getByLabelText('ai_settings.model_label');
@@ -180,7 +183,9 @@ describe('AiSettings', () => {
       await waitFor(() => {
         expect(save).toHaveBeenCalledTimes(1);
       });
-      expect(save.mock.calls[0][0]).toMatchObject({ model: 'gpt-4o-mini' });
+      expect(save.mock.calls[0][0]).toMatchObject({
+        allowedModels: [{ modelId: 'gpt-4o-mini', isDefault: true }],
+      });
     });
 
     it('shows a success toast after a successful save', async () => {
@@ -203,7 +208,7 @@ describe('AiSettings', () => {
   describe('save failure (R6.3)', () => {
     it('shows an error toast and retains the in-progress input', async () => {
       // Arrange
-      setData({ model: 'gpt-4o' });
+      setData({ allowedModels: [{ modelId: 'gpt-4o', isDefault: true }] });
       save.mockRejectedValue(new Error('update failed'));
 
       // Act
