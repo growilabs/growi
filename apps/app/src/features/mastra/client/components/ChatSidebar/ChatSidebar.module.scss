@@ -4,6 +4,15 @@
   z-index: bs.$zindex-fixed + 2;
   width: 100%;
 
+  // When a Radix popover (e.g. the model-select dropdown) opens, react-remove-scroll
+  // locks the body (overflow: hidden) and removes the page scrollbar, which widens the
+  // viewport. A position-fixed, right-anchored panel would then jump right by the
+  // scrollbar width. react-remove-scroll publishes that width as
+  // `--removed-body-scroll-bar-size` on <body> while locked, so mirror it as a
+  // right margin to keep the sidebar visually fixed. It resolves to 0 when nothing
+  // is locked, so there is no effect outside the lock (or with overlay scrollbars).
+  margin-right: var(--removed-body-scroll-bar-size, 0px);
+
   @include bs.media-breakpoint-up(sm) {
     width: 500px;
   }

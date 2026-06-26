@@ -5,7 +5,6 @@ import { useFormContext } from 'react-hook-form';
 import { Alert, FormGroup, FormText, Input, Label } from 'reactstrap';
 
 import type { AiSettingsFormValues } from './ai-settings-form-values';
-import { ModelField } from './ModelField';
 import { registerToInputProps } from './register-to-input-props';
 
 export interface AzureOpenaiSettingsProps {
@@ -17,10 +16,13 @@ export interface AzureOpenaiSettingsProps {
  * Register-based form for the Azure OpenAI connection settings (3.1).
  *
  * Reads/writes the shared react-hook-form context owned by `AiSettings`. Renders
- * nothing unless the watched `provider === 'azure-openai'` (3.2). When
- * `azureOpenaiSettings.useEntraId` is on, surfaces a note that the apiKey is not used
- * (3.3) — the apiKey field itself lives in `ProviderCommonSettings`, which also
- * labels the model field as the Azure deployment name for this provider (3.4).
+ * nothing unless the watched `provider === 'azure-openai'` (3.2). This section now
+ * holds only the Azure *connection* settings (resource name / base URL / API
+ * version / Entra ID); the deployment-name field moved into the shared
+ * `AllowedModelsField` (hosted by `ProviderCommonSettings`), which labels it as
+ * the deployment name for this provider. When `azureOpenaiSettings.useEntraId` is
+ * on, surfaces a note that the apiKey is not used (3.3) — the apiKey field itself
+ * lives in `ProviderCommonSettings`.
  *
  * Azure is the most configuration-heavy provider (resource name vs. base URL,
  * optional API version, two auth methods), so each field carries inline help and
@@ -50,14 +52,6 @@ export const AzureOpenaiSettings = (
       <h2 className="border-bottom my-4 admin-setting-header">
         {t('ai_settings.azure_section_title')}
       </h2>
-
-      {/* `ai:model` carries the Azure *deployment name* for this provider, so the
-          shared model field is rendered here (labelled accordingly) rather than in
-          the provider-agnostic common settings. */}
-      <ModelField
-        labelKey="ai_settings.azure_model_deployment_label"
-        disabled={disabled}
-      />
 
       <FormGroup className="mb-3">
         <Label for={resourceNameId}>

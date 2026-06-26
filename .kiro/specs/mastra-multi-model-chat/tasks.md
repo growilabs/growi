@@ -1,0 +1,112 @@
+# Implementation Plan
+
+- [x] 1. Foundation: 共有型・config・ストレージ定義
+- [x] 1.1 共有型と AI 設定 DTO の更新
+  - `AllowedModel { modelId; providerOptions?; isDefault? }` と `ModelProviderOptions` を新規定義（interfaces）
+  - `IUserUISettings` に `aiChatSelectedModelId?: string` を追加
+  - `AiSettingsResponse`/`AiSettingsUpdateRequest` から `model`/`providerOptions` を除去し `allowedModels` を追加、`AI_SETTING_KEYS` を `[app:aiEnabled, ai:provider, ai:apiKey, ai:allowedModels, ai:azureOpenaiSettings]` に
+  - 完了状態: 型が tsc を通り、`AI_SETTING_KEYS` の spec が新キー集合を期待
+  - _Requirements: 1.1, 2.1_
+- [x] 1.2 config キーと UserUISettings スキーマの定義
+  - `ai:allowedModels` をオブジェクト配列キーとして追加（`envVarName: AI_ALLOWED_MODELS`, `defaultValue: []`）
+  - env-only グループ `env:useOnlyEnvVars:ai` の `targetKeys` を更新: `ai:allowedModels` を追加し、削除する `ai:model` / `ai:providerOptions` を**除去**（dangling 参照を残さない）
+  - `ai:model` / `ai:providerOptions` の config 定義を削除（env も読まれなくなる）
+  - `UserUISettings` スキーマに `aiChatSelectedModelId` を追加
+  - 完了状態: `configManager.getConfig('ai:allowedModels')` が配列を返し、旧キーは未定義。env-only `targetKeys` が削除済みキーを参照せず `ai:allowedModels` を含む。`UserUISettings` に新フィールドが保存できる
+  - _Requirements: 1.1, 2.1, 3.6_
+
+- [x] 2. Core: サーバのモデル解決
+- [x] 2.1 許可リスト・既定・実効モデルの解決
+  - `getAllowedModels()`（`Array.isArray(value) ? value : []`、合成なし）、`getDefaultModelId()`（`find(isDefault) ?? 先頭`）、`resolveEffectiveModelId(modelId?)`（許可内ならそれ・無ければ既定・空なら throw）を実装し `requireModel()` を撤去。許可リスト所属判定は共有純粋述語 `isModelInAllowList(modelId, allowedModels)` に集約（get-models ルートと共用）
+  - 完了状態: ユニットテストで 許可内 / 許可外→既定 / 未指定→既定 / 空→throw が通る
+  - _Requirements: 4.1, 4.2, 4.3, 1.3_
+  - _Boundary: ai-sdk-modules_
+- [x] 2.2 provider resolver の modelId 引数化と Map キャッシュ
+  - `modelResolvers` を `Record<AiProvider, (modelId: string) => MastraModelConfig>` に変更、各 provider resolver（openai/anthropic/google/azure-openai）を modelId 引数受け取りに。`resolveMastraModel(modelId?)` を `${provider}:${effective}` キーの Map キャッシュに、`clearResolvedMastraModelCache()` は Map 全消去
+  - 完了状態: 同一 modelId は 1 回だけ構築（キャッシュ）され、cache clear で再構築。Azure+Entra のトークンプロバイダがモデルごとに保持される
+  - _Requirements: 4.1, 1.2_
+  - _Boundary: ai-sdk-modules_
+  - _Depends: 2.1_
+- [x] 2.3 provider オプションのモデル単位解決
+  - `getProviderOptionsForModel(effectiveModelId: string)` を**既に解決済みの実効モデル ID** のエントリから引く純粋ルックアップとして実装（無ければ `{}`、自前の丸め/検証は持たない）。グローバル一律適用は廃止
+  - 完了状態: ユニットテストで モデル別 options / 未設定→`{}` / エントリ無し→`{}` が通る
+  - _Requirements: 2.2, 2.5, 4.4_
+  - _Boundary: ai-sdk-modules_
+  - _Depends: 2.1_
+- [x] 2.4 エージェントのリクエスト単位モデル化
+  - `growiAgent.model` を `({ requestContext }) => resolveMastraModel(requestContext.get('modelId'))` に、`MastraRequestContextShape` に `modelId?: string` を追加
+  - 完了状態: requestContext に modelId を入れて stream すると当該モデルで解決される（ユニット/結合）
+  - _Requirements: 4.1, 4.3_
+  - _Boundary: mastra-modules_
+  - _Depends: 2.1, 2.2_
+- [x] 2.5 (P) AI 構成済み判定の更新
+  - `isAiConfigured()` を `provider + apiKey + 非空 getAllowedModels()` ベースに更新
+  - 編集対象は `is-ai-configured` のみ（`getAllowedModels` は 2.1 が config 側に追加済み）。2.2/2.3/2.4 とは別ファイルのため並行安全
+  - 完了状態: allowedModels 空→未構成、非空→構成済みのユニットテストが通る
+  - _Requirements: 6.1_
+  - _Boundary: is-ai-configured_
+  - _Depends: 2.1_
+
+- [x] 3. Core: サーバ API
+- [x] 3.1 (P) post-message に modelId 経路を追加
+  - validator に `modelId` optional を追加、route で実効モデルを `resolveEffectiveModelId(modelId)` で**一度だけ**解決し、その ID を `requestContext.set('modelId', effectiveModelId)` と `providerOptions: getProviderOptionsForModel(effectiveModelId)` の両方に渡す（実効モデルをリクエストごとに二度解決しない）。許可外/未指定は `resolveEffectiveModelId` が既定に丸め。provider エラーは既存サニタイズを維持
+  - 編集対象は post-message route と validator のみ。`routes/index` は変更しない（新ルート登録は 3.2 が所有）
+  - 完了状態: 許可内 modelId はそのモデルで応答、許可外/未指定は既定で応答（結合テスト）。エラー時は安全メッセージ
+  - _Requirements: 3.3, 4.1, 4.2, 4.3, 4.4, 4.5_
+  - _Boundary: post-message route_
+  - _Depends: 2.3, 2.4_
+- [x] 3.2 (P) チャット用モデル一覧エンドポイント
+  - `GET /_api/v3/mastra/models` を追加（`routes/index` に登録、`aiReadyGuard` 配下、login + `READ.FEATURES.AI`）。共有 `ChatModelsResponse { modelIds: string[]; selectedModelId: string }`（ルート/クライアント共用）を返す。`modelIds` は `getAllowedModels().map(m => m.modelId)`（素のモデル ID 文字列のみ、表示名なし）。`selectedModelId` は `UserUISettings.aiChatSelectedModelId` を `isModelInAllowList` で許可検証して `saved ∈ allowed ? saved : default`（常に存在＝非 optional。`aiReadyGuard` 配下なので非空許可リスト＝既定が必ず存在し、まれに既定解決不可なときのみハンドラがエラー返却）。`defaultModelId` は返さない（クライアント未使用）。providerOptions は返さない
+  - 完了状態: 結合テストで `modelIds` + 検証済み `selectedModelId` を返す（保存値許可外→既定）
+  - _Requirements: 3.1, 3.2, 3.7_
+  - _Boundary: get-models route, routes/index_
+  - _Depends: 2.1_
+- [x] 3.3 (P) 管理 AI 設定 API の許可リスト対応
+  - get-ai-settings で `allowedModels` を返却、put-ai-settings で `allowedModels` を read/validate/save。**非空リストのとき**のみ検証（各 modelId 非空・重複禁止・`isDefault` ちょうど 1・各 providerOptions の JSON/名前空間検証）、env-only 422、保存後 `clearResolvedMastraModelCache`。`model`/`providerOptions` 書込みは除去
+  - **空配列/未指定はクリア経路**: `buildUpdates` で `ai:allowedModels` に `undefined` を設定し `updateConfigs({ removeIfUndefined: true })` でキー削除（→ `getConfig` は既定 `[]`）。空配列は 422 にしない（正当な無効化）
+  - 完了状態: PUT→GET ラウンドトリップで `allowedModels`（`isDefault` 含む）が往復、重複/非空時の空 modelId/`isDefault!=1`/不正 JSON は 422、env-only で 422。空配列 PUT はキー削除され GET が `[]` を返す
+  - _Requirements: 1.1, 1.2, 1.3, 1.4, 1.5, 1.6, 2.3, 2.4, 6.2_
+  - _Boundary: admin ai-settings routes_
+  - _Depends: 1.1, 1.2_
+
+- [x] 4. Core: クライアント UI
+- [x] 4.1 (P) 管理画面の許可モデルリストエディタ
+  - `AllowedModelsField`（`useFieldArray`、各行 = モデル ID + 既定ラジオ(`isDefault`, 単一) + 折りたたみ providerOptions JSON(既存バリデータ) + 削除、追加ボタン、既定行削除時の再付与）を実装し `ProviderCommonSettings` に単一配置（provider watch でラベル「デプロイ名/モデル」切替）。`AzureOpenaiSettings` から `ModelField` を除去、`ModelField` を削除、`ai-settings-form-values` を `{ modelId; providerOptionsText; isDefault }[]` 化（parse/stringify 変換）。env-only 時 disabled
+  - 完了状態: 行の追加/削除・既定ラジオ単一性・不正 JSON のインラインエラー・env-only disabled・Azure 時ラベル「デプロイ名」がコンポーネントテストで確認できる
+  - _Requirements: 1.1, 1.3, 1.4, 1.6, 2.1, 2.3, 2.4_
+  - _Boundary: admin client UI_
+  - _Depends: 3.3_
+- [x] 4.2 (P) チャットのモデルセレクタ配線
+  - `stores/models.tsx`（SWR で `GET /mastra/models`、共有 `ChatModelsResponse` を消費）を追加。ChatSidebar に `PromptInputModelSelect*` を mount、`useState(selectedModelId)`、transport は `modelId` をライブ getter から毎リクエスト読み body へ注入（`useChat` が transport 差し替えを無視するため変更時も transport は再生成しない）、選択変更時に共有 `scheduleToPut({ aiChatSelectedModelId })`。許可モデルが 1 つなら選択状態表示。models 解決までセレクタを disabled
+  - 完了状態: 初期選択 = `selectedModelId`、変更で（transport 再生成なしに）ライブ getter 経由で `modelId` 送信 + `scheduleToPut` 呼出、regenerate でも `modelId` 保持（コンポーネントテスト）
+  - _Requirements: 3.1, 3.2, 3.3, 3.4, 3.5, 3.6_
+  - _Boundary: chat client UI_
+  - _Depends: 3.1, 3.2_
+
+- [ ] 5. Integration & Validation
+- [x] 5.1 結合・回帰テストと品質ゲート
+  - 解決系ユニット（`resolveEffectiveModelId`/`getDefaultModelId`/`getAllowedModels`/`getProviderOptionsForModel`/`isModelInAllowList`/`resolveMastraModel` Map）、put-ai-settings バリデータ、post-message の `modelId` 経路、get-models の `selectedModelId` 検証を整備。既存スレッドの読込・継続・ストリーミングが回帰しないことを確認。lint/typecheck/test を通す
+  - 完了状態: 対象テストと既存スイートがグリーン、lint/typecheck パス
+  - _Requirements: 4.5, 5.1, 6.1, 6.2_
+  - _Depends: 3.1, 3.2, 3.3, 4.1, 4.2_
+- [ ] 5.2 devcontainer 実機スモーク
+  - dev サーバ起動。管理で複数モデル + 既定 + 一部に providerOptions を設定→保存。チャットでセレクタに許可モデルが出る・初期 = 既定/前回選択・別モデル選択で応答・reasoning options が対応モデルにのみ効く・許可外を送ってもデフォルトで応答・env-only で編集不可、を実機確認
+  - 完了状態: 上記フローが実機で観測できる
+  - _Requirements: 1.6, 2.2, 3.1, 3.3, 4.1, 4.2_
+  - _Depends: 5.1_
+
+- [x] 6. 関連既存 spec のドキュメント整合更新
+  - admin-ai-settings spec（`ai:model` 単一→`allowedModels`、`providerOptions` 廃止、UI、GET/PUT 契約、`AI_SETTING_KEYS`、env-only）と multi-llm-provider spec（単一モデル解決→modelId パラメータ化、provider options 単一→per-model、「per-request 切替は対象外」へ「モデル単位の per-request 選択は本 spec で扱う／ベンダー切替は対象外」追記）を本実装に整合更新
+  - 完了状態: 両 spec の該当記述が本実装と矛盾しない
+  - _Requirements: 本タスクは spec 保守作業であり EARS 要件 ID を持たない（requirements.md Boundary Context「In scope」のスコープ項目）_
+  - _Depends: 5.1_
+
+## Implementation Notes
+
+- **5.2 スモークで発見した UI バグ（モデルセレクタが開いても何も見えない）→ 修正済み**: チャットのモデルセレクタ（vendored `PromptInputModelSelect`→Radix `SelectPrimitive.Portal`）のドロップダウンは `document.body` 直下に Portal され、vendored 既定の `tw:z-50`(z-index:50) を持つ。一方 ChatSidebar は `.grw-chat-sidebar { z-index: $zindex-fixed + 2 }` = **1032** の `position-fixed`・不透明パネル。両者は root スタッキングコンテキストの兄弟なので、トリガー上に開いたメニューがパネル背後(50 < 1032)に隠れて「何も表示されない」。`all: revert-layer`(base レイヤ)・CSS変数スコープ・クラス未生成・disabled は 3 観点ワークフローで否定済み（純粋な z-index 逆転）。**修正**: `ChatSidebar.tsx` の `PromptInputModelSelectContent` に `className="tw:z-[1070]"`（Bootstrap `$zindex-popover`）を付与し prefix 対応 tailwind-merge で `tw:z-50` を上書き。**残る潜在バグ（systemic）**: 同じ vendored 系の `DropdownMenu`/`Tooltip`/`HoverCard`/`Dialog` も `tw:z-50`+body Portal で同じ罠を持つ。現状 ChatSidebar には Select+Submit のみ描画のため未顕在だが、将来これらをサイドバー内に追加する際は vendored 既定 z-index の引き上げ（または Portal の `container` をサイドバー root に向ける）を検討すること。
+- **検証ゲートで発見した設計の欠落（共有 PUT ルート）→ 修正済み**: design.md の File Structure Plan は `client/services/user-ui-settings.ts`（`scheduleToPut`）を「再利用・無改変」とし、共有サービスが任意の `IUserUISettings` 部分更新を永続化すると仮定していたが、実際のサーバルート `apps/app/src/server/routes/apiv3/user-ui-settings.ts` の PUT は **3 フィールドのハードコード allow-list** のみを `updateData` に展開しており、`aiChatSelectedModelId` を黙って破棄していた（→ Req 3.6 の永続化が機能せず、Req 3.2/3.7 の「前回選択」初期化も常に既定にフォールバック）。ChatSidebar テストは `scheduleToPut` をモックしていたため検出できず、feature レベル検証（/kiro-validate-impl）で発見。**修正済み**: 当該ルートの validator/`updateData`/swagger に `aiChatSelectedModelId` を追加（additive、no-accidental-clear 維持、実ハンドラ契約テスト追加）。**design.md の Modified リストに本来含めるべきだったファイル**。
+- **5.2 / 実機スモークは部分検証（残りは operator 手動検証が必要）**: devcontainer で dev サーバ（`turbo run dev --filter @growi/app`）を起動し、以下を**実行時に確認済み**: (1) 本 feature のコードでサーバが正常起動し `GET / → 200`（ルート登録・config-definition・agent 変更が起動を壊さない＝回帰なし、Req 5.1）、(2) `GET /_api/v3/mastra/models` が AI 未設定時に `aiReadyGuard` で **501「GROWI AI is not configured」** を返す（Req 6.1 のゲーティングが実機で動作）。**未検証（実 LLM プロバイダ API キーが devcontainer に無いため捏造せず）**: 管理 UI での複数モデル+既定+providerOptions 保存の実 UI 操作、チャットのセレクタ表示/初期選択、別モデル選択での**実応答**、reasoning options の対応モデル限定の効き、許可外送信時のデフォルト応答、env-only での編集不可の実 UI。これらは構造的には全タスクのユニット/結合/コンポーネントテスト（5.1 で mastra 500 tests green）で網羅済み。**operator は実プロバイダ+API キーを設定し上記フローを手動確認すること**（MANUAL_VERIFY_REQUIRED）。
+- **4.1 / 新規 i18n キーの翻訳エントリ未追加（5.1 で対応）**: `AllowedModelsField` が参照する `ai_settings.add_model` / `ai_settings.remove_model` / `ai_settings.default_model_label` の 3 キーが全 locale の `apps/app/public/static/locales/{en_US,ja_JP,ko_KR,zh_CN,fr_FR}/admin.json` に未定義。locale ファイルは 4.1 の _Boundary（client/admin/）_ 外のため未編集。**task 5.1 でこの 3 キーを 5 locale に追加**すること（未追加だと UI が生キーを表示。5.2 実機スモークでも要確認）。実装者報告の「task 5.3」は誤りで、そのタスクは存在しない。
+- **3.3 / config-manager.spec.ts の旧キー参照（5.1 で対応）**: `apps/app/src/server/service/config-manager/config-manager.spec.ts` が削除済みの `ai:model` / `ai:providerOptions` を参照しており typecheck が赤い。どのタスクの _Boundary_ にも明示されていない巻き添えのため、**task 5.1（品質ゲート、lint/typecheck/test を通す）で修正**すること。
+- **3.3 / 検証失敗の HTTP コードは 400（env-only のみ 422）**: design.md の本文（管理保存・Error Handling 節）は配列不変条件の検証失敗を「422」と書く箇所があるが、権威ある API Contract 表は `400 (validation), 422 (env-only)` と定義。実装は `apiV3FormValidator → res.apiv3Err` 既定の **400** で検証失敗を返し、env-only のみ明示 422。要件 1.4/1.5/2.4 は HTTP コードを指定せず「保存を拒否」のみなので整合。**task 6 のドキュメント整合更新で design.md 本文の「422」表記を 400 に修正**すること。
+- **2.5 / isAiConfigured と Azure（エンドポイント + Entra ID）**: design.md は構成済み判定を字面どおり「provider + apiKey + 非空 allowedModels」と記すが、この記述は Azure OpenAI のエンドポイント要件・Entra ID（`ai:azureOpenaiSettings.useEntraId === true`、apiKey 不要のベアラートークン認証）を考慮していない。無条件 apiKey 必須は Entra 専用デプロイを「構成済み→未構成」に退行させ、要件 6.1「従来どおりのゲーティング維持」に反する（実装時にレビューで検出・修正）。`isAiConfigured()` は `resolveAzureOpenaiModel` の実分岐に整合した形で実装済み（`hasRequiredProviderConfig(provider)` ヘルパ）: azure-openai は**認証方式に関わらずエンドポイント（resourceName または baseURL）を必須**とし（両方欠落なら `resolveAzureOpenaiModel` が throw するため「構成済み→500」を防ぐ）、apiKey は `useEntraId === true` のときのみ免除、それ以外（非 Azure 含む）は共有 apiKey 必須。**task 6 のドキュメント整合更新時に design.md / 関連 spec の「provider + apiKey」字面へこの Azure エンドポイント要件と Entra 例外を反映すること。**

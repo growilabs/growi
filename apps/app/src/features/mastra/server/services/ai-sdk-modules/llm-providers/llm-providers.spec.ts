@@ -3,8 +3,9 @@ import { AI_PROVIDERS } from '~/features/mastra/interfaces/ai-provider';
 // Each provider creator returns a "provider function" that, when called with a
 // model id, yields a Mastra-compatible model. We mock the @ai-sdk/* + config
 // boundaries so we can observe (a) the apiKey the creator is constructed with and
-// (b) the model id applied. azure-openai resolves its own (richer) config, so it
-// is mocked here and covered by azure-openai.spec.ts.
+// (b) the model id applied. The model id now arrives as the resolver argument
+// (not from config). azure-openai resolves its own (richer) config, so it is
+// mocked here and covered by azure-openai.spec.ts.
 const {
   createOpenAI,
   createAnthropic,
@@ -15,17 +16,17 @@ const {
   getConfig,
   resolveAzureOpenaiModel,
 } = vi.hoisted(() => {
-  const openaiProviderFn = vi.fn((model: string) => ({
+  const openaiProviderFn = vi.fn((modelId: string) => ({
     tag: 'openai-model',
-    model,
+    modelId,
   }));
-  const anthropicProviderFn = vi.fn((model: string) => ({
+  const anthropicProviderFn = vi.fn((modelId: string) => ({
     tag: 'anthropic-model',
-    model,
+    modelId,
   }));
-  const googleProviderFn = vi.fn((model: string) => ({
+  const googleProviderFn = vi.fn((modelId: string) => ({
     tag: 'google-model',
-    model,
+    modelId,
   }));
   return {
     openaiProviderFn,
@@ -37,7 +38,10 @@ const {
       (_opts: { apiKey: string }) => googleProviderFn,
     ),
     getConfig: vi.fn(),
-    resolveAzureOpenaiModel: vi.fn(() => ({ tag: 'azure-model' })),
+    resolveAzureOpenaiModel: vi.fn((modelId: string) => ({
+      tag: 'azure-model',
+      modelId,
+    })),
   };
 });
 
@@ -54,12 +58,11 @@ import { resolveGoogleModel } from './google';
 import { modelResolvers } from './index';
 import { resolveOpenaiModel } from './openai';
 
-const setKeyAndModel = (apiKey: string | undefined, model: string): void => {
-  getConfig.mockImplementation((key: string) => {
-    if (key === 'ai:apiKey') return apiKey;
-    if (key === 'ai:model') return model;
-    return undefined;
-  });
+// Only the api key comes from config now; the model id is the resolver argument.
+const setApiKey = (apiKey: string | undefined): void => {
+  getConfig.mockImplementation((key: string) =>
+    key === 'ai:apiKey' ? apiKey : undefined,
+  );
 };
 
 beforeEach(() => {
@@ -67,62 +70,53 @@ beforeEach(() => {
 });
 
 describe('key-based provider resolvers', () => {
-  it('resolveOpenaiModel constructs OpenAI with the config apiKey + model', () => {
-    setKeyAndModel('sk-openai-123', 'gpt-test');
+  it('resolveOpenaiModel constructs OpenAI with the config apiKey + the model argument', () => {
+    setApiKey('sk-openai-123');
 
-    const result = resolveOpenaiModel();
+    const result = resolveOpenaiModel('gpt-test');
 
     expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk-openai-123' });
     expect(openaiProviderFn).toHaveBeenCalledWith('gpt-test');
-    expect(result).toEqual({ tag: 'openai-model', model: 'gpt-test' });
+    expect(result).toEqual({ tag: 'openai-model', modelId: 'gpt-test' });
   });
 
-  it('resolveAnthropicModel constructs Anthropic with the config apiKey + model', () => {
-    setKeyAndModel('sk-anthropic-456', 'claude-test');
+  it('resolveAnthropicModel constructs Anthropic with the config apiKey + the model argument', () => {
+    setApiKey('sk-anthropic-456');
 
-    const result = resolveAnthropicModel();
+    const result = resolveAnthropicModel('claude-test');
 
     expect(createAnthropic).toHaveBeenCalledWith({
       apiKey: 'sk-anthropic-456',
     });
     expect(anthropicProviderFn).toHaveBeenCalledWith('claude-test');
-    expect(result).toEqual({ tag: 'anthropic-model', model: 'claude-test' });
+    expect(result).toEqual({ tag: 'anthropic-model', modelId: 'claude-test' });
   });
 
-  it('resolveGoogleModel constructs Google with the config apiKey + model', () => {
-    setKeyAndModel('sk-google-789', 'gemini-test');
+  it('resolveGoogleModel constructs Google with the config apiKey + the model argument', () => {
+    setApiKey('sk-google-789');
 
-    const result = resolveGoogleModel();
+    const result = resolveGoogleModel('gemini-test');
 
     expect(createGoogleGenerativeAI).toHaveBeenCalledWith({
       apiKey: 'sk-google-789',
     });
     expect(googleProviderFn).toHaveBeenCalledWith('gemini-test');
-    expect(result).toEqual({ tag: 'google-model', model: 'gemini-test' });
+    expect(result).toEqual({ tag: 'google-model', modelId: 'gemini-test' });
   });
 
   it('throws (naming AI_API_KEY) when the api key is missing', () => {
-    setKeyAndModel(undefined, 'gpt-test');
+    setApiKey(undefined);
 
-    expect(() => resolveOpenaiModel()).toThrow(/AI_API_KEY/);
+    expect(() => resolveOpenaiModel('gpt-test')).toThrow(/AI_API_KEY/);
     expect(createOpenAI).not.toHaveBeenCalled();
-  });
-
-  it('throws (naming AI_MODEL) when the model is missing', () => {
-    getConfig.mockImplementation((key: string) =>
-      key === 'ai:apiKey' ? 'sk-openai-123' : undefined,
-    );
-
-    expect(() => resolveOpenaiModel()).toThrow(/AI_MODEL/);
-    expect(openaiProviderFn).not.toHaveBeenCalled();
   });
 
   it('injects the config apiKey explicitly (never the provider env var)', () => {
     const original = process.env.OPENAI_API_KEY;
     process.env.OPENAI_API_KEY = 'env-should-not-be-used';
     try {
-      setKeyAndModel('sk-explicit', 'gpt-test');
-      resolveOpenaiModel();
+      setApiKey('sk-explicit');
+      resolveOpenaiModel('gpt-test');
       // The creator receives the config key, never the provider's env var.
       expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk-explicit' });
     } finally {
@@ -142,20 +136,29 @@ describe('modelResolvers', () => {
     );
   });
 
-  it('routes each provider key to its own resolver', () => {
-    setKeyAndModel('sk', 'm');
+  it('routes each provider key to its own resolver, forwarding the model argument', () => {
+    setApiKey('sk');
 
-    modelResolvers.openai();
+    expect(modelResolvers.openai('m-openai')).toMatchObject({
+      modelId: 'm-openai',
+    });
     expect(createOpenAI).toHaveBeenCalledWith({ apiKey: 'sk' });
+    expect(openaiProviderFn).toHaveBeenCalledWith('m-openai');
 
-    modelResolvers.anthropic();
+    expect(modelResolvers.anthropic('m-anthropic')).toMatchObject({
+      modelId: 'm-anthropic',
+    });
     expect(createAnthropic).toHaveBeenCalledWith({ apiKey: 'sk' });
+    expect(anthropicProviderFn).toHaveBeenCalledWith('m-anthropic');
 
-    modelResolvers.google();
+    expect(modelResolvers.google('m-google')).toMatchObject({
+      modelId: 'm-google',
+    });
     expect(createGoogleGenerativeAI).toHaveBeenCalledWith({ apiKey: 'sk' });
+    expect(googleProviderFn).toHaveBeenCalledWith('m-google');
 
-    const azureResult = modelResolvers['azure-openai']();
-    expect(resolveAzureOpenaiModel).toHaveBeenCalledTimes(1);
-    expect(azureResult).toEqual({ tag: 'azure-model' });
+    const azureResult = modelResolvers['azure-openai']('m-azure');
+    expect(resolveAzureOpenaiModel).toHaveBeenCalledWith('m-azure');
+    expect(azureResult).toEqual({ tag: 'azure-model', modelId: 'm-azure' });
   });
 });
