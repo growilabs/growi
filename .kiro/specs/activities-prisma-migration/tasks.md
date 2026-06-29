@@ -12,12 +12,14 @@
   - 観察可能な完了状態: 「(a) native composite filter を採用 / (b) `aggregateRaw` 生クエリへフォールバック」のいずれかを判断として記録し、タスク 3.5・6.4 の実装方式を確定させる
   - _Requirements: 2.2, 3.4_
   - _Boundary: spike（utils/prisma 検証）_
+  - _Blocked: 実 MongoDB が必要。本リモート環境は egress ポリシーが mongod バイナリ DL を 403 ブロックするため実行不可。MongoDB が使える環境（devcontainer/CI）で実施。依存実装(3.5)は design 第一候補（native composite filter `snapshot:{is:{username:{in}}}`）で進め、tsgo 型チェック＋CI integ で検証する。_
 
 - [ ] 1.2 (P) R4 先行スパイク（明示 `_id` の受理確認）
   - `create` / `createMany` が明示 `_id`（ObjectId 文字列）を受け付けるかを使い捨てスクリプトで検証する（integ テストが明示 `_id` を使うための前提）
   - 観察可能な完了状態: 「明示 `_id` 指定が可能/不可」を判断として記録し、フェーズ1・2 の integ テストの fixture 方式を確定させる
   - _Requirements: 5.2, 5.3_
   - _Boundary: spike（integ テスト前提）_
+  - _Blocked: 実 MongoDB が必要（同上）。CI integ で明示 `_id` 利用の fixture が通るかを検証する。_
 
 - [ ] 1.3 schema.prisma の relation 明示と型再生成
   - `model activities` の `user` リレーションに `onDelete: NoAction, onUpdate: NoAction` を明示（mongoose-to-prisma スキル準拠。Mongoose に整合性強制が無いため）
@@ -113,6 +115,7 @@
   - 観察可能な完了状態: 正規化が必要な BSON 拡張 JSON の形と cursor バッチング方式を判断として記録し、5.2・6.x の実装方式を確定させる
   - _Requirements: 3.1, 3.2, 3.3_
   - _Boundary: spike（aggregateRaw/cursor 検証）_
+  - _Blocked: 実 MongoDB が必要（同上）。aggregateRaw の戻り BSON 表現は runtime 依存のため型チェックで代替不可。5.2 normalizer は Prisma/MongoDB の既知の拡張 JSON 仕様（$oid/$date）を前提に実装し、CI integ で実戻り値に対する正規化を検証する。_
 
 - [ ] 5.2 prisma-raw-normalize ユーティリティ
   - `aggregateRaw` 戻り値の BSON 拡張 JSON（`$oid`→`string`、`$date`→`Date`）を正規化する pure util を新規作成（co-located spec 付き）。想定外 BSON は明示エラー＋文脈ログ
@@ -168,3 +171,11 @@
   - 観察可能な完了状態: ゲート grep が statics 参照ゼロを示し、フェーズ1・2 の全 integ がグリーン、フロントエンドの diff が無い
   - _Depends: 7.2_
   - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+
+## Implementation Notes
+
+- **環境制約（本リモート実行環境）**: 外部 `mongo` ホストは未提供。integ テストは `mongodb-memory-server` を使うが、mongod バイナリの DL 先が egress ポリシーで 403 ブロックされ、キャッシュ・システム mongod も無いため **ローカルで integ テストを実行できない**。検証方針:
+  - ローカルで実行可能な検証: `pnpm run lint:typecheck`（tsgo）、`pnpm run lint:biome`、`turbo run build --filter @growi/app`、DB 不要の pure ユニットテスト（1.4 paginate、5.2 normalizer 等）。
+  - integ テストは**コードとして実装し、実行は CI（GitHub Actions の mongo サービス＝外部 `MONGO_URI`）に委ねる**。ローカルでは型チェックで integ ファイルのコンパイルのみ担保。
+  - DB 依存スパイク（1.1/1.2/5.1）は本環境で実行不可のため Blocked。依存実装は design の第一候補方式で進め、型レベルで確認できる範囲（R1/R4 の Prisma 構文サポート）は tsgo で前倒し確認する。
+- 前提セットアップ: `@growi/*` ワークスペースパッケージは未ビルドだと vitest が `@growi/logger` 解決に失敗する。`turbo run build --filter='@growi/app^...'` で先にビルド済み（本セッションで実施）。Prisma クライアントは `src/generated/prisma` に生成済み。
