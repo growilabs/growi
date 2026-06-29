@@ -165,6 +165,8 @@ describe('AuditlogChangeStreamService', () => {
   beforeEach(() => {
     esWriter = mock<AuditlogEsWriter>();
     vi.mocked(configManager.getConfig).mockReturnValue(true);
+    // load is called twice per start(): once inside reconcileInitialSyncState() and once in
+    // start() itself. Use mockResolvedValue (not Once) so both calls see the same value.
     vi.mocked(ChangeStreamResumeToken.load).mockResolvedValue(null);
     vi.mocked(ChangeStreamResumeToken.upsert).mockResolvedValue(undefined);
     vi.mocked(ChangeStreamResumeToken.clear).mockResolvedValue(undefined);
@@ -423,6 +425,30 @@ describe('AuditlogChangeStreamService', () => {
       );
     });
 
+    it('continues the stream when token persist fails — batch will be reprocessed on restart (at-least-once)', async () => {
+      const fakeStream = new FakeChangeStream();
+      vi.spyOn(Activity, 'watch').mockReturnValue(
+        fakeStream as unknown as ChangeStream<ActivityDocument>,
+      );
+      vi.mocked(ChangeStreamResumeToken.upsert).mockRejectedValue(
+        new Error('persist failed'),
+      );
+      service = new AuditlogChangeStreamService(esWriter);
+
+      await service.start();
+
+      fakeStream.push(makeInsertEvent({}, 'tok1'));
+
+      await vi.waitFor(() =>
+        expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalledWith(
+          'auditlogs',
+          { _data: 'tok1' },
+        ),
+      );
+      expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledOnce();
+      expect(fakeStream.closed).toBe(false);
+    });
+
     it('persists only the last event token when multiple events are batched together (H-1)', async () => {
       const fakeStream = new FakeChangeStream();
       vi.spyOn(Activity, 'watch').mockReturnValue(
@@ -521,8 +547,7 @@ describe('AuditlogChangeStreamService', () => {
       await driveFlushes(internal, 7, 'tok-a');
 
       // 1 failure on tok-b resets the counter
-      internal.buffer = [makeInsertEvent({}, 'tok-b')];
-      await internal.flushBuffer.call(service);
+      await driveFlushes(internal, 1, 'tok-b');
 
       // 6 more failures on tok-b (1 + 6 = 7 total; skip fires on the 8th)
       await driveFlushes(internal, 6, 'tok-b');
@@ -531,8 +556,7 @@ describe('AuditlogChangeStreamService', () => {
       expect(vi.mocked(markUnsyncedAndAdvanceToken)).not.toHaveBeenCalled();
 
       // The 8th tok-b failure triggers the skip
-      internal.buffer = [makeInsertEvent({}, 'tok-b')];
-      await internal.flushBuffer.call(service);
+      await driveFlushes(internal, 1, 'tok-b');
 
       expect(vi.mocked(markUnsyncedAndAdvanceToken)).toHaveBeenCalledWith(
         'auditlogs',
