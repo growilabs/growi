@@ -177,18 +177,18 @@ export const extension = Prisma.defineExtension((client) => {
          * @returns external account objects
          */
         async findAllWithPagination({
-          page,
+          offset = 0,
           limit = DEFAULT_LIMIT,
           sort = [{ accountId: 'asc' }, { createdAt: 'asc' }],
         }: {
-          page: number;
-          limit: number;
-          sort: Prisma.externalaccountsOrderByWithRelationInput[];
-        }) {
+          offset?: number;
+          limit?: number;
+          sort?: Prisma.externalaccountsOrderByWithRelationInput[];
+        } = {}) {
           const context =
             Prisma.getExtensionContext<typeof prisma.externalaccounts>(this);
           const result = await context.paginate({
-            page,
+            offset,
             limit,
             orderBy: sort,
             include: {

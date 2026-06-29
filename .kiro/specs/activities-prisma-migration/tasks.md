@@ -27,13 +27,13 @@
   - 観察可能な完了状態: 再生成後の Prisma クライアント型に `activities.user` リレーションが存在し、型エラーなくビルドできる
   - _Requirements: 5.2_
 
-- [ ] 1.4 共有 paginate を offset 入力へ統一
+- [x] 1.4 共有 paginate を offset 入力へ統一
   - `utils/prisma.ts` の `paginate` 入力を offset 一本化（`skip = offset`、`page` 入力廃止）。出力は page 系フィールドを内部計算で保持し、`offset` を必ず含める。`page`/`pagingCounter`/`hasPrevPage`/`prevPage` を mongoose-paginate-v2 互換式（`page===1 && offset!==0` のとき `hasPrevPage=true, prevPage=1`）で導出
   - `PaginateResult<T>` を `interfaces/mongoose-utils.ts` の shape（`offset: number` 含む）に揃える
   - 観察可能な完了状態: 単体テストで offset 入力→正しい skip、出力に `offset` フィールドが必ず含まれ、`page`/`totalPages`/`hasNextPage` と `page===1 && offset!==0` 時の `hasPrevPage/prevPage` が期待どおりになる
   - _Requirements: 2.1, 2.3_
 
-- [ ] 1.5 external-account の offset 追随（共有ヘルパ変更の巻き添え・integration）
+- [x] 1.5 external-account の offset 追随（共有ヘルパ変更の巻き添え・integration）
   - `external-account.ts` の `findAllWithPagination` を offset 受けに変更し、呼び出し側（`apiv3/users.js` の external-accounts ルート）で `offset=(page-1)*limit` 変換を1箇所入れる
   - 観察可能な完了状態: external-account 一覧の件数・並び順・ページ情報が offset 化前後で不変であることを実 DB の integ 回帰テストでアサートする
   - _Depends: 1.4_
