@@ -18,6 +18,7 @@ import {
 } from '~/interfaces/activity';
 import type { ActivityDocument } from '~/server/models/activity';
 import Activity from '~/server/models/activity';
+import { prisma } from '~/utils/prisma';
 
 import loggerFactory from '../../utils/logger';
 import type Crowi from '../crowi';
@@ -61,7 +62,8 @@ class ActivityService {
         generatePreNotify?: GeneratePreNotify,
         getAdditionalTargetUsers?: GetAdditionalTargetUsers,
       ) => {
-        let activity: ActivityDocument;
+        // biome-ignore lint/suspicious/noExplicitAny: Prisma returns a different shape than ActivityDocument; any is safe here because downstream emitters are also typed as any
+        let activity: any;
         const { contributor, ...activityParameters } = parameters;
         const shoudUpdate = this.shoudUpdateActivity(parameters.action);
         const shouldGenerateContribution = this.shouldGenerateContribution(
@@ -97,7 +99,7 @@ class ActivityService {
 
         if (shoudUpdate) {
           try {
-            activity = await Activity.updateByParameters(
+            activity = await prisma.activities.updateByParameters(
               activityId,
               activityParameters,
             );
@@ -204,7 +206,7 @@ class ActivityService {
     if (shoudCreateActivity) {
       let activity: IActivity;
       try {
-        activity = await Activity.createByParameters(parameters);
+        activity = await prisma.activities.createByParameters(parameters);
         return activity;
       } catch (err) {
         logger.error('Create activity failed', err);

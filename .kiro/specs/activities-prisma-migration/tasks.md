@@ -63,7 +63,7 @@
   - _Depends: 2.1_
   - _Requirements: 1.1_
 
-- [ ] 3.2 service/activity.ts の create/update を拡張経由へ（TTL/index は据え置き）
+- [x] 3.2 service/activity.ts の create/update を拡張経由へ（TTL/index は据え置き）
   - `createActivity`（`createByParameters`）と `activityEvent.on('update')` ハンドラ（`updateByParameters`）を拡張メソッド経由へ。`shoudUpdateActivity` ゲート（記録可否判定）は不変
   - `createTtlIndex`（`createIndexes`＋raw collection）は **Mongoose のまま据え置き**（要件 4-1・4-3）。index 用途の Activity import のみ残す
   - **重複エラー処理（4.2）**: 既存の Mongoose 重複エラー捕捉箇所があれば Prisma `P2002` 捕捉へ置換し、複合 unique 制約違反時の挙動を維持する
