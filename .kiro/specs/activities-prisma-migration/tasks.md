@@ -154,7 +154,7 @@
   - 注: `apiv3/users.js` はタスク 1.5（external-accounts ルート）と同一ファイルを編集するため、フェーズ越え・ファイル単位では並行不可（フェーズ順序で直列化される）
 
 - [ ] 7. フェーズ2 検証・クリーンアップ・最終検証
-- [ ] 7.1 フェーズ2 integ テスト
+- [x] 7.1 フェーズ2 integ テスト
   - 集計: user-activities／contribution が移行前と同一集計（明示 `_id` は ObjectId 保持で維持）。エクスポート: cursor executor が `_id` 昇順で全件を同順序出力し resume が成立。autocomplete: 候補一覧・総件数が同一
   - 観察可能な完了状態: 既存 integ（`update-activity.spec`・`activity-aggregation-service.spec`・`audit-log-...integ`）を含むフェーズ2 テストがすべてグリーン
   - _Depends: 6.1, 6.2, 6.3, 6.4_
