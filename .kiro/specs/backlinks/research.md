@@ -40,11 +40,11 @@
     `rehype-raw` has materialized raw HTML), resolving relative hrefs against `pagePath`.
     Zero DOM/`window` dependencies → runs in Node.
   - The pukiwiki rehype variant resolves wiki-links against a **trailing-slash base** (so
-    relative wiki-links resolve as children, not siblings) — matching decision §2.
+    relative wiki-links resolve as children, not siblings) — the per-type relative base.
   - Code spans/blocks never produce `<a>` nodes (they become `<code>`/`<pre>` text), so
     requirement 1.4 is satisfied structurally, not by a special case.
   - `isCreatablePage()` is the same gate `NextLink` uses to decide "internal page vs.
-    external/non-page" — the correct §7.2 target-scope filter.
+    external/non-page" — the correct target-scope filter.
 - **Implications**: Extraction is a thin terminal step on the **existing** pipeline. We build
   a server processor from the same plugins, append a collector that harvests resolved `a[href]`
   values into an accumulator, then post-filter (strip `#`/`?` via `new URL(...).pathname`,
@@ -53,7 +53,7 @@
 ### Page lifecycle events — how to stay in sync without touching PageService
 
 - **Context**: Requirements 3.1–3.3 and 5–6 require the index to react to create/update/delete.
-  Decision §9-A mandates subscribing to the event bus rather than editing `PageService`.
+  The design subscribes to the event bus rather than editing `PageService`.
 - **Sources Consulted**:
   - `apps/app/src/server/events/page.ts` (PageEvent extends EventEmitter)
   - `apps/app/src/server/crowi/index.ts:248-255` (`this.events.page = new PageEvent(this)`)
@@ -105,19 +105,19 @@
 | Option | Description | Strengths | Risks / Limitations | Notes |
 |--------|-------------|-----------|---------------------|-------|
 | Server-side index via event listener (**chosen**) | Extract links at save, persist `PageLink` edges, react via `crowi.events.page` | Single trust boundary; backfillable; covers every write path; no `PageService` edits | Index lags HTTP response by the async listener window (same as search) | Mirrors `search.ts` precedent |
-| Client-side reporting | Browser reports rendered links | Reuses client render | Only runs on view; no backfill; server must re-validate anyway | Rejected (decision §1) |
-| Synchronous in-line write inside `PageService` | Write index inside the save transaction | Str+ always current | Couples to `PageService`; violates §9-A; raises save latency | Rejected |
-| Derived target-state (no broken/trashed flags stored) (**chosen**) | Store only `toPage` id cache; derive normal/trashed/broken at read from target page status | `_id`-stable cache survives rename & restore with **no** write-time work | Read path must join target status | Resolves §8 trash question |
+| Client-side reporting | Browser reports rendered links | Reuses client render | Only runs on view; no backfill; server must re-validate anyway | Rejected |
+| Synchronous in-line write inside `PageService` | Write index inside the save transaction | Str+ always current | Couples to `PageService`; raises save latency | Rejected |
+| Derived target-state (no broken/trashed flags stored) (**chosen**) | Store only `toPage` id cache; derive normal/trashed/broken at read from target page status | `_id`-stable cache survives rename & restore with **no** write-time work | Read path must join target status | Resolves the trashed-vs-broken question |
 
 ## Design Decisions
 
 ### Decision: `toPage` is an `_id` cache; link target state is **derived**, not stored
 
 - **Context**: Requirements 6.1–6.3 require distinguishing *trashed (recoverable)* from
-  *broken (permanently gone)* targets and returning to *normal* on restore. Decision §5
+  *broken (permanently gone)* targets and returning to *normal* on restore. An earlier draft
   originally proposed nulling inbound `toPage` on soft-delete and deleting `fromPage` rows.
 - **Alternatives Considered**:
-  1. Null `toPage` on soft-delete (original §5) — collapses "trashed" into "broken", and
+  1. Null `toPage` on soft-delete (the earlier draft) — collapses "trashed" into "broken", and
      makes restore require re-resolution + a restore event.
   2. Store an explicit `state` enum column, mutated on every lifecycle event — more writes,
      more event coupling, more drift surface.
@@ -216,8 +216,12 @@
   (acceptable per 4.2 — completeness only required *after* completion; new edits index instantly).
   In-process means the parse still shares the one JS thread; the duty cycle bounds but cannot
   remove that contention — only `worker_threads` could, which GROWI lacks (deferred).
-- **Follow-up / open**: auto-start vs. admin-triggered is a delivery decision (same job, different
-  trigger); verify `CronService` registration site and the bulk-export claim/progress pattern.
+- **Delivery decision (resolved)**: **auto-start** the throttled job from `crowi` setup after boot —
+  no admin action, guaranteed completion. Admin-triggered start deferred (a one-line wiring change to
+  add later, reusing the identical job). Implementation reuses the page-bulk-export scaffolding:
+  `CronService` base, `createBatchStream`, the cursor→resume(progress marker)→`pipeline` skeleton, and
+  the watchdog start/stop logic; the new code is link extraction/resolution, the in-memory `{path→_id}`
+  map, the `bulkWrite` upsert sink, and an atomic claim (stronger than the bulk-export watchdog race).
 
 ### Decision: recognize permalink (`/{id}`) and same-wiki absolute-URL link targets
 

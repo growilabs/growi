@@ -543,8 +543,8 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkPage[]>;
 **Contracts**: Batch [x] / State [x]
 
 ##### Batch / Job Contract
-- Trigger: started from `crowi` setup after boot (auto-start) **or** an admin action — see Open
-  Question below. Skips immediately if the job document is marked complete.
+- Trigger: **auto-started from `crowi` setup after boot** (throttled). Skips immediately if the job
+  document is marked complete. (Admin-triggered start deferred — see Delivery decision below.)
 - Input per chunk: a cursor page-batch (`Page.find(...).cursor({ batch_size })` +
   `createBatchStream`); body via `Revision.findById(page.revision).body`.
 - Per page: `extractInternalLinks(body, page.path, siteUrl)` → resolve each path via the in-memory
@@ -553,11 +553,11 @@ useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkPage[]>;
 - Progress/observability: emit count/total over the existing admin Socket.IO channel (as the
   Elasticsearch reindex does).
 
-**Open Question (delivery decision, not architecture)**
-- **Auto-start vs. admin-triggered.** Auto-start (throttled) guarantees completion with no admin
-  action; admin-trigger lets large-instance operators pick an off-peak window and raise the duty
-  cycle. Both reuse the identical job; only the trigger differs. Pending product decision; the
-  job is designed to support either with a one-line wiring change.
+**Delivery decision (resolved): auto-start, throttled.**
+- The backfill **auto-starts** from `crowi` setup after boot, bounded by a conservative default duty
+  cycle (operator-tunable), and guarantees completion with no admin action. An admin-triggered start
+  (operator picks an off-peak window / raises the duty cycle) was considered but **deferred**; the
+  job is built so adding that trigger later is a one-line wiring change — it reuses the identical job.
 
 ## Data Models
 
@@ -611,7 +611,7 @@ interface IBacklinkPage {
   all yield resolved internal paths (1.2); external/`#`-anchor/code-fence links excluded
   (1.3, 1.4); duplicates collapsed and the **path** self-link dropped (1.5, 1.6 — permalink
   self-links are dropped at sync, covered in integration); relative resolution uses the correct
-  per-type base (§2). A same-host absolute URL (`https://<siteUrl-host>/a/b`) yields
+  per-type base. A same-host absolute URL (`https://<siteUrl-host>/a/b`) yields
   `/a/b` while a different-host URL is excluded (1.10); with `siteUrl` undefined, absolute URLs are
   excluded (1.11); a permalink `/{id}` is returned verbatim (1.9).
 - `resolveToPage`: live page wins; single and double redirect chains resolve to `.end.toPath`;

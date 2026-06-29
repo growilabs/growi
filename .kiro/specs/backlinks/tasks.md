@@ -1,12 +1,12 @@
 # Implementation Plan
 
-> **Migration approach is an open team decision.** Tasks 1–5 and 7.1–7.3 are independent of how
-> the backfill runs and can be implemented immediately. The **backfill** is isolated in **Task 6**
-> (+ test 7.4) and reflects the design's current choice — an online, throttled `CronService` job.
-> If the team instead chooses a blocking migrate-mongo data migration, Task 6 is the only group
-> that changes: 6.1 (job state model) and 6.3 (cron registration) collapse, and 6.2's core logic
-> (cursor → extract → in-memory resolve → bulkWrite upsert) moves into the migration file. Nothing
-> in Tasks 1–5/7.1–7.3 is affected. Do not start Task 6 until the decision is made.
+> **Backfill approach (decided): online, throttled, auto-started `CronService` job.** Tasks 1–5 and
+> 7.1–7.3 are independent of the backfill and can be implemented immediately. The backfill is isolated
+> in **Task 6** (+ test 7.4): an online, throttled job that **auto-starts** after boot — no admin
+> action (an admin-triggered start was deferred as a one-line future change). It reuses the
+> page-bulk-export scaffolding (`CronService` base, `createBatchStream`, the cursor→resume→`pipeline`
+> skeleton, the watchdog start/stop logic); the new code is link extraction/resolution, the in-memory
+> `{path→_id}` map, the `bulkWrite` upsert sink, and an atomic claim. **Task 6 is now unblocked.**
 
 - [ ] 1. Foundation: data model, types, and indexes
 - [ ] 1.1 Define backlinks interfaces and shared types
@@ -169,10 +169,9 @@
   - _Boundary: PageAccessoriesModal_
   - _Depends: 4.4_
 
-- [ ] 6. Backfill of pre-existing pages — APPROACH PENDING TEAM DECISION (do not start until decided)
-  - Reflects the design's current choice: an online, throttled, resumable background job. If a
-    blocking migrate-mongo data migration is chosen instead, collapse 6.1/6.3 and move 6.2's loop
-    into the migration. Either way the extract→resolve→bulkWrite core is the same and reuses 2.1.
+- [ ] 6. Backfill of pre-existing pages — online, throttled, auto-started CronService job
+  - An online, throttled, resumable background job that auto-starts after boot. Reuses the
+    page-bulk-export scaffolding; the extract→resolve→bulkWrite core reuses 2.1.
 - [ ] 6.1 Add the backfill job state model
   - Add a single-document model tracking backfill status, a progress marker (resume point), and an
     atomic-claim field so only one instance runs the job and it stops once complete
@@ -196,9 +195,9 @@
   - _Boundary: PageLinkBackfillCron_
   - _Depends: 6.1, 2.1, 1.2_
 
-- [ ] 6.3 Register and trigger the backfill job
-  - Register the backfill cron in server setup; trigger it per the chosen policy (auto-start
-    throttled, or admin-triggered) — wire whichever the team selects
+- [ ] 6.3 Register and auto-start the backfill job
+  - Register the backfill cron in server setup and auto-start it (throttled) after boot, mirroring
+    the page-bulk-export watchdog start/stop; stop permanently once the job document is marked complete
   - Note: this edits the same server-setup file as 5.1; sequence after 5.1 to avoid a merge
   - Done when, after boot, the job claims and runs to completion on a fresh dataset and marks
     itself complete so it does not re-run
@@ -232,7 +231,7 @@
   - _Requirements: 3.4_
   - _Depends: 5.1, 5.2_
 
-- [ ] 7.4 Backfill tests — PENDING TEAM DECISION (pairs with Task 6)
+- [ ] 7.4 Backfill tests
   - Verify backfill output matches the live path; running twice or resuming after an interrupted
     chunk produces no duplicates; the atomic claim prevents two instances/ticks double-processing
   - Done when these pass against a seeded dataset
