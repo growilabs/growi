@@ -21,7 +21,7 @@
   - _Boundary: spike（integ テスト前提）_
   - _Blocked: 実 MongoDB が必要（同上）。CI integ で明示 `_id` 利用の fixture が通るかを検証する。_
 
-- [ ] 1.3 schema.prisma の relation 明示と型再生成
+- [x] 1.3 schema.prisma の relation 明示と型再生成
   - `model activities` の `user` リレーションに `onDelete: NoAction, onUpdate: NoAction` を明示（mongoose-to-prisma スキル準拠。Mongoose に整合性強制が無いため）
   - フィールド追加・index 変更はしない（複合 unique `@@unique` は不変）。`pnpm prisma generate` で型を再生成
   - 観察可能な完了状態: 再生成後の Prisma クライアント型に `activities.user` リレーションが存在し、型エラーなくビルドできる
