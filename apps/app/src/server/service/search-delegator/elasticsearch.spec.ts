@@ -349,7 +349,7 @@ describe('ElasticsearchDelegator', () => {
       // index state stays observable rather than being asserted through a spy.
       addAllAuditlogsSpy = vi
         .spyOn(delegator, 'addAllAuditlogs')
-        .mockResolvedValue(undefined);
+        .mockResolvedValue({ totalCount: 0, count: 0 });
     });
 
     it('reindexes into the tmp index before dropping the live index', async () => {
