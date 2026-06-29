@@ -2,7 +2,10 @@ import fs from 'node:fs';
 import path from 'node:path';
 import { defineConfig, devices, type Project } from '@playwright/test';
 
-const authFile = path.resolve(__dirname, './playwright/.auth/admin.json');
+const authFile = path.resolve(
+  import.meta.dirname,
+  './playwright/.auth/admin.json',
+);
 
 // Use prepared auth state.
 const storageState = fs.existsSync(authFile) ? authFile : undefined;

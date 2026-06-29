@@ -159,7 +159,10 @@ graph TB
 apps/growi-vault-manager/
 ├── package.json                              # Ts.ED + isomorphic-git + mongoose
 ├── tsconfig.json                             # strict TypeScript
-├── Dockerfile                                # node + git binary (apk add git)
+├── docker/
+│   ├── Dockerfile                            # build: node:24-bookworm / release: dhi.io dev (git binary)
+│   ├── Dockerfile.dockerignore               # build-context trimming
+│   └── docker-entrypoint.ts                  # root prepares /data repo, then drops to node (uid 1000)
 ├── src/
 │   ├── server.ts                             # Ts.ED bootstrap + DI container
 │   ├── controllers/

@@ -1,13 +1,9 @@
 import { Agent } from '@mastra/core/agent';
 
-import { configManager } from '~/server/service/config-manager';
-
-import { getOpenaiProvider } from '../../ai-sdk-modules/get-openai-provider';
+import { resolveMastraModel } from '../../ai-sdk-modules/resolve-mastra-model';
 import { memory } from '../memory';
 import { fullTextSearchTool } from '../tools/full-text-search-tool';
 import { getPageContentTool } from '../tools/get-page-content-tool';
-
-const model = configManager.getConfig('openai:assistantModel:mastraAgent');
 
 export const growiAgent = new Agent({
   id: 'growiAgent',
@@ -23,7 +19,14 @@ export const growiAgent = new Agent({
   - Keep answers concise and well-structured with headings, lists, and links where helpful.
   `,
 
-  model: getOpenaiProvider()(model),
+  // Resolve the model lazily (DynamicArgument<MastraModelConfig>): the function
+  // runs at use time, not at import time, so constructing the agent never throws
+  // even when the provider/API key are unconfigured (Req 4.3). On misconfiguration
+  // resolveMastraModel() throws; the throw surfaces at request time and is
+  // handled by the post-message route's existing try/catch (Req 4.4). Its
+  // message carries only the provider name / missing-var name — never the API key
+  // (Req 4.1, 2.5).
+  model: () => resolveMastraModel(),
   tools: {
     fullTextSearchTool,
     getPageContentTool,

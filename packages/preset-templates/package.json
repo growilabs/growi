@@ -4,6 +4,7 @@
   "description": "GROWI preset templates",
   "license": "MIT",
   "private": true,
+  "type": "module",
   "scripts": {
     "test": "vitest run",
     "lint": "biome check"

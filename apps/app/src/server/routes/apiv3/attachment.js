@@ -24,7 +24,8 @@ import { excludeReadOnlyUser } from '../../middlewares/exclude-read-only-user';
 const logger = loggerFactory('growi:routes:apiv3:attachment');
 
 const router = express.Router();
-const { query, param, body } = require('express-validator');
+
+import { body, param, query } from 'express-validator';
 
 /**
  * @swagger
@@ -133,8 +134,11 @@ const { query, param, body } = require('express-validator');
  *            description: temporary URL cached
  *            example: "https://example.com/attachment/5e0734e072560e001761fa67"
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequired = loginRequiredFactory(crowi, true);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const { Page, User } = crowi.models;

@@ -8,8 +8,8 @@ import {
 } from 'react';
 import dynamic from 'next/dynamic';
 import { GlobalCodeMirrorEditorKey, useSetResolvedTheme } from '@growi/editor';
-import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment';
-import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor';
+import { CodeMirrorEditorComment } from '@growi/editor/dist/client/components/CodeMirrorEditorComment.js';
+import { useCodeMirrorEditorIsolated } from '@growi/editor/dist/client/stores/codemirror-editor.js';
 import { UserPicture } from '@growi/ui/dist/components';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';

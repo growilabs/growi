@@ -151,7 +151,7 @@
   "Page Tree": "페이지 트리",
   "Bookmarks": "북마크",
   "In-App Notification": "알림",
-  "AI Chat": "AI 채팅",
+  "GROWI AI": "GROWI AI",
   "original_path": "원본 경로",
   "new_path": "새 경로",
   "duplicated_path": "중복된 경로",
@@ -511,12 +511,18 @@
     "selected_editable_revision": "선택된 편집 가능한 페이지 본문"
   },
   "ai_unavailable": {
-    "open_cloud_settings_to_enable": "AI 통합을 활성화하려면 GROWI.cloud 관리 화면을 확인하십시오",
-    "to_cloud_settings": "GROWI.cloud 관리 화면 열기"
+    "open_admin_settings_to_enable": "AI 통합을 활성화하려면 관리 화면에서 설정하십시오",
+    "to_admin_ai_settings": "AI 설정 관리 화면 열기",
+    "contact_admin_to_enable": "AI 통합이 활성화되지 않았습니다. 관리자에게 문의하십시오."
   },
   "ai_sidebar": {
     "new_chat": "새 채팅",
     "recent_threads": "최근 항목",
+    "error": {
+      "title": "오류가 발생했습니다",
+      "retry": "다시 시도",
+      "dismiss": "닫기"
+    },
     "toaster": {
       "thread_deleted_success": "스레드 삭제됨",
       "thread_deleted_failed": "스레드 삭제 실패"
@@ -850,6 +856,8 @@
   },
   "user_home_page": {
     "bookmarks": "북마크",
+    "contribution_graph": "기여 그래프",
+    "contribution_migration_in_progress": "기여 데이터를 준비하고 있습니다. 잠시 후 새로고침하면 표시됩니다.",
     "recently_created": "최근 생성됨",
     "recent_activity": "최근 활동",
     "unknown_action": "지정되지 않은 변경 사항을 적용했습니다",
@@ -1014,5 +1022,12 @@
       "docs_color": "색상 상세 정보",
       "docs_alert": "알림 블록 상세 정보"
     }
+  },
+  "pageMention": {
+    "placeholder": "메시지를 입력하세요... ( @ 로 페이지 멘션 )",
+    "hint": "검색할 페이지 이름을 입력하세요",
+    "searching": "검색 중...",
+    "noResults": "페이지를 찾을 수 없습니다",
+    "candidatesLabel": "페이지 후보"
   }
 }

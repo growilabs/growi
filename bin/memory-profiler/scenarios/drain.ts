@@ -11,7 +11,7 @@
  * Design: Req 2.1 (3-phase ordering — Drain follows Load), Req 2.5
  * (reproducibility — const export is the single source of truth).
  */
-import type { LoadDriver } from '../load-driver';
+import type { LoadDriver } from '../load-driver.ts';
 
 /**
  * Duration of the drain idle phase in seconds.

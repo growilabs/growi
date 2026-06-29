@@ -69,7 +69,6 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
   return {
     props: {
       serverConfig: {
-        aiEnabled: configManager.getConfig('app:aiEnabled'),
         isUsersHomepageDeletionEnabled: configManager.getConfig(
           'security:user-homepage-deletion:isEnabled',
         ),
@@ -121,4 +120,25 @@ export const getServerSideGeneralPageProps: GetServerSideProps<
       },
     },
   };
+};
+
+export const getServerSideShareLinkRendererConfigProps: GetServerSideProps<
+  RendererConfigProps
+> = async (context: GetServerSidePropsContext) => {
+  const result = await getServerSideRendererConfigProps(context);
+
+  if ('props' in result) {
+    const props = await result.props;
+    return {
+      props: {
+        ...props,
+        rendererConfig: {
+          ...props.rendererConfig,
+          isSharedPage: true,
+        },
+      },
+    };
+  }
+
+  return result;
 };

@@ -153,7 +153,7 @@
   "Page Tree": "Arborescence",
   "Bookmarks": "Favoris",
   "In-App Notification": "Notifications",
-  "AI Chat": "Chat IA",
+  "GROWI AI": "GROWI AI",
   "original_path": "Chemin originel",
   "new_path": "Nouveau chemin",
   "duplicated_path": "Chemin dupliqué",
@@ -536,12 +536,18 @@
     "selected_editable_revision": "Corps de page sélectionné (Modifiable)"
   },
   "ai_unavailable": {
-    "open_cloud_settings_to_enable": "Veuillez consulter l'écran de gestion GROWI.cloud pour activer l'intégration AI",
-    "to_cloud_settings": "Ouvrir les paramètres GROWI.cloud"
+    "open_admin_settings_to_enable": "Configurez les paramètres AI sur la page d'administration pour activer l'intégration AI",
+    "to_admin_ai_settings": "Ouvrir les paramètres AI",
+    "contact_admin_to_enable": "L'intégration AI n'est pas activée. Veuillez contacter votre administrateur."
   },
   "ai_sidebar": {
     "new_chat": "Nouvelle discussion",
     "recent_threads": "Éléments récents",
+    "error": {
+      "title": "Une erreur s'est produite",
+      "retry": "Réessayer",
+      "dismiss": "Fermer"
+    },
     "toaster": {
       "thread_deleted_success": "Discussion supprimée",
       "thread_deleted_failed": "Échec de la suppression de la discussion"
@@ -875,6 +881,8 @@
   },
   "user_home_page": {
     "bookmarks": "Favoris",
+    "contribution_graph": "Graphe de contribution",
+    "contribution_migration_in_progress": "Préparation de vos données de contribution. Actualisez dans un instant pour les voir.",
     "recently_created": "Pages récentes",
     "recent_activity": "Modifications récentes",
     "unknown_action": "a effectué une modification non spécifiée",
@@ -1037,5 +1045,12 @@
       "docs_color": "En savoir plus sur les Couleurs",
       "docs_alert": "En savoir plus sur les Blocs d'alerte"
     }
+  },
+  "pageMention": {
+    "placeholder": "Saisissez un message... ( @ pour mentionner une page )",
+    "hint": "Saisissez un nom de page pour rechercher",
+    "searching": "Recherche en cours...",
+    "noResults": "Aucune page trouvée",
+    "candidatesLabel": "Pages suggérées"
   }
 }

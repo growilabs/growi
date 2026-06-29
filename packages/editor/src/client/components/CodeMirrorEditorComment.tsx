@@ -2,12 +2,12 @@ import { type JSX, memo, useEffect } from 'react';
 import type { Extension } from '@codemirror/state';
 import { keymap } from '@codemirror/view';
 
-import type { GlobalCodeMirrorEditorKey } from '../../consts';
+import type { GlobalCodeMirrorEditorKey } from '../../consts/index.js';
 import {
   CodeMirrorEditor,
   type CodeMirrorEditorProps,
-} from '../components-internal/CodeMirrorEditor';
-import { useCodeMirrorEditorIsolated } from '../stores/codemirror-editor';
+} from '../components-internal/CodeMirrorEditor/index.js';
+import { useCodeMirrorEditorIsolated } from '../stores/codemirror-editor.js';
 
 const additionalExtensions: Extension[] = [];
 

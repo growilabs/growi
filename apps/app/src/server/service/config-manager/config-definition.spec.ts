@@ -266,3 +266,87 @@ describe('config-definition suggest-path agentic keys', () => {
     });
   });
 });
+
+describe('config-definition multi-llm-provider keys', () => {
+  describe('CONFIG_KEYS array', () => {
+    it('contains ai:provider', () => {
+      expect(CONFIG_KEYS).toContain('ai:provider');
+    });
+
+    it('contains ai:apiKey', () => {
+      expect(CONFIG_KEYS).toContain('ai:apiKey');
+    });
+
+    it('contains ai:model', () => {
+      expect(CONFIG_KEYS).toContain('ai:model');
+    });
+
+    it('contains ai:providerOptions', () => {
+      expect(CONFIG_KEYS).toContain('ai:providerOptions');
+    });
+  });
+
+  describe('CONFIG_DEFINITIONS', () => {
+    describe('ai:provider', () => {
+      it('has envVarName AI_PROVIDER', () => {
+        expect(CONFIG_DEFINITIONS['ai:provider'].envVarName).toBe(
+          'AI_PROVIDER',
+        );
+      });
+
+      it('has no default value (provider is required)', () => {
+        expect(CONFIG_DEFINITIONS['ai:provider'].defaultValue).toBe(undefined);
+      });
+
+      it('is not marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:provider'].isSecret).toBeFalsy();
+      });
+    });
+
+    describe('ai:apiKey', () => {
+      it('has envVarName AI_API_KEY', () => {
+        expect(CONFIG_DEFINITIONS['ai:apiKey'].envVarName).toBe('AI_API_KEY');
+      });
+
+      it('has default value of undefined', () => {
+        expect(CONFIG_DEFINITIONS['ai:apiKey'].defaultValue).toBe(undefined);
+      });
+
+      it('is marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:apiKey'].isSecret).toBe(true);
+      });
+    });
+
+    describe('ai:model', () => {
+      it('has envVarName AI_MODEL', () => {
+        expect(CONFIG_DEFINITIONS['ai:model'].envVarName).toBe('AI_MODEL');
+      });
+
+      it('has no default value (model is required)', () => {
+        expect(CONFIG_DEFINITIONS['ai:model'].defaultValue).toBe(undefined);
+      });
+
+      it('is not marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:model'].isSecret).toBeFalsy();
+      });
+    });
+
+    describe('ai:providerOptions', () => {
+      it('has envVarName AI_PROVIDER_OPTIONS', () => {
+        expect(CONFIG_DEFINITIONS['ai:providerOptions'].envVarName).toBe(
+          'AI_PROVIDER_OPTIONS',
+        );
+      });
+
+      it('has no default value (unset means no provider options)', () => {
+        expect(CONFIG_DEFINITIONS['ai:providerOptions'].defaultValue).toBe(
+          undefined,
+        );
+      });
+
+      it('is not marked as secret', () => {
+        expect(CONFIG_DEFINITIONS['ai:providerOptions'].isSecret).toBeFalsy();
+      });
+    });
+  });
+});

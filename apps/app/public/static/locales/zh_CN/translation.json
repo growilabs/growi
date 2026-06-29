@@ -158,7 +158,7 @@
   "Page Tree": "页面树",
   "Bookmarks": "书签",
   "In-App Notification": "通知",
-  "AI Chat": "AI 聊天",
+  "GROWI AI": "GROWI AI",
   "original_path": "Original path",
   "new_path": "New path",
   "duplicated_path": "Duplicated path",
@@ -532,12 +532,18 @@
     "selected_editable_revision": "选定的可编辑页面正文"
   },
   "ai_unavailable": {
-    "open_cloud_settings_to_enable": "请查看 GROWI.cloud 管理界面以启用 AI 集成",
-    "to_cloud_settings": "前往 GROWI.cloud 管理界面"
+    "open_admin_settings_to_enable": "请在管理界面中配置 AI 设置以启用 AI 集成",
+    "to_admin_ai_settings": "前往 AI 设置管理界面",
+    "contact_admin_to_enable": "AI 集成尚未启用。请联系您的管理员。"
   },
   "ai_sidebar": {
     "new_chat": "新建对话",
     "recent_threads": "最近的项目",
+    "error": {
+      "title": "发生错误",
+      "retry": "重试",
+      "dismiss": "关闭"
+    },
     "toaster": {
       "thread_deleted_success": "已删除会话",
       "thread_deleted_failed": "删除会话失败"
@@ -885,6 +891,8 @@
   },
   "user_home_page": {
     "bookmarks": "书签",
+    "contribution_graph": "贡献图",
+    "contribution_migration_in_progress": "正在准备您的贡献数据。请稍后刷新查看。",
     "recently_created": "最近创建页面",
     "recent_activity": "最近动态",
     "unknown_action": "进行了未指明的更改",
@@ -1050,5 +1058,12 @@
       "docs_color": "了解更多关于颜色的信息",
       "docs_alert": "了解更多关于警告框的信息"
     }
+  },
+  "pageMention": {
+    "placeholder": "输入消息...（ 输入 @ 提及页面 ）",
+    "hint": "输入页面名称进行搜索",
+    "searching": "搜索中...",
+    "noResults": "未找到页面",
+    "candidatesLabel": "页面候选"
   }
 }

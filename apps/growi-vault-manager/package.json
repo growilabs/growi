@@ -7,14 +7,16 @@
   "private": true,
   "type": "module",
   "scripts": {
-    "dev:vault-manager": "cross-env NODE_ENV=development SWCRC=true node --import @swc-node/register/esm-register src/index.ts",
-    "dev:vault-manager:ci": "cross-env NODE_ENV=development SWCRC=true node --import @swc-node/register/esm-register src/index.ts --ci",
+    "dev:vault-manager": "cross-env NODE_ENV=development node --import @swc-node/register/esm-register src/index.ts",
+    "dev:vault-manager:ci": "cross-env NODE_ENV=development node --import @swc-node/register/esm-register src/index.ts --ci",
     "start:prod": "cross-env NODE_ENV=production node dist/index.js",
     "start:prod:ci": "cross-env NODE_ENV=production pnpm start:prod --ci",
     "lint:biome": "biome check",
     "lint:typecheck": "tsc --noEmit",
     "lint": "run-p lint:**",
     "build": "pnpm tsc -p tsconfig.build.json",
+    "version:prerelease": "pnpm version prerelease --preid=RC --no-git-tag-version --no-git-checks",
+    "version:prepatch": "pnpm version prepatch --preid=RC --no-git-tag-version --no-git-checks",
     "test": "vitest run",
     "test:integ": "RUN_VAULT_INTEG=true vitest run src/__tests__"
   },
@@ -47,7 +49,6 @@
     "@types/dotenv-flow": "^3.2.0",
     "@types/express": "^4.17.21",
     "@types/node": "^20.18.3",
-    "unplugin-swc": "^1.5.3",
     "vitest": "^2.0.0"
   }
 }

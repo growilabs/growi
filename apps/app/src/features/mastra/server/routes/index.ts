@@ -1,21 +1,17 @@
-import { ErrorV3 } from '@growi/core/dist/models';
 import express from 'express';
 
-import { isAiEnabled } from '~/features/openai/server/services';
 import type Crowi from '~/server/crowi';
-import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
+
+import { aiReadyGuard } from './ai-ready-guard';
 
 const router = express.Router();
 
 export const factory = (crowi: Crowi): express.Router => {
-  // disable all routes if AI is not enabled
-  if (!isAiEnabled()) {
-    router.all('*', (req, res: ApiV3Response) => {
-      return res.apiv3Err(new ErrorV3('GROWI AI is not enabled'), 501);
-    });
-  }
+  // Gate every mastra route on a per-request availability check (enabled AND
+  // configured). Applied via router.use so readiness is re-evaluated on each
+  // request — a toggle/config change takes effect without a restart (Req 7.5).
+  router.use(aiReadyGuard);
 
-  // enabled
   import('./post-message').then(({ postMessageHandlersFactory }) => {
     router.post('/message', postMessageHandlersFactory(crowi));
   });

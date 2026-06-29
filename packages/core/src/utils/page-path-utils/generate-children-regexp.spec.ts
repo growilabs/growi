@@ -1,6 +1,6 @@
 import { describe, expect, test } from 'vitest';
 
-import { generateChildrenRegExp } from './generate-children-regexp';
+import { generateChildrenRegExp } from './generate-children-regexp.js';
 
 describe('generateChildrenRegExp', () => {
   describe.each([

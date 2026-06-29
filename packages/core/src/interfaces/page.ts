@@ -1,13 +1,13 @@
-import type { Ref } from './common';
-import type { HasObjectId } from './has-object-id';
+import type { Ref } from './common.js';
+import type { HasObjectId } from './has-object-id.js';
 import type {
   HasRevisionShortbody,
   IRevision,
   IRevisionHasId,
-} from './revision';
-import type { SubscriptionStatusType } from './subscription';
-import type { ITag } from './tag';
-import type { IUser, IUserGroup, IUserGroupHasId, IUserHasId } from './user';
+} from './revision.js';
+import type { SubscriptionStatusType } from './subscription.js';
+import type { ITag } from './tag.js';
+import type { IUser, IUserGroup, IUserGroupHasId, IUserHasId } from './user.js';
 
 export const GroupType = {
   userGroup: 'UserGroup',

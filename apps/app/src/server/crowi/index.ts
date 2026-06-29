@@ -1,4 +1,4 @@
-import next from 'next';
+import nextPkg from 'next';
 import http from 'node:http';
 import path from 'node:path';
 import { createTerminus } from '@godaddy/terminus';
@@ -6,7 +6,10 @@ import { createHttpLoggerMiddleware } from '@growi/logger';
 import attachmentRoutes from '@growi/remark-attachment-refs/dist/server';
 import lsxRoutes from '@growi/remark-lsx/dist/server/index.cjs';
 import type { Express } from 'express';
+import expressFactory from 'express';
+import expressSession from 'express-session';
 import mongoose from 'mongoose';
+import uidSafe from 'uid-safe';
 
 import instantiateAuditLogBulkExportJobCleanUpCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-clean-up-cron';
 import instantiateAuditLogBulkExportJobCronService from '~/features/audit-log-bulk-export/server/service/audit-log-bulk-export-job-cron';
@@ -14,6 +17,8 @@ import { checkAuditLogExportJobInProgressCronService } from '~/features/audit-lo
 import { KeycloakUserGroupSyncService } from '~/features/external-user-group/server/service/keycloak-user-group-sync';
 import { LdapUserGroupSyncService } from '~/features/external-user-group/server/service/ldap-user-group-sync';
 import { initializeVaultFeature } from '~/features/growi-vault/server';
+import { isAiReady as resolveIsAiReady } from '~/features/mastra/server/services/is-ai-configured';
+import { modelConfigSync } from '~/features/mastra/server/services/model-config-sync';
 import { checkPageBulkExportJobInProgressCronService } from '~/features/page-bulk-export/server/service/check-page-bulk-export-job-in-progress-cron';
 import instanciatePageBulkExportJobCleanUpCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-clean-up-cron';
 import instanciatePageBulkExportJobCronService from '~/features/page-bulk-export/server/service/page-bulk-export-job-cron';
@@ -66,10 +71,17 @@ import UserGroupService from '../service/user-group';
 import { UserNotificationService } from '../service/user-notification';
 import { initializeYjsService } from '../service/yjs';
 import { getMongoUri, mongoOptions } from '../util/mongoose-utils';
+import { setup as setupExpressInit } from './express-init';
 import type { ModelsMapDependentOnCrowi } from './setup-models';
 import { setupModelsDependentOnCrowi } from './setup-models';
 
 const logger = loggerFactory('growi:crowi');
+
+// next's CJS entry self-patches `module.exports` to the createServer function,
+// so the runtime default import IS callable; the shipped d.ts (`export default`
+// in a CJS package) makes NodeNext type it as the module namespace instead.
+// Narrow the binding back to the callable declared as its `default`.
+const next = nextPkg as unknown as typeof import('next').default;
 
 const sep = path.sep;
 
@@ -211,7 +223,7 @@ class Crowi {
     this.publicDir = path.join(projectRoot, 'public') + sep;
     this.resourceDir = path.join(projectRoot, 'resource') + sep;
     this.localeDir = path.join(this.resourceDir, 'locales') + sep;
-    this.viewsDir = path.resolve(__dirname, '../views') + sep;
+    this.viewsDir = path.resolve(import.meta.dirname, '../views') + sep;
     this.tmpDir = path.join(projectRoot, 'tmp') + sep;
     this.cacheDir = path.join(this.tmpDir, 'cache');
 
@@ -323,6 +335,18 @@ class Crowi {
     return false;
   }
 
+  // AI usability verdict (enabled && configured) for callers that cannot reach
+  // the module-level config singleton safely — notably getServerSideProps, which
+  // runs in the Next/Turbopack SSR realm where a directly-imported configManager
+  // is a separate, never-loaded instance ("Config is not loaded"). Exposing the
+  // verdict here makes it execute in this (Express) realm, where the singleton is
+  // bootstrapped and loaded, so SSR code only needs the crowi reference it already
+  // has. Mirrors the verdict the mastra route guard uses, keeping UI and API
+  // aligned (Req 7.4).
+  isAiReady(): boolean {
+    return resolveIsAiReady();
+  }
+
   setConfig(config: Record<string, unknown>): void {
     this.config = config;
   }
@@ -344,8 +368,7 @@ class Crowi {
     return await mongoose.connect(mongoUri, mongoOptions);
   }
 
-  setupSessionConfig(): void {
-    const session = require('express-session');
+  async setupSessionConfig(): Promise<void> {
     const sessionMaxAge =
       this.configManager.getConfig('security:sessionMaxAge') || 2592000000; // default: 30days
     const redisUrl =
@@ -353,7 +376,7 @@ class Crowi {
       this.env.REDIS_URI ||
       this.env.REDIS_URL ||
       null;
-    const uid = require('uid-safe').sync;
+    const uid = uidSafe.sync;
 
     // generate pre-defined uid for healthcheck
     const healthcheckUid = uid(24);
@@ -380,15 +403,17 @@ class Crowi {
     }
 
     // use Redis for session store
+    // (loaded lazily: the redis stack is only needed when a Redis URL is configured)
     if (redisUrl) {
-      const redis = require('redis');
-      const redisClient = redis.createClient({ url: redisUrl });
-      const RedisStore = require('connect-redis')(session);
+      const { createClient } = await import('redis');
+      const redisClient = createClient({ url: redisUrl });
+      const { default: connectRedis } = await import('connect-redis');
+      const RedisStore = connectRedis(expressSession);
       sessionConfig.store = new RedisStore({ client: redisClient });
     }
     // use MongoDB for session store
     else {
-      const MongoStore = require('connect-mongo');
+      const { default: MongoStore } = await import('connect-mongo');
       sessionConfig.store = MongoStore.create({
         client: mongoose.connection.getClient(),
       });
@@ -402,13 +427,18 @@ class Crowi {
     return await this.configManager.loadConfigs();
   }
 
-  setupS2sMessagingService(): void {
-    const s2sMessagingService = require('../service/s2s-messaging')(this);
+  async setupS2sMessagingService(): Promise<void> {
+    const { setup: setupS2sMessaging } = await import(
+      '../service/s2s-messaging'
+    );
+    const s2sMessagingService = await setupS2sMessaging(this);
     if (s2sMessagingService != null) {
-      s2sMessagingService.subscribe();
+      s2sMessagingService.subscribe(false);
       this.configManager.setS2sMessagingService(s2sMessagingService);
       // add as a message handler
       s2sMessagingService.addMessageHandler(this.configManager);
+      // discard the memoized Mastra model on remote AI settings updates
+      s2sMessagingService.addMessageHandler(modelConfigSync);
 
       this.s2sMessagingService = s2sMessagingService;
     }
@@ -493,8 +523,10 @@ class Crowi {
     this.searchService = await SearchService.create(this);
   }
 
-  setupMailer(): void {
-    const MailService = require('~/server/service/mail').default;
+  async setupMailer(): Promise<void> {
+    // intentionally lazy: service/mail participates in a require cycle with
+    // this hub module; loading it at import time would surface the cycle
+    const { default: MailService } = await import('~/server/service/mail');
     this.mailService = new MailService(this);
 
     // add as a message handler
@@ -557,20 +589,24 @@ class Crowi {
     await this.buildServer();
 
     // setup Next.js
-    // Save ts-node's .ts extension hook before Next.js prepare() destroys it.
+    // Save the dev TS runner's .ts extension hook (tsx registers one for CJS
+    // interop) before Next.js prepare() destroys it.
     // Next.js's next.config.ts transpiler registers/deregisters its own require hooks,
     // and deregisterHook() deletes require.extensions['.ts'] instead of restoring the previous hook.
-    const savedTsHook = require.extensions['.ts'];
+    // `typeof require` guards the CJS-only API: under the ESM build `require` is
+    // undefined and no .ts hook exists, so there is nothing to restore.
+    const cjsRequire = typeof require === 'function' ? require : undefined;
+    const savedTsHook = cjsRequire?.extensions['.ts'];
     this.nextApp = next({ dev });
     await this.nextApp.prepare();
-    // Restore ts-node's .ts hook if Next.js removed it
-    if (savedTsHook && !require.extensions['.ts']) {
-      require.extensions['.ts'] = savedTsHook;
+    // Restore the runner's .ts hook if Next.js removed it
+    if (cjsRequire && savedTsHook && !cjsRequire.extensions['.ts']) {
+      cjsRequire.extensions['.ts'] = savedTsHook;
     }
 
-    // setup CrowiDev
+    // setup CrowiDev (loaded lazily: development runtime only)
     if (dev) {
-      const CrowiDev = require('./dev');
+      const { default: CrowiDev } = await import('./dev');
       this.crowiDev = new CrowiDev(this);
       this.crowiDev.init();
     }
@@ -624,9 +660,9 @@ class Crowi {
 
   async buildServer(): Promise<void> {
     const env = this.node_env;
-    const express: Express = require('express')();
+    const express: Express = expressFactory();
 
-    require('./express-init')(this, express);
+    setupExpressInit(this, express);
 
     // HTTP request logging via @growi/logger (encapsulates pino-http)
     const httpLogger = await createHttpLoggerMiddleware({
@@ -669,10 +705,9 @@ class Crowi {
    */
   async setupRoutesAtLast(): Promise<void> {
     type RoutesSetup = (crowi: Crowi, app: Express) => void;
-    // CommonJS modules are always wrapped in { default } when dynamically imported
-    const { default: setupRoutes } = (await import('../routes')) as unknown as {
-      default: RoutesSetup;
-    };
+    const { setup: setupRoutes }: { setup: RoutesSetup } = await import(
+      '../routes'
+    );
     setupRoutes(this, this.express);
   }
 
@@ -748,17 +783,19 @@ class Crowi {
   /**
    * setup FileUploadService
    */
-  setUpFileUpload(isForceUpdate = false): void {
+  async setUpFileUpload(isForceUpdate = false): Promise<void> {
     if (this.fileUploadService == null || isForceUpdate) {
-      this.fileUploadService = getUploader(this);
+      this.fileUploadService = await getUploader(this);
     }
   }
 
   /**
    * setup FileUploaderSwitchService
    */
-  setUpFileUploaderSwitchService(): void {
-    const FileUploaderSwitchService = require('../service/file-uploader-switch');
+  async setUpFileUploaderSwitchService(): Promise<void> {
+    const { default: FileUploaderSwitchService } = await import(
+      '../service/file-uploader-switch'
+    );
     this.fileUploaderSwitchService = new FileUploaderSwitchService(this);
     // add as a message handler
     if (this.s2sMessagingService != null) {

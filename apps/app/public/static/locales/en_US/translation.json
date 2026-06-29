@@ -151,7 +151,7 @@
   "Page Tree": "Page Tree",
   "Bookmarks": "Bookmarks",
   "In-App Notification": "Notifications",
-  "AI Chat": "AI Chat",
+  "GROWI AI": "GROWI AI",
   "original_path": "Original path",
   "new_path": "New path",
   "duplicated_path": "Duplicated path",
@@ -540,12 +540,18 @@
     "selected_editable_revision": "Selected Page Body (Editable)"
   },
   "ai_unavailable": {
-    "open_cloud_settings_to_enable": "Please check the GROWI.cloud management screen to enable AI integration",
-    "to_cloud_settings": "Open GROWI.cloud Settings"
+    "open_admin_settings_to_enable": "Configure AI settings on the admin page to enable AI integration",
+    "to_admin_ai_settings": "Open AI Settings",
+    "contact_admin_to_enable": "AI integration is not enabled. Please contact your administrator."
   },
   "ai_sidebar": {
     "new_chat": "New Chat",
     "recent_threads": "Recent Items",
+    "error": {
+      "title": "An error occurred",
+      "retry": "Retry",
+      "dismiss": "Dismiss"
+    },
     "toaster": {
       "thread_deleted_success": "Thread deleted",
       "thread_deleted_failed": "Failed to delete thread"
@@ -879,6 +885,8 @@
   },
   "user_home_page": {
     "bookmarks": "Bookmarks",
+    "contribution_graph": "Contribution Graph",
+    "contribution_migration_in_progress": "Preparing your contribution data. Refresh in a moment to see it.",
     "recently_created": "Recently Created",
     "recent_activity": "Recent Activity",
     "unknown_action": "made an unspecified change",
@@ -1044,5 +1052,12 @@
       "docs_color": "Learn more about Colors",
       "docs_alert": "Learn more about Alert Blocks"
     }
+  },
+  "pageMention": {
+    "placeholder": "Type a message... ( @ to mention a page )",
+    "hint": "Type a page name to search",
+    "searching": "Searching...",
+    "noResults": "No pages found",
+    "candidatesLabel": "Page candidates"
   }
 }

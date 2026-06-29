@@ -1,0 +1,134 @@
+import type { JSX } from 'react';
+import { useId } from 'react';
+import { useTranslation } from 'next-i18next';
+import { useFormContext } from 'react-hook-form';
+import { Alert, FormGroup, FormText, Input, Label } from 'reactstrap';
+
+import type { AiSettingsFormValues } from './ai-settings-form-values';
+import { ModelField } from './ModelField';
+import { registerToInputProps } from './register-to-input-props';
+
+export interface AzureOpenaiSettingsProps {
+  /** Disable the inputs when env-only mode is active (4.2). */
+  readonly disabled: boolean;
+}
+
+/**
+ * Register-based form for the Azure OpenAI connection settings (3.1).
+ *
+ * Reads/writes the shared react-hook-form context owned by `AiSettings`. Renders
+ * nothing unless the watched `provider === 'azure-openai'` (3.2). When
+ * `azureOpenaiSettings.useEntraId` is on, surfaces a note that the apiKey is not used
+ * (3.3) — the apiKey field itself lives in `ProviderCommonSettings`, which also
+ * labels the model field as the Azure deployment name for this provider (3.4).
+ *
+ * Azure is the most configuration-heavy provider (resource name vs. base URL,
+ * optional API version, two auth methods), so each field carries inline help and
+ * the Entra ID note spells out how credentials are resolved — managed/workload
+ * identity when GROWI runs on Azure, environment variables otherwise.
+ */
+export const AzureOpenaiSettings = (
+  props: AzureOpenaiSettingsProps,
+): JSX.Element | null => {
+  const { disabled } = props;
+  const { t } = useTranslation('admin');
+  const { register, watch } = useFormContext<AiSettingsFormValues>();
+
+  const resourceNameId = useId();
+  const baseUrlId = useId();
+  const apiVersionId = useId();
+  const useEntraIdId = useId();
+
+  if (watch('provider') !== 'azure-openai') {
+    return null;
+  }
+
+  const useEntraId = watch('azureOpenaiSettings.useEntraId');
+
+  return (
+    <div>
+      <h2 className="border-bottom my-4 admin-setting-header">
+        {t('ai_settings.azure_section_title')}
+      </h2>
+
+      {/* `ai:model` carries the Azure *deployment name* for this provider, so the
+          shared model field is rendered here (labelled accordingly) rather than in
+          the provider-agnostic common settings. */}
+      <ModelField
+        labelKey="ai_settings.azure_model_deployment_label"
+        disabled={disabled}
+      />
+
+      <FormGroup className="mb-3">
+        <Label for={resourceNameId}>
+          {t('ai_settings.azure_resource_name_label')}
+        </Label>
+        <Input
+          id={resourceNameId}
+          type="text"
+          disabled={disabled}
+          {...registerToInputProps(
+            register('azureOpenaiSettings.resourceName'),
+          )}
+        />
+        <FormText>{t('ai_settings.azure_resource_name_help')}</FormText>
+      </FormGroup>
+
+      <FormGroup className="mb-3">
+        <Label for={baseUrlId}>{t('ai_settings.azure_base_url_label')}</Label>
+        <Input
+          id={baseUrlId}
+          type="text"
+          disabled={disabled}
+          {...registerToInputProps(register('azureOpenaiSettings.baseURL'))}
+        />
+        <FormText>{t('ai_settings.azure_base_url_help')}</FormText>
+      </FormGroup>
+
+      <FormGroup className="mb-3">
+        <Label for={apiVersionId}>
+          {t('ai_settings.azure_api_version_label')}
+        </Label>
+        <Input
+          id={apiVersionId}
+          type="text"
+          disabled={disabled}
+          {...registerToInputProps(register('azureOpenaiSettings.apiVersion'))}
+        />
+        <FormText>{t('ai_settings.azure_api_version_help')}</FormText>
+      </FormGroup>
+
+      <FormGroup switch className="mb-3">
+        <Input
+          id={useEntraIdId}
+          type="switch"
+          role="switch"
+          disabled={disabled}
+          {...registerToInputProps(register('azureOpenaiSettings.useEntraId'))}
+        />
+        <Label htmlFor={useEntraIdId} className="ms-2">
+          {t('ai_settings.azure_use_entra_id_label')}
+        </Label>
+      </FormGroup>
+
+      {useEntraId && (
+        <Alert color="info" className="mb-3">
+          <p className="mb-2">{t('ai_settings.azure_entra_id_api_key_note')}</p>
+          <p className="mb-2">
+            {t('ai_settings.azure_entra_id_credential_note')}
+          </p>
+          <ul className="mb-0 ps-3">
+            <li>{t('ai_settings.azure_entra_id_managed_identity_note')}</li>
+            <li>
+              {t('ai_settings.azure_entra_id_env_note')}
+              <span className="d-block mt-1">
+                <code>AZURE_TENANT_ID</code> / <code>AZURE_CLIENT_ID</code> /{' '}
+                <code>AZURE_CLIENT_SECRET</code>
+              </span>
+            </li>
+          </ul>
+        </Alert>
+      )}
+    </div>
+  );
+};

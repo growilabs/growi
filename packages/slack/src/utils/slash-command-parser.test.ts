@@ -1,5 +1,5 @@
-import { InvalidGrowiCommandError } from '../models/errors';
-import { parseSlashCommand } from './slash-command-parser';
+import { InvalidGrowiCommandError } from '../models/errors.js';
+import { parseSlashCommand } from './slash-command-parser.js';
 
 describe('parseSlashCommand', () => {
   describe('without growiCommandType', () => {

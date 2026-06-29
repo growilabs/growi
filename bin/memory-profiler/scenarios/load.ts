@@ -17,7 +17,7 @@
  * Design: Req 2.2 (mixed load), Req 2.5 (reproducibility), Req 7.1 (search /
  * get / list path coverage).
  */
-import type { LoadDriver } from '../load-driver';
+import type { LoadDriver } from '../load-driver.ts';
 
 // ---------------------------------------------------------------------------
 // Op counts — source of truth for reproducibility (Req 2.5)

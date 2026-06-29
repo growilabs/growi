@@ -1,6 +1,6 @@
-import type { KeyMapMode } from '../../../../consts';
-import { AllKeyMap } from '../../../../consts';
-import { OutlineSecondaryButtons } from './OutlineSecondaryButtons';
+import type { KeyMapMode } from '../../../../consts/index.js';
+import { AllKeyMap } from '../../../../consts/index.js';
+import { OutlineSecondaryButtons } from './OutlineSecondaryButtons.js';
 
 type KeymapControlProps = {
   setEditorKeymap: (value: KeyMapMode) => void;
