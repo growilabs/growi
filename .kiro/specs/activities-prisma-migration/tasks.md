@@ -124,7 +124,7 @@
   - _Requirements: 3.1, 3.2_
 
 - [ ] 6. フェーズ2 executor 群（pipeline/work-set を引数で受ける pure executor）
-- [ ] 6.1 (P) ユーザー別アクティビティ集計 executor
+- [x] 6.1 (P) ユーザー別アクティビティ集計 executor
   - `$facet`/`$lookup` pipeline を引数で受け `aggregateRaw`→正規化して `{docs, totalCount}` を返す pure executor を新規作成（spec 付き）。`apiv3/user-activities.ts` の `Activity.aggregate` を本 executor 呼び出しへ置換
   - 観察可能な完了状態: 単体テスト（pipeline 注入）で現行 Mongoose 集計と同一の docs/totalCount を返し、API が移行前と同一集計を返す
   - _Depends: 5.2_

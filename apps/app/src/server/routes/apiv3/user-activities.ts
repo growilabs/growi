@@ -9,9 +9,10 @@ import { Types } from 'mongoose';
 import type { IActivity } from '~/interfaces/activity';
 import { ActivityLogActions } from '~/interfaces/activity';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
+import { aggregateUserActivities } from '~/server/service/activity/aggregate-user-activities';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import type Crowi from '../../crowi';
 import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
@@ -272,8 +273,10 @@ export const setup = (crowi: Crowi): Router => {
           },
         ];
 
-        const [activityResults] =
-          await Activity.aggregate(userActivityPipeline);
+        const activityResults = await aggregateUserActivities(
+          prisma,
+          userActivityPipeline as unknown as Record<string, unknown>[],
+        );
 
         const serializedResults = activityResults.docs.map((doc: IActivity) => {
           const { user, ...rest } = doc;
@@ -283,10 +286,7 @@ export const setup = (crowi: Crowi): Router => {
           };
         });
 
-        const totalDocs =
-          activityResults.totalCount.length > 0
-            ? activityResults.totalCount[0].count
-            : 0;
+        const totalDocs = activityResults.totalCount;
         const totalPages = Math.ceil(totalDocs / limit);
         const page = Math.floor(offset / limit) + 1;
 
@@ -295,7 +295,8 @@ export const setup = (crowi: Crowi): Router => {
         const pagingCounter = offset + 1;
 
         const serializedPaginationResult: ActivityPaginationResult = {
-          docs: serializedResults,
+          // serializedResults are IActivity docs with their user populated and serialized
+          docs: serializedResults as unknown as IActivity[],
           totalDocs,
           limit,
           offset,
