@@ -1,5 +1,5 @@
 import type { IUser, Ref } from '@growi/core';
-import type { Document, Model, SortOrder } from 'mongoose';
+import type { Document, Model } from 'mongoose';
 import { Schema, Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
@@ -35,17 +35,12 @@ export interface ActivityDocument extends Document {
   createdAt: Date;
 }
 
-export interface ActivityModel extends Model<ActivityDocument> {
-  [x: string]: any;
-  getActionUsersFromActivities(activities: ActivityDocument[]): any[];
-}
-
 const snapshotSchema = new Schema<ISnapshot>({
   username: { type: String, index: true },
 });
 
 // TODO: add revision id
-const activitySchema = new Schema<ActivityDocument, ActivityModel>(
+const activitySchema = new Schema<ActivityDocument>(
   {
     user: {
       type: Schema.Types.ObjectId,
@@ -104,57 +99,12 @@ activitySchema.post('save', function () {
   logger.debug({ activity: this }, 'activity has been created');
 });
 
-activitySchema.statics.createByParameters = async function (
-  parameters,
-): Promise<IActivity> {
-  const activity = (await this.create(parameters)) as unknown as IActivity;
-
-  return activity;
-};
-
-// When using this method, ensure that activity updates are allowed using ActivityService.shoudUpdateActivity
-activitySchema.statics.updateByParameters = async function (
-  activityId: string,
-  parameters,
-): Promise<ActivityDocument | null> {
-  const activity = await this.findOneAndUpdate(
-    { _id: activityId },
-    parameters,
-    { new: true },
-  ).exec();
-
-  return activity;
-};
-
-activitySchema.statics.findSnapshotUsernamesByUsernameRegexWithTotalCount =
-  async function (
-    q: string,
-    option: { sortOpt: SortOrder; offset: number; limit: number },
-  ): Promise<{ usernames: string[]; totalCount: number }> {
-    const opt = option || {};
-    const sortOpt = opt.sortOpt || 1;
-    const offset = opt.offset || 0;
-    const limit = opt.limit || 10;
-
-    const conditions = { 'snapshot.username': { $regex: q, $options: 'i' } };
-
-    const usernames = await this.aggregate()
-      .skip(0)
-      .limit(10000) // Narrow down the search target
-      .match(conditions)
-      .group({ _id: '$snapshot.username' })
-      .sort({ _id: sortOpt }) // Sort "snapshot.username" in ascending order
-      .skip(offset)
-      .limit(limit);
-
-    const totalCount = (
-      await this.find(conditions).distinct('snapshot.username')
-    ).length;
-
-    return { usernames: usernames.map((r) => r._id), totalCount };
-  };
-
-export default getOrCreateModel<ActivityDocument, ActivityModel>(
+// NOTE: export default is kept (not removed per mongoose-to-prisma Step 6) because
+// service/activity.ts calls Activity.createIndexes() to register the TTL index, and
+// integration specs seed the collection via this Mongoose model.  The Mongoose schema
+// block above remains for collection/index registration (requirement 4.3) until all
+// models have migrated to Prisma.
+export default getOrCreateModel<ActivityDocument, Model<ActivityDocument>>(
   'Activity',
   activitySchema,
 );

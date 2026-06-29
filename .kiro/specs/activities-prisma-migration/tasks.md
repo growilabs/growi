@@ -160,7 +160,7 @@
   - _Depends: 6.1, 6.2, 6.3, 6.4_
   - _Requirements: 3.1, 3.2, 3.3, 3.4_
 
-- [ ] 7.2 Mongoose statics の撤去とモデルファイル整理
+- [x] 7.2 Mongoose statics の撤去とモデルファイル整理
   - `models/activity.ts` の3 statics（`createByParameters`/`updateByParameters`/`findSnapshotUsernamesByUsernameRegexWithTotalCount`）と Mongoose 専用 interface を撤去。schema 本体・`createTtlIndex` 用の登録は残す。全消費者移行後に `export default` を撤去
   - 観察可能な完了状態: 3 statics が削除されても型チェック・ビルドが通り、schema 登録と TTL index 作成は継続する
   - _Depends: 7.1_
