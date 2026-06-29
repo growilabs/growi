@@ -22,7 +22,7 @@
 ## Boundary Commitments
 
 ### This Spec Owns
-- `models/activity.ts` の Mongoose statics（`createByParameters` / `updateByParameters` / `findSnapshotUsernamesByUsernameRegexWithTotalCount` / `getActionUsersFromActivities`）の Prisma 拡張（`ActivityExtension`）への置換と、`utils/prisma.ts` への `.$extends(ActivityExtension)` 追加。
+- `models/activity.ts` の Mongoose statics（`createByParameters` / `updateByParameters` / `findSnapshotUsernamesByUsernameRegexWithTotalCount`）の Prisma 拡張（`ActivityExtension`）への置換と、`utils/prisma.ts` への `.$extends(ActivityExtension)` 追加。（`getActionUsersFromActivities` は static 実装が無く移植不要。）
 - Activity を読む全消費者（一覧 paginate・集計 aggregate×2・CSV cursor・各 find/create/update）の Prisma 経由への移行。
 - 難所（集計・cursor バッチング）を **pipeline／work-set を引数で受ける pure executor** として分離（確定2：Option C 構造）。
 - **共有 `utils/prisma` の `paginate` 入力を offset に一本化**（確定1）。これに伴う **external-account の1呼び出し箇所（`page→offset`）の変換**を含む。
@@ -119,8 +119,8 @@ graph TB
 実装は **フェーズ B**（読み書き先行 → 難所）で段階化する（確定2）。各ファイルの所属フェーズを併記する。
 
 ### Modified Files
-- `apps/app/src/server/models/activity.ts` — 末尾に `ActivityExtension`（`Prisma.defineExtension`）を追加。`model.activities`: `createByParameters` / `updateByParameters` / `findSnapshotUsernamesByUsernameRegexWithTotalCount` / `getActionUsersFromActivities`。`result.activities`: `_id` / `__v` alias。Mongoose schema 本体・`createByParameters` 等 statics は**フェーズ2完了時に撤去**（それまで併存）。`export default` の撤去も全消費者移行後。【フェーズ1で拡張追加・フェーズ2で statics 撤去】
-- `apps/app/src/utils/prisma.ts` — (1) `paginate` の入力を **offset 一本化**（`skip = offset`、出力は `page`/`totalPages`/`hasNextPage` 等を内部計算で保持）。(2) `.$extends(ActivityExtension)` を追加。【フェーズ1】
+- `apps/app/src/server/models/activity.ts` — 末尾に `ActivityExtension`（`Prisma.defineExtension`）を追加。`model.activities`: `createByParameters` / `updateByParameters` / `findSnapshotUsernamesByUsernameRegexWithTotalCount`（`getActionUsersFromActivities` は static 実装が無く移植不要）。`result.activities`: `_id` / `__v` alias。Mongoose schema 本体・`createByParameters` 等 statics は**フェーズ2完了時に撤去**（それまで併存）。`export default` の撤去も全消費者移行後。【フェーズ1で拡張追加・フェーズ2で statics 撤去】
+- `apps/app/src/utils/prisma.ts` — (1) `paginate` の入力を **offset 一本化**（`skip = offset`）。**出力は mongoose-paginate-v2 互換**にする：`offset` フィールドを必ず含め、`page = Math.ceil((offset+1)/limit)`・`pagingCounter = (page-1)*limit + 1`・`hasPrevPage/prevPage` は「`page===1 && offset!==0` のとき `hasPrevPage=true, prevPage=1`」という mongoose-paginate-v2 の分岐を再現する。`utils/prisma.ts` 内の `PaginateResult<T>` interface を `apps/app/src/interfaces/mongoose-utils.ts` の shape（`offset: number` を含む）に揃える。(2) `.$extends(ActivityExtension)` を追加。【フェーズ1】
 - `apps/app/src/server/models/external-account.ts` ＋ `apps/app/src/server/routes/apiv3/users.js`(external-accounts ルート) — paginate offset 化に追随し `findAllWithPagination` を `offset` 受けに変更（呼び出し側で `offset=(page-1)*limit`）。挙動・出力不変。【フェーズ1：共有ヘルパ変更の一部】
 - `apps/app/src/server/routes/apiv3/activity.ts` — `Activity.paginate(query,{offset,limit,sort,populate})` を `prisma.activities.paginate({where,orderBy,offset,limit,include:{user:true}})` へ。where の `$in`→`{in}`・composite filter 変換、`populate:'user'`→`include`＋`userId→user` remap。【フェーズ1】
 - `apps/app/src/server/service/activity.ts` — `createActivity`（`createByParameters`）と `activityEvent.on('update')`（`updateByParameters`）を拡張メソッド経由へ。`createTtlIndex`（`createIndexes`＋raw collection）は据え置き（Mongoose import 継続、要件 4-3）。【フェーズ1】
@@ -230,10 +230,10 @@ updateByParameters(activityId: string, parameters: Partial<IActivityParameters>)
 findSnapshotUsernamesByUsernameRegexWithTotalCount(
   q: string, option: { sortOpt: 1 | -1; offset: number; limit: number },
 ): Promise<{ usernames: string[]; totalCount: number }>;
-getActionUsersFromActivities(activities: activities[]): users[];
+// 注: getActionUsersFromActivities は static 実装が無く移植不要（Open Questions 参照）
 ```
 - Preconditions: `createPrisma()` に `.$extends(ActivityExtension)` 済み。
-- Postconditions: 既存 statics と同じ戻り値・例外。`updateByParameters` の戻りは下流（pre-notify/in-app-notification）が読む `user`/`target`/`_id`/`targetModel`/`action` を満たす（Key Decision 5）。
+- Postconditions: 既存 statics と同じ戻り値・例外。**`updateByParameters` は `include: { user: true }` を付け、戻り値に `userId`(string) と `user`(relation) の両方を含める（確定）**。下流の3経路——`pre-notify.ts` の `getIdForRef(activity.user)`、`update-activity-logic.ts` の `getIdStringForRef(lastContentActivity?.user)`、`in-app-notification.ts` の `{ _id, targetModel, target, action }` 分割代入——はこれで互換を保つ（`getIdForRef`/`getIdStringForRef` は Ref も populated も受けるため）。同 `include` は `apiv3/activity.ts`/`user-activities.ts` の `serializeUserSecurely(user)` が要求する populated user も満たす。`target`/`_id`/`targetModel`/`action` はフラットなのでそのまま乗る。
 - Invariants: 公開シグネチャを既存 statics と一致させ、消費者の呼び出し形を変えない。
 
 ### Service / Feature executors（Option C）
@@ -267,7 +267,8 @@ exportActivityCursor(
 paginate(options: { where?; orderBy?; include?; select?; offset?: number; limit?: number })
   : Promise<PaginateResult<T>>; // docs,totalDocs,limit,offset,page,totalPages,hasNextPage,...
 ```
-- Invariants: 出力 shape は mongoose-paginate-v2 互換（`offset` 含む）。external-account・activity 一覧・将来の消費者すべてが offset 入力で揃う。external-account の観察可能挙動は不変（呼び出し側で `offset=(page-1)*limit`）。
+- Invariants: 出力 shape は mongoose-paginate-v2 互換（`offset` を必ず含み、`page`/`pagingCounter`/`hasPrevPage`/`prevPage` を上記 File Structure Plan の式どおりに導出）。`utils/prisma` の `PaginateResult<T>` を `interfaces/mongoose-utils.ts` の shape（`offset: number` 含む）に一致させる。external-account・activity 一覧・将来の消費者すべてが offset 入力で揃う。external-account の観察可能挙動は不変（呼び出し側で `offset=(page-1)*limit`）。
+- 背景: 現行は `mongoose-paginate-v2` が結果に `offset` を必ず詰める（`apiv3/activity.ts` の応答型 `PaginateResult` は `offset` を必須宣言）。現状の `utils/prisma` の `paginate` 戻り型には `offset` が無いため、揃えないと型エラーまたは画面のページ番号・「前へ」ボタン挙動がずれる（要件 2.3・5.4 違反）。
 
 ## Data Models
 - **schema.prisma の変更は最小**: `model activities` の `user` リレーションへ `onDelete: NoAction, onUpdate: NoAction` を明示（Mongoose に整合性強制が無いため。mongoose-to-prisma スキル準拠）。フィールド追加・index 変更はしない（`ActivitiesSnapshot` への添付フィールド追加は `activity-log` の責務）。
@@ -284,7 +285,7 @@ paginate(options: { where?; orderBy?; include?; select?; offset?: number; limit?
 ### Unit Tests
 - `prisma-raw-normalize`: `$oid`/`$date` を含む aggregateRaw 戻りを正しく `string`/`Date` へ正規化（要件 3.1・3.2）。
 - `aggregate-user-activities` / `aggregate-contributions`: 注入した pipeline に対し、現行 Mongoose 集計と同一の docs/totalCount／日次集計を返す（pipeline 注入でテスト容易）。
-- `offset paginate`: offset 入力 → 正しい skip と、出力の page 系フィールド（`page`/`totalPages`/`hasNextPage`）が offset/limit と整合（要件 2.1・2.3）。
+- `offset paginate`: offset 入力 → 正しい skip と、出力の page 系フィールド（`page`/`totalPages`/`hasNextPage`）が offset/limit と整合（要件 2.1・2.3）。**出力に `offset` フィールドが必ず含まれること**と、**`page===1 && offset!==0` のとき `hasPrevPage=true, prevPage=1` になる**こと（mongoose-paginate-v2 互換）を観察可能契約として検証する。
 
 ### Integration Tests（実 DB）
 - 記録: middleware→`activityEvent('update')` で activity が移行前と同じフィールドで確定する（要件 1.1・1.2）。記録対象外 action はスキップ（要件 1.3）。
@@ -300,12 +301,15 @@ paginate(options: { where?; orderBy?; include?; select?; offset?: number; limit?
 - **段階移行（フェーズ B）**: フェーズ1（読み書き＋paginate）でゲート達成 → フェーズ2（集計・cursor・autocomplete）で完了。フェーズ間は併存可（Mongoose schema 残置）。
 - **Mongoose 据え置き**: schema 登録・`createTtlIndex`・index 作成は全モデル移行完了まで Mongoose が担う（要件 4-1・4-3）。`prisma db push` は使わない。
 - 実装時運用: schema.prisma 変更後は `pnpm prisma generate` で型再生成。
+- **既存 quirk `offset || 1` は維持する（純粋移行）**: `apiv3/activity.ts` は `const offset = req.query.offset || 1` で、フロントが1ページ目に送る `offset=0` が falsy のため `offset=1` に化け、**現状は1ページ目の先頭1件をスキップしている**。純粋移行の原則（観察可能挙動を変えない・要件 2.1）に従い、**この挙動を移行後もそのまま維持**する（移行後に素直に `skip=0` にすると件数が変わり要件 2.1 違反になるため）。この潜在不具合の修正は R6 の regex と同様**スコープ外**とし、別変更に切り出す。実装時はルートの `offset` 受け取り → 新 paginate への受け渡しで `offset` が現状どおり（`|| 1` 込み）skip に届くことを確認する。
 
 ## Open Questions / Risks（Research Needed の引き継ぎ）
 - **R1**: composite type（`snapshot.username`）への `where` フィルタ構文が introspect 済み型で意図通り効くか（autocomplete／一覧フィルタ）。
 - **R2**: `aggregateRaw` の戻り型と `$oid`/`$date` 表現。`$facet`/`$lookup`/`$dateTrunc` 込み既存 pipeline をそのまま渡せるか。
 - **R3**: cursor の最適手段（`cursor`+`take` バッチ反復のメモリ/性能）。確定3で方向づけ済み、性能は実測で確認。
-- **R4**: `create`/`createMany` で明示 `_id`（ObjectId 文字列）を指定できるか（integ テスト）。
-- **R5（解決済み方針）**: paginate 出力は page 系フィールドを保持し offset 入力（確定1）。
+- **R4**: `create`/`createMany` で明示 `_id`（ObjectId 文字列）を指定できるか（integ テスト）。R1 とともに**フェーズ2・integ テストの前提なので、フェーズ1 内で先行検証タスクとして潰す**（design レビュー Minor 反映）。
+- **R5（解決済み方針）**: paginate 出力は `offset` を必ず含み、`page`/`pagingCounter`/`hasPrevPage` を mongoose-paginate-v2 互換式で導出（確定1。Critical 1 反映済み）。
 - **R6（スコープ外）**: `findSnapshotUsernames` の regex は現状の生 `q` を維持（エスケープ改善は別変更）。
-- **Key Decisions（実装で確定）**: (4) create 時の `user`/`target` の ID 正規化の所在（拡張内 vs 呼び出し側）、(5) `updateByParameters` 戻りに `include:{user:true}` が要るか／`getIdForRef(userId)` で足りるか。
+- **Key Decision 5（確定）**: `updateByParameters` は `include: { user: true }` を付け `userId` と `user` の両方を返す（上記 ActivityExtension Postconditions に確定として記載。Critical 3 反映済み）。
+- **Key Decision 4（実装で確定）**: create 時の `user`/`target` のオブジェクト→ID 正規化の所在（拡張内で正規化 vs 呼び出し側で ID 化）。フェーズ1 で決める。
+- **`getActionUsersFromActivities` は移行不要**: gap 分析で「static 実装は無く、`in-app-notification.ts` のインライン関数が `populate` 経由で activity を読むだけ」と判明。`ActivityExtension` への移植は不要（モデル interface 上の宣言のみ）。実装者の混乱回避のため明記（design レビュー Minor 反映）。
