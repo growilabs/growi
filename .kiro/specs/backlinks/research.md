@@ -219,6 +219,50 @@
 - **Follow-up / open**: auto-start vs. admin-triggered is a delivery decision (same job, different
   trigger); verify `CronService` registration site and the bulk-export claim/progress pattern.
 
+### Decision: recognize permalink (`/{id}`) and same-wiki absolute-URL link targets
+
+- **Context**: Requirements 1.9–1.11 and 5.4 (added after the first design pass) extend recognition
+  to links written as page **permalinks** (`/{pageId}`) and to **absolute URLs** whose origin is
+  this wiki. Requirement 1.3 redefines "external" as *different-host* absolute URLs, and 1.6 extends
+  self-link exclusion to a page's own permalink.
+- **Sources Consulted**:
+  - `packages/core/src/utils/page-path-utils/index.ts:21-24` (`isPermalink` = `isValidObjectId(path.substring(1))`),
+    `:101-121` (`restrictedPatternsToCreate` / `isCreatablePage`)
+  - `packages/core/src/utils/path-utils.ts:85-97` (`removeHeadingSlash`)
+  - `packages/core/src/utils/objectid-utils.ts:3-16` (`isValidObjectId`)
+  - `apps/app/src/components/ReactMarkdownComponents/NextLink.tsx:15-24` (`isExternalLink`:
+    `new URL(siteUrl ?? 'https://example.com')`, compares `baseUrl.host !== hrefUrl.host`, uses
+    `hrefUrl.pathname`), `:48` (`useSiteUrl()`)
+  - `apps/app/src/services/renderer/rehype-plugins/relative-links.ts:35-65` (skips `isAbsolute(href)`
+    and anchor links; resolves relative hrefs against `pagePath`)
+  - `apps/app/src/server/service/config-manager/config-definition.ts` (`app:siteUrl`, env `APP_SITE_URL`,
+    default `undefined`)
+- **Findings**:
+  - `isCreatablePage('/{objectid}')` returns **true** (a bare ObjectId matches none of the restricted
+    patterns), so a resolved permalink path survives the extraction gate and needs no special keep-rule.
+  - `relativeLinks` **leaves absolute `http(s)://` URLs untouched**, so the extraction collector must
+    classify absolute hrefs itself (host vs. `app:siteUrl`), mirroring `NextLink.isExternalLink`.
+  - **AC 9 caveat surfaced during design**: the renderer resolves relative links against the linking
+    page's *directory*, and `isPermalink` matches only an exact `/{id}` path — so `./{pageId}` is a
+    permalink only from a top-level page. AC 9 was reworded to key recognition off the **resolved
+    absolute path** rather than promising the `./{pageId}` syntax. (Requirements clarification, not
+    a design workaround.)
+- **Selected Approach**:
+  - `resolveToPage`: permalink branch first — `isPermalink(toPath)` → `Page.findById(removeHeadingSlash(toPath))`;
+    no path lookup or redirect-following. Such rows are `_id`-stable and rename-immune (5.4).
+  - `extractInternalLinks(markdown, pagePath, siteUrl?)`: classify each `a[href]` — absolute URL kept
+    as `url.pathname` iff `siteUrl` set and same host (1.10); dropped otherwise / when `siteUrl` unset
+    (1.3, 1.11); `siteUrl` is an injected param (function stays pure; the service reads `configManager`).
+  - Self-permalink exclusion (1.6): drop at sync any resolved row where `toPage == fromPage` (the path
+    self-link is still dropped cheaply in extraction).
+  - Backfill: permalink resolution is an **id-existence check** against the `{path→_id}` map's values,
+    not a path lookup.
+- **Rationale**: keys recognition off the resolved path (robust to authoring form), reuses GROWI's own
+  `isExternalLink` host rule for consistency with what the renderer/UI treat as internal, and keeps the
+  pure extractor config-free. No schema change — `toPath`/`toPage` already model id-stable edges.
+- **Trade-offs**: absolute-URL recognition requires `app:siteUrl` to be configured (1.11); host (not
+  origin) comparison ignores scheme/port, matching `NextLink`.
+
 ## Risks & Mitigations
 
 - **Index lag after save** (listener is async, not awaited) — Mitigation: acceptable for v1

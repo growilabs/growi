@@ -37,38 +37,46 @@
 
 - [ ] 2. Core: link extraction and target resolution (pure logic)
 - [ ] 2.1 (P) Implement internal-link extraction from a page body
-  - Build a pure function that takes a Markdown body + the page's path and returns a deduplicated
-    list of resolved internal page paths, reusing the existing remark/rehype link plugins
-    (pukiwiki + relative-links) in a trimmed server processor
-  - Recognize standard Markdown, wiki-link (`[[alias>/path]]`), and raw-HTML anchors; exclude
-    external URLs, in-page `#` anchors, and links inside code spans/blocks; strip query/anchor;
-    normalize paths; gate on `isCreatablePage`; drop the page's self-link
-  - Done when unit tests cover each link form and each exclusion rule and assert the deduped,
-    self-excluded result
-  - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.6_
+  - Build a pure function that takes a Markdown body, the page's path, and the wiki's site URL, and
+    returns a deduplicated list of resolved internal page paths, reusing the existing remark/rehype
+    link plugins (pukiwiki + relative-links) in a trimmed server processor
+  - Recognize standard Markdown, wiki-link (`[[alias>/path]]`), and raw-HTML anchors; classify
+    scheme-bearing absolute URLs by host (same host as the configured site URL → keep its path
+    component; different host → external; site URL unset → no absolute URL is internal); exclude
+    in-page `#` anchors and links inside code spans/blocks; strip query/anchor; normalize paths;
+    gate on `isCreatablePage`; pass page-permalink (`/{id}`) targets through unchanged; drop the
+    page's own-**path** self-link only (a link to the page's own permalink cannot be detected here —
+    the extractor has no page `_id` — and is dropped later at sync, task 3.1)
+  - Done when unit tests cover each link form and each exclusion rule, plus a same-host absolute URL
+    kept as its path, a different-host URL and a (site-URL-unset) absolute URL both excluded, and a
+    permalink returned verbatim; the deduped result excludes the page's own-path self-link
+  - _Requirements: 1.2, 1.3, 1.4, 1.5, 1.6, 1.9, 1.10, 1.11_
   - _Boundary: extractInternalLinks_
   - _Depends: 1.1_
 
 - [ ] 2.2 (P) Implement target-page resolution with redirect following
-  - Build the live-path resolver: a stored path resolves to a page id by direct path lookup, else
+  - Build the live-path resolver: a **permalink** path (`/{id}`) resolves directly to that page id
+    with no path lookup or redirect-following; otherwise a path resolves by direct path lookup, else
     by following the redirect chain to its endpoint, else null
-  - Handle multi-hop renames (A→B→C) via the redirect endpoint lookup; null when neither a page
-    nor a redirect resolves (the broken case)
-  - Done when unit tests cover direct hit, single and double redirect chains, and the unresolved
-    (null) case
-  - _Requirements: 5.1, 5.2, 5.3_
+  - Handle multi-hop renames (A→B→C) via the redirect endpoint lookup; null when neither a page nor
+    a redirect resolves (the broken case); a permalink to a non-existent id also resolves to null
+  - Done when unit tests cover direct hit, single and double redirect chains, the unresolved (null)
+    case, and a permalink resolving by id (and to null when no page has that id)
+  - _Requirements: 1.9, 5.1, 5.2, 5.3, 5.4_
   - _Boundary: resolveToPage_
   - _Depends: 1.1_
 
 - [ ] 3. Core: synchronization logic and the backlinks service
 - [ ] 3.1 Implement the index synchronization operations
   - Implement the row operations on top of the model: replace a source page's outbound rows from a
-    freshly extracted+resolved set; re-resolve inbound rows matching a given path (to repoint stale
-    caches when a page appears at that path); reconcile a deleted page by checking its current DB
-    state (still trashed → no-op; truly gone → remove its outbound rows and null inbound `toPage`)
-  - Done when unit tests show: replacing outbound rows is idempotent; reconcile no-ops a trashed
-    page and nulls inbound `toPage` for a permanently-gone page
-  - _Requirements: 3.1, 3.2, 3.3, 6.2_
+    freshly extracted+resolved set, **dropping any resolved row whose target is the source page
+    itself** (covers a page linking to its own permalink); re-resolve inbound rows matching a given
+    path (to repoint stale caches when a page appears at that path); reconcile a deleted page by
+    checking its current DB state (still trashed → no-op; truly gone → remove its outbound rows and
+    null inbound `toPage`)
+  - Done when unit tests show: replacing outbound rows is idempotent and excludes a self-permalink
+    row; reconcile no-ops a trashed page and nulls inbound `toPage` for a permanently-gone page
+  - _Requirements: 1.6, 3.1, 3.2, 3.3, 6.2_
   - _Boundary: page-link-sync, PageLink_
   - _Depends: 1.2, 2.1, 2.2_
 
@@ -76,11 +84,14 @@
   - Implement service handlers that, given a page lifecycle event, drive the sync operations:
     create/update re-extract the body and replace outbound rows (create also re-resolves inbound
     matches); delete/deleteCompletely/syncDescendantsDelete route to the state-based reconcile
+  - The service reads the configured site URL and passes it into extraction (so same-wiki absolute
+    URLs are recognized), keeping the extractor itself config-free
   - Handlers are idempotent and tolerate missing/empty bodies and already-removed pages; they read
     the body from the latest revision when the event payload lacks it
   - Done when unit tests invoke each handler with a fake event payload and assert the resulting row
-    changes (created/replaced/removed/nulled)
-  - _Requirements: 3.1, 3.2, 3.3, 6.2_
+    changes (created/replaced/removed/nulled), including a same-wiki absolute link recorded as an
+    internal row
+  - _Requirements: 1.10, 1.11, 3.1, 3.2, 3.3, 6.2_
   - _Boundary: PageLinkService_
   - _Depends: 3.1_
 
@@ -174,11 +185,13 @@
 - [ ] 6.2 Implement the throttled, resumable backfill job
   - Implement a cron-based job that, per tick, processes a bounded chunk of pages: build/reuse an
     in-memory path→id map (one projection query) for resolution instead of per-link lookups,
-    extract links via the core extractor, and bulk-upsert rows; persist the progress marker after
-    each chunk and resume from it on restart
+    extract links via the core extractor (passing the configured site URL), resolve permalink
+    targets via an id-existence check against the known page ids (not the path map), and bulk-upsert
+    rows; persist the progress marker after each chunk and resume from it on restart
   - Throttle via cron cadence × chunk size; skip immediately once the job document is complete
-  - Done when running the job over a seeded dataset populates rows equivalent to the live path, a
-    re-run/resume adds no duplicates, and progress is emitted on the admin channel
+  - Done when running the job over a seeded dataset (including pages linked by permalink and by
+    same-wiki absolute URL) populates rows equivalent to the live path, a re-run/resume adds no
+    duplicates, and progress is emitted on the admin channel
   - _Requirements: 4.1, 4.2, 4.3_
   - _Boundary: PageLinkBackfillCron_
   - _Depends: 6.1, 2.1, 1.2_
@@ -197,10 +210,12 @@
 - [ ] 7.1 Integration tests for lifecycle, permissions, rename/move, and delete states
   - Cover: create/update add and remove backlinks; deleted page is no longer an active source;
     backlinks exclude pages the viewer cannot read and reflect grant changes; inbound links survive
-    rename/move (including descendants) with no index writes; trash → trashed, permanent delete →
-    broken, restore → normal
+    rename/move (including descendants) with no index writes; a permalink-based backlink keeps
+    resolving after its target is renamed/moved with no index writes; a page linking to its own
+    permalink is excluded from its own backlinks; trash → trashed, permanent delete → broken,
+    restore → normal
   - Done when these scenarios pass against the wired service through real lifecycle operations
-  - _Requirements: 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 5.1, 5.2, 6.1, 6.2, 6.3_
+  - _Requirements: 1.6, 1.9, 2.1, 2.2, 2.3, 2.4, 3.1, 3.2, 3.3, 5.1, 5.2, 5.4, 6.1, 6.2, 6.3_
   - _Depends: 5.1_
 
 - [ ] 7.2 E2E test for the backlinks panel
