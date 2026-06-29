@@ -1,4 +1,4 @@
-import ExtensibleCustomError from 'extensible-custom-error';
+import { ExtensibleCustomError } from '~/server/util/extensible-custom-error';
 
 export class PathAlreadyExistsError extends ExtensibleCustomError {
   targetPath: string;
@@ -16,3 +16,6 @@ export class NullUsernameToBeRegisteredError extends ExtensibleCustomError {}
 
 // Invalid Parent bookmark folder error
 export class InvalidParentBookmarkFolderError extends ExtensibleCustomError {}
+
+export class BookmarkFolderNotFoundError extends ExtensibleCustomError {}
+export class BookmarkFolderForbiddenError extends ExtensibleCustomError {}

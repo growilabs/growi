@@ -1,6 +1,6 @@
 import type React from 'react';
 
-import { growiReact } from './growi-react';
+import { growiReact } from './growi-react.js';
 
 describe('growiReact()', () => {
   const mockReact = { useState: () => {} } as unknown as typeof React;

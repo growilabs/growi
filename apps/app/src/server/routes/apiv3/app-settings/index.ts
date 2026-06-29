@@ -1,10 +1,13 @@
 import { ConfigSource, SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
-import pathUtils from '@growi/core/dist/utils/path-utils';
+import * as pathUtils from '@growi/core/dist/utils/path-utils';
+import type { Router } from 'express';
 import express from 'express';
 import { body } from 'express-validator';
 
-import * as nextI18nConfig from '^/config/next-i18next.config';
+// next-i18next.config.mjs has a single `export default` config object; `i18n` is
+// a property of it, not a named export. Use a default import and read `.i18n`.
+import nextI18nConfig from '^/config/next-i18next.config.mjs';
 
 import { SupportedAction } from '~/interfaces/activity';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
@@ -20,6 +23,7 @@ import loggerFactory from '~/utils/logger';
 import { generateAddActivityMiddleware } from '../../../middlewares/add-activity';
 import { apiV3FormValidator } from '../../../middlewares/apiv3-form-validator';
 import type { ApiV3Response } from '../interfaces/apiv3-response';
+import { setup as setupFileUploadSetting } from './file-upload-setting';
 
 const logger = loggerFactory('growi:routes:apiv3:app-settings');
 
@@ -318,7 +322,7 @@ const router = express.Router();
  *            type: boolean
  *            description: is enable internal stream system for azure file request
  */
-module.exports = (crowi: Crowi) => {
+export const setup = (crowi: Crowi): Router => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware();
@@ -392,6 +396,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: /app-settings
    *        description: get app setting params
    *        responses:
@@ -1034,7 +1039,7 @@ module.exports = (crowi: Crowi) => {
     },
   );
 
-  router.use('/file-upload-setting', require('./file-upload-setting')(crowi));
+  router.use('/file-upload-setting', setupFileUploadSetting(crowi));
 
   router.put(
     '/page-bulk-export-settings',
@@ -1087,6 +1092,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: AccessToken supported.
    *        description: Update V5SchemaMigration
    *        responses:
@@ -1145,6 +1151,7 @@ module.exports = (crowi: Crowi) => {
    *        security:
    *          - bearer: []
    *          - accessTokenInQuery: []
+   *          - accessTokenHeaderAuth: []
    *        summary: AccessToken supported.
    *        description: Update MaintenanceMode
    *        requestBody:

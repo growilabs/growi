@@ -322,5 +322,116 @@ describe('ConfigManager test', () => {
       ); // Should fallback to env when db value is undefined
       expect(configManager.getConfig('app:fileUploadType')).toBe('gridfs'); // Should use db value when valid
     });
+
+    describe('env-only mode for AI settings (env:useOnlyEnvVars:ai)', () => {
+      // The 5 keys fixed by the env:useOnlyEnvVars:ai control key:
+      // app:aiEnabled + the 4 ai:* keys. The former single ai:model /
+      // ai:providerOptions keys were replaced by the ai:allowedModels array
+      // (the Azure connection config is one ai:azureOpenaiSettings JSON object).
+      const aiKeys = [
+        'app:aiEnabled',
+        'ai:provider',
+        'ai:apiKey',
+        'ai:allowedModels',
+        'ai:azureOpenaiSettings',
+      ] as const;
+
+      // Distinct db/env values per key so a resolution that picks the wrong
+      // source is observable. Booleans use opposite values across db/env; the
+      // ai:allowedModels arrays differ by entry; the ai:azureOpenaiSettings
+      // object differs by field value across db/env.
+      const dbValues: Partial<TestConfigData> = {
+        'app:aiEnabled': { value: true },
+        'ai:provider': { value: 'openai' },
+        'ai:apiKey': { value: 'db-api-key' },
+        'ai:allowedModels': {
+          value: [
+            {
+              modelId: 'db-model',
+              providerOptions: { openai: { db: true } },
+              isDefault: true,
+            },
+          ],
+        },
+        'ai:azureOpenaiSettings': {
+          value: {
+            resourceName: 'db-resource',
+            baseURL: 'https://db.example.com',
+            apiVersion: '2024-db',
+            useEntraId: true,
+          },
+        },
+      };
+      const envValues: Partial<TestConfigData> = {
+        'app:aiEnabled': { value: false },
+        'ai:provider': { value: 'anthropic' },
+        'ai:apiKey': { value: 'env-api-key' },
+        'ai:allowedModels': {
+          value: [
+            {
+              modelId: 'env-model',
+              providerOptions: { anthropic: { env: true } },
+              isDefault: true,
+            },
+          ],
+        },
+        'ai:azureOpenaiSettings': {
+          value: {
+            resourceName: 'env-resource',
+            baseURL: 'https://env.example.com',
+            apiVersion: '2024-env',
+            useEntraId: false,
+          },
+        },
+      };
+
+      test('returns env value only (ignoring db) for all 5 AI keys when control key is true', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: true },
+        });
+
+        for (const key of aiKeys) {
+          expect(configManager.getConfig(key)).toEqual(envValues[key]?.value);
+        }
+      });
+
+      test('returns db value (env as fallback default) for all 5 AI keys when control key is false', () => {
+        setTestConfigs(dbValues, {
+          ...envValues,
+          'env:useOnlyEnvVars:ai': { value: false },
+        });
+
+        for (const key of aiKeys) {
+          expect(configManager.getConfig(key)).toEqual(dbValues[key]?.value);
+        }
+      });
+
+      test('falls back to env value when db value is undefined and control key is false', () => {
+        setTestConfigs(
+          { 'ai:provider': { value: undefined } },
+          {
+            'ai:provider': { value: 'anthropic' },
+            'env:useOnlyEnvVars:ai': { value: false },
+          },
+        );
+
+        expect(configManager.getConfig('ai:provider')).toBe('anthropic');
+      });
+
+      test('does not change resolution of unrelated keys when control key is true', () => {
+        // app:title is not part of the ai env-only group, so it must keep the
+        // default db ?? env resolution regardless of env:useOnlyEnvVars:ai.
+        setTestConfigs(
+          { 'app:title': { value: 'db-title' } },
+          {
+            'app:title': { value: 'env-title' },
+            'env:useOnlyEnvVars:ai': { value: true },
+          },
+        );
+
+        expect(configManager.getConfig('app:title')).toBe('db-title');
+      });
+    });
   });
 });

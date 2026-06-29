@@ -22,11 +22,11 @@ jobs:
       with:
         ref: ${{ github.event.pull_request.base.ref }}
 
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v6
       with:
-        node-version: '20'
+        node-version: '24'
         cache: 'pnpm'
 
     - name: Install dependencies
@@ -104,7 +104,7 @@ jobs:
   build-app-image:
     needs: create-github-release
 
-    uses: growilabs/growi/.github/workflows/reusable-app-build-image.yml@master
+    uses: ./.github/workflows/reusable-app-build-image.yml
     with:
       source-version: refs/tags/v${{ needs.create-github-release.outputs.RELEASED_VERSION }}
       image-name: growilabs/growi
@@ -115,7 +115,7 @@ jobs:
   publish-app-image:
     needs: [determine-tags, build-app-image]
 
-    uses: growilabs/growi/.github/workflows/reusable-app-create-manifests.yml@master
+    uses: ./.github/workflows/reusable-app-create-manifests.yml
     with:
       tags: ${{ needs.determine-tags.outputs.TAGS }}
       registry: docker.io
@@ -159,11 +159,11 @@ jobs:
       with:
         ref: v${{ needs.create-github-release.outputs.RELEASED_VERSION }}
 
-    - uses: pnpm/action-setup@v4
+    - uses: pnpm/action-setup@v6
 
-    - uses: actions/setup-node@v4
+    - uses: actions/setup-node@v6
       with:
-        node-version: '20'
+        node-version: '24'
         cache: 'pnpm'
 
     - name: Install dependencies

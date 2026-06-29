@@ -12,12 +12,12 @@ import { apiV3FormValidator } from '../../middlewares/apiv3-form-validator';
 
 const logger = loggerFactory('growi:routes:apiv3:search');
 
-const express = require('express');
-const { body } = require('express-validator');
+import express from 'express';
+import { body } from 'express-validator';
 
 const router = express.Router();
 
-const noCache = require('nocache');
+import noCache from 'nocache';
 
 /**
  * @swagger
@@ -100,8 +100,11 @@ const noCache = require('nocache');
  *             write_load:
  *               type: number
  */
-/** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi) => {
+/**
+ * @param {import('~/server/crowi').default} crowi Crowi instance
+ * @returns {import('express').Router} router
+ */
+export const setup = (crowi) => {
   const loginRequired = loginRequiredFactory(crowi);
   const adminRequired = adminRequiredFactory(crowi);
   const addActivity = generateAddActivityMiddleware(crowi);
@@ -254,6 +257,7 @@ module.exports = (crowi) => {
     async (req, res) => {
       const operation = req.body.operation;
 
+      // @type {import('~/server/service/search').SearchService}
       const { searchService } = crowi;
 
       if (!searchService.isConfigured) {
@@ -288,7 +292,7 @@ module.exports = (crowi) => {
               .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
             // NOT wait the processing is terminated
-            searchService.rebuildIndex();
+            searchService.rebuildIndex(true);
 
             activityEvent.emit('update', res.locals.activity._id, {
               action: SupportedAction.ACTION_ADMIN_SEARCH_INDICES_REBUILD,

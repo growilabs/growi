@@ -9,7 +9,7 @@ import { Provider } from 'jotai';
 import { appWithTranslation } from 'next-i18next';
 import { SWRConfig } from 'swr';
 
-import * as nextI18nConfig from '^/config/next-i18next.config';
+import nextI18nConfig from '^/config/next-i18next.config.mjs';
 
 import { GlobalFonts } from '~/components/FontFamily/GlobalFonts';
 import type { CrowiRequest } from '~/interfaces/crowi-request';
@@ -28,6 +28,7 @@ import { deserializeSuperJSONProps } from './utils/superjson-ssr';
 
 import '~/styles/prebuilt/vendor.css';
 import '~/styles/style-app.scss';
+import '~/styles/tailwind.css';
 
 // register custom serializer
 registerTransformerForObjectId();
@@ -112,7 +113,7 @@ function GrowiApp(props: GrowiAppProps): JSX.Element {
 
 // inject userLocale by context
 GrowiApp.getInitialProps = async (appContext: AppContext) => {
-  const appProps = App.getInitialProps(appContext);
+  const appProps = await App.getInitialProps(appContext);
   const userLocale = getLocaleAtServerSide(
     appContext.ctx.req as unknown as CrowiRequest,
   );

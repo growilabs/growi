@@ -43,11 +43,22 @@ export default defineWorkspace([
       name: 'app-integration',
       environment: 'node',
       include: ['**/*.integ.ts'],
+      // Vault E2E tests live in their own project below — they need extra setup
+      // (spawning vault-manager, mounting express, seeding users) that the
+      // generic app-integration project should not pay for.
+      exclude: [
+        ...defaultExclude,
+        'playwright/**',
+        'tmp/**',
+        'src/features/growi-vault/__tests__/**',
+      ],
       // Pre-download the MongoDB binary before workers start to avoid lock-file race conditions
       globalSetup: ['./test/setup/mongo/global-setup.ts'],
       setupFiles: [
+        './test/setup/elasticsearch.ts',
         './test/setup/migrate-mongo.ts',
         './test/setup/mongo/index.ts',
+        './test/setup/prisma.ts',
       ],
       deps: {
         // Transform inline modules (allows ESM in require context)
@@ -62,6 +73,52 @@ export default defineWorkspace([
             '@growi/remark-lsx',
             /src\/server\/events/,
           ],
+        },
+      },
+    },
+  }),
+
+  // vault E2E integration test (separate project: extra setup spawns
+  // vault-manager and mounts the gateway router on a test Express server).
+  mergeConfig(configShared, {
+    resolve: {
+      conditions: ['require', 'node', 'default'],
+    },
+    ssr: {
+      resolve: {
+        conditions: ['require', 'node', 'default'],
+      },
+    },
+    test: {
+      name: 'app-integration-vault',
+      environment: 'node',
+      include: ['src/features/growi-vault/__tests__/*.integ.ts'],
+      globalSetup: ['./test/setup/mongo/global-setup.ts'],
+      setupFiles: [
+        // Vault E2E seeds the schemas it needs directly via mongoose factory
+        // calls — no migrate-mongo dependency. Skipping migrate-mongo also
+        // avoids the cross-file MONGO_URI carryover that breaks the second
+        // file's setup when the first file's mongo-memory-server is stopped.
+        './test/setup/mongo/index.ts',
+        './test/setup/vault-e2e/index.ts',
+      ],
+      // Vault provisioning is process-wide; running tests in a single fork
+      // avoids spinning up multiple vault-managers / Express servers.
+      // isolate=false reuses the module cache across files so mongoose model
+      // registrations (Comment, Page, etc.) are not re-executed and conflict.
+      pool: 'forks',
+      poolOptions: {
+        forks: { singleFork: true },
+      },
+      isolate: false,
+      // Timeout is generous to accommodate first-run vault-manager startup
+      // (~3-5s) and the bootstrap polling loop.
+      testTimeout: 60_000,
+      hookTimeout: 5 * 60 * 1000,
+      deps: { interopDefault: true },
+      server: {
+        deps: {
+          inline: [/src\/server\/events/],
         },
       },
     },

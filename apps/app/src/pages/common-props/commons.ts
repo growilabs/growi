@@ -24,6 +24,7 @@ export type CommonInitialProps = {
   growiCloudUri: string | undefined;
   growiAppIdForGrowiCloud: number | undefined;
   forcedColorScheme?: ColorScheme;
+  aiEnabled: boolean;
 };
 
 export const getServerSideCommonInitialProps: GetServerSideProps<
@@ -59,6 +60,14 @@ export const getServerSideCommonInitialProps: GetServerSideProps<
         'app:growiAppIdForCloud',
       ),
       forcedColorScheme,
+      // Routed through crowi (not a direct isAiReady import) on purpose: this
+      // runs in the Next SSR realm, where a directly-imported configManager is a
+      // separate, never-loaded instance. crowi.isAiReady() executes in the
+      // Express realm against the loaded config, and importing the server-only
+      // verdict module here would also leak the mongoose Config model into the
+      // client bundle. The verdict (= enabled && configured) mirrors the mastra
+      // route guard, keeping UI and API aligned.
+      aiEnabled: crowi.isAiReady(),
     } satisfies CommonInitialProps,
   };
 };

@@ -99,6 +99,7 @@ const validator = [
  *     security:
  *       - bearer: []
  *       - accessTokenInQuery: []
+ *       - accessTokenHeaderAuth: []
  *     requestBody:
  *       required: true
  *       content:
@@ -126,7 +127,7 @@ export const suggestPathHandlersFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
   return [
-    accessTokenParser([SCOPE.READ.FEATURES.AI_ASSISTANT], {
+    accessTokenParser([SCOPE.READ.FEATURES.AI], {
       acceptLegacy: true,
     }),
     loginRequiredStrictly,

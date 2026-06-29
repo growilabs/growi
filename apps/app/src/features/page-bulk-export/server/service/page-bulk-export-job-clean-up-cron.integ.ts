@@ -1,4 +1,5 @@
 import mongoose from 'mongoose';
+import { mock } from 'vitest-mock-extended';
 
 import type Crowi from '~/server/crowi';
 import { configManager } from '~/server/service/config-manager';
@@ -36,9 +37,15 @@ vi.mock('./page-bulk-export-job-cron', () => {
 });
 
 describe('PageBulkExportJobCleanUpCronService', () => {
-  const crowi = {} as Crowi;
-  // biome-ignore lint/suspicious/noImplicitAnyLet: ignore
-  let user;
+  const removeAttachmentMock = vi.fn(() => Promise.resolve());
+  const crowi = mock<Crowi>({
+    attachmentService: {
+      removeAttachment: removeAttachmentMock,
+    },
+  });
+  let user: mongoose.HydratedDocument<
+    mongoose.InferSchemaType<typeof userSchema>
+  >;
 
   beforeAll(async () => {
     await configManager.loadConfigs();
@@ -52,6 +59,7 @@ describe('PageBulkExportJobCleanUpCronService', () => {
 
   beforeEach(async () => {
     await PageBulkExportJob.deleteMany();
+    removeAttachmentMock.mockClear();
   });
 
   describe('deleteExpiredExportJobs', () => {
@@ -174,6 +182,146 @@ describe('PageBulkExportJobCleanUpCronService', () => {
       expect(jobs.map((job) => job._id).sort()).toStrictEqual(
         [jobId1, jobId3, jobId4].sort(),
       );
+    });
+  });
+
+  // Regression coverage for the race condition that left zombie job records
+  // when multiple expired jobs shared a single attachment (the duplicate-reuse
+  // path re-binds an existing attachment to a fresh job). Without the dedup,
+  // the concurrent cleanup loop calls removeAttachment per-sibling and the
+  // loser of the race throws "Attachment not found", which silently drops its
+  // job record out of the deleteMany() set.
+  describe('deleteDownloadExpiredExportJobs (shared attachment)', () => {
+    const sharedAttachmentId = new mongoose.Types.ObjectId();
+    const otherAttachmentId = new mongoose.Types.ObjectId();
+
+    beforeEach(async () => {
+      await configManager.updateConfig(
+        'app:bulkExportDownloadExpirationSeconds',
+        86400,
+      ); // 1 day
+    });
+
+    test('should call removeAttachment exactly once when multiple expired jobs share the same attachment', async () => {
+      // arrange: two expired jobs pointing at the same attachment (the
+      // duplicate-reuse path produces this shape)
+      const expiredAt = new Date(Date.now() - 86400 * 1000 - 1);
+      await PageBulkExportJob.insertMany([
+        {
+          user,
+          page: new mongoose.Types.ObjectId(),
+          format: PageBulkExportFormat.md,
+          status: PageBulkExportJobStatus.completed,
+          completedAt: expiredAt,
+          attachment: sharedAttachmentId,
+        },
+        {
+          user,
+          page: new mongoose.Types.ObjectId(),
+          format: PageBulkExportFormat.md,
+          status: PageBulkExportJobStatus.completed,
+          completedAt: expiredAt,
+          attachment: sharedAttachmentId,
+        },
+      ]);
+
+      // act
+      await pageBulkExportJobCleanUpCronService?.deleteDownloadExpiredExportJobs();
+
+      // assert: only one removeAttachment call for the shared attachment, and
+      // both job records are gone (no zombie left behind)
+      expect(removeAttachmentMock).toHaveBeenCalledTimes(1);
+      expect(removeAttachmentMock).toHaveBeenCalledWith(sharedAttachmentId);
+      expect(await PageBulkExportJob.find()).toHaveLength(0);
+    });
+
+    test('should still remove distinct attachments once each when expired jobs reference different attachments', async () => {
+      // arrange: ensure the dedup does not over-merge across distinct attachments
+      const expiredAt = new Date(Date.now() - 86400 * 1000 - 1);
+      await PageBulkExportJob.insertMany([
+        {
+          user,
+          page: new mongoose.Types.ObjectId(),
+          format: PageBulkExportFormat.md,
+          status: PageBulkExportJobStatus.completed,
+          completedAt: expiredAt,
+          attachment: sharedAttachmentId,
+        },
+        {
+          user,
+          page: new mongoose.Types.ObjectId(),
+          format: PageBulkExportFormat.md,
+          status: PageBulkExportJobStatus.completed,
+          completedAt: expiredAt,
+          attachment: otherAttachmentId,
+        },
+      ]);
+
+      // act
+      await pageBulkExportJobCleanUpCronService?.deleteDownloadExpiredExportJobs();
+
+      // assert
+      expect(removeAttachmentMock).toHaveBeenCalledTimes(2);
+      expect(removeAttachmentMock).toHaveBeenCalledWith(sharedAttachmentId);
+      expect(removeAttachmentMock).toHaveBeenCalledWith(otherAttachmentId);
+      expect(await PageBulkExportJob.find()).toHaveLength(0);
+    });
+
+    test('should not call removeAttachment when an unexpired sibling job still references the attachment', async () => {
+      // arrange: one expired + one unexpired sharing the same attachment.
+      // The unexpired sibling protects the attachment from deletion.
+      await PageBulkExportJob.insertMany([
+        {
+          user,
+          page: new mongoose.Types.ObjectId(),
+          format: PageBulkExportFormat.md,
+          status: PageBulkExportJobStatus.completed,
+          completedAt: new Date(Date.now() - 86400 * 1000 - 1),
+          attachment: sharedAttachmentId,
+        },
+        {
+          user,
+          page: new mongoose.Types.ObjectId(),
+          format: PageBulkExportFormat.md,
+          status: PageBulkExportJobStatus.completed,
+          completedAt: new Date(Date.now()),
+          attachment: sharedAttachmentId,
+        },
+      ]);
+
+      // act
+      await pageBulkExportJobCleanUpCronService?.deleteDownloadExpiredExportJobs();
+
+      // assert: attachment retained, only the expired job is gone
+      expect(removeAttachmentMock).not.toHaveBeenCalled();
+      const remaining = await PageBulkExportJob.find();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].attachment?.toString()).toBe(
+        sharedAttachmentId.toString(),
+      );
+    });
+
+    test('should delete an expired job whose removeAttachment resolves as a no-op (zombie with dangling attachment ref)', async () => {
+      // arrange: simulate the real removeAttachment idempotent contract — when
+      // the attachment metadata doc is already gone, the call resolves without
+      // throwing. The job record must still be deleteMany()-d.
+      const zombieAttachmentId = new mongoose.Types.ObjectId();
+      await PageBulkExportJob.create({
+        user,
+        page: new mongoose.Types.ObjectId(),
+        format: PageBulkExportFormat.md,
+        status: PageBulkExportJobStatus.completed,
+        completedAt: new Date(Date.now() - 86400 * 1000 - 1),
+        attachment: zombieAttachmentId,
+      });
+
+      // act
+      await pageBulkExportJobCleanUpCronService?.deleteDownloadExpiredExportJobs();
+
+      // assert
+      expect(removeAttachmentMock).toHaveBeenCalledTimes(1);
+      expect(removeAttachmentMock).toHaveBeenCalledWith(zombieAttachmentId);
+      expect(await PageBulkExportJob.find()).toHaveLength(0);
     });
   });
 

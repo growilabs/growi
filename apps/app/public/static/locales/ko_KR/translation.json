@@ -151,9 +151,7 @@
   "Page Tree": "페이지 트리",
   "Bookmarks": "북마크",
   "In-App Notification": "알림",
-  "AI Assistant": "AI 어시스턴트",
-  "Knowledge Assistant": "지식 어시스턴트 (베타)",
-  "Editor Assistant": "편집기 어시스턴트 (베타)",
+  "GROWI AI": "GROWI AI",
   "original_path": "원본 경로",
   "new_path": "새 경로",
   "duplicated_path": "중복된 경로",
@@ -344,7 +342,6 @@
       "file": "파일만"
     },
     "editor_config": "편집기 구성",
-    "editor_assistant": "편집기 어시스턴트",
     "Show active line": "활성 줄 표시",
     "auto_format_table": "테이블 자동 서식",
     "overwrite_scopes": "{{operation}} 및 모든 하위 항목의 범위 덮어쓰기",
@@ -513,135 +510,30 @@
     "latest_revision": "그들의 것",
     "selected_editable_revision": "선택된 편집 가능한 페이지 본문"
   },
-  "sidebar_ai_assistant": {
-    "reference_pages_label": "참조 페이지",
-    "recent_chat": "최근 채팅",
-    "no_recent_chat": "최근 채팅 없음",
-    "placeholder": "무엇이든 물어보세요.",
-    "knowledge_assistant_placeholder": "무엇이든 물어보세요.",
-    "editor_assistant_placeholder": "도와드릴까요?",
-    "summary_mode_label": "요약 모드",
-    "summary_mode_help": "2-3문장으로 간결한 답변",
-    "extended_thinking_mode_label": "확장 사고 모드",
-    "extended_thinking_mode_help": "활성화하면 AI가 더 많은 시간을 들여 생각하고 더 포괄적인 답변을 제공합니다.",
-    "caution_against_hallucination": "정보를 확인하고 출처를 확인하십시오.",
-    "progress_label": "답변 생성 중",
-    "failed_to_create_or_retrieve_thread": "스레드를 생성하거나 검색하는 데 실패했습니다.",
-    "budget_exceeded": "OpenAI API 사용 한도에 도달했습니다. 지식 어시스턴트를 다시 사용하려면 OpenAI 결제 페이지에서 크레딧을 추가하십시오.",
-    "budget_exceeded_for_growi_cloud": "OpenAI API 사용 한도에 도달했습니다. 지식 어시스턴트를 다시 사용하려면 호스팅 사용자의 경우 GROWI.cloud 관리 페이지에서, 소유 사용자의 경우 OpenAI 결제 페이지에서 크레딧을 추가하십시오.",
-    "error_message": "오류가 발생했습니다.",
-    "show_error_detail": "오류 세부 정보 표시",
-    "editor_assistant_long_context_warn_with_unit_line": "텍스트가 너무 길어서 편집기 어시스턴트는 응답을 위해 약 {{startPosition}}줄에서 {{endPosition}}줄을 참조합니다.",
-    "editor_assistant_long_context_warn_with_unit_char": "텍스트가 너무 길어서 편집기 어시스턴트는 응답을 위해 {{startPosition}}자에서 {{endPosition}}자를 참조합니다.",
-    "discard": "버리기",
-    "accept": "수락",
-    "use_assistant": "어시스턴트 사용",
-    "remove_assistant": "선택된 어시스턴트 선택 해제",
-    "text_generation_by_editor_assistant_label": "편집기 어시스턴트가 텍스트를 생성 중입니다.",
-    "preset_menu": {
-      "summarize": {
-        "title": "이 문서 요약",
-        "prompt": "마크다운 콘텐츠를 요약해 주세요."
-      },
-      "correct": {
-        "title": "텍스트의 오류 수정",
-        "prompt": "마크다운 텍스트의 오류를 수정해 주세요."
-      }
-    }
+  "ai_unavailable": {
+    "open_admin_settings_to_enable": "AI 통합을 활성화하려면 관리 화면에서 설정하십시오",
+    "to_admin_ai_settings": "AI 설정 관리 화면 열기",
+    "contact_admin_to_enable": "AI 통합이 활성화되지 않았습니다. 관리자에게 문의하십시오."
   },
-  "modal_ai_assistant": {
-    "header": {
-      "update_assistant": "어시스턴트 업데이트",
-      "add_new_assistant": "새 어시스턴트 추가"
-    },
-    "assistant_name_placeholder": "어시스턴트 이름 입력",
-    "page_count": "{{count}} 페이지",
-    "memo": {
-      "title": "어시스턴트 메모",
-      "optional": "선택 사항",
-      "placeholder": "콘텐츠 및 사용법에 대한 메모를 표시할 수 있습니다.",
-      "description": "메모 내용은 어시스턴트 처리에 영향을 미치지 않습니다."
-    },
-    "submit_button": {
-      "update_assistant": "어시스턴트 업데이트",
-      "create_assistant": "어시스턴트 생성"
-    },
-    "toaster": {
-      "create_success": "어시스턴트가 생성되었습니다.",
-      "update_success": "어시스턴트가 업데이트되었습니다.",
-      "create_failed": "어시스턴트 생성 실패",
-      "update_failed": "어시스턴트 업데이트 실패"
-    },
-    "edit_page_description": "어시스턴트가 참조할 수 있는 페이지를 편집합니다.<br>어시스턴트는 하위 페이지를 포함하여 최대 {{limitLearnablePageCountPerAssistant}}개의 페이지를 참조할 수 있습니다.",
-    "default_instruction": "당신은 이 위키의 지식 어시스턴트입니다.\n\n## 다국어 지원:\n사용자가 입력한 언어와 동일한 언어로 응답하십시오.\n",
-    "add_page_button": "페이지 추가",
-    "page_mode_title": {
-      "share": "어시스턴트 공유",
-      "pages": "참조 페이지",
-      "instruction": "어시스턴트 지침"
-    },
-    "share_assistant": "어시스턴트 공유",
-    "page_access_permission": "페이지 접근 권한",
-    "access_scope": {
-      "owner": "{{username}}이 접근할 수 있는 모든 페이지",
-      "groups": "그룹 지정",
-      "publicOnly": "공개 페이지만"
-    },
-    "share_scope": {
-      "title": "어시스턴트 공유 범위",
-      "owner": {
-        "label": "{{username}}만"
-      },
-      "publicOnly": {
-        "label": "공개",
-        "desc": "모든 사용자와 공유됨"
-      },
-      "groups": {
-        "label": "그룹 지정",
-        "desc": "선택된 그룹의 구성원과만 공유됨"
-      },
-      "sameAsAccessScope": {
-        "label": "페이지 접근 범위와 동일",
-        "desc": "페이지 접근과 동일한 범위로 공유됨"
-      }
-    },
-    "instructions": {
-      "description": "어시스턴트의 동작 방식을 결정하는 지침을 설정할 수 있습니다.<br>어시스턴트는 이 지침을 기반으로 답변하고 분석합니다.",
-      "reset_to_default": "기본값으로 재설정"
-    }
-  },
-  "share_scope_warning_modal": {
-    "header_title": "공유 범위 확인",
-    "warning_message": "이 어시스턴트에는 접근이 제한된 페이지가 포함되어 있습니다.<br>현재 설정으로는 이 페이지의 정보가 어시스턴트의 공개 범위를 통해 원래 접근 권한을 넘어 공유될 수 있습니다.",
-    "selected_pages_label": "선택된 페이지 경로",
-    "confirmation_message": "진행하면 이 페이지의 내용이 어시스턴트의 공개 범위 내에서 공유될 수 있음을 이해했는지 확인하십시오.",
-    "button": {
-      "review": "설정 검토",
-      "proceed": "이해하고 진행"
-    }
-  },
-  "default_ai_assistant": {
-    "not_set": "기본 어시스턴트가 설정되지 않았습니다.",
-    "open_cloud_settings_to_enable": "AI 통합을 활성화하려면 GROWI.cloud 관리 화면을 확인하십시오",
-    "to_cloud_settings": "GROWI.cloud 관리 화면 열기"
-  },
-  "ai_assistant_substance": {
-    "add_assistant": "어시스턴트 추가",
-    "my_assistants": "내 어시스턴트",
-    "team_assistants": "팀 어시스턴트",
-    "thread_does_not_exist": "스레드가 존재하지 않습니다.",
+  "ai_sidebar": {
+    "new_chat": "새 채팅",
     "recent_threads": "최근 항목",
-    "toaster": {
-      "ai_assistant_deleted_success": "어시스턴트 삭제됨",
-      "ai_assistant_deleted_failed": "어시스턴트 삭제 실패",
-      "thread_deleted_success": "스레드 삭제됨",
-      "thread_deleted_failed": "스레드 삭제 실패",
-      "ai_assistant_set_default_success": "기본 어시스턴트 설정 성공",
-      "ai_assistant_set_default_failed": "기본 어시스턴트 설정 실패"
+    "sources": "참고한 페이지 {{count}}건",
+    "error": {
+      "title": "오류가 발생했습니다",
+      "retry": "다시 시도",
+      "dismiss": "닫기"
     },
-    "delete_modal": {
-      "title": "어시스턴트 삭제",
-      "confirm_message": "정말로 이 어시스턴트를 삭제하시겠습니까?"
+    "incomplete": {
+      "length": "응답이 최대 길이에 도달하여 도중에 중단되었습니다.",
+      "tool_calls": "처리 단계 한도에 도달하여 도중에 중단되었습니다.",
+      "content_filter": "콘텐츠 정책에 의해 응답이 중단되었습니다.",
+      "error": "오류가 발생하여 응답이 도중에 중단되었습니다.",
+      "unknown": "응답이 완료되기 전에 중단되었습니다."
+    },
+    "toaster": {
+      "thread_deleted_success": "스레드 삭제됨",
+      "thread_deleted_failed": "스레드 삭제 실패"
     }
   },
   "link_edit": {
@@ -972,6 +864,8 @@
   },
   "user_home_page": {
     "bookmarks": "북마크",
+    "contribution_graph": "기여 그래프",
+    "contribution_migration_in_progress": "기여 데이터를 준비하고 있습니다. 잠시 후 새로고침하면 표시됩니다.",
     "recently_created": "최근 생성됨",
     "recent_activity": "최근 활동",
     "unknown_action": "지정되지 않은 변경 사항을 적용했습니다",
@@ -1062,5 +956,86 @@
     "table": "표",
     "template": "템플릿",
     "text_formatting": "텍스트 서식"
+  },
+  "editor_guide": {
+    "title": "에디터 가이드",
+    "tabs": {
+      "textstyle": "텍스트 스타일",
+      "layout": "레이아웃",
+      "decoration": "데코레이션"
+    },
+    "textstyle": {
+      "copy_done": "복사되었습니다!",
+      "this": "이것은",
+      "is": "입니다",
+      "bold": "굵게",
+      "italic": "기울임꼴",
+      "strikethrough": "취소선",
+      "inline_code": "인라인 코드",
+      "bold_italic": "전체가 굵게 또는 기울임꼴",
+      "emoji": "이모지",
+      "sub_sup": "아래 첨자 / 위 첨자",
+      "link_label": "라벨이 있는 링크",
+      "link_docs": "GROWI 문서",
+      "link_growi": "GROWI 링크",
+      "link_sandbox": "연습장 페이지는 여기입니다",
+      "all_important": "이 텍스트는 모두\n중요합니다",
+      "sub_text": "아래 첨자",
+      "sup_text": "위 첨자",
+      "is_text": "이것은 {{val}}입니다"
+    },
+    "layout": {
+      "copy_done": "복사되었습니다!",
+      "header": "헤더",
+      "header_text": "제목",
+      "list": "글머리 기호 목록",
+      "list_text": "목록 항목입니다",
+      "ordered_list": "번호 매기기 목록",
+      "ordered_list_text": "번호 항목입니다",
+      "checkbox": "체크박스",
+      "task": "할 일 ",
+      "quote": "인용구",
+      "quote_text": "인용",
+      "multi_quote": "중첩 인용",
+      "hr": "가로줄",
+      "br": "줄바꿈",
+      "br_code": "스페이스를 두 번 입력하면  줄바꿈을\n할 수 있습니다",
+      "br_preview_1": "스페이스를 두 번 입력하면",
+      "br_preview_2": "줄바꿈을 할 수 있습니다",
+      "code_block": "코드 블록",
+      "code_block_text": "여기에 코드를 추가하세요",
+      "table": "표",
+      "left": "왼쪽 정렬",
+      "right": "오른쪽 정렬",
+      "center": "가운데 정렬",
+      "row_text": "이 열은",
+      "row_display": "됩니다",
+      "footnote": "각주",
+      "footnote_label": "각주가 있는 텍스트",
+      "footnote_desc": "주석은 이와 같이 작성합니다"
+    },
+    "decoration": {
+      "copy_done": "클립보드에 복사되었습니다!",
+      "style": "스타일",
+      "alert": "알림",
+      "alert_with_custom_title": "레이블이 있는 알림",
+      "alert_with_custom_title_text": "사용자 정의 제목",
+      "alert_unavailable": "이 스타일에서는 사용할 수 없습니다",
+      "badge": "배지",
+      "text_color": "텍스트 색상",
+      "back_color": "배경 색상",
+      "placeholder": "텍스트가 입력됩니다",
+      "docs_title": "Bootstrap 5 공식 문서",
+      "docs_badge": "배지 상세 정보",
+      "docs_color": "색상 상세 정보",
+      "docs_alert": "알림 블록 상세 정보"
+    }
+  },
+  "pageMention": {
+    "placeholder": "메시지를 입력하세요... ( @ 로 페이지 멘션 )",
+    "hint": "검색할 페이지 이름을 입력하세요",
+    "searching": "검색 중...",
+    "noResults": "페이지를 찾을 수 없습니다",
+    "candidatesLabel": "페이지 후보"
   }
 }

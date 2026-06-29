@@ -6,7 +6,16 @@
     "resolveJsonModule": true,
     "types": ["vitest/globals", "@testing-library/jest-dom/vitest"],
 
+    // Suffix patterns (esm-migration task 3.6): Turbopack does not apply
+    // TypeScript's `.js` -> `.ts` extension substitution, so the
+    // `.js`-suffixed alias specifiers required by the NodeNext server build
+    // are mapped back to their extensionless form, which every pipeline
+    // (Turbopack, tsgo, vite-tsconfig-paths) resolves with normal extension
+    // searching. Keep the targets extensionless: typescript-go panics on
+    // suffix patterns with extensioned targets.
     "paths": {
+      "~/*.js": ["./src/*"],
+      "^/*.js": ["./*"],
       "~/*": ["./src/*"],
       "^/*": ["./*"]
     },
@@ -18,6 +27,12 @@
     "noImplicitAny": false,
     "noImplicitOverride": true,
 
+    // Enforce erasable-only TS (no enum / parameter properties / namespaces) so
+    // the server runs under Node's native type stripping with no
+    // --experimental-transform-types (esm-migration task 3.7.c). tsgo --noEmit
+    // (CI lint) fails if a non-erasable construct is reintroduced.
+    "erasableSyntaxOnly": true,
+
     // Note: To transform paths for both the output .js and .d.ts files, you need both of the below entries
     "plugins": [
       // Transform paths in output .js files
@@ -27,13 +42,5 @@
     ]
   },
   "include": ["next-env.d.ts", "config", "prisma", "src"],
-  "exclude": ["src/**/*.vendor-styles.*"],
-  "ts-node": {
-    "transpileOnly": true,
-    "swc": true,
-    "compilerOptions": {
-      "module": "CommonJS",
-      "moduleResolution": "Node"
-    }
-  }
+  "exclude": ["src/**/*.vendor-styles.*"]
 }

@@ -1,3 +1,71 @@
 packages:
   - 'apps/*'
   - 'packages/*'
+  - 'bin'
+
+overrides:
+  # KEEP: mime v4 is ESM-only (no `require` export). @lykmapipo/common is CommonJS and reads
+  # `mime.getType` / `mime.getExtension` off the require() result (exposed as mimeTypeOf /
+  # mimeExtensionOf). Under Node 24 require(esm), mime v4 resolves to a module *namespace*
+  # whose getType/getExtension live on `.default`, so those top-level accesses are undefined
+  # and mimeTypeOf/mimeExtensionOf throw "is not a function". mime v3's module.exports IS the
+  # Mime instance, so the accesses work. Pin retained until @lykmapipo/common is dropped or
+  # ships ESM-aware mime access. (esm-migration Phase 5.2 — verified by phase5-smoke harness)
+  '@lykmapipo/common>mime': 3.0.0
+  # CVE-2026-40175 / GHSA-fvcv-3m26-pcqx: Unrestricted Cloud Metadata Exfiltration via CRLF
+  # header-injection chain that combines Prototype Pollution from other deps with Axios'
+  # unsanitised header merge, enabling HTTP Request Smuggling and AWS IMDSv2 bypass
+  # (CVSS Critical). Fixed in 1.15.0 - see https://github.com/advisories/GHSA-fvcv-3m26-pcqx
+  axios: ^1.15.0
+  # Dedupe @codemirror/commands to a single version. <= 6.10.2 has a bug where
+  # Shift+Arrow selection gets stuck on soft-wrapped lines (growilabs/growi#11093);
+  # fixed in 6.10.3. Without this, transitive consumers (@uiw/*, codemirror) keep
+  # pulling 6.8.0 alongside our direct 6.10.3.
+  '@codemirror/commands': ^6.10.3
+  # Dedupe @babel/core to a single patch so Turbopack's build-time
+  # .next/node_modules/<pkg>-<hash> symlinks survive `pnpm deploy --prod`.
+  # next@16 declares @babel/core as an optional peer, and pnpm bakes the resolved
+  # peer version into next's (and next-i18next's, which embeds next's) virtual-store
+  # dir name. The full dev install deduped it to 7.29.7, but `pnpm deploy --prod`
+  # re-resolved the prod-only graph to 7.29.0 — a different .pnpm dir name — so the
+  # symlinks Turbopack baked at build time dangled in the prod tarball
+  # (check-next-symlinks.sh failure). Both are patch-equal and babel is an unused
+  # optional peer here (GROWI builds with Turbopack/SWC), so pinning the higher patch
+  # is safe and keeps the dev build hash unchanged.
+  # See apps/app/.claude/rules/package-dependencies.md.
+  '@babel/core': 7.29.7
+
+packageExtensions:
+  # @orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime,
+  # but @orval/core does not declare lodash as a dependency.
+  '@orval/core':
+    dependencies:
+      lodash: '*'
+
+patchedDependencies:
+  # The patch excludes mathjax-full from the dependency graph of Marp Core.
+  '@marp-team/marp-core': packages/presentation/patches/@marp-team__marp-core.patch
+
+# pnpm v11+ unified allowlist: true=run install scripts, false=skip them.
+# Migrated from onlyBuiltDependencies (true) and ignoredBuiltDependencies (false).
+allowBuilds:
+  lefthook: true
+  '@swc/core': false
+  core-js: false
+  esbuild: false
+  leveldown: false
+  protobufjs: false
+  puppeteer: false
+  ttf2woff2: false
+  # Prisma: apps/app's `postinstall: prisma generate` covers the work that these
+  # packages' install scripts would do. In particular, `prisma generate` itself
+  # downloads the engine binary on demand (verified by removing
+  # libquery_engine-*.so.node and re-running `prisma generate` — the binary is
+  # restored byte-for-byte), so `@prisma/engines`' postinstall is redundant here.
+  '@prisma/client': false
+  '@prisma/engines': false
+  prisma: false
+  # sharp ships platform-specific prebuilt binaries via optional dependencies
+  # (e.g. @img/sharp-linux-x64, @img/sharp-libvips-linux-x64), so its install
+  # script (which would build libvips from source as a fallback) is not needed.
+  sharp: false

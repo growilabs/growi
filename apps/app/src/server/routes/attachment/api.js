@@ -7,7 +7,7 @@ import { validateImageContentType } from './image-content-type-validator';
 
 const logger = loggerFactory('growi:routes:attachment');
 
-const ApiResponse = require('../../util/apiResponse');
+import ApiResponse from '../../util/apiResponse';
 
 /**
  * @swagger

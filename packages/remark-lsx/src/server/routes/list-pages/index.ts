@@ -1,16 +1,19 @@
 import type { IUser } from '@growi/core';
 import { OptionParser } from '@growi/core/dist/remark-plugins';
-import { pathUtils } from '@growi/core/dist/utils';
+import { escapeStringForMongoRegex, pathUtils } from '@growi/core/dist/utils';
 import { loggerFactory } from '@growi/logger';
 import type { Request, Response } from 'express';
 import createError, { isHttpError } from 'http-errors';
 
-import type { LsxApiParams, LsxApiResponseData } from '../../../interfaces/api';
-import { addDepthCondition } from './add-depth-condition';
-import { addNumCondition } from './add-num-condition';
-import { addSortCondition } from './add-sort-condition';
-import { generateBaseQuery, type PageQuery } from './generate-base-query';
-import { getToppageViewersCount } from './get-toppage-viewers-count';
+import type {
+  LsxApiParams,
+  LsxApiResponseData,
+} from '../../../interfaces/api.js';
+import { addDepthCondition } from './add-depth-condition.js';
+import { addNumCondition } from './add-num-condition.js';
+import { addSortCondition } from './add-sort-condition.js';
+import { generateBaseQuery, type PageQuery } from './generate-base-query.js';
+import { getToppageViewersCount } from './get-toppage-viewers-count.js';
 
 const logger = loggerFactory('growi:remark-lsx:routes:list-pages');
 
@@ -33,16 +36,18 @@ export function addFilterCondition(
     );
   }
 
-  const pagePathForRegexp = RegExp.escape(addTrailingSlash(pagePath));
+  const pagePathForRegexp = escapeStringForMongoRegex(
+    addTrailingSlash(pagePath),
+  );
 
   let filterPath: RegExp;
   try {
     if (optionsFilter.charAt(0) === '^') {
       // move '^' to the first of path
-      const escapedFilter = RegExp.escape(optionsFilter.slice(1));
+      const escapedFilter = escapeStringForMongoRegex(optionsFilter.slice(1));
       filterPath = new RegExp(`^${pagePathForRegexp}${escapedFilter}`);
     } else {
-      const escapedFilter = RegExp.escape(optionsFilter);
+      const escapedFilter = escapeStringForMongoRegex(optionsFilter);
       filterPath = new RegExp(`^${pagePathForRegexp}.*${escapedFilter}`);
     }
   } catch (err) {
@@ -101,7 +106,7 @@ export const listPages = ({
       if (excludedPaths.length > 0) {
         const escapedPaths = excludedPaths.map((p) => {
           const cleanPath = p.startsWith('/') ? p.substring(1) : p;
-          return RegExp.escape(cleanPath);
+          return escapeStringForMongoRegex(cleanPath);
         });
 
         const regex = new RegExp(`^\\/(${escapedPaths.join('|')})(\\/|$)`);

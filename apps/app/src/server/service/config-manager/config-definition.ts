@@ -5,8 +5,10 @@ import type {
   NonBlankString,
 } from '@growi/core/dist/interfaces';
 import { defineConfig, toNonBlankString } from '@growi/core/dist/interfaces';
-import type OpenAI from 'openai';
 
+import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
+import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
+import type { AzureOpenaiConfig } from '~/features/mastra/interfaces/azure-openai-config';
 import { ActionGroupSize } from '~/interfaces/activity';
 import { AttachmentMethodType } from '~/interfaces/attachment';
 import type {
@@ -68,6 +70,7 @@ export const CONFIG_KEYS = [
   'app:minPasswordLength',
   'app:auditLogEnabled',
   'app:activityExpirationSeconds',
+  'app:revisionDiffMaxLookbackSeconds',
   'app:auditLogActionGroupSize',
   'app:auditLogAdditionalActions',
   'app:auditLogExcludeActions',
@@ -75,9 +78,28 @@ export const CONFIG_KEYS = [
   'app:deploymentType',
   'app:ssrMaxRevisionBodyLength',
   'app:wipPageExpirationSeconds',
-  'app:openaiThreadDeletionCronMaxMinutesUntilRequest',
-  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest',
   'app:isReadOnlyForNewUser',
+  'app:vaultEnabled',
+  'app:vaultManagerEndpoint',
+  'app:vaultManagerInternalSecret',
+  'app:vaultBootstrapOnStart',
+  'app:vaultBootstrapRetryMax',
+  'app:vaultBootstrapRetryBaseMs',
+  'app:vaultBootstrapRetryMaxMs',
+  'app:vaultBootstrapHeartbeatIntervalMs',
+  'app:vaultBootstrapHeartbeatStaleMs',
+  'app:vaultBootstrapRetryDisabled',
+  'app:vaultDriftDetectionIntervalMs',
+  'app:vaultDriftMaxPagesPerTick',
+  'app:vaultDriftDetectionDisabled',
+  'app:vaultReconcileMaxPagesPerUserRequest',
+  'app:vaultReconcileMaxPagesPerAdminRequest',
+  'app:vaultReconcileMaxConcurrentPerUser',
+  'app:vaultReconcileMaxConcurrentSystem',
+  'app:vaultReconcileChunkSize',
+  'app:vaultReconcileHistoryRetentionDays',
+  'app:vaultReconcileRejectWhenBootstrapNotDone',
+  'app:vaultReconcileAdminBypassCapacityLimit',
 
   // Content-Disposition settings for MIME types
   'attachments:contentDisposition:inlineMimeTypes',
@@ -264,21 +286,26 @@ export const CONFIG_KEYS = [
   // OpenAI Settings
   'openai:serviceType',
   'openai:apiKey',
-  'openai:assistantModel:chat',
-  'openai:assistantModel:edit',
-  'openai:threadDeletionCronExpression',
-  'openai:threadDeletionBarchSize',
-  'openai:threadDeletionApiCallInterval',
-  'openai:vectorStoreFileDeletionCronExpression',
-  'openai:vectorStoreFileDeletionBarchSize',
-  'openai:vectorStoreFileDeletionApiCallInterval',
-  'openai:limitLearnablePageCountPerAssistant',
+
+  // Mastra LLM Settings (provider-agnostic: one provider per app)
+  'ai:provider',
+  'ai:apiKey',
+  // Allow-list of selectable models (modelId + per-model providerOptions + isDefault
+  // flag), stored as a single JSON array. Replaces the former single ai:model /
+  // ai:providerOptions keys.
+  'ai:allowedModels',
+  // Azure OpenAI-only connection config (ai:provider='azure-openai'), stored as
+  // a single JSON object (consolidated from the former four ai:azureOpenaiSettings* keys)
+  'ai:azureOpenaiSettings',
 
   // OpenTelemetry Settings
   'otel:enabled',
   'otel:isAppSiteUrlHashed',
   'otel:anonymizeInBestEffort',
   'otel:serviceInstanceId',
+
+  // News Settings
+  'news:isDeliveryEnabled',
 
   // S2S Messaging Pubsub Settings
   's2sMessagingPubsub:serverType',
@@ -320,6 +347,7 @@ export const CONFIG_KEYS = [
   'env:useOnlyEnvVars:security:passport-saml',
   'env:useOnlyEnvVars:gcs',
   'env:useOnlyEnvVars:azure',
+  'env:useOnlyEnvVars:ai',
 
   // Page Bulk Export Settings
   'app:bulkExportJobExpirationSeconds',
@@ -487,6 +515,13 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'ACTIVITY_EXPIRATION_SECONDS',
     defaultValue: 2592000,
   }),
+  // Changes Index API: how far back (seconds from now) a request may look. Each cursor
+  // page recomputes runs over the window, so this bounds the worst-case scan. Finite by
+  // default (30 days); operators may tune it via the env var.
+  'app:revisionDiffMaxLookbackSeconds': defineConfig<number>({
+    envVarName: 'REVISION_DIFF_MAX_LOOKBACK_SECONDS',
+    defaultValue: 2592000,
+  }),
   'app:auditLogActionGroupSize': defineConfig<ActionGroupSize>({
     envVarName: 'AUDIT_LOG_ACTION_GROUP_SIZE',
     defaultValue: ActionGroupSize.Small,
@@ -515,18 +550,97 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'WIP_PAGE_EXPIRATION_SECONDS',
     defaultValue: 172800,
   }),
-  'app:openaiThreadDeletionCronMaxMinutesUntilRequest': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
-    defaultValue: 30,
-  }),
-  'app:openaiVectorStoreFileDeletionCronMaxMinutesUntilRequest':
-    defineConfig<number>({
-      envVarName:
-        'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_MAX_MINUTES_UNTIL_REQUEST',
-      defaultValue: 30,
-    }),
   'app:isReadOnlyForNewUser': defineConfig<boolean>({
     envVarName: 'DEFAULT_USER_READONLY',
+    defaultValue: false,
+  }),
+  // Vault Settings
+  // Note: app:vaultManagerEndpoint and app:vaultManagerInternalSecret are read
+  // from environment variables only — the VaultSettingsService must use ConfigSource.env.
+  'app:vaultEnabled': defineConfig<boolean>({
+    envVarName: 'VAULT_ENABLED',
+    defaultValue: false,
+  }),
+  'app:vaultManagerEndpoint': defineConfig<string | undefined>({
+    envVarName: 'VAULT_MANAGER_ENDPOINT',
+    defaultValue: undefined,
+  }),
+  'app:vaultManagerInternalSecret': defineConfig<string | undefined>({
+    envVarName: 'VAULT_MANAGER_INTERNAL_SECRET',
+    defaultValue: undefined,
+    isSecret: true,
+  }),
+  'app:vaultBootstrapOnStart': defineConfig<'true' | 'false' | 'force'>({
+    envVarName: 'VAULT_BOOTSTRAP_ON_START',
+    defaultValue: 'false',
+    isSecret: false,
+  }),
+  'app:vaultBootstrapRetryMax': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX',
+    defaultValue: 5,
+  }),
+  'app:vaultBootstrapRetryBaseMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_BASE_MS',
+    defaultValue: 30_000,
+  }),
+  'app:vaultBootstrapRetryMaxMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_MAX_MS',
+    defaultValue: 1_800_000, // 30 * 60_000
+  }),
+  'app:vaultBootstrapHeartbeatIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_INTERVAL_MS',
+    defaultValue: 10_000,
+  }),
+  'app:vaultBootstrapHeartbeatStaleMs': defineConfig<number>({
+    envVarName: 'VAULT_BOOTSTRAP_HEARTBEAT_STALE_MS',
+    defaultValue: 60_000,
+  }),
+  'app:vaultBootstrapRetryDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_BOOTSTRAP_RETRY_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultDriftDetectionIntervalMs': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_DETECTION_INTERVAL_MS',
+    defaultValue: 300_000, // 5 * 60_000
+  }),
+  'app:vaultDriftMaxPagesPerTick': defineConfig<number>({
+    envVarName: 'VAULT_DRIFT_MAX_PAGES_PER_TICK',
+    defaultValue: 10_000,
+  }),
+  'app:vaultDriftDetectionDisabled': defineConfig<boolean>({
+    envVarName: 'VAULT_DRIFT_DETECTION_DISABLED',
+    defaultValue: false,
+  }),
+  'app:vaultReconcileMaxPagesPerUserRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_USER_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxPagesPerAdminRequest': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_PAGES_PER_ADMIN_REQUEST',
+    defaultValue: 1000,
+  }),
+  'app:vaultReconcileMaxConcurrentPerUser': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_PER_USER',
+    defaultValue: 1,
+  }),
+  'app:vaultReconcileMaxConcurrentSystem': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_MAX_CONCURRENT_SYSTEM',
+    defaultValue: 3,
+  }),
+  'app:vaultReconcileChunkSize': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_CHUNK_SIZE',
+    defaultValue: 100,
+  }),
+  'app:vaultReconcileHistoryRetentionDays': defineConfig<number>({
+    envVarName: 'VAULT_RECONCILE_HISTORY_RETENTION_DAYS',
+    defaultValue: 30,
+  }),
+  'app:vaultReconcileRejectWhenBootstrapNotDone': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_REJECT_WHEN_BOOTSTRAP_NOT_DONE',
+    defaultValue: true,
+  }),
+  'app:vaultReconcileAdminBypassCapacityLimit': defineConfig<boolean>({
+    envVarName: 'VAULT_RECONCILE_ADMIN_BYPASS_CAPACITY_LIMIT',
     defaultValue: false,
   }),
 
@@ -1160,41 +1274,67 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: undefined,
     isSecret: true,
   }),
-  'openai:assistantModel:chat': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_CHAT_ASSISTANT_MODEL',
-    defaultValue: 'gpt-4.1-mini',
+
+  // AI chat (Mastra) Settings — provider-agnostic, one provider per app.
+  // Single set of keys regardless of provider — the resolver reads `ai:provider`
+  // to pick the provider client, then injects `ai:apiKey` and resolves the model
+  // from `ai:allowedModels`.
+  // No defaultValue on purpose for provider / apiKey: they are required, so an
+  // unset value surfaces as a clear error at resolve time rather than silently
+  // defaulting to a particular provider. `ai:provider` is typed with the
+  // shared `AiProvider` (type-only import — erased at runtime, dependency-free
+  // leaf, no cycle); the type aids DX but is not runtime-enforced for env-loaded
+  // values, so the resolver still validates with `isAiProvider`.
+  'ai:provider': defineConfig<AiProvider | undefined>({
+    envVarName: 'AI_PROVIDER',
+    defaultValue: undefined,
   }),
-  'openai:assistantModel:edit': defineConfig<OpenAI.Chat.ChatModel>({
-    envVarName: 'OPENAI_EDITOR_ASSISTANT_MODEL',
-    defaultValue: 'gpt-4.1-mini',
+  'ai:apiKey': defineConfig<string | undefined>({
+    envVarName: 'AI_API_KEY',
+    defaultValue: undefined,
+    isSecret: true,
   }),
-  'openai:threadDeletionCronExpression': defineConfig<string>({
-    envVarName: 'OPENAI_THREAD_DELETION_CRON_EXPRESSION',
-    defaultValue: '0 * * * *',
+  // Allow-list of selectable models. Each entry bundles the model id (the Azure
+  // *deployment name* for the azure-openai provider), optional per-model AI SDK
+  // `providerOptions` (provider-namespaced), and an `isDefault` flag marking the
+  // default model. Replaces the former single ai:model / ai:providerOptions keys
+  // (no auto-migration: operators reconfigure via ai:allowedModels).
+  //
+  // Stored/loaded as JSON: the DB value is the serialized array, and the
+  // AI_ALLOWED_MODELS env var is a JSON string. defaultValue is an array ([]) so
+  // the loader treats env/DB values as JSON (typeof defaultValue === 'object')
+  // and getConfig falls back to [] when unset (= AI not configured).
+  'ai:allowedModels': defineConfig<AllowedModel[] | undefined>({
+    envVarName: 'AI_ALLOWED_MODELS',
+    defaultValue: [],
   }),
-  'openai:threadDeletionBarchSize': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_BARCH_SIZE',
-    defaultValue: 100,
-  }),
-  'openai:threadDeletionApiCallInterval': defineConfig<number>({
-    envVarName: 'OPENAI_THREAD_DELETION_API_CALL_INTERVAL',
-    defaultValue: 36000,
-  }),
-  'openai:vectorStoreFileDeletionCronExpression': defineConfig<string>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_CRON_EXPRESSION',
-    defaultValue: '0 * * * *',
-  }),
-  'openai:vectorStoreFileDeletionBarchSize': defineConfig<number>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_BARCH_SIZE',
-    defaultValue: 100,
-  }),
-  'openai:vectorStoreFileDeletionApiCallInterval': defineConfig<number>({
-    envVarName: 'OPENAI_VECTOR_STORE_FILE_DELETION_API_CALL_INTERVAL',
-    defaultValue: 36000,
-  }),
-  'openai:limitLearnablePageCountPerAssistant': defineConfig<number>({
-    envVarName: 'OPENAI_LIMIT_LEARNABLE_PAGE_COUNT_PER_ASSISTANT',
-    defaultValue: 3000,
+
+  // Azure OpenAI-only connection config (ai:provider='azure-openai'),
+  // consolidated into a SINGLE JSON object key (was four flat keys:
+  // ai:azureOpenai{ResourceName,BaseUrl,ApiVersion,UseEntraId}). Azure is reached
+  // via a resource-specific endpoint, so { apiKey, modelId } alone is not enough.
+  // Set exactly one of resourceName / baseURL: resourceName builds the standard
+  // https://<name>.openai.azure.com/... URL; baseURL is the
+  // escape hatch for Azure Government / sovereign clouds / API Management
+  // gateways / custom domains. apiVersion is optional (the AI SDK defaults it).
+  // useEntraId selects Microsoft Entra ID (managed identity / DefaultAzureCredential)
+  // auth instead of an API key (then AI_API_KEY is not required). For Azure, an
+  // allowed model's `modelId` is the *deployment name*, not an OpenAI model id. This
+  // key is ignored by the other providers and is not secret (only ai:apiKey is).
+  // See AzureOpenaiConfig for field semantics.
+  //
+  // Stored/loaded as JSON: the DB value is the serialized object, and the
+  // AI_AZURE_OPENAI_SETTINGS env var is a JSON string. defaultValue is an object ({}) so
+  // the loader parses the env var as JSON (a malformed env var fails soft to null;
+  // consumers read it defensively with `?? {}`).
+  // The type includes `| undefined` because this is a CLEARABLE key: the admin PUT
+  // handler sets it to undefined when the admin clears every field, so
+  // updateConfigs({ removeIfUndefined }) deletes it and the value falls back to the
+  // env default. The runtime default stays `{}` (not undefined) so the env
+  // JSON-parse branch is selected.
+  'ai:azureOpenaiSettings': defineConfig<AzureOpenaiConfig | undefined>({
+    envVarName: 'AI_AZURE_OPENAI_SETTINGS',
+    defaultValue: {},
   }),
 
   // OpenTelemetry Settings
@@ -1213,6 +1353,11 @@ export const CONFIG_DEFINITIONS = {
   'otel:serviceInstanceId': defineConfig<string | undefined>({
     envVarName: 'OPENTELEMETRY_SERVICE_INSTANCE_ID',
     defaultValue: undefined,
+  }),
+
+  // News Settings
+  'news:isDeliveryEnabled': defineConfig<boolean>({
+    defaultValue: true,
   }),
 
   // S2S Messaging Pubsub Settings
@@ -1352,6 +1497,10 @@ export const CONFIG_DEFINITIONS = {
     envVarName: 'AZURE_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
     defaultValue: false,
   }),
+  'env:useOnlyEnvVars:ai': defineConfig<boolean>({
+    envVarName: 'AI_USES_ONLY_ENV_VARS_FOR_SOME_OPTIONS',
+    defaultValue: false,
+  }),
   'app:bulkExportJobExpirationSeconds': defineConfig<number>({
     envVarName: 'BULK_EXPORT_JOB_EXPIRATION_SECONDS',
     defaultValue: 86400,
@@ -1444,6 +1593,20 @@ export const ENV_ONLY_GROUPS: EnvOnlyGroup[] = [
       'azure:clientSecret',
       'azure:storageAccountName',
       'azure:storageContainerName',
+    ],
+  },
+  {
+    // AI settings: provider-common keys (provider, apiKey, allowed models) + the
+    // Azure OpenAI-only object key + the enable toggle. app:aiEnabled uses the
+    // app: prefix but is fixed together with the ai:* keys as a single AI
+    // configuration unit.
+    controlKey: 'env:useOnlyEnvVars:ai',
+    targetKeys: [
+      'app:aiEnabled',
+      'ai:provider',
+      'ai:apiKey',
+      'ai:allowedModels',
+      'ai:azureOpenaiSettings',
     ],
   },
 ];

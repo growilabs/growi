@@ -1,16 +1,20 @@
 import { getIdStringForRef } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
+import { body, validationResult } from 'express-validator';
+import mongoose from 'mongoose';
 
-import { Comment, CommentEvent, commentEvent } from '~/features/comment/server';
+import { CommentEvent, commentEvent } from '~/features/comment/server';
 import {
   SupportedAction,
   SupportedEventModel,
   SupportedTargetModel,
 } from '~/interfaces/activity';
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
 import { GlobalNotificationSettingEvent } from '../models/GlobalNotificationSetting';
 import { preNotifyService } from '../service/pre-notify';
+import ApiResponse from '../util/apiResponse';
 
 /**
  * @swagger
@@ -58,18 +62,15 @@ import { preNotifyService } from '../service/pre-notify';
  */
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
-module.exports = (crowi, _app) => {
+export const setup = (crowi, _app) => {
   const logger = loggerFactory('growi:routes:comment');
-  const { User, Page } = crowi.models;
-  const ApiResponse = require('../util/apiResponse');
+  const { Page } = crowi.models;
 
   const activityEvent = crowi.events.activity;
 
   const globalNotificationService = crowi.globalNotificationService;
   const userNotificationService = crowi.userNotificationService;
 
-  const { body } = require('express-validator');
-  const mongoose = require('mongoose');
   const ObjectId = mongoose.Types.ObjectId;
 
   const actions = {};
@@ -136,26 +137,36 @@ module.exports = (crowi, _app) => {
       );
     }
 
-    let query = null;
+    let comments;
 
     try {
       if (revisionId) {
-        query = Comment.findCommentsByRevisionId(revisionId);
+        comments = await prisma.comments.findCommentsByRevisionId(revisionId, {
+          include: { creator: true },
+        });
       } else {
-        query = Comment.findCommentsByPageId(pageId);
+        comments = await prisma.comments.findCommentsByPageId(pageId, {
+          include: { creator: true },
+        });
       }
     } catch (err) {
       return res.json(ApiResponse.error(err));
     }
 
-    const comments = await query.populate('creator');
-    comments.forEach((comment) => {
-      if (comment.creator != null && comment.creator instanceof User) {
-        comment.creator = serializeUserSecurely(comment.creator);
-      }
-    });
-
-    res.json(ApiResponse.success({ comments }));
+    res.json(
+      ApiResponse.success({
+        comments: comments.map((comment) => ({
+          ...comment,
+          page: comment.pageId,
+          creator:
+            comment.creator != null
+              ? serializeUserSecurely(comment.creator)
+              : comment.creatorId,
+          revision: comment.revisionId,
+          replyTo: comment.replyToId,
+        })),
+      }),
+    );
   };
 
   api.validators.add = () => {
@@ -236,7 +247,6 @@ module.exports = (crowi, _app) => {
    */
   api.add = async (req, res) => {
     const { commentForm, slackNotificationForm } = req.body;
-    const { validationResult } = require('express-validator');
 
     const errors = validationResult(req.body);
     if (!errors.isEmpty()) {
@@ -263,7 +273,7 @@ module.exports = (crowi, _app) => {
 
     let createdComment;
     try {
-      createdComment = await Comment.add(
+      createdComment = await prisma.comments.add(
         pageId,
         req.user._id,
         revisionId,
@@ -289,8 +299,9 @@ module.exports = (crowi, _app) => {
       targetModel: SupportedTargetModel.MODEL_PAGE,
       target: page,
       eventModel: SupportedEventModel.MODEL_COMMENT,
-      event: createdComment,
+      event: createdComment.id,
       action: SupportedAction.ACTION_COMMENT_CREATE,
+      contributor: req.user,
     };
 
     /** @type {import('../service/pre-notify').GetAdditionalTargetUsers} */
@@ -311,7 +322,17 @@ module.exports = (crowi, _app) => {
       getAdditionalTargetUsers,
     );
 
-    res.json(ApiResponse.success({ comment: createdComment }));
+    res.json(
+      ApiResponse.success({
+        comment: {
+          ...createdComment,
+          page: createdComment.pageId,
+          creator: createdComment.creatorId,
+          revision: createdComment.revisionId,
+          replyTo: createdComment.replyToId,
+        },
+      }),
+    );
 
     // global notification
     try {
@@ -409,7 +430,7 @@ module.exports = (crowi, _app) => {
 
     const commentStr = commentForm?.comment;
     const commentId = commentForm?.comment_id;
-    const revision = commentForm?.revision_id;
+    const revisionId = commentForm?.revision_id;
 
     if (commentStr === '') {
       return res.json(ApiResponse.error('Comment text is required'));
@@ -421,14 +442,22 @@ module.exports = (crowi, _app) => {
 
     let updatedComment;
     try {
-      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
+      const comment = await prisma.comments.findUnique({
+        select: {
+          pageId: true,
+          creatorId: true,
+        },
+        where: {
+          id: commentId,
+        },
+      });
 
       if (comment == null) {
         throw new Error('This comment does not exist.');
       }
 
       // check whether accessible
-      const pageId = comment.page;
+      const pageId = comment.pageId;
       const isAccessible = await Page.isAccessiblePageByViewer(
         pageId,
         req.user,
@@ -436,14 +465,23 @@ module.exports = (crowi, _app) => {
       if (!isAccessible) {
         throw new Error('Current user is not accessible to this page.');
       }
-      if (req.user._id.toString() !== comment.creator.toString()) {
+      if (req.user._id.toString() !== comment.creatorId.toString()) {
         throw new Error('Current user is not operatable to this comment.');
       }
 
-      updatedComment = await Comment.findOneAndUpdate(
-        { _id: { $eq: commentId } },
-        { $set: { comment: commentStr, revision } },
-      );
+      updatedComment = await prisma.comments.update({
+        where: {
+          id: commentId,
+        },
+        data: {
+          comment: commentStr,
+          revision: {
+            connect: {
+              id: revisionId,
+            },
+          },
+        },
+      });
       commentEvent.emit(CommentEvent.UPDATE, updatedComment);
     } catch (err) {
       logger.error(err);
@@ -453,7 +491,17 @@ module.exports = (crowi, _app) => {
     const parameters = { action: SupportedAction.ACTION_COMMENT_UPDATE };
     activityEvent.emit('update', res.locals.activity._id, parameters);
 
-    res.json(ApiResponse.success({ comment: updatedComment }));
+    res.json(
+      ApiResponse.success({
+        comment: {
+          ...updatedComment,
+          page: createdComment.pageId,
+          creator: createdComment.creatorId,
+          revision: createdComment.revisionId,
+          replyTo: createdComment.replyToId,
+        },
+      }),
+    );
 
     // process notification if needed
   };
@@ -504,15 +552,21 @@ module.exports = (crowi, _app) => {
     }
 
     try {
-      /** @type {import('mongoose').HydratedDocument<import('~/interfaces/comment').IComment>} */
-      const comment = await Comment.findOne({ _id: { $eq: commentId } }).exec();
+      const comment = await prisma.comments.findUnique({
+        include: {
+          page: true,
+        },
+        where: {
+          id: commentId,
+        },
+      });
 
       if (comment == null) {
         throw new Error('This comment does not exist.');
       }
 
       // check whether accessible
-      const pageId = getIdStringForRef(comment.page);
+      const pageId = comment.pageId;
       const isAccessible = await Page.isAccessiblePageByViewer(
         pageId,
         req.user,
@@ -520,12 +574,12 @@ module.exports = (crowi, _app) => {
       if (!isAccessible) {
         throw new Error('Current user is not accessible to this page.');
       }
-      if (getIdStringForRef(req.user) !== getIdStringForRef(comment.creator)) {
+      if (getIdStringForRef(req.user) !== comment.creatorId) {
         throw new Error('Current user is not operatable to this comment.');
       }
 
-      await Comment.removeWithReplies(comment);
-      await Page.updateCommentCount(comment.page);
+      await prisma.comments.removeWithReplies(comment.id);
+      await Page.updateCommentCount(comment.pageId);
       commentEvent.emit(CommentEvent.DELETE, comment);
     } catch (err) {
       return res.json(ApiResponse.error(err));

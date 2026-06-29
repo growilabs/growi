@@ -1,0 +1,4 @@
+# 3.8.a build (turbo run build --filter @growi/app) — sandbox
+captured: 2026-06-14T03:51:23Z / commit: 04033e13
+
+ Tasks:    21 successful, 21 total

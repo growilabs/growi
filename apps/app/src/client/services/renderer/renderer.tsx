@@ -3,7 +3,7 @@ import { isClient } from '@growi/core/dist/utils/browser-utils';
 import * as presentation from '@growi/presentation/dist/client/services/sanitize-option';
 import * as refsGrowiDirective from '@growi/remark-attachment-refs/dist/client';
 import * as drawio from '@growi/remark-drawio';
-import * as lsxGrowiDirective from '@growi/remark-lsx/dist/client';
+import * as lsxGrowiDirective from '@growi/remark-lsx/dist/client/index.js';
 import assert from 'assert';
 import katex from 'rehype-katex';
 import sanitize from 'rehype-sanitize';
@@ -112,7 +112,10 @@ export const generateViewOptions = (
       lsxGrowiDirective.rehypePlugin,
       { pagePath, isSharedPage: config.isSharedPage },
     ],
-    [refsGrowiDirective.rehypePlugin, { pagePath }],
+    [
+      refsGrowiDirective.rehypePlugin,
+      { pagePath, isSharedPage: config.isSharedPage },
+    ],
     rehypeSanitizePlugin,
     katex,
     [relocateToc.rehypePluginStore, { storeTocNode }],
@@ -238,7 +241,10 @@ export const generateSimpleViewOptions = (
       lsxGrowiDirective.rehypePlugin,
       { pagePath, isSharedPage: config.isSharedPage },
     ],
-    [refsGrowiDirective.rehypePlugin, { pagePath }],
+    [
+      refsGrowiDirective.rehypePlugin,
+      { pagePath, isSharedPage: config.isSharedPage },
+    ],
     [keywordHighlighter.rehypePlugin, { keywords: highlightKeywords }],
     rehypeSanitizePlugin,
     katex,
@@ -342,7 +348,10 @@ export const generatePreviewOptions = (
       lsxGrowiDirective.rehypePlugin,
       { pagePath, isSharedPage: config.isSharedPage },
     ],
-    [refsGrowiDirective.rehypePlugin, { pagePath }],
+    [
+      refsGrowiDirective.rehypePlugin,
+      { pagePath, isSharedPage: config.isSharedPage },
+    ],
     addLineNumberAttribute.rehypePlugin,
     rehypeSanitizePlugin,
     katex,

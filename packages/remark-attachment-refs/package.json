@@ -22,8 +22,9 @@
       "import": "./dist/client/*"
     },
     "./dist/server": {
+      "types": "./dist/server/index.d.ts",
       "require": "./dist/server/index.cjs",
-      "import": "./dist/server/index.js"
+      "import": "./dist/server/index.cjs"
     }
   },
   "scripts": {
@@ -48,10 +49,10 @@
     "@growi/logger": "workspace:^",
     "@growi/remark-growi-directive": "workspace:^",
     "@growi/ui": "workspace:^",
-    "axios": "^1.15.0",
+    "axios": "^1.16.0",
     "express": "^4.20.0",
     "hast-util-select": "^6.0.2",
-    "mongoose": "^6.13.6",
+    "mongoose": "^6.13.9",
     "swr": "^2.3.2",
     "xss": "^1.0.15"
   },

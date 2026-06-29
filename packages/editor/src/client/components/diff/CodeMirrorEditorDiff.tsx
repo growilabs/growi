@@ -3,10 +3,10 @@ import type { Extension } from '@codemirror/state';
 import { placeholder, scrollPastEnd } from '@codemirror/view';
 import type { ReactCodeMirrorProps } from '@uiw/react-codemirror';
 
-import { GlobalCodeMirrorEditorKey } from '../../../consts';
-import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor';
-import { useDefaultExtensions } from '../../stores/use-default-extensions';
-import { useEditorSettings } from '../../stores/use-editor-settings';
+import { GlobalCodeMirrorEditorKey } from '../../../consts/index.js';
+import { useCodeMirrorEditorIsolated } from '../../stores/codemirror-editor.js';
+import { useDefaultExtensions } from '../../stores/use-default-extensions.js';
+import { useEditorSettings } from '../../stores/use-editor-settings.js';
 
 const additionalExtensions: Extension[] = [
   [

@@ -1,5 +1,15 @@
 import { themesRootPath as presetThemesRootPath } from '@growi/preset-themes';
+import bodyParser from 'body-parser';
+import compression from 'compression';
+import flash from 'connect-flash';
+import cookieParser from 'cookie-parser';
 import csrf from 'csurf';
+import express from 'express';
+import mongoSanitize from 'express-mongo-sanitize';
+import expressSession from 'express-session';
+import helmet from 'helmet';
+import methodOverride from 'method-override';
+import passport from 'passport';
 import qs from 'qs';
 
 import { resolveFromRoot } from '~/server/util/project-dir-utils';
@@ -9,30 +19,23 @@ import {
   PLUGIN_STORING_PATH,
 } from '../../features/growi-plugin/server/consts';
 import loggerFactory from '../../utils/logger';
+import { setup as setupAutoReconnectToS2sMsgServer } from '../middlewares/auto-reconnect-to-s2s-msg-server';
 import CertifyOrigin from '../middlewares/certify-origin';
+import { denyUploadsDirectAccess } from '../middlewares/deny-uploads-direct-access';
+import { setup as setupInjectCurrentuserToLocalvars } from '../middlewares/inject-currentuser-to-localvars';
 import registerSafeRedirectFactory from '../middlewares/safe-redirect';
+import avoidSessionRoutes from '../routes/avoid-session-routes';
 
 const logger = loggerFactory('growi:crowi:express-init');
 
-/** @param {import('./index').default} crowi Crowi instance */
-module.exports = (crowi, app) => {
-  const express = require('express');
-  const compression = require('compression');
-  const helmet = require('helmet');
-  const bodyParser = require('body-parser');
-  const cookieParser = require('cookie-parser');
-  const methodOverride = require('method-override');
-  const passport = require('passport');
-  const expressSession = require('express-session');
-  const flash = require('connect-flash');
-  const mongoSanitize = require('express-mongo-sanitize');
-
+/**
+ * @param {import('./index').default} crowi Crowi instance
+ * @param {import('express').Express} app Express app
+ */
+export const setup = (crowi, app) => {
   const registerSafeRedirect = registerSafeRedirectFactory();
-  const injectCurrentuserToLocalvars =
-    require('../middlewares/inject-currentuser-to-localvars')();
-  const autoReconnectToS2sMsgServer =
-    require('../middlewares/auto-reconnect-to-s2s-msg-server')(crowi);
-  const avoidSessionRoutes = require('../routes/avoid-session-routes');
+  const injectCurrentuserToLocalvars = setupInjectCurrentuserToLocalvars();
+  const autoReconnectToS2sMsgServer = setupAutoReconnectToS2sMsgServer(crowi);
 
   const env = crowi.node_env;
 
@@ -92,6 +95,11 @@ module.exports = (crowi, app) => {
   app.set('port', crowi.port);
 
   const staticOption = crowi.node_env === 'production' ? { maxAge: '30d' } : {};
+  // Deny direct access to uploaded files (publicDir/uploads/**) BEFORE static
+  // serving. Uploads must be served only via the /attachment and /download
+  // routes, which apply authorization, Content-Disposition and CSP headers.
+  // see: src/server/middlewares/deny-uploads-direct-access.ts
+  app.use('/uploads', denyUploadsDirectAccess);
   app.use(express.static(crowi.publicDir, staticOption));
   app.use(
     '/static/preset-themes',
@@ -105,17 +113,6 @@ module.exports = (crowi, app) => {
 
   app.use(methodOverride());
 
-  // inject rawBody to req
-  app.use((req, res, next) => {
-    if (!req.is('multipart/form-data')) {
-      req.rawBody = '';
-      req.on('data', (chunk) => {
-        req.rawBody += chunk;
-      });
-    }
-
-    next();
-  });
   app.use(bodyParser.urlencoded({ extended: true, limit: '50mb' }));
   app.use(bodyParser.json({ limit: '50mb' }));
   app.use(cookieParser());

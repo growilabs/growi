@@ -6,7 +6,7 @@ export {
   LeafGrowiPluginDirectiveData,
   TextGrowiPluginDirective,
   TextGrowiPluginDirectiveData,
-} from './mdast-util-growi-directive';
+} from './mdast-util-growi-directive/index.js';
 
 // biome-ignore lint/style/noDefaultExport: remark plugins are conventionally consumed as default imports
 export default remarkGrowiDirectivePlugin;

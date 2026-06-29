@@ -176,7 +176,7 @@ const validator = {
  *               example: null
  */
 
-module.exports = (crowi: Crowi): Router => {
+export const setup = (crowi: Crowi): Router => {
   const adminRequired = adminRequiredFactory(crowi);
   const loginRequiredStrictly = loginRequiredFactory(crowi);
 
@@ -192,6 +192,7 @@ module.exports = (crowi: Crowi): Router => {
    *     security:
    *       - bearer: []
    *       - accessTokenInQuery: []
+   *       - accessTokenHeaderAuth: []
    *     parameters:
    *       - name: limit
    *         in: query
