@@ -1,3 +1,4 @@
+import type { MastraModelConfig } from '@mastra/core/llm';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 // ---------------------------------------------------------------------------
@@ -70,28 +71,18 @@ vi.mock('~/utils/logger', () => ({
   }),
 }));
 
-// Config stub with a mutable backing map: the dynamic-model tests change a
-// value BETWEEN model evaluations to prove per-request resolution (3.4).
-const configMocks = vi.hoisted(() => {
-  const values = new Map<string, string>();
-  return {
-    values,
-    getConfig: vi.fn((key: string) => values.get(key)),
-  };
-});
-
-vi.mock('~/server/service/config-manager', () => ({
-  configManager: { getConfig: configMocks.getConfig },
+// The resolver is the single seam this module depends on for model supply.
+// A hoisted mutable holder lets each test choose the resolution that
+// `resolveMastraModel()` returns, while the mock itself stays declared once.
+// Because suggest-path-agent.ts resolves the model lazily inside its `model()`
+// function (not at import time), changing this return value between tests is
+// enough to vary behavior — no module reset / re-import is required.
+const resolverMock = vi.hoisted(() => ({
+  fn: vi.fn<() => MastraModelConfig>(),
 }));
 
-// getOpenaiProvider()(modelId) — return a callable provider that yields a
-// placeholder carrying the resolved model id, so tests can observe which id
-// the dynamic model function resolved.
-vi.mock('../../../ai-sdk-modules/get-openai-provider', () => ({
-  getOpenaiProvider: () => (modelId: string) => ({
-    id: modelId,
-    provider: 'stub-openai',
-  }),
+vi.mock('../../../ai-sdk-modules/resolve-mastra-model', () => ({
+  resolveMastraModel: () => resolverMock.fn(),
 }));
 
 // Replace memory with an inert stub: mastra-modules/index.ts (loaded by the
@@ -101,17 +92,32 @@ vi.mock('../../memory', () => ({
   memory: { id: 'stub-memory' },
 }));
 
+// A sentinel model. The agent must hand back exactly this object from its
+// `model()` function when resolution succeeds — proving it forwards the
+// resolver's model rather than constructing one itself.
+const sentinelModel = { id: 'sentinel-model' } as unknown as MastraModelConfig;
+
+// Importing suggestPathAgent is the act under test for lazy resolution: module
+// load (and thus `new Agent(...)`) must complete WITHOUT calling the resolver.
+// We import while the resolver is in a throwing (misconfigured) state and
+// assert below that it was never invoked during construction — if it were, the
+// import would throw.
+resolverMock.fn.mockImplementation(() => {
+  throw new Error('Mastra LLM provider is not configured (set AI_PROVIDER)');
+});
+
 import { getPageContentTool } from '../../tools/get-page-content-tool';
 import { listChildrenTool } from '../../tools/list-children-tool';
 import { SUGGEST_PATH_INSTRUCTIONS } from './instructions';
 import { limitedSearchTool } from './limited-search-tool';
 import { suggestPathAgent } from './suggest-path-agent';
 
+// Snapshot whether the resolver was touched during the import above.
+const resolverCalledDuringImport = resolverMock.fn.mock.calls.length > 0;
+
 // ---------------------------------------------------------------------------
 // Helpers
 // ---------------------------------------------------------------------------
-
-const MODEL_CONFIG_KEY = 'openai:assistantModel:suggestPathAgent';
 
 const getCapturedConfig = (): CapturedAgentConfig => {
   const config = captured.agentConfigs.find((c) => c.id === 'suggestPathAgent');
@@ -132,9 +138,7 @@ const resolveModel = (config: CapturedAgentConfig): unknown => {
 };
 
 beforeEach(() => {
-  configMocks.values.clear();
-  configMocks.values.set(MODEL_CONFIG_KEY, 'gpt-test-model');
-  configMocks.getConfig.mockClear();
+  resolverMock.fn.mockReset();
 });
 
 // ---------------------------------------------------------------------------
@@ -196,24 +200,56 @@ describe('suggestPathAgent', () => {
       expect(typeof config.model).toBe('function');
     });
 
-    it("resolves the model id via configManager key 'openai:assistantModel:suggestPathAgent'", () => {
-      const resolved = resolveModel(getCapturedConfig());
+    it('constructs without invoking the resolver, so a disabled config cannot throw at import', () => {
+      // The module was imported (top of file) while the resolver reported
+      // disabled. Because model supply is a deferred dynamic function, the
+      // import must have succeeded AND never called the resolver.
+      expect(suggestPathAgent).toBeDefined();
+      expect(resolverCalledDuringImport).toBe(false);
+    });
 
-      expect(configMocks.getConfig).toHaveBeenCalledWith(MODEL_CONFIG_KEY);
-      expect(resolved).toMatchObject({
-        id: 'gpt-test-model',
-        provider: 'stub-openai',
-      });
+    it('forwards the model from resolveMastraModel() when resolution succeeds', () => {
+      resolverMock.fn.mockReturnValue(sentinelModel);
+
+      // The dynamic function hands back exactly the resolver's model — a single
+      // provider's single model (support/mastra's provider-agnostic AI layer),
+      // resolved at use time rather than constructed here.
+      expect(resolveModel(getCapturedConfig())).toBe(sentinelModel);
     });
 
     it('re-resolves the model on every evaluation, so a config change takes effect without a restart', () => {
       const config = getCapturedConfig();
 
-      configMocks.values.set(MODEL_CONFIG_KEY, 'gpt-first');
-      expect(resolveModel(config)).toMatchObject({ id: 'gpt-first' });
+      const firstModel = { id: 'model-first' } as unknown as MastraModelConfig;
+      const secondModel = {
+        id: 'model-second',
+      } as unknown as MastraModelConfig;
 
-      configMocks.values.set(MODEL_CONFIG_KEY, 'gpt-second');
-      expect(resolveModel(config)).toMatchObject({ id: 'gpt-second' });
+      resolverMock.fn.mockReturnValue(firstModel);
+      expect(resolveModel(config)).toBe(firstModel);
+
+      resolverMock.fn.mockReturnValue(secondModel);
+      expect(resolveModel(config)).toBe(secondModel);
+    });
+
+    it('propagates the resolver throw at use time without swallowing it', () => {
+      // On misconfiguration resolveMastraModel() throws; the agent's lazy
+      // model() must let it surface (handled by the engine's error handling),
+      // not swallow or replace it.
+      const resolverError = new Error(
+        'Mastra LLM provider is not configured (set AI_PROVIDER)',
+      );
+      resolverMock.fn.mockImplementation(() => {
+        throw resolverError;
+      });
+
+      let thrown: unknown;
+      try {
+        resolveModel(getCapturedConfig());
+      } catch (e) {
+        thrown = e;
+      }
+      expect(thrown).toBe(resolverError);
     });
   });
 

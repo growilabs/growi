@@ -1,8 +1,6 @@
 import { Agent } from '@mastra/core/agent';
 
-import { configManager } from '~/server/service/config-manager';
-
-import { getOpenaiProvider } from '../../../ai-sdk-modules/get-openai-provider';
+import { resolveMastraModel } from '../../../ai-sdk-modules/resolve-mastra-model';
 import { getPageContentTool } from '../../tools/get-page-content-tool';
 import { listChildrenTool } from '../../tools/list-children-tool';
 import { SUGGEST_PATH_INSTRUCTIONS } from './instructions';
@@ -19,14 +17,14 @@ export const suggestPathAgent = new Agent({
   id: 'suggestPathAgent',
   name: 'Suggest Path Agent',
   instructions: SUGGEST_PATH_INSTRUCTIONS,
-  // DynamicArgument: resolved per request so that a config change takes
-  // effect without a server restart (Requirement 3.4). The function is
-  // evaluated ~2x per generate (research.md Spike item 3) — keep it cheap
-  // and side-effect-free.
-  model: () =>
-    getOpenaiProvider()(
-      configManager.getConfig('openai:assistantModel:suggestPathAgent'),
-    ),
+  // Resolve the model lazily (DynamicArgument<MastraModelConfig>): the function
+  // runs at use time, not at import time, so a config change takes effect
+  // without a server restart (Requirement 3.4) and constructing the agent never
+  // throws even when the provider/API key are unconfigured. On misconfiguration
+  // resolveMastraModel() throws at request time, surfaced by the engine's
+  // existing error handling. The provider-agnostic AI layer (support/mastra)
+  // resolves a single app-wide model, so suggestPath no longer selects its own.
+  model: () => resolveMastraModel(),
   tools: {
     fullTextSearch: limitedSearchTool,
     getPageContent: getPageContentTool,
