@@ -117,7 +117,7 @@
   - _Boundary: spike（aggregateRaw/cursor 検証）_
   - _Blocked: 実 MongoDB が必要（同上）。aggregateRaw の戻り BSON 表現は runtime 依存のため型チェックで代替不可。5.2 normalizer は Prisma/MongoDB の既知の拡張 JSON 仕様（$oid/$date）を前提に実装し、CI integ で実戻り値に対する正規化を検証する。_
 
-- [ ] 5.2 prisma-raw-normalize ユーティリティ
+- [x] 5.2 prisma-raw-normalize ユーティリティ
   - `aggregateRaw` 戻り値の BSON 拡張 JSON（`$oid`→`string`、`$date`→`Date`）を正規化する pure util を新規作成（co-located spec 付き）。想定外 BSON は明示エラー＋文脈ログ
   - 観察可能な完了状態: 単体テストで `$oid`/`$date` を含む戻りが `string`/`Date` へ正しく正規化される
   - _Depends: 5.1_
