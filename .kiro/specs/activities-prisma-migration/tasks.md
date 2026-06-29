@@ -78,7 +78,7 @@
   - _Depends: 2.1_
   - _Requirements: 1.1_
 
-- [ ] 3.4 update-activity-logic の findOne を findFirst へ
+- [x] 3.4 update-activity-logic の findOne を findFirst へ
   - `update-activity-logic.ts` の `findOne({...}).sort()` を `findFirst({where, orderBy})` へ（`$ne`→`{not}`、`$in`→`{in}`、1件取得）
   - 観察可能な完了状態: 直近の content activity 取得が Prisma 経由で移行前と同一の1件を返す
   - _Depends: 2.1_
