@@ -131,7 +131,7 @@
   - _Requirements: 3.2_
   - _Boundary: aggregate-user-activities, apiv3/user-activities_
 
-- [ ] 6.2 (P) 貢献度集計 executor
+- [x] 6.2 (P) 貢献度集計 executor
   - `$dateTrunc` 日次集計 pipeline を引数で受ける pure executor を新規作成（spec 付き）。`activity-aggregation-service.ts` の `aggregate` を置換し、`contribution-migration-service.ts` の `findById().select()` を `findUnique({select})` へ
   - 観察可能な完了状態: 単体テスト（pipeline 注入）で現行と同一の日次集計を返し、貢献度グラフが移行前と同一集計を返す
   - _Depends: 5.2_

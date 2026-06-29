@@ -1,10 +1,10 @@
-import type { Aggregate, PipelineStage } from 'mongoose';
 import mongoose from 'mongoose';
 
-import Activity from '~/server/models/activity';
+import { prisma } from '~/utils/prisma';
 
 import type { IContributionDay } from '../../interfaces/contribution';
 import { ContributionGraphActions } from '../../interfaces/supported-actions';
+import { aggregateContributions } from './aggregate-contributions';
 
 export interface PipelineParams {
   userId: string;
@@ -14,14 +14,12 @@ export interface PipelineParams {
 
 export const getContributionActivities = (
   params: PipelineParams,
-): Aggregate<IContributionDay[]> => {
+): Promise<IContributionDay[]> => {
   const pipeline = buildPipeline(params);
-  const activityContributions = Activity.aggregate(pipeline);
-
-  return activityContributions;
+  return aggregateContributions(prisma, pipeline);
 };
 
-const buildPipeline = (params: PipelineParams): PipelineStage[] => {
+const buildPipeline = (params: PipelineParams): Record<string, unknown>[] => {
   const { userId, startDate, endDate } = params;
 
   return [
