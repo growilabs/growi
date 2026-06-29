@@ -3,6 +3,7 @@ import {
   PrismaClient as OriginalPrismaClient,
   Prisma,
 } from '~/generated/prisma/client';
+import { extension as ActivityExtension } from '~/server/models/activity';
 import { extension as ExternalAccountExtension } from '~/server/models/external-account';
 import { extension as UserExtension } from '~/server/models/user/index.prisma';
 
@@ -200,6 +201,7 @@ export const createPrisma = (datasourceUrl?: string) =>
         },
       },
     })
+    .$extends(ActivityExtension)
     .$extends(CommentExtension)
     .$extends(ExternalAccountExtension)
     .$extends(UserExtension);

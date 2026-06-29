@@ -1,6 +1,6 @@
 import type { IUser, Ref } from '@growi/core';
-import type { Document, Model, SortOrder, Types } from 'mongoose';
-import { Schema } from 'mongoose';
+import type { Document, Model, SortOrder } from 'mongoose';
+import { Schema, Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
 import type {
@@ -158,3 +158,124 @@ export default getOrCreateModel<ActivityDocument, ActivityModel>(
   'Activity',
   activitySchema,
 );
+
+// ---------------------------------------------------------------------------
+// Prisma Extension
+// TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
+// Until then, use mongoose to automatically create collections and indexes when connected.
+// ---------------------------------------------------------------------------
+import { Prisma } from '~/generated/prisma/client';
+import type { prisma } from '~/utils/prisma';
+
+/**
+ * Normalize a user/target argument to an ObjectId string.
+ *
+ * Callers (e.g. service/page/index.ts) may pass a Mongoose document or
+ * plain object rather than a bare ID string.  Prisma's create() requires a
+ * string ObjectId, so we coerce here to keep callers unchanged.
+ *
+ * Exported for unit-testing the normalization logic in isolation.
+ */
+export function normalizeToId(value: unknown): string | null | undefined {
+  if (value == null) return value as null | undefined;
+  if (typeof value === 'string') return value;
+  if (typeof value === 'object') {
+    const obj = value as Record<string, unknown>;
+    const id = obj._id ?? obj.id;
+    if (id != null) return String(id);
+  }
+  return String(value);
+}
+
+/**
+ * Parameters accepted by createByParameters — mirrors the Mongoose static's
+ * caller interface.  `user` and `target` may be either a bare ID string or a
+ * Mongoose document / plain object (normalization is done inside the method).
+ */
+export type IActivityParameters = {
+  user?: unknown;
+  target?: unknown;
+  targetModel?: string;
+  eventModel?: string;
+  event?: unknown;
+  ip?: string;
+  endpoint?: string;
+  action: string;
+  snapshot?: { username?: string };
+  createdAt?: Date;
+};
+
+export const extension = Prisma.defineExtension((client) => {
+  return client.$extends({
+    result: {
+      activities: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
+      },
+    },
+    model: {
+      activities: {
+        /**
+         * Create an activity from parameters.
+         *
+         * Mirrors the existing Mongoose static `createByParameters`.
+         * Defensively normalizes `user` and `target` from objects to ID
+         * strings so callers that pass Mongoose documents work unchanged
+         * (Key Decision 4: normalization lives inside the extension).
+         *
+         * Defaults:
+         *   v        = 0  (Mongoose initialises __v to 0 on create)
+         *   createdAt = now  (Mongoose timestamps: { createdAt: true })
+         *   snapshot.id = new ObjectId string (composite type requires it)
+         */
+        async createByParameters(
+          parameters: IActivityParameters,
+        ): Promise<IActivity> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.activities>(this);
+
+          const { user, target, event, snapshot, createdAt, ...rest } =
+            parameters;
+
+          // Build the snapshot composite type Prisma requires:
+          // ActivitiesSnapshotCreateInput = { id: string; username: string }
+          // The snapshot.id maps to _id in the ActivitiesSnapshot composite.
+          // Generate a new ObjectId hex string when not provided by the caller.
+          const snapshotId = new Types.ObjectId().toString();
+          const snapshotData: Prisma.activitiesUncheckedCreateInput['snapshot'] =
+            {
+              id: snapshotId,
+              username: snapshot?.username ?? '',
+            };
+
+          const data: Prisma.activitiesUncheckedCreateInput = {
+            ...rest,
+            v: 0,
+            createdAt: createdAt ?? new Date(),
+            ip: rest.ip ?? '',
+            endpoint: rest.endpoint ?? '',
+            userId: normalizeToId(user) ?? undefined,
+            target: normalizeToId(target) ?? undefined,
+            event: normalizeToId(event) ?? undefined,
+            snapshot: snapshotData,
+          };
+
+          const activity = await context.create({ data });
+          return activity as unknown as IActivity;
+        },
+      },
+    },
+  });
+});

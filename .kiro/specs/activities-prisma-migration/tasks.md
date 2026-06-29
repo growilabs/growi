@@ -41,7 +41,7 @@
   - _Boundary: ExternalAccount, apiv3/users(external-accounts ルート)_
 
 - [ ] 2. ActivityExtension（薄いアダプタ）の作成と有効化
-- [ ] 2.1 ActivityExtension の骨格・create・チェーン有効化
+- [x] 2.1 ActivityExtension の骨格・create・チェーン有効化
   - `models/activity.ts` 末尾に `Prisma.defineExtension` を追加。`result.activities` に `_id`/`__v` alias、`model.activities.createByParameters` を実装
   - **Key Decision 4 をここで確定**: `user`/`target` のオブジェクト→ID 正規化の所在（拡張内で正規化 vs 呼び出し側で ID 化）を決め、以降の消費者タスク（特に 3.3）がこの方針を継承する
   - `utils/prisma.ts` に `.$extends(ActivityExtension)` を追加して有効化
