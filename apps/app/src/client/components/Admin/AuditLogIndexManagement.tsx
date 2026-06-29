@@ -153,6 +153,7 @@ export const AuditLogIndexManagement = (): JSX.Element => {
     } catch (e) {
       toastError(e);
       setIsRebuildingProcessing(false);
+      await retrieveStatus();
     }
   };
 

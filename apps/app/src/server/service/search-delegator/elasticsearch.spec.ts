@@ -456,6 +456,110 @@ describe('ElasticsearchDelegator', () => {
     });
   });
 
+  describe('getAuditlogInfoForAdmin()', () => {
+    let mockES8Client: DeepMockProxy<ES8ClientDelegator>;
+
+    const givenIndexAndAliasState = (state: {
+      mainExists: boolean;
+      tmpExists: boolean;
+      mainHasAlias: boolean;
+      tmpHasAlias?: boolean;
+    }) => {
+      mockES8Client.indices.exists.mockImplementation((params) =>
+        Promise.resolve(
+          params.index === 'auditlogs-tmp' ? state.tmpExists : state.mainExists,
+        ),
+      );
+
+      const aliasEntry = (hasAlias: boolean) =>
+        hasAlias ? { aliases: { 'auditlogs-alias': {} } } : { aliases: {} };
+
+      const aliasResponse: Record<string, ReturnType<typeof aliasEntry>> = {};
+      if (state.mainExists)
+        aliasResponse.auditlogs = aliasEntry(state.mainHasAlias);
+      if (state.tmpExists)
+        aliasResponse['auditlogs-tmp'] = aliasEntry(state.tmpHasAlias ?? false);
+
+      mockES8Client.indices.getAlias.mockResolvedValue(
+        aliasResponse as unknown as Awaited<
+          ReturnType<typeof mockES8Client.indices.getAlias>
+        >,
+      );
+      mockES8Client.indices.stats.mockResolvedValue({
+        indices: {},
+      } as unknown as Awaited<ReturnType<typeof mockES8Client.indices.stats>>);
+    };
+
+    beforeEach(() => {
+      mockES8Client = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
+      injectClient(delegator, mockES8Client);
+    });
+
+    it('returns isNormalized: true when only the main index exists with the alias', async () => {
+      givenIndexAndAliasState({
+        mainExists: true,
+        tmpExists: false,
+        mainHasAlias: true,
+      });
+
+      const result = await delegator.getAuditlogInfoForAdmin();
+
+      expect(result.isNormalized).toBe(true);
+    });
+
+    it('returns isNormalized: false when the main index exists but has no alias', async () => {
+      givenIndexAndAliasState({
+        mainExists: true,
+        tmpExists: false,
+        mainHasAlias: false,
+      });
+
+      const result = await delegator.getAuditlogInfoForAdmin();
+
+      expect(result.isNormalized).toBe(false);
+    });
+
+    it('returns isNormalized: false when both main and tmp indices exist (mid-rebuild state)', async () => {
+      givenIndexAndAliasState({
+        mainExists: true,
+        tmpExists: true,
+        mainHasAlias: true,
+      });
+
+      const result = await delegator.getAuditlogInfoForAdmin();
+
+      expect(result.isNormalized).toBe(false);
+    });
+
+    it('returns empty indices and aliases with isNormalized: false when no index exists', async () => {
+      givenIndexAndAliasState({
+        mainExists: false,
+        tmpExists: false,
+        mainHasAlias: false,
+      });
+
+      const result = await delegator.getAuditlogInfoForAdmin();
+
+      expect(result).toEqual({ indices: [], aliases: [], isNormalized: false });
+    });
+
+    it('returns isNormalized: false without throwing when the index disappears between exists and getAlias (TOCTOU)', async () => {
+      mockES8Client.indices.exists.mockResolvedValue(true);
+      mockES8Client.indices.getAlias.mockResolvedValue(
+        {} as unknown as Awaited<
+          ReturnType<typeof mockES8Client.indices.getAlias>
+        >,
+      );
+      mockES8Client.indices.stats.mockResolvedValue({
+        indices: {},
+      } as unknown as Awaited<ReturnType<typeof mockES8Client.indices.stats>>);
+
+      await expect(delegator.getAuditlogInfoForAdmin()).resolves.toMatchObject({
+        isNormalized: false,
+      });
+    });
+  });
+
   describe('bulkSyncAuditlogs()', () => {
     let mockES8Client: MockProxy<ES8ClientDelegator>;
 
