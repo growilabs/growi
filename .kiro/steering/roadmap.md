@@ -11,3 +11,4 @@
 | Umbrella spec | Status | Sub-spec roadmap |
 |---|---|---|
 | [growi-vault](../specs/growi-vault/) | resilience / reconcile 完了、ha は brief 段階 | [.kiro/specs/growi-vault/roadmap.md](../specs/growi-vault/roadmap.md) |
+| [editor-commands](../specs/editor-commands/) | spec 整備中（slash-command は tasks 生成済み、extended-elements / selection-palette は WIP） | [.kiro/specs/editor-commands/roadmap.md](../specs/editor-commands/roadmap.md) |
