@@ -165,6 +165,7 @@ export default getOrCreateModel<ActivityDocument, ActivityModel>(
 // Until then, use mongoose to automatically create collections and indexes when connected.
 // ---------------------------------------------------------------------------
 import { Prisma } from '~/generated/prisma/client';
+import { normalizeAggregateRaw } from '~/server/util/prisma-raw-normalize';
 import type { prisma } from '~/utils/prisma';
 
 /**
@@ -326,6 +327,75 @@ export const extension = Prisma.defineExtension((client) => {
 
           const activity = await context.create({ data });
           return activity as unknown as IActivity;
+        },
+
+        /**
+         * Find snapshot usernames matching a regex, with a distinct total count.
+         *
+         * Reproduces the Mongoose static `findSnapshotUsernamesByUsernameRegexWithTotalCount`
+         * via two Prisma `aggregateRaw` calls:
+         *
+         * 1. Usernames pipeline (same stage order as the Mongoose aggregate):
+         *    $limit(10000) → $match(regex) → $group(_id) → $sort → $skip → $limit
+         *    Maps each result `r._id` to a username string.
+         *
+         * 2. TotalCount pipeline (distinct count, reproduces distinct('snapshot.username').length):
+         *    $match(regex) → $group(_id) → $count('total')
+         *    Returns the `total` field, or 0 when the result is empty.
+         *
+         * R6 (design.md Open Questions): `q` is passed raw into `$regex` WITHOUT
+         * escaping. This preserves the behavior of the Mongoose static, which also
+         * passes `q` unescaped. Changing this would be a behavior change out of scope.
+         *
+         * Requirements: 3.4 — design.md: ActivityExtension Contracts (findSnapshotUsernames).
+         */
+        async findSnapshotUsernamesByUsernameRegexWithTotalCount(
+          q: string,
+          option: { sortOpt: 1 | -1; offset: number; limit: number },
+        ): Promise<{ usernames: string[]; totalCount: number }> {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.activities>(this);
+
+          const opt = option || {};
+          const sortOpt = opt.sortOpt || 1;
+          const offset = opt.offset || 0;
+          const limit = opt.limit || 10;
+
+          // Usernames pipeline — stages match the Mongoose aggregate order exactly
+          const usernamesPipeline = [
+            { $limit: 10000 },
+            { $match: { 'snapshot.username': { $regex: q, $options: 'i' } } },
+            { $group: { _id: '$snapshot.username' } },
+            { $sort: { _id: sortOpt } },
+            { $skip: offset },
+            { $limit: limit },
+          ];
+
+          // TotalCount pipeline — distinct username count via $count
+          const totalCountPipeline = [
+            { $match: { 'snapshot.username': { $regex: q, $options: 'i' } } },
+            { $group: { _id: '$snapshot.username' } },
+            { $count: 'total' },
+          ];
+
+          const [usernamesRaw, totalCountRaw] = await Promise.all([
+            context.aggregateRaw({ pipeline: usernamesPipeline }),
+            context.aggregateRaw({ pipeline: totalCountPipeline }),
+          ]);
+
+          // normalizeAggregateRaw handles BSON wrappers; after $group, _id is a
+          // plain string (the username) — passed through unchanged.
+          const usernamesNormalized = normalizeAggregateRaw(
+            usernamesRaw,
+          ) as Array<{ _id: string }>;
+          const totalCountNormalized = normalizeAggregateRaw(
+            totalCountRaw,
+          ) as Array<{ total: number }>;
+
+          const usernames = usernamesNormalized.map((r) => r._id);
+          const totalCount = totalCountNormalized[0]?.total ?? 0;
+
+          return { usernames, totalCount };
         },
       },
     },

@@ -289,3 +289,162 @@ describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () =
     ).rejects.toThrow('Unique constraint failed.');
   });
 });
+
+describe('ActivityExtension.findSnapshotUsernamesByUsernameRegexWithTotalCount', () => {
+  /**
+   * Build a real extended client and spy on `activities.aggregateRaw` so no DB
+   * I/O occurs.
+   *
+   * The method makes two aggregateRaw calls:
+   *   1st: usernames pipeline → returns grouped rows [{ _id: 'alice' }, ...]
+   *   2nd: totalCount pipeline → returns [{ total: N }]
+   *
+   * Contract under test (design.md ActivityExtension Contracts, req 3.4):
+   *   - Returns { usernames: string[], totalCount: number }
+   *   - Usernames pipeline stages in order: $limit(10000), $match(regex), $group, $sort, $skip, $limit
+   *   - TotalCount pipeline: $match(regex), $group, $count('total') → distinct count
+   *   - Raw q is passed unchanged into $regex (R6: no escaping)
+   *   - Empty aggregateRaw results → { usernames: [], totalCount: 0 }
+   */
+  const buildAggregateClient = () => {
+    const base = new PrismaClient({
+      datasourceUrl: 'mongodb://localhost:27017/test',
+    });
+    const client = base.$extends(extension);
+    const aggregateRawSpy = vi.spyOn(client.activities, 'aggregateRaw');
+    return { client, aggregateRawSpy };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('returns usernames and totalCount from two aggregateRaw calls', async () => {
+    // Arrange
+    const { client, aggregateRawSpy } = buildAggregateClient();
+    // 1st call: usernames pipeline result
+    aggregateRawSpy.mockResolvedValueOnce([
+      { _id: 'alice' },
+      { _id: 'bob' },
+    ] as never);
+    // 2nd call: totalCount pipeline result
+    aggregateRawSpy.mockResolvedValueOnce([{ total: 5 }] as never);
+
+    // Act
+    const result =
+      await client.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+        'ali',
+        { sortOpt: 1, offset: 0, limit: 10 },
+      );
+
+    // Assert: observable return value
+    expect(result).toEqual({ usernames: ['alice', 'bob'], totalCount: 5 });
+  });
+
+  it('usernames pipeline contains correct stages in order with raw q (R6)', async () => {
+    // Arrange
+    const { client, aggregateRawSpy } = buildAggregateClient();
+    aggregateRawSpy.mockResolvedValueOnce([{ _id: 'charlie' }] as never);
+    aggregateRawSpy.mockResolvedValueOnce([{ total: 1 }] as never);
+    const rawQ = 'char.*[special';
+
+    // Act
+    await client.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+      rawQ,
+      { sortOpt: -1, offset: 5, limit: 20 },
+    );
+
+    // Assert: first aggregateRaw call = usernames pipeline
+    expect(aggregateRawSpy).toHaveBeenCalledTimes(2);
+    const firstCallArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
+      pipeline: unknown[];
+    };
+    expect(firstCallArgs).toBeDefined();
+    const pipeline = firstCallArgs.pipeline;
+    expect(pipeline).toHaveLength(6);
+    // Stage 0: $limit 10000
+    expect(pipeline[0]).toEqual({ $limit: 10000 });
+    // Stage 1: $match with raw q (R6 — no escaping)
+    expect(pipeline[1]).toEqual({
+      $match: { 'snapshot.username': { $regex: rawQ, $options: 'i' } },
+    });
+    // Stage 2: $group by snapshot.username
+    expect(pipeline[2]).toEqual({ $group: { _id: '$snapshot.username' } });
+    // Stage 3: $sort with provided sortOpt
+    expect(pipeline[3]).toEqual({ $sort: { _id: -1 } });
+    // Stage 4: $skip with provided offset
+    expect(pipeline[4]).toEqual({ $skip: 5 });
+    // Stage 5: $limit with provided limit
+    expect(pipeline[5]).toEqual({ $limit: 20 });
+  });
+
+  it('totalCount pipeline uses $match, $group, $count to reproduce distinct count', async () => {
+    // Arrange
+    const { client, aggregateRawSpy } = buildAggregateClient();
+    aggregateRawSpy.mockResolvedValueOnce([{ _id: 'dave' }] as never);
+    aggregateRawSpy.mockResolvedValueOnce([{ total: 42 }] as never);
+
+    // Act
+    await client.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+      'dave',
+      { sortOpt: 1, offset: 0, limit: 10 },
+    );
+
+    // Assert: second aggregateRaw call = totalCount pipeline
+    const secondCallArgs = aggregateRawSpy.mock.calls[1]?.[0] as {
+      pipeline: unknown[];
+    };
+    expect(secondCallArgs).toBeDefined();
+    const totalPipeline = secondCallArgs.pipeline;
+    expect(totalPipeline).toHaveLength(3);
+    expect(totalPipeline[0]).toEqual({
+      $match: { 'snapshot.username': { $regex: 'dave', $options: 'i' } },
+    });
+    expect(totalPipeline[1]).toEqual({ $group: { _id: '$snapshot.username' } });
+    expect(totalPipeline[2]).toEqual({ $count: 'total' });
+    await expect(aggregateRawSpy.mock.results[1]?.value).resolves.toEqual([
+      { total: 42 },
+    ]);
+  });
+
+  it('returns empty usernames and totalCount 0 when aggregateRaw returns empty arrays', async () => {
+    // Arrange
+    const { client, aggregateRawSpy } = buildAggregateClient();
+    aggregateRawSpy.mockResolvedValueOnce([] as never);
+    aggregateRawSpy.mockResolvedValueOnce([] as never);
+
+    // Act
+    const result =
+      await client.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+        'nomatch',
+        { sortOpt: 1, offset: 0, limit: 10 },
+      );
+
+    // Assert: graceful empty result
+    expect(result).toEqual({ usernames: [], totalCount: 0 });
+  });
+
+  it('applies defaults (sortOpt=1, offset=0, limit=10) when options values are falsy', async () => {
+    // Arrange
+    const { client, aggregateRawSpy } = buildAggregateClient();
+    aggregateRawSpy.mockResolvedValueOnce([] as never);
+    aggregateRawSpy.mockResolvedValueOnce([] as never);
+
+    // Act — pass 0/0/0 so all || fallbacks trigger
+    await client.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+      'q',
+      { sortOpt: 0 as unknown as 1 | -1, offset: 0, limit: 0 },
+    );
+
+    const firstCallArgs = aggregateRawSpy.mock.calls[0]?.[0] as {
+      pipeline: unknown[];
+    };
+    const pipeline = firstCallArgs.pipeline;
+    // Default sortOpt = 1
+    expect(pipeline[3]).toEqual({ $sort: { _id: 1 } });
+    // Default limit = 10
+    expect(pipeline[5]).toEqual({ $limit: 10 });
+    // offset = 0 (the || default is also 0, so same result)
+    expect(pipeline[4]).toEqual({ $skip: 0 });
+  });
+});

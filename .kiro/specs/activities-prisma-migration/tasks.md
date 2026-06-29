@@ -145,7 +145,7 @@
   - _Requirements: 3.3_
   - _Boundary: activity-export-cursor, audit-log-bulk-export step_
 
-- [ ] 6.4 (P) ユーザー名補完を aggregateRaw 経由へ
+- [x] 6.4 (P) ユーザー名補完を aggregateRaw 経由へ
   - `findSnapshotUsernamesByUsernameRegexWithTotalCount` を拡張メソッド（`aggregateRaw`）で再実装し、`apiv3/users.js`（autocomplete ルート）の呼び出しを置換。regex は現状の生 `q` を維持（エスケープ改善はスコープ外）
   - 観察可能な完了状態: オートコンプリートが移行前と同一の候補一覧と総件数を返す
   - _Depends: 5.2, 1.1_

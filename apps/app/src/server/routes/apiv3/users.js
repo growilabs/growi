@@ -16,7 +16,6 @@ import { SupportedAction } from '~/interfaces/activity';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
-import Activity from '~/server/models/activity';
 import { serializePageSecurely } from '~/server/models/serializers';
 import { UserStatus } from '~/server/models/user/conts';
 import UserGroupRelation from '~/server/models/user-group-relation';
@@ -1595,7 +1594,7 @@ export const setup = (crowi) => {
 
         if (options.isIncludeActivitySnapshotUser && req.user.admin) {
           const activitySnapshotUserData =
-            await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+            await prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(
               q,
               { offset, limit },
             );
