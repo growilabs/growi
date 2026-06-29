@@ -1,0 +1,451 @@
+# 技術設計書: activity-log（snapshot 型付け＋添付削除ログ）
+
+## Overview
+
+本機能は GROWI の監査ログ（activity log）に対し、(1) activity の `snapshot` を **action 種別を判別子とする判別可能ユニオン**として型付けし、(2) 添付ファイル削除時に削除直前の情報（ファイル名・所属ページ・サイズ）を snapshot に残す。これにより、管理者は監査ログで「誰がどのページのどの添付ファイルをいつ削除したか」を追跡でき、GROWI 開発者は action 単位で snapshot を型安全に扱える。
+
+**対象利用者**: 監査・コンプライアンス対応を行う GROWI 管理者（監査ログ参照）と、activity log を保守・拡張する GROWI 開発者（型の利用）。
+
+**Impact**: 現状 `snapshot` は `{ username }` のみで、添付削除では「誰が消したか」しか残らない。本機能は snapshot を action ごとの判別可能ユニオンにし、添付削除（直接削除・カスケード削除の両方）で対象ファイルの情報を凍結保存する。
+
+> **【ハードブロッカー】** 本スペックは **`activities` モデルが Mongoose から Prisma へ移行済み**であることを実装着手の絶対前提とする（移行は別スペックの責務。`research.md` D-2 方針3 を参照）。以降の永続層・API・サービスの記述はすべて移行後の Prisma を前提とする。
+>
+> **移行未完のまま実装してはならない。** 現状の書き込み実体は Mongoose の `snapshotSchema = new Schema({ username })`（`apps/app/src/server/models/activity.ts:43-45`）であり、Mongoose は strict 既定で未宣言フィールドを保存時に黙って捨てる。移行前に schema.prisma の `ActivitiesSnapshot` にだけフィールドを足しても、実際に書き込むのは Mongoose 経由なので添付フィールドは1バイトも保存されず、「型は通るが保存されない」最も気づきにくい失敗に陥る（要件 2・3・4 が同時に空振りする）。移行完了の確認（`activities` の書き込み・読み取り・paginate がすべて Prisma 拡張経由になっていること）を実装着手のゲートとする。
+
+### Goals
+- `snapshot` 型を `action` を唯一の判別子とする判別可能ユニオンにする（要件 1）。
+- 添付ファイルの直接削除・カスケード削除の両方で、対象ファイルの情報を snapshot に記録する（要件 2・3）。
+- 監査ログ API の応答に snapshot の添付フィールドを後方互換に含める（要件 4）。
+- 既存の activity データ（`username` のみの snapshot）を破壊的移行なしにそのまま扱える。
+
+### Non-Goals
+- `activities` モデルの Mongoose → Prisma 移行そのもの（別スペックの前提条件）。
+- `target × targetModel` 全体の判別可能ユニオン化（型安全化の全面適用）。本スペックでは `SupportedTargetModel` に `Attachment` を1つ足すのみ。
+- action グループの設定変更（`ACTION_ATTACHMENT_REMOVE` を Small グループへ格上げする、管理 UI トグルを足す等）。記録可否は既存の `AUDIT_LOG_ACTION_GROUP_SIZE` / `AUDIT_LOG_ADDITIONAL_ACTIONS` に従う。
+- 監査ログ画面への「対象」列の UI 実装（本スペックは参照可能なデータを保存するところまで）。
+- 保持期間・TTL の変更、大量カスケード削除時のボリューム制御・スロットリング。
+
+## Boundary Commitments
+
+### This Spec Owns
+- `snapshot` の判別可能ユニオン型・type guard・型付きビルダー（`interfaces/activity.ts` ＋ サーバ側ビルダー）。
+- `schema.prisma` の `ActivitiesSnapshot` composite type への添付フィールド追加。
+- `SupportedTargetModel` への `Attachment` 値の追加。
+- 添付削除 activity の記録ロジック（直接削除＝既存 activity の更新、カスケード削除＝添付ごとの新規作成）。`target` には削除対象添付の `_id` を、`targetModel` には `Attachment` を設定する。
+- 監査ログ API（`apiv3/activity.ts`）の OpenAPI への snapshot 添付フィールド記述と、応答にフィールドが乗ることの保証。
+
+### Out of Boundary
+- `activities` の Mongoose → Prisma 移行（別スペック・前提条件）。
+- `target × targetModel` の全面的型安全化。
+- action グループ／記録可否の設定変更。
+- 監査ログ画面の「対象」列 UI。
+- TTL・保持期間、カスケード削除の件数制御。
+- contribution-graph / audit-log-bulk-export / page-bulk-export 等、添付削除と無関係な activities 消費者の挙動変更。
+
+### Allowed Dependencies
+- 移行済み `activities` Prisma モデルと拡張（`createByParameters` / `updateByParameters` / `paginate` 相当）。`~/utils/prisma` の `prisma` クライアント。**この移行完了はハードブロッカー**（上記 Overview の囲み参照）。未完なら本スペックは着手しない。
+- `attachments` Prisma モデル（`originalName` / `fileSize` / `pageId`）と `pages` モデル（`path` の引き当て）。
+- `attachmentService.removeAttachment` / `removeAllAttachments`（削除実体）。
+- `ActivityService.createActivity` / `shoudUpdateActivity` と `activityEvent`、`addActivity` middleware が用意する `res.locals.activity`。
+
+### Revalidation Triggers
+- `ISnapshot` ユニオンの shape 変更、`AttachmentRemoveSnapshot` のフィールド増減。
+- `SupportedTargetModel` への値追加・変更。
+- `ActivitiesSnapshot` composite type のフィールド変更。
+- 前提の移行スペックが `createByParameters` / `updateByParameters` / `paginate` のシグネチャを変えた場合。
+- 複合 unique index `{ userId, target, action, createdAt }` の定義変更（本スペックは変更しない前提で設計している）。
+
+## Architecture
+
+### Existing Architecture Analysis
+
+- activity 記録には2経路がある。**直接削除**は `addActivity` middleware が `ACTION_UNSETTLED` の activity を1件先に作り `res.locals.activity` に置き、API が `activityEvent.emit('update', activityId, parameters)` でそれを更新する。**カスケード削除**は `deleteCompletelyOperation` が `removeAllAttachments` で複数添付を一括削除するが、添付ごとの activity は作られない（親の `PAGE_DELETE_COMPLETELY` 等に紐付くのみ）。
+- 記録可否は `ActivityService.shoudUpdateActivity(action)` が `getAvailableActions()`（`AUDIT_LOG_ACTION_GROUP_SIZE` / `ADDITIONAL_ACTIONS` / `EXCLUDE_ACTIONS` から算出）で判定する。`ACTION_ATTACHMENT_REMOVE` は Medium グループ以上に含まれ、既定 Small では記録されない。本スペックはこの判定をそのまま使う（設定変更はしない）。
+- 監査ログ取得 API（`apiv3/activity.ts`）は paginate 結果を `...rest` で展開して応答するため、`snapshot` は素通りで応答に乗る。**現状は `Activity.paginate`（Mongoose, lean + populate）だが、前提の移行後は `prisma.activities.paginate` になる**。本スペックは移行後の Prisma 版を前提に記述する（`...rest` で snapshot が乗る性質は移行前後で不変）。
+- 永続層は移行後 Prisma + MongoDB。`activities.snapshot` は composite type `ActivitiesSnapshot`。**Prisma の composite type は union を表現できない**ため、判別はドメイン層（TypeScript）で行い、永続層は全 variant を許す superset とする。
+
+### Architecture Pattern & Boundary Map
+
+```mermaid
+graph TB
+    subgraph Types
+        SnapshotTypes[snapshot union types and guard]
+        TargetModel[SupportedTargetModel plus Attachment]
+    end
+    subgraph Service
+        Builder[attachment removal snapshot builder]
+        ActivityService[ActivityService createActivity and event handler]
+    end
+    subgraph Routes
+        DirectRemove[attachment api remove]
+        AuditApi[apiv3 activity paginate]
+    end
+    subgraph PageDelete
+        Cascade[deleteCompletelyOperation]
+    end
+    subgraph Data
+        PrismaActivities[prisma activities and ActivitiesSnapshot]
+    end
+
+    SnapshotTypes --> Builder
+    TargetModel --> Builder
+    Builder --> DirectRemove
+    Builder --> Cascade
+    DirectRemove --> ActivityService
+    Cascade --> ActivityService
+    ActivityService --> PrismaActivities
+    AuditApi --> PrismaActivities
+    SnapshotTypes --> AuditApi
+```
+
+**Architecture Integration**:
+- 選択パターン: ドメイン層での判別可能ユニオン＋ type guard＋型付きビルダー（言語標準機能で実現。Mongoose/Prisma の discriminator 機構は不採用。理由は `research.md` D-2 方針1）。
+- 責務分離: 「型と判別」（Types）／「snapshot 生成と記録」（Service）／「記録の起点」（Routes・PageDelete）／「永続」（Data）を分ける。ビルダーは作業対象（添付・ページ・操作者）を引数で受け取り、データセットを自分で import しない（coding-style の executor 原則）。
+- 既存パターン維持: 記録の2経路（更新 / 新規作成）と `shoudUpdateActivity` ゲートを変えない。監査ログ API の `...rest` 応答も流用。
+- 新規の理由: 添付ごとの snapshot 生成は複数経路（直接・カスケード）から呼ばれる純粋ロジックなので、フレームワーク非依存のビルダーに切り出す。
+
+### Dependency Direction
+
+`Types（interfaces/activity.ts）` → `Prisma モデル/composite type` → `Service（ビルダー・ActivityService）` → `Routes（attachment api・apiv3/activity）/ PageDelete サービス`。各層は左の層のみに依存し、右へは依存しない。
+
+### Technology Stack
+
+| Layer | Choice / Version | Role in Feature | Notes |
+|-------|------------------|-----------------|-------|
+| Backend / Services | TypeScript（判別可能ユニオン＋type guard） | snapshot の action 別型付けと安全な生成 | ライブラリ非導入。`any` 不使用 |
+| Data / Storage | Prisma（MongoDB, `prisma-client` ESM 出力） | `activities` / `ActivitiesSnapshot` の永続 | composite type は superset。union 不可のためドメイン層で判別 |
+| Messaging / Events | `activityEvent`（既存） | 直接削除の `emit('update', ...)` 経路 | 変更なし。parameters に target/targetModel/snapshot を追加 |
+
+## File Structure Plan
+
+### Modified Files
+- `apps/app/prisma/schema.prisma` — `ActivitiesSnapshot` composite type に添付フィールド（`originalName` / `pagePath` / `pageId` / `fileSize`、いずれも optional）を追加。`username` を optional 化（user 無し削除経路への安全策。`research.md` D-5）。`activities` モデル本体・index は変更しない。
+- `apps/app/src/interfaces/activity.ts` — `SupportedTargetModel` に `MODEL_ATTACHMENT = 'Attachment'` を追加。`ISnapshot` を `DefaultSnapshot | AttachmentRemoveSnapshot` のユニオンに再定義。`isAttachmentRemoveActivity` type guard を追加。`IActivity` は `snapshot?: ISnapshot` のまま（後方互換）。
+- `apps/app/src/server/routes/attachment/api.js` — `api.remove`: 削除前に `attachment` から `pagePath`（`pages` から path 引き当て）・`originalName`・`fileSize`・`pageId` を取り、ビルダーで snapshot を生成。`emit('update', res.locals.activity._id, { action: ACTION_ATTACHMENT_REMOVE, target: attachment._id, targetModel: MODEL_ATTACHMENT, snapshot })` に変更。
+- `apps/app/src/server/service/page/index.ts` — `deleteCompletelyOperation` で `removeAllAttachments` の**直前**に、削除対象添付ごとに `ACTION_ATTACHMENT_REMOVE` activity を新規作成（recorder 呼び出し）。`deleteCompletelyOperation(pageIds, pagePaths)` に **`actor` 引数を追加**し、それを渡す**全到達経路**を改修する（下表）。経路により操作者情報の入手範囲が異なる点に注意：
+
+  | 到達経路 | `deleteCompletelyOperation` 呼び出し | 入手できる actor |
+  |----------|--------------------------------------|------------------|
+  | `deleteCompletely`（単一・非再帰） | 直接（2515行） | **user + ip + endpoint**（`activityParameters` あり） |
+  | `deleteCompletelyV4`（v4 非再帰） | 直接（2614行） | user のみ |
+  | `deleteMultipleCompletely(pages, user)` | 直接（2422行） | **user のみ** |
+
+  `deleteMultipleCompletely` は `deleteCompletelyDescendantsWithStream` の stream batch（2698行）から呼ばれ、その stream は `deleteCompletelyRecursivelyMainOperation`（再帰完全削除の main op, 2580行）・`deleteCompletelyV4`（2617行）・`emptyTrashPage`（ゴミ箱空, 2644行）から起動される。**再帰完全削除とゴミ箱空という要件 3.1・3.2 の主経路は、いずれも `deleteMultipleCompletely` 経由で user しか持たない**ため、`ip`/`endpoint` は取れない前提で actor を user 中心に縮退させる。`deleteCompletelyDescendantsWithStream` → `deleteMultipleCompletely` の2段にも actor（user）を貫通させる必要がある。
+- `apps/app/src/server/routes/apiv3/activity.ts` — OpenAPI の `snapshot` プロパティに添付フィールドを追記。応答整形（`...rest`）は変更不要だが、snapshot 添付フィールドが欠落なく乗ることをテストで担保。
+
+### New Files
+- `apps/app/src/server/service/activity/attachment-removal-snapshot.ts` — 純粋関数 `buildAttachmentRemoveSnapshot(...)`（添付・pagePath・username → `AttachmentRemoveSnapshot`）と、カスケード用 recorder `recordCascadeAttachmentRemovals(activityService, attachments, pageIdToPath, actor)`（添付ごとに `createActivity` を呼ぶ）。executor はデータセットを import せず引数で受け取る。
+- `apps/app/src/server/service/activity/attachment-removal-snapshot.spec.ts` — 上記の co-located ユニットテスト。
+
+> `interfaces/activity.ts` は client store（`stores/activity.ts`）も import する共有型ハブ。型・guard はここに置き、サーバ専用のビルダー／recorder は server 配下の新規ファイルに置いて server-client 境界を守る。
+
+## System Flows
+
+### 直接削除（要件 2）— 既存 activity の更新
+
+```mermaid
+sequenceDiagram
+    participant Client
+    participant RemoveApi as attachment api remove
+    participant Pages as prisma pages
+    participant Builder as snapshot builder
+    participant Event as activityEvent
+    participant Handler as ActivityService update handler
+    participant DB as prisma activities
+
+    Client->>RemoveApi: POST attachments.remove
+    RemoveApi->>Pages: find path by attachment pageId
+    RemoveApi->>Builder: build snapshot from attachment and pagePath and username
+    RemoveApi->>RemoveApi: attachmentService removeAttachment
+    RemoveApi->>Event: emit update with action target attachmentId targetModel Attachment snapshot
+    Event->>Handler: handle update
+    Handler->>Handler: shoudUpdateActivity check
+    Handler->>DB: update pre created activity
+```
+
+snapshot は **削除前**の `attachment`（`api.remove` のスコープに存在）から生成する。`pagePath` は `attachment.pageId` から `pages` を引いて得る。ページが見つからない／添付フィールドが欠ける場合は取れた範囲で記録し警告する（要件 2.3）。
+
+### カスケード削除（要件 3）— 添付ごとの新規作成
+
+```mermaid
+sequenceDiagram
+    participant Caller as deleteCompletely or emptyTrash
+    participant Op as deleteCompletelyOperation
+    participant Recorder as recordCascadeAttachmentRemovals
+    participant Svc as ActivityService createActivity
+    participant DB as prisma activities
+    participant Store as attachmentService removeAllAttachments
+
+    Caller->>Op: pageIds pagePaths and actor
+    Op->>Op: find attachments by pageIds
+    Op->>Recorder: attachments and pageId to path map and actor
+    loop each attachment
+        Recorder->>Svc: createActivity action target attachmentId targetModel Attachment snapshot
+        Svc->>Svc: shoudUpdateActivity check
+        Svc->>DB: create activity
+    end
+    Op->>Store: removeAllAttachments
+```
+
+`removeAllAttachments`（ストレージ削除）の**前**に snapshot を取り activity を作る（要件 3.4）。完全削除・ゴミ箱を空にする操作はいずれも最終的に `deleteCompletelyOperation` に収束するため、記録ロジック自体はここ1箇所で要件 3.1・3.2 を満たす。ただし `deleteCompletelyOperation` に actor を届けるには複数経路の改修が要る（上の File Structure Plan の表）。`pageId → path` は `deleteCompletelyOperation` が受け取る `pageIds` / `pagePaths` の対応から作る。再帰・ゴミ箱空の主経路では actor が user のみで `ip`/`endpoint` を欠くため、snapshot の `username` は取れるが ip/endpoint は activity に乗らないことがある（許容）。
+
+**unique index 衝突の回避**: 各 activity の `target` を各添付の `_id` にするため、複合 unique index `{ userId, target, action, createdAt }` は添付ごとに一意となり、同一ページ配下の複数添付・同一ミリ秒でも衝突しない。index は変更しない（`research.md` D-2 方針2）。
+
+## Requirements Traceability
+
+| Requirement | Summary | Components | Interfaces | Flows |
+|-------------|---------|------------|------------|-------|
+| 1.1 | snapshot を action 判別子のユニオンに | Snapshot Types | `ISnapshot` ユニオン | — |
+| 1.2 | 添付削除に固有 variant | Snapshot Types | `AttachmentRemoveSnapshot` | — |
+| 1.3 | catch-all（username のみ）を維持 | Snapshot Types | `DefaultSnapshot` | — |
+| 1.4 | action を唯一の判別子、別フィールド追加なし | Snapshot Types | `isAttachmentRemoveActivity`（action で判定） | — |
+| 2.1 | 直接削除で originalName/pagePath/pageId/fileSize を記録 | Snapshot Builder, Direct Remove | `buildAttachmentRemoveSnapshot` | 直接削除 |
+| 2.2 | 操作者 username を含める | Snapshot Builder | `buildAttachmentRemoveSnapshot` | 直接削除 |
+| 2.3 | 添付が取れない場合は取れた範囲＋警告 | Snapshot Builder, Direct Remove | ビルダーの optional 処理 | 直接削除 |
+| 3.1 | 完全削除のカスケードで添付ごとに記録 | Cascade Recorder, deleteCompletelyOperation | `recordCascadeAttachmentRemovals` | カスケード |
+| 3.2 | ゴミ箱を空にする操作でも同様 | Cascade Recorder | 同上（収束点で共通） | カスケード |
+| 3.3 | 直接削除と同じフィールドを記録 | Snapshot Builder | `buildAttachmentRemoveSnapshot`（共用） | カスケード |
+| 3.4 | ストレージ削除前に snapshot 取得 | deleteCompletelyOperation | recorder を removeAllAttachments の前に呼ぶ | カスケード |
+| 4.1 | API 応答に snapshot 添付フィールドを含める | Audit Log API | paginate `...rest` ＋ OpenAPI | — |
+| 4.2 | 後方互換・破壊的移行不要 | Snapshot Types, ActivitiesSnapshot | optional フィールド | — |
+
+## Components and Interfaces
+
+| Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
+|-----------|--------------|--------|--------------|--------------------------|-----------|
+| Snapshot Types & Guard | Types | action 判別子の snapshot ユニオンと narrowing | 1.1, 1.2, 1.3, 1.4, 4.2 | — | State |
+| Snapshot Builder | Service | 添付＋ページ＋操作者から snapshot を生成 | 2.1, 2.2, 2.3, 3.3 | Snapshot Types (P0) | Service |
+| Cascade Recorder | Service | 添付ごとに activity を新規作成 | 3.1, 3.2, 3.4 | ActivityService (P0), Builder (P0) | Service |
+| Direct Remove Integration | Routes | 直接削除時に snapshot 付きで update を emit | 2.1, 2.2, 2.3 | Builder (P0), activityEvent (P0), pages (P1) | Event |
+| Audit Log API | Routes | 応答に snapshot 添付フィールドを surface | 4.1, 4.2 | prisma.activities.paginate (P0) | API |
+| ActivitiesSnapshot composite | Data | 添付フィールドの永続（superset） | 1.2, 2.1, 3.3, 4.2 | — | State |
+
+### Types
+
+#### Snapshot Types & Guard
+
+| Field | Detail |
+|-------|--------|
+| Intent | `action` を判別子とする snapshot 判別可能ユニオンと type guard を定義 |
+| Requirements | 1.1, 1.2, 1.3, 1.4, 4.2 |
+
+**Responsibilities & Constraints**
+- `ISnapshot` を `DefaultSnapshot | AttachmentRemoveSnapshot` のユニオンとして定義する。判別子は `IActivity.action`（既存の必須フィールド）であり、snapshot 内に判別キーを足さない（要件 1.4）。
+- `DefaultSnapshot`（catch-all）は既存の `{ username?: string }` を保つ（要件 1.3・後方互換）。
+- 永続層（composite type）は union を表現できないため superset。型の厳密さはドメイン層の guard とビルダーで担保する。
+
+**Contracts**: State [x]
+
+##### State Management
+```typescript
+import type { IUser } from '@growi/core';
+
+export const MODEL_ATTACHMENT = 'Attachment';
+// SupportedTargetModel に MODEL_ATTACHMENT を追加（既存: Page/User/PageBulkExportJob/AuditLogBulkExportJob）
+
+export type DefaultSnapshot = Partial<Pick<IUser, 'username'>>;
+
+export type AttachmentRemoveSnapshot = {
+  username?: string;
+  originalName?: string;
+  pagePath?: string;
+  pageId?: string;
+  fileSize?: number;
+};
+
+export type ISnapshot = DefaultSnapshot | AttachmentRemoveSnapshot;
+
+// action を判別子に narrowing する type guard（要件 1.4）
+export const isAttachmentRemoveActivity = (
+  activity: Pick<IActivity, 'action' | 'snapshot'>,
+): activity is Pick<IActivity, 'action' | 'snapshot'> & {
+  snapshot?: AttachmentRemoveSnapshot;
+} => activity.action === SupportedAction.ACTION_ATTACHMENT_REMOVE;
+```
+- Preconditions: `IActivity.action` は常に存在（既存スキーマで必須）。
+- Postconditions: guard 成立時、`snapshot` は `AttachmentRemoveSnapshot` として扱える。
+- Invariants: snapshot に判別キー専用フィールドを追加しない。`username` は両 variant に存在し、既存読み取り（`snapshot.username`）は変更不要。
+
+### Service
+
+#### Snapshot Builder
+
+| Field | Detail |
+|-------|--------|
+| Intent | 添付・ページパス・操作者名から `AttachmentRemoveSnapshot` を生成する純粋関数 |
+| Requirements | 2.1, 2.2, 2.3, 3.3 |
+
+**Responsibilities & Constraints**
+- 直接削除・カスケードの両経路から共用する。フレームワーク非依存の純粋関数。
+- 取得できないフィールドは省略する（要件 2.3）。`fileSize` は Prisma 上 `Int @default(0)` のため通常存在。
+
+**Dependencies**: Outbound: Snapshot Types (P0)
+
+**Contracts**: Service [x]
+
+##### Service Interface
+```typescript
+type AttachmentLike = {
+  _id: string;
+  originalName?: string;
+  fileSize?: number;
+  pageId?: string;
+};
+
+export const buildAttachmentRemoveSnapshot = (
+  attachment: AttachmentLike,
+  pagePath: string | undefined,
+  username: string | undefined,
+): AttachmentRemoveSnapshot => ({
+  username,
+  originalName: attachment.originalName,
+  pagePath,
+  pageId: attachment.pageId,
+  fileSize: attachment.fileSize,
+});
+```
+- Preconditions: `attachment` は削除前のレコード（直接削除では API スコープ、カスケードでは `removeAllAttachments` 前の配列）。
+- Postconditions: `AttachmentRemoveSnapshot` を返す。欠損フィールドは `undefined`。
+- Invariants: 入力を破壊しない（新しいオブジェクトを返す）。
+
+**Implementation Notes**
+- Integration: 直接削除は `api.remove`、カスケードは recorder から呼ぶ。
+- Validation: `pagePath` が引けない場合は `undefined` を渡し、呼び出し側で警告ログを出す（要件 2.3）。
+- Risks: なし（純粋関数）。
+
+#### Cascade Recorder
+
+| Field | Detail |
+|-------|--------|
+| Intent | カスケード削除される添付ごとに `ACTION_ATTACHMENT_REMOVE` activity を新規作成する |
+| Requirements | 3.1, 3.2, 3.4 |
+
+**Responsibilities & Constraints**
+- `removeAllAttachments` の前に呼ばれ、各添付について `target = 添付の _id`・`targetModel = 'Attachment'`・snapshot 付きで `createActivity` を呼ぶ。
+- 作業対象（添付配列・pageId→path・操作者）は引数で受け取り、自身でデータ取得しない（executor 原則）。
+- `createActivity` は内部で `shoudUpdateActivity` ゲートを通すため、`ACTION_ATTACHMENT_REMOVE` が記録対象でない設定では何も作られない（既存挙動と一致）。
+
+**Dependencies**: Outbound: ActivityService.createActivity (P0), Snapshot Builder (P0)
+
+**Contracts**: Service [x]
+
+##### Service Interface
+```typescript
+// ip / endpoint はカスケードの再帰・ゴミ箱空経路では入手できないため optional。
+// 通常 user のみが渡る（File Structure Plan の経路表を参照）。
+type Actor = { user?: IUserHasId; ip?: string; endpoint?: string };
+
+export const recordCascadeAttachmentRemovals = async (
+  activityService: { createActivity(parameters: IActivity): Promise<IActivity | null> },
+  attachments: AttachmentLike[],
+  pageIdToPath: Map<string, string>,
+  actor: Actor,
+): Promise<void> => {
+  // for each attachment: build snapshot, then createActivity with
+  // { action: ACTION_ATTACHMENT_REMOVE, target: attachment._id,
+  //   targetModel: MODEL_ATTACHMENT, snapshot, user, ip, endpoint }
+};
+```
+- Preconditions: `attachments` は削除前（ストレージ削除はこの後）。
+- Postconditions: 記録対象設定なら添付ごとに1件作成。各 activity の `target` が一意なので unique index に衝突しない。
+- Invariants: 1件の作成失敗が削除処理全体を止めないようにする（下記 Error Handling 参照）。
+
+**Implementation Notes**
+- Integration: `deleteCompletelyOperation` が `removeAllAttachments` の直前で呼ぶ。actor は `deleteCompletelyOperation` の新引数として受け取り、File Structure Plan の表に挙げた**全到達経路**（`deleteCompletely` 直接 / `deleteCompletelyV4` / `deleteMultipleCompletely`、および stream 経由の `emptyTrashPage`・`deleteCompletelyRecursivelyMainOperation`）から貫通させる。再帰・ゴミ箱空の経路は user のみ。
+- Validation: `pageId → path` が引けない添付は `pagePath` を `undefined` で記録（削除済み等）。
+- Risks: 大量カスケード時の件数（Open Questions 参照）。
+
+### Routes
+
+#### Direct Remove Integration（attachment api remove）
+
+| Field | Detail |
+|-------|--------|
+| Intent | 直接削除時に target/targetModel/snapshot 付きで `emit('update')` する |
+| Requirements | 2.1, 2.2, 2.3 |
+
+**Contracts**: Event [x]
+
+##### Event Contract
+- Published: `activityEvent.emit('update', res.locals.activity._id, { action: ACTION_ATTACHMENT_REMOVE, target: attachment._id, targetModel: MODEL_ATTACHMENT, snapshot })`
+- 既存 activity（middleware が作成済み）を更新する経路。1リクエスト1更新で unique index に衝突しない。
+- delivery/idempotency: 既存の `emit('update')` 経路をそのまま使う。snapshot は削除前に生成済み。
+
+**Implementation Notes**
+- Integration: `attachmentService.removeAttachment(attachment)` の前に snapshot を作る（削除後は doc が消えるため）。`pagePath` は `attachment.pageId` から `pages` を引く。
+- Validation: 添付が見つからない既存分岐は維持。ページが引けない場合は `pagePath` 省略＋警告（要件 2.3）。
+
+#### Audit Log API
+
+| Field | Detail |
+|-------|--------|
+| Intent | 監査ログ応答に snapshot 添付フィールドを含める |
+| Requirements | 4.1, 4.2 |
+
+**Contracts**: API [x]
+
+##### API Contract
+| Method | Endpoint | Request | Response | Errors |
+|--------|----------|---------|----------|--------|
+| GET | (既存の activity 一覧) | 既存フィルタ | `serializedPaginationResult.docs[].snapshot` に添付フィールド | 既存 |
+
+**Implementation Notes**
+- Integration: 応答整形は既存の `...rest` で snapshot を素通しするため変更不要。OpenAPI の `snapshot` に `originalName` / `pagePath` / `pageId` / `fileSize` を追記。
+- Validation: 既存 activity（`username` のみ）は添付フィールドが欠落していても応答可能（optional）→ 後方互換（要件 4.2）。
+
+### Data
+
+#### ActivitiesSnapshot composite type（schema.prisma）
+
+```prisma
+type ActivitiesSnapshot {
+  id           String  @map("_id") @db.ObjectId
+  username     String?           // optional 化（user 無し削除経路への安全策）
+  originalName String?
+  pagePath     String?
+  pageId       String? @db.ObjectId
+  fileSize     Int?
+}
+```
+- 既存ドキュメントは `username` のみ。追加フィールドは optional のため、既存データの破壊的移行は不要（要件 4.2）。
+- `activities` モデル本体・index（`@@unique([userId, target, action, createdAt])` 等）は変更しない。
+
+## Error Handling
+
+### Error Strategy
+- **snapshot データ欠損（要件 2.3）**: 添付レコードや所属ページが取得できない場合、取れたフィールドのみで記録し `logger.warn` を出す。記録自体は止めない。
+- **カスケード時の個別失敗**: recorder 内で1件の `createActivity` が失敗しても、残りの添付記録とページ削除本体（`removeAllAttachments` 以降）を止めない。失敗は `logger.error` で文脈付きログを残す（既存 `createActivity` も内部で try/catch し `null` を返す方針に一致）。
+- **記録対象外の設定**: `ACTION_ATTACHMENT_REMOVE` が `getAvailableActions()` に含まれない設定では `shoudUpdateActivity` が false を返し、何も作成・更新されない（正常系。設定変更はスコープ外）。
+
+### Monitoring
+- 欠損・失敗時の警告／エラーログに添付 `_id`・page 情報を含め、監査ログ欠落の追跡を可能にする。
+
+## Testing Strategy
+
+### Unit Tests
+- `buildAttachmentRemoveSnapshot` が `originalName` / `pagePath` / `pageId` / `fileSize` / `username` を正しく詰める（要件 2.1, 2.2, 3.3）。
+- `buildAttachmentRemoveSnapshot` が欠損入力（pagePath 無し等）で当該フィールドを省略する（要件 2.3）。
+- `isAttachmentRemoveActivity` が `action` で正しく narrowing し、それ以外の action では `DefaultSnapshot` 扱いになる（要件 1.1, 1.3, 1.4）。
+
+### Integration Tests
+- 直接削除（`attachments.remove`）後、対象 activity の `snapshot` に添付フィールドと `username` が入り、`target` が添付 `_id`・`targetModel` が `Attachment` になる（要件 2.1, 2.2）。
+- 完全削除で1ページ複数添付を消したとき、添付ごとに `ACTION_ATTACHMENT_REMOVE` activity が作成され、**E11000 が発生しない**（target が添付ごとに一意。要件 3.1, 3.4）。
+- ゴミ箱を空にする操作でも同様に添付ごとの activity が作られる（要件 3.2）。
+- 監査ログ API の応答に snapshot 添付フィールドが乗る／`username` のみの既存 activity も問題なく返る（要件 4.1, 4.2）。
+
+> テスト記述時は `essential-test-design`（観察可能な契約をテスト）と `essential-test-patterns`（Vitest / 型安全モック）に従う。記録可否ゲートを通すため、結合試験は `ACTION_ATTACHMENT_REMOVE` を記録対象にする設定（Medium 以上または additional actions）を明示的に注入する（`research.md` D-5）。
+
+## Migration Strategy
+
+- **データ移行は不要**: 追加フィールドはすべて optional で後方互換。既存 activity はそのまま動作する（要件 1.3, 4.2）。
+- **前提条件（別スペック・ハードブロッカー）**: `activities` の Mongoose → Prisma 移行が完了していること。本スペックの実装順は「移行完了 → 本スペック」で、移行未完のまま着手すると Overview の囲みに記したとおり snapshot が無言で保存されない。実装着手前のゲート＝「`apiv3/activity.ts` の paginate・`service/activity.ts` の create/update が Prisma 拡張経由になっており、`models/activity.ts` の Mongoose statics に依存していないこと」を確認する。移行が `createByParameters` / `updateByParameters` / `paginate` のシグネチャを変えた場合は Revalidation Triggers に従い本設計を見直す。
+- **`ActivitiesSnapshot.username` の必須→optional 化**: 移行 introspect は `username String`（必須）で生成される。本スペックで optional 化すると `prisma generate` 後に `string | null` 型へ変わるため、`snapshot.username` を読む箇所（`apiv3/activity.ts` の検索クエリ、`models/activity.ts` の `findSnapshotUsernamesByUsernameRegexWithTotalCount` 相当、`stores/activity.ts`）の型整合をタスクで確認する。
+- `schema.prisma` 変更後は `pnpm prisma generate` で型を再生成する（実装時の運用手順）。
+
+## Open Questions / Risks
+- **大量カスケード時の activity 件数**: 再帰的な完全削除で数千の添付があると同数の activity が作られる。要件上ボリューム制御はスコープ外のため本スペックでは制御しない。運用上の注意として記録する（将来スペックでスロットリング／集約を検討）。
+- **username 無しの削除経路**: 直接削除・ゴミ箱空・完全削除はいずれも操作者を持つ想定だが、安全のため `ActivitiesSnapshot.username` は optional とする。
+
+## Security Considerations
+- snapshot は監査証跡であり、削除済みファイルの `originalName` / `pagePath` を保持する。これらは元々その activity を閲覧できる管理者向け監査ログの範囲内の情報であり、新たな機密の露出は増やさない。
+- 監査ログ API は既存の認可（管理者向け）をそのまま使う。本スペックは認可ロジックを追加・変更しない。
