@@ -343,6 +343,7 @@ describe('AuditlogChangeStreamService', () => {
           vi.mocked(AuditlogEsSyncStatus.setUnsynced),
         ).toHaveBeenCalledTimes(1);
       } finally {
+        await service.close();
         vi.useRealTimers();
       }
     });
@@ -446,43 +447,77 @@ describe('AuditlogChangeStreamService', () => {
         ),
       );
       expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledOnce();
-      expect(fakeStream.closed).toBe(false);
+
+      // Push a second event: if the stream had been closed after the persist failure,
+      // this event would never be processed. Two successful syncs confirm the stream ran on.
+      fakeStream.push(makeInsertEvent({}, 'tok2'));
+      await vi.waitFor(() =>
+        expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledTimes(2),
+      );
     });
 
     it('persists only the last event token when multiple events are batched together (H-1)', async () => {
+      vi.useFakeTimers();
+      try {
+        const fakeStream = new FakeChangeStream();
+        vi.spyOn(Activity, 'watch').mockReturnValue(
+          fakeStream as unknown as ChangeStream<ActivityDocument>,
+        );
+        service = new AuditlogChangeStreamService(esWriter);
+
+        await service.start();
+
+        fakeStream.push(makeInsertEvent({}, 'tok1'));
+        fakeStream.push(makeInsertEvent({}, 'tok2'));
+        fakeStream.push(makeInsertEvent({}, 'tok3'));
+
+        // Advance past the 200 ms idle window to trigger a single batched flush.
+        await vi.runAllTimersAsync();
+
+        expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalledTimes(
+          1,
+        );
+        expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalledWith(
+          'auditlogs',
+          { _data: 'tok3' },
+        );
+      } finally {
+        vi.useRealTimers();
+      }
+    });
+
+    it('flushes immediately when buffer reaches BATCH_SIZE without waiting for the idle timer', async () => {
       const fakeStream = new FakeChangeStream();
       vi.spyOn(Activity, 'watch').mockReturnValue(
         fakeStream as unknown as ChangeStream<ActivityDocument>,
       );
       service = new AuditlogChangeStreamService(esWriter);
-
       await service.start();
 
-      fakeStream.push(makeInsertEvent({}, 'tok1'));
-      fakeStream.push(makeInsertEvent({}, 'tok2'));
-      fakeStream.push(makeInsertEvent({}, 'tok3'));
+      for (let i = 0; i < 100; i++) {
+        fakeStream.push(makeInsertEvent({}, `tok${i}`));
+      }
 
       await vi.waitFor(() =>
-        expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalled(),
+        expect(esWriter.bulkSyncAuditlogs).toHaveBeenCalledOnce(),
       );
-      expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalledTimes(
-        1,
-      );
-      expect(vi.mocked(ChangeStreamResumeToken.upsert)).toHaveBeenCalledWith(
-        'auditlogs',
-        { _data: 'tok3' },
-      );
+      const [upserts] = esWriter.bulkSyncAuditlogs.mock.calls[0];
+      expect(upserts).toHaveLength(100);
     });
   });
 
   // ─── Poison pill skip ──────────────────────────────────────────────────────
 
   describe('poison pill skip (MAX_CONSECUTIVE_EVENT_FAILURES)', () => {
-    it('calls markUnsyncedAndAdvanceToken after MAX consecutive failures on the same token', async () => {
-      service = new AuditlogChangeStreamService(esWriter);
-      const internal = service as unknown as ServiceInternals;
-      esWriter.bulkSyncAuditlogs.mockRejectedValue(new Error('ES error'));
+    let internal: ServiceInternals;
 
+    beforeEach(() => {
+      service = new AuditlogChangeStreamService(esWriter);
+      internal = service as unknown as ServiceInternals;
+      esWriter.bulkSyncAuditlogs.mockRejectedValue(new Error('ES error'));
+    });
+
+    it('calls markUnsyncedAndAdvanceToken after MAX consecutive failures on the same token', async () => {
       await driveFlushes(internal, 8, 'tok-poison');
 
       expect(vi.mocked(markUnsyncedAndAdvanceToken)).toHaveBeenCalledWith(
@@ -492,8 +527,6 @@ describe('AuditlogChangeStreamService', () => {
     });
 
     it('logs an error message when skipping a poison pill batch', async () => {
-      service = new AuditlogChangeStreamService(esWriter);
-      const internal = service as unknown as ServiceInternals;
       const esError = new Error('permanent ES error');
       esWriter.bulkSyncAuditlogs.mockRejectedValue(esError);
 
@@ -505,21 +538,19 @@ describe('AuditlogChangeStreamService', () => {
       );
     });
 
-    it('returns true after skipping a poison pill batch', async () => {
-      service = new AuditlogChangeStreamService(esWriter);
-      const internal = service as unknown as ServiceInternals;
-      esWriter.bulkSyncAuditlogs.mockRejectedValue(new Error('ES error'));
+    it('logs an error when markUnsyncedAndAdvanceToken throws during the skip', async () => {
+      const txErr = new Error('tx failed');
+      vi.mocked(markUnsyncedAndAdvanceToken).mockRejectedValue(txErr);
 
-      const result = await driveFlushes(internal, 8, 'tok-poison');
+      await driveFlushes(internal, 8, 'tok-poison');
 
-      expect(result).toBe(true);
+      expect(mockError).toHaveBeenCalledWith(
+        txErr,
+        'Failed to mark unsynced + advance token past poison pill batch; will retry on restart.',
+      );
     });
 
     it('resets failure count after a skip — next 8 failures on a new token trigger another skip', async () => {
-      service = new AuditlogChangeStreamService(esWriter);
-      const internal = service as unknown as ServiceInternals;
-      esWriter.bulkSyncAuditlogs.mockRejectedValue(new Error('ES error'));
-
       await driveFlushes(internal, 8, 'tok-poison');
       vi.mocked(markUnsyncedAndAdvanceToken).mockClear();
 
@@ -586,6 +617,26 @@ describe('AuditlogChangeStreamService', () => {
       );
       // Reject the pending next() with HistoryLost so the outer catch fires
       fakeStream.pushError(historyLostErr);
+
+      await vi.waitFor(() =>
+        expect(vi.mocked(markUnsyncedAndClearToken)).toHaveBeenCalledWith(
+          'auditlogs',
+        ),
+      );
+    });
+
+    it('calls markUnsyncedAndClearToken when HistoryLost is detected by message text (no error code)', async () => {
+      const fakeStream = new FakeChangeStream();
+      vi.spyOn(Activity, 'watch').mockReturnValue(
+        fakeStream as unknown as ChangeStream<ActivityDocument>,
+      );
+      service = new AuditlogChangeStreamService(esWriter);
+
+      await service.start();
+
+      fakeStream.pushError(
+        new Error('Resume of change stream was not possible'),
+      );
 
       await vi.waitFor(() =>
         expect(vi.mocked(markUnsyncedAndClearToken)).toHaveBeenCalledWith(
@@ -710,8 +761,8 @@ describe('AuditlogChangeStreamService', () => {
 
         expect(watchSpy).toHaveBeenCalledTimes(2);
       } finally {
-        vi.useRealTimers();
         await service.close();
+        vi.useRealTimers();
       }
     });
 
@@ -735,8 +786,8 @@ describe('AuditlogChangeStreamService', () => {
           vi.mocked(AuditlogEsSyncStatus.setUnsynced),
         ).not.toHaveBeenCalled();
       } finally {
-        vi.useRealTimers();
         await service.close();
+        vi.useRealTimers();
       }
     });
 
