@@ -226,14 +226,14 @@ sequenceDiagram
 ```typescript
 // model.activities に生やすメソッド（既存 statics と同シグネチャを維持）
 createByParameters(parameters: IActivityParameters): Promise<IActivity>;
-updateByParameters(activityId: string, parameters: Partial<IActivityParameters>): Promise<activities | null>;
+updateByParameters(activityId: string, parameters: Partial<IActivityParameters>): Promise<activities | null>; // 対象なしは null（下記 Postconditions 参照）
 findSnapshotUsernamesByUsernameRegexWithTotalCount(
   q: string, option: { sortOpt: 1 | -1; offset: number; limit: number },
 ): Promise<{ usernames: string[]; totalCount: number }>;
 // 注: getActionUsersFromActivities は static 実装が無く移植不要（Open Questions 参照）
 ```
 - Preconditions: `createPrisma()` に `.$extends(ActivityExtension)` 済み。
-- Postconditions: 既存 statics と同じ戻り値・例外。**`updateByParameters` は `include: { user: true }` を付け、戻り値に `userId`(string) と `user`(relation) の両方を含める（確定）**。下流の3経路——`pre-notify.ts` の `getIdForRef(activity.user)`、`update-activity-logic.ts` の `getIdStringForRef(lastContentActivity?.user)`、`in-app-notification.ts` の `{ _id, targetModel, target, action }` 分割代入——はこれで互換を保つ（`getIdForRef`/`getIdStringForRef` は Ref も populated も受けるため）。同 `include` は `apiv3/activity.ts`/`user-activities.ts` の `serializeUserSecurely(user)` が要求する populated user も満たす。`target`/`_id`/`targetModel`/`action` はフラットなのでそのまま乗る。
+- Postconditions: 既存 statics と同じ戻り値・例外。**`updateByParameters` は `include: { user: true }` を付け、戻り値に `userId`(string) と `user`(relation) の両方を含める（確定）**。**not-found セマンティクスの保持（確定・C1）**: 現行の `findOneAndUpdate(..., { new: true })` は対象が無い場合 `null` を返す（作成はしない＝`upsert` 無し）。一方 Prisma の `update({ where: { id } })` は対象なしで `P2025` を throw するため、**`P2025` を catch して `null` を返す**ことで現行の null セマンティクスを保つ（`upsert` 化＝「無ければ作成」は挙動変更なので採らない）。`updateMany` 案は戻り値が更新後ドキュメントでなく件数になり `include: { user: true }` と両立しないため不採用。下流の3経路——`pre-notify.ts` の `getIdForRef(activity.user)`、`update-activity-logic.ts` の `getIdStringForRef(lastContentActivity?.user)`、`in-app-notification.ts` の `{ _id, targetModel, target, action }` 分割代入——はこれで互換を保つ（`getIdForRef`/`getIdStringForRef` は Ref も populated も受けるため）。同 `include` は `apiv3/activity.ts`/`user-activities.ts` の `serializeUserSecurely(user)` が要求する populated user も満たす。`target`/`_id`/`targetModel`/`action` はフラットなのでそのまま乗る。
 - Invariants: 公開シグネチャを既存 statics と一致させ、消費者の呼び出し形を変えない。
 
 ### Service / Feature executors（Option C）
@@ -279,6 +279,7 @@ paginate(options: { where?; orderBy?; include?; select?; offset?: number; limit?
 - **集計 raw の戻り正規化失敗**: `prisma-raw-normalize` で想定外 BSON を検出したら明示エラー＋文脈ログ（挙動同一性の早期検知）。
 - **cursor バッチ中断**: 既存 `pipeline` のエラーハンドラ（`handleError`）と `lastExportedId` resume をそのまま使う。
 - **unique 制約違反（P2002）**: 既存の Mongoose 重複エラー処理箇所を Prisma の `P2002` 捕捉へ置換（要件 4.2 の挙動維持）。
+- **更新対象なし（P2025・C1）**: `updateByParameters` は Prisma `update` の `P2025`（Record not found）を catch して `null` を返し、現行 `findOneAndUpdate` の「対象なし＝null（例外を投げない・作成しない）」挙動を保つ（要件 1.2・5.3 の純粋移行）。なお settle 経路は `addActivity` middleware が先に作成した activity を `activityEvent('update')` が更新する流れのため、実運用で not-found に至る可能性は低いが、戻り型 `| null` の契約を守るため明示的に握る。
 
 ## Testing Strategy
 
@@ -293,6 +294,7 @@ paginate(options: { where?; orderBy?; include?; select?; offset?: number; limit?
 - 集計: user-activities／contribution が移行前と同一集計（要件 3.1・3.2）。
 - エクスポート: cursor executor が `_id` 昇順で全件を同順序出力し、`lastExportedId` resume が成立（要件 3.3）。
 - 完了ゲート: `models/activity.ts` の Mongoose statics への参照が消費側から消えている（grep ベースの確認、要件 5.1・5.5）。
+- **external-account 一覧の回帰（offset 化の巻き添え検証・C3）**: 共有 `paginate` の入力 page→offset 化（確定1）は、唯一の現 Prisma `paginate` 消費者である external-account を巻き込む（他の `.paginate` 消費者は全て未移行の Mongoose モデルであることを確認済み）。これは本スペックの対象外機能のため要件 5.3 の「観察可能挙動不変」が直接は及ばない穴になる。これを塞ぐため、**external-account 一覧（`findAllWithPagination`／`apiv3/users.js` の external-accounts ルート）の件数・並び順・ページ情報が offset 化前後で不変**であることを実 DB の integ テストで明示的にアサートする。paginate ヘルパ単体テスト（下記 Unit Tests）は出力 shape を守るが、at-risk な実消費者の観察可能挙動はこの回帰テストで守る。
 
 > テスト記述時は essential-test-design（観察可能契約）／essential-test-patterns（Vitest・型安全モック）に従う。既存の integ テスト（`update-activity.spec`・`activity-aggregation-service.spec`・`audit-log-...integ`）は `insertMany`→`createMany`／`find`→executor へ追随（明示 `_id` は ObjectId 保持で維持。Research R4）。
 
@@ -304,10 +306,10 @@ paginate(options: { where?; orderBy?; include?; select?; offset?: number; limit?
 - **既存 quirk `offset || 1` は維持する（純粋移行）**: `apiv3/activity.ts` は `const offset = req.query.offset || 1` で、フロントが1ページ目に送る `offset=0` が falsy のため `offset=1` に化け、**現状は1ページ目の先頭1件をスキップしている**。純粋移行の原則（観察可能挙動を変えない・要件 2.1）に従い、**この挙動を移行後もそのまま維持**する（移行後に素直に `skip=0` にすると件数が変わり要件 2.1 違反になるため）。この潜在不具合の修正は R6 の regex と同様**スコープ外**とし、別変更に切り出す。実装時はルートの `offset` 受け取り → 新 paginate への受け渡しで `offset` が現状どおり（`|| 1` 込み）skip に届くことを確認する。
 
 ## Open Questions / Risks（Research Needed の引き継ぎ）
-- **R1**: composite type（`snapshot.username`）への `where` フィルタ構文が introspect 済み型で意図通り効くか（autocomplete／一覧フィルタ）。
+- **R1（フェーズ1 着手前の blocking spike・C2 反映）**: composite type（`snapshot.username`）への `where` フィルタ構文（`snapshot: { is: { username: { in: [...] } } }` 等）が introspect 済み型で意図通り効くか。**一覧フィルタ（要件 2.2）はフェーズ1 の成果物**であり、この構文の可否が一覧の実装方針を左右するため、**一覧フィルタのコードを書き始める前に**、10〜20 行の使い捨て検証コードで実 DB に対し動作を確かめる（blocking spike）。スパイク結果で実装方針を分岐させる: (a) native composite filter が効く → そのまま採用、(b) 効かない → `aggregateRaw` による生クエリのフォールバックに切り替える。autocomplete（要件 3.4・フェーズ2）も同じ構文に依存するため、本スパイクの結果を共有する。
 - **R2**: `aggregateRaw` の戻り型と `$oid`/`$date` 表現。`$facet`/`$lookup`/`$dateTrunc` 込み既存 pipeline をそのまま渡せるか。
 - **R3**: cursor の最適手段（`cursor`+`take` バッチ反復のメモリ/性能）。確定3で方向づけ済み、性能は実測で確認。
-- **R4**: `create`/`createMany` で明示 `_id`（ObjectId 文字列）を指定できるか（integ テスト）。R1 とともに**フェーズ2・integ テストの前提なので、フェーズ1 内で先行検証タスクとして潰す**（design レビュー Minor 反映）。
+- **R4**: `create`/`createMany` で明示 `_id`（ObjectId 文字列）を指定できるか（integ テスト）。**フェーズ2・integ テストの前提なので、フェーズ1 内で先行検証タスクとして潰す**（design レビュー Minor 反映）。R1 は上記のとおり一覧フィルタ（フェーズ1）の前提のため、R4 より早い「フェーズ1 着手前の blocking spike」として独立させた。
 - **R5（解決済み方針）**: paginate 出力は `offset` を必ず含み、`page`/`pagingCounter`/`hasPrevPage` を mongoose-paginate-v2 互換式で導出（確定1。Critical 1 反映済み）。
 - **R6（スコープ外）**: `findSnapshotUsernames` の regex は現状の生 `q` を維持（エスケープ改善は別変更）。
 - **Key Decision 5（確定）**: `updateByParameters` は `include: { user: true }` を付け `userId` と `user` の両方を返す（上記 ActivityExtension Postconditions に確定として記載。Critical 3 反映済み）。
