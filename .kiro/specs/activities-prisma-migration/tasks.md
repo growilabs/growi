@@ -57,7 +57,7 @@
   - _Requirements: 1.2_
 
 - [ ] 3. フェーズ1 消費者の Prisma 化
-- [ ] 3.1 addActivity middleware の create を拡張経由へ
+- [x] 3.1 addActivity middleware の create を拡張経由へ
   - `add-activity.ts` の `Activity.createByParameters` を拡張メソッドへ置換（`user` は `req.user?._id` で ID 寄り）
   - 観察可能な完了状態: 監査対象操作で middleware が Prisma 拡張経由で activity を記録する
   - _Depends: 2.1_
