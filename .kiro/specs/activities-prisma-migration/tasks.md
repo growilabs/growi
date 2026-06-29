@@ -72,7 +72,7 @@
   - _Requirements: 1.2, 1.3, 4.1, 4.2, 4.3_
   - _Boundary: ActivityService（service/activity.ts）_
 
-- [ ] 3.3 page delete 時の記録を拡張経由へ
+- [x] 3.3 page delete 時の記録を拡張経由へ
   - `service/page/index.ts` の `Activity.createByParameters`（page 削除時）を拡張経由へ。`user`/`target` のオブジェクト→ID 正規化は 2.1 で確定した方針に従う
   - 観察可能な完了状態: ページ削除時に Prisma 拡張経由で `target`/`targetModel` を含む activity が記録される
   - _Depends: 2.1_

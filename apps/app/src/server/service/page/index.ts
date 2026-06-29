@@ -31,7 +31,11 @@ import { pipeline } from 'stream/promises';
 
 import type { ExternalUserGroupDocument } from '~/features/external-user-group/server/models/external-user-group';
 import ExternalUserGroupRelation from '~/features/external-user-group/server/models/external-user-group-relation';
-import { SupportedAction, SupportedTargetModel } from '~/interfaces/activity';
+import {
+  type IActivityHasId,
+  SupportedAction,
+  SupportedTargetModel,
+} from '~/interfaces/activity';
 import { V5ConversionErrCode } from '~/interfaces/errors/v5-conversion-error';
 import type { IOptionsForCreate, IOptionsForUpdate } from '~/interfaces/page';
 import type { IPageDeleteConfigValueToProcessValidation } from '~/interfaces/page-delete-config';
@@ -49,7 +53,6 @@ import {
 } from '~/interfaces/websocket';
 import type { CurrentPageYjsData } from '~/interfaces/yjs';
 import type Crowi from '~/server/crowi';
-import Activity, { type ActivityDocument } from '~/server/models/activity';
 import type { CreateMethod } from '~/server/models/page';
 import {
   type PageDocument,
@@ -2837,9 +2840,11 @@ class PageService implements IPageService {
       },
     };
 
-    let activity: ActivityDocument | null = null;
+    let activity: IActivityHasId | null = null;
     try {
-      activity = await Activity.createByParameters(parameters);
+      activity = (await prisma.activities.createByParameters(
+        parameters,
+      )) as IActivityHasId;
     } catch (err) {
       logger.error('Create activity failed', err);
     }
@@ -2980,7 +2985,7 @@ class PageService implements IPageService {
     options,
     pageOpId: ObjectIdLike,
     resolvedAction,
-    activity: ActivityDocument | null,
+    activity: IActivityHasId | null,
   ): Promise<void> {
     const Page = mongoose.model<IPage, PageModel>('Page');
 
