@@ -205,6 +205,17 @@ export type IActivityParameters = {
   createdAt?: Date;
 };
 
+/**
+ * Parameters accepted by updateByParameters.
+ *
+ * Uses Prisma's unchecked update input type — the activity extension only
+ * updates scalar fields (action, snapshot, etc.) without relation nesting.
+ * `activitiesUncheckedUpdateInput` maps directly to what callers pass
+ * (e.g. `{ action: 'PAGE_VIEW', snapshot: ... }`) and is the correct Prisma
+ * update payload for `context.update({ data: ... })`.
+ */
+export type IActivityUpdateParameters = Prisma.activitiesUncheckedUpdateInput;
+
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
     result: {
@@ -227,6 +238,47 @@ export const extension = Prisma.defineExtension((client) => {
     },
     model: {
       activities: {
+        /**
+         * Update an activity by ID, returning the updated document (with
+         * populated user relation) or null when the record does not exist.
+         *
+         * Mirrors the existing Mongoose static `updateByParameters`:
+         *   findOneAndUpdate({ _id }, params, { new: true }) → doc | null
+         *
+         * Key Decision 5: include: { user: true } so that downstream consumers
+         * (pre-notify.ts, update-activity-logic.ts, in-app-notification.ts)
+         * receive both `userId` (string) and `user` (relation) on the result.
+         *
+         * C1 (not-found semantics): Prisma `update` throws P2025 when no row
+         * matches; we catch it and return null to preserve the existing null
+         * return of findOneAndUpdate. Other errors are re-thrown unchanged.
+         *
+         * Requirements: 1.2, 5.3 — design.md: ActivityExtension Postconditions (C1),
+         * Error Handling (更新対象なし P2025・C1), Key Decision 5.
+         */
+        async updateByParameters(
+          activityId: string,
+          parameters: IActivityUpdateParameters,
+        ) {
+          const context =
+            Prisma.getExtensionContext<typeof prisma.activities>(this);
+          try {
+            return await context.update({
+              where: { id: activityId },
+              data: parameters,
+              include: { user: true },
+            });
+          } catch (err) {
+            if (
+              err instanceof Prisma.PrismaClientKnownRequestError &&
+              err.code === 'P2025'
+            ) {
+              return null;
+            }
+            throw err;
+          }
+        },
+
         /**
          * Create an activity from parameters.
          *

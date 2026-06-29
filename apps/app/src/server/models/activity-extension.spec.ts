@@ -8,12 +8,13 @@
  * 3. createByParameters: builds the correct Prisma `create` data — mapping
  *    user→userId, target→target (normalized to ID strings), injecting the
  *    Mongoose-compat defaults (v:0, createdAt, snapshot.id, ip/endpoint '').
+ * 4. updateByParameters: calls context.update with correct args (including
+ *    include:{user:true}); returns null on P2025; re-throws on other errors.
  *
- * DB-free: a real extended Prisma client is built, but `activities.create` is
- * spied/mocked so no connection is opened. The assertions target the arguments
- * passed to `create`, i.e. the actual data-building contract of the method.
+ * DB-free: a real extended Prisma client is built, but `activities.create` /
+ * `activities.update` are spied/mocked so no connection is opened.
  */
-import { PrismaClient } from '~/generated/prisma/client';
+import { Prisma, PrismaClient } from '~/generated/prisma/client';
 
 import { extension, normalizeToId } from './activity';
 
@@ -179,5 +180,112 @@ describe('ActivityExtension.createByParameters - data-building contract', () => 
     };
     expect(data.userId).toBeUndefined();
     expect(data.target).toBeUndefined();
+  });
+});
+
+describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () => {
+  /**
+   * Build a real extended client and spy on `activities.update` so no DB I/O
+   * occurs. updateByParameters must:
+   *   - call update({ where: { id }, data: parameters, include: { user: true } })
+   *   - return the updated document on success
+   *   - return null (not throw) when Prisma throws P2025
+   *   - re-throw any other error
+   *
+   * Design ref: design.md "ActivityExtension Postconditions (C1)", "Error Handling",
+   * "Key Decision 5". Requirements: 1.2, 5.3.
+   */
+
+  // A full, valid activities row (with populated user) returned from mocked update.
+  const populatedRow = {
+    _id: 'activity-id-1',
+    __v: 0,
+    id: 'activity-id-1',
+    v: 0,
+    action: 'PAGE_CREATE',
+    createdAt: new Date(),
+    endpoint: '/_api/v3/pages',
+    event: null,
+    eventModel: null,
+    ip: '127.0.0.1',
+    target: null,
+    targetModel: null,
+    userId: 'user-id-1',
+    snapshot: { id: 'snap-id', username: 'alice' },
+    user: { id: 'user-id-1', username: 'alice' },
+  };
+
+  const buildUpdateClient = () => {
+    const base = new PrismaClient({
+      datasourceUrl: 'mongodb://localhost:27017/test',
+    });
+    const client = base.$extends(extension);
+    const updateSpy = vi
+      .spyOn(client.activities, 'update')
+      .mockResolvedValue(populatedRow);
+    return { client, updateSpy };
+  };
+
+  beforeEach(() => {
+    vi.clearAllMocks();
+  });
+
+  it('calls update with correct where/data/include and returns the populated result', async () => {
+    // Arrange
+    const { client, updateSpy } = buildUpdateClient();
+    const activityId = 'activity-id-1';
+    const parameters = { action: 'PAGE_VIEW' };
+
+    // Act
+    const result = await client.activities.updateByParameters(
+      activityId,
+      parameters,
+    );
+
+    // Assert: update called with exact args (Key Decision 5: include user)
+    expect(updateSpy).toHaveBeenCalledTimes(1);
+    expect(updateSpy).toHaveBeenCalledWith({
+      where: { id: activityId },
+      data: parameters,
+      include: { user: true },
+    });
+
+    // Assert: populated row is returned unchanged
+    expect(result).toEqual(populatedRow);
+  });
+
+  it('returns null (does NOT throw) when Prisma throws P2025 (record not found, C1)', async () => {
+    // Arrange: simulate Prisma "Record to update not found" error
+    const { client, updateSpy } = buildUpdateClient();
+    const p2025 = new Prisma.PrismaClientKnownRequestError(
+      'Record to update not found.',
+      { code: 'P2025', clientVersion: 'test' },
+    );
+    updateSpy.mockRejectedValue(p2025);
+
+    // Act
+    const result = await client.activities.updateByParameters('missing-id', {
+      action: 'PAGE_VIEW',
+    });
+
+    // Assert: null returned, not thrown (preserves findOneAndUpdate null semantics)
+    expect(result).toBeNull();
+  });
+
+  it('re-throws errors other than P2025 (non-P2025 errors must not be swallowed)', async () => {
+    // Arrange: simulate a non-P2025 known error (e.g. unique constraint P2002)
+    const { client, updateSpy } = buildUpdateClient();
+    const p2002 = new Prisma.PrismaClientKnownRequestError(
+      'Unique constraint failed.',
+      { code: 'P2002', clientVersion: 'test' },
+    );
+    updateSpy.mockRejectedValue(p2002);
+
+    // Act & Assert: the error propagates (not swallowed to null)
+    await expect(
+      client.activities.updateByParameters('activity-id-1', {
+        action: 'PAGE_VIEW',
+      }),
+    ).rejects.toThrow('Unique constraint failed.');
   });
 });

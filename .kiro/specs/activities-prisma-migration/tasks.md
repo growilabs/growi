@@ -49,7 +49,7 @@
   - _Depends: 1.3, 1.4_
   - _Requirements: 1.1, 1.4_
 
-- [ ] 2.2 updateByParameters（not-found セマンティクス保持）
+- [x] 2.2 updateByParameters（not-found セマンティクス保持）
   - `model.activities.updateByParameters` を `include: { user: true }` 付きで実装し、戻り値に `userId` と `user` の両方を含める（Key Decision 5）
   - **C1**: Prisma `update` の `P2025` を catch して `null` を返し、現行 `findOneAndUpdate(..., {new:true})` の「対象なし＝null（例外を投げない・作成しない）」挙動を保つ（`upsert` 化はしない）
   - 観察可能な完了状態: 既存 activity を更新すると populated `user` 付きで返り、存在しない id では例外を投げず `null` を返す
@@ -179,3 +179,4 @@
   - integ テストは**コードとして実装し、実行は CI（GitHub Actions の mongo サービス＝外部 `MONGO_URI`）に委ねる**。ローカルでは型チェックで integ ファイルのコンパイルのみ担保。
   - DB 依存スパイク（1.1/1.2/5.1）は本環境で実行不可のため Blocked。依存実装は design の第一候補方式で進め、型レベルで確認できる範囲（R1/R4 の Prisma 構文サポート）は tsgo で前倒し確認する。
 - 前提セットアップ: `@growi/*` ワークスペースパッケージは未ビルドだと vitest が `@growi/logger` 解決に失敗する。`turbo run build --filter='@growi/app^...'` で先にビルド済み（本セッションで実施）。Prisma クライアントは `src/generated/prisma` に生成済み。
+- **2.1/2.2 → 3.x への申し送り**: `createByParameters`/`updateByParameters` の `user`/`target` 正規化は拡張内（`normalizeToId`）で行う方針（Key Decision 4）。`updateByParameters` の `parameters` 型は `Prisma.activitiesUncheckedUpdateInput`（design の `Partial<IActivityParameters>` から意図的に変更）。タスク 3.2 で `activityEvent.on('update')` を切り替える際、caller の update payload の `target` がオブジェクトの場合は `normalizeToId` 相当の正規化が必要になりうる点に留意。
