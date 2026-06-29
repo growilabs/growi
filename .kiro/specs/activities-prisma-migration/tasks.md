@@ -84,7 +84,7 @@
   - _Depends: 2.1_
   - _Requirements: 1.2_
 
-- [ ] 3.5 監査ログ一覧 paginate の Prisma 化
+- [x] 3.5 監査ログ一覧 paginate の Prisma 化
   - `apiv3/activity.ts` の `Activity.paginate(query, {offset,...})` を `prisma.activities.paginate({where, orderBy, offset, limit, include:{user:true}})` へ
   - where 変換: `action` 配列→`{in}`、date 範囲、`snapshot.username` 絞り込みは **スパイク 1.1 の判断（native / aggregateRaw フォールバック）に従う**。`populate:'user'`→`include` ＋ レスポンスの `userId`→`user` remap
   - **既存 quirk 維持**: ルートの `offset = req.query.offset || 1` をそのまま維持し、移行後も `offset` が現状どおり（`|| 1` 込み）skip に届く（純粋移行・要件 2.1）
