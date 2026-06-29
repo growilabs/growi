@@ -9,7 +9,6 @@ import type { MockInstance } from 'vitest';
 
 import { getInstance } from '^/test/setup/crowi';
 
-import type { IBookmark } from '~/interfaces/bookmark-info';
 import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
@@ -19,7 +18,6 @@ import UserGroup from '~/server/models/user-group';
 import UserGroupRelation from '~/server/models/user-group-relation';
 import { generalXssFilter } from '~/services/general-xss-filter';
 
-import type { BookmarkModel } from '../../models/bookmark';
 import type { ShareLinkModel } from '../../models/share-link';
 
 let rootPage: PageDocument;
@@ -70,7 +68,6 @@ describe('PageService', () => {
   let Page: PageModel;
   let Revision: Model<IRevision>;
   let User: Model<IUser>;
-  let Bookmark: BookmarkModel;
   let ShareLink: ShareLinkModel;
   let generalXssFilterProcessSpy: MockInstance;
 
@@ -81,7 +78,6 @@ describe('PageService', () => {
     User = mongoose.model('User');
     Page = mongoose.model('Page') as PageModel;
     Revision = mongoose.model<IRevision>('Revision');
-    Bookmark = mongoose.model<IBookmark, BookmarkModel>('Bookmark');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
 
     // Create test users if they don't exist

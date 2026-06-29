@@ -1,6 +1,7 @@
-import { model, Schema } from 'mongoose';
+import { Schema } from 'mongoose';
 
 import { Prisma } from '~/generated/prisma/client';
+import { getOrCreateModel } from '~/server/util/mongoose-utils';
 import type { prisma } from '~/utils/prisma';
 
 // TODO: remove mongoose model and use `prisma db push` after all models are migrated to prisma.
@@ -18,7 +19,7 @@ const commentSchema = new Schema(
     timestamps: true,
   },
 );
-model('Comment', commentSchema);
+getOrCreateModel('Comment', commentSchema);
 
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({

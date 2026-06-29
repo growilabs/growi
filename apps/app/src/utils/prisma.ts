@@ -3,6 +3,7 @@ import {
   PrismaClient as OriginalPrismaClient,
   Prisma,
 } from '~/generated/prisma/client';
+import { extension as BookmarkExtension } from '~/server/models/bookmark';
 import { extension as ExternalAccountExtension } from '~/server/models/external-account';
 import { extension as UserExtension } from '~/server/models/user/index.prisma';
 
@@ -143,6 +144,7 @@ export const createPrisma = (datasourceUrl?: string) =>
         },
       },
     })
+    .$extends(BookmarkExtension)
     .$extends(CommentExtension)
     .$extends(ExternalAccountExtension)
     .$extends(UserExtension);
