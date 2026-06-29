@@ -138,7 +138,7 @@
   - _Requirements: 3.1_
   - _Boundary: aggregate-contributions, contribution-graph services_
 
-- [ ] 6.3 (P) 監査ログ CSV エクスポート cursor executor
+- [x] 6.3 (P) 監査ログ CSV エクスポート cursor executor
   - フィルタ＋batchSize＋prisma を受け `_id` 昇順で `cursor`+`take` バッチを yield する `AsyncIterable` を新規作成（spec 付き）。`exportAuditLogsToFsAsync.ts` の `exists`→`count>0`/`findFirst`、`find().cursor()`→`Readable.from(executor)` で既存 `pipeline` に接続
   - 観察可能な完了状態: executor が `_id` 昇順で全件を同順序出力し、`lastExportedId` resume が成立、一定メモリで動作する
   - _Depends: 5.1_
