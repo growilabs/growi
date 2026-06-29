@@ -70,11 +70,7 @@ export type UnavailableTermsKey<K extends AllTermsKey> = Exclude<
   AllTermsKey,
   K
 >;
-// NOTE: group/not_group are declared here but are NOT yet runtime-enabled —
-// AVAILABLE_KEYS in elasticsearch.ts (the runtime gate) intentionally stops at
-// not_editor, so a `group:` search currently throws SearchError. The group filter
-// is wired up in a later PR (#11299): group terms are resolved to the requesting
-// user's own group IDs and matched against the `granted_groups` index field.
+
 export type ESTermsKey =
   | 'match'
   | 'not_match'
@@ -96,11 +92,6 @@ export type MongoTermsKey = 'match' | 'not_match' | 'prefix' | 'not_prefix';
 export type ESQueryTerms = Pick<QueryTerms, ESTermsKey>;
 export type MongoQueryTerms = Pick<QueryTerms, MongoTermsKey>;
 
-// Holds filter values that require server-side resolution before being turned
-// into delegator query criteria. Currently reserved for the group filter (added
-// in PR #11299): `group:` terms are resolved to the requesting user's group IDs
-// here. author/editor need no entry — they are matched directly against the
-// `username` / `last_update_username` index fields.
 export type ResolvedFilterData = {
   groupIds: string[];
   notGroupIds: string[];
