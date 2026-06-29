@@ -585,6 +585,42 @@ describe('AuditlogChangeStreamService', () => {
         ),
       );
     });
+
+    it('stops permanently and does not restart when markUnsyncedAndClearToken throws after HistoryLost', async () => {
+      vi.useFakeTimers();
+      try {
+        const fakeStream = new FakeChangeStream();
+        const watchSpy = vi
+          .spyOn(Activity, 'watch')
+          .mockReturnValue(
+            fakeStream as unknown as ChangeStream<ActivityDocument>,
+          );
+        vi.mocked(markUnsyncedAndClearToken).mockRejectedValue(
+          new Error('tx failed'),
+        );
+        service = new AuditlogChangeStreamService(esWriter);
+
+        await service.start();
+
+        const historyLostErr = Object.assign(
+          new Error('Resume of change stream was not possible'),
+          { code: 286 },
+        );
+        fakeStream.pushError(historyLostErr);
+
+        // Wait for markUnsyncedAndClearToken to have been attempted
+        await vi.waitFor(() =>
+          expect(vi.mocked(markUnsyncedAndClearToken)).toHaveBeenCalled(),
+        );
+
+        // Advance past RESTART_BASE_DELAY_MS — no restart must occur
+        await vi.runAllTimersAsync();
+
+        expect(watchSpy).toHaveBeenCalledTimes(1);
+      } finally {
+        vi.useRealTimers();
+      }
+    });
   });
 
   // ─── close() / stopped flag ───────────────────────────────────────────────
