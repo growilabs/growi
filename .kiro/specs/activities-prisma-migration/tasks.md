@@ -101,7 +101,7 @@
   - _Depends: 3.1, 3.2, 3.3, 3.4, 3.5_
   - _Requirements: 1.1, 1.2, 1.3, 2.1, 2.2, 2.3, 4.2_
 
-- [ ] 4.2 ハードブロッカー解除ゲートの確認
+- [x] 4.2 ハードブロッカー解除ゲートの確認
   - `add-activity.ts` / `service/activity.ts` / `apiv3/activity.ts` が `Activity.create/update/paginate`（Mongoose statics）を呼ばないことを grep で機械確認
   - 観察可能な完了状態: 記録・更新・一覧が Prisma 経由であることが grep で確認でき、`activity-log` 着手ゲートを満たす
   - _Depends: 4.1_
