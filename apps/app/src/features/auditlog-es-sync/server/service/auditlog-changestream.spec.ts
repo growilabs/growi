@@ -1,5 +1,3 @@
-/** biome-ignore-all lint/performance/noAwaitInLoops: sequential flushBuffer calls are intentional in these tests */
-
 import type { ChangeStream, ChangeStreamDocument } from 'mongodb';
 import { Types } from 'mongoose';
 import { type MockProxy, mock } from 'vitest-mock-extended';
@@ -149,6 +147,10 @@ const makeDeleteEvent = (
     documentKey: { _id: id },
   }) as unknown as ChangeStreamDocument<ActivityDocument>;
 
+// Shadow type that mirrors private members of AuditlogChangeStreamService.
+// Used by poison-pill tests to drive flushBuffer directly and avoid restart-backoff
+// overhead — the public change-stream path would require fake-timer management per
+// restart cycle. Rename or signature changes to the private members will surface here.
 type ServiceInternals = {
   consecutiveEventFailures: number;
   consecutiveRestarts: number;
@@ -172,6 +174,8 @@ describe('AuditlogChangeStreamService', () => {
     vi.mocked(markUnsyncedAndAdvanceToken).mockResolvedValue(undefined);
     vi.mocked(markUnsyncedAndClearToken).mockResolvedValue(undefined);
     esWriter.bulkSyncAuditlogs.mockResolvedValue(undefined);
+    // Default: no activities exist (fresh install). Tests that need a backlog override this.
+    vi.spyOn(Activity, 'exists').mockResolvedValue(null);
   });
 
   afterEach(async () => {
@@ -441,6 +445,7 @@ describe('AuditlogChangeStreamService', () => {
       // 8 failures on the same batch token trigger the skip
       for (let i = 0; i < 8; i++) {
         internal.buffer = [makeInsertEvent({}, 'tok-poison')];
+        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
         await internal.flushBuffer.call(service);
       }
 
@@ -458,6 +463,7 @@ describe('AuditlogChangeStreamService', () => {
 
       for (let i = 0; i < 8; i++) {
         internal.buffer = [makeInsertEvent({}, 'tok-poison')];
+        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
         await internal.flushBuffer.call(service);
       }
 
@@ -475,6 +481,7 @@ describe('AuditlogChangeStreamService', () => {
       let result = false;
       for (let i = 0; i < 8; i++) {
         internal.buffer = [makeInsertEvent({}, 'tok-poison')];
+        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
         result = await internal.flushBuffer.call(service);
       }
 
@@ -489,6 +496,7 @@ describe('AuditlogChangeStreamService', () => {
       // First poison pill skip on tok-poison
       for (let i = 0; i < 8; i++) {
         internal.buffer = [makeInsertEvent({}, 'tok-poison')];
+        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
         await internal.flushBuffer.call(service);
       }
       vi.mocked(markUnsyncedAndAdvanceToken).mockClear();
@@ -497,6 +505,7 @@ describe('AuditlogChangeStreamService', () => {
       // If it WAS reset, the skip fires only on the 8th new-token failure.
       for (let i = 0; i < 8; i++) {
         internal.buffer = [makeInsertEvent({}, 'tok-next')];
+        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
         await internal.flushBuffer.call(service);
       }
 
@@ -519,6 +528,7 @@ describe('AuditlogChangeStreamService', () => {
       // 7 failures on tok-a (one short of the MAX=8 threshold)
       for (let i = 0; i < 7; i++) {
         internal.buffer = [makeInsertEvent({}, 'tok-a')];
+        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
         await internal.flushBuffer.call(service);
       }
 
@@ -529,6 +539,7 @@ describe('AuditlogChangeStreamService', () => {
       // 6 more failures on tok-b (1 + 6 = 7 total; skip fires on the 8th)
       for (let i = 0; i < 6; i++) {
         internal.buffer = [makeInsertEvent({}, 'tok-b')];
+        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
         await internal.flushBuffer.call(service);
       }
 
