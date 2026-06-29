@@ -58,9 +58,7 @@ describe('ActivityService', () => {
       const saved = await Activity.findOne({
         action: SupportedAction.ACTION_PAGE_CREATE,
       });
-      expect(saved).toMatchObject({
-        action: SupportedAction.ACTION_PAGE_CREATE,
-      });
+      expect(saved?._id).toEqual(result?._id);
       expect(createdListener).toHaveBeenCalledWith(
         expect.objectContaining({ action: SupportedAction.ACTION_PAGE_CREATE }),
       );

@@ -40,8 +40,6 @@ vi.mock(
       upsert: vi.fn(),
       clear: vi.fn(),
     },
-    buildResumeTokenUpsertArgs: vi.fn(),
-    buildResumeTokenDeleteArgs: vi.fn(),
   }),
 );
 
@@ -171,6 +169,7 @@ describe('AuditlogChangeStreamService', () => {
     vi.mocked(ChangeStreamResumeToken.upsert).mockResolvedValue(undefined);
     vi.mocked(ChangeStreamResumeToken.clear).mockResolvedValue(undefined);
     vi.mocked(AuditlogEsSyncStatus.setUnsynced).mockResolvedValue(undefined);
+    vi.mocked(AuditlogEsSyncStatus.isUnsynced).mockResolvedValue(false);
     vi.mocked(markUnsyncedAndAdvanceToken).mockResolvedValue(undefined);
     vi.mocked(markUnsyncedAndClearToken).mockResolvedValue(undefined);
     esWriter.bulkSyncAuditlogs.mockResolvedValue(undefined);
@@ -182,6 +181,22 @@ describe('AuditlogChangeStreamService', () => {
     await service?.close();
     vi.restoreAllMocks();
   });
+
+  // Drives n consecutive flush attempts via ServiceInternals, bypassing the change-stream
+  // loop to avoid restart-backoff overhead. Used by poison-pill and counter-separation tests.
+  const driveFlushes = async (
+    internal: ServiceInternals,
+    n: number,
+    tokenData: string,
+  ): Promise<boolean> => {
+    let last = false;
+    for (let i = 0; i < n; i++) {
+      internal.buffer = [makeInsertEvent({}, tokenData)];
+      // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
+      last = await internal.flushBuffer.call(service);
+    }
+    return last;
+  };
 
   // ─── start() options ───────────────────────────────────────────────────────
 
@@ -442,12 +457,7 @@ describe('AuditlogChangeStreamService', () => {
       const internal = service as unknown as ServiceInternals;
       esWriter.bulkSyncAuditlogs.mockRejectedValue(new Error('ES error'));
 
-      // 8 failures on the same batch token trigger the skip
-      for (let i = 0; i < 8; i++) {
-        internal.buffer = [makeInsertEvent({}, 'tok-poison')];
-        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
-        await internal.flushBuffer.call(service);
-      }
+      await driveFlushes(internal, 8, 'tok-poison');
 
       expect(vi.mocked(markUnsyncedAndAdvanceToken)).toHaveBeenCalledWith(
         'auditlogs',
@@ -461,11 +471,7 @@ describe('AuditlogChangeStreamService', () => {
       const esError = new Error('permanent ES error');
       esWriter.bulkSyncAuditlogs.mockRejectedValue(esError);
 
-      for (let i = 0; i < 8; i++) {
-        internal.buffer = [makeInsertEvent({}, 'tok-poison')];
-        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
-        await internal.flushBuffer.call(service);
-      }
+      await driveFlushes(internal, 8, 'tok-poison');
 
       expect(mockError).toHaveBeenCalledWith(
         expect.objectContaining({ err: esError }),
@@ -478,12 +484,7 @@ describe('AuditlogChangeStreamService', () => {
       const internal = service as unknown as ServiceInternals;
       esWriter.bulkSyncAuditlogs.mockRejectedValue(new Error('ES error'));
 
-      let result = false;
-      for (let i = 0; i < 8; i++) {
-        internal.buffer = [makeInsertEvent({}, 'tok-poison')];
-        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
-        result = await internal.flushBuffer.call(service);
-      }
+      const result = await driveFlushes(internal, 8, 'tok-poison');
 
       expect(result).toBe(true);
     });
@@ -493,21 +494,12 @@ describe('AuditlogChangeStreamService', () => {
       const internal = service as unknown as ServiceInternals;
       esWriter.bulkSyncAuditlogs.mockRejectedValue(new Error('ES error'));
 
-      // First poison pill skip on tok-poison
-      for (let i = 0; i < 8; i++) {
-        internal.buffer = [makeInsertEvent({}, 'tok-poison')];
-        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
-        await internal.flushBuffer.call(service);
-      }
+      await driveFlushes(internal, 8, 'tok-poison');
       vi.mocked(markUnsyncedAndAdvanceToken).mockClear();
 
       // If the counter was NOT reset, the skip would fire on the very first new-token failure.
       // If it WAS reset, the skip fires only on the 8th new-token failure.
-      for (let i = 0; i < 8; i++) {
-        internal.buffer = [makeInsertEvent({}, 'tok-next')];
-        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
-        await internal.flushBuffer.call(service);
-      }
+      await driveFlushes(internal, 8, 'tok-next');
 
       expect(vi.mocked(markUnsyncedAndAdvanceToken)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(markUnsyncedAndAdvanceToken)).toHaveBeenCalledWith(
@@ -526,22 +518,14 @@ describe('AuditlogChangeStreamService', () => {
       esWriter.bulkSyncAuditlogs.mockRejectedValue(new Error('ES error'));
 
       // 7 failures on tok-a (one short of the MAX=8 threshold)
-      for (let i = 0; i < 7; i++) {
-        internal.buffer = [makeInsertEvent({}, 'tok-a')];
-        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
-        await internal.flushBuffer.call(service);
-      }
+      await driveFlushes(internal, 7, 'tok-a');
 
       // 1 failure on tok-b resets the counter
       internal.buffer = [makeInsertEvent({}, 'tok-b')];
       await internal.flushBuffer.call(service);
 
       // 6 more failures on tok-b (1 + 6 = 7 total; skip fires on the 8th)
-      for (let i = 0; i < 6; i++) {
-        internal.buffer = [makeInsertEvent({}, 'tok-b')];
-        // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
-        await internal.flushBuffer.call(service);
-      }
+      await driveFlushes(internal, 6, 'tok-b');
 
       // After 7 tok-a + 1 tok-b + 6 tok-b = 14 calls, skip should NOT have fired yet
       expect(vi.mocked(markUnsyncedAndAdvanceToken)).not.toHaveBeenCalled();
