@@ -508,7 +508,7 @@ class ElasticsearchDelegator
       if (shouldEmitProgress) {
         const socket = this.socketIoService.getAdminSocket();
         socket.emit(SocketEventName.AuditlogRebuildingFailed, {
-          error: error.message,
+          error: error instanceof Error ? error.message : String(error),
         });
       }
       throw error;

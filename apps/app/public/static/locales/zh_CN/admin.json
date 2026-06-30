@@ -897,7 +897,10 @@
     "rebuild_requested": "审计日志索引重建请求已接受。",
     "rebuild_description_1": "删除并重建所有审计日志索引。",
     "rebuild_description_2": "此操作可能需要一些时间。",
-    "unsynced_events_warning": "部分审计日志事件未能同步到 Elasticsearch。请重建以恢复一致性。"
+    "unsynced_events_warning": "部分审计日志事件未能同步到 Elasticsearch。请重建以恢复一致性。",
+    "rebuild_progress_processing": "处理中..",
+    "rebuild_progress_completed": "已完成",
+    "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。"
   },
   "audit_log_management": {
     "audit_log": "审计日志",

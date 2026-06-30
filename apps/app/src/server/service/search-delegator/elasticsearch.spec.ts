@@ -1,3 +1,4 @@
+import type { estypes } from '@elastic/elasticsearch8';
 import mongoose from 'mongoose';
 import {
   type DeepMockProxy,
@@ -471,23 +472,21 @@ describe('ElasticsearchDelegator', () => {
         ),
       );
 
-      const aliasEntry = (hasAlias: boolean) =>
+      const aliasEntry = (
+        hasAlias: boolean,
+      ): estypes.IndicesGetAliasIndexAliases =>
         hasAlias ? { aliases: { 'auditlogs-alias': {} } } : { aliases: {} };
 
-      const aliasResponse: Record<string, ReturnType<typeof aliasEntry>> = {};
+      const aliasResponse: estypes.IndicesGetAliasResponse = {};
       if (state.mainExists)
         aliasResponse.auditlogs = aliasEntry(state.mainHasAlias);
       if (state.tmpExists)
         aliasResponse['auditlogs-tmp'] = aliasEntry(state.tmpHasAlias ?? false);
 
-      mockES8Client.indices.getAlias.mockResolvedValue(
-        aliasResponse as unknown as Awaited<
-          ReturnType<typeof mockES8Client.indices.getAlias>
-        >,
+      mockES8Client.indices.getAlias.mockResolvedValue(aliasResponse);
+      mockES8Client.indices.stats.mockResolvedValue(
+        mock<estypes.IndicesStatsResponse>({ indices: {} }),
       );
-      mockES8Client.indices.stats.mockResolvedValue({
-        indices: {},
-      } as unknown as Awaited<ReturnType<typeof mockES8Client.indices.stats>>);
     };
 
     beforeEach(() => {

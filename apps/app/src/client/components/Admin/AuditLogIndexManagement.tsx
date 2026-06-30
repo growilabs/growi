@@ -77,43 +77,63 @@ export const AuditLogIndexManagement = (): JSX.Element => {
       return;
     }
 
-    socket.on(SocketEventName.AddAuditlogProgress, (data) => {
+    const onProgress = (data) => {
       setIsRebuildingProcessing(true);
       setRebuildTotal(data.totalCount);
       setRebuildCurrent(data.count);
-    });
+    };
 
-    socket.on(SocketEventName.FinishAddAuditlog, async (data) => {
+    const onFinish = async (data) => {
       setRebuildTotal(data.totalCount);
       setRebuildCurrent(data.count);
 
       const maxRetries = 5;
       const retryDelay = 500;
 
+      let succeeded = false;
       for (let i = 0; i < maxRetries; i++) {
-        const isNormalized = await retrieveStatus();
-        if (isNormalized) break;
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, retryDelay);
-        });
+        const normalized = await retrieveStatus();
+        if (normalized) {
+          succeeded = true;
+          break;
+        }
+        await new Promise<void>((resolve) => setTimeout(resolve, retryDelay));
       }
 
       setIsRebuildingProcessing(false);
-      setIsRebuildingCompleted(true);
-    });
+      if (succeeded) {
+        setIsRebuildingCompleted(true);
+      } else {
+        toastError(
+          new Error(
+            t('audit_log_index_management.rebuild_normalization_timeout'),
+          ),
+        );
+      }
+    };
 
-    socket.on(SocketEventName.AuditlogRebuildingFailed, async (data) => {
+    const onFailed = async (data) => {
       toastError(new Error(data.error));
       setIsRebuildingProcessing(false);
       await retrieveStatus();
-    });
+    };
+
+    const onDisconnect = () => {
+      setIsRebuildingProcessing(false);
+    };
+
+    socket.on(SocketEventName.AddAuditlogProgress, onProgress);
+    socket.on(SocketEventName.FinishAddAuditlog, onFinish);
+    socket.on(SocketEventName.AuditlogRebuildingFailed, onFailed);
+    socket.on('disconnect', onDisconnect);
 
     return () => {
-      socket.off(SocketEventName.AddAuditlogProgress);
-      socket.off(SocketEventName.FinishAddAuditlog);
-      socket.off(SocketEventName.AuditlogRebuildingFailed);
+      socket.off(SocketEventName.AddAuditlogProgress, onProgress);
+      socket.off(SocketEventName.FinishAddAuditlog, onFinish);
+      socket.off(SocketEventName.AuditlogRebuildingFailed, onFailed);
+      socket.off('disconnect', onDisconnect);
     };
-  }, [retrieveStatus, socket]);
+  }, [retrieveStatus, socket, t]);
 
   if (!auditLogEnabled) {
     return <AuditLogDisableMode />;
@@ -249,7 +269,13 @@ export const AuditLogIndexManagement = (): JSX.Element => {
           {showProgressBar && (
             <div className="mb-3">
               <LabeledProgressBar
-                header={isRebuildingCompleted ? 'Completed' : 'Processing..'}
+                header={
+                  isRebuildingCompleted
+                    ? t('audit_log_index_management.rebuild_progress_completed')
+                    : t(
+                        'audit_log_index_management.rebuild_progress_processing',
+                      )
+                }
                 currentCount={rebuildCurrent}
                 totalCount={rebuildTotal}
                 isInProgress={isRebuildingProcessing}

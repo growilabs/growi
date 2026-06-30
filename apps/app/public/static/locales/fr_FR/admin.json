@@ -887,7 +887,10 @@
     "rebuild_requested": "La reconstruction de l'index des journaux d'audit a été demandée.",
     "rebuild_description_1": "Supprime et reconstruit tous les index des journaux d'audit.",
     "rebuild_description_2": "Cette opération peut prendre un certain temps.",
-    "unsynced_events_warning": "Certains événements du journal d'audit n'ont pas pu être synchronisés avec Elasticsearch. Reconstruisez pour restaurer la cohérence."
+    "unsynced_events_warning": "Certains événements du journal d'audit n'ont pas pu être synchronisés avec Elasticsearch. Reconstruisez pour restaurer la cohérence.",
+    "rebuild_progress_processing": "En cours..",
+    "rebuild_progress_completed": "Terminé",
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement."
   },
   "audit_log_management": {
     "audit_log": "Audit",
