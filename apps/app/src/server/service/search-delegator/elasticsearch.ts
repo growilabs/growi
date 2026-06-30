@@ -459,6 +459,10 @@ class ElasticsearchDelegator
     const { shouldEmitProgress } = option;
     const tmpIndexName = `${indexName}-tmp`;
 
+    let totalCount = 0;
+    let count = 0;
+    let rebuildSucceeded = false;
+
     try {
       // Drop any leftover tmp index, then reindex the live index into a fresh tmp.
       // reindex is fire-and-forget (wait_for_completion:false), so tmp is a best-effort
@@ -483,9 +487,9 @@ class ElasticsearchDelegator
       // flush index
       await client.indices.delete({ index: indexName });
       await this.createAuditlogIndex(indexName);
-      const { totalCount, count } = await this.addAllAuditlogs({
+      ({ totalCount, count } = await this.addAllAuditlogs({
         shouldEmitProgress,
-      });
+      }));
 
       // Swap the alias back atomically so it never resolves to nothing mid-rebuild;
       // the now-unaliased tmp is dropped by normalizeAuditlogIndices in the finally.
@@ -496,10 +500,7 @@ class ElasticsearchDelegator
         ],
       });
 
-      if (shouldEmitProgress) {
-        const socket = this.socketIoService.getAdminSocket();
-        socket.emit(SocketEventName.FinishAddAuditlog, { totalCount, count });
-      }
+      rebuildSucceeded = true;
     } catch (error) {
       logger.error(
         { err: error, body: error?.meta?.body },
@@ -519,6 +520,10 @@ class ElasticsearchDelegator
         await this.normalizeAuditlogIndices();
       } catch (normalizeErr) {
         logger.error('Failed to normalize auditlog indices', normalizeErr);
+      }
+      if (shouldEmitProgress && rebuildSucceeded) {
+        const socket = this.socketIoService.getAdminSocket();
+        socket.emit(SocketEventName.FinishAddAuditlog, { totalCount, count });
       }
     }
   }
