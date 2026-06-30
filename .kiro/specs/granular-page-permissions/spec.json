@@ -1,0 +1,22 @@
+{
+  "feature_name": "granular-page-permissions",
+  "created_at": "2026-06-30T06:45:40Z",
+  "updated_at": "2026-06-30T06:52:00Z",
+  "language": "ja",
+  "phase": "design-generated",
+  "approvals": {
+    "requirements": {
+      "generated": true,
+      "approved": true
+    },
+    "design": {
+      "generated": true,
+      "approved": false
+    },
+    "tasks": {
+      "generated": false,
+      "approved": false
+    }
+  },
+  "ready_for_implementation": false
+}
