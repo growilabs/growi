@@ -891,7 +891,8 @@
     "unsynced_events_warning": "Certains événements du journal d'audit n'ont pas pu être synchronisés avec Elasticsearch. Reconstruisez pour restaurer la cohérence.",
     "rebuild_progress_processing": "En cours..",
     "rebuild_progress_completed": "Terminé",
-    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement."
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement.",
+    "reconnect": "Reconnexion"
   },
   "audit_log_management": {
     "audit_log": "Audit",

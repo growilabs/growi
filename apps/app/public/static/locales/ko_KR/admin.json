@@ -892,7 +892,8 @@
     "unsynced_events_warning": "일부 감사 로그 이벤트가 Elasticsearch에 동기화되지 않았습니다. 재구성하여 일관성을 복구하십시오.",
     "rebuild_progress_processing": "처리 중..",
     "rebuild_progress_completed": "완료",
-    "rebuild_normalization_timeout": "리빌드가 완료되었지만 정규화가 시간 초과되었습니다. 수동으로 정규화해 주세요."
+    "rebuild_normalization_timeout": "리빌드가 완료되었지만 정규화가 시간 초과되었습니다. 수동으로 정규화해 주세요.",
+    "reconnect": "재연결"
   },
   "audit_log_management": {
     "audit_log": "감사 로그",

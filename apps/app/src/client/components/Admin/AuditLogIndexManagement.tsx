@@ -84,7 +84,7 @@ export const AuditLogIndexManagement = (): JSX.Element => {
 
       <div className="row">
         <div className="col-md-3 col-form-label text-start text-md-end">
-          {t('full_text_search_management.reconnect')}
+          {t('audit_log_index_management.reconnect')}
         </div>
         <div className="col-md-6">
           <ReconnectControls

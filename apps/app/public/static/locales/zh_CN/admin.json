@@ -901,7 +901,8 @@
     "unsynced_events_warning": "部分审计日志事件未能同步到 Elasticsearch。请重建以恢复一致性。",
     "rebuild_progress_processing": "处理中..",
     "rebuild_progress_completed": "已完成",
-    "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。"
+    "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。",
+    "reconnect": "重新连接"
   },
   "audit_log_management": {
     "audit_log": "审计日志",

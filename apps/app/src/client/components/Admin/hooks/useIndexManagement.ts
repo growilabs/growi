@@ -200,8 +200,7 @@ export const useIndexManagement = ({
     isNormalized &&
     !isRebuildingProcessing &&
     !isNormalizingProcessing &&
-    isConnected &&
-    socket != null;
+    isConnected;
 
   return {
     socket,

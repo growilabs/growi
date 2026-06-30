@@ -454,12 +454,16 @@ module.exports = (crowi) => {
             searchService
               .rebuildAuditlogIndex({ shouldEmitProgress: true })
               .then(async ({ totalCount, count }) => {
-                await AuditlogEsSyncStatus.setUnsynced(false).catch((err) => {
+                try {
+                  await AuditlogEsSyncStatus.setUnsynced(false);
+                } catch (err) {
                   logger.error(
                     'Failed to clear auditlog unsynced flag after rebuild',
                     err,
                   );
-                });
+                  // setUnsynced failure is non-critical: the ES rebuild succeeded.
+                  // Still notify the client so the UI is not left stuck in processing state.
+                }
                 crowi.socketIoService
                   .getAdminSocket()
                   .emit(SocketEventName.FinishAddAuditlog, {
