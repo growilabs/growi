@@ -1,5 +1,6 @@
 import type { estypes } from '@elastic/elasticsearch8';
 import mongoose from 'mongoose';
+import type { Namespace } from 'socket.io';
 import {
   type DeepMockProxy,
   type MockProxy,
@@ -7,6 +8,7 @@ import {
   mockDeep,
 } from 'vitest-mock-extended';
 
+import { SocketEventName } from '~/interfaces/websocket';
 import type { ActivityDocument } from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager/config-manager';
 import type { SocketIoService } from '~/server/service/socket-io';
@@ -455,6 +457,39 @@ describe('ElasticsearchDelegator', () => {
         'reindex failed',
       );
     });
+
+    describe('with shouldEmitProgress: true', () => {
+      let mockAdminSocket: MockProxy<Namespace>;
+
+      beforeEach(() => {
+        mockAdminSocket = mock<Namespace>();
+        mockSocketIo.getAdminSocket.mockReturnValue(mockAdminSocket);
+      });
+
+      it('emits FinishAddAuditlog with totalCount and count on success', async () => {
+        addAllAuditlogsSpy.mockResolvedValue({ totalCount: 100, count: 100 });
+
+        await delegator.rebuildAuditlogIndex({ shouldEmitProgress: true });
+
+        expect(mockAdminSocket.emit).toHaveBeenCalledWith(
+          SocketEventName.FinishAddAuditlog,
+          { totalCount: 100, count: 100 },
+        );
+      });
+
+      it('emits AuditlogRebuildingFailed with error message on failure', async () => {
+        mockES8Client.reindex.mockRejectedValue(new Error('reindex failed'));
+
+        await expect(
+          delegator.rebuildAuditlogIndex({ shouldEmitProgress: true }),
+        ).rejects.toThrow('reindex failed');
+
+        expect(mockAdminSocket.emit).toHaveBeenCalledWith(
+          SocketEventName.AuditlogRebuildingFailed,
+          { error: 'reindex failed' },
+        );
+      });
+    });
   });
 
   describe('getAuditlogInfoForAdmin()', () => {
@@ -544,14 +579,10 @@ describe('ElasticsearchDelegator', () => {
 
     it('returns isNormalized: false without throwing when the index disappears between exists and getAlias (TOCTOU)', async () => {
       mockES8Client.indices.exists.mockResolvedValue(true);
-      mockES8Client.indices.getAlias.mockResolvedValue(
-        {} as unknown as Awaited<
-          ReturnType<typeof mockES8Client.indices.getAlias>
-        >,
+      mockES8Client.indices.getAlias.mockResolvedValue({});
+      mockES8Client.indices.stats.mockResolvedValue(
+        mock<estypes.IndicesStatsResponse>({ indices: {} }),
       );
-      mockES8Client.indices.stats.mockResolvedValue({
-        indices: {},
-      } as unknown as Awaited<ReturnType<typeof mockES8Client.indices.stats>>);
 
       await expect(delegator.getAuditlogInfoForAdmin()).resolves.toMatchObject({
         isNormalized: false,

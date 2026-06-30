@@ -77,13 +77,13 @@ export const AuditLogIndexManagement = (): JSX.Element => {
       return;
     }
 
-    const onProgress = (data) => {
+    const onProgress = (data: { totalCount: number; count: number }) => {
       setIsRebuildingProcessing(true);
       setRebuildTotal(data.totalCount);
       setRebuildCurrent(data.count);
     };
 
-    const onFinish = async (data) => {
+    const onFinish = async (data: { totalCount: number; count: number }) => {
       setRebuildTotal(data.totalCount);
       setRebuildCurrent(data.count);
 
@@ -112,7 +112,7 @@ export const AuditLogIndexManagement = (): JSX.Element => {
       }
     };
 
-    const onFailed = async (data) => {
+    const onFailed = async (data: { error: string }) => {
       toastError(new Error(data.error));
       setIsRebuildingProcessing(false);
       await retrieveStatus();
