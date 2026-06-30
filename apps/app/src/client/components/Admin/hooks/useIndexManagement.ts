@@ -122,7 +122,7 @@ export const useIndexManagement = ({
     const onFailed = async (data: { error: string }) => {
       toastError(new Error(data.error));
       setIsRebuildingProcessing(false);
-      await retrieveStatus();
+      await retrieveStatus({ silent: true });
     };
 
     const onDisconnect = () => {
@@ -170,7 +170,7 @@ export const useIndexManagement = ({
       toastError(e);
     } finally {
       setIsNormalizingProcessing(false);
-      await retrieveStatus();
+      await retrieveStatus({ silent: true });
     }
   };
 
@@ -180,10 +180,11 @@ export const useIndexManagement = ({
     try {
       await apiv3Put(statusEndpoint, { operation: 'rebuild' });
       toastSuccess(requestedMessage);
+      await retrieveStatus({ silent: true });
     } catch (e) {
       toastError(e);
       setIsRebuildingProcessing(false);
-      await retrieveStatus();
+      await retrieveStatus({ silent: true });
     }
   };
 
@@ -203,7 +204,6 @@ export const useIndexManagement = ({
     isConnected;
 
   return {
-    socket,
     isInitialized,
     isConnected,
     isConfigured,

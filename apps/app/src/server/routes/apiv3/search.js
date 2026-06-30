@@ -357,9 +357,10 @@ module.exports = (crowi) => {
       }
 
       try {
-        const info = await searchService.getAuditlogInfoForAdmin();
-        const auditlogHasUnsyncedEvents =
-          await AuditlogEsSyncStatus.isUnsynced();
+        const [info, auditlogHasUnsyncedEvents] = await Promise.all([
+          searchService.getAuditlogInfoForAdmin(),
+          AuditlogEsSyncStatus.isUnsynced(),
+        ]);
         return res.status(200).send({ info, auditlogHasUnsyncedEvents });
       } catch (err) {
         logger.error(err);
