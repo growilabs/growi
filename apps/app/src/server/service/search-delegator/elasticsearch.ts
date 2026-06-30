@@ -395,15 +395,16 @@ class ElasticsearchDelegator
     }
   }
 
-  async rebuildAuditlogIndex(
-    option: { shouldEmitProgress: boolean } = { shouldEmitProgress: false },
-  ): Promise<{ totalCount: number; count: number }> {
+  async rebuildAuditlogIndex({
+    shouldEmitProgress = false,
+  }: {
+    shouldEmitProgress?: boolean;
+  } = {}): Promise<{ totalCount: number; count: number }> {
     const {
       client,
       auditlogIndexName: indexName,
       auditlogAliasName: aliasName,
     } = this;
-    const { shouldEmitProgress } = option;
     const tmpIndexName = `${indexName}-tmp`;
 
     let totalCount = 0;
@@ -471,12 +472,14 @@ class ElasticsearchDelegator
     return { totalCount, count };
   }
 
-  async normalizeIndices(): Promise<void> {
-    const { client, indexName, aliasName } = this;
-
+  private async normalizeIndexSet(
+    indexName: string,
+    aliasName: string,
+    createFn: () => Promise<unknown>,
+  ): Promise<void> {
+    const { client } = this;
     const tmpIndexName = `${indexName}-tmp`;
 
-    // remove tmp index
     const isExistsTmpIndex = await client.indices.exists({
       index: tmpIndexName,
     });
@@ -484,58 +487,33 @@ class ElasticsearchDelegator
       await client.indices.delete({ index: tmpIndexName });
     }
 
-    // create index
     const isExistsIndex = await client.indices.exists({ index: indexName });
     if (!isExistsIndex) {
-      await this.createIndex(indexName);
+      await createFn();
     }
 
-    // create alias
+    // re-attaches alias if a failed rebuild left it detached
     const isExistsAlias = await client.indices.existsAlias({
       name: aliasName,
       index: indexName,
-    });
-    if (!isExistsAlias) {
-      await client.indices.putAlias({
-        name: aliasName,
-        index: indexName,
-      });
-    }
-  }
-
-  async normalizeAuditlogIndices(): Promise<void> {
-    const {
-      client,
-      auditlogIndexName: indexName,
-      auditlogAliasName: aliasName,
-    } = this;
-
-    const tmpIndexName = `${indexName}-tmp`;
-
-    // remove tmp index
-    const isExistsAuditlogTmpIndex = await client.indices.exists({
-      index: tmpIndexName,
-    });
-    if (isExistsAuditlogTmpIndex) {
-      await client.indices.delete({ index: tmpIndexName });
-    }
-
-    // create index
-    const isExistsAuditlogIndex = await client.indices.exists({
-      index: indexName,
-    });
-    if (!isExistsAuditlogIndex) {
-      await this.createAuditlogIndex(indexName);
-    }
-
-    // create alias — re-attaches it if a failed rebuild left the alias detached
-    const isExistsAlias = await client.indices.existsAlias({
-      index: indexName,
-      name: aliasName,
     });
     if (!isExistsAlias) {
       await client.indices.putAlias({ name: aliasName, index: indexName });
     }
+  }
+
+  async normalizeIndices(): Promise<void> {
+    await this.normalizeIndexSet(this.indexName, this.aliasName, () =>
+      this.createIndex(this.indexName),
+    );
+  }
+
+  async normalizeAuditlogIndices(): Promise<void> {
+    await this.normalizeIndexSet(
+      this.auditlogIndexName,
+      this.auditlogAliasName,
+      () => this.createAuditlogIndex(this.auditlogIndexName),
+    );
   }
 
   async addAllAuditlogs(
@@ -589,12 +567,10 @@ class ElasticsearchDelegator
             `Adding auditlogs progressing: (count=${count}, took=${bulkResponse.took}ms)`,
           );
 
-          if (shouldEmitProgress) {
-            socket?.emit(SocketEventName.AddAuditlogProgress, {
-              totalCount,
-              count,
-            });
-          }
+          socket?.emit(SocketEventName.AddAuditlogProgress, {
+            totalCount,
+            count,
+          });
         } catch (err) {
           logger.error('Adding auditlogs bulk indexing failed.', err);
           callback(err);

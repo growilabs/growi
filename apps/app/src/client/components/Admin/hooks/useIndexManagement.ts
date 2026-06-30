@@ -8,7 +8,6 @@ import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 
 interface UseIndexManagementOptions {
   statusEndpoint: string;
-  normalizeRebuildEndpoint: string;
   progressSocketEvent: string;
   finishSocketEvent: string;
   failedSocketEvent: string;
@@ -18,7 +17,6 @@ interface UseIndexManagementOptions {
 
 export const useIndexManagement = ({
   statusEndpoint,
-  normalizeRebuildEndpoint,
   progressSocketEvent,
   finishSocketEvent,
   failedSocketEvent,
@@ -166,7 +164,7 @@ export const useIndexManagement = ({
   const normalizeIndices = async (successMessage: string) => {
     setIsNormalizingProcessing(true);
     try {
-      await apiv3Put(normalizeRebuildEndpoint, { operation: 'normalize' });
+      await apiv3Put(statusEndpoint, { operation: 'normalize' });
       toastSuccess(successMessage);
     } catch (e) {
       toastError(e);
@@ -180,7 +178,7 @@ export const useIndexManagement = ({
     setIsRebuildingProcessing(true);
     setIsRebuildingCompleted(false);
     try {
-      await apiv3Put(normalizeRebuildEndpoint, { operation: 'rebuild' });
+      await apiv3Put(statusEndpoint, { operation: 'rebuild' });
       toastSuccess(requestedMessage);
     } catch (e) {
       toastError(e);

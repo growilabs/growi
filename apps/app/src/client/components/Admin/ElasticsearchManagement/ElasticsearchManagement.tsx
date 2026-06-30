@@ -28,7 +28,6 @@ const ElasticsearchManagement = (): JSX.Element => {
     rebuildIndices,
   } = useIndexManagement({
     statusEndpoint: '/search/indices',
-    normalizeRebuildEndpoint: '/search/indices',
     progressSocketEvent: SocketEventName.AddPageProgress,
     finishSocketEvent: SocketEventName.FinishAddPage,
     failedSocketEvent: SocketEventName.RebuildingFailed,
