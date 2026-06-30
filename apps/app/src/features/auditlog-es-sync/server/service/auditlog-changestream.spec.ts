@@ -86,6 +86,9 @@ class FakeChangeStream {
   }
 
   next(): Promise<ChangeStreamDocument<ActivityDocument> | null> {
+    // errorQueue is drained before queue (not FIFO). Safe because all current
+    // tests call pushError() only while a waiter is pending — the queue is
+    // never mixed with errorQueue simultaneously.
     if (this.errorQueue.length > 0) {
       // biome-ignore lint/style/noNonNullAssertion: length checked above
       return Promise.reject(this.errorQueue.shift()!);
@@ -198,14 +201,12 @@ describe('AuditlogChangeStreamService', () => {
     internal: ServiceInternals,
     n: number,
     tokenData: string,
-  ): Promise<boolean> => {
-    let last = false;
+  ): Promise<void> => {
     for (let i = 0; i < n; i++) {
       internal.buffer = [makeInsertEvent({}, tokenData)];
       // biome-ignore lint/performance/noAwaitInLoops: intentional sequential calls via ServiceInternals
-      last = await internal.flushBuffer.call(service);
+      await internal.flushBuffer.call(service);
     }
-    return last;
   };
 
   // ─── start() options ───────────────────────────────────────────────────────

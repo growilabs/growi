@@ -37,8 +37,9 @@ describe('auditlog ES sync transactions', () => {
     });
 
     it('rolls back the flag when storing the token fails', async () => {
-      // The required Json token column rejects undefined, so the second write
-      // fails and the transaction must undo the flag set by the first write.
+      // undefined fails Prisma's required Json column at runtime (token: unknown
+      // bypasses TypeScript). If Prisma ever coerces undefined to null, replace
+      // with mockRejectedValueOnce on the second write.
       await expect(
         markUnsyncedAndAdvanceToken(STREAM_KEY, undefined),
       ).rejects.toThrow();
