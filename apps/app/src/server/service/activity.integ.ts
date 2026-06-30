@@ -216,11 +216,13 @@ describe('ActivityService', () => {
         action: SupportedAction.ACTION_PAGE_CREATE,
       });
 
-      // shoudUpdateActivity returns false synchronously, so the handler bails before any await.
       activityEvent.emit('update', activity._id.toString(), {
         action: SupportedAction.ACTION_PAGE_SUBSCRIBE,
         endpoint: '/updated',
       });
+
+      // Flush the event loop so any handler path — sync or async — has settled.
+      await new Promise(setImmediate);
 
       const saved = await Activity.findById(activity._id);
       expect(saved?.endpoint).toBeUndefined();

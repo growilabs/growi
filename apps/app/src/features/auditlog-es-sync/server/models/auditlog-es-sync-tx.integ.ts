@@ -59,5 +59,12 @@ describe('auditlog ES sync transactions', () => {
       expect(await readUnsyncedFlag()).toBe(true);
       expect(await readToken(STREAM_KEY)).toBeNull();
     });
+
+    it('succeeds when no resume token exists', async () => {
+      await markUnsyncedAndClearToken(STREAM_KEY);
+
+      expect(await readUnsyncedFlag()).toBe(true);
+      expect(await readToken(STREAM_KEY)).toBeNull();
+    });
   });
 });

@@ -68,6 +68,8 @@ class FakeChangeStream {
 
   private queue: ChangeStreamDocument<ActivityDocument>[] = [];
 
+  private errorQueue: Error[] = [];
+
   private waiter: {
     resolve: (v: ChangeStreamDocument<ActivityDocument> | null) => void;
     reject: (err: Error) => void;
@@ -84,6 +86,10 @@ class FakeChangeStream {
   }
 
   next(): Promise<ChangeStreamDocument<ActivityDocument> | null> {
+    if (this.errorQueue.length > 0) {
+      // biome-ignore lint/style/noNonNullAssertion: length checked above
+      return Promise.reject(this.errorQueue.shift()!);
+    }
     if (this.queue.length > 0) {
       // biome-ignore lint/style/noNonNullAssertion: length checked above
       return Promise.resolve(this.queue.shift()!);
@@ -121,6 +127,8 @@ class FakeChangeStream {
       const { reject } = this.waiter;
       this.waiter = null;
       reject(err);
+    } else {
+      this.errorQueue.push(err);
     }
   }
 }
@@ -554,9 +562,12 @@ describe('AuditlogChangeStreamService', () => {
       await driveFlushes(internal, 8, 'tok-poison');
       vi.mocked(markUnsyncedAndAdvanceToken).mockClear();
 
-      // If the counter was NOT reset, the skip would fire on the very first new-token failure.
-      // If it WAS reset, the skip fires only on the 8th new-token failure.
-      await driveFlushes(internal, 8, 'tok-next');
+      // 7 failures must NOT fire a skip (boundary: fires on the 8th, not before).
+      await driveFlushes(internal, 7, 'tok-next');
+      expect(vi.mocked(markUnsyncedAndAdvanceToken)).not.toHaveBeenCalled();
+
+      // The 8th failure triggers the skip.
+      await driveFlushes(internal, 1, 'tok-next');
 
       expect(vi.mocked(markUnsyncedAndAdvanceToken)).toHaveBeenCalledTimes(1);
       expect(vi.mocked(markUnsyncedAndAdvanceToken)).toHaveBeenCalledWith(
