@@ -475,14 +475,17 @@ describe('ElasticsearchDelegator', () => {
         mockSocketIo.getAdminSocket.mockReturnValue(mockAdminSocket);
       });
 
-      it('emits FinishAddAuditlog with totalCount and count on success', async () => {
+      it('returns totalCount and count from addAllAuditlogs on success', async () => {
         addAllAuditlogsSpy.mockResolvedValue({ totalCount: 100, count: 100 });
 
-        await delegator.rebuildAuditlogIndex({ shouldEmitProgress: true });
+        const result = await delegator.rebuildAuditlogIndex({
+          shouldEmitProgress: true,
+        });
 
-        expect(mockAdminSocket.emit).toHaveBeenCalledWith(
+        expect(result).toEqual({ totalCount: 100, count: 100 });
+        expect(mockAdminSocket.emit).not.toHaveBeenCalledWith(
           SocketEventName.FinishAddAuditlog,
-          { totalCount: 100, count: 100 },
+          expect.anything(),
         );
       });
 

@@ -3,6 +3,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 
 import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import { SupportedAction } from '~/interfaces/activity';
+import { SocketEventName } from '~/interfaces/websocket';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -452,14 +453,20 @@ module.exports = (crowi) => {
             // NOT wait the processing is terminated
             searchService
               .rebuildAuditlogIndex({ shouldEmitProgress: true })
-              .then(() =>
-                AuditlogEsSyncStatus.setUnsynced(false).catch((err) => {
+              .then(async ({ totalCount, count }) => {
+                await AuditlogEsSyncStatus.setUnsynced(false).catch((err) => {
                   logger.error(
                     'Failed to clear auditlog unsynced flag after rebuild',
                     err,
                   );
-                }),
-              )
+                });
+                crowi.socketIoService
+                  .getAdminSocket()
+                  .emit(SocketEventName.FinishAddAuditlog, {
+                    totalCount,
+                    count,
+                  });
+              })
               .catch((err) => {
                 logger.error('Rebuild auditlog index failed', err);
               });

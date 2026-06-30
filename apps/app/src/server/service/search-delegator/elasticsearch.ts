@@ -397,7 +397,7 @@ class ElasticsearchDelegator
 
   async rebuildAuditlogIndex(
     option: { shouldEmitProgress: boolean } = { shouldEmitProgress: false },
-  ): Promise<void> {
+  ): Promise<{ totalCount: number; count: number }> {
     const {
       client,
       auditlogIndexName: indexName,
@@ -408,7 +408,6 @@ class ElasticsearchDelegator
 
     let totalCount = 0;
     let count = 0;
-    let rebuildSucceeded = false;
     const socket = shouldEmitProgress
       ? this.socketIoService.getAdminSocket()
       : null;
@@ -449,8 +448,6 @@ class ElasticsearchDelegator
           { remove: { alias: aliasName, index: tmpIndexName } },
         ],
       });
-
-      rebuildSucceeded = true;
     } catch (error) {
       logger.error(
         { err: error, body: error?.meta?.body },
@@ -470,10 +467,8 @@ class ElasticsearchDelegator
       } catch (normalizeErr) {
         logger.error('Failed to normalize auditlog indices', normalizeErr);
       }
-      if (socket != null && rebuildSucceeded) {
-        socket.emit(SocketEventName.FinishAddAuditlog, { totalCount, count });
-      }
     }
+    return { totalCount, count };
   }
 
   async normalizeIndices(): Promise<void> {

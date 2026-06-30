@@ -1,202 +1,63 @@
-import React, { type JSX, useCallback, useEffect, useState } from 'react';
+import React, { type JSX, useCallback, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { SocketEventName } from '~/interfaces/websocket';
-import {
-  auditLogEnabledAtom,
-  isSearchServiceReachableAtom,
-} from '~/states/server-configurations';
+import { auditLogEnabledAtom } from '~/states/server-configurations';
 
 import { AuditLogDisableMode } from './AuditLog/AuditLogDisableMode';
 import LabeledProgressBar from './Common/LabeledProgressBar';
 import ReconnectControls from './ElasticsearchManagement/ReconnectControls';
 import StatusTable from './ElasticsearchManagement/StatusTable';
+import { useIndexManagement } from './hooks/useIndexManagement';
 
 export const AuditLogIndexManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');
-  const isSearchServiceReachable = useAtomValue(isSearchServiceReachableAtom);
   const auditLogEnabled = useAtomValue(auditLogEnabledAtom);
-  const socket = useAdminSocket();
-
-  const [isInitialized, setIsInitialized] = useState(false);
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConfigured, setIsConfigured] = useState(false);
-  const [isReconnectingProcessing, setIsReconnectingProcessing] =
-    useState(false);
-  const [isNormalizingProcessing, setIsNormalizingProcessing] = useState(false);
-  const [isRebuildingProcessing, setIsRebuildingProcessing] = useState(false);
-  const [isRebuildingCompleted, setIsRebuildingCompleted] = useState(false);
-
-  const [isNormalized, setIsNormalized] = useState(false);
-  const [indicesData, setIndicesData] = useState(null);
-  const [aliasesData, setAliasesData] = useState(null);
   const [hasUnsyncedEvents, setHasUnsyncedEvents] = useState(false);
-  const [rebuildTotal, setRebuildTotal] = useState(0);
-  const [rebuildCurrent, setRebuildCurrent] = useState(0);
 
-  const retrieveStatus = useCallback(async (): Promise<boolean> => {
-    try {
-      const { data } = await apiv3Get('/search/auditlog-indices');
-      const { info } = data;
-
-      setIsConnected(true);
-      setIsConfigured(true);
-      setIsNormalized(info.isNormalized);
-      setIndicesData(info.indices);
-      setAliasesData(info.aliases);
-      setHasUnsyncedEvents(data.auditlogHasUnsyncedEvents ?? false);
-      return info.isNormalized;
-    } catch (errors: unknown) {
-      setIsConnected(false);
-      if (Array.isArray(errors)) {
-        for (const error of errors) {
-          if (error.code === 'search-service-unconfigured') {
-            setIsConfigured(false);
-          }
-        }
-        toastError(errors);
-      } else {
-        toastError(
-          errors instanceof Error ? errors : new Error(String(errors)),
-        );
-      }
-      return false;
-    } finally {
-      setIsInitialized(true);
-    }
+  const onStatusSuccess = useCallback((data: unknown) => {
+    setHasUnsyncedEvents(
+      (data as { auditlogHasUnsyncedEvents?: boolean })
+        .auditlogHasUnsyncedEvents ?? false,
+    );
   }, []);
 
-  useEffect(() => {
-    retrieveStatus();
-  }, [retrieveStatus]);
-
-  useEffect(() => {
-    if (socket == null) {
-      return;
-    }
-
-    const onProgress = (data: { totalCount: number; count: number }) => {
-      setIsRebuildingProcessing(true);
-      setRebuildTotal(data.totalCount);
-      setRebuildCurrent(data.count);
-    };
-
-    const onFinish = async (data: { totalCount: number; count: number }) => {
-      setRebuildTotal(data.totalCount);
-      setRebuildCurrent(data.count);
-
-      const maxRetries = 5;
-      const retryDelay = 500;
-
-      let succeeded = false;
-      for (let i = 0; i < maxRetries; i++) {
-        // biome-ignore lint/performance/noAwaitInLoops: sequential retry polling requires sequential awaits
-        const normalized = await retrieveStatus();
-        if (normalized) {
-          succeeded = true;
-          break;
-        }
-        // biome-ignore lint/performance/noAwaitInLoops: sequential retry polling requires sequential awaits
-        await new Promise<void>((resolve) => setTimeout(resolve, retryDelay));
-      }
-
-      setIsRebuildingProcessing(false);
-      if (succeeded) {
-        setIsRebuildingCompleted(true);
-      } else {
-        toastError(
-          new Error(
-            t('audit_log_index_management.rebuild_normalization_timeout'),
-          ),
-        );
-      }
-    };
-
-    const onFailed = async (data: { error: string }) => {
-      toastError(new Error(data.error));
-      setIsRebuildingProcessing(false);
-      await retrieveStatus();
-    };
-
-    const onDisconnect = () => {
-      setIsRebuildingProcessing(false);
-    };
-
-    socket.on(SocketEventName.AddAuditlogProgress, onProgress);
-    socket.on(SocketEventName.FinishAddAuditlog, onFinish);
-    socket.on(SocketEventName.AuditlogRebuildingFailed, onFailed);
-    socket.on('disconnect', onDisconnect);
-
-    return () => {
-      socket.off(SocketEventName.AddAuditlogProgress, onProgress);
-      socket.off(SocketEventName.FinishAddAuditlog, onFinish);
-      socket.off(SocketEventName.AuditlogRebuildingFailed, onFailed);
-      socket.off('disconnect', onDisconnect);
-    };
-  }, [retrieveStatus, socket, t]);
+  const {
+    isInitialized,
+    isConnected,
+    isConfigured,
+    isReconnectingProcessing,
+    isNormalizingProcessing,
+    isRebuildingProcessing,
+    isRebuildingCompleted,
+    isNormalized,
+    indicesData,
+    aliasesData,
+    rebuildTotal,
+    rebuildCurrent,
+    isErrorOccuredOnSearchService,
+    isReconnectBtnEnabled,
+    isNormalizeEnabled,
+    isRebuildEnabled,
+    reconnect,
+    normalizeIndices,
+    rebuildIndices,
+  } = useIndexManagement({
+    statusEndpoint: '/search/auditlog-indices',
+    normalizeRebuildEndpoint: '/search/auditlog-indices',
+    progressSocketEvent: SocketEventName.AddAuditlogProgress,
+    finishSocketEvent: SocketEventName.FinishAddAuditlog,
+    failedSocketEvent: SocketEventName.AuditlogRebuildingFailed,
+    normalizationTimeoutMessage: t(
+      'audit_log_index_management.rebuild_normalization_timeout',
+    ),
+    onStatusSuccess,
+  });
 
   if (!auditLogEnabled) {
     return <AuditLogDisableMode />;
   }
-
-  const reconnect = async () => {
-    setIsReconnectingProcessing(true);
-    try {
-      await apiv3Post('/search/connection');
-    } catch (e) {
-      toastError(e);
-      setIsReconnectingProcessing(false);
-      return;
-    }
-    window.location.reload();
-  };
-
-  const normalizeIndices = async () => {
-    setIsNormalizingProcessing(true);
-    try {
-      await apiv3Put('/search/auditlog-indices', { operation: 'normalize' });
-      toastSuccess(t('audit_log_index_management.normalize_success'));
-    } catch (e) {
-      toastError(e);
-    } finally {
-      setIsNormalizingProcessing(false);
-      await retrieveStatus();
-    }
-  };
-
-  const rebuildIndices = async () => {
-    setIsRebuildingProcessing(true);
-    setIsRebuildingCompleted(false);
-    try {
-      await apiv3Put('/search/auditlog-indices', { operation: 'rebuild' });
-      toastSuccess(t('audit_log_index_management.rebuild_requested'));
-    } catch (e) {
-      toastError(e);
-      setIsRebuildingProcessing(false);
-      await retrieveStatus();
-    }
-  };
-
-  const isErrorOccuredOnSearchService = !isSearchServiceReachable;
-
-  const isReconnectBtnEnabled =
-    !isReconnectingProcessing &&
-    (!isInitialized || !isConnected || isErrorOccuredOnSearchService);
-
-  const isNormalizeEnabled =
-    !isNormalized &&
-    !isNormalizingProcessing &&
-    !isRebuildingProcessing &&
-    isConnected;
-  const isRebuildEnabled =
-    isNormalized &&
-    !isRebuildingProcessing &&
-    !isNormalizingProcessing &&
-    isConnected;
 
   const showProgressBar = isRebuildingProcessing || isRebuildingCompleted;
 
@@ -246,7 +107,11 @@ export const AuditLogIndexManagement = (): JSX.Element => {
             type="button"
             className={`btn ${isNormalizeEnabled ? 'btn-outline-info' : 'btn-outline-secondary'}`}
             disabled={!isNormalizeEnabled}
-            onClick={normalizeIndices}
+            onClick={() =>
+              normalizeIndices(
+                t('audit_log_index_management.normalize_success'),
+              )
+            }
           >
             {isNormalizingProcessing && (
               <span
@@ -290,7 +155,9 @@ export const AuditLogIndexManagement = (): JSX.Element => {
             type="button"
             className="btn btn-primary"
             disabled={!isRebuildEnabled}
-            onClick={rebuildIndices}
+            onClick={() =>
+              rebuildIndices(t('audit_log_index_management.rebuild_requested'))
+            }
           >
             {t('audit_log_index_management.rebuild_button')}
           </button>

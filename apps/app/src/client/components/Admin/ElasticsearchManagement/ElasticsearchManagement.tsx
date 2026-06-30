@@ -1,13 +1,8 @@
-import React, { useCallback, useEffect, useState } from 'react';
-import { useAtomValue } from 'jotai';
 import { useTranslation } from 'next-i18next';
 
-import { apiv3Get, apiv3Post, apiv3Put } from '~/client/util/apiv3-client';
-import { toastError, toastSuccess } from '~/client/util/toastr';
-import { useAdminSocket } from '~/features/admin/states/socket-io';
 import { SocketEventName } from '~/interfaces/websocket';
-import { isSearchServiceReachableAtom } from '~/states/server-configurations';
 
+import { useIndexManagement } from '../hooks/useIndexManagement';
 import NormalizeIndicesControls from './NormalizeIndicesControls';
 import RebuildIndexControls from './RebuildIndexControls';
 import ReconnectControls from './ReconnectControls';
@@ -15,155 +10,32 @@ import StatusTable from './StatusTable';
 
 const ElasticsearchManagement = (): JSX.Element => {
   const { t } = useTranslation('admin');
-  // Get search service reachable flag from atom
-  const isSearchServiceReachable = useAtomValue(isSearchServiceReachableAtom);
-  const socket = useAdminSocket();
 
-  const [isInitialized, setIsInitialized] = useState(false);
-
-  const [isConnected, setIsConnected] = useState(false);
-  const [isConfigured, setIsConfigured] = useState(false);
-  const [isReconnectingProcessing, setIsReconnectingProcessing] =
-    useState(false);
-  const [isRebuildingProcessing, setIsRebuildingProcessing] = useState(false);
-  const [isRebuildingCompleted, setIsRebuildingCompleted] = useState(false);
-
-  const [isNormalized, setIsNormalized] = useState(false);
-  const [indicesData, setIndicesData] = useState(null);
-  const [aliasesData, setAliasesData] = useState(null);
-
-  const retrieveIndicesStatus = useCallback(async () => {
-    try {
-      const { data } = await apiv3Get('/search/indices');
-      const { info } = data;
-
-      setIsConnected(true);
-      setIsConfigured(true);
-
-      setIndicesData(info.indices);
-      setAliasesData(info.aliases);
-      setIsNormalized(info.isNormalized);
-
-      return info.isNormalized;
-    } catch (errors: unknown) {
-      setIsConnected(false);
-
-      // evaluate whether configured or not
-      if (Array.isArray(errors)) {
-        for (const error of errors) {
-          if (error.code === 'search-service-unconfigured') {
-            setIsConfigured(false);
-          }
-        }
-        toastError(errors as Error[]);
-      } else {
-        toastError(errors as Error);
-      }
-
-      return false;
-    } finally {
-      setIsInitialized(true);
-    }
-  }, []);
-
-  useEffect(() => {
-    retrieveIndicesStatus();
-  }, [retrieveIndicesStatus]);
-
-  useEffect(() => {
-    if (socket == null) {
-      return;
-    }
-    socket.on(SocketEventName.AddPageProgress, () => {
-      setIsRebuildingProcessing(true);
-    });
-
-    socket.on(SocketEventName.FinishAddPage, async (data) => {
-      const maxRetries = 5;
-      const retryDelay = 500;
-
-      let succeeded = false;
-      for (let i = 0; i < maxRetries; i++) {
-        // biome-ignore lint/performance/noAwaitInLoops: sequential retry polling requires sequential awaits
-        const normalized = await retrieveIndicesStatus();
-        if (normalized) {
-          succeeded = true;
-          break;
-        }
-        // biome-ignore lint/performance/noAwaitInLoops: sequential retry polling requires sequential awaits
-        await new Promise<void>((resolve) => {
-          setTimeout(resolve, retryDelay);
-        });
-      }
-
-      setIsRebuildingProcessing(false);
-      if (succeeded) {
-        setIsRebuildingCompleted(true);
-      } else {
-        toastError(
-          new Error(
-            t('full_text_search_management.rebuild_normalization_timeout'),
-          ),
-        );
-      }
-    });
-
-    socket.on(SocketEventName.RebuildingFailed, (data) => {
-      toastError(new Error(data.error));
-      setIsRebuildingProcessing(false);
-    });
-
-    return () => {
-      socket.off(SocketEventName.AddPageProgress);
-      socket.off(SocketEventName.FinishAddPage);
-      socket.off(SocketEventName.RebuildingFailed);
-    };
-  }, [retrieveIndicesStatus, socket, t]);
-
-  const reconnect = async () => {
-    setIsReconnectingProcessing(true);
-
-    try {
-      await apiv3Post('/search/connection');
-    } catch (e) {
-      toastError(e);
-      return;
-    }
-
-    // reload
-    window.location.reload();
-  };
-
-  const normalizeIndices = async () => {
-    try {
-      await apiv3Put('/search/indices', { operation: 'normalize' });
-    } catch (e) {
-      toastError(e);
-    }
-
-    await retrieveIndicesStatus();
-
-    toastSuccess('Normalizing has succeeded');
-  };
-
-  const rebuildIndices = async () => {
-    setIsRebuildingProcessing(true);
-
-    try {
-      await apiv3Put('/search/indices', { operation: 'rebuild' });
-      toastSuccess('Rebuilding is requested');
-    } catch (e) {
-      toastError(e);
-    }
-
-    await retrieveIndicesStatus();
-  };
-
-  const isErrorOccuredOnSearchService = !isSearchServiceReachable;
-
-  const isReconnectBtnEnabled =
-    !isReconnectingProcessing &&
-    (!isInitialized || !isConnected || isErrorOccuredOnSearchService);
+  const {
+    isInitialized,
+    isConnected,
+    isConfigured,
+    isReconnectingProcessing,
+    isRebuildingProcessing,
+    isRebuildingCompleted,
+    isNormalized,
+    indicesData,
+    aliasesData,
+    isErrorOccuredOnSearchService,
+    isReconnectBtnEnabled,
+    reconnect,
+    normalizeIndices,
+    rebuildIndices,
+  } = useIndexManagement({
+    statusEndpoint: '/search/indices',
+    normalizeRebuildEndpoint: '/search/indices',
+    progressSocketEvent: SocketEventName.AddPageProgress,
+    finishSocketEvent: SocketEventName.FinishAddPage,
+    failedSocketEvent: SocketEventName.RebuildingFailed,
+    normalizationTimeoutMessage: t(
+      'full_text_search_management.rebuild_normalization_timeout',
+    ),
+  });
 
   return (
     <>
@@ -207,7 +79,9 @@ const ElasticsearchManagement = (): JSX.Element => {
           <NormalizeIndicesControls
             isRebuildingProcessing={isRebuildingProcessing}
             isNormalized={isNormalized}
-            onNormalizingRequested={normalizeIndices}
+            onNormalizingRequested={() =>
+              normalizeIndices('Normalizing has succeeded')
+            }
           />
         </div>
       </div>
@@ -223,7 +97,9 @@ const ElasticsearchManagement = (): JSX.Element => {
             isRebuildingProcessing={isRebuildingProcessing}
             isRebuildingCompleted={isRebuildingCompleted}
             isNormalized={isNormalized}
-            onRebuildingRequested={rebuildIndices}
+            onRebuildingRequested={() =>
+              rebuildIndices('Rebuilding is requested')
+            }
           />
         </div>
       </div>
