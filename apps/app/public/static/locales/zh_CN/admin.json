@@ -308,7 +308,8 @@
     "rebuild": "重建",
     "rebuild_button": "重建索引",
     "rebuild_description_1": "单击按钮以重新生成索引并添加所有页面数据。",
-    "rebuild_description_2": "这可能需要一段时间。"
+    "rebuild_description_2": "这可能需要一段时间。",
+    "rebuild_normalization_timeout": "重建完成，但规范化超时。请手动规范化。"
   },
   "mailer_setup_required": "<a href='/admin/app'>Email settings</a> are required to send.",
   "admin_top": {

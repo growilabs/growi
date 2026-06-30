@@ -308,7 +308,8 @@
     "rebuild": "リビルド",
     "rebuild_button": "インデックスのリビルド",
     "rebuild_description_1": "全てのページのインデックスを削除し、作り直します。",
-    "rebuild_description_2": "この作業には数秒かかります。"
+    "rebuild_description_2": "この作業には数秒かかります。",
+    "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。"
   },
   "audit_log_index_management": {
     "audit_log_index_management": "監査ログ管理",

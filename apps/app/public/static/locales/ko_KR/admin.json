@@ -299,7 +299,8 @@
     "rebuild": "재구축",
     "rebuild_button": "인덱스 재구축",
     "rebuild_description_1": "버튼을 클릭하여 인덱스를 재구축하고 모든 페이지 데이터를 추가합니다.",
-    "rebuild_description_2": "이 작업은 시간이 걸릴 수 있습니다."
+    "rebuild_description_2": "이 작업은 시간이 걸릴 수 있습니다.",
+    "rebuild_normalization_timeout": "재구축은 완료되었지만 정규화가 시간 초과되었습니다. 수동으로 정규화하세요."
   },
   "mailer_setup_required": "<a href='/admin/app'>이메일 설정</a>이 전송에 필요합니다.",
   "admin_top": {

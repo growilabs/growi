@@ -289,72 +289,8 @@ class ElasticsearchDelegator
   /**
    * Return information for Admin Full Text Search Management page
    */
-  async getInfoForAdmin() {
-    const { client, indexName, aliasName } = this;
-
-    const tmpIndexName = `${indexName}-tmp`;
-
-    // check existence
-    const isExistsMainIndex = await client.indices.exists({ index: indexName });
-    const isExistsTmpIndex = await client.indices.exists({
-      index: tmpIndexName,
-    });
-
-    // create indices name list
-    const existingIndices: string[] = [];
-    if (isExistsMainIndex) {
-      existingIndices.push(indexName);
-    }
-    if (isExistsTmpIndex) {
-      existingIndices.push(tmpIndexName);
-    }
-
-    // results when there is no indices
-    if (existingIndices.length === 0) {
-      return {
-        indices: [],
-        aliases: [],
-        isNormalized: false,
-      };
-    }
-
-    const indicesStats = await client.indices.stats({
-      index: existingIndices,
-      metric: ['docs', 'store', 'indexing'],
-    });
-    const { indices } = indicesStats;
-
-    const aliases = await client.indices.getAlias({ index: existingIndices });
-
-    const isMainIndexHasAlias =
-      isExistsMainIndex &&
-      aliases[indexName]?.aliases != null &&
-      aliases[indexName]?.aliases[aliasName] != null;
-    const isTmpIndexHasAlias =
-      isExistsTmpIndex &&
-      aliases[tmpIndexName]?.aliases != null &&
-      aliases[tmpIndexName]?.aliases[aliasName] != null;
-
-    const isNormalized =
-      isExistsMainIndex &&
-      isMainIndexHasAlias &&
-      !isExistsTmpIndex &&
-      !isTmpIndexHasAlias;
-
-    return {
-      indices,
-      aliases,
-      isNormalized,
-    };
-  }
-
-  async getAuditlogInfoForAdmin() {
-    const {
-      client,
-      auditlogIndexName: indexName,
-      auditlogAliasName: aliasName,
-    } = this;
-
+  private async getIndexInfoForAdmin(indexName: string, aliasName: string) {
+    const { client } = this;
     const tmpIndexName = `${indexName}-tmp`;
 
     const isExistsMainIndex = await client.indices.exists({ index: indexName });
@@ -394,6 +330,17 @@ class ElasticsearchDelegator
       !isTmpIndexHasAlias;
 
     return { indices, aliases, isNormalized };
+  }
+
+  async getInfoForAdmin() {
+    return this.getIndexInfoForAdmin(this.indexName, this.aliasName);
+  }
+
+  async getAuditlogInfoForAdmin() {
+    return this.getIndexInfoForAdmin(
+      this.auditlogIndexName,
+      this.auditlogAliasName,
+    );
   }
 
   /**

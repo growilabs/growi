@@ -299,7 +299,8 @@
     "rebuild": "Reconstruire",
     "rebuild_button": "Reconstruire",
     "rebuild_description_1": "Reconstruire l'index et les données de pages",
-    "rebuild_description_2": "Cela peut prendre un certain temps."
+    "rebuild_description_2": "Cela peut prendre un certain temps.",
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement."
   },
   "mailer_setup_required": "La <a href='/admin/app'>configuration du SMTP</a> est requise.",
   "admin_top": {

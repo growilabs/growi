@@ -379,7 +379,9 @@ describe('ElasticsearchDelegator', () => {
       expect(mockES8Client.indices.create).toHaveBeenCalledWith(
         expect.objectContaining({ index: 'auditlogs' }),
       );
-      expect(addAllAuditlogsSpy).toHaveBeenCalled();
+      expect(addAllAuditlogsSpy).toHaveBeenCalledWith({
+        shouldEmitProgress: false,
+      });
     });
 
     it('swaps the alias onto the tmp index while the live index is rebuilt', async () => {
@@ -411,6 +413,9 @@ describe('ElasticsearchDelegator', () => {
           { remove: { alias: 'auditlogs-alias', index: 'auditlogs-tmp' } },
         ],
       });
+      expect(
+        mockES8Client.indices.updateAliases.mock.invocationCallOrder[1],
+      ).toBeGreaterThan(addAllAuditlogsSpy.mock.invocationCallOrder[0]);
     });
 
     it('deletes a leftover tmp index before reindexing', async () => {

@@ -58,9 +58,11 @@ export const AuditLogIndexManagement = (): JSX.Element => {
             setIsConfigured(false);
           }
         }
-        toastError(errors as Error[]);
+        toastError(errors);
       } else {
-        toastError(errors as Error);
+        toastError(
+          errors instanceof Error ? errors : new Error(String(errors)),
+        );
       }
       return false;
     } finally {
@@ -92,11 +94,13 @@ export const AuditLogIndexManagement = (): JSX.Element => {
 
       let succeeded = false;
       for (let i = 0; i < maxRetries; i++) {
+        // biome-ignore lint/performance/noAwaitInLoops: sequential retry polling requires sequential awaits
         const normalized = await retrieveStatus();
         if (normalized) {
           succeeded = true;
           break;
         }
+        // biome-ignore lint/performance/noAwaitInLoops: sequential retry polling requires sequential awaits
         await new Promise<void>((resolve) => setTimeout(resolve, retryDelay));
       }
 

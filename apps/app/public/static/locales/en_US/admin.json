@@ -299,7 +299,8 @@
     "rebuild": "Rebuild",
     "rebuild_button": "Rebuild index",
     "rebuild_description_1": "Click the button to rebuild index and add all page datas.",
-    "rebuild_description_2": "This may take a while."
+    "rebuild_description_2": "This may take a while.",
+    "rebuild_normalization_timeout": "Rebuild completed but normalization timed out. Please normalize manually."
   },
   "audit_log_index_management": {
     "audit_log_index_management": "Audit Log Index Management",

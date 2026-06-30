@@ -82,16 +82,30 @@ const ElasticsearchManagement = (): JSX.Element => {
       const maxRetries = 5;
       const retryDelay = 500;
 
+      let succeeded = false;
       for (let i = 0; i < maxRetries; i++) {
-        const isNormalized = await retrieveIndicesStatus();
-        if (isNormalized) break;
+        // biome-ignore lint/performance/noAwaitInLoops: sequential retry polling requires sequential awaits
+        const normalized = await retrieveIndicesStatus();
+        if (normalized) {
+          succeeded = true;
+          break;
+        }
+        // biome-ignore lint/performance/noAwaitInLoops: sequential retry polling requires sequential awaits
         await new Promise<void>((resolve) => {
           setTimeout(resolve, retryDelay);
         });
       }
 
       setIsRebuildingProcessing(false);
-      setIsRebuildingCompleted(true);
+      if (succeeded) {
+        setIsRebuildingCompleted(true);
+      } else {
+        toastError(
+          new Error(
+            t('full_text_search_management.rebuild_normalization_timeout'),
+          ),
+        );
+      }
     });
 
     socket.on(SocketEventName.RebuildingFailed, (data) => {
@@ -103,7 +117,7 @@ const ElasticsearchManagement = (): JSX.Element => {
       socket.off(SocketEventName.FinishAddPage);
       socket.off(SocketEventName.RebuildingFailed);
     };
-  }, [retrieveIndicesStatus, socket]);
+  }, [retrieveIndicesStatus, socket, t]);
 
   const reconnect = async () => {
     setIsReconnectingProcessing(true);
