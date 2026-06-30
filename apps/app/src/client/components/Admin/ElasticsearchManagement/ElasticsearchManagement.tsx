@@ -110,6 +110,7 @@ const ElasticsearchManagement = (): JSX.Element => {
 
     socket.on(SocketEventName.RebuildingFailed, (data) => {
       toastError(new Error(data.error));
+      setIsRebuildingProcessing(false);
     });
 
     return () => {

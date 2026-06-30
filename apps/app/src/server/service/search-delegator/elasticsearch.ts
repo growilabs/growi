@@ -409,6 +409,9 @@ class ElasticsearchDelegator
     let totalCount = 0;
     let count = 0;
     let rebuildSucceeded = false;
+    const socket = shouldEmitProgress
+      ? this.socketIoService.getAdminSocket()
+      : null;
 
     try {
       // Drop any leftover tmp index, then reindex the live index into a fresh tmp.
@@ -453,8 +456,7 @@ class ElasticsearchDelegator
         { err: error, body: error?.meta?.body },
         "An error occurred while 'rebuildAuditlogIndex'.",
       );
-      if (shouldEmitProgress) {
-        const socket = this.socketIoService.getAdminSocket();
+      if (socket != null) {
         socket.emit(SocketEventName.AuditlogRebuildingFailed, {
           error: error instanceof Error ? error.message : String(error),
         });
@@ -468,8 +470,7 @@ class ElasticsearchDelegator
       } catch (normalizeErr) {
         logger.error('Failed to normalize auditlog indices', normalizeErr);
       }
-      if (shouldEmitProgress && rebuildSucceeded) {
-        const socket = this.socketIoService.getAdminSocket();
+      if (socket != null && rebuildSucceeded) {
         socket.emit(SocketEventName.FinishAddAuditlog, { totalCount, count });
       }
     }
