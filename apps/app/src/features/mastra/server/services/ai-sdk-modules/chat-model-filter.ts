@@ -1,7 +1,17 @@
-// The catalog-provider set is declared once in the client-safe interfaces layer
-// (single source of truth) and re-exported here so the vendoring script and the
-// route keep importing it from this module unchanged.
-export { CATALOG_PROVIDERS } from '~/features/mastra/interfaces/catalog-providers';
+import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
+
+/**
+ * Providers whose model catalog is present in models.dev and therefore drive
+ * selection-only registration. Declared as data (not computed by excluding
+ * azure-openai from AI_PROVIDERS): azure-openai is absent from models.dev
+ * because its model IDs are operator-defined deployment names and cannot be
+ * enumerated, so it stays free-input.
+ */
+export const CATALOG_PROVIDERS = [
+  'openai',
+  'anthropic',
+  'google',
+] as const satisfies readonly AiProvider[];
 
 /**
  * A single models.dev catalog entry, narrowed to the only two authoritative

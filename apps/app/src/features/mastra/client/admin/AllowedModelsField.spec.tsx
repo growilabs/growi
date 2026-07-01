@@ -1,7 +1,7 @@
 // @vitest-environment happy-dom
 
 import type { JSX, ReactNode } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
 import type { SWRResponse } from 'swr';
@@ -509,12 +509,14 @@ describe('AllowedModelsField', () => {
       ).toBeInTheDocument();
     });
 
-    it('renders the dropdown (not a text input) while the catalog is still loading for a catalog provider — no text→select flash on open (8)', () => {
-      // Arrange: loading window — the hook has neither resolved nor errored yet.
-      mockedUseSelectableModels.mockReturnValue(swrResponse({}));
+    it('shows the saved model id (not the placeholder) after the catalog resolves on reload', async () => {
+      // Repro of the reload bug: on page (re)load the catalog fetch is initially
+      // in flight (data undefined), then resolves to a list that INCLUDES the
+      // saved model id. The <select> must end up displaying the saved id, not the
+      // empty "Select a model" placeholder.
+      mockedUseSelectableModels.mockReturnValue(swrResponse({})); // loading
 
-      // Act: a configured catalog provider (openai) is opened.
-      renderComponent({
+      const { rerender } = renderComponent({
         defaultValues: {
           provider: 'openai',
           allowedModels: [
@@ -523,41 +525,27 @@ describe('AllowedModelsField', () => {
         },
       });
 
-      // Assert: the control is already a <select> (predicted from the declared
-      // catalog-provider set), not a text input, and disabled while loading — so
-      // opening a configured catalog provider never flashes text→select. Value
-      // preservation is covered by the resolved-state test above.
-      const modelControl = screen.getByLabelText('ai_settings.model_label');
-      expect(modelControl.tagName).toBe('SELECT');
-      expect(modelControl).toBeDisabled();
-    });
-
-    it('renders a free-text input while loading for a catalog-less provider, e.g. Azure (no flash) (8)', () => {
-      // Arrange: loading window for azure-openai (absent from the catalog set).
-      mockedUseSelectableModels.mockReturnValue(swrResponse({}));
-
-      // Act
-      renderComponent({
-        defaultValues: {
-          provider: 'azure-openai',
-          allowedModels: [
-            {
-              modelId: 'my-deployment',
-              providerOptionsText: '',
-              isDefault: true,
-            },
-          ],
-        },
-      });
-
-      // Assert: a catalog-less provider stays free-text throughout load, so it
-      // does not flash select→text once the empty list resolves.
-      const modelControl = screen.getByLabelText(
-        'ai_settings.azure_model_deployment_label',
+      // The catalog resolves; gpt-4o is a valid, in-catalog model.
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ data: { modelIds: ['gpt-4o', 'gpt-4.1'] } }),
       );
-      expect(modelControl).toBeInstanceOf(HTMLInputElement);
-      expect((modelControl as HTMLInputElement).type).toBe('text');
-      expect(modelControl).toBeDisabled();
+      rerender(
+        <FormHarness
+          defaultValues={{
+            provider: 'openai',
+            allowedModels: [
+              { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            ],
+          }}
+        >
+          <AllowedModelsField disabled={false} />
+        </FormHarness>,
+      );
+
+      const modelControl = screen.getByLabelText('ai_settings.model_label');
+      await waitFor(() => {
+        expect((modelControl as HTMLSelectElement).value).toBe('gpt-4o');
+      });
     });
 
     it('disables the dropdown in env-only mode so it cannot be edited (7.3)', () => {

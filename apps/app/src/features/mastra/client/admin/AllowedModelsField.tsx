@@ -4,7 +4,6 @@ import { useTranslation } from 'next-i18next';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { Badge, Button, FormGroup, Input, Label } from 'reactstrap';
 
-import { providerHasCatalog } from '../../interfaces/catalog-providers';
 import { isValidProviderOptionsJson } from '../../utils/provider-options-validation';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { getProviderOptionsJsonStatus } from './provider-options-json-status';
@@ -71,22 +70,24 @@ export const AllowedModelsField = (
   const { data, error } = useSWRxSelectableModels(provider);
 
   // Mode derivation (design "AllowedModelsField（UI 変更）"):
-  // - `select` when the catalog resolved to a non-empty list (1.4).
+  // - `select` only when the catalog resolved to a non-empty list (1.4).
   // - `freetext` when the provider is unset (5.2), the fetch failed (3.2), or the
   //   catalog resolved but is empty — e.g. azure-openai (3.1). In all three the
   //   admin can still type a model id, so save is never blocked (3.2).
+  //
+  // NOTE: the <select> is rendered ONLY after the catalog resolves — never during
+  // the loading window. react-hook-form applies the saved value to an
+  // uncontrolled <select> once, when the element mounts; if the matching <option>
+  // does not yet exist (loading, empty list), the value is lost and the field
+  // shows the placeholder even after options arrive later (the browser does not
+  // re-select and RHF does not re-apply on the same element). Mounting the select
+  // only when its options already exist keeps the saved value displayed on reload.
   const selectableModelIds = data?.modelIds ?? [];
   const isResolved = data != null;
   // A request is in flight only while a provider is selected and nothing has
   // resolved or errored yet; the modelId control is disabled during that window.
   const isLoadingModels = provider !== '' && !isResolved && error == null;
-  // While loading, predict the control type from the declared catalog-provider
-  // set so a configured catalog provider renders the <select> immediately on open
-  // — avoids a text→select flash. Once resolved, the actual list decides (a
-  // catalog provider that returns an empty list still falls back to free-text).
-  const useSelect = isLoadingModels
-    ? providerHasCatalog(provider)
-    : isResolved && selectableModelIds.length > 0;
+  const useSelect = isResolved && selectableModelIds.length > 0;
 
   // Azure OpenAI stores the *deployment name* in `modelId`, so the label changes
   // by provider (data-driven on the watched value, no provider-specific branch
