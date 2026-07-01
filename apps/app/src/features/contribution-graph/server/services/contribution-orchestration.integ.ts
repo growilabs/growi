@@ -40,12 +40,23 @@ vi.mock('~/server/service/config-manager', () => ({
 }));
 vi.mocked(configManager.getConfig).mockReturnValue(2592000);
 
-// Minimal User schema (only the field the migration logic reads). Guarded
-// against duplicate registration across specs in the same process.
+// Minimal User schema (the fields the migration logic reads, plus `username`
+// and timestamps) -- required because ActivityExtension.updateByParameters
+// always does `include: { user: true }` [Key Decision 5], and the real
+// `users` Prisma model declares `username`/`createdAt`/`updatedAt`
+// non-nullable; a seeded User missing any of them makes the settle-update's
+// relation fetch throw P2032. Guarded against duplicate registration across
+// specs in the same process.
 if (mongoose.models.User == null) {
   mongoose.model(
     'User',
-    new mongoose.Schema({ contributionsMigratedAt: { type: Date } }),
+    new mongoose.Schema(
+      {
+        username: { type: String },
+        contributionsMigratedAt: { type: Date },
+      },
+      { timestamps: true },
+    ),
   );
 }
 const User = mongoose.model<IUser>('User');
@@ -125,7 +136,7 @@ describe('ActivityService contribution orchestration', () => {
   const settleViaUpdateListener = async (
     action: SupportedActionType,
   ): Promise<string> => {
-    await User.create({ _id: userId }); // un-migrated user
+    await User.create({ _id: userId, username: 'testuser' }); // un-migrated user
 
     const activityId = new Types.ObjectId().toHexString();
     await prisma.activities.create({

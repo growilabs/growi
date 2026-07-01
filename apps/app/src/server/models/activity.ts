@@ -119,6 +119,21 @@ import { normalizeAggregateRaw } from '~/server/util/prisma-raw-normalize';
 import type { prisma } from '~/utils/prisma';
 
 /**
+ * The activities row shape returned by `updateByParameters` on success
+ * (never null -- callers that may receive the not-found `null` case narrow
+ * it themselves). `include: { user: true }` (Key Decision 5) means this
+ * always carries a populated `user` relation alongside the `userId` scalar.
+ *
+ * Downstream consumers (pre-notify.ts, in-app-notification.ts) previously
+ * typed this as the pre-migration Mongoose `ActivityDocument`; that type no
+ * longer matches the actual runtime shape now that record/update goes
+ * through Prisma (anticipated in design.md's Revalidation Triggers).
+ */
+export type ActivityWithUser = NonNullable<
+  Awaited<ReturnType<typeof prisma.activities.updateByParameters>>
+>;
+
+/**
  * Normalize a user/target argument to an ObjectId string.
  *
  * Callers (e.g. service/page/index.ts) may pass a Mongoose document or
@@ -136,6 +151,35 @@ export function normalizeToId(value: unknown): string | null | undefined {
     if (id != null) return String(id);
   }
   return String(value);
+}
+
+type NullableIdUpdateField =
+  | Prisma.NullableStringFieldUpdateOperationsInput
+  | string
+  | null
+  | undefined;
+
+/**
+ * Normalizes an `updateByParameters` scalar reference field (`target`,
+ * `event`, `userId`) to an ID string.
+ *
+ * Callers such as `update-page.ts`'s PAGE_UPDATE settle path pass the full
+ * updated Mongoose Page document (or a bare ObjectId) for `target`, relying
+ * on the auto-cast Mongoose's `findOneAndUpdate` used to perform. Prisma's
+ * `update()` has no such casting and fails to serialize a Document/ObjectId
+ * value passed as-is, so this mirrors `createByParameters`'s `normalizeToId`
+ * for the update path.
+ *
+ * A Prisma field-update-operation object (`{ set: ... }`) is passed through
+ * unchanged -- it is already valid Prisma input, not a loose Document/ObjectId
+ * to normalize.
+ */
+function normalizeUpdateIdField(
+  value: NullableIdUpdateField,
+): NullableIdUpdateField {
+  if (value == null || typeof value === 'string') return value;
+  if ('set' in value) return value;
+  return normalizeToId(value);
 }
 
 /**
@@ -213,10 +257,22 @@ export const extension = Prisma.defineExtension((client) => {
         ) {
           const context =
             Prisma.getExtensionContext<typeof prisma.activities>(this);
+
+          // Normalize target/event/userId (see normalizeUpdateIdField) --
+          // callers may pass a Mongoose Document or ObjectId instead of a
+          // bare string, which Prisma cannot serialize unlike Mongoose's
+          // auto-casting findOneAndUpdate.
+          const normalizedParameters: IActivityUpdateParameters = {
+            ...parameters,
+            userId: normalizeUpdateIdField(parameters.userId),
+            target: normalizeUpdateIdField(parameters.target),
+            event: normalizeUpdateIdField(parameters.event),
+          };
+
           try {
             return await context.update({
               where: { id: activityId },
-              data: parameters,
+              data: normalizedParameters,
               include: { user: true },
             });
           } catch (err) {

@@ -254,6 +254,100 @@ describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () =
     expect(result).toEqual(populatedRow);
   });
 
+  it('normalizes a Document/ObjectId-like `target` to an ID string (regression: update-page.ts passes the full updated Page document, relying on the auto-cast Mongoose findOneAndUpdate used to perform)', async () => {
+    // Arrange
+    const { client, updateSpy } = buildUpdateClient();
+    const pageDocument = {
+      _id: { toString: () => '507f1f77bcf86cd799439033' },
+      path: '/some/page',
+    };
+
+    // Act
+    await client.activities.updateByParameters('activity-id-1', {
+      action: 'PAGE_UPDATE',
+      target: pageDocument as never,
+    });
+
+    // Assert: the Document was normalized to a bare ID string before reaching
+    // Prisma's update() -- Prisma has no Mongoose-style auto-cast and fails to
+    // serialize a Document/ObjectId value passed as-is.
+    expect(updateSpy).toHaveBeenCalledWith({
+      where: { id: 'activity-id-1' },
+      data: { action: 'PAGE_UPDATE', target: '507f1f77bcf86cd799439033' },
+      include: { user: true },
+    });
+  });
+
+  it('normalizes a bare ObjectId instance passed for `target`/`event` to an ID string', async () => {
+    // Arrange
+    const { client, updateSpy } = buildUpdateClient();
+    const objectId = { toString: () => '507f1f77bcf86cd799439044' };
+
+    // Act
+    await client.activities.updateByParameters('activity-id-1', {
+      action: 'PAGE_REVERT',
+      target: objectId as never,
+      event: objectId as never,
+    });
+
+    // Assert
+    expect(updateSpy).toHaveBeenCalledWith({
+      where: { id: 'activity-id-1' },
+      data: {
+        action: 'PAGE_REVERT',
+        target: '507f1f77bcf86cd799439044',
+        event: '507f1f77bcf86cd799439044',
+      },
+      include: { user: true },
+    });
+  });
+
+  it('passes a Prisma field-update-operation object (`{ set: ... }`) through unchanged', async () => {
+    // Arrange
+    const { client, updateSpy } = buildUpdateClient();
+
+    // Act
+    await client.activities.updateByParameters('activity-id-1', {
+      action: 'PAGE_UPDATE',
+      target: { set: '507f1f77bcf86cd799439055' },
+    });
+
+    // Assert: an already-valid Prisma update-operation input is not
+    // mistaken for a loose Document and re-wrapped/mangled.
+    expect(updateSpy).toHaveBeenCalledWith({
+      where: { id: 'activity-id-1' },
+      data: {
+        action: 'PAGE_UPDATE',
+        target: { set: '507f1f77bcf86cd799439055' },
+      },
+      include: { user: true },
+    });
+  });
+
+  it('passes string/null/undefined target/event/userId through unchanged', async () => {
+    // Arrange
+    const { client, updateSpy } = buildUpdateClient();
+
+    // Act: target absent (undefined), event explicitly null
+    await client.activities.updateByParameters('activity-id-1', {
+      action: 'PAGE_UPDATE',
+      userId: '507f1f77bcf86cd799439066',
+      event: null,
+    });
+
+    // Assert
+    expect(updateSpy).toHaveBeenCalledWith({
+      where: { id: 'activity-id-1' },
+      data: {
+        action: 'PAGE_UPDATE',
+        userId: '507f1f77bcf86cd799439066',
+        target: undefined,
+        event: null,
+      },
+      include: { user: true },
+    });
+  });
+
   it('returns null (does NOT throw) when Prisma throws P2025 (record not found, C1)', async () => {
     // Arrange: simulate Prisma "Record to update not found" error
     const { client, updateSpy } = buildUpdateClient();
