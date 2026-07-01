@@ -4401,6 +4401,28 @@ class PageService implements IPageService {
   }
 
   /**
+   * Recount descendantCount for every page (global reconciliation).
+   *
+   * Sorted by DESC path so each page is recounted after its descendants — a
+   * parent's path is always a prefix of its children's — and streamed via cursor
+   * over the indexed `path` field to stay bounded in memory. Used by the
+   * page-cleanup cron to repair drift left when the TTL index deletes WIP pages
+   * outside app code.
+   */
+  async recountAndUpdateDescendantCountOfAllPages(): Promise<void> {
+    const BATCH_SIZE = 200;
+    const Page = mongoose.model<IPage, PageModel>('Page');
+    const { PageQueryBuilder } = Page;
+
+    // includeEmpty: true — empty placeholder pages carry a descendantCount too.
+    const builder = new PageQueryBuilder(Page.find(), true);
+    builder.addConditionToSortPagesByDescPath();
+
+    const cursor = builder.query.lean().cursor({ batchSize: BATCH_SIZE });
+    await this.recountAndUpdateDescendantCountOfPages(cursor, BATCH_SIZE);
+  }
+
+  /**
    * Recount descendantCount of pages one by one
    */
   async recountAndUpdateDescendantCountOfPages(
@@ -4416,7 +4438,12 @@ class PageService implements IPageService {
           const descendantCount = await Page.recountDescendantCount(
             document._id,
           );
-          await Page.findByIdAndUpdate(document._id, { descendantCount });
+          // Skip no-op writes: on a healthy tree almost every page is already
+          // correct, so this avoids a full-collection rewrite and shrinks the
+          // window to clobber a concurrent live edit.
+          if (descendantCount !== document.descendantCount) {
+            await Page.findByIdAndUpdate(document._id, { descendantCount });
+          }
         }
         callback();
       },
