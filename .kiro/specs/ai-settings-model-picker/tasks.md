@@ -14,7 +14,7 @@
   - _Boundary: locales admin.json_
 
 - [ ] 2. 取り込みステップ（リリース前段）の vendoring パイプライン（コミット成果物の生成）
-- [ ] 2.1 (P) chat/ツール対応モデルの判定（純関数）を実装する
+- [x] 2.1 (P) chat/ツール対応モデルの判定（純関数）を実装する
   - 対象プロバイダ（openai/anthropic/google、azure-openai は models.dev 非収録で対象外）を宣言データにする
   - `isSelectableModel(entry) = tool_call===true && modalities.output に text を含む` を純関数で実装（models.dev の権威的フィールドで判定、名前 heuristic は使わない）
   - 完了状態: `tool_call:true & output:['text']` を通し、`tool_call:false` や `output:['image']` 等を除外する単体テストが green。対象プロバイダに azure-openai を含まない
