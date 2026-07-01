@@ -308,7 +308,7 @@ export const useSWRxSelectableModels: (
 ) => SWRResponse<SelectableModelsResponse, Error>;
 ```
 - Key: `provider === '' ? null : ['/ai-settings/available-models', provider]`（null = fetch しない、5.2）。
-- Fetcher: `apiv3Get<SelectableModelsResponse>('/ai-settings/available-models', { params: { provider } })`。`useSWRImmutable`（静的データ）。provider 変更で自動再取得（5.1）。
+- Fetcher: `apiv3Get<SelectableModelsResponse>('/ai-settings/available-models', { provider })`。`useSWRImmutable`（静的データ）。provider 変更で自動再取得（5.1）。**注意**: `apiv3Get(path, params)` は第2引数を内部で `{ params }` に包んで axios へ渡す（[apiv3-client.ts](../../../apps/app/src/client/util/apiv3-client.ts)）ため、クエリ値のオブジェクトを**そのまま**第2引数に渡す（`{ provider }`）。`{ params: { provider } }` と書くと二重ラップされ `?params[provider]=...` となり `req.query.provider` が undefined → 400 になるので不可。
 
 #### AllowedModelsField（UI 変更）
 | Field | Detail |
