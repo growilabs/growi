@@ -110,10 +110,13 @@ _Discovery type: **Light（Extension）**。新規外部ライブラリなしの
   - `AiProvider`/`isAiProvider`/`AllowedModel` を再利用（新規 provider enum を作らない）。
 
 ## 解決した決定（gap 分析の Research Needed の確定）
-- **D1（Req6 フィルタ）**: 名前パターンによる除外（`embedding|image|tts|whisper|dall-e|moderation|realtime|audio|transcribe` 等）を `chat-model-filter.ts` に宣言データ化。判別不能は除外しない（6.2）。
+
+> ⚠️ **注記（supersede）**: 本節は `@mastra/core getProviderConfig` をデータ源とする前提で確定した決定である。後続の「[モデル取得元・取得方法の比較検討と決定（2026-07-01）](#モデル取得元取得方法の比較検討と決定2026-07-01)」でデータ源を **models.dev の vendored 成果物**に変更したため、**D1（フィルタ方式）と D4（`@mastra/core` 値 import）は覆されている**（下記の各項参照）。**requirements / design が反映する最終決定は後続節側**であり、D1/D4 の当初内容は実装根拠にしないこと。D2・D3・D5・D6・D7 は有効。
+
+- **D1（Req6 フィルタ）** ⚠️ *supersede 済み*: ~~名前パターンによる除外（`embedding|image|tts|whisper|dall-e|moderation|realtime|audio|transcribe` 等）を `chat-model-filter.ts` に宣言データ化。判別不能は除外しない（6.2）。~~ → データ源を models.dev に変更したことで、**`tool_call === true` かつ出力 modality に text を含む** という models.dev の権威的メタデータによるフィルタに置き換わった（名前 heuristic は**不採用**。requirements 6.2 / design 準拠）。
 - **D2（PUT 検証範囲）**: PUT は **カタログ membership を検証しない**。理由: (a) 保存済み一覧外 ID の保全（1.5）、(b) native `@ai-sdk` は任意 ID を受理し将来モデルも動く、(c) azure 自由入力、(d) バージョン drift。カタログ制約は UI アフォーダンスであり server 不変条件ではない。既存 PUT 検証（単一 isDefault・providerOptions JSON）は不変。
 - **D3（エンドポイント）**: `GET /_api/v3/ai-settings/available-models?provider=<AiProvider>`、admin 認可、`SelectableModelsResponse { modelIds }`、azure は `200 { modelIds: [] }`、不正 provider は 400、aiReadyGuard なし。
-- **D4（externalization）**: `@mastra/core` を型のみ→値 import（server 限定）。既に `dependencies`。prod ビルド後 `.next/node_modules` を確認（Revalidation Trigger）。client は `string[]` と `AiProvider` のみ参照し `@mastra/core` を client バンドルに入れない。
+- **D4（externalization）** ⚠️ *supersede 済み*: ~~`@mastra/core` を型のみ→値 import（server 限定）。既に `dependencies`。prod ビルド後 `.next/node_modules` を確認（Revalidation Trigger）。~~ → データ源を models.dev vendored 成果物に変更したことで **`@mastra/core` の値 import は不要**になり、Turbopack externalization 検証（旧 task 6.1）も消滅した。実行時は committed JSON を静的 read するのみ（通信ゼロ）。client は `string[]` と `AiProvider` 型のみ参照する点は不変。
 - **D5（UI 状態）**: provider 空/error/空一覧 → 自由入力、非空 → `<select>`、ロード中 → disabled。保存済み一覧外値は補完 option（1.5）。フィールド単位で1回 fetch。
 - **D6（i18n）**: `ai_settings.model_select_placeholder` 等を 5 ロケール（en_US/ja_JP/fr_FR/ko_KR/zh_CN）へ追加。
 - **D7（Req8 具体差分）**: `mastra-multi-model-chat`（requirements 確定判断・design Non-Goals）と `multi-llm-provider/research.md`（D-2/D-3）を編集対象として実装タスク化。
