@@ -1,7 +1,7 @@
 # Implementation Plan
 
 - [ ] 1. 基盤: 共有コントラクトと i18n
-- [ ] 1.1 選択可能モデル一覧の応答コントラクトを定義する
+- [x] 1.1 選択可能モデル一覧の応答コントラクトを定義する
   - server/client 共有の応答型 `SelectableModelsResponse`（`modelIds: string[]` のみ）を interfaces に追加する
   - providerOptions/apiKey などの秘匿情報をフィールドに含めない（modelId 情報のみ）
   - 完了状態: 型が server ルートと client フックの双方から import 可能で、`modelIds: string[]` 以外のフィールドを持たない
