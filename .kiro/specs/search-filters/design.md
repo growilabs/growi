@@ -51,8 +51,9 @@ The `last_update_username` field exists only on pages indexed **after** the mapp
 - `parseQueryString()`: regex and branching extended for new operator prefixes; empty-value guard
 - `resolveFilterData()`: new private method in `SearchService` — resolves `group` / `not_group` names against the user's own groups (MongoDB, id-scoped) only
 - `searchKeyword()`: resolution step inserted between parse and delegate
-- `appendCriteriaForQueryString()`: 6 new filter clause builders (`author`/`editor` as direct `term`; `group` from resolved IDs)
-- `AVAILABLE_KEYS` array in `ElasticsearchDelegator`: updated to include new keys
+- `appendCriteriaForQueryString()`: 4 new clause builders for `author`/`not_author`/`editor`/`not_editor` (direct `term`s; positive operators OR-ed via `should`)
+- `appendCriteriaForGroupFilter()`: dedicated method for `group`/`not_group`, building `terms` clauses on `granted_groups` from the resolved IDs (kept separate because it needs `resolvedFilterData`)
+- `AVAILABLE_KEYS` array in `ElasticsearchDelegator`: updated to include all six new keys (`group`/`not_group` included, so `group:` is runtime-enabled)
 - **New indexed ES field `last_update_username`**:
   - `mappings-es7.ts` / `mappings-es8.ts` / `mappings-es9.ts`: add `last_update_username: { type: 'keyword' }`
   - `aggregate-to-index.ts`: add `lastUpdateUser` `$lookup` + `$unwind` + project `lastUpdateUser.username`
@@ -146,7 +147,8 @@ apps/app/src/server/
 │   └── search.ts                          # Extend parseQueryString(); add resolveFilterData();
 │                                          #   call it in searchKeyword()
 └── service/search-delegator/
-    ├── elasticsearch.ts                   # Extend appendCriteriaForQueryString(); update AVAILABLE_KEYS;
+    ├── elasticsearch.ts                   # Extend appendCriteriaForQueryString() (author/editor);
+    │                                      #   add appendCriteriaForGroupFilter() (group); update AVAILABLE_KEYS;
     │                                      #   write last_update_username in prepareBodyForCreate()
     ├── aggregate-to-index.ts              # Add lastUpdateUser $lookup/$unwind + project lastUpdateUser.username
     ├── bulk-write.d.ts                    # AggregatedPage.lastUpdateUser?; BulkWriteBody.last_update_username?
@@ -212,7 +214,7 @@ sequenceDiagram
 | Requirement | Summary | Component | Notes |
 |-------------|---------|-----------|-------|
 | 1.1 | `author:` returns creator pages | `parseQueryString` + `appendCriteriaForQueryString` | `term: { username }` on existing ES field |
-| 1.2 | `author:` + keywords combined | `appendCriteriaForQueryString` | AND via separate filter and must clauses |
+| 1.2 | `author:` + keywords combined | `appendCriteriaForQueryString` | AND via separate `bool.filter` clauses (author values OR-ed within their own `should`) |
 | 1.3 | `author:` not in full-text | `parseQueryString` | Token not added to `match[]` |
 | 1.4 | `author:` empty → ignore | `parseQueryString` | Empty value guard; token dropped |
 | 2.1 | `editor:` returns last-editor pages | `parseQueryString` + `appendCriteriaForQueryString` | `term: { last_update_username }` on new ES field |
@@ -221,14 +223,14 @@ sequenceDiagram
 | 2.4 | `editor:` empty → ignore | `parseQueryString` | Empty value guard; token dropped |
 | 2.5 | `editor:` resolves via indexed field, not MongoDB | `appendCriteriaForQueryString` | Direct `term` on `last_update_username`; no `resolveFilterData` path |
 | 2.6 | Indexing populates `last_update_username` | `aggregate-to-index` + `prepareBodyForCreate` | `lastUpdateUser` `$lookup` → `lastUpdateUser.username` → doc field |
-| 3.1 | `group:` returns pages granted to group | `resolveFilterData` + `appendCriteriaForQueryString` | typed name matched against user's own groups → group ID(s) → `granted_groups` clause |
-| 3.2 | `group:` + keywords combined | `appendCriteriaForQueryString` | AND via bool.filter |
+| 3.1 | `group:` returns pages granted to group | `resolveFilterData` + `appendCriteriaForGroupFilter` | typed name matched against user's own groups → group ID(s) → `granted_groups` clause |
+| 3.2 | `group:` + keywords combined | `appendCriteriaForGroupFilter` | AND via bool.filter |
 | 3.3 | `group:` not in full-text | `parseQueryString` | Token not added to `match[]` |
 | 3.4 | `group:` empty → ignore | `parseQueryString` | Empty value guard; token dropped |
 | 3.5 | Group filter limited to user's own groups | `resolveFilterData` | Lookup scoped to `_id ∈ userGroups`; non-member group names are absent from the map → `groupIds = []` (implicit membership) |
 | 4.1 | `-author:` excludes creator | `parseQueryString` + `appendCriteriaForQueryString` | `must_not: { term: { username } }` |
 | 4.2 | `-editor:` excludes last editor | `parseQueryString` + `appendCriteriaForQueryString` | `must_not: { term: { last_update_username } }` |
-| 4.3 | `-group:` excludes pages granted to group | `resolveFilterData` + `appendCriteriaForQueryString` | `must_not: { terms: { granted_groups: notGroupIds } }`; non-member groups silently ignored |
+| 4.3 | `-group:` excludes pages granted to group | `resolveFilterData` + `appendCriteriaForGroupFilter` | `must_not: { terms: { granted_groups: notGroupIds } }`; non-member groups silently ignored |
 | 4.4 | All constraints AND | `appendCriteriaForQueryString` | All pushed to `bool.filter[]` |
 | 5.1 | Multiple operators AND | `appendCriteriaForQueryString` | All in `bool.filter[]` array |
 | 5.2 | New + existing operators | `appendCriteriaForQueryString` | All filter clauses merged into same `bool.filter[]` |
@@ -236,8 +238,8 @@ sequenceDiagram
 | 5.4 | Existing operators unchanged | `parseQueryString` | Existing regex branches unmodified |
 | 6.1 | Unknown `author:` → empty | `appendCriteriaForQueryString` | ES `term` on non-existent username → no match |
 | 6.2 | Unknown `editor:` → empty | `appendCriteriaForQueryString` | ES `term` on non-existent `last_update_username` → no match (same as author) |
-| 6.3 | Unknown `group:` → empty | `resolveFilterData` + `appendCriteriaForQueryString` | Name absent from the user's-own-groups map → `groupIds = []` → still push `terms: { granted_groups: [] }` (empty terms matches nothing) → no match |
-| 6.4 | Group with no granted pages → empty | `appendCriteriaForQueryString` | `terms: { granted_groups }` matches no documents — natural ES behavior |
+| 6.3 | Unknown `group:` → empty | `resolveFilterData` + `appendCriteriaForGroupFilter` | Name absent from the user's-own-groups map → `groupIds = []` → still push `terms: { granted_groups: [] }` (empty terms matches nothing) → no match |
+| 6.4 | Group with no granted pages → empty | `appendCriteriaForGroupFilter` | `terms: { granted_groups }` matches no documents — natural ES behavior |
 | 7.1–7.3 | Access control not widened | Architecture | New clauses pushed to `bool.filter[]` (AND); cannot override existing permission filter already in same array |
 | 7.4 | No page existence inference | Architecture | Empty clause = empty result; no metadata exposed |
 | 7.5 | Group membership enforced | `resolveFilterData` | Lookup scoped to user's own groups; non-member names resolve to `[]` before ES clause is built |
@@ -351,31 +353,19 @@ last_update_username: { type: 'keyword' },
 
 **Contracts**: Service [x]
 
-The existing regex is extended to include the three new operator prefixes:
+The operator prefixes are declared once in a `FILTER_PREFIXES` constant and joined into the existing positive/negative regexes, so the regex stays the single source of truth:
 
 ```typescript
-// Before (existing):
-const matchNegative = word.match(/^-(prefix:|tag:)?(.+)$/);
-const matchPositive = word.match(/^(prefix:|tag:)?(.+)$/);
-
-// After (extended):
-const matchNegative = word.match(/^-(prefix:|tag:|author:|editor:|group:)?(.+)$/);
-const matchPositive = word.match(/^(prefix:|tag:|author:|editor:|group:)?(.+)$/);
+const FILTER_PREFIXES = ['prefix:', 'tag:', 'author:', 'editor:', 'group:'] as const;
+const NEGATIVE_TERM_REGEXP = new RegExp(`^-(${FILTER_PREFIXES.join('|')})?(.+)$`);
+const POSITIVE_TERM_REGEXP = new RegExp(`^(${FILTER_PREFIXES.join('|')})?(.+)$`);
 ```
 
-New branches added in the `if/else` chain:
-```typescript
-if (matchPositive[1] === 'author:') {
-  if (matchPositive[2]) authors.push(matchPositive[2]);   // empty-value guard (Req 1.4)
-} else if (matchPositive[1] === 'editor:') {
-  if (matchPositive[2]) editors.push(matchPositive[2]);   // empty-value guard (Req 2.4)
-} else if (matchPositive[1] === 'group:') {
-  if (matchPositive[2]) groups.push(matchPositive[2]);    // empty-value guard (Req 3.4)
-}
-// Negation mirrors (not_author, not_editor, not_group)
-```
+**Empty-value guard.** Because the prefix group is optional and `(.+)` is greedy, a bare `author:` (no value) would otherwise be captured as a literal `match` word. The guard is a pre-check against a `VALUELESS_IGNORED_PREFIXES` set (the three new operators) **before** the regex match — applied to the word with any leading `-` stripped — so a valueless `author:`/`editor:`/`group:` (positive or negated) is skipped entirely and never leaks into `match[]` (Req 1.4, 2.4, 3.4). `prefix:`/`tag:` keep their existing behavior and are intentionally **not** in this set.
 
-- **Postcondition**: tokens with recognized operator prefix are never added to `match[]` (Req 1.3, 2.3, 3.3)
+New branches added in the `if/else` chain populate `author`/`not_author`, `editor`/`not_editor`, `group`/`not_group` from `match[1]` (the prefix) and `match[2]` (the value), mirroring the existing `prefix:`/`tag:` branches.
+
+- **Postcondition**: tokens with a recognized operator prefix are never added to `match[]` (Req 1.3, 2.3, 3.3)
 - **Postcondition**: existing `prefix`, `not_prefix`, `tag`, `not_tag`, `match`, `not_match`, `phrase`, `not_phrase` behavior unmodified (Req 5.4)
 
 ---
@@ -396,13 +386,14 @@ private async resolveFilterData(terms: Partial<QueryTerms>, userGroups: ObjectId
 ```
 
 - Called in `searchKeyword()` between `resolve()` and `delegator.search()`
-- **Early-return** with all-empty arrays when the user is a **guest** (`userGroups == null`) **or** no group operators were typed. Guard on **array emptiness**, **not** on the arrays being `== null`: the parser always initializes `group`/`not_group` to `[]`, so a `groupTerms == null` guard never fires and would issue two MongoDB queries on every search (Req 5.4 / perf regression). Because `terms` is typed `Partial<QueryTerms>`, write the emptiness check null-safely: `(terms.group?.length ?? 0) === 0 && (terms.not_group?.length ?? 0) === 0`.
+- **Early-return** with all-empty arrays when the user is a **guest** (`userGroups == null`), **belongs to no groups** (`userGroups.length < 1` — nothing could resolve anyway), **or** no group operators were typed. Guard on **array emptiness**, **not** on the arrays being `== null`: the parser always initializes `group`/`not_group` to `[]`, so a `groupTerms == null` guard never fires and would issue two MongoDB queries on every search (Req 5.4 / perf regression). Because `terms` is typed `Partial<QueryTerms>`, write the emptiness check null-safely: `(terms.group?.length ?? 0) === 0 && (terms.not_group?.length ?? 0) === 0`.
 
 **Group resolution** (scoped to the user's own groups — membership is implicit):
 ```
-// Guest, or no group operator typed → early return, no DB query (guard on emptiness, not == null).
-// terms is Partial<QueryTerms>, so the emptiness check is null-safe.
-if (userGroups == null || ((terms.group?.length ?? 0) === 0 && (terms.not_group?.length ?? 0) === 0))
+// Guest, member of no groups, or no group operator typed → early return, no DB query
+// (guard on emptiness, not == null). terms is Partial<QueryTerms>, so the check is null-safe.
+if (userGroups == null || userGroups.length < 1
+    || ((terms.group?.length ?? 0) === 0 && (terms.not_group?.length ?? 0) === 0))
   return { groupIds: [], notGroupIds: [] }
 
 // Fetch ONLY the user's own groups (internal + external). userGroups is ObjectIdLike[];
@@ -442,31 +433,37 @@ return { groupIds: resolve(terms.group), notGroupIds: resolve(terms.not_group) }
 
 **Contracts**: Service [x]
 
-Method signature extended:
+The clauses are split across two methods. `author:`/`editor:` build directly from `terms` inside `appendCriteriaForQueryString()`; `group:` needs the resolved IDs, so it lives in a dedicated `appendCriteriaForGroupFilter()` method that receives `terms` **and** the resolved data (it must see `terms` to know whether `group:` was typed — see the gating note below):
+
 ```typescript
 appendCriteriaForQueryString(
+  query: SearchQuery,
+  parsedKeywords: ESQueryTerms,
+): void
+
+appendCriteriaForGroupFilter(
   query: SearchQuery,
   parsedKeywords: ESQueryTerms,
   resolvedFilterData?: ResolvedFilterData,  // group IDs only
 ): void
 ```
 
-New clauses appended to `query.body.query.bool.filter[]`:
+Clauses for `author:`/`editor:` are appended to `query.body.query.bool.filter[]`. For `group:`, the positive clause is appended to `bool.filter[]` and the negative clause to `bool.must_not[]`:
 
-| Operator | ES Clause | Condition |
-|----------|-----------|-----------|
-| `author:jim` | `{ bool: { must: [{ term: { username: 'jim' } }] } }` | `terms.author.length > 0` |
-| `-author:jim` | `{ bool: { must_not: [{ term: { username: 'jim' } }] } }` | `terms.not_author.length > 0` |
-| `editor:alice` | `{ bool: { must: [{ term: { last_update_username: 'alice' } }] } }` | `terms.editor.length > 0` |
-| `-editor:alice` | `{ bool: { must_not: [{ term: { last_update_username: 'alice' } }] } }` | `terms.not_editor.length > 0` |
-| `group:dev` | `{ bool: { must: [{ terms: { granted_groups: groupIds } }] } }` | `terms.group.length > 0` (user typed `group:`) — **not** `groupIds.length > 0` |
-| `-group:dev` | `{ bool: { must_not: [{ terms: { granted_groups: notGroupIds } }] } }` | `notGroupIds.length > 0` |
+| Operator | ES Clause | Pushed into | Condition |
+|----------|-----------|-------------|-----------|
+| `author:jim` (one or more) | `{ bool: { should: [{ term: { username: 'jim' } }, …] } }` | `bool.filter[]` | `terms.author.length > 0` |
+| `-author:jim` | `{ bool: { must_not: [{ term: { username: 'jim' } }, …] } }` | `bool.filter[]` | `terms.not_author.length > 0` |
+| `editor:alice` (one or more) | `{ bool: { should: [{ term: { last_update_username: 'alice' } }, …] } }` | `bool.filter[]` | `terms.editor.length > 0` |
+| `-editor:alice` | `{ bool: { must_not: [{ term: { last_update_username: 'alice' } }, …] } }` | `bool.filter[]` | `terms.not_editor.length > 0` |
+| `group:dev` | `{ terms: { granted_groups: groupIds } }` | `bool.filter[]` | `terms.group.length > 0` (user typed `group:`) — **not** `groupIds.length > 0` |
+| `-group:dev` | `{ terms: { granted_groups: notGroupIds } }` | `bool.must_not[]` | `terms.not_group.length > 0` |
 
-- `author:` and `editor:` build their clauses directly from `terms` (no `resolvedFilterData`) — same code shape, different field name. An ES `term` on a non-existent username matches nothing, so unknown `author:`/`editor:` return 0 results with no special handling (Req 6.1, 6.2).
-- **Positive `group:` is gated on "did the user type it?" (`terms.group.length > 0`), not "did resolution succeed?" (`groupIds.length > 0`).** When the user typed `group:` but resolution yields `groupIds = []` (unknown group — Req 6.3; or a group the user is not a member of — Req 3.5, 7.5), the clause is **still pushed** as `terms: { granted_groups: [] }`. An empty ES `terms` array matches **no** documents, so the result is correctly empty. *Skipping* the clause here would remove the filter entirely and return every page matching the rest of the query — the opposite of the requirement.
-- **Negation is the asymmetric case — `-group:` skips when `notGroupIds` is empty.** An unknown/non-member negated group must "exclude nobody", so pushing nothing is correct (Req 4.3). This is the one place positive and negative operators are deliberately handled differently: positive pushes a match-nothing clause on empty resolution; negative skips.
-- The group clause is omitted **only** when neither `group` nor `not_group` was typed — i.e. `terms.group` and `terms.not_group` are both empty (regression-safety / no-op case, Req 5.4), distinct from "typed but resolved to empty". Note `resolvedFilterData` itself is **always present** (`resolveFilterData` always returns an object with possibly-empty arrays); the builder still tolerates a `null` defensively, but the operative gate is the typed `terms`, not the presence of `resolvedFilterData`.
-- `AVAILABLE_KEYS` constant updated with all six new `QueryTerms` key names.
+- `author:` and `editor:` build their clauses directly from `terms` (no `resolvedFilterData`) — same code shape, different field name. **Multiple values of the same operator are OR-ed** via a `should` clause: a page has exactly one creator/last-editor, so `author:a author:b` means "by a **or** b" (an AND `must` would always match nothing). An ES `term` on a non-existent username matches nothing, so unknown `author:`/`editor:` return 0 results with no special handling (Req 6.1, 6.2).
+- **Positive `group:` is gated on "did the user type it?" (`terms.group.length > 0`), not "did resolution succeed?" (`groupIds.length > 0`).** When the user typed `group:` but resolution yields `groupIds = []` (unknown group — Req 6.3; or a group the user is not a member of — Req 3.5, 7.5), the clause is **still pushed** as `terms: { granted_groups: [] }`. An empty ES `terms` array matches **no** documents, so the result is correctly empty. *Skipping* the positive clause would remove the filter entirely and return every page matching the rest of the query — the opposite of the requirement.
+- **Negation `-group:` is gated symmetrically on `terms.not_group.length > 0`** and pushes `must_not: { terms: { granted_groups: notGroupIds } }`. When `notGroupIds = []` (unknown/non-member negated group), an empty ES `terms` array matches **nothing**, so `must_not` of a match-nothing query excludes **nobody** — exactly the "exclude nobody" behavior Req 4.3 requires. (Gating on `notGroupIds.length > 0` instead would be equivalent; the implementation gates on the typed `terms` for symmetry with the positive case.)
+- `appendCriteriaForGroupFilter()` is a no-op when `resolvedFilterData == null` and otherwise touches the filter only for the operators actually typed: when neither `group` nor `not_group` was typed, `bool.filter[]`/`bool.must_not[]` are left unchanged (regression-safety / no-op case, Req 5.4).
+- `AVAILABLE_KEYS` constant updated with all six new `QueryTerms` key names (including `group`/`not_group`), so `validateTerms()` accepts a `group:` query at runtime.
 
 ---
 
@@ -508,13 +505,15 @@ New clauses appended to `query.body.query.bool.filter[]`:
 | `prepareBodyForCreate` with `lastUpdateUser.username` | Output doc has `last_update_username` set (Req 2.6) |
 | `prepareBodyForCreate` without `lastUpdateUser` | `last_update_username` is `undefined`; no throw (Req 2.6) |
 | `aggregatePipelineToIndex` | Pipeline contains a `lastUpdateUser` `$lookup` and projects `lastUpdateUser.username` (Req 2.6) |
-| `appendCriteriaForQueryString` — `author` terms | `bool.filter` contains `term: { username }` (Req 1.1) |
+| `appendCriteriaForQueryString` — `author` terms | `bool.filter` contains `should: [{ term: { username } }]` (OR clause) (Req 1.1) |
+| `appendCriteriaForQueryString` — two `author` values | single `should` clause with both `term: { username }` entries (OR) (Req 1.1) |
 | `appendCriteriaForQueryString` — `not_author` terms | `bool.filter` contains `must_not: { term: { username } }` (Req 4.1) |
-| `appendCriteriaForQueryString` — `editor` terms | `bool.filter` contains `term: { last_update_username }` (Req 2.1) |
+| `appendCriteriaForQueryString` — `editor` terms | `bool.filter` contains `should: [{ term: { last_update_username } }]` (OR clause) (Req 2.1) |
 | `appendCriteriaForQueryString` — `not_editor` terms | `bool.filter` contains `must_not: { term: { last_update_username } }` (Req 4.2) |
-| `appendCriteriaForQueryString` — `groupIds` | `bool.filter` contains `terms: { granted_groups: [...] }` (Req 3.1) |
-| `appendCriteriaForQueryString` — `group` typed, `groupIds` empty | Match-nothing `terms: { granted_groups: [] }` clause IS added (NOT skipped) (Req 6.3, 3.5, 7.5) |
-| `appendCriteriaForQueryString` — no `group`/`not_group` typed (empty `resolvedFilterData`) | `bool.filter` unchanged from pre-extension behavior (Req 5.4) |
+| `appendCriteriaForGroupFilter` — `groupIds` | `bool.filter` contains `terms: { granted_groups: [...] }` (Req 3.1) |
+| `appendCriteriaForGroupFilter` — `notGroupIds` | `bool.must_not` contains `terms: { granted_groups: [...] }` (Req 4.3) |
+| `appendCriteriaForGroupFilter` — `group` typed, `groupIds` empty | Match-nothing `terms: { granted_groups: [] }` clause IS added (NOT skipped) (Req 6.3, 3.5, 7.5) |
+| `appendCriteriaForGroupFilter` — no `group`/`not_group` typed (empty `resolvedFilterData`) | `bool.filter`/`bool.must_not` unchanged from pre-extension behavior (Req 5.4) |
 
 ### Integration Tests
 
