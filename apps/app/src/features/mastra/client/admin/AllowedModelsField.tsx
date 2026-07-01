@@ -277,40 +277,39 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
               the free-text input (catalog-less provider / unset / fetch failure —
               3.1/3.2/5.2). The control is disabled in env-only mode and while the
               catalog is still loading. */}
-          {useSelect ? (
-            <Input
-              id={modelInputId}
-              type="select"
-              className="font-monospace flex-grow-1"
-              disabled={disabled || isLoadingModels}
-              {...registerToInputProps(
-                register(`allowedModels.${index}.modelId`),
-              )}
-            >
-              <option value="">{t('ai_settings.model_placeholder')}</option>
-              {selectableModelIds.map((id) => (
-                <option key={id} value={id}>
-                  {id}
-                </option>
-              ))}
-              {/* Preserve a saved value that is not in the current catalog as its
-                  own selected option so it is neither reset nor silently changed
-                  (1.5). */}
-              {hasOutOfListValue && (
-                <option value={currentModelId}>{currentModelId}</option>
-              )}
-            </Input>
-          ) : (
-            <Input
-              id={modelInputId}
-              type="text"
-              className="font-monospace flex-grow-1"
-              disabled={disabled || isLoadingModels}
-              {...registerToInputProps(
-                register(`allowedModels.${index}.modelId`),
-              )}
-            />
-          )}
+          <Input
+            id={modelInputId}
+            type={useSelect ? 'select' : 'text'}
+            className="font-monospace flex-grow-1"
+            disabled={disabled || isLoadingModels}
+            {...registerToInputProps(
+              register(`allowedModels.${index}.modelId`),
+            )}
+          >
+            {/* Options only exist in select mode. Free-text mode must pass
+                `undefined` (NOT `false`): a text <input> is a void element, and
+                React rejects any non-null child — reactstrap only strips a
+                *truthy* child, so `false` would crash. Both modes share the same
+                id/class/disabled/register binding above (1.3) so the binding
+                cannot drift between them — only the control type differs (1.4 vs
+                3.1/3.2/5.2). */}
+            {useSelect ? (
+              <>
+                <option value="">{t('ai_settings.model_placeholder')}</option>
+                {selectableModelIds.map((id) => (
+                  <option key={id} value={id}>
+                    {id}
+                  </option>
+                ))}
+                {/* Preserve a saved value that is not in the current catalog as
+                    its own selected option so it is neither reset nor silently
+                    changed (1.5). */}
+                {hasOutOfListValue && (
+                  <option value={currentModelId}>{currentModelId}</option>
+                )}
+              </>
+            ) : undefined}
+          </Input>
           <FormGroup check className="mb-0 text-nowrap">
             <Input
               id={radioId}
