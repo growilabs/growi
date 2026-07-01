@@ -176,7 +176,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     });
   });
 
-  it('should return empty arrays when ES returns []', async () => {
+  it('should return empty arrays without querying MongoDB when ES returns []', async () => {
     vi.mocked(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).mockResolvedValue([]);
@@ -194,6 +194,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
         inactiveUsernames: [],
       },
     });
+    expect(mockUserModel.find).not.toHaveBeenCalled();
   });
 
   it('should classify active and inactive usernames from the MongoDB fallback when ES is not configured', async () => {

@@ -135,18 +135,17 @@ const buildSnapshotUsernameRegexConditions = (q: string) => ({
   },
 });
 
-activitySchema.statics.findSnapshotUsernamesByUsernameRegex = async function (
-  q: string,
-  option: { sortOpt: SortOrder; offset: number; limit: number },
-): Promise<string[]> {
-  const opt = option || {};
-  const sortOpt = opt.sortOpt || 1;
-  const offset = opt.offset || 0;
-  const limit = opt.limit || 10;
-
-  const conditions = buildSnapshotUsernameRegexConditions(q);
-
-  const usernames = await this.aggregate()
+const aggregateSnapshotUsernames = async (
+  model: ActivityModel,
+  conditions: ReturnType<typeof buildSnapshotUsernameRegexConditions>,
+  {
+    sortOpt,
+    offset,
+    limit,
+  }: { sortOpt: SortOrder; offset: number; limit: number },
+): Promise<string[]> => {
+  const usernames = await model
+    .aggregate()
     .match(conditions)
     .group({ _id: '$snapshot.username' })
     .sort({ _id: sortOpt }) // Sort "snapshot.username" in ascending order
@@ -157,17 +156,33 @@ activitySchema.statics.findSnapshotUsernamesByUsernameRegex = async function (
   return usernames.map((r) => r._id);
 };
 
+activitySchema.statics.findSnapshotUsernamesByUsernameRegex = function (
+  q: string,
+  option: { sortOpt: SortOrder; offset: number; limit: number },
+): Promise<string[]> {
+  const opt = option || {};
+  const conditions = buildSnapshotUsernameRegexConditions(q);
+
+  return aggregateSnapshotUsernames(this, conditions, {
+    sortOpt: opt.sortOpt || 1,
+    offset: opt.offset || 0,
+    limit: opt.limit || 10,
+  });
+};
+
 activitySchema.statics.findSnapshotUsernamesByUsernameRegexWithTotalCount =
   async function (
     q: string,
     option: { offset: number; limit: number },
   ): Promise<{ usernames: string[]; totalCount: number }> {
-    const usernames = await this.findSnapshotUsernamesByUsernameRegex(q, {
-      sortOpt: 1,
-      ...option,
-    });
-
+    const opt = option || {};
     const conditions = buildSnapshotUsernameRegexConditions(q);
+
+    const usernames = await aggregateSnapshotUsernames(this, conditions, {
+      sortOpt: 1,
+      offset: opt.offset || 0,
+      limit: opt.limit || 10,
+    });
     const totalCount = (
       await this.find(conditions).distinct('snapshot.username')
     ).length;

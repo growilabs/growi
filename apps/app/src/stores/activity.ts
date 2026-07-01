@@ -17,8 +17,9 @@ export const useSWRxAuditlogSuggestions = (
   q: string,
   limit = 5,
 ): SWRResponse<AuditlogSuggestionsResponse, Error> => {
+  const trimmedQ = q.trim();
   return useSWRImmutable(
-    q.trim() !== '' ? ['/activity/suggestions', field, q, limit] : null,
+    trimmedQ !== '' ? ['/activity/suggestions', field, trimmedQ, limit] : null,
     ([endpoint, field, q, limit]) =>
       apiv3Get(endpoint, { field, q, limit }).then((r) => r.data),
   );

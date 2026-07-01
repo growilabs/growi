@@ -372,18 +372,23 @@ class SearchService implements SearchQueryParser, SearchResolver {
             offset: 0,
             limit,
           });
-      const User = mongoose.model<IUser>('User');
-      const users = await User.find({ username: { $in: usernames } })
-        .select('username status')
-        .lean();
-      response.username = {
-        activeUsernames: users
-          .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
-          .map((u) => u.username),
-        inactiveUsernames: users
-          .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
-          .map((u) => u.username),
-      };
+
+      if (usernames.length === 0) {
+        response.username = { activeUsernames: [], inactiveUsernames: [] };
+      } else {
+        const User = mongoose.model<IUser>('User');
+        const users = await User.find({ username: { $in: usernames } })
+          .select('username status')
+          .lean();
+        response.username = {
+          activeUsernames: users
+            .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+            .map((u) => u.username),
+          inactiveUsernames: users
+            .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
+            .map((u) => u.username),
+        };
+      }
     }
 
     return response;

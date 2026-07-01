@@ -27,9 +27,15 @@ vi.mock('react-bootstrap-typeahead', () => {
   return {
     AsyncTypeahead: (props: {
       options: object[];
+      filterBy?: (option: object) => boolean;
       renderMenu?: (opts: object[], p: object) => ReactNode;
       [key: string]: unknown;
-    }) => <>{props.renderMenu?.(props.options, { id: 'test-menu' })}</>,
+    }) => {
+      const options = props.filterBy
+        ? props.options.filter(props.filterBy)
+        : props.options;
+      return <>{props.renderMenu?.(options, { id: 'test-menu' })}</>;
+    },
     Menu,
     MenuItem: ({ children }: { children: ReactNode }) => <li>{children}</li>,
   };
@@ -54,6 +60,26 @@ describe('SearchUsernameTypeahead', () => {
     expect(screen.getByText('Active User')).toBeInTheDocument();
     expect(screen.getByText('alice')).toBeInTheDocument();
     expect(screen.getByText('Inactive User')).toBeInTheDocument();
+    expect(screen.getByText('bob')).toBeInTheDocument();
+  });
+
+  it('filters out already-selected usernames from the suggestion menu', () => {
+    mockUseSWRxAuditlogSuggestions.mockReturnValue({
+      data: {
+        username: { activeUsernames: ['alice', 'bob'], inactiveUsernames: [] },
+      },
+      error: undefined,
+      isLoading: false,
+    });
+
+    render(
+      <SearchUsernameTypeahead
+        onChange={() => {}}
+        initialUsernames={['alice']}
+      />,
+    );
+
+    expect(screen.queryByText('alice')).not.toBeInTheDocument();
     expect(screen.getByText('bob')).toBeInTheDocument();
   });
 
