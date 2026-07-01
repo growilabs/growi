@@ -24,6 +24,7 @@
 
 ### This Spec Owns
 - スラッシュコマンドの補完ソース（トリガー検出・候補生成・フィルタリング・`apply`）。
+- コマンドのアクション抽象 `SlashCommandAction`（`insert` 静的挿入 / `run` 副作用起動）と `apply` の分岐。`run` は子スペック `editor-slash-extended-elements` が drawio/lsx のモーダル起動に用いる**共有 seam**（基盤は run の中身を知らない）。
 - コマンド集合の宣言（定義レジストリ）と、各コマンドの挿入ビルダー（行頭マーカー / コードブロック / 空テーブル）。
 - コマンドラベル/説明の i18n キーと、その解決（`t` 関数によるラベル解決）。
 - 絵文字補完と統合した単一 `autocompletion()` 設定の構築（登録点）。
@@ -146,7 +147,7 @@ sequenceDiagram
 
 - **トリガー判定**: `from`（`/` の位置）の直前が**行頭（先頭空白のみ）または空白文字**の場合に `CompletionResult` を返す。直前が空白以外の文字（単語の途中、例 `foo/`）の場合は `null`（Req 1.2）。
 - **フィルタ**: `filter: false` とし、source 側で query（`/` 以降の文字列）を label と `keywords` に対して大文字小文字を無視して照合（Req 2.1/2.2）。一致なしは `options: []`→メニューは閉じ、入力テキストは不変（Req 2.4/4.3）。
-- **apply**: コマンドの `buildInsertion` が返す `{ insert, cursorOffset }` から、`/query`（`[from, to]`）を置換する単一 change `{ from, to, insert }` を 1 トランザクションで発行（Req 3.2/3.5）。
+- **apply**: コマンドの `action.kind` で分岐。`insert` は `buildInsertion` が返す `{ insert, cursorOffset }` から `/query`（`[from, to]`）を置換する単一 change を 1 トランザクションで発行（Req 3.2/3.5）。`run` は `/query` 削除の単一 change を発行後に `action.run(view, from)` を呼ぶ（副作用＝モーダル起動等。拡張要素スペックが利用）。
 
 ## Requirements Traceability
 
@@ -215,14 +216,33 @@ export interface SlashInsertion {
   readonly cursorOffset: number;  // 挿入後のカーソル位置（from からの相対オフセット）
 }
 
+/**
+ * コマンドのアクション。2 種を判別共用体で表す。
+ * - insert: `/query`（[from,to]）を静的テキストで置換する（MVP の全コマンド）。
+ * - run:    `/query` を削除したうえで副作用処理を実行する（モーダル起動など。拡張要素スペックが利用）。
+ * これにより「テキスト挿入」と「モーダル起動等の副作用」を単一の抽象で表現でき、
+ * 基盤は run の中身（drawio/lsx 等）を知らずに `apply` から呼ぶだけで済む。
+ */
+export interface SlashInsertAction {
+  readonly kind: 'insert';
+  /** 挿入内容（テキスト + カーソルオフセット）を生成（純粋・副作用なし） */
+  readonly buildInsertion: (view: EditorView, from: number) => SlashInsertion;
+}
+export interface SlashRunAction {
+  readonly kind: 'run';
+  /** `/query` 削除後に呼ばれる副作用処理。テキスト挿入は run 側 or 後続モーダルが担う */
+  readonly run: (view: EditorView, from: number) => void;
+}
+export type SlashCommandAction = SlashInsertAction | SlashRunAction;
+
 /** コマンド定義（i18n キーを保持。表示文字列は解決時に付与） */
 export interface SlashCommand {
   readonly id: string;                   // 安定 id 例: 'heading1'
   readonly labelKey: string;             // i18n キー 例: 'slash_command.heading1.label'
   readonly descriptionKey: string;
   readonly keywords: readonly string[];  // 追加の照合語 例: ['h1', 'title']
-  /** 挿入内容（テキスト + カーソルオフセット）を生成（純粋・副作用なし） */
-  readonly buildInsertion: (view: EditorView, from: number) => SlashInsertion;
+  /** アクション（insert: 静的挿入 / run: 副作用起動） */
+  readonly action: SlashCommandAction;
 }
 
 /** 表示文字列を解決済みのコマンド */
@@ -241,12 +261,12 @@ export interface ResolvedSlashCommand extends SlashCommand {
 **Responsibilities & Constraints**
 - 提供コマンド（Req 5.1）: `heading1`/`heading2`/`heading3`（`# `/`## `/`### `）, `bulletList`(`- `), `numberedList`(`1. `), `taskList`(`- [ ] `), `quote`(`> `), `codeBlock`, `table`。
 - 拡張要素（drawio/math/lsx/template）は**含めない**（Req 5.4）。
-- 各コマンドは `buildInsertion` に `insertion-builders` のいずれかを参照する（executor へ集合を渡す単一ソース）。
+- 各コマンドは `action: { kind:'insert', buildInsertion }` に `insertion-builders` のいずれかを参照する（executor へ集合を渡す単一ソース）。MVP は全コマンドが `insert`。`run` は拡張要素スペック（drawio/lsx のモーダル起動）が用いる。
 
 ```typescript
 export const SLASH_COMMANDS: readonly SlashCommand[] = [
-  { id: 'heading1', labelKey: 'slash_command.heading1.label', descriptionKey: 'slash_command.heading1.description', keywords: ['h1', 'title'], buildInsertion: lineMarkerInsertion('# ') },
-  // ... heading2/3, bulletList, numberedList, taskList, quote, codeBlock, table
+  { id: 'heading1', labelKey: 'slash_command.heading1.label', descriptionKey: 'slash_command.heading1.description', keywords: ['h1', 'title'], action: { kind: 'insert', buildInsertion: lineMarkerInsertion('# ') } },
+  // ... heading2/3, bulletList, numberedList, taskList, quote, codeBlock, table — すべて { kind:'insert', ... }
 ];
 ```
 
@@ -263,13 +283,13 @@ export const SLASH_COMMANDS: readonly SlashCommand[] = [
 ##### Service Interface
 ```typescript
 /** 行頭マーカー（見出し/リスト/引用/タスク）。挿入後カーソルはマーカー直後 */
-export const lineMarkerInsertion: (marker: string) => SlashCommand['buildInsertion'];
+export const lineMarkerInsertion: (marker: string) => SlashInsertAction['buildInsertion'];
 
 /** 空のコードブロック。挿入後カーソルは中身の空行 */
-export const codeBlockInsertion: SlashCommand['buildInsertion'];
+export const codeBlockInsertion: SlashInsertAction['buildInsertion'];
 
 /** 2 列・ヘッダ+区切り+1 ボディ行の空 Markdown テーブル。挿入後カーソルは先頭ヘッダセル */
-export const tableInsertion: SlashCommand['buildInsertion'];
+export const tableInsertion: SlashInsertAction['buildInsertion'];
 ```
 - **Preconditions**: `from` は `/` の位置（置換レンジ `[from, to]` の起点）。
 - **Postconditions**: `insert`（置換テキスト全体）と `cursorOffset`（`from` 相対）のみを返す。絶対位置の変更や `view.dispatch` は行わない。`cursorOffset` で続行入力位置を指定（Req 3.4）。
@@ -314,7 +334,9 @@ export const resolveSlashCommands: (
 - 入力（work-set）として `ResolvedSlashCommand[]` を受け取る（executor は集合を所有しない）。
 - トリガー判定: `/` の直前が行頭（先頭空白のみ許容）**または空白文字**のときに発火。直前が空白以外（単語の途中）のときは発火しない。`from` を `/` 位置、`to` を `context.pos` とする。
 - `filter: false`、`validFor: /\/\w*$/` 相当。query を `label`/`keywords` に対し大文字小文字無視で照合。
-- `apply`: `buildInsertion(view, from)` の結果から、**単一の `view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + cursorOffset } })`** を発行する。削除（`[from, to]`）と挿入が1つの change にまとまるため、change レンジの重なりが発生せず、undo も1回で復元される（Req 3.5）。
+- `apply`: コマンドの `action.kind` で分岐する。
+  - `insert`: `action.buildInsertion(view, from)` の結果から、**単一の `view.dispatch({ changes: { from, to, insert }, selection: { anchor: from + cursorOffset } })`** を発行する。削除（`[from, to]`）と挿入が1つの change にまとまるため、change レンジの重なりが発生せず、undo も1回で復元される（Req 3.5）。
+  - `run`: `/query` を削除する単一の `view.dispatch({ changes: { from, to, insert: '' }, selection: { anchor: from } })` を発行したうえで `action.run(view, from)` を呼ぶ。`run` はモーダル起動等の副作用を行ってよい（実際の挿入は run / 後続モーダルが別トランザクションで担う）。基盤は `run` の中身を知らない（拡張要素スペックが drawio/lsx 等を供給）。MVP の基本コマンドはすべて `insert`。
 
 **Dependencies**
 - Outbound: insertion-builders — 挿入内容生成（P0）
@@ -330,7 +352,7 @@ export const createSlashCommandSource: (
 ) => CompletionSource;
 ```
 - **Preconditions**: `commands` は解決済み。
-- **Postconditions**: トリガー時に query 一致 `Completion[]` を返し、`apply` が単一トランザクションで削除+挿入を行う。非トリガー時は `null`。
+- **Postconditions**: トリガー時に query 一致 `Completion[]` を返し、`apply` が `action.kind` に応じて（`insert`: 単一トランザクションで削除+挿入 / `run`: 削除後に副作用起動）処理する。非トリガー時は `null`。
 - **Invariants**: `/query` 以外のドキュメントを変更しない（Req 2.4/4.3）。
 
 **Implementation Notes**
