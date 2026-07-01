@@ -45,7 +45,7 @@ describe('chat-model-filter', () => {
     });
 
     it('does NOT contain azure-openai', () => {
-      expect(CATALOG_PROVIDERS.includes('azure-openai')).toBe(false);
+      expect(CATALOG_PROVIDERS).not.toContain('azure-openai');
     });
   });
 });
