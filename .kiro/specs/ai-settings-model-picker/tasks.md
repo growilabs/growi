@@ -13,7 +13,7 @@
   - _Requirements: 1.1_
   - _Boundary: locales admin.json_
 
-- [ ] 2. ビルド/リリース時の vendoring パイプライン（コミット成果物の生成）
+- [ ] 2. 取り込みステップ（リリース前段）の vendoring パイプライン（コミット成果物の生成）
 - [ ] 2.1 (P) chat/ツール対応モデルの判定（純関数）を実装する
   - 対象プロバイダ（openai/anthropic/google、azure-openai は models.dev 非収録で対象外）を宣言データにする
   - `isSelectableModel(entry) = tool_call===true && modalities.output に text を含む` を純関数で実装（models.dev の権威的フィールドで判定、名前 heuristic は使わない）
@@ -22,7 +22,7 @@
   - _Boundary: chat-model-filter_
 
 - [ ] 2.2 models.dev から取り込む vendoring スクリプトとコミット成果物を作成する
-  - `pnpm vendor:models` で `https://models.dev/api.json` を fetch（**build/release 時のみ**）→ 対象プロバイダ選択 → `isSelectableModel` で**生成時フィルタ** → **id のみ**を `models.<provider> = string[]` に整形し、`{ _source(MIT帰属), _generatedAt, models }` の形（ヘッダとデータを分離）で決定的（ソート）に `model-catalog-data.json` を書き出す
+  - `pnpm vendor:models` で `https://models.dev/api.json` を fetch（**取り込みステップ＝リリース前段でのみ／ビルド工程・実行時では fetch しない**）→ 対象プロバイダ選択 → `isSelectableModel` で**生成時フィルタ** → **id のみ**を `models.<provider> = string[]` に整形し、`{ _source(MIT帰属), _generatedAt, models }` の形（ヘッダとデータを分離）で決定的（ソート）に `model-catalog-data.json` を書き出す
   - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。fetch 失敗時は非ゼロ終了し既存成果物を保持
   - **生成時サニティチェック（Issue 2）**: 取得 JSON を境界で最小スキーマ検証（`providers`/`models` 構造・`tool_call`/`modalities.output` の型）し、**各対象プロバイダ（openai/anthropic/google）で選択可能1件以上**を assert。違反（想定外の形・空結果）なら**非ゼロ終了して既存成果物を保持**（上書きしない）＝スキーマドリフトによる「無言の空カタログ」出荷を防止。欠落内容（プロバイダ名・件数）をログ出力
   - 初回生成した `model-catalog-data.json` をコミットする
@@ -88,7 +88,7 @@
   - _Boundary: spec mastra-multi-model-chat_
 
 - [ ] 7.2 (P) multi-llm-provider スペックを整合させる
-  - research の D-2/D-3 に、models.dev の runtime fetch（モデルルーター）は不採用のまま／build・release 時に vendoring した静的カタログの read は別物であり推論は native 実装のまま、という注記を追加する
+  - research の D-2/D-3 に、models.dev の runtime fetch（モデルルーター）は不採用のまま／取り込みステップ（リリース前段）で vendoring した静的カタログの read は別物であり推論は native 実装のまま、という注記を追加する
   - 完了状態: 当該 research に「runtime fetch 不採用」と「vendored 静的 read は別物」の区別を示す注記が存在する
   - _Requirements: 8.2_
   - _Boundary: spec multi-llm-provider_
