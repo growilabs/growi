@@ -7,7 +7,7 @@
   - 完了状態: 型が server ルートと client フックの双方から import 可能で、`modelIds: string[]` 以外のフィールドを持たない
   - _Requirements: 1.1, 7.1_
 
-- [ ] 1.2 (P) モデル選択 UI 文言を全ロケールに追加する
+- [x] 1.2 (P) モデル選択 UI 文言を全ロケールに追加する
   - モデル選択プレースホルダ等の新規キーを 5 ロケール（en_US/ja_JP/fr_FR/ko_KR/zh_CN）の admin.json に追加する
   - 完了状態: 5 ロケール全てに同一キーが存在し、欠落キーによる i18n フォールバック警告が出ない
   - _Requirements: 1.1_
@@ -98,3 +98,7 @@
   - 完了状態: mastra-multi-model-chat / multi-llm-provider / ai-settings-model-picker の間にモデル入力方式の矛盾記述がない
   - _Requirements: 8.3_
   - _Depends: 7.1, 7.2_
+
+## Implementation Notes
+
+- 1.2: i18n プレースホルダの確定キーは `ai_settings.model_placeholder`（既存 `provider_placeholder` に倣う）。design/research では例示的に `model_select_placeholder` と表記されているが、実装・タスク 5.1 が参照するのは `model_placeholder`。5.1 の `<select>` 空 option プレースホルダはこのキーを使うこと。
