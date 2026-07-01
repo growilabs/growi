@@ -21,7 +21,7 @@
   - _Requirements: 6.1, 6.2_
   - _Boundary: chat-model-filter_
 
-- [ ] 2.2 models.dev から取り込む vendoring スクリプトとコミット成果物を作成する
+- [x] 2.2 models.dev から取り込む vendoring スクリプトとコミット成果物を作成する
   - `pnpm vendor:models` で `https://models.dev/api.json` を fetch（**取り込みステップ＝リリース前段でのみ／ビルド工程・実行時では fetch しない**）→ 対象プロバイダ選択 → `isSelectableModel` で**生成時フィルタ** → **id のみ**を `models.<provider> = string[]` に整形し、`{ _source(MIT帰属), _generatedAt, models }` の形（ヘッダとデータを分離）で決定的（ソート）に `model-catalog-data.json` を書き出す
   - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。fetch 失敗時は非ゼロ終了し既存成果物を保持
   - **生成時サニティチェック（Issue 2）**: 取得 JSON を境界で最小スキーマ検証（`providers`/`models` 構造・`tool_call`/`modalities.output` の型）し、**各対象プロバイダ（openai/anthropic/google）で選択可能1件以上**を assert。違反（想定外の形・空結果）なら**非ゼロ終了して既存成果物を保持**（上書きしない）＝スキーマドリフトによる「無言の空カタログ」出荷を防止。欠落内容（プロバイダ名・件数）をログ出力
@@ -102,3 +102,5 @@
 ## Implementation Notes
 
 - 1.2: i18n プレースホルダの確定キーは `ai_settings.model_placeholder`（既存 `provider_placeholder` に倣う）。design/research では例示的に `model_select_placeholder` と表記されているが、実装・タスク 5.1 が参照するのは `model_placeholder`。5.1 の `<select>` 空 option プレースホルダはこのキーを使うこと。
+- プロセス（重要）: **vitest は型チェックしない**。TS 系タスクは完了前に必ず `apps/app` で `pnpm run lint:typecheck`（tsgo）を実行すること。2.1 で `CATALOG_PROVIDERS.includes('azure-openai')` の TS2345 が vitest green のまますり抜けた（後に 5728dab62e で修正）。`out/tsconfig.json` の TSConfck 警告は既存ノイズで無関係。
+- 2.2: bin スクリプトは `node bin/*.ts`（Node24 型ストリップ）で実行。bin/ から `src/` の TS を import する際は**明示的 `.ts` 拡張子が必須**（extensionless は ERR_MODULE_NOT_FOUND）。bin/ は `lint:import-convention`（src のみ走査）対象外なので `.ts` は許容。実行時・ビルド工程は fetch せず、この取り込みスクリプトのみが models.dev へ fetch する。成果物 `model-catalog-data.json` は静的 JSON として commit 済み（openai=41/anthropic=24/google=16）。
