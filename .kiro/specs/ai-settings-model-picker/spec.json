@@ -1,13 +1,13 @@
 {
   "feature_name": "ai-settings-model-picker",
   "created_at": "2026-07-01T05:10:41Z",
-  "updated_at": "2026-07-01T11:06:29Z",
+  "updated_at": "2026-07-01T11:12:03Z",
   "language": "ja",
   "phase": "tasks-generated",
   "approvals": {
     "requirements": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "design": {
       "generated": true,
