@@ -148,7 +148,7 @@ apps/app/
 
 ### Modified
 - `apps/app/package.json` — `"vendor:models": "node bin/vendor-model-catalog.ts"` を追加。
-- **リリース(RC/本番)ワークフロー**（`.github/workflows` のリリース系。例: `release-rc-scheduled.yml`）— **リリースビルドの前段の独立 step** として `vendor:models` を実行し成果物をコミット（差分時。prod=pre-release step／無人 RC=build-image の前段ジョブで token/PR）。**リリースビルドはコミット済み成果物を read するのみで、refresh/fetch/commit を build 工程に融合しない**。
+- **本番リリースワークフロー**（`.github/workflows/release.yml`）— リリース commit/tag を切る**前段の独立 step**として `vendor:models` を実行し、成果物を（差分時）リリース commit に同梱する。オンデマンド更新は手動 `pnpm vendor:models` → PR。無人 RC（`release-rc-scheduled.yml`）はコミット済み成果物をそのまま read して build する（RC 側で refresh/commit は行わない）。**リリースビルドはコミット済み成果物を read するのみで、refresh/fetch/commit を build 工程に融合しない**。
 - `apps/app/src/features/mastra/server/routes/admin-ai-settings/index.ts` — `router.get('/available-models', getAvailableModelsFactory(crowi))` を追加。
 - `apps/app/src/features/mastra/client/admin/AllowedModelsField.tsx` — provider で `useSWRxSelectableModels` を1回呼び、modelId 入力を `<select>`（catalog あり）／`<input type=text>`（catalog なし・provider 未選択・取得失敗）に出し分け。保存済みだが一覧外の値は `<option>` 補完で保持（1.5）。
 - `apps/app/src/features/mastra/client/admin/AllowedModelsField.spec.tsx` — 出し分け・保存済み値保持・取得失敗フォールバックのテスト。
@@ -191,7 +191,7 @@ sequenceDiagram
     end
 ```
 
-- **鮮度運用の不変条件**: リフレッシュ（fetch＋フィルタ＋コミット）は**リリースビルドの前段の独立 step**で実行し成果物をブランチにコミットする。**リリースビルドはコミット済み成果物を read するのみ**で、build 工程に fetch/commit を融合しない。タイミングは最低限リリース時（prod=pre-release step／無人 RC=build 前段ジョブ）、必要に応じ手動 `pnpm vendor:models` / 将来 cron。
+- **鮮度運用の不変条件**: リフレッシュ（fetch＋フィルタ＋コミット）は**本番リリースの前段の独立 step**で実行し成果物をリリース commit に同梱する。**リリースビルド（prod・無人 RC とも）はコミット済み成果物を read するのみ**で、build 工程に fetch/commit を融合しない。タイミングは本番リリース時（`release.yml` の pre-release step）＋必要に応じ手動 `pnpm vendor:models` → PR（将来 cron も可）。無人 RC はコミット済みカタログから build する。
 - **生成時フィルタ**: 成果物には chat＋tool 対応の id だけが載る（`tool_call:false` や非 text 出力は書き出さない）。実行時フィルタは不要。
 
 ## Requirements Traceability
@@ -250,7 +250,7 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 - `fetch('https://models.dev/api.json')`（**取り込みステップ＝リリース前段でのみ／ビルド工程では実行しない**）→ `CATALOG_PROVIDERS` を選択 → `isSelectableModel` で生成時フィルタ → **id のみ**を `models.<provider> = string[]` に整形し、`{ _source（MIT 帰属）, _generatedAt, models }` の形（ヘッダとデータを分離）で `model-catalog-data.json` を**決定的（ソート）**に書き出す。
 - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。
 - **生成時サニティチェック（Issue 2）**: 取得した api.json を境界で **zod** による最小スキーマ検証（**読む分のみ**＝対象プロバイダの `tool_call`・`modalities.output` の型を検証し、他フィールド/他プロバイダは passthrough で寛容に）し、**各対象プロバイダ（openai/anthropic/google）で `isSelectableModel` 通過が1件以上**であることを assert する。いずれか違反（想定外の形・空結果）なら**非ゼロ終了して既存のコミット成果物を保持**し上書きしない（models.dev のスキーマドリフトで「無言の空カタログ」が出荷されるのを防ぐ）。
-- 実行は `pnpm vendor:models`。**スクリプトは生成（fetch＋フィルタ＋ファイル write）のみで git 操作はしない**（純ジェネレータ・副作用なし）。**コミットは別ステップの責務**（手動＝開発者が diff 確認して PR ／ 無人＝リリース前段ジョブが差分時に commit/PR）。リリースビルドはコミット済み成果物を read するのみ（build 工程に fetch/commit を融合しない）。
+- 実行は `pnpm vendor:models`。**スクリプトは生成（fetch＋フィルタ＋ファイル write）のみで git 操作はしない**（純ジェネレータ・副作用なし）。**コミットは別ステップの責務**（手動＝開発者が diff 確認して PR ／ 本番リリース＝`release.yml` の pre-release step が差分時にリリース commit へ同梱）。リリースビルド（prod・無人 RC とも）はコミット済み成果物を read するのみ（build 工程に fetch/commit を融合しない）。
 
 **Contracts**: Batch [x]
 - Trigger: 手動 `pnpm vendor:models` ／ リリースビルド前段の独立 step。
@@ -259,7 +259,7 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 - Idempotency: 同一上流なら同一出力（決定的）。fetch 失敗・スキーマ検証失敗・いずれかの対象プロバイダが空、のいずれでも非ゼロ終了し既存成果物を保持（後述 Error Handling）。
 
 **Implementation Notes**
-- Integration: **リリースビルドの前段の独立 step**（prod=pre-release step／無人 RC=build-image の前段ジョブ、保護ブランチは token/PR）で refresh→コミット。build 工程には refresh/fetch/commit を**融合しない**（毎ビルド fetch＝非決定的・オフライン不可を避ける）。build はコミット済み成果物を read。
+- Integration: **本番リリースの前段の独立 step**（`release.yml` の pre-release step）で refresh→リリース commit へ同梱。オンデマンドは手動 `pnpm vendor:models` → PR。無人 RC はコミット済み成果物から build する（RC 側 refresh なし）。build 工程には refresh/fetch/commit を**融合しない**（毎ビルド fetch＝非決定的・オフライン不可を避ける）。build はコミット済み成果物を read。
 - Risks: 上流スキーマ変更で抽出が壊れ得るが、生成時サニティチェック（形検証＋各プロバイダ非空 assert）で検知し非ゼロ終了・既存保持するため無言の空カタログ出荷は防げる（Revalidation Trigger）。fixture ベースのテストで transform とサニティチェックを固定。
 
 ### Server (runtime)
