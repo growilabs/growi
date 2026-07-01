@@ -1,7 +1,7 @@
 {
   "feature_name": "ai-settings-model-picker",
   "created_at": "2026-07-01T05:10:41Z",
-  "updated_at": "2026-07-01T07:49:26Z",
+  "updated_at": "2026-07-01T10:13:19Z",
   "language": "ja",
   "phase": "tasks-generated",
   "approvals": {
@@ -11,12 +11,12 @@
     },
     "design": {
       "generated": true,
-      "approved": true
+      "approved": false
     },
     "tasks": {
       "generated": true,
-      "approved": true
+      "approved": false
     }
   },
-  "ready_for_implementation": true
+  "ready_for_implementation": false
 }
