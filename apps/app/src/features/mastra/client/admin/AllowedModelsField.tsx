@@ -17,7 +17,7 @@ const PROVIDER_OPTIONS_DOC_URL =
 
 export interface AllowedModelsFieldProps {
   /**
-   * Disable every input/control when env-only mode is active (1.6). `disabled`
+   * Disable every input/control when env-only mode is active (7.3). `disabled`
    * (not `readOnly`) so the locked fields are removed from the tab order and
    * cannot receive focus.
    */
