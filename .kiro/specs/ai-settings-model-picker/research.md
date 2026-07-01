@@ -118,7 +118,7 @@ _Discovery type: **Light（Extension）**。新規外部ライブラリなしの
 - **D3（エンドポイント）**: `GET /_api/v3/ai-settings/available-models?provider=<AiProvider>`、admin 認可、`SelectableModelsResponse { modelIds }`、azure は `200 { modelIds: [] }`、不正 provider は 400、aiReadyGuard なし。
 - **D4（externalization）** ⚠️ *supersede 済み*: ~~`@mastra/core` を型のみ→値 import（server 限定）。既に `dependencies`。prod ビルド後 `.next/node_modules` を確認（Revalidation Trigger）。~~ → データ源を models.dev vendored 成果物に変更したことで **`@mastra/core` の値 import は不要**になり、Turbopack externalization 検証（旧 task 6.1）も消滅した。実行時は committed JSON を静的 read するのみ（通信ゼロ）。client は `string[]` と `AiProvider` 型のみ参照する点は不変。
 - **D5（UI 状態）**: provider 空/error/空一覧 → 自由入力、非空 → `<select>`、ロード中 → disabled。保存済み一覧外値は補完 option（1.5）。フィールド単位で1回 fetch。
-- **D6（i18n）**: `ai_settings.model_select_placeholder` 等を 5 ロケール（en_US/ja_JP/fr_FR/ko_KR/zh_CN）へ追加。
+- **D6（i18n）**: `ai_settings.model_placeholder`（`<select>` 空 option 用。既存 `provider_placeholder` に倣う）を 5 ロケール（en_US/ja_JP/fr_FR/ko_KR/zh_CN）へ追加。
 - **D7（Req8 具体差分）**: `mastra-multi-model-chat`（requirements 確定判断・design Non-Goals）と `multi-llm-provider/research.md`（D-2/D-3）を編集対象として実装タスク化。
 
 ## 統合リスク（Light discovery）
