@@ -509,6 +509,57 @@ describe('AllowedModelsField', () => {
       ).toBeInTheDocument();
     });
 
+    it('renders the dropdown (not a text input) while the catalog is still loading for a catalog provider — no text→select flash on open (8)', () => {
+      // Arrange: loading window — the hook has neither resolved nor errored yet.
+      mockedUseSelectableModels.mockReturnValue(swrResponse({}));
+
+      // Act: a configured catalog provider (openai) is opened.
+      renderComponent({
+        defaultValues: {
+          provider: 'openai',
+          allowedModels: [
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+          ],
+        },
+      });
+
+      // Assert: the control is already a <select> (predicted from the declared
+      // catalog-provider set), not a text input, and disabled while loading — so
+      // opening a configured catalog provider never flashes text→select. Value
+      // preservation is covered by the resolved-state test above.
+      const modelControl = screen.getByLabelText('ai_settings.model_label');
+      expect(modelControl.tagName).toBe('SELECT');
+      expect(modelControl).toBeDisabled();
+    });
+
+    it('renders a free-text input while loading for a catalog-less provider, e.g. Azure (no flash) (8)', () => {
+      // Arrange: loading window for azure-openai (absent from the catalog set).
+      mockedUseSelectableModels.mockReturnValue(swrResponse({}));
+
+      // Act
+      renderComponent({
+        defaultValues: {
+          provider: 'azure-openai',
+          allowedModels: [
+            {
+              modelId: 'my-deployment',
+              providerOptionsText: '',
+              isDefault: true,
+            },
+          ],
+        },
+      });
+
+      // Assert: a catalog-less provider stays free-text throughout load, so it
+      // does not flash select→text once the empty list resolves.
+      const modelControl = screen.getByLabelText(
+        'ai_settings.azure_model_deployment_label',
+      );
+      expect(modelControl).toBeInstanceOf(HTMLInputElement);
+      expect((modelControl as HTMLInputElement).type).toBe('text');
+      expect(modelControl).toBeDisabled();
+    });
+
     it('disables the dropdown in env-only mode so it cannot be edited (7.3)', () => {
       // Arrange: select mode + env-only (disabled).
       mockedUseSelectableModels.mockReturnValue(
