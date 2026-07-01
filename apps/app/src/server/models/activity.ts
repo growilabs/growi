@@ -127,9 +127,10 @@ activitySchema.statics.updateByParameters = async function (
   return activity;
 };
 
+// Prefix-anchored to match the ES path's `${escaped}*` wildcard and use the snapshot.username index.
 const buildSnapshotUsernameRegexConditions = (q: string) => ({
   'snapshot.username': {
-    $regex: escapeStringForMongoRegex(q),
+    $regex: `^${escapeStringForMongoRegex(q)}`,
     $options: 'i',
   },
 });
@@ -147,11 +148,11 @@ activitySchema.statics.findSnapshotUsernamesByUsernameRegex = async function (
 
   const usernames = await this.aggregate()
     .match(conditions)
-    .limit(10000) // Narrow down the search target
     .group({ _id: '$snapshot.username' })
     .sort({ _id: sortOpt }) // Sort "snapshot.username" in ascending order
     .skip(offset)
-    .limit(limit);
+    .limit(limit)
+    .allowDiskUse(true);
 
   return usernames.map((r) => r._id);
 };
