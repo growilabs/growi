@@ -462,6 +462,12 @@ class Crowi {
       '~/features/news/server/services/news-cron-service'
     );
     new NewsCronService().startCron();
+
+    // Repair page-tree state left inconsistent by TTL-index deletion of WIP pages
+    const { PageCleanupCronService } = await import(
+      '~/server/service/page/page-cleanup-cron'
+    );
+    new PageCleanupCronService(this).startCron();
   }
 
   getSlack(): unknown {

@@ -182,6 +182,7 @@ export interface PageModel extends Model<PageDocument> {
     path: string,
   ): Promise<HydratedDocument<PageDocument> | null>;
   removeLeafEmptyPagesRecursively(pageId: ObjectIdLike): Promise<void>;
+  recountDescendantCount(id: ObjectIdLike): Promise<number>;
   findTemplate(path: string): Promise<{
     templateBody?: string;
     templateTags?: string[];

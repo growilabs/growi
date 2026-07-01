@@ -107,6 +107,7 @@ export interface IPageService {
     revisionBody?: string,
   ): Promise<CurrentPageYjsData>;
   updateDescendantCountOfPagesWithPaths(paths: string[]): Promise<void>;
+  recountAndUpdateDescendantCountOfAllPages(): Promise<void>;
   revertRecursivelyMainOperation(
     page,
     user,
