@@ -111,3 +111,35 @@ export function normalizeAggregateRaw(value: unknown): unknown {
   }
   return normalized;
 }
+
+/**
+ * Wraps an ID string in the MongoDB Extended JSON `$oid` form that
+ * `aggregateRaw` requires to match against a real BSON ObjectId field.
+ *
+ * A raw ObjectId instance (e.g. `new mongoose.Types.ObjectId(id)`) or a bare
+ * hex string placed directly in an `aggregateRaw` pipeline's `$match`
+ * serializes to a plain JSON string, which does NOT match a stored
+ * ObjectId-typed field -- the query silently matches zero documents. Use
+ * this helper whenever an ObjectId value is compared in a pipeline stage
+ * that goes through `aggregateRaw` (verified against a real MongoDB
+ * replica set).
+ */
+export function toRawObjectId(id: string): { $oid: string } {
+  return { $oid: id };
+}
+
+/**
+ * Wraps a Date in the MongoDB Extended JSON `$date` form that `aggregateRaw`
+ * requires to compare against a real BSON Date field.
+ *
+ * A plain `Date` instance (or its ISO string) placed directly in an
+ * `aggregateRaw` pipeline's `$match` range comparison (`$gte`/`$lte`)
+ * serializes to a bare JSON string, which does NOT compare correctly
+ * against a stored BSON Date field -- the query silently matches zero
+ * documents. Use this helper whenever a Date value is compared in a
+ * pipeline stage that goes through `aggregateRaw` (verified against a real
+ * MongoDB replica set).
+ */
+export function toRawDate(date: Date): { $date: string } {
+  return { $date: date.toISOString() };
+}

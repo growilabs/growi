@@ -1,4 +1,8 @@
-import { normalizeAggregateRaw } from './prisma-raw-normalize';
+import {
+  normalizeAggregateRaw,
+  toRawDate,
+  toRawObjectId,
+} from './prisma-raw-normalize';
 
 describe('normalizeAggregateRaw', () => {
   describe('$oid wrapper', () => {
@@ -188,5 +192,43 @@ describe('normalizeAggregateRaw', () => {
       expect(result.createdAt).toBeInstanceOf(Date);
       expect(result.count).toBe(3);
     });
+  });
+});
+
+describe('toRawObjectId', () => {
+  it('wraps a hex ID string in the MongoDB Extended JSON $oid form', () => {
+    const id = '507f1f77bcf86cd799439011';
+    expect(toRawObjectId(id)).toEqual({ $oid: id });
+  });
+
+  it('round-trips through normalizeAggregateRaw back to the same ID string', () => {
+    // Regression: a raw ObjectId instance or bare string in an aggregateRaw
+    // $match serializes to a plain JSON string, which does NOT match a
+    // stored BSON ObjectId field -- the query silently matches zero
+    // documents. Only the { $oid } form matches correctly (verified against
+    // a real MongoDB replica set). This test guards the wire-format contract:
+    // whatever toRawObjectId produces must normalize back to the same ID.
+    const id = 'aabbccddeeff001122334455';
+    expect(normalizeAggregateRaw(toRawObjectId(id))).toBe(id);
+  });
+});
+
+describe('toRawDate', () => {
+  it('wraps a Date in the MongoDB Extended JSON $date form (ISO string)', () => {
+    const date = new Date('2025-11-01T00:00:00.000Z');
+    expect(toRawDate(date)).toEqual({ $date: '2025-11-01T00:00:00.000Z' });
+  });
+
+  it('round-trips through normalizeAggregateRaw back to an equal Date', () => {
+    // Regression: a plain Date instance (or its ISO string) in an
+    // aggregateRaw $match range comparison ($gte/$lte) serializes to a bare
+    // JSON string, which does NOT compare correctly against a stored BSON
+    // Date field -- the query silently matches zero documents. Only the
+    // { $date } form compares correctly (verified against a real MongoDB
+    // replica set).
+    const date = new Date('2025-11-01T12:34:56.789Z');
+    const normalized = normalizeAggregateRaw(toRawDate(date));
+    expect(normalized).toBeInstanceOf(Date);
+    expect((normalized as Date).getTime()).toBe(date.getTime());
   });
 });

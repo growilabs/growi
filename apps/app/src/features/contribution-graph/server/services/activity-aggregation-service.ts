@@ -1,5 +1,4 @@
-import mongoose from 'mongoose';
-
+import { toRawDate, toRawObjectId } from '~/server/util/prisma-raw-normalize';
 import { prisma } from '~/utils/prisma';
 
 import type { IContributionDay } from '../../interfaces/contribution';
@@ -19,15 +18,17 @@ export const getContributionActivities = (
   return aggregateContributions(prisma, pipeline);
 };
 
-const buildPipeline = (params: PipelineParams): Record<string, unknown>[] => {
+export const buildPipeline = (
+  params: PipelineParams,
+): Record<string, unknown>[] => {
   const { userId, startDate, endDate } = params;
 
   return [
     {
       $match: {
-        user: new mongoose.Types.ObjectId(userId),
+        user: toRawObjectId(userId),
         action: { $in: Object.values(ContributionGraphActions) },
-        createdAt: { $gte: startDate, $lte: endDate },
+        createdAt: { $gte: toRawDate(startDate), $lte: toRawDate(endDate) },
       },
     },
     {

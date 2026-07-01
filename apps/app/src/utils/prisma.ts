@@ -71,8 +71,13 @@ export async function paginateLogic<T>(
     select?: unknown;
   },
 ): Promise<PaginateResult<T>> {
-  const offset = options.offset ?? 0;
-  const limit = options.limit ?? 10;
+  // Coerce defensively: Express query params (e.g. apiv3/activity.ts's
+  // req.query.offset/limit) arrive as strings even after express-validator's
+  // `.isInt()` (which validates but does not sanitize). Prisma's skip/take
+  // reject strings with PrismaClientValidationError, unlike
+  // mongoose-paginate-v2, which coerced internally.
+  const offset = Number(options.offset ?? 0);
+  const limit = Number(options.limit ?? 10);
   const skip = offset; // exact: skip = offset
 
   const findArgs = {

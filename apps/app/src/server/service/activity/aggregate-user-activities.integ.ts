@@ -32,6 +32,7 @@
 import { Types } from 'mongoose';
 
 import { ActivityLogActions } from '~/interfaces/activity';
+import { buildUserActivityPipeline } from '~/server/routes/apiv3/user-activities';
 import { aggregateUserActivities } from '~/server/service/activity/aggregate-user-activities';
 import { prisma } from '~/utils/prisma';
 
@@ -54,83 +55,6 @@ function makeActivityData(overrides: {
     snapshot: { id: new Types.ObjectId().toHexString(), username: 'testuser' },
     userId: overrides.userId,
   };
-}
-
-/**
- * Build the same $facet/$lookup/$project pipeline that apiv3/user-activities.ts
- * constructs at runtime — this exercises the exact production code path.
- *
- * Note: `user` in the pipeline refers to the `userId` field (stored as ObjectId
- * in the raw collection under the key `user` — the Mongoose field name).
- */
-function buildUserActivityPipeline(
-  userId: string,
-  offset: number,
-  limit: number,
-): Record<string, unknown>[] {
-  // Use Types.ObjectId to match the production code in user-activities.ts which
-  // passes `new Types.ObjectId(targetUserId)` into $match.user — same form here.
-  const userObjectId = new Types.ObjectId(userId);
-
-  return [
-    {
-      $match: {
-        user: userObjectId,
-        action: { $in: Object.values(ActivityLogActions) },
-      },
-    },
-    {
-      $facet: {
-        totalCount: [{ $count: 'count' }],
-        docs: [
-          { $sort: { createdAt: -1 } },
-          { $skip: offset },
-          { $limit: limit },
-          {
-            $lookup: {
-              from: 'pages',
-              localField: 'target',
-              foreignField: '_id',
-              as: 'target',
-            },
-          },
-          {
-            $unwind: {
-              path: '$target',
-              preserveNullAndEmptyArrays: true,
-            },
-          },
-          {
-            $lookup: {
-              from: 'users',
-              localField: 'user',
-              foreignField: '_id',
-              as: 'user',
-            },
-          },
-          {
-            $unwind: {
-              path: '$user',
-              preserveNullAndEmptyArrays: true,
-            },
-          },
-          {
-            $project: {
-              _id: 1,
-              'user._id': 1,
-              'user.username': 1,
-              'user.name': 1,
-              'user.imageUrlCached': 1,
-              action: 1,
-              createdAt: 1,
-              target: 1,
-              targetModel: 1,
-            },
-          },
-        ],
-      },
-    },
-  ];
 }
 
 describe('aggregateUserActivities', () => {
@@ -172,7 +96,7 @@ describe('aggregateUserActivities', () => {
       ],
     });
 
-    const pipeline = buildUserActivityPipeline(userA, 0, 10);
+    const pipeline = buildUserActivityPipeline(userA, { offset: 0, limit: 10 });
 
     // Act
     const result = await aggregateUserActivities(prisma, pipeline);
@@ -199,7 +123,7 @@ describe('aggregateUserActivities', () => {
     });
 
     // Limit to 2 docs starting from offset 1
-    const pipeline = buildUserActivityPipeline(userId, 1, 2);
+    const pipeline = buildUserActivityPipeline(userId, { offset: 1, limit: 2 });
 
     // Act
     const result = await aggregateUserActivities(prisma, pipeline);
@@ -213,7 +137,10 @@ describe('aggregateUserActivities', () => {
     // Arrange: no activities seeded for this user
     const userId = new Types.ObjectId().toHexString();
 
-    const pipeline = buildUserActivityPipeline(userId, 0, 10);
+    const pipeline = buildUserActivityPipeline(userId, {
+      offset: 0,
+      limit: 10,
+    });
 
     // Act
     const result = await aggregateUserActivities(prisma, pipeline);
@@ -247,7 +174,10 @@ describe('aggregateUserActivities', () => {
       ],
     });
 
-    const pipeline = buildUserActivityPipeline(userId, 0, 10);
+    const pipeline = buildUserActivityPipeline(userId, {
+      offset: 0,
+      limit: 10,
+    });
 
     // Act
     const result = await aggregateUserActivities(prisma, pipeline);

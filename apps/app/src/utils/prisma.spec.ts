@@ -53,6 +53,22 @@ describe('paginateLogic — observable contract', () => {
         expect.objectContaining({ skip: 0 }),
       );
     });
+
+    it("coerces numeric-string offset/limit to real numbers (regression: Express query params arrive as strings, e.g. apiv3/activity.ts's req.query.offset; Prisma's skip/take reject strings with PrismaClientValidationError, unlike mongoose-paginate-v2 which coerced internally)", async () => {
+      delegate.findMany.mockResolvedValue([]);
+      delegate.count.mockResolvedValue(0);
+
+      await paginateLogic(delegate, {
+        // biome-ignore lint/suspicious/noExplicitAny: simulating unconverted Express query params
+        offset: '15' as any,
+        // biome-ignore lint/suspicious/noExplicitAny: simulating unconverted Express query params
+        limit: '10' as any,
+      });
+
+      expect(delegate.findMany).toHaveBeenCalledWith(
+        expect.objectContaining({ skip: 15, take: 10 }),
+      );
+    });
   });
 
   describe('output always includes offset field', () => {
