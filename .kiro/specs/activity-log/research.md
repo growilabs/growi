@@ -154,7 +154,7 @@ activitySchema.index({ user: 1, target: 1, action: 1, createdAt: 1 }, { unique: 
 
 ギャップ分析は Mongoose を前提に書いたが、設計フェーズの調査で前提が変わった。
 
-1. **`activities` モデルは既に `schema.prisma` に存在する**（introspect 済み、`apps/app/prisma/schema.prisma` 50-71行）。`snapshot` も `ActivitiesSnapshot` という composite type（16-19行、現状 `username` のみ）として定義済み。ただしアプリ側はまだ Mongoose statics を使っており、Prisma 拡張への移行は未実施。GROWI は Mongoose → Prisma を1モデルずつ漸進移行中（comments / users / external-account が移行済み）。
+1. **`activities` モデルは既に `schema.prisma` に存在する**（introspect 済み、`apps/app/prisma/schema.prisma` 50-71行）。`snapshot` も `ActivitiesSnapshot` という composite type（16-19行、現状 `username` のみ）として定義済み。ただしアプリ側はまだ Mongoose statics を使っており、Prisma 拡張への移行は未実施。GROWI は Mongoose → Prisma を1モデルずつ漸進移行中（comments / users / external-account が移行済み）。**追記（2026-07-01）**: 本節は設計時点（方針3 決定前）の記録。Prisma 拡張への移行は別スペック `activities-prisma-migration` で完了済み（grep 確認＋実 DB 統合テスト 42 件 green）。
 2. **Prisma では `target` はリレーション強制のない緩い `String? @db.ObjectId`**、`targetModel` も自由な `String?`。Mongoose の `refPath` のような整合性強制は無い（`onDelete: NoAction` 相当）。
 3. **既存の discriminator パターンはモデルレベル**（`GlobalNotificationSetting`、collection 単位の `Model.discriminator()`）であり、single nested subdocument の discriminator ではない。さらに **Prisma + MongoDB の composite type は union 型を表現できない**（固定 shape のみ）。
 4. **`activities` モデルの消費者は 15+ ファイル**で、create/update のほか paginate・aggregate（contribution-graph / user-activities）・`find().sort().cursor()`（監査ログ CSV ストリーム）・TTL index・`findSnapshotUsernamesByUsernameRegexWithTotalCount` など多岐にわたる。利用元には contribution-graph / audit-log-bulk-export / page-bulk-export という今回の機能と無関係の feature が複数含まれる。
@@ -189,6 +189,7 @@ activitySchema.index({ user: 1, target: 1, action: 1, createdAt: 1 }, { unique: 
 
 - 理由: 移行は 15+ ファイル・aggregate・cursor・TTL に及び、無関係 feature も巻き込むため、本機能（R1〜R4）とは独立に動かせる別責務。設計レビューゲートの「独立した責務の継ぎ目が複数見えたらスペックを分割せよ」に該当。
 - 効果: モデルを触るのは一度だけ（移行スペック）で二度手間を避けられ、各スペックがレビュー可能なサイズに収まる。
+- **追記（2026-07-01）**: `activities-prisma-migration` は完了済み。本スペックが依存する具体的な API（`ActivityExtension` の `createByParameters`/`updateByParameters`/`paginate`/`findSnapshotUsernamesByUsernameRegexWithTotalCount`、offset 統一済みの共有 paginate、composite type への native フィルタ、明示 `_id` の受理）は design.md の Overview に転記済み。移行スペック自体の詳細な設計判断は git 履歴（`.kiro/specs/activities-prisma-migration/` 相当のコミット群）に残る。
 
 ## D-3. Synthesis（一般化 / Build-vs-Adopt / 簡素化）
 
@@ -205,7 +206,7 @@ activitySchema.index({ user: 1, target: 1, action: 1, createdAt: 1 }, { unique: 
 | R3 カスケードの添付ごと記録 | M | Medium | `deleteCompletelyOperation` に actor 引数を足し、**複数の到達経路**（`deleteCompletely` 直接 / `deleteCompletelyV4` / `deleteMultipleCompletely`、stream 経由の `emptyTrashPage`・`deleteCompletelyRecursivelyMainOperation`）を貫通改修。再帰・ゴミ箱空は user のみ（ip/endpoint なし）。添付ごとに createActivity、index 変更不要で衝突なし。シグネチャ変更が複数呼び出し元に波及するため Low→Medium に修正（design レビュー指摘）。大量カスケード時の件数は要件上スコープ外（Open Question） |
 | R4 監査ログ API の snapshot 参照 | S | Low | 応答は `...rest` で素通り。OpenAPI 更新中心 |
 
-全体: **S〜M / Low-Medium**（前提の Prisma 移行が完了している条件下）。移行スペック自体は別途 L〜XL。
+全体: **S〜M / Low-Medium**（前提の Prisma 移行は 2026-07-01 に完了済み）。移行スペック自体は別途 L〜XL だったが、こちらも完了済み。
 
 ## D-5. 残課題（Open Questions）
 
