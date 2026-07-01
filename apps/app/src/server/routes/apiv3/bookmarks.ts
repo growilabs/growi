@@ -260,10 +260,26 @@ module.exports = (crowi: Crowi) => {
         const bookmarkedPageIds = userRootBookmarks
           .map((b) => b.page?._id)
           .filter((id): id is Types.ObjectId => id != null);
+
+        const hideRestrictedByOwner = configManager.getConfig(
+          'security:list-policy:hideRestrictedByOwner',
+        );
+        const hideRestrictedByGroup = configManager.getConfig(
+          'security:list-policy:hideRestrictedByGroup',
+        );
+        // "Anyone with the link" pages are never listed anywhere, so the bookmark is
+        // often the owner's only path back to them: keep them visible on the owner's
+        // own list, but hide them from other users' bookmark listings.
+        const isOwnList = req.user?._id.toString() === userId;
+
         const viewablePages = await Page.findByIdsAndViewer(
           bookmarkedPageIds,
           req.user,
           null,
+          false,
+          isOwnList,
+          !hideRestrictedByOwner,
+          !hideRestrictedByGroup,
         );
         const viewableIdSet = new Set(
           viewablePages.map((p) => p._id.toString()),
