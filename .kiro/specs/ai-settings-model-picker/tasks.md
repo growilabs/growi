@@ -24,8 +24,9 @@
 - [ ] 2.2 models.dev から取り込む vendoring スクリプトとコミット成果物を作成する
   - `pnpm vendor:models` で `https://models.dev/api.json` を fetch（**build/release 時のみ**）→ 対象プロバイダ選択 → `isSelectableModel` で**生成時フィルタ** → **id のみ**を `provider → string[]` に整形 → 決定的（ソート）に `model-catalog-data.json` を書き出す（`_source`(MIT帰属)/`_generatedAt` 付与）
   - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。fetch 失敗時は非ゼロ終了し既存成果物を保持
+  - **生成時サニティチェック（Issue 2）**: 取得 JSON を境界で最小スキーマ検証（`providers`/`models` 構造・`tool_call`/`modalities.output` の型）し、**各対象プロバイダ（openai/anthropic/google）で選択可能1件以上**を assert。違反（想定外の形・空結果）なら**非ゼロ終了して既存成果物を保持**（上書きしない）＝スキーマドリフトによる「無言の空カタログ」出荷を防止。欠落内容（プロバイダ名・件数）をログ出力
   - 初回生成した `model-catalog-data.json` をコミットする
-  - 完了状態: `pnpm vendor:models` 実行で、chat＋tool 対応の id のみを含む3プロバイダ分の JSON が生成・コミットされ、fixture の api.json を入力にした変換テストが期待どおり（`tool_call:false` 系が含まれない）green
+  - 完了状態: `pnpm vendor:models` 実行で、chat＋tool 対応の id のみを含む3プロバイダ分の JSON が生成・コミットされ、fixture の api.json を入力にした変換テストが期待どおり（`tool_call:false` 系が含まれない）green。加えて、想定外スキーマ／いずれかの対象プロバイダが0件になる fixture で**非ゼロ終了し既存成果物を上書きしない**ことを確認できる
   - _Requirements: 1.1, 2.1, 2.2, 2.3, 6.1_
   - _Depends: 2.1_
   - _Boundary: vendor-model-catalog, model-catalog-data.json_

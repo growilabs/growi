@@ -42,6 +42,7 @@
 ### Allowed Dependencies
 - **models.dev api.json**（`https://models.dev/api.json`, MIT）— **build/release 時のみ** fetch（実行時は触れない）。取り込みスクリプト内で Node の `fetch` を使用。
 - **コミット済み vendored 成果物**（`model-catalog-data.json`）— 実行時に静的 import して read。
+- **zod `^4.1.9`**（既存 dep）— vendoring スクリプトの**境界検証**（api.json の想定形チェック）。mastra feature（tools・feed-parser）で使用実績あり。build 時のみ利用。
 - 既存 admin 認可チェーン（`accessTokenParser([SCOPE.READ.ADMIN.AI])` → `loginRequiredFactory` → `adminRequiredFactory`）。
 - 既存 client 資産（`apiv3-client`、`useSWRImmutable`、reactstrap `Input`、react-hook-form `register`）。
 - `interfaces/ai-provider`（`AiProvider` / `isAiProvider`）、`interfaces/allowed-model`。
@@ -107,7 +108,7 @@ graph TB
 | Frontend | React 18 + reactstrap `Input` + react-hook-form `register` | modelId の `<select>`／自由入力の出し分け | 新規依存なし。`Controller` 不要 |
 | Frontend data | SWR (`useSWRImmutable`) | provider キーの一覧取得 | 静的データゆえ immutable |
 | Backend (runtime) | Express apiv3 (admin router) + 静的 JSON import | provider スコープの一覧エンドポイント（通信なし） | 既存認可チェーン踏襲 |
-| Vendoring (build/release) | Node script（`fetch` 組込み）+ models.dev api.json (MIT) | api.json を fetch → 生成時フィルタ → コミット JSON 生成 | **実行時ではなく build/release 時**。`pnpm vendor:models` |
+| Vendoring (build/release) | Node script（`fetch` 組込み）+ models.dev api.json (MIT) + zod `^4.1.9`（境界検証） | api.json を fetch → 境界を zod 検証 → 生成時フィルタ → コミット JSON 生成 | **実行時ではなく build/release 時**。`pnpm vendor:models`。zod は既存 dep（mastra feature で使用実績） |
 | Data asset | committed `model-catalog-data.json` | `provider → string[]`（chat＋tool 対応 id） | git 管理・PR レビュー・リリースで一様配布 |
 
 ## File Structure Plan
@@ -238,17 +239,18 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 **Responsibilities & Constraints**
 - `fetch('https://models.dev/api.json')`（**build/release 時のみ**）→ `CATALOG_PROVIDERS` を選択 → `isSelectableModel` で生成時フィルタ → **id のみ**を `provider → string[]` に整形 → `model-catalog-data.json` を**決定的（ソート）**に書き出す。ヘッダに `_source`（MIT 帰属）/ `_generatedAt` を付与。
 - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。
+- **生成時サニティチェック（Issue 2）**: 取得した api.json を境界で **zod** による最小スキーマ検証（**読む分のみ**＝対象プロバイダの `tool_call`・`modalities.output` の型を検証し、他フィールド/他プロバイダは passthrough で寛容に）し、**各対象プロバイダ（openai/anthropic/google）で `isSelectableModel` 通過が1件以上**であることを assert する。いずれか違反（想定外の形・空結果）なら**非ゼロ終了して既存のコミット成果物を保持**し上書きしない（models.dev のスキーマドリフトで「無言の空カタログ」が出荷されるのを防ぐ）。
 - 実行は `pnpm vendor:models`。**リリースビルドの前段の独立 step で実行し成果物をコミット**、リリースビルドはコミット済みを消費（build 工程に fetch/commit を融合しない）。
 
 **Contracts**: Batch [x]
 - Trigger: 手動 `pnpm vendor:models` ／ リリースビルド前段の独立 step。
 - Input: models.dev api.json（build/release 時 fetch）。
 - Output: コミットされる `model-catalog-data.json`（差分は PR レビュー）。
-- Idempotency: 同一上流なら同一出力（決定的）。fetch 失敗時は非ゼロ終了し、既存成果物は保持（後述 Error Handling）。
+- Idempotency: 同一上流なら同一出力（決定的）。fetch 失敗・スキーマ検証失敗・いずれかの対象プロバイダが空、のいずれでも非ゼロ終了し既存成果物を保持（後述 Error Handling）。
 
 **Implementation Notes**
 - Integration: **リリースビルドの前段の独立 step**（prod=pre-release step／無人 RC=build-image の前段ジョブ、保護ブランチは token/PR）で refresh→コミット。build 工程には refresh/fetch/commit を**融合しない**（毎ビルド fetch＝非決定的・オフライン不可を避ける）。build はコミット済み成果物を read。
-- Risks: 上流スキーマ変更で抽出が壊れ得る（Revalidation Trigger）。fixture ベースのテストで transform を固定。
+- Risks: 上流スキーマ変更で抽出が壊れ得るが、生成時サニティチェック（形検証＋各プロバイダ非空 assert）で検知し非ゼロ終了・既存保持するため無言の空カタログ出荷は防げる（Revalidation Trigger）。fixture ベースのテストで transform とサニティチェックを固定。
 
 ### Server (runtime)
 
@@ -341,6 +343,7 @@ export interface SelectableModelsResponse {
 ## Error Handling
 
 - **build/release 時の fetch 失敗**: `vendor-model-catalog` は非ゼロ終了し、**既存のコミット成果物を保持**（上書きしない）。リリースは前回カタログで継続可能。ログに詳細（HTTP ステータス）を出す。
+- **build/release 時のスキーマドリフト／空結果（Issue 2）**: 取得 JSON が想定形でない、またはいずれかの対象プロバイダで選択可能モデルが0件になった場合、`vendor-model-catalog` は**非ゼロ終了して既存成果物を保持**する（「無言の空カタログ」出荷を防止）。何が欠けたか（プロバイダ名・件数）をログに出し、refresh の PR/CI で検知させる。
 - **400 invalid provider**: `isAiProvider` 不合格 query → `ErrorV3` で 400。
 - **実行時のサーバ 5xx / 取得失敗**: フックの `error` → UI は自由入力にフォールバックし保存をブロックしない（3.2）。`res.apiv3Err(new ErrorV3(...), 500)`、秘匿を載せない。
 - **空一覧（azure 等）**: エラーではなく `{ modelIds: [] }`。UI は自由入力（3.1）。
@@ -350,7 +353,7 @@ export interface SelectableModelsResponse {
 
 ### Unit Tests
 - `chat-model-filter.isSelectableModel`: `tool_call:true & output:['text']` を通し、`tool_call:false` や `output:['image']`（embedding/image/audio 相当）を除外（6.1/6.2）。`CATALOG_PROVIDERS` に azure-openai を含めない。
-- `vendor-model-catalog`: fixture の api.json（openai/anthropic/google + 非chat混在）から、**chat＋tool の id のみ**の `provider→string[]` 成果物が決定的に生成される（2.x/6.1）。fetch 失敗時に既存成果物を保持し非ゼロ終了。
+- `vendor-model-catalog`: fixture の api.json（openai/anthropic/google + 非chat混在）から、**chat＋tool の id のみ**の `provider→string[]` 成果物が決定的に生成される（2.x/6.1）。fetch 失敗時に既存成果物を保持し非ゼロ終了。**サニティチェック（Issue 2）: 想定外スキーマの fixture／いずれかの対象プロバイダが0件になる fixture で、非ゼロ終了かつ既存成果物を上書きしない**ことを検証。
 - `model-catalog.getSelectableModelIds`: コミット成果物を read し `openai` 非空・`azure-openai` は `[]`・**ネットワーク呼び出しなし**（1.1/2.x/3.1）。
 - `useSWRxSelectableModels`: `provider===''` で fetch しない、provider 変更で再 fetch（5.1/5.2）。
 
