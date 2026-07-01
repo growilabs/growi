@@ -65,9 +65,10 @@
   - _Boundary: AllowedModelsField_
 
 - [ ] 6. リリース連動と検証
-- [ ] 6.1 vendoring をリリース(RC/本番)パイプラインに組み込む
-  - リリース(RC/本番)ワークフローに「`vendor:models` 実行 → 成果物に差分があればコミット/PR → その後 build」の順でステップを差し込む。**build 自体はコミット済み成果物を read し、build 中に live fetch しない**（毎ビルド fetch＝非決定的・オフライン不可を避ける）
-  - 完了状態: リリースワークフローに refresh ステップが存在し、ビルドがコミット済み `model-catalog-data.json` を消費する（build task graph には fetch を組み込まない）ことを確認できる
+- [ ] 6.1 vendoring をリリースビルドの前段の独立 step として実行する
+  - リリースビルドの**前段の独立 step**で `pnpm vendor:models` を実行し、成果物（`model-catalog-data.json`）を（差分があれば）ブランチにコミットする。**リリースビルドはコミット済み成果物を read するだけ**で、refresh/fetch/commit を build 工程に融合しない（毎ビルド fetch＝非決定的・オフライン不可を避ける）
+  - 配置: 人手 trigger の prod/タグリリースは「リリースを切る前の pre-release step（手動でも可）」、無人の scheduled RC（`release-rc-scheduled.yml`）は「build-image の前段ジョブ」でブランチへコミット（保護ブランチは token/PR）→ 後段の build が更新後 HEAD を消費。この配線詳細は実装時に確定
+  - 完了状態: refresh step がリリースビルドより**厳密に前**に実行され成果物をコミットし、build 工程に fetch/commit が一切含まれない（build はコミット済み `model-catalog-data.json` を read するのみ）ことを確認できる
   - _Requirements: 2.1, 2.2, 2.3_
   - _Depends: 2.2_
 

@@ -137,7 +137,7 @@ apps/app/
 
 ### Modified
 - `apps/app/package.json` — `"vendor:models": "node bin/vendor-model-catalog.ts"` を追加。
-- **リリース(RC/本番)ワークフロー**（`.github/workflows` のリリース系。例: `release-rc-scheduled.yml` 近傍）— リリース時に `vendor:models` を実行し、更新があれば成果物をコミット/PR してから build させる（**build 自体は成果物を read、live fetch しない**）。
+- **リリース(RC/本番)ワークフロー**（`.github/workflows` のリリース系。例: `release-rc-scheduled.yml`）— **リリースビルドの前段の独立 step** として `vendor:models` を実行し成果物をコミット（差分時。prod=pre-release step／無人 RC=build-image の前段ジョブで token/PR）。**リリースビルドはコミット済み成果物を read するのみで、refresh/fetch/commit を build 工程に融合しない**。
 - `apps/app/src/features/mastra/server/routes/admin-ai-settings/index.ts` — `router.get('/available-models', getAvailableModelsFactory(crowi))` を追加。
 - `apps/app/src/features/mastra/client/admin/AllowedModelsField.tsx` — provider で `useSWRxSelectableModels` を1回呼び、modelId 入力を `<select>`（catalog あり）／`<input type=text>`（catalog なし・provider 未選択・取得失敗）に出し分け。保存済みだが一覧外の値は `<option>` 補完で保持（1.5）。
 - `apps/app/src/features/mastra/client/admin/AllowedModelsField.spec.tsx` — 出し分け・保存済み値保持・取得失敗フォールバックのテスト。
@@ -148,10 +148,10 @@ apps/app/
 
 ```mermaid
 sequenceDiagram
-    participant Rel as Release/CI (build時)
+    participant Rel as リリース前段refresh step
     participant MD as models.dev api.json
     participant Repo as committed JSON
-    Rel->>MD: fetch (build/release のみ)
+    Rel->>MD: fetch リリース前段stepのみ
     Rel->>Rel: 3provider選択 + isSelectableModel(tool_call && text) で生成時フィルタ
     Rel->>Repo: model-catalog-data.json を書き出しコミット（差分は PR レビュー）
     Note over Repo: 以降ビルドはこの成果物を read（live fetch しない）
@@ -180,7 +180,7 @@ sequenceDiagram
     end
 ```
 
-- **鮮度運用の不変条件**: リリースの**ビルドはコミット済み成果物を read**する（ビルド中に live fetch しない）。リフレッシュ（fetch＋フィルタ＋コミット）は**最低限リリース(RC/本番)タイミング**で実行（必要に応じ手動 `pnpm vendor:models` / 将来 cron）。
+- **鮮度運用の不変条件**: リフレッシュ（fetch＋フィルタ＋コミット）は**リリースビルドの前段の独立 step**で実行し成果物をブランチにコミットする。**リリースビルドはコミット済み成果物を read するのみ**で、build 工程に fetch/commit を融合しない。タイミングは最低限リリース時（prod=pre-release step／無人 RC=build 前段ジョブ）、必要に応じ手動 `pnpm vendor:models` / 将来 cron。
 - **生成時フィルタ**: 成果物には chat＋tool 対応の id だけが載る（`tool_call:false` や非 text 出力は書き出さない）。実行時フィルタは不要。
 
 ## Requirements Traceability
@@ -189,7 +189,7 @@ sequenceDiagram
 |-------------|---------|------------|------------|-------|
 | 1.1–1.4 | カタログありは選択のみ提示 | AllowedModelsField, useSWRxSelectableModels, model-catalog | `SelectableModelsResponse` | provider→fetch→select |
 | 1.5 | 保存済みだが一覧外の値を保持 | AllowedModelsField | — | select options 補完 |
-| 2.1–2.3 | 実行時は通信ゼロ | model-catalog（成果物 read）、vendor-model-catalog（取得は build/release のみ）、release wiring | — | build時 fetch / runtime read |
+| 2.1–2.3 | 実行時は通信ゼロ | model-catalog（成果物 read）、vendor-model-catalog（取得はリリース前段 step のみ）、release wiring | — | リリース前段 fetch / runtime read |
 | 3.1–3.3 | カタログ無し/失敗時は自由入力 | AllowedModelsField, useSWRxSelectableModels | — | 空/error フォールバック |
 | 4.1–4.4 | 既存挙動不変 | （変更しない：put-ai-settings, resolve-mastra-model, get-models, isAiConfigured） | — | — |
 | 5.1–5.2 | provider 切替追従／未設定 | AllowedModelsField, useSWRxSelectableModels | — | SWR キー=provider |
@@ -238,16 +238,16 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 **Responsibilities & Constraints**
 - `fetch('https://models.dev/api.json')`（**build/release 時のみ**）→ `CATALOG_PROVIDERS` を選択 → `isSelectableModel` で生成時フィルタ → **id のみ**を `provider → string[]` に整形 → `model-catalog-data.json` を**決定的（ソート）**に書き出す。ヘッダに `_source`（MIT 帰属）/ `_generatedAt` を付与。
 - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。
-- 実行は `pnpm vendor:models`。**リリース(RC/本番)パイプラインで実行し成果物をコミット**、ビルドはコミット済みを消費（build 中に live fetch しない）。
+- 実行は `pnpm vendor:models`。**リリースビルドの前段の独立 step で実行し成果物をコミット**、リリースビルドはコミット済みを消費（build 工程に fetch/commit を融合しない）。
 
 **Contracts**: Batch [x]
-- Trigger: 手動 `pnpm vendor:models` ／ リリース(RC/本番)ワークフローのステップ。
+- Trigger: 手動 `pnpm vendor:models` ／ リリースビルド前段の独立 step。
 - Input: models.dev api.json（build/release 時 fetch）。
 - Output: コミットされる `model-catalog-data.json`（差分は PR レビュー）。
 - Idempotency: 同一上流なら同一出力（決定的）。fetch 失敗時は非ゼロ終了し、既存成果物は保持（後述 Error Handling）。
 
 **Implementation Notes**
-- Integration: リリースワークフローに「refresh→コミット→build」の順で差し込む。build task graph には**組み込まない**（毎ビルド fetch＝非決定的・オフライン不可を避ける）。
+- Integration: **リリースビルドの前段の独立 step**（prod=pre-release step／無人 RC=build-image の前段ジョブ、保護ブランチは token/PR）で refresh→コミット。build 工程には refresh/fetch/commit を**融合しない**（毎ビルド fetch＝非決定的・オフライン不可を避ける）。build はコミット済み成果物を read。
 - Risks: 上流スキーマ変更で抽出が壊れ得る（Revalidation Trigger）。fixture ベースのテストで transform を固定。
 
 ### Server (runtime)
