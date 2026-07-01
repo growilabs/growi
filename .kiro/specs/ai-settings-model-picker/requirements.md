@@ -23,17 +23,100 @@
 - 依存分類: `@mastra/core` を型のみ import から **値 import（SSR 実行）** に変えるため、build 後に `.next/node_modules` の externalization を確認する必要がある（`package-dependencies` ルール）。
 
 ### 本 spec のスコープに含める既存 spec の更新（新 spec のタスクとして整合させる）
-- **`mastra-multi-model-chat`**（`tasks-approved` / `ready_for_implementation=true`）:
-  - `requirements.md` の確定判断「モデル一覧取得 API は新設しない（理由: ai-sdk 列挙不可）」の**前提を修正**（ai-sdk 単体では不可でも `@mastra/core` 静的レジストリで列挙可能）。
-  - `design.md` Non-Goals「ベンダー API / レジストリからのモデル一覧自動取得。許可モデルは管理者の手入力」を、**「静的レジストリの read（オフライン）は採用、runtime fetch は依然不採用」** と整合させる。
-- **`multi-llm-provider`**（`tasks-generated` / `ready_for_implementation=false`）:
-  - `research.md` D-2/D-3 の Mastra model router（models.dev runtime fetch）**却下判断は維持**しつつ、**「静的レジストリの read 専用経路は別物・推論は native `@ai-sdk/*` のまま」** という反証注記を追加。
+- **`mastra-multi-model-chat`**（`tasks-approved` / `ready_for_implementation=true`）: requirements の「モデル一覧取得 API は新設しない」前提の修正、design Non-Goals の整合。
+- **`multi-llm-provider`**（`tasks-generated` / `ready_for_implementation=false`）: research D-2/D-3 の Mastra model router 却下は維持しつつ、静的レジストリ read 経路が別物である旨の注記を追加。
 
-### 想定する実装の当てはめ（要件確定後に design で詳細化）
-- 新規 admin GET endpoint を `admin-ai-settings` ルータ配下に追加（auth: `accessTokenParser([SCOPE.READ.ADMIN.AI])` → loginRequired → adminRequired）。provider スコープのモデル一覧を返す。
-- サーバ accessor（`features/mastra/server/services/ai-sdk-modules/llm-providers/config.ts`）に `getSelectableModels(provider)` を追加（`getProviderConfig` read + chat フィルタ）。
-- 共有 wire DTO を `features/mastra/interfaces/` に追加し、client は `useSWRImmutable` フックで取得。
-- `AllowedModelsField.tsx` の modelId 入力を combobox 化（`<input list>` + `<datalist>`）、azure は従来 input（`ProviderCommonSettings` の provider 分岐を踏襲）。
+---
+
+## Introduction
+
+本機能は、GROWI 管理画面の「AI Settings」において、チャットで許可するモデル（許可リスト）を登録する際の **modelId 入力を、手入力から選択式へ変更**するものである。選択肢は、製品に同梱された静的なモデルカタログ（Mastra 静的レジストリ）から、現在設定中のプロバイダにスコープして提供する。この一覧取得は **外部ネットワーク通信を一切伴わず**、自己ホスト・オフライン・エアギャップ環境でも同一に機能する。
+
+本機能が変更するのは「管理者がモデル ID をどう入力するか」のみであり、許可リストによる認可、既定モデルの扱い、モデルごとのオプション設定、推論の実行方式、およびチャット画面側のモデル選択 UI は変更しない。静的カタログを持たないプロバイダ（Azure OpenAI 等）や、カタログに未収録のモデルについては、従来どおり自由入力を併用できる。
+
+あわせて、本機能の導入により記述が矛盾する既存スペック（`mastra-multi-model-chat` / `multi-llm-provider`）の該当箇所を、本スペックのスコープとして整合更新する。
+
+## Boundary Context
+
+- **In scope**:
+  - AI Settings（管理画面）における許可モデルの入力方式を、選択式（+ 自由入力併用）へ変更する。
+  - 現在設定中のプロバイダにスコープした、外部通信を伴わない選択可能モデル一覧の提供。
+  - 静的カタログを持たないプロバイダ／未収録モデルに対する自由入力の維持。
+  - 記述が矛盾する既存スペック（`mastra-multi-model-chat` / `multi-llm-provider`）の整合更新。
+- **Out of scope**:
+  - チャット画面側のモデル選択 UI・体験の変更。
+  - モデルの推論実行方式（プロバイダ実装・呼び出し経路）の変更。
+  - 許可リストによる認可モデルの再設計、既定モデル選定ロジック・オプション設定の意味変更。
+  - 外部サービスへの通信を伴う自動的なモデル一覧取得、あるいは外部ゲートウェイ経由のモデルルーターの採用。
+  - Azure OpenAI のデプロイ名の自動列挙。
+  - 同梱カタログを常時最新化する仕組み（バージョン更新以外での自動リフレッシュ）。
+- **Adjacent expectations**:
+  - 既存の許可リスト検証、既定モデルの一意性、モデルごとのオプション設定、環境変数専用モードの読み取り専用挙動、AI 機能の有効判定は、本機能が依拠する前提としてそのまま維持され、本スペックはそれらの意味を変更しない。
+  - 提示されるモデル一覧の網羅性・鮮度は同梱静的カタログの内容に従い、本スペックはカタログの最新性を保証しない。
+  - 静的カタログを持たないプロバイダにおいては、モデル登録の妥当性は管理者の自由入力に依存する。
 
 ## Requirements
-<!-- Will be generated in /kiro-spec-requirements phase -->
+
+### Requirement 1: プロバイダ別の選択可能モデル一覧からの登録
+**Objective:** 管理者として、許可モデルを手入力ではなく提示された一覧から選択して登録したい。存在しない/綴り間違いの modelId 登録を防ぎ、利用可能なモデルを別途調べる手間をなくすため。
+
+#### Acceptance Criteria
+1. When 管理者が許可モデルの登録欄を操作したとき, the AI設定管理画面 shall 現在設定されているプロバイダに対応する選択可能なモデル ID の一覧を提示する。
+2. When 管理者が一覧からモデルを選択したとき, the AI設定管理画面 shall 選択された modelId を許可リストのエントリとして登録する。
+3. The AI設定管理画面 shall 一覧から選択された値を、既存の許可リストエントリと同一の形式（modelId 文字列）で保持する。
+4. While 設定中のプロバイダに対応する選択可能モデルが1件以上存在する場合, the AI設定管理画面 shall それらを選択肢として表示する。
+
+### Requirement 2: 外部通信を伴わないオフラインでの一覧取得
+**Objective:** 運用者として、モデル一覧の取得で外部サービスへの通信が発生しないことを保証したい。自己ホスト・エアギャップ・オフライン環境でも安全かつ確実に機能させるため。
+
+#### Acceptance Criteria
+1. When モデル一覧を取得するとき, the モデル選択機能 shall 外部ネットワークへの通信を一切行わない。
+2. Where ネットワークが遮断された環境で運用される場合, the モデル選択機能 shall 製品に同梱された静的カタログのみからモデル一覧を提供する。
+3. The モデル選択機能 shall モデル一覧の提供にあたり、外部のモデルカタログ／ベンダー API を参照しない。
+
+### Requirement 3: 未収録プロバイダ・モデルに対する自由入力の併用
+**Objective:** 管理者として、一覧に含まれないモデル（Azure OpenAI のデプロイ名や新たにリリースされたモデル）も登録したい。選択式の利便性を保ちつつ、登録可能なモデルを不当に制限しないため。
+
+#### Acceptance Criteria
+1. Where 設定中のプロバイダに対応する選択可能モデル一覧が存在しない場合, the AI設定管理画面 shall 従来どおりモデル ID の自由入力を提供する。
+2. When 管理者が一覧に含まれないモデル ID を入力したとき, the AI設定管理画面 shall その値の入力および登録を許可する。
+3. If 設定中のプロバイダの選択可能モデル一覧を取得できない場合, then the AI設定管理画面 shall 自由入力にフォールバックし、保存操作をブロックしない。
+
+### Requirement 4: 許可リストのセマンティクスと既存挙動の不変性
+**Objective:** 運用者として、入力方式の変更（手入力→選択）以外の挙動が一切変わらないことを保証したい。認可・既定モデル・オプション設定・推論・チャット側 UI の回帰を防ぐため。
+
+#### Acceptance Criteria
+1. The モデル選択機能 shall 許可リスト（許可モデルの集合）を引き続き認可境界として維持し、許可外モデルの利用を許さない。
+2. When 管理者が許可モデルを登録・削除・既定指定・オプション設定するとき, the AI設定管理画面 shall 既存の許可リストのセマンティクス（既定は非空時に1件のみ 等）をそのまま適用する。
+3. The モデル選択機能 shall モデルの推論実行方式、およびチャット画面でのモデル選択 UI を変更しない。
+4. The モデル選択機能 shall AI 機能の有効判定（設定済みと見なす条件）の基準を変更しない。
+
+### Requirement 5: プロバイダ切替時の一覧追従と未設定時の扱い
+**Objective:** 管理者として、プロバイダを切り替えたら選択肢もそのプロバイダのものに更新されてほしい。誤ったプロバイダのモデルを登録しないため。
+
+#### Acceptance Criteria
+1. When 管理者が設定中のプロバイダを変更したとき, the AI設定管理画面 shall 提示するモデル一覧を、新しいプロバイダに対応する内容へ更新する。
+2. While プロバイダが未設定または未選択の場合, the AI設定管理画面 shall モデル一覧を提示せず、自由入力を提供する。
+
+### Requirement 6: チャット用途モデルへの絞り込み
+**Objective:** 管理者として、チャットで使えないモデル（埋め込み・画像生成等）が選択肢に混在して混乱しないようにしたい。
+
+#### Acceptance Criteria
+1. When 選択可能モデル一覧を提示するとき, the モデル選択機能 should チャット用途に適さないと判別できるモデル（埋め込み・画像生成など）を一覧から除外する。
+2. Where 用途を判別できないモデルが存在する場合, the モデル選択機能 shall そのモデルを一覧に含めることを許容する（自由入力で任意の ID を登録できるため、過剰な除外を行わない）。
+
+### Requirement 7: 秘匿情報の非漏洩・管理者認可・環境変数専用モードの尊重
+**Objective:** 運用者として、一覧取得機能が秘匿情報を漏らさず、管理者のみが利用でき、環境変数専用モードの読み取り専用挙動を尊重することを保証したい。
+
+#### Acceptance Criteria
+1. The モデル選択機能 shall モデル一覧の応答に API キーやプロバイダ資格情報を一切含めず、モデル ID に関する情報のみを返す。
+2. If 管理者権限を持たない要求者がモデル一覧を要求した場合, then the モデル選択機能 shall その要求を拒否する。
+3. While AI 設定が環境変数専用モードで運用されている場合, the AI設定管理画面 shall 既存の読み取り専用挙動を維持し、選択 UI からの編集を許可しない。
+
+### Requirement 8: 既存スペックとの整合更新（本スペックのスコープ）
+**Objective:** スペック保守者として、本機能の導入に伴い矛盾する既存スペックの記述を更新し、ドキュメント間の一貫性を保ちたい。
+
+#### Acceptance Criteria
+1. When 本機能を実装するとき, the スペック保守プロセス shall `mastra-multi-model-chat` の要件・設計から「モデル一覧取得の仕組みは設けない／許可モデルは管理者が手入力する」という記述を、オフライン静的カタログに基づく選択方式の採用へ更新する。
+2. When 本機能を実装するとき, the スペック保守プロセス shall `multi-llm-provider` の調査記述に対し、外部通信を伴うモデルルーターの不採用を維持しつつ、静的カタログの読み取り経路は別物であり推論は従来実装のままである旨の注記を追加する。
+3. The スペック保守プロセス shall 上記更新の後、関連スペック間でモデル入力方式に関する矛盾記述が残らない状態にする。
