@@ -4,7 +4,8 @@ import type { JSX, ReactNode } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
-import { describe, expect, it, vi } from 'vitest';
+import type { SWRResponse } from 'swr';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({
@@ -13,8 +14,30 @@ vi.mock('next-i18next', () => ({
   }),
 }));
 
+vi.mock('./use-selectable-models', () => ({
+  useSWRxSelectableModels: vi.fn(),
+}));
+
+import type { SelectableModelsResponse } from '../../interfaces/selectable-models-response';
 import { AllowedModelsField } from './AllowedModelsField';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
+import { useSWRxSelectableModels } from './use-selectable-models';
+
+const mockedUseSelectableModels = vi.mocked(useSWRxSelectableModels);
+
+// Build a minimal SWRResponse for the hook mock. Only `data`/`error` are read by
+// the component; the rest of the SWRResponse surface is filled with inert stubs so
+// the returned value is a real SWRResponse (no type assertion needed).
+const swrResponse = (partial: {
+  data?: SelectableModelsResponse;
+  error?: Error;
+}): SWRResponse<SelectableModelsResponse, Error> => ({
+  data: partial.data,
+  error: partial.error,
+  isLoading: false,
+  isValidating: false,
+  mutate: vi.fn(),
+});
 
 const defaultFormValues: AiSettingsFormValues = {
   aiEnabled: true,
@@ -94,6 +117,17 @@ const removeAt = async (
 };
 
 describe('AllowedModelsField', () => {
+  // Default the hook to a free-text-inducing state (fetch failure) so the modelId
+  // control stays a text input for the provider-agnostic behavior suites below
+  // (add/remove, default radio, providerOptions, env-only). The select-mode suites
+  // override this per test. This keeps `getModelInputs()` (HTMLInputElement filter)
+  // matching the model control in every pre-existing test.
+  beforeEach(() => {
+    mockedUseSelectableModels.mockReturnValue(
+      swrResponse({ error: new Error('default: force free-text') }),
+    );
+  });
+
   describe('add / remove cards', () => {
     it('adds a new card when the add button is clicked', async () => {
       // Arrange
@@ -354,6 +388,148 @@ describe('AllowedModelsField', () => {
         (g) => within(g).queryByRole('radio') != null,
       );
       expect(modelCards).toHaveLength(2);
+    });
+  });
+
+  describe('modelId input: select vs free-text', () => {
+    it('renders a dropdown of the catalog models for a catalog provider (1.4)', () => {
+      // Arrange: openai has a catalog of selectable models.
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ data: { modelIds: ['gpt-4o', 'gpt-4.1'] } }),
+      );
+
+      // Act
+      renderComponent({
+        defaultValues: {
+          provider: 'openai',
+          allowedModels: [
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+          ],
+        },
+      });
+
+      // Assert: the model control is a <select> (not a free-text input) whose
+      // options are exactly the placeholder + the catalog ids — free typing of an
+      // out-of-list value is impossible (select-only).
+      const modelControl = screen.getByLabelText('ai_settings.model_label');
+      expect(modelControl.tagName).toBe('SELECT');
+      const optionLabels = within(modelControl)
+        .getAllByRole('option')
+        .map((o) => o.textContent);
+      expect(optionLabels).toEqual([
+        'ai_settings.model_placeholder',
+        'gpt-4o',
+        'gpt-4.1',
+      ]);
+    });
+
+    it('renders a free-text input when the catalog provider returns no models, e.g. Azure (3.1)', () => {
+      // Arrange: azure-openai is catalog-less → resolved but empty.
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ data: { modelIds: [] } }),
+      );
+
+      // Act
+      renderComponent({
+        defaultValues: {
+          provider: 'azure-openai',
+          allowedModels: [
+            {
+              modelId: 'my-deployment',
+              providerOptionsText: '',
+              isDefault: true,
+            },
+          ],
+        },
+      });
+
+      // Assert: free input remains (a text input, not a select) so a deployment
+      // name can be typed. Azure uses its own label key.
+      const modelControl = screen.getByLabelText(
+        'ai_settings.azure_model_deployment_label',
+      );
+      expect(modelControl).toBeInstanceOf(HTMLInputElement);
+      expect((modelControl as HTMLInputElement).type).toBe('text');
+    });
+
+    it('falls back to a free-text input when the model list cannot be fetched, without blocking editing (3.2)', async () => {
+      // Arrange: the fetch failed (error surfaced by the hook).
+      const user = userEvent.setup();
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ error: new Error('boom') }),
+      );
+
+      // Act
+      renderComponent({
+        defaultValues: {
+          provider: 'openai',
+          allowedModels: [
+            { modelId: '', providerOptionsText: '', isDefault: true },
+          ],
+        },
+      });
+
+      // Assert: a text input is rendered and remains editable (save is not blocked
+      // by the fetch failure — the admin can still type a model id).
+      const modelControl = screen.getByLabelText('ai_settings.model_label');
+      expect(modelControl).toBeInstanceOf(HTMLInputElement);
+      await user.type(modelControl, 'gpt-4o');
+      expect((modelControl as HTMLInputElement).value).toBe('gpt-4o');
+    });
+
+    it('keeps a saved modelId that is not in the current catalog as the selected value (1.5)', () => {
+      // Arrange: the saved value predates / is absent from the current catalog.
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ data: { modelIds: ['gpt-4o'] } }),
+      );
+
+      // Act
+      renderComponent({
+        defaultValues: {
+          provider: 'openai',
+          allowedModels: [
+            {
+              modelId: 'legacy-custom-id',
+              providerOptionsText: '',
+              isDefault: true,
+            },
+          ],
+        },
+      });
+
+      // Assert: the <select> retains the out-of-list value as a selected option —
+      // it is neither reset to empty nor silently changed.
+      const modelControl = screen.getByLabelText('ai_settings.model_label');
+      expect(modelControl.tagName).toBe('SELECT');
+      expect((modelControl as HTMLSelectElement).value).toBe(
+        'legacy-custom-id',
+      );
+      expect(
+        within(modelControl).getByRole('option', { name: 'legacy-custom-id' }),
+      ).toBeInTheDocument();
+    });
+
+    it('disables the dropdown in env-only mode so it cannot be edited (7.3)', () => {
+      // Arrange: select mode + env-only (disabled).
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ data: { modelIds: ['gpt-4o', 'gpt-4.1'] } }),
+      );
+
+      // Act
+      renderComponent({
+        disabled: true,
+        defaultValues: {
+          provider: 'openai',
+          allowedModels: [
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+          ],
+        },
+      });
+
+      // Assert: the dropdown is disabled (removed from the tab order, non-editable).
+      const modelControl = screen.getByLabelText('ai_settings.model_label');
+      expect(modelControl.tagName).toBe('SELECT');
+      expect(modelControl).toBeDisabled();
     });
   });
 });

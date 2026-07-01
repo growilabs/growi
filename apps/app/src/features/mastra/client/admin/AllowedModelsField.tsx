@@ -9,6 +9,7 @@ import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { getProviderOptionsJsonStatus } from './provider-options-json-status';
 import { buildInitialProviderOptionsText } from './provider-options-namespace';
 import { registerToInputProps } from './register-to-input-props';
+import { useSWRxSelectableModels } from './use-selectable-models';
 
 // Vercel AI SDK docs describing the provider-namespaced `providerOptions` shape.
 const PROVIDER_OPTIONS_DOC_URL =
@@ -62,6 +63,23 @@ export const AllowedModelsField = (
   const radioGroupName = useId();
 
   const provider = watch('provider');
+
+  // Fetch the selectable models for the current provider once at the field level
+  // and share the result with every row. The hook returns `null` key while the
+  // provider is unset, so no request is issued then (5.2).
+  const { data, error } = useSWRxSelectableModels(provider);
+
+  // Mode derivation (design "AllowedModelsField（UI 変更）"):
+  // - `select` only when the catalog resolved to a non-empty list (1.4).
+  // - `freetext` when the provider is unset (5.2), the fetch failed (3.2), or the
+  //   catalog resolved but is empty — e.g. azure-openai (3.1). In all three the
+  //   admin can still type a model id, so save is never blocked (3.2).
+  const selectableModelIds = data?.modelIds ?? [];
+  const isResolved = data != null;
+  // A request is in flight only while a provider is selected and nothing has
+  // resolved or errored yet; the modelId control is disabled during that window.
+  const isLoadingModels = provider !== '' && !isResolved && error == null;
+  const useSelect = isResolved && selectableModelIds.length > 0;
 
   // Azure OpenAI stores the *deployment name* in `modelId`, so the label changes
   // by provider (data-driven on the watched value, no provider-specific branch
@@ -124,6 +142,9 @@ export const AllowedModelsField = (
           labelKey={modelLabelKey}
           radioGroupName={radioGroupName}
           disabled={disabled}
+          useSelect={useSelect}
+          selectableModelIds={selectableModelIds}
+          isLoadingModels={isLoadingModels}
           docUrl={PROVIDER_OPTIONS_DOC_URL}
           placeholder={buildInitialProviderOptionsText(provider)}
           onSelectDefault={() => selectDefault(index)}
@@ -165,6 +186,16 @@ interface AllowedModelRowProps {
   readonly labelKey: string;
   readonly radioGroupName: string;
   readonly disabled: boolean;
+  /**
+   * Render the modelId control as a select-only dropdown (`true`) when the current
+   * provider has a non-empty catalog, or as free-text input (`false`) otherwise
+   * (catalog-less provider, unset provider, or fetch failure).
+   */
+  readonly useSelect: boolean;
+  /** The catalog model ids offered as dropdown options (empty in free-text mode). */
+  readonly selectableModelIds: readonly string[];
+  /** The catalog fetch is in flight; the modelId control is disabled meanwhile. */
+  readonly isLoadingModels: boolean;
   readonly docUrl: string;
   readonly placeholder: string;
   readonly onSelectDefault: () => void;
@@ -183,6 +214,9 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
     labelKey,
     radioGroupName,
     disabled,
+    useSelect,
+    selectableModelIds,
+    isLoadingModels,
     docUrl,
     placeholder,
     onSelectDefault,
@@ -195,14 +229,20 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
   const providerOptionsId = useId();
   const radioId = useId();
 
-  // Watch only this card's own fields (isDefault + providerOptions text) so editing
-  // a row or toggling the default re-renders just the affected rows — the parent
-  // subscribes to neither, keeping re-renders row-local.
+  // Watch only this card's own fields (isDefault + providerOptions text + modelId)
+  // so editing a row or toggling the default re-renders just the affected rows —
+  // the parent subscribes to none, keeping re-renders row-local.
   const isDefault =
     useWatch({ control, name: `allowedModels.${index}.isDefault` }) === true;
   const providerOptionsText =
     useWatch({ control, name: `allowedModels.${index}.providerOptionsText` }) ??
     '';
+  // The current modelId drives the out-of-list preservation option (1.5): a saved
+  // value absent from the catalog is kept as its own selectable <option>.
+  const currentModelId =
+    useWatch({ control, name: `allowedModels.${index}.modelId` }) ?? '';
+  const hasOutOfListValue =
+    currentModelId !== '' && !selectableModelIds.includes(currentModelId);
   const status = useMemo(
     () => getProviderOptionsJsonStatus(providerOptionsText),
     [providerOptionsText],
@@ -231,15 +271,46 @@ const AllowedModelRow = (props: AllowedModelRowProps): JSX.Element => {
           )}
         </div>
         <div className="d-flex align-items-center gap-3">
-          <Input
-            id={modelInputId}
-            type="text"
-            className="font-monospace flex-grow-1"
-            disabled={disabled}
-            {...registerToInputProps(
-              register(`allowedModels.${index}.modelId`),
-            )}
-          />
+          {/* The form binding (`register(...modelId)`) and value format are
+              identical in both modes (1.3); only the control type differs — a
+              select-only dropdown when the provider has a catalog (1.4), otherwise
+              the free-text input (catalog-less provider / unset / fetch failure —
+              3.1/3.2/5.2). The control is disabled in env-only mode and while the
+              catalog is still loading. */}
+          {useSelect ? (
+            <Input
+              id={modelInputId}
+              type="select"
+              className="font-monospace flex-grow-1"
+              disabled={disabled || isLoadingModels}
+              {...registerToInputProps(
+                register(`allowedModels.${index}.modelId`),
+              )}
+            >
+              <option value="">{t('ai_settings.model_placeholder')}</option>
+              {selectableModelIds.map((id) => (
+                <option key={id} value={id}>
+                  {id}
+                </option>
+              ))}
+              {/* Preserve a saved value that is not in the current catalog as its
+                  own selected option so it is neither reset nor silently changed
+                  (1.5). */}
+              {hasOutOfListValue && (
+                <option value={currentModelId}>{currentModelId}</option>
+              )}
+            </Input>
+          ) : (
+            <Input
+              id={modelInputId}
+              type="text"
+              className="font-monospace flex-grow-1"
+              disabled={disabled || isLoadingModels}
+              {...registerToInputProps(
+                register(`allowedModels.${index}.modelId`),
+              )}
+            />
+          )}
           <FormGroup check className="mb-0 text-nowrap">
             <Input
               id={radioId}
