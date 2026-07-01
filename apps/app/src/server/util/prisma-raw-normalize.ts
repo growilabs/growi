@@ -143,3 +143,26 @@ export function toRawObjectId(id: string): { $oid: string } {
 export function toRawDate(date: Date): { $date: string } {
   return { $date: date.toISOString() };
 }
+
+/**
+ * Asserts that a value normalized from an `aggregateRaw` result is an
+ * array, narrowing its type without a cast.
+ *
+ * Executors (aggregate-user-activities, aggregate-contributions) previously
+ * cast an unvalidated result straight to the expected array/interface type.
+ * A structurally wrong pipeline result (e.g. a broken $facet) then produced
+ * an empty-looking value indistinguishable from a genuine "no matching
+ * activities" outcome. Call this at each structural boundary of a raw
+ * result so a shape mismatch fails loudly with the offending path instead
+ * of silently flowing through as an empty array.
+ */
+export function assertIsArray(
+  value: unknown,
+  context: string,
+): asserts value is unknown[] {
+  if (!Array.isArray(value)) {
+    throw new Error(
+      `Expected an array from aggregateRaw (${context}), got ${typeof value}`,
+    );
+  }
+}

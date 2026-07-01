@@ -1,4 +1,5 @@
 import {
+  assertIsArray,
   normalizeAggregateRaw,
   toRawDate,
   toRawObjectId,
@@ -230,5 +231,31 @@ describe('toRawDate', () => {
     const normalized = normalizeAggregateRaw(toRawDate(date));
     expect(normalized).toBeInstanceOf(Date);
     expect((normalized as Date).getTime()).toBe(date.getTime());
+  });
+});
+
+describe('assertIsArray', () => {
+  it('does not throw for an array', () => {
+    expect(() => assertIsArray([1, 2, 3], 'test context')).not.toThrow();
+  });
+
+  it('does not throw for an empty array', () => {
+    expect(() => assertIsArray([], 'test context')).not.toThrow();
+  });
+
+  it('throws with the given context when the value is not an array', () => {
+    // Regression: aggregate-user-activities.ts / aggregate-contributions.ts
+    // used to cast an unvalidated aggregateRaw result straight to the
+    // expected array type. A silently-wrong pipeline (e.g. a broken $facet)
+    // then produced an empty-looking result indistinguishable from "no
+    // matching activities" -- exactly the failure mode that let the
+    // toRawObjectId/toRawDate regressions go undetected. This guards that a
+    // structurally wrong result now fails loudly instead.
+    expect(() => assertIsArray({}, 'user-activities $facet.docs')).toThrow(
+      /user-activities \$facet\.docs/,
+    );
+    expect(() => assertIsArray(undefined, 'test context')).toThrow(
+      /test context/,
+    );
   });
 });

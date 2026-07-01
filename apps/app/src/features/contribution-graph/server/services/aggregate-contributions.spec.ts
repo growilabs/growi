@@ -193,4 +193,24 @@ describe('aggregateContributions — DB-free unit (injected pipeline + mock aggr
     expect(typeof result[0].count).toBe('number');
     expect(result[0].count).toBe(4);
   });
+
+  // -------------------------------------------------------------------------
+  // Regression: a structurally wrong aggregateRaw result must fail loudly,
+  // not silently cast to IContributionDay[]
+  // -------------------------------------------------------------------------
+
+  it('throws when aggregateRaw does not return an array', async () => {
+    // Guards against re-introducing a blind `as IContributionDay[]` cast: a
+    // broken pipeline that returns e.g. a single object (not wrapped in an
+    // array) must fail loudly instead of silently producing wrong data.
+    const mockAggregateRaw = vi.fn().mockResolvedValue({ unexpected: true });
+
+    const mockPrisma = mock<PrismaClient>({
+      activities: { aggregateRaw: mockAggregateRaw },
+    });
+
+    await expect(
+      aggregateContributions(mockPrisma, STUB_PIPELINE),
+    ).rejects.toThrow(/array/i);
+  });
 });

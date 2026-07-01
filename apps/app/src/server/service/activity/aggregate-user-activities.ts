@@ -1,6 +1,9 @@
 import type { Prisma } from '~/generated/prisma/client';
 import type { IActivity } from '~/interfaces/activity';
-import { normalizeAggregateRaw } from '~/server/util/prisma-raw-normalize';
+import {
+  assertIsArray,
+  normalizeAggregateRaw,
+} from '~/server/util/prisma-raw-normalize';
 import type { PrismaClient } from '~/utils/prisma';
 
 /**
@@ -29,27 +32,45 @@ export const aggregateUserActivities = async (
     pipeline: pipeline as Prisma.InputJsonValue[],
   });
 
-  // aggregateRaw returns an array; the $facet stage yields exactly one document
-  // as its single result element.
-  const normalized = normalizeAggregateRaw(rawResult) as Array<
-    Record<string, unknown>
-  >;
+  // aggregateRaw returns an array; the $facet stage yields exactly one
+  // document as its single result element, even when zero activities match
+  // ({ docs: [], totalCount: [] }) -- a missing/wrong-shaped facet document
+  // means the pipeline itself is broken, not that there is no data.
+  const normalized = normalizeAggregateRaw(rawResult);
+  assertIsArray(normalized, 'user-activities aggregateRaw result');
 
-  const facetDoc = normalized[0] ?? {};
+  const facetDoc = normalized[0];
+  if (typeof facetDoc !== 'object' || facetDoc == null) {
+    throw new Error(
+      `aggregateUserActivities: expected a $facet document as the aggregateRaw result, got ${JSON.stringify(facetDoc)}`,
+    );
+  }
 
-  const rawDocs = (facetDoc.docs as unknown[]) ?? [];
-  const rawTotalCount =
-    (facetDoc.totalCount as Array<Record<string, unknown>>) ?? [];
+  const { docs, totalCount } = facetDoc as Record<string, unknown>;
+  assertIsArray(docs, 'user-activities $facet.docs');
+  assertIsArray(totalCount, 'user-activities $facet.totalCount');
 
   // Mirror the extraction the current Mongoose route performs:
   //   activityResults.totalCount.length > 0
   //     ? activityResults.totalCount[0].count
   //     : 0
-  const totalCount =
-    rawTotalCount.length > 0 ? (rawTotalCount[0].count as number) : 0;
-
   return {
-    docs: rawDocs as IActivity[],
-    totalCount,
+    docs: docs as IActivity[],
+    totalCount: totalCount.length > 0 ? extractCount(totalCount[0]) : 0,
   };
 };
+
+function extractCount(entry: unknown): number {
+  if (typeof entry !== 'object' || entry == null) {
+    throw new Error(
+      `aggregateUserActivities: $facet.totalCount[0] is not an object, got ${JSON.stringify(entry)}`,
+    );
+  }
+  const { count } = entry as Record<string, unknown>;
+  if (typeof count !== 'number') {
+    throw new Error(
+      `aggregateUserActivities: $facet.totalCount[0].count is not a number, got ${JSON.stringify(count)}`,
+    );
+  }
+  return count;
+}

@@ -1,6 +1,9 @@
 import type { IContributionDay } from '~/features/contribution-graph/interfaces/contribution';
 import type { Prisma } from '~/generated/prisma/client';
-import { normalizeAggregateRaw } from '~/server/util/prisma-raw-normalize';
+import {
+  assertIsArray,
+  normalizeAggregateRaw,
+} from '~/server/util/prisma-raw-normalize';
 import type { PrismaClient } from '~/utils/prisma';
 
 /**
@@ -28,6 +31,7 @@ export const aggregateContributions = async (
     pipeline: pipeline as Prisma.InputJsonValue[],
   });
 
-  const normalized = normalizeAggregateRaw(rawResult) as IContributionDay[];
-  return normalized;
+  const normalized = normalizeAggregateRaw(rawResult);
+  assertIsArray(normalized, 'contribution aggregateRaw result');
+  return normalized as IContributionDay[];
 };

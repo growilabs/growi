@@ -245,4 +245,67 @@ describe('aggregateUserActivities — DB-free unit (injected pipeline + mock agg
 
     expect(result.totalCount).toBe(42);
   });
+
+  // -------------------------------------------------------------------------
+  // Regression: a structurally wrong aggregateRaw result must fail loudly,
+  // not silently cast to { docs: IActivity[]; totalCount: number }
+  // -------------------------------------------------------------------------
+
+  it('throws when aggregateRaw does not return an array', async () => {
+    const mockAggregateRaw = vi.fn().mockResolvedValue({ unexpected: true });
+
+    const mockPrisma = mock<PrismaClient>({
+      activities: { aggregateRaw: mockAggregateRaw },
+    });
+
+    await expect(
+      aggregateUserActivities(mockPrisma, STUB_PIPELINE),
+    ).rejects.toThrow(/array/i);
+  });
+
+  it('throws when the $facet document is missing (empty aggregateRaw array)', async () => {
+    // Guards against re-introducing `normalized[0] ?? {}`, which silently
+    // treated a missing $facet document (e.g. a broken pipeline that never
+    // reaches the $facet stage) the same as a valid "zero activities" result.
+    const mockAggregateRaw = vi.fn().mockResolvedValue([]);
+
+    const mockPrisma = mock<PrismaClient>({
+      activities: { aggregateRaw: mockAggregateRaw },
+    });
+
+    await expect(
+      aggregateUserActivities(mockPrisma, STUB_PIPELINE),
+    ).rejects.toThrow(/facet/i);
+  });
+
+  it('throws when the $facet document is missing a docs array', async () => {
+    // Guards against re-introducing `(facetDoc.docs as unknown[]) ?? []`,
+    // which silently treated a broken pipeline (wrong $facet key name) the
+    // same as a valid "zero activities" result.
+    const mockAggregateRaw = vi
+      .fn()
+      .mockResolvedValue([{ totalCount: [{ count: 1 }] }]);
+
+    const mockPrisma = mock<PrismaClient>({
+      activities: { aggregateRaw: mockAggregateRaw },
+    });
+
+    await expect(
+      aggregateUserActivities(mockPrisma, STUB_PIPELINE),
+    ).rejects.toThrow(/docs/i);
+  });
+
+  it('throws when totalCount[0].count is not a number', async () => {
+    const mockAggregateRaw = vi
+      .fn()
+      .mockResolvedValue([{ docs: [], totalCount: [{ count: 'oops' }] }]);
+
+    const mockPrisma = mock<PrismaClient>({
+      activities: { aggregateRaw: mockAggregateRaw },
+    });
+
+    await expect(
+      aggregateUserActivities(mockPrisma, STUB_PIPELINE),
+    ).rejects.toThrow(/count/i);
+  });
 });
