@@ -1,11 +1,14 @@
-import type { NextFunction, Request, Response } from 'express';
+import type { NextFunction, Request, RequestHandler, Response } from 'express';
 import express from 'express';
 import { Types } from 'mongoose';
 import request from 'supertest';
+import type { MockInstance } from 'vitest';
 
 import { getInstance } from '^/test/setup/crowi';
 
+import type { CommentModel } from '~/features/comment/server/models/comment';
 import type Crowi from '~/server/crowi';
+import type { ShareLinkModel } from '~/server/models/share-link';
 
 const { ObjectId } = Types;
 
@@ -34,19 +37,18 @@ interface TestRequest extends Request {
 describe('/comments.get share-link authorization (integration)', () => {
   let crowi: Crowi;
   let app: express.Application;
-  // biome-ignore lint/suspicious/noExplicitAny: mongoose models are dynamically typed here
+  // `isAccessiblePageByViewer` is a JS-defined static (obsolete-page.js) that is
+  // not on the TS PageModel interface, and crowi.models.Page's default export is
+  // typed `any`, so there is no usable type to spy on here.
+  // biome-ignore lint/suspicious/noExplicitAny: no usable type for Page (see above)
   let Page: any;
-  // biome-ignore lint/suspicious/noExplicitAny: mongoose models are dynamically typed here
-  let Comment: any;
-  // biome-ignore lint/suspicious/noExplicitAny: mongoose models are dynamically typed here
-  let ShareLink: any;
-  // biome-ignore lint/suspicious/noExplicitAny: express middleware
-  let certifySharedPage: any;
+  let Comment: CommentModel;
+  let ShareLink: ShareLinkModel;
+  let certifySharedPage: RequestHandler;
 
   // Controllable request user, read by the injector middleware at request time.
   let currentUser: { _id: Types.ObjectId } | null = null;
-  // biome-ignore lint/suspicious/noExplicitAny: vitest spy instance
-  let accessSpy: any;
+  let accessSpy: MockInstance;
 
   // Seeded ids (page A is the share-link target; page B is a foreign page).
   const pageAId = new ObjectId();
@@ -169,11 +171,11 @@ describe('/comments.get share-link authorization (integration)', () => {
   });
 
   describe('certifySharedPage verification', () => {
-    const runCertify = async (
-      query: Record<string, unknown>,
-    ): Promise<boolean> => {
-      // WHY: a minimal request stub is enough for this middleware (it only reads
-      // query/body); building a full express Request is unwarranted here.
+    const runCertify = async (query: Request['query']): Promise<boolean> => {
+      // A minimal literal stub is required here (not mock<TestRequest>()): the
+      // middleware reads absent query keys as `undefined` (e.g. `req.query.pageId
+      // || ...`), but a deep mock returns stub functions for absent keys, which
+      // would break those reads. The middleware only touches query/body/next.
       const req = { query, body: {} } as unknown as TestRequest;
       await certifySharedPage(req, {} as Response, () => undefined);
       return req.isSharedPage === true;
@@ -404,6 +406,23 @@ describe('/comments.get share-link authorization (integration)', () => {
         .query({ 'page_id[$gt]': '' });
 
       expectValidationRejected(res);
+      expect(accessSpy).not.toHaveBeenCalled();
+    });
+
+    it('rejects an array-valued page_id (Mongoose $in / cross-page IDOR)', async () => {
+      // Both ids are valid MongoIds individually. Without a scalar guard,
+      // `.isMongoId()` passes the array and Mongoose casts `find({ page: [A,B] })`
+      // into an implicit `$in`, leaking page B's comments to a viewer who only
+      // has access to page A. The scalar `.isString()` guard must reject it
+      // before the handler runs.
+      currentUser = { _id: new ObjectId() };
+      accessSpy.mockResolvedValue(true);
+      const res = await request(app)
+        .get('/comments.get')
+        .query({ page_id: [pageAId.toString(), pageBId.toString()] });
+
+      expectValidationRejected(res);
+      // never reaches the access check or the handler -> no cross-page $in leak
       expect(accessSpy).not.toHaveBeenCalled();
     });
 

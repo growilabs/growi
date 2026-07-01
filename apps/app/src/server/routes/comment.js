@@ -171,19 +171,32 @@ module.exports = (crowi, _app) => {
   };
 
   api.validators.get = () => {
-    // Validate ids as MongoId to close the NoSQL injection surface
-    // (e.g. `?page_id[$gt]=`). page_id is required; shareLinkId / revision_id
-    // are optional. The handler rejects via validationResult when these fail.
+    // Validate ids as scalar MongoId strings to close the NoSQL injection
+    // surface. `.isMongoId()` alone does NOT reject array/object values:
+    // `?page_id[$gt]=` (object) and, more importantly, `?page_id[0]=A&page_id[1]=B`
+    // (array) both slip through, and Mongoose casts an array id into an implicit
+    // `$in`. That would let one request fetch comments across multiple page_ids
+    // (an IDOR that defeats the "verify id === fetch id" single-id invariant).
+    // `.isString().bail()` rejects non-string values first, then `.isMongoId()`
+    // validates the string. Enforcement happens at the route-level
+    // `apiV1FormValidator`, which short-circuits before this handler runs.
+    // page_id is required; shareLinkId / revision_id are optional.
     return [
       query('page_id')
+        .isString()
+        .bail()
         .isMongoId()
         .withMessage('page_id must be a valid MongoId'),
       query('shareLinkId')
         .optional()
+        .isString()
+        .bail()
         .isMongoId()
         .withMessage('shareLinkId must be a valid MongoId'),
       query('revision_id')
         .optional()
+        .isString()
+        .bail()
         .isMongoId()
         .withMessage('revision_id must be a valid MongoId'),
     ];
