@@ -17,6 +17,30 @@ import { prisma } from '~/utils/prisma';
 
 const DEFAULT_LIMIT = 50;
 
+// Minimal User schema (the fields createTestUser seeds, plus timestamps --
+// the real `users` Prisma model declares `createdAt`/`updatedAt`
+// non-nullable, and findAllWithPagination's `include: { user: true }`
+// throws P2032 if a seeded User is missing either). Guarded against
+// duplicate registration across specs in the same process; mongoose.model
+// ('User') below throws MissingSchemaError otherwise -- nothing else in
+// this file's import graph registers the User model.
+if (mongoose.models.User == null) {
+  mongoose.model(
+    'User',
+    new mongoose.Schema(
+      {
+        name: String,
+        username: String,
+        email: String,
+        status: Number,
+        lang: String,
+        isEmailPublished: Boolean,
+      },
+      { timestamps: true },
+    ),
+  );
+}
+
 /**
  * Helper to create a test user in MongoDB via Mongoose so that Prisma's
  * externalaccounts.user relation can be satisfied (userId must reference a

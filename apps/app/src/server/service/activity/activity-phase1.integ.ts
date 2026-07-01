@@ -83,7 +83,7 @@ function makeCreateParams(overrides: {
     action: overrides.action ?? SupportedAction.ACTION_PAGE_CREATE,
     ip: overrides.ip ?? TEST_IP,
     endpoint: overrides.endpoint ?? '/test/phase1',
-    userId: overrides.userId,
+    user: overrides.userId,
     snapshot: { username: overrides.username ?? 'testuser_phase1' },
     target: overrides.target,
     targetModel: overrides.targetModel,

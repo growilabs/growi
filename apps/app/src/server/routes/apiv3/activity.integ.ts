@@ -23,6 +23,7 @@ import request from 'supertest';
 import { getInstance } from '^/test/setup/crowi';
 
 import type Crowi from '~/server/crowi';
+import { configManager } from '~/server/service/config-manager';
 import { prisma } from '~/utils/prisma';
 
 import type { ApiV3Response } from './interfaces/apiv3-response';
@@ -88,6 +89,11 @@ describe('GET /api/v3/activity', () => {
   beforeAll(async () => {
     crowi = await getInstance();
 
+    // The route handler short-circuits to 405 "AuditLog is not enabled" when
+    // this is falsy -- required for any of the below requests to reach the
+    // paginate/filter logic under test.
+    await configManager.updateConfigs({ 'app:auditLogEnabled': true });
+
     const { setup } = await import('./activity');
     const router = setup(crowi);
 
@@ -133,7 +139,9 @@ describe('GET /api/v3/activity', () => {
       const searchFilter = JSON.stringify({ usernames: ['alice'] });
       const res = await request(app)
         .get('/api/v3/activity')
-        .query({ limit: 10, offset: 1, searchFilter });
+        // offset=0 (not 1): this test asserts response shape, not the
+        // offset||1 quirk -- offset=1 would skip the only seeded record.
+        .query({ limit: 10, offset: 0, searchFilter });
 
       expect(res.status).toBe(200);
       const { serializedPaginationResult } = res.body.data;
@@ -167,7 +175,7 @@ describe('GET /api/v3/activity', () => {
 
       const res = await request(app)
         .get('/api/v3/activity')
-        .query({ limit: 10, offset: 1 });
+        .query({ limit: 10, offset: 1, searchFilter: JSON.stringify({}) });
 
       expect(res.status).toBe(200);
       const pr = res.body.data.serializedPaginationResult;

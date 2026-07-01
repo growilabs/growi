@@ -39,6 +39,12 @@ import {
 // A sentinel ip value so cleanup deletes only this suite's rows.
 const TEST_IP = '10.0.0.71';
 
+// Monotonically-increasing offset so records seeded in the same tight loop
+// (same userId/target/action, no explicit createdAt) get distinct
+// createdAt values -- otherwise same-millisecond createdAt collides with
+// the compound unique index (userId, target, action, createdAt).
+let createdAtOffsetMs = 0;
+
 /** Build a minimal activities record for seeding via prisma.activities.createMany. */
 function makeActivityData(overrides: {
   id: string;
@@ -51,7 +57,8 @@ function makeActivityData(overrides: {
     id: overrides.id,
     v: 0,
     action: overrides.action,
-    createdAt: overrides.createdAt ?? new Date(),
+    createdAt:
+      overrides.createdAt ?? new Date(Date.now() + createdAtOffsetMs++),
     endpoint: '/test/export-cursor',
     ip: overrides.ip ?? TEST_IP,
     snapshot: { id: new Types.ObjectId().toHexString(), username: 'testuser' },
