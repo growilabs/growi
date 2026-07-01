@@ -1,4 +1,4 @@
-import type { IPage } from '@growi/core';
+import type { IPage, IUser, Ref } from '@growi/core';
 import mongoose from 'mongoose';
 
 import { ContributionGraphActions } from '~/features/contribution-graph/interfaces/supported-actions';
@@ -7,7 +7,12 @@ import {
   resolveContributor,
 } from '~/features/contribution-graph/server/services/contribution-migration-service';
 import { addContribution } from '~/features/contribution-graph/server/services/contribution-service';
-import type { IActivity, SupportedActionType } from '~/interfaces/activity';
+import type {
+  IActivity,
+  SupportedActionType,
+  SupportedEventModelType,
+  SupportedTargetModelType,
+} from '~/interfaces/activity';
 import {
   ActionGroupSize,
   AllEssentialActions,
@@ -16,8 +21,7 @@ import {
   AllSmallGroupActions,
   AllSupportedActions,
 } from '~/interfaces/activity';
-import type { ActivityDocument } from '~/server/models/activity';
-import Activity from '~/server/models/activity';
+import Activity, { type ActivityWithUser } from '~/server/models/activity';
 import { prisma } from '~/utils/prisma';
 
 import loggerFactory from '../../utils/logger';
@@ -36,6 +40,33 @@ const parseActionString = (actionsString: string): SupportedActionType[] => {
     (AllSupportedActions as string[]).includes(action),
   ) as SupportedActionType[];
 };
+
+/**
+ * Converts a Prisma `activities` row (updateByParameters's result, populated
+ * via `include: { user: true }`) to the `IActivity` shape `GeneratePreNotify`
+ * expects. Prisma's scalar reference fields (`user`, `target`, `event`, ...)
+ * are `| null` when unset; `IActivity`'s are `| undefined` (no `null`). The
+ * populated `users` row also has nullable fields (e.g. `name: string | null`)
+ * where `IUser` requires non-nullable -- at runtime they map to the same
+ * MongoDB document (same cast pattern as apiv3/activity.ts's
+ * serializeUserSecurely call). Tier-2 rationale: the cast is confined to this
+ * single conversion, not spread across call sites.
+ */
+const toGeneratePreNotifyActivity = (
+  activity: ActivityWithUser,
+): IActivity => ({
+  ...activity,
+  action: activity.action as SupportedActionType,
+  user: (activity.user ?? undefined) as Ref<IUser> | undefined,
+  target: activity.target ?? undefined,
+  targetModel: (activity.targetModel ?? undefined) as
+    | SupportedTargetModelType
+    | undefined,
+  event: activity.event ?? undefined,
+  eventModel: (activity.eventModel ?? undefined) as
+    | SupportedEventModelType
+    | undefined,
+});
 
 class ActivityService {
   crowi!: Crowi;
@@ -62,8 +93,9 @@ class ActivityService {
         generatePreNotify?: GeneratePreNotify,
         getAdditionalTargetUsers?: GetAdditionalTargetUsers,
       ) => {
-        // biome-ignore lint/suspicious/noExplicitAny: Prisma returns a different shape than ActivityDocument; any is safe here because downstream emitters are also typed as any
-        let activity: any;
+        let activity: Awaited<
+          ReturnType<typeof prisma.activities.updateByParameters>
+        >;
         const { contributor, ...activityParameters } = parameters;
         const shoudUpdate = this.shoudUpdateActivity(parameters.action);
         const shouldGenerateContribution = this.shouldGenerateContribution(
@@ -108,9 +140,16 @@ class ActivityService {
             return;
           }
 
+          // updateByParameters returns null when activityId matches no row
+          // (C1 not-found semantics, e.g. P2025) -- nothing was updated, so
+          // there is nothing to notify about.
+          if (activity == null) {
+            return;
+          }
+
           if (generatePreNotify != null) {
             const preNotify = generatePreNotify(
-              activity,
+              toGeneratePreNotifyActivity(activity),
               getAdditionalTargetUsers,
             );
 

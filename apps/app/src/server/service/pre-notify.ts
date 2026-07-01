@@ -1,7 +1,8 @@
 import { getIdForRef, type IPage, type IUser, type Ref } from '@growi/core';
 import mongoose from 'mongoose';
 
-import type { ActivityDocument } from '../models/activity';
+import type { IActivity } from '~/interfaces/activity';
+
 import Subscription from '../models/subscription';
 import { UserStatus } from '../models/user/conts';
 
@@ -11,10 +12,10 @@ export type PreNotifyProps = {
 
 export type PreNotify = (props: PreNotifyProps) => Promise<void>;
 export type GetAdditionalTargetUsers = (
-  activity: ActivityDocument,
+  activity: IActivity,
 ) => Promise<Ref<IUser>[]>;
 export type GeneratePreNotify = (
-  activity: ActivityDocument,
+  activity: IActivity,
   getAdditionalTargetUsers?: GetAdditionalTargetUsers,
 ) => PreNotify;
 
@@ -33,7 +34,7 @@ class PreNotifyService implements IPreNotifyService {
   };
 
   generatePreNotify = (
-    activity: ActivityDocument,
+    activity: IActivity,
     getAdditionalTargetUsers?: GetAdditionalTargetUsers,
   ): PreNotify => {
     const preNotify = async (props: PreNotifyProps) => {
@@ -45,9 +46,14 @@ class PreNotifyService implements IPreNotifyService {
       const subscribedUsers = await Subscription.getSubscription(
         target as unknown as Ref<IPage>,
       );
-      const notificationUsers = subscribedUsers.filter(
-        (item) => item.toString() !== getIdForRef(actionUser).toString(),
-      );
+      // actionUser is absent for system-triggered activities with no acting
+      // user; in that case there is no one to exclude from the subscribers.
+      const notificationUsers =
+        actionUser == null
+          ? subscribedUsers
+          : subscribedUsers.filter(
+              (item) => item.toString() !== getIdForRef(actionUser).toString(),
+            );
       const activeNotificationUsers = await User.find({
         _id: { $in: notificationUsers },
         status: UserStatus.STATUS_ACTIVE,
