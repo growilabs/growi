@@ -21,10 +21,18 @@ type CommentOperation = {
   post(args: ICommentPostArgs): Promise<void>;
 };
 
-const hasShareLinkId = (
-  shareLinkId: string | null | undefined,
-): shareLinkId is string => {
-  return shareLinkId != null && shareLinkId.trim().length > 0;
+/**
+ * Normalize a raw shareLinkId into a non-empty trimmed string, or `undefined`
+ * when it carries no share-link context. Feeding this normalized value into
+ * both the SWR cache key and the request keeps them in sync: without it,
+ * distinct-but-equivalent raw values (e.g. '  ' vs '   ') would produce
+ * separate cache entries that all resolve to the same request.
+ */
+const normalizeShareLinkId = (
+  shareLinkId: string | undefined,
+): string | undefined => {
+  const trimmed = shareLinkId?.trim();
+  return trimmed != null && trimmed.length > 0 ? trimmed : undefined;
 };
 
 /**
@@ -36,9 +44,9 @@ const hasShareLinkId = (
  */
 const buildCommentGetParams = (
   pageId: string,
-  shareLinkId: string | null | undefined,
+  shareLinkId: string | undefined,
 ): { page_id: string; shareLinkId?: string } => {
-  if (hasShareLinkId(shareLinkId)) {
+  if (shareLinkId != null) {
     return { page_id: pageId, shareLinkId };
   }
   return { page_id: pageId };
@@ -47,17 +55,13 @@ const buildCommentGetParams = (
 export const useSWRxPageComment = (
   pageId: Nullable<string>,
 ): SWRResponse<ICommentHasIdList, Error> & CommentOperation => {
-  const shareLinkId = useShareLinkId();
+  const shareLinkId = normalizeShareLinkId(useShareLinkId());
 
   const shouldFetch: boolean = pageId != null;
 
   const swrResponse = useSWR(
     shouldFetch ? ['/comments.get', pageId, shareLinkId] : null,
-    ([endpoint, pageId, shareLinkId]: [
-      string,
-      string,
-      string | null | undefined,
-    ]) =>
+    ([endpoint, pageId, shareLinkId]: [string, string, string | undefined]) =>
       apiGet(endpoint, buildCommentGetParams(pageId, shareLinkId)).then(
         (response: IResponseComment) => response.comments,
       ),
