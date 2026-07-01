@@ -39,7 +39,7 @@
   - _Depends: 2.2_
   - _Boundary: model-catalog_
 
-- [ ] 3.2 available-models エンドポイントを公開し admin ルータに接続する
+- [x] 3.2 available-models エンドポイントを公開し admin ルータに接続する
   - 管理者認可チェーン（read:admin:ai スコープ + login + admin）配下で、プロバイダをクエリに取り選択可能モデル一覧を返すエンドポイントを追加し admin ルータに mount する
   - プロバイダ値を allow-list 検証し不正なら 400、未収録プロバイダは空一覧、応答は modelId のみ（秘匿情報なし）
   - 完了状態: 非管理者は 401/403、`?provider=openai` は非空 modelIds、`?provider=azure-openai` は空、不正 provider は 400、応答に apiKey/providerOptions を含まないことを統合テストで確認できる
