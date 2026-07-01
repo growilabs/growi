@@ -32,7 +32,7 @@
   - _Boundary: vendor-model-catalog, model-catalog-data.json_
 
 - [ ] 3. サーバ実行時の読み取りとエンドポイント
-- [ ] 3.1 コミット成果物からモデル一覧を返す読み取りサービスを実装する
+- [x] 3.1 コミット成果物からモデル一覧を返す読み取りサービスを実装する
   - `getSelectableModelIds(provider)` がコミット済み `model-catalog-data.json` を静的 read し `provider` の配列を返す。**ネットワーク I/O なし**、カタログ非対応プロバイダは空配列
   - 完了状態: コミット成果物をもとに openai が非空・azure-openai が空を返し、実行時にネットワーク呼び出しが発生しないことを単体テストで確認できる
   - _Requirements: 1.1, 2.1, 2.2, 2.3, 3.1_
