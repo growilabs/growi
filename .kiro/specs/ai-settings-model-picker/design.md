@@ -264,7 +264,7 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 ```typescript
 export const getSelectableModelIds: (provider: AiProvider) => string[];
 ```
-- `import catalog from './model-catalog-data.json'` を静的 read し、`catalog[provider] ?? []` を返す。**ネットワーク I/O なし**、フィルタは既に生成時に完了しているため実行時ロジックは最小。カタログ非対応プロバイダ（azure-openai）は `[]`。
+- `import catalog from './model-catalog-data.json'` を境界で **`as ModelCatalog`** として型付けし、`catalog[provider] ?? []` を返す（以降は型安全）。**ネットワーク I/O なし**、フィルタは既に生成時に完了しているため実行時ロジックは最小。カタログ非対応プロバイダ（azure-openai）は `[]`。
 
 #### get-available-models（API）
 | Field | Detail |
@@ -338,6 +338,13 @@ export interface SelectableModelsResponse {
   "google":    ["..."]
 }
 ```
+```typescript
+// vendored 成果物（model-catalog-data.json）の型。server 限定（client は SelectableModelsResponse のみ）。
+// 生成側（vendoring script）と消費側（model-catalog.ts）がこの単一型を参照しドリフトを防ぐ。
+// 配置は model-catalog.ts 近傍（server 側）。
+export type ModelCatalog = Partial<Record<AiProvider, readonly string[]>>;
+```
+- 消費側 `model-catalog.ts` は JSON import を**境界で `as ModelCatalog` として型付け**し、以降は型安全に read する（`getSelectableModelIds` は `string[]` を返す）。vendored 成果物がこの型に適合することは1本のテストで担保する（runtime parse は不要＝自前生成・生成時 zod 検証済みのため）。
 - 既存 `AllowedModel` / `AiSettingsResponse` / `AiSettingsUpdateRequest` は変更しない（4.x）。
 
 ## Error Handling
