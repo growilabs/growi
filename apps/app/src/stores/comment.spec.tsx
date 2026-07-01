@@ -12,7 +12,8 @@ vi.mock('~/client/util/apiv1-client', () => ({
   apiGet: vi.fn().mockResolvedValue({ comments: [], ok: true }),
   apiPost: vi.fn().mockResolvedValue({ ok: true }),
 }));
-vi.mock('~/states/page/hooks', () => ({
+vi.mock('~/states/page/hooks', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('~/states/page/hooks')>()),
   useShareLinkId: vi.fn(),
 }));
 
