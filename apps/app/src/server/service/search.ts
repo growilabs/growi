@@ -361,7 +361,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const response: AuditlogSuggestionsResponse = {};
 
     if (fields.includes('username')) {
-      const usernames = this.isConfigured
+      const usernames = this.isReachable
         ? await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
             'username',
             q,

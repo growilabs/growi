@@ -227,4 +227,27 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).not.toHaveBeenCalled();
   });
+
+  it('should use the MongoDB fallback when ES is configured but unreachable', async () => {
+    searchService.isErrorOccuredOnHealthcheck = true;
+    vi.mocked(Activity.findSnapshotUsernamesByUsernameRegex).mockResolvedValue([
+      'alice',
+    ]);
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+    ]);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      'ali',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: { activeUsernames: ['alice'], inactiveUsernames: [] },
+    });
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).not.toHaveBeenCalled();
+  });
 });
