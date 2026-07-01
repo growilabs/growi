@@ -87,7 +87,7 @@
   - _Requirements: 8.1_
   - _Boundary: spec mastra-multi-model-chat_
 
-- [ ] 7.2 (P) multi-llm-provider スペックを整合させる
+- [x] 7.2 (P) multi-llm-provider スペックを整合させる
   - research の D-2/D-3 に、models.dev の runtime fetch（モデルルーター）は不採用のまま／取り込みステップ（リリース前段）で vendoring した静的カタログの read は別物であり推論は native 実装のまま、という注記を追加する
   - 完了状態: 当該 research に「runtime fetch 不採用」と「vendored 静的 read は別物」の区別を示す注記が存在する
   - _Requirements: 8.2_
