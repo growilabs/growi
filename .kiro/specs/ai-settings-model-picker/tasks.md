@@ -81,7 +81,7 @@
   - _Depends: 3.2, 5.1_
 
 - [ ] 7. スペック整合更新
-- [ ] 7.1 (P) mastra-multi-model-chat スペックを整合させる
+- [x] 7.1 (P) mastra-multi-model-chat スペックを整合させる
   - 「モデル一覧取得の仕組みは設けない／許可モデルは管理者が手入力する」という要件・設計の記述を、オフライン vendored カタログに基づく選択方式の採用へ更新する
   - 完了状態: 当該スペックの requirements/design に手入力前提の記述が残らず、vendored カタログ選択方式の採用が明記されている
   - _Requirements: 8.1_
