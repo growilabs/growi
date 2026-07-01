@@ -8,9 +8,17 @@
 
 **Impact**: 現状 `snapshot` は `{ username }` のみで、添付削除では「誰が消したか」しか残らない。本機能は snapshot を action ごとの判別可能ユニオンにし、添付削除（直接削除・カスケード削除の両方）で対象ファイルの情報を凍結保存する。
 
-> **【ハードブロッカー】** 本スペックは **`activities` モデルが Mongoose から Prisma へ移行済み**であることを実装着手の絶対前提とする（移行は別スペックの責務。`research.md` D-2 方針3 を参照）。以降の永続層・API・サービスの記述はすべて移行後の Prisma を前提とする。
+> **【前提条件は完了済み】** 本スペックは **`activities` モデルが Mongoose から Prisma へ移行済み**であることを実装着手の絶対前提とする（移行は別スペック `activities-prisma-migration` の責務。`research.md` D-2 方針3 を参照）。**この移行は 2026-07-01 に完了を確認済み**：`add-activity.ts` / `service/activity.ts` / `apiv3/activity.ts` が Mongoose の `Activity.create` / `update` / `paginate` を一切呼ばないことを grep で確認し、実 MongoDB（devcontainer の `mongo:27017`, replicaSet rs0）に対する統合テスト 7 ファイル・42 件がすべて green だった。以降の永続層・API・サービスの記述はすべて移行後の Prisma を前提とする。
 >
-> **移行未完のまま実装してはならない。** 現状の書き込み実体は Mongoose の `snapshotSchema = new Schema({ username })`（`apps/app/src/server/models/activity.ts:43-45`）であり、Mongoose は strict 既定で未宣言フィールドを保存時に黙って捨てる。移行前に schema.prisma の `ActivitiesSnapshot` にだけフィールドを足しても、実際に書き込むのは Mongoose 経由なので添付フィールドは1バイトも保存されず、「型は通るが保存されない」最も気づきにくい失敗に陥る（要件 2・3・4 が同時に空振りする）。移行完了の確認（`activities` の書き込み・読み取り・paginate がすべて Prisma 拡張経由になっていること）を実装着手のゲートとする。
+> **移行後に使える具体的な API**（`models/activity.ts` の `ActivityExtension`、詳細は移行スペックの design.md/tasks.md — git 履歴に残る）:
+> - `prisma.activities.createByParameters(params)` — `user`/`target` がオブジェクトで渡ってきた場合の ID への変換は拡張の内部で行う
+> - `prisma.activities.updateByParameters(id, parameters)` — `include: { user: true }` 済みで返る。対象が見つからない場合は例外を投げず `null` を返す（Mongoose 版の `findOneAndUpdate(..., {new:true})` と同じ挙動）
+> - `prisma.activities.paginate({ where, orderBy, offset, limit, include })` — **offset 指定のみを受け付ける**（`page` 指定は廃止済み。共有ヘルパ `~/utils/prisma` の `paginate` も同様に offset 統一済み）
+> - `prisma.activities.findSnapshotUsernamesByUsernameRegexWithTotalCount(...)` — `aggregateRaw` を使う実装に置き換え済み
+> - `where: { snapshot: { is: { username: { in: [...] } } } }` という composite type への絞り込みは、実 MongoDB に対して意図通り効くことを確認済み（`aggregateRaw` への生クエリ回避は不要だった）
+> - `create` / `createMany` は明示的な `_id`（ObjectId 文字列）を指定しても受け付けることを確認済み
+>
+> （移行前に懸念していたこと: Mongoose は strict 既定で未宣言フィールドを保存時に黙って捨てるため、schema.prisma の `ActivitiesSnapshot` にだけフィールドを足しても、実際の書き込みが Mongoose 経由のままだと添付フィールドが1バイトも保存されない「型は通るが保存されない」失敗になり得た。移行完了によりこの懸念は解消している。）
 
 ### Goals
 - `snapshot` 型を `action` を唯一の判別子とする判別可能ユニオンにする（要件 1）。
@@ -19,7 +27,7 @@
 - 既存の activity データ（`username` のみの snapshot）を破壊的移行なしにそのまま扱える。
 
 ### Non-Goals
-- `activities` モデルの Mongoose → Prisma 移行そのもの（別スペックの前提条件）。
+- `activities` モデルの Mongoose → Prisma 移行そのもの（別スペック `activities-prisma-migration` が担当、2026-07-01 完了確認済み）。
 - `target × targetModel` 全体の判別可能ユニオン化（型安全化の全面適用）。本スペックでは `SupportedTargetModel` に `Attachment` を1つ足すのみ。
 - action グループの設定変更（`ACTION_ATTACHMENT_REMOVE` を Small グループへ格上げする、管理 UI トグルを足す等）。記録可否は既存の `AUDIT_LOG_ACTION_GROUP_SIZE` / `AUDIT_LOG_ADDITIONAL_ACTIONS` に従う。
 - 監査ログ画面への「対象」列の UI 実装（本スペックは参照可能なデータを保存するところまで）。
@@ -35,7 +43,7 @@
 - 監査ログ API（`apiv3/activity.ts`）の OpenAPI への snapshot 添付フィールド記述と、応答にフィールドが乗ることの保証。
 
 ### Out of Boundary
-- `activities` の Mongoose → Prisma 移行（別スペック・前提条件）。
+- `activities` の Mongoose → Prisma 移行（別スペック `activities-prisma-migration` が担当、2026-07-01 完了確認済み）。
 - `target × targetModel` の全面的型安全化。
 - action グループ／記録可否の設定変更。
 - 監査ログ画面の「対象」列 UI。
@@ -43,7 +51,7 @@
 - contribution-graph / audit-log-bulk-export / page-bulk-export 等、添付削除と無関係な activities 消費者の挙動変更。
 
 ### Allowed Dependencies
-- 移行済み `activities` Prisma モデルと拡張（`createByParameters` / `updateByParameters` / `paginate` 相当）。`~/utils/prisma` の `prisma` クライアント。**この移行完了はハードブロッカー**（上記 Overview の囲み参照）。未完なら本スペックは着手しない。
+- 移行済み `activities` Prisma モデルと拡張（`ActivityExtension` の `createByParameters` / `updateByParameters` / `paginate` / `findSnapshotUsernamesByUsernameRegexWithTotalCount`）。`~/utils/prisma` の `prisma` クライアント。**移行は 2026-07-01 に完了済み**（詳細は Overview の囲み参照）。
 - `attachments` Prisma モデル（`originalName` / `fileSize` / `pageId`）と `pages` モデル（`path` の引き当て）。
 - `attachmentService.removeAttachment` / `removeAllAttachments`（削除実体）。
 - `ActivityService.createActivity` / `shoudUpdateActivity` と `activityEvent`、`addActivity` middleware が用意する `res.locals.activity`。
@@ -52,7 +60,7 @@
 - `ISnapshot` ユニオンの shape 変更、`AttachmentRemoveSnapshot` のフィールド増減。
 - `SupportedTargetModel` への値追加・変更。
 - `ActivitiesSnapshot` composite type のフィールド変更。
-- 前提の移行スペックが `createByParameters` / `updateByParameters` / `paginate` のシグネチャを変えた場合。
+- 移行済みの `ActivityExtension`（`activities-prisma-migration`）が `createByParameters` / `updateByParameters` / `paginate` のシグネチャを変えた場合。
 - 複合 unique index `{ userId, target, action, createdAt }` の定義変更（本スペックは変更しない前提で設計している）。
 
 ## Architecture
@@ -61,8 +69,8 @@
 
 - activity 記録には2経路がある。**直接削除**は `addActivity` middleware が `ACTION_UNSETTLED` の activity を1件先に作り `res.locals.activity` に置き、API が `activityEvent.emit('update', activityId, parameters)` でそれを更新する。**カスケード削除**は `deleteCompletelyOperation` が `removeAllAttachments` で複数添付を一括削除するが、添付ごとの activity は作られない（親の `PAGE_DELETE_COMPLETELY` 等に紐付くのみ）。
 - 記録可否は `ActivityService.shoudUpdateActivity(action)` が `getAvailableActions()`（`AUDIT_LOG_ACTION_GROUP_SIZE` / `ADDITIONAL_ACTIONS` / `EXCLUDE_ACTIONS` から算出）で判定する。`ACTION_ATTACHMENT_REMOVE` は Medium グループ以上に含まれ、既定 Small では記録されない。本スペックはこの判定をそのまま使う（設定変更はしない）。
-- 監査ログ取得 API（`apiv3/activity.ts`）は paginate 結果を `...rest` で展開して応答するため、`snapshot` は素通りで応答に乗る。**現状は `Activity.paginate`（Mongoose, lean + populate）だが、前提の移行後は `prisma.activities.paginate` になる**。本スペックは移行後の Prisma 版を前提に記述する（`...rest` で snapshot が乗る性質は移行前後で不変）。
-- 永続層は移行後 Prisma + MongoDB。`activities.snapshot` は composite type `ActivitiesSnapshot`。**Prisma の composite type は union を表現できない**ため、判別はドメイン層（TypeScript）で行い、永続層は全 variant を許す superset とする。
+- 監査ログ取得 API（`apiv3/activity.ts`）は paginate 結果を `...rest` で展開して応答するため、`snapshot` は素通りで応答に乗る。**移行済みの現在は `prisma.activities.paginate`（`include: { user: true }`）を使う**（移行前は `Activity.paginate`, Mongoose lean + populate だった）。`...rest` で snapshot が乗る性質は移行前後で不変。
+- 永続層は Prisma + MongoDB（移行済み）。`activities.snapshot` は composite type `ActivitiesSnapshot`。**Prisma の composite type は union を表現できない**ため、判別はドメイン層（TypeScript）で行い、永続層は全 variant を許す superset とする。
 
 ### Architecture Pattern & Boundary Map
 
@@ -438,8 +446,8 @@ type ActivitiesSnapshot {
 ## Migration Strategy
 
 - **データ移行は不要**: 追加フィールドはすべて optional で後方互換。既存 activity はそのまま動作する（要件 1.3, 4.2）。
-- **前提条件（別スペック・ハードブロッカー）**: `activities` の Mongoose → Prisma 移行が完了していること。本スペックの実装順は「移行完了 → 本スペック」で、移行未完のまま着手すると Overview の囲みに記したとおり snapshot が無言で保存されない。実装着手前のゲート＝「`apiv3/activity.ts` の paginate・`service/activity.ts` の create/update が Prisma 拡張経由になっており、`models/activity.ts` の Mongoose statics に依存していないこと」を確認する。移行が `createByParameters` / `updateByParameters` / `paginate` のシグネチャを変えた場合は Revalidation Triggers に従い本設計を見直す。
-- **`ActivitiesSnapshot.username` の必須→optional 化**: 移行 introspect は `username String`（必須）で生成される。本スペックで optional 化すると `prisma generate` 後に `string | null` 型へ変わるため、`snapshot.username` を読む箇所（`apiv3/activity.ts` の検索クエリ、`models/activity.ts` の `findSnapshotUsernamesByUsernameRegexWithTotalCount` 相当、`stores/activity.ts`）の型整合をタスクで確認する。
+- **前提条件は完了済み**: `activities` の Mongoose → Prisma 移行（別スペック `activities-prisma-migration`）は 2026-07-01 に完了を確認済み。ゲート「`apiv3/activity.ts` の paginate・`service/activity.ts` の create/update が Prisma 拡張経由になっており、`models/activity.ts` の Mongoose statics に依存していないこと」は grep で確認済み（3 statics — `createByParameters`/`updateByParameters`/`findSnapshotUsernamesByUsernameRegexWithTotalCount` — への呼び出しはゼロ）、かつ実 MongoDB に対する統合テスト 7 ファイル・42 件がすべて green。本スペックは着手可能な状態にある。今後 `ActivityExtension` が `createByParameters` / `updateByParameters` / `paginate` のシグネチャを変えた場合は Revalidation Triggers に従い本設計を見直す。
+- **`ActivitiesSnapshot.username` の必須→optional 化**: 移行時点の introspect は `username String`（必須）で生成されている。本スペックで optional 化すると `prisma generate` 後に `string | null` 型へ変わるため、`snapshot.username` を読む箇所（`apiv3/activity.ts` の検索クエリ、`models/activity.ts` の `findSnapshotUsernamesByUsernameRegexWithTotalCount`、`stores/activity.ts`）の型整合をタスクで確認する。
 - `schema.prisma` 変更後は `pnpm prisma generate` で型を再生成する（実装時の運用手順）。
 
 ## Open Questions / Risks

@@ -61,7 +61,7 @@ model activities {
   targetModel String?
   userId      String?            @map("user") @db.ObjectId
 
-  user users? @relation(fields: [userId], references: [id])
+  user users? @relation(fields: [userId], references: [id], onDelete: NoAction, onUpdate: NoAction)
 
   @@unique([userId, target, action, createdAt], map: "user_1_target_1_action_1_createdAt_1")
   @@index([userId], map: "user_1")
