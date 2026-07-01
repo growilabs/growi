@@ -2,100 +2,129 @@
 
 ## Overview
 
-**Purpose**: 基盤 `editor-slash-command` のスラッシュコマンド機構の上に、GROWI 固有の拡張要素（drawio / plantuml / lsx）を `/` から挿入するコマンドを追加する。本スペックは「拡張要素コマンドの定義データ」と「各要素の雛形を生成する純粋ビルダー」を新設し、基盤のトリガー・補完ソース・`apply`・i18n 解決はそのまま利用する。
+**Purpose**: 基盤 `editor-slash-command` のスラッシュコマンド機構の上に、GROWI 固有の拡張要素（drawio / plantuml / lsx / callout）を `/` から挿入・起動するコマンドを追加する。拡張要素には「静的テキスト挿入で足りるもの（plantuml / callout）」と「専用モーダルでの設定・編集が要るもの（drawio / lsx）」があるため、基盤のコマンドアクションを **`insert`（静的挿入）/ `run`（副作用起動）** の2種に一般化したうえで、本スペックが各コマンドの定義・ビルダー・モーダル起動導線・（lsx は）新規設定モーダルを足す。
 
-**Users**: エディタで執筆する全ユーザーが、`/drawio` `/plantuml` `/lsx` で記法を手入力せず雛形を挿入する。
+**Users**: エディタで執筆する全ユーザーが、`/drawio`（作図モーダル）・`/plantuml`（フェンス挿入）・`/lsx`（設定モーダル）・`/callout`（種別選択挿入）で GROWI 拡張要素を素早く扱う。
 
-**Impact**: 基盤のコマンド集合に拡張要素コマンドを**合流**させる。基盤の機構・基本コマンド・絵文字補完・描画機構（remark/rehype プラグイン）の挙動は変更しない。
+**Impact**: 基盤のコマンド集合に拡張要素コマンドを**合流**させる。drawio / lsx は副作用（モーダル起動）を伴うため、基盤のアクションモデルを `insert | run` に一般化する（基盤の変更＝前提ゲート）。drawio モーダルは既存資産を再利用し、lsx 設定モーダルは新規に作る。基盤の機構・基本コマンド・絵文字補完・描画機構（remark/rehype プラグイン）・既存 drawio モーダル本体の挙動は変更しない。
 
 ### Goals
-- drawio / plantuml / lsx の雛形を、基盤と一貫した挙動（`/query` 置換・単一トランザクション・カーソル配置・undo 1 回復元）で挿入する。
-- 拡張コマンドを独立モジュールとして持ち、依存逆転なく基盤レジストリへ合流させる。
+- drawio / plantuml / lsx / callout を、基盤と一貫した挙動（`/query` 置換・単一トランザクション・undo 整合）で挿入または起動する。
+- 静的挿入（plantuml / callout）と副作用起動（drawio / lsx）の両方を、単一のアクション抽象で表現する。
+- callout を変種宣言リストからデータ駆動で生成し、種別追加を宣言の編集のみで可能にする。
+- packages/editor → apps/app の逆依存を作らずにモーダルを起動する。
 
 ### Non-Goals
 - 拡張要素の描画・プレビュー（既存 remark/rehype プラグインの領域）。
-- drawio のモーダル作図エディタ起動（将来拡張）。
-- math / mermaid / callout 等、今回未選択の要素（将来拡張）。
-- 基盤のトリガー・補完ソース・レジストリ機構そのものの変更。
+- 既存 drawio モーダル本体の改修（再利用のみ）。
+- lsx サーバ側 list-pages ロジックの変更（既存。本スペックはフォーム→記法文字列の生成と挿入のみ）。
+- math / mermaid 等、今回未選択の要素（将来拡張）。
+- 基盤のトリガー検出・補完ソース・レジストリ機構そのものの変更（アクションモデルの一般化を除く）。
 
 ## Boundary Commitments
 
 ### This Spec Owns
-- 拡張要素コマンドの定義データ（drawio / plantuml / lsx の id・i18n キー・キーワード・対応ビルダー）。
-- 各要素の雛形を生成する純粋挿入ビルダー（drawio / plantuml / lsx）。
-- 拡張要素コマンドのラベル/説明の locale キー（`slash_command.*`）。
-- 拡張コマンド集合を基盤の合流点へ供給すること。
+- 拡張要素コマンドの定義（drawio / plantuml / lsx / callout×7 の id・i18n キー・キーワード・アクション）。
+- 静的挿入ビルダー（plantuml フェンス、callout ディレクティブ）。
+- callout 変種の宣言リスト（packages/editor 側、`features/callout` の真実源と整合）。
+- drawio / lsx の `run` コマンドを、モーダルオープナーと `editorKey` を束縛して生成する React フック（合成点）。
+- **lsx 設定モーダル一式（新規）**: editor 側トリガーフック（atom）、apps/app 側モーダル UI、`$lsx(...)` 文字列ビルダー、エディタ書き戻しユーティリティ。
+- 拡張要素コマンドのラベル/説明 locale キー（`slash_command.*`）。
 
 ### Out of Boundary
-- 基盤 `editor-slash-command` の `SlashCommand` / `SlashInsertion` 契約、補完ソース、トリガー検出、`apply`、i18n 解決機構（基盤が所有・変更しない）。
+- 基盤 `editor-slash-command` の補完ソース・トリガー検出・i18n 解決機構（基盤が所有）。**例外**: `SlashCommand` のアクションモデル（`insert | run`）一般化と `apply` の分岐は基盤側の変更だが、本スペックの前提ゲートとして要求する（下記「着手前提条件」）。
 - 拡張要素の描画・パース（remark/rehype プラグイン）。
-- drawio モーダル（`DiagramButton` / `useDrawioModalForEditorActions`）。
+- 既存 drawio モーダル本体（`DrawioModal` / `DrawioCommunicationHelper` / `replaceFocusedDrawioWithEditor`）。本スペックは起動導線（`useDrawioModalForEditorActions().open`）の呼び出しのみ追加。
+- lsx サーバ側 list-pages（`packages/remark-lsx/src/server`）。
+- callout 描画コンポーネント（`features/callout/components/CalloutViewer`）と変種の真実源（`features/callout/services/consts.ts`）。本スペックは変種**名**を参照するのみ。
 - 絵文字補完・キーバインド・グローバルホットキー。
 
 ### Allowed Dependencies
-- 基盤の型/契約: `SlashCommand`、`SlashInsertion`（`{ insert: string, cursorOffset: number }`）。
-- `@codemirror/view`（`EditorView`、`buildInsertion` 引数の型のため。雛形は静的なので view は未使用）。
+- 基盤の型/契約: `SlashCommand`、`SlashCommandAction`（`insert | run`）、`SlashInsertion`（`{ insert, cursorOffset }`）。
+- `@codemirror/view`（`EditorView`）。
+- 既存 drawio トリガーフック: `useDrawioModalForEditorActions`（`packages/editor/src/states/modal/drawio-for-editor.ts`）。
 - i18n: 基盤の `resolveSlashCommands(t, commands)` 経由でラベル解決（本スペックは locale キーを足すのみ）。
-- 依存方向: `extended-element-builders → 基盤の型` / `extended-element-commands → builders + 基盤の型` / `合流点（登録レイヤ）→ 基盤コマンド + 拡張コマンド`。拡張モジュールは基盤の core 定義を import しない（基盤が拡張を知らない＝逆転なし）。
+- 依存方向: `builders/variants → 基盤の型` / `static commands → builders + 基盤の型` / `run commands フック → 基盤の型 + モーダルオープナー` / `合成点（React 登録レイヤ）→ 基盤コマンド + 拡張コマンド`。拡張モジュールは基盤の core 定義を import しない（基盤が拡張を知らない＝逆転なし）。apps/app は editor 側モーダルフックを購読するのみ（packages/editor → apps/app の逆依存なし）。
 
 ### Revalidation Triggers
-- 基盤の `SlashCommand` / `SlashInsertion` 契約変更。
-- コマンド集合の**合流点**の構造変更（登録レイヤの合成方法）。
+- 基盤の `SlashCommand` / `SlashCommandAction` / `SlashInsertion` 契約変更。
+- コマンド集合の**合成点**の構造変更（React 登録レイヤの合成方法、`editorKey` の受け渡し）。
+- 既存 drawio トリガーフック（`useDrawioModalForEditorActions`）のシグネチャ変更。
+- `features/callout/services/consts.ts` の変種追加・削除（本スペックの変種宣言リストと drift）。
+- remark-lsx のオプション仕様変更（lsx モーダルのフォーム/ビルダーに影響）。
 - locale キー命名（`slash_command.*`）の変更。
-- 雛形（記法）の変更（描画側プラグインの記法要件に追従が必要な場合）。
 
 ### 着手前提条件 (Prerequisites)
-- **基盤インタフェースの凍結（必須ゲート）**: 本スペックの実装着手前に、基盤 `editor-slash-command` の次の3契約を確定・凍結すること。これらが固まる前に着手するとビルダー署名・合流方法に手戻りが生じる。
-  1. `SlashCommand` 型（特に `buildInsertion` の署名）
-  2. `SlashInsertion` 型（`{ insert: string, cursorOffset: number }`）
-  3. コマンド集合の合流点の関数形（`[...SLASH_COMMANDS, ...EXTENDED_ELEMENT_COMMANDS]` をどこで合成するか）
-  - 別ストーリーで並行着手する場合は、基盤側でこの3点のみ先行実装してインタフェースを固定する。
+- **基盤インタフェースの凍結（必須ゲート）**: 本スペックの実装着手前に、基盤 `editor-slash-command` の次を確定・凍結すること。
+  1. `SlashCommandAction` 型 = `SlashInsertAction { kind:'insert'; buildInsertion } | SlashRunAction { kind:'run'; run }`。
+  2. `SlashCommand` が `action: SlashCommandAction` を持つ（旧 `buildInsertion` 直持ちからの変更）。
+  3. 基盤 `apply` が `action.kind` で分岐する: `insert` は単一 `dispatch`（削除+挿入+カーソル）、`run` は `/query` 削除（単一 `dispatch`）後に `run(view, from)` を呼ぶ。
+  4. コマンド集合の合成点が **React レイヤ**で `[...SLASH_COMMANDS, ...extendedCommands]` を組めること（drawio/lsx の run はモーダルオープナーと `editorKey` を要するため、静的配列ではなくフック合成になる）。合成点が `editorKey` を取得できること。
+  - 別ストーリーで並行着手する場合は、基盤側でこのアクションモデルと合成点を先行実装してインタフェースを固定する。
 
 ## Architecture
 
 ### Existing Architecture Analysis
-- 基盤（設計済み・未実装）は、`slash-command/` 配下に `slash-command-definitions.ts`（基本コマンド `SLASH_COMMANDS`）、`insertion-builders.ts`、`slash-command-source.ts`、`resolve-slash-commands.ts` を持ち、`use-default-extensions.ts` で `createSlashCommandSource(resolveSlashCommands(t, commands))` を絵文字と統合した単一 `autocompletion()` として登録する。
-- 拡張要素の記法は確定: drawio/plantuml = コードフェンス、lsx = `$lsx(...)`。描画は既存プラグインが担う。
+- 基盤（設計済み・未実装）は `slash-command/` 配下に型・定義・ビルダー・source・resolve を持ち、`use-default-extensions.ts` で emoji と統合した単一 `autocompletion()` を登録する。現状のアクションは `buildInsertion`（静的挿入）のみ。
+- **drawio モーダルは既存**（実機確認済み）:
+  - トリガーフック `useDrawioModalForEditorActions().open(editorKey)` が `@growi/editor`（`packages/editor/src/states/modal/drawio-for-editor.ts`）にあり、atom に `{ isOpened, editorKey }` を立てるだけ。
+  - モーダル本体 `DrawioModal`（apps/app）が atom を購読し、`useCodeMirrorEditorIsolated(editorKey)` で `EditorView` を取得、保存時に `replaceFocusedDrawioWithEditor(editor, xml)` で ` ```drawio ` フェンスを `editor.dispatch`（`apps/app/src/client/components/PageEditor/markdown-drawio-util-for-editor.ts`）。
+  - → **packages/editor から `open(editorKey)` を呼べばモーダルが起動し、挿入はモーダルが行う**。apps/app への逆依存は不要。
+- **lsx 設定モーダルは存在しない**: 記法 `$lsx(/path, num=, depth=, sort=, reverse=, filter=, except=)` のみ（`packages/remark-lsx`）。drawio パターンに倣い新規作成する。
+- **callout は対応済み**: `:::type[label] … :::`（`apps/app/src/features/callout`）。7 種（note/tip/important/info/warning/danger/caution、`features/callout/services/consts.ts`）。挿入は静的テキストで足りる。
 
 ### Architecture Pattern & Boundary Map
 
 ```mermaid
 graph TB
-    subgraph extended_module
-        ExtBuilders[extended element builders]
-        ExtCommands[extended element commands]
+    subgraph extended_module[packages/editor 拡張モジュール]
+        Variants[callout variants 宣言リスト]
+        StaticBuilders[insertion builders<br/>plantuml / callout]
+        StaticCommands[static commands<br/>plantuml + callout×7]
+        RunHook[useExtendedElementCommands フック<br/>drawio / lsx の run 合成]
+        LsxTrigger[lsx モーダル トリガーフック atom]
     end
-    subgraph foundation
-        Types[SlashCommand SlashInsertion types]
+    subgraph foundation[基盤 editor-slash-command]
+        Types[SlashCommand / SlashCommandAction / SlashInsertion]
         BasicCommands[basic slash commands]
-        Resolve[resolve slash commands]
-        Source[slash command source]
+        Apply[source.apply insert|run 分岐]
     end
-    Compose[active command set composition]
-    Hook[use default extensions hook]
+    subgraph appside[apps/app]
+        DrawioModal[既存 DrawioModal 再利用]
+        LsxModal[新規 LsxModal UI + $lsx ビルダー + 書き戻し]
+    end
+    DrawioTrigger[既存 useDrawioModalForEditorActions]
+    Compose[React 合成点 use-default-extensions]
 
-    ExtBuilders --> Types
-    ExtCommands --> ExtBuilders
-    ExtCommands --> Types
-    BasicCommands --> Types
+    StaticBuilders --> Types
+    StaticCommands --> StaticBuilders
+    StaticCommands --> Types
+    StaticCommands --> Variants
+    RunHook --> Types
+    RunHook --> DrawioTrigger
+    RunHook --> LsxTrigger
     Compose --> BasicCommands
-    Compose --> ExtCommands
-    Hook --> Compose
-    Hook --> Resolve
-    Hook --> Source
+    Compose --> StaticCommands
+    Compose --> RunHook
+    Apply --> RunHook
+    LsxModal --> LsxTrigger
+    DrawioModal --> DrawioTrigger
 ```
 
 **Architecture Integration**:
-- **Selected pattern**: Option B — 拡張コマンドを独立モジュール化し、**合流点（active command set composition）**で基盤コマンドと結合。基盤 core は拡張を知らない。
-- **Composition point**: 有効コマンド集合を `[...SLASH_COMMANDS, ...EXTENDED_ELEMENT_COMMANDS]` として宣言する単一箇所を設け、登録フックはそれを読む。拡張スペックが増えても合流点への追記のみで済み、`use-default-extensions` のロジックは変更不要（"Executors take their work-set as input" / "declare items in the set"）。
-- **Steering compliance**: データ駆動・pure function 抽出・barrel 最小公開に準拠。
+- **Selected pattern**: 拡張コマンドを独立モジュール化し、**React 合成点**で基盤コマンドと結合（基盤 core は拡張を知らない）。静的コマンドはデータ宣言、副作用コマンド（drawio/lsx）はモーダルオープナーと `editorKey` を束縛するフックで生成。
+- **アクション一般化**: 基盤 `apply` が `insert | run` を分岐。`run` により「モーダル起動」を汎用的に表現（基盤は drawio/lsx を知らず、`run` 関数を呼ぶだけ）。
+- **drawio = 既存資産再利用 / lsx = 新規モーダル（drawio パターン踏襲）**: editor 側トリガーフック（atom）＋ apps/app 側 UI＋書き戻しユーティリティ。
+- **Steering compliance**: データ駆動（callout 変種・コマンド集合）、pure function 抽出（静的ビルダー・`$lsx` ビルダー）、barrel 最小公開、Executors take their work-set as input（合成点が集合を受け取る）。
 
 ### Technology Stack
 
 | Layer | Choice / Version | Role in Feature | Notes |
 |-------|------------------|-----------------|-------|
-| Frontend (editor) | 基盤 `editor-slash-command`（同一パッケージ） | コマンド機構・補完・apply・i18n 解決 | 本スペックは定義/ビルダーを供給 |
-| Frontend (editor) | `@codemirror/view`（既存） | `buildInsertion` の型 | 雛形は静的、view 未使用 |
+| Frontend (editor) | 基盤 `editor-slash-command`（同一パッケージ） | コマンド機構・補完・apply（insert/run）・i18n 解決 | アクションモデル一般化が前提 |
+| Frontend (editor) | `@codemirror/view`（既存） | `EditorView`・`buildInsertion` の型 | 静的ビルダーは view 未使用 |
+| Frontend (editor) | Jotai（既存） | drawio/lsx モーダルのトリガー atom | drawio は既存、lsx は新規 |
+| Frontend (app) | React + reactstrap Modal（既存） | lsx 設定モーダル UI | drawio モーダルの構成に倣う |
 | Frontend (i18n) | `react-i18next` + locale JSON（既存） | ラベル/説明 | `slash_command.*` キー追加 |
 | Data / Storage | なし | — | 永続化なし |
 
@@ -104,131 +133,299 @@ graph TB
 ## File Structure Plan
 
 ### Directory Structure
+
 ```
+# packages/editor 側
 packages/editor/src/client/services-internal/slash-command/extended-elements/
-├── index.ts                          # barrel: EXTENDED_ELEMENT_COMMANDS を公開
-├── extended-element-builders.ts      # 純粋ビルダー: drawioInsertion / plantumlInsertion / lsxInsertion
-├── extended-element-commands.ts      # EXTENDED_ELEMENT_COMMANDS: SlashCommand[]（定義データ）
-├── extended-element-builders.spec.ts # 各雛形の挿入テキスト + カーソル位置の単体テスト
-└── extended-element-commands.spec.ts # 定義の健全性（対象3種・未選択要素を含まない）テスト
+├── index.ts                          # barrel: 静的コマンド集合 + useExtendedElementCommands を公開
+├── callout-variants.ts               # CALLOUT_VARIANTS: 宣言リスト（note/tip/.../caution + 別名キーワード）
+├── insertion-builders.ts             # plantumlInsertion / calloutInsertion(type)（純粋）
+├── static-commands.ts                # plantuml + callout×7（insert アクション。callout は変種リストから生成）
+├── use-extended-element-commands.ts  # React フック: drawio/lsx の run コマンド + 静的コマンドを合成して返す
+├── insertion-builders.spec.ts
+├── static-commands.spec.ts           # plantuml/callout 定義の健全性 + callout 変種網羅・未選択要素非含有
+└── use-extended-element-commands.spec.ts  # run コマンドがオープナーを editorKey 付きで呼ぶ
+
+packages/editor/src/states/modal/
+└── lsx-for-editor.ts                 # 新規: lsx モーダル トリガーフック（drawio-for-editor.ts に倣う atom）
+
+# apps/app 側（lsx 設定モーダル UI）
+apps/app/src/client/components/PageEditor/LsxModal/
+├── LsxModal.tsx                      # 新規: 設定フォーム + 確定で書き戻し
+├── build-lsx-notation.ts            # 新規: フォーム値 → `$lsx(...)` 文字列（純粋）
+├── build-lsx-notation.spec.ts
+└── markdown-lsx-util-for-editor.ts   # 新規: editor へ `$lsx(...)` を dispatch（drawio util に倣う）
 ```
 
 ### Modified Files
-- 基盤の**コマンド集合合流点**（基盤設計で `use-default-extensions.ts` 内の `resolveSlashCommands(t, commands)` 呼び出しに渡す集合、または基盤が用意する集約モジュール）— `EXTENDED_ELEMENT_COMMANDS` を基本コマンドに合流させる。
-  - 基盤未実装のため、合流点の正確な形（集約モジュール `all-slash-commands.ts` を新設するか、フック内合成か）は基盤実装時に確定。本スペックは「拡張集合を1箇所で合流させる」契約のみに依存。
-- `apps/app/public/static/locales/en_US/translation.json` — `slash_command.drawio.*` / `plantuml.*` / `lsx.*` キー追加。
-- `apps/app/public/static/locales/ja_JP/translation.json` — 同上。
+- 基盤の**コマンド集合合成点**（基盤設計で `use-default-extensions.ts`）— `[...SLASH_COMMANDS, ...useExtendedElementCommands(editorKey)]` を `resolveSlashCommands(t, ...)` に渡す。合成点が `editorKey` を取得できるよう配線する。
+- 基盤の `slash-command-types.ts` / `slash-command-source.ts`（前提ゲート、基盤所有）— `SlashCommandAction`（`insert | run`）導入と `apply` の分岐。詳細は基盤 design.md に反映。
+- apps/app の lsx モーダル登録点 — drawio モーダルが置かれているのと同じモーダルマウント箇所に `LsxModal` を追加。
+- `apps/app/public/static/locales/en_US/translation.json` / `ja_JP/translation.json` — `slash_command.drawio.*` / `plantuml.*` / `lsx.*` / `callout.<type>.*` キー追加、および lsx モーダルのフォームラベル `lsx_modal.*`。
 
 ## System Flows
 
-挿入フロー・トリガー・絞り込みは基盤フローと同一（基盤 design.md「System Flows」参照）。本スペックは `apply` が呼ぶ `buildInsertion` の中身（雛形生成）と、コマンド集合への合流のみを足す。新規フローはなし。
+### 静的挿入フロー（plantuml / callout）
+基盤の挿入フローと同一。`apply` が `action.buildInsertion(view, from)` の `{ insert, cursorOffset }` から `/query`（`[from,to]`）を置換する単一 `dispatch` を発行。
+
+### 副作用起動フロー（drawio / lsx）
+
+```mermaid
+sequenceDiagram
+    participant U as User
+    participant S as slash command source (基盤 apply)
+    participant V as EditorView
+    participant A as atom (drawio/lsx for editor)
+    participant M as Modal (DrawioModal / LsxModal)
+
+    U->>S: "/drawio" or "/lsx" を選択
+    S->>V: dispatch({changes:{from,to,insert:''}, selection:{anchor:from}})  // /query 削除（単一transaction）
+    S->>S: action.run(view, from)
+    S->>A: open(editorKey)
+    A-->>M: isOpened=true を購読
+    M->>V: useCodeMirrorEditorIsolated(editorKey) で view 取得
+    U->>M: 作図 / オプション設定して確定
+    M->>V: dispatch({changes:{from:pos,to:pos,insert: ```drawio…``` / $lsx(...)}})  // 別transaction
+    M->>A: close()
+    V-->>U: 要素挿入
+```
+
+- `run` は基盤の `apply` から呼ばれ、`editorKey` は合成フックが束縛済み。
+- `/query` 削除（基盤・単一トランザクション・undo 可）とモーダルの挿入（モーダル側・別トランザクション）は別操作。キャンセル時はモーダル挿入が発生しない（`/query` 削除のみ残る）。
 
 ## Requirements Traceability
 
 | Requirement | Summary | Components | Interfaces | Flows |
 |-------------|---------|------------|------------|-------|
-| 1.1 | drawio/plantuml/lsx コマンド提供 | extended-element-commands | `EXTENDED_ELEMENT_COMMANDS` | 基盤フロー |
-| 1.2 | drawio 空フェンス挿入 | extended-element-builders | `drawioInsertion` | 選択 |
-| 1.3 | plantuml フェンス挿入 | extended-element-builders | `plantumlInsertion` | 選択 |
-| 1.4 | lsx 記法雛形挿入 | extended-element-builders | `lsxInsertion` | 選択 |
-| 1.5 | 未選択要素は非提供 | extended-element-commands | 定義から除外 | — |
-| 2.1 | `/query` 置換して挿入 | 基盤 source.apply（再利用） | `SlashInsertion` | 選択 |
-| 2.2 | カーソル配置 | extended-element-builders | `cursorOffset` | 選択 |
-| 2.3 | undo 1 回で復元 | 基盤 source.apply（単一transaction） | — | 選択 |
-| 3.1 | 同一メニューに表示 | 合流点 | active command set | 起動 |
-| 3.2 | ラベル/キーワードで絞り込み | extended-element-commands（keywords） | 基盤 source の照合 | 絞り込み |
-| 3.3 | 起動条件（行頭/空白直後）に従う | 基盤 source（再利用） | — | 起動 |
-| 4.1 | ラベル/説明 i18n | extended-element-commands（i18nキー）+ 基盤 resolve | locale JSON | — |
-| 4.2 | 既定言語フォールバック | react-i18next（標準） | `fallbackLng` | — |
-| 5.1 | 挿入のみ・描画は既存機構 | extended-element-builders | — | — |
-| 5.2 | 絵文字/基本コマンドと共存 | 合流点（同一 autocompletion） | — | — |
+| 1.1 | drawio/plantuml/lsx/callout 提供 | static-commands, use-extended-element-commands | コマンド集合 | 合成 |
+| 1.2 | drawio モーダル起動 | use-extended-element-commands | `run` → drawio open | 副作用起動 |
+| 1.3 | plantuml フェンス挿入 | insertion-builders | `plantumlInsertion` | 静的挿入 |
+| 1.4 | lsx モーダル起動 | use-extended-element-commands | `run` → lsx open | 副作用起動 |
+| 1.5 | callout 挿入 | static-commands, insertion-builders | `calloutInsertion` | 静的挿入 |
+| 1.6 | 未選択要素は非提供 | static-commands / フック | 定義から除外 | — |
+| 2.1–2.4 | drawio 起動・書き戻し・キャンセル・逆依存なし | use-extended-element-commands, 既存 DrawioModal | `useDrawioModalForEditorActions` | 副作用起動 |
+| 3.1–3.6 | lsx モーダル・オプション・挿入・既定・キャンセル・配線 | LsxModal, build-lsx-notation, lsx-for-editor | フォーム→`$lsx(...)` | 副作用起動 |
+| 4.1–4.4 | callout 種別別・記法・データ駆動・絞り込み | callout-variants, static-commands | `CALLOUT_VARIANTS` | 静的挿入 |
+| 5.1 | `/query` 削除 | 基盤 apply（再利用） | — | 両 |
+| 5.2 | 静的挿入のカーソル/単一transaction/undo | insertion-builders + 基盤 apply | `SlashInsertion` | 静的挿入 |
+| 5.3 | run は削除単一transaction後に起動 | 基盤 apply（run 分岐） | `SlashRunAction` | 副作用起動 |
+| 6.1–6.3 | 同一メニュー・絞り込み・起動条件 | 合成点 + 基盤 source | active command set | 起動 |
+| 7.1–7.2 | ラベル/説明 i18n・フォールバック | 各コマンド i18n キー + 基盤 resolve | locale JSON | — |
+| 8.1 | 挿入/起動のみ・描画は既存機構 | insertion-builders / run | — | — |
+| 8.2 | 絵文字/基本コマンドと共存 | 合成点（同一 autocompletion） | — | — |
+| 8.3 | 既存 drawio モーダル不変 | use-extended-element-commands | 起動導線追加のみ | — |
 
 ## Components and Interfaces
 
 | Component | Domain/Layer | Intent | Req Coverage | Key Dependencies (P0/P1) | Contracts |
 |-----------|--------------|--------|--------------|--------------------------|-----------|
-| extended-element-builders | logic | 各拡張要素の雛形（テキスト + カーソル）を生成する純粋関数 | 1.2, 1.3, 1.4, 2.2, 5.1 | 基盤 SlashInsertion 型 (P0) | Service |
-| extended-element-commands | data | drawio/plantuml/lsx のコマンド定義集合 | 1.1, 1.5, 3.2, 4.1 | builders (P0), 基盤 SlashCommand 型 (P0) | State |
-| コマンド集合合流点（基盤側・変更） | integration | 拡張集合を基本コマンドへ合流 | 3.1, 5.2 | extended-element-commands (P0), 基盤 (P0) | Service |
+| callout-variants | data | callout 変種の宣言リスト | 4.1, 4.3 | — | State |
+| insertion-builders | logic | plantuml/callout の雛形（純粋） | 1.3, 1.5, 4.2, 5.2, 8.1 | 基盤 SlashInsertion 型 (P0) | Service |
+| static-commands | data | plantuml + callout×7（insert） | 1.1, 1.5, 1.6, 4.1, 4.4 | builders (P0), variants (P0), 基盤 SlashCommand 型 (P0) | State |
+| use-extended-element-commands | integration/logic | drawio/lsx の run + 静的コマンド合成 | 1.1, 1.2, 1.4, 2.1, 2.4 | drawio トリガー (P0), lsx トリガー (P0), static-commands (P0) | Service |
+| lsx-for-editor（新規 atom） | state | lsx モーダル起動トリガー | 1.4, 3.1, 3.6 | Jotai (P0) | State |
+| build-lsx-notation（apps/app） | logic | フォーム値→`$lsx(...)`（純粋） | 3.2, 3.3, 3.4 | — | Service |
+| LsxModal（apps/app） | ui | 設定フォーム + 書き戻し | 3.1–3.6 | lsx-for-editor (P0), build-lsx-notation (P0), useCodeMirrorEditorIsolated (P0) | UI |
+| コマンド集合合成点（基盤側・変更） | integration | 拡張集合を基本コマンドへ合流 | 6.1, 8.2 | use-extended-element-commands (P0), 基盤 (P0) | Service |
 
-### logic / data
+### data
 
-#### extended-element-builders
+#### callout-variants
 | Field | Detail |
 |-------|--------|
-| Intent | 拡張要素の雛形（`SlashInsertion`）を返す純粋関数群 |
-| Requirements | 1.2, 1.3, 1.4, 2.2, 5.1 |
-
-**Contracts**: Service [x]
-
-##### Service Interface
-```typescript
-import type { EditorView } from '@codemirror/view';
-import type { SlashInsertion } from '../slash-command-types'; // 基盤の型
-
-// いずれも buildInsertion 契約 (view, from) => SlashInsertion に適合（雛形は静的、view 未使用）
-export const drawioInsertion: (view: EditorView, from: number) => SlashInsertion;
-export const plantumlInsertion: (view: EditorView, from: number) => SlashInsertion;
-export const lsxInsertion: (view: EditorView, from: number) => SlashInsertion;
-```
-- **雛形（確定）**:
-  - drawio: ` ```drawio ` + 改行 + 空行 + ` ``` `。カーソルは空行（フェンス内）。
-  - plantuml: ` ```plantuml ` + 改行 + `@startuml` + 改行 + 空行 + `@enduml` + 改行 + ` ``` `。カーソルは `@startuml` と `@enduml` の間の空行。
-  - lsx: `$lsx()`。カーソルは括弧内（オプション入力位置）。
-- **Preconditions**: `from` は `/` の位置（置換レンジ `[from, to]` の起点）。
-- **Postconditions**: `insert`（置換テキスト全体）と `cursorOffset`（`from` 相対）を返す。`view.dispatch` しない。
-- **Invariants**: 副作用なし。
-- **確認済み**: lsx の引数なし `$lsx()` は「現在ページ配下の一覧」として正常描画される（`remark-lsx` が `prefix` 未指定時に現在ページパスへフォールバック。`renderer/lsx.ts:134-136`）。既定雛形は `$lsx()` で確定（`$lsx(/)` への変更は不要）。
-
-#### extended-element-commands
-| Field | Detail |
-|-------|--------|
-| Intent | drawio/plantuml/lsx のコマンドを宣言したデータ集合 |
-| Requirements | 1.1, 1.5, 3.2, 4.1 |
+| Intent | callout 変種をデータ宣言（種別 + 絞り込み別名） |
+| Requirements | 4.1, 4.3 |
 
 **Contracts**: State [x]
 
 ```typescript
-import type { SlashCommand } from '../slash-command-types';
-import { drawioInsertion, plantumlInsertion, lsxInsertion } from './extended-element-builders';
+export interface CalloutVariant {
+  readonly type: 'note' | 'tip' | 'important' | 'info' | 'warning' | 'danger' | 'caution';
+  readonly keywords: readonly string[]; // 別名（例 warning: ['warn', 'caution']）
+}
 
-export const EXTENDED_ELEMENT_COMMANDS: readonly SlashCommand[] = [
-  { id: 'drawio',   labelKey: 'slash_command.drawio.label',   descriptionKey: 'slash_command.drawio.description',   keywords: ['diagram', 'draw'],     buildInsertion: drawioInsertion },
-  { id: 'plantuml', labelKey: 'slash_command.plantuml.label', descriptionKey: 'slash_command.plantuml.description', keywords: ['uml', 'sequence'],     buildInsertion: plantumlInsertion },
-  { id: 'lsx',      labelKey: 'slash_command.lsx.label',      descriptionKey: 'slash_command.lsx.description',      keywords: ['list', 'pages', 'tree'], buildInsertion: lsxInsertion },
+export const CALLOUT_VARIANTS: readonly CalloutVariant[] = [
+  { type: 'note',      keywords: ['note'] },
+  { type: 'tip',       keywords: ['tip', 'hint'] },
+  { type: 'important', keywords: ['important'] },
+  { type: 'info',      keywords: ['info', 'information'] },
+  { type: 'warning',   keywords: ['warning', 'warn'] },
+  { type: 'danger',    keywords: ['danger'] },
+  { type: 'caution',   keywords: ['caution'] },
 ];
 ```
-- **Constraints**: 対象は drawio/plantuml/lsx の3種のみ。未選択要素（math/mermaid/callout 等）は含めない（Req 1.5）。
+- **Source of truth note**: 種別の真実源は `apps/app/src/features/callout/services/consts.ts`。packages/editor は apps/app を import できないため本リストで宣言し、drift を避けるため変種追加時は両方を更新する（Revalidation Trigger 参照）。
+
+### logic
+
+#### insertion-builders
+| Field | Detail |
+|-------|--------|
+| Intent | plantuml/callout の雛形（`SlashInsertion`）を返す純粋関数 |
+| Requirements | 1.3, 1.5, 4.2, 5.2, 8.1 |
+
+**Contracts**: Service [x]
+
+```typescript
+import type { EditorView } from '@codemirror/view';
+import type { SlashInsertion } from '../slash-command-types'; // 基盤の型
+
+// いずれも基盤の buildInsertion 契約 (view, from) => SlashInsertion に適合する。
+
+// plantuml フェンス（@startuml/@enduml）。カーソルは中間の空行
+export const plantumlInsertion: (view: EditorView, from: number) => SlashInsertion;
+
+// callout ディレクティブ。`:::<type>` + 改行 + 本文行(空) + 改行 + `:::`。カーソルは本文行
+export const calloutInsertion: (type: CalloutVariant['type']) => (view: EditorView, from: number) => SlashInsertion;
+```
+
+- **雛形（確定）**:
+  - plantuml: ` ```plantuml ` + 改行 + `@startuml` + 改行 + 空行 + `@enduml` + 改行 + ` ``` `。カーソルは中間の空行。
+  - callout: `:::<type>` + 改行 + 空行（本文） + 改行 + `:::`。カーソルは本文の空行。
+- **Preconditions**: `from` は `/` の位置。
+- **Postconditions**: `{ insert, cursorOffset }`（`from` 相対）を返す。`view.dispatch` しない。
+- **行頭/行中の出し分け**: 基盤 design の方針に従い、先行する非空白テキストがある場合は区切り（改行/空行）を前置する。callout / plantuml はブロック要素のため、先行行が非空のとき改行を前置する（テストで固定）。
+- **Invariants**: 副作用なし。
+
+#### use-extended-element-commands
+| Field | Detail |
+|-------|--------|
+| Intent | drawio/lsx の `run` コマンドをモーダルオープナー + `editorKey` で生成し、静的コマンドと合成して返す React フック |
+| Requirements | 1.1, 1.2, 1.4, 2.1, 2.4 |
+
+**Contracts**: Service [x]
+
+```typescript
+import { useDrawioModalForEditorActions } from '../../../states/modal/drawio-for-editor';
+import { useLsxModalForEditorActions } from '../../../states/modal/lsx-for-editor';
+import type { SlashCommand } from '../slash-command-types';
+
+export const useExtendedElementCommands = (editorKey: string): readonly SlashCommand[] => {
+  const { open: openDrawio } = useDrawioModalForEditorActions();
+  const { open: openLsx } = useLsxModalForEditorActions();
+  return useMemo(() => [
+    { id: 'drawio', labelKey: 'slash_command.drawio.label', descriptionKey: 'slash_command.drawio.description',
+      keywords: ['diagram', 'draw'],
+      action: { kind: 'run', run: () => openDrawio(editorKey) } },
+    { id: 'lsx', labelKey: 'slash_command.lsx.label', descriptionKey: 'slash_command.lsx.description',
+      keywords: ['list', 'pages', 'tree'],
+      action: { kind: 'run', run: () => openLsx(editorKey) } },
+    ...STATIC_EXTENDED_COMMANDS, // plantuml + callout×7
+  ], [editorKey, openDrawio, openLsx]);
+};
+```
+- **Preconditions**: `editorKey` は現在のエディタインスタンスのキー（合成点が取得）。
+- **Postconditions**: `run` は `view`/`from` を使わず（モーダルがカーソル位置を読む）、オープナーを `editorKey` 付きで呼ぶ。
+- **Invariants**: `STATIC_EXTENDED_COMMANDS`（plantuml + callout）は副作用を持たないデータ。
+
+#### static-commands
+| Field | Detail |
+|-------|--------|
+| Intent | plantuml + callout×7 の insert コマンドを宣言 |
+| Requirements | 1.1, 1.5, 1.6, 4.1, 4.4 |
+
+```typescript
+export const STATIC_EXTENDED_COMMANDS: readonly SlashCommand[] = [
+  { id: 'plantuml', labelKey: 'slash_command.plantuml.label', descriptionKey: 'slash_command.plantuml.description',
+    keywords: ['uml', 'sequence'], action: { kind: 'insert', buildInsertion: plantumlInsertion } },
+  ...CALLOUT_VARIANTS.map((v) => ({
+    id: `callout-${v.type}`,
+    labelKey: `slash_command.callout.${v.type}.label`,
+    descriptionKey: `slash_command.callout.${v.type}.description`,
+    keywords: ['callout', ...v.keywords],
+    action: { kind: 'insert', buildInsertion: calloutInsertion(v.type) } as const,
+  })),
+];
+```
+- **Constraints**: callout は `CALLOUT_VARIANTS` からデータ駆動で生成（4.3）。`callout` を共通キーワードに含め `/callout` で全種別が絞り込まれる（4.4）。未選択要素（math/mermaid）は含めない（1.6）。
+
+### state (packages/editor)
+
+#### lsx-for-editor（新規トリガーフック）
+| Field | Detail |
+|-------|--------|
+| Intent | lsx 設定モーダルの起動トリガー（drawio-for-editor.ts に倣う） |
+| Requirements | 1.4, 3.1, 3.6 |
+
+```typescript
+type LsxModalForEditorState = { isOpened: boolean; editorKey?: string };
+export const useLsxModalForEditorStatus = () => useAtomValue(lsxModalForEditorAtom);
+export const useLsxModalForEditorActions = () => {
+  const set = useSetAtom(lsxModalForEditorAtom);
+  return {
+    open: (editorKey: string) => set({ isOpened: true, editorKey }),
+    close: () => set({ isOpened: false, editorKey: undefined }),
+  };
+};
+```
+
+### logic / ui (apps/app)
+
+#### build-lsx-notation
+| Field | Detail |
+|-------|--------|
+| Intent | フォーム値から `$lsx(...)` 文字列を組み立てる純粋関数 |
+| Requirements | 3.2, 3.3, 3.4 |
+
+```typescript
+export interface LsxOptions {
+  prefix?: string; num?: string; depth?: string;
+  sort?: 'path' | 'createdAt' | 'updatedAt'; reverse?: boolean;
+  filter?: string; except?: string;
+}
+export const buildLsxNotation: (opts: LsxOptions) => string;
+```
+- **規則**: prefix は先頭に位置指定（空なら省略）。残りは `key=value` をカンマ区切り。空・既定値は出力しない。全て空なら `$lsx()`（3.4）。`reverse` は `true` のときのみ `reverse=true` を付与。
+- 例: `{ prefix:'/docs', num:'10', depth:'1-2', sort:'createdAt', reverse:true }` → `$lsx(/docs, num=10, depth=1-2, sort=createdAt, reverse=true)`。
+
+#### LsxModal
+| Field | Detail |
+|-------|--------|
+| Intent | lsx 設定フォーム。確定で `buildLsxNotation` → エディタへ挿入。drawio モーダルの構成に倣う |
+| Requirements | 3.1–3.6 |
+
+**Implementation Notes**
+- `useLsxModalForEditorStatus()` で `{ isOpened, editorKey }` を購読、`useCodeMirrorEditorIsolated(editorKey)` で `view` を取得。
+- 確定時に `view.dispatch({ changes: { from: pos, to: pos, insert: buildLsxNotation(opts) } })`（`markdown-lsx-util-for-editor.ts`）。
+- フォーム: prefix（テキスト）、num（テキスト, 例 `10` / `2-5`）、depth（テキスト, 例 `1` / `1-2`）、sort（select）、reverse（checkbox）、filter / except（テキスト）。
+- ラベルは i18n（`lsx_modal.*`）。バリデーションは MVP では最小（数値/範囲の形式チェックは将来拡張、無入力は省略）。
 
 ### integration
 
-#### コマンド集合合流点（基盤側・変更）
+#### コマンド集合合成点（基盤側・変更）
 | Field | Detail |
 |-------|--------|
 | Intent | 拡張コマンドを基本コマンドへ合流し、単一 `autocompletion()` に乗せる |
-| Requirements | 3.1, 5.2 |
+| Requirements | 6.1, 8.2 |
 
 **Implementation Notes**
-- Integration: 有効コマンド集合 = `[...SLASH_COMMANDS, ...EXTENDED_ELEMENT_COMMANDS]`。基盤の `resolveSlashCommands(t, activeCommands)` → `createSlashCommandSource(...)` に渡す。
-- Validation: `/drawio` `/plantuml` `/lsx` が基本コマンドと同一メニューに現れ、絵文字補完と共存することをスモーク確認。
-- Risks: 合流点の正確な実装形は基盤実装に従属。拡張スペックが増える場合は合流を単一集約モジュールに集約し、`use-default-extensions` のロジック変更を不要に保つ（Revalidation Trigger 参照）。
+- Integration: React レイヤで `const extended = useExtendedElementCommands(editorKey);` → `resolveSlashCommands(t, [...SLASH_COMMANDS, ...extended])` → `createSlashCommandSource(...)`。
+- `editorKey` の取得: 合成点（`use-default-extensions` 相当）がエディタの key を受け取れるよう配線する（drawio の `DiagramButton` が `editorKey` を prop で受けるのと同経路）。**未確定なら実装タスクで配線を確定**。
+- Validation: `/drawio`・`/lsx`・`/plantuml`・`/callout` が基本コマンドと同一メニューに現れ、絵文字補完と共存することをスモーク確認。drawio/lsx 選択でモーダルが開くこと。
 
 ## Error Handling
-- 拡張コマンドは基盤の `source` / `apply` 上で動作するため、トリガー外・一致なし・キャンセルの挙動は基盤の Error Handling に従う（本スペック固有のエラー経路なし）。
-- 雛形は静的文字列のため失敗経路はない（`buildInsertion` は常に有効な `SlashInsertion` を返す）。
+- 静的挿入（plantuml/callout）は静的文字列のため失敗経路なし（`buildInsertion` は常に有効な `SlashInsertion` を返す）。
+- run コマンド: `/query` 削除は基盤の単一トランザクション。モーダル起動失敗・キャンセルはモーダル側の責務で、エディタには `/query` 削除のみが残る（要素は挿入されない）。
+- lsx モーダル: フォーム未入力時は `$lsx()`（既定描画 = 現在ページ配下一覧）。不正なオプション文字列はサーバ側 list-pages のバリデーションに委ねる（本スペックは文字列生成のみ）。
+- トリガー外・一致なし・キャンセルは基盤の Error Handling に従う。
 
 ## Testing Strategy
 
 ### Unit Tests
-1. `drawioInsertion`: ` ```drawio ` 空フェンスを返し、カーソルがフェンス内の空行に来る（1.2, 2.2）。
-2. `plantumlInsertion`: `@startuml/@enduml` を含むフェンスを返し、カーソルが中間の空行に来る（1.3, 2.2）。
-3. `lsxInsertion`: `$lsx()` を返し、カーソルが括弧内に来る（1.4, 2.2）。実装時に `$lsx()` の既定描画が正常（現在ページ配下一覧）であることを確認し、不適なら既定雛形を見直す。
-4. `EXTENDED_ELEMENT_COMMANDS`: drawio/plantuml/lsx の3種が定義され、未選択要素を含まない。各コマンドが i18n キーとキーワードを持つ（1.1, 1.5, 3.2, 4.1）。
+1. `plantumlInsertion`: `@startuml/@enduml` を含むフェンスを返し、カーソルが中間の空行（1.3, 5.2）。
+2. `calloutInsertion('warning')` 等: `:::warning` … `:::` を返し、カーソルが本文行（1.5, 4.2, 5.2）。各種別で記法が正しいこと。
+3. `CALLOUT_VARIANTS` / `STATIC_EXTENDED_COMMANDS`: 7 種の callout コマンドが生成され、各 id・i18n キー・`callout` 共通キーワードを持つこと。plantuml が含まれ未選択要素（math/mermaid）を含まないこと（1.1, 1.6, 4.1, 4.3, 4.4）。
+4. `useExtendedElementCommands`: drawio/lsx コマンドが `kind:'run'` を持ち、`run()` 呼出で対応オープナーが `editorKey` 付きで呼ばれること（モックフックで検証）（1.2, 1.4, 2.1）。
+5. `buildLsxNotation`: 各オプション組合せで期待文字列、全空で `$lsx()`、`reverse=false` は出力しないこと（3.2, 3.3, 3.4）。
 
 ### Integration Tests
-1. 合流点経由で `/drawio` `/plantuml` `/lsx` が基本コマンドと同一の補完メニューに現れ、`/uml` で plantuml が絞り込まれる（3.1, 3.2）。
-2. 拡張コマンド選択時、基盤の `apply` により `/query` が置換され単一トランザクションで挿入、undo 1 回で復元（2.1, 2.3）。
-3. 拡張コマンドが絵文字補完（`:`）と同時に機能する（5.2）。
+1. 合成点経由で `/drawio` `/plantuml` `/lsx` `/callout` が基本コマンドと同一の補完メニューに現れ、`/uml` で plantuml、`/warn` で warning callout が絞り込まれる（6.1, 6.2, 4.4）。
+2. plantuml/callout 選択時、基盤 `apply` により `/query` が置換され単一トランザクションで挿入、undo 1 回で復元（5.1, 5.2）。
+3. drawio/lsx 選択時、`/query` が削除され（単一トランザクション）対応モーダルの起動 atom が立つこと（5.3, 1.2, 1.4）。
+4. 拡張コマンドが絵文字補完（`:`）と同時に機能する（8.2）。
+5. 既存 drawio モーダルのツールバー起動・書き戻しが回帰しないこと（8.3）。
 
 ### E2E/UI Tests（任意）
-1. `/lsx` 選択 → `$lsx()` が挿入されカーソルが括弧内に来て、続けて `/` などのオプションを入力できる（1.4, 2.2）。
+1. `/drawio` 選択 → drawio モーダルが開き、保存で ` ```drawio ` フェンスが挿入される（1.2, 2.2）。
+2. `/lsx` 選択 → lsx モーダルでオプション設定 → 確定で `$lsx(...)` が挿入される（1.4, 3.3）。
+3. `/callout` で全種別が候補表示され、`tip` 選択で `:::tip` が挿入されカーソルが本文行に来る（4.1, 4.2, 4.4）。
