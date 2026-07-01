@@ -138,6 +138,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
         multiple
         delay={400}
         minLength={0}
+        filterBy={() => true}
         placeholder={t('admin:audit_log_management.username')}
         isLoading={isLoading}
         options={allUser}
