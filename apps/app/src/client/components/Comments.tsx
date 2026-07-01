@@ -95,7 +95,9 @@ export const Comments = (props: CommentsProps): JSX.Element => {
           isReadOnly={isReadOnly}
         />
         {isReadOnly && hasNoComments && (
-          <p className="text-muted mb-0">{t('page_comment.no_comments')}</p>
+          <p className="text-muted mb-0" data-testid="comments-empty-state">
+            {t('page_comment.no_comments')}
+          </p>
         )}
       </div>
       {!isDeleted && !isReadOnly && (
