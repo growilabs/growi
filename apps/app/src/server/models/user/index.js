@@ -1,6 +1,9 @@
 import crypto from 'node:crypto';
 import { omitInsecureAttributes } from '@growi/core/dist/models/serializers';
-import { pagePathUtils } from '@growi/core/dist/utils';
+import {
+  escapeStringForMongoRegex,
+  pagePathUtils,
+} from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
@@ -824,8 +827,14 @@ const factory = (crowi) => {
     const offset = opt.offset || 0;
     const limit = opt.limit || 10;
 
+    // Prefix-anchored and escaped so it matches the same semantics as
+    // Activity.findSnapshotUsernamesByUsernameRegex, which the /usernames
+    // route's isIncludeMixedUsernames option merges results with.
     const conditions = {
-      username: { $regex: username, $options: 'i' },
+      username: {
+        $regex: `^${escapeStringForMongoRegex(username)}`,
+        $options: 'i',
+      },
       status: { $in: status },
     };
 

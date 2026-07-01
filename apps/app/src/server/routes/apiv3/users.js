@@ -1602,6 +1602,9 @@ module.exports = (crowi) => {
           (options.isIncludeMixedUsernames &&
             !options.isIncludeActivitySnapshotUser);
         if (canIncludeMixedUsernames) {
+          // activeUser/inactiveUser (User.findUserByUsernameRegexWithTotalCount) and
+          // activitySnapshotUser (Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount)
+          // both match by prefix now, so this merge is consistent across sources.
           const allUsernames = [
             ...(data.activeUser?.usernames || []),
             ...(data.inactiveUser?.usernames || []),

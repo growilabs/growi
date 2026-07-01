@@ -10,7 +10,6 @@ import { query } from 'express-validator';
 import {
   AUDITLOG_SUGGESTION_FIELDS,
   type AuditlogSuggestionField,
-  type AuditlogSuggestionsResponse,
   type IActivity,
   type ISearchFilter,
   isAuditlogSuggestionField,
@@ -407,10 +406,6 @@ module.exports = (crowi: Crowi): Router => {
             );
 
       const { searchService } = crowi;
-
-      if (!searchService.isConfigured) {
-        return res.apiv3({} satisfies AuditlogSuggestionsResponse);
-      }
 
       try {
         const result = await searchService.searchAuditlogSuggestions(
