@@ -6,11 +6,13 @@
 
 **Users**: GROWI 管理者（admin AI Settings で LLM を設定する運用者）。
 
-**Impact**: 現行の自由入力（[AllowedModelsField.tsx:234-242](../../../apps/app/src/features/mastra/client/admin/AllowedModelsField.tsx#L234-L242)）を、カタログのあるプロバイダでは `<select>` に置き換える。カタログは models.dev をビルド/リリース時に取り込み、`tool_call` かつ text 出力のモデルだけに **生成時フィルタ**して**コミット済み JSON アセット**にする。実行時はそのアセットを read するだけで、`@mastra/core` への値 import も不要。許可リストの認可・既定モデル・推論の native `@ai-sdk/*`・チャット側 UI は不変。
+**Impact**: 現行の自由入力（[AllowedModelsField.tsx:234-242](../../../apps/app/src/features/mastra/client/admin/AllowedModelsField.tsx#L234-L242)）を、カタログのあるプロバイダでは `<select>` に置き換える。カタログは models.dev を**取り込みステップ（リリース前段の独立ステップ。ビルド工程では実行しない）**で取り込み、`tool_call` かつ text 出力のモデルだけに **生成時フィルタ**して**コミット済み JSON アセット**にする。実行時はそのアセットを read するだけで、`@mastra/core` への値 import も不要。許可リストの認可・既定モデル・推論の native `@ai-sdk/*`・チャット側 UI は不変。
+
+> **用語（取り込みステップ / ingest step）**: 本設計で「取り込みステップ」とは models.dev の api.json を fetch → フィルタ → コミット成果物を生成する処理を指し、**リリース前段の独立ステップ**（手動 `pnpm vendor:models` も可）で実行する。**毎ビルドでも実行時でも fetch は行わない**——ビルド工程・実行時はコミット済み成果物を read するのみ（requirements「外部通信に関する前提」準拠）。以降、本文の「取り込みステップ」／図表の "ingest step" はすべてこの意味で用い、"build time" とは区別する。
 
 ### Goals
 - カタログを持つプロバイダ（openai / anthropic / google）で選択のみの登録を提供（1.x）。
-- モデル一覧の**実行時取得を外部通信ゼロ**にする（2.x）。取得は build/release 時のみ。
+- モデル一覧の**実行時取得を外部通信ゼロ**にする（2.x）。取得は**取り込みステップ（リリース前段）でのみ**行い、ビルド工程・実行時には fetch しない。
 - カタログを持たないプロバイダ（azure-openai）・一覧が空の場合は自由入力を維持（3.x）。
 - **`tool_call` かつ text 出力のモデルだけ**を選択肢にする（生成時フィルタ、6.x）。GROWI エージェントのツール呼び出し要件を担保。
 - 既存の許可リスト挙動・認可・推論・チャット UI を不変に保つ（4.x）。
@@ -27,7 +29,7 @@
 ## Boundary Commitments
 
 ### This Spec Owns
-- **models.dev → コミット済みモデルカタログの vendoring**（build/release 時の取り込みスクリプト、生成時フィルタ、コミット成果物）。
+- **models.dev → コミット済みモデルカタログの vendoring**（取り込みステップ＝リリース前段の取り込みスクリプト、生成時フィルタ、コミット成果物）。
 - provider スコープの「選択可能モデル一覧」を返す admin 読み取り経路（サーバ read サービス + エンドポイント + client フック）。
 - `AllowedModelsField` の modelId 入力コントロールの出し分け（`<select>` ↔ 自由入力）。
 - 新規 wire DTO `SelectableModelsResponse`。
@@ -40,9 +42,9 @@
 - `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` の意味。
 
 ### Allowed Dependencies
-- **models.dev api.json**（`https://models.dev/api.json`, MIT）— **build/release 時のみ** fetch（実行時は触れない）。取り込みスクリプト内で Node の `fetch` を使用。
+- **models.dev api.json**（`https://models.dev/api.json`, MIT）— **取り込みステップ（リリース前段）でのみ** fetch（ビルド工程・実行時は触れない）。取り込みスクリプト内で Node の `fetch` を使用。
 - **コミット済み vendored 成果物**（`model-catalog-data.json`）— 実行時に静的 import して read。
-- **zod `^4.1.9`**（既存 dep）— vendoring スクリプトの**境界検証**（api.json の想定形チェック）。mastra feature（tools・feed-parser）で使用実績あり。build 時のみ利用。
+- **zod `^4.1.9`**（既存 dep）— vendoring スクリプトの**境界検証**（api.json の想定形チェック）。mastra feature（tools・feed-parser）で使用実績あり。取り込みステップでのみ利用。
 - 既存 admin 認可チェーン（`accessTokenParser([SCOPE.READ.ADMIN.AI])` → `loginRequiredFactory` → `adminRequiredFactory`）。
 - 既存 client 資産（`apiv3-client`、`useSWRImmutable`、reactstrap `Input`、react-hook-form `register`）。
 - `interfaces/ai-provider`（`AiProvider` / `isAiProvider`）、`interfaces/allowed-model`。
@@ -67,12 +69,12 @@
 
 ```mermaid
 graph TB
-    subgraph BuildRelease[Build or Release time]
+    subgraph BuildRelease[Ingest step - release pre-step, not build]
         ModelsDev[models.dev api.json]
         Vendor[vendor-model-catalog script]
         Filter[chat-model-filter]
         Vendor --> Filter
-        ModelsDev -->|fetch build/release only| Vendor
+        ModelsDev -->|fetch ingest-step only| Vendor
         Vendor -->|write committed| Data[model-catalog-data.json committed]
     end
     subgraph Runtime[Runtime no network]
@@ -97,8 +99,8 @@ graph TB
     Catalog -.->|imports type| Provider
 ```
 
-- **Selected pattern**: 「build/release 時に models.dev から vendoring → コミット成果物 → 実行時は成果物を read」の二段構え（marpit/emoji の vendoring 定石に準拠）。実行時は一方向 read で通信ゼロ。
-- **Dependency direction**: `interfaces`（DTO/AiProvider）← `chat-model-filter` ← `vendor-model-catalog`(script, build時) → コミット `model-catalog-data.json` ← `model-catalog`(runtime) ← `route` / `use-selectable-models`(client) ← `AllowedModelsField`。models.dev は build/release スクリプトからのみ到達。
+- **Selected pattern**: 「取り込みステップ（リリース前段）に models.dev から vendoring → コミット成果物 → 実行時は成果物を read」の二段構え（marpit/emoji の vendoring 定石に準拠）。実行時は一方向 read で通信ゼロ。
+- **Dependency direction**: `interfaces`（DTO/AiProvider）← `chat-model-filter` ← `vendor-model-catalog`(script, 取り込みステップ) → コミット `model-catalog-data.json` ← `model-catalog`(runtime) ← `route` / `use-selectable-models`(client) ← `AllowedModelsField`。models.dev は取り込みステップのスクリプトからのみ到達。
 - **Steering compliance**: server-client 境界（vendored JSON を client に持ち込まない）、cross-platform（Node の fetch/fs、curl/rm 不使用）、data-driven（provider 選択・フィルタ条件を宣言）、pure function 抽出（chat-model-filter）。
 
 ### Technology Stack
@@ -108,7 +110,7 @@ graph TB
 | Frontend | React 18 + reactstrap `Input` + react-hook-form `register` | modelId の `<select>`／自由入力の出し分け | 新規依存なし。`Controller` 不要 |
 | Frontend data | SWR (`useSWRImmutable`) | provider キーの一覧取得 | 静的データゆえ immutable |
 | Backend (runtime) | Express apiv3 (admin router) + 静的 JSON import | provider スコープの一覧エンドポイント（通信なし） | 既存認可チェーン踏襲 |
-| Vendoring (build/release) | Node script（`fetch` 組込み）+ models.dev api.json (MIT) + zod `^4.1.9`（境界検証） | api.json を fetch → 境界を zod 検証 → 生成時フィルタ → コミット JSON 生成 | **実行時ではなく build/release 時**。`pnpm vendor:models`。zod は既存 dep（mastra feature で使用実績） |
+| Vendoring (ingest step) | Node script（`fetch` 組込み）+ models.dev api.json (MIT) + zod `^4.1.9`（境界検証） | api.json を fetch → 境界を zod 検証 → 生成時フィルタ → コミット JSON 生成 | **実行時・ビルド工程ではなく取り込みステップ（リリース前段）**。`pnpm vendor:models`。zod は既存 dep（mastra feature で使用実績） |
 | Data asset | committed `model-catalog-data.json` | `provider → string[]`（chat＋tool 対応 id） | git 管理・PR レビュー・リリースで一様配布 |
 
 ## File Structure Plan
@@ -117,7 +119,7 @@ graph TB
 ```
 apps/app/
 ├── bin/
-│   ├── vendor-model-catalog.ts                 # build/release: fetch api.json → filter → write committed JSON
+│   ├── vendor-model-catalog.ts                 # ingest step (pre-release, not build): fetch api.json → filter → write committed JSON
 │   └── vendor-model-catalog.spec.ts            # fixture api.json → 期待する成果物 shape を検証
 └── src/features/mastra/
     ├── interfaces/
@@ -204,8 +206,8 @@ sequenceDiagram
 
 | Component | Layer | Intent | Req Coverage | Key Dependencies | Contracts |
 |-----------|-------|--------|--------------|------------------|-----------|
-| chat-model-filter | Build (pure) | 対象provider定義 + chat＋tool モデル判定 | 6.1, 6.2 | interfaces/ai-provider (P1) | Service |
-| vendor-model-catalog | Build/Release (script) | models.dev fetch→生成時フィルタ→コミット JSON 生成 | 2.1–2.3, 6.1 | models.dev api.json (P0), chat-model-filter (P0) | Batch |
+| chat-model-filter | Ingest (pure) | 対象provider定義 + chat＋tool モデル判定 | 6.1, 6.2 | interfaces/ai-provider (P1) | Service |
+| vendor-model-catalog | Ingest step (script) | models.dev fetch→生成時フィルタ→コミット JSON 生成 | 2.1–2.3, 6.1 | models.dev api.json (P0), chat-model-filter (P0) | Batch |
 | model-catalog | Server (runtime) | 成果物 read で provider→id 一覧（通信なし） | 1.1, 2.1–2.3, 7.1 | model-catalog-data.json (P0), ai-provider (P1) | Service |
 | get-available-models | Server (route) | admin GET エンドポイント | 1.1, 3.1, 5.1, 7.1, 7.2 | model-catalog (P0), 認可 middleware (P0) | API |
 | useSWRxSelectableModels | Client (hook) | provider キーの一覧取得 | 1.1, 3.2, 5.1, 5.2 | apiv3-client (P0), SelectableModelsResponse (P1) | Service, State |
@@ -230,21 +232,21 @@ export const CATALOG_PROVIDERS: readonly AiProvider[]; // openai / anthropic / g
 export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call && output⊇text
 ```
 
-#### vendor-model-catalog（Batch script, build/release）
+#### vendor-model-catalog（Batch script, 取り込みステップ／リリース前段）
 | Field | Detail |
 |-------|--------|
 | Intent | models.dev から chat＋tool モデルだけを取り込み、コミット成果物を生成 |
 | Requirements | 2.1, 2.2, 2.3, 6.1 |
 
 **Responsibilities & Constraints**
-- `fetch('https://models.dev/api.json')`（**build/release 時のみ**）→ `CATALOG_PROVIDERS` を選択 → `isSelectableModel` で生成時フィルタ → **id のみ**を `models.<provider> = string[]` に整形し、`{ _source（MIT 帰属）, _generatedAt, models }` の形（ヘッダとデータを分離）で `model-catalog-data.json` を**決定的（ソート）**に書き出す。
+- `fetch('https://models.dev/api.json')`（**取り込みステップ＝リリース前段でのみ／ビルド工程では実行しない**）→ `CATALOG_PROVIDERS` を選択 → `isSelectableModel` で生成時フィルタ → **id のみ**を `models.<provider> = string[]` に整形し、`{ _source（MIT 帰属）, _generatedAt, models }` の形（ヘッダとデータを分離）で `model-catalog-data.json` を**決定的（ソート）**に書き出す。
 - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。
 - **生成時サニティチェック（Issue 2）**: 取得した api.json を境界で **zod** による最小スキーマ検証（**読む分のみ**＝対象プロバイダの `tool_call`・`modalities.output` の型を検証し、他フィールド/他プロバイダは passthrough で寛容に）し、**各対象プロバイダ（openai/anthropic/google）で `isSelectableModel` 通過が1件以上**であることを assert する。いずれか違反（想定外の形・空結果）なら**非ゼロ終了して既存のコミット成果物を保持**し上書きしない（models.dev のスキーマドリフトで「無言の空カタログ」が出荷されるのを防ぐ）。
 - 実行は `pnpm vendor:models`。**スクリプトは生成（fetch＋フィルタ＋ファイル write）のみで git 操作はしない**（純ジェネレータ・副作用なし）。**コミットは別ステップの責務**（手動＝開発者が diff 確認して PR ／ 無人＝リリース前段ジョブが差分時に commit/PR）。リリースビルドはコミット済み成果物を read するのみ（build 工程に fetch/commit を融合しない）。
 
 **Contracts**: Batch [x]
 - Trigger: 手動 `pnpm vendor:models` ／ リリースビルド前段の独立 step。
-- Input: models.dev api.json（build/release 時 fetch）。
+- Input: models.dev api.json（取り込みステップで fetch）。
 - Output: 生成（write）した `model-catalog-data.json`。git 操作はせず、コミットは別ステップが担う（差分は PR レビュー）。
 - Idempotency: 同一上流なら同一出力（決定的）。fetch 失敗・スキーマ検証失敗・いずれかの対象プロバイダが空、のいずれでも非ゼロ終了し既存成果物を保持（後述 Error Handling）。
 
@@ -350,8 +352,8 @@ export type ModelCatalogFile = { _source: string; _generatedAt: string; models: 
 
 ## Error Handling
 
-- **build/release 時の fetch 失敗**: `vendor-model-catalog` は非ゼロ終了し、**既存のコミット成果物を保持**（上書きしない）。リリースは前回カタログで継続可能。ログに詳細（HTTP ステータス）を出す。
-- **build/release 時のスキーマドリフト／空結果（Issue 2）**: 取得 JSON が想定形でない、またはいずれかの対象プロバイダで選択可能モデルが0件になった場合、`vendor-model-catalog` は**非ゼロ終了して既存成果物を保持**する（「無言の空カタログ」出荷を防止）。何が欠けたか（プロバイダ名・件数）をログに出し、refresh の PR/CI で検知させる。
+- **取り込みステップ（リリース前段）の fetch 失敗**: `vendor-model-catalog` は非ゼロ終了し、**既存のコミット成果物を保持**（上書きしない）。リリースは前回カタログで継続可能。ログに詳細（HTTP ステータス）を出す。
+- **取り込みステップ（リリース前段）のスキーマドリフト／空結果（Issue 2）**: 取得 JSON が想定形でない、またはいずれかの対象プロバイダで選択可能モデルが0件になった場合、`vendor-model-catalog` は**非ゼロ終了して既存成果物を保持**する（「無言の空カタログ」出荷を防止）。何が欠けたか（プロバイダ名・件数）をログに出し、refresh の PR/CI で検知させる。
 - **400 invalid provider**: `isAiProvider` 不合格 query → `ErrorV3` で 400。
 - **実行時のサーバ 5xx / 取得失敗**: フックの `error` → UI は自由入力にフォールバックし保存をブロックしない（3.2）。`res.apiv3Err(new ErrorV3(...), 500)`、秘匿を載せない。
 - **空一覧（azure 等）**: エラーではなく `{ modelIds: [] }`。UI は自由入力（3.1）。
@@ -375,7 +377,7 @@ export type ModelCatalogFile = { _source: string; _generatedAt: string; models: 
 - `put-ai-settings` の単一 isDefault 不変条件・providerOptions JSON 検証、`resolveEffectiveModelId` の allow-list 検証、`get-models`（chat 側）応答が不変。
 
 ## Security Considerations
-- **実行時の外部通信ゼロ**: 一覧提供は committed 成果物の read のみ（2.x）。models.dev への fetch は build/release スクリプト限定。
+- **実行時の外部通信ゼロ**: 一覧提供は committed 成果物の read のみ（2.x）。models.dev への fetch は取り込みステップのスクリプト限定。
 - **秘匿非漏洩**: 応答は `modelIds: string[]` のみ（7.1、[get-models.ts](../../../apps/app/src/features/mastra/server/routes/get-models.ts) の modelId-only 前例に準拠）。
 - **認可**: `SCOPE.READ.ADMIN.AI` + `adminRequired`（7.2）。
 - **入力検証**: query `provider` は `isAiProvider` で allow-list 検証。
@@ -384,6 +386,6 @@ export type ModelCatalogFile = { _source: string; _generatedAt: string; models: 
 ## Migration Strategy
 - ランタイムのデータ移行なし。8.x はドキュメント整合更新（実装タスク）:
   - `mastra-multi-model-chat`: 「モデル一覧 API 新設しない／管理者手入力」→「オフライン vendored カタログの選択方式を採用」に更新（8.1）。
-  - `multi-llm-provider`: research D-2/D-3 に「models.dev の **runtime fetch（モデルルーター）は不採用のまま**／**build/release 時 vendoring した静的カタログの read は別物**・推論は native `@ai-sdk/*`」を注記（8.2）。
+  - `multi-llm-provider`: research D-2/D-3 に「models.dev の **runtime fetch（モデルルーター）は不採用のまま**／**取り込みステップ（リリース前段）で vendoring した静的カタログの read は別物**・推論は native `@ai-sdk/*`」を注記（8.2）。
   - 更新後、関連スペック間に矛盾記述が残らないこと（8.3）。
 ```
