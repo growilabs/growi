@@ -35,9 +35,9 @@ const wrapper = ({ children }: { children: ReactNode }) =>
     children,
   );
 
-const renderUseSelectableModels = (provider: AiProvider | '') =>
+const renderUseSelectableModels = (provider: AiProvider | '' | undefined) =>
   renderHook(
-    ({ provider }: { provider: AiProvider | '' }) =>
+    ({ provider }: { provider: AiProvider | '' | undefined }) =>
       useSWRxSelectableModels(provider),
     { wrapper, initialProps: { provider } },
   );
@@ -53,6 +53,19 @@ describe('useSWRxSelectableModels', () => {
     const { result } = renderUseSelectableModels('');
 
     // Assert: the null key suppresses the fetch entirely.
+    await waitFor(() => {
+      expect(result.current.isLoading).toBe(false);
+    });
+    expect(mockedApiv3Get).not.toHaveBeenCalled();
+    expect(result.current.data).toBeUndefined();
+  });
+
+  it('does not fetch while the provider is undefined — before the form seeds (Req 5.2)', async () => {
+    // Before the AI-settings data resolves, useForm has no defaultValues, so
+    // watch('provider') returns undefined (not ''). A `=== ''`-only guard would
+    // let it through and fire a request with no provider query param → a 400.
+    const { result } = renderUseSelectableModels(undefined);
+
     await waitFor(() => {
       expect(result.current.isLoading).toBe(false);
     });

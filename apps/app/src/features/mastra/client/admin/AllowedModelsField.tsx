@@ -86,7 +86,11 @@ export const AllowedModelsField = (
   const isResolved = data != null;
   // A request is in flight only while a provider is selected and nothing has
   // resolved or errored yet; the modelId control is disabled during that window.
-  const isLoadingModels = provider !== '' && !isResolved && error == null;
+  // `provider` can be `undefined` before the settings data seeds the form (the
+  // hook issues no request then either — see use-selectable-models), so treat
+  // nullish as unset rather than "loading".
+  const isLoadingModels =
+    provider != null && provider !== '' && !isResolved && error == null;
   const useSelect = isResolved && selectableModelIds.length > 0;
 
   // Azure OpenAI stores the *deployment name* in `modelId`, so the label changes

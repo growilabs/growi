@@ -304,10 +304,10 @@ export const getSelectableModelIds: (provider: AiProvider) => string[];
 **Contracts**: Service [x] / State [x]
 ```typescript
 export const useSWRxSelectableModels: (
-  provider: AiProvider | '',
+  provider: AiProvider | '' | undefined,
 ) => SWRResponse<SelectableModelsResponse, Error>;
 ```
-- Key: `provider === '' ? null : ['/ai-settings/available-models', provider]`（null = fetch しない、5.2）。
+- Key: `provider == null || provider === '' ? null : ['/ai-settings/available-models', provider]`（null = fetch しない、5.2）。**未選択は `''` だけでなく `undefined` も含める**: 設定データ解決前は `useForm` に defaultValues が無く `watch('provider')` が（型に反して）`undefined` を返すため、`=== ''` だけのガードだと `[ENDPOINT, undefined]` キーで fetch が走り、`provider` クエリ無しのリクエスト → 400 になる。nullish もガードして「provider 無し ⇒ リクエストしない」を初期ロード中も守る。
 - Fetcher: `apiv3Get<SelectableModelsResponse>('/ai-settings/available-models', { provider })`。`useSWRImmutable`（静的データ）。provider 変更で自動再取得（5.1）。**注意**: `apiv3Get(path, params)` は第2引数を内部で `{ params }` に包んで axios へ渡す（[apiv3-client.ts](../../../apps/app/src/client/util/apiv3-client.ts)）ため、クエリ値のオブジェクトを**そのまま**第2引数に渡す（`{ provider }`）。`{ params: { provider } }` と書くと二重ラップされ `?params[provider]=...` となり `req.query.provider` が undefined → 400 になるので不可。
 
 #### AllowedModelsField（UI 変更）
