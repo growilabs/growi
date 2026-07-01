@@ -61,7 +61,7 @@
 - admin AI 設定は feature-local な GET/PUT（[admin-ai-settings/index.ts](../../../apps/app/src/features/mastra/server/routes/admin-ai-settings/index.ts)、`routerForAdmin.use('/ai-settings', ...)` 配下）。各ハンドラファクトリが認可チェーンを内包。
 - config は `configManager.getConfig('ai:*')`、薄い accessor が [llm-providers/config.ts](../../../apps/app/src/features/mastra/server/services/ai-sdk-modules/llm-providers/config.ts)。
 - provider ドロップダウンは既に reactstrap `<Input type="select">` × `AI_PROVIDERS.map()`（[ProviderCommonSettings.tsx:83-95](../../../apps/app/src/features/mastra/client/admin/ProviderCommonSettings.tsx#L83-L95)）。本設計はこのパターンを modelId 入力へ横展開。
-- **vendoring の前例**: marpit（[extract-marpit-css.ts](../../../packages/presentation/scripts/extract-marpit-css.ts) → コミット `*.prebuilt.ts`、「ランタイム依存なしで使うため生成」）と emoji（`@growi/emoji-mart-data` の `build: node bin/extract.ts`）。本設計はこの「抽出→コミット→実行時は依存なし」に倣う。ただし emoji/marpit は**ローカル devDep から決定的に抽出**するため build 時再生成が安全なのに対し、本カタログの源は**ネットワーク（models.dev）**なので、取り込みは**毎ビルドではなく build/release タイミングで実行し成果物をコミット**、ビルドはコミット済みを消費する（下記）。
+- **vendoring の前例**: marpit（[extract-marpit-css.ts](../../../packages/presentation/scripts/extract-marpit-css.ts) → コミット `*.prebuilt.ts`、「ランタイム依存なしで使うため生成」）と emoji（`@growi/emoji-mart-data` の `build: node bin/extract.ts`）。本設計はこの「抽出→コミット→実行時は依存なし」に倣う。ただし emoji/marpit は**ローカル devDep から決定的に抽出**するため build 時再生成が安全なのに対し、本カタログの源は**ネットワーク（models.dev）**なので、取り込みは**毎ビルドではなくリリース前段の取り込みステップで実行**（生成のみ／コミットは別ステップ）、ビルドはコミット済みを消費する（下記）。
 
 ### Architecture Pattern & Boundary Map
 
@@ -240,12 +240,12 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 - `fetch('https://models.dev/api.json')`（**build/release 時のみ**）→ `CATALOG_PROVIDERS` を選択 → `isSelectableModel` で生成時フィルタ → **id のみ**を `provider → string[]` に整形 → `model-catalog-data.json` を**決定的（ソート）**に書き出す。ヘッダに `_source`（MIT 帰属）/ `_generatedAt` を付与。
 - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。
 - **生成時サニティチェック（Issue 2）**: 取得した api.json を境界で **zod** による最小スキーマ検証（**読む分のみ**＝対象プロバイダの `tool_call`・`modalities.output` の型を検証し、他フィールド/他プロバイダは passthrough で寛容に）し、**各対象プロバイダ（openai/anthropic/google）で `isSelectableModel` 通過が1件以上**であることを assert する。いずれか違反（想定外の形・空結果）なら**非ゼロ終了して既存のコミット成果物を保持**し上書きしない（models.dev のスキーマドリフトで「無言の空カタログ」が出荷されるのを防ぐ）。
-- 実行は `pnpm vendor:models`。**リリースビルドの前段の独立 step で実行し成果物をコミット**、リリースビルドはコミット済みを消費（build 工程に fetch/commit を融合しない）。
+- 実行は `pnpm vendor:models`。**スクリプトは生成（fetch＋フィルタ＋ファイル write）のみで git 操作はしない**（純ジェネレータ・副作用なし）。**コミットは別ステップの責務**（手動＝開発者が diff 確認して PR ／ 無人＝リリース前段ジョブが差分時に commit/PR）。リリースビルドはコミット済み成果物を read するのみ（build 工程に fetch/commit を融合しない）。
 
 **Contracts**: Batch [x]
 - Trigger: 手動 `pnpm vendor:models` ／ リリースビルド前段の独立 step。
 - Input: models.dev api.json（build/release 時 fetch）。
-- Output: コミットされる `model-catalog-data.json`（差分は PR レビュー）。
+- Output: 生成（write）した `model-catalog-data.json`。git 操作はせず、コミットは別ステップが担う（差分は PR レビュー）。
 - Idempotency: 同一上流なら同一出力（決定的）。fetch 失敗・スキーマ検証失敗・いずれかの対象プロバイダが空、のいずれでも非ゼロ終了し既存成果物を保持（後述 Error Handling）。
 
 **Implementation Notes**
