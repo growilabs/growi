@@ -121,3 +121,84 @@ _Discovery type: **Light（Extension）**。新規外部ライブラリなしの
 ## 統合リスク（Light discovery）
 - Medium: `@mastra/core` 値 import の Turbopack externalization（要 prod ビルド検証）／chat フィルタ heuristic の品質。
 - Low: 認可・DTO・form・SWR は確立パターンの再利用。既存挙動は不変（4.x を回帰テストで担保）。
+
+---
+
+# モデル取得元・取得方法の比較検討と決定（2026-07-01）
+
+**決定: 取得元 = models.dev / 取得方法 = X2（ビルド時 vendoring → コミット済み静的アセットを実行時 read）。** ユーザー採択済み。
+
+## 要件（再掲）
+admin モデルピッカーは、(1) 実行時に外部通信しない（Req 2）、(2) プロバイダ単位、(3) chat/ツール対応モデルへ絞れるだけのメタデータ、を満たすモデルカタログ源を要する。GROWI エージェントは**ツール呼び出し必須**のため `tool_call` 情報が要件に効く。
+
+## 選択肢の比較
+
+| 案 | 取得元 / 方法 | 実行時通信 | フィルタ | 判定 | 却下/採択理由 |
+|---|---|---|---|---|---|
+| **Y** | `@mastra/core` getProviderConfig（同梱レジストリ） | なし | heuristic 止まり | 却下 | データが削ぎ落とし（id＋attachment のみ、`tool_call`/modality なし）。値 import で externalization 懸念。誤除外リスク（旧 Issue 1）を消せない |
+| **X1** | models.dev の npm ラッパーをランタイム依存 | なし | 権威的 | 却下 | 候補は**全て単独メンテ・低採用・新規**。複数が既に**サイレント陳腐化**。tokenlens を却下した理由がそのまま適用 |
+| — | models.dev / OpenRouter を runtime fetch | **あり** | 権威的 | 却下 | **Req 2 違反**。OpenRouter は ToS でカタログ複製禁止（法的リスク） |
+| — | config-manager にカタログ主保管 | 方法次第 | — | 却下 | config は運用者設定用で参照データ向きでない。投入方法（migration/runtime-fetch/手動）が全て劣る。「運用者の選択（許可リスト）」と「上流の事実（カタログ）」を混同 |
+| **X2** | **models.dev をビルド時 vendoring → コミット成果物** | **なし** | **権威的** | **採択** | 上流の tool_call/modality を使い authoritative フィルタ（Issue 1 解消）。第三者ランタイム依存なし。鮮度は GROWI 管理・可視 |
+
+## models.dev ラッパー調査（一次ソース＝npm レジストリ / GitHub API / 型定義で検証）
+
+- **models.dev（anomalyco, MIT）は公式 npm データパッケージを出していない**（JSON `api.json` ＋ TOML のみ）。上流は**活発**（日次コミット・複数コントリビュータ・最新 2026-07-01）。全ラッパーはこれを再スナップショットしているだけ。
+- 候補と判定（すべて offline＋tool_call/modality の有無・保守状況を検証）:
+
+| 候補 | offline | tool_call＋text | 保守（vs 2026-07） | 判定 | 主な懸念 |
+|---|---|---|---|---|---|
+| ai-model-prices | ✅ 同梱 | ✅ | active（本日公開・日次CI） | viable | bus factor 1・0 stars・生後2.5ヶ月・CI 停止＝サイレント陳腐化 |
+| ai-sdk-json-schema | ✅ 同梱 | ✅ | slowing（2026-05） | viable | provider ネスト・cost/limit 無し・単著・0 stars |
+| pickai | △（自前snap必要） | ✅ | slowing（2026-03） | viable | 同梱データ無し・solo・1 star |
+| models-dev-db | ✅ 同梱 | ✅ | slowing | risky | **npm 公開が40日停止**（git は毎時、npm 未反映）・solo・4 stars |
+| pi-frontier | ✅ 同梱 | ✅ | risky | risky | **npm tarball 凍結**（日次更新は GitHub のみ）・solo・0 stars |
+| @swoosh-dev/router(+capabilities) | ✅ | ✅（features:["tools"]） | 新規 | risky | 生後3週・0 stars・週11DL・Apache-2.0 |
+| LiteLLM prices JSON（BerriAI） | ✅ vendoring | ✅（supports_function_calling、独自スキーマ） | active（企業・day-0 PR） | 有力（独立系） | text-out は mode:'chat' で暗黙 |
+| @pydantic/genai-prices | ✅ | ❌（価格のみ） | active（Pydantic・314★） | reject | tool_call/modality 無し |
+| @plurnk/plurnk-models | ✅ | ❌（context＋価格のみ） | active | reject | 要件フィールド無し |
+| OpenRouter Models API | ❌ fetch専用 | ✅ | active（商用） | reject | オフライン不可＋ToS 複製禁止 |
+| llm-info / @tokenlens/* | — | ❌/normalize除去 | — | reject | tool_call 無し / tokenlens 系（休眠） |
+
+- **結論**: 「よく採用された・複数メンテの・オフライン対応 wrapper」は存在しない。全て solo/低採用/新規で、複数は既にサイレント陳腐化 → tokenlens 却下の論理が全ラッパーに及ぶ。よって**ラッパーをランタイム依存にはしない**。
+- **LangChain.js** `@langchain/core` の `ModelProfile`（toolCalling/modalities、models.dev 由来・provider 統合ごとに同梱）は堅牢だが provider 統合に分散・LangChain 抽象に結合 → クリーンな catalog にはならず fallback 扱い。
+
+## X2 設計（決定内容）
+
+- **取得方式（GROWI 流）**: marpit / emoji と同じ「**(dev)依存から抽出 → コミット成果物 → 実行時は依存なし**」。第三者ラッパー（ai-model-prices / @tokenlens/models / LiteLLM 等）は使うとしても **devDependency（生成時のみ）**、本番/SSR には GROWI がレビューしてコミットした成果物のみを載せる → **供給鎖リスク解消**。
+- **成果物**: コミットされる1つの静的アセット（例 `model-catalog-data.json`／marpit 流なら `.prebuilt.ts`）。`provider → [{ id, tool_call, output modalities, … }]`（openai/anthropic/google）。**azure-openai は models.dev 非収録 → 従来どおり自由入力（不変）**。
+- **実行時**: サーバ側 `model-catalog` が成果物を静的 import → `tool_call===true && output⊇text` で**権威的フィルタ** → `string[]` を返す。**通信ゼロ（Req 2）**。`@mastra/core` の値 import は不要になり、旧 D4/task 6.1 の externalization 検証は消える。
+- **鮮度運用**: 手動 `pnpm vendor:models` → PR、または定期 CI 自動 PR（人レビュー）。更新は git 上で可視・制御可能（npm ラッパーのサイレント陳腐化を回避）。
+- **（任意）オーバーライド**: 既定＝コミット成果物、`ai:modelsCatalogOverride`（config/env, 既定 undefined）で差し替え可能にする案。エアギャップ/独自カタログ用の逃げ道。要否は未決。
+
+## GROWI 内の前例（X2 は既存の定石）
+- **marpit**: `packages/presentation/scripts/extract-marpit-css.ts` → コミット `src/client/consts/marpit-base-css.vendor-styles.prebuilt.ts`（ヘッダ「@marp-team/* への*ランタイム依存なし*で使うため生成」）。
+- **emoji**: `packages/emoji-mart-data`（`build: node bin/extract.ts`）→ 静的アセット化、実行時は `@growi/emoji-mart-data`（vendored）を read（重い `@emoji-mart/data` をランタイムに背負わない）。
+- 他: prisma 生成（`src/generated/prisma/*`）、orval（OpenAPI→client, `gen:client-code`）、openapi codegen（`bin/openapi`）、vendor CSS プリコンパイル（`bin/build-bulk-export-css.ts` / vendor-styles-components）。
+
+## 不変（この決定で変えないもの）
+- 許可リスト `ai:allowedModels`（＝運用者の選択）は **config のまま**・認可境界。
+- native `@ai-sdk/*` 推論・chat 側 UI・PUT はカタログ照合しない（D2）。
+
+## spec 反映時に詰める小論点（未決）
+1. 取り込み元: **api.json snapshot** / **wrapper を devDep** / **LiteLLM（独立系）** のどれ。
+2. フィルタ位置: 成果物に**事実だけ入れて実行時フィルタ**（推奨）か、生成時に絞るか。
+3. 成果物形式: `.json` か `.ts`（marpit 流）か。配置は apps/app の mastra feature 内か workspace パッケージ化か。
+4. 鮮度: 手動のみか 定期 CI 自動 PR か。
+5. 任意オーバーライド `ai:modelsCatalogOverride` を入れるか。
+
+## 影響（design/tasks 改修の要点）
+- データ源: `@mastra/core getProviderConfig` → **コミット vendored 成果物**。
+- chat フィルタ: heuristic denylist → **authoritative（tool_call＋text 出力）**。**Issue 1 解消**。
+- 削除/変更: `@mastra/core` 値 import ＋ Turbopack externalization 検証（旧 D4 / task 6.1）は不要に。
+- 追加: vendoring devDep ＋ extract スクリプト（`bin/…`）＋ コミット成果物 ＋（任意）定期 CI。
+- Req 2 文言: 「取得はビルド時、実行時は同梱アセットを read、外部通信なし」。
+- Req 6: 「`tool_call` かつ text 出力による権威的フィルタ」。
+
+## Sources
+- anomalyco/models.dev（github.com/anomalyco/models.dev, MIT）/ models.dev api.json
+- ai-model-prices（npm; github.com/Corentints/ai-model-prices）
+- models-dev-db（github.com/vklimontovich/models-dev）/ pi-frontier（github.com/ffrappo/pi-frontier）
+- @swoosh-dev/router,@swoosh-dev/capabilities（github.com/acalejos/swoosh）/ pickai（github.com/niftymonkey/pickai）
+- LiteLLM model_prices_and_context_window_backup.json（github.com/BerriAI/litellm）/ OpenRouter models API
+- tokenlens（github.com/xn1cklas/tokenlens）— 休眠（2025-10 以降）
