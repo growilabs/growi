@@ -126,33 +126,28 @@ activitySchema.statics.updateByParameters = async function (
   return activity;
 };
 
-activitySchema.statics.findSnapshotUsernamesByUsernameRegexWithTotalCount =
-  async function (
-    q: string,
-    option: { sortOpt: SortOrder; offset: number; limit: number },
-  ): Promise<{ usernames: string[]; totalCount: number }> {
-    const opt = option || {};
-    const sortOpt = opt.sortOpt || 1;
-    const offset = opt.offset || 0;
-    const limit = opt.limit || 10;
+activitySchema.statics.findSnapshotUsernamesByUsernameRegex = async function (
+  q: string,
+  option: { sortOpt: SortOrder; offset: number; limit: number },
+): Promise<string[]> {
+  const opt = option || {};
+  const sortOpt = opt.sortOpt || 1;
+  const offset = opt.offset || 0;
+  const limit = opt.limit || 10;
 
-    const conditions = { 'snapshot.username': { $regex: q, $options: 'i' } };
+  const conditions = { 'snapshot.username': { $regex: q, $options: 'i' } };
 
-    const usernames = await this.aggregate()
-      .skip(0)
-      .limit(10000) // Narrow down the search target
-      .match(conditions)
-      .group({ _id: '$snapshot.username' })
-      .sort({ _id: sortOpt }) // Sort "snapshot.username" in ascending order
-      .skip(offset)
-      .limit(limit);
+  const usernames = await this.aggregate()
+    .skip(0)
+    .limit(10000) // Narrow down the search target
+    .match(conditions)
+    .group({ _id: '$snapshot.username' })
+    .sort({ _id: sortOpt }) // Sort "snapshot.username" in ascending order
+    .skip(offset)
+    .limit(limit);
 
-    const totalCount = (
-      await this.find(conditions).distinct('snapshot.username')
-    ).length;
-
-    return { usernames: usernames.map((r) => r._id), totalCount };
-  };
+  return usernames.map((r) => r._id);
+};
 
 export default getOrCreateModel<ActivityDocument, ActivityModel>(
   'Activity',

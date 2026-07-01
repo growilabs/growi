@@ -35,6 +35,7 @@ import type {
   SearchQueryParser,
   SearchResolver,
 } from '../interfaces/search';
+import Activity from '../models/activity';
 import NamedQuery from '../models/named-query';
 import type { PageModel } from '../models/page';
 import { SearchError } from '../models/vo/search-error';
@@ -360,12 +361,17 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const response: AuditlogSuggestionsResponse = {};
 
     if (fields.includes('username')) {
-      const usernames =
-        await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
-          'username',
-          q,
-          limit,
-        );
+      const usernames = this.isConfigured
+        ? await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+            'username',
+            q,
+            limit,
+          )
+        : await Activity.findSnapshotUsernamesByUsernameRegex(q, {
+            sortOpt: 1,
+            offset: 0,
+            limit,
+          });
       const User = mongoose.model<IUser>('User');
       const users = await User.find({ username: { $in: usernames } })
         .select('username status')

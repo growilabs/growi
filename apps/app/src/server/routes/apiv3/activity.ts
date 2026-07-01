@@ -1,4 +1,3 @@
-import type { IUser } from '@growi/core';
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import { addMinutes } from 'date-fns/addMinutes';
@@ -7,12 +6,10 @@ import { parseISO } from 'date-fns/parseISO';
 import type { Request, Router } from 'express';
 import express from 'express';
 import { query } from 'express-validator';
-import mongoose from 'mongoose';
 
 import {
   AUDITLOG_SUGGESTION_FIELDS,
   type AuditlogSuggestionField,
-  type AuditlogSuggestionsResponse,
   type IActivity,
   type ISearchFilter,
   isAuditlogSuggestionField,
@@ -21,7 +18,6 @@ import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import Activity from '~/server/models/activity';
-import { UserStatus } from '~/server/models/user/conts';
 import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
@@ -410,31 +406,6 @@ module.exports = (crowi: Crowi): Router => {
             );
 
       const { searchService } = crowi;
-
-      if (!searchService.isConfigured) {
-        if (fields.includes('username')) {
-          const User = mongoose.model<IUser>('User');
-          const { usernames } =
-            await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(
-              q,
-              { sortOpt: 1, offset: 0, limit },
-            );
-          const users = await User.find({ username: { $in: usernames } })
-            .select('username status')
-            .lean();
-          return res.apiv3({
-            username: {
-              activeUsernames: users
-                .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
-                .map((u) => u.username),
-              inactiveUsernames: users
-                .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
-                .map((u) => u.username),
-            },
-          } satisfies AuditlogSuggestionsResponse);
-        }
-        return res.apiv3({} satisfies AuditlogSuggestionsResponse);
-      }
 
       try {
         const result = await searchService.searchAuditlogSuggestions(

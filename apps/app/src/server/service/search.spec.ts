@@ -5,6 +5,7 @@ import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type Crowi from '~/server/crowi';
+import Activity from '~/server/models/activity';
 import { UserStatus } from '~/server/models/user/conts';
 import { configManager } from '~/server/service/config-manager/config-manager';
 
@@ -16,12 +17,20 @@ vi.mock('~/server/models/named-query', () => ({
   default: { findOne: vi.fn() },
 }));
 
+vi.mock('~/server/models/activity', () => ({
+  default: { findSnapshotUsernamesByUsernameRegex: vi.fn() },
+}));
+
 vi.mock('~/server/service/config-manager/config-manager', () => ({
   default: { getConfig: vi.fn() },
   configManager: { getConfig: vi.fn() },
 }));
 
 class TestSearchService extends SearchService {
+  // isConfigured is normally derived from fullTextSearchDelegator; tests flip this
+  // directly to exercise both the ES path and the MongoDB fallback path.
+  isConfiguredOverride = true;
+
   // biome-ignore lint/complexity/noUselessConstructor: widens the protected base ctor (factory pattern) to public so the test can instantiate and wire mocks
   public constructor() {
     super();
@@ -43,7 +52,7 @@ class TestSearchService extends SearchService {
   override registerUpdateEvent(): void {}
 
   override get isConfigured(): boolean {
-    return false;
+    return this.isConfiguredOverride;
   }
 }
 
@@ -81,7 +90,7 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     mockCrowi.configManager = configManager;
     // SearchService now uses a protected ctor + async create() factory (dev/8.0.x).
     // create() hardcodes `new SearchService()`, ignoring our subclass override, so wire
-    // the mocked delegator manually here (isConfigured=false skips the real init block).
+    // the mocked delegator manually here instead of calling create().
     searchService = new TestSearchService();
     searchService.crowi = mockCrowi;
     searchService.fullTextSearchDelegator =
@@ -185,5 +194,37 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
         inactiveUsernames: [],
       },
     });
+  });
+
+  it('should classify active and inactive usernames from the MongoDB fallback when ES is not configured', async () => {
+    searchService.isConfiguredOverride = false;
+    vi.mocked(Activity.findSnapshotUsernamesByUsernameRegex).mockResolvedValue([
+      'alice',
+      'bob',
+    ]);
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+      { username: 'bob', status: UserStatus.STATUS_SUSPENDED },
+    ]);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      'ali',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: {
+        activeUsernames: ['alice'],
+        inactiveUsernames: ['bob'],
+      },
+    });
+    expect(Activity.findSnapshotUsernamesByUsernameRegex).toHaveBeenCalledWith(
+      'ali',
+      { sortOpt: 1, offset: 0, limit: 10 },
+    );
+    expect(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).not.toHaveBeenCalled();
   });
 });
