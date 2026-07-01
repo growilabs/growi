@@ -93,7 +93,7 @@
   - _Requirements: 8.2_
   - _Boundary: spec multi-llm-provider_
 
-- [ ] 7.3 スペック間の矛盾がないことを確認する
+- [x] 7.3 スペック間の矛盾がないことを確認する
   - 関連スペック間でモデル入力方式に関する矛盾記述が残っていないことを確認する
   - 完了状態: mastra-multi-model-chat / multi-llm-provider / ai-settings-model-picker の間にモデル入力方式の矛盾記述がない
   - _Requirements: 8.3_
