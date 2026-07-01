@@ -26,7 +26,7 @@
 ### This Spec Owns
 - 拡張要素コマンドの定義（drawio / plantuml / lsx / callout×7 の id・i18n キー・キーワード・アクション）。
 - 静的挿入ビルダー（plantuml フェンス、callout ディレクティブ）。
-- callout 変種の宣言リスト（packages/editor 側、`features/callout` の真実源と整合）。
+- callout 種別リスト（`AllCallout` / `Callout` 型）の **`@growi/core` への移動**（真実源の一本化）と、apps/app 既存 consts の再エクスポート化。editor 側は `AllCallout` から `CALLOUT_VARIANTS`（絞り込み別名付き）を生成。
 - drawio / lsx の `run` コマンドを、モーダルオープナーと `editorKey` を束縛して生成する React フック（合成点）。
 - **lsx 設定モーダル一式（新規）**: editor 側トリガーフック（atom）、apps/app 側モーダル UI、`$lsx(...)` 文字列ビルダー、エディタ書き戻しユーティリティ。
 - 拡張要素コマンドのラベル/説明 locale キー（`slash_command.*`）。
@@ -36,11 +36,12 @@
 - 拡張要素の描画・パース（remark/rehype プラグイン）。
 - 既存 drawio モーダル本体（`DrawioModal` / `DrawioCommunicationHelper` / `replaceFocusedDrawioWithEditor`）。本スペックは起動導線（`useDrawioModalForEditorActions().open`）の呼び出しのみ追加。
 - lsx サーバ側 list-pages（`packages/remark-lsx/src/server`）。
-- callout 描画コンポーネント（`features/callout/components/CalloutViewer`）と変種の真実源（`features/callout/services/consts.ts`）。本スペックは変種**名**を参照するのみ。
+- callout 描画コンポーネント（`features/callout/components/CalloutViewer`）と callout パース（`features/callout/services/callout.ts`）。本スペックは種別**名**（`AllCallout`）を参照するのみで、描画・パースは変更しない（`consts.ts` は @growi/core からの再エクスポートに置き換えるが、`AllCallout`/`Callout` の import 経路・値は不変）。
 - 絵文字補完・キーバインド・グローバルホットキー。
 
 ### Allowed Dependencies
 - 基盤の型/契約: `SlashCommand`、`SlashCommandAction`（`insert | run`）、`SlashInsertion`（`{ insert, cursorOffset }`）。
+- `@growi/core`: callout 種別の真実源 `AllCallout` / `Callout`（本スペックで core へ移動）。packages/editor・apps/app とも既に @growi/core に依存済み。
 - `@codemirror/view`（`EditorView`）。
 - 既存 drawio トリガーフック: `useDrawioModalForEditorActions`（`packages/editor/src/states/modal/drawio-for-editor.ts`）。
 - i18n: 基盤の `resolveSlashCommands(t, commands)` 経由でラベル解決（本スペックは locale キーを足すのみ）。
@@ -50,7 +51,7 @@
 - 基盤の `SlashCommand` / `SlashCommandAction` / `SlashInsertion` 契約変更。
 - コマンド集合の**合成点**の構造変更（React 登録レイヤの合成方法、`editorKey` の受け渡し）。
 - 既存 drawio トリガーフック（`useDrawioModalForEditorActions`）のシグネチャ変更。
-- `features/callout/services/consts.ts` の変種追加・削除（本スペックの変種宣言リストと drift）。
+- `@growi/core` の `AllCallout` の変種追加・削除（editor 側 `KEYWORDS` の `Record<Callout, …>` が型エラーで検出。別名の追記が必要）。
 - remark-lsx のオプション仕様変更（lsx モーダルのフォーム/ビルダーに影響）。
 - locale キー命名（`slash_command.*`）の変更。
 
@@ -138,8 +139,9 @@ graph TB
 # packages/editor 側
 packages/editor/src/client/services-internal/slash-command/extended-elements/
 ├── index.ts                          # barrel: 静的コマンド集合 + useExtendedElementCommands を公開
-├── callout-variants.ts               # CALLOUT_VARIANTS: 宣言リスト（note/tip/.../caution + 別名キーワード）
+├── callout-variants.ts               # CALLOUT_VARIANTS: @growi/core の AllCallout から生成（+ 別名キーワード KEYWORDS）
 ├── insertion-builders.ts             # plantumlInsertion / calloutInsertion(type)（純粋）
+├── ensure-block-line-start.ts        # run 用: from が行頭でなければ改行を前置しカーソルを新行へ（Req 5.4）
 ├── static-commands.ts                # plantuml + callout×7（insert アクション。callout は変種リストから生成）
 ├── use-extended-element-commands.ts  # React フック: drawio/lsx の run コマンド + 静的コマンドを合成して返す
 ├── insertion-builders.spec.ts
@@ -156,6 +158,10 @@ apps/app/src/client/components/PageEditor/LsxModal/
 ├── build-lsx-notation.spec.ts
 └── markdown-lsx-util-for-editor.ts   # 新規: editor へ `$lsx(...)` を dispatch（drawio util に倣う）
 ```
+
+### New / Modified Files（callout 真実源の @growi/core 移動）
+- `packages/core/src/consts/callout.ts`（新規）— `AllCallout` / `Callout` を apps/app から移設。core barrel（`consts` / index）から公開。**@growi/core は公開パッケージのため `npx changeset` が必要**（bump は patch 相当）。
+- `apps/app/src/features/callout/services/consts.ts`（変更）— 自前宣言をやめ `export { AllCallout, type Callout } from '@growi/core/...'` の再エクスポートに置換（既存 import 元 `callout.ts` / `CalloutViewer.tsx` は無修正）。
 
 ### Modified Files
 - 基盤の**コマンド集合合成点**（基盤設計で `use-default-extensions.ts`）— `[...SLASH_COMMANDS, ...useExtendedElementCommands(editorKey)]` を `resolveSlashCommands(t, ...)` に渡す。合成点が `editorKey` を取得できるよう配線する。
@@ -181,17 +187,21 @@ sequenceDiagram
     U->>S: "/drawio" or "/lsx" を選択
     S->>V: dispatch({changes:{from,to,insert:''}, selection:{anchor:from}})  // /query 削除（単一transaction）
     S->>S: action.run(view, from)
+    S->>V: ensureBlockLineStart(view, from)  // 行頭でなければ改行を前置（ブロックを独立行へ）
     S->>A: open(editorKey)
     A-->>M: isOpened=true を購読
     M->>V: useCodeMirrorEditorIsolated(editorKey) で view 取得
     U->>M: 作図 / オプション設定して確定
-    M->>V: dispatch({changes:{from:pos,to:pos,insert: ```drawio…``` / $lsx(...)}})  // 別transaction
+    M->>V: dispatch({changes:{from:pos,to:pos,insert: ```drawio…``` / $lsx(...)}})  // 別transaction（行頭に挿入）
     M->>A: close()
     V-->>U: 要素挿入
 ```
 
 - `run` は基盤の `apply` から呼ばれ、`editorKey` は合成フックが束縛済み。
-- `/query` 削除（基盤・単一トランザクション・undo 可）とモーダルの挿入（モーダル側・別トランザクション）は別操作。キャンセル時はモーダル挿入が発生しない（`/query` 削除のみ残る）。
+- **行頭正規化（Req 5.4）**: スラッシュコマンドは「行頭または空白直後」で発火するため、`図: /drawio` のように行の途中でも起動しうる。この場合 `/query` 削除後のカーソルは行の途中に残り、モーダルが挿入する ` ```drawio ` フェンス / `$lsx(...)` が先行テキストと同一行に連結して**ブロックとして描画されない**。これを防ぐため、drawio/lsx の `run` はモーダルを開く**前**に共有ヘルパ `ensureBlockLineStart(view, from)` を呼び、`from` が行頭でなければ改行を前置してカーソルを新しい空行へ移す。以降モーダルはその行頭位置に挿入する。
+  - **配置理由**: 行頭正規化を**拡張側の `run` に置く**ことで、基盤 `apply` は「run は副作用」以上を仮定せず汎用のまま保て、かつ既存 drawio モーダル本体（out of boundary）を改修せずに drawio・lsx の両方を一括で正しくできる。
+  - **トレードオフ**: `ensureBlockLineStart` は起動前に改行を挿入するため、モーダルを**キャンセル**すると空行が1行残りうる（許容。MVP）。lsx 書き戻しユーティリティ（新規・in-scope）は確定時にも行頭を保証してよい。
+- `/query` 削除（基盤・単一トランザクション・undo 可）と行頭正規化・モーダルの挿入はそれぞれ別トランザクション。キャンセル時はモーダル挿入が発生しない（`/query` 削除＋場合により空行が残るのみ）。
 
 ## Requirements Traceability
 
@@ -209,6 +219,7 @@ sequenceDiagram
 | 5.1 | `/query` 削除 | 基盤 apply（再利用） | — | 両 |
 | 5.2 | 静的挿入のカーソル/単一transaction/undo | insertion-builders + 基盤 apply | `SlashInsertion` | 静的挿入 |
 | 5.3 | run は削除単一transaction後に起動 | 基盤 apply（run 分岐） | `SlashRunAction` | 副作用起動 |
+| 5.4 | run は挿入位置を行頭へ正規化 | ensure-block-line-start, use-extended-element-commands | `ensureBlockLineStart` | 副作用起動 |
 | 6.1–6.3 | 同一メニュー・絞り込み・起動条件 | 合成点 + 基盤 source | active command set | 起動 |
 | 7.1–7.2 | ラベル/説明 i18n・フォールバック | 各コマンド i18n キー + 基盤 resolve | locale JSON | — |
 | 8.1 | 挿入/起動のみ・描画は既存機構 | insertion-builders / run | — | — |
@@ -222,7 +233,8 @@ sequenceDiagram
 | callout-variants | data | callout 変種の宣言リスト | 4.1, 4.3 | — | State |
 | insertion-builders | logic | plantuml/callout の雛形（純粋） | 1.3, 1.5, 4.2, 5.2, 8.1 | 基盤 SlashInsertion 型 (P0) | Service |
 | static-commands | data | plantuml + callout×7（insert） | 1.1, 1.5, 1.6, 4.1, 4.4 | builders (P0), variants (P0), 基盤 SlashCommand 型 (P0) | State |
-| use-extended-element-commands | integration/logic | drawio/lsx の run + 静的コマンド合成 | 1.1, 1.2, 1.4, 2.1, 2.4 | drawio トリガー (P0), lsx トリガー (P0), static-commands (P0) | Service |
+| use-extended-element-commands | integration/logic | drawio/lsx の run + 静的コマンド合成 | 1.1, 1.2, 1.4, 2.1, 2.4 | drawio トリガー (P0), lsx トリガー (P0), static-commands (P0), ensure-block-line-start (P0) | Service |
+| ensure-block-line-start | logic | run の挿入位置を行頭へ正規化 | 5.4 | `@codemirror/view` (P0) | Service |
 | lsx-for-editor（新規 atom） | state | lsx モーダル起動トリガー | 1.4, 3.1, 3.6 | Jotai (P0) | State |
 | build-lsx-notation（apps/app） | logic | フォーム値→`$lsx(...)`（純粋） | 3.2, 3.3, 3.4 | — | Service |
 | LsxModal（apps/app） | ui | 設定フォーム + 書き戻し | 3.1–3.6 | lsx-for-editor (P0), build-lsx-notation (P0), useCodeMirrorEditorIsolated (P0) | UI |
@@ -238,23 +250,26 @@ sequenceDiagram
 
 **Contracts**: State [x]
 
-```typescript
-export interface CalloutVariant {
-  readonly type: 'note' | 'tip' | 'important' | 'info' | 'warning' | 'danger' | 'caution';
-  readonly keywords: readonly string[]; // 別名（例 warning: ['warn', 'caution']）
-}
+種別の**真実源は `@growi/core` に一本化**する。callout の種別リスト（`AllCallout` / `Callout` 型）は元々 `apps/app/src/features/callout/services/consts.ts` にあったが、これを `@growi/core`（`packages/core/src/consts/callout.ts`）へ移動し、apps/app の描画側と packages/editor のスラッシュコマンド側が**同一の定義を import** する（二重管理・drift を解消）。別名キーワード（`warn` 等）はスラッシュコマンド固有の絞り込み UX なので editor 側に持つ。
 
-export const CALLOUT_VARIANTS: readonly CalloutVariant[] = [
-  { type: 'note',      keywords: ['note'] },
-  { type: 'tip',       keywords: ['tip', 'hint'] },
-  { type: 'important', keywords: ['important'] },
-  { type: 'info',      keywords: ['info', 'information'] },
-  { type: 'warning',   keywords: ['warning', 'warn'] },
-  { type: 'danger',    keywords: ['danger'] },
-  { type: 'caution',   keywords: ['caution'] },
-];
+```typescript
+// @growi/core（真実源。apps/app 描画側と共有）
+export const AllCallout = ['note','tip','important','info','warning','danger','caution'] as const;
+export type Callout = (typeof AllCallout)[number];
+
+// packages/editor 側: AllCallout から変種メタ（絞り込み別名）を付与して宣言
+import { AllCallout, type Callout } from '@growi/core'; // 実際の import 経路は core barrel に従う
+
+const KEYWORDS: Record<Callout, readonly string[]> = {
+  note: ['note'], tip: ['tip', 'hint'], important: ['important'],
+  info: ['info', 'information'], warning: ['warning', 'warn'],
+  danger: ['danger'], caution: ['caution'],
+};
+export interface CalloutVariant { readonly type: Callout; readonly keywords: readonly string[]; }
+export const CALLOUT_VARIANTS: readonly CalloutVariant[] =
+  AllCallout.map((type) => ({ type, keywords: [type, ...KEYWORDS[type]] }));
 ```
-- **Source of truth note**: 種別の真実源は `apps/app/src/features/callout/services/consts.ts`。packages/editor は apps/app を import できないため本リストで宣言し、drift を避けるため変種追加時は両方を更新する（Revalidation Trigger 参照）。
+- **Single source of truth**: 種別の追加/削除は `@growi/core` の `AllCallout` の1箇所編集で完結し、描画側・スラッシュコマンド側の両方へ自動的に波及する（editor 側 `KEYWORDS` は `Record<Callout, …>` のため、型で網羅漏れを検出できる）。drift テストは不要。
 
 ### logic
 
@@ -296,8 +311,10 @@ export const calloutInsertion: (type: CalloutVariant['type']) => (view: EditorVi
 **Contracts**: Service [x]
 
 ```typescript
+import type { EditorView } from '@codemirror/view';
 import { useDrawioModalForEditorActions } from '../../../states/modal/drawio-for-editor';
 import { useLsxModalForEditorActions } from '../../../states/modal/lsx-for-editor';
+import { ensureBlockLineStart } from './ensure-block-line-start';
 import type { SlashCommand } from '../slash-command-types';
 
 export const useExtendedElementCommands = (editorKey: string): readonly SlashCommand[] => {
@@ -306,17 +323,40 @@ export const useExtendedElementCommands = (editorKey: string): readonly SlashCom
   return useMemo(() => [
     { id: 'drawio', labelKey: 'slash_command.drawio.label', descriptionKey: 'slash_command.drawio.description',
       keywords: ['diagram', 'draw'],
-      action: { kind: 'run', run: () => openDrawio(editorKey) } },
+      // 行頭正規化してからモーダルを開く（Req 5.4）
+      action: { kind: 'run', run: (view: EditorView, from: number) => { ensureBlockLineStart(view, from); openDrawio(editorKey); } } },
     { id: 'lsx', labelKey: 'slash_command.lsx.label', descriptionKey: 'slash_command.lsx.description',
       keywords: ['list', 'pages', 'tree'],
-      action: { kind: 'run', run: () => openLsx(editorKey) } },
+      action: { kind: 'run', run: (view: EditorView, from: number) => { ensureBlockLineStart(view, from); openLsx(editorKey); } } },
     ...STATIC_EXTENDED_COMMANDS, // plantuml + callout×7
   ], [editorKey, openDrawio, openLsx]);
 };
 ```
 - **Preconditions**: `editorKey` は現在のエディタインスタンスのキー（合成点が取得）。
-- **Postconditions**: `run` は `view`/`from` を使わず（モーダルがカーソル位置を読む）、オープナーを `editorKey` 付きで呼ぶ。
+- **Postconditions**: `run` は `ensureBlockLineStart(view, from)` で挿入位置を行頭へ正規化したうえで、オープナーを `editorKey` 付きで呼ぶ（挿入自体はモーダルがカーソル位置に対して行う）。
 - **Invariants**: `STATIC_EXTENDED_COMMANDS`（plantuml + callout）は副作用を持たないデータ。
+
+#### ensure-block-line-start
+| Field | Detail |
+|-------|--------|
+| Intent | run コマンドがモーダルを開く前に、ブロック要素の挿入位置を行頭へ正規化する（Req 5.4） |
+| Requirements | 5.4 |
+
+**Contracts**: Service [x]
+
+```typescript
+import type { EditorView } from '@codemirror/view';
+
+/**
+ * `pos` が行頭（同一行に先行する非空白テキストがない）でなければ、`pos` に改行を挿入して
+ * カーソルを新しい空行の先頭へ移す。行頭ならなにもしない。以降のブロック挿入が独立行に置かれることを保証する。
+ */
+export const ensureBlockLineStart: (view: EditorView, pos: number) => void;
+```
+- **Preconditions**: `pos` は `/query` 削除後のカーソル位置（＝ 基盤 `apply` の `from`）。
+- **Postconditions**: 行頭でなければ `\n` を1つ挿入しカーソルを新行先頭へ。行頭ならドキュメント不変。
+- **Invariants**: `view.dispatch` を最大1回。既存 drawio モーダル本体には手を入れない（正規化はこのヘルパに閉じる）。
+- **Trade-off**: 起動前に挿入するため、モーダルキャンセル時に空行が残りうる（許容・MVP）。
 
 #### static-commands
 | Field | Detail |
@@ -405,7 +445,7 @@ export const buildLsxNotation: (opts: LsxOptions) => string;
 
 ## Error Handling
 - 静的挿入（plantuml/callout）は静的文字列のため失敗経路なし（`buildInsertion` は常に有効な `SlashInsertion` を返す）。
-- run コマンド: `/query` 削除は基盤の単一トランザクション。モーダル起動失敗・キャンセルはモーダル側の責務で、エディタには `/query` 削除のみが残る（要素は挿入されない）。
+- run コマンド: `/query` 削除は基盤の単一トランザクション。行の途中で起動された場合は `ensureBlockLineStart` が改行を1つ前置してブロックを独立行へ置く（Req 5.4）。モーダル起動失敗・キャンセルはモーダル側の責務で、エディタには `/query` 削除（＋場合により空行1つ）のみが残る（要素は挿入されない）。
 - lsx モーダル: フォーム未入力時は `$lsx()`（既定描画 = 現在ページ配下一覧）。不正なオプション文字列はサーバ側 list-pages のバリデーションに委ねる（本スペックは文字列生成のみ）。
 - トリガー外・一致なし・キャンセルは基盤の Error Handling に従う。
 
@@ -417,11 +457,12 @@ export const buildLsxNotation: (opts: LsxOptions) => string;
 3. `CALLOUT_VARIANTS` / `STATIC_EXTENDED_COMMANDS`: 7 種の callout コマンドが生成され、各 id・i18n キー・`callout` 共通キーワードを持つこと。plantuml が含まれ未選択要素（math/mermaid）を含まないこと（1.1, 1.6, 4.1, 4.3, 4.4）。
 4. `useExtendedElementCommands`: drawio/lsx コマンドが `kind:'run'` を持ち、`run()` 呼出で対応オープナーが `editorKey` 付きで呼ばれること（モックフックで検証）（1.2, 1.4, 2.1）。
 5. `buildLsxNotation`: 各オプション組合せで期待文字列、全空で `$lsx()`、`reverse=false` は出力しないこと（3.2, 3.3, 3.4）。
+6. `ensureBlockLineStart`: `pos` が行頭のときはドキュメント不変、行の途中（先行非空白あり）のときは改行を1つ前置しカーソルが新行先頭へ来ること（5.4）（jsdom + EditorState/EditorView）。
 
 ### Integration Tests
 1. 合成点経由で `/drawio` `/plantuml` `/lsx` `/callout` が基本コマンドと同一の補完メニューに現れ、`/uml` で plantuml、`/warn` で warning callout が絞り込まれる（6.1, 6.2, 4.4）。
 2. plantuml/callout 選択時、基盤 `apply` により `/query` が置換され単一トランザクションで挿入、undo 1 回で復元（5.1, 5.2）。
-3. drawio/lsx 選択時、`/query` が削除され（単一トランザクション）対応モーダルの起動 atom が立つこと（5.3, 1.2, 1.4）。
+3. drawio/lsx 選択時、`/query` が削除され（単一トランザクション）、行の途中で起動した場合は行頭正規化が入ったうえで対応モーダルの起動 atom が立つこと（5.3, 5.4, 1.2, 1.4）。
 4. 拡張コマンドが絵文字補完（`:`）と同時に機能する（8.2）。
 5. 既存 drawio モーダルのツールバー起動・書き戻しが回帰しないこと（8.3）。
 

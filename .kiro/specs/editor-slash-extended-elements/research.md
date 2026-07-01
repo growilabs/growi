@@ -119,7 +119,8 @@ Research Needed の各項目を設計で次のとおり確定した（詳細は 
 - 記法: `:::type[label]` … `:::`（remark-directive、`apps/app/src/features/callout/services/callout.ts`）。GitHub 風 `> [!NOTE]` も `remark-github-admonitions-to-directives` で同等に変換。
 - 7 種: note / tip / important / info / warning / danger / caution（真実源 `apps/app/src/features/callout/services/consts.ts`）。
 - 挿入は**静的テキストで足りる**（モーダル不要）。種別選択は「種別ごとのスラッシュコマンド」をデータ駆動で生成して実現（フラットな補完メニューに submenu 機構はないため）。
-- 変種の真実源は apps/app だが、packages/editor は apps/app を import できない → 変種リストを packages/editor 側に宣言し drift に注意（両者更新）。
+- 変種の真実源は当初 apps/app（`features/callout/services/consts.ts` の `AllCallout`）にあり、packages/editor は apps/app を import できない。
+  - **設計判断（レビュー後に採用）**: 真実源 `AllCallout` / `Callout` を **`@growi/core` へ移動**し、apps/app 描画側と packages/editor スラッシュコマンド側が同一定義を import する（二重管理・drift を解消）。consts.ts は @growi/core からの再エクスポートに置換（既存 import は無修正）。import 元は2ファイルのみ（`callout.ts` / `CalloutViewer.tsx`）で影響範囲は小さい。@growi/core は公開パッケージのため changeset が必要。
 
 ## 設計上の重要な帰結: 基盤アクションモデルの一般化（前提ゲート）
 - 基盤の `SlashCommand` は `buildInsertion`（静的テキスト挿入）専用で、**モーダル起動という副作用を表現できない**。
