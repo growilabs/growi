@@ -1,6 +1,6 @@
 import { expect, test } from '@playwright/test';
 
-import { appendTextToEditorUntilContains } from '../utils/AppendTextToEditorUntilContains';
+import { appendTextToEditorUntilContains } from '../utils/append-text-to-editor-until-contains';
 
 /**
  * Regression test for the pre-load race in issue #11272.

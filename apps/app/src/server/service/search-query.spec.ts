@@ -1,14 +1,43 @@
 import { vi } from 'vitest';
-import { type MockProxy, mock } from 'vitest-mock-extended';
+import { type MockProxy, mock, mockDeep } from 'vitest-mock-extended';
 
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type Crowi from '~/server/crowi';
+import UserGroup from '~/server/models/user-group';
 import { configManager } from '~/server/service/config-manager/config-manager';
 
-import type { SearchDelegator } from '../interfaces/search';
+import type { QueryTerms, SearchDelegator } from '../interfaces/search';
 import NamedQuery from '../models/named-query';
 import SearchService from './search';
 import type ElasticsearchDelegator from './search-delegator/elasticsearch';
+
+// Mock UserGroup
+vi.mock('~/server/models/user-group', () => {
+  const mockModel = {
+    find: vi.fn(),
+    findOne: vi.fn(),
+  };
+
+  return {
+    default: mockModel,
+    UserGroup: mockModel,
+  };
+});
+vi.mock(
+  '~/features/external-user-group/server/models/external-user-group',
+  () => {
+    const mockModel = {
+      find: vi.fn(),
+      findOne: vi.fn(),
+    };
+
+    return {
+      default: mockModel,
+      ExternalUserGroup: mockModel,
+    };
+  },
+);
 
 // Mock NamedQuery
 vi.mock('~/server/models/named-query', () => {
@@ -151,5 +180,374 @@ describe('searchParseQuery()', () => {
     );
     expect(result.terms.not_prefix).toContain('/user');
     expect(result.terms.match).toContain('/user/my-private-page');
+  });
+});
+
+type MockGroupDoc = { id: string; name: string };
+const mockExternalQuery = mockDeep<ReturnType<typeof ExternalUserGroup.find>>();
+const mockInternalQuery = mockDeep<ReturnType<typeof UserGroup.find>>();
+
+// Builds the find().select().exec() chain for both group models.
+const mockGroupFinds = (
+  internal: MockGroupDoc[],
+  external: MockGroupDoc[],
+): void => {
+  mockExternalQuery.select.mockReturnThis();
+  mockExternalQuery.exec.mockResolvedValue(external);
+
+  mockInternalQuery.select.mockReturnThis();
+  mockInternalQuery.exec.mockResolvedValue(internal);
+
+  vi.mocked(ExternalUserGroup.find).mockReturnValue(mockExternalQuery);
+  vi.mocked(UserGroup.find).mockReturnValue(mockInternalQuery);
+};
+
+describe('resolveFilterData()', () => {
+  let searchService: TestSearchService;
+  let mockCrowi: MockProxy<Crowi>;
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+
+    mockCrowi = mock<Crowi>();
+    mockCrowi.configManager = configManager;
+    searchService = new TestSearchService(mockCrowi);
+  });
+
+  it('resolves the id for an existing group', async () => {
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'admin-only' }],
+    );
+
+    const mockTerms: Partial<QueryTerms> = { group: ['dev-1'] };
+    const userGroups = ['id1', 'id2'];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: ['id1'],
+      notGroupIds: [],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+  });
+
+  it('resolves the ids for several existing groups', async () => {
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'admin-only' }],
+    );
+
+    const mockTerms: Partial<QueryTerms> = { group: ['dev-1', 'admin-only'] };
+    const userGroups = ['id1', 'id2'];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: ['id1', 'id2'],
+      notGroupIds: [],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+  });
+
+  it('resolves to empty when the group is not among the users groups', async () => {
+    mockGroupFinds([{ id: 'id1', name: 'other-group' }], []);
+
+    const mockTerms: Partial<QueryTerms> = { group: ['dev-1'] };
+    const userGroups = ['id1'];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: [],
+      notGroupIds: [],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+    expect(UserGroup.find).toHaveBeenCalled();
+    expect(ExternalUserGroup.find).toHaveBeenCalled();
+  });
+
+  it('returns early without querying when the user belongs to no groups', async () => {
+    const mockTerms: Partial<QueryTerms> = { group: ['dev-1'] };
+    const userGroups = [];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: [],
+      notGroupIds: [],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+    expect(UserGroup.find).not.toHaveBeenCalled();
+    expect(ExternalUserGroup.find).not.toHaveBeenCalled();
+  });
+
+  it('does not resolve any ids on empty group terms', async () => {
+    const mockTerms: Partial<QueryTerms> = { group: [] };
+    const userGroups = ['id1', 'id2'];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: [],
+      notGroupIds: [],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+    expect(UserGroup.find).not.toHaveBeenCalled();
+    expect(ExternalUserGroup.find).not.toHaveBeenCalled();
+  });
+
+  it('resolves the ids for not-groups', async () => {
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'admin-only' }],
+    );
+
+    const mockTerms: Partial<QueryTerms> = {
+      not_group: ['dev-1', 'admin-only'],
+    };
+    const userGroups = ['id1', 'id2'];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: [],
+      notGroupIds: ['id1', 'id2'],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+  });
+
+  it('resolves the ids for not-group combined with group', async () => {
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'admin-only' }],
+    );
+
+    const mockTerms: Partial<QueryTerms> = {
+      group: ['admin-only'],
+      not_group: ['dev-1'],
+    };
+    const userGroups = ['id1', 'id2'];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: ['id2'],
+      notGroupIds: ['id1'],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+  });
+
+  it('returns early when no terms', async () => {
+    const mockTerms: Partial<QueryTerms> = {};
+    const userGroups = ['id1', 'id2'];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: [],
+      notGroupIds: [],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+    expect(UserGroup.find).not.toHaveBeenCalled();
+    expect(ExternalUserGroup.find).not.toHaveBeenCalled();
+  });
+
+  it('returns early for a guest without querying groups (null userGroups)', async () => {
+    const mockTerms: Partial<QueryTerms> = { not_group: ['dev-1'] };
+    const userGroups = null;
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: [],
+      notGroupIds: [],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+    expect(UserGroup.find).not.toHaveBeenCalled();
+    expect(ExternalUserGroup.find).not.toHaveBeenCalled();
+  });
+
+  it('resolves to correct ids when group names are identical', async () => {
+    mockGroupFinds(
+      [{ id: 'id1', name: 'dev-1' }],
+      [{ id: 'id2', name: 'dev-1' }],
+    );
+
+    const mockTerms: Partial<QueryTerms> = {
+      group: ['dev-1'],
+      not_group: [],
+    };
+    const userGroups = ['id1', 'id2'];
+
+    const resolvedIds = await searchService.resolveFilterData(
+      mockTerms,
+      userGroups,
+    );
+
+    const expectedResolvedIds = {
+      groupIds: ['id1', 'id2'],
+      notGroupIds: [],
+    };
+
+    expect(resolvedIds).toStrictEqual(expectedResolvedIds);
+  });
+});
+
+describe('parseQueryString()', () => {
+  let searchService: TestSearchService;
+  let mockCrowi: MockProxy<Crowi>;
+
+  const emptyTerms = (overrides: Partial<QueryTerms> = {}): QueryTerms => ({
+    match: [],
+    not_match: [],
+    phrase: [],
+    not_phrase: [],
+    prefix: [],
+    not_prefix: [],
+    tag: [],
+    not_tag: [],
+    author: [],
+    not_author: [],
+    editor: [],
+    not_editor: [],
+    group: [],
+    not_group: [],
+    ...overrides,
+  });
+
+  beforeEach(() => {
+    vi.resetAllMocks();
+
+    mockCrowi = mock<Crowi>();
+    mockCrowi.configManager = configManager;
+    searchService = new TestSearchService(mockCrowi);
+  });
+
+  it('extracts author into the author bucket and nothing else', () => {
+    const queryString = 'author:alice';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { author: ['alice'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts editor into the editor bucket and nothing else', () => {
+    const queryString = 'editor:john';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { editor: ['john'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts group into the group bucket and nothing else', () => {
+    const queryString = 'group:dev-1';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { group: ['dev-1'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts a negated author into the not_author bucket and nothing else', () => {
+    const queryString = '-author:alice';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { not_author: ['alice'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts a negated editor into the not_editor bucket and nothing else', () => {
+    const queryString = '-editor:john';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { not_editor: ['john'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('extracts a negated group into the not_group bucket and nothing else', () => {
+    const queryString = '-group:dev-1';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { not_group: ['dev-1'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('collects repeated authors into the author bucket in order', () => {
+    const queryString = 'author:alice author:bob';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = { author: ['alice', 'bob'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('routes each token to its own bucket in a mixed query', () => {
+    const queryString =
+      'hello author:alice -editor:bob group:dev-1 -group:dev-2';
+    const terms = searchService.parseQueryString(queryString);
+
+    const expectedTerm = {
+      match: ['hello'],
+      author: ['alice'],
+      not_editor: ['bob'],
+      group: ['dev-1'],
+      not_group: ['dev-2'],
+    };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('ignores a valueless new-filter operator, capturing nothing', () => {
+    const terms = searchService.parseQueryString('author: editor: group:');
+
+    // A bare operator must not leak into match (or any bucket).
+    expect(terms).toStrictEqual(emptyTerms());
+  });
+
+  it('ignores a valueless negated new-filter operator, capturing nothing', () => {
+    const terms = searchService.parseQueryString('-author: -editor: -group:');
+
+    expect(terms).toStrictEqual(emptyTerms());
+  });
+
+  it('drops only the valueless operator while parsing the rest of the query', () => {
+    const terms = searchService.parseQueryString('author: hello group:dev-1');
+
+    const expectedTerm = { match: ['hello'], group: ['dev-1'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
   });
 });

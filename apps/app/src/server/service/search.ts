@@ -1,9 +1,10 @@
-import type { IPage, IPageHasId, IUser } from '@growi/core';
+import type { IPage, IPageHasId } from '@growi/core';
 import { serializeUserSecurely } from '@growi/core/dist/models/serializers';
 import mongoose from 'mongoose';
 import { FilterXSS } from 'xss';
 
 import { CommentEvent, commentEvent } from '~/features/comment/server';
+import ExternalUserGroup from '~/features/external-user-group/server/models/external-user-group';
 import {
   isIncludeAiMenthion,
   removeAiMenthion,
@@ -16,6 +17,7 @@ import type {
   ISearchResult,
 } from '~/interfaces/search';
 import { USER_FIELDS_EXCEPT_CONFIDENTIAL } from '~/server/models/user/conts';
+import UserGroup from '~/server/models/user-group';
 import loggerFactory from '~/utils/logger';
 
 import type Crowi from '../crowi';
@@ -23,6 +25,7 @@ import type { ObjectIdLike } from '../interfaces/mongoose-utils';
 import type {
   ParsedQuery,
   QueryTerms,
+  ResolvedFilterData,
   SearchableData,
   SearchDelegator,
   SearchQueryParser,
@@ -49,6 +52,32 @@ const filterXssOptions = {
 };
 
 const filterXss = new FilterXSS(filterXssOptions);
+
+const FILTER_PREFIXES = [
+  'prefix:',
+  'tag:',
+  'author:',
+  'editor:',
+  'group:',
+] as const;
+
+// New-filter operators (author/editor/group) typed with no value (e.g. `author:`,
+// `-group:`) are ignored. They must not be captured as
+// full-text match terms. prefix:/tag: keep their existing behavior.
+const VALUELESS_IGNORED_PREFIXES: readonly string[] = [
+  'author:',
+  'editor:',
+  'group:',
+];
+
+// https://regex101.com/r/pN9XfK/2
+const NEGATIVE_TERM_REGEXP = new RegExp(
+  `^-(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
+// https://regex101.com/r/3qw9FQ/2
+const POSITIVE_TERM_REGEXP = new RegExp(
+  `^(${FILTER_PREFIXES.join('|')})?(.+)$`,
+);
 
 const normalizeQueryString = (_queryString: string): string => {
   let queryString = _queryString.trim();
@@ -420,7 +449,7 @@ class SearchService implements SearchQueryParser, SearchResolver {
     keyword: string,
     nqName: string | null,
     user,
-    userGroups,
+    userGroups: ObjectIdLike[] | null,
     searchOpts,
   ): Promise<[ISearchResult<unknown>, string | null]> {
     let parsedQuery: ParsedQuery;
@@ -446,13 +475,65 @@ class SearchService implements SearchQueryParser, SearchResolver {
       throw err;
     }
 
-    // throws
     this.validateSearchableData(delegator, data);
+
+    data.resolvedFilterData = await this.resolveFilterData(
+      data.terms,
+      userGroups,
+    );
 
     return [
       await delegator.search(data, user, userGroups, searchOpts),
       delegator.name ?? null,
     ];
+  }
+
+  async resolveFilterData(
+    terms: Partial<QueryTerms>,
+    userGroups: ObjectIdLike[] | null,
+  ): Promise<ResolvedFilterData> {
+    const groupTerms = terms.group ?? [];
+    const notGroupTerms = terms.not_group ?? [];
+
+    // Early-return (no MongoDB query) for guests or when no group operator was typed.
+    if (
+      userGroups == null ||
+      userGroups.length < 1 ||
+      (groupTerms.length === 0 && notGroupTerms.length === 0)
+    ) {
+      const emptyFilterData: ResolvedFilterData = {
+        groupIds: [],
+        notGroupIds: [],
+      };
+      return emptyFilterData;
+    }
+
+    const [internal, external] = await Promise.all([
+      UserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+      ExternalUserGroup.find({ _id: { $in: userGroups } })
+        .select('_id name')
+        .exec(),
+    ]);
+    const myGroups = [...internal, ...external];
+    const namesToIds = new Map<string, string[]>();
+
+    // Save all the user's group names and their ids
+    for (const group of myGroups) {
+      const id = group.id;
+      namesToIds.set(group.name, [...(namesToIds.get(group.name) ?? []), id]);
+    }
+
+    const resolve = (names: string[] = []) =>
+      names.flatMap((name) => namesToIds.get(name) ?? []);
+
+    const resolvedFilterData: ResolvedFilterData = {
+      groupIds: resolve(groupTerms),
+      notGroupIds: resolve(notGroupTerms),
+    };
+
+    return resolvedFilterData;
   }
 
   parseQueryString(_queryString: string): QueryTerms {
@@ -467,6 +548,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const notPrefixPaths: string[] = [];
     const tags: string[] = [];
     const notTags: string[] = [];
+    const authors: string[] = [];
+    const notAuthors: string[] = [];
+    const editors: string[] = [];
+    const notEditors: string[] = [];
+    const groups: string[] = [];
+    const notGroups: string[] = [];
 
     // First: Parse phrase keywords
     const phraseRegExp = new RegExp(/(-?"[^"]+")/g);
@@ -491,16 +578,27 @@ class SearchService implements SearchQueryParser, SearchResolver {
         return;
       }
 
-      // https://regex101.com/r/pN9XfK/1
-      const matchNegative = word.match(/^-(prefix:|tag:)?(.+)$/);
-      // https://regex101.com/r/3qw9FQ/1
-      const matchPositive = word.match(/^(prefix:|tag:)?(.+)$/);
+      // Ignore a bare new-filter operator with no value (positive or negated) so it
+      // does not leak into full-text match terms
+      const wordWithoutNegation = word.startsWith('-') ? word.slice(1) : word;
+      if (VALUELESS_IGNORED_PREFIXES.includes(wordWithoutNegation)) {
+        return;
+      }
+
+      const matchNegative = word.match(NEGATIVE_TERM_REGEXP);
+      const matchPositive = word.match(POSITIVE_TERM_REGEXP);
 
       if (matchNegative != null) {
         if (matchNegative[1] === 'prefix:') {
           notPrefixPaths.push(matchNegative[2]);
         } else if (matchNegative[1] === 'tag:') {
           notTags.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'author:') {
+          notAuthors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'editor:') {
+          notEditors.push(matchNegative[2]);
+        } else if (matchNegative[1] === 'group:') {
+          notGroups.push(matchNegative[2]);
         } else {
           notMatchWords.push(matchNegative[2]);
         }
@@ -509,6 +607,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
           prefixPaths.push(matchPositive[2]);
         } else if (matchPositive[1] === 'tag:') {
           tags.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'author:') {
+          authors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'editor:') {
+          editors.push(matchPositive[2]);
+        } else if (matchPositive[1] === 'group:') {
+          groups.push(matchPositive[2]);
         } else {
           matchWords.push(matchPositive[2]);
         }
@@ -524,6 +628,12 @@ class SearchService implements SearchQueryParser, SearchResolver {
       not_prefix: notPrefixPaths,
       tag: tags,
       not_tag: notTags,
+      author: authors,
+      not_author: notAuthors,
+      editor: editors,
+      not_editor: notEditors,
+      group: groups,
+      not_group: notGroups,
     };
 
     return terms;
