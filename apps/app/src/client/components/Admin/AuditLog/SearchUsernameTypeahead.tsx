@@ -12,7 +12,7 @@ import { AsyncTypeahead, Menu, MenuItem } from 'react-bootstrap-typeahead';
 import { useTranslation } from 'react-i18next';
 
 import type { IClearable } from '~/client/interfaces/clearable';
-import { useSWRxAuditlogSuggestions } from '~/stores/user';
+import { useSWRxAuditlogSuggestions } from '~/stores/activity';
 
 const Categories = {
   activeUser: 'Active User',
@@ -65,14 +65,16 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   const inactiveUsernames = suggestionsData?.username?.inactiveUsernames ?? [];
   const isLoading = _isLoading === true && error == null;
 
-  const allUser: UserDataType[] = [];
-  const pushToAllUser = (usernames: string[], category: CategoryType) => {
-    usernames.forEach((username) => {
-      allUser.push({ username, category });
-    });
-  };
-  pushToAllUser(activeUsernames, Categories.activeUser);
-  pushToAllUser(inactiveUsernames, Categories.inactiveUser);
+  const allUser: UserDataType[] = [
+    ...activeUsernames.map((username) => ({
+      username,
+      category: Categories.activeUser,
+    })),
+    ...inactiveUsernames.map((username) => ({
+      username,
+      category: Categories.inactiveUser,
+    })),
+  ];
 
   /*
    * Functions
@@ -89,6 +91,12 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
   const searchHandler = useCallback((text: string) => {
     setSearchKeyword(text);
   }, []);
+
+  const filterBy = useCallback(
+    (option: UserDataType) =>
+      !selectedItems.some((s) => s.username === option.username),
+    [selectedItems],
+  );
 
   const renderMenu = useCallback((allUser: UserDataType[], menuProps) => {
     if (allUser == null || allUser.length === 0) {
@@ -138,7 +146,7 @@ const SearchUsernameTypeaheadSubstance: ForwardRefRenderFunction<
         multiple
         delay={400}
         minLength={0}
-        filterBy={() => true}
+        filterBy={filterBy}
         placeholder={t('admin:audit_log_management.username')}
         isLoading={isLoading}
         options={allUser}

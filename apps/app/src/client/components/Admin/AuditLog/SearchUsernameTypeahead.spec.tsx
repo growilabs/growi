@@ -5,7 +5,7 @@ import { SearchUsernameTypeahead } from './SearchUsernameTypeahead';
 
 const mockUseSWRxAuditlogSuggestions = vi.hoisted(() => vi.fn());
 
-vi.mock('~/stores/user', () => ({
+vi.mock('~/stores/activity', () => ({
   useSWRxAuditlogSuggestions: mockUseSWRxAuditlogSuggestions,
 }));
 

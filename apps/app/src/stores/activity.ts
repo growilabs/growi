@@ -3,9 +3,26 @@ import type { SWRResponse } from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-import type { IActivityHasId, ISearchFilter } from '~/interfaces/activity';
+import type {
+  AuditlogSuggestionField,
+  AuditlogSuggestionsResponse,
+  IActivityHasId,
+  ISearchFilter,
+} from '~/interfaces/activity';
 import type { PaginateResult } from '~/interfaces/mongoose-utils';
 import { auditLogEnabledAtom } from '~/states/server-configurations';
+
+export const useSWRxAuditlogSuggestions = (
+  field: AuditlogSuggestionField,
+  q: string,
+  limit = 5,
+): SWRResponse<AuditlogSuggestionsResponse, Error> => {
+  return useSWRImmutable(
+    q.trim() !== '' ? ['/activity/suggestions', field, q, limit] : null,
+    ([endpoint, field, q, limit]) =>
+      apiv3Get(endpoint, { field, q, limit }).then((r) => r.data),
+  );
+};
 
 export const useSWRxActivity = (
   limit?: number,

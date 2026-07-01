@@ -4,10 +4,6 @@ import useSWR from 'swr';
 import useSWRImmutable from 'swr/immutable';
 
 import { apiv3Get } from '~/client/util/apiv3-client';
-import type {
-  AuditlogSuggestionField,
-  AuditlogSuggestionsResponse,
-} from '~/interfaces/activity';
 import type { PopulatedGrantedGroup } from '~/interfaces/page-grant';
 import { useIsGuestUser } from '~/states/context';
 import { checkAndUpdateImageUrlCached } from '~/stores/middlewares/user';
@@ -76,18 +72,6 @@ export const useSWRxUsernames = (
 
 type RelatedGroupsResponse = {
   relatedGroups: PopulatedGrantedGroup[];
-};
-
-export const useSWRxAuditlogSuggestions = (
-  field: AuditlogSuggestionField,
-  q: string,
-  limit = 5,
-): SWRResponse<AuditlogSuggestionsResponse, Error> => {
-  return useSWRImmutable(
-    q.trim() !== '' ? ['/activity/suggestions', field, q, limit] : null,
-    ([endpoint, field, q, limit]) =>
-      apiv3Get(endpoint, { field, q, limit }).then((r) => r.data),
-  );
 };
 
 export const useSWRxUserRelatedGroups = (): SWRResponse<
