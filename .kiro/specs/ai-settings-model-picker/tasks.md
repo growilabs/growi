@@ -66,7 +66,7 @@
   - _Boundary: AllowedModelsField_
 
 - [ ] 6. リリース連動と検証
-- [ ] 6.1 vendoring をリリースビルドの前段の独立 step として実行する
+- [x] 6.1 vendoring をリリースビルドの前段の独立 step として実行する
   - リリースビルドの**前段の独立 step**で `pnpm vendor:models` を実行し、成果物（`model-catalog-data.json`）を（差分があれば）ブランチにコミットする。**リリースビルドはコミット済み成果物を read するだけ**で、refresh/fetch/commit を build 工程に融合しない（毎ビルド fetch＝非決定的・オフライン不可を避ける）
   - 配置: 人手 trigger の prod/タグリリースは「リリースを切る前の pre-release step（手動でも可）」、無人の scheduled RC（`release-rc-scheduled.yml`）は「build-image の前段ジョブ」でブランチへコミット（保護ブランチは token/PR）→ 後段の build が更新後 HEAD を消費。この配線詳細は実装時に確定
   - 完了状態: refresh step がリリースビルドより**厳密に前**に実行され成果物をコミットし、build 工程に fetch/commit が一切含まれない（build はコミット済み `model-catalog-data.json` を read するのみ）ことを確認できる
@@ -104,3 +104,4 @@
 - 1.2: i18n プレースホルダの確定キーは `ai_settings.model_placeholder`（既存 `provider_placeholder` に倣う）。design/research では例示的に `model_select_placeholder` と表記されているが、実装・タスク 5.1 が参照するのは `model_placeholder`。5.1 の `<select>` 空 option プレースホルダはこのキーを使うこと。
 - プロセス（重要）: **vitest は型チェックしない**。TS 系タスクは完了前に必ず `apps/app` で `pnpm run lint:typecheck`（tsgo）を実行すること。2.1 で `CATALOG_PROVIDERS.includes('azure-openai')` の TS2345 が vitest green のまますり抜けた（後に 5728dab62e で修正）。`out/tsconfig.json` の TSConfck 警告は既存ノイズで無関係。
 - 2.2: bin スクリプトは `node bin/*.ts`（Node24 型ストリップ）で実行。bin/ から `src/` の TS を import する際は**明示的 `.ts` 拡張子が必須**（extensionless は ERR_MODULE_NOT_FOUND）。bin/ は `lint:import-convention`（src のみ走査）対象外なので `.ts` は許容。実行時・ビルド工程は fetch せず、この取り込みスクリプトのみが models.dev へ fetch する。成果物 `model-catalog-data.json` は静的 JSON として commit 済み（openai=41/anthropic=24/google=16）。
+- 6.1: リリースワークフロー配線は**この環境では CI 実行できず、YAML 妥当性＋構造インスペクションでのみ検証済み**。prod=`release.yml` create-github-release 内で tag commit の前に vendor:models（`continue-on-error`）、RC=`release-rc-scheduled.yml` の `refresh-model-catalog` ジョブ→ build が `source-version` で更新後 SHA を消費。build（`reusable-app-build-image.yml`）は不変（read-only 維持）。**注意**: 無人 RC の保護ブランチ master への直接 push（git-auto-commit-action）は branch protection で拒否され得る。本番投入前に人手の CI ドライラン（例: workflow_dispatch）を推奨。拒否される場合は既存 `create-pr-for-next-rc` の token/PR パターンにフォールバック（YAML コメントに明記済み）。

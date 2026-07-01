@@ -45,9 +45,59 @@ jobs:
           type=raw,value=${{ steps.package-json.outputs.packageVersion }}.{{sha}}
 
 
+  # Ingest step: runs STRICTLY BEFORE build-image-rc (as a `needs` predecessor).
+  # It fetches models.dev and commits any diff to the branch so the subsequent
+  # build consumes the refreshed HEAD. The build workflow itself performs no
+  # fetch/commit — it only reads the committed model-catalog-data.json.
+  refresh-model-catalog:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    outputs:
+      # New commit sha when the catalog changed; otherwise fall back to the
+      # trigger sha so the build always has a valid source-version.
+      sha: ${{ steps.commit.outputs.commit_hash || github.sha }}
+    steps:
+    - uses: actions/checkout@v4
+
+    - uses: pnpm/action-setup@v6
+
+    - uses: actions/setup-node@v6
+      with:
+        node-version: '24'
+        cache: 'pnpm'
+
+    - name: Install dependencies
+      run: |
+        pnpm add turbo --global
+        pnpm install --frozen-lockfile
+
+    - name: Refresh vendored model catalog (ingest step)
+      working-directory: ./apps/app
+      # On fetch/schema/empty failure vendor:models exits non-zero and preserves
+      # the existing committed artifact, so the RC proceeds with the last-good
+      # catalog (design Error Handling). No fetch/commit is added to the build.
+      continue-on-error: true
+      run: pnpm vendor:models
+
+    - name: Commit refreshed catalog if changed
+      id: commit
+      # NOTE: `master` may be a protected branch. If branch protection rejects a
+      # direct push, switch to the token/PR mechanism already used by
+      # release.yml's `create-pr-for-next-rc` job (github-actions-x/commit with
+      # secrets.GITHUB_TOKEN + repo-sync/pull-request). Do not introduce new
+      # secret names.
+      uses: stefanzweifel/git-auto-commit-action@v5
+      with:
+        commit_message: 'chore(ai-settings-model-picker): refresh vendored model catalog'
+        file_pattern: apps/app/src/features/mastra/server/services/ai-sdk-modules/model-catalog-data.json
+
+
   build-image-rc:
+    needs: [refresh-model-catalog]
     uses: ./.github/workflows/reusable-app-build-image.yml
     with:
+      source-version: ${{ needs.refresh-model-catalog.outputs.sha }}
       image-name: growilabs/growi
       tag-temporary: latest-rc
     secrets:

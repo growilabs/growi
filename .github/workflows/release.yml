@@ -34,6 +34,17 @@ jobs:
         pnpm add turbo --global
         pnpm install --frozen-lockfile
 
+    - name: Refresh vendored model catalog (pre-release ingest step)
+      working-directory: ./apps/app
+      # Ingest step: fetch models.dev and regenerate the committed catalog so the
+      # release tag bundles the freshest chat+tool model list. On fetch/schema/empty
+      # failure vendor:models exits non-zero and preserves the existing committed
+      # artifact, so the release proceeds with the last-good catalog (design Error
+      # Handling: "リリースは前回カタログで継続可能"). The subsequent build reads only
+      # the committed JSON (no fetch/commit added to the build workflow).
+      continue-on-error: true
+      run: pnpm vendor:models
+
     - name: Bump versions
       run: |
         turbo run version:patch --filter=@growi/app
