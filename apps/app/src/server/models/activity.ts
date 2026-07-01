@@ -1,4 +1,5 @@
 import type { IUser, Ref } from '@growi/core';
+import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
 import type { Document, Model, SortOrder, Types } from 'mongoose';
 import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
@@ -126,6 +127,13 @@ activitySchema.statics.updateByParameters = async function (
   return activity;
 };
 
+const buildSnapshotUsernameRegexConditions = (q: string) => ({
+  'snapshot.username': {
+    $regex: escapeStringForMongoRegex(q),
+    $options: 'i',
+  },
+});
+
 activitySchema.statics.findSnapshotUsernamesByUsernameRegex = async function (
   q: string,
   option: { sortOpt: SortOrder; offset: number; limit: number },
@@ -135,12 +143,11 @@ activitySchema.statics.findSnapshotUsernamesByUsernameRegex = async function (
   const offset = opt.offset || 0;
   const limit = opt.limit || 10;
 
-  const conditions = { 'snapshot.username': { $regex: q, $options: 'i' } };
+  const conditions = buildSnapshotUsernameRegexConditions(q);
 
   const usernames = await this.aggregate()
-    .skip(0)
-    .limit(10000) // Narrow down the search target
     .match(conditions)
+    .limit(10000) // Narrow down the search target
     .group({ _id: '$snapshot.username' })
     .sort({ _id: sortOpt }) // Sort "snapshot.username" in ascending order
     .skip(offset)
@@ -148,6 +155,24 @@ activitySchema.statics.findSnapshotUsernamesByUsernameRegex = async function (
 
   return usernames.map((r) => r._id);
 };
+
+activitySchema.statics.findSnapshotUsernamesByUsernameRegexWithTotalCount =
+  async function (
+    q: string,
+    option: { offset: number; limit: number },
+  ): Promise<{ usernames: string[]; totalCount: number }> {
+    const usernames = await this.findSnapshotUsernamesByUsernameRegex(q, {
+      sortOpt: 1,
+      ...option,
+    });
+
+    const conditions = buildSnapshotUsernameRegexConditions(q);
+    const totalCount = (
+      await this.find(conditions).distinct('snapshot.username')
+    ).length;
+
+    return { usernames, totalCount };
+  };
 
 export default getOrCreateModel<ActivityDocument, ActivityModel>(
   'Activity',
