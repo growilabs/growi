@@ -299,7 +299,26 @@
     "rebuild": "Rebuild",
     "rebuild_button": "Rebuild index",
     "rebuild_description_1": "Click the button to rebuild index and add all page datas.",
-    "rebuild_description_2": "This may take a while."
+    "rebuild_description_2": "This may take a while.",
+    "rebuild_normalization_timeout": "Rebuild completed but normalization timed out. Please normalize manually."
+  },
+  "audit_log_index_management": {
+    "audit_log_index_management": "Audit Log Index Management",
+    "elasticsearch_management": "Elasticsearch Management (Audit Log)",
+    "normalize": "Normalize",
+    "normalize_button": "Normalize audit log index",
+    "normalize_success": "Audit log index normalized successfully.",
+    "normalize_description": "Repairs broken audit log indices.",
+    "rebuild": "Rebuild",
+    "rebuild_button": "Rebuild audit log index",
+    "rebuild_requested": "Audit log index rebuild has been requested.",
+    "rebuild_description_1": "Deletes and rebuilds all audit log indices.",
+    "rebuild_description_2": "This may take a while.",
+    "unsynced_events_warning": "Some audit log events failed to sync to Elasticsearch. Rebuild to restore consistency.",
+    "rebuild_progress_processing": "Processing..",
+    "rebuild_progress_completed": "Completed",
+    "rebuild_normalization_timeout": "Rebuild completed but normalization timed out. Please normalize manually.",
+    "reconnect": "Reconnect"
   },
   "mailer_setup_required": "<a href='/admin/app'>Email settings</a> are required to send.",
   "admin_top": {

@@ -299,7 +299,8 @@
     "rebuild": "Reconstruire",
     "rebuild_button": "Reconstruire",
     "rebuild_description_1": "Reconstruire l'index et les données de pages",
-    "rebuild_description_2": "Cela peut prendre un certain temps."
+    "rebuild_description_2": "Cela peut prendre un certain temps.",
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement."
   },
   "mailer_setup_required": "La <a href='/admin/app'>configuration du SMTP</a> est requise.",
   "admin_top": {
@@ -874,6 +875,24 @@
       "force_update_parents_label": "Forcer l'ajout d'utilisateurs manquants",
       "force_update_parents_description": "Ajoute les utilisateurs manquants au groupe ancêtre si ils existent lors d'un changement de groupe parent."
     }
+  },
+  "audit_log_index_management": {
+    "audit_log_index_management": "Gestion de l'index des journaux d'audit",
+    "elasticsearch_management": "Configuration Elasticsearch (journaux d'audit)",
+    "normalize": "Normaliser",
+    "normalize_button": "Normaliser l'index des journaux d'audit",
+    "normalize_success": "L'index des journaux d'audit a été normalisé.",
+    "normalize_description": "Répare les index des journaux d'audit corrompus.",
+    "rebuild": "Reconstruire",
+    "rebuild_button": "Reconstruire l'index des journaux d'audit",
+    "rebuild_requested": "La reconstruction de l'index des journaux d'audit a été demandée.",
+    "rebuild_description_1": "Supprime et reconstruit tous les index des journaux d'audit.",
+    "rebuild_description_2": "Cette opération peut prendre un certain temps.",
+    "unsynced_events_warning": "Certains événements du journal d'audit n'ont pas pu être synchronisés avec Elasticsearch. Reconstruisez pour restaurer la cohérence.",
+    "rebuild_progress_processing": "En cours..",
+    "rebuild_progress_completed": "Terminé",
+    "rebuild_normalization_timeout": "La reconstruction est terminée mais la normalisation a expiré. Veuillez normaliser manuellement.",
+    "reconnect": "Reconnexion"
   },
   "audit_log_management": {
     "audit_log": "Audit",

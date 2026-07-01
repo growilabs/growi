@@ -3,6 +3,7 @@ import { ErrorV3 } from '@growi/core/dist/models';
 
 import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import { SupportedAction } from '~/interfaces/activity';
+import { SocketEventName } from '~/interfaces/websocket';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -313,6 +314,61 @@ module.exports = (crowi) => {
     },
   );
 
+  /**
+   * @swagger
+   *
+   *  /search/auditlog-indices:
+   *    get:
+   *      tags: [FullTextSearch Management]
+   *      summary: Get auditlog indices status
+   *      responses:
+   *        200:
+   *          description: Status of auditlog indices
+   *          content:
+   *            application/json:
+   *              schema:
+   *                properties:
+   *                  info:
+   *                    type: object
+   *                    description: Status of auditlog indices
+   *                  auditlogHasUnsyncedEvents:
+   *                    type: boolean
+   *                    description: Whether auditlog events failed to sync to Elasticsearch (rebuild needed)
+   */
+  router.get(
+    '/auditlog-indices',
+    noCache(),
+    accessTokenParser([SCOPE.READ.ADMIN.FULL_TEXT_SEARCH], {
+      acceptLegacy: true,
+    }),
+    loginRequired,
+    adminRequired,
+    async (req, res) => {
+      const { searchService } = crowi;
+
+      if (!searchService.isConfigured) {
+        return res.apiv3Err(
+          new ErrorV3(
+            'SearchService is not configured',
+            'search-service-unconfigured',
+          ),
+          503,
+        );
+      }
+
+      try {
+        const [info, auditlogHasUnsyncedEvents] = await Promise.all([
+          searchService.getAuditlogInfoForAdmin(),
+          AuditlogEsSyncStatus.isUnsynced(),
+        ]);
+        return res.status(200).send({ info, auditlogHasUnsyncedEvents });
+      } catch (err) {
+        logger.error(err);
+        return res.apiv3Err(err, 503);
+      }
+    },
+  );
+
   const validatorForPutAuditlogIndices = [
     body('operation').isString().isIn(['rebuild', 'normalize']),
   ];
@@ -397,8 +453,25 @@ module.exports = (crowi) => {
           case 'rebuild':
             // NOT wait the processing is terminated
             searchService
-              .rebuildAuditlogIndex()
-              .then(() => AuditlogEsSyncStatus.setUnsynced(false))
+              .rebuildAuditlogIndex({ shouldEmitProgress: true })
+              .then(async ({ totalCount, count }) => {
+                try {
+                  await AuditlogEsSyncStatus.setUnsynced(false);
+                } catch (err) {
+                  logger.error(
+                    'Failed to clear auditlog unsynced flag after rebuild',
+                    err,
+                  );
+                  // setUnsynced failure is non-critical: the ES rebuild succeeded.
+                  // Still notify the client so the UI is not left stuck in processing state.
+                }
+                crowi.socketIoService
+                  .getAdminSocket()
+                  .emit(SocketEventName.FinishAddAuditlog, {
+                    totalCount,
+                    count,
+                  });
+              })
               .catch((err) => {
                 logger.error('Rebuild auditlog index failed', err);
               });

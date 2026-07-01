@@ -296,14 +296,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
     logger.info('Try to reconnect...');
     this.fullTextSearchDelegator.initClient();
 
-    try {
-      await this.getInfoForHealth();
+    await this.getInfoForHealth();
 
-      logger.info('Reconnecting succeeded.');
-      this.resetErrorStatus();
-    } catch (err) {
-      throw err;
-    }
+    logger.info('Reconnecting succeeded.');
+    this.resetErrorStatus();
   }
 
   async getInfo() {
@@ -334,6 +330,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.getInfoForAdmin();
   }
 
+  async getAuditlogInfoForAdmin() {
+    return this.fullTextSearchDelegator.getAuditlogInfoForAdmin();
+  }
+
   async normalizeIndices() {
     return this.fullTextSearchDelegator.normalizeIndices();
   }
@@ -346,8 +346,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.rebuildIndex({ shouldEmitProgress });
   }
 
-  async rebuildAuditlogIndex() {
-    return this.fullTextSearchDelegator.rebuildAuditlogIndex();
+  async rebuildAuditlogIndex(
+    option: { shouldEmitProgress: boolean } = { shouldEmitProgress: false },
+  ) {
+    return this.fullTextSearchDelegator.rebuildAuditlogIndex(option);
   }
 
   async searchAuditlogSuggestions(

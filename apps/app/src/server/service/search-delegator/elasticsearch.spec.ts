@@ -1,4 +1,7 @@
+import type { estypes as estypes7 } from '@elastic/elasticsearch7';
+import type { estypes } from '@elastic/elasticsearch8';
 import mongoose from 'mongoose';
+import type { Namespace } from 'socket.io';
 import {
   type DeepMockProxy,
   type MockProxy,
@@ -6,6 +9,7 @@ import {
   mockDeep,
 } from 'vitest-mock-extended';
 
+import { SocketEventName } from '~/interfaces/websocket';
 import type { ActivityDocument } from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager/config-manager';
 import type { SocketIoService } from '~/server/service/socket-io';
@@ -45,11 +49,13 @@ describe('ElasticsearchDelegator', () => {
 
       beforeEach(() => {
         mockES8Client = mock<ES8ClientDelegator>({ delegatorVersion: 8 });
-        mockES8Client.search.mockResolvedValue({
-          aggregations: {
-            unique_values: { buckets: makeBuckets(['alice', 'bob']) },
-          },
-        } as unknown as Awaited<ReturnType<typeof mockES8Client.search>>);
+        mockES8Client.search.mockResolvedValue(
+          mock<estypes.SearchResponse>({
+            aggregations: {
+              unique_values: { buckets: makeBuckets(['alice', 'bob']) },
+            },
+          }),
+        );
         injectClient(delegator, mockES8Client);
       });
 
@@ -132,9 +138,11 @@ describe('ElasticsearchDelegator', () => {
       });
 
       it('should return [] when rawBuckets is not an array', async () => {
-        mockES8Client.search.mockResolvedValue({
-          aggregations: { unique_values: { buckets: 'invalid' } },
-        } as unknown as Awaited<ReturnType<typeof mockES8Client.search>>);
+        mockES8Client.search.mockResolvedValue(
+          mock<estypes.SearchResponse>({
+            aggregations: { unique_values: { buckets: 'invalid' } },
+          }),
+        );
 
         const result = await delegator.searchAuditlogByFuzzyWildcard(
           'username',
@@ -151,11 +159,13 @@ describe('ElasticsearchDelegator', () => {
 
       beforeEach(() => {
         mockES7Client = mock<ES7ClientDelegator>({ delegatorVersion: 7 });
-        mockES7Client.search.mockResolvedValue({
-          aggregations: {
-            unique_values: { buckets: makeBuckets(['alice']) },
-          },
-        } as unknown as Awaited<ReturnType<typeof mockES7Client.search>>);
+        mockES7Client.search.mockResolvedValue(
+          mock<estypes7.SearchResponse>({
+            aggregations: {
+              unique_values: { buckets: makeBuckets(['alice']) },
+            },
+          }),
+        );
         injectClient(delegator, mockES7Client);
       });
 
@@ -349,7 +359,7 @@ describe('ElasticsearchDelegator', () => {
       // index state stays observable rather than being asserted through a spy.
       addAllAuditlogsSpy = vi
         .spyOn(delegator, 'addAllAuditlogs')
-        .mockResolvedValue(undefined);
+        .mockResolvedValue({ totalCount: 0, count: 0 });
     });
 
     it('reindexes into the tmp index before dropping the live index', async () => {
@@ -369,21 +379,23 @@ describe('ElasticsearchDelegator', () => {
       expect(mockES8Client.indices.create).toHaveBeenCalledWith(
         expect.objectContaining({ index: 'auditlogs' }),
       );
-      expect(addAllAuditlogsSpy).toHaveBeenCalled();
+      expect(addAllAuditlogsSpy).toHaveBeenCalledWith({
+        shouldEmitProgress: false,
+      });
     });
 
     it('swaps the alias onto the tmp index while the live index is rebuilt', async () => {
       await delegator.rebuildAuditlogIndex();
 
-      expect(mockES8Client.indices.updateAliases).toHaveBeenCalledWith({
+      // The alias must move onto tmp before the live index is dropped so it stays attached
+      // to an existing index rather than dangling. (tmp may be incomplete; reindex is
+      // best-effort — see the addAllAuditlogs repopulation below.)
+      expect(mockES8Client.indices.updateAliases).toHaveBeenNthCalledWith(1, {
         actions: [
           { add: { alias: 'auditlogs-alias', index: 'auditlogs-tmp' } },
           { remove: { alias: 'auditlogs-alias', index: 'auditlogs' } },
         ],
       });
-      // The alias must move onto tmp before the live index is dropped so it stays attached
-      // to an existing index rather than dangling. (tmp may be incomplete; reindex is
-      // best-effort — see the addAllAuditlogs repopulation below.)
       expect(
         mockES8Client.indices.updateAliases.mock.invocationCallOrder[0],
       ).toBeLessThan(mockES8Client.indices.delete.mock.invocationCallOrder[0]);
@@ -393,14 +405,14 @@ describe('ElasticsearchDelegator', () => {
       await delegator.rebuildAuditlogIndex();
 
       // The mid-rebuild swap leaves the alias on tmp; the rebuild must atomically swap
-      // it back onto the live index so the alias never resolves to nothing.
-      expect(mockES8Client.indices.updateAliases).toHaveBeenCalledWith({
+      // it back onto the live index so the alias never resolves to nothing —
+      // and only after the live index has been repopulated.
+      expect(mockES8Client.indices.updateAliases).toHaveBeenNthCalledWith(2, {
         actions: [
           { add: { alias: 'auditlogs-alias', index: 'auditlogs' } },
           { remove: { alias: 'auditlogs-alias', index: 'auditlogs-tmp' } },
         ],
       });
-      // The swap-back must happen only after the live index has been repopulated.
       expect(
         mockES8Client.indices.updateAliases.mock.invocationCallOrder[1],
       ).toBeGreaterThan(addAllAuditlogsSpy.mock.invocationCallOrder[0]);
@@ -453,6 +465,140 @@ describe('ElasticsearchDelegator', () => {
       await expect(delegator.rebuildAuditlogIndex()).rejects.toThrow(
         'reindex failed',
       );
+    });
+
+    describe('with shouldEmitProgress: true', () => {
+      let mockAdminSocket: MockProxy<Namespace>;
+
+      beforeEach(() => {
+        mockAdminSocket = mock<Namespace>();
+        mockSocketIo.getAdminSocket.mockReturnValue(mockAdminSocket);
+      });
+
+      it('returns totalCount and count from addAllAuditlogs on success', async () => {
+        addAllAuditlogsSpy.mockResolvedValue({ totalCount: 100, count: 100 });
+
+        const result = await delegator.rebuildAuditlogIndex({
+          shouldEmitProgress: true,
+        });
+
+        expect(result).toEqual({ totalCount: 100, count: 100 });
+        expect(mockAdminSocket.emit).not.toHaveBeenCalledWith(
+          SocketEventName.FinishAddAuditlog,
+          expect.anything(),
+        );
+      });
+
+      it('emits AuditlogRebuildingFailed with error message on failure', async () => {
+        mockES8Client.reindex.mockRejectedValue(new Error('reindex failed'));
+
+        await expect(
+          delegator.rebuildAuditlogIndex({ shouldEmitProgress: true }),
+        ).rejects.toThrow('reindex failed');
+
+        expect(mockAdminSocket.emit).toHaveBeenCalledWith(
+          SocketEventName.AuditlogRebuildingFailed,
+          { error: 'reindex failed' },
+        );
+      });
+    });
+  });
+
+  describe('getAuditlogInfoForAdmin()', () => {
+    let mockES8Client: DeepMockProxy<ES8ClientDelegator>;
+
+    const givenIndexAndAliasState = (state: {
+      mainExists: boolean;
+      tmpExists: boolean;
+      mainHasAlias: boolean;
+      tmpHasAlias?: boolean;
+    }) => {
+      mockES8Client.indices.exists.mockImplementation((params) =>
+        Promise.resolve(
+          params.index === 'auditlogs-tmp' ? state.tmpExists : state.mainExists,
+        ),
+      );
+
+      const aliasEntry = (
+        hasAlias: boolean,
+      ): estypes.IndicesGetAliasIndexAliases =>
+        hasAlias ? { aliases: { 'auditlogs-alias': {} } } : { aliases: {} };
+
+      const aliasResponse: estypes.IndicesGetAliasResponse = {};
+      if (state.mainExists)
+        aliasResponse.auditlogs = aliasEntry(state.mainHasAlias);
+      if (state.tmpExists)
+        aliasResponse['auditlogs-tmp'] = aliasEntry(state.tmpHasAlias ?? false);
+
+      mockES8Client.indices.getAlias.mockResolvedValue(aliasResponse);
+      mockES8Client.indices.stats.mockResolvedValue(
+        mock<estypes.IndicesStatsResponse>({ indices: {} }),
+      );
+    };
+
+    beforeEach(() => {
+      mockES8Client = mockDeep<ES8ClientDelegator>({ delegatorVersion: 8 });
+      injectClient(delegator, mockES8Client);
+    });
+
+    it('returns isNormalized: true when only the main index exists with the alias', async () => {
+      givenIndexAndAliasState({
+        mainExists: true,
+        tmpExists: false,
+        mainHasAlias: true,
+      });
+
+      const result = await delegator.getAuditlogInfoForAdmin();
+
+      expect(result.isNormalized).toBe(true);
+    });
+
+    it('returns isNormalized: false when the main index exists but has no alias', async () => {
+      givenIndexAndAliasState({
+        mainExists: true,
+        tmpExists: false,
+        mainHasAlias: false,
+      });
+
+      const result = await delegator.getAuditlogInfoForAdmin();
+
+      expect(result.isNormalized).toBe(false);
+    });
+
+    it('returns isNormalized: false when both main and tmp indices exist (mid-rebuild state)', async () => {
+      givenIndexAndAliasState({
+        mainExists: true,
+        tmpExists: true,
+        mainHasAlias: true,
+      });
+
+      const result = await delegator.getAuditlogInfoForAdmin();
+
+      expect(result.isNormalized).toBe(false);
+    });
+
+    it('returns empty indices and aliases with isNormalized: false when no index exists', async () => {
+      givenIndexAndAliasState({
+        mainExists: false,
+        tmpExists: false,
+        mainHasAlias: false,
+      });
+
+      const result = await delegator.getAuditlogInfoForAdmin();
+
+      expect(result).toEqual({ indices: [], aliases: [], isNormalized: false });
+    });
+
+    it('returns isNormalized: false without throwing when the index disappears between exists and getAlias (TOCTOU)', async () => {
+      mockES8Client.indices.exists.mockResolvedValue(true);
+      mockES8Client.indices.getAlias.mockResolvedValue({});
+      mockES8Client.indices.stats.mockResolvedValue(
+        mock<estypes.IndicesStatsResponse>({ indices: {} }),
+      );
+
+      await expect(delegator.getAuditlogInfoForAdmin()).resolves.toMatchObject({
+        isNormalized: false,
+      });
     });
   });
 

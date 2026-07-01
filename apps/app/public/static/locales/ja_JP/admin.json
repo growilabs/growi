@@ -308,7 +308,26 @@
     "rebuild": "リビルド",
     "rebuild_button": "インデックスのリビルド",
     "rebuild_description_1": "全てのページのインデックスを削除し、作り直します。",
-    "rebuild_description_2": "この作業には数秒かかります。"
+    "rebuild_description_2": "この作業には数秒かかります。",
+    "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。"
+  },
+  "audit_log_index_management": {
+    "audit_log_index_management": "監査ログ管理",
+    "elasticsearch_management": "Elasticsearch 管理（監査ログ）",
+    "normalize": "正規化",
+    "normalize_button": "監査のログのインデックスの正規化",
+    "normalize_success": "監査ログのインデックスを正規化しました。",
+    "normalize_description": "破損した監査ログのインデックスを修復します。",
+    "rebuild": "リビルド",
+    "rebuild_button": "監査ログのインデックスのリビルド",
+    "rebuild_requested": "監査ログのインデックスのリビルドをリクエストしました。",
+    "rebuild_description_1": "全ての監査ログのインデックスを削除し、作り直します。",
+    "rebuild_description_2": "この作業には数秒かかります。",
+    "unsynced_events_warning": "Elasticsearch に同期できなかった監査ログがあります。リビルドして整合性を回復してください。",
+    "rebuild_progress_processing": "処理中..",
+    "rebuild_progress_completed": "完了",
+    "rebuild_normalization_timeout": "リビルドは完了しましたが、正規化がタイムアウトしました。手動で正規化してください。",
+    "reconnect": "再接続"
   },
   "mailer_setup_required": "送信するには <a href='/admin/app'>メールの設定</a> が必要です。",
   "admin_top": {
