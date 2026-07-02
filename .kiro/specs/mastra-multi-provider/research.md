@@ -79,7 +79,7 @@
 |---|---|---|
 | suggest-path(`features/ai-tools`) | レガシー `openai:serviceType` / `openai:*` キー + `certifyAiService` を使用。Mastra 系設定と**未統合** | 影響なし(別系統)。統合は本 spec のスコープ判断事項(先行 2 spec は据え置きを選択) |
 | SSR props | `aiEnabled: boolean` のみ | 変更不要 |
-| i18n | `admin.json` の `ai_settings.*`(en/ja/zh/fr)。単一プロバイダ前提の文言(`api_key_provider_change_warning` 等) | プロバイダパネル用キーの追加・一部文言改訂 |
+| i18n | `admin.json` の `ai_settings.*`(en/ja/zh/fr/ko の 5 ロケール)。単一プロバイダ前提の文言(`api_key_provider_change_warning` 等) | プロバイダパネル用キーの追加・一部文言改訂 |
 | 単一前提を固定しているテスト | `put-ai-settings.spec` / `get-ai-settings.spec` / `env-only-mode.integ.spec` / `is-ai-configured.spec` / `get-models.spec` / `config-manager.spec` / `ai-settings.spec` ほか | スキーマ変更に伴い広範な改修 |
 | Env var ドキュメント | `AI_*` は docs 未記載(growi-docs 側の課題) | 新スキーマの env 表現を確定後に整理 |
 

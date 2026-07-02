@@ -204,7 +204,7 @@ features/mastra/client/admin/
 - `features/mastra/client/components/ChatSidebar/chat-sidebar-helpers.ts` — `getModelKey` ライブ getter(機構は不変)
 - `features/mastra/client/stores/models.tsx` — 新 `ChatModelsResponse` 型
 - `components/ai-elements/prompt-input.tsx` — `PromptInputModelSelectGroup` / `PromptInputModelSelectLabel`(ui/select の再輸出ラッパ)を追加
-- `public/static/locales/{en_US,ja_JP,zh_CN,fr_FR}/admin.json` — providers タブ・有効トグル・既定モデルセレクタ等のキー追加、単一プロバイダ前提キー(`provider_label` / `api_key_provider_change_warning` 等)の削除
+- `public/static/locales/{en_US,ja_JP,zh_CN,fr_FR,ko_KR}/admin.json` — providers タブ・有効トグル・既定モデルセレクタ等のキー追加、単一プロバイダ前提キー(`provider_label` / `api_key_provider_change_warning` 等)の削除(**5 ロケールすべて** — ko_KR にも `ai_settings` セクションが存在する)
 
 ### Deleted Files
 
@@ -533,7 +533,7 @@ export interface AiSettingsFormValues {
 - **DefaultModelSelector**: `allowedModels` を provider でグループ表示し、選択 = 対象行の `isDefault` を true・他を false(3.1)。ProviderPanel 行内の★と同一の書き換え(共有ヘルパ)。
 - **ProviderPanel**: 有効トグル(1.5)・API キー入力(設定済みは `(configured)` placeholder、1.8)・「API key set / not set」チップ・AllowedModelsField(provider prop)・azure のみ AzureOpenaiSettings。env-only 時は接続設定系フィールドを disabled(5.2)、モデル編集は活性のまま(5.3)。
 - **AllowedModelsField**: カタログ対応プロバイダは select(登録済み除外)、非対応は自由入力(2.6, 2.7 — picker 実装を provider スコープで流用)。同一プロバイダ内重複はクライアントでも行エラー表示(2.4。最終判定はサーバ)。既定の不変条件はフォーム操作でも維持する: 空リストへ最初のモデルを追加したときは `isDefault` を自動付与し、既定行を削除したときは残存する先頭行へ既定を付け替える(残 0 件なら既定なし — 3.1/3.3。付替えは共有ヘルパ経由)。これにより通常のフォーム操作から 3.2 の検証エラーに到達しない。**index 整合の制約**: グローバル `allowedModels` 配列に対する単一 `useFieldArray` を維持し、provider によるフィルタは**表示のみ**とする。remove/update/★付替えは必ず原配列 index を保持した対応付け(表示行 → 原 index のマップ)経由で行い、フィルタ後 index を配列操作に直接使わない(越境操作バグの防止。component テストで検証)。
-- i18n: 新キーは `ai_settings.providers_*` / `ai_settings.default_model_*` 系。4 ロケール同時更新。
+- i18n: 新キーは `ai_settings.providers_*` / `ai_settings.default_model_*` 系。5 ロケール(en/ja/zh/fr/ko)同時更新。
 
 ### client / ChatSidebar セレクタ
 
