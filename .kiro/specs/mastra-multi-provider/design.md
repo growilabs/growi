@@ -439,7 +439,7 @@ export interface AiProviderUpdateRequest {
 }
 export interface AiSettingsUpdateRequest {
   aiEnabled?: boolean;
-  providers?: Partial<Record<AiProvider, AiProviderUpdateRequest>>; // full-state replace (apiKey を除く)
+  providers?: Record<AiProvider, AiProviderUpdateRequest>; // 存在する場合は 4 プロバイダ全エントリ必須 (validator 強制)
   allowedModels?: AllowedModel[];           // full-state replace
 }
 ```
@@ -449,7 +449,7 @@ export interface AiSettingsUpdateRequest {
 | GET | /_api/v3/ai-settings | — | AiSettingsResponse | 500 |
 | PUT | /_api/v3/ai-settings | AiSettingsUpdateRequest | AiSettingsResponse 相当 | 400(検証・env-only 違反), 500 |
 
-- **PUT セマンティクス**: 現行の full-state replace を踏襲。`providers` は Record 全置換だが、各プロバイダの `apiKey` のみ merge 例外(非空のみ更新、消去操作なし)。`ai:providerApiKeys` は「現在値 + 今回の非空キー」で再構成する(1.3, 1.4)。
+- **PUT セマンティクス**: 現行の full-state replace を踏襲。`providers` を含むリクエストは**対応 4 プロバイダの全エントリ必須**(validator で強制 — 固定スロットモデルに整合し、省略エントリの暗黙リセットという解釈余地を契約から排除する)。各プロバイダの `apiKey` のみ merge 例外(非空のみ更新、消去操作なし)。`ai:providerApiKeys` は「現在値 + 今回の非空キー」で再構成する(1.3, 1.4)。
 - **env-only 分割(5.2/5.3)**: `env:useOnlyEnvVars:ai` 有効時、`providers` または `aiEnabled` を含むリクエストは 400(明示拒否)。`allowedModels` のみのリクエストは通常どおり検証・保存(5.4: validate-allowed-models は経路共通)。
 - **validate-allowed-models**: 各エントリ = `isAiProvider(provider)`(2.5)∧ modelId 非空 ∧ (provider, modelId) 一意(2.3, 2.4)∧ providerOptions namespace 形式 ∧ isDefault ちょうど 1 つ(3.2)。所属プロバイダの構成状態は検証しない(2.9)。
 - **秘匿規律(1.9)**: catch でも request body を stringify しない(現行パターン)。保存成功後 `clearResolvedMastraModelCache()` + availability ログ dedup リセット。
@@ -509,12 +509,12 @@ export interface AiSettingsFormValues {
 - **AiSettings.tsx**: AI 有効トグル → DefaultModelSelector → ProviderTabs(アクティブタブ state)→ ProviderPanel(アクティブのみ mount)→ Update。
 - **DefaultModelSelector**: `allowedModels` を provider でグループ表示し、選択 = 対象行の `isDefault` を true・他を false(3.1)。ProviderPanel 行内の★と同一の書き換え(共有ヘルパ)。
 - **ProviderPanel**: 有効トグル(1.5)・API キー入力(設定済みは `(configured)` placeholder、1.8)・「API key set / not set」チップ・AllowedModelsField(provider prop)・azure のみ AzureOpenaiSettings。env-only 時は接続設定系フィールドを disabled(5.2)、モデル編集は活性のまま(5.3)。
-- **AllowedModelsField**: カタログ対応プロバイダは select(登録済み除外)、非対応は自由入力(2.6, 2.7 — picker 実装を provider スコープで流用)。同一プロバイダ内重複はクライアントでも行エラー表示(2.4。最終判定はサーバ)。
+- **AllowedModelsField**: カタログ対応プロバイダは select(登録済み除外)、非対応は自由入力(2.6, 2.7 — picker 実装を provider スコープで流用)。同一プロバイダ内重複はクライアントでも行エラー表示(2.4。最終判定はサーバ)。**index 整合の制約**: グローバル `allowedModels` 配列に対する単一 `useFieldArray` を維持し、provider によるフィルタは**表示のみ**とする。remove/update/★付替えは必ず原配列 index を保持した対応付け(表示行 → 原 index のマップ)経由で行い、フィルタ後 index を配列操作に直接使わない(越境操作バグの防止。component テストで検証)。
 - i18n: 新キーは `ai_settings.providers_*` / `ai_settings.default_model_*` 系。4 ロケール同時更新。
 
 ### client / ChatSidebar セレクタ
 
-Summary-only。`useSWRxChatModels` の新型に追従し、`models` を provider でグループ化して `PromptInputModelSelectGroup` + `PromptInputModelSelectLabel`(新設ラッパ、実体は `ui/select` の SelectGroup/SelectLabel)で表示(4.1, 4.2)。選択状態は `modelKey`(feature ローカル useState + ライブ getter — 機構不変、4.7)。変更時 `scheduleToPut({ aiChatSelectedModelKey })`(4.4)。トリガ表示は選択中の modelId(必要ならツールチップで provider)。
+Summary-only。`useSWRxChatModels` の新型に追従し、`models` を provider でグループ化して `PromptInputModelSelectGroup` + `PromptInputModelSelectLabel`(新設ラッパ、実体は `ui/select` の SelectGroup/SelectLabel)で表示(4.1, 4.2)。選択状態は `modelKey`(feature ローカル useState + ライブ getter — 機構不変、4.7)。変更時 `scheduleToPut({ aiChatSelectedModelKey })`(4.4)。トリガ表示は「provider · modelId」(モックの既定モデルセレクタと同一形式。プロバイダ間で同名 modelId が共存しても閉状態で判別可能 — 4.2)。
 
 ## Data Models
 
@@ -561,7 +561,7 @@ Config コレクションは key-value(値 JSON)のため**スキーマ変更な
 
 ### Integration Tests
 
-1. `put/get-ai-settings.spec`: プロバイダ独立更新(1.3)・apiKey merge 例外(1.4)・isApiKeySet マスク(1.8)・無効化しても設定保持(1.6)・未構成プロバイダのモデル保存可(2.9)
+1. `put/get-ai-settings.spec`: プロバイダ独立更新(1.3)・apiKey merge 例外(1.4)・isApiKeySet マスク(1.8)・無効化しても設定保持(1.6)・未構成プロバイダのモデル保存可(2.9)・`providers` の不完全エントリ(4 種未満)→ 400
 2. `env-only-mode.integ.spec`(書き換え): env-only 時に providers/aiEnabled を含む PUT → 400(5.2)、allowedModels のみの PUT → 反映(5.3)+ 同一検証(5.4)、GET の useOnlyEnvVars
 3. `get-models.spec`: 有効プロバイダのみの models(4.1, 6.1)・保存キー有効時はそれ / 無効時は実効既定(4.4, 4.5)
 4. `post-message.spec`: body modelKey の受理・集合外の丸め・requestContext への実効キー設定(4.3, 4.6)
