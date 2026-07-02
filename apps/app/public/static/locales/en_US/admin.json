@@ -452,6 +452,7 @@
     "models_section_title": "Models",
     "models_section_desc": "Choose one of your registered models as the default. The default is the model initially selected for users in chat.",
     "model_label": "Model name",
+    "model_placeholder": "Select a model",
     "set_as_default": "Set as default",
     "default_badge": "Default",
     "add_model": "Add model",

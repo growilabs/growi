@@ -452,6 +452,7 @@
     "models_section_title": "Models",
     "models_section_desc": "Choisissez l'un de vos modèles enregistrés comme modèle par défaut. Le modèle par défaut est celui sélectionné au départ pour les utilisateurs dans la conversation.",
     "model_label": "Nom du modèle",
+    "model_placeholder": "Sélectionnez un modèle",
     "set_as_default": "Définir par défaut",
     "default_badge": "Par défaut",
     "add_model": "Ajouter un modèle",

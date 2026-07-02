@@ -461,6 +461,7 @@
     "models_section_title": "Models",
     "models_section_desc": "从已注册的模型中选择一个作为默认模型。默认模型是聊天中最初为用户选中的模型。",
     "model_label": "模型名称",
+    "model_placeholder": "请选择模型",
     "set_as_default": "设为默认",
     "default_badge": "默认",
     "add_model": "添加模型",

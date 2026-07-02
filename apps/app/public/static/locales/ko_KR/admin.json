@@ -452,6 +452,7 @@
     "models_section_title": "Models",
     "models_section_desc": "등록한 모델 중 하나를 기본값으로 선택합니다. 기본 모델은 채팅에서 사용자에게 처음 선택되어 있는 모델입니다.",
     "model_label": "모델 이름",
+    "model_placeholder": "모델을 선택하세요",
     "set_as_default": "기본값으로 설정",
     "default_badge": "기본",
     "add_model": "모델 추가",

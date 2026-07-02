@@ -461,6 +461,7 @@
     "models_section_title": "Models",
     "models_section_desc": "登録したモデルから 1 つをデフォルトとして選びます。デフォルトは、チャットで最初に選択されているモデルです。",
     "model_label": "モデル名",
+    "model_placeholder": "モデルを選択してください",
     "set_as_default": "デフォルトにする",
     "default_badge": "デフォルト",
     "add_model": "モデルを追加",

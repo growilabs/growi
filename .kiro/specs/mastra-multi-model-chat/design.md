@@ -16,7 +16,7 @@
 
 ### Non-Goals
 - 異なるプロバイダのモデルを 1 つの許可リストに混在させること。`ai:provider`/`ai:apiKey` は単一のまま。
-- ベンダー API / レジストリからのモデル一覧自動取得。許可モデルは管理者の手入力。
+- 実行時のベンダー API / レジストリからのモデル一覧自動取得（実行時ベンダー API 呼び出しは引き続き非対象）。（更新: ai-settings-model-picker により、カタログを持つプロバイダの管理者許可リストは、models.dev をリリース前段で取り込んだオフライン同梱カタログ (`model-catalog-data.json`) からの選択方式を採用。実行時は成果物 read のみで外部通信なし。azure-openai・取得失敗時は従来どおり自由入力。詳細は `.kiro/specs/ai-settings-model-picker`。）
 - 会話（スレッド）ごとの選択モデルのサーバ永続化。
 - 旧 `ai:model` / `ai:providerOptions` からの自動移行（完全廃止・運用者が再設定）。
 - AI 有効性ゲーティング・スレッド永続化・ストリーミング・エラーサニタイズの挙動変更。
@@ -35,7 +35,7 @@
 
 ### Out of Boundary
 - 複数プロバイダ混在（別 spec / 将来）。`multi-llm-provider` のベンダー切替は据え置き。
-- ベンダー API からのモデル一覧取得。会話固定モデルのサーバ永続化。
+- 実行時のベンダー API からのモデル一覧取得は引き続き非対象。ただし ai-settings-model-picker はオフライン同梱（リリース前段で成果物へ commit 済み）カタログの read を採用する（実行時外部通信ゼロの別経路。詳細は `.kiro/specs/ai-settings-model-picker`）。会話固定モデルのサーバ永続化。
 - 旧 `ai:model` / `ai:providerOptions` からの自動移行（完全廃止。運用者は `ai:allowedModels` で再設定）。
 - 既存 spec（`admin-ai-settings` / `multi-llm-provider`）のドキュメント更新は本 spec の**タスク**として行うが、本設計の実装対象コードではない。
 - スレッド永続化 / ストリーミング / エラーサニタイズ / AI 有効性ゲーティングの内部実装。
