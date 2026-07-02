@@ -361,6 +361,9 @@
     },
     "exclude_group": {
       "desc": "Exclure les pages accordées au groupe {{group}}"
+    },
+    "quoted_value": {
+      "desc": "Entourez toute valeur de filtre de guillemets doubles si elle contient un espace (par ex. un nom de groupe ou un chemin de page)"
     }
   },
   "search": {

@@ -164,6 +164,16 @@ export const SearchHelp = (): JSX.Element => {
                 </h6>
               </td>
             </tr>
+            <tr>
+              <th className="py-2">
+                <code>group:&quot;dev team&quot;</code>
+              </th>
+              <td>
+                <h6 className="m-0 text-muted">
+                  {t('search_help.quoted_value.desc')}
+                </h6>
+              </td>
+            </tr>
           </tbody>
         </table>
       </Collapse>

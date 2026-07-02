@@ -352,6 +352,9 @@
     },
     "exclude_group": {
       "desc": "排除授予{{group}}组的页面"
+    },
+    "quoted_value": {
+      "desc": "筛选值包含空格时，请用双引号括起来（例如组名或页面路径）"
     }
   },
   "search": {

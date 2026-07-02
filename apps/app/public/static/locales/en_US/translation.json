@@ -359,6 +359,9 @@
     },
     "exclude_group": {
       "desc": "Exclude pages granted to group {{group}}"
+    },
+    "quoted_value": {
+      "desc": "Wrap any filter value in double quotes when it contains a space (e.g. a group name or page path)"
     }
   },
   "search": {
