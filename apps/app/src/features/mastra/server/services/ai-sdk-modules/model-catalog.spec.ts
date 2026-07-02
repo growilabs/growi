@@ -3,29 +3,30 @@ import catalog from './model-catalog-data.json' with { type: 'json' };
 
 describe('getSelectableModelIds', () => {
   describe('catalog-backed providers', () => {
-    it('returns a non-empty list of model ids for openai', () => {
-      // Contract: a provider present in the committed catalog yields its ids (1.1/3.1).
+    // The expected value is derived from the same committed catalog so these tests
+    // survive `vendor:models` regeneration (which the release workflow runs without a
+    // test gate); asserting the whole slice with toEqual still catches a provider
+    // mix-up (returning another provider's list) — the reason not to just check
+    // non-emptiness (1.1/3.1).
+    it('returns openai model ids from the committed catalog', () => {
       const result = getSelectableModelIds('openai');
 
-      expect(Array.isArray(result)).toBe(true);
       expect(result.length).toBeGreaterThan(0);
-      expect(result.every((id) => typeof id === 'string')).toBe(true);
-      // Sanity: openai ids, not another provider's list.
-      expect(result).toContain('gpt-4o');
+      expect(result).toEqual(catalog.models.openai);
     });
 
-    it('returns a non-empty list of model ids for anthropic', () => {
+    it('returns anthropic model ids from the committed catalog', () => {
       const result = getSelectableModelIds('anthropic');
 
       expect(result.length).toBeGreaterThan(0);
-      expect(result).toContain('claude-opus-4-8');
+      expect(result).toEqual(catalog.models.anthropic);
     });
 
-    it('returns a non-empty list of model ids for google', () => {
+    it('returns google model ids from the committed catalog', () => {
       const result = getSelectableModelIds('google');
 
       expect(result.length).toBeGreaterThan(0);
-      expect(result).toContain('gemini-2.5-pro');
+      expect(result).toEqual(catalog.models.google);
     });
   });
 
