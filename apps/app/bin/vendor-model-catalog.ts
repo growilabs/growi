@@ -103,10 +103,11 @@ export const buildModelCatalog = (
       .filter(([, entry]) => isSelectableModel(entry as ModelsDevModel))
       .map(([id]) => id);
 
-    // Dedup (map keys are already unique, but keep the invariant explicit) + sort.
-    const sorted = [...new Set(selectableIds)].sort((a, b) =>
-      a.localeCompare(b),
-    );
+    // Sort by code point (locale-independent) to keep the emitted file
+    // deterministic across environments. A bare `localeCompare()` collates per the
+    // runner's default ICU locale and would reorder ids such as `gpt-5.1-chat-latest`
+    // under e.g. a Czech locale, breaking the same-input⇒same-output guarantee.
+    const sorted = selectableIds.toSorted();
 
     if (sorted.length === 0) {
       emptyProviders.push(provider);
