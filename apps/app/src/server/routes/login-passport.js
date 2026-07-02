@@ -257,7 +257,6 @@ module.exports = (crowi, app) => {
         res,
         user,
         SupportedAction.ACTION_USER_LOGIN_WITH_LDAP,
-        true,
       );
     });
   };
