@@ -97,6 +97,17 @@ export const getAvailableModelsValidators: ValidationChain[] = [
 ];
 
 /**
+ * Request for the handler below. `provider` is validated upstream
+ * (getAvailableModelsValidators + apiV3FormValidator), so the query carries a
+ * known AiProvider. Intersecting with `Request['query']` (ParsedQs) types the
+ * field while keeping the handler assignable to `RequestHandler` — the same
+ * pattern as get-threads.ts.
+ */
+export interface GetAvailableModelsRequest extends Request {
+  query: Request['query'] & { provider: AiProvider };
+}
+
+/**
  * GET /_api/v3/ai-settings/available-models handler.
  *
  * Returns the selectable model ids for `provider` from the committed offline
@@ -110,11 +121,12 @@ export const getAvailableModelsValidators: ValidationChain[] = [
  * provider is a 400 before this runs; scope + login + adminRequired are composed
  * in `getAvailableModelsFactory` below (Req 7.2).
  */
-export const getAvailableModels = (req: Request, res: ApiV3Response): void => {
-  // `provider` is validated upstream (getAvailableModelsValidators +
-  // apiV3FormValidator), so it is a known AiProvider by the time we get here.
-  // req.query is ParsedQs (not `any`), hence the annotation on the trusted value.
-  const provider = req.query.provider as AiProvider;
+export const getAvailableModels = (
+  req: GetAvailableModelsRequest,
+  res: ApiV3Response,
+): void => {
+  // provider is a validated AiProvider (see GetAvailableModelsRequest); no cast.
+  const { provider } = req.query;
 
   try {
     const modelIds = getSelectableModelIds(provider);

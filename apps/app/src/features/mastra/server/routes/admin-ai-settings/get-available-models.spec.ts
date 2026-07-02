@@ -21,15 +21,20 @@ vi.mock('../../services/ai-sdk-modules/model-catalog', () => ({
   getSelectableModelIds,
 }));
 
-import type { Request } from 'express';
 import { mock } from 'vitest-mock-extended';
 
+import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 
-import { getAvailableModels } from './get-available-models';
+import {
+  type GetAvailableModelsRequest,
+  getAvailableModels,
+} from './get-available-models';
 
-const invoke = (query: { provider?: string }) => {
-  const req = mock<Request>({ query });
+// The handler trusts a validated provider (GetAvailableModelsRequest), so the
+// unit test supplies AiProvider values directly.
+const invoke = (query: { provider: AiProvider }) => {
+  const req = mock<GetAvailableModelsRequest>({ query });
   const res = mock<ApiV3Response>();
   getAvailableModels(req, res);
   return { res };
