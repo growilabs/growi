@@ -43,7 +43,7 @@ const SOURCE_ATTRIBUTION = `${MODELS_DEV_URL} (MIT)`;
 
 const OUTPUT_PATH = resolve(
   import.meta.dirname,
-  '../src/features/mastra/server/services/ai-sdk-modules/model-catalog-data.json',
+  '../resource/model-catalog-data.json',
 );
 
 // ─── Boundary schema (tolerant / passthrough) ────────────────────────────────

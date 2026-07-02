@@ -127,16 +127,17 @@ graph TB
 ```
 apps/app/
 ├── bin/
-│   ├── vendor-model-catalog.ts                 # ingest step (pre-release, not build): fetch api.json → filter → write committed JSON
+│   ├── vendor-model-catalog.ts                 # ingest step (pre-release, not build): fetch api.json → filter → write committed JSON to resource/
 │   └── vendor-model-catalog.spec.ts            # fixture api.json → 期待する成果物 shape を検証
+├── resource/
+│   └── model-catalog-data.json                 # vendored 成果物（コミット・Docker で本番同梱）: { _source, _generatedAt, models: { openai:[], anthropic:[], google:[] } }
 └── src/features/mastra/
     ├── interfaces/
     │   └── selectable-models-response.ts       # DTO: SelectableModelsResponse { modelIds: string[] }
     ├── server/services/ai-sdk-modules/
     │   ├── chat-model-filter.ts                # pure: 対象provider定義 + isSelectableModel(tool_call && output⊇text)
     │   ├── chat-model-filter.spec.ts
-    │   ├── model-catalog-data.json             # vendored 成果物（コミット）: { _source, _generatedAt, models: { openai:[], anthropic:[], google:[] } }
-    │   ├── model-catalog.ts                    # runtime: getSelectableModelIds(provider) = 成果物を read して返す（通信なし）
+    │   ├── model-catalog.ts                    # runtime: getSelectableModelIds(provider) = `^/resource/model-catalog-data.json` を static import して read（通信なし）
     │   └── model-catalog.spec.ts
     ├── server/routes/admin-ai-settings/
     │   ├── get-available-models.ts             # getAvailableModelsFactory(crowi): RequestHandler[]
@@ -274,7 +275,7 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 ```typescript
 export const getSelectableModelIds: (provider: AiProvider) => string[];
 ```
-- `import catalog from './model-catalog-data.json' with { type: 'json' }`（ネイティブ ESM 必須・`growi-version.ts` 準拠、`resolveJsonModule` で自動型付け＝アサーション不要）で read し、`catalog.models[provider] ?? []` を返す（ヘッダ分離済みの `models` を `Record<string, readonly string[]>` として引く。`provider: AiProvider`、azure 等は `[]`）。**ネットワーク I/O なし**、フィルタは既に生成時に完了しているため実行時ロジックは最小。
+- `import catalog from '^/resource/model-catalog-data.json' with { type: 'json' }`（ネイティブ ESM 必須・`growi-version.ts` 準拠、`resolveJsonModule` で自動型付け＝アサーション不要）で read し、`catalog.models[provider] ?? []` を返す（ヘッダ分離済みの `models` を `Record<string, readonly string[]>` として引く。`provider: AiProvider`、azure 等は `[]`）。**ネットワーク I/O なし**、フィルタは既に生成時に完了しているため実行時ロジックは最小。
 
 #### get-available-models（API）
 | Field | Detail |
@@ -355,7 +356,7 @@ export interface SelectableModelsResponse {
 export type ModelCatalog = Partial<Record<AiProvider, readonly string[]>>;               // provider → 選択可能 id
 export type ModelCatalogFile = { _source: string; _generatedAt: string; models: ModelCatalog };
 ```
-- 消費側 `model-catalog.ts` は `import catalog from './model-catalog-data.json' with { type: 'json' }`（ネイティブ ESM 必須・前例 `growi-version.ts`）で read。`resolveJsonModule: true` により **import 時に自動で型が付く（アサーション不要）**。`getSelectableModelIds(provider)` は、ヘッダを分離した `catalog.models`（provider→`string[]` のみなので `Record<string, readonly string[]>` として健全に扱える）から `catalog.models[provider] ?? []` を返す（`provider: AiProvider`、azure 等は `[]`＝自由入力）。runtime parse は不要（自前生成・生成時 zod 検証済み）／成果物が `ModelCatalogFile` に適合することは1本のテストで担保。
+- 消費側 `model-catalog.ts` は `import catalog from '^/resource/model-catalog-data.json' with { type: 'json' }`（ネイティブ ESM 必須・前例 `growi-version.ts`）で read。`resolveJsonModule: true` により **import 時に自動で型が付く（アサーション不要）**。`getSelectableModelIds(provider)` は、ヘッダを分離した `catalog.models`（provider→`string[]` のみなので `Record<string, readonly string[]>` として健全に扱える）から `catalog.models[provider] ?? []` を返す（`provider: AiProvider`、azure 等は `[]`＝自由入力）。runtime parse は不要（自前生成・生成時 zod 検証済み）／成果物が `ModelCatalogFile` に適合することは1本のテストで担保。
 - 既存 `AllowedModel` / `AiSettingsResponse` / `AiSettingsUpdateRequest` は変更しない（4.x）。
 
 ## Error Handling

@@ -1,9 +1,10 @@
-import type { AiProvider } from '../../../interfaces/ai-provider';
 // Statically imported committed artifact (vendored from models.dev at the
 // ingest step, not at build or runtime). Reading it is the ONLY data source at
 // runtime — there is no network/fs/config access here, which is what makes the
 // list provision fully offline (Req 2.1/2.2/2.3).
-import catalog from './model-catalog-data.json' with { type: 'json' };
+import catalog from '^/resource/model-catalog-data.json' with { type: 'json' };
+
+import type { AiProvider } from '../../../interfaces/ai-provider';
 
 // The auto-inferred type of `catalog.models` only covers the catalog-backed
 // providers (openai/anthropic/google) and cannot be indexed by a general
