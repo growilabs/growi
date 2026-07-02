@@ -12,7 +12,8 @@
 
 ### Goals
 - カタログを持つプロバイダ（openai / anthropic / google）で選択のみの登録を提供（1.x）。
-- モデル一覧の**実行時取得を外部通信ゼロ**にする（2.x）。取得は**取り込みステップ（リリース前段）でのみ**行い、ビルド工程・実行時には fetch しない。
+- モデル一覧の**提供（read パス）を外部通信ゼロ**にする（2.x）。一覧提供はローカル保存済みカタログ（同梱、または更新済み）の read のみで、リクエスト都度の外部取得は行わない。
+- **カタログのリフレッシュ手段を opt-in で提供**（9.x）: 管理画面からの手動更新／起動時更新オプション／定期自動更新オプション。既定はすべて無効（外部通信ゼロのまま）。更新は同梱カタログと**同一のフィルタ・検証**を経て永続化され、以後の一覧提供に反映される（解決順: 更新済み ?? 同梱）。
 - カタログを持たないプロバイダ（azure-openai）・一覧が空の場合は自由入力を維持（3.x）。
 - **`tool_call` かつ text 出力のモデルだけ**を選択肢にする（生成時フィルタ、6.x）。GROWI エージェントのツール呼び出し要件を担保。
 - 既存の許可リスト挙動・認可・推論・チャット UI を不変に保つ（4.x）。
@@ -20,19 +21,20 @@
 
 ### Non-Goals
 - チャット画面側 UI・推論実行方式の変更（4.3）。
-- **実行時**の外部通信を伴う一覧取得／モデルルーター採用。
-- 同梱カタログ未収録モデルのための外部リクエスト取得（将来オプション、対象外）。
+- **一覧提供（read パス）でのリクエスト都度の外部取得**／モデルルーター採用（外部通信は Req 9 のリフレッシュ操作に限る）。
+- models.dev 以外のソース（各ベンダー API 等）からのモデル一覧取得。
 - Azure デプロイ名の自動列挙。
 - PUT 側でのカタログ membership 検証（D2）。
-- カタログの config-manager への主保管、および `ai:modelsCatalogOverride` 等のオーバーライド（今回は入れない）。
+- カタログの config-manager への主保管、および `ai:modelsCatalogOverride` 等のオーバーライド（今回は入れない。更新済みカタログの保管は config ではなく専用 collection — 追補 R 参照）。
 
 ## Boundary Commitments
 
 ### This Spec Owns
 - **models.dev → コミット済みモデルカタログの vendoring**（取り込みステップ＝リリース前段の取り込みスクリプト、生成時フィルタ、コミット成果物）。
 - provider スコープの「選択可能モデル一覧」を返す admin 読み取り経路（サーバ read サービス + エンドポイント + client フック）。
+- **カタログのリフレッシュ経路（Req 9・追補 R）**: 共有純変換（`build-model-catalog`）、runtime refresh サービス、更新済みカタログの永続化（`RefreshedModelCatalog` singleton collection）、`POST /ai-settings/refresh-model-catalog`、管理画面の更新ボタン、opt-in 設定キー（`ai:modelCatalogRefreshOnStartup` / `ai:modelCatalogRefreshCronSchedule`）と起動時/cron 配線。
 - `AllowedModelsField` の modelId 入力コントロールの出し分け（`<select>` ↔ 自由入力）。
-- 新規 wire DTO `SelectableModelsResponse`。
+- 新規 wire DTO `SelectableModelsResponse` / `RefreshModelCatalogResponse`。
 - 既存スペック（`mastra-multi-model-chat` / `multi-llm-provider`）のモデル入力方式に関する記述の整合更新。
 
 ### Out of Boundary
@@ -42,13 +44,15 @@
 - `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` の意味。
 
 ### Allowed Dependencies
-- **models.dev api.json**（`https://models.dev/api.json`, MIT）— **取り込みステップ（リリース前段）でのみ** fetch（ビルド工程・実行時は触れない）。取り込みスクリプト内で Node の `fetch` を使用。
-- **コミット済み vendored 成果物**（`model-catalog-data.json`）— 実行時に静的 import して read。
-- **zod `^4.1.9`**（既存 dep）— vendoring スクリプトの**境界検証**（api.json の想定形チェック）。mastra feature（tools・feed-parser）で使用実績あり。取り込みステップでのみ利用。
-- 既存 admin 認可チェーン（`accessTokenParser([SCOPE.READ.ADMIN.AI])` → `loginRequiredFactory` → `adminRequiredFactory`）。
-- 既存 client 資産（`apiv3-client`、`useSWRImmutable`、reactstrap `Input`、react-hook-form `register`）。
+- **models.dev api.json**（`https://models.dev/api.json`, MIT）— fetch するのは **(a) 取り込みステップ（リリース前段）の取り込みスクリプト**と **(b) opt-in の runtime refresh サービス（Req 9・明示トリガ時のみ）** の 2 箇所に限る（ビルド工程・一覧提供 read パスは触れない）。URL はビルトイン定数（要求側から指定不可、9.7）。
+- **コミット済み vendored 成果物**（`model-catalog-data.json`）— 実行時に静的 import して read（基線）。
+- **更新済みカタログの永続化** — MongoDB の専用 singleton collection（`RefreshedModelCatalog`）。多インスタンス共有・再起動耐性のため（追補 R）。
+- **zod `^4.1.9`**（既存 dep）— 共有純変換 `build-model-catalog` の**境界検証**（api.json の想定形チェック）。取り込みステップと refresh サービスの両方が同一検証を通る。
+- **node-cron（既存 `CronService` 基盤）** — 定期リフレッシュ（opt-in、Req 9.3）。
+- 既存 admin 認可チェーン（`accessTokenParser([SCOPE.READ.ADMIN.AI])`／書き込みは `[SCOPE.WRITE.ADMIN.AI]` → `loginRequiredFactory` → `adminRequiredFactory`）。
+- 既存 client 資産（`apiv3-client`、`useSWRImmutable`、reactstrap `Input`/`Button`、react-hook-form `register`、`toastr`）。
 - `interfaces/ai-provider` — サーバ（route）は runtime の `isAiProvider` で query を検証し、**client は型のみ `import type { AiProvider }`** を参照する（ビルド時に erase されるため server-only モジュールへの実行時結合は生じない。同モジュール冒頭の「Do NOT add client imports here」は"モジュール内へ client 依存を持ち込むな"の意で、型の被参照は禁じていない）。`interfaces/allowed-model`。
-- **制約**: vendored JSON はサーバ側のみで read し、client には `string[]` のみ返す（JSON を client バンドルに入れない）。**実行時のネットワーク I/O は禁止**。
+- **制約**: カタログ（同梱 JSON・更新済み collection）はサーバ側のみで read し、client には `string[]`（と refresh メタデータ）のみ返す。**一覧提供（read パス）のネットワーク I/O は禁止**（外部通信は Req 9 のリフレッシュ操作に限る）。
 
 ### Revalidation Triggers
 - `SelectableModelsResponse` の形状変更 → client フック／UI の再検証。
@@ -137,23 +141,39 @@ apps/app/
     ├── server/services/ai-sdk-modules/
     │   ├── chat-model-filter.ts                # pure: 対象provider定義 + isSelectableModel(tool_call && output⊇text)
     │   ├── chat-model-filter.spec.ts
+    │   ├── build-model-catalog.ts              # pure 共有変換（追補 R）: api.json → zod 境界検証 → フィルタ → ModelCatalog。ingest script と refresh サービスの単一ソース
+    │   ├── build-model-catalog.spec.ts
     │   ├── model-catalog.ts                    # runtime: getSelectableModelIds(provider) = `^/resource/model-catalog-data.json` を static import して read（通信なし）
-    │   └── model-catalog.spec.ts
+    │   ├── model-catalog.spec.ts
+    │   ├── effective-model-catalog.ts          # runtime（追補 R）: getEffectiveSelectableModelIds = 更新済み（RefreshedModelCatalog）?? 同梱（9.5）
+    │   ├── effective-model-catalog.spec.ts
+    │   ├── refresh-model-catalog.ts            # runtime（追補 R）: opt-in リフレッシュ = fetch models.dev → 共有変換 → 永続化（失敗時は何も書かない、9.4）
+    │   └── refresh-model-catalog.spec.ts
+    ├── server/models/
+    │   └── refreshed-model-catalog.ts          # 更新済みカタログの singleton collection（追補 R）
+    ├── server/services/
+    │   ├── model-catalog-refresh-jobs.ts       # opt-in 起動時/cron トリガ（追補 R、Req 9.2/9.3）
+    │   └── model-catalog-refresh-jobs.spec.ts
     ├── server/routes/admin-ai-settings/
     │   ├── get-available-models.ts             # getAvailableModelsFactory(crowi): RequestHandler[]
-    │   └── get-available-models.spec.ts
+    │   ├── get-available-models.spec.ts
+    │   └── post-refresh-model-catalog.ts       # 管理画面からの手動リフレッシュ（追補 R、Req 9.1。統合テストは index.spec.ts）
+    ├── interfaces/
+    │   └── refresh-model-catalog-response.ts   # DTO（追補 R）: { fetchedAt, counts }
     └── client/admin/
         ├── use-selectable-models.ts            # useSWRxSelectableModels(provider)
         └── use-selectable-models.spec.ts
 ```
 
 ### Modified
-- `apps/app/package.json` — `"vendor:models": "node bin/vendor-model-catalog.ts"` を追加。
-- **本番リリースワークフロー**（`.github/workflows/release.yml`）— リリース commit/tag を切る**前段の独立 step**として `vendor:models` を実行し、成果物を（差分時）リリース commit に同梱する。オンデマンド更新は手動 `pnpm vendor:models` → PR。無人 RC（`release-rc-scheduled.yml`）はコミット済み成果物をそのまま read して build する（RC 側で refresh/commit は行わない）。**リリースビルドはコミット済み成果物を read するのみで、refresh/fetch/commit を build 工程に融合しない**。
-- `apps/app/src/features/mastra/server/routes/admin-ai-settings/index.ts` — `router.get('/available-models', getAvailableModelsFactory(crowi))` を追加。
-- `apps/app/src/features/mastra/client/admin/AllowedModelsField.tsx` — provider で `useSWRxSelectableModels` を1回呼び、modelId 入力を `<select>`（catalog あり）／`<input type=text>`（catalog なし・provider 未選択・取得失敗）に出し分け。保存済みだが一覧外の値は `<option>` 補完で保持（1.5）。
-- `apps/app/src/features/mastra/client/admin/AllowedModelsField.spec.tsx` — 出し分け・保存済み値保持・取得失敗フォールバックのテスト。
-- `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/admin.json` — `ai_settings.model_placeholder`（既存 `provider_placeholder` に倣う。5 ロケール）。
+- `apps/app/package.json` — `"vendor:models": "node --import ./bin/dev-esm-resolver.mjs bin/vendor-model-catalog.ts"` を追加（src 側共有変換の path-alias/extensionless import を解決するため resolver 経由で起動）。
+- **本番リリースワークフロー**（`.github/workflows/release.yml`）— リリース commit/tag を切る**前段の独立 step**として `vendor:models` を実行し、成果物を（差分時）リリース commit に同梱する。オンデマンド更新は手動 `pnpm vendor:models` → PR、または runtime リフレッシュ（追補 R）。無人 RC（`release-rc-scheduled.yml`）はコミット済み成果物をそのまま read して build する（RC 側で refresh/commit は行わない）。**リリースビルドはコミット済み成果物を read するのみで、refresh/fetch/commit を build 工程に融合しない**。
+- `apps/app/src/features/mastra/server/routes/admin-ai-settings/index.ts` — `router.get('/available-models', ...)` と `router.post('/refresh-model-catalog', ...)`（追補 R）を追加。
+- `apps/app/src/features/mastra/client/admin/AllowedModelsField.tsx` — provider で `useSWRxSelectableModels` を1回呼び、modelId 入力を `<select>`（catalog あり）／`<input type=text>`（catalog なし・provider 未選択・取得失敗）に出し分け。保存済みだが一覧外の値は `<option>` 補完で保持（1.5）。Models セクション見出しに**カタログ更新ボタン**（追補 R、Req 9.1）。
+- `apps/app/src/features/mastra/client/admin/AllowedModelsField.spec.tsx` — 出し分け・保存済み値保持・取得失敗フォールバック・カタログ更新ボタンのテスト。
+- `apps/app/src/server/service/config-manager/config-definition.ts` — opt-in 設定キー `ai:modelCatalogRefreshOnStartup`（env `AI_MODEL_CATALOG_REFRESH_ON_STARTUP`）/ `ai:modelCatalogRefreshCronSchedule`（env `AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE`）を追加（追補 R。既定 OFF、env-only targetKeys には含めない＝設定フォーム項目ではなくデプロイオプション）。
+- `apps/app/src/server/crowi/index.ts` — `setupCron()` に cron 起動（schedule 設定時のみ）、`asyncAfterExpressServerReady()` に起動時リフレッシュ（opt-in・fire-and-forget）を配線（追補 R）。
+- `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/admin.json` — `ai_settings.model_placeholder` と `ai_settings.refresh_model_catalog{,_success,_failed}`（5 ロケール）。
 - `.kiro/specs/mastra-multi-model-chat/{requirements.md,design.md,research.md}` / `.kiro/specs/multi-llm-provider/research.md` — 8.x の整合更新（実装タスクとして）。
 
 ## System Flows
@@ -201,7 +221,7 @@ sequenceDiagram
 |-------------|---------|------------|------------|-------|
 | 1.1–1.4 | カタログありは選択のみ提示 | AllowedModelsField, useSWRxSelectableModels, model-catalog | `SelectableModelsResponse` | provider→fetch→select |
 | 1.5 | 保存済みだが一覧外の値を保持 | AllowedModelsField | — | select options 補完 |
-| 2.1–2.3 | 実行時は通信ゼロ | model-catalog（成果物 read）、vendor-model-catalog（取得はリリース前段 step のみ）、release wiring | — | リリース前段 fetch / runtime read |
+| 2.1–2.3 | 一覧提供（read パス）は通信ゼロ | model-catalog / effective-model-catalog（ローカル read のみ）、vendor-model-catalog（取得はリリース前段 step のみ）、release wiring | — | リリース前段 fetch / runtime read |
 | 3.1–3.3 | カタログ無し/失敗時は自由入力 | AllowedModelsField, useSWRxSelectableModels | — | 空/error フォールバック |
 | 4.1–4.4 | 既存挙動不変 | （変更しない：put-ai-settings, resolve-mastra-model, get-models, isAiConfigured） | — | — |
 | 5.1–5.2 | provider 切替追従／未設定 | AllowedModelsField, useSWRxSelectableModels | — | SWR キー=provider |
@@ -210,6 +230,12 @@ sequenceDiagram
 | 7.2 | admin 認可 | get-available-models（認可チェーン） | — | API 前段 |
 | 7.3 | env-only モード読み取り専用維持 | AllowedModelsField（既存 `disabled`） | — | — |
 | 8.1–8.3 | 既存スペック整合更新 | （ドキュメント編集タスク） | — | — |
+| 9.1 | 管理画面からの手動リフレッシュ | post-refresh-model-catalog, refresh-model-catalog, build-model-catalog, AllowedModelsField（更新ボタン） | `RefreshModelCatalogResponse` | 追補 R フロー |
+| 9.2–9.3 | 起動時／定期リフレッシュ（opt-in） | model-catalog-refresh-jobs, config keys, crowi 配線 | — | 追補 R フロー |
+| 9.4 | 失敗時 last-good 維持 | refresh-model-catalog（永続化前に throw）, model-catalog-refresh-jobs（boot 非破壊） | — | 追補 R Error Handling |
+| 9.5 | 解決順 = 更新済み ?? 同梱 | effective-model-catalog, RefreshedModelCatalog | — | 追補 R フロー |
+| 9.6 | 既定無効（外部通信ゼロ維持） | config keys（既定 OFF）, model-catalog-refresh-jobs（guard） | — | — |
+| 9.7 | admin 認可・取得先固定 | post-refresh-model-catalog（WRITE スコープ + admin）, build-model-catalog（URL 定数） | — | API 前段 |
 
 ## Components and Interfaces
 
@@ -386,11 +412,68 @@ export type ModelCatalogFile = { _source: string; _generatedAt: string; models: 
 - `put-ai-settings` の単一 isDefault 不変条件・providerOptions JSON 検証、`resolveEffectiveModelId` の allow-list 検証、`get-models`（chat 側）応答が不変。
 
 ## Security Considerations
-- **実行時の外部通信ゼロ**: 一覧提供は committed 成果物の read のみ（2.x）。models.dev への fetch は取り込みステップのスクリプト限定。
-- **秘匿非漏洩**: 応答は `modelIds: string[]` のみ（7.1、[get-models.ts](../../../apps/app/src/features/mastra/server/routes/get-models.ts) の modelId-only 前例に準拠）。
-- **認可**: `SCOPE.READ.ADMIN.AI` + `adminRequired`（7.2）。
-- **入力検証**: query `provider` は `isAiProvider` で allow-list 検証。
-- **ライセンス**: models.dev は MIT。成果物ヘッダに帰属（`_source`）を記載。
+- **一覧提供（read パス）の外部通信ゼロ**: 提供はローカル保存済みカタログ（committed 成果物 / RefreshedModelCatalog）の read のみ（2.x）。models.dev への fetch は取り込みスクリプトと opt-in の refresh サービス（Req 9・明示トリガ時のみ）に限定。
+- **秘匿非漏洩**: 応答は `modelIds: string[]`（一覧）／`{ fetchedAt, counts }`（refresh メタデータ）のみ（7.1、[get-models.ts](../../../apps/app/src/features/mastra/server/routes/get-models.ts) の modelId-only 前例に準拠）。
+- **認可**: 一覧は `SCOPE.READ.ADMIN.AI`、リフレッシュは `SCOPE.WRITE.ADMIN.AI`、いずれも + `adminRequired`（7.2/9.7）。
+- **入力検証**: query `provider` は `isAiProvider` で allow-list 検証。リフレッシュの取得先はビルトイン定数（要求から指定不可、9.7）。
+- **ライセンス**: models.dev は MIT。成果物ヘッダ・RefreshedModelCatalog.source に帰属を記載。
+
+## 追補 R: カタログのリフレッシュ（Req 9 — PR #11383 レビューFB 対応）
+
+同梱カタログは公式イメージに焼き込まれた後は変化しないため、イメージ更新なしにカタログを最新化する opt-in 経路を追加する。**一覧提供（read パス）の通信ゼロは不変**であり、外部通信は明示的なリフレッシュ操作に限る（9.6）。
+
+### アーキテクチャ
+
+```mermaid
+graph LR
+    subgraph Triggers[opt-in トリガ（既定すべて無効）]
+        Btn[管理画面ボタン<br/>POST refresh-model-catalog]
+        Boot[起動時 opt-in<br/>ai:modelCatalogRefreshOnStartup]
+        Cron[定期 opt-in<br/>ai:modelCatalogRefreshCronSchedule]
+    end
+    Btn --> Svc[refresh-model-catalog]
+    Boot --> Jobs[model-catalog-refresh-jobs] --> Svc
+    Cron --> Jobs
+    Svc -->|fetch 固定URL| MD[models.dev api.json]
+    Svc -->|共有純変換+検証| BMC[build-model-catalog]
+    Svc -->|成功時のみ upsert| DB[(RefreshedModelCatalog<br/>singleton)]
+    Route[GET available-models] --> Eff[effective-model-catalog]
+    Eff -->|あれば| DB
+    Eff -->|なければ| Bundled[同梱 model-catalog-data.json]
+```
+
+### コンポーネント（追加分）
+
+| Component | Layer | Intent | Req |
+|-----------|-------|--------|-----|
+| build-model-catalog | 共有 (pure) | api.json → zod 境界検証 → chat＋tool フィルタ → `ModelCatalog`。ingest script と refresh サービスの**単一ソース**（同一フィルタ・同一サニティチェック） | 6.x, 9.1 |
+| refresh-model-catalog | Server (runtime) | 固定 URL fetch（30s timeout）→ 共有変換 → `RefreshedModelCatalog.upsertSingleton`。**失敗時は永続化前に throw**（last-good 維持） | 9.1, 9.4, 9.7 |
+| RefreshedModelCatalog | Server (model) | `{ _id:'singleton', models, fetchedAt, source }` の専用 collection（`mastra_refreshed_model_catalog`）。多インスタンス共有・再起動耐性。config-manager には置かない（設定ではなくキャッシュ） | 9.1, 9.5 |
+| effective-model-catalog | Server (runtime) | `getEffectiveSelectableModelIds(provider)` = 更新済み ?? 同梱（`?? []` フェイルソフトは従来どおり）。get-available-models はこれを await する | 9.5, 2.x, 3.1 |
+| post-refresh-model-catalog | Server (route) | `POST /_api/v3/ai-settings/refresh-model-catalog`。`[accessTokenParser([SCOPE.WRITE.ADMIN.AI]) → login → admin]`。成功 200 `{ fetchedAt, counts }`／失敗は generic 500（内部情報を漏らさない） | 9.1, 9.7, 7.1 |
+| model-catalog-refresh-jobs | Server (boot) | `startModelCatalogRefreshCronIfEnabled()`（schedule 未設定なら no-op、invalid でも boot を壊さない）＋ `triggerModelCatalogRefreshOnStartupIfEnabled()`（fire-and-forget）。crowi の `setupCron()` / `asyncAfterExpressServerReady()` から呼ぶ | 9.2, 9.3, 9.4, 9.6 |
+| AllowedModelsField 更新ボタン | Client (UI) | Models セクション見出しの「カタログを更新」→ apiv3Post → 成功で SWR `mutate()`＋toast。**env-only モードでも有効**（カタログは設定ではなく公開メタデータのサーバ側キャッシュであり、env-only 運用の GROWI.cloud がこの機能の主対象のため） | 9.1 |
+
+### 設定キー（デプロイオプション・既定 OFF）
+
+| Key | env | 型/既定 | 意味 |
+|-----|-----|---------|------|
+| `ai:modelCatalogRefreshOnStartup` | `AI_MODEL_CATALOG_REFRESH_ON_STARTUP` | boolean / `false` | サーバ起動後に一度リフレッシュを試行（growi-docker-compose 等の焼き込みイメージ向け） |
+| `ai:modelCatalogRefreshCronSchedule` | `AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE` | string / 未設定 | node-cron 式（例 `0 4 * * *`）。未設定/空 = 無効 |
+
+env-only（`env:useOnlyEnvVars:ai`）の targetKeys には**含めない**: これらは設定フォーム項目ではなく env 駆動のデプロイオプションであり、PUT 経路にも現れない。
+
+### Error Handling（追加分）
+- **リフレッシュ失敗（fetch 不達 / HTTP エラー / スキーマドリフト / 空プロバイダ）**: `refreshModelCatalog` は**永続化の前に throw** → last-good（更新済み or 同梱）が有効なまま（9.4）。エンドポイントは generic 500、起動時/cron は warn ログのみで稼働継続。
+- **起動時/cron の boot 安全性**: invalid cron 式は捕捉してログ（boot を壊さない）。起動時リフレッシュは fire-and-forget（await しない）。
+
+### Testing Strategy（追加分）
+- `build-model-catalog.spec`: 純変換（旧 vendor spec から移設。フィルタ・決定性・ドリフト/空 throw）。
+- `refresh-model-catalog.spec`: 固定 URL fetch・成功時 upsert 1 回・失敗 3 系（HTTP/network/空）で**永続化ゼロ**（9.4）。
+- `effective-model-catalog.spec`: 更新済みあり→それを返す／なし→同梱へフォールバック／azure `[]`／コピー返却／fetch 不発（9.5, 2.1）。
+- `model-catalog-refresh-jobs.spec`: 未設定で no-op（9.6）・設定時に schedule + tick で refresh 実行（9.3）・invalid 式でも throw しない（9.4）・startup on/off（9.2）・fire-and-forget の失敗吸収。
+- `admin-ai-settings/index.spec`（統合）: POST refresh の admin 200 `{ fetchedAt, counts }`／失敗 500（内部非漏洩）／非 admin・未認証拒否／WRITE スコープ（9.1/9.7）。available-models は RefreshedModelCatalog を null にモックし同梱フォールバック経路を実走（9.5）。
+- `AllowedModelsField.spec`（UI）: ボタン → POST + `mutate()` + 成功 toast／失敗 toast + 非 revalidate + ボタン復帰／**env-only でも enabled**。
 
 ## Migration Strategy
 - ランタイムのデータ移行なし。8.x はドキュメント整合更新（実装タスク）:
