@@ -175,7 +175,7 @@ graph TB
 ```
 apps/app/src/features/backlinks/
 ├── interfaces/
-│   └── page-link.ts              # IPageLink, IBacklinkPage DTO, LinkTargetState union
+│   └── page-link.ts              # IPageLink, IBacklink & ILinkTarget DTOs, LinkTargetState union
 ├── server/
 │   ├── models/
 │   │   ├── page-link.ts          # Mongoose model (getOrCreateModel) + statics
@@ -275,7 +275,7 @@ needs no write — derived state reads the restored page's status.
 | 1.5 | One source listed once | unique `{fromPage,toPath}` + dedupe in extraction | Save flow |
 | 1.6 | Exclude self-link (path or own permalink) | extractInternalLinks (drop `toPath == page.path`) + sync (drop `toPage == fromPage`) | Save flow |
 | 1.7 | Empty state | BacklinksPanel | Read flow |
-| 1.8 | Show title + path | IBacklinkPage DTO, BacklinkListItem | Read flow |
+| 1.8 | Show title + path | IBacklink DTO, BacklinkListItem | Read flow |
 | 1.9 | Permalink (`/{id}`) link targets page by id | extractInternalLinks (verbatim) + resolveToPage permalink branch | Save flow |
 | 1.10 | Same-host absolute URL → internal | extractInternalLinks classifier (`app:siteUrl` host match) | — |
 | 1.11 | Unset `app:siteUrl` → absolute URLs not internal | extractInternalLinks classifier (no base origin) | — |
@@ -441,16 +441,16 @@ function resolveToPage(toPath: string): Promise<ObjectId | null>;
 
 ##### Service Interface
 ```typescript
-interface IBacklinkResult { backlinks: IBacklinkPage[]; }
-findBacklinks(toPageId: ObjectId, user: IUser | null): Promise<IBacklinkPage[]>;
-findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<IBacklinkPage[]>;
+interface IBacklinkResult { backlinks: IBacklink[]; }
+findBacklinks(toPageId: ObjectId, user: IUser | null): Promise<IBacklink[]>;
+findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<ILinkTarget[]>;
 ```
 - `findBacklinks`: `findBacklinkSources(toPageId)` → ids → `findByIdsAndViewer` with the user's
-  groups, **excluding trashed source pages** → map to `IBacklinkPage` (2.1–2.3). Empty array
+  groups, **excluding trashed source pages** → map to `IBacklink` (2.1–2.3). Empty array
   when none (1.7).
 - `findForwardLinkHealth`: rows where `fromPage == X`; derive each target's
   `LinkTargetState` (`toPage == null` → `broken`; target trashed → `trashed`; else `normal`);
-  return rows that are `trashed`/`broken` for the editor's attention (6.4).
+  return the `trashed`/`broken` rows as `ILinkTarget` for the editor's attention (6.4).
 
 **Implementation Notes**
 - Integration: register in `crowi` page-service setup; never edit `PageService`.
@@ -472,7 +472,7 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<IBackli
 ##### API Contract
 | Method | Endpoint | Request | Response | Errors |
 |--------|----------|---------|----------|--------|
-| GET | `/_api/v3/page/backlinks` | query: `pageId` (MongoId) | `{ backlinks: IBacklinkPage[] }` | 400, 403, 500 |
+| GET | `/_api/v3/page/backlinks` | query: `pageId` (MongoId) | `{ backlinks: IBacklink[] }` | 400, 403, 500 |
 
 - Middleware: `accessTokenParser([SCOPE.READ.FEATURES.PAGE])`, `loginRequired` (guest per ACL),
   `apiV3FormValidator`; `req.user` is the viewer. Delegates to `PageLinkService.findBacklinks`.
@@ -482,7 +482,7 @@ findForwardLinkHealth(fromPageId: ObjectId, user: IUser | null): Promise<IBackli
 
 #### useSWRxBacklinks (summary)
 ```typescript
-useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklinkPage[]>;
+useSWRxBacklinks(pageId: string | null): SWRResponse<IBacklink[]>;
 ```
 - Key `['/page/backlinks', pageId, isGuestUser]`; fetch via `apiv3Get(...).then(r => r.data.backlinks)`.
   `useSWRImmutable`; key `null` when `pageId == null`.
@@ -578,12 +578,18 @@ type LinkTargetState = 'normal' | 'trashed' | 'broken';
 // normal  := toPage resolves to an active page
 ```
 
-### DTO
+### DTOs
 ```typescript
-interface IBacklinkPage {
+// Incoming backlinks (findBacklinks): always live, readable source pages — no health to report.
+interface IBacklink {
   pageId: string;
   path: string;
-  targetState?: LinkTargetState; // present for forward-link-health rows
+}
+// Outgoing link health (findForwardLinkHealth): a page the subject links out to, plus its state.
+interface ILinkTarget {
+  pageId: string;
+  path: string;
+  targetState: LinkTargetState; // required — a health row is meaningless without it
 }
 ```
 

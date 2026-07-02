@@ -10,8 +10,9 @@
 
 - [ ] 1. Foundation: data model, types, and indexes
 - [ ] 1.1 Define backlinks interfaces and shared types
-  - Define the `PageLink` shape (`fromPage`, `toPath`, `toPage`), the backlink DTO returned to
-    clients (page id + path, optional target state), and the `LinkTargetState` union
+  - Define the `IPageLink` edge shape (`fromPage`, `toPath`, `toPage`), the two client DTOs —
+    `IBacklink` (page id + path; incoming backlinks, always healthy) and `ILinkTarget` (page id +
+    path + required target state; outgoing link health) — and the `LinkTargetState` union
     (`normal` / `trashed` / `broken`)
   - Done when the types compile and are importable by both server and client code
   - _Requirements: 1.8, 6.4_
@@ -97,8 +98,8 @@
 
 - [ ] 3.3 Implement the permission-filtered read queries
   - Implement `findBacklinks` (sources pointing at a page, filtered to readable, non-trashed pages
-    via the shared viewer/grant filter, mapped to the DTO) and `findForwardLinkHealth` (a page's
-    outbound rows whose derived target state is trashed/broken)
+    via the shared viewer/grant filter, mapped to `IBacklink`) and `findForwardLinkHealth` (a page's
+    outbound rows whose derived target state is trashed/broken, mapped to `ILinkTarget`)
   - Never return unfiltered paths; any count is derived only from the filtered set; derive target
     state from `toPage`/target status rather than a stored flag
   - Done when integration tests show restricted source pages are omitted from results, and forward
