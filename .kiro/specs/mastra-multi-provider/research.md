@@ -201,3 +201,55 @@ Claude Design プロジェクト「GROWI AI機能設定UI改善」(https://claud
 - 用語の再定義: 「構成済み(接続設定が揃う)」/「有効(トグル ON かつ構成済み)」。R2/R4/R5/R6 の各 AC を新用語・固定スロット前提に整合済み。
 - モックが示す設計ヒント(design フェーズで使用): グローバル既定モデルは画面上部のプロバイダ横断ドロップダウン + 各パネルの★の 2 導線(同一のグローバル既定を操作)。プロバイダタブに構成状態ドット表示。モデル追加はカタログ select(非 Azure、登録済みを除外)/デプロイ名自由入力(Azure)。モデル行は折りたたみで provider options JSON 編集(検証 + 「Reset to default」)。単一の Update ボタンで全量保存(現行 PUT パターン踏襲)。
 - モックに env-only モードの描写はない → 部分ロック(接続設定 read-only + モデル編集可)の UI 表現は design で確定する。
+
+---
+
+## 設計フェーズ Discovery (2026-07-02, /kiro-spec-design)
+
+- **Discovery Scope**: Extension(light discovery。gap 分析済みのため統合点の精査のみ)
+
+### Research Log
+
+#### env-only モードの機構
+- **Sources**: `config-definition.ts` L1556–1612
+- **Findings**: `ENV_ONLY_GROUPS: { controlKey, targetKeys[] }[]`。`env:useOnlyEnvVars:ai` の現 targetKeys は `app:aiEnabled` + `ai:provider` / `ai:apiKey` / `ai:allowedModels` / `ai:azureOpenaiSettings`(AI 設定一括)。
+- **Implications**: 部分ロック(R5.2/5.3)は targetKeys を接続設定系(`app:aiEnabled`, `ai:providers`, `ai:providerApiKeys`)に差し替えるだけで実現。仕組み自体の変更は不要。
+
+#### モデル解決キャッシュと再起動なし反映
+- **Sources**: `resolve-mastra-model.ts`
+- **Findings**: `resolvedModelCache: Map`(キー `${provider}:${modelId}`)+ `clearResolvedMastraModelCache()`。AI 設定保存時(ローカル)と s2s `configUpdated` 受信時(他インスタンス)に全クリア。Azure+Entra のトークンキャッシュ保持のためキャッシュ自体は必須。
+- **Implications**: 機構を温存し、キャッシュキーを modelKey に変更するのみ。
+
+#### チャット UI のグループ化部品
+- **Sources**: `components/ui/select.tsx`, `components/ai-elements/prompt-input.tsx`
+- **Findings**: `ui/select.tsx` は `SelectGroup` / `SelectLabel` を既に export。`prompt-input.tsx` の `PromptInputModelSelect*` には Group/Label ラッパが未定義。
+- **Implications**: prompt-input.tsx に薄い re-export ラッパ 2 つを追加するだけでプロバイダ別グループ表示が可能(新規依存なし)。
+
+#### RN-2 解決: Azure デプロイ名の文字種
+- **Sources**: Microsoft Learn resource-name-rules(Web 検索)
+- **Findings**: デプロイ名は 1–64 文字、英数字・アンダースコア・括弧・ハイフン・ピリオド。**`/` は不可**。
+- **Implications**: `${provider}/${modelId}` 複合キーのセパレータとして `/` は安全。さらに「最初の `/` で分割」仕様(provider 側に `/` は出現しない)により、万一の逸脱値でも解釈が曖昧にならない。
+
+#### RN-1 解決: Mastra モデルルーター文字列との競合
+- **Findings**: 各 resolver は ai-sdk factory で構築済みの LanguageModel(`MastraModelConfig`)を返しており、Mastra の "provider/model" マジック文字列解釈は経由しない。
+- **Implications**: 自前 modelKey は GROWI コード内でのみ解釈され、Mastra のルーター意味論と競合しない。
+
+#### 再利用資産の確定
+- picker(`admin-ai-settings/get-available-models.ts` + `use-selectable-models.ts`)は provider 引数を取る設計 → プロバイダパネル単位でそのまま再利用。
+- `MAX_MODEL_ID_LENGTH`(256)は防御上限として modelKey にも流用可能(名称変更)。
+
+### Design Decisions(要点)
+
+1. **D1 モデル識別子**: config 保存形は `AllowedModel.provider`(必須フィールド)で構造化。境界を渡るスカラー(transport body・UserUISettings・requestContext・キャッシュキー)は複合キー `${provider}/${modelId}`(modelKey)。解析は最初の `/` で分割する pure 関数(`interfaces/model-key.ts`)。tuple 案は既存の string 配管(ライブ getter 注入・単一 String フィールド)を全て二重化するため不採用。
+2. **D2 config 構造**: `ai:providers: Record<AiProvider, AiProviderSettings>`(enabled + azure 接続設定、非秘匿)と `ai:providerApiKeys: Partial<Record<AiProvider, string>>`(isSecret)に分離。秘匿/非秘匿を key 単位で分けることで管理 API が非秘匿設定をそのまま返せる。旧 `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` は削除(R7、移行なし)。env: `AI_PROVIDERS` / `AI_PROVIDER_API_KEYS`(JSON。`AI_ALLOWED_MODELS` の JSON env 前例に整合)。
+3. **D3 可用性判定の一元化**: `provider-availability.ts`(新規)に「構成済み」「有効」判定と有効モデル集合の導出を集約。`isAiConfigured` / `get-models` / `resolveEffectiveModelKey` が同一述語を共有(判定の drift 防止、R6)。
+4. **D4 既定モデル**: `isDefault` フラグ維持(グローバル 1)。実行時の実効既定 = 既定エントリが有効ならそれ、無効なら「有効なエントリの先頭」(決定的、R6.4)。
+5. **D5 UserUISettings**: `aiChatSelectedModelId` → `aiChatSelectedModelKey` へ改名(値が modelKey になり意味が変わるため。プレリリース、旧フィールドは放置)。PUT ルートのハードコード allow-list 拡張が必須。
+6. **D6 env-only PUT 分割**: env-only 時、PUT は `allowedModels` のみ受理。`providers` / `aiEnabled` を含むリクエストは 400(暗黙無視より明示的、R5.2)。
+7. **D7 チャット API**: `ChatModelsResponse = { models: Array<{ key, provider, modelId }>, selectedModelKey }`(クライアントは parse せず構造化データを使用)。post-message body は `modelKey` に改名。
+8. **D8 管理 UI**: モック準拠の 3 新コンポーネント(DefaultModelSelector / ProviderTabs / ProviderPanel)+ AllowedModelsField を provider スコープ化。ProviderCommonSettings は削除。フォーム値は `providers: Record<AiProvider, ProviderFormValue>` + フラットな `allowedModels[]`(グローバル既定検証のため単一配列)。
+
+### Risks & Mitigations
+- ai-settings-model-picker(現行ブランチ)と同一ファイル群への変更 → **picker マージ後に本 spec を実装**(タスク前提条件に明記)。
+- (provider, modelId) 一意性への検証変更で既存テストが広範に破損 → タスクで interfaces → server → routes → client の依存順に段階実装。
+- 秘匿値の per-provider 化でログ/応答への漏えい面が増える → 既存の「body を stringify しない」規律を put/get の全 catch に踏襲、Record 全体を isSecret 指定。
