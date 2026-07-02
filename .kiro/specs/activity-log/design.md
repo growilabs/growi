@@ -18,7 +18,7 @@
 > - `where: { snapshot: { is: { username: { in: [...] } } } }` という composite type への絞り込みは、実 MongoDB に対して意図通り効くことを確認済み（`aggregateRaw` への生クエリ回避は不要だった）
 > - `create` / `createMany` は明示的な `_id`（ObjectId 文字列）を指定しても受け付けることを確認済み
 >
-> **【「型は通るが保存されない」失敗に注意 — Prisma 移行後も残る】** Mongoose 時代は strict 既定で未宣言フィールドを保存時に黙って捨てることが原因だった。移行完了でこの Mongoose 由来の経路は消えたが、**同じ失敗が Prisma 拡張側に残っている**。`prisma.activities.createByParameters` は渡された `snapshot` を素通しせず `{ id, username }` だけを手で組み立て直すため（`models/activity.ts` 315-320行）、schema.prisma の `ActivitiesSnapshot` にフィールドを足しただけでは、**カスケード削除（`createActivity` → `createByParameters` 経由）で添付フィールドが1バイトも保存されない**。型は通り activity レコードも作られるので「保存したつもり」になりやすい。したがって本スペックは `createByParameters` の改修も所有範囲に含める（下記「This Spec Owns」）。直接削除は `updateByParameters` が `...parameters` で snapshot を素通しするため経路が異なるが、composite type の `set` 時に必須の `snapshot._id` を保持できるかを実装前にテストで確認する。
+> **【「型は通るが保存されない」失敗に注意 — Prisma 移行後も残る】** Mongoose 時代は strict 既定で未宣言フィールドを保存時に黙って捨てることが原因だった。移行完了でこの Mongoose 由来の経路は消えたが、**同じ失敗が Prisma 拡張側に残っている**。`prisma.activities.createByParameters` は渡された `snapshot` を素通しせず `{ id, username }` だけを手で組み立て直すため（`models/activity.ts` 315-320行）、schema.prisma の `ActivitiesSnapshot` にフィールドを足しただけでは、**カスケード削除（`createActivity` → `createByParameters` 経由）で添付フィールドが1バイトも保存されない**。型は通り activity レコードも作られるので「保存したつもり」になりやすい。したがって本スペックは `createByParameters`（カスケード削除の保存口）と `updateByParameters`（直接削除の保存口）の **両方の改修** を所有範囲に含める（下記「This Spec Owns」）。直接削除の経路は `updateByParameters` → `context.update` に届くが、Prisma の composite type は更新時に素の object を渡せず、`snapshot: { set: { … } }`／`{ update: { … } }` の envelope 形と必須の `_id` の保持が要る。しかも失敗しても更新ハンドラ（`service/activity.ts`）が握りつぶすため、素通しのままだと直接削除の添付フィールドが黙って保存されない。create 経路と同じ罠が update 経路にも残っているので、実装では両方を直し、実 DB から読み直すテストで保存を確認する。
 
 ### Goals
 - `snapshot` 型を `action` を唯一の判別子とする判別可能ユニオンにする（要件 1）。
@@ -38,7 +38,11 @@
 ### This Spec Owns
 - `snapshot` の判別可能ユニオン型・type guard・型付きビルダー（`interfaces/activity.ts` ＋ サーバ側ビルダー）。
 - `schema.prisma` の `ActivitiesSnapshot` composite type への添付フィールド追加。
-- **`models/activity.ts` の `createByParameters` の改修** — 渡された `snapshot` の添付フィールド（`originalName`/`pagePath`/`pageId`/`fileSize`）を保存する `snapshotData` に反映する。この関数は元々 `activities-prisma-migration` が作成したもので、現状は `{ id, username }` だけを手組みして添付フィールドを捨てる（315-320行）。カスケード削除の保存口はここなので、本スペックが所有範囲を1つ広げて改修する。`updateByParameters`（直接削除の保存口）は snapshot を素通しするため改修不要の見込みだが、composite `set` と必須の `snapshot._id` の扱いをテストで確認する。
+- **`models/activity.ts` の `createByParameters` の改修（カスケード削除の保存口）** — 渡された `snapshot` の添付フィールド（`originalName`/`pagePath`/`pageId`/`fileSize`）を、保存に使う `snapshotData` に反映する。この関数は元々 `activities-prisma-migration` が作成したもので、現状は `{ id, username }` だけを手組みして添付フィールドを捨てる（315-320行）。カスケード削除は `createActivity` → `createByParameters` を通るため、ここを直さないと添付フィールドが1バイトも保存されない。
+- **`models/activity.ts` の `updateByParameters` の改修（直接削除の保存口）** — 直接削除は middleware が作った既存 activity を `activityEvent.emit('update', ...)` で更新する経路で、最終的に `updateByParameters` → `context.update({ data })` に届く。Prisma の composite type は **更新時に素の object を渡せず**、`snapshot: { set: { …全フィールド + `_id` } }` または `{ update: { … } }` の envelope 形が必須なので、`createByParameters`（create は素の object 可）とは別に update 用の組み立てを書く。既存の `snapshot._id`・`username` を壊さないこと。現状の `updateByParameters` は snapshot に触れず `...parameters` で素通しするだけで、(1) 型はイベント経由で通ってしまい、(2) 失敗しても更新ハンドラ（`service/activity.ts` の `catch → logger.error → return`）が握りつぶすため、素通しのままだと直接削除の添付フィールドが黙って保存されない（create 経路と同じ「型は通るが保存されない」罠が update 経路にも残っている）。この経路は移行スペックでも実 DB で検証されていない（既存の `updateByParameters` テストはすべてモックで、`context.update` の呼び出し引数しか見ていない）ため、実 DB から読み直すテストで保存を確認する（Testing Strategy「保存口の直接検証」）。
+- **書き込み口のパラメータ型の拡張** — `IActivityParameters.snapshot`（現状 `{ username?: string }`、`models/activity.ts` 190-201行付近）と `updateByParameters` の入力型（`IActivityUpdateParameters`）を、添付フィールドを載せられる `ISnapshot`（union）へ広げる。これを広げないと、上記2関数を直しても呼び出し側で型が通らない／`any` 経由で黙って落ちる。
+
+  **型安全性の担保（明記）**: 拡張後の型は必ず `ISnapshot`（union）で受け、`any` / `as any` / `as unknown as T` で型検査を迂回しない。とくに `updateByParameters` は**素の `ISnapshot` を受け取り**、Prisma composite の envelope 形（`{ set }` / `{ update }`）への変換を**関数内部で型付きに**行う（呼び出し側は Prisma の envelope 形を意識しない）。既存の `emit('update')` 呼び出し元は snapshot を渡していないことを確認済みのため、この入力契約の変更（envelope→素の `ISnapshot`）は後方互換。ただし将来 snapshot を渡す update 呼び出し元が現れると二重ラップの恐れがあるので、この不変条件を Revalidation Triggers に追加して守る。
 - `SupportedTargetModel` への `Attachment` 値の追加。
 - 添付削除 activity の記録ロジック（直接削除＝既存 activity の更新、カスケード削除＝添付ごとの新規作成）。`target` には削除対象添付の `_id` を、`targetModel` には `Attachment` を設定する。
 - 監査ログ API（`apiv3/activity.ts`）の OpenAPI への snapshot 添付フィールド記述と、応答にフィールドが乗ることの保証。
@@ -63,6 +67,7 @@
 - `ActivitiesSnapshot` composite type のフィールド変更。
 - 移行済みの `ActivityExtension`（`activities-prisma-migration`）が `createByParameters` / `updateByParameters` / `paginate` のシグネチャを変えた場合。
 - 複合 unique index `{ userId, target, action, createdAt }` の定義変更（本スペックは変更しない前提で設計している）。
+- `activityEvent.emit('update', ...)` の呼び出し元が新たに `snapshot` を渡し始めた場合（`updateByParameters` は素の `ISnapshot` を受けて内部で envelope 化する前提のため、envelope 形で渡すと二重ラップになる）。
 
 ## Architecture
 
@@ -129,6 +134,7 @@ graph TB
 
 ### Modified Files
 - `apps/app/prisma/schema.prisma` — `ActivitiesSnapshot` composite type に添付フィールド（`originalName` / `pagePath` / `pageId` / `fileSize`、いずれも optional）を追加。`username` を optional 化（user 無し削除経路への安全策。`research.md` D-5）。`activities` モデル本体・index は変更しない。
+- `apps/app/src/server/models/activity.ts` — **2つの保存口を改修**。(1) `createByParameters`（カスケード削除の保存口）で `snapshotData` に添付フィールドを反映（現状 315-320行は `{ id, username }` だけを手組み）。(2) `updateByParameters`（直接削除の保存口）で snapshot を composite 更新の envelope 形（`{ set }`／`{ update }` ＋ `_id` 保持）に組み立てる（現状は `...parameters` で素通しのみ）。あわせて書き込み口のパラメータ型 `IActivityParameters.snapshot`（190-201行付近）と `IActivityUpdateParameters` を `ISnapshot`（union）へ拡張。詳細は Boundary Commitments「This Spec Owns」参照。
 - `apps/app/src/interfaces/activity.ts` — `SupportedTargetModel` に `MODEL_ATTACHMENT = 'Attachment'` を追加。`ISnapshot` を `DefaultSnapshot | AttachmentRemoveSnapshot` のユニオンに再定義。`isAttachmentRemoveActivity` type guard を追加。`IActivity` は `snapshot?: ISnapshot` のまま（後方互換）。
 - `apps/app/src/server/routes/attachment/api.js` — `api.remove`: 削除前に `attachment` から `originalName`・`fileSize`・ページ ID（**Mongoose の `attachment.page`**。ビルダーへは `pageId` として渡す）・`pagePath`（その `page` から `pages` を引いて path を得る）を取り、ビルダーで snapshot を生成。`emit('update', res.locals.activity._id, { action: ACTION_ATTACHMENT_REMOVE, target: attachment._id, targetModel: MODEL_ATTACHMENT, snapshot })` に変更。
 - `apps/app/src/server/service/page/index.ts` — `deleteCompletelyOperation` で `removeAllAttachments` の**直前**に、削除対象添付ごとに `ACTION_ATTACHMENT_REMOVE` activity を新規作成（recorder 呼び出し）。操作者情報を届けるため、`deleteCompletelyOperation` に **actor を1つの Parameter Object として追加**する（設計は直下参照）。
@@ -434,7 +440,7 @@ type ActivitiesSnapshot {
 ```
 - 既存ドキュメントは `username` のみ。追加フィールドは optional のため、既存データの破壊的移行は不要（要件 4.2）。
 - `activities` モデル本体・index（`@@unique([userId, target, action, createdAt])` 等）は変更しない。
-- **composite type にフィールドを足すだけでは保存されない**: 書き込み口の `createByParameters` が snapshot を手組みしているため、この schema 変更と対で `createByParameters` の改修（This Spec Owns 参照）が必須。片方だけだと「型は通るが保存されない」状態になる。
+- **composite type にフィールドを足すだけでは保存されない**: 書き込み口は2つあり（カスケード削除の `createByParameters`・直接削除の `updateByParameters`）、どちらも snapshot をそのままは保存しない（`createByParameters` は手組みで添付フィールドを捨て、`updateByParameters` は composite 更新の `set`／`update` envelope 形にしないと保存されない）。この schema 変更と対で **両関数の改修**（This Spec Owns 参照）が必須。片方でも欠けると、その経路は「型は通るが保存されない」状態になる。
 
 ## Error Handling
 
@@ -442,6 +448,7 @@ type ActivitiesSnapshot {
 - **snapshot データ欠損（要件 2.3）**: 添付レコードや所属ページが取得できない場合、取れたフィールドのみで記録し `logger.warn` を出す。記録自体は止めない。
 - **カスケード時の個別失敗**: recorder 内で1件の `createActivity` が失敗しても、残りの添付記録とページ削除本体（`removeAllAttachments` 以降）を止めない。失敗は `logger.error` で文脈付きログを残す（既存 `createActivity` も内部で try/catch し `null` を返す方針に一致）。
 - **記録対象外の設定**: `ACTION_ATTACHMENT_REMOVE` が `getAvailableActions()` に含まれない設定では `shoudUpdateActivity` が false を返し、何も作成・更新されない（正常系。設定変更はスコープ外）。
+- **カスケードは「削除の試行」を記録する（容認判断）**: 要件 3.4 によりストレージ削除前に snapshot を確保する必要があるため、カスケードの activity 記録は実削除（`removeAllAttachments`）の**前**に行う。したがって、まれに後続の一括削除が失敗した場合、実際には消えていない添付に対して「削除」の activity が残りうる（直接削除は `removeAttachment` 成功後に emit するためこの非対称がある）。これを次の理由で容認する: (1) 要件 3.4 の要請上、データ凍結は実削除の前にしか行えない、(2) `deleteCompletelyOperation` の一括削除は元々 Mongoose の `deleteMany` と Prisma の `$transaction` をまたぐ非原子的操作で、失敗時はページ完全削除そのものがエラーとなり運用で検知される。監査ログは「削除の試行」を記録する意味論とする。
 
 ### Monitoring
 - 欠損・失敗時の警告／エラーログに添付 `_id`・page 情報を含め、監査ログ欠落の追跡を可能にする。
