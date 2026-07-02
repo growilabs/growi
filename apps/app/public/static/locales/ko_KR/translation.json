@@ -923,7 +923,8 @@
   "user_group": {
     "select_group": "그룹 선택",
     "belonging_to_no_group": "속한 그룹을 찾을 수 없습니다.",
-    "manage_user_groups": "사용자 그룹 관리"
+    "manage_user_groups": "사용자 그룹 관리",
+    "only_yourself": "본인만"
   },
   "fix_page_grant": {
     "modal": {
