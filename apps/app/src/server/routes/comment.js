@@ -187,14 +187,17 @@ module.exports = (crowi, _app) => {
         .bail()
         .isMongoId()
         .withMessage('page_id must be a valid MongoId'),
+      // `checkFalsy` skips empty-string params (e.g. `revision_id=`) so external
+      // API callers keep backward compatibility; matches design.md and the
+      // existing `get-page-info.ts` validator.
       query('shareLinkId')
-        .optional()
+        .optional({ checkFalsy: true })
         .isString()
         .bail()
         .isMongoId()
         .withMessage('shareLinkId must be a valid MongoId'),
       query('revision_id')
-        .optional()
+        .optional({ checkFalsy: true })
         .isString()
         .bail()
         .isMongoId()

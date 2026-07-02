@@ -434,6 +434,22 @@ describe('/comments.get share-link authorization (integration)', () => {
 
       expectValidationRejected(res);
     });
+
+    it('skips an empty-string revision_id (checkFalsy) instead of rejecting it', async () => {
+      // `.optional({ checkFalsy: true })` must treat `revision_id=` as absent so
+      // external API callers stay backward compatible; the request resolves by
+      // page_id in the share context rather than failing MongoId validation.
+      const res = await request(app).get('/comments.get').query({
+        page_id: pageAId.toString(),
+        shareLinkId: shareLinkAId.toString(),
+        revision_id: '',
+      });
+
+      expect(res.status).toBe(200);
+      expect(res.body.ok).toBe(true);
+      expect(res.body.comments).toHaveLength(1);
+      expect(res.body.comments[0]._id).toBe(commentAId.toString());
+    });
   });
 
   describe('write operations ignore the share context (read-only boundary)', () => {

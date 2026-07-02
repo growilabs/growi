@@ -134,17 +134,17 @@ graph TB
 - `apps/app/src/stores/comment.tsx` — `useSWRxPageComment` 内で `useShareLinkId()` を取得。SWR キーに `shareLinkId` を含め、取得時のクエリに（存在時のみ）`shareLinkId` を付与する。既存 `page_id` は維持し、**別 `pageId` は送らない**（単一 ID 不変条件）。`update` / `post` は不変。
 
 **Task 3 — isAccessiblePageByViewer 問題の解決（認可）**
-- `apps/app/src/server/middlewares/certify-shared-page.js` — 検証対象 ID の読み取りを `req.query.pageId || req.query.page_id || req.body.pageId` に **additive 一般化**。既存呼び出し元（`/page/info`・`/revisions/list`）は `pageId` を送るため挙動不変。これにより comments.get では「検証対象＝取得対象」が単一 `page_id` に揃う。
+- `apps/app/src/server/middlewares/certify-shared-page.js` — 検証対象 ID の読み取りを `pageId`（camelCase）と `page_id`（snake_case）の両方に対応させる **additive 一般化**。既存呼び出し元（`/page/info`・`/revisions/list`）は `pageId` を送るため挙動不変。**precedence による片寄せ（`pageId || page_id`）は採らず、両方が存在し値が異なる ambiguous リクエストは `isSharedPage` を立てずに通す（拒否）**（verify/fetch split IDOR の封鎖、L70 参照）。これにより comments.get でも「検証対象＝取得対象」が単一 `page_id` に揃う。
 - `apps/app/src/server/routes/index.js` — `certifySharedPage`（`require('../middlewares/certify-shared-page')(crowi)`）を生成し、`/comments.get` ルートの `loginRequired` の**前**に挿入。あわせて MongoId バリデータ（`comment.api.validators.get()`）を結線。
 - `apps/app/src/server/routes/comment.js` —
   - `comment.api.get` のアクセス判定を `if (!req.isSharedPage && !(await Page.isAccessiblePageByViewer(pageId, req.user)))` に変更。
   - 共有文脈では `revision_id` 分岐を使わず検証済み `page_id` で取得（CRITICAL-2 の閉塞）。
-  - `comment.api.validators.get()` を追加（`query('page_id').isMongoId()` / `query('shareLinkId').optional({ checkFalsy: true }).isMongoId()` / `query('revision_id').optional({ checkFalsy: true }).isMongoId()`）。ハンドラ冒頭で `validationResult` を検査（既存 `api.add` と同形）。
+  - `comment.api.validators.get()` を追加（`query('page_id').isString().bail().isMongoId()` / `query('shareLinkId').optional({ checkFalsy: true }).isString().bail().isMongoId()` / `query('revision_id').optional({ checkFalsy: true }).isString().bail().isMongoId()`）。scalar 強制（`.isString().bail()`）で配列注入面を閉じる。検証は**ルート段の `apiV1FormValidator` が短絡**するため、ハンドラ内に重複した `validationResult` チェックは置かない（L310 と一致）。
 
 ### New Files (tests)
 - `apps/app/src/server/routes/comment.integ.ts`（または既存 integ への追記）— `/comments.get` の共有リンク認可に対する統合テスト（下記 Testing Strategy）。
 
-> `certify-shared-page.js` は `page_id` も検証対象として読むよう additive に一般化する（後方互換）。クライアントは `page_id` ＋ `shareLinkId` のみ送り、**別 `pageId` は併送しない**。これにより「ミドルウェアが検証したページ」と「ハンドラが取得するページ」が単一 ID で一致し、取り違えによる IDOR を構造的に排除する。
+> `certify-shared-page.js` は `page_id` も検証対象として読むよう additive に一般化する（後方互換）。正当なクライアントは `page_id` ＋ `shareLinkId` のみ送り別 `pageId` は併送しないが、**`pageId` と `page_id` が両方存在し値が異なる ambiguous リクエストはサーバ側で `isSharedPage` を立てず拒否する**（クライアントの善意に依存しない）。これにより「ミドルウェアが検証したページ」と「ハンドラが取得するページ」が単一 ID で一致し、取り違えによる IDOR を構造的に排除する。
 
 ## System Flows
 
