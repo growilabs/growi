@@ -264,7 +264,8 @@ sequenceDiagram
 | 2.8 | provider オプション | AllowedModelsField(行内 JSON、既存)+ resolve-provider-options(modelKey 照合) |
 | 2.9 | 未構成プロバイダでも編集可 | put-ai-settings(構成状態と独立に検証・保存)、利用可否は 6.x |
 | 3.1 | グローバル既定 1 つ | `AllowedModel.isDefault` + DefaultModelSelector / 行内★ |
-| 3.2 | 既定 0 or 2+ 拒否 | validate-allowed-models(defaultCount === 1) |
+| 3.2 | 既定 0 or 2+ 拒否(非空時) | validate-allowed-models(非空リストで defaultCount === 1) |
+| 3.3 | 空集合の保存許可 | validate-allowed-models(空配列受理)、put-ai-settings(`[]` を保存)、is-ai-configured(0 件 = 未設定、6.3 合流) |
 | 4.1 | 横断モデルセレクタ | get-models(有効集合)、ChatSidebar + PromptInputModelSelect* |
 | 4.2 | プロバイダ判別表示 | `ChatModelEntry.provider` + SelectGroup / SelectLabel 表示 |
 | 4.3 | 選択プロバイダで生成 | modelKey → parse → modelResolvers dispatch(resolve-mastra-model) |
@@ -458,9 +459,9 @@ export interface AiProviderUpdateRequest {
   azureOpenaiSettings?: AzureOpenaiConfig;  // full-state replace ('azure-openai' のみ)
 }
 export interface AiSettingsUpdateRequest {
-  aiEnabled?: boolean;
-  providers?: Record<AiProvider, AiProviderUpdateRequest>; // 存在する場合は 4 プロバイダ全エントリ必須 (validator 強制)
-  allowedModels?: AllowedModel[];           // full-state replace
+  aiEnabled?: boolean;                      // 省略 = 変更なし
+  providers?: Record<AiProvider, AiProviderUpdateRequest>; // 省略 = 変更なし。存在する場合は 4 プロバイダ全エントリ必須 (validator 強制)
+  allowedModels?: AllowedModel[];           // 省略 = 変更なし。存在 = full-state replace (空配列 = 許可モデルなし、3.3)
 }
 ```
 
@@ -469,10 +470,10 @@ export interface AiSettingsUpdateRequest {
 | GET | /_api/v3/ai-settings | — | AiSettingsResponse | 500 |
 | PUT | /_api/v3/ai-settings | AiSettingsUpdateRequest | AiSettingsResponse 相当 | 400(検証・env-only 違反), 500 |
 
-- **PUT セマンティクス**: 現行の full-state replace を踏襲。`providers` を含むリクエストは**対応 4 プロバイダの全エントリ必須**(validator で強制 — 固定スロットモデルに整合し、省略エントリの暗黙リセットという解釈余地を契約から排除する)。各プロバイダの `apiKey` のみ merge 例外(非空のみ更新、消去操作なし)。`ai:providerApiKeys` は「現在値 + 今回の非空キー」で再構成する(1.3, 1.4)。merge の「現在値」の読取ソースは **`getConfig('ai:providerApiKeys')` のマージ後ビュー(DB ?? env)** とする — `isApiKeySet` と同じビューなので、管理画面で「設定済み」と見えているキーは env 由来であっても保存後に必ず維持され(1.4)、稼働中の構成が UI 保存で壊れない。副作用として env 由来キーが DB へ複製され以後その env 変更は効かなくなるが、これはシャドーイング規則(config-definition 節)どおりの標準挙動。さらに**非空の `apiKey` を 1 つも含まないリクエストでは `ai:providerApiKeys` を updates に含めない**(書かない = DB 値を作らない)— トグルや許可モデルだけの保存で env 運用中のキーが DB に複製・固定化されることを防ぐ。
+- **PUT セマンティクス**: トップレベル 3 フィールド(`aiEnabled` / `providers` / `allowedModels`)は**省略 = その区画を変更しない**。存在する区画は full-state replace(暗黙リセットの解釈余地を契約から排除する — 現行の「省略 = クリア」semantics は引き継がない)。`providers` を含むリクエストは**対応 4 プロバイダの全エントリ必須**(validator で強制 — 固定スロットモデルに整合し、省略エントリの暗黙リセットという解釈余地を契約から排除する)。`allowedModels` の**空配列は「許可モデルなし」として受理し、DB に `[]` を保存**する(キー削除による env フォールバックへの暗黙リセットはしない — シャドーイング規則と一貫。0 件状態の可用性は 6.3 の「AI 未設定」に合流し、段階的セットアップ・全モデル撤去を可能にする = 3.3)。各プロバイダの `apiKey` のみ merge 例外(非空のみ更新、消去操作なし)。`ai:providerApiKeys` は「現在値 + 今回の非空キー」で再構成する(1.3, 1.4)。merge の「現在値」の読取ソースは **`getConfig('ai:providerApiKeys')` のマージ後ビュー(DB ?? env)** とする — `isApiKeySet` と同じビューなので、管理画面で「設定済み」と見えているキーは env 由来であっても保存後に必ず維持され(1.4)、稼働中の構成が UI 保存で壊れない。副作用として env 由来キーが DB へ複製され以後その env 変更は効かなくなるが、これはシャドーイング規則(config-definition 節)どおりの標準挙動。さらに**非空の `apiKey` を 1 つも含まないリクエストでは `ai:providerApiKeys` を updates に含めない**(書かない = DB 値を作らない)— トグルや許可モデルだけの保存で env 運用中のキーが DB に複製・固定化されることを防ぐ。
 - **並行更新(lost update)の扱い**: PUT は last-write-wins とし、楽観ロック等の並行制御は導入しない(現行 AiSettings と同じ特性。管理画面の同時編集の直列化は保証しない — R1.3 の「独立」は、1 リクエストが他プロバイダの保存値を意図的に変更しないことを指す)。ただし `apiKey` merge の「現在値」は**保存処理内で読み取ることを必須とする**(GET 時点のスナップショットやフォーム由来の値から Record を再構成してはならない)。キー値は応答に含まれず「空 = 維持」のため、フォームの古い状態からキー素材が巻き戻ることは構造的に起きず、他プロバイダのキー(例: ローテーション直後の新キー)が旧値へ戻り得るのは同時 PUT のハンドラ内 read→write 間の短い窓のみに限定される(マルチインスタンス構成では、他インスタンスの直前の保存が s2s `configUpdated` で自インスタンスの config キャッシュに反映されるまでの伝搬遅延分だけ窓が延びる)。`ai:providers`(トグル・Azure 設定)はフォーム全量置換のため同時編集では後勝ちが先の変更を上書きし得るが、これは管理画面上で可視であり再設定で回復可能。
 - **env-only 分割(5.2/5.3)**: `env:useOnlyEnvVars:ai` 有効時、`providers` または `aiEnabled` を含むリクエストは 400(明示拒否)。`allowedModels` のみのリクエストは通常どおり検証・保存(5.4: validate-allowed-models は経路共通)。この 400 契約と対になるクライアント側の送出分岐(env-only 時は `allowedModels` のみの body を構成する)は管理画面の `buildUpdateRequest` が担う(client / 管理画面 節参照)— 分岐がないと env-only 時に Update が常に 400 になり R5.3 を満たせない。
-- **validate-allowed-models**: 各エントリ = `isAiProvider(provider)`(2.5)∧ modelId 非空 ∧ (provider, modelId) 一意(2.3, 2.4)∧ providerOptions namespace 形式 ∧ isDefault ちょうど 1 つ(3.2)。所属プロバイダの構成状態は検証しない(2.9)。
+- **validate-allowed-models**: 各エントリ = `isAiProvider(provider)`(2.5)∧ modelId 非空 ∧ (provider, modelId) 一意(2.3, 2.4)∧ providerOptions namespace 形式 ∧ isDefault ちょうど 1 つ(3.2 — **非空リストのみに適用**。空配列は「許可モデルなし」として受理する = 3.3)。所属プロバイダの構成状態は検証しない(2.9)。
 - **秘匿規律(1.9)**: catch でも request body を stringify しない(現行パターン)。保存成功後 `clearResolvedMastraModelCache()` + availability ログ dedup リセット。
 
 ### routes / chat API(get-models・post-message)
@@ -531,7 +532,7 @@ export interface AiSettingsFormValues {
 - **AiSettings.tsx**: AI 有効トグル → DefaultModelSelector → ProviderTabs(アクティブタブ state)→ ProviderPanel(アクティブのみ mount)→ Update。
 - **DefaultModelSelector**: `allowedModels` を provider でグループ表示し、選択 = 対象行の `isDefault` を true・他を false(3.1)。ProviderPanel 行内の★と同一の書き換え(共有ヘルパ)。
 - **ProviderPanel**: 有効トグル(1.5)・API キー入力(設定済みは `(configured)` placeholder、1.8)・「API key set / not set」チップ・AllowedModelsField(provider prop)・azure のみ AzureOpenaiSettings。env-only 時は接続設定系フィールドを disabled(5.2)、モデル編集は活性のまま(5.3)。
-- **AllowedModelsField**: カタログ対応プロバイダは select(登録済み除外)、非対応は自由入力(2.6, 2.7 — picker 実装を provider スコープで流用)。同一プロバイダ内重複はクライアントでも行エラー表示(2.4。最終判定はサーバ)。**index 整合の制約**: グローバル `allowedModels` 配列に対する単一 `useFieldArray` を維持し、provider によるフィルタは**表示のみ**とする。remove/update/★付替えは必ず原配列 index を保持した対応付け(表示行 → 原 index のマップ)経由で行い、フィルタ後 index を配列操作に直接使わない(越境操作バグの防止。component テストで検証)。
+- **AllowedModelsField**: カタログ対応プロバイダは select(登録済み除外)、非対応は自由入力(2.6, 2.7 — picker 実装を provider スコープで流用)。同一プロバイダ内重複はクライアントでも行エラー表示(2.4。最終判定はサーバ)。既定の不変条件はフォーム操作でも維持する: 空リストへ最初のモデルを追加したときは `isDefault` を自動付与し、既定行を削除したときは残存する先頭行へ既定を付け替える(残 0 件なら既定なし — 3.1/3.3。付替えは共有ヘルパ経由)。これにより通常のフォーム操作から 3.2 の検証エラーに到達しない。**index 整合の制約**: グローバル `allowedModels` 配列に対する単一 `useFieldArray` を維持し、provider によるフィルタは**表示のみ**とする。remove/update/★付替えは必ず原配列 index を保持した対応付け(表示行 → 原 index のマップ)経由で行い、フィルタ後 index を配列操作に直接使わない(越境操作バグの防止。component テストで検証)。
 - i18n: 新キーは `ai_settings.providers_*` / `ai_settings.default_model_*` 系。4 ロケール同時更新。
 
 ### client / ChatSidebar セレクタ
@@ -561,7 +562,7 @@ Config コレクションは key-value(値 JSON)のため**スキーマ変更な
   { "provider": "azure-openai", "modelId": "prod-deployment" } ]
 ```
 
-- 不変条件: `ai:allowedModels` 内で (provider, modelId) 一意・`isDefault: true` はちょうど 1 件(PUT validator が保証。env 直書きの逸脱値はアクセサの防御ガード + 実効既定フォールバックで fail-soft)。
+- 不変条件: `ai:allowedModels` 内で (provider, modelId) 一意・非空のとき `isDefault: true` はちょうど 1 件(PUT validator が保証。空配列は「許可モデルなし」の正当な状態 = 3.3。env 直書きの逸脱値はアクセサの防御ガード + 実効既定フォールバックで fail-soft)。
 - UserUISettings: `aiChatSelectedModelKey: { type: String }`(旧 `aiChatSelectedModelId` は削除。プレリリースにつき残存値は放置 = 参照されない)。
 
 ## Error Handling
@@ -577,7 +578,7 @@ Config コレクションは key-value(値 JSON)のため**スキーマ変更な
 ### Unit Tests
 
 1. `model-key.spec`: buildModelKey/parseModelKey の往復・最初の `/` で分割(modelId 内 `/` 許容)・不正 prefix / 空 modelId → null(2.1)
-2. `validate-allowed-models.spec`: 異プロバイダ同名共存 OK(2.3)/同一プロバイダ重複拒否(2.4)/不正 provider 拒否(2.5)/既定 0・2+ 拒否(3.2)/providerOptions namespace 検証(2.8)
+2. `validate-allowed-models.spec`: 異プロバイダ同名共存 OK(2.3)/同一プロバイダ重複拒否(2.4)/不正 provider 拒否(2.5)/非空リストで既定 0・2+ 拒否(3.2)/空配列は受理(3.3)/providerOptions namespace 検証(2.8)
 3. `provider-availability.spec`: enabled × apiKey × azure endpoint/Entra のマトリクス(1.6, 1.7, 6.1)、有効モデル集合の導出、warn dedup とリセット
 4. `config.spec`(llm-providers): `requireApiKey(p)` のメッセージにキー値が含まれない(1.9)、malformed な `ai:providers` / `ai:providerApiKeys` / `ai:allowedModels` → 未設定として扱い `(key, 理由)` warn が dedup で 1 回だけ出る・warn に値/キー値を含まない、同一キーの DB 値 + env 値の同時定義でシャドーイング info が dedup 付きで出る(値は含まない)
 5. `effective-model-key.spec`: `resolveEffectiveModelKey` の丸め(4.6)・実効既定のフォールバック(既定が無効プロバイダ → 有効先頭、6.4)・0 件 throw
@@ -585,7 +586,7 @@ Config コレクションは key-value(値 JSON)のため**スキーマ変更な
 
 ### Integration Tests
 
-1. `put/get-ai-settings.spec`: プロバイダ独立更新(1.3)・apiKey merge 例外(1.4)・isApiKeySet マスク(1.8)・無効化しても設定保持(1.6)・未構成プロバイダのモデル保存可(2.9)・`providers` の不完全エントリ(4 種未満)→ 400・連続する 2 つの PUT(openai キーのみ → anthropic キーのみ)後に両キーが保持される(merge の現在値が保存時読み取りであることの回帰検証)・env でキーを注入した状態で非空キーなしの PUT をしても `ai:providerApiKeys` の DB 値が作られない(env フォールバック維持)/ 非空キーありの PUT では env 由来キーがマージ後ビューから引き継がれる(1.4)
+1. `put/get-ai-settings.spec`: プロバイダ独立更新(1.3)・apiKey merge 例外(1.4)・isApiKeySet マスク(1.8)・無効化しても設定保持(1.6)・未構成プロバイダのモデル保存可(2.9)・`providers` の不完全エントリ(4 種未満)→ 400・連続する 2 つの PUT(openai キーのみ → anthropic キーのみ)後に両キーが保持される(merge の現在値が保存時読み取りであることの回帰検証)・env でキーを注入した状態で非空キーなしの PUT をしても `ai:providerApiKeys` の DB 値が作られない(env フォールバック維持)/ 非空キーありの PUT では env 由来キーがマージ後ビューから引き継がれる(1.4)・`allowedModels` 省略の PUT で保存済みモデル集合が変わらない/空配列の PUT で `[]` が保存され AI 未設定扱いになる(3.3)
 2. `env-only-mode.integ.spec`(書き換え): env-only 時に providers/aiEnabled を含む PUT → 400(5.2)、allowedModels のみの PUT → 反映(5.3)+ 同一検証(5.4)、GET の useOnlyEnvVars
 3. `get-models.spec`: 有効プロバイダのみの models(4.1, 6.1)・保存キー有効時はそれ / 無効時は実効既定(4.4, 4.5)
 4. `post-message.spec`: body modelKey の受理・集合外の丸め・requestContext への実効キー設定(4.3, 4.6)
