@@ -67,6 +67,25 @@ vi.mock(
   '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model',
   () => ({ clearResolvedMastraModelCache: vi.fn() }),
 );
+// No refreshed catalog persisted (getSingleton → null): the REAL
+// available-models handler falls back to the bundled committed asset, keeping
+// these cases DB-free while still exercising the real catalog read (Req 9.5).
+vi.mock('~/features/mastra/server/models/refreshed-model-catalog', () => ({
+  RefreshedModelCatalog: {
+    getSingleton: vi.fn(async () => null),
+    upsertSingleton: vi.fn(),
+  },
+}));
+// The POST /refresh-model-catalog terminal handler's collaborator: mocked so
+// the route never fetches models.dev in tests; per-test overrides drive the
+// success/failure shapes.
+const { refreshModelCatalog } = vi.hoisted(() => ({
+  refreshModelCatalog: vi.fn(),
+}));
+vi.mock(
+  '~/features/mastra/server/services/ai-sdk-modules/refresh-model-catalog',
+  () => ({ refreshModelCatalog }),
+);
 
 import { SCOPE } from '@growi/core/dist/interfaces';
 import express, {
@@ -267,6 +286,69 @@ describe('admin-ai-settings router factory', () => {
       );
       expect(res.status).toBe(403);
       expect(res.body).not.toHaveProperty('modelIds');
+    });
+  });
+
+  // POST /refresh-model-catalog drives the SAME access control (WRITE scope +
+  // login + admin); the refresh service itself is mocked (never fetches here).
+  describe('POST /refresh-model-catalog (Req 9.1, 9.7)', () => {
+    const admin: TestUser = { _id: 'u1', status: ACTIVE, admin: true };
+    const member: TestUser = { _id: 'u2', status: ACTIVE, admin: false };
+
+    it('requests the AI admin WRITE scope (accepts legacy) for the route', () => {
+      factory(mock<Crowi>());
+      expect(accessTokenParser).toHaveBeenCalledWith([SCOPE.WRITE.ADMIN.AI], {
+        acceptLegacy: true,
+      });
+    });
+
+    it('refreshes and answers metadata only for an admin (Req 9.1, 7.1)', async () => {
+      const fetchedAt = new Date('2026-07-02T00:00:00.000Z');
+      refreshModelCatalog.mockResolvedValue({
+        models: { openai: ['gpt-4o'], anthropic: ['claude'], google: ['g'] },
+        fetchedAt,
+      });
+
+      const res = await request(buildApp(admin)).post(
+        '/_api/v3/ai-settings/refresh-model-catalog',
+      );
+
+      expect(res.status).toBe(200);
+      expect(refreshModelCatalog).toHaveBeenCalledTimes(1);
+      // Metadata only: timestamp + per-provider counts, no ids and no secrets.
+      expect(res.body).toEqual({
+        fetchedAt: fetchedAt.toISOString(),
+        counts: { openai: 1, anthropic: 1, google: 1 },
+      });
+    });
+
+    it('answers a generic 500 when the refresh fails, without leaking internals (Req 9.4)', async () => {
+      refreshModelCatalog.mockRejectedValue(
+        new Error('fetch failed: 503 for https://models.dev/api.json'),
+      );
+
+      const res = await request(buildApp(admin)).post(
+        '/_api/v3/ai-settings/refresh-model-catalog',
+      );
+
+      expect(res.status).toBe(500);
+      expect(JSON.stringify(res.body)).not.toContain('models.dev');
+    });
+
+    it('rejects a logged-in non-admin before the handler runs (Req 9.7)', async () => {
+      const res = await request(buildApp(member)).post(
+        '/_api/v3/ai-settings/refresh-model-catalog',
+      );
+      expect(res.status).not.toBe(200);
+      expect(refreshModelCatalog).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unauthenticated request with 403, handler not reached (Req 9.7)', async () => {
+      const res = await request(buildApp()).post(
+        '/_api/v3/ai-settings/refresh-model-catalog',
+      );
+      expect(res.status).toBe(403);
+      expect(refreshModelCatalog).not.toHaveBeenCalled();
     });
   });
 });

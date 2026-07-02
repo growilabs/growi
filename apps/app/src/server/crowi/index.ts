@@ -321,6 +321,14 @@ class Crowi {
     if (this.pageOperationService != null) {
       await this.pageOperationService.afterExpressServerReady();
     }
+
+    // One-shot model-catalog refresh (opt-in: no-op unless
+    // ai:modelCatalogRefreshOnStartup is true). Fire-and-forget inside — a
+    // failure only logs and the bundled/last-good catalog stays in effect.
+    const { triggerModelCatalogRefreshOnStartupIfEnabled } = await import(
+      '~/features/mastra/server/services/model-catalog-refresh-jobs'
+    );
+    triggerModelCatalogRefreshOnStartupIfEnabled();
   }
 
   isPageId(pageId: unknown): boolean {
@@ -483,6 +491,13 @@ class Crowi {
       '~/features/news/server/services/news-cron-service'
     );
     new NewsCronService().startCron();
+
+    // Periodic model-catalog refresh (opt-in: no-op unless
+    // ai:modelCatalogRefreshCronSchedule is set)
+    const { startModelCatalogRefreshCronIfEnabled } = await import(
+      '~/features/mastra/server/services/model-catalog-refresh-jobs'
+    );
+    startModelCatalogRefreshCronIfEnabled();
   }
 
   getSlack(): unknown {

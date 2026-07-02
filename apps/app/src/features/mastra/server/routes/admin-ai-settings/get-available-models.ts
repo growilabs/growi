@@ -16,7 +16,7 @@ import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-respo
 import loggerFactory from '~/utils/logger';
 
 import type { SelectableModelsResponse } from '../../../interfaces/selectable-models-response';
-import { getSelectableModelIds } from '../../services/ai-sdk-modules/model-catalog';
+import { getEffectiveSelectableModelIds } from '../../services/ai-sdk-modules/effective-model-catalog';
 
 const logger = loggerFactory(
   'growi:features:mastra:routes:admin-ai-settings:get-available-models',
@@ -110,10 +110,12 @@ export interface GetAvailableModelsRequest extends Request {
 /**
  * GET /_api/v3/ai-settings/available-models handler.
  *
- * Returns the selectable model ids for `provider` from the committed offline
- * catalog. The lookup is a pure in-process read (no network / DB), so a valid but
- * catalog-less provider (e.g. `azure-openai`) naturally yields `{ modelIds: [] }`
- * with 200 semantics — no special case (Req 3.1).
+ * Returns the selectable model ids for `provider` from the EFFECTIVE catalog:
+ * the persisted refreshed catalog when a runtime refresh has succeeded (Req 9.5),
+ * otherwise the committed bundled asset. The lookup consults local storage only
+ * (no external communication — Req 2), so a valid but catalog-less provider
+ * (e.g. `azure-openai`) naturally yields `{ modelIds: [] }` with 200 semantics —
+ * no special case (Req 3.1).
  *
  * The response carries ONLY `modelIds` — never an API key, provider credentials,
  * or providerOptions (Req 7.1). Input validation lives in the middleware chain
@@ -121,19 +123,19 @@ export interface GetAvailableModelsRequest extends Request {
  * provider is a 400 before this runs; scope + login + adminRequired are composed
  * in `getAvailableModelsFactory` below (Req 7.2).
  */
-export const getAvailableModels = (
+export const getAvailableModels = async (
   req: GetAvailableModelsRequest,
   res: ApiV3Response,
-): void => {
+): Promise<void> => {
   // provider is a validated AiProvider (see GetAvailableModelsRequest); no cast.
   const { provider } = req.query;
 
   try {
-    const modelIds = getSelectableModelIds(provider);
+    const modelIds = await getEffectiveSelectableModelIds(provider);
     const response: SelectableModelsResponse = { modelIds };
     res.apiv3(response);
   } catch (err) {
-    // The offline catalog read is the only failure source; surface a generic
+    // The local catalog read is the only failure source; surface a generic
     // message so no internal detail leaks to the client.
     logger.error('Failed to get available models', err);
     res.apiv3Err(new ErrorV3('Failed to get available models'), 500);

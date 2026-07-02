@@ -297,6 +297,9 @@ export const CONFIG_KEYS = [
   // Azure OpenAI-only connection config (ai:provider='azure-openai'), stored as
   // a single JSON object (consolidated from the former four ai:azureOpenaiSettings* keys)
   'ai:azureOpenaiSettings',
+  // Opt-in refresh paths for the vendored model catalog (both default OFF)
+  'ai:modelCatalogRefreshOnStartup',
+  'ai:modelCatalogRefreshCronSchedule',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1335,6 +1338,21 @@ export const CONFIG_DEFINITIONS = {
   'ai:azureOpenaiSettings': defineConfig<AzureOpenaiConfig | undefined>({
     envVarName: 'AI_AZURE_OPENAI_SETTINGS',
     defaultValue: {},
+  }),
+
+  // Opt-in refresh paths for the vendored model catalog (Req 9). Both default
+  // OFF so a default configuration performs zero external communication (the
+  // bundled catalog is the baseline; air-gapped installs are unaffected).
+  // These are deployment options (env-driven), not admin-form settings, so they
+  // are intentionally NOT part of the env:useOnlyEnvVars:ai target keys.
+  'ai:modelCatalogRefreshOnStartup': defineConfig<boolean>({
+    envVarName: 'AI_MODEL_CATALOG_REFRESH_ON_STARTUP',
+    defaultValue: false,
+  }),
+  // node-cron schedule expression (e.g. '0 4 * * *'). Empty/unset = disabled.
+  'ai:modelCatalogRefreshCronSchedule': defineConfig<string | undefined>({
+    envVarName: 'AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE',
+    defaultValue: undefined,
   }),
 
   // OpenTelemetry Settings
