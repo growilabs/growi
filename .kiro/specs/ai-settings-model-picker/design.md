@@ -448,7 +448,7 @@ graph LR
 |-----------|-------|--------|-----|
 | build-model-catalog | 共有 (pure) | api.json → zod 境界検証 → chat＋tool フィルタ → `ModelCatalog`。ingest script と refresh サービスの**単一ソース**（同一フィルタ・同一サニティチェック） | 6.x, 9.1 |
 | refresh-model-catalog | Server (runtime) | 固定 URL fetch（30s timeout）→ 共有変換 → `RefreshedModelCatalog.upsertSingleton`。**失敗時は永続化前に throw**（last-good 維持） | 9.1, 9.4, 9.7 |
-| RefreshedModelCatalog | Server (model) | `{ _id:'singleton', models, fetchedAt, source }` の専用 collection（`mastra_refreshed_model_catalog`）。多インスタンス共有・再起動耐性。config-manager には置かない（設定ではなくキャッシュ） | 9.1, 9.5 |
+| RefreshedModelCatalog | Server (model) | `{ _id:'singleton', models, fetchedAt, source }` の専用 collection（`mastra_refreshed_model_catalog`）。**Prisma-first**（schema.prisma の `mastrarefreshedmodelcatalogs` + `@@map`、`getSingleton`/`upsertSingleton` は Prisma extension。新規 collection のため Mongoose schema は持たない）。多インスタンス共有・再起動耐性。config-manager には置かない（設定ではなくキャッシュ） | 9.1, 9.5 |
 | effective-model-catalog | Server (runtime) | `getEffectiveSelectableModelIds(provider)` = 更新済み ?? 同梱（`?? []` フェイルソフトは従来どおり）。get-available-models はこれを await する | 9.5, 2.x, 3.1 |
 | post-refresh-model-catalog | Server (route) | `POST /_api/v3/ai-settings/refresh-model-catalog`。`[accessTokenParser([SCOPE.WRITE.ADMIN.AI]) → login → admin]`。成功 200 `{ fetchedAt, counts }`／失敗は generic 500（内部情報を漏らさない） | 9.1, 9.7, 7.1 |
 | model-catalog-refresh-jobs | Server (boot) | `startModelCatalogRefreshCronIfEnabled()`（schedule 未設定なら no-op、invalid でも boot を壊さない）＋ `triggerModelCatalogRefreshOnStartupIfEnabled()`（fire-and-forget）。crowi の `setupCron()` / `asyncAfterExpressServerReady()` から呼ぶ | 9.2, 9.3, 9.4, 9.6 |

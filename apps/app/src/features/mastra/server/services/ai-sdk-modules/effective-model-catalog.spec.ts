@@ -1,15 +1,15 @@
 // --- Mock boundary ---------------------------------------------------------
 //
 // getEffectiveSelectableModelIds resolves "refreshed (persisted) ?? bundled"
-// (Req 9.5). The persistence singleton is mocked to drive both branches; the
-// bundled fallback is the REAL committed asset so the fallback branch proves
-// the actual offline behavior (Req 2).
+// (Req 9.5). The persistence singleton (prisma.mastrarefreshedmodelcatalogs)
+// is mocked to drive both branches; the bundled fallback is the REAL committed
+// asset so the fallback branch proves the actual offline behavior (Req 2).
 const { getSingleton } = vi.hoisted(() => ({
   getSingleton: vi.fn(),
 }));
 
-vi.mock('../../models/refreshed-model-catalog', () => ({
-  RefreshedModelCatalog: { getSingleton },
+vi.mock('~/utils/prisma', () => ({
+  prisma: { mastrarefreshedmodelcatalogs: { getSingleton } },
 }));
 
 import { getEffectiveSelectableModelIds } from './effective-model-catalog';

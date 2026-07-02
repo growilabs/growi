@@ -4,15 +4,15 @@
 //   - global fetch          : stubbed per test (success / HTTP error / network error)
 //   - buildModelCatalog     : REAL — the shared pure transform is the very
 //     guarantee under test (same filter/validation as the bundled asset, 9.1)
-//   - RefreshedModelCatalog : mocked — persistence is asserted by contract
-//     (upserted exactly once on success, NEVER on failure — 9.4)
+//   - prisma.mastrarefreshedmodelcatalogs : mocked — persistence is asserted by
+//     contract (upserted exactly once on success, NEVER on failure — 9.4)
 const { getSingleton, upsertSingleton } = vi.hoisted(() => ({
   getSingleton: vi.fn(),
   upsertSingleton: vi.fn(),
 }));
 
-vi.mock('../../models/refreshed-model-catalog', () => ({
-  RefreshedModelCatalog: { getSingleton, upsertSingleton },
+vi.mock('~/utils/prisma', () => ({
+  prisma: { mastrarefreshedmodelcatalogs: { getSingleton, upsertSingleton } },
 }));
 
 import { mock } from 'vitest-mock-extended';

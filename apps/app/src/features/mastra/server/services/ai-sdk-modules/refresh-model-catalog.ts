@@ -1,6 +1,6 @@
 import loggerFactory from '~/utils/logger';
+import { prisma } from '~/utils/prisma';
 
-import { RefreshedModelCatalog } from '../../models/refreshed-model-catalog';
 import {
   buildModelCatalog,
   MODELS_DEV_SOURCE_ATTRIBUTION,
@@ -50,7 +50,7 @@ export const refreshModelCatalog =
     const models = buildModelCatalog(apiJson);
 
     const fetchedAt = new Date();
-    await RefreshedModelCatalog.upsertSingleton({
+    await prisma.mastrarefreshedmodelcatalogs.upsertSingleton({
       models,
       fetchedAt,
       source: MODELS_DEV_SOURCE_ATTRIBUTION,

@@ -70,10 +70,14 @@ vi.mock(
 // No refreshed catalog persisted (getSingleton → null): the REAL
 // available-models handler falls back to the bundled committed asset, keeping
 // these cases DB-free while still exercising the real catalog read (Req 9.5).
-vi.mock('~/features/mastra/server/models/refreshed-model-catalog', () => ({
-  RefreshedModelCatalog: {
-    getSingleton: vi.fn(async () => null),
-    upsertSingleton: vi.fn(),
+// Mocking '~/utils/prisma' also prevents the real PrismaClient from being
+// instantiated in this unit suite.
+vi.mock('~/utils/prisma', () => ({
+  prisma: {
+    mastrarefreshedmodelcatalogs: {
+      getSingleton: vi.fn(async () => null),
+      upsertSingleton: vi.fn(),
+    },
   },
 }));
 // The POST /refresh-model-catalog terminal handler's collaborator: mocked so

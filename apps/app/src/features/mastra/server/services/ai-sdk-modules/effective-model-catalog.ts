@@ -1,5 +1,6 @@
+import { prisma } from '~/utils/prisma';
+
 import type { AiProvider } from '../../../interfaces/ai-provider';
-import { RefreshedModelCatalog } from '../../models/refreshed-model-catalog';
 import { getSelectableModelIds } from './model-catalog';
 
 /**
@@ -15,7 +16,7 @@ import { getSelectableModelIds } from './model-catalog';
 export const getEffectiveSelectableModelIds = async (
   provider: AiProvider,
 ): Promise<string[]> => {
-  const refreshed = await RefreshedModelCatalog.getSingleton();
+  const refreshed = await prisma.mastrarefreshedmodelcatalogs.getSingleton();
 
   if (refreshed != null) {
     // Same controlled widening as the bundled read: the stored value is a
