@@ -18,7 +18,7 @@
   - _Requirements: 4.2_
 
 - [ ] 2. 保存口（activities 拡張）の改修 — 実 DB 読み直しで保存を検証
-- [ ] 2.1 カスケードの保存口（createByParameters）で添付フィールドを保存する
+- [x] 2.1 カスケードの保存口（createByParameters）で添付フィールドを保存する
   - 渡された snapshot の添付フィールドを、実際に永続化する composite データへ反映する（現状は `{ id, username }` だけを手組みして添付フィールドを捨てているのを直す）
   - 書き込み口の入力型（create 側）を `ISnapshot`（union）へ広げ、`any` で型を迂回しない
   - 先に結合テストを書く（red→green）: 添付フィールド入りの snapshot で作成 → **実 DB（devcontainer の mongo, rs0）から当該レコードを読み直し**、4フィールドが保存されていることを assert する（ビルダーやサービスの返り値ではなく DB を見る）
@@ -103,3 +103,9 @@
   - 観察可能な完了条件: 応答内容の後方互換を assert する結合テストが green
   - _Requirements: 4.1, 4.2_
   - _Depends: 6.1_
+
+## Implementation Notes
+
+- 2.1: `createByParameters` の `username: snapshot?.username ?? ''` は削除済み（username 欠落時は保存しない。空文字補填は移行期の回避策で、全消費者の null 安全を確認済み）。後続タスクは「username 無し snapshot → 読み出しは null」を前提にする。
+- 結合テストの分離パターン: `test/setup/prisma.ts` 経由の per-worker DB（`growi_test_<workerId>`）＋テスト専用の番兵 IP で beforeEach/afterAll 掃除。既存 activities integ スイートと同じ流儀に従うこと。
+- vitest は必ず `apps/app` ディレクトリから実行する（repo root からだと別パッケージのプロジェクトに誤マッチして `~/` alias 解決が壊れる）。

@@ -4,6 +4,7 @@ import { Schema, Types } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
 import type {
+  AttachmentRemoveSnapshot,
   IActivity,
   ISnapshot,
   SupportedActionType,
@@ -186,6 +187,10 @@ function normalizeUpdateIdField(
  * Parameters accepted by createByParameters — mirrors the Mongoose static's
  * caller interface.  `user` and `target` may be either a bare ID string or a
  * Mongoose document / plain object (normalization is done inside the method).
+ *
+ * `snapshot` accepts the full ISnapshot union so action-specific variants
+ * (e.g. AttachmentRemoveSnapshot) reach the persisted composite without any
+ * type bypass (design.md: Boundary Commitments > 書き込み口のパラメータ型の拡張).
  */
 export type IActivityParameters = {
   user?: unknown;
@@ -196,7 +201,7 @@ export type IActivityParameters = {
   ip?: string;
   endpoint?: string;
   action: string;
-  snapshot?: { username?: string };
+  snapshot?: ISnapshot;
   createdAt?: Date;
 };
 
@@ -294,6 +299,12 @@ export const extension = Prisma.defineExtension((client) => {
          * strings so callers that pass Mongoose documents work unchanged
          * (Key Decision 4: normalization lives inside the extension).
          *
+         * The full ISnapshot union is persisted: attachment-removal fields
+         * (originalName / pagePath / pageId / fileSize) reach the stored
+         * composite as-is (requirements 2.1, 3.3; design.md This Spec Owns >
+         * createByParameters の改修 — the previous hand-built `{ id, username }`
+         * silently dropped them).
+         *
          * Defaults:
          *   v        = 0  (Mongoose initialises __v to 0 on create)
          *   createdAt = now  (Mongoose timestamps: { createdAt: true })
@@ -308,15 +319,29 @@ export const extension = Prisma.defineExtension((client) => {
           const { user, target, event, snapshot, createdAt, ...rest } =
             parameters;
 
-          // Build the snapshot composite type Prisma requires:
-          // ActivitiesSnapshotCreateInput = { id: string; username: string }
-          // The snapshot.id maps to _id in the ActivitiesSnapshot composite.
-          // Generate a new ObjectId hex string when not provided by the caller.
-          const snapshotId = new Types.ObjectId().toString();
+          // Every ISnapshot variant is structurally assignable to
+          // AttachmentRemoveSnapshot (all fields optional), so widening here
+          // lets us read the attachment fields type-safely — they are simply
+          // undefined for the default variant. Plain assignability, no casts.
+          const snap: AttachmentRemoveSnapshot | undefined = snapshot;
+
+          // Build the snapshot composite type Prisma requires. snapshot.id
+          // maps to _id in the ActivitiesSnapshot composite; generate a new
+          // ObjectId hex string (callers never provide one). Fields the caller
+          // did not set stay undefined and are omitted from the stored
+          // document (Prisma reads them back as null). username is
+          // intentionally NOT defaulted to '' anymore: the composite field is
+          // optional (schema.prisma) precisely so user-less paths persist no
+          // username, restoring pre-migration Mongoose behavior instead of
+          // storing a semantically wrong empty string.
           const snapshotData: Prisma.activitiesUncheckedCreateInput['snapshot'] =
             {
-              id: snapshotId,
-              username: snapshot?.username ?? '',
+              id: new Types.ObjectId().toString(),
+              username: snap?.username,
+              originalName: snap?.originalName,
+              pagePath: snap?.pagePath,
+              pageId: snap?.pageId,
+              fileSize: snap?.fileSize,
             };
 
           const data: Prisma.activitiesUncheckedCreateInput = {
