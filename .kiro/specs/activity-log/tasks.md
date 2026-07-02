@@ -45,7 +45,7 @@
   - _Requirements: 2.1, 2.2, 2.3, 3.3_
   - _Boundary: Snapshot Builder（新規ファイル）_
   - _Depends: 1.1_
-- [ ] 3.2 カスケード recorder（添付ごとに activity を新規作成）とユニットテスト
+- [x] 3.2 カスケード recorder（添付ごとに activity を新規作成）とユニットテスト
   - 削除対象の添付配列・`pageId → path` マップ・操作者を引数で受け取り（データセットを自分で取得しない executor 原則）、添付ごとに target=添付の `_id`・targetModel=`Attachment`・snapshot 付きで activity 作成サービスを呼ぶ
   - 1件の作成失敗が残りの記録・削除本体を止めないようにする（失敗は文脈付きで error ログ）
   - 先にユニットテストを書く: 添付ごとに1件作成される、記録対象外設定では何も作られない、1件失敗が他を止めない、target が添付ごとに一意
@@ -106,6 +106,7 @@
 
 ## Implementation Notes
 
+- 3.2: recorder の依存型は `ActivityCreator`（`{ createActivity(parameters: IActivityParameters): Promise<IActivity | null> }`）。design スニペットの `IActivity` 引数は概略で、実サービスの転送先型に合わせた。`ActivityActor` は attachment-removal-snapshot.ts から export 済み（5.1 が import する）。
 - 2.2: `updateByParameters` の入力契約は「素の `ISnapshot`」（envelope 禁止・`id` は渡さない）。内部の `buildSnapshotUpdateEnvelope` が `{ update }` へ変換し既存 `_id`・`username` を保持する。後続の emit('update') 呼び出し（4.1）はこの契約で snapshot を渡すこと。
 - 2.1: `createByParameters` の `username: snapshot?.username ?? ''` は削除済み（username 欠落時は保存しない。空文字補填は移行期の回避策で、全消費者の null 安全を確認済み）。後続タスクは「username 無し snapshot → 読み出しは null」を前提にする。
 - 結合テストの分離パターン: `test/setup/prisma.ts` 経由の per-worker DB（`growi_test_<workerId>`）＋テスト専用の番兵 IP で beforeEach/afterAll 掃除。既存 activities integ スイートと同じ流儀に従うこと。
