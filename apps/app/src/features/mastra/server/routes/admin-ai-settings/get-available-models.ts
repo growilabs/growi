@@ -1,11 +1,16 @@
 import { SCOPE } from '@growi/core/dist/interfaces';
 import { ErrorV3 } from '@growi/core/dist/models';
 import type { Request, RequestHandler } from 'express';
+import { query, type ValidationChain } from 'express-validator';
 
-import { isAiProvider } from '~/features/mastra/interfaces/ai-provider';
+import {
+  type AiProvider,
+  isAiProvider,
+} from '~/features/mastra/interfaces/ai-provider';
 import type Crowi from '~/server/crowi';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
+import { apiV3FormValidator } from '~/server/middlewares/apiv3-form-validator';
 import loginRequiredFactory from '~/server/middlewares/login-required';
 import type { ApiV3Response } from '~/server/routes/apiv3/interfaces/apiv3-response';
 import loggerFactory from '~/utils/logger';
@@ -77,28 +82,39 @@ const logger = loggerFactory(
  */
 
 /**
+ * Validators for GET /_api/v3/ai-settings/available-models.
+ *
+ * `provider` is required and must be one of the supported providers; the
+ * allow-list membership is checked with `isAiProvider` (mirrors the
+ * `body('provider')` rule in put-ai-settings). A missing/invalid provider fails
+ * here and is turned into a 400 by `apiV3FormValidator`, so the handler never has
+ * to re-validate the query (Req 7.1 boundary).
+ */
+export const getAvailableModelsValidators: ValidationChain[] = [
+  query('provider')
+    .custom((value) => isAiProvider(value))
+    .withMessage('provider must be one of the supported AI providers'),
+];
+
+/**
  * GET /_api/v3/ai-settings/available-models handler.
  *
- * Validates the `provider` query against the provider allow-list (`isAiProvider`)
- * and, when valid, returns the selectable model ids from the committed offline
+ * Returns the selectable model ids for `provider` from the committed offline
  * catalog. The lookup is a pure in-process read (no network / DB), so a valid but
  * catalog-less provider (e.g. `azure-openai`) naturally yields `{ modelIds: [] }`
  * with 200 semantics — no special case (Req 3.1).
  *
  * The response carries ONLY `modelIds` — never an API key, provider credentials,
- * or providerOptions (Req 7.1). An invalid/missing provider is a 400 and never
- * reaches the catalog (input validation). Middleware (scope + login + adminRequired)
- * is composed in `getAvailableModelsFactory` below (Req 7.2).
+ * or providerOptions (Req 7.1). Input validation lives in the middleware chain
+ * (`getAvailableModelsValidators` + `apiV3FormValidator`), so an invalid/missing
+ * provider is a 400 before this runs; scope + login + adminRequired are composed
+ * in `getAvailableModelsFactory` below (Req 7.2).
  */
 export const getAvailableModels = (req: Request, res: ApiV3Response): void => {
-  const { provider } = req.query;
-
-  // Allow-list validation — reject anything that is not a known provider before
-  // touching the catalog (input validation, Req 7.1 boundary).
-  if (!isAiProvider(provider)) {
-    res.apiv3Err(new ErrorV3('Invalid provider'), 400);
-    return;
-  }
+  // `provider` is validated upstream (getAvailableModelsValidators +
+  // apiV3FormValidator), so it is a known AiProvider by the time we get here.
+  // req.query is ParsedQs (not `any`), hence the annotation on the trusted value.
+  const provider = req.query.provider as AiProvider;
 
   try {
     const modelIds = getSelectableModelIds(provider);
@@ -116,10 +132,12 @@ export const getAvailableModels = (req: Request, res: ApiV3Response): void => {
  * GET /_api/v3/ai-settings/available-models handler factory.
  *
  * Returns the full middleware chain (scope gate + login + admin authorization +
- * the handler), matching the mastra route convention where each handler factory
- * owns its middleware and the router just mounts the array (same shape as
- * getAiSettingsFactory). NO ai-ready guard is attached: admins must reach this
- * even while AI is disabled/unconfigured (Req 1).
+ * provider validation + the handler), matching the mastra route convention where
+ * each handler factory owns its middleware and the router just mounts the array
+ * (same shape as getAiSettingsFactory / putAiSettingsFactory). Validation is done
+ * with express-validator (getAvailableModelsValidators) + apiV3FormValidator, like
+ * put-ai-settings. NO ai-ready guard is attached: admins must reach this even
+ * while AI is disabled/unconfigured (Req 1).
  */
 export const getAvailableModelsFactory = (crowi: Crowi): RequestHandler[] => {
   const loginRequiredStrictly = loginRequiredFactory(crowi);
@@ -129,6 +147,8 @@ export const getAvailableModelsFactory = (crowi: Crowi): RequestHandler[] => {
     accessTokenParser([SCOPE.READ.ADMIN.AI], { acceptLegacy: true }),
     loginRequiredStrictly,
     adminRequired,
+    ...getAvailableModelsValidators,
+    apiV3FormValidator,
     getAvailableModels,
   ];
 };

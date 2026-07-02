@@ -36,14 +36,12 @@ vi.mock('~/server/middlewares/access-token-parser', () => ({
   },
 }));
 
-// updateAiSettingsValidators now lives inline in put-ai-settings.ts and is mounted
-// for real by the factory; body validation is covered in put-ai-settings.spec.ts.
-// apiV3FormValidator stays a passthrough so validation runs but never blocks → the
-// PUT handler is still reached for the valid body this test sends.
-vi.mock('~/server/middlewares/apiv3-form-validator', () => ({
-  apiV3FormValidator: (_req: Request, _res: Response, next: NextFunction) =>
-    next(),
-}));
+// updateAiSettingsValidators (PUT) and getAvailableModelsValidators (GET
+// /available-models) live in their handler factories and are mounted for real.
+// apiV3FormValidator is deliberately NOT mocked here so the real validator chain
+// enforces end-to-end: the PUT body this test sends is valid (reaches the
+// handler), while an invalid `?provider` on /available-models is turned into a
+// 400 by the real middleware rather than reaching the handler.
 vi.mock('~/server/middlewares/add-activity', () => ({
   generateAddActivityMiddleware:
     () => (_req: Request, res: Response, next: NextFunction) => {
@@ -112,8 +110,11 @@ const buildApp = (user?: TestUser) => {
   app.use((_req: Request, res: Response, next: NextFunction) => {
     // biome-ignore lint/suspicious/noExplicitAny: test seam to add apiv3 helpers to res
     (res as any).apiv3 = (data: unknown) => res.status(200).json(data ?? {});
+    // Default code 400 mirrors the real express.response.apiv3Err default, so the
+    // real apiV3FormValidator (which calls apiv3Err with no explicit code on a
+    // validation failure) yields a 400 here.
     // biome-ignore lint/suspicious/noExplicitAny: test seam to add apiv3 helpers to res
-    (res as any).apiv3Err = (_err: unknown, code = 500) =>
+    (res as any).apiv3Err = (_err: unknown, code = 400) =>
       res.status(code).json({ err: true });
     next();
   });
@@ -238,6 +239,14 @@ describe('admin-ai-settings router factory', () => {
     it('rejects an invalid provider with 400 (Req input validation)', async () => {
       const res = await request(buildApp(admin)).get(
         '/_api/v3/ai-settings/available-models?provider=bogus',
+      );
+      expect(res.status).toBe(400);
+      expect(res.body).not.toHaveProperty('modelIds');
+    });
+
+    it('rejects a missing provider with 400 (Req input validation)', async () => {
+      const res = await request(buildApp(admin)).get(
+        '/_api/v3/ai-settings/available-models',
       );
       expect(res.status).toBe(400);
       expect(res.body).not.toHaveProperty('modelIds');
