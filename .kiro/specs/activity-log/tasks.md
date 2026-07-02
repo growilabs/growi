@@ -26,7 +26,7 @@
   - _Requirements: 2.1, 3.3, 4.2_
   - _Boundary: ActivitiesSnapshot composite, activities 拡張（createByParameters）_
   - _Depends: 1.1, 1.2_
-- [ ] 2.2 直接削除の保存口（updateByParameters）で composite を envelope 形で更新する
+- [x] 2.2 直接削除の保存口（updateByParameters）で composite を envelope 形で更新する
   - Prisma composite の更新は素のオブジェクトを渡せないため、`{ update: { … } }`（既存 `_id`・`username` を保てる形を第一候補）または `{ set: { … + _id } }` の envelope 形に**関数内部で型付きに**変換する。呼び出し側は素の `ISnapshot` を渡すだけにする（envelope を意識させない）
   - update 側入力型を素の `ISnapshot` を受け取れるよう広げ、`any` を使わない（design「型安全性の担保」参照）
   - 更新前に、middleware が先に作る `ACTION_UNSETTLED` の activity が `snapshot._id`・`username` を既に持つことを実 DB で1度確認し、`{ update }` が成立する前提を固定する
@@ -106,6 +106,7 @@
 
 ## Implementation Notes
 
+- 2.2: `updateByParameters` の入力契約は「素の `ISnapshot`」（envelope 禁止・`id` は渡さない）。内部の `buildSnapshotUpdateEnvelope` が `{ update }` へ変換し既存 `_id`・`username` を保持する。後続の emit('update') 呼び出し（4.1）はこの契約で snapshot を渡すこと。
 - 2.1: `createByParameters` の `username: snapshot?.username ?? ''` は削除済み（username 欠落時は保存しない。空文字補填は移行期の回避策で、全消費者の null 安全を確認済み）。後続タスクは「username 無し snapshot → 読み出しは null」を前提にする。
 - 結合テストの分離パターン: `test/setup/prisma.ts` 経由の per-worker DB（`growi_test_<workerId>`）＋テスト専用の番兵 IP で beforeEach/afterAll 掃除。既存 activities integ スイートと同じ流儀に従うこと。
 - vitest は必ず `apps/app` ディレクトリから実行する（repo root からだと別パッケージのプロジェクトに誤マッチして `~/` alias 解決が壊れる）。

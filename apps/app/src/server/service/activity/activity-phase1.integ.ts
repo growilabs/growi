@@ -182,12 +182,14 @@ describe('ActivityExtension — Phase-1 observable behavior', () => {
       const initial = asRow(rawInitial);
 
       // Step 2: settle via updateByParameters (simulate activityEvent 'update' handler)
+      // snapshot is a plain ISnapshot (no id): updateByParameters converts it
+      // to the composite { update } envelope internally, preserving the
+      // existing snapshot._id (activity-log task 2.2 input contract).
       const rawUpdated = await prisma.activities.updateByParameters(
         initial.id,
         {
           action: SupportedAction.ACTION_PAGE_CREATE,
           snapshot: {
-            id: initial.snapshot?.id ?? new Types.ObjectId().toHexString(),
             username: 'charlie_phase1',
           },
         },
@@ -231,8 +233,9 @@ describe('ActivityExtension — Phase-1 observable behavior', () => {
         initial.id,
         {
           action: SupportedAction.ACTION_PAGE_UPDATE,
+          // plain ISnapshot — the { update } envelope conversion inside
+          // updateByParameters keeps the existing snapshot._id
           snapshot: {
-            id: initial.snapshot?.id ?? new Types.ObjectId().toHexString(),
             username: 'diana_phase1',
           },
         },

@@ -209,12 +209,60 @@ export type IActivityParameters = {
  * Parameters accepted by updateByParameters.
  *
  * Uses Prisma's unchecked update input type — the activity extension only
- * updates scalar fields (action, snapshot, etc.) without relation nesting.
- * `activitiesUncheckedUpdateInput` maps directly to what callers pass
- * (e.g. `{ action: 'PAGE_VIEW', snapshot: ... }`) and is the correct Prisma
- * update payload for `context.update({ data: ... })`.
+ * updates scalar fields (action, snapshot, etc.) without relation nesting —
+ * except for `snapshot`, which accepts a plain `ISnapshot` instead of the
+ * Prisma composite update envelope. Callers pass the snapshot as-is; the
+ * conversion to the `{ update: ... }` envelope happens inside
+ * updateByParameters (design.md: This Spec Owns > updateByParameters の改修,
+ * 型安全性の担保 — callers must never build the envelope themselves, or the
+ * value would be double-wrapped; see Revalidation Triggers).
  */
-export type IActivityUpdateParameters = Prisma.activitiesUncheckedUpdateInput;
+export type IActivityUpdateParameters = Omit<
+  Prisma.activitiesUncheckedUpdateInput,
+  'snapshot'
+> & {
+  snapshot?: ISnapshot;
+};
+
+/**
+ * Converts a plain `ISnapshot` to the Prisma composite update envelope.
+ *
+ * Prisma composite types reject a bare object on update — the value must be
+ * wrapped as `{ set: ... }` (whole-composite replacement, requires `id`) or
+ * `{ update: ... }` (partial field update). `{ update }` is used here because
+ * it preserves the existing `snapshot._id` and any field the caller did not
+ * provide (notably the `username` the add-activity middleware wrote at
+ * ACTION_UNSETTLED creation time — requirement 2.2). Fields left `undefined`
+ * are ignored by Prisma, i.e. kept unchanged in the stored composite.
+ *
+ * Premise (verified against the real DB): every activities row carries a
+ * `snapshot` composite with `_id`, so `{ update }` always targets an existing
+ * composite and never creates a broken partial object.
+ *
+ * Requirements: 2.1, 2.2, 4.2 — design.md: This Spec Owns
+ * (updateByParameters の改修・直接削除の保存口).
+ */
+function buildSnapshotUpdateEnvelope(
+  snapshot: ISnapshot | undefined,
+): Prisma.ActivitiesSnapshotUpdateEnvelopeInput | undefined {
+  if (snapshot == null) return undefined;
+
+  // Every ISnapshot variant is structurally assignable to
+  // AttachmentRemoveSnapshot (all fields optional), so widening here lets us
+  // read the attachment fields type-safely — they are simply undefined for
+  // the default variant. Plain assignability, no casts.
+  const snap: AttachmentRemoveSnapshot = snapshot;
+
+  return {
+    update: {
+      username: snap.username,
+      originalName: snap.originalName,
+      pagePath: snap.pagePath,
+      pageId: snap.pageId,
+      fileSize: snap.fileSize,
+    },
+  };
+}
 
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
@@ -263,15 +311,22 @@ export const extension = Prisma.defineExtension((client) => {
           const context =
             Prisma.getExtensionContext<typeof prisma.activities>(this);
 
+          const { snapshot, ...rest } = parameters;
+
           // Normalize target/event/userId (see normalizeUpdateIdField) --
           // callers may pass a Mongoose Document or ObjectId instead of a
           // bare string, which Prisma cannot serialize unlike Mongoose's
-          // auto-casting findOneAndUpdate.
-          const normalizedParameters: IActivityUpdateParameters = {
-            ...parameters,
-            userId: normalizeUpdateIdField(parameters.userId),
-            target: normalizeUpdateIdField(parameters.target),
-            event: normalizeUpdateIdField(parameters.event),
+          // auto-casting findOneAndUpdate. The plain ISnapshot is converted
+          // to the composite `{ update }` envelope here (see
+          // buildSnapshotUpdateEnvelope) so callers never handle Prisma
+          // envelope shapes; when no snapshot is passed (every current
+          // emit('update') caller) the stored composite stays untouched.
+          const normalizedParameters: Prisma.activitiesUncheckedUpdateInput = {
+            ...rest,
+            userId: normalizeUpdateIdField(rest.userId),
+            target: normalizeUpdateIdField(rest.target),
+            event: normalizeUpdateIdField(rest.event),
+            snapshot: buildSnapshotUpdateEnvelope(snapshot),
           };
 
           try {
