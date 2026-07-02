@@ -3,12 +3,12 @@ import { Schema } from 'mongoose';
 import { getOrCreateModel } from '~/server/util/mongoose-utils';
 
 import type {
-  PageLink,
+  IPageLink,
   PageLinkDocument,
   PageLinkModel,
 } from '../../interfaces/page-link';
 
-const PageLinkSchema = new Schema<PageLink>({
+const PageLinkSchema = new Schema<IPageLink>({
   fromPage: {
     type: Schema.Types.ObjectId,
   },
