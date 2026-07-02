@@ -351,6 +351,7 @@ export type AiProviderApiKeys = Partial<Record<AiProvider, string>>;
 
 - `ENV_ONLY_GROUPS` の ai グループ: `targetKeys: ['app:aiEnabled', 'ai:providers', 'ai:providerApiKeys']`(モデル設定を外す = 5.3)。
 - 削除: `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings`(7.1。migration なし = 7.2。新キー不在時は available provider が 0 になり自然に未設定扱い = 7.3)。
+- **単一 JSON env への集約 — トレードオフの記録(5.1)**: `AI_PROVIDER_API_KEYS` は全プロバイダの API キーを 1 つの JSON env 値に合成する形であり、K8s の `secretKeyRef` 等でプロバイダごとに別々のシークレットソースから注入することはできない。config-manager の機構(1 config key = 1 env var)と D2 の Record 保存形に整合するため、この形を採る。**非採用代替**: per-provider env var(`AI_OPENAI_API_KEY` 等)は、config key の per-provider 分割(Record 設計の放棄)か config-loader への例外機構の追加を要するため見送り。運用要望が生じた場合は、loader 段で per-provider env を Record へマージする「追加エイリアス」として後方互換に導入できる(拡張余地 — 本 spec では実装しない)。JSON エスケープ誤りは malformed config warn(Error Handling 参照)で観測可能。env 記述例(JSON エスケープ・複数キー合成の具体例)のドキュメント整備は tasks で 1 タスク化する。
 - config-manager は値をランタイム検証しないため、アクセサ側で `Array.isArray` / object ガードを行う(現行 `getAllowedModels` の防御パターン踏襲)。ガードが不正形状を検出した場合は「未設定」として fail-soft しつつ、`(config key, 理由)` の warn を dedup 付きで出力する(fail-silent の排除 — Error Handling 参照)。JSON env のタイポ等で `ai:providers` 自体が読めないケースは 6.1 の不備ログ(enabled 判定後)に到達しないため、この warn が唯一の手がかりになる。
 
 ### service / provider-availability
