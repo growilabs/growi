@@ -18,7 +18,7 @@
 > - `where: { snapshot: { is: { username: { in: [...] } } } }` という composite type への絞り込みは、実 MongoDB に対して意図通り効くことを確認済み（`aggregateRaw` への生クエリ回避は不要だった）
 > - `create` / `createMany` は明示的な `_id`（ObjectId 文字列）を指定しても受け付けることを確認済み
 >
-> （移行前に懸念していたこと: Mongoose は strict 既定で未宣言フィールドを保存時に黙って捨てるため、schema.prisma の `ActivitiesSnapshot` にだけフィールドを足しても、実際の書き込みが Mongoose 経由のままだと添付フィールドが1バイトも保存されない「型は通るが保存されない」失敗になり得た。移行完了によりこの懸念は解消している。）
+> **【「型は通るが保存されない」失敗に注意 — Prisma 移行後も残る】** Mongoose 時代は strict 既定で未宣言フィールドを保存時に黙って捨てることが原因だった。移行完了でこの Mongoose 由来の経路は消えたが、**同じ失敗が Prisma 拡張側に残っている**。`prisma.activities.createByParameters` は渡された `snapshot` を素通しせず `{ id, username }` だけを手で組み立て直すため（`models/activity.ts` 315-320行）、schema.prisma の `ActivitiesSnapshot` にフィールドを足しただけでは、**カスケード削除（`createActivity` → `createByParameters` 経由）で添付フィールドが1バイトも保存されない**。型は通り activity レコードも作られるので「保存したつもり」になりやすい。したがって本スペックは `createByParameters` の改修も所有範囲に含める（下記「This Spec Owns」）。直接削除は `updateByParameters` が `...parameters` で snapshot を素通しするため経路が異なるが、composite type の `set` 時に必須の `snapshot._id` を保持できるかを実装前にテストで確認する。
 
 ### Goals
 - `snapshot` 型を `action` を唯一の判別子とする判別可能ユニオンにする（要件 1）。
@@ -38,6 +38,7 @@
 ### This Spec Owns
 - `snapshot` の判別可能ユニオン型・type guard・型付きビルダー（`interfaces/activity.ts` ＋ サーバ側ビルダー）。
 - `schema.prisma` の `ActivitiesSnapshot` composite type への添付フィールド追加。
+- **`models/activity.ts` の `createByParameters` の改修** — 渡された `snapshot` の添付フィールド（`originalName`/`pagePath`/`pageId`/`fileSize`）を保存する `snapshotData` に反映する。この関数は元々 `activities-prisma-migration` が作成したもので、現状は `{ id, username }` だけを手組みして添付フィールドを捨てる（315-320行）。カスケード削除の保存口はここなので、本スペックが所有範囲を1つ広げて改修する。`updateByParameters`（直接削除の保存口）は snapshot を素通しするため改修不要の見込みだが、composite `set` と必須の `snapshot._id` の扱いをテストで確認する。
 - `SupportedTargetModel` への `Attachment` 値の追加。
 - 添付削除 activity の記録ロジック（直接削除＝既存 activity の更新、カスケード削除＝添付ごとの新規作成）。`target` には削除対象添付の `_id` を、`targetModel` には `Attachment` を設定する。
 - 監査ログ API（`apiv3/activity.ts`）の OpenAPI への snapshot 添付フィールド記述と、応答にフィールドが乗ることの保証。
@@ -51,7 +52,7 @@
 - contribution-graph / audit-log-bulk-export / page-bulk-export 等、添付削除と無関係な activities 消費者の挙動変更。
 
 ### Allowed Dependencies
-- 移行済み `activities` Prisma モデルと拡張（`ActivityExtension` の `createByParameters` / `updateByParameters` / `paginate` / `findSnapshotUsernamesByUsernameRegexWithTotalCount`）。`~/utils/prisma` の `prisma` クライアント。**移行は 2026-07-01 に完了済み**（詳細は Overview の囲み参照）。
+- 移行済み `activities` Prisma モデルと拡張（`ActivityExtension` の `createByParameters` / `updateByParameters` / `paginate` / `findSnapshotUsernamesByUsernameRegexWithTotalCount`）。`~/utils/prisma` の `prisma` クライアント。**移行は 2026-07-01 に完了済み**（詳細は Overview の囲み参照）。ただし `createByParameters` は snapshot 添付フィールドを保存するため本スペックで改修する（上記 This Spec Owns 参照。依存ではなく所有に格上げ）。
 - `attachments` Prisma モデル（`originalName` / `fileSize` / `pageId`）と `pages` モデル（`path` の引き当て）。
 - `attachmentService.removeAttachment` / `removeAllAttachments`（削除実体）。
 - `ActivityService.createActivity` / `shoudUpdateActivity` と `activityEvent`、`addActivity` middleware が用意する `res.locals.activity`。
@@ -129,16 +130,29 @@ graph TB
 ### Modified Files
 - `apps/app/prisma/schema.prisma` — `ActivitiesSnapshot` composite type に添付フィールド（`originalName` / `pagePath` / `pageId` / `fileSize`、いずれも optional）を追加。`username` を optional 化（user 無し削除経路への安全策。`research.md` D-5）。`activities` モデル本体・index は変更しない。
 - `apps/app/src/interfaces/activity.ts` — `SupportedTargetModel` に `MODEL_ATTACHMENT = 'Attachment'` を追加。`ISnapshot` を `DefaultSnapshot | AttachmentRemoveSnapshot` のユニオンに再定義。`isAttachmentRemoveActivity` type guard を追加。`IActivity` は `snapshot?: ISnapshot` のまま（後方互換）。
-- `apps/app/src/server/routes/attachment/api.js` — `api.remove`: 削除前に `attachment` から `pagePath`（`pages` から path 引き当て）・`originalName`・`fileSize`・`pageId` を取り、ビルダーで snapshot を生成。`emit('update', res.locals.activity._id, { action: ACTION_ATTACHMENT_REMOVE, target: attachment._id, targetModel: MODEL_ATTACHMENT, snapshot })` に変更。
-- `apps/app/src/server/service/page/index.ts` — `deleteCompletelyOperation` で `removeAllAttachments` の**直前**に、削除対象添付ごとに `ACTION_ATTACHMENT_REMOVE` activity を新規作成（recorder 呼び出し）。`deleteCompletelyOperation(pageIds, pagePaths)` に **`actor` 引数を追加**し、それを渡す**全到達経路**を改修する（下表）。経路により操作者情報の入手範囲が異なる点に注意：
+- `apps/app/src/server/routes/attachment/api.js` — `api.remove`: 削除前に `attachment` から `originalName`・`fileSize`・ページ ID（**Mongoose の `attachment.page`**。ビルダーへは `pageId` として渡す）・`pagePath`（その `page` から `pages` を引いて path を得る）を取り、ビルダーで snapshot を生成。`emit('update', res.locals.activity._id, { action: ACTION_ATTACHMENT_REMOVE, target: attachment._id, targetModel: MODEL_ATTACHMENT, snapshot })` に変更。
+- `apps/app/src/server/service/page/index.ts` — `deleteCompletelyOperation` で `removeAllAttachments` の**直前**に、削除対象添付ごとに `ACTION_ATTACHMENT_REMOVE` activity を新規作成（recorder 呼び出し）。操作者情報を届けるため、`deleteCompletelyOperation` に **actor を1つの Parameter Object として追加**する（設計は直下参照）。
 
-  | 到達経路 | `deleteCompletelyOperation` 呼び出し | 入手できる actor |
-  |----------|--------------------------------------|------------------|
-  | `deleteCompletely`（単一・非再帰） | 直接（2515行） | **user + ip + endpoint**（`activityParameters` あり） |
-  | `deleteCompletelyV4`（v4 非再帰） | 直接（2614行） | user のみ |
-  | `deleteMultipleCompletely(pages, user)` | 直接（2422行） | **user のみ** |
+  **actor の受け渡し設計（Parameter Object を採用）**
 
-  `deleteMultipleCompletely` は `deleteCompletelyDescendantsWithStream` の stream batch（2698行）から呼ばれ、その stream は `deleteCompletelyRecursivelyMainOperation`（再帰完全削除の main op, 2580行）・`deleteCompletelyV4`（2617行）・`emptyTrashPage`（ゴミ箱空, 2644行）から起動される。**再帰完全削除とゴミ箱空という要件 3.1・3.2 の主経路は、いずれも `deleteMultipleCompletely` 経由で user しか持たない**ため、`ip`/`endpoint` は取れない前提で actor を user 中心に縮退させる。`deleteCompletelyDescendantsWithStream` → `deleteMultipleCompletely` の2段にも actor（user）を貫通させる必要がある。
+  *なぜ Parameter Object か*: 操作者情報は `user`（必須）＋ `ip`/`endpoint`（任意）の3値。これを個別の位置引数で足すと `deleteCompletelyOperation(pageIds, pagePaths, user, ip, endpoint)` の5引数になり読みにくい。既存コードには既に `activityParameters`（`{ ip, endpoint }` を束ねたオブジェクト）を `deleteCompletely`・`emptyTrashPage` に渡す前例があり（`deleteCompletely` は6位置引数 ＋ `activityParameters`）、これに倣って actor を型付きの1オブジェクトにまとめる。`actor` は **必須引数**にする（省略可だと user 無しで黙って記録される。必須なら呼び出し漏れをコンパイルで検出できる）。
+
+  ```typescript
+  type ActivityActor = { user: IUserHasId; ip?: string; endpoint?: string };
+  // deleteCompletelyOperation(pageIds, pagePaths, actor: ActivityActor)
+  ```
+
+  *貫通は最小で済む — `user` は既に全経路にある*: `deleteCompletelyOperation` を呼ぶ直接呼び出し元は次の3つだけで、いずれも `user` を既にスコープに持つ。よって `deleteCompletelyOperation` に `actor` を足し、各直接呼び出し元が手持ちの情報から `actor` を組み立てて渡すだけでよい（下流の stream 関数群の signature は変えない）：
+
+  | 直接呼び出し元 | 行 | `actor` に詰められる情報 |
+  |----------------|----|--------------------------|
+  | `deleteCompletely`（単一・非再帰） | 2518行 | **user + ip + endpoint**（`activityParameters` あり） |
+  | `deleteCompletelyV4`（v4 非再帰） | 2617行 | user のみ |
+  | `deleteMultipleCompletely(pages, user)` | 2425行 | **user のみ**（既存の `user` 引数から `{ user }` を組む） |
+
+  *要件3の主経路と、見落としがちな第4の経路はすべて `deleteMultipleCompletely` に収束する*。`deleteMultipleCompletely` は (a) stream batch（`deleteCompletelyDescendantsWithStream` 内, 2701行。これは `deleteCompletelyRecursivelyMainOperation` 2583行・`deleteCompletelyV4` 2620行・`emptyTrashPage`（ゴミ箱空）2647行 から起動）と、(b) **`handlePrivatePagesForGroupsToDelete`（ユーザーグループ削除に伴う私有ページの完全削除, 3358行）** から呼ばれる。いずれも `deleteMultipleCompletely(pages, user)` の形で `user` を渡している。したがって **`deleteMultipleCompletely` が自身の `user` 引数から `{ user }` を組んで `deleteCompletelyOperation` に渡す**ようにすれば、stream 経由の全経路とグループ削除経路が**呼び出し元を一切変えずに**カバーされる（当初レビューで指摘した「経路の列挙漏れ = `handlePrivatePagesForGroupsToDelete`」は、この seam で吸収されるため個別改修は不要）。
+
+  *ip/endpoint の縮退（許容）*: `deleteMultipleCompletely` は `user` しか持たないため、そこを通る再帰完全削除・ゴミ箱空・グループ削除では `ip`/`endpoint` は snapshot に乗らない（`username` は乗る）。単一・非再帰の直接削除（`deleteCompletely` 経由）だけが ip/endpoint を持つ。要件3は username があれば満たせるため、この縮退は許容する。将来 ip/endpoint も通したい場合は、同じ `ActivityActor` オブジェクトを stream・`deleteMultipleCompletely` の signature に足して貫通させれば拡張できる（本スペックのスコープ外）。
 - `apps/app/src/server/routes/apiv3/activity.ts` — OpenAPI の `snapshot` プロパティに添付フィールドを追記。応答整形（`...rest`）は変更不要だが、snapshot 添付フィールドが欠落なく乗ることをテストで担保。
 
 ### New Files
@@ -171,7 +185,7 @@ sequenceDiagram
     Handler->>DB: update pre created activity
 ```
 
-snapshot は **削除前**の `attachment`（`api.remove` のスコープに存在）から生成する。`pagePath` は `attachment.pageId` から `pages` を引いて得る。ページが見つからない／添付フィールドが欠ける場合は取れた範囲で記録し警告する（要件 2.3）。
+snapshot は **削除前**の `attachment`（`api.remove` のスコープに存在）から生成する。`pagePath` は Mongoose 添付の `attachment.page`（ObjectId）から `pages` を引いて得る（ビルダーへ渡すときは `pageId` に読み替える）。ページが見つからない／添付フィールドが欠ける場合は取れた範囲で記録し警告する（要件 2.3）。
 
 ### カスケード削除（要件 3）— 添付ごとの新規作成
 
@@ -195,7 +209,7 @@ sequenceDiagram
     Op->>Store: removeAllAttachments
 ```
 
-`removeAllAttachments`（ストレージ削除）の**前**に snapshot を取り activity を作る（要件 3.4）。完全削除・ゴミ箱を空にする操作はいずれも最終的に `deleteCompletelyOperation` に収束するため、記録ロジック自体はここ1箇所で要件 3.1・3.2 を満たす。ただし `deleteCompletelyOperation` に actor を届けるには複数経路の改修が要る（上の File Structure Plan の表）。`pageId → path` は `deleteCompletelyOperation` が受け取る `pageIds` / `pagePaths` の対応から作る。再帰・ゴミ箱空の主経路では actor が user のみで `ip`/`endpoint` を欠くため、snapshot の `username` は取れるが ip/endpoint は activity に乗らないことがある（許容）。
+`removeAllAttachments`（ストレージ削除）の**前**に snapshot を取り activity を作る（要件 3.4）。完全削除・ゴミ箱を空にする操作はいずれも最終的に `deleteCompletelyOperation` に収束するため、記録ロジック自体はここ1箇所で要件 3.1・3.2 を満たす。`deleteCompletelyOperation` に actor を届けるのは、Parameter Object（`ActivityActor`）を新引数に足し、3つの直接呼び出し元と `deleteMultipleCompletely` の seam で組む最小改修で足りる（上の File Structure Plan「actor の受け渡し設計」）。`pageId → path` は `deleteCompletelyOperation` が受け取る `pageIds` / `pagePaths` の対応から作る（添付は Mongoose の `attachment.page` で `pageId` に読み替え）。再帰・ゴミ箱空の主経路では actor が user のみで `ip`/`endpoint` を欠くため、snapshot の `username` は取れるが ip/endpoint は activity に乗らないことがある（許容）。
 
 **unique index 衝突の回避**: 各 activity の `target` を各添付の `_id` にするため、複合 unique index `{ userId, target, action, createdAt }` は添付ごとに一意となり、同一ページ配下の複数添付・同一ミリ秒でも衝突しない。index は変更しない（`research.md` D-2 方針2）。
 
@@ -286,6 +300,7 @@ export const isAttachmentRemoveActivity = (
 **Responsibilities & Constraints**
 - 直接削除・カスケードの両経路から共用する。フレームワーク非依存の純粋関数。
 - 取得できないフィールドは省略する（要件 2.3）。`fileSize` は Prisma 上 `Int @default(0)` のため通常存在。
+- **入力の `attachment` は呼び出し側で正規化してから渡す（フィールド名の罠）**: ビルダーは `attachment.pageId` を読むが、**Mongoose の添付ドキュメントはページ参照を `page`（ObjectId）として持ち、`pageId` という別名は Prisma モデル側の `@map("page")` にしか存在しない**。カスケードは `Attachment.find(...)`（Mongoose、`page/index.ts` 2383行）で添付を取り、直接削除の `api.remove` の添付も Mongoose なので、両経路とも **`page → pageId` に読み替えてから** `buildAttachmentRemoveSnapshot` に渡す（`pagePath` を引くための ID もこの `page` から取る）。`AttachmentLike.pageId` は optional なので、変換を忘れても型では捕まらず `pageId` と `pagePath` が黙って `undefined` になり、要件 2.1/3.3 の4フィールドのうち2つが欠落する。
 
 **Dependencies**: Outbound: Snapshot Types (P0)
 
@@ -293,6 +308,8 @@ export const isAttachmentRemoveActivity = (
 
 ##### Service Interface
 ```typescript
+// NOTE: `pageId` is the Prisma alias for the Mongoose attachment's `page` field.
+// Callers holding a Mongoose attachment doc must map `page` -> `pageId` first.
 type AttachmentLike = {
   _id: string;
   originalName?: string;
@@ -339,15 +356,15 @@ export const buildAttachmentRemoveSnapshot = (
 
 ##### Service Interface
 ```typescript
-// ip / endpoint はカスケードの再帰・ゴミ箱空経路では入手できないため optional。
-// 通常 user のみが渡る（File Structure Plan の経路表を参照）。
-type Actor = { user?: IUserHasId; ip?: string; endpoint?: string };
+// Shared with deleteCompletelyOperation's actor Parameter Object (File Structure Plan).
+// user is required; ip/endpoint are optional (absent on the cascade / empty-trash paths).
+type ActivityActor = { user: IUserHasId; ip?: string; endpoint?: string };
 
 export const recordCascadeAttachmentRemovals = async (
   activityService: { createActivity(parameters: IActivity): Promise<IActivity | null> },
   attachments: AttachmentLike[],
   pageIdToPath: Map<string, string>,
-  actor: Actor,
+  actor: ActivityActor,
 ): Promise<void> => {
   // for each attachment: build snapshot, then createActivity with
   // { action: ACTION_ATTACHMENT_REMOVE, target: attachment._id,
@@ -359,7 +376,7 @@ export const recordCascadeAttachmentRemovals = async (
 - Invariants: 1件の作成失敗が削除処理全体を止めないようにする（下記 Error Handling 参照）。
 
 **Implementation Notes**
-- Integration: `deleteCompletelyOperation` が `removeAllAttachments` の直前で呼ぶ。actor は `deleteCompletelyOperation` の新引数として受け取り、File Structure Plan の表に挙げた**全到達経路**（`deleteCompletely` 直接 / `deleteCompletelyV4` / `deleteMultipleCompletely`、および stream 経由の `emptyTrashPage`・`deleteCompletelyRecursivelyMainOperation`）から貫通させる。再帰・ゴミ箱空の経路は user のみ。
+- Integration: `deleteCompletelyOperation` が `removeAllAttachments` の直前で呼ぶ。actor は `deleteCompletelyOperation` の新しい Parameter Object 引数（`ActivityActor`）として受け取る。貫通は「3つの直接呼び出し元が手持ちから `actor` を組む＋`deleteMultipleCompletely` が既存の `user` から `{ user }` を組む」の最小改修で足りる（File Structure Plan「actor の受け渡し設計」参照）。stream 経由の再帰・ゴミ箱空、および `handlePrivatePagesForGroupsToDelete`（グループ削除）経路は `deleteMultipleCompletely` に収束するため自動的にカバーされ、いずれも user のみ（ip/endpoint なし）。
 - Validation: `pageId → path` が引けない添付は `pagePath` を `undefined` で記録（削除済み等）。
 - Risks: 大量カスケード時の件数（Open Questions 参照）。
 
@@ -380,7 +397,7 @@ export const recordCascadeAttachmentRemovals = async (
 - delivery/idempotency: 既存の `emit('update')` 経路をそのまま使う。snapshot は削除前に生成済み。
 
 **Implementation Notes**
-- Integration: `attachmentService.removeAttachment(attachment)` の前に snapshot を作る（削除後は doc が消えるため）。`pagePath` は `attachment.pageId` から `pages` を引く。
+- Integration: `attachmentService.removeAttachment(attachment)` の前に snapshot を作る（削除後は doc が消えるため）。`pagePath` は Mongoose 添付の `attachment.page`（ObjectId）から `pages` を引く（ビルダーへは `pageId` として渡す。C3 の `page → pageId` 読み替え）。
 - Validation: 添付が見つからない既存分岐は維持。ページが引けない場合は `pagePath` 省略＋警告（要件 2.3）。
 
 #### Audit Log API
@@ -417,6 +434,7 @@ type ActivitiesSnapshot {
 ```
 - 既存ドキュメントは `username` のみ。追加フィールドは optional のため、既存データの破壊的移行は不要（要件 4.2）。
 - `activities` モデル本体・index（`@@unique([userId, target, action, createdAt])` 等）は変更しない。
+- **composite type にフィールドを足すだけでは保存されない**: 書き込み口の `createByParameters` が snapshot を手組みしているため、この schema 変更と対で `createByParameters` の改修（This Spec Owns 参照）が必須。片方だけだと「型は通るが保存されない」状態になる。
 
 ## Error Handling
 
@@ -435,10 +453,12 @@ type ActivitiesSnapshot {
 - `buildAttachmentRemoveSnapshot` が欠損入力（pagePath 無し等）で当該フィールドを省略する（要件 2.3）。
 - `isAttachmentRemoveActivity` が `action` で正しく narrowing し、それ以外の action では `DefaultSnapshot` 扱いになる（要件 1.1, 1.3, 1.4）。
 
-### Integration Tests
-- 直接削除（`attachments.remove`）後、対象 activity の `snapshot` に添付フィールドと `username` が入り、`target` が添付 `_id`・`targetModel` が `Attachment` になる（要件 2.1, 2.2）。
-- 完全削除で1ページ複数添付を消したとき、添付ごとに `ACTION_ATTACHMENT_REMOVE` activity が作成され、**E11000 が発生しない**（target が添付ごとに一意。要件 3.1, 3.4）。
-- ゴミ箱を空にする操作でも同様に添付ごとの activity が作られる（要件 3.2）。
+> **重要 — 返り値ではなく DB から読み直して検証する**: 下の各テストは activity を作った後、**永続層から当該レコードを取り直して** `snapshot.originalName`/`pagePath`/`pageId`/`fileSize` の4フィールドが実際に保存されていることを assert する。`createByParameters` が snapshot を手組みして添付フィールドを捨てる不具合（This Spec Owns 参照）は、ビルダーやサービスの返り値だけを見るテストでは通ってしまい捕まらない。実 MongoDB（devcontainer の `mongo:27017`, rs0）に対する結合試験で検証する。
+
+- **保存口の直接検証（C1 ガード）**: `createByParameters` に添付フィールド入り snapshot を渡して作成 → DB から読み直し4フィールドが乗ることを確認。`updateByParameters` でも同様に、composite の `set` 後に4フィールドが保存され、既存 `snapshot._id`・`username` が壊れないことを確認する。
+- 直接削除（`attachments.remove`）後、対象 activity を**取り直して** `snapshot` に添付フィールド4つと `username` が入り、`target` が添付 `_id`・`targetModel` が `Attachment` になる（要件 2.1, 2.2）。
+- 完全削除で1ページ複数添付を消したとき、添付ごとに `ACTION_ATTACHMENT_REMOVE` activity が作成され（**E11000 が発生しない** — target が添付ごとに一意）、各レコードを取り直して4フィールドが保存されていること、`pageId`/`pagePath` が `undefined` に落ちていないこと（C3 の `page → pageId` 読み替えの検証）を確認する（要件 3.1, 3.3, 3.4）。
+- ゴミ箱を空にする操作でも同様に添付ごとの activity が作られ、4フィールドが保存される（要件 3.2）。**あわせて `handlePrivatePagesForGroupsToDelete`（グループ削除）経由でも記録されることを1ケース確認**し、actor 貫通が `deleteMultipleCompletely` の seam で効いていることを担保する。
 - 監査ログ API の応答に snapshot 添付フィールドが乗る／`username` のみの既存 activity も問題なく返る（要件 4.1, 4.2）。
 
 > テスト記述時は `essential-test-design`（観察可能な契約をテスト）と `essential-test-patterns`（Vitest / 型安全モック）に従う。記録可否ゲートを通すため、結合試験は `ACTION_ATTACHMENT_REMOVE` を記録対象にする設定（Medium 以上または additional actions）を明示的に注入する（`research.md` D-5）。
