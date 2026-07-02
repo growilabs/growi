@@ -13,16 +13,18 @@ vi.mock('~/utils/prisma', () => ({
 }));
 
 import { getEffectiveSelectableModelIds } from './effective-model-catalog';
+import { BUNDLED_CATALOG_GENERATED_AT } from './model-catalog';
 
 beforeEach(() => {
   vi.clearAllMocks();
 });
 
 describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
-  describe('when a refreshed catalog is persisted', () => {
+  describe('when a refreshed catalog is persisted (newer than the bundled asset)', () => {
     beforeEach(() => {
       getSingleton.mockResolvedValue({
         models: { openai: ['refreshed-model'] },
+        // Fetched "now" — strictly newer than the committed asset's header.
         fetchedAt: new Date(),
         source: 'https://models.dev/api.json (MIT)',
       });
@@ -46,6 +48,44 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
 
       const second = await getEffectiveSelectableModelIds('openai');
       expect(second).toEqual(['refreshed-model']);
+    });
+  });
+
+  describe('when the bundled asset is NEWER than the persisted snapshot (e.g. after an image update)', () => {
+    beforeEach(() => {
+      getSingleton.mockResolvedValue({
+        models: { openai: ['stale-refreshed-model'] },
+        // Strictly older than the committed asset's _generatedAt header.
+        fetchedAt: new Date(0),
+        source: 'https://models.dev/api.json (MIT)',
+      });
+    });
+
+    it('serves the bundled catalog instead of the stale snapshot (Req 9.5)', async () => {
+      const ids = await getEffectiveSelectableModelIds('openai');
+
+      expect(ids).not.toContain('stale-refreshed-model');
+      expect(ids.length).toBeGreaterThan(0); // the real bundled openai list
+    });
+
+    it('keeps the bundled behavior for catalog-less providers (azure → [])', async () => {
+      await expect(
+        getEffectiveSelectableModelIds('azure-openai'),
+      ).resolves.toEqual([]);
+    });
+  });
+
+  describe('when the snapshot and the bundled asset have the SAME timestamp', () => {
+    it('resolves the tie to the refreshed snapshot (bundled wins only when STRICTLY newer)', async () => {
+      getSingleton.mockResolvedValue({
+        models: { openai: ['refreshed-model'] },
+        fetchedAt: new Date(BUNDLED_CATALOG_GENERATED_AT.getTime()),
+        source: 'https://models.dev/api.json (MIT)',
+      });
+
+      await expect(getEffectiveSelectableModelIds('openai')).resolves.toEqual([
+        'refreshed-model',
+      ]);
     });
   });
 

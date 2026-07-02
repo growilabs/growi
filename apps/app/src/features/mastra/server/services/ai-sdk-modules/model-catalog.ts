@@ -13,6 +13,14 @@ import type { AiProvider } from '../../../interfaces/ai-provider';
 const models: Record<string, readonly string[]> = catalog.models;
 
 /**
+ * When the bundled asset was generated (its `_generatedAt` header). Used by the
+ * effective-catalog resolution to prefer the NEWER of "bundled" vs "persisted
+ * refreshed" — after an image update ships a fresher bundled catalog, a stale
+ * runtime snapshot must not shadow it (Req 9.5).
+ */
+export const BUNDLED_CATALOG_GENERATED_AT = new Date(catalog._generatedAt);
+
+/**
  * Return the selectable model ids for the given provider from the committed
  * catalog. Synchronous and offline: performs no network or filesystem I/O.
  * Providers absent from the catalog (e.g. 'azure-openai') fail soft with an

@@ -106,8 +106,8 @@
   - _Requirements: 6.1, 9.1_
   - _Boundary: build-model-catalog, vendor-model-catalog_
 - [x] 9.2 更新済みカタログの永続化と effective read を実装する
-  - `RefreshedModelCatalog` singleton collection（`{ models, fetchedAt, source }`）と `getEffectiveSelectableModelIds(provider)`（更新済み ?? 同梱、9.5）を追加し、`get-available-models` を effective read に切替える
-  - 完了状態: 更新済みありでそれを返し、なしで同梱へフォールバック、azure は `[]`、read パスに外部通信がないことを単体テストで確認できる
+  - `RefreshedModelCatalog` singleton collection（`{ models, fetchedAt, source }`）と `getEffectiveSelectableModelIds(provider)`（更新済み／同梱の**新しい方**を採用。同梱が厳密に新しい場合のみ同梱優先＝イメージ更新後の stale スナップショット覆い隠し防止。無ければ同梱、9.5）を追加し、`get-available-models` を effective read に切替える
+  - 完了状態: 更新済みが新しければそれを返し、同梱が新しければ同梱を返し、なしで同梱へフォールバック、azure は `[]`、read パスに外部通信がないことを単体テストで確認できる
   - _Requirements: 9.4, 9.5, 2.1, 3.1_
   - _Boundary: refreshed-model-catalog, effective-model-catalog, get-available-models_
 - [x] 9.3 refresh サービスと管理画面からの手動更新を実装する
