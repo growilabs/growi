@@ -40,8 +40,8 @@ jobs:
       # release tag bundles the freshest chat+tool model list. On fetch/schema/empty
       # failure vendor:models exits non-zero and preserves the existing committed
       # artifact, so the release proceeds with the last-good catalog (design Error
-      # Handling: "リリースは前回カタログで継続可能"). The subsequent build reads only
-      # the committed JSON (no fetch/commit added to the build workflow).
+      # Handling: the release can continue with the previous catalog). The subsequent
+      # build reads only the committed JSON (no fetch/commit added to the build workflow).
       continue-on-error: true
       run: pnpm vendor:models
 

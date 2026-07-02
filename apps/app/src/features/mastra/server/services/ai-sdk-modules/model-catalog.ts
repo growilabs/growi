@@ -15,7 +15,7 @@ const models: Record<string, readonly string[]> = catalog.models;
  * Return the selectable model ids for the given provider from the committed
  * catalog. Synchronous and offline: performs no network or filesystem I/O.
  * Providers absent from the catalog (e.g. 'azure-openai') fail soft with an
- * empty array (Error Handling: "成果物欠損/破損 → ?? []").
+ * empty array (Error Handling: missing/corrupt artifact → `?? []`).
  */
 export const getSelectableModelIds = (provider: AiProvider): string[] => {
   // Spread into a fresh mutable array so callers cannot mutate the shared

@@ -69,7 +69,7 @@ export const AllowedModelsField = (
   // provider is unset, so no request is issued then (5.2).
   const { data, error } = useSWRxSelectableModels(provider);
 
-  // Mode derivation (design "AllowedModelsField（UI 変更）"):
+  // Mode derivation (design "AllowedModelsField (UI change)"):
   // - `select` only when the catalog resolved to a non-empty list (1.4).
   // - `freetext` when the provider is unset (5.2), the fetch failed (3.2), or the
   //   catalog resolved but is empty — e.g. azure-openai (3.1). In all three the
