@@ -198,6 +198,9 @@ module.exports = (crowi: Crowi) => {
         return res.apiv3({ bookmarkFolder });
       } catch (err) {
         logger.error(err);
+        if (err instanceof BookmarkFolderForbiddenError) {
+          return res.apiv3Err('forbidden', 403);
+        }
         if (err instanceof InvalidParentBookmarkFolderError) {
           return res.apiv3Err(
             new ErrorV3(err.message, 'failed_to_create_bookmark_folder'),
