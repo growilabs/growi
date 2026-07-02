@@ -989,7 +989,8 @@
   "user_group": {
     "select_group": "选择组别",
     "belonging_to_no_group": "无法找到你所属的团体。",
-    "manage_user_groups": "管理用户组"
+    "manage_user_groups": "管理用户组",
+    "only_yourself": "仅限自己"
   },
   "fix_page_grant": {
     "modal": {

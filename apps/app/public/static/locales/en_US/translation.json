@@ -984,7 +984,8 @@
   "user_group": {
     "select_group": "Select group",
     "belonging_to_no_group": "Could not find the groups you belong to.",
-    "manage_user_groups": "Manage user groups"
+    "manage_user_groups": "Manage user groups",
+    "only_yourself": "Only you"
   },
   "fix_page_grant": {
     "modal": {
