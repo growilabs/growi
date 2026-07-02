@@ -170,4 +170,48 @@ describe('PageCleanupCronService (integration)', () => {
       expect(await Page.findById(realLeafId)).not.toBeNull();
     });
   });
+
+  describe('executeJob', () => {
+    // Stub the jitter so the job does not actually sleep (up to MAX_RANDOM_SLEEP_MS).
+    beforeEach(() => {
+      vi.spyOn(Math, 'random').mockReturnValue(0);
+    });
+    afterEach(() => {
+      vi.restoreAllMocks();
+    });
+
+    it('runs both cleanup steps: removes orphaned empty pages and repairs counts', async () => {
+      // A tree needing both fixes: an inflated ancestor count AND an orphaned
+      // empty leaf, so a missing step leaves one of them unfixed.
+      const parentId = new mongoose.Types.ObjectId();
+      await Page.create({
+        _id: parentId,
+        path: base,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: false,
+        descendantCount: 5, // inflated, as if a TTL-deleted WIP page were still counted
+      });
+      await Page.create({
+        path: `${base}/child`,
+        parent: parentId,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: false,
+        descendantCount: 0,
+      });
+      const orphanEmptyId = new mongoose.Types.ObjectId();
+      await Page.create({
+        _id: orphanEmptyId,
+        path: `${base}/orphan-empty`,
+        grant: Page.GRANT_PUBLIC,
+        isEmpty: true,
+      });
+
+      await cron.executeJob();
+
+      expect(await Page.findById(orphanEmptyId)).toBeNull();
+      // One real child → correct count is 1.
+      const parent = await Page.findById(parentId);
+      expect(parent?.descendantCount).toBe(1);
+    });
+  });
 });

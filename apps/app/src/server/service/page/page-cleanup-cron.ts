@@ -3,6 +3,7 @@ import mongoose from 'mongoose';
 import type Crowi from '~/server/crowi';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import CronService from '~/server/service/cron';
+import { randomSleep } from '~/server/util/random-sleep';
 import loggerFactory from '~/utils/logger';
 
 const logger = loggerFactory('growi:service:page-cleanup-cron');
@@ -16,11 +17,6 @@ const MAX_RANDOM_SLEEP_MS = 5 * 60 * 1000;
 // Each pass can expose a new layer of empty leaves, so the loop is unbounded in
 // principle; this backstops a data anomaly (e.g. a parent cycle) from spinning forever.
 const MAX_EMPTY_CLEANUP_PASSES = 100;
-
-const randomSleep = (maxMs: number): Promise<void> => {
-  const ms = Math.floor(Math.random() * maxMs);
-  return new Promise((resolve) => setTimeout(resolve, ms));
-};
 
 /**
  * When the MongoDB TTL index deletes an expired WIP page, no application code
@@ -49,6 +45,30 @@ export class PageCleanupCronService extends CronService {
     await this.crowi.pageService.recountAndUpdateDescendantCountOfAllPages();
   }
 
+  // Shared by the broad discovery pass and the pre-delete re-verification below.
+  private async findChildlessEmptyLeafIds(
+    match: mongoose.FilterQuery<PageDocument>,
+  ): Promise<mongoose.Types.ObjectId[]> {
+    const Page = mongoose.model<PageDocument, PageModel>('Page');
+
+    const emptyLeaves = await Page.aggregate<{ _id: mongoose.Types.ObjectId }>([
+      { $match: match },
+      {
+        $lookup: {
+          from: 'pages',
+          localField: '_id',
+          foreignField: 'parent',
+          pipeline: [{ $limit: 1 }, { $project: { _id: 1 } }],
+          as: 'children',
+        },
+      },
+      { $match: { children: { $size: 0 } } },
+      { $project: { _id: 1 } },
+    ]);
+
+    return emptyLeaves.map((p) => p._id);
+  }
+
   /**
    * An empty page is a structural placeholder that only connects a real
    * descendant to its ancestors; once childless it serves no purpose. Deleting
@@ -62,29 +82,28 @@ export class PageCleanupCronService extends CronService {
     let pass = 0;
     for (; pass < MAX_EMPTY_CLEANUP_PASSES; pass++) {
       // biome-ignore lint/performance/noAwaitInLoops: each pass depends on the previous one's deletions
-      const emptyLeaves = await Page.aggregate<{
-        _id: mongoose.Types.ObjectId;
-      }>([
-        { $match: { isEmpty: true, path: { $ne: '/' } } },
-        {
-          $lookup: {
-            from: 'pages',
-            localField: '_id',
-            foreignField: 'parent',
-            pipeline: [{ $limit: 1 }, { $project: { _id: 1 } }],
-            as: 'children',
-          },
-        },
-        { $match: { children: { $size: 0 } } },
-        { $project: { _id: 1 } },
-      ]);
+      const candidateIds = await this.findChildlessEmptyLeafIds({
+        isEmpty: true,
+        path: { $ne: '/' },
+      });
 
-      if (emptyLeaves.length === 0) {
+      if (candidateIds.length === 0) {
         break;
       }
 
-      const ids = emptyLeaves.map((p) => p._id);
-      const res = await Page.deleteMany({ _id: { $in: ids } });
+      // Re-verify childlessness right before deleting: the broad scan above can
+      // be stale, and deleting a candidate that has since gained a real child
+      // would orphan it. Re-checking the small id set keeps the TOCTOU window tiny.
+      const idsToDelete = await this.findChildlessEmptyLeafIds({
+        _id: { $in: candidateIds },
+        isEmpty: true,
+      });
+
+      if (idsToDelete.length === 0) {
+        break;
+      }
+
+      const res = await Page.deleteMany({ _id: { $in: idsToDelete } });
       totalRemoved += res.deletedCount ?? 0;
     }
 
