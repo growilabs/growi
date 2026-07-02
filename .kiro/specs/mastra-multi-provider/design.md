@@ -51,7 +51,7 @@
 - `~/components/ui/select`(SelectGroup / SelectLabel)と `ai-elements/prompt-input` のベンダリング部品
 - UserUISettings 基盤(mongoose モデル・PUT ルート・`scheduleToPut`)
 
-依存方向(左から右へのみ import 可): **interfaces → config-manager 定義 → server services(availability → llm-providers → resolve)→ routes → client stores/hooks → client components**。逆方向・client から server への import は違反。
+依存方向(右のモジュールが左を import する。逆は違反): **interfaces → config-manager 定義 → server services(config アクセサ → provider-availability → 実効キー解決 → resolve)→ routes → client stores/hooks → client components**。client から server への import も違反。
 
 ### Revalidation Triggers
 
@@ -91,8 +91,9 @@ graph TB
         CD[config-definition ai keys]
     end
     subgraph ServiceLayer
-        PA[provider-availability]
         LPC[llm-providers config]
+        PA[provider-availability]
+        EMK[effective-model-key]
         PRV[per-provider resolvers]
         RMM[resolve-mastra-model]
         IAC[is-ai-configured]
@@ -108,14 +109,16 @@ graph TB
         ADM[admin AiSettings UI]
         CHT[ChatSidebar selector]
     end
-    CD --> PA
-    PA --> IAC
-    PA --> LPC
+    CD --> LPC
+    LPC --> PA
     LPC --> PRV
+    PA --> EMK
+    PA --> IAC
     PRV --> RMM
-    LPC --> RMM
+    EMK --> RMM
     PA --> GMS
-    LPC --> POM
+    EMK --> GMS
+    EMK --> POM
     RMM --> POM
     GAS --> ADM
     PAS --> ADM
@@ -152,7 +155,9 @@ features/mastra/interfaces/
 └── provider-settings.ts          # AiProviderSettings / AiProvidersConfig / AiProviderApiKeys 型
 
 features/mastra/server/services/ai-sdk-modules/llm-providers/
-└── provider-availability.ts      # 有効プロバイダ判定・有効モデル集合・不備ログ (dedup 付き)
+├── warn-dedup.ts                 # (キー/プロバイダ, 理由) 単位の warn dedup レジストリ + clearAvailabilityLogDedup()。config アクセサと provider-availability が共用
+├── provider-availability.ts      # 有効プロバイダ判定・有効モデル集合・不備ログ (warn-dedup を利用)
+└── effective-model-key.ts        # 実効既定モデルの決定・リクエスト時の実効キー解決 (availability 連携。config.ts に置くと config ⇄ availability の循環 import になるため分離)
 
 features/mastra/client/admin/
 ├── DefaultModelSelector.tsx      # グローバル既定モデルのプロバイダ横断ドロップダウン (モック gd 部)
@@ -172,7 +177,7 @@ features/mastra/client/admin/
 - `server/service/config-manager/config-definition.ts` — `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` を削除、`ai:providers`(`AI_PROVIDERS`)・`ai:providerApiKeys`(`AI_PROVIDER_API_KEYS`, isSecret)を追加。`ENV_ONLY_GROUPS` の ai グループ targetKeys を `['app:aiEnabled', 'ai:providers', 'ai:providerApiKeys']` へ(allowedModels を除外 = R5.3)
 
 **server services**
-- `.../llm-providers/config.ts` — アクセサをプロバイダ引数付きへ(`getApiKey(p)` / `requireApiKey(p)` / `getProviderSettings(p)`)。`resolveEffectiveModelKey` / `getEffectiveDefaultModelKey` を availability 連携で再実装
+- `.../llm-providers/config.ts` — アクセサをプロバイダ引数付きへ(`getApiKey(p)` / `requireApiKey(p)` / `getProviderSettings(p)`)。availability / effective-model-key は import しない(現行 `resolveEffectiveModelId` / `getDefaultModelId` 相当は新設 `effective-model-key.ts` へ移設 — New Files 参照)
 - `.../llm-providers/{openai,anthropic,google,azure-openai}.ts` — 自プロバイダ名で `requireApiKey('openai')` 等を呼ぶ。azure は `getProviderSettings('azure-openai')?.azureOpenaiSettings` を読む
 - `.../resolve-mastra-model.ts` — `resolveMastraModel(modelKey?)`: 実効キー解決 → parse → dispatch。キャッシュキー = modelKey。`clearResolvedMastraModelCache` は現行の呼び出し契約のまま
 - `.../resolve-provider-options.ts` — `getProviderOptionsForModel(modelKey)`: (provider, modelId) 照合
@@ -286,8 +291,9 @@ sequenceDiagram
 | model-key | interfaces | modelKey の生成・解析の単一実装 | 2.1, 4.3, 4.4 | ai-provider (P0) | Service |
 | provider-settings / allowed-model / DTO 群 | interfaces | クロスレイヤ型の単一宣言 | 1.2, 2.1, 4.2 | — | State |
 | config-definition ai keys | config | 新キー定義・env 対応・env-only 部分ロック | 1.1, 5.1–5.3, 7.1 | config-manager (P0) | State |
-| provider-availability | service | 有効プロバイダ/有効モデルの単一述語 + 不備ログ | 1.6, 1.7, 6.1–6.4 | config accessors (P0) | Service |
-| llm-providers config | service | プロバイダ別アクセサ・実効キー解決 | 1.4, 4.6, 6.4 | provider-availability (P0) | Service |
+| provider-availability | service | 有効プロバイダ/有効モデルの単一述語 + 不備ログ | 1.6, 1.7, 6.1–6.4 | config accessors, warn-dedup (P0) | Service |
+| llm-providers config | service | プロバイダ別 config アクセサ(availability 非依存の最下層) | 1.4, 1.9 | config-manager, warn-dedup (P0) | Service |
+| effective-model-key | service | 実効既定モデルの決定・リクエスト時の実効キー解決 | 4.6, 6.4 | provider-availability, config accessors (P0) | Service |
 | per-provider resolvers | service | 各社 factory の薄いアダプタ | 1.10, 4.3 | @ai-sdk/* (P0) | Service |
 | resolve-mastra-model | service | modelKey → キャッシュ済みモデル | 4.3 | resolvers (P0) | Service |
 | is-ai-configured | service | AI 有効判定(ガード・SSR 用) | 6.2, 6.3, 7.3 | provider-availability (P0) | Service |
@@ -381,22 +387,34 @@ export const getAvailableModels = (): AllowedModel[];
 - Preconditions: なし(config 未設定でも安全に空集合)。
 - Postconditions: `getAvailableModels()` ⊆ `getAllowedModels()`。
 - **不備ログ(6.1)**: enabled なのに構成不備のプロバイダは `(provider, reason)` 単位で warn。同一内容はモジュール内 dedup し、`clearAvailabilityLogDedup()`(設定保存 / s2s 更新時に `clearResolvedMastraModelCache` と同時に呼ぶ)でリセット — リクエスト毎のログ洪水を防ぎつつ、設定変更後は再通知する。
-- **malformed config warn も同一の dedup・リセット契約を共有**: アクセサの防御ガード(config-definition 節)が出す `(config key, 理由)` warn は、この dedup レジストリと `clearAvailabilityLogDedup()` を共用する。レジストリは llm-providers 内の小さな共有ヘルパとして切り出し、availability → config アクセサの依存方向を壊さない。
+- **malformed config warn も同一の dedup・リセット契約を共有**: アクセサの防御ガード(config-definition 節)が出す `(config key, 理由)` warn は、この dedup レジストリと `clearAvailabilityLogDedup()` を共用する。レジストリは共有ヘルパ `warn-dedup.ts`(New Files 参照)に置き、config アクセサと availability の双方がそこへ依存する — config アクセサ → availability の一方向依存を保ち、循環 import を作らない。
 - azure の構成済み条件: endpoint(resourceName または baseURL)必須。Entra ID 時は apiKey 免除(現行 `isAiConfigured` の条件を per-provider 化)。
 
-### service / llm-providers config(アクセサ・実効キー解決)
+### service / llm-providers config(アクセサ)
 
 | Field | Detail |
 |-------|--------|
-| Intent | プロバイダ別 config 読取と、リクエスト時の単一検証点 |
-| Requirements | 1.4, 1.9, 4.6, 6.4 |
+| Intent | プロバイダ別 config 読取(availability 非依存の最下層) |
+| Requirements | 1.4, 1.9 |
 
 ```typescript
 export const getProviderSettings = (provider: AiProvider): AiProviderSettings | undefined;
 export const getApiKey = (provider: AiProvider): string | undefined;
 export const requireApiKey = (provider: AiProvider): string; // 不在時 throw (メッセージは provider 名 + env var 名のみ。キー値なし)
 export const getAllowedModels = (): AllowedModel[];
+```
 
+- per-provider resolvers(openai/anthropic/google/azure-openai)は署名 `(modelId: string) => MastraModelConfig` を維持し、内部で自プロバイダ名の `requireApiKey` / `getProviderSettings` を呼ぶ。`modelResolvers` Record は不変。
+- config.ts は provider-availability / effective-model-key を import しない(依存方向: config アクセサ → availability → 実効キー解決。共用するのは warn-dedup のみ)。
+
+### service / effective-model-key(実効キー解決)
+
+| Field | Detail |
+|-------|--------|
+| Intent | 実効既定モデルの決定と、リクエスト時の単一検証点 |
+| Requirements | 4.6, 6.4 |
+
+```typescript
 /** 実効既定: isDefault エントリが available ならそれ、でなければ available なエントリの先頭。0 件なら throw */
 export const getEffectiveDefaultModelKey = (): ModelKey;
 
@@ -409,7 +427,6 @@ export const getEffectiveDefaultModelKey = (): ModelKey;
 export const resolveEffectiveModelKey = (modelKey?: string): ModelKey;
 ```
 
-- per-provider resolvers(openai/anthropic/google/azure-openai)は署名 `(modelId: string) => MastraModelConfig` を維持し、内部で自プロバイダ名の `requireApiKey` / `getProviderSettings` を呼ぶ。`modelResolvers` Record は不変。
 - `resolveMastraModel(modelKey?)`: 実効キー解決 → `parseModelKey` → dispatch → `resolvedModelCache.set(modelKey, model)`。`clearResolvedMastraModelCache()` の呼び出し契約(put-ai-settings + s2s)は不変。
 
 ### routes / admin ai-settings API
@@ -560,8 +577,9 @@ Config コレクションは key-value(値 JSON)のため**スキーマ変更な
 1. `model-key.spec`: buildModelKey/parseModelKey の往復・最初の `/` で分割(modelId 内 `/` 許容)・不正 prefix / 空 modelId → null(2.1)
 2. `validate-allowed-models.spec`: 異プロバイダ同名共存 OK(2.3)/同一プロバイダ重複拒否(2.4)/不正 provider 拒否(2.5)/既定 0・2+ 拒否(3.2)/providerOptions namespace 検証(2.8)
 3. `provider-availability.spec`: enabled × apiKey × azure endpoint/Entra のマトリクス(1.6, 1.7, 6.1)、有効モデル集合の導出、warn dedup とリセット
-4. `config.spec`(llm-providers): `resolveEffectiveModelKey` の丸め(4.6)・実効既定のフォールバック(既定が無効プロバイダ → 有効先頭、6.4)・0 件 throw、`requireApiKey(p)` のメッセージにキー値が含まれない(1.9)、malformed な `ai:providers` / `ai:providerApiKeys` / `ai:allowedModels` → 未設定として扱い `(key, 理由)` warn が dedup で 1 回だけ出る・warn に値/キー値を含まない
-5. `resolve-mastra-model.spec`: modelKey ディスパッチ(4.3)・キャッシュ・clear 後の再構築
+4. `config.spec`(llm-providers): `requireApiKey(p)` のメッセージにキー値が含まれない(1.9)、malformed な `ai:providers` / `ai:providerApiKeys` / `ai:allowedModels` → 未設定として扱い `(key, 理由)` warn が dedup で 1 回だけ出る・warn に値/キー値を含まない
+5. `effective-model-key.spec`: `resolveEffectiveModelKey` の丸め(4.6)・実効既定のフォールバック(既定が無効プロバイダ → 有効先頭、6.4)・0 件 throw
+6. `resolve-mastra-model.spec`: modelKey ディスパッチ(4.3)・キャッシュ・clear 後の再構築
 
 ### Integration Tests
 
