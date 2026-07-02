@@ -269,7 +269,7 @@ sequenceDiagram
 | 4.7 | メッセージ単位・途中切替 | chat-sidebar-helpers ライブ getter(機構不変) |
 | 5.1 | env のみで構成可 | `AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS`(JSON env) |
 | 5.2 | 接続設定 env-only・読み取り専用 | ENV_ONLY_GROUPS targetKeys、put-ai-settings(400)、ProviderPanel disabled 表示 |
-| 5.3 | モデル設定は編集可 | targetKeys から `ai:allowedModels` 除外、put-ai-settings(allowedModels 受理) |
+| 5.3 | モデル設定は編集可 | targetKeys から `ai:allowedModels` 除外、put-ai-settings(allowedModels 受理)、buildUpdateRequest(env-only 時 allowedModels のみ送出) |
 | 5.4 | env-only 時も同一検証 | validate-allowed-models(経路共通) |
 | 6.1 | 不備プロバイダ除外 + ログ | provider-availability(reason 付き warn、dedup) |
 | 6.2 | 有効 1 つ以上で利用可 | is-ai-configured(available provider ∧ model ≥1) |
@@ -452,7 +452,7 @@ export interface AiSettingsUpdateRequest {
 | PUT | /_api/v3/ai-settings | AiSettingsUpdateRequest | AiSettingsResponse 相当 | 400(検証・env-only 違反), 500 |
 
 - **PUT セマンティクス**: 現行の full-state replace を踏襲。`providers` を含むリクエストは**対応 4 プロバイダの全エントリ必須**(validator で強制 — 固定スロットモデルに整合し、省略エントリの暗黙リセットという解釈余地を契約から排除する)。各プロバイダの `apiKey` のみ merge 例外(非空のみ更新、消去操作なし)。`ai:providerApiKeys` は「現在値 + 今回の非空キー」で再構成する(1.3, 1.4)。
-- **env-only 分割(5.2/5.3)**: `env:useOnlyEnvVars:ai` 有効時、`providers` または `aiEnabled` を含むリクエストは 400(明示拒否)。`allowedModels` のみのリクエストは通常どおり検証・保存(5.4: validate-allowed-models は経路共通)。
+- **env-only 分割(5.2/5.3)**: `env:useOnlyEnvVars:ai` 有効時、`providers` または `aiEnabled` を含むリクエストは 400(明示拒否)。`allowedModels` のみのリクエストは通常どおり検証・保存(5.4: validate-allowed-models は経路共通)。この 400 契約と対になるクライアント側の送出分岐(env-only 時は `allowedModels` のみの body を構成する)は管理画面の `buildUpdateRequest` が担う(client / 管理画面 節参照)— 分岐がないと env-only 時に Update が常に 400 になり R5.3 を満たせない。
 - **validate-allowed-models**: 各エントリ = `isAiProvider(provider)`(2.5)∧ modelId 非空 ∧ (provider, modelId) 一意(2.3, 2.4)∧ providerOptions namespace 形式 ∧ isDefault ちょうど 1 つ(3.2)。所属プロバイダの構成状態は検証しない(2.9)。
 - **秘匿規律(1.9)**: catch でも request body を stringify しない(現行パターン)。保存成功後 `clearResolvedMastraModelCache()` + availability ログ dedup リセット。
 
@@ -508,6 +508,7 @@ export interface AiSettingsFormValues {
 }
 ```
 
+- **buildUpdateRequest(フォーム → 更新リクエスト)**: 通常時は `{ aiEnabled, providers(4 エントリすべて), allowedModels }` を送出。**env-only 時(`useOnlyEnvVars: true`)は `{ allowedModels }` のみを送出**し、`providers` / `aiEnabled` を body に含めない(PUT の env-only 400 契約に対応するクライアント側責務 — 5.3)。
 - **AiSettings.tsx**: AI 有効トグル → DefaultModelSelector → ProviderTabs(アクティブタブ state)→ ProviderPanel(アクティブのみ mount)→ Update。
 - **DefaultModelSelector**: `allowedModels` を provider でグループ表示し、選択 = 対象行の `isDefault` を true・他を false(3.1)。ProviderPanel 行内の★と同一の書き換え(共有ヘルパ)。
 - **ProviderPanel**: 有効トグル(1.5)・API キー入力(設定済みは `(configured)` placeholder、1.8)・「API key set / not set」チップ・AllowedModelsField(provider prop)・azure のみ AzureOpenaiSettings。env-only 時は接続設定系フィールドを disabled(5.2)、モデル編集は活性のまま(5.3)。
@@ -572,7 +573,7 @@ Config コレクションは key-value(値 JSON)のため**スキーマ変更な
 
 ### Component Tests
 
-1. `AiSettings.spec`: タブ 4 種常時表示(1.1)・構成状態ドット・Update で buildUpdateRequest の形(providers Record + allowedModels)
+1. `AiSettings.spec`: タブ 4 種常時表示(1.1)・構成状態ドット・Update で buildUpdateRequest の形(通常時: providers Record + allowedModels / env-only 時: allowedModels のみで providers・aiEnabled を含まない — 5.3)
 2. `ProviderPanel.spec`: 有効トグル(1.5)・`(configured)` placeholder(1.8)・env-only で接続設定 disabled かつモデル編集活性(5.2, 5.3)
 3. `AllowedModelsField.spec`(改修): provider スコープの追加(2.2)・カタログ select / 自由入力の切替(2.6, 2.7)・同一プロバイダ重複エラー(2.4)
 4. `DefaultModelSelector.spec`: プロバイダ別グループ表示・選択で isDefault が単一に付替わる(3.1)
