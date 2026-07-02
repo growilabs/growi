@@ -343,6 +343,24 @@
     },
     "exclude_tag": {
       "desc": "Pages n'ayant pas l'étiquette {{tag}}"
+    },
+    "author": {
+      "desc": "Rechercher les pages créées par {{author}}"
+    },
+    "exclude_author": {
+      "desc": "Exclure les pages créées par {{author}}"
+    },
+    "editor": {
+      "desc": "Rechercher les pages dernièrement modifiées par {{editor}}"
+    },
+    "exclude_editor": {
+      "desc": "Exclure les pages modifiées par {{editor}}"
+    },
+    "group": {
+      "desc": "Rechercher les pages accordées au groupe {{group}}"
+    },
+    "exclude_group": {
+      "desc": "Exclure les pages accordées au groupe {{group}}"
     }
   },
   "search": {

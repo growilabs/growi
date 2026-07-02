@@ -334,6 +334,24 @@
     },
     "exclude_tag": {
       "desc": "排除带有{{tag}标记的页"
+    },
+    "author": {
+      "desc": "搜索由{{author}}创建的页面"
+    },
+    "exclude_author": {
+      "desc": "排除由{{author}}创建的页面"
+    },
+    "editor": {
+      "desc": "搜索最后由{{editor}}编辑的页面"
+    },
+    "exclude_editor": {
+      "desc": "排除由{{editor}}编辑的页面"
+    },
+    "group": {
+      "desc": "搜索授予{{group}}组的页面"
+    },
+    "exclude_group": {
+      "desc": "排除授予{{group}}组的页面"
     }
   },
   "search": {
