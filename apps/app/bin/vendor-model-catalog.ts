@@ -16,6 +16,7 @@ import { z } from 'zod';
 
 import {
   CATALOG_PROVIDERS,
+  type CatalogProvider,
   isSelectableModel,
   type ModelsDevModel,
 } from '../src/features/mastra/server/services/ai-sdk-modules/chat-model-filter.ts';
@@ -26,7 +27,7 @@ import {
 // `src/` module imports from `bin/`.
 
 /** provider → generation-time-filtered selectable model ids (bare ids, sorted). */
-type ModelCatalog = Record<(typeof CATALOG_PROVIDERS)[number], string[]>;
+type ModelCatalog = Record<CatalogProvider, string[]>;
 
 /** The committed file shape: header (attribution / timestamp) separated from data. */
 interface ModelCatalogFile {
@@ -76,7 +77,7 @@ const providerSchema = z.looseObject({
  */
 export const buildModelCatalog = (
   apiJson: unknown,
-  providers: readonly (typeof CATALOG_PROVIDERS)[number][] = CATALOG_PROVIDERS,
+  providers: readonly CatalogProvider[] = CATALOG_PROVIDERS,
 ): ModelCatalog => {
   const root = z.record(z.string(), z.unknown()).parse(apiJson);
 

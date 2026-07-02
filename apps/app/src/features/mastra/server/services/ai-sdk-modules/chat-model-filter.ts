@@ -1,17 +1,33 @@
-import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
+import {
+  AI_PROVIDER_DEFS,
+  AI_PROVIDERS,
+  type AiProvider,
+} from '~/features/mastra/interfaces/ai-provider';
+
+/**
+ * The subset of AiProvider whose model catalog is enumerable via models.dev
+ * (metadata flag `enumerable: true`). Derived from AI_PROVIDER_DEFS at the type
+ * level so it stays a precise literal union (used to key the vendored catalog)
+ * and tracks the metadata automatically.
+ */
+export type CatalogProvider = {
+  [K in AiProvider]: (typeof AI_PROVIDER_DEFS)[K]['enumerable'] extends true
+    ? K
+    : never;
+}[AiProvider];
 
 /**
  * Providers whose model catalog is present in models.dev and therefore drive
- * selection-only registration. Declared as data (not computed by excluding
- * azure-openai from AI_PROVIDERS): azure-openai is absent from models.dev
- * because its model IDs are operator-defined deployment names and cannot be
- * enumerated, so it stays free-input.
+ * selection-only registration. Derived (not hand-listed) from AI_PROVIDER_DEFS:
+ * the `enumerable` flag is the single source, so adding a provider is one
+ * declaration there and this list can never drift out of sync. azure-openai is
+ * `enumerable: false` (its model IDs are operator-defined deployment names that
+ * cannot be enumerated), so it stays free-input.
  */
-export const CATALOG_PROVIDERS = [
-  'openai',
-  'anthropic',
-  'google',
-] as const satisfies readonly AiProvider[];
+export const CATALOG_PROVIDERS: readonly CatalogProvider[] =
+  AI_PROVIDERS.filter(
+    (p): p is CatalogProvider => AI_PROVIDER_DEFS[p].enumerable,
+  );
 
 /**
  * A single models.dev catalog entry, narrowed to the only two authoritative

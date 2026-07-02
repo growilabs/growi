@@ -230,13 +230,13 @@ sequenceDiagram
 | Requirements | 6.1, 6.2 |
 
 **Responsibilities & Constraints**
-- 対象プロバイダ（`['openai','anthropic','google']`）を宣言データとして持つ（azure-openai は models.dev 非収録＝対象外）。
+- 対象プロバイダ（`openai`/`anthropic`/`google`）は `AI_PROVIDER_DEFS`（[ai-provider.ts](../../../apps/app/src/features/mastra/interfaces/ai-provider.ts)）の `enumerable: true` フラグから導出する（`CATALOG_PROVIDERS`）。azure-openai は `enumerable: false`＝models.dev 非収録（デプロイ名で列挙不可）で対象外。フラグを単一ソースにすることで、プロバイダ追加時に別リストと二重管理・ドリフトしない。
 - `isSelectableModel(entry)` = `entry.tool_call === true && entry.modalities.output.includes('text')`。models.dev の**権威的フィールド**で判定するため、名前 heuristic は不要（旧 Issue 1 解消）。
 - 純関数（config/network 非依存）。vendoring スクリプトから呼ばれる（生成時）。
 
 **Contracts**: Service [x]
 ```typescript
-export const CATALOG_PROVIDERS: readonly AiProvider[]; // openai / anthropic / google
+export const CATALOG_PROVIDERS: readonly CatalogProvider[]; // AI_PROVIDER_DEFS の enumerable:true を導出 = openai / anthropic / google
 export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call && output⊇text
 ```
 

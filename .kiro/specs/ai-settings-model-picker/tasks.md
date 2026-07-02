@@ -15,7 +15,7 @@
 
 - [ ] 2. 取り込みステップ（リリース前段）の vendoring パイプライン（コミット成果物の生成）
 - [x] 2.1 (P) chat/ツール対応モデルの判定（純関数）を実装する
-  - 対象プロバイダ（openai/anthropic/google、azure-openai は models.dev 非収録で対象外）を宣言データにする
+  - 対象プロバイダ（openai/anthropic/google、azure-openai は models.dev 非収録で対象外）を `AI_PROVIDER_DEFS` の `enumerable` フラグから導出する（`CATALOG_PROVIDERS`。宣言データを単一ソース化し別リストとのドリフトを防ぐ）
   - `isSelectableModel(entry) = tool_call===true && modalities.output に text を含む` を純関数で実装（models.dev の権威的フィールドで判定、名前 heuristic は使わない）
   - 完了状態: `tool_call:true & output:['text']` を通し、`tool_call:false` や `output:['image']` 等を除外する単体テストが green。対象プロバイダに azure-openai を含まない
   - _Requirements: 6.1, 6.2_
