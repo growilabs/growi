@@ -90,6 +90,13 @@ const getModelInputs = (): HTMLInputElement[] =>
     .getAllByLabelText('ai_settings.model_label')
     .filter((el): el is HTMLInputElement => el instanceof HTMLInputElement);
 
+// In select mode the model control is a <select> (HTMLSelectElement), so it does
+// not match getModelInputs()'s HTMLInputElement filter — count/read it here.
+const getModelSelects = (): HTMLSelectElement[] =>
+  screen
+    .getAllByLabelText('ai_settings.model_label')
+    .filter((el): el is HTMLSelectElement => el instanceof HTMLSelectElement);
+
 // The "set as default" radios (one per card). Narrow via a type guard — not an
 // `as` cast — so reading `.checked` stays type-safe.
 const getDefaultRadios = (): HTMLInputElement[] =>
@@ -569,6 +576,118 @@ describe('AllowedModelsField', () => {
       const modelControl = screen.getByLabelText('ai_settings.model_label');
       expect(modelControl.tagName).toBe('SELECT');
       expect(modelControl).toBeDisabled();
+    });
+  });
+
+  // The interaction suites above run in free-text mode (the outer beforeEach forces
+  // a fetch error). openai/anthropic/google admins use SELECT mode, where the modelId
+  // control is a <select> and react-hook-form applies the saved value to the
+  // uncontrolled element once at mount — a fragile path for add/remove re-indexing and
+  // default toggling. Cover those same interactions in select mode here.
+  describe('add / remove / default in select mode', () => {
+    beforeEach(() => {
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({
+          data: { modelIds: ['gpt-4o', 'gpt-4.1', 'gpt-4o-mini'] },
+        }),
+      );
+    });
+
+    it('appends a select card showing the placeholder when add is clicked', async () => {
+      const user = userEvent.setup();
+      renderComponent({
+        defaultValues: {
+          provider: 'openai',
+          allowedModels: [
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+          ],
+        },
+      });
+      expect(getModelSelects()).toHaveLength(1);
+
+      await user.click(
+        screen.getByRole('button', { name: 'ai_settings.add_model' }),
+      );
+
+      // The new card is also a <select> (not a stray text input) and starts on the
+      // empty placeholder since its modelId is blank.
+      const selects = getModelSelects();
+      expect(selects).toHaveLength(2);
+      expect(selects[1].value).toBe('');
+    });
+
+    it('keeps the remaining card value after the first card is removed (re-indexing)', async () => {
+      const user = userEvent.setup();
+      renderComponent({
+        defaultValues: {
+          provider: 'openai',
+          allowedModels: [
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            { modelId: 'gpt-4.1', providerOptionsText: '', isDefault: false },
+          ],
+        },
+      });
+      expect(getModelSelects().map((s) => s.value)).toEqual([
+        'gpt-4o',
+        'gpt-4.1',
+      ]);
+
+      // Remove the first (default) card.
+      await removeAt(user, 0);
+
+      // The formerly-second card survives with its own value intact (not the
+      // placeholder, not the removed card's value) and becomes the new default.
+      const remaining = getModelSelects();
+      expect(remaining).toHaveLength(1);
+      expect(remaining[0].value).toBe('gpt-4.1');
+      expect(getDefaultRadios()[0].checked).toBe(true);
+    });
+
+    it('preserves both select values when the default radio is switched', async () => {
+      const user = userEvent.setup();
+      renderComponent({
+        defaultValues: {
+          provider: 'openai',
+          allowedModels: [
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+            { modelId: 'gpt-4.1', providerOptionsText: '', isDefault: false },
+          ],
+        },
+      });
+      const radios = getDefaultRadios();
+
+      // Switch the default from card A to card B.
+      await user.click(radios[1]);
+
+      // Selecting a different default flips only isDefault (via setValue); the model
+      // <select> values must be left untouched.
+      expect(radios[0].checked).toBe(false);
+      expect(radios[1].checked).toBe(true);
+      expect(getModelSelects().map((s) => s.value)).toEqual([
+        'gpt-4o',
+        'gpt-4.1',
+      ]);
+    });
+  });
+
+  describe('modelId control while the catalog is loading', () => {
+    it('disables the control during the fetch so an out-of-catalog id cannot be typed (1.4)', () => {
+      // A catalog request is in flight: neither data nor error has arrived yet.
+      mockedUseSelectableModels.mockReturnValue(swrResponse({}));
+
+      renderComponent({
+        defaultValues: {
+          provider: 'openai',
+          allowedModels: [
+            { modelId: 'gpt-4o', providerOptionsText: '', isDefault: true },
+          ],
+        },
+      });
+
+      // Not env-only (disabled=false): the control is disabled purely because the
+      // catalog is loading, so the select-only guarantee also holds during the
+      // initial-load window instead of briefly exposing an editable free-text input.
+      expect(screen.getByLabelText('ai_settings.model_label')).toBeDisabled();
     });
   });
 });
