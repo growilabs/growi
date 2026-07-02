@@ -351,7 +351,7 @@ export type AiProviderApiKeys = Partial<Record<AiProvider, string>>;
 
 - `ENV_ONLY_GROUPS` の ai グループ: `targetKeys: ['app:aiEnabled', 'ai:providers', 'ai:providerApiKeys']`(モデル設定を外す = 5.3)。
 - 削除: `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings`(7.1。migration なし = 7.2。新キー不在時は available provider が 0 になり自然に未設定扱い = 7.3)。
-- config-manager は値をランタイム検証しないため、アクセサ側で `Array.isArray` / object ガードを行う(現行 `getAllowedModels` の防御パターン踏襲)。
+- config-manager は値をランタイム検証しないため、アクセサ側で `Array.isArray` / object ガードを行う(現行 `getAllowedModels` の防御パターン踏襲)。ガードが不正形状を検出した場合は「未設定」として fail-soft しつつ、`(config key, 理由)` の warn を dedup 付きで出力する(fail-silent の排除 — Error Handling 参照)。JSON env のタイポ等で `ai:providers` 自体が読めないケースは 6.1 の不備ログ(enabled 判定後)に到達しないため、この warn が唯一の手がかりになる。
 
 ### service / provider-availability
 
@@ -380,6 +380,7 @@ export const getAvailableModels = (): AllowedModel[];
 - Preconditions: なし(config 未設定でも安全に空集合)。
 - Postconditions: `getAvailableModels()` ⊆ `getAllowedModels()`。
 - **不備ログ(6.1)**: enabled なのに構成不備のプロバイダは `(provider, reason)` 単位で warn。同一内容はモジュール内 dedup し、`clearAvailabilityLogDedup()`(設定保存 / s2s 更新時に `clearResolvedMastraModelCache` と同時に呼ぶ)でリセット — リクエスト毎のログ洪水を防ぎつつ、設定変更後は再通知する。
+- **malformed config warn も同一の dedup・リセット契約を共有**: アクセサの防御ガード(config-definition 節)が出す `(config key, 理由)` warn は、この dedup レジストリと `clearAvailabilityLogDedup()` を共用する。レジストリは llm-providers 内の小さな共有ヘルパとして切り出し、availability → config アクセサの依存方向を壊さない。
 - azure の構成済み条件: endpoint(resourceName または baseURL)必須。Entra ID 時は apiKey 免除(現行 `isAiConfigured` の条件を per-provider 化)。
 
 ### service / llm-providers config(アクセサ・実効キー解決)
@@ -547,6 +548,7 @@ Config コレクションは key-value(値 JSON)のため**スキーマ変更な
 - **管理 PUT(400)**: 検証失敗(2.4, 2.5, 3.2, providerOptions 不正)は該当箇所を特定できるメッセージで拒否。env-only 違反(5.2)は「接続設定は環境変数でのみ変更可能」の明示エラー。エラーメッセージ・ログに API キー値を含めない(1.9)。
 - **チャット経路**: AI 未設定(有効モデル 0)は ai-ready-guard の 501(6.3、既存)。有効集合外の modelKey は例外にせず実効既定へ丸め + warn(4.6 — ユーザー操作を止めない)。resolver の構成不備 throw はキャッシュされず、修正が次リクエストから効く(現行原則)。
 - **部分縮退(6.1)**: enabled ∧ 構成不備は選択肢から除外し、`(provider, reason)` dedup 付き warn。アプリ本体は常に継続(6.3)。
+- **不正な設定値(malformed config)の観測性**: JSON env(`AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS`)や DB 値が期待形状でない場合、アクセサは「未設定」として fail-soft しつつ `(config key, 理由)` の warn を dedup 付きで出力する — ログゼロでの AI 機能無効化(fail-silent)を排除する(R5.1 の env-only 運用で特に重要)。warn には値そのもの(特に `ai:providerApiKeys`)を含めず、config key 名と理由のみ。dedup のリセットは 6.1 の不備ログと同一契約(設定保存 / s2s 更新時)。
 - **観測性**: ログはプロバイダ名・reason・モデルキーのみ(秘匿値なし)。
 
 ## Testing Strategy
@@ -556,7 +558,7 @@ Config コレクションは key-value(値 JSON)のため**スキーマ変更な
 1. `model-key.spec`: buildModelKey/parseModelKey の往復・最初の `/` で分割(modelId 内 `/` 許容)・不正 prefix / 空 modelId → null(2.1)
 2. `validate-allowed-models.spec`: 異プロバイダ同名共存 OK(2.3)/同一プロバイダ重複拒否(2.4)/不正 provider 拒否(2.5)/既定 0・2+ 拒否(3.2)/providerOptions namespace 検証(2.8)
 3. `provider-availability.spec`: enabled × apiKey × azure endpoint/Entra のマトリクス(1.6, 1.7, 6.1)、有効モデル集合の導出、warn dedup とリセット
-4. `config.spec`(llm-providers): `resolveEffectiveModelKey` の丸め(4.6)・実効既定のフォールバック(既定が無効プロバイダ → 有効先頭、6.4)・0 件 throw、`requireApiKey(p)` のメッセージにキー値が含まれない(1.9)
+4. `config.spec`(llm-providers): `resolveEffectiveModelKey` の丸め(4.6)・実効既定のフォールバック(既定が無効プロバイダ → 有効先頭、6.4)・0 件 throw、`requireApiKey(p)` のメッセージにキー値が含まれない(1.9)、malformed な `ai:providers` / `ai:providerApiKeys` / `ai:allowedModels` → 未設定として扱い `(key, 理由)` warn が dedup で 1 回だけ出る・warn に値/キー値を含まない
 5. `resolve-mastra-model.spec`: modelKey ディスパッチ(4.3)・キャッシュ・clear 後の再構築
 
 ### Integration Tests
