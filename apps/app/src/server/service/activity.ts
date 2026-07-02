@@ -66,6 +66,17 @@ const toGeneratePreNotifyActivity = (
   eventModel: (activity.eventModel ?? undefined) as
     | SupportedEventModelType
     | undefined,
+  // The ActivitiesSnapshot composite fields are optional in schema.prisma,
+  // so Prisma materializes absent fields as `null`; ISnapshot models absence
+  // as `undefined` (missing field), so coerce null -> undefined per field.
+  snapshot: {
+    ...activity.snapshot,
+    username: activity.snapshot.username ?? undefined,
+    originalName: activity.snapshot.originalName ?? undefined,
+    pagePath: activity.snapshot.pagePath ?? undefined,
+    pageId: activity.snapshot.pageId ?? undefined,
+    fileSize: activity.snapshot.fileSize ?? undefined,
+  },
 });
 
 class ActivityService {

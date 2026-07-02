@@ -10,7 +10,7 @@
   - 先にユニットテストを書く: guard が添付削除 action で添付 variant に narrow し、それ以外の action では catch-all 扱いになること、既存の `snapshot.username` 読み取りが両 variant で型エラーなく通ること
   - 観察可能な完了条件: 追加した guard のユニットテストが green で、`snapshot.username` を読む既存箇所の型検査が通る
   - _Requirements: 1.1, 1.2, 1.3, 1.4_
-- [ ] 1.2 永続スキーマ（composite type）へ添付フィールド追加と username の optional 化
+- [x] 1.2 永続スキーマ（composite type）へ添付フィールド追加と username の optional 化
   - `ActivitiesSnapshot` composite type に添付フィールド（`originalName`/`pagePath`/`pageId`/`fileSize`）をすべて optional で追加し、`username` を必須から optional に変更する（既存データは追加フィールド無しでもそのまま有効＝破壊的移行なし）
   - `prisma generate` を実行して型を再生成する
   - `username` が `string | null` に変わることで型整合が必要になる既存消費者（監査ログ検索クエリ、snapshot username 集計、client store）を洗い出し、`any` を使わずに型を合わせる

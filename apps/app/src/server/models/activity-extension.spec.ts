@@ -86,7 +86,15 @@ describe('ActivityExtension.createByParameters - data-building contract', () => 
       target: null,
       targetModel: null,
       userId: null,
-      snapshot: { id: 'snap-id', username: '' },
+      // Prisma materializes absent optional composite fields as null
+      snapshot: {
+        id: 'snap-id',
+        username: '',
+        originalName: null,
+        pagePath: null,
+        pageId: null,
+        fileSize: null,
+      },
     };
     const createSpy = vi
       .spyOn(client.activities, 'create')
@@ -211,7 +219,15 @@ describe('ActivityExtension.updateByParameters - not-found semantics (C1)', () =
     target: null,
     targetModel: null,
     userId: 'user-id-1',
-    snapshot: { id: 'snap-id', username: 'alice' },
+    // Prisma materializes absent optional composite fields as null
+    snapshot: {
+      id: 'snap-id',
+      username: 'alice',
+      originalName: null,
+      pagePath: null,
+      pageId: null,
+      fileSize: null,
+    },
     user: { id: 'user-id-1', username: 'alice' },
   };
 

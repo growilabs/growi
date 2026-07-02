@@ -57,7 +57,15 @@ function makeActivity(overrides: { userId?: string | null; createdAt?: Date }) {
     target: TARGET_PAGE_ID,
     endpoint: '/api',
     ip: '127.0.0.1',
-    snapshot: { id: 'u1', username: 'testuser' },
+    // Prisma materializes absent optional composite fields as null
+    snapshot: {
+      id: 'u1',
+      username: 'testuser',
+      originalName: null,
+      pagePath: null,
+      pageId: null,
+      fileSize: null,
+    },
     event: null,
     eventModel: null,
     targetModel: null,
