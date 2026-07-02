@@ -139,7 +139,7 @@ const isEntryPoint = (): boolean => {
   );
 };
 
-const main = async (): Promise<void> => {
+export const main = async (): Promise<void> => {
   let apiJson: unknown;
   try {
     const res = await fetch(MODELS_DEV_URL);
