@@ -1,5 +1,12 @@
 # @growi/pluginkit
 
+## 1.2.6
+
+### Patch Changes
+
+- Updated dependencies [[`5e8f105`](https://github.com/growilabs/growi/commit/5e8f1054c01771275682dcdbcb2fc3488e1c0be3)]:
+  - @growi/core@2.4.0
+
 ## 1.2.5
 
 ### Patch Changes
