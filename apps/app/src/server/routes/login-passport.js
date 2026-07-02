@@ -7,6 +7,7 @@ import { createRedirectToForUnauthenticated } from '~/server/util/createRedirect
 import loggerFactory from '~/utils/logger';
 
 import { externalAccountService } from '../service/external-account';
+import { sendLoginSuccessResponse } from './login-success-response';
 
 /** @param {import('~/server/crowi').default} crowi Crowi instance */
 module.exports = (crowi, app) => {
@@ -59,7 +60,7 @@ module.exports = (crowi, app) => {
     res,
     user,
     action,
-    isExternalAccount = false,
+    respondWithRedirect = false,
   ) => {
     // update lastLoginAt
     user.updateLastLoginAt(new Date(), (err, userData) => {
@@ -87,11 +88,7 @@ module.exports = (crowi, app) => {
     const redirectTo =
       redirectToForUnauthenticated ?? res.locals.redirectTo ?? '/';
 
-    if (isExternalAccount) {
-      return res.safeRedirect(redirectTo);
-    }
-
-    return res.apiv3({ redirectTo });
+    return sendLoginSuccessResponse(res, redirectTo, respondWithRedirect);
   };
 
   const injectRedirectTo = (req, res, next) => {
@@ -252,6 +249,10 @@ module.exports = (crowi, app) => {
         return next(err);
       }
 
+      // LDAP login is submitted through the AJAX login form (POST /_api/v3/login), the
+      // same as local login, so it must respond with JSON. Do NOT pass respondWithRedirect
+      // here even though LDAP is an external account: a 302 would leave the client stuck on
+      // the login page until a manual reload. See issue #11384.
       return loginSuccessHandler(
         req,
         res,
