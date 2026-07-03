@@ -1,0 +1,119 @@
+import type { JSX, ReactNode } from 'react';
+import { useId } from 'react';
+import { useTranslation } from 'next-i18next';
+import { type FieldPath, useFormContext } from 'react-hook-form';
+import { Badge, FormGroup, FormText, Input, Label } from 'reactstrap';
+
+import type { AiProvider } from '../../interfaces/ai-provider';
+import { AzureOpenaiSettings } from './AzureOpenaiSettings';
+import type { AiSettingsFormValues } from './ai-settings-form-values';
+import { registerToInputProps } from './register-to-input-props';
+
+export interface ProviderPanelProps {
+  /** The provider slot this panel edits. */
+  readonly provider: AiProvider;
+  /**
+   * Whether this provider already has a stored API key, from the GET response.
+   * Drives the "(configured)" placeholder and the key-status chip (R1.8); the
+   * form's write-only `apiKey` field cannot reveal this.
+   */
+  readonly isApiKeySet: boolean;
+  /**
+   * env-only mode. When true, the *connection* settings (enabled toggle, apiKey,
+   * and — for azure — the AzureOpenaiSettings fields) are disabled (not focusable)
+   * because they are governed by environment variables (R5.2). Model editing is
+   * NOT disabled by this panel (R5.3) — it stays in the `children` slot untouched.
+   */
+  readonly useOnlyEnvVars: boolean;
+  /**
+   * The models-list editor, injected by the caller (task 6.5 passes
+   * `<AllowedModelsField provider={provider} .../>`). It is rendered at the models
+   * insertion point and is deliberately NOT wrapped in the env-only disabled
+   * treatment — model editing stays active even under env-only (R5.3); the child
+   * owns its own disabled state.
+   */
+  readonly children?: ReactNode;
+}
+
+/**
+ * One provider's settings panel (mock: ProviderPanel). Renders, in order:
+ *   - the enable/disable toggle bound to `providers.<provider>.enabled` (R1.5),
+ *   - the write-only API key input with a "(configured)" placeholder and a
+ *     "API key set / not set" chip when a key is already stored (R1.8),
+ *   - the models slot (`children` — filled by the caller in a later task),
+ *   - the Azure connection settings, only for the azure-openai panel (R1.10).
+ *
+ * Reads/writes the shared react-hook-form context owned by `AiSettings`. The
+ * connection settings are disabled (not focusable) under env-only mode (R5.2)
+ * while the models slot stays editable (R5.3).
+ */
+export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
+  const { provider, isApiKeySet, useOnlyEnvVars, children } = props;
+  const { t } = useTranslation('admin');
+  const { register } = useFormContext<AiSettingsFormValues>();
+
+  const enabledId = useId();
+  const apiKeyId = useId();
+
+  // Nested per-provider paths. Typed as FieldPath so `register` accepts the
+  // runtime-composed template without an `as any` escape (the template's union
+  // of concrete paths is a valid FieldPath of the form).
+  const enabledPath =
+    `providers.${provider}.enabled` as FieldPath<AiSettingsFormValues>;
+  const apiKeyPath =
+    `providers.${provider}.apiKey` as FieldPath<AiSettingsFormValues>;
+
+  return (
+    <div>
+      <FormGroup switch className="mb-3">
+        <Input
+          id={enabledId}
+          type="switch"
+          role="switch"
+          disabled={useOnlyEnvVars}
+          {...registerToInputProps(register(enabledPath))}
+        />
+        <Label htmlFor={enabledId} className="ms-2">
+          {t('ai_settings.provider_enabled_label')}
+        </Label>
+      </FormGroup>
+
+      <FormGroup className="mb-3">
+        <div className="d-flex align-items-center gap-2 mb-1">
+          <Label for={apiKeyId} className="mb-0">
+            {t('ai_settings.api_key_label')}
+          </Label>
+          {isApiKeySet ? (
+            <Badge color="success" pill data-testid="provider-api-key-status">
+              {t('ai_settings.api_key_set_chip')}
+            </Badge>
+          ) : (
+            <Badge color="secondary" pill data-testid="provider-api-key-status">
+              {t('ai_settings.api_key_not_set_chip')}
+            </Badge>
+          )}
+        </div>
+        <Input
+          id={apiKeyId}
+          type="password"
+          disabled={useOnlyEnvVars}
+          autoComplete="new-password"
+          placeholder={
+            isApiKeySet ? t('ai_settings.api_key_set_placeholder') : ''
+          }
+          {...registerToInputProps(register(apiKeyPath))}
+        />
+        <FormText>{t('ai_settings.api_key_help')}</FormText>
+      </FormGroup>
+
+      {/* Models slot: the caller injects the provider-scoped AllowedModelsField
+          here (task 6.5). NOT disabled by env-only — model editing stays active
+          (R5.3); the child manages its own disabled state. */}
+      {children}
+
+      {provider === 'azure-openai' && (
+        <AzureOpenaiSettings disabled={useOnlyEnvVars} />
+      )}
+    </div>
+  );
+};
