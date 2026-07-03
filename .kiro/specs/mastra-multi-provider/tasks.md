@@ -16,7 +16,7 @@
   - _Requirements: 1.2, 2.1_
 
 - [ ] 2. 基盤: config スキーマと env 構成
-- [ ] 2.1 config スキーマと env-only 部分ロックを再構成する
+- [x] 2.1 config スキーマと env-only 部分ロックを再構成する
   - 複数プロバイダ設定(非秘匿)とプロバイダ別 API キー(秘匿)の 2 キーを JSON env var 対応で新設し、旧単一プロバイダ 3 キーを削除する(自動移行なし。`CONFIG_KEYS` 列挙も追従)
   - env-only グループの対象を「AI 有効トグル + プロバイダ接続設定 2 キー」に差し替え、許可モデルを対象から外す
   - picker 由来のカタログリフレッシュ 2 キー(`ai:modelCatalogRefreshOnStartup` / `ai:modelCatalogRefreshCronSchedule`)は変更対象外として温存する(`ai:*` の一括整理に巻き込まない)
