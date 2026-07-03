@@ -1,9 +1,11 @@
 // --- Mock boundary ---------------------------------------------------------
 //
-// getEffectiveSelectableModelIds resolves "refreshed (persisted) ?? bundled"
-// (Req 9.5). The persistence singleton (prisma.mastrarefreshedmodelcatalogs)
-// is mocked to drive both branches; the bundled fallback is the REAL committed
-// asset so the fallback branch proves the actual offline behavior (Req 2).
+// getEffectiveSelectableModelIds resolves the NEWER of the refreshed
+// (persisted) and bundled catalogs, comparing bundled _generatedAt values on
+// both sides (Req 9.5). The persistence singleton
+// (prisma.mastrarefreshedmodelcatalogs) is mocked to drive the branches; the
+// bundled fallback is the REAL committed asset so the fallback branch proves
+// the actual offline behavior (Req 2).
 const { getSingleton } = vi.hoisted(() => ({
   getSingleton: vi.fn(),
 }));
@@ -20,12 +22,16 @@ beforeEach(() => {
 });
 
 describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
-  describe('when a refreshed catalog is persisted (newer than the bundled asset)', () => {
+  describe('when the snapshot was refreshed against the CURRENT bundled generation (same image)', () => {
     beforeEach(() => {
       getSingleton.mockResolvedValue({
         models: { openai: ['refreshed-model'] },
-        // Fetched "now" — strictly newer than the committed asset's header.
         fetchedAt: new Date(),
+        // Refresh ran while THIS bundled asset was deployed — the normal case,
+        // and a timestamp tie: bundled wins only when STRICTLY newer.
+        supersededBundledGeneratedAt: new Date(
+          BUNDLED_CATALOG_GENERATED_AT.getTime(),
+        ),
         source: 'https://models.dev/api.json (MIT)',
       });
     });
@@ -49,14 +55,34 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
       const second = await getEffectiveSelectableModelIds('openai');
       expect(second).toEqual(['refreshed-model']);
     });
+
+    it('is NOT shadowed by a lagging server clock (fetchedAt older than the bundled _generatedAt)', async () => {
+      // Regression: the resolution must compare bundled generations only.
+      // fetchedAt comes from the SERVER clock — if it were compared against
+      // the CI-clock _generatedAt, a lagging server clock would silently
+      // shadow a just-persisted refresh while the admin sees a success toast.
+      getSingleton.mockResolvedValue({
+        models: { openai: ['refreshed-model'] },
+        fetchedAt: new Date(0), // server clock hopelessly behind the CI clock
+        supersededBundledGeneratedAt: new Date(
+          BUNDLED_CATALOG_GENERATED_AT.getTime(),
+        ),
+        source: 'https://models.dev/api.json (MIT)',
+      });
+
+      await expect(getEffectiveSelectableModelIds('openai')).resolves.toEqual([
+        'refreshed-model',
+      ]);
+    });
   });
 
-  describe('when the bundled asset is NEWER than the persisted snapshot (e.g. after an image update)', () => {
+  describe('when the image now bundles a NEWER catalog generation (image updated after the refresh)', () => {
     beforeEach(() => {
       getSingleton.mockResolvedValue({
         models: { openai: ['stale-refreshed-model'] },
-        // Strictly older than the committed asset's _generatedAt header.
-        fetchedAt: new Date(0),
+        fetchedAt: new Date(),
+        // Refresh ran against an OLDER bundled generation than the current one.
+        supersededBundledGeneratedAt: new Date(0),
         source: 'https://models.dev/api.json (MIT)',
       });
     });
@@ -75,11 +101,15 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
     });
   });
 
-  describe('when the snapshot and the bundled asset have the SAME timestamp', () => {
-    it('resolves the tie to the refreshed snapshot (bundled wins only when STRICTLY newer)', async () => {
+  describe('when the image was ROLLED BACK to an older bundled generation after the refresh', () => {
+    it('keeps serving the refreshed snapshot (it holds live-fetched data)', async () => {
       getSingleton.mockResolvedValue({
         models: { openai: ['refreshed-model'] },
-        fetchedAt: new Date(BUNDLED_CATALOG_GENERATED_AT.getTime()),
+        fetchedAt: new Date(),
+        // The refresh ran on a NEWER image than the one now deployed.
+        supersededBundledGeneratedAt: new Date(
+          BUNDLED_CATALOG_GENERATED_AT.getTime() + 86_400_000,
+        ),
         source: 'https://models.dev/api.json (MIT)',
       });
 

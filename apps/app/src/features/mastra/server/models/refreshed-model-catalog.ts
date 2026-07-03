@@ -11,9 +11,11 @@ const SINGLETON_ID = 'singleton';
  * sanity checks as the bundled asset (buildModelCatalog), stored so it
  * survives restarts and is shared across app instances.
  *
- * The effective catalog resolution is "refreshed (this document) if present,
- * otherwise the bundled committed asset" (Req 9.5) — deleting the document
- * simply falls back to the bundled catalog.
+ * The effective catalog resolution picks the NEWER of this document and the
+ * bundled committed asset (Req 9.5): the refreshed snapshot wins unless the
+ * image now bundles a strictly newer catalog generation than the one that was
+ * current when the refresh ran (see effective-model-catalog.ts). Deleting the
+ * document simply falls back to the bundled catalog.
  *
  * Prisma-first model (no Mongoose counterpart): the collection is brand new,
  * has no secondary indexes, and is created lazily by MongoDB on the first
@@ -24,8 +26,17 @@ const SINGLETON_ID = 'singleton';
 export interface IRefreshedModelCatalog {
   /** provider → selectable model ids (same shape/filter as the bundled catalog). */
   models: ModelCatalog;
-  /** When the snapshot was fetched from models.dev. */
+  /** When the snapshot was fetched from models.dev (server clock; informational). */
   fetchedAt: Date;
+  /**
+   * `_generatedAt` of the bundled asset that was current when this snapshot
+   * was fetched. The newer-wins resolution (Req 9.5) compares this against the
+   * CURRENT bundled `_generatedAt`, so both operands come from the vendoring
+   * machine's clock — comparing the server-clock `fetchedAt` against the
+   * CI-clock `_generatedAt` would let server clock skew silently shadow a
+   * successful refresh behind the bundled catalog.
+   */
+  supersededBundledGeneratedAt: Date;
   /** Upstream attribution (mirrors the bundled asset's `_source`). */
   source: string;
 }
@@ -75,6 +86,7 @@ export const extension = Prisma.defineExtension((client) => {
             // is always a validated ModelCatalog.
             models: doc.models as ModelCatalog,
             fetchedAt: doc.fetchedAt,
+            supersededBundledGeneratedAt: doc.supersededBundledGeneratedAt,
             source: doc.source,
           };
         },

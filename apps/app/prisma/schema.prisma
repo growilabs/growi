@@ -229,12 +229,17 @@ model mastrarefreshedmodelcatalogs {
   // (NOT an ObjectId). Holds the models.dev snapshot persisted by the opt-in
   // runtime catalog refresh; deleting the document falls back to the bundled
   // model-catalog-data.json asset.
-  id        String   @id @map("_id")
-  v         Int      @default(0) @map("__v")
+  id                           String   @id @map("_id")
+  v                            Int      @default(0) @map("__v")
   /// provider -> selectable model ids (validated by buildModelCatalog before every write)
-  models    Json
-  fetchedAt DateTime
-  source    String
+  models                       Json
+  fetchedAt                    DateTime
+  /// _generatedAt of the bundled asset that was current when this snapshot was
+  /// fetched. The newer-wins resolution compares this against the CURRENT
+  /// bundled _generatedAt so both operands come from the vendoring machine's
+  /// clock (see effective-model-catalog.ts) - never the server's wall clock.
+  supersededBundledGeneratedAt DateTime
+  source                       String
 
   @@map("mastra_refreshed_model_catalog")
 }

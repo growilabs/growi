@@ -12,9 +12,20 @@ import {
  * committed asset (Req 9.5). Concretely:
  *
  * - no refreshed snapshot → bundled (the offline default)
- * - refreshed snapshot present → the refreshed one, UNLESS the bundled asset is
- *   strictly newer (an image update shipped a fresher catalog after the last
- *   refresh) — then the bundled one wins until the next successful refresh
+ * - refreshed snapshot present → the refreshed one, UNLESS the image now
+ *   bundles a strictly newer catalog generation than the one that was current
+ *   when the refresh ran (an image update shipped a fresher catalog) — then
+ *   the bundled one wins until the next successful refresh
+ *
+ * The comparison uses bundled `_generatedAt` values on BOTH sides (the current
+ * asset's vs the one stamped on the snapshot at refresh time), so both
+ * operands come from the vendoring machine's clock. Comparing the
+ * server-clock `fetchedAt` against the CI-clock `_generatedAt` would let a
+ * lagging server clock silently shadow a just-persisted refresh behind the
+ * bundled catalog while the admin sees a success toast. A successful refresh
+ * is by construction at least as fresh as the asset bundled at that moment,
+ * so "did the image change to a newer generation since" is the only question
+ * the read needs to answer.
  *
  * The read itself performs no external communication — it consults local
  * storage (MongoDB) and the statically imported bundled asset only (Req 2).
@@ -27,11 +38,14 @@ export const getEffectiveSelectableModelIds = async (
   const refreshed = await prisma.mastrarefreshedmodelcatalogs.getSingleton();
 
   if (refreshed != null) {
-    // "Strictly newer" so a tie (and an unparsable bundled timestamp, whose
-    // getTime() is NaN and never compares greater) resolves to the refreshed
-    // snapshot.
+    // "Strictly newer" so a tie — the normal "refreshed on the currently
+    // deployed image" case — and an unparsable timestamp (NaN never compares
+    // greater) resolve to the refreshed snapshot. An image ROLLBACK (bundled
+    // generation older than the superseded one) also keeps the refreshed
+    // snapshot, which is correct: it holds live-fetched data.
     const bundledIsNewer =
-      BUNDLED_CATALOG_GENERATED_AT.getTime() > refreshed.fetchedAt.getTime();
+      BUNDLED_CATALOG_GENERATED_AT.getTime() >
+      refreshed.supersededBundledGeneratedAt.getTime();
 
     if (!bundledIsNewer) {
       // Same controlled widening as the bundled read: the stored value is a

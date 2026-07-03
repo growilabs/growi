@@ -18,6 +18,7 @@ vi.mock('~/utils/prisma', () => ({
 import { mock } from 'vitest-mock-extended';
 
 import { MODELS_DEV_URL } from './build-model-catalog';
+import { BUNDLED_CATALOG_GENERATED_AT } from './model-catalog';
 import { refreshModelCatalog } from './refresh-model-catalog';
 
 const selectable = (id: string) => ({
@@ -87,11 +88,14 @@ describe('refreshModelCatalog (Req 9.1, 9.4, 9.7)', () => {
     expect(result.models.openai).toEqual(['gpt-4.1', 'gpt-4o']);
     expect(result.fetchedAt).toBeInstanceOf(Date);
 
-    // Persisted exactly once, with the validated snapshot + attribution.
+    // Persisted exactly once, with the validated snapshot + attribution. The
+    // snapshot stamps the CURRENT bundled generation so the newer-wins read
+    // compares vendoring-clock timestamps only (never the server clock).
     expect(upsertSingleton).toHaveBeenCalledTimes(1);
     expect(upsertSingleton).toHaveBeenCalledWith({
       models: result.models,
       fetchedAt: result.fetchedAt,
+      supersededBundledGeneratedAt: BUNDLED_CATALOG_GENERATED_AT,
       source: expect.stringContaining(MODELS_DEV_URL),
     });
   });
