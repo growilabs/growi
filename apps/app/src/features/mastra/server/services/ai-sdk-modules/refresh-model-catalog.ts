@@ -2,18 +2,15 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import {
-  buildModelCatalog,
   MODELS_DEV_SOURCE_ATTRIBUTION,
-  MODELS_DEV_URL,
   type ModelCatalog,
 } from './build-model-catalog';
+import { fetchModelsDevCatalog } from './fetch-model-catalog';
 import { BUNDLED_CATALOG_GENERATED_AT } from './model-catalog';
 
 const logger = loggerFactory(
   'growi:features:mastra:services:refresh-model-catalog',
 );
-
-const FETCH_TIMEOUT_MS = 30_000;
 
 export interface RefreshModelCatalogResult {
   models: ModelCatalog;
@@ -36,19 +33,10 @@ export interface RefreshModelCatalogResult {
  */
 export const refreshModelCatalog =
   async (): Promise<RefreshModelCatalogResult> => {
-    const res = await fetch(MODELS_DEV_URL, {
-      signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
-    });
-    if (!res.ok) {
-      throw new Error(
-        `Failed to fetch the model catalog: ${res.status} ${res.statusText} for ${MODELS_DEV_URL}`,
-      );
-    }
-    const apiJson: unknown = await res.json();
-
-    // Throws on schema drift or any empty target provider — nothing is
-    // persisted on failure (Req 9.4).
-    const models = buildModelCatalog(apiJson);
+    // Shared acquisition pipeline (fixed URL, bounded by a timeout): throws on
+    // network/HTTP failure, schema drift, or any empty target provider —
+    // nothing is persisted on failure (Req 9.4).
+    const models = await fetchModelsDevCatalog();
 
     const fetchedAt = new Date();
     await prisma.mastrarefreshedmodelcatalogs.upsertSingleton({

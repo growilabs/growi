@@ -78,8 +78,14 @@ describe('main (fetch → validate → write wrapper)', () => {
     vi.unstubAllGlobals();
   });
 
-  const stubFetch = (impl: () => Promise<Response>): void => {
-    vi.stubGlobal('fetch', vi.fn(impl));
+  const stubFetch = (impl: () => Promise<Response>) => {
+    // Typed with fetch's parameter shape so assertions on the call arguments
+    // (URL / RequestInit) type-check; the impl itself ignores the arguments.
+    const fetchMock = vi.fn(
+      (_input: string | URL | Request, _init?: RequestInit) => impl(),
+    );
+    vi.stubGlobal('fetch', fetchMock);
+    return fetchMock;
   };
 
   it('exits non-zero and does not overwrite the catalog on a network error', async () => {
@@ -126,7 +132,7 @@ describe('main (fetch → validate → write wrapper)', () => {
   });
 
   it('writes the catalog exactly once on a valid response', async () => {
-    stubFetch(() =>
+    const fetchMock = stubFetch(() =>
       Promise.resolve(
         mock<Response>({
           ok: true,
@@ -141,5 +147,11 @@ describe('main (fetch → validate → write wrapper)', () => {
     expect(writeFileSyncMock).toHaveBeenCalledTimes(1);
     const contents = writeFileSyncMock.mock.calls[0][1];
     expect(JSON.parse(contents).models.openai).toContain('gpt-4o');
+
+    // Regression guard: the ingest fetch must be time-bounded (shared
+    // acquisition pipeline). An unbounded fetch would let a slow-drip upstream
+    // stall the release job toward GitHub's 360-minute job kill, which the
+    // step's continue-on-error cannot rescue.
+    expect(fetchMock.mock.calls[0][1]?.signal).toBeInstanceOf(AbortSignal);
   });
 });

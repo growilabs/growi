@@ -21,12 +21,12 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
-  buildModelCatalog,
   MODELS_DEV_SOURCE_ATTRIBUTION,
   MODELS_DEV_URL,
   type ModelCatalog,
   type ModelCatalogFile,
 } from '../src/features/mastra/server/services/ai-sdk-modules/build-model-catalog.ts';
+import { fetchModelsDevCatalog } from '../src/features/mastra/server/services/ai-sdk-modules/fetch-model-catalog.ts';
 
 const OUTPUT_PATH = resolve(
   import.meta.dirname,
@@ -43,36 +43,19 @@ const isEntryPoint = (): boolean => {
 };
 
 export const main = async (): Promise<void> => {
-  let apiJson: unknown;
-  try {
-    const res = await fetch(MODELS_DEV_URL);
-    if (!res.ok) {
-      // biome-ignore lint/suspicious/noConsole: ingest script — stderr diagnostics are expected
-      console.error(
-        `[vendor:models] fetch failed: ${res.status} ${res.statusText} for ${MODELS_DEV_URL}. Existing catalog preserved (not overwritten).`,
-      );
-      process.exit(1);
-    }
-    apiJson = await res.json();
-  } catch (err) {
-    // biome-ignore lint/suspicious/noConsole: ingest script — stderr diagnostics are expected
-    console.error(
-      `[vendor:models] network error fetching ${MODELS_DEV_URL}. Existing catalog preserved (not overwritten).`,
-      err,
-    );
-    process.exit(1);
-    return;
-  }
-
   let models: ModelCatalog;
   try {
-    // buildModelCatalog throws on schema drift or any empty target provider,
-    // BEFORE any write — so a bad upstream can never overwrite a good catalog.
-    models = buildModelCatalog(apiJson);
+    // Shared acquisition pipeline (same module the runtime refresh uses):
+    // fixed URL, bounded by a timeout so a hung/slow-drip upstream fails this
+    // step instead of stalling the release job toward its 360-minute kill.
+    // Throws on network/HTTP failure, schema drift, or any empty target
+    // provider, BEFORE any write — a bad upstream can never overwrite a good
+    // catalog.
+    models = await fetchModelsDevCatalog();
   } catch (err) {
     // biome-ignore lint/suspicious/noConsole: ingest script — stderr diagnostics are expected
     console.error(
-      '[vendor:models] validation/sanity check failed. Existing catalog preserved (not overwritten).',
+      `[vendor:models] fetch/validation failed for ${MODELS_DEV_URL}. Existing catalog preserved (not overwritten).`,
       err instanceof Error ? err.message : err,
     );
     process.exit(1);

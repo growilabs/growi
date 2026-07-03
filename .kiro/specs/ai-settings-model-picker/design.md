@@ -143,11 +143,12 @@ apps/app/
     │   ├── chat-model-filter.spec.ts
     │   ├── build-model-catalog.ts              # pure 共有変換（追補 R）: api.json → zod 境界検証 → フィルタ → ModelCatalog。ingest script と refresh サービスの単一ソース
     │   ├── build-model-catalog.spec.ts
+    │   ├── fetch-model-catalog.ts              # 共有取得（追補 R）: fetch models.dev（固定URL・timeout 付き）→ 共有変換。ingest script と refresh サービスの単一取得経路
     │   ├── model-catalog.ts                    # runtime: getSelectableModelIds(provider) = `^/resource/model-catalog-data.json` を static import して read（通信なし）
     │   ├── model-catalog.spec.ts
-    │   ├── effective-model-catalog.ts          # runtime（追補 R）: getEffectiveSelectableModelIds = 更新済み（RefreshedModelCatalog）?? 同梱（9.5）
+    │   ├── effective-model-catalog.ts          # runtime（追補 R）: getEffectiveSelectableModelIds = 更新済み（RefreshedModelCatalog）／同梱の新しい方（9.5、同梱世代同士の比較）
     │   ├── effective-model-catalog.spec.ts
-    │   ├── refresh-model-catalog.ts            # runtime（追補 R）: opt-in リフレッシュ = fetch models.dev → 共有変換 → 永続化（失敗時は何も書かない、9.4）
+    │   ├── refresh-model-catalog.ts            # runtime（追補 R）: opt-in リフレッシュ = 共有取得（fetch-model-catalog）→ 永続化（失敗時は何も書かない、9.4）
     │   └── refresh-model-catalog.spec.ts
     ├── server/models/
     │   └── refreshed-model-catalog.ts          # 更新済みカタログの singleton collection（追補 R）
