@@ -4,8 +4,8 @@ import type { JSX, ReactNode } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
-import type { SWRResponse } from 'swr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({
@@ -18,25 +18,42 @@ vi.mock('./use-selectable-models', () => ({
   useSWRxSelectableModels: vi.fn(),
 }));
 
+// The manual catalog-refresh button POSTs via apiv3Post and reports via toasts;
+// both are mocked so the suite stays network-free and can assert the calls.
+vi.mock('~/client/util/apiv3-client', () => ({ apiv3Post: vi.fn() }));
+vi.mock('~/client/util/toastr', () => ({
+  toastSuccess: vi.fn(),
+  toastError: vi.fn(),
+}));
+
+import { apiv3Post } from '~/client/util/apiv3-client';
+import { toastError, toastSuccess } from '~/client/util/toastr';
+
 import type { SelectableModelsResponse } from '../../interfaces/selectable-models-response';
 import { AllowedModelsField } from './AllowedModelsField';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { useSWRxSelectableModels } from './use-selectable-models';
 
 const mockedUseSelectableModels = vi.mocked(useSWRxSelectableModels);
+const mockedApiv3Post = vi.mocked(apiv3Post);
 
-// Build a minimal SWRResponse for the hook mock. Only `data`/`error` are read by
-// the component; the rest of the SWRResponse surface is filled with inert stubs so
-// the returned value is a real SWRResponse (no type assertion needed).
+// Build a minimal hook result for the mock. Only `data`/`error` and the
+// `invalidateAllProviders` util are read by the component; the rest of the
+// SWRResponse surface is filled with inert stubs so the returned value is a
+// real hook result (no type assertion needed). The cache-wide breadth of
+// `invalidateAllProviders` itself is the hook's contract, covered in
+// use-selectable-models.spec.ts — here tests only assert the refresh flow
+// calls it.
 const swrResponse = (partial: {
   data?: SelectableModelsResponse;
   error?: Error;
-}): SWRResponse<SelectableModelsResponse, Error> => ({
+}): ReturnType<typeof useSWRxSelectableModels> => ({
   data: partial.data,
   error: partial.error,
   isLoading: false,
   isValidating: false,
   mutate: vi.fn(),
+  invalidateAllProviders: vi.fn(),
 });
 
 const defaultFormValues: AiSettingsFormValues = {
@@ -688,6 +705,99 @@ describe('AllowedModelsField', () => {
       // catalog is loading, so the select-only guarantee also holds during the
       // initial-load window instead of briefly exposing an editable free-text input.
       expect(screen.getByLabelText('ai_settings.model_label')).toBeDisabled();
+    });
+  });
+
+  describe('manual catalog refresh (Req 9.1)', () => {
+    const getRefreshButton = (): HTMLElement =>
+      screen.getByRole('button', {
+        name: 'ai_settings.refresh_model_catalog',
+      });
+    const getConfirmButton = (): HTMLElement =>
+      screen.getByRole('button', {
+        name: 'ai_settings.refresh_model_catalog_confirm',
+      });
+
+    it('POSTs the refresh endpoint only after the admin confirms, revalidates the list, and toasts success', async () => {
+      const user = userEvent.setup();
+      const hookResult = swrResponse({ data: { modelIds: ['gpt-4o'] } });
+      mockedUseSelectableModels.mockReturnValue(hookResult);
+      mockedApiv3Post.mockResolvedValue(
+        // Only resolution matters to the component (the body is not read);
+        // mock<T>() keeps the stub type-checked without an assertion.
+        mock<Awaited<ReturnType<typeof apiv3Post>>>(),
+      );
+
+      renderComponent();
+      await user.click(getRefreshButton());
+
+      // The refresh triggers OUTBOUND communication (models.dev), so the click
+      // opens a confirmation instead of firing the request (Req 9.6).
+      expect(mockedApiv3Post).not.toHaveBeenCalled();
+      expect(
+        screen.getByText('ai_settings.refresh_model_catalog_confirmation'),
+      ).toBeInTheDocument();
+
+      await user.click(getConfirmButton());
+
+      await waitFor(() => {
+        expect(mockedApiv3Post).toHaveBeenCalledExactlyOnceWith(
+          '/ai-settings/refresh-model-catalog',
+        );
+      });
+      // EVERY cached provider list is invalidated (not just the current one):
+      // the server-side snapshot is replaced for all providers at once.
+      expect(hookResult.invalidateAllProviders).toHaveBeenCalled();
+      expect(toastSuccess).toHaveBeenCalledWith(
+        'ai_settings.refresh_model_catalog_success',
+      );
+      expect(toastError).not.toHaveBeenCalled();
+    });
+
+    it('does NOT communicate when the admin cancels the confirmation', async () => {
+      const user = userEvent.setup();
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ data: { modelIds: ['gpt-4o'] } }),
+      );
+
+      renderComponent();
+      await user.click(getRefreshButton());
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(mockedApiv3Post).not.toHaveBeenCalled();
+      expect(toastSuccess).not.toHaveBeenCalled();
+      expect(toastError).not.toHaveBeenCalled();
+      // The trigger stays available for another attempt.
+      expect(getRefreshButton()).toBeEnabled();
+    });
+
+    it('toasts the localized failure message and does not revalidate when the refresh fails (Req 9.4)', async () => {
+      const user = userEvent.setup();
+      const hookResult = swrResponse({ data: { modelIds: ['gpt-4o'] } });
+      mockedUseSelectableModels.mockReturnValue(hookResult);
+      mockedApiv3Post.mockRejectedValue(new Error('refresh failed'));
+
+      renderComponent();
+      await user.click(getRefreshButton());
+      await user.click(getConfirmButton());
+
+      await waitFor(() => {
+        expect(toastError).toHaveBeenCalledWith(
+          'ai_settings.refresh_model_catalog_failed',
+        );
+      });
+      expect(hookResult.invalidateAllProviders).not.toHaveBeenCalled();
+      expect(toastSuccess).not.toHaveBeenCalled();
+      // The button recovers so the admin can retry.
+      expect(getRefreshButton()).toBeEnabled();
+    });
+
+    it('stays ENABLED in env-only mode — the catalog is a server-side cache, not an AI setting', () => {
+      // env-only deployments (e.g. GROWI.cloud) fix the SETTINGS via env vars but
+      // must still be able to refresh the catalog (the very audience of Req 9.1).
+      renderComponent({ disabled: true });
+
+      expect(getRefreshButton()).toBeEnabled();
     });
   });
 });

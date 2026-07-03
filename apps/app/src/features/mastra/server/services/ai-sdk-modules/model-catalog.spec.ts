@@ -1,5 +1,6 @@
+import catalog from '^/resource/model-catalog-data.json' with { type: 'json' };
+
 import { getSelectableModelIds } from './model-catalog';
-import catalog from './model-catalog-data.json' with { type: 'json' };
 
 describe('getSelectableModelIds', () => {
   describe('catalog-backed providers', () => {

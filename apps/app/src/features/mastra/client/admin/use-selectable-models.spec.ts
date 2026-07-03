@@ -2,10 +2,11 @@
 
 import type { ReactNode } from 'react';
 import { createElement } from 'react';
-import { renderHook, waitFor } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 // biome-ignore lint/style/noRestrictedImports: import only types
 import type { AxiosResponse } from 'axios';
 import { SWRConfig } from 'swr';
+import useSWRImmutable from 'swr/immutable';
 import { vi } from 'vitest';
 
 import * as apiv3Client from '~/client/util/apiv3-client';
@@ -124,5 +125,67 @@ describe('useSWRxSelectableModels', () => {
       expect(result.current.error).toBeDefined();
     });
     expect(result.current.data).toBeUndefined();
+  });
+});
+
+describe('invalidateAllProviders', () => {
+  it('invalidates every visited provider list — including unmounted ones — leaving unrelated keys untouched', async () => {
+    // This encodes the real regression scenario: the component mounts ONE
+    // provider's hook at a time (keyed on the watched provider), and
+    // useSWRImmutable disables all stale revalidation — so after a catalog
+    // refresh, a provider visited earlier in the session would keep serving
+    // its pre-refresh list from cache forever. An unrelated SWR key acts as
+    // the control probe for over-invalidation.
+    mockedApiv3Get.mockResolvedValue(
+      buildResponse({ modelIds: ['old-model'] }),
+    );
+    const unrelatedFetcher = vi.fn(async () => 'unrelated-data');
+
+    const useHarness = ({ provider }: { provider: AiProvider }) => ({
+      models: useSWRxSelectableModels(provider),
+      unrelated: useSWRImmutable('unrelated-key', unrelatedFetcher),
+    });
+    const { result, rerender } = renderHook(useHarness, {
+      wrapper,
+      initialProps: { provider: 'openai' as AiProvider },
+    });
+
+    // openai visited and cached with the pre-refresh list...
+    await waitFor(() => {
+      expect(result.current.models.data).toEqual({ modelIds: ['old-model'] });
+    });
+    // ...then the admin switches to anthropic (openai's hook unmounts).
+    rerender({ provider: 'anthropic' });
+    await waitFor(() => {
+      expect(result.current.models.data).toEqual({ modelIds: ['old-model'] });
+    });
+    expect(result.current.unrelated.data).toBe('unrelated-data');
+
+    // The server-side snapshot changes — a catalog refresh replaces it for ALL
+    // providers at once.
+    mockedApiv3Get.mockResolvedValue(
+      buildResponse({ modelIds: ['new-model'] }),
+    );
+
+    // Act: refresh while anthropic is the mounted provider.
+    await act(async () => {
+      await result.current.models.invalidateAllProviders();
+    });
+
+    // Assert: the mounted provider refetches immediately...
+    await waitFor(() => {
+      expect(result.current.models.data).toEqual({ modelIds: ['new-model'] });
+    });
+
+    // ...and switching back to the previously visited openai refetches too
+    // (its cache entry was cleared), instead of serving the pre-refresh list.
+    rerender({ provider: 'openai' });
+    await waitFor(() => {
+      expect(result.current.models.data).toEqual({ modelIds: ['new-model'] });
+    });
+
+    // The unrelated key was neither cleared nor refetched.
+    expect(result.current.unrelated.data).toBe('unrelated-data');
+    expect(unrelatedFetcher).toHaveBeenCalledTimes(1);
   });
 });

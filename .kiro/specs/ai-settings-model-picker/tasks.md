@@ -99,9 +99,33 @@
   - _Requirements: 8.3_
   - _Depends: 7.1, 7.2_
 
+- [ ] 9. 追補 R: カタログのリフレッシュ（PR #11383 レビューFB 対応）
+- [x] 9.1 共有純変換を src へ抽出し ingest script を薄いラッパーにする
+  - `buildModelCatalog`＋zod 境界検証＋`MODELS_DEV_URL`/帰属を `build-model-catalog.ts`（src）へ移設し、`bin/vendor-model-catalog.ts` は fetch→変換→write のラッパーのみにする。純変換テストは src 側 spec へ移設
+  - 完了状態: ingest script と refresh サービスが同一の変換・サニティチェックを import し、`pnpm vendor:models` と両 spec が green
+  - _Requirements: 6.1, 9.1_
+  - _Boundary: build-model-catalog, vendor-model-catalog_
+- [x] 9.2 更新済みカタログの永続化と effective read を実装する
+  - `RefreshedModelCatalog` singleton collection（`{ models, fetchedAt, source }`）と `getEffectiveSelectableModelIds(provider)`（更新済み／同梱の**新しい方**を採用。同梱が厳密に新しい場合のみ同梱優先＝イメージ更新後の stale スナップショット覆い隠し防止。無ければ同梱、9.5）を追加し、`get-available-models` を effective read に切替える
+  - 完了状態: 更新済みが新しければそれを返し、同梱が新しければ同梱を返し、なしで同梱へフォールバック、azure は `[]`、read パスに外部通信がないことを単体テストで確認できる
+  - _Requirements: 9.4, 9.5, 2.1, 3.1_
+  - _Boundary: refreshed-model-catalog, effective-model-catalog, get-available-models_
+- [x] 9.3 refresh サービスと管理画面からの手動更新を実装する
+  - `refreshModelCatalog()`（固定 URL fetch→共有変換→upsert、失敗時は永続化前に throw）、`POST /ai-settings/refresh-model-catalog`（WRITE スコープ + admin）、`AllowedModelsField` の更新ボタン（確認モーダル→apiv3Post→invalidate→toast。env-only でも有効）、i18n キー×5 ロケールを追加
+  - 完了状態: 統合テストで admin 200 `{ fetchedAt, counts }`・失敗 500（内部非漏洩）・非 admin/未認証拒否、UI テストでボタン→確認モーダル→POST→invalidate→toast・キャンセル時は通信ゼロ・失敗フォールバック・env-only で enabled を確認できる
+  - _Requirements: 9.1, 9.4, 9.7, 7.1_
+  - _Boundary: refresh-model-catalog, post-refresh-model-catalog, admin-ai-settings router, AllowedModelsField, locales admin.json_
+- [x] 9.4 起動時・定期リフレッシュの配線を実装する（AI 有効時のみ作動）
+  - 設定キー `ai:modelCatalogRefreshOnStartup`（既定 `false`）/ `ai:modelCatalogRefreshCronSchedule`（**既定 `'0 4 * * *'`**＝日次。空文字で無効化）を追加し、`model-catalog-refresh-jobs`（両トリガとも先頭で `isAiEnabled()` ゲート／cron: AI 有効かつ schedule 設定時のみ・invalid でも boot 非破壊／startup: AI 有効かつ opt-in・fire-and-forget）を crowi の `setupCron()` / `asyncAfterExpressServerReady()` に配線する
+  - 完了状態: **AI 無効なら cron/startup とも no-op（外部通信ゼロ）**、schedule 未設定/空でも no-op、AI 有効かつ設定時に schedule/起動時リフレッシュが発火し、失敗しても boot・稼働を壊さないことを単体テストで確認できる
+  - _Requirements: 9.2, 9.3, 9.4, 9.6_
+  - _Boundary: config-definition, model-catalog-refresh-jobs, crowi/index.ts_
+
 ## Implementation Notes
 
 - 1.2: i18n プレースホルダの確定キーは `ai_settings.model_placeholder`（既存 `provider_placeholder` に倣う）。design/research では例示的に `model_select_placeholder` と表記されているが、実装・タスク 5.1 が参照するのは `model_placeholder`。5.1 の `<select>` 空 option プレースホルダはこのキーを使うこと。
 - プロセス（重要）: **vitest は型チェックしない**。TS 系タスクは完了前に必ず `apps/app` で `pnpm run lint:typecheck`（tsgo）を実行すること。2.1 で `CATALOG_PROVIDERS.includes('azure-openai')` の TS2345 が vitest green のまますり抜けた（後に 5728dab62e で修正）。`out/tsconfig.json` の TSConfck 警告は既存ノイズで無関係。
 - 2.2: bin スクリプトは `node bin/*.ts`（Node24 型ストリップ）で実行。bin/ から `src/` の TS を import する際は**明示的 `.ts` 拡張子が必須**（extensionless は ERR_MODULE_NOT_FOUND）。bin/ は `lint:import-convention`（src のみ走査）対象外なので `.ts` は許容。実行時・ビルド工程は fetch せず、この取り込みスクリプトのみが models.dev へ fetch する。成果物 `model-catalog-data.json` は静的 JSON として commit 済み（openai=41/anthropic=24/google=16）。
 - 6.1: リリースワークフロー配線は**この環境では CI 実行できず、YAML 妥当性＋構造インスペクションでのみ検証済み**。prod=`release.yml` の `create-github-release` 内で tag commit の前に `vendor:models`（`continue-on-error`）を実行し、成果物をリリース commit に同梱する。無人 RC（`release-rc-scheduled.yml`）はコミット済み成果物から build するのみ（RC 側で refresh/commit は行わない）。オンデマンド更新は手動 `pnpm vendor:models` → PR。build（`reusable-app-build-image.yml`）は不変（read-only 維持）。本番投入前に prod リリースワークフローの人手 CI ドライラン（例: workflow_dispatch）を推奨。
+- 9.x: `vendor:models` は `node --import ./bin/dev-esm-resolver.mjs` 経由で起動する（src 側共有変換が `~/` エイリアス・extensionless import を含むため。plain `node bin/*.ts` は ERR_MODULE_NOT_FOUND）。更新済みカタログは config-manager ではなく専用 collection `mastra_refreshed_model_catalog`（設定ではなくキャッシュ・多インスタンス共有）。管理画面の更新ボタンは env-only モードでも有効（カタログは設定ではない。env-only 運用の GROWI.cloud が主対象）。
+- プロセス（重要）: **新規 MongoDB モデルは Mongoose ではなく Prisma で作成する**（schema.prisma にモデル追加＋`Prisma.defineExtension` で statics 相当を実装し `createPrisma()` に連結。`external-account.ts` パターン準拠）。`RefreshedModelCatalog` は Prisma-first（新規 collection・二次 index なしのため Mongoose schema 登録も不要）。schema.prisma 変更後は `pnpm prisma generate` の実行が必要。

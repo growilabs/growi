@@ -10,7 +10,7 @@
 //   - getAiSettings / putAiSettings terminal handlers        — REAL (deep leaves mocked below)
 //   - updateAiSettingsValidators                             — REAL (inline in put-ai-settings; covered in put-ai-settings.spec.ts)
 //   - apiV3FormValidator                                     — mocked → passthrough so validation runs but never blocks
-//   - generateAddActivityMiddleware()                        — mocked → sets res.locals.activity (PUT)
+//   - generateAddActivityMiddleware()                        — mocked → sets res.locals.activity (PUT / POST refresh)
 //
 // The observable contract we assert (Req 1.1, 1.2):
 //   - an admin reaches the GET handler and the PUT handler (success → status 200)
@@ -67,6 +67,29 @@ vi.mock(
   '~/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model',
   () => ({ clearResolvedMastraModelCache: vi.fn() }),
 );
+// No refreshed catalog persisted (getSingleton → null): the REAL
+// available-models handler falls back to the bundled committed asset, keeping
+// these cases DB-free while still exercising the real catalog read (Req 9.5).
+// Mocking '~/utils/prisma' also prevents the real PrismaClient from being
+// instantiated in this unit suite.
+vi.mock('~/utils/prisma', () => ({
+  prisma: {
+    mastrarefreshedmodelcatalogs: {
+      getSingleton: vi.fn(async () => null),
+      upsertSingleton: vi.fn(),
+    },
+  },
+}));
+// The POST /refresh-model-catalog terminal handler's collaborator: mocked so
+// the route never fetches models.dev in tests; per-test overrides drive the
+// success/failure shapes.
+const { refreshModelCatalog } = vi.hoisted(() => ({
+  refreshModelCatalog: vi.fn(),
+}));
+vi.mock(
+  '~/features/mastra/server/services/ai-sdk-modules/refresh-model-catalog',
+  () => ({ refreshModelCatalog }),
+);
 
 import { SCOPE } from '@growi/core/dist/interfaces';
 import express, {
@@ -77,6 +100,7 @@ import express, {
 import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
+import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 
 import { factory } from './index';
@@ -88,12 +112,19 @@ const ACTIVE = 2; // UserStatus.STATUS_ACTIVE
 // Build an app that injects `user` (or none) before the router, then mounts the
 // factory under a `/_api/v3`-style base so login-required treats it as an API path
 // (responds 403 rather than redirecting when unauthenticated).
+// Shared across buildApp instances so tests can assert the audit emit of the
+// mutation handlers (PUT / POST refresh); cleared by the beforeEach below.
+const activityEmitMock = vi.fn();
+
 const buildApp = (user?: TestUser) => {
-  // The real PUT handler emits an audit event via crowi.events.activity.emit, so
-  // provide it (a bare mock<Crowi>() leaves events.activity undefined).
+  // The real PUT / POST refresh handlers emit an audit event via
+  // crowi.events.activity.emit, so provide it (a bare mock<Crowi>() leaves
+  // events.activity undefined).
   const crowi = mock<Crowi>({
     events: {
-      activity: { emit: vi.fn() } as unknown as Crowi['events']['activity'],
+      activity: {
+        emit: activityEmitMock,
+      } as unknown as Crowi['events']['activity'],
     },
   });
   const app = express();
@@ -267,6 +298,76 @@ describe('admin-ai-settings router factory', () => {
       );
       expect(res.status).toBe(403);
       expect(res.body).not.toHaveProperty('modelIds');
+    });
+  });
+
+  // POST /refresh-model-catalog drives the SAME access control (WRITE scope +
+  // login + admin); the refresh service itself is mocked (never fetches here).
+  describe('POST /refresh-model-catalog (Req 9.1, 9.7)', () => {
+    const admin: TestUser = { _id: 'u1', status: ACTIVE, admin: true };
+    const member: TestUser = { _id: 'u2', status: ACTIVE, admin: false };
+
+    it('requests the AI admin WRITE scope (accepts legacy) for the route', () => {
+      factory(mock<Crowi>());
+      expect(accessTokenParser).toHaveBeenCalledWith([SCOPE.WRITE.ADMIN.AI], {
+        acceptLegacy: true,
+      });
+    });
+
+    it('refreshes and answers metadata only for an admin (Req 9.1, 7.1)', async () => {
+      const fetchedAt = new Date('2026-07-02T00:00:00.000Z');
+      refreshModelCatalog.mockResolvedValue({
+        counts: { openai: 1, anthropic: 1, google: 1 },
+        fetchedAt,
+      });
+
+      const res = await request(buildApp(admin)).post(
+        '/_api/v3/ai-settings/refresh-model-catalog',
+      );
+
+      expect(res.status).toBe(200);
+      expect(refreshModelCatalog).toHaveBeenCalledTimes(1);
+      // Metadata only: timestamp + per-provider counts, no ids and no secrets.
+      expect(res.body).toEqual({
+        fetchedAt: fetchedAt.toISOString(),
+        counts: { openai: 1, anthropic: 1, google: 1 },
+      });
+      // Audit trail: the successful refresh settles the Activity created by
+      // addActivity, so operators can attribute who refreshed the catalog.
+      expect(activityEmitMock).toHaveBeenCalledWith('update', 'activity-id', {
+        action: SupportedAction.ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH,
+      });
+    });
+
+    it('answers a generic 500 when the refresh fails, without leaking internals (Req 9.4)', async () => {
+      refreshModelCatalog.mockRejectedValue(
+        new Error('fetch failed: 503 for https://models.dev/api.json'),
+      );
+
+      const res = await request(buildApp(admin)).post(
+        '/_api/v3/ai-settings/refresh-model-catalog',
+      );
+
+      expect(res.status).toBe(500);
+      expect(JSON.stringify(res.body)).not.toContain('models.dev');
+      // A failed refresh must not settle the audit Activity (nothing changed).
+      expect(activityEmitMock).not.toHaveBeenCalled();
+    });
+
+    it('rejects a logged-in non-admin before the handler runs (Req 9.7)', async () => {
+      const res = await request(buildApp(member)).post(
+        '/_api/v3/ai-settings/refresh-model-catalog',
+      );
+      expect(res.status).not.toBe(200);
+      expect(refreshModelCatalog).not.toHaveBeenCalled();
+    });
+
+    it('rejects an unauthenticated request with 403, handler not reached (Req 9.7)', async () => {
+      const res = await request(buildApp()).post(
+        '/_api/v3/ai-settings/refresh-model-catalog',
+      );
+      expect(res.status).toBe(403);
+      expect(refreshModelCatalog).not.toHaveBeenCalled();
     });
   });
 });
