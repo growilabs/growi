@@ -38,7 +38,7 @@ pageLinkSchema.index({ fromPage: 1, toPath: 1 }, { unique: true });
 pageLinkSchema.statics.replaceOutboundLinks = async function (
   fromPageId: ObjectId,
   resolvedRows: IPageLink[],
-) {
+): Promise<void> {
   const toPaths = resolvedRows.map((r) => r.toPath);
 
   if (resolvedRows.length > 0) {
@@ -74,7 +74,7 @@ pageLinkSchema.statics.findBacklinkSources = async function (
  */
 pageLinkSchema.statics.reconcileDeletedPages = async function (
   pageIds: ObjectId[],
-) {
+): Promise<void> {
   await this.updateMany(
     { toPage: { $in: pageIds } },
     { $set: { toPage: null } },
