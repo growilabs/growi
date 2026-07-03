@@ -83,7 +83,7 @@
 
 - [ ] 7. 検証: 実 DB に対する結合テスト（読み直し方式）
   - 全体前提: 記録可否ゲートを通すため `ACTION_ATTACHMENT_REMOVE` を記録対象にする設定（Medium 以上または additional actions）を明示的に注入する（process.env を書き換えず明示 API で注入）。結合試験は per-worker 分離で実行する
-- [ ] 7.1 (P) 直接削除の結合テスト
+- [x] 7.1 (P) 直接削除の結合テスト
   - 直接削除 API 実行後、対象 activity を実 DB から読み直し、snapshot に添付4フィールド＋username、target=添付 `_id`、targetModel=`Attachment` を確認する
   - 観察可能な完了条件: 上記を assert する結合テストが green
   - _Requirements: 2.1, 2.2_
@@ -106,6 +106,7 @@
 
 ## Implementation Notes
 
+- 7.1: ゲート注入の前例 = `configManager.updateConfigs({ 'app:auditLogEnabled': true, 'app:auditLogActionGroupSize': ActionGroupSize.Medium })`（DB 書き込みの明示 API・process.env 非改変）＋ afterAll で `removeIfUndefined: true` により撤去。7.2/7.3/7.4 も同じ口を使うこと。番兵 IP 使用済み: 10.0.0.70/.72/.73/.74/.75/.88/.99, 127.0.0.1。
 - 6.1: 既存問題（境界外・未修正）: `components.schemas.ActivityResponse` が `apiv3/user-activities.ts` にも同名定義され生成 spec 内で衝突（activity.ts 側が採用される）。将来スキーマ名の分離（例: AuditLogActivityResponse）を推奨。
 - 5.1: `deleteCompletelyOperation` の actor は `ActivityActor | null`（必須引数）。design の表に無い第4の直接呼び出し元 `deleteCompletelyUserHomeBySystem`（システムによるユーザーホーム強制削除・操作者不在）が typecheck で発見され、**システム経路は意図的に記録対象外・明示的な null が契約**（省略はコンパイルエラーのまま）。7.2/7.3 はこの前提で書くこと。
 - 4.1: pino logger は context-first（`logger.warn({ ... }, 'msg')`）。message-first だと文脈オブジェクトが実行時に黙って捨てられる（レビューで実測・差し戻し済み）。7.1 では「page が引けないケースの warn に attachmentId/pageId が構造化フィールドで乗る」ことの assert を検討（レビュアー提案）。
