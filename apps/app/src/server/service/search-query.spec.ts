@@ -550,4 +550,72 @@ describe('parseQueryString()', () => {
     const expectedTerm = { match: ['hello'], group: ['dev-1'] };
     expect(terms).toStrictEqual(emptyTerms(expectedTerm));
   });
+
+  it('keeps a quoted group value with spaces as a single filter value', () => {
+    const terms = searchService.parseQueryString('group:"My Group"');
+
+    // The quotes must not leak into the phrase bucket, and the value must not be
+    // truncated at the space.
+    const expectedTerm = { group: ['My Group'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('drops an unpaired quote and parses the rest of the query normally', () => {
+    const terms = searchService.parseQueryString(
+      'hello group:"My Group tag:foo',
+    );
+
+    // (`My`, not `"My`) and the remaining tokens still route to their buckets.
+    const expectedTerm = {
+      match: ['hello', 'Group'],
+      group: ['My'],
+      tag: ['foo'],
+    };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('keeps a negated quoted group value with spaces as a single filter value', () => {
+    const terms = searchService.parseQueryString('-group:"My Group"');
+
+    const expectedTerm = { not_group: ['My Group'] };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('supports quoted values for author and editor filters too', () => {
+    const terms = searchService.parseQueryString(
+      'author:"Jane Doe" -editor:"John Smith"',
+    );
+
+    const expectedTerm = {
+      author: ['Jane Doe'],
+      not_editor: ['John Smith'],
+    };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('distinguishes a quoted filter value from a bare quoted phrase', () => {
+    const terms = searchService.parseQueryString(
+      'group:"My Group" "hello world"',
+    );
+
+    // group:"My Group" is a filter value; "hello world" is a full-text phrase.
+    const expectedTerm = {
+      group: ['My Group'],
+      phrase: ['"hello world"'],
+    };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
+  it('parses a quoted group value alongside other tokens', () => {
+    const terms = searchService.parseQueryString(
+      'hello group:"My Group" tag:foo',
+    );
+
+    const expectedTerm = {
+      match: ['hello'],
+      group: ['My Group'],
+      tag: ['foo'],
+    };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
 });

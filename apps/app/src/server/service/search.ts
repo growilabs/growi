@@ -555,7 +555,38 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const groups: string[] = [];
     const notGroups: string[] = [];
 
-    // First: Parse phrase keywords
+    // First: Parse quoted filter values (e.g. `group:"My Group"`, `-editor:"Jane Doe"`).
+    // This must run before the phrase pass below, otherwise the phrase regex would strip
+    // the `"..."` part into a full-text phrase and leave a bare, valueless operator behind.
+    // The quotes let a filter value contain spaces despite the later space-based tokenizing.
+    const positiveBuckets: Record<string, string[]> = {
+      'prefix:': prefixPaths,
+      'tag:': tags,
+      'author:': authors,
+      'editor:': editors,
+      'group:': groups,
+    };
+    const negativeBuckets: Record<string, string[]> = {
+      'prefix:': notPrefixPaths,
+      'tag:': notTags,
+      'author:': notAuthors,
+      'editor:': notEditors,
+      'group:': notGroups,
+    };
+    const quotedFilterRegExp = new RegExp(
+      `(-?)(${FILTER_PREFIXES.join('|')})"([^"]+)"`,
+      'g',
+    );
+    queryString = queryString.replace(
+      quotedFilterRegExp,
+      (_match, negation, prefix, value) => {
+        const buckets = negation === '-' ? negativeBuckets : positiveBuckets;
+        buckets[prefix].push(value);
+        return '';
+      },
+    );
+
+    // Second: Parse phrase keywords
     const phraseRegExp = new RegExp(/(-?"[^"]+")/g);
     const phrases = queryString.match(phraseRegExp);
 
@@ -572,7 +603,10 @@ class SearchService implements SearchQueryParser, SearchResolver {
       });
     }
 
-    // Second: Parse other keywords (include minus keywords)
+    // Any unpaired quotes are removed
+    queryString = queryString.replace(/"/g, '');
+
+    // Third: Parse other keywords (include minus keywords)
     queryString.split(' ').forEach((word) => {
       if (word === '') {
         return;
