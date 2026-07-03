@@ -1058,6 +1058,8 @@
     "SEARCH_PAGE": "ページの検索",
     "SEARCH_PAGE_VIEW": "ページ閲覧（検索結果ページ）",
     "ADMIN_APP_SETTING_UPDATE": "アプリ設定の更新",
+    "ADMIN_AI_SETTING_UPDATE": "AI設定の更新",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "モデルカタログの更新",
     "ADMIN_SITE_URL_UPDATE": "サイトURL設定の更新",
     "ADMIN_MAIL_SMTP_UPDATE": "メール設定（SMTP）の更新",
     "ADMIN_MAIL_SES_UPDATE": "メール設定（SES）の更新",

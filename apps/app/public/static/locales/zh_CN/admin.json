@@ -1058,6 +1058,8 @@
     "SEARCH_PAGE": "页面搜索",
     "SEARCH_PAGE_VIEW": "页面浏览量（搜索结果页面）",
     "ADMIN_APP_SETTING_UPDATE": "更新应用设置",
+    "ADMIN_AI_SETTING_UPDATE": "更新 AI 设置",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "刷新模型目录",
     "ADMIN_SITE_URL_UPDATE": "更新站点 URL 设置",
     "ADMIN_MAIL_SMTP_UPDATE": "更新电子邮件（SMTP）设置",
     "ADMIN_MAIL_SES_UPDATE": "更新电子邮件（SES）设置",

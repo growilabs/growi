@@ -1049,6 +1049,8 @@
     "SEARCH_PAGE": "페이지 검색",
     "SEARCH_PAGE_VIEW": "페이지 보기(검색 결과 페이지)",
     "ADMIN_APP_SETTING_UPDATE": "앱 설정 업데이트",
+    "ADMIN_AI_SETTING_UPDATE": "AI 설정 업데이트",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "모델 카탈로그 새로고침",
     "ADMIN_SITE_URL_UPDATE": "사이트 URL 설정 업데이트",
     "ADMIN_MAIL_SMTP_UPDATE": "이메일(SMTP) 설정 업데이트",
     "ADMIN_MAIL_SES_UPDATE": "이메일(SES) 설정 업데이트",

@@ -10,7 +10,7 @@
 //   - getAiSettings / putAiSettings terminal handlers        — REAL (deep leaves mocked below)
 //   - updateAiSettingsValidators                             — REAL (inline in put-ai-settings; covered in put-ai-settings.spec.ts)
 //   - apiV3FormValidator                                     — mocked → passthrough so validation runs but never blocks
-//   - generateAddActivityMiddleware()                        — mocked → sets res.locals.activity (PUT)
+//   - generateAddActivityMiddleware()                        — mocked → sets res.locals.activity (PUT / POST refresh)
 //
 // The observable contract we assert (Req 1.1, 1.2):
 //   - an admin reaches the GET handler and the PUT handler (success → status 200)
@@ -100,6 +100,7 @@ import express, {
 import request from 'supertest';
 import { mock } from 'vitest-mock-extended';
 
+import { SupportedAction } from '~/interfaces/activity';
 import type Crowi from '~/server/crowi';
 
 import { factory } from './index';
@@ -111,12 +112,19 @@ const ACTIVE = 2; // UserStatus.STATUS_ACTIVE
 // Build an app that injects `user` (or none) before the router, then mounts the
 // factory under a `/_api/v3`-style base so login-required treats it as an API path
 // (responds 403 rather than redirecting when unauthenticated).
+// Shared across buildApp instances so tests can assert the audit emit of the
+// mutation handlers (PUT / POST refresh); cleared by the beforeEach below.
+const activityEmitMock = vi.fn();
+
 const buildApp = (user?: TestUser) => {
-  // The real PUT handler emits an audit event via crowi.events.activity.emit, so
-  // provide it (a bare mock<Crowi>() leaves events.activity undefined).
+  // The real PUT / POST refresh handlers emit an audit event via
+  // crowi.events.activity.emit, so provide it (a bare mock<Crowi>() leaves
+  // events.activity undefined).
   const crowi = mock<Crowi>({
     events: {
-      activity: { emit: vi.fn() } as unknown as Crowi['events']['activity'],
+      activity: {
+        emit: activityEmitMock,
+      } as unknown as Crowi['events']['activity'],
     },
   });
   const app = express();
@@ -324,6 +332,11 @@ describe('admin-ai-settings router factory', () => {
         fetchedAt: fetchedAt.toISOString(),
         counts: { openai: 1, anthropic: 1, google: 1 },
       });
+      // Audit trail: the successful refresh settles the Activity created by
+      // addActivity, so operators can attribute who refreshed the catalog.
+      expect(activityEmitMock).toHaveBeenCalledWith('update', 'activity-id', {
+        action: SupportedAction.ACTION_ADMIN_AI_MODEL_CATALOG_REFRESH,
+      });
     });
 
     it('answers a generic 500 when the refresh fails, without leaking internals (Req 9.4)', async () => {
@@ -337,6 +350,8 @@ describe('admin-ai-settings router factory', () => {
 
       expect(res.status).toBe(500);
       expect(JSON.stringify(res.body)).not.toContain('models.dev');
+      // A failed refresh must not settle the audit Activity (nothing changed).
+      expect(activityEmitMock).not.toHaveBeenCalled();
     });
 
     it('rejects a logged-in non-admin before the handler runs (Req 9.7)', async () => {

@@ -1048,6 +1048,8 @@
     "SEARCH_PAGE": "Rechercher une page",
     "SEARCH_PAGE_VIEW": "Résultats de recherche",
     "ADMIN_APP_SETTING_UPDATE": "Modifier les paramètres d'application",
+    "ADMIN_AI_SETTING_UPDATE": "Modifier les paramètres d'IA",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "Actualiser le catalogue de modèles",
     "ADMIN_SITE_URL_UPDATE": "Modifier les paramètres d'URL",
     "ADMIN_MAIL_SMTP_UPDATE": "Modifier les paramètres d'e-mail",
     "ADMIN_MAIL_SES_UPDATE": "Modifier les paramètres d'e-mail (SES)",

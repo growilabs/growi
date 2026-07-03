@@ -1049,6 +1049,8 @@
     "SEARCH_PAGE": "Page Search",
     "SEARCH_PAGE_VIEW": "Page view(Search results page)",
     "ADMIN_APP_SETTING_UPDATE": "Update App Settings",
+    "ADMIN_AI_SETTING_UPDATE": "Update AI Settings",
+    "ADMIN_AI_MODEL_CATALOG_REFRESH": "Refresh model catalog",
     "ADMIN_SITE_URL_UPDATE": "Update Site URL Settings",
     "ADMIN_MAIL_SMTP_UPDATE": "Update E-mail(SMTP) Settings",
     "ADMIN_MAIL_SES_UPDATE": "Update E-mail(SES) Settings",
