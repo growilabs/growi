@@ -1,11 +1,16 @@
 // --- Mock boundary ---------------------------------------------------------
 //
 // The jobs module wires two opt-in triggers around refreshModelCatalog:
+//   - isAiEnabled        : mocked — the AI-feature gate that fronts BOTH
+//     triggers (a refresh only runs when the AI feature itself is enabled)
 //   - configManager      : mocked — drives the opt-in guards (Req 9.6)
 //   - node-cron          : mocked — asserts whether/what gets scheduled and
 //     lets the test fire the tick callback deterministically
 //   - refreshModelCatalog: mocked — the refresh behavior itself is covered by
 //     refresh-model-catalog.spec.ts; here only the trigger contract matters
+const { isAiEnabled } = vi.hoisted(() => ({ isAiEnabled: vi.fn() }));
+vi.mock('~/features/openai/server/services', () => ({ isAiEnabled }));
+
 const { getConfig } = vi.hoisted(() => ({ getConfig: vi.fn() }));
 vi.mock('~/server/service/config-manager', () => ({
   configManager: { getConfig },
@@ -38,9 +43,20 @@ const setConfig = (overrides: Record<string, unknown>): void => {
 beforeEach(() => {
   vi.clearAllMocks();
   cronScheduleMock.mockReturnValue(scheduledTask);
+  // AI enabled is the common case; the AI-off gate is asserted explicitly below.
+  isAiEnabled.mockReturnValue(true);
 });
 
 describe('startModelCatalogRefreshCronIfEnabled (Req 9.3, 9.6)', () => {
+  it('does NOT schedule anything when the AI feature is disabled, even with a valid schedule (Req 9.6)', () => {
+    isAiEnabled.mockReturnValue(false);
+    setConfig({ 'ai:modelCatalogRefreshCronSchedule': '0 4 * * *' });
+
+    startModelCatalogRefreshCronIfEnabled();
+
+    expect(cronScheduleMock).not.toHaveBeenCalled();
+  });
+
   it('does NOT schedule anything when the cron config is unset (opt-in default)', () => {
     setConfig({ 'ai:modelCatalogRefreshCronSchedule': undefined });
 
@@ -94,6 +110,15 @@ describe('startModelCatalogRefreshCronIfEnabled (Req 9.3, 9.6)', () => {
 });
 
 describe('triggerModelCatalogRefreshOnStartupIfEnabled (Req 9.2, 9.6)', () => {
+  it('does nothing when the AI feature is disabled, even with the startup option on (Req 9.6)', () => {
+    isAiEnabled.mockReturnValue(false);
+    setConfig({ 'ai:modelCatalogRefreshOnStartup': true });
+
+    triggerModelCatalogRefreshOnStartupIfEnabled();
+
+    expect(refreshModelCatalog).not.toHaveBeenCalled();
+  });
+
   it('does nothing when the startup option is off (opt-in default)', () => {
     setConfig({ 'ai:modelCatalogRefreshOnStartup': false });
 

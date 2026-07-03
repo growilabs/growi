@@ -13,7 +13,7 @@
 ### Goals
 - カタログを持つプロバイダ（openai / anthropic / google）で選択のみの登録を提供（1.x）。
 - モデル一覧の**提供（read パス）を外部通信ゼロ**にする（2.x）。一覧提供はローカル保存済みカタログ（同梱、または更新済み）の read のみで、リクエスト都度の外部取得は行わない。
-- **カタログのリフレッシュ手段を opt-in で提供**（9.x）: 管理画面からの手動更新／起動時更新オプション／定期自動更新オプション。既定はすべて無効（外部通信ゼロのまま）。更新は同梱カタログと**同一のフィルタ・検証**を経て永続化され、以後の一覧提供に反映される（解決: 更新済み／同梱の**新しい方**。更新済みが無ければ同梱）。
+- **カタログのリフレッシュ手段を提供**（9.x）: 管理画面からの手動更新／起動時更新オプション／定期自動更新。起動時・定期の更新は **AI 機能が有効（`app:aiEnabled`）な場合に限り**作動する。AI 機能は既定 OFF のため既定構成は外部通信ゼロ。起動時更新は既定 OFF（opt-in）、定期自動更新は既定で日次スケジュール（AI 有効化時に自動最新化。空文字で無効化可）。更新は同梱カタログと**同一のフィルタ・検証**を経て永続化され、以後の一覧提供に反映される（解決: 更新済み／同梱の**新しい方**。更新済みが無ければ同梱）。
 - カタログを持たないプロバイダ（azure-openai）・一覧が空の場合は自由入力を維持（3.x）。
 - **`tool_call` かつ text 出力のモデルだけ**を選択肢にする（生成時フィルタ、6.x）。GROWI エージェントのツール呼び出し要件を担保。
 - 既存の許可リスト挙動・認可・推論・チャット UI を不変に保つ（4.x）。
@@ -153,7 +153,7 @@ apps/app/
     ├── server/models/
     │   └── refreshed-model-catalog.ts          # 更新済みカタログの singleton collection（追補 R）
     ├── server/services/
-    │   ├── model-catalog-refresh-jobs.ts       # opt-in 起動時/cron トリガ（追補 R、Req 9.2/9.3）
+    │   ├── model-catalog-refresh-jobs.ts       # 起動時/cron トリガ（追補 R、Req 9.2/9.3）。両トリガとも isAiEnabled() でゲート（Req 9.6）
     │   └── model-catalog-refresh-jobs.spec.ts
     ├── server/routes/admin-ai-settings/
     │   ├── get-available-models.ts             # getAvailableModelsFactory(crowi): RequestHandler[]
@@ -172,8 +172,8 @@ apps/app/
 - `apps/app/src/features/mastra/server/routes/admin-ai-settings/index.ts` — `router.get('/available-models', ...)` と `router.post('/refresh-model-catalog', ...)`（追補 R）を追加。
 - `apps/app/src/features/mastra/client/admin/AllowedModelsField.tsx` — provider で `useSWRxSelectableModels` を1回呼び、modelId 入力を `<select>`（catalog あり）／`<input type=text>`（catalog なし・provider 未選択・取得失敗）に出し分け。保存済みだが一覧外の値は `<option>` 補完で保持（1.5）。Models セクション見出しに**カタログ更新ボタン**（追補 R、Req 9.1。クリックで確認モーダルを開き、確認後にのみ POST）。
 - `apps/app/src/features/mastra/client/admin/AllowedModelsField.spec.tsx` — 出し分け・保存済み値保持・取得失敗フォールバック・カタログ更新ボタンのテスト。
-- `apps/app/src/server/service/config-manager/config-definition.ts` — opt-in 設定キー `ai:modelCatalogRefreshOnStartup`（env `AI_MODEL_CATALOG_REFRESH_ON_STARTUP`）/ `ai:modelCatalogRefreshCronSchedule`（env `AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE`）を追加（追補 R。既定 OFF、env-only targetKeys には含めない＝設定フォーム項目ではなくデプロイオプション）。
-- `apps/app/src/server/crowi/index.ts` — `setupCron()` に cron 起動（schedule 設定時のみ）、`asyncAfterExpressServerReady()` に起動時リフレッシュ（opt-in・fire-and-forget）を配線（追補 R）。
+- `apps/app/src/server/service/config-manager/config-definition.ts` — 設定キー `ai:modelCatalogRefreshOnStartup`（env `AI_MODEL_CATALOG_REFRESH_ON_STARTUP`、既定 `false`）/ `ai:modelCatalogRefreshCronSchedule`（env `AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE`、**既定 `'0 4 * * *'`**＝日次。空文字で無効化）を追加（追補 R。env-only targetKeys には含めない＝設定フォーム項目ではなくデプロイオプション）。
+- `apps/app/src/server/crowi/index.ts` — `setupCron()` に cron 起動（AI 有効 かつ schedule 設定時のみ）、`asyncAfterExpressServerReady()` に起動時リフレッシュ（AI 有効 かつ opt-in・fire-and-forget）を配線（追補 R）。両トリガの AI-有効ゲートは `model-catalog-refresh-jobs` 側 `isAiEnabled()` で実装（Req 9.6）。
 - `apps/app/public/static/locales/{en_US,ja_JP,fr_FR,ko_KR,zh_CN}/admin.json` — `ai_settings.model_placeholder` と `ai_settings.refresh_model_catalog{,_success,_failed}`（5 ロケール）。
 - `.kiro/specs/mastra-multi-model-chat/{requirements.md,design.md,research.md}` / `.kiro/specs/multi-llm-provider/research.md` — 8.x の整合更新（実装タスクとして）。
 
@@ -232,10 +232,10 @@ sequenceDiagram
 | 7.3 | env-only モード読み取り専用維持 | AllowedModelsField（既存 `disabled`） | — | — |
 | 8.1–8.3 | 既存スペック整合更新 | （ドキュメント編集タスク） | — | — |
 | 9.1 | 管理画面からの手動リフレッシュ | post-refresh-model-catalog, refresh-model-catalog, build-model-catalog, AllowedModelsField（更新ボタン） | `RefreshModelCatalogResponse` | 追補 R フロー |
-| 9.2–9.3 | 起動時／定期リフレッシュ（opt-in） | model-catalog-refresh-jobs, config keys, crowi 配線 | — | 追補 R フロー |
+| 9.2–9.3 | 起動時（opt-in）／定期（既定日次）リフレッシュ。ともに AI 有効時のみ | model-catalog-refresh-jobs（`isAiEnabled()` ゲート）, config keys, crowi 配線 | — | 追補 R フロー |
 | 9.4 | 失敗時 last-good 維持 | refresh-model-catalog（永続化前に throw）, model-catalog-refresh-jobs（boot 非破壊） | — | 追補 R Error Handling |
 | 9.5 | 解決 = 更新済み／同梱の新しい方（無ければ同梱） | effective-model-catalog, RefreshedModelCatalog, model-catalog（`BUNDLED_CATALOG_GENERATED_AT`） | — | 追補 R フロー |
-| 9.6 | 既定無効（外部通信ゼロ維持） | config keys（既定 OFF）, model-catalog-refresh-jobs（guard） | — | — |
+| 9.6 | 起動時・定期更新は AI 有効時のみ（AI 既定 OFF → 既定構成は外部通信ゼロ） | model-catalog-refresh-jobs（`isAiEnabled()` ゲート）, config keys | — | — |
 | 9.7 | admin 認可・取得先固定 | post-refresh-model-catalog（WRITE スコープ + admin）, build-model-catalog（URL 定数） | — | API 前段 |
 
 ## Components and Interfaces
@@ -427,14 +427,14 @@ export type ModelCatalogFile = { _source: string; _generatedAt: string; models: 
 
 ```mermaid
 graph LR
-    subgraph Triggers[opt-in トリガ（既定すべて無効）]
+    subgraph Triggers[トリガ（起動時/定期は AI 有効時のみ作動）]
         Btn[管理画面ボタン<br/>POST refresh-model-catalog]
-        Boot[起動時 opt-in<br/>ai:modelCatalogRefreshOnStartup]
-        Cron[定期 opt-in<br/>ai:modelCatalogRefreshCronSchedule]
+        Boot[起動時 opt-in・既定OFF<br/>ai:modelCatalogRefreshOnStartup]
+        Cron[定期・既定日次<br/>ai:modelCatalogRefreshCronSchedule]
     end
     Btn --> Svc[refresh-model-catalog]
-    Boot --> Jobs[model-catalog-refresh-jobs] --> Svc
-    Cron --> Jobs
+    Boot -->|isAiEnabled ゲート| Jobs[model-catalog-refresh-jobs] --> Svc
+    Cron -->|isAiEnabled ゲート| Jobs
     Svc -->|fetch 固定URL| MD[models.dev api.json]
     Svc -->|共有純変換+検証| BMC[build-model-catalog]
     Svc -->|成功時のみ upsert| DB[(RefreshedModelCatalog<br/>singleton)]
@@ -452,27 +452,28 @@ graph LR
 | RefreshedModelCatalog | Server (model) | `{ _id:'singleton', models, fetchedAt, supersededBundledGeneratedAt, source }` の専用 collection（`mastra_refreshed_model_catalog`）。**Prisma-first**（schema.prisma の `mastrarefreshedmodelcatalogs` + `@@map`、`getSingleton`/`upsertSingleton` は Prisma extension。新規 collection のため Mongoose schema は持たない）。多インスタンス共有・再起動耐性。config-manager には置かない（設定ではなくキャッシュ） | 9.1, 9.5 |
 | effective-model-catalog | Server (runtime) | `getEffectiveSelectableModelIds(provider)` = 更新済み／同梱の**新しい方**（比較は**同梱 `_generatedAt` 同士**: refresh 時点で同梱されていた世代 `supersededBundledGeneratedAt` vs 現在の同梱 `_generatedAt`。両辺とも vendoring 実行機のクロック由来なので、サーバ時計の遅れが成功した refresh を同梱で覆い隠すことがない。同梱世代が**厳密に**新しい場合のみ同梱＝イメージ更新後の古いスナップショットの覆い隠しを防止。tie（同一イメージ上での refresh）・タイムスタンプ不正・ロールバックは更新済み優先。無ければ同梱。`?? []` フェイルソフトは従来どおり）。get-available-models はこれを await する | 9.5, 2.x, 3.1 |
 | post-refresh-model-catalog | Server (route) | `POST /_api/v3/ai-settings/refresh-model-catalog`。`[accessTokenParser([SCOPE.WRITE.ADMIN.AI]) → login → admin]`。成功 200 `{ fetchedAt, counts }`／失敗は generic 500（内部情報を漏らさない） | 9.1, 9.7, 7.1 |
-| model-catalog-refresh-jobs | Server (boot) | `startModelCatalogRefreshCronIfEnabled()`（schedule 未設定なら no-op、invalid でも boot を壊さない）＋ `triggerModelCatalogRefreshOnStartupIfEnabled()`（fire-and-forget）。crowi の `setupCron()` / `asyncAfterExpressServerReady()` から呼ぶ | 9.2, 9.3, 9.4, 9.6 |
+| model-catalog-refresh-jobs | Server (boot) | `startModelCatalogRefreshCronIfEnabled()`（**AI 無効なら no-op**、schedule 未設定/空でも no-op、invalid でも boot を壊さない）＋ `triggerModelCatalogRefreshOnStartupIfEnabled()`（**AI 無効なら no-op**、fire-and-forget）。両者とも先頭で `isAiEnabled()` をチェック（Req 9.6）。crowi の `setupCron()` / `asyncAfterExpressServerReady()` から呼ぶ | 9.2, 9.3, 9.4, 9.6 |
 | AllowedModelsField 更新ボタン | Client (UI) | Models セクション見出しの「カタログを更新」→ **確認モーダル（ConfirmModal 再利用。外部サービス models.dev への通信が発生する旨を明示し、確認後にのみ実行 — 9.6）** → apiv3Post → 成功で全 provider キャッシュ invalidate＋toast。**env-only モードでも有効**（カタログは設定ではなく公開メタデータのサーバ側キャッシュであり、env-only 運用の GROWI.cloud がこの機能の主対象のため） | 9.1 |
 
-### 設定キー（デプロイオプション・既定 OFF）
+### 設定キー（デプロイオプション。作動はいずれも AI 有効時のみ）
 
 | Key | env | 型/既定 | 意味 |
 |-----|-----|---------|------|
-| `ai:modelCatalogRefreshOnStartup` | `AI_MODEL_CATALOG_REFRESH_ON_STARTUP` | boolean / `false` | サーバ起動後に一度リフレッシュを試行（growi-docker-compose 等の焼き込みイメージ向け） |
-| `ai:modelCatalogRefreshCronSchedule` | `AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE` | string / 未設定 | node-cron 式（例 `0 4 * * *`）。未設定/空 = 無効 |
+| `ai:modelCatalogRefreshOnStartup` | `AI_MODEL_CATALOG_REFRESH_ON_STARTUP` | boolean / `false` | サーバ起動後に一度リフレッシュを試行（growi-docker-compose 等の焼き込みイメージ向け）。既定 OFF。AI 有効時のみ作動 |
+| `ai:modelCatalogRefreshCronSchedule` | `AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE` | string / **`'0 4 * * *'`** | node-cron 式。**既定は日次**（AI 有効化で自動最新化）。空文字 = 無効。AI 有効時のみ作動 |
 
 env-only（`env:useOnlyEnvVars:ai`）の targetKeys には**含めない**: これらは設定フォーム項目ではなく env 駆動のデプロイオプションであり、PUT 経路にも現れない。
 
 ### Error Handling（追加分）
 - **リフレッシュ失敗（fetch 不達 / HTTP エラー / スキーマドリフト / 空プロバイダ）**: `refreshModelCatalog` は**永続化の前に throw** → last-good（更新済み or 同梱）が有効なまま（9.4）。エンドポイントは generic 500、起動時/cron は warn ログのみで稼働継続。
 - **起動時/cron の boot 安全性**: invalid cron 式は捕捉してログ（boot を壊さない）。起動時リフレッシュは fire-and-forget（await しない）。
+- **AI-有効ゲート（9.6）**: 起動時・定期の両トリガは先頭で `isAiEnabled()` を評価し、AI 無効なら即 no-op（cron も登録しない）。定期スケジュールは既定で日次のため、この AI-有効ゲートが「既定構成（AI 無効）＝外部通信ゼロ」を担保する。
 
 ### Testing Strategy（追加分）
 - `build-model-catalog.spec`: 純変換（旧 vendor spec から移設。フィルタ・決定性・ドリフト/空 throw）。
 - `refresh-model-catalog.spec`: 固定 URL fetch・成功時 upsert 1 回・失敗 3 系（HTTP/network/空）で**永続化ゼロ**（9.4）。
 - `effective-model-catalog.spec`: 更新済みが新しい→それを返す／同梱が厳密に新しい→同梱を返す（stale スナップショット不使用）／tie→更新済み／なし→同梱へフォールバック／azure `[]`／コピー返却／fetch 不発（9.5, 2.1）。
-- `model-catalog-refresh-jobs.spec`: 未設定で no-op（9.6）・設定時に schedule + tick で refresh 実行（9.3）・invalid 式でも throw しない（9.4）・startup on/off（9.2）・fire-and-forget の失敗吸収。
+- `model-catalog-refresh-jobs.spec`: **AI 無効なら cron/startup とも no-op（9.6）**・schedule 未設定/空で no-op・設定時に schedule + tick で refresh 実行（9.3）・invalid 式でも throw しない（9.4）・startup on/off（9.2）・fire-and-forget の失敗吸収。
 - `admin-ai-settings/index.spec`（統合）: POST refresh の admin 200 `{ fetchedAt, counts }`／失敗 500（内部非漏洩）／非 admin・未認証拒否／WRITE スコープ（9.1/9.7）。available-models は RefreshedModelCatalog を null にモックし同梱フォールバック経路を実走（9.5）。
 - `AllowedModelsField.spec`（UI）: ボタン → 確認モーダル（確認前は POST なし・キャンセルで通信ゼロ）→ POST + 全 provider invalidate + 成功 toast／失敗 toast + 非 revalidate + ボタン復帰／**env-only でも enabled**。
 

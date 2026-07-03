@@ -115,9 +115,9 @@
   - 完了状態: 統合テストで admin 200 `{ fetchedAt, counts }`・失敗 500（内部非漏洩）・非 admin/未認証拒否、UI テストでボタン→確認モーダル→POST→invalidate→toast・キャンセル時は通信ゼロ・失敗フォールバック・env-only で enabled を確認できる
   - _Requirements: 9.1, 9.4, 9.7, 7.1_
   - _Boundary: refresh-model-catalog, post-refresh-model-catalog, admin-ai-settings router, AllowedModelsField, locales admin.json_
-- [x] 9.4 起動時・定期リフレッシュの opt-in 配線を実装する
-  - 設定キー `ai:modelCatalogRefreshOnStartup` / `ai:modelCatalogRefreshCronSchedule`（既定 OFF）を追加し、`model-catalog-refresh-jobs`（cron: schedule 設定時のみ・invalid でも boot 非破壊／startup: fire-and-forget）を crowi の `setupCron()` / `asyncAfterExpressServerReady()` に配線する
-  - 完了状態: 未設定で外部通信ゼロ（no-op）、設定時に schedule/起動時リフレッシュが発火し、失敗しても boot・稼働を壊さないことを単体テストで確認できる
+- [x] 9.4 起動時・定期リフレッシュの配線を実装する（AI 有効時のみ作動）
+  - 設定キー `ai:modelCatalogRefreshOnStartup`（既定 `false`）/ `ai:modelCatalogRefreshCronSchedule`（**既定 `'0 4 * * *'`**＝日次。空文字で無効化）を追加し、`model-catalog-refresh-jobs`（両トリガとも先頭で `isAiEnabled()` ゲート／cron: AI 有効かつ schedule 設定時のみ・invalid でも boot 非破壊／startup: AI 有効かつ opt-in・fire-and-forget）を crowi の `setupCron()` / `asyncAfterExpressServerReady()` に配線する
+  - 完了状態: **AI 無効なら cron/startup とも no-op（外部通信ゼロ）**、schedule 未設定/空でも no-op、AI 有効かつ設定時に schedule/起動時リフレッシュが発火し、失敗しても boot・稼働を壊さないことを単体テストで確認できる
   - _Requirements: 9.2, 9.3, 9.4, 9.6_
   - _Boundary: config-definition, model-catalog-refresh-jobs, crowi/index.ts_
 

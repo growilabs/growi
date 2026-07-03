@@ -322,7 +322,7 @@ class Crowi {
       await this.pageOperationService.afterExpressServerReady();
     }
 
-    // One-shot model-catalog refresh (opt-in: no-op unless
+    // One-shot model-catalog refresh (no-op unless AI is enabled AND
     // ai:modelCatalogRefreshOnStartup is true). Fire-and-forget inside — a
     // failure only logs and the bundled/last-good catalog stays in effect.
     const { triggerModelCatalogRefreshOnStartupIfEnabled } = await import(
@@ -492,8 +492,8 @@ class Crowi {
     );
     new NewsCronService().startCron();
 
-    // Periodic model-catalog refresh (opt-in: no-op unless
-    // ai:modelCatalogRefreshCronSchedule is set)
+    // Periodic model-catalog refresh (no-op unless AI is enabled; the schedule
+    // defaults to daily and can be disabled with an empty ai:modelCatalogRefreshCronSchedule)
     const { startModelCatalogRefreshCronIfEnabled } = await import(
       '~/features/mastra/server/services/model-catalog-refresh-jobs'
     );

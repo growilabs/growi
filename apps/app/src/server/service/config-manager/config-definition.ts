@@ -1340,19 +1340,23 @@ export const CONFIG_DEFINITIONS = {
     defaultValue: {},
   }),
 
-  // Opt-in refresh paths for the vendored model catalog (Req 9). Both default
-  // OFF so a default configuration performs zero external communication (the
-  // bundled catalog is the baseline; air-gapped installs are unaffected).
-  // These are deployment options (env-driven), not admin-form settings, so they
-  // are intentionally NOT part of the env:useOnlyEnvVars:ai target keys.
+  // Refresh paths for the vendored model catalog (Req 9). These are deployment
+  // options (env-driven), not admin-form settings, so they are intentionally NOT
+  // part of the env:useOnlyEnvVars:ai target keys. The refresh jobs run ONLY when
+  // the AI feature itself is enabled (app:aiEnabled) — since that defaults OFF, a
+  // default GROWI install still performs zero external communication (the bundled
+  // catalog is the baseline; air-gapped installs are unaffected).
   'ai:modelCatalogRefreshOnStartup': defineConfig<boolean>({
     envVarName: 'AI_MODEL_CATALOG_REFRESH_ON_STARTUP',
     defaultValue: false,
   }),
-  // node-cron schedule expression (e.g. '0 4 * * *'). Empty/unset = disabled.
-  'ai:modelCatalogRefreshCronSchedule': defineConfig<string | undefined>({
+  // node-cron schedule expression. Defaults to a daily refresh so that once an
+  // admin enables AI the catalog stays fresh automatically; set the env var to an
+  // empty string to opt back out (e.g. air-gapped AI deployments). Gated by
+  // app:aiEnabled, so this default never fires in a default (AI-off) install.
+  'ai:modelCatalogRefreshCronSchedule': defineConfig<string>({
     envVarName: 'AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE',
-    defaultValue: undefined,
+    defaultValue: '0 4 * * *',
   }),
 
   // OpenTelemetry Settings
