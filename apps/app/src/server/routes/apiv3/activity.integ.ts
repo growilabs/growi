@@ -13,6 +13,11 @@
  *
  * Requirements: 2.1, 2.2, 2.3
  * Design: "apiv3/activity.ts" node; Migration Strategy "offset || 1 quirk" paragraph
+ *
+ * activity-log spec coverage (Requirements 4.1, 4.2):
+ *  - ATTACHMENT_REMOVE activities surface all four attachment snapshot fields
+ *    (originalName / pagePath / pageId / fileSize) in the response
+ *  - legacy username-only snapshots keep working (backward compat)
  */
 
 import type { NextFunction, Request, Response } from 'express';
@@ -56,6 +61,13 @@ function makeActivityData(overrides: {
   ip?: string;
   endpoint?: string;
   createdAt?: Date;
+  /** Attachment snapshot fields (activity-log spec req 4.1) */
+  snapshotExtras?: {
+    originalName?: string;
+    pagePath?: string;
+    pageId?: string;
+    fileSize?: number;
+  };
 }) {
   const snapshotId = new Types.ObjectId().toHexString();
   return {
@@ -65,7 +77,11 @@ function makeActivityData(overrides: {
     createdAt: overrides.createdAt ?? new Date(),
     endpoint: overrides.endpoint ?? '/test',
     ip: overrides.ip ?? '127.0.0.1',
-    snapshot: { id: snapshotId, username: overrides.username },
+    snapshot: {
+      id: snapshotId,
+      username: overrides.username,
+      ...overrides.snapshotExtras,
+    },
     userId: overrides.userId,
   };
 }
@@ -290,6 +306,83 @@ describe('GET /api/v3/activity', () => {
       expect(res.status).toBe(200);
       const { totalDocs } = res.body.data.serializedPaginationResult;
       expect(totalDocs).toBeGreaterThanOrEqual(3);
+    });
+  });
+
+  describe('activity-log req 4.1 / 4.2 — attachment snapshot fields', () => {
+    it('surfaces all four attachment fields on an ATTACHMENT_REMOVE activity snapshot (req 4.1)', async () => {
+      const pageId = new Types.ObjectId().toHexString();
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId1,
+            username: 'attachment-remover',
+            action: 'ATTACHMENT_REMOVE',
+            snapshotExtras: {
+              originalName: 'design-v2.pdf',
+              pagePath: '/Sandbox/attachments',
+              pageId,
+              fileSize: 12345,
+            },
+          }),
+        ],
+      });
+
+      const searchFilter = JSON.stringify({
+        usernames: ['attachment-remover'],
+      });
+      const res = await request(app)
+        .get('/api/v3/activity')
+        // offset=0: the single seeded record must not be skipped by the
+        // offset||1 quirk (see req 2.1 tests above).
+        .query({ limit: 10, offset: 0, searchFilter });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      expect(docs).toHaveLength(1);
+
+      const doc = docs[0];
+      expect(doc.action).toBe('ATTACHMENT_REMOVE');
+      // req 4.1: all four attachment fields surface in the response
+      // without loss, alongside the operator's username (req 2.2).
+      expect(doc.snapshot).toMatchObject({
+        username: 'attachment-remover',
+        originalName: 'design-v2.pdf',
+        pagePath: '/Sandbox/attachments',
+        pageId,
+        fileSize: 12345,
+      });
+    });
+
+    it('returns legacy username-only snapshots unchanged (req 4.2 backward compat)', async () => {
+      await prisma.activities.createMany({
+        data: [
+          makeActivityData({
+            userId: userId2,
+            username: 'legacy-writer',
+            action: 'PAGE_UPDATE',
+          }),
+        ],
+      });
+
+      const searchFilter = JSON.stringify({ usernames: ['legacy-writer'] });
+      const res = await request(app)
+        .get('/api/v3/activity')
+        .query({ limit: 10, offset: 0, searchFilter });
+
+      expect(res.status).toBe(200);
+      const { docs } = res.body.data.serializedPaginationResult;
+      expect(docs).toHaveLength(1);
+
+      const doc = docs[0];
+      expect(doc.snapshot.username).toBe('legacy-writer');
+      // Attachment fields were never persisted for this record, so they
+      // must not carry fabricated values. Prisma reads missing optional
+      // composite fields back as null, so accept absent (undefined) or null.
+      expect(doc.snapshot.originalName ?? null).toBeNull();
+      expect(doc.snapshot.pagePath ?? null).toBeNull();
+      expect(doc.snapshot.pageId ?? null).toBeNull();
+      expect(doc.snapshot.fileSize ?? null).toBeNull();
     });
   });
 

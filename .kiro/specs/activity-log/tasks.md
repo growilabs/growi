@@ -73,7 +73,7 @@
   - _Boundary: page 完全削除サービス（deleteCompletelyOperation と直接呼び出し元）_
   - _Depends: 3.2, 2.1_
 - [ ] 6. 統合: 監査ログ API での snapshot 参照
-- [ ] 6.1 (P) 監査ログ API の OpenAPI に添付フィールドを追記し、応答に乗ることを担保
+- [x] 6.1 (P) 監査ログ API の OpenAPI に添付フィールドを追記し、応答に乗ることを担保
   - OpenAPI の snapshot に添付4フィールドを追記する（応答整形は既存の素通しのため変更不要）
   - テストで、添付削除 activity の応答に4フィールドが欠落なく乗り、username のみの既存 activity も後方互換に返ることを確認する
   - 観察可能な完了条件: API 応答に添付フィールドが含まれ、旧形式 activity も問題なく返るテストが green
@@ -106,6 +106,7 @@
 
 ## Implementation Notes
 
+- 6.1: 既存問題（境界外・未修正）: `components.schemas.ActivityResponse` が `apiv3/user-activities.ts` にも同名定義され生成 spec 内で衝突（activity.ts 側が採用される）。将来スキーマ名の分離（例: AuditLogActivityResponse）を推奨。
 - 5.1: `deleteCompletelyOperation` の actor は `ActivityActor | null`（必須引数）。design の表に無い第4の直接呼び出し元 `deleteCompletelyUserHomeBySystem`（システムによるユーザーホーム強制削除・操作者不在）が typecheck で発見され、**システム経路は意図的に記録対象外・明示的な null が契約**（省略はコンパイルエラーのまま）。7.2/7.3 はこの前提で書くこと。
 - 4.1: pino logger は context-first（`logger.warn({ ... }, 'msg')`）。message-first だと文脈オブジェクトが実行時に黙って捨てられる（レビューで実測・差し戻し済み）。7.1 では「page が引けないケースの warn に attachmentId/pageId が構造化フィールドで乗る」ことの assert を検討（レビュアー提案）。
 - 3.2: recorder の依存型は `ActivityCreator`（`{ createActivity(parameters: IActivityParameters): Promise<IActivity | null> }`）。design スニペットの `IActivity` 引数は概略で、実サービスの転送先型に合わせた。`ActivityActor` は attachment-removal-snapshot.ts から export 済み（5.1 が import する）。

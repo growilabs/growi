@@ -82,6 +82,30 @@ const validator = {
  *                       _id:
  *                         type: string
  *                         example: "67e33da5d97e8d3b53e99f96"
+ *                       originalName:
+ *                         type: string
+ *                         description: >-
+ *                           Original file name of the removed attachment.
+ *                           Present on ATTACHMENT_REMOVE activities.
+ *                         example: "design-v2.pdf"
+ *                       pagePath:
+ *                         type: string
+ *                         description: >-
+ *                           Path of the page the removed attachment belonged to.
+ *                           Present on ATTACHMENT_REMOVE activities.
+ *                         example: "/Sandbox/attachments"
+ *                       pageId:
+ *                         type: string
+ *                         description: >-
+ *                           ID of the page the removed attachment belonged to.
+ *                           Present on ATTACHMENT_REMOVE activities.
+ *                         example: "675547e97f208f8050a361d4"
+ *                       fileSize:
+ *                         type: integer
+ *                         description: >-
+ *                           File size in bytes of the removed attachment.
+ *                           Present on ATTACHMENT_REMOVE activities.
+ *                         example: 12345
  *                   createdAt:
  *                     type: string
  *                     format: date-time
