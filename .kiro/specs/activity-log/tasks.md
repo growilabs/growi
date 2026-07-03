@@ -88,7 +88,7 @@
   - 観察可能な完了条件: 上記を assert する結合テストが green
   - _Requirements: 2.1, 2.2_
   - _Depends: 4.1_
-- [ ] 7.2 (P) 完全削除カスケードの結合テスト
+- [x] 7.2 (P) 完全削除カスケードの結合テスト
   - 1ページに複数添付がある状態で完全削除し、添付ごとに activity が作られ（E11000 が発生しない＝target が添付ごとに一意）、各レコードを読み直して4フィールドが保存され、`pageId`/`pagePath` が undefined に落ちていない（page→pageId 読み替えの検証）ことを確認する
   - 観察可能な完了条件: 添付ごとの記録・4フィールド保存・衝突なしを assert する結合テストが green
   - _Requirements: 3.1, 3.3, 3.4_
@@ -106,7 +106,7 @@
 
 ## Implementation Notes
 
-- 7.1: ゲート注入の前例 = `configManager.updateConfigs({ 'app:auditLogEnabled': true, 'app:auditLogActionGroupSize': ActionGroupSize.Medium })`（DB 書き込みの明示 API・process.env 非改変）＋ afterAll で `removeIfUndefined: true` により撤去。7.2/7.3/7.4 も同じ口を使うこと。番兵 IP 使用済み: 10.0.0.70/.72/.73/.74/.75/.88/.99, 127.0.0.1。
+- 7.1: ゲート注入の前例 = `configManager.updateConfigs({ 'app:auditLogEnabled': true, 'app:auditLogActionGroupSize': ActionGroupSize.Medium })`（DB 書き込みの明示 API・process.env 非改変）＋ afterAll で `removeIfUndefined: true` により撤去。7.2/7.3/7.4 も同じ口を使うこと。番兵 IP 使用済み: 10.0.0.55/.56/.57/.70/.71/.72/.73/.74/.75/.76/.88/.99, 127.0.0.1（新規テストは未使用の IP を選ぶ前に `grep -rn "10\.0\.0\." apps/app/src` で確認）。7.2 の前例: v5 分岐には `app:isV5Compatible: true` 注入＋root 直下・PUBLISHED・parent ありのページが必要（STATUS_DELETED だと v4 分岐で ip/endpoint が縮退）。removeAllAttachments は fileUploadService を要求（gridfs + setUpFileUpload(true)）。
 - 6.1: 既存問題（境界外・未修正）: `components.schemas.ActivityResponse` が `apiv3/user-activities.ts` にも同名定義され生成 spec 内で衝突（activity.ts 側が採用される）。将来スキーマ名の分離（例: AuditLogActivityResponse）を推奨。
 - 5.1: `deleteCompletelyOperation` の actor は `ActivityActor | null`（必須引数）。design の表に無い第4の直接呼び出し元 `deleteCompletelyUserHomeBySystem`（システムによるユーザーホーム強制削除・操作者不在）が typecheck で発見され、**システム経路は意図的に記録対象外・明示的な null が契約**（省略はコンパイルエラーのまま）。7.2/7.3 はこの前提で書くこと。
 - 4.1: pino logger は context-first（`logger.warn({ ... }, 'msg')`）。message-first だと文脈オブジェクトが実行時に黙って捨てられる（レビューで実測・差し戻し済み）。7.1 では「page が引けないケースの warn に attachmentId/pageId が構造化フィールドで乗る」ことの assert を検討（レビュアー提案）。
