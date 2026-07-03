@@ -1,4 +1,5 @@
 import { extension as CommentExtension } from '~/features/comment/server';
+import { extension as MastraRefreshedModelCatalogExtension } from '~/features/mastra/server/models/refreshed-model-catalog';
 import {
   PrismaClient as OriginalPrismaClient,
   Prisma,
@@ -147,6 +148,7 @@ export const createPrisma = (datasourceUrl?: string) =>
     .$extends(BookmarkExtension)
     .$extends(CommentExtension)
     .$extends(ExternalAccountExtension)
+    .$extends(MastraRefreshedModelCatalogExtension)
     .$extends(UserExtension);
 
 export const prisma = createPrisma();

@@ -19,7 +19,7 @@
 
 - Azure OpenAI 接続設定は 4 つの flat キーから単一の JSON オブジェクトキー `ai:azureOpenaiSettings` へ集約済み(env も単一 `AI_AZURE_OPENAI_SETTINGS` が JSON 文字列を保持)。型は `apps/app/src/features/mastra/interfaces/azure-openai-config.ts` の `AzureOpenaiConfig`(既存 React コンポーネント `AzureOpenaiSettings.tsx` との名前衝突回避のため `*Settings` ではなく `*Config` 命名)。`useEntraId` の default は `false`。
 
-- プロバイダー定義: `apps/app/src/features/mastra/interfaces/ai-provider.ts` — `AI_PROVIDERS`(openai, anthropic, google, azure-openai)+ `isAiProvider()` 型ガード
+- プロバイダー定義: `apps/app/src/features/mastra/interfaces/ai-provider.ts` — `AI_PROVIDERS`(openai, anthropic, google, azure-openai)+ `isAiProvider()` 型ガード（現行は provider ごとの `enumerable` メタデータマップ `AI_PROVIDER_DEFS` を源泉とし、`AI_PROVIDERS`/`AiProvider` はそこから導出＝ai-settings-model-picker。メンバー・ガード挙動は同じ）
 - 消費側: `apps/app/src/features/mastra/server/services/ai-sdk-modules/resolve-mastra-model.ts` — **モジュールスコープでメモ化**(無効化機構なし)。設定不備時は throw(throw 時はメモ化されない)。注(mastra-multi-model-chat 反映後): `resolveMastraModel(modelId?)` がモデル引数を受け取り、メモは `${provider}:${effective}` をキーとする Map に変更された
 - provider オプションの解決: `resolve-provider-options.ts` — パース失敗時は警告ログ + `{}` フォールバック(fail-soft)。注(mastra-multi-model-chat 反映後): グローバル単一 `ai:providerOptions` ではなく `getProviderOptionsForModel(effectiveModelId)` が**実効モデル ID を引数に取り**、その `ai:allowedModels` エントリの `providerOptions` を返す純粋なルックアップ（一律適用は廃止、自前のラウンディング/検証は行わない）。実効モデルの解決は呼び出し側(post-message ハンドラ)が `resolveEffectiveModelId` で 1 度だけ行い、その ID を requestContext と本関数の両方へ渡す（実効モデルをリクエストあたり 2 度解決しない）
 

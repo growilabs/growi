@@ -1,0 +1,85 @@
+import { useCallback } from 'react';
+import { type SWRResponseWithUtils, withUtils } from '@growi/core/dist/swr';
+import { useSWRConfig } from 'swr';
+import useSWRImmutable from 'swr/immutable';
+
+import { apiv3Get } from '~/client/util/apiv3-client';
+
+// Type-only import: the client must not pull the server-only provider module at
+// runtime (it is a plain type union here).
+import type { AiProvider } from '../../interfaces/ai-provider';
+import type { SelectableModelsResponse } from '../../interfaces/selectable-models-response';
+
+const ENDPOINT = '/ai-settings/available-models';
+
+type SelectableModelsUtils = {
+  /**
+   * Invalidate EVERY cached selectable-models list (one per visited provider).
+   *
+   * A catalog refresh replaces the persisted snapshot for ALL providers at
+   * once, but the per-provider entries live under `[ENDPOINT, provider]` keys
+   * cached by `useSWRImmutable`, which disables stale revalidation entirely —
+   * the response's own `mutate` is bound to the current provider's key and
+   * would leave every other already-visited provider's list pre-refresh until
+   * a full page reload.
+   *
+   * The cache entries are CLEARED (`data: undefined`), not just revalidated: a
+   * plain no-data `mutate(filter)` refetches only keys with a mounted hook,
+   * and the consumer mounts one provider's hook at a time — the other
+   * providers' keys have no revalidator, so their stale data would survive
+   * untouched. Clearing instead means the mounted provider refetches
+   * immediately, and each other visited provider refetches on its next mount
+   * (provider switch), same as its first visit. Unrelated SWR keys are
+   * untouched by the filter.
+   */
+  invalidateAllProviders: () => Promise<void>;
+};
+
+/**
+ * Fetch the selectable models for the currently configured provider.
+ *
+ * While the provider is unset the SWR key is `null`, so no request is issued
+ * (Req 5.2). "Unset" means both '' (form default) AND `undefined` — before the
+ * AI-settings data resolves, `useForm` has no defaultValues so `watch('provider')`
+ * returns `undefined`, not '', despite the form-value type. A plain `=== ''`
+ * guard would let that `undefined` through, producing an SWR key of
+ * `[ENDPOINT, undefined]`; the request would then drop the (undefined) query
+ * param and hit the route with no `provider` → a 400. Guarding on nullish too
+ * keeps the "no provider ⇒ no request" contract during that initial window.
+ *
+ * The key embeds the provider, so switching providers changes the cache key and
+ * triggers a refetch for the new provider (Req 5.1). The data is static per
+ * provider, hence `useSWRImmutable`.
+ *
+ * The fetch `error` is surfaced (not swallowed) so the container can fall back
+ * to free-text input without blocking save (Req 3.2).
+ */
+export const useSWRxSelectableModels = (
+  provider: AiProvider | '' | undefined,
+): SWRResponseWithUtils<
+  SelectableModelsUtils,
+  SelectableModelsResponse,
+  Error
+> => {
+  const { mutate: mutateGlobal } = useSWRConfig();
+
+  const swrResult = useSWRImmutable<SelectableModelsResponse, Error>(
+    provider == null || provider === '' ? null : [ENDPOINT, provider],
+    ([endpoint, p]: [string, AiProvider]) =>
+      apiv3Get<SelectableModelsResponse>(endpoint, { provider: p }).then(
+        (res) => res.data,
+      ),
+  );
+
+  // See SelectableModelsUtils for why this clears (not just revalidates) and
+  // why the response's own bound `mutate` is not enough.
+  const invalidateAllProviders = useCallback(async (): Promise<void> => {
+    await mutateGlobal(
+      (key) => Array.isArray(key) && key[0] === ENDPOINT,
+      undefined,
+      { revalidate: true },
+    );
+  }, [mutateGlobal]);
+
+  return withUtils(swrResult, { invalidateAllProviders });
+};

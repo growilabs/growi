@@ -107,7 +107,7 @@
   - _Boundary: package.json_
 
 - [ ] 7.2 ベンダー集合への `'azure-openai'` 追加
-  - `AI_PROVIDERS` に `'azure-openai'` を追加する（`AiProvider` 型・`isAiProvider` は自動拡張）。識別子は既存の `openai:serviceType` の `'azure-openai'` 値と表記を揃える
+  - `AI_PROVIDERS` に `'azure-openai'` を追加する（`AiProvider` 型・`isAiProvider` は自動拡張）。識別子は既存の `openai:serviceType` の `'azure-openai'` 値と表記を揃える（現行は `AI_PROVIDER_DEFS` のエントリ `'azure-openai': { enumerable: false }` として保持＝ai-settings-model-picker。観測条件・振る舞いは不変）
   - 観測可能: `isAiProvider('azure-openai')` が true を返し、`AI_PROVIDERS` の長さが 4 になる
   - _Requirements: 1.1, 1.4_
   - _Boundary: llm-provider interface_

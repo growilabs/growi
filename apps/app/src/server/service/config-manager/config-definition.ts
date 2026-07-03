@@ -297,6 +297,9 @@ export const CONFIG_KEYS = [
   // Azure OpenAI-only connection config (ai:provider='azure-openai'), stored as
   // a single JSON object (consolidated from the former four ai:azureOpenaiSettings* keys)
   'ai:azureOpenaiSettings',
+  // Opt-in refresh paths for the vendored model catalog (both default OFF)
+  'ai:modelCatalogRefreshOnStartup',
+  'ai:modelCatalogRefreshCronSchedule',
 
   // OpenTelemetry Settings
   'otel:enabled',
@@ -1335,6 +1338,25 @@ export const CONFIG_DEFINITIONS = {
   'ai:azureOpenaiSettings': defineConfig<AzureOpenaiConfig | undefined>({
     envVarName: 'AI_AZURE_OPENAI_SETTINGS',
     defaultValue: {},
+  }),
+
+  // Refresh paths for the vendored model catalog (Req 9). These are deployment
+  // options (env-driven), not admin-form settings, so they are intentionally NOT
+  // part of the env:useOnlyEnvVars:ai target keys. The refresh jobs run ONLY when
+  // the AI feature itself is enabled (app:aiEnabled) — since that defaults OFF, a
+  // default GROWI install still performs zero external communication (the bundled
+  // catalog is the baseline; air-gapped installs are unaffected).
+  'ai:modelCatalogRefreshOnStartup': defineConfig<boolean>({
+    envVarName: 'AI_MODEL_CATALOG_REFRESH_ON_STARTUP',
+    defaultValue: false,
+  }),
+  // node-cron schedule expression. Defaults to a daily refresh so that once an
+  // admin enables AI the catalog stays fresh automatically; set the env var to an
+  // empty string to opt back out (e.g. air-gapped AI deployments). Gated by
+  // app:aiEnabled, so this default never fires in a default (AI-off) install.
+  'ai:modelCatalogRefreshCronSchedule': defineConfig<string>({
+    envVarName: 'AI_MODEL_CATALOG_REFRESH_CRON_SCHEDULE',
+    defaultValue: '0 4 * * *',
   }),
 
   // OpenTelemetry Settings
