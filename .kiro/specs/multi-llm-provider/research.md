@@ -216,7 +216,7 @@ export type OpenAICompatibleConfig =
 > 1. **runtime fetch 不採用は不変**: models.dev の **runtime fetch**（Mastra model router / Approach B のゲートウェイ経由の解決）は引き続き**不採用**。推論経路は native `@ai-sdk/*`（Approach A）のままであり、本 D-2/D-3 の決定は不変。
 > 2. **vendored 静的 read は別物**: `ai-settings-model-picker` が採用した「models.dev を**取り込みステップ（リリース前段）**で vendoring し、chat＋tool 対応に絞って**コミットした静的カタログ**を実行時に read する」経路は、D-2 の runtime fetch とは**別物**。相違点は以下:
 >    - **取得タイミング**: 実行時ではなく**リリース前段の取り込みステップのみ** models.dev を fetch する。
->    - **実行時**: 一覧提供（read パス）はローカル保存済みカタログ（コミット済み成果物、または opt-in リフレッシュで永続化された更新済みカタログ）を read するのみ＝**既定で外部通信ゼロ**（自己ホスト／エアギャップ環境でも既定のまま機能）。opt-in のカタログリフレッシュ〔管理画面手動／起動時／定期〕が明示的に実行された場合に限り models.dev へ fetch する（推論経路には関与しない）。
+>    - **実行時**: 一覧提供（read パス）はローカル保存済みカタログ（コミット済み成果物、またはリフレッシュで永続化された更新済みカタログ）を read するのみ＝**外部通信ゼロ**（自己ホスト／エアギャップ環境でも既定のまま機能）。カタログリフレッシュ〔管理画面手動／起動時／定期。起動時・定期は AI 機能が有効（`app:aiEnabled`）な場合のみ作動し、定期は既定で日次〕が実行された場合に限り models.dev へ fetch する（推論経路には関与しない）。
 >    - **用途**: **管理画面の許可モデル選択肢**の提示に限る。**推論経路は一切変えない**（native `@ai-sdk/*` のまま）。
 >    - つまり D-2/D-3 が退けた「models.dev への runtime 依存を持つモデルルーター」と、この「オフラインの vendored 静的 read」は目的も通信特性も異なるため、本決定を退行させるものではない。
 >    - Cross-reference: 詳細は `.kiro/specs/ai-settings-model-picker`。

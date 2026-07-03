@@ -32,7 +32,7 @@
 ### This Spec Owns
 - **models.dev → コミット済みモデルカタログの vendoring**（取り込みステップ＝リリース前段の取り込みスクリプト、生成時フィルタ、コミット成果物）。
 - provider スコープの「選択可能モデル一覧」を返す admin 読み取り経路（サーバ read サービス + エンドポイント + client フック）。
-- **カタログのリフレッシュ経路（Req 9・追補 R）**: 共有純変換（`build-model-catalog`）、runtime refresh サービス、更新済みカタログの永続化（`RefreshedModelCatalog` singleton collection）、`POST /ai-settings/refresh-model-catalog`、管理画面の更新ボタン、opt-in 設定キー（`ai:modelCatalogRefreshOnStartup` / `ai:modelCatalogRefreshCronSchedule`）と起動時/cron 配線。
+- **カタログのリフレッシュ経路（Req 9・追補 R）**: 共有純変換（`build-model-catalog`）、runtime refresh サービス、更新済みカタログの永続化（`RefreshedModelCatalog` singleton collection）、`POST /ai-settings/refresh-model-catalog`、管理画面の更新ボタン、設定キー（`ai:modelCatalogRefreshOnStartup`＝既定 OFF / `ai:modelCatalogRefreshCronSchedule`＝既定日次）と起動時/cron 配線（起動時・定期とも AI 有効時のみ作動）。
 - `AllowedModelsField` の modelId 入力コントロールの出し分け（`<select>` ↔ 自由入力）。
 - 新規 wire DTO `SelectableModelsResponse` / `RefreshModelCatalogResponse`。
 - 既存スペック（`mastra-multi-model-chat` / `multi-llm-provider`）のモデル入力方式に関する記述の整合更新。
@@ -44,11 +44,11 @@
 - `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` の意味。
 
 ### Allowed Dependencies
-- **models.dev api.json**（`https://models.dev/api.json`, MIT）— fetch するのは **(a) 取り込みステップ（リリース前段）の取り込みスクリプト**と **(b) opt-in の runtime refresh サービス（Req 9・明示トリガ時のみ）** の 2 箇所に限る（ビルド工程・一覧提供 read パスは触れない）。URL はビルトイン定数（要求側から指定不可、9.7）。
+- **models.dev api.json**（`https://models.dev/api.json`, MIT）— fetch するのは **(a) 取り込みステップ（リリース前段）の取り込みスクリプト**と **(b) runtime refresh サービス（Req 9・AI 有効時のリフレッシュ時のみ: 手動/起動時/定期）** の 2 箇所に限る（ビルド工程・一覧提供 read パスは触れない）。URL はビルトイン定数（要求側から指定不可、9.7）。
 - **コミット済み vendored 成果物**（`model-catalog-data.json`）— 実行時に静的 import して read（基線）。
 - **更新済みカタログの永続化** — MongoDB の専用 singleton collection（`RefreshedModelCatalog`）。多インスタンス共有・再起動耐性のため（追補 R）。
 - **zod `^4.1.9`**（既存 dep）— 共有純変換 `build-model-catalog` の**境界検証**（api.json の想定形チェック）。取り込みステップと refresh サービスの両方が同一検証を通る。
-- **node-cron（既存 `CronService` 基盤）** — 定期リフレッシュ（opt-in、Req 9.3）。
+- **node-cron（既存 `CronService` 基盤）** — 定期リフレッシュ（AI 有効時・既定日次、Req 9.3）。
 - 既存 admin 認可チェーン（`accessTokenParser([SCOPE.READ.ADMIN.AI])`／書き込みは `[SCOPE.WRITE.ADMIN.AI]` → `loginRequiredFactory` → `adminRequiredFactory`）。
 - 既存 client 資産（`apiv3-client`、`useSWRImmutable`、reactstrap `Input`/`Button`、react-hook-form `register`、`toastr`）。
 - `interfaces/ai-provider` — サーバ（route）は runtime の `isAiProvider` で query を検証し、**client は型のみ `import type { AiProvider }`** を参照する（ビルド時に erase されるため server-only モジュールへの実行時結合は生じない。同モジュール冒頭の「Do NOT add client imports here」は"モジュール内へ client 依存を持ち込むな"の意で、型の被参照は禁じていない）。`interfaces/allowed-model`。
@@ -148,7 +148,7 @@ apps/app/
     │   ├── model-catalog.spec.ts
     │   ├── effective-model-catalog.ts          # runtime（追補 R）: getEffectiveSelectableModelIds = 更新済み（RefreshedModelCatalog）／同梱の新しい方（9.5、同梱世代同士の比較）
     │   ├── effective-model-catalog.spec.ts
-    │   ├── refresh-model-catalog.ts            # runtime（追補 R）: opt-in リフレッシュ = 共有取得（fetch-model-catalog）→ 永続化（失敗時は何も書かない、9.4）
+    │   ├── refresh-model-catalog.ts            # runtime（追補 R）: リフレッシュ = 共有取得（fetch-model-catalog）→ 永続化（失敗時は何も書かない、9.4）
     │   └── refresh-model-catalog.spec.ts
     ├── server/models/
     │   └── refreshed-model-catalog.ts          # 更新済みカタログの singleton collection（追補 R）
@@ -413,7 +413,7 @@ export type ModelCatalogFile = { _source: string; _generatedAt: string; models: 
 - `put-ai-settings` の単一 isDefault 不変条件・providerOptions JSON 検証、`resolveEffectiveModelId` の allow-list 検証、`get-models`（chat 側）応答が不変。
 
 ## Security Considerations
-- **一覧提供（read パス）の外部通信ゼロ**: 提供はローカル保存済みカタログ（committed 成果物 / RefreshedModelCatalog）の read のみ（2.x）。models.dev への fetch は取り込みスクリプトと opt-in の refresh サービス（Req 9・明示トリガ時のみ）に限定。
+- **一覧提供（read パス）の外部通信ゼロ**: 提供はローカル保存済みカタログ（committed 成果物 / RefreshedModelCatalog）の read のみ（2.x）。models.dev への fetch は取り込みスクリプトと refresh サービス（Req 9・AI 有効時のリフレッシュ時のみ）に限定。
 - **秘匿非漏洩**: 応答は `modelIds: string[]`（一覧）／`{ fetchedAt, counts }`（refresh メタデータ）のみ（7.1、[get-models.ts](../../../apps/app/src/features/mastra/server/routes/get-models.ts) の modelId-only 前例に準拠）。
 - **認可**: 一覧は `SCOPE.READ.ADMIN.AI`、リフレッシュは `SCOPE.WRITE.ADMIN.AI`、いずれも + `adminRequired`（7.2/9.7）。
 - **入力検証**: query `provider` は `isAiProvider` で allow-list 検証。リフレッシュの取得先はビルトイン定数（要求から指定不可、9.7）。
@@ -421,7 +421,7 @@ export type ModelCatalogFile = { _source: string; _generatedAt: string; models: 
 
 ## 追補 R: カタログのリフレッシュ（Req 9 — PR #11383 レビューFB 対応）
 
-同梱カタログは公式イメージに焼き込まれた後は変化しないため、イメージ更新なしにカタログを最新化する opt-in 経路を追加する。**一覧提供（read パス）の通信ゼロは不変**であり、外部通信は明示的なリフレッシュ操作に限る（9.6）。
+同梱カタログは公式イメージに焼き込まれた後は変化しないため、イメージ更新なしにカタログを最新化するリフレッシュ経路を追加する。起動時・定期のリフレッシュは **AI 機能が有効（`app:aiEnabled`）な場合に限り**作動し（AI 既定 OFF のため既定構成は外部通信ゼロ）。**一覧提供（read パス）の通信ゼロは不変**であり、外部通信は AI 有効時のリフレッシュ操作（手動/起動時/定期）に限る（9.6）。
 
 ### アーキテクチャ
 
