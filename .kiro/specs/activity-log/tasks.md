@@ -55,7 +55,7 @@
   - _Depends: 3.1_
 
 - [ ] 4. 統合: 添付ファイル直接削除の記録
-- [ ] 4.1 (P) 直接削除 API で snapshot 付き update を emit する
+- [x] 4.1 (P) 直接削除 API で snapshot 付き update を emit する
   - 添付の実削除**前**に、添付ドキュメントと所属ページのパスから snapshot を生成する（削除後は添付が消えるため順序が重要）。ページが引けない場合は pagePath を省略し警告ログを出す（要件 2.3）
   - 記録イベントに target=添付の `_id`・targetModel=`Attachment`・snapshot を追加する（現状は action のみ）
   - 添付の `page`（ObjectId）→ `pageId` 読み替えの上でビルダーへ渡す
@@ -106,6 +106,7 @@
 
 ## Implementation Notes
 
+- 4.1: pino logger は context-first（`logger.warn({ ... }, 'msg')`）。message-first だと文脈オブジェクトが実行時に黙って捨てられる（レビューで実測・差し戻し済み）。7.1 では「page が引けないケースの warn に attachmentId/pageId が構造化フィールドで乗る」ことの assert を検討（レビュアー提案）。
 - 3.2: recorder の依存型は `ActivityCreator`（`{ createActivity(parameters: IActivityParameters): Promise<IActivity | null> }`）。design スニペットの `IActivity` 引数は概略で、実サービスの転送先型に合わせた。`ActivityActor` は attachment-removal-snapshot.ts から export 済み（5.1 が import する）。
 - 2.2: `updateByParameters` の入力契約は「素の `ISnapshot`」（envelope 禁止・`id` は渡さない）。内部の `buildSnapshotUpdateEnvelope` が `{ update }` へ変換し既存 `_id`・`username` を保持する。後続の emit('update') 呼び出し（4.1）はこの契約で snapshot を渡すこと。
 - 2.1: `createByParameters` の `username: snapshot?.username ?? ''` は削除済み（username 欠落時は保存しない。空文字補填は移行期の回避策で、全消費者の null 安全を確認済み）。後続タスクは「username 無し snapshot → 読み出しは null」を前提にする。
