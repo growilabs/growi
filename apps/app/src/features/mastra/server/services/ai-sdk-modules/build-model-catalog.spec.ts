@@ -44,6 +44,17 @@ const embeddingOutput = (id: string) => ({
   modalities: { input: ['text'], output: ['embedding'] },
 });
 
+// An entry with the two filter fields ABSENT. models.dev never ships this shape
+// (even non-chat models carry the fields with non-selectable values), so their
+// absence means the upstream shape has drifted — the transform must fail loudly,
+// not silently drop entries from a selection-only catalog (Issue 2).
+const missingFilterFields = (id: string) => ({
+  id,
+  name: id,
+  // no tool_call, no modalities — a drifted/incomplete entry shape
+  cost: { input: 0.1, output: 0.2 },
+});
+
 // Accept any entry shape carrying an id: the fixtures deliberately vary in
 // width (selectable is wide, the non-selectable builders are narrow) to prove
 // the transform's passthrough tolerance.
@@ -131,6 +142,23 @@ describe('buildModelCatalog', () => {
       },
     };
     expect(() => buildModelCatalog(malformed as unknown)).toThrow();
+  });
+
+  it('throws when a target-provider entry omits tool_call/modalities (schema drift)', () => {
+    // models.dev populates both fields on every entry, so their absence signals
+    // an upstream shape change — not a non-chat entry. It must fail loudly
+    // (last-good preserved) rather than silently drop entries from a
+    // selection-only catalog, even though the provider keeps a selectable id.
+    const withMissingFields = {
+      openai: provider('openai', [
+        selectable('gpt-4o'),
+        missingFilterFields('text-embedding-3-small'),
+      ]),
+      anthropic: provider('anthropic', [selectable('claude')]),
+      google: provider('google', [selectable('gemini-2.5-pro')]),
+    };
+
+    expect(() => buildModelCatalog(withMissingFields as unknown)).toThrow();
   });
 
   it('throws when tool_call has the wrong type (schema drift)', () => {

@@ -33,6 +33,11 @@ export const CATALOG_PROVIDERS: readonly CatalogProvider[] =
  * A single models.dev catalog entry, narrowed to the only two authoritative
  * fields the chat/tool filter reads. models.dev entries carry many more fields;
  * structural typing lets the vendoring script pass wider validated objects.
+ *
+ * Both fields are REQUIRED: models.dev populates them on every entry (including
+ * non-chat ones such as embeddings/TTS, which carry `tool_call: false` and a
+ * non-text output modality). Their absence therefore signals a models.dev
+ * schema drift, which the boundary schema rejects loudly (see build-model-catalog).
  */
 export interface ModelsDevModel {
   readonly tool_call: boolean;
@@ -44,7 +49,8 @@ export interface ModelsDevModel {
  * text output. The judgment uses models.dev's authoritative metadata only
  * (tool_call flag + output modality); it never relies on name heuristics (6.2).
  * This excludes tool-incapable models and non-text modalities (embedding /
- * image / audio) that cannot serve the chat use case (6.1).
+ * image / audio) that cannot serve the chat use case (6.1). The two fields are
+ * guaranteed present by the boundary schema, so no missing-field handling here.
  */
 export const isSelectableModel = (entry: ModelsDevModel): boolean =>
   entry.tool_call === true && entry.modalities.output.includes('text');

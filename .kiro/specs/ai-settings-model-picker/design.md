@@ -259,7 +259,7 @@ sequenceDiagram
 
 **Responsibilities & Constraints**
 - 対象プロバイダ（`openai`/`anthropic`/`google`）は `AI_PROVIDER_DEFS`（[ai-provider.ts](../../../apps/app/src/features/mastra/interfaces/ai-provider.ts)）の `enumerable: true` フラグから導出する（`CATALOG_PROVIDERS`）。azure-openai は `enumerable: false`＝models.dev 非収録（デプロイ名で列挙不可）で対象外。フラグを単一ソースにすることで、プロバイダ追加時に別リストと二重管理・ドリフトしない。
-- `isSelectableModel(entry)` = `entry.tool_call === true && entry.modalities.output.includes('text')`。models.dev の**権威的フィールド**で判定するため、名前 heuristic は不要（旧 Issue 1 解消）。
+- `isSelectableModel(entry)` = `entry.tool_call === true && entry.modalities.output.includes('text')`。models.dev の**権威的フィールド**で判定するため、名前 heuristic は不要（旧 Issue 1 解消）。両フィールドは全エントリに**必須**扱い＝models.dev は非 chat エントリ（embedding/TTS 等）でもこれらを埋める（`tool_call:false`・非 text modality として）ため、**欠落はデータ形ではなくスキーマドリフトのシグナル**と解釈し、境界スキーマが fail-loud で reject する。
 - 純関数（config/network 非依存）。vendoring スクリプトから呼ばれる（生成時）。
 
 **Contracts**: Service [x]
@@ -277,7 +277,7 @@ export const isSelectableModel: (entry: ModelsDevModel) => boolean; // tool_call
 **Responsibilities & Constraints**
 - `fetch('https://models.dev/api.json')`（**取り込みステップ＝リリース前段でのみ／ビルド工程では実行しない**）→ `CATALOG_PROVIDERS` を選択 → `isSelectableModel` で生成時フィルタ → **id のみ**を `models.<provider> = string[]` に整形し、`{ _source（MIT 帰属）, _generatedAt, models }` の形（ヘッダとデータを分離）で `model-catalog-data.json` を**決定的（ソート）**に書き出す。
 - cross-platform（Node の fetch/fs のみ、curl/rm 不使用）。
-- **生成時サニティチェック（Issue 2）**: 取得した api.json を境界で **zod** による最小スキーマ検証（**読む分のみ**＝対象プロバイダの `tool_call`・`modalities.output` の型を検証し、他フィールド/他プロバイダは passthrough で寛容に）し、**各対象プロバイダ（openai/anthropic/google）で `isSelectableModel` 通過が1件以上**であることを assert する。いずれか違反（想定外の形・空結果）なら**非ゼロ終了して既存のコミット成果物を保持**し上書きしない（models.dev のスキーマドリフトで「無言の空カタログ」が出荷されるのを防ぐ）。
+- **生成時サニティチェック（Issue 2）**: 取得した api.json を境界で **zod** による最小スキーマ検証（**読む分のみ**＝対象プロバイダの全エントリで `tool_call`・`modalities.output` の存在と型を検証し、他フィールド/他プロバイダは passthrough で寛容に）し、**各対象プロバイダ（openai/anthropic/google）で `isSelectableModel` 通過が1件以上**であることを assert する。スキーマドリフト（`models` が map でない／`tool_call`・`modalities.output` の**欠落または型不正**）または空結果のときは**非ゼロ終了して既存のコミット成果物を保持**し上書きしない（models.dev のスキーマ変更で「無言の空／劣化カタログ」が出荷されるのを防ぐ）。**fail-loud を選ぶ理由**: 欠落を許容すると、上流が一部エントリだけ再構造化した場合に正当な chat モデルが無言で選択肢から消え、選択のみ UI がシグナルなく劣化する。失敗時は last-good（コミット成果物／永続 or 同梱カタログ）が維持されるため、fail-loud のコストは鮮度であって可用性ではない（Req 9.4）。
 - 実行は `pnpm vendor:models`。**スクリプトは生成（fetch＋フィルタ＋ファイル write）のみで git 操作はしない**（純ジェネレータ・副作用なし）。**コミットは別ステップの責務**（手動＝開発者が diff 確認して PR ／ 本番リリース＝`release.yml` の pre-release step が差分時にリリース commit へ同梱）。リリースビルド（prod・無人 RC とも）はコミット済み成果物を read するのみ（build 工程に fetch/commit を融合しない）。
 
 **Contracts**: Batch [x]

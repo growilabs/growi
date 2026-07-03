@@ -81,11 +81,18 @@ export const formatProviderCounts = (
     .join(', ');
 };
 
-// ─── Boundary schema (tolerant / passthrough) ────────────────────────────────
-// Validate ONLY the fields the filter reads (`tool_call`, `modalities.output`);
-// pass every other field/provider through so upstream additions never break the
-// ingest. A shape violation (missing/mistyped required field, `models` not a
-// map) throws — models.dev schema drift must fail loudly, not ship a bad catalog.
+// ─── Boundary schema (fail-loud on drift, passthrough elsewhere) ─────────────
+// Validate the two fields the filter reads (`tool_call`, `modalities.output`) on
+// EVERY entry of a target provider, and pass every OTHER field/provider through
+// untouched. models.dev populates these two on every entry (non-chat models such
+// as embeddings/TTS carry `tool_call: false` / a non-text output modality, not a
+// missing field), so a missing or mistyped field means models.dev has drifted
+// from the shape we depend on. That must fail loudly, not silently ship a
+// degraded catalog: a partial drift (some entries restructured) would otherwise
+// drop real chat models with no signal, and the effective read would serve the
+// shrunken list. On such a throw the last-good catalog is preserved (the release
+// ingest keeps the committed artifact; a runtime refresh keeps the persisted/
+// bundled one — Req 9.4), so failing loud costs freshness, never availability.
 
 const modelEntrySchema = z.looseObject({
   tool_call: z.boolean(),
@@ -109,7 +116,10 @@ const providerSchema = z.looseObject({
  * For each target provider it boundary-validates the shape, applies the
  * generation-time chat+tool filter (`isSelectableModel`), collects bare ids,
  * sorts them, and asserts the result is non-empty (Issue 2: never ship a silent
- * empty catalog). Any invalid shape or empty provider throws.
+ * empty catalog). Any drift — a missing/mistyped `tool_call` or
+ * `modalities.output` on any entry, a non-map `models`, a missing target
+ * provider, or a provider left empty after filtering — throws (fail-loud: a
+ * models.dev shape change must surface, not degrade the catalog silently).
  */
 export const buildModelCatalog = (
   apiJson: unknown,
@@ -128,8 +138,9 @@ export const buildModelCatalog = (
       );
     }
 
-    // Boundary validation: throws on schema drift (wrong `models` shape,
-    // missing/mistyped `tool_call` or `modalities.output`).
+    // Boundary validation: throws on schema drift (`models` not a map, or a
+    // missing/mistyped `tool_call`/`modalities.output` on any entry). See the
+    // schema note above for why a missing field is treated as drift, not data.
     const parsed = providerSchema.parse(rawProvider);
 
     // The bare model id is the map key (mirrored on `entry.id` in real data);
