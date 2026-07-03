@@ -15,7 +15,6 @@ import { PageActionStage, PageActionType } from '~/interfaces/page-operation';
 import type { IPageTagRelation } from '~/interfaces/page-tag-relation';
 import type { IShareLink } from '~/interfaces/share-link';
 import type Crowi from '~/server/crowi';
-import type { BookmarkDocument, BookmarkModel } from '~/server/models/bookmark';
 import type { PageDocument, PageModel } from '~/server/models/page';
 import type {
   IPageOperation,
@@ -51,7 +50,6 @@ describe('PageService page operations with only public pages', () => {
   let Page: PageModel;
   let Revision: IRevisionModel;
   let User: Model<IUser>;
-  let Bookmark: BookmarkModel;
   let ShareLink: ShareLinkModel;
   let PageRedirect: PageRedirectModel;
   let PageOperation: PageOperationModel;
@@ -94,7 +92,6 @@ describe('PageService page operations with only public pages', () => {
     User = mongoose.model('User');
     Page = mongoose.model<IPage, PageModel>('Page');
     Revision = mongoose.model<IRevision, IRevisionModel>('Revision');
-    Bookmark = mongoose.model<BookmarkDocument, BookmarkModel>('Bookmark');
     ShareLink = mongoose.model<IShareLink, ShareLinkModel>('ShareLink');
     PageRedirect = mongoose.model<IPageRedirect, PageRedirectModel>(
       'PageRedirect',
@@ -1049,16 +1046,18 @@ describe('PageService page operations with only public pages', () => {
       },
     ]);
 
-    await Bookmark.insertMany([
-      {
-        page: pageIdForDeleteCompletely2,
-        user: dummyUser1._id,
-      },
-      {
-        page: pageIdForDeleteCompletely2,
-        user: dummyUser2._id,
-      },
-    ]);
+    await prisma.bookmarks.createMany({
+      data: [
+        {
+          pageId: pageIdForDeleteCompletely2.toString(),
+          userId: dummyUser1._id.toString(),
+        },
+        {
+          pageId: pageIdForDeleteCompletely2.toString(),
+          userId: dummyUser2._id.toString(),
+        },
+      ],
+    });
 
     await prisma.comments.create({
       data: {
@@ -2726,7 +2725,9 @@ describe('PageService page operations with only public pages', () => {
       const pageTagRelation2 = await PageTagRelation.findOne({
         relatedPage: grandchildPage?._id,
       });
-      const bookmark = await Bookmark.findOne({ page: parentPage?._id });
+      const bookmark = await prisma.bookmarks.findFirst({
+        where: { pageId: parentPage?._id.toString() },
+      });
       const comment = await prisma.comments.findFirst({
         where: { pageId: parentPage?._id.toString() },
       });
@@ -2770,7 +2771,9 @@ describe('PageService page operations with only public pages', () => {
       const deletedPageTagRelations = await PageTagRelation.find({
         _id: { $in: [pageTagRelation1?._id, pageTagRelation2?._id] },
       });
-      const remainingBookmarks = await Bookmark.find({ _id: bookmark?._id });
+      const remainingBookmarks = await prisma.bookmarks.findMany({
+        where: { id: bookmark?.id },
+      });
       const deletedComments = await prisma.comments.findMany({
         where: { id: comment?.id },
       });

@@ -57,6 +57,10 @@ const toGeneratePreNotifyActivity = (
 ): IActivity => ({
   ...activity,
   action: activity.action as SupportedActionType,
+  // ip/endpoint are nullable in schema.prisma (legacy documents may lack
+  // them); IActivity models absence as `undefined`, so coerce null per field.
+  ip: activity.ip ?? undefined,
+  endpoint: activity.endpoint ?? undefined,
   user: (activity.user ?? undefined) as Ref<IUser> | undefined,
   target: activity.target ?? undefined,
   targetModel: (activity.targetModel ?? undefined) as

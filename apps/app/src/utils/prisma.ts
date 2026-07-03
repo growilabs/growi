@@ -1,9 +1,11 @@
 import { extension as CommentExtension } from '~/features/comment/server';
+import { extension as MastraRefreshedModelCatalogExtension } from '~/features/mastra/server/models/refreshed-model-catalog';
 import {
   PrismaClient as OriginalPrismaClient,
   Prisma,
 } from '~/generated/prisma/client';
 import { extension as ActivityExtension } from '~/server/models/activity';
+import { extension as BookmarkExtension } from '~/server/models/bookmark';
 import { extension as ExternalAccountExtension } from '~/server/models/external-account';
 import { extension as UserExtension } from '~/server/models/user/index.prisma';
 
@@ -207,8 +209,10 @@ export const createPrisma = (datasourceUrl?: string) =>
       },
     })
     .$extends(ActivityExtension)
+    .$extends(BookmarkExtension)
     .$extends(CommentExtension)
     .$extends(ExternalAccountExtension)
+    .$extends(MastraRefreshedModelCatalogExtension)
     .$extends(UserExtension);
 
 export const prisma = createPrisma();
