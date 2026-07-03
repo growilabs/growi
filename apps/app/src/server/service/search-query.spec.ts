@@ -560,6 +560,20 @@ describe('parseQueryString()', () => {
     expect(terms).toStrictEqual(emptyTerms(expectedTerm));
   });
 
+  it('drops an unpaired quote and parses the rest of the query normally', () => {
+    const terms = searchService.parseQueryString(
+      'hello group:"My Group tag:foo',
+    );
+
+    // (`My`, not `"My`) and the remaining tokens still route to their buckets.
+    const expectedTerm = {
+      match: ['hello', 'Group'],
+      group: ['My'],
+      tag: ['foo'],
+    };
+    expect(terms).toStrictEqual(emptyTerms(expectedTerm));
+  });
+
   it('keeps a negated quoted group value with spaces as a single filter value', () => {
     const terms = searchService.parseQueryString('-group:"My Group"');
 

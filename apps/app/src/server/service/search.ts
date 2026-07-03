@@ -603,6 +603,9 @@ class SearchService implements SearchQueryParser, SearchResolver {
       });
     }
 
+    // Any unpaired quotes are removed
+    queryString = queryString.replace(/"/g, '');
+
     // Third: Parse other keywords (include minus keywords)
     queryString.split(' ').forEach((word) => {
       if (word === '') {
