@@ -28,6 +28,21 @@ export interface ModelCatalogFile {
   readonly models: ModelCatalog;
 }
 
+// ─── Persisted-snapshot schema (read-side validation) ────────────────────────
+// The runtime refresh persists a ModelCatalog as an untyped Json field
+// (mastra_refreshed_model_catalog). Reads validate against this schema instead
+// of trusting a cast: the stored value is only as trustworthy as the code
+// version that WROTE it, so a version-skewed (rolling upgrade sharing one
+// MongoDB) or hand-edited document must degrade to the bundled catalog, not
+// crash every available-models read. Keys are restricted to the current
+// CATALOG_PROVIDERS: a document written by a different version with a
+// different provider set fails validation and is ignored (conservative).
+
+export const persistedModelCatalogSchema = z.record(
+  z.enum(CATALOG_PROVIDERS),
+  z.array(z.string()),
+);
+
 // ─── Boundary schema (tolerant / passthrough) ────────────────────────────────
 // Validate ONLY the fields the filter reads (`tool_call`, `modalities.output`);
 // pass every other field/provider through so upstream additions never break the

@@ -1,4 +1,7 @@
-import { buildModelCatalog } from './build-model-catalog';
+import {
+  buildModelCatalog,
+  persistedModelCatalogSchema,
+} from './build-model-catalog';
 
 /**
  * A minimal models.dev api.json shaped fixture. Only the fields the transform
@@ -165,5 +168,42 @@ describe('buildModelCatalog', () => {
       anthropic: provider('anthropic', [selectable('claude')]),
     };
     expect(() => buildModelCatalog(missingGoogle as unknown)).toThrow();
+  });
+});
+
+describe('persistedModelCatalogSchema (read-side validation)', () => {
+  const validCatalog = {
+    openai: ['gpt-4o'],
+    anthropic: ['claude-sonnet-4'],
+    google: ['gemini-2.5-pro'],
+  };
+
+  it('accepts what buildModelCatalog writes (every provider → string array)', () => {
+    const parsed = persistedModelCatalogSchema.safeParse(validCatalog);
+
+    expect(parsed.success).toBe(true);
+    expect(parsed.data).toEqual(validCatalog);
+  });
+
+  // Each rejection below represents a document a DIFFERENT code version (or an
+  // operator) wrote: the reader must treat it as absent (bundled fallback),
+  // never crash on it. Note a string value would not even throw at the read
+  // site (`[...'text']` spreads into characters), so the schema is the only
+  // guard against silently serving garbage.
+  it.each([
+    ['a non-array provider value', { ...validCatalog, openai: 'gpt-4o' }],
+    ['a non-iterable provider value', { ...validCatalog, openai: 42 }],
+    [
+      'an unknown provider key (newer version wrote it)',
+      { ...validCatalog, mistral: ['m'] },
+    ],
+    [
+      'a missing provider key (older version wrote it)',
+      { openai: ['gpt-4o'], anthropic: ['claude'] },
+    ],
+    ['a null document field', null],
+    ['a non-object value', 'catalog'],
+  ])('rejects %s', (_label, value) => {
+    expect(persistedModelCatalogSchema.safeParse(value).success).toBe(false);
   });
 });

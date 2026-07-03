@@ -119,6 +119,36 @@ describe('getEffectiveSelectableModelIds (Req 9.5)', () => {
     });
   });
 
+  describe('when the persisted snapshot cannot be read (version skew, DB failure)', () => {
+    it('falls back to the bundled catalog when getSingleton rejects (e.g. a document Prisma cannot map)', async () => {
+      // A document written by a different code version (missing/mistyped
+      // required fields) makes the Prisma read itself throw. The endpoint must
+      // degrade to the bundled catalog, not answer 500 on every request.
+      getSingleton.mockRejectedValue(
+        new Error('P2032: missing required field'),
+      );
+
+      const ids = await getEffectiveSelectableModelIds('openai');
+      expect(ids.length).toBeGreaterThan(0); // the real bundled openai list
+    });
+
+    it('falls back to the bundled catalog when the snapshot data throws at use (defense in depth)', async () => {
+      // getSingleton validates on read, but if a corrupt value ever slips
+      // through, spreading a non-iterable must be caught, not become a 500.
+      getSingleton.mockResolvedValue({
+        models: { openai: 42 },
+        fetchedAt: new Date(),
+        supersededBundledGeneratedAt: new Date(
+          BUNDLED_CATALOG_GENERATED_AT.getTime(),
+        ),
+        source: 'https://models.dev/api.json (MIT)',
+      });
+
+      const ids = await getEffectiveSelectableModelIds('openai');
+      expect(ids.length).toBeGreaterThan(0); // the real bundled openai list
+    });
+  });
+
   describe('when no refreshed catalog exists (never refreshed)', () => {
     beforeEach(() => {
       getSingleton.mockResolvedValue(null);

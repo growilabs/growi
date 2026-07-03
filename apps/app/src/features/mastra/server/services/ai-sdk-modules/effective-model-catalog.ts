@@ -1,3 +1,4 @@
+import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import type { AiProvider } from '../../../interfaces/ai-provider';
@@ -5,6 +6,10 @@ import {
   BUNDLED_CATALOG_GENERATED_AT,
   getSelectableModelIds,
 } from './model-catalog';
+
+const logger = loggerFactory(
+  'growi:features:mastra:services:effective-model-catalog',
+);
 
 /**
  * Resolve the selectable model ids for a provider from the EFFECTIVE catalog:
@@ -35,25 +40,38 @@ import {
 export const getEffectiveSelectableModelIds = async (
   provider: AiProvider,
 ): Promise<string[]> => {
-  const refreshed = await prisma.mastrarefreshedmodelcatalogs.getSingleton();
+  try {
+    const refreshed = await prisma.mastrarefreshedmodelcatalogs.getSingleton();
 
-  if (refreshed != null) {
-    // "Strictly newer" so a tie — the normal "refreshed on the currently
-    // deployed image" case — and an unparsable timestamp (NaN never compares
-    // greater) resolve to the refreshed snapshot. An image ROLLBACK (bundled
-    // generation older than the superseded one) also keeps the refreshed
-    // snapshot, which is correct: it holds live-fetched data.
-    const bundledIsNewer =
-      BUNDLED_CATALOG_GENERATED_AT.getTime() >
-      refreshed.supersededBundledGeneratedAt.getTime();
+    if (refreshed != null) {
+      // "Strictly newer" so a tie — the normal "refreshed on the currently
+      // deployed image" case — and an unparsable timestamp (NaN never compares
+      // greater) resolve to the refreshed snapshot. An image ROLLBACK (bundled
+      // generation older than the superseded one) also keeps the refreshed
+      // snapshot, which is correct: it holds live-fetched data.
+      const bundledIsNewer =
+        BUNDLED_CATALOG_GENERATED_AT.getTime() >
+        refreshed.supersededBundledGeneratedAt.getTime();
 
-    if (!bundledIsNewer) {
-      // Same controlled widening as the bundled read: the stored value is a
-      // validated ModelCatalog, indexable only by catalog-backed providers, so
-      // a catalog-less provider (e.g. 'azure-openai') falls back to [] (Req 3.1).
-      const models: Record<string, readonly string[]> = refreshed.models;
-      return [...(models[provider] ?? [])];
+      if (!bundledIsNewer) {
+        // Same controlled widening as the bundled read: getSingleton validates
+        // the stored value into a ModelCatalog, indexable only by
+        // catalog-backed providers, so a catalog-less provider (e.g.
+        // 'azure-openai') falls back to [] (Req 3.1).
+        const models: Record<string, readonly string[]> = refreshed.models;
+        return [...(models[provider] ?? [])];
+      }
     }
+  } catch (err) {
+    // The refreshed branch must never take the endpoint down: any persistence
+    // failure (a document a different code version wrote that Prisma cannot
+    // map, a transient MongoDB error) degrades to the bundled catalog — the
+    // static import below cannot fail — instead of turning every
+    // available-models read into a 500.
+    logger.warn(
+      'Failed to read the refreshed model catalog; serving the bundled catalog instead',
+      err,
+    );
   }
 
   return getSelectableModelIds(provider);

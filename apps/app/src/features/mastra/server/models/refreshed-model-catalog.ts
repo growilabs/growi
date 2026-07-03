@@ -1,7 +1,15 @@
 import { Prisma } from '~/generated/prisma/client';
+import loggerFactory from '~/utils/logger';
 import type { prisma } from '~/utils/prisma';
 
-import type { ModelCatalog } from '../services/ai-sdk-modules/build-model-catalog';
+import {
+  type ModelCatalog,
+  persistedModelCatalogSchema,
+} from '../services/ai-sdk-modules/build-model-catalog';
+
+const logger = loggerFactory(
+  'growi:features:mastra:models:refreshed-model-catalog',
+);
 
 const SINGLETON_ID = 'singleton';
 
@@ -65,7 +73,8 @@ export const extension = Prisma.defineExtension((client) => {
       mastrarefreshedmodelcatalogs: {
         /**
          * The persisted snapshot, or null when no refresh has ever succeeded
-         * (the caller then falls back to the bundled catalog — Req 9.5).
+         * OR the stored document does not validate (the caller then falls
+         * back to the bundled catalog — Req 9.5).
          */
         async getSingleton(): Promise<IRefreshedModelCatalog | null> {
           const context =
@@ -80,11 +89,24 @@ export const extension = Prisma.defineExtension((client) => {
             return null;
           }
 
+          // Read-side validation: every write goes through buildModelCatalog
+          // first, but the stored Json is only as trustworthy as the code
+          // version that wrote it (rolling upgrades share one MongoDB, and
+          // operators can edit documents). A non-validating snapshot is
+          // treated like an absent one instead of crashing every read.
+          const parsed = persistedModelCatalogSchema.safeParse(doc.models);
+          if (!parsed.success) {
+            logger.warn(
+              { err: parsed.error },
+              'Ignoring the persisted model-catalog snapshot: its `models` field does not match the expected shape. ' +
+                'The bundled catalog will be served; run a catalog refresh (or delete the mastra_refreshed_model_catalog document) to repair.',
+            );
+            return null;
+          }
+
+          const models: ModelCatalog = parsed.data;
           return {
-            // Stored as Json; every write goes through buildModelCatalog
-            // validation first (upsertSingleton below), so the persisted shape
-            // is always a validated ModelCatalog.
-            models: doc.models as ModelCatalog,
+            models,
             fetchedAt: doc.fetchedAt,
             supersededBundledGeneratedAt: doc.supersededBundledGeneratedAt,
             source: doc.source,
