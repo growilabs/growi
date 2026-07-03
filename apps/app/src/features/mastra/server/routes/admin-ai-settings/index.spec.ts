@@ -317,7 +317,7 @@ describe('admin-ai-settings router factory', () => {
     it('refreshes and answers metadata only for an admin (Req 9.1, 7.1)', async () => {
       const fetchedAt = new Date('2026-07-02T00:00:00.000Z');
       refreshModelCatalog.mockResolvedValue({
-        models: { openai: ['gpt-4o'], anthropic: ['claude'], google: ['g'] },
+        counts: { openai: 1, anthropic: 1, google: 1 },
         fetchedAt,
       });
 

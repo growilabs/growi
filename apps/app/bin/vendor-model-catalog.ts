@@ -21,6 +21,8 @@ import { writeFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 
 import {
+  deriveProviderCounts,
+  formatProviderCounts,
   MODELS_DEV_SOURCE_ATTRIBUTION,
   MODELS_DEV_URL,
   type ModelCatalog,
@@ -72,9 +74,7 @@ export const main = async (): Promise<void> => {
   // keys are emitted in CATALOG_PROVIDERS order (buildModelCatalog iterates it).
   writeFileSync(OUTPUT_PATH, `${JSON.stringify(file, null, 2)}\n`, 'utf-8');
 
-  const counts = Object.entries(models)
-    .map(([p, ids]) => `${p}=${ids.length}`)
-    .join(', ');
+  const counts = formatProviderCounts(deriveProviderCounts(models));
   // biome-ignore lint/suspicious/noConsole: ingest script — stdout summary is expected
   console.log(`[vendor:models] wrote ${OUTPUT_PATH} (${counts})`);
 };

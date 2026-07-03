@@ -106,11 +106,8 @@ export const postRefreshModelCatalogFactory = (
    */
   const handler = async (_req: Request, res: ApiV3Response): Promise<void> => {
     try {
-      const { models, fetchedAt } = await refreshModelCatalog();
+      const { counts, fetchedAt } = await refreshModelCatalog();
 
-      const counts = Object.fromEntries(
-        Object.entries(models).map(([provider, ids]) => [provider, ids.length]),
-      );
       const response: RefreshModelCatalogResponse = {
         fetchedAt: fetchedAt.toISOString(),
         counts,

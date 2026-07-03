@@ -70,7 +70,7 @@ describe('startModelCatalogRefreshCronIfEnabled (Req 9.3, 9.6)', () => {
   it('runs the refresh when the scheduled tick fires', async () => {
     setConfig({ 'ai:modelCatalogRefreshCronSchedule': '0 4 * * *' });
     refreshModelCatalog.mockResolvedValue({
-      models: {},
+      counts: {},
       fetchedAt: new Date(),
     });
 
@@ -105,7 +105,7 @@ describe('triggerModelCatalogRefreshOnStartupIfEnabled (Req 9.2, 9.6)', () => {
   it('fires the refresh when the startup option is on (Req 9.2)', () => {
     setConfig({ 'ai:modelCatalogRefreshOnStartup': true });
     refreshModelCatalog.mockResolvedValue({
-      models: {},
+      counts: {},
       fetchedAt: new Date(),
     });
 

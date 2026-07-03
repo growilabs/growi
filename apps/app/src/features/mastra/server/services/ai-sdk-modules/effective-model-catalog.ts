@@ -2,6 +2,7 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import type { AiProvider } from '../../../interfaces/ai-provider';
+import { pickSelectableModelIds } from './build-model-catalog';
 import {
   BUNDLED_CATALOG_GENERATED_AT,
   getSelectableModelIds,
@@ -54,12 +55,9 @@ export const getEffectiveSelectableModelIds = async (
         refreshed.supersededBundledGeneratedAt.getTime();
 
       if (!bundledIsNewer) {
-        // Same controlled widening as the bundled read: getSingleton validates
-        // the stored value into a ModelCatalog, indexable only by
-        // catalog-backed providers, so a catalog-less provider (e.g.
-        // 'azure-openai') falls back to [] (Req 3.1).
-        const models: Record<string, readonly string[]> = refreshed.models;
-        return [...(models[provider] ?? [])];
+        // Shared accessor (same as the bundled read): catalog-less providers
+        // (e.g. 'azure-openai') fail soft to [] (Req 3.1).
+        return pickSelectableModelIds(refreshed.models, provider);
       }
     }
   } catch (err) {

@@ -1,5 +1,6 @@
 import { z } from 'zod';
 
+import type { AiProvider } from '../../../interfaces/ai-provider';
 import {
   CATALOG_PROVIDERS,
   type CatalogProvider,
@@ -42,6 +43,43 @@ export const persistedModelCatalogSchema = z.record(
   z.enum(CATALOG_PROVIDERS),
   z.array(z.string()),
 );
+
+// ─── Catalog accessors (shared by every read/report site) ───────────────────
+
+/**
+ * Index a catalog by ANY AiProvider with the catalog-less fail-soft (Req 3.1):
+ * ModelCatalog is keyed only by the catalog-backed providers, so a general
+ * AiProvider (which includes 'azure-openai') cannot index it directly — widen
+ * to the string-keyed record shape and fall back to []. The result is spread
+ * into a fresh mutable array so callers can never mutate the shared imported
+ * asset or the stored snapshot. Single source for BOTH read paths (the bundled
+ * model-catalog.ts and the refreshed effective-model-catalog.ts).
+ */
+export const pickSelectableModelIds = (
+  models: ModelCatalog,
+  provider: AiProvider,
+): string[] => {
+  const widened: Record<string, readonly string[]> = models;
+  return [...(widened[provider] ?? [])];
+};
+
+/** provider → number of selectable ids (refresh response + log summaries). */
+export const deriveProviderCounts = (
+  models: ModelCatalog,
+): Record<string, number> => {
+  return Object.fromEntries(
+    Object.entries(models).map(([provider, ids]) => [provider, ids.length]),
+  );
+};
+
+/** `openai=41, anthropic=24, ...` — the log-line form of deriveProviderCounts. */
+export const formatProviderCounts = (
+  counts: Record<string, number>,
+): string => {
+  return Object.entries(counts)
+    .map(([provider, count]) => `${provider}=${count}`)
+    .join(', ');
+};
 
 // ─── Boundary schema (tolerant / passthrough) ────────────────────────────────
 // Validate ONLY the fields the filter reads (`tool_call`, `modalities.output`);

@@ -84,16 +84,22 @@ describe('refreshModelCatalog (Req 9.1, 9.4, 9.7)', () => {
     // The target is the built-in constant — callers cannot redirect it (9.7).
     expect(fetchMock.mock.calls[0][0]).toBe(MODELS_DEV_URL);
 
-    // The same generation-time filter/sort as the bundled asset applied (9.1).
-    expect(result.models.openai).toEqual(['gpt-4.1', 'gpt-4o']);
+    // Metadata only crosses the service boundary (Req 7.1): per-provider
+    // counts of the filtered snapshot + the fetch timestamp, never the map.
+    expect(result.counts).toEqual({ openai: 2, anthropic: 1, google: 1 });
     expect(result.fetchedAt).toBeInstanceOf(Date);
 
-    // Persisted exactly once, with the validated snapshot + attribution. The
-    // snapshot stamps the CURRENT bundled generation so the newer-wins read
-    // compares vendoring-clock timestamps only (never the server clock).
+    // Persisted exactly once, with the validated snapshot (the same
+    // generation-time filter/sort as the bundled asset, 9.1) + attribution.
+    // The snapshot stamps the CURRENT bundled generation so the newer-wins
+    // read compares vendoring-clock timestamps only (never the server clock).
     expect(upsertSingleton).toHaveBeenCalledTimes(1);
     expect(upsertSingleton).toHaveBeenCalledWith({
-      models: result.models,
+      models: {
+        openai: ['gpt-4.1', 'gpt-4o'],
+        anthropic: ['claude-3-7-sonnet'],
+        google: ['gemini-2.5-pro'],
+      },
       fetchedAt: result.fetchedAt,
       supersededBundledGeneratedAt: BUNDLED_CATALOG_GENERATED_AT,
       source: expect.stringContaining(MODELS_DEV_URL),

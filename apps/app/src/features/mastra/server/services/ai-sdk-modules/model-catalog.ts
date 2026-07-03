@@ -5,12 +5,7 @@
 import catalog from '^/resource/model-catalog-data.json' with { type: 'json' };
 
 import type { AiProvider } from '../../../interfaces/ai-provider';
-
-// The auto-inferred type of `catalog.models` only covers the catalog-backed
-// providers (openai/anthropic/google) and cannot be indexed by a general
-// AiProvider (which includes 'azure-openai'). Treat it as the design-prescribed
-// `Record<string, readonly string[]>` shape of our own generated asset.
-const models: Record<string, readonly string[]> = catalog.models;
+import { pickSelectableModelIds } from './build-model-catalog';
 
 /**
  * When the bundled asset was generated (its `_generatedAt` header). Used by the
@@ -27,7 +22,7 @@ export const BUNDLED_CATALOG_GENERATED_AT = new Date(catalog._generatedAt);
  * empty array (Error Handling: missing/corrupt artifact → `?? []`).
  */
 export const getSelectableModelIds = (provider: AiProvider): string[] => {
-  // Spread into a fresh mutable array so callers cannot mutate the shared
-  // imported catalog.
-  return [...(models[provider] ?? [])];
+  // Shared accessor: widening for non-catalog providers, `?? []` fail-soft,
+  // and the defensive copy all live in pickSelectableModelIds.
+  return pickSelectableModelIds(catalog.models, provider);
 };

@@ -2,8 +2,9 @@ import loggerFactory from '~/utils/logger';
 import { prisma } from '~/utils/prisma';
 
 import {
+  deriveProviderCounts,
+  formatProviderCounts,
   MODELS_DEV_SOURCE_ATTRIBUTION,
-  type ModelCatalog,
 } from './build-model-catalog';
 import { fetchModelsDevCatalog } from './fetch-model-catalog';
 import { BUNDLED_CATALOG_GENERATED_AT } from './model-catalog';
@@ -12,8 +13,15 @@ const logger = loggerFactory(
   'growi:features:mastra:services:refresh-model-catalog',
 );
 
+/**
+ * Metadata of a successful refresh. Deliberately NOT the full catalog: the
+ * only external consumer (the POST route) answers with metadata only
+ * (Req 7.1), and the list itself is served by the effective read — so the
+ * models map never needs to cross this boundary.
+ */
 export interface RefreshModelCatalogResult {
-  models: ModelCatalog;
+  /** provider → number of selectable model ids in the persisted snapshot. */
+  counts: Record<string, number>;
   fetchedAt: Date;
 }
 
@@ -50,10 +58,10 @@ export const refreshModelCatalog =
       source: MODELS_DEV_SOURCE_ATTRIBUTION,
     });
 
-    const counts = Object.entries(models)
-      .map(([provider, ids]) => `${provider}=${ids.length}`)
-      .join(', ');
-    logger.info(`Refreshed the model catalog from models.dev (${counts})`);
+    const counts = deriveProviderCounts(models);
+    logger.info(
+      `Refreshed the model catalog from models.dev (${formatProviderCounts(counts)})`,
+    );
 
-    return { models, fetchedAt };
+    return { counts, fetchedAt };
   };

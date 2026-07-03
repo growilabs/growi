@@ -1,6 +1,9 @@
 import {
   buildModelCatalog,
+  deriveProviderCounts,
+  formatProviderCounts,
   persistedModelCatalogSchema,
+  pickSelectableModelIds,
 } from './build-model-catalog';
 
 /**
@@ -205,5 +208,47 @@ describe('persistedModelCatalogSchema (read-side validation)', () => {
     ['a non-object value', 'catalog'],
   ])('rejects %s', (_label, value) => {
     expect(persistedModelCatalogSchema.safeParse(value).success).toBe(false);
+  });
+});
+
+describe('catalog accessors', () => {
+  const catalog = {
+    openai: ['gpt-4.1', 'gpt-4o'],
+    anthropic: ['claude-3-7-sonnet'],
+    google: ['gemini-2.5-pro'],
+  };
+
+  describe('pickSelectableModelIds', () => {
+    it('returns the ids for a catalog-backed provider', () => {
+      expect(pickSelectableModelIds(catalog, 'openai')).toEqual([
+        'gpt-4.1',
+        'gpt-4o',
+      ]);
+    });
+
+    it('fails soft to [] for a catalog-less provider (Req 3.1)', () => {
+      expect(pickSelectableModelIds(catalog, 'azure-openai')).toEqual([]);
+    });
+
+    it('returns a fresh copy so callers cannot mutate the catalog', () => {
+      const first = pickSelectableModelIds(catalog, 'openai');
+      first.push('__mutated__');
+
+      expect(pickSelectableModelIds(catalog, 'openai')).toEqual([
+        'gpt-4.1',
+        'gpt-4o',
+      ]);
+    });
+  });
+
+  describe('deriveProviderCounts / formatProviderCounts', () => {
+    it('derives per-provider counts and formats them as a log summary', () => {
+      const counts = deriveProviderCounts(catalog);
+
+      expect(counts).toEqual({ openai: 2, anthropic: 1, google: 1 });
+      expect(formatProviderCounts(counts)).toBe(
+        'openai=2, anthropic=1, google=1',
+      );
+    });
   });
 });
