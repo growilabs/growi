@@ -250,6 +250,29 @@ Claude Design プロジェクト「GROWI AI機能設定UI改善」(https://claud
 8. **D8 管理 UI**: モック準拠の 3 新コンポーネント(DefaultModelSelector / ProviderTabs / ProviderPanel)+ AllowedModelsField を provider スコープ化。ProviderCommonSettings は削除。フォーム値は `providers: Record<AiProvider, ProviderFormValue>` + フラットな `allowedModels[]`(グローバル既定検証のため単一配列)。
 
 ### Risks & Mitigations
-- ai-settings-model-picker(現行ブランチ)と同一ファイル群への変更 → **picker マージ後に本 spec を実装**(タスク前提条件に明記)。
+- ai-settings-model-picker(現行ブランチ)と同一ファイル群への変更 → **picker マージ後に本 spec を実装**(タスク前提条件に明記)。→ **解消済み(2026-07-03 追記参照)**
 - (provider, modelId) 一意性への検証変更で既存テストが広範に破損 → タスクで interfaces → server → routes → client の依存順に段階実装。
 - 秘匿値の per-provider 化でログ/応答への漏えい面が増える → 既存の「body を stringify しない」規律を put/get の全 catch に踏襲、Record 全体を isSecret 指定。
+
+---
+
+## 追記 (2026-07-03, ベース変更の影響評価)
+
+feat/186192-ai-settings-model-picker が PR #11383 で dev/8.0.x にマージされ、本ブランチ(feat/186460-mastra-multi-provider)のベースが dev/8.0.x になった(`git merge-base --is-ancestor` で確認済み)。**着手前提条件(C3 / RN-6)は解消**。
+
+### マージされた picker 最終形と設計時スナップショットの差分
+
+picker はマージまでに拡張されており、以下が設計時の想定と異なる:
+
+| 項目 | 設計時の想定 | マージ後の実態 |
+|---|---|---|
+| 同梱カタログの場所 | `src/features/mastra/server/services/ai-sdk-modules/model-catalog-data.json` | `apps/app/resource/model-catalog-data.json` |
+| カタログの提供元 | 同梱資産の read のみ | **実効カタログ** = DB のリフレッシュ済みカタログ(Prisma モデル `refreshed-model-catalog`)?? 同梱資産(`effective-model-catalog.ts`) |
+| 外部通信 | なし | **opt-in** のリフレッシュ(既定 OFF): 起動時 `ai:modelCatalogRefreshOnStartup` / cron `ai:modelCatalogRefreshCronSchedule` / 手動 POST `/ai-settings/refresh-model-catalog`(`AllowedModelsField` に導線あり) |
+| ロケール | en/ja/zh/fr | **ko_KR が追加**(dev/8.0.x 由来。tasks 6.6 は 5 ロケールに修正済み) |
+
+### 本 spec への影響(確認結果)
+
+- **依拠契約は不変**: `get-available-models` は provider 引数 → `getEffectiveSelectableModelIds(provider)` で `SelectableModelsResponse` を返す(呼び出し契約は設計時と同一)。`AllowedModel` 形・`AI_SETTING_KEYS`・env-only グループ(旧 5 キー)も設計の前提どおり。
+- **spec 文書の更新(実施済み)**: design の Out of Boundary / Allowed Dependencies を picker 最終形のファイル群・契約へ更新。カタログリフレッシュ 2 config キーは `ai:*` prefix だが**変更対象外**と明記(task 2.1 に温存 bullet 追加 — `ai:*` 一括整理への巻き込み防止)。`AllowedModelsField` の provider スコープ化(task 6.4)で**手動リフレッシュ導線を維持**する bullet を追加。requirements の関連 spec 記載・Adjacent expectations を「実装済み + 実効カタログ」前提へ更新。
+- **タスクグラフへの構造的影響なし**: 追加・削除タスクなし(既存タスクへの bullet 追記のみ)。

@@ -38,7 +38,7 @@
 ### Out of Boundary
 
 - レガシー `openai:*` 設定と `features/ai-tools`(suggest-path)・`features/openai` — 現状のまま
-- カタログデータの vendoring・フィルタ(`model-catalog-data.json` / `chat-model-filter.ts` / `bin/vendor-model-catalog.ts`)— ai-settings-model-picker の所管
+- カタログデータの vendoring・フィルタ・リフレッシュ機構一式(`resource/model-catalog-data.json` / `bin/vendor-model-catalog.ts` / `chat-model-filter.ts` / `build-model-catalog.ts` / `fetch-model-catalog.ts` / `refresh-model-catalog.ts` / `effective-model-catalog.ts` / `model-catalog-refresh-jobs.ts` / Prisma モデル `refreshed-model-catalog` / POST `/ai-settings/refresh-model-catalog` / config キー `ai:modelCatalogRefreshOnStartup`・`ai:modelCatalogRefreshCronSchedule`)— ai-settings-model-picker の所管。本 spec はこれらを変更しない
 - Mastra エージェント本体(tools・memory・stream 処理)— `growi-agent.ts` は modelKey の受け渡し行のみ変更
 - `crowi.isAiReady()` の外部契約(boolean のまま。内部意味論のみ本 spec が変更)
 - SSR 共通 props(`aiEnabled: boolean` のまま変更なし)
@@ -47,7 +47,7 @@
 
 - config-manager 基盤(`defineConfig` / `ENV_ONLY_GROUPS` / s2s `configUpdated`)
 - `@ai-sdk/{openai,anthropic,google,azure}` ^3 の provider factory、`@mastra/core` ^1.32 の動的モデル関数と `RequestContext`
-- picker 資産: `get-available-models` ルート・`use-selectable-models` フック・同梱カタログ(provider 引数を取る現行契約のまま)
+- picker 資産: `get-available-models` ルート(provider 引数 → `getEffectiveSelectableModelIds(provider)` で**実効カタログ** = DB リフレッシュ済みカタログ ?? 同梱資産 を返す現行契約のまま)・`use-selectable-models` フック・AllowedModelsField 内の手動カタログリフレッシュ導線(POST `/ai-settings/refresh-model-catalog`)
 - `~/components/ui/select`(SelectGroup / SelectLabel)と `ai-elements/prompt-input` のベンダリング部品
 - UserUISettings 基盤(mongoose モデル・PUT ルート・`scheduleToPut`)
 
@@ -59,7 +59,7 @@
 - modelKey の書式(セパレータ・解析規則)変更
 - env var 名(`AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS`)・`ENV_ONLY_GROUPS` targetKeys の変更
 - `UserUISettings` フィールドの変更(PUT ルートのハードコード allow-list と連動)
-- **前提条件**: 本 spec の実装は ai-settings-model-picker(現行ブランチ)のマージ後に着手する(同一ファイル群を変更するため)
+- **前提条件(充足済み 2026-07-03)**: ai-settings-model-picker は PR #11383 で dev/8.0.x へマージ済みで、本ブランチ(feat/186460-mastra-multi-provider)のベースに含まれる。マージされた最終形は設計時スナップショットから拡張されている(実効カタログ = DB リフレッシュ済み ?? 同梱資産、opt-in の起動時/cron/手動リフレッシュ。research.md 2026-07-03 追記参照)が、本 spec が依拠する契約(provider 引数の selectable-models・`AllowedModel` 形・env-only グループ)は不変であることを確認済み
 
 ## Architecture
 
@@ -174,7 +174,7 @@ features/mastra/client/admin/
 - `interfaces/user-ui-settings.ts` — `aiChatSelectedModelId` → `aiChatSelectedModelKey`
 
 **config**
-- `server/service/config-manager/config-definition.ts` — `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` を削除、`ai:providers`(`AI_PROVIDERS`)・`ai:providerApiKeys`(`AI_PROVIDER_API_KEYS`, isSecret)を追加。`ENV_ONLY_GROUPS` の ai グループ targetKeys を `['app:aiEnabled', 'ai:providers', 'ai:providerApiKeys']` へ(allowedModels を除外 = R5.3)
+- `server/service/config-manager/config-definition.ts` — `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings` を削除、`ai:providers`(`AI_PROVIDERS`)・`ai:providerApiKeys`(`AI_PROVIDER_API_KEYS`, isSecret)を追加(`CONFIG_KEYS` 列挙も追従)。`ENV_ONLY_GROUPS` の ai グループ targetKeys を `['app:aiEnabled', 'ai:providers', 'ai:providerApiKeys']` へ(allowedModels を除外 = R5.3)。picker 由来の `ai:modelCatalogRefreshOnStartup` / `ai:modelCatalogRefreshCronSchedule` は**変更対象外**(env-only グループ外・admin 編集単位外の現状を維持)
 
 **server services**
 - `.../llm-providers/config.ts` — アクセサをプロバイダ引数付きへ(`getApiKey(p)` / `requireApiKey(p)` / `getProviderSettings(p)`)。availability / effective-model-key は import しない(現行 `resolveEffectiveModelId` / `getDefaultModelId` 相当は新設 `effective-model-key.ts` へ移設 — New Files 参照)
@@ -197,7 +197,7 @@ features/mastra/client/admin/
 **client**
 - `features/mastra/client/admin/AiSettings.tsx` — モック構成(AI トグル → DefaultModelSelector → ProviderTabs → ProviderPanel → Update)へ再構成
 - `features/mastra/client/admin/ai-settings-form-values.ts` — `AiSettingsFormValues = { aiEnabled, providers: Record<AiProvider, ProviderFormValue>, allowedModels: AllowedModelFormValue[] }` と双方向マッピング
-- `features/mastra/client/admin/AllowedModelsField.tsx` — `provider` prop を受け、グローバル `allowedModels` 配列の該当プロバイダ行のみを編集(追加時は provider + namespace テンプレートをシード。★ = グローバル既定の付替え)
+- `features/mastra/client/admin/AllowedModelsField.tsx` — `provider` prop を受け、グローバル `allowedModels` 配列の該当プロバイダ行のみを編集(追加時は provider + namespace テンプレートをシード。★ = グローバル既定の付替え)。既存の手動カタログリフレッシュ導線(POST `/ai-settings/refresh-model-catalog`)は維持する
 - `features/mastra/client/admin/AzureOpenaiSettings.tsx` — `providers.azure-openai.azureOpenaiSettings` 配下のフィールドへ(グローバル provider watch を廃止)
 - `features/mastra/client/admin/use-ai-settings.ts` — 新 DTO 対応
 - `features/mastra/client/components/ChatSidebar/ChatSidebar.tsx` — modelKey 状態・プロバイダ別グループ表示・`scheduleToPut({ aiChatSelectedModelKey })`
@@ -357,7 +357,7 @@ export type AiProviderApiKeys = Partial<Record<AiProvider, string>>;
 | `ai:allowedModels` | `AllowedModel[]`(provider 必須) | `AI_ALLOWED_MODELS`(JSON) | no |
 
 - `ENV_ONLY_GROUPS` の ai グループ: `targetKeys: ['app:aiEnabled', 'ai:providers', 'ai:providerApiKeys']`(モデル設定を外す = 5.3)。
-- 削除: `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings`(7.1。migration なし = 7.2。新キー不在時は available provider が 0 になり自然に未設定扱い = 7.3)。
+- 削除: `ai:provider` / `ai:apiKey` / `ai:azureOpenaiSettings`(7.1。migration なし = 7.2。新キー不在時は available provider が 0 になり自然に未設定扱い = 7.3)。picker 由来のカタログリフレッシュ 2 キー(`ai:modelCatalogRefreshOnStartup` / `ai:modelCatalogRefreshCronSchedule`)は `ai:*` prefix だが本 spec の対象外 — 削除・移設しない。
 - **単一 JSON env への集約 — トレードオフの記録(5.1)**: `AI_PROVIDER_API_KEYS` は全プロバイダの API キーを 1 つの JSON env 値に合成する形であり、K8s の `secretKeyRef` 等でプロバイダごとに別々のシークレットソースから注入することはできない。config-manager の機構(1 config key = 1 env var)と D2 の Record 保存形に整合するため、この形を採る。**非採用代替**: per-provider env var(`AI_OPENAI_API_KEY` 等)は、config key の per-provider 分割(Record 設計の放棄)か config-loader への例外機構の追加を要するため見送り。運用要望が生じた場合は、loader 段で per-provider env を Record へマージする「追加エイリアス」として後方互換に導入できる(拡張余地 — 本 spec では実装しない)。JSON エスケープ誤りは malformed config warn(Error Handling 参照)で観測可能。env 記述例(JSON エスケープ・複数キー合成の具体例)のドキュメント整備は tasks で 1 タスク化する。
 - config-manager は値をランタイム検証しないため、アクセサ側で `Array.isArray` / object ガードを行う(現行 `getAllowedModels` の防御パターン踏襲)。ガードが不正形状を検出した場合は「未設定」として fail-soft しつつ、`(config key, 理由)` の warn を dedup 付きで出力する(fail-silent の排除 — Error Handling 参照)。JSON env のタイポ等で `ai:providers` 自体が読めないケースは 6.1 の不備ログ(enabled 判定後)に到達しないため、この warn が唯一の手がかりになる。
 - **env 値と DB 値の混在(シャドーイング)の規則**: config-manager の標準解決(env-only グループ外は「DB 値 ?? env 値」を**キー全体**に適用。Record の deep merge はしない)をそのまま踏襲し、アクセサ側で per-provider の deep merge を自作しない(env-only 判定の複製 = drift 源になるため)。したがって `AI_PROVIDERS` / `AI_PROVIDER_API_KEYS` / `AI_ALLOWED_MODELS` の env 値が効くのは同キーの DB 値が存在しない間だけで、管理画面の保存で DB 値が書かれた後は env 側の変更は反映されない(env 値 = 初期値として振る舞う)。接続設定を env で恒久的に統制したい運用は env-only モード(R5.2)を使う — それがモード分割の意図。観測性のため、アクセサは同一キーで DB 値と env 値が同時に定義されているのを検出したら「env 値が DB 値にシャドーされている」旨を dedup 付き info で出力する(「env を変えたのに反映されない」調査の観測点。値そのものは出力しない)。
@@ -532,7 +532,7 @@ export interface AiSettingsFormValues {
 - **AiSettings.tsx**: AI 有効トグル → DefaultModelSelector → ProviderTabs(アクティブタブ state)→ ProviderPanel(アクティブのみ mount)→ Update。
 - **DefaultModelSelector**: `allowedModels` を provider でグループ表示し、選択 = 対象行の `isDefault` を true・他を false(3.1)。ProviderPanel 行内の★と同一の書き換え(共有ヘルパ)。
 - **ProviderPanel**: 有効トグル(1.5)・API キー入力(設定済みは `(configured)` placeholder、1.8)・「API key set / not set」チップ・AllowedModelsField(provider prop)・azure のみ AzureOpenaiSettings。env-only 時は接続設定系フィールドを disabled(5.2)、モデル編集は活性のまま(5.3)。
-- **AllowedModelsField**: カタログ対応プロバイダは select(登録済み除外)、非対応は自由入力(2.6, 2.7 — picker 実装を provider スコープで流用)。同一プロバイダ内重複はクライアントでも行エラー表示(2.4。最終判定はサーバ)。既定の不変条件はフォーム操作でも維持する: 空リストへ最初のモデルを追加したときは `isDefault` を自動付与し、既定行を削除したときは残存する先頭行へ既定を付け替える(残 0 件なら既定なし — 3.1/3.3。付替えは共有ヘルパ経由)。これにより通常のフォーム操作から 3.2 の検証エラーに到達しない。**index 整合の制約**: グローバル `allowedModels` 配列に対する単一 `useFieldArray` を維持し、provider によるフィルタは**表示のみ**とする。remove/update/★付替えは必ず原配列 index を保持した対応付け(表示行 → 原 index のマップ)経由で行い、フィルタ後 index を配列操作に直接使わない(越境操作バグの防止。component テストで検証)。
+- **AllowedModelsField**: カタログ対応プロバイダは select(登録済み除外)、非対応は自由入力(2.6, 2.7 — picker 実装を provider スコープで流用)。既存の手動カタログリフレッシュ導線は維持する(picker 所管の機能を UI 再構成で失わない)。同一プロバイダ内重複はクライアントでも行エラー表示(2.4。最終判定はサーバ)。既定の不変条件はフォーム操作でも維持する: 空リストへ最初のモデルを追加したときは `isDefault` を自動付与し、既定行を削除したときは残存する先頭行へ既定を付け替える(残 0 件なら既定なし — 3.1/3.3。付替えは共有ヘルパ経由)。これにより通常のフォーム操作から 3.2 の検証エラーに到達しない。**index 整合の制約**: グローバル `allowedModels` 配列に対する単一 `useFieldArray` を維持し、provider によるフィルタは**表示のみ**とする。remove/update/★付替えは必ず原配列 index を保持した対応付け(表示行 → 原 index のマップ)経由で行い、フィルタ後 index を配列操作に直接使わない(越境操作バグの防止。component テストで検証)。
 - i18n: 新キーは `ai_settings.providers_*` / `ai_settings.default_model_*` 系。5 ロケール(en/ja/zh/fr/ko)同時更新。
 
 ### client / ChatSidebar セレクタ

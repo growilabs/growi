@@ -26,7 +26,7 @@ GROWI AI において、同時に複数の Provider, Model を登録できる機
 
 - [multi-llm-provider](../multi-llm-provider/) — プロバイダ選択(1 App = 1 ベンダー)の導入
 - [mastra-multi-model-chat](../mastra-multi-model-chat/) — 同一プロバイダ内の複数許可モデル + チャットでのモデル選択(実装済み)
-- [ai-settings-model-picker](../ai-settings-model-picker/) — 管理画面の許可モデル入力をオフライン同梱カタログからの選択式にする(実装中・現行ブランチ)
+- [ai-settings-model-picker](../ai-settings-model-picker/) — 管理画面の許可モデル入力をオフライン同梱カタログからの選択式にする(**実装済み**。2026-07-03 に dev/8.0.x へマージされ、本ブランチのベースに含まれる。最終形は同梱資産に加え opt-in のカタログリフレッシュ機構を持つ)
 
 ## Introduction
 
@@ -55,7 +55,7 @@ GROWI AI において、同時に複数の Provider, Model を登録できる機
   - 実行時の外部ネットワーク通信によるモデル一覧取得(ai-settings-model-picker の非スコープを踏襲)
   - 旧設定から新設定への自動移行(migration)
 - **Adjacent expectations(隣接する前提)**
-  - 許可モデル入力のカタログ選択方式(カタログ対応プロバイダは選択式、非対応プロバイダは自由入力。オフライン同梱カタログ)は ai-settings-model-picker が提供する前提であり、本仕様はそれを所属プロバイダ単位で適用する。
+  - 許可モデル入力のカタログ選択方式(カタログ対応プロバイダは選択式、非対応プロバイダは自由入力。同梱カタログ + opt-in リフレッシュによる実効カタログ)は ai-settings-model-picker が提供する前提であり、本仕様はそれを所属プロバイダ単位で適用する。カタログのリフレッシュ機構(起動時/cron/手動)とその設定・UI 導線は picker の所管のまま維持され、本仕様の管理画面再構成で失われない。
   - 「許可モデル集合 = 認可境界。クライアントからのモデル指定はサーバが検証する」という原則は維持され、本仕様はその判定単位を(プロバイダ, モデル識別子)の組に拡張する。
   - モデルごとの provider オプション・メッセージ単位のモデル適用・ユーザー個人設定としての選択永続化の各挙動(mastra-multi-model-chat)は維持される。
   - 管理画面のレイアウト・操作構造は [ui-design/](./ui-design/) の Claude Design モック(AI Settings Multi-Provider / ProviderPanel)を参照とする(細部の実装表現は design で確定する)。
