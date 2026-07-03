@@ -21,4 +21,8 @@ export interface IPageLink {
 }
 
 export interface PageLinkDocument extends IPageLink, Document {}
-export interface PageLinkModel extends Model<PageLinkDocument> {}
+export interface PageLinkModel extends Model<PageLinkDocument> {
+  replaceOutboundLinks(fromPageId: ObjectId, resolvedRows: IPageLink[]): void;
+  findBacklinkSources(toPageId: ObjectId): ObjectId[];
+  reconcileDeletedPages(pageIds: ObjectId[]): void;
+}
