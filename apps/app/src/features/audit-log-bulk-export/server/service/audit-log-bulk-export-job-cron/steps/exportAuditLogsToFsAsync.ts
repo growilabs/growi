@@ -6,12 +6,16 @@ import { getIdStringForRef } from '@growi/core';
 import { AuditLogBulkExportJobStatus } from '~/features/audit-log-bulk-export/interfaces/audit-log-bulk-export';
 import type { Prisma } from '~/generated/prisma/client';
 import { SupportedAction } from '~/interfaces/activity';
-import type { ActivityDocument } from '~/server/models/activity';
-import { prisma } from '~/utils/prisma';
+import { type PrismaClient, prisma } from '~/utils/prisma';
 
 import type { AuditLogBulkExportJobDocument } from '../../../models/audit-log-bulk-export-job';
 import type { IAuditLogBulkExportJobCronService } from '..';
 import { exportActivityCursor } from './activity-export-cursor';
+
+/** A row streamed from exportActivityCursor (extended client: has computed _id/__v). */
+type ExportedActivityRow = Awaited<
+  ReturnType<PrismaClient['activities']['findMany']>
+>[number];
 
 /**
  * Get a Writable that writes audit logs to JSON files
@@ -21,13 +25,17 @@ function getAuditLogWritable(
   job: AuditLogBulkExportJobDocument,
 ): Writable {
   const outputDir = this.getTmpOutputDir(job);
-  let buffer: ActivityDocument[] = [];
+  let buffer: Array<ExportedActivityRow & { user?: string }> = [];
   let fileIndex = 0;
   return new Writable({
     objectMode: true,
-    write: async (log: ActivityDocument, _encoding, callback) => {
+    write: async (log: ExportedActivityRow, _encoding, callback) => {
       try {
-        buffer.push(log);
+        // Prisma maps the DB field "user" to the `userId` scalar; exported
+        // audit-log JSON must keep the legacy `user` key (the Mongoose export
+        // shape), so restore it here. `undefined` keeps the key absent for
+        // legacy documents that never had a user.
+        buffer.push({ ...log, user: log.userId ?? undefined });
 
         // Update lastExportedId for resumability
         job.lastExportedId = log._id.toString();
