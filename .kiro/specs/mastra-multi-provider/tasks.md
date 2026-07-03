@@ -22,7 +22,7 @@
   - picker 由来のカタログリフレッシュ 2 キー(`ai:modelCatalogRefreshOnStartup` / `ai:modelCatalogRefreshCronSchedule`)は変更対象外として温存する(`ai:*` の一括整理に巻き込まない)
   - 完了条件: config 定義の spec がグリーンで、旧キー参照が config 定義から消えている。新形式未設定時(旧設定のみ残存時)は AI 未設定扱いになる
   - _Requirements: 1.1, 1.2, 5.1, 5.2, 5.3, 7.1, 7.2, 7.3_
-- [ ] 2.2 環境変数の記述例ドキュメントを整備する
+- [x] 2.2 環境変数の記述例ドキュメントを整備する
   - 3 つの JSON env var の具体例(JSON エスケープ、複数プロバイダ・複数キーの合成、Azure の endpoint/Entra ID 例、既定モデル指定)を作成する
   - 完了条件: `.kiro/specs/mastra-multi-provider/docs/env-configuration-examples.md` が存在し、8.2 のスモークテスト手順がこの記述例をそのまま使って検証する
   - _Requirements: 5.1_
