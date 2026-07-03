@@ -23,6 +23,7 @@ import type { ObjectIdLike } from '~/server/interfaces/mongoose-utils';
 import type { PageDocument } from '~/server/models/page';
 import type { PageOperationDocument } from '~/server/models/page-operation';
 import type { UserGroupDocument } from '~/server/models/user-group';
+import type { ActivityActor } from '~/server/service/activity/attachment-removal-snapshot';
 
 export interface IPageService {
   // Page event emitter
@@ -59,6 +60,9 @@ export interface IPageService {
   deleteCompletelyOperation: (
     pageIds: ObjectIdLike[],
     pagePaths: string[],
+    // Required (nullable) so that a new caller cannot silently omit the
+    // operator; null explicitly marks a system operation without one.
+    actor: ActivityActor | null,
   ) => Promise<void>;
   getEventEmitter: () => EventEmitter;
   deleteMultipleCompletely: (

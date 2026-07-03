@@ -84,10 +84,18 @@ import Subscription from '../../models/subscription';
 import UserGroupRelation from '../../models/user-group-relation';
 import { V5ConversionError } from '../../models/vo/v5-conversion-error';
 import { divideByType } from '../../util/granted-group';
+import {
+  type ActivityActor,
+  recordCascadeAttachmentRemovals,
+} from '../activity/attachment-removal-snapshot';
 import { configManager } from '../config-manager';
 import type { IPageGrantService } from '../page-grant';
 import { preNotifyService } from '../pre-notify';
 import { getYjsService } from '../yjs';
+import {
+  buildPageIdToPathMap,
+  toAttachmentLikes,
+} from './cascade-attachment-removal-inputs';
 import { BULK_REINDEX_SIZE, LIMIT_FOR_MULTIPLE_PAGE_OP } from './consts';
 import { onSeen } from './events/seen';
 import type { IPageService } from './page-service';
@@ -2375,12 +2383,32 @@ class PageService implements IPageService {
     return nDeletedNonEmptyPages;
   }
 
-  async deleteCompletelyOperation(pageIds, pagePaths): Promise<void> {
+  async deleteCompletelyOperation(
+    pageIds,
+    pagePaths,
+    actor: ActivityActor | null,
+  ): Promise<void> {
     // Delete Attachments, Revisions, Pages and emit delete
     const Page = mongoose.model<IPage, PageModel>('Page');
 
     const { attachmentService } = this.crowi;
     const attachments = await Attachment.find({ page: { $in: pageIds } });
+
+    // Record one ACTION_ATTACHMENT_REMOVE activity per cascaded attachment
+    // BEFORE removeAllAttachments runs: requirement 3.4 demands the snapshot
+    // be frozen before storage deletion, so the cascade records the deletion
+    // "attempt" (design: Error Handling). The recorder isolates per-record
+    // failures internally and never rejects, so page deletion is not blocked.
+    // A null actor means a system operation without an operator
+    // (deleteCompletelyUserHomeBySystem); no operator activity is recorded.
+    if (actor != null) {
+      await recordCascadeAttachmentRemovals(
+        this.crowi.activityService,
+        toAttachmentLikes(attachments),
+        buildPageIdToPathMap(pageIds, pagePaths),
+        actor,
+      );
+    }
 
     await Promise.all([
       prisma.$transaction([
@@ -2422,7 +2450,17 @@ class PageService implements IPageService {
 
     logger.debug({ paths }, 'Deleting completely');
 
-    await this.deleteCompletelyOperation(ids, paths);
+    // Every recursive complete-deletion, empty-trash and group-deletion path
+    // converges on this method, so building the actor from the `user` this
+    // method already receives covers them all without touching their
+    // signatures (design: actor の受け渡し設計). ip/endpoint are not available
+    // here — an accepted degradation. `user` is undefined only on the system
+    // deletion path (deleteCompletelyUserHomeBySystem).
+    await this.deleteCompletelyOperation(
+      ids,
+      paths,
+      user != null ? { user } : null,
+    );
 
     this.pageEvent.emit('syncDescendantsDelete', pages, user); // update as renamed page
     return;
@@ -2515,7 +2553,11 @@ class PageService implements IPageService {
       );
     }
     // 2. then delete target completely
-    await this.deleteCompletelyOperation(ids, paths);
+    await this.deleteCompletelyOperation(ids, paths, {
+      user,
+      ip: activityParameters.ip,
+      endpoint: activityParameters.endpoint,
+    });
 
     // delete leaf empty pages
     await Page.removeLeafEmptyPagesRecursively(page.parent);
@@ -2614,7 +2656,8 @@ class PageService implements IPageService {
 
     logger.debug({ paths }, 'Deleting completely');
 
-    await this.deleteCompletelyOperation(ids, paths);
+    // The v4 path has no activityParameters — actor degrades to user only.
+    await this.deleteCompletelyOperation(ids, paths, { user });
 
     if (isRecursively) {
       this.deleteCompletelyDescendantsWithStream(page, user, options);

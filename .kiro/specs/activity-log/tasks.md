@@ -64,7 +64,7 @@
   - _Boundary: Direct Remove Integration（attachment 削除 API）_
   - _Depends: 2.2, 3.1_
 - [ ] 5. 統合: カスケード削除の記録
-- [ ] 5.1 (P) 完全削除の共通処理に操作者を届け、実削除前に recorder を呼ぶ
+- [x] 5.1 (P) 完全削除の共通処理に操作者を届け、実削除前に recorder を呼ぶ
   - 完全削除の共通処理へ操作者（user 必須、ip/endpoint 任意）を1つの Parameter Object として追加し、3つの直接呼び出し元＋複数ページ一括削除の継ぎ目で組んで貫通させる（stream 経由の再帰・ゴミ箱空・グループ削除は複数ページ一括削除に収束するため自動的にカバー、いずれも user のみ＝ip/endpoint 縮退を許容）
   - `removeAllAttachments`（実削除）**の前**に、`pageId → path` マップ（ObjectId は文字列化して突き合わせ）を作り recorder を呼ぶ
   - design の容認判断（カスケードは「削除の試行」を記録する。3.4 の要請上、実削除前にデータ凍結する）に沿って順序を固定する
@@ -106,6 +106,7 @@
 
 ## Implementation Notes
 
+- 5.1: `deleteCompletelyOperation` の actor は `ActivityActor | null`（必須引数）。design の表に無い第4の直接呼び出し元 `deleteCompletelyUserHomeBySystem`（システムによるユーザーホーム強制削除・操作者不在）が typecheck で発見され、**システム経路は意図的に記録対象外・明示的な null が契約**（省略はコンパイルエラーのまま）。7.2/7.3 はこの前提で書くこと。
 - 4.1: pino logger は context-first（`logger.warn({ ... }, 'msg')`）。message-first だと文脈オブジェクトが実行時に黙って捨てられる（レビューで実測・差し戻し済み）。7.1 では「page が引けないケースの warn に attachmentId/pageId が構造化フィールドで乗る」ことの assert を検討（レビュアー提案）。
 - 3.2: recorder の依存型は `ActivityCreator`（`{ createActivity(parameters: IActivityParameters): Promise<IActivity | null> }`）。design スニペットの `IActivity` 引数は概略で、実サービスの転送先型に合わせた。`ActivityActor` は attachment-removal-snapshot.ts から export 済み（5.1 が import する）。
 - 2.2: `updateByParameters` の入力契約は「素の `ISnapshot`」（envelope 禁止・`id` は渡さない）。内部の `buildSnapshotUpdateEnvelope` が `{ update }` へ変換し既存 `_id`・`username` を保持する。後続の emit('update') 呼び出し（4.1）はこの契約で snapshot を渡すこと。
