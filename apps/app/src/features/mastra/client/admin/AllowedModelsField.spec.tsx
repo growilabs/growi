@@ -4,7 +4,6 @@ import type { JSX, ReactNode } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
-import type { SWRResponse } from 'swr';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 
 vi.mock('next-i18next', () => ({
@@ -37,18 +36,23 @@ import { useSWRxSelectableModels } from './use-selectable-models';
 const mockedUseSelectableModels = vi.mocked(useSWRxSelectableModels);
 const mockedApiv3Post = vi.mocked(apiv3Post);
 
-// Build a minimal SWRResponse for the hook mock. Only `data`/`error` are read by
-// the component; the rest of the SWRResponse surface is filled with inert stubs so
-// the returned value is a real SWRResponse (no type assertion needed).
+// Build a minimal hook result for the mock. Only `data`/`error` and the
+// `invalidateAllProviders` util are read by the component; the rest of the
+// SWRResponse surface is filled with inert stubs so the returned value is a
+// real hook result (no type assertion needed). The cache-wide breadth of
+// `invalidateAllProviders` itself is the hook's contract, covered in
+// use-selectable-models.spec.ts — here tests only assert the refresh flow
+// calls it.
 const swrResponse = (partial: {
   data?: SelectableModelsResponse;
   error?: Error;
-}): SWRResponse<SelectableModelsResponse, Error> => ({
+}): ReturnType<typeof useSWRxSelectableModels> => ({
   data: partial.data,
   error: partial.error,
   isLoading: false,
   isValidating: false,
   mutate: vi.fn(),
+  invalidateAllProviders: vi.fn(),
 });
 
 const defaultFormValues: AiSettingsFormValues = {
@@ -726,9 +730,9 @@ describe('AllowedModelsField', () => {
           '/ai-settings/refresh-model-catalog',
         );
       });
-      // The current provider's list is revalidated so the dropdown reflects the
-      // refreshed catalog immediately.
-      expect(hookResult.mutate).toHaveBeenCalled();
+      // EVERY cached provider list is invalidated (not just the current one):
+      // the server-side snapshot is replaced for all providers at once.
+      expect(hookResult.invalidateAllProviders).toHaveBeenCalled();
       expect(toastSuccess).toHaveBeenCalledWith(
         'ai_settings.refresh_model_catalog_success',
       );
@@ -749,7 +753,7 @@ describe('AllowedModelsField', () => {
           'ai_settings.refresh_model_catalog_failed',
         );
       });
-      expect(hookResult.mutate).not.toHaveBeenCalled();
+      expect(hookResult.invalidateAllProviders).not.toHaveBeenCalled();
       expect(toastSuccess).not.toHaveBeenCalled();
       // The button recovers so the admin can retry.
       expect(getRefreshButton()).toBeEnabled();

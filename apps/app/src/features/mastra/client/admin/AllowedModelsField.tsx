@@ -71,14 +71,17 @@ export const AllowedModelsField = (
   // Fetch the selectable models for the current provider once at the field level
   // and share the result with every row. The hook returns `null` key while the
   // provider is unset, so no request is issued then (5.2).
-  const { data, error, mutate } = useSWRxSelectableModels(provider);
+  const { data, error, invalidateAllProviders } =
+    useSWRxSelectableModels(provider);
 
   // Manual catalog refresh (9.1): ask the server to re-ingest models.dev and
-  // persist the snapshot, then revalidate the current provider's list so the
-  // dropdown reflects it immediately. Intentionally NOT disabled in env-only
-  // mode: the catalog is a server-side cache of public model metadata, not an
-  // AI setting, and env-only deployments (e.g. GROWI.cloud) are a primary
-  // audience of this action.
+  // persist the snapshot, then invalidate every cached provider list — the
+  // snapshot is replaced for ALL providers server-side, so a mutate bound to
+  // the current provider only would leave other visited providers' immutable
+  // caches pre-refresh until a page reload. Intentionally NOT disabled in
+  // env-only mode: the catalog is a server-side cache of public model
+  // metadata, not an AI setting, and env-only deployments (e.g. GROWI.cloud)
+  // are a primary audience of this action.
   const [isRefreshingCatalog, setRefreshingCatalog] = useState(false);
   const refreshCatalog = useCallback(async (): Promise<void> => {
     setRefreshingCatalog(true);
@@ -86,7 +89,7 @@ export const AllowedModelsField = (
       await apiv3Post<RefreshModelCatalogResponse>(
         '/ai-settings/refresh-model-catalog',
       );
-      await mutate();
+      await invalidateAllProviders();
       toastSuccess(t('ai_settings.refresh_model_catalog_success'));
     } catch {
       // The server answers a generic 500 on failure (the last-good catalog
@@ -95,7 +98,7 @@ export const AllowedModelsField = (
     } finally {
       setRefreshingCatalog(false);
     }
-  }, [mutate, t]);
+  }, [invalidateAllProviders, t]);
 
   // Mode derivation (design "AllowedModelsField (UI change)"):
   // - `select` only when the catalog resolved to a non-empty list (1.4).
