@@ -15,6 +15,9 @@ const logger = loggerFactory(
  */
 class ModelCatalogRefreshCronService extends CronService {
   override getCronSchedule(): string {
+    // `?? ''` only satisfies the non-nullable return type: this service is
+    // constructed solely by startModelCatalogRefreshCronIfEnabled AFTER it has
+    // confirmed a non-empty schedule, so '' is never actually reached here.
     return configManager.getConfig('ai:modelCatalogRefreshCronSchedule') ?? '';
   }
 

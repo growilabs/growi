@@ -50,10 +50,10 @@ export const refreshModelCatalog =
     await prisma.mastrarefreshedmodelcatalogs.upsertSingleton({
       models,
       fetchedAt,
-      // Stamp the bundled generation this snapshot supersedes: the newer-wins
-      // read (Req 9.5) compares bundled _generatedAt values only, keeping both
-      // operands in the vendoring machine's clock domain (server clock skew
-      // must not shadow a successful refresh — see effective-model-catalog.ts).
+      // Stamp the bundled generation this snapshot supersedes; the newer-wins
+      // read compares it against the current bundled generation (Req 9.5). See
+      // IRefreshedModelCatalog.supersededBundledGeneratedAt for the clock-domain
+      // rationale (why both operands are vendoring-clock values).
       supersededBundledGeneratedAt: BUNDLED_CATALOG_GENERATED_AT,
       source: MODELS_DEV_SOURCE_ATTRIBUTION,
     });

@@ -24,14 +24,10 @@ const logger = loggerFactory(
  *   the bundled one wins until the next successful refresh
  *
  * The comparison uses bundled `_generatedAt` values on BOTH sides (the current
- * asset's vs the one stamped on the snapshot at refresh time), so both
- * operands come from the vendoring machine's clock. Comparing the
- * server-clock `fetchedAt` against the CI-clock `_generatedAt` would let a
- * lagging server clock silently shadow a just-persisted refresh behind the
- * bundled catalog while the admin sees a success toast. A successful refresh
- * is by construction at least as fresh as the asset bundled at that moment,
- * so "did the image change to a newer generation since" is the only question
- * the read needs to answer.
+ * asset's vs the one stamped on the snapshot at refresh time), so server clock
+ * skew cannot shadow a just-persisted refresh behind the bundled catalog. The
+ * full clock-domain rationale lives on the field it reads:
+ * IRefreshedModelCatalog.supersededBundledGeneratedAt.
  *
  * The read itself performs no external communication — it consults local
  * storage (MongoDB) and the statically imported bundled asset only (Req 2).

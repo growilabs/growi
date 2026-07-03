@@ -139,7 +139,9 @@ export const AllowedModelsField = (
   // nullish as unset rather than "loading".
   const isLoadingModels =
     provider != null && provider !== '' && !isResolved && error == null;
-  const useSelect = isResolved && selectableModelIds.length > 0;
+  // `selectableModelIds` is [] until the catalog resolves (data?.modelIds ?? []),
+  // so a non-empty list already implies "resolved" — no separate isResolved guard.
+  const useSelect = selectableModelIds.length > 0;
 
   // Azure OpenAI stores the *deployment name* in `modelId`, so the label changes
   // by provider (data-driven on the watched value, no provider-specific branch
