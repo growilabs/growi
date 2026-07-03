@@ -30,8 +30,9 @@ const logger = loggerFactory(
  *     SelectableModelsResponse:
  *       description: >-
  *         The selectable model ids for a provider, narrowed to chat + tool-capable
- *         models at vendoring time. Carries model-id information only — never an
- *         API key, provider credentials, or providerOptions (Req 7.1).
+ *         models by the catalog filter (applied identically at vendoring time and on
+ *         a runtime refresh). Carries model-id information only — never an API key,
+ *         provider credentials, or providerOptions (Req 7.1).
  *       type: object
  *       required: [modelIds]
  *       properties:
@@ -56,8 +57,9 @@ const logger = loggerFactory(
  *          - accessTokenHeaderAuth: []
  *        summary: /ai-settings/available-models
  *        description: >-
- *          Get the selectable model ids for a provider from the committed offline
- *          catalog. The response carries model-id information only (no secrets).
+ *          Get the selectable model ids for a provider from the effective catalog
+ *          (the runtime-refreshed snapshot when newer, otherwise the committed
+ *          offline catalog). The response carries model-id information only (no secrets).
  *        parameters:
  *          - name: provider
  *            in: query
