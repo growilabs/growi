@@ -454,6 +454,8 @@
     "model_label": "Model name",
     "model_placeholder": "Select a model",
     "refresh_model_catalog": "Refresh model catalog",
+    "refresh_model_catalog_confirmation": "Refreshing the model catalog sends a request to the external service (models.dev) to fetch the latest model list. Do you want to continue?",
+    "refresh_model_catalog_confirm": "Refresh",
     "refresh_model_catalog_success": "The model catalog has been refreshed.",
     "refresh_model_catalog_failed": "Failed to refresh the model catalog. The previous catalog remains in effect.",
     "set_as_default": "Set as default",

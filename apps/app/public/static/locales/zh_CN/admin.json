@@ -463,6 +463,8 @@
     "model_label": "模型名称",
     "model_placeholder": "请选择模型",
     "refresh_model_catalog": "刷新模型目录",
+    "refresh_model_catalog_confirmation": "刷新模型目录时，将向外部服务（models.dev）发送请求以获取最新的模型列表。是否继续？",
+    "refresh_model_catalog_confirm": "刷新",
     "refresh_model_catalog_success": "模型目录已刷新。",
     "refresh_model_catalog_failed": "刷新模型目录失败。将继续使用之前的目录。",
     "set_as_default": "设为默认",

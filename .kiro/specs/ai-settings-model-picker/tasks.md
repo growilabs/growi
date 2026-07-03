@@ -111,8 +111,8 @@
   - _Requirements: 9.4, 9.5, 2.1, 3.1_
   - _Boundary: refreshed-model-catalog, effective-model-catalog, get-available-models_
 - [x] 9.3 refresh サービスと管理画面からの手動更新を実装する
-  - `refreshModelCatalog()`（固定 URL fetch→共有変換→upsert、失敗時は永続化前に throw）、`POST /ai-settings/refresh-model-catalog`（WRITE スコープ + admin）、`AllowedModelsField` の更新ボタン（apiv3Post→mutate→toast。env-only でも有効）、i18n 3 キー×5 ロケールを追加
-  - 完了状態: 統合テストで admin 200 `{ fetchedAt, counts }`・失敗 500（内部非漏洩）・非 admin/未認証拒否、UI テストでボタン→POST→revalidate→toast・失敗フォールバック・env-only で enabled を確認できる
+  - `refreshModelCatalog()`（固定 URL fetch→共有変換→upsert、失敗時は永続化前に throw）、`POST /ai-settings/refresh-model-catalog`（WRITE スコープ + admin）、`AllowedModelsField` の更新ボタン（確認モーダル→apiv3Post→invalidate→toast。env-only でも有効）、i18n キー×5 ロケールを追加
+  - 完了状態: 統合テストで admin 200 `{ fetchedAt, counts }`・失敗 500（内部非漏洩）・非 admin/未認証拒否、UI テストでボタン→確認モーダル→POST→invalidate→toast・キャンセル時は通信ゼロ・失敗フォールバック・env-only で enabled を確認できる
   - _Requirements: 9.1, 9.4, 9.7, 7.1_
   - _Boundary: refresh-model-catalog, post-refresh-model-catalog, admin-ai-settings router, AllowedModelsField, locales admin.json_
 - [x] 9.4 起動時・定期リフレッシュの opt-in 配線を実装する

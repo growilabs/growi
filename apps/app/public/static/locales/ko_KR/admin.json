@@ -454,6 +454,8 @@
     "model_label": "모델 이름",
     "model_placeholder": "모델을 선택하세요",
     "refresh_model_catalog": "모델 카탈로그 새로고침",
+    "refresh_model_catalog_confirmation": "모델 카탈로그를 새로고침하면 최신 모델 목록을 가져오기 위해 외부 서비스(models.dev)와 통신합니다. 계속하시겠습니까?",
+    "refresh_model_catalog_confirm": "새로고침",
     "refresh_model_catalog_success": "모델 카탈로그를 새로고침했습니다.",
     "refresh_model_catalog_failed": "모델 카탈로그 새로고침에 실패했습니다. 이전 카탈로그가 계속 사용됩니다.",
     "set_as_default": "기본값으로 설정",

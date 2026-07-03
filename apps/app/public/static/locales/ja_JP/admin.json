@@ -463,6 +463,8 @@
     "model_label": "モデル名",
     "model_placeholder": "モデルを選択してください",
     "refresh_model_catalog": "モデルカタログを更新",
+    "refresh_model_catalog_confirmation": "モデルカタログの更新では、最新のモデル一覧を取得するために外部サービス（models.dev）への通信が発生します。続行しますか？",
+    "refresh_model_catalog_confirm": "更新する",
     "refresh_model_catalog_success": "モデルカタログを更新しました。",
     "refresh_model_catalog_failed": "モデルカタログの更新に失敗しました。以前のカタログが引き続き使用されます。",
     "set_as_default": "デフォルトにする",

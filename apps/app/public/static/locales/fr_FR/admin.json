@@ -454,6 +454,8 @@
     "model_label": "Nom du modèle",
     "model_placeholder": "Sélectionnez un modèle",
     "refresh_model_catalog": "Actualiser le catalogue de modèles",
+    "refresh_model_catalog_confirmation": "L'actualisation du catalogue de modèles envoie une requête au service externe (models.dev) pour récupérer la liste des modèles la plus récente. Voulez-vous continuer ?",
+    "refresh_model_catalog_confirm": "Actualiser",
     "refresh_model_catalog_success": "Le catalogue de modèles a été actualisé.",
     "refresh_model_catalog_failed": "Échec de l'actualisation du catalogue de modèles. Le catalogue précédent reste en vigueur.",
     "set_as_default": "Définir par défaut",

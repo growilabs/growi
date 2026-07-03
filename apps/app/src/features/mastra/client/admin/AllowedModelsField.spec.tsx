@@ -713,8 +713,12 @@ describe('AllowedModelsField', () => {
       screen.getByRole('button', {
         name: 'ai_settings.refresh_model_catalog',
       });
+    const getConfirmButton = (): HTMLElement =>
+      screen.getByRole('button', {
+        name: 'ai_settings.refresh_model_catalog_confirm',
+      });
 
-    it('POSTs the refresh endpoint, revalidates the list, and toasts success', async () => {
+    it('POSTs the refresh endpoint only after the admin confirms, revalidates the list, and toasts success', async () => {
       const user = userEvent.setup();
       const hookResult = swrResponse({ data: { modelIds: ['gpt-4o'] } });
       mockedUseSelectableModels.mockReturnValue(hookResult);
@@ -726,6 +730,15 @@ describe('AllowedModelsField', () => {
 
       renderComponent();
       await user.click(getRefreshButton());
+
+      // The refresh triggers OUTBOUND communication (models.dev), so the click
+      // opens a confirmation instead of firing the request (Req 9.6).
+      expect(mockedApiv3Post).not.toHaveBeenCalled();
+      expect(
+        screen.getByText('ai_settings.refresh_model_catalog_confirmation'),
+      ).toBeInTheDocument();
+
+      await user.click(getConfirmButton());
 
       await waitFor(() => {
         expect(mockedApiv3Post).toHaveBeenCalledExactlyOnceWith(
@@ -741,6 +754,23 @@ describe('AllowedModelsField', () => {
       expect(toastError).not.toHaveBeenCalled();
     });
 
+    it('does NOT communicate when the admin cancels the confirmation', async () => {
+      const user = userEvent.setup();
+      mockedUseSelectableModels.mockReturnValue(
+        swrResponse({ data: { modelIds: ['gpt-4o'] } }),
+      );
+
+      renderComponent();
+      await user.click(getRefreshButton());
+      await user.click(screen.getByRole('button', { name: 'Cancel' }));
+
+      expect(mockedApiv3Post).not.toHaveBeenCalled();
+      expect(toastSuccess).not.toHaveBeenCalled();
+      expect(toastError).not.toHaveBeenCalled();
+      // The trigger stays available for another attempt.
+      expect(getRefreshButton()).toBeEnabled();
+    });
+
     it('toasts the localized failure message and does not revalidate when the refresh fails (Req 9.4)', async () => {
       const user = userEvent.setup();
       const hookResult = swrResponse({ data: { modelIds: ['gpt-4o'] } });
@@ -749,6 +779,7 @@ describe('AllowedModelsField', () => {
 
       renderComponent();
       await user.click(getRefreshButton());
+      await user.click(getConfirmButton());
 
       await waitFor(() => {
         expect(toastError).toHaveBeenCalledWith(

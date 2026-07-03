@@ -4,6 +4,7 @@ import { useTranslation } from 'next-i18next';
 import { useFieldArray, useFormContext, useWatch } from 'react-hook-form';
 import { Badge, Button, FormGroup, Input, Label } from 'reactstrap';
 
+import { ConfirmModal } from '~/client/components/Admin/App/ConfirmModal';
 import { apiv3Post } from '~/client/util/apiv3-client';
 import { toastError, toastSuccess } from '~/client/util/toastr';
 
@@ -100,6 +101,22 @@ export const AllowedModelsField = (
     }
   }, [invalidateAllProviders, t]);
 
+  // The refresh triggers server-side OUTBOUND communication (models.dev), so
+  // the button opens a confirmation first — the request runs only after the
+  // admin explicitly confirms (Req 9.6: external fetch on explicit admin
+  // action only).
+  const [isRefreshConfirmOpen, setRefreshConfirmOpen] = useState(false);
+  const openRefreshConfirm = useCallback((): void => {
+    setRefreshConfirmOpen(true);
+  }, []);
+  const cancelRefreshConfirm = useCallback((): void => {
+    setRefreshConfirmOpen(false);
+  }, []);
+  const confirmRefreshCatalog = useCallback(async (): Promise<void> => {
+    setRefreshConfirmOpen(false);
+    await refreshCatalog();
+  }, [refreshCatalog]);
+
   // Mode derivation (design "AllowedModelsField (UI change)"):
   // - `select` only when the catalog resolved to a non-empty list (1.4).
   // - `freetext` when the provider is unset (5.2), the fetch failed (3.2), or the
@@ -181,7 +198,7 @@ export const AllowedModelsField = (
           size="sm"
           className="ms-auto p-0 d-inline-flex align-items-center"
           disabled={isRefreshingCatalog}
-          onClick={refreshCatalog}
+          onClick={openRefreshConfirm}
         >
           <span
             className="material-symbols-outlined fs-6 me-1"
@@ -192,6 +209,14 @@ export const AllowedModelsField = (
           {t('ai_settings.refresh_model_catalog')}
         </Button>
       </div>
+      <ConfirmModal
+        isModalOpen={isRefreshConfirmOpen}
+        warningMessage={t('ai_settings.refresh_model_catalog_confirmation')}
+        supplymentaryMessage={null}
+        confirmButtonTitle={t('ai_settings.refresh_model_catalog_confirm')}
+        onConfirm={confirmRefreshCatalog}
+        onCancel={cancelRefreshConfirm}
+      />
       <p className="form-text text-muted mt-0 mb-3">
         {t('ai_settings.models_section_desc')}
       </p>
