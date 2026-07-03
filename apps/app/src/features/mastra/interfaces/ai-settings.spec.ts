@@ -1,4 +1,3 @@
-import type { AiProvider } from './ai-provider';
 import {
   AI_SETTING_KEYS,
   type AiSettingsResponse,
@@ -8,17 +7,23 @@ import {
 describe('ai-settings interfaces', () => {
   describe('AI_SETTING_KEYS', () => {
     // Contract: this list is the single source of truth for the config keys this
-    // feature manages (the env-only group mirrors it). It must contain exactly
-    // these 5 keys — the per-model allow-list is one ai:allowedModels object array,
-    // and the Azure connection config is one ai:azureOpenaiSettings JSON object.
-    it('enumerates exactly the 5 editable config keys (app:aiEnabled + 4 ai:* keys)', () => {
+    // feature manages — the AI enablement toggle plus the 3 multi-provider
+    // `ai:*` keys (providers Record, per-provider API key Record, cross-provider
+    // allow-list).
+    it('enumerates exactly the 4 managed config keys (app:aiEnabled + 3 ai:* keys)', () => {
       expect([...AI_SETTING_KEYS]).toStrictEqual([
         'app:aiEnabled',
-        'ai:provider',
-        'ai:apiKey',
+        'ai:providers',
+        'ai:providerApiKeys',
         'ai:allowedModels',
-        'ai:azureOpenaiSettings',
       ]);
+    });
+
+    it('no longer contains the legacy single-provider keys (Req 7.1)', () => {
+      const keys: readonly string[] = AI_SETTING_KEYS;
+      expect(keys).not.toContain('ai:provider');
+      expect(keys).not.toContain('ai:apiKey');
+      expect(keys).not.toContain('ai:azureOpenaiSettings');
     });
 
     it('contains no duplicate keys', () => {
@@ -28,63 +33,76 @@ describe('ai-settings interfaces', () => {
 
   describe('type-level usage (compile check)', () => {
     it('AiSettingsResponse and AiSettingsUpdateRequest are importable and shaped as designed', () => {
-      const provider: AiProvider = 'azure-openai';
-
+      // Fixed-slot model (Req 1.1/1.2): `providers` is a Record over ALL 4
+      // supported providers — omitting a slot is a compile error.
       const response: AiSettingsResponse = {
         aiEnabled: true,
-        provider,
+        providers: {
+          openai: { enabled: true, isApiKeySet: true },
+          anthropic: { enabled: false, isApiKeySet: false },
+          google: { enabled: false, isApiKeySet: false },
+          'azure-openai': {
+            enabled: true,
+            isApiKeySet: false,
+            azureOpenaiSettings: {
+              resourceName: 'my-resource',
+              baseURL: 'https://example.openai.azure.com',
+              apiVersion: '2024-02-01',
+              useEntraId: true,
+            },
+          },
+        },
         allowedModels: [
           {
+            provider: 'openai',
             modelId: 'gpt-4o',
             providerOptions: { openai: { temperature: 0.2 } },
             isDefault: true,
           },
-          { modelId: 'gpt-4o-mini' },
+          // Cross-provider coexistence of the same modelId (Req 2.3)
+          { provider: 'azure-openai', modelId: 'gpt-4o' },
         ],
-        azureOpenaiSettings: {
-          resourceName: 'my-resource',
-          baseURL: 'https://example.openai.azure.com',
-          apiVersion: '2024-02-01',
-          useEntraId: false,
-        },
-        isApiKeySet: true,
         useOnlyEnvVars: false,
         isConfigured: true,
       };
 
       const updateRequest: AiSettingsUpdateRequest = {
         aiEnabled: true,
-        provider,
-        apiKey: 'secret',
-        allowedModels: [{ modelId: 'gpt-4o', isDefault: true }],
-        azureOpenaiSettings: {
-          resourceName: 'my-resource',
-          baseURL: 'https://example.openai.azure.com',
-          apiVersion: '2024-02-01',
-          useEntraId: true,
+        providers: {
+          openai: { enabled: true, apiKey: 'secret' },
+          anthropic: { enabled: false },
+          google: { enabled: false },
+          'azure-openai': {
+            enabled: true,
+            azureOpenaiSettings: {
+              resourceName: 'my-resource',
+              useEntraId: true,
+            },
+          },
         },
+        allowedModels: [
+          { provider: 'openai', modelId: 'gpt-4o', isDefault: true },
+        ],
       };
 
-      // The minimal-required shape: only the non-optional response fields
-      // (allowedModels is always an array — an empty one is valid; azureOpenaiSettings
-      // is always present — an empty object is valid).
-      const minimalResponse: AiSettingsResponse = {
-        aiEnabled: false,
-        allowedModels: [],
-        azureOpenaiSettings: {},
-        isApiKeySet: false,
-        useOnlyEnvVars: false,
-        isConfigured: false,
-      };
-
-      // An empty update is valid because every field is optional.
+      // Every top-level section is optional: omitted = "leave that section
+      // unchanged" (the design's PUT semantics), so an empty update is valid.
       const emptyUpdate: AiSettingsUpdateRequest = {};
 
-      expect(response.provider).toBe('azure-openai');
-      expect(response.allowedModels[0]?.isDefault).toBe(true);
-      expect(updateRequest.apiKey).toBe('secret');
-      expect(minimalResponse.aiEnabled).toBe(false);
+      // An allowedModels-only update is valid (env-only mode sends just this
+      // section — Req 5.3).
+      const modelsOnlyUpdate: AiSettingsUpdateRequest = {
+        allowedModels: [],
+      };
+
+      expect(
+        response.providers['azure-openai'].azureOpenaiSettings?.useEntraId,
+      ).toBe(true);
+      expect(response.providers.openai.isApiKeySet).toBe(true);
+      expect(response.allowedModels[0]?.provider).toBe('openai');
+      expect(updateRequest.providers?.openai.apiKey).toBe('secret');
       expect(emptyUpdate).toStrictEqual({});
+      expect(modelsOnlyUpdate.allowedModels).toStrictEqual([]);
     });
   });
 });
