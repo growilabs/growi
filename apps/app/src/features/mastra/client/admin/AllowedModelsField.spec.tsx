@@ -5,6 +5,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { FormProvider, useForm } from 'react-hook-form';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { mock } from 'vitest-mock-extended';
 
 vi.mock('next-i18next', () => ({
   useTranslation: () => ({
@@ -718,8 +719,9 @@ describe('AllowedModelsField', () => {
       const hookResult = swrResponse({ data: { modelIds: ['gpt-4o'] } });
       mockedUseSelectableModels.mockReturnValue(hookResult);
       mockedApiv3Post.mockResolvedValue(
-        // Only resolution matters to the component (the body is not read).
-        {} as Awaited<ReturnType<typeof apiv3Post>>,
+        // Only resolution matters to the component (the body is not read);
+        // mock<T>() keeps the stub type-checked without an assertion.
+        mock<Awaited<ReturnType<typeof apiv3Post>>>(),
       );
 
       renderComponent();
