@@ -29,7 +29,9 @@ import {
   type PromptInputMessage,
   PromptInputModelSelect,
   PromptInputModelSelectContent,
+  PromptInputModelSelectGroup,
   PromptInputModelSelectItem,
+  PromptInputModelSelectLabel,
   PromptInputModelSelectTrigger,
   PromptInputModelSelectValue,
   PromptInputSubmit,
@@ -42,6 +44,7 @@ import {
 import { Response } from '~/components/ai-elements/response';
 import { Button } from '~/components/ui/button';
 import { PageMentionInput } from '~/features/mastra/client/components/PageMentionInput';
+import { AI_PROVIDERS } from '~/features/mastra/interfaces/ai-provider';
 import type { CustomUIMessage } from '~/features/mastra/interfaces/chat-message';
 
 import {
@@ -64,6 +67,12 @@ import styles from './ChatSidebar.module.scss';
 
 const moduleClass = styles['grw-chat-sidebar'] ?? '';
 
+// Separator between the provider and the modelId in the closed trigger label,
+// matching the admin default-model selector ("provider · modelId"). U+00B7
+// MIDDLE DOT. Naming the selected model with its provider keeps the same modelId
+// under different providers distinguishable when the menu is closed (Req 4.2).
+const TRIGGER_SEPARATOR = ' · ';
+
 export const ChatSidebar = (): JSX.Element => {
   const { t } = useTranslation();
 
@@ -83,32 +92,52 @@ export const ChatSidebar = (): JSX.Element => {
   const swrInfiniteThreads = useSWRINFxRecentThreads();
   const { data: threadPages, mutate: mutateRecentThreads } = swrInfiniteThreads;
 
-  // Allowed models + the server-validated initial selection (Req 3.1/3.2/3.7).
+  // Available models across every enabled provider + the server-validated
+  // initial selection (Req 4.1/4.4/4.5). Each entry carries its owning provider
+  // for grouped display, and an opaque cross-provider `key` (the modelKey).
   const { data: chatModels } = useSWRxChatModels();
-  const modelIds = chatModels?.modelIds;
+  const models = chatModels?.models;
 
-  // Live model selection. Feature-local state only — no dedicated atom, no SSR
-  // hydration (design: read via /mastra/models, write via shared scheduleToPut).
-  // The server already rounds an out-of-allowlist / absent saved value to the
-  // default, so `selectedModelId` is trusted as-is for the initial value.
-  const [modelId, setModelId] = useState<string | undefined>(
-    () => chatModels?.selectedModelId,
+  // Live model selection, held as the opaque modelKey. Feature-local state only —
+  // no dedicated atom, no SSR hydration (design: read via /mastra/models, write
+  // via shared scheduleToPut). The server already rounds an out-of-allowlist /
+  // absent saved key to the effective default, so `selectedModelKey` is trusted
+  // as-is for the initial value.
+  const [modelKey, setModelKey] = useState<string | undefined>(
+    () => chatModels?.selectedModelKey,
   );
 
-  // `selectedModelId` may arrive after the first render (SWR resolves async).
+  // `selectedModelKey` may arrive after the first render (SWR resolves async).
   // Seed the local selection once it lands and the user has not picked yet.
   useEffect(() => {
-    if (modelId == null && chatModels?.selectedModelId != null) {
-      setModelId(chatModels.selectedModelId);
+    if (modelKey == null && chatModels?.selectedModelKey != null) {
+      setModelKey(chatModels.selectedModelKey);
     }
-  }, [modelId, chatModels?.selectedModelId]);
+  }, [modelKey, chatModels?.selectedModelKey]);
 
-  const handleModelChange = (nextModelId: string) => {
-    setModelId(nextModelId);
+  const handleModelChange = (nextModelKey: string) => {
+    setModelKey(nextModelKey);
     // Persist as the user's selection for next visit (debounced DB write, Req
-    // 3.6). The shared service owns the debounce + PUT; we only schedule it.
-    scheduleToPut({ aiChatSelectedModelId: nextModelId });
+    // 4.4 — unique down to the provider). The shared service owns the debounce +
+    // PUT; we only schedule it.
+    scheduleToPut({ aiChatSelectedModelKey: nextModelKey });
   };
+
+  // Group the available models by owning provider in fixed slot order, keeping
+  // allow-list order within each group and dropping providers that own no model
+  // (Req 4.1/4.2). Mirrors the admin selector's grouping.
+  const providerGroups = useMemo(
+    () =>
+      AI_PROVIDERS.map((provider) => ({
+        provider,
+        entries: (models ?? []).filter((entry) => entry.provider === provider),
+      })).filter((group) => group.entries.length > 0),
+    [models],
+  );
+
+  // The currently-selected entry, used to render the closed trigger as
+  // "provider · modelId" (Req 4.2).
+  const selectedEntry = models?.find((entry) => entry.key === modelKey);
 
   const headerLabel = resolveChatHeaderLabel(
     chatThreadId,
@@ -116,23 +145,23 @@ export const ChatSidebar = (): JSX.Element => {
     t('ai_sidebar.new_chat'),
   );
 
-  // The transport reads the current model through this ref at request time.
+  // The transport reads the current modelKey through this ref at request time.
   // `useChat` captures the transport when its internal Chat is created and only
   // re-creates that Chat when the chat `id` changes (NOT when the transport
   // instance changes), so re-creating the transport on a model change would have
   // no effect. A ref lets the (stable) transport always see the live selection.
-  const modelRef = useRef(modelId);
-  modelRef.current = modelId;
+  const modelKeyRef = useRef(modelKey);
+  modelKeyRef.current = modelKey;
 
   // Stable getter that reads the live selection from the ref on each request.
-  const getModelId = useCallback(() => modelRef.current, []);
+  const getModelKey = useCallback(() => modelKeyRef.current, []);
 
   // Stable for the session (chatThreadId is fixed). The factory attaches the
-  // threadId and the live modelId (via the getter) to EVERY request — incl.
-  // regenerate(), which sends no per-call body (Critical Issue 1, Req 3.3/3.4).
+  // threadId and the live modelKey (via the getter) to EVERY request — incl.
+  // regenerate(), which sends no per-call body (Critical Issue 1, Req 4.7).
   const transport = useMemo(
-    () => createMastraChatTransport(chatThreadId, getModelId),
-    [chatThreadId, getModelId],
+    () => createMastraChatTransport(chatThreadId, getModelKey),
+    [chatThreadId, getModelKey],
   );
 
   const {
@@ -371,12 +400,24 @@ export const ChatSidebar = (): JSX.Element => {
               </PromptInputBody>
               <PromptInputFooter>
                 <PromptInputModelSelect
-                  value={modelId ?? ''}
+                  value={modelKey ?? ''}
                   onValueChange={handleModelChange}
-                  disabled={modelIds == null}
+                  disabled={models == null}
                 >
                   <PromptInputModelSelectTrigger>
-                    <PromptInputModelSelectValue />
+                    {/*
+                      The grouped items render only the modelId, so the default
+                      <SelectValue/> would show a bare modelId — ambiguous when
+                      the same modelId exists under two providers. Render the
+                      selected entry as "provider · modelId" instead; fall back to
+                      the empty placeholder value before a selection resolves
+                      (Req 4.2).
+                    */}
+                    {selectedEntry != null ? (
+                      `${selectedEntry.provider}${TRIGGER_SEPARATOR}${selectedEntry.modelId}`
+                    ) : (
+                      <PromptInputModelSelectValue />
+                    )}
                   </PromptInputModelSelectTrigger>
                   {/*
                     The Radix Select dropdown is portaled to document.body — a
@@ -396,10 +437,20 @@ export const ChatSidebar = (): JSX.Element => {
                     `--bs-border-color`, the light gray used elsewhere in GROWI).
                   */}
                   <PromptInputModelSelectContent className="tw:z-[1070] tw:border-border">
-                    {modelIds?.map((id) => (
-                      <PromptInputModelSelectItem key={id} value={id}>
-                        {id}
-                      </PromptInputModelSelectItem>
+                    {providerGroups.map((group) => (
+                      <PromptInputModelSelectGroup key={group.provider}>
+                        <PromptInputModelSelectLabel>
+                          {group.provider}
+                        </PromptInputModelSelectLabel>
+                        {group.entries.map((entry) => (
+                          <PromptInputModelSelectItem
+                            key={entry.key}
+                            value={entry.key}
+                          >
+                            {entry.modelId}
+                          </PromptInputModelSelectItem>
+                        ))}
+                      </PromptInputModelSelectGroup>
                     ))}
                   </PromptInputModelSelectContent>
                 </PromptInputModelSelect>
