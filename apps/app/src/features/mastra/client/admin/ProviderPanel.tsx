@@ -2,7 +2,7 @@ import type { JSX, ReactNode } from 'react';
 import { useId } from 'react';
 import { useTranslation } from 'next-i18next';
 import { type FieldPath, useFormContext } from 'react-hook-form';
-import { Badge, FormGroup, FormText, Input, Label } from 'reactstrap';
+import { Badge, FormGroup, Input, Label } from 'reactstrap';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
 import { AzureOpenaiSettings } from './AzureOpenaiSettings';
@@ -95,6 +95,11 @@ export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
             </Badge>
           )}
         </div>
+        {/* Help text sits directly under the label (above the input), matching
+            the Models / Default model sections' description placement. */}
+        <p className="form-text text-muted mt-0 mb-2">
+          {t('ai_settings.api_key_help')}
+        </p>
         <Input
           id={apiKeyId}
           type="password"
@@ -105,7 +110,6 @@ export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
           }
           {...registerToInputProps(register(apiKeyPath))}
         />
-        <FormText>{t('ai_settings.api_key_help')}</FormText>
       </FormGroup>
 
       {/* Models slot: the caller injects the provider-scoped AllowedModelsField
