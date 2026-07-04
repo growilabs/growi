@@ -156,7 +156,7 @@
   - _Depends: 5.1, 5.3, 7.1_
 
 - [ ] 8. 統合検証
-- [ ] 8.1 機能横断の整合検証を行う
+- [x] 8.1 機能横断の整合検証を行う
   - 旧キー・旧フィールド(単一プロバイダ設定・旧選択フィールド)への参照が src から消えていることを検索で確認する
   - 完了条件: typecheck・lint・全テスト(`turbo run test --filter @growi/app`)がグリーン
   - _Requirements: 7.1, 7.2_
@@ -166,3 +166,7 @@
   - env-only モードで接続設定が読み取り専用・モデル編集が可能なことを確認する
   - 完了条件: 上記 3 シナリオが手動確認でパスし、結果が記録される
   - _Requirements: 4.3, 5.2, 5.3, 6.1, 6.2, 6.4_
+
+## Implementation Notes
+
+- 8.1: 旧キー/旧フィールド参照は src から消滅(grep clean)。typecheck 0・biome 0(2144 files)・全テスト 3646 passed。残 4 failed は `features/growi-vault/__tests__/clone-e2e.integ.ts` の git サーバ infra 失敗(`vault.git` not found / bootstrap 未完了)のみで、本 feature とは無結合(growi-vault は変更ファイルを一切 import しない)。mastra/config-manager/user-ui-settings のテストは全て green。
