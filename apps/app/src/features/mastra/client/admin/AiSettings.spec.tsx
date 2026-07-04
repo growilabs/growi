@@ -165,6 +165,48 @@ describe('AiSettings', () => {
       ).toBeInTheDocument();
       expect(screen.queryByDisplayValue('gpt-4o')).not.toBeInTheDocument();
     });
+
+    it('keeps each provider enable toggle independent across tab switches', async () => {
+      // Locks the intended contract: each tab's enable switch reflects its OWN
+      // provider's state, and saving persists per-provider enabled flags
+      // independently. (The related browser-only symptom — an uncontrolled switch's
+      // DOM `checked` leaking across a reused panel subtree — is not reproducible in
+      // happy-dom, which re-syncs the input; the AiSettings `key={activeProvider}`
+      // remount guards it in the browser.) Fixture: openai enabled, the rest off.
+      const user = userEvent.setup();
+      render(<AiSettings />);
+
+      // openai tab: its enable switch reflects openai.enabled === true.
+      expect(
+        screen.getByLabelText('ai_settings.provider_enabled_label'),
+      ).toBeChecked();
+
+      // Switch to anthropic (enabled === false): its switch must show ITS OWN
+      // state (off), not the openai switch's on state carried over by a reused node.
+      await user.click(screen.getByTestId('provider-tab-anthropic'));
+      const anthropicSwitch = screen.getByLabelText(
+        'ai_settings.provider_enabled_label',
+      );
+      expect(anthropicSwitch).not.toBeChecked();
+
+      // Enable anthropic, return to openai — openai stays on (independent state).
+      await user.click(anthropicSwitch);
+      await user.click(screen.getByTestId('provider-tab-openai'));
+      expect(
+        screen.getByLabelText('ai_settings.provider_enabled_label'),
+      ).toBeChecked();
+
+      // Persisted state is per-provider: openai + anthropic on, the rest off.
+      await submitForm();
+      await waitFor(() => {
+        expect(save).toHaveBeenCalledTimes(1);
+      });
+      const body = save.mock.calls[0][0];
+      expect(body.providers?.openai.enabled).toBe(true);
+      expect(body.providers?.anthropic.enabled).toBe(true);
+      expect(body.providers?.google.enabled).toBe(false);
+      expect(body.providers?.['azure-openai'].enabled).toBe(false);
+    });
   });
 
   describe('update request shape', () => {

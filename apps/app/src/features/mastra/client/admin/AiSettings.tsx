@@ -135,7 +135,14 @@ export const AiSettings = (): JSX.Element | null => {
           apiKeySet={apiKeySetMap}
         />
 
+        {/* key={activeProvider}: remount the panel per tab. Its enable switch and
+            API-key input are UNCONTROLLED (react-hook-form register), so without a
+            per-provider key React reuses the same DOM nodes across tab switches and
+            an input's DOM state (e.g. the switch's checked) leaks from the
+            previously-viewed provider instead of reflecting the active one.
+            Remounting re-initialises each input from its own provider's form value. */}
         <ProviderPanel
+          key={activeProvider}
           provider={activeProvider}
           isApiKeySet={data.providers[activeProvider].isApiKeySet}
           useOnlyEnvVars={useOnlyEnvVars}
