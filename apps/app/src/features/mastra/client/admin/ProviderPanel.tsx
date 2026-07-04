@@ -64,7 +64,9 @@ export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
     `providers.${provider}.apiKey` as FieldPath<AiSettingsFormValues>;
 
   return (
-    <div>
+    // `mt-3`: the panel mounts directly under the provider tab bar; without a top
+    // gap the enable toggle sits too close to the tabs.
+    <div className="mt-3">
       <FormGroup switch className="mb-3">
         <Input
           id={enabledId}

@@ -128,10 +128,14 @@ export const DefaultModelSelector = (
         {t('ai_settings.default_model_help')}
       </p>
       <Dropdown isOpen={isOpen} toggle={toggle}>
+        {/* `outline-secondary` (not `light`): a solid light button keeps a white
+            background under the dark admin theme and reads as out of place. The
+            outline variant is theme-adaptive — transparent background + a neutral
+            border that follows `data-bs-theme`. */}
         <DropdownToggle
           caret
-          color="light"
-          className="border"
+          outline
+          color="secondary"
           disabled={disabled}
           data-testid="default-model-toggle"
         >
@@ -151,7 +155,7 @@ export const DefaultModelSelector = (
                   <DropdownItem
                     key={entry.index}
                     active={entry.model.isDefault === true}
-                    className="font-monospace"
+                    className="font-monospace py-2"
                     data-testid={`default-model-item-${entry.index}`}
                     onClick={() => selectDefault(entry.index)}
                   >
