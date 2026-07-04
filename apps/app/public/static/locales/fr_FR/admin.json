@@ -443,6 +443,7 @@
   "ai_settings": {
     "ai_settings": "Paramètres IA",
     "ai_enabled_label": "Activer les fonctionnalités IA",
+    "providers_section_title": "Fournisseurs",
     "provider_enabled_label": "Activer ce fournisseur",
     "provider_configured": "Configuré",
     "provider_not_configured": "Non configuré",

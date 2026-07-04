@@ -443,6 +443,7 @@
   "ai_settings": {
     "ai_settings": "AI Settings",
     "ai_enabled_label": "Enable AI features",
+    "providers_section_title": "Providers",
     "provider_enabled_label": "Enable this provider",
     "provider_configured": "Configured",
     "provider_not_configured": "Not configured",

@@ -126,6 +126,9 @@ export const AiSettings = (): JSX.Element | null => {
         {/* Model setting: stays editable even under env-only (R5.3). */}
         <DefaultModelSelector />
 
+        <h2 className="h5 fw-bold mt-4 mb-2">
+          {t('ai_settings.providers_section_title')}
+        </h2>
         <ProviderTabs
           activeProvider={activeProvider}
           onSelectProvider={setActiveProvider}

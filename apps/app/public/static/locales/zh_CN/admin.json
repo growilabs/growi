@@ -452,6 +452,7 @@
   "ai_settings": {
     "ai_settings": "AI 设置",
     "ai_enabled_label": "启用 AI 功能",
+    "providers_section_title": "提供商",
     "provider_enabled_label": "启用此提供商",
     "provider_configured": "已配置",
     "provider_not_configured": "未配置",

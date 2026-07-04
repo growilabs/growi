@@ -443,6 +443,7 @@
   "ai_settings": {
     "ai_settings": "AI 설정",
     "ai_enabled_label": "AI 기능 사용",
+    "providers_section_title": "공급자",
     "provider_enabled_label": "이 공급자 사용",
     "provider_configured": "설정됨",
     "provider_not_configured": "설정되지 않음",

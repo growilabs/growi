@@ -452,6 +452,7 @@
   "ai_settings": {
     "ai_settings": "AI 設定",
     "ai_enabled_label": "AI 機能を有効にする",
+    "providers_section_title": "プロバイダー",
     "provider_enabled_label": "このプロバイダーを有効にする",
     "provider_configured": "設定済み",
     "provider_not_configured": "未設定",
