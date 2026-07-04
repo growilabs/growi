@@ -269,7 +269,10 @@ export const AllowedModelsField = (
   return (
     <FormGroup className="mb-3">
       <div className="d-flex align-items-center mt-4 mb-1">
-        <h3 className="h5 fw-bold m-0">
+        {/* Tab-panel subsection heading — fs-5 (1.25rem), one step below the
+            "Providers" section (fs-4) and matching the sibling "Azure OpenAI
+            settings" subsection. */}
+        <h3 className="fs-5 fw-bold m-0">
           {t('ai_settings.models_section_title')}
         </h3>
         <Button

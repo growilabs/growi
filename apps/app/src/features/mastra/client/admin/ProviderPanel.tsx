@@ -75,14 +75,14 @@ export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
           disabled={useOnlyEnvVars}
           {...registerToInputProps(register(enabledPath))}
         />
-        <Label htmlFor={enabledId} className="ms-2">
+        <Label htmlFor={enabledId} className="ms-2 fw-bold">
           {t('ai_settings.provider_enabled_label')}
         </Label>
       </FormGroup>
 
       <FormGroup className="mb-3">
         <div className="d-flex align-items-center gap-2 mb-1">
-          <Label for={apiKeyId} className="mb-0">
+          <Label for={apiKeyId} className="mb-0 fw-bold">
             {t('ai_settings.api_key_label')}
           </Label>
           {isApiKeySet ? (

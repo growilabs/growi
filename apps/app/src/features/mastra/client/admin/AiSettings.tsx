@@ -126,7 +126,10 @@ export const AiSettings = (): JSX.Element | null => {
         {/* Model setting: stays editable even under env-only (R5.3). */}
         <DefaultModelSelector />
 
-        <h2 className="h5 fw-bold mt-4 mb-2">
+        {/* Section heading — one level below the page title (h1.fs-2, 2rem):
+            fs-4 (1.5rem). The tab panel's subsection headings (Models / Azure
+            OpenAI settings) are a further step down at fs-5. */}
+        <h2 className="fs-4 fw-bold mt-4 mb-2">
           {t('ai_settings.providers_section_title')}
         </h2>
         <ProviderTabs

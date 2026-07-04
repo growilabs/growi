@@ -50,12 +50,15 @@ export const AzureOpenaiSettings = (
 
   return (
     <div>
-      <h2 className="border-bottom my-4 admin-setting-header">
+      {/* Tab-panel subsection heading — same level as the "Models" section, so it
+          uses the identical fs-5 fw-bold. Was an <h2>.admin-setting-header, which
+          rendered at the <h2> size (~2rem) and clashed with the page title. */}
+      <h3 className="fs-5 fw-bold mt-4 mb-2">
         {t('ai_settings.azure_section_title')}
-      </h2>
+      </h3>
 
       <FormGroup className="mb-3">
-        <Label for={resourceNameId}>
+        <Label for={resourceNameId} className="fw-bold">
           {t('ai_settings.azure_resource_name_label')}
         </Label>
         <Input
@@ -70,7 +73,9 @@ export const AzureOpenaiSettings = (
       </FormGroup>
 
       <FormGroup className="mb-3">
-        <Label for={baseUrlId}>{t('ai_settings.azure_base_url_label')}</Label>
+        <Label for={baseUrlId} className="fw-bold">
+          {t('ai_settings.azure_base_url_label')}
+        </Label>
         <Input
           id={baseUrlId}
           type="text"
@@ -83,7 +88,7 @@ export const AzureOpenaiSettings = (
       </FormGroup>
 
       <FormGroup className="mb-3">
-        <Label for={apiVersionId}>
+        <Label for={apiVersionId} className="fw-bold">
           {t('ai_settings.azure_api_version_label')}
         </Label>
         <Input
@@ -107,7 +112,7 @@ export const AzureOpenaiSettings = (
             register('providers.azure-openai.azureOpenaiSettings.useEntraId'),
           )}
         />
-        <Label htmlFor={useEntraIdId} className="ms-2">
+        <Label htmlFor={useEntraIdId} className="ms-2 fw-bold">
           {t('ai_settings.azure_use_entra_id_label')}
         </Label>
       </FormGroup>
