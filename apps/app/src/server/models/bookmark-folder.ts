@@ -43,6 +43,24 @@ getOrCreateModel('BookmarkFolder', bookmarkFolderSchema);
 
 export const extension = Prisma.defineExtension((client) => {
   return client.$extends({
+    result: {
+      bookmarkfolders: {
+        // for backward compatibility with mongoose
+        _id: {
+          needs: { id: true },
+          compute(model) {
+            return model.id;
+          },
+        },
+        // for backward compatibility with mongoose
+        __v: {
+          needs: { v: true },
+          compute(model) {
+            return model.v;
+          },
+        },
+      },
+    },
     model: {
       bookmarkfolders: {
         async createByParameters(params: IBookmarkFolder) {
