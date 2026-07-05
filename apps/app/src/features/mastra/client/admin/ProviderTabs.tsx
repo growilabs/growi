@@ -5,6 +5,7 @@ import { Nav, NavItem, NavLink } from 'reactstrap';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
 import { AI_PROVIDERS } from '../../interfaces/ai-provider';
+import { evaluateProviderAvailability } from '../../interfaces/provider-availability-rule';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
 
 export interface ProviderTabsProps {
@@ -15,7 +16,7 @@ export interface ProviderTabsProps {
   /**
    * Whether each provider already has a stored API key, from the GET response.
    * The form's `apiKey` field is write-only and cannot reveal this (R1.8/R1.9),
-   * so the status must be passed in.
+   * so the saved-key status must be passed in.
    */
   readonly apiKeySet: Record<AiProvider, boolean>;
 }
@@ -24,18 +25,19 @@ export interface ProviderTabsProps {
  * The fixed provider tab bar (R1.1): always exactly the four supported providers,
  * never a dynamic add/remove. Each tab shows the provider name (rendered as the
  * raw provider key, matching the DefaultModelSelector/AllowedModelsField
- * convention) and a status dot that hints whether the provider is *configured*.
+ * convention) and a status dot that reflects the provider's *availability*.
  *
- * "Configured" is a UI hint only — the authoritative availability check lives
- * server-side in `provider-availability`. The rule here is intentionally minimal:
- *   - azure-openai: has a credential (`apiKeySet['azure-openai']` OR Entra ID) AND
- *     an endpoint (resourceName or baseURL) — mirrors the per-provider "configured"
- *     predicate the server uses for Azure.
- *   - every other provider: `apiKeySet[provider]`.
- * It deliberately does NOT factor in the enabled toggle: the dot reflects
- * connection readiness, not whether the admin has switched the provider on.
+ * Availability is computed from live form values through the SAME pure rule the
+ * server uses (`evaluateProviderAvailability`), so the dot reacts to unsaved edits
+ * and cannot drift from the server's judgement. `hasApiKey` here is the saved-key
+ * flag (`apiKeySet[provider]`, which reflects the merged DB??env view) OR a
+ * non-empty typed key in the form. The dot has three states:
+ *   - available (enabled ∧ configured) -> green (bg-success)
+ *   - disabled (provider toggle off)   -> gray (bg-secondary)
+ *   - misconfigured (enabled but a required credential/endpoint is missing)
+ *                                       -> amber (bg-warning)
  *
- * The dot's on/off state is exposed via `data-configured` (and a title) so it is
+ * The state is exposed via `data-availability` (and a title) so it is
  * deterministically assertable, not encoded in a CSS class alone.
  */
 export const ProviderTabs = (props: ProviderTabsProps): JSX.Element => {
@@ -43,31 +45,45 @@ export const ProviderTabs = (props: ProviderTabsProps): JSX.Element => {
   const { t } = useTranslation('admin');
   const { control } = useFormContext<AiSettingsFormValues>();
 
-  // Watch the azure connection settings so the azure dot reflects live edits to
-  // the endpoint / Entra ID toggle (the endpoint is not derivable from apiKeySet).
-  const azureSettings = useWatch<
-    AiSettingsFormValues,
-    'providers.azure-openai.azureOpenaiSettings'
-  >({ control, name: 'providers.azure-openai.azureOpenaiSettings' });
-
-  const isConfigured = (provider: AiProvider): boolean => {
-    if (provider === 'azure-openai') {
-      const hasEndpoint =
-        (azureSettings?.resourceName ?? '').trim() !== '' ||
-        (azureSettings?.baseURL ?? '').trim() !== '';
-      const hasCredential =
-        apiKeySet['azure-openai'] === true ||
-        (azureSettings?.useEntraId ?? false);
-      return hasEndpoint && hasCredential;
-    }
-    return apiKeySet[provider] === true;
-  };
+  // Watch every provider slot so each dot reflects live edits to the enable
+  // toggle, the typed API key, and (azure) the endpoint / Entra ID toggle.
+  const providers = useWatch<AiSettingsFormValues, 'providers'>({
+    control,
+    name: 'providers',
+  });
 
   return (
     <Nav tabs role="tablist">
       {AI_PROVIDERS.map((provider) => {
         const active = provider === activeProvider;
-        const configured = isConfigured(provider);
+        const providerFormValue = providers?.[provider];
+        const availability = evaluateProviderAvailability({
+          provider,
+          enabled: providerFormValue?.enabled === true,
+          hasApiKey:
+            apiKeySet[provider] === true ||
+            (providerFormValue?.apiKey ?? '').trim() !== '',
+          azureOpenaiSettings: providerFormValue?.azureOpenaiSettings,
+        });
+
+        const dot = availability.available
+          ? {
+              state: 'available' as const,
+              className: 'bg-success',
+              title: t('ai_settings.provider_status_available'),
+            }
+          : availability.reason === 'disabled'
+            ? {
+                state: 'disabled' as const,
+                className: 'bg-secondary',
+                title: t('ai_settings.provider_status_disabled'),
+              }
+            : {
+                state: 'misconfigured' as const,
+                className: 'bg-warning',
+                title: t('ai_settings.provider_status_misconfigured'),
+              };
+
         return (
           <NavItem key={provider}>
             <NavLink
@@ -83,15 +99,9 @@ export const ProviderTabs = (props: ProviderTabsProps): JSX.Element => {
               <span
                 aria-hidden="true"
                 data-testid={`provider-tab-dot-${provider}`}
-                data-configured={String(configured)}
-                title={
-                  configured
-                    ? t('ai_settings.provider_configured')
-                    : t('ai_settings.provider_not_configured')
-                }
-                className={`d-inline-block rounded-circle ${
-                  configured ? 'bg-success' : 'bg-secondary'
-                }`}
+                data-availability={dot.state}
+                title={dot.title}
+                className={`d-inline-block rounded-circle ${dot.className}`}
                 style={{ width: '7px', height: '7px' }}
               />
             </NavLink>

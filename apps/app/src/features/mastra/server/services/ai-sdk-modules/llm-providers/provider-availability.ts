@@ -1,6 +1,11 @@
 import type { AiProvider } from '~/features/mastra/interfaces/ai-provider';
 import { AI_PROVIDERS } from '~/features/mastra/interfaces/ai-provider';
 import type { AllowedModel } from '~/features/mastra/interfaces/allowed-model';
+import type {
+  ProviderAvailability,
+  ProviderUnavailableReason,
+} from '~/features/mastra/interfaces/provider-availability-rule';
+import { evaluateProviderAvailability } from '~/features/mastra/interfaces/provider-availability-rule';
 
 import { getAllowedModels, getApiKey, getProviderSettings } from './config';
 import { clearAvailabilityLogDedup, warnOnce } from './warn-dedup';
@@ -12,28 +17,21 @@ import { clearAvailabilityLogDedup, warnOnce } from './warn-dedup';
 // effective-model-key) derives from here, so the enabled-and-configured judgement
 // cannot drift between call sites (design D3).
 //
+// The rule itself lives in the client-safe pure module
+// `~/features/mastra/interfaces/provider-availability-rule` so the server and the
+// admin client share ONE definition. This module is the server adapter: it GATHERS
+// the inputs from the config accessors, DELEGATES the verdict to the pure rule, and
+// owns the runtime side effect (the dedup'd misconfiguration warn).
+//
 // Dependency direction: config accessor -> provider-availability -> effective-key
 // resolution. This module therefore imports the config accessors (never the other
 // way round) and only shares the warn-dedup registry with them (design
 // "Allowed Dependencies"). It must NOT import effective-model-key or
 // is-ai-configured — those import IT.
 
-/**
- * Why an enabled provider is nonetheless unavailable.
- * - `disabled`: the admin has not turned the provider on (enabled !== true). This
- *   is the administrator's intent, so it is NOT logged (Req 1.6).
- * - `missing-api-key`: a key-required provider has no API key (Req 6.1 — warned).
- * - `missing-azure-endpoint`: azure-openai has neither resourceName nor baseURL
- *   (Req 6.1 — warned).
- */
-export type ProviderUnavailableReason =
-  | 'disabled'
-  | 'missing-api-key'
-  | 'missing-azure-endpoint';
-
-type ProviderAvailability =
-  | { available: true }
-  | { available: false; reason: ProviderUnavailableReason };
+// Re-exported so server consumers/tests can keep importing the availability types
+// from this module; the rule (and its types) now live in the interfaces layer.
+export type { ProviderAvailability, ProviderUnavailableReason };
 
 // Emit the misconfiguration warn for an enabled-but-broken provider, deduplicated
 // per (provider, reason) so a per-request availability check does not flood the log
@@ -51,35 +49,6 @@ const warnMisconfigured = (
   );
 };
 
-// azure-openai is the one non-uniform provider: it needs an endpoint (resourceName
-// or baseURL) regardless of auth method, and its API key is waived under Microsoft
-// Entra ID (ambient managed identity). This mirrors resolveAzureOpenaiModel's
-// real success/throw path so availability agrees with what the resolver would do
-// (endpoint checked first, so a key-present-but-endpoint-missing deployment reads
-// as missing-azure-endpoint, not missing-api-key).
-const getAzureAvailability = (): ProviderAvailability => {
-  const azureOpenaiSettings =
-    getProviderSettings('azure-openai')?.azureOpenaiSettings;
-
-  if (
-    azureOpenaiSettings?.resourceName == null &&
-    azureOpenaiSettings?.baseURL == null
-  ) {
-    warnMisconfigured('azure-openai', 'missing-azure-endpoint');
-    return { available: false, reason: 'missing-azure-endpoint' };
-  }
-
-  if (
-    azureOpenaiSettings.useEntraId !== true &&
-    getApiKey('azure-openai') == null
-  ) {
-    warnMisconfigured('azure-openai', 'missing-api-key');
-    return { available: false, reason: 'missing-api-key' };
-  }
-
-  return { available: true };
-};
-
 /**
  * Availability of a single provider: enabled AND configured. Preconditions: none
  * (safe on fully-unset config). A `disabled` verdict is silent; a misconfiguration
@@ -88,21 +57,24 @@ const getAzureAvailability = (): ProviderAvailability => {
 export const getProviderAvailability = (
   provider: AiProvider,
 ): ProviderAvailability => {
-  if (getProviderSettings(provider)?.enabled !== true) {
-    return { available: false, reason: 'disabled' };
+  const enabled = getProviderSettings(provider)?.enabled === true;
+  const hasApiKey = getApiKey(provider) != null;
+  // Only consulted for the azure-openai verdict; harmless (undefined) otherwise.
+  const azureOpenaiSettings =
+    getProviderSettings('azure-openai')?.azureOpenaiSettings;
+
+  const availability = evaluateProviderAvailability({
+    provider,
+    enabled,
+    hasApiKey,
+    azureOpenaiSettings,
+  });
+
+  if (!availability.available && availability.reason !== 'disabled') {
+    warnMisconfigured(provider, availability.reason);
   }
 
-  if (provider === 'azure-openai') {
-    return getAzureAvailability();
-  }
-
-  // Key-based providers (openai / anthropic / google) require only an API key.
-  if (getApiKey(provider) == null) {
-    warnMisconfigured(provider, 'missing-api-key');
-    return { available: false, reason: 'missing-api-key' };
-  }
-
-  return { available: true };
+  return availability;
 };
 
 /**

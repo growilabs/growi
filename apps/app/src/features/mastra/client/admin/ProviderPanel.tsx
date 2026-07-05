@@ -1,10 +1,11 @@
 import type { JSX, ReactNode } from 'react';
 import { useId } from 'react';
 import { useTranslation } from 'next-i18next';
-import { type FieldPath, useFormContext } from 'react-hook-form';
-import { Badge, FormGroup, Input, Label } from 'reactstrap';
+import { type FieldPath, useFormContext, useWatch } from 'react-hook-form';
+import { Alert, Badge, FormGroup, Input, Label } from 'reactstrap';
 
 import type { AiProvider } from '../../interfaces/ai-provider';
+import { evaluateProviderAvailability } from '../../interfaces/provider-availability-rule';
 import { AzureOpenaiSettings } from './AzureOpenaiSettings';
 import type { AiSettingsFormValues } from './ai-settings-form-values';
 import { registerToInputProps } from './register-to-input-props';
@@ -38,6 +39,9 @@ export interface ProviderPanelProps {
 /**
  * One provider's settings panel (mock: ProviderPanel). Renders, in order:
  *   - the enable/disable toggle bound to `providers.<provider>.enabled` (R1.5),
+ *   - an inline warning when the provider is enabled but misconfigured (a required
+ *     API key or, for azure, an endpoint is missing) — computed from live form
+ *     values via the shared availability rule; hidden for available/disabled,
  *   - the write-only API key input with a "(configured)" placeholder and a
  *     "API key set / not set" chip when a key is already stored (R1.8),
  *   - the models slot (`children` — filled by the caller in a later task),
@@ -50,7 +54,7 @@ export interface ProviderPanelProps {
 export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
   const { provider, isApiKeySet, useOnlyEnvVars, children } = props;
   const { t } = useTranslation('admin');
-  const { register } = useFormContext<AiSettingsFormValues>();
+  const { register, control } = useFormContext<AiSettingsFormValues>();
 
   const enabledId = useId();
   const apiKeyId = useId();
@@ -62,6 +66,30 @@ export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
     `providers.${provider}.enabled` as FieldPath<AiSettingsFormValues>;
   const apiKeyPath =
     `providers.${provider}.apiKey` as FieldPath<AiSettingsFormValues>;
+
+  // Watch the provider slots so the misconfiguration warning reacts to unsaved
+  // edits (toggle / typed key / azure endpoint). Availability is computed through
+  // the SAME pure rule the server uses, so the warning cannot drift from what the
+  // server would exclude. `hasApiKey` = the saved-key flag OR a non-empty typed
+  // key in the form.
+  const providers = useWatch<AiSettingsFormValues, 'providers'>({
+    control,
+    name: 'providers',
+  });
+  const providerFormValue = providers?.[provider];
+  const availability = evaluateProviderAvailability({
+    provider,
+    enabled: providerFormValue?.enabled === true,
+    hasApiKey: isApiKeySet || (providerFormValue?.apiKey ?? '').trim() !== '',
+    azureOpenaiSettings: providerFormValue?.azureOpenaiSettings,
+  });
+  // Only enabled-but-misconfigured providers warrant an inline warning; a disabled
+  // provider is admin intent, and an available one needs nothing. The narrowed
+  // reason (undefined otherwise) drives both the visibility and the message.
+  const misconfiguredReason =
+    !availability.available && availability.reason !== 'disabled'
+      ? availability.reason
+      : undefined;
 
   return (
     // `mt-3`: the panel mounts directly under the provider tab bar; without a top
@@ -79,6 +107,19 @@ export const ProviderPanel = (props: ProviderPanelProps): JSX.Element => {
           {t('ai_settings.provider_enabled_label')}
         </Label>
       </FormGroup>
+
+      {misconfiguredReason != null && (
+        <Alert
+          color="warning"
+          fade={false}
+          className="mb-3"
+          data-testid="provider-misconfigured-warning"
+        >
+          {misconfiguredReason === 'missing-azure-endpoint'
+            ? t('ai_settings.provider_warning_missing_azure_endpoint')
+            : t('ai_settings.provider_warning_missing_api_key')}
+        </Alert>
+      )}
 
       <FormGroup className="mb-3">
         <div className="d-flex align-items-center gap-2 mb-1">

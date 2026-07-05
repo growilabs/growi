@@ -217,6 +217,66 @@ describe('ProviderPanel', () => {
     });
   });
 
+  describe('misconfiguration warning', () => {
+    it('shows the missing-api-key warning when enabled without a key', () => {
+      // Act: enabled but no stored key and nothing typed.
+      renderComponent({
+        provider: 'openai',
+        isApiKeySet: false,
+        formValues: buildFormValues({ openai: { enabled: true } }),
+      });
+
+      // Assert: the warning surfaces the missing-key message.
+      expect(
+        screen.getByTestId('provider-misconfigured-warning'),
+      ).toHaveTextContent('ai_settings.provider_warning_missing_api_key');
+    });
+
+    it('shows the missing-azure-endpoint warning for azure enabled without an endpoint', () => {
+      // Act: azure enabled but neither resourceName nor baseURL set.
+      renderComponent({
+        provider: 'azure-openai',
+        isApiKeySet: false,
+        formValues: buildFormValues({ 'azure-openai': { enabled: true } }),
+      });
+
+      // Assert: endpoint is checked first, so the endpoint message wins.
+      expect(
+        screen.getByTestId('provider-misconfigured-warning'),
+      ).toHaveTextContent(
+        'ai_settings.provider_warning_missing_azure_endpoint',
+      );
+    });
+
+    it('does not show the warning when the provider is available (enabled with a key)', () => {
+      // Act
+      renderComponent({
+        provider: 'openai',
+        isApiKeySet: true,
+        formValues: buildFormValues({ openai: { enabled: true } }),
+      });
+
+      // Assert
+      expect(
+        screen.queryByTestId('provider-misconfigured-warning'),
+      ).not.toBeInTheDocument();
+    });
+
+    it('does not show the warning when the provider is disabled', () => {
+      // Act: toggle off — a disabled provider is admin intent, not a fault.
+      renderComponent({
+        provider: 'openai',
+        isApiKeySet: false,
+        formValues: buildFormValues({ openai: { enabled: false } }),
+      });
+
+      // Assert
+      expect(
+        screen.queryByTestId('provider-misconfigured-warning'),
+      ).not.toBeInTheDocument();
+    });
+  });
+
   describe('models slot', () => {
     it('renders the passed children at the models insertion point', () => {
       // Act
