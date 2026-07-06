@@ -238,10 +238,22 @@ describe('resolveMastraModel', () => {
       expect(anthropicResolver).toHaveBeenCalledTimes(2);
     });
 
-    it('is a no-op when nothing is cached (safe to call before the first resolve)', async () => {
-      const { clearResolvedMastraModelCache } = await loadResolver();
+    it('is safe to call before the first resolve: a later resolve still builds once and caches normally', async () => {
+      // Contract: clearing a never-populated cache must not corrupt caching. A bare
+      // `not.toThrow()` can never fail (Map.clear() on an empty map cannot throw),
+      // so instead drive the observable behavior — clear first, then resolve twice
+      // and assert the model builds exactly once and the second call returns the
+      // cached instance.
+      resolveEffectiveModelKey.mockReturnValue('openai/gpt-4');
+      const { resolveMastraModel, clearResolvedMastraModelCache } =
+        await loadResolver();
 
-      expect(() => clearResolvedMastraModelCache()).not.toThrow();
+      clearResolvedMastraModelCache();
+      const first = resolveMastraModel('openai/gpt-4');
+      const second = resolveMastraModel('openai/gpt-4');
+
+      expect(openaiResolver).toHaveBeenCalledTimes(1);
+      expect(second).toBe(first);
     });
   });
 });
