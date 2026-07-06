@@ -85,6 +85,17 @@ const buildReqRes = () => {
   return { req, res };
 };
 
+// Invoke the route handler with the typed req/res mocks. The handler is pulled from
+// the factory as a generic express RequestHandler, which erases its real
+// (Req, ApiV3Response) signature; the single cast that bridges the narrow mocks to
+// that signature is confined HERE, so the call sites stay cast-free.
+const invoke = (
+  req: ReturnType<typeof buildReqRes>['req'],
+  res: ReturnType<typeof buildReqRes>['res'],
+): void | Promise<void> =>
+  // biome-ignore lint/suspicious/noExplicitAny: one confined cast at the invoke boundary
+  getHandler()(req as any, res as any, vi.fn());
+
 // Set the per-user persisted selection the handler will read (a modelKey).
 const mockSavedSelection = (aiChatSelectedModelKey?: string) => {
   lean.mockResolvedValue(
@@ -115,8 +126,7 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     expect(res.apiv3).toHaveBeenCalledTimes(1);
     const payload = res.apiv3.mock.calls[0][0];
@@ -139,8 +149,7 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     const payload = res.apiv3.mock.calls[0][0];
     for (const entry of payload.models) {
@@ -157,8 +166,7 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
     mockSavedSelection('openai/gpt-4o');
 
     const { req, res } = buildReqRes();
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     const payload = res.apiv3.mock.calls[0][0];
     expect(payload.selectedModelKey).toBe('openai/gpt-4o');
@@ -171,8 +179,7 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     const payload = res.apiv3.mock.calls[0][0];
     expect(payload.selectedModelKey).toBe('anthropic/claude-3-5-sonnet');
@@ -185,8 +192,7 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
     mockSavedSelection('garbage-without-separator');
 
     const { req, res } = buildReqRes();
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     const payload = res.apiv3.mock.calls[0][0];
     expect(payload.selectedModelKey).toBe('anthropic/claude-3-5-sonnet');
@@ -200,8 +206,7 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
     mockSavedSelection('google/gemini-1.5-pro');
 
     const { req, res } = buildReqRes();
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     const payload = res.apiv3.mock.calls[0][0];
     expect(payload.selectedModelKey).toBe('anthropic/claude-3-5-sonnet');
@@ -219,8 +224,7 @@ describe('get-models handler (Req 4.1, 4.2, 4.4, 4.5)', () => {
     mockSavedSelection(undefined);
 
     const { req, res } = buildReqRes();
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     expect(res.apiv3).not.toHaveBeenCalled();
     expect(res.apiv3Err).toHaveBeenCalledTimes(1);

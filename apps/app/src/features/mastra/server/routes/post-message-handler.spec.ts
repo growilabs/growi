@@ -136,6 +136,17 @@ const buildReqRes = (modelKey?: string) => {
   return { req, res };
 };
 
+// Invoke the route handler with the typed req/res mocks. The handler is pulled from
+// the factory as a generic express RequestHandler, which erases its real
+// (Req, ApiV3Response) signature; the single cast that bridges the narrow mocks to
+// that signature is confined HERE, so the call sites stay cast-free.
+const invoke = (
+  req: ReturnType<typeof buildReqRes>['req'],
+  res: ReturnType<typeof buildReqRes>['res'],
+): void | Promise<void> =>
+  // biome-ignore lint/suspicious/noExplicitAny: one confined cast at the invoke boundary
+  getHandler()(req as any, res as any, vi.fn());
+
 beforeEach(() => {
   vi.clearAllMocks();
   getMemory.mockResolvedValue({});
@@ -157,8 +168,7 @@ describe('post-message handler — model selection (Req 4.3, 4.6)', () => {
     getProviderOptionsForModel.mockReturnValue(options);
 
     const { req, res } = buildReqRes('openai/o3');
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     // The route rounds the request's modelKey through resolveEffectiveModelKey
     // exactly once (the single checkpoint), then threads the resolved key everywhere.
@@ -183,8 +193,7 @@ describe('post-message handler — model selection (Req 4.3, 4.6)', () => {
     getProviderOptionsForModel.mockReturnValue(defaultOptions);
 
     const { req, res } = buildReqRes('anthropic/not-allowed');
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     expect(resolveEffectiveModelKey).toHaveBeenCalledWith(
       'anthropic/not-allowed',
@@ -205,8 +214,7 @@ describe('post-message handler — model selection (Req 4.3, 4.6)', () => {
     getProviderOptionsForModel.mockReturnValue(defaultOptions);
 
     const { req, res } = buildReqRes(undefined);
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     expect(resolveEffectiveModelKey).toHaveBeenCalledWith(undefined);
     expect(getProviderOptionsForModel).toHaveBeenCalledWith(DEFAULT_KEY);
@@ -221,8 +229,7 @@ describe('post-message handler — model selection (Req 4.3, 4.6)', () => {
     getProviderOptionsForModel.mockReturnValue({});
 
     const { req, res } = buildReqRes('openai/o3');
-    // biome-ignore lint/suspicious/noExplicitAny: invoking the express handler with mocked req/res
-    await getHandler()(req as any, res as any, vi.fn());
+    await invoke(req, res);
 
     // createUIMessageStream receives an onError hook; the handler must route it
     // through resolveChatErrorMessage (the existing, unchanged sanitizer).
