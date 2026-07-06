@@ -316,6 +316,18 @@ describe('putAiSettings (multi-provider)', () => {
       expect(updates()).not.toHaveProperty('ai:providerApiKeys');
     });
 
+    it('treats a whitespace-only apiKey as empty: keeps the stored key instead of persisting a blank', async () => {
+      // A stray space must follow the merge exception (keep the stored value) exactly
+      // like an omitted key — never persisted as a "set" key that reads back as
+      // configured yet 401s at the provider.
+      await invoke(
+        { providers: providersRequest({ openai: { apiKey: '   ' } }) },
+        { currentApiKeys: { openai: 'env-openai-key' } },
+      );
+
+      expect(updates()).not.toHaveProperty('ai:providerApiKeys');
+    });
+
     it('carries other providers keys forward from the merged view when one non-empty key is sent', async () => {
       await invoke(
         { providers: providersRequest({ google: { apiKey: 'sk-google' } }) },
