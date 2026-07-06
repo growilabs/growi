@@ -1461,13 +1461,13 @@ module.exports = (crowi) => {
    *        get:
    *          tags: [Users]
    *          summary: /users/usernames
-   *          description: Get list of usernames
+   *          description: Get list of usernames. The query matches usernames by case-insensitive prefix (formerly substring; changed in v8.0).
    *          parameters:
    *            - in: query
    *              name: q
    *              schema:
    *                type: string
-   *                description: query string to search usernames
+   *                description: query string to search usernames by prefix
    *                example: alice
    *            - in: query
    *              name: offset

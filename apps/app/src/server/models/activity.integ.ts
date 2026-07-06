@@ -24,7 +24,7 @@ describe('Activity.findSnapshotUsernamesByUsernameRegex', () => {
 
     const usernames = await Activity.findSnapshotUsernamesByUsernameRegex(
       'john',
-      { sortOpt: 1, offset: 0, limit: 10 },
+      { offset: 0, limit: 10 },
     );
 
     expect(usernames).toEqual(['johnson']);
@@ -35,7 +35,7 @@ describe('Activity.findSnapshotUsernamesByUsernameRegex', () => {
 
     const usernames = await Activity.findSnapshotUsernamesByUsernameRegex(
       'hnso',
-      { sortOpt: 1, offset: 0, limit: 10 },
+      { offset: 0, limit: 10 },
     );
 
     expect(usernames).toEqual([]);
@@ -46,7 +46,7 @@ describe('Activity.findSnapshotUsernamesByUsernameRegex', () => {
 
     const usernames = await Activity.findSnapshotUsernamesByUsernameRegex(
       'JOHN',
-      { sortOpt: 1, offset: 0, limit: 10 },
+      { offset: 0, limit: 10 },
     );
 
     expect(usernames).toEqual(['johnson']);
@@ -58,7 +58,7 @@ describe('Activity.findSnapshotUsernamesByUsernameRegex', () => {
 
     const usernames = await Activity.findSnapshotUsernamesByUsernameRegex(
       'john.doe',
-      { sortOpt: 1, offset: 0, limit: 10 },
+      { offset: 0, limit: 10 },
     );
 
     expect(usernames).toEqual(['john.doe']);
@@ -70,7 +70,7 @@ describe('Activity.findSnapshotUsernamesByUsernameRegex', () => {
 
     const usernames = await Activity.findSnapshotUsernamesByUsernameRegex(
       'john',
-      { sortOpt: 1, offset: 0, limit: 10 },
+      { offset: 0, limit: 10 },
     );
 
     expect(usernames).toEqual(['johnson']);
@@ -107,5 +107,44 @@ describe('Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount', () => {
 
     expect(result.totalCount).toBe(2);
     expect(result.usernames.sort()).toEqual(['johnny', 'johnson']);
+  });
+
+  it('counts all distinct matches even when the page is limited', async () => {
+    await Activity.create({
+      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+      target: new Types.ObjectId(),
+      snapshot: { username: 'johnson' },
+    });
+    await Activity.create({
+      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+      target: new Types.ObjectId(),
+      snapshot: { username: 'johnny' },
+    });
+
+    const result =
+      await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+        'john',
+        { offset: 0, limit: 1 },
+      );
+
+    expect(result.usernames).toEqual(['johnny']);
+    expect(result.totalCount).toBe(2);
+  });
+
+  it('returns an empty page and zero totalCount when nothing matches', async () => {
+    await Activity.create({
+      action: SupportedAction.ACTION_USER_LOGIN_WITH_LOCAL,
+      target: new Types.ObjectId(),
+      snapshot: { username: 'alice' },
+    });
+
+    const result =
+      await Activity.findSnapshotUsernamesByUsernameRegexWithTotalCount(
+        'john',
+        { offset: 0, limit: 10 },
+      );
+
+    expect(result.usernames).toEqual([]);
+    expect(result.totalCount).toBe(0);
   });
 });

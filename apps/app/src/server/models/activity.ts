@@ -1,6 +1,5 @@
 import type { IUser, Ref } from '@growi/core';
-import { escapeStringForMongoRegex } from '@growi/core/dist/utils';
-import type { Document, Model, SortOrder, Types } from 'mongoose';
+import type { Document, Model, Types } from 'mongoose';
 import { Schema } from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 
@@ -19,6 +18,7 @@ import {
 
 import loggerFactory from '../../utils/logger';
 import { getOrCreateModel } from '../util/mongoose-utils';
+import { buildUsernamePrefixRegexQuery } from '../util/username-prefix-regex';
 
 const logger = loggerFactory('growi:models:activity');
 
@@ -127,28 +127,23 @@ activitySchema.statics.updateByParameters = async function (
   return activity;
 };
 
-// Prefix-anchored to match the ES path's `${escaped}*` wildcard and use the snapshot.username index.
+// Prefix-anchored to match the ES path's `${escaped}*` wildcard.
+// Note: the case-insensitive regex cannot use a bounded prefix seek on the
+// snapshot.username index; MongoDB scans the whole index (covered scan).
 const buildSnapshotUsernameRegexConditions = (q: string) => ({
-  'snapshot.username': {
-    $regex: `^${escapeStringForMongoRegex(q)}`,
-    $options: 'i',
-  },
+  'snapshot.username': buildUsernamePrefixRegexQuery(q),
 });
 
 const aggregateSnapshotUsernames = async (
   model: ActivityModel,
   conditions: ReturnType<typeof buildSnapshotUsernameRegexConditions>,
-  {
-    sortOpt,
-    offset,
-    limit,
-  }: { sortOpt: SortOrder; offset: number; limit: number },
+  { offset, limit }: { offset: number; limit: number },
 ): Promise<string[]> => {
   const usernames = await model
     .aggregate()
     .match(conditions)
     .group({ _id: '$snapshot.username' })
-    .sort({ _id: sortOpt }) // Sort "snapshot.username" in ascending order
+    .sort({ _id: 1 }) // Sort "snapshot.username" in ascending order
     .skip(offset)
     .limit(limit)
     .allowDiskUse(true);
@@ -158,13 +153,12 @@ const aggregateSnapshotUsernames = async (
 
 activitySchema.statics.findSnapshotUsernamesByUsernameRegex = function (
   q: string,
-  option: { sortOpt: SortOrder; offset: number; limit: number },
+  option: { offset: number; limit: number },
 ): Promise<string[]> {
   const opt = option || {};
   const conditions = buildSnapshotUsernameRegexConditions(q);
 
   return aggregateSnapshotUsernames(this, conditions, {
-    sortOpt: opt.sortOpt || 1,
     offset: opt.offset || 0,
     limit: opt.limit || 10,
   });
@@ -178,16 +172,23 @@ activitySchema.statics.findSnapshotUsernamesByUsernameRegexWithTotalCount =
     const opt = option || {};
     const conditions = buildSnapshotUsernameRegexConditions(q);
 
-    const usernames = await aggregateSnapshotUsernames(this, conditions, {
-      sortOpt: 1,
-      offset: opt.offset || 0,
-      limit: opt.limit || 10,
-    });
-    const totalCount = (
-      await this.find(conditions).distinct('snapshot.username')
-    ).length;
+    const [result] = await this.aggregate()
+      .match(conditions)
+      .group({ _id: '$snapshot.username' })
+      .facet({
+        usernames: [
+          { $sort: { _id: 1 } },
+          { $skip: opt.offset || 0 },
+          { $limit: opt.limit || 10 },
+        ],
+        totalCount: [{ $count: 'count' }],
+      })
+      .allowDiskUse(true);
 
-    return { usernames, totalCount };
+    return {
+      usernames: result.usernames.map((r) => r._id),
+      totalCount: result.totalCount[0]?.count ?? 0,
+    };
   };
 
 export default getOrCreateModel<ActivityDocument, ActivityModel>(

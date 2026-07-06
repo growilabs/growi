@@ -222,11 +222,37 @@ describe('SearchService.searchAuditlogSuggestions()', () => {
     });
     expect(Activity.findSnapshotUsernamesByUsernameRegex).toHaveBeenCalledWith(
       'ali',
-      { sortOpt: 1, offset: 0, limit: 10 },
+      { offset: 0, limit: 10 },
     );
     expect(
       searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
     ).not.toHaveBeenCalled();
+  });
+
+  it('should fall back to MongoDB when the ES search fails', async () => {
+    vi.mocked(
+      searchService.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard,
+    ).mockRejectedValue(new Error('ES is down'));
+    vi.mocked(Activity.findSnapshotUsernamesByUsernameRegex).mockResolvedValue([
+      'alice',
+    ]);
+    setupUserModelMock(mockUserModel, [
+      { username: 'alice', status: UserStatus.STATUS_ACTIVE },
+    ]);
+
+    const result = await searchService.searchAuditlogSuggestions(
+      ['username'],
+      'ali',
+      10,
+    );
+
+    expect(result).toEqual({
+      username: { activeUsernames: ['alice'], inactiveUsernames: [] },
+    });
+    expect(Activity.findSnapshotUsernamesByUsernameRegex).toHaveBeenCalledWith(
+      'ali',
+      { offset: 0, limit: 10 },
+    );
   });
 
   it('should use the MongoDB fallback when ES is configured but unreachable', async () => {

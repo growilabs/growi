@@ -1,9 +1,6 @@
 import crypto from 'node:crypto';
 import { omitInsecureAttributes } from '@growi/core/dist/models/serializers';
-import {
-  escapeStringForMongoRegex,
-  pagePathUtils,
-} from '@growi/core/dist/utils';
+import { pagePathUtils } from '@growi/core/dist/utils';
 import mongoose from 'mongoose';
 import mongoosePaginate from 'mongoose-paginate-v2';
 import uniqueValidator from 'mongoose-unique-validator';
@@ -16,6 +13,7 @@ import loggerFactory from '~/utils/logger';
 import { aclService } from '../../service/acl';
 import { configManager } from '../../service/config-manager';
 import { getModelSafely } from '../../util/mongoose-utils';
+import { buildUsernamePrefixRegexQuery } from '../../util/username-prefix-regex';
 import { Attachment } from '../attachment';
 import { UserStatus } from './conts';
 
@@ -827,24 +825,16 @@ const factory = (crowi) => {
     const offset = opt.offset || 0;
     const limit = opt.limit || 10;
 
-    // Prefix-anchored and escaped so it matches the same semantics as
-    // Activity.findSnapshotUsernamesByUsernameRegex, which the /usernames
-    // route's isIncludeMixedUsernames option merges results with.
     const conditions = {
-      username: {
-        $regex: `^${escapeStringForMongoRegex(username)}`,
-        $options: 'i',
-      },
+      username: buildUsernamePrefixRegexQuery(username),
       status: { $in: status },
     };
 
-    const users = await this.find(conditions)
-      .sort(sortOpt)
-      .skip(offset)
-      .limit(limit);
-
-    const totalCount = (await this.find(conditions).distinct('username'))
-      .length;
+    // username is unique, so countDocuments equals counting distinct usernames
+    const [users, totalCount] = await Promise.all([
+      this.find(conditions).sort(sortOpt).skip(offset).limit(limit),
+      this.countDocuments(conditions),
+    ]);
 
     return { users, totalCount };
   };

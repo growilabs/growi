@@ -351,6 +351,30 @@ class SearchService implements SearchQueryParser, SearchResolver {
     return this.fullTextSearchDelegator.rebuildAuditlogIndex();
   }
 
+  private async searchAuditlogUsernames(
+    q: string,
+    limit: number,
+  ): Promise<string[]> {
+    if (this.isReachable) {
+      try {
+        return await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
+          'username',
+          q,
+          limit,
+        );
+      } catch (err) {
+        logger.error(
+          'Failed to search auditlog suggestions on Elasticsearch. Falling back to MongoDB.',
+          err,
+        );
+      }
+    }
+    return Activity.findSnapshotUsernamesByUsernameRegex(q, {
+      offset: 0,
+      limit,
+    });
+  }
+
   async searchAuditlogSuggestions(
     fields: AuditlogSuggestionField[],
     q: string,
@@ -361,34 +385,24 @@ class SearchService implements SearchQueryParser, SearchResolver {
     const response: AuditlogSuggestionsResponse = {};
 
     if (fields.includes('username')) {
-      const usernames = this.isReachable
-        ? await this.fullTextSearchDelegator.searchAuditlogByFuzzyWildcard(
-            'username',
-            q,
-            limit,
-          )
-        : await Activity.findSnapshotUsernamesByUsernameRegex(q, {
-            sortOpt: 1,
-            offset: 0,
-            limit,
-          });
+      const usernames = await this.searchAuditlogUsernames(q, limit);
 
-      if (usernames.length === 0) {
-        response.username = { activeUsernames: [], inactiveUsernames: [] };
-      } else {
-        const User = mongoose.model<IUser>('User');
-        const users = await User.find({ username: { $in: usernames } })
-          .select('username status')
-          .lean();
-        response.username = {
-          activeUsernames: users
-            .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
-            .map((u) => u.username),
-          inactiveUsernames: users
-            .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
-            .map((u) => u.username),
-        };
-      }
+      const User = mongoose.model<IUser>('User');
+      const users =
+        usernames.length === 0
+          ? []
+          : await User.find({ username: { $in: usernames } })
+              .select('username status')
+              .lean();
+
+      response.username = {
+        activeUsernames: users
+          .filter((u) => u.status === UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+        inactiveUsernames: users
+          .filter((u) => u.status !== UserStatus.STATUS_ACTIVE)
+          .map((u) => u.username),
+      };
     }
 
     return response;
