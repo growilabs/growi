@@ -214,6 +214,7 @@ export const extension = Prisma.defineExtension((client) => {
                   $pull: {
                     bookmarks: { $oid: bookmarkedPage._id },
                   },
+                  $inc: { __v: 1 },
                 },
                 multi: true,
               },
@@ -237,6 +238,7 @@ export const extension = Prisma.defineExtension((client) => {
                   $addToSet: {
                     bookmarks: { $oid: bookmarkedPage._id },
                   },
+                  $inc: { __v: 1 },
                 },
                 multi: false,
                 upsert: true,
@@ -283,6 +285,7 @@ export const extension = Prisma.defineExtension((client) => {
                       $pull: {
                         bookmarks: { $oid: bookmarkedPage._id },
                       },
+                      $inc: { __v: 1 },
                     },
                     multi: false,
                   },
