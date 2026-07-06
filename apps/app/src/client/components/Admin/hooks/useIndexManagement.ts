@@ -198,7 +198,9 @@ export const useIndexManagement = ({
     isNormalized &&
     !isRebuildingProcessing &&
     !isNormalizingProcessing &&
-    isConnected;
+    isConnected &&
+    // Without a socket, the finish/failed event above can never arrive.
+    socket != null;
 
   return {
     isInitialized,

@@ -103,7 +103,8 @@ describe('useIndexManagement', () => {
   });
 
   describe('isRebuildEnabled', () => {
-    it('is true when index is normalized and service is connected', async () => {
+    it('is true when index is normalized, service is connected, and socket is ready', async () => {
+      mockUseAdminSocket.mockReturnValue({ on: vi.fn(), off: vi.fn() });
       const { result } = renderHook(() => useIndexManagement(defaultOptions), {
         wrapper,
       });
@@ -112,7 +113,17 @@ describe('useIndexManagement', () => {
     });
 
     it('is false when service is not connected', async () => {
+      mockUseAdminSocket.mockReturnValue({ on: vi.fn(), off: vi.fn() });
       mockApiv3Get.mockRejectedValue(new Error('Not connected'));
+      const { result } = renderHook(() => useIndexManagement(defaultOptions), {
+        wrapper,
+      });
+      await waitFor(() => expect(result.current.isInitialized).toBe(true));
+      expect(result.current.isRebuildEnabled).toBe(false);
+    });
+
+    it('is false when the socket has not connected yet, even if otherwise ready', async () => {
+      mockUseAdminSocket.mockReturnValue(null);
       const { result } = renderHook(() => useIndexManagement(defaultOptions), {
         wrapper,
       });
