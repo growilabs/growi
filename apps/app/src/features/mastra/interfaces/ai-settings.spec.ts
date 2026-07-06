@@ -1,36 +1,9 @@
-import {
-  AI_SETTING_KEYS,
-  type AiSettingsResponse,
-  type AiSettingsUpdateRequest,
+import type {
+  AiSettingsResponse,
+  AiSettingsUpdateRequest,
 } from './ai-settings';
 
 describe('ai-settings interfaces', () => {
-  describe('AI_SETTING_KEYS', () => {
-    // Contract: this list is the single source of truth for the config keys this
-    // feature manages — the AI enablement toggle plus the 3 multi-provider
-    // `ai:*` keys (providers Record, per-provider API key Record, cross-provider
-    // allow-list).
-    it('enumerates exactly the 4 managed config keys (app:aiEnabled + 3 ai:* keys)', () => {
-      expect([...AI_SETTING_KEYS]).toStrictEqual([
-        'app:aiEnabled',
-        'ai:providers',
-        'ai:providerApiKeys',
-        'ai:allowedModels',
-      ]);
-    });
-
-    it('no longer contains the legacy single-provider keys (Req 7.1)', () => {
-      const keys: readonly string[] = AI_SETTING_KEYS;
-      expect(keys).not.toContain('ai:provider');
-      expect(keys).not.toContain('ai:apiKey');
-      expect(keys).not.toContain('ai:azureOpenaiSettings');
-    });
-
-    it('contains no duplicate keys', () => {
-      expect(new Set(AI_SETTING_KEYS).size).toBe(AI_SETTING_KEYS.length);
-    });
-  });
-
   describe('type-level usage (compile check)', () => {
     it('AiSettingsResponse and AiSettingsUpdateRequest are importable and shaped as designed', () => {
       // Fixed-slot model (Req 1.1/1.2): `providers` is a Record over ALL 4

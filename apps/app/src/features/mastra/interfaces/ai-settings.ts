@@ -63,24 +63,3 @@ export interface AiSettingsUpdateRequest {
   providers?: Record<AiProvider, AiProviderUpdateRequest>; // omitted = leave unchanged; present = all 4 entries required
   allowedModels?: AllowedModel[]; // omitted = leave unchanged; present = full-state replace ([] = no allowed models, 3.3)
 }
-
-/**
- * The config keys this feature manages: the AI enablement toggle plus the 3
- * multi-provider `ai:*` settings — the non-secret per-provider settings Record
- * (`ai:providers`), the secret per-provider API key Record
- * (`ai:providerApiKeys`), and the cross-provider allow-list
- * (`ai:allowedModels`, one object array with a required `provider` per entry).
- * The legacy single-provider keys (`ai:provider` / `ai:apiKey` /
- * `ai:azureOpenaiSettings`) are replaced without migration (Req 7.1, 7.2).
- *
- * NOTE: this is NOT identical to the env-only group in config-definition
- * (`env:useOnlyEnvVars:ai`): that group's targetKeys exclude
- * `ai:allowedModels`, because model settings stay editable from the admin UI
- * even in env-only mode (Req 5.3). Keep both lists deliberately in sync.
- */
-export const AI_SETTING_KEYS = [
-  'app:aiEnabled',
-  'ai:providers',
-  'ai:providerApiKeys',
-  'ai:allowedModels',
-] as const;
