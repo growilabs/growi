@@ -108,6 +108,15 @@ describe('resolveEffectiveModelKey (Req 4.6)', () => {
     expect(loggerWarn).not.toHaveBeenCalled();
   });
 
+  it('computes the available set only ONCE on the default-fallback path (no double sweep)', () => {
+    getAvailableModels.mockReturnValue(availableSet);
+
+    // The omitted-key path falls back to the effective default; availability must
+    // be computed once and reused, not swept a second time to pick the default.
+    resolveEffectiveModelKey(undefined);
+    expect(getAvailableModels).toHaveBeenCalledTimes(1);
+  });
+
   it('rounds an unparseable key to the effective default and warns', () => {
     getAvailableModels.mockReturnValue(availableSet);
 

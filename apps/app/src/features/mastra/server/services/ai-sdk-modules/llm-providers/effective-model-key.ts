@@ -1,4 +1,7 @@
-import { isModelInAllowList } from '~/features/mastra/interfaces/allowed-model';
+import {
+  type AllowedModel,
+  isModelInAllowList,
+} from '~/features/mastra/interfaces/allowed-model';
 import {
   buildModelKey,
   type ModelKey,
@@ -30,17 +33,16 @@ const logger = loggerFactory(
 const NO_AVAILABLE_MODELS_MESSAGE =
   'No available AI model to resolve: every configured provider is disabled or misconfigured, or the allow-list is empty';
 
-/**
- * The effective default modelKey: the `isDefault` entry when its owning provider
- * is available, otherwise the first available entry (deterministic — Req 6.4).
- * Throws when the available set is empty.
- */
-export const getEffectiveDefaultModelKey = (): ModelKey => {
-  const availableModels = getAvailableModels();
-
-  // find() over the AVAILABLE set already implements the 6.4 fallback: if the
-  // saved default's provider is now unavailable, that entry is absent here, so
-  // find() misses and we deterministically take the first available entry.
+// Pick the effective default from an ALREADY-COMPUTED available set: the
+// `isDefault` entry, else the first available entry (deterministic — Req 6.4).
+// find() over the AVAILABLE set already implements the fallback: if the saved
+// default's provider is now unavailable, that entry is absent here, so find()
+// misses and we deterministically take the first available entry. Throws when the
+// set is empty. Taking the set as input lets resolveEffectiveModelKey reuse the
+// list it already holds instead of recomputing availability a second time.
+const pickEffectiveDefault = (
+  availableModels: readonly AllowedModel[],
+): ModelKey => {
   const defaultModel =
     availableModels.find((model) => model.isDefault) ?? availableModels[0];
 
@@ -50,6 +52,14 @@ export const getEffectiveDefaultModelKey = (): ModelKey => {
 
   return buildModelKey(defaultModel.provider, defaultModel.modelId);
 };
+
+/**
+ * The effective default modelKey: the `isDefault` entry when its owning provider
+ * is available, otherwise the first available entry (deterministic — Req 6.4).
+ * Throws when the available set is empty.
+ */
+export const getEffectiveDefaultModelKey = (): ModelKey =>
+  pickEffectiveDefault(getAvailableModels());
 
 /**
  * Request-time single validation checkpoint (Req 4.6). Validates the client-
@@ -88,5 +98,6 @@ export const resolveEffectiveModelKey = (modelKey?: string): ModelKey => {
     );
   }
 
-  return getEffectiveDefaultModelKey();
+  // Reuse the set already computed above — no second availability sweep.
+  return pickEffectiveDefault(availableModels);
 };
