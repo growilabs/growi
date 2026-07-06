@@ -9,6 +9,7 @@ import {
   mockDeep,
 } from 'vitest-mock-extended';
 
+import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import { SocketEventName } from '~/interfaces/websocket';
 import type { ActivityDocument } from '~/server/models/activity';
 import { configManager } from '~/server/service/config-manager/config-manager';
@@ -23,6 +24,10 @@ import type { ES8ClientDelegator } from './elasticsearch-client-delegator/es8-cl
 vi.mock('~/server/service/config-manager/config-manager', () => ({
   default: { getConfig: vi.fn() },
   configManager: { getConfig: vi.fn() },
+}));
+
+vi.mock('~/features/auditlog-es-sync/server', () => ({
+  AuditlogEsSyncStatus: { setUnsynced: vi.fn() },
 }));
 
 describe('ElasticsearchDelegator', () => {
@@ -473,9 +478,10 @@ describe('ElasticsearchDelegator', () => {
       beforeEach(() => {
         mockAdminSocket = mock<Namespace>();
         mockSocketIo.getAdminSocket.mockReturnValue(mockAdminSocket);
+        vi.mocked(AuditlogEsSyncStatus.setUnsynced).mockResolvedValue();
       });
 
-      it('returns totalCount and count from addAllAuditlogs on success', async () => {
+      it('clears the unsynced flag and emits FinishAddAuditlog on success', async () => {
         addAllAuditlogsSpy.mockResolvedValue({ totalCount: 100, count: 100 });
 
         const result = await delegator.rebuildAuditlogIndex({
@@ -483,13 +489,33 @@ describe('ElasticsearchDelegator', () => {
         });
 
         expect(result).toEqual({ totalCount: 100, count: 100 });
-        expect(mockAdminSocket.emit).not.toHaveBeenCalledWith(
+        expect(AuditlogEsSyncStatus.setUnsynced).toHaveBeenCalledWith(false);
+        expect(mockAdminSocket.emit).toHaveBeenCalledWith(
           SocketEventName.FinishAddAuditlog,
-          expect.anything(),
+          { totalCount: 100, count: 100 },
         );
       });
 
-      it('emits AuditlogRebuildingFailed with error message on failure', async () => {
+      it('still emits FinishAddAuditlog when clearing the unsynced flag fails', async () => {
+        addAllAuditlogsSpy.mockResolvedValue({ totalCount: 100, count: 100 });
+        vi.mocked(AuditlogEsSyncStatus.setUnsynced).mockRejectedValue(
+          new Error('db unavailable'),
+        );
+
+        const result = await delegator.rebuildAuditlogIndex({
+          shouldEmitProgress: true,
+        });
+
+        // The ES rebuild itself succeeded, so the client should not be left stuck
+        // in a processing state just because the unrelated flag write failed.
+        expect(result).toEqual({ totalCount: 100, count: 100 });
+        expect(mockAdminSocket.emit).toHaveBeenCalledWith(
+          SocketEventName.FinishAddAuditlog,
+          { totalCount: 100, count: 100 },
+        );
+      });
+
+      it('emits AuditlogRebuildingFailed and not FinishAddAuditlog on failure', async () => {
         mockES8Client.reindex.mockRejectedValue(new Error('reindex failed'));
 
         await expect(
@@ -500,6 +526,11 @@ describe('ElasticsearchDelegator', () => {
           SocketEventName.AuditlogRebuildingFailed,
           { error: 'reindex failed' },
         );
+        expect(mockAdminSocket.emit).not.toHaveBeenCalledWith(
+          SocketEventName.FinishAddAuditlog,
+          expect.anything(),
+        );
+        expect(AuditlogEsSyncStatus.setUnsynced).not.toHaveBeenCalled();
       });
     });
   });

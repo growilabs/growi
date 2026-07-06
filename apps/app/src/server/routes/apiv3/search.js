@@ -3,7 +3,6 @@ import { ErrorV3 } from '@growi/core/dist/models';
 
 import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import { SupportedAction } from '~/interfaces/activity';
-import { SocketEventName } from '~/interfaces/websocket';
 import { accessTokenParser } from '~/server/middlewares/access-token-parser';
 import adminRequiredFactory from '~/server/middlewares/admin-required';
 import loginRequiredFactory from '~/server/middlewares/login-required';
@@ -451,27 +450,11 @@ module.exports = (crowi) => {
               .status(200)
               .send({ message: 'Operation is successfully processed.' });
           case 'rebuild':
-            // NOT wait the processing is terminated
+            // NOT wait the processing is terminated. Completion (including clearing
+            // the unsynced flag and emitting FinishAddAuditlog) is handled entirely
+            // inside rebuildAuditlogIndex, matching the page-side rebuildIndex flow.
             searchService
               .rebuildAuditlogIndex({ shouldEmitProgress: true })
-              .then(async ({ totalCount, count }) => {
-                try {
-                  await AuditlogEsSyncStatus.setUnsynced(false);
-                } catch (err) {
-                  logger.error(
-                    'Failed to clear auditlog unsynced flag after rebuild',
-                    err,
-                  );
-                  // setUnsynced failure is non-critical: the ES rebuild succeeded.
-                  // Still notify the client so the UI is not left stuck in processing state.
-                }
-                crowi.socketIoService
-                  .getAdminSocket()
-                  .emit(SocketEventName.FinishAddAuditlog, {
-                    totalCount,
-                    count,
-                  });
-              })
               .catch((err) => {
                 logger.error('Rebuild auditlog index failed', err);
               });

@@ -7,6 +7,7 @@ import { Transform, Writable } from 'stream';
 import { pipeline } from 'stream/promises';
 import { URL } from 'url';
 
+import { AuditlogEsSyncStatus } from '~/features/auditlog-es-sync/server';
 import type { AuditlogSuggestionField } from '~/interfaces/activity';
 import { SearchDelegatorName } from '~/interfaces/named-query';
 import type { ISearchResult, ISearchResultData } from '~/interfaces/search';
@@ -478,6 +479,16 @@ class ElasticsearchDelegator
         logger.error('Failed to normalize auditlog indices', normalizeErr);
       }
     }
+
+    try {
+      await AuditlogEsSyncStatus.setUnsynced(false);
+    } catch (err) {
+      logger.error('Failed to clear auditlog unsynced flag after rebuild', err);
+      // Non-critical: the ES rebuild itself succeeded, so still notify the client
+      // below rather than leaving it stuck in a processing state.
+    }
+    socket?.emit(SocketEventName.FinishAddAuditlog, { totalCount, count });
+
     return { totalCount, count };
   }
 
