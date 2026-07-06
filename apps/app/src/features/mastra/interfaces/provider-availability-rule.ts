@@ -1,4 +1,5 @@
 import type { AiProvider } from './ai-provider';
+import type { AzureOpenaiConfig } from './azure-openai-config';
 
 // The single per-provider availability predicate, extracted as a client-safe pure
 // function so the rule has ONE definition. Both the server
@@ -7,9 +8,11 @@ import type { AiProvider } from './ai-provider';
 // this function, so the enabled-and-configured judgement — and in particular the
 // non-uniform azure-openai rule — cannot drift between server and client.
 //
-// This module is intentionally dependency-free apart from the `AiProvider` type:
-// it must stay importable from both the Next.js client bundle and the Express
-// server. Do NOT add config, logger, or other server-only imports here.
+// This module is intentionally dependency-free apart from the `AiProvider` and
+// `AzureOpenaiConfig` types — both pure, client-safe interface modules (type-only
+// imports, erased at build). It must stay importable from both the Next.js client
+// bundle and the Express server. Do NOT add config, logger, or other server-only
+// imports here.
 
 /**
  * Why an enabled provider is nonetheless unavailable.
@@ -31,12 +34,14 @@ export interface ProviderAvailabilityInput {
   readonly provider: AiProvider;
   readonly enabled: boolean;
   readonly hasApiKey: boolean;
-  /** Only consulted for the 'azure-openai' provider. */
-  readonly azureOpenaiSettings?: {
-    readonly resourceName?: string;
-    readonly baseURL?: string;
-    readonly useEntraId?: boolean;
-  };
+  /**
+   * Only consulted for the 'azure-openai' provider. Picked from AzureOpenaiConfig
+   * (its single source of truth) so a field rename there is a compile error here,
+   * not a silent drift; `apiVersion` is omitted because availability never reads it.
+   */
+  readonly azureOpenaiSettings?: Readonly<
+    Pick<AzureOpenaiConfig, 'resourceName' | 'baseURL' | 'useEntraId'>
+  >;
 }
 
 // A blank ('' / whitespace / undefined) value counts as "not set". The server reads
