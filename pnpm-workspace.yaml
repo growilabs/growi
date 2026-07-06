@@ -34,6 +34,20 @@ overrides:
   # is safe and keeps the dev build hash unchanged.
   # See apps/app/.claude/rules/package-dependencies.md.
   '@babel/core': 7.29.7
+  # Dedupe the CodeMirror/Lezer parser stack to a single copy each. CodeMirror and
+  # Lezer require exactly ONE instance of these packages at runtime: a syntax tree
+  # (Tree/TreeNode/TreeCursor from @lezer/common) built by one copy is traversed with
+  # the classes of whichever copy is imported at the traversal site, and across two
+  # copies an internal field is undefined -> "Cannot read properties of undefined
+  # (reading 'length')" in TreeNode.nextChild. The full install had drifted to two
+  # copies each (@lezer/common 1.5.1+1.5.2, @lezer/lr 1.4.8+1.4.10,
+  # @codemirror/language 6.12.2+6.12.3) via transitive @uiw/*/codemirror consumers.
+  # Pre-ESM bundling deduped them, masking the drift; after the ESM/Turbopack flip
+  # both copies land in separate client chunks, so a Yjs collaborative update -> reparse
+  # crosses the copies and crashes the editor (typed text vanishes on the next resync).
+  '@lezer/common': ^1.5.2
+  '@lezer/lr': ^1.4.10
+  '@codemirror/language': ^6.12.3
 
 packageExtensions:
   # @orval/core bundles @stoplight/json-ref-resolver which requires lodash/get at runtime,
