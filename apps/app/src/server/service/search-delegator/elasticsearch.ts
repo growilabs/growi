@@ -539,15 +539,24 @@ class ElasticsearchDelegator
       .cursor();
     const batchStream = createBatchStream(bulkSize);
 
+    // Counts activities read from the cursor, not documents actually bulk-indexed:
+    // activities without a snapshot.username are skipped by prepareBodyForAuditlog,
+    // so counting only indexed items would leave count permanently short of totalCount.
     let count = 0;
     const writeStream = new Writable({
       objectMode: true,
       async write(batch, _encoding, callback) {
+        count += batch.length;
+
         const body = batch.flatMap((activity) =>
           prepareBodyForAuditlog(activity),
         );
 
         if (body.length === 0) {
+          socket?.emit(SocketEventName.AddAuditlogProgress, {
+            totalCount,
+            count,
+          });
           callback();
           return;
         }
@@ -562,7 +571,6 @@ class ElasticsearchDelegator
             return;
           }
 
-          count += (bulkResponse.items || []).length;
           logger.info(
             `Adding auditlogs progressing: (count=${count}, took=${bulkResponse.took}ms)`,
           );
