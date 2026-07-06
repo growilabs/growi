@@ -46,7 +46,6 @@ export const extractInternalLinks = async (
   const anchors = selectAll('a[href]', runTree as Nodes);
   const base = new URL(siteUrl ?? 'https://example.com');
   const normalizedSelf = normalizePath(pagePath);
-
   const linkSet = new Set<string>();
 
   for (const a of anchors) {
@@ -59,7 +58,12 @@ export const extractInternalLinks = async (
     )
       continue;
 
-    const path = normalizePath(new URL(href, base).pathname);
+    let path: string;
+    try {
+      path = normalizePath(decodeURIComponent(new URL(href, base).pathname));
+    } catch {
+      continue;
+    }
 
     if (!pagePathUtils.isCreatablePage(path) || path === normalizedSelf)
       continue;
