@@ -308,6 +308,11 @@ module.exports = (crowi: Crowi) => {
             viewablePages.map((page) => page._id.toString()),
           );
 
+          // Drop orphaned bookmarks whose page is null as well
+          // as pages the viewer cannot access. Orphaned bookmarks carry no path or
+          // title and are already rendered as nothing by the client, so there is no
+          // point transmitting them.
+          //
           // !! DO NOT THIS SERIALIZING OUTSIDE OF PROMISES !! -- 05.23.2023 ryoji-s
           // Serializing outside of promises will cause not populated.
           const bookmarks = folder.bookmarks
