@@ -91,7 +91,14 @@ RUN mkdir -p /tmp/release/apps/app && \
        apps/app/package.json apps/app/node_modules \
        apps/app/next.config.js \
        /tmp/release/apps/app/ && \
-  (cp apps/app/.env.production* /tmp/release/apps/app/ 2>/dev/null || true)
+  (cp apps/app/.env.production* /tmp/release/apps/app/ 2>/dev/null || true) && \
+  # Prisma query-engine binaries for the SSR (.next) consumer. Turbopack bundles the
+  # generated client JS into .next but does NOT copy the native engine, and the bundled
+  # client resolves it at `process.cwd()/src/generated/prisma/` at runtime. dist/ (used by
+  # the Express server) gets its engines via postbuild-server.ts, but src/ is not otherwise
+  # shipped, so the SSR path 500s without this copy.
+  mkdir -p /tmp/release/apps/app/src/generated/prisma && \
+  cp -a apps/app/src/generated/prisma/*.so.node /tmp/release/apps/app/src/generated/prisma/
 
 
 ##
