@@ -149,7 +149,10 @@ const buildProviderStatus = (provider: AiProvider): AiProviderStatus => {
 
   const status: AiProviderStatus = {
     enabled: settings?.enabled === true,
-    isApiKeySet: apiKey != null && apiKey !== '',
+    // getApiKey already normalizes a blank / whitespace-only key to undefined, so a
+    // present value here is a usable key — this flag cannot disagree with the
+    // availability rule, which reads the same accessor.
+    isApiKeySet: apiKey != null,
   };
 
   if (provider === 'azure-openai') {

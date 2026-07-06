@@ -244,6 +244,25 @@ describe('getApiKey', () => {
     expect(loggerWarn).not.toHaveBeenCalled();
   });
 
+  it('reads a blank / whitespace-only / non-string key as unset (single blankness rule)', () => {
+    // A hand-edited AI_PROVIDER_API_KEYS can carry '' / '   ' / a non-string; all
+    // must read as "no usable key" so availability, isApiKeySet, and the resolvers
+    // agree instead of exposing a provider whose every request 401s on a blank key.
+    configureConfig({
+      env: {
+        'ai:providerApiKeys': {
+          openai: '',
+          anthropic: '   ',
+          google: 123,
+        },
+      },
+    });
+
+    expect(getApiKey('openai')).toBeUndefined();
+    expect(getApiKey('anthropic')).toBeUndefined();
+    expect(getApiKey('google')).toBeUndefined();
+  });
+
   it('fails soft and warns exactly once for a malformed ai:providerApiKeys without leaking key material', () => {
     // A malformed non-object value must never surface any key material in the warn.
     configureConfig({

@@ -183,9 +183,15 @@ export const getProviderSettings = (
 ): AiProviderSettings | undefined =>
   normalizeProviderSettings(readProvidersConfig()?.[provider]);
 
-/** The stored API key for `provider`, or undefined when none is set. */
+/**
+ * The stored API key for `provider`, or undefined when none is set. The value is
+ * normalized at this boundary (blank / whitespace-only / non-string reads as
+ * "unset"), so this is the single source of truth for "does this provider have a
+ * usable key": availability, the admin GET's isApiKeySet, and the resolvers all
+ * derive from it and cannot disagree over a blank value.
+ */
 export const getApiKey = (provider: AiProvider): string | undefined =>
-  readProviderApiKeys()?.[provider];
+  asNonBlankString(readProviderApiKeys()?.[provider]);
 
 // The API key is mandatory for the key-based providers. The message names only the
 // provider and the env var (never the key value or its absence in value form) so an

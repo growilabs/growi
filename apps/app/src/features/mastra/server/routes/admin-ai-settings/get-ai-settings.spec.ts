@@ -181,13 +181,15 @@ describe('getAiSettings (Req 1.1, 1.8, 1.9)', () => {
     expect(providers.openai).not.toHaveProperty('apiKey');
   });
 
-  it('reports isApiKeySet=false when a provider key is unset or empty (Req 1.8)', () => {
-    setApiKeys({ openai: undefined, anthropic: '' });
+  it('reports isApiKeySet=false when a provider has no usable key (Req 1.8)', () => {
+    // getApiKey is the single blankness authority: it normalizes an unset / blank /
+    // whitespace-only stored key to undefined, so the admin GET only ever sees a
+    // usable key or undefined, and isApiKeySet simply mirrors that presence.
+    setApiKeys({ openai: undefined });
 
     const providers = providersOf(invoke().res);
 
     expect(providers.openai.isApiKeySet).toBe(false);
-    expect(providers.anthropic.isApiKeySet).toBe(false);
   });
 
   it('returns the allowedModels allow-list verbatim incl. provider, providerOptions and isDefault (Req 1.1)', () => {
