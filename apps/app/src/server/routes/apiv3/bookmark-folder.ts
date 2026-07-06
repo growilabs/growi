@@ -15,6 +15,7 @@ import {
 } from '~/server/models/errors';
 import type { PageModel } from '~/server/models/page';
 import { serializeBookmarkSecurely } from '~/server/models/serializers/bookmark-serializer';
+import { configManager } from '~/server/service/config-manager';
 import loggerFactory from '~/utils/logger';
 
 import BookmarkFolder from '../../models/bookmark-folder';
@@ -251,6 +252,17 @@ module.exports = (crowi: Crowi) => {
       const { userId } = req.params;
       const Page = mongoose.model<InstanceType<PageModel>, PageModel>('Page');
 
+      const hideRestrictedByOwner = configManager.getConfig(
+        'security:list-policy:hideRestrictedByOwner',
+      );
+      const hideRestrictedByGroup = configManager.getConfig(
+        'security:list-policy:hideRestrictedByGroup',
+      );
+      // "Anyone with the link" pages are never listed anywhere, so the bookmark is
+      // often the owner's only path back to them: keep them visible on the owner's
+      // own list, but hide them from other users' bookmark listings.
+      const isOwnList = req.user?._id.toString() === userId;
+
       const getBookmarkFolders = async (
         userId: Types.ObjectId | string,
         parentFolderId?: Types.ObjectId | string,
@@ -279,26 +291,32 @@ module.exports = (crowi: Crowi) => {
         const promises = folders.map(async (folder: BookmarkFolderItems) => {
           const childFolder = await getBookmarkFolders(userId, folder._id);
 
+          const bookmarkedPageIds = folder.bookmarks
+            .map((bookmark) => bookmark.page?._id)
+            .filter((id): id is string => id != null);
+
+          const viewablePages = await Page.findByIdsAndViewer(
+            bookmarkedPageIds,
+            req.user,
+            null,
+            false,
+            isOwnList,
+            !hideRestrictedByOwner,
+            !hideRestrictedByGroup,
+          );
+          const viewableIdSet = new Set(
+            viewablePages.map((page) => page._id.toString()),
+          );
+
           // !! DO NOT THIS SERIALIZING OUTSIDE OF PROMISES !! -- 05.23.2023 ryoji-s
           // Serializing outside of promises will cause not populated.
-
-          // Filter bookmarks to only include pages accessible to the requesting user
-          const accessibleBookmarks = (
-            await Promise.all(
-              folder.bookmarks.map(async (bookmark) => {
-                if (bookmark.page == null) return null;
-                const isAccessible = await Page.isAccessiblePageByViewer(
-                  bookmark.page._id,
-                  req.user,
-                );
-                return isAccessible ? bookmark : null;
-              }),
+          const bookmarks = folder.bookmarks
+            .filter(
+              (bookmark) =>
+                bookmark.page?._id != null &&
+                viewableIdSet.has(bookmark.page._id.toString()),
             )
-          ).filter((b): b is NonNullable<typeof b> => b != null);
-
-          const bookmarks = accessibleBookmarks.map((bookmark) =>
-            serializeBookmarkSecurely(bookmark),
-          );
+            .map((bookmark) => serializeBookmarkSecurely(bookmark));
 
           const res = {
             _id: folder._id.toString(),
@@ -435,6 +453,7 @@ module.exports = (crowi: Crowi) => {
     accessTokenParser([SCOPE.WRITE.FEATURES.BOOKMARK], { acceptLegacy: true }),
     loginRequiredStrictly,
     validator.bookmarkFolder,
+    apiV3FormValidator,
     async (req, res) => {
       const { bookmarkFolderId, name, parent, childFolder } = req.body;
       try {
@@ -444,6 +463,16 @@ module.exports = (crowi: Crowi) => {
         }
         if (folder.owner.toString() !== req.user._id.toString()) {
           return res.apiv3Err('forbidden', 403);
+        }
+        // A user must not move a folder under another user's folder
+        if (parent != null) {
+          const parentFolder = await BookmarkFolder.findById(parent);
+          if (parentFolder == null) {
+            return res.apiv3Err('bookmark_folder_not_found', 404);
+          }
+          if (parentFolder.owner.toString() !== req.user._id.toString()) {
+            return res.apiv3Err('forbidden', 403);
+          }
         }
         const bookmarkFolder = await BookmarkFolder.updateBookmarkFolder(
           bookmarkFolderId,
