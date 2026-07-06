@@ -125,6 +125,28 @@ describe('resolveEffectiveModelKey (Req 4.6)', () => {
     expect(loggerWarn).toHaveBeenCalledTimes(1);
   });
 
+  it('escapes control characters in the logged rejected key (no log / terminal injection)', () => {
+    getAvailableModels.mockReturnValue(availableSet);
+
+    // A client could submit (within the length cap) a key carrying a newline + ANSI
+    // escape to forge log lines / inject terminal control sequences. It parses
+    // (openai prefix, non-empty modelId) but is not in the available set -> warned.
+    // Build the control chars via char codes so no raw control byte lives in source.
+    const newline = String.fromCharCode(10);
+    const esc = String.fromCharCode(27);
+    const malicious = `openai/x${newline}${esc}[31mFORGED-LOG-LINE`;
+    expect(resolveEffectiveModelKey(malicious)).toBe('openai/gpt-5');
+
+    expect(loggerWarn).toHaveBeenCalledTimes(1);
+    const warned = loggerWarn.mock.calls[0].join(' ');
+    // The raw newline / ESC never reach the log line...
+    expect(warned).not.toContain(newline);
+    expect(warned).not.toContain(esc);
+    // ...they appear only JSON-escaped (backslash sequences).
+    expect(warned).toContain('\\n');
+    expect(warned).toContain('\\u001b');
+  });
+
   it('throws when there are 0 available models (the 501 guard normally preempts this)', () => {
     getAvailableModels.mockReturnValue([]);
 

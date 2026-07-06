@@ -156,6 +156,32 @@ describe('isValidAllowedModelsRequest (Req 2.5, 2.8, 3.3)', () => {
     ).toBe(false);
   });
 
+  it('rejects an entry carrying an unknown extra property (no verbatim persistence of arbitrary keys)', () => {
+    expect(
+      isValidAllowedModelsRequest([
+        {
+          provider: 'openai',
+          modelId: 'gpt-5',
+          isDefault: true,
+          injected: 'attacker-chosen-blob',
+        },
+      ]),
+    ).toBe(false);
+  });
+
+  it('rejects a null / non-object entry without throwing', () => {
+    expect(isValidAllowedModelsRequest([null])).toBe(false);
+    expect(isValidAllowedModelsRequest(['gpt-5'])).toBe(false);
+  });
+
+  it('rejects a modelId longer than the defensive length bound', () => {
+    expect(
+      isValidAllowedModelsRequest([
+        { provider: 'openai', modelId: 'a'.repeat(257), isDefault: true },
+      ]),
+    ).toBe(false);
+  });
+
   it('delegates a valid non-empty array to the per-entry rules', () => {
     expect(
       isValidAllowedModelsRequest([

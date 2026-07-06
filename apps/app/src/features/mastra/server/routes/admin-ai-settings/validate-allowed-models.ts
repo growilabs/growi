@@ -1,6 +1,17 @@
 import { isAiProvider } from '../../../interfaces/ai-provider';
 import type { AllowedModel } from '../../../interfaces/allowed-model';
+import { MAX_MODEL_KEY_LENGTH } from '../../../interfaces/model-key';
 import { isProviderNamespacedObject } from '../../../utils/provider-options-validation';
+
+// The only properties an allow-list entry may carry. Any other property is
+// rejected so an attacker-chosen key / blob cannot be persisted verbatim into the
+// ai:allowedModels config document (security.md: validate the input shape).
+const ALLOWED_ENTRY_KEYS: ReadonlySet<string> = new Set([
+  'provider',
+  'modelId',
+  'providerOptions',
+  'isDefault',
+]);
 
 /**
  * Pure validator for a NON-EMPTY `allowedModels` list submitted to PUT /ai-settings.
@@ -8,8 +19,10 @@ import { isProviderNamespacedObject } from '../../../utils/provider-options-vali
  * Returns `true` when the list satisfies every rule below, `false` otherwise. It is
  * the single source of truth used by the express-validator `.custom()` chain, so the
  * rules can be unit-tested directly without driving the middleware:
+ *   - every entry is an object carrying ONLY the declared keys (unknown properties
+ *     are rejected so nothing outside the shape is persisted verbatim)
  *   - every entry's `provider` is one of the supported providers (Req 2.5)
- *   - every entry's `modelId` is a non-empty string
+ *   - every entry's `modelId` is a non-empty string within the length bound
  *   - no two entries share the same (provider, modelId) pair — the same modelId may
  *     coexist under DIFFERENT providers (Req 2.3) but not under the SAME one (Req 2.4)
  *   - every entry's `providerOptions`, when present, is a provider-namespaced object
@@ -29,14 +42,29 @@ export const isValidNonEmptyAllowedModels = (
   let defaultCount = 0;
 
   for (const entry of models) {
+    // The runtime value is client-supplied JSON, so reject a non-object entry
+    // (null / primitive) before reading its fields, and reject any unknown extra
+    // property so nothing outside the declared shape is persisted verbatim.
+    if (entry == null || typeof entry !== 'object') {
+      return false;
+    }
+    if (Object.keys(entry).some((key) => !ALLOWED_ENTRY_KEYS.has(key))) {
+      return false;
+    }
+
     // provider must be one of the supported providers (Req 2.5). The type says
     // AiProvider, but the runtime value is client-supplied JSON, so validate it.
     if (!isAiProvider(entry.provider)) {
       return false;
     }
 
-    // modelId must be a non-empty string.
-    if (typeof entry.modelId !== 'string' || entry.modelId.trim() === '') {
+    // modelId must be a non-empty string within the defensive length bound (the
+    // same cap the chat modelKey uses — a longer id could never form a valid key).
+    if (
+      typeof entry.modelId !== 'string' ||
+      entry.modelId.trim() === '' ||
+      entry.modelId.length > MAX_MODEL_KEY_LENGTH
+    ) {
       return false;
     }
 

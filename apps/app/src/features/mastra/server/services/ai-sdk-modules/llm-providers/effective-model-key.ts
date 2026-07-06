@@ -80,8 +80,11 @@ export const resolveEffectiveModelKey = (modelKey?: string): ModelKey => {
     // A supplied key that failed the membership check is rounded to the default.
     // Audit the fallback with the rejected KEY VALUE ONLY — no secrets, no config
     // values. This is a per-request audit log, so a plain warn (not warn-dedup).
+    // JSON.stringify escapes the client-supplied value (newlines, ANSI escapes,
+    // quotes) so it cannot forge log lines or inject terminal control sequences
+    // into an operator's console — the validator only bounds its length/type.
     logger.warn(
-      `Requested model "${modelKey}" is not in the available allow-list; falling back to the effective default model`,
+      `Requested model ${JSON.stringify(modelKey)} is not in the available allow-list; falling back to the effective default model`,
     );
   }
 
